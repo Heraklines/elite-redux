@@ -68,6 +68,9 @@ export class EggGachaUiHandler extends MessageUiHandler {
   /** Per-voucher-row bulk-buy multiplier state (persists per session). */
   private voucherMultipliers: MultiplierStep[] = [1, 1, 1, 1, 1];
 
+  /** Phaser text labels rendered next to each voucher row showing the current multiplier. */
+  private voucherMultiplierLabels: Phaser.GameObjects.Text[] = [];
+
   private cursorObj: Phaser.GameObjects.Image;
   private transitioning: boolean;
   private transitionCancelled: boolean;
@@ -307,9 +310,25 @@ export class EggGachaUiHandler extends MessageUiHandler {
         .setScale(3 * this.scale)
         .setPositionRelative(this.eggGachaOptionSelectBg, 20, 9 + (48 + i * 96) * this.scale);
       this.eggGachaOptionsContainer.add(icon);
+
+      const multiplierLabel = addTextObject(
+        0,
+        0,
+        this.formatMultiplier(this.voucherMultipliers[i]),
+        TextStyle.WINDOW_ALT,
+      )
+        .setOrigin(1, 0.5)
+        .setFontSize("60px")
+        .setPositionRelative(this.eggGachaOptionSelectBg, -2, 9 + (48 + i * 96) * this.scale);
+      this.eggGachaOptionsContainer.add(multiplierLabel);
+      this.voucherMultiplierLabels.push(multiplierLabel);
     });
 
     this.eggGachaContainer.add(this.eggGachaOptionsContainer);
+
+    for (let i = 0; i < this.voucherMultipliers.length; i++) {
+      this.refreshMultiplierLabel(i);
+    }
 
     for (const voucher of getEnumValues(VoucherType)) {
       const container = globalScene.add.container(globalScene.scaledCanvas.width - 56 * voucher, 0);
@@ -726,6 +745,16 @@ export class EggGachaUiHandler extends MessageUiHandler {
     }
     this.transitioning = transitioning;
     this.transitionCancelled = false;
+  }
+
+  /** Format a multiplier step for display next to a voucher row. */
+  private formatMultiplier(m: MultiplierStep): string {
+    return m === "MAX" ? i18next.t("egg:bulkMax") : i18next.t("egg:bulkMultiplier", { n: m });
+  }
+
+  /** Refresh the rendered multiplier label for a single voucher row. */
+  private refreshMultiplierLabel(rowIndex: number): void {
+    this.voucherMultiplierLabels[rowIndex]?.setText(this.formatMultiplier(this.voucherMultipliers[rowIndex]));
   }
 
   /**
