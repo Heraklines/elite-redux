@@ -800,7 +800,32 @@ export class EggGachaUiHandler extends MessageUiHandler {
       return;
     }
     const ui = this.getUi();
-    const voucher = EggGachaUiHandler.cursorToVoucher(cursor);
+
+    // Resolve the per-row multiplier (1, 5, 10, 25, 50, 100, or "MAX") into a concrete count.
+    const baseRow = EggGachaUiHandler.cursorToVoucher(cursor, 1);
+    if (!baseRow) {
+      ui.revertMode();
+      return true;
+    }
+    const [baseType, baseVouchers, basePulls] = baseRow;
+    const rawMult = this.voucherMultipliers[cursor] ?? 1;
+    const heldVouchers = globalScene.gameData.voucherCounts[baseType];
+    const heldEggs = globalScene.gameData.eggs.length;
+    const resolvedMult =
+      rawMult === "MAX"
+        ? resolveMaxMultiplier({
+            vouchersPerStep: baseVouchers,
+            pullsPerStep: basePulls,
+            vouchersHeld: heldVouchers,
+            eggsHeld: heldEggs,
+            maxEggs: MAX_EGG_COUNT,
+          })
+        : rawMult;
+    if (resolvedMult < 1) {
+      this.showError(i18next.t("egg:vouchersExceedEggCap"));
+      return false;
+    }
+    const voucher = EggGachaUiHandler.cursorToVoucher(cursor, resolvedMult);
     if (!voucher) {
       ui.revertMode();
       return true;
@@ -872,12 +897,20 @@ export class EggGachaUiHandler extends MessageUiHandler {
         }
         break;
       case Button.LEFT:
-        if (this.gachaCursor) {
+        if (this.cursor >= 0 && this.cursor <= 4) {
+          this.voucherMultipliers[this.cursor] = cycleMultiplier(this.voucherMultipliers[this.cursor], -1);
+          this.refreshMultiplierLabel(this.cursor);
+          success = true;
+        } else if (this.gachaCursor) {
           success = this.setGachaCursor(this.gachaCursor - 1);
         }
         break;
       case Button.RIGHT:
-        if (this.gachaCursor < Object.keys(GachaType).length - 1) {
+        if (this.cursor >= 0 && this.cursor <= 4) {
+          this.voucherMultipliers[this.cursor] = cycleMultiplier(this.voucherMultipliers[this.cursor], 1);
+          this.refreshMultiplierLabel(this.cursor);
+          success = true;
+        } else if (this.gachaCursor < Object.keys(GachaType).length - 1) {
           success = this.setGachaCursor(this.gachaCursor + 1);
         }
         break;
