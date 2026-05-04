@@ -42,6 +42,11 @@ import { MysteryEncounterSaveData } from "#mystery-encounters/mystery-encounter-
 import type { Variant } from "#sprites/variant";
 import { achvs } from "#system/achv";
 import { ArenaData, type SerializedArenaData } from "#system/arena-data";
+import {
+  type AutoEggRestockSettings,
+  defaultAutoEggRestockSettings,
+  mergeAutoEggRestockSettings,
+} from "#system/auto-egg-restock-settings";
 import { ChallengeData } from "#system/challenge-data";
 import { EggData } from "#system/egg-data";
 import { GameStats } from "#system/game-stats";
@@ -147,6 +152,9 @@ export class GameData {
   public eggPity: number[];
   public unlockPity: number[];
 
+  /** Settings controlling silent auto-restock of the egg queue between waves. */
+  public autoEggRestock: AutoEggRestockSettings = defaultAutoEggRestockSettings();
+
   /**
    * @param fromRaw - If true, will skip initialization of fields that are normally randomized on new game start. Used for the admin panel; default `false`
    */
@@ -181,6 +189,7 @@ export class GameData {
     this.eggs = [];
     this.eggPity = [0, 0, 0, 0];
     this.unlockPity = [0, 0, 0, 0];
+    this.autoEggRestock = defaultAutoEggRestockSettings();
     this.initDexData();
     this.initStarterData();
   }
@@ -202,6 +211,7 @@ export class GameData {
       timestamp: Date.now(),
       eggPity: this.eggPity.slice(0),
       unlockPity: this.unlockPity.slice(0),
+      autoEggRestock: this.autoEggRestock,
     };
   }
 
@@ -378,6 +388,8 @@ export class GameData {
     }
 
     this.eggs = systemData.eggs ? systemData.eggs.map(e => e.toEgg()) : [];
+
+    this.autoEggRestock = mergeAutoEggRestockSettings(systemData.autoEggRestock);
 
     this.eggPity = systemData.eggPity ? systemData.eggPity.slice(0) : [0, 0, 0, 0];
     this.unlockPity = systemData.unlockPity ? systemData.unlockPity.slice(0) : [0, 0, 0, 0];

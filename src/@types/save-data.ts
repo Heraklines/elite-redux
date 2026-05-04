@@ -11,6 +11,7 @@ import type { SpeciesId } from "#enums/species-id";
 import type { MysteryEncounterSaveData } from "#mystery-encounters/mystery-encounter-save-data";
 import type { Variant } from "#sprites/variant";
 import type { ArenaData } from "#system/arena-data";
+import type { AutoEggRestockSettings } from "#system/auto-egg-restock-settings";
 import type { ChallengeData } from "#system/challenge-data";
 import type { EggData } from "#system/egg-data";
 import type { GameStats } from "#system/game-stats";
@@ -36,6 +37,8 @@ export interface SystemSaveData {
   timestamp: number;
   eggPity: number[];
   unlockPity: number[];
+  /** Optional for back-compat with saves created before the auto-restock feature. */
+  autoEggRestock?: AutoEggRestockSettings;
 }
 
 export interface SessionSaveData {
