@@ -32,15 +32,6 @@ export function cycleMultiplier(current: MultiplierStep, direction: 1 | -1): Mul
 }
 
 /**
- * Cycle to the next step, wrapping back to 1 after MAX. Single-button cycler
- * for {@link Button.CYCLE_FORM}.
- */
-export function cycleMultiplierWrap(current: MultiplierStep): MultiplierStep {
-  const idx = MULTIPLIER_STEPS.indexOf(current);
-  return MULTIPLIER_STEPS[(idx + 1) % MULTIPLIER_STEPS.length];
-}
-
-/**
  * Compute the largest multiplier the player can actually afford for a row,
  * given vouchers held and remaining egg cap.
  */
@@ -76,6 +67,13 @@ export class EggGachaUiHandler extends MessageUiHandler {
 
   /** Per-voucher-row bulk-buy multiplier state (persists per session). */
   private voucherMultipliers: MultiplierStep[] = [1, 1, 1, 1, 1];
+
+  /**
+   * When non-null, the gacha is in "edit quantity" mode for the given voucher
+   * row (0-4). LEFT/RIGHT scrub the multiplier; ACTION confirms-and-pulls;
+   * CANCEL exits without pulling.
+   */
+  private editingMultiplierRow: number | null = null;
 
   /** Phaser text labels rendered next to each voucher row showing the current multiplier. */
   private voucherMultiplierLabels: Phaser.GameObjects.Text[] = [];
@@ -763,14 +761,20 @@ export class EggGachaUiHandler extends MessageUiHandler {
     this.transitionCancelled = false;
   }
 
-  /** Format a multiplier step for display next to a voucher row. */
-  private formatMultiplier(m: MultiplierStep): string {
-    return m === "MAX" ? i18next.t("egg:bulkMax") : i18next.t("egg:bulkMultiplier", { n: m });
+  /**
+   * Format a multiplier step for display next to a voucher row. Wraps in
+   * `◀ ▶` markers when the row is in edit mode so the player sees what
+   * LEFT/RIGHT will affect.
+   */
+  private formatMultiplier(m: MultiplierStep, editing = false): string {
+    const inner = m === "MAX" ? i18next.t("egg:bulkMax") : i18next.t("egg:bulkMultiplier", { n: m });
+    return editing ? `◀${inner}▶` : inner;
   }
 
   /** Refresh the rendered multiplier label for a single voucher row. */
   private refreshMultiplierLabel(rowIndex: number): void {
-    this.voucherMultiplierLabels[rowIndex]?.setText(this.formatMultiplier(this.voucherMultipliers[rowIndex]));
+    const editing = this.editingMultiplierRow === rowIndex;
+    this.voucherMultiplierLabels[rowIndex]?.setText(this.formatMultiplier(this.voucherMultipliers[rowIndex], editing));
   }
 
   /**
@@ -826,6 +830,22 @@ export class EggGachaUiHandler extends MessageUiHandler {
       ui.revertMode();
       return true;
     }
+
+    // Voucher rows 0-4: first ACTION enters quantity-edit mode for the row
+    // (does NOT pull). The actual pull happens when ACTION is pressed again
+    // while in edit mode (see processQuantityEditInput).
+    this.editingMultiplierRow = cursor;
+    this.refreshMultiplierLabel(cursor);
+    return true;
+  }
+
+  /**
+   * Resolve a voucher row's current multiplier into a concrete pull and
+   * execute it against the player's vouchers. Used as the second-stage
+   * confirm in the click-then-cycle quantity flow.
+   */
+  private executePullForRow(cursor: number): boolean | undefined {
+    const ui = this.getUi();
 
     // Resolve the per-row multiplier (1, 5, 10, 25, 50, 100, or "MAX") into a concrete count.
     const baseRow = EggGachaUiHandler.cursorToVoucher(cursor, 1);
@@ -903,6 +923,13 @@ export class EggGachaUiHandler extends MessageUiHandler {
    * @returns `true` if the success sound should be played, `false` if the error sound should be played, or `undefined` no input event occurred.
    */
   private processNormalInput(button: Button): boolean | undefined {
+    // While editing a voucher row's quantity, all inputs are routed to the
+    // edit handler — LEFT/RIGHT scrub the multiplier, ACTION confirms the
+    // pull, CANCEL exits without pulling.
+    if (this.editingMultiplierRow !== null) {
+      return this.processQuantityEditInput(button);
+    }
+
     const ui = this.getUi();
     let success: boolean | undefined;
     switch (button) {
@@ -932,17 +959,43 @@ export class EggGachaUiHandler extends MessageUiHandler {
           success = this.setGachaCursor(this.gachaCursor + 1);
         }
         break;
-      case Button.CYCLE_FORM:
-        if (this.cursor >= 0 && this.cursor <= 4) {
-          this.voucherMultipliers[this.cursor] = cycleMultiplierWrap(this.voucherMultipliers[this.cursor]);
-          this.refreshMultiplierLabel(this.cursor);
-          success = true;
-        }
-        break;
     }
 
     // Return undefined here because we do not play error sound in case of failed directional movements
     return success || undefined;
+  }
+
+  /**
+   * Handle input while a voucher row's multiplier is being edited.
+   * - LEFT/RIGHT scrub the multiplier (clamps at 1 and MAX)
+   * - ACTION confirms and executes the pull at the chosen multiplier
+   * - CANCEL exits edit mode without pulling
+   */
+  private processQuantityEditInput(button: Button): boolean | undefined {
+    const row = this.editingMultiplierRow;
+    if (row === null) {
+      return;
+    }
+    switch (button) {
+      case Button.LEFT:
+        this.voucherMultipliers[row] = cycleMultiplier(this.voucherMultipliers[row], -1);
+        this.refreshMultiplierLabel(row);
+        return true;
+      case Button.RIGHT:
+        this.voucherMultipliers[row] = cycleMultiplier(this.voucherMultipliers[row], 1);
+        this.refreshMultiplierLabel(row);
+        return true;
+      case Button.ACTION:
+        this.editingMultiplierRow = null;
+        this.refreshMultiplierLabel(row);
+        return this.executePullForRow(row);
+      case Button.CANCEL:
+        this.editingMultiplierRow = null;
+        this.refreshMultiplierLabel(row);
+        return true;
+      default:
+        return;
+    }
   }
 
   /**
