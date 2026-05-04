@@ -21,7 +21,7 @@ import {
 } from "#balance/starters";
 import { speciesTmMoves } from "#balance/tms";
 import { allAbilities, allMoves, allSpecies, catchableSpecies } from "#data/data-lists";
-import { Egg, getEggTierForSpecies } from "#data/egg";
+import { Egg, getEggTierForSpecies, MAX_EGG_COUNT } from "#data/egg";
 import { GrowthRate, getGrowthRateColor } from "#data/exp";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
@@ -2068,10 +2068,10 @@ export class PokedexPageUiHandler extends MessageUiHandler {
                   return false;
                 }
 
-                if (globalScene.gameData.eggs.length >= 99 && !Overrides.UNLIMITED_EGG_COUNT_OVERRIDE) {
+                if (globalScene.gameData.eggs.length >= MAX_EGG_COUNT && !Overrides.UNLIMITED_EGG_COUNT_OVERRIDE) {
                   // Egg list full, show error message at the top of the screen and abort
                   this.showText(
-                    i18next.t("egg:tooManyEggs"),
+                    i18next.t("egg:tooManyEggs", { max: MAX_EGG_COUNT }),
                     undefined,
                     () => this.showText("", 0, () => (this.tutorialActive = false)),
                     2000,

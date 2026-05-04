@@ -2,7 +2,7 @@ import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import type { IEggOptions } from "#data/egg";
-import { Egg, getLegendaryGachaSpeciesForTimestamp } from "#data/egg";
+import { Egg, getLegendaryGachaSpeciesForTimestamp, MAX_EGG_COUNT } from "#data/egg";
 import { Button } from "#enums/buttons";
 import { EggTier } from "#enums/egg-type";
 import { GachaType } from "#enums/gacha-types";
@@ -740,14 +740,14 @@ export class EggGachaUiHandler extends MessageUiHandler {
     let errorKey: string | undefined;
     const freePulls = Overrides.EGG_FREE_GACHA_PULLS_OVERRIDE;
 
-    if (!freePulls && globalScene.gameData.eggs.length + pulls > 99) {
+    if (!freePulls && globalScene.gameData.eggs.length + pulls > MAX_EGG_COUNT) {
       errorKey = "egg:tooManyEggs";
     } else if (!freePulls && globalScene.gameData.voucherCounts[voucherType] < vouchersConsumed) {
       errorKey = "egg:notEnoughVouchers";
     }
 
     if (errorKey) {
-      this.showError(i18next.t(errorKey));
+      this.showError(i18next.t(errorKey, { max: MAX_EGG_COUNT }));
       return false;
     }
 
