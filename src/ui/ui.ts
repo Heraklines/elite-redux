@@ -6,6 +6,7 @@ import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import { AchvBar } from "#ui/achv-bar";
 import { AchvsUiHandler } from "#ui/achvs-ui-handler";
+import { AutoEggRestockUiHandler } from "#ui/auto-egg-restock-ui-handler";
 import { AutoCompleteUiHandler } from "#ui/autocomplete-ui-handler";
 import { AwaitableUiHandler } from "#ui/awaitable-ui-handler";
 import { BallUiHandler } from "#ui/ball-ui-handler";
@@ -162,6 +163,7 @@ export class UI extends Phaser.GameObjects.Container {
       new GameStatsUiHandler(),
       new EggListUiHandler(),
       new EggGachaUiHandler(),
+      new AutoEggRestockUiHandler(),
       new PokedexUiHandler(),
       new PokedexScanUiHandler(UiMode.TEST_DIALOGUE),
       new PokedexPageUiHandler(),
