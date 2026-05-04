@@ -247,7 +247,8 @@ export class EggGachaUiHandler extends MessageUiHandler {
         eggGachaOptionSelectWidth = 96;
     }
 
-    this.eggGachaOptionSelectBg = addWindow(0, 0, eggGachaOptionSelectWidth, 16 + 576 * this.scale).setOrigin(1);
+    // 7 rows total: 5 voucher pull options + auto-restock entry + cancel.
+    this.eggGachaOptionSelectBg = addWindow(0, 0, eggGachaOptionSelectWidth, 16 + 672 * this.scale).setOrigin(1);
     this.eggGachaOptionsContainer = globalScene.add
       .container(globalScene.scaledCanvas.width, 148)
       .add(this.eggGachaOptionSelectBg);
@@ -297,7 +298,13 @@ export class EggGachaUiHandler extends MessageUiHandler {
       })
       .join("\n");
 
-    const optionText = addTextObject(0, 0, `${pullOptionsText}\n${i18next.t("menu:cancel")}`, TextStyle.WINDOW)
+    const autoRestockEntryLine = `     ${i18next.t("egg:autoRestockEntry")}`;
+    const optionText = addTextObject(
+      0,
+      0,
+      `${pullOptionsText}\n${autoRestockEntryLine}\n${i18next.t("menu:cancel")}`,
+      TextStyle.WINDOW,
+    )
       .setLineSpacing(28)
       .setFontSize("80px")
       .setPositionRelative(this.eggGachaOptionSelectBg, 16, 9);
@@ -796,10 +803,20 @@ export class EggGachaUiHandler extends MessageUiHandler {
    */
   private handleVoucherSelectAction(cursor: number): boolean | undefined {
     // Cursors that are out of range should not be processed
-    if (cursor < 0 || cursor > 5) {
+    if (cursor < 0 || cursor > 6) {
       return;
     }
     const ui = this.getUi();
+
+    // Cursor 5 is the new "Auto Restock..." entry; cursor 6 is cancel.
+    if (cursor === 5) {
+      void ui.setOverlayMode(UiMode.AUTO_EGG_RESTOCK);
+      return true;
+    }
+    if (cursor === 6) {
+      ui.revertMode();
+      return true;
+    }
 
     // Resolve the per-row multiplier (1, 5, 10, 25, 50, 100, or "MAX") into a concrete count.
     const baseRow = EggGachaUiHandler.cursorToVoucher(cursor, 1);
@@ -892,7 +909,7 @@ export class EggGachaUiHandler extends MessageUiHandler {
         }
         break;
       case Button.DOWN:
-        if (this.cursor < 5) {
+        if (this.cursor < 6) {
           success = this.setCursor(this.cursor + 1);
         }
         break;
