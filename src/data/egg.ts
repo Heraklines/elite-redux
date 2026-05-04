@@ -40,6 +40,9 @@ import i18next from "i18next";
 
 export const EGG_SEED = 1073741824;
 
+/** Maximum number of unhatched eggs the player can hold at once. */
+export const MAX_EGG_COUNT = 10_000;
+
 /** Egg options to override egg properties */
 export interface IEggOptions {
   /** ID. Used to check if egg type will be manaphy (`id % 204 === 0`) */

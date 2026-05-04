@@ -479,4 +479,9 @@ describe("Egg Generation Tests", () => {
     expect(diffShiny).toBe(true);
     expect(diffAbility).toBe(true);
   });
+
+  it("MAX_EGG_COUNT is exported as 10000", async () => {
+    const { MAX_EGG_COUNT } = await import("#data/egg");
+    expect(MAX_EGG_COUNT).toBe(10_000);
+  });
 });
