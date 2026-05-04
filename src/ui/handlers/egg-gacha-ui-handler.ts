@@ -17,6 +17,37 @@ import { getEnumValues } from "#utils/enums";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
 
+export const MULTIPLIER_STEPS = [1, 5, 10, 25, 50, 100, "MAX"] as const;
+export type MultiplierStep = (typeof MULTIPLIER_STEPS)[number];
+
+/**
+ * Advance or retreat through {@link MULTIPLIER_STEPS}, clamping at the ends.
+ * @param current - The current multiplier step.
+ * @param direction - +1 to advance toward MAX, -1 to retreat toward 1.
+ */
+export function cycleMultiplier(current: MultiplierStep, direction: 1 | -1): MultiplierStep {
+  const idx = MULTIPLIER_STEPS.indexOf(current);
+  const next = Math.min(MULTIPLIER_STEPS.length - 1, Math.max(0, idx + direction));
+  return MULTIPLIER_STEPS[next];
+}
+
+/**
+ * Compute the largest multiplier the player can actually afford for a row,
+ * given vouchers held and remaining egg cap.
+ */
+export function resolveMaxMultiplier(p: {
+  vouchersPerStep: number;
+  pullsPerStep: number;
+  vouchersHeld: number;
+  eggsHeld: number;
+  maxEggs: number;
+}): number {
+  const byVouchers = Math.floor(p.vouchersHeld / p.vouchersPerStep);
+  const remainingEggSlots = Math.max(0, p.maxEggs - p.eggsHeld);
+  const byEggSpace = Math.floor(remainingEggSlots / p.pullsPerStep);
+  return Math.max(0, Math.min(byVouchers, byEggSpace));
+}
+
 export class EggGachaUiHandler extends MessageUiHandler {
   private eggGachaContainer: Phaser.GameObjects.Container;
   private eggGachaMessageBox: Phaser.GameObjects.NineSlice;
@@ -33,6 +64,9 @@ export class EggGachaUiHandler extends MessageUiHandler {
   private voucherCountLabels: Phaser.GameObjects.Text[];
 
   private gachaCursor: number;
+
+  /** Per-voucher-row bulk-buy multiplier state (persists per session). */
+  private voucherMultipliers: MultiplierStep[] = [1, 1, 1, 1, 1];
 
   private cursorObj: Phaser.GameObjects.Image;
   private transitioning: boolean;
