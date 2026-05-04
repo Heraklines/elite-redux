@@ -695,23 +695,30 @@ export class EggGachaUiHandler extends MessageUiHandler {
   }
 
   /**
-   * Convert a cursor index to a voucher type and count
-   * @param cursor - The cursor index corresponding to the voucher type
-   * @returns The voucher type, vouchers used, and pulls given, or an empty array if the cursor is not on a voucher
+   * Convert a cursor index + multiplier to a voucher type and counts.
+   * @param cursor - The cursor index (0-4)
+   * @param multiplier - How many times to apply the row's base cost (default 1)
+   * @returns The voucher type, vouchers used, and pulls given, or undefined if the cursor is not on a voucher
    */
-  private static cursorToVoucher(cursor: number): [VoucherType, number, number] | undefined {
-    switch (cursor) {
-      case 0:
-        return [VoucherType.REGULAR, 1, 1];
-      case 1:
-        return [VoucherType.REGULAR, 10, 10];
-      case 2:
-        return [VoucherType.PLUS, 1, 5];
-      case 3:
-        return [VoucherType.PREMIUM, 1, 10];
-      case 4:
-        return [VoucherType.GOLDEN, 1, 25];
+  private static cursorToVoucher(cursor: number, multiplier = 1): [VoucherType, number, number] | undefined {
+    const base = ((): [VoucherType, number, number] | undefined => {
+      switch (cursor) {
+        case 0:
+          return [VoucherType.REGULAR, 1, 1];
+        case 1:
+          return [VoucherType.REGULAR, 10, 10];
+        case 2:
+          return [VoucherType.PLUS, 1, 5];
+        case 3:
+          return [VoucherType.PREMIUM, 1, 10];
+        case 4:
+          return [VoucherType.GOLDEN, 1, 25];
+      }
+    })();
+    if (!base) {
+      return;
     }
+    return [base[0], base[1] * multiplier, base[2] * multiplier];
   }
 
   /**
