@@ -32,6 +32,15 @@ export function cycleMultiplier(current: MultiplierStep, direction: 1 | -1): Mul
 }
 
 /**
+ * Cycle to the next step, wrapping back to 1 after MAX. Single-button cycler
+ * for {@link Button.CYCLE_FORM}.
+ */
+export function cycleMultiplierWrap(current: MultiplierStep): MultiplierStep {
+  const idx = MULTIPLIER_STEPS.indexOf(current);
+  return MULTIPLIER_STEPS[(idx + 1) % MULTIPLIER_STEPS.length];
+}
+
+/**
  * Compute the largest multiplier the player can actually afford for a row,
  * given vouchers held and remaining egg cap.
  */
@@ -914,21 +923,20 @@ export class EggGachaUiHandler extends MessageUiHandler {
         }
         break;
       case Button.LEFT:
-        if (this.cursor >= 0 && this.cursor <= 4) {
-          this.voucherMultipliers[this.cursor] = cycleMultiplier(this.voucherMultipliers[this.cursor], -1);
-          this.refreshMultiplierLabel(this.cursor);
-          success = true;
-        } else if (this.gachaCursor) {
+        if (this.gachaCursor) {
           success = this.setGachaCursor(this.gachaCursor - 1);
         }
         break;
       case Button.RIGHT:
+        if (this.gachaCursor < Object.keys(GachaType).length - 1) {
+          success = this.setGachaCursor(this.gachaCursor + 1);
+        }
+        break;
+      case Button.CYCLE_FORM:
         if (this.cursor >= 0 && this.cursor <= 4) {
-          this.voucherMultipliers[this.cursor] = cycleMultiplier(this.voucherMultipliers[this.cursor], 1);
+          this.voucherMultipliers[this.cursor] = cycleMultiplierWrap(this.voucherMultipliers[this.cursor]);
           this.refreshMultiplierLabel(this.cursor);
           success = true;
-        } else if (this.gachaCursor < Object.keys(GachaType).length - 1) {
-          success = this.setGachaCursor(this.gachaCursor + 1);
         }
         break;
     }
