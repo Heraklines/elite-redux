@@ -11,17 +11,17 @@ import type { DirectorClient } from "#system/llm-director/director-client";
 
 export interface GenerateStoryBibleOptions {
   seedText: string;
-  /** Defaults to moonshotai/kimi-k2.6 (non-thinking, ~17s for bible-shaped output). */
+  /** Defaults to moonshotai/kimi-k2.6 (non-thinking; 17-55s observed for bible-shaped output). */
   model?: string;
   /** Defaults to 3. */
   maxRetries?: number;
-  /** Per-call timeout, default 60s — generous headroom over the ~17s typical. */
+  /** Per-call timeout, default 120s — bible latency varies (17s best case, 55s observed worst). */
   timeoutMs?: number;
 }
 
 const DEFAULT_BIBLE_MODEL = "moonshotai/kimi-k2.6";
 const DEFAULT_MAX_RETRIES = 3;
-const DEFAULT_TIMEOUT_MS = 60_000;
+const DEFAULT_TIMEOUT_MS = 120_000;
 
 const FENCE_REGEX = /^```(?:json)?\s*([\s\S]*?)\s*```$/m;
 

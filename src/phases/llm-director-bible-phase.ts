@@ -45,6 +45,9 @@ export class LLMDirectorBiblePhase extends Phase {
 
     const runtime = getDirectorRuntime();
     if (!runtime) {
+      console.warn(
+        "[llm-director] BiblePhase: getDirectorRuntime() returned null — VITE_NANOGPT_API_KEY or VITE_NANOGPT_BASE_URL missing/invalid. Falling back to Classic.",
+      );
       this.fallbackToClassic();
       return;
     }
@@ -83,7 +86,11 @@ export class LLMDirectorBiblePhase extends Phase {
       // Cache consumed — next Director pick rolls a fresh seed.
       clearPendingBible();
     } catch (err) {
-      console.warn("[llm-director] Story bible generation failed:", err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn("[llm-director] Story bible generation failed — reason:", msg);
+      console.warn(
+        "[llm-director] Falling back to Classic. Common causes: timeout (raise bible timeout), schema validation exhausted retries (model wouldn't emit valid JSON), or 4xx (account/auth).",
+      );
       // Bad cache; clear so the next attempt isn't poisoned by the same error.
       clearPendingBible();
     }
