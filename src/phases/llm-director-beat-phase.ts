@@ -6,8 +6,10 @@ import type {
   DialogueChoiceOption,
   ItemEventBeat,
   NarrativeOnlyBeat,
+  TrainerBattleBeat,
 } from "#data/llm-director/beat-schema";
 import { UiMode } from "#enums/ui-mode";
+import { buildTrainerOverride } from "#phases/llm-director-beat-utils";
 import { type ApplyResult, applyConsequence } from "#system/llm-director/beat-applier";
 import { recordBeatHistory, recordPlayerChoice } from "#system/llm-director/beat-history";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
@@ -80,9 +82,7 @@ export class LLMDirectorBeatPhase extends Phase {
         this.renderDialogue(beat);
         return;
       case "trainer_battle":
-        // Wired in Task 16. v1: show pre-battle text and end so the wave
-        // continues with the upcoming vanilla content.
-        this.renderTextThenEnd(beat.introText, beat.preBattleText);
+        this.renderTrainerBattle(beat);
         return;
       case "biome_transition":
         // Wired in Task 17. v1: show first option flavor text and end.
@@ -136,6 +136,35 @@ export class LLMDirectorBeatPhase extends Phase {
     // message handler renders cleanly on top of the dialogue background.
     globalScene.ui.revertMode();
     this.afterConsequence(result);
+  }
+
+  /**
+   * Trainer-battle beat: build the inter-beat override for the next vanilla
+   * NewBattlePhase (offset +1) so the upcoming trainer is rewritten with our
+   * spec, then show the pre-battle text and end. The actual battle resolves
+   * via Task 18's NewBattlePhase hook.
+   */
+  private renderTrainerBattle(beat: TrainerBattleBeat): void {
+    const runtime = getDirectorRuntime();
+    if (runtime) {
+      const override = buildTrainerOverride(beat, { recentFaints: this.countRecentFaints() });
+      if (override) {
+        runtime.queue.setInterBeatOverride(this.waveIndex + override.atWaveOffset, override);
+      }
+    }
+    this.renderTextThenEnd(beat.introText, beat.preBattleText);
+  }
+
+  /**
+   * Number of party faints across the last 10 waves. Used to gate brutal
+   * trainer beats (the balance rails roll back +10 to ±3 if this is non-zero).
+   *
+   * v1: conservatively reports 0 — the LLM's own `difficultyTag` already
+   * gates brutal beats, and threading a 10-wave-window faint count from
+   * `globalScene` is deferred to v2.
+   */
+  private countRecentFaints(): number {
+    return 0;
   }
 
   private renderItemEvent(beat: ItemEventBeat): void {
