@@ -24,7 +24,7 @@ interface PendingEntry {
 }
 
 export class DirectorQueue {
-  private readonly generate: (wave: number) => Promise<Beat>;
+  private generate: (wave: number) => Promise<Beat>;
   private readonly pending = new Map<number, PendingEntry>();
   private readonly ready = new Map<number, Beat>();
   private readonly interBeatOverrides = new Map<number, InterBeatOverride>();
@@ -32,6 +32,15 @@ export class DirectorQueue {
 
   public constructor(opts: DirectorQueueOptions) {
     this.generate = opts.generate;
+  }
+
+  /**
+   * Replace the generator function. Used by the bible phase once a story
+   * bible exists, so the queue can call into `generateBeat` with the right
+   * envelope. In-flight pending generations are unaffected.
+   */
+  public setGenerator(generate: (wave: number) => Promise<Beat>): void {
+    this.generate = generate;
   }
 
   /**
@@ -129,6 +138,17 @@ export class DirectorQueue {
    */
   public cancel(): void {
     this.cancelled = true;
+    this.pending.clear();
+    this.ready.clear();
+    this.interBeatOverrides.clear();
+  }
+
+  /**
+   * Re-arm a previously cancelled queue. Used when starting a new Director
+   * run on top of a runtime that was cancelled by an earlier run.
+   */
+  public reset(): void {
+    this.cancelled = false;
     this.pending.clear();
     this.ready.clear();
     this.interBeatOverrides.clear();

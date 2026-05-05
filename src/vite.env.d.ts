@@ -17,6 +17,11 @@ interface ImportMetaEnv {
   readonly VITE_DISCORD_CLIENT_ID?: string;
   readonly VITE_GOOGLE_CLIENT_ID?: string;
   readonly VITE_I18N_DEBUG?: "0" | "1";
+  // LLM Director — read by `getDirectorRuntime()` at first access. Tests
+  // mutate these to simulate missing/present configuration, so they are
+  // intentionally not declared `readonly`.
+  VITE_NANOGPT_API_KEY?: string;
+  VITE_NANOGPT_BASE_URL?: string;
 }
 
 // tell vite to disallow missing env vars
