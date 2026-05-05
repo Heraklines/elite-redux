@@ -50,7 +50,7 @@ describe("DirectorQueue", () => {
   it("supports interBeatOverrides storage", () => {
     const generate = vi.fn().mockResolvedValue(narrativeBeat("b1"));
     const q = new DirectorQueue({ generate });
-    q.setInterBeatOverride(4, { trainerOverride: { levelDelta: 2 } });
+    q.setInterBeatOverride(4, { atWaveOffset: 1, trainerOverride: { levelDelta: 2 } });
     expect(q.takeInterBeatOverride(4)?.trainerOverride?.levelDelta).toBe(2);
     // Once taken, it's gone.
     expect(q.takeInterBeatOverride(4)).toBeUndefined();
