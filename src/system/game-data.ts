@@ -50,6 +50,7 @@ import {
 import { ChallengeData } from "#system/challenge-data";
 import { EggData } from "#system/egg-data";
 import { GameStats } from "#system/game-stats";
+import { defaultDirectorState, type LLMDirectorState, mergeDirectorState } from "#system/llm-director/director-state";
 import { ModifierData as PersistentModifierData } from "#system/modifier-data";
 import { PokemonData } from "#system/pokemon-data";
 import { RibbonData } from "#system/ribbons/ribbon-data";
@@ -155,6 +156,9 @@ export class GameData {
   /** Settings controlling silent auto-restock of the egg queue between waves. */
   public autoEggRestock: AutoEggRestockSettings = defaultAutoEggRestockSettings();
 
+  /** Persistent state for LLM Director runs (story bible, beat history, alignment, …). */
+  public llmDirectorState: LLMDirectorState = defaultDirectorState();
+
   /**
    * @param fromRaw - If true, will skip initialization of fields that are normally randomized on new game start. Used for the admin panel; default `false`
    */
@@ -190,6 +194,7 @@ export class GameData {
     this.eggPity = [0, 0, 0, 0];
     this.unlockPity = [0, 0, 0, 0];
     this.autoEggRestock = defaultAutoEggRestockSettings();
+    this.llmDirectorState = defaultDirectorState();
     this.initDexData();
     this.initStarterData();
   }
@@ -212,6 +217,7 @@ export class GameData {
       eggPity: this.eggPity.slice(0),
       unlockPity: this.unlockPity.slice(0),
       autoEggRestock: this.autoEggRestock,
+      llmDirectorState: this.llmDirectorState,
     };
   }
 
@@ -390,6 +396,7 @@ export class GameData {
     this.eggs = systemData.eggs ? systemData.eggs.map(e => e.toEgg()) : [];
 
     this.autoEggRestock = mergeAutoEggRestockSettings(systemData.autoEggRestock);
+    this.llmDirectorState = mergeDirectorState(systemData.llmDirectorState);
 
     this.eggPity = systemData.eggPity ? systemData.eggPity.slice(0) : [0, 0, 0, 0];
     this.unlockPity = systemData.unlockPity ? systemData.unlockPity.slice(0) : [0, 0, 0, 0];

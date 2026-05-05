@@ -15,6 +15,7 @@ import type { AutoEggRestockSettings } from "#system/auto-egg-restock-settings";
 import type { ChallengeData } from "#system/challenge-data";
 import type { EggData } from "#system/egg-data";
 import type { GameStats } from "#system/game-stats";
+import type { LLMDirectorState } from "#system/llm-director/director-state";
 import type { ModifierData } from "#system/modifier-data";
 import type { PokemonData } from "#system/pokemon-data";
 import type { TrainerData } from "#system/trainer-data";
@@ -39,6 +40,8 @@ export interface SystemSaveData {
   unlockPity: number[];
   /** Optional for back-compat with saves created before the auto-restock feature. */
   autoEggRestock?: AutoEggRestockSettings;
+  /** Optional for back-compat with saves created before the LLM Director feature. */
+  llmDirectorState?: LLMDirectorState;
 }
 
 export interface SessionSaveData {
