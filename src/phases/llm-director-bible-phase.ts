@@ -89,10 +89,40 @@ export class LLMDirectorBiblePhase extends Phase {
     }
 
     if (success) {
-      this.end();
+      this.renderIntroThenEnd();
     } else {
       this.fallbackToClassic();
     }
+  }
+
+  /**
+   * Show the player intro + opening scene from the freshly-loaded bible
+   * before the first wave's encounter phase fires. This grounds the player
+   * (who am I, where am I) so subsequent beats land in context.
+   */
+  private renderIntroThenEnd(): void {
+    const bible = globalScene.gameData.llmDirectorState.storyBible;
+    if (!bible) {
+      this.end();
+      return;
+    }
+    const intro = clip(bible.playerIntro, 280);
+    const scene = clip(bible.openingScene, 280);
+    const lines: string[] = [];
+    if (bible.themeName) {
+      lines.push(`— ${bible.themeName} —`);
+    }
+    if (intro) {
+      lines.push(intro);
+    }
+    if (scene) {
+      lines.push(scene);
+    }
+    if (lines.length === 0) {
+      this.end();
+      return;
+    }
+    globalScene.ui.showText(lines.join("\n"), null, () => this.end(), null, true);
   }
 
   /**
@@ -129,6 +159,19 @@ export class LLMDirectorBiblePhase extends Phase {
       true,
     );
   }
+}
+
+/** Hard cap for the intro/scene strings — defense-in-depth. */
+function clip(text: string | undefined, max: number): string {
+  if (!text) {
+    return "";
+  }
+  if (text.length <= max) {
+    return text;
+  }
+  const head = text.slice(0, max);
+  const lastSentence = Math.max(head.lastIndexOf(". "), head.lastIndexOf("! "), head.lastIndexOf("? "));
+  return lastSentence > max * 0.6 ? head.slice(0, lastSentence + 1) : `${head.trimEnd()}…`;
 }
 
 /**

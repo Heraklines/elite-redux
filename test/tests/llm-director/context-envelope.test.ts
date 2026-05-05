@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 const sampleBible = (): StoryBible => ({
   themeName: "Theme",
   blurb: "Blurb.",
+  playerIntro: "You are a wandering trainer.",
+  openingScene: "Dawn breaks over the gym ruins.",
   tonalKeywords: ["dark"],
   acts: [{ name: "Act 1", waveStart: 1, waveEnd: 50, summary: "x" }],
   factions: [{ name: "Rebels", description: "x", initialRep: 0 }],

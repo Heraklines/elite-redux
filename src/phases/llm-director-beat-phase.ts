@@ -110,7 +110,7 @@ export class LLMDirectorBeatPhase extends Phase {
   }
 
   private renderTextThenEnd(intro: string, body: string): void {
-    const text = body ? `${intro}\n${body}` : intro;
+    const text = body ? `${truncate(intro, 260)}\n${truncate(body, 320)}` : truncate(intro, 320);
     globalScene.ui.showText(text, null, () => this.end(), null, true);
   }
 
@@ -121,16 +121,23 @@ export class LLMDirectorBeatPhase extends Phase {
    */
   private renderDialogue(beat: DialogueChoiceBeat): void {
     const showChoices = () => this.showChoiceMenu(beat);
+    // PokéRogue's dialogue widget paginates long text and fires the callback
+    // on the FIRST page advance, so a 2-page intro causes the option overlay
+    // to open while page 2 is still rendering. Cap dialogue intro at ~140
+    // chars to keep it on one page.
+    const intro = truncate(beat.introText, 140);
     if (beat.speaker?.name) {
-      globalScene.ui.showDialogue(beat.introText, beat.speaker.name, null, showChoices);
+      globalScene.ui.showDialogue(intro, beat.speaker.name, null, showChoices);
     } else {
-      globalScene.ui.showText(beat.introText, null, showChoices, null, true);
+      globalScene.ui.showText(intro, null, showChoices, null, true);
     }
   }
 
   private showChoiceMenu(beat: DialogueChoiceBeat): void {
     const items: OptionSelectItem[] = beat.options.map(opt => ({
-      label: opt.label,
+      // Hard cap option label length so the OPTION_SELECT widget doesn't
+      // clip on the left edge.
+      label: truncate(opt.label, 50),
       handler: () => {
         this.handleChoiceSelected(opt);
         return true;
@@ -216,13 +223,15 @@ export class LLMDirectorBeatPhase extends Phase {
   private renderItemEvent(beat: ItemEventBeat): void {
     const state = globalScene.gameData.llmDirectorState;
     const result = applyConsequence(state, beat.consequence);
-    const text = result.epilogueText ? `${beat.introText}\n${result.epilogueText}` : beat.introText;
+    const intro = truncate(beat.introText, 260);
+    const epi = result.epilogueText ? truncate(result.epilogueText, 260) : "";
+    const text = epi ? `${intro}\n${epi}` : intro;
     globalScene.ui.showText(text, null, () => this.end(), null, true);
   }
 
   private afterConsequence(result: ApplyResult): void {
     if (result.epilogueText) {
-      globalScene.ui.showText(result.epilogueText, null, () => this.end(), null, true);
+      globalScene.ui.showText(truncate(result.epilogueText, 260), null, () => this.end(), null, true);
       return;
     }
     this.end();
@@ -245,4 +254,25 @@ export class LLMDirectorBeatPhase extends Phase {
     }
     this.renderNarrative(filler);
   }
+}
+
+/**
+ * Hard cap for any LLM-emitted player-facing text. Cuts at the last sentence
+ * boundary within `max` chars when one exists; otherwise hard-cuts and adds
+ * an ellipsis. Defense-in-depth — the system prompt enforces budgets, but if
+ * the model ignores them the UI still doesn't break.
+ */
+function truncate(text: string | undefined, max: number): string {
+  if (!text) {
+    return "";
+  }
+  if (text.length <= max) {
+    return text;
+  }
+  const head = text.slice(0, max);
+  const lastSentence = Math.max(head.lastIndexOf(". "), head.lastIndexOf("! "), head.lastIndexOf("? "));
+  if (lastSentence > max * 0.6) {
+    return head.slice(0, lastSentence + 1);
+  }
+  return `${head.trimEnd()}…`;
 }

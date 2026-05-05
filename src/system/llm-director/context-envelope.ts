@@ -1,4 +1,6 @@
 import type { StoryBible } from "#data/llm-director/beat-schema";
+import { BiomeId } from "#enums/biome-id";
+import { TrainerType } from "#enums/trainer-type";
 import type { BeatHistoryEntry, LLMDirectorState } from "#system/llm-director/director-state";
 
 /**
@@ -60,37 +62,71 @@ export interface ContextEnvelope {
  * Static, prompt-cacheable facts about the game's curve and pools. Sent every
  * call but doesn't change run-to-run, so providers with prompt caching get a
  * free win.
+ *
+ * The trainer + biome catalogs are generated FROM the enums so they stay in
+ * sync as PokéRogue adds more. The LLM emits an integer id; the game maps it
+ * back to the enum value directly.
  */
 export interface GameBalanceCard {
   levelCurveNote: string;
   rewardTiers: string[];
-  trainerTypePool: string[];
-  biomePool: string[];
+  /** Generic, dialog-friendly trainer types. Excludes named gym leaders. */
+  trainerTypeCatalog: CatalogEntry[];
+  biomeCatalog: CatalogEntry[];
+}
+
+export interface CatalogEntry {
+  id: number;
+  name: string;
 }
 
 const HISTORY_VERBATIM_LIMIT = 30;
 
 /**
- * v1 game balance card. The pools are referenced by string for now — the LLM
- * does not need to know the underlying enum values; the game maps them.
+ * Build the generic-trainer catalog from the TrainerType enum. We exclude:
+ * - id 0 (UNKNOWN sentinel)
+ * - id >= 200 (named special trainers — gym leaders, elite four, champions,
+ *   rivals; these have fixed canonical teams and the Director shouldn't
+ *   override them)
+ *
+ * Result: ~70 generic trainer archetypes the LLM can pick from by id.
  */
+function buildTrainerCatalog(): CatalogEntry[] {
+  const entries: CatalogEntry[] = [];
+  for (const [name, id] of Object.entries(TrainerType)) {
+    if (typeof id !== "number") {
+      continue;
+    }
+    if (id === 0) {
+      continue;
+    }
+    if (id >= 200) {
+      continue;
+    }
+    entries.push({ id, name: name.toLowerCase() });
+  }
+  return entries.sort((a, b) => a.id - b.id);
+}
+
+/** All biomes in the BiomeId frozen-object enum. */
+function buildBiomeCatalog(): CatalogEntry[] {
+  const entries: CatalogEntry[] = [];
+  for (const [name, id] of Object.entries(BiomeId)) {
+    if (typeof id !== "number") {
+      continue;
+    }
+    entries.push({ id, name: name.toLowerCase() });
+  }
+  return entries.sort((a, b) => a.id - b.id);
+}
+
+/** Built once at module load — both enums are static. */
 const GAME_BALANCE_CARD: GameBalanceCard = {
   levelCurveNote:
     "Trainer party levels follow the Classic curve. Default deviations cap at ±3 levels around the curve.",
   rewardTiers: ["common", "uncommon", "rare", "epic"],
-  trainerTypePool: [
-    "youngster",
-    "lass",
-    "ace_trainer",
-    "rich_boy",
-    "veteran",
-    "scientist",
-    "psychic",
-    "hex_maniac",
-    "biker",
-    "rocker",
-  ],
-  biomePool: ["plains", "grass", "forest", "tall_grass", "metropolis", "cave", "desert", "ice_cave", "ruins", "swamp"],
+  trainerTypeCatalog: buildTrainerCatalog(),
+  biomeCatalog: buildBiomeCatalog(),
 };
 
 function findCurrentAct(bible: StoryBible | undefined, wave: number): StoryBible["acts"][number] | undefined {

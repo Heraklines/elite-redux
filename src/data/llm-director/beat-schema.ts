@@ -293,10 +293,24 @@ const compiledBeatValidator: ValidateFunction = ajv.compile(beatSchema);
  */
 const storyBibleSchema = {
   type: "object",
-  required: ["themeName", "blurb", "tonalKeywords", "acts", "factions", "recurringNPCs", "moralSpectrum"],
+  required: [
+    "themeName",
+    "blurb",
+    "tonalKeywords",
+    "acts",
+    "factions",
+    "recurringNPCs",
+    "moralSpectrum",
+    "playerIntro",
+    "openingScene",
+  ],
   properties: {
     themeName: { type: "string", minLength: 1 },
     blurb: { type: "string", minLength: 1 },
+    /** 1-2 sentences explaining who the player is in this story. Max ~200 chars. */
+    playerIntro: { type: "string", minLength: 1, maxLength: 300 },
+    /** 1-2 sentences setting the opening scene for wave 1. Max ~200 chars. */
+    openingScene: { type: "string", minLength: 1, maxLength: 300 },
     tonalKeywords: { type: "array", items: { type: "string" }, minItems: 1 },
     acts: {
       type: "array",
@@ -358,6 +372,10 @@ const compiledStoryBibleValidator: ValidateFunction = ajv.compile(storyBibleSche
 export interface StoryBible {
   themeName: string;
   blurb: string;
+  /** 1-2 sentences explaining who the player is in this story. Shown at wave 1. */
+  playerIntro: string;
+  /** 1-2 sentences setting the opening scene. Shown at wave 1 right after playerIntro. */
+  openingScene: string;
   tonalKeywords: string[];
   acts: Array<{ name: string; waveStart: number; waveEnd: number; summary: string }>;
   factions: Array<{ name: string; description: string; initialRep: number }>;

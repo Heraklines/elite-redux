@@ -6,6 +6,8 @@ import { describe, expect, it, vi } from "vitest";
 const validBible: StoryBible = {
   themeName: "Underground Tournament",
   blurb: "An underground league hides one fixed match.",
+  playerIntro: "You are a marked entrant in a fight you can't afford to lose.",
+  openingScene: "The cellar door opens and a referee waves you to the pit.",
   tonalKeywords: ["mafia", "tense"],
   acts: [
     { name: "Entry", waveStart: 1, waveEnd: 50, summary: "x" },
