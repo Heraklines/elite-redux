@@ -110,21 +110,16 @@ export class LLMDirectorBeatPhase extends Phase {
   }
 
   private renderTextThenEnd(intro: string, body: string): void {
-    // Each page must fit in one text box render — `showText` does NOT
-    // auto-paginate; oversize text overflows and the advance prompt
-    // disappears. Chain one call per non-empty page.
-    const pages: string[] = [];
+    // queueMessage(text, _, prompt=true) creates a phase-managed MessagePhase
+    // per page. The phase pipeline pauses each one for player input; calling
+    // showText directly bypasses that and leaves the player stuck.
     if (intro) {
-      pages.push(truncate(intro, 140));
+      globalScene.phaseManager.queueMessage(truncate(intro, 140), null, true);
     }
     if (body) {
-      pages.push(truncate(body, 140));
+      globalScene.phaseManager.queueMessage(truncate(body, 140), null, true);
     }
-    if (pages.length === 0) {
-      this.end();
-      return;
-    }
-    showTextChain(pages, 0, () => this.end());
+    this.end();
   }
 
   /**
@@ -205,6 +200,10 @@ export class LLMDirectorBeatPhase extends Phase {
    * text is shown before the phase ends.
    */
   private renderBiomeTransition(beat: BiomeTransitionBeat): void {
+    // Intro via showText with the option-overlay opener as the callback —
+    // here the chain is short enough (1 page) that the showText callback
+    // path is acceptable. If we ever need multi-page intros for biome
+    // beats, switch to queueMessage and a follow-up CallbackPhase.
     const showOptions = () => this.showBiomeOptions(beat);
     globalScene.ui.showText(truncate(beat.introText, 140), null, showOptions, null, true);
   }
@@ -229,41 +228,30 @@ export class LLMDirectorBeatPhase extends Phase {
     globalScene.ui.revertMode();
     // Queue the biome switch ahead of the next vanilla wave.
     globalScene.phaseManager.unshiftNew("SwitchBiomePhase", option.biomeId as BiomeId);
-    const pages: string[] = [];
     if (option.flavorText) {
-      pages.push(truncate(option.flavorText, 140));
+      globalScene.phaseManager.queueMessage(truncate(option.flavorText, 140), null, true);
     }
     if (result.epilogueText) {
-      pages.push(truncate(result.epilogueText, 140));
+      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 140), null, true);
     }
-    if (pages.length === 0) {
-      this.end();
-      return;
-    }
-    showTextChain(pages, 0, () => this.end());
+    this.end();
   }
 
   private renderItemEvent(beat: ItemEventBeat): void {
     const state = globalScene.gameData.llmDirectorState;
     const result = applyConsequence(state, beat.consequence);
-    const pages: string[] = [];
     if (beat.introText) {
-      pages.push(truncate(beat.introText, 140));
+      globalScene.phaseManager.queueMessage(truncate(beat.introText, 140), null, true);
     }
     if (result.epilogueText) {
-      pages.push(truncate(result.epilogueText, 140));
+      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 140), null, true);
     }
-    if (pages.length === 0) {
-      this.end();
-      return;
-    }
-    showTextChain(pages, 0, () => this.end());
+    this.end();
   }
 
   private afterConsequence(result: ApplyResult): void {
     if (result.epilogueText) {
-      globalScene.ui.showText(truncate(result.epilogueText, 140), null, () => this.end(), null, true);
-      return;
+      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 140), null, true);
     }
     this.end();
   }
@@ -285,20 +273,6 @@ export class LLMDirectorBeatPhase extends Phase {
     }
     this.renderNarrative(filler);
   }
-}
-
-/**
- * Show pages of text sequentially via `showText`, each call waiting for
- * the player to press to advance before the next fires. This is the ONLY
- * safe way to render multi-page text in PokéRogue — `showText` does not
- * auto-paginate and a single oversize call hides the advance prompt.
- */
-function showTextChain(pages: string[], index: number, done: () => void): void {
-  if (index >= pages.length) {
-    done();
-    return;
-  }
-  globalScene.ui.showText(pages[index], null, () => showTextChain(pages, index + 1, done), null, true);
 }
 
 /**

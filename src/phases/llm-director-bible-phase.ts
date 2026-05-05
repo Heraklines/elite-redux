@@ -107,11 +107,12 @@ export class LLMDirectorBiblePhase extends Phase {
    * before the first wave's encounter phase fires. This grounds the player
    * (who am I, where am I) so subsequent beats land in context.
    *
-   * Why chain `showText` per page instead of one big call: PokéRogue's
-   * `showText` does NOT auto-paginate text that exceeds the dialog box
-   * height — it just renders into the box, overflows, and the "▼" advance
-   * prompt disappears, leaving the player stuck. Each call below shows ONE
-   * bounded page, waits for the player to advance, and chains to the next.
+   * Uses `phaseManager.queueMessage(text, _, prompt=true)` which creates a
+   * proper `MessagePhase` for each page. MessagePhase IS the input-aware
+   * text renderer — it pauses the phase pipeline until the player presses
+   * ACTION, then auto-advances. Calling `globalScene.ui.showText()`
+   * directly does NOT integrate with the phase pipeline and the player
+   * gets stuck because input never reaches a handler.
    */
   private renderIntroThenEnd(): void {
     const bible = globalScene.gameData.llmDirectorState.storyBible;
@@ -134,19 +135,10 @@ export class LLMDirectorBiblePhase extends Phase {
     if (scene) {
       pages.push(scene);
     }
-    if (pages.length === 0) {
-      this.end();
-      return;
+    for (const page of pages) {
+      globalScene.phaseManager.queueMessage(page, null, true);
     }
-    this.showPageChain(pages, 0);
-  }
-
-  private showPageChain(pages: string[], index: number): void {
-    if (index >= pages.length) {
-      this.end();
-      return;
-    }
-    globalScene.ui.showText(pages[index], null, () => this.showPageChain(pages, index + 1), null, true);
+    this.end();
   }
 
   /**
