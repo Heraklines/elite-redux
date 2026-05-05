@@ -1,6 +1,34 @@
 import { clampTrainerBattle } from "#data/llm-director/balance-rails";
 import type { InterBeatOverride, TrainerBattleBeat } from "#data/llm-director/beat-schema";
 
+export interface BattleSnapshotForOverride {
+  enemyLevels: number[] | undefined;
+}
+
+/**
+ * Apply an inter-beat override to a battle's enemy-level array. Pure,
+ * mutates-and-returns the snapshot so callers (NewBattlePhase) can apply it
+ * to `globalScene.currentBattle` while keeping this function unit-testable.
+ *
+ * v1 only handles `levelDelta`; species swaps are reported by the caller
+ * but not applied yet (deferred to v2).
+ *
+ * Returns `true` when at least one field was applied so callers can log.
+ */
+export function applyOverrideToBattle(snapshot: BattleSnapshotForOverride, override: InterBeatOverride): boolean {
+  let applied = false;
+  const trainerOverride = override.trainerOverride;
+  if (!trainerOverride) {
+    return applied;
+  }
+  const { levelDelta } = trainerOverride;
+  if (typeof levelDelta === "number" && Array.isArray(snapshot.enemyLevels)) {
+    snapshot.enemyLevels = snapshot.enemyLevels.map(l => Math.max(1, l + levelDelta));
+    applied = true;
+  }
+  return applied;
+}
+
 /**
  * Pure helpers for the LLMDirectorBeatPhase, split out so they can be
  * unit-tested without spinning up Phaser / globalScene.
