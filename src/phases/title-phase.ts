@@ -361,16 +361,20 @@ export class TitlePhase extends Phase {
     if (!this.loaded && !globalScene.gameMode.isDaily) {
       globalScene.loadBgm(globalScene.arena.bgm);
       globalScene.gameMode = getGameMode(this.gameMode);
+      // For LLM Director mode: kick off bible generation in the BACKGROUND
+      // before starter select so the LLM call runs in parallel with the
+      // player picking starters. The bible is awaited (or no-op if already
+      // resolved) by LLMDirectorBiblePhase pushed after starter select.
+      if (this.gameMode === GameModes.LLM_DIRECTOR) {
+        globalScene.phaseManager.pushNew("LLMDirectorStartPhase");
+      }
       if (this.gameMode === GameModes.CHALLENGE) {
         globalScene.phaseManager.pushNew("SelectChallengePhase");
       } else {
         globalScene.phaseManager.pushNew("SelectStarterPhase");
       }
-      // For LLM Director mode, route the player through the theme picker
-      // and bible-generation phase between starter selection and the first
-      // wave's encounter.
       if (this.gameMode === GameModes.LLM_DIRECTOR) {
-        globalScene.phaseManager.pushNew("LLMDirectorStartPhase");
+        globalScene.phaseManager.pushNew("LLMDirectorBiblePhase");
       }
       globalScene.newArena(globalScene.gameMode.getStartingBiome());
     } else {

@@ -1,36 +1,42 @@
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import type { ThemeSeed } from "#data/llm-director/theme-seeds";
 import { GameModes } from "#enums/game-modes";
 import { buildContextEnvelope, type EnvelopePartyMember } from "#system/llm-director/context-envelope";
-import { getDirectorRuntime } from "#system/llm-director/director-runtime";
+import {
+  clearPendingBible,
+  ensurePendingBible,
+  getDirectorRuntime,
+  getPendingBible,
+} from "#system/llm-director/director-runtime";
 import { generateBeat } from "#system/llm-director/generate-beat";
 import { generateStoryBible } from "#system/llm-director/generate-story-bible";
 import i18next from "i18next";
 
 /**
- * Generates the run's story bible from the player-picked theme seed, then
- * kicks off pre-generation of the first Director beat (wave 3 by default).
+ * Awaits the pending story-bible generation kicked off by
+ * `LLMDirectorStartPhase`, applies it to game state, and kicks off the
+ * first Director beat (wave 3 by default).
  *
- * On any failure (missing env config, network error, validation exhausted)
- * the run silently falls back to Classic mode rather than blocking — the
- * player still gets a playable run.
+ * If the pending bible is already resolved (because LLM generation finished
+ * during starter selection) this phase ends in <50ms with no overlay. If
+ * the bible is still in flight, the phase shows a "Preparing your story…"
+ * overlay until generation completes.
  *
- * The phase shows a brief "Preparing your story…" overlay while the LLM
- * call is in flight. Player input during this phase is intentionally
- * ignored so the phase advances cleanly.
+ * On any failure (missing env config, generation error) the run silently
+ * falls back to Classic mode — the player still gets a playable run.
+ *
+ * Cache: clears the pending bible once consumed, so the next Director pick
+ * rolls a fresh seed.
  */
 export class LLMDirectorBiblePhase extends Phase {
   public readonly phaseName = "LLMDirectorBiblePhase";
 
-  private readonly seed: ThemeSeed;
   /** Wave for the first generated beat. Director cadence is every 3 waves. */
   private readonly firstBeatWave: number;
 
-  public constructor(seed: ThemeSeed, firstBeatWave = 3) {
+  public constructor(firstBeatWave = 3) {
     super();
-    this.seed = seed;
     this.firstBeatWave = firstBeatWave;
   }
 
@@ -43,11 +49,23 @@ export class LLMDirectorBiblePhase extends Phase {
       return;
     }
 
-    this.showPreparingOverlay();
+    // If StartPhase didn't run (or we lost the entry to a HMR reset), make
+    // sure a generation is in flight before we await.
+    let pending = getPendingBible();
+    if (!pending) {
+      pending = ensurePendingBible(seed => generateStoryBible(runtime.client, { seedText: seed.text }));
+    }
+
+    // Only show the overlay if the bible isn't already resolved. If the
+    // player took >17s on starter select, no overlay flashes at all.
+    const needsOverlay = !pending.resolved;
+    if (needsOverlay) {
+      this.showPreparingOverlay();
+    }
 
     let success = false;
     try {
-      const bible = await generateStoryBible(runtime.client, { seedText: this.seed.text });
+      const bible = pending.resolved ?? (await pending.promise);
       const state = globalScene.gameData.llmDirectorState;
       state.storyBible = bible;
       // Initialize faction reputations from the bible's seeded values so the
@@ -62,10 +80,12 @@ export class LLMDirectorBiblePhase extends Phase {
       runtime.queue.setGenerator(wave => this.runBeatGeneration(wave));
       runtime.queue.kickOff(this.firstBeatWave);
       success = true;
+      // Cache consumed — next Director pick rolls a fresh seed.
+      clearPendingBible();
     } catch (err) {
-      // Don't include any auth/key material in the log surface. The error
-      // message from DirectorClient already redacts the request body.
       console.warn("[llm-director] Story bible generation failed:", err instanceof Error ? err.message : String(err));
+      // Bad cache; clear so the next attempt isn't poisoned by the same error.
+      clearPendingBible();
     }
 
     if (success) {
@@ -94,8 +114,6 @@ export class LLMDirectorBiblePhase extends Phase {
   }
 
   private showPreparingOverlay(): void {
-    // Use the message handler to surface the loading text. The phase ends
-    // before the player needs to dismiss it — no input handling required.
     globalScene.ui.showText(i18next.t("llmDirector:preparingStory"), null, undefined, null, false);
   }
 
@@ -114,9 +132,7 @@ export class LLMDirectorBiblePhase extends Phase {
 }
 
 /**
- * Read-only snapshot of the player's party for the envelope. Names use the
- * species name verbatim; types/abilities/moves are coerced to strings since
- * the LLM consumes them as descriptive text.
+ * Read-only snapshot of the player's party for the envelope.
  */
 function snapshotPlayerParty(): EnvelopePartyMember[] {
   const party = globalScene.getPlayerParty?.() ?? [];
