@@ -110,8 +110,21 @@ export class LLMDirectorBeatPhase extends Phase {
   }
 
   private renderTextThenEnd(intro: string, body: string): void {
-    const text = body ? `${truncate(intro, 260)}\n${truncate(body, 320)}` : truncate(intro, 320);
-    globalScene.ui.showText(text, null, () => this.end(), null, true);
+    // Each page must fit in one text box render — `showText` does NOT
+    // auto-paginate; oversize text overflows and the advance prompt
+    // disappears. Chain one call per non-empty page.
+    const pages: string[] = [];
+    if (intro) {
+      pages.push(truncate(intro, 140));
+    }
+    if (body) {
+      pages.push(truncate(body, 140));
+    }
+    if (pages.length === 0) {
+      this.end();
+      return;
+    }
+    showTextChain(pages, 0, () => this.end());
   }
 
   /**
@@ -193,7 +206,7 @@ export class LLMDirectorBeatPhase extends Phase {
    */
   private renderBiomeTransition(beat: BiomeTransitionBeat): void {
     const showOptions = () => this.showBiomeOptions(beat);
-    globalScene.ui.showText(beat.introText, null, showOptions, null, true);
+    globalScene.ui.showText(truncate(beat.introText, 140), null, showOptions, null, true);
   }
 
   private showBiomeOptions(beat: BiomeTransitionBeat): void {
@@ -216,22 +229,40 @@ export class LLMDirectorBeatPhase extends Phase {
     globalScene.ui.revertMode();
     // Queue the biome switch ahead of the next vanilla wave.
     globalScene.phaseManager.unshiftNew("SwitchBiomePhase", option.biomeId as BiomeId);
-    const tail = result.epilogueText ? `\n${result.epilogueText}` : "";
-    globalScene.ui.showText(`${option.flavorText}${tail}`, null, () => this.end(), null, true);
+    const pages: string[] = [];
+    if (option.flavorText) {
+      pages.push(truncate(option.flavorText, 140));
+    }
+    if (result.epilogueText) {
+      pages.push(truncate(result.epilogueText, 140));
+    }
+    if (pages.length === 0) {
+      this.end();
+      return;
+    }
+    showTextChain(pages, 0, () => this.end());
   }
 
   private renderItemEvent(beat: ItemEventBeat): void {
     const state = globalScene.gameData.llmDirectorState;
     const result = applyConsequence(state, beat.consequence);
-    const intro = truncate(beat.introText, 260);
-    const epi = result.epilogueText ? truncate(result.epilogueText, 260) : "";
-    const text = epi ? `${intro}\n${epi}` : intro;
-    globalScene.ui.showText(text, null, () => this.end(), null, true);
+    const pages: string[] = [];
+    if (beat.introText) {
+      pages.push(truncate(beat.introText, 140));
+    }
+    if (result.epilogueText) {
+      pages.push(truncate(result.epilogueText, 140));
+    }
+    if (pages.length === 0) {
+      this.end();
+      return;
+    }
+    showTextChain(pages, 0, () => this.end());
   }
 
   private afterConsequence(result: ApplyResult): void {
     if (result.epilogueText) {
-      globalScene.ui.showText(truncate(result.epilogueText, 260), null, () => this.end(), null, true);
+      globalScene.ui.showText(truncate(result.epilogueText, 140), null, () => this.end(), null, true);
       return;
     }
     this.end();
@@ -254,6 +285,20 @@ export class LLMDirectorBeatPhase extends Phase {
     }
     this.renderNarrative(filler);
   }
+}
+
+/**
+ * Show pages of text sequentially via `showText`, each call waiting for
+ * the player to press to advance before the next fires. This is the ONLY
+ * safe way to render multi-page text in PokéRogue — `showText` does not
+ * auto-paginate and a single oversize call hides the advance prompt.
+ */
+function showTextChain(pages: string[], index: number, done: () => void): void {
+  if (index >= pages.length) {
+    done();
+    return;
+  }
+  globalScene.ui.showText(pages[index], null, () => showTextChain(pages, index + 1, done), null, true);
 }
 
 /**

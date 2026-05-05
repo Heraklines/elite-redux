@@ -99,6 +99,12 @@ export class LLMDirectorBiblePhase extends Phase {
    * Show the player intro + opening scene from the freshly-loaded bible
    * before the first wave's encounter phase fires. This grounds the player
    * (who am I, where am I) so subsequent beats land in context.
+   *
+   * Why chain `showText` per page instead of one big call: PokéRogue's
+   * `showText` does NOT auto-paginate text that exceeds the dialog box
+   * height — it just renders into the box, overflows, and the "▼" advance
+   * prompt disappears, leaving the player stuck. Each call below shows ONE
+   * bounded page, waits for the player to advance, and chains to the next.
    */
   private renderIntroThenEnd(): void {
     const bible = globalScene.gameData.llmDirectorState.storyBible;
@@ -106,23 +112,34 @@ export class LLMDirectorBiblePhase extends Phase {
       this.end();
       return;
     }
-    const intro = clip(bible.playerIntro, 280);
-    const scene = clip(bible.openingScene, 280);
-    const lines: string[] = [];
+    const pages: string[] = [];
     if (bible.themeName) {
-      lines.push(`— ${bible.themeName} —`);
+      pages.push(`— ${bible.themeName} —`);
     }
+    // 120 chars per page is the conservative ceiling for the standard
+    // PokéRogue text box at default font scale. Going over starts wrapping
+    // off the bottom.
+    const intro = clip(bible.playerIntro, 120);
+    const scene = clip(bible.openingScene, 120);
     if (intro) {
-      lines.push(intro);
+      pages.push(intro);
     }
     if (scene) {
-      lines.push(scene);
+      pages.push(scene);
     }
-    if (lines.length === 0) {
+    if (pages.length === 0) {
       this.end();
       return;
     }
-    globalScene.ui.showText(lines.join("\n"), null, () => this.end(), null, true);
+    this.showPageChain(pages, 0);
+  }
+
+  private showPageChain(pages: string[], index: number): void {
+    if (index >= pages.length) {
+      this.end();
+      return;
+    }
+    globalScene.ui.showText(pages[index], null, () => this.showPageChain(pages, index + 1), null, true);
   }
 
   /**
