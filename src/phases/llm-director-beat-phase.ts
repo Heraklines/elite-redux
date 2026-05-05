@@ -10,6 +10,7 @@ import type {
   NarrativeOnlyBeat,
   TrainerBattleBeat,
 } from "#data/llm-director/beat-schema";
+import { pickFillerBeat } from "#data/llm-director/filler-beats";
 import type { BiomeId } from "#enums/biome-id";
 import { UiMode } from "#enums/ui-mode";
 import { buildTrainerOverride } from "#phases/llm-director-beat-utils";
@@ -220,12 +221,20 @@ export class LLMDirectorBeatPhase extends Phase {
   }
 
   /**
-   * Underrun: no beat was ready in time. v1 just logs and ends the phase;
-   * Task 21 replaces this with a prefab filler beat so the player still
-   * sees content rather than dead air.
+   * Underrun: no beat was ready in time. Pick a tone-neutral filler beat,
+   * record it in history (so the LLM gets a placeholder to refer back to
+   * rather than a gap), and render it. The queue keeps generating in the
+   * background; the next 1-ahead slot should be back on cadence.
    */
   private handleUnderrun(): void {
-    console.warn(`[llm-director] queue underrun for wave ${this.waveIndex}; ending phase early`);
-    this.end();
+    console.warn(`[llm-director] queue underrun for wave ${this.waveIndex}; rendering filler beat`);
+    const filler = pickFillerBeat();
+    recordBeatHistory(globalScene.gameData.llmDirectorState, filler, this.waveIndex);
+    // Re-kick the next slot in case the queue lost the kickOff race.
+    const runtime = getDirectorRuntime();
+    if (runtime) {
+      runtime.queue.kickOff(this.waveIndex + 3);
+    }
+    this.renderNarrative(filler);
   }
 }
