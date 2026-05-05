@@ -109,6 +109,13 @@ export class TitlePhase extends Phase {
             },
           });
           options.push({
+            label: GameMode.getModeName(GameModes.LLM_DIRECTOR),
+            handler: () => {
+              setModeAndEnd(GameModes.LLM_DIRECTOR);
+              return true;
+            },
+          });
+          options.push({
             label: i18next.t("menu:dailyRun"),
             handler: () => {
               this.initDailyRun();
@@ -358,6 +365,12 @@ export class TitlePhase extends Phase {
         globalScene.phaseManager.pushNew("SelectChallengePhase");
       } else {
         globalScene.phaseManager.pushNew("SelectStarterPhase");
+      }
+      // For LLM Director mode, route the player through the theme picker
+      // and bible-generation phase between starter selection and the first
+      // wave's encounter.
+      if (this.gameMode === GameModes.LLM_DIRECTOR) {
+        globalScene.phaseManager.pushNew("LLMDirectorStartPhase");
       }
       globalScene.newArena(globalScene.gameMode.getStartingBiome());
     } else {

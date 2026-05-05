@@ -47,6 +47,7 @@ import { LevelCapPhase } from "#phases/level-cap-phase";
 import { LevelUpPhase } from "#phases/level-up-phase";
 import { LLMDirectorBeatPhase } from "#phases/llm-director-beat-phase";
 import { LLMDirectorBiblePhase } from "#phases/llm-director-bible-phase";
+import { LLMDirectorStartPhase } from "#phases/llm-director-start-phase";
 import { LoadMoveAnimPhase } from "#phases/load-move-anim-phase";
 import { LoginPhase } from "#phases/login-phase";
 import { MessagePhase } from "#phases/message-phase";
@@ -157,6 +158,7 @@ const PHASES = Object.freeze({
   LearnMovePhase,
   LLMDirectorBeatPhase,
   LLMDirectorBiblePhase,
+  LLMDirectorStartPhase,
   LevelCapPhase,
   LevelUpPhase,
   LoadMoveAnimPhase,
