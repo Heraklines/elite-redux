@@ -3,9 +3,14 @@ import type { Beat, Consequence, NpcMemory, StoryBible } from "#data/llm-directo
 /**
  * Persistent director state, mutated by `applyConsequence`. Mirrors the
  * `llmDirectorState` slice on `SystemSaveData` (see Task 5).
+ *
+ * `storyBible` is optional here — Task 5's `LLMDirectorState` shape allows it
+ * to be absent before the bible phase fires, and `applyConsequence` never
+ * reads it. Keeping the field optional lets the runtime state pass directly
+ * to the applier without an `as` cast.
  */
 export interface DirectorState {
-  storyBible: StoryBible;
+  storyBible?: StoryBible;
   beatHistory: BeatRecord[];
   factionRep: Record<string, number>;
   alignment: number;
