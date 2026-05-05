@@ -37,6 +37,10 @@ interface GameModeConfig {
   isSplicedOnly?: boolean;
   isChallenge?: boolean;
   hasMysteryEncounters?: boolean;
+  /** True for the LLM Director mode (per-run story arcs). */
+  isLLMDirector?: boolean;
+  /** Excludes this mode from daily-seed/leaderboard logic. */
+  nonDeterministic?: boolean;
 }
 
 export class GameMode implements GameModeConfig {
@@ -57,6 +61,8 @@ export class GameMode implements GameModeConfig {
   public hasMysteryEncounters: boolean;
   public minMysteryEncounterWave: number;
   public maxMysteryEncounterWave: number;
+  public isLLMDirector: boolean;
+  public nonDeterministic: boolean;
 
   constructor(modeId: GameModes, config: GameModeConfig, battleConfig?: FixedBattleConfigs) {
     this.modeId = modeId;
@@ -297,6 +303,7 @@ export class GameMode implements GameModeConfig {
     switch (modeId) {
       case GameModes.CLASSIC:
       case GameModes.CHALLENGE:
+      case GameModes.LLM_DIRECTOR:
         return waveIndex === 200;
       case GameModes.ENDLESS:
       case GameModes.SPLICED_ENDLESS:
@@ -402,6 +409,7 @@ export class GameMode implements GameModeConfig {
       case GameModes.CLASSIC:
       case GameModes.CHALLENGE:
       case GameModes.DAILY:
+      case GameModes.LLM_DIRECTOR:
         return isBoss ? 6 : 18;
       case GameModes.ENDLESS:
       case GameModes.SPLICED_ENDLESS:
@@ -421,6 +429,8 @@ export class GameMode implements GameModeConfig {
         return i18next.t("gameMode:dailyRun");
       case GameModes.CHALLENGE:
         return i18next.t("gameMode:challenge");
+      case GameModes.LLM_DIRECTOR:
+        return i18next.t("gameMode:llmDirector");
     }
   }
 
@@ -462,6 +472,8 @@ export class GameMode implements GameModeConfig {
         return i18next.t("gameMode:dailyRun");
       case GameModes.CHALLENGE:
         return i18next.t("gameMode:challenge");
+      case GameModes.LLM_DIRECTOR:
+        return i18next.t("gameMode:llmDirector");
     }
   }
 }
@@ -501,6 +513,21 @@ export function getGameMode(gameMode: GameModes): GameMode {
           hasTrainers: true,
           isChallenge: true,
           hasMysteryEncounters: true,
+        },
+        classicFixedBattles,
+      );
+    case GameModes.LLM_DIRECTOR:
+      // Inherits Classic's starter selection, level curve, and 200-wave count.
+      // The LLM Director phase fires every 3 waves between Classic vanilla content.
+      // nonDeterministic excludes this mode from daily-seed/leaderboard code.
+      return new GameMode(
+        GameModes.LLM_DIRECTOR,
+        {
+          isClassic: true,
+          hasTrainers: true,
+          hasMysteryEncounters: true,
+          isLLMDirector: true,
+          nonDeterministic: true,
         },
         classicFixedBattles,
       );

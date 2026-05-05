@@ -4,4 +4,5 @@ export enum GameModes {
   SPLICED_ENDLESS,
   DAILY,
   CHALLENGE,
+  LLM_DIRECTOR,
 }
