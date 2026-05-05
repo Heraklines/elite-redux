@@ -2,7 +2,13 @@
  * NanoGPT chat-completions client. Thin wrapper over `fetch` with timeout,
  * exponential-backoff retry on 5xx/network failures, and per-call latency +
  * token telemetry. Speaks the OpenAI-compatible v1 chat-completions API.
+ *
+ * Successful completions are mirrored into the in-memory telemetry ring
+ * buffer so the debug overlay (Task 23) can show recent activity without
+ * touching save data.
  */
+
+import { recordTelemetry } from "#system/llm-director/telemetry";
 
 export interface DirectorClientOptions {
   apiKey: string;
@@ -107,11 +113,22 @@ export class DirectorClient {
         if (res.status >= 200 && res.status < 300) {
           const json = (await res.json()) as OpenAiChatResponse;
           const content = json.choices?.[0]?.message?.content ?? "";
+          const latencyMs = performance.now() - t0;
+          const inputTokens = json.usage?.prompt_tokens ?? 0;
+          const outputTokens = json.usage?.completion_tokens ?? 0;
+          recordTelemetry({
+            model: req.model,
+            inputTokens,
+            outputTokens,
+            latencyMs,
+            status: attempts > 1 ? "retry" : "ok",
+            timestampMs: Date.now(),
+          });
           return {
             content,
-            inputTokens: json.usage?.prompt_tokens ?? 0,
-            outputTokens: json.usage?.completion_tokens ?? 0,
-            latencyMs: performance.now() - t0,
+            inputTokens,
+            outputTokens,
+            latencyMs,
             attempts,
           };
         }

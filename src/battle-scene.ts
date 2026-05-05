@@ -133,6 +133,7 @@ import { AbilityBar } from "#ui/ability-bar";
 import { ArenaFlyout } from "#ui/arena-flyout";
 import { CandyBar } from "#ui/candy-bar";
 import { CharSprite } from "#ui/char-sprite";
+import { getDebugOverlay } from "#ui/llm-director-debug-overlay";
 import { PartyExpBar } from "#ui/party-exp-bar";
 import { PokeballTray } from "#ui/pokeball-tray";
 import { PokemonInfoContainer } from "#ui/pokemon-info-container";
@@ -654,6 +655,11 @@ export class BattleScene extends SceneBase {
     this.ui = new UI();
     this.uiContainer.add(this.ui);
     this.ui.setup();
+
+    // Mount the LLM Director debug overlay (F12 toggle, hidden by default).
+    // Safe to mount unconditionally — it's a no-op when no LLM calls have
+    // been made and stays invisible until the developer presses F12.
+    getDebugOverlay().mount();
 
     this.phaseManager.toTitleScreen(true);
     this.phaseManager.shiftPhase();
