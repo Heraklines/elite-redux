@@ -20,6 +20,7 @@ const baseEnvelope = (): ContextEnvelope =>
     currentAct: undefined,
     gameBalanceCard: { levelCurveNote: "", rewardTiers: [], trainerTypeCatalog: [], biomeCatalog: [] },
     currentBeatType: "auto",
+    isFirstBeat: false,
   }) as ContextEnvelope;
 
 const validNarrativeBeat: Beat = {

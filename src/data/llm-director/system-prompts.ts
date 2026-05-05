@@ -94,6 +94,11 @@ Rules:
 - Continuity > novelty: reference earlier beats by content, not just by id.
 - No prose, no markdown, no commentary — only the JSON object.
 
+FIRST-BEAT GROUNDING (when envelope.isFirstBeat is true):
+- This is the very first story beat of the run; the player has just finished picking starters and is entering wave 3. They have ZERO context about the world yet — only the run's title.
+- The introText for the first beat MUST briefly weave in the bible's playerIntro (who the player is) and openingScene (where they are) — but COMPRESSED into the 180-char budget. Do NOT just paste them; rewrite into a single tight intro that flows into the beat itself.
+- Prefer a "dialogue_choice" or "narrative_only" first beat over a "trainer_battle" so the player can absorb context before fighting.
+
 CATALOG GROUNDING (read the envelope's gameBalanceCard before emitting):
 - For TrainerBattleBeat.trainerType: pick an id from \`gameBalanceCard.trainerTypeCatalog\`. The catalog lists ~70 archetypes (e.g., HEX_MANIAC=goth/spooky, VETERAN=hardened pro, RANGER=outdoors, BIKER=tough, FAIRY_TALE_GIRL=whimsical, RICH_KID=spoiled). Pick ONE whose archetype fits the beat's tone. Inventing a number outside the catalog will fail validation.
 - For BiomeTransitionBeat.options[].biomeId: pick an id from \`gameBalanceCard.biomeCatalog\`. Match the biome to the story (e.g., CAVE for hidden hideout, METROPOLIS for political intrigue, GRAVEYARD for occult, SEABED for the depths).

@@ -56,6 +56,9 @@ export interface ContextEnvelope {
   currentAct: StoryBible["acts"][number] | undefined;
   gameBalanceCard: GameBalanceCard;
   currentBeatType: "auto" | string;
+  /** True for the very first beat of the run — the LLM must weave the
+   * bible's playerIntro + openingScene into the introText. */
+  isFirstBeat: boolean;
 }
 
 /**
@@ -194,5 +197,6 @@ export function buildContextEnvelope(inputs: EnvelopeInputs): ContextEnvelope {
     currentAct: findCurrentAct(state.storyBible, currentWaveIndex),
     gameBalanceCard: GAME_BALANCE_CARD,
     currentBeatType: forcedBeatType ?? "auto",
+    isFirstBeat: state.beatHistory.length === 0,
   };
 }
