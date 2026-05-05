@@ -1,23 +1,36 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import type { Beat, Consequence } from "#data/llm-director/beat-schema";
-import { applyConsequence } from "#system/llm-director/beat-applier";
+import type {
+  Beat,
+  DialogueChoiceBeat,
+  DialogueChoiceOption,
+  ItemEventBeat,
+  NarrativeOnlyBeat,
+} from "#data/llm-director/beat-schema";
+import { UiMode } from "#enums/ui-mode";
+import { type ApplyResult, applyConsequence } from "#system/llm-director/beat-applier";
+import { recordBeatHistory, recordPlayerChoice } from "#system/llm-director/beat-history";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
+import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 
 /**
  * Pulls the next pre-generated beat from the queue and routes to the
- * appropriate sub-flow (UI handler, battle init, biome select, item event).
+ * appropriate sub-flow.
  *
  * The phase is invoked from the wave-cadence hook (Task 19) on every third
  * wave. The pre-generation pipeline (Task 10) means the beat is usually
  * already buffered; on a buffer underrun we fall through to a filler beat
  * (Task 21) so the run never stalls.
  *
- * The actual UI/battle dispatch for `dialogue_choice`, `trainer_battle`,
- * `biome_transition`, and `item_event` lands in Tasks 15-17. v1 of this
- * phase wires `narrative_only` end-to-end and stubs the others with a
- * single-line `showText` so the phase still resolves cleanly during
- * development.
+ * Renders use the existing UI primitives:
+ *   - `narrative_only` → showText
+ *   - `dialogue_choice` → showDialogue (speaker) + OPTION_SELECT (choices)
+ *   - `item_event` → applyConsequence + showText
+ *   - `trainer_battle` / `biome_transition` → wired in Tasks 16-17
+ *
+ * Using the existing primitives instead of a bespoke beat handler is a
+ * deliberate deviation from the plan: it cuts surface area and matches the
+ * mystery-encounter codebase pattern.
  */
 export class LLMDirectorBeatPhase extends Phase {
   public readonly phaseName = "LLMDirectorBeatPhase";
@@ -54,53 +67,90 @@ export class LLMDirectorBeatPhase extends Phase {
     // the 1-ahead buffer warm.
     runtime.queue.kickOff(this.waveIndex + 3);
 
-    this.recordHistory(beat);
+    recordBeatHistory(globalScene.gameData.llmDirectorState, beat, this.waveIndex);
     this.dispatch(beat);
   }
 
   private dispatch(beat: Beat): void {
     switch (beat.type) {
       case "narrative_only":
-        this.showNarrative(beat.introText, beat.bodyText);
+        this.renderNarrative(beat);
         return;
       case "dialogue_choice":
-        // Wired in Task 15 (LLMDirectorBeatUiHandler).
-        this.showNarrative(beat.introText, beat.options[0]?.label ?? "");
+        this.renderDialogue(beat);
         return;
       case "trainer_battle":
-        // Wired in Task 16 (initBattleWithEnemyConfig).
-        this.showNarrative(beat.introText, beat.preBattleText);
+        // Wired in Task 16. v1: show pre-battle text and end so the wave
+        // continues with the upcoming vanilla content.
+        this.renderTextThenEnd(beat.introText, beat.preBattleText);
         return;
       case "biome_transition":
-        // Wired in Task 17.
-        this.showNarrative(beat.introText, beat.options[0]?.flavorText ?? "");
+        // Wired in Task 17. v1: show first option flavor text and end.
+        this.renderTextThenEnd(beat.introText, beat.options[0]?.flavorText ?? "");
         return;
       case "item_event":
-        this.applyAndEnd(beat.consequence, beat.introText);
+        this.renderItemEvent(beat);
         return;
     }
   }
 
-  private showNarrative(intro: string, body: string): void {
+  private renderNarrative(beat: NarrativeOnlyBeat): void {
+    this.renderTextThenEnd(beat.introText, beat.bodyText);
+  }
+
+  private renderTextThenEnd(intro: string, body: string): void {
     const text = body ? `${intro}\n${body}` : intro;
     globalScene.ui.showText(text, null, () => this.end(), null, true);
   }
 
-  private applyAndEnd(consequence: Consequence, introText: string): void {
-    const state = globalScene.gameData.llmDirectorState;
-    const result = applyConsequence(state, consequence);
-    const tail = result.epilogueText ? `\n${result.epilogueText}` : "";
-    globalScene.ui.showText(`${introText}${tail}`, null, () => this.end(), null, true);
+  /**
+   * Render a dialogue choice: optional speaker line, then OPTION_SELECT for
+   * the choices. The selected option's consequence is applied immediately;
+   * any epilogue text is shown before the phase ends.
+   */
+  private renderDialogue(beat: DialogueChoiceBeat): void {
+    const showChoices = () => this.showChoiceMenu(beat);
+    if (beat.speaker?.name) {
+      globalScene.ui.showDialogue(beat.introText, beat.speaker.name, null, showChoices);
+    } else {
+      globalScene.ui.showText(beat.introText, null, showChoices, null, true);
+    }
   }
 
-  private recordHistory(beat: Beat): void {
+  private showChoiceMenu(beat: DialogueChoiceBeat): void {
+    const items: OptionSelectItem[] = beat.options.map(opt => ({
+      label: opt.label,
+      handler: () => {
+        this.handleChoiceSelected(opt);
+        return true;
+      },
+    }));
+    globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options: items, noCancel: true });
+  }
+
+  private handleChoiceSelected(option: DialogueChoiceOption): void {
     const state = globalScene.gameData.llmDirectorState;
-    state.beatHistory.push({
-      beatId: beat.beatId,
-      wave: this.waveIndex,
-      beatType: beat.type,
-      verbatim: beat,
-    });
+    recordPlayerChoice(state, option);
+    const result = applyConsequence(state, option.consequence);
+    // Pop the OPTION_SELECT overlay before showing follow-up text, so the
+    // message handler renders cleanly on top of the dialogue background.
+    globalScene.ui.revertMode();
+    this.afterConsequence(result);
+  }
+
+  private renderItemEvent(beat: ItemEventBeat): void {
+    const state = globalScene.gameData.llmDirectorState;
+    const result = applyConsequence(state, beat.consequence);
+    const text = result.epilogueText ? `${beat.introText}\n${result.epilogueText}` : beat.introText;
+    globalScene.ui.showText(text, null, () => this.end(), null, true);
+  }
+
+  private afterConsequence(result: ApplyResult): void {
+    if (result.epilogueText) {
+      globalScene.ui.showText(result.epilogueText, null, () => this.end(), null, true);
+      return;
+    }
+    this.end();
   }
 
   /**
