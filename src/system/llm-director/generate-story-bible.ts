@@ -3,7 +3,7 @@ import { STORY_BIBLE_SYSTEM_PROMPT } from "#data/llm-director/system-prompts";
 import type { DirectorClient } from "#system/llm-director/director-client";
 
 /**
- * One DeepSeek-V4-Pro:thinking call → validated StoryBible. On schema failure
+ * One DeepSeek call → validated StoryBible. On schema failure
  * we retry up to 3 times with the validation error appended to the next prompt
  * so the model self-corrects. After 3 failures we throw and let the caller
  * fall back (typically to Classic mode + apology text).
@@ -11,17 +11,17 @@ import type { DirectorClient } from "#system/llm-director/director-client";
 
 export interface GenerateStoryBibleOptions {
   seedText: string;
-  /** Defaults to TEE/deepseek-v4-pro:thinking. */
+  /** Defaults to moonshotai/kimi-k2.6 (non-thinking, ~17s for bible-shaped output). */
   model?: string;
   /** Defaults to 3. */
   maxRetries?: number;
-  /** Per-call timeout, default 30s. */
+  /** Per-call timeout, default 60s — generous headroom over the ~17s typical. */
   timeoutMs?: number;
 }
 
-const DEFAULT_BIBLE_MODEL = "TEE/deepseek-v4-pro:thinking";
+const DEFAULT_BIBLE_MODEL = "moonshotai/kimi-k2.6";
 const DEFAULT_MAX_RETRIES = 3;
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 const FENCE_REGEX = /^```(?:json)?\s*([\s\S]*?)\s*```$/m;
 
@@ -57,6 +57,7 @@ export async function generateStoryBible(client: DirectorClient, opts: GenerateS
       ],
       timeoutMs,
       responseFormat: "json_object",
+      maxTokens: 2500,
     });
 
     let parsed: unknown;

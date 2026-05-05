@@ -34,6 +34,9 @@ export interface CompletionRequest {
   /** Forwarded as `response_format` for JSON-mode hints. */
   responseFormat?: "text" | "json_object";
   temperature?: number;
+  /** Cap output tokens. Strongly recommended — uncapped, models can stream
+   * 4k+ tokens and blow timeout budgets. */
+  maxTokens?: number;
 }
 
 export interface CompletionResult {
@@ -91,6 +94,9 @@ export class DirectorClient {
     if (typeof req.temperature === "number") {
       body.temperature = req.temperature;
     }
+    if (typeof req.maxTokens === "number") {
+      body.max_tokens = req.maxTokens;
+    }
 
     const t0 = performance.now();
     let attempts = 0;
@@ -140,7 +146,12 @@ export class DirectorClient {
         lastErrorMessage = `${res.status} ${res.statusText || "server error"}`;
       } catch (err) {
         clearTimeout(timeoutHandle);
-        if (err instanceof DOMException && err.name === "AbortError") {
+        // Node's fetch throws Error (not DOMException) on abort with
+        // name="AbortError" or message including "aborted". Match both.
+        const isAbort =
+          (err instanceof DOMException && err.name === "AbortError")
+          || (err instanceof Error && (err.name === "AbortError" || /abort/i.test(err.message)));
+        if (isAbort) {
           // Timeout: surface immediately, do not retry. This makes upstream
           // budgets predictable: the queue can decide to fall back to filler
           // beats rather than burn the whole 3-wave budget on retries.

@@ -6,9 +6,9 @@ import type { DirectorClient } from "#system/llm-director/director-client";
 /**
  * Two-phase beat generation:
  *
- *   1. Skeleton — DeepSeek-V4-Pro:thinking emits structured JSON. This is the
+ *   1. Skeleton — DeepSeek emits structured JSON. This is the
  *      authoritative pass for trainer composition, choice trees, etc.
- *   2. Prose (optional) — Kimi K2.6 rewrites the human-facing text fields with
+ *   2. Prose (optional) — Kimi rewrites the human-facing text fields with
  *      better voice. v1 ships skeleton-only; the prose phase is wired but only
  *      runs when `withProsePass: true`.
  *
@@ -18,22 +18,22 @@ import type { DirectorClient } from "#system/llm-director/director-client";
 
 export interface GenerateBeatOptions {
   envelope: ContextEnvelope;
-  /** Defaults to TEE/deepseek-v4-pro:thinking. */
+  /** Defaults to deepseek/deepseek-v4-flash (~7s — fastest non-thinking subscription model). */
   skeletonModel?: string;
-  /** Defaults to TEE/kimi-k2.6. */
+  /** Defaults to moonshotai/kimi-k2.6 (better prose voice, used only when withProsePass is on). */
   proseModel?: string;
   /** Default 3. */
   maxRetries?: number;
-  /** Default 20s. */
+  /** Default 30s — comfortably above the ~7s typical for the fast skeleton model. */
   timeoutMs?: number;
   /** v1 default false; turn on once costs are characterized. */
   withProsePass?: boolean;
 }
 
-const DEFAULT_SKELETON_MODEL = "TEE/deepseek-v4-pro:thinking";
-const DEFAULT_PROSE_MODEL = "TEE/kimi-k2.6";
+const DEFAULT_SKELETON_MODEL = "deepseek/deepseek-v4-flash";
+const DEFAULT_PROSE_MODEL = "moonshotai/kimi-k2.6";
 const DEFAULT_MAX_RETRIES = 3;
-const DEFAULT_TIMEOUT_MS = 20_000;
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 const FENCE_REGEX = /^```(?:json)?\s*([\s\S]*?)\s*```$/m;
 
@@ -80,6 +80,7 @@ async function runSkeletonPhase(
         ],
         timeoutMs,
         responseFormat: "json_object",
+        maxTokens: 1200,
       });
       parsed = parseLooseJson(result.content);
     } catch (err) {
@@ -106,6 +107,7 @@ async function runProsePhase(client: DirectorClient, beat: Beat, model: string, 
       ],
       timeoutMs,
       responseFormat: "json_object",
+      maxTokens: 1500,
     });
     parsed = parseLooseJson(result.content);
   } catch {

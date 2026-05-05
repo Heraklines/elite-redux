@@ -16,7 +16,7 @@ import type { BeatHistoryEntry, LLMDirectorState } from "#system/llm-director/di
 export const HISTORY_COMPACT_THRESHOLD = 30;
 export const HISTORY_KEEP_VERBATIM = 20;
 
-const DEFAULT_MODEL = "TEE/kimi-k2.6";
+const DEFAULT_MODEL = "moonshotai/kimi-k2.6";
 const DEFAULT_TIMEOUT_MS = 20_000;
 
 const COMPACTION_SYSTEM_PROMPT =

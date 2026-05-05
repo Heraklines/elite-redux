@@ -16,7 +16,7 @@ describe("DirectorClient", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
     const client = new DirectorClient({ apiKey: "test", baseUrl: "https://x/api/v1" });
-    const r = await client.complete({ model: "TEE/kimi-k2.6", messages: [{ role: "user", content: "hi" }] });
+    const r = await client.complete({ model: "moonshotai/kimi-latest", messages: [{ role: "user", content: "hi" }] });
     expect(r.content).toBe('{"ok":true}');
     expect(r.latencyMs).toBeGreaterThanOrEqual(0);
     expect(r.inputTokens).toBe(100);
