@@ -2,12 +2,15 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import type {
   Beat,
+  BiomeTransitionBeat,
+  BiomeTransitionOption,
   DialogueChoiceBeat,
   DialogueChoiceOption,
   ItemEventBeat,
   NarrativeOnlyBeat,
   TrainerBattleBeat,
 } from "#data/llm-director/beat-schema";
+import type { BiomeId } from "#enums/biome-id";
 import { UiMode } from "#enums/ui-mode";
 import { buildTrainerOverride } from "#phases/llm-director-beat-utils";
 import { type ApplyResult, applyConsequence } from "#system/llm-director/beat-applier";
@@ -85,8 +88,7 @@ export class LLMDirectorBeatPhase extends Phase {
         this.renderTrainerBattle(beat);
         return;
       case "biome_transition":
-        // Wired in Task 17. v1: show first option flavor text and end.
-        this.renderTextThenEnd(beat.introText, beat.options[0]?.flavorText ?? "");
+        this.renderBiomeTransition(beat);
         return;
       case "item_event":
         this.renderItemEvent(beat);
@@ -165,6 +167,41 @@ export class LLMDirectorBeatPhase extends Phase {
    */
   private countRecentFaints(): number {
     return 0;
+  }
+
+  /**
+   * Biome-transition beat: show the intro then OPTION_SELECT for the
+   * options. The selected option's consequence (if any) is applied, the
+   * chosen biome is queued via SwitchBiomePhase, and the option's flavor
+   * text is shown before the phase ends.
+   */
+  private renderBiomeTransition(beat: BiomeTransitionBeat): void {
+    const showOptions = () => this.showBiomeOptions(beat);
+    globalScene.ui.showText(beat.introText, null, showOptions, null, true);
+  }
+
+  private showBiomeOptions(beat: BiomeTransitionBeat): void {
+    const items: OptionSelectItem[] = beat.options.map(opt => ({
+      label: opt.flavorText.split("\n")[0].slice(0, 40), // first line, abbreviated
+      handler: () => {
+        this.handleBiomeOptionSelected(opt);
+        return true;
+      },
+    }));
+    globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options: items, noCancel: true });
+  }
+
+  private handleBiomeOptionSelected(option: BiomeTransitionOption): void {
+    const state = globalScene.gameData.llmDirectorState;
+    let result: ApplyResult = {};
+    if (option.consequence) {
+      result = applyConsequence(state, option.consequence);
+    }
+    globalScene.ui.revertMode();
+    // Queue the biome switch ahead of the next vanilla wave.
+    globalScene.phaseManager.unshiftNew("SwitchBiomePhase", option.biomeId as BiomeId);
+    const tail = result.epilogueText ? `\n${result.epilogueText}` : "";
+    globalScene.ui.showText(`${option.flavorText}${tail}`, null, () => this.end(), null, true);
   }
 
   private renderItemEvent(beat: ItemEventBeat): void {
