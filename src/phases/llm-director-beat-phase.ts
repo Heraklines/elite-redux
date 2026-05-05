@@ -16,6 +16,7 @@ import { UiMode } from "#enums/ui-mode";
 import { buildTrainerOverride } from "#phases/llm-director-beat-utils";
 import { type ApplyResult, applyConsequence } from "#system/llm-director/beat-applier";
 import { recordBeatHistory, recordPlayerChoice } from "#system/llm-director/beat-history";
+import { compactHistory, HISTORY_COMPACT_THRESHOLD } from "#system/llm-director/compact-history";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 
@@ -74,6 +75,13 @@ export class LLMDirectorBeatPhase extends Phase {
     runtime.queue.kickOff(this.waveIndex + 3);
 
     recordBeatHistory(globalScene.gameData.llmDirectorState, beat, this.waveIndex);
+    // Compaction runs in the background as soon as history grows past the
+    // threshold. We don't await — the result lands on `state.beatHistory`
+    // before the next envelope is built, and a missed window just means
+    // one more uncompacted envelope.
+    if (globalScene.gameData.llmDirectorState.beatHistory.length > HISTORY_COMPACT_THRESHOLD) {
+      void compactHistory(globalScene.gameData.llmDirectorState, runtime.client);
+    }
     this.dispatch(beat);
   }
 
