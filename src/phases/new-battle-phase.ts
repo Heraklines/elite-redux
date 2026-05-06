@@ -5,7 +5,7 @@ import { UiMode } from "#enums/ui-mode";
 import { BattlePhase } from "#phases/battle-phase";
 import { applyOverrideToBattle } from "#phases/llm-director-beat-utils";
 import { clampAuthoredTeam } from "#system/llm-director/authored-team";
-import { logBiomeSwitch } from "#system/llm-director/director-log";
+import { logBiomeSwitch, logTrainerNarrationApplied } from "#system/llm-director/director-log";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 import { installAuthoredTeam } from "#system/llm-director/install-authored-team";
 
@@ -111,6 +111,7 @@ export class NewBattlePhase extends BattlePhase {
     if (override.preBattleText) {
       void globalScene.ui.setMode(UiMode.MESSAGE);
       globalScene.phaseManager.queueMessage(override.preBattleText, null, true);
+      logTrainerNarrationApplied(battle.waveIndex, override.preBattleText);
     }
   }
 

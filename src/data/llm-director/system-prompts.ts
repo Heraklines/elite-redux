@@ -41,7 +41,15 @@ Constraints:
 - moralSpectrum labels MUST be 1 word each, fitting the theme's tone.
 - playerIntro and openingScene MUST each be ONE short sentence (HARD MAX 100 chars EACH). Anything longer will be hard-truncated and look broken. Punchy and concrete: <=15 words per field.
 
-The player should be able to lose this run. Failure is part of the experience.`;
+The player should be able to lose this run. Failure is part of the experience.
+
+TONAL VARIETY (CRITICAL):
+- DO NOT default to "ruined / desolate / dystopian" themes. Match the seed's tone exactly.
+- If the seed is wholesome (summer festival, bake-off circuit, school trip, mentor's apprentice, lighthouse keeper, romance), the bible MUST stay warm. NPCs are friendly, stakes are low or hopeful, the moralSpectrum spans "kind ↔ cold" or "thoughtful ↔ self-centered" rather than "merciful ↔ ruthless".
+- If the seed is comedic (talking starter, ghost bachelor, wrong-trainer mix-up), keep the tone comedic across acts. Stakes can be silly. Failure can be embarrassing rather than tragic.
+- If the seed is sports/competitive (tournament, draft format, championship), the world is normal — focus on rivalries, training arcs, audience reactions, prize money.
+- "Ruined kingdom" / "fallen world" / "ancient curse" tropes are ONE flavor. There are dozens of others — pick whichever the seed calls for, not the easy default.
+- The blurb, faction descriptions, and NPC roles all need to MATCH the seed's tone. A wholesome seed with a "hostile" NPC is fine; a wholesome seed where every NPC is "tortured" or "scarred" is wrong.`;
 
 export const BEAT_SKELETON_SYSTEM_PROMPT = `You are the Director writing one beat of a generative Pokémon run. Read the envelope (story bible, beat history, current state) and emit ONE beat as STRICT JSON matching this discriminated union.
 

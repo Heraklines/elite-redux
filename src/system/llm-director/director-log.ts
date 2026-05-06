@@ -1,12 +1,12 @@
 /**
- * Centralized verbose logger for the LLM Director. Every important step
- * — bible generation, beat generation, beat application, biome/trainer
- * overrides, fallback paths — emits `console.info("[llm-director] ...")`
- * lines so the player can open DevTools and audit exactly what the
- * model emitted vs what the game applied.
+ * Centralized verbose logger for the LLM Director.
  *
- * Designed for diagnosis, not user-facing output. Tagged for easy grep
- * in the browser console.
+ * Two outputs per event:
+ *   1. `console.info("[llm-director] ...")` for live DevTools auditing
+ *   2. POST to `/api/llm-log` (Vite dev plugin) which appends to
+ *      `<repo>/llm-director-trace.jsonl` so the player can `tail -f` the
+ *      file during a run and audit exactly what the model emitted vs
+ *      what the game applied without scrolling 1000 console lines.
  *
  * NEVER logs the API key or request headers — only the prompt content,
  * model, latency, response body, and game-state deltas.
@@ -26,62 +26,146 @@ function pretty(value: unknown, max = 600): string {
   }
 }
 
+interface LogEvent {
+  event: string;
+  timestamp: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Send the structured event to the dev-server log endpoint. Fire-and-forget;
+ * a network error never breaks gameplay. Only attempts in browser context.
+ */
+function persist(event: LogEvent): void {
+  if (typeof globalThis === "undefined" || typeof globalThis.fetch !== "function") {
+    return;
+  }
+  // Don't block on logging — fire and forget. Errors are silent.
+  globalThis
+    .fetch("/api/llm-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(event),
+    })
+    .catch(() => {
+      /* dev-only logging; ignore failures */
+    });
+}
+
+function emit(event: string, data: Record<string, unknown>, level: "info" | "warn" = "info"): void {
+  const payload: LogEvent = { event, timestamp: Date.now(), ...data };
+  if (level === "warn") {
+    console.warn(`${TAG} ${event}`, data);
+  } else {
+    console.info(`${TAG} ${event}`, data);
+  }
+  persist(payload);
+}
+
+// ─── Bible ────────────────────────────────────────────────────────────────
+
 export function logBibleRequest(seedText: string): void {
-  console.info(`${TAG} bible-request`, { seedText });
+  emit("bible-request", { seedText });
 }
 
 export function logBibleResponse(rawContent: string, latencyMs: number): void {
-  console.info(`${TAG} bible-response (${latencyMs.toFixed(0)}ms)`, pretty(rawContent, 1200));
+  emit("bible-response", { latencyMs, rawContent: pretty(rawContent, 1500), rawFull: rawContent });
 }
 
 export function logBibleParsed(bible: unknown): void {
-  console.info(`${TAG} bible-parsed`, pretty(bible, 1500));
+  emit("bible-parsed", { bible });
 }
 
 export function logBibleValidationFail(error: string, attempt: number): void {
-  console.warn(`${TAG} bible-validation-fail (attempt ${attempt})`, error);
+  emit("bible-validation-fail", { attempt, error }, "warn");
 }
 
+// ─── Beat ─────────────────────────────────────────────────────────────────
+
 export function logBeatRequest(wave: number, envelopeSizeKb: number): void {
-  console.info(`${TAG} beat-request wave=${wave} envelope=${envelopeSizeKb.toFixed(1)}KB`);
+  emit("beat-request", { wave, envelopeSizeKb: Number(envelopeSizeKb.toFixed(1)) });
 }
 
 export function logBeatResponse(wave: number, rawContent: string, latencyMs: number): void {
-  console.info(`${TAG} beat-response wave=${wave} (${latencyMs.toFixed(0)}ms)`, pretty(rawContent, 800));
+  emit("beat-response", { wave, latencyMs, rawContent: pretty(rawContent, 1000), rawFull: rawContent });
 }
 
 export function logBeatParsed(wave: number, beat: unknown): void {
-  console.info(`${TAG} beat-parsed wave=${wave}`, pretty(beat, 1000));
+  emit("beat-parsed", { wave, beat });
 }
 
 export function logBeatValidationFail(wave: number, error: string, attempt: number): void {
-  console.warn(`${TAG} beat-validation-fail wave=${wave} attempt=${attempt}`, error);
+  emit("beat-validation-fail", { wave, attempt, error }, "warn");
 }
 
 export function logBeatDispatched(wave: number, beatType: string, beatId: string): void {
-  console.info(`${TAG} beat-dispatched wave=${wave} type=${beatType} id=${beatId}`);
+  emit("beat-dispatched", { wave, beatType, beatId });
 }
 
 export function logBeatRendered(wave: number, beatType: string, pages: number): void {
-  console.info(`${TAG} beat-rendered wave=${wave} type=${beatType} pages=${pages}`);
+  emit("beat-rendered", { wave, beatType, pages });
 }
 
-export function logChoiceMade(beatId: string, optionLabel: string, consequenceSummary: object): void {
-  console.info(`${TAG} choice-made beat=${beatId} option="${optionLabel}"`, consequenceSummary);
+// ─── Choice + applied state changes ───────────────────────────────────────
+
+export function logChoiceMade(beatId: string, optionLabel: string, consequence: unknown): void {
+  emit("choice-made", { beatId, optionLabel, consequence });
 }
+
+/**
+ * What the game ACTUALLY applied for a choice. Lets the player diff this
+ * against the LLM's emitted consequence to see what landed vs what was
+ * silently dropped (unknown modifierType, unknown effect type, target
+ * resolution failed, etc.).
+ */
+export function logConsequenceApplied(args: {
+  beatId: string;
+  alignmentBefore: number;
+  alignmentAfter: number;
+  factionRepBefore: Record<string, number>;
+  factionRepAfter: Record<string, number>;
+  itemsGranted: Array<{ modifierType: string; qty: number }>;
+  moneyDelta: number;
+  effectsAttempted: number;
+  effectsApplied: number;
+  effectsStubbed: string[];
+  effectsFailed: Array<{ type: string; reason: string }>;
+}): void {
+  emit("consequence-applied", args);
+}
+
+export function logEffectApplied(beatId: string, effectType: string, ok: boolean, detail?: unknown): void {
+  emit(ok ? "effect-applied" : "effect-failed", { beatId, effectType, detail });
+}
+
+// ─── Biome / trainer ──────────────────────────────────────────────────────
 
 export function logBiomeSwitch(reason: string, from: number | undefined, to: number, actName?: string): void {
-  console.info(`${TAG} biome-switch reason=${reason} ${from ?? "?"} -> ${to}${actName ? ` (act: ${actName})` : ""}`);
+  emit("biome-switch", { reason, from, to, actName });
 }
 
 export function logTrainerOverride(wave: number, override: unknown): void {
-  console.info(`${TAG} trainer-override wave=${wave}`, pretty(override, 400));
+  emit("trainer-override", { wave, override });
 }
 
+/**
+ * Records that an LLM-authored preBattleText was queued for a wave's
+ * vanilla trainer encounter. Lets the player verify the override fired.
+ */
+export function logTrainerNarrationApplied(wave: number, text: string): void {
+  emit("trainer-narration-applied", { wave, text });
+}
+
+export function logAuthoredTeamInstalled(wave: number, teamSize: number, levels: number[]): void {
+  emit("authored-team-installed", { wave, teamSize, levels });
+}
+
+// ─── Failures ─────────────────────────────────────────────────────────────
+
 export function logUnderrun(wave: number): void {
-  console.warn(`${TAG} underrun wave=${wave}: queue empty, falling to filler beat`);
+  emit("underrun", { wave }, "warn");
 }
 
 export function logFallbackToClassic(reason: string): void {
-  console.warn(`${TAG} fallback-to-classic reason="${reason}"`);
+  emit("fallback-to-classic", { reason }, "warn");
 }

@@ -292,4 +292,170 @@ export const THEME_SEEDS: readonly ThemeSeed[] = [
     text: "A nine-year-old has won every gym in record time. Nobody knows where they came from.",
     tones: ["mystery", "investigative"],
   },
+
+  // — Lighthearted / festive —
+  {
+    id: "summer-festival",
+    text: "The biggest Pokémon festival of the year is in town: contests, food stalls, fireworks.",
+    tones: ["lighthearted", "festive", "warm"],
+  },
+  {
+    id: "first-summer-camp",
+    text: "You're a counselor at a Pokémon summer camp; the kids are running wild.",
+    tones: ["wholesome", "comedic"],
+  },
+  {
+    id: "wedding-tour",
+    text: "Two trainers are getting married; you're the rival of honor on a region-wide tour.",
+    tones: ["wholesome", "romantic", "lighthearted"],
+  },
+  {
+    id: "bake-off-circuit",
+    text: "A traveling bake-off circuit pairs Pokémon-themed pastries with battles.",
+    tones: ["whimsical", "comedic"],
+  },
+  {
+    id: "pokemon-circus",
+    text: "You join a wandering Pokémon circus that performs in every town.",
+    tones: ["whimsical", "wholesome"],
+  },
+  {
+    id: "school-trip",
+    text: "Your school's region-wide field trip just kicked off. Eight stops, lots of trouble.",
+    tones: ["wholesome", "coming-of-age"],
+  },
+
+  // — Heroic / adventure —
+  {
+    id: "apprentice-of-champion",
+    text: "An aging Champion takes you on as their last apprentice for one final tour.",
+    tones: ["heroic", "mentor", "wholesome"],
+  },
+  {
+    id: "tournament-rookie",
+    text: "You're an unseeded rookie in the regional tournament. Everyone's watching the wrong people.",
+    tones: ["heroic", "underdog"],
+  },
+  {
+    id: "kingdom-tour",
+    text: "The crown prince invites you on a diplomatic tour of allied kingdoms.",
+    tones: ["heroic", "political", "warm"],
+  },
+  {
+    id: "treasure-map",
+    text: "An old map promises a legendary Pokémon at the end of a 200-step pilgrimage.",
+    tones: ["adventure", "heroic"],
+  },
+  {
+    id: "rescue-rangers",
+    text: "You join a Pokémon rescue squad. Each wave is a region in crisis.",
+    tones: ["heroic", "wholesome"],
+  },
+
+  // — Romance / friendship —
+  {
+    id: "rival-romance",
+    text: "Your childhood rival proposes a tour together to settle who's stronger.",
+    tones: ["romantic", "rivalry", "warm"],
+  },
+  {
+    id: "long-pen-pal",
+    text: "You finally get to meet your pen-pal, who turns out to be a famous trainer.",
+    tones: ["romantic", "wholesome"],
+  },
+  {
+    id: "reunion-tour",
+    text: "Five old friends agreed years ago to meet at the next eclipse. The eclipse is now.",
+    tones: ["wholesome", "bittersweet"],
+  },
+
+  // — Comedic / surreal —
+  {
+    id: "interdimensional-circus",
+    text: "An interdimensional traveling circus stops in this region for one week.",
+    tones: ["surreal", "whimsical"],
+  },
+  {
+    id: "talking-pokemon",
+    text: "Your starter Pokémon can suddenly speak — and they have OPINIONS.",
+    tones: ["comedic", "absurd"],
+  },
+  {
+    id: "wrong-trainer",
+    text: "A bureaucratic mix-up assigned you the wrong starter. Now you're stuck with it.",
+    tones: ["comedic", "underdog"],
+  },
+  {
+    id: "ghost-bachelor",
+    text: "A friendly ghost trainer haunts you because you're the only one who can see them.",
+    tones: ["comedic", "whimsical"],
+  },
+  {
+    id: "amateur-detective",
+    text: "You're a wannabe detective with no actual cases. Then a real one falls in your lap.",
+    tones: ["comedic", "investigative"],
+  },
+
+  // — Cozy / slice-of-life —
+  {
+    id: "grandparents-shop",
+    text: "You inherit your grandparents' Pokémon supply shop. It's been there forever.",
+    tones: ["cozy", "wholesome"],
+  },
+  {
+    id: "lighthouse-keeper",
+    text: "You take over a coastal lighthouse and the Pokémon that live in its beam.",
+    tones: ["cozy", "melancholy", "warm"],
+  },
+  {
+    id: "small-town-doctor",
+    text: "You move to a small town as the only Pokémon Center nurse. Everyone has a story.",
+    tones: ["cozy", "wholesome"],
+  },
+
+  // — Sci-fi / cosmic —
+  {
+    id: "first-contact",
+    text: "Pokémon from another planet just arrived. Nobody knows the rules yet.",
+    tones: ["sci-fi", "wonder"],
+  },
+  {
+    id: "time-loop",
+    text: "Every wave you lose, you wake up at wave 1 with one new memory.",
+    tones: ["sci-fi", "puzzle"],
+  },
+  {
+    id: "moon-base",
+    text: "A research station on the moon needs trainers for low-gravity Pokémon studies.",
+    tones: ["sci-fi", "adventure"],
+  },
+
+  // — Mature / morally complex (positive AND negative) —
+  {
+    id: "redemption-arc",
+    text: "A former villain is your traveling companion. They want to make amends.",
+    tones: ["mature", "redemption", "bittersweet"],
+  },
+  {
+    id: "unlikely-mentor",
+    text: "An ex-Champion who quit in disgrace agrees to mentor you for unclear reasons.",
+    tones: ["mature", "mentor", "moral-grey"],
+  },
+  {
+    id: "rebellion-and-mercy",
+    text: "A justified rebellion has begun. The League is corrupt, but the rebels aren't kind.",
+    tones: ["political", "moral-grey", "mature"],
+  },
+
+  // — Sports / competition —
+  {
+    id: "underdog-championship",
+    text: "An open-bracket tournament with prize money that could change your life.",
+    tones: ["competitive", "underdog", "warm"],
+  },
+  {
+    id: "draft-format",
+    text: "You compete in a brand-new draft format: each round, you and rivals draft from a shared pool.",
+    tones: ["competitive", "novel"],
+  },
 ] as const;
