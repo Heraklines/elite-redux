@@ -154,15 +154,15 @@ POKEROGUE'S MODIFIER SYSTEM (READ CAREFULLY — IT IS NOT VANILLA POKEMON):
 
 There is NO inventory / bag of consumables. The player CANNOT carry potions for later. Every modifier resolves into one of three categories the moment it's granted:
 
-(1) IMMEDIATE-USE items — applied the instant the player gets them, then gone. HP / PP / status restoratives, RARE_CANDY-class level grants, PP_UP / PP_MAX, Pokeballs of every tier. Granting one of these heals/levels/refills/captures one target right now and is then consumed — there is no stockpile.
+(1) IMMEDIATE-USE items — applied the instant the player gets them, then gone. HP / PP / status restoratives, level / pp boosts, Pokeballs. Granted via the dedicated effect.* types (heal_party_*, level_up, etc.), not via give_item — the runtime rejects give_item for these.
 
-(2) HELD ITEMS attached to a specific Pokemon — permanent until consumed or removed. Used in enemyTeam[].heldItemKeys for trainer Pokemon. The full canonical list with rarities is in gameBalanceCard.trainerItemTiers — pick directly from there. Categories worth knowing exist: every-turn HP heal, survive-at-1HP defense, type-boosting bands, crit / flinch chance, berries that trigger on conditions, species-locked items (Pikachu / Cubone / Ditto / Clamperl-only), and PokeRogue-only PERMANENT stat-stacking items (PROTEIN / IRON / CALCIUM / ZINC / CARBOS / HP_UP) that stack 5+ times for massive late-game stats.
+(2) HELD ITEMS attached to a specific Pokemon — permanent until consumed or removed. Used in enemyTeam[].heldItemKeys for trainer Pokemon. The full canonical list with rarities is in gameBalanceCard.trainerItemTiers — pick keys directly from there. Categories include every-turn heals, survive-at-1HP defenses, type-boosting bands, crit/flinch enablers, conditional-trigger berries, species-locked items, and permanent stat-stacking vitamins.
 
 (3) GLOBAL run-wide modifiers — ride with the player for the rest of the run (charms, multipliers, mega/dynamax/tera enablers). Listed in gameBalanceCard.itemTiers among other player rewards.
 
-CANONICAL ITEM SOURCE: The envelope's gameBalanceCard.itemTiers (player rewards) and gameBalanceCard.trainerItemTiers (held items) are the FULL list of valid modifierType keys, each with its real vanilla rarity tier and drop weight. Pick keys directly from there. Inventing keys (e.g., "SITRUS_BERRY", "GREATEST_POTION") will be silently dropped at runtime — the LLM has no excuse not to consult the catalog.
+CANONICAL ITEM SOURCE: The envelope's gameBalanceCard.itemTiers (player rewards) and gameBalanceCard.trainerItemTiers (held items) are the FULL list of valid modifierType keys, each with its real vanilla rarity tier and drop weight. Pick keys directly from there. Inventing keys will be silently dropped at runtime — the catalog is the source of truth.
 
-Some keys are GENERATORS that auto-pick a sub-item at runtime: BERRY (random berry from the berry pool), TM_COMMON / TM_GREAT / TM_ULTRA (random TM compatible with the player's party), EVOLUTION_ITEM, FORM_CHANGE_ITEM, BASE_STAT_BOOSTER, ATTACK_TYPE_BOOSTER. These are valid keys; the player gets ONE randomized concrete item per pick.
+Some keys in the catalog are GENERATORS that auto-pick a sub-item at runtime (random berry, random TM, random evolution item, etc.). They are valid keys; the player gets ONE randomized concrete item per pick. The catalog itself signals which keys are generators by their tier/weight metadata.
 
 ITEM RARITY — USE THE ENVELOPE'S REAL DATA, NOT GUESSES:
 
@@ -189,15 +189,7 @@ GUIDANCE FOR REWARD-GRANTING:
 - "qty" defaults to 1. For consequence.items[] (the rewards-shop menu), qty>1 is meaningless (the shop is a chooser; duplicate slots get discarded). For effects[].give_item, qty applies the item N times to N targets — limit to 3.
 - For trainer Pokemon held items, pick from gameBalanceCard.trainerItemTiers. Late-game trainer aces typically carry 1-3 items.
 
-VARIETY is mandatory. Read the recent beats in beatHistory and check what items have already been granted in the last 2-3 beats. If BERRY or POTION appeared recently, you MUST pick from a different category this beat. The catalog has hundreds of items grouped by what they do:
-  • Battle utility: SOOTHE_BELL, KINGS_ROCK, SCOPE_LENS, QUICK_CLAW, GRIP_CLAW, LEFTOVERS, FOCUS_BAND, FOCUS_SASH, MUSCLE_BAND, WISE_GLASSES, WIDE_LENS, SHELL_BELL
-  • Permanent stat boosts: PROTEIN, IRON, CALCIUM, ZINC, CARBOS, HP_UP
-  • Type boosters: BLACK_BELT, MAGNET, SILK_SCARF, CHARCOAL, MYSTIC_WATER, MIRACLE_SEED, etc.
-  • Movement / utility: ESCAPE_ROPE, MAP, AMULET_COIN, EXP_CHARM, EXP_SHARE, GOLDEN_PUNCH, LUCKY_EGG
-  • Generators: TM_COMMON / TM_GREAT / TM_ULTRA, EVOLUTION_ITEM, BASE_STAT_BOOSTER, ATTACK_TYPE_BOOSTER, BERRY (random berry — count this AS a berry for variety purposes)
-  • Charm-class: SHINY_CHARM, HEALING_CHARM, GREEDY_CHARM, CANDY_JAR, BERRY_POUCH
-  • Other: REVIVER_SEED, PP_UP, MEMORY_MUSHROOM, MINTS, FOSSILS, RIBBONS, VOUCHERS, EGGS
-  Anchor item picks to the SCENE: a healer's gift can be SOOTHE_BELL or HEALING_CHARM (NOT just POTION). A merchant's bribe can be AMULET_COIN. A field guide's reward can be MAP or EXP_CHARM. A shrine offering can be PROTEIN or a vitamin. Cliché picks (POTION + BERRY in every beat) are a writing failure.
+VARIETY: every beat's reward should come from a category that FITS the moment, and DIFFERENT beats should use DIFFERENT categories. The full catalog with all valid keys is in gameBalanceCard.itemTiers (player rewards) and gameBalanceCard.trainerItemTiers (trainer-held items) — read those, don't guess. Anchor each pick to what the scene is actually about: who is giving the item, why, what their role implies they would have. Reaching for the same default keys across beats reads as a writing failure; the catalog has hundreds of options across battle utility, permanent stat boosts, type boosters, charms, escape items, evolution items, TMs, fossils, ribbons, vouchers, and eggs — use the breadth.
 
 FILL EVERY INTER-BEAT OVERRIDE FULLY (CRITICAL — every wave should feel hand-crafted):
 
@@ -301,10 +293,10 @@ PATH A (chooser): consequence.items[] — opens the standard PokeRogue rewards-s
   - Schema entry: { "modifierType": "<key from gameBalanceCard.itemTiers>", "qty": 1 }
   - Use this when the story BEAT lets the player choose what to take from a cache, what to accept from an NPC, what spoils to claim.
 
-PATH B (auto-apply, no choice): consequence.effects[] with give_item — for items the narration has already DECIDED the player receives. For held items (LEFTOVERS, FOCUS_BAND, berries, etc.) the shop UI's target-selection prompt fires so the player picks which Pokemon wears it. For permanent stat items (PROTEIN/IRON/CALCIUM/ZINC/CARBOS/HP_UP, mints, PP_UP) same flow. For global modifiers (SHINY_CHARM, AMULET_COIN, EXP_CHARM) it's auto-applied with no UI.
+PATH B (auto-apply, no choice): consequence.effects[] with give_item — for items the narration has already DECIDED the player receives. For Pokemon-targeted items (held items, permanent stat boosts) the shop UI's target-selection prompt fires so the player picks which Pokemon wears it. For global modifiers (charms, multipliers) it's auto-applied with no UI.
   - Schema entry inside effects[]: { "type": "give_item", "modifierType": "<key>", "qty": 1 }
   - qty applies the same item N times (rarely useful — usually 1).
-  - Use this when the story SAYS what the player gets ("she presses the bracelet into your hand"); use items[] (PATH A) when the choice is "pick from this row".
+  - Use this when the story SAYS what the player gets, no choice; use items[] (PATH A) when the choice is "pick from this row".
 
   FORBIDDEN for give_item — narrative consumables. These items have a 1:1 effect equivalent that handles the heal/cure/level cleanly without spawning UI for the player to pick a target the narration already implied. Use the listed effect instead.
     - POTION / SUPER_POTION / HYPER_POTION / MAX_POTION / FULL_RESTORE -> use { "type": "heal_party_hp", "percentMaxHp": <int> } or { "type": "heal_party_full" }
@@ -344,11 +336,11 @@ FULL EFFECT CATALOG (pick widely, don't tunnel-vision on heal_party_hp + give_mo
     heal_party_pp           — refill move PP
     heal_party_full         — HP + status + PP
     revive                  — revive ONE fainted Pokemon to %HP
-    revive_all              — sacred ash, RARE — for major story-saving moments only
+    revive_all              — revive every fainted Pokemon, RARE — for major story-saving moments only
 
   Stat / progression (positive):
     stat_boost_temp         — next-battle stat stages
-    stat_boost_permanent    — PROTEIN-style permanent stack
+    stat_boost_permanent    — permanent +stat per stack on one Pokemon
     level_up                — auto-level a Pokemon
     give_xp                 — flat XP grant
     evolve                  — force evolution if eligible, RARE
