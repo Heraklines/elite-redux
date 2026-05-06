@@ -200,17 +200,25 @@ For each interBeatOverride, populate these fields whenever the story implies the
   "preBattleText": "<story-themed line just before the battle, max 120 chars>",
   "postWinText": "<what happens after victory, max 120 chars>",
   "postLossText": "<what happens if the player loses, max 120 chars>",
-  "trainerName": "Concordat Ranger Vance",  // overrides the default trainer-class display name
+  "trainerName": "<display-name override for the wave's trainer, if any>",
   "trainerOverride": {
-    "trainerType": <id from gameBalanceCard.trainerTypeCatalog>,  // pick the sprite that matches the story role
-    "levelDelta": 0,                        // only deviate if the narrative justifies it
+    "trainerType": <id from gameBalanceCard.trainerTypeCatalog>,
+    "levelDelta": 0,
     "enemyTeam": [ /* optional; see AUTHORING TRAINER TEAMS below */ ]
   },
+  "wildEncounter": {
+    "pokemon": [ /* 1-2 AuthoredPokemon from speciesCatalog — for narrative-specific wild fights */ ],
+    "isBoss": false
+  },
+  "biomeChange": { "biomeId": <id from biomeCatalog, for mid-act biome shifts> },
+  "forceMysteryEncounter": false,
   "victoryRewards": [ /* loot description; modifierType keys from gameBalanceCard.itemTiers */ ],
   "victoryEffects": [ /* any of the discriminated effects */ ],
   "defeatEffects":  [ /* what happens narratively + mechanically when the player loses */ ]
 }
 \`\`\`
+
+Only include the override fields you actually want to fire. Don't emit every field every time — pick the ones that match what the story is actually doing on this wave.
 
 ALWAYS EMIT INTER-BEAT OVERRIDES (every beat must include 2 of these):
 - The player plays 2 vanilla wave battles between beats. WITHOUT story-themed narration on those waves, the run feels like Classic with story dialogue once in a while.
@@ -218,12 +226,29 @@ ALWAYS EMIT INTER-BEAT OVERRIDES (every beat must include 2 of these):
     "preBattleText": 1-2 sentences (max 120 chars) of story-themed narration spoken right before that wave's battle. Tie it to the current beat's situation — name the antagonist faction, recall a recent NPC, hint at the next beat. Generic "you meet a trainer" lines are unacceptable.
     Optionally also: trainerName (overrides the default trainer-class display name), levelDelta (-3..+3 to bend difficulty for narrative reasons), biomeFlavorText.
 
-STORY-FIGHT MATCH (important — fixes the "narration says X, fight is Y" disconnect):
-- When preBattleText names a SPECIFIC encounter (a Pelipper guarding the buoy / a Slateport Maritime cutter with a Mantine / a wild Cetoddle blocking the path), you SHOULD also set trainerOverride.enemyTeam in that override so the vanilla wave actually IS that encounter. Otherwise the player reads about a Pelipper and fights random fauna, which breaks immersion.
-- For trainer waves: enemyTeam = trainer's actual party. Match the species to the narration.
-- For wild waves: still use enemyTeam (1-2 entries) so the wild Pokemon matches the story (a wild Pelipper => speciesId 279 with appropriate level).
-- Skip enemyTeam ONLY when the preBattleText is generic ("a passing trainer challenges you") — let vanilla pick the team.
-- This is not optional when the narration is specific. Every beat governs a 3-wave chunk: itself + the next 2.
+STORY-FIGHT MATCH — set the right override field for the encounter you describe:
+
+  TRAINER battle (sailor, ranger, cultist, smuggler, etc.):
+    trainerOverride: {
+      trainerType: <id from gameBalanceCard.trainerTypeCatalog>,
+      enemyTeam: [...]   // the trainer's actual party
+    }
+  WILD encounter (a specific Pokemon, no trainer — Pelipper guarding the buoy, feral Houndoom blocking the cave):
+    wildEncounter: {
+      pokemon: [<1-2 entries from speciesCatalog>],
+      isBoss: false      // true for dramatic boss-coded wild fights, sparingly
+    }
+  MID-ACT BIOME SHIFT (the road dips into a cave, the corridor opens to the bay):
+    biomeChange: { biomeId: <from biomeCatalog> }
+  VANILLA mystery encounter (chest, sleeping Snorlax, fight-or-flight, etc.):
+    forceMysteryEncounter: true
+    // pulls a random eligible encounter from PokeRogue's standard biome pool
+
+Rules:
+- Pick ONE battle-type-changing override per wave (forceMysteryEncounter > wildEncounter > trainerOverride.enemyTeam priority).
+- biomeChange composes with any of the above (the new biome is in place when the wave plays).
+- When narration is specific, set the matching override. Generic "a passing trainer challenges you" can fall through to vanilla generation (no override needed).
+- These cover: specific Pokemon, boss fights, biome changes, vanilla mystery events, AND named-trainer fights. Use what fits the story.
 
 AUTHORING TRAINER TEAMS (enemyTeam — the heart of v2):
 - Whenever you set enemyTeam, ALWAYS source ids from envelope.gameBalanceCard:

@@ -103,7 +103,12 @@ export class EncounterPhase extends BattlePhase {
         // Skip enemy loading for MEs, those are loaded elsewhere
         return false;
       }
-      if (!this.loaded) {
+      // The LLM Director can pre-populate battle.enemyParty[e] via
+      // NewBattlePhase.applyWildEncounterOverride for narrative-driven
+      // wild encounters (a specific Pelipper, a feral Houndoom). When
+      // that's the case, skip the standard generation so the LLM's
+      // choices stick.
+      if (!this.loaded && !battle.enemyParty[e]) {
         if (battle.battleType === BattleType.TRAINER) {
           battle.enemyParty[e] = battle.trainer?.genPartyMember(e)!; // TODO:: is the bang correct here?
         } else {

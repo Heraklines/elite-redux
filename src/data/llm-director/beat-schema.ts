@@ -51,6 +51,35 @@ export interface InterBeatOverride {
     /** Full LLM-authored team for the upcoming trainer wave (1-6 entries). */
     enemyTeam?: AuthoredPokemon[];
   };
+  /**
+   * Wild-encounter override: forces this wave to be a wild encounter with
+   * a specific Pokemon (or a small party for double battles / boss waves).
+   * Use when the story names a specific creature ("a wild Pelipper guards
+   * the buoy", "a feral Houndoom blocks the cave"). If both this and
+   * trainerOverride.enemyTeam are set, this wins (the wave becomes WILD).
+   */
+  wildEncounter?: {
+    /** Up to 2 Pokemon for single/double wild battles. */
+    pokemon: AuthoredPokemon[];
+    /** Marks the encounter as a boss (segmented HP, dramatic music).
+     * Use sparingly — every 50ish waves naturally gets a boss. */
+    isBoss?: boolean;
+  };
+  /**
+   * Switch the arena biome at this wave. Use when the LLM's narration says
+   * the location changes ("you cross the cave threshold", "the road opens
+   * onto the bay"). The wave still plays in whatever it was, just in the
+   * new biome. For act boundaries the bible's act.biomeId already auto-
+   * switches; this is for mid-act biome shifts.
+   */
+  biomeChange?: { biomeId: number };
+  /**
+   * Force this wave to be a vanilla PokéRogue mystery encounter (chest,
+   * sleeping snorlax, fight or flight, etc.). Picks at random from the
+   * standard biome-eligible pool; the LLM gives up control over the wave
+   * but gets a wider variety of vanilla content woven in.
+   */
+  forceMysteryEncounter?: boolean;
   biomeFlavorText?: string;
   /** Story-themed line spoken just before the battle starts. Max ~240 chars. */
   preBattleText?: string;
@@ -911,6 +940,24 @@ const interBeatOverrideSchema = {
       },
       additionalProperties: false,
     },
+    wildEncounter: {
+      type: "object",
+      required: ["pokemon"],
+      properties: {
+        pokemon: { type: "array", minItems: 1, maxItems: 2, items: authoredPokemonSchema },
+        isBoss: { type: "boolean" },
+      },
+      additionalProperties: false,
+    },
+    biomeChange: {
+      type: "object",
+      required: ["biomeId"],
+      properties: {
+        biomeId: { type: "integer", minimum: 0 },
+      },
+      additionalProperties: false,
+    },
+    forceMysteryEncounter: { type: "boolean" },
     biomeFlavorText: { type: "string", maxLength: 240 },
     preBattleText: { type: "string", maxLength: 240 },
     postWinText: { type: "string", maxLength: 240 },

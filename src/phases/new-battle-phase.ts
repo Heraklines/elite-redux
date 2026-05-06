@@ -2,10 +2,13 @@ import { globalScene } from "#app/global-scene";
 import { BattleType } from "#enums/battle-type";
 import type { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
+import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerType } from "#enums/trainer-type";
 import { TrainerVariant } from "#enums/trainer-variant";
 import { UiMode } from "#enums/ui-mode";
 import { Trainer } from "#field/trainer";
+import { PokemonMove } from "#moves/pokemon-move";
 import { BattlePhase } from "#phases/battle-phase";
 import { applyOverrideToBattle } from "#phases/llm-director-beat-utils";
 import { clampAuthoredTeam } from "#system/llm-director/authored-team";
@@ -14,6 +17,7 @@ import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 import { installAuthoredTeam } from "#system/llm-director/install-authored-team";
 import { paginate } from "#system/llm-director/text-pagination";
 import { trainerConfigs } from "#trainers/trainer-config";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 export class NewBattlePhase extends BattlePhase {
   public readonly phaseName = "NewBattlePhase";
@@ -55,17 +59,44 @@ export class NewBattlePhase extends BattlePhase {
 
   /**
    * If `wave` is the start (waveStart) of a story bible act, switch to that
-   * act's designated biome. Keeps the visual location in sync with the
-   * narrative — a smuggler's-den arc plays in a CAVE, a court drama in a
-   * TEMPLE, etc. No-op if the bible isn't loaded or the wave isn't a boundary.
+   * act's designated biome AND fire a bible-refinement pass in the
+   * background so the next act's beats benefit from a re-read of the
+   * run-so-far. Refinement is opportunistic — it doesn't block the act
+   * transition, and falls back to the original bible silently on failure.
+   * Keeps the visual location in sync with the narrative — a smuggler's-
+   * den arc plays in a CAVE, a court drama in a TEMPLE, etc. No-op if
+   * the bible isn't loaded or the wave isn't a boundary.
    */
   private applyActBiomeSwitch(wave: number): void {
-    const bible = globalScene.gameData.llmDirectorState?.storyBible;
+    const state = globalScene.gameData.llmDirectorState;
+    const bible = state?.storyBible;
     if (!bible || wave <= 0) {
       return;
     }
     const act = bible.acts.find(a => a.waveStart === wave);
-    if (!act || typeof act.biomeId !== "number") {
+    if (!act) {
+      return;
+    }
+    // Fire a refinement pass in the background. Don't await; the next
+    // beat envelope picks up the refined bible if it lands in time.
+    const runtime = getDirectorRuntime();
+    if (runtime && state) {
+      void import("#system/llm-director/refine-story-bible").then(({ refineStoryBible }) =>
+        refineStoryBible(runtime.client, { bible, state })
+          .then(refined => {
+            if (refined) {
+              state.storyBible = refined;
+              console.info(`[llm-director] bible refined at act boundary wave=${wave} act=${act.name}`);
+            }
+          })
+          .catch(err => {
+            console.warn(
+              `[llm-director] bible refinement crashed wave=${wave}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }),
+      );
+    }
+    if (typeof act.biomeId !== "number") {
       return;
     }
     const currentBiome = globalScene.arena?.biomeId;
@@ -89,33 +120,58 @@ export class NewBattlePhase extends BattlePhase {
     if (!override) {
       return;
     }
-    // Trainer-sprite override: if the LLM picked a specific trainerType for
-    // this wave, swap the existing trainer instance for one of the requested
-    // type BEFORE installAuthoredTeam binds to it. This must happen before
-    // enemyTeam application because installAuthoredTeam mutates the bound
-    // trainer's config; we want the new trainer's config (matching the
-    // narration's sprite) to receive those mutations.
-    const requestedTrainerType = override.trainerOverride?.trainerType;
-    if (
-      typeof requestedTrainerType === "number"
-      && battle.battleType === BattleType.TRAINER
-      && battle.trainer
-      && requestedTrainerType !== battle.trainer.config.trainerType
-    ) {
-      this.applyTrainerTypeOverride(battle.waveIndex, requestedTrainerType);
-    }
-    // v2 Phase A: full LLM-authored team. Apply BEFORE levelDelta so the
-    // authored levels are clamped against the wave-curve baseline (not
-    // against post-delta levels), and so genPartyMember sees the correct
-    // enemyLevels when EncounterPhase calls it.
-    const enemyTeam = override.trainerOverride?.enemyTeam;
-    if (enemyTeam && enemyTeam.length > 0) {
-      this.applyAuthoredEnemyTeam(battle.waveIndex, enemyTeam, override.trainerOverride?.levelDelta);
+    // ── BATTLE-TYPE OVERRIDES (priority order) ──────────────────────────
+    // Each override below can transform what the upcoming wave actually IS:
+    //   forceMysteryEncounter   wave -> MYSTERY_ENCOUNTER (vanilla pool)
+    //   wildEncounter           wave -> WILD with LLM-specified Pokemon
+    //   trainerOverride.enemyTeam   wave -> TRAINER with LLM-authored team
+    //   trainerOverride.trainerType  wave -> TRAINER with LLM-specified sprite
+    // Higher priority transforms run first; lower-priority transforms only
+    // apply if the higher-priority ones didn't fire.
+    if (override.forceMysteryEncounter) {
+      this.applyForceMysteryEncounter(battle.waveIndex);
+    } else if (override.wildEncounter && override.wildEncounter.pokemon.length > 0) {
+      this.applyWildEncounterOverride(battle.waveIndex, override.wildEncounter);
     } else {
-      const snapshot = { enemyLevels: battle.enemyLevels };
-      const applied = applyOverrideToBattle(snapshot, override);
-      if (applied && snapshot.enemyLevels) {
-        battle.enemyLevels = snapshot.enemyLevels;
+      // Trainer-sprite override: swap the existing trainer for one of the
+      // requested type BEFORE installAuthoredTeam binds to it.
+      const requestedTrainerType = override.trainerOverride?.trainerType;
+      if (
+        typeof requestedTrainerType === "number"
+        && battle.battleType === BattleType.TRAINER
+        && battle.trainer
+        && requestedTrainerType !== battle.trainer.config.trainerType
+      ) {
+        this.applyTrainerTypeOverride(battle.waveIndex, requestedTrainerType);
+      }
+    }
+    // Mid-act biome switch: orthogonal to battle-type — just queue the
+    // SwitchBiomePhase before EncounterPhase runs. The new biome is in
+    // place by the time the wave actually plays.
+    if (override.biomeChange && typeof override.biomeChange.biomeId === "number") {
+      const targetBiome = override.biomeChange.biomeId as BiomeId;
+      const currentBiome = globalScene.arena?.biomeId;
+      if (currentBiome !== targetBiome) {
+        logBiomeSwitch(`override-wave-${battle.waveIndex}`, currentBiome, targetBiome);
+        globalScene.phaseManager.unshiftNew("SwitchBiomePhase", targetBiome);
+      }
+    }
+    // LLM-authored trainer team. Skipped if a higher-priority override
+    // already transformed the wave (forceMysteryEncounter / wildEncounter)
+    // — those replace the entire battle setup, so a trainer-team override
+    // would be moot. Still applies levelDelta in the no-team case.
+    const enemyTeam = override.trainerOverride?.enemyTeam;
+    const isTransformedToWildOrME =
+      override.forceMysteryEncounter || (override.wildEncounter && override.wildEncounter.pokemon.length > 0);
+    if (!isTransformedToWildOrME) {
+      if (enemyTeam && enemyTeam.length > 0 && battle.battleType === BattleType.TRAINER) {
+        this.applyAuthoredEnemyTeam(battle.waveIndex, enemyTeam, override.trainerOverride?.levelDelta);
+      } else {
+        const snapshot = { enemyLevels: battle.enemyLevels };
+        const applied = applyOverrideToBattle(snapshot, override);
+        if (applied && snapshot.enemyLevels) {
+          battle.enemyLevels = snapshot.enemyLevels;
+        }
       }
     }
     const swapCount = override.trainerOverride?.speciesSwaps?.length ?? 0;
@@ -265,6 +321,124 @@ export class NewBattlePhase extends BattlePhase {
       const reason = err instanceof Error ? err.message : String(err);
       console.warn(`[llm-director] trainer-type-override failed wave=${waveIndex} reason=${reason}`);
     }
+  }
+
+  /**
+   * Convert the wave to a WILD encounter populated with the LLM-specified
+   * Pokemon. If the wave was originally TRAINER, the trainer is destroyed
+   * first. The enemyParty is pre-populated so EncounterPhase reuses it
+   * (skipping its own `globalScene.randomSpecies` roll — see the
+   * `!battle.enemyParty[e]` guard added in encounter-phase.ts).
+   *
+   * Up to 2 Pokemon (single or double battle). Each entry's level defaults
+   * to the wave-curve baseline; abilityIndex / moveIds / nickname / shiny
+   * are honored when valid; held items granted via consequence.effects
+   * paths instead (we don't apply heldItemKeys for wild encounters since
+   * vanilla wild Pokemon don't carry held items by default).
+   */
+  private applyWildEncounterOverride(
+    waveIndex: number,
+    spec: { pokemon: import("#data/llm-director/beat-schema").AuthoredPokemon[]; isBoss?: boolean },
+  ): void {
+    const battle = globalScene.currentBattle;
+    if (!battle) {
+      return;
+    }
+    // Tear down the trainer if there was one.
+    if (battle.battleType === BattleType.TRAINER && battle.trainer) {
+      try {
+        globalScene.field.remove(battle.trainer, false);
+        battle.trainer.destroy();
+      } catch (err) {
+        console.warn(
+          `[llm-director] wild-encounter-override wave=${waveIndex} trainer-destroy warning: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      battle.trainer = null;
+    }
+    battle.battleType = BattleType.WILD;
+    const baseLevel = battle.enemyLevels?.[0] ?? Math.max(5, waveIndex);
+    const finalLevels: number[] = [];
+    battle.enemyParty = [];
+    for (let i = 0; i < spec.pokemon.length && i < 2; i++) {
+      const p = spec.pokemon[i];
+      const species = getPokemonSpecies(p.speciesId);
+      if (!species) {
+        console.warn(`[llm-director] wild-encounter-override wave=${waveIndex} unknown speciesId=${p.speciesId}`);
+        continue;
+      }
+      const level = Math.max(1, Math.floor(p.level ?? baseLevel));
+      const isBoss = !!p.isBoss || !!spec.isBoss;
+      try {
+        const enemy = globalScene.addEnemyPokemon(species, level, TrainerSlot.NONE, isBoss);
+        if (Array.isArray(p.moveIds) && p.moveIds.length > 0) {
+          enemy.moveset = p.moveIds.slice(0, 4).map(id => new PokemonMove(id));
+        }
+        // AuthoredPokemon uses `abilityId` (the Ability enum value); the
+        // EnemyPokemon's `abilityIndex` is the slot (0=ability1, 1=ability2,
+        // 2=hidden) into its species. Map by matching the requested ability.
+        if (typeof p.abilityId === "number" && p.abilityId >= 0) {
+          const slot =
+            species.ability1 === p.abilityId
+              ? 0
+              : species.ability2 === p.abilityId
+                ? 1
+                : species.abilityHidden === p.abilityId
+                  ? 2
+                  : -1;
+          if (slot >= 0) {
+            enemy.abilityIndex = slot;
+          }
+        }
+        if (p.shiny) {
+          enemy.shiny = true;
+        }
+        battle.enemyParty.push(enemy);
+        finalLevels.push(level);
+      } catch (err) {
+        console.warn(
+          `[llm-director] wild-encounter-override wave=${waveIndex} addEnemyPokemon failed for speciesId=${p.speciesId}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+    battle.enemyLevels = finalLevels;
+    battle.double = battle.enemyParty.length > 1;
+    console.info(
+      `[llm-director] wild-encounter-override applied wave=${waveIndex} count=${battle.enemyParty.length} levels=[${finalLevels.join(",")}] boss=${!!spec.isBoss}`,
+    );
+  }
+
+  /**
+   * Convert the wave to a vanilla MYSTERY_ENCOUNTER. PokeRogue's existing
+   * `EncounterPhase` then runs the standard mystery-encounter pipeline:
+   * picks an eligible encounter from the biome pool, sets up sprites, and
+   * queues `MysteryEncounterPhase` for the option-select UI. This gives
+   * the LLM an "I want a vanilla mystery event here" lever, alongside the
+   * LLM-authored dialogue beats.
+   */
+  private applyForceMysteryEncounter(waveIndex: number): void {
+    const battle = globalScene.currentBattle;
+    if (!battle) {
+      return;
+    }
+    if (battle.battleType === BattleType.TRAINER && battle.trainer) {
+      try {
+        globalScene.field.remove(battle.trainer, false);
+        battle.trainer.destroy();
+      } catch (err) {
+        console.warn(
+          `[llm-director] force-mystery-encounter wave=${waveIndex} trainer-destroy warning: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      battle.trainer = null;
+    }
+    battle.battleType = BattleType.MYSTERY_ENCOUNTER;
+    // Leave battle.mysteryEncounter undefined so EncounterPhase fills it
+    // from the vanilla pool (`globalScene.getMysteryEncounter(undefined)`
+    // rolls by tier weight against the biome's eligible list).
+    battle.mysteryEncounter = undefined;
+    battle.mysteryEncounterType = MysteryEncounterType.MYSTERIOUS_CHEST;
+    console.info(`[llm-director] force-mystery-encounter applied wave=${waveIndex} (vanilla pool roll)`);
   }
 
   /**
