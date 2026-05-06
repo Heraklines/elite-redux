@@ -9,7 +9,7 @@ import { UiMode } from "#enums/ui-mode";
 import type { ModifierType } from "#modifiers/modifier-type";
 import { handleMysteryEncounterVictory } from "#mystery-encounters/encounter-phase-utils";
 import { PokemonPhase } from "#phases/pokemon-phase";
-import { applyEffects } from "#system/llm-director/consequence-effects";
+import { applyEffects, resolveItemThunk } from "#system/llm-director/consequence-effects";
 import { logEffectApplied } from "#system/llm-director/director-log";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 
@@ -189,9 +189,13 @@ function applyPostVictoryHook(waveIndex: number): void {
         console.warn(`[llm-director] unknown modifierType in victoryRewards: "${item.modifierType}"`);
         continue;
       }
+      const resolved = resolveItemThunk(factory, item.modifierType);
+      if (!resolved) {
+        continue;
+      }
       const qty = Math.max(1, item.qty ?? 1);
       for (let i = 0; i < qty; i++) {
-        globalScene.phaseManager.pushNew("ModifierRewardPhase", factory);
+        globalScene.phaseManager.pushNew("ModifierRewardPhase", resolved);
       }
     }
   }

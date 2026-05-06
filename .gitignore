@@ -50,3 +50,4 @@ coverage
 # Local env overrides (Vite convention) - never committed
 .env.local
 .env.*.local
+llm-director-trace.jsonl

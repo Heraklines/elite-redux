@@ -9,6 +9,7 @@ import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { PlayerPokemon } from "#field/pokemon";
 import type { ModifierType } from "#modifiers/modifier-type";
+import { generateModifierType } from "#mystery-encounters/utils/encounter-phase-utils";
 import { VoucherType } from "#system/voucher";
 import { randSeedInt } from "#utils/common";
 
@@ -311,16 +312,47 @@ function applyFaint(effect: { target: TargetSpec }): void {
 
 function applyGiveItem(effect: { modifierType: string; qty?: number }): void {
   const factories = modifierTypes as Record<string, (() => ModifierType) | undefined>;
-  const factory = factories[effect.modifierType];
-  if (typeof factory !== "function") {
+  const rawFactory = factories[effect.modifierType];
+  if (typeof rawFactory !== "function") {
     console.warn(`[llm-director] give_item unknown modifierType="${effect.modifierType}"`);
+    return;
+  }
+  const resolved = resolveItemThunk(rawFactory, effect.modifierType);
+  if (!resolved) {
     return;
   }
   const qty = Math.max(1, effect.qty ?? 1);
   for (let i = 0; i < qty; i++) {
-    globalScene.phaseManager.unshiftNew("ModifierRewardPhase", factory);
+    globalScene.phaseManager.unshiftNew("ModifierRewardPhase", resolved);
   }
   console.info(`[llm-director] give_item type=${effect.modifierType} qty=${qty}`);
+}
+
+/**
+ * Resolve a `modifierTypes[id]` factory into a thunk that returns a fully-
+ * materialized `ModifierType` (with `id`, `tier`, and — for generators like
+ * `TM_COMMON` / `EVOLUTION_ITEM` — a concrete pick).
+ *
+ * Uses PokeRogue's canonical `generateModifierType` helper (the same one
+ * mystery encounters use, e.g. `absolute-avarice-encounter.ts:290`,
+ * `bug-type-superfan-encounter.ts:221`). Without this, passing a bare
+ * generator to `ModifierRewardPhase` shows "You received !" with an empty
+ * name, because the generator's `localeKey` is unset until `generateType`
+ * runs against the player's party.
+ *
+ * Returns `null` when the generator has no compatible pick for the current
+ * party (e.g. TM_COMMON when no party member can learn any common-tier TM);
+ * caller should skip the reward rather than enqueue an empty phase.
+ */
+export function resolveItemThunk(rawFactory: () => ModifierType, id: string): (() => ModifierType) | null {
+  const resolved = generateModifierType(rawFactory);
+  if (!resolved) {
+    console.warn(
+      `[llm-director] give_item generator "${id}" produced no compatible item for current party — skipping reward`,
+    );
+    return null;
+  }
+  return () => resolved;
 }
 
 function applyRemoveItem(effect: { modifierType: string; qty?: number }): void {

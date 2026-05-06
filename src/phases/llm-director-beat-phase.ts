@@ -19,7 +19,7 @@ import { buildTrainerOverride } from "#phases/llm-director-beat-utils";
 import { type ApplyResult, applyConsequence } from "#system/llm-director/beat-applier";
 import { recordBeatHistory, recordPlayerChoice } from "#system/llm-director/beat-history";
 import { compactHistory, HISTORY_COMPACT_THRESHOLD } from "#system/llm-director/compact-history";
-import { applyEffects } from "#system/llm-director/consequence-effects";
+import { applyEffects, resolveItemThunk } from "#system/llm-director/consequence-effects";
 import { logBeatDispatched, logChoiceMade, logTrainerOverride, logUnderrun } from "#system/llm-director/director-log";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
@@ -424,9 +424,13 @@ function grantConsequenceRewards(consequence: import("#data/llm-director/beat-sc
         console.warn(`[llm-director] unknown modifierType in consequence.items: "${item.modifierType}"`);
         continue;
       }
+      const resolved = resolveItemThunk(factory, item.modifierType);
+      if (!resolved) {
+        continue;
+      }
       const qty = Math.max(1, item.qty ?? 1);
       for (let i = 0; i < qty; i++) {
-        globalScene.phaseManager.unshiftNew("ModifierRewardPhase", factory);
+        globalScene.phaseManager.unshiftNew("ModifierRewardPhase", resolved);
       }
     }
   }
