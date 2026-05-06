@@ -4,8 +4,10 @@ import { GameModes } from "#enums/game-modes";
 import { UiMode } from "#enums/ui-mode";
 import { BattlePhase } from "#phases/battle-phase";
 import { applyOverrideToBattle } from "#phases/llm-director-beat-utils";
+import { clampAuthoredTeam } from "#system/llm-director/authored-team";
 import { logBiomeSwitch } from "#system/llm-director/director-log";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
+import { installAuthoredTeam } from "#system/llm-director/install-authored-team";
 
 export class NewBattlePhase extends BattlePhase {
   public readonly phaseName = "NewBattlePhase";
@@ -81,14 +83,24 @@ export class NewBattlePhase extends BattlePhase {
     if (!override) {
       return;
     }
-    const snapshot = { enemyLevels: battle.enemyLevels };
-    const applied = applyOverrideToBattle(snapshot, override);
-    if (applied && snapshot.enemyLevels) {
-      battle.enemyLevels = snapshot.enemyLevels;
+    // v2 Phase A: full LLM-authored team. Apply BEFORE levelDelta so the
+    // authored levels are clamped against the wave-curve baseline (not
+    // against post-delta levels), and so genPartyMember sees the correct
+    // enemyLevels when EncounterPhase calls it.
+    const enemyTeam = override.trainerOverride?.enemyTeam;
+    if (enemyTeam && enemyTeam.length > 0) {
+      this.applyAuthoredEnemyTeam(battle.waveIndex, enemyTeam, override.trainerOverride?.levelDelta);
+    } else {
+      const snapshot = { enemyLevels: battle.enemyLevels };
+      const applied = applyOverrideToBattle(snapshot, override);
+      if (applied && snapshot.enemyLevels) {
+        battle.enemyLevels = snapshot.enemyLevels;
+      }
     }
     const swapCount = override.trainerOverride?.speciesSwaps?.length ?? 0;
-    if (swapCount > 0) {
-      // v2: thread species swaps into trainer.genPartyMember.
+    if (swapCount > 0 && (!enemyTeam || enemyTeam.length === 0)) {
+      // legacy v1 swap path is superseded by enemyTeam in v2; only log when
+      // the LLM emitted swaps without a full team.
       console.info(
         `[llm-director] interBeatOverride.speciesSwaps received for wave ${battle.waveIndex} (deferred to v2)`,
       );
@@ -99,6 +111,43 @@ export class NewBattlePhase extends BattlePhase {
     if (override.preBattleText) {
       void globalScene.ui.setMode(UiMode.MESSAGE);
       globalScene.phaseManager.queueMessage(override.preBattleText, null, true);
+    }
+  }
+
+  /**
+   * Apply an LLM-authored team for an upcoming trainer wave. Server-side
+   * balance rails clamp levels/team-size/moveset, then `installAuthoredTeam`
+   * mutates the live trainer config so EncounterPhase emits the authored
+   * party. On any failure (bad species id, invalid move, etc.) we log and
+   * leave the vanilla generation in place — the run never breaks.
+   */
+  private applyAuthoredEnemyTeam(
+    waveIndex: number,
+    team: import("#data/llm-director/beat-schema").AuthoredPokemon[],
+    levelDelta: number | undefined,
+  ): void {
+    const battle = globalScene.currentBattle;
+    if (!battle) {
+      return;
+    }
+    const baseLevel = battle.enemyLevels?.[0] ?? 5;
+    const adjustedBase = baseLevel + (levelDelta ?? 0);
+    try {
+      const clamped = clampAuthoredTeam(team, {
+        baseLevel: adjustedBase,
+        recentFaints: 0,
+      });
+      const failure = installAuthoredTeam(battle, clamped);
+      if (failure) {
+        console.warn(`[llm-director] team-build-failed wave=${waveIndex} reason=${failure}`);
+        return;
+      }
+      console.info(
+        `[llm-director] authored-team-installed wave=${waveIndex} size=${clamped.length} levels=[${battle.enemyLevels?.join(",")}]`,
+      );
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      console.warn(`[llm-director] team-build-failed wave=${waveIndex} reason=${reason}`);
     }
   }
 }
