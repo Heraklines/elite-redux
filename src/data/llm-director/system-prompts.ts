@@ -22,7 +22,19 @@ Output STRICT JSON matching this shape (no prose, no markdown fences):
   "openingScene": "ONE short sentence (HARD MAX 100 chars). WHERE you are at run start, sensory and concrete.",
   "tonalKeywords": ["3-7 keywords describing tone/genre/mood"],
   "acts": [
-    { "name": "Act name", "waveStart": 1, "waveEnd": 50, "summary": "1-2 sentence intent for this act", "biomeId": 1 }
+    {
+      "name": "Act name",
+      "waveStart": 1,
+      "waveEnd": 50,
+      "summary": "1-2 sentence intent for this act",
+      "biomeId": 1,
+      "microArcs": [
+        { "waveStart": 1, "waveEnd": 10, "focus": "what happens / who appears / what the player decides in this 10-wave span — concrete and load-bearing" },
+        { "waveStart": 11, "waveEnd": 20, "focus": "..." },
+        { "waveStart": 21, "waveEnd": 35, "focus": "..." },
+        { "waveStart": 36, "waveEnd": 50, "focus": "act climax — the act's central tension comes to a head; act-finale beat at waveEnd is a boss-coded fight" }
+      ]
+    }
   ],
   "factions": [
     { "name": "Faction name", "description": "1-2 sentences", "initialRep": -100..100 integer }
@@ -36,6 +48,7 @@ Output STRICT JSON matching this shape (no prose, no markdown fences):
 Constraints:
 - 3-5 acts spanning waves 1..200 with no gaps and no overlaps.
 - EACH act MUST have a thematically-fitting biomeId from the standard PokéRogue biome catalog. Common ids: TOWN=0, PLAINS=1, GRASS=2, TALL_GRASS=3, METROPOLIS=4, FOREST=5, SEA=6, SWAMP=7, BEACH=8, LAKE=9, SEABED=10, MOUNTAIN=11, BADLANDS=12, CAVE=13, DESERT=14, ICE_CAVE=15, MEADOW=16, POWER_PLANT=17, VOLCANO=18, GRAVEYARD=19, DOJO=20, FACTORY=21, RUINS=22, WASTELAND=23, ABYSS=24, SPACE=25, CONSTRUCTION_SITE=26, JUNGLE=27, FAIRY_CAVE=28, TEMPLE=29, SLUM=30, SNOWY_FOREST=31, ISLAND=40, LABORATORY=41. Pick the biome that most fits the act's mood; the game auto-switches to this biome when the act starts.
+- EACH act MUST have a microArcs array (3-8 entries). Each micro-arc covers a wave span (typically ~10 waves) and gives WAVE-GRANULAR direction: who appears in those waves, what scenes happen, what the player should be deciding, what the antagonist's move is. Without micro-arcs the beat-writer LLM has only the act-level summary and improvises — causing the same NPC to be re-introduced every beat and the story to drift. Make microArcs LOAD-BEARING: each focus string should answer "if you only read this, what should happen across these 10 waves?". Cover the entire act (microArcs[0].waveStart == act.waveStart, microArcs[last].waveEnd == act.waveEnd, no gaps). Include the act-finale climax in the LAST micro-arc.
 - 0-5 factions; their initialRep must reflect the theme (a rebel-friendly arc starts with rebels positively, an oppressive-state arc starts with rebels negatively, etc.).
 - 1-4 recurring NPCs; memoryKey is stable across the whole run, the LLM will refer back to it in future beats.
 - moralSpectrum labels MUST be 1 word each, fitting the theme's tone.
@@ -66,6 +79,8 @@ POKEMON-WORLD GROUNDING (REQUIRED — do not skip):
 A reader should be able to tell within one sentence that this is a Pokemon-world story.`;
 
 export const BEAT_SKELETON_SYSTEM_PROMPT = `You are the Director writing one beat of a generative Pokémon run. Read the envelope (story bible, beat history, current state) and emit ONE beat as STRICT JSON matching this discriminated union.
+
+PRIMARY DIRECTIVE — read envelope.currentMicroArc FIRST. It tells you exactly what should happen in the wave span containing this beat: who appears, what scenes play, what decision the player makes, what the antagonist does. The act-level summary in storyBible.acts and the bible's blurb are background; the micro-arc is the marching orders for THIS beat. If currentMicroArc.focus says "the player meets Cinder for the first time", introduce Cinder. If it says "the Scavenger Guild ambushes the player to retake stolen supplies", that ambush IS this beat. Do NOT improvise around it; do NOT skip what it asks for.
 
 CRITICAL — TEXT LENGTH BUDGETS (the game truncates anything longer):
 - introText, bodyText, preBattleText, postWinText, postLossText, epilogueText: max 120 chars each (~2 short sentences). HARD CAP — the in-battle dialog box wraps to ~2 visible lines per page (~70 chars per line). Anything longer paginates into multiple page-advances; over 120 chars risks visual truncation. Plain and clear, not flowery.
@@ -272,7 +287,15 @@ AUTHORING TRAINER TEAMS (enemyTeam):
 - TRAINER-TYPE catalog: gameBalanceCard.trainerTypeCatalog includes BOTH generic archetypes (id 1-199) and named trainers (id 200+, gym leaders / Elite Four / champions / rivals). Named trainers are marked with requiresEnemyTeam=true: you can borrow their SPRITE for narrative reuse (a former rival cameos, a champion's apprentice arrives) but you MUST also emit trainerOverride.enemyTeam — otherwise the runtime rejects the override (their canonical endgame teams would surface). Lean on this freely; the named-trainer sprites add narrative weight when used judiciously.
 - TIE TEAM COMPOSITION TO THE STORY. A team's type spread should signal the encounter's mood and the antagonist's identity. Match the type pool to what the narration says about the foe.
 - LEVELS: scale to envelope.partyPower.averageLevel and envelope.partyPower.waveCurveLevel. Stay within roughly ±3 of whichever is HIGHER (so under-leveled players aren't crushed, over-leveled players aren't bored). Boss-coded fights (act finales, isBoss=true) may be +1 to +3 above that. Server clamps anyway, but emit reasonable values — the LLM seeing the actual party power is the whole point.
-- TEAM SIZE 1-6. For story climaxes (act finales, boss-coded beats), prefer 4-6 with one isBoss=true. For mid-act trainers, 2-4.
+- TEAM SIZE scales with wave curve and is enforced server-side:
+    waves 1-5   : >=1 Pokemon
+    waves 6-15  : >=2 Pokemon
+    waves 16-35 : >=3 Pokemon
+    waves 36-70 : >=4 Pokemon
+    waves 71+   : >=5 Pokemon
+  Act finales (waveEnd) should sit at the upper end (5-6) with one isBoss=true. Under-sized teams are rejected.
+- HELD ITEMS are MANDATORY past wave 10: every Pokemon in enemyTeam needs at least one entry in heldItemKeys (pick from gameBalanceCard.trainerItemTiers). Stack items per Pokemon's maxStack — a methodical hoarder might stack 3-5 of the same item, a versatile fighter mixes 2-3 different ones. Under-equipped trainer Pokemon past wave 10 are rejected.
+- WHENEVER you set trainerName OR trainerOverride.trainerType OR write a preBattleText that names a specific trainer, you MUST also emit trainerOverride.enemyTeam. Otherwise the narration writes a check the team can't cash — "her Magnemite tingles" with no Magnemite in the actual fight is a wiring failure, not a flavor choice. Server-side rejected.
 - MOVESETS should match the species' archetype AND the story role.
 
 ACT FINALES (climactic boss-coded fights):

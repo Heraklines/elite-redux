@@ -10,8 +10,30 @@ const validBible: StoryBible = {
   openingScene: "The cellar door opens and a referee waves you to the pit.",
   tonalKeywords: ["mafia", "tense"],
   acts: [
-    { name: "Entry", waveStart: 1, waveEnd: 50, summary: "x", biomeId: 30 },
-    { name: "Climb", waveStart: 51, waveEnd: 200, summary: "x", biomeId: 13 },
+    {
+      name: "Entry",
+      waveStart: 1,
+      waveEnd: 50,
+      summary: "x",
+      biomeId: 30,
+      microArcs: [
+        { waveStart: 1, waveEnd: 25, focus: "test" },
+        { waveStart: 26, waveEnd: 40, focus: "test" },
+        { waveStart: 41, waveEnd: 50, focus: "test" },
+      ],
+    },
+    {
+      name: "Climb",
+      waveStart: 51,
+      waveEnd: 200,
+      summary: "x",
+      biomeId: 13,
+      microArcs: [
+        { waveStart: 51, waveEnd: 100, focus: "test" },
+        { waveStart: 101, waveEnd: 150, focus: "test" },
+        { waveStart: 151, waveEnd: 200, focus: "test" },
+      ],
+    },
   ],
   factions: [{ name: "Cartel", description: "runs the league", initialRep: -10 }],
   recurringNPCs: [{ memoryKey: "boss", name: "The Boss", role: "kingpin", initialDisposition: "watchful" }],

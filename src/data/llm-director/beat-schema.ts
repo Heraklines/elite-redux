@@ -1122,7 +1122,7 @@ const storyBibleSchema = {
       minItems: 1,
       items: {
         type: "object",
-        required: ["name", "waveStart", "waveEnd", "summary", "biomeId"],
+        required: ["name", "waveStart", "waveEnd", "summary", "biomeId", "microArcs"],
         properties: {
           name: { type: "string" },
           waveStart: { type: "integer" },
@@ -1131,6 +1131,27 @@ const storyBibleSchema = {
           /** Biome the act takes place in (id from gameBalanceCard.biomeCatalog).
            * Game auto-switches to this biome when the act starts. */
           biomeId: { type: "integer", minimum: 0 },
+          /** Wave-granular outline within this act. Each micro-arc covers
+           * roughly 10 waves and describes the focus of that span — what
+           * happens, who appears, what the player should be deciding. The
+           * envelope exposes the current micro-arc to each beat call so
+           * the LLM has wave-by-wave guidance instead of just "you're in
+           * Act 1, figure it out." */
+          microArcs: {
+            type: "array",
+            minItems: 3,
+            maxItems: 8,
+            items: {
+              type: "object",
+              required: ["waveStart", "waveEnd", "focus"],
+              properties: {
+                waveStart: { type: "integer", minimum: 1 },
+                waveEnd: { type: "integer", minimum: 1 },
+                focus: { type: "string", minLength: 1, maxLength: 240 },
+              },
+              additionalProperties: false,
+            },
+          },
         },
         additionalProperties: false,
       },
@@ -1185,7 +1206,16 @@ export interface StoryBible {
   /** 1-2 sentences setting the opening scene. Shown at wave 1 right after playerIntro. */
   openingScene: string;
   tonalKeywords: string[];
-  acts: Array<{ name: string; waveStart: number; waveEnd: number; summary: string; biomeId: number }>;
+  acts: Array<{
+    name: string;
+    waveStart: number;
+    waveEnd: number;
+    summary: string;
+    biomeId: number;
+    /** Wave-granular outline within the act. Roughly one entry per 10 waves;
+     * each describes the focus / events / NPCs / decisions of that span. */
+    microArcs: Array<{ waveStart: number; waveEnd: number; focus: string }>;
+  }>;
   factions: Array<{ name: string; description: string; initialRep: number }>;
   recurringNPCs: Array<{ memoryKey: string; name: string; role: string; initialDisposition: string }>;
   moralSpectrum: { goodLabel: string; evilLabel: string };

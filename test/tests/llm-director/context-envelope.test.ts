@@ -9,7 +9,20 @@ const sampleBible = (): StoryBible => ({
   playerIntro: "You are a wandering trainer.",
   openingScene: "Dawn breaks over the gym ruins.",
   tonalKeywords: ["dark"],
-  acts: [{ name: "Act 1", waveStart: 1, waveEnd: 50, summary: "x", biomeId: 1 }],
+  acts: [
+    {
+      name: "Act 1",
+      waveStart: 1,
+      waveEnd: 50,
+      summary: "x",
+      biomeId: 1,
+      microArcs: [
+        { waveStart: 1, waveEnd: 25, focus: "x" },
+        { waveStart: 26, waveEnd: 40, focus: "x" },
+        { waveStart: 41, waveEnd: 50, focus: "x" },
+      ],
+    },
+  ],
   factions: [{ name: "Rebels", description: "x", initialRep: 0 }],
   recurringNPCs: [{ memoryKey: "old-man", name: "Old Man", role: "guide", initialDisposition: "wary" }],
   moralSpectrum: { goodLabel: "merciful", evilLabel: "ruthless" },
@@ -50,8 +63,30 @@ describe("buildContextEnvelope", () => {
       throw new Error("expected story bible");
     }
     bible.acts = [
-      { name: "Act 1", waveStart: 1, waveEnd: 50, summary: "early", biomeId: 1 },
-      { name: "Act 2", waveStart: 51, waveEnd: 100, summary: "mid", biomeId: 13 },
+      {
+        name: "Act 1",
+        waveStart: 1,
+        waveEnd: 50,
+        summary: "early",
+        biomeId: 1,
+        microArcs: [
+          { waveStart: 1, waveEnd: 25, focus: "e" },
+          { waveStart: 26, waveEnd: 40, focus: "e" },
+          { waveStart: 41, waveEnd: 50, focus: "e" },
+        ],
+      },
+      {
+        name: "Act 2",
+        waveStart: 51,
+        waveEnd: 100,
+        summary: "mid",
+        biomeId: 13,
+        microArcs: [
+          { waveStart: 51, waveEnd: 75, focus: "m" },
+          { waveStart: 76, waveEnd: 90, focus: "m" },
+          { waveStart: 91, waveEnd: 100, focus: "m" },
+        ],
+      },
     ];
     inputs.currentWaveIndex = 75;
     expect(buildContextEnvelope(inputs).currentAct?.name).toBe("Act 2");

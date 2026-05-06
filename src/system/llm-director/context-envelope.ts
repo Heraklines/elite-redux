@@ -74,6 +74,16 @@ export interface ContextEnvelope {
   lossRiskBudget: { used: number; target: number };
   currentWaveIndex: number;
   currentAct: StoryBible["acts"][number] | undefined;
+  /**
+   * The micro-arc within the current act that covers `currentWaveIndex`.
+   * Bibles emit ~5 micro-arcs per act (one per ~10 waves), each with a
+   * `focus` string that tells the LLM what should happen in this span.
+   * Without this, the LLM has only the act-level summary to work from
+   * and improvises wave-by-wave (causing NPC over-recurrence and
+   * narrative drift). The current micro-arc is THE primary directive
+   * for what this beat should do.
+   */
+  currentMicroArc: { waveStart: number; waveEnd: number; focus: string } | undefined;
   gameBalanceCard: GameBalanceCard;
   currentBeatType: "auto" | string;
   /** True for the very first beat of the run — the LLM must weave the
@@ -371,6 +381,26 @@ function findCurrentAct(bible: StoryBible | undefined, wave: number): StoryBible
   return bible.acts.find(a => wave >= a.waveStart && wave <= a.waveEnd);
 }
 
+function findCurrentMicroArc(
+  bible: StoryBible | undefined,
+  wave: number,
+): { waveStart: number; waveEnd: number; focus: string } | undefined {
+  if (!bible) {
+    return;
+  }
+  for (const act of bible.acts) {
+    if (wave < act.waveStart || wave > act.waveEnd) {
+      continue;
+    }
+    const microArcs = act.microArcs ?? [];
+    const found = microArcs.find(m => wave >= m.waveStart && wave <= m.waveEnd);
+    if (found) {
+      return found;
+    }
+  }
+  return;
+}
+
 /**
  * Compress beat history older than the verbatim window down to digest-only
  * entries. v1 keeps even old entries in the array (with verbatim stripped); a
@@ -464,6 +494,7 @@ export function buildContextEnvelope(inputs: EnvelopeInputs): ContextEnvelope {
     lossRiskBudget: state.lossRiskBudget,
     currentWaveIndex,
     currentAct: findCurrentAct(state.storyBible, currentWaveIndex),
+    currentMicroArc: findCurrentMicroArc(state.storyBible, currentWaveIndex),
     gameBalanceCard: GAME_BALANCE_CARD(),
     currentBeatType: forcedBeatType ?? "auto",
     isFirstBeat: state.beatHistory.length === 0,

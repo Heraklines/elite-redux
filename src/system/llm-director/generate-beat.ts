@@ -158,6 +158,15 @@ async function runSkeletonPhase(
           continue;
         }
       }
+      // General-beat semantic check: scale-aware team requirements on
+      // trainer overrides and the beat's own enemyTeam (trainer_battle).
+      const generalErr = validateGeneralBeatSemantics(parsed as Beat, envelope.currentWaveIndex);
+      if (generalErr) {
+        lastError = `general-beat semantic check: ${generalErr}`;
+        logBeatValidationFail(wave, `${model}: ${lastError}`, attempt);
+        lastWasValidationError = true;
+        continue;
+      }
       logBeatParsed(wave, parsed);
       return parsed as Beat;
     }
@@ -230,6 +239,86 @@ function validateFirstBeatSemantics(beat: Beat): string | null {
   const anyHasItems = beat.options.some(o => (o.consequence.items?.length ?? 0) > 0);
   if (!anyHasItems) {
     return "at least one option must have non-empty consequence.items[] (a 2-3 entry rewards-shop menu)";
+  }
+  return null;
+}
+
+/**
+ * Wave-curve minimum team size. Trainer fights at later waves should bring
+ * more Pokemon — a 1-Pokemon "boss" at wave 50 reads as broken. The LLM's
+ * tendency to under-author teams is corrected here by post-validation
+ * rejection-and-retry.
+ */
+function minTeamSizeForWave(wave: number): number {
+  if (wave <= 5) {
+    return 1;
+  }
+  if (wave <= 15) {
+    return 2;
+  }
+  if (wave <= 35) {
+    return 3;
+  }
+  if (wave <= 70) {
+    return 4;
+  }
+  return 5;
+}
+
+/** Past this wave, every Pokemon on a trainer's team should carry at least
+ *  one held item — vanilla trainers do, and a story-authored trainer with
+ *  no held items reads as flat. */
+const HELD_ITEM_REQUIRED_WAVE = 10;
+
+/**
+ * General-beat semantic check (runs on every beat, not just the first).
+ * Catches the most common LLM failure modes:
+ *   - trainer overrides that name a specific trainer but skip enemyTeam
+ *     (so vanilla rolls a generic team that doesn't match the narration)
+ *   - enemyTeam too small for the wave's curve
+ *   - trainer Pokemon past wave 10 with no held items
+ *   - trainer_battle beats whose own enemyTeam violates the same rules
+ */
+function validateGeneralBeatSemantics(beat: Beat, currentWave: number): string | null {
+  const minSize = minTeamSizeForWave(currentWave);
+
+  // The beat's own trainer_battle enemyTeam.
+  if (beat.type === "trainer_battle") {
+    const team = beat.enemyTeam ?? [];
+    if (team.length < minSize) {
+      return `trainer_battle enemyTeam has ${team.length} entries; wave ${currentWave} requires at least ${minSize}`;
+    }
+    if (currentWave > HELD_ITEM_REQUIRED_WAVE) {
+      const noItem = team.findIndex(p => !p.heldItemKeys || p.heldItemKeys.length === 0);
+      if (noItem >= 0) {
+        return `trainer_battle enemyTeam[${noItem}] has no heldItemKeys (required past wave ${HELD_ITEM_REQUIRED_WAVE}; pick from gameBalanceCard.trainerItemTiers)`;
+      }
+    }
+  }
+
+  // interBeatOverrides — these drive the off-beat waves.
+  const overrides = beat.interBeatOverrides ?? [];
+  for (let i = 0; i < overrides.length; i++) {
+    const ov = overrides[i];
+    const overrideWave = currentWave + (ov.atWaveOffset ?? 1);
+    const overrideMinSize = minTeamSizeForWave(overrideWave);
+    const tr = ov.trainerOverride;
+    const wantsTrainer = !!ov.trainerName || !!tr?.trainerType || (tr?.enemyTeam && tr.enemyTeam.length > 0);
+    if (wantsTrainer) {
+      const team = tr?.enemyTeam ?? [];
+      if (team.length === 0) {
+        return `interBeatOverrides[${i}] (wave ${overrideWave}) names a trainer (trainerName="${ov.trainerName ?? ""}", trainerType=${tr?.trainerType ?? "?"}) but has no enemyTeam — narration would describe a foe the player never fights. Emit trainerOverride.enemyTeam.`;
+      }
+      if (team.length < overrideMinSize) {
+        return `interBeatOverrides[${i}].trainerOverride.enemyTeam has ${team.length} entries; wave ${overrideWave} requires at least ${overrideMinSize}`;
+      }
+      if (overrideWave > HELD_ITEM_REQUIRED_WAVE) {
+        const noItem = team.findIndex(p => !p.heldItemKeys || p.heldItemKeys.length === 0);
+        if (noItem >= 0) {
+          return `interBeatOverrides[${i}].trainerOverride.enemyTeam[${noItem}] has no heldItemKeys (required past wave ${HELD_ITEM_REQUIRED_WAVE})`;
+        }
+      }
+    }
   }
   return null;
 }
