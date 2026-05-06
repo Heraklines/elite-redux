@@ -18,8 +18,8 @@ Output STRICT JSON matching this shape (no prose, no markdown fences):
 {
   "themeName": "2-6 word title",
   "blurb": "2-3 sentence pitch establishing tone, stakes, and central tension",
-  "playerIntro": "ONE short sentence (HARD MAX 100 chars). WHO the player is in this story — role + stake in <=15 words. Use 'you' (second person). Example: 'You are a disgraced League referee with a debt to settle.'",
-  "openingScene": "ONE short sentence (HARD MAX 100 chars). WHERE you are at run start. Example: 'Smoke curls over the ruined gym at dawn.'",
+  "playerIntro": "ONE short sentence (HARD MAX 100 chars). WHO the player is in this story — role + stake in <=15 words. Use 'you' (second person).",
+  "openingScene": "ONE short sentence (HARD MAX 100 chars). WHERE you are at run start, sensory and concrete.",
   "tonalKeywords": ["3-7 keywords describing tone/genre/mood"],
   "acts": [
     { "name": "Act name", "waveStart": 1, "waveEnd": 50, "summary": "1-2 sentence intent for this act", "biomeId": 1 }
@@ -35,8 +35,8 @@ Output STRICT JSON matching this shape (no prose, no markdown fences):
 
 Constraints:
 - 3-5 acts spanning waves 1..200 with no gaps and no overlaps.
-- EACH act MUST have a thematically-fitting biomeId from the standard PokéRogue biome catalog. Common ids: TOWN=0, PLAINS=1, GRASS=2, TALL_GRASS=3, METROPOLIS=4, FOREST=5, SEA=6, SWAMP=7, BEACH=8, LAKE=9, SEABED=10, MOUNTAIN=11, BADLANDS=12, CAVE=13, DESERT=14, ICE_CAVE=15, MEADOW=16, POWER_PLANT=17, VOLCANO=18, GRAVEYARD=19, DOJO=20, FACTORY=21, RUINS=22, WASTELAND=23, ABYSS=24, SPACE=25, CONSTRUCTION_SITE=26, JUNGLE=27, FAIRY_CAVE=28, TEMPLE=29, SLUM=30, SNOWY_FOREST=31, ISLAND=40, LABORATORY=41. Pick the biome that most fits the act's mood (e.g., a smuggler's-den arc → CAVE or SLUM; a regal court → TEMPLE or METROPOLIS; an apocalyptic finale → WASTELAND or VOLCANO). The game auto-switches to this biome when the act starts.
-- 0-5 factions; their initialRep must reflect the theme (a rebel-friendly arc starts with rebels at +20, etc.).
+- EACH act MUST have a thematically-fitting biomeId from the standard PokéRogue biome catalog. Common ids: TOWN=0, PLAINS=1, GRASS=2, TALL_GRASS=3, METROPOLIS=4, FOREST=5, SEA=6, SWAMP=7, BEACH=8, LAKE=9, SEABED=10, MOUNTAIN=11, BADLANDS=12, CAVE=13, DESERT=14, ICE_CAVE=15, MEADOW=16, POWER_PLANT=17, VOLCANO=18, GRAVEYARD=19, DOJO=20, FACTORY=21, RUINS=22, WASTELAND=23, ABYSS=24, SPACE=25, CONSTRUCTION_SITE=26, JUNGLE=27, FAIRY_CAVE=28, TEMPLE=29, SLUM=30, SNOWY_FOREST=31, ISLAND=40, LABORATORY=41. Pick the biome that most fits the act's mood; the game auto-switches to this biome when the act starts.
+- 0-5 factions; their initialRep must reflect the theme (a rebel-friendly arc starts with rebels positively, an oppressive-state arc starts with rebels negatively, etc.).
 - 1-4 recurring NPCs; memoryKey is stable across the whole run, the LLM will refer back to it in future beats.
 - moralSpectrum labels MUST be 1 word each, fitting the theme's tone.
 - playerIntro and openingScene MUST each be ONE short sentence (HARD MAX 100 chars EACH). Anything longer will be hard-truncated and look broken. Punchy and concrete: <=15 words per field.
@@ -53,25 +53,16 @@ TONAL VARIETY (CRITICAL):
 
 POKEMON-WORLD GROUNDING (REQUIRED — do not skip):
 - This is a POKEMON game. Every story MUST feel like it could only happen in the Pokemon world. Generic fantasy / sci-fi / urban-noir without Pokemon flavor is a FAILURE.
-- The blurb, acts, factions, NPC roles MUST reference Pokemon-world specifics:
-  * trainers, gym leaders, the league, frontier brains, elite four, champions
-  * Pokemon types (Fire, Water, Ghost, Dragon, Fairy, etc.) and the cultural meaning around them
-  * Pokemon centers, marts, daycares, breeders, rangers, professors, contest halls
-  * specific Pokemon by name when it adds flavor (a Slowking elder, a Lucario lieutenant, a Mimikyu hidden in a basket)
-  * regional cultures (Kantonian / Johtonian / Hoennian / Sinnohan / Unovan / Kalosian / Alolan / Galarian / Paldean) and their stereotypes
-  * mechanics-flavored conflict — illegal IV breeding rings, Mega Stone smuggling, Z-Crystal heists, badge counterfeiting, fossil reanimation ethics, Ditto identity laundering
-- Conflict examples that read as POKEMON, not generic:
-  * "A Ranger discovers a Larvitar nursery being culled by a mining cartel."
-  * "A retired Ace Trainer travels with a Mawile that won't stop stealing wedding rings."
-  * "Three friends launch an underground Contest circuit after the official one bans Roselia."
-  * "A Hex Maniac's Drifloon keeps showing up at funerals it wasn't invited to."
-- Conflicts to AVOID (too generic):
-  * "warehouse fires", "burned shrines", "flooded mines" with no Pokemon angle
-  * "vigilance committees" / "iron bough" / "rooted choir" without explaining HOW Pokemon factor in
-  * pure cyberpunk / noir / fantasy without trainers, types, or species
-- The playerIntro should name a Pokemon-world ROLE: "lapsed ranger", "former Ace Trainer", "shrine medium for Ghost-types", "off-the-books Pokemon midwife", "disqualified Contest coordinator". NOT a generic "wandering medic" or "lapsed officer".
-- factions should be Pokemon-world groups: "the Pewter Geological Society", "Cerulean Cape Surf League", "Saffron Psychic Authority", "Lavender Bereavement Trust" — not "Vigilance Committees" or "Broken Rock Remnants" without context.
-- NPCs ideally have a signature Pokemon (mentioned in their role) — "Sienna, retired Officer Jenny who patrols with a half-blind Manectric"; "Bramble, an Iron Bough botanist whose Lurantis won't bloom anymore". Treat the Pokemon as a character beat, not a name-drop.
+- The blurb, acts, factions, NPC roles MUST reference Pokemon-world specifics from these categories:
+  * trainer institutions: gym leaders, the league, frontier brains, elite four, champions, contest coordinators, rangers, breeders, professors
+  * Pokemon types and the cultural meaning around them (a town that distrusts Ghost-types; a coast where Water-types are sacred; a desert clan that believes Steel-types bring rain)
+  * Pokemon-world venues: Pokemon centers, marts, daycares, contest halls, gyms, ranger stations, frontier bases, daycare-centers, trainer schools
+  * specific Pokemon as supporting cast — not name-dropped, but woven in (a town elder's ailing partner Pokemon, a smuggler whose signature mon hints at their methods, a daycare runaway who keeps reappearing)
+  * regional cultures (Kantonian, Johtonian, Hoennian, Sinnohan, Unovan, Kalosian, Alolan, Galarian, Paldean) and their stereotypes
+  * mechanics-flavored conflict — illegal breeding rings, Mega Stone smuggling, Z-Crystal heists, badge counterfeiting, fossil reanimation ethics, Ditto identity laundering, Pokeball patent disputes, voucher black markets
+- The playerIntro should name a Pokemon-world ROLE, not a generic profession. The role should imply how the player relates to trainers, types, or institutions.
+- factions should be Pokemon-world groups whose name and brief description make their relationship to trainers, types, or institutions immediately legible — not generic "Vigilance Committees" or "Iron Bough" that could appear in any non-Pokemon story.
+- NPCs ideally have a signature Pokemon woven into their role — treat that Pokemon as a character beat (its quirk, condition, or behavior), not a name-drop.
 
 If you write a bible and a reader couldn't tell within ONE sentence that this is a Pokemon world, you have failed. Rewrite.`;
 
@@ -85,24 +76,22 @@ CRITICAL — TEXT LENGTH BUDGETS (the game truncates anything longer):
 You have a 256k+ context window — be generous in REASONING, but text shown to the player must stay terse and dense.
 
 GROUNDING RULES (so the player always knows who is who):
-- The FIRST time a recurring NPC appears in a beat, the introText MUST establish their role in one short clause. Example: "Vance, the ex-Ranger turned smuggler, blocks the path." — not just "Vance blocks the path."
+- The FIRST time a recurring NPC appears in a beat, the introText MUST establish their role in one short clause (name + role descriptor + verb), not just the name alone.
 - Subsequent beats featuring the same NPC may skip the role recap if the previous 3 beats already mentioned them.
 - Address the player as "you" (second person). Never "the trainer" or third person.
-- For dialogue beats, separate stage direction from speech. Stage direction in introText (1 sentence), spoken line in the speaker block. Example introText: "Vance, the ex-Ranger, leans on the doorframe." Then dialogue lives in option labels or a follow-up.
+- For dialogue beats, separate stage direction from speech. Stage direction lives in introText (1 sentence describing the speaker's action/posture). The actual spoken line lives elsewhere — in option labels or in a follow-up beat.
 - Avoid run-on sentences. Prefer short, punchy lines. Each beat should read in <10 seconds.
 
 POKEMON-WORLD GROUNDING (REQUIRED in EVERY beat):
 - Every beat MUST anchor in Pokemon-world specifics. A beat that reads as generic fantasy/noir/sci-fi WITHOUT Pokemon, trainers, types, or species is wrong — rewrite.
-- Concrete examples a beat can/should reference:
-  * a specific Pokemon by name when it adds flavor ("his Houndoom watches you from the shadow", "her Audino is already tending your Eevee")
-  * a type-based superstition or culture ("Ghost-types are unlucky in this town", "Fire-type trainers eat first at this shrine")
-  * a Pokemon-world institution (Pokemon Center, Mart, daycare, Trainer's School, Contest hall, gym, ranger station, frontier base)
+- A beat should reference at least one of:
+  * a specific Pokemon woven into the scene (a companion, an antagonist's partner, a wild interloper)
+  * a type-based superstition or culture relevant to the location/faction
+  * a Pokemon-world institution (Pokemon Center, Mart, daycare, Trainer's School, Contest hall, gym, ranger station, frontier base, daycare-center)
   * a mechanic-flavored stake (badge, evolution stone, Mega Stone, Z-Crystal, TM, fossil, ribbon, voucher, egg)
-- BAD beat (generic): "A figure in a hooded coat blocks the path." -> rewrite.
-- GOOD beat (Pokemon): "A Ranger captain blocks the path; her Manectric's static makes your Pokeballs hum at her belt."
-- BAD option ("custom" flavor): "you sense danger".
-- GOOD option ("custom" flavor): "the Lurantis at her shoulder unfolds slightly, ready to dance".
-- The CONSEQUENCE of a choice should also feel Pokemon-flavored when possible: a friendship_boost narrated as "your Eevee curls up with hers", a give_item: ESCAPE_ROPE narrated as "she presses a worn rope into your hand", etc.
+- A "figure blocks the path" or "shadow looms" without trainer/Pokemon/type context is too generic — rewrite to make the Pokemon-world specifics load-bearing.
+- Option-level "custom" effect descriptions should also carry Pokemon flavor (a Pokemon's behavior, a held-item glint, a type-aura). Generic "you sense danger" or "the air shifts" is a miss.
+- The CONSEQUENCE of a choice should feel Pokemon-flavored when possible — narrate a friendship_boost as a moment between the player's Pokemon and an NPC's, an item grant as a tangible Pokemon-world object changing hands.
 
 Beat schemas:
 
@@ -152,10 +141,10 @@ Rules:
 - No prose, no markdown, no commentary — only the JSON object.
 
 LEVERAGE VS OVERRIDE — IMPORTANT:
-- PokéRogue's vanilla trainer types ALREADY have curated parties, level scaling, and movesets per archetype (e.g., HEX_MANIAC has psychic/ghost-leaning teams; BIKER has poison/dark; VETERAN has high-tier stage species). These are well-balanced for the wave curve.
-- DEFAULT to leaving teams to vanilla — DO NOT specify enemyTeam unless the story explicitly calls for a custom team. Examples that warrant override: a named recurring NPC (Vance's signature Houndoom), a thematically-loaded encounter (an "evil cultist" fight needing psychic/dark types), a scripted boss.
+- PokéRogue's vanilla trainer types ALREADY have curated parties, level scaling, and movesets per archetype, balanced for the wave curve. Trust them by default.
+- DEFAULT to leaving teams to vanilla — DO NOT specify enemyTeam unless the story explicitly calls for a custom team. Override only when the beat is a named recurring NPC, a thematically-loaded encounter where the type spread is the point, or a scripted act-boss fight.
 - For incidental in-between waves, just pick a fitting trainerType and let vanilla generate the party. The interBeatOverride.preBattleText is what makes it feel story-themed; the team itself can stay vanilla.
-- When you DO override, keep the team coherent: 2-4 Pokémon for early waves, scale up for later. Mix types intentionally; don't stuff six dragons.
+- When you DO override, keep the team coherent: 2-4 Pokémon for early waves, scale up for later. Mix types intentionally; don't stuff six dragons unless the story is literally about a dragon clan.
 
 POKÉROGUE'S MODIFIER SYSTEM (READ CAREFULLY — IT IS NOT VANILLA POKÉMON):
 
@@ -184,7 +173,7 @@ ITEM RARITY — USE THE ENVELOPE'S REAL DATA, NOT GUESSES:
 The envelope's gameBalanceCard.itemTiers is the AUTHORITATIVE list of player-reward items, with their actual vanilla rarity tier and drop weight. Each entry is { id, tier, weight }:
 
   - tier is one of: COMMON < GREAT < ULTRA < ROGUE < MASTER < LUXURY (six tiers)
-  - weight is the vanilla drop weight inside the tier (higher = more frequent in vanilla rolls). "fn" means the weight is computed dynamically (e.g., POKEBALL drops more if you're not at cap).
+  - weight is the vanilla drop weight inside the tier (higher = more frequent in vanilla rolls). "fn" means the weight is computed dynamically at runtime based on game state.
 
 Similarly gameBalanceCard.trainerItemTiers lists held items trainer Pokémon can carry, with their tiers.
 
@@ -217,86 +206,41 @@ For each interBeatOverride, populate these fields whenever the story implies the
   "postLossText": "what happens if the player loses — captured, escape narrowly, lose a clue (max 240 chars)",
   "trainerName": "Concordat Ranger Vance",  // overrides the default trainer-class display name
   "trainerOverride": {
-    "trainerType": <id from gameBalanceCard.trainerTypeCatalog>,  // PICK THE SPRITE that matches the story (RANGER for Ranger Corps, BIKER for street thug, HEX_MANIAC for cultist, FAIRY_TALE_GIRL for whimsical encounter, etc.)
+    "trainerType": <id from gameBalanceCard.trainerTypeCatalog>,  // pick the sprite that matches the story role
     "levelDelta": 0,                        // only deviate if the narrative justifies it
-    "enemyTeam": [                          // OPTIONAL but strongly preferred for named/scripted fights
-      {"speciesId": 229, "level": 12, "moveIds": [44, 257], "heldItemKeys": ["FOCUS_BAND"]}
-    ]
+    "enemyTeam": [ /* optional; see AUTHORING TRAINER TEAMS below */ ]
   },
-  "victoryRewards": [                       // FOR CACHE / LOOT scenarios — describe what's in the cache
-    {"modifierType": "POTION", "qty": 2},
-    {"modifierType": "PROTEIN", "qty": 1}
-  ],
-  "victoryEffects": [                       // OR any of the discriminated effects
-    {"type": "heal_party_full"},
-    {"type": "give_money", "amount": 500}
-  ],
-  "defeatEffects": [
-    {"type": "lose_money", "amount": 100},
-    {"type": "custom", "description": "The Corps confiscates your bag", "positive": false}
-  ]
-}
-\`\`\`
-
-Example (story: "Pip's note leads you to a Linebreaker cache hidden in an old barn"):
-\`\`\`json
-{
-  "atWaveOffset": 2,
-  "preBattleText": "A disgruntled farmer leans on a pitchfork outside the barn, eyes narrow. He whistles his Mightyena.",
-  "postWinText": "Inside the barn: crates marked with the Linebreaker sigil, plus a manifest you barely have time to pocket.",
-  "postLossText": "The farmer kicks the manifest into the fire. You walk away empty-handed and bruised.",
-  "trainerName": "Bitter Farmer",
-  "trainerOverride": {
-    "trainerType": <RANGER or HIKER id from catalog>,  // pick whichever sprite reads "rural enforcer"
-    "enemyTeam": [
-      {"speciesId": 262, "level": 10, "moveIds": [44, 252]},
-      {"speciesId": 263, "level": 9}
-    ]
-  },
-  "victoryRewards": [
-    {"modifierType": "POTION", "qty": 2},
-    {"modifierType": "BERRY", "qty": 3}
-  ],
-  "victoryEffects": [
-    {"type": "custom", "description": "The manifest names a supply train passing Ashfall Ridge in three days.", "positive": true}
-  ]
+  "victoryRewards": [ /* loot description; modifierType keys from gameBalanceCard.itemTiers */ ],
+  "victoryEffects": [ /* any of the discriminated effects */ ],
+  "defeatEffects":  [ /* what happens narratively + mechanically when the player loses */ ]
 }
 \`\`\`
 
 ALWAYS EMIT INTER-BEAT OVERRIDES (CRITICAL — every beat must include 2 of these):
 - The player plays 2 vanilla wave battles between beats. WITHOUT story-themed narration on those waves, the run feels like Classic with story dialogue once in a while.
 - For EACH beat, include \`interBeatOverrides\` with TWO entries (atWaveOffset 1 and 2), each with:
-    "preBattleText": "1-2 sentences (max 200 chars) of story-themed narration spoken right before that wave's battle. Tie it to the current beat's situation — name the antagonist faction, recall a recent NPC, hint at the next beat. NOT generic battle taunts. Example: 'Two of Vance's runners block the alley. The taller one cracks his knuckles.' Bad: 'You meet a trainer.'"
+    "preBattleText": 1-2 sentences (max 200 chars) of story-themed narration spoken right before that wave's battle. Tie it to the current beat's situation — name the antagonist faction, recall a recent NPC, hint at the next beat. Generic "you meet a trainer" lines are unacceptable.
     Optionally also: trainerName (overrides the default trainer-class display name), levelDelta (-3..+3 to bend difficulty for narrative reasons), biomeFlavorText.
     Optionally trainerOverride.enemyTeam (same shape as TrainerBattleBeat.enemyTeam) to fully spec the upcoming vanilla trainer's party — use this to make the in-between waves feel hand-crafted, not random encounters.
 - This is not optional. Every beat governs a 3-wave chunk: itself + the next 2.
 
 AUTHORING TRAINER TEAMS (enemyTeam — the heart of v2):
 - Whenever you set enemyTeam, ALWAYS source ids from envelope.gameBalanceCard:
-    speciesId from \`gameBalanceCard.speciesCatalog\` (e.g., 261=poochyena, 197=umbreon, 359=absol)
-    abilityId from \`gameBalanceCard.abilityCatalog\` (e.g., 22=intimidate, 39=inner_focus, 46=pressure)
-    moveIds from \`gameBalanceCard.moveCatalog\` (e.g., 423=crunch, 269=taunt, 14=swords_dance)
+    speciesId from \`gameBalanceCard.speciesCatalog\`
+    abilityId from \`gameBalanceCard.abilityCatalog\`
+    moveIds from \`gameBalanceCard.moveCatalog\`
   Inventing ids will fail validation. Search the catalog by name; pick by id.
-- heldItemKeys uses STRING keys (uppercase, with underscores) — these are the modifier-type keys, not numeric ids. Common picks:
-    LEFTOVERS (every-turn HP heal), FOCUS_BAND (chance to survive at 1HP), BERRY (with random berry), KINGS_ROCK (flinch chance), SCOPE_LENS (crit boost), QUICK_CLAW, SHELL_BELL, BLACK_SLUDGE (poison-type leftovers), CHARCOAL/MYSTIC_WATER/MAGNET/MIRACLE_SEED/etc. (type-boost items), SOOTHE_BELL, LUCKY_EGG, EVIOLITE, AMULET_COIN.
-  Unknown keys are dropped silently — prefer the well-known ones above.
-
-- TIE TEAM COMPOSITION TO THE STORY. The whole point of v2:
-    Smuggler/criminal beat → dark/poison types: poochyena, mightyena, koffing, weezing, scraggy, sneasel, houndour, houndoom.
-    Religious cult / oracle beat → psychic/fairy types: kadabra, alakazam, gardevoir, claydol, espeon, sigilyph, mr_mime.
-    Wasteland/post-apocalyptic beat → poison/steel/dark: garbodor, salazzle, bisharp, drapion, skuntank.
-    Court/political intrigue → elegant types: gardevoir, gallade, swanna, cinccino, milotic.
-    Ranger/wilderness → grass/normal/flying with utility moves.
-    Cyberpunk/factory → steel/electric: magnezone, klinklang, golurk, registeel.
+- heldItemKeys uses STRING keys (uppercase, with underscores) — these are the modifier-type keys, not numeric ids. Pick from gameBalanceCard.trainerItemTiers; unknown keys are silently dropped. Common categories: every-turn HP heal, survive-at-1HP, type-boosters, crit/flinch chance, berry-on-low-HP, money/exp multipliers.
+- TIE TEAM COMPOSITION TO THE STORY. A team's type spread should signal the encounter's mood and the antagonist's identity:
+    Smuggler / criminal → dark/poison
+    Religious cult / oracle → psychic/fairy
+    Wasteland / post-apocalyptic → poison/steel/dark
+    Court / political intrigue → elegant/balanced (psychic/fairy/normal)
+    Ranger / wilderness → grass/normal/flying with utility moves
+    Cyberpunk / factory → steel/electric
 - LEVELS within ±3 of the wave-curve baseline (±5 only if difficultyTag=brutal AND a recent beat had an explicit escape route). Server clamps anyway, but emit reasonable values.
 - TEAM SIZE 1-6. For story climaxes (act finales, boss-coded beats), prefer 4-6 with one isBoss=true. For mid-act trainers, 2-4.
-- MOVESETS should match the species' archetype AND the story role. A smuggler's Houndoom: [crunch, dark_pulse, fire_fang, sucker_punch] — not [splash, harden, growl, leer].
-
-EXAMPLE enemyTeam (smuggler beat, wave ~30):
-"enemyTeam": [
-  { "speciesId": 262, "level": 28, "abilityId": 22, "moveIds": [423, 184, 269, 98], "heldItemKeys": ["BLACK_GLASSES"], "nickname": "Vance's Mightyena" },
-  { "speciesId": 229, "level": 30, "abilityId": 23, "moveIds": [336, 53, 252, 555], "heldItemKeys": ["LEFTOVERS","FOCUS_BAND"], "isBoss": true, "nickname": "Vance's Houndoom" }
-]
+- MOVESETS should match the species' archetype AND the story role. A combat-coded antagonist's signature mon should have offensive coverage, not status-only filler. Conversely a frightened apprentice should not have a tournament-tier moveset.
 
 FIRST-BEAT GROUNDING (when envelope.isFirstBeat is true):
 - This is the very first story beat of the run; the player has just finished picking starters and is at wave 1 (the v3 forced wave-1 mystery event). They have ZERO context about the world yet — only the run's title.
@@ -319,115 +263,78 @@ CONSEQUENCE EFFECTS — THE CORE V2 EXTENSION POINT (read carefully):
 
 Every consequence supports an \`effects: ConsequenceEffect[]\` array. This is the MAIN tool you have to make choices feel mechanical. The LLM that ignores effects emits flat, low-stakes runs. The LLM that uses them well makes the player gasp.
 
-CHAIN MULTIPLE EFFECTS PER CONSEQUENCE. Most meaningful choices have 2-4 effects, not one. Effects fire in array order. Examples:
+CHAIN MULTIPLE EFFECTS PER CONSEQUENCE. Most meaningful choices have 2-4 effects, not one. Effects fire in array order. Common patterns to compose:
+  - Bargain: a desirable mechanical gain paired with a deferred mechanical cost (status, money loss, persistent debuff).
+  - Patron: a flat reward paired with a friendship/faction lift and a "custom" line that flags an off-the-books debt.
+  - Sacred reward: full restore + a high-tier give_egg or give_item, plus a "custom" line that grounds the moment.
+  - Cynical pact: a one-time large give_money paired with a debuff_persistent for several waves, plus a strong negative alignment shift.
 
-  "Drink the cursed potion" →
-    "effects": [
-      { "type": "heal_party_full" },
-      { "type": "status_inflict", "target": "all", "status": "TOXIC" },
-      { "type": "lose_money", "amount": 500 }
-    ]
-    Story: short-term gain at long-term cost. Feels like a real bargain.
-
-  "Take the king's offer" →
-    "effects": [
-      { "type": "give_money", "amount": 5000 },
-      { "type": "give_held_item", "modifierType": "LEFTOVERS", "target": { "partyIndex": 0 } },
-      { "type": "friendship_boost", "amount": 50 },
-      { "type": "custom", "description": "you owe him a favor", "positive": false }
-    ]
-    Story: net-positive but with a moral hook for later.
-
-  "Step into the shrine" →
-    "effects": [
-      { "type": "heal_party_full" },
-      { "type": "give_egg", "tier": "rare" },
-      { "type": "custom", "description": "the deity blessed your team — a strange warmth lingers" }
-    ]
-    Story: pure reward beat, but the custom line gives it FLAVOR.
-
-  "Betray the rebels" →
-    "effects": [
-      { "type": "give_money", "amount": 10000 },
-      { "type": "debuff_persistent", "kind": "money_multiplier", "multiplier": 0.7, "waves": 10 }
-    ]
-    AND \`alignment: -8\`. Short-term jackpot, long-term bleed.
-
-EFFECTS DON'T HAVE TO BE SYMMETRIC. Negative choices can have positive effects (a brutal blow that hardens your team → heal_party_full + a stat boost). Positive choices can have negative side effects. Mix freely. Real consequences are messy.
+EFFECTS DON'T HAVE TO BE SYMMETRIC. Negative choices can carry positive effects (a brutal blow hardens the team into stat boosts). Positive choices can carry negative side effects. Mix freely. Real consequences are messy.
 
 NOT EVERY CHOICE NEEDS EFFECTS. If a choice is purely social/political and the consequence is alignment + factionRep + an epilogueText, leave \`effects: []\` or omit the field. Effects are for *gameplay* changes — don't shove a heal into a dialogue beat just to fill space. Empty effects with strong epilogueText is a valid pattern.
 
-CUSTOM IS ALWAYS AVAILABLE. The \`{ "type": "custom", "description": "..." }\` variant exists exactly so you're never stuck. When the catalog doesn't fit:
-  - "time slows for thirty seconds and you slip past the guard"
-  - "the runes on your trainer card shift to match the cult's sigil"
-  - "every Pokémon in your team dreams of the same forest tonight"
-We surface the description as a story message; the player still feels the consequence. Better to use \`custom\` and emit a vivid line than to skip the consequence entirely. \`severity\` ("minor"|"major") and \`positive\` (true|false) are optional metadata that influence how it's surfaced (✨ prefix for positive, ⚠ for negative). Use them.
+CUSTOM IS ALWAYS AVAILABLE. The \`{ "type": "custom", "description": "..." }\` variant exists so you're never stuck when the catalog can't represent what the story is doing. We surface the description as a story message; the player still feels the consequence. Better to emit a vivid \`custom\` line than to skip the consequence entirely. \`severity\` ("minor"|"major") and \`positive\` (true|false) are optional metadata that influence how it's surfaced (✨ prefix for positive, ⚠ for negative). Use them.
 
-FULL EFFECT CATALOG (one-line use case per type — pick widely, don't tunnel-vision on heal_party_hp + give_money):
+FULL EFFECT CATALOG (pick widely, don't tunnel-vision on heal_party_hp + give_money):
 
   Heal / restore (positive):
-    heal_party_hp           — partial HP restore, e.g., "drank from a cool stream"
-    heal_party_status       — cure poison/burn/etc., e.g., "the medic patches you up"
-    heal_party_pp           — refill move PP, e.g., "studying old scrolls sharpens your moves"
-    heal_party_full         — HP+status+PP, e.g., "found a hidden shrine, all wounds mend"
-    revive                  — revive ONE fainted Pokémon to %HP, e.g., "the priestess kneels by your fallen ace"
+    heal_party_hp           — partial HP restore
+    heal_party_status       — cure poison/burn/paralysis/etc.
+    heal_party_pp           — refill move PP
+    heal_party_full         — HP + status + PP
+    revive                  — revive ONE fainted Pokemon to %HP
     revive_all              — sacred ash, RARE — for major story-saving moments only
 
   Stat / progression (positive):
-    stat_boost_temp         — next-battle stages, e.g., "drank battle-rage tonic, +2 ATK next fight"
-    stat_boost_permanent    — PROTEIN-style permanent stack, e.g., "you found a vitamin cache"
-    level_up                — auto-level a Pokémon, e.g., "training under the master pays off"
-    give_xp                 — flat XP grant, e.g., "the elder shares battle wisdom"
-    evolve                  — force evolution if eligible, RARE — e.g., "the moon stone glows"
-    friendship_boost        — increase happiness, e.g., "you rest by the fire together"
+    stat_boost_temp         — next-battle stat stages
+    stat_boost_permanent    — PROTEIN-style permanent stack
+    level_up                — auto-level a Pokemon
+    give_xp                 — flat XP grant
+    evolve                  — force evolution if eligible, RARE
+    friendship_boost        — increase happiness
 
-  Pokémon mechanics (mixed; many stubbed in v1 — still use them, the LLM emitting them surfaces narrative even if mechanics are deferred):
+  Pokemon mechanics (mixed; many stubbed in v1 — still use them; emitting them surfaces narrative even if mechanics are deferred):
     learn_move              — teach a move, optionally replacing slot N
     forget_move             — clear move slot
     change_ability          — swap ability id
-    change_type             — re-typing a Pokémon (story-driven, e.g., "the storm marks your Eevee as electric")
-    change_form             — alternate form (e.g., Rotom appliance swap)
-    give_held_item          — attach a held item to a target Pokémon
+    change_type             — re-typing a Pokemon (story-driven)
+    change_form             — alternate form for species that support it
+    give_held_item          — attach a held item to a target Pokemon
     remove_held_item        — strip held items
     tera_change             — change tera type
-    shiny_unlock            — cosmetic shiny, e.g., "the moonlight scars your starter"
+    shiny_unlock            — cosmetic shiny
 
   Inventory / economy:
-    give_item               — flat item grant by modifierType key (e.g., POTION, RARE_CANDY, LEFTOVERS)
-    remove_item             — confiscate items, e.g., "the customs officer demands a tribute"
-    give_money              — flat money grant, e.g., "the merchant pays for safe passage"
-    lose_money              — flat money loss, e.g., "the bandit lifts your wallet"
-    give_egg                — common|rare|epic|legendary tier, e.g., "the temple priest hands you a warm egg"
+    give_item               — flat item grant by modifierType key (must come from gameBalanceCard.itemTiers)
+    remove_item             — confiscate items
+    give_money              — flat money grant
+    lose_money              — flat money loss
+    give_egg                — common|rare|epic|legendary tier
     lose_egg                — give an egg as tribute (RARE)
-    give_voucher            — REGULAR|PLUS|PREMIUM|GOLDEN, e.g., "you win a gacha ticket at the festival"
+    give_voucher            — REGULAR|PLUS|PREMIUM|GOLDEN
 
   Damage / status (negative):
-    status_inflict POISON   — "walked through a toxic swamp"
-    status_inflict BURN     — "the volcanic vent scorches your team"
-    status_inflict PARALYSIS — "the static field locks your muscles"
-    status_inflict SLEEP    — "the lullaby drifts over the camp"
-    status_inflict FREEZE   — "the cold pierces deep"
-    status_inflict TOXIC    — "the cursed potion takes hold"
-    damage_party            — flat %HP damage, e.g., "the rockslide grazes everyone"
-    faint                   — KO ONE specific Pokémon (require target), RARE
-    release_pokemon         — permanent removal — VERY RARE, only for major moral choices ("you give your Pokémon as tribute")
-    level_down              — drop levels, RARE — story de-empowerment
+    status_inflict          — apply POISON|BURN|PARALYSIS|SLEEP|FREEZE|TOXIC to one or all party members
+    damage_party            — flat %HP damage to one or all party members
+    faint                   — KO ONE specific Pokemon (requires target), RARE
+    release_pokemon         — permanent removal, VERY RARE, only for major moral choices
+    level_down              — drop levels, RARE, for story de-empowerment
 
   Battle / encounter:
-    trigger_battle          — an NPC betrays you mid-conversation, fight starts
+    trigger_battle          — fight starts immediately (mid-conversation pivot)
     trigger_boss_battle     — climactic encounter with full enemyTeam
-    skip_wave               — fast-forward 1-5 waves narratively (e.g., "the convoy travels three days")
+    skip_wave               — fast-forward 1-5 waves narratively
     force_capture_chance    — guaranteed catch on a target species
 
   Field / world:
     set_biome               — switch arena biome NOW (mid-act biome jolt)
-    weather_change          — RAIN|SUNNY|SANDSTORM|HAIL|FOG|HEAVY_RAIN|HARSH_SUN|STRONG_WINDS for next_battle or n_waves, e.g., "a storm rolls in"
+    weather_change          — RAIN|SUNNY|SANDSTORM|HAIL|FOG|HEAVY_RAIN|HARSH_SUN|STRONG_WINDS for next_battle or n_waves
     field_effect            — TRICK_ROOM|SCREENS|TERRAIN for next_battle or n_waves
     reveal_map_ahead        — peek at the next N waves' encounters
 
   Long-term modifiers (run-changing — use sparingly):
-    buff_persistent         — money|exp|drop|shiny multiplier 1.1-3x for N waves, e.g., "the gilded charm doubles your earnings"
-    debuff_persistent       — same kinds at 0.1-0.9x, e.g., "the curse halves your XP gain for 10 waves"
+    buff_persistent         — money|exp|drop|shiny multiplier 1.1-3x for N waves
+    debuff_persistent       — same kinds at 0.1-0.9x for N waves
 
   CUSTOM (escape hatch):
     custom                  — anything you can describe but the catalog doesn't cover. Always available. Use it.
@@ -441,8 +348,8 @@ TARGETING (TargetSpec): when an effect supports \`target\`:
 PICK WIDELY. The catalog has ~40 variants for a reason. If every choice has \`heal_party_hp + give_money\`, the run feels flat. Reach for status, weather, biome, eggs, vouchers, persistent buffs, and custom to make beats feel different from each other.
 
 CATALOG GROUNDING (read the envelope's gameBalanceCard before emitting):
-- For TrainerBattleBeat.trainerType: pick an id from \`gameBalanceCard.trainerTypeCatalog\`. The catalog lists ~70 archetypes (e.g., HEX_MANIAC=goth/spooky, VETERAN=hardened pro, RANGER=outdoors, BIKER=tough, FAIRY_TALE_GIRL=whimsical, RICH_KID=spoiled). Pick ONE whose archetype fits the beat's tone. Inventing a number outside the catalog will fail validation.
-- For BiomeTransitionBeat.options[].biomeId: pick an id from \`gameBalanceCard.biomeCatalog\`. Match the biome to the story (e.g., CAVE for hidden hideout, METROPOLIS for political intrigue, GRAVEYARD for occult, SEABED for the depths).
+- For TrainerBattleBeat.trainerType: pick an id from \`gameBalanceCard.trainerTypeCatalog\`. Match the archetype to the beat's tone — the catalog name itself signals the role (a "HEX_MANIAC" entry reads as goth/spooky, a "RANGER" as outdoors, etc.). Inventing a number outside the catalog will fail validation.
+- For BiomeTransitionBeat.options[].biomeId: pick an id from \`gameBalanceCard.biomeCatalog\`. Match the biome's name/character to the destination's story role.
 - For TrainerBattleBeat.enemyTeam: see "AUTHORING TRAINER TEAMS" above. ALWAYS use ids from \`gameBalanceCard.speciesCatalog\`, \`abilityCatalog\`, \`moveCatalog\`. NEVER invent ids — validation will reject the beat.
 - TrainerBattleBeat.speciesSwaps is a v1 leftover; use enemyTeam instead. If you set speciesSwaps and enemyTeam together, enemyTeam wins.
 - DO NOT echo the catalog back; just use one entry.`;
