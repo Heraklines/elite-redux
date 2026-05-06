@@ -2,6 +2,7 @@ import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { GameModes } from "#enums/game-modes";
+import { UiMode } from "#enums/ui-mode";
 import { buildContextEnvelope, type EnvelopePartyMember } from "#system/llm-director/context-envelope";
 import {
   clearPendingBible,
@@ -96,16 +97,54 @@ export class LLMDirectorBiblePhase extends Phase {
     }
 
     if (success) {
-      // The bible's playerIntro + openingScene are delivered as part of
-      // the FIRST beat's introText (wave 3), not via a pre-wave-1 message.
-      // Reason: pre-wave-1 the battle UI hasn't been initialized yet, so
-      // the message renderer's input handler isn't wired and the player
-      // gets stuck on the very first text screen. By wave 3, EncounterPhase
-      // has set everything up and queueMessage / dialog UI works correctly.
-      this.end();
+      this.renderIntroThenEnd();
     } else {
       this.fallbackToClassic();
     }
+  }
+
+  /**
+   * Show the player intro + opening scene from the freshly-loaded bible
+   * before the first wave's encounter phase fires.
+   *
+   * The previous version of this code rendered text but the player got
+   * stuck because Enter wasn't routed to the message handler. The active
+   * UiMode after SelectStarterPhase ends is whatever was left over —
+   * not MESSAGE — so the message handler renders the text but doesn't
+   * receive ACTION input. Calling `setMode(UiMode.MESSAGE)` BEFORE
+   * queueing makes the message handler the active input handler so
+   * Enter advances pages.
+   */
+  private renderIntroThenEnd(): void {
+    const bible = globalScene.gameData.llmDirectorState.storyBible;
+    if (!bible) {
+      this.end();
+      return;
+    }
+    const pages: string[] = [];
+    if (bible.themeName) {
+      pages.push(`— ${bible.themeName} —`);
+    }
+    const intro = clip(bible.playerIntro, 120);
+    const scene = clip(bible.openingScene, 120);
+    if (intro) {
+      pages.push(intro);
+    }
+    if (scene) {
+      pages.push(scene);
+    }
+    if (pages.length === 0) {
+      this.end();
+      return;
+    }
+    // Route input to the message handler — the missing piece that was
+    // breaking Enter-to-advance. setMode is sync; subsequent MessagePhases
+    // queued below will run with MESSAGE as the active mode.
+    void globalScene.ui.setMode(UiMode.MESSAGE);
+    for (const page of pages) {
+      globalScene.phaseManager.queueMessage(page, null, true);
+    }
+    this.end();
   }
 
   /**
@@ -142,6 +181,19 @@ export class LLMDirectorBiblePhase extends Phase {
       true,
     );
   }
+}
+
+/** Hard cap for the intro/scene strings — defense-in-depth. */
+function clip(text: string | undefined, max: number): string {
+  if (!text) {
+    return "";
+  }
+  if (text.length <= max) {
+    return text;
+  }
+  const head = text.slice(0, max);
+  const lastSentence = Math.max(head.lastIndexOf(". "), head.lastIndexOf("! "), head.lastIndexOf("? "));
+  return lastSentence > max * 0.6 ? head.slice(0, lastSentence + 1) : `${head.trimEnd()}…`;
 }
 
 /**
