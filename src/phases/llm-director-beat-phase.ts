@@ -19,6 +19,7 @@ import { buildTrainerOverride } from "#phases/llm-director-beat-utils";
 import { type ApplyResult, applyConsequence } from "#system/llm-director/beat-applier";
 import { recordBeatHistory, recordPlayerChoice } from "#system/llm-director/beat-history";
 import { compactHistory, HISTORY_COMPACT_THRESHOLD } from "#system/llm-director/compact-history";
+import { applyEffects } from "#system/llm-director/consequence-effects";
 import { logBeatDispatched, logChoiceMade, logTrainerOverride, logUnderrun } from "#system/llm-director/director-log";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
@@ -374,11 +375,21 @@ function truncate(text: string | undefined, max: number): string {
 }
 
 /**
- * Grant items and money from a Consequence. Items go through PokéRogue's
- * standard ModifierRewardPhase — same path vanilla item rewards use, so the
- * player sees the standard "You received X!" message + item-fanfare sound
- * and the item lands in inventory. Money goes through MoneyRewardPhase.
- * Unknown modifierType keys are logged and skipped.
+ * Grant items, money, and v2 effects from a Consequence.
+ *
+ * Legacy fields (`items`, `money`):
+ *   - `items[]` go through PokéRogue's standard ModifierRewardPhase — same
+ *     path vanilla item rewards use, so the player sees the standard "You
+ *     received X!" message + item-fanfare sound and the item lands in
+ *     inventory. Unknown modifierType keys are logged and skipped.
+ *   - `money` is a wave-curve multiplier piped through MoneyRewardPhase.
+ *
+ * v2 `effects[]`:
+ *   - Discriminated-union variants dispatched by `applyEffects`. Effects fire
+ *     in source order. Many are end-to-end implementations; some are stubbed
+ *     log + no-op for v1 — see `consequence-effects.ts`. The `custom`
+ *     escape hatch surfaces the LLM's free-form description as a player
+ *     message so even unimplemented effects are felt narratively.
  */
 function grantConsequenceRewards(consequence: import("#data/llm-director/beat-schema").Consequence): void {
   if (consequence.items) {
@@ -397,5 +408,8 @@ function grantConsequenceRewards(consequence: import("#data/llm-director/beat-sc
   }
   if (typeof consequence.money === "number" && consequence.money !== 0) {
     globalScene.phaseManager.unshiftNew("MoneyRewardPhase", consequence.money);
+  }
+  if (consequence.effects && consequence.effects.length > 0) {
+    applyEffects(consequence.effects);
   }
 }
