@@ -11,9 +11,41 @@ import Ajv, { type ValidateFunction } from "ajv";
 
 export type BeatType = "narrative_only" | "dialogue_choice" | "trainer_battle" | "biome_transition" | "item_event";
 
+/**
+ * One LLM-authored Pokémon entry. Used in both `TrainerBattleBeat.enemyTeam`
+ * (the beat's own trainer fight) and `InterBeatOverride.trainerOverride.enemyTeam`
+ * (the in-between vanilla waves). Lets the LLM fully spec a trainer team:
+ * species, level, ability, moves, held items.
+ *
+ * - speciesId: from gameBalanceCard.speciesCatalog (positive integer)
+ * - level: optional override; defaults to the wave-curve level
+ * - abilityId: optional, from gameBalanceCard.abilityCatalog
+ * - moveIds: 0-4 entries from gameBalanceCard.moveCatalog
+ * - heldItemKeys: 0-6 string keys (e.g., "LEFTOVERS", "FOCUS_BAND"); unknown
+ *   keys are silently dropped at apply time. We use string keys (not ids)
+ *   because PokéRogue's modifier system identifies held items by string.
+ * - isBoss: enables segmented HP bars
+ * - shiny / nickname: cosmetic flair for narrative consistency
+ */
+export interface AuthoredPokemon {
+  speciesId: number;
+  level?: number;
+  abilityId?: number;
+  moveIds?: number[];
+  heldItemKeys?: string[];
+  isBoss?: boolean;
+  shiny?: boolean;
+  nickname?: string;
+}
+
 export interface InterBeatOverride {
   atWaveOffset: 1 | 2;
-  trainerOverride?: { speciesSwaps?: number[]; levelDelta?: number };
+  trainerOverride?: {
+    speciesSwaps?: number[];
+    levelDelta?: number;
+    /** Full LLM-authored team for the upcoming trainer wave (1-6 entries). */
+    enemyTeam?: AuthoredPokemon[];
+  };
   biomeFlavorText?: string;
   /** Story-themed line spoken just before the battle starts. Replaces the
    * vanilla trainer's canned dialogue for that wave. Max ~200 chars. */
@@ -73,6 +105,10 @@ export interface TrainerBattleBeat extends BeatBase {
   trainerType: number;
   speciesSwaps?: number[];
   levelDelta?: number;
+  /** Full LLM-authored team for THIS beat's trainer encounter (1-6 entries).
+   * Applied to the next wave's trainer encounter via the inter-beat override
+   * pipeline. */
+  enemyTeam?: AuthoredPokemon[];
   difficultyTag?: "easy" | "normal" | "hard" | "brutal";
   preBattleText: string;
   postWinText: string;
@@ -154,6 +190,29 @@ const consequenceSchema = {
   additionalProperties: false,
 } as const;
 
+const authoredPokemonSchema = {
+  type: "object",
+  required: ["speciesId"],
+  properties: {
+    speciesId: { type: "integer", minimum: 1 },
+    level: { type: "integer", minimum: 1, maximum: 200 },
+    abilityId: { type: "integer", minimum: 0 },
+    moveIds: { type: "array", maxItems: 4, items: { type: "integer", minimum: 0 } },
+    heldItemKeys: { type: "array", maxItems: 6, items: { type: "string", minLength: 1 } },
+    isBoss: { type: "boolean" },
+    shiny: { type: "boolean" },
+    nickname: { type: "string", maxLength: 20 },
+  },
+  additionalProperties: false,
+} as const;
+
+const enemyTeamSchema = {
+  type: "array",
+  minItems: 1,
+  maxItems: 6,
+  items: authoredPokemonSchema,
+} as const;
+
 const interBeatOverrideSchema = {
   type: "object",
   required: ["atWaveOffset"],
@@ -164,6 +223,7 @@ const interBeatOverrideSchema = {
       properties: {
         speciesSwaps: { type: "array", items: { type: "integer" } },
         levelDelta: { type: "integer" },
+        enemyTeam: enemyTeamSchema,
       },
       additionalProperties: false,
     },
@@ -234,6 +294,7 @@ const trainerBattleSchema = {
     trainerType: { type: "integer" },
     speciesSwaps: { type: "array", items: { type: "integer" } },
     levelDelta: { type: "integer" },
+    enemyTeam: enemyTeamSchema,
     difficultyTag: { type: "string", enum: ["easy", "normal", "hard", "brutal"] },
     preBattleText: { type: "string", minLength: 1 },
     postWinText: { type: "string", minLength: 1 },
