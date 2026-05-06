@@ -104,12 +104,45 @@ async function runSkeletonPhase(
       continue;
     }
     const validation = validateBeat(parsed);
-    if (validation.ok) {
-      logBeatParsed(wave, parsed);
-      return parsed as Beat;
+    if (!validation.ok) {
+      lastError = validation.error;
+      logBeatValidationFail(wave, lastError, attempt);
+      continue;
     }
-    lastError = validation.error;
-    logBeatValidationFail(wave, lastError, attempt);
+    // First-beat semantic check: dialogue_choice with at least one
+    // non-custom effect on each option AND at least one option with a
+    // non-empty consequence.items[] (rewards-shop menu). This is enforced
+    // in the prompt; we re-check here to fail fast and retry instead of
+    // letting a flat first beat ship.
+    if (envelope.isFirstBeat) {
+      const semanticErr = validateFirstBeatSemantics(parsed as Beat);
+      if (semanticErr) {
+        lastError = `first-beat semantic check: ${semanticErr}`;
+        logBeatValidationFail(wave, lastError, attempt);
+        continue;
+      }
+    }
+    logBeatParsed(wave, parsed);
+    return parsed as Beat;
+  }
+  return null;
+}
+
+function validateFirstBeatSemantics(beat: Beat): string | null {
+  if (beat.type !== "dialogue_choice") {
+    return `must be dialogue_choice, got "${beat.type}"`;
+  }
+  for (let i = 0; i < beat.options.length; i++) {
+    const opt = beat.options[i];
+    const effects = opt.consequence.effects ?? [];
+    const hasNonCustom = effects.some(e => e.type !== "custom");
+    if (!hasNonCustom) {
+      return `options[${i}] must have at least one non-custom effect`;
+    }
+  }
+  const anyHasItems = beat.options.some(o => (o.consequence.items?.length ?? 0) > 0);
+  if (!anyHasItems) {
+    return "at least one option must have non-empty consequence.items[] (a 2-3 entry rewards-shop menu)";
   }
   return null;
 }
