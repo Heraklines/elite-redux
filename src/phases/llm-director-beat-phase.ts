@@ -12,16 +12,16 @@ import type {
   TrainerBattleBeat,
 } from "#data/llm-director/beat-schema";
 import { pickFillerBeat } from "#data/llm-director/filler-beats";
-import { BattleType } from "#enums/battle-type";
 import type { BiomeId } from "#enums/biome-id";
 import { UiMode } from "#enums/ui-mode";
 import type { ModifierType } from "#modifiers/modifier-type";
+import { ModifierTypeOption } from "#modifiers/modifier-type";
+import { generateModifierType } from "#mystery-encounters/utils/encounter-phase-utils";
 import { buildTrainerOverride } from "#phases/llm-director-beat-utils";
 import { type ApplyResult, applyConsequence } from "#system/llm-director/beat-applier";
 import { recordBeatHistory, recordPlayerChoice } from "#system/llm-director/beat-history";
-import { buildLlmDialogueEncounter } from "#system/llm-director/build-llm-encounter";
 import { compactHistory, HISTORY_COMPACT_THRESHOLD } from "#system/llm-director/compact-history";
-import { applyEffects, resolveItemThunk } from "#system/llm-director/consequence-effects";
+import { applyEffects } from "#system/llm-director/consequence-effects";
 import { logBeatDispatched, logChoiceMade, logTrainerOverride, logUnderrun } from "#system/llm-director/director-log";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
@@ -155,41 +155,17 @@ export class LLMDirectorBeatPhase extends Phase {
   }
 
   /**
-   * Render a dialogue choice as a real PokeRogue MysteryEncounter:
-   * promotes the current battle to MYSTERY_ENCOUNTER type, plants a
-   * runtime-built encounter on `currentBattle.mysteryEncounter`, and ends
-   * the phase. The next phase already in the queue (`EncounterPhase`)
-   * sees the encounter, slides in the speaker sprite, and queues
-   * `MysteryEncounterPhase` to render the proper option-select UI with
-   * title bar + description box + option buttons.
+   * Render a dialogue choice IN-BETWEEN waves (no wave consumed, no battle
+   * skipped). Uses the lightweight dialogue + OPTION_SELECT overlay so the
+   * cadence stays "every 3 waves a beat fires *alongside* the regular wave
+   * fight", not "every 3 waves a wave is replaced by an encounter".
    *
-   * The option callbacks themselves (in `build-llm-encounter.ts`) handle
-   * applying consequences, queueing item rewards via `setEncounterRewards`,
-   * and exiting via `leaveEncounterWithoutBattle`.
+   * Item rewards from the chosen option still go through PokeRogue's proper
+   * rewards-shop UI via `SelectModifierPhase` with `guaranteedModifierTypeOptions`
+   * — the same plumbing mystery encounters use, just unshifted directly so we
+   * don't have to be a mystery encounter to use it.
    */
   private renderDialogue(beat: DialogueChoiceBeat): void {
-    const battle = globalScene.currentBattle;
-    if (!battle) {
-      console.warn("[llm-director] renderDialogue: no currentBattle, falling back to OPTION_SELECT");
-      this.renderDialogueLegacy(beat);
-      return;
-    }
-    const encounter = buildLlmDialogueEncounter(beat);
-    battle.battleType = BattleType.MYSTERY_ENCOUNTER;
-    battle.mysteryEncounter = encounter;
-    battle.mysteryEncounterType = encounter.encounterType;
-    console.info(
-      `[llm-director] dialogue_choice promoted to MysteryEncounter: speaker="${beat.speaker?.name ?? "?"}", options=${beat.options.length}`,
-    );
-    this.end();
-  }
-
-  /**
-   * Legacy fallback path — invoked only when there's no currentBattle to
-   * promote (shouldn't happen in normal play). Kept so the run never
-   * stalls on an unexpected null.
-   */
-  private renderDialogueLegacy(beat: DialogueChoiceBeat): void {
     const showChoices = () => this.showChoiceMenu(beat);
     const intro = paginate(beat.introText);
     void globalScene.ui.setMode(UiMode.MESSAGE);
@@ -445,22 +421,41 @@ function truncate(text: string | undefined, max: number): string {
  */
 function grantConsequenceRewards(consequence: import("#data/llm-director/beat-schema").Consequence): string[] {
   const messages: string[] = [];
-  if (consequence.items) {
+  if (consequence.items && consequence.items.length > 0) {
+    // Materialize each LLM-emitted item via PokeRogue's canonical helper
+    // (mystery-encounters use this same path) so generators like TM_COMMON,
+    // EVOLUTION_ITEM etc. resolve to a concrete name-bearing ModifierType
+    // BEFORE the rewards UI reads them. Then bundle them into ONE
+    // SelectModifierPhase so the player sees a proper "pick from these
+    // items" rewards shop instead of a chain of "You received X!" messages.
     const factories = modifierTypes as Record<string, (() => ModifierType) | undefined>;
+    const guaranteed: ModifierTypeOption[] = [];
     for (const item of consequence.items) {
       const factory = factories[item.modifierType];
       if (typeof factory !== "function") {
         console.warn(`[llm-director] unknown modifierType in consequence.items: "${item.modifierType}"`);
         continue;
       }
-      const resolved = resolveItemThunk(factory, item.modifierType);
+      const resolved = generateModifierType(factory);
       if (!resolved) {
+        console.warn(`[llm-director] consequence.items "${item.modifierType}" produced no compatible item — skipping`);
         continue;
       }
       const qty = Math.max(1, item.qty ?? 1);
       for (let i = 0; i < qty; i++) {
-        globalScene.phaseManager.unshiftNew("ModifierRewardPhase", resolved);
+        guaranteed.push(new ModifierTypeOption(resolved, 0));
       }
+    }
+    if (guaranteed.length > 0) {
+      // unshiftNew so the rewards shop opens BEFORE the queued battle's
+      // EncounterPhase / SummonPhase. fillRemaining=false caps the row to
+      // exactly the LLM's items; rerollMultiplier=0 disables the reroll
+      // button so a single beat doesn't burn the player's reroll budget.
+      globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, {
+        guaranteedModifierTypeOptions: guaranteed,
+        fillRemaining: false,
+        rerollMultiplier: 0,
+      });
     }
   }
   if (typeof consequence.money === "number" && consequence.money !== 0) {

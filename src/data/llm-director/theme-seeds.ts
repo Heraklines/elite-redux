@@ -15,6 +15,83 @@ export interface ThemeSeed {
 }
 
 export const THEME_SEEDS: readonly ThemeSeed[] = [
+  // — Pokemon-world specific (REQUIRED FLAVOR) —
+  {
+    id: "rotten-badge-circuit",
+    text: "Three of the eight Gym Leaders are selling badges. You're the inspector sent to prove it.",
+    tones: ["procedural", "investigation"],
+  },
+  {
+    id: "ditto-laundering",
+    text: "A Ditto-laundering ring has been substituting champions' Pokemon at official matches.",
+    tones: ["heist", "intrigue"],
+  },
+  {
+    id: "lavender-bereavement",
+    text: "You're a junior medium at Lavender Tower; a Marowak in the basement won't let anyone past floor three.",
+    tones: ["ghost", "melancholy", "small-town"],
+  },
+  {
+    id: "frontier-brain-rivalry",
+    text: "You apprentice under a Frontier Brain who has been quietly losing matches on purpose.",
+    tones: ["mentor", "intrigue", "competitive"],
+  },
+  {
+    id: "ranger-poaching-run",
+    text: "A Ranger pursuing a Larvitar-poaching cartel through three biomes. The cartel pays in Mega Stones.",
+    tones: ["procedural", "naturalist", "tense"],
+  },
+  {
+    id: "contest-circuit-revival",
+    text: "You revive an outlawed Contest circuit in the streets of Hearthome, dodging League officials.",
+    tones: ["wholesome", "underdog", "performance"],
+  },
+  {
+    id: "fossil-ethics",
+    text: "A Cinnabar lab is reviving Aerodactyl illegally; the lead researcher is your former mentor.",
+    tones: ["sci-fi", "moral-grey", "mentor"],
+  },
+  {
+    id: "z-crystal-heist",
+    text: "Four Alolan trial captains lost their Z-Crystals in one night. You're the only outsider in the village.",
+    tones: ["heist", "tropical", "investigation"],
+  },
+  {
+    id: "daycare-runaway",
+    text: "The Solaceon Daycare has been quietly running a Pokemon-trafficking back door. You're the new hire.",
+    tones: ["procedural", "small-town", "moral-grey"],
+  },
+  {
+    id: "ace-trainer-retired",
+    text: "A retired Ace Trainer hires you to find their missing Mawile, last seen at a wedding.",
+    tones: ["wholesome", "investigation", "cozy"],
+  },
+  {
+    id: "psychic-authority",
+    text: "Saffron Psychic Authority is using Hypno to interrogate dissidents. You broke in to free a friend.",
+    tones: ["dystopian", "tense", "rescue"],
+  },
+  {
+    id: "drifloon-funerals",
+    text: "Drifloon keep showing up at funerals they weren't invited to. The Hex Maniac thinks you can help.",
+    tones: ["ghost", "melancholy", "investigation"],
+  },
+  {
+    id: "mega-stone-prospector",
+    text: "You're a Mega Stone prospector working a played-out vein in the Glittering Cave.",
+    tones: ["western", "small-town", "naturalist"],
+  },
+  {
+    id: "nuzlocke-pact",
+    text: "Three rivals sworn to the Nuzlocke pact. The first to lose three Pokemon owes the others their starter.",
+    tones: ["competitive", "mentor", "intrigue"],
+  },
+  {
+    id: "cetoddle-migration",
+    text: "A Cetoddle migration is being blocked by an oil platform. The local Trainer School wants to help; the company wants to crush them.",
+    tones: ["activist", "wholesome", "naturalist"],
+  },
+
   // — Mafia / underground —
   {
     id: "underground-fixed-tournament",
@@ -433,7 +510,7 @@ export const THEME_SEEDS: readonly ThemeSeed[] = [
   // — Mature / morally complex (positive AND negative) —
   {
     id: "redemption-arc",
-    text: "A former villain is your traveling companion. They want to make amends.",
+    text: "A former Team Rocket admin and their unevolved Mightyena travel with you, trying to undo what they did.",
     tones: ["mature", "redemption", "bittersweet"],
   },
   {

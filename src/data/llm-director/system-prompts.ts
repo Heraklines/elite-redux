@@ -49,7 +49,31 @@ TONAL VARIETY (CRITICAL):
 - If the seed is comedic (talking starter, ghost bachelor, wrong-trainer mix-up), keep the tone comedic across acts. Stakes can be silly. Failure can be embarrassing rather than tragic.
 - If the seed is sports/competitive (tournament, draft format, championship), the world is normal — focus on rivalries, training arcs, audience reactions, prize money.
 - "Ruined kingdom" / "fallen world" / "ancient curse" tropes are ONE flavor. There are dozens of others — pick whichever the seed calls for, not the easy default.
-- The blurb, faction descriptions, and NPC roles all need to MATCH the seed's tone. A wholesome seed with a "hostile" NPC is fine; a wholesome seed where every NPC is "tortured" or "scarred" is wrong.`;
+- The blurb, faction descriptions, and NPC roles all need to MATCH the seed's tone. A wholesome seed with a "hostile" NPC is fine; a wholesome seed where every NPC is "tortured" or "scarred" is wrong.
+
+POKEMON-WORLD GROUNDING (REQUIRED — do not skip):
+- This is a POKEMON game. Every story MUST feel like it could only happen in the Pokemon world. Generic fantasy / sci-fi / urban-noir without Pokemon flavor is a FAILURE.
+- The blurb, acts, factions, NPC roles MUST reference Pokemon-world specifics:
+  * trainers, gym leaders, the league, frontier brains, elite four, champions
+  * Pokemon types (Fire, Water, Ghost, Dragon, Fairy, etc.) and the cultural meaning around them
+  * Pokemon centers, marts, daycares, breeders, rangers, professors, contest halls
+  * specific Pokemon by name when it adds flavor (a Slowking elder, a Lucario lieutenant, a Mimikyu hidden in a basket)
+  * regional cultures (Kantonian / Johtonian / Hoennian / Sinnohan / Unovan / Kalosian / Alolan / Galarian / Paldean) and their stereotypes
+  * mechanics-flavored conflict — illegal IV breeding rings, Mega Stone smuggling, Z-Crystal heists, badge counterfeiting, fossil reanimation ethics, Ditto identity laundering
+- Conflict examples that read as POKEMON, not generic:
+  * "A Ranger discovers a Larvitar nursery being culled by a mining cartel."
+  * "A retired Ace Trainer travels with a Mawile that won't stop stealing wedding rings."
+  * "Three friends launch an underground Contest circuit after the official one bans Roselia."
+  * "A Hex Maniac's Drifloon keeps showing up at funerals it wasn't invited to."
+- Conflicts to AVOID (too generic):
+  * "warehouse fires", "burned shrines", "flooded mines" with no Pokemon angle
+  * "vigilance committees" / "iron bough" / "rooted choir" without explaining HOW Pokemon factor in
+  * pure cyberpunk / noir / fantasy without trainers, types, or species
+- The playerIntro should name a Pokemon-world ROLE: "lapsed ranger", "former Ace Trainer", "shrine medium for Ghost-types", "off-the-books Pokemon midwife", "disqualified Contest coordinator". NOT a generic "wandering medic" or "lapsed officer".
+- factions should be Pokemon-world groups: "the Pewter Geological Society", "Cerulean Cape Surf League", "Saffron Psychic Authority", "Lavender Bereavement Trust" — not "Vigilance Committees" or "Broken Rock Remnants" without context.
+- NPCs ideally have a signature Pokemon (mentioned in their role) — "Sienna, retired Officer Jenny who patrols with a half-blind Manectric"; "Bramble, an Iron Bough botanist whose Lurantis won't bloom anymore". Treat the Pokemon as a character beat, not a name-drop.
+
+If you write a bible and a reader couldn't tell within ONE sentence that this is a Pokemon world, you have failed. Rewrite.`;
 
 export const BEAT_SKELETON_SYSTEM_PROMPT = `You are the Director writing one beat of a generative Pokémon run. Read the envelope (story bible, beat history, current state) and emit ONE beat as STRICT JSON matching this discriminated union.
 
@@ -66,6 +90,19 @@ GROUNDING RULES (so the player always knows who is who):
 - Address the player as "you" (second person). Never "the trainer" or third person.
 - For dialogue beats, separate stage direction from speech. Stage direction in introText (1 sentence), spoken line in the speaker block. Example introText: "Vance, the ex-Ranger, leans on the doorframe." Then dialogue lives in option labels or a follow-up.
 - Avoid run-on sentences. Prefer short, punchy lines. Each beat should read in <10 seconds.
+
+POKEMON-WORLD GROUNDING (REQUIRED in EVERY beat):
+- Every beat MUST anchor in Pokemon-world specifics. A beat that reads as generic fantasy/noir/sci-fi WITHOUT Pokemon, trainers, types, or species is wrong — rewrite.
+- Concrete examples a beat can/should reference:
+  * a specific Pokemon by name when it adds flavor ("his Houndoom watches you from the shadow", "her Audino is already tending your Eevee")
+  * a type-based superstition or culture ("Ghost-types are unlucky in this town", "Fire-type trainers eat first at this shrine")
+  * a Pokemon-world institution (Pokemon Center, Mart, daycare, Trainer's School, Contest hall, gym, ranger station, frontier base)
+  * a mechanic-flavored stake (badge, evolution stone, Mega Stone, Z-Crystal, TM, fossil, ribbon, voucher, egg)
+- BAD beat (generic): "A figure in a hooded coat blocks the path." -> rewrite.
+- GOOD beat (Pokemon): "A Ranger captain blocks the path; her Manectric's static makes your Pokeballs hum at her belt."
+- BAD option ("custom" flavor): "you sense danger".
+- GOOD option ("custom" flavor): "the Lurantis at her shoulder unfolds slightly, ready to dance".
+- The CONSEQUENCE of a choice should also feel Pokemon-flavored when possible: a friendship_boost narrated as "your Eevee curls up with hers", a give_item: ESCAPE_ROPE narrated as "she presses a worn rope into your hand", etc.
 
 Beat schemas:
 
