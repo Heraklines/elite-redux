@@ -309,16 +309,28 @@ export class LLMDirectorBeatPhase extends Phase {
    * of one dialog instead of fighting between separate MessagePhases that
    * race with battle UI mode changes. Empty / whitespace-only entries are
    * skipped. If the combined string is empty, no message is queued.
+   *
+   * `trailing` is the consequence's epilogueText — the line the LLM
+   * authored as the player's choice feedback. It MUST always render after
+   * effect narration; without it, picking a choice with silent effects
+   * (friendship_boost, heal_party_status, etc.) shows the player nothing
+   * after their pick and the run feels frozen.
    */
-  private queueConsolidatedTail(parts: string[], _trailing: string | undefined): void {
-    const cleaned = parts.map(p => (p ?? "").trim()).filter(p => p.length > 0);
-    if (cleaned.length === 0) {
+  private queueConsolidatedTail(parts: string[], trailing: string | undefined): void {
+    const collected: string[] = parts.map(p => (p ?? "").trim()).filter(p => p.length > 0);
+    if (trailing) {
+      const t = trailing.trim();
+      if (t.length > 0) {
+        collected.push(t);
+      }
+    }
+    if (collected.length === 0) {
       return;
     }
     // Each part is itself paginated (long parts split at sentence boundaries),
     // then the parts are joined by `$` so the message handler treats each
     // part as its own advanceable page.
-    const combined = cleaned.map(p => paginate(p)).join("$");
+    const combined = collected.map(p => paginate(p)).join("$");
     void globalScene.ui.setMode(UiMode.MESSAGE);
     globalScene.phaseManager.queueMessage(combined, null, true);
   }
