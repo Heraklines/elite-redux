@@ -51,6 +51,20 @@ export interface ContextEnvelope {
   storyBible: StoryBible | undefined;
   beatHistory: BeatHistoryEntry[];
   playerParty: EnvelopePartyMember[];
+  /**
+   * Quick power summary so the LLM can scale encounters and rewards
+   * without manually averaging playerParty levels every beat.
+   */
+  partyPower: {
+    averageLevel: number;
+    minLevel: number;
+    maxLevel: number;
+    livingCount: number;
+    /** Wave-curve baseline level for the current wave — what vanilla
+     * trainer Pokemon at this wave would be at. Useful to gauge whether
+     * the player is over-/under-leveled relative to the curve. */
+    waveCurveLevel: number;
+  };
   inventory: EnvelopeInventory;
   factionRep: Record<string, number>;
   alignment: number;
@@ -111,23 +125,43 @@ export interface ItemTierEntry {
   tier: string;
   /** Weight in the vanilla pool. Higher = more frequent. "fn" if dynamic. */
   weight: number | "fn";
+  /**
+   * For held items: the maximum number of copies of this item that can
+   * stack on a single Pokemon. PokeRogue items don't follow vanilla
+   * "one per Pokemon" — most stack with diminishing returns. Probed by
+   * instantiating a stub modifier and reading getMaxStackCount(false).
+   * `undefined` for non-held items, items where probing failed, or items
+   * whose limit depends on Pokemon-specific state we can't simulate.
+   */
+  maxStack?: number;
 }
 
 export interface CatalogEntry {
   id: number;
   name: string;
+  /** For trainer types >= 200 (gym leaders / E4 / champions / rivals):
+   * the runtime requires an enemyTeam override when this id is used so
+   * their canonical (often very-high-level) team doesn't surface. */
+  requiresEnemyTeam?: boolean;
 }
 
 const HISTORY_VERBATIM_LIMIT = 30;
 
 /**
- * Build the generic-trainer catalog from the TrainerType enum. We exclude:
- * - id 0 (UNKNOWN sentinel)
- * - id >= 200 (named special trainers — gym leaders, elite four, champions,
- *   rivals; these have fixed canonical teams and the Director shouldn't
- *   override them)
+ * Build the trainer catalog from the TrainerType enum.
+ * - id 0 (UNKNOWN sentinel) is excluded.
+ * - id 1..199 are generic archetypes (ranger, biker, harlequin, etc.) —
+ *   safe to assign with any team.
+ * - id >= 200 are named special trainers (gym leaders, elite four,
+ *   champions, rivals). They have fixed canonical teams the LLM does
+ *   NOT want to surface. The runtime allows id>=200 ONLY when the LLM
+ *   also provides trainerOverride.enemyTeam so the canonical team is
+ *   replaced — this gives the LLM access to those sprites for narrative
+ *   reuse (a champion's apprentice, a gym leader cameo, etc.) without
+ *   accidentally spawning their canonical 30+ level Pokemon at wave 5.
  *
- * Result: ~70 generic trainer archetypes the LLM can pick from by id.
+ * Catalog entries above id 199 carry a `requiresEnemyTeam: true` flag
+ * so the LLM knows the constraint.
  */
 function buildTrainerCatalog(): CatalogEntry[] {
   const entries: CatalogEntry[] = [];
@@ -138,10 +172,11 @@ function buildTrainerCatalog(): CatalogEntry[] {
     if (id === 0) {
       continue;
     }
+    const entry: CatalogEntry = { id, name: name.toLowerCase() };
     if (id >= 200) {
-      continue;
+      entry.requiresEnemyTeam = true;
     }
-    entries.push({ id, name: name.toLowerCase() });
+    entries.push(entry);
   }
   return entries.sort((a, b) => a.id - b.id);
 }
@@ -237,6 +272,37 @@ function getModifierCatalog(): string[] {
  */
 let cachedItemTiers: { player: ItemTierEntry[]; trainer: ItemTierEntry[] } | null = null;
 
+/**
+ * Probe an item's max stack count by instantiating a sample modifier
+ * with a stubbed-out Pokemon arg. Most held-item modifiers' getMaxStackCount
+ * returns a constant; the few that don't (BerryModifier reads berry type,
+ * etc.) work fine with our stub since the stub.id is a number. Anything
+ * that throws during construction is treated as unprobeable -> undefined.
+ */
+function probeMaxStack(
+  modifierType: { newModifier?: (...args: unknown[]) => unknown } | undefined,
+): number | undefined {
+  if (!modifierType || typeof modifierType.newModifier !== "function") {
+    return;
+  }
+  try {
+    // Stub PlayerPokemon: many held-item factories read .id; some read
+    // .moveset etc. We pass a minimal shape and hope the factory works.
+    const stub = { id: 0, moveset: [], abilityIndex: 0 } as unknown;
+    const modifier = modifierType.newModifier(stub) as { getMaxStackCount?: (forThreshold?: boolean) => number } | null;
+    if (!modifier || typeof modifier.getMaxStackCount !== "function") {
+      return;
+    }
+    const max = modifier.getMaxStackCount(false);
+    if (typeof max !== "number" || !Number.isFinite(max) || max <= 0) {
+      return;
+    }
+    return max;
+  } catch {
+    return;
+  }
+}
+
 function getItemTierCatalogs(): { player: ItemTierEntry[]; trainer: ItemTierEntry[] } {
   if (cachedItemTiers !== null && cachedItemTiers.player.length > 0) {
     return cachedItemTiers;
@@ -251,20 +317,34 @@ function getItemTierCatalogs(): { player: ItemTierEntry[]; trainer: ItemTierEntr
     }
     const playerEntries = modifierPool[tier] ?? [];
     for (const wmt of playerEntries) {
-      const id = (wmt as { modifierType?: { id?: string } }).modifierType?.id ?? "unknown";
+      const modType = (wmt as { modifierType?: { id?: string; newModifier?: (...args: unknown[]) => unknown } })
+        .modifierType;
+      const id = modType?.id ?? "unknown";
       const w = (wmt as { weight?: unknown }).weight;
       const weight = typeof w === "number" ? w : "fn";
       if (id !== "unknown") {
-        player.push({ id, tier: tierName, weight });
+        const entry: ItemTierEntry = { id, tier: tierName, weight };
+        const maxStack = probeMaxStack(modType);
+        if (typeof maxStack === "number") {
+          entry.maxStack = maxStack;
+        }
+        player.push(entry);
       }
     }
     const trainerEntries = trainerModifierPool[tier] ?? [];
     for (const wmt of trainerEntries) {
-      const id = (wmt as { modifierType?: { id?: string } }).modifierType?.id ?? "unknown";
+      const modType = (wmt as { modifierType?: { id?: string; newModifier?: (...args: unknown[]) => unknown } })
+        .modifierType;
+      const id = modType?.id ?? "unknown";
       const w = (wmt as { weight?: unknown }).weight;
       const weight = typeof w === "number" ? w : "fn";
       if (id !== "unknown") {
-        trainer.push({ id, tier: tierName, weight });
+        const entry: ItemTierEntry = { id, tier: tierName, weight };
+        const maxStack = probeMaxStack(modType);
+        if (typeof maxStack === "number") {
+          entry.maxStack = maxStack;
+        }
+        trainer.push(entry);
       }
     }
   }
@@ -324,6 +404,42 @@ function compactHistory(history: BeatHistoryEntry[]): BeatHistoryEntry[] {
   });
 }
 
+/**
+ * Wave-curve baseline level — roughly what vanilla trainer Pokemon would
+ * be at this wave. Linear ramp (~1 level per wave for the early game,
+ * with some curve compression at higher waves). Used as a yardstick so
+ * the LLM can detect over- / under-leveled parties relative to the wave.
+ */
+function waveCurveLevel(waveIndex: number): number {
+  // Mirrors PokeRogue's typical scaling. Early waves: level ≈ wave. Past
+  // wave 50, scaling slows. Past wave 100, slower still.
+  if (waveIndex <= 50) {
+    return Math.max(1, waveIndex);
+  }
+  if (waveIndex <= 100) {
+    return 50 + Math.floor((waveIndex - 50) * 0.6);
+  }
+  return 80 + Math.floor((waveIndex - 100) * 0.4);
+}
+
+function computePartyPower(
+  playerParty: EnvelopePartyMember[],
+  currentWaveIndex: number,
+): ContextEnvelope["partyPower"] {
+  const living = playerParty.filter(p => (p.hpPct ?? 1) > 0);
+  const levels = living.map(p => p.level ?? 1);
+  const avg = levels.length > 0 ? Math.round(levels.reduce((a, b) => a + b, 0) / levels.length) : 0;
+  const min = levels.length > 0 ? Math.min(...levels) : 0;
+  const max = levels.length > 0 ? Math.max(...levels) : 0;
+  return {
+    averageLevel: avg,
+    minLevel: min,
+    maxLevel: max,
+    livingCount: living.length,
+    waveCurveLevel: waveCurveLevel(currentWaveIndex),
+  };
+}
+
 export function buildContextEnvelope(inputs: EnvelopeInputs): ContextEnvelope {
   const {
     state,
@@ -338,6 +454,7 @@ export function buildContextEnvelope(inputs: EnvelopeInputs): ContextEnvelope {
     storyBible: state.storyBible,
     beatHistory: compactHistory(state.beatHistory),
     playerParty,
+    partyPower: computePartyPower(playerParty, currentWaveIndex),
     inventory,
     factionRep: state.factionRep,
     alignment: state.alignment,

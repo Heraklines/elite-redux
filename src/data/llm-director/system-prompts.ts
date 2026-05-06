@@ -262,31 +262,34 @@ Rules:
 - preBattleText that names a trainer/character REQUIRES trainerOverride with at least trainerType. preBattleText that names a wild creature REQUIRES wildEncounter. Generic "a passing trainer challenges you" with no specific name can fall through to vanilla generation.
 - These cover: specific Pokemon, boss fights, biome changes, vanilla mystery events, AND named-trainer fights. Use what fits the story.
 
-AUTHORING TRAINER TEAMS (enemyTeam — the heart of v2):
-- Whenever you set enemyTeam, ALWAYS source ids from envelope.gameBalanceCard:
-    speciesId from \`gameBalanceCard.speciesCatalog\`
-    abilityId from \`gameBalanceCard.abilityCatalog\`
-    moveIds from \`gameBalanceCard.moveCatalog\`
+AUTHORING TRAINER TEAMS (enemyTeam):
+- Source ALL ids from envelope.gameBalanceCard:
+    speciesId from gameBalanceCard.speciesCatalog
+    abilityId from gameBalanceCard.abilityCatalog
+    moveIds from gameBalanceCard.moveCatalog
   Inventing ids will fail validation. Search the catalog by name; pick by id.
-- heldItemKeys uses STRING keys (uppercase, with underscores) — these are the modifier-type keys, not numeric ids. Pick from gameBalanceCard.trainerItemTiers; unknown keys are silently dropped. Common categories: every-turn HP heal, survive-at-1HP, type-boosters, crit/flinch chance, berry-on-low-HP, money/exp multipliers.
-- TIE TEAM COMPOSITION TO THE STORY. A team's type spread should signal the encounter's mood and the antagonist's identity:
-    Smuggler / criminal → dark/poison
-    Religious cult / oracle → psychic/fairy
-    Wasteland / post-apocalyptic → poison/steel/dark
-    Court / political intrigue → elegant/balanced (psychic/fairy/normal)
-    Ranger / wilderness → grass/normal/flying with utility moves
-    Cyberpunk / factory → steel/electric
-- LEVELS within ±3 of the wave-curve baseline (±5 only if difficultyTag=brutal AND a recent beat had an explicit escape route). Server clamps anyway, but emit reasonable values.
+- heldItemKeys uses STRING keys (uppercase, with underscores). Pick from gameBalanceCard.trainerItemTiers; unknown keys are silently dropped. Each entry in that catalog carries a "maxStack" field — a single Pokemon can carry MULTIPLE copies of the same held item up to maxStack. So a Pokemon's heldItemKeys array can repeat keys (e.g., the same item three times) up to its maxStack, AND can carry several different items at once. Use this stacking when it matches the antagonist's identity — a methodical hoarder might stack one item, a versatile fighter might mix several.
+- TRAINER-TYPE catalog: gameBalanceCard.trainerTypeCatalog includes BOTH generic archetypes (id 1-199) and named trainers (id 200+, gym leaders / Elite Four / champions / rivals). Named trainers are marked with requiresEnemyTeam=true: you can borrow their SPRITE for narrative reuse (a former rival cameos, a champion's apprentice arrives) but you MUST also emit trainerOverride.enemyTeam — otherwise the runtime rejects the override (their canonical endgame teams would surface). Lean on this freely; the named-trainer sprites add narrative weight when used judiciously.
+- TIE TEAM COMPOSITION TO THE STORY. A team's type spread should signal the encounter's mood and the antagonist's identity. Match the type pool to what the narration says about the foe.
+- LEVELS: scale to envelope.partyPower.averageLevel and envelope.partyPower.waveCurveLevel. Stay within roughly ±3 of whichever is HIGHER (so under-leveled players aren't crushed, over-leveled players aren't bored). Boss-coded fights (act finales, isBoss=true) may be +1 to +3 above that. Server clamps anyway, but emit reasonable values — the LLM seeing the actual party power is the whole point.
 - TEAM SIZE 1-6. For story climaxes (act finales, boss-coded beats), prefer 4-6 with one isBoss=true. For mid-act trainers, 2-4.
-- MOVESETS should match the species' archetype AND the story role. A combat-coded antagonist's signature mon should have offensive coverage, not status-only filler. Conversely a frightened apprentice should not have a tournament-tier moveset.
+- MOVESETS should match the species' archetype AND the story role.
 
-FIRST-BEAT GROUNDING (when envelope.isFirstBeat is true) — these are HARD requirements; the runtime re-validates and rejects if violated:
-- This is the very first story beat of the run; the player has just finished picking starters and is at wave 1. They have ZERO context about the world yet — only the run's title.
-- The introText MUST briefly weave in the bible's playerIntro (who the player is) and openingScene (where they are), COMPRESSED into the 140-char budget. Do NOT paste them; rewrite into a single tight intro.
-- The first beat MUST be type "dialogue_choice". Not narrative_only, not trainer_battle.
-- EVERY option's consequence.effects[] MUST contain at least one non-"custom" effect — give_money, lose_money, give_voucher, give_egg, status_inflict, heal_party_pp, give_held_item, buff_persistent, etc. "custom"-only options will be rejected. You MAY chain a "custom" entry alongside a tangible one for flavor.
-- AT LEAST ONE option's consequence.items[] MUST be a non-empty rewards-shop menu (2-3 distinct entries from gameBalanceCard.itemTiers, qty=1 each). This guarantees the player sees a real shop on the first beat.
-- The choices should be a real decision tied to the bible's central situation. Each option should produce a different mechanical outcome (different effects / faction-rep / items). Avoid options that read as "yes / no / maybe" — they should each take the player somewhere distinct.
+ACT FINALES (climactic boss-coded fights):
+- The wave at act.waveEnd is the act's narrative climax. The beat there should produce a BOSS-CODED fight: enemyTeam with one entry isBoss=true, team size 4-6, levels at the upper end of the curve, type spread that crystallizes the act's antagonist. Run-defining moments, not just another encounter.
+
+POWER-LEVEL AWARENESS:
+- envelope.partyPower carries averageLevel, minLevel, maxLevel, livingCount, and waveCurveLevel. Use these to gauge the player's strength relative to the wave curve.
+- Vitamin / stat-boost effects (stat_boost_permanent, give_item with vitamin keys) should be modest in the early game — emit small +1 boosts at low waves, larger stacks only when the player has demonstrably progressed (averageLevel >> waveCurveLevel).
+- A first-act vitamin reward shouldn't push the lead Pokemon's stats to mid-act levels. Match the magnitude of mechanical rewards to where the run is.
+
+FIRST-BEAT GROUNDING (when envelope.isFirstBeat is true) — HARD requirements; the runtime re-validates and rejects if violated:
+- This is the very first story beat of the run. The player just picked starters and the party is at FULL HP, no statuses, no fainted Pokemon, full PP. Healing rewards are pointless and will be rejected.
+- The introText MUST briefly weave in the bible's playerIntro and openingScene, COMPRESSED into the length budget. Rewrite into a single tight intro, do not paste.
+- The first beat MUST be type "dialogue_choice".
+- EVERY option's consequence.effects[] MUST contain at least one non-"custom", non-healing effect. FORBIDDEN on first beat: heal_party_hp / heal_party_status / heal_party_full / heal_party_pp / revive / revive_all (party is full HP — these do nothing). USE: give_money, lose_money, give_voucher, give_egg, status_inflict, give_held_item, buff_persistent, debuff_persistent, friendship_boost, level_up, give_xp, set_biome, weather_change, give_item (held / vitamin / charm / TM-class only), and so on.
+- AT LEAST ONE option's consequence.items[] MUST be a non-empty rewards-shop menu (2-3 distinct entries from gameBalanceCard.itemTiers, qty=1 each). FORBIDDEN keys on first beat: POTION, SUPER_POTION, HYPER_POTION, MAX_POTION, FULL_RESTORE, REVIVE, MAX_REVIVE, SACRED_ASH, FULL_HEAL, ETHER, MAX_ETHER, ELIXIR, MAX_ELIXIR. Pick from held items, vitamins, charms, TMs, evolution items, vouchers, eggs, etc.
+- Choices should be a real decision tied to the bible's central situation. Each option produces a different mechanical outcome (different effects / faction-rep / items).
 
 SPEAKER for dialogue_choice:
 - dialogue_choice beats render IN-BETWEEN waves as a lightweight dialogue overlay (speaker name above the text box, then an option list). They do NOT consume a wave or replace a battle — the regular wave fight still happens after the dialogue.

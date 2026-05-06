@@ -149,13 +149,14 @@ export class NewBattlePhase extends BattlePhase {
         this.convertWildToTrainer(battle.waveIndex, trOver.trainerType);
       }
       const requestedTrainerType = trOver?.trainerType;
+      const hasEnemyTeam = !!(trOver?.enemyTeam && trOver.enemyTeam.length > 0);
       if (
         typeof requestedTrainerType === "number"
         && battle.battleType === BattleType.TRAINER
         && battle.trainer
         && requestedTrainerType !== battle.trainer.config.trainerType
       ) {
-        this.applyTrainerTypeOverride(battle.waveIndex, requestedTrainerType);
+        this.applyTrainerTypeOverride(battle.waveIndex, requestedTrainerType, hasEnemyTeam);
       }
     }
     // Mid-act biome switch: orthogonal to battle-type — just queue the
@@ -199,13 +200,22 @@ export class NewBattlePhase extends BattlePhase {
     // this wave so the trainer encounter feels part of the run's story
     // instead of a vanilla wave with canned trainer-class dialogue.
     if (override.preBattleText) {
-      // CRITICAL: paginate before queueMessage. The Phaser dialog box has
-      // maxLines=2 and silently truncates anything past that. Without `$`
-      // separators, a 150+ char preBattleText shows ~120 chars and the
-      // player presses A to advance, hitting the next phase (the actual
-      // wild/trainer fight) without seeing the rest of the narration.
-      void globalScene.ui.setMode(UiMode.MESSAGE);
-      globalScene.phaseManager.queueMessage(paginate(override.preBattleText), null, true);
+      // For trainer waves: REPLACE the canonical "I challenge you!" line
+      // with the LLM's preBattleText via the per-instance
+      // encounterMessagesOverride. The standard EncounterPhase flow then
+      // shows our text with the trainer's name as speaker, character
+      // sprite if any, and proper timing (after the trainer slides in,
+      // before the first Pokemon summons). No separate MessagePhase.
+      //
+      // For wild waves and mystery encounters: queue a MessagePhase as
+      // before (no trainer instance to attach the override to).
+      if (battle.battleType === BattleType.TRAINER && battle.trainer) {
+        // Paginate so the in-battle dialog respects the 2-line cap.
+        battle.trainer.encounterMessagesOverride = [paginate(override.preBattleText)];
+      } else {
+        void globalScene.ui.setMode(UiMode.MESSAGE);
+        globalScene.phaseManager.queueMessage(paginate(override.preBattleText), null, true);
+      }
       logTrainerNarrationApplied(battle.waveIndex, override.preBattleText);
     }
     // Trainer name override: best-effort cosmetic so the trainer is
@@ -317,14 +327,27 @@ export class NewBattlePhase extends BattlePhase {
     }
   }
 
-  private applyTrainerTypeOverride(waveIndex: number, requestedType: number): void {
+  private applyTrainerTypeOverride(waveIndex: number, requestedType: number, hasEnemyTeam: boolean): void {
     const battle = globalScene.currentBattle;
     if (!battle?.trainer) {
       return;
     }
-    if (requestedType <= TrainerType.UNKNOWN || requestedType >= 200) {
+    if (requestedType <= TrainerType.UNKNOWN) {
       console.warn(
-        `[llm-director] trainer-type-override wave=${waveIndex} rejected: id=${requestedType} is reserved (gym leader / champion / rival / unknown sentinel)`,
+        `[llm-director] trainer-type-override wave=${waveIndex} rejected: id=${requestedType} is the UNKNOWN sentinel`,
+      );
+      return;
+    }
+    // Named trainers (id >= 200, gym leaders / E4 / champions / rivals)
+    // have fixed canonical teams that are usually dramatically scaled
+    // for endgame. Refuse the swap when the LLM didn't provide enemyTeam
+    // (otherwise wave 5 would face a champion's level-60 lineup). With
+    // enemyTeam, installAuthoredTeam overwrites the canonical party so
+    // only the SPRITE is borrowed — perfect for "the rival's apprentice"
+    // / "a champion-style ace appears" / etc.
+    if (requestedType >= 200 && !hasEnemyTeam) {
+      console.warn(
+        `[llm-director] trainer-type-override wave=${waveIndex} rejected: named-trainer id=${requestedType} requires trainerOverride.enemyTeam (canonical team would otherwise surface). Sprite reuse for named trainers is allowed, but the LLM must spec the team.`,
       );
       return;
     }

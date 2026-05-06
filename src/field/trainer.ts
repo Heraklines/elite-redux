@@ -30,6 +30,15 @@ export class Trainer extends Phaser.GameObjects.Container {
   public nameKey: string;
   public partnerNameKey: string | undefined;
   public originalIndexes: { [key: number]: number } = {};
+  /**
+   * Per-instance override for `getEncounterMessages`. Used by the LLM
+   * Director to replace the trainer's canonical "I challenge you!" line
+   * with the story-themed `preBattleText` so the in-battle dialogue
+   * fires through the standard EncounterPhase flow (sprite + name +
+   * proper timing) instead of as a separate MessagePhase queued before.
+   * `undefined` means "use canonical config dialogue" (vanilla behavior).
+   */
+  public encounterMessagesOverride?: string[] | undefined;
 
   /**
    * Create a new Trainer.
@@ -232,6 +241,9 @@ export class Trainer extends Phaser.GameObjects.Container {
   }
 
   getEncounterMessages(): string[] {
+    if (this.encounterMessagesOverride && this.encounterMessagesOverride.length > 0) {
+      return this.encounterMessagesOverride;
+    }
     return this.variant
       ? (this.variant === TrainerVariant.DOUBLE
           ? this.config.doubleEncounterMessages

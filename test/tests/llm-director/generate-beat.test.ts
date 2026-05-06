@@ -9,6 +9,7 @@ const baseEnvelope = (): ContextEnvelope =>
     storyBible: undefined,
     beatHistory: [],
     playerParty: [],
+    partyPower: { averageLevel: 5, minLevel: 5, maxLevel: 5, livingCount: 1, waveCurveLevel: 3 },
     inventory: { items: [], money: 0, vouchers: 0 },
     factionRep: {},
     alignment: 0,

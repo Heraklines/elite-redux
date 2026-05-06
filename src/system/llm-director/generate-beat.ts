@@ -171,6 +171,38 @@ async function runSkeletonPhase(
   return null;
 }
 
+/** Effect types that are pointless on the first beat (party is at full HP,
+ *  no fainted Pokemon, no statuses, no PP usage yet — these heal/cure
+ *  effects literally do nothing for the player on wave 1). */
+const POINTLESS_FIRST_BEAT_EFFECTS = new Set<string>([
+  "heal_party_hp",
+  "heal_party_status",
+  "heal_party_full",
+  "heal_party_pp",
+  "revive",
+  "revive_all",
+]);
+
+/** Item keys that are healing-class consumables (POTION-family, REVIVE, etc.).
+ *  Pointless to grant in a first-beat rewards-shop menu since the team is
+ *  full HP. The full set is enforced in consequence-effects.ts at runtime;
+ *  here we surface a subset for the validator to reject early. */
+const POINTLESS_FIRST_BEAT_ITEM_KEYS = new Set<string>([
+  "POTION",
+  "SUPER_POTION",
+  "HYPER_POTION",
+  "MAX_POTION",
+  "FULL_RESTORE",
+  "REVIVE",
+  "MAX_REVIVE",
+  "SACRED_ASH",
+  "FULL_HEAL",
+  "ETHER",
+  "MAX_ETHER",
+  "ELIXIR",
+  "MAX_ELIXIR",
+]);
+
 function validateFirstBeatSemantics(beat: Beat): string | null {
   if (beat.type !== "dialogue_choice") {
     return `must be dialogue_choice, got "${beat.type}"`;
@@ -178,6 +210,18 @@ function validateFirstBeatSemantics(beat: Beat): string | null {
   for (let i = 0; i < beat.options.length; i++) {
     const opt = beat.options[i];
     const effects = opt.consequence.effects ?? [];
+    // Reject pointless heal/revive effects — wave 1 = full party HP, no
+    // statuses, no fainted Pokemon. Granting these as the only "tangible"
+    // consequence reads as a no-op to the player.
+    const pointlessEffects = effects.filter(e => POINTLESS_FIRST_BEAT_EFFECTS.has(e.type));
+    if (pointlessEffects.length > 0) {
+      return `options[${i}] uses pointless first-beat effect "${pointlessEffects[0].type}" (party is full HP at wave 1; pick give_money / give_voucher / give_egg / status_inflict / give_held_item / buff_persistent / etc.)`;
+    }
+    const items = opt.consequence.items ?? [];
+    const pointlessItem = items.find(it => POINTLESS_FIRST_BEAT_ITEM_KEYS.has(it.modifierType));
+    if (pointlessItem) {
+      return `options[${i}].items contains pointless first-beat consumable "${pointlessItem.modifierType}" (party is full HP; pick a held item, vitamin, charm, TM, voucher, egg, or other meaningful first-beat reward)`;
+    }
     const hasNonCustom = effects.some(e => e.type !== "custom");
     if (!hasNonCustom) {
       return `options[${i}] must have at least one non-custom effect`;
