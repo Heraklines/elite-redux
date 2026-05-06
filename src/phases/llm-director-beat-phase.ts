@@ -79,8 +79,12 @@ export class LLMDirectorBeatPhase extends Phase {
     logBeatDispatched(this.waveIndex, beat.type, beat.beatId);
 
     // Always kick off the next beat as soon as we resolve this one — keeps
-    // the 1-ahead buffer warm.
-    runtime.queue.kickOff(this.waveIndex + 3);
+    // the 1-ahead buffer warm. Snap to the regular 3-wave cadence so the
+    // wave-1 forced beat schedules wave 3 (not wave 4) — otherwise wave 4
+    // gets generated but never consumed (NewBattlePhase only fires beats
+    // on wave % 3 === 0) and wave 3 underruns.
+    const nextWave = Math.max(3, Math.floor(this.waveIndex / 3) * 3 + 3);
+    runtime.queue.kickOff(nextWave);
 
     recordBeatHistory(globalScene.gameData.llmDirectorState, beat, this.waveIndex);
     // Compaction runs in the background as soon as history grows past the
