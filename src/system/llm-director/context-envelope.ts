@@ -1,5 +1,6 @@
 import type { StoryBible } from "#data/llm-director/beat-schema";
 import { BiomeId } from "#enums/biome-id";
+import { MoveId } from "#enums/move-id";
 import { TrainerType } from "#enums/trainer-type";
 import type { BeatHistoryEntry, LLMDirectorState } from "#system/llm-director/director-state";
 
@@ -76,6 +77,8 @@ export interface GameBalanceCard {
   /** Generic, dialog-friendly trainer types. Excludes named gym leaders. */
   trainerTypeCatalog: CatalogEntry[];
   biomeCatalog: CatalogEntry[];
+  /** Full move catalog for authoring trainer Pokémon movesets. */
+  moveCatalog: CatalogEntry[];
 }
 
 export interface CatalogEntry {
@@ -123,13 +126,29 @@ function buildBiomeCatalog(): CatalogEntry[] {
   return entries.sort((a, b) => a.id - b.id);
 }
 
-/** Built once at module load — both enums are static. */
+/** Full move catalog for trainer authoring (~950 moves, ~25KB). */
+function buildMoveCatalog(): CatalogEntry[] {
+  const entries: CatalogEntry[] = [];
+  for (const [name, id] of Object.entries(MoveId)) {
+    if (typeof id !== "number") {
+      continue;
+    }
+    if (id === 0) {
+      continue;
+    }
+    entries.push({ id, name: name.toLowerCase() });
+  }
+  return entries.sort((a, b) => a.id - b.id);
+}
+
+/** Built once at module load — all enums are static. */
 const GAME_BALANCE_CARD: GameBalanceCard = {
   levelCurveNote:
     "Trainer party levels follow the Classic curve. Default deviations cap at ±3 levels around the curve.",
   rewardTiers: ["common", "uncommon", "rare", "epic"],
   trainerTypeCatalog: buildTrainerCatalog(),
   biomeCatalog: buildBiomeCatalog(),
+  moveCatalog: buildMoveCatalog(),
 };
 
 function findCurrentAct(bible: StoryBible | undefined, wave: number): StoryBible["acts"][number] | undefined {

@@ -122,10 +122,10 @@ export class LLMDirectorBeatPhase extends Phase {
     // ends up running FIRST. To preserve source order (intro → body),
     // queue body first, then intro.
     if (body) {
-      globalScene.phaseManager.queueMessage(truncate(body, 130), null, true);
+      globalScene.phaseManager.queueMessage(truncate(body, 200), null, true);
     }
     if (intro) {
-      globalScene.phaseManager.queueMessage(truncate(intro, 130), null, true);
+      globalScene.phaseManager.queueMessage(truncate(intro, 200), null, true);
     }
     this.end();
   }
@@ -142,7 +142,7 @@ export class LLMDirectorBeatPhase extends Phase {
     // pre-emptively sees the truncated text *and* the option overlay
     // opens on a single page-advance — not a clean "read everything,
     // then choose" flow.
-    const intro = truncate(beat.introText, 110);
+    const intro = truncate(beat.introText, 200);
     void globalScene.ui.setMode(UiMode.MESSAGE);
     if (beat.speaker?.name) {
       globalScene.ui.showDialogue(intro, beat.speaker.name, null, showChoices);
@@ -215,7 +215,7 @@ export class LLMDirectorBeatPhase extends Phase {
     // path is acceptable. If we ever need multi-page intros for biome
     // beats, switch to queueMessage and a follow-up CallbackPhase.
     const showOptions = () => this.showBiomeOptions(beat);
-    globalScene.ui.showText(truncate(beat.introText, 140), null, showOptions, null, true);
+    globalScene.ui.showText(truncate(beat.introText, 200), null, showOptions, null, true);
   }
 
   private showBiomeOptions(beat: BiomeTransitionBeat): void {
@@ -241,10 +241,10 @@ export class LLMDirectorBeatPhase extends Phase {
     void globalScene.ui.setMode(UiMode.MESSAGE);
     // Queue in REVERSE source order so unshift puts them in the right order.
     if (result.epilogueText) {
-      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 130), null, true);
+      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 200), null, true);
     }
     if (option.flavorText) {
-      globalScene.phaseManager.queueMessage(truncate(option.flavorText, 130), null, true);
+      globalScene.phaseManager.queueMessage(truncate(option.flavorText, 200), null, true);
     }
     this.end();
   }
@@ -255,10 +255,10 @@ export class LLMDirectorBeatPhase extends Phase {
     void globalScene.ui.setMode(UiMode.MESSAGE);
     // Queue in REVERSE source order so unshift puts them in the right order.
     if (result.epilogueText) {
-      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 130), null, true);
+      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 200), null, true);
     }
     if (beat.introText) {
-      globalScene.phaseManager.queueMessage(truncate(beat.introText, 130), null, true);
+      globalScene.phaseManager.queueMessage(truncate(beat.introText, 200), null, true);
     }
     this.end();
   }
@@ -269,7 +269,7 @@ export class LLMDirectorBeatPhase extends Phase {
       // state where input doesn't reach the message handler. setMode(MESSAGE)
       // routes Enter correctly so the player can advance the epilogue.
       void globalScene.ui.setMode(UiMode.MESSAGE);
-      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 130), null, true);
+      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 200), null, true);
     }
     this.end();
   }

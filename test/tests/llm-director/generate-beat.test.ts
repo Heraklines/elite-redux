@@ -18,7 +18,7 @@ const baseEnvelope = (): ContextEnvelope =>
     lossRiskBudget: { used: 0, target: 0.15 },
     currentWaveIndex: 3,
     currentAct: undefined,
-    gameBalanceCard: { levelCurveNote: "", rewardTiers: [], trainerTypeCatalog: [], biomeCatalog: [] },
+    gameBalanceCard: { levelCurveNote: "", rewardTiers: [], trainerTypeCatalog: [], biomeCatalog: [], moveCatalog: [] },
     currentBeatType: "auto",
     isFirstBeat: false,
   }) as ContextEnvelope;
