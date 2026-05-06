@@ -1,7 +1,11 @@
 import { globalScene } from "#app/global-scene";
+import { BattleType } from "#enums/battle-type";
 import type { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
+import { TrainerType } from "#enums/trainer-type";
+import { TrainerVariant } from "#enums/trainer-variant";
 import { UiMode } from "#enums/ui-mode";
+import { Trainer } from "#field/trainer";
 import { BattlePhase } from "#phases/battle-phase";
 import { applyOverrideToBattle } from "#phases/llm-director-beat-utils";
 import { clampAuthoredTeam } from "#system/llm-director/authored-team";
@@ -9,6 +13,7 @@ import { logBiomeSwitch, logTrainerNarrationApplied } from "#system/llm-director
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 import { installAuthoredTeam } from "#system/llm-director/install-authored-team";
 import { paginate } from "#system/llm-director/text-pagination";
+import { trainerConfigs } from "#trainers/trainer-config";
 
 export class NewBattlePhase extends BattlePhase {
   public readonly phaseName = "NewBattlePhase";
@@ -84,6 +89,21 @@ export class NewBattlePhase extends BattlePhase {
     if (!override) {
       return;
     }
+    // Trainer-sprite override: if the LLM picked a specific trainerType for
+    // this wave, swap the existing trainer instance for one of the requested
+    // type BEFORE installAuthoredTeam binds to it. This must happen before
+    // enemyTeam application because installAuthoredTeam mutates the bound
+    // trainer's config; we want the new trainer's config (matching the
+    // narration's sprite) to receive those mutations.
+    const requestedTrainerType = override.trainerOverride?.trainerType;
+    if (
+      typeof requestedTrainerType === "number"
+      && battle.battleType === BattleType.TRAINER
+      && battle.trainer
+      && requestedTrainerType !== battle.trainer.config.trainerType
+    ) {
+      this.applyTrainerTypeOverride(battle.waveIndex, requestedTrainerType);
+    }
     // v2 Phase A: full LLM-authored team. Apply BEFORE levelDelta so the
     // authored levels are clamped against the wave-curve baseline (not
     // against post-delta levels), and so genPartyMember sees the correct
@@ -124,14 +144,6 @@ export class NewBattlePhase extends BattlePhase {
     if (override.trainerName && battle.trainer) {
       battle.trainer.name = override.trainerName;
     }
-    // Trainer sprite override: switching trainerType mid-NewBattle is
-    // invasive and risks breaking the encounter pipeline. Deferred to v3
-    // when we hook into the trainer-creation step earlier in the flow.
-    if (override.trainerOverride?.trainerType !== undefined) {
-      console.info(
-        `[llm-director] trainer-sprite-override wave=${battle.waveIndex} requested trainerType=${override.trainerOverride.trainerType} (deferred to v3 — needs trainer-creation hook, not post-create)`,
-      );
-    }
     // Stash the post-battle slice so VictoryPhase / FaintPhase can fire
     // narration + rewards + effects after the battle resolves. Only set the
     // hook if at least one field is non-empty; an empty hook is wasted memory.
@@ -162,6 +174,96 @@ export class NewBattlePhase extends BattlePhase {
       console.info(
         `[llm-director] post-wave-hook stashed wave=${battle.waveIndex} (postWinText=${!!override.postWinText} postLossText=${!!override.postLossText} rewards=${override.victoryRewards?.length ?? 0} victoryEffects=${override.victoryEffects?.length ?? 0} defeatEffects=${override.defeatEffects?.length ?? 0})`,
       );
+    }
+  }
+
+  /**
+   * Replace the current battle's trainer with one of the LLM-requested type.
+   *
+   * `globalScene.newBattle()` (called at the top of NewBattlePhase) has
+   * already created a Trainer of the wave-curve-rolled trainerType, added
+   * it to `globalScene.field`, and stored it on `battle.trainer`. By the
+   * time this runs, the old trainer is fully constructed but its sprite
+   * assets haven't been loaded yet — that happens later in EncounterPhase
+   * via `battle.trainer?.loadAssets().then(initSprite)`. So we can swap
+   * the trainer instance cleanly here and EncounterPhase will load assets
+   * for the new one.
+   *
+   * Refuses to swap to:
+   *   - id 0 (UNKNOWN sentinel)
+   *   - id >= 200 (named gym leaders / elite four / champions / rivals;
+   *     these have fixed canonical teams and special UI handling that
+   *     would break if hijacked by the LLM)
+   *   - unknown trainerConfigs entries
+   * Skips silently if the requested type matches the existing trainer.
+   *
+   * Variant is preserved from the original (DEFAULT / FEMALE / DOUBLE);
+   * the Trainer constructor falls back to DEFAULT if the new config
+   * doesn't support the requested variant.
+   */
+  private applyTrainerTypeOverride(waveIndex: number, requestedType: number): void {
+    const battle = globalScene.currentBattle;
+    if (!battle?.trainer) {
+      return;
+    }
+    if (requestedType <= TrainerType.UNKNOWN || requestedType >= 200) {
+      console.warn(
+        `[llm-director] trainer-type-override wave=${waveIndex} rejected: id=${requestedType} is reserved (gym leader / champion / rival / unknown sentinel)`,
+      );
+      return;
+    }
+    const newConfig = trainerConfigs[requestedType as TrainerType];
+    if (!newConfig) {
+      console.warn(
+        `[llm-director] trainer-type-override wave=${waveIndex} rejected: no trainerConfig for id=${requestedType}`,
+      );
+      return;
+    }
+    const oldTrainer = battle.trainer;
+    const oldVariant = oldTrainer.variant;
+    // If the original was DOUBLE and the new config doesn't support double,
+    // fall back to DEFAULT — Trainer's constructor handles this internally,
+    // but we surface it to the log so behavior is debuggable.
+    let chosenVariant = oldVariant;
+    if (oldVariant === TrainerVariant.DOUBLE && !newConfig.hasDouble && !newConfig.doubleOnly) {
+      chosenVariant = TrainerVariant.DEFAULT;
+    }
+    if (oldVariant === TrainerVariant.FEMALE && !newConfig.hasGenders) {
+      chosenVariant = TrainerVariant.DEFAULT;
+    }
+    if (newConfig.doubleOnly && oldVariant !== TrainerVariant.DOUBLE) {
+      // newConfig requires double but battle isn't set up for it — refuse,
+      // because changing battle.double mid-construction would cascade into
+      // FieldPosition / SummonPhase logic we don't want to mess with.
+      console.warn(
+        `[llm-director] trainer-type-override wave=${waveIndex} rejected: id=${requestedType} is double-only but battle is single`,
+      );
+      return;
+    }
+    try {
+      const newTrainer = new Trainer(requestedType as TrainerType, chosenVariant);
+      // If the original had a custom display name, preserve it on the new
+      // instance so the LLM's `trainerName` override (applied later in this
+      // method) stays consistent.
+      if (oldTrainer.name) {
+        newTrainer.name = oldTrainer.name;
+      }
+      // Detach old trainer from the field and destroy its Phaser resources.
+      // destroy() walks parent containers and removes itself; explicit
+      // remove() first is belt-and-braces in case the trainer was added to
+      // a custom container at any point.
+      globalScene.field.remove(oldTrainer, false);
+      oldTrainer.destroy();
+      // Wire the new trainer in. EncounterPhase will load its sprite assets
+      // when it runs `battle.trainer?.loadAssets().then(initSprite)`.
+      globalScene.field.add(newTrainer);
+      battle.trainer = newTrainer;
+      console.info(
+        `[llm-director] trainer-type-override applied wave=${waveIndex} oldType=${oldTrainer.config.trainerType} newType=${requestedType} variant=${chosenVariant}`,
+      );
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      console.warn(`[llm-director] trainer-type-override failed wave=${waveIndex} reason=${reason}`);
     }
   }
 
