@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { modifierTypes } from "#data/data-lists";
 import type {
   Beat,
   BiomeTransitionBeat,
@@ -13,6 +14,7 @@ import type {
 import { pickFillerBeat } from "#data/llm-director/filler-beats";
 import type { BiomeId } from "#enums/biome-id";
 import { UiMode } from "#enums/ui-mode";
+import type { ModifierType } from "#modifiers/modifier-type";
 import { buildTrainerOverride } from "#phases/llm-director-beat-utils";
 import { type ApplyResult, applyConsequence } from "#system/llm-director/beat-applier";
 import { recordBeatHistory, recordPlayerChoice } from "#system/llm-director/beat-history";
@@ -179,6 +181,9 @@ export class LLMDirectorBeatPhase extends Phase {
       itemCount: option.consequence.items?.length ?? 0,
       hasEpilogue: !!result.epilogueText,
     });
+    // Actually grant the items + money. applyConsequence is pure (mutates
+    // director state only); side effects on game state happen here.
+    grantConsequenceRewards(option.consequence);
     // Pop the OPTION_SELECT overlay before showing follow-up text, so the
     // message handler renders cleanly on top of the dialogue background.
     globalScene.ui.revertMode();
@@ -247,6 +252,7 @@ export class LLMDirectorBeatPhase extends Phase {
     let result: ApplyResult = {};
     if (option.consequence) {
       result = applyConsequence(state, option.consequence);
+      grantConsequenceRewards(option.consequence);
     }
     globalScene.ui.revertMode();
     // Queue the biome switch ahead of the next vanilla wave.
@@ -265,6 +271,7 @@ export class LLMDirectorBeatPhase extends Phase {
   private renderItemEvent(beat: ItemEventBeat): void {
     const state = globalScene.gameData.llmDirectorState;
     const result = applyConsequence(state, beat.consequence);
+    grantConsequenceRewards(beat.consequence);
     void globalScene.ui.setMode(UiMode.MESSAGE);
     // Queue in REVERSE source order so unshift puts them in the right order.
     if (result.epilogueText) {
@@ -364,4 +371,31 @@ function truncate(text: string | undefined, max: number): string {
     return head.slice(0, lastSentence + 1);
   }
   return `${head.trimEnd()}…`;
+}
+
+/**
+ * Grant items and money from a Consequence. Items go through PokéRogue's
+ * standard ModifierRewardPhase — same path vanilla item rewards use, so the
+ * player sees the standard "You received X!" message + item-fanfare sound
+ * and the item lands in inventory. Money goes through MoneyRewardPhase.
+ * Unknown modifierType keys are logged and skipped.
+ */
+function grantConsequenceRewards(consequence: import("#data/llm-director/beat-schema").Consequence): void {
+  if (consequence.items) {
+    const factories = modifierTypes as Record<string, (() => ModifierType) | undefined>;
+    for (const item of consequence.items) {
+      const factory = factories[item.modifierType];
+      if (typeof factory !== "function") {
+        console.warn(`[llm-director] unknown modifierType in consequence.items: "${item.modifierType}"`);
+        continue;
+      }
+      const qty = Math.max(1, item.qty ?? 1);
+      for (let i = 0; i < qty; i++) {
+        globalScene.phaseManager.unshiftNew("ModifierRewardPhase", factory);
+      }
+    }
+  }
+  if (typeof consequence.money === "number" && consequence.money !== 0) {
+    globalScene.phaseManager.unshiftNew("MoneyRewardPhase", consequence.money);
+  }
 }
