@@ -22,7 +22,7 @@ Output STRICT JSON matching this shape (no prose, no markdown fences):
   "openingScene": "ONE short sentence (HARD MAX 100 chars). WHERE you are at run start. Example: 'Smoke curls over the ruined gym at dawn.'",
   "tonalKeywords": ["3-7 keywords describing tone/genre/mood"],
   "acts": [
-    { "name": "Act name", "waveStart": 1, "waveEnd": 50, "summary": "1-2 sentence intent for this act" }
+    { "name": "Act name", "waveStart": 1, "waveEnd": 50, "summary": "1-2 sentence intent for this act", "biomeId": 1 }
   ],
   "factions": [
     { "name": "Faction name", "description": "1-2 sentences", "initialRep": -100..100 integer }
@@ -35,6 +35,7 @@ Output STRICT JSON matching this shape (no prose, no markdown fences):
 
 Constraints:
 - 3-5 acts spanning waves 1..200 with no gaps and no overlaps.
+- EACH act MUST have a thematically-fitting biomeId from the standard PokéRogue biome catalog. Common ids: TOWN=0, PLAINS=1, GRASS=2, TALL_GRASS=3, METROPOLIS=4, FOREST=5, SEA=6, SWAMP=7, BEACH=8, LAKE=9, SEABED=10, MOUNTAIN=11, BADLANDS=12, CAVE=13, DESERT=14, ICE_CAVE=15, MEADOW=16, POWER_PLANT=17, VOLCANO=18, GRAVEYARD=19, DOJO=20, FACTORY=21, RUINS=22, WASTELAND=23, ABYSS=24, SPACE=25, CONSTRUCTION_SITE=26, JUNGLE=27, FAIRY_CAVE=28, TEMPLE=29, SLUM=30, SNOWY_FOREST=31, ISLAND=40, LABORATORY=41. Pick the biome that most fits the act's mood (e.g., a smuggler's-den arc → CAVE or SLUM; a regal court → TEMPLE or METROPOLIS; an apocalyptic finale → WASTELAND or VOLCANO). The game auto-switches to this biome when the act starts.
 - 0-5 factions; their initialRep must reflect the theme (a rebel-friendly arc starts with rebels at +20, etc.).
 - 1-4 recurring NPCs; memoryKey is stable across the whole run, the LLM will refer back to it in future beats.
 - moralSpectrum labels MUST be 1 word each, fitting the theme's tone.

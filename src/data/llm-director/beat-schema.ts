@@ -317,12 +317,15 @@ const storyBibleSchema = {
       minItems: 1,
       items: {
         type: "object",
-        required: ["name", "waveStart", "waveEnd", "summary"],
+        required: ["name", "waveStart", "waveEnd", "summary", "biomeId"],
         properties: {
           name: { type: "string" },
           waveStart: { type: "integer" },
           waveEnd: { type: "integer" },
           summary: { type: "string" },
+          /** Biome the act takes place in (id from gameBalanceCard.biomeCatalog).
+           * Game auto-switches to this biome when the act starts. */
+          biomeId: { type: "integer", minimum: 0 },
         },
         additionalProperties: false,
       },
@@ -377,7 +380,7 @@ export interface StoryBible {
   /** 1-2 sentences setting the opening scene. Shown at wave 1 right after playerIntro. */
   openingScene: string;
   tonalKeywords: string[];
-  acts: Array<{ name: string; waveStart: number; waveEnd: number; summary: string }>;
+  acts: Array<{ name: string; waveStart: number; waveEnd: number; summary: string; biomeId: number }>;
   factions: Array<{ name: string; description: string; initialRep: number }>;
   recurringNPCs: Array<{ memoryKey: string; name: string; role: string; initialDisposition: string }>;
   moralSpectrum: { goodLabel: string; evilLabel: string };

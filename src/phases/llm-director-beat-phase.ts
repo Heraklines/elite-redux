@@ -118,11 +118,14 @@ export class LLMDirectorBeatPhase extends Phase {
     // can advance. Without it the previous mode's handler intercepts input
     // and the player gets stuck.
     void globalScene.ui.setMode(UiMode.MESSAGE);
-    if (intro) {
-      globalScene.phaseManager.queueMessage(truncate(intro, 130), null, true);
-    }
+    // queueMessage unshifts to the front of the queue, so the LAST call
+    // ends up running FIRST. To preserve source order (intro → body),
+    // queue body first, then intro.
     if (body) {
       globalScene.phaseManager.queueMessage(truncate(body, 130), null, true);
+    }
+    if (intro) {
+      globalScene.phaseManager.queueMessage(truncate(intro, 130), null, true);
     }
     this.end();
   }
@@ -236,11 +239,12 @@ export class LLMDirectorBeatPhase extends Phase {
     // Queue the biome switch ahead of the next vanilla wave.
     globalScene.phaseManager.unshiftNew("SwitchBiomePhase", option.biomeId as BiomeId);
     void globalScene.ui.setMode(UiMode.MESSAGE);
-    if (option.flavorText) {
-      globalScene.phaseManager.queueMessage(truncate(option.flavorText, 130), null, true);
-    }
+    // Queue in REVERSE source order so unshift puts them in the right order.
     if (result.epilogueText) {
       globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 130), null, true);
+    }
+    if (option.flavorText) {
+      globalScene.phaseManager.queueMessage(truncate(option.flavorText, 130), null, true);
     }
     this.end();
   }
@@ -249,11 +253,12 @@ export class LLMDirectorBeatPhase extends Phase {
     const state = globalScene.gameData.llmDirectorState;
     const result = applyConsequence(state, beat.consequence);
     void globalScene.ui.setMode(UiMode.MESSAGE);
-    if (beat.introText) {
-      globalScene.phaseManager.queueMessage(truncate(beat.introText, 130), null, true);
-    }
+    // Queue in REVERSE source order so unshift puts them in the right order.
     if (result.epilogueText) {
       globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 130), null, true);
+    }
+    if (beat.introText) {
+      globalScene.phaseManager.queueMessage(truncate(beat.introText, 130), null, true);
     }
     this.end();
   }

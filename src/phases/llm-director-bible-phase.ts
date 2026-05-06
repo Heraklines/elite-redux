@@ -1,6 +1,7 @@
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import type { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
 import { UiMode } from "#enums/ui-mode";
 import { buildContextEnvelope, type EnvelopePartyMember } from "#system/llm-director/context-envelope";
@@ -141,8 +142,19 @@ export class LLMDirectorBiblePhase extends Phase {
     // breaking Enter-to-advance. setMode is sync; subsequent MessagePhases
     // queued below will run with MESSAGE as the active mode.
     void globalScene.ui.setMode(UiMode.MESSAGE);
-    for (const page of pages) {
-      globalScene.phaseManager.queueMessage(page, null, true);
+    // Switch to the first act's biome BEFORE messages render so the
+    // location matches the story's opening scene. Unshift first so it
+    // ends up *behind* all the message phases in the queue (since
+    // queueMessage also unshifts, it ends up in front).
+    const firstAct = globalScene.gameData.llmDirectorState.storyBible?.acts[0];
+    if (firstAct && typeof firstAct.biomeId === "number" && globalScene.arena?.biomeId !== firstAct.biomeId) {
+      console.info(`[llm-director] Setting wave-1 biome to ${firstAct.biomeId} from act 1 (${firstAct.name})`);
+      globalScene.phaseManager.unshiftNew("SwitchBiomePhase", firstAct.biomeId as BiomeId);
+    }
+    // queueMessage unshifts (adds to front), so iterating in reverse here
+    // means the messages run in source order: theme → intro → scene.
+    for (let i = pages.length - 1; i >= 0; i--) {
+      globalScene.phaseManager.queueMessage(pages[i], null, true);
     }
     this.end();
   }

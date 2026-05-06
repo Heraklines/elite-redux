@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import type { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
 import { BattlePhase } from "#phases/battle-phase";
 import { applyOverrideToBattle } from "#phases/llm-director-beat-utils";
@@ -23,6 +24,12 @@ export class NewBattlePhase extends BattlePhase {
       // The first beat (wave 1 intro) is fired by BiblePhase via the queue;
       // here we fire on every 3rd wave (3, 6, 9, …).
       const wave = globalScene.currentBattle?.waveIndex ?? 0;
+
+      // Act-boundary biome switch: if this wave is the start of a new act
+      // in the bible, switch to the act's designated biome so the location
+      // matches the story.
+      this.applyActBiomeSwitch(wave);
+
       const isBeatWave = wave > 0 && wave % 3 === 0;
       console.info(
         `[llm-director] NewBattlePhase wave=${wave}, isBeatWave=${isBeatWave}, mode=${globalScene.gameMode.modeId}`,
@@ -34,6 +41,31 @@ export class NewBattlePhase extends BattlePhase {
     }
 
     this.end();
+  }
+
+  /**
+   * If `wave` is the start (waveStart) of a story bible act, switch to that
+   * act's designated biome. Keeps the visual location in sync with the
+   * narrative — a smuggler's-den arc plays in a CAVE, a court drama in a
+   * TEMPLE, etc. No-op if the bible isn't loaded or the wave isn't a boundary.
+   */
+  private applyActBiomeSwitch(wave: number): void {
+    const bible = globalScene.gameData.llmDirectorState?.storyBible;
+    if (!bible || wave <= 0) {
+      return;
+    }
+    const act = bible.acts.find(a => a.waveStart === wave);
+    if (!act || typeof act.biomeId !== "number") {
+      return;
+    }
+    const currentBiome = globalScene.arena?.biomeId;
+    if (currentBiome === act.biomeId) {
+      return;
+    }
+    console.info(
+      `[llm-director] Act boundary at wave ${wave}: switching biome ${currentBiome} -> ${act.biomeId} (${act.name})`,
+    );
+    globalScene.phaseManager.unshiftNew("SwitchBiomePhase", act.biomeId as BiomeId);
   }
 
   private applyPendingDirectorOverride(): void {

@@ -9,7 +9,7 @@ const sampleBible = (): StoryBible => ({
   playerIntro: "You are a wandering trainer.",
   openingScene: "Dawn breaks over the gym ruins.",
   tonalKeywords: ["dark"],
-  acts: [{ name: "Act 1", waveStart: 1, waveEnd: 50, summary: "x" }],
+  acts: [{ name: "Act 1", waveStart: 1, waveEnd: 50, summary: "x", biomeId: 1 }],
   factions: [{ name: "Rebels", description: "x", initialRep: 0 }],
   recurringNPCs: [{ memoryKey: "old-man", name: "Old Man", role: "guide", initialDisposition: "wary" }],
   moralSpectrum: { goodLabel: "merciful", evilLabel: "ruthless" },
@@ -50,8 +50,8 @@ describe("buildContextEnvelope", () => {
       throw new Error("expected story bible");
     }
     bible.acts = [
-      { name: "Act 1", waveStart: 1, waveEnd: 50, summary: "early" },
-      { name: "Act 2", waveStart: 51, waveEnd: 100, summary: "mid" },
+      { name: "Act 1", waveStart: 1, waveEnd: 50, summary: "early", biomeId: 1 },
+      { name: "Act 2", waveStart: 51, waveEnd: 100, summary: "mid", biomeId: 13 },
     ];
     inputs.currentWaveIndex = 75;
     expect(buildContextEnvelope(inputs).currentAct?.name).toBe("Act 2");
