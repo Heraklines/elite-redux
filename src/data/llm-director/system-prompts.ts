@@ -45,12 +45,13 @@ The player should be able to lose this run. Failure is part of the experience.`;
 export const BEAT_SKELETON_SYSTEM_PROMPT = `You are the Director writing one beat of a generative Pokémon run. Read the envelope (story bible, beat history, current state) and emit ONE beat as STRICT JSON matching this discriminated union.
 
 CRITICAL — TEXT LENGTH BUDGETS (must NOT be exceeded; UI breaks if you do):
-- introText: max 180 chars (~2 short sentences)
-- bodyText: max 260 chars (~3 short sentences)
-- preBattleText / postWinText / postLossText: max 180 chars EACH
+- introText for DialogueChoiceBeat: HARD MAX 100 chars. ONE short sentence. The dialog box has a speaker label eating space; longer text either truncates mid-word or the option menu opens before the player finishes reading. Example: "Vance, the ex-Ranger, blocks the doorway and eyes your team."
+- introText for other beat types: max 130 chars (~1-2 short sentences).
+- bodyText: max 130 chars (~1-2 short sentences). Aggressive cap — the dialog box renders 1-2 lines.
+- preBattleText / postWinText / postLossText: max 130 chars EACH
 - DialogueChoice option label: max 40 chars (one short clause; the player must read 3 of these in 2 seconds)
 - BiomeTransition flavorText: max 80 chars per option
-- consequence.epilogueText: max 180 chars
+- consequence.epilogueText: max 130 chars (ONE short sentence, NOT two — the post-choice text shows in a single page)
 
 GROUNDING RULES (so the player always knows who is who):
 - The FIRST time a recurring NPC appears in a beat, the introText MUST establish their role in one short clause. Example: "Vance, the ex-Ranger turned smuggler, blocks the path." — not just "Vance blocks the path."

@@ -114,14 +114,15 @@ export class LLMDirectorBeatPhase extends Phase {
   }
 
   private renderTextThenEnd(intro: string, body: string): void {
-    // queueMessage(text, _, prompt=true) creates a phase-managed MessagePhase
-    // per page. The phase pipeline pauses each one for player input; calling
-    // showText directly bypasses that and leaves the player stuck.
+    // setMode(MESSAGE) routes Enter to the message handler so MessagePhase
+    // can advance. Without it the previous mode's handler intercepts input
+    // and the player gets stuck.
+    void globalScene.ui.setMode(UiMode.MESSAGE);
     if (intro) {
-      globalScene.phaseManager.queueMessage(truncate(intro, 140), null, true);
+      globalScene.phaseManager.queueMessage(truncate(intro, 130), null, true);
     }
     if (body) {
-      globalScene.phaseManager.queueMessage(truncate(body, 140), null, true);
+      globalScene.phaseManager.queueMessage(truncate(body, 130), null, true);
     }
     this.end();
   }
@@ -133,11 +134,13 @@ export class LLMDirectorBeatPhase extends Phase {
    */
   private renderDialogue(beat: DialogueChoiceBeat): void {
     const showChoices = () => this.showChoiceMenu(beat);
-    // PokéRogue's dialogue widget paginates long text and fires the callback
-    // on the FIRST page advance, so a 2-page intro causes the option overlay
-    // to open while page 2 is still rendering. Cap dialogue intro at ~140
-    // chars to keep it on one page.
-    const intro = truncate(beat.introText, 140);
+    // Dialogue intros must fit ONE Phaser dialog page (~100 chars with a
+    // speaker name eating box space). Going longer means the player
+    // pre-emptively sees the truncated text *and* the option overlay
+    // opens on a single page-advance — not a clean "read everything,
+    // then choose" flow.
+    const intro = truncate(beat.introText, 110);
+    void globalScene.ui.setMode(UiMode.MESSAGE);
     if (beat.speaker?.name) {
       globalScene.ui.showDialogue(intro, beat.speaker.name, null, showChoices);
     } else {
@@ -232,11 +235,12 @@ export class LLMDirectorBeatPhase extends Phase {
     globalScene.ui.revertMode();
     // Queue the biome switch ahead of the next vanilla wave.
     globalScene.phaseManager.unshiftNew("SwitchBiomePhase", option.biomeId as BiomeId);
+    void globalScene.ui.setMode(UiMode.MESSAGE);
     if (option.flavorText) {
-      globalScene.phaseManager.queueMessage(truncate(option.flavorText, 140), null, true);
+      globalScene.phaseManager.queueMessage(truncate(option.flavorText, 130), null, true);
     }
     if (result.epilogueText) {
-      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 140), null, true);
+      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 130), null, true);
     }
     this.end();
   }
@@ -244,18 +248,23 @@ export class LLMDirectorBeatPhase extends Phase {
   private renderItemEvent(beat: ItemEventBeat): void {
     const state = globalScene.gameData.llmDirectorState;
     const result = applyConsequence(state, beat.consequence);
+    void globalScene.ui.setMode(UiMode.MESSAGE);
     if (beat.introText) {
-      globalScene.phaseManager.queueMessage(truncate(beat.introText, 140), null, true);
+      globalScene.phaseManager.queueMessage(truncate(beat.introText, 130), null, true);
     }
     if (result.epilogueText) {
-      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 140), null, true);
+      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 130), null, true);
     }
     this.end();
   }
 
   private afterConsequence(result: ApplyResult): void {
     if (result.epilogueText) {
-      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 140), null, true);
+      // After OPTION_SELECT was reverted, mode may still be in a transitional
+      // state where input doesn't reach the message handler. setMode(MESSAGE)
+      // routes Enter correctly so the player can advance the epilogue.
+      void globalScene.ui.setMode(UiMode.MESSAGE);
+      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 130), null, true);
     }
     this.end();
   }
