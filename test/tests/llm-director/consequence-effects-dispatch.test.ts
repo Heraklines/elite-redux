@@ -106,9 +106,14 @@ describe("applyEffects — dispatch (integration via GameManager)", () => {
     ]);
     // give 200 then lose 500 → -300 net
     expect(game.scene.money).toBe(700);
-    // Custom is the only effect that returns a narrative string.
-    expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain("the bargain feels heavier than the gold.");
+    // give_money / lose_money / custom each return a notification string so
+    // the player sees what happened — three messages, in source order.
+    expect(messages).toHaveLength(3);
+    expect(messages[0]).toContain("received");
+    expect(messages[0]).toContain("200");
+    expect(messages[1]).toContain("lost");
+    expect(messages[1]).toContain("500");
+    expect(messages[2]).toContain("the bargain feels heavier than the gold.");
   });
 
   it("does not throw when a single effect raises — continues to subsequent effects", () => {

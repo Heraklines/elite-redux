@@ -98,20 +98,15 @@ function getParty(): PlayerPokemon[] {
 function dispatchOne(effect: ConsequenceEffect): string | null {
   switch (effect.type) {
     case "heal_party_hp":
-      applyHealHp(effect);
-      return null;
+      return applyHealHp(effect);
     case "heal_party_status":
-      applyHealStatus(effect);
-      return null;
+      return applyHealStatus(effect);
     case "heal_party_full":
-      applyHealFull(effect);
-      return null;
+      return applyHealFull(effect);
     case "revive":
-      applyRevive(effect);
-      return null;
+      return applyRevive(effect);
     case "revive_all":
-      applyReviveAll();
-      return null;
+      return applyReviveAll();
     case "status_inflict":
       applyStatusInflict(effect);
       return null;
@@ -125,11 +120,9 @@ function dispatchOne(effect: ConsequenceEffect): string | null {
       applyRemoveItem(effect);
       return null;
     case "give_money":
-      applyGiveMoney(effect);
-      return null;
+      return applyGiveMoney(effect);
     case "lose_money":
-      applyLoseMoney(effect);
-      return null;
+      return applyLoseMoney(effect);
     case "level_up":
       applyLevelUp(effect);
       return null;
@@ -145,11 +138,9 @@ function dispatchOne(effect: ConsequenceEffect): string | null {
       applyWeatherChange(effect);
       return null;
     case "give_egg":
-      applyGiveEgg(effect);
-      return null;
+      return applyGiveEgg(effect);
     case "give_voucher":
-      applyGiveVoucher(effect);
-      return null;
+      return applyGiveVoucher(effect);
     case "custom":
       return applyCustom(effect);
     case "faint":
@@ -189,32 +180,45 @@ function dispatchOne(effect: ConsequenceEffect): string | null {
 // Heal / restore
 // -------------------------------------------------------------------------
 
-function applyHealHp(effect: { target?: TargetSpec; percentMaxHp: number }): void {
+function applyHealHp(effect: { target?: TargetSpec; percentMaxHp: number }): string | null {
   const targets = resolveTargets(effect.target, getParty());
+  let healed = 0;
   for (const p of targets) {
     if (p.isFainted()) {
       continue;
     }
     const amount = Math.ceil((p.getMaxHp() * effect.percentMaxHp) / 100);
     p.heal(amount);
+    healed++;
   }
   console.info(`[llm-director] heal_party_hp percent=${effect.percentMaxHp} count=${targets.length}`);
+  if (healed === 0) {
+    return null;
+  }
+  return targets.length === 1 ? `${targets[0].getNameToRender()} recovered some HP.` : "Your party recovered some HP.";
 }
 
-function applyHealStatus(effect: { target?: TargetSpec }): void {
+function applyHealStatus(effect: { target?: TargetSpec }): string | null {
   const targets = resolveTargets(effect.target, getParty());
+  let cured = 0;
   for (const p of targets) {
     if (p.status) {
       // asPhase=false to avoid scheduling a ResetStatusPhase inside a beat
       // phase — we just want immediate clear without animation interference.
       p.resetStatus(false, false, false, false);
+      cured++;
     }
   }
   console.info(`[llm-director] heal_party_status count=${targets.length}`);
+  if (cured === 0) {
+    return null;
+  }
+  return targets.length === 1 ? `${targets[0].getNameToRender()}'s status was cured.` : "Status conditions were cured.";
 }
 
-function applyHealFull(effect: { target?: TargetSpec }): void {
+function applyHealFull(effect: { target?: TargetSpec }): string | null {
   const targets = resolveTargets(effect.target, getParty());
+  let touched = 0;
   for (const p of targets) {
     if (p.isFainted()) {
       continue;
@@ -229,32 +233,53 @@ function applyHealFull(effect: { target?: TargetSpec }): void {
         move.ppUsed = 0;
       }
     }
+    touched++;
   }
   console.info(`[llm-director] heal_party_full count=${targets.length}`);
+  if (touched === 0) {
+    return null;
+  }
+  return targets.length === 1
+    ? `${targets[0].getNameToRender()} was fully restored.`
+    : "Your party was fully restored.";
 }
 
-function applyRevive(effect: { target?: TargetSpec; percentMaxHp?: number }): void {
+function applyRevive(effect: { target?: TargetSpec; percentMaxHp?: number }): string | null {
   const targets = resolveTargets(effect.target, getParty());
   const pct = effect.percentMaxHp ?? 50;
+  let revived = 0;
+  let last: PlayerPokemon | null = null;
   for (const p of targets) {
     if (!p.isFainted()) {
       continue;
     }
     p.resetStatus(true, false, false, false);
     p.hp = Math.max(1, Math.ceil((p.getMaxHp() * pct) / 100));
+    revived++;
+    last = p;
   }
   console.info(`[llm-director] revive percent=${pct} count=${targets.length}`);
+  if (revived === 0) {
+    return null;
+  }
+  if (revived === 1 && last) {
+    return `${last.getNameToRender()} was revived.`;
+  }
+  return `${revived} party members were revived.`;
 }
 
-function applyReviveAll(): void {
+function applyReviveAll(): string | null {
+  let revived = 0;
   for (const p of getParty()) {
     if (!p.isFainted()) {
       continue;
     }
     p.resetStatus(true, false, false, false);
     p.hp = p.getMaxHp();
+    revived++;
   }
   console.info("[llm-director] revive_all (sacred ash)");
+  return revived > 0 ? "Your party was fully revived." : null;
 }
 
 // -------------------------------------------------------------------------
@@ -406,17 +431,24 @@ function applyRemoveItem(effect: { modifierType: string; qty?: number }): void {
   );
 }
 
-function applyGiveMoney(effect: { amount: number }): void {
-  globalScene.addMoney(Math.max(1, Math.floor(effect.amount)));
-  console.info(`[llm-director] give_money amount=${effect.amount}`);
+function applyGiveMoney(effect: { amount: number }): string | null {
+  const amount = Math.max(1, Math.floor(effect.amount));
+  globalScene.addMoney(amount);
+  console.info(`[llm-director] give_money amount=${amount}`);
+  return `You received ₽${formatMoney(amount)}.`;
 }
 
-function applyLoseMoney(effect: { amount: number }): void {
+function applyLoseMoney(effect: { amount: number }): string | null {
   const loss = Math.max(1, Math.floor(effect.amount));
   globalScene.money = Math.max(0, globalScene.money - loss);
   globalScene.updateMoneyText();
   globalScene.animateMoneyChanged(false);
   console.info(`[llm-director] lose_money amount=${loss}`);
+  return `You lost ₽${formatMoney(loss)}.`;
+}
+
+function formatMoney(amount: number): string {
+  return amount.toLocaleString(navigator.language || "en-US");
 }
 
 const EGG_TIER_MAP: Record<string, EggTier> = {
@@ -426,11 +458,11 @@ const EGG_TIER_MAP: Record<string, EggTier> = {
   legendary: EggTier.LEGENDARY,
 };
 
-function applyGiveEgg(effect: { tier: string }): void {
+function applyGiveEgg(effect: { tier: string }): string | null {
   const tier = EGG_TIER_MAP[effect.tier];
   if (tier === undefined) {
     console.warn(`[llm-director] give_egg unknown tier="${effect.tier}"`);
-    return;
+    return null;
   }
   const egg = new Egg({
     tier,
@@ -439,6 +471,8 @@ function applyGiveEgg(effect: { tier: string }): void {
   });
   egg.addEggToGameData();
   console.info(`[llm-director] give_egg tier=${effect.tier}`);
+  const tierLabel = effect.tier.charAt(0).toUpperCase() + effect.tier.slice(1);
+  return `You received a ${tierLabel} Egg.`;
 }
 
 const VOUCHER_KEY_MAP: Record<string, VoucherType> = {
@@ -448,14 +482,16 @@ const VOUCHER_KEY_MAP: Record<string, VoucherType> = {
   GOLDEN: VoucherType.GOLDEN,
 };
 
-function applyGiveVoucher(effect: { voucherType: string }): void {
+function applyGiveVoucher(effect: { voucherType: string }): string | null {
   const vt = VOUCHER_KEY_MAP[effect.voucherType];
   if (vt === undefined) {
     console.warn(`[llm-director] give_voucher unknown voucherType="${effect.voucherType}"`);
-    return;
+    return null;
   }
   globalScene.gameData.voucherCounts[vt] = (globalScene.gameData.voucherCounts[vt] ?? 0) + 1;
   console.info(`[llm-director] give_voucher type=${effect.voucherType}`);
+  const label = effect.voucherType.charAt(0) + effect.voucherType.slice(1).toLowerCase();
+  return `You received a ${label} Voucher.`;
 }
 
 // -------------------------------------------------------------------------

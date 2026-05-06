@@ -363,7 +363,7 @@ export class LLMDirectorBeatPhase extends Phase {
  * Use this for ANY LLM-emitted text passed to queueMessage / showText so
  * the player can press Enter to read all of it instead of getting truncated.
  */
-function paginate(text: string | undefined, perPage = 80): string {
+function paginate(text: string | undefined, perPage = 70): string {
   if (!text) {
     return "";
   }
