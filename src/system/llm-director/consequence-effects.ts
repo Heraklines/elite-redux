@@ -422,7 +422,7 @@ function applySetBiome(effect: { biomeId: number; flavorText?: string }): void {
   globalScene.phaseManager.unshiftNew("SwitchBiomePhase", effect.biomeId as BiomeId);
   if (effect.flavorText) {
     void globalScene.ui.setMode(UiMode.MESSAGE);
-    globalScene.phaseManager.queueMessage(effect.flavorText, null, true);
+    globalScene.phaseManager.queueMessage(paginate(effect.flavorText), null, true);
   }
   console.info(`[llm-director] set_biome biomeId=${effect.biomeId}`);
 }
@@ -464,10 +464,48 @@ function applyCustom(effect: { description: string; severity?: string; positive?
   // facing message + a console log so the player still feels the consequence
   // even when the catalog can't simulate it.
   const prefix = effect.positive === true ? "✨ " : effect.positive === false ? "⚠ " : "";
-  const message = `${prefix}${effect.description}`;
+  // paginate inserts `$` page-breaks at sentence boundaries; MessagePhase
+  // auto-paginates on `$` so long descriptions render as multiple advanceable
+  // pages instead of one overflowing box where the player gets stuck.
+  const message = paginate(`${prefix}${effect.description}`);
   void globalScene.ui.setMode(UiMode.MESSAGE);
   globalScene.phaseManager.queueMessage(message, null, true);
   console.info(
     `[llm-director] custom-effect description="${effect.description}" severity=${effect.severity ?? "-"} positive=${effect.positive ?? "-"}`,
   );
+}
+
+/**
+ * Insert `$` page-break separators into long text so MessagePhase auto-
+ * paginates. Same logic as paginate() in llm-director-beat-phase.ts; kept
+ * here as a separate copy to avoid a cross-module import that would couple
+ * the pure effect handlers to the phase layer.
+ */
+function paginate(text: string | undefined, perPage = 120): string {
+  if (!text) {
+    return "";
+  }
+  if (text.length <= perPage) {
+    return text;
+  }
+  const pages: string[] = [];
+  let remaining = text.trim();
+  while (remaining.length > perPage) {
+    const slice = remaining.slice(0, perPage);
+    let cut = Math.max(slice.lastIndexOf(". "), slice.lastIndexOf("! "), slice.lastIndexOf("? "));
+    if (cut < perPage * 0.5) {
+      cut = slice.lastIndexOf(" ");
+      if (cut < perPage * 0.3) {
+        cut = perPage;
+      }
+    } else {
+      cut += 1;
+    }
+    pages.push(remaining.slice(0, cut).trim());
+    remaining = remaining.slice(cut).trim();
+  }
+  if (remaining.length > 0) {
+    pages.push(remaining);
+  }
+  return pages.join("$");
 }
