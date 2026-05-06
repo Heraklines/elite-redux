@@ -141,7 +141,8 @@ function buildOption(option: DialogueChoiceBeat["options"][number], beatId: stri
       // Apply effects (heal, give_money, status_inflict, etc.). Effects mutate
       // state directly; narrative strings (custom descriptions, biome flavor)
       // are returned for us to surface as outro dialogue.
-      const effectMessages = option.consequence.effects?.length > 0 ? applyEffects(option.consequence.effects) : [];
+      const effects = option.consequence.effects;
+      const effectMessages = effects && effects.length > 0 ? applyEffects(effects) : [];
 
       // Queue any narrative text from custom-effects as outro dialogue.
       // The MysteryEncounter's "selected" dialogue already covers the
