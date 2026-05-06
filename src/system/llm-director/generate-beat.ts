@@ -91,7 +91,10 @@ async function runSkeletonPhase(
         ],
         timeoutMs,
         responseFormat: "json_object",
-        maxTokens: 1200,
+        // 4000 tokens lets the LLM emit a full beat + 2 inter-beat overrides
+        // (preBattleText for next 2 waves) without truncation. The previous
+        // 1200 cap was cutting off mid-JSON on rich beats.
+        maxTokens: 4000,
       });
       logBeatResponse(wave, result.content, result.latencyMs);
       parsed = parseLooseJson(result.content);

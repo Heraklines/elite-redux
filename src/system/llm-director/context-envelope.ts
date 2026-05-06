@@ -1,6 +1,8 @@
 import type { StoryBible } from "#data/llm-director/beat-schema";
+import { AbilityId } from "#enums/ability-id";
 import { BiomeId } from "#enums/biome-id";
 import { MoveId } from "#enums/move-id";
+import { SpeciesId } from "#enums/species-id";
 import { TrainerType } from "#enums/trainer-type";
 import type { BeatHistoryEntry, LLMDirectorState } from "#system/llm-director/director-state";
 
@@ -79,6 +81,10 @@ export interface GameBalanceCard {
   biomeCatalog: CatalogEntry[];
   /** Full move catalog for authoring trainer Pokémon movesets. */
   moveCatalog: CatalogEntry[];
+  /** Full Pokémon species catalog for speciesSwaps. */
+  speciesCatalog: CatalogEntry[];
+  /** Full ability catalog for trainer team customization. */
+  abilityCatalog: CatalogEntry[];
 }
 
 export interface CatalogEntry {
@@ -141,6 +147,33 @@ function buildMoveCatalog(): CatalogEntry[] {
   return entries.sort((a, b) => a.id - b.id);
 }
 
+/** Full Pokémon species catalog (~1080 species, ~25KB). */
+function buildSpeciesCatalog(): CatalogEntry[] {
+  const entries: CatalogEntry[] = [];
+  for (const [name, id] of Object.entries(SpeciesId)) {
+    if (typeof id !== "number") {
+      continue;
+    }
+    entries.push({ id, name: name.toLowerCase() });
+  }
+  return entries.sort((a, b) => a.id - b.id);
+}
+
+/** Ability catalog (~310 abilities, ~8KB). */
+function buildAbilityCatalog(): CatalogEntry[] {
+  const entries: CatalogEntry[] = [];
+  for (const [name, id] of Object.entries(AbilityId)) {
+    if (typeof id !== "number") {
+      continue;
+    }
+    if (id === 0) {
+      continue;
+    }
+    entries.push({ id, name: name.toLowerCase() });
+  }
+  return entries.sort((a, b) => a.id - b.id);
+}
+
 /** Built once at module load — all enums are static. */
 const GAME_BALANCE_CARD: GameBalanceCard = {
   levelCurveNote:
@@ -149,6 +182,8 @@ const GAME_BALANCE_CARD: GameBalanceCard = {
   trainerTypeCatalog: buildTrainerCatalog(),
   biomeCatalog: buildBiomeCatalog(),
   moveCatalog: buildMoveCatalog(),
+  speciesCatalog: buildSpeciesCatalog(),
+  abilityCatalog: buildAbilityCatalog(),
 };
 
 function findCurrentAct(bible: StoryBible | undefined, wave: number): StoryBible["acts"][number] | undefined {

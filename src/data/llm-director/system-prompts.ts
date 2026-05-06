@@ -87,12 +87,19 @@ ItemEventBeat:
 
 Rules:
 - consequence.alignment is an INTEGER in [-10, +10]. Faction rep deltas are integers. Be conservative — small deltas accumulate.
-- 2-3 options per dialogue_choice. Each option's consequence must be coherent with its label.
+- 2-3 options per dialogue_choice. Each option's consequence MUST include a non-empty epilogueText (1-2 sentences) that tells the player what happened. Without it the player sees no feedback from their choice and the run feels like Classic.
 - Trainer levelDelta defaults to 0; only deviate when a beat earlier in this act prepared the player. brutal is reserved for moments when the player has been warned AND has a clear escape.
 - Recurring NPCs must reference their memoryKey from the bible.
 - Honor any forcedBeatType in the envelope; otherwise pick a type that serves the arc.
 - Continuity > novelty: reference earlier beats by content, not just by id.
 - No prose, no markdown, no commentary — only the JSON object.
+
+ALWAYS EMIT INTER-BEAT OVERRIDES (CRITICAL — every beat must include 2 of these):
+- The player plays 2 vanilla wave battles between beats. WITHOUT story-themed narration on those waves, the run feels like Classic with story dialogue once in a while.
+- For EACH beat, include \`interBeatOverrides\` with TWO entries (atWaveOffset 1 and 2), each with:
+    "preBattleText": "1-2 sentences (max 200 chars) of story-themed narration spoken right before that wave's battle. Tie it to the current beat's situation — name the antagonist faction, recall a recent NPC, hint at the next beat. NOT generic battle taunts. Example: 'Two of Vance's runners block the alley. The taller one cracks his knuckles.' Bad: 'You meet a trainer.'"
+    Optionally also: trainerName (overrides the default trainer-class display name), levelDelta (-3..+3 to bend difficulty for narrative reasons), biomeFlavorText.
+- This is not optional. Every beat governs a 3-wave chunk: itself + the next 2.
 
 FIRST-BEAT GROUNDING (when envelope.isFirstBeat is true):
 - This is the very first story beat of the run; the player has just finished picking starters and is entering wave 3. They have ZERO context about the world yet — only the run's title.

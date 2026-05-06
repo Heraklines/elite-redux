@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import type { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
+import { UiMode } from "#enums/ui-mode";
 import { BattlePhase } from "#phases/battle-phase";
 import { applyOverrideToBattle } from "#phases/llm-director-beat-utils";
 import { logBiomeSwitch } from "#system/llm-director/director-log";
@@ -91,6 +92,13 @@ export class NewBattlePhase extends BattlePhase {
       console.info(
         `[llm-director] interBeatOverride.speciesSwaps received for wave ${battle.waveIndex} (deferred to v2)`,
       );
+    }
+    // Story-themed pre-battle line: queue the LLM-written narration for
+    // this wave so the trainer encounter feels part of the run's story
+    // instead of a vanilla wave with canned trainer-class dialogue.
+    if (override.preBattleText) {
+      void globalScene.ui.setMode(UiMode.MESSAGE);
+      globalScene.phaseManager.queueMessage(override.preBattleText, null, true);
     }
   }
 }

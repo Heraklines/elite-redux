@@ -15,6 +15,11 @@ export interface InterBeatOverride {
   atWaveOffset: 1 | 2;
   trainerOverride?: { speciesSwaps?: number[]; levelDelta?: number };
   biomeFlavorText?: string;
+  /** Story-themed line spoken just before the battle starts. Replaces the
+   * vanilla trainer's canned dialogue for that wave. Max ~200 chars. */
+  preBattleText?: string;
+  /** Optional per-trainer name override for narrative consistency. */
+  trainerName?: string;
 }
 
 export interface ConsequenceItem {
@@ -163,6 +168,8 @@ const interBeatOverrideSchema = {
       additionalProperties: false,
     },
     biomeFlavorText: { type: "string" },
+    preBattleText: { type: "string", maxLength: 240 },
+    trainerName: { type: "string", maxLength: 40 },
   },
   additionalProperties: false,
 } as const;
