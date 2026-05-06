@@ -120,17 +120,53 @@ LEVERAGE VS OVERRIDE — IMPORTANT:
 - For incidental in-between waves, just pick a fitting trainerType and let vanilla generate the party. The interBeatOverride.preBattleText is what makes it feel story-themed; the team itself can stay vanilla.
 - When you DO override, keep the team coherent: 2-4 Pokémon for early waves, scale up for later. Mix types intentionally; don't stuff six dragons.
 
-POKÉROGUE'S MODIFIER SYSTEM (read this when authoring teams or item rewards):
-- This is NOT vanilla Pokémon — PokéRogue has stat-stacking items unique to the game.
-- Held items go on individual Pokémon via \`enemyTeam[].heldItemKeys\`. Multiple held items per Pokémon are normal and STACK. A trainer's ace can hold LEFTOVERS + FOCUS_BAND + KINGS_ROCK simultaneously.
-- Categories of modifier keys (full list in envelope.gameBalanceCard.modifierCatalog):
-  · COMBAT HELDS: LEFTOVERS, FOCUS_BAND, FOCUS_SASH, KINGS_ROCK, GRIP_CLAW, SHELL_BELL, MULTI_LENS, SCOPE_LENS, WIDE_LENS, MUSCLE_BAND, WISE_GLASSES, SOUL_DEW, EXP_SHARE
-  · TYPE-BOOST HELDS: BLACK_BELT, MAGNET, DRAGON_FANG, SHARP_BEAK, SOFT_SAND, SILK_SCARF, CHARCOAL, MYSTIC_WATER, NEVER_MELT_ICE, etc. (one per type)
-  · TYPE-RESIST BERRIES: HEAL_BERRY, ENIGMA_BERRY, LEPPA_BERRY, LUM_BERRY, SITRUS_BERRY, GANLON_BERRY, etc.
-  · STAT-STACKING (PokéRogue-specific, can stack 5+ times on one Pokémon!): PROTEIN, CALCIUM, IRON, ZINC, CARBOS, HP_UP — these PERMANENTLY raise a stat per stack. Strong trainers in late waves often have aces with multiple PROTEIN stacks.
-  · SPECIES-LOCKED (only work on the right species): LIGHT_BALL (Pikachu), THICK_CLUB (Cubone/Marowak), METAL_POWDER (Ditto), QUICK_POWDER (Ditto), DEEP_SEA_SCALE/TOOTH (Clamperl)
-- For \`consequence.items[].modifierType\`: use ANY key from modifierCatalog. Player rewards are typically: POTION, SUPER_POTION, REVIVE (early); RARE_CANDY, ETHER, ELIXIR, BERRY_* (mid); MAX_REVIVE, SACRED_ASH, MASTER_BALL, MEGA_BRACELET (late/special).
-- Power scale: a wave 30 trainer ace might have 1-2 stacked stat-boosters (PROTEIN ×2). A wave 100+ trainer ace might have 4-5 stacked. Match this to wave + difficultyTag.
+POKÉROGUE'S MODIFIER SYSTEM (READ CAREFULLY — IT IS NOT VANILLA POKÉMON):
+
+There is **NO inventory / bag** of consumables. The player CANNOT carry potions for later. Items work like this:
+
+(1) IMMEDIATE-USE items — applied the instant the player gets them, then gone:
+    - HP/PP/status restoratives: POTION, SUPER_POTION, HYPER_POTION, MAX_POTION, FULL_RESTORE, ETHER, MAX_ETHER, ELIXIR, MAX_ELIXIR, FULL_HEAL, REVIVE, MAX_REVIVE, SACRED_ASH
+    - Level/EXP: RARE_CANDY (1 level), RARER_CANDY (1 level for whole party)
+    - PP boost: PP_UP, PP_MAX
+    - Pokeballs: POKEBALL, GREAT_BALL, ULTRA_BALL, ROGUE_BALL, MASTER_BALL — used to catch the next wild
+    Granting "POTION x1" means "one Pokémon's HP fills 20 right now, then the item is gone." Granting "POTION x2" means TWO Pokémon get healed (still no inventory).
+    Use these for narrative caches: a healer's blessing → SACRED_ASH or REVIVE_ALL effect; a found medkit → SUPER_POTION applied to a hurt party member.
+
+(2) HELD ITEMS attached to a specific Pokémon — permanent until consumed/removed. Use enemyTeam[].heldItemKeys for trainer Pokémon, OR consequence.effects[].give_held_item for player Pokémon (effect type, schema-only in v1).
+    - Combat: LEFTOVERS, FOCUS_BAND, FOCUS_SASH, KINGS_ROCK, GRIP_CLAW, SHELL_BELL, MULTI_LENS, SCOPE_LENS, WIDE_LENS, MUSCLE_BAND, WISE_GLASSES, SOUL_DEW, EXP_SHARE
+    - Type-boost: BLACK_BELT, MAGNET, DRAGON_FANG, SHARP_BEAK, SOFT_SAND, SILK_SCARF, CHARCOAL, MYSTIC_WATER, NEVER_MELT_ICE, MIRACLE_SEED, POISON_BARB, TWISTED_SPOON, METAL_COAT, METAL_POWDER (Ditto), HARD_STONE, SHARP_BEAK, SPELL_TAG, BLACKGLASSES, SILVER_POWDER, RED_CARD
+    - Berries: SITRUS_BERRY (heal), LUM_BERRY (cure status), LEPPA_BERRY (PP), ENIGMA_BERRY, HEAL_BERRY, GANLON_BERRY, SALAC_BERRY, LIECHI_BERRY, PETAYA_BERRY, APICOT_BERRY, STARF_BERRY
+    - PokéRogue-only stacking stat boosters (PERMANENTLY +stat per stack, can stack 5-10 times): PROTEIN (Atk), IRON (Def), CALCIUM (SpAtk), ZINC (SpDef), CARBOS (Speed), HP_UP (HP). These are massive — late-game aces often have 5+ stacks.
+    - Species-locked: LIGHT_BALL (Pikachu only), THICK_CLUB (Cubone/Marowak), QUICK_POWDER (Ditto), DEEP_SEA_SCALE/TOOTH (Clamperl)
+
+(3) GLOBAL run-wide modifiers — ride with the player for the rest of the run:
+    - SHINY_CHARM (boosts shiny rate), AMULET_COIN (more money), EXP_CHARM (more XP), GREEDY_CHARM, CANDY_JAR, BERRY_POUCH, GOLDEN_PUNCH, MULTI_LENS (player), HEALING_CHARM, BACKWARDS_RIBBON, MEGA_BRACELET (mega-evos), DYNAMAX_BAND, TERA_ORB
+
+ITEM RARITY — USE THE ENVELOPE'S REAL DATA, NOT GUESSES:
+
+The envelope's gameBalanceCard.itemTiers is the AUTHORITATIVE list of player-reward items, with their actual vanilla rarity tier and drop weight. Each entry is { id, tier, weight }:
+
+  - tier is one of: COMMON < GREAT < ULTRA < ROGUE < MASTER < LUXURY (six tiers)
+  - weight is the vanilla drop weight inside the tier (higher = more frequent in vanilla rolls). "fn" means the weight is computed dynamically (e.g., POKEBALL drops more if you're not at cap).
+
+Similarly gameBalanceCard.trainerItemTiers lists held items trainer Pokémon can carry, with their tiers.
+
+DO NOT INVENT items or guess at rarity. Pick modifierType strings from these lists. The pools were extracted from vanilla PokéRogue at startup, so they reflect what the game actually drops.
+
+GUIDANCE FOR REWARD-GRANTING:
+- Match item tier to the narrative moment:
+    Roadside cache, low-stakes choice → COMMON (POTION, BERRY, etc.)
+    Faction quest reward, mid-stakes choice → GREAT (BASE_STAT_BOOSTER family, etc.)
+    Temple boon, important choice → ULTRA
+    Act-defining find, major moral pivot → ROGUE
+    Once-per-run revelation, run-defining → MASTER / LUXURY
+- Power scale by wave:
+    Wave 1-30: mostly COMMON / GREAT
+    Wave 30-80: GREAT / ULTRA, occasional ROGUE
+    Wave 80+: ULTRA / ROGUE / MASTER, occasional LUXURY
+- "qty" is how many APPLICATIONS, not "stockpile" — PokéRogue has no inventory. qty: 2 of POTION = two Pokémon get a 20-HP heal RIGHT NOW. Default qty: 1.
+- For trainer Pokémon held items, pick from trainerItemTiers. Late-game trainer aces typically carry 1-3 items (LEFTOVERS + a stat booster + a berry is a common combo).
+- If you want flair without picking specific items, use a "custom" effect with descriptive narration ("the cache yields a treasure beyond price") instead of inventing item names — making up modifier keys causes the game to silently drop them.
 
 FILL EVERY INTER-BEAT OVERRIDE FULLY (CRITICAL — every wave should feel hand-crafted):
 

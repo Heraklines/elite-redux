@@ -6,7 +6,6 @@ import type { BiomeId } from "#enums/biome-id";
 import { EggSourceType } from "#enums/egg-source-types";
 import { EggTier } from "#enums/egg-type";
 import { StatusEffect } from "#enums/status-effect";
-import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import type { PlayerPokemon } from "#field/pokemon";
 import type { ModifierType } from "#modifiers/modifier-type";
@@ -30,15 +29,29 @@ import { randSeedInt } from "#utils/common";
  * we want LLM-source-order display. We don't — we want simple "all effects
  * apply, then a short summary" semantics, which keeps the messaging cap low.
  */
-export function applyEffects(effects: readonly ConsequenceEffect[]): void {
+/**
+ * Apply each effect in source order. Effect handlers MUTATE game state
+ * directly (heal HP, change biome, etc.) but DO NOT queue messages —
+ * instead they return any narrative text they produced. The caller
+ * collects those messages and queues ONE consolidated `$`-paginated
+ * MessagePhase so Enter advances through them as pages of a single
+ * dialog instead of fighting between separate MessagePhases that race
+ * with battle UI mode changes (the bug that left the player stuck on
+ * "the torn corner of the map dissolves" with no way to advance).
+ */
+export function applyEffects(effects: readonly ConsequenceEffect[]): string[] {
+  const messages: string[] = [];
   for (const effect of effects) {
     try {
-      dispatchOne(effect);
+      const msg = dispatchOne(effect);
+      if (msg) {
+        messages.push(msg);
+      }
     } catch (err) {
-      // Effects must NEVER blow up the run. Log and continue.
       console.error(`[llm-director] effect crashed type=${effect.type}`, err);
     }
   }
+  return messages;
 }
 
 /**
@@ -72,68 +85,66 @@ function getParty(): PlayerPokemon[] {
   return globalScene.getPlayerParty();
 }
 
-function dispatchOne(effect: ConsequenceEffect): void {
+function dispatchOne(effect: ConsequenceEffect): string | null {
   switch (effect.type) {
     case "heal_party_hp":
       applyHealHp(effect);
-      return;
+      return null;
     case "heal_party_status":
       applyHealStatus(effect);
-      return;
+      return null;
     case "heal_party_full":
       applyHealFull(effect);
-      return;
+      return null;
     case "revive":
       applyRevive(effect);
-      return;
+      return null;
     case "revive_all":
       applyReviveAll();
-      return;
+      return null;
     case "status_inflict":
       applyStatusInflict(effect);
-      return;
+      return null;
     case "damage_party":
       applyDamageParty(effect);
-      return;
+      return null;
     case "give_item":
       applyGiveItem(effect);
-      return;
+      return null;
     case "remove_item":
       applyRemoveItem(effect);
-      return;
+      return null;
     case "give_money":
       applyGiveMoney(effect);
-      return;
+      return null;
     case "lose_money":
       applyLoseMoney(effect);
-      return;
+      return null;
     case "level_up":
       applyLevelUp(effect);
-      return;
+      return null;
     case "give_xp":
       applyGiveXp(effect);
-      return;
+      return null;
     case "friendship_boost":
       applyFriendshipBoost(effect);
-      return;
+      return null;
     case "set_biome":
-      applySetBiome(effect);
-      return;
+      return applySetBiome(effect);
     case "weather_change":
       applyWeatherChange(effect);
-      return;
+      return null;
     case "give_egg":
       applyGiveEgg(effect);
-      return;
+      return null;
     case "give_voucher":
       applyGiveVoucher(effect);
-      return;
+      return null;
     case "custom":
-      applyCustom(effect);
-      return;
+      return applyCustom(effect);
     case "faint":
       applyFaint(effect);
-      return;
+      return null;
     // --- stubbed (schema-visible, log + no-op for v1) ------------------
     case "heal_party_pp":
     case "stat_boost_temp":
@@ -160,7 +171,7 @@ function dispatchOne(effect: ConsequenceEffect): void {
     case "debuff_persistent":
     case "lose_egg":
       console.info(`[llm-director] effect-stubbed type=${effect.type} — TODO v2 implement end-to-end`);
-      return;
+      return null;
   }
 }
 
@@ -418,13 +429,10 @@ function applyFriendshipBoost(effect: { target?: TargetSpec; amount: number }): 
 // Field / world
 // -------------------------------------------------------------------------
 
-function applySetBiome(effect: { biomeId: number; flavorText?: string }): void {
+function applySetBiome(effect: { biomeId: number; flavorText?: string }): string | null {
   globalScene.phaseManager.unshiftNew("SwitchBiomePhase", effect.biomeId as BiomeId);
-  if (effect.flavorText) {
-    void globalScene.ui.setMode(UiMode.MESSAGE);
-    globalScene.phaseManager.queueMessage(paginate(effect.flavorText), null, true);
-  }
   console.info(`[llm-director] set_biome biomeId=${effect.biomeId}`);
+  return effect.flavorText ?? null;
 }
 
 const WEATHER_KEY_MAP: Record<string, WeatherType> = {
@@ -459,53 +467,15 @@ function applyWeatherChange(effect: { weather: string; duration: string; waves?:
 // Custom (escape hatch) — narrative-only, no mechanical effect
 // -------------------------------------------------------------------------
 
-function applyCustom(effect: { description: string; severity?: string; positive?: boolean }): void {
-  // The "effect" is the narrative. We surface the description as a player-
-  // facing message + a console log so the player still feels the consequence
-  // even when the catalog can't simulate it.
+function applyCustom(effect: { description: string; severity?: string; positive?: boolean }): string {
+  // The "effect" is the narrative. Return the prefixed description; the
+  // caller consolidates all effect messages + epilogue into ONE
+  // `$`-paginated MessagePhase so the player can advance through them
+  // as pages of a single dialog instead of fighting between separate
+  // MessagePhases that race with battle UI mode changes.
   const prefix = effect.positive === true ? "✨ " : effect.positive === false ? "⚠ " : "";
-  // paginate inserts `$` page-breaks at sentence boundaries; MessagePhase
-  // auto-paginates on `$` so long descriptions render as multiple advanceable
-  // pages instead of one overflowing box where the player gets stuck.
-  const message = paginate(`${prefix}${effect.description}`);
-  void globalScene.ui.setMode(UiMode.MESSAGE);
-  globalScene.phaseManager.queueMessage(message, null, true);
   console.info(
     `[llm-director] custom-effect description="${effect.description}" severity=${effect.severity ?? "-"} positive=${effect.positive ?? "-"}`,
   );
-}
-
-/**
- * Insert `$` page-break separators into long text so MessagePhase auto-
- * paginates. Same logic as paginate() in llm-director-beat-phase.ts; kept
- * here as a separate copy to avoid a cross-module import that would couple
- * the pure effect handlers to the phase layer.
- */
-function paginate(text: string | undefined, perPage = 120): string {
-  if (!text) {
-    return "";
-  }
-  if (text.length <= perPage) {
-    return text;
-  }
-  const pages: string[] = [];
-  let remaining = text.trim();
-  while (remaining.length > perPage) {
-    const slice = remaining.slice(0, perPage);
-    let cut = Math.max(slice.lastIndexOf(". "), slice.lastIndexOf("! "), slice.lastIndexOf("? "));
-    if (cut < perPage * 0.5) {
-      cut = slice.lastIndexOf(" ");
-      if (cut < perPage * 0.3) {
-        cut = perPage;
-      }
-    } else {
-      cut += 1;
-    }
-    pages.push(remaining.slice(0, cut).trim());
-    remaining = remaining.slice(cut).trim();
-  }
-  if (remaining.length > 0) {
-    pages.push(remaining);
-  }
-  return pages.join("$");
+  return `${prefix}${effect.description}`;
 }

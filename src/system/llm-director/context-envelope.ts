@@ -2,9 +2,11 @@ import { modifierTypes } from "#data/data-lists";
 import type { StoryBible } from "#data/llm-director/beat-schema";
 import { AbilityId } from "#enums/ability-id";
 import { BiomeId } from "#enums/biome-id";
+import { ModifierTier } from "#enums/modifier-tier";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerType } from "#enums/trainer-type";
+import { modifierPool, trainerModifierPool } from "#modifiers/modifier-pools";
 import type { BeatHistoryEntry, LLMDirectorState } from "#system/llm-director/director-state";
 
 /**
@@ -92,6 +94,23 @@ export interface GameBalanceCard {
    * load. Subset of these are valid held items (those backed by
    * PokemonHeldItemModifierType). */
   modifierCatalog: string[];
+  /** Tiered item drop catalog with REAL rarity weights pulled from the
+   * vanilla `modifierPool`. Six tiers (COMMON < GREAT < ULTRA < ROGUE <
+   * MASTER < LUXURY). Higher tier + higher weight = more common in vanilla
+   * drops. The LLM picks items grounded in the actual game data instead of
+   * guessing. Trainer items are listed separately under `trainerItemTiers`. */
+  itemTiers: ItemTierEntry[];
+  /** Tiered held-item catalog for trainer Pokémon, again from vanilla. */
+  trainerItemTiers: ItemTierEntry[];
+}
+
+export interface ItemTierEntry {
+  /** Modifier key (e.g., "POTION", "LEFTOVERS"). */
+  id: string;
+  /** Tier name from ModifierTier enum (COMMON, GREAT, ULTRA, ROGUE, MASTER, LUXURY). */
+  tier: string;
+  /** Weight in the vanilla pool. Higher = more frequent. "fn" if dynamic. */
+  weight: number | "fn";
 }
 
 export interface CatalogEntry {
@@ -206,10 +225,64 @@ function getModifierCatalog(): string[] {
   return cachedModifierCatalog ?? [];
 }
 
-const GAME_BALANCE_CARD = (): GameBalanceCard => ({
-  ...STATIC_GAME_BALANCE_CARD,
-  modifierCatalog: getModifierCatalog(),
-});
+/**
+ * Tiered item rarity catalog. Pulled from vanilla `modifierPool` (player
+ * rewards) and `trainerModifierPool` (trainer Pokémon held items). The
+ * pools are populated by `init-modifier-pools.ts` at game start; we lazy-
+ * read them on first access so each playtest reflects the live data.
+ *
+ * Each entry: { id, tier, weight }. `weight` is the vanilla drop weight
+ * (higher = more common); "fn" means the weight is computed dynamically
+ * (e.g., "more pokeballs if at cap").
+ */
+let cachedItemTiers: { player: ItemTierEntry[]; trainer: ItemTierEntry[] } | null = null;
+
+function getItemTierCatalogs(): { player: ItemTierEntry[]; trainer: ItemTierEntry[] } {
+  if (cachedItemTiers !== null && cachedItemTiers.player.length > 0) {
+    return cachedItemTiers;
+  }
+  const tierNames: Array<keyof typeof ModifierTier> = ["COMMON", "GREAT", "ULTRA", "ROGUE", "MASTER", "LUXURY"];
+  const player: ItemTierEntry[] = [];
+  const trainer: ItemTierEntry[] = [];
+  for (const tierName of tierNames) {
+    const tier = ModifierTier[tierName] as unknown as number;
+    if (typeof tier !== "number") {
+      continue;
+    }
+    const playerEntries = modifierPool[tier] ?? [];
+    for (const wmt of playerEntries) {
+      const id = (wmt as { modifierType?: { id?: string } }).modifierType?.id ?? "unknown";
+      const w = (wmt as { weight?: unknown }).weight;
+      const weight = typeof w === "number" ? w : "fn";
+      if (id !== "unknown") {
+        player.push({ id, tier: tierName, weight });
+      }
+    }
+    const trainerEntries = trainerModifierPool[tier] ?? [];
+    for (const wmt of trainerEntries) {
+      const id = (wmt as { modifierType?: { id?: string } }).modifierType?.id ?? "unknown";
+      const w = (wmt as { weight?: unknown }).weight;
+      const weight = typeof w === "number" ? w : "fn";
+      if (id !== "unknown") {
+        trainer.push({ id, tier: tierName, weight });
+      }
+    }
+  }
+  if (player.length > 0 || trainer.length > 0) {
+    cachedItemTiers = { player, trainer };
+  }
+  return cachedItemTiers ?? { player: [], trainer: [] };
+}
+
+const GAME_BALANCE_CARD = (): GameBalanceCard => {
+  const tiers = getItemTierCatalogs();
+  return {
+    ...STATIC_GAME_BALANCE_CARD,
+    modifierCatalog: getModifierCatalog(),
+    itemTiers: tiers.player,
+    trainerItemTiers: tiers.trainer,
+  };
+};
 
 function findCurrentAct(bible: StoryBible | undefined, wave: number): StoryBible["acts"][number] | undefined {
   if (!bible) {

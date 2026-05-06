@@ -35,10 +35,11 @@ import i18next from "i18next";
 export class LLMDirectorBiblePhase extends Phase {
   public readonly phaseName = "LLMDirectorBiblePhase";
 
-  /** Wave for the first generated beat. Director cadence is every 3 waves. */
+  /** Wave for the first generated beat. v3 default = 1 (forced wave-1
+   * mystery event so testing/playtest sees the system engage immediately). */
   private readonly firstBeatWave: number;
 
-  public constructor(firstBeatWave = 3) {
+  public constructor(firstBeatWave = 1) {
     super();
     this.firstBeatWave = firstBeatWave;
   }

@@ -182,13 +182,17 @@ export class LLMDirectorBeatPhase extends Phase {
       itemCount: option.consequence.items?.length ?? 0,
       hasEpilogue: !!result.epilogueText,
     });
-    // Actually grant the items + money. applyConsequence is pure (mutates
-    // director state only); side effects on game state happen here.
-    grantConsequenceRewards(option.consequence);
-    // Pop the OPTION_SELECT overlay before showing follow-up text, so the
-    // message handler renders cleanly on top of the dialogue background.
+    // Apply game-state side effects + collect any narrative messages from
+    // effects (custom descriptions, biome flavor, etc.).
+    const effectMessages = grantConsequenceRewards(option.consequence);
+    // Pop the OPTION_SELECT overlay so the message handler renders cleanly.
     globalScene.ui.revertMode();
-    this.afterConsequence(result);
+    // Consolidate effect messages + epilogue into ONE `$`-paginated
+    // MessagePhase. PokéRogue's MessagePhase auto-paginates on `$` and
+    // chains pages with single-press advance, so the player never gets
+    // stuck between separate MessagePhases racing with mode changes.
+    this.queueConsolidatedTail(effectMessages, result.epilogueText);
+    this.end();
   }
 
   /**
@@ -251,48 +255,63 @@ export class LLMDirectorBeatPhase extends Phase {
   private handleBiomeOptionSelected(option: BiomeTransitionOption): void {
     const state = globalScene.gameData.llmDirectorState;
     let result: ApplyResult = {};
+    let effectMessages: string[] = [];
     if (option.consequence) {
       result = applyConsequence(state, option.consequence);
-      grantConsequenceRewards(option.consequence);
+      effectMessages = grantConsequenceRewards(option.consequence);
     }
     globalScene.ui.revertMode();
     // Queue the biome switch ahead of the next vanilla wave.
     globalScene.phaseManager.unshiftNew("SwitchBiomePhase", option.biomeId as BiomeId);
-    void globalScene.ui.setMode(UiMode.MESSAGE);
-    // Queue in REVERSE source order so unshift puts them in the right order.
-    if (result.epilogueText) {
-      globalScene.phaseManager.queueMessage(paginate(result.epilogueText), null, true);
-    }
+    // Consolidate flavor text + effect messages + epilogue into ONE
+    // paginated message. Order: flavor (option's own description),
+    // effect messages, epilogue.
+    const tail: string[] = [];
     if (option.flavorText) {
-      globalScene.phaseManager.queueMessage(paginate(option.flavorText), null, true);
+      tail.push(option.flavorText);
     }
+    tail.push(...effectMessages);
+    if (result.epilogueText) {
+      tail.push(result.epilogueText);
+    }
+    this.queueConsolidatedTail(tail, undefined);
     this.end();
   }
 
   private renderItemEvent(beat: ItemEventBeat): void {
     const state = globalScene.gameData.llmDirectorState;
     const result = applyConsequence(state, beat.consequence);
-    grantConsequenceRewards(beat.consequence);
-    void globalScene.ui.setMode(UiMode.MESSAGE);
-    // Queue in REVERSE source order so unshift puts them in the right order.
-    if (result.epilogueText) {
-      globalScene.phaseManager.queueMessage(paginate(result.epilogueText), null, true);
-    }
+    const effectMessages = grantConsequenceRewards(beat.consequence);
+    const tail: string[] = [];
     if (beat.introText) {
-      globalScene.phaseManager.queueMessage(paginate(beat.introText), null, true);
+      tail.push(beat.introText);
     }
+    tail.push(...effectMessages);
+    if (result.epilogueText) {
+      tail.push(result.epilogueText);
+    }
+    this.queueConsolidatedTail(tail, undefined);
     this.end();
   }
 
-  private afterConsequence(result: ApplyResult): void {
-    if (result.epilogueText) {
-      // After OPTION_SELECT was reverted, mode may still be in a transitional
-      // state where input doesn't reach the message handler. setMode(MESSAGE)
-      // routes Enter correctly so the player can advance the epilogue.
-      void globalScene.ui.setMode(UiMode.MESSAGE);
-      globalScene.phaseManager.queueMessage(paginate(result.epilogueText), null, true);
+  /**
+   * Consolidate multiple text fragments into ONE `$`-paginated MessagePhase.
+   * The phase handler auto-paginates on `$` so Enter advances through pages
+   * of one dialog instead of fighting between separate MessagePhases that
+   * race with battle UI mode changes. Empty / whitespace-only entries are
+   * skipped. If the combined string is empty, no message is queued.
+   */
+  private queueConsolidatedTail(parts: string[], _trailing: string | undefined): void {
+    const cleaned = parts.map(p => (p ?? "").trim()).filter(p => p.length > 0);
+    if (cleaned.length === 0) {
+      return;
     }
-    this.end();
+    // Each part is itself paginated (long parts split at sentence boundaries),
+    // then the parts are joined by `$` so the message handler treats each
+    // part as its own advanceable page.
+    const combined = cleaned.map(p => paginate(p)).join("$");
+    void globalScene.ui.setMode(UiMode.MESSAGE);
+    globalScene.phaseManager.queueMessage(combined, null, true);
   }
 
   /**
@@ -391,7 +410,8 @@ function truncate(text: string | undefined, max: number): string {
  *     escape hatch surfaces the LLM's free-form description as a player
  *     message so even unimplemented effects are felt narratively.
  */
-function grantConsequenceRewards(consequence: import("#data/llm-director/beat-schema").Consequence): void {
+function grantConsequenceRewards(consequence: import("#data/llm-director/beat-schema").Consequence): string[] {
+  const messages: string[] = [];
   if (consequence.items) {
     const factories = modifierTypes as Record<string, (() => ModifierType) | undefined>;
     for (const item of consequence.items) {
@@ -410,6 +430,7 @@ function grantConsequenceRewards(consequence: import("#data/llm-director/beat-sc
     globalScene.phaseManager.unshiftNew("MoneyRewardPhase", consequence.money);
   }
   if (consequence.effects && consequence.effects.length > 0) {
-    applyEffects(consequence.effects);
+    messages.push(...applyEffects(consequence.effects));
   }
+  return messages;
 }

@@ -45,17 +45,22 @@ describe("applyEffects — dispatch (integration via GameManager)", () => {
     expect(game.scene.gameData.voucherCounts[2]).toBe(before + 1);
   });
 
-  it("custom queues the description as a player-facing message", () => {
-    const queueSpy = vi.spyOn(game.scene.phaseManager, "queueMessage");
-    applyEffects([
+  it("custom returns the prefixed description for the caller to queue", () => {
+    // applyEffects is pure-ish — it mutates game state for non-narrative
+    // effects and RETURNS narrative strings for the caller to consolidate
+    // into a single $-paginated MessagePhase. The previous behavior
+    // (queueMessage per effect) caused stuck-text bugs when multiple
+    // effects' messages raced with battle UI mode changes.
+    const messages = applyEffects([
       {
         type: "custom",
         description: "the moonlight scars your starter",
         positive: false,
       },
     ]);
-    expect(queueSpy).toHaveBeenCalledWith(expect.stringContaining("the moonlight scars your starter"), null, true);
-    queueSpy.mockRestore();
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("the moonlight scars your starter");
+    expect(messages[0]).toContain("⚠");
   });
 
   it("logs every stubbed variant without throwing", () => {
@@ -94,20 +99,16 @@ describe("applyEffects — dispatch (integration via GameManager)", () => {
 
   it("multi-effect chain: cursed-potion pattern produces all three side effects", () => {
     game.scene.money = 1000;
-    const queueSpy = vi.spyOn(game.scene.phaseManager, "queueMessage");
-    applyEffects([
+    const messages = applyEffects([
       { type: "give_money", amount: 200 },
       { type: "lose_money", amount: 500 },
       { type: "custom", description: "the bargain feels heavier than the gold." },
     ]);
     // give 200 then lose 500 → -300 net
     expect(game.scene.money).toBe(700);
-    expect(queueSpy).toHaveBeenCalledWith(
-      expect.stringContaining("the bargain feels heavier than the gold."),
-      null,
-      true,
-    );
-    queueSpy.mockRestore();
+    // Custom is the only effect that returns a narrative string.
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("the bargain feels heavier than the gold.");
   });
 
   it("does not throw when a single effect raises — continues to subsequent effects", () => {
