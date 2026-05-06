@@ -133,9 +133,22 @@ export class NewBattlePhase extends BattlePhase {
     } else if (override.wildEncounter && override.wildEncounter.pokemon.length > 0) {
       this.applyWildEncounterOverride(battle.waveIndex, override.wildEncounter);
     } else {
-      // Trainer-sprite override: swap the existing trainer for one of the
-      // requested type BEFORE installAuthoredTeam binds to it.
-      const requestedTrainerType = override.trainerOverride?.trainerType;
+      // Trainer override path. Two sub-cases:
+      //  (a) wave was already TRAINER, requested type differs → swap sprite
+      //  (b) wave was WILD but the LLM emitted trainerType OR enemyTeam →
+      //      convert WILD→TRAINER so the narration matches the actual fight.
+      // (b) is critical: without it, the LLM writes "a Grass Kingdom ranger
+      // blocks the path" but the player faces a random wild Sentret because
+      // vanilla rolled WILD that wave and we only set trainerType which is
+      // a no-op for non-trainer waves.
+      const trOver = override.trainerOverride;
+      const wantsTrainer =
+        !!trOver
+        && (typeof trOver.trainerType === "number" || (Array.isArray(trOver.enemyTeam) && trOver.enemyTeam.length > 0));
+      if (wantsTrainer && battle.battleType === BattleType.WILD) {
+        this.convertWildToTrainer(battle.waveIndex, trOver.trainerType);
+      }
+      const requestedTrainerType = trOver?.trainerType;
       if (
         typeof requestedTrainerType === "number"
         && battle.battleType === BattleType.TRAINER
@@ -257,6 +270,53 @@ export class NewBattlePhase extends BattlePhase {
    * the Trainer constructor falls back to DEFAULT if the new config
    * doesn't support the requested variant.
    */
+  /**
+   * Convert a WILD wave to a TRAINER wave by spawning a Trainer instance
+   * from scratch. Used when the LLM's preBattleText narration implies a
+   * trainer fight (named NPC, faction-tagged opponent) but vanilla rolled
+   * WILD for this wave and there's no existing trainer to swap.
+   *
+   * If `requestedType` is provided and valid, uses it. Otherwise picks a
+   * neutral fallback (BACKPACKER) so the narration still gets a
+   * matching-ish sprite. The caller's subsequent installAuthoredTeam
+   * step (when enemyTeam is set) will populate the team; otherwise the
+   * trainer's vanilla party templates run.
+   */
+  private convertWildToTrainer(waveIndex: number, requestedType: number | undefined): void {
+    const battle = globalScene.currentBattle;
+    if (!battle) {
+      return;
+    }
+    let chosenType: TrainerType = TrainerType.BACKPACKER;
+    if (typeof requestedType === "number" && requestedType > TrainerType.UNKNOWN && requestedType < 200) {
+      const cfg = trainerConfigs[requestedType as TrainerType];
+      if (cfg && !cfg.doubleOnly) {
+        chosenType = requestedType as TrainerType;
+      }
+    }
+    try {
+      const variant = TrainerVariant.DEFAULT;
+      const newTrainer = new Trainer(chosenType, variant);
+      globalScene.field.add(newTrainer);
+      battle.trainer = newTrainer;
+      battle.battleType = BattleType.TRAINER;
+      // Wipe any wild Pokemon that vanilla pre-loaded so EncounterPhase
+      // generates the trainer party fresh via genPartyMember.
+      battle.enemyParty = [];
+      // Trainer parties typically use the wave-curve-derived enemyLevels;
+      // keep whatever vanilla set, just truncate to single-battle size.
+      const baseLevel = battle.enemyLevels?.[0] ?? Math.max(5, waveIndex);
+      battle.enemyLevels = [baseLevel];
+      battle.double = false;
+      console.info(
+        `[llm-director] wild-to-trainer conversion wave=${waveIndex} chosenType=${chosenType} (LLM requested type=${requestedType ?? "none"})`,
+      );
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      console.warn(`[llm-director] wild-to-trainer conversion failed wave=${waveIndex} reason=${reason}`);
+    }
+  }
+
   private applyTrainerTypeOverride(waveIndex: number, requestedType: number): void {
     const battle = globalScene.currentBattle;
     if (!battle?.trainer) {

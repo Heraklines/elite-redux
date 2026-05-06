@@ -188,7 +188,16 @@ GUIDANCE FOR REWARD-GRANTING:
     Wave 80+: ULTRA / ROGUE / MASTER, occasional LUXURY
 - "qty" defaults to 1. For consequence.items[] (the rewards-shop menu), qty>1 is meaningless (the shop is a chooser; duplicate slots get discarded). For effects[].give_item, qty applies the item N times to N targets — limit to 3.
 - For trainer Pokemon held items, pick from gameBalanceCard.trainerItemTiers. Late-game trainer aces typically carry 1-3 items.
-- VARIETY is important. The catalog has hundreds of items across six tiers — vitamins, mints, type-boosters, charms, lures, escape items, base-stat boosters, evolution items, TMs, fossils, ribbons, vouchers. Don't reach for the same handful (no run should ever feature only POTION + BERRY rewards). Match the item to what the moment is actually about.
+
+VARIETY is mandatory. Read the recent beats in beatHistory and check what items have already been granted in the last 2-3 beats. If BERRY or POTION appeared recently, you MUST pick from a different category this beat. The catalog has hundreds of items grouped by what they do:
+  • Battle utility: SOOTHE_BELL, KINGS_ROCK, SCOPE_LENS, QUICK_CLAW, GRIP_CLAW, LEFTOVERS, FOCUS_BAND, FOCUS_SASH, MUSCLE_BAND, WISE_GLASSES, WIDE_LENS, SHELL_BELL
+  • Permanent stat boosts: PROTEIN, IRON, CALCIUM, ZINC, CARBOS, HP_UP
+  • Type boosters: BLACK_BELT, MAGNET, SILK_SCARF, CHARCOAL, MYSTIC_WATER, MIRACLE_SEED, etc.
+  • Movement / utility: ESCAPE_ROPE, MAP, AMULET_COIN, EXP_CHARM, EXP_SHARE, GOLDEN_PUNCH, LUCKY_EGG
+  • Generators: TM_COMMON / TM_GREAT / TM_ULTRA, EVOLUTION_ITEM, BASE_STAT_BOOSTER, ATTACK_TYPE_BOOSTER, BERRY (random berry — count this AS a berry for variety purposes)
+  • Charm-class: SHINY_CHARM, HEALING_CHARM, GREEDY_CHARM, CANDY_JAR, BERRY_POUCH
+  • Other: REVIVER_SEED, PP_UP, MEMORY_MUSHROOM, MINTS, FOSSILS, RIBBONS, VOUCHERS, EGGS
+  Anchor item picks to the SCENE: a healer's gift can be SOOTHE_BELL or HEALING_CHARM (NOT just POTION). A merchant's bribe can be AMULET_COIN. A field guide's reward can be MAP or EXP_CHARM. A shrine offering can be PROTEIN or a vitamin. Cliché picks (POTION + BERRY in every beat) are a writing failure.
 
 FILL EVERY INTER-BEAT OVERRIDE FULLY (CRITICAL — every wave should feel hand-crafted):
 
@@ -226,13 +235,16 @@ ALWAYS EMIT INTER-BEAT OVERRIDES (every beat must include 2 of these):
     "preBattleText": 1-2 sentences (max 120 chars) of story-themed narration spoken right before that wave's battle. Tie it to the current beat's situation — name the antagonist faction, recall a recent NPC, hint at the next beat. Generic "you meet a trainer" lines are unacceptable.
     Optionally also: trainerName (overrides the default trainer-class display name), levelDelta (-3..+3 to bend difficulty for narrative reasons), biomeFlavorText.
 
-STORY-FIGHT MATCH — set the right override field for the encounter you describe:
+STORY-FIGHT MATCH — the narration in preBattleText MUST match the actual fight that follows. The runtime now ENFORCES the contract: if your narration names a trainer/character ("a Ranger blocks the path", "Stitch steps from the trees", "Lady Kairi's Leafeon stands ready") AND you set trainerOverride.trainerType, the wave will be CONVERTED to a trainer fight even if vanilla rolled wild. So pick the right override for what you wrote:
 
-  TRAINER battle (sailor, ranger, cultist, smuggler, etc.):
+  TRAINER battle (named NPC, faction-tagged, anyone wielding Pokemon):
     trainerOverride: {
       trainerType: <id from gameBalanceCard.trainerTypeCatalog>,
-      enemyTeam: [...]   // the trainer's actual party
+      enemyTeam: [...]   // the trainer's actual party — REQUIRED when you wrote a specific antagonist
     }
+    // If you write "a Concordat ranger blocks the path", you MUST emit
+    // trainerOverride with trainerType (and ideally enemyTeam) — otherwise
+    // the runtime spawns a fallback BACKPACKER trainer.
   WILD encounter (a specific Pokemon, no trainer — Pelipper guarding the buoy, feral Houndoom blocking the cave):
     wildEncounter: {
       pokemon: [<1-2 entries from speciesCatalog>],
@@ -247,7 +259,7 @@ STORY-FIGHT MATCH — set the right override field for the encounter you describ
 Rules:
 - Pick ONE battle-type-changing override per wave (forceMysteryEncounter > wildEncounter > trainerOverride.enemyTeam priority).
 - biomeChange composes with any of the above (the new biome is in place when the wave plays).
-- When narration is specific, set the matching override. Generic "a passing trainer challenges you" can fall through to vanilla generation (no override needed).
+- preBattleText that names a trainer/character REQUIRES trainerOverride with at least trainerType. preBattleText that names a wild creature REQUIRES wildEncounter. Generic "a passing trainer challenges you" with no specific name can fall through to vanilla generation.
 - These cover: specific Pokemon, boss fights, biome changes, vanilla mystery events, AND named-trainer fights. Use what fits the story.
 
 AUTHORING TRAINER TEAMS (enemyTeam — the heart of v2):
