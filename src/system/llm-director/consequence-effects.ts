@@ -8,7 +8,16 @@ import { EggTier } from "#enums/egg-type";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { PlayerPokemon } from "#field/pokemon";
-import { type ModifierType, ModifierTypeOption, PokemonModifierType } from "#modifiers/modifier-type";
+import {
+  type ModifierType,
+  ModifierTypeOption,
+  PokemonAllMovePpRestoreModifierType,
+  PokemonHpRestoreModifierType,
+  PokemonLevelIncrementModifierType,
+  PokemonModifierType,
+  PokemonPpRestoreModifierType,
+  PokemonStatusHealModifierType,
+} from "#modifiers/modifier-type";
 import { generateModifierType } from "#mystery-encounters/utils/encounter-phase-utils";
 import { VoucherType } from "#system/voucher";
 import { randSeedInt } from "#utils/common";
@@ -322,13 +331,26 @@ function applyGiveItem(effect: { modifierType: string; qty?: number }): void {
     console.warn(`[llm-director] give_item "${effect.modifierType}" produced no compatible item — skipping`);
     return;
   }
+  // Block narrative-consumable item types — these are POTION-class items
+  // whose mechanical effect (heal HP, cure status, refill PP, level up,
+  // revive) maps cleanly to a discriminated effect we already implement.
+  // Granting them as items spawns target-selection UI for what the
+  // narrative already decided ("you drink the potion" -> just heal). The
+  // LLM should use the matching effect.* type instead.
+  const consumableHint = consumableEffectHint(resolved);
+  if (consumableHint) {
+    console.warn(
+      `[llm-director] give_item "${effect.modifierType}" is a narrative consumable — use effect "${consumableHint}" instead. Skipping.`,
+    );
+    return;
+  }
   const qty = Math.max(1, effect.qty ?? 1);
-  // Pokemon-targeted modifiers (POTION, HYPER_POTION, REVIVE, RARE_CANDY,
-  // LEFTOVERS, FOCUS_BAND, etc.) require a target Pokemon at .newModifier(p)
-  // time. ModifierRewardPhase calls .newModifier() with NO args, so for those
-  // types it crashes (`Cannot read properties of undefined (reading 'id')`)
-  // and the run freezes. Route them through SelectModifierPhase instead — the
-  // shop UI gives the player the standard target-selection prompt.
+  // Pokemon-targeted modifiers that ARE valid grants (LEFTOVERS, FOCUS_BAND,
+  // berries, vitamins, mints, PP_UP, etc.) require a target Pokemon at
+  // .newModifier(p) time. ModifierRewardPhase calls .newModifier() with no
+  // args, so for those types it crashes and the run freezes. Route them
+  // through SelectModifierPhase — the shop UI gives the player the standard
+  // target-selection prompt for free.
   //
   // Global modifiers (SHINY_CHARM, EXP_CHARM, AMULET_COIN, etc.) are not
   // PokemonModifierType and work fine through ModifierRewardPhase.
@@ -350,6 +372,29 @@ function applyGiveItem(effect: { modifierType: string; qty?: number }): void {
     globalScene.phaseManager.unshiftNew("ModifierRewardPhase", thunk);
   }
   console.info(`[llm-director] give_item type=${effect.modifierType} qty=${qty} (global modifier)`);
+}
+
+/**
+ * Map narrative-consumable modifier classes to the discriminated effect type
+ * the LLM should use instead. Returns the suggested effect name if the type
+ * is forbidden for `give_item`, or `null` if it's fine to grant.
+ */
+function consumableEffectHint(resolved: ModifierType): string | null {
+  if (resolved instanceof PokemonHpRestoreModifierType) {
+    // PokemonReviveModifierType extends PokemonHpRestoreModifierType, so
+    // catch revives first via the more-specific check.
+    return resolved.constructor.name === "PokemonReviveModifierType" ? "revive" : "heal_party_hp";
+  }
+  if (resolved instanceof PokemonStatusHealModifierType) {
+    return "heal_party_status";
+  }
+  if (resolved instanceof PokemonPpRestoreModifierType || resolved instanceof PokemonAllMovePpRestoreModifierType) {
+    return "heal_party_pp";
+  }
+  if (resolved instanceof PokemonLevelIncrementModifierType) {
+    return "level_up";
+  }
+  return null;
 }
 
 function applyRemoveItem(effect: { modifierType: string; qty?: number }): void {

@@ -266,12 +266,22 @@ PATH A (chooser): consequence.items[] — opens the standard PokeRogue rewards-s
   - Schema entry: { "modifierType": "<key from gameBalanceCard.itemTiers>", "qty": 1 }
   - Use this when the story BEAT lets the player choose what to take from a cache, what to accept from an NPC, what spoils to claim.
 
-PATH B (auto-apply, no choice): consequence.effects[] with give_item — runs ModifierRewardPhase directly, item is auto-applied (heal, level up, attach to a Pokemon, etc.) with no shop UI. One per effects entry.
+PATH B (auto-apply, no choice): consequence.effects[] with give_item — for items the narration has already DECIDED the player receives. For held items (LEFTOVERS, FOCUS_BAND, berries, etc.) the shop UI's target-selection prompt fires so the player picks which Pokemon wears it. For permanent stat items (PROTEIN/IRON/CALCIUM/ZINC/CARBOS/HP_UP, mints, PP_UP) same flow. For global modifiers (SHINY_CHARM, AMULET_COIN, EXP_CHARM) it's auto-applied with no UI.
   - Schema entry inside effects[]: { "type": "give_item", "modifierType": "<key>", "qty": 1 }
-  - qty here means "apply this item N times to N different targets" (e.g., qty:2 of POTION heals 2 party members one after the other). Limit to qty<=3 to avoid spam.
-  - Use this when the story SAYS what the player gets, no choice — a spilled medkit heals the whole team; a stolen vitamin lands on the lead.
+  - qty applies the same item N times (rarely useful — usually 1).
+  - Use this when the story SAYS what the player gets ("she presses the bracelet into your hand"); use items[] (PATH A) when the choice is "pick from this row".
 
-CHOOSE WISELY. effects[] (PATH B) is for narration-driven granting. items[] (PATH A) is for player-agency moments. Don't put narrative-decided rewards in items[] (the player already chose the dialogue option, they shouldn't have to pick again from a 1-item shop).
+  FORBIDDEN for give_item — narrative consumables. These items have a 1:1 effect equivalent that handles the heal/cure/level cleanly without spawning UI for the player to pick a target the narration already implied. Use the listed effect instead.
+    - POTION / SUPER_POTION / HYPER_POTION / MAX_POTION / FULL_RESTORE -> use { "type": "heal_party_hp", "percentMaxHp": <int> } or { "type": "heal_party_full" }
+    - REVIVE / MAX_REVIVE -> use { "type": "revive", "target": {...}, "percentMaxHp": <int> }
+    - SACRED_ASH -> use { "type": "revive_all" }
+    - FULL_HEAL -> use { "type": "heal_party_status" }
+    - ETHER / MAX_ETHER / ELIXIR / MAX_ELIXIR -> use { "type": "heal_party_pp" }
+    - RARE_CANDY -> use { "type": "level_up" }
+    - RARER_CANDY -> use { "type": "level_up" } targeted at "all"
+  The runtime hard-rejects give_item with these keys; emitting them is a wasted effect entry.
+
+CHOOSE WISELY. effects[] (PATH B) is for narration-driven granting of HELD/PERMANENT items. items[] (PATH A) is for player-agency moments. Healing / curing / leveling go through the dedicated effect types, never give_item.
 
 OTHER consequence.effects[] variants apply IMMEDIATELY (heal, give_money, status_inflict, etc.) and fire BEFORE the rewards shop opens.
 
