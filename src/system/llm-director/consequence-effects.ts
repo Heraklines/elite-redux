@@ -8,7 +8,7 @@ import { EggTier } from "#enums/egg-type";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { PlayerPokemon } from "#field/pokemon";
-import type { ModifierType } from "#modifiers/modifier-type";
+import { type ModifierType, ModifierTypeOption, PokemonModifierType } from "#modifiers/modifier-type";
 import { generateModifierType } from "#mystery-encounters/utils/encounter-phase-utils";
 import { VoucherType } from "#system/voucher";
 import { randSeedInt } from "#utils/common";
@@ -317,42 +317,39 @@ function applyGiveItem(effect: { modifierType: string; qty?: number }): void {
     console.warn(`[llm-director] give_item unknown modifierType="${effect.modifierType}"`);
     return;
   }
-  const resolved = resolveItemThunk(rawFactory, effect.modifierType);
+  const resolved = generateModifierType(rawFactory);
   if (!resolved) {
+    console.warn(`[llm-director] give_item "${effect.modifierType}" produced no compatible item — skipping`);
     return;
   }
   const qty = Math.max(1, effect.qty ?? 1);
+  // Pokemon-targeted modifiers (POTION, HYPER_POTION, REVIVE, RARE_CANDY,
+  // LEFTOVERS, FOCUS_BAND, etc.) require a target Pokemon at .newModifier(p)
+  // time. ModifierRewardPhase calls .newModifier() with NO args, so for those
+  // types it crashes (`Cannot read properties of undefined (reading 'id')`)
+  // and the run freezes. Route them through SelectModifierPhase instead — the
+  // shop UI gives the player the standard target-selection prompt.
+  //
+  // Global modifiers (SHINY_CHARM, EXP_CHARM, AMULET_COIN, etc.) are not
+  // PokemonModifierType and work fine through ModifierRewardPhase.
+  if (resolved instanceof PokemonModifierType) {
+    const guaranteed: ModifierTypeOption[] = [];
+    for (let i = 0; i < qty; i++) {
+      guaranteed.push(new ModifierTypeOption(resolved, 0));
+    }
+    globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, {
+      guaranteedModifierTypeOptions: guaranteed,
+      fillRemaining: false,
+      rerollMultiplier: 0,
+    });
+    console.info(`[llm-director] give_item type=${effect.modifierType} qty=${qty} (Pokemon-targeted, routed via shop)`);
+    return;
+  }
+  const thunk = () => resolved;
   for (let i = 0; i < qty; i++) {
-    globalScene.phaseManager.unshiftNew("ModifierRewardPhase", resolved);
+    globalScene.phaseManager.unshiftNew("ModifierRewardPhase", thunk);
   }
-  console.info(`[llm-director] give_item type=${effect.modifierType} qty=${qty}`);
-}
-
-/**
- * Resolve a `modifierTypes[id]` factory into a thunk that returns a fully-
- * materialized `ModifierType` (with `id`, `tier`, and — for generators like
- * `TM_COMMON` / `EVOLUTION_ITEM` — a concrete pick).
- *
- * Uses PokeRogue's canonical `generateModifierType` helper (the same one
- * mystery encounters use, e.g. `absolute-avarice-encounter.ts:290`,
- * `bug-type-superfan-encounter.ts:221`). Without this, passing a bare
- * generator to `ModifierRewardPhase` shows "You received !" with an empty
- * name, because the generator's `localeKey` is unset until `generateType`
- * runs against the player's party.
- *
- * Returns `null` when the generator has no compatible pick for the current
- * party (e.g. TM_COMMON when no party member can learn any common-tier TM);
- * caller should skip the reward rather than enqueue an empty phase.
- */
-export function resolveItemThunk(rawFactory: () => ModifierType, id: string): (() => ModifierType) | null {
-  const resolved = generateModifierType(rawFactory);
-  if (!resolved) {
-    console.warn(
-      `[llm-director] give_item generator "${id}" produced no compatible item for current party — skipping reward`,
-    );
-    return null;
-  }
-  return () => resolved;
+  console.info(`[llm-director] give_item type=${effect.modifierType} qty=${qty} (global modifier)`);
 }
 
 function applyRemoveItem(effect: { modifierType: string; qty?: number }): void {

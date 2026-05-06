@@ -2796,7 +2796,7 @@ function getNewModifierTypeOption(
     }
     if (player && tierValue && allowLuckUpgrades) {
       const partyLuckValue = getPartyLuckValue(party);
-      const upgradeOdds = Math.floor(128 / ((partyLuckValue + 4) / 4));
+      const upgradeOdds = getLuckUpgradeOdds(partyLuckValue);
       let upgraded = false;
       do {
         upgraded = randSeedInt(upgradeOdds) < 4;
@@ -2829,7 +2829,7 @@ function getNewModifierTypeOption(
     upgradeCount = 0;
     if (tier < ModifierTier.MASTER && allowLuckUpgrades) {
       const partyLuckValue = getPartyLuckValue(party);
-      const upgradeOdds = Math.floor(128 / ((partyLuckValue + 4) / 4));
+      const upgradeOdds = getLuckUpgradeOdds(partyLuckValue);
       while (Object.hasOwn(pool, tier + upgradeCount + 1) && pool[tier + upgradeCount + 1].length > 0) {
         if (randSeedInt(upgradeOdds) < 4) {
           upgradeCount++;
@@ -2901,9 +2901,20 @@ export class ModifierTypeOption {
 }
 
 /**
+ * Hard cap on the party luck value. Vanilla cap was 14 (each Pokemon contributes
+ * 0-3 luck via shininess; clamped to 14 to bound the upgrade-odds formula).
+ *
+ * v3 raises the cap to 18 — the natural ceiling when all 6 party members are
+ * triple-variant shinies (3 luck each). Daily Run still seeds within the
+ * legacy 0-14 range so existing daily seeds stay reproducible.
+ */
+export const MAX_PARTY_LUCK = 18;
+
+/**
  * Calculates the team's luck value.
  * @param party The player's party.
- * @returns A number between 0 and 14 based on the party's total luck value, or a random number between 0 and 14 if the player is in Daily Run mode.
+ * @returns A number between 0 and {@linkcode MAX_PARTY_LUCK} based on the
+ *   party's total luck value (Daily Run rolls a random 0-14 from the seed).
  */
 export function getPartyLuckValue(party: readonly Pokemon[]): number {
   if (globalScene.gameMode.isDaily) {
@@ -2930,17 +2941,67 @@ export function getPartyLuckValue(party: readonly Pokemon[]): number {
       .map(p => (p.isAllowedInBattle() ? p.getLuck() + (eventSpecies.includes(p.species.speciesId) ? 1 : 0) : 0))
       .reduce((total: number, value: number) => (total += value), 0),
     0,
-    14,
+    MAX_PARTY_LUCK,
   );
-  return Math.min(timedEventManager.getEventLuckBoost() + (luck ?? 0), 14);
+  return Math.min(timedEventManager.getEventLuckBoost() + (luck ?? 0), MAX_PARTY_LUCK);
 }
 
+/**
+ * Compute the luck-upgrade odds (per-iteration chance is `4 / upgradeOdds`).
+ * Lower numbers = higher chance.
+ *
+ * Vanilla formula was `floor(128 / ((luck + 4) / 4))` = `floor(512 / (luck + 4))`.
+ * v3 changes:
+ *   - Slight overall boost: numerator becomes `(luck + 5)` instead of `(luck + 4)`,
+ *     pushing each tier up a hair across the whole range.
+ *   - Super-linear ramp past the legacy cap (luck 15-18): each point above 14
+ *     adds 2 instead of 1, so the curve visibly bends as the player approaches
+ *     a max-shiny party.
+ *
+ * Roughly: per-roll upgrade chance at luck 0 ~3.9%, luck 7 ~9.4%, luck 14
+ * ~15.4%, luck 15 ~16.7%, luck 16 ~17.9%, luck 17 ~19.4%, luck 18 ~22.2%.
+ */
+export function getLuckUpgradeOdds(partyLuckValue: number): number {
+  const base = Math.min(partyLuckValue, 14) + 5;
+  const overflow = Math.max(0, partyLuckValue - 14) * 2;
+  return Math.max(1, Math.floor(512 / (base + overflow)));
+}
+
+/**
+ * 19 letter-rank entries (indices 0..18). Vanilla shipped 15 entries (D..SSS);
+ * v3 adds SSS+ for 15-16 and EX for 17-18 to match the new MAX_PARTY_LUCK = 18.
+ */
+const LUCK_RANK_TABLE = [
+  "D", // 0
+  "C", // 1
+  "C+", // 2
+  "B-", // 3
+  "B", // 4
+  "B+", // 5
+  "A-", // 6
+  "A", // 7
+  "A+", // 8
+  "A++", // 9
+  "S", // 10
+  "S+", // 11
+  "SS", // 12
+  "SS+", // 13
+  "SSS", // 14
+  "SSS+", // 15
+  "SSS+", // 16
+  "EX", // 17
+  "EX", // 18
+];
+
 export function getLuckString(luckValue: number): string {
-  return ["D", "C", "C+", "B-", "B", "B+", "A-", "A", "A+", "A++", "S", "S+", "SS", "SS+", "SSS"][luckValue];
+  const idx = Phaser.Math.Clamp(luckValue, 0, MAX_PARTY_LUCK);
+  return LUCK_RANK_TABLE[idx];
 }
 
 export function getLuckTextTint(luckValue: number): number {
   let modifierTier: ModifierTier;
+  // 12+ all map to LUXURY (highest tint); the SSS+/EX ranks at 15-18 share
+  // the LUXURY color since there's no higher tier to pull a tint from.
   if (luckValue > 11) {
     modifierTier = ModifierTier.LUXURY;
   } else if (luckValue > 9) {

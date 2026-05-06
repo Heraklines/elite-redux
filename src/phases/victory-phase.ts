@@ -6,10 +6,10 @@ import type { BattlerIndex } from "#enums/battler-index";
 import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
 import { GameModes } from "#enums/game-modes";
 import { UiMode } from "#enums/ui-mode";
-import type { ModifierType } from "#modifiers/modifier-type";
-import { handleMysteryEncounterVictory } from "#mystery-encounters/encounter-phase-utils";
+import { type ModifierType, ModifierTypeOption } from "#modifiers/modifier-type";
+import { generateModifierType, handleMysteryEncounterVictory } from "#mystery-encounters/encounter-phase-utils";
 import { PokemonPhase } from "#phases/pokemon-phase";
-import { applyEffects, resolveItemThunk } from "#system/llm-director/consequence-effects";
+import { applyEffects } from "#system/llm-director/consequence-effects";
 import { logEffectApplied } from "#system/llm-director/director-log";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 
@@ -180,23 +180,39 @@ function applyPostVictoryHook(waveIndex: number): void {
     }
   }
 
-  // 2. LLM-authored victoryRewards: each is a ModifierType id (e.g. "POTION").
+  // 2. LLM-authored victoryRewards: bundle into a single SelectModifierPhase
+  // so the player picks ONE from the row. Pokemon-targeted modifiers
+  // (POTION, LEFTOVERS, etc.) need the shop's target-selection step
+  // anyway — and bundling everything into one shop avoids the empty-name +
+  // freeze bugs from per-item ModifierRewardPhase. Same dedupe + qty=1 cap
+  // as grantConsequenceRewards: the shop is a chooser, not a stockpile.
   if (hook.victoryRewards && hook.victoryRewards.length > 0) {
     const factories = modifierTypes as Record<string, (() => ModifierType) | undefined>;
+    const guaranteed: ModifierTypeOption[] = [];
+    const seen = new Set<string>();
     for (const item of hook.victoryRewards) {
+      if (seen.has(item.modifierType)) {
+        continue;
+      }
+      seen.add(item.modifierType);
       const factory = factories[item.modifierType];
       if (typeof factory !== "function") {
         console.warn(`[llm-director] unknown modifierType in victoryRewards: "${item.modifierType}"`);
         continue;
       }
-      const resolved = resolveItemThunk(factory, item.modifierType);
+      const resolved = generateModifierType(factory);
       if (!resolved) {
+        console.warn(`[llm-director] victoryRewards "${item.modifierType}" produced no compatible item — skipping`);
         continue;
       }
-      const qty = Math.max(1, item.qty ?? 1);
-      for (let i = 0; i < qty; i++) {
-        globalScene.phaseManager.pushNew("ModifierRewardPhase", resolved);
-      }
+      guaranteed.push(new ModifierTypeOption(resolved, 0));
+    }
+    if (guaranteed.length > 0) {
+      globalScene.phaseManager.pushNew("SelectModifierPhase", 0, undefined, {
+        guaranteedModifierTypeOptions: guaranteed,
+        fillRemaining: false,
+        rerollMultiplier: 0,
+      });
     }
   }
 
