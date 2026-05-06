@@ -19,32 +19,45 @@ export interface GenerateStoryBibleOptions {
   seedText: string;
   /**
    * Primary model for bible generation. Defaults to deepseek/deepseek-v4-flash
-   * (~11s observed for full bible, same model used for beats — proven reliable).
-   *
-   * History: previously moonshotai/kimi-k2.6 was used for richer prose voice,
-   * but Kimi started intermittently hanging on bible-shaped requests
-   * (>90s no response on a prompt DeepSeek answers in 11s). Switched to
-   * DeepSeek as primary; Kimi remains available via the optional prose-pass
-   * path on beats, where its strengths actually matter.
+   * (~11s observed for a full bible, same model used for beats — proven reliable).
    */
   model?: string;
   /**
-   * Fallback model. If the primary model errors (network failure, server
-   * timeout, etc.), retry the same prompt with this model. Defaults to
-   * moonshotai/kimi-k2.6 so a Kimi outage doesn't block runs and a
-   * DeepSeek outage falls back to Kimi.
+   * Ordered fallback chain. If the primary model errors (network / timeout /
+   * hang), each fallback is tried in order until one succeeds. Validation
+   * errors break out without falling back — they're model-agnostic.
    */
-  fallbackModel?: string;
+  fallbackModels?: readonly string[];
   /** Defaults to 3. */
   maxRetries?: number;
-  /** Per-call timeout, default 60s — DeepSeek bibles complete in ~11s; 60s leaves ample headroom. */
+  /** Per-call timeout, default 150s — long enough to forgive a slow model
+   *  before falling back to the next in the chain. DeepSeek finishes in ~11s,
+   *  MiniMax ~28s, GLM ~95s; 150s gives them all headroom. */
   timeoutMs?: number;
 }
 
+/**
+ * Bible-generation model chain (primary first, then fallbacks). All measured
+ * against the same bible prompt:
+ *
+ *   deepseek/deepseek-v4-flash : ~11s, valid JSON ✓
+ *   minimax/minimax-latest     : ~28s, valid JSON (wraps in markdown fences,
+ *                                parseLooseJson handles that) ✓
+ *   zai-org/glm-latest         : ~95s, valid JSON ✓
+ *   moonshotai/kimi-k2.6       : hangs on bible-sized prompts as of
+ *                                2026-05; kept as last resort in case the
+ *                                provider stabilises. Reserved for the
+ *                                optional prose-pass on beats where its
+ *                                voice strengths actually matter.
+ */
 const DEFAULT_BIBLE_MODEL = "deepseek/deepseek-v4-flash";
-const DEFAULT_FALLBACK_BIBLE_MODEL = "moonshotai/kimi-k2.6";
+const DEFAULT_BIBLE_FALLBACK_CHAIN: readonly string[] = [
+  "minimax/minimax-latest",
+  "zai-org/glm-latest",
+  "moonshotai/kimi-k2.6",
+];
 const DEFAULT_MAX_RETRIES = 3;
-const DEFAULT_TIMEOUT_MS = 60_000;
+const DEFAULT_TIMEOUT_MS = 150_000;
 
 const FENCE_REGEX = /^```(?:json)?\s*([\s\S]*?)\s*```$/m;
 
@@ -62,20 +75,23 @@ function parseLooseJson(content: string): unknown {
 
 export async function generateStoryBible(client: DirectorClient, opts: GenerateStoryBibleOptions): Promise<StoryBible> {
   const primaryModel = opts.model ?? DEFAULT_BIBLE_MODEL;
-  const fallbackModel = opts.fallbackModel ?? DEFAULT_FALLBACK_BIBLE_MODEL;
+  const fallbackChain = opts.fallbackModels ?? DEFAULT_BIBLE_FALLBACK_CHAIN;
   const maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   logBibleRequest(opts.seedText);
 
-  // Try the primary model first. If every attempt fails for non-validation
-  // reasons (network errors, timeouts, server hangs), retry once on the
-  // fallback model. Validation errors are model-agnostic — the bible shape
-  // is hard, so a model that can't produce valid JSON in 3 tries probably
-  // can't on the fallback either; we surface those without retrying.
-  const modelsToTry: string[] = [primaryModel];
-  if (fallbackModel && fallbackModel !== primaryModel) {
-    modelsToTry.push(fallbackModel);
+  // Build the ordered list to try: primary, then each fallback (deduped).
+  // We try the WHOLE retry budget on each model before moving on — the
+  // model decides when to abandon (network/timeout error breaks out
+  // immediately so we don't burn all retries on a hung server).
+  const seen = new Set<string>();
+  const modelsToTry: string[] = [];
+  for (const m of [primaryModel, ...fallbackChain]) {
+    if (m && !seen.has(m)) {
+      seen.add(m);
+      modelsToTry.push(m);
+    }
   }
 
   let lastError = "";
@@ -100,10 +116,11 @@ export async function generateStoryBible(client: DirectorClient, opts: GenerateS
           maxTokens: 2500,
         });
       } catch (err) {
-        // Network / timeout / server error — break out to try the fallback
-        // model instead of burning all retries on a hung primary.
+        // Network / timeout / server error — break out to try the next
+        // model in the chain instead of burning all retries on a hung
+        // server.
         lastError = err instanceof Error ? err.message : String(err);
-        logBibleValidationFail(lastError, attempt);
+        logBibleValidationFail(`${model}: ${lastError}`, attempt);
         lastWasValidationError = false;
         break;
       }
@@ -114,7 +131,7 @@ export async function generateStoryBible(client: DirectorClient, opts: GenerateS
         parsed = parseLooseJson(result.content);
       } catch (err) {
         lastError = `JSON parse error: ${err instanceof Error ? err.message : String(err)}`;
-        logBibleValidationFail(lastError, attempt);
+        logBibleValidationFail(`${model}: ${lastError}`, attempt);
         lastWasValidationError = true;
         continue;
       }
@@ -124,7 +141,7 @@ export async function generateStoryBible(client: DirectorClient, opts: GenerateS
         return parsed as StoryBible;
       }
       lastError = validation.error;
-      logBibleValidationFail(lastError, attempt);
+      logBibleValidationFail(`${model}: ${lastError}`, attempt);
       lastWasValidationError = true;
     }
     // If we exhausted retries on validation errors, the model can produce
@@ -133,9 +150,9 @@ export async function generateStoryBible(client: DirectorClient, opts: GenerateS
     if (lastWasValidationError) {
       break;
     }
-    // Otherwise (network/timeout) try the fallback.
+    // Otherwise (network/timeout) try the next model in the chain.
   }
   throw new Error(
-    `generateStoryBible: validation failed after ${maxRetries} attempts (primary+fallback): ${lastError}`,
+    `generateStoryBible: validation failed after ${maxRetries} attempts across ${modelsToTry.length} model(s): ${lastError}`,
   );
 }
