@@ -18,8 +18,8 @@ Output STRICT JSON matching this shape (no prose, no markdown fences):
 {
   "themeName": "2-6 word title",
   "blurb": "2-3 sentence pitch establishing tone, stakes, and central tension",
-  "playerIntro": "1-2 sentences (max 200 chars). WHO the player is in this story — their role, their stake. Use 'you' (second person). Concrete, not generic.",
-  "openingScene": "1-2 sentences (max 200 chars). WHERE the player is when the run begins, and what they're about to do. Sets up wave 1.",
+  "playerIntro": "ONE short sentence (HARD MAX 100 chars). WHO the player is in this story — role + stake in <=15 words. Use 'you' (second person). Example: 'You are a disgraced League referee with a debt to settle.'",
+  "openingScene": "ONE short sentence (HARD MAX 100 chars). WHERE you are at run start. Example: 'Smoke curls over the ruined gym at dawn.'",
   "tonalKeywords": ["3-7 keywords describing tone/genre/mood"],
   "acts": [
     { "name": "Act name", "waveStart": 1, "waveEnd": 50, "summary": "1-2 sentence intent for this act" }
@@ -38,7 +38,7 @@ Constraints:
 - 0-5 factions; their initialRep must reflect the theme (a rebel-friendly arc starts with rebels at +20, etc.).
 - 1-4 recurring NPCs; memoryKey is stable across the whole run, the LLM will refer back to it in future beats.
 - moralSpectrum labels MUST be 1 word each, fitting the theme's tone.
-- playerIntro and openingScene MUST be terse and concrete (max 200 chars EACH). Together they answer "who am I and where am I" in <=4 short sentences.
+- playerIntro and openingScene MUST each be ONE short sentence (HARD MAX 100 chars EACH). Anything longer will be hard-truncated and look broken. Punchy and concrete: <=15 words per field.
 
 The player should be able to lose this run. Failure is part of the experience.`;
 

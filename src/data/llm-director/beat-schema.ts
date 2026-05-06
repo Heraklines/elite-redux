@@ -307,10 +307,10 @@ const storyBibleSchema = {
   properties: {
     themeName: { type: "string", minLength: 1 },
     blurb: { type: "string", minLength: 1 },
-    /** 1-2 sentences explaining who the player is in this story. Max ~200 chars. */
-    playerIntro: { type: "string", minLength: 1, maxLength: 300 },
-    /** 1-2 sentences setting the opening scene for wave 1. Max ~200 chars. */
-    openingScene: { type: "string", minLength: 1, maxLength: 300 },
+    /** ONE short sentence explaining who the player is. Max 100 chars (must fit one dialog page). */
+    playerIntro: { type: "string", minLength: 1, maxLength: 110 },
+    /** ONE short sentence setting the opening scene. Max 100 chars (must fit one dialog page). */
+    openingScene: { type: "string", minLength: 1, maxLength: 110 },
     tonalKeywords: { type: "array", items: { type: "string" }, minItems: 1 },
     acts: {
       type: "array",
