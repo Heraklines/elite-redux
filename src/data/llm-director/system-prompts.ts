@@ -74,7 +74,7 @@ NarrativeOnlyBeat:
 
 DialogueChoiceBeat:
 { "beatId": "uuid", "type": "dialogue_choice", "introText": "...",
-  "speaker": { "name": "...", "memoryKey": "..." },
+  "speaker": { "name": "...", "memoryKey": "...", "trainerType": 5 },
   "options": [
     { "label": "...", "consequence": { "alignment": -10..10, "factionRep": {"...":int}, "flags":{"...":bool}, "effects": [...], "epilogueText":"..." } }
   ] }
@@ -267,6 +267,16 @@ FIRST-BEAT GROUNDING (when envelope.isFirstBeat is true):
 - HARD REQUIREMENT: the first beat MUST be type "dialogue_choice". Not narrative_only, not trainer_battle. The whole point of the wave-1 forced beat is to put a meaningful decision in front of the player IMMEDIATELY so they feel the run's stakes.
 - HARD REQUIREMENT: each choice MUST have a "consequence.effects" array with AT LEAST ONE non-"custom" effect — give_money, lose_money, give_voucher, give_egg, status_inflict, heal_party_pp, give_held_item, buff_persistent, etc. The player must SEE a tangible mechanical change immediately. "custom" effects ALONE on a first-beat choice are forbidden — they're narrative-only and the player won't trust the system. You may chain a "custom" alongside a tangible one for flavor.
 - The choices should pose a SEMI-IMPORTANT decision tied to the bible's central conflict — not "do you want healing yes/no" but "the courier offers you contraband or a clean tip-off, which do you take?". Asymmetric tradeoffs.
+
+SPEAKER SPRITE for dialogue_choice (NEW v3 — REQUIRED for proper UI):
+- dialogue_choice beats render as a real PokeRogue MysteryEncounter with a sprite of the speaker on the field, a title bar with the speaker name, a description box with introText, and option buttons. To make the sprite match the character, set "speaker.trainerType" to a TrainerType enum value from the gameBalanceCard.trainerTypeCatalog.
+- Pick the trainerType that best matches the character's role/look: a mob lieutenant -> RICH_KID; a wandering medic -> NURSE; a forest scout -> RANGER; a cyberpunk fixer -> WORKER_F; a clown trickster -> HARLEQUIN; an aristocrat -> ARTIST; etc. If unsure, pick something thematically close and the rest of the world will make sense. Omitting trainerType falls back to BACKPACKER which reads as a generic wanderer — fine but bland.
+- speaker.name and speaker.memoryKey are still REQUIRED. trainerType is OPTIONAL but strongly preferred.
+
+REWARDS FROM DIALOGUE CHOICES (NEW v3):
+- For dialogue_choice beats, "consequence.items": [{modifierType: "POTION", qty: 2}, ...] now drives the standard PokeRogue rewards-shop UI that appears after the encounter exits. The player sees the items in a row and picks one. Use this for tangible LOOT — TM_COMMON, EVOLUTION_ITEM, etc. all materialize correctly.
+- "consequence.effects" still apply IMMEDIATE state changes (heal, give_money, status_inflict, etc.) BEFORE the rewards shop opens.
+- A choice that gives flat money (give_money) + a single chosen item (consequence.items: [{modifierType: "RARE_CANDY"}]) feels MUCH richer than money alone or item alone. Combine them.
 
 CONSEQUENCE EFFECTS — THE CORE V2 EXTENSION POINT (read carefully):
 

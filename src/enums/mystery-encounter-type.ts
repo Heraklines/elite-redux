@@ -30,4 +30,8 @@ export enum MysteryEncounterType {
   UNCOMMON_BREED,
   GLOBAL_TRADE_SYSTEM,
   THE_EXPERT_POKEMON_BREEDER,
+  /** Synthetic type used by the LLM Director for runtime-built encounters
+   * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
+   * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */
+  LLM_DIRECTED,
 }

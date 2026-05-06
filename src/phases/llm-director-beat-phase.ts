@@ -12,12 +12,14 @@ import type {
   TrainerBattleBeat,
 } from "#data/llm-director/beat-schema";
 import { pickFillerBeat } from "#data/llm-director/filler-beats";
+import { BattleType } from "#enums/battle-type";
 import type { BiomeId } from "#enums/biome-id";
 import { UiMode } from "#enums/ui-mode";
 import type { ModifierType } from "#modifiers/modifier-type";
 import { buildTrainerOverride } from "#phases/llm-director-beat-utils";
 import { type ApplyResult, applyConsequence } from "#system/llm-director/beat-applier";
 import { recordBeatHistory, recordPlayerChoice } from "#system/llm-director/beat-history";
+import { buildLlmDialogueEncounter } from "#system/llm-director/build-llm-encounter";
 import { compactHistory, HISTORY_COMPACT_THRESHOLD } from "#system/llm-director/compact-history";
 import { applyEffects, resolveItemThunk } from "#system/llm-director/consequence-effects";
 import { logBeatDispatched, logChoiceMade, logTrainerOverride, logUnderrun } from "#system/llm-director/director-log";
@@ -94,6 +96,20 @@ export class LLMDirectorBeatPhase extends Phase {
     if (globalScene.gameData.llmDirectorState.beatHistory.length > HISTORY_COMPACT_THRESHOLD) {
       void compactHistory(globalScene.gameData.llmDirectorState, runtime.client);
     }
+    // Register any beat-emitted interBeatOverrides[] with the queue so the
+    // upcoming vanilla NewBattlePhase(s) pick them up. This is THE plumbing
+    // for the LLM's "preBattleText" / "trainerName" / "victoryEffects" /
+    // "postWinText" / etc. on non-current waves. trainer_battle beats also
+    // build their own override (offset +1) inside renderTrainerBattle; both
+    // paths share `setInterBeatOverride` so the wave's override is whatever
+    // was registered last.
+    if (Array.isArray(beat.interBeatOverrides)) {
+      for (const override of beat.interBeatOverrides) {
+        const targetWave = this.waveIndex + (override.atWaveOffset ?? 1);
+        runtime.queue.setInterBeatOverride(targetWave, override);
+        logTrainerOverride(targetWave, override);
+      }
+    }
     this.dispatch(beat);
   }
 
@@ -139,20 +155,42 @@ export class LLMDirectorBeatPhase extends Phase {
   }
 
   /**
-   * Render a dialogue choice: optional speaker line, then OPTION_SELECT for
-   * the choices. The selected option's consequence is applied immediately;
-   * any epilogue text is shown before the phase ends.
+   * Render a dialogue choice as a real PokeRogue MysteryEncounter:
+   * promotes the current battle to MYSTERY_ENCOUNTER type, plants a
+   * runtime-built encounter on `currentBattle.mysteryEncounter`, and ends
+   * the phase. The next phase already in the queue (`EncounterPhase`)
+   * sees the encounter, slides in the speaker sprite, and queues
+   * `MysteryEncounterPhase` to render the proper option-select UI with
+   * title bar + description box + option buttons.
+   *
+   * The option callbacks themselves (in `build-llm-encounter.ts`) handle
+   * applying consequences, queueing item rewards via `setEncounterRewards`,
+   * and exiting via `leaveEncounterWithoutBattle`.
    */
   private renderDialogue(beat: DialogueChoiceBeat): void {
+    const battle = globalScene.currentBattle;
+    if (!battle) {
+      console.warn("[llm-director] renderDialogue: no currentBattle, falling back to OPTION_SELECT");
+      this.renderDialogueLegacy(beat);
+      return;
+    }
+    const encounter = buildLlmDialogueEncounter(beat);
+    battle.battleType = BattleType.MYSTERY_ENCOUNTER;
+    battle.mysteryEncounter = encounter;
+    battle.mysteryEncounterType = encounter.encounterType;
+    console.info(
+      `[llm-director] dialogue_choice promoted to MysteryEncounter: speaker="${beat.speaker?.name ?? "?"}", options=${beat.options.length}`,
+    );
+    this.end();
+  }
+
+  /**
+   * Legacy fallback path — invoked only when there's no currentBattle to
+   * promote (shouldn't happen in normal play). Kept so the run never
+   * stalls on an unexpected null.
+   */
+  private renderDialogueLegacy(beat: DialogueChoiceBeat): void {
     const showChoices = () => this.showChoiceMenu(beat);
-    // Dialogue intros must fit ONE Phaser dialog page (~100 chars with a
-    // speaker name eating box space). Going longer means the player
-    // pre-emptively sees the truncated text *and* the option overlay
-    // opens on a single page-advance — not a clean "read everything,
-    // then choose" flow.
-    // Use paginate so long dialogue intros split into multiple pages
-    // (showDialogue auto-paginates on `$`) — the option overlay only opens
-    // after the LAST page advance.
     const intro = paginate(beat.introText);
     void globalScene.ui.setMode(UiMode.MESSAGE);
     if (beat.speaker?.name) {
@@ -164,8 +202,6 @@ export class LLMDirectorBeatPhase extends Phase {
 
   private showChoiceMenu(beat: DialogueChoiceBeat): void {
     const items: OptionSelectItem[] = beat.options.map(opt => ({
-      // Hard cap option label length so the OPTION_SELECT widget doesn't
-      // clip on the left edge.
       label: truncate(opt.label, 50),
       handler: () => {
         this.handleChoiceSelected(opt);
@@ -186,15 +222,8 @@ export class LLMDirectorBeatPhase extends Phase {
       itemCount: option.consequence.items?.length ?? 0,
       hasEpilogue: !!result.epilogueText,
     });
-    // Apply game-state side effects + collect any narrative messages from
-    // effects (custom descriptions, biome flavor, etc.).
     const effectMessages = grantConsequenceRewards(option.consequence);
-    // Pop the OPTION_SELECT overlay so the message handler renders cleanly.
     globalScene.ui.revertMode();
-    // Consolidate effect messages + epilogue into ONE `$`-paginated
-    // MessagePhase. PokéRogue's MessagePhase auto-paginates on `$` and
-    // chains pages with single-press advance, so the player never gets
-    // stuck between separate MessagePhases racing with mode changes.
     this.queueConsolidatedTail(effectMessages, result.epilogueText);
     this.end();
   }

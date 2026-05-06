@@ -228,7 +228,13 @@ export interface DialogueChoiceOption {
 
 export interface DialogueChoiceBeat extends BeatBase {
   type: "dialogue_choice";
-  speaker?: { name: string; memoryKey?: string };
+  /**
+   * Speaker for the encounter. `trainerType` is the numeric `TrainerType` enum
+   * value (e.g. 13 for HARLEQUIN, 24 for RICH_KID). It drives the sprite shown
+   * in the proper MysteryEncounter UI; if omitted we fall back to a generic
+   * BACKPACKER sprite.
+   */
+  speaker?: { name: string; memoryKey?: string; trainerType?: number };
   options: DialogueChoiceOption[];
 }
 
@@ -946,6 +952,7 @@ const dialogueChoiceSchema = {
       properties: {
         name: { type: "string" },
         memoryKey: { type: "string" },
+        trainerType: { type: "integer", minimum: 0 },
       },
       additionalProperties: false,
     },
