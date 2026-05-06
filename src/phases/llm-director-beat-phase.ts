@@ -422,15 +422,20 @@ function truncate(text: string | undefined, max: number): string {
 function grantConsequenceRewards(consequence: import("#data/llm-director/beat-schema").Consequence): string[] {
   const messages: string[] = [];
   if (consequence.items && consequence.items.length > 0) {
-    // Materialize each LLM-emitted item via PokeRogue's canonical helper
-    // (mystery-encounters use this same path) so generators like TM_COMMON,
-    // EVOLUTION_ITEM etc. resolve to a concrete name-bearing ModifierType
-    // BEFORE the rewards UI reads them. Then bundle them into ONE
-    // SelectModifierPhase so the player sees a proper "pick from these
-    // items" rewards shop instead of a chain of "You received X!" messages.
+    // The shop is a CHOOSER UI: player picks ONE option from the row, the
+    // rest are discarded. So we treat consequence.items[] as a menu —
+    // dedupe by modifierType and ignore qty>1 (a duplicate slot in the row
+    // is just wasted space). Each entry materializes via PokeRogue's
+    // canonical helper so generators (TM_COMMON, EVOLUTION_ITEM, etc.)
+    // come out as concrete name-bearing ModifierTypes.
     const factories = modifierTypes as Record<string, (() => ModifierType) | undefined>;
     const guaranteed: ModifierTypeOption[] = [];
+    const seen = new Set<string>();
     for (const item of consequence.items) {
+      if (seen.has(item.modifierType)) {
+        continue;
+      }
+      seen.add(item.modifierType);
       const factory = factories[item.modifierType];
       if (typeof factory !== "function") {
         console.warn(`[llm-director] unknown modifierType in consequence.items: "${item.modifierType}"`);
@@ -441,10 +446,7 @@ function grantConsequenceRewards(consequence: import("#data/llm-director/beat-sc
         console.warn(`[llm-director] consequence.items "${item.modifierType}" produced no compatible item — skipping`);
         continue;
       }
-      const qty = Math.max(1, item.qty ?? 1);
-      for (let i = 0; i < qty; i++) {
-        guaranteed.push(new ModifierTypeOption(resolved, 0));
-      }
+      guaranteed.push(new ModifierTypeOption(resolved, 0));
     }
     if (guaranteed.length > 0) {
       // unshiftNew so the rewards shop opens BEFORE the queued battle's

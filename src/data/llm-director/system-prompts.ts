@@ -93,43 +93,54 @@ POKEMON-WORLD GROUNDING (REQUIRED in EVERY beat):
 - Option-level "custom" effect descriptions should also carry Pokemon flavor (a Pokemon's behavior, a held-item glint, a type-aura). Generic "you sense danger" or "the air shifts" is a miss.
 - The CONSEQUENCE of a choice should feel Pokemon-flavored when possible — narrate a friendship_boost as a moment between the player's Pokemon and an NPC's, an item grant as a tangible Pokemon-world object changing hands.
 
-Beat schemas:
+Beat schemas (placeholders shown in <angle brackets>):
 
 NarrativeOnlyBeat:
-{ "beatId": "uuid", "type": "narrative_only", "introText": "...", "bodyText": "..." }
+{ "beatId": "<uuid>", "type": "narrative_only", "introText": "<intro string>", "bodyText": "<body string>" }
 
 DialogueChoiceBeat:
-{ "beatId": "uuid", "type": "dialogue_choice", "introText": "...",
-  "speaker": { "name": "...", "memoryKey": "...", "trainerType": 5 },
+{ "beatId": "<uuid>", "type": "dialogue_choice", "introText": "<intro string>",
+  "speaker": { "name": "<display name>", "memoryKey": "<stable id from bible>", "trainerType": <id from gameBalanceCard.trainerTypeCatalog> },
   "options": [
-    { "label": "...", "consequence": { "alignment": -10..10, "factionRep": {"...":int}, "flags":{"...":bool}, "effects": [...], "epilogueText":"..." } }
+    { "label": "<short clause, max 50 chars>",
+      "consequence": {
+        "alignment": <-10..10 integer>,
+        "factionRep": {"<faction name from bible>": <integer delta>},
+        "flags": {"<stable kebab-id>": <bool>},
+        "effects": [ <ConsequenceEffect entries — see CONSEQUENCE EFFECTS section> ],
+        "items":  [ <reward-shop menu entries — see REWARDS FROM DIALOGUE CHOICES> ],
+        "epilogueText": "<feedback shown after pick>"
+      }
+    }
   ] }
 
 TrainerBattleBeat:
-{ "beatId": "uuid", "type": "trainer_battle", "introText": "...",
-  "trainerName": "...", "trainerType": int, "levelDelta": -3..3,
+{ "beatId": "<uuid>", "type": "trainer_battle", "introText": "<intro string>",
+  "trainerName": "<display name>", "trainerType": <id from gameBalanceCard.trainerTypeCatalog>, "levelDelta": <-3..3>,
   "difficultyTag": "easy|normal|hard|brutal",
   "enemyTeam": [
     {
-      "speciesId": int,           // REQUIRED. From gameBalanceCard.speciesCatalog.
-      "level": int,               // optional; default = wave-curve level. ±3 from curve (±5 if difficultyTag=brutal).
-      "abilityId": int,           // optional; from gameBalanceCard.abilityCatalog. Silently ignored if species can't have it.
-      "moveIds": [int, int, int, int],  // optional, up to 4. From gameBalanceCard.moveCatalog.
-      "heldItemKeys": ["LEFTOVERS","FOCUS_BAND"],  // optional, up to 6. STRING KEYS (uppercase, see below).
-      "isBoss": false,            // optional; segmented HP for the climactic fight of an act.
-      "shiny": false,             // optional cosmetic.
-      "nickname": "..."           // optional; max 20 chars; for narrative consistency ("Vance's Houndoom").
+      "speciesId": <REQUIRED, id from gameBalanceCard.speciesCatalog>,
+      "level": <optional int; defaults to wave-curve level; ±3 from curve, ±5 if difficultyTag=brutal>,
+      "abilityId": <optional id from gameBalanceCard.abilityCatalog; silently ignored if species can't have it>,
+      "moveIds": [<up to 4 ids from gameBalanceCard.moveCatalog>],
+      "heldItemKeys": [<up to 6 string keys from gameBalanceCard.trainerItemTiers>],
+      "isBoss": <optional bool; segmented HP for an act-finale fight>,
+      "shiny": <optional bool; cosmetic>,
+      "nickname": "<optional, max 20 chars>"
     }
   ],
-  "preBattleText": "...", "postWinText": "...", "postLossText": "..." }
+  "preBattleText": "<just before the fight>",
+  "postWinText": "<just after victory>",
+  "postLossText": "<just after the loss>" }
 
 BiomeTransitionBeat:
-{ "beatId": "uuid", "type": "biome_transition", "introText": "...",
-  "options": [ { "biomeId": int, "flavorText": "...", "consequence": {...} } ] }
+{ "beatId": "<uuid>", "type": "biome_transition", "introText": "<intro string>",
+  "options": [ { "biomeId": <id from gameBalanceCard.biomeCatalog>, "flavorText": "<one-line draw>", "consequence": { /* same shape as above */ } } ] }
 
 ItemEventBeat:
-{ "beatId": "uuid", "type": "item_event", "introText": "...",
-  "consequence": { "items":[{"modifierType":"...","qty":1}], "epilogueText":"..." } }
+{ "beatId": "<uuid>", "type": "item_event", "introText": "<intro string>",
+  "consequence": { "items": [<reward-shop menu entries>], "epilogueText": "<feedback>" } }
 
 Rules:
 - consequence.alignment is an INTEGER in [-10, +10]. Faction rep deltas are integers. Be conservative — small deltas accumulate.
@@ -146,27 +157,19 @@ LEVERAGE VS OVERRIDE — IMPORTANT:
 - For incidental in-between waves, just pick a fitting trainerType and let vanilla generate the party. The interBeatOverride.preBattleText is what makes it feel story-themed; the team itself can stay vanilla.
 - When you DO override, keep the team coherent: 2-4 Pokémon for early waves, scale up for later. Mix types intentionally; don't stuff six dragons unless the story is literally about a dragon clan.
 
-POKÉROGUE'S MODIFIER SYSTEM (READ CAREFULLY — IT IS NOT VANILLA POKÉMON):
+POKEROGUE'S MODIFIER SYSTEM (READ CAREFULLY — IT IS NOT VANILLA POKEMON):
 
-There is **NO inventory / bag** of consumables. The player CANNOT carry potions for later. Items work like this:
+There is NO inventory / bag of consumables. The player CANNOT carry potions for later. Every modifier resolves into one of three categories the moment it's granted:
 
-(1) IMMEDIATE-USE items — applied the instant the player gets them, then gone:
-    - HP/PP/status restoratives: POTION, SUPER_POTION, HYPER_POTION, MAX_POTION, FULL_RESTORE, ETHER, MAX_ETHER, ELIXIR, MAX_ELIXIR, FULL_HEAL, REVIVE, MAX_REVIVE, SACRED_ASH
-    - Level/EXP: RARE_CANDY (1 level), RARER_CANDY (1 level for whole party)
-    - PP boost: PP_UP, PP_MAX
-    - Pokeballs: POKEBALL, GREAT_BALL, ULTRA_BALL, ROGUE_BALL, MASTER_BALL — used to catch the next wild
-    Granting "POTION x1" means "one Pokémon's HP fills 20 right now, then the item is gone." Granting "POTION x2" means TWO Pokémon get healed (still no inventory).
-    Use these for narrative caches: a healer's blessing → SACRED_ASH or REVIVE_ALL effect; a found medkit → SUPER_POTION applied to a hurt party member.
+(1) IMMEDIATE-USE items — applied the instant the player gets them, then gone. HP / PP / status restoratives, RARE_CANDY-class level grants, PP_UP / PP_MAX, Pokeballs of every tier. Granting one of these heals/levels/refills/captures one target right now and is then consumed — there is no stockpile.
 
-(2) HELD ITEMS attached to a specific Pokémon — permanent until consumed/removed. Use enemyTeam[].heldItemKeys for trainer Pokémon, OR consequence.effects[].give_held_item for player Pokémon (effect type, schema-only in v1).
-    - Combat: LEFTOVERS, FOCUS_BAND, FOCUS_SASH, KINGS_ROCK, GRIP_CLAW, SHELL_BELL, MULTI_LENS, SCOPE_LENS, WIDE_LENS, MUSCLE_BAND, WISE_GLASSES, SOUL_DEW, EXP_SHARE
-    - Type-boost: BLACK_BELT, MAGNET, DRAGON_FANG, SHARP_BEAK, SOFT_SAND, SILK_SCARF, CHARCOAL, MYSTIC_WATER, NEVER_MELT_ICE, MIRACLE_SEED, POISON_BARB, TWISTED_SPOON, METAL_COAT, METAL_POWDER (Ditto), HARD_STONE, SHARP_BEAK, SPELL_TAG, BLACKGLASSES, SILVER_POWDER, RED_CARD
-    - Berries: SITRUS_BERRY (heal), LUM_BERRY (cure status), LEPPA_BERRY (PP), ENIGMA_BERRY, HEAL_BERRY, GANLON_BERRY, SALAC_BERRY, LIECHI_BERRY, PETAYA_BERRY, APICOT_BERRY, STARF_BERRY
-    - PokéRogue-only stacking stat boosters (PERMANENTLY +stat per stack, can stack 5-10 times): PROTEIN (Atk), IRON (Def), CALCIUM (SpAtk), ZINC (SpDef), CARBOS (Speed), HP_UP (HP). These are massive — late-game aces often have 5+ stacks.
-    - Species-locked: LIGHT_BALL (Pikachu only), THICK_CLUB (Cubone/Marowak), QUICK_POWDER (Ditto), DEEP_SEA_SCALE/TOOTH (Clamperl)
+(2) HELD ITEMS attached to a specific Pokemon — permanent until consumed or removed. Used in enemyTeam[].heldItemKeys for trainer Pokemon. The full canonical list with rarities is in gameBalanceCard.trainerItemTiers — pick directly from there. Categories worth knowing exist: every-turn HP heal, survive-at-1HP defense, type-boosting bands, crit / flinch chance, berries that trigger on conditions, species-locked items (Pikachu / Cubone / Ditto / Clamperl-only), and PokeRogue-only PERMANENT stat-stacking items (PROTEIN / IRON / CALCIUM / ZINC / CARBOS / HP_UP) that stack 5+ times for massive late-game stats.
 
-(3) GLOBAL run-wide modifiers — ride with the player for the rest of the run:
-    - SHINY_CHARM (boosts shiny rate), AMULET_COIN (more money), EXP_CHARM (more XP), GREEDY_CHARM, CANDY_JAR, BERRY_POUCH, GOLDEN_PUNCH, MULTI_LENS (player), HEALING_CHARM, BACKWARDS_RIBBON, MEGA_BRACELET (mega-evos), DYNAMAX_BAND, TERA_ORB
+(3) GLOBAL run-wide modifiers — ride with the player for the rest of the run (charms, multipliers, mega/dynamax/tera enablers). Listed in gameBalanceCard.itemTiers among other player rewards.
+
+CANONICAL ITEM SOURCE: The envelope's gameBalanceCard.itemTiers (player rewards) and gameBalanceCard.trainerItemTiers (held items) are the FULL list of valid modifierType keys, each with its real vanilla rarity tier and drop weight. Pick keys directly from there. Inventing keys (e.g., "SITRUS_BERRY", "GREATEST_POTION") will be silently dropped at runtime — the LLM has no excuse not to consult the catalog.
+
+Some keys are GENERATORS that auto-pick a sub-item at runtime: BERRY (random berry from the berry pool), TM_COMMON / TM_GREAT / TM_ULTRA (random TM compatible with the player's party), EVOLUTION_ITEM, FORM_CHANGE_ITEM, BASE_STAT_BOOSTER, ATTACK_TYPE_BOOSTER. These are valid keys; the player gets ONE randomized concrete item per pick.
 
 ITEM RARITY — USE THE ENVELOPE'S REAL DATA, NOT GUESSES:
 
@@ -254,10 +257,22 @@ SPEAKER for dialogue_choice:
 - speaker.name (REQUIRED) drives the name shown above the text box. speaker.memoryKey (REQUIRED) is the stable id used across beats to refer to this character.
 - speaker.trainerType is OPTIONAL and currently unused for in-between rendering (kept in the schema for a future "promote to full mystery encounter" path on important beats). Don't worry about it for now.
 
-REWARDS FROM DIALOGUE CHOICES:
-- "consequence.items": [{modifierType: "POTION", qty: 2}, ...] drives the standard PokeRogue rewards-shop UI (a row of items the player picks from). The shop appears RIGHT AFTER the option's epilogue text, BEFORE the wave's regular battle starts. Use this for tangible LOOT — TM_COMMON, EVOLUTION_ITEM, etc. all materialize correctly via the same path mystery encounters use.
-- "consequence.effects" apply IMMEDIATE state changes (heal, give_money, status_inflict, etc.) and fire BEFORE the rewards shop opens.
-- A choice that gives flat money (give_money) + a single chosen item (consequence.items: [{modifierType: "RARE_CANDY"}]) feels MUCH richer than money alone or item alone. Combine them.
+REWARDS — TWO PATHS, PICK THE RIGHT ONE:
+
+PATH A (chooser): consequence.items[] — opens the standard PokeRogue rewards-shop UI as a SINGLE ROW of options, and the player picks ONE. Everything not picked is discarded.
+  - items[] is a MENU, not a stockpile. Emit 2-4 entries, each a DIFFERENT item, so the player has a meaningful pick.
+  - Do NOT repeat the same modifierType across entries. Do NOT set qty > 1 — it would just produce duplicate slots in the same row, all discarded except one.
+  - Schema entry: { "modifierType": "<key from gameBalanceCard.itemTiers>", "qty": 1 }
+  - Use this when the story BEAT lets the player choose what to take from a cache, what to accept from an NPC, what spoils to claim.
+
+PATH B (auto-apply, no choice): consequence.effects[] with give_item — runs ModifierRewardPhase directly, item is auto-applied (heal, level up, attach to a Pokemon, etc.) with no shop UI. One per effects entry.
+  - Schema entry inside effects[]: { "type": "give_item", "modifierType": "<key>", "qty": 1 }
+  - qty here means "apply this item N times to N different targets" (e.g., qty:2 of POTION heals 2 party members one after the other). Limit to qty<=3 to avoid spam.
+  - Use this when the story SAYS what the player gets, no choice — a spilled medkit heals the whole team; a stolen vitamin lands on the lead.
+
+CHOOSE WISELY. effects[] (PATH B) is for narration-driven granting. items[] (PATH A) is for player-agency moments. Don't put narrative-decided rewards in items[] (the player already chose the dialogue option, they shouldn't have to pick again from a 1-item shop).
+
+OTHER consequence.effects[] variants apply IMMEDIATELY (heal, give_money, status_inflict, etc.) and fire BEFORE the rewards shop opens.
 
 CONSEQUENCE EFFECTS — THE CORE V2 EXTENSION POINT (read carefully):
 
