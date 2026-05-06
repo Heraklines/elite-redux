@@ -126,20 +126,35 @@ export class NewBattlePhase extends BattlePhase {
         `[llm-director] trainer-sprite-override wave=${battle.waveIndex} requested trainerType=${override.trainerOverride.trainerType} (deferred to v3 — needs trainer-creation hook, not post-create)`,
       );
     }
-    // postWinText / postLossText / victoryRewards / victoryEffects /
-    // defeatEffects are accepted by the schema and ride through the
-    // trace log, but consumption by VictoryPhase / FaintPhase is v3.
-    // For now, the LLM emits them, the player sees the intent in the
-    // trace, and we know what to wire next.
-    if (
-      override.postWinText
-      || override.postLossText
+    // Stash the post-battle slice so VictoryPhase / FaintPhase can fire
+    // narration + rewards + effects after the battle resolves. Only set the
+    // hook if at least one field is non-empty; an empty hook is wasted memory.
+    const hasPostHook =
+      !!override.postWinText
+      || !!override.postLossText
       || (override.victoryRewards && override.victoryRewards.length > 0)
       || (override.victoryEffects && override.victoryEffects.length > 0)
-      || (override.defeatEffects && override.defeatEffects.length > 0)
-    ) {
+      || (override.defeatEffects && override.defeatEffects.length > 0);
+    if (hasPostHook) {
+      const hook: import("#system/llm-director/director-queue").PostBattleHook = {};
+      if (override.postWinText) {
+        hook.postWinText = override.postWinText;
+      }
+      if (override.postLossText) {
+        hook.postLossText = override.postLossText;
+      }
+      if (override.victoryRewards && override.victoryRewards.length > 0) {
+        hook.victoryRewards = override.victoryRewards;
+      }
+      if (override.victoryEffects && override.victoryEffects.length > 0) {
+        hook.victoryEffects = override.victoryEffects;
+      }
+      if (override.defeatEffects && override.defeatEffects.length > 0) {
+        hook.defeatEffects = override.defeatEffects;
+      }
+      runtime.queue.setPostBattleHook(battle.waveIndex, hook);
       console.info(
-        `[llm-director] post-wave-hook wave=${battle.waveIndex} (postWinText=${!!override.postWinText} postLossText=${!!override.postLossText} rewards=${override.victoryRewards?.length ?? 0} victoryEffects=${override.victoryEffects?.length ?? 0} defeatEffects=${override.defeatEffects?.length ?? 0}) — schema accepted, applier deferred to v3`,
+        `[llm-director] post-wave-hook stashed wave=${battle.waveIndex} (postWinText=${!!override.postWinText} postLossText=${!!override.postLossText} rewards=${override.victoryRewards?.length ?? 0} victoryEffects=${override.victoryEffects?.length ?? 0} defeatEffects=${override.defeatEffects?.length ?? 0})`,
       );
     }
   }

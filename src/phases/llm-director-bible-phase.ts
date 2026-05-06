@@ -17,6 +17,14 @@ import { generateStoryBible } from "#system/llm-director/generate-story-bible";
 import i18next from "i18next";
 
 /**
+ * Wave-1 beat takes longer than mid-run beats: queue.kickOff(1) only just
+ * fired (vs. mid-run waves where the beat has been pre-generating during
+ * the prior 2 waves of battles). Give it a generous 90s window so a slow
+ * NanoGPT response doesn't fall through to the filler beat on wave 1.
+ */
+const FIRST_BEAT_TAKE_TIMEOUT_MS = 90_000;
+
+/**
  * Awaits the pending story-bible generation kicked off by
  * `LLMDirectorStartPhase`, applies it to game state, and kicks off the
  * first Director beat (wave 3 by default).
@@ -139,10 +147,14 @@ export class LLMDirectorBiblePhase extends Phase {
     // breaking Enter-to-advance. setMode is sync; subsequent MessagePhases
     // queued below will run with MESSAGE as the active mode.
     void globalScene.ui.setMode(UiMode.MESSAGE);
-    // Switch to the first act's biome BEFORE messages render so the
-    // location matches the story's opening scene. Unshift first so it
-    // ends up *behind* all the message phases in the queue (since
-    // queueMessage also unshifts, it ends up in front).
+    // Each unshift puts the new phase at the FRONT of the queue. Doing them
+    // in this order produces final queue:
+    //   [theme, intro, scene, SwitchBiome, BeatPhase(wave 1), ...rest]
+    // i.e. messages run first, then biome swap, then the forced wave-1
+    // mystery beat, THEN the wave-1 EncounterPhase that was already queued
+    // by the run start. So the player reads the intro, lands in the right
+    // biome, makes a story decision, and only then walks into wave 1.
+    globalScene.phaseManager.unshiftNew("LLMDirectorBeatPhase", this.firstBeatWave, FIRST_BEAT_TAKE_TIMEOUT_MS);
     const firstAct = globalScene.gameData.llmDirectorState.storyBible?.acts[0];
     if (firstAct && typeof firstAct.biomeId === "number" && globalScene.arena?.biomeId !== firstAct.biomeId) {
       logBiomeSwitch("bible-first-act", globalScene.arena?.biomeId, firstAct.biomeId, firstAct.name);

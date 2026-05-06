@@ -8,6 +8,7 @@ import { getCharVariantFromDialogue } from "#data/dialogue";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { BattleType } from "#enums/battle-type";
 import { Challenges } from "#enums/challenges";
+import { GameModes } from "#enums/game-modes";
 import { PlayerGender } from "#enums/player-gender";
 import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
@@ -18,6 +19,9 @@ import type { EndCardPhase } from "#phases/end-card-phase";
 import { achvs, ChallengeAchv } from "#system/achv";
 import { ArenaData } from "#system/arena-data";
 import { ChallengeData } from "#system/challenge-data";
+import { applyEffects } from "#system/llm-director/consequence-effects";
+import { logEffectApplied } from "#system/llm-director/director-log";
+import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 import { ModifierData as PersistentModifierData } from "#system/modifier-data";
 import { PokemonData } from "#system/pokemon-data";
 import { RibbonData, type RibbonFlag } from "#system/ribbons/ribbon-data";
@@ -50,6 +54,14 @@ export class GameOverPhase extends BattlePhase {
     // Failsafe if players somehow skip floor 200 in classic mode
     if (globalScene.gameMode.isClassic && globalScene.currentBattle.waveIndex > 200) {
       this.isVictory = true;
+    }
+
+    // LLM Director post-defeat hook: when the player dies on a wave that
+    // had a beat-authored override, queue the LLM's postLossText +
+    // defeatEffects narration so the death feels tied to the run's story.
+    // No effect for victory game-over (handled by VictoryPhase).
+    if (!this.isVictory && globalScene.gameMode.modeId === GameModes.LLM_DIRECTOR) {
+      applyPostDefeatHook(globalScene.currentBattle.waveIndex);
     }
 
     // Handle Mystery Encounter special Game Over cases
@@ -359,4 +371,46 @@ export class GameOverPhase extends BattlePhase {
       playerFaints: globalScene.arena.playerFaints,
     } as SessionSaveData;
   }
+}
+
+/**
+ * Consume the LLM Director post-battle hook for `wave` and queue the LOSS
+ * narration (postLossText + defeatEffects). Mirrors `applyPostVictoryHook`
+ * in victory-phase.ts. Called from GameOverPhase on a non-victory game-over.
+ *
+ * defeatEffects can mutate state (lose_money, status_inflict, lose_egg,
+ * etc.) — they fire even though the run is ending so the player sees
+ * what the LLM said the loss costs them, in the same trace.
+ */
+function applyPostDefeatHook(waveIndex: number): void {
+  const runtime = getDirectorRuntime();
+  if (!runtime) {
+    return;
+  }
+  const hook = runtime.queue.takePostBattleHook(waveIndex);
+  if (!hook) {
+    return;
+  }
+  const tail: string[] = [];
+  if (hook.postLossText) {
+    tail.push(hook.postLossText);
+  }
+  if (hook.defeatEffects && hook.defeatEffects.length > 0) {
+    try {
+      tail.push(...applyEffects(hook.defeatEffects));
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      logEffectApplied(`defeat-wave-${waveIndex}`, "defeat-effects-batch", false, reason);
+    }
+  }
+  if (tail.length > 0) {
+    const cleaned = tail.map(p => (p ?? "").trim()).filter(p => p.length > 0);
+    if (cleaned.length > 0) {
+      void globalScene.ui.setMode(UiMode.MESSAGE);
+      globalScene.phaseManager.unshiftNew("MessagePhase", cleaned.join("$"), null, true);
+    }
+  }
+  console.info(
+    `[llm-director] post-defeat-hook applied wave=${waveIndex} postLossTextLen=${hook.postLossText?.length ?? 0} effects=${hook.defeatEffects?.length ?? 0}`,
+  );
 }

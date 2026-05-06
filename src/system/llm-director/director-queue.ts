@@ -1,4 +1,18 @@
-import type { Beat, InterBeatOverride } from "#data/llm-director/beat-schema";
+import type { Beat, ConsequenceEffect, ConsequenceItem, InterBeatOverride } from "#data/llm-director/beat-schema";
+
+/**
+ * Slice of an InterBeatOverride that fires AFTER the wave's battle resolves
+ * (win or loss). Stashed during NewBattlePhase, consumed by VictoryPhase or
+ * FaintPhase, so post-battle narration & rewards stay tied to the LLM-
+ * authored story instead of being thrown away once pre-battle text fires.
+ */
+export interface PostBattleHook {
+  postWinText?: string;
+  postLossText?: string;
+  victoryRewards?: ConsequenceItem[];
+  victoryEffects?: ConsequenceEffect[];
+  defeatEffects?: ConsequenceEffect[];
+}
 
 /**
  * Pre-generation queue. Holds at most one in-flight generation plus the most
@@ -28,6 +42,7 @@ export class DirectorQueue {
   private readonly pending = new Map<number, PendingEntry>();
   private readonly ready = new Map<number, Beat>();
   private readonly interBeatOverrides = new Map<number, InterBeatOverride>();
+  private readonly postBattleHooks = new Map<number, PostBattleHook>();
   private cancelled = false;
 
   public constructor(opts: DirectorQueueOptions) {
@@ -120,6 +135,18 @@ export class DirectorQueue {
     return v;
   }
 
+  public setPostBattleHook(wave: number, hook: PostBattleHook): void {
+    this.postBattleHooks.set(wave, hook);
+  }
+
+  public takePostBattleHook(wave: number): PostBattleHook | undefined {
+    const v = this.postBattleHooks.get(wave);
+    if (v) {
+      this.postBattleHooks.delete(wave);
+    }
+    return v;
+  }
+
   /** Diagnostic: are we still generating something for this wave? */
   public isPending(wave: number): boolean {
     return this.pending.has(wave);
@@ -141,6 +168,7 @@ export class DirectorQueue {
     this.pending.clear();
     this.ready.clear();
     this.interBeatOverrides.clear();
+    this.postBattleHooks.clear();
   }
 
   /**
@@ -152,5 +180,6 @@ export class DirectorQueue {
     this.pending.clear();
     this.ready.clear();
     this.interBeatOverrides.clear();
+    this.postBattleHooks.clear();
   }
 }

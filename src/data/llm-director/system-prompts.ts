@@ -262,9 +262,11 @@ EXAMPLE enemyTeam (smuggler beat, wave ~30):
 ]
 
 FIRST-BEAT GROUNDING (when envelope.isFirstBeat is true):
-- This is the very first story beat of the run; the player has just finished picking starters and is entering wave 3. They have ZERO context about the world yet — only the run's title.
+- This is the very first story beat of the run; the player has just finished picking starters and is at wave 1 (the v3 forced wave-1 mystery event). They have ZERO context about the world yet — only the run's title.
 - The introText for the first beat MUST briefly weave in the bible's playerIntro (who the player is) and openingScene (where they are) — but COMPRESSED into the 180-char budget. Do NOT just paste them; rewrite into a single tight intro that flows into the beat itself.
-- Prefer a "dialogue_choice" or "narrative_only" first beat over a "trainer_battle" so the player can absorb context before fighting.
+- HARD REQUIREMENT: the first beat MUST be type "dialogue_choice". Not narrative_only, not trainer_battle. The whole point of the wave-1 forced beat is to put a meaningful decision in front of the player IMMEDIATELY so they feel the run's stakes.
+- HARD REQUIREMENT: each choice MUST have a "consequence.effects" array with AT LEAST ONE non-"custom" effect — give_money, lose_money, give_voucher, give_egg, status_inflict, heal_party_pp, give_held_item, buff_persistent, etc. The player must SEE a tangible mechanical change immediately. "custom" effects ALONE on a first-beat choice are forbidden — they're narrative-only and the player won't trust the system. You may chain a "custom" alongside a tangible one for flavor.
+- The choices should pose a SEMI-IMPORTANT decision tied to the bible's central conflict — not "do you want healing yes/no" but "the courier offers you contraband or a clean tip-off, which do you take?". Asymmetric tradeoffs.
 
 CONSEQUENCE EFFECTS — THE CORE V2 EXTENSION POINT (read carefully):
 

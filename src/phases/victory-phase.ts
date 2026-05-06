@@ -4,8 +4,14 @@ import { modifierTypes } from "#data/data-lists";
 import { BattleType } from "#enums/battle-type";
 import type { BattlerIndex } from "#enums/battler-index";
 import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
+import { GameModes } from "#enums/game-modes";
+import { UiMode } from "#enums/ui-mode";
+import type { ModifierType } from "#modifiers/modifier-type";
 import { handleMysteryEncounterVictory } from "#mystery-encounters/encounter-phase-utils";
 import { PokemonPhase } from "#phases/pokemon-phase";
+import { applyEffects } from "#system/llm-director/consequence-effects";
+import { logEffectApplied } from "#system/llm-director/director-log";
+import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 
 export class VictoryPhase extends PokemonPhase {
   public readonly phaseName = "VictoryPhase";
@@ -48,6 +54,14 @@ export class VictoryPhase extends PokemonPhase {
 
       const gameMode = globalScene.gameMode;
       const currentWaveIndex = globalScene.currentBattle.waveIndex;
+
+      // LLM Director post-victory hook: queue the LLM-authored postWinText +
+      // victoryEffects narration + victoryRewards BEFORE the vanilla
+      // egg/modifier rewards. Applies only in Director mode and only if the
+      // beat that authored this wave actually emitted a hook.
+      if (gameMode.modeId === GameModes.LLM_DIRECTOR) {
+        applyPostVictoryHook(currentWaveIndex);
+      }
 
       if (gameMode.isEndless || !gameMode.isWaveFinal(currentWaveIndex)) {
         globalScene.phaseManager.pushNew("EggLapsePhase");
@@ -121,4 +135,68 @@ export class VictoryPhase extends PokemonPhase {
 
     this.end();
   }
+}
+
+/**
+ * Consume the LLM Director post-battle hook for `wave` and queue its
+ * narration + effects + rewards. Mirrors `grantConsequenceRewards` from
+ * llm-director-beat-phase.ts but for the post-victory case.
+ *
+ * Phase ordering (each pushNew appends to the queue):
+ *   1. MessagePhase: postWinText + victoryEffects narration (one $-paginated msg)
+ *   2. ModifierRewardPhase × N: one per victoryRewards item (× qty)
+ *
+ * Defeat-side hook (postLossText, defeatEffects) lives on FaintPhase / GameOverPhase.
+ */
+function applyPostVictoryHook(waveIndex: number): void {
+  const runtime = getDirectorRuntime();
+  if (!runtime) {
+    return;
+  }
+  const hook = runtime.queue.takePostBattleHook(waveIndex);
+  if (!hook) {
+    return;
+  }
+
+  // 1. Apply effects (mutates state, returns narrative strings) +
+  //    consolidate with postWinText into one message.
+  const tail: string[] = [];
+  if (hook.postWinText) {
+    tail.push(hook.postWinText);
+  }
+  if (hook.victoryEffects && hook.victoryEffects.length > 0) {
+    try {
+      tail.push(...applyEffects(hook.victoryEffects));
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      logEffectApplied(`victory-wave-${waveIndex}`, "victory-effects-batch", false, reason);
+    }
+  }
+  if (tail.length > 0) {
+    const cleaned = tail.map(p => (p ?? "").trim()).filter(p => p.length > 0);
+    if (cleaned.length > 0) {
+      void globalScene.ui.setMode(UiMode.MESSAGE);
+      globalScene.phaseManager.pushNew("MessagePhase", cleaned.join("$"), null, true);
+    }
+  }
+
+  // 2. LLM-authored victoryRewards: each is a ModifierType id (e.g. "POTION").
+  if (hook.victoryRewards && hook.victoryRewards.length > 0) {
+    const factories = modifierTypes as Record<string, (() => ModifierType) | undefined>;
+    for (const item of hook.victoryRewards) {
+      const factory = factories[item.modifierType];
+      if (typeof factory !== "function") {
+        console.warn(`[llm-director] unknown modifierType in victoryRewards: "${item.modifierType}"`);
+        continue;
+      }
+      const qty = Math.max(1, item.qty ?? 1);
+      for (let i = 0; i < qty; i++) {
+        globalScene.phaseManager.pushNew("ModifierRewardPhase", factory);
+      }
+    }
+  }
+
+  console.info(
+    `[llm-director] post-victory-hook applied wave=${waveIndex} postWinTextLen=${hook.postWinText?.length ?? 0} effects=${hook.victoryEffects?.length ?? 0} rewards=${hook.victoryRewards?.length ?? 0}`,
+  );
 }
