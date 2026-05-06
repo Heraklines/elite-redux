@@ -106,6 +106,24 @@ Rules:
 - Continuity > novelty: reference earlier beats by content, not just by id.
 - No prose, no markdown, no commentary — only the JSON object.
 
+LEVERAGE VS OVERRIDE — IMPORTANT:
+- PokéRogue's vanilla trainer types ALREADY have curated parties, level scaling, and movesets per archetype (e.g., HEX_MANIAC has psychic/ghost-leaning teams; BIKER has poison/dark; VETERAN has high-tier stage species). These are well-balanced for the wave curve.
+- DEFAULT to leaving teams to vanilla — DO NOT specify enemyTeam unless the story explicitly calls for a custom team. Examples that warrant override: a named recurring NPC (Vance's signature Houndoom), a thematically-loaded encounter (an "evil cultist" fight needing psychic/dark types), a scripted boss.
+- For incidental in-between waves, just pick a fitting trainerType and let vanilla generate the party. The interBeatOverride.preBattleText is what makes it feel story-themed; the team itself can stay vanilla.
+- When you DO override, keep the team coherent: 2-4 Pokémon for early waves, scale up for later. Mix types intentionally; don't stuff six dragons.
+
+POKÉROGUE'S MODIFIER SYSTEM (read this when authoring teams or item rewards):
+- This is NOT vanilla Pokémon — PokéRogue has stat-stacking items unique to the game.
+- Held items go on individual Pokémon via \`enemyTeam[].heldItemKeys\`. Multiple held items per Pokémon are normal and STACK. A trainer's ace can hold LEFTOVERS + FOCUS_BAND + KINGS_ROCK simultaneously.
+- Categories of modifier keys (full list in envelope.gameBalanceCard.modifierCatalog):
+  · COMBAT HELDS: LEFTOVERS, FOCUS_BAND, FOCUS_SASH, KINGS_ROCK, GRIP_CLAW, SHELL_BELL, MULTI_LENS, SCOPE_LENS, WIDE_LENS, MUSCLE_BAND, WISE_GLASSES, SOUL_DEW, EXP_SHARE
+  · TYPE-BOOST HELDS: BLACK_BELT, MAGNET, DRAGON_FANG, SHARP_BEAK, SOFT_SAND, SILK_SCARF, CHARCOAL, MYSTIC_WATER, NEVER_MELT_ICE, etc. (one per type)
+  · TYPE-RESIST BERRIES: HEAL_BERRY, ENIGMA_BERRY, LEPPA_BERRY, LUM_BERRY, SITRUS_BERRY, GANLON_BERRY, etc.
+  · STAT-STACKING (PokéRogue-specific, can stack 5+ times on one Pokémon!): PROTEIN, CALCIUM, IRON, ZINC, CARBOS, HP_UP — these PERMANENTLY raise a stat per stack. Strong trainers in late waves often have aces with multiple PROTEIN stacks.
+  · SPECIES-LOCKED (only work on the right species): LIGHT_BALL (Pikachu), THICK_CLUB (Cubone/Marowak), METAL_POWDER (Ditto), QUICK_POWDER (Ditto), DEEP_SEA_SCALE/TOOTH (Clamperl)
+- For \`consequence.items[].modifierType\`: use ANY key from modifierCatalog. Player rewards are typically: POTION, SUPER_POTION, REVIVE (early); RARE_CANDY, ETHER, ELIXIR, BERRY_* (mid); MAX_REVIVE, SACRED_ASH, MASTER_BALL, MEGA_BRACELET (late/special).
+- Power scale: a wave 30 trainer ace might have 1-2 stacked stat-boosters (PROTEIN ×2). A wave 100+ trainer ace might have 4-5 stacked. Match this to wave + difficultyTag.
+
 ALWAYS EMIT INTER-BEAT OVERRIDES (CRITICAL — every beat must include 2 of these):
 - The player plays 2 vanilla wave battles between beats. WITHOUT story-themed narration on those waves, the run feels like Classic with story dialogue once in a while.
 - For EACH beat, include \`interBeatOverrides\` with TWO entries (atWaveOffset 1 and 2), each with:

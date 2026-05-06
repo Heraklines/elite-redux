@@ -26,6 +26,7 @@ const baseEnvelope = (): ContextEnvelope =>
       moveCatalog: [],
       speciesCatalog: [],
       abilityCatalog: [],
+      modifierCatalog: [],
     },
     currentBeatType: "auto",
     isFirstBeat: false,

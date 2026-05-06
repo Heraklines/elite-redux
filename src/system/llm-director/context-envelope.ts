@@ -1,3 +1,4 @@
+import { modifierTypes } from "#data/data-lists";
 import type { StoryBible } from "#data/llm-director/beat-schema";
 import { AbilityId } from "#enums/ability-id";
 import { BiomeId } from "#enums/biome-id";
@@ -85,6 +86,12 @@ export interface GameBalanceCard {
   speciesCatalog: CatalogEntry[];
   /** Full ability catalog for trainer team customization. */
   abilityCatalog: CatalogEntry[];
+  /** All modifier type keys (held items, stat boosters, consumables, etc.).
+   * Use for `consequence.items[].modifierType` AND `enemyTeam[].heldItemKeys`.
+   * Built lazily from `modifierTypes` since that map initializes after module
+   * load. Subset of these are valid held items (those backed by
+   * PokemonHeldItemModifierType). */
+  modifierCatalog: string[];
 }
 
 export interface CatalogEntry {
@@ -174,8 +181,8 @@ function buildAbilityCatalog(): CatalogEntry[] {
   return entries.sort((a, b) => a.id - b.id);
 }
 
-/** Built once at module load — all enums are static. */
-const GAME_BALANCE_CARD: GameBalanceCard = {
+/** Static slice of the balance card — built once at module load. */
+const STATIC_GAME_BALANCE_CARD = {
   levelCurveNote:
     "Trainer party levels follow the Classic curve. Default deviations cap at ±3 levels around the curve.",
   rewardTiers: ["common", "uncommon", "rare", "epic"],
@@ -185,6 +192,24 @@ const GAME_BALANCE_CARD: GameBalanceCard = {
   speciesCatalog: buildSpeciesCatalog(),
   abilityCatalog: buildAbilityCatalog(),
 };
+
+/** Modifier catalog — lazy-built since `modifierTypes` is empty until init. */
+let cachedModifierCatalog: string[] | null = null;
+function getModifierCatalog(): string[] {
+  if (cachedModifierCatalog && cachedModifierCatalog.length > 0) {
+    return cachedModifierCatalog;
+  }
+  const keys = Object.keys(modifierTypes ?? {});
+  if (keys.length > 0) {
+    cachedModifierCatalog = keys.sort();
+  }
+  return cachedModifierCatalog ?? [];
+}
+
+const GAME_BALANCE_CARD = (): GameBalanceCard => ({
+  ...STATIC_GAME_BALANCE_CARD,
+  modifierCatalog: getModifierCatalog(),
+});
 
 function findCurrentAct(bible: StoryBible | undefined, wave: number): StoryBible["acts"][number] | undefined {
   if (!bible) {
@@ -249,7 +274,7 @@ export function buildContextEnvelope(inputs: EnvelopeInputs): ContextEnvelope {
     lossRiskBudget: state.lossRiskBudget,
     currentWaveIndex,
     currentAct: findCurrentAct(state.storyBible, currentWaveIndex),
-    gameBalanceCard: GAME_BALANCE_CARD,
+    gameBalanceCard: GAME_BALANCE_CARD(),
     currentBeatType: forcedBeatType ?? "auto",
     isFirstBeat: state.beatHistory.length === 0,
   };
