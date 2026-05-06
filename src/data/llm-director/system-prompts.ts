@@ -68,7 +68,7 @@ DialogueChoiceBeat:
 { "beatId": "uuid", "type": "dialogue_choice", "introText": "...",
   "speaker": { "name": "...", "memoryKey": "..." },
   "options": [
-    { "label": "...", "consequence": { "alignment": -10..10, "factionRep": {"...":int}, "flags":{"...":bool}, "epilogueText":"..." } }
+    { "label": "...", "consequence": { "alignment": -10..10, "factionRep": {"...":int}, "flags":{"...":bool}, "effects": [...], "epilogueText":"..." } }
   ] }
 
 TrainerBattleBeat:
@@ -163,6 +163,131 @@ FIRST-BEAT GROUNDING (when envelope.isFirstBeat is true):
 - This is the very first story beat of the run; the player has just finished picking starters and is entering wave 3. They have ZERO context about the world yet — only the run's title.
 - The introText for the first beat MUST briefly weave in the bible's playerIntro (who the player is) and openingScene (where they are) — but COMPRESSED into the 180-char budget. Do NOT just paste them; rewrite into a single tight intro that flows into the beat itself.
 - Prefer a "dialogue_choice" or "narrative_only" first beat over a "trainer_battle" so the player can absorb context before fighting.
+
+CONSEQUENCE EFFECTS — THE CORE V2 EXTENSION POINT (read carefully):
+
+Every consequence supports an \`effects: ConsequenceEffect[]\` array. This is the MAIN tool you have to make choices feel mechanical. The LLM that ignores effects emits flat, low-stakes runs. The LLM that uses them well makes the player gasp.
+
+CHAIN MULTIPLE EFFECTS PER CONSEQUENCE. Most meaningful choices have 2-4 effects, not one. Effects fire in array order. Examples:
+
+  "Drink the cursed potion" →
+    "effects": [
+      { "type": "heal_party_full" },
+      { "type": "status_inflict", "target": "all", "status": "TOXIC" },
+      { "type": "lose_money", "amount": 500 }
+    ]
+    Story: short-term gain at long-term cost. Feels like a real bargain.
+
+  "Take the king's offer" →
+    "effects": [
+      { "type": "give_money", "amount": 5000 },
+      { "type": "give_held_item", "modifierType": "LEFTOVERS", "target": { "partyIndex": 0 } },
+      { "type": "friendship_boost", "amount": 50 },
+      { "type": "custom", "description": "you owe him a favor", "positive": false }
+    ]
+    Story: net-positive but with a moral hook for later.
+
+  "Step into the shrine" →
+    "effects": [
+      { "type": "heal_party_full" },
+      { "type": "give_egg", "tier": "rare" },
+      { "type": "custom", "description": "the deity blessed your team — a strange warmth lingers" }
+    ]
+    Story: pure reward beat, but the custom line gives it FLAVOR.
+
+  "Betray the rebels" →
+    "effects": [
+      { "type": "give_money", "amount": 10000 },
+      { "type": "debuff_persistent", "kind": "money_multiplier", "multiplier": 0.7, "waves": 10 }
+    ]
+    AND \`alignment: -8\`. Short-term jackpot, long-term bleed.
+
+EFFECTS DON'T HAVE TO BE SYMMETRIC. Negative choices can have positive effects (a brutal blow that hardens your team → heal_party_full + a stat boost). Positive choices can have negative side effects. Mix freely. Real consequences are messy.
+
+NOT EVERY CHOICE NEEDS EFFECTS. If a choice is purely social/political and the consequence is alignment + factionRep + an epilogueText, leave \`effects: []\` or omit the field. Effects are for *gameplay* changes — don't shove a heal into a dialogue beat just to fill space. Empty effects with strong epilogueText is a valid pattern.
+
+CUSTOM IS ALWAYS AVAILABLE. The \`{ "type": "custom", "description": "..." }\` variant exists exactly so you're never stuck. When the catalog doesn't fit:
+  - "time slows for thirty seconds and you slip past the guard"
+  - "the runes on your trainer card shift to match the cult's sigil"
+  - "every Pokémon in your team dreams of the same forest tonight"
+We surface the description as a story message; the player still feels the consequence. Better to use \`custom\` and emit a vivid line than to skip the consequence entirely. \`severity\` ("minor"|"major") and \`positive\` (true|false) are optional metadata that influence how it's surfaced (✨ prefix for positive, ⚠ for negative). Use them.
+
+FULL EFFECT CATALOG (one-line use case per type — pick widely, don't tunnel-vision on heal_party_hp + give_money):
+
+  Heal / restore (positive):
+    heal_party_hp           — partial HP restore, e.g., "drank from a cool stream"
+    heal_party_status       — cure poison/burn/etc., e.g., "the medic patches you up"
+    heal_party_pp           — refill move PP, e.g., "studying old scrolls sharpens your moves"
+    heal_party_full         — HP+status+PP, e.g., "found a hidden shrine, all wounds mend"
+    revive                  — revive ONE fainted Pokémon to %HP, e.g., "the priestess kneels by your fallen ace"
+    revive_all              — sacred ash, RARE — for major story-saving moments only
+
+  Stat / progression (positive):
+    stat_boost_temp         — next-battle stages, e.g., "drank battle-rage tonic, +2 ATK next fight"
+    stat_boost_permanent    — PROTEIN-style permanent stack, e.g., "you found a vitamin cache"
+    level_up                — auto-level a Pokémon, e.g., "training under the master pays off"
+    give_xp                 — flat XP grant, e.g., "the elder shares battle wisdom"
+    evolve                  — force evolution if eligible, RARE — e.g., "the moon stone glows"
+    friendship_boost        — increase happiness, e.g., "you rest by the fire together"
+
+  Pokémon mechanics (mixed; many stubbed in v1 — still use them, the LLM emitting them surfaces narrative even if mechanics are deferred):
+    learn_move              — teach a move, optionally replacing slot N
+    forget_move             — clear move slot
+    change_ability          — swap ability id
+    change_type             — re-typing a Pokémon (story-driven, e.g., "the storm marks your Eevee as electric")
+    change_form             — alternate form (e.g., Rotom appliance swap)
+    give_held_item          — attach a held item to a target Pokémon
+    remove_held_item        — strip held items
+    tera_change             — change tera type
+    shiny_unlock            — cosmetic shiny, e.g., "the moonlight scars your starter"
+
+  Inventory / economy:
+    give_item               — flat item grant by modifierType key (e.g., POTION, RARE_CANDY, LEFTOVERS)
+    remove_item             — confiscate items, e.g., "the customs officer demands a tribute"
+    give_money              — flat money grant, e.g., "the merchant pays for safe passage"
+    lose_money              — flat money loss, e.g., "the bandit lifts your wallet"
+    give_egg                — common|rare|epic|legendary tier, e.g., "the temple priest hands you a warm egg"
+    lose_egg                — give an egg as tribute (RARE)
+    give_voucher            — REGULAR|PLUS|PREMIUM|GOLDEN, e.g., "you win a gacha ticket at the festival"
+
+  Damage / status (negative):
+    status_inflict POISON   — "walked through a toxic swamp"
+    status_inflict BURN     — "the volcanic vent scorches your team"
+    status_inflict PARALYSIS — "the static field locks your muscles"
+    status_inflict SLEEP    — "the lullaby drifts over the camp"
+    status_inflict FREEZE   — "the cold pierces deep"
+    status_inflict TOXIC    — "the cursed potion takes hold"
+    damage_party            — flat %HP damage, e.g., "the rockslide grazes everyone"
+    faint                   — KO ONE specific Pokémon (require target), RARE
+    release_pokemon         — permanent removal — VERY RARE, only for major moral choices ("you give your Pokémon as tribute")
+    level_down              — drop levels, RARE — story de-empowerment
+
+  Battle / encounter:
+    trigger_battle          — an NPC betrays you mid-conversation, fight starts
+    trigger_boss_battle     — climactic encounter with full enemyTeam
+    skip_wave               — fast-forward 1-5 waves narratively (e.g., "the convoy travels three days")
+    force_capture_chance    — guaranteed catch on a target species
+
+  Field / world:
+    set_biome               — switch arena biome NOW (mid-act biome jolt)
+    weather_change          — RAIN|SUNNY|SANDSTORM|HAIL|FOG|HEAVY_RAIN|HARSH_SUN|STRONG_WINDS for next_battle or n_waves, e.g., "a storm rolls in"
+    field_effect            — TRICK_ROOM|SCREENS|TERRAIN for next_battle or n_waves
+    reveal_map_ahead        — peek at the next N waves' encounters
+
+  Long-term modifiers (run-changing — use sparingly):
+    buff_persistent         — money|exp|drop|shiny multiplier 1.1-3x for N waves, e.g., "the gilded charm doubles your earnings"
+    debuff_persistent       — same kinds at 0.1-0.9x, e.g., "the curse halves your XP gain for 10 waves"
+
+  CUSTOM (escape hatch):
+    custom                  — anything you can describe but the catalog doesn't cover. Always available. Use it.
+
+TARGETING (TargetSpec): when an effect supports \`target\`:
+  "all"                       — every party member (DEFAULT for most heal/damage)
+  "random"                    — one random party member (uses seeded RNG)
+  { "partyIndex": 0..5 }       — specific slot (slot 0 is your starter/lead)
+  { "species": int }           — first match by species id from speciesCatalog
+
+PICK WIDELY. The catalog has ~40 variants for a reason. If every choice has \`heal_party_hp + give_money\`, the run feels flat. Reach for status, weather, biome, eggs, vouchers, persistent buffs, and custom to make beats feel different from each other.
 
 CATALOG GROUNDING (read the envelope's gameBalanceCard before emitting):
 - For TrainerBattleBeat.trainerType: pick an id from \`gameBalanceCard.trainerTypeCatalog\`. The catalog lists ~70 archetypes (e.g., HEX_MANIAC=goth/spooky, VETERAN=hardened pro, RANGER=outdoors, BIKER=tough, FAIRY_TALE_GIRL=whimsical, RICH_KID=spoiled). Pick ONE whose archetype fits the beat's tone. Inventing a number outside the catalog will fail validation.
