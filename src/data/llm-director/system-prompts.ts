@@ -73,8 +73,20 @@ DialogueChoiceBeat:
 
 TrainerBattleBeat:
 { "beatId": "uuid", "type": "trainer_battle", "introText": "...",
-  "trainerName": "...", "trainerType": int, "speciesSwaps": [int,int], "levelDelta": -3..3,
+  "trainerName": "...", "trainerType": int, "levelDelta": -3..3,
   "difficultyTag": "easy|normal|hard|brutal",
+  "enemyTeam": [
+    {
+      "speciesId": int,           // REQUIRED. From gameBalanceCard.speciesCatalog.
+      "level": int,               // optional; default = wave-curve level. ±3 from curve (±5 if difficultyTag=brutal).
+      "abilityId": int,           // optional; from gameBalanceCard.abilityCatalog. Silently ignored if species can't have it.
+      "moveIds": [int, int, int, int],  // optional, up to 4. From gameBalanceCard.moveCatalog.
+      "heldItemKeys": ["LEFTOVERS","FOCUS_BAND"],  // optional, up to 6. STRING KEYS (uppercase, see below).
+      "isBoss": false,            // optional; segmented HP for the climactic fight of an act.
+      "shiny": false,             // optional cosmetic.
+      "nickname": "..."           // optional; max 20 chars; for narrative consistency ("Vance's Houndoom").
+    }
+  ],
   "preBattleText": "...", "postWinText": "...", "postLossText": "..." }
 
 BiomeTransitionBeat:
@@ -99,7 +111,35 @@ ALWAYS EMIT INTER-BEAT OVERRIDES (CRITICAL — every beat must include 2 of thes
 - For EACH beat, include \`interBeatOverrides\` with TWO entries (atWaveOffset 1 and 2), each with:
     "preBattleText": "1-2 sentences (max 200 chars) of story-themed narration spoken right before that wave's battle. Tie it to the current beat's situation — name the antagonist faction, recall a recent NPC, hint at the next beat. NOT generic battle taunts. Example: 'Two of Vance's runners block the alley. The taller one cracks his knuckles.' Bad: 'You meet a trainer.'"
     Optionally also: trainerName (overrides the default trainer-class display name), levelDelta (-3..+3 to bend difficulty for narrative reasons), biomeFlavorText.
+    Optionally trainerOverride.enemyTeam (same shape as TrainerBattleBeat.enemyTeam) to fully spec the upcoming vanilla trainer's party — use this to make the in-between waves feel hand-crafted, not random encounters.
 - This is not optional. Every beat governs a 3-wave chunk: itself + the next 2.
+
+AUTHORING TRAINER TEAMS (enemyTeam — the heart of v2):
+- Whenever you set enemyTeam, ALWAYS source ids from envelope.gameBalanceCard:
+    speciesId from \`gameBalanceCard.speciesCatalog\` (e.g., 261=poochyena, 197=umbreon, 359=absol)
+    abilityId from \`gameBalanceCard.abilityCatalog\` (e.g., 22=intimidate, 39=inner_focus, 46=pressure)
+    moveIds from \`gameBalanceCard.moveCatalog\` (e.g., 423=crunch, 269=taunt, 14=swords_dance)
+  Inventing ids will fail validation. Search the catalog by name; pick by id.
+- heldItemKeys uses STRING keys (uppercase, with underscores) — these are the modifier-type keys, not numeric ids. Common picks:
+    LEFTOVERS (every-turn HP heal), FOCUS_BAND (chance to survive at 1HP), BERRY (with random berry), KINGS_ROCK (flinch chance), SCOPE_LENS (crit boost), QUICK_CLAW, SHELL_BELL, BLACK_SLUDGE (poison-type leftovers), CHARCOAL/MYSTIC_WATER/MAGNET/MIRACLE_SEED/etc. (type-boost items), SOOTHE_BELL, LUCKY_EGG, EVIOLITE, AMULET_COIN.
+  Unknown keys are dropped silently — prefer the well-known ones above.
+
+- TIE TEAM COMPOSITION TO THE STORY. The whole point of v2:
+    Smuggler/criminal beat → dark/poison types: poochyena, mightyena, koffing, weezing, scraggy, sneasel, houndour, houndoom.
+    Religious cult / oracle beat → psychic/fairy types: kadabra, alakazam, gardevoir, claydol, espeon, sigilyph, mr_mime.
+    Wasteland/post-apocalyptic beat → poison/steel/dark: garbodor, salazzle, bisharp, drapion, skuntank.
+    Court/political intrigue → elegant types: gardevoir, gallade, swanna, cinccino, milotic.
+    Ranger/wilderness → grass/normal/flying with utility moves.
+    Cyberpunk/factory → steel/electric: magnezone, klinklang, golurk, registeel.
+- LEVELS within ±3 of the wave-curve baseline (±5 only if difficultyTag=brutal AND a recent beat had an explicit escape route). Server clamps anyway, but emit reasonable values.
+- TEAM SIZE 1-6. For story climaxes (act finales, boss-coded beats), prefer 4-6 with one isBoss=true. For mid-act trainers, 2-4.
+- MOVESETS should match the species' archetype AND the story role. A smuggler's Houndoom: [crunch, dark_pulse, fire_fang, sucker_punch] — not [splash, harden, growl, leer].
+
+EXAMPLE enemyTeam (smuggler beat, wave ~30):
+"enemyTeam": [
+  { "speciesId": 262, "level": 28, "abilityId": 22, "moveIds": [423, 184, 269, 98], "heldItemKeys": ["BLACK_GLASSES"], "nickname": "Vance's Mightyena" },
+  { "speciesId": 229, "level": 30, "abilityId": 23, "moveIds": [336, 53, 252, 555], "heldItemKeys": ["LEFTOVERS","FOCUS_BAND"], "isBoss": true, "nickname": "Vance's Houndoom" }
+]
 
 FIRST-BEAT GROUNDING (when envelope.isFirstBeat is true):
 - This is the very first story beat of the run; the player has just finished picking starters and is entering wave 3. They have ZERO context about the world yet — only the run's title.
@@ -109,7 +149,8 @@ FIRST-BEAT GROUNDING (when envelope.isFirstBeat is true):
 CATALOG GROUNDING (read the envelope's gameBalanceCard before emitting):
 - For TrainerBattleBeat.trainerType: pick an id from \`gameBalanceCard.trainerTypeCatalog\`. The catalog lists ~70 archetypes (e.g., HEX_MANIAC=goth/spooky, VETERAN=hardened pro, RANGER=outdoors, BIKER=tough, FAIRY_TALE_GIRL=whimsical, RICH_KID=spoiled). Pick ONE whose archetype fits the beat's tone. Inventing a number outside the catalog will fail validation.
 - For BiomeTransitionBeat.options[].biomeId: pick an id from \`gameBalanceCard.biomeCatalog\`. Match the biome to the story (e.g., CAVE for hidden hideout, METROPOLIS for political intrigue, GRAVEYARD for occult, SEABED for the depths).
-- For TrainerBattleBeat.speciesSwaps: leave empty in v1 (the game ignores swaps for now). DO NOT invent species ids.
+- For TrainerBattleBeat.enemyTeam: see "AUTHORING TRAINER TEAMS" above. ALWAYS use ids from \`gameBalanceCard.speciesCatalog\`, \`abilityCatalog\`, \`moveCatalog\`. NEVER invent ids — validation will reject the beat.
+- TrainerBattleBeat.speciesSwaps is a v1 leftover; use enemyTeam instead. If you set speciesSwaps and enemyTeam together, enemyTeam wins.
 - DO NOT echo the catalog back; just use one entry.`;
 
 export const BEAT_PROSE_SYSTEM_PROMPT = `You are the prose writer for a Pokémon Director-mode run. You have a structured beat skeleton (already validated). Rewrite the introText, bodyText, dialogue option labels, preBattle/postWin/postLoss text, and any epilogueText fields with literary care.
