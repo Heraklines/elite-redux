@@ -12,6 +12,7 @@ import { PokemonPhase } from "#phases/pokemon-phase";
 import { applyEffects } from "#system/llm-director/consequence-effects";
 import { logEffectApplied } from "#system/llm-director/director-log";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
+import { paginateAndJoin } from "#system/llm-director/text-pagination";
 
 export class VictoryPhase extends PokemonPhase {
   public readonly phaseName = "VictoryPhase";
@@ -173,10 +174,10 @@ function applyPostVictoryHook(waveIndex: number): void {
     }
   }
   if (tail.length > 0) {
-    const cleaned = tail.map(p => (p ?? "").trim()).filter(p => p.length > 0);
-    if (cleaned.length > 0) {
+    const combined = paginateAndJoin(tail);
+    if (combined.length > 0) {
       void globalScene.ui.setMode(UiMode.MESSAGE);
-      globalScene.phaseManager.pushNew("MessagePhase", cleaned.join("$"), null, true);
+      globalScene.phaseManager.pushNew("MessagePhase", combined, null, true);
     }
   }
 

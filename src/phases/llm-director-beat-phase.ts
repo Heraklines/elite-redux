@@ -24,6 +24,7 @@ import { compactHistory, HISTORY_COMPACT_THRESHOLD } from "#system/llm-director/
 import { applyEffects } from "#system/llm-director/consequence-effects";
 import { logBeatDispatched, logChoiceMade, logTrainerOverride, logUnderrun } from "#system/llm-director/director-log";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
+import { paginate } from "#system/llm-director/text-pagination";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 
 /**
@@ -352,45 +353,6 @@ export class LLMDirectorBeatPhase extends Phase {
     }
     this.renderNarrative(filler);
   }
-}
-
-/**
- * Insert PokéRogue's `$` page-break separator into long text so MessagePhase
- * auto-paginates. The widget can fit ~120 chars per page; we split at
- * sentence boundaries within that budget. If a single sentence exceeds the
- * budget we fall back to a hard split at a word boundary (no mid-word cuts).
- *
- * Use this for ANY LLM-emitted text passed to queueMessage / showText so
- * the player can press Enter to read all of it instead of getting truncated.
- */
-function paginate(text: string | undefined, perPage = 70): string {
-  if (!text) {
-    return "";
-  }
-  if (text.length <= perPage) {
-    return text;
-  }
-  const pages: string[] = [];
-  let remaining = text.trim();
-  while (remaining.length > perPage) {
-    const slice = remaining.slice(0, perPage);
-    let cut = Math.max(slice.lastIndexOf(". "), slice.lastIndexOf("! "), slice.lastIndexOf("? "));
-    if (cut < perPage * 0.5) {
-      // No sentence boundary — fall back to last word boundary
-      cut = slice.lastIndexOf(" ");
-      if (cut < perPage * 0.3) {
-        cut = perPage; // last resort: hard cut
-      }
-    } else {
-      cut += 1; // include the period
-    }
-    pages.push(remaining.slice(0, cut).trim());
-    remaining = remaining.slice(cut).trim();
-  }
-  if (remaining.length > 0) {
-    pages.push(remaining);
-  }
-  return pages.join("$");
 }
 
 /**

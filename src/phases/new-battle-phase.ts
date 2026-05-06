@@ -8,6 +8,7 @@ import { clampAuthoredTeam } from "#system/llm-director/authored-team";
 import { logBiomeSwitch, logTrainerNarrationApplied } from "#system/llm-director/director-log";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 import { installAuthoredTeam } from "#system/llm-director/install-authored-team";
+import { paginate } from "#system/llm-director/text-pagination";
 
 export class NewBattlePhase extends BattlePhase {
   public readonly phaseName = "NewBattlePhase";
@@ -109,8 +110,13 @@ export class NewBattlePhase extends BattlePhase {
     // this wave so the trainer encounter feels part of the run's story
     // instead of a vanilla wave with canned trainer-class dialogue.
     if (override.preBattleText) {
+      // CRITICAL: paginate before queueMessage. The Phaser dialog box has
+      // maxLines=2 and silently truncates anything past that. Without `$`
+      // separators, a 150+ char preBattleText shows ~120 chars and the
+      // player presses A to advance, hitting the next phase (the actual
+      // wild/trainer fight) without seeing the rest of the narration.
       void globalScene.ui.setMode(UiMode.MESSAGE);
-      globalScene.phaseManager.queueMessage(override.preBattleText, null, true);
+      globalScene.phaseManager.queueMessage(paginate(override.preBattleText), null, true);
       logTrainerNarrationApplied(battle.waveIndex, override.preBattleText);
     }
     // Trainer name override: best-effort cosmetic so the trainer is

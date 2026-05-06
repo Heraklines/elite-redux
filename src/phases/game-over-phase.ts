@@ -22,6 +22,7 @@ import { ChallengeData } from "#system/challenge-data";
 import { applyEffects } from "#system/llm-director/consequence-effects";
 import { logEffectApplied } from "#system/llm-director/director-log";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
+import { paginateAndJoin } from "#system/llm-director/text-pagination";
 import { ModifierData as PersistentModifierData } from "#system/modifier-data";
 import { PokemonData } from "#system/pokemon-data";
 import { RibbonData, type RibbonFlag } from "#system/ribbons/ribbon-data";
@@ -404,10 +405,10 @@ function applyPostDefeatHook(waveIndex: number): void {
     }
   }
   if (tail.length > 0) {
-    const cleaned = tail.map(p => (p ?? "").trim()).filter(p => p.length > 0);
-    if (cleaned.length > 0) {
+    const combined = paginateAndJoin(tail);
+    if (combined.length > 0) {
       void globalScene.ui.setMode(UiMode.MESSAGE);
-      globalScene.phaseManager.unshiftNew("MessagePhase", cleaned.join("$"), null, true);
+      globalScene.phaseManager.unshiftNew("MessagePhase", combined, null, true);
     }
   }
   console.info(

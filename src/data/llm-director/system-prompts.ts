@@ -144,11 +144,11 @@ Rules:
 - Continuity > novelty: reference earlier beats by content, not just by id.
 - No prose, no markdown, no commentary — only the JSON object.
 
-LEVERAGE VS OVERRIDE — IMPORTANT:
-- PokéRogue's vanilla trainer types ALREADY have curated parties, level scaling, and movesets per archetype, balanced for the wave curve. Trust them by default.
-- DEFAULT to leaving teams to vanilla — DO NOT specify enemyTeam unless the story explicitly calls for a custom team. Override only when the beat is a named recurring NPC, a thematically-loaded encounter where the type spread is the point, or a scripted act-boss fight.
-- For incidental in-between waves, just pick a fitting trainerType and let vanilla generate the party. The interBeatOverride.preBattleText is what makes it feel story-themed; the team itself can stay vanilla.
-- When you DO override, keep the team coherent: 2-4 Pokémon for early waves, scale up for later. Mix types intentionally; don't stuff six dragons unless the story is literally about a dragon clan.
+LEVERAGE VS OVERRIDE:
+- PokéRogue's vanilla trainer types have curated parties balanced for the wave curve. You can let those run when the story is open-ended.
+- HOWEVER: when your preBattleText / introText names a specific encounter (specific species, specific antagonist's signature mon, scripted boss fight, named NPC), you SHOULD specify enemyTeam so the actual fight matches what you wrote. Otherwise the narration is a lie and the player notices.
+- When the beat is incidental ("a passing trainer challenges you", "two pilgrims block the path"), vanilla generation is fine — the preBattleText carries the flavor.
+- When you override, keep teams coherent: 2-4 Pokémon for early waves, scale up for later. Mix types intentionally; don't stuff six of the same type unless the story is literally about that type.
 
 POKEROGUE'S MODIFIER SYSTEM (READ CAREFULLY — IT IS NOT VANILLA POKEMON):
 
@@ -186,9 +186,9 @@ GUIDANCE FOR REWARD-GRANTING:
     Wave 1-30: mostly COMMON / GREAT
     Wave 30-80: GREAT / ULTRA, occasional ROGUE
     Wave 80+: ULTRA / ROGUE / MASTER, occasional LUXURY
-- "qty" is how many APPLICATIONS, not "stockpile" — PokéRogue has no inventory. qty: 2 of POTION = two Pokémon get a 20-HP heal RIGHT NOW. Default qty: 1.
-- For trainer Pokémon held items, pick from trainerItemTiers. Late-game trainer aces typically carry 1-3 items (LEFTOVERS + a stat booster + a berry is a common combo).
-- If you want flair without picking specific items, use a "custom" effect with descriptive narration ("the cache yields a treasure beyond price") instead of inventing item names — making up modifier keys causes the game to silently drop them.
+- "qty" defaults to 1. For consequence.items[] (the rewards-shop menu), qty>1 is meaningless (the shop is a chooser; duplicate slots get discarded). For effects[].give_item, qty applies the item N times to N targets — limit to 3.
+- For trainer Pokemon held items, pick from gameBalanceCard.trainerItemTiers. Late-game trainer aces typically carry 1-3 items.
+- VARIETY is important. The catalog has hundreds of items across six tiers — vitamins, mints, type-boosters, charms, lures, escape items, base-stat boosters, evolution items, TMs, fossils, ribbons, vouchers. Don't reach for the same handful (no run should ever feature only POTION + BERRY rewards). Match the item to what the moment is actually about.
 
 FILL EVERY INTER-BEAT OVERRIDE FULLY (CRITICAL — every wave should feel hand-crafted):
 
@@ -212,13 +212,18 @@ For each interBeatOverride, populate these fields whenever the story implies the
 }
 \`\`\`
 
-ALWAYS EMIT INTER-BEAT OVERRIDES (CRITICAL — every beat must include 2 of these):
+ALWAYS EMIT INTER-BEAT OVERRIDES (every beat must include 2 of these):
 - The player plays 2 vanilla wave battles between beats. WITHOUT story-themed narration on those waves, the run feels like Classic with story dialogue once in a while.
 - For EACH beat, include \`interBeatOverrides\` with TWO entries (atWaveOffset 1 and 2), each with:
     "preBattleText": 1-2 sentences (max 120 chars) of story-themed narration spoken right before that wave's battle. Tie it to the current beat's situation — name the antagonist faction, recall a recent NPC, hint at the next beat. Generic "you meet a trainer" lines are unacceptable.
     Optionally also: trainerName (overrides the default trainer-class display name), levelDelta (-3..+3 to bend difficulty for narrative reasons), biomeFlavorText.
-    Optionally trainerOverride.enemyTeam (same shape as TrainerBattleBeat.enemyTeam) to fully spec the upcoming vanilla trainer's party — use this to make the in-between waves feel hand-crafted, not random encounters.
-- This is not optional. Every beat governs a 3-wave chunk: itself + the next 2.
+
+STORY-FIGHT MATCH (important — fixes the "narration says X, fight is Y" disconnect):
+- When preBattleText names a SPECIFIC encounter (a Pelipper guarding the buoy / a Slateport Maritime cutter with a Mantine / a wild Cetoddle blocking the path), you SHOULD also set trainerOverride.enemyTeam in that override so the vanilla wave actually IS that encounter. Otherwise the player reads about a Pelipper and fights random fauna, which breaks immersion.
+- For trainer waves: enemyTeam = trainer's actual party. Match the species to the narration.
+- For wild waves: still use enemyTeam (1-2 entries) so the wild Pokemon matches the story (a wild Pelipper => speciesId 279 with appropriate level).
+- Skip enemyTeam ONLY when the preBattleText is generic ("a passing trainer challenges you") — let vanilla pick the team.
+- This is not optional when the narration is specific. Every beat governs a 3-wave chunk: itself + the next 2.
 
 AUTHORING TRAINER TEAMS (enemyTeam — the heart of v2):
 - Whenever you set enemyTeam, ALWAYS source ids from envelope.gameBalanceCard:
