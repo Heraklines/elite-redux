@@ -17,6 +17,7 @@ import { buildTrainerOverride } from "#phases/llm-director-beat-utils";
 import { type ApplyResult, applyConsequence } from "#system/llm-director/beat-applier";
 import { recordBeatHistory, recordPlayerChoice } from "#system/llm-director/beat-history";
 import { compactHistory, HISTORY_COMPACT_THRESHOLD } from "#system/llm-director/compact-history";
+import { logBeatDispatched, logChoiceMade, logTrainerOverride, logUnderrun } from "#system/llm-director/director-log";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 
@@ -68,11 +69,11 @@ export class LLMDirectorBeatPhase extends Phase {
 
     const beat = await runtime.queue.tryTake(this.waveIndex, { timeoutMs: this.takeTimeoutMs });
     if (!beat) {
-      console.warn(`[llm-director] BeatPhase wave=${this.waveIndex}: queue underrun, falling to filler`);
+      logUnderrun(this.waveIndex);
       this.handleUnderrun();
       return;
     }
-    console.info(`[llm-director] BeatPhase wave=${this.waveIndex}: got beat type=${beat.type}, id=${beat.beatId}`);
+    logBeatDispatched(this.waveIndex, beat.type, beat.beatId);
 
     // Always kick off the next beat as soon as we resolve this one — keeps
     // the 1-ahead buffer warm.
@@ -122,10 +123,10 @@ export class LLMDirectorBeatPhase extends Phase {
     // ends up running FIRST. To preserve source order (intro → body),
     // queue body first, then intro.
     if (body) {
-      globalScene.phaseManager.queueMessage(truncate(body, 200), null, true);
+      globalScene.phaseManager.queueMessage(paginate(body), null, true);
     }
     if (intro) {
-      globalScene.phaseManager.queueMessage(truncate(intro, 200), null, true);
+      globalScene.phaseManager.queueMessage(paginate(intro), null, true);
     }
     this.end();
   }
@@ -142,7 +143,10 @@ export class LLMDirectorBeatPhase extends Phase {
     // pre-emptively sees the truncated text *and* the option overlay
     // opens on a single page-advance — not a clean "read everything,
     // then choose" flow.
-    const intro = truncate(beat.introText, 200);
+    // Use paginate so long dialogue intros split into multiple pages
+    // (showDialogue auto-paginates on `$`) — the option overlay only opens
+    // after the LAST page advance.
+    const intro = paginate(beat.introText);
     void globalScene.ui.setMode(UiMode.MESSAGE);
     if (beat.speaker?.name) {
       globalScene.ui.showDialogue(intro, beat.speaker.name, null, showChoices);
@@ -168,6 +172,13 @@ export class LLMDirectorBeatPhase extends Phase {
     const state = globalScene.gameData.llmDirectorState;
     recordPlayerChoice(state, option);
     const result = applyConsequence(state, option.consequence);
+    logChoiceMade("(current)", option.label, {
+      alignment: option.consequence.alignment,
+      factionRep: option.consequence.factionRep,
+      flags: option.consequence.flags,
+      itemCount: option.consequence.items?.length ?? 0,
+      hasEpilogue: !!result.epilogueText,
+    });
     // Pop the OPTION_SELECT overlay before showing follow-up text, so the
     // message handler renders cleanly on top of the dialogue background.
     globalScene.ui.revertMode();
@@ -185,7 +196,9 @@ export class LLMDirectorBeatPhase extends Phase {
     if (runtime) {
       const override = buildTrainerOverride(beat, { recentFaints: this.countRecentFaints() });
       if (override) {
-        runtime.queue.setInterBeatOverride(this.waveIndex + override.atWaveOffset, override);
+        const targetWave = this.waveIndex + override.atWaveOffset;
+        runtime.queue.setInterBeatOverride(targetWave, override);
+        logTrainerOverride(targetWave, override);
       }
     }
     this.renderTextThenEnd(beat.introText, beat.preBattleText);
@@ -215,7 +228,7 @@ export class LLMDirectorBeatPhase extends Phase {
     // path is acceptable. If we ever need multi-page intros for biome
     // beats, switch to queueMessage and a follow-up CallbackPhase.
     const showOptions = () => this.showBiomeOptions(beat);
-    globalScene.ui.showText(truncate(beat.introText, 200), null, showOptions, null, true);
+    globalScene.ui.showText(paginate(beat.introText), null, showOptions, null, true);
   }
 
   private showBiomeOptions(beat: BiomeTransitionBeat): void {
@@ -241,10 +254,10 @@ export class LLMDirectorBeatPhase extends Phase {
     void globalScene.ui.setMode(UiMode.MESSAGE);
     // Queue in REVERSE source order so unshift puts them in the right order.
     if (result.epilogueText) {
-      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 200), null, true);
+      globalScene.phaseManager.queueMessage(paginate(result.epilogueText), null, true);
     }
     if (option.flavorText) {
-      globalScene.phaseManager.queueMessage(truncate(option.flavorText, 200), null, true);
+      globalScene.phaseManager.queueMessage(paginate(option.flavorText), null, true);
     }
     this.end();
   }
@@ -255,10 +268,10 @@ export class LLMDirectorBeatPhase extends Phase {
     void globalScene.ui.setMode(UiMode.MESSAGE);
     // Queue in REVERSE source order so unshift puts them in the right order.
     if (result.epilogueText) {
-      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 200), null, true);
+      globalScene.phaseManager.queueMessage(paginate(result.epilogueText), null, true);
     }
     if (beat.introText) {
-      globalScene.phaseManager.queueMessage(truncate(beat.introText, 200), null, true);
+      globalScene.phaseManager.queueMessage(paginate(beat.introText), null, true);
     }
     this.end();
   }
@@ -269,7 +282,7 @@ export class LLMDirectorBeatPhase extends Phase {
       // state where input doesn't reach the message handler. setMode(MESSAGE)
       // routes Enter correctly so the player can advance the epilogue.
       void globalScene.ui.setMode(UiMode.MESSAGE);
-      globalScene.phaseManager.queueMessage(truncate(result.epilogueText, 200), null, true);
+      globalScene.phaseManager.queueMessage(paginate(result.epilogueText), null, true);
     }
     this.end();
   }
@@ -294,10 +307,49 @@ export class LLMDirectorBeatPhase extends Phase {
 }
 
 /**
+ * Insert PokéRogue's `$` page-break separator into long text so MessagePhase
+ * auto-paginates. The widget can fit ~120 chars per page; we split at
+ * sentence boundaries within that budget. If a single sentence exceeds the
+ * budget we fall back to a hard split at a word boundary (no mid-word cuts).
+ *
+ * Use this for ANY LLM-emitted text passed to queueMessage / showText so
+ * the player can press Enter to read all of it instead of getting truncated.
+ */
+function paginate(text: string | undefined, perPage = 120): string {
+  if (!text) {
+    return "";
+  }
+  if (text.length <= perPage) {
+    return text;
+  }
+  const pages: string[] = [];
+  let remaining = text.trim();
+  while (remaining.length > perPage) {
+    const slice = remaining.slice(0, perPage);
+    let cut = Math.max(slice.lastIndexOf(". "), slice.lastIndexOf("! "), slice.lastIndexOf("? "));
+    if (cut < perPage * 0.5) {
+      // No sentence boundary — fall back to last word boundary
+      cut = slice.lastIndexOf(" ");
+      if (cut < perPage * 0.3) {
+        cut = perPage; // last resort: hard cut
+      }
+    } else {
+      cut += 1; // include the period
+    }
+    pages.push(remaining.slice(0, cut).trim());
+    remaining = remaining.slice(cut).trim();
+  }
+  if (remaining.length > 0) {
+    pages.push(remaining);
+  }
+  return pages.join("$");
+}
+
+/**
  * Hard cap for any LLM-emitted player-facing text. Cuts at the last sentence
  * boundary within `max` chars when one exists; otherwise hard-cuts and adds
- * an ellipsis. Defense-in-depth — the system prompt enforces budgets, but if
- * the model ignores them the UI still doesn't break.
+ * an ellipsis. Used when content MUST fit one page (e.g., bible intro per
+ * user spec). For most beat content, prefer `paginate()` instead.
  */
 function truncate(text: string | undefined, max: number): string {
   if (!text) {

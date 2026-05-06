@@ -5,6 +5,7 @@ import type { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
 import { UiMode } from "#enums/ui-mode";
 import { buildContextEnvelope, type EnvelopePartyMember } from "#system/llm-director/context-envelope";
+import { logBiomeSwitch, logFallbackToClassic } from "#system/llm-director/director-log";
 import {
   clearPendingBible,
   ensurePendingBible,
@@ -47,9 +48,7 @@ export class LLMDirectorBiblePhase extends Phase {
 
     const runtime = getDirectorRuntime();
     if (!runtime) {
-      console.warn(
-        "[llm-director] BiblePhase: getDirectorRuntime() returned null — VITE_NANOGPT_API_KEY or VITE_NANOGPT_BASE_URL missing/invalid. Falling back to Classic.",
-      );
+      logFallbackToClassic("missing-env-config (VITE_NANOGPT_API_KEY or VITE_NANOGPT_BASE_URL)");
       this.fallbackToClassic();
       return;
     }
@@ -89,10 +88,7 @@ export class LLMDirectorBiblePhase extends Phase {
       clearPendingBible();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn("[llm-director] Story bible generation failed — reason:", msg);
-      console.warn(
-        "[llm-director] Falling back to Classic. Common causes: timeout (raise bible timeout), schema validation exhausted retries (model wouldn't emit valid JSON), or 4xx (account/auth).",
-      );
+      logFallbackToClassic(`bible-gen-failed: ${msg}`);
       // Bad cache; clear so the next attempt isn't poisoned by the same error.
       clearPendingBible();
     }
@@ -148,7 +144,7 @@ export class LLMDirectorBiblePhase extends Phase {
     // queueMessage also unshifts, it ends up in front).
     const firstAct = globalScene.gameData.llmDirectorState.storyBible?.acts[0];
     if (firstAct && typeof firstAct.biomeId === "number" && globalScene.arena?.biomeId !== firstAct.biomeId) {
-      console.info(`[llm-director] Setting wave-1 biome to ${firstAct.biomeId} from act 1 (${firstAct.name})`);
+      logBiomeSwitch("bible-first-act", globalScene.arena?.biomeId, firstAct.biomeId, firstAct.name);
       globalScene.phaseManager.unshiftNew("SwitchBiomePhase", firstAct.biomeId as BiomeId);
     }
     // queueMessage unshifts (adds to front), so iterating in reverse here

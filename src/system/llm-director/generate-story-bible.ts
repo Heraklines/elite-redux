@@ -1,6 +1,12 @@
 import { type StoryBible, validateStoryBible } from "#data/llm-director/beat-schema";
 import { STORY_BIBLE_SYSTEM_PROMPT } from "#data/llm-director/system-prompts";
 import type { DirectorClient } from "#system/llm-director/director-client";
+import {
+  logBibleParsed,
+  logBibleRequest,
+  logBibleResponse,
+  logBibleValidationFail,
+} from "#system/llm-director/director-log";
 
 /**
  * One DeepSeek call → validated StoryBible. On schema failure
@@ -49,6 +55,9 @@ export async function generateStoryBible(client: DirectorClient, opts: GenerateS
         ? `Theme seed: ${opts.seedText}\n\nGenerate the story bible.`
         : `Theme seed: ${opts.seedText}\n\nYour previous output failed validation: ${lastError}\nRe-emit valid JSON.`;
 
+    if (attempt === 1) {
+      logBibleRequest(opts.seedText);
+    }
     const result = await client.complete({
       model,
       messages: [
@@ -59,19 +68,23 @@ export async function generateStoryBible(client: DirectorClient, opts: GenerateS
       responseFormat: "json_object",
       maxTokens: 2500,
     });
+    logBibleResponse(result.content, result.latencyMs);
 
     let parsed: unknown;
     try {
       parsed = parseLooseJson(result.content);
     } catch (err) {
       lastError = `JSON parse error: ${err instanceof Error ? err.message : String(err)}`;
+      logBibleValidationFail(lastError, attempt);
       continue;
     }
     const validation = validateStoryBible(parsed);
     if (validation.ok) {
+      logBibleParsed(parsed);
       return parsed as StoryBible;
     }
     lastError = validation.error;
+    logBibleValidationFail(lastError, attempt);
   }
   throw new Error(`generateStoryBible: validation failed after ${maxRetries} attempts: ${lastError}`);
 }

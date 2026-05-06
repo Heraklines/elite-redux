@@ -2,6 +2,12 @@ import { type Beat, validateBeat } from "#data/llm-director/beat-schema";
 import { BEAT_PROSE_SYSTEM_PROMPT, BEAT_SKELETON_SYSTEM_PROMPT } from "#data/llm-director/system-prompts";
 import type { ContextEnvelope } from "#system/llm-director/context-envelope";
 import type { DirectorClient } from "#system/llm-director/director-client";
+import {
+  logBeatParsed,
+  logBeatRequest,
+  logBeatResponse,
+  logBeatValidationFail,
+} from "#system/llm-director/director-log";
 
 /**
  * Two-phase beat generation:
@@ -69,9 +75,14 @@ async function runSkeletonPhase(
   timeoutMs: number,
 ): Promise<Beat | null> {
   let lastError = "";
+  const wave = envelope.currentWaveIndex;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     let parsed: unknown;
     try {
+      if (attempt === 1) {
+        const envelopeBytes = JSON.stringify(envelope).length;
+        logBeatRequest(wave, envelopeBytes / 1024);
+      }
       const result = await client.complete({
         model,
         messages: [
@@ -82,16 +93,20 @@ async function runSkeletonPhase(
         responseFormat: "json_object",
         maxTokens: 1200,
       });
+      logBeatResponse(wave, result.content, result.latencyMs);
       parsed = parseLooseJson(result.content);
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
+      logBeatValidationFail(wave, lastError, attempt);
       continue;
     }
     const validation = validateBeat(parsed);
     if (validation.ok) {
+      logBeatParsed(wave, parsed);
       return parsed as Beat;
     }
     lastError = validation.error;
+    logBeatValidationFail(wave, lastError, attempt);
   }
   return null;
 }

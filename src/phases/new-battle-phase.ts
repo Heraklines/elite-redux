@@ -3,6 +3,7 @@ import type { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
 import { BattlePhase } from "#phases/battle-phase";
 import { applyOverrideToBattle } from "#phases/llm-director-beat-utils";
+import { logBiomeSwitch } from "#system/llm-director/director-log";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 
 export class NewBattlePhase extends BattlePhase {
@@ -62,9 +63,7 @@ export class NewBattlePhase extends BattlePhase {
     if (currentBiome === act.biomeId) {
       return;
     }
-    console.info(
-      `[llm-director] Act boundary at wave ${wave}: switching biome ${currentBiome} -> ${act.biomeId} (${act.name})`,
-    );
+    logBiomeSwitch(`act-boundary-wave-${wave}`, currentBiome, act.biomeId, act.name);
     globalScene.phaseManager.unshiftNew("SwitchBiomePhase", act.biomeId as BiomeId);
   }
 
