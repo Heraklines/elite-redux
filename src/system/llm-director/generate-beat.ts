@@ -24,22 +24,44 @@ import {
 
 export interface GenerateBeatOptions {
   envelope: ContextEnvelope;
-  /** Defaults to deepseek/deepseek-v4-flash (~7s — fastest non-thinking subscription model). */
+  /**
+   * Primary skeleton model. Default minimax/minimax-latest (~24s on a real
+   * beat prompt; richer prose, broader variety vs deepseek-flash which
+   * over-indexes on stock phrasings and item picks).
+   */
   skeletonModel?: string;
+  /**
+   * Ordered fallback chain. Each is tried in order on network/timeout
+   * errors. Validation errors break out — they're model-agnostic.
+   */
+  fallbackSkeletonModels?: readonly string[];
   /** Defaults to moonshotai/kimi-k2.6 (better prose voice, used only when withProsePass is on). */
   proseModel?: string;
   /** Default 3. */
   maxRetries?: number;
-  /** Default 30s — comfortably above the ~7s typical for the fast skeleton model. */
+  /** Default 90s — comfortable for the slower-but-better primary; pre-gen
+   *  buffer is 3 waves ahead so up to 90s feels instant to the player. */
   timeoutMs?: number;
   /** v1 default false; turn on once costs are characterized. */
   withProsePass?: boolean;
 }
 
-const DEFAULT_SKELETON_MODEL = "deepseek/deepseek-v4-flash";
+/**
+ * Beat-generation model chain. Probed against a real beat prompt:
+ *
+ *   minimax/minimax-latest      : ~24s, varied prose + items, schema-clean ✓
+ *   deepseek/deepseek-v4-flash  : ~5s, but heavy repetition across beats
+ *   zai-org/glm-latest          : works but slow (~90s)
+ *   moonshotai/kimi-k2.6        : hangs on beat prompts (>150s no response) ✗
+ *
+ * MiniMax primary for quality. DeepSeek-flash fallback for the hot path
+ * if MiniMax is unavailable / hangs. GLM as last resort.
+ */
+const DEFAULT_SKELETON_MODEL = "minimax/minimax-latest";
+const DEFAULT_SKELETON_FALLBACK_CHAIN: readonly string[] = ["deepseek/deepseek-v4-flash", "zai-org/glm-latest"];
 const DEFAULT_PROSE_MODEL = "moonshotai/kimi-k2.6";
 const DEFAULT_MAX_RETRIES = 3;
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 90_000;
 
 const FENCE_REGEX = /^```(?:json)?\s*([\s\S]*?)\s*```$/m;
 
@@ -70,60 +92,81 @@ function fallbackBeat(envelope: ContextEnvelope): Beat {
 async function runSkeletonPhase(
   client: DirectorClient,
   envelope: ContextEnvelope,
-  model: string,
+  primaryModel: string,
+  fallbackModels: readonly string[],
   maxRetries: number,
   timeoutMs: number,
 ): Promise<Beat | null> {
-  let lastError = "";
   const wave = envelope.currentWaveIndex;
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    let parsed: unknown;
-    try {
-      if (attempt === 1) {
-        const envelopeBytes = JSON.stringify(envelope).length;
-        logBeatRequest(wave, envelopeBytes / 1024);
+  const envelopeBytes = JSON.stringify(envelope).length;
+  logBeatRequest(wave, envelopeBytes / 1024);
+
+  // Build dedup'd model chain: primary first, then fallbacks.
+  const seen = new Set<string>();
+  const modelsToTry: string[] = [];
+  for (const m of [primaryModel, ...fallbackModels]) {
+    if (m && !seen.has(m)) {
+      seen.add(m);
+      modelsToTry.push(m);
+    }
+  }
+
+  let lastError = "";
+  for (const model of modelsToTry) {
+    let lastWasValidationError = false;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      let parsed: unknown;
+      try {
+        const result = await client.complete({
+          model,
+          messages: [
+            { role: "system", content: BEAT_SKELETON_SYSTEM_PROMPT },
+            { role: "user", content: buildUserPrompt(envelope, attempt > 1 ? lastError : undefined) },
+          ],
+          timeoutMs,
+          responseFormat: "json_object",
+          // 4000 tokens lets the LLM emit a full beat + 2 inter-beat overrides
+          // without truncation.
+          maxTokens: 4000,
+        });
+        logBeatResponse(wave, result.content, result.latencyMs);
+        parsed = parseLooseJson(result.content);
+      } catch (err) {
+        // Network / timeout / server error — break out of retries and try
+        // the next model in the chain (don't burn retries on a hung model).
+        lastError = err instanceof Error ? err.message : String(err);
+        logBeatValidationFail(wave, `${model}: ${lastError}`, attempt);
+        lastWasValidationError = false;
+        break;
       }
-      const result = await client.complete({
-        model,
-        messages: [
-          { role: "system", content: BEAT_SKELETON_SYSTEM_PROMPT },
-          { role: "user", content: buildUserPrompt(envelope, attempt > 1 ? lastError : undefined) },
-        ],
-        timeoutMs,
-        responseFormat: "json_object",
-        // 4000 tokens lets the LLM emit a full beat + 2 inter-beat overrides
-        // (preBattleText for next 2 waves) without truncation. The previous
-        // 1200 cap was cutting off mid-JSON on rich beats.
-        maxTokens: 4000,
-      });
-      logBeatResponse(wave, result.content, result.latencyMs);
-      parsed = parseLooseJson(result.content);
-    } catch (err) {
-      lastError = err instanceof Error ? err.message : String(err);
-      logBeatValidationFail(wave, lastError, attempt);
-      continue;
-    }
-    const validation = validateBeat(parsed);
-    if (!validation.ok) {
-      lastError = validation.error;
-      logBeatValidationFail(wave, lastError, attempt);
-      continue;
-    }
-    // First-beat semantic check: dialogue_choice with at least one
-    // non-custom effect on each option AND at least one option with a
-    // non-empty consequence.items[] (rewards-shop menu). This is enforced
-    // in the prompt; we re-check here to fail fast and retry instead of
-    // letting a flat first beat ship.
-    if (envelope.isFirstBeat) {
-      const semanticErr = validateFirstBeatSemantics(parsed as Beat);
-      if (semanticErr) {
-        lastError = `first-beat semantic check: ${semanticErr}`;
-        logBeatValidationFail(wave, lastError, attempt);
+      const validation = validateBeat(parsed);
+      if (!validation.ok) {
+        lastError = validation.error;
+        logBeatValidationFail(wave, `${model}: ${lastError}`, attempt);
+        lastWasValidationError = true;
         continue;
       }
+      // First-beat semantic check: dialogue_choice with at least one
+      // non-custom effect on each option AND at least one option with a
+      // non-empty consequence.items[] (rewards-shop menu).
+      if (envelope.isFirstBeat) {
+        const semanticErr = validateFirstBeatSemantics(parsed as Beat);
+        if (semanticErr) {
+          lastError = `first-beat semantic check: ${semanticErr}`;
+          logBeatValidationFail(wave, `${model}: ${lastError}`, attempt);
+          lastWasValidationError = true;
+          continue;
+        }
+      }
+      logBeatParsed(wave, parsed);
+      return parsed as Beat;
     }
-    logBeatParsed(wave, parsed);
-    return parsed as Beat;
+    // Validation errors burned all retries — switching models won't help
+    // since the schema/semantic constraints are model-agnostic.
+    if (lastWasValidationError) {
+      break;
+    }
+    // Network/timeout — try next model in the chain.
   }
   return null;
 }
@@ -170,11 +213,19 @@ async function runProsePhase(client: DirectorClient, beat: Beat, model: string, 
 
 export async function generateBeat(client: DirectorClient, opts: GenerateBeatOptions): Promise<Beat> {
   const skeletonModel = opts.skeletonModel ?? DEFAULT_SKELETON_MODEL;
+  const fallbackSkeletonModels = opts.fallbackSkeletonModels ?? DEFAULT_SKELETON_FALLBACK_CHAIN;
   const proseModel = opts.proseModel ?? DEFAULT_PROSE_MODEL;
   const maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-  const skeleton = await runSkeletonPhase(client, opts.envelope, skeletonModel, maxRetries, timeoutMs);
+  const skeleton = await runSkeletonPhase(
+    client,
+    opts.envelope,
+    skeletonModel,
+    fallbackSkeletonModels,
+    maxRetries,
+    timeoutMs,
+  );
   if (!skeleton) {
     return fallbackBeat(opts.envelope);
   }

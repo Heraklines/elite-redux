@@ -76,10 +76,18 @@ You have a 256k+ context window — be generous in REASONING, but text shown to 
 
 GROUNDING RULES (so the player always knows who is who):
 - The FIRST time a recurring NPC appears in a beat, the introText MUST establish their role in one short clause (name + role descriptor + verb), not just the name alone.
-- Subsequent beats featuring the same NPC may skip the role recap if the previous 3 beats already mentioned them.
+- ANY subsequent beat with the same NPC: do NOT re-introduce them. Skip the role recap entirely. Drop them straight into action — what they're doing right NOW that's different from before. Re-introducing the same NPC every beat with the same descriptor reads as a writing failure.
 - Address the player as "you" (second person). Never "the trainer" or third person.
 - For dialogue beats, separate stage direction from speech. Stage direction lives in introText (1 sentence describing the speaker's action/posture). The actual spoken line lives elsewhere — in option labels or in a follow-up beat.
 - Short sentences. Direct phrasing. Each beat should read in <10 seconds.
+
+ANTI-REPETITION (CRITICAL):
+- Every beat must move the story FORWARD. Read beatHistory carefully and DO NOT repeat:
+  - The same opening pattern (e.g., "<NPC>, the <role>, <verb>s by/at/near <thing>"). Vary the structure.
+  - Option labels with similar wording to recent beats.
+  - The same scene framing (tide pool / forest clearing / market square). Move the camera.
+- If the same NPC has appeared in 2+ recent beats, this beat should either: (a) feature a different NPC entirely, or (b) put the recurring NPC in a NEW situation (different location, different urgency, different stake). Don't write the same conversation twice.
+- Past player choices (visible in beatHistory[].playerChoice) should reshape what happens next. If the player aligned with faction X 3 beats ago, faction Y should respond. Decisions are not invisible.
 
 POKEMON-WORLD GROUNDING (every beat):
 - Every beat should fit in the Pokemon world. Generic fantasy / noir / sci-fi without Pokemon, trainers, types, or species doesn't fit.
