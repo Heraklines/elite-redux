@@ -55,20 +55,24 @@ export class LLMDirectorBeatPhase extends Phase {
 
   public override async start(): Promise<void> {
     super.start();
+    console.info(`[llm-director] BeatPhase start, wave=${this.waveIndex}`);
 
     const runtime = getDirectorRuntime();
     if (!runtime) {
       // No runtime → mode was started without env config. Just end the phase
       // and let the vanilla flow resume.
+      console.warn("[llm-director] BeatPhase: no runtime, ending without beat");
       this.end();
       return;
     }
 
     const beat = await runtime.queue.tryTake(this.waveIndex, { timeoutMs: this.takeTimeoutMs });
     if (!beat) {
+      console.warn(`[llm-director] BeatPhase wave=${this.waveIndex}: queue underrun, falling to filler`);
       this.handleUnderrun();
       return;
     }
+    console.info(`[llm-director] BeatPhase wave=${this.waveIndex}: got beat type=${beat.type}, id=${beat.beatId}`);
 
     // Always kick off the next beat as soon as we resolve this one — keeps
     // the 1-ahead buffer warm.

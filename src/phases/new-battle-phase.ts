@@ -19,11 +19,16 @@ export class NewBattlePhase extends BattlePhase {
     // since they need deeper hooks into trainer party generation.
     if (globalScene.gameMode.modeId === GameModes.LLM_DIRECTOR) {
       this.applyPendingDirectorOverride();
-      // Wave-cadence hook: every 3rd wave fires a Director beat BEFORE the
-      // vanilla EncounterPhase. The beat phase is unshifted (rather than
-      // pushed) so it runs immediately after this NewBattlePhase ends.
+      // NewBattlePhase fires when transitioning between waves (wave 2 onward).
+      // The first beat (wave 1 intro) is fired by BiblePhase via the queue;
+      // here we fire on every 3rd wave (3, 6, 9, …).
       const wave = globalScene.currentBattle?.waveIndex ?? 0;
-      if (wave > 0 && wave % 3 === 0) {
+      const isBeatWave = wave > 0 && wave % 3 === 0;
+      console.info(
+        `[llm-director] NewBattlePhase wave=${wave}, isBeatWave=${isBeatWave}, mode=${globalScene.gameMode.modeId}`,
+      );
+      if (isBeatWave) {
+        console.info(`[llm-director] Unshifting LLMDirectorBeatPhase for wave ${wave}`);
         globalScene.phaseManager.unshiftNew("LLMDirectorBeatPhase", wave);
       }
     }
