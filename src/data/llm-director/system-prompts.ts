@@ -132,6 +132,64 @@ POKÉROGUE'S MODIFIER SYSTEM (read this when authoring teams or item rewards):
 - For \`consequence.items[].modifierType\`: use ANY key from modifierCatalog. Player rewards are typically: POTION, SUPER_POTION, REVIVE (early); RARE_CANDY, ETHER, ELIXIR, BERRY_* (mid); MAX_REVIVE, SACRED_ASH, MASTER_BALL, MEGA_BRACELET (late/special).
 - Power scale: a wave 30 trainer ace might have 1-2 stacked stat-boosters (PROTEIN ×2). A wave 100+ trainer ace might have 4-5 stacked. Match this to wave + difficultyTag.
 
+FILL EVERY INTER-BEAT OVERRIDE FULLY (CRITICAL — every wave should feel hand-crafted):
+
+For each interBeatOverride, populate these fields whenever the story implies them. Don't be lazy with preBattleText alone — the player NOTICES when the trainer sprite is generic Joe instead of the Concordat Ranger you described.
+
+\`\`\`json
+{
+  "atWaveOffset": 1,
+  "preBattleText": "story-themed line just before the battle (max 240 chars)",
+  "postWinText": "what happens after victory — found a note, the trainer flees, the patrol radios in (max 240 chars)",
+  "postLossText": "what happens if the player loses — captured, escape narrowly, lose a clue (max 240 chars)",
+  "trainerName": "Concordat Ranger Vance",  // overrides the default trainer-class display name
+  "trainerOverride": {
+    "trainerType": <id from gameBalanceCard.trainerTypeCatalog>,  // PICK THE SPRITE that matches the story (RANGER for Ranger Corps, BIKER for street thug, HEX_MANIAC for cultist, FAIRY_TALE_GIRL for whimsical encounter, etc.)
+    "levelDelta": 0,                        // only deviate if the narrative justifies it
+    "enemyTeam": [                          // OPTIONAL but strongly preferred for named/scripted fights
+      {"speciesId": 229, "level": 12, "moveIds": [44, 257], "heldItemKeys": ["FOCUS_BAND"]}
+    ]
+  },
+  "victoryRewards": [                       // FOR CACHE / LOOT scenarios — describe what's in the cache
+    {"modifierType": "POTION", "qty": 2},
+    {"modifierType": "PROTEIN", "qty": 1}
+  ],
+  "victoryEffects": [                       // OR any of the discriminated effects
+    {"type": "heal_party_full"},
+    {"type": "give_money", "amount": 500}
+  ],
+  "defeatEffects": [
+    {"type": "lose_money", "amount": 100},
+    {"type": "custom", "description": "The Corps confiscates your bag", "positive": false}
+  ]
+}
+\`\`\`
+
+Example (story: "Pip's note leads you to a Linebreaker cache hidden in an old barn"):
+\`\`\`json
+{
+  "atWaveOffset": 2,
+  "preBattleText": "A disgruntled farmer leans on a pitchfork outside the barn, eyes narrow. He whistles his Mightyena.",
+  "postWinText": "Inside the barn: crates marked with the Linebreaker sigil, plus a manifest you barely have time to pocket.",
+  "postLossText": "The farmer kicks the manifest into the fire. You walk away empty-handed and bruised.",
+  "trainerName": "Bitter Farmer",
+  "trainerOverride": {
+    "trainerType": <RANGER or HIKER id from catalog>,  // pick whichever sprite reads "rural enforcer"
+    "enemyTeam": [
+      {"speciesId": 262, "level": 10, "moveIds": [44, 252]},
+      {"speciesId": 263, "level": 9}
+    ]
+  },
+  "victoryRewards": [
+    {"modifierType": "POTION", "qty": 2},
+    {"modifierType": "BERRY", "qty": 3}
+  ],
+  "victoryEffects": [
+    {"type": "custom", "description": "The manifest names a supply train passing Ashfall Ridge in three days.", "positive": true}
+  ]
+}
+\`\`\`
+
 ALWAYS EMIT INTER-BEAT OVERRIDES (CRITICAL — every beat must include 2 of these):
 - The player plays 2 vanilla wave battles between beats. WITHOUT story-themed narration on those waves, the run feels like Classic with story dialogue once in a while.
 - For EACH beat, include \`interBeatOverrides\` with TWO entries (atWaveOffset 1 and 2), each with:

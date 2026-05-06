@@ -41,17 +41,32 @@ export interface AuthoredPokemon {
 export interface InterBeatOverride {
   atWaveOffset: 1 | 2;
   trainerOverride?: {
+    /** Trainer-class id from gameBalanceCard.trainerTypeCatalog. Picks the
+     * SPRITE for this wave. Use whenever the story implies a specific
+     * faction/role (RANGER for "Concordat Ranger", BIKER for "street gang",
+     * HEX_MANIAC for "cultist"). */
+    trainerType?: number;
     speciesSwaps?: number[];
     levelDelta?: number;
     /** Full LLM-authored team for the upcoming trainer wave (1-6 entries). */
     enemyTeam?: AuthoredPokemon[];
   };
   biomeFlavorText?: string;
-  /** Story-themed line spoken just before the battle starts. Replaces the
-   * vanilla trainer's canned dialogue for that wave. Max ~200 chars. */
+  /** Story-themed line spoken just before the battle starts. Max ~240 chars. */
   preBattleText?: string;
+  /** Story-themed line shown after winning this wave. Max ~240 chars. */
+  postWinText?: string;
+  /** Story-themed line shown if the player loses this wave. Max ~240 chars. */
+  postLossText?: string;
   /** Optional per-trainer name override for narrative consistency. */
   trainerName?: string;
+  /** Items granted on victory (besides vanilla rewards). For caches, loot
+   * drops, plot-relevant pickups. */
+  victoryRewards?: ConsequenceItem[];
+  /** Effects applied on victory — heal party, give XP, lose status, etc. */
+  victoryEffects?: ConsequenceEffect[];
+  /** Effects applied on defeat. */
+  defeatEffects?: ConsequenceEffect[];
 }
 
 export interface ConsequenceItem {
@@ -865,6 +880,16 @@ const enemyTeamSchema = {
   items: authoredPokemonSchema,
 } as const;
 
+const consequenceItemSchema = {
+  type: "object",
+  required: ["modifierType", "qty"],
+  properties: {
+    modifierType: { type: "string", minLength: 1 },
+    qty: { type: "integer", minimum: 1, maximum: 99 },
+  },
+  additionalProperties: false,
+} as const;
+
 const interBeatOverrideSchema = {
   type: "object",
   required: ["atWaveOffset"],
@@ -873,15 +898,21 @@ const interBeatOverrideSchema = {
     trainerOverride: {
       type: "object",
       properties: {
+        trainerType: { type: "integer", minimum: 0 },
         speciesSwaps: { type: "array", items: { type: "integer" } },
         levelDelta: { type: "integer" },
         enemyTeam: enemyTeamSchema,
       },
       additionalProperties: false,
     },
-    biomeFlavorText: { type: "string" },
+    biomeFlavorText: { type: "string", maxLength: 240 },
     preBattleText: { type: "string", maxLength: 240 },
+    postWinText: { type: "string", maxLength: 240 },
+    postLossText: { type: "string", maxLength: 240 },
     trainerName: { type: "string", maxLength: 40 },
+    victoryRewards: { type: "array", maxItems: 6, items: consequenceItemSchema },
+    victoryEffects: { type: "array", maxItems: 6, items: consequenceEffectSchema },
+    defeatEffects: { type: "array", maxItems: 6, items: consequenceEffectSchema },
   },
   additionalProperties: false,
 } as const;

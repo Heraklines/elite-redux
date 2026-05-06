@@ -113,6 +113,35 @@ export class NewBattlePhase extends BattlePhase {
       globalScene.phaseManager.queueMessage(override.preBattleText, null, true);
       logTrainerNarrationApplied(battle.waveIndex, override.preBattleText);
     }
+    // Trainer name override: best-effort cosmetic so the trainer is
+    // displayed as "Concordat Ranger Vance" instead of "Ranger Joe".
+    if (override.trainerName && battle.trainer) {
+      battle.trainer.name = override.trainerName;
+    }
+    // Trainer sprite override: switching trainerType mid-NewBattle is
+    // invasive and risks breaking the encounter pipeline. Deferred to v3
+    // when we hook into the trainer-creation step earlier in the flow.
+    if (override.trainerOverride?.trainerType !== undefined) {
+      console.info(
+        `[llm-director] trainer-sprite-override wave=${battle.waveIndex} requested trainerType=${override.trainerOverride.trainerType} (deferred to v3 — needs trainer-creation hook, not post-create)`,
+      );
+    }
+    // postWinText / postLossText / victoryRewards / victoryEffects /
+    // defeatEffects are accepted by the schema and ride through the
+    // trace log, but consumption by VictoryPhase / FaintPhase is v3.
+    // For now, the LLM emits them, the player sees the intent in the
+    // trace, and we know what to wire next.
+    if (
+      override.postWinText
+      || override.postLossText
+      || (override.victoryRewards && override.victoryRewards.length > 0)
+      || (override.victoryEffects && override.victoryEffects.length > 0)
+      || (override.defeatEffects && override.defeatEffects.length > 0)
+    ) {
+      console.info(
+        `[llm-director] post-wave-hook wave=${battle.waveIndex} (postWinText=${!!override.postWinText} postLossText=${!!override.postLossText} rewards=${override.victoryRewards?.length ?? 0} victoryEffects=${override.victoryEffects?.length ?? 0} defeatEffects=${override.defeatEffects?.length ?? 0}) — schema accepted, applier deferred to v3`,
+      );
+    }
   }
 
   /**
