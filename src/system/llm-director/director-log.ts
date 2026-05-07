@@ -86,12 +86,12 @@ export function logBeatRequest(wave: number, envelopeSizeKb: number): void {
   emit("beat-request", { wave, envelopeSizeKb: Number(envelopeSizeKb.toFixed(1)) });
 }
 
-export function logBeatResponse(wave: number, rawContent: string, latencyMs: number): void {
-  emit("beat-response", { wave, latencyMs, rawContent: pretty(rawContent, 1000), rawFull: rawContent });
+export function logBeatResponse(wave: number, rawContent: string, latencyMs: number, model?: string): void {
+  emit("beat-response", { wave, model, latencyMs, rawContent: pretty(rawContent, 1000), rawFull: rawContent });
 }
 
-export function logBeatParsed(wave: number, beat: unknown): void {
-  emit("beat-parsed", { wave, beat });
+export function logBeatParsed(wave: number, beat: unknown, model?: string): void {
+  emit("beat-parsed", { wave, model, beat });
 }
 
 export function logBeatValidationFail(wave: number, error: string, attempt: number): void {

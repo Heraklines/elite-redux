@@ -50,27 +50,19 @@ export interface GenerateBeatOptions {
 }
 
 /**
- * Beat-generation model chain. Probed in playtest with the actual beat
- * prompt + 50K-token envelope:
+ * Beat-generation model. User explicitly locked this to MiniMax-only
+ * (no fallback chain): the quality difference vs DeepSeek-Flash is large
+ * enough that they prefer waiting through MiniMax's slow tail (or
+ * accepting a rare filler) over silent fallbacks degrading the run.
  *
- *   minimax/minimax-latest     : 24-153s (highly variable), better prose
- *                                + tighter narrative cohesion than other
- *                                options. User explicitly chose this as
- *                                primary despite the latency variance —
- *                                quality over speed.
- *   deepseek/deepseek-v4-flash : ~5-15s, schema-clean, occasional repetition
- *   zai-org/glm-latest         : ~95s, works
- *   moonshotai/kimi-k2.6       : hangs on beat-sized prompts (>150s) ✗
- *
- * The earlier MiniMax->DeepSeek revert was made to keep the player off
- * filler beats, but the user preferred MiniMax's quality and asked to
- * just bump the timeouts. Both per-call timeout and BeatPhase
- * takeTimeoutMs are now 5 minutes — the player will wait on a loading
- * overlay rather than fall into a generic filler. Pre-gen happens in
- * background so most beats arrive before the player reaches them.
+ * If MiniMax is genuinely down (network error, server unavailable),
+ * retries on the same model still fire, then the fallback BEAT in
+ * generate-beat.ts emits a tone-neutral filler — we never silently
+ * downgrade to a different LLM.
  */
 const DEFAULT_SKELETON_MODEL = "minimax/minimax-latest";
-const DEFAULT_SKELETON_FALLBACK_CHAIN: readonly string[] = ["deepseek/deepseek-v4-flash", "zai-org/glm-latest"];
+/** Empty: no auto-fallback. User wants MiniMax or filler, nothing in between. */
+const DEFAULT_SKELETON_FALLBACK_CHAIN: readonly string[] = [];
 const DEFAULT_PROSE_MODEL = "moonshotai/kimi-k2.6";
 const DEFAULT_MAX_RETRIES = 3;
 /** Default 5 minutes per call. MiniMax variance hits 150s+ on long
@@ -145,7 +137,7 @@ async function runSkeletonPhase(
           // without truncation.
           maxTokens: 4000,
         });
-        logBeatResponse(wave, result.content, result.latencyMs);
+        logBeatResponse(wave, result.content, result.latencyMs, model);
         parsed = parseLooseJson(result.content);
       } catch (err) {
         // Network / timeout / server error — break out of retries and try
@@ -183,7 +175,7 @@ async function runSkeletonPhase(
         lastWasValidationError = true;
         continue;
       }
-      logBeatParsed(wave, parsed);
+      logBeatParsed(wave, parsed, model);
       return parsed as Beat;
     }
     // Validation errors burned all retries — switching models won't help
