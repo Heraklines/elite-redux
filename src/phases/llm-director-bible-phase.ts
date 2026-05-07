@@ -46,10 +46,21 @@ export class LLMDirectorBiblePhase extends Phase {
   /** Wave for the first generated beat. v3 default = 1 (forced wave-1
    * mystery event so testing/playtest sees the system engage immediately). */
   private readonly firstBeatWave: number;
+  /**
+   * Resume mode — caller (TitlePhase loaded branch) explicitly tells us
+   * "this is a saved run, the bible is already in state, just rewire the
+   * runtime queue and exit." We do NOT auto-detect resume from the
+   * presence of state.storyBible because stale director state can leak
+   * across new runs (in-process gameData isn't always cleared between
+   * runs); using the explicit flag avoids stepping on a fresh run that
+   * happens to inherit a leftover bible.
+   */
+  private readonly isResume: boolean;
 
-  public constructor(firstBeatWave = 1) {
+  public constructor(firstBeatWave = 1, isResume = false) {
     super();
     this.firstBeatWave = firstBeatWave;
+    this.isResume = isResume;
   }
 
   public override async start(): Promise<void> {
@@ -62,32 +73,46 @@ export class LLMDirectorBiblePhase extends Phase {
       return;
     }
 
-    // RESUME path: the player loaded a save and the bible is already
-    // persisted on llmDirectorState. We must NOT regenerate (would
-    // overwrite the in-progress story) and we must NOT show the wave-1
-    // intro again. We only need to RE-WIRE the queue's generator (the
-    // DirectorRuntime is process-scoped — its placeholder generator
-    // throws until setGenerator runs) and kick off the next upcoming
-    // beat so beats keep flowing as the player walks. The currently-
-    // running wave's beat (if any) will surface on the next BeatPhase
-    // tryTake; we don't need to fire a wave-1 forced beat.
+    // RESUME path: explicitly flagged by TitlePhase on the loaded branch.
+    // The player loaded a save, the bible is already persisted on
+    // llmDirectorState, and we just need to rewire the runtime queue
+    // (the DirectorQueue is process-scoped; its placeholder generator
+    // throws until setGenerator runs). No regeneration, no intro
+    // narration. The next on-cadence BeatPhase tryTake gets the queued
+    // beat as it would on a fresh run.
     const state = globalScene.gameData.llmDirectorState;
-    if (state.storyBible) {
-      runtime.queue.reset();
-      runtime.queue.setGenerator(wave => this.runBeatGeneration(wave));
-      const currentWave = globalScene.currentBattle?.waveIndex ?? 1;
-      const nextBeatWave = Math.max(3, Math.floor(currentWave / 3) * 3 + 3);
-      runtime.queue.kickOff(nextBeatWave);
-      console.info(
-        `[llm-director] bible phase RESUME — bible already persisted (theme="${state.storyBible.themeName}"), wired queue and kicked off wave ${nextBeatWave}`,
+    if (this.isResume) {
+      if (state.storyBible) {
+        runtime.queue.reset();
+        runtime.queue.setGenerator(wave => this.runBeatGeneration(wave));
+        const currentWave = globalScene.currentBattle?.waveIndex ?? 1;
+        const nextBeatWave = Math.max(3, Math.floor(currentWave / 3) * 3 + 3);
+        runtime.queue.kickOff(nextBeatWave);
+        console.info(
+          `[llm-director] bible phase RESUME — bible already persisted (theme="${state.storyBible.themeName}"), wired queue and kicked off wave ${nextBeatWave}`,
+        );
+        this.end();
+        return;
+      }
+      // Edge case: marked as resume but state has no bible — fall
+      // through to fresh generation rather than leaving the queue
+      // dead. Logs so it's visible in the trace.
+      console.warn(
+        "[llm-director] bible phase RESUME flagged but no persisted bible found — falling through to fresh generation",
       );
-      this.end();
-      return;
     }
 
-    // FRESH-RUN path: bible isn't in state yet. Await the pending
-    // generation kicked off by LLMDirectorStartPhase (or kick off one
-    // here if Start didn't run for some reason).
+    // FRESH-RUN path: await the pending bible generation kicked off by
+    // LLMDirectorStartPhase (or kick one off here if Start didn't run).
+    // Crucially, we ALWAYS regenerate the bible on a fresh run —
+    // never lean on a leaked state.storyBible from a previous run in
+    // the same process. Clear any lingering state up front.
+    (state as { storyBible?: unknown }).storyBible = undefined;
+    state.beatHistory = [];
+    state.factionRep = {};
+    state.alignment = 0;
+    state.flags = {};
+    state.npcMemory = {};
     let pending = getPendingBible();
     if (!pending) {
       pending = ensurePendingBible(seed => generateStoryBible(runtime.client, { seedText: seed.text }));

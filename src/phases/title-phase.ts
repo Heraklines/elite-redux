@@ -388,10 +388,13 @@ export class TitlePhase extends Phase {
     // generator is process-scoped — its placeholder throws until BiblePhase
     // calls setGenerator. Without re-running BiblePhase on load, beats
     // never generate and the player sees no story. BiblePhase's resume
-    // path detects the persisted bible, skips regeneration + intro
-    // narration, and just rewires the queue.
+    // path takes the persisted bible, skips regeneration + intro narration,
+    // and just rewires the queue. The 2nd ctor arg (isResume=true)
+    // explicitly flags this so the phase doesn't try to detect resume
+    // from state alone (which can mis-trigger on a fresh run that
+    // inherits leftover state from a previous in-process run).
     if (this.loaded && globalScene.gameMode.modeId === GameModes.LLM_DIRECTOR) {
-      globalScene.phaseManager.pushNew("LLMDirectorBiblePhase");
+      globalScene.phaseManager.pushNew("LLMDirectorBiblePhase", 1, true);
     }
 
     if (this.loaded) {
