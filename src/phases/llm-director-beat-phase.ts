@@ -54,18 +54,19 @@ export class LLMDirectorBeatPhase extends Phase {
   /**
    * Wall-clock budget the player will tolerate between waves while the
    * Director finishes generating the beat. If the buffered beat isn't
-   * ready when this phase fires, we await up to this long before giving
-   * up and playing a filler beat.
+   * ready when this phase fires, we await up to this long (showing a
+   * "preparing the next scene" overlay) before giving up and playing
+   * a filler beat.
    *
-   * Default 15s. The buffered beat is kicked off ~2-3 waves earlier on
-   * DeepSeek-Flash (~5-15s response), so usually it's already in `ready`
-   * and tryTake returns instantly. 15s covers a one-off slow response
-   * or a validation retry; longer than that and the player notices the
-   * pause. Filler fires for genuine outages.
+   * Default 5 minutes. With MiniMax as primary and its 60-150s+
+   * variance + up to 3 validation retries, the wait can be long.
+   * User's explicit preference: keep MiniMax for quality, the player
+   * will wait. Filler fires only for catastrophic outages (>5min with
+   * zero progress).
    */
   private readonly takeTimeoutMs: number;
 
-  public constructor(waveIndex: number, takeTimeoutMs = 15_000) {
+  public constructor(waveIndex: number, takeTimeoutMs = 300_000) {
     super();
     this.waveIndex = waveIndex;
     this.takeTimeoutMs = takeTimeoutMs;
@@ -84,7 +85,36 @@ export class LLMDirectorBeatPhase extends Phase {
       return;
     }
 
-    const beat = await runtime.queue.tryTake(this.waveIndex, { timeoutMs: this.takeTimeoutMs });
+    // If the beat isn't already buffered (queue.ready) when we hit the
+    // beat wave, the player would otherwise stare at a frozen frame for
+    // up to 5 minutes. Show a "preparing the next scene..." overlay so
+    // they know the system is working. We only fire the overlay when
+    // the beat genuinely needs awaiting; an instantly-resolved tryTake
+    // skips it.
+    const beatPromise = runtime.queue.tryTake(this.waveIndex, { timeoutMs: this.takeTimeoutMs });
+    let overlayShown = false;
+    const overlayTimer = setTimeout(() => {
+      if (overlayShown) {
+        return;
+      }
+      overlayShown = true;
+      try {
+        void globalScene.ui.setMode(UiMode.MESSAGE);
+        globalScene.ui.showText("Preparing the next scene...", null, undefined, null, false);
+      } catch {
+        // Best-effort — UI mode might be in transition; the overlay is cosmetic.
+      }
+    }, 2_000);
+
+    const beat = await beatPromise;
+    clearTimeout(overlayTimer);
+    if (overlayShown) {
+      try {
+        globalScene.ui.clearText();
+      } catch {
+        // ignore — text will be replaced by the next phase's UI
+      }
+    }
     if (!beat) {
       logUnderrun(this.waveIndex);
       this.handleUnderrun();
