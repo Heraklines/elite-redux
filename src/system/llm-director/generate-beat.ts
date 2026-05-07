@@ -39,8 +39,11 @@ export interface GenerateBeatOptions {
   proseModel?: string;
   /** Default 3. */
   maxRetries?: number;
-  /** Default 90s — comfortable for the slower-but-better primary; pre-gen
-   *  buffer is 3 waves ahead so up to 90s feels instant to the player. */
+  /** Default 180s — one MiniMax beat call can take 60-75s; with up to 3
+   *  retries on validation rejection (size curve / held items / missing
+   *  enemyTeam), a strict timeout starves the chain. Real wall-clock
+   *  budget is bounded by the player walking through waves, but per-call
+   *  needs headroom so individual responses don't mid-flight abort. */
   timeoutMs?: number;
   /** v1 default false; turn on once costs are characterized. */
   withProsePass?: boolean;
@@ -61,7 +64,7 @@ const DEFAULT_SKELETON_MODEL = "minimax/minimax-latest";
 const DEFAULT_SKELETON_FALLBACK_CHAIN: readonly string[] = ["deepseek/deepseek-v4-flash", "zai-org/glm-latest"];
 const DEFAULT_PROSE_MODEL = "moonshotai/kimi-k2.6";
 const DEFAULT_MAX_RETRIES = 3;
-const DEFAULT_TIMEOUT_MS = 90_000;
+const DEFAULT_TIMEOUT_MS = 180_000;
 
 const FENCE_REGEX = /^```(?:json)?\s*([\s\S]*?)\s*```$/m;
 
