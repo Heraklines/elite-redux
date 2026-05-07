@@ -383,6 +383,17 @@ export class TitlePhase extends Phase {
 
     globalScene.phaseManager.pushNew("EncounterPhase", this.loaded);
 
+    // RESUME: a saved LLM Director run rehydrates llmDirectorState (bible,
+    // beat history, factionRep, alignment, flags) but the runtime queue's
+    // generator is process-scoped — its placeholder throws until BiblePhase
+    // calls setGenerator. Without re-running BiblePhase on load, beats
+    // never generate and the player sees no story. BiblePhase's resume
+    // path detects the persisted bible, skips regeneration + intro
+    // narration, and just rewires the queue.
+    if (this.loaded && globalScene.gameMode.modeId === GameModes.LLM_DIRECTOR) {
+      globalScene.phaseManager.pushNew("LLMDirectorBiblePhase");
+    }
+
     if (this.loaded) {
       const availablePartyMembers = globalScene.getPokemonAllowedInBattle().length;
 

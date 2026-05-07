@@ -62,15 +62,36 @@ export class LLMDirectorBiblePhase extends Phase {
       return;
     }
 
-    // If StartPhase didn't run (or we lost the entry to a HMR reset), make
-    // sure a generation is in flight before we await.
+    // RESUME path: the player loaded a save and the bible is already
+    // persisted on llmDirectorState. We must NOT regenerate (would
+    // overwrite the in-progress story) and we must NOT show the wave-1
+    // intro again. We only need to RE-WIRE the queue's generator (the
+    // DirectorRuntime is process-scoped — its placeholder generator
+    // throws until setGenerator runs) and kick off the next upcoming
+    // beat so beats keep flowing as the player walks. The currently-
+    // running wave's beat (if any) will surface on the next BeatPhase
+    // tryTake; we don't need to fire a wave-1 forced beat.
+    const state = globalScene.gameData.llmDirectorState;
+    if (state.storyBible) {
+      runtime.queue.reset();
+      runtime.queue.setGenerator(wave => this.runBeatGeneration(wave));
+      const currentWave = globalScene.currentBattle?.waveIndex ?? 1;
+      const nextBeatWave = Math.max(3, Math.floor(currentWave / 3) * 3 + 3);
+      runtime.queue.kickOff(nextBeatWave);
+      console.info(
+        `[llm-director] bible phase RESUME — bible already persisted (theme="${state.storyBible.themeName}"), wired queue and kicked off wave ${nextBeatWave}`,
+      );
+      this.end();
+      return;
+    }
+
+    // FRESH-RUN path: bible isn't in state yet. Await the pending
+    // generation kicked off by LLMDirectorStartPhase (or kick off one
+    // here if Start didn't run for some reason).
     let pending = getPendingBible();
     if (!pending) {
       pending = ensurePendingBible(seed => generateStoryBible(runtime.client, { seedText: seed.text }));
     }
-
-    // Only show the overlay if the bible isn't already resolved. If the
-    // player took >17s on starter select, no overlay flashes at all.
     const needsOverlay = !pending.resolved;
     if (needsOverlay) {
       this.showPreparingOverlay();
@@ -79,7 +100,6 @@ export class LLMDirectorBiblePhase extends Phase {
     let success = false;
     try {
       const bible = pending.resolved ?? (await pending.promise);
-      const state = globalScene.gameData.llmDirectorState;
       state.storyBible = bible;
       // Initialize faction reputations from the bible's seeded values so the
       // first beat's prompt is grounded.
