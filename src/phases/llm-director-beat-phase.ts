@@ -57,15 +57,15 @@ export class LLMDirectorBeatPhase extends Phase {
    * ready when this phase fires, we await up to this long before giving
    * up and playing a filler beat.
    *
-   * Default 30s. The buffered beat is kicked off ~2-3 waves earlier, so
-   * usually it's already in `ready` and tryTake returns instantly. The
-   * 30s budget covers the case where MiniMax is slow (60-75s typical) or
-   * a validation retry was needed — better to let the player wait a few
-   * seconds for a real beat than to drop into a generic filler.
+   * Default 15s. The buffered beat is kicked off ~2-3 waves earlier on
+   * DeepSeek-Flash (~5-15s response), so usually it's already in `ready`
+   * and tryTake returns instantly. 15s covers a one-off slow response
+   * or a validation retry; longer than that and the player notices the
+   * pause. Filler fires for genuine outages.
    */
   private readonly takeTimeoutMs: number;
 
-  public constructor(waveIndex: number, takeTimeoutMs = 30_000) {
+  public constructor(waveIndex: number, takeTimeoutMs = 15_000) {
     super();
     this.waveIndex = waveIndex;
     this.takeTimeoutMs = takeTimeoutMs;

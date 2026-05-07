@@ -50,21 +50,37 @@ export interface GenerateBeatOptions {
 }
 
 /**
- * Beat-generation model chain. Probed against a real beat prompt:
+ * Beat-generation model chain. Probed in playtest with the actual beat
+ * prompt + 50K-token envelope:
  *
- *   minimax/minimax-latest      : ~24s, varied prose + items, schema-clean ✓
- *   deepseek/deepseek-v4-flash  : ~5s, but heavy repetition across beats
- *   zai-org/glm-latest          : works but slow (~90s)
- *   moonshotai/kimi-k2.6        : hangs on beat prompts (>150s no response) ✗
+ *   deepseek/deepseek-v4-flash : ~5-15s, schema-clean, occasional repetition
+ *   minimax/minimax-latest     : 24-153s (highly variable), schema-flaky on
+ *                                long prompts (emits invalid additional
+ *                                properties); validation retries blow the
+ *                                wall-clock budget so beats underrun and
+ *                                the player gets filler.
+ *   zai-org/glm-latest         : ~95s, works
+ *   moonshotai/kimi-k2.6       : hangs on beat-sized prompts (>150s) ✗
  *
- * MiniMax primary for quality. DeepSeek-flash fallback for the hot path
- * if MiniMax is unavailable / hangs. GLM as last resort.
+ * DeepSeek-Flash is the only model that consistently delivers under the
+ * pre-gen buffer's wall-clock budget. The earlier swap to MiniMax for
+ * "richer prose" backfired — playtest produced fillers everywhere because
+ * MiniMax responses outran the 3-wave pre-gen window.
+ *
+ * Repetition (the original reason for swapping away from DeepSeek-Flash)
+ * is now handled by the bible's microArcs giving wave-by-wave guidance
+ * and the anti-repetition prompt rules — narrative direction comes from
+ * the bible, not the model's training-set defaults.
  */
-const DEFAULT_SKELETON_MODEL = "minimax/minimax-latest";
-const DEFAULT_SKELETON_FALLBACK_CHAIN: readonly string[] = ["deepseek/deepseek-v4-flash", "zai-org/glm-latest"];
+const DEFAULT_SKELETON_MODEL = "deepseek/deepseek-v4-flash";
+const DEFAULT_SKELETON_FALLBACK_CHAIN: readonly string[] = ["minimax/minimax-latest", "zai-org/glm-latest"];
 const DEFAULT_PROSE_MODEL = "moonshotai/kimi-k2.6";
 const DEFAULT_MAX_RETRIES = 3;
-const DEFAULT_TIMEOUT_MS = 180_000;
+/** Default 60s — DeepSeek-Flash finishes in 5-15s comfortably; 60s leaves
+ *  ample headroom for one slow response without burning the wall-clock
+ *  budget on a single retry. MiniMax fallback gets the same window
+ *  (which is why it's secondary, not primary — its variance doesn't fit). */
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 const FENCE_REGEX = /^```(?:json)?\s*([\s\S]*?)\s*```$/m;
 
