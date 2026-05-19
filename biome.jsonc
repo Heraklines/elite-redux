@@ -45,6 +45,10 @@
       // Excluding only `*.json` preserves the script's idempotency while still
       // letting biome lint any `.ts`/`.js` test helpers added alongside.
       "!!scripts/elite-redux/fixtures/*.json",
+      // Elite Redux: auto-generated TS modules emitted by `pnpm run er:build`.
+      // Their bodies are large JSON.stringify outputs; biome formatting would
+      // dirty the tree on every regen. Linter/formatter rules don't apply here.
+      "!!src/data/elite-redux/er-*.ts",
       // TODO: lint css and html?
       "!!*.css",
       "!!*.html",
