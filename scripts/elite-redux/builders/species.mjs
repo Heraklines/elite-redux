@@ -10,6 +10,8 @@ import { emitModule } from "../lib/emit.mjs";
 
 const ABILITY_NONE_ID = 0;
 
+// Subset of v2.65 fields consumed by this transformer. See
+// scripts/elite-redux/fixtures/README.md for the full schema.
 /**
  * @typedef {Object} ErSpeciesRaw
  * @property {number} id
@@ -40,31 +42,36 @@ const ABILITY_NONE_ID = 0;
  */
 
 /**
- * Pad an array of numeric IDs to exactly length 3 with ABILITY_NONE_ID.
+ * Pad an array of numeric IDs to exactly length 3 with ABILITY_NONE_ID. Throws
+ * if the input has more than 3 entries (silent truncation would mask bugs).
  * @param {number[] | undefined | null} arr
  * @returns {[number, number, number]}
  */
 function padToThree(arr) {
   const safe = arr ?? [];
-  const a = safe[0] ?? ABILITY_NONE_ID;
-  const b = safe[1] ?? ABILITY_NONE_ID;
-  const c = safe[2] ?? ABILITY_NONE_ID;
-  return [a, b, c];
+  if (safe.length > 3) {
+    throw new Error(`expected at most 3 entries, got ${safe.length}: [${safe.join(",")}]`);
+  }
+  return [safe[0] ?? ABILITY_NONE_ID, safe[1] ?? ABILITY_NONE_ID, safe[2] ?? ABILITY_NONE_ID];
 }
 
 /**
  * Normalize the type tuple. Mono-type ER mons have `types.length === 1`; some
  * have `[t, t]` duplicated. Either way the canonical shape is `[primary, null]`.
+ * Throws if there are 0 or 3+ entries (the engine only supports dual-typing).
  * @param {number[]} types
  * @returns {[number, number | null]}
  */
 function normalizeTypes(types) {
   if (!Array.isArray(types) || types.length === 0) {
-    throw new Error("species.stats.types is empty or not an array");
+    throw new Error("stats.types is empty or not an array");
   }
-  const primary = types[0];
-  const secondary = types[1] ?? null;
-  return [primary, secondary === primary ? null : secondary];
+  if (types.length > 2) {
+    throw new Error(`stats.types has ${types.length} entries, expected 1 or 2: [${types.join(",")}]`);
+  }
+  const t1 = types[0];
+  const t2 = types[1] ?? null;
+  return [t1, t2 === t1 ? null : t2];
 }
 
 /**
@@ -74,36 +81,44 @@ function normalizeTypes(types) {
  * @param {ErSpeciesRaw} raw
  */
 export function buildSpeciesEntry(raw) {
+  const name = raw.NAME ?? "<unnamed>";
   const st = raw.stats;
   if (!Array.isArray(st?.base) || st.base.length !== 6) {
-    throw new Error(`species ${raw.NAME}: stats.base length != 6 (got ${st?.base?.length})`);
+    throw new Error(`species ${name}: stats.base length != 6 (got ${st?.base?.length})`);
   }
-  return {
-    id: raw.id,
-    speciesConst: raw.NAME,
-    name: raw.name,
-    baseStats: /** @type {[number,number,number,number,number,number]} */ ([...st.base]),
-    types: normalizeTypes(st.types),
-    abilities: padToThree(st.abis),
-    innates: padToThree(st.inns),
-    evolutions: (raw.evolutions ?? []).map(e => ({ kind: e.kd, requirement: e.rs, into: e.in })),
-    eggMoves: raw.eggMoves ?? [],
-    levelUpMoves: (raw.levelUpMoves ?? []).map(m => ({ id: m.id, level: m.lv })),
-    tmhmMoves: raw.TMHMMoves ?? [],
-    tutorMoves: raw.tutor ?? [],
-    forms: raw.forms ?? [],
-    catchRate: st.catchR,
-    baseExp: st.exp,
-    evYield: /** @type {[number,number,number,number,number,number]} */ ([...st.EVY]),
-    genderRatio: st.gender,
-    eggCycles: st.eggC,
-    friendship: st.fren,
-    growthRate: st.grow,
-    eggGroups: st.eggG ?? [],
-    color: st.col,
-    noFlip: !!st.noFlip,
-    flags: st.flags ?? "",
-  };
+  try {
+    return {
+      id: raw.id,
+      speciesConst: raw.NAME,
+      name: raw.name,
+      baseStats: /** @type {[number,number,number,number,number,number]} */ ([...st.base]),
+      types: normalizeTypes(st.types),
+      abilities: padToThree(st.abis),
+      innates: padToThree(st.inns),
+      evolutions: (raw.evolutions ?? []).map(e => ({ kind: e.kd, requirement: e.rs, into: e.in })),
+      eggMoves: raw.eggMoves ?? [],
+      levelUpMoves: (raw.levelUpMoves ?? []).map(m => ({ id: m.id, level: m.lv })),
+      tmhmMoves: raw.TMHMMoves ?? [],
+      tutorMoves: raw.tutor ?? [],
+      forms: raw.forms ?? [],
+      catchRate: st.catchR,
+      baseExp: st.exp,
+      evYield: /** @type {[number,number,number,number,number,number]} */ ([...st.EVY]),
+      genderRatio: st.gender,
+      eggCycles: st.eggC,
+      friendship: st.fren,
+      growthRate: st.grow,
+      eggGroups: st.eggG ?? [],
+      color: st.col,
+      noFlip: !!st.noFlip,
+      flags: st.flags ?? "",
+    };
+  } catch (err) {
+    if (err instanceof Error) {
+      throw new Error(`species ${name}: ${err.message}`);
+    }
+    throw err;
+  }
 }
 
 /** @type {import("../lib/builder-types.mjs").BuildFn} */
