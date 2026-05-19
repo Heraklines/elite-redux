@@ -5,14 +5,18 @@
     "sName": "Tackle",
     "eff": 0,
     "pwr": 40,
-    "types": [0],
+    "types": [
+      0
+    ],
     "acc": 100,
     "pp": 20,
     "chance": 0,
     "target": 0,
     "prio": 0,
     "split": 0,
-    "flags": [0],
+    "flags": [
+      0
+    ],
     "arg": "",
     "desc": "Charges the foe with a full-body tackle.",
     "lDesc": "A physical attack in which the user charges, full body, into the foe.",
@@ -25,7 +29,9 @@
     "sName": "Eerie Fog",
     "eff": 397,
     "pwr": 0,
-    "types": [16],
+    "types": [
+      16
+    ],
     "acc": 0,
     "pp": 10,
     "chance": 0,
