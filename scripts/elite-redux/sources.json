@@ -1,0 +1,9 @@
+{
+  "gameData": {
+    "repo": "ForwardFeed/ER-nextdex",
+    "ref": "main",
+    "path": "static/js/data/gameDataV2.65beta.json",
+    "expectedSizeBytes": 3870000,
+    "comment": "v2.65 beta data dump — verified via spot-check of species/ability/move counts"
+  }
+}
