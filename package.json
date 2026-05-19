@@ -42,7 +42,8 @@
     "update-submodules": "git submodule update --progress --init --recursive --force --depth 1",
     "update-submodules:remote": "pnpm update-submodules --remote",
     "sample-movesets": "pnpm dlx vite-node scripts/gen-moveset/gen-moveset-driver.ts",
-    "er:fetch": "node scripts/elite-redux/fetch-source.mjs"
+    "er:fetch": "node scripts/elite-redux/fetch-source.mjs",
+    "er:fixtures": "node scripts/elite-redux/extract-fixtures.mjs"
   },
   "dependencies": {
     "@material/material-color-utilities": "^0.4.0",
