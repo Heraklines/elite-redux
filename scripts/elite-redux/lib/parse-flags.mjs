@@ -25,7 +25,7 @@ export function parseFlags(argv) {
     } else if (arg === "--dry-run") {
       flags.dryRun = true;
     } else if (arg.startsWith("--only=")) {
-      flags.only = arg.slice("--only=".length).split(",");
+      flags.only = arg.slice("--only=".length).split(",").filter(Boolean);
     }
   }
   return flags;

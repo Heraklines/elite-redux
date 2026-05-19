@@ -65,7 +65,7 @@ export default defineConfig(async config => {
         include: ["src/**/*.ts", "test/utils/**/*.ts"],
       },
       name: "main",
-      include: ["./test/**/*.{test,spec}.ts"],
+      include: ["./test/**/*.{test,spec}.ts", "./scripts/**/*.{test,spec}.ts"],
     },
   };
   return opts;
