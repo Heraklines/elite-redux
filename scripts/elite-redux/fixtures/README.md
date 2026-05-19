@@ -23,10 +23,15 @@ inaccurate guesses. The fixtures exposed the real shape:
 
 ### Abilities (`sample-ability.json`)
 - **Only `name`, `desc`, `id` — NO `NAME` field.** Cannot filter by NAME-prefix.
-- To distinguish vanilla vs. ER-custom, cross-reference pokerogue's
-  `src/enums/ability-id.ts` enum (vanilla IDs are 1-298 in pokerogue; ER customs
-  in the v2.65 dump start at id ≈ 299 onwards but the boundary should be
-  computed at build time, not assumed).
+- To distinguish vanilla vs. ER-custom, **compute the boundary at build time**
+  by name-matching the v2.65 ability names against pokerogue's enum
+  (`src/enums/ability-id.ts`). DO NOT assume an id range — the boundary is not
+  contiguous: ids in the 220-268 range mix vanilla rebalances, naming variants
+  ("Electric Surge" vs. "Electro Surge"), and a handful of genuine ER customs.
+  Empirically, id 268 (`Chloroplast` in ER, would be `LINGERING_AROMA` if
+  naively id-aligned) is the first id where the ER and pokerogue enums diverge
+  in concept (not just spelling). Beyond id 268, the abilities are largely ER
+  originals with no pokerogue counterpart.
 
 ### Moves (`sample-move.json`)
 - 18 top-level keys including `name`, `NAME`, `eff`, `pwr`, `acc`, `pp`,
