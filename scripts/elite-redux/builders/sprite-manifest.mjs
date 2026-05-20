@@ -8,6 +8,10 @@
 import { resolve } from "node:path";
 import { emitModule } from "../lib/emit.mjs";
 
+// NOTE: Plan A spec'd Record<slug, paths>, but we emit ErSpriteEntry[] so
+// the audit (Phase B) can correlate manifest entries to er-id-map.ts by
+// speciesId + speciesConst. Array shape carries both keys; Record would lose them.
+
 // Subset of v2.65 fields consumed by this transformer. See
 // scripts/elite-redux/fixtures/README.md for the full schema.
 /**
@@ -59,8 +63,13 @@ export function buildSpriteEntry(raw) {
 
 /** @type {import("../lib/builder-types.mjs").BuildFn} */
 export async function build({ dump, outDir, flags }) {
-  const raws = /** @type {ErSpeciesRaw[]} */ (dump.species ?? []);
-  const entries = raws.map(buildSpriteEntry);
+  const speciesList = /** @type {ErSpeciesRaw[]} */ (
+    (dump.species ?? []).filter(s => {
+      // Exclude SPECIES_NONE sentinel — has no real sprite upstream.
+      return s.id !== -1 && s.NAME !== "SPECIES_NONE";
+    })
+  );
+  const entries = speciesList.map(buildSpriteEntry);
 
   // Detect duplicate slugs — could happen if two species share NAME (shouldn't,
   // but defensive). Emit a warning if found.

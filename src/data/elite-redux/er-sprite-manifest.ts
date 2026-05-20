@@ -21,18 +21,6 @@ export interface ErSpriteEntry {
 
 export const ER_SPRITE_MANIFEST: readonly ErSpriteEntry[] = [
   {
-    "speciesId": -1,
-    "speciesConst": "SPECIES_NONE",
-    "slug": "none",
-    "paths": {
-      "front": "assets/images/pokemon/elite-redux/front/none.png",
-      "back": "assets/images/pokemon/elite-redux/back/none.png",
-      "shinyFront": "assets/images/pokemon/elite-redux/shiny/front/none.png",
-      "shinyBack": "assets/images/pokemon/elite-redux/shiny/back/none.png",
-      "icon": "assets/images/pokemon/elite-redux/icons/none.png"
-    }
-  },
-  {
     "speciesId": 1,
     "speciesConst": "SPECIES_BULBASAUR",
     "slug": "bulbasaur",

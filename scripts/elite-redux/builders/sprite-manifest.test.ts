@@ -46,16 +46,22 @@ describe("sprite manifest (pure)", () => {
 });
 
 describe.skipIf(!existsSync(VENDOR_PATH))("sprite manifest — full dump", () => {
-  it("emits 1907 entries", async () => {
+  it("emits 1906 entries (excludes SPECIES_NONE)", async () => {
+    // Filter out SPECIES_NONE per A10 hardening — its sprite paths point to
+    // non-existent files upstream, would fail Phase B's sprite-audit pass.
     const dump = JSON.parse(await readFile(VENDOR_PATH, "utf8"));
-    const entries = dump.species.map(buildSpriteEntry);
-    expect(entries.length).toBe(1907);
+    const speciesList = dump.species.filter(
+      (s: { id: number; NAME?: string }) => s.id !== -1 && s.NAME !== "SPECIES_NONE",
+    );
+    const entries = speciesList.map(buildSpriteEntry);
+    expect(entries.length).toBe(1906);
   });
 
   it("every entry has a non-empty slug", async () => {
     const dump = JSON.parse(await readFile(VENDOR_PATH, "utf8"));
     const entries = dump.species.map(buildSpriteEntry);
-    // SPECIES_NONE may have empty NAME — exclude
+    // SPECIES_NONE has NAME="SPECIES_NONE" (slug="none") — it's filtered out
+    // in build() but buildSpriteEntry itself still produces a slug for it.
     const withSlug = entries.filter((e: { slug: string }) => e.slug.length > 0);
     expect(withSlug.length).toBeGreaterThan(1900);
   });
