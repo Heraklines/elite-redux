@@ -23,8 +23,19 @@
 // =============================================================================
 
 // biome-ignore lint/performance/noBarrelFile: archetype layer is intentionally a barrel for Phase C tests + ER ability wiring; small module set
+export { ChanceStatusOnHitAbAttr, type ChanceStatusOnHitOptions } from "./chance-status-on-hit";
+export {
+  ConditionalDamageAbAttr,
+  type ConditionalDamageOptions,
+  type DamageCondition,
+  type DamageConditionKind,
+  type DamageConditionSelfLowHp,
+  type DamageConditionTargetConfused,
+  type DamageConditionTargetHasLoweredStat,
+  type DamageConditionTargetLowHp,
+  type DamageConditionTargetStatused,
+} from "./conditional-damage";
 export type { EntryEffect, EntryEffectKind } from "./entry-effect";
-// biome-ignore lint/performance/noBarrelFile: see above
 export {
   EntryEffectAbAttr,
   type EntryEffectAddSelfType,
@@ -36,7 +47,23 @@ export {
   type EntryEffectSetTerrain,
   type EntryEffectSetWeather,
 } from "./entry-effect";
-// biome-ignore lint/performance/noBarrelFile: see above
 export { FlagDamageBoostAbAttr, type FlagDamageBoostAbAttrOptions } from "./flag-damage-boost";
-// biome-ignore lint/performance/noBarrelFile: see above
+export {
+  TypeAbsorbHealAbAttr,
+  type TypeAbsorbHealOptions,
+  TypeAbsorbStatBoostAbAttr,
+  type TypeAbsorbStatBoostOptions,
+} from "./immunity-with-absorb";
+export {
+  type OnHitFilter,
+  type StatChange,
+  type StatTriggerEvent,
+  StatTriggerOnEntryAbAttr,
+  type StatTriggerOnEventAbAttr,
+  StatTriggerOnHitAbAttr,
+  type StatTriggerOnHitPayload,
+  StatTriggerOnKoAbAttr,
+  StatTriggerOnStatLoweredAbAttr,
+  type StatTriggerPayload,
+} from "./stat-trigger-on-event";
 export { TypeDamageBoostAbAttr, type TypeDamageBoostAbAttrOptions } from "./type-damage-boost";
