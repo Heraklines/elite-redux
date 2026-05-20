@@ -5,47 +5,74 @@ has `setPassives()` called with non-NONE slots 1/2 in Phase A).
 
 Phase B's `init-elite-redux-species.ts` will be the first code to install real
 3-passive sets via `species.setPassives([A, B, C])`. **Before that landing,
-ALL FOUR issues below must be fixed.**
+all four issues below must be fixed.**
 
-## I1 — `canApplyAbility(passive)` resolves only to slot 0
+Task B0 closes I1, I2, I3. I4 remains documented and is deferred to Phase C
+(after a real callsite that mid-turn-swaps a slot-1/2 ability is identified).
 
-`src/field/pokemon.ts:2251` reads `passive ? this.getPassiveAbility() : this.getAbility()`.
-For slots 1 and 2, this returns the WRONG ability (slot 0), so suppression/
-ignorability/conditions checks fire against slot 0 instead of the slot being
-dispatched.
+## ✅ Resolved in B0
 
-**Fix:** extend `canApplyAbility(passive: boolean, slot?: 0 | 1 | 2)` and have
-`applySingleAbAttrs` (`src/data/abilities/apply-ab-attrs.ts:29`) pass
-`params.passiveSlot` through.
+The following three issues were closed by task B0 (see commit listed at the
+bottom of this section). Each is regression-tested in
+`test/data/abilities/apply-ab-attrs-passives.test.ts` ("B0 I1: canApplyAbility
+slot routing") and the broader A12-A16 suite still passes.
 
-## I2 — `ShowAbilityPhase` displays slot-0's name for all passive firings
+### I1 — `canApplyAbility(passive)` resolves only to slot 0 ✅
 
-`src/phase-manager.ts:465` (`queueAbilityDisplay`) and
-`src/phases/show-ability-phase.ts:22` both resolve the displayed ability via
-the singular `getPassiveAbility()`. For slots 1/2, the player sees slot 0's
-name on the ability-bar reveal.
+**Was:** `src/field/pokemon.ts:2251` read
+`passive ? this.getPassiveAbility() : this.getAbility()`. For slots 1 and 2 this
+returned the WRONG ability (slot 0), so suppression / ignorability / conditions
+checks fired against slot 0 instead of the slot being dispatched.
 
-**Fix:** extend `queueAbilityDisplay(pokemon, passive, ..., slot?)` and update
-`ShowAbilityPhase` to resolve via `pokemon.getPassiveAbilities()[slot]`.
+**Resolution:** `canApplyAbility(passive: boolean = false, passiveSlot: 0 | 1 | 2 = 0)`
+in `src/field/pokemon.ts` now resolves via the slot-indexed array
+(`this.getPassiveAbilities()[passiveSlot]`) and returns `false` for an empty
+slot (no fallback to slot 0). `applySingleAbAttrs`
+(`src/data/abilities/apply-ab-attrs.ts:30`) passes `params.passiveSlot ?? 0`
+through.
 
-## I3 — Trigger messages in `ab-attrs.ts` use `getPassiveAbility()` singularly
+### I2 — `ShowAbilityPhase` displays slot-0's name for all passive firings ✅
 
-`src/data/abilities/ab-attrs.ts:455, 3950, 3981, 4063, 4319, 4679` all build
-trigger messages with `(passive ? pokemon.getPassiveAbility() : pokemon.getAbility()).name`.
-For slots 1/2, the message attributes the trigger to slot 0's ability name.
+**Was:** `queueAbilityDisplay` and `ShowAbilityPhase` resolved the displayed
+ability via singular `getPassiveAbility()`. For slots 1/2 the player saw
+slot 0's name on the ability-bar reveal.
 
-**Fix:** plumb `params.passiveSlot` through to these `apply()` overrides and
-resolve via `pokemon.getPassiveAbilities()[slot]?.name`.
+**Resolution:** `queueAbilityDisplay(pokemon, passive, show, passiveSlot = 0)`
+in `src/phase-manager.ts` and the `ShowAbilityPhase` constructor in
+`src/phases/show-ability-phase.ts` both accept and propagate `passiveSlot`.
+The phase resolves the ability via `getPassiveAbilities()[passiveSlot]` and
+short-circuits to `end()` for an empty slot (the bar isn't shown). The two
+`queueAbilityDisplay` callsites inside `applySingleAbAttrs` pass the current
+dispatch slot.
+
+### I3 — Trigger messages in `ab-attrs.ts` use `getPassiveAbility()` singularly ✅
+
+**Was:** 6 trigger-message callsites in `src/data/abilities/ab-attrs.ts`
+(formerly lines 455, 3950, 3981, 4063, 4319, 4679) built the message text
+with `(passive ? pokemon.getPassiveAbility() : pokemon.getAbility()).name`,
+which attributed the trigger to slot 0's name for slots 1/2.
+
+**Resolution:** added a `resolveTriggerAbility(params)` helper at the top of
+`ab-attrs.ts`. The 6 callsites now read
+`const abilityName = resolveTriggerAbility(params)?.name ?? "";`. The helper
+honors `params.passiveSlot` (defaulting to slot 0). After the edits the 6
+attrs in question are: `TypeImmunityHealAbAttr`, `PostWeatherLapseHealAbAttr`,
+`PostWeatherLapseDamageAbAttr`, `PostTurnStatusHealAbAttr`, `PostTurnHealAbAttr`,
+`HealFromBerryUseAbAttr`.
 
 ## I4 — `applyOnGainAbAttrs` is slot-0-only
 
-`src/data/abilities/apply-ab-attrs.ts:134` documents the existing limitation
+`src/data/abilities/apply-ab-attrs.ts:182` documents the existing limitation
 ("Ignores passives as they don't change"). Mid-turn ability swaps to a slot-1
 or slot-2 ability won't fire OnGain attrs.
 
 **Fix:** when an ability *change* targets a specific slot, dispatch OnGain to
 that slot. Or document this as an intentional limitation if no callsite
 actually swaps slots 1/2 at runtime.
+
+Deferred to Phase C — no current callsite swaps a non-slot-0 passive at runtime,
+so this is latent. Will revisit once a Phase B/C species (e.g. a form-change
+species that uses a slot-1 or slot-2 passive) requires it.
 
 ## Verification before Phase B species init lands
 

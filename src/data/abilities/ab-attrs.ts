@@ -110,6 +110,33 @@ export interface AbAttrParamsWithCancel extends AbAttrBaseParams {
 }
 
 /**
+ * Resolve the {@linkcode Ability} corresponding to the dispatch that produced
+ * these {@linkcode AbAttrBaseParams}. Used by attribute `apply()` implementations
+ * that build trigger-message strings — they need the active ability's name when
+ * `passive` is `false`, and the specific passive slot's name when `passive` is
+ * `true`.
+ *
+ * ER 3-passive: when `passive` is `true`, this honors `params.passiveSlot`
+ * (defaulting to slot 0 for legacy callers that omit it). The result is `null`
+ * when the requested passive slot is empty — callers should treat a missing
+ * name as `""` rather than crashing on `.name`.
+ *
+ * @remarks
+ * This is intentionally lenient on missing fields (no exception when
+ * `passiveSlot` is undefined or out of range). The dispatcher in
+ * {@linkcode applySingleAbAttrs} already guarantees a non-empty slot ability
+ * exists by the time `apply()` runs — this helper is the read-only "what was
+ * the ability that triggered this?" lookup for the message text.
+ */
+function resolveTriggerAbility(params: AbAttrBaseParams) {
+  if (!params.passive) {
+    return params.pokemon.getAbility();
+  }
+  const slot = (params.passiveSlot ?? 0) as 0 | 1 | 2;
+  return params.pokemon.getPassiveAbilities()[slot];
+}
+
+/**
  * Abstract class for all ability attributes.
  *
  * Each {@linkcode Ability} may have any number of individual attributes, each functioning independently from one another.
@@ -450,9 +477,9 @@ export class TypeImmunityHealAbAttr extends TypeImmunityAbAttr {
 
   override apply(params: TypeMultiplierAbAttrParams): void {
     super.apply(params);
-    const { pokemon, cancelled, simulated, passive } = params;
+    const { pokemon, cancelled, simulated } = params;
     if (!pokemon.isFullHp() && !simulated) {
-      const abilityName = (passive ? pokemon.getPassiveAbility() : pokemon.getAbility()).name;
+      const abilityName = resolveTriggerAbility(params)?.name ?? "";
       globalScene.phaseManager.unshiftNew(
         "PokemonHealPhase",
         pokemon.getBattlerIndex(),
@@ -3946,8 +3973,9 @@ export class PostWeatherLapseHealAbAttr extends PostWeatherLapseAbAttr {
     return !pokemon.isFullHp();
   }
 
-  override apply({ pokemon, passive, simulated }: PostWeatherLapseAbAttrParams): void {
-    const abilityName = (passive ? pokemon.getPassiveAbility() : pokemon.getAbility()).name;
+  override apply(params: PostWeatherLapseAbAttrParams): void {
+    const { pokemon, simulated } = params;
+    const abilityName = resolveTriggerAbility(params)?.name ?? "";
     if (!simulated) {
       globalScene.phaseManager.unshiftNew(
         "PokemonHealPhase",
@@ -3976,9 +4004,10 @@ export class PostWeatherLapseDamageAbAttr extends PostWeatherLapseAbAttr {
     return !pokemon.hasAbilityWithAttr("BlockNonDirectDamageAbAttr");
   }
 
-  override apply({ simulated, pokemon, passive }: PostWeatherLapseAbAttrParams): void {
+  override apply(params: PostWeatherLapseAbAttrParams): void {
+    const { simulated, pokemon } = params;
     if (!simulated) {
-      const abilityName = (passive ? pokemon.getPassiveAbility() : pokemon.getAbility()).name;
+      const abilityName = resolveTriggerAbility(params)?.name ?? "";
       globalScene.phaseManager.queueMessage(
         i18next.t("abilityTriggers:postWeatherLapseDamage", {
           pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
@@ -4058,9 +4087,10 @@ export class PostTurnStatusHealAbAttr extends PostTurnAbAttr {
     return pokemon.status != null && this.effects.includes(pokemon.status.effect) && !pokemon.isFullHp();
   }
 
-  override apply({ simulated, passive, pokemon }: AbAttrBaseParams): void {
+  override apply(params: AbAttrBaseParams): void {
+    const { simulated, pokemon } = params;
     if (!simulated) {
-      const abilityName = (passive ? pokemon.getPassiveAbility() : pokemon.getAbility()).name;
+      const abilityName = resolveTriggerAbility(params)?.name ?? "";
       globalScene.phaseManager.unshiftNew(
         "PokemonHealPhase",
         pokemon.getBattlerIndex(),
@@ -4314,9 +4344,10 @@ export class PostTurnHealAbAttr extends PostTurnAbAttr {
     return !pokemon.isFullHp();
   }
 
-  override apply({ simulated, pokemon, passive }: AbAttrBaseParams): void {
+  override apply(params: AbAttrBaseParams): void {
+    const { simulated, pokemon } = params;
     if (!simulated) {
-      const abilityName = (passive ? pokemon.getPassiveAbility() : pokemon.getAbility()).name;
+      const abilityName = resolveTriggerAbility(params)?.name ?? "";
       globalScene.phaseManager.unshiftNew(
         "PokemonHealPhase",
         pokemon.getBattlerIndex(),
@@ -4671,12 +4702,13 @@ export class HealFromBerryUseAbAttr extends AbAttr {
     this.healPercent = Math.max(Math.min(healPercent, 1), 0);
   }
 
-  override apply({ simulated, passive, pokemon }: AbAttrBaseParams): void {
+  override apply(params: AbAttrBaseParams): void {
+    const { simulated, pokemon } = params;
     if (simulated) {
       return;
     }
 
-    const { name: abilityName } = passive ? pokemon.getPassiveAbility() : pokemon.getAbility();
+    const abilityName = resolveTriggerAbility(params)?.name ?? "";
     globalScene.phaseManager.unshiftNew(
       "PokemonHealPhase",
       pokemon.getBattlerIndex(),

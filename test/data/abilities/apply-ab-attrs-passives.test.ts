@@ -27,7 +27,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 interface StubPokemon {
   getAbility(): Ability;
   getPassiveAbilities(): readonly [Ability | null, Ability | null, Ability | null];
-  canApplyAbility(passive?: boolean): boolean;
+  canApplyAbility(passive?: boolean, passiveSlot?: 0 | 1 | 2): boolean;
   waveData: { abilitiesApplied: Set<AbilityId> };
   summonData: { abilitiesApplied: Set<AbilityId> };
 }
@@ -226,7 +226,7 @@ describe("apply-ab-attrs — 3-passive dispatch", () => {
         passives: [AbilityId.HUGE_POWER, AbilityId.PURE_POWER, AbilityId.SPEED_BOOST],
       });
       // Make canApplyAbility return false for the active only.
-      pokemon.canApplyAbility = (passive = false) => !!passive;
+      pokemon.canApplyAbility = (passive = false, _passiveSlot: 0 | 1 | 2 = 0) => !!passive;
 
       const calledIds: AbilityId[] = [];
       vi.spyOn(Ability.prototype, "getAttrs").mockImplementation(function (this: Ability) {
@@ -325,6 +325,98 @@ describe("apply-ab-attrs — 3-passive dispatch", () => {
       expect(passives[0]).toBe(species.getPassiveAbility());
       expect(passives[1]).toBe(AbilityId.NONE);
       expect(passives[2]).toBe(AbilityId.NONE);
+    });
+  });
+
+  /**
+   * Task B0: I1 — `canApplyAbility(passive, slot)` slot-aware resolution.
+   *
+   * Phase A14 added the dispatcher loop iterating slots 0/1/2 but
+   * `canApplyAbility(passive)` was still slot-0-only. These tests verify
+   * that `applySingleAbAttrs` passes the correct slot to `canApplyAbility`
+   * so suppression/ignorability checks fire against the slot being dispatched,
+   * not slot 0.
+   */
+  describe("B0 I1: canApplyAbility slot routing", () => {
+    it("applyAbAttrs dispatcher calls canApplyAbility(true, N) for each non-empty slot", () => {
+      const pokemon = makeStubPokemon({
+        active: AbilityId.INTIMIDATE,
+        passives: [AbilityId.HUGE_POWER, AbilityId.PURE_POWER, AbilityId.SPEED_BOOST],
+      });
+
+      // Capture every (passive, slot) tuple canApplyAbility is queried with.
+      const calls: [boolean, 0 | 1 | 2 | undefined][] = [];
+      pokemon.canApplyAbility = (passive = false, slot: 0 | 1 | 2 = 0) => {
+        calls.push([passive, slot]);
+        return true;
+      };
+
+      vi.spyOn(Ability.prototype, "getAttrs").mockReturnValue([]);
+
+      applyAbAttrs("PostSummonAbAttr", { pokemon: pokemon as unknown as Pokemon, simulated: true });
+
+      // Expect: active query (passive=false, slot=0), then each passive slot:
+      //   passive=true, slot=0  (HUGE_POWER)
+      //   passive=true, slot=1  (PURE_POWER)
+      //   passive=true, slot=2  (SPEED_BOOST)
+      expect(calls).toEqual([
+        [false, 0],
+        [true, 0],
+        [true, 1],
+        [true, 2],
+      ]);
+    });
+
+    it("explicit passive=true + passiveSlot=2 calls canApplyAbility(true, 2) — not slot 0", () => {
+      const pokemon = makeStubPokemon({
+        active: AbilityId.INTIMIDATE,
+        passives: [AbilityId.HUGE_POWER, AbilityId.PURE_POWER, AbilityId.SPEED_BOOST],
+      });
+
+      const calls: [boolean, 0 | 1 | 2 | undefined][] = [];
+      pokemon.canApplyAbility = (passive = false, slot: 0 | 1 | 2 = 0) => {
+        calls.push([passive, slot]);
+        return true;
+      };
+
+      vi.spyOn(Ability.prototype, "getAttrs").mockReturnValue([]);
+
+      applyAbAttrs("PostSummonAbAttr", {
+        pokemon: pokemon as unknown as Pokemon,
+        simulated: true,
+        passive: true,
+        passiveSlot: 2,
+      });
+
+      // Critical: the canApplyAbility query must target slot 2, not slot 0.
+      // Pre-B0 this passed `passive=true` only and resolved against slot 0.
+      expect(calls).toEqual([[true, 2]]);
+    });
+
+    it("canApplyAbility returning false for a specific slot stops that slot's dispatch only", () => {
+      const pokemon = makeStubPokemon({
+        active: AbilityId.INTIMIDATE,
+        passives: [AbilityId.HUGE_POWER, AbilityId.PURE_POWER, AbilityId.SPEED_BOOST],
+      });
+      // Slot 1's ability is suppressed (canApplyAbility returns false for it).
+      // Slots 0 and 2 should still fire.
+      pokemon.canApplyAbility = (passive = false, slot: 0 | 1 | 2 = 0) => {
+        if (passive && slot === 1) {
+          return false;
+        }
+        return true;
+      };
+
+      const calledIds: AbilityId[] = [];
+      vi.spyOn(Ability.prototype, "getAttrs").mockImplementation(function (this: Ability) {
+        calledIds.push(this.id);
+        return [];
+      });
+
+      applyAbAttrs("PostSummonAbAttr", { pokemon: pokemon as unknown as Pokemon, simulated: true });
+
+      // Active + slot 0 + slot 2 fire; slot 1 is suppressed.
+      expect(calledIds).toEqual([AbilityId.INTIMIDATE, AbilityId.HUGE_POWER, AbilityId.SPEED_BOOST]);
     });
   });
 });

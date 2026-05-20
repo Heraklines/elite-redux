@@ -2246,13 +2246,25 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * This should rarely be
    * directly called, as {@linkcode hasAbility} and {@linkcode hasAbilityWithAttr} already call this.
    * @param passive - Whether to check the passive (`true`) or non-passive (`false`) ability; default `false`
-   * @returns Whether the ability can be applied
+   * @param passiveSlot - When `passive` is `true`, which of the 3 ER passive slots
+   *   (0, 1, or 2) to check. Defaults to slot 0 for legacy single-passive
+   *   callers. Ignored when `passive` is `false`.
+   * @returns Whether the ability can be applied. Returns `false` immediately when
+   *   the requested passive slot is empty (so the dispatcher in
+   *   {@linkcode applySingleAbAttrs} short-circuits without falling back to slot 0).
    */
-  public canApplyAbility(passive = false): boolean {
+  public canApplyAbility(passive = false, passiveSlot: 0 | 1 | 2 = 0): boolean {
     if (passive && !this.hasPassive()) {
       return false;
     }
-    const ability = passive ? this.getPassiveAbility() : this.getAbility();
+    // ER 3-passive: resolve directly from the slot-indexed array. We avoid
+    // falling back to `this.getAbility()` for an empty slot because that would
+    // double-fire on legacy species (slots 1/2 are NONE), and callers explicitly
+    // requesting an empty slot should get `false` (nothing to apply).
+    const ability = passive ? this.getPassiveAbilities()[passiveSlot] : this.getAbility();
+    if (!ability) {
+      return false;
+    }
     if (this.isFusion() && ability.hasAttr("NoFusionAbilityAbAttr")) {
       return false;
     }

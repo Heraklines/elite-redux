@@ -26,19 +26,21 @@ function applySingleAbAttrs<T extends AbAttrString>(
   { attrFilter = () => true, messages }: ApplyAbAttrConfig<T> = {},
 ) {
   const { simulated = false, passive = false, pokemon } = params;
-  if (!pokemon.canApplyAbility(passive)) {
+  // ER 3-passive: resolve the requested slot. Default to slot 0 for callers
+  // that set `passive: true` without specifying a slot (legacy behavior).
+  const slot = (params.passiveSlot ?? 0) as 0 | 1 | 2;
+  if (!pokemon.canApplyAbility(passive, slot)) {
     return;
   }
 
   let ability: Ability;
   if (passive) {
-    // ER 3-passive: resolve the requested slot. Default to slot 0 for callers
-    // that set `passive: true` without specifying a slot (legacy behavior).
-    const slot = params.passiveSlot ?? 0;
     const slotAbility = pokemon.getPassiveAbilities()[slot];
     if (!slotAbility) {
       // Empty slot — nothing to apply. Do NOT fall back to getPassiveAbility(),
       // as that would double-fire for legacy species (which fill slots 1/2 with NONE).
+      // (canApplyAbility above also returns false for an empty slot — this is a
+      // defensive belt-and-suspenders guard for the type narrowing.)
       return;
     }
     ability = slotAbility;
@@ -74,7 +76,7 @@ function applySingleAbAttrs<T extends AbAttrString>(
     let abShown = false;
 
     if (attr.showAbility && !simulated) {
-      globalScene.phaseManager.queueAbilityDisplay(pokemon, passive, true);
+      globalScene.phaseManager.queueAbilityDisplay(pokemon, passive, true, slot);
       abShown = true;
     }
 
@@ -91,7 +93,7 @@ function applySingleAbAttrs<T extends AbAttrString>(
     attr.apply(params as any);
 
     if (abShown) {
-      globalScene.phaseManager.queueAbilityDisplay(pokemon, passive, false);
+      globalScene.phaseManager.queueAbilityDisplay(pokemon, passive, false, slot);
     }
 
     if (!simulated) {
