@@ -19,9 +19,9 @@ type Entry = {
   paths: {
     front: string;
     back: string;
-    shinyFront: string;
-    shinyBack: string;
     icon: string;
+    animFront: string;
+    footprint: string;
   };
 };
 
@@ -31,11 +31,11 @@ const SAMPLE_ENTRIES: Entry[] = [
     speciesConst: "SPECIES_BULBASAUR",
     slug: "bulbasaur",
     paths: {
-      front: "assets/images/pokemon/elite-redux/front/bulbasaur.png",
-      back: "assets/images/pokemon/elite-redux/back/bulbasaur.png",
-      shinyFront: "assets/images/pokemon/elite-redux/shiny/front/bulbasaur.png",
-      shinyBack: "assets/images/pokemon/elite-redux/shiny/back/bulbasaur.png",
-      icon: "assets/images/pokemon/elite-redux/icons/bulbasaur.png",
+      front: "assets/images/pokemon/elite-redux/bulbasaur/front.png",
+      back: "assets/images/pokemon/elite-redux/bulbasaur/back.png",
+      icon: "assets/images/pokemon/elite-redux/bulbasaur/icon.png",
+      animFront: "assets/images/pokemon/elite-redux/bulbasaur/anim_front.png",
+      footprint: "assets/images/pokemon/elite-redux/bulbasaur/footprint.png",
     },
   },
   {
@@ -43,11 +43,11 @@ const SAMPLE_ENTRIES: Entry[] = [
     speciesConst: "SPECIES_IVYSAUR",
     slug: "ivysaur",
     paths: {
-      front: "assets/images/pokemon/elite-redux/front/ivysaur.png",
-      back: "assets/images/pokemon/elite-redux/back/ivysaur.png",
-      shinyFront: "assets/images/pokemon/elite-redux/shiny/front/ivysaur.png",
-      shinyBack: "assets/images/pokemon/elite-redux/shiny/back/ivysaur.png",
-      icon: "assets/images/pokemon/elite-redux/icons/ivysaur.png",
+      front: "assets/images/pokemon/elite-redux/ivysaur/front.png",
+      back: "assets/images/pokemon/elite-redux/ivysaur/back.png",
+      icon: "assets/images/pokemon/elite-redux/ivysaur/icon.png",
+      animFront: "assets/images/pokemon/elite-redux/ivysaur/anim_front.png",
+      footprint: "assets/images/pokemon/elite-redux/ivysaur/footprint.png",
     },
   },
 ];
@@ -71,13 +71,13 @@ describe("audit-sprites (pure)", () => {
     expect(result.missing[0].missingPaths.length).toBe(5);
   });
 
-  it("auditManifest reports partial misses (e.g. shiny-only gap)", async () => {
-    // Bulbasaur has only non-shiny assets; Ivysaur has everything.
+  it("auditManifest reports partial misses (e.g. anim/footprint-only gap)", async () => {
+    // Bulbasaur has only static assets; Ivysaur has everything.
     const probe = async (absPath: string) => {
       if (absPath.includes("ivysaur")) {
         return true;
       }
-      if (absPath.includes("bulbasaur") && !absPath.includes("shiny")) {
+      if (absPath.includes("bulbasaur") && !absPath.includes("anim_") && !absPath.includes("footprint")) {
         return true;
       }
       return false;
@@ -88,8 +88,8 @@ describe("audit-sprites (pure)", () => {
     expect(result.missing.length).toBe(1);
     expect(result.missing[0].slug).toBe("bulbasaur");
     expect(result.missing[0].missingPaths).toEqual([
-      "assets/images/pokemon/elite-redux/shiny/front/bulbasaur.png",
-      "assets/images/pokemon/elite-redux/shiny/back/bulbasaur.png",
+      "assets/images/pokemon/elite-redux/bulbasaur/anim_front.png",
+      "assets/images/pokemon/elite-redux/bulbasaur/footprint.png",
     ]);
   });
 
@@ -103,8 +103,8 @@ describe("audit-sprites (pure)", () => {
           speciesConst: "SPECIES_BULBASAUR",
           speciesId: 1,
           missingPaths: [
-            "assets/images/pokemon/elite-redux/shiny/front/bulbasaur.png",
-            "assets/images/pokemon/elite-redux/shiny/back/bulbasaur.png",
+            "assets/images/pokemon/elite-redux/bulbasaur/anim_front.png",
+            "assets/images/pokemon/elite-redux/bulbasaur/footprint.png",
           ],
         },
         {
@@ -112,11 +112,11 @@ describe("audit-sprites (pure)", () => {
           speciesConst: "SPECIES_IVYSAUR",
           speciesId: 2,
           missingPaths: [
-            "assets/images/pokemon/elite-redux/front/ivysaur.png",
-            "assets/images/pokemon/elite-redux/back/ivysaur.png",
-            "assets/images/pokemon/elite-redux/shiny/front/ivysaur.png",
-            "assets/images/pokemon/elite-redux/shiny/back/ivysaur.png",
-            "assets/images/pokemon/elite-redux/icons/ivysaur.png",
+            "assets/images/pokemon/elite-redux/ivysaur/front.png",
+            "assets/images/pokemon/elite-redux/ivysaur/back.png",
+            "assets/images/pokemon/elite-redux/ivysaur/icon.png",
+            "assets/images/pokemon/elite-redux/ivysaur/anim_front.png",
+            "assets/images/pokemon/elite-redux/ivysaur/footprint.png",
           ],
         },
       ],
@@ -131,8 +131,6 @@ describe("audit-sprites (pure)", () => {
     expect(body).toContain("`ivysaur`");
     expect(body).toContain("`bulbasaur`");
     expect(body).toContain("## Accepted Gaps");
-    expect(body).toContain("Path-layout mismatch");
-    expect(body).toContain("No shiny PNGs upstream");
   });
 
   it("renderReport handles a fully-clean audit without listing sections", () => {
@@ -149,6 +147,6 @@ describe.skipIf(!existsSync(MANIFEST_PATH))("audit-sprites — manifest parser",
     const entries = await loadManifest(MANIFEST_PATH);
     expect(entries.length).toBe(1906);
     expect(entries[0].speciesConst).toBe("SPECIES_BULBASAUR");
-    expect(entries[0].paths.front).toContain("bulbasaur.png");
+    expect(entries[0].paths.front).toContain("bulbasaur/front.png");
   });
 });

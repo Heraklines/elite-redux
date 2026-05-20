@@ -31,16 +31,23 @@ export function speciesConstToSlug(constName) {
 const SPRITE_ROOT = "assets/images/pokemon/elite-redux";
 
 /**
- * Build the sprite-paths object for a given slug.
+ * Build the sprite-paths object for a given slug. Matches the upstream
+ * Elite-Redux/eliteredux repo's actual layout: per-species directory with
+ * variants as siblings (`<slug>/front.png`, `<slug>/back.png`, etc.).
+ *
+ * **No shiny PNGs upstream** — Elite-Redux ships shinies as `.pal` palette
+ * files for runtime palette-swap. Phase C wires the palette load; the
+ * manifest only lists the PNG variants that exist on disk.
+ *
  * @param {string} slug
  */
 export function buildSpritePaths(slug) {
   return {
-    front: `${SPRITE_ROOT}/front/${slug}.png`,
-    back: `${SPRITE_ROOT}/back/${slug}.png`,
-    shinyFront: `${SPRITE_ROOT}/shiny/front/${slug}.png`,
-    shinyBack: `${SPRITE_ROOT}/shiny/back/${slug}.png`,
-    icon: `${SPRITE_ROOT}/icons/${slug}.png`,
+    front: `${SPRITE_ROOT}/${slug}/front.png`,
+    back: `${SPRITE_ROOT}/${slug}/back.png`,
+    icon: `${SPRITE_ROOT}/${slug}/icon.png`,
+    animFront: `${SPRITE_ROOT}/${slug}/anim_front.png`,
+    footprint: `${SPRITE_ROOT}/${slug}/footprint.png`,
   };
 }
 
@@ -86,9 +93,9 @@ export async function build({ dump, outDir, flags }) {
   const body = `export interface ErSpritePaths {
   readonly front: string;
   readonly back: string;
-  readonly shinyFront: string;
-  readonly shinyBack: string;
   readonly icon: string;
+  readonly animFront: string;
+  readonly footprint: string;
 }
 
 export interface ErSpriteEntry {

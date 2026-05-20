@@ -21,13 +21,13 @@ describe("sprite manifest (pure)", () => {
     expect(speciesConstToSlug("")).toBe("");
   });
 
-  it("buildSpritePaths produces 5 paths under elite-redux/", () => {
+  it("buildSpritePaths produces 5 paths matching upstream <slug>/<variant>.png layout", () => {
     const paths = buildSpritePaths("bulbasaur");
-    expect(paths.front).toBe("assets/images/pokemon/elite-redux/front/bulbasaur.png");
-    expect(paths.back).toBe("assets/images/pokemon/elite-redux/back/bulbasaur.png");
-    expect(paths.shinyFront).toBe("assets/images/pokemon/elite-redux/shiny/front/bulbasaur.png");
-    expect(paths.shinyBack).toBe("assets/images/pokemon/elite-redux/shiny/back/bulbasaur.png");
-    expect(paths.icon).toBe("assets/images/pokemon/elite-redux/icons/bulbasaur.png");
+    expect(paths.front).toBe("assets/images/pokemon/elite-redux/bulbasaur/front.png");
+    expect(paths.back).toBe("assets/images/pokemon/elite-redux/bulbasaur/back.png");
+    expect(paths.icon).toBe("assets/images/pokemon/elite-redux/bulbasaur/icon.png");
+    expect(paths.animFront).toBe("assets/images/pokemon/elite-redux/bulbasaur/anim_front.png");
+    expect(paths.footprint).toBe("assets/images/pokemon/elite-redux/bulbasaur/footprint.png");
   });
 
   it("buildSpriteEntry maps Bulbasaur from smoke fixture", async () => {
@@ -36,7 +36,7 @@ describe("sprite manifest (pure)", () => {
     expect(entry.speciesId).toBe(1);
     expect(entry.speciesConst).toBe("SPECIES_BULBASAUR");
     expect(entry.slug).toBe("bulbasaur");
-    expect(entry.paths.front).toContain("bulbasaur.png");
+    expect(entry.paths.front).toContain("bulbasaur/front.png");
   });
 
   it("throws with id context when NAME is missing", () => {

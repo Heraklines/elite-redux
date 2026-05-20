@@ -54,13 +54,7 @@ export async function auditManifest(manifest, probe, root) {
   let totalPresent = 0;
 
   for (const entry of manifest) {
-    const paths = [
-      entry.paths.front,
-      entry.paths.back,
-      entry.paths.shinyFront,
-      entry.paths.shinyBack,
-      entry.paths.icon,
-    ];
+    const paths = [entry.paths.front, entry.paths.back, entry.paths.icon, entry.paths.animFront, entry.paths.footprint];
     /** @type {string[]} */
     const missingForEntry = [];
     for (const relPath of paths) {
@@ -143,23 +137,19 @@ export function renderReport(result) {
 
   body += "\n## Accepted Gaps\n\n";
   body += "Gaps below are tracked here per the Phase B plan, with remediation owned by Phase C asset work.\n\n";
-  body += "### Path-layout mismatch (`<variant>/<slug>.png` vs upstream `<slug>/<variant>.png`)\n\n";
-  body += '**Status:** systemic — affects the bulk of "completely missing" entries above.\n\n';
-  body += "The manifest emits paths in the form `assets/images/pokemon/elite-redux/<variant>/<slug>.png`\n";
-  body += "(e.g. `front/bulbasaur.png`, `icons/bulbasaur.png`). However the `er:fetch-sprites` script mirrors\n";
-  body += "upstream's directory structure verbatim, which is `<slug>/<variant>.png`\n";
-  body +=
-    "(e.g. `bulbasaur/front.png`, `bulbasaur/icon.png`). The sprites ARE on disk — just under different paths.\n\n";
-  body += "**Remediation (Phase C):** either (a) re-layout the mirrored sprites into the manifest-expected\n";
-  body += "structure at fetch time, or (b) regenerate the manifest builder to emit paths matching the upstream\n";
-  body += "layout. Option (b) is cheaper and avoids divergence from upstream naming.\n\n";
-  body += "### No shiny PNGs upstream\n\n";
-  body += "**Status:** structural — every species's `shinyFront` + `shinyBack` will be missing.\n\n";
-  body += "Upstream Elite-Redux ships shiny variants as palette files (`shiny.pal`), not separate PNGs.\n";
-  body += "There are no `shiny/front/<slug>.png` or `shiny/back/<slug>.png` sources to mirror.\n\n";
-  body += "**Remediation (Phase C):** runtime palette-swap support (preferred), OR a one-time offline render\n";
-  body += "that produces shiny PNGs from `normal.pal` + `shiny.pal` + base sprite. Until then, ER customs will\n";
-  body += "show their non-shiny sprite even when the player rolls a shiny.\n";
+  body += "### ER-custom species without upstream sprites\n\n";
+  body += "**Status:** structural — the upstream `Elite-Redux/eliteredux` repo only ships PNGs for vanilla\n";
+  body += "Gen1-9 Pokémon. ER-original species (`*_REDUX`, custom megas) typically have no source PNG.\n\n";
+  body += "**Remediation (Phase C):** source sprites from the ER community (Discord asset packs, fan ports),\n";
+  body += "hand-create placeholders, or render shiny variants from palette files. Track individual sprite\n";
+  body += "additions here as they land.\n\n";
+  body += "### Shiny variants (palette-based upstream)\n\n";
+  body += "**Status:** the manifest no longer asks for shiny PNGs (animFront + footprint replace them).\n";
+  body += "Phase C will load `shiny.pal` palette files at runtime to recolor the base front/back sprites.\n\n";
+  body += "### anim_front + footprint partial coverage\n\n";
+  body += "**Status:** ~185 vanilla species have front+back+icon but no animated front or footprint frames.\n";
+  body += "Acceptable for Phase B — these are optional visual flourishes (footprint is dex-only, anim_front\n";
+  body += "falls back to static front). Phase C should fill where feasible.\n";
 
   return body;
 }
