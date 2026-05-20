@@ -9,6 +9,7 @@ import { initEliteReduxCustomAbilities } from "#data/elite-redux/init-elite-redu
 import { initEliteReduxCustomMoves } from "#data/elite-redux/init-elite-redux-custom-moves";
 import { initEliteReduxCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
 import { initEliteReduxSpecies } from "#data/elite-redux/init-elite-redux-species";
+import { initEliteReduxVanillaRebalance } from "#data/elite-redux/init-elite-redux-vanilla-rebalance";
 import { initPokemonForms } from "#data/pokemon-forms";
 import { initBiomeBgmLoopPoints } from "#init/init-biome-bgm-loop-points";
 import { initBiomeDepths } from "#init/init-biome-depths";
@@ -76,5 +77,19 @@ export function initializeGame() {
   }
   console.info(
     `[er-b2] registered ${moveResult.customsAdded} ER-custom moves (skipped ${moveResult.customsAlreadyPresent} already present)`,
+  );
+  // Elite Redux Phase B3: patch ER's stat rebalances onto vanilla moves +
+  // abilities. Must run AFTER initEliteReduxCustomAbilities() and
+  // initEliteReduxCustomMoves() so we know which ids are customs (skipped)
+  // and which are vanilla (patched).
+  const rebalanceResult = initEliteReduxVanillaRebalance();
+  if (rebalanceResult.moveErrors.length > 0 || rebalanceResult.abilityErrors.length > 0) {
+    console.warn(
+      `[er-b3] rebalance errors: ${rebalanceResult.moveErrors.length} moves, ${rebalanceResult.abilityErrors.length} abilities`,
+      [...rebalanceResult.moveErrors.slice(0, 3), ...rebalanceResult.abilityErrors.slice(0, 3)],
+    );
+  }
+  console.info(
+    `[er-b3] vanilla rebalance applied: ${rebalanceResult.moveDeltas} move deltas (${rebalanceResult.moveFieldWrites} field writes), ${rebalanceResult.abilityDeltas} ability deltas, ${rebalanceResult.moveMissing} moves + ${rebalanceResult.abilityMissing} abilities skipped (id-map drift)`,
   );
 }
