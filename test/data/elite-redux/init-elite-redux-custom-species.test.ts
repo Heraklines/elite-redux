@@ -42,7 +42,8 @@ describe("initEliteReduxCustomSpecies (B1b)", () => {
   });
 
   it("first ErSpeciesId entry (PHANTOWL = 10000) is registered with valid construction", () => {
-    const phantowl = allSpecies.find(s => s.speciesId === ErSpeciesId.PHANTOWL);
+    // ER customs use numeric ids outside the vanilla SpeciesId enum; cast for comparison.
+    const phantowl = allSpecies.find(s => (s.speciesId as number) === ErSpeciesId.PHANTOWL);
     expect(phantowl).toBeDefined();
     if (!phantowl) {
       return;
@@ -67,7 +68,7 @@ describe("initEliteReduxCustomSpecies (B1b)", () => {
   });
 
   it("ER-custom species have 3-passive triple installed (getPassiveCount > 0)", () => {
-    const phantowl = allSpecies.find(s => s.speciesId === ErSpeciesId.PHANTOWL);
+    const phantowl = allSpecies.find(s => (s.speciesId as number) === ErSpeciesId.PHANTOWL);
     expect(phantowl).toBeDefined();
     if (!phantowl) {
       return;
