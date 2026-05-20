@@ -9,6 +9,7 @@ import { initEliteReduxCustomAbilities } from "#data/elite-redux/init-elite-redu
 import { initEliteReduxCustomMoves } from "#data/elite-redux/init-elite-redux-custom-moves";
 import { initEliteReduxCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
 import { initEliteReduxSpecies } from "#data/elite-redux/init-elite-redux-species";
+import { initEliteReduxTrainers } from "#data/elite-redux/init-elite-redux-trainers";
 import { initEliteReduxVanillaRebalance } from "#data/elite-redux/init-elite-redux-vanilla-rebalance";
 import { initPokemonForms } from "#data/pokemon-forms";
 import { initBiomeBgmLoopPoints } from "#init/init-biome-bgm-loop-points";
@@ -91,5 +92,20 @@ export function initializeGame() {
   }
   console.info(
     `[er-b3] vanilla rebalance applied: ${rebalanceResult.moveDeltas} move deltas (${rebalanceResult.moveFieldWrites} field writes), ${rebalanceResult.abilityDeltas} ability deltas, ${rebalanceResult.moveMissing} moves + ${rebalanceResult.abilityMissing} abilities skipped (id-map drift)`,
+  );
+  // Elite Redux Phase B4: populate the ER trainer registry. Must run AFTER
+  // initEliteReduxCustomSpecies() and initEliteReduxCustomMoves() so the
+  // species/move ids the registry references are guaranteed-resolvable
+  // downstream (the registry itself only translates ER ids — the constraint
+  // is on consumers, not this initializer).
+  const trainerResult = initEliteReduxTrainers();
+  if (trainerResult.errors.length > 0) {
+    console.warn(
+      `[er-b4] ${trainerResult.errors.length} trainer registration errors:`,
+      trainerResult.errors.slice(0, 5),
+    );
+  }
+  console.info(
+    `[er-b4] registered ${trainerResult.trainersRegistered} ER trainers in registry (skipped ${trainerResult.trainersSkipped} already present, dropped ${trainerResult.trainersDroppedMissingSpecies} for missing-species drift)`,
   );
 }
