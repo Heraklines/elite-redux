@@ -55,6 +55,29 @@ export {
   type TypeAbsorbStatBoostOptions,
 } from "./immunity-with-absorb";
 export {
+  type MoveReplacement,
+  MovesetReplacementAbAttr,
+  type MovesetReplacementOptions,
+  MoveTypeReplacementAbAttr,
+  type MoveTypeReplacementOptions,
+} from "./move-replacement";
+export {
+  type OnFaintEffect,
+  OnFaintEffectAbAttr,
+  type OnFaintEffectAttackerDamageFlat,
+  type OnFaintEffectKind,
+  type OnFaintEffectOptions,
+  type OnFaintEffectSetHazard,
+  type OnFaintEffectSetTerrain,
+  type OnFaintEffectSetWeather,
+} from "./on-faint-effect";
+export {
+  type PriorityCondition,
+  PriorityModifierAbAttr,
+  type PriorityModifierFilter,
+  type PriorityModifierOptions,
+} from "./priority-modifier";
+export {
   type OnHitFilter,
   type StatChange,
   type StatTriggerEvent,
@@ -66,4 +89,12 @@ export {
   StatTriggerOnStatLoweredAbAttr,
   type StatTriggerPayload,
 } from "./stat-trigger-on-event";
+export {
+  BattlerTagImmunityAbAttrEr,
+  type BattlerTagImmunityOptions,
+  IntimidateImmunityAbAttrEr,
+  StatusEffectImmunityAbAttrEr,
+  type StatusEffectImmunityOptions,
+  type StatusImmunity,
+} from "./status-immunity";
 export { TypeDamageBoostAbAttr, type TypeDamageBoostAbAttrOptions } from "./type-damage-boost";
