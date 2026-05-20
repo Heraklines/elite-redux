@@ -9,7 +9,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildAbilityEntry } from "./abilities.mjs";
+import { buildAbilityEntry, normalizeName } from "./abilities.mjs";
 
 const SAMPLE_PATH = resolve(__dirname, "../fixtures/sample-ability.json");
 const VENDOR_PATH = resolve(__dirname, "../../../vendor/elite-redux/v2.65beta.json");
@@ -63,6 +63,25 @@ describe("abilities transformer (pure)", () => {
     expect(a1.archetype).toBe("vanilla");
     expect(a2.archetype).toBe("vanilla");
     expect(a3.archetype).toBe("vanilla");
+  });
+});
+
+describe("normalizeName", () => {
+  it("lowercases and strips separators", () => {
+    expect(normalizeName("Wandering Spirit")).toBe("wanderingspirit");
+    expect(normalizeName("WANDERING_SPIRIT")).toBe("wanderingspirit");
+    expect(normalizeName("wandering-spirit")).toBe("wanderingspirit");
+  });
+  it("returns empty for empty/whitespace/separator-only", () => {
+    expect(normalizeName("")).toBe("");
+    expect(normalizeName("   ")).toBe("");
+    expect(normalizeName("___")).toBe("");
+  });
+  it("strips non-ASCII (e.g., é)", () => {
+    expect(normalizeName("Pokémon")).toBe("pokmon");
+  });
+  it("preserves digits", () => {
+    expect(normalizeName("123ABC")).toBe("123abc");
   });
 });
 

@@ -44,6 +44,14 @@ export async function loadVanillaAbilityNames() {
   for (const match of src.matchAll(re)) {
     out.add(normalizeName(match[1]));
   }
+  // Sanity: if the enum file format changes (split, const enum, generated, etc.)
+  // we'd silently get a small/empty set, flipping every ER ability to "unknown".
+  // 200 is a generous floor — pokerogue ships ~310 enum keys today.
+  if (out.size < 200) {
+    throw new Error(
+      `loadVanillaAbilityNames: parsed only ${out.size} keys from ${enumPath} — file format may have changed`,
+    );
+  }
   return out;
 }
 
@@ -72,6 +80,27 @@ export async function build({ dump, outDir, flags }) {
   const vanillaNames = await loadVanillaAbilityNames();
   const raws = /** @type {ErAbilityRaw[]} */ (dump.abilities ?? []);
   const entries = raws.map(a => buildAbilityEntry(a, vanillaNames));
+  // Detect duplicate-name groups — ER stores Glastrier/Spectrier "As One" as
+  // two id-distinct rows with identical names; same for the 4 "Embody Aspect"
+  // variants. A9 (id-map hand-resolution) needs this surface for cross-ref.
+  const nameCounts = new Map();
+  for (const e of entries) {
+    const norm = normalizeName(e.name);
+    if (!norm) {
+      continue;
+    }
+    nameCounts.set(norm, (nameCounts.get(norm) ?? 0) + 1);
+  }
+  const dupGroups = [...nameCounts.entries()].filter(([, count]) => count > 1);
+  if (dupGroups.length > 0) {
+    const summary = dupGroups
+      .map(([norm, count]) => {
+        const example = entries.find(e => normalizeName(e.name) === norm)?.name ?? "?";
+        return `${example} x${count}`;
+      })
+      .join(", ");
+    console.log(`[er:abilities] note: ${dupGroups.length} duplicate-name groups (${summary})`);
+  }
   const vanillaCount = entries.filter(e => e.archetype === "vanilla").length;
   const unknownCount = entries.length - vanillaCount;
   const body = `export interface ErAbilityDraft {
