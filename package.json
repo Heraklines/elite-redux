@@ -45,7 +45,8 @@
     "er:fetch": "node scripts/elite-redux/fetch-source.mjs",
     "er:fetch-sprites": "node scripts/elite-redux/fetch-sprites.mjs",
     "er:fixtures": "node scripts/elite-redux/extract-fixtures.mjs",
-    "er:build": "node scripts/elite-redux/build-pokerogue-data.mjs"
+    "er:build": "node scripts/elite-redux/build-pokerogue-data.mjs",
+    "er:cluster-archetypes": "node scripts/elite-redux/cluster-archetypes.mjs"
   },
   "dependencies": {
     "@material/material-color-utilities": "^0.4.0",
