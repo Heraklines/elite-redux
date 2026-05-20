@@ -90,6 +90,18 @@ export interface AbAttrBaseParams {
    * is the pokemon's passive, and `false` otherwise.
    */
   passive?: boolean | undefined;
+
+  /**
+   * (For callers of {@linkcode applyAbAttrs}): The passive slot (0, 1, or 2) being applied.
+   * Only meaningful when {@linkcode passive} is `true`. When undefined and `passive` is true,
+   * slot 0 (the legacy single-passive slot) is used.
+   *
+   * (For implementations of {@linkcode AbAttr}): When iterating during a default
+   * `applyAbAttrs` call this will be `0 | 1 | 2` for passive triggers and `undefined`
+   * for the active ability trigger. Implementations should almost never need to read this
+   * directly — it exists so the dispatcher can iterate all 3 ER passive slots.
+   */
+  passiveSlot?: 0 | 1 | 2 | undefined;
 }
 
 export interface AbAttrParamsWithCancel extends AbAttrBaseParams {

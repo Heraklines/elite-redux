@@ -1,3 +1,4 @@
+import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import type {
   AbAttrBaseParams,
@@ -25,11 +26,30 @@ function applySingleAbAttrs<T extends AbAttrString>(
   { attrFilter = () => true, messages }: ApplyAbAttrConfig<T> = {},
 ) {
   const { simulated = false, passive = false, pokemon } = params;
-  if (!pokemon.canApplyAbility(passive) || (passive && pokemon.getPassiveAbility().id === pokemon.getAbility().id)) {
+  if (!pokemon.canApplyAbility(passive)) {
     return;
   }
 
-  const ability = passive ? pokemon.getPassiveAbility() : pokemon.getAbility();
+  let ability: Ability;
+  if (passive) {
+    // ER 3-passive: resolve the requested slot. Default to slot 0 for callers
+    // that set `passive: true` without specifying a slot (legacy behavior).
+    const slot = params.passiveSlot ?? 0;
+    const slotAbility = pokemon.getPassiveAbilities()[slot];
+    if (!slotAbility) {
+      // Empty slot — nothing to apply. Do NOT fall back to getPassiveAbility(),
+      // as that would double-fire for legacy species (which fill slots 1/2 with NONE).
+      return;
+    }
+    ability = slotAbility;
+    // Avoid double-firing when this passive slot matches the active ability.
+    // Mirrors the prior single-passive guard: `passive && passiveId === activeId`.
+    if (ability.id === pokemon.getAbility().id) {
+      return;
+    }
+  } else {
+    ability = pokemon.getAbility();
+  }
   const attrs = ability.getAttrs(attrType);
 
   for (const attr of attrs) {
@@ -94,12 +114,28 @@ function applyAbAttrsInternal<T extends CallableAbAttrString>(
     return;
   }
 
-  for (const passive of [false, true]) {
-    params.passive = passive;
+  // Apply the active ability first.
+  params.passive = false;
+  params.passiveSlot = undefined;
+  applySingleAbAttrs(attrType, params, config);
+
+  // Then iterate each non-empty passive slot (ER 3-passive model).
+  // Empty slots return null from getPassiveAbilities() and are skipped.
+  // Slots matching the active ability id are skipped inside applySingleAbAttrs
+  // to preserve the legacy "no double-fire when active === passive" invariant.
+  const passiveAbilities = params.pokemon.getPassiveAbilities();
+  for (let slot = 0; slot < 3; slot++) {
+    if (passiveAbilities[slot] === null) {
+      continue;
+    }
+    params.passive = true;
+    params.passiveSlot = slot as 0 | 1 | 2;
     applySingleAbAttrs(attrType, params, config);
   }
-  // Restore passive if it was undefined on entry to allow re-use of parameter objects
+
+  // Restore passive/passiveSlot if they were undefined on entry to allow re-use of parameter objects
   params.passive = undefined;
+  params.passiveSlot = undefined;
 }
 
 /**
@@ -149,32 +185,43 @@ export function applyOnGainAbAttrs(params: AbAttrBaseParams): void {
 export function applyPostFormChangeAbAttrs(params: Omit<AbAttrBaseParams, "passive">): void {
   const { pokemon } = params;
   const { formChangeAbilitiesApplied } = pokemon.turnData;
-  const activeApplied = formChangeAbilitiesApplied.has(pokemon.getAbility().id);
-  const passiveApplied = formChangeAbilitiesApplied.has(pokemon.getPassiveAbility().id);
+  const activeId = pokemon.getAbility().id;
+  const passiveAbilities = pokemon.getPassiveAbilities();
 
-  if (activeApplied && passiveApplied) {
-    return;
+  const attrFilter = (attr: AbAttrMap["PostSummonAbAttr"]) =>
+    !attr.is("PostSummonFormChangeAbAttr") && !attr.is("PostSummonFormChangeByWeatherAbAttr");
+
+  // Apply the active ability if its id has not yet been applied this turn.
+  // Per-id idempotence prevents the form-change re-application from double-firing
+  // (e.g. Mega Tyranitar re-applies Sand Stream once even if a prior trigger already ran it).
+  if (!formChangeAbilitiesApplied.has(activeId)) {
+    formChangeAbilitiesApplied.add(activeId);
+    const activeParams = {
+      ...params,
+      passive: false as const,
+      passiveSlot: undefined,
+    } as AbAttrParamMap["PostSummonAbAttr"];
+    applySingleAbAttrs("PostSummonAbAttr", activeParams, { attrFilter });
   }
 
-  // Form change abilities currently don't work as passives, but no harm future-proofing it for later
-  let passive: boolean | undefined;
-  if (activeApplied) {
-    passive = true;
-    formChangeAbilitiesApplied.add(pokemon.getPassiveAbility().id);
-  } else if (passiveApplied) {
-    passive = false;
-    formChangeAbilitiesApplied.add(pokemon.getAbility().id);
-  } else {
-    formChangeAbilitiesApplied.add(pokemon.getPassiveAbility().id).add(pokemon.getAbility().id);
+  // Apply each non-empty passive slot whose id has not yet been applied.
+  // Form change abilities currently don't work as passives, but we future-proof here
+  // by iterating all 3 ER slots. The per-id idempotence is enforced via
+  // formChangeAbilitiesApplied — we re-check on each slot (not a pre-snapshot)
+  // so two slots sharing the same id don't double-fire within a single call.
+  for (let slot = 0; slot < 3; slot++) {
+    const slotAbility = passiveAbilities[slot];
+    if (slotAbility === null || formChangeAbilitiesApplied.has(slotAbility.id)) {
+      continue;
+    }
+    formChangeAbilitiesApplied.add(slotAbility.id);
+    const passiveParams = {
+      ...params,
+      passive: true as const,
+      passiveSlot: slot as 0 | 1 | 2,
+    } as AbAttrParamMap["PostSummonAbAttr"];
+    applySingleAbAttrs("PostSummonAbAttr", passiveParams, { attrFilter });
   }
-
-  applyAbAttrsInternal(
-    "PostSummonAbAttr",
-    { ...params, passive },
-    {
-      attrFilter: attr => !attr.is("PostSummonFormChangeAbAttr") && !attr.is("PostSummonFormChangeByWeatherAbAttr"),
-    },
-  );
 }
 
 /**

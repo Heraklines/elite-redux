@@ -2095,6 +2095,49 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   /**
+   * Return the 3 ER-style passive abilities for this Pokemon, resolving
+   * through the species' {@linkcode PokemonSpeciesForm.getPassiveAbilities}
+   * override. Each entry is the {@linkcode Ability} instance for that slot,
+   * or `null` if that slot is empty (`AbilityId.NONE`).
+   *
+   * Slot 0 honors overrides / custom data / event bosses identically to
+   * {@linkcode getPassiveAbility}, so legacy single-passive behavior is
+   * preserved when no 3-passive override has been installed on the species.
+   *
+   * Used by {@linkcode applyAbAttrs} to iterate all 3 passive slots when
+   * applying ability attributes (ER 3-passive model).
+   */
+  public getPassiveAbilities(): readonly [Ability | null, Ability | null, Ability | null] {
+    // Slot 0 must continue to honor overrides / customPokemonData / event
+    // boss settings so single-passive behavior is preserved when no
+    // 3-passive override is set on the species. We mirror the lookup order
+    // used by getPassiveAbility() exactly for slot 0.
+    let slot0: Ability | null = null;
+    if (Overrides.PASSIVE_ABILITY_OVERRIDE && this.isPlayer()) {
+      slot0 = allAbilities[Overrides.PASSIVE_ABILITY_OVERRIDE];
+    } else if (Overrides.ENEMY_PASSIVE_ABILITY_OVERRIDE && this.isEnemy()) {
+      slot0 = allAbilities[Overrides.ENEMY_PASSIVE_ABILITY_OVERRIDE];
+    } else if (this.customPokemonData.passive != null && this.customPokemonData.passive !== -1) {
+      slot0 = allAbilities[this.customPokemonData.passive];
+    } else if (this.isBoss() && isDailyFinalBoss()) {
+      const eventBoss = getDailyEventSeedBoss();
+      if (eventBoss?.passive != null) {
+        slot0 = allAbilities[eventBoss.passive];
+      }
+    }
+
+    const ids = this.species.getPassiveAbilities(this.formIndex);
+    if (slot0 === null) {
+      slot0 = ids[0] === AbilityId.NONE ? null : allAbilities[ids[0]];
+    }
+    return [
+      slot0,
+      ids[1] === AbilityId.NONE ? null : allAbilities[ids[1]],
+      ids[2] === AbilityId.NONE ? null : allAbilities[ids[2]],
+    ];
+  }
+
+  /**
    * Gets a list of all instances of a given ability attribute among abilities this pokemon has.
    * Accounts for all the various effects which can affect whether an ability will be present or
    * in effect, and both passive and non-passive.
