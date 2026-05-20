@@ -76,6 +76,11 @@ function mapPartyOrNull(arr, ctxLabel) {
 
 /**
  * Transform one ER raw trainer entry into the draft shape.
+ *
+ * Note: dump.trainers[i].rem is empty in all 895 v2.65 trainers — dropped
+ * from the emit. If a future ER version starts populating rem, restore the
+ * field then.
+ *
  * @param {ErTrainerRaw} raw
  * @param {number} index  - the trainer's index in dump.trainers (used as id)
  */
@@ -86,6 +91,7 @@ export function buildTrainerEntry(raw, index) {
   const party = (raw.party ?? []).map((m, idx) => buildPartyMember(m, `trainer ${index} party[${idx}]`));
   return {
     id: index,
+    stableKey: raw.name,
     name: raw.name,
     trainerClass: raw.tclass ?? 0,
     isDouble: !!raw.db,
@@ -93,7 +99,6 @@ export function buildTrainerEntry(raw, index) {
     party,
     insaneParty: mapPartyOrNull(raw.insane, `trainer ${index} insane`),
     hellParty: mapPartyOrNull(raw.hell, `trainer ${index} hell`),
-    extras: (raw.rem ?? []).map((m, idx) => buildPartyMember(m, `trainer ${index} rem[${idx}]`)),
   };
 }
 
@@ -124,6 +129,8 @@ export async function build({ dump, outDir, flags }) {
 
   const body = `export interface ErPartyMember {
   readonly species: number;
+  /** Index into species.abilities[0..2] (active ability pick). Innates are
+   *  species-intrinsic and not selected per-trainer. */
   readonly abilitySlot: number;
   readonly ivs: readonly [number, number, number, number, number, number];
   readonly evs: readonly [number, number, number, number, number, number];
@@ -135,6 +142,9 @@ export async function build({ dump, outDir, flags }) {
 
 export interface ErTrainerDraft {
   readonly id: number;
+  /** Stable identity key (= name). Use this for cross-ref tables in A9
+   *  instead of \`id\`, since the array index shifts under SHA bumps. */
+  readonly stableKey: string;
   readonly name: string;
   readonly trainerClass: number;
   readonly isDouble: boolean;
@@ -142,7 +152,6 @@ export interface ErTrainerDraft {
   readonly party: readonly ErPartyMember[];
   readonly insaneParty: readonly ErPartyMember[] | null;
   readonly hellParty: readonly ErPartyMember[] | null;
-  readonly extras: readonly ErPartyMember[];
 }
 
 export const ER_TRAINERS: readonly ErTrainerDraft[] = ${JSON.stringify(entries, null, 2)} as const;

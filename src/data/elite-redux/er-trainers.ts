@@ -6,6 +6,8 @@
 
 export interface ErPartyMember {
   readonly species: number;
+  /** Index into species.abilities[0..2] (active ability pick). Innates are
+   *  species-intrinsic and not selected per-trainer. */
   readonly abilitySlot: number;
   readonly ivs: readonly [number, number, number, number, number, number];
   readonly evs: readonly [number, number, number, number, number, number];
@@ -17,6 +19,9 @@ export interface ErPartyMember {
 
 export interface ErTrainerDraft {
   readonly id: number;
+  /** Stable identity key (= name). Use this for cross-ref tables in A9
+   *  instead of `id`, since the array index shifts under SHA bumps. */
+  readonly stableKey: string;
   readonly name: string;
   readonly trainerClass: number;
   readonly isDouble: boolean;
@@ -24,12 +29,12 @@ export interface ErTrainerDraft {
   readonly party: readonly ErPartyMember[];
   readonly insaneParty: readonly ErPartyMember[] | null;
   readonly hellParty: readonly ErPartyMember[] | null;
-  readonly extras: readonly ErPartyMember[];
 }
 
 export const ER_TRAINERS: readonly ErTrainerDraft[] = [
   {
     "id": 0,
+    "stableKey": "May Route 103 Treecko",
     "name": "May Route 103 Treecko",
     "trainerClass": 15,
     "isDouble": false,
@@ -95,11 +100,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 1,
+    "stableKey": "May Route 103 Mudkip",
     "name": "May Route 103 Mudkip",
     "trainerClass": 15,
     "isDouble": false,
@@ -165,11 +170,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 2,
+    "stableKey": "May Route 103 Torchic",
     "name": "May Route 103 Torchic",
     "trainerClass": 15,
     "isDouble": false,
@@ -235,11 +240,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 3,
+    "stableKey": "Brendan Route 103 Treecko",
     "name": "Brendan Route 103 Treecko",
     "trainerClass": 15,
     "isDouble": false,
@@ -305,11 +310,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 4,
+    "stableKey": "Brendan Route 103 Mudkip",
     "name": "Brendan Route 103 Mudkip",
     "trainerClass": 15,
     "isDouble": false,
@@ -375,11 +380,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 5,
+    "stableKey": "Brendan Route 103 Torchic",
     "name": "Brendan Route 103 Torchic",
     "trainerClass": 15,
     "isDouble": false,
@@ -445,11 +450,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 6,
+    "stableKey": "Rick",
     "name": "Rick",
     "trainerClass": 55,
     "isDouble": false,
@@ -778,11 +783,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 3
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 7,
+    "stableKey": "Allen",
     "name": "Allen",
     "trainerClass": 41,
     "isDouble": false,
@@ -1140,11 +1145,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 8,
+    "stableKey": "Billy",
     "name": "Billy",
     "trainerClass": 41,
     "isDouble": false,
@@ -1531,11 +1536,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 9,
+    "stableKey": "Darian",
     "name": "Darian",
     "trainerClass": 42,
     "isDouble": false,
@@ -2009,11 +2014,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 10,
+    "stableKey": "Lyle",
     "name": "Lyle",
     "trainerClass": 55,
     "isDouble": false,
@@ -2429,11 +2434,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 11,
+    "stableKey": "Grunt Petalburg Woods",
     "name": "Grunt Petalburg Woods",
     "trainerClass": 1,
     "isDouble": false,
@@ -2907,11 +2912,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 12,
+    "stableKey": "Ivan",
     "name": "Ivan",
     "trainerClass": 42,
     "isDouble": false,
@@ -3269,11 +3274,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 13,
+    "stableKey": "Joey",
     "name": "Joey",
     "trainerClass": 41,
     "isDouble": false,
@@ -3660,11 +3665,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 14,
+    "stableKey": "Jose",
     "name": "Jose",
     "trainerClass": 55,
     "isDouble": false,
@@ -4136,11 +4141,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 15,
+    "stableKey": "Clark",
     "name": "Clark",
     "trainerClass": 0,
     "isDouble": false,
@@ -4527,11 +4532,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 16,
+    "stableKey": "Johnson",
     "name": "Johnson",
     "trainerClass": 41,
     "isDouble": false,
@@ -4946,11 +4951,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 17,
+    "stableKey": "Devan",
     "name": "Devan",
     "trainerClass": 0,
     "isDouble": false,
@@ -5307,11 +5312,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 18,
+    "stableKey": "Josh",
     "name": "Josh",
     "trainerClass": 41,
     "isDouble": false,
@@ -5756,11 +5761,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 19,
+    "stableKey": "Tommy",
     "name": "Tommy",
     "trainerClass": 41,
     "isDouble": false,
@@ -6147,11 +6152,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 20,
+    "stableKey": "Marc",
     "name": "Marc",
     "trainerClass": 0,
     "isDouble": false,
@@ -6422,11 +6427,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 21,
+    "stableKey": "Grunt Rusturf Tunnel",
     "name": "Grunt Rusturf Tunnel",
     "trainerClass": 1,
     "isDouble": false,
@@ -6928,11 +6933,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 22,
+    "stableKey": "May Rustboro Treecko",
     "name": "May Rustboro Treecko",
     "trainerClass": 15,
     "isDouble": false,
@@ -7260,11 +7265,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 23,
+    "stableKey": "May Rustboro Mudkip",
     "name": "May Rustboro Mudkip",
     "trainerClass": 15,
     "isDouble": false,
@@ -7592,11 +7597,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 24,
+    "stableKey": "May Rustboro Torchic",
     "name": "May Rustboro Torchic",
     "trainerClass": 15,
     "isDouble": false,
@@ -7924,11 +7929,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 25,
+    "stableKey": "Brendan Rustboro Treecko",
     "name": "Brendan Rustboro Treecko",
     "trainerClass": 15,
     "isDouble": false,
@@ -8256,11 +8261,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 26,
+    "stableKey": "Brendan Rustboro Mudkip",
     "name": "Brendan Rustboro Mudkip",
     "trainerClass": 15,
     "isDouble": false,
@@ -8588,11 +8593,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 27,
+    "stableKey": "Brendan Rustboro Torchic",
     "name": "Brendan Rustboro Torchic",
     "trainerClass": 15,
     "isDouble": false,
@@ -8920,11 +8925,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 28,
+    "stableKey": "Ned",
     "name": "Ned",
     "trainerClass": 42,
     "isDouble": false,
@@ -9224,11 +9229,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 29,
+    "stableKey": "Steven Granite Cave",
     "name": "Steven Granite Cave",
     "trainerClass": 54,
     "isDouble": false,
@@ -9702,11 +9707,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 30,
+    "stableKey": "Huey",
     "name": "Huey",
     "trainerClass": 53,
     "isDouble": false,
@@ -10092,11 +10097,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 31,
+    "stableKey": "Edmond",
     "name": "Edmond",
     "trainerClass": 53,
     "isDouble": false,
@@ -10483,11 +10488,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 32,
+    "stableKey": "Hailey",
     "name": "Hailey",
     "trainerClass": 18,
     "isDouble": false,
@@ -10874,11 +10879,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 33,
+    "stableKey": "Simon",
     "name": "Simon",
     "trainerClass": 19,
     "isDouble": false,
@@ -11265,11 +11270,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 34,
+    "stableKey": "Johanna",
     "name": "Johanna",
     "trainerClass": 21,
     "isDouble": false,
@@ -11481,11 +11486,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 4
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 35,
+    "stableKey": "Laura",
     "name": "Laura",
     "trainerClass": 47,
     "isDouble": false,
@@ -11843,11 +11848,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 36,
+    "stableKey": "Takao",
     "name": "Takao",
     "trainerClass": 10,
     "isDouble": false,
@@ -12234,11 +12239,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 37,
+    "stableKey": "Cristian",
     "name": "Cristian",
     "trainerClass": 10,
     "isDouble": false,
@@ -12625,11 +12630,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 38,
+    "stableKey": "Jocelyn",
     "name": "Jocelyn",
     "trainerClass": 47,
     "isDouble": false,
@@ -13016,11 +13021,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 39,
+    "stableKey": "Brenden",
     "name": "Brenden",
     "trainerClass": 53,
     "isDouble": false,
@@ -13291,11 +13296,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 40,
+    "stableKey": "Lilith",
     "name": "Lilith",
     "trainerClass": 47,
     "isDouble": false,
@@ -13566,11 +13571,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 41,
+    "stableKey": "Grunt Museum 1",
     "name": "Grunt Museum 1",
     "trainerClass": 1,
     "isDouble": false,
@@ -13812,11 +13817,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 42,
+    "stableKey": "Grunt Museum 2",
     "name": "Grunt Museum 2",
     "trainerClass": 1,
     "isDouble": false,
@@ -14058,11 +14063,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 43,
+    "stableKey": "Archie Slateport",
     "name": "Archie Slateport",
     "trainerClass": 11,
     "isDouble": false,
@@ -14507,11 +14512,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 44,
+    "stableKey": "Kaleb",
     "name": "Kaleb",
     "trainerClass": 40,
     "isDouble": false,
@@ -14926,11 +14931,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 45,
+    "stableKey": "Daisy",
     "name": "Daisy",
     "trainerClass": 13,
     "isDouble": false,
@@ -15404,11 +15409,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 46,
+    "stableKey": "Rhett",
     "name": "Rhett",
     "trainerClass": 10,
     "isDouble": false,
@@ -15853,11 +15858,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 47,
+    "stableKey": "Marcos",
     "name": "Marcos",
     "trainerClass": 27,
     "isDouble": false,
@@ -16273,11 +16278,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 48,
+    "stableKey": "Andrew",
     "name": "Andrew",
     "trainerClass": 42,
     "isDouble": false,
@@ -16576,11 +16581,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 49,
+    "stableKey": "Sally",
     "name": "Sally",
     "trainerClass": 58,
     "isDouble": false,
@@ -16646,11 +16651,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 50,
+    "stableKey": "Robin",
     "name": "Robin",
     "trainerClass": 58,
     "isDouble": false,
@@ -16716,11 +16721,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 51,
+    "stableKey": "Eddie",
     "name": "Eddie",
     "trainerClass": 41,
     "isDouble": false,
@@ -16786,11 +16791,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 52,
+    "stableKey": "Timmy",
     "name": "Timmy",
     "trainerClass": 41,
     "isDouble": false,
@@ -17264,11 +17269,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 53,
+    "stableKey": "May Route 110 Treecko",
     "name": "May Route 110 Treecko",
     "trainerClass": 15,
     "isDouble": false,
@@ -17625,11 +17630,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 54,
+    "stableKey": "May Route 110 Mudkip",
     "name": "May Route 110 Mudkip",
     "trainerClass": 15,
     "isDouble": false,
@@ -17986,11 +17991,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 55,
+    "stableKey": "May Route 110 Torchic",
     "name": "May Route 110 Torchic",
     "trainerClass": 15,
     "isDouble": false,
@@ -18347,11 +18352,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 56,
+    "stableKey": "Brendan Route 110 Treecko",
     "name": "Brendan Route 110 Treecko",
     "trainerClass": 15,
     "isDouble": false,
@@ -18708,11 +18713,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 57,
+    "stableKey": "Brendan Route 110 Mudkip",
     "name": "Brendan Route 110 Mudkip",
     "trainerClass": 15,
     "isDouble": false,
@@ -19069,11 +19074,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 58,
+    "stableKey": "Brendan Route 110 Torchic",
     "name": "Brendan Route 110 Torchic",
     "trainerClass": 15,
     "isDouble": false,
@@ -19430,11 +19435,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 59,
+    "stableKey": "Joseph",
     "name": "Joseph",
     "trainerClass": 27,
     "isDouble": false,
@@ -19820,11 +19825,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 60,
+    "stableKey": "Alyssa",
     "name": "Alyssa",
     "trainerClass": 43,
     "isDouble": false,
@@ -20240,11 +20245,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 61,
+    "stableKey": "Edward",
     "name": "Edward",
     "trainerClass": 31,
     "isDouble": false,
@@ -20660,11 +20665,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 62,
+    "stableKey": "Dale",
     "name": "Dale",
     "trainerClass": 42,
     "isDouble": false,
@@ -21138,11 +21143,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 63,
+    "stableKey": "Jaclyn",
     "name": "Jaclyn",
     "trainerClass": 31,
     "isDouble": false,
@@ -21558,11 +21563,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 64,
+    "stableKey": "Anthony",
     "name": "Anthony",
     "trainerClass": 43,
     "isDouble": false,
@@ -22007,11 +22012,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 65,
+    "stableKey": "Jasmine",
     "name": "Jasmine",
     "trainerClass": 43,
     "isDouble": false,
@@ -22368,11 +22373,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 66,
+    "stableKey": "Jacob",
     "name": "Jacob",
     "trainerClass": 43,
     "isDouble": false,
@@ -22788,11 +22793,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 67,
+    "stableKey": "Deandre",
     "name": "Deandre",
     "trainerClass": 41,
     "isDouble": false,
@@ -23208,11 +23213,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 68,
+    "stableKey": "Wade",
     "name": "Wade",
     "trainerClass": 42,
     "isDouble": false,
@@ -23657,11 +23662,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 69,
+    "stableKey": "Celina",
     "name": "Celina",
     "trainerClass": 13,
     "isDouble": false,
@@ -24163,11 +24168,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 70,
+    "stableKey": "Tyron",
     "name": "Tyron",
     "trainerClass": 29,
     "isDouble": false,
@@ -24641,11 +24646,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 71,
+    "stableKey": "Bianca",
     "name": "Bianca",
     "trainerClass": 30,
     "isDouble": false,
@@ -25090,11 +25095,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 72,
+    "stableKey": "Hayden",
     "name": "Hayden",
     "trainerClass": 28,
     "isDouble": false,
@@ -25539,11 +25544,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 73,
+    "stableKey": "Victor",
     "name": "Victor",
     "trainerClass": 39,
     "isDouble": false,
@@ -25872,11 +25877,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 74,
+    "stableKey": "Victoria",
     "name": "Victoria",
     "trainerClass": 39,
     "isDouble": false,
@@ -26205,11 +26210,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 75,
+    "stableKey": "Vivi",
     "name": "Vivi",
     "trainerClass": 39,
     "isDouble": false,
@@ -26567,11 +26572,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 76,
+    "stableKey": "Vicky",
     "name": "Vicky",
     "trainerClass": 39,
     "isDouble": false,
@@ -26987,11 +26992,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 77,
+    "stableKey": "Derek",
     "name": "Derek",
     "trainerClass": 24,
     "isDouble": false,
@@ -27465,11 +27470,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 78,
+    "stableKey": "Aisha",
     "name": "Aisha",
     "trainerClass": 47,
     "isDouble": false,
@@ -27914,11 +27919,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 6
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 79,
+    "stableKey": "Brandi",
     "name": "Brandi",
     "trainerClass": 31,
     "isDouble": false,
@@ -28392,11 +28397,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 80,
+    "stableKey": "Wally Mauville",
     "name": "Wally Mauville",
     "trainerClass": 15,
     "isDouble": false,
@@ -28870,11 +28875,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 81,
+    "stableKey": "Vivian",
     "name": "Vivian",
     "trainerClass": 47,
     "isDouble": false,
@@ -29289,11 +29294,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 82,
+    "stableKey": "Kirk",
     "name": "Kirk",
     "trainerClass": 27,
     "isDouble": false,
@@ -29709,11 +29714,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 83,
+    "stableKey": "Ben",
     "name": "Ben",
     "trainerClass": 41,
     "isDouble": false,
@@ -30128,11 +30133,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 84,
+    "stableKey": "Angelo",
     "name": "Angelo",
     "trainerClass": 24,
     "isDouble": false,
@@ -30374,11 +30379,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 85,
+    "stableKey": "Shawn",
     "name": "Shawn",
     "trainerClass": 27,
     "isDouble": false,
@@ -30620,11 +30625,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 3
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 86,
+    "stableKey": "Irene",
     "name": "Irene",
     "trainerClass": 30,
     "isDouble": false,
@@ -31069,11 +31074,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 87,
+    "stableKey": "Travis",
     "name": "Travis",
     "trainerClass": 29,
     "isDouble": false,
@@ -31547,11 +31552,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 88,
+    "stableKey": "Larry",
     "name": "Larry",
     "trainerClass": 29,
     "isDouble": false,
@@ -32025,11 +32030,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 89,
+    "stableKey": "Carol",
     "name": "Carol",
     "trainerClass": 30,
     "isDouble": false,
@@ -32503,11 +32508,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 90,
+    "stableKey": "Brice",
     "name": "Brice",
     "trainerClass": 0,
     "isDouble": false,
@@ -32952,11 +32957,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 91,
+    "stableKey": "Shayla",
     "name": "Shayla",
     "trainerClass": 13,
     "isDouble": false,
@@ -33371,11 +33376,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 92,
+    "stableKey": "Bryant",
     "name": "Bryant",
     "trainerClass": 28,
     "isDouble": false,
@@ -33790,11 +33795,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 93,
+    "stableKey": "Jaylen",
     "name": "Jaylen",
     "trainerClass": 41,
     "isDouble": false,
@@ -34210,11 +34215,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 94,
+    "stableKey": "Lawrence",
     "name": "Lawrence",
     "trainerClass": 29,
     "isDouble": false,
@@ -34659,11 +34664,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 95,
+    "stableKey": "Lung",
     "name": "Lung",
     "trainerClass": 45,
     "isDouble": false,
@@ -35166,11 +35171,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 96,
+    "stableKey": "Wyatt",
     "name": "Wyatt",
     "trainerClass": 25,
     "isDouble": false,
@@ -35615,11 +35620,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 97,
+    "stableKey": "Tori And Tia",
     "name": "Tori And Tia",
     "trainerClass": 51,
     "isDouble": true,
@@ -36064,11 +36069,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 98,
+    "stableKey": "Dillon",
     "name": "Dillon",
     "trainerClass": 41,
     "isDouble": false,
@@ -36455,11 +36460,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 99,
+    "stableKey": "Sophie",
     "name": "Sophie",
     "trainerClass": 30,
     "isDouble": false,
@@ -36874,11 +36879,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 100,
+    "stableKey": "Coby",
     "name": "Coby",
     "trainerClass": 4,
     "isDouble": false,
@@ -37352,11 +37357,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 101,
+    "stableKey": "Nolan",
     "name": "Nolan",
     "trainerClass": 42,
     "isDouble": false,
@@ -37626,11 +37631,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 102,
+    "stableKey": "Kai",
     "name": "Kai",
     "trainerClass": 42,
     "isDouble": false,
@@ -38104,11 +38109,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 103,
+    "stableKey": "Charlotte",
     "name": "Charlotte",
     "trainerClass": 30,
     "isDouble": false,
@@ -38551,11 +38556,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 104,
+    "stableKey": "Claude",
     "name": "Claude",
     "trainerClass": 42,
     "isDouble": false,
@@ -39029,11 +39034,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 105,
+    "stableKey": "Nancy",
     "name": "Nancy",
     "trainerClass": 30,
     "isDouble": false,
@@ -39507,11 +39512,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 106,
+    "stableKey": "Tyra And Ivy",
     "name": "Tyra And Ivy",
     "trainerClass": 37,
     "isDouble": true,
@@ -40042,11 +40047,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 107,
+    "stableKey": "Shane",
     "name": "Shane",
     "trainerClass": 29,
     "isDouble": false,
@@ -40519,11 +40524,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 108,
+    "stableKey": "Angelina",
     "name": "Angelina",
     "trainerClass": 30,
     "isDouble": false,
@@ -40910,11 +40915,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 109,
+    "stableKey": "Lenny",
     "name": "Lenny",
     "trainerClass": 0,
     "isDouble": false,
@@ -41330,11 +41335,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 110,
+    "stableKey": "Courtney Meteor Falls",
     "name": "Courtney Meteor Falls",
     "trainerClass": 16,
     "isDouble": false,
@@ -41605,11 +41610,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 111,
+    "stableKey": "Grunt Meteor Falls",
     "name": "Grunt Meteor Falls",
     "trainerClass": 7,
     "isDouble": false,
@@ -41880,11 +41885,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 112,
+    "stableKey": "Hector",
     "name": "Hector",
     "trainerClass": 5,
     "isDouble": false,
@@ -42358,11 +42363,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 113,
+    "stableKey": "Marlene",
     "name": "Marlene",
     "trainerClass": 31,
     "isDouble": false,
@@ -42720,11 +42725,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 114,
+    "stableKey": "Grunt Mt Chimney 1",
     "name": "Grunt Mt Chimney 1",
     "trainerClass": 7,
     "isDouble": false,
@@ -43198,11 +43203,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 115,
+    "stableKey": "Grunt Mt Chimney 2",
     "name": "Grunt Mt Chimney 2",
     "trainerClass": 7,
     "isDouble": false,
@@ -43676,11 +43681,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 116,
+    "stableKey": "Tabitha Mt Chimney",
     "name": "Tabitha Mt Chimney",
     "trainerClass": 16,
     "isDouble": false,
@@ -44212,11 +44217,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 3
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 117,
+    "stableKey": "Maxie Mt Chimney",
     "name": "Maxie Mt Chimney",
     "trainerClass": 57,
     "isDouble": false,
@@ -44748,11 +44753,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 118,
+    "stableKey": "Eric",
     "name": "Eric",
     "trainerClass": 0,
     "isDouble": false,
@@ -45168,11 +45173,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 119,
+    "stableKey": "Grunt Jagged Pass",
     "name": "Grunt Jagged Pass",
     "trainerClass": 7,
     "isDouble": false,
@@ -45646,11 +45651,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 120,
+    "stableKey": "Autumn",
     "name": "Autumn",
     "trainerClass": 30,
     "isDouble": false,
@@ -46066,11 +46071,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 121,
+    "stableKey": "Julio",
     "name": "Julio",
     "trainerClass": 43,
     "isDouble": false,
@@ -46515,11 +46520,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 122,
+    "stableKey": "Roman",
     "name": "Roman",
     "trainerClass": 0,
     "isDouble": false,
@@ -46993,11 +46998,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 123,
+    "stableKey": "Martin",
     "name": "Martin",
     "trainerClass": 22,
     "isDouble": false,
@@ -47471,11 +47476,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 124,
+    "stableKey": "Alannah",
     "name": "Alannah",
     "trainerClass": 22,
     "isDouble": false,
@@ -47978,11 +47983,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 125,
+    "stableKey": "Elmer",
     "name": "Elmer",
     "trainerClass": 24,
     "isDouble": false,
@@ -48485,11 +48490,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 126,
+    "stableKey": "Lucy Lavaridge",
     "name": "Lucy Lavaridge",
     "trainerClass": 26,
     "isDouble": false,
@@ -48992,11 +48997,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 127,
+    "stableKey": "Jeff",
     "name": "Jeff",
     "trainerClass": 28,
     "isDouble": false,
@@ -49441,11 +49446,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 128,
+    "stableKey": "Jace",
     "name": "Jace",
     "trainerClass": 28,
     "isDouble": false,
@@ -49890,11 +49895,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 129,
+    "stableKey": "Eli",
     "name": "Eli",
     "trainerClass": 0,
     "isDouble": false,
@@ -50339,11 +50344,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 130,
+    "stableKey": "Cole",
     "name": "Cole",
     "trainerClass": 28,
     "isDouble": false,
@@ -50672,11 +50677,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 131,
+    "stableKey": "Gerald",
     "name": "Gerald",
     "trainerClass": 3,
     "isDouble": false,
@@ -51121,11 +51126,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 132,
+    "stableKey": "Axle",
     "name": "Axle",
     "trainerClass": 28,
     "isDouble": false,
@@ -51570,11 +51575,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 133,
+    "stableKey": "Keegan",
     "name": "Keegan",
     "trainerClass": 28,
     "isDouble": false,
@@ -51903,11 +51908,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 134,
+    "stableKey": "Danielle",
     "name": "Danielle",
     "trainerClass": 47,
     "isDouble": false,
@@ -52352,11 +52357,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 135,
+    "stableKey": "Beau",
     "name": "Beau",
     "trainerClass": 29,
     "isDouble": false,
@@ -52830,11 +52835,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 136,
+    "stableKey": "Drew",
     "name": "Drew",
     "trainerClass": 29,
     "isDouble": false,
@@ -53307,11 +53312,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 137,
+    "stableKey": "Heidi",
     "name": "Heidi",
     "trainerClass": 30,
     "isDouble": false,
@@ -53756,11 +53761,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 138,
+    "stableKey": "Becky",
     "name": "Becky",
     "trainerClass": 30,
     "isDouble": false,
@@ -54205,11 +54210,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 139,
+    "stableKey": "Celia",
     "name": "Celia",
     "trainerClass": 30,
     "isDouble": false,
@@ -54683,11 +54688,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 140,
+    "stableKey": "Branden",
     "name": "Branden",
     "trainerClass": 29,
     "isDouble": false,
@@ -55161,11 +55166,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 141,
+    "stableKey": "Randall",
     "name": "Randall",
     "trainerClass": 3,
     "isDouble": false,
@@ -55668,11 +55673,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 142,
+    "stableKey": "Mary",
     "name": "Mary",
     "trainerClass": 3,
     "isDouble": false,
@@ -56175,11 +56180,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 143,
+    "stableKey": "Parker",
     "name": "Parker",
     "trainerClass": 3,
     "isDouble": false,
@@ -56682,11 +56687,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 144,
+    "stableKey": "Alexia",
     "name": "Alexia",
     "trainerClass": 3,
     "isDouble": false,
@@ -57187,11 +57192,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 145,
+    "stableKey": "George",
     "name": "George",
     "trainerClass": 3,
     "isDouble": false,
@@ -57694,11 +57699,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 146,
+    "stableKey": "Jody",
     "name": "Jody",
     "trainerClass": 3,
     "isDouble": false,
@@ -58201,11 +58206,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 147,
+    "stableKey": "Berke",
     "name": "Berke",
     "trainerClass": 3,
     "isDouble": false,
@@ -58701,11 +58706,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 148,
+    "stableKey": "Kyra",
     "name": "Kyra",
     "trainerClass": 43,
     "isDouble": false,
@@ -59063,11 +59068,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 149,
+    "stableKey": "Koichi",
     "name": "Koichi",
     "trainerClass": 10,
     "isDouble": false,
@@ -59454,11 +59459,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 150,
+    "stableKey": "Jaiden",
     "name": "Jaiden",
     "trainerClass": 45,
     "isDouble": false,
@@ -59816,11 +59821,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 151,
+    "stableKey": "Reyna",
     "name": "Reyna",
     "trainerClass": 47,
     "isDouble": false,
@@ -59915,11 +59920,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 152,
+    "stableKey": "Alix",
     "name": "Alix",
     "trainerClass": 31,
     "isDouble": false,
@@ -60219,11 +60224,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 153,
+    "stableKey": "Imani",
     "name": "Imani",
     "trainerClass": 50,
     "isDouble": false,
@@ -60522,11 +60527,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 154,
+    "stableKey": "Dominik",
     "name": "Dominik",
     "trainerClass": 6,
     "isDouble": false,
@@ -60825,11 +60830,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 155,
+    "stableKey": "Foster",
     "name": "Foster",
     "trainerClass": 14,
     "isDouble": false,
@@ -61157,11 +61162,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 156,
+    "stableKey": "Beverly",
     "name": "Beverly",
     "trainerClass": 50,
     "isDouble": false,
@@ -61460,11 +61465,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 157,
+    "stableKey": "Josue",
     "name": "Josue",
     "trainerClass": 4,
     "isDouble": false,
@@ -61676,11 +61681,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 158,
+    "stableKey": "Luis",
     "name": "Luis",
     "trainerClass": 6,
     "isDouble": false,
@@ -62008,11 +62013,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 159,
+    "stableKey": "Douglas",
     "name": "Douglas",
     "trainerClass": 6,
     "isDouble": false,
@@ -62310,11 +62315,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 160,
+    "stableKey": "Kyla",
     "name": "Kyla",
     "trainerClass": 50,
     "isDouble": false,
@@ -62613,11 +62618,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 161,
+    "stableKey": "Denise",
     "name": "Denise",
     "trainerClass": 50,
     "isDouble": false,
@@ -62740,11 +62745,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 162,
+    "stableKey": "Lisa And Ray",
     "name": "Lisa And Ray",
     "trainerClass": 61,
     "isDouble": true,
@@ -62868,11 +62873,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 163,
+    "stableKey": "Darrin",
     "name": "Darrin",
     "trainerClass": 6,
     "isDouble": false,
@@ -62996,11 +63001,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 164,
+    "stableKey": "Beth",
     "name": "Beth",
     "trainerClass": 50,
     "isDouble": false,
@@ -63124,11 +63129,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 165,
+    "stableKey": "Camron",
     "name": "Camron",
     "trainerClass": 43,
     "isDouble": false,
@@ -63281,11 +63286,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 166,
+    "stableKey": "Matthew",
     "name": "Matthew",
     "trainerClass": 6,
     "isDouble": false,
@@ -63408,11 +63413,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 167,
+    "stableKey": "Tara",
     "name": "Tara",
     "trainerClass": 50,
     "isDouble": false,
@@ -63536,11 +63541,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 168,
+    "stableKey": "Carolina",
     "name": "Carolina",
     "trainerClass": 3,
     "isDouble": false,
@@ -63664,11 +63669,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 169,
+    "stableKey": "Jerome",
     "name": "Jerome",
     "trainerClass": 6,
     "isDouble": false,
@@ -63791,11 +63796,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 170,
+    "stableKey": "Demetrius",
     "name": "Demetrius",
     "trainerClass": 41,
     "isDouble": false,
@@ -63947,11 +63952,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 171,
+    "stableKey": "Duncan",
     "name": "Duncan",
     "trainerClass": 53,
     "isDouble": false,
@@ -64075,11 +64080,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 172,
+    "stableKey": "Charlie",
     "name": "Charlie",
     "trainerClass": 19,
     "isDouble": false,
@@ -64203,11 +64208,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 173,
+    "stableKey": "Garrison",
     "name": "Garrison",
     "trainerClass": 14,
     "isDouble": false,
@@ -64360,11 +64365,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 174,
+    "stableKey": "Jani",
     "name": "Jani",
     "trainerClass": 18,
     "isDouble": false,
@@ -64488,11 +64493,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 175,
+    "stableKey": "Elijah",
     "name": "Elijah",
     "trainerClass": 4,
     "isDouble": false,
@@ -64850,11 +64855,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 176,
+    "stableKey": "Carter",
     "name": "Carter",
     "trainerClass": 42,
     "isDouble": false,
@@ -65328,11 +65333,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 177,
+    "stableKey": "Mel And Paul",
     "name": "Mel And Paul",
     "trainerClass": 59,
     "isDouble": true,
@@ -65631,11 +65636,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 178,
+    "stableKey": "Alice",
     "name": "Alice",
     "trainerClass": 50,
     "isDouble": false,
@@ -65905,11 +65910,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 179,
+    "stableKey": "Austina",
     "name": "Austina",
     "trainerClass": 18,
     "isDouble": false,
@@ -66325,11 +66330,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 180,
+    "stableKey": "Gwen",
     "name": "Gwen",
     "trainerClass": 18,
     "isDouble": false,
@@ -66716,11 +66721,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 181,
+    "stableKey": "Magikarp Guy",
     "name": "Magikarp Guy",
     "trainerClass": 52,
     "isDouble": false,
@@ -66902,11 +66907,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 182,
+    "stableKey": "Barny",
     "name": "Barny",
     "trainerClass": 42,
     "isDouble": false,
@@ -67380,11 +67385,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 183,
+    "stableKey": "Steven Route118",
     "name": "Steven Route118",
     "trainerClass": 54,
     "isDouble": false,
@@ -67916,11 +67921,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 184,
+    "stableKey": "Perry",
     "name": "Perry",
     "trainerClass": 4,
     "isDouble": false,
@@ -68365,11 +68370,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 185,
+    "stableKey": "Chester",
     "name": "Chester",
     "trainerClass": 4,
     "isDouble": false,
@@ -68814,11 +68819,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 186,
+    "stableKey": "Jazmyn",
     "name": "Jazmyn",
     "trainerClass": 54,
     "isDouble": false,
@@ -68942,11 +68947,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 187,
+    "stableKey": "Davis",
     "name": "Davis",
     "trainerClass": 55,
     "isDouble": false,
@@ -69012,11 +69017,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 188,
+    "stableKey": "Violet",
     "name": "Violet",
     "trainerClass": 13,
     "isDouble": false,
@@ -69082,11 +69087,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 189,
+    "stableKey": "Miu And Yuki",
     "name": "Miu And Yuki",
     "trainerClass": 51,
     "isDouble": true,
@@ -69152,11 +69157,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 190,
+    "stableKey": "Kent",
     "name": "Kent",
     "trainerClass": 55,
     "isDouble": false,
@@ -69630,11 +69635,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 191,
+    "stableKey": "Donald",
     "name": "Donald",
     "trainerClass": 24,
     "isDouble": false,
@@ -70079,11 +70084,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 192,
+    "stableKey": "Greg",
     "name": "Greg",
     "trainerClass": 55,
     "isDouble": false,
@@ -70557,11 +70562,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 193,
+    "stableKey": "Taylor",
     "name": "Taylor",
     "trainerClass": 24,
     "isDouble": false,
@@ -71035,11 +71040,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 194,
+    "stableKey": "Doug",
     "name": "Doug",
     "trainerClass": 55,
     "isDouble": false,
@@ -71513,11 +71518,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 195,
+    "stableKey": "Chris",
     "name": "Chris",
     "trainerClass": 42,
     "isDouble": false,
@@ -71962,11 +71967,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 196,
+    "stableKey": "Rachel",
     "name": "Rachel",
     "trainerClass": 48,
     "isDouble": false,
@@ -72411,11 +72416,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 197,
+    "stableKey": "Phil",
     "name": "Phil",
     "trainerClass": 4,
     "isDouble": false,
@@ -72889,11 +72894,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 198,
+    "stableKey": "Dayton",
     "name": "Dayton",
     "trainerClass": 28,
     "isDouble": false,
@@ -73367,11 +73372,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 199,
+    "stableKey": "Takashi",
     "name": "Takashi",
     "trainerClass": 45,
     "isDouble": false,
@@ -73816,11 +73821,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 200,
+    "stableKey": "Hugh",
     "name": "Hugh",
     "trainerClass": 4,
     "isDouble": false,
@@ -74265,11 +74270,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 201,
+    "stableKey": "Grunt Weather Inst 1",
     "name": "Grunt Weather Inst 1",
     "trainerClass": 1,
     "isDouble": false,
@@ -74801,11 +74806,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 202,
+    "stableKey": "Grunt Weather Inst 2",
     "name": "Grunt Weather Inst 2",
     "trainerClass": 1,
     "isDouble": false,
@@ -75279,11 +75284,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 203,
+    "stableKey": "Grunt Weather Inst 3",
     "name": "Grunt Weather Inst 3",
     "trainerClass": 1,
     "isDouble": false,
@@ -75728,11 +75733,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 204,
+    "stableKey": "Grunt Weather Inst 5",
     "name": "Grunt Weather Inst 5",
     "trainerClass": 1,
     "isDouble": false,
@@ -76206,11 +76211,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 205,
+    "stableKey": "Grunt Weather Inst 4",
     "name": "Grunt Weather Inst 4",
     "trainerClass": 1,
     "isDouble": false,
@@ -76683,11 +76688,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 206,
+    "stableKey": "Shelly Weather Institute",
     "name": "Shelly Weather Institute",
     "trainerClass": 9,
     "isDouble": false,
@@ -77219,11 +77224,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 207,
+    "stableKey": "May Route 119 Treecko",
     "name": "May Route 119 Treecko",
     "trainerClass": 15,
     "isDouble": false,
@@ -77580,11 +77585,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 208,
+    "stableKey": "May Route 119 Mudkip",
     "name": "May Route 119 Mudkip",
     "trainerClass": 15,
     "isDouble": false,
@@ -77941,11 +77946,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 209,
+    "stableKey": "May Route 119 Torchic",
     "name": "May Route 119 Torchic",
     "trainerClass": 15,
     "isDouble": false,
@@ -78302,11 +78307,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 210,
+    "stableKey": "Brendan Route 119 Treecko",
     "name": "Brendan Route 119 Treecko",
     "trainerClass": 15,
     "isDouble": false,
@@ -78663,11 +78668,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 211,
+    "stableKey": "Brendan Route 119 Mudkip",
     "name": "Brendan Route 119 Mudkip",
     "trainerClass": 15,
     "isDouble": false,
@@ -79024,11 +79029,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 212,
+    "stableKey": "Brendan Route 119 Torchic",
     "name": "Brendan Route 119 Torchic",
     "trainerClass": 15,
     "isDouble": false,
@@ -79385,11 +79390,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 213,
+    "stableKey": "Fabian",
     "name": "Fabian",
     "trainerClass": 27,
     "isDouble": false,
@@ -79834,11 +79839,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 214,
+    "stableKey": "Yasu",
     "name": "Yasu",
     "trainerClass": 45,
     "isDouble": false,
@@ -80312,11 +80317,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 215,
+    "stableKey": "Hideo",
     "name": "Hideo",
     "trainerClass": 45,
     "isDouble": false,
@@ -80761,11 +80766,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 216,
+    "stableKey": "Spenser Fortree",
     "name": "Spenser Fortree",
     "trainerClass": 26,
     "isDouble": false,
@@ -81297,11 +81302,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 217,
+    "stableKey": "Clarissa",
     "name": "Clarissa",
     "trainerClass": 48,
     "isDouble": false,
@@ -81746,11 +81751,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 218,
+    "stableKey": "Colin",
     "name": "Colin",
     "trainerClass": 4,
     "isDouble": false,
@@ -82224,11 +82229,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 219,
+    "stableKey": "Riley",
     "name": "Riley",
     "trainerClass": 45,
     "isDouble": false,
@@ -82702,11 +82707,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 220,
+    "stableKey": "Callie",
     "name": "Callie",
     "trainerClass": 47,
     "isDouble": false,
@@ -83180,11 +83185,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 221,
+    "stableKey": "Leonel",
     "name": "Leonel",
     "trainerClass": 3,
     "isDouble": false,
@@ -83542,11 +83547,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 222,
+    "stableKey": "Angelica",
     "name": "Angelica",
     "trainerClass": 48,
     "isDouble": false,
@@ -84018,11 +84023,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 223,
+    "stableKey": "Jennifer",
     "name": "Jennifer",
     "trainerClass": 3,
     "isDouble": false,
@@ -84525,11 +84530,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 224,
+    "stableKey": "Jenna",
     "name": "Jenna",
     "trainerClass": 22,
     "isDouble": false,
@@ -85032,11 +85037,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 225,
+    "stableKey": "Lorenzo",
     "name": "Lorenzo",
     "trainerClass": 22,
     "isDouble": false,
@@ -85510,11 +85515,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 226,
+    "stableKey": "Keigo",
     "name": "Keigo",
     "trainerClass": 45,
     "isDouble": false,
@@ -85988,11 +85993,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 227,
+    "stableKey": "Chip",
     "name": "Chip",
     "trainerClass": 14,
     "isDouble": false,
@@ -86466,11 +86471,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 228,
+    "stableKey": "Tammy",
     "name": "Tammy",
     "trainerClass": 12,
     "isDouble": false,
@@ -86973,11 +86978,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 229,
+    "stableKey": "Cale",
     "name": "Cale",
     "trainerClass": 24,
     "isDouble": false,
@@ -87451,11 +87456,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 230,
+    "stableKey": "Kate And Joy",
     "name": "Kate And Joy",
     "trainerClass": 37,
     "isDouble": true,
@@ -87755,11 +87760,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 231,
+    "stableKey": "Myles",
     "name": "Myles",
     "trainerClass": 2,
     "isDouble": false,
@@ -88262,11 +88267,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 232,
+    "stableKey": "Pat",
     "name": "Pat",
     "trainerClass": 2,
     "isDouble": false,
@@ -88769,11 +88774,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 233,
+    "stableKey": "Marcel",
     "name": "Marcel",
     "trainerClass": 3,
     "isDouble": false,
@@ -89131,11 +89136,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 234,
+    "stableKey": "May Lilycove Treecko",
     "name": "May Lilycove Treecko",
     "trainerClass": 15,
     "isDouble": false,
@@ -89317,11 +89322,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 235,
+    "stableKey": "May Lilycove Mudkip",
     "name": "May Lilycove Mudkip",
     "trainerClass": 15,
     "isDouble": false,
@@ -89503,11 +89508,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 236,
+    "stableKey": "May Lilycove Torchic",
     "name": "May Lilycove Torchic",
     "trainerClass": 15,
     "isDouble": false,
@@ -89689,11 +89694,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 237,
+    "stableKey": "Brendan Lilycove Treecko",
     "name": "Brendan Lilycove Treecko",
     "trainerClass": 15,
     "isDouble": false,
@@ -89875,11 +89880,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 238,
+    "stableKey": "Brendan Lilycove Mudkip",
     "name": "Brendan Lilycove Mudkip",
     "trainerClass": 15,
     "isDouble": false,
@@ -90061,11 +90066,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 239,
+    "stableKey": "Brendan Lilycove Torchic",
     "name": "Brendan Lilycove Torchic",
     "trainerClass": 15,
     "isDouble": false,
@@ -90247,11 +90252,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 240,
+    "stableKey": "Jonas",
     "name": "Jonas",
     "trainerClass": 45,
     "isDouble": false,
@@ -90317,11 +90322,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 241,
+    "stableKey": "Kayley",
     "name": "Kayley",
     "trainerClass": 48,
     "isDouble": false,
@@ -90387,11 +90392,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 242,
+    "stableKey": "Kindra",
     "name": "Kindra",
     "trainerClass": 12,
     "isDouble": false,
@@ -90486,11 +90491,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 243,
+    "stableKey": "Ed",
     "name": "Ed",
     "trainerClass": 5,
     "isDouble": false,
@@ -90585,11 +90590,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 244,
+    "stableKey": "Wendy",
     "name": "Wendy",
     "trainerClass": 3,
     "isDouble": false,
@@ -90771,11 +90776,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 245,
+    "stableKey": "Braxton",
     "name": "Braxton",
     "trainerClass": 3,
     "isDouble": false,
@@ -90957,11 +90962,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 246,
+    "stableKey": "Alberto",
     "name": "Alberto",
     "trainerClass": 4,
     "isDouble": false,
@@ -91056,11 +91061,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 247,
+    "stableKey": "Fredrick",
     "name": "Fredrick",
     "trainerClass": 8,
     "isDouble": false,
@@ -91155,11 +91160,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 248,
+    "stableKey": "Mark",
     "name": "Mark",
     "trainerClass": 25,
     "isDouble": false,
@@ -91633,11 +91638,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 249,
+    "stableKey": "Leah",
     "name": "Leah",
     "trainerClass": 12,
     "isDouble": false,
@@ -92082,11 +92087,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 250,
+    "stableKey": "Zander",
     "name": "Zander",
     "trainerClass": 10,
     "isDouble": false,
@@ -92531,11 +92536,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 251,
+    "stableKey": "Dez And Luke",
     "name": "Dez And Luke",
     "trainerClass": 59,
     "isDouble": true,
@@ -93067,11 +93072,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 252,
+    "stableKey": "Kayla",
     "name": "Kayla",
     "trainerClass": 31,
     "isDouble": false,
@@ -93429,11 +93434,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 253,
+    "stableKey": "William",
     "name": "William",
     "trainerClass": 31,
     "isDouble": false,
@@ -93791,11 +93796,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 254,
+    "stableKey": "Tasha",
     "name": "Tasha",
     "trainerClass": 12,
     "isDouble": false,
@@ -94269,11 +94274,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 255,
+    "stableKey": "Atsushi",
     "name": "Atsushi",
     "trainerClass": 10,
     "isDouble": false,
@@ -94718,11 +94723,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 256,
+    "stableKey": "Cedric",
     "name": "Cedric",
     "trainerClass": 31,
     "isDouble": false,
@@ -95225,11 +95230,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 257,
+    "stableKey": "Grunt Mt Pyre 2",
     "name": "Grunt Mt Pyre 2",
     "trainerClass": 1,
     "isDouble": false,
@@ -95703,11 +95708,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 258,
+    "stableKey": "Grunt Mt Pyre 1",
     "name": "Grunt Mt Pyre 1",
     "trainerClass": 1,
     "isDouble": false,
@@ -96152,11 +96157,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 259,
+    "stableKey": "Grunt Mt Pyre 3",
     "name": "Grunt Mt Pyre 3",
     "trainerClass": 1,
     "isDouble": false,
@@ -96514,11 +96519,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 260,
+    "stableKey": "Grunt Mt Pyre 4",
     "name": "Grunt Mt Pyre 4",
     "trainerClass": 1,
     "isDouble": false,
@@ -96876,11 +96881,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 261,
+    "stableKey": "Matt Mt Pyre",
     "name": "Matt Mt Pyre",
     "trainerClass": 9,
     "isDouble": false,
@@ -97412,11 +97417,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 262,
+    "stableKey": "Humberto",
     "name": "Humberto",
     "trainerClass": 4,
     "isDouble": false,
@@ -97919,11 +97924,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 263,
+    "stableKey": "Jared",
     "name": "Jared",
     "trainerClass": 4,
     "isDouble": false,
@@ -98165,11 +98170,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 264,
+    "stableKey": "Ashley",
     "name": "Ashley",
     "trainerClass": 30,
     "isDouble": false,
@@ -98381,11 +98386,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 265,
+    "stableKey": "Flint",
     "name": "Flint",
     "trainerClass": 29,
     "isDouble": false,
@@ -98655,11 +98660,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 266,
+    "stableKey": "Edwardo",
     "name": "Edwardo",
     "trainerClass": 4,
     "isDouble": false,
@@ -98930,11 +98935,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 267,
+    "stableKey": "Darius",
     "name": "Darius",
     "trainerClass": 4,
     "isDouble": false,
@@ -99437,11 +99442,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 268,
+    "stableKey": "Grunt Magma Hideout 2",
     "name": "Grunt Magma Hideout 2",
     "trainerClass": 7,
     "isDouble": false,
@@ -99886,11 +99891,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 269,
+    "stableKey": "Grunt Magma Hideout 3",
     "name": "Grunt Magma Hideout 3",
     "trainerClass": 7,
     "isDouble": false,
@@ -100335,11 +100340,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 270,
+    "stableKey": "Grunt Magma Hideout 14",
     "name": "Grunt Magma Hideout 14",
     "trainerClass": 7,
     "isDouble": false,
@@ -100784,11 +100789,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 271,
+    "stableKey": "Grunt Magma Hideout 4",
     "name": "Grunt Magma Hideout 4",
     "trainerClass": 7,
     "isDouble": false,
@@ -101262,11 +101267,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 272,
+    "stableKey": "Grunt Magma Hideout 5",
     "name": "Grunt Magma Hideout 5",
     "trainerClass": 7,
     "isDouble": false,
@@ -101711,11 +101716,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 273,
+    "stableKey": "Grunt Magma Hideout 6",
     "name": "Grunt Magma Hideout 6",
     "trainerClass": 7,
     "isDouble": false,
@@ -102189,11 +102194,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 274,
+    "stableKey": "Grunt Magma Hideout 15",
     "name": "Grunt Magma Hideout 15",
     "trainerClass": 7,
     "isDouble": false,
@@ -102638,11 +102643,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 275,
+    "stableKey": "Grunt Magma Hideout 7",
     "name": "Grunt Magma Hideout 7",
     "trainerClass": 7,
     "isDouble": false,
@@ -103116,11 +103121,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 276,
+    "stableKey": "Grunt Magma Hideout 8",
     "name": "Grunt Magma Hideout 8",
     "trainerClass": 7,
     "isDouble": false,
@@ -103565,11 +103570,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 277,
+    "stableKey": "Grunt Magma Hideout 1",
     "name": "Grunt Magma Hideout 1",
     "trainerClass": 7,
     "isDouble": false,
@@ -104014,11 +104019,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 278,
+    "stableKey": "Grunt Magma Hideout 9",
     "name": "Grunt Magma Hideout 9",
     "trainerClass": 7,
     "isDouble": false,
@@ -104463,11 +104468,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 279,
+    "stableKey": "Grunt Magma Hideout 10",
     "name": "Grunt Magma Hideout 10",
     "trainerClass": 7,
     "isDouble": false,
@@ -104912,11 +104917,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 280,
+    "stableKey": "Grunt Magma Hideout 16",
     "name": "Grunt Magma Hideout 16",
     "trainerClass": 7,
     "isDouble": false,
@@ -105390,11 +105395,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 281,
+    "stableKey": "Grunt Magma Hideout 11",
     "name": "Grunt Magma Hideout 11",
     "trainerClass": 7,
     "isDouble": false,
@@ -105868,11 +105873,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 282,
+    "stableKey": "Grunt Magma Hideout 12",
     "name": "Grunt Magma Hideout 12",
     "trainerClass": 7,
     "isDouble": false,
@@ -106317,11 +106322,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 283,
+    "stableKey": "Grunt Magma Hideout 13",
     "name": "Grunt Magma Hideout 13",
     "trainerClass": 7,
     "isDouble": false,
@@ -106795,11 +106800,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 284,
+    "stableKey": "Courtney Magma Hideout",
     "name": "Courtney Magma Hideout",
     "trainerClass": 16,
     "isDouble": false,
@@ -107070,11 +107075,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 285,
+    "stableKey": "Tabitha Magma Hideout",
     "name": "Tabitha Magma Hideout",
     "trainerClass": 16,
     "isDouble": false,
@@ -107345,11 +107350,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 286,
+    "stableKey": "Maxie Magma Hideout",
     "name": "Maxie Magma Hideout",
     "trainerClass": 57,
     "isDouble": false,
@@ -107881,11 +107886,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 287,
+    "stableKey": "Grunt Aqua Hideout 1",
     "name": "Grunt Aqua Hideout 1",
     "trainerClass": 1,
     "isDouble": false,
@@ -108359,11 +108364,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 288,
+    "stableKey": "Grunt Aqua Hideout 2",
     "name": "Grunt Aqua Hideout 2",
     "trainerClass": 1,
     "isDouble": false,
@@ -108837,11 +108842,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 289,
+    "stableKey": "Grunt Aqua Hideout 7",
     "name": "Grunt Aqua Hideout 7",
     "trainerClass": 1,
     "isDouble": false,
@@ -109199,11 +109204,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 290,
+    "stableKey": "Grunt Aqua Hideout 4",
     "name": "Grunt Aqua Hideout 4",
     "trainerClass": 1,
     "isDouble": false,
@@ -109648,11 +109653,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 291,
+    "stableKey": "Grunt Aqua Hideout 3",
     "name": "Grunt Aqua Hideout 3",
     "trainerClass": 1,
     "isDouble": false,
@@ -110155,11 +110160,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 292,
+    "stableKey": "Grunt Aqua Hideout 6",
     "name": "Grunt Aqua Hideout 6",
     "trainerClass": 1,
     "isDouble": false,
@@ -110517,11 +110522,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 293,
+    "stableKey": "Grunt Aqua Hideout 8",
     "name": "Grunt Aqua Hideout 8",
     "trainerClass": 1,
     "isDouble": false,
@@ -110879,11 +110884,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 294,
+    "stableKey": "Matt",
     "name": "Matt",
     "trainerClass": 9,
     "isDouble": false,
@@ -111415,11 +111420,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 295,
+    "stableKey": "Grace",
     "name": "Grace",
     "trainerClass": 50,
     "isDouble": false,
@@ -111631,11 +111636,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 296,
+    "stableKey": "Declan",
     "name": "Declan",
     "trainerClass": 6,
     "isDouble": false,
@@ -111701,11 +111706,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 297,
+    "stableKey": "Spencer",
     "name": "Spencer",
     "trainerClass": 6,
     "isDouble": false,
@@ -111771,11 +111776,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 298,
+    "stableKey": "Chad",
     "name": "Chad",
     "trainerClass": 6,
     "isDouble": false,
@@ -111870,11 +111875,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 299,
+    "stableKey": "Isabella",
     "name": "Isabella",
     "trainerClass": 43,
     "isDouble": false,
@@ -112057,11 +112062,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 300,
+    "stableKey": "Roland",
     "name": "Roland",
     "trainerClass": 6,
     "isDouble": false,
@@ -112127,11 +112132,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 301,
+    "stableKey": "Nolen",
     "name": "Nolen",
     "trainerClass": 6,
     "isDouble": false,
@@ -112401,11 +112406,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 302,
+    "stableKey": "Sharon",
     "name": "Sharon",
     "trainerClass": 50,
     "isDouble": false,
@@ -112675,11 +112680,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 303,
+    "stableKey": "Tanya",
     "name": "Tanya",
     "trainerClass": 50,
     "isDouble": false,
@@ -112978,11 +112983,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 304,
+    "stableKey": "Presley",
     "name": "Presley",
     "trainerClass": 4,
     "isDouble": false,
@@ -113281,11 +113286,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 305,
+    "stableKey": "Auron",
     "name": "Auron",
     "trainerClass": 8,
     "isDouble": false,
@@ -113584,11 +113589,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 306,
+    "stableKey": "Stan",
     "name": "Stan",
     "trainerClass": 6,
     "isDouble": false,
@@ -113858,11 +113863,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 307,
+    "stableKey": "Kim And Iris",
     "name": "Kim And Iris",
     "trainerClass": 37,
     "isDouble": true,
@@ -114161,11 +114166,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 308,
+    "stableKey": "Isobel",
     "name": "Isobel",
     "trainerClass": 43,
     "isDouble": false,
@@ -114289,11 +114294,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 309,
+    "stableKey": "Leonardo",
     "name": "Leonardo",
     "trainerClass": 6,
     "isDouble": false,
@@ -114359,11 +114364,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 310,
+    "stableKey": "Dean",
     "name": "Dean",
     "trainerClass": 6,
     "isDouble": false,
@@ -114458,11 +114463,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 311,
+    "stableKey": "Sienna",
     "name": "Sienna",
     "trainerClass": 50,
     "isDouble": false,
@@ -114557,11 +114562,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 312,
+    "stableKey": "Athena",
     "name": "Athena",
     "trainerClass": 3,
     "isDouble": false,
@@ -114656,11 +114661,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 313,
+    "stableKey": "Jonah",
     "name": "Jonah",
     "trainerClass": 42,
     "isDouble": false,
@@ -114726,11 +114731,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 314,
+    "stableKey": "Henry",
     "name": "Henry",
     "trainerClass": 42,
     "isDouble": false,
@@ -114796,11 +114801,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 315,
+    "stableKey": "Roger",
     "name": "Roger",
     "trainerClass": 42,
     "isDouble": false,
@@ -114866,11 +114871,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 316,
+    "stableKey": "Camden",
     "name": "Camden",
     "trainerClass": 43,
     "isDouble": false,
@@ -114965,11 +114970,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 317,
+    "stableKey": "Donny",
     "name": "Donny",
     "trainerClass": 43,
     "isDouble": false,
@@ -115035,11 +115040,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 318,
+    "stableKey": "Alexa",
     "name": "Alexa",
     "trainerClass": 3,
     "isDouble": false,
@@ -115192,11 +115197,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 319,
+    "stableKey": "Ruben",
     "name": "Ruben",
     "trainerClass": 3,
     "isDouble": false,
@@ -115349,11 +115354,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 320,
+    "stableKey": "Wayne",
     "name": "Wayne",
     "trainerClass": 42,
     "isDouble": false,
@@ -115419,11 +115424,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 321,
+    "stableKey": "Carlee",
     "name": "Carlee",
     "trainerClass": 50,
     "isDouble": false,
@@ -115489,11 +115494,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 322,
+    "stableKey": "Harrison",
     "name": "Harrison",
     "trainerClass": 6,
     "isDouble": false,
@@ -115559,11 +115564,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 323,
+    "stableKey": "Reed",
     "name": "Reed",
     "trainerClass": 6,
     "isDouble": false,
@@ -115629,11 +115634,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 324,
+    "stableKey": "Chase",
     "name": "Chase",
     "trainerClass": 43,
     "isDouble": false,
@@ -115699,11 +115704,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 325,
+    "stableKey": "Allison",
     "name": "Allison",
     "trainerClass": 43,
     "isDouble": false,
@@ -115769,11 +115774,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 326,
+    "stableKey": "Tisha",
     "name": "Tisha",
     "trainerClass": 50,
     "isDouble": false,
@@ -115839,11 +115844,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 327,
+    "stableKey": "Clarence",
     "name": "Clarence",
     "trainerClass": 6,
     "isDouble": false,
@@ -115909,11 +115914,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 328,
+    "stableKey": "Rodney",
     "name": "Rodney",
     "trainerClass": 6,
     "isDouble": false,
@@ -115979,11 +115984,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 329,
+    "stableKey": "Katie",
     "name": "Katie",
     "trainerClass": 50,
     "isDouble": false,
@@ -116049,11 +116054,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 330,
+    "stableKey": "Santiago",
     "name": "Santiago",
     "trainerClass": 6,
     "isDouble": false,
@@ -116119,11 +116124,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 331,
+    "stableKey": "Kevin",
     "name": "Kevin",
     "trainerClass": 6,
     "isDouble": false,
@@ -116189,11 +116194,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 332,
+    "stableKey": "Talia",
     "name": "Talia",
     "trainerClass": 43,
     "isDouble": false,
@@ -116259,11 +116264,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 333,
+    "stableKey": "Susie",
     "name": "Susie",
     "trainerClass": 3,
     "isDouble": false,
@@ -116416,11 +116421,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 334,
+    "stableKey": "Herman",
     "name": "Herman",
     "trainerClass": 3,
     "isDouble": false,
@@ -116573,11 +116578,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 335,
+    "stableKey": "Richard",
     "name": "Richard",
     "trainerClass": 6,
     "isDouble": false,
@@ -116643,11 +116648,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 336,
+    "stableKey": "Kara",
     "name": "Kara",
     "trainerClass": 50,
     "isDouble": false,
@@ -116713,11 +116718,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 337,
+    "stableKey": "Reli And Ian",
     "name": "Reli And Ian",
     "trainerClass": 61,
     "isDouble": true,
@@ -116783,11 +116788,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 338,
+    "stableKey": "Gilbert",
     "name": "Gilbert",
     "trainerClass": 6,
     "isDouble": false,
@@ -116853,11 +116858,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 339,
+    "stableKey": "Darcy",
     "name": "Darcy",
     "trainerClass": 3,
     "isDouble": false,
@@ -116952,11 +116957,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 340,
+    "stableKey": "Paxton",
     "name": "Paxton",
     "trainerClass": 8,
     "isDouble": false,
@@ -117051,11 +117056,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 341,
+    "stableKey": "Makayla",
     "name": "Makayla",
     "trainerClass": 8,
     "isDouble": false,
@@ -117150,11 +117155,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 342,
+    "stableKey": "Jonathan",
     "name": "Jonathan",
     "trainerClass": 3,
     "isDouble": false,
@@ -117249,11 +117254,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 343,
+    "stableKey": "Dana",
     "name": "Dana",
     "trainerClass": 50,
     "isDouble": false,
@@ -117319,11 +117324,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 344,
+    "stableKey": "Ronald",
     "name": "Ronald",
     "trainerClass": 42,
     "isDouble": false,
@@ -117505,11 +117510,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 345,
+    "stableKey": "Kiyo",
     "name": "Kiyo",
     "trainerClass": 10,
     "isDouble": false,
@@ -117604,11 +117609,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 346,
+    "stableKey": "Franklin",
     "name": "Franklin",
     "trainerClass": 6,
     "isDouble": false,
@@ -117674,11 +117679,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 347,
+    "stableKey": "Debra",
     "name": "Debra",
     "trainerClass": 50,
     "isDouble": false,
@@ -117744,11 +117749,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 348,
+    "stableKey": "Mollie",
     "name": "Mollie",
     "trainerClass": 8,
     "isDouble": false,
@@ -117843,11 +117848,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 349,
+    "stableKey": "Conor",
     "name": "Conor",
     "trainerClass": 8,
     "isDouble": false,
@@ -117942,11 +117947,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 350,
+    "stableKey": "Warren",
     "name": "Warren",
     "trainerClass": 3,
     "isDouble": false,
@@ -118099,11 +118104,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 351,
+    "stableKey": "Beck",
     "name": "Beck",
     "trainerClass": 4,
     "isDouble": false,
@@ -118198,11 +118203,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 352,
+    "stableKey": "Laurel",
     "name": "Laurel",
     "trainerClass": 50,
     "isDouble": false,
@@ -118268,11 +118273,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 353,
+    "stableKey": "Hudson",
     "name": "Hudson",
     "trainerClass": 53,
     "isDouble": false,
@@ -118338,11 +118343,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 354,
+    "stableKey": "Marley",
     "name": "Marley",
     "trainerClass": 3,
     "isDouble": false,
@@ -118437,11 +118442,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 355,
+    "stableKey": "Aaron",
     "name": "Aaron",
     "trainerClass": 44,
     "isDouble": false,
@@ -118536,11 +118541,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 356,
+    "stableKey": "Jack",
     "name": "Jack",
     "trainerClass": 6,
     "isDouble": false,
@@ -118606,11 +118611,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 357,
+    "stableKey": "Hitoshi",
     "name": "Hitoshi",
     "trainerClass": 10,
     "isDouble": false,
@@ -118705,11 +118710,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 358,
+    "stableKey": "Alex",
     "name": "Alex",
     "trainerClass": 4,
     "isDouble": false,
@@ -118775,11 +118780,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 359,
+    "stableKey": "Kelvin",
     "name": "Kelvin",
     "trainerClass": 53,
     "isDouble": false,
@@ -118845,11 +118850,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 360,
+    "stableKey": "Preston",
     "name": "Preston",
     "trainerClass": 31,
     "isDouble": false,
@@ -119091,11 +119096,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 361,
+    "stableKey": "Maura",
     "name": "Maura",
     "trainerClass": 31,
     "isDouble": false,
@@ -119337,11 +119342,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 362,
+    "stableKey": "Blake",
     "name": "Blake",
     "trainerClass": 31,
     "isDouble": false,
@@ -119583,11 +119588,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 363,
+    "stableKey": "Samantha",
     "name": "Samantha",
     "trainerClass": 31,
     "isDouble": false,
@@ -119829,11 +119834,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 364,
+    "stableKey": "Kathleen",
     "name": "Kathleen",
     "trainerClass": 12,
     "isDouble": false,
@@ -119987,11 +119992,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 365,
+    "stableKey": "Nicholas",
     "name": "Nicholas",
     "trainerClass": 31,
     "isDouble": false,
@@ -120233,11 +120238,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 366,
+    "stableKey": "Clifford",
     "name": "Clifford",
     "trainerClass": 32,
     "isDouble": false,
@@ -120421,11 +120426,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 367,
+    "stableKey": "Macey",
     "name": "Macey",
     "trainerClass": 31,
     "isDouble": false,
@@ -120667,11 +120672,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 368,
+    "stableKey": "Virgil",
     "name": "Virgil",
     "trainerClass": 31,
     "isDouble": false,
@@ -120942,11 +120947,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 369,
+    "stableKey": "Nate",
     "name": "Nate",
     "trainerClass": 32,
     "isDouble": false,
@@ -121217,11 +121222,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 370,
+    "stableKey": "Hannah",
     "name": "Hannah",
     "trainerClass": 31,
     "isDouble": false,
@@ -121463,11 +121468,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 371,
+    "stableKey": "Sylvia",
     "name": "Sylvia",
     "trainerClass": 12,
     "isDouble": false,
@@ -121709,11 +121714,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 372,
+    "stableKey": "Grunt Space Center 3",
     "name": "Grunt Space Center 3",
     "trainerClass": 7,
     "isDouble": false,
@@ -122216,11 +122221,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 373,
+    "stableKey": "Grunt Space Center 1",
     "name": "Grunt Space Center 1",
     "trainerClass": 7,
     "isDouble": false,
@@ -122578,11 +122583,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 374,
+    "stableKey": "Grunt Space Center 4",
     "name": "Grunt Space Center 4",
     "trainerClass": 7,
     "isDouble": false,
@@ -123085,11 +123090,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 375,
+    "stableKey": "Grunt Space Center 2",
     "name": "Grunt Space Center 2",
     "trainerClass": 7,
     "isDouble": false,
@@ -123563,11 +123568,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 376,
+    "stableKey": "Grunt Space Center 5",
     "name": "Grunt Space Center 5",
     "trainerClass": 7,
     "isDouble": false,
@@ -123838,11 +123843,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 377,
+    "stableKey": "Grunt Space Center 6",
     "name": "Grunt Space Center 6",
     "trainerClass": 7,
     "isDouble": false,
@@ -124142,11 +124147,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 378,
+    "stableKey": "Grunt Space Center 7",
     "name": "Grunt Space Center 7",
     "trainerClass": 7,
     "isDouble": false,
@@ -124446,11 +124451,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 379,
+    "stableKey": "Tabitha Mossdeep",
     "name": "Tabitha Mossdeep",
     "trainerClass": 16,
     "isDouble": false,
@@ -124982,11 +124987,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 380,
+    "stableKey": "Maxie Mossdeep",
     "name": "Maxie Mossdeep",
     "trainerClass": 57,
     "isDouble": false,
@@ -125257,11 +125262,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 381,
+    "stableKey": "Courtney Mossdeep",
     "name": "Courtney Mossdeep",
     "trainerClass": 16,
     "isDouble": false,
@@ -125532,11 +125537,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 382,
+    "stableKey": "Brenda",
     "name": "Brenda",
     "trainerClass": 50,
     "isDouble": false,
@@ -125602,11 +125607,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 383,
+    "stableKey": "Grunt Seafloor Cavern 1",
     "name": "Grunt Seafloor Cavern 1",
     "trainerClass": 1,
     "isDouble": false,
@@ -126051,11 +126056,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 384,
+    "stableKey": "Grunt Seafloor Cavern 2",
     "name": "Grunt Seafloor Cavern 2",
     "trainerClass": 1,
     "isDouble": false,
@@ -126529,11 +126534,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 385,
+    "stableKey": "Grunt Seafloor Cavern 3",
     "name": "Grunt Seafloor Cavern 3",
     "trainerClass": 1,
     "isDouble": false,
@@ -126920,11 +126925,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 386,
+    "stableKey": "Grunt Seafloor Cavern 4",
     "name": "Grunt Seafloor Cavern 4",
     "trainerClass": 1,
     "isDouble": false,
@@ -127340,11 +127345,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 387,
+    "stableKey": "Grunt Seafloor Cavern 5",
     "name": "Grunt Seafloor Cavern 5",
     "trainerClass": 1,
     "isDouble": false,
@@ -127847,11 +127852,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 388,
+    "stableKey": "Shelly Seafloor Cavern",
     "name": "Shelly Seafloor Cavern",
     "trainerClass": 9,
     "isDouble": false,
@@ -128383,11 +128388,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 389,
+    "stableKey": "Archie",
     "name": "Archie",
     "trainerClass": 11,
     "isDouble": false,
@@ -128919,11 +128924,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 390,
+    "stableKey": "Connie",
     "name": "Connie",
     "trainerClass": 21,
     "isDouble": false,
@@ -129339,11 +129344,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 391,
+    "stableKey": "Andrea",
     "name": "Andrea",
     "trainerClass": 58,
     "isDouble": false,
@@ -129788,11 +129793,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 392,
+    "stableKey": "Daphne",
     "name": "Daphne",
     "trainerClass": 20,
     "isDouble": false,
@@ -130208,11 +130213,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 393,
+    "stableKey": "Annika",
     "name": "Annika",
     "trainerClass": 40,
     "isDouble": false,
@@ -130657,11 +130662,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 394,
+    "stableKey": "Tiffany",
     "name": "Tiffany",
     "trainerClass": 21,
     "isDouble": false,
@@ -131193,11 +131198,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 395,
+    "stableKey": "Bridget",
     "name": "Bridget",
     "trainerClass": 21,
     "isDouble": false,
@@ -131613,11 +131618,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 396,
+    "stableKey": "Hope",
     "name": "Hope",
     "trainerClass": 3,
     "isDouble": true,
@@ -132120,11 +132125,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 397,
+    "stableKey": "Shannon",
     "name": "Shannon",
     "trainerClass": 3,
     "isDouble": false,
@@ -132656,11 +132661,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 398,
+    "stableKey": "Samuel",
     "name": "Samuel",
     "trainerClass": 3,
     "isDouble": false,
@@ -133163,11 +133168,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 399,
+    "stableKey": "Julie",
     "name": "Julie",
     "trainerClass": 3,
     "isDouble": false,
@@ -133699,11 +133704,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 400,
+    "stableKey": "Vito",
     "name": "Vito",
     "trainerClass": 3,
     "isDouble": true,
@@ -134235,11 +134240,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 401,
+    "stableKey": "Mitchell",
     "name": "Mitchell",
     "trainerClass": 3,
     "isDouble": true,
@@ -134742,11 +134747,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 402,
+    "stableKey": "Halle",
     "name": "Halle",
     "trainerClass": 3,
     "isDouble": false,
@@ -135249,11 +135254,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 403,
+    "stableKey": "Edgar",
     "name": "Edgar",
     "trainerClass": 3,
     "isDouble": true,
@@ -135785,11 +135790,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 404,
+    "stableKey": "Katelynn",
     "name": "Katelynn",
     "trainerClass": 3,
     "isDouble": false,
@@ -136321,11 +136326,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 405,
+    "stableKey": "Quincy",
     "name": "Quincy",
     "trainerClass": 3,
     "isDouble": false,
@@ -136828,11 +136833,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 406,
+    "stableKey": "Calvin E4",
     "name": "Calvin E4",
     "trainerClass": 41,
     "isDouble": false,
@@ -137364,11 +137369,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 407,
+    "stableKey": "Sidney",
     "name": "Sidney",
     "trainerClass": 33,
     "isDouble": false,
@@ -137900,11 +137905,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 408,
+    "stableKey": "Phoebe",
     "name": "Phoebe",
     "trainerClass": 33,
     "isDouble": false,
@@ -138436,11 +138441,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 409,
+    "stableKey": "Glacia",
     "name": "Glacia",
     "trainerClass": 33,
     "isDouble": false,
@@ -138971,11 +138976,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 410,
+    "stableKey": "Drake",
     "name": "Drake",
     "trainerClass": 33,
     "isDouble": false,
@@ -139507,11 +139512,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 411,
+    "stableKey": "Sawyer 1",
     "name": "Sawyer 1",
     "trainerClass": 0,
     "isDouble": false,
@@ -139984,11 +139989,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 412,
+    "stableKey": "Sawyer 2",
     "name": "Sawyer 2",
     "trainerClass": 0,
     "isDouble": false,
@@ -140112,11 +140117,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 413,
+    "stableKey": "Sawyer 3",
     "name": "Sawyer 3",
     "trainerClass": 0,
     "isDouble": false,
@@ -140240,11 +140245,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 414,
+    "stableKey": "Sawyer 4",
     "name": "Sawyer 4",
     "trainerClass": 0,
     "isDouble": false,
@@ -140368,11 +140373,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 415,
+    "stableKey": "Gabrielle 1",
     "name": "Gabrielle 1",
     "trainerClass": 2,
     "isDouble": false,
@@ -140875,11 +140880,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 416,
+    "stableKey": "Gabrielle 2",
     "name": "Gabrielle 2",
     "trainerClass": 2,
     "isDouble": false,
@@ -141061,11 +141066,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 417,
+    "stableKey": "Gabrielle 3",
     "name": "Gabrielle 3",
     "trainerClass": 2,
     "isDouble": false,
@@ -141247,11 +141252,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 418,
+    "stableKey": "Gabrielle 4",
     "name": "Gabrielle 4",
     "trainerClass": 2,
     "isDouble": false,
@@ -141433,11 +141438,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 419,
+    "stableKey": "Grunt Aqua Hideout 5",
     "name": "Grunt Aqua Hideout 5",
     "trainerClass": 1,
     "isDouble": false,
@@ -141882,11 +141887,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 420,
+    "stableKey": "Rose 1",
     "name": "Rose 1",
     "trainerClass": 13,
     "isDouble": false,
@@ -142329,11 +142334,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 421,
+    "stableKey": "Rose 2",
     "name": "Rose 2",
     "trainerClass": 13,
     "isDouble": false,
@@ -142515,11 +142520,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 422,
+    "stableKey": "Rose 3",
     "name": "Rose 3",
     "trainerClass": 13,
     "isDouble": false,
@@ -142701,11 +142706,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 423,
+    "stableKey": "Rose 4",
     "name": "Rose 4",
     "trainerClass": 13,
     "isDouble": false,
@@ -142887,11 +142892,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 424,
+    "stableKey": "Felix",
     "name": "Felix",
     "trainerClass": 3,
     "isDouble": false,
@@ -143423,11 +143428,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 425,
+    "stableKey": "Dusty 1",
     "name": "Dusty 1",
     "trainerClass": 14,
     "isDouble": false,
@@ -143901,11 +143906,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 426,
+    "stableKey": "Dusty 2",
     "name": "Dusty 2",
     "trainerClass": 14,
     "isDouble": false,
@@ -144058,11 +144063,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 427,
+    "stableKey": "Dusty 3",
     "name": "Dusty 3",
     "trainerClass": 14,
     "isDouble": false,
@@ -144215,11 +144220,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 428,
+    "stableKey": "Dusty 4",
     "name": "Dusty 4",
     "trainerClass": 14,
     "isDouble": false,
@@ -144401,11 +144406,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 429,
+    "stableKey": "May Treecko Meteor Falls",
     "name": "May Treecko Meteor Falls",
     "trainerClass": 15,
     "isDouble": false,
@@ -144500,11 +144505,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 430,
+    "stableKey": "May Torchic Meteor Falls",
     "name": "May Torchic Meteor Falls",
     "trainerClass": 15,
     "isDouble": false,
@@ -144599,11 +144604,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 431,
+    "stableKey": "May Mudkip Meteor Falls",
     "name": "May Mudkip Meteor Falls",
     "trainerClass": 15,
     "isDouble": false,
@@ -144698,11 +144703,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 432,
+    "stableKey": "Brendan Treecko Meteor Falls",
     "name": "Brendan Treecko Meteor Falls",
     "trainerClass": 15,
     "isDouble": false,
@@ -144797,11 +144802,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 433,
+    "stableKey": "Brendan Torchic Meteor Falls",
     "name": "Brendan Torchic Meteor Falls",
     "trainerClass": 15,
     "isDouble": false,
@@ -144896,11 +144901,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 434,
+    "stableKey": "Brendan Mudkip Meteor Falls",
     "name": "Brendan Mudkip Meteor Falls",
     "trainerClass": 15,
     "isDouble": false,
@@ -144995,11 +145000,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 435,
+    "stableKey": "Gabby And Ty 1",
     "name": "Gabby And Ty 1",
     "trainerClass": 17,
     "isDouble": true,
@@ -145415,11 +145420,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 436,
+    "stableKey": "Gabby And Ty 2",
     "name": "Gabby And Ty 2",
     "trainerClass": 17,
     "isDouble": true,
@@ -145718,11 +145723,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 437,
+    "stableKey": "Gabby And Ty 3",
     "name": "Gabby And Ty 3",
     "trainerClass": 17,
     "isDouble": true,
@@ -146254,11 +146259,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 438,
+    "stableKey": "Gabby And Ty 4",
     "name": "Gabby And Ty 4",
     "trainerClass": 17,
     "isDouble": true,
@@ -146615,11 +146620,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 439,
+    "stableKey": "Gabby And Ty 5",
     "name": "Gabby And Ty 5",
     "trainerClass": 17,
     "isDouble": true,
@@ -146976,11 +146981,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 440,
+    "stableKey": "Gabby And Ty 6",
     "name": "Gabby And Ty 6",
     "trainerClass": 17,
     "isDouble": true,
@@ -147337,11 +147342,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 441,
+    "stableKey": "Lola 1",
     "name": "Lola 1",
     "trainerClass": 18,
     "isDouble": false,
@@ -147728,11 +147733,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 442,
+    "stableKey": "Lola 2",
     "name": "Lola 2",
     "trainerClass": 18,
     "isDouble": false,
@@ -147827,11 +147832,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 443,
+    "stableKey": "Lola 3",
     "name": "Lola 3",
     "trainerClass": 18,
     "isDouble": false,
@@ -147984,11 +147989,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 444,
+    "stableKey": "Lola 4",
     "name": "Lola 4",
     "trainerClass": 18,
     "isDouble": false,
@@ -148083,11 +148088,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 445,
+    "stableKey": "Ricky 1",
     "name": "Ricky 1",
     "trainerClass": 19,
     "isDouble": false,
@@ -148300,11 +148305,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 446,
+    "stableKey": "Ricky 2",
     "name": "Ricky 2",
     "trainerClass": 19,
     "isDouble": false,
@@ -148399,11 +148404,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 447,
+    "stableKey": "Ricky 3",
     "name": "Ricky 3",
     "trainerClass": 19,
     "isDouble": false,
@@ -148527,11 +148532,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 448,
+    "stableKey": "Ricky 4",
     "name": "Ricky 4",
     "trainerClass": 19,
     "isDouble": false,
@@ -148626,11 +148631,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 449,
+    "stableKey": "Vincent",
     "name": "Vincent",
     "trainerClass": 3,
     "isDouble": false,
@@ -148812,11 +148817,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 450,
+    "stableKey": "Leroy",
     "name": "Leroy",
     "trainerClass": 3,
     "isDouble": false,
@@ -148998,11 +149003,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 451,
+    "stableKey": "Wilton 1",
     "name": "Wilton 1",
     "trainerClass": 3,
     "isDouble": false,
@@ -149476,11 +149481,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 452,
+    "stableKey": "Wilton 2",
     "name": "Wilton 2",
     "trainerClass": 3,
     "isDouble": false,
@@ -149662,11 +149667,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 453,
+    "stableKey": "Wilton 3",
     "name": "Wilton 3",
     "trainerClass": 3,
     "isDouble": false,
@@ -149848,11 +149853,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 454,
+    "stableKey": "Wilton 4",
     "name": "Wilton 4",
     "trainerClass": 3,
     "isDouble": false,
@@ -149947,11 +149952,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 455,
+    "stableKey": "Albert",
     "name": "Albert",
     "trainerClass": 3,
     "isDouble": false,
@@ -150454,11 +150459,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 456,
+    "stableKey": "Owen",
     "name": "Owen",
     "trainerClass": 3,
     "isDouble": false,
@@ -150961,11 +150966,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 457,
+    "stableKey": "Keira",
     "name": "Keira",
     "trainerClass": 3,
     "isDouble": false,
@@ -151147,11 +151152,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 458,
+    "stableKey": "Brooke 1",
     "name": "Brooke 1",
     "trainerClass": 3,
     "isDouble": false,
@@ -151625,11 +151630,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 459,
+    "stableKey": "Brooke 2",
     "name": "Brooke 2",
     "trainerClass": 3,
     "isDouble": false,
@@ -151811,11 +151816,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 460,
+    "stableKey": "Brooke 3",
     "name": "Brooke 3",
     "trainerClass": 3,
     "isDouble": false,
@@ -151997,11 +152002,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 461,
+    "stableKey": "Brooke 4",
     "name": "Brooke 4",
     "trainerClass": 3,
     "isDouble": false,
@@ -152096,11 +152101,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 462,
+    "stableKey": "Michelle",
     "name": "Michelle",
     "trainerClass": 3,
     "isDouble": true,
@@ -152603,11 +152608,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 463,
+    "stableKey": "Caroline",
     "name": "Caroline",
     "trainerClass": 3,
     "isDouble": true,
@@ -153110,11 +153115,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 464,
+    "stableKey": "Patricia",
     "name": "Patricia",
     "trainerClass": 12,
     "isDouble": false,
@@ -153209,11 +153214,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 465,
+    "stableKey": "Valerie 1",
     "name": "Valerie 1",
     "trainerClass": 12,
     "isDouble": false,
@@ -153716,11 +153721,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 466,
+    "stableKey": "Valerie 2",
     "name": "Valerie 2",
     "trainerClass": 12,
     "isDouble": false,
@@ -153844,11 +153849,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 467,
+    "stableKey": "Valerie 3",
     "name": "Valerie 3",
     "trainerClass": 12,
     "isDouble": false,
@@ -153972,11 +153977,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 468,
+    "stableKey": "Valerie 4",
     "name": "Valerie 4",
     "trainerClass": 12,
     "isDouble": false,
@@ -154071,11 +154076,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 469,
+    "stableKey": "Cindy 1",
     "name": "Cindy 1",
     "trainerClass": 20,
     "isDouble": false,
@@ -154433,11 +154438,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 470,
+    "stableKey": "Cindy 2",
     "name": "Cindy 2",
     "trainerClass": 20,
     "isDouble": false,
@@ -154532,11 +154537,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 471,
+    "stableKey": "Cindy 3",
     "name": "Cindy 3",
     "trainerClass": 20,
     "isDouble": false,
@@ -154660,11 +154665,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 472,
+    "stableKey": "Cindy 4",
     "name": "Cindy 4",
     "trainerClass": 20,
     "isDouble": false,
@@ -154759,11 +154764,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 473,
+    "stableKey": "Brianna",
     "name": "Brianna",
     "trainerClass": 20,
     "isDouble": false,
@@ -155179,11 +155184,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 474,
+    "stableKey": "Naomi",
     "name": "Naomi",
     "trainerClass": 20,
     "isDouble": false,
@@ -155278,11 +155283,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 475,
+    "stableKey": "Cindy 6",
     "name": "Cindy 6",
     "trainerClass": 20,
     "isDouble": false,
@@ -155319,11 +155324,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 476,
+    "stableKey": "Melissa",
     "name": "Melissa",
     "trainerClass": 21,
     "isDouble": false,
@@ -155768,11 +155773,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 477,
+    "stableKey": "Sheila",
     "name": "Sheila",
     "trainerClass": 21,
     "isDouble": false,
@@ -156246,11 +156251,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 478,
+    "stableKey": "Shirley",
     "name": "Shirley",
     "trainerClass": 21,
     "isDouble": false,
@@ -156724,11 +156729,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 479,
+    "stableKey": "Jessica 1",
     "name": "Jessica 1",
     "trainerClass": 21,
     "isDouble": false,
@@ -157231,11 +157236,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 480,
+    "stableKey": "Jessica 2",
     "name": "Jessica 2",
     "trainerClass": 21,
     "isDouble": false,
@@ -157359,11 +157364,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 481,
+    "stableKey": "Jessica 3",
     "name": "Jessica 3",
     "trainerClass": 21,
     "isDouble": false,
@@ -157487,11 +157492,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 482,
+    "stableKey": "Jessica 4",
     "name": "Jessica 4",
     "trainerClass": 21,
     "isDouble": false,
@@ -157615,11 +157620,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 483,
+    "stableKey": "Olivia",
     "name": "Olivia",
     "trainerClass": 21,
     "isDouble": false,
@@ -158035,11 +158040,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 484,
+    "stableKey": "Winston 1",
     "name": "Winston 1",
     "trainerClass": 23,
     "isDouble": false,
@@ -158513,11 +158518,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 485,
+    "stableKey": "Winston 2",
     "name": "Winston 2",
     "trainerClass": 23,
     "isDouble": false,
@@ -158699,11 +158704,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 486,
+    "stableKey": "Winston 3",
     "name": "Winston 3",
     "trainerClass": 23,
     "isDouble": false,
@@ -158885,11 +158890,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 487,
+    "stableKey": "Winston 4",
     "name": "Winston 4",
     "trainerClass": 23,
     "isDouble": false,
@@ -159071,11 +159076,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 488,
+    "stableKey": "Garret",
     "name": "Garret",
     "trainerClass": 23,
     "isDouble": false,
@@ -159170,11 +159175,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 489,
+    "stableKey": "Steve 1",
     "name": "Steve 1",
     "trainerClass": 25,
     "isDouble": false,
@@ -159619,11 +159624,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 490,
+    "stableKey": "Steve 2",
     "name": "Steve 2",
     "trainerClass": 25,
     "isDouble": false,
@@ -159718,11 +159723,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 491,
+    "stableKey": "Steve 3",
     "name": "Steve 3",
     "trainerClass": 25,
     "isDouble": false,
@@ -159817,11 +159822,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 492,
+    "stableKey": "Steve 4",
     "name": "Steve 4",
     "trainerClass": 25,
     "isDouble": false,
@@ -159916,11 +159921,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 493,
+    "stableKey": "Thalia 1",
     "name": "Thalia 1",
     "trainerClass": 21,
     "isDouble": false,
@@ -160073,11 +160078,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 494,
+    "stableKey": "Thalia 2",
     "name": "Thalia 2",
     "trainerClass": 21,
     "isDouble": false,
@@ -160172,11 +160177,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 495,
+    "stableKey": "Thalia 3",
     "name": "Thalia 3",
     "trainerClass": 21,
     "isDouble": false,
@@ -160271,11 +160276,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 496,
+    "stableKey": "Thalia 4",
     "name": "Thalia 4",
     "trainerClass": 21,
     "isDouble": false,
@@ -160399,11 +160404,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 497,
+    "stableKey": "Tony 1",
     "name": "Tony 1",
     "trainerClass": 6,
     "isDouble": false,
@@ -160527,11 +160532,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 498,
+    "stableKey": "Tony 2",
     "name": "Tony 2",
     "trainerClass": 6,
     "isDouble": false,
@@ -160597,11 +160602,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 499,
+    "stableKey": "Tony 3",
     "name": "Tony 3",
     "trainerClass": 6,
     "isDouble": false,
@@ -160667,11 +160672,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 500,
+    "stableKey": "Tony 4",
     "name": "Tony 4",
     "trainerClass": 6,
     "isDouble": false,
@@ -160737,11 +160742,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 501,
+    "stableKey": "David",
     "name": "David",
     "trainerClass": 6,
     "isDouble": false,
@@ -161070,11 +161075,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 502,
+    "stableKey": "Barry",
     "name": "Barry",
     "trainerClass": 6,
     "isDouble": false,
@@ -161140,11 +161145,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 503,
+    "stableKey": "Greta Slateport",
     "name": "Greta Slateport",
     "trainerClass": 26,
     "isDouble": false,
@@ -161501,11 +161506,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 504,
+    "stableKey": "Nob 1",
     "name": "Nob 1",
     "trainerClass": 10,
     "isDouble": false,
@@ -161717,11 +161722,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 505,
+    "stableKey": "Nob 2",
     "name": "Nob 2",
     "trainerClass": 10,
     "isDouble": false,
@@ -161758,11 +161763,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 506,
+    "stableKey": "Nob 3",
     "name": "Nob 3",
     "trainerClass": 10,
     "isDouble": false,
@@ -161799,11 +161804,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 507,
+    "stableKey": "Nob 4",
     "name": "Nob 4",
     "trainerClass": 10,
     "isDouble": false,
@@ -161840,11 +161845,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 508,
+    "stableKey": "Nob 5",
     "name": "Nob 5",
     "trainerClass": 10,
     "isDouble": false,
@@ -162008,11 +162013,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 509,
+    "stableKey": "Yuji",
     "name": "Yuji",
     "trainerClass": 10,
     "isDouble": false,
@@ -162078,11 +162083,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 510,
+    "stableKey": "Daisuke",
     "name": "Daisuke",
     "trainerClass": 10,
     "isDouble": false,
@@ -162527,11 +162532,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 511,
+    "stableKey": "Fernando 1",
     "name": "Fernando 1",
     "trainerClass": 27,
     "isDouble": false,
@@ -162626,11 +162631,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 512,
+    "stableKey": "Fernando 2",
     "name": "Fernando 2",
     "trainerClass": 27,
     "isDouble": false,
@@ -162725,11 +162730,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 513,
+    "stableKey": "Fernando 3",
     "name": "Fernando 3",
     "trainerClass": 27,
     "isDouble": false,
@@ -162824,11 +162829,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 514,
+    "stableKey": "Fernando 4",
     "name": "Fernando 4",
     "trainerClass": 27,
     "isDouble": false,
@@ -162923,11 +162928,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 515,
+    "stableKey": "Dalton 1",
     "name": "Dalton 1",
     "trainerClass": 27,
     "isDouble": false,
@@ -163372,11 +163377,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 516,
+    "stableKey": "Dalton 2",
     "name": "Dalton 2",
     "trainerClass": 27,
     "isDouble": false,
@@ -163471,11 +163476,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 517,
+    "stableKey": "Dalton 3",
     "name": "Dalton 3",
     "trainerClass": 27,
     "isDouble": false,
@@ -163570,11 +163575,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 518,
+    "stableKey": "Dalton 4",
     "name": "Dalton 4",
     "trainerClass": 27,
     "isDouble": false,
@@ -163669,11 +163674,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 519,
+    "stableKey": "Bernie 1",
     "name": "Bernie 1",
     "trainerClass": 28,
     "isDouble": false,
@@ -164146,11 +164151,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 520,
+    "stableKey": "Bernie 2",
     "name": "Bernie 2",
     "trainerClass": 28,
     "isDouble": false,
@@ -164216,11 +164221,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 521,
+    "stableKey": "Bernie 3",
     "name": "Bernie 3",
     "trainerClass": 28,
     "isDouble": false,
@@ -164286,11 +164291,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 522,
+    "stableKey": "Bernie 4",
     "name": "Bernie 4",
     "trainerClass": 28,
     "isDouble": false,
@@ -164356,11 +164361,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 523,
+    "stableKey": "Bernie 5",
     "name": "Bernie 5",
     "trainerClass": 28,
     "isDouble": false,
@@ -164524,11 +164529,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 524,
+    "stableKey": "Justin",
     "name": "Justin",
     "trainerClass": 29,
     "isDouble": false,
@@ -164623,11 +164628,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 525,
+    "stableKey": "Ethan 1",
     "name": "Ethan 1",
     "trainerClass": 29,
     "isDouble": false,
@@ -165130,11 +165135,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 526,
+    "stableKey": "Ethan 2",
     "name": "Ethan 2",
     "trainerClass": 29,
     "isDouble": false,
@@ -165258,11 +165263,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 527,
+    "stableKey": "Ethan 3",
     "name": "Ethan 3",
     "trainerClass": 29,
     "isDouble": false,
@@ -165386,11 +165391,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 528,
+    "stableKey": "Ethan 4",
     "name": "Ethan 4",
     "trainerClass": 29,
     "isDouble": false,
@@ -165514,11 +165519,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 529,
+    "stableKey": "Brent",
     "name": "Brent",
     "trainerClass": 24,
     "isDouble": false,
@@ -165932,11 +165937,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 530,
+    "stableKey": "Jeffrey 1",
     "name": "Jeffrey 1",
     "trainerClass": 24,
     "isDouble": false,
@@ -166410,11 +166415,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 531,
+    "stableKey": "Jeffrey 2",
     "name": "Jeffrey 2",
     "trainerClass": 24,
     "isDouble": false,
@@ -166509,11 +166514,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 532,
+    "stableKey": "Jeffrey 3",
     "name": "Jeffrey 3",
     "trainerClass": 24,
     "isDouble": false,
@@ -166608,11 +166613,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 533,
+    "stableKey": "Jeffrey 4",
     "name": "Jeffrey 4",
     "trainerClass": 24,
     "isDouble": false,
@@ -166707,11 +166712,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 534,
+    "stableKey": "Joshua",
     "name": "Joshua",
     "trainerClass": 31,
     "isDouble": false,
@@ -166806,11 +166811,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 535,
+    "stableKey": "Cameron 1",
     "name": "Cameron 1",
     "trainerClass": 31,
     "isDouble": false,
@@ -166905,11 +166910,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 536,
+    "stableKey": "Cameron 2",
     "name": "Cameron 2",
     "trainerClass": 31,
     "isDouble": false,
@@ -167033,11 +167038,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 537,
+    "stableKey": "Cameron 3",
     "name": "Cameron 3",
     "trainerClass": 31,
     "isDouble": false,
@@ -167161,11 +167166,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 538,
+    "stableKey": "Cameron 4",
     "name": "Cameron 4",
     "trainerClass": 31,
     "isDouble": false,
@@ -167289,11 +167294,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 539,
+    "stableKey": "Alexis",
     "name": "Alexis",
     "trainerClass": 31,
     "isDouble": false,
@@ -167388,11 +167393,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 540,
+    "stableKey": "Jacki 1",
     "name": "Jacki 1",
     "trainerClass": 31,
     "isDouble": false,
@@ -167487,11 +167492,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 541,
+    "stableKey": "Jacki 2",
     "name": "Jacki 2",
     "trainerClass": 31,
     "isDouble": false,
@@ -167586,11 +167591,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 542,
+    "stableKey": "Jacki 3",
     "name": "Jacki 3",
     "trainerClass": 31,
     "isDouble": false,
@@ -167685,11 +167690,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 543,
+    "stableKey": "Jacki 4",
     "name": "Jacki 4",
     "trainerClass": 31,
     "isDouble": false,
@@ -167813,11 +167818,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 544,
+    "stableKey": "Walter 1",
     "name": "Walter 1",
     "trainerClass": 32,
     "isDouble": false,
@@ -168320,11 +168325,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 545,
+    "stableKey": "Walter 2",
     "name": "Walter 2",
     "trainerClass": 32,
     "isDouble": false,
@@ -168419,11 +168424,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 546,
+    "stableKey": "Walter 3",
     "name": "Walter 3",
     "trainerClass": 32,
     "isDouble": false,
@@ -168518,11 +168523,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 547,
+    "stableKey": "Walter 4",
     "name": "Walter 4",
     "trainerClass": 32,
     "isDouble": false,
@@ -168617,11 +168622,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 548,
+    "stableKey": "Micah",
     "name": "Micah",
     "trainerClass": 32,
     "isDouble": false,
@@ -168687,11 +168692,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 549,
+    "stableKey": "Thomas",
     "name": "Thomas",
     "trainerClass": 32,
     "isDouble": false,
@@ -168786,11 +168791,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 550,
+    "stableKey": "Walter 5",
     "name": "Walter 5",
     "trainerClass": 32,
     "isDouble": false,
@@ -168885,11 +168890,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 551,
+    "stableKey": "Sidney 2",
     "name": "Sidney 2",
     "trainerClass": 33,
     "isDouble": true,
@@ -169071,11 +169076,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 552,
+    "stableKey": "Sidney 3",
     "name": "Sidney 3",
     "trainerClass": 33,
     "isDouble": false,
@@ -169257,11 +169262,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 553,
+    "stableKey": "Sidney 4",
     "name": "Sidney 4",
     "trainerClass": 33,
     "isDouble": true,
@@ -169443,11 +169448,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 554,
+    "stableKey": "Phoebe 2",
     "name": "Phoebe 2",
     "trainerClass": 33,
     "isDouble": true,
@@ -169629,11 +169634,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 555,
+    "stableKey": "Phoebe 3",
     "name": "Phoebe 3",
     "trainerClass": 33,
     "isDouble": false,
@@ -169815,11 +169820,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 556,
+    "stableKey": "Phoebe 4",
     "name": "Phoebe 4",
     "trainerClass": 33,
     "isDouble": true,
@@ -170001,11 +170006,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 557,
+    "stableKey": "Glacia 2",
     "name": "Glacia 2",
     "trainerClass": 33,
     "isDouble": true,
@@ -170187,11 +170192,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 558,
+    "stableKey": "Glacia 3",
     "name": "Glacia 3",
     "trainerClass": 33,
     "isDouble": false,
@@ -170373,11 +170378,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 559,
+    "stableKey": "Glacia 4",
     "name": "Glacia 4",
     "trainerClass": 33,
     "isDouble": false,
@@ -170559,11 +170564,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 560,
+    "stableKey": "Drake 2",
     "name": "Drake 2",
     "trainerClass": 33,
     "isDouble": true,
@@ -170745,11 +170750,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 561,
+    "stableKey": "Drake 3",
     "name": "Drake 3",
     "trainerClass": 33,
     "isDouble": false,
@@ -170931,11 +170936,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 562,
+    "stableKey": "Drake 4",
     "name": "Drake 4",
     "trainerClass": 33,
     "isDouble": true,
@@ -171117,11 +171122,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 563,
+    "stableKey": "Roxanne 1",
     "name": "Roxanne 1",
     "trainerClass": 34,
     "isDouble": false,
@@ -171624,11 +171629,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 564,
+    "stableKey": "Roxanne 2",
     "name": "Roxanne 2",
     "trainerClass": 34,
     "isDouble": false,
@@ -171810,11 +171815,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 565,
+    "stableKey": "Roxanne 3",
     "name": "Roxanne 3",
     "trainerClass": 34,
     "isDouble": false,
@@ -171996,11 +172001,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 566,
+    "stableKey": "Roxanne 4",
     "name": "Roxanne 4",
     "trainerClass": 34,
     "isDouble": true,
@@ -172182,11 +172187,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 567,
+    "stableKey": "Brawly 1",
     "name": "Brawly 1",
     "trainerClass": 34,
     "isDouble": false,
@@ -172689,11 +172694,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 568,
+    "stableKey": "Brawly 2",
     "name": "Brawly 2",
     "trainerClass": 34,
     "isDouble": false,
@@ -172875,11 +172880,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 569,
+    "stableKey": "Brawly 3",
     "name": "Brawly 3",
     "trainerClass": 34,
     "isDouble": false,
@@ -173061,11 +173066,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 570,
+    "stableKey": "Brawly 4",
     "name": "Brawly 4",
     "trainerClass": 34,
     "isDouble": true,
@@ -173247,11 +173252,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 571,
+    "stableKey": "Wattson 1",
     "name": "Wattson 1",
     "trainerClass": 34,
     "isDouble": false,
@@ -173783,11 +173788,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 572,
+    "stableKey": "Wattson 2",
     "name": "Wattson 2",
     "trainerClass": 34,
     "isDouble": false,
@@ -173969,11 +173974,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 573,
+    "stableKey": "Wattson 3",
     "name": "Wattson 3",
     "trainerClass": 34,
     "isDouble": false,
@@ -174155,11 +174160,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 574,
+    "stableKey": "Wattson 4",
     "name": "Wattson 4",
     "trainerClass": 34,
     "isDouble": true,
@@ -174341,11 +174346,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 575,
+    "stableKey": "Flannery 1",
     "name": "Flannery 1",
     "trainerClass": 34,
     "isDouble": false,
@@ -174877,11 +174882,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 576,
+    "stableKey": "Flannery 2",
     "name": "Flannery 2",
     "trainerClass": 34,
     "isDouble": false,
@@ -175063,11 +175068,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 577,
+    "stableKey": "Flannery 3",
     "name": "Flannery 3",
     "trainerClass": 34,
     "isDouble": false,
@@ -175249,11 +175254,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 578,
+    "stableKey": "Flannery 4",
     "name": "Flannery 4",
     "trainerClass": 34,
     "isDouble": true,
@@ -175435,11 +175440,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 579,
+    "stableKey": "Norman 1",
     "name": "Norman 1",
     "trainerClass": 34,
     "isDouble": false,
@@ -175971,11 +175976,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 580,
+    "stableKey": "Norman 2",
     "name": "Norman 2",
     "trainerClass": 34,
     "isDouble": false,
@@ -176154,11 +176159,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 581,
+    "stableKey": "Norman 3",
     "name": "Norman 3",
     "trainerClass": 34,
     "isDouble": true,
@@ -176340,11 +176345,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 582,
+    "stableKey": "Norman 4",
     "name": "Norman 4",
     "trainerClass": 34,
     "isDouble": false,
@@ -176526,11 +176531,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 583,
+    "stableKey": "Winona 1",
     "name": "Winona 1",
     "trainerClass": 34,
     "isDouble": false,
@@ -177061,11 +177066,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 584,
+    "stableKey": "Winona 2",
     "name": "Winona 2",
     "trainerClass": 34,
     "isDouble": false,
@@ -177247,11 +177252,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 585,
+    "stableKey": "Winona 3",
     "name": "Winona 3",
     "trainerClass": 34,
     "isDouble": true,
@@ -177433,11 +177438,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 586,
+    "stableKey": "Winona 4",
     "name": "Winona 4",
     "trainerClass": 34,
     "isDouble": false,
@@ -177619,11 +177624,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 587,
+    "stableKey": "Tate And Liza 1",
     "name": "Tate And Liza 1",
     "trainerClass": 34,
     "isDouble": true,
@@ -177980,11 +177985,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 588,
+    "stableKey": "Tate And Liza 2",
     "name": "Tate And Liza 2",
     "trainerClass": 34,
     "isDouble": true,
@@ -178166,11 +178171,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 589,
+    "stableKey": "Tate And Liza 3",
     "name": "Tate And Liza 3",
     "trainerClass": 34,
     "isDouble": true,
@@ -178352,11 +178357,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 590,
+    "stableKey": "Juan 1",
     "name": "Juan 1",
     "trainerClass": 34,
     "isDouble": false,
@@ -178627,11 +178632,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 591,
+    "stableKey": "Juan 2",
     "name": "Juan 2",
     "trainerClass": 34,
     "isDouble": false,
@@ -178813,11 +178818,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 592,
+    "stableKey": "Juan 3",
     "name": "Juan 3",
     "trainerClass": 34,
     "isDouble": true,
@@ -178999,11 +179004,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 593,
+    "stableKey": "Juan 4",
     "name": "Juan 4",
     "trainerClass": 34,
     "isDouble": false,
@@ -179185,11 +179190,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 594,
+    "stableKey": "Jerry 1",
     "name": "Jerry 1",
     "trainerClass": 35,
     "isDouble": false,
@@ -179605,11 +179610,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 595,
+    "stableKey": "Jerry 2",
     "name": "Jerry 2",
     "trainerClass": 35,
     "isDouble": false,
@@ -179704,11 +179709,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 596,
+    "stableKey": "Jerry 3",
     "name": "Jerry 3",
     "trainerClass": 35,
     "isDouble": false,
@@ -179832,11 +179837,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 597,
+    "stableKey": "Jerry 4",
     "name": "Jerry 4",
     "trainerClass": 35,
     "isDouble": false,
@@ -179989,11 +179994,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 598,
+    "stableKey": "Ted",
     "name": "Ted",
     "trainerClass": 35,
     "isDouble": false,
@@ -180059,11 +180064,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 599,
+    "stableKey": "Paul",
     "name": "Paul",
     "trainerClass": 35,
     "isDouble": false,
@@ -180158,11 +180163,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 600,
+    "stableKey": "Karen 1",
     "name": "Karen 1",
     "trainerClass": 35,
     "isDouble": false,
@@ -180549,11 +180554,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 601,
+    "stableKey": "Karen 2",
     "name": "Karen 2",
     "trainerClass": 35,
     "isDouble": false,
@@ -180648,11 +180653,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 602,
+    "stableKey": "Karen 3",
     "name": "Karen 3",
     "trainerClass": 35,
     "isDouble": false,
@@ -180805,11 +180810,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 603,
+    "stableKey": "Karen 4",
     "name": "Karen 4",
     "trainerClass": 35,
     "isDouble": false,
@@ -180962,11 +180967,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 604,
+    "stableKey": "Georgia",
     "name": "Georgia",
     "trainerClass": 35,
     "isDouble": false,
@@ -181032,11 +181037,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 605,
+    "stableKey": "Steven Mossdeep",
     "name": "Steven Mossdeep",
     "trainerClass": 36,
     "isDouble": false,
@@ -181219,11 +181224,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 606,
+    "stableKey": "Anna And Meg 1",
     "name": "Anna And Meg 1",
     "trainerClass": 37,
     "isDouble": true,
@@ -181697,11 +181702,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 607,
+    "stableKey": "Anna And Meg 2",
     "name": "Anna And Meg 2",
     "trainerClass": 37,
     "isDouble": true,
@@ -181880,11 +181885,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 608,
+    "stableKey": "Anna And Meg 3",
     "name": "Anna And Meg 3",
     "trainerClass": 37,
     "isDouble": true,
@@ -182063,11 +182068,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 609,
+    "stableKey": "Anna And Meg 4",
     "name": "Anna And Meg 4",
     "trainerClass": 37,
     "isDouble": true,
@@ -182246,11 +182251,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 610,
+    "stableKey": "Wallace Doubles",
     "name": "Wallace Doubles",
     "trainerClass": 38,
     "isDouble": true,
@@ -182432,11 +182437,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 611,
+    "stableKey": "Miguel 1",
     "name": "Miguel 1",
     "trainerClass": 40,
     "isDouble": false,
@@ -182910,11 +182915,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 612,
+    "stableKey": "Miguel 2",
     "name": "Miguel 2",
     "trainerClass": 40,
     "isDouble": false,
@@ -183096,11 +183101,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 613,
+    "stableKey": "Miguel 3",
     "name": "Miguel 3",
     "trainerClass": 40,
     "isDouble": false,
@@ -183282,11 +183287,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 614,
+    "stableKey": "Miguel 4",
     "name": "Miguel 4",
     "trainerClass": 40,
     "isDouble": false,
@@ -183468,11 +183473,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 615,
+    "stableKey": "Colton",
     "name": "Colton",
     "trainerClass": 40,
     "isDouble": false,
@@ -183654,11 +183659,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 616,
+    "stableKey": "Vanessa",
     "name": "Vanessa",
     "trainerClass": 40,
     "isDouble": false,
@@ -184190,11 +184195,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 617,
+    "stableKey": "Bethany",
     "name": "Bethany",
     "trainerClass": 40,
     "isDouble": false,
@@ -184465,11 +184470,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 618,
+    "stableKey": "Isabel 1",
     "name": "Isabel 1",
     "trainerClass": 40,
     "isDouble": false,
@@ -184885,11 +184890,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 619,
+    "stableKey": "Isabel 2",
     "name": "Isabel 2",
     "trainerClass": 40,
     "isDouble": false,
@@ -184984,11 +184989,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 620,
+    "stableKey": "Isabel 3",
     "name": "Isabel 3",
     "trainerClass": 40,
     "isDouble": false,
@@ -185112,11 +185117,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 621,
+    "stableKey": "Isabel 4",
     "name": "Isabel 4",
     "trainerClass": 40,
     "isDouble": false,
@@ -185269,11 +185274,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 622,
+    "stableKey": "Timothy 1",
     "name": "Timothy 1",
     "trainerClass": 8,
     "isDouble": false,
@@ -185543,11 +185548,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 623,
+    "stableKey": "Timothy 2",
     "name": "Timothy 2",
     "trainerClass": 8,
     "isDouble": false,
@@ -185700,11 +185705,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 624,
+    "stableKey": "Timothy 3",
     "name": "Timothy 3",
     "trainerClass": 8,
     "isDouble": false,
@@ -185857,11 +185862,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 625,
+    "stableKey": "Timothy 4",
     "name": "Timothy 4",
     "trainerClass": 8,
     "isDouble": false,
@@ -186014,11 +186019,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 626,
+    "stableKey": "Timothy 5",
     "name": "Timothy 5",
     "trainerClass": 8,
     "isDouble": false,
@@ -186182,11 +186187,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 627,
+    "stableKey": "Shelby 1",
     "name": "Shelby 1",
     "trainerClass": 8,
     "isDouble": false,
@@ -186631,11 +186636,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 628,
+    "stableKey": "Shelby 2",
     "name": "Shelby 2",
     "trainerClass": 8,
     "isDouble": false,
@@ -186817,11 +186822,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 629,
+    "stableKey": "Shelby 3",
     "name": "Shelby 3",
     "trainerClass": 8,
     "isDouble": false,
@@ -187003,11 +187008,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 630,
+    "stableKey": "Shelby 4",
     "name": "Shelby 4",
     "trainerClass": 8,
     "isDouble": false,
@@ -187189,11 +187194,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 631,
+    "stableKey": "Calvin 1",
     "name": "Calvin 1",
     "trainerClass": 41,
     "isDouble": false,
@@ -187667,11 +187672,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 632,
+    "stableKey": "Calvin 2",
     "name": "Calvin 2",
     "trainerClass": 41,
     "isDouble": false,
@@ -187853,11 +187858,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 633,
+    "stableKey": "Calvin 3",
     "name": "Calvin 3",
     "trainerClass": 41,
     "isDouble": false,
@@ -188039,11 +188044,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 634,
+    "stableKey": "Calvin 4",
     "name": "Calvin 4",
     "trainerClass": 41,
     "isDouble": false,
@@ -188225,11 +188230,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 635,
+    "stableKey": "Wallace",
     "name": "Wallace",
     "trainerClass": 34,
     "isDouble": false,
@@ -188500,11 +188505,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 636,
+    "stableKey": "Wallace 2",
     "name": "Wallace 2",
     "trainerClass": 34,
     "isDouble": false,
@@ -188686,11 +188691,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 637,
+    "stableKey": "Wallace 3",
     "name": "Wallace 3",
     "trainerClass": 34,
     "isDouble": false,
@@ -188872,11 +188877,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 638,
+    "stableKey": "Wallace 4",
     "name": "Wallace 4",
     "trainerClass": 34,
     "isDouble": false,
@@ -189058,11 +189063,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 639,
+    "stableKey": "Wallace 5",
     "name": "Wallace 5",
     "trainerClass": 34,
     "isDouble": false,
@@ -189362,11 +189367,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 640,
+    "stableKey": "Elliot 1",
     "name": "Elliot 1",
     "trainerClass": 42,
     "isDouble": false,
@@ -189695,11 +189700,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 641,
+    "stableKey": "Elliot 2",
     "name": "Elliot 2",
     "trainerClass": 42,
     "isDouble": false,
@@ -189823,11 +189828,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 642,
+    "stableKey": "Elliot 3",
     "name": "Elliot 3",
     "trainerClass": 42,
     "isDouble": false,
@@ -189980,11 +189985,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 643,
+    "stableKey": "Elliot 4",
     "name": "Elliot 4",
     "trainerClass": 42,
     "isDouble": false,
@@ -190166,11 +190171,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 644,
+    "stableKey": "Benjamin 1",
     "name": "Benjamin 1",
     "trainerClass": 43,
     "isDouble": false,
@@ -190586,11 +190591,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 645,
+    "stableKey": "Benjamin 2",
     "name": "Benjamin 2",
     "trainerClass": 43,
     "isDouble": false,
@@ -190772,11 +190777,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 646,
+    "stableKey": "Benjamin 3",
     "name": "Benjamin 3",
     "trainerClass": 43,
     "isDouble": false,
@@ -190956,11 +190961,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 647,
+    "stableKey": "Benjamin 4",
     "name": "Benjamin 4",
     "trainerClass": 43,
     "isDouble": false,
@@ -191142,11 +191147,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 648,
+    "stableKey": "Abigail 1",
     "name": "Abigail 1",
     "trainerClass": 43,
     "isDouble": false,
@@ -191591,11 +191596,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 649,
+    "stableKey": "Abigail 2",
     "name": "Abigail 2",
     "trainerClass": 43,
     "isDouble": false,
@@ -191777,11 +191782,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 650,
+    "stableKey": "Abigail 3",
     "name": "Abigail 3",
     "trainerClass": 43,
     "isDouble": false,
@@ -191963,11 +191968,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 651,
+    "stableKey": "Abigail 4",
     "name": "Abigail 4",
     "trainerClass": 43,
     "isDouble": false,
@@ -192149,11 +192154,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 652,
+    "stableKey": "Dylan 1",
     "name": "Dylan 1",
     "trainerClass": 43,
     "isDouble": false,
@@ -192598,11 +192603,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 653,
+    "stableKey": "Dylan 2",
     "name": "Dylan 2",
     "trainerClass": 43,
     "isDouble": false,
@@ -192726,11 +192731,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 654,
+    "stableKey": "Dylan 3",
     "name": "Dylan 3",
     "trainerClass": 43,
     "isDouble": false,
@@ -192854,11 +192859,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 655,
+    "stableKey": "Dylan 4",
     "name": "Dylan 4",
     "trainerClass": 43,
     "isDouble": false,
@@ -192982,11 +192987,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 656,
+    "stableKey": "Maria 1",
     "name": "Maria 1",
     "trainerClass": 43,
     "isDouble": false,
@@ -193431,11 +193436,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 657,
+    "stableKey": "Maria 2",
     "name": "Maria 2",
     "trainerClass": 43,
     "isDouble": false,
@@ -193530,11 +193535,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 658,
+    "stableKey": "Maria 3",
     "name": "Maria 3",
     "trainerClass": 43,
     "isDouble": false,
@@ -193629,11 +193634,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 659,
+    "stableKey": "Maria 4",
     "name": "Maria 4",
     "trainerClass": 43,
     "isDouble": false,
@@ -193728,11 +193733,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 660,
+    "stableKey": "Isaiah 1",
     "name": "Isaiah 1",
     "trainerClass": 43,
     "isDouble": false,
@@ -193798,11 +193803,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 661,
+    "stableKey": "Isaiah 2",
     "name": "Isaiah 2",
     "trainerClass": 43,
     "isDouble": false,
@@ -193897,11 +193902,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 662,
+    "stableKey": "Isaiah 3",
     "name": "Isaiah 3",
     "trainerClass": 43,
     "isDouble": false,
@@ -193996,11 +194001,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 663,
+    "stableKey": "Isaiah 4",
     "name": "Isaiah 4",
     "trainerClass": 43,
     "isDouble": false,
@@ -194124,11 +194129,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 664,
+    "stableKey": "Pablo 1",
     "name": "Pablo 1",
     "trainerClass": 43,
     "isDouble": false,
@@ -194223,11 +194228,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 665,
+    "stableKey": "Pablo 2",
     "name": "Pablo 2",
     "trainerClass": 43,
     "isDouble": false,
@@ -194322,11 +194327,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 666,
+    "stableKey": "Pablo 3",
     "name": "Pablo 3",
     "trainerClass": 43,
     "isDouble": false,
@@ -194421,11 +194426,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 667,
+    "stableKey": "Pablo 4",
     "name": "Pablo 4",
     "trainerClass": 43,
     "isDouble": false,
@@ -194520,11 +194525,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 668,
+    "stableKey": "Katelyn 1",
     "name": "Katelyn 1",
     "trainerClass": 43,
     "isDouble": false,
@@ -194590,11 +194595,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 669,
+    "stableKey": "Katelyn 2",
     "name": "Katelyn 2",
     "trainerClass": 43,
     "isDouble": false,
@@ -194689,11 +194694,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 670,
+    "stableKey": "Katelyn 3",
     "name": "Katelyn 3",
     "trainerClass": 43,
     "isDouble": false,
@@ -194788,11 +194793,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 671,
+    "stableKey": "Katelyn 4",
     "name": "Katelyn 4",
     "trainerClass": 43,
     "isDouble": false,
@@ -194887,11 +194892,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 672,
+    "stableKey": "Nicolas 1",
     "name": "Nicolas 1",
     "trainerClass": 44,
     "isDouble": false,
@@ -195015,11 +195020,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 673,
+    "stableKey": "Nicolas 2",
     "name": "Nicolas 2",
     "trainerClass": 44,
     "isDouble": false,
@@ -195143,11 +195148,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 674,
+    "stableKey": "Nicolas 3",
     "name": "Nicolas 3",
     "trainerClass": 44,
     "isDouble": false,
@@ -195300,11 +195305,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 675,
+    "stableKey": "Nicolas 4",
     "name": "Nicolas 4",
     "trainerClass": 44,
     "isDouble": false,
@@ -195457,11 +195462,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 676,
+    "stableKey": "Robert 1",
     "name": "Robert 1",
     "trainerClass": 4,
     "isDouble": false,
@@ -195935,11 +195940,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 677,
+    "stableKey": "Robert 2",
     "name": "Robert 2",
     "trainerClass": 4,
     "isDouble": false,
@@ -196034,11 +196039,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 678,
+    "stableKey": "Robert 3",
     "name": "Robert 3",
     "trainerClass": 4,
     "isDouble": false,
@@ -196133,11 +196138,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 679,
+    "stableKey": "Robert 4",
     "name": "Robert 4",
     "trainerClass": 4,
     "isDouble": false,
@@ -196232,11 +196237,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 680,
+    "stableKey": "Benny",
     "name": "Benny",
     "trainerClass": 4,
     "isDouble": false,
@@ -196418,11 +196423,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 681,
+    "stableKey": "Dianne",
     "name": "Dianne",
     "trainerClass": 3,
     "isDouble": true,
@@ -196925,11 +196930,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 682,
+    "stableKey": "Lao 1",
     "name": "Lao 1",
     "trainerClass": 45,
     "isDouble": false,
@@ -197402,11 +197407,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 683,
+    "stableKey": "Lao 2",
     "name": "Lao 2",
     "trainerClass": 45,
     "isDouble": false,
@@ -197530,11 +197535,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 684,
+    "stableKey": "Lao 3",
     "name": "Lao 3",
     "trainerClass": 45,
     "isDouble": false,
@@ -197687,11 +197692,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 685,
+    "stableKey": "Lao 4",
     "name": "Lao 4",
     "trainerClass": 45,
     "isDouble": false,
@@ -197844,11 +197849,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 686,
+    "stableKey": "Cynthia 2",
     "name": "Cynthia 2",
     "trainerClass": 46,
     "isDouble": false,
@@ -198205,11 +198210,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 687,
+    "stableKey": "Cyndy 1",
     "name": "Cyndy 1",
     "trainerClass": 47,
     "isDouble": false,
@@ -198567,11 +198572,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 688,
+    "stableKey": "Cyndy 2",
     "name": "Cyndy 2",
     "trainerClass": 47,
     "isDouble": false,
@@ -198695,11 +198700,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 689,
+    "stableKey": "Cyndy 3",
     "name": "Cyndy 3",
     "trainerClass": 47,
     "isDouble": false,
@@ -198823,11 +198828,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 690,
+    "stableKey": "Cyndy 4",
     "name": "Cyndy 4",
     "trainerClass": 47,
     "isDouble": false,
@@ -198951,11 +198956,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 691,
+    "stableKey": "Cora",
     "name": "Cora",
     "trainerClass": 47,
     "isDouble": false,
@@ -199050,11 +199055,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 692,
+    "stableKey": "Paula",
     "name": "Paula",
     "trainerClass": 47,
     "isDouble": false,
@@ -199178,11 +199183,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 693,
+    "stableKey": "Cyndy 5",
     "name": "Cyndy 5",
     "trainerClass": 47,
     "isDouble": false,
@@ -199346,11 +199351,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 694,
+    "stableKey": "Madeline 1",
     "name": "Madeline 1",
     "trainerClass": 48,
     "isDouble": false,
@@ -199795,11 +199800,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 695,
+    "stableKey": "Madeline 2",
     "name": "Madeline 2",
     "trainerClass": 48,
     "isDouble": false,
@@ -199952,11 +199957,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 696,
+    "stableKey": "Madeline 3",
     "name": "Madeline 3",
     "trainerClass": 48,
     "isDouble": false,
@@ -200109,11 +200114,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 697,
+    "stableKey": "Madeline 4",
     "name": "Madeline 4",
     "trainerClass": 48,
     "isDouble": false,
@@ -200266,11 +200271,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 698,
+    "stableKey": "Leaf Altering Cave",
     "name": "Leaf Altering Cave",
     "trainerClass": 49,
     "isDouble": false,
@@ -200627,11 +200632,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 699,
+    "stableKey": "Missy",
     "name": "Missy",
     "trainerClass": 50,
     "isDouble": false,
@@ -200783,11 +200788,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 700,
+    "stableKey": "Jenny 1",
     "name": "Jenny 1",
     "trainerClass": 50,
     "isDouble": false,
@@ -200882,11 +200887,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 701,
+    "stableKey": "Jenny 2",
     "name": "Jenny 2",
     "trainerClass": 50,
     "isDouble": false,
@@ -201010,11 +201015,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 702,
+    "stableKey": "Jenny 3",
     "name": "Jenny 3",
     "trainerClass": 50,
     "isDouble": false,
@@ -201138,11 +201143,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 703,
+    "stableKey": "Jenny 4",
     "name": "Jenny 4",
     "trainerClass": 50,
     "isDouble": false,
@@ -201266,11 +201271,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 704,
+    "stableKey": "Nikki",
     "name": "Nikki",
     "trainerClass": 50,
     "isDouble": false,
@@ -201336,11 +201341,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 705,
+    "stableKey": "Linda",
     "name": "Linda",
     "trainerClass": 50,
     "isDouble": false,
@@ -201406,11 +201411,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 706,
+    "stableKey": "Kaylee",
     "name": "Kaylee",
     "trainerClass": 50,
     "isDouble": false,
@@ -201505,11 +201510,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 707,
+    "stableKey": "Martha",
     "name": "Martha",
     "trainerClass": 30,
     "isDouble": false,
@@ -201604,11 +201609,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 708,
+    "stableKey": "Diana 1",
     "name": "Diana 1",
     "trainerClass": 30,
     "isDouble": false,
@@ -202082,11 +202087,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 709,
+    "stableKey": "Diana 2",
     "name": "Diana 2",
     "trainerClass": 30,
     "isDouble": false,
@@ -202210,11 +202215,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 710,
+    "stableKey": "Diana 3",
     "name": "Diana 3",
     "trainerClass": 30,
     "isDouble": false,
@@ -202396,11 +202401,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 711,
+    "stableKey": "Diana 4",
     "name": "Diana 4",
     "trainerClass": 30,
     "isDouble": false,
@@ -202582,11 +202587,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 712,
+    "stableKey": "Amy And Liv 1",
     "name": "Amy And Liv 1",
     "trainerClass": 51,
     "isDouble": true,
@@ -203060,11 +203065,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 713,
+    "stableKey": "Amy And Liv 2",
     "name": "Amy And Liv 2",
     "trainerClass": 51,
     "isDouble": true,
@@ -203246,11 +203251,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 714,
+    "stableKey": "Amy And Liv 3",
     "name": "Amy And Liv 3",
     "trainerClass": 51,
     "isDouble": true,
@@ -203432,11 +203437,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 715,
+    "stableKey": "Amy And Liv 4",
     "name": "Amy And Liv 4",
     "trainerClass": 51,
     "isDouble": true,
@@ -203618,11 +203623,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 716,
+    "stableKey": "Gina And Mia 1",
     "name": "Gina And Mia 1",
     "trainerClass": 51,
     "isDouble": true,
@@ -204095,11 +204100,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 2
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 717,
+    "stableKey": "Ernest 1",
     "name": "Ernest 1",
     "trainerClass": 53,
     "isDouble": false,
@@ -204398,11 +204403,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 718,
+    "stableKey": "Ernest 2",
     "name": "Ernest 2",
     "trainerClass": 53,
     "isDouble": false,
@@ -204497,11 +204502,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 719,
+    "stableKey": "Ernest 3",
     "name": "Ernest 3",
     "trainerClass": 53,
     "isDouble": false,
@@ -204596,11 +204601,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 720,
+    "stableKey": "Ernest 4",
     "name": "Ernest 4",
     "trainerClass": 53,
     "isDouble": false,
@@ -204695,11 +204700,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 721,
+    "stableKey": "Dwayne",
     "name": "Dwayne",
     "trainerClass": 53,
     "isDouble": false,
@@ -205086,11 +205091,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 722,
+    "stableKey": "Phillip",
     "name": "Phillip",
     "trainerClass": 53,
     "isDouble": false,
@@ -205156,11 +205161,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 723,
+    "stableKey": "Leonard",
     "name": "Leonard",
     "trainerClass": 53,
     "isDouble": false,
@@ -205226,11 +205231,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 724,
+    "stableKey": "Edwin 1",
     "name": "Edwin 1",
     "trainerClass": 5,
     "isDouble": false,
@@ -205704,11 +205709,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 725,
+    "stableKey": "Edwin 2",
     "name": "Edwin 2",
     "trainerClass": 5,
     "isDouble": false,
@@ -205861,11 +205866,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 726,
+    "stableKey": "Edwin 3",
     "name": "Edwin 3",
     "trainerClass": 5,
     "isDouble": false,
@@ -206018,11 +206023,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 727,
+    "stableKey": "Edwin 4",
     "name": "Edwin 4",
     "trainerClass": 5,
     "isDouble": false,
@@ -206204,11 +206209,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 728,
+    "stableKey": "Wally Vr 1",
     "name": "Wally Vr 1",
     "trainerClass": 15,
     "isDouble": false,
@@ -206740,11 +206745,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 729,
+    "stableKey": "Isaac 1",
     "name": "Isaac 1",
     "trainerClass": 2,
     "isDouble": false,
@@ -207102,11 +207107,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 730,
+    "stableKey": "Isaac 2",
     "name": "Isaac 2",
     "trainerClass": 2,
     "isDouble": false,
@@ -207288,11 +207293,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 731,
+    "stableKey": "Isaac 3",
     "name": "Isaac 3",
     "trainerClass": 2,
     "isDouble": false,
@@ -207474,11 +207479,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 732,
+    "stableKey": "Isaac 4",
     "name": "Isaac 4",
     "trainerClass": 2,
     "isDouble": false,
@@ -207660,11 +207665,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 733,
+    "stableKey": "Wallace Legends",
     "name": "Wallace Legends",
     "trainerClass": 38,
     "isDouble": false,
@@ -207846,11 +207851,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 734,
+    "stableKey": "Lydia 1",
     "name": "Lydia 1",
     "trainerClass": 2,
     "isDouble": false,
@@ -208324,11 +208329,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 735,
+    "stableKey": "Lydia 2",
     "name": "Lydia 2",
     "trainerClass": 2,
     "isDouble": false,
@@ -208510,11 +208515,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 736,
+    "stableKey": "Lydia 3",
     "name": "Lydia 3",
     "trainerClass": 2,
     "isDouble": false,
@@ -208696,11 +208701,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 737,
+    "stableKey": "Lydia 4",
     "name": "Lydia 4",
     "trainerClass": 2,
     "isDouble": false,
@@ -208882,11 +208887,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 738,
+    "stableKey": "Wallace Doubles Legends",
     "name": "Wallace Doubles Legends",
     "trainerClass": 38,
     "isDouble": true,
@@ -209068,11 +209073,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 739,
+    "stableKey": "Jackson 1",
     "name": "Jackson 1",
     "trainerClass": 22,
     "isDouble": false,
@@ -209544,11 +209549,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 740,
+    "stableKey": "Jackson 2",
     "name": "Jackson 2",
     "trainerClass": 22,
     "isDouble": false,
@@ -209701,11 +209706,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 741,
+    "stableKey": "Jackson 3",
     "name": "Jackson 3",
     "trainerClass": 22,
     "isDouble": false,
@@ -209858,11 +209863,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 742,
+    "stableKey": "Jackson 4",
     "name": "Jackson 4",
     "trainerClass": 22,
     "isDouble": false,
@@ -210044,11 +210049,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 743,
+    "stableKey": "Sebastian",
     "name": "Sebastian",
     "trainerClass": 22,
     "isDouble": false,
@@ -210143,11 +210148,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 744,
+    "stableKey": "Catherine 1",
     "name": "Catherine 1",
     "trainerClass": 22,
     "isDouble": false,
@@ -210592,11 +210597,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 745,
+    "stableKey": "Catherine 2",
     "name": "Catherine 2",
     "trainerClass": 22,
     "isDouble": false,
@@ -210749,11 +210754,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 746,
+    "stableKey": "Catherine 3",
     "name": "Catherine 3",
     "trainerClass": 22,
     "isDouble": false,
@@ -210906,11 +210911,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 747,
+    "stableKey": "Catherine 4",
     "name": "Catherine 4",
     "trainerClass": 22,
     "isDouble": false,
@@ -211092,11 +211097,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 748,
+    "stableKey": "Sophia",
     "name": "Sophia",
     "trainerClass": 22,
     "isDouble": false,
@@ -211220,11 +211225,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 749,
+    "stableKey": "Buffel",
     "name": "Buffel",
     "trainerClass": 56,
     "isDouble": false,
@@ -211406,11 +211411,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 750,
+    "stableKey": "Oldplayer",
     "name": "Oldplayer",
     "trainerClass": 56,
     "isDouble": false,
@@ -211592,11 +211597,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 751,
+    "stableKey": "Tiana",
     "name": "Tiana",
     "trainerClass": 58,
     "isDouble": false,
@@ -211981,11 +211986,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 752,
+    "stableKey": "Haley 1",
     "name": "Haley 1",
     "trainerClass": 58,
     "isDouble": false,
@@ -212343,11 +212348,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 753,
+    "stableKey": "Haley 2",
     "name": "Haley 2",
     "trainerClass": 58,
     "isDouble": false,
@@ -212471,11 +212476,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 754,
+    "stableKey": "Haley 3",
     "name": "Haley 3",
     "trainerClass": 58,
     "isDouble": false,
@@ -212657,11 +212662,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 755,
+    "stableKey": "Haley 4",
     "name": "Haley 4",
     "trainerClass": 58,
     "isDouble": false,
@@ -212843,11 +212848,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 756,
+    "stableKey": "Janice",
     "name": "Janice",
     "trainerClass": 58,
     "isDouble": false,
@@ -213205,11 +213210,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 757,
+    "stableKey": "Crissy",
     "name": "Crissy",
     "trainerClass": 58,
     "isDouble": false,
@@ -213654,11 +213659,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 758,
+    "stableKey": "James 1",
     "name": "James 1",
     "trainerClass": 55,
     "isDouble": false,
@@ -213987,11 +213992,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 759,
+    "stableKey": "James 2",
     "name": "James 2",
     "trainerClass": 55,
     "isDouble": false,
@@ -214115,11 +214120,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 760,
+    "stableKey": "James 3",
     "name": "James 3",
     "trainerClass": 55,
     "isDouble": false,
@@ -214272,11 +214277,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 761,
+    "stableKey": "James 4",
     "name": "James 4",
     "trainerClass": 55,
     "isDouble": false,
@@ -214458,11 +214463,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 762,
+    "stableKey": "Trent 1",
     "name": "Trent 1",
     "trainerClass": 0,
     "isDouble": false,
@@ -214801,11 +214806,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 763,
+    "stableKey": "Trent 2",
     "name": "Trent 2",
     "trainerClass": 0,
     "isDouble": false,
@@ -214917,11 +214922,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 764,
+    "stableKey": "Trent 3",
     "name": "Trent 3",
     "trainerClass": 0,
     "isDouble": false,
@@ -215059,11 +215064,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 765,
+    "stableKey": "Trent 4",
     "name": "Trent 4",
     "trainerClass": 0,
     "isDouble": false,
@@ -215227,11 +215232,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 766,
+    "stableKey": "Lucas 1",
     "name": "Lucas 1",
     "trainerClass": 0,
     "isDouble": false,
@@ -215734,11 +215739,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 767,
+    "stableKey": "Alan",
     "name": "Alan",
     "trainerClass": 0,
     "isDouble": false,
@@ -215862,11 +215867,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 768,
+    "stableKey": "Mike 2",
     "name": "Mike 2",
     "trainerClass": 0,
     "isDouble": false,
@@ -216253,11 +216258,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 769,
+    "stableKey": "Cynthia 1",
     "name": "Cynthia 1",
     "trainerClass": 46,
     "isDouble": false,
@@ -216439,11 +216444,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 770,
+    "stableKey": "Lea And Jed",
     "name": "Lea And Jed",
     "trainerClass": 59,
     "isDouble": true,
@@ -216509,11 +216514,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 771,
+    "stableKey": "Kira And Dan 1",
     "name": "Kira And Dan 1",
     "trainerClass": 59,
     "isDouble": true,
@@ -216637,11 +216642,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 772,
+    "stableKey": "Kira And Dan 2",
     "name": "Kira And Dan 2",
     "trainerClass": 59,
     "isDouble": true,
@@ -216707,11 +216712,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 773,
+    "stableKey": "Kira And Dan 3",
     "name": "Kira And Dan 3",
     "trainerClass": 59,
     "isDouble": true,
@@ -216835,11 +216840,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 774,
+    "stableKey": "Kira And Dan 4",
     "name": "Kira And Dan 4",
     "trainerClass": 59,
     "isDouble": true,
@@ -216963,11 +216968,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 775,
+    "stableKey": "Wally Vr 2",
     "name": "Wally Vr 2",
     "trainerClass": 15,
     "isDouble": false,
@@ -217149,11 +217154,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 776,
+    "stableKey": "Wally Vr 3",
     "name": "Wally Vr 3",
     "trainerClass": 15,
     "isDouble": false,
@@ -217335,11 +217340,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 777,
+    "stableKey": "Wally Vr 4",
     "name": "Wally Vr 4",
     "trainerClass": 15,
     "isDouble": false,
@@ -217521,11 +217526,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 778,
+    "stableKey": "Wally Vr 5",
     "name": "Wally Vr 5",
     "trainerClass": 15,
     "isDouble": false,
@@ -217707,11 +217712,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 779,
+    "stableKey": "Koji 1",
     "name": "Koji 1",
     "trainerClass": 10,
     "isDouble": false,
@@ -217777,11 +217782,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 780,
+    "stableKey": "Koji 2",
     "name": "Koji 2",
     "trainerClass": 10,
     "isDouble": false,
@@ -217847,11 +217852,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 781,
+    "stableKey": "Koji 3",
     "name": "Koji 3",
     "trainerClass": 10,
     "isDouble": false,
@@ -217917,11 +217922,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 782,
+    "stableKey": "Koji 4",
     "name": "Koji 4",
     "trainerClass": 10,
     "isDouble": false,
@@ -217987,11 +217992,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 783,
+    "stableKey": "Aidan",
     "name": "Aidan",
     "trainerClass": 4,
     "isDouble": false,
@@ -218086,11 +218091,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 784,
+    "stableKey": "John And Jay 1",
     "name": "John And Jay 1",
     "trainerClass": 60,
     "isDouble": true,
@@ -218389,11 +218394,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 785,
+    "stableKey": "John And Jay 2",
     "name": "John And Jay 2",
     "trainerClass": 60,
     "isDouble": true,
@@ -218517,11 +218522,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 786,
+    "stableKey": "John And Jay 3",
     "name": "John And Jay 3",
     "trainerClass": 60,
     "isDouble": true,
@@ -218645,11 +218650,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 787,
+    "stableKey": "John And Jay 4",
     "name": "John And Jay 4",
     "trainerClass": 60,
     "isDouble": true,
@@ -218831,11 +218836,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 788,
+    "stableKey": "John And Jay 5",
     "name": "John And Jay 5",
     "trainerClass": 60,
     "isDouble": true,
@@ -218901,11 +218906,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 789,
+    "stableKey": "Lila And Roy 1",
     "name": "Lila And Roy 1",
     "trainerClass": 61,
     "isDouble": true,
@@ -218971,11 +218976,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 790,
+    "stableKey": "Lila And Roy 2",
     "name": "Lila And Roy 2",
     "trainerClass": 61,
     "isDouble": true,
@@ -219041,11 +219046,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 791,
+    "stableKey": "Lila And Roy 3",
     "name": "Lila And Roy 3",
     "trainerClass": 61,
     "isDouble": true,
@@ -219169,11 +219174,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 792,
+    "stableKey": "Lila And Roy 4",
     "name": "Lila And Roy 4",
     "trainerClass": 61,
     "isDouble": true,
@@ -219297,11 +219302,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 793,
+    "stableKey": "Dawson",
     "name": "Dawson",
     "trainerClass": 23,
     "isDouble": false,
@@ -219687,11 +219692,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 794,
+    "stableKey": "Sarah",
     "name": "Sarah",
     "trainerClass": 20,
     "isDouble": false,
@@ -220107,11 +220112,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 795,
+    "stableKey": "Chandler",
     "name": "Chandler",
     "trainerClass": 19,
     "isDouble": false,
@@ -220440,11 +220445,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 796,
+    "stableKey": "Pete",
     "name": "Pete",
     "trainerClass": 6,
     "isDouble": false,
@@ -220714,11 +220719,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 797,
+    "stableKey": "Isabelle",
     "name": "Isabelle",
     "trainerClass": 50,
     "isDouble": false,
@@ -220928,11 +220933,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 798,
+    "stableKey": "Andres 1",
     "name": "Andres 1",
     "trainerClass": 14,
     "isDouble": false,
@@ -221144,11 +221149,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 799,
+    "stableKey": "Andres 2",
     "name": "Andres 2",
     "trainerClass": 14,
     "isDouble": false,
@@ -221243,11 +221248,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 800,
+    "stableKey": "Andres 3",
     "name": "Andres 3",
     "trainerClass": 14,
     "isDouble": false,
@@ -221342,11 +221347,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 801,
+    "stableKey": "Andres 4",
     "name": "Andres 4",
     "trainerClass": 14,
     "isDouble": false,
@@ -221441,11 +221446,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 802,
+    "stableKey": "Cory 1",
     "name": "Cory 1",
     "trainerClass": 53,
     "isDouble": false,
@@ -221598,11 +221603,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 803,
+    "stableKey": "Cory 2",
     "name": "Cory 2",
     "trainerClass": 53,
     "isDouble": false,
@@ -221726,11 +221731,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 804,
+    "stableKey": "Cory 3",
     "name": "Cory 3",
     "trainerClass": 53,
     "isDouble": false,
@@ -221854,11 +221859,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 805,
+    "stableKey": "Cory 4",
     "name": "Cory 4",
     "trainerClass": 53,
     "isDouble": false,
@@ -221982,11 +221987,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 806,
+    "stableKey": "Bryan",
     "name": "Bryan",
     "trainerClass": 14,
     "isDouble": false,
@@ -222460,11 +222465,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 807,
+    "stableKey": "Helene",
     "name": "Helene",
     "trainerClass": 47,
     "isDouble": false,
@@ -222735,11 +222740,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 808,
+    "stableKey": "Melina",
     "name": "Melina",
     "trainerClass": 43,
     "isDouble": false,
@@ -223126,11 +223131,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 809,
+    "stableKey": "Cristin 1",
     "name": "Cristin 1",
     "trainerClass": 3,
     "isDouble": false,
@@ -223633,11 +223638,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 810,
+    "stableKey": "Cristin 2",
     "name": "Cristin 2",
     "trainerClass": 3,
     "isDouble": false,
@@ -223761,11 +223766,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 811,
+    "stableKey": "Cristin 3",
     "name": "Cristin 3",
     "trainerClass": 3,
     "isDouble": false,
@@ -223918,11 +223923,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 812,
+    "stableKey": "Cristin 4",
     "name": "Cristin 4",
     "trainerClass": 3,
     "isDouble": false,
@@ -224104,11 +224109,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 813,
+    "stableKey": "Roxanne 5",
     "name": "Roxanne 5",
     "trainerClass": 34,
     "isDouble": true,
@@ -224290,11 +224295,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 814,
+    "stableKey": "Brawly 5",
     "name": "Brawly 5",
     "trainerClass": 34,
     "isDouble": true,
@@ -224476,11 +224481,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 815,
+    "stableKey": "Wattson 5",
     "name": "Wattson 5",
     "trainerClass": 34,
     "isDouble": true,
@@ -224662,11 +224667,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 816,
+    "stableKey": "Flannery 5",
     "name": "Flannery 5",
     "trainerClass": 34,
     "isDouble": true,
@@ -224848,11 +224853,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 817,
+    "stableKey": "Norman 5",
     "name": "Norman 5",
     "trainerClass": 34,
     "isDouble": true,
@@ -225031,11 +225036,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 818,
+    "stableKey": "Winona 5",
     "name": "Winona 5",
     "trainerClass": 34,
     "isDouble": true,
@@ -225217,11 +225222,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 819,
+    "stableKey": "Juan 5",
     "name": "Juan 5",
     "trainerClass": 34,
     "isDouble": true,
@@ -225492,11 +225497,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 820,
+    "stableKey": "Steven",
     "name": "Steven",
     "trainerClass": 38,
     "isDouble": false,
@@ -226028,11 +226033,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 821,
+    "stableKey": "Steven Legends",
     "name": "Steven Legends",
     "trainerClass": 38,
     "isDouble": false,
@@ -226214,11 +226219,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 822,
+    "stableKey": "Steven Doubles",
     "name": "Steven Doubles",
     "trainerClass": 38,
     "isDouble": false,
@@ -226400,11 +226405,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 823,
+    "stableKey": "Steven Doubles Legends",
     "name": "Steven Doubles Legends",
     "trainerClass": 38,
     "isDouble": false,
@@ -226586,11 +226591,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 824,
+    "stableKey": "Sawyer 5",
     "name": "Sawyer 5",
     "trainerClass": 0,
     "isDouble": false,
@@ -226754,11 +226759,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 825,
+    "stableKey": "Mariela",
     "name": "Mariela",
     "trainerClass": 31,
     "isDouble": false,
@@ -226853,11 +226858,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 826,
+    "stableKey": "Alvaro",
     "name": "Alvaro",
     "trainerClass": 31,
     "isDouble": false,
@@ -226952,11 +226957,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 827,
+    "stableKey": "Everett",
     "name": "Everett",
     "trainerClass": 32,
     "isDouble": false,
@@ -227051,11 +227056,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 828,
+    "stableKey": "Meganiumite Verdanturf Meadow",
     "name": "Meganiumite Verdanturf Meadow",
     "trainerClass": 13,
     "isDouble": false,
@@ -227412,11 +227417,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 829,
+    "stableKey": "New Test",
     "name": "New Test",
     "trainerClass": 13,
     "isDouble": false,
@@ -227598,11 +227603,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 830,
+    "stableKey": "Feraligatritex Route105",
     "name": "Feraligatritex Route105",
     "trainerClass": 53,
     "isDouble": false,
@@ -228134,11 +228139,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 831,
+    "stableKey": "Typhlosionite Ashen Woods",
     "name": "Typhlosionite Ashen Woods",
     "trainerClass": 28,
     "isDouble": false,
@@ -228641,11 +228646,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 832,
+    "stableKey": "Krookodilenite Route111 Ruins Exterior",
     "name": "Krookodilenite Route111 Ruins Exterior",
     "trainerClass": 14,
     "isDouble": false,
@@ -229177,11 +229182,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 833,
+    "stableKey": "Shedinjite Abandoned Ship",
     "name": "Shedinjite Abandoned Ship",
     "trainerClass": 55,
     "isDouble": false,
@@ -229538,11 +229543,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 834,
+    "stableKey": "Crobatite Dewford Manor",
     "name": "Crobatite Dewford Manor",
     "trainerClass": 8,
     "isDouble": false,
@@ -230074,11 +230079,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 835,
+    "stableKey": "Sinnoh Megas Mauville Game Corner",
     "name": "Sinnoh Megas Mauville Game Corner",
     "trainerClass": 41,
     "isDouble": false,
@@ -230348,11 +230353,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 836,
+    "stableKey": "Nido Megas Route116 Rusturf",
     "name": "Nido Megas Route116 Rusturf",
     "trainerClass": 3,
     "isDouble": true,
@@ -230884,11 +230889,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 11
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 837,
+    "stableKey": "Dragonitenite Sage 1",
     "name": "Dragonitenite Sage 1",
     "trainerClass": 8,
     "isDouble": false,
@@ -231012,11 +231017,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 838,
+    "stableKey": "Dragonitenite Sage 2",
     "name": "Dragonitenite Sage 2",
     "trainerClass": 8,
     "isDouble": false,
@@ -231140,11 +231145,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 839,
+    "stableKey": "Dragonitenite Sage 3",
     "name": "Dragonitenite Sage 3",
     "trainerClass": 8,
     "isDouble": false,
@@ -231268,11 +231273,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 840,
+    "stableKey": "Hitmonstone Blackbelt 1",
     "name": "Hitmonstone Blackbelt 1",
     "trainerClass": 10,
     "isDouble": false,
@@ -231309,11 +231314,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 841,
+    "stableKey": "Hitmonstone Blackbelt 2",
     "name": "Hitmonstone Blackbelt 2",
     "trainerClass": 10,
     "isDouble": false,
@@ -231350,11 +231355,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 842,
+    "stableKey": "Hitmonstone Blackbelt 3",
     "name": "Hitmonstone Blackbelt 3",
     "trainerClass": 10,
     "isDouble": false,
@@ -231391,11 +231396,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 843,
+    "stableKey": "Granbullite Route123",
     "name": "Granbullite Route123",
     "trainerClass": 20,
     "isDouble": true,
@@ -231752,11 +231757,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 844,
+    "stableKey": "Baneful Petalburg Woods",
     "name": "Baneful Petalburg Woods",
     "trainerClass": 3,
     "isDouble": false,
@@ -232113,11 +232118,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 845,
+    "stableKey": "Crew Mtpyre",
     "name": "Crew Mtpyre",
     "trainerClass": 54,
     "isDouble": false,
@@ -232649,11 +232654,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 846,
+    "stableKey": "Vinegar",
     "name": "Vinegar",
     "trainerClass": 10,
     "isDouble": false,
@@ -232981,11 +232986,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 847,
+    "stableKey": "Salsa",
     "name": "Salsa",
     "trainerClass": 10,
     "isDouble": false,
@@ -233313,11 +233318,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 848,
+    "stableKey": "Katsup",
     "name": "Katsup",
     "trainerClass": 10,
     "isDouble": true,
@@ -233645,11 +233650,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 849,
+    "stableKey": "Monochamp Normal",
     "name": "Monochamp Normal",
     "trainerClass": 62,
     "isDouble": false,
@@ -234006,11 +234011,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 850,
+    "stableKey": "Monochamp Fighting",
     "name": "Monochamp Fighting",
     "trainerClass": 62,
     "isDouble": false,
@@ -234367,11 +234372,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 851,
+    "stableKey": "Monochamp Flying",
     "name": "Monochamp Flying",
     "trainerClass": 62,
     "isDouble": false,
@@ -234553,11 +234558,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 852,
+    "stableKey": "Monochamp Poison",
     "name": "Monochamp Poison",
     "trainerClass": 62,
     "isDouble": false,
@@ -234739,11 +234744,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 853,
+    "stableKey": "Monochamp Ground",
     "name": "Monochamp Ground",
     "trainerClass": 62,
     "isDouble": false,
@@ -234925,11 +234930,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 854,
+    "stableKey": "Monochamp Rock",
     "name": "Monochamp Rock",
     "trainerClass": 62,
     "isDouble": false,
@@ -235111,11 +235116,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 855,
+    "stableKey": "Monochamp Bug",
     "name": "Monochamp Bug",
     "trainerClass": 62,
     "isDouble": false,
@@ -235297,11 +235302,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 856,
+    "stableKey": "Monochamp Ghost",
     "name": "Monochamp Ghost",
     "trainerClass": 62,
     "isDouble": false,
@@ -235483,11 +235488,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 857,
+    "stableKey": "Monochamp Steel",
     "name": "Monochamp Steel",
     "trainerClass": 62,
     "isDouble": false,
@@ -235669,11 +235674,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 858,
+    "stableKey": "Monochamp Fire",
     "name": "Monochamp Fire",
     "trainerClass": 62,
     "isDouble": false,
@@ -235855,11 +235860,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 859,
+    "stableKey": "Monochamp Water",
     "name": "Monochamp Water",
     "trainerClass": 62,
     "isDouble": false,
@@ -236041,11 +236046,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 860,
+    "stableKey": "Monochamp Grass",
     "name": "Monochamp Grass",
     "trainerClass": 62,
     "isDouble": false,
@@ -236227,11 +236232,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 861,
+    "stableKey": "Monochamp Electric",
     "name": "Monochamp Electric",
     "trainerClass": 62,
     "isDouble": false,
@@ -236413,11 +236418,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 862,
+    "stableKey": "Monochamp Psychic",
     "name": "Monochamp Psychic",
     "trainerClass": 62,
     "isDouble": false,
@@ -236599,11 +236604,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 863,
+    "stableKey": "Monochamp Ice",
     "name": "Monochamp Ice",
     "trainerClass": 62,
     "isDouble": false,
@@ -236785,11 +236790,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 864,
+    "stableKey": "Monochamp Dragon",
     "name": "Monochamp Dragon",
     "trainerClass": 62,
     "isDouble": false,
@@ -236971,11 +236976,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 865,
+    "stableKey": "Monochamp Dark",
     "name": "Monochamp Dark",
     "trainerClass": 62,
     "isDouble": false,
@@ -237157,11 +237162,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 866,
+    "stableKey": "Monochamp Fairy",
     "name": "Monochamp Fairy",
     "trainerClass": 62,
     "isDouble": false,
@@ -237343,11 +237348,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 867,
+    "stableKey": "Trent 5",
     "name": "Trent 5",
     "trainerClass": 0,
     "isDouble": false,
@@ -237523,11 +237528,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 868,
+    "stableKey": "Alfredo",
     "name": "Alfredo",
     "trainerClass": 10,
     "isDouble": false,
@@ -237884,11 +237889,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 869,
+    "stableKey": "Teriyaki",
     "name": "Teriyaki",
     "trainerClass": 10,
     "isDouble": false,
@@ -238245,11 +238250,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 870,
+    "stableKey": "New Trainer",
     "name": "New Trainer",
     "trainerClass": 3,
     "isDouble": false,
@@ -238281,11 +238286,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 871,
+    "stableKey": "Cindy 5",
     "name": "Cindy 5",
     "trainerClass": 20,
     "isDouble": false,
@@ -238317,11 +238322,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 872,
+    "stableKey": "Mega Fidough",
     "name": "Mega Fidough",
     "trainerClass": 3,
     "isDouble": false,
@@ -238503,11 +238508,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 873,
+    "stableKey": "Blunder",
     "name": "Blunder",
     "trainerClass": 8,
     "isDouble": false,
@@ -238689,11 +238694,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
       }
     ],
     "insaneParty": null,
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 874,
+    "stableKey": "Lett",
     "name": "Lett",
     "trainerClass": 14,
     "isDouble": false,
@@ -239225,11 +239230,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 875,
+    "stableKey": "Orwell",
     "name": "Orwell",
     "trainerClass": 14,
     "isDouble": false,
@@ -239732,11 +239737,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 876,
+    "stableKey": "Amanda",
     "name": "Amanda",
     "trainerClass": 22,
     "isDouble": false,
@@ -240239,11 +240244,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 877,
+    "stableKey": "Rodrick",
     "name": "Rodrick",
     "trainerClass": 29,
     "isDouble": false,
@@ -240717,11 +240722,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 878,
+    "stableKey": "Grunt Sunhollow 1",
     "name": "Grunt Sunhollow 1",
     "trainerClass": 7,
     "isDouble": false,
@@ -241195,11 +241200,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 879,
+    "stableKey": "Grunt Sunhollow 2",
     "name": "Grunt Sunhollow 2",
     "trainerClass": 7,
     "isDouble": false,
@@ -241702,11 +241707,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 880,
+    "stableKey": "Grunt Sunhollow 3",
     "name": "Grunt Sunhollow 3",
     "trainerClass": 7,
     "isDouble": false,
@@ -242180,11 +242185,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 881,
+    "stableKey": "Courtney Sunhollow",
     "name": "Courtney Sunhollow",
     "trainerClass": 16,
     "isDouble": false,
@@ -242716,11 +242721,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   },
   {
     "id": 882,
+    "stableKey": "Ace Trainer Goat",
     "name": "Ace Trainer Goat",
     "trainerClass": 3,
     "isDouble": false,
@@ -243048,11 +243053,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 883,
+    "stableKey": "Ace Trainer Neo",
     "name": "Ace Trainer Neo",
     "trainerClass": 3,
     "isDouble": false,
@@ -243351,11 +243356,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 884,
+    "stableKey": "Ace Trainer Anabelle",
     "name": "Ace Trainer Anabelle",
     "trainerClass": 3,
     "isDouble": false,
@@ -243683,11 +243688,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 885,
+    "stableKey": "Ace Trainer Violet",
     "name": "Ace Trainer Violet",
     "trainerClass": 3,
     "isDouble": false,
@@ -244015,11 +244020,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 886,
+    "stableKey": "Skier Janet",
     "name": "Skier Janet",
     "trainerClass": 63,
     "isDouble": false,
@@ -244318,11 +244323,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 887,
+    "stableKey": "Skier Glovel",
     "name": "Skier Glovel",
     "trainerClass": 63,
     "isDouble": false,
@@ -244650,11 +244655,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 888,
+    "stableKey": "Ace Trainer Pagani",
     "name": "Ace Trainer Pagani",
     "trainerClass": 3,
     "isDouble": false,
@@ -244953,11 +244958,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 889,
+    "stableKey": "Ace Trainer Ashley",
     "name": "Ace Trainer Ashley",
     "trainerClass": 3,
     "isDouble": false,
@@ -245256,11 +245261,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 890,
+    "stableKey": "Ace Trainer Leela",
     "name": "Ace Trainer Leela",
     "trainerClass": 3,
     "isDouble": false,
@@ -245617,11 +245622,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 891,
+    "stableKey": "Ace Trainer Dick",
     "name": "Ace Trainer Dick",
     "trainerClass": 3,
     "isDouble": false,
@@ -245949,11 +245954,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 892,
+    "stableKey": "Skier Guin",
     "name": "Skier Guin",
     "trainerClass": 63,
     "isDouble": false,
@@ -246223,11 +246228,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 893,
+    "stableKey": "Ace Trainer Mike",
     "name": "Ace Trainer Mike",
     "trainerClass": 63,
     "isDouble": false,
@@ -246526,11 +246531,11 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         "hpType": 0
       }
     ],
-    "hellParty": null,
-    "extras": []
+    "hellParty": null
   },
   {
     "id": 894,
+    "stableKey": "Archie Mt Pyre",
     "name": "Archie Mt Pyre",
     "trainerClass": 11,
     "isDouble": false,
@@ -247062,7 +247067,6 @@ export const ER_TRAINERS: readonly ErTrainerDraft[] = [
         ],
         "hpType": 0
       }
-    ],
-    "extras": []
+    ]
   }
 ] as const;

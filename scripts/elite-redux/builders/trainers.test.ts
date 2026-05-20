@@ -26,7 +26,7 @@ describe("trainers transformer (pure)", () => {
     expect(entry.party).toHaveLength(2);
     expect(entry.insaneParty).toBeNull();
     expect(entry.hellParty).toBeNull();
-    expect(entry.extras).toEqual([]);
+    expect(entry.stableKey).toBe("May Route 103 Treecko");
   });
 
   it("maps the tiered fixture (Rick) with all 3 tiers populated", async () => {
