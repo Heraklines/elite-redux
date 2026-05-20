@@ -55,3 +55,4 @@ llm-director-trace.jsonl
 # Elite Redux source data — fetched at build time, not redistributed.
 vendor/elite-redux/*.json
 vendor/elite-redux/sprites/
+assets/images/pokemon/elite-redux/
