@@ -223,6 +223,42 @@ export abstract class PokemonSpeciesForm {
     return starterPassiveAbilities[starterSpeciesId][formIndex];
   }
 
+  /** ER 3-passive override. Null when not set (legacy behavior — defer to
+   *  the original starterPassiveAbilities lookup via getPassiveAbility()).
+   *  Populated by Phase B's species init from the er-species.ts draft. */
+  protected _passives: readonly [AbilityId, AbilityId, AbilityId] | null = null;
+
+  /**
+   * Return all 3 ER-style passive abilities for this species form.
+   *
+   * - If `setPassives()` has been called (Phase B init path), returns those.
+   * - Otherwise falls back to the legacy single-passive lookup: slot 1 =
+   *   the result of `getPassiveAbility()`, slots 2/3 = `AbilityId.NONE`.
+   *
+   * @param formIndex - The form index to resolve passives against. Defaults
+   *                    to this instance's `formIndex`.
+   */
+  getPassiveAbilities(formIndex = this.formIndex): readonly [AbilityId, AbilityId, AbilityId] {
+    if (this._passives) {
+      return this._passives;
+    }
+    return [this.getPassiveAbility(formIndex), AbilityId.NONE, AbilityId.NONE];
+  }
+
+  /**
+   * Override the 3-passive set for this species. Called by Phase B's
+   * `init-elite-redux-species.ts` to install ER's `inns[]` triple.
+   * @param passives - Triple of AbilityIds. Use AbilityId.NONE for empty slots.
+   */
+  setPassives(passives: readonly [AbilityId, AbilityId, AbilityId]): void {
+    this._passives = passives;
+  }
+
+  /** Count of non-NONE passive slots (0-3). */
+  getPassiveCount(formIndex = this.formIndex): number {
+    return this.getPassiveAbilities(formIndex).filter(a => a !== AbilityId.NONE).length;
+  }
+
   getLevelMoves(): LevelMoves {
     if (
       Object.hasOwn(pokemonSpeciesFormLevelMoves, this.speciesId)
