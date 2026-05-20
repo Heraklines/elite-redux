@@ -152,6 +152,33 @@ describe("apply-ab-attrs — 3-passive dispatch", () => {
       ]);
     });
 
+    it("deduplicates passive slots that share the same ability id (data-entry safety)", () => {
+      // Slots 0 and 1 both list HUGE_POWER — simulates a data-entry mistake
+      // in an inns[] override (same ability appearing twice). The dispatcher
+      // must fire HUGE_POWER once, not twice, even though it appears in two slots.
+      const pokemon = makeStubPokemon({
+        active: AbilityId.INTIMIDATE,
+        passives: [AbilityId.HUGE_POWER, AbilityId.HUGE_POWER, AbilityId.SPEED_BOOST],
+      });
+
+      const calledIds: AbilityId[] = [];
+      vi.spyOn(Ability.prototype, "getAttrs").mockImplementation(function (this: Ability) {
+        calledIds.push(this.id);
+        return [];
+      });
+
+      applyAbAttrs("PostSummonAbAttr", { pokemon: pokemon as unknown as Pokemon, simulated: true });
+
+      // Expected: active (INTIMIDATE) fires, slot 0 (HUGE_POWER) fires,
+      // slot 1 (HUGE_POWER duplicate) is SKIPPED, slot 2 (SPEED_BOOST) fires.
+      expect(calledIds).toEqual([
+        AbilityId.INTIMIDATE, // active
+        AbilityId.HUGE_POWER, // slot 0
+        // slot 1 skipped — duplicate of slot 0's id
+        AbilityId.SPEED_BOOST, // slot 2
+      ]);
+    });
+
     it("dedups passive slot 1 against active (not just slot 0)", () => {
       // Active = PURE_POWER. Slot 1 also PURE_POWER → must be skipped.
       // Slots 0 and 2 are unique and must fire.

@@ -42,8 +42,12 @@ function applySingleAbAttrs<T extends AbAttrString>(
       return;
     }
     ability = slotAbility;
-    // Avoid double-firing when this passive slot matches the active ability.
-    // Mirrors the prior single-passive guard: `passive && passiveId === activeId`.
+    // Defensive: avoid double-firing when this passive slot matches the active ability.
+    // For dispatches that arrive via applyAbAttrsInternal, this is redundant with the
+    // seenIds dedup in the loop above — but applySingleAbAttrs is also reachable
+    // directly (e.g. applyOnGainAbAttrs, applyPostFormChangeAbAttrs, applyOnLoseAbAttrs)
+    // with `passive: true`, so we keep this guard to preserve the legacy
+    // "no double-fire when active === passive" invariant for all entry points.
     if (ability.id === pokemon.getAbility().id) {
       return;
     }
@@ -121,13 +125,21 @@ function applyAbAttrsInternal<T extends CallableAbAttrString>(
 
   // Then iterate each non-empty passive slot (ER 3-passive model).
   // Empty slots return null from getPassiveAbilities() and are skipped.
-  // Slots matching the active ability id are skipped inside applySingleAbAttrs
-  // to preserve the legacy "no double-fire when active === passive" invariant.
+  // Track ability ids we've already dispatched in this call so that:
+  //   (a) a passive slot matching the active ability id is skipped (legacy invariant), AND
+  //   (b) duplicate ids across passive slots — e.g. data-entry mistake where
+  //       `inns[]` lists the same ability twice — fire only once.
+  // The per-slot id check inside applySingleAbAttrs remains as defensive belt-and-suspenders
+  // for callers that invoke applySingleAbAttrs directly with `passive: true`.
+  const seenIds = new Set<number>();
+  seenIds.add(params.pokemon.getAbility().id);
   const passiveAbilities = params.pokemon.getPassiveAbilities();
   for (let slot = 0; slot < 3; slot++) {
-    if (passiveAbilities[slot] === null) {
+    const slotAbility = passiveAbilities[slot];
+    if (slotAbility === null || seenIds.has(slotAbility.id)) {
       continue;
     }
+    seenIds.add(slotAbility.id);
     params.passive = true;
     params.passiveSlot = slot as 0 | 1 | 2;
     applySingleAbAttrs(attrType, params, config);
