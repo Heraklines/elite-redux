@@ -25,6 +25,9 @@ const BUILDERS = {
   trainers: () => import("./builders/trainers.mjs"),
   idmap: () => import("./builders/id-map.mjs"),
   sprites: () => import("./builders/sprite-manifest.mjs"),
+  // B1b: depends on id-map's name-matching algorithm; runs after species/idmap
+  // but reads the same dump so it stays decoupled from their emitted output.
+  erSpeciesIdEnum: () => import("./builders/er-species-id-enum.mjs"),
 };
 
 async function main() {

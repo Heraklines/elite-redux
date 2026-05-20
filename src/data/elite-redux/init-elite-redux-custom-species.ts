@@ -1,0 +1,309 @@
+// =============================================================================
+// Elite Redux — Phase B Task B1b: register ER-custom species in `allSpecies`.
+//
+// Reads `er-species.ts` and, for every entry whose pokerogue id resolves to
+// ≥ VANILLA_ID_CUTOFF (the ER-custom range — see `er-id-map.ts`), constructs
+// a fresh `PokemonSpecies` instance and pushes it onto `allSpecies`.
+//
+// Vanilla species (id < VANILLA_ID_CUTOFF) are handled by B1a's
+// `initEliteReduxSpecies()` and skipped here.
+//
+// Localization note: pokerogue's `PokemonSpecies.localize()` uses
+// `SpeciesId[this.speciesId]` to look up the i18n key, but ER-custom ids
+// are not in the `SpeciesId` enum. We override `localize()` in a thin
+// subclass to take the draft name verbatim — Phase C will wire proper
+// localization keys.
+// =============================================================================
+
+import { allSpecies } from "#data/data-lists";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import type { ErSpeciesDraft } from "#data/elite-redux/er-species";
+import { ER_SPECIES } from "#data/elite-redux/er-species";
+import { GrowthRate } from "#data/exp";
+import { PokemonSpecies } from "#data/pokemon-species";
+import { AbilityId } from "#enums/ability-id";
+import { PokemonType } from "#enums/pokemon-type";
+
+/**
+ * Numeric cutoff for "vanilla pokerogue" species ids. ER-custom species are
+ * assigned fresh ids ≥ 10000 by the id-map builder (see `er-id-map.ts`).
+ * Mirrors B1a's constant — kept here as a local literal so the two files
+ * don't import from one another.
+ */
+const VANILLA_ID_CUTOFF = 10000;
+
+/** Aggregated result of a single `initEliteReduxCustomSpecies()` run. */
+export interface InitEliteReduxCustomSpeciesResult {
+  /** Number of ER-custom species newly constructed and pushed onto allSpecies. */
+  customsAdded: number;
+  /** Number of ER-custom species skipped because an entry already existed (idempotent re-run). */
+  customsAlreadyPresent: number;
+  /** Non-fatal issues — e.g. constructor failures with a usable error message. */
+  errors: string[];
+}
+
+/**
+ * Map ER's numeric type id (decoded by `ER_TYPE_NAMES` in `er-move-tables.ts`)
+ * to pokerogue's `PokemonType` enum. Returns `null` for the ER sentinels
+ * "Mystery" (18) and "None" (19) — `PokemonSpecies` accepts a nullable type2
+ * for mono-typed mons.
+ */
+function mapType(erTypeId: number | null): PokemonType | null {
+  if (erTypeId === null) {
+    return null;
+  }
+  switch (erTypeId) {
+    case 0:
+      return PokemonType.NORMAL;
+    case 1:
+      return PokemonType.FIGHTING;
+    case 2:
+      return PokemonType.FIRE;
+    case 3:
+      return PokemonType.ICE;
+    case 4:
+      return PokemonType.ELECTRIC;
+    case 5:
+      return PokemonType.BUG;
+    case 6:
+      return PokemonType.FLYING;
+    case 7:
+      return PokemonType.STEEL;
+    case 8:
+      return PokemonType.GRASS;
+    case 9:
+      return PokemonType.GROUND;
+    case 10:
+      return PokemonType.POISON;
+    case 11:
+      return PokemonType.DARK;
+    case 12:
+      return PokemonType.WATER;
+    case 13:
+      return PokemonType.PSYCHIC;
+    case 14:
+      return PokemonType.ROCK;
+    case 15:
+      return PokemonType.DRAGON;
+    case 16:
+      return PokemonType.GHOST;
+    case 17:
+      return PokemonType.FAIRY;
+    case 20:
+      return PokemonType.STELLAR;
+    // 18 Mystery, 19 None → treat as untyped (null)
+    default:
+      return null;
+  }
+}
+
+/**
+ * Resolve an ER ability id (0-N or 0 = "----" sentinel) to a pokerogue
+ * `AbilityId`. Same shape as B1a's `mapAbilityId` — kept local to avoid a
+ * cross-file import.
+ */
+function mapAbilityId(erAbilityId: number): AbilityId {
+  if (erAbilityId === 0) {
+    return AbilityId.NONE;
+  }
+  const mapped = ER_ID_MAP.abilities[erAbilityId];
+  if (mapped === undefined) {
+    return AbilityId.NONE;
+  }
+  return mapped as AbilityId;
+}
+
+/**
+ * Map ER's `growthRate` index (0-5, see PokeEmerald `gGrowthRates`) to
+ * pokerogue's `GrowthRate` enum. ER ships `0` in the v2.65 dump for every
+ * species (the engine resolves growth elsewhere), so this is mostly a
+ * defensive mapping — anything out of range falls back to MEDIUM_FAST.
+ *
+ * Gen3 mapping per upstream `gGrowthRates`:
+ *  0 = Medium Fast, 1 = Erratic, 2 = Fluctuating, 3 = Medium Slow,
+ *  4 = Fast, 5 = Slow
+ */
+function mapGrowthRate(erGrowthRate: number): GrowthRate {
+  switch (erGrowthRate) {
+    case 1:
+      return GrowthRate.ERRATIC;
+    case 2:
+      return GrowthRate.FLUCTUATING;
+    case 3:
+      return GrowthRate.MEDIUM_SLOW;
+    case 4:
+      return GrowthRate.FAST;
+    case 5:
+      return GrowthRate.SLOW;
+    default:
+      return GrowthRate.MEDIUM_FAST;
+  }
+}
+
+/**
+ * Map ER's `genderRatio` (gen3-style 0-255 ratio, with 255 = genderless)
+ * to pokerogue's `malePercent: number | null`. The v2.65 dump ships
+ * placeholder values (e.g. Bulbasaur = 12700) for many species, so we
+ * clamp out-of-range values to the safe 50/50 default. Real-data alignment
+ * is Phase C work.
+ */
+function mapGenderRatio(erGender: number): number | null {
+  if (erGender === 255) {
+    return null;
+  }
+  if (erGender < 0 || erGender > 254) {
+    // Out-of-range placeholder — default to 50% male.
+    return 50;
+  }
+  // gen3 convention: gender value is the chance of being FEMALE in 256ths.
+  // malePercent = 100 * (1 - gender/256).
+  return Math.round((1 - erGender / 256) * 100);
+}
+
+/**
+ * Thin `PokemonSpecies` subclass for ER-custom species. Overrides
+ * `localize()` to take the draft's display name verbatim — the vanilla
+ * implementation looks up `SpeciesId[this.speciesId]` which is `undefined`
+ * for ids ≥ VANILLA_ID_CUTOFF.
+ *
+ * The display name is stored on the prototype (via the constructor) before
+ * the base-class `localize()` call clobbers it; we restore it afterwards.
+ */
+class ErCustomSpecies extends PokemonSpecies {
+  /** Fallback display name from the ER draft (set pre-construction). */
+  private static readonly _draftNames = new Map<number, string>();
+
+  /**
+   * Override of the base `localize()`. Looks up the draft name installed
+   * by `registerDraftName()` before the constructor ran; falls back to
+   * `Unknown` if absent.
+   */
+  override localize(): void {
+    this.name = ErCustomSpecies._draftNames.get(this.speciesId) ?? "Unknown";
+    this.category = "??? Pokémon";
+  }
+
+  /** Stash the draft name keyed by pokerogue species id before construction. */
+  static registerDraftName(id: number, name: string): void {
+    ErCustomSpecies._draftNames.set(id, name);
+  }
+}
+
+/**
+ * Construct `PokemonSpecies` instances for the ER-custom species and push
+ * them onto `allSpecies`. Idempotent: a re-run skips species that are
+ * already present (by `speciesId` match).
+ *
+ * Order constraint: must run AFTER `initSpecies()` (so the vanilla baseline
+ * is in place) and AFTER `initAbilities()` (so ability ids resolve at
+ * activation time). Typically called from `init/init.ts:initializeGame()`
+ * right after `initEliteReduxSpecies()`.
+ */
+export function initEliteReduxCustomSpecies(): InitEliteReduxCustomSpeciesResult {
+  const result: InitEliteReduxCustomSpeciesResult = {
+    customsAdded: 0,
+    customsAlreadyPresent: 0,
+    errors: [],
+  };
+
+  // Build a O(1) speciesId → bool lookup for idempotency.
+  const existingIds = new Set<number>();
+  for (const species of allSpecies) {
+    existingIds.add(species.speciesId);
+  }
+
+  for (const draft of ER_SPECIES) {
+    const pokerogueId = ER_ID_MAP.species[draft.id];
+    if (pokerogueId === undefined) {
+      // SPECIES_NONE sentinel falls here — B1a already reports it.
+      continue;
+    }
+    if (pokerogueId < VANILLA_ID_CUTOFF) {
+      // Vanilla — B1a's job.
+      continue;
+    }
+    if (existingIds.has(pokerogueId)) {
+      result.customsAlreadyPresent++;
+      continue;
+    }
+
+    try {
+      const species = buildCustomSpecies(draft, pokerogueId);
+      species.setPassives([
+        mapAbilityId(draft.innates[0]),
+        mapAbilityId(draft.innates[1]),
+        mapAbilityId(draft.innates[2]),
+      ]);
+      (allSpecies as PokemonSpecies[]).push(species);
+      existingIds.add(pokerogueId);
+      result.customsAdded++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      result.errors.push(
+        `Failed to construct species ${draft.speciesConst} (er id ${draft.id} → ${pokerogueId}): ${msg}`,
+      );
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Construct a single ER-custom `PokemonSpecies` (subclass) from its draft.
+ * Defaults applied to fields ER does not ship per-species:
+ *  - height: 1.0m, weight: 30.0kg (TODO: pull from ER dex hw[] in Phase C)
+ *  - catchRate: 45 if draft.catchRate is 0 (ER ships 0 for most entries)
+ *  - baseFriendship: 50 (vanilla default)
+ *  - baseExp: 100 if draft.baseExp is 0
+ *  - generation: 9 — all ER customs treated as gen9 for now (TODO: archetype)
+ *
+ * @param draft - ER species draft from `er-species.ts`
+ * @param speciesId - pokerogue species id (≥ VANILLA_ID_CUTOFF) from `ER_ID_MAP.species`
+ */
+function buildCustomSpecies(draft: ErSpeciesDraft, speciesId: number): PokemonSpecies {
+  const type1 = mapType(draft.types[0]) ?? PokemonType.NORMAL;
+  const type2 = mapType(draft.types[1]);
+
+  const baseTotal = draft.baseStats.reduce((sum, n) => sum + n, 0);
+
+  // Pre-stash the display name so the constructor's localize() picks it up.
+  ErCustomSpecies.registerDraftName(speciesId, draft.name);
+
+  // PokemonSpecies constructor signature (verified against
+  // src/data/pokemon-species.ts:823):
+  //   id, generation, subLegendary, legendary, mythical,
+  //   category, type1, type2, height, weight,
+  //   ability1, ability2, abilityHidden,
+  //   baseTotal, hp, atk, def, spatk, spdef, spd,
+  //   catchRate, baseFriendship, baseExp,
+  //   growthRate, malePercent, genderDiffs, canChangeForm, ...forms
+  return new ErCustomSpecies(
+    speciesId,
+    9, // generation — TODO(B/C): derive from ER archetype/source-gen
+    false, // subLegendary
+    false, // legendary
+    false, // mythical
+    "??? Pokémon", // category — placeholder; localize() overrides
+    type1,
+    type2,
+    1.0, // height (m) — TODO: extract from dex.hw[0]
+    30.0, // weight (kg) — TODO: extract from dex.hw[1]
+    mapAbilityId(draft.abilities[0]),
+    mapAbilityId(draft.abilities[1]),
+    mapAbilityId(draft.abilities[2]),
+    baseTotal,
+    draft.baseStats[0],
+    draft.baseStats[1],
+    draft.baseStats[2],
+    draft.baseStats[3],
+    draft.baseStats[4],
+    draft.baseStats[5],
+    draft.catchRate > 0 ? draft.catchRate : 45,
+    draft.friendship > 0 ? draft.friendship : 50,
+    draft.baseExp > 0 ? draft.baseExp : 100,
+    mapGrowthRate(draft.growthRate),
+    mapGenderRatio(draft.genderRatio),
+    false, // genderDiffs
+    false, // canChangeForm — TODO: support forms in Phase C
+  );
+}

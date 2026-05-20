@@ -5,6 +5,7 @@ import { initPokemonPrevolutions, initPokemonStarters } from "#balance/pokemon-e
 import { initSpecies } from "#balance/pokemon-species";
 import { initChallenges } from "#data/challenge";
 import { initTrainerTypeDialogue } from "#data/dialogue";
+import { initEliteReduxCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
 import { initEliteReduxSpecies } from "#data/elite-redux/init-elite-redux-species";
 import { initPokemonForms } from "#data/pokemon-forms";
 import { initBiomeBgmLoopPoints } from "#init/init-biome-bgm-loop-points";
@@ -42,4 +43,16 @@ export function initializeGame() {
   // Must run AFTER initSpecies() (needs allSpecies populated) and AFTER
   // initAbilities() (so ability ids resolve cleanly when activated later).
   initEliteReduxSpecies();
+  // Elite Redux Phase B1b: register 881 ER-custom species (ids ≥ 10000).
+  // Must run AFTER initEliteReduxSpecies() since it appends to allSpecies.
+  const customResult = initEliteReduxCustomSpecies();
+  if (customResult.errors.length > 0) {
+    console.warn(
+      `[er-b1b] ${customResult.errors.length} species construction errors:`,
+      customResult.errors.slice(0, 5),
+    );
+  }
+  console.info(
+    `[er-b1b] registered ${customResult.customsAdded} ER-custom species (skipped ${customResult.customsAlreadyPresent} already present)`,
+  );
 }

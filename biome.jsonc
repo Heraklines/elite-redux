@@ -49,6 +49,8 @@
       // Their bodies are large JSON.stringify outputs; biome formatting would
       // dirty the tree on every regen. Linter/formatter rules don't apply here.
       "!!src/data/elite-redux/er-*.ts",
+      // Elite Redux: auto-generated SpeciesId companion enum (B1b).
+      "!!src/enums/er-species-id.ts",
       // TODO: lint css and html?
       "!!*.css",
       "!!*.html",
