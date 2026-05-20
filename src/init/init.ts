@@ -8,6 +8,7 @@ import { initTrainerTypeDialogue } from "#data/dialogue";
 import { initEliteReduxCustomAbilities } from "#data/elite-redux/init-elite-redux-custom-abilities";
 import { initEliteReduxCustomMoves } from "#data/elite-redux/init-elite-redux-custom-moves";
 import { initEliteReduxCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
+import { initEliteReduxFormChanges } from "#data/elite-redux/init-elite-redux-form-changes";
 import { initEliteReduxSpecies } from "#data/elite-redux/init-elite-redux-species";
 import { initEliteReduxTrainers } from "#data/elite-redux/init-elite-redux-trainers";
 import { initEliteReduxVanillaRebalance } from "#data/elite-redux/init-elite-redux-vanilla-rebalance";
@@ -107,5 +108,19 @@ export function initializeGame() {
   }
   console.info(
     `[er-b4] registered ${trainerResult.trainersRegistered} ER trainers in registry (skipped ${trainerResult.trainersSkipped} already present, dropped ${trainerResult.trainersDroppedMissingSpecies} for missing-species drift)`,
+  );
+  // Elite Redux Phase B5: populate the ER form-change registry (megas +
+  // primals + move-megas). Must run AFTER initEliteReduxCustomSpecies() so
+  // the source/target species ids the registry references are
+  // guaranteed-resolvable downstream. ER models megas as separate species
+  // (not form keys), so the registry stores a (source → target) edge
+  // pair; pokerogue's `pokemonFormChanges` is NOT modified here — see
+  // file header on init-elite-redux-form-changes.ts.
+  const formResult = initEliteReduxFormChanges();
+  if (formResult.errors.length > 0) {
+    console.warn(`[er-b5] ${formResult.errors.length} form-change errors:`, formResult.errors.slice(0, 5));
+  }
+  console.info(
+    `[er-b5] registered ${formResult.formChangesRegistered} ER form changes (${formResult.megaRegistered} mega + ${formResult.primalRegistered} primal + ${formResult.moveMegaRegistered} move-mega), skipped ${formResult.skipped} already present, dropped ${formResult.droppedMissingSpecies} for missing-species drift`,
   );
 }
