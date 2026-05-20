@@ -16,6 +16,9 @@ export interface ErMoveDraft {
   readonly accuracy: number;
   readonly pp: number;
   readonly priority: number;
+  /** Numeric index into ER_SPLIT_NAMES (er-move-tables.ts).
+   *  ER has 7 splits (vs. pokerogue's 3): physical, special, status, +
+   *  USE_HIGHEST_OFFENSE, HITS_DEF, USE_HIGHEST_DAMAGE, HITS_SPDEF. */
   readonly split: number;
   readonly target: number;
   readonly effect: number;

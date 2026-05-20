@@ -80,6 +80,8 @@ function classifyMoveArchetype(moveConst, vanillaNames) {
   return key && vanillaNames.has(key) ? "vanilla" : "unknown";
 }
 
+// Extracted for biome's noExcessiveCognitiveComplexity ≤ 15. Returns the
+// two array-snapshot operations as one object so the calling site is flat.
 /**
  * Snapshot the array-shaped fields. ER occasionally ships odd shapes (missing
  * keys for malformed rows); guard with Array.isArray and fall back to [].
@@ -90,6 +92,24 @@ function snapshotArrays(raw) {
     types: Array.isArray(raw.types) ? [...raw.types] : [],
     flags: Array.isArray(raw.flags) ? [...raw.flags] : [],
   };
+}
+
+/**
+ * Build the body of the er-move-tables.ts decoder-tables module. Pulled out
+ * of build() to keep cognitive complexity ≤ 15.
+ * @param {object} dump
+ */
+function buildTablesBody(dump) {
+  return `// Decoder tables for the numeric IDs in er-moves.ts.
+// All arrays are extracted verbatim from vendor/elite-redux/v2.65beta.json
+// top-level keys (typeT/targetT/flagsT/effT/splitT).
+
+export const ER_TYPE_NAMES: readonly string[] = ${JSON.stringify(dump.typeT ?? [], null, 2)} as const;
+export const ER_TARGET_NAMES: readonly string[] = ${JSON.stringify(dump.targetT ?? [], null, 2)} as const;
+export const ER_FLAG_NAMES: readonly string[] = ${JSON.stringify(dump.flagsT ?? [], null, 2)} as const;
+export const ER_EFFECT_NAMES: readonly string[] = ${JSON.stringify(dump.effT ?? [], null, 2)} as const;
+export const ER_SPLIT_NAMES: readonly string[] = ${JSON.stringify(dump.splitT ?? [], null, 2)} as const;
+`;
 }
 
 /**
@@ -121,6 +141,9 @@ export function buildMoveEntry(raw, vanillaNames) {
     flags,
     arg: raw.arg ?? "",
     usesHpType: !!raw.usesHpType,
+    // Classifier is exact-match-only. "unknown" guaranteed to mean "ER custom"
+    // (verified empirically: all 187 v2.65 unknowns have no normalized vanilla
+    // MoveId match — no spelling-mismatch surface for A9 to hand-resolve).
     archetype: classifyMoveArchetype(raw.NAME, vanillaNames),
   };
 }
@@ -133,8 +156,9 @@ export async function build({ dump, outDir, flags }) {
   const vanillaCount = entries.filter(e => e.archetype === "vanilla").length;
   const unknownCount = entries.length - vanillaCount;
 
-  // Detect duplicate-NAME groups (like A6 did for abilities — ER occasionally
-  // ships identically-named distinct moves). A9 will hand-resolve.
+  // Detect duplicate-NAME groups. Empirically zero for v2.65 (unlike abilities,
+  // which had Embody Aspect x4 + As One x2). Kept as forward-defense in case
+  // a future ER version ships NAME collisions.
   const nameCounts = new Map();
   for (const e of entries) {
     if (!e.moveConst) {
@@ -160,6 +184,9 @@ export async function build({ dump, outDir, flags }) {
   readonly accuracy: number;
   readonly pp: number;
   readonly priority: number;
+  /** Numeric index into ER_SPLIT_NAMES (er-move-tables.ts).
+   *  ER has 7 splits (vs. pokerogue's 3): physical, special, status, +
+   *  USE_HIGHEST_OFFENSE, HITS_DEF, USE_HIGHEST_DAMAGE, HITS_SPDEF. */
   readonly split: number;
   readonly target: number;
   readonly effect: number;
@@ -177,5 +204,19 @@ export const ER_MOVES: readonly ErMoveDraft[] = ${JSON.stringify(entries, null, 
     return;
   }
   await emitModule(resolve(outDir, "er-moves.ts"), body);
+
+  // Emit decoder tables so downstream code can decode the numeric IDs in er-moves.ts.
+  // These are referenced by er-moves.ts fields: types[i] → typeT[i], flags[i] → flagsT[i],
+  // effect → effT[effect], split → splitT[split], target → targetT[target].
+  await emitModule(resolve(outDir, "er-move-tables.ts"), buildTablesBody(dump));
+  const nTypes = (dump.typeT ?? []).length;
+  const nTargets = (dump.targetT ?? []).length;
+  const nFlags = (dump.flagsT ?? []).length;
+  const nEffects = (dump.effT ?? []).length;
+  const nSplits = (dump.splitT ?? []).length;
+  console.log(
+    `[er:moves] decoder tables: ${nTypes} types, ${nTargets} targets, ${nFlags} flags, ${nEffects} effects, ${nSplits} splits`,
+  );
+
   console.log(`[er:moves] emitted ${entries.length} moves (${vanillaCount} vanilla, ${unknownCount} unknown)`);
 }

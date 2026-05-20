@@ -104,3 +104,32 @@ describe.skipIf(!existsSync(VENDOR_PATH))("moves transformer — full dump", () 
     expect(set.size).toBeGreaterThan(700);
   });
 });
+
+const TABLES_PATH = resolve(__dirname, "../../../src/data/elite-redux/er-move-tables.ts");
+
+describe.skipIf(!existsSync(TABLES_PATH))("decoder tables emission", () => {
+  it("emits all 5 decoder tables when build runs", async () => {
+    // Verify the emitted file exists and has all 5 exports.
+    const src = await readFile(TABLES_PATH, "utf8");
+    expect(src).toMatch(/export const ER_TYPE_NAMES/);
+    expect(src).toMatch(/export const ER_TARGET_NAMES/);
+    expect(src).toMatch(/export const ER_FLAG_NAMES/);
+    expect(src).toMatch(/export const ER_EFFECT_NAMES/);
+    expect(src).toMatch(/export const ER_SPLIT_NAMES/);
+  });
+
+  it("ER_SPLIT_NAMES has 7 entries (ER's 4 extra splits beyond physical/special/status)", async () => {
+    // Verify via text-content match — robust to ESM/dynamic-import quirks on Windows.
+    const src = await readFile(TABLES_PATH, "utf8");
+    // Match the ER_SPLIT_NAMES array and count its string entries.
+    const m = src.match(/ER_SPLIT_NAMES[^=]*=\s*(\[[\s\S]*?\])\s*as const/);
+    expect(m).not.toBeNull();
+    const arr = JSON.parse(m![1]);
+    expect(arr).toHaveLength(7);
+    // Sanity-check ER's 4 extra splits are present.
+    expect(arr).toContain("USE_HIGHEST_OFFENSE");
+    expect(arr).toContain("HITS_DEF");
+    expect(arr).toContain("USE_HIGHEST_DAMAGE");
+    expect(arr).toContain("HITS_SPDEF");
+  });
+});
