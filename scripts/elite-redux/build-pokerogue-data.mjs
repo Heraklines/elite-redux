@@ -28,6 +28,10 @@ const BUILDERS = {
   // B1b: depends on id-map's name-matching algorithm; runs after species/idmap
   // but reads the same dump so it stays decoupled from their emitted output.
   erSpeciesIdEnum: () => import("./builders/er-species-id-enum.mjs"),
+  // B2: ER-custom ability + move enum companions. Same id-assignment logic
+  // as idmap (custom IDs start at 5000), emitted to src/enums/.
+  erAbilityIdEnum: () => import("./builders/er-ability-id-enum.mjs"),
+  erMoveIdEnum: () => import("./builders/er-move-id-enum.mjs"),
 };
 
 async function main() {

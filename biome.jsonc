@@ -51,6 +51,9 @@
       "!!src/data/elite-redux/er-*.ts",
       // Elite Redux: auto-generated SpeciesId companion enum (B1b).
       "!!src/enums/er-species-id.ts",
+      // Elite Redux: auto-generated AbilityId/MoveId companion enums (B2).
+      "!!src/enums/er-ability-id.ts",
+      "!!src/enums/er-move-id.ts",
       // TODO: lint css and html?
       "!!*.css",
       "!!*.html",
