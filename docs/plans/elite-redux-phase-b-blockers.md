@@ -53,3 +53,28 @@ Run all 4 issues against the integration-test suite once `init-elite-redux-speci
 is in place. Each issue can be regression-tested by setting up a test
 species with slots 0/1/2 all distinct and verifying the right ability fires,
 displays its own name, and produces its own trigger message.
+
+## Save migration note (Phase A — A15)
+
+The `Passive` bitmask widening (A12) preserves numeric values for slot 1
+(`UNLOCKED = UNLOCKED_1 = 1`, `ENABLED = ENABLED_1 = 2`). Existing saves
+stored `passiveAttr` as `(UNLOCKED | ENABLED) == 3`, which under the new
+enum still means "slot 1 unlocked AND enabled". No data migration was
+needed for Phase A.
+
+**Phase B note:** Once `init-elite-redux-species.ts` installs real 3-passive
+sets, players' first interaction with a 3-passive species will populate
+slots 2 and 3 (bits 4-32) for the first time. The save format gains those
+bits automatically (it's a number, not a struct), so no format change.
+But the `starterData[speciesId].passiveAttr` field in storage is the same
+slot used for both legacy single-passive AND new 3-passive — Phase B must
+ensure:
+
+1. UI lets players unlock each of the 3 slots independently (A16 covered).
+2. The unlock-confirmation candy cost is charged per slot.
+3. Loading a save with `passiveAttr = 63` (all 6 bits) doesn't trigger
+   any "unknown bit" warnings or migrations.
+
+Verified by A15's test: a synthetic `passiveAttr = 3` still reads as
+slot-1 unlocked+enabled. A `passiveAttr = 63` would mean all 3 slots
+unlocked+enabled — verify in Phase B testing.
