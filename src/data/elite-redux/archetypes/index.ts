@@ -35,6 +35,8 @@ export {
   type DamageConditionTargetLowHp,
   type DamageConditionTargetStatused,
 } from "./conditional-damage";
+export { ContactDamageOnHitAbAttr, type ContactDamageOnHitOptions } from "./contact-damage-on-hit";
+export { EffectChanceModifierAbAttr, type EffectChanceModifierOptions } from "./effect-chance-modifier";
 export type { EntryEffect, EntryEffectKind } from "./entry-effect";
 export {
   EntryEffectAbAttr,
@@ -48,6 +50,14 @@ export {
   type EntryEffectSetWeather,
 } from "./entry-effect";
 export { FlagDamageBoostAbAttr, type FlagDamageBoostAbAttrOptions } from "./flag-damage-boost";
+export {
+  type HitMultiplier,
+  HitMultiplierAbAttr,
+  type HitMultiplierFilter,
+  type HitMultiplierOptions,
+  HitMultiplierPowerAbAttr,
+  type HitMultiplierPowerOptions,
+} from "./hit-multiplier";
 export {
   TypeAbsorbHealAbAttr,
   type TypeAbsorbHealOptions,
@@ -71,6 +81,11 @@ export {
   type OnFaintEffectSetTerrain,
   type OnFaintEffectSetWeather,
 } from "./on-faint-effect";
+export {
+  PreFaintReviveAbAttr,
+  type PreFaintReviveGate,
+  type PreFaintReviveOptions,
+} from "./pre-faint-revive";
 export {
   type PriorityCondition,
   PriorityModifierAbAttr,
@@ -97,4 +112,23 @@ export {
   type StatusEffectImmunityOptions,
   type StatusImmunity,
 } from "./status-immunity";
+export {
+  type TypeConversion,
+  TypeConversionAbAttr,
+  type TypeConversionOptions,
+  TypeConversionPowerBoostAbAttr,
+  type TypeConversionPowerBoostOptions,
+  type TypeConversionSource,
+} from "./type-conversion";
 export { TypeDamageBoostAbAttr, type TypeDamageBoostAbAttrOptions } from "./type-damage-boost";
+export {
+  SetTerrainOnEntryAbAttr,
+  type SetTerrainOnEntryOptions,
+  SetWeatherOnEntryAbAttr,
+  type SetWeatherOnEntryOptions,
+  WeatherDamageReductionAbAttr,
+  type WeatherDamageReductionOptions,
+  type WeatherTerrainInteraction,
+  WeatherTypeBoostAbAttr,
+  type WeatherTypeBoostOptions,
+} from "./weather-terrain-interaction";
