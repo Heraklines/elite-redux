@@ -295,6 +295,52 @@ interface SpeciesDetails {
   teraType?: PokemonType | undefined;
 }
 
+// =============================================================================
+// Elite Redux — 3-slot passive helpers
+//
+// Phase A widens `passiveAttr` from a 2-bit single-slot bitmask to a 6-bit
+// 3-slot bitmask. Most call sites in this file remain slot-1-only via the
+// `PassiveAttr.UNLOCKED`/`PassiveAttr.ENABLED` aliases — those literally equal
+// `UNLOCKED_1`/`ENABLED_1`, so back-compat is preserved by construction.
+//
+// The helpers below are only used when `species.getPassiveCount() > 1`, i.e.
+// for ER multi-passive species. Phase A leaves the unreachable-in-practice
+// rendering path here for Phase B to drive (Phase B installs `setPassives()`
+// for each species; until then `getPassiveCount()` is always 1).
+//
+// Cost multiplier per slot: slot 1 = 1x (base), slot 2 = 2x, slot 3 = 4x.
+// =============================================================================
+
+/** Slot index into the 3-passive bitmask. */
+export type PassiveSlot = 0 | 1 | 2;
+
+/** Static metadata for the 3 passive slots: bit positions + cost multiplier. */
+export const PASSIVE_SLOTS = [
+  { unlocked: PassiveAttr.UNLOCKED_1, enabled: PassiveAttr.ENABLED_1, costMultiplier: 1 },
+  { unlocked: PassiveAttr.UNLOCKED_2, enabled: PassiveAttr.ENABLED_2, costMultiplier: 2 },
+  { unlocked: PassiveAttr.UNLOCKED_3, enabled: PassiveAttr.ENABLED_3, costMultiplier: 4 },
+] as const;
+
+/** True if the given passive slot is unlocked in `passiveAttr`. */
+export function isSlotUnlocked(passiveAttr: number, slot: PassiveSlot): boolean {
+  return (passiveAttr & PASSIVE_SLOTS[slot].unlocked) !== 0;
+}
+
+/** True if the given passive slot is enabled in `passiveAttr`. */
+export function isSlotEnabled(passiveAttr: number, slot: PassiveSlot): boolean {
+  return (passiveAttr & PASSIVE_SLOTS[slot].enabled) !== 0;
+}
+
+/** Return `passiveAttr` with the given slot's enabled bit flipped. */
+export function toggleSlotEnabled(passiveAttr: number, slot: PassiveSlot): number {
+  return passiveAttr ^ PASSIVE_SLOTS[slot].enabled;
+}
+
+/** Return `passiveAttr` with the given slot's unlocked AND enabled bits set. */
+export function unlockSlot(passiveAttr: number, slot: PassiveSlot): number {
+  return passiveAttr | PASSIVE_SLOTS[slot].unlocked | PASSIVE_SLOTS[slot].enabled;
+}
+
 export class StarterSelectUiHandler extends MessageUiHandler {
   private starterSelectContainer: Phaser.GameObjects.Container;
   private starterSelectScrollBar: ScrollBar;
@@ -1447,6 +1493,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     const starterData = globalScene.gameData.starterData[speciesId];
     const starterCost = speciesStarterCosts[speciesId];
 
+    // TODO(er-phase-b): widen to "any slot still locked && enough candies for any slot".
+    // For Phase A this stays slot-1-only; vanilla species have only one slot.
     return (
       starterCost != null
       && starterData.candyCount >= getPassiveCandyCount(starterCost)
@@ -2162,8 +2210,43 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           }
 
           const passiveAttr = starterData.passiveAttr;
-          if (passiveAttr & PassiveAttr.UNLOCKED) {
-            // this is for enabling and disabling the passive
+          const passiveCount = this.lastSpecies.getPassiveCount();
+          if (passiveCount > 1) {
+            // ER 3-slot mode: render one enable/disable row per unlocked slot.
+            // Unreachable in Phase A (no species has `setPassives()` called yet);
+            // Phase B installs the per-species passives and this path lights up.
+            const passiveAbilityIds = this.lastSpecies.getPassiveAbilities(
+              starterAttributes.form ?? this.lastSpecies.formIndex,
+            );
+            for (let slot = 0; slot < PASSIVE_SLOTS.length; slot++) {
+              const slotIndex = slot as PassiveSlot;
+              if (passiveAbilityIds[slot] === AbilityId.NONE) {
+                continue; // skip empty slots — species with fewer than 3 passives
+              }
+              if (!isSlotUnlocked(passiveAttr, slotIndex)) {
+                continue; // locked slot — exposed via the candy submenu instead
+              }
+              const abilityName = allAbilities[passiveAbilityIds[slot]].name;
+              const label = `${slot + 1}. ${abilityName}: ${i18next.t(
+                isSlotEnabled(passiveAttr, slotIndex)
+                  ? "starterSelectUiHandler:disablePassive"
+                  : "starterSelectUiHandler:enablePassive",
+              )}`;
+              options.push({
+                label,
+                handler: () => {
+                  starterData.passiveAttr = toggleSlotEnabled(starterData.passiveAttr, slotIndex);
+                  persistentStarterData.passiveAttr = toggleSlotEnabled(persistentStarterData.passiveAttr, slotIndex);
+                  ui.setMode(UiMode.STARTER_SELECT);
+                  this.setSpeciesDetails(this.lastSpecies);
+                  return true;
+                },
+              });
+            }
+          } else if (passiveAttr & PassiveAttr.UNLOCKED) {
+            // Legacy single-passive mode (vanilla pokerogue path — unchanged).
+            // NOTE: Phase A — slot 1 only. Phase B widens to all 3 slots via the
+            // multi-slot branch above.
             const label = i18next.t(
               passiveAttr & PassiveAttr.ENABLED
                 ? "starterSelectUiHandler:disablePassive"
@@ -2251,41 +2334,99 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             const options: any[] = []; // TODO: add proper type
 
             // Unlock passive option
-            if (!(passiveAttr & PassiveAttr.UNLOCKED) && !globalScene.gameMode.hasChallenge(Challenges.FRESH_START)) {
-              const passiveCost = getPassiveCandyCount(speciesStarterCosts[this.lastSpecies.speciesId]);
-              options.push({
-                label: `×${passiveCost} ${i18next.t("starterSelectUiHandler:unlockPassive")}`,
-                handler: () => {
-                  if (Overrides.FREE_CANDY_UPGRADE_OVERRIDE || candyCount >= passiveCost) {
-                    persistentStarterData.passiveAttr |= PassiveAttr.UNLOCKED | PassiveAttr.ENABLED;
-                    starterData.passiveAttr = persistentStarterData.passiveAttr;
-                    if (!Overrides.FREE_CANDY_UPGRADE_OVERRIDE) {
-                      persistentStarterData.candyCount -= passiveCost;
-                      starterData.candyCount = persistentStarterData.candyCount;
-                    }
-                    this.pokemonCandyCountText.setText(`×${starterData.candyCount}`);
-                    updateCandyCountTextStyle(this.pokemonCandyCountText, starterData.candyCount);
-                    globalScene.gameData.saveSystem().then(success => {
-                      if (!success) {
-                        return globalScene.reset(true);
-                      }
-                    });
-                    ui.setMode(UiMode.STARTER_SELECT);
-                    this.setSpeciesDetails(this.lastSpecies);
-                    globalScene.playSound("se/buy");
-
-                    // update the passive background and icon/animation for available upgrade
-                    if (starterContainer) {
-                      this.updateCandyUpgradeDisplay(starterContainer);
-                      starterContainer.starterPassiveBgs.setVisible(!!starterData.passiveAttr);
-                    }
-                    return true;
+            if (!globalScene.gameMode.hasChallenge(Challenges.FRESH_START)) {
+              const baseCost = getPassiveCandyCount(speciesStarterCosts[this.lastSpecies.speciesId]);
+              if (passiveCount > 1) {
+                // ER 3-slot mode: emit one unlock row per still-locked slot.
+                // Unreachable in Phase A; Phase B installs `setPassives()` for
+                // each species and lights this branch up.
+                const passiveAbilityIds = this.lastSpecies.getPassiveAbilities(
+                  starterAttributes.form ?? this.lastSpecies.formIndex,
+                );
+                for (let slot = 0; slot < PASSIVE_SLOTS.length; slot++) {
+                  const slotIndex = slot as PassiveSlot;
+                  if (passiveAbilityIds[slot] === AbilityId.NONE) {
+                    continue;
                   }
-                  return false;
-                },
-                item: "candy",
-                itemArgs: starterColors[this.lastSpecies.speciesId],
-              });
+                  if (isSlotUnlocked(passiveAttr, slotIndex)) {
+                    continue;
+                  }
+                  const slotCost = baseCost * PASSIVE_SLOTS[slot].costMultiplier;
+                  const abilityName = allAbilities[passiveAbilityIds[slot]].name;
+                  options.push({
+                    label: `×${slotCost} ${slot + 1}. ${abilityName}: ${i18next.t(
+                      "starterSelectUiHandler:unlockPassive",
+                    )}`,
+                    handler: () => {
+                      if (Overrides.FREE_CANDY_UPGRADE_OVERRIDE || candyCount >= slotCost) {
+                        persistentStarterData.passiveAttr = unlockSlot(persistentStarterData.passiveAttr, slotIndex);
+                        starterData.passiveAttr = persistentStarterData.passiveAttr;
+                        if (!Overrides.FREE_CANDY_UPGRADE_OVERRIDE) {
+                          persistentStarterData.candyCount -= slotCost;
+                          starterData.candyCount = persistentStarterData.candyCount;
+                        }
+                        this.pokemonCandyCountText.setText(`×${starterData.candyCount}`);
+                        updateCandyCountTextStyle(this.pokemonCandyCountText, starterData.candyCount);
+                        globalScene.gameData.saveSystem().then(success => {
+                          if (!success) {
+                            return globalScene.reset(true);
+                          }
+                        });
+                        ui.setMode(UiMode.STARTER_SELECT);
+                        this.setSpeciesDetails(this.lastSpecies);
+                        globalScene.playSound("se/buy");
+
+                        if (starterContainer) {
+                          this.updateCandyUpgradeDisplay(starterContainer);
+                          starterContainer.starterPassiveBgs.setVisible(!!starterData.passiveAttr);
+                        }
+                        return true;
+                      }
+                      return false;
+                    },
+                    item: "candy",
+                    itemArgs: starterColors[this.lastSpecies.speciesId],
+                  });
+                }
+              } else if (!(passiveAttr & PassiveAttr.UNLOCKED)) {
+                // Legacy single-passive unlock path (vanilla pokerogue — unchanged).
+                // NOTE: Phase A — slot 1 only. Phase B widens to all 3 slots via
+                // the multi-slot branch above.
+                const passiveCost = baseCost;
+                options.push({
+                  label: `×${passiveCost} ${i18next.t("starterSelectUiHandler:unlockPassive")}`,
+                  handler: () => {
+                    if (Overrides.FREE_CANDY_UPGRADE_OVERRIDE || candyCount >= passiveCost) {
+                      persistentStarterData.passiveAttr |= PassiveAttr.UNLOCKED | PassiveAttr.ENABLED;
+                      starterData.passiveAttr = persistentStarterData.passiveAttr;
+                      if (!Overrides.FREE_CANDY_UPGRADE_OVERRIDE) {
+                        persistentStarterData.candyCount -= passiveCost;
+                        starterData.candyCount = persistentStarterData.candyCount;
+                      }
+                      this.pokemonCandyCountText.setText(`×${starterData.candyCount}`);
+                      updateCandyCountTextStyle(this.pokemonCandyCountText, starterData.candyCount);
+                      globalScene.gameData.saveSystem().then(success => {
+                        if (!success) {
+                          return globalScene.reset(true);
+                        }
+                      });
+                      ui.setMode(UiMode.STARTER_SELECT);
+                      this.setSpeciesDetails(this.lastSpecies);
+                      globalScene.playSound("se/buy");
+
+                      // update the passive background and icon/animation for available upgrade
+                      if (starterContainer) {
+                        this.updateCandyUpgradeDisplay(starterContainer);
+                        starterContainer.starterPassiveBgs.setVisible(!!starterData.passiveAttr);
+                      }
+                      return true;
+                    }
+                    return false;
+                  },
+                  item: "candy",
+                  itemArgs: starterColors[this.lastSpecies.speciesId],
+                });
+              }
             }
 
             // Reduce cost option
@@ -2817,6 +2958,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
     const { dexEntry, starterDataEntry } = this.getSpeciesData(species.speciesId);
 
+    // TODO(er-phase-b): `passive: boolean` on the run-start `Starter` is slot-1 only.
+    // Phase B will widen `Starter` to carry per-slot enabled state across all 3 slots.
     const starter = {
       speciesId: species.speciesId,
       shiny: props.shiny,
@@ -4115,6 +4258,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         }
 
         if (passiveAbility) {
+          // TODO(er-phase-b): the species info panel currently renders only slot 1's
+          // passive name + lock/disable status. Phase B will swap this out for a
+          // multi-row component that shows all 3 slots side-by-side.
           const isUnlocked = !!(passiveAttr & PassiveAttr.UNLOCKED);
           const isEnabled = !!(passiveAttr & PassiveAttr.ENABLED);
 
