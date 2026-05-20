@@ -8,7 +8,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildIdMapForCategory, loadEnumValues, normalizeName } from "./id-map.mjs";
+import { buildIdMapForCategory, buildTrainerClassMap, loadEnumValues, normalizeName } from "./id-map.mjs";
 
 const VENDOR_PATH = resolve(__dirname, "../../../vendor/elite-redux/v2.65beta.json");
 
@@ -48,6 +48,75 @@ describe("id-map transformer (pure)", () => {
     expect(r.map[2]).toBe(10001);
     expect(r.map[3]).toBe(10002);
     expect(r.customCount).toBe(3);
+  });
+
+  it("maps sentinel id 0 (and -1) directly to 0 without consuming custom IDs", () => {
+    const vanilla = new Map([["foo", 50]]);
+    const entries = [
+      { id: 0, name: "-------" },
+      { id: -1, name: "NONE" },
+      { id: 1, name: "Foo" },
+      { id: 2, name: "Custom" },
+    ];
+    const r = buildIdMapForCategory(entries, vanilla, 1000);
+    expect(r.map[0]).toBe(0);
+    expect(r.map[-1]).toBe(0);
+    expect(r.map[1]).toBe(50);
+    expect(r.map[2]).toBe(1000); // first custom — NOT 1001, sentinels didn't consume slots
+    expect(r.vanillaCount).toBe(3); // 2 sentinels + 1 name match
+  });
+
+  it("buildIdMapForCategory: interleaved vanilla/custom assigns customs sequentially without gaps", () => {
+    const vanilla = new Map([
+      ["foo", 100],
+      ["baz", 200],
+    ]);
+    const entries = [
+      { id: 1, name: "Foo" }, // vanilla → 100
+      { id: 2, name: "Bar" }, // custom → 1000
+      { id: 3, name: "Baz" }, // vanilla → 200
+      { id: 4, name: "Qux" }, // custom → 1001 (NOT 1002)
+    ];
+    const r = buildIdMapForCategory(entries, vanilla, 1000);
+    expect(r.map[1]).toBe(100);
+    expect(r.map[2]).toBe(1000);
+    expect(r.map[3]).toBe(200);
+    expect(r.map[4]).toBe(1001);
+    expect(r.vanillaCount).toBe(2);
+    expect(r.customCount).toBe(2);
+  });
+});
+
+describe("buildTrainerClassMap (pure)", () => {
+  it("alias takes precedence over normalized match", () => {
+    const vanilla = new Map([
+      ["acetrainer", 100],
+      ["tuber", 50],
+    ]);
+    const aliases = { "Tuber M": "ACE_TRAINER" };
+    const r = buildTrainerClassMap(["Tuber M"], vanilla, aliases);
+    expect(r.map[0]).toBe(100); // alias wins (ACE_TRAINER=100), not normalized "tuber"=50
+  });
+
+  it("falls through to normalized match when alias absent", () => {
+    const vanilla = new Map([["acetrainer", 100]]);
+    const aliases = {};
+    const r = buildTrainerClassMap(["Ace Trainer"], vanilla, aliases);
+    expect(r.map[0]).toBe(100);
+  });
+
+  it("falls through to custom when neither alias nor normalized match", () => {
+    const vanilla = new Map([["acetrainer", 100]]);
+    const aliases = {};
+    const r = buildTrainerClassMap(["Battle Girl"], vanilla, aliases);
+    expect(r.map[0]).toBe(1000);
+  });
+
+  it("alias pointing to missing enum key falls through to normalized then custom", () => {
+    const vanilla = new Map([["foo", 50]]);
+    const aliases = { Bar: "MISSING_KEY" };
+    const r = buildTrainerClassMap(["Bar"], vanilla, aliases);
+    expect(r.map[0]).toBe(1000); // alias couldn't resolve, normalized "bar" not in vanilla, custom assigned
   });
 });
 

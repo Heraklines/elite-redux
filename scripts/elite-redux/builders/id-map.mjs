@@ -143,6 +143,16 @@ export function buildIdMapForCategory(entries, vanillaMap, customStart) {
   let vanillaCount = 0;
   let customCount = 0;
   for (const e of entries) {
+    // Special-case: ER's id=0 ability is "-------" (sentinel), id=-1 species is
+    // SPECIES_NONE, id=0 move is MOVE_NONE. Map directly to pokerogue's NONE
+    // constant (value 0 by convention in pokerogue's enums) without consuming
+    // a custom ID slot. Without this, the normalized empty / "none" name would
+    // miss the vanilla lookup and flip these sentinels into the custom range.
+    if (e.id === 0 || e.id === -1) {
+      map[e.id] = 0;
+      vanillaCount++;
+      continue;
+    }
     const norm = normalizeName(e.name);
     const vanillaId = norm ? vanillaMap.get(norm) : undefined;
     if (vanillaId === undefined) {
@@ -167,7 +177,7 @@ export function buildIdMapForCategory(entries, vanillaMap, customStart) {
  * @param {Readonly<Record<string, string>>} aliases
  * @returns {{ map: Record<number, number>, vanillaCount: number, customCount: number }}
  */
-function buildTrainerClassMap(classNames, vanillaMap, aliases) {
+export function buildTrainerClassMap(classNames, vanillaMap, aliases) {
   /** @type {Record<number, number>} */
   const map = {};
   let nextCustom = CUSTOM_ID_START.trainerClasses;
