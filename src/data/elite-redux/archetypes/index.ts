@@ -36,6 +36,21 @@ export {
   type DamageConditionTargetStatused,
 } from "./conditional-damage";
 export { ContactDamageOnHitAbAttr, type ContactDamageOnHitOptions } from "./contact-damage-on-hit";
+export {
+  CritDamageMultiplierAbAttr,
+  type CritDamageMultiplierOptions,
+  CritImmunityAbAttr,
+  type CritMod,
+  type CritModFilter,
+  CritStageBonusAbAttr,
+  type CritStageBonusOptions,
+} from "./crit-mod";
+export {
+  type DamageReduction,
+  DamageReductionAbAttr,
+  type DamageReductionFilter,
+  type DamageReductionOptions,
+} from "./damage-reduction-generic";
 export { EffectChanceModifierAbAttr, type EffectChanceModifierOptions } from "./effect-chance-modifier";
 export type { EntryEffect, EntryEffectKind } from "./entry-effect";
 export {
@@ -65,6 +80,14 @@ export {
   type TypeAbsorbStatBoostOptions,
 } from "./immunity-with-absorb";
 export {
+  type Lifesteal,
+  type LifestealFilter,
+  LifestealOnHitAbAttr,
+  type LifestealOnHitOptions,
+  LifestealOnKoAbAttr,
+  type LifestealOnKoOptions,
+} from "./lifesteal";
+export {
   type MoveReplacement,
   MovesetReplacementAbAttr,
   type MovesetReplacementOptions,
@@ -82,6 +105,12 @@ export {
   type OnFaintEffectSetWeather,
 } from "./on-faint-effect";
 export {
+  type PassiveRecovery,
+  PassiveRecoveryAbAttr,
+  type PassiveRecoveryCondition,
+  type PassiveRecoveryOptions,
+} from "./passive-recovery";
+export {
   PreFaintReviveAbAttr,
   type PreFaintReviveGate,
   type PreFaintReviveOptions,
@@ -92,6 +121,10 @@ export {
   type PriorityModifierFilter,
   type PriorityModifierOptions,
 } from "./priority-modifier";
+export {
+  StatStageChangeModifierAbAttr,
+  type StatStageChangeModifierOptions,
+} from "./stat-stage-change-modifier";
 export {
   type OnHitFilter,
   type StatChange,
