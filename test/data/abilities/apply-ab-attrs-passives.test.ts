@@ -58,13 +58,17 @@ describe("apply-ab-attrs — 3-passive dispatch", () => {
     expect(allAbilities[AbilityId.PURE_POWER]).toBeDefined();
   });
 
-  /** Track species we mutate via setPassives so we can restore them in afterEach. */
-  const mutatedSpecies: PokemonSpecies[] = [];
+  /**
+   * Track species we mutate via setPassives so we can restore them in afterEach.
+   * We snapshot the original `_passives` (which ER B1a populates at vitest
+   * setup time) so the cleanup restores ER state rather than nullifying it.
+   */
+  const mutatedSpecies: { species: PokemonSpecies; original: unknown }[] = [];
 
   afterEach(() => {
     // Restore any species we mutated — don't pollute downstream tests.
-    for (const species of mutatedSpecies) {
-      (species as unknown as { _passives: unknown })._passives = null;
+    for (const { species, original } of mutatedSpecies) {
+      (species as unknown as { _passives: unknown })._passives = original;
     }
     mutatedSpecies.length = 0;
     vi.restoreAllMocks();
@@ -77,8 +81,9 @@ describe("apply-ab-attrs — 3-passive dispatch", () => {
   ): PokemonSpecies => {
     const species = allSpecies.find(s => s.speciesId === speciesId);
     expect(species).toBeDefined();
+    const original = (species as unknown as { _passives: unknown })._passives;
     species!.setPassives(passives);
-    mutatedSpecies.push(species!);
+    mutatedSpecies.push({ species: species!, original });
     return species!;
   };
 
@@ -320,7 +325,13 @@ describe("apply-ab-attrs — 3-passive dispatch", () => {
     it("species.getPassiveAbilities() returns [legacy, NONE, NONE] when no override set", () => {
       // Sanity: this mirrors the existing pokemon-species-passives.test.ts invariant
       // and is the foundation Pokemon.getPassiveAbilities() relies on.
+      // ER B1a's `initEliteReduxSpecies()` installs `_passives` on every vanilla
+      // species at vitest setup time, so we clear it here to exercise the
+      // legacy fallback path explicitly. The afterEach hook restores it.
       const species = allSpecies.find(s => s.speciesId === SpeciesId.MAGIKARP)!;
+      const original = (species as unknown as { _passives: unknown })._passives;
+      (species as unknown as { _passives: unknown })._passives = null;
+      mutatedSpecies.push({ species, original });
       const passives = species.getPassiveAbilities();
       expect(passives[0]).toBe(species.getPassiveAbility());
       expect(passives[1]).toBe(AbilityId.NONE);

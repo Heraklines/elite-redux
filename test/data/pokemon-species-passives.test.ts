@@ -10,12 +10,20 @@ describe("PokemonSpeciesForm 3-passive accessors", () => {
     if (!species) {
       return;
     }
-    const passives = species.getPassiveAbilities();
-    expect(passives.length).toBe(3);
-    // Slot 1 must match the legacy getPassiveAbility() result
-    expect(passives[0]).toBe(species.getPassiveAbility());
-    expect(passives[1]).toBe(AbilityId.NONE);
-    expect(passives[2]).toBe(AbilityId.NONE);
+    // ER B1a installs `_passives` globally at vitest setup time. Clear it for
+    // this test so we exercise the legacy fallback path explicitly.
+    const original = (species as unknown as { _passives: unknown })._passives;
+    try {
+      (species as unknown as { _passives: unknown })._passives = null;
+      const passives = species.getPassiveAbilities();
+      expect(passives.length).toBe(3);
+      // Slot 1 must match the legacy getPassiveAbility() result
+      expect(passives[0]).toBe(species.getPassiveAbility());
+      expect(passives[1]).toBe(AbilityId.NONE);
+      expect(passives[2]).toBe(AbilityId.NONE);
+    } finally {
+      (species as unknown as { _passives: unknown })._passives = original;
+    }
   });
 
   it("setPassives() installs a 3-passive triple that getPassiveAbilities() returns", () => {
@@ -24,14 +32,15 @@ describe("PokemonSpeciesForm 3-passive accessors", () => {
     if (!species) {
       return;
     }
+    const originalPassives = (species as unknown as { _passives: unknown })._passives;
     const original = species.getPassiveAbilities();
     try {
       species.setPassives([AbilityId.OVERGROW, AbilityId.CHLOROPHYLL, AbilityId.LEAF_GUARD]);
       const passives = species.getPassiveAbilities();
       expect(passives).toEqual([AbilityId.OVERGROW, AbilityId.CHLOROPHYLL, AbilityId.LEAF_GUARD]);
     } finally {
-      // Restore — don't pollute other tests.
-      (species as unknown as { _passives: unknown })._passives = null;
+      // Restore the original ER-installed triple so we don't pollute later tests.
+      (species as unknown as { _passives: unknown })._passives = originalPassives;
       expect(species.getPassiveAbilities()).toEqual(original);
     }
   });
@@ -42,6 +51,7 @@ describe("PokemonSpeciesForm 3-passive accessors", () => {
     if (!species) {
       return;
     }
+    const originalPassives = (species as unknown as { _passives: unknown })._passives;
     try {
       species.setPassives([AbilityId.OVERGROW, AbilityId.CHLOROPHYLL, AbilityId.LEAF_GUARD]);
       expect(species.getPassiveCount()).toBe(3);
@@ -52,7 +62,7 @@ describe("PokemonSpeciesForm 3-passive accessors", () => {
       species.setPassives([AbilityId.NONE, AbilityId.NONE, AbilityId.NONE]);
       expect(species.getPassiveCount()).toBe(0);
     } finally {
-      (species as unknown as { _passives: unknown })._passives = null;
+      (species as unknown as { _passives: unknown })._passives = originalPassives;
     }
   });
 

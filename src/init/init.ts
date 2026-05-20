@@ -5,6 +5,7 @@ import { initPokemonPrevolutions, initPokemonStarters } from "#balance/pokemon-e
 import { initSpecies } from "#balance/pokemon-species";
 import { initChallenges } from "#data/challenge";
 import { initTrainerTypeDialogue } from "#data/dialogue";
+import { initEliteReduxSpecies } from "#data/elite-redux/init-elite-redux-species";
 import { initPokemonForms } from "#data/pokemon-forms";
 import { initBiomeBgmLoopPoints } from "#init/init-biome-bgm-loop-points";
 import { initBiomeDepths } from "#init/init-biome-depths";
@@ -37,4 +38,8 @@ export function initializeGame() {
   initAbilities();
   initChallenges();
   initMysteryEncounters();
+  // Elite Redux Phase B1a: install ER 3-passive triples on vanilla species.
+  // Must run AFTER initSpecies() (needs allSpecies populated) and AFTER
+  // initAbilities() (so ability ids resolve cleanly when activated later).
+  initEliteReduxSpecies();
 }
