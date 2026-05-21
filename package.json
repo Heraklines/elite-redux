@@ -48,6 +48,7 @@
     "er:build": "node scripts/elite-redux/build-pokerogue-data.mjs",
     "er:cluster-archetypes": "node scripts/elite-redux/cluster-archetypes.mjs",
     "er:classify-abilities": "node scripts/elite-redux/classify-abilities.mjs",
+    "er:classify-moves": "node scripts/elite-redux/classify-moves.mjs",
     "er:audit-sprites": "node scripts/elite-redux/audit-sprites.mjs",
     "er:test": "vitest run test/data/elite-redux"
   },
