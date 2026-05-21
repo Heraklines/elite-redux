@@ -929,13 +929,27 @@ export class SummaryUiHandler extends UiHandler {
         const allAbilityInfo = [this.abilityContainer]; // Creates an array to iterate through
         // Only add to the array and set up displaying a passive if it's unlocked
         if (this.pokemon?.hasPassive()) {
-          this.passiveContainer = {
-            labelImage: globalScene.add.image(0, 0, getLocalizedSpriteKey("summary_profile_passive")), // Pixel text 'PASSIVE'
-            ability: this.pokemon.getPassiveAbility(),
-            nameText: null,
-            descriptionText: null,
-          };
-          allAbilityInfo.push(this.passiveContainer);
+          // Elite Redux: append every non-null passive slot. Vanilla pokerogue
+          // species fill slots 1/2 with NONE so this is a 1-entry append; ER
+          // species (post-B1a) get up to 3 passive entries.
+          const passiveAbilities = this.pokemon.getPassiveAbilities();
+          for (const passiveAbility of passiveAbilities) {
+            if (!passiveAbility) {
+              continue;
+            }
+            allAbilityInfo.push({
+              labelImage: globalScene.add.image(0, 0, getLocalizedSpriteKey("summary_profile_passive")), // Pixel text 'PASSIVE'
+              ability: passiveAbility,
+              nameText: null,
+              descriptionText: null,
+            });
+          }
+          // Keep the legacy passiveContainer reference pointing at slot 0 for
+          // back-compat with any other code path that reads it directly. (Only
+          // assigned when at least one passive landed in the array.)
+          if (allAbilityInfo.length > 1) {
+            this.passiveContainer = allAbilityInfo[1];
+          }
 
           // Sets up the pixel button prompt image
           this.abilityPrompt = globalScene.add.image(
