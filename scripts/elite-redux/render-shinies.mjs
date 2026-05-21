@@ -68,17 +68,21 @@ const VIEWS = [
  * Render every shiny variant for a single species directory.
  *
  * @param {string} slug
- * @param {string} vendorDir absolute path to the species' vendor dir
+ * @param {string} vendorDir absolute path to the species' vendor dir (used for `shiny.pal`)
  * @param {string} outDir absolute path to the species' output dir
+ * @param {{ pngSource?: string }} [opts] override PNG source dir (defaults to `vendorDir`).
+ *   Palette-only forms have their `front.png`/`back.png` palette-derived
+ *   into the OUTPUT dir by `fetch-sprites.mjs`, not the vendor dir.
  * @returns {Promise<{ written: number, skipped: number, missingPalettes: string[], errors: string[] }>}
  */
-export async function renderSpecies(slug, vendorDir, outDir) {
+export async function renderSpecies(slug, vendorDir, outDir, opts = {}) {
   /** @type {string[]} */
   const errors = [];
   /** @type {string[]} */
   const missingPalettes = [];
   let written = 0;
   let skipped = 0;
+  const pngSource = opts.pngSource ?? vendorDir;
 
   // Load shiny palette (one per species — applies to both front + back).
   const shinyPalPath = join(vendorDir, "shiny.pal");
@@ -99,7 +103,7 @@ export async function renderSpecies(slug, vendorDir, outDir) {
   const palettesByTier = TIERS.map(t => (t.hueShift === 0 ? shinyPal : rotateHue(shinyPal, t.hueShift)));
 
   for (const view of VIEWS) {
-    const srcPath = join(vendorDir, view.src);
+    const srcPath = join(pngSource, view.src);
     if (!existsSync(srcPath)) {
       // Not all species have back sprites; skip silently — the manifest's
       // audit pass tracks missing PNGs, not this renderer.
@@ -148,11 +152,53 @@ export async function renderSpecies(slug, vendorDir, outDir) {
 }
 
 /**
- * Iterate every top-level species directory under `vendor/.../graphics/pokemon/`
+ * Walk every species directory under `vendor/.../graphics/pokemon/` and
+ * collect a flattened (slug → vendorDir) map of every renderable species and
+ * form sub-directory. Slug derivation mirrors `fetch-sprites.mjs`:
+ *
+ *   `bulbasaur/`            → slug `bulbasaur`
+ *   `arceus/bug/`           → slug `arceus_bug`
+ *   `minior/core/red/`      → slug `minior_core_red`
+ *
+ * The slug must match the manifest builder's output (lower_snake_case derived
+ * from the upstream dir path) so `audit-sprites` can verify each entry.
+ *
+ * @param {string} root
+ * @returns {Promise<Map<string, string>>}
+ */
+async function collectSpeciesDirs(root) {
+  /** @type {Map<string, string>} */
+  const out = new Map();
+  /**
+   * @param {string} dir
+   * @param {string} slug
+   */
+  async function walk(dir, slug) {
+    out.set(slug, dir);
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const ent of entries) {
+      if (ent.isDirectory()) {
+        await walk(join(dir, ent.name), `${slug}_${ent.name}`);
+      }
+    }
+  }
+  const top = await readdir(root, { withFileTypes: true });
+  for (const ent of top) {
+    if (ent.isDirectory()) {
+      await walk(join(root, ent.name), ent.name);
+    }
+  }
+  return out;
+}
+
+/**
+ * Iterate every species + form directory under `vendor/.../graphics/pokemon/`
  * and render shinies into the matching `assets/.../<slug>/` directory.
  *
- * Form sub-directories (e.g. `arceus/bug/`) are not rendered — those would
- * require A11/B-followup mirroring to lay out the source PNGs first.
+ * Form sub-directories are flattened into the slug (e.g. `arceus/bug/` →
+ * `arceus_bug/`). Palette-only forms work the same way: fetch-sprites.mjs
+ * has already palette-derived `front.png` + `back.png` for them, so the
+ * renderer just has to apply `shiny.pal` from the form dir.
  *
  * @param {{ limit?: number, slugFilter?: string }} [opts]
  */
@@ -160,11 +206,8 @@ export async function renderAll(opts = {}) {
   if (!existsSync(VENDOR_ROOT)) {
     throw new Error(`vendor sprite tree missing: ${VENDOR_ROOT}\nRun 'pnpm run er:fetch-sprites' first.`);
   }
-  const entries = await readdir(VENDOR_ROOT, { withFileTypes: true });
-  let slugs = entries
-    .filter(e => e.isDirectory())
-    .map(e => e.name)
-    .sort();
+  const allDirs = await collectSpeciesDirs(VENDOR_ROOT);
+  let slugs = [...allDirs.keys()].sort();
   if (opts.slugFilter) {
     slugs = slugs.filter(s => s === opts.slugFilter);
   }
@@ -183,9 +226,12 @@ export async function renderAll(opts = {}) {
 
   for (const slug of slugs) {
     speciesProcessed++;
-    const vendorDir = join(VENDOR_ROOT, slug);
+    const vendorDir = /** @type {string} */ (allDirs.get(slug));
     const outDir = join(ASSET_ROOT, slug);
-    const result = await renderSpecies(slug, vendorDir, outDir);
+    // Palette-only forms: the form's shiny.pal applies to the form-derived
+    // PNGs that fetch-sprites.mjs wrote, which live in ASSET_ROOT — NOT in
+    // the vendor dir. Pass ASSET_ROOT as the PNG source via `pngSource`.
+    const result = await renderSpecies(slug, vendorDir, outDir, { pngSource: outDir });
     totalWritten += result.written;
     totalSkipped += result.skipped;
     allMissingPalettes.push(...result.missingPalettes);
@@ -193,7 +239,7 @@ export async function renderAll(opts = {}) {
     if (result.written > 0 || result.skipped > 0) {
       speciesSucceeded++;
     }
-    if (speciesProcessed % 100 === 0) {
+    if (speciesProcessed % 200 === 0) {
       console.log(`[er:render-shinies] progressed ${speciesProcessed}/${slugs.length} species…`);
     }
   }
