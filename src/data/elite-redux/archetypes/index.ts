@@ -24,6 +24,7 @@
 
 // biome-ignore lint/performance/noBarrelFile: archetype layer is intentionally a barrel for Phase C tests + ER ability wiring; small module set
 export { ChanceStatusOnHitAbAttr, type ChanceStatusOnHitOptions } from "./chance-status-on-hit";
+export { type CompositeOptions, composeAbAttrs } from "./composite";
 export {
   ConditionalDamageAbAttr,
   type ConditionalDamageOptions,
