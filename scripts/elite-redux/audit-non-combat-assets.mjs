@@ -81,6 +81,27 @@ const CATEGORIES = [
     minPngs: 5,
     probes: ["wallpapers"],
   },
+  {
+    dir: "pokedex",
+    // ER's pokedex chrome is largely .bin tilemaps + .pal palettes; the
+    // PNG floor only requires the screen-region overlays to land.
+    minPngs: 1,
+    probes: [],
+  },
+  {
+    dir: "summary_screen",
+    // Summary screen has a small PNG set (HP bar, A/B button hints, move
+    // selector) plus the ball-icons sub-dir of pokeball variants.
+    minPngs: 5,
+    probes: ["a_button.png", "b_button.png", "hp_bar.png", "ball_icons"],
+  },
+  {
+    dir: "evolution_scene",
+    // Evolution scene only ships one PNG (`bg.png`) — the rest are palettes
+    // and tile data the engine renders procedurally.
+    minPngs: 1,
+    probes: ["bg.png"],
+  },
 ];
 
 /**

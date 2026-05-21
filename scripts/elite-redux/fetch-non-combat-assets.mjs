@@ -13,6 +13,14 @@
  *   - graphics/battle_interface/ in-battle UI (HP bars, status icons, ...)
  *   - graphics/types/           type chips (fire.png, water.png, ...)
  *   - graphics/pokemon_storage/ PC box wallpapers + storage UI
+ *   - graphics/pokedex/         pokedex screen chrome (HGSS-style overlays, ...)
+ *   - graphics/summary_screen/  party-summary screen (HP bar, page tabs, ...)
+ *   - graphics/evolution_scene/ evolution-cutscene backgrounds
+ *
+ * Skipped categories (no pokerogue analogue):
+ *   - graphics/pokenav/      — overworld nav system; pokerogue has no map screen
+ *   - graphics/title_screen/ — pokerogue ships its own title art
+ *   - graphics/intro/        — pokerogue ships its own opening cinematic
  *
  * Shares the vendor clone with fetch-sprites.mjs by appending to the existing
  * sparse-checkout patterns. Idempotent — pass --force to re-sync.
@@ -48,6 +56,9 @@ const CATEGORIES = [
   { sparse: "graphics/battle_interface/", src: "graphics/battle_interface", dst: "battle_interface" },
   { sparse: "graphics/types/", src: "graphics/types", dst: "types" },
   { sparse: "graphics/pokemon_storage/", src: "graphics/pokemon_storage", dst: "pokemon_storage" },
+  { sparse: "graphics/pokedex/", src: "graphics/pokedex", dst: "pokedex" },
+  { sparse: "graphics/summary_screen/", src: "graphics/summary_screen", dst: "summary_screen" },
+  { sparse: "graphics/evolution_scene/", src: "graphics/evolution_scene", dst: "evolution_scene" },
 ];
 
 // Existing pattern from fetch-sprites.mjs — keep it so the combat clone stays usable.
