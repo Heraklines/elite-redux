@@ -35,9 +35,12 @@ const SPRITE_ROOT = "assets/images/pokemon/elite-redux";
  * Elite-Redux/eliteredux repo's actual layout: per-species directory with
  * variants as siblings (`<slug>/front.png`, `<slug>/back.png`, etc.).
  *
- * **No shiny PNGs upstream** — Elite-Redux ships shinies as `.pal` palette
- * files for runtime palette-swap. Phase C wires the palette load; the
- * manifest only lists the PNG variants that exist on disk.
+ * **Shinies are GENERATED, not stored upstream.** Elite-Redux ships
+ * `shiny.pal` (a single JASC-PAL palette) per species. Pokerogue uses 3
+ * shiny tiers (regular/+/++), so `scripts/elite-redux/render-shinies.mjs`
+ * applies the upstream shiny.pal at tier 1, then hue-rotates it by 120°
+ * and 240° to derive tiers 2 and 3. Output paths follow the same per-slug
+ * directory layout as the base sprites.
  *
  * @param {string} slug
  */
@@ -48,6 +51,12 @@ export function buildSpritePaths(slug) {
     icon: `${SPRITE_ROOT}/${slug}/icon.png`,
     animFront: `${SPRITE_ROOT}/${slug}/anim_front.png`,
     footprint: `${SPRITE_ROOT}/${slug}/footprint.png`,
+    shinyFront: `${SPRITE_ROOT}/${slug}/shiny.png`,
+    shinyBack: `${SPRITE_ROOT}/${slug}/shiny-back.png`,
+    shinyPlusFront: `${SPRITE_ROOT}/${slug}/shiny-2.png`,
+    shinyPlusBack: `${SPRITE_ROOT}/${slug}/shiny-back-2.png`,
+    shinyUltraFront: `${SPRITE_ROOT}/${slug}/shiny-3.png`,
+    shinyUltraBack: `${SPRITE_ROOT}/${slug}/shiny-back-3.png`,
   };
 }
 
@@ -96,6 +105,15 @@ export async function build({ dump, outDir, flags }) {
   readonly icon: string;
   readonly animFront: string;
   readonly footprint: string;
+  /** Tier 1 shiny — derived from upstream \`shiny.pal\` (regular shiny). */
+  readonly shinyFront: string;
+  readonly shinyBack: string;
+  /** Tier 2 shiny — \`shiny.pal\` hue-rotated +120° (rare). */
+  readonly shinyPlusFront: string;
+  readonly shinyPlusBack: string;
+  /** Tier 3 shiny — \`shiny.pal\` hue-rotated +240° (legendary). */
+  readonly shinyUltraFront: string;
+  readonly shinyUltraBack: string;
 }
 
 export interface ErSpriteEntry {

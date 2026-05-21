@@ -21,13 +21,38 @@ describe("sprite manifest (pure)", () => {
     expect(speciesConstToSlug("")).toBe("");
   });
 
-  it("buildSpritePaths produces 5 paths matching upstream <slug>/<variant>.png layout", () => {
+  it("buildSpritePaths produces 11 paths matching upstream <slug>/<variant>.png layout", () => {
     const paths = buildSpritePaths("bulbasaur");
     expect(paths.front).toBe("assets/images/pokemon/elite-redux/bulbasaur/front.png");
     expect(paths.back).toBe("assets/images/pokemon/elite-redux/bulbasaur/back.png");
     expect(paths.icon).toBe("assets/images/pokemon/elite-redux/bulbasaur/icon.png");
     expect(paths.animFront).toBe("assets/images/pokemon/elite-redux/bulbasaur/anim_front.png");
     expect(paths.footprint).toBe("assets/images/pokemon/elite-redux/bulbasaur/footprint.png");
+    expect(paths.shinyFront).toBe("assets/images/pokemon/elite-redux/bulbasaur/shiny.png");
+    expect(paths.shinyBack).toBe("assets/images/pokemon/elite-redux/bulbasaur/shiny-back.png");
+    expect(paths.shinyPlusFront).toBe("assets/images/pokemon/elite-redux/bulbasaur/shiny-2.png");
+    expect(paths.shinyPlusBack).toBe("assets/images/pokemon/elite-redux/bulbasaur/shiny-back-2.png");
+    expect(paths.shinyUltraFront).toBe("assets/images/pokemon/elite-redux/bulbasaur/shiny-3.png");
+    expect(paths.shinyUltraBack).toBe("assets/images/pokemon/elite-redux/bulbasaur/shiny-back-3.png");
+  });
+
+  it("buildSpritePaths returns exactly 11 keys (no surplus / no missing)", () => {
+    const paths = buildSpritePaths("bulbasaur");
+    expect(Object.keys(paths).sort()).toEqual(
+      [
+        "animFront",
+        "back",
+        "footprint",
+        "front",
+        "icon",
+        "shinyBack",
+        "shinyFront",
+        "shinyPlusBack",
+        "shinyPlusFront",
+        "shinyUltraBack",
+        "shinyUltraFront",
+      ].sort(),
+    );
   });
 
   it("buildSpriteEntry maps Bulbasaur from smoke fixture", async () => {
