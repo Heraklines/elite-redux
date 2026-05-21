@@ -1,5 +1,8 @@
 // =============================================================================
-// Elite Redux — Phase B Task B2: register ER-custom moves in `allMoves`.
+// Elite Redux — Phase B Task B2 / Phase D Task D4:
+//   - B2: register ER-custom moves in `allMoves`.
+//   - D4: wire archetype-classified moves' `MoveFlags` bits + `MoveAttr`
+//     instances onto each registered move via the move-archetype dispatcher.
 //
 // Reads `er-moves.ts` and, for every entry whose pokerogue id resolves to
 // ≥ VANILLA_ID_CUTOFF (the ER-custom range — see `er-id-map.ts`), constructs
@@ -10,23 +13,39 @@
 // vanilla-rebalance task. ER moves whose const happens to match a vanilla
 // MoveId (e.g. `MOVE_POUND`) simply get the vanilla id and skip.
 //
-// Behavior note: Phase B registers placeholder moves only — they own id,
-// name, effect (description), type/category/power/accuracy/pp/priority, but
-// they ship with NO `MoveAttr`s attached beyond the framework defaults
-// (AttackMove auto-adds HealStatusEffectAttr for FIRE-type moves, which is
-// fine; no other auto-attrs). Phase C will wire actual per-move behavior.
+// Behavior note (Phase D4): archetype-classified moves get:
+//   - flag-tagged-move (100): MoveFlag bits OR'd into the Move's flag bitmask,
+//     plus an optional status-chance side effect when present.
+//   - chance-status-on-hit (20): StatusEffectAttr or AddBattlerTagAttr.
+//   - recoil-or-drain (7): RecoilAttr (mode=recoil) or HitHealAttr (mode=drain),
+//     plus RECKLESS_MOVE / TRIAGE_MOVE flags.
+//   - type-conversion (2): a custom BestEffectivenessTypeAttr (subclass of
+//     VariableMoveTypeAttr) that picks the most effective type at apply-time.
+//   - conditional-damage (1): MovePowerMultiplierAttr with a closure over the
+//     user's status state (ER's Facade analog).
+//   - bespoke (58): no wiring; placeholder behavior preserved.
 //
 // i18n note: pokerogue's `Move.localize()` derives an `i18nKey` from
 // `MoveId[this.id]`. For custom ids (≥ 5000) that reverse-lookup returns
 // `undefined`, which would throw inside `toCamelCase`. We override
 // `localize()` in subclasses to read the draft name/description verbatim
 // from a pre-stashed map.
+//
+// Flag mutability note: pokerogue's `Move.flags` field is private with a
+// private `setFlag()` helper — no public surface exists for OR'ing arbitrary
+// bits post-construction. The subclasses here expose a public
+// `applyErArchetype(flags, attrs)` method that uses a runtime cast to OR
+// directly into the field; this is a deliberate ER-glue escape hatch (the
+// `private` modifier is a TS compile-time check only — at runtime the field
+// is a regular property).
 // =============================================================================
 
 import { allMoves } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { ER_MOVE_ARCHETYPES, type ErMoveArchetypeKind } from "#data/elite-redux/er-move-archetypes";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
-import { AttackMove, type Move, SelfStatusMove, StatusMove } from "#data/moves/move";
+import { dispatchMoveArchetype } from "#data/elite-redux/move-archetype-dispatcher";
+import { AttackMove, type Move, type MoveAttr, SelfStatusMove, StatusMove } from "#data/moves/move";
 import { MoveCategory } from "#enums/move-category";
 import type { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
@@ -47,6 +66,30 @@ export interface InitEliteReduxCustomMovesResult {
   customsAlreadyPresent: number;
   /** Non-fatal issues — e.g. constructor failures with a usable error message. */
   errors: string[];
+  /**
+   * Per-archetype count of how many moves got at least one MoveAttr OR flag
+   * bit wired via the dispatcher this run. Only counts NEW additions
+   * (idempotent re-run sees zero). Bespoke/missing-shape rows don't appear
+   * in this map.
+   */
+  attrsWiredByArchetype: Record<string, number>;
+  /**
+   * Per-archetype count of how many rows the dispatcher skipped this run
+   * (because the params shape didn't have a wired translation). Surfaces
+   * coverage gaps without failing the build.
+   */
+  dispatchSkipsByArchetype: Record<string, number>;
+  /**
+   * Total number of MoveAttr instances attached this run across every move.
+   * A single move with N attrs contributes N.
+   */
+  totalAttrsAttached: number;
+  /**
+   * Total number of MoveFlag bits OR'd this run across every move. Counts
+   * each row's bitmask population — i.e. a move that received two flag bits
+   * contributes 2.
+   */
+  totalFlagBitsApplied: number;
 }
 
 /**
@@ -125,6 +168,32 @@ function mapSplit(erSplit: number): MoveCategory {
 }
 
 /**
+ * Bit-or a `MoveFlags` mask onto a Move instance via runtime cast. The
+ * `flags` field on `Move` is declared `private` (TS compile-time only), so
+ * a typed cast suffices to access it at runtime without altering core.
+ *
+ * Also forwards a list of pre-built `MoveAttr` instances through the public
+ * `Move.addAttr(...)` API so any per-attr `MoveCondition` chains are
+ * registered correctly.
+ *
+ * Idempotent: re-applying the same bits is a no-op (bitmask OR is idempotent).
+ *
+ * @param move - The Move to mutate
+ * @param flagBits - The bitmask of `MoveFlags` to OR onto `move.flags`
+ * @param attrs - Pre-built MoveAttr instances to attach
+ */
+function applyErArchetypeToMove(move: Move, flagBits: number, attrs: readonly MoveAttr[]): void {
+  if (flagBits !== 0) {
+    // `private` is a TypeScript compile-time check; at runtime `flags` is a
+    // regular property on the Move instance.
+    (move as unknown as { flags: number }).flags |= flagBits;
+  }
+  for (const attr of attrs) {
+    move.addAttr(attr);
+  }
+}
+
+/**
  * Thin `AttackMove` subclass for ER-custom attack moves. Overrides
  * `localize()` to read the draft's display name/description from a static
  * registry — the vanilla implementation looks up `MoveId[this.id]` which is
@@ -176,6 +245,18 @@ class ErCustomSelfStatusMove extends SelfStatusMove {
   }
 }
 
+/** Count the number of set bits in a (non-negative integer) bitmask. */
+function popcount(mask: number): number {
+  // The ER MoveFlags enum has < 32 bits, so a simple Brian-Kernighan loop is fine.
+  let count = 0;
+  let m = mask;
+  while (m > 0) {
+    m &= m - 1;
+    count++;
+  }
+  return count;
+}
+
 /**
  * Construct `Move` instances for the ER-custom moves and push them onto
  * `allMoves`. Idempotent: a re-run skips moves that are already present
@@ -183,14 +264,18 @@ class ErCustomSelfStatusMove extends SelfStatusMove {
  *
  * Order constraint: must run AFTER `initMoves()` (so the vanilla baseline
  * is in place) and AFTER `initAbilities()` (some `MoveAttr` flag checks read
- * ability state, though customs currently ship no attrs). Typically called
- * from `init/init.ts:initializeGame()` right after `initEliteReduxCustomAbilities()`.
+ * ability state). Typically called from `init/init.ts:initializeGame()`
+ * right after `initEliteReduxCustomAbilities()`.
  */
 export function initEliteReduxCustomMoves(): InitEliteReduxCustomMovesResult {
   const result: InitEliteReduxCustomMovesResult = {
     customsAdded: 0,
     customsAlreadyPresent: 0,
     errors: [],
+    attrsWiredByArchetype: {},
+    dispatchSkipsByArchetype: {},
+    totalAttrsAttached: 0,
+    totalFlagBitsApplied: 0,
   };
 
   // Build a O(1) id → bool lookup for idempotency.
@@ -214,7 +299,7 @@ export function initEliteReduxCustomMoves(): InitEliteReduxCustomMovesResult {
     }
 
     try {
-      const move = buildCustomMove(draft, pokerogueId);
+      const move = buildCustomMove(draft, pokerogueId, result);
       (allMoves as Move[]).push(move);
       existingIds.add(pokerogueId);
       result.customsAdded++;
@@ -231,17 +316,24 @@ export function initEliteReduxCustomMoves(): InitEliteReduxCustomMovesResult {
  * Construct a single ER-custom `Move` from its draft. Selects between
  * `ErCustomAttackMove`, `ErCustomStatusMove`, and `ErCustomSelfStatusMove`
  * based on the ER `split` field and target. Generation is fixed at 9 for
- * now — TODO(Phase C): derive from ER archetype taxonomy.
+ * now — TODO(Phase D): derive from ER archetype taxonomy.
  *
- * No `MoveAttr`s are attached at this stage (placeholder move — Phase C
- * wires behavior). `AttackMove` may auto-add `HealStatusEffectAttr` for
- * FIRE-type moves (intentional vanilla behavior, kept verbatim).
+ * Phase D4: when the ER move's archetype row in `ER_MOVE_ARCHETYPES` is
+ * non-bespoke and the dispatcher produces flag bits and/or MoveAttr
+ * instances, those are applied to the Move post-construction via
+ * `applyErArchetypeToMove`. `bespoke` and shapes the dispatcher can't yet
+ * translate produce no wire-up (placeholder behavior unchanged from B2).
+ *
+ * `AttackMove` may auto-add `HealStatusEffectAttr` for FIRE-type moves
+ * (intentional vanilla behavior, kept verbatim).
  *
  * @param draft - ER move draft from `er-moves.ts`
  * @param pokerogueId - pokerogue move id (≥ VANILLA_ID_CUTOFF) from `ER_ID_MAP.moves`
+ * @param result - aggregate result object — mutated to record per-archetype wired/skip counts
  */
 function buildCustomMove(
   draft: {
+    id: number;
     name: string;
     description: string;
     types: readonly number[];
@@ -253,6 +345,7 @@ function buildCustomMove(
     effectChance: number;
   },
   pokerogueId: number,
+  result: InitEliteReduxCustomMovesResult,
 ): Move {
   const type = mapType(draft.types[0] ?? 0);
   const category = mapSplit(draft.split);
@@ -267,6 +360,7 @@ function buildCustomMove(
   // "infinite" in some places — coerce to 5 as a safe minimum.
   const pp = draft.pp > 0 ? draft.pp : 5;
 
+  let move: Move;
   if (category === MoveCategory.STATUS) {
     // ER doesn't distinguish self-status from foe-status in the `split`
     // field — defer to the `target` field. ER target 2 = USER per
@@ -276,32 +370,82 @@ function buildCustomMove(
     const isSelfStatus = (draft as { target?: number }).target === 2;
     if (isSelfStatus) {
       ErCustomSelfStatusMove.registerDraft(pokerogueId, draft.name, draft.description);
-      return new ErCustomSelfStatusMove(
+      move = new ErCustomSelfStatusMove(
         pokerogueId as MoveId,
         type,
         accuracy,
         pp,
         chance,
         draft.priority,
-        9, // generation — TODO(Phase C): derive from archetype
+        9, // generation — TODO(Phase D): derive from archetype
       );
+    } else {
+      ErCustomStatusMove.registerDraft(pokerogueId, draft.name, draft.description);
+      move = new ErCustomStatusMove(pokerogueId as MoveId, type, accuracy, pp, chance, draft.priority, 9);
     }
-    ErCustomStatusMove.registerDraft(pokerogueId, draft.name, draft.description);
-    return new ErCustomStatusMove(pokerogueId as MoveId, type, accuracy, pp, chance, draft.priority, 9);
+  } else {
+    // AttackMove (PHYSICAL/SPECIAL/etc.). Default target is NEAR_OTHER (set
+    // by AttackMove). Per-move MoveTarget refinement is Phase C.
+    ErCustomAttackMove.registerDraft(pokerogueId, draft.name, draft.description);
+    move = new ErCustomAttackMove(
+      pokerogueId as MoveId,
+      type,
+      category,
+      draft.power > 0 ? draft.power : 0,
+      accuracy,
+      pp,
+      chance,
+      draft.priority,
+      9,
+    );
   }
 
-  // AttackMove (PHYSICAL/SPECIAL/etc.). Default target is NEAR_OTHER (set
-  // by AttackMove). Per-move MoveTarget refinement is Phase C.
-  ErCustomAttackMove.registerDraft(pokerogueId, draft.name, draft.description);
-  return new ErCustomAttackMove(
-    pokerogueId as MoveId,
-    type,
-    category,
-    draft.power > 0 ? draft.power : 0,
-    accuracy,
-    pp,
-    chance,
-    draft.priority,
-    9,
-  );
+  // Phase D4: wire archetype-classified flags + attrs via the dispatcher. We
+  // look up the archetype row by the ER-side id (not the pokerogue id) since
+  // the classifier keys on ER's source numbering.
+  const archetypeRow = ER_MOVE_ARCHETYPES[draft.id];
+  if (archetypeRow !== undefined) {
+    wireArchetypeToMove(move, archetypeRow.archetype, archetypeRow.params, result);
+  }
+
+  return move;
+}
+
+/**
+ * Dispatch the archetype row through the move dispatcher and apply the
+ * produced flags + attrs to the Move. Records per-archetype wired/skip
+ * counts in `result` for diagnostics.
+ *
+ * Any throw from the dispatcher (e.g. an attr constructor's invariant check)
+ * is caught here and recorded in `result.errors`, then the move proceeds
+ * without those wire-ups — better to register the move as a placeholder
+ * than to fail the whole init pass.
+ */
+function wireArchetypeToMove(
+  move: Move,
+  archetype: ErMoveArchetypeKind,
+  params: Record<string, unknown> | null,
+  result: InitEliteReduxCustomMovesResult,
+): void {
+  let dispatched: ReturnType<typeof dispatchMoveArchetype>;
+  try {
+    dispatched = dispatchMoveArchetype(archetype, params);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    result.errors.push(`Move archetype ${archetype} dispatch threw for move id ${move.id}: ${msg}`);
+    return;
+  }
+  const hasFlags = dispatched.flags !== 0;
+  const hasAttrs = dispatched.attrs.length > 0;
+  if (!hasFlags && !hasAttrs) {
+    // Skipped — either bespoke (expected) or shape-mismatch (logged).
+    if (dispatched.skipReason !== null) {
+      result.dispatchSkipsByArchetype[archetype] = (result.dispatchSkipsByArchetype[archetype] ?? 0) + 1;
+    }
+    return;
+  }
+  applyErArchetypeToMove(move, dispatched.flags, dispatched.attrs);
+  result.attrsWiredByArchetype[archetype] = (result.attrsWiredByArchetype[archetype] ?? 0) + 1;
+  result.totalAttrsAttached += dispatched.attrs.length;
+  result.totalFlagBitsApplied += popcount(dispatched.flags);
 }
