@@ -51,4 +51,59 @@ export enum MoveFlags {
   REFLECTABLE = 1 << 18,
   /** Indicates a move should fail when {@link https://bulbapedia.bulbagarden.net/wiki/Gravity_(move) | Gravity} is in effect */
   GRAVITY = 1 << 19,
+  /**
+   * Elite Redux: air- or wing-based moves. Boosted by ER abilities such as
+   * `Giant Wings`. No vanilla pokerogue analog.
+   */
+  AIR_BASED = 1 << 20,
+  /**
+   * Elite Redux: arrow-based moves. Boosted by ER's `Archer` ability.
+   * No vanilla pokerogue analog.
+   */
+  ARROW_BASED = 1 << 21,
+  /**
+   * Elite Redux: bone-based moves. Boosted by ER's `Calcium Bones` ability
+   * (sourced from Marowak-family moves). No vanilla pokerogue analog.
+   */
+  BONE_BASED = 1 << 22,
+  /**
+   * Elite Redux: drill-based moves. Often shares boosters with
+   * {@linkcode HORN_BASED} via composite ER abilities. No vanilla pokerogue analog.
+   */
+  DRILL_BASED = 1 << 23,
+  /**
+   * Elite Redux: terrain/field-interaction moves. Triggers ER abilities
+   * that key on field manipulation. No vanilla pokerogue analog.
+   */
+  FIELD_BASED = 1 << 24,
+  /**
+   * Elite Redux: hammer-based moves. Boosted by ER's `Super Slammer` ability.
+   * No vanilla pokerogue analog.
+   */
+  HAMMER_BASED = 1 << 25,
+  /**
+   * Elite Redux: horn-based moves. Boosted by ER's `Mighty Horn` ability
+   * (and its drill-flavoured composite). No vanilla pokerogue analog.
+   */
+  HORN_BASED = 1 << 26,
+  /**
+   * Elite Redux: kicking moves. Boosted by ER's `Striker` ability (the
+   * kick-flavoured Iron Fist analog). No vanilla pokerogue analog.
+   */
+  KICKING_MOVE = 1 << 27,
+  /**
+   * Elite Redux: lunar-themed moves (e.g. moon-flavoured attacks). Used by
+   * ER's lunar-themed forms for stat-boost interactions. No vanilla pokerogue analog.
+   */
+  LUNAR_MOVE = 1 << 28,
+  /**
+   * Elite Redux: throw-flavoured moves (Beat Up, Bonemerang lineage). Used by
+   * ER throw-boost abilities. No vanilla pokerogue analog.
+   */
+  THROW_BASED = 1 << 29,
+  /**
+   * Elite Redux: moves whose mechanics interact with the active weather.
+   * Used by ER weather-syncing abilities. No vanilla pokerogue analog.
+   */
+  WEATHER_BASED = 1 << 30,
 }

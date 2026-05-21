@@ -50,6 +50,7 @@
     "er:classify-abilities": "node scripts/elite-redux/classify-abilities.mjs",
     "er:classify-moves": "node scripts/elite-redux/classify-moves.mjs",
     "er:audit-sprites": "node scripts/elite-redux/audit-sprites.mjs",
+    "er:audit-flag-mapping": "node scripts/elite-redux/audit-flag-mapping.mjs",
     "er:test": "vitest run test/data/elite-redux"
   },
   "dependencies": {
