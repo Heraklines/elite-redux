@@ -1,3 +1,5 @@
+ignoredBuiltDependencies:
+  - puppeteer
 minimumReleaseAge: 1440
 
 onlyBuiltDependencies:

@@ -57,3 +57,6 @@ vendor/elite-redux/*.json
 vendor/elite-redux/sprites/
 assets/images/pokemon/elite-redux/
 assets/images/elite-redux/
+
+# Elite Redux visual verification screenshots (generated locally, not committed).
+docs/plans/screenshots/
