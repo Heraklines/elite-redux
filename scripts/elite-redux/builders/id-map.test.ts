@@ -8,7 +8,13 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildIdMapForCategory, buildTrainerClassMap, loadEnumValues, normalizeName } from "./id-map.mjs";
+import {
+  buildIdMapForCategory,
+  buildTrainerClassMap,
+  loadEnumValues,
+  normalizeName,
+  regionalSpeciesAliases,
+} from "./id-map.mjs";
 
 const VENDOR_PATH = resolve(__dirname, "../../../vendor/elite-redux/v2.65beta.json");
 
@@ -84,6 +90,54 @@ describe("id-map transformer (pure)", () => {
     expect(r.map[4]).toBe(1001);
     expect(r.vanillaCount).toBe(2);
     expect(r.customCount).toBe(2);
+  });
+});
+
+describe("regionalSpeciesAliases (pure)", () => {
+  it("RAICHU_ALOLAN → ALOLA_RAICHU", () => {
+    expect(regionalSpeciesAliases("RAICHU_ALOLAN")).toEqual([normalizeName("ALOLA_RAICHU")]);
+  });
+
+  it("GROWLITHE_HISUIAN → HISUI_GROWLITHE", () => {
+    expect(regionalSpeciesAliases("GROWLITHE_HISUIAN")).toEqual([normalizeName("HISUI_GROWLITHE")]);
+  });
+
+  it("SLOWBRO_MEGA_GALARIAN → GALAR_SLOWBRO_MEGA (mega flag retained)", () => {
+    expect(regionalSpeciesAliases("SLOWBRO_MEGA_GALARIAN")).toEqual([normalizeName("GALAR_SLOWBRO_MEGA")]);
+  });
+
+  it("TAUROS_PALDEAN_COMBAT → PALDEA_TAUROS_COMBAT (multi-token base after suffix)", () => {
+    expect(regionalSpeciesAliases("TAUROS_PALDEAN_COMBAT")).toEqual([normalizeName("PALDEA_TAUROS_COMBAT")]);
+  });
+
+  it("VENUSAUR (no regional suffix) → empty", () => {
+    expect(regionalSpeciesAliases("VENUSAUR")).toEqual([]);
+  });
+
+  it("buildIdMapForCategory consults aliasFn on miss", () => {
+    const vanilla = new Map([
+      ["alolaraichu", 2026],
+      ["raichu", 26],
+    ]);
+    const entries = [
+      { id: 1, name: "RAICHU" },
+      { id: 2, name: "RAICHU_ALOLAN" },
+    ];
+    const r = buildIdMapForCategory(entries, vanilla, 5000, regionalSpeciesAliases);
+    expect(r.map[1]).toBe(26); // direct match
+    expect(r.map[2]).toBe(2026); // via regional alias
+    expect(r.aliasHits).toBe(1);
+    expect(r.vanillaCount).toBe(2);
+    expect(r.customCount).toBe(0);
+  });
+
+  it("aliasFn miss falls through to custom assignment", () => {
+    const vanilla = new Map<string, number>();
+    const entries = [{ id: 1, name: "RAICHU_ALOLAN" }];
+    const r = buildIdMapForCategory(entries, vanilla, 5000, regionalSpeciesAliases);
+    expect(r.map[1]).toBe(5000);
+    expect(r.aliasHits).toBe(0);
+    expect(r.customCount).toBe(1);
   });
 });
 

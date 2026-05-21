@@ -83,6 +83,54 @@ export function normalizeName(s) {
 }
 
 /**
+ * Map of ER regional-form suffix (e.g. `ALOLAN`) → pokerogue enum prefix
+ * (e.g. `ALOLA`). ER ships regional forms as `<base>_<suffix>` species
+ * (e.g. `SPECIES_RAICHU_ALOLAN`); pokerogue stores them as standalone
+ * `<prefix>_<base>` enum values (e.g. `SpeciesId.ALOLA_RAICHU`).
+ *
+ * Used by `regionalSpeciesAliases()` to derive candidate pokerogue keys
+ * the name-normalize pass would otherwise miss.
+ */
+const REGIONAL_SUFFIX_TO_PREFIX = Object.freeze({
+  ALOLAN: "ALOLA",
+  GALARIAN: "GALAR",
+  HISUIAN: "HISUI",
+  PALDEAN: "PALDEA",
+});
+
+/**
+ * For an ER species const (e.g. `RAICHU_ALOLAN` — the SPECIES_ prefix has
+ * already been stripped by the caller), yield zero or more candidate
+ * pokerogue enum keys derived from regional-form aliases.
+ *
+ * Examples:
+ *   RAICHU_ALOLAN              → ALOLA_RAICHU
+ *   SLOWBRO_MEGA_GALARIAN      → GALAR_SLOWBRO_MEGA (mega-flag preserved)
+ *   GROWLITHE_HISUIAN          → HISUI_GROWLITHE
+ *   TAUROS_PALDEAN_COMBAT_BREED → PALDEA_TAUROS_COMBAT_BREED (multi-token base)
+ *
+ * Returns the alternative key forms IN ADDITION to the original — callers
+ * should still try the original first (`raichualolan` → no match → try
+ * regional candidates).
+ *
+ * @param {string} name SPECIES_-stripped const (e.g. `RAICHU_ALOLAN`)
+ * @returns {string[]} candidate keys, normalized form (use as Map.get input)
+ */
+export function regionalSpeciesAliases(name) {
+  /** @type {string[]} */
+  const out = [];
+  for (const suffix of Object.keys(REGIONAL_SUFFIX_TO_PREFIX)) {
+    const re = new RegExp(`_${suffix}(?=_|$)`);
+    if (re.test(name)) {
+      const base = name.replace(re, "");
+      const prefix = REGIONAL_SUFFIX_TO_PREFIX[/** @type {keyof typeof REGIONAL_SUFFIX_TO_PREFIX} */ (suffix)];
+      out.push(normalizeName(`${prefix}_${base}`));
+    }
+  }
+  return out;
+}
+
+/**
  * Parse a pokerogue enum file and return a Map of `normalizedKey → numericValue`.
  * Handles both `KEY = N,` (explicit) and `KEY,` (sequential — auto-incremented).
  * If `= <expr>` is non-literal (unlikely for these enums but defensive), the
@@ -128,20 +176,27 @@ export async function loadEnumValues(enumFilename, minSize) {
 
 /**
  * Build an ID map for one entity category. For each entry, the normalized
- * name is looked up in `vanillaMap`; on miss, a fresh custom ID is assigned
- * starting at `customStart` and incremented monotonically.
+ * name is looked up in `vanillaMap`; on miss the entry's name is run
+ * through `aliasFn` to produce alternative candidate keys (used to bridge
+ * ER↔pokerogue naming asymmetries — e.g. ER's `RAICHU_ALOLAN` resolves to
+ * pokerogue's `ALOLA_RAICHU`). On every-candidate miss, a fresh custom ID
+ * is assigned starting at `customStart` and incremented monotonically.
  *
  * @param {Iterable<{id: number, name: string}>} entries
  * @param {Map<string, number>} vanillaMap - normalized name → pokerogue numeric value
  * @param {number} customStart - first ID to assign for ER customs
- * @returns {{ map: Record<number, number>, vanillaCount: number, customCount: number }}
+ * @param {(name: string) => string[]} [aliasFn] optional alias generator
+ *   that receives the entry's (SPECIES_-stripped) name and returns
+ *   normalized alternative keys to try. Default: no aliases.
+ * @returns {{ map: Record<number, number>, vanillaCount: number, customCount: number, aliasHits: number }}
  */
-export function buildIdMapForCategory(entries, vanillaMap, customStart) {
+export function buildIdMapForCategory(entries, vanillaMap, customStart, aliasFn) {
   /** @type {Record<number, number>} */
   const map = {};
   let nextCustom = customStart;
   let vanillaCount = 0;
   let customCount = 0;
+  let aliasHits = 0;
   for (const e of entries) {
     // Special-case: ER's id=0 ability is "-------" (sentinel), id=-1 species is
     // SPECIES_NONE, id=0 move is MOVE_NONE. Map directly to pokerogue's NONE
@@ -154,7 +209,17 @@ export function buildIdMapForCategory(entries, vanillaMap, customStart) {
       continue;
     }
     const norm = normalizeName(e.name);
-    const vanillaId = norm ? vanillaMap.get(norm) : undefined;
+    let vanillaId = norm ? vanillaMap.get(norm) : undefined;
+    if (vanillaId === undefined && aliasFn !== undefined) {
+      for (const alias of aliasFn(e.name)) {
+        const hit = vanillaMap.get(alias);
+        if (hit !== undefined) {
+          vanillaId = hit;
+          aliasHits++;
+          break;
+        }
+      }
+    }
     if (vanillaId === undefined) {
       map[e.id] = nextCustom++;
       customCount++;
@@ -163,7 +228,7 @@ export function buildIdMapForCategory(entries, vanillaMap, customStart) {
       vanillaCount++;
     }
   }
-  return { map, vanillaCount, customCount };
+  return { map, vanillaCount, customCount, aliasHits };
 }
 
 /**
@@ -235,7 +300,12 @@ export async function build({ dump, outDir, flags }) {
     name: (m.NAME ?? m.name ?? "").replace(/^MOVE_/, ""),
   }));
 
-  const speciesResult = buildIdMapForCategory(speciesForLookup, speciesEnum, CUSTOM_ID_START.species);
+  const speciesResult = buildIdMapForCategory(
+    speciesForLookup,
+    speciesEnum,
+    CUSTOM_ID_START.species,
+    regionalSpeciesAliases,
+  );
   const abilitiesResult = buildIdMapForCategory(abilityEntries, abilitiesEnum, CUSTOM_ID_START.abilities);
   const movesResult = buildIdMapForCategory(moveForLookup, movesEnum, CUSTOM_ID_START.moves);
   const trainerResult = buildTrainerClassMap(tclassNames, trainerTypesEnum, TRAINER_CLASS_ALIASES);
@@ -279,7 +349,7 @@ export const ER_TRAINER_CLASS_ALIASES: Readonly<Record<string, string>> = ${JSON
   await emitModule(resolve(outDir, "er-id-map.ts"), body);
   await emitModule(resolve(outDir, "er-trainer-class-aliases.ts"), aliasBody);
   console.log(
-    `[er:idmap] species: ${speciesResult.vanillaCount} vanilla / ${speciesResult.customCount} custom, `
+    `[er:idmap] species: ${speciesResult.vanillaCount} vanilla / ${speciesResult.customCount} custom (${speciesResult.aliasHits} regional aliases), `
       + `abilities: ${abilitiesResult.vanillaCount} / ${abilitiesResult.customCount}, `
       + `moves: ${movesResult.vanillaCount} / ${movesResult.customCount}, `
       + `trainerClasses: ${trainerResult.vanillaCount} / ${trainerResult.customCount}`,

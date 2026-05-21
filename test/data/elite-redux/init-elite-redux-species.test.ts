@@ -187,6 +187,24 @@ describe("initEliteReduxSpecies (B1a)", () => {
     expect(result.formCount).toBeLessThan(900);
   });
 
+  it("regional-form aliases land ER innates on the matching vanilla species (ALOLA_RAICHU)", () => {
+    // The id-map's `regionalSpeciesAliases` resolves ER's `SPECIES_RAICHU_ALOLAN`
+    // (ER id 1553) to pokerogue's `SpeciesId.ALOLA_RAICHU` (2026) — a vanilla
+    // species in `allSpecies`, not an ER-custom slot. Verify the alias
+    // landed the passives.
+    initEliteReduxSpecies();
+    const alolaRaichu = allSpecies.find(s => s.speciesId === SpeciesId.ALOLA_RAICHU);
+    expect(alolaRaichu).toBeDefined();
+    if (!alolaRaichu) {
+      return;
+    }
+    // At least one of the 3 passive slots must be non-NONE — the ER draft
+    // ships real innates for ER id 1553.
+    const passives = alolaRaichu.getPassiveAbilities();
+    expect(passives).toHaveLength(3);
+    expect(passives.filter(p => p !== AbilityId.NONE).length).toBeGreaterThan(0);
+  });
+
   it("Charizard's mega-x and mega-y forms have distinct ER passives", () => {
     initEliteReduxSpecies();
 
