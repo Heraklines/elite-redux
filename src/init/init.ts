@@ -107,7 +107,7 @@ export function initializeGame() {
     );
   }
   console.info(
-    `[er-b4] registered ${trainerResult.trainersRegistered} ER trainers in registry (skipped ${trainerResult.trainersSkipped} already present, dropped ${trainerResult.trainersDroppedMissingSpecies} for missing-species drift)`,
+    `[er-b4] registered ${trainerResult.trainersRegistered} ER trainers in registry (skipped ${trainerResult.trainersSkipped} already present, dropped ${trainerResult.trainersDroppedMissingSpecies} trainers + ${trainerResult.membersDroppedMissingSpecies} party members for missing-species drift)`,
   );
   // Elite Redux Phase B5: populate the ER form-change registry (megas +
   // primals + move-megas). Must run AFTER initEliteReduxCustomSpecies() so

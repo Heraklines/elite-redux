@@ -121,19 +121,29 @@ export interface InitEliteReduxTrainersResult {
   /** Number of trainers skipped because they were already present (idempotent re-run). */
   trainersSkipped: number;
   /**
-   * Number of trainers dropped because at least one party member referenced
-   * an ER species id that isn't in `ER_ID_MAP.species` (and isn't in the
-   * species dump at all). This is pre-existing ER-data drift — the v2.65
-   * trainer dump references gen3 species constants like 1175, 1187, 1437
-   * etc. that were never carried into the species dump. There is nothing the
-   * registry can do here: a trainer with an unknown species cannot be safely
-   * battled, so we drop the whole entry.
+   * Number of trainers dropped because EVERY party member across all tiers
+   * referenced an ER species id missing from `ER_ID_MAP.species`. This is
+   * pre-existing ER-data drift: the v2.65 trainer dump references gen3
+   * species constants like 1175, 1187, 1437 etc. that were never carried
+   * into the species dump itself (121 distinct ids — see commit history
+   * around 2026-05-21 for the audit). When EVERY tier ends up empty after
+   * per-member filtering, the trainer cannot be battled at all and is
+   * dropped entirely; otherwise the trainer is kept with the remaining
+   * resolvable members.
    *
-   * TODO(infra): triage the missing-species set with the ER source dumps and
-   *              extend `er-species.ts` / `er-id-map.ts` upstream to cover
-   *              the gap. Until then, ~370 trainers (~40%) are unbattleable.
+   * Prior to the per-member-drop refactor this counted ANY trainer whose
+   * party referenced a missing species (~373/895 trainers), but most of
+   * those trainers had OTHER resolvable members. The current count reflects
+   * only the unrecoverable trainers — typically only a handful.
    */
   trainersDroppedMissingSpecies: number;
+  /**
+   * Number of individual party members dropped (across all tiers) because
+   * their species id isn't in `ER_ID_MAP.species`. The trainer that owns
+   * the member is still registered if any of its tiered parties has at
+   * least one resolvable member left.
+   */
+  membersDroppedMissingSpecies: number;
   /** Non-fatal real issues — e.g. trainerClass id-map failures (vs species drift). */
   errors: string[];
 }
@@ -172,6 +182,7 @@ export function initEliteReduxTrainers(): InitEliteReduxTrainersResult {
     trainersRegistered: 0,
     trainersSkipped: 0,
     trainersDroppedMissingSpecies: 0,
+    membersDroppedMissingSpecies: 0,
     errors: [],
   };
 
@@ -181,16 +192,17 @@ export function initEliteReduxTrainers(): InitEliteReduxTrainersResult {
       continue;
     }
     try {
-      const entry = buildRegistryEntry(draft);
+      const { entry, droppedMembers } = buildRegistryEntry(draft);
+      result.membersDroppedMissingSpecies += droppedMembers;
+      if (entry === null) {
+        // Every tier was emptied by per-member drops — trainer is unbattleable.
+        result.trainersDroppedMissingSpecies++;
+        continue;
+      }
       ER_TRAINER_REGISTRY.push(entry);
       ER_TRAINER_BY_KEY.set(entry.stableKey, entry);
       result.trainersRegistered++;
     } catch (err) {
-      if (err instanceof MissingSpeciesError) {
-        // ER-data drift — counted separately, not flagged as an error.
-        result.trainersDroppedMissingSpecies++;
-        continue;
-      }
       const msg = err instanceof Error ? err.message : String(err);
       result.errors.push(`Trainer ${draft.stableKey} (er id ${draft.id}): ${msg}`);
     }
@@ -200,23 +212,20 @@ export function initEliteReduxTrainers(): InitEliteReduxTrainersResult {
 }
 
 /**
- * Sentinel thrown when a party member references an ER species id that has
- * no `ER_ID_MAP.species` entry. Used internally to distinguish data drift
- * (silent skip) from real errors (logged + reported).
- */
-class MissingSpeciesError extends Error {
-  constructor(speciesId: number) {
-    super(`No id-map entry for species ${speciesId}`);
-    this.name = "MissingSpeciesError";
-  }
-}
-
-/**
  * Translate one `ErTrainerDraft` into a fully-resolved registry entry.
- * Throws on unrecoverable id-map failures (which propagate to the caller's
- * error list).
+ * Per-member ER-id-map misses are dropped from the tier they belong to
+ * (counted in `droppedMembers`). If EVERY tier ends up empty after the
+ * drops, the function returns `entry: null` so the caller can record the
+ * trainer as fully unbattleable.
+ *
+ * Throws on unrecoverable id-map failures unrelated to per-member drift —
+ * specifically a missing `ER_ID_MAP.trainerClasses` entry — which propagates
+ * to the caller's `errors` list.
  */
-function buildRegistryEntry(draft: ErTrainerDraft): ErTrainerRegistryEntry {
+function buildRegistryEntry(draft: ErTrainerDraft): {
+  entry: ErTrainerRegistryEntry | null;
+  droppedMembers: number;
+} {
   const trainerType = ER_ID_MAP.trainerClasses[draft.trainerClass];
   if (trainerType === undefined) {
     throw new Error(`No id-map entry for trainerClass ${draft.trainerClass}`);
@@ -224,28 +233,65 @@ function buildRegistryEntry(draft: ErTrainerDraft): ErTrainerRegistryEntry {
 
   const trainerClassName = ER_TRAINER_CLASS_NAMES[draft.trainerClass] ?? "Unknown";
 
+  let droppedMembers = 0;
+  const resolveTier = (members: readonly ErPartyMember[] | null): ErPartyMemberRegistered[] | null => {
+    if (members === null) {
+      return null;
+    }
+    const resolved: ErPartyMemberRegistered[] = [];
+    for (const m of members) {
+      const r = resolvePartyMember(m);
+      if (r === null) {
+        droppedMembers++;
+        continue;
+      }
+      resolved.push(r);
+    }
+    return resolved;
+  };
+
+  const party = resolveTier(draft.party) ?? [];
+  const insaneParty = resolveTier(draft.insaneParty);
+  const hellParty = resolveTier(draft.hellParty);
+
+  // Trainer is unbattleable if the default party is empty AND no tier
+  // recovers any members. We treat null tiers (ER didn't ship that
+  // difficulty for this trainer) as already-absent, not as a failure.
+  const defaultEmpty = party.length === 0;
+  const insaneEmpty = insaneParty === null || insaneParty.length === 0;
+  const hellEmpty = hellParty === null || hellParty.length === 0;
+  if (defaultEmpty && insaneEmpty && hellEmpty) {
+    return { entry: null, droppedMembers };
+  }
+
   return {
-    stableKey: draft.stableKey,
-    id: draft.id,
-    trainerType,
-    trainerClassName,
-    isDouble: draft.isDouble,
-    map: draft.map,
-    party: draft.party.map(resolvePartyMember),
-    insaneParty: draft.insaneParty ? draft.insaneParty.map(resolvePartyMember) : null,
-    hellParty: draft.hellParty ? draft.hellParty.map(resolvePartyMember) : null,
+    entry: {
+      stableKey: draft.stableKey,
+      id: draft.id,
+      trainerType,
+      trainerClassName,
+      isDouble: draft.isDouble,
+      map: draft.map,
+      party,
+      // Re-null tiers ER never shipped so the consumer can distinguish
+      // "this trainer has no insane tier" from "we dropped every member".
+      insaneParty: draft.insaneParty === null ? null : insaneParty,
+      hellParty: draft.hellParty === null ? null : hellParty,
+    },
+    droppedMembers,
   };
 }
 
 /**
- * Resolve a single party member's ER ids to pokerogue ids. The species id
- * must resolve; moves with no map entry are filtered out (this can happen
- * for `move 0` "----" sentinels in incomplete movesets).
+ * Resolve a single party member's ER ids to pokerogue ids. Returns `null`
+ * when the species id is missing from `ER_ID_MAP.species` (per-member drop
+ * for upstream-data drift). Move ids with no map entry are filtered out
+ * (this can happen for `move 0` "----" sentinels in incomplete movesets).
  */
-function resolvePartyMember(member: ErPartyMember): ErPartyMemberRegistered {
+function resolvePartyMember(member: ErPartyMember): ErPartyMemberRegistered | null {
   const speciesId = ER_ID_MAP.species[member.species];
   if (speciesId === undefined) {
-    throw new MissingSpeciesError(member.species);
+    return null;
   }
 
   const mappedMoves: number[] = [];
