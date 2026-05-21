@@ -1,5 +1,8 @@
 // =============================================================================
-// Elite Redux — Phase B Task B2: register ER-custom abilities in `allAbilities`.
+// Elite Redux — Phase B Task B2 / Phase D Task D3:
+//   - B2: register ER-custom abilities in `allAbilities`.
+//   - D3: wire archetype-classified abilities' AbAttrs onto each registered
+//     ability via the archetype dispatcher.
 //
 // Reads `er-abilities.ts` and, for every entry whose pokerogue id resolves to
 // ≥ VANILLA_ID_CUTOFF (the ER-custom range — see `er-id-map.ts`), constructs
@@ -10,11 +13,12 @@
 // B3's vanilla-rebalance task. ER abilities whose name happens to match a
 // vanilla AbilityId (e.g. "Stench") simply get the vanilla id and skip.
 //
-// Behavior note: Phase B registers placeholder abilities only — they own
-// `id`, `name`, `description`, and the framework hooks expected by callers,
-// but they ship with NO `AbAttr`s attached. Phase C will wire actual
-// per-ability behavior (the `attr(...)` calls in `init-abilities.ts`'s
-// style). For now, customs behave as no-op abilities at battle time.
+// Behavior note (Phase D3): archetype-classified abilities get their
+// archetype-primitive AbAttrs attached via the dispatcher (see
+// `archetype-dispatcher.ts`). `bespoke`, `composite-vanilla-mashup`, and
+// classifier rows whose params shape doesn't yet have a wired archetype
+// primitive remain as placeholder no-op abilities — they're tracked in the
+// init result's `dispatchSkipsByArchetype` map for diagnostics.
 //
 // i18n note: pokerogue's `Ability` constructor derives an `i18nKey` from
 // `AbilityId[this.id]`. For custom ids (≥ 5000) that reverse-lookup returns
@@ -27,7 +31,9 @@
 
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities } from "#data/data-lists";
-import { ER_ABILITIES } from "#data/elite-redux/er-abilities";
+import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
+import { ER_ABILITIES, type ErAbilityDraft } from "#data/elite-redux/er-abilities";
+import { ER_ABILITY_ARCHETYPES, type ErArchetypeKind } from "#data/elite-redux/er-ability-archetypes";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { AbilityId } from "#enums/ability-id";
 
@@ -47,6 +53,24 @@ export interface InitEliteReduxCustomAbilitiesResult {
   customsAlreadyPresent: number;
   /** Non-fatal issues — e.g. constructor failures with a usable error message. */
   errors: string[];
+  /**
+   * Per-archetype count of how many abilities got at least one AbAttr wired
+   * via the dispatcher this run. Only counts NEW additions (idempotent
+   * re-run sees zero). Bespoke/composite/missing-shape rows don't appear in
+   * this map.
+   */
+  attrsWiredByArchetype: Record<string, number>;
+  /**
+   * Per-archetype count of how many rows the dispatcher skipped this run
+   * (because the params shape didn't have a wired translation). Surfaces
+   * coverage gaps without failing the build.
+   */
+  dispatchSkipsByArchetype: Record<string, number>;
+  /**
+   * Total number of archetype-primitive AbAttr instances attached this run
+   * across every ability. A single ability with N parts contributes N.
+   */
+  totalAttrsAttached: number;
 }
 
 /**
@@ -79,6 +103,9 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
     customsAdded: 0,
     customsAlreadyPresent: 0,
     errors: [],
+    attrsWiredByArchetype: {},
+    dispatchSkipsByArchetype: {},
+    totalAttrsAttached: 0,
   };
 
   // Build a O(1) id → bool lookup for idempotency.
@@ -102,7 +129,7 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
     }
 
     try {
-      const ability = buildCustomAbility(draft, pokerogueId);
+      const ability = buildCustomAbility(draft, pokerogueId, result);
       (allAbilities as Ability[]).push(ability);
       existingIds.add(pokerogueId);
       result.customsAdded++;
@@ -117,9 +144,14 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
 
 /**
  * Construct a single ER-custom `Ability` from its draft. Generation is fixed
- * at 9 for now — TODO(Phase C): derive from ER archetype taxonomy. No
- * `AbAttr`s are attached at this stage (placeholder ability — Phase C wires
- * behavior).
+ * at 9 for now — TODO(Phase D): derive from ER archetype taxonomy.
+ *
+ * Phase D3 behavior: when the ER ability's archetype row in
+ * `ER_ABILITY_ARCHETYPES` is non-bespoke and the dispatcher produces one or
+ * more `AbAttr` instances, those are pushed onto the builder's attrs list
+ * before `.build()`. `bespoke`, `composite-vanilla-mashup`, and shapes the
+ * dispatcher can't yet translate produce no attrs (placeholder behavior
+ * unchanged from B2).
  *
  * Two side-effects on construction:
  *  1. Installs `AbilityId[pokerogueId] = enumKey` at runtime so the
@@ -129,10 +161,15 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
  *     `Object.defineProperty` to return the draft text verbatim — i18next
  *     would otherwise return the missing-key placeholder string.
  *
- * @param draft - ER ability draft from `er-abilities.ts`
- * @param pokerogueId - pokerogue ability id (≥ VANILLA_ID_CUTOFF) from `ER_ID_MAP.abilities`
+ * @param draft        - ER ability draft from `er-abilities.ts`
+ * @param pokerogueId  - pokerogue ability id (≥ VANILLA_ID_CUTOFF) from `ER_ID_MAP.abilities`
+ * @param result       - aggregate result object — mutated to record per-archetype attr counts
  */
-function buildCustomAbility(draft: { name: string; description: string }, pokerogueId: number): Ability {
+function buildCustomAbility(
+  draft: ErAbilityDraft,
+  pokerogueId: number,
+  result: InitEliteReduxCustomAbilitiesResult,
+): Ability {
   const enumKey = abilityNameToEnumKey(draft.name);
   // Runtime reverse-mapping injection. TypeScript enums compile to JS objects
   // — mutation is supported. Idempotent: setting the same key twice is a no-op.
@@ -143,7 +180,17 @@ function buildCustomAbility(draft: { name: string; description: string }, pokero
   // Construct via the canonical AbBuilder path. `id` is typed `AbilityId` —
   // values ≥ 5000 are outside the declared enum range but acceptable at
   // runtime; the cast satisfies the type system without changing behavior.
-  const ability = new AbBuilder(pokerogueId as AbilityId, 9).build();
+  const builder = new AbBuilder(pokerogueId as AbilityId, 9);
+
+  // Phase D3: wire archetype-classified attrs via the dispatcher. We look up
+  // the archetype row by the ER-side id (not the pokerogue id) since the
+  // classifier keys on ER's source numbering.
+  const archetypeRow = ER_ABILITY_ARCHETYPES[draft.id];
+  if (archetypeRow !== undefined) {
+    wireArchetypeAttrs(builder, archetypeRow.archetype, archetypeRow.params, result);
+  }
+
+  const ability = builder.build();
 
   // Override the prototype-level `name`/`description` getters with verbatim
   // draft text. `configurable: true` lets a later run (e.g. test re-init)
@@ -162,4 +209,51 @@ function buildCustomAbility(draft: { name: string; description: string }, pokero
   });
 
   return ability;
+}
+
+/**
+ * Dispatch the archetype row through the dispatcher and push the produced
+ * AbAttrs onto the builder. Records per-archetype wired/skip counts in
+ * `result` for diagnostics.
+ *
+ * `builder.attrs` is `public readonly` at the TS level — meaning the *binding*
+ * is readonly, but the array itself is mutable. We push pre-built attr
+ * instances directly because the canonical `builder.attr(Cls, ...args)` API
+ * takes a constructor + ctor-args; here we have already-constructed instances
+ * (the dispatcher builds them so it can structure-translate classifier params
+ * into the archetype's typed options shape).
+ *
+ * Any throw from the dispatcher (e.g. an archetype primitive's invariant
+ * check) is caught here and recorded in `result.errors`, then the ability
+ * proceeds without those attrs — better to register the ability as a
+ * placeholder than to fail the whole init pass.
+ */
+function wireArchetypeAttrs(
+  builder: AbBuilder,
+  archetype: ErArchetypeKind,
+  params: Record<string, unknown> | null,
+  result: InitEliteReduxCustomAbilitiesResult,
+): void {
+  let dispatched: ReturnType<typeof dispatchArchetype>;
+  try {
+    dispatched = dispatchArchetype(archetype, params);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    result.errors.push(`Archetype ${archetype} dispatch threw for ability id ${builder.id}: ${msg}`);
+    return;
+  }
+  if (dispatched.attrs.length === 0) {
+    // Skipped — either composite/bespoke (expected) or shape-mismatch (logged).
+    if (dispatched.skipReason !== null) {
+      result.dispatchSkipsByArchetype[archetype] = (result.dispatchSkipsByArchetype[archetype] ?? 0) + 1;
+    }
+    return;
+  }
+  // Push every produced attr onto the builder. The builder's `attrs` array is
+  // mutable; `Ability` snapshots it at construction time.
+  for (const attr of dispatched.attrs) {
+    builder.attrs.push(attr);
+  }
+  result.attrsWiredByArchetype[archetype] = (result.attrsWiredByArchetype[archetype] ?? 0) + 1;
+  result.totalAttrsAttached += dispatched.attrs.length;
 }
