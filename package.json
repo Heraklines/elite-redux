@@ -50,6 +50,8 @@
     "er:classify-abilities": "node scripts/elite-redux/classify-abilities.mjs",
     "er:classify-moves": "node scripts/elite-redux/classify-moves.mjs",
     "er:audit-sprites": "node scripts/elite-redux/audit-sprites.mjs",
+    "er:fetch-non-combat-assets": "node scripts/elite-redux/fetch-non-combat-assets.mjs",
+    "er:audit-non-combat-assets": "node scripts/elite-redux/audit-non-combat-assets.mjs",
     "er:render-shinies": "node scripts/elite-redux/render-shinies.mjs",
     "er:audit-flag-mapping": "node scripts/elite-redux/audit-flag-mapping.mjs",
     "er:audit-archetype-coverage": "node scripts/elite-redux/audit-archetype-coverage.mjs",
