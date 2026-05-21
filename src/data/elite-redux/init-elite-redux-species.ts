@@ -30,8 +30,25 @@ export interface InitEliteReduxSpeciesResult {
   vanillaCount: number;
   /** Number of ER-custom species skipped (B1b's job). */
   customSkipped: number;
+  /** Number of non-base FORMS (mega / primal / origin) that received ER passives. */
+  formCount: number;
   /** Non-fatal issues encountered (missing mappings, missing species). */
   errors: string[];
+}
+
+/**
+ * Pokerogue form keys (e.g. `"mega"`, `"mega-x"`, `"primal"`) map to ER
+ * species-name suffixes. ER ships e.g. `SPECIES_VENUSAUR_MEGA_REDUX` and
+ * `SPECIES_CHARIZARD_MEGA_X_REDUX` as separate species records (id ≥ 10000),
+ * with their innates representing the mega/primal-form's passive triple.
+ *
+ * The mapping derives the candidate ER name from the base species' const
+ * (`SPECIES_VENUSAUR`) + the form's pokerogue key (`mega` → `MEGA`) + the
+ * `_REDUX` suffix ER uses for its custom species names.
+ */
+function deriveErFormSpeciesConst(baseConst: string, formKey: string): string {
+  const upperFormKey = formKey.toUpperCase().replace(/-/g, "_");
+  return `${baseConst}_${upperFormKey}_REDUX`;
 }
 
 /**
@@ -48,6 +65,7 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
   const result: InitEliteReduxSpeciesResult = {
     vanillaCount: 0,
     customSkipped: 0,
+    formCount: 0,
     errors: [],
   };
 
@@ -60,6 +78,13 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
   const byId = new Map<number, (typeof allSpecies)[number]>();
   for (const species of allSpecies) {
     byId.set(species.speciesId, species);
+  }
+
+  // Build a O(1) ER speciesConst → draft lookup for the form-mapping pass.
+  // (ER ships mega/primal forms as separate species records keyed by name.)
+  const erDraftByConst = new Map<string, (typeof ER_SPECIES)[number]>();
+  for (const draft of ER_SPECIES) {
+    erDraftByConst.set(draft.speciesConst, draft);
   }
 
   for (const draft of ER_SPECIES) {
@@ -89,6 +114,33 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
 
     species.setPassives(passives);
     result.vanillaCount++;
+
+    // Also install ER innates on each non-base FORM of this species (mega,
+    // mega-x, mega-y, primal, origin). ER ships those forms as separate
+    // species records (e.g. SPECIES_VENUSAUR_MEGA_REDUX) — we look each up
+    // by name and copy its innates onto the pokerogue PokemonForm instance.
+    // This fixes the "mega-form-passives" gap documented in the fusion +
+    // transform audit (post-Phase-B).
+    for (const form of species.forms) {
+      if (!form.formKey) {
+        continue;
+      }
+      const candidateConst = deriveErFormSpeciesConst(draft.speciesConst, form.formKey);
+      const formDraft = erDraftByConst.get(candidateConst);
+      if (!formDraft) {
+        // No ER counterpart for this form — silently skip. Acceptable: many
+        // pokerogue forms (regional variants, alolan/galarian, etc.) don't
+        // exist in ER's mega-centric custom set.
+        continue;
+      }
+      const formPassives: readonly [AbilityId, AbilityId, AbilityId] = [
+        mapAbilityId(formDraft.innates[0]),
+        mapAbilityId(formDraft.innates[1]),
+        mapAbilityId(formDraft.innates[2]),
+      ];
+      form.setPassives(formPassives);
+      result.formCount++;
+    }
   }
 
   return result;

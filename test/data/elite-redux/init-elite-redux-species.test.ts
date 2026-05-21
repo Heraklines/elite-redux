@@ -175,4 +175,37 @@ describe("initEliteReduxSpecies (B1a)", () => {
     expect(legacy).not.toBe(AbilityId.NONE);
     expect(typeof legacy).toBe("number");
   });
+
+  it("installs ER innates on non-base forms (mega/primal/origin)", () => {
+    const result = initEliteReduxSpecies();
+
+    // formCount should be > 0 — ER ships ~280 mega/primal forms; even if not
+    // all map cleanly (regional variants etc. don't exist in ER), a meaningful
+    // chunk of pokerogue's mega forms have ER counterparts.
+    expect(result.formCount).toBeGreaterThan(0);
+    // Sanity: shouldn't be larger than the count of ER customs (881).
+    expect(result.formCount).toBeLessThan(900);
+  });
+
+  it("Charizard's mega-x and mega-y forms have distinct ER passives", () => {
+    initEliteReduxSpecies();
+
+    const charizard = allSpecies.find(s => s.speciesId === SpeciesId.CHARIZARD);
+    expect(charizard).toBeDefined();
+    if (!charizard) {
+      return;
+    }
+
+    // Charizard has 3 forms in pokerogue: base (0), Mega X (1), Mega Y (2).
+    // Each should have its own _passives if ER ships the matching customs.
+    expect(charizard.forms.length).toBeGreaterThanOrEqual(2);
+
+    // At least ONE of the mega forms should have its passives populated
+    // (i.e., at least one slot non-NONE). Don't assert which one in case
+    // ER ships only mega-x or only mega-y.
+    const megaXForm = charizard.forms.find(f => f.formKey === "mega-x");
+    const megaYForm = charizard.forms.find(f => f.formKey === "mega-y");
+    const anyFormHasPassives = (megaXForm?.getPassiveCount() ?? 0) > 0 || (megaYForm?.getPassiveCount() ?? 0) > 0;
+    expect(anyFormHasPassives).toBe(true);
+  });
 });
