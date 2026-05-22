@@ -55,7 +55,13 @@
 //   archetype shape. Phase D's bespoke-implementation task wires them.
 // =============================================================================
 
-import { type AbAttr, BlockRecoilDamageAttr, PostDefendContactDamageAbAttr } from "#abilities/ab-attrs";
+import {
+  type AbAttr,
+  BlockRecoilDamageAttr,
+  PostDefendContactDamageAbAttr,
+  PostReceiveCritStatStageChangeAbAttr,
+  ProtectStatAbAttr,
+} from "#abilities/ab-attrs";
 import { allAbilities } from "#data/data-lists";
 import { PostTurnHurtNonTypedAbAttr } from "#data/elite-redux/abilities/post-turn-hurt-non-typed";
 import { PpReductionOnContactAbAttr } from "#data/elite-redux/abilities/pp-reduction-on-contact";
@@ -85,6 +91,7 @@ import { TypeAbsorbHealAbAttr, TypeAbsorbStatBoostAbAttr } from "#data/elite-red
 import { LifestealOnHitAbAttr, LifestealOnKoAbAttr } from "#data/elite-redux/archetypes/lifesteal";
 import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
 import { PassiveRecoveryAbAttr, type PassiveRecoveryCondition } from "#data/elite-redux/archetypes/passive-recovery";
+import { PreFaintReviveAbAttr } from "#data/elite-redux/archetypes/pre-faint-revive";
 import {
   type PriorityCondition,
   PriorityModifierAbAttr,
@@ -104,6 +111,7 @@ import {
 } from "#data/elite-redux/archetypes/status-immunity";
 import { TypeConversionAbAttr, TypeConversionPowerBoostAbAttr } from "#data/elite-redux/archetypes/type-conversion";
 import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
+import { WeatherStatMultiplierAbAttr } from "#data/elite-redux/archetypes/weather-stat-multiplier";
 import {
   WeatherDamageReductionAbAttr,
   WeatherTypeBoostAbAttr,
@@ -1320,6 +1328,39 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
  *     non-empty non-zero-stages payload, gate canApply on a live attacker,
  *     dispatch one `StatStageChangePhase` per delta against the attacker's
  *     battler index in `apply`.
+ *
+ * Cluster table (round 7):
+ *   - 427 Cheating Death → {@linkcode PreFaintReviveAbAttr} (gate:
+ *     hp-threshold:0, usage: first-n-hits:2). Endure-shaped (clamp to 1 HP)
+ *     for the first two incoming hits — full "no damage" semantics is a
+ *     partial wire.
+ *   - 583 Gallantry → {@linkcode PreFaintReviveAbAttr} (gate: hp-threshold:0,
+ *     usage: first-n-hits:1). Same endure-shaped clamp as Cheating Death
+ *     with N=1.
+ *   - 724 Lucky Halo → {@linkcode ProtectStatAbAttr} (vanilla Clear Body
+ *     parent) + {@linkcode PreFaintReviveAbAttr} (first-n-hits:1). The two
+ *     compose at the wire-up layer; both attach to the same Ability.
+ *   - 862 Thermal Slide → {@linkcode WeatherStatMultiplierAbAttr} (Stat.SPD,
+ *     1.5x, [SUNNY/HARSH_SUN/HAIL/SNOW]). Uses the new weather-stat-multiplier
+ *     primitive introduced this round.
+ *   - 488 Tipping Point → {@linkcode StatTriggerOnHitAbAttr} (SPATK +1) +
+ *     vanilla {@linkcode PostReceiveCritStatStageChangeAbAttr} (SPATK +12,
+ *     effectively max-out via the StatStageChangePhase internal clamp).
+ *
+ * Primitive extension (round 7):
+ *   - {@linkcode PreFaintReviveAbAttr} gained a `usage` discriminator with
+ *     `per-hit` (vanilla Sturdy parity) and `first-n-hits` (new, backed by
+ *     `Pokemon.battleData.hitCount`) variants. Also removed the
+ *     `isFullHp()` precondition from the dispatch site in `pokemon.ts:3968`
+ *     so non-full-HP gates dispatch correctly — vanilla Sturdy's own
+ *     `canApply` still checks `isFullHp()` so behavior is unchanged.
+ *   - New archetype {@linkcode WeatherStatMultiplierAbAttr} added under
+ *     `src/data/elite-redux/archetypes/weather-stat-multiplier.ts`. Generalizes
+ *     Swift Swim / Chlorophyll to arbitrary (stat, multiplier, weather-list).
+ *   - FROSTBITE (BattlerTagType.ER_FROSTBITE) now halves special-attack damage
+ *     on the offensive side via a new `frostbiteMultiplier` in pokemon.ts —
+ *     mirrors the BURN physical-attack halving. Completes the round-5
+ *     BattlerTag work.
  */
 function dispatchBespoke(erAbilityId: number): DispatchResult {
   switch (erAbilityId) {
@@ -1648,6 +1689,70 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // who actually scored the KO, matching the "anywhere on the field"
       // text).
       return ok([new StatTriggerOnKoAbAttr({ stats: [{ stat: Stat.ATK, stages: 1 }] })]);
+    case 427:
+      // Cheating Death — "Gets no damage for the first two hits." Modeled as
+      // the endure-shaped subset (clamp lethal damage to leave 1 HP) for the
+      // first two incoming hits of the battle. Non-lethal-clamping
+      // (full damage immunity) is a partial wire — the existing pre-faint
+      // revive primitive only intercepts one-shot KOs, not arbitrary damage.
+      // Full no-damage-for-N-hits semantics would need a separate primitive
+      // hooking the pre-damage-application path; deferred.
+      return ok([
+        new PreFaintReviveAbAttr({
+          gate: { kind: "hp-threshold", threshold: 0 },
+          usage: { kind: "first-n-hits", n: 2 },
+        }),
+      ]);
+    case 583:
+      // Gallantry — "Gets no damage for first hit." Same endure-shaped subset
+      // as Cheating Death with N=1. Partial wire vs the full "no-damage" text.
+      return ok([
+        new PreFaintReviveAbAttr({
+          gate: { kind: "hp-threshold", threshold: 0 },
+          usage: { kind: "first-n-hits", n: 1 },
+        }),
+      ]);
+    case 724:
+      // Lucky Halo — "Negates self stat drops. Endures the a single KO."
+      // Composes two AbAttrs: vanilla ProtectStatAbAttr (Clear Body parity —
+      // protects all stats from incoming reductions) + PreFaintReviveAbAttr
+      // with first-n-hits N=1 (endure once per battle). The "self stat drops"
+      // language in ER's text is the same predicate vanilla Clear Body covers:
+      // incoming stat-drop attempts get cancelled.
+      return ok([
+        new ProtectStatAbAttr(),
+        new PreFaintReviveAbAttr({
+          gate: { kind: "hp-threshold", threshold: 0 },
+          usage: { kind: "first-n-hits", n: 1 },
+        }),
+      ]);
+    case 862:
+      // Thermal Slide — "Ups speed by 50% in sun or hail." Uses the new
+      // weather-stat-multiplier primitive: Stat.SPD * 1.5 when active weather
+      // is sun (incl HARSH_SUN) or hail/snow. The HAIL/SNOW pair matches
+      // vanilla Slush Rush coverage; the SUNNY/HARSH_SUN pair matches
+      // Chlorophyll. (Round 7 of the ER bespoke ability grind.)
+      return ok([
+        new WeatherStatMultiplierAbAttr({
+          stat: Stat.SPD,
+          multiplier: 1.5,
+          weathers: [WeatherType.SUNNY, WeatherType.HARSH_SUN, WeatherType.HAIL, WeatherType.SNOW],
+        }),
+      ]);
+    case 488:
+      // Tipping Point — "Getting hit raises SpAtk. Critical hits maximize
+      // SpAtk." Composes two vanilla AbAttrs: StatTriggerOnHitAbAttr for the
+      // +1 SpAtk on any incoming damaging hit, plus
+      // PostReceiveCritStatStageChangeAbAttr(SPATK, 12) for the "maximize on
+      // crit" piece. The +12 stages exceed the engine clamp of +6 but the
+      // StatStageChangePhase clamps internally — effectively "max out". The
+      // crit hook (`PostReceiveCritStatStageChangeAbAttr`) is the same one
+      // vanilla Anger Point uses; it's dispatched in move-effect-phase.ts
+      // line ~831 when the incoming hit was a crit.
+      return ok([
+        new StatTriggerOnHitAbAttr({ stats: [{ stat: Stat.SPATK, stages: 1 }] }),
+        new PostReceiveCritStatStageChangeAbAttr(Stat.SPATK, 12),
+      ]);
     default:
       return SKIP_BESPOKE;
   }

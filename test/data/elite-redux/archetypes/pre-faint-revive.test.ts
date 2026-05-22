@@ -23,6 +23,7 @@ type StubOpts = {
   maxHp?: number;
   fullHp?: boolean;
   hasSturdy?: boolean;
+  hitCount?: number;
 };
 
 function makeStubPokemon(opts: StubOpts = {}): Pokemon {
@@ -36,6 +37,10 @@ function makeStubPokemon(opts: StubOpts = {}): Pokemon {
     getHpRatio: (_precise = false) => hp / maxHp,
     getTag: (tag: BattlerTagType) => (tag === BattlerTagType.STURDY && opts.hasSturdy ? {} : null),
     addTag: () => {},
+    // `battleData.hitCount` is the persistent counter the `first-n-hits` usage
+    // policy gates on; we stub it as a plain numeric field. The real engine
+    // increments this post-damage in `move-effect-phase.ts:705`.
+    battleData: { hitCount: opts.hitCount ?? 0 },
   } as unknown as Pokemon;
 }
 
@@ -152,6 +157,16 @@ describe("PreFaintReviveAbAttr archetype (C1d)", () => {
       const attr = new PreFaintReviveAbAttr();
       expect(attr.getGate()).toEqual({ kind: "full-hp" });
     });
+
+    it("defaults usage to per-hit when no options are passed", () => {
+      const attr = new PreFaintReviveAbAttr();
+      expect(attr.getUsage()).toEqual({ kind: "per-hit" });
+    });
+
+    it("exposes the configured usage", () => {
+      const attr = new PreFaintReviveAbAttr({ usage: { kind: "first-n-hits", n: 2 } });
+      expect(attr.getUsage()).toEqual({ kind: "first-n-hits", n: 2 });
+    });
   });
 
   describe("validation", () => {
@@ -170,6 +185,99 @@ describe("PreFaintReviveAbAttr archetype (C1d)", () => {
     it("accepts boundary thresholds (0 and 1)", () => {
       expect(() => new PreFaintReviveAbAttr({ gate: { kind: "hp-threshold", threshold: 0 } })).not.toThrow();
       expect(() => new PreFaintReviveAbAttr({ gate: { kind: "hp-threshold", threshold: 1 } })).not.toThrow();
+    });
+
+    it("rejects first-n-hits n below 1", () => {
+      expect(() => new PreFaintReviveAbAttr({ usage: { kind: "first-n-hits", n: 0 } })).toThrow(
+        /first-n-hits n must be a positive integer/,
+      );
+    });
+
+    it("rejects first-n-hits non-integer n", () => {
+      expect(() => new PreFaintReviveAbAttr({ usage: { kind: "first-n-hits", n: 1.5 } })).toThrow(
+        /first-n-hits n must be a positive integer/,
+      );
+    });
+  });
+
+  describe("first-n-hits usage policy", () => {
+    it("fires when hitCount is below n (first hit, N=1, Gallantry-style)", () => {
+      const attr = new PreFaintReviveAbAttr({
+        gate: { kind: "hp-threshold", threshold: 0 },
+        usage: { kind: "first-n-hits", n: 1 },
+      });
+      const pokemon = makeStubPokemon({ hp: 50, maxHp: 100, fullHp: false, hitCount: 0 });
+      expect(attr.canApply(makeParams({ pokemon, damageValue: 150 }))).toBe(true);
+    });
+
+    it("blocks fires after the Nth hit (Gallantry, N=1, hitCount=1)", () => {
+      const attr = new PreFaintReviveAbAttr({
+        gate: { kind: "hp-threshold", threshold: 0 },
+        usage: { kind: "first-n-hits", n: 1 },
+      });
+      const pokemon = makeStubPokemon({ hp: 50, maxHp: 100, fullHp: false, hitCount: 1 });
+      expect(attr.canApply(makeParams({ pokemon, damageValue: 150 }))).toBe(false);
+    });
+
+    it("permits exactly N fires (Cheating Death, N=2)", () => {
+      const attr = new PreFaintReviveAbAttr({
+        gate: { kind: "hp-threshold", threshold: 0 },
+        usage: { kind: "first-n-hits", n: 2 },
+      });
+      // hitCount=0 → first hit OK
+      expect(
+        attr.canApply(
+          makeParams({
+            pokemon: makeStubPokemon({ hp: 50, maxHp: 100, fullHp: false, hitCount: 0 }),
+            damageValue: 150,
+          }),
+        ),
+      ).toBe(true);
+      // hitCount=1 → second hit OK
+      expect(
+        attr.canApply(
+          makeParams({
+            pokemon: makeStubPokemon({ hp: 50, maxHp: 100, fullHp: false, hitCount: 1 }),
+            damageValue: 150,
+          }),
+        ),
+      ).toBe(true);
+      // hitCount=2 → third hit blocked
+      expect(
+        attr.canApply(
+          makeParams({
+            pokemon: makeStubPokemon({ hp: 50, maxHp: 100, fullHp: false, hitCount: 2 }),
+            damageValue: 150,
+          }),
+        ),
+      ).toBe(false);
+    });
+
+    it("ignores the STURDY tag check under first-n-hits (the persistent counter is the source of truth)", () => {
+      // Under per-hit, having STURDY tag blocks the proc. Under first-n-hits,
+      // the STURDY tag is irrelevant — only hitCount matters.
+      const attr = new PreFaintReviveAbAttr({
+        gate: { kind: "hp-threshold", threshold: 0 },
+        usage: { kind: "first-n-hits", n: 1 },
+      });
+      const pokemon = makeStubPokemon({ hp: 50, maxHp: 100, fullHp: false, hitCount: 0, hasSturdy: true });
+      expect(attr.canApply(makeParams({ pokemon, damageValue: 150 }))).toBe(true);
+    });
+  });
+
+  describe("matchesUsage helper", () => {
+    it("per-hit returns true when STURDY tag is absent, false when present", () => {
+      const attr = new PreFaintReviveAbAttr();
+      expect(attr.matchesUsage(makeStubPokemon({ hasSturdy: false }))).toBe(true);
+      expect(attr.matchesUsage(makeStubPokemon({ hasSturdy: true }))).toBe(false);
+    });
+
+    it("first-n-hits returns true when hitCount < n, false otherwise", () => {
+      const attr = new PreFaintReviveAbAttr({ usage: { kind: "first-n-hits", n: 2 } });
+      expect(attr.matchesUsage(makeStubPokemon({ hitCount: 0 }))).toBe(true);
+      expect(attr.matchesUsage(makeStubPokemon({ hitCount: 1 }))).toBe(true);
+      expect(attr.matchesUsage(makeStubPokemon({ hitCount: 2 }))).toBe(false);
+      expect(attr.matchesUsage(makeStubPokemon({ hitCount: 3 }))).toBe(false);
     });
   });
 });

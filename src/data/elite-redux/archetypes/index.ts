@@ -115,6 +115,7 @@ export {
   PreFaintReviveAbAttr,
   type PreFaintReviveGate,
   type PreFaintReviveOptions,
+  type PreFaintReviveUsage,
 } from "./pre-faint-revive";
 export {
   type PriorityCondition,
@@ -155,6 +156,10 @@ export {
   type TypeConversionSource,
 } from "./type-conversion";
 export { TypeDamageBoostAbAttr, type TypeDamageBoostAbAttrOptions } from "./type-damage-boost";
+export {
+  WeatherStatMultiplierAbAttr,
+  type WeatherStatMultiplierOptions,
+} from "./weather-stat-multiplier";
 export {
   SetTerrainOnEntryAbAttr,
   type SetTerrainOnEntryOptions,

@@ -16,7 +16,12 @@
 // matching what the init layer does for `bespoke` rows.
 // =============================================================================
 
-import { BlockRecoilDamageAttr, PostDefendContactDamageAbAttr } from "#abilities/ab-attrs";
+import {
+  BlockRecoilDamageAttr,
+  PostDefendContactDamageAbAttr,
+  PostReceiveCritStatStageChangeAbAttr,
+  ProtectStatAbAttr,
+} from "#abilities/ab-attrs";
 import { PostTurnHurtNonTypedAbAttr } from "#data/elite-redux/abilities/post-turn-hurt-non-typed";
 import { PpReductionOnContactAbAttr } from "#data/elite-redux/abilities/pp-reduction-on-contact";
 import { SetArenaTagOnHitAbAttr, SetTerrainOnHitAbAttr } from "#data/elite-redux/abilities/set-arena-effect-on-hit";
@@ -30,7 +35,9 @@ import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
 import { LifestealOnKoAbAttr } from "#data/elite-redux/archetypes/lifesteal";
 import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
 import { PassiveRecoveryAbAttr } from "#data/elite-redux/archetypes/passive-recovery";
+import { PreFaintReviveAbAttr } from "#data/elite-redux/archetypes/pre-faint-revive";
 import { StatTriggerOnHitAbAttr, StatTriggerOnKoAbAttr } from "#data/elite-redux/archetypes/stat-trigger-on-event";
+import { WeatherStatMultiplierAbAttr } from "#data/elite-redux/archetypes/weather-stat-multiplier";
 import { WeatherDamageReductionAbAttr } from "#data/elite-redux/archetypes/weather-terrain-interaction";
 import { TerrainType } from "#data/terrain";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -425,6 +432,59 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(res.attrs).toHaveLength(1);
     const attr = res.attrs[0] as StatTriggerOnKoAbAttr;
     expect(attr.getStatChanges()).toEqual([{ stat: Stat.ATK, stages: 1 }]);
+  });
+
+  // Round 7 — pre-faint-revive + weather-stat-multiplier + crit-trigger
+  it("er id 427 (Cheating Death) wires PreFaintRevive (hp-threshold:0, first-n-hits:2)", () => {
+    const res = dispatchArchetype("bespoke", null, 427);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as PreFaintReviveAbAttr;
+    expect(attr).toBeInstanceOf(PreFaintReviveAbAttr);
+    expect(attr.getGate()).toEqual({ kind: "hp-threshold", threshold: 0 });
+    expect(attr.getUsage()).toEqual({ kind: "first-n-hits", n: 2 });
+  });
+
+  it("er id 583 (Gallantry) wires PreFaintRevive (hp-threshold:0, first-n-hits:1)", () => {
+    const res = dispatchArchetype("bespoke", null, 583);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as PreFaintReviveAbAttr;
+    expect(attr).toBeInstanceOf(PreFaintReviveAbAttr);
+    expect(attr.getGate()).toEqual({ kind: "hp-threshold", threshold: 0 });
+    expect(attr.getUsage()).toEqual({ kind: "first-n-hits", n: 1 });
+  });
+
+  it("er id 724 (Lucky Halo) wires ProtectStat + PreFaintRevive(first-n-hits:1)", () => {
+    const res = dispatchArchetype("bespoke", null, 724);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(2);
+    expect(res.attrs[0]).toBeInstanceOf(ProtectStatAbAttr);
+    const reviveAttr = res.attrs[1] as PreFaintReviveAbAttr;
+    expect(reviveAttr).toBeInstanceOf(PreFaintReviveAbAttr);
+    expect(reviveAttr.getUsage()).toEqual({ kind: "first-n-hits", n: 1 });
+  });
+
+  it("er id 862 (Thermal Slide) wires WeatherStatMultiplier (SPD, 1.5x, sun/hail set)", () => {
+    const res = dispatchArchetype("bespoke", null, 862);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as WeatherStatMultiplierAbAttr;
+    expect(attr).toBeInstanceOf(WeatherStatMultiplierAbAttr);
+    expect(attr.stat).toBe(Stat.SPD);
+    expect(attr.multiplier).toBe(1.5);
+    expect(attr.getWeathers()).toEqual([WeatherType.SUNNY, WeatherType.HARSH_SUN, WeatherType.HAIL, WeatherType.SNOW]);
+  });
+
+  it("er id 488 (Tipping Point) wires StatTriggerOnHit(+1 SPATK) + PostReceiveCritStatStageChange(SPATK, 12)", () => {
+    const res = dispatchArchetype("bespoke", null, 488);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(2);
+    const hitAttr = res.attrs[0] as StatTriggerOnHitAbAttr;
+    expect(hitAttr).toBeInstanceOf(StatTriggerOnHitAbAttr);
+    expect(hitAttr.getStatChanges()).toEqual([{ stat: Stat.SPATK, stages: 1 }]);
+    const critAttr = res.attrs[1];
+    expect(critAttr).toBeInstanceOf(PostReceiveCritStatStageChangeAbAttr);
   });
 
   it("unrecognized er id falls through to default bespoke skip", () => {

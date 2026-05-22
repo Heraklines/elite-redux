@@ -3878,6 +3878,23 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
     }
 
+    /**
+     * Halves damage if the attacker is using a special attack while
+     * frostbitten (ER status — see {@linkcode BattlerTagType.ER_FROSTBITE}).
+     * Mirrors the BURN halving above but on the special side, matching the
+     * Gen 9 mainline FROSTBITE mechanic Elite Redux ports. The check uses the
+     * battler-tag presence rather than a dedicated `StatusEffect` because ER's
+     * FROSTBITE is modeled as a battler tag rather than a primary status (so
+     * we don't have to mutate pokerogue's `StatusEffect` enum). The BURN
+     * `Bypass` ability hook is not mirrored — Elite Redux does not ship a
+     * frostbite-bypass ability yet; one can be added if/when it appears.
+     * (Round 7 of the ER bespoke ability grind.)
+     */
+    let frostbiteMultiplier = 1;
+    if (!isPhysical && source.getTag(BattlerTagType.ER_FROSTBITE)) {
+      frostbiteMultiplier = 0.5;
+    }
+
     /** Reduces damage if this Pokemon has a relevant screen (e.g. Light Screen for special attacks) */
     const screenMultiplier = new NumberHolder(1);
 
@@ -3921,6 +3938,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         * stabMultiplier
         * typeMultiplier
         * burnMultiplier
+        * frostbiteMultiplier
         * screenMultiplier.value
         * hitsTagMultiplier.value
         * mistyTerrainMultiplier,
@@ -3965,7 +3983,16 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // This attribute may modify damage arbitrarily, so be careful about changing its order of application.
     applyMoveAttrs("ModifiedDamageAttr", source, this, move, damage);
 
-    if (this.isFullHp() && !ignoreAbility) {
+    // The pre-defend "endure / revive" hook used to gate on `isFullHp()` at
+    // the dispatch site, mirroring vanilla Sturdy's hardcoded full-HP precond.
+    // Elite Redux primitives (see {@linkcode PreFaintReviveAbAttr}) carry the
+    // HP gate inside their own `canApply` to support non-full-HP variants
+    // (Gallantry / Lucky Halo / Cheating Death gate on `hp-threshold:0`, etc).
+    // Vanilla `PreDefendFullHpEndureAbAttr` still checks `isFullHp()` in its
+    // own `canApply`, so removing this precondition does NOT change Sturdy
+    // semantics — it just stops blocking non-Sturdy subclasses at the dispatch
+    // site. (Round 7 of the ER bespoke ability grind.)
+    if (!ignoreAbility) {
       applyAbAttrs("PreDefendFullHpEndureAbAttr", abAttrParams);
     }
 
