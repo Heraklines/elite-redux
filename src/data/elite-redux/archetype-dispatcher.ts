@@ -1291,6 +1291,35 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
  *   - 807 Woodland Curse → {@linkcode EntryEffectAbAttr} (scripted-move: FORESTS_CURSE).
  *     The "Adds Grass type on contact" piece is deferred — partial wire.
  *   - 991 Resilience → {@linkcode PassiveRecoveryAbAttr} (hp-below-fraction: 0.5, 1/4).
+ *
+ * Cluster table (round 6):
+ *   - 429 Coward → {@linkcode EntryEffectAbAttr} (scripted-move: PROTECT). The
+ *     scripted-move sub-effect is a wiring stub today; full per-turn Protect
+ *     injection lands with the later turn-queue work. Partial wire.
+ *   - 431 Dune Terror → {@linkcode WeatherDamageReductionAbAttr} (SANDSTORM,
+ *     0.65 multiplier = 35% reduction). The "+20% Ground moves" piece would
+ *     compose via `WeatherTypeBoostAbAttr` (sand + Ground type) but isn't
+ *     wired here — partial wire.
+ *   - 464 Hunter's Horn → {@linkcode LifestealOnKoAbAttr} (1/4 max-HP heal on
+ *     KO). The "boost horn moves" piece composes via `FlagDamageBoostAbAttr`
+ *     (HORN_BASED) but isn't wired here — partial wire.
+ *   - 559 Guilt Trip → {@linkcode OnFaintEffectAbAttr} (attacker-stat-change:
+ *     ATK -2, SPATK -2). Uses the new attacker-stat-change sub-effect
+ *     introduced this round.
+ *   - 673 Blood Stain → {@linkcode ChanceBattlerTagOnHitAbAttr} (chance 100,
+ *     ER_BLEED, contact). The "is always bleeding" self-bleed piece is
+ *     deferred — partial wire.
+ *   - 697 Dragon's Ritual → {@linkcode StatTriggerOnKoAbAttr} (+1 ATK, +1 SPD).
+ *   - 705 Terastal Treasure → {@linkcode DamageReductionAbAttr} (kind: all,
+ *     reduction: 0.4). The "-20% Speed" tradeoff is deferred — partial wire.
+ *   - 771 Forsaken Heart → {@linkcode StatTriggerOnKoAbAttr} (+1 ATK).
+ *
+ * Primitive extension (round 6):
+ *   - {@linkcode OnFaintEffectAbAttr} gained the `attacker-stat-change`
+ *     sub-effect kind. Pattern mirrors `attacker-battler-tag`: validate
+ *     non-empty non-zero-stages payload, gate canApply on a live attacker,
+ *     dispatch one `StatStageChangePhase` per delta against the attacker's
+ *     battler index in `apply`.
  */
 function dispatchBespoke(erAbilityId: number): DispatchResult {
   switch (erAbilityId) {
@@ -1545,6 +1574,80 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
           condition: { kind: "hp-below-fraction", fraction: 0.5 },
         }),
       ]);
+    case 429:
+      // Coward — sets up Protect on switch-in (once per ability evaluation).
+      // The `scripted-move` sub-effect is a configuration-only stub today: the
+      // dispatcher records the wiring and the full per-turn Protect injection
+      // is deferred to the later C-phase turn-queue integration. Partial wire.
+      return ok([new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.PROTECT })]);
+    case 431:
+      // Dune Terror — sand reduces incoming damage by 35%. The "+20% Ground
+      // moves" piece composes via `WeatherTypeBoostAbAttr` but isn't wired
+      // here yet — partial wire. Multiplier is `1 - 0.35 = 0.65`.
+      return ok([
+        new WeatherDamageReductionAbAttr({
+          weathers: [WeatherType.SANDSTORM],
+          multiplier: 0.65,
+        }),
+      ]);
+    case 464:
+      // Hunter's Horn — heal 1/4 max HP on KO. The "boost horn moves" piece
+      // composes via `FlagDamageBoostAbAttr` (HORN_BASED) but isn't wired here
+      // yet — partial wire.
+      return ok([new LifestealOnKoAbAttr({ healFraction: 1 / 4 })]);
+    case 559:
+      // Guilt Trip — sharply lowers attacker's Atk and SpAtk when fainting.
+      // "Sharply" = -2 in pokerogue convention. Uses the on-faint-effect's
+      // new `attacker-stat-change` sub-effect added this round.
+      return ok([
+        new OnFaintEffectAbAttr({
+          effect: {
+            kind: "attacker-stat-change",
+            stats: [
+              { stat: Stat.ATK, stages: -2 },
+              { stat: Stat.SPATK, stages: -2 },
+            ],
+          },
+        }),
+      ]);
+    case 673:
+      // Blood Stain — bleeds spread on contact: 100% chance to apply ER_BLEED
+      // when the holder is touched. The "is always bleeding if not immune"
+      // self-bleed piece composes via an entry-effect that adds the tag to
+      // self, but isn't wired here yet — partial wire.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.ER_BLEED],
+          contactRequired: true,
+        }),
+      ]);
+    case 697:
+      // Dragon's Ritual — Atk and Speed each +1 on KO.
+      return ok([
+        new StatTriggerOnKoAbAttr({
+          stats: [
+            { stat: Stat.ATK, stages: 1 },
+            { stat: Stat.SPD, stages: 1 },
+          ],
+        }),
+      ]);
+    case 705:
+      // Terastal Treasure — takes 40% less damage from all moves. The "-20%
+      // Speed" tradeoff composes via a stat-multiplier primitive that doesn't
+      // exist yet — partial wire.
+      return ok([
+        new DamageReductionAbAttr({
+          reduction: 0.4,
+          filter: { kind: "all" },
+        }),
+      ]);
+    case 771:
+      // Forsaken Heart — Attack +1 whenever any Pokemon is KO'd. Uses the
+      // unfiltered KO trigger (the trigger fires for the holder regardless of
+      // who actually scored the KO, matching the "anywhere on the field"
+      // text).
+      return ok([new StatTriggerOnKoAbAttr({ stats: [{ stat: Stat.ATK, stages: 1 }] })]);
     default:
       return SKIP_BESPOKE;
   }

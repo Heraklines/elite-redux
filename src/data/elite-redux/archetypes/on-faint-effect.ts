@@ -64,6 +64,7 @@ import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { ArenaTagType } from "#enums/arena-tag-type";
 import type { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
+import type { BattleStat } from "#enums/stat";
 import { WeatherType } from "#enums/weather-type";
 import { BooleanHolder, toDmgValue } from "#utils/common";
 
@@ -133,6 +134,28 @@ export interface OnFaintEffectAttackerBattlerTag {
 }
 
 /**
+ * Apply a list of {@linkcode StatChange} entries to the attacker that caused
+ * the faint. Used by ER abilities such as `Guilt Trip` ("Sharply lowers
+ * attacker's Attack and SpAtk when fainting"). Each entry is dispatched as
+ * its own `StatStageChangePhase` against the attacker, matching how the
+ * stat-trigger archetype applies multi-stat payloads on its own surfaces.
+ *
+ * If there's no known attacker (status / hazard faint, ally KO via spread
+ * move) the effect is a no-op — same gate as the other attacker-targeted
+ * sub-effects.
+ */
+export interface OnFaintEffectAttackerStatChange {
+  readonly kind: "attacker-stat-change";
+  /**
+   * One or more stat-stage deltas to apply to the attacker. Negative for
+   * drops (the common ER flavor — "lower attacker's Atk by -2"), positive for
+   * the rarer "buff your killer" variant. Each entry must carry a non-zero
+   * `stages` value; an empty list is rejected at construction time.
+   */
+  readonly stats: ReadonlyArray<{ readonly stat: BattleStat; readonly stages: number }>;
+}
+
+/**
  * Discriminated union describing every post-faint side-effect this archetype
  * can carry. New sub-shapes should extend this union additively.
  */
@@ -141,7 +164,8 @@ export type OnFaintEffect =
   | OnFaintEffectSetTerrain
   | OnFaintEffectAttackerDamageFlat
   | OnFaintEffectSetHazard
-  | OnFaintEffectAttackerBattlerTag;
+  | OnFaintEffectAttackerBattlerTag
+  | OnFaintEffectAttackerStatChange;
 
 /** All valid {@linkcode OnFaintEffect.kind} discriminator strings. */
 export type OnFaintEffectKind = OnFaintEffect["kind"];
@@ -202,6 +226,8 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
         return true;
       case "attacker-battler-tag":
         return params.attacker !== undefined && !params.attacker.isFainted();
+      case "attacker-stat-change":
+        return params.attacker !== undefined && !params.attacker.isFainted();
     }
   }
 
@@ -224,20 +250,23 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
         return;
       case "attacker-battler-tag":
         OnFaintEffectAbAttr.applyAttackerBattlerTag(this.effect, params);
+        return;
+      case "attacker-stat-change":
+        OnFaintEffectAbAttr.applyAttackerStatChange(this.effect, params);
     }
   }
 
   /**
    * Validate the effect payload at construction time. Rejects nonsensical
    * configurations (e.g. WeatherType.NONE, out-of-range fractions, zero
-   * hazard layers).
+   * hazard layers). Per-kind validation lives in the small helpers below so
+   * the dispatch keeps a flat shape — biome's cognitive-complexity budget
+   * prefers single-step dispatchers over inlined per-branch logic.
    */
   private static validateEffect(effect: OnFaintEffect): void {
     switch (effect.kind) {
       case "set-weather":
-        if (effect.weather === WeatherType.NONE) {
-          throw new Error("[OnFaintEffectAbAttr] set-weather effect cannot use WeatherType.NONE");
-        }
+        OnFaintEffectAbAttr.validateSetWeather(effect);
         return;
       case "set-terrain":
         // No invalid terrain to guard against — TerrainType.NONE has a valid
@@ -245,27 +274,56 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
         // semantics in pokerogue, which is an intentional use case.
         return;
       case "attacker-damage-flat":
-        if (!(effect.maxHpFraction > 0 && effect.maxHpFraction <= 1)) {
-          throw new Error(
-            `[OnFaintEffectAbAttr] attacker-damage-flat maxHpFraction must be in (0, 1]; got ${effect.maxHpFraction}`,
-          );
-        }
+        OnFaintEffectAbAttr.validateAttackerDamageFlat(effect);
         return;
-      case "set-hazard": {
-        const layers = effect.layers ?? 1;
-        if (!Number.isInteger(layers) || layers < 1) {
-          throw new Error(`[OnFaintEffectAbAttr] set-hazard layers must be a positive integer; got ${layers}`);
-        }
+      case "set-hazard":
+        OnFaintEffectAbAttr.validateSetHazard(effect);
         return;
-      }
-      case "attacker-battler-tag": {
-        const turns = effect.turns ?? 0;
-        if (!Number.isInteger(turns) || turns < 0) {
-          throw new Error(
-            `[OnFaintEffectAbAttr] attacker-battler-tag turns must be a non-negative integer; got ${turns}`,
-          );
-        }
+      case "attacker-battler-tag":
+        OnFaintEffectAbAttr.validateAttackerBattlerTag(effect);
         return;
+      case "attacker-stat-change":
+        OnFaintEffectAbAttr.validateAttackerStatChange(effect);
+    }
+  }
+
+  private static validateSetWeather(effect: OnFaintEffectSetWeather): void {
+    if (effect.weather === WeatherType.NONE) {
+      throw new Error("[OnFaintEffectAbAttr] set-weather effect cannot use WeatherType.NONE");
+    }
+  }
+
+  private static validateAttackerDamageFlat(effect: OnFaintEffectAttackerDamageFlat): void {
+    if (!(effect.maxHpFraction > 0 && effect.maxHpFraction <= 1)) {
+      throw new Error(
+        `[OnFaintEffectAbAttr] attacker-damage-flat maxHpFraction must be in (0, 1]; got ${effect.maxHpFraction}`,
+      );
+    }
+  }
+
+  private static validateSetHazard(effect: OnFaintEffectSetHazard): void {
+    const layers = effect.layers ?? 1;
+    if (!Number.isInteger(layers) || layers < 1) {
+      throw new Error(`[OnFaintEffectAbAttr] set-hazard layers must be a positive integer; got ${layers}`);
+    }
+  }
+
+  private static validateAttackerBattlerTag(effect: OnFaintEffectAttackerBattlerTag): void {
+    const turns = effect.turns ?? 0;
+    if (!Number.isInteger(turns) || turns < 0) {
+      throw new Error(`[OnFaintEffectAbAttr] attacker-battler-tag turns must be a non-negative integer; got ${turns}`);
+    }
+  }
+
+  private static validateAttackerStatChange(effect: OnFaintEffectAttackerStatChange): void {
+    if (effect.stats.length === 0) {
+      throw new Error("[OnFaintEffectAbAttr] attacker-stat-change must include at least one stat change");
+    }
+    for (const change of effect.stats) {
+      if (change.stages === 0) {
+        throw new Error(
+          `[OnFaintEffectAbAttr] attacker-stat-change stages must be non-zero; got 0 for stat ${change.stat}`,
+        );
       }
     }
   }
@@ -334,5 +392,34 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
     }
     const turns = effect.turns ?? 0;
     attacker.addTag(effect.tagType, turns, undefined, pokemon.id);
+  }
+
+  /**
+   * Apply a list of stat-stage deltas to the attacker that caused the faint.
+   * Models ER's "Guilt Trip" cluster ("Sharply lowers attacker's Attack and
+   * SpAtk when fainting"). Each delta dispatches its own `StatStageChangePhase`
+   * — pokerogue collapses same-frame phases into one animation, so multi-stat
+   * payloads display as a single message.
+   *
+   * The phase is targeted at the attacker's battler index with
+   * `selfTarget: false`, matching how foe-targeting stat-change abilities (e.g.
+   * `Intimidate`'s post-summon Atk drop on foes) construct their phase calls.
+   */
+  private static applyAttackerStatChange(
+    effect: OnFaintEffectAttackerStatChange,
+    { attacker, simulated }: PostFaintAbAttrParams,
+  ): void {
+    if (simulated || attacker === undefined) {
+      return;
+    }
+    for (const change of effect.stats) {
+      globalScene.phaseManager.unshiftNew(
+        "StatStageChangePhase",
+        attacker.getBattlerIndex(),
+        false,
+        [change.stat],
+        change.stages,
+      );
+    }
   }
 }

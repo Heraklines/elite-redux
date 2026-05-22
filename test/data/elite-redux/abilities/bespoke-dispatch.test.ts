@@ -24,11 +24,14 @@ import { StatBoostOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-bo
 import { StatChangeOnCategoryAttackAbAttr } from "#data/elite-redux/abilities/stat-change-on-category-attack";
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
+import { ChanceBattlerTagOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { DamageReductionAbAttr } from "#data/elite-redux/archetypes/damage-reduction-generic";
 import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
+import { LifestealOnKoAbAttr } from "#data/elite-redux/archetypes/lifesteal";
 import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
 import { PassiveRecoveryAbAttr } from "#data/elite-redux/archetypes/passive-recovery";
-import { StatTriggerOnHitAbAttr } from "#data/elite-redux/archetypes/stat-trigger-on-event";
+import { StatTriggerOnHitAbAttr, StatTriggerOnKoAbAttr } from "#data/elite-redux/archetypes/stat-trigger-on-event";
+import { WeatherDamageReductionAbAttr } from "#data/elite-redux/archetypes/weather-terrain-interaction";
 import { TerrainType } from "#data/terrain";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -328,6 +331,100 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     const attr = res.attrs[0] as PassiveRecoveryAbAttr;
     expect(attr.getHealFraction()).toBeCloseTo(1 / 4);
     expect(attr.getRecoveryCondition()).toEqual({ kind: "hp-below-fraction", fraction: 0.5 });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Round 6 wires (on-faint attacker-stat-change extension, KO stat triggers,
+  // weather-gated damage reduction, generic damage reduction with `all` filter,
+  // chance-battler-tag for ER_BLEED, lifesteal-on-KO, scripted-move Protect).
+  // ---------------------------------------------------------------------------
+
+  it("er id 429 (Coward) wires EntryEffect (scripted-move PROTECT)", () => {
+    const res = dispatchArchetype("bespoke", null, 429);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as EntryEffectAbAttr;
+    expect(attr).toBeInstanceOf(EntryEffectAbAttr);
+    expect(attr.getKind()).toBe("scripted-move");
+    const effect = attr.getEffect();
+    expect(effect.kind === "scripted-move" && effect.move).toBe(MoveId.PROTECT);
+  });
+
+  it("er id 431 (Dune Terror) wires WeatherDamageReduction (SANDSTORM, 0.65)", () => {
+    const res = dispatchArchetype("bespoke", null, 431);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as WeatherDamageReductionAbAttr;
+    expect(attr).toBeInstanceOf(WeatherDamageReductionAbAttr);
+    expect(attr.getMultiplier()).toBeCloseTo(0.65);
+    expect(attr.getWeathers()).toEqual([WeatherType.SANDSTORM]);
+  });
+
+  it("er id 464 (Hunter's Horn) wires LifestealOnKo (1/4)", () => {
+    const res = dispatchArchetype("bespoke", null, 464);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as LifestealOnKoAbAttr;
+    expect(attr).toBeInstanceOf(LifestealOnKoAbAttr);
+    expect(attr.getHealFraction()).toBeCloseTo(1 / 4);
+  });
+
+  it("er id 559 (Guilt Trip) wires OnFaintEffect (attacker-stat-change ATK/SPATK -2)", () => {
+    const res = dispatchArchetype("bespoke", null, 559);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as OnFaintEffectAbAttr;
+    expect(attr).toBeInstanceOf(OnFaintEffectAbAttr);
+    expect(attr.getKind()).toBe("attacker-stat-change");
+    const effect = attr.getEffect();
+    if (effect.kind !== "attacker-stat-change") {
+      throw new Error("expected attacker-stat-change effect kind");
+    }
+    expect(effect.stats).toEqual([
+      { stat: Stat.ATK, stages: -2 },
+      { stat: Stat.SPATK, stages: -2 },
+    ]);
+  });
+
+  it("er id 673 (Blood Stain) wires ChanceBattlerTagOnHit (100% ER_BLEED on contact)", () => {
+    const res = dispatchArchetype("bespoke", null, 673);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as ChanceBattlerTagOnHitAbAttr;
+    expect(attr).toBeInstanceOf(ChanceBattlerTagOnHitAbAttr);
+    expect(attr.getChance()).toBe(100);
+    expect(attr.getTags()).toEqual([BattlerTagType.ER_BLEED]);
+    expect(attr.requiresContact()).toBe(true);
+  });
+
+  it("er id 697 (Dragon's Ritual) wires StatTriggerOnKo (+1 ATK, +1 SPD)", () => {
+    const res = dispatchArchetype("bespoke", null, 697);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as StatTriggerOnKoAbAttr;
+    expect(attr).toBeInstanceOf(StatTriggerOnKoAbAttr);
+    expect(attr.getStatChanges()).toEqual([
+      { stat: Stat.ATK, stages: 1 },
+      { stat: Stat.SPD, stages: 1 },
+    ]);
+  });
+
+  it("er id 705 (Terastal Treasure) wires DamageReduction (all, 0.4)", () => {
+    const res = dispatchArchetype("bespoke", null, 705);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as DamageReductionAbAttr;
+    expect(attr).toBeInstanceOf(DamageReductionAbAttr);
+    expect(attr.getReduction()).toBeCloseTo(0.4);
+    expect(attr.getFilter()).toEqual({ kind: "all" });
+  });
+
+  it("er id 771 (Forsaken Heart) wires StatTriggerOnKo (+1 ATK)", () => {
+    const res = dispatchArchetype("bespoke", null, 771);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as StatTriggerOnKoAbAttr;
+    expect(attr.getStatChanges()).toEqual([{ stat: Stat.ATK, stages: 1 }]);
   });
 
   it("unrecognized er id falls through to default bespoke skip", () => {

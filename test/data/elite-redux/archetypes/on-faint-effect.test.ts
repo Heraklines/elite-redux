@@ -17,6 +17,7 @@ import { type OnFaintEffect, OnFaintEffectAbAttr } from "#data/elite-redux/arche
 import { TerrainType } from "#data/terrain";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { Stat } from "#enums/stat";
 import { WeatherType } from "#enums/weather-type";
 import { describe, expect, it } from "vitest";
 
@@ -144,6 +145,66 @@ describe("OnFaintEffectAbAttr — construction validation", () => {
         }),
     ).toThrow(/non-negative integer/);
   });
+
+  // Round 6 — attacker-stat-change sub-effect (powers Guilt Trip).
+
+  it("constructs with attacker-stat-change effect (single stat)", () => {
+    const attr = new OnFaintEffectAbAttr({
+      effect: { kind: "attacker-stat-change", stats: [{ stat: Stat.ATK, stages: -2 }] },
+    });
+    expect(attr.getKind()).toBe("attacker-stat-change");
+    const effect = attr.getEffect();
+    expect(effect.kind === "attacker-stat-change" && effect.stats).toEqual([{ stat: Stat.ATK, stages: -2 }]);
+  });
+
+  it("constructs with attacker-stat-change effect (multi-stat)", () => {
+    const attr = new OnFaintEffectAbAttr({
+      effect: {
+        kind: "attacker-stat-change",
+        stats: [
+          { stat: Stat.ATK, stages: -2 },
+          { stat: Stat.SPATK, stages: -2 },
+        ],
+      },
+    });
+    expect(attr.getKind()).toBe("attacker-stat-change");
+  });
+
+  it("rejects attacker-stat-change with empty stats list", () => {
+    expect(
+      () =>
+        new OnFaintEffectAbAttr({
+          effect: { kind: "attacker-stat-change", stats: [] },
+        }),
+    ).toThrow(/at least one stat change/);
+  });
+
+  it("rejects attacker-stat-change with zero-stages entry", () => {
+    expect(
+      () =>
+        new OnFaintEffectAbAttr({
+          effect: {
+            kind: "attacker-stat-change",
+            stats: [{ stat: Stat.ATK, stages: 0 }],
+          },
+        }),
+    ).toThrow(/stages must be non-zero/);
+  });
+
+  it("rejects attacker-stat-change with one zero-stages entry among many", () => {
+    expect(
+      () =>
+        new OnFaintEffectAbAttr({
+          effect: {
+            kind: "attacker-stat-change",
+            stats: [
+              { stat: Stat.ATK, stages: -2 },
+              { stat: Stat.SPATK, stages: 0 },
+            ],
+          },
+        }),
+    ).toThrow(/stages must be non-zero/);
+  });
 });
 
 describe("OnFaintEffectAbAttr — accessors", () => {
@@ -153,6 +214,10 @@ describe("OnFaintEffectAbAttr — accessors", () => {
       { effect: { kind: "set-terrain", terrain: TerrainType.MISTY }, expected: "set-terrain" },
       { effect: { kind: "attacker-damage-flat", maxHpFraction: 0.5 }, expected: "attacker-damage-flat" },
       { effect: { kind: "set-hazard", hazard: ArenaTagType.STEALTH_ROCK }, expected: "set-hazard" },
+      {
+        effect: { kind: "attacker-stat-change", stats: [{ stat: Stat.ATK, stages: -1 }] },
+        expected: "attacker-stat-change",
+      },
     ];
     for (const v of variants) {
       const attr = new OnFaintEffectAbAttr({ effect: v.effect });
