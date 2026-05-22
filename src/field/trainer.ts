@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { signatureSpecies } from "#balance/signature-species";
 import { EntryHazardTag } from "#data/arena-tag";
+import { applyErRosterOverride } from "#data/elite-redux/er-trainer-runtime-hook";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { PartyMemberStrength } from "#enums/party-member-strength";
@@ -341,6 +342,18 @@ export class Trainer extends Phaser.GameObjects.Container {
             ret = this.config.partyMemberFuncs[index - template.size](level, template.getStrength(index));
             return;
           }
+        }
+
+        // ER trainer-overlay hook: if this trainer's class matches an ER
+        // registry entry AND no explicit partyMemberFunc (LLM director /
+        // mystery encounter) won above, replace the rolled species /
+        // moveset / IVs with the ER roster. Returns null for non-ER
+        // trainers (or members beyond the ER roster length) and vanilla
+        // pokerogue generation continues unchanged below.
+        const erEnemy = applyErRosterOverride(this, index);
+        if (erEnemy !== null) {
+          ret = erEnemy;
+          return;
         }
         let offset = 0;
 

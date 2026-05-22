@@ -212,8 +212,9 @@ export abstract class PokemonSpeciesForm {
       if (Object.hasOwn(pokemonPrevolutions, starterSpeciesId)) {
         starterSpeciesId = pokemonPrevolutions[starterSpeciesId];
       } else {
-        // If we've reached the base species and still haven't found a matching ability, use form 0 if possible
-        if (0 in starterPassiveAbilities[starterSpeciesId]) {
+        // If we've reached the base species and still haven't found a matching ability, use form 0 if possible.
+        // ER-custom species (id >= 10000) won't have an entry in starterPassiveAbilities — guard the index.
+        if (starterSpeciesId in starterPassiveAbilities && 0 in starterPassiveAbilities[starterSpeciesId]) {
           return starterPassiveAbilities[starterSpeciesId][0];
         }
         console.log("No passive ability found for %s, using run away", this.speciesId);

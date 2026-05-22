@@ -1,0 +1,162 @@
+// =============================================================================
+// Elite Redux — trainer-runtime hook.
+//
+// Connects the inert `er-trainer-overlay.ts` helper to pokerogue's live
+// trainer-party generation. When a pokerogue `Trainer` is about to roll a
+// party member (in `Trainer.genPartyMember(index)`), this hook checks the
+// ER registry for a trainer whose `trainerType` matches the encountered
+// trainer's class. If a match exists, the hook constructs an
+// `EnemyPokemon` directly from the ER roster — species, moves, IVs/EVs,
+// nature, ability slot — and returns it; otherwise it returns `null` and
+// vanilla pokerogue generation continues unchanged.
+//
+// Why hook `genPartyMember` rather than re-architecting the trainer path?
+// Pokerogue's party generation is mode-specific (classic vs daily vs
+// challenge) but every mode funnels through `genPartyMember`. Hooking
+// here is the minimum-surface-area integration: same call site, same
+// signature, same return type. The hook is OPT-IN — it only activates
+// when an ER trainer matches.
+//
+// Trainer selection strategy (matching ER stableKey to a live Trainer):
+//   1. Match by `config.trainerType`. Each ER trainer carries a mapped
+//      pokerogue `TrainerType` (the trainer class — Hiker, Ace Trainer,
+//      Lass, etc.). Multiple ER trainers share a class; the first match
+//      is used (deterministic / seeded selection is a future enhancement).
+//   2. Trainer is memoized per `Trainer` instance via a WeakMap, so all
+//      `genPartyMember(0..n)` calls within one battle resolve to the
+//      same ER roster. Without memoization, a multi-member ER party
+//      could rotate between different ER trainers per slot.
+//
+// Tier selection is currently fixed at "party" (Easy). Difficulty-gated
+// tier selection (insane / hell) is a follow-up that requires a project-
+// wide difficulty flag.
+//
+// =============================================================================
+
+import { globalScene } from "#app/global-scene";
+import {
+  type ErPartyMemberRegistered,
+  type ErTrainerRegistryEntry,
+} from "#data/elite-redux/init-elite-redux-trainers";
+import { findErTrainersForType, selectErRoster } from "#data/elite-redux/er-trainer-overlay";
+import type { Nature } from "#enums/nature";
+import { TrainerSlot } from "#enums/trainer-slot";
+import type { EnemyPokemon } from "#field/pokemon";
+import type { Trainer } from "#field/trainer";
+import { PokemonMove } from "#moves/pokemon-move";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
+
+/**
+ * Cache of selected ER trainer per pokerogue Trainer instance. The cached
+ * value is either an `ErTrainerRegistryEntry` (matched) or `null` (no
+ * match — vanilla generation should run). Using a WeakMap so destroyed
+ * Trainer instances don't keep the cache alive.
+ */
+let TRAINER_CACHE: WeakMap<Trainer, ErTrainerRegistryEntry | null> = new WeakMap();
+
+/**
+ * Inspect the live Trainer and decide which ER roster (if any) drives
+ * its party. Side-effect: caches the choice on the Trainer instance so
+ * downstream calls for the same trainer return the same registry entry.
+ *
+ * Returns `null` when no ER trainer matches — caller should let vanilla
+ * generation proceed.
+ */
+export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry | null {
+  const cached = TRAINER_CACHE.get(trainer);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const trainerType = trainer.config.trainerType;
+  const candidates = findErTrainersForType(trainerType);
+  // First candidate. Future enhancement: seed off `battle.waveIndex` so
+  // the same wave deterministically picks the same ER trainer.
+  const choice = candidates.length > 0 ? candidates[0] : null;
+  TRAINER_CACHE.set(trainer, choice);
+  return choice;
+}
+
+/**
+ * Reset the ER-trainer cache for a Trainer. Used by tests that re-use
+ * the same Trainer object across test cases and want a fresh match.
+ */
+export function resetErTrainerCacheFor(trainer: Trainer): void {
+  TRAINER_CACHE.delete(trainer);
+}
+
+/**
+ * Drop the entire trainer cache. Used by tests at module boundaries —
+ * the WeakMap will naturally clean up when Trainers are GC'd, but tests
+ * sometimes need to force a fresh lookup for the SAME object.
+ */
+export function clearErTrainerCacheForTests(): void {
+  // WeakMap has no clear() — recreate by reassigning the module-level
+  // map. We do this defensively for testing scenarios only.
+  TRAINER_CACHE = new WeakMap();
+}
+
+/**
+ * Build a single ER-overridden EnemyPokemon for `index` from the matched
+ * ER trainer. Returns `null` if no ER trainer matches or the requested
+ * index is out of the ER roster's bounds (caller should fall through to
+ * vanilla generation in that case).
+ *
+ * The returned EnemyPokemon has:
+ *   - species set from the ER roster member's speciesId
+ *   - abilityIndex set from the ER `abilitySlot`
+ *   - moveset populated from the ER roster's moves
+ *   - ivs / nature set from the ER roster
+ *   - level taken from `battle.enemyLevels[index]` (so wave-scaling still
+ *     applies — ER's per-member level field is a placeholder).
+ *
+ * EVs are NOT applied: pokerogue's `EnemyPokemon` doesn't expose a public
+ * EV channel (trainer mons use a separate boost mechanism). The hook
+ * stops at the in-engine fields it can mutate safely.
+ */
+export function applyErRosterOverride(trainer: Trainer, index: number): EnemyPokemon | null {
+  const erTrainer = getErTrainerForTrainer(trainer);
+  if (erTrainer === null) {
+    return null;
+  }
+  // Tier selection: fixed to "party" until a difficulty flag exists.
+  const roster: readonly ErPartyMemberRegistered[] = selectErRoster(erTrainer, "party");
+  if (index >= roster.length) {
+    return null;
+  }
+  const member = roster[index];
+  const species = getPokemonSpecies(member.speciesId);
+  if (!species) {
+    return null;
+  }
+  const battle = globalScene.currentBattle;
+  const level = battle.enemyLevels?.[index] ?? member.level;
+  const trainerSlot
+    = !trainer.isDouble() || !(index % 2) ? TrainerSlot.TRAINER : TrainerSlot.TRAINER_PARTNER;
+  const enemy: EnemyPokemon = globalScene.addEnemyPokemon(species, level, trainerSlot);
+  enemy.abilityIndex = member.abilitySlot;
+  enemy.ivs = [
+    member.ivs[0],
+    member.ivs[1],
+    member.ivs[2],
+    member.ivs[3],
+    member.ivs[4],
+    member.ivs[5],
+  ];
+  enemy.nature = member.nature as Nature;
+  if (member.moves.length > 0) {
+    const moves = member.moves.map(id => new PokemonMove(id));
+    enemy.moveset = moves;
+    enemy.summonData.moveset = moves;
+  }
+  enemy.generateName();
+  return enemy;
+}
+
+/**
+ * True if the given trainer has any matching ER roster. Cheaper than
+ * `applyErRosterOverride` for callers that just want to gate behavior
+ * (e.g. "is this an ER battle?").
+ */
+export function hasErRosterOverride(trainer: Trainer): boolean {
+  return getErTrainerForTrainer(trainer) !== null;
+}

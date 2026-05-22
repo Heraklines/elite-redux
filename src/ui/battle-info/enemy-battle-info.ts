@@ -110,12 +110,15 @@ export class EnemyBattleInfo extends BattleInfo {
     }
 
     const dexEntry = globalScene.gameData.dexData[pokemon.species.speciesId];
-    this.ownedIcon.setVisible(!!dexEntry.caughtAttr);
+    this.ownedIcon.setVisible(!!dexEntry?.caughtAttr);
     const opponentPokemonDexAttr = pokemon.getDexAttr();
+    // ER-custom species (id >= 10000) aren't in starterData by default — guard.
+    const rootStarter = globalScene.gameData.starterData[pokemon.species.getRootSpeciesId()];
+    const rootStarterTrue = globalScene.gameData.starterData[pokemon.species.getRootSpeciesId(true)];
     if (
       globalScene.gameMode.isClassic
-      && globalScene.gameData.starterData[pokemon.species.getRootSpeciesId()].classicWinCount > 0
-      && globalScene.gameData.starterData[pokemon.species.getRootSpeciesId(true)].classicWinCount > 0
+      && (rootStarter?.classicWinCount ?? 0) > 0
+      && (rootStarterTrue?.classicWinCount ?? 0) > 0
     ) {
       // move the ribbon to the left if there is no owned icon
       const championRibbonX = this.ownedIcon.visible ? 8 : 0;
