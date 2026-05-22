@@ -192,7 +192,7 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     expect(ability.attrs).toHaveLength(0);
   });
 
-  it("composite entries (e.g. As One er id 266) have no archetype attrs (deferred to D3b)", () => {
+  it("composite entries (e.g. As One er id 266 — Unnerve + Chilling Neigh) wire parts' attrs (D3b)", () => {
     const id = ER_ID_MAP.abilities[266];
     expect(id).toBeDefined();
     const ability = allAbilities.find(a => a.id === id);
@@ -200,9 +200,11 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     if (!ability) {
       return;
     }
-    // ER 266 is classified `composite-vanilla-mashup` — dispatcher returns
-    // no attrs in D3 (recursive sub-archetype resolution is the D3b follow-up).
-    expect(ability.attrs).toHaveLength(0);
+    // ER 266 = "Unnerve + Chilling Neigh". Both parts are vanilla pokerogue
+    // abilities — their AbAttrs (PreventBerryUseAbAttr + PostVictoryStatStageChangeAbAttr)
+    // should be copied onto this composite. We just check non-empty here;
+    // structural assertions live in composite-resolution.test.ts.
+    expect(ability.attrs.length).toBeGreaterThanOrEqual(2);
   });
 
   it("ER ability count by archetype matches the dispatcher's coverage", () => {
@@ -231,8 +233,10 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     expect(wiredCounts["flag-damage-boost"] ?? 0).toBeGreaterThanOrEqual(6);
     expect(wiredCounts["chance-status-on-hit"] ?? 0).toBeGreaterThanOrEqual(10);
     expect(wiredCounts["entry-effect"] ?? 0).toBeGreaterThanOrEqual(20);
-    // Composite + bespoke should NOT appear in wired counts.
-    expect(wiredCounts["composite-vanilla-mashup"] ?? 0).toBe(0);
+    // D3b: composite-vanilla-mashup now wires attrs via the resolved-parts side
+    // table — at least 100 of the 196 composites should have ≥1 attr each.
+    expect(wiredCounts["composite-vanilla-mashup"] ?? 0).toBeGreaterThanOrEqual(100);
+    // Bespoke remains zero-wired (its attrs are hand-written, not dispatcher-emitted).
     expect(wiredCounts.bespoke ?? 0).toBe(0);
   });
 

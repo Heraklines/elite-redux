@@ -5,10 +5,11 @@
  */
 
 // =============================================================================
-// Elite Redux — Phase D Task D3: archetype-classifier → archetype-primitive
-// dispatcher. Translates `ER_ABILITY_ARCHETYPES` rows (which carry flat
-// classifier-emitted JSON params) into one or more constructed `AbAttr`
-// instances ready to be attached to a custom `Ability` via the builder.
+// Elite Redux — Phase D Task D3 + D3b: archetype-classifier →
+// archetype-primitive dispatcher. Translates `ER_ABILITY_ARCHETYPES` rows
+// (which carry flat classifier-emitted JSON params) into one or more
+// constructed `AbAttr` instances ready to be attached to a custom `Ability`
+// via the builder.
 //
 // Why a dispatcher and not direct construction at the init site?
 //
@@ -29,13 +30,23 @@
 //   attrs list and record a `skipped` note so the caller's diagnostics can
 //   surface coverage gaps.
 //
-// Composite skip
+// Composite resolution (D3b)
 //
-//   `composite-vanilla-mashup` (196 entries) is intentionally skipped in D3.
-//   The classifier emitted only the named parts (`["Unnerve", "Chilling Neigh"]`),
-//   not the sub-archetypes' params. Resolving each part to its own archetype
-//   row is a recursive lookup that needs a registry of named-ability →
-//   archetype mapping — that's the D3b follow-up task.
+//   For `composite-vanilla-mashup` rows, the dispatcher consults
+//   `ER_COMPOSITE_PARTS` (auto-generated from
+//   `scripts/elite-redux/classify-composites.mjs`) to walk the named parts
+//   back to either vanilla pokerogue `AbilityId`s (whose AbAttrs are copied
+//   verbatim from `allAbilities[id].attrs`) or other ER `erAbilityId`s
+//   (whose archetype rows are recursively dispatched). Free-text riders
+//   ("triggers hail when hit") show up as `unresolvedParts` on the side
+//   table and contribute no attrs — they're for triage / future bespoke
+//   implementation.
+//
+//   Recursion is guarded by a per-call `visited` set passed through the
+//   internal dispatch entry: a composite referencing another composite
+//   eventually bottoms out in concrete archetype-primitive rows or in a
+//   vanilla pokerogue ability. A cycle (composite A → composite B →
+//   composite A) would otherwise infinite-loop; the guard skips repeats.
 //
 // Bespoke skip
 //
@@ -45,6 +56,7 @@
 // =============================================================================
 
 import type { AbAttr } from "#abilities/ab-attrs";
+import { allAbilities } from "#data/data-lists";
 import { ChanceStatusOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { ConditionalDamageAbAttr, type DamageCondition } from "#data/elite-redux/archetypes/conditional-damage";
 import {
@@ -85,7 +97,8 @@ import {
   WeatherDamageReductionAbAttr,
   WeatherTypeBoostAbAttr,
 } from "#data/elite-redux/archetypes/weather-terrain-interaction";
-import type { ErArchetypeKind } from "#data/elite-redux/er-ability-archetypes";
+import { ER_ABILITY_ARCHETYPES, type ErArchetypeKind } from "#data/elite-redux/er-ability-archetypes";
+import { ER_COMPOSITE_PARTS, type ErCompositePartRef } from "#data/elite-redux/er-composite-parts";
 import { ER_CLASSIFIER_FLAG_TO_MOVE_FLAG } from "#data/elite-redux/er-flag-mapping";
 import { TerrainType } from "#data/terrain";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -116,10 +129,6 @@ export interface DispatchResult {
 }
 
 /** Convenience: an empty success result. Only used internally. */
-const SKIP_COMPOSITE: DispatchResult = {
-  attrs: [],
-  skipReason: "composite-vanilla-mashup deferred to D3b (needs recursive sub-archetype resolution)",
-};
 const SKIP_BESPOKE: DispatchResult = {
   attrs: [],
   skipReason: "bespoke entry; hand-written implementation pending",
@@ -1037,20 +1046,122 @@ function dispatchConditionalDamage(params: Record<string, unknown>): DispatchRes
 }
 
 /**
- * Dispatcher entry point. Looks up the right per-archetype handler and
- * invokes it. The caller wraps any throw in the init result's `errors`
- * array; this function ITSELF never throws on classifier-shape mismatches —
- * it returns a `DispatchResult` with `skipReason` set.
- *
- * @param archetype - The archetype kind (matches `ErArchetypeKind`).
- * @param params    - Classifier-emitted params (or `null` for `bespoke`).
+ * Resolve a single composite part reference (vanilla pokerogue or ER) into
+ * AbAttrs. For pokerogue parts the dispatcher copies the references from
+ * `allAbilities[abilityId].attrs` verbatim — the existing per-attr state is
+ * read-only at apply time (per-battle mutation lives on Pokemon, not on the
+ * attr), so sharing instances across abilities is safe. For ER parts the
+ * dispatcher recursively dispatches the referenced ability's archetype row;
+ * `visited` blocks cycles.
  */
-export function dispatchArchetype(archetype: ErArchetypeKind, params: Record<string, unknown> | null): DispatchResult {
+function resolveCompositePartAttrs(
+  part: ErCompositePartRef,
+  visited: Set<number>,
+): { attrs: readonly AbAttr[]; skipReason: string | null } {
+  if (part.kind === "pokerogue") {
+    const ability = allAbilities[part.abilityId];
+    if (ability === undefined) {
+      // `allAbilities` is sparse-ish — built positionally in `initAbilities()`.
+      // A missing entry usually means the dispatcher ran before that init step
+      // (test ordering bug) or the id-map references an ability that isn't
+      // implemented yet.
+      return { attrs: [], skipReason: `pokerogue ability id ${part.abilityId} not initialised at dispatch time` };
+    }
+    if (ability.attrs.length === 0) {
+      // Vanilla ability without wired AbAttrs (rare placeholder). Mention the
+      // id so triage can confirm the upstream ability really is a no-op.
+      return { attrs: [], skipReason: `pokerogue ability id ${part.abilityId} has no attrs to copy` };
+    }
+    return { attrs: ability.attrs, skipReason: null };
+  }
+  // ER recursive lookup.
+  if (visited.has(part.erAbilityId)) {
+    return { attrs: [], skipReason: `composite cycle: er ability ${part.erAbilityId} already visited` };
+  }
+  const archetypeRow = ER_ABILITY_ARCHETYPES[part.erAbilityId];
+  if (archetypeRow === undefined) {
+    return { attrs: [], skipReason: `er ability ${part.erAbilityId} missing archetype row` };
+  }
+  const sub = dispatchArchetypeInternal(part.erAbilityId, archetypeRow.archetype, archetypeRow.params, visited);
+  return { attrs: sub.attrs, skipReason: sub.skipReason };
+}
+
+/**
+ * Dispatch a `composite-vanilla-mashup` row. Looks up the per-ability resolved
+ * parts table (`ER_COMPOSITE_PARTS`), walks each part through
+ * `resolveCompositePartAttrs`, and concatenates the resulting AbAttr lists.
+ *
+ * Even when some parts fail to resolve (free-text riders, cycles), the
+ * dispatcher returns whatever parts it COULD wire — partial coverage is
+ * better than total skip. `skipReason` is set only when zero attrs were
+ * produced (composite contributed nothing).
+ */
+function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchResult {
+  const entry = ER_COMPOSITE_PARTS[erAbilityId];
+  if (entry === undefined) {
+    return skip(
+      `composite-vanilla-mashup: no resolved-parts entry for er ability ${erAbilityId} (run er:classify-composites)`,
+    );
+  }
+  if (entry.parts.length === 0) {
+    return skip(
+      `composite-vanilla-mashup: er ability ${erAbilityId} had no resolvable parts (riders: ${entry.unresolvedParts?.join(", ") ?? "(none)"})`,
+    );
+  }
+  // Defensive: track the visited set with the composite's own id added BEFORE
+  // recursion so self-references (rare but possible if the classifier emits a
+  // composite that names itself) abort cleanly.
+  const nextVisited = new Set(visited);
+  nextVisited.add(erAbilityId);
+  const out: AbAttr[] = [];
+  const subSkips: string[] = [];
+  for (const part of entry.parts) {
+    const partResult = resolveCompositePartAttrs(part, nextVisited);
+    if (partResult.skipReason !== null) {
+      subSkips.push(partResult.skipReason);
+      continue;
+    }
+    for (const attr of partResult.attrs) {
+      out.push(attr);
+    }
+  }
+  if (out.length === 0) {
+    return skip(
+      `composite-vanilla-mashup: er ability ${erAbilityId} resolved ${entry.parts.length} part(s) but none produced attrs (${subSkips.join("; ")})`,
+    );
+  }
+  // Compose order matches the parts order in ER's source description.
+  return ok(out);
+}
+
+/**
+ * Internal dispatch with a `visited` cycle-guard. The public `dispatchArchetype`
+ * forwards to this with a fresh empty set; recursive composite dispatch
+ * propagates the same set forward.
+ *
+ * @param erAbilityId  - Optional ER ability id; only meaningful for composite
+ *                       rows (the dispatcher uses it to find the side-table
+ *                       entry). Pass `null` when the row's archetype is not
+ *                       composite.
+ * @param archetype    - The archetype kind (matches `ErArchetypeKind`).
+ * @param params       - Classifier-emitted params (or `null` for `bespoke`).
+ * @param visited      - Set of er ability ids already on the current recursion
+ *                       stack — prevents A → B → A cycles.
+ */
+function dispatchArchetypeInternal(
+  erAbilityId: number | null,
+  archetype: ErArchetypeKind,
+  params: Record<string, unknown> | null,
+  visited: Set<number>,
+): DispatchResult {
   if (archetype === "bespoke") {
     return SKIP_BESPOKE;
   }
   if (archetype === "composite-vanilla-mashup") {
-    return SKIP_COMPOSITE;
+    if (erAbilityId === null) {
+      return skip("composite-vanilla-mashup: dispatcher called without erAbilityId (init wiring bug)");
+    }
+    return dispatchComposite(erAbilityId, visited);
   }
   if (params === null) {
     return skip(`${archetype}: null params (classifier produced no shape)`);
@@ -1102,4 +1213,24 @@ export function dispatchArchetype(archetype: ErArchetypeKind, params: Record<str
       return skip(`unknown archetype ${String(_exhaustive)}`);
     }
   }
+}
+
+/**
+ * Dispatcher entry point. Looks up the right per-archetype handler and
+ * invokes it. The caller wraps any throw in the init result's `errors`
+ * array; this function ITSELF never throws on classifier-shape mismatches —
+ * it returns a `DispatchResult` with `skipReason` set.
+ *
+ * @param archetype     - The archetype kind (matches `ErArchetypeKind`).
+ * @param params        - Classifier-emitted params (or `null` for `bespoke`).
+ * @param erAbilityId   - Optional ER ability id. Required for
+ *                        `composite-vanilla-mashup` rows (used to look up the
+ *                        resolved-parts side table); ignored otherwise.
+ */
+export function dispatchArchetype(
+  archetype: ErArchetypeKind,
+  params: Record<string, unknown> | null,
+  erAbilityId: number | null = null,
+): DispatchResult {
+  return dispatchArchetypeInternal(erAbilityId, archetype, params, new Set());
 }

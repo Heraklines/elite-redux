@@ -182,12 +182,14 @@ function buildCustomAbility(
   // runtime; the cast satisfies the type system without changing behavior.
   const builder = new AbBuilder(pokerogueId as AbilityId, 9);
 
-  // Phase D3: wire archetype-classified attrs via the dispatcher. We look up
-  // the archetype row by the ER-side id (not the pokerogue id) since the
-  // classifier keys on ER's source numbering.
+  // Phase D3 / D3b: wire archetype-classified attrs via the dispatcher. We
+  // look up the archetype row by the ER-side id (not the pokerogue id) since
+  // the classifier keys on ER's source numbering. The ER id is also forwarded
+  // to the dispatcher so composite-vanilla-mashup rows can find their
+  // resolved-parts entry in `ER_COMPOSITE_PARTS`.
   const archetypeRow = ER_ABILITY_ARCHETYPES[draft.id];
   if (archetypeRow !== undefined) {
-    wireArchetypeAttrs(builder, archetypeRow.archetype, archetypeRow.params, result);
+    wireArchetypeAttrs(builder, draft.id, archetypeRow.archetype, archetypeRow.params, result);
   }
 
   const ability = builder.build();
@@ -230,13 +232,14 @@ function buildCustomAbility(
  */
 function wireArchetypeAttrs(
   builder: AbBuilder,
+  erAbilityId: number,
   archetype: ErArchetypeKind,
   params: Record<string, unknown> | null,
   result: InitEliteReduxCustomAbilitiesResult,
 ): void {
   let dispatched: ReturnType<typeof dispatchArchetype>;
   try {
-    dispatched = dispatchArchetype(archetype, params);
+    dispatched = dispatchArchetype(archetype, params, erAbilityId);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     result.errors.push(`Archetype ${archetype} dispatch threw for ability id ${builder.id}: ${msg}`);
