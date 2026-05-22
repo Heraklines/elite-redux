@@ -365,6 +365,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private pokemonAbilityText: Phaser.GameObjects.Text;
   private pokemonPassiveLabelText: Phaser.GameObjects.Text;
   private pokemonPassiveText: Phaser.GameObjects.Text;
+  /**
+   * ER 3-passive layout — slot 1 reuses {@link pokemonPassiveText}; slots 2 and 3
+   * are rendered immediately below it. Indices 1 and 2 correspond to ER slots 2 and 3.
+   */
+  private pokemonPassiveSlotTexts: [Phaser.GameObjects.Text, Phaser.GameObjects.Text];
   private pokemonNatureLabelText: Phaser.GameObjects.Text;
   private pokemonNatureText: BBCodeText;
   private pokemonMovesContainer: Phaser.GameObjects.Container;
@@ -390,6 +395,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private pokemonShinyIcon: Phaser.GameObjects.Sprite;
   private pokemonPassiveDisabledIcon: Phaser.GameObjects.Sprite;
   private pokemonPassiveLockedIcon: Phaser.GameObjects.Sprite;
+  /** ER 3-passive layout — disabled (stop) icons for slots 2 and 3. */
+  private pokemonPassiveSlotDisabledIcons: [Phaser.GameObjects.Sprite, Phaser.GameObjects.Sprite];
+  /** ER 3-passive layout — locked icons for slots 2 and 3. */
+  private pokemonPassiveSlotLockedIcons: [Phaser.GameObjects.Sprite, Phaser.GameObjects.Sprite];
   private teraIcon: Phaser.GameObjects.Sprite;
 
   private activeTooltip: "ABILITY" | "PASSIVE" | "CANDY" | undefined;
@@ -760,9 +769,50 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       .setScale(0.42, 0.38)
       .setVisible(false);
 
+    // ER 3-passive layout — slot 2 + slot 3 text rows immediately below slot 1.
+    // Spacing matches the existing 7-8px row pitch (ability=127, passive=136).
+    // We piggy-back on the legacy `pokemonPassiveLabelText` at y=136 — it labels
+    // the whole passive group; individual slots are unlabeled (their slot index
+    // is implicit in the visual stacking, mirroring the option-list "1. Foo,
+    // 2. Bar, 3. Baz" rows in the candy submenu).
+    const passiveSlot2Y = 143 + starterInfoYOffset;
+    const passiveSlot3Y = 150 + starterInfoYOffset;
+    this.pokemonPassiveSlotTexts = [
+      addTextObject(starterInfoXPos, passiveSlot2Y, "", TextStyle.SUMMARY_ALT, { fontSize: starterInfoTextSize })
+        .setOrigin(0)
+        .setInteractive(new Phaser.Geom.Rectangle(0, 0, 250, 55), Phaser.Geom.Rectangle.Contains),
+      addTextObject(starterInfoXPos, passiveSlot3Y, "", TextStyle.SUMMARY_ALT, { fontSize: starterInfoTextSize })
+        .setOrigin(0)
+        .setInteractive(new Phaser.Geom.Rectangle(0, 0, 250, 55), Phaser.Geom.Rectangle.Contains),
+    ];
+    this.pokemonPassiveSlotDisabledIcons = [
+      globalScene.add
+        .sprite(starterInfoXPos, passiveSlot2Y + 1, "icon_stop")
+        .setOrigin(0, 0.5)
+        .setScale(0.35)
+        .setVisible(false),
+      globalScene.add
+        .sprite(starterInfoXPos, passiveSlot3Y + 1, "icon_stop")
+        .setOrigin(0, 0.5)
+        .setScale(0.35)
+        .setVisible(false),
+    ];
+    this.pokemonPassiveSlotLockedIcons = [
+      globalScene.add
+        .sprite(starterInfoXPos, passiveSlot2Y + 1, "icon_lock")
+        .setOrigin(0, 0.5)
+        .setScale(0.42, 0.38)
+        .setVisible(false),
+      globalScene.add
+        .sprite(starterInfoXPos, passiveSlot3Y + 1, "icon_lock")
+        .setOrigin(0, 0.5)
+        .setScale(0.42, 0.38)
+        .setVisible(false),
+    ];
+
     this.pokemonNatureLabelText = addTextObject(
       6,
-      145 + starterInfoYOffset,
+      157 + starterInfoYOffset,
       i18next.t("starterSelectUiHandler:nature"),
       TextStyle.SUMMARY_ALT,
       { fontSize: starterInfoTextSize },
@@ -770,7 +820,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       .setOrigin(0)
       .setVisible(false);
 
-    this.pokemonNatureText = addBBCodeTextObject(starterInfoXPos, 145 + starterInfoYOffset, "", TextStyle.SUMMARY_ALT, {
+    this.pokemonNatureText = addBBCodeTextObject(starterInfoXPos, 157 + starterInfoYOffset, "", TextStyle.SUMMARY_ALT, {
       fontSize: starterInfoTextSize,
     }).setOrigin(0);
 
@@ -1199,6 +1249,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.pokemonPassiveText,
       this.pokemonPassiveDisabledIcon,
       this.pokemonPassiveLockedIcon,
+      ...this.pokemonPassiveSlotTexts,
+      ...this.pokemonPassiveSlotDisabledIcons,
+      ...this.pokemonPassiveSlotLockedIcons,
       this.pokemonNatureLabelText,
       this.pokemonNatureText,
       this.valueLimitLabel,
@@ -1287,6 +1340,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.pokemonPassiveLabelText.setVisible(notFreshStart);
       this.pokemonPassiveLockedIcon.setVisible(notFreshStart);
       this.pokemonPassiveText.setVisible(notFreshStart);
+      for (const slotText of this.pokemonPassiveSlotTexts) {
+        slotText.setVisible(notFreshStart);
+      }
+      for (const slotIcon of this.pokemonPassiveSlotDisabledIcons) {
+        slotIcon.setVisible(false);
+      }
+      for (const slotIcon of this.pokemonPassiveSlotLockedIcons) {
+        slotIcon.setVisible(false);
+      }
 
       this.resetFilters();
       this.updateStarters();
@@ -4007,6 +4069,122 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     return { dexEntry: { ...copiedDexEntry }, starterDataEntry: { ...copiedStarterDataEntry } };
   }
 
+  /**
+   * Render the 3 ER passive slots in the species info panel.
+   *
+   * - Slot 1 reuses the legacy `pokemonPassiveText` / `pokemonPassiveDisabledIcon`
+   *   / `pokemonPassiveLockedIcon` so the vanilla single-passive layout is bit-
+   *   for-bit preserved.
+   * - Slots 2/3 reuse `pokemonPassiveSlotTexts[0..1]` and their matching icons.
+   * - Vanilla species (`getPassiveAbility()` populated only) collapse slots 2/3
+   *   to a gray "—" placeholder rather than hiding them entirely — the layout
+   *   stays stable across species.
+   *
+   * Visual states per slot:
+   *   - LOCKED     → gray text, `icon_lock` to the right of the ability name
+   *   - UNLOCKED + DISABLED → gray text @ 0.5 alpha, `icon_stop` to the right
+   *   - UNLOCKED + ENABLED  → SUMMARY_ALT text (full color)
+   *   - Empty (NONE)        → "—" placeholder, no icons
+   */
+  private renderPassiveSlots(passiveAttr: number, formIndex: number | undefined, isFreshStartChallenge: boolean): void {
+    if (!this.lastSpecies) {
+      return;
+    }
+    const passiveAbilityIds = this.lastSpecies.getPassiveAbilities(formIndex);
+    // All 3 slot text objects: slot 0 = legacy `pokemonPassiveText`, slots 1-2 = new.
+    const slotTexts: [Phaser.GameObjects.Text, Phaser.GameObjects.Text, Phaser.GameObjects.Text] = [
+      this.pokemonPassiveText,
+      this.pokemonPassiveSlotTexts[0],
+      this.pokemonPassiveSlotTexts[1],
+    ];
+    const slotDisabledIcons: [Phaser.GameObjects.Sprite, Phaser.GameObjects.Sprite, Phaser.GameObjects.Sprite] = [
+      this.pokemonPassiveDisabledIcon,
+      this.pokemonPassiveSlotDisabledIcons[0],
+      this.pokemonPassiveSlotDisabledIcons[1],
+    ];
+    const slotLockedIcons: [Phaser.GameObjects.Sprite, Phaser.GameObjects.Sprite, Phaser.GameObjects.Sprite] = [
+      this.pokemonPassiveLockedIcon,
+      this.pokemonPassiveSlotLockedIcons[0],
+      this.pokemonPassiveSlotLockedIcons[1],
+    ];
+
+    // Always clear old pointer handlers on slot 0 (vanilla path). Slots 1/2 also
+    // get fresh handlers each render — `off("pointerover")` is invoked in
+    // setCursor so we don't need to clear them here.
+    this.pokemonPassiveText.off("pointerover");
+    this.pokemonPassiveText.off("pointerout");
+    for (const slotText of this.pokemonPassiveSlotTexts) {
+      slotText.off("pointerover");
+      slotText.off("pointerout");
+    }
+
+    for (let slot = 0; slot < 3; slot++) {
+      const slotIndex = slot as PassiveSlot;
+      const text = slotTexts[slot];
+      const disabledIcon = slotDisabledIcons[slot];
+      const lockedIcon = slotLockedIcons[slot];
+      const abilityId = passiveAbilityIds[slot];
+
+      if (abilityId === AbilityId.NONE) {
+        // Empty slot — render a faint "—" placeholder so the layout stays
+        // visually consistent across vanilla (1 passive) and ER (3 passives).
+        text
+          .setVisible(!isFreshStartChallenge)
+          .setText("—")
+          .setColor(getTextColor(TextStyle.SUMMARY_GRAY))
+          .setAlpha(0.35)
+          .setShadowColor(getTextColor(TextStyle.SUMMARY_GRAY, true));
+        disabledIcon.setVisible(false);
+        lockedIcon.setVisible(false);
+        continue;
+      }
+
+      const ability = allAbilities[abilityId];
+      const isUnlocked = isSlotUnlocked(passiveAttr, slotIndex);
+      const isEnabled = isSlotEnabled(passiveAttr, slotIndex);
+
+      const textStyle = isUnlocked && isEnabled ? TextStyle.SUMMARY_ALT : TextStyle.SUMMARY_GRAY;
+      const textAlpha = isUnlocked && isEnabled ? 1 : 0.5;
+
+      text
+        .setVisible(!isFreshStartChallenge)
+        .setText(ability.name)
+        .setColor(getTextColor(textStyle))
+        .setAlpha(textAlpha)
+        .setShadowColor(getTextColor(textStyle, true));
+
+      // Tooltip handlers — slot 0 keeps the legacy `"PASSIVE"` activeTooltip
+      // sentinel so editTooltip wiring elsewhere continues to work; slots 1/2
+      // use the same sentinel because only one tooltip is ever visible at a time.
+      if (text.visible) {
+        text.on("pointerover", () => {
+          globalScene.ui.showTooltip(`${ability.name}`, `${ability.description}`, true);
+          this.activeTooltip = "PASSIVE";
+        });
+        text.on("pointerout", () => {
+          globalScene.ui.hideTooltip();
+          this.activeTooltip = undefined;
+        });
+      }
+
+      const iconPosition = {
+        x: text.x + text.displayWidth + 1,
+        y: text.y + text.displayHeight / 2,
+      };
+      disabledIcon
+        .setVisible(isUnlocked && !isEnabled && !isFreshStartChallenge)
+        .setPosition(iconPosition.x, iconPosition.y);
+      lockedIcon.setVisible(!isUnlocked && !isFreshStartChallenge).setPosition(iconPosition.x, iconPosition.y);
+    }
+
+    // If a PASSIVE tooltip is currently active, refresh its content to point at
+    // slot 1 (legacy behavior — slots 2/3 don't drive editTooltip).
+    if (this.activeTooltip === "PASSIVE" && passiveAbilityIds[0] !== AbilityId.NONE) {
+      const slot0Ability = allAbilities[passiveAbilityIds[0]];
+      globalScene.ui.editTooltip(`${slot0Ability.name}`, `${slot0Ability.description}`);
+    }
+  }
+
   setSpeciesDetails(species: PokemonSpecies, options: SpeciesDetails = {}, save = true): void {
     let { shiny, formIndex, female, variant, abilityIndex, natureIndex, teraType } = options;
     const forSeen: boolean = options.forSeen ?? false;
@@ -4077,6 +4255,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.pokemonPassiveText.setVisible(false);
     this.pokemonPassiveDisabledIcon.setVisible(false);
     this.pokemonPassiveLockedIcon.setVisible(false);
+    for (const slotText of this.pokemonPassiveSlotTexts) {
+      slotText.setVisible(false).setText("");
+    }
+    for (const slotIcon of this.pokemonPassiveSlotDisabledIcons) {
+      slotIcon.setVisible(false);
+    }
+    for (const slotIcon of this.pokemonPassiveSlotLockedIcons) {
+      slotIcon.setVisible(false);
+    }
     this.teraIcon.setVisible(false);
 
     if (this.assetLoadCancelled) {
@@ -4258,51 +4445,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         }
 
         if (passiveAbility) {
-          // TODO(er-phase-b): the species info panel currently renders only slot 1's
-          // passive name + lock/disable status. Phase B will swap this out for a
-          // multi-row component that shows all 3 slots side-by-side.
-          const isUnlocked = !!(passiveAttr & PassiveAttr.UNLOCKED);
-          const isEnabled = !!(passiveAttr & PassiveAttr.ENABLED);
-
-          const textStyle = isUnlocked && isEnabled ? TextStyle.SUMMARY_ALT : TextStyle.SUMMARY_GRAY;
-          const textAlpha = isUnlocked && isEnabled ? 1 : 0.5;
+          // ER 3-passive rendering: render slot 1 in the legacy `pokemonPassiveText`
+          // and slots 2/3 in `pokemonPassiveSlotTexts[0..1]`. For vanilla species
+          // (getPassiveCount() === 1) slots 2/3 collapse to a gray "—" placeholder.
+          this.renderPassiveSlots(passiveAttr, formIndex, isFreshStartChallenge);
 
           this.pokemonPassiveLabelText
             .setVisible(!isFreshStartChallenge)
             .setColor(getTextColor(TextStyle.SUMMARY_ALT))
             .setShadowColor(getTextColor(TextStyle.SUMMARY_ALT, true));
-          this.pokemonPassiveText
-            .setVisible(!isFreshStartChallenge)
-            .setText(passiveAbility.name)
-            .setColor(getTextColor(textStyle))
-            .setAlpha(textAlpha)
-            .setShadowColor(getTextColor(textStyle, true));
-
-          if (this.activeTooltip === "PASSIVE") {
-            globalScene.ui.editTooltip(`${passiveAbility.name}`, `${passiveAbility.description}`);
-          }
-
-          if (this.pokemonPassiveText.visible) {
-            this.pokemonPassiveText.on("pointerover", () => {
-              globalScene.ui.showTooltip(`${passiveAbility.name}`, `${passiveAbility.description}`, true);
-              this.activeTooltip = "PASSIVE";
-            });
-            this.pokemonPassiveText.on("pointerout", () => {
-              globalScene.ui.hideTooltip();
-              this.activeTooltip = undefined;
-            });
-          }
-
-          const iconPosition = {
-            x: this.pokemonPassiveText.x + this.pokemonPassiveText.displayWidth + 1,
-            y: this.pokemonPassiveText.y + this.pokemonPassiveText.displayHeight / 2,
-          };
-          this.pokemonPassiveDisabledIcon
-            .setVisible(isUnlocked && !isEnabled && !isFreshStartChallenge)
-            .setPosition(iconPosition.x, iconPosition.y);
-          this.pokemonPassiveLockedIcon
-            .setVisible(!isUnlocked && !isFreshStartChallenge)
-            .setPosition(iconPosition.x, iconPosition.y);
         } else if (this.activeTooltip === "PASSIVE") {
           // No passive and passive tooltip is active > hide it
           globalScene.ui.hideTooltip();
@@ -4368,6 +4519,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       } else {
         this.pokemonAbilityText.setText("");
         this.pokemonPassiveText.setText("");
+        for (const slotText of this.pokemonPassiveSlotTexts) {
+          slotText.setText("");
+        }
         this.pokemonNatureText.setText("");
         this.teraIcon.setVisible(false);
         this.setTypeIcons(null, null);
@@ -4380,6 +4534,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.pokemonGenderText.setText("");
       this.pokemonAbilityText.setText("");
       this.pokemonPassiveText.setText("");
+      for (const slotText of this.pokemonPassiveSlotTexts) {
+        slotText.setText("");
+      }
       this.pokemonNatureText.setText("");
       this.teraIcon.setVisible(false);
       this.setTypeIcons(null, null);
