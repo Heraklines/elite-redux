@@ -15,10 +15,10 @@
  *   - assets/images/pokemon/elite-redux/ combat sprites
  *
  * Per-file checks:
- *   1. Size >= 100 bytes (rejects 0-byte placeholders + HTML error pages,
- *      which are typically 200B+ but have a different signature anyway).
+ *   1. Size >= MIN_PNG_BYTES (rejects 0-byte placeholders + truncated downloads;
+ *      see constant docstring for the exact floor and why).
  *   2. PNG magic bytes (89 50 4E 47 0D 0A 1A 0A) at offset 0.
- *   3. IHDR chunk at offset 8 with parseable width/height/depth/colorType.
+ *   3. IHDR chunk at offset 8 with non-zero width/height.
  *   4. At least one IDAT chunk (compressed image data).
  *   5. IEND chunk at end of file with CRC32 marker.
  *
