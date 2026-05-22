@@ -1554,6 +1554,26 @@ export class GameData {
       };
     }
 
+    // Elite Redux: seed default starterData entries for ER-custom species
+    // (ids >= 10000). Without these, UI/battle code that reads
+    // starterData[id].classicWinCount, .abilityAttr, etc. crashes on
+    // ER-custom encounters. Imported lazily here to avoid a circular
+    // module dependency (init.ts imports game-data.ts).
+    for (const species of allSpecies) {
+      if (species.speciesId >= 10000 && starterData[species.speciesId] === undefined) {
+        starterData[species.speciesId] = {
+          moveset: null,
+          eggMoves: 0,
+          candyCount: 0,
+          friendship: 0,
+          abilityAttr: 0,
+          passiveAttr: 0,
+          valueReduction: 0,
+          classicWinCount: 0,
+        };
+      }
+    }
+
     this.starterData = starterData;
   }
 
