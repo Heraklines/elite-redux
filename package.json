@@ -55,6 +55,7 @@
     "er:fetch-non-combat-assets": "node scripts/elite-redux/fetch-non-combat-assets.mjs",
     "er:audit-non-combat-assets": "node scripts/elite-redux/audit-non-combat-assets.mjs",
     "er:render-shinies": "node scripts/elite-redux/render-shinies.mjs",
+    "er:synth-icons": "node scripts/elite-redux/synth-icons.mjs",
     "er:audit-flag-mapping": "node scripts/elite-redux/audit-flag-mapping.mjs",
     "er:audit-archetype-coverage": "node scripts/elite-redux/audit-archetype-coverage.mjs",
     "er:verify-assets": "node scripts/elite-redux/verify-assets.mjs",
