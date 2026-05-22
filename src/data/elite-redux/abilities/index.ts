@@ -31,3 +31,7 @@ export {
   StatBoostOnFlagAttackAbAttr,
   type StatBoostOnFlagAttackOptions,
 } from "./stat-boost-on-flag-attack";
+export {
+  StatDebuffOnFlagAttackAbAttr,
+  type StatDebuffOnFlagAttackOptions,
+} from "./stat-debuff-on-flag-attack";

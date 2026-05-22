@@ -20,13 +20,18 @@ import { BlockRecoilDamageAttr, PostDefendContactDamageAbAttr } from "#abilities
 import { PostTurnHurtNonTypedAbAttr } from "#data/elite-redux/abilities/post-turn-hurt-non-typed";
 import { SetArenaTagOnHitAbAttr, SetTerrainOnHitAbAttr } from "#data/elite-redux/abilities/set-arena-effect-on-hit";
 import { StatBoostOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-boost-on-flag-attack";
+import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
 import { DamageReductionAbAttr } from "#data/elite-redux/archetypes/damage-reduction-generic";
+import { PassiveRecoveryAbAttr } from "#data/elite-redux/archetypes/passive-recovery";
+import { StatTriggerOnHitAbAttr } from "#data/elite-redux/archetypes/stat-trigger-on-event";
 import { TerrainType } from "#data/terrain";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { MoveFlags } from "#enums/move-flags";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
+import { StatusEffect } from "#enums/status-effect";
+import { WeatherType } from "#enums/weather-type";
 import { describe, expect, it } from "vitest";
 
 describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () => {
@@ -155,6 +160,95 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(1);
     expect(res.attrs[0]).toBeInstanceOf(PostDefendContactDamageAbAttr);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Round 3 wires (passive-recovery gating, stat-debuff-on-flag, stat-trigger-
+  // on-hit type-filter, weather-gated post-turn chip).
+  // ---------------------------------------------------------------------------
+
+  it("er id 333 (Sweet Dreams) wires PassiveRecovery (status: SLEEP, 1/8)", () => {
+    const res = dispatchArchetype("bespoke", null, 333);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as PassiveRecoveryAbAttr;
+    expect(attr).toBeInstanceOf(PassiveRecoveryAbAttr);
+    expect(attr.getHealFraction()).toBeCloseTo(1 / 8);
+    expect(attr.getRecoveryCondition()).toEqual({ kind: "status", status: StatusEffect.SLEEP });
+  });
+
+  it("er id 447 (Furnace) wires StatTriggerOnHit (ROCK filter, +2 SPD)", () => {
+    const res = dispatchArchetype("bespoke", null, 447);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as StatTriggerOnHitAbAttr;
+    expect(attr).toBeInstanceOf(StatTriggerOnHitAbAttr);
+    expect(attr.getStatChanges()).toEqual([{ stat: Stat.SPD, stages: 2 }]);
+    expect(attr.getFilter()).toEqual({ types: [PokemonType.ROCK] });
+  });
+
+  it("er id 591 (Celestial Blessing) wires PassiveRecovery (terrain: MISTY, 1/12)", () => {
+    const res = dispatchArchetype("bespoke", null, 591);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as PassiveRecoveryAbAttr;
+    expect(attr.getHealFraction()).toBeCloseTo(1 / 12);
+    expect(attr.getRecoveryCondition()).toEqual({ kind: "terrain", terrains: [TerrainType.MISTY] });
+  });
+
+  it("er id 643 (Denting Blows) wires StatDebuffOnFlagAttack (HAMMER -1 DEF)", () => {
+    const res = dispatchArchetype("bespoke", null, 643);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as StatDebuffOnFlagAttackAbAttr;
+    expect(attr).toBeInstanceOf(StatDebuffOnFlagAttackAbAttr);
+    expect(attr.getFlag()).toBe(MoveFlags.HAMMER_BASED);
+    expect(attr.getStat()).toBe(Stat.DEF);
+    expect(attr.getStages()).toBe(-1);
+  });
+
+  it("er id 653 (Rest in Peace) wires PassiveRecovery (weather: FOG, 1/8)", () => {
+    const res = dispatchArchetype("bespoke", null, 653);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as PassiveRecoveryAbAttr;
+    expect(attr.getHealFraction()).toBeCloseTo(1 / 8);
+    expect(attr.getRecoveryCondition()).toEqual({ kind: "weather", weathers: [WeatherType.FOG] });
+  });
+
+  it("er id 787 (Cryo Architect) wires StatTriggerOnHit (WATER+ICE filter, +1 ATK/DEF)", () => {
+    const res = dispatchArchetype("bespoke", null, 787);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as StatTriggerOnHitAbAttr;
+    expect(attr.getStatChanges()).toEqual([
+      { stat: Stat.ATK, stages: 1 },
+      { stat: Stat.DEF, stages: 1 },
+    ]);
+    expect(attr.getFilter()).toEqual({ types: [PokemonType.WATER, PokemonType.ICE] });
+  });
+
+  it("er id 874 (Winter Throne) wires PostTurnHurtNonTyped (Ice safe-type, 1/8)", () => {
+    const res = dispatchArchetype("bespoke", null, 874);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as PostTurnHurtNonTypedAbAttr;
+    expect(attr).toBeInstanceOf(PostTurnHurtNonTypedAbAttr);
+    expect(attr.getSafeTypes()).toEqual([PokemonType.ICE]);
+    expect(attr.getDamageFraction()).toBeCloseTo(1 / 8);
+    expect(attr.getRequiredWeathers()).toBeNull();
+  });
+
+  it("er id 942 (Christmas Nightmare) wires PostTurnHurtNonTyped (weather-gated HAIL/SNOW)", () => {
+    const res = dispatchArchetype("bespoke", null, 942);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as PostTurnHurtNonTypedAbAttr;
+    expect(attr.getSafeTypes()).toEqual([]);
+    expect(attr.getDamageFraction()).toBeCloseTo(1 / 8);
+    expect(attr.getRequiredWeathers()).toEqual([WeatherType.HAIL, WeatherType.SNOW]);
+  });
+
+  it("er id 945 (Chainsaw) wires StatDebuffOnFlagAttack (SLICING -1 DEF)", () => {
+    const res = dispatchArchetype("bespoke", null, 945);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as StatDebuffOnFlagAttackAbAttr;
+    expect(attr.getFlag()).toBe(MoveFlags.SLICING_MOVE);
+    expect(attr.getStat()).toBe(Stat.DEF);
+    expect(attr.getStages()).toBe(-1);
   });
 
   it("unrecognized er id falls through to default bespoke skip", () => {

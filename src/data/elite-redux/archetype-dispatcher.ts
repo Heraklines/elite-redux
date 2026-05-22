@@ -60,6 +60,7 @@ import { allAbilities } from "#data/data-lists";
 import { PostTurnHurtNonTypedAbAttr } from "#data/elite-redux/abilities/post-turn-hurt-non-typed";
 import { SetArenaTagOnHitAbAttr, SetTerrainOnHitAbAttr } from "#data/elite-redux/abilities/set-arena-effect-on-hit";
 import { StatBoostOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-boost-on-flag-attack";
+import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
 import {
   ChanceBattlerTagOnHitAbAttr,
   ChanceStatusOnHitAbAttr,
@@ -1211,6 +1212,19 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
  *   - 401 Loose Quills → {@linkcode SetArenaTagOnHitAbAttr} Spikes + contact required.
  *   - 405 Loose Rocks → {@linkcode SetArenaTagOnHitAbAttr} Stealth Rock + contact required.
  *   - 574 Sharp Edges → vanilla {@linkcode PostDefendContactDamageAbAttr} 1/6 ratio.
+ *
+ * Cluster table (round 3):
+ *   - 333 Sweet Dreams → {@linkcode PassiveRecoveryAbAttr} (status: SLEEP, 1/8).
+ *   - 447 Furnace → {@linkcode StatTriggerOnHitAbAttr} (filter: ROCK, +2 SPD).
+ *   - 591 Celestial Blessing → {@linkcode PassiveRecoveryAbAttr} (terrain: MISTY, 1/12).
+ *   - 643 Denting Blows → {@linkcode StatDebuffOnFlagAttackAbAttr} HAMMER_BASED -1 DEF.
+ *   - 653 Rest in Peace → {@linkcode PassiveRecoveryAbAttr} (weather: FOG, 1/8).
+ *   - 787 Cryo Architect → {@linkcode StatTriggerOnHitAbAttr} (filter: WATER+ICE, +1 ATK/DEF).
+ *   - 874 Winter Throne → {@linkcode PostTurnHurtNonTypedAbAttr} (safeTypes: [ICE], 1/8).
+ *     The "heals Ice 1/8 each turn" piece is deferred — partial wire.
+ *   - 942 Christmas Nightmare → {@linkcode PostTurnHurtNonTypedAbAttr} (weather-gated:
+ *     [HAIL, SNOW], 1/8 to all foes).
+ *   - 945 Chainsaw → {@linkcode StatDebuffOnFlagAttackAbAttr} SLICING_MOVE -1 DEF.
  */
 function dispatchBespoke(erAbilityId: number): DispatchResult {
   switch (erAbilityId) {
@@ -1221,6 +1235,16 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
           flag: MoveFlags.BITING_MOVE,
           stat: Stat.ATK,
           stages: 1,
+        }),
+      ]);
+    case 333:
+      // Sweet Dreams — heals 1/8 max HP each turn while asleep. The
+      // "Immune to Bad Dreams" piece is a status-gated immunity composing
+      // with this archetype; deferred — partial wire.
+      return ok([
+        new PassiveRecoveryAbAttr({
+          healFraction: 1 / 8,
+          condition: { kind: "status", status: StatusEffect.SLEEP },
         }),
       ]);
     case 391:
@@ -1271,11 +1295,48 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
           damageFraction: 1 / 8,
         }),
       ]);
+    case 447:
+      // Furnace — +2 Speed when hit by Rock-type moves. The ER text says "by
+      // rocks" — interpreted as type-keyed (matches the existing
+      // {@linkcode StatTriggerOnHitAbAttr} filter shape used by Inflatable).
+      return ok([
+        new StatTriggerOnHitAbAttr({
+          stats: [{ stat: Stat.SPD, stages: 2 }],
+          filter: { types: [PokemonType.ROCK] },
+        }),
+      ]);
     case 574:
       // Sharp Edges — 1/6 HP damage when touched. Vanilla Rough Skin uses 1/8
       // ratio; we use 1/6 per ER description. Pokerogue's class takes the
       // *divisor* (so 6 → 1/6, 8 → 1/8).
       return ok([new PostDefendContactDamageAbAttr(6)]);
+    case 591:
+      // Celestial Blessing — heals 1/12 max HP each turn while Misty Terrain
+      // is active.
+      return ok([
+        new PassiveRecoveryAbAttr({
+          healFraction: 1 / 12,
+          condition: { kind: "terrain", terrains: [TerrainType.MISTY] },
+        }),
+      ]);
+    case 643:
+      // Denting Blows — Hammer moves drop the target's Defense by -1.
+      return ok([
+        new StatDebuffOnFlagAttackAbAttr({
+          flag: MoveFlags.HAMMER_BASED,
+          stat: Stat.DEF,
+          stages: -1,
+        }),
+      ]);
+    case 653:
+      // Rest in Peace — heals 1/8 max HP each turn while Fog is the active
+      // weather.
+      return ok([
+        new PassiveRecoveryAbAttr({
+          healFraction: 1 / 8,
+          condition: { kind: "weather", weathers: [WeatherType.FOG] },
+        }),
+      ]);
     case 663:
       // Funeral Pyre — non-Ghost-AND-non-Dark take 1/4 dmg every turn.
       return ok([
@@ -1289,6 +1350,30 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([
         new PostTurnHurtNonTypedAbAttr({
           safeTypes: [PokemonType.FIRE],
+          damageFraction: 1 / 8,
+        }),
+      ]);
+    case 787:
+      // Cryo Architect — +1 Attack AND +1 Defense when hit by Water- or
+      // Ice-type moves.
+      return ok([
+        new StatTriggerOnHitAbAttr({
+          stats: [
+            { stat: Stat.ATK, stages: 1 },
+            { stat: Stat.DEF, stages: 1 },
+          ],
+          filter: { types: [PokemonType.WATER, PokemonType.ICE] },
+        }),
+      ]);
+    case 874:
+      // Winter Throne — non-Ice foes take 1/8 dmg every turn. The "heals
+      // self-Ice 1/8 each turn" piece is deferred — partial wire. (A second
+      // `PassiveRecoveryAbAttr` could compose with this, but it'd fire for
+      // every owner regardless of type; gating heal-on-self-type requires a
+      // new condition kind.)
+      return ok([
+        new PostTurnHurtNonTypedAbAttr({
+          safeTypes: [PokemonType.ICE],
           damageFraction: 1 / 8,
         }),
       ]);
@@ -1307,6 +1392,26 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
           tagType: ArenaTagType.SPIKES,
           side: "attacker",
           contactRequired: true,
+        }),
+      ]);
+    case 942:
+      // Christmas Nightmare — every foe takes 1/8 dmg per turn while it's
+      // hailing/snowing. Empty `safeTypes` (no type-keyed immunity) +
+      // weather gate (the weather is what conditions the proc).
+      return ok([
+        new PostTurnHurtNonTypedAbAttr({
+          safeTypes: [],
+          damageFraction: 1 / 8,
+          requiredWeathers: [WeatherType.HAIL, WeatherType.SNOW],
+        }),
+      ]);
+    case 945:
+      // Chainsaw — Keen edge (slicing) moves drop the target's Defense by -1.
+      return ok([
+        new StatDebuffOnFlagAttackAbAttr({
+          flag: MoveFlags.SLICING_MOVE,
+          stat: Stat.DEF,
+          stages: -1,
         }),
       ]);
     case 956:

@@ -22,17 +22,31 @@ import type { BattleScene } from "#app/battle-scene";
 import { initGlobalScene } from "#app/global-scene";
 import { PostTurnHurtNonTypedAbAttr } from "#data/elite-redux/abilities/post-turn-hurt-non-typed";
 import { PokemonType } from "#enums/pokemon-type";
+import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const queueMessage = vi.fn();
+let currentWeather: WeatherType = WeatherType.NONE;
+
+function setCurrentWeather(weather: WeatherType): void {
+  currentWeather = weather;
+}
 
 beforeEach(() => {
   queueMessage.mockClear();
+  currentWeather = WeatherType.NONE;
   initGlobalScene({
     phaseManager: {
       queueMessage: (...args: unknown[]) => queueMessage(...args),
       queueAbilityDisplay: () => {},
+    },
+    // Arena stub exposes only the live `weatherType` field — that's what
+    // the weather-gated branch of `PostTurnHurtNonTypedAbAttr` reads.
+    arena: {
+      get weatherType() {
+        return currentWeather;
+      },
     },
   } as unknown as BattleScene);
 });
@@ -168,5 +182,68 @@ describe("PostTurnHurtNonTypedAbAttr", () => {
     const subject = makeStubSubject({ opponents: [target] });
     attr.apply({ pokemon: subject, simulated: true });
     expect(target.damageAndUpdate).not.toHaveBeenCalled();
+  });
+
+  describe("requiredWeathers gate (Christmas Nightmare)", () => {
+    it("getRequiredWeathers returns null when omitted", () => {
+      const attr = new PostTurnHurtNonTypedAbAttr({
+        safeTypes: [PokemonType.POISON],
+        damageFraction: 1 / 8,
+      });
+      expect(attr.getRequiredWeathers()).toBeNull();
+    });
+
+    it("getRequiredWeathers returns the configured list when set", () => {
+      const attr = new PostTurnHurtNonTypedAbAttr({
+        safeTypes: [],
+        damageFraction: 1 / 8,
+        requiredWeathers: [WeatherType.HAIL, WeatherType.SNOW],
+      });
+      expect(attr.getRequiredWeathers()).toEqual([WeatherType.HAIL, WeatherType.SNOW]);
+    });
+
+    it("treats empty requiredWeathers list as omitted (null)", () => {
+      const attr = new PostTurnHurtNonTypedAbAttr({
+        safeTypes: [PokemonType.FIRE],
+        damageFraction: 1 / 8,
+        requiredWeathers: [],
+      });
+      expect(attr.getRequiredWeathers()).toBeNull();
+    });
+
+    it("canApply returns false when weather gate not satisfied", () => {
+      const attr = new PostTurnHurtNonTypedAbAttr({
+        safeTypes: [],
+        damageFraction: 1 / 8,
+        requiredWeathers: [WeatherType.HAIL, WeatherType.SNOW],
+      });
+      setCurrentWeather(WeatherType.RAIN);
+      const target = makeStubOpponent({ types: [PokemonType.FIRE] });
+      const subject = makeStubSubject({ opponents: [target] });
+      expect(attr.canApply({ pokemon: subject, simulated: false })).toBe(false);
+    });
+
+    it("canApply returns true when one of the required weathers is active", () => {
+      const attr = new PostTurnHurtNonTypedAbAttr({
+        safeTypes: [],
+        damageFraction: 1 / 8,
+        requiredWeathers: [WeatherType.HAIL, WeatherType.SNOW],
+      });
+      setCurrentWeather(WeatherType.SNOW);
+      const target = makeStubOpponent({ types: [PokemonType.FIRE] });
+      const subject = makeStubSubject({ opponents: [target] });
+      expect(attr.canApply({ pokemon: subject, simulated: false })).toBe(true);
+    });
+
+    it("weather-agnostic instances (no gate) fire under any weather, including NONE", () => {
+      const attr = new PostTurnHurtNonTypedAbAttr({
+        safeTypes: [PokemonType.FIRE],
+        damageFraction: 1 / 8,
+      });
+      setCurrentWeather(WeatherType.NONE);
+      const target = makeStubOpponent({ types: [PokemonType.WATER] });
+      const subject = makeStubSubject({ opponents: [target] });
+      expect(attr.canApply({ pokemon: subject, simulated: false })).toBe(true);
+    });
   });
 });

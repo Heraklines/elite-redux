@@ -37,6 +37,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { HitResult } from "#enums/hit-result";
 import type { PokemonType } from "#enums/pokemon-type";
+import type { WeatherType } from "#enums/weather-type";
 import type { AbAttrBaseParams } from "#types/ability-types";
 import { toDmgValue } from "#utils/common";
 import { BooleanHolder } from "#utils/value-holder";
@@ -48,7 +49,8 @@ export interface PostTurnHurtNonTypedOptions {
    * The Pokemon types that are IMMUNE to the chip damage. Foes possessing any
    * of these types are spared. Empty list is allowed (degenerates to "hurt
    * every foe each turn") but unusual — every wired ER ability lists at least
-   * one safe type.
+   * one safe type. Christmas Nightmare ("Enemies take 1/8 dmg when in hail")
+   * uses the empty-list shape — the weather gate carries the conditioning.
    */
   readonly safeTypes: readonly PokemonType[];
   /**
@@ -56,6 +58,13 @@ export interface PostTurnHurtNonTypedOptions {
    * `<= 1`. Typical values: `1/8`, `1/4`.
    */
   readonly damageFraction: number;
+  /**
+   * Optional weather gate — when set, the proc only fires while one of the
+   * listed {@linkcode WeatherType}s is active. Wires ER abilities like
+   * Christmas Nightmare ("Enemies take 1/8 damage when in hail"). Omit for
+   * weather-agnostic procs (Toxic Spill / Flame Coat / Funeral Pyre).
+   */
+  readonly requiredWeathers?: readonly WeatherType[];
 }
 
 /**
@@ -72,6 +81,7 @@ export interface PostTurnHurtNonTypedOptions {
 export class PostTurnHurtNonTypedAbAttr extends PostTurnAbAttr {
   private readonly safeTypes: readonly PokemonType[];
   private readonly damageFraction: number;
+  private readonly requiredWeathers: readonly WeatherType[] | null;
 
   constructor(opts: PostTurnHurtNonTypedOptions) {
     if (!(opts.damageFraction > 0 && opts.damageFraction <= 1)) {
@@ -80,6 +90,7 @@ export class PostTurnHurtNonTypedAbAttr extends PostTurnAbAttr {
     super(true);
     this.safeTypes = opts.safeTypes;
     this.damageFraction = opts.damageFraction;
+    this.requiredWeathers = opts.requiredWeathers && opts.requiredWeathers.length > 0 ? opts.requiredWeathers : null;
   }
 
   /** Read-only accessor: the configured safe-types list. */
@@ -93,16 +104,43 @@ export class PostTurnHurtNonTypedAbAttr extends PostTurnAbAttr {
   }
 
   /**
+   * Read-only accessor: the configured weather gate (or `null` for
+   * weather-agnostic procs).
+   */
+  public getRequiredWeathers(): readonly WeatherType[] | null {
+    return this.requiredWeathers;
+  }
+
+  /**
    * Check if the proc has at least one valid target. Pure read-only check —
    * matches vanilla `PostTurnHurtIfSleepingAbAttr.canApply` shape.
+   *
+   * If a weather gate is configured, returns false immediately when none of
+   * the listed weathers is active — saves the per-opponent type-check loop.
    */
   public override canApply({ pokemon }: AbAttrBaseParams): boolean {
+    if (!this.isWeatherActive()) {
+      return false;
+    }
     for (const opp of pokemon.getOpponents()) {
       if (this.isValidTarget(opp)) {
         return true;
       }
     }
     return false;
+  }
+
+  /**
+   * Whether the configured weather gate is currently satisfied. Returns
+   * `true` when no gate is configured (weather-agnostic mode). Mirrors the
+   * convention in `weather-terrain-interaction.ts` — read the cached
+   * `arena.weatherType` rather than the optional `arena.weather` object.
+   */
+  private isWeatherActive(): boolean {
+    if (this.requiredWeathers === null) {
+      return true;
+    }
+    return this.requiredWeathers.includes(globalScene.arena.weatherType);
   }
 
   /**
