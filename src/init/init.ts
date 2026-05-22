@@ -8,7 +8,9 @@ import { initTrainerTypeDialogue } from "#data/dialogue";
 import { initEliteReduxCustomAbilities } from "#data/elite-redux/init-elite-redux-custom-abilities";
 import { initEliteReduxCustomMoves } from "#data/elite-redux/init-elite-redux-custom-moves";
 import { initEliteReduxCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
+import { initEliteReduxEvolutions } from "#data/elite-redux/init-elite-redux-evolutions";
 import { initEliteReduxFormChanges } from "#data/elite-redux/init-elite-redux-form-changes";
+import { initEliteReduxMovesets } from "#data/elite-redux/init-elite-redux-movesets";
 import { initEliteReduxSpecies } from "#data/elite-redux/init-elite-redux-species";
 import { initEliteReduxTrainers } from "#data/elite-redux/init-elite-redux-trainers";
 import { initEliteReduxVanillaRebalance } from "#data/elite-redux/init-elite-redux-vanilla-rebalance";
@@ -122,5 +124,30 @@ export function initializeGame() {
   }
   console.info(
     `[er-b5] registered ${formResult.formChangesRegistered} ER form changes (${formResult.megaRegistered} mega + ${formResult.primalRegistered} primal + ${formResult.moveMegaRegistered} move-mega), skipped ${formResult.skipped} already present, dropped ${formResult.droppedMissingSpecies} for missing-species drift`,
+  );
+  // Elite Redux Phase B6: wire ER per-species level-up movesets into
+  // pokerogue's `pokemonSpeciesLevelMoves` table. Must run AFTER
+  // initEliteReduxCustomMoves() (so ER-custom move ids ≥ 5000 are valid)
+  // and AFTER initEliteReduxCustomSpecies() (so ER-custom species ids
+  // ≥ 10000 have entries that can be keyed).
+  const movesetResult = initEliteReduxMovesets();
+  if (movesetResult.errors.length > 0) {
+    console.warn(`[er-b6] ${movesetResult.errors.length} moveset errors:`, movesetResult.errors.slice(0, 5));
+  }
+  console.info(
+    `[er-b6] patched ${movesetResult.speciesPatched} species' level-up movesets (${movesetResult.movesetEntriesApplied} [level, move] entries; skipped ${movesetResult.speciesSkippedNoMapping} no-mapping + ${movesetResult.speciesSkippedEmpty} empty; dropped ${movesetResult.moveIdsDropped} unmapped move ids)`,
+  );
+  // Elite Redux Phase B6: wire ER per-species level evolution requirements
+  // into pokerogue's `pokemonEvolutions` table (kinds 0/3/4 — LEVEL,
+  // LEVEL_MALE, LEVEL_FEMALE). Form changes (kinds 1/2/5 — MEGA, PRIMAL,
+  // MOVE_MEGA) are owned by B5 and live in the ER form-change registry.
+  // The initializer rebuilds `pokemonPrevolutions` + `pokemonStarters`
+  // after its patches.
+  const evoResult = initEliteReduxEvolutions();
+  if (evoResult.errors.length > 0) {
+    console.warn(`[er-b6] ${evoResult.errors.length} evolution errors:`, evoResult.errors.slice(0, 5));
+  }
+  console.info(
+    `[er-b6] patched ${evoResult.speciesPatched} species' evolution tables (${evoResult.evolutionEdgesApplied} level edges; skipped ${evoResult.speciesSkippedNoLevelEvos} no-level-evos + ${evoResult.formChangeEdgesSkipped} form-change edges + ${evoResult.speciesSkippedNoMapping} no-mapping; dropped ${evoResult.edgesDroppedMissingTarget} missing-target + ${evoResult.edgesDroppedBadLevel} bad-level)`,
   );
 }
