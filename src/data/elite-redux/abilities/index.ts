@@ -22,6 +22,10 @@ export {
   type PostTurnHurtNonTypedOptions,
 } from "./post-turn-hurt-non-typed";
 export {
+  PpReductionOnContactAbAttr,
+  type PpReductionOnContactOptions,
+} from "./pp-reduction-on-contact";
+export {
   SetArenaTagOnHitAbAttr,
   type SetArenaTagOnHitOptions,
   SetTerrainOnHitAbAttr,
@@ -31,6 +35,10 @@ export {
   StatBoostOnFlagAttackAbAttr,
   type StatBoostOnFlagAttackOptions,
 } from "./stat-boost-on-flag-attack";
+export {
+  StatChangeOnCategoryAttackAbAttr,
+  type StatChangeOnCategoryAttackOptions,
+} from "./stat-change-on-category-attack";
 export {
   StatDebuffOnFlagAttackAbAttr,
   type StatDebuffOnFlagAttackOptions,

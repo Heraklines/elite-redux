@@ -62,6 +62,7 @@ import { globalScene } from "#app/global-scene";
 import type { TerrainType } from "#data/terrain";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { ArenaTagType } from "#enums/arena-tag-type";
+import type { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
 import { WeatherType } from "#enums/weather-type";
 import { BooleanHolder, toDmgValue } from "#utils/common";
@@ -112,6 +113,26 @@ export interface OnFaintEffectSetHazard {
 }
 
 /**
+ * Apply a {@linkcode BattlerTagType} to the attacker that caused the faint.
+ * Used by ER abilities such as Haunted Spirit ("When this Pokemon is KO'd,
+ * casts a Curse on the attacker"). The tag goes onto the attacker via
+ * `attacker.addTag(...)`; if there's no known attacker (status / hazard
+ * faint) the effect is a no-op.
+ */
+export interface OnFaintEffectAttackerBattlerTag {
+  readonly kind: "attacker-battler-tag";
+  /** The {@linkcode BattlerTagType} to add to the attacker. */
+  readonly tagType: BattlerTagType;
+  /**
+   * Number of turns the tag persists. `0` = "until lifted" (some tags like
+   * CURSED don't honor turn counts in pokerogue's implementation; passing
+   * `0` matches the move-effect convention).
+   * @defaultValue `0`
+   */
+  readonly turns?: number;
+}
+
+/**
  * Discriminated union describing every post-faint side-effect this archetype
  * can carry. New sub-shapes should extend this union additively.
  */
@@ -119,7 +140,8 @@ export type OnFaintEffect =
   | OnFaintEffectSetWeather
   | OnFaintEffectSetTerrain
   | OnFaintEffectAttackerDamageFlat
-  | OnFaintEffectSetHazard;
+  | OnFaintEffectSetHazard
+  | OnFaintEffectAttackerBattlerTag;
 
 /** All valid {@linkcode OnFaintEffect.kind} discriminator strings. */
 export type OnFaintEffectKind = OnFaintEffect["kind"];
@@ -178,6 +200,8 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
         return OnFaintEffectAbAttr.canApplyAttackerDamage(params);
       case "set-hazard":
         return true;
+      case "attacker-battler-tag":
+        return params.attacker !== undefined && !params.attacker.isFainted();
     }
   }
 
@@ -197,6 +221,9 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
         return;
       case "set-hazard":
         OnFaintEffectAbAttr.applyHazard(this.effect, params);
+        return;
+      case "attacker-battler-tag":
+        OnFaintEffectAbAttr.applyAttackerBattlerTag(this.effect, params);
     }
   }
 
@@ -228,6 +255,15 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
         const layers = effect.layers ?? 1;
         if (!Number.isInteger(layers) || layers < 1) {
           throw new Error(`[OnFaintEffectAbAttr] set-hazard layers must be a positive integer; got ${layers}`);
+        }
+        return;
+      }
+      case "attacker-battler-tag": {
+        const turns = effect.turns ?? 0;
+        if (!Number.isInteger(turns) || turns < 0) {
+          throw new Error(
+            `[OnFaintEffectAbAttr] attacker-battler-tag turns must be a non-negative integer; got ${turns}`,
+          );
         }
         return;
       }
@@ -281,5 +317,22 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
     for (let i = 0; i < layers; i++) {
       globalScene.arena.addTag(effect.hazard, 0, undefined, pokemon.id, targetSide);
     }
+  }
+
+  /**
+   * Apply a `BattlerTagType` to the attacker that caused the faint. Models
+   * ER's "haunt your killer" cluster (Haunted Spirit casts Curse). The tag
+   * goes through pokerogue's standard `addTag` path so its lapse / immunity
+   * checks apply normally.
+   */
+  private static applyAttackerBattlerTag(
+    effect: OnFaintEffectAttackerBattlerTag,
+    { attacker, pokemon, simulated }: PostFaintAbAttrParams,
+  ): void {
+    if (simulated || attacker === undefined) {
+      return;
+    }
+    const turns = effect.turns ?? 0;
+    attacker.addTag(effect.tagType, turns, undefined, pokemon.id);
   }
 }

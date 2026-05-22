@@ -16,6 +16,7 @@
 import { type OnFaintEffect, OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
 import { TerrainType } from "#data/terrain";
 import { ArenaTagType } from "#enums/arena-tag-type";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { WeatherType } from "#enums/weather-type";
 import { describe, expect, it } from "vitest";
 
@@ -115,6 +116,33 @@ describe("OnFaintEffectAbAttr — construction validation", () => {
           effect: { kind: "set-hazard", hazard: ArenaTagType.SPIKES, layers: 1.5 },
         }),
     ).toThrow(/positive integer/);
+  });
+
+  it("constructs with attacker-battler-tag effect (Haunted Spirit)", () => {
+    const attr = new OnFaintEffectAbAttr({
+      effect: { kind: "attacker-battler-tag", tagType: BattlerTagType.CURSED },
+    });
+    expect(attr.getKind()).toBe("attacker-battler-tag");
+    const effect = attr.getEffect();
+    expect(effect.kind === "attacker-battler-tag" && effect.tagType).toBe(BattlerTagType.CURSED);
+  });
+
+  it("rejects attacker-battler-tag with negative turns", () => {
+    expect(
+      () =>
+        new OnFaintEffectAbAttr({
+          effect: { kind: "attacker-battler-tag", tagType: BattlerTagType.CURSED, turns: -2 },
+        }),
+    ).toThrow(/non-negative integer/);
+  });
+
+  it("rejects attacker-battler-tag with non-integer turns", () => {
+    expect(
+      () =>
+        new OnFaintEffectAbAttr({
+          effect: { kind: "attacker-battler-tag", tagType: BattlerTagType.CURSED, turns: 2.5 },
+        }),
+    ).toThrow(/non-negative integer/);
   });
 });
 

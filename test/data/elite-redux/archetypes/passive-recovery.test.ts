@@ -24,10 +24,12 @@ import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { beforeEach, describe, expect, it } from "vitest";
 
-function makeStubPokemon(opts: { fullHp?: boolean; status?: StatusEffect } = {}): Pokemon {
+function makeStubPokemon(opts: { fullHp?: boolean; status?: StatusEffect; hp?: number; maxHp?: number } = {}): Pokemon {
   return {
     isFullHp: () => opts.fullHp ?? false,
     status: opts.status === undefined ? null : { effect: opts.status },
+    hp: opts.hp ?? 50,
+    getMaxHp: () => opts.maxHp ?? 100,
   } as unknown as Pokemon;
 }
 
@@ -182,6 +184,53 @@ describe("PassiveRecoveryAbAttr archetype (C1e)", () => {
 
     it("accepts healFraction = 1 (max boundary)", () => {
       expect(() => new PassiveRecoveryAbAttr({ healFraction: 1 })).not.toThrow();
+    });
+
+    it("rejects hp-below-fraction with fraction = 0", () => {
+      expect(
+        () =>
+          new PassiveRecoveryAbAttr({
+            healFraction: 1 / 4,
+            condition: { kind: "hp-below-fraction", fraction: 0 },
+          }),
+      ).toThrow(/hp-below-fraction must be in/);
+    });
+
+    it("rejects hp-below-fraction with fraction = 1 (must be < 1)", () => {
+      expect(
+        () =>
+          new PassiveRecoveryAbAttr({
+            healFraction: 1 / 4,
+            condition: { kind: "hp-below-fraction", fraction: 1 },
+          }),
+      ).toThrow(/hp-below-fraction must be in/);
+    });
+  });
+
+  describe("condition — hp-below-fraction (Resilience)", () => {
+    it("fires when current HP <= maxHp * fraction", () => {
+      const attr = new PassiveRecoveryAbAttr({
+        healFraction: 1 / 4,
+        condition: { kind: "hp-below-fraction", fraction: 0.5 },
+      });
+      // 50/100 — boundary; threshold is inclusive so fires.
+      expect(runCanApply({ attr, pokemon: makeStubPokemon({ hp: 50, maxHp: 100 }) })).toBe(true);
+    });
+
+    it("fires when current HP well below threshold", () => {
+      const attr = new PassiveRecoveryAbAttr({
+        healFraction: 1 / 4,
+        condition: { kind: "hp-below-fraction", fraction: 0.5 },
+      });
+      expect(runCanApply({ attr, pokemon: makeStubPokemon({ hp: 10, maxHp: 100 }) })).toBe(true);
+    });
+
+    it("does NOT fire when current HP exceeds threshold", () => {
+      const attr = new PassiveRecoveryAbAttr({
+        healFraction: 1 / 4,
+        condition: { kind: "hp-below-fraction", fraction: 0.5 },
+      });
+      expect(runCanApply({ attr, pokemon: makeStubPokemon({ hp: 75, maxHp: 100 }) })).toBe(false);
     });
   });
 });

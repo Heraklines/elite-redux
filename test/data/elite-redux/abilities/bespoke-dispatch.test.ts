@@ -18,16 +18,23 @@
 
 import { BlockRecoilDamageAttr, PostDefendContactDamageAbAttr } from "#abilities/ab-attrs";
 import { PostTurnHurtNonTypedAbAttr } from "#data/elite-redux/abilities/post-turn-hurt-non-typed";
+import { PpReductionOnContactAbAttr } from "#data/elite-redux/abilities/pp-reduction-on-contact";
 import { SetArenaTagOnHitAbAttr, SetTerrainOnHitAbAttr } from "#data/elite-redux/abilities/set-arena-effect-on-hit";
 import { StatBoostOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-boost-on-flag-attack";
+import { StatChangeOnCategoryAttackAbAttr } from "#data/elite-redux/abilities/stat-change-on-category-attack";
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
 import { DamageReductionAbAttr } from "#data/elite-redux/archetypes/damage-reduction-generic";
+import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
+import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
 import { PassiveRecoveryAbAttr } from "#data/elite-redux/archetypes/passive-recovery";
 import { StatTriggerOnHitAbAttr } from "#data/elite-redux/archetypes/stat-trigger-on-event";
 import { TerrainType } from "#data/terrain";
 import { ArenaTagType } from "#enums/arena-tag-type";
+import { BattlerTagType } from "#enums/battler-tag-type";
+import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
+import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
@@ -249,6 +256,78 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(attr.getFlag()).toBe(MoveFlags.SLICING_MOVE);
     expect(attr.getStat()).toBe(Stat.DEF);
     expect(attr.getStages()).toBe(-1);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Round 4 wires (on-faint-effect attacker-tag, pp-reduction-on-contact,
+  // category-keyed stat-change-on-attack, hp-below-fraction passive recovery,
+  // scripted-move entry-effect).
+  // ---------------------------------------------------------------------------
+
+  it("er id 335 (Haunted Spirit) wires OnFaintEffect (attacker-battler-tag CURSED)", () => {
+    const res = dispatchArchetype("bespoke", null, 335);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as OnFaintEffectAbAttr;
+    expect(attr).toBeInstanceOf(OnFaintEffectAbAttr);
+    expect(attr.getKind()).toBe("attacker-battler-tag");
+    const effect = attr.getEffect();
+    expect(effect.kind === "attacker-battler-tag" && effect.tagType).toBe(BattlerTagType.CURSED);
+  });
+
+  it("er id 518 (Spiteful) wires PpReductionOnContact (reduction: 4, contact)", () => {
+    const res = dispatchArchetype("bespoke", null, 518);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as PpReductionOnContactAbAttr;
+    expect(attr).toBeInstanceOf(PpReductionOnContactAbAttr);
+    expect(attr.getReduction()).toBe(4);
+    expect(attr.requiresContact()).toBe(true);
+  });
+
+  it("er id 609 (Parasitic Spores) wires PostTurnHurtNonTyped (Ghost safe-type, 1/8)", () => {
+    const res = dispatchArchetype("bespoke", null, 609);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as PostTurnHurtNonTypedAbAttr;
+    expect(attr.getSafeTypes()).toEqual([PokemonType.GHOST]);
+    expect(attr.getDamageFraction()).toBeCloseTo(1 / 8);
+  });
+
+  it("er id 722 (Whiplash) wires StatChangeOnCategoryAttack (PHYSICAL opponent DEF -1)", () => {
+    const res = dispatchArchetype("bespoke", null, 722);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as StatChangeOnCategoryAttackAbAttr;
+    expect(attr).toBeInstanceOf(StatChangeOnCategoryAttackAbAttr);
+    expect(attr.getCategory()).toBe(MoveCategory.PHYSICAL);
+    expect(attr.getStat()).toBe(Stat.DEF);
+    expect(attr.getStages()).toBe(-1);
+    expect(attr.getTarget()).toBe("opponent");
+  });
+
+  it("er id 729 (Victory Bomb) wires OnFaintEffect (attacker-damage-flat 0.25)", () => {
+    const res = dispatchArchetype("bespoke", null, 729);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as OnFaintEffectAbAttr;
+    expect(attr.getKind()).toBe("attacker-damage-flat");
+    const effect = attr.getEffect();
+    expect(effect.kind === "attacker-damage-flat" && effect.maxHpFraction).toBeCloseTo(0.25);
+  });
+
+  it("er id 807 (Woodland Curse) wires EntryEffect (scripted-move FORESTS_CURSE)", () => {
+    const res = dispatchArchetype("bespoke", null, 807);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as EntryEffectAbAttr;
+    expect(attr).toBeInstanceOf(EntryEffectAbAttr);
+    expect(attr.getKind()).toBe("scripted-move");
+    const effect = attr.getEffect();
+    expect(effect.kind === "scripted-move" && effect.move).toBe(MoveId.FORESTS_CURSE);
+  });
+
+  it("er id 991 (Resilience) wires PassiveRecovery (hp-below-fraction 0.5, 1/4)", () => {
+    const res = dispatchArchetype("bespoke", null, 991);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as PassiveRecoveryAbAttr;
+    expect(attr.getHealFraction()).toBeCloseTo(1 / 4);
+    expect(attr.getRecoveryCondition()).toEqual({ kind: "hp-below-fraction", fraction: 0.5 });
   });
 
   it("unrecognized er id falls through to default bespoke skip", () => {

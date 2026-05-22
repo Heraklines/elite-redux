@@ -58,8 +58,10 @@
 import { type AbAttr, BlockRecoilDamageAttr, PostDefendContactDamageAbAttr } from "#abilities/ab-attrs";
 import { allAbilities } from "#data/data-lists";
 import { PostTurnHurtNonTypedAbAttr } from "#data/elite-redux/abilities/post-turn-hurt-non-typed";
+import { PpReductionOnContactAbAttr } from "#data/elite-redux/abilities/pp-reduction-on-contact";
 import { SetArenaTagOnHitAbAttr, SetTerrainOnHitAbAttr } from "#data/elite-redux/abilities/set-arena-effect-on-hit";
 import { StatBoostOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-boost-on-flag-attack";
+import { StatChangeOnCategoryAttackAbAttr } from "#data/elite-redux/abilities/stat-change-on-category-attack";
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
 import {
   ChanceBattlerTagOnHitAbAttr,
@@ -80,6 +82,7 @@ import { FlagDamageBoostAbAttr } from "#data/elite-redux/archetypes/flag-damage-
 import { HitMultiplierAbAttr, HitMultiplierPowerAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
 import { TypeAbsorbHealAbAttr, TypeAbsorbStatBoostAbAttr } from "#data/elite-redux/archetypes/immunity-with-absorb";
 import { LifestealOnHitAbAttr, LifestealOnKoAbAttr } from "#data/elite-redux/archetypes/lifesteal";
+import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
 import { PassiveRecoveryAbAttr, type PassiveRecoveryCondition } from "#data/elite-redux/archetypes/passive-recovery";
 import {
   type PriorityCondition,
@@ -112,6 +115,7 @@ import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
+import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
@@ -1225,6 +1229,22 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
  *   - 942 Christmas Nightmare → {@linkcode PostTurnHurtNonTypedAbAttr} (weather-gated:
  *     [HAIL, SNOW], 1/8 to all foes).
  *   - 945 Chainsaw → {@linkcode StatDebuffOnFlagAttackAbAttr} SLICING_MOVE -1 DEF.
+ *
+ * Cluster table (round 4):
+ *   - 335 Haunted Spirit → {@linkcode OnFaintEffectAbAttr} (attacker-battler-tag: CURSED).
+ *   - 518 Spiteful → {@linkcode PpReductionOnContactAbAttr} (reduction: 4, contact).
+ *   - 609 Parasitic Spores → {@linkcode PostTurnHurtNonTypedAbAttr} (safeTypes: [GHOST], 1/8).
+ *     The "spreads on contact" piece is deferred — partial wire.
+ *   - 722 Whiplash → {@linkcode StatChangeOnCategoryAttackAbAttr} (PHYSICAL, opponent
+ *     DEF -1).
+ *   - 729 Victory Bomb → {@linkcode OnFaintEffectAbAttr} (attacker-damage-flat: 0.25).
+ *     ER's spec is a 100BP Fire-type Explosion; the flat-damage approximation
+ *     keeps the proc observable while the explosion-as-attack piece is
+ *     deferred to a future primitive (no current archetype models "queue a
+ *     scripted move on faint"). Partial wire.
+ *   - 807 Woodland Curse → {@linkcode EntryEffectAbAttr} (scripted-move: FORESTS_CURSE).
+ *     The "Adds Grass type on contact" piece is deferred — partial wire.
+ *   - 991 Resilience → {@linkcode PassiveRecoveryAbAttr} (hp-below-fraction: 0.5, 1/4).
  */
 function dispatchBespoke(erAbilityId: number): DispatchResult {
   switch (erAbilityId) {
@@ -1245,6 +1265,14 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
         new PassiveRecoveryAbAttr({
           healFraction: 1 / 8,
           condition: { kind: "status", status: StatusEffect.SLEEP },
+        }),
+      ]);
+    case 335:
+      // Haunted Spirit — when KO'd, applies CURSED to the attacker. Vanilla
+      // pokerogue's Curse battler tag handles the lapse damage downstream.
+      return ok([
+        new OnFaintEffectAbAttr({
+          effect: { kind: "attacker-battler-tag", tagType: BattlerTagType.CURSED },
         }),
       ]);
     case 391:
@@ -1305,6 +1333,11 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
           filter: { types: [PokemonType.ROCK] },
         }),
       ]);
+    case 518:
+      // Spiteful — Reduces attacker's PP by 4 on contact. The 4-PP reduction
+      // matches vanilla Spite (the move) so the proc has a symmetric mental
+      // model with the move-effect cousin.
+      return ok([new PpReductionOnContactAbAttr({ reduction: 4, contactRequired: true })]);
     case 574:
       // Sharp Edges — 1/6 HP damage when touched. Vanilla Rough Skin uses 1/8
       // ratio; we use 1/6 per ER description. Pokerogue's class takes the
@@ -1317,6 +1350,17 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
         new PassiveRecoveryAbAttr({
           healFraction: 1 / 12,
           condition: { kind: "terrain", terrains: [TerrainType.MISTY] },
+        }),
+      ]);
+    case 609:
+      // Parasitic Spores — non-Ghost foes take 1/8 dmg every turn. The
+      // "spreads on contact" piece (the secondary contact-status proc) is
+      // deferred — needs a "infect on contact" primitive composing with this
+      // base proc. Partial wire.
+      return ok([
+        new PostTurnHurtNonTypedAbAttr({
+          safeTypes: [PokemonType.GHOST],
+          damageFraction: 1 / 8,
         }),
       ]);
     case 643:
@@ -1345,6 +1389,28 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
           damageFraction: 1 / 4,
         }),
       ]);
+    case 722:
+      // Whiplash — Physical attacks lower the target's Defense by -1.
+      return ok([
+        new StatChangeOnCategoryAttackAbAttr({
+          category: MoveCategory.PHYSICAL,
+          stat: Stat.DEF,
+          stages: -1,
+          target: "opponent",
+        }),
+      ]);
+    case 729:
+      // Victory Bomb — ER text: "Attacks with a 100BP Fire-type Explosion on
+      // fainting". No archetype today queues a scripted move on faint; we
+      // approximate as 25% of attacker max HP indirect damage via the
+      // `attacker-damage-flat` sub-effect. The full Explosion semantics
+      // (BP-based damage roll, Fire type, hitting both targets) is deferred
+      // until a `scripted-move-on-faint` primitive lands. Partial wire.
+      return ok([
+        new OnFaintEffectAbAttr({
+          effect: { kind: "attacker-damage-flat", maxHpFraction: 0.25 },
+        }),
+      ]);
     case 775:
       // Flame Coat — non-Fire-types take 1/8 dmg every turn.
       return ok([
@@ -1365,6 +1431,11 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
           filter: { types: [PokemonType.WATER, PokemonType.ICE] },
         }),
       ]);
+    case 807:
+      // Woodland Curse — uses Forest's Curse on entry. The "Adds Grass type
+      // on contact" piece is deferred — needs a separate post-defend "add
+      // type to attacker" primitive. Partial wire.
+      return ok([new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.FORESTS_CURSE })]);
     case 874:
       // Winter Throne — non-Ice foes take 1/8 dmg every turn. The "heals
       // self-Ice 1/8 each turn" piece is deferred — partial wire. (A second
@@ -1420,6 +1491,14 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 957:
       // Brain Mass — halves damage taken at full HP.
       return ok([new DamageReductionAbAttr({ reduction: 0.5, filter: { kind: "full-hp" } })]);
+    case 991:
+      // Resilience — heals 1/4 max HP each turn while at or below 1/2 HP.
+      return ok([
+        new PassiveRecoveryAbAttr({
+          healFraction: 1 / 4,
+          condition: { kind: "hp-below-fraction", fraction: 0.5 },
+        }),
+      ]);
     default:
       return SKIP_BESPOKE;
   }

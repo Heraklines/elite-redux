@@ -70,7 +70,18 @@ export type PassiveRecoveryCondition =
   | { readonly kind: "always" }
   | { readonly kind: "status"; readonly status: StatusEffect }
   | { readonly kind: "weather"; readonly weathers: readonly WeatherType[] }
-  | { readonly kind: "terrain"; readonly terrains: readonly TerrainType[] };
+  | { readonly kind: "terrain"; readonly terrains: readonly TerrainType[] }
+  | {
+      /**
+       * Gate the heal on the subject's current HP being at or below a fraction
+       * of their max HP. Models ER abilities like Resilience ("Heal 1/4 of max
+       * HP whenever below 1/2 health"). The fraction is inclusive — when
+       * configured at `0.5`, the heal fires at exactly 50% HP and below.
+       */
+      readonly kind: "hp-below-fraction";
+      /** Threshold fraction of max HP. Must be in `(0, 1)`. Typical: `0.5`. */
+      readonly fraction: number;
+    };
 
 /** Construction options for {@linkcode PassiveRecoveryAbAttr}. */
 export interface PassiveRecoveryOptions {
@@ -114,6 +125,12 @@ export class PassiveRecoveryAbAttr extends PostTurnHealAbAttr {
   constructor(opts: PassiveRecoveryOptions) {
     if (!(opts.healFraction > 0 && opts.healFraction <= 1)) {
       throw new Error(`[PassiveRecoveryAbAttr] healFraction must be in (0, 1]; got ${opts.healFraction}`);
+    }
+    if (opts.condition?.kind === "hp-below-fraction") {
+      const f = opts.condition.fraction;
+      if (!(f > 0 && f < 1)) {
+        throw new Error(`[PassiveRecoveryAbAttr] hp-below-fraction must be in (0, 1); got ${f}`);
+      }
     }
     super();
     this.healFractionValue = opts.healFraction;
@@ -189,6 +206,8 @@ export class PassiveRecoveryAbAttr extends PostTurnHealAbAttr {
         return condition.weathers.includes(globalScene.arena.weatherType);
       case "terrain":
         return condition.terrains.includes(globalScene.arena.terrainType);
+      case "hp-below-fraction":
+        return pokemon.hp <= toDmgValue(pokemon.getMaxHp() * condition.fraction);
     }
   }
 }
