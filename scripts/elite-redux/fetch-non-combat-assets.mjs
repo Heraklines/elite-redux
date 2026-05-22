@@ -6,24 +6,55 @@
  */
 
 /**
- * Fetch the non-combat asset categories from upstream Elite-Redux/eliteredux:
- *   - graphics/items/           item icons (held items, mega stones, key items, berries, ...)
- *   - graphics/trainers/        trainer portraits (front + back sprites)
- *   - graphics/interface/       generic menu chrome (bag, party menu, money icon, ...)
- *   - graphics/battle_interface/ in-battle UI (HP bars, status icons, ...)
- *   - graphics/types/           type chips (fire.png, water.png, ...)
- *   - graphics/pokemon_storage/ PC box wallpapers + storage UI
- *   - graphics/pokedex/         pokedex screen chrome (HGSS-style overlays, ...)
- *   - graphics/summary_screen/  party-summary screen (HP bar, page tabs, ...)
- *   - graphics/evolution_scene/ evolution-cutscene backgrounds
+ * Fetch the non-combat asset categories from upstream Elite-Redux/eliteredux.
  *
- * Skipped categories (no pokerogue analogue):
- *   - graphics/pokenav/      — overworld nav system; pokerogue has no map screen
- *   - graphics/title_screen/ — pokerogue ships its own title art
- *   - graphics/intro/        — pokerogue ships its own opening cinematic
+ * Sparse-checkout policy: pull every `graphics/<category>/` whose contents could
+ * plausibly be referenced by pokerogue's UI/audio/effects pipeline. Skip only
+ * categories that are intrinsically tied to the GBA overworld engine (door
+ * animations, world map tilesets, minigames pokerogue doesn't ship).
  *
- * Shares the vendor clone with fetch-sprites.mjs by appending to the existing
- * sparse-checkout patterns. Idempotent — pass --force to re-sync.
+ * Upstream surveyed categories (60 total) — categorization rationale:
+ *
+ *   PULL — UI / battle / sprite chrome pokerogue can render:
+ *     pokemon, items, trainers, interface, battle_interface, types,
+ *     pokemon_storage, pokedex, summary_screen, evolution_scene,
+ *     battle_anims, battle_terrain, battle_transitions, berries, weather,
+ *     field_effects, text_window, fonts, picture_frame, trainer_card,
+ *     decorations, frontier_pass, naming_screen, tm_case, ui_menus,
+ *     misc, contest, easy_chat, dexnav, mail, trade,
+ *     intro, title_screen, unknown (defensive — some legitimate UI bits)
+ *
+ *   SKIP — overworld engine / GBA-specific / pokerogue ships its own:
+ *     object_events       overworld NPC walking sprites; we ship icons instead
+ *     door_anims          overworld door open/close (no overworld in pokerogue)
+ *     pokenav             overworld navigation system
+ *     rayquaza_scene      scripted intro sequence
+ *     roulette            minigame, not in pokerogue
+ *     slot_machine        minigame, not in pokerogue
+ *     berry_blender       minigame
+ *     berry_crush         minigame
+ *     berry_fix           save-corruption-recovery screen
+ *     dodrio_berry_picking minigame
+ *     pokemon_jump        minigame
+ *     cable_car           Mt Chimney cable car cutscene
+ *     pokeblock           pokeblock making (not in pokerogue)
+ *     wallclock           in-game clock setting
+ *     reset_rtc_screen    GBA RTC reset
+ *     union_room_chat     GBA Union Room
+ *     wonder_transfers    Wonder Card transfer
+ *     link                link-cable graphics
+ *     birch_speech        Prof. Birch intro
+ *     spinda_spots        empty dir upstream
+ *     credits             single rolling-credits sprite
+ *     rhh_copyright       rom-hacking-hideout watermark
+ *     interface_fr        French-locale duplicate
+ *     unused              prefixed "old_*" assets removed from upstream
+ *
+ *   Pokemon combat sprites (`graphics/pokemon/`) are mirrored by fetch-sprites.mjs
+ *   into assets/images/pokemon/elite-redux/ — kept in the sparse-checkout pattern
+ *   here so a single clone services both.
+ *
+ * The mirror is idempotent. Pass --force to re-sync.
  */
 
 import { execFileSync } from "node:child_process";
@@ -44,12 +75,15 @@ const SPRITE_BRANCH = "master";
 
 /**
  * Asset categories we mirror locally. Each entry maps a sparse-checkout pattern
- * onto a sub-dir of assets/images/elite-redux/. Keep these in sync with the
- * `CATEGORIES` constant in audit-non-combat-assets.mjs.
+ * onto a sub-dir of assets/images/elite-redux/.
+ *
+ * Order matches the rationale in the module header — pull the originally-vetted
+ * 9 categories first, then the widened set.
  *
  * @type {ReadonlyArray<{ sparse: string, src: string, dst: string }>}
  */
 const CATEGORIES = [
+  // Original 9 (vetted in prior pass — keep at top for diff stability).
   { sparse: "graphics/items/", src: "graphics/items", dst: "items" },
   { sparse: "graphics/trainers/", src: "graphics/trainers", dst: "trainers" },
   { sparse: "graphics/interface/", src: "graphics/interface", dst: "interface" },
@@ -59,6 +93,32 @@ const CATEGORIES = [
   { sparse: "graphics/pokedex/", src: "graphics/pokedex", dst: "pokedex" },
   { sparse: "graphics/summary_screen/", src: "graphics/summary_screen", dst: "summary_screen" },
   { sparse: "graphics/evolution_scene/", src: "graphics/evolution_scene", dst: "evolution_scene" },
+
+  // Widened pass — UI / battle chrome / effects.
+  { sparse: "graphics/battle_anims/", src: "graphics/battle_anims", dst: "battle_anims" },
+  { sparse: "graphics/battle_terrain/", src: "graphics/battle_terrain", dst: "battle_terrain" },
+  { sparse: "graphics/battle_transitions/", src: "graphics/battle_transitions", dst: "battle_transitions" },
+  { sparse: "graphics/berries/", src: "graphics/berries", dst: "berries" },
+  { sparse: "graphics/weather/", src: "graphics/weather", dst: "weather" },
+  { sparse: "graphics/field_effects/", src: "graphics/field_effects", dst: "field_effects" },
+  { sparse: "graphics/text_window/", src: "graphics/text_window", dst: "text_window" },
+  { sparse: "graphics/fonts/", src: "graphics/fonts", dst: "fonts" },
+  { sparse: "graphics/picture_frame/", src: "graphics/picture_frame", dst: "picture_frame" },
+  { sparse: "graphics/trainer_card/", src: "graphics/trainer_card", dst: "trainer_card" },
+  { sparse: "graphics/decorations/", src: "graphics/decorations", dst: "decorations" },
+  { sparse: "graphics/frontier_pass/", src: "graphics/frontier_pass", dst: "frontier_pass" },
+  { sparse: "graphics/naming_screen/", src: "graphics/naming_screen", dst: "naming_screen" },
+  { sparse: "graphics/tm_case/", src: "graphics/tm_case", dst: "tm_case" },
+  { sparse: "graphics/ui_menus/", src: "graphics/ui_menus", dst: "ui_menus" },
+  { sparse: "graphics/misc/", src: "graphics/misc", dst: "misc" },
+  { sparse: "graphics/contest/", src: "graphics/contest", dst: "contest" },
+  { sparse: "graphics/easy_chat/", src: "graphics/easy_chat", dst: "easy_chat" },
+  { sparse: "graphics/dexnav/", src: "graphics/dexnav", dst: "dexnav" },
+  { sparse: "graphics/mail/", src: "graphics/mail", dst: "mail" },
+  { sparse: "graphics/trade/", src: "graphics/trade", dst: "trade" },
+  { sparse: "graphics/intro/", src: "graphics/intro", dst: "intro" },
+  { sparse: "graphics/title_screen/", src: "graphics/title_screen", dst: "title_screen" },
+  { sparse: "graphics/unknown/", src: "graphics/unknown", dst: "unknown" },
 ];
 
 // Existing pattern from fetch-sprites.mjs — keep it so the combat clone stays usable.
@@ -123,11 +183,14 @@ async function ensureCloneWithPatterns() {
     run("git", ["config", "core.sparseCheckout", "true"], { cwd: VENDOR });
   }
 
+  // If we previously toggled sparseCheckout off during audit, re-enable it.
+  run("git", ["config", "core.sparseCheckout", "true"], { cwd: VENDOR });
+
   // Build the full sparse-checkout pattern set: combat sprites + non-combat categories.
   const patterns = [POKEMON_SPARSE_PATH, ...CATEGORIES.map(c => c.sparse)];
   await writeFile(sparseConfigPath, `${patterns.join("\n")}\n`);
 
-  console.log("[er:fetch-non-combat-assets] sparse-checkout patterns:");
+  console.log(`[er:fetch-non-combat-assets] sparse-checkout patterns (${patterns.length} entries):`);
   for (const p of patterns) {
     console.log(`  - ${p}`);
   }
