@@ -202,4 +202,55 @@ describe("initEliteReduxCustomMoves (B2 + D4)", () => {
     // niche flags without making the test brittle.
     expect(tagged.length).toBeGreaterThan(80);
   });
+
+  // -------------------------------------------------------------------------
+  // Round-1 bespoke wiring — spot-check that hand-written compositions
+  // landed on the registered moves (not just the dispatcher in isolation).
+  // -------------------------------------------------------------------------
+
+  it("bespoke wire: SEISMIC_FIST has a StatStageChangeAttr attached", () => {
+    const move = allMoves.find(m => m.id === (ErMoveId.SEISMIC_FIST as number));
+    expect(move).toBeDefined();
+    if (!move) {
+      return;
+    }
+    // StatStageChangeAttr is the attr we wired for er-id 761.
+    expect(move.attrs.some(a => a.constructor.name === "StatStageChangeAttr")).toBe(true);
+  });
+
+  it("bespoke wire: BEATDOWN has a MultiHitAttr attached", () => {
+    const move = allMoves.find(m => m.id === (ErMoveId.BEATDOWN as number));
+    expect(move).toBeDefined();
+    if (!move) {
+      return;
+    }
+    expect(move.attrs.some(a => a.constructor.name === "MultiHitAttr")).toBe(true);
+  });
+
+  it("bespoke wire: MEGATON_HAMMER has IGNORE_PROTECT flag set", () => {
+    const move = allMoves.find(m => m.id === (ErMoveId.MEGATON_HAMMER as number));
+    expect(move).toBeDefined();
+    if (!move) {
+      return;
+    }
+    expect(move.hasFlag(MoveFlags.IGNORE_PROTECT)).toBe(true);
+  });
+
+  it("bespoke wire: OUTBURST has a SacrificialAttr attached", () => {
+    const move = allMoves.find(m => m.id === (ErMoveId.OUTBURST as number));
+    expect(move).toBeDefined();
+    if (!move) {
+      return;
+    }
+    expect(move.attrs.some(a => a.constructor.name === "SacrificialAttr")).toBe(true);
+  });
+
+  it("bespoke wire: FLUTTERING_LEAF has a ForceSwitchOutAttr attached", () => {
+    const move = allMoves.find(m => m.id === (ErMoveId.FLUTTERING_LEAF as number));
+    expect(move).toBeDefined();
+    if (!move) {
+      return;
+    }
+    expect(move.attrs.some(a => a.constructor.name === "ForceSwitchOutAttr")).toBe(true);
+  });
 });

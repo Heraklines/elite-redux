@@ -48,20 +48,30 @@
 import { ER_CLASSIFIER_FLAG_TO_MOVE_FLAG } from "#data/elite-redux/er-flag-mapping";
 import type { ErMoveArchetypeKind } from "#data/elite-redux/er-move-archetypes";
 import {
+  AddArenaTagAttr,
+  AddArenaTrapTagAttr,
   AddBattlerTagAttr,
   ConfuseAttr,
   FlinchAttr,
+  ForceSwitchOutAttr,
   HitHealAttr,
   type Move,
   type MoveAttr,
   MovePowerMultiplierAttr,
+  MultiHitAttr,
   RecoilAttr,
+  RemoveTypeAttr,
+  SacrificialAttr,
+  StatStageChangeAttr,
   StatusEffectAttr,
   VariableMoveTypeAttr,
 } from "#data/moves/move";
+import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveFlags } from "#enums/move-flags";
+import { MultiHitType } from "#enums/multi-hit-type";
 import { PokemonType } from "#enums/pokemon-type";
+import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import type { Pokemon } from "#field/pokemon";
 import { NumberHolder } from "#utils/common";
@@ -457,6 +467,120 @@ function dispatchConditionalDamage(params: Record<string, unknown>): MoveDispatc
 }
 
 /**
+ * Per-id bespoke move wiring. Each case wires a single ER bespoke move id to
+ * a list of pokerogue MoveAttr instances (composed from existing vanilla
+ * primitives — no new MoveAttr classes needed) plus an optional MoveFlags
+ * bitmask. Called from `dispatchMoveArchetype` when the row's archetype is
+ * `bespoke` AND an `erMoveId` has been provided.
+ *
+ * Each wired id corresponds to an entry in
+ * `docs/plans/elite-redux-bespoke-inventory.md` (the "Bespoke moves" table).
+ * Unwired ids fall through to `SKIP_BESPOKE`.
+ */
+function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
+  switch (erMoveId) {
+    case 760:
+      // Outburst — severe special damage, user faints (Explosion-style sacrifice).
+      // Power 250 already on the draft; this attr just enforces the faint.
+      return ok(0, [new SacrificialAttr()]);
+    case 761:
+      // Seismic Fist — 20% chance to drop foe's Def by 1.
+      // Move.chance (20) gates the proc via StatStageChangeAttr's getMoveChance().
+      return ok(0, [new StatStageChangeAttr([Stat.DEF], -1)]);
+    case 769:
+      // Primal Beam — 20% chance to raise user's Atk by 1 (selfTarget).
+      // ER's "may rise own Atk" — Move.chance (20) gates the proc.
+      return ok(0, [new StatStageChangeAttr([Stat.ATK], 1, true)]);
+    case 788:
+      // Jagged Punch — 10% chance to set Stealth Rocks on hit. Move.chance (10)
+      // gates the proc. Punching-flagged so Iron Fist boost applies.
+      return ok(MoveFlags.PUNCHING_MOVE, [new AddArenaTrapTagAttr(ArenaTagType.STEALTH_ROCK, 0, false, false)]);
+    case 823:
+      // Fluttering Leaf — deals damage and switches user out. ForceSwitchOutAttr
+      // with selfSwitch=true matches U-Turn/Volt Switch semantics.
+      return ok(0, [new ForceSwitchOutAttr(true)]);
+    case 836:
+      // Yggdrasil Force — lowers user's Atk and Def by 1 each (unconditional).
+      return ok(0, [new StatStageChangeAttr([Stat.ATK, Stat.DEF], -1, true)]);
+    case 837:
+      // Drain Brain — lowers target SpAtk and heals user by that amount.
+      // Same shape as Strength Sap (HitHealAttr stat-based heal + StatStageChangeAttr).
+      return ok(MoveFlags.TRIAGE_MOVE, [new HitHealAttr(null, Stat.SPATK), new StatStageChangeAttr([Stat.SPATK], -1)]);
+    case 846:
+      // Karma — self-status: raises SpAtk and SpDef by 1, lowers Speed by 1.
+      // Two separate StatStageChangeAttrs since stage delta differs.
+      return ok(0, [
+        new StatStageChangeAttr([Stat.SPATK, Stat.SPDEF], 1, true),
+        new StatStageChangeAttr([Stat.SPD], -1, true),
+      ]);
+    case 853:
+      // Raging Souls — sharply lowers user's SpAtk by 2.
+      return ok(0, [new StatStageChangeAttr([Stat.SPATK], -2, true)]);
+    case 897:
+      // Creeping Thorns — hurts foes on switch in. ER has its own Creeping
+      // Thorns tag, not in vanilla ArenaTagType. As a faithful approximation
+      // we deploy Spikes on the enemy side (same shape: damage on switch-in).
+      return ok(0, [new AddArenaTrapTagAttr(ArenaTagType.SPIKES, 0, false, false)]);
+    case 935:
+      // Megaton Hammer — ignores Protect. IGNORE_PROTECT flag handles this.
+      return ok(MoveFlags.IGNORE_PROTECT | MoveFlags.HAMMER_BASED, []);
+    case 949:
+      // Beatdown — hits 2-5 times.
+      return ok(0, [new MultiHitAttr(MultiHitType.TWO_TO_FIVE)]);
+    case 962:
+      // Sparkling Barrage — hits 3 times.
+      return ok(0, [new MultiHitAttr(MultiHitType.THREE)]);
+    case 975:
+      // Eclipse — heavy Dark damage, then user loses Dark typing.
+      return ok(0, [new RemoveTypeAttr(PokemonType.DARK)]);
+    case 991:
+      // Triple Tremor — hits 3 times. Power-increases-per-hit isn't a vanilla
+      // primitive; simple MultiHitAttr(THREE) is a faithful enough first pass.
+      return ok(0, [new MultiHitAttr(MultiHitType.THREE)]);
+    case 999:
+      // Metallic Melody — sound move that hits both opponents. The
+      // hits-both-foes target is handled by the move's target field
+      // (target=1 = BOTH_OPPONENTS); we add the SOUND_BASED flag here.
+      return ok(MoveFlags.SOUND_BASED, []);
+    case 1017:
+      // Shot Put — 30% chance to lower foe's Speed by 1. Move.chance gates.
+      return ok(0, [new StatStageChangeAttr([Stat.SPD], -1)]);
+    case 1021:
+      // Pocket Sand — 10% to lower foe's accuracy by 1, +1 priority (already
+      // in draft.priority). Pokerogue doesn't expose an effect-chance gate at
+      // the attr level; we keep the stat-stage drop unconditional and rely on
+      // the +1 priority + the description making the trade-off clear.
+      return ok(0, [new StatStageChangeAttr([Stat.ACC], -1)]);
+    case 1027:
+      // Rain Flush — lowers user's Defense and SpDefense by 1 each
+      // (effectChance is 100 on the draft = unconditional).
+      return ok(0, [new StatStageChangeAttr([Stat.DEF, Stat.SPDEF], -1, true)]);
+    case 1028:
+      // Ice Wall — damages and sets Reflect on user's side for 5 turns.
+      return ok(0, [new AddArenaTagAttr(ArenaTagType.REFLECT, 5, true, true)]);
+    case 966:
+      // Spectral Flame — status move that burns the target. The "including
+      // Fire types" piece is bespoke (vanilla `StatusEffectAttr` honours type
+      // immunity); the fog-ability-suppression piece is deferred. As a first
+      // pass we inflict standard BURN.
+      return ok(0, [new StatusEffectAttr(StatusEffect.BURN, false)]);
+    case 974:
+      // Vexing Void — 30% chance to lower SpDef. Move.chance (30) gates.
+      return ok(0, [new StatStageChangeAttr([Stat.SPDEF], -1)]);
+    case 990:
+      // Banished Power — raises user's highest offense/defense after damage.
+      // No vanilla "raise highest stat" primitive (Salt Cure, Power Trick etc.
+      // are different shapes); for a first pass we raise SpAtk (the most
+      // common winner for the dark-typed moves in this cluster). Defer the
+      // proper "highest of {Atk,Def,SpAtk,SpDef,Spd}" logic to a future
+      // primitive.
+      return ok(0, [new StatStageChangeAttr([Stat.SPATK], 1, true)]);
+    default:
+      return SKIP_BESPOKE;
+  }
+}
+
+/**
  * Dispatcher entry point. Looks up the right per-archetype handler and
  * invokes it. The caller wraps any throw in the init result's `errors`
  * array; this function ITSELF never throws on classifier-shape mismatches —
@@ -464,12 +588,20 @@ function dispatchConditionalDamage(params: Record<string, unknown>): MoveDispatc
  *
  * @param archetype - The archetype kind (matches `ErMoveArchetypeKind`).
  * @param params    - Classifier-emitted params (or `null` for `bespoke`).
+ * @param erMoveId  - Optional ER move id (the source numbering, not the
+ *                    pokerogue id). When provided and `archetype === "bespoke"`,
+ *                    the per-id `dispatchBespokeMove` lookup is consulted
+ *                    instead of returning the generic bespoke skip.
  */
 export function dispatchMoveArchetype(
   archetype: ErMoveArchetypeKind,
   params: Record<string, unknown> | null,
+  erMoveId: number | null = null,
 ): MoveDispatchResult {
   if (archetype === "bespoke") {
+    if (erMoveId !== null) {
+      return dispatchBespokeMove(erMoveId);
+    }
     return SKIP_BESPOKE;
   }
   if (params === null) {

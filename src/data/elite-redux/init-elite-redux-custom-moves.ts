@@ -402,10 +402,12 @@ function buildCustomMove(
 
   // Phase D4: wire archetype-classified flags + attrs via the dispatcher. We
   // look up the archetype row by the ER-side id (not the pokerogue id) since
-  // the classifier keys on ER's source numbering.
+  // the classifier keys on ER's source numbering. The ER-side id is also
+  // forwarded so the dispatcher can route `bespoke` rows through per-id
+  // hand-written wiring.
   const archetypeRow = ER_MOVE_ARCHETYPES[draft.id];
   if (archetypeRow !== undefined) {
-    wireArchetypeToMove(move, archetypeRow.archetype, archetypeRow.params, result);
+    wireArchetypeToMove(move, archetypeRow.archetype, archetypeRow.params, draft.id, result);
   }
 
   return move;
@@ -425,11 +427,12 @@ function wireArchetypeToMove(
   move: Move,
   archetype: ErMoveArchetypeKind,
   params: Record<string, unknown> | null,
+  erMoveId: number,
   result: InitEliteReduxCustomMovesResult,
 ): void {
   let dispatched: ReturnType<typeof dispatchMoveArchetype>;
   try {
-    dispatched = dispatchMoveArchetype(archetype, params);
+    dispatched = dispatchMoveArchetype(archetype, params, erMoveId);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     result.errors.push(`Move archetype ${archetype} dispatch threw for move id ${move.id}: ${msg}`);
