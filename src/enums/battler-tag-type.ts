@@ -93,4 +93,13 @@ export enum BattlerTagType {
   MAGIC_COAT = "MAGIC_COAT",
   SUPREME_OVERLORD = "SUPREME_OVERLORD",
   BYPASS_SPEED = "BYPASS_SPEED",
+  // ER-specific battler tags. Modelled as battler tags rather than vanilla
+  // {@linkcode StatusEffect} entries to avoid mutating pokerogue's primary
+  // status enum (which would cascade through save loaders, sprite picks,
+  // status-immunity tables, etc). Semantic depth varies — BLEED is HP chip,
+  // FROSTBITE/FEAR currently stub minimal flag-bearing tags so dispatch
+  // can route. See {@linkcode BleedTag} et al. in `battler-tags.ts`.
+  ER_BLEED = "ER_BLEED",
+  ER_FROSTBITE = "ER_FROSTBITE",
+  ER_FEAR = "ER_FEAR",
 }

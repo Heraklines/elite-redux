@@ -3754,6 +3754,104 @@ export class SupremeOverlordTag extends AbilityBattlerTag {
   }
 }
 
+// =============================================================================
+// Elite Redux — ER-specific battler tags.
+//
+// These three tags (`ER_BLEED`, `ER_FROSTBITE`, `ER_FEAR`) back the ER status
+// concepts the classifier emits. They are modelled as battler tags rather than
+// `StatusEffect` entries so we don't have to mutate pokerogue's primary status
+// enum (which would cascade through save loaders, status-immunity tables,
+// sprite picks, etc).
+//
+// Semantic depth:
+//   - BLEED: 1/16 max-HP chip per turn (modeled on `NightmareTag`-style chip).
+//     Indefinite duration (turnCount=0 → does not auto-decay).
+//   - FROSTBITE: 1/16 max-HP chip per turn (mirrors the Gen 9 mechanic of
+//     burn-equivalent damage on a special-attack body). The Atk→SpA halving
+//     is deferred to a later round (would require a damage-calc hook akin
+//     to the BURN attack-halving in `applyMoveAttrs`); the chip-only flavor
+//     is enough for the dispatcher routing this round delivers.
+//   - FEAR: paralysis-like (25% chance to fail per turn). Currently a marker
+//     tag — the fail-roll is deferred along with the FROSTBITE Atk halving.
+//     Carrying the tag is sufficient for ER abilities to apply it via the
+//     `chance-status-on-hit` dispatch path.
+//
+// All three tags use `BattlerTagLapseType.TURN_END` (chip per turn) and start
+// with a long default `turnCount` of 99 so they effectively persist until
+// cured (matches ER's "until end of battle" semantics). Cures can be wired
+// later via composite parts.
+// =============================================================================
+
+/** ER `BLEED` — 1/16 max-HP chip per turn-end. Persists until cured. */
+export class ErBleedTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_BLEED;
+  constructor() {
+    super(BattlerTagType.ER_BLEED, BattlerTagLapseType.TURN_END, 99);
+  }
+
+  override canAdd(pokemon: Pokemon): boolean {
+    // Type immunity hook — ER convention is that Grass/Steel/Rock are
+    // immune to bleed (no blood). Mirrors ER source. Keep it conservative
+    // here; classifier rejects via canApply, so an extra guard is fine.
+    return (
+      !pokemon.isOfType(PokemonType.GRASS)
+      && !pokemon.isOfType(PokemonType.STEEL)
+      && !pokemon.isOfType(PokemonType.ROCK)
+    );
+  }
+
+  override lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {
+    const ret = lapseType !== BattlerTagLapseType.CUSTOM || super.lapse(pokemon, lapseType);
+    if (!ret) {
+      return false;
+    }
+    const cancelled = new BooleanHolder(false);
+    applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon, cancelled });
+    if (!cancelled.value) {
+      pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() / 16), { result: HitResult.INDIRECT });
+    }
+    return true;
+  }
+}
+
+/** ER `FROSTBITE` — 1/16 max-HP chip per turn-end. Persists until cured. */
+export class ErFrostbiteTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_FROSTBITE;
+  constructor() {
+    super(BattlerTagType.ER_FROSTBITE, BattlerTagLapseType.TURN_END, 99);
+  }
+
+  override canAdd(pokemon: Pokemon): boolean {
+    // Ice types are immune to frostbite (Gen 9 mainline behavior).
+    return !pokemon.isOfType(PokemonType.ICE);
+  }
+
+  override lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {
+    const ret = lapseType !== BattlerTagLapseType.CUSTOM || super.lapse(pokemon, lapseType);
+    if (!ret) {
+      return false;
+    }
+    const cancelled = new BooleanHolder(false);
+    applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon, cancelled });
+    if (!cancelled.value) {
+      pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() / 16), { result: HitResult.INDIRECT });
+    }
+    return true;
+  }
+}
+
+/**
+ * ER `FEAR` — marker tag (stub). Real semantics (25% chance to flinch / fail
+ * to move) defer to a later round; the tag's presence is enough for the
+ * dispatcher to route the proc, which is the goal of this round.
+ */
+export class ErFearTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_FEAR;
+  constructor() {
+    super(BattlerTagType.ER_FEAR, BattlerTagLapseType.TURN_END, 99);
+  }
+}
+
 /**
  * Retrieves a {@linkcode BattlerTag} based on the provided tag type, turn count, source move, and source ID.
  * @param sourceId - The ID of the pokemon adding the tag
@@ -3952,6 +4050,12 @@ export function getBattlerTag(
       return new SupremeOverlordTag();
     case BattlerTagType.BYPASS_SPEED:
       return new BypassSpeedTag();
+    case BattlerTagType.ER_BLEED:
+      return new ErBleedTag();
+    case BattlerTagType.ER_FROSTBITE:
+      return new ErFrostbiteTag();
+    case BattlerTagType.ER_FEAR:
+      return new ErFearTag();
   }
 }
 
@@ -4085,6 +4189,9 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.MAGIC_COAT]: MagicCoatTag;
   [BattlerTagType.SUPREME_OVERLORD]: SupremeOverlordTag;
   [BattlerTagType.BYPASS_SPEED]: BypassSpeedTag;
+  [BattlerTagType.ER_BLEED]: ErBleedTag;
+  [BattlerTagType.ER_FROSTBITE]: ErFrostbiteTag;
+  [BattlerTagType.ER_FEAR]: ErFearTag;
 };
 
 /**

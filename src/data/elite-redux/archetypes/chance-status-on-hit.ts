@@ -57,7 +57,31 @@
 import { PostDefendAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
 import type { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveFlags } from "#enums/move-flags";
+import type { PokemonType } from "#enums/pokemon-type";
 import type { StatusEffect } from "#enums/status-effect";
+
+/**
+ * Optional filter restricting which incoming moves can trigger the proc. The
+ * primitive supports two filter kinds today, both matching ER classifier
+ * payloads:
+ *
+ *   - `{ flag: MoveFlags }` — the incoming move must carry the given flag
+ *     (e.g. `MoveFlags.BITING_MOVE` for `Cold Bite`-style `chance:50, status:
+ *     FROSTBITE, filter:{flag:BITING_MOVE}`).
+ *   - `{ type: PokemonType }` — the incoming move must be of the given type
+ *     (e.g. `PokemonType.GRASS` for `Spore Defense`-style `chance:30,
+ *     status:BURN, filter:{type:GRASS}`).
+ *
+ * Both filters compose with the `contactRequired` gate (AND'd together): a
+ * move must satisfy both contact (if required) and the filter to roll the
+ * proc.
+ *
+ * @remarks
+ * The shape is intentionally narrow — these are the only two filter kinds the
+ * classifier emits today. If more filter kinds appear (e.g. category), extend
+ * the union here rather than introducing a separate primitive.
+ */
+export type ChanceStatusFilter = { readonly flag: MoveFlags } | { readonly type: PokemonType };
 
 /** Construction payload for {@linkcode ChanceStatusOnHitAbAttr}. */
 export interface ChanceStatusOnHitOptions {
@@ -79,6 +103,19 @@ export interface ChanceStatusOnHitOptions {
    * @defaultValue `true`
    */
   readonly contactRequired?: boolean;
+  /**
+   * Optional gate on the incoming move (flag or type). When provided, the
+   * proc only fires for moves that satisfy the filter (in addition to the
+   * contact gate when `contactRequired` is true). Used by ER abilities like
+   * `Cold Bite` (BITING_MOVE-gated FROSTBITE) or `Spore Defense` (GRASS-type
+   * gated BURN).
+   * @remarks
+   * When `filter` is set, `contactRequired` typically defaults to `false`
+   * to avoid a double-gate semantic mismatch — callers can still set it true
+   * explicitly if they want both checks (e.g. BITING_MOVE that also makes
+   * contact). Both gates are AND'd.
+   */
+  readonly filter?: ChanceStatusFilter;
 }
 
 /**
@@ -104,6 +141,7 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
   private readonly chance: number;
   private readonly effects: readonly StatusEffect[];
   private readonly contactRequired: boolean;
+  private readonly filter: ChanceStatusFilter | undefined;
 
   constructor(opts: ChanceStatusOnHitOptions) {
     if (!(opts.chance >= 0 && opts.chance <= 100)) {
@@ -115,7 +153,10 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
     super();
     this.chance = opts.chance;
     this.effects = opts.effects;
-    this.contactRequired = opts.contactRequired ?? true;
+    // When a filter is configured, default contactRequired to false (the
+    // filter itself is the gate). Callers can still set true explicitly.
+    this.contactRequired = opts.contactRequired ?? opts.filter === undefined;
+    this.filter = opts.filter;
   }
 
   /** The configured proc chance (0-100). */
@@ -131,6 +172,11 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
   /** Whether the proc requires the incoming move to make contact. */
   public requiresContact(): boolean {
     return this.contactRequired;
+  }
+
+  /** The configured move filter, or `undefined` when no filter is set. */
+  public getFilter(): ChanceStatusFilter | undefined {
+    return this.filter;
   }
 
   /**
@@ -151,6 +197,10 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
       this.contactRequired
       && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
     ) {
+      return false;
+    }
+    // Filter gate (move-flag or type).
+    if (this.filter !== undefined && !checkChanceStatusFilter(this.filter, move)) {
       return false;
     }
     // Attacker must be alive and unstatused (existing status blocks new one).
@@ -234,6 +284,12 @@ export interface ChanceBattlerTagOnHitOptions {
    * @defaultValue `undefined` (engine default)
    */
   readonly turns?: number;
+  /**
+   * Optional gate on the incoming move (flag or type). See
+   * {@linkcode ChanceStatusOnHitOptions.filter} for details — the semantics
+   * are identical, just inflicting a battler tag instead of a status effect.
+   */
+  readonly filter?: ChanceStatusFilter;
 }
 
 /**
@@ -262,6 +318,7 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
   private readonly tags: readonly BattlerTagType[];
   private readonly contactRequired: boolean;
   private readonly turns: number | undefined;
+  private readonly filter: ChanceStatusFilter | undefined;
 
   constructor(opts: ChanceBattlerTagOnHitOptions) {
     if (!(opts.chance >= 0 && opts.chance <= 100)) {
@@ -273,8 +330,14 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
     super();
     this.chance = opts.chance;
     this.tags = opts.tags;
-    this.contactRequired = opts.contactRequired ?? true;
+    this.contactRequired = opts.contactRequired ?? opts.filter === undefined;
     this.turns = opts.turns;
+    this.filter = opts.filter;
+  }
+
+  /** The configured move filter, or `undefined` when no filter is set. */
+  public getFilter(): ChanceStatusFilter | undefined {
+    return this.filter;
   }
 
   /** The configured proc chance (0-100). */
@@ -303,6 +366,9 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
       this.contactRequired
       && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
     ) {
+      return false;
+    }
+    if (this.filter !== undefined && !checkChanceStatusFilter(this.filter, move)) {
       return false;
     }
     if (this.chance !== 100 && pokemon.randBattleSeedInt(100) >= this.chance) {
@@ -336,4 +402,22 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
     }
     return this.tags[pokemon.randBattleSeedInt(this.tags.length)];
   }
+}
+
+/**
+ * Check whether the incoming `move` satisfies the given filter. Shared by
+ * both {@linkcode ChanceStatusOnHitAbAttr} and
+ * {@linkcode ChanceBattlerTagOnHitAbAttr}.
+ *
+ * The `Move` instance is structurally typed via the AbAttr params; we only
+ * need `hasFlag` and `type` from it. Imports remain narrow.
+ */
+function checkChanceStatusFilter(
+  filter: ChanceStatusFilter,
+  move: { hasFlag(flag: MoveFlags): boolean; readonly type: PokemonType },
+): boolean {
+  if ("flag" in filter) {
+    return move.hasFlag(filter.flag);
+  }
+  return move.type === filter.type;
 }

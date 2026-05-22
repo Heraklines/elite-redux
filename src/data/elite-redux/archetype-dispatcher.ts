@@ -65,6 +65,7 @@ import { StatChangeOnCategoryAttackAbAttr } from "#data/elite-redux/abilities/st
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
 import {
   ChanceBattlerTagOnHitAbAttr,
+  type ChanceStatusFilter,
   ChanceStatusOnHitAbAttr,
 } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { ConditionalDamageAbAttr, type DamageCondition } from "#data/elite-redux/archetypes/conditional-damage";
@@ -500,10 +501,10 @@ function dispatchEntryEffect(params: Record<string, unknown>): DispatchResult {
 
 /**
  * Map classifier-emitted status strings that are actually battler-tag concepts
- * (CONFUSION, INFATUATION, FLINCH, DISABLE, TAUNT) to their {@linkcode
- * BattlerTagType} value. Returns `null` for inputs that aren't battler-tag
- * concepts — those flow to `lookupStatusEffect` (vanilla StatusEffect) or
- * skip entirely (ER-specific BLEED, FROSTBITE, FEAR).
+ * (CONFUSION, INFATUATION, FLINCH, DISABLE, plus ER-specific BLEED,
+ * FROSTBITE, FEAR) to their {@linkcode BattlerTagType} value. Returns `null`
+ * for inputs that aren't battler-tag concepts — those flow to
+ * `lookupStatusEffect` (vanilla StatusEffect).
  */
 function lookupBattlerTagFromStatus(value: unknown): BattlerTagType | null {
   if (typeof value !== "string") {
@@ -523,9 +524,47 @@ function lookupBattlerTagFromStatus(value: unknown): BattlerTagType | null {
       return BattlerTagType.FLINCHED;
     case "DISABLE":
       return BattlerTagType.DISABLED;
+    // ER-specific status concepts modelled as battler tags (see
+    // `BattlerTagType.ER_BLEED` et al. and their backing tag classes in
+    // `src/data/battler-tags.ts`).
+    case "BLEED":
+      return BattlerTagType.ER_BLEED;
+    case "FROSTBITE":
+      return BattlerTagType.ER_FROSTBITE;
+    case "FEAR":
+      return BattlerTagType.ER_FEAR;
     default:
       return null;
   }
+}
+
+/**
+ * Translate a classifier-emitted `filter` payload into a
+ * {@linkcode ChanceStatusFilter}. The classifier emits `{flag: "BITING_MOVE"}`
+ * (CAPS form, going through `ER_CLASSIFIER_FLAG_TO_MOVE_FLAG`) or
+ * `{type: "GRASS"}` (`PokemonType` enum key). Returns `undefined` for absent
+ * filters and `null` for unparseable ones so the caller can record a skip
+ * reason.
+ */
+function lookupChanceStatusFilter(value: unknown): ChanceStatusFilter | null | undefined {
+  if (value === undefined || value === null) {
+    return;
+  }
+  if (!isObject(value)) {
+    return null;
+  }
+  if (typeof value.flag === "string") {
+    const flag = ER_CLASSIFIER_FLAG_TO_MOVE_FLAG[value.flag];
+    if (flag === undefined || flag === null) {
+      return null;
+    }
+    return { flag };
+  }
+  if (typeof value.type === "string") {
+    const t = lookupPokemonType(value.type);
+    return t === null ? null : { type: t };
+  }
+  return null;
 }
 
 /** Dispatch a `chance-status-on-hit` classifier row. */
@@ -536,17 +575,23 @@ function dispatchChanceStatusOnHit(params: Record<string, unknown>): DispatchRes
   }
   // Prefer the vanilla StatusEffect path first; only fall back to the
   // battler-tag flavor when the status string is a tag concept (CONFUSION,
-  // INFATUATION, FLINCH, DISABLE). The skip path remains for ER-specific
-  // entries (BLEED, FROSTBITE, FEAR) that aren't in either vocabulary.
+  // INFATUATION, FLINCH, DISABLE) or an ER-specific one (BLEED, FROSTBITE,
+  // FEAR) routed through `lookupBattlerTagFromStatus`.
   const status = lookupStatusEffect(params.status);
   const contactRequired = params.onContactOnly;
   const contactOpt = typeof contactRequired === "boolean" ? { contactRequired } : {};
+  const filter = lookupChanceStatusFilter(params.filter);
+  if (filter === null) {
+    return skip(`chance-status-on-hit: unparseable filter ${JSON.stringify(params.filter)}`);
+  }
+  const filterOpt = filter === undefined ? {} : { filter };
   if (status !== null) {
     return ok([
       new ChanceStatusOnHitAbAttr({
         chance,
         effects: [status],
         ...contactOpt,
+        ...filterOpt,
       }),
     ]);
   }
@@ -557,6 +602,7 @@ function dispatchChanceStatusOnHit(params: Record<string, unknown>): DispatchRes
         chance,
         tags: [tag],
         ...contactOpt,
+        ...filterOpt,
       }),
     ]);
   }

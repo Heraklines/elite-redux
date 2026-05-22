@@ -51,7 +51,8 @@ function makeStubPokemon(opts: StubPokemonOpts = {}): Pokemon {
   } as unknown as Pokemon;
 }
 
-function makeStubMove(opts: { makesContact?: boolean }): Move {
+function makeStubMove(opts: { makesContact?: boolean; flags?: MoveFlags; type?: number }): Move {
+  const flags = opts.flags ?? MoveFlags.NONE;
   return {
     doesFlagEffectApply: ({ flag }: { flag: MoveFlags }) => {
       if (flag === MoveFlags.MAKES_CONTACT) {
@@ -59,6 +60,8 @@ function makeStubMove(opts: { makesContact?: boolean }): Move {
       }
       return false;
     },
+    hasFlag: (flag: MoveFlags) => (flags & flag) !== MoveFlags.NONE,
+    type: opts.type ?? 0,
   } as unknown as Move;
 }
 
@@ -340,5 +343,128 @@ describe("ChanceBattlerTagOnHitAbAttr archetype (round-2 extension)", () => {
     expect(attr.getTags()).toEqual([BattlerTagType.CONFUSED, BattlerTagType.INFATUATED]);
     expect(attr.requiresContact()).toBe(false);
     expect(attr.getTurns()).toBe(4);
+  });
+});
+
+describe("ChanceStatusOnHitAbAttr — filter (round 5)", () => {
+  it("flag-filter accepts a flag-bearing move", () => {
+    const attr = new ChanceStatusOnHitAbAttr({
+      chance: 100,
+      effects: [StatusEffect.BURN],
+      filter: { flag: MoveFlags.SLICING_MOVE },
+    });
+    // contactRequired auto-defaults to false when filter is set.
+    expect(attr.requiresContact()).toBe(false);
+    const defender = makeStubPokemon();
+    const attacker = makeStubPokemon();
+    const move = makeStubMove({ flags: MoveFlags.SLICING_MOVE });
+    const result = attr.canApply(makeParams({ defender, attacker, move }));
+    expect(result).toBe(true);
+  });
+
+  it("flag-filter rejects a move missing the flag", () => {
+    const attr = new ChanceStatusOnHitAbAttr({
+      chance: 100,
+      effects: [StatusEffect.BURN],
+      filter: { flag: MoveFlags.SLICING_MOVE },
+    });
+    const defender = makeStubPokemon();
+    const attacker = makeStubPokemon();
+    const move = makeStubMove({ flags: MoveFlags.NONE });
+    expect(attr.canApply(makeParams({ defender, attacker, move }))).toBe(false);
+  });
+
+  it("type-filter accepts a matching type", () => {
+    const attr = new ChanceStatusOnHitAbAttr({
+      chance: 100,
+      effects: [StatusEffect.BURN],
+      filter: { type: 11 as never }, // arbitrary type tag for the stub
+    });
+    const defender = makeStubPokemon();
+    const attacker = makeStubPokemon();
+    const move = makeStubMove({ type: 11 });
+    expect(attr.canApply(makeParams({ defender, attacker, move }))).toBe(true);
+  });
+
+  it("type-filter rejects a non-matching type", () => {
+    const attr = new ChanceStatusOnHitAbAttr({
+      chance: 100,
+      effects: [StatusEffect.BURN],
+      filter: { type: 11 as never },
+    });
+    const defender = makeStubPokemon();
+    const attacker = makeStubPokemon();
+    const move = makeStubMove({ type: 5 });
+    expect(attr.canApply(makeParams({ defender, attacker, move }))).toBe(false);
+  });
+
+  it("filter AND contactRequired both must pass", () => {
+    const attr = new ChanceStatusOnHitAbAttr({
+      chance: 100,
+      effects: [StatusEffect.BURN],
+      filter: { flag: MoveFlags.SLICING_MOVE },
+      contactRequired: true,
+    });
+    expect(attr.requiresContact()).toBe(true);
+    const defender = makeStubPokemon();
+    const attacker = makeStubPokemon();
+    // Has flag but no contact → rejected.
+    const noContact = makeStubMove({ flags: MoveFlags.SLICING_MOVE, makesContact: false });
+    expect(attr.canApply(makeParams({ defender, attacker, move: noContact }))).toBe(false);
+    // Has contact but no flag → rejected.
+    const noFlag = makeStubMove({ flags: MoveFlags.NONE, makesContact: true });
+    expect(attr.canApply(makeParams({ defender, attacker, move: noFlag }))).toBe(false);
+    // Both → accepted.
+    const both = makeStubMove({ flags: MoveFlags.SLICING_MOVE, makesContact: true });
+    expect(attr.canApply(makeParams({ defender, attacker, move: both }))).toBe(true);
+  });
+
+  it("filter accessor returns the configured filter", () => {
+    const attr = new ChanceStatusOnHitAbAttr({
+      chance: 50,
+      effects: [StatusEffect.BURN],
+      filter: { flag: MoveFlags.BITING_MOVE },
+    });
+    expect(attr.getFilter()).toEqual({ flag: MoveFlags.BITING_MOVE });
+  });
+});
+
+describe("ChanceBattlerTagOnHitAbAttr — filter (round 5)", () => {
+  it("flag-filter routes through canAddTag check", () => {
+    const attr = new ChanceBattlerTagOnHitAbAttr({
+      chance: 100,
+      tags: [BattlerTagType.ER_BLEED],
+      filter: { flag: MoveFlags.KICKING_MOVE },
+    });
+    expect(attr.requiresContact()).toBe(false);
+    const defender = makeStubPokemon();
+    const attacker = {
+      id: 2,
+      canAddTag: vi.fn(() => true),
+      addTag: vi.fn(),
+    } as unknown as Pokemon;
+    const move = makeStubMove({ flags: MoveFlags.KICKING_MOVE });
+    expect(attr.canApply(makeParams({ defender, attacker, move }))).toBe(true);
+  });
+
+  it("filter rejects when flag absent", () => {
+    const attr = new ChanceBattlerTagOnHitAbAttr({
+      chance: 100,
+      tags: [BattlerTagType.ER_BLEED],
+      filter: { flag: MoveFlags.KICKING_MOVE },
+    });
+    const defender = makeStubPokemon();
+    const attacker = { id: 2, canAddTag: vi.fn(() => true) } as unknown as Pokemon;
+    const move = makeStubMove({ flags: MoveFlags.NONE });
+    expect(attr.canApply(makeParams({ defender, attacker, move }))).toBe(false);
+  });
+
+  it("filter accessor returns the configured filter", () => {
+    const attr = new ChanceBattlerTagOnHitAbAttr({
+      chance: 50,
+      tags: [BattlerTagType.ER_FROSTBITE],
+      filter: { flag: MoveFlags.BITING_MOVE },
+    });
+    expect(attr.getFilter()).toEqual({ flag: MoveFlags.BITING_MOVE });
   });
 });
