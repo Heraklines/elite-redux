@@ -1361,6 +1361,32 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
  *     on the offensive side via a new `frostbiteMultiplier` in pokemon.ts —
  *     mirrors the BURN physical-attack halving. Completes the round-5
  *     BattlerTag work.
+ *
+ * Cluster table (round 8):
+ *   - 674 Blood Stigma → {@linkcode StatusEffectImmunityAbAttrEr} with empty
+ *     `statuses` list (Comatose-style block-all). "2x vs bleeding foes" piece
+ *     deferred. Partial wire.
+ *   - 855 Hyper Cleanse → {@linkcode StatusEffectImmunityAbAttrEr} with empty
+ *     `statuses` list. "Halves poison damage" piece deferred (no type-keyed
+ *     DamageReduction filter today). Partial wire.
+ *   - 1004 Feathercoat → {@linkcode DamageReductionAbAttr} (kind: all,
+ *     reduction: 0.1). "20% if resisted" piece deferred. Partial wire.
+ *   - 944 Dead Bark → {@linkcode DamageReductionAbAttr} (kind: all, reduction:
+ *     0.15). "Adds Ghost type" + "30% if SE" pieces deferred. Partial wire.
+ *   - 931 Hammer Fist → two {@linkcode FlagDamageBoostAbAttr} instances:
+ *     PUNCHING_MOVE 1.25x + HAMMER_BASED 1.25x. The flags are mutually
+ *     exclusive on real moves in practice; stacking is theoretical.
+ *   - 544 Airborne → {@linkcode TypeDamageBoostAbAttr} (FLYING, 1.3x).
+ *     Ally-boost piece deferred (needs field-aura primitive). Partial wire.
+ *   - 375 Precise Fist → {@linkcode CritStageBonusAbAttr} (+1, filter:
+ *     PUNCHING_MOVE). "5x effect chance" piece deferred (no flag-gated
+ *     effect-chance modifier today). Partial wire.
+ *   - 278 Antarctic Bird → two {@linkcode TypeDamageBoostAbAttr} instances:
+ *     ICE 1.3x + FLYING 1.3x. Single-type-per-move semantics — no compounding.
+ *   - 883 Warmonger → three {@linkcode TypeDamageBoostAbAttr} instances:
+ *     ROCK 1.3x + STEEL 1.3x + FIGHTING 1.3x. Same single-type guarantee.
+ *   - 975 Talon Trap → {@linkcode ChanceBattlerTagOnHitAbAttr} (50%, TRAPPED,
+ *     contact). "100% if entered this turn" piece deferred. Partial wire.
  */
 function dispatchBespoke(erAbilityId: number): DispatchResult {
   switch (erAbilityId) {
@@ -1752,6 +1778,102 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([
         new StatTriggerOnHitAbAttr({ stats: [{ stat: Stat.SPATK, stages: 1 }] }),
         new PostReceiveCritStatStageChangeAbAttr(Stat.SPATK, 12),
+      ]);
+    // -------------------------------------------------------------------------
+    // Round 8 — status-immunity-all + damage-reduction-all + multi-type/flag
+    // damage boost + crit-stage flag bonus + chance-trap-on-hit.
+    // -------------------------------------------------------------------------
+    case 674:
+      // Blood Stigma — "Immune to status. Gets a 2x boost vs bleeding foes."
+      // Wire the status-immunity piece via StatusEffectImmunityAbAttrEr with
+      // an empty `statuses` list — pokerogue's parent treats empty-list as
+      // "block every non-FAINT status" (Comatose parity). The "2x vs bleeding
+      // foes" piece is a conditional damage multiplier; the conditional-damage
+      // primitive doesn't support an ER_BLEED target-condition today, so that
+      // piece is deferred. Partial wire.
+      return ok([new StatusEffectImmunityAbAttrEr({ statuses: [] })]);
+    case 855:
+      // Hyper Cleanse — "Immune to status. Halves poison damage taken." Same
+      // empty-list block-all pattern as Blood Stigma for the immunity piece.
+      // The "halves poison damage" piece would compose via a type-keyed
+      // DamageReduction (POISON), but the current filter union doesn't carry a
+      // `type` variant; deferred. Partial wire.
+      return ok([new StatusEffectImmunityAbAttrEr({ statuses: [] })]);
+    case 1004:
+      // Feathercoat — "Takes 10% less damage from attacks, 20% if resisted."
+      // Wire the flat 10% reduction via DamageReductionAbAttr({all}). The
+      // "20% if resisted" piece would need a new filter kind (not-very-
+      // effective resist gate) — deferred. Partial wire.
+      return ok([new DamageReductionAbAttr({ reduction: 0.1, filter: { kind: "all" } })]);
+    case 944:
+      // Dead Bark — "Adds Ghost type. Takes 15% less damage. 30% less damage
+      // if SE." Wire the flat 15% reduction via DamageReductionAbAttr({all}).
+      // The "Adds Ghost type" entry-effect piece composes via TypeConversion
+      // (add-type variant doesn't exist yet); the "30% if SE" piece needs a
+      // super-effective override (existing super-effective filter is for a
+      // separate 30% reduction, but stacking two DamageReductions would
+      // multiply incorrectly). Both pieces deferred. Partial wire.
+      return ok([new DamageReductionAbAttr({ reduction: 0.15, filter: { kind: "all" } })]);
+    case 931:
+      // Hammer Fist — "Boosts punch and hammer moves by 25%." Wire as two
+      // FlagDamageBoost instances — PUNCHING_MOVE and HAMMER_BASED at 1.25x
+      // each. The two flags are typically not both set on a single move
+      // (PUNCHING is vanilla, HAMMER is ER), so the multipliers don't compound
+      // in practice. Even if a future move flags both, 1.25 * 1.25 = 1.5625
+      // would be a fringe overlap accepted per the additive flag-stacking
+      // convention used elsewhere (e.g. Iron Fist + Strong Jaw on a hypothetical
+      // dual-flag move).
+      return ok([
+        new FlagDamageBoostAbAttr({ flag: MoveFlags.PUNCHING_MOVE, multiplier: 1.25 }),
+        new FlagDamageBoostAbAttr({ flag: MoveFlags.HAMMER_BASED, multiplier: 1.25 }),
+      ]);
+    case 544:
+      // Airborne — "Boosts own & ally's Flying-type moves by 1.3x." Wire the
+      // self-boost via TypeDamageBoost(FLYING, 1.3). The ally-boost piece
+      // requires a field-aura primitive (similar to how vanilla Fairy Aura
+      // / Dark Aura broadcast to allies); pokerogue has FieldMoveTypePowerBoost
+      // for that but the archetype layer doesn't expose it yet. Partial wire.
+      return ok([new TypeDamageBoostAbAttr({ type: PokemonType.FLYING, multiplier: 1.3 })]);
+    case 375:
+      // Precise Fist — "Punching moves get +1 crit and 5x effect chance."
+      // Wire the +1 crit-stage gate on PUNCHING_MOVE via CritStageBonus. The
+      // 5x effect chance piece could compose via EffectChanceModifier, but
+      // pokerogue's parent doesn't support per-flag filtering, so a global 5x
+      // would amplify non-punch effects too — better to defer until we add a
+      // flag-gated effect-chance modifier. Partial wire.
+      return ok([new CritStageBonusAbAttr({ bonus: 1, filter: { flag: MoveFlags.PUNCHING_MOVE } })]);
+    case 278:
+      // Antarctic Bird — "Ice-type and Flying-type moves get a 1.3x power
+      // boost." Wire as two TypeDamageBoost instances (ICE, FLYING) at 1.3x
+      // each. A move that's both Ice AND Flying would only have one type per
+      // pokerogue's single-type-per-move semantics; the two attrs are
+      // mutually exclusive at apply time, so no compounding concern.
+      return ok([
+        new TypeDamageBoostAbAttr({ type: PokemonType.ICE, multiplier: 1.3 }),
+        new TypeDamageBoostAbAttr({ type: PokemonType.FLYING, multiplier: 1.3 }),
+      ]);
+    case 883:
+      // Warmonger — "Boosts the user's rock, steel, and fighting moves by
+      // 30%." Wire as three TypeDamageBoost instances (ROCK, STEEL, FIGHTING)
+      // at 1.3x each. Same single-type-per-move guarantee as Antarctic Bird —
+      // exactly one of the three attrs fires for a given outgoing move.
+      return ok([
+        new TypeDamageBoostAbAttr({ type: PokemonType.ROCK, multiplier: 1.3 }),
+        new TypeDamageBoostAbAttr({ type: PokemonType.STEEL, multiplier: 1.3 }),
+        new TypeDamageBoostAbAttr({ type: PokemonType.FIGHTING, multiplier: 1.3 }),
+      ]);
+    case 975:
+      // Talon Trap — "50% chance to trap on contact. 100% if entered this
+      // turn." Wire the contact-trap proc at 50% via ChanceBattlerTagOnHit
+      // applying BattlerTagType.TRAPPED. The "100% if entered this turn"
+      // piece needs a switch-in-turn condition that the chance-status
+      // primitive doesn't carry today; deferred. Partial wire.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 50,
+          tags: [BattlerTagType.TRAPPED],
+          contactRequired: true,
+        }),
       ]);
     default:
       return SKIP_BESPOKE;

@@ -30,13 +30,17 @@ import { StatChangeOnCategoryAttackAbAttr } from "#data/elite-redux/abilities/st
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
 import { ChanceBattlerTagOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
+import { CritStageBonusAbAttr } from "#data/elite-redux/archetypes/crit-mod";
 import { DamageReductionAbAttr } from "#data/elite-redux/archetypes/damage-reduction-generic";
 import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
+import { FlagDamageBoostAbAttr } from "#data/elite-redux/archetypes/flag-damage-boost";
 import { LifestealOnKoAbAttr } from "#data/elite-redux/archetypes/lifesteal";
 import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
 import { PassiveRecoveryAbAttr } from "#data/elite-redux/archetypes/passive-recovery";
 import { PreFaintReviveAbAttr } from "#data/elite-redux/archetypes/pre-faint-revive";
 import { StatTriggerOnHitAbAttr, StatTriggerOnKoAbAttr } from "#data/elite-redux/archetypes/stat-trigger-on-event";
+import { StatusEffectImmunityAbAttrEr } from "#data/elite-redux/archetypes/status-immunity";
+import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
 import { WeatherStatMultiplierAbAttr } from "#data/elite-redux/archetypes/weather-stat-multiplier";
 import { WeatherDamageReductionAbAttr } from "#data/elite-redux/archetypes/weather-terrain-interaction";
 import { TerrainType } from "#data/terrain";
@@ -485,6 +489,117 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(hitAttr.getStatChanges()).toEqual([{ stat: Stat.SPATK, stages: 1 }]);
     const critAttr = res.attrs[1];
     expect(critAttr).toBeInstanceOf(PostReceiveCritStatStageChangeAbAttr);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Round 8 — status-immunity-all + damage-reduction-all + multi-type/flag
+  // damage boost + crit-stage flag bonus + chance-trap-on-hit.
+  // ---------------------------------------------------------------------------
+  it("er id 674 (Blood Stigma) wires StatusEffectImmunityAbAttrEr (block-all)", () => {
+    const res = dispatchArchetype("bespoke", null, 674);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as StatusEffectImmunityAbAttrEr;
+    expect(attr).toBeInstanceOf(StatusEffectImmunityAbAttrEr);
+    expect(attr.getStatuses()).toEqual([]);
+  });
+
+  it("er id 855 (Hyper Cleanse) wires StatusEffectImmunityAbAttrEr (block-all)", () => {
+    const res = dispatchArchetype("bespoke", null, 855);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as StatusEffectImmunityAbAttrEr;
+    expect(attr).toBeInstanceOf(StatusEffectImmunityAbAttrEr);
+    expect(attr.getStatuses()).toEqual([]);
+  });
+
+  it("er id 1004 (Feathercoat) wires DamageReductionAbAttr (kind: all, reduction: 0.1)", () => {
+    const res = dispatchArchetype("bespoke", null, 1004);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as DamageReductionAbAttr;
+    expect(attr).toBeInstanceOf(DamageReductionAbAttr);
+    expect(attr.getReduction()).toBeCloseTo(0.1);
+    expect(attr.getFilter()).toEqual({ kind: "all" });
+  });
+
+  it("er id 944 (Dead Bark) wires DamageReductionAbAttr (kind: all, reduction: 0.15)", () => {
+    const res = dispatchArchetype("bespoke", null, 944);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as DamageReductionAbAttr;
+    expect(attr).toBeInstanceOf(DamageReductionAbAttr);
+    expect(attr.getReduction()).toBeCloseTo(0.15);
+    expect(attr.getFilter()).toEqual({ kind: "all" });
+  });
+
+  it("er id 931 (Hammer Fist) wires two FlagDamageBoost instances (PUNCHING_MOVE 1.25x + HAMMER_BASED 1.25x)", () => {
+    const res = dispatchArchetype("bespoke", null, 931);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(2);
+    const a0 = res.attrs[0] as FlagDamageBoostAbAttr;
+    expect(a0).toBeInstanceOf(FlagDamageBoostAbAttr);
+    expect(a0.getBoostFlag()).toBe(MoveFlags.PUNCHING_MOVE);
+    expect(a0.getHighHpMultiplier()).toBeCloseTo(1.25);
+    const a1 = res.attrs[1] as FlagDamageBoostAbAttr;
+    expect(a1).toBeInstanceOf(FlagDamageBoostAbAttr);
+    expect(a1.getBoostFlag()).toBe(MoveFlags.HAMMER_BASED);
+    expect(a1.getHighHpMultiplier()).toBeCloseTo(1.25);
+  });
+
+  it("er id 544 (Airborne) wires TypeDamageBoostAbAttr (FLYING, 1.3x)", () => {
+    const res = dispatchArchetype("bespoke", null, 544);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as TypeDamageBoostAbAttr;
+    expect(attr).toBeInstanceOf(TypeDamageBoostAbAttr);
+    expect(attr.getBoostType()).toBe(PokemonType.FLYING);
+    expect(attr.getHighHpMultiplier()).toBeCloseTo(1.3);
+  });
+
+  it("er id 375 (Precise Fist) wires CritStageBonusAbAttr (+1 with PUNCHING_MOVE filter)", () => {
+    const res = dispatchArchetype("bespoke", null, 375);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as CritStageBonusAbAttr;
+    expect(attr).toBeInstanceOf(CritStageBonusAbAttr);
+    expect(attr.getBonus()).toBe(1);
+    expect(attr.getFilter()).toEqual({ flag: MoveFlags.PUNCHING_MOVE });
+  });
+
+  it("er id 278 (Antarctic Bird) wires two TypeDamageBoost instances (ICE 1.3x + FLYING 1.3x)", () => {
+    const res = dispatchArchetype("bespoke", null, 278);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(2);
+    const a0 = res.attrs[0] as TypeDamageBoostAbAttr;
+    expect(a0.getBoostType()).toBe(PokemonType.ICE);
+    expect(a0.getHighHpMultiplier()).toBeCloseTo(1.3);
+    const a1 = res.attrs[1] as TypeDamageBoostAbAttr;
+    expect(a1.getBoostType()).toBe(PokemonType.FLYING);
+    expect(a1.getHighHpMultiplier()).toBeCloseTo(1.3);
+  });
+
+  it("er id 883 (Warmonger) wires three TypeDamageBoost instances (ROCK + STEEL + FIGHTING)", () => {
+    const res = dispatchArchetype("bespoke", null, 883);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(3);
+    const types = (res.attrs as TypeDamageBoostAbAttr[]).map(a => a.getBoostType());
+    expect(types).toEqual([PokemonType.ROCK, PokemonType.STEEL, PokemonType.FIGHTING]);
+    for (const a of res.attrs as TypeDamageBoostAbAttr[]) {
+      expect(a).toBeInstanceOf(TypeDamageBoostAbAttr);
+      expect(a.getHighHpMultiplier()).toBeCloseTo(1.3);
+    }
+  });
+
+  it("er id 975 (Talon Trap) wires ChanceBattlerTagOnHit (50%, TRAPPED, contact)", () => {
+    const res = dispatchArchetype("bespoke", null, 975);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as ChanceBattlerTagOnHitAbAttr;
+    expect(attr).toBeInstanceOf(ChanceBattlerTagOnHitAbAttr);
+    expect(attr.getChance()).toBe(50);
+    expect(attr.getTags()).toEqual([BattlerTagType.TRAPPED]);
+    expect(attr.requiresContact()).toBe(true);
   });
 
   it("unrecognized er id falls through to default bespoke skip", () => {

@@ -257,11 +257,12 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     // Phase D bespoke: long-tail bespoke ER abilities are hand-wired via
     // `dispatchBespoke` (see `archetype-dispatcher.ts`). Each lands a
     // constructed AbAttr; the rest of the 258 bespoke rows still skip with
-    // `SKIP_BESPOKE`. Round 2 raised the wired count from 9 to 15. Bound
-    // loosely so adding more bespoke wirings in follow-up rounds doesn't
-    // invalidate this assertion.
+    // `SKIP_BESPOKE`. Round 2 raised the wired count from 9 to 15; rounds
+    // 3-8 have steadily extended primitives and added wires. Bound loosely
+    // so future rounds adding more bespoke wirings don't invalidate this
+    // assertion.
     expect(wiredCounts.bespoke ?? 0).toBeGreaterThanOrEqual(15);
-    expect(wiredCounts.bespoke ?? 0).toBeLessThanOrEqual(50);
+    expect(wiredCounts.bespoke ?? 0).toBeLessThanOrEqual(80);
   });
 
   it("init result reports per-archetype wired counts (fresh run on a clean baseline)", () => {
