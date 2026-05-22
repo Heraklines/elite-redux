@@ -31,6 +31,8 @@ describe("initEliteReduxVanillaRebalance (B3)", () => {
     const result = initEliteReduxVanillaRebalance();
     expect(result.moveDeltas).toBe(0);
     expect(result.moveFieldWrites).toBe(0);
+    // Abilities are also idempotent — patched abilities carry a Symbol marker
+    // that the patcher checks to skip already-patched entries.
     expect(result.abilityDeltas).toBe(0);
   });
 
@@ -97,8 +99,12 @@ describe("initEliteReduxVanillaRebalance (B3)", () => {
     // Hard contract: we don't (and can't) rewrite vanilla ability descriptions
     // at runtime — `Ability.description` is a getter that delegates to
     // i18next. The Phase C ER locale pack is where this content properly
-    // belongs. Lock the no-op count here so a future change that tries to
-    // mutate the prototype-level getter has to update this test.
+    // belongs.
+    //
+    // Mechanic patches (MINOR / MAJOR / TOTAL deltas) are now applied through
+    // the ABILITY_PATCHERS dispatch table, but those patches mutate `attrs`
+    // not `description`. On a re-run, idempotency kicks in and `abilityDeltas`
+    // reports 0.
     const result = initEliteReduxVanillaRebalance();
     expect(result.abilityDeltas).toBe(0);
     expect(result.abilityErrors).toHaveLength(0);
