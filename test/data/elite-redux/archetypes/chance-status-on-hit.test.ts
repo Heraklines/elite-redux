@@ -16,7 +16,11 @@
 // have a PostDefend trigger for full integration tests.
 // =============================================================================
 
-import { ChanceStatusOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
+import {
+  ChanceBattlerTagOnHitAbAttr,
+  ChanceStatusOnHitAbAttr,
+} from "#data/elite-redux/archetypes/chance-status-on-hit";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
 import { MoveFlags } from "#enums/move-flags";
 import { StatusEffect } from "#enums/status-effect";
@@ -210,5 +214,131 @@ describe("ChanceStatusOnHitAbAttr archetype (C1)", () => {
     expect(attr.getChance()).toBe(25);
     expect(attr.getEffects()).toEqual([StatusEffect.SLEEP, StatusEffect.POISON]);
     expect(attr.requiresContact()).toBe(false);
+  });
+});
+
+// Tag-flavor stubs — separate factory so we can fake `canAddTag` / `addTag`
+// independently of the status-side `canSetStatus` / `trySetStatus` plumbing.
+type StubTagPokemonOpts = {
+  canAddTag?: boolean;
+  rolls?: number[];
+};
+
+function makeStubTagPokemon(opts: StubTagPokemonOpts = {}): Pokemon {
+  const rolls = opts.rolls ?? [0];
+  let idx = 0;
+  return {
+    id: 1,
+    canAddTag: vi.fn(() => opts.canAddTag ?? true),
+    addTag: vi.fn(),
+    randBattleSeedInt: vi.fn(() => {
+      const v = rolls[idx % rolls.length];
+      idx++;
+      return v;
+    }),
+  } as unknown as Pokemon;
+}
+
+describe("ChanceBattlerTagOnHitAbAttr archetype (round-2 extension)", () => {
+  it("fires on a contact hit when the roll passes (Haunting Frenzy, 20% flinch, roll=0)", () => {
+    const attr = new ChanceBattlerTagOnHitAbAttr({
+      chance: 20,
+      tags: [BattlerTagType.FLINCHED],
+    });
+    const defender = makeStubTagPokemon({ rolls: [0] });
+    const attacker = makeStubTagPokemon();
+    const params = makeParams({ defender, attacker, move: makeStubMove({ makesContact: true }) });
+    expect(attr.canApply(params)).toBe(true);
+    attr.apply(params);
+    expect(attacker.addTag).toHaveBeenCalledWith(BattlerTagType.FLINCHED, undefined, undefined, defender.id);
+  });
+
+  it("does NOT fire when the roll exceeds the chance", () => {
+    const attr = new ChanceBattlerTagOnHitAbAttr({
+      chance: 20,
+      tags: [BattlerTagType.CONFUSED],
+    });
+    const defender = makeStubTagPokemon({ rolls: [50] });
+    const attacker = makeStubTagPokemon();
+    const params = makeParams({ defender, attacker, move: makeStubMove({ makesContact: true }) });
+    expect(attr.canApply(params)).toBe(false);
+  });
+
+  it("Loud Bang-style: non-contact proc at 50% with CONFUSED", () => {
+    const attr = new ChanceBattlerTagOnHitAbAttr({
+      chance: 50,
+      tags: [BattlerTagType.CONFUSED],
+      contactRequired: false,
+    });
+    const params = makeParams({
+      defender: makeStubTagPokemon({ rolls: [0] }),
+      attacker: makeStubTagPokemon(),
+      move: makeStubMove({ makesContact: false }),
+    });
+    expect(attr.canApply(params)).toBe(true);
+  });
+
+  it("does NOT fire when canAddTag rejects the tag", () => {
+    const attr = new ChanceBattlerTagOnHitAbAttr({
+      chance: 100,
+      tags: [BattlerTagType.FLINCHED],
+    });
+    const defender = makeStubTagPokemon();
+    const attacker = makeStubTagPokemon({ canAddTag: false });
+    const params = makeParams({ defender, attacker, move: makeStubMove({ makesContact: true }) });
+    expect(attr.canApply(params)).toBe(false);
+  });
+
+  it("apply is a no-op when simulated", () => {
+    const attr = new ChanceBattlerTagOnHitAbAttr({
+      chance: 100,
+      tags: [BattlerTagType.FLINCHED],
+    });
+    const defender = makeStubTagPokemon();
+    const attacker = makeStubTagPokemon();
+    attr.apply({
+      ...makeParams({ defender, attacker, move: makeStubMove({ makesContact: true }) }),
+      simulated: true,
+    });
+    expect(attacker.addTag).not.toHaveBeenCalled();
+  });
+
+  it("forwards `turns` to addTag when configured", () => {
+    const attr = new ChanceBattlerTagOnHitAbAttr({
+      chance: 100,
+      tags: [BattlerTagType.DISABLED],
+      turns: 3,
+    });
+    const defender = makeStubTagPokemon();
+    const attacker = makeStubTagPokemon();
+    const params = makeParams({ defender, attacker, move: makeStubMove({ makesContact: true }) });
+    attr.apply(params);
+    expect(attacker.addTag).toHaveBeenCalledWith(BattlerTagType.DISABLED, 3, undefined, defender.id);
+  });
+
+  it("rejects empty tags array at construction time", () => {
+    expect(() => new ChanceBattlerTagOnHitAbAttr({ chance: 50, tags: [] })).toThrow(/at least one battler tag/);
+  });
+
+  it("rejects invalid chance values at construction time", () => {
+    expect(() => new ChanceBattlerTagOnHitAbAttr({ chance: -1, tags: [BattlerTagType.FLINCHED] })).toThrow(
+      /chance must be in/,
+    );
+    expect(() => new ChanceBattlerTagOnHitAbAttr({ chance: 101, tags: [BattlerTagType.FLINCHED] })).toThrow(
+      /chance must be in/,
+    );
+  });
+
+  it("exposes configuration via accessors", () => {
+    const attr = new ChanceBattlerTagOnHitAbAttr({
+      chance: 30,
+      tags: [BattlerTagType.CONFUSED, BattlerTagType.INFATUATED],
+      contactRequired: false,
+      turns: 4,
+    });
+    expect(attr.getChance()).toBe(30);
+    expect(attr.getTags()).toEqual([BattlerTagType.CONFUSED, BattlerTagType.INFATUATED]);
+    expect(attr.requiresContact()).toBe(false);
+    expect(attr.getTurns()).toBe(4);
   });
 });

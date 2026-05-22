@@ -27,3 +27,7 @@ export {
   SetTerrainOnHitAbAttr,
   type SetTerrainOnHitOptions,
 } from "./set-arena-effect-on-hit";
+export {
+  StatBoostOnFlagAttackAbAttr,
+  type StatBoostOnFlagAttackOptions,
+} from "./stat-boost-on-flag-attack";

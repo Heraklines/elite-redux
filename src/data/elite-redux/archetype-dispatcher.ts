@@ -55,11 +55,15 @@
 //   archetype shape. Phase D's bespoke-implementation task wires them.
 // =============================================================================
 
-import { type AbAttr, BlockRecoilDamageAttr } from "#abilities/ab-attrs";
+import { type AbAttr, BlockRecoilDamageAttr, PostDefendContactDamageAbAttr } from "#abilities/ab-attrs";
 import { allAbilities } from "#data/data-lists";
 import { PostTurnHurtNonTypedAbAttr } from "#data/elite-redux/abilities/post-turn-hurt-non-typed";
 import { SetArenaTagOnHitAbAttr, SetTerrainOnHitAbAttr } from "#data/elite-redux/abilities/set-arena-effect-on-hit";
-import { ChanceStatusOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
+import { StatBoostOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-boost-on-flag-attack";
+import {
+  ChanceBattlerTagOnHitAbAttr,
+  ChanceStatusOnHitAbAttr,
+} from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { ConditionalDamageAbAttr, type DamageCondition } from "#data/elite-redux/archetypes/conditional-damage";
 import {
   CritDamageMultiplierAbAttr,
@@ -489,27 +493,69 @@ function dispatchEntryEffect(params: Record<string, unknown>): DispatchResult {
   return ok([new EntryEffectAbAttr(effect)]);
 }
 
+/**
+ * Map classifier-emitted status strings that are actually battler-tag concepts
+ * (CONFUSION, INFATUATION, FLINCH, DISABLE, TAUNT) to their {@linkcode
+ * BattlerTagType} value. Returns `null` for inputs that aren't battler-tag
+ * concepts — those flow to `lookupStatusEffect` (vanilla StatusEffect) or
+ * skip entirely (ER-specific BLEED, FROSTBITE, FEAR).
+ */
+function lookupBattlerTagFromStatus(value: unknown): BattlerTagType | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  // Direct enum match (CONFUSED, INFATUATED, FLINCHED, DISABLED, TAUNT).
+  if (Object.hasOwn(BattlerTagType, value)) {
+    return (BattlerTagType as unknown as Record<string, BattlerTagType>)[value];
+  }
+  // Classifier aliases — the inventory uses non-suffixed forms.
+  switch (value) {
+    case "CONFUSION":
+      return BattlerTagType.CONFUSED;
+    case "INFATUATION":
+      return BattlerTagType.INFATUATED;
+    case "FLINCH":
+      return BattlerTagType.FLINCHED;
+    case "DISABLE":
+      return BattlerTagType.DISABLED;
+    default:
+      return null;
+  }
+}
+
 /** Dispatch a `chance-status-on-hit` classifier row. */
 function dispatchChanceStatusOnHit(params: Record<string, unknown>): DispatchResult {
   const chance = params.chance;
   if (typeof chance !== "number" || chance < 0 || chance > 100) {
     return skip("chance-status-on-hit: missing/invalid chance");
   }
+  // Prefer the vanilla StatusEffect path first; only fall back to the
+  // battler-tag flavor when the status string is a tag concept (CONFUSION,
+  // INFATUATION, FLINCH, DISABLE). The skip path remains for ER-specific
+  // entries (BLEED, FROSTBITE, FEAR) that aren't in either vocabulary.
   const status = lookupStatusEffect(params.status);
-  if (status === null) {
-    // Non-StatusEffect status concept (CONFUSION/INFATUATION → BattlerTag,
-    // BLEED/FROSTBITE → ER-specific, FLINCH → BattlerTag, DISABLE → tag).
-    // ChanceStatusOnHitAbAttr only accepts StatusEffect[] — skip.
-    return skip(`chance-status-on-hit: status ${String(params.status)} not a vanilla StatusEffect`);
-  }
   const contactRequired = params.onContactOnly;
-  return ok([
-    new ChanceStatusOnHitAbAttr({
-      chance,
-      effects: [status],
-      ...(typeof contactRequired === "boolean" ? { contactRequired } : {}),
-    }),
-  ]);
+  const contactOpt = typeof contactRequired === "boolean" ? { contactRequired } : {};
+  if (status !== null) {
+    return ok([
+      new ChanceStatusOnHitAbAttr({
+        chance,
+        effects: [status],
+        ...contactOpt,
+      }),
+    ]);
+  }
+  const tag = lookupBattlerTagFromStatus(params.status);
+  if (tag !== null) {
+    return ok([
+      new ChanceBattlerTagOnHitAbAttr({
+        chance,
+        tags: [tag],
+        ...contactOpt,
+      }),
+    ]);
+  }
+  return skip(`chance-status-on-hit: status ${String(params.status)} not a vanilla StatusEffect or BattlerTag`);
 }
 
 /** Dispatch a `crit-mod` classifier row. */
@@ -1146,7 +1192,7 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
  * through to the default {@linkcode SKIP_BESPOKE} (`"hand-written
  * implementation pending"`), so adding a new bespoke is purely additive.
  *
- * Cluster table:
+ * Cluster table (round 1):
  *   - 396 Steel Barrel → reuse pokerogue's {@linkcode BlockRecoilDamageAttr}.
  *   - 411 Toxic Spill, 775 Flame Coat, 663 Funeral Pyre →
  *     {@linkcode PostTurnHurtNonTypedAbAttr} per-turn chip damage.
@@ -1157,13 +1203,66 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
  *   - 898 Power Leak → {@linkcode SetTerrainOnHitAbAttr} Electric Terrain.
  *   - 956 Brain Overload → {@linkcode SetTerrainOnHitAbAttr} Psychic Terrain.
  *   - 957 Brain Mass → {@linkcode DamageReductionAbAttr} with `full-hp` filter.
+ *
+ * Cluster table (round 2):
+ *   - 289 Growing Tooth → {@linkcode StatBoostOnFlagAttackAbAttr} BITING_MOVE +1 ATK.
+ *   - 391 Hardened Sheath → {@linkcode StatBoostOnFlagAttackAbAttr} HORN_BASED +1 ATK.
+ *   - 400 Scrapyard → {@linkcode SetArenaTagOnHitAbAttr} Spikes + contact required.
+ *   - 401 Loose Quills → {@linkcode SetArenaTagOnHitAbAttr} Spikes + contact required.
+ *   - 405 Loose Rocks → {@linkcode SetArenaTagOnHitAbAttr} Stealth Rock + contact required.
+ *   - 574 Sharp Edges → vanilla {@linkcode PostDefendContactDamageAbAttr} 1/6 ratio.
  */
 function dispatchBespoke(erAbilityId: number): DispatchResult {
   switch (erAbilityId) {
+    case 289:
+      // Growing Tooth — Atk +1 after a biting move resolves.
+      return ok([
+        new StatBoostOnFlagAttackAbAttr({
+          flag: MoveFlags.BITING_MOVE,
+          stat: Stat.ATK,
+          stages: 1,
+        }),
+      ]);
+    case 391:
+      // Hardened Sheath — Atk +1 after a horn move resolves.
+      return ok([
+        new StatBoostOnFlagAttackAbAttr({
+          flag: MoveFlags.HORN_BASED,
+          stat: Stat.ATK,
+          stages: 1,
+        }),
+      ]);
     case 396:
       // Steel Barrel — immune to recoil damage (Explosion/crash dmg NOT
       // recoil per pokerogue's split). Reuses vanilla Rock Head's primitive.
       return ok([new BlockRecoilDamageAttr()]);
+    case 400:
+      // Scrapyard — Spikes deploy when hit by a contact move.
+      return ok([
+        new SetArenaTagOnHitAbAttr({
+          tagType: ArenaTagType.SPIKES,
+          side: "attacker",
+          contactRequired: true,
+        }),
+      ]);
+    case 401:
+      // Loose Quills — Spikes deploy when hit by a contact move.
+      return ok([
+        new SetArenaTagOnHitAbAttr({
+          tagType: ArenaTagType.SPIKES,
+          side: "attacker",
+          contactRequired: true,
+        }),
+      ]);
+    case 405:
+      // Loose Rocks — Stealth Rock deploys when hit by a contact move.
+      return ok([
+        new SetArenaTagOnHitAbAttr({
+          tagType: ArenaTagType.STEALTH_ROCK,
+          side: "attacker",
+          contactRequired: true,
+        }),
+      ]);
     case 411:
       // Toxic Spill — non-Poison-types take 1/8 dmg every turn.
       return ok([
@@ -1172,6 +1271,11 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
           damageFraction: 1 / 8,
         }),
       ]);
+    case 574:
+      // Sharp Edges — 1/6 HP damage when touched. Vanilla Rough Skin uses 1/8
+      // ratio; we use 1/6 per ER description. Pokerogue's class takes the
+      // *divisor* (so 6 → 1/6, 8 → 1/8).
+      return ok([new PostDefendContactDamageAbAttr(6)]);
     case 663:
       // Funeral Pyre — non-Ghost-AND-non-Dark take 1/4 dmg every turn.
       return ok([

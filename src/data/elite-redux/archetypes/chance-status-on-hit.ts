@@ -55,6 +55,7 @@
 // =============================================================================
 
 import { PostDefendAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
+import type { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveFlags } from "#enums/move-flags";
 import type { StatusEffect } from "#enums/status-effect";
 
@@ -201,5 +202,138 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
       return this.effects[0];
     }
     return this.effects[pokemon.randBattleSeedInt(this.effects.length)];
+  }
+}
+
+/** Construction payload for {@linkcode ChanceBattlerTagOnHitAbAttr}. */
+export interface ChanceBattlerTagOnHitOptions {
+  /**
+   * Roll chance for the proc, as an integer in the range `[0, 100]`. The proc
+   * fires when `pokemon.randBattleSeedInt(100) < chance` — i.e. 100 always
+   * fires, 0 never fires.
+   */
+  readonly chance: number;
+  /**
+   * One or more battler tags to inflict on the attacker. When multiple are
+   * provided, a uniform-random one is picked per proc. Most ER abilities in
+   * this cluster wire a single tag, but the multi-tag shape matches the
+   * sibling {@linkcode ChanceStatusOnHitAbAttr} symmetrically.
+   */
+  readonly tags: readonly BattlerTagType[];
+  /**
+   * When true (default), the proc only fires when the incoming move makes
+   * contact. When false, any damaging move triggers a roll. ER abilities like
+   * `Loud Bang` (sound-based, 50% chance to confuse) wire this `false`.
+   * @defaultValue `true`
+   */
+  readonly contactRequired?: boolean;
+  /**
+   * Number of turns the tag persists. Most battler tags use the engine's
+   * default duration (e.g. CONFUSED rolls 2-5 turns internally) — pass
+   * `undefined` to defer to that default. Otherwise overrides the count.
+   * @defaultValue `undefined` (engine default)
+   */
+  readonly turns?: number;
+}
+
+/**
+ * Parameterized `AbAttr` implementing the battler-tag flavor of the
+ * `chance-status-on-hit` archetype.
+ *
+ * Used by ER abilities such as `Loud Bang` ("Sound-based moves have 50% chance
+ * to confuse"), `Haunting Frenzy` ("20% chance to flinch"), `Radio Jam` (sound
+ * → 20% disable), and any other ability whose proc semantics match
+ * {@linkcode ChanceStatusOnHitAbAttr} but inflicts a tag (CONFUSED, FLINCHED,
+ * INFATUATED, DISABLED, TAUNT, …) rather than a `StatusEffect`.
+ *
+ * @remarks
+ * Extends {@linkcode PostDefendAbAttr}. The shape mirrors pokerogue's
+ * existing `PostDefendContactApplyTagChanceAbAttr` (which hardcodes contact
+ * required); we make the contact gate optional and accept multiple tags.
+ *
+ * The proc fires by calling `attacker.addTag(tag, turns, undefined,
+ * pokemon.id)` — the same call pokerogue uses for the vanilla `*ApplyTag`
+ * abilities. We pass `undefined` for `sourceMove` because none of our
+ * incoming attacks should attribute the tag back to a specific move id; the
+ * source pokemon is the defender (the ability holder).
+ */
+export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
+  private readonly chance: number;
+  private readonly tags: readonly BattlerTagType[];
+  private readonly contactRequired: boolean;
+  private readonly turns: number | undefined;
+
+  constructor(opts: ChanceBattlerTagOnHitOptions) {
+    if (!(opts.chance >= 0 && opts.chance <= 100)) {
+      throw new Error(`[ChanceBattlerTagOnHitAbAttr] chance must be in [0, 100]; got ${opts.chance}`);
+    }
+    if (opts.tags.length === 0) {
+      throw new Error("[ChanceBattlerTagOnHitAbAttr] must configure at least one battler tag");
+    }
+    super();
+    this.chance = opts.chance;
+    this.tags = opts.tags;
+    this.contactRequired = opts.contactRequired ?? true;
+    this.turns = opts.turns;
+  }
+
+  /** The configured proc chance (0-100). */
+  public getChance(): number {
+    return this.chance;
+  }
+
+  /** The configured battler-tag list (read-only). */
+  public getTags(): readonly BattlerTagType[] {
+    return this.tags;
+  }
+
+  /** Whether the proc requires the incoming move to make contact. */
+  public requiresContact(): boolean {
+    return this.contactRequired;
+  }
+
+  /** The configured turn override, or `undefined` to use the engine default. */
+  public getTurns(): number | undefined {
+    return this.turns;
+  }
+
+  public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, move, opponent: attacker } = params;
+    if (
+      this.contactRequired
+      && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
+    ) {
+      return false;
+    }
+    if (this.chance !== 100 && pokemon.randBattleSeedInt(100) >= this.chance) {
+      return false;
+    }
+    const tag = this.pickTag(pokemon);
+    return attacker.canAddTag(tag);
+  }
+
+  public override apply(params: PostMoveInteractionAbAttrParams): void {
+    if (params.simulated) {
+      return;
+    }
+    const { pokemon, opponent: attacker } = params;
+    const tag = this.pickTag(pokemon);
+    attacker.addTag(tag, this.turns, undefined, pokemon.id);
+  }
+
+  /**
+   * Uniform-random pick from {@linkcode tags} using `pokemon.randBattleSeedInt`
+   * so test seeding works. Returns the singleton when only one is configured.
+   *
+   * @remarks
+   * Mirrors the picking trick in {@linkcode ChanceStatusOnHitAbAttr.pickEffect}.
+   * The same seed advances deterministically between `canApply` and `apply`,
+   * so both calls pick the same index.
+   */
+  private pickTag(pokemon: Parameters<PostDefendAbAttr["apply"]>[0]["pokemon"]): BattlerTagType {
+    if (this.tags.length === 1) {
+      return this.tags[0];
+    }
+    return this.tags[pokemon.randBattleSeedInt(this.tags.length)];
   }
 }

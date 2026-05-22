@@ -90,9 +90,9 @@ describe("initEliteReduxCustomAbilities (B2)", () => {
     expect(scrapyard.name).not.toMatch(/^ability:/);
     expect(typeof scrapyard.description).toBe("string");
     expect(scrapyard.description.length).toBeGreaterThan(0);
-    // Scrapyard is classified `bespoke` — Phase D3 leaves it as a placeholder
-    // (no AbAttrs) until its hand-written wiring lands in the bespoke task.
-    expect(scrapyard.attrs).toHaveLength(0);
+    // Scrapyard is classified `bespoke`. Round 2 wires its hand-written
+    // SetArenaTagOnHit Spikes-on-contact attr via `dispatchBespoke`.
+    expect(scrapyard.attrs.length).toBeGreaterThanOrEqual(1);
   });
 
   it("no construction errors on the test harness's startup run", () => {
@@ -180,7 +180,22 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     expect(effect.kind).toBe("set-terrain");
   });
 
-  it("bespoke entries (e.g. SCRAPYARD er id 400) have no archetype attrs", () => {
+  it("unwired bespoke entries (e.g. WANDRNG_SPRIT er id 254) have no archetype attrs", () => {
+    const id = ER_ID_MAP.abilities[254];
+    expect(id).toBeDefined();
+    const ability = allAbilities.find(a => a.id === id);
+    expect(ability).toBeDefined();
+    if (!ability) {
+      return;
+    }
+    // ER 254 is classified `bespoke` and not yet wired by `dispatchBespoke`,
+    // so the dispatcher returns no attrs. Other bespoke ids (400 Scrapyard,
+    // 396 Steel Barrel, ...) ARE wired and will have attrs — see
+    // bespoke-dispatch.test.ts for the per-id wiring.
+    expect(ability.attrs).toHaveLength(0);
+  });
+
+  it("wired bespoke entries (e.g. SCRAPYARD er id 400) get their hand-written attrs", () => {
     const id = ER_ID_MAP.abilities[400];
     expect(id).toBeDefined();
     const ability = allAbilities.find(a => a.id === id);
@@ -188,8 +203,8 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     if (!ability) {
       return;
     }
-    // ER 400 is classified `bespoke` — dispatcher returns no attrs.
-    expect(ability.attrs).toHaveLength(0);
+    // ER 400 is classified `bespoke` and round-2 wires SetArenaTagOnHit Spikes.
+    expect(ability.attrs.length).toBeGreaterThanOrEqual(1);
   });
 
   it("composite entries (e.g. As One er id 266 — Unnerve + Chilling Neigh) wire parts' attrs (D3b)", () => {
@@ -222,26 +237,30 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     // Per-archetype wire counts — these are concrete sanity bounds.
     //   - type-damage-boost (25 rows): every entry has a parseable type + multiplier.
     //   - flag-damage-boost (8 rows): every entry has a parseable flag + multiplier.
-    //   - chance-status-on-hit (29 rows): some skip due to non-StatusEffect
-    //     statuses (CONFUSION, FLINCH, BLEED, FROSTBITE, INFATUATION, FEAR,
-    //     DISABLE). Vanilla statuses (POISON, TOXIC, PARALYSIS, SLEEP, BURN,
-    //     FREEZE) wire — about a third of the rows.
+    //   - chance-status-on-hit (29 rows): some skip due to ER-specific
+    //     statuses (BLEED, FROSTBITE, FEAR). Round 2 added BattlerTag routing
+    //     (CONFUSION, INFATUATION, FLINCH, DISABLE) so the wired count is now
+    //     higher — the remaining skips are ER-specific only.
     //   - entry-effect (76 rows total but only ~30 wire — the classifier
     //     emits `scripted-move` (23), `set-misc` (11), `misc` (10), and
     //     `lower-foe-stat` (2) which the archetype doesn't yet model).
     expect(wiredCounts["type-damage-boost"] ?? 0).toBeGreaterThanOrEqual(20);
     expect(wiredCounts["flag-damage-boost"] ?? 0).toBeGreaterThanOrEqual(6);
-    expect(wiredCounts["chance-status-on-hit"] ?? 0).toBeGreaterThanOrEqual(10);
+    // Round 2 raised the chance-status-on-hit minimum from 10 to 15 — the
+    // BattlerTag routing now picks up CONFUSION/INFATUATION/FLINCH/DISABLE
+    // rows that previously skipped.
+    expect(wiredCounts["chance-status-on-hit"] ?? 0).toBeGreaterThanOrEqual(15);
     expect(wiredCounts["entry-effect"] ?? 0).toBeGreaterThanOrEqual(20);
     // D3b: composite-vanilla-mashup now wires attrs via the resolved-parts side
     // table — at least 100 of the 196 composites should have ≥1 attr each.
     expect(wiredCounts["composite-vanilla-mashup"] ?? 0).toBeGreaterThanOrEqual(100);
-    // Phase D bespoke: a small handful of long-tail bespoke ER abilities are
-    // now hand-wired via `dispatchBespoke` (see `archetype-dispatcher.ts`).
-    // Each lands a constructed AbAttr; the rest of the 258 bespoke rows still
-    // skip with `SKIP_BESPOKE`. Bound the wired count loosely so adding more
-    // bespoke wirings in follow-up tasks doesn't invalidate this assertion.
-    expect(wiredCounts.bespoke ?? 0).toBeGreaterThanOrEqual(5);
+    // Phase D bespoke: long-tail bespoke ER abilities are hand-wired via
+    // `dispatchBespoke` (see `archetype-dispatcher.ts`). Each lands a
+    // constructed AbAttr; the rest of the 258 bespoke rows still skip with
+    // `SKIP_BESPOKE`. Round 2 raised the wired count from 9 to 15. Bound
+    // loosely so adding more bespoke wirings in follow-up rounds doesn't
+    // invalidate this assertion.
+    expect(wiredCounts.bespoke ?? 0).toBeGreaterThanOrEqual(15);
     expect(wiredCounts.bespoke ?? 0).toBeLessThanOrEqual(50);
   });
 

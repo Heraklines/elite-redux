@@ -16,14 +16,17 @@
 // matching what the init layer does for `bespoke` rows.
 // =============================================================================
 
-import { BlockRecoilDamageAttr } from "#abilities/ab-attrs";
+import { BlockRecoilDamageAttr, PostDefendContactDamageAbAttr } from "#abilities/ab-attrs";
 import { PostTurnHurtNonTypedAbAttr } from "#data/elite-redux/abilities/post-turn-hurt-non-typed";
 import { SetArenaTagOnHitAbAttr, SetTerrainOnHitAbAttr } from "#data/elite-redux/abilities/set-arena-effect-on-hit";
+import { StatBoostOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-boost-on-flag-attack";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
 import { DamageReductionAbAttr } from "#data/elite-redux/archetypes/damage-reduction-generic";
 import { TerrainType } from "#data/terrain";
 import { ArenaTagType } from "#enums/arena-tag-type";
+import { MoveFlags } from "#enums/move-flags";
 import { PokemonType } from "#enums/pokemon-type";
+import { Stat } from "#enums/stat";
 import { describe, expect, it } from "vitest";
 
 describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () => {
@@ -101,6 +104,57 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(drAttr).toBeInstanceOf(DamageReductionAbAttr);
     expect(drAttr.getReduction()).toBeCloseTo(0.5);
     expect(drAttr.getFilter()).toEqual({ kind: "full-hp" });
+  });
+
+  it("er id 289 (Growing Tooth) wires StatBoostOnFlagAttack with BITING_MOVE +1 ATK", () => {
+    const res = dispatchArchetype("bespoke", null, 289);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as StatBoostOnFlagAttackAbAttr;
+    expect(attr).toBeInstanceOf(StatBoostOnFlagAttackAbAttr);
+    expect(attr.getFlag()).toBe(MoveFlags.BITING_MOVE);
+    expect(attr.getStat()).toBe(Stat.ATK);
+    expect(attr.getStages()).toBe(1);
+  });
+
+  it("er id 391 (Hardened Sheath) wires StatBoostOnFlagAttack with HORN_BASED +1 ATK", () => {
+    const res = dispatchArchetype("bespoke", null, 391);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as StatBoostOnFlagAttackAbAttr;
+    expect(attr.getFlag()).toBe(MoveFlags.HORN_BASED);
+    expect(attr.getStat()).toBe(Stat.ATK);
+  });
+
+  it("er id 400 (Scrapyard) wires SetArenaTagOnHit Spikes + contact required", () => {
+    const res = dispatchArchetype("bespoke", null, 400);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as SetArenaTagOnHitAbAttr;
+    expect(attr).toBeInstanceOf(SetArenaTagOnHitAbAttr);
+    expect(attr.getTagType()).toBe(ArenaTagType.SPIKES);
+    expect(attr.requiresContact()).toBe(true);
+  });
+
+  it("er id 401 (Loose Quills) wires SetArenaTagOnHit Spikes + contact required", () => {
+    const res = dispatchArchetype("bespoke", null, 401);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as SetArenaTagOnHitAbAttr;
+    expect(attr.getTagType()).toBe(ArenaTagType.SPIKES);
+    expect(attr.requiresContact()).toBe(true);
+  });
+
+  it("er id 405 (Loose Rocks) wires SetArenaTagOnHit Stealth Rock + contact required", () => {
+    const res = dispatchArchetype("bespoke", null, 405);
+    expect(res.skipReason).toBeNull();
+    const attr = res.attrs[0] as SetArenaTagOnHitAbAttr;
+    expect(attr.getTagType()).toBe(ArenaTagType.STEALTH_ROCK);
+    expect(attr.requiresContact()).toBe(true);
+  });
+
+  it("er id 574 (Sharp Edges) wires vanilla PostDefendContactDamage with 1/6 ratio", () => {
+    const res = dispatchArchetype("bespoke", null, 574);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    expect(res.attrs[0]).toBeInstanceOf(PostDefendContactDamageAbAttr);
   });
 
   it("unrecognized er id falls through to default bespoke skip", () => {

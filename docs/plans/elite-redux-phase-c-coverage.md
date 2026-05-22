@@ -2,7 +2,7 @@
 
 > Auto-generated. Regenerate: `pnpm run er:audit-archetype-coverage`.
 >
-> Last regenerated: 2026-05-21T14:24:30.783Z.
+> Last regenerated: 2026-05-22T02:52:32.986Z.
 
 Snapshot of Phase C structural work. Captures the per-bucket distribution of
 ER abilities + moves across:

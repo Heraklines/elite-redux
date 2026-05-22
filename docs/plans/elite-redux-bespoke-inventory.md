@@ -2,7 +2,7 @@
 
 > Auto-generated. Regenerate: `pnpm run er:audit-archetype-coverage`.
 >
-> Last regenerated: 2026-05-21T14:24:30.781Z.
+> Last regenerated: 2026-05-22T02:52:32.985Z.
 
 This doc enumerates the ER abilities and moves the C2/C3 archetype classifier
 could NOT slot into an archetype primitive. Each entry needs a hand-written
