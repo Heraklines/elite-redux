@@ -236,8 +236,13 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     // D3b: composite-vanilla-mashup now wires attrs via the resolved-parts side
     // table — at least 100 of the 196 composites should have ≥1 attr each.
     expect(wiredCounts["composite-vanilla-mashup"] ?? 0).toBeGreaterThanOrEqual(100);
-    // Bespoke remains zero-wired (its attrs are hand-written, not dispatcher-emitted).
-    expect(wiredCounts.bespoke ?? 0).toBe(0);
+    // Phase D bespoke: a small handful of long-tail bespoke ER abilities are
+    // now hand-wired via `dispatchBespoke` (see `archetype-dispatcher.ts`).
+    // Each lands a constructed AbAttr; the rest of the 258 bespoke rows still
+    // skip with `SKIP_BESPOKE`. Bound the wired count loosely so adding more
+    // bespoke wirings in follow-up tasks doesn't invalidate this assertion.
+    expect(wiredCounts.bespoke ?? 0).toBeGreaterThanOrEqual(5);
+    expect(wiredCounts.bespoke ?? 0).toBeLessThanOrEqual(50);
   });
 
   it("init result reports per-archetype wired counts (fresh run on a clean baseline)", () => {

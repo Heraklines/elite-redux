@@ -55,8 +55,10 @@
 //   archetype shape. Phase D's bespoke-implementation task wires them.
 // =============================================================================
 
-import type { AbAttr } from "#abilities/ab-attrs";
+import { type AbAttr, BlockRecoilDamageAttr } from "#abilities/ab-attrs";
 import { allAbilities } from "#data/data-lists";
+import { PostTurnHurtNonTypedAbAttr } from "#data/elite-redux/abilities/post-turn-hurt-non-typed";
+import { SetArenaTagOnHitAbAttr, SetTerrainOnHitAbAttr } from "#data/elite-redux/abilities/set-arena-effect-on-hit";
 import { ChanceStatusOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { ConditionalDamageAbAttr, type DamageCondition } from "#data/elite-redux/archetypes/conditional-damage";
 import {
@@ -1135,6 +1137,86 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
 }
 
 /**
+ * Per-id bespoke dispatch. Hand-written wiring for ER abilities whose
+ * mechanics don't fit any archetype primitive (the classifier emits
+ * `bespoke` for these — see `er-ability-archetypes.ts`).
+ *
+ * Returns a {@linkcode DispatchResult} just like the archetype-typed
+ * dispatchers; an entry for `erAbilityId` not present in the lookup falls
+ * through to the default {@linkcode SKIP_BESPOKE} (`"hand-written
+ * implementation pending"`), so adding a new bespoke is purely additive.
+ *
+ * Cluster table:
+ *   - 396 Steel Barrel → reuse pokerogue's {@linkcode BlockRecoilDamageAttr}.
+ *   - 411 Toxic Spill, 775 Flame Coat, 663 Funeral Pyre →
+ *     {@linkcode PostTurnHurtNonTypedAbAttr} per-turn chip damage.
+ *   - 906 Drop Blocks → {@linkcode SetArenaTagOnHitAbAttr} Spikes deploy.
+ *   - 909 Loose Thorns → {@linkcode SetArenaTagOnHitAbAttr} Spikes (ER's
+ *     Creeping Thorns isn't in vanilla `ArenaTagType` — Spikes stands in
+ *     until the ER tag lands).
+ *   - 898 Power Leak → {@linkcode SetTerrainOnHitAbAttr} Electric Terrain.
+ *   - 956 Brain Overload → {@linkcode SetTerrainOnHitAbAttr} Psychic Terrain.
+ *   - 957 Brain Mass → {@linkcode DamageReductionAbAttr} with `full-hp` filter.
+ */
+function dispatchBespoke(erAbilityId: number): DispatchResult {
+  switch (erAbilityId) {
+    case 396:
+      // Steel Barrel — immune to recoil damage (Explosion/crash dmg NOT
+      // recoil per pokerogue's split). Reuses vanilla Rock Head's primitive.
+      return ok([new BlockRecoilDamageAttr()]);
+    case 411:
+      // Toxic Spill — non-Poison-types take 1/8 dmg every turn.
+      return ok([
+        new PostTurnHurtNonTypedAbAttr({
+          safeTypes: [PokemonType.POISON],
+          damageFraction: 1 / 8,
+        }),
+      ]);
+    case 663:
+      // Funeral Pyre — non-Ghost-AND-non-Dark take 1/4 dmg every turn.
+      return ok([
+        new PostTurnHurtNonTypedAbAttr({
+          safeTypes: [PokemonType.GHOST, PokemonType.DARK],
+          damageFraction: 1 / 4,
+        }),
+      ]);
+    case 775:
+      // Flame Coat — non-Fire-types take 1/8 dmg every turn.
+      return ok([
+        new PostTurnHurtNonTypedAbAttr({
+          safeTypes: [PokemonType.FIRE],
+          damageFraction: 1 / 8,
+        }),
+      ]);
+    case 898:
+      // Power Leak — set Electric Terrain when hit.
+      return ok([new SetTerrainOnHitAbAttr({ terrain: TerrainType.ELECTRIC })]);
+    case 906:
+      // Drop Blocks — set Spikes on attacker side when hit.
+      return ok([new SetArenaTagOnHitAbAttr({ tagType: ArenaTagType.SPIKES, side: "attacker" })]);
+    case 909:
+      // Loose Thorns — Creeping Thorns when hit by contact. ER's Creeping
+      // Thorns isn't in vanilla `ArenaTagType`; we deploy Spikes as a
+      // stand-in so the proc is at least observable in test runs.
+      return ok([
+        new SetArenaTagOnHitAbAttr({
+          tagType: ArenaTagType.SPIKES,
+          side: "attacker",
+          contactRequired: true,
+        }),
+      ]);
+    case 956:
+      // Brain Overload — set Psychic Terrain when hit.
+      return ok([new SetTerrainOnHitAbAttr({ terrain: TerrainType.PSYCHIC })]);
+    case 957:
+      // Brain Mass — halves damage taken at full HP.
+      return ok([new DamageReductionAbAttr({ reduction: 0.5, filter: { kind: "full-hp" } })]);
+    default:
+      return SKIP_BESPOKE;
+  }
+}
+
+/**
  * Internal dispatch with a `visited` cycle-guard. The public `dispatchArchetype`
  * forwards to this with a fresh empty set; recursive composite dispatch
  * propagates the same set forward.
@@ -1155,6 +1237,9 @@ function dispatchArchetypeInternal(
   visited: Set<number>,
 ): DispatchResult {
   if (archetype === "bespoke") {
+    if (erAbilityId !== null) {
+      return dispatchBespoke(erAbilityId);
+    }
     return SKIP_BESPOKE;
   }
   if (archetype === "composite-vanilla-mashup") {
