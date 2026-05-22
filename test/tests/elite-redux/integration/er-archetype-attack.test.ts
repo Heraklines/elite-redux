@@ -52,7 +52,7 @@ describe("ER integration — flag-damage-boost archetype boosts real move damage
     // the IRON_FIST ability (which has PUNCHING_MOVE-gated boosts in vanilla
     // pokerogue at 1.2x). We override the player's ability to IRON_FIST,
     // pick MACH_PUNCH (a punching move), and assert the boosted power.
-    const ironFist = allAbilities.find(a => a.id === AbilityId.IRON_FIST);
+    const ironFist = allAbilities.find(a => a?.id === AbilityId.IRON_FIST);
     expect(ironFist).toBeDefined();
 
     // Snapshot pre-existing attrs so we can restore after.

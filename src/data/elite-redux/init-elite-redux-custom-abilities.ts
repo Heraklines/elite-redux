@@ -110,7 +110,11 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
 
   // Build a O(1) id → bool lookup for idempotency.
   const existingIds = new Set<number>();
+  // allAbilities is now sparse (id-indexed for ER customs). Skip undefined gaps.
   for (const ability of allAbilities) {
+    if (!ability) {
+      continue;
+    }
     existingIds.add(ability.id);
   }
 
@@ -130,7 +134,14 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
 
     try {
       const ability = buildCustomAbility(draft, pokerogueId, result);
-      (allAbilities as Ability[]).push(ability);
+      // CRITICAL: index by ID, not push. Pokerogue's PokemonSpeciesForm.getPassiveAbilities()
+      // resolves slots via `allAbilities[id]` (id-indexed lookup, NOT array-position).
+      // ER customs use ids ≥5000 but vanilla pokerogue only has ~311 entries —
+      // a push would land them at index 311+, making `allAbilities[5082]` return
+      // undefined and crash the apply-ab-attrs dispatcher in the first PostSummonPhase.
+      // Sparse array assignment fills the gap (intermediate slots remain undefined,
+      // which is fine because lookups go through species-defined slot ids only).
+      (allAbilities as Ability[])[pokerogueId] = ability;
       existingIds.add(pokerogueId);
       result.customsAdded++;
     } catch (err) {

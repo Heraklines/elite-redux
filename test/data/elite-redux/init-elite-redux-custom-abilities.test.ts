@@ -27,7 +27,7 @@ function tallyWiredCounts(): Record<string, number> {
     if (pokerogueId === undefined || pokerogueId < VANILLA_ID_CUTOFF) {
       continue;
     }
-    const ability = allAbilities.find(a => a.id === pokerogueId);
+    const ability = allAbilities.find(a => a?.id === pokerogueId);
     if (!ability || ability.attrs.length === 0) {
       continue;
     }
@@ -66,7 +66,7 @@ describe("initEliteReduxCustomAbilities (B2)", () => {
   });
 
   it("all ER-custom abilities are in allAbilities with id ≥ 5000", () => {
-    const customsInAllAbilities = allAbilities.filter(a => a.id >= VANILLA_ID_CUTOFF);
+    const customsInAllAbilities = allAbilities.filter(a => a?.id >= VANILLA_ID_CUTOFF);
     expect(customsInAllAbilities.length).toBeGreaterThan(700);
     expect(customsInAllAbilities.length).toBeLessThan(800);
   });
@@ -77,7 +77,7 @@ describe("initEliteReduxCustomAbilities (B2)", () => {
     // comparison as having no overlap.
     const scrapyardId = ErAbilityId.SCRAPYARD as number;
     expect(scrapyardId).toBeGreaterThanOrEqual(VANILLA_ID_CUTOFF);
-    const scrapyard = allAbilities.find(a => a.id === scrapyardId);
+    const scrapyard = allAbilities.find(a => a?.id === scrapyardId);
     expect(scrapyard).toBeDefined();
     if (!scrapyard) {
       return;
@@ -120,7 +120,7 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
   it("KEEN_EDGE (er id 271, flag-damage-boost) has a FlagDamageBoostAbAttr", () => {
     const id = ER_ID_MAP.abilities[271];
     expect(id).toBeDefined();
-    const ability = allAbilities.find(a => a.id === id);
+    const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();
     if (!ability) {
       return;
@@ -135,7 +135,7 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
   it("ELECTROCYTES (er id 281, type-damage-boost) has a TypeDamageBoostAbAttr", () => {
     const id = ER_ID_MAP.abilities[281];
     expect(id).toBeDefined();
-    const ability = allAbilities.find(a => a.id === id);
+    const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();
     if (!ability) {
       return;
@@ -152,7 +152,7 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
   it("SPECTRAL_SHROUD (er id 386, chance-status-on-hit) has a ChanceStatusOnHitAbAttr for TOXIC", () => {
     const id = ER_ID_MAP.abilities[386];
     expect(id).toBeDefined();
-    const ability = allAbilities.find(a => a.id === id);
+    const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();
     if (!ability) {
       return;
@@ -169,7 +169,7 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
   it("ELECTRO_SURGE (er id 226, entry-effect set-terrain) has an EntryEffectAbAttr", () => {
     const id = ER_ID_MAP.abilities[226];
     expect(id).toBeDefined();
-    const ability = allAbilities.find(a => a.id === id);
+    const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();
     if (!ability) {
       return;
@@ -183,7 +183,7 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
   it("unwired bespoke entries (e.g. WANDRNG_SPRIT er id 254) have no archetype attrs", () => {
     const id = ER_ID_MAP.abilities[254];
     expect(id).toBeDefined();
-    const ability = allAbilities.find(a => a.id === id);
+    const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();
     if (!ability) {
       return;
@@ -198,7 +198,7 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
   it("wired bespoke entries (e.g. SCRAPYARD er id 400) get their hand-written attrs", () => {
     const id = ER_ID_MAP.abilities[400];
     expect(id).toBeDefined();
-    const ability = allAbilities.find(a => a.id === id);
+    const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();
     if (!ability) {
       return;
@@ -210,7 +210,7 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
   it("composite entries (e.g. As One er id 266 — Unnerve + Chilling Neigh) wire parts' attrs (D3b)", () => {
     const id = ER_ID_MAP.abilities[266];
     expect(id).toBeDefined();
-    const ability = allAbilities.find(a => a.id === id);
+    const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();
     if (!ability) {
       return;

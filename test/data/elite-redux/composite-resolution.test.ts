@@ -93,7 +93,7 @@ describe("composite dispatch wiring (D3b): vanilla-only composites copy AbAttrs"
   it("As One (er id 266) ability has Unnerve's PreventBerryUseAbAttr attached", () => {
     const id = ER_ID_MAP.abilities[266];
     expect(id).toBeDefined();
-    const ability = allAbilities.find(a => a.id === id);
+    const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();
     if (!ability) {
       return;
@@ -107,7 +107,7 @@ describe("composite dispatch wiring (D3b): vanilla-only composites copy AbAttrs"
   it("As One (er id 266) ability has both parts' attrs (at least 2 total)", () => {
     const id = ER_ID_MAP.abilities[266];
     expect(id).toBeDefined();
-    const ability = allAbilities.find(a => a.id === id);
+    const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();
     if (!ability) {
       return;
@@ -140,7 +140,7 @@ describe("composite dispatch wiring (D3b): ER-recursive composites resolve sub-a
     // with a TypeConversionAbAttr or similar via the recursive dispatch.
     const id = ER_ID_MAP.abilities[366];
     expect(id).toBeDefined();
-    const ability = allAbilities.find(a => a.id === id);
+    const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();
     if (!ability) {
       return;
@@ -164,7 +164,7 @@ describe("composite dispatch wiring (D3b): coverage diagnostics", () => {
       if (id === undefined) {
         continue;
       }
-      const ability = allAbilities.find(a => a.id === id);
+      const ability = allAbilities.find(a => a?.id === id);
       if (ability && ability.attrs.length > 0) {
         wiredComposites++;
       }
@@ -182,7 +182,7 @@ describe("composite dispatch wiring (D3b): coverage diagnostics", () => {
       if (id === undefined) {
         continue;
       }
-      const ability = allAbilities.find(a => a.id === id);
+      const ability = allAbilities.find(a => a?.id === id);
       if (ability && ability.attrs.length >= 2) {
         multiAttrComposites++;
       }
@@ -237,7 +237,7 @@ describe("composite dispatch wiring (D3b): sub-archetype reuse evidence", () => 
       if (id === undefined) {
         continue;
       }
-      const ability = allAbilities.find(a => a.id === id);
+      const ability = allAbilities.find(a => a?.id === id);
       const tdb = ability?.attrs.find(a => a instanceof TypeDamageBoostAbAttr);
       if (tdb !== undefined) {
         // Found at least one — the recursive dispatch works for type-damage-boost parts.

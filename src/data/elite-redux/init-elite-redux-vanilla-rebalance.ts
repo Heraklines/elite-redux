@@ -102,7 +102,12 @@ export function initEliteReduxVanillaRebalance(): VanillaRebalanceResult {
     moveById.set(move.id, move);
   }
   const abilityById = new Map<number, (typeof allAbilities)[number]>();
+  // allAbilities is sparse — ER custom abilities are assigned to positions
+  // ≥5000 by id. Iterate via Object.values to skip the gap (undefined entries).
   for (const ability of allAbilities) {
+    if (!ability) {
+      continue;
+    }
     abilityById.set(ability.id, ability);
   }
 
