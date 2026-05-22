@@ -123,6 +123,7 @@ export {
   type PriorityModifierFilter,
   type PriorityModifierOptions,
 } from "./priority-modifier";
+export { type StabAdd, StabAddAbAttr, type StabAddOptions } from "./stab-add";
 export {
   StatStageChangeModifierAbAttr,
   type StatStageChangeModifierOptions,

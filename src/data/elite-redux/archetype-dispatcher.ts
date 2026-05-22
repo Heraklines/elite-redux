@@ -97,6 +97,7 @@ import {
   PriorityModifierAbAttr,
   type PriorityModifierFilter,
 } from "#data/elite-redux/archetypes/priority-modifier";
+import { StabAddAbAttr } from "#data/elite-redux/archetypes/stab-add";
 import {
   type StatChange,
   StatTriggerOnEntryAbAttr,
@@ -1658,10 +1659,15 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 464:
-      // Hunter's Horn — heal 1/4 max HP on KO. The "boost horn moves" piece
-      // composes via `FlagDamageBoostAbAttr` (HORN_BASED) but isn't wired here
-      // yet — partial wire.
-      return ok([new LifestealOnKoAbAttr({ healFraction: 1 / 4 })]);
+      // Hunter's Horn — "Boost horn moves and heals 1/4 HP when defeating an
+      // enemy." Round 9: extended from heal-only to full FlagDamageBoost
+      // (HORN_BASED, 1.3x) + LifestealOnKo(0.25). The 1.3x multiplier is the
+      // ER convention for "Boost" without explicit number (matches
+      // Hardened Sheath, Antarctic Bird, and the existing flag-boost rows).
+      return ok([
+        new FlagDamageBoostAbAttr({ flag: MoveFlags.HORN_BASED, multiplier: 1.3 }),
+        new LifestealOnKoAbAttr({ healFraction: 0.25 }),
+      ]);
     case 559:
       // Guilt Trip — sharply lowers attacker's Atk and SpAtk when fainting.
       // "Sharply" = -2 in pokerogue convention. Uses the on-faint-effect's
@@ -1875,6 +1881,116 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
           contactRequired: true,
         }),
       ]);
+    // -------------------------------------------------------------------------
+    // Round 9 — stab-add primitive + composition wires.
+    //
+    // The `stab-add` archetype (see #data/elite-redux/archetypes/stab-add)
+    // models the ER "moves gain STAB" cluster: abilities that grant the +0.5
+    // STAB power factor to a move type the holder does NOT natively share.
+    // Implemented as a `MovePowerBoostAbAttr` that multiplies outgoing power
+    // by 1.5x when the move type matches the configured `targetType` (or any
+    // off-type, for the all-moves shape) AND the move's resolved type is not
+    // already a source type (avoids double-stab).
+    // -------------------------------------------------------------------------
+    case 287:
+      // Mystic Power — "All moves gain the 1.5x power boost from STAB."
+      // Wire a no-targetType StabAdd: every off-type move gets +0.5 STAB.
+      // Real-STAB moves still get the natural +0.5 from the damage formula's
+      // built-in `calculateStabMultiplier`; the StabAdd guard prevents
+      // double-counting.
+      return ok([new StabAddAbAttr()]);
+    case 291:
+      // Aurora Borealis — "Ice-type moves gain STAB. Moves always benefit
+      // from hail." Wire the Ice STAB add via StabAdd(ICE). The "always
+      // benefit from hail" piece (boosting Ice-typed moves under hail
+      // regardless of typing match) overlaps the StabAdd boost on this
+      // user — a Sub-Zero Ninetales firing Ice Beam already gets the StabAdd
+      // because Ice ≠ source type — but the hail-perma-boost piece would
+      // need a weather-keyed type boost (WeatherTypeBoost exists for type-
+      // gated, but not for cross-type "always benefit from"). Partial wire.
+      return ok([new StabAddAbAttr({ targetType: PokemonType.ICE })]);
+    case 297:
+      // Amphibious — "Water moves gain STAB. Can't become drenched."
+      // Wire the Water STAB add via StabAdd(WATER). The "can't become
+      // drenched" piece is an ER-specific tag-immunity (DRENCHED battler
+      // tag) that the status-immunity primitive doesn't model yet —
+      // deferred. Partial wire.
+      return ok([new StabAddAbAttr({ targetType: PokemonType.WATER })]);
+    case 365:
+      // Lunar Eclipse — "Fairy & Dark gains STAB. Hypnosis has 1.5x accuracy."
+      // The classifier marked this as a composite-vanilla-mashup, but its
+      // parts ("Chloroplast", "Immolate" — wrong target abilities per the
+      // classifier's loose match) don't actually capture the intent. Wire it
+      // here as two StabAdd instances (FAIRY, DARK) — Hypnosis accuracy is
+      // a third sub-shape that would compose via accuracy-mod, but no
+      // accuracy-mod primitive exists in the archetype layer today.
+      // Single-type-per-move semantics mean the FAIRY and DARK attrs are
+      // mutually exclusive at apply-time; no compounding.
+      return ok([
+        new StabAddAbAttr({ targetType: PokemonType.FAIRY }),
+        new StabAddAbAttr({ targetType: PokemonType.DARK }),
+      ]);
+    case 478:
+      // Moon Spirit — "Fairy & Dark gains STAB. Moonlight recovers 75% HP."
+      // Same STAB-add piece as Lunar Eclipse. The 75%-HP-Moonlight rider is
+      // a move-specific heal override (vanilla Moonlight is 50% HP); needs
+      // a move-replacement primitive that distinguishes per-move heal
+      // fractions — deferred. Partial wire.
+      return ok([
+        new StabAddAbAttr({ targetType: PokemonType.FAIRY }),
+        new StabAddAbAttr({ targetType: PokemonType.DARK }),
+      ]);
+    case 494:
+      // Arcane Force — "All moves gain STAB. Ups super-effective by 10%."
+      // Wire the all-moves StabAdd. The "+10% super-effective" piece is a
+      // type-effectiveness override (super-effective multiplier rider) —
+      // no archetype primitive exists for that yet; deferred. Partial wire.
+      return ok([new StabAddAbAttr()]);
+    // -------------------------------------------------------------------------
+    // Round 9 — bonus composition wires using existing primitives.
+    // Picked up while the stab-add primitive was in flight; each composes
+    // already-existing primitives to add coverage without new abstractions.
+    // (See also case 464 above — extended from partial heal-only wire to
+    // include the FlagDamageBoost(HORN_BASED) piece.)
+    // -------------------------------------------------------------------------
+    case 466:
+      // Plasma Lamp — "Boost accuracy & power of Fire & Electric type moves
+      // by 1.2x." Wire the power-boost piece via two TypeDamageBoost
+      // instances at 1.2x each (single-type-per-move semantics — no
+      // compounding). The accuracy-boost piece needs the accuracy-mod
+      // primitive (not yet built); deferred. Partial wire.
+      return ok([
+        new TypeDamageBoostAbAttr({ type: PokemonType.FIRE, multiplier: 1.2 }),
+        new TypeDamageBoostAbAttr({ type: PokemonType.ELECTRIC, multiplier: 1.2 }),
+      ]);
+    case 764:
+      // Deep Freeze — "Boosts Water and Ice by 1.25x. Halves Fire damage
+      // taken." Wire all three pieces: two TypeDamageBoost (WATER, ICE)
+      // and a DamageReduction(FIRE) — but the damage-reduction filter union
+      // doesn't carry a `type` variant today, so the Fire half-damage piece
+      // composes via the kind:"all" filter at 0.5 only when paired with a
+      // type-keyed gate, which we lack. Partial wire — emit only the offense
+      // boost.
+      return ok([
+        new TypeDamageBoostAbAttr({ type: PokemonType.WATER, multiplier: 1.25 }),
+        new TypeDamageBoostAbAttr({ type: PokemonType.ICE, multiplier: 1.25 }),
+      ]);
+    case 941:
+      // Devious Present — "Boosts Ice and throwing moves by 50%." Wire as
+      // TypeDamageBoost(ICE, 1.5) + FlagDamageBoost(THROW_BASED, 1.5).
+      // Stacking would occur if an Ice-typed throw-flagged move existed
+      // (multipliers compound multiplicatively — 1.5 * 1.5 = 2.25). This
+      // matches ER's intent: a Frozen Bonemerang-style move gets a 2.25x
+      // boost from both axes of the ability text.
+      return ok([
+        new TypeDamageBoostAbAttr({ type: PokemonType.ICE, multiplier: 1.5 }),
+        new FlagDamageBoostAbAttr({ flag: MoveFlags.THROW_BASED, multiplier: 1.5 }),
+      ]);
+    case 360:
+      // Field Explorer — "Boosts field moves by 50%. Cut, Surf, Strength etc."
+      // Wire FlagDamageBoost(FIELD_BASED, 1.5). The named moves (Cut, Surf,
+      // Strength) all carry the FIELD_BASED bit per ER move tagging.
+      return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.FIELD_BASED, multiplier: 1.5 })]);
     default:
       return SKIP_BESPOKE;
   }

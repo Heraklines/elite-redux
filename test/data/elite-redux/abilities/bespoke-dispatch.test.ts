@@ -38,6 +38,7 @@ import { LifestealOnKoAbAttr } from "#data/elite-redux/archetypes/lifesteal";
 import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
 import { PassiveRecoveryAbAttr } from "#data/elite-redux/archetypes/passive-recovery";
 import { PreFaintReviveAbAttr } from "#data/elite-redux/archetypes/pre-faint-revive";
+import { StabAddAbAttr } from "#data/elite-redux/archetypes/stab-add";
 import { StatTriggerOnHitAbAttr, StatTriggerOnKoAbAttr } from "#data/elite-redux/archetypes/stat-trigger-on-event";
 import { StatusEffectImmunityAbAttrEr } from "#data/elite-redux/archetypes/status-immunity";
 import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
@@ -371,14 +372,7 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(attr.getWeathers()).toEqual([WeatherType.SANDSTORM]);
   });
 
-  it("er id 464 (Hunter's Horn) wires LifestealOnKo (1/4)", () => {
-    const res = dispatchArchetype("bespoke", null, 464);
-    expect(res.skipReason).toBeNull();
-    expect(res.attrs).toHaveLength(1);
-    const attr = res.attrs[0] as LifestealOnKoAbAttr;
-    expect(attr).toBeInstanceOf(LifestealOnKoAbAttr);
-    expect(attr.getHealFraction()).toBeCloseTo(1 / 4);
-  });
+  // (er id 464 Hunter's Horn dispatch test is below — extended in Round 9.)
 
   it("er id 559 (Guilt Trip) wires OnFaintEffect (attacker-stat-change ATK/SPATK -2)", () => {
     const res = dispatchArchetype("bespoke", null, 559);
@@ -600,6 +594,122 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(attr.getChance()).toBe(50);
     expect(attr.getTags()).toEqual([BattlerTagType.TRAPPED]);
     expect(attr.requiresContact()).toBe(true);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Round 9 — stab-add primitive wires.
+  // ---------------------------------------------------------------------------
+
+  it("er id 287 (Mystic Power) wires a no-targetType StabAdd (all moves gain STAB)", () => {
+    const res = dispatchArchetype("bespoke", null, 287);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as StabAddAbAttr;
+    expect(attr).toBeInstanceOf(StabAddAbAttr);
+    expect(attr.getTargetType()).toBeNull();
+    expect(attr.getMultiplier()).toBe(1.5);
+  });
+
+  it("er id 291 (Aurora Borealis) wires StabAdd(ICE) at 1.5x", () => {
+    const res = dispatchArchetype("bespoke", null, 291);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as StabAddAbAttr;
+    expect(attr).toBeInstanceOf(StabAddAbAttr);
+    expect(attr.getTargetType()).toBe(PokemonType.ICE);
+    expect(attr.getMultiplier()).toBe(1.5);
+  });
+
+  it("er id 297 (Amphibious) wires StabAdd(WATER) at 1.5x", () => {
+    const res = dispatchArchetype("bespoke", null, 297);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as StabAddAbAttr;
+    expect(attr).toBeInstanceOf(StabAddAbAttr);
+    expect(attr.getTargetType()).toBe(PokemonType.WATER);
+  });
+
+  it("er id 365 (Lunar Eclipse) wires two StabAdd instances (FAIRY + DARK)", () => {
+    const res = dispatchArchetype("bespoke", null, 365);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(2);
+    const types = (res.attrs as StabAddAbAttr[]).map(a => a.getTargetType());
+    expect(types).toEqual([PokemonType.FAIRY, PokemonType.DARK]);
+    for (const a of res.attrs as StabAddAbAttr[]) {
+      expect(a).toBeInstanceOf(StabAddAbAttr);
+      expect(a.getMultiplier()).toBe(1.5);
+    }
+  });
+
+  it("er id 478 (Moon Spirit) wires two StabAdd instances (FAIRY + DARK)", () => {
+    const res = dispatchArchetype("bespoke", null, 478);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(2);
+    const types = (res.attrs as StabAddAbAttr[]).map(a => a.getTargetType());
+    expect(types).toEqual([PokemonType.FAIRY, PokemonType.DARK]);
+  });
+
+  it("er id 494 (Arcane Force) wires a no-targetType StabAdd (all-moves shape)", () => {
+    const res = dispatchArchetype("bespoke", null, 494);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as StabAddAbAttr;
+    expect(attr).toBeInstanceOf(StabAddAbAttr);
+    expect(attr.getTargetType()).toBeNull();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Round 9 — composition wires using existing primitives.
+  // ---------------------------------------------------------------------------
+
+  it("er id 464 (Hunter's Horn) wires FlagDamageBoost(HORN_BASED, 1.3) + LifestealOnKo(1/4)", () => {
+    const res = dispatchArchetype("bespoke", null, 464);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(2);
+    expect(res.attrs[0]).toBeInstanceOf(FlagDamageBoostAbAttr);
+    expect(res.attrs[1]).toBeInstanceOf(LifestealOnKoAbAttr);
+    expect((res.attrs[1] as LifestealOnKoAbAttr).getHealFraction()).toBeCloseTo(0.25);
+  });
+
+  it("er id 466 (Plasma Lamp) wires two TypeDamageBoost instances (FIRE + ELECTRIC) at 1.2x", () => {
+    const res = dispatchArchetype("bespoke", null, 466);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(2);
+    const types = (res.attrs as TypeDamageBoostAbAttr[]).map(a => a.getBoostType());
+    expect(types).toEqual([PokemonType.FIRE, PokemonType.ELECTRIC]);
+    for (const a of res.attrs as TypeDamageBoostAbAttr[]) {
+      expect(a).toBeInstanceOf(TypeDamageBoostAbAttr);
+      expect(a.getHighHpMultiplier()).toBeCloseTo(1.2);
+    }
+  });
+
+  it("er id 764 (Deep Freeze) wires two TypeDamageBoost instances (WATER + ICE) at 1.25x", () => {
+    const res = dispatchArchetype("bespoke", null, 764);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(2);
+    const types = (res.attrs as TypeDamageBoostAbAttr[]).map(a => a.getBoostType());
+    expect(types).toEqual([PokemonType.WATER, PokemonType.ICE]);
+    for (const a of res.attrs as TypeDamageBoostAbAttr[]) {
+      expect(a).toBeInstanceOf(TypeDamageBoostAbAttr);
+      expect(a.getHighHpMultiplier()).toBeCloseTo(1.25);
+    }
+  });
+
+  it("er id 941 (Devious Present) wires TypeDamageBoost(ICE, 1.5) + FlagDamageBoost(THROW_BASED, 1.5)", () => {
+    const res = dispatchArchetype("bespoke", null, 941);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(2);
+    expect(res.attrs[0]).toBeInstanceOf(TypeDamageBoostAbAttr);
+    expect((res.attrs[0] as TypeDamageBoostAbAttr).getBoostType()).toBe(PokemonType.ICE);
+    expect((res.attrs[0] as TypeDamageBoostAbAttr).getHighHpMultiplier()).toBe(1.5);
+    expect(res.attrs[1]).toBeInstanceOf(FlagDamageBoostAbAttr);
+  });
+
+  it("er id 360 (Field Explorer) wires FlagDamageBoost(FIELD_BASED, 1.5)", () => {
+    const res = dispatchArchetype("bespoke", null, 360);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    expect(res.attrs[0]).toBeInstanceOf(FlagDamageBoostAbAttr);
   });
 
   it("unrecognized er id falls through to default bespoke skip", () => {
