@@ -872,7 +872,7 @@ describe("ER Phase C coverage sanity (C5)", () => {
     // — if either side drifts, the audit script regenerates the doc and this
     // test should be updated to match. We pin TOTAL but allow the per-bucket
     // distribution to grow as the classifier improves.
-    expect(total, "total ability archetype rows").toBe(736);
+    expect(total, "total ability archetype rows").toBe(732);
     expect(bespoke).toBeGreaterThan(200);
     expect(bespoke).toBeLessThan(300);
     expect(classified).toBeGreaterThan(400);

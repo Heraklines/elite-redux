@@ -53,7 +53,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   261: { erAbilityId: 261, archetype: "entry-effect", params: {"effect":{"kind":"misc","note":"Resets its ally's stat changes on entry"}} },
   264: { erAbilityId: 264, archetype: "stat-trigger-on-event", params: {"trigger":"on-ko","stats":[{"stat":"ATK","stages":1}]} },
   266: { erAbilityId: 266, archetype: "composite-vanilla-mashup", params: {"parts":["Unnerve","Chilling Neigh"]} },
-  267: { erAbilityId: 267, archetype: "composite-vanilla-mashup", params: {"parts":["Unnerve","Grim Neigh"]} },
+  // 267 stripped — id-resync drift; entry no longer points to a real draft.
   268: { erAbilityId: 268, archetype: "bespoke", params: null },
   269: { erAbilityId: 269, archetype: "weather-or-terrain-interaction", params: {"condition":{"weather":"HAIL"},"effect":{"kind":"stat-boost","stat":"HIGHEST_ATK","multiplier":1.5}} },
   270: { erAbilityId: 270, archetype: "bespoke", params: null },
@@ -545,9 +545,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   793: { erAbilityId: 793, archetype: "composite-vanilla-mashup", params: {"parts":["Analytic","Neuroforce"]} },
   794: { erAbilityId: 794, archetype: "accuracy-mod", params: {"filter":{"tag":"super-effective"},"override":{"mode":"set","value":100}} },
   795: { erAbilityId: 795, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"SPD","stages":1}} },
-  796: { erAbilityId: 796, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"ATK","stages":1}} },
-  797: { erAbilityId: 797, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"DEF","stages":1}} },
-  798: { erAbilityId: 798, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"SPDEF","stages":1}} },
+  // 796-798 stripped — id-resync drift; entries no longer match real drafts.
   799: { erAbilityId: 799, archetype: "type-damage-boost", params: {"type":"ROCK","multiplier":1.3,"lowHpMultiplier":1.8,"lowHpThreshold":0.3333333333333333} },
   800: { erAbilityId: 800, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"DARK","multiplier":1.2} },
   801: { erAbilityId: 801, archetype: "composite-vanilla-mashup", params: {"parts":["Leaf Guard","Harvest"]} },
