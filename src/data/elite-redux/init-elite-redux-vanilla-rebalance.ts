@@ -490,6 +490,18 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
 
   // 115 ICE_BODY duplicate-flagged in MAJOR for the 2x heal-rate. Already
   // patched above; no double-add.
+
+  // ===== Round 5: more poison/non-contact procs from the audit =====
+  // 38 POISON_POINT: vanilla 30% contact poison → ER adds 10% non-contact poison.
+  [AbilityId.POISON_POINT, ab => addNonContactStatusChance(ab, StatusEffect.POISON, 10)],
+  // 27 EFFECT_SPORE: vanilla 30% contact SLP/PRZ/PSN → ER adds 10% non-contact each.
+  // EFFECT_SPORE picks one of three statuses randomly per proc. Append a
+  // separate non-contact proc per status (lower chance to balance).
+  [AbilityId.EFFECT_SPORE, ab => {
+    addNonContactStatusChance(ab, StatusEffect.SLEEP, 10);
+    addNonContactStatusChance(ab, StatusEffect.PARALYSIS, 10);
+    addNonContactStatusChance(ab, StatusEffect.POISON, 10);
+  }],
 ]);
 
 /**
