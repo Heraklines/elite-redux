@@ -1170,7 +1170,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
     if (Object.hasOwn(speciesStarterCosts, speciesId)) {
       return speciesId;
     }
-    return pokemonStarters[speciesId];
+    // ER-custom species (id ≥ 10000) typically aren't in `pokemonStarters`.
+    // Fall back to the species itself so downstream lookups don't return undefined.
+    return pokemonStarters[speciesId] ?? speciesId;
   }
 
   private getStarterSpecies(species): PokemonSpecies {

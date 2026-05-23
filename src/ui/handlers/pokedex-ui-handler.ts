@@ -904,7 +904,11 @@ export class PokedexUiHandler extends MessageUiHandler {
     if (Object.hasOwn(speciesStarterCosts, speciesId)) {
       return speciesId;
     }
-    return pokemonStarters[speciesId];
+    // ER-custom species (id ≥ 10000) typically aren't in `pokemonStarters`
+    // (the gen-X prevolution map). Without a fallback, this returns
+    // `undefined` and downstream `starterData[undefined]` accesses silently
+    // drop the species from the dex render.
+    return pokemonStarters[speciesId] ?? speciesId;
   }
 
   /**
