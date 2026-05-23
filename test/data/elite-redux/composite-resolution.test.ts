@@ -32,9 +32,12 @@ import { describe, expect, it } from "vitest";
  */
 
 describe("ER_COMPOSITE_PARTS (D3b): side-table coverage", () => {
-  it("contains exactly 196 composite entries (one per composite-vanilla-mashup row)", () => {
+  it("matches composite count in the archetype config", () => {
+    // Snapshot was 196; the id-resync stripped one entry to 195. The test
+    // now asserts dynamic equality rather than a fixed number so future
+    // drift doesn't trip the test.
     const composites = Object.values(ER_ABILITY_ARCHETYPES).filter(e => e.archetype === "composite-vanilla-mashup");
-    expect(Object.keys(ER_COMPOSITE_PARTS)).toHaveLength(composites.length);
+    expect(Object.keys(ER_COMPOSITE_PARTS).length).toBe(composites.length);
   });
 
   it("resolves ≥ 100 composites with all-named parts (full coverage)", () => {

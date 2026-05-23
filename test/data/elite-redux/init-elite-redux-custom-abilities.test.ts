@@ -180,18 +180,18 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     expect(effect.kind).toBe("set-terrain");
   });
 
-  it("unwired bespoke entries (e.g. WANDRNG_SPRIT er id 254) have no archetype attrs", () => {
-    const id = ER_ID_MAP.abilities[254];
+  it("unwired bespoke entries (e.g. ER id 1000 Survivor Bias) have no archetype attrs", () => {
+    // Note: ER 254 WandrngSprit was wired in round 27 with vanilla
+    // PostDefendAbilitySwapAbAttr. ER 1000 Survivor Bias remains unwired
+    // (needs damage-cap-on-resist primitive). Use the latter as the
+    // canonical example for this assertion.
+    const id = ER_ID_MAP.abilities[1000];
     expect(id).toBeDefined();
     const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();
     if (!ability) {
       return;
     }
-    // ER 254 is classified `bespoke` and not yet wired by `dispatchBespoke`,
-    // so the dispatcher returns no attrs. Other bespoke ids (400 Scrapyard,
-    // 396 Steel Barrel, ...) ARE wired and will have attrs — see
-    // bespoke-dispatch.test.ts for the per-id wiring.
     expect(ability.attrs).toHaveLength(0);
   });
 
@@ -262,9 +262,9 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     // so future rounds adding more bespoke wirings don't invalidate this
     // assertion.
     expect(wiredCounts.bespoke ?? 0).toBeGreaterThanOrEqual(15);
-    // Round 12 raised the upper bound from 80 to 130 — round 12 added 11 new
-    // bespoke wires and the cumulative count is now ~90 (~30% of 258).
-    expect(wiredCounts.bespoke ?? 0).toBeLessThanOrEqual(130);
+    // R13-R47 grind raised the bespoke wire count substantially. Upper
+    // bound widened to 220 to accommodate the ~205 wires now in place.
+    expect(wiredCounts.bespoke ?? 0).toBeLessThanOrEqual(220);
   });
 
   it("init result reports per-archetype wired counts (fresh run on a clean baseline)", () => {

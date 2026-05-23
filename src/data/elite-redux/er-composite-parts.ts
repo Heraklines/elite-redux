@@ -51,7 +51,7 @@ export interface ErCompositeEntry {
 
 export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   266: { erAbilityId: 266, parts: [{ kind: "pokerogue", abilityId: 127 }, { kind: "pokerogue", abilityId: 264 }], hasRider: false },
-  267: { erAbilityId: 267, parts: [{ kind: "pokerogue", abilityId: 127 }, { kind: "pokerogue", abilityId: 265 }], hasRider: false },
+  // 267 stripped (id-resync orphan; archetype entry removed in commit 6803b22).
   366: { erAbilityId: 366, parts: [{ kind: "er", erAbilityId: 268 }, { kind: "er", erAbilityId: 279 }], hasRider: false },
   374: { erAbilityId: 374, parts: [{ kind: "er", erAbilityId: 268 }, { kind: "pokerogue", abilityId: 34 }, { kind: "pokerogue", abilityId: 102 }, { kind: "pokerogue", abilityId: 139 }, { kind: "pokerogue", abilityId: 94 }], hasRider: false },
   389: { erAbilityId: 389, parts: [{ kind: "pokerogue", abilityId: 151 }], unresolvedParts: ["50% more damage to Water-types"], hasRider: true },
