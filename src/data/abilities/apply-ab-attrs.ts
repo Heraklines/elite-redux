@@ -10,6 +10,31 @@ import type {
 
 type AbAttrPredicate<T extends AbAttrString> = (attr: AbAttrMap[T]) => boolean;
 
+/**
+ * ER enemy difficulty scaling: cap how many of the 3 passive (innate) slots
+ * an enemy pokemon can use based on its current level. Player pokemon are
+ * unaffected (their passives are gated by candy-unlock state as designed).
+ *
+ * Curve:
+ *   L1-14:  1 innate (slot 0 only)         — fresh-game encounters stay tame
+ *   L15-23: 2 innates (slots 0-1)          — mid-route ramp
+ *   L24-39: 3 innates (slots 0-2)          — late-route / gym leaders
+ *   L40+:   3 innates (all slots)          — endgame parity with player
+ *
+ * Note: pokerogue's "active" ability is separate from passive slots — the
+ * gate only restricts the 3 passive (innate) iteration; the active ability
+ * always fires regardless of level.
+ */
+function getEnemyPassiveSlotLimit(pokemon: { isEnemy: () => boolean; level: number }): number {
+  if (!pokemon.isEnemy()) {
+    return 3;
+  }
+  const lvl = pokemon.level;
+  if (lvl >= 24) return 3;
+  if (lvl >= 15) return 2;
+  return 1;
+}
+
 interface ApplyAbAttrConfig<T extends AbAttrString> {
   /** An optional array to which ability trigger messges will be added */
   messages?: string[] | undefined;
@@ -136,7 +161,14 @@ function applyAbAttrsInternal<T extends CallableAbAttrString>(
   const seenIds = new Set<number>();
   seenIds.add(params.pokemon.getAbility().id);
   const passiveAbilities = params.pokemon.getPassiveAbilities();
+  // ER difficulty scaling: enemy pokemon unlock passive slots progressively
+  // with level so wave-1 encounters don't punch above their weight with all
+  // 3 innates active. Player passives stay gated by candy unlock as designed.
+  const enemySlotLimit = getEnemyPassiveSlotLimit(params.pokemon);
   for (let slot = 0; slot < 3; slot++) {
+    if (slot >= enemySlotLimit) {
+      continue;
+    }
     const slotAbility = passiveAbilities[slot];
     if (slotAbility === null || seenIds.has(slotAbility.id)) {
       continue;
@@ -223,7 +255,11 @@ export function applyPostFormChangeAbAttrs(params: Omit<AbAttrBaseParams, "passi
   // by iterating all 3 ER slots. The per-id idempotence is enforced via
   // formChangeAbilitiesApplied — we re-check on each slot (not a pre-snapshot)
   // so two slots sharing the same id don't double-fire within a single call.
+  const enemySlotLimitFC = getEnemyPassiveSlotLimit(pokemon);
   for (let slot = 0; slot < 3; slot++) {
+    if (slot >= enemySlotLimitFC) {
+      continue;
+    }
     const slotAbility = passiveAbilities[slot];
     if (slotAbility === null || formChangeAbilitiesApplied.has(slotAbility.id)) {
       continue;
