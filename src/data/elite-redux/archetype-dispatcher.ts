@@ -2646,6 +2646,63 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Speed." Status-cascade primitive missing — StatTriggerOnHit doesn't
       // expose a chance field. Defer.
       return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
+    // Round 17 — composites and more flag-boost wires
+    // -------------------------------------------------------------------------
+    case 933:
+      // Hammer Fist — "Boosts punch and hammer moves by 25%."
+      return ok([
+        new FlagDamageBoostAbAttr({ flag: MoveFlags.PUNCHING_MOVE, multiplier: 1.25 }),
+        new FlagDamageBoostAbAttr({ flag: MoveFlags.HAMMER_BASED, multiplier: 1.25 }),
+      ]);
+    case 932: {
+      // Ice Picks — "Tough Claws + Slush Rush." Compose vanilla AbilityIds:
+      // TOUGH_CLAWS (181) gives contact moves 1.3x; SLUSH_RUSH (202) gives
+      // 1.5x SPD in hail. Copy vanilla attrs from allAbilities.
+      const toughClaws = allAbilities[181]?.attrs ?? [];
+      const slushRush = allAbilities[202]?.attrs ?? [];
+      return ok([...toughClaws, ...slushRush]);
+    }
+    case 938:
+      // Cosmic Wings — "Flying moves become Fairy-type." Type-conversion
+      // override per-move-type (Flying source → Fairy target).
+      return ok([
+        new TypeConversionAbAttr({
+          source: { kind: "type", type: PokemonType.FLYING },
+          newType: PokemonType.FAIRY,
+        }),
+      ]);
+    case 889:
+      // Thick Blubber — "Take 1/4 damage from fire and ice in return for
+      // having 1/2 speed." Defer until type-specific damage-reduction
+      // primitive AND speed-debuff primitive land together.
+      return SKIP_BESPOKE;
+    case 904:
+      // Strong Foundation — "Takes 1/2 Water and Ground dmg and can't be
+      // forced out." Defer (typed damage reduction + force-switch immunity).
+      return SKIP_BESPOKE;
+    case 1012:
+      // Petal Shield — "Maxes Def on entry. -1 Def when hit." Compose:
+      // entry stat-trigger maxing DEF (+12 stages clamps to max in engine)
+      // plus stat-trigger on hit dropping DEF by 1.
+      return ok([
+        new StatTriggerOnEntryAbAttr({ stats: [{ stat: Stat.DEF, stages: 12 }] }),
+        new StatTriggerOnHitAbAttr({ stats: [{ stat: Stat.DEF, stages: -1 }] }),
+      ]);
+    case 1030:
+      // Sleek Scales — "Uses +15% of its Speed when defending." Needs a
+      // stat-substitution primitive (Speed → Def). Defer.
+      return SKIP_BESPOKE;
+    case 911:
+      // Musical Notes — "Status moves become sound-based." Move-flag
+      // injection primitive missing. Defer.
+      return SKIP_BESPOKE;
+    case 871:
+      // Blistering Sun — "Desolate Land + Air Blower." Compose vanilla
+      // DESOLATE_LAND (236) attrs + a partial Air Blower stand-in.
+      // Wire just the vanilla Desolate Land piece for now; Air Blower
+      // (terrain-clear) needs a new primitive.
+      return ok([...(allAbilities[236]?.attrs ?? [])]);
     default:
       return SKIP_BESPOKE;
   }
