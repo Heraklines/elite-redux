@@ -16,6 +16,7 @@
 import { allSpecies } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
+import { PokemonForm } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
 import { PokemonType } from "#enums/pokemon-type";
 
@@ -256,9 +257,134 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
 
       result.formCount++;
     }
+
+    // ER introduces NEW megas for species that have no vanilla mega (e.g.
+    // Meganium Mega, Typhlosion Mega, Feraligatr Mega — none exist in mainline
+    // games). For each such ER mega variant whose pokerogue base species has
+    // no matching form key, inject a fresh PokemonForm onto species.forms so
+    // the dex's form-cycle button can switch to it.
+    injectMissingErMegaForms(species, draft, erDraftByConst, result);
   }
 
   return result;
+}
+
+/**
+ * Form-key suffixes ER ships on a base species' const. Order matters — more
+ * specific suffixes MUST come before more general ones (e.g. "_MEGA_X" before
+ * "_MEGA") so the longest match wins. `null` formKey is intentionally never
+ * produced — only non-base forms.
+ *
+ * Covers all 5 ER form families that appear on base species (from suffix
+ * audit of v2.65 dump): split megas (X/Y), single mega, primal, origin, and
+ * the regional variants (Alolan / Galarian / Hisuian / Paldean / Hisuian-Mega
+ * combos). Total ~250 forms across all suffixes.
+ */
+const ER_FORM_SUFFIXES: readonly { suffix: string; formKey: string; formName: string }[] = [
+  // Split megas (must precede plain _MEGA)
+  { suffix: "_MEGA_X", formKey: "mega-x", formName: "Mega X" },
+  { suffix: "_MEGA_Y", formKey: "mega-y", formName: "Mega Y" },
+  // Regional + mega combos (must precede plain regional suffixes)
+  { suffix: "_HISUIAN_MEGA", formKey: "hisui-mega", formName: "Hisuian Mega" },
+  { suffix: "_MEGA_GALARIAN", formKey: "galar-mega", formName: "Galarian Mega" },
+  // Special-form megas
+  { suffix: "_PRIMAL", formKey: "primal", formName: "Primal" },
+  { suffix: "_ORIGIN", formKey: "origin", formName: "Origin" },
+  // Plain mega
+  { suffix: "_MEGA", formKey: "mega", formName: "Mega" },
+  // Regional variants
+  { suffix: "_ALOLAN", formKey: "alola", formName: "Alolan" },
+  { suffix: "_GALARIAN", formKey: "galar", formName: "Galarian" },
+  { suffix: "_HISUIAN", formKey: "hisui", formName: "Hisuian" },
+  { suffix: "_PALDEAN", formKey: "paldea", formName: "Paldean" },
+  // Forme variants (Castform / Deoxys / Rotom / Lycanroc-style)
+  { suffix: "_SUNNY", formKey: "sunny", formName: "Sunny" },
+  { suffix: "_RAINY", formKey: "rainy", formName: "Rainy" },
+  { suffix: "_SNOWY", formKey: "snowy", formName: "Snowy" },
+  { suffix: "_ATTACK", formKey: "attack", formName: "Attack" },
+  { suffix: "_DEFENSE", formKey: "defense", formName: "Defense" },
+  { suffix: "_SPEED", formKey: "speed", formName: "Speed" },
+  { suffix: "_HEAT", formKey: "heat", formName: "Heat" },
+];
+
+/**
+ * Look for ER `${baseConst}${suffix}` variants of this species. If the base
+ * pokerogue species already has a form with the matching `formKey`, the
+ * existing form loop above already patched it — skip. Otherwise construct a
+ * new PokemonForm with the ER variant's stats / types / abilities / passives
+ * and push it onto `species.forms` so the dex form-cycle picks it up.
+ */
+function injectMissingErMegaForms(
+  species: (typeof allSpecies)[number],
+  draft: (typeof ER_SPECIES)[number],
+  erDraftByConst: Map<string, (typeof ER_SPECIES)[number]>,
+  result: InitEliteReduxSpeciesResult,
+): void {
+  for (const { suffix, formKey, formName } of ER_FORM_SUFFIXES) {
+    const erConst = `${draft.speciesConst}${suffix}`;
+    const formDraft = erDraftByConst.get(erConst);
+    if (!formDraft) {
+      continue;
+    }
+    // Already present as a form? Existing-form loop handled it.
+    if (species.forms.some(f => f.formKey === formKey)) {
+      continue;
+    }
+
+    const formType1 = mapErType(formDraft.types[0]);
+    if (formType1 === null) {
+      continue;
+    }
+    const formType2 = mapErType(formDraft.types[1]);
+    const ab1 = mapAbilityId(formDraft.abilities[0]);
+    const ab2 = mapAbilityId(formDraft.abilities[1]);
+    const abH = mapAbilityId(formDraft.abilities[2]);
+    const [hp, atk, def, spatk, spdef, spd] = formDraft.baseStats;
+    const baseTotal = hp + atk + def + spatk + spdef + spd;
+    const form = new PokemonForm(
+      formName,
+      formKey,
+      formType1,
+      formType2,
+      species.height, // height — reuse base; ER source dump doesn't ship per-form hw
+      species.weight,
+      ab1,
+      ab2,
+      abH,
+      baseTotal,
+      hp,
+      atk,
+      def,
+      spatk,
+      spdef,
+      spd,
+      species.catchRate,
+      species.baseFriendship,
+      species.baseExp,
+      false, // genderDiffs
+      null, // formSpriteKey — pokerogue derives from formKey
+      false, // isStarterSelectable
+      false, // isUnobtainable
+    );
+    // Wire the 3-passive override (PokemonForm extends PokemonSpeciesForm so
+    // setPassives is available). Stats / types are already set via constructor;
+    // setActiveAbilities is redundant but harmless if called.
+    form.setPassives([
+      mapAbilityId(formDraft.innates[0]),
+      mapAbilityId(formDraft.innates[1]),
+      mapAbilityId(formDraft.innates[2]),
+    ]);
+    // PokemonForm-private fields (speciesId, formIndex, generation) are
+    // assigned by the PokemonSpecies constructor's `forms.forEach` block —
+    // since we're pushing after construction, we set them here.
+    const formMut = form as unknown as { speciesId: number; formIndex: number; generation: number };
+    formMut.speciesId = species.speciesId;
+    formMut.formIndex = species.forms.length;
+    formMut.generation = species.generation;
+
+    (species.forms as unknown as PokemonForm[]).push(form);
+    result.formCount++;
+  }
 }
 
 /**
