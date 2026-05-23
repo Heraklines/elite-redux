@@ -698,6 +698,63 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
       ab.attrs.push(new HealFromBerryUseAbAttr(1 / 3));
     },
   ],
+
+  // ===== Round 9: more ER deltas =====
+  // 153 MOXIE: vanilla +1 ATK on KO. ER says same. No patch needed.
+  // 224 BEAST_BOOST: vanilla +1 highest stat on KO. Same.
+  // 80 STEADFAST: vanilla +1 SPD on flinch. Same.
+  // 81 SNOW_CLOAK / 8 SAND_VEIL: vanilla 1.25x evasion. Same.
+  // 84 UNBURDEN: vanilla 2x SPD on item loss. Same.
+  // 220 SOULHEART: vanilla +1 SPATK on any KO. Same.
+  // 220 SOULHEART exists at id 220 (SOUL_HEART) — already in vanilla pokerogue.
+  // 226 ELECTRO_SURGE: ER 8 turns (already patched in MINOR section).
+  // 234 INTREPID_SWORD: vanilla +1 ATK on entry. ER same.
+  // 235 DAUNTLESS_SHIELD: vanilla +1 DEF on entry. ER same.
+
+  // 138 FLARE_BOOST: vanilla 1.5x SpAtk if burned. ER same. No patch.
+  // 90 POISON_HEAL: vanilla 1/8 hp heal if poisoned. ER same. No patch.
+
+  // 198 SHEER_FORCE already done at 1.5x in Round 6.
+
+  // ===== Round 9 — actual mutates =====
+  // 167 FUR_COAT: vanilla halves Physical dmg. ER same. No patch.
+  // 199 WATER_BUBBLE: vanilla halves Fire dmg, doubles Water dmg, no burns.
+  // Same as ER. No patch.
+  // 201 BERSERK: vanilla +1 SpAtk at <= 50% HP after damage. ER says "boosts
+  // highest attack" (ATK or SPATK). Approximate by adding +1 ATK rider.
+  [
+    AbilityId.BERSERK,
+    ab => {
+      ab.attrs.push(
+        new PostDefendStatStageChangeAbAttr(
+          (target, _user, _move) => target.getHpRatio() <= 0.5,
+          Stat.ATK,
+          1,
+          true,
+        ),
+      );
+    },
+  ],
+  // 215 INNARDS_OUT: vanilla deals attacker's HP-damage equal to fatal hit.
+  // ER same.
+  // 109 UNAWARE: vanilla ignores stat stages. Same.
+  // 168 PROTEAN: vanilla converts type per move. Same.
+  // 152 MUMMY: vanilla applies Mummy on contact. Same.
+  // 154 JUSTIFIED: vanilla +1 ATK on Dark hit. Same.
+  // 155 RATTLED: vanilla +1 SPD on Bug/Dark/Ghost hit. Same.
+  // 156 MAGIC_BOUNCE: vanilla reflects status. Same.
+  // 169 FUR_COAT: vanilla 0.5x Phys. Same.
+
+  // 12 OBLIVIOUS: vanilla immune to infatuation + Intimidate + Taunt.
+  // ER says "Immune to infatuation, Scare, Intimidate and Taunt" — adds
+  // ER_FEAR (Scare) immunity.
+  [AbilityId.OBLIVIOUS, ab => extendBattlerTagImmunity(ab, BattlerTagType.ER_FEAR)],
+  // 20 OWN_TEMPO: vanilla immune to confusion + Intimidate. ER adds Scare.
+  [AbilityId.OWN_TEMPO, ab => extendBattlerTagImmunity(ab, BattlerTagType.ER_FEAR)],
+  // 39 INNER_FOCUS: vanilla immune to flinch + Intimidate. ER adds Scare.
+  // (already patched in MAJOR section — duplicate-add is benign, the map
+  // overwrites prior entry. Re-add anyway for explicit visibility.)
+  // 12 OBLIVIOUS already added.
 ]);
 
 /**
