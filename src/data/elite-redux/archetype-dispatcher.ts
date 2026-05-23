@@ -2773,6 +2773,64 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // turn." On-deal-crit hook + lowest-3-stats selector both missing.
       // Defer.
       return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
+    // Round 19 — last batch of pure-composition wires before the remaining
+    // unwired set requires new primitives (HP-curve, defensive-stat-swap,
+    // recoil-event, counter-attack, scripted-followup, etc.). Pure-composition
+    // grind ends here.
+    // -------------------------------------------------------------------------
+    case 457:
+      // Phantom Pain — "Ghost-type moves deal normal damage to Normal."
+      // Type-chart override Ghost vs Normal: 0 → 1.0. Approximate via
+      // offensive TypeEffectivenessMod (offensive 1.0 against Normal).
+      // Actually offensive-1.0 is a no-op; ER intent is "stop the 0x
+      // immunity" — needs type-chart override. Defer.
+      return SKIP_BESPOKE;
+    case 492:
+      // Freezing Point — "20% chance to get frostbitten on contact and 30%
+      // non-contact." Frostbite battler-tag (ER_FROSTBITE) — wire as two
+      // procs (contact + non-contact) using the same primitive.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 20,
+          tags: [BattlerTagType.ER_FROSTBITE],
+          contactRequired: true,
+        }),
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 30,
+          tags: [BattlerTagType.ER_FROSTBITE],
+          contactRequired: false,
+        }),
+      ]);
+    case 476:
+      // Itchy Defense — "Causes infestation when hit by a contact move."
+      // Infestation tag (mapped to BattlerTagType.INFESTATION) — 100% on
+      // contact.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({ chance: 100, tags: [BattlerTagType.INFESTATION] }),
+      ]);
+    case 639:
+      // Piercing Solo — "Sound moves cause bleeding." Same as 831 Grass
+      // Flute but with ER_BLEED instead of ER_FEAR.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.ER_BLEED],
+          filter: { flag: MoveFlags.SOUND_BASED },
+          contactRequired: false,
+        }),
+      ]);
+    case 637:
+      // Battle Aura — "Boosts each battler's crit rate by +2." Field-wide
+      // crit-stage bonus needs an ally-side aura primitive. Approximate
+      // as self-only +2 crit-stage.
+      return ok([new CritStageBonusAbAttr({ bonus: 2 })]);
+    case 595:
+      // Noise Cancel — "Protects the party from sound-based moves." Party-
+      // wide sound-move immunity needs a field-aura primitive. Approximate
+      // as self-only sound-move immunity via PreApplyBattlerTagImmunity —
+      // there's no SOUND-specific battler tag; defer the full wiring.
+      return SKIP_BESPOKE;
     default:
       return SKIP_BESPOKE;
   }
