@@ -2516,6 +2516,69 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Bad Company — "Not implemented right now. Has no effect." Genuinely
       // no-op per ER source. Empty wire.
       return ok([]);
+    // -------------------------------------------------------------------------
+    // Round 15 — flag-damage-boost cluster (the "X moves become special and
+    // deal 30% more damage" family). Each wires the 1.3x flag boost; the
+    // category-swap (physical → special) is deferred pending a new primitive.
+    // -------------------------------------------------------------------------
+    case 273:
+      // Power Fists — "Iron Fist moves target Special Defense and get a
+      // 1.3x boost." Wire only the 1.3x. Def → SpDef target deferred.
+      return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.PUNCHING_MOVE, multiplier: 1.3 })]);
+    case 505:
+      // Mystic Blades — "Keen edge moves become special and deal 30% more
+      // damage." Wire 1.3x on SLICING_MOVE.
+      return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.SLICING_MOVE, multiplier: 1.3 })]);
+    case 568:
+      // Mind Crunch — "Biting moves use SpAtk and deal 30% more damage."
+      return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.BITING_MOVE, multiplier: 1.3 })]);
+    case 601:
+      // Mythical Arrows — "Arrow moves become special and deal 30% more
+      // damage."
+      return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.ARROW_BASED, multiplier: 1.3 })]);
+    case 500:
+      // Heaven Asunder — "Spacial Rend always crits. Ups crit level by +1."
+      // The Spacial-Rend-always-crits piece needs a per-move accuracy
+      // override. Wire only the +1 crit-stage bonus.
+      return ok([new CritStageBonusAbAttr({ bonus: 1 })]);
+    // -------------------------------------------------------------------------
+    // Round 15 — additional simple compositions
+    // -------------------------------------------------------------------------
+    case 599:
+      // (Dead Power was wired in round 12 already — sentinel to keep
+      // ordering consistent with the inventory.)
+      return SKIP_BESPOKE;
+    case 611:
+      // Entrance — "Confusion also inflicts infatuation." Status-cascade
+      // primitive missing. Approximation: any contact also has 100% chance
+      // to confuse + infatuate combined.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 30,
+          tags: [BattlerTagType.CONFUSED, BattlerTagType.INFATUATED],
+        }),
+      ]);
+    case 564:
+      // Tactical Retreat — "Flees when stats are lowered." Switch-on-stat-
+      // lowered needs a new event-trigger primitive (PostStatStageChange).
+      // Defer.
+      return SKIP_BESPOKE;
+    case 555:
+      // Egoist — "Raises its own stats when foes raise theirs." Needs an
+      // observer hook on opponent stat-change events. Defer.
+      return SKIP_BESPOKE;
+    case 588:
+      // Iron Serpent — "Ups super-effective by 33%." Defensive-side
+      // super-effective multiplier change. Vanilla SolidRock-like attrs
+      // exist but invert direction. Defer until super-effective-mod primitive.
+      return SKIP_BESPOKE;
+    case 586:
+      // Winged King — same shape as Iron Serpent. Defer.
+      return SKIP_BESPOKE;
+    case 634:
+      // Last Stand — "Def and SpDef increase as HP drops. Max 1.6x." Needs
+      // HP-curve stat-multiplier primitive. Defer.
+      return SKIP_BESPOKE;
     default:
       return SKIP_BESPOKE;
   }
