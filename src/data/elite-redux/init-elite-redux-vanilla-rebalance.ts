@@ -75,6 +75,7 @@ import {
 import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { ChanceStatusOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
 import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
 import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
@@ -480,6 +481,15 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // 89-cluster (PUNCH/BITE/SLICE) — STRONG_JAW already patched. Add 132 SHARPNESS (slice 1.5x).
   // SHARPNESS is gen-9 — present in pokerogue. ER spec: "Slicing moves 1.5x" (vanilla baseline).
   // Already at 1.5 by default; no-op. Skipped.
+
+  // ===== Round 4: chance-status composite additions =====
+  // 9 STATIC: vanilla 30% contact paralysis → ER adds 10% non-contact PRZ.
+  [AbilityId.STATIC, ab => addNonContactStatusChance(ab, StatusEffect.PARALYSIS, 10)],
+  // 49 FLAME_BODY: vanilla 30% contact burn → ER adds 20% non-contact burn.
+  [AbilityId.FLAME_BODY, ab => addNonContactStatusChance(ab, StatusEffect.BURN, 20)],
+
+  // 115 ICE_BODY duplicate-flagged in MAJOR for the 2x heal-rate. Already
+  // patched above; no double-add.
 ]);
 
 /**
@@ -790,6 +800,17 @@ class ErTerrainSummonAbAttr extends PostSummonTerrainChangeAbAttr {
       }
     }
   }
+}
+
+/**
+ * Add a non-contact ChanceStatusOnHit proc to a vanilla ability that
+ * already has the contact-only proc (e.g. Static, Flame Body). ER's twist
+ * is "also fires on non-contact at a lower rate"; this appends a fresh
+ * ChanceStatusOnHitAbAttr instance with contactRequired:false. Idempotent
+ * via the PATCHED_MARKER on the parent ability.
+ */
+function addNonContactStatusChance(ability: MutableAbility, effect: StatusEffect, chance: number): void {
+  ability.attrs.push(new ChanceStatusOnHitAbAttr({ chance, effects: [effect], contactRequired: false }));
 }
 
 /**
