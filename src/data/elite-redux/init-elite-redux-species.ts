@@ -320,6 +320,55 @@ function injectMissingErMegaForms(
   erDraftByConst: Map<string, (typeof ER_SPECIES)[number]>,
   result: InitEliteReduxSpeciesResult,
 ): void {
+  // Pokerogue convention: when a species has multiple forms, formIndex 0 is
+  // ALWAYS the "Normal" base form (formKey = ""). Adding a Mega without a
+  // base-form predecessor leaves the dex defaulting to formIndex 0 = Mega,
+  // which crashes downstream renders (sprite lookup, evolutions menu).
+  //
+  // Strategy: detect whether THIS species will receive any new ER form
+  // injections. If yes AND species.forms is currently empty, seed a "Normal"
+  // base form first so the new injected forms land at index >= 1.
+  const willInject = ER_FORM_SUFFIXES.some(
+    ({ suffix, formKey }) =>
+      erDraftByConst.has(`${draft.speciesConst}${suffix}`) && !species.forms.some(f => f.formKey === formKey),
+  );
+  if (willInject && species.forms.length === 0) {
+    const baseForm = new PokemonForm(
+      "Normal",
+      "",
+      species.type1,
+      species.type2,
+      species.height,
+      species.weight,
+      species.ability1,
+      species.ability2,
+      species.abilityHidden,
+      species.baseTotal,
+      species.baseStats[0],
+      species.baseStats[1],
+      species.baseStats[2],
+      species.baseStats[3],
+      species.baseStats[4],
+      species.baseStats[5],
+      species.catchRate,
+      species.baseFriendship,
+      species.baseExp,
+      false, // genderDiffs
+      null, // formSpriteKey — null = use base species sprite key
+      true, // isStarterSelectable — the base form should remain selectable
+      false, // isUnobtainable
+    );
+    // Mirror the base species's 3-passive triple so PokemonForm-level
+    // lookups don't fall back to legacy single-passive.
+    const basePassives = species.getPassiveAbilities();
+    baseForm.setPassives(basePassives);
+    const baseMut = baseForm as unknown as { speciesId: number; formIndex: number; generation: number };
+    baseMut.speciesId = species.speciesId;
+    baseMut.formIndex = 0;
+    baseMut.generation = species.generation;
+    (species.forms as unknown as PokemonForm[]).push(baseForm);
+  }
+
   for (const { suffix, formKey, formName } of ER_FORM_SUFFIXES) {
     const erConst = `${draft.speciesConst}${suffix}`;
     const formDraft = erDraftByConst.get(erConst);
