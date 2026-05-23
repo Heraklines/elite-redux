@@ -54,8 +54,10 @@
 // =============================================================================
 
 import { ReceivedMoveDamageMultiplierAbAttr } from "#abilities/ab-attrs";
+import { globalScene } from "#app/global-scene";
 import { MoveCategory, type MoveDamageCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
+import type { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
 
@@ -69,7 +71,15 @@ export type DamageReductionFilter =
   | { readonly kind: "category"; readonly category: MoveDamageCategory }
   | { readonly kind: "contact" }
   | { readonly kind: "super-effective" }
-  | { readonly kind: "full-hp" };
+  | { readonly kind: "full-hp" }
+  /** Crit-received reduction — Bad Omen ("takes 1/4 damage from crits"). */
+  | { readonly kind: "crit" }
+  /** Category-in-weather — Sand Guard / Sun Basking ("1/2 spec dmg in sand"). */
+  | {
+      readonly kind: "category-in-weather";
+      readonly category: MoveDamageCategory;
+      readonly weather: WeatherType;
+    };
 
 /** Construction options for {@linkcode DamageReductionAbAttr}. */
 export interface DamageReductionOptions {
@@ -185,6 +195,19 @@ export class DamageReductionAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
       }
       case "full-hp":
         return target.isFullHp() && move.category !== MoveCategory.STATUS;
+      case "crit": {
+        // `move.isCrit` would only be set during the actual damage phase.
+        // Pokerogue's PostDefend chain provides crit info via the damage
+        // calculator; for our PreApply reduction we approximate via
+        // `target.turnData.attacksReceived[0]?.critical`. Falls back to
+        // false if no attack data is recorded yet.
+        const lastAttack = target.turnData.attacksReceived?.[0];
+        return move.category !== MoveCategory.STATUS && !!lastAttack?.critical;
+      }
+      case "category-in-weather": {
+        const currentWeather = globalScene?.arena?.weather?.weatherType;
+        return move.category === filter.category && currentWeather === filter.weather;
+      }
     }
   }
 }

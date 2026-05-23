@@ -2387,20 +2387,33 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
         new CritStageBonusAbAttr({ bonus: 1 }),
       ]);
     case 671:
-      // Bad Omen — "Foes min roll. Takes 1/4 damage from crits."
-      // DamageReductionFilter doesn't yet have a "crit-received" kind, and
-      // the min-damage-roll piece needs a damage-roll-override primitive.
-      // Defer both pieces — add to next-primitive backlog.
-      return SKIP_BESPOKE;
+      // Bad Omen — "Foes min roll. Takes 1/4 damage from crits." Wire the
+      // 0.75 reduction from crits (1/4 received = 75% reduction). The min-
+      // damage-roll piece needs a separate damage-roll-override primitive.
+      return ok([
+        new DamageReductionAbAttr({
+          reduction: 0.75,
+          filter: { kind: "crit" },
+        }),
+      ]);
     case 482:
       // Sand Guard — "Blocks priority and reduces special damage by 1/2 in sand."
-      // Filter "category-in-weather" not yet supported by DamageReductionFilter.
-      // Defer — needs filter-kind extension.
-      return SKIP_BESPOKE;
+      // Priority-block side still deferred; wire the in-sand 0.5 special
+      // damage reduction via the new category-in-weather filter kind.
+      return ok([
+        new DamageReductionAbAttr({
+          reduction: 0.5,
+          filter: { kind: "category-in-weather", category: MoveCategory.SPECIAL, weather: WeatherType.SANDSTORM },
+        }),
+      ]);
     case 585:
       // Sun Basking — "Blocks priority and reduces physical damage by 1/2 in sun."
-      // Same filter limitation as Sand Guard. Defer.
-      return SKIP_BESPOKE;
+      return ok([
+        new DamageReductionAbAttr({
+          reduction: 0.5,
+          filter: { kind: "category-in-weather", category: MoveCategory.PHYSICAL, weather: WeatherType.SUNNY },
+        }),
+      ]);
     case 837:
       // Chokehold — "Binding moves lower speed and paralyze." The "binding
       // moves" filter would require move-attr inspection (vanilla pokerogue
