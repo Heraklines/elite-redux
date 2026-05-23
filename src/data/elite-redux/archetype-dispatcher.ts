@@ -2317,6 +2317,113 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
           lowHpThreshold: 1 / 3,
         }),
       ]);
+    // -------------------------------------------------------------------------
+    // Round 13 — large batch of composition wires for common ability shapes.
+    //
+    // Picked from the bespoke-unwired set, grouped by archetype family. Each
+    // wire either composes existing primitives or ports a tight one-off
+    // pattern that doesn't merit a new primitive. Riders that need new
+    // primitives are deferred with inline notes.
+    // -------------------------------------------------------------------------
+    case 270:
+      // Pyromancy — "Moves inflict burn 5x as often." Wire a flat 30% on-hit
+      // burn proc as an approximation (vanilla burn-chance moves are 10% so
+      // 5x ≈ 50%; flat 30% averages across the move pool). A per-move-chance
+      // multiplier primitive would be more correct — deferred.
+      return ok([
+        new ChanceStatusOnHitAbAttr({ chance: 30, effects: [StatusEffect.BURN], contactRequired: false }),
+      ]);
+    case 662:
+      // Higher Rank — "Priority moves get a 1.2x boost." No PRIORITY_MOVE
+      // flag exists in MoveFlags; this needs a priority-aware power-boost
+      // primitive (move's priority > 0 → boost). Deferred to a future primitive.
+      return SKIP_BESPOKE;
+    case 923:
+      // Galeforce Wings — "Flying moves get +1 Priority."
+      return ok([
+        new PriorityModifierAbAttr({
+          filter: { type: PokemonType.FLYING },
+          priority: 1,
+        }),
+      ]);
+    case 740:
+      // Set Ablaze — "Inflicting burn also inflicts fear." Approximation:
+      // also tag ER_FEAR with same probability as burn (30%). Over-fires
+      // vs ER spec slightly (fires on any contact, not gated to "burn just
+      // landed") — refine later with a status-cascade primitive.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({ chance: 30, tags: [BattlerTagType.ER_FEAR] }),
+      ]);
+    case 468:
+      // Super Hot Goo — "Inflicts burn and lowers Speed on contact."
+      return ok([
+        new ChanceStatusOnHitAbAttr({ chance: 30, effects: [StatusEffect.BURN] }),
+        new StatTriggerOnHitAbAttr({ stats: [{ stat: Stat.SPD, stages: -1 }] }),
+      ]);
+    case 912:
+      // Laser Drill — "Horn moves have a 50% burn chance."
+      return ok([
+        new ChanceStatusOnHitAbAttr({
+          chance: 50,
+          effects: [StatusEffect.BURN],
+          filter: { flag: MoveFlags.HORN_BASED },
+          contactRequired: false,
+        }),
+      ]);
+    case 435:
+      // Ambush — "Guaranteed critical hit on first turn." First-turn gate
+      // not yet primitive; wire a flat crit-stage bonus instead (+1).
+      return ok([
+        new CritStageBonusAbAttr({ bonus: 1 }),
+      ]);
+    case 671:
+      // Bad Omen — "Foes min roll. Takes 1/4 damage from crits."
+      // DamageReductionFilter doesn't yet have a "crit-received" kind, and
+      // the min-damage-roll piece needs a damage-roll-override primitive.
+      // Defer both pieces — add to next-primitive backlog.
+      return SKIP_BESPOKE;
+    case 482:
+      // Sand Guard — "Blocks priority and reduces special damage by 1/2 in sand."
+      // Filter "category-in-weather" not yet supported by DamageReductionFilter.
+      // Defer — needs filter-kind extension.
+      return SKIP_BESPOKE;
+    case 585:
+      // Sun Basking — "Blocks priority and reduces physical damage by 1/2 in sun."
+      // Same filter limitation as Sand Guard. Defer.
+      return SKIP_BESPOKE;
+    case 837:
+      // Chokehold — "Binding moves lower speed and paralyze." The "binding
+      // moves" filter would require move-attr inspection (vanilla pokerogue
+      // doesn't have a BIND flag in MoveFlags). Wire the stat-drop on any hit
+      // as approximation; the binding-only gate deferred.
+      return ok([
+        new StatTriggerOnHitAbAttr({ stats: [{ stat: Stat.SPD, stages: -1 }] }),
+      ]);
+    case 730:
+      // Razor Sharp — "Critical hits also inflict bleeding." On-deal-crit
+      // hook not yet primitive; wire a 20% ER_BLEED on any hit as approximation.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({ chance: 20, tags: [BattlerTagType.ER_BLEED] }),
+      ]);
+    case 953:
+      // Hypnotic Trance — "Hypnosis never misses and also causes Confusion."
+      // The "Hypnosis never misses" piece needs a per-move accuracy override.
+      // Wire only the confusion piece (any sleep-move hit also confuses) —
+      // sleep-detect via status-cascade primitive deferred.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({ chance: 100, tags: [BattlerTagType.CONFUSED] }),
+      ]);
+    case 268:
+      // Chloroplast — "Weather Ball, Solar Beam/Blade, Growth act as if used
+      // in sun." Per-move-presumption primitive doesn't exist; approximate
+      // via SpAtk multiplier in sun.
+      return ok([
+        new WeatherStatMultiplierAbAttr({
+          weathers: [WeatherType.SUNNY],
+          stat: Stat.SPATK,
+          multiplier: 1.2,
+        }),
+      ]);
     default:
       return SKIP_BESPOKE;
   }
