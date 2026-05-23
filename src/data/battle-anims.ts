@@ -3,6 +3,7 @@ import { allMoves } from "#data/data-lists";
 import type { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { EncounterAnim } from "#enums/encounter-anims";
+import { ErMoveId } from "#enums/er-move-id";
 import { AnimBlendType, AnimFocus, AnimFrameTarget, ChargeAnim, CommonAnim } from "#enums/move-anims-common";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
@@ -417,6 +418,59 @@ export const chargeAnims = new Map<ChargeAnim, AnimConfig | [AnimConfig, AnimCon
 export const commonAnims = new Map<CommonAnim, AnimConfig>();
 export const encounterAnims = new Map<EncounterAnim, AnimConfig>();
 
+/**
+ * ER-custom move id cutoff — values ≥ this are ER customs, not vanilla
+ * pokerogue MoveIds. Mirrors `VANILLA_ID_CUTOFF` in
+ * `src/data/elite-redux/init-elite-redux-custom-moves.ts` and the value
+ * baked into `scripts/elite-redux/builders/id-map.mjs`.
+ *
+ * @internal
+ */
+const ER_CUSTOM_MOVE_ID_CUTOFF = 5000;
+
+/** ER-custom move animation subdirectory (sibling of `./battle-anims/`). */
+const ER_ANIMS_SUBDIR = "./battle-anims-er";
+
+/**
+ * Resolve the fetch URL for a move's animation JSON. ER-custom moves
+ * (id ≥ {@link ER_CUSTOM_MOVE_ID_CUTOFF}) get their slug from
+ * {@link ErMoveId} reverse-lookup and live under `./battle-anims-er/`;
+ * vanilla moves use {@link MoveId} reverse-lookup and live under
+ * `./battle-anims/`. Returns `null` when neither enum has the id — caller
+ * falls back to a default anim.
+ *
+ * @internal Exported only for tests.
+ */
+export function getMoveAnimUrl(move: MoveId): string | null {
+  if (move >= ER_CUSTOM_MOVE_ID_CUTOFF) {
+    // Build a reverse-lookup of ErMoveId once and cache. ErMoveId is a
+    // `const` object, not a TS reverse-mapped enum, so we have to invert
+    // it manually.
+    const slug = erMoveIdSlug(move);
+    if (!slug) {
+      return null;
+    }
+    return `${ER_ANIMS_SUBDIR}/${slug}.json`;
+  }
+  const enumKey = MoveId[move];
+  if (!enumKey) {
+    return null;
+  }
+  return `./battle-anims/${toKebabCase(enumKey)}.json`;
+}
+
+/** Cached reverse-lookup for ErMoveId (pokerogue id → kebab-case slug). */
+let _erMoveSlugCache: Map<number, string> | null = null;
+function erMoveIdSlug(id: number): string | undefined {
+  if (_erMoveSlugCache === null) {
+    _erMoveSlugCache = new Map();
+    for (const [key, value] of Object.entries(ErMoveId)) {
+      _erMoveSlugCache.set(value as number, toKebabCase(key));
+    }
+  }
+  return _erMoveSlugCache.get(id);
+}
+
 export async function initCommonAnims(): Promise<void> {
   const commonAnimFetches: Promise<Map<CommonAnim, AnimConfig>>[] = [];
   for (const commonAnimName of getEnumKeys(CommonAnim)) {
@@ -458,7 +512,14 @@ export function initMoveAnim(move: MoveId): Promise<void> {
           : MoveId.TAIL_WHIP;
 
       const fetchAnimAndResolve = (move: MoveId) => {
-        cachedFetch(`./battle-anims/${toKebabCase(MoveId[move])}.json`)
+        const url = getMoveAnimUrl(move);
+        if (url === null) {
+          // Unknown id in both MoveId and ErMoveId — bail to the per-category default.
+          useDefaultAnim(move, defaultMoveAnim);
+          logMissingMoveAnim(move, "unknown move id (not in MoveId or ErMoveId)");
+          return resolve();
+        }
+        cachedFetch(url)
           .then(response => {
             const contentType = response.headers.get("content-type");
             if (!response.ok || contentType?.indexOf("application/json") === -1) {

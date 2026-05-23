@@ -92,7 +92,10 @@ vi.mock(import("#utils/fetch-utils"), async importOriginal => {
   async function cachedFetch(url: string, _init?: RequestInit): Promise<Response> {
     // Replace all battle anim fetches solely with the tackle anim to save time.
     // TODO: This effectively bars us from testing battle animation related code ever
-    const newUrl = url.includes("./battle-anims/") ? prependPath("./battle-anims/tackle.json") : prependPath(url);
+    // ER-custom moves use `./battle-anims-er/`; collapse them to tackle as well so the
+    // mock doesn't 404 on ER custom moves at game-init time.
+    const isAnimFetch = url.includes("./battle-anims/") || url.includes("./battle-anims-er/");
+    const newUrl = isAnimFetch ? prependPath("./battle-anims/tackle.json") : prependPath(url);
     try {
       const raw = fs.readFileSync(newUrl, { encoding: "utf8", flag: "r" });
       return createFetchResponse(JSON.parse(raw));
