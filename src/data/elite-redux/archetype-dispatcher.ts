@@ -2515,6 +2515,32 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
           ],
         }),
       ]);
+    // -------------------------------------------------------------------------
+    // Round 41 — heal-block via HEAL_BLOCK BattlerTag application
+    // -------------------------------------------------------------------------
+    case 532:
+      // Permanence — "Foes can't heal in any way." Apply HEAL_BLOCK to
+      // every attacker on hit (100% chance). True aura would need a field
+      // primitive; this approximation lands the heal-block on whoever
+      // attacks the holder.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.HEAL_BLOCK],
+          contactRequired: false,
+        }),
+      ]);
+    case 782:
+      // Hemolysis — "Poisoned foes lose all stat buffs and can't heal."
+      // Wire HEAL_BLOCK on hit; stat-buff-reset rider needs a new
+      // primitive (defer). Poison-conditional gate also deferred.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.HEAL_BLOCK],
+          contactRequired: false,
+        }),
+      ]);
     case 556:
       // Subdue — "Doubles stat drop effects used by this pokemon." Boost
       // outgoing stat-drop magnitude (e.g. Growl → -2 instead of -1).
