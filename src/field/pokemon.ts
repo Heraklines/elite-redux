@@ -1880,7 +1880,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // Override moveset based on arrays specified in overrides.ts
     const overrideArray = coerceArray(this.isPlayer() ? Overrides.MOVESET_OVERRIDE : Overrides.ENEMY_MOVESET_OVERRIDE);
     if (overrideArray.length === 0) {
-      return !ignoreOverride && this.summonData.moveset ? this.summonData.moveset : this.moveset;
+      const ms = !ignoreOverride && this.summonData.moveset ? this.summonData.moveset : this.moveset;
+      // ER hardening: filter out moveset entries whose moveId can't resolve
+      // to a Move in `allMoves`. Without this filter, every caller of
+      // getMoveset has to defensively check `move.getMove()` before reading
+      // .category/.type/.name — and many don't, causing trainer freezes.
+      // Track unresolved moves at the source to keep the surface clean.
+      return ms.filter(m => allMoves[m.moveId] !== undefined);
     }
 
     if (!this.isPlayer()) {
@@ -1892,7 +1898,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       this.moveset[index] = new PokemonMove(move, Math.min(ppUsed, allMoves[move].pp));
     });
 
-    return !ignoreOverride && this.summonData.moveset ? this.summonData.moveset : this.moveset;
+    const ms = !ignoreOverride && this.summonData.moveset ? this.summonData.moveset : this.moveset;
+    return ms.filter(m => allMoves[m.moveId] !== undefined);
   }
 
   /**
@@ -2839,6 +2846,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // TODO: this calculation needs to consider more factors; it's currently very simplistic
     for (const move of moveset) {
       const resolvedMove = move.getMove();
+      // Defend against id-map drift: a moveset entry can point to a move
+      // that didn't register in allMoves (typically ER customs that failed
+      // to init). Skip rather than crash the enemy-command phase.
+      if (!resolvedMove) {
+        continue;
+      }
       // NOTE: Counter and Mirror Coat are considered as attack moves here
       if (resolvedMove.category === MoveCategory.STATUS || move.getPpRatio() <= 0) {
         continue;
