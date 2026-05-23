@@ -242,7 +242,10 @@ export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   1020: { erAbilityId: 1020, parts: [{ kind: "er", erAbilityId: 367 }, { kind: "pokerogue", abilityId: 106 }], hasRider: false },
   1024: { erAbilityId: 1024, parts: [{ kind: "pokerogue", abilityId: 151 }, { kind: "pokerogue", abilityId: 172 }], hasRider: false },
   1026: { erAbilityId: 1026, parts: [{ kind: "pokerogue", abilityId: 181 }, { kind: "er", erAbilityId: 1025 }], hasRider: false },
-  1028: { erAbilityId: 1028, parts: [{ kind: "pokerogue", abilityId: 151 }], unresolvedParts: ["deals 1.5x more damage to Grass-types"], hasRider: true },
+  // 1028 (King of the Jungle) was flipped from composite-vanilla-mashup to
+  // bespoke in round 11 — the dispatcher's bespoke branch wires Infiltrator's
+  // attrs + an OffensiveTypeMultiplier(GRASS, 1.5) for the unresolved rider.
+  // The side-table entry was removed to keep the per-archetype count balance.
   1029: { erAbilityId: 1029, parts: [{ kind: "er", erAbilityId: 390 }, { kind: "er", erAbilityId: 300 }], hasRider: false },
   1032: { erAbilityId: 1032, parts: [{ kind: "er", erAbilityId: 337 }, { kind: "pokerogue", abilityId: 49 }], hasRider: false },
   1033: { erAbilityId: 1033, parts: [{ kind: "pokerogue", abilityId: 60 }, { kind: "pokerogue", abilityId: 183 }], hasRider: false },

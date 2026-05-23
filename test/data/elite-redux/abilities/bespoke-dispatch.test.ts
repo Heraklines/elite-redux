@@ -712,6 +712,113 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(res.attrs[0]).toBeInstanceOf(FlagDamageBoostAbAttr);
   });
 
+  // ---------------------------------------------------------------------------
+  // Round 11 — composition wires using existing primitives.
+  // ---------------------------------------------------------------------------
+
+  it("er id 348 (North Wind) wires EntryEffect(set-screen-or-room AURORA_VEIL 3 turns)", () => {
+    const res = dispatchArchetype("bespoke", null, 348);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as EntryEffectAbAttr;
+    expect(attr).toBeInstanceOf(EntryEffectAbAttr);
+    expect(attr.getKind()).toBe("set-screen-or-room");
+    const effect = attr.getEffect();
+    if (effect.kind !== "set-screen-or-room") {
+      throw new Error("expected set-screen-or-room effect kind");
+    }
+    expect(effect.tag).toBe(ArenaTagType.AURORA_VEIL);
+    expect(effect.turns).toBe(3);
+  });
+
+  it("er id 378 (Amplifier) wires FlagDamageBoost(SOUND_BASED, 1.3)", () => {
+    const res = dispatchArchetype("bespoke", null, 378);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    expect(res.attrs[0]).toBeInstanceOf(FlagDamageBoostAbAttr);
+  });
+
+  it("er id 438 (Jaws of Carnage) wires LifestealOnKo(0.5)", () => {
+    const res = dispatchArchetype("bespoke", null, 438);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as LifestealOnKoAbAttr;
+    expect(attr).toBeInstanceOf(LifestealOnKoAbAttr);
+    expect(attr.getHealFraction()).toBeCloseTo(0.5);
+  });
+
+  it("er id 519 (Fortitude) wires StatTriggerOnHit(SPDEF +1) + PostReceiveCritStatStageChange(SPDEF +12)", () => {
+    const res = dispatchArchetype("bespoke", null, 519);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(2);
+    const trigger = res.attrs[0] as StatTriggerOnHitAbAttr;
+    expect(trigger).toBeInstanceOf(StatTriggerOnHitAbAttr);
+    expect(trigger.getStatChanges()).toEqual([{ stat: Stat.SPDEF, stages: 1 }]);
+    expect(res.attrs[1]).toBeInstanceOf(PostReceiveCritStatStageChangeAbAttr);
+  });
+
+  it("er id 627 (Ethereal Rush) wires WeatherStatMultiplier(SPD, 1.5, [FOG])", () => {
+    const res = dispatchArchetype("bespoke", null, 627);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as WeatherStatMultiplierAbAttr;
+    expect(attr).toBeInstanceOf(WeatherStatMultiplierAbAttr);
+    expect(attr.stat).toBe(Stat.SPD);
+    expect(attr.multiplier).toBeCloseTo(1.5);
+    expect(attr.getWeathers()).toEqual([WeatherType.FOG]);
+  });
+
+  it("er id 645 (Soul Crusher) wires FlagDamageBoost(HAMMER_BASED, 1.1)", () => {
+    const res = dispatchArchetype("bespoke", null, 645);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    expect(res.attrs[0]).toBeInstanceOf(FlagDamageBoostAbAttr);
+  });
+
+  it("er id 655 (Smokey Maneuvers) wires WeatherStatMultiplier(EVA, 1.25, [FOG])", () => {
+    const res = dispatchArchetype("bespoke", null, 655);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as WeatherStatMultiplierAbAttr;
+    expect(attr).toBeInstanceOf(WeatherStatMultiplierAbAttr);
+    expect(attr.stat).toBe(Stat.EVA);
+    expect(attr.multiplier).toBeCloseTo(1.25);
+    expect(attr.getWeathers()).toEqual([WeatherType.FOG]);
+  });
+
+  it("er id 819 (Serpent Bind) wires ChanceBattlerTagOnHit(50% TRAPPED on contact)", () => {
+    const res = dispatchArchetype("bespoke", null, 819);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as ChanceBattlerTagOnHitAbAttr;
+    expect(attr).toBeInstanceOf(ChanceBattlerTagOnHitAbAttr);
+    expect(attr.getChance()).toBe(50);
+    expect(attr.getTags()).toEqual([BattlerTagType.TRAPPED]);
+    expect(attr.requiresContact()).toBe(true);
+  });
+
+  it("er id 987 (Rain Shroud) wires WeatherStatMultiplier(EVA, 1.3, [RAIN, HEAVY_RAIN])", () => {
+    const res = dispatchArchetype("bespoke", null, 987);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as WeatherStatMultiplierAbAttr;
+    expect(attr).toBeInstanceOf(WeatherStatMultiplierAbAttr);
+    expect(attr.stat).toBe(Stat.EVA);
+    expect(attr.multiplier).toBeCloseTo(1.3);
+    expect(attr.getWeathers()).toEqual([WeatherType.RAIN, WeatherType.HEAVY_RAIN]);
+  });
+
+  it("er id 1018 (Abominable Monster) wires WeatherStatMultiplier(SPDEF, 1.5, [HAIL, SNOW])", () => {
+    const res = dispatchArchetype("bespoke", null, 1018);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as WeatherStatMultiplierAbAttr;
+    expect(attr).toBeInstanceOf(WeatherStatMultiplierAbAttr);
+    expect(attr.stat).toBe(Stat.SPDEF);
+    expect(attr.multiplier).toBeCloseTo(1.5);
+    expect(attr.getWeathers()).toEqual([WeatherType.HAIL, WeatherType.SNOW]);
+  });
+
   it("unrecognized er id falls through to default bespoke skip", () => {
     const res = dispatchArchetype("bespoke", null, 99999);
     expect(res.attrs).toHaveLength(0);

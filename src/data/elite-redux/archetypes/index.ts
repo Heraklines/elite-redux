@@ -158,6 +158,12 @@ export {
 } from "./type-conversion";
 export { TypeDamageBoostAbAttr, type TypeDamageBoostAbAttrOptions } from "./type-damage-boost";
 export {
+  buildTypeEffectivenessModAttrs,
+  OffensiveTypeMultiplierAbAttr,
+  type TypeEffectivenessMod,
+  type TypeEffectivenessModOptions,
+} from "./type-effectiveness-mod";
+export {
   WeatherStatMultiplierAbAttr,
   type WeatherStatMultiplierOptions,
 } from "./weather-stat-multiplier";

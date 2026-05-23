@@ -112,6 +112,7 @@ import {
 } from "#data/elite-redux/archetypes/status-immunity";
 import { TypeConversionAbAttr, TypeConversionPowerBoostAbAttr } from "#data/elite-redux/archetypes/type-conversion";
 import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
+import { buildTypeEffectivenessModAttrs } from "#data/elite-redux/archetypes/type-effectiveness-mod";
 import { WeatherStatMultiplierAbAttr } from "#data/elite-redux/archetypes/weather-stat-multiplier";
 import {
   WeatherDamageReductionAbAttr,
@@ -1991,6 +1992,186 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Wire FlagDamageBoost(FIELD_BASED, 1.5). The named moves (Cut, Surf,
       // Strength) all carry the FIELD_BASED bit per ER move tagging.
       return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.FIELD_BASED, multiplier: 1.5 })]);
+    // -------------------------------------------------------------------------
+    // Round 11 — type-effectiveness-mod primitive wires (the "hunter" cluster).
+    //
+    // The round-10 primitive `buildTypeEffectivenessModAttrs(opts)` returns a
+    // pair of AbAttrs (offensive `OffensiveTypeMultiplierAbAttr` +
+    // vanilla `ReceivedTypeDamageMultiplierAbAttr`) modeling the symmetric
+    // "boost vs type X / reduce from type X" shape. The classifier originally
+    // emitted these as `conditional-damage` rows with `{kind: "other", note: "<type>"}`
+    // — placeholder shapes that the dispatcher couldn't translate. Round 11
+    // flips them to `bespoke` (see er-ability-archetypes.ts) and wires them
+    // explicitly here.
+    // -------------------------------------------------------------------------
+    case 313:
+      // Dragonslayer — 1.5x to Dragons, 0.5x from Dragons.
+      return ok([
+        ...buildTypeEffectivenessModAttrs({
+          type: PokemonType.DRAGON,
+          offensiveMultiplier: 1.5,
+          defensiveMultiplier: 0.5,
+        }),
+      ]);
+    case 442:
+      // Fae Hunter — 1.5x to Fairy, 0.5x from Fairy.
+      return ok([
+        ...buildTypeEffectivenessModAttrs({
+          type: PokemonType.FAIRY,
+          offensiveMultiplier: 1.5,
+          defensiveMultiplier: 0.5,
+        }),
+      ]);
+    case 445:
+      // Lumberjack — 1.5x to Grass, 0.5x from Grass.
+      return ok([
+        ...buildTypeEffectivenessModAttrs({
+          type: PokemonType.GRASS,
+          offensiveMultiplier: 1.5,
+          defensiveMultiplier: 0.5,
+        }),
+      ]);
+    case 526:
+      // Monster Hunter — 1.5x to Dark, 0.5x from Dark.
+      return ok([
+        ...buildTypeEffectivenessModAttrs({
+          type: PokemonType.DARK,
+          offensiveMultiplier: 1.5,
+          defensiveMultiplier: 0.5,
+        }),
+      ]);
+    case 804:
+      // Firefighter — 1.5x to Fire, 0.5x from Fire.
+      return ok([
+        ...buildTypeEffectivenessModAttrs({
+          type: PokemonType.FIRE,
+          offensiveMultiplier: 1.5,
+          defensiveMultiplier: 0.5,
+        }),
+      ]);
+    case 1028: {
+      // King of the Jungle — "Infiltrator + deals 1.5x more damage to
+      // Grass-types." The classifier emitted this as composite-vanilla-mashup
+      // with one unresolved rider ("deals 1.5x more damage to Grass-types").
+      // We override to bespoke and wire BOTH pieces:
+      //   - Vanilla Infiltrator (AbilityId 151) — copy its attrs verbatim from
+      //     allAbilities, matching how the composite dispatcher copies vanilla
+      //     parts.
+      //   - Offensive-only type-effectiveness-mod for Grass (1.5x offense, 1.0x
+      //     defense — defensive side omitted by the factory).
+      const infiltrator = allAbilities[151];
+      const infiltratorAttrs = infiltrator?.attrs ?? [];
+      return ok([
+        ...infiltratorAttrs,
+        ...buildTypeEffectivenessModAttrs({
+          type: PokemonType.GRASS,
+          offensiveMultiplier: 1.5,
+          defensiveMultiplier: 1,
+        }),
+      ]);
+    }
+    // -------------------------------------------------------------------------
+    // Round 11 — composition wires using existing primitives.
+    //
+    // Picked up from `docs/plans/elite-redux-bespoke-inventory.md`: pure
+    // compositions of round 1-10 primitives — no new abstractions needed.
+    // Several have ER-text riders that compose with the wired piece but need
+    // primitives we don't yet expose (per-flag accuracy-mod, ally auras,
+    // BattlerTag-keyed damage filters). Those are marked partial wire.
+    // -------------------------------------------------------------------------
+    case 348:
+      // North Wind — "3 turns Aurora Veil on entry. Immune to Hail damage."
+      // Wire the entry-effect side via EntryEffectAbAttr (set-screen-or-room
+      // AURORA_VEIL, 3 turns). The "immune to Hail damage" piece would compose
+      // via a weather-status-immunity primitive that doesn't exist yet
+      // (Ice-types are already hail-immune via the base type immunity, so this
+      // matters only for non-Ice holders of the ability). Partial wire.
+      return ok([new EntryEffectAbAttr({ kind: "set-screen-or-room", tag: ArenaTagType.AURORA_VEIL, turns: 3 })]);
+    case 378:
+      // Amplifier — "Ups sound moves by 30% and makes them hit both foes."
+      // Wire the FlagDamageBoost(SOUND_BASED, 1.3) piece. The multi-target
+      // piece (single-target sound → spread) needs a target-set override
+      // primitive that doesn't exist yet. Partial wire.
+      return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.SOUND_BASED, multiplier: 1.3 })]);
+    case 438:
+      // Jaws of Carnage — "Devours 1/2 of the foe when defeating it." The
+      // "devours 1/2" wording maps to a heal on KO equal to 50% of max HP
+      // (ER's signature lifesteal-on-KO shape; the "foe" framing is narrative
+      // — the holder recovers 1/2 of *its own* max HP). LifestealOnKo(0.5).
+      return ok([new LifestealOnKoAbAttr({ healFraction: 0.5 })]);
+    case 519:
+      // Fortitude — "Boosts SpDef +1 when hit. Maxes SpDef on crit." Mirrors
+      // case 488 (Tipping Point) but on the SPDEF stat. The crit-maximize
+      // piece uses PostReceiveCritStatStageChangeAbAttr with stages exceeding
+      // the engine clamp (+12) — pokerogue's StatStageChangePhase clamps
+      // internally so the effective result is "max out". Vanilla Anger Point
+      // uses the same +12 trick.
+      return ok([
+        new StatTriggerOnHitAbAttr({ stats: [{ stat: Stat.SPDEF, stages: 1 }] }),
+        new PostReceiveCritStatStageChangeAbAttr(Stat.SPDEF, 12),
+      ]);
+    case 627:
+      // Ethereal Rush — "This Pokémon's Speed gets a 1.5x boost in fog." Uses
+      // the round-7 weather-stat-multiplier primitive — Stat.SPD * 1.5 gated
+      // on WeatherType.FOG.
+      return ok([
+        new WeatherStatMultiplierAbAttr({
+          stat: Stat.SPD,
+          multiplier: 1.5,
+          weathers: [WeatherType.FOG],
+        }),
+      ]);
+    case 645:
+      // Soul Crusher — "Hammer moves hit SpDef and get a 1.1x power boost."
+      // Wire the FlagDamageBoost(HAMMER_BASED, 1.1) piece. The "hit SpDef"
+      // piece is a defensive-stat-swap that needs a primitive routed through
+      // the damage formula's defender-stat selector — not yet exposed.
+      // Partial wire.
+      return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.HAMMER_BASED, multiplier: 1.1 })]);
+    case 655:
+      // Smokey Maneuvers — "Evasion is boosted by 1.25x in fog." Uses the
+      // weather-stat-multiplier primitive with Stat.EVA.
+      return ok([
+        new WeatherStatMultiplierAbAttr({
+          stat: Stat.EVA,
+          multiplier: 1.25,
+          weathers: [WeatherType.FOG],
+        }),
+      ]);
+    case 819:
+      // Serpent Bind — "50% chance to trap, then drop their speed by -1 each
+      // turn." Wire the 50% trap-on-contact piece via ChanceBattlerTagOnHit
+      // (TRAPPED tag, contact). The per-turn speed-drop piece is a
+      // BattlerTag-gated post-turn debuff that the stat-trigger family doesn't
+      // model (needs PerTurnStatChangeOnTrap primitive). Partial wire.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 50,
+          tags: [BattlerTagType.TRAPPED],
+          contactRequired: true,
+        }),
+      ]);
+    case 987:
+      // Rain Shroud — "Ups evasion by 30% in rain." WeatherStatMultiplier with
+      // Stat.EVA * 1.3 on WeatherType.RAIN and HEAVY_RAIN (the parent
+      // weather pair).
+      return ok([
+        new WeatherStatMultiplierAbAttr({
+          stat: Stat.EVA,
+          multiplier: 1.3,
+          weathers: [WeatherType.RAIN, WeatherType.HEAVY_RAIN],
+        }),
+      ]);
+    case 1018:
+      // Abominable Monster — "Ups SpDef by 1.5x in hail." WeatherStatMultiplier
+      // with Stat.SPDEF * 1.5 on hail/snow (the parent weather pair).
+      return ok([
+        new WeatherStatMultiplierAbAttr({
+          stat: Stat.SPDEF,
+          multiplier: 1.5,
+          weathers: [WeatherType.HAIL, WeatherType.SNOW],
+        }),
+      ]);
     default:
       return SKIP_BESPOKE;
   }
