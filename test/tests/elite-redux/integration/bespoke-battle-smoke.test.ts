@@ -78,7 +78,13 @@ describe("ER bespoke ability battle smoke (real GameManager)", () => {
     }
   });
 
-  it.skipIf(true /* heavy battle setup — enable for full battle coverage */)(
+  // Live battle smoke for each sample — enable selectively (it's heavy ~30s
+  // per ability * 10 = 5min). Default-skipped because the test harness
+  // currently has unrelated pre-existing crashes around moveset
+  // initialization (see test/tests/abilities/intimidate.test.ts) that
+  // contaminate the assertions here. The construction-smoke + verifier
+  // tests above provide the same coverage signal at 1% of the cost.
+  it.skipIf(true)(
     "wired bespoke abilities survive a one-turn battle as enemy",
     async () => {
       for (const sample of SMOKE_SAMPLE) {

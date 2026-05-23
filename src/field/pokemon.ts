@@ -765,8 +765,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   async loadAssets(ignoreOverride = true, useIllusion = false): Promise<void> {
     /** Promises that are loading assets and can be run concurrently. */
     const loadPromises: Promise<void>[] = [];
-    // Assets for moves
-    loadPromises.push(loadMoveAnimations(this.getMoveset().map(m => m.getMove().id)));
+    // Assets for moves — defend against id-map drift where a moveset entry
+    // points to an invalid move (e.g. ER custom move that failed to init).
+    // We filter out undefined Move references rather than crash here, which
+    // would otherwise hang ShowTrainerPhase → NextEncounterPhase → loadAssets
+    // (user-visible "freeze when trainer loads").
+    const moveIds = this.getMoveset()
+      .map(m => m.getMove()?.id)
+      .filter((id): id is MoveId => id !== undefined);
+    loadPromises.push(loadMoveAnimations(moveIds));
 
     /** alias for `this.summonData.illusion`; bangs on this are safe when guarded with `useIllusion` being true   */
     const illusion = this.summonData.illusion;

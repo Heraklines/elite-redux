@@ -93,6 +93,13 @@ function getAndWeightLevelMoves(pokemon: Pokemon): Map<MoveId, number> {
       break;
     }
     const move = allMoves[id];
+    // Defend against id-map drift: an ER-customized species can reference a
+    // move id whose Move entry never got registered (e.g. ER custom moves
+    // that failed to init, or vanilla moves replaced by ER customs with a
+    // different id). Skip the entry rather than crashing the moveset gen.
+    if (!move) {
+      continue;
+    }
     // Skip unimplemented moves or moves that are already in the pool
     if (move.name.endsWith(" (N)") || movePool.has(id)) {
       continue;

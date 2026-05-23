@@ -178,7 +178,9 @@ export class EncounterPhase extends BattlePhase {
       ];
       const moveset: string[] = [];
       for (const move of enemyPokemon.getMoveset()) {
-        moveset.push(move.getName());
+        // Defend against invalid move ids in the moveset (id-map drift).
+        const resolved = move.getMove();
+        moveset.push(resolved ? resolved.name : `?moveId=${move.moveId}`);
       }
 
       console.log(
