@@ -46,6 +46,7 @@
 
 import {
   type AbAttr,
+  type AbAttrBaseParams,
   AlliedFieldDamageReductionAbAttr,
   AllyStatMultiplierAbAttr,
   ArenaTrapAbAttr,
@@ -61,6 +62,7 @@ import {
   PostDefendContactApplyTagChanceAbAttr,
   PostDefendStatStageChangeAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
+  PostSummonAbAttr,
   PostSummonTerrainChangeAbAttr,
   PostSummonWeatherChangeAbAttr,
   PostTurnHurtIfSleepingAbAttr,
@@ -72,6 +74,7 @@ import {
   UserFieldBattlerTagImmunityAbAttr,
   UserFieldMoveTypePowerBoostAbAttr,
 } from "#abilities/ab-attrs";
+import { StatTriggerOnStatLoweredAbAttr } from "#data/elite-redux/archetypes/stat-trigger-on-event";
 import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import { allAbilities, allMoves } from "#data/data-lists";
@@ -91,7 +94,7 @@ import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
-import { Stat } from "#enums/stat";
+import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 
@@ -566,7 +569,109 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // 213 SWEET_VEIL: vanilla sleep immunity for user + allies. ER unchanged.
   // 209 WIMP_OUT: vanilla switch out at <= 50% HP. ER unchanged.
   // 197 PRANKSTER already extended.
+
+  // ===== Round 7: ER-specific deltas surfaced from vanilla-audit =====
+  // 55 HUSTLE: vanilla 1.5x ATK / 0.8 acc → ER 1.4x ATK / 0.9 acc.
+  // We can only mutate the StatMultiplier — accuracy gating is handled
+  // separately in pokerogue and not easily mutable.
+  [AbilityId.HUSTLE, ab => mutateStatMultiplier(ab, Stat.ATK, 1.4)],
+  // 96 NORMALIZE: vanilla converts all moves to Normal-type. ER adds 1.1x
+  // boost on Normal-type moves (the post-conversion boost).
+  [
+    AbilityId.NORMALIZE,
+    ab => {
+      ab.attrs.push(
+        new MovePowerBoostAbAttr((_user, _t, move) => move?.type === PokemonType.NORMAL, 1.1),
+      );
+    },
+  ],
+  // 113 SCRAPPY: vanilla Normal/Fighting hits Ghost. ER adds ER_FEAR-immune
+  // (the ER analogue of Intimidate's stat-drop fear tag).
+  [AbilityId.SCRAPPY, ab => extendBattlerTagImmunity(ab, BattlerTagType.ER_FEAR)],
+  // 105 SUPER_LUCK: vanilla +1 crit stage. ER also gives 1.3x crit dmg.
+  // pokerogue's crit damage multiplier is fixed; mutate via additive attrs
+  // — the BonusCritDamageMultiplier path is private. Defer: would need new primitive.
+  // 159 SAND_FORCE: vanilla 1.3x Rock/Steel/Ground in sand → ER "highest atk
+  // stat 1.5x in sand". Complex; defer.
+  // 85 HEATPROOF: vanilla 0.5x Fire dmg + no burn damage. Same as ER.
+  // 47 THICK_FAT: vanilla 0.5x Fire/Ice dmg. Same as ER.
+  // 91 ADAPTABILITY: vanilla 2x STAB. Same as ER.
+  // 119 SOUL_HEART (cluster) already MAJOR'd.
+  // 88 DOWNLOAD: vanilla +1 ATK/SPATK on entry depending on opponent. Same.
+  // 78 MOTOR_DRIVE: vanilla absorb Electric → +1 Speed. Same as ER.
+  // 80 STEADFAST: vanilla +1 Speed on flinch. Same as ER.
+  // 81 SNOW_CLOAK: vanilla 1.25x evasion in hail. Same as ER.
+  // 8 SAND_VEIL: vanilla 1.25x evasion in sand. Same as ER.
+  // 84 UNBURDEN: vanilla 2x speed on item consumption. Same as ER.
+
+  // ===== Round 7 (cont.) — MAJOR rider additions =====
+  // 46 PRESSURE: vanilla 2x foe PP usage + "clear stat buffs on entry" rider.
+  // Approximate via PostSummon (clear positive stages on all opponents).
+  [
+    AbilityId.PRESSURE,
+    ab => {
+      ab.attrs.push(new ClearOpponentStatBuffsOnSummonAbAttr());
+    },
+  ],
+  // 53 PICKUP: vanilla "find items post-battle" → ER "Removes all hazards on
+  // entry". Completely different effect. Add hazard-clear entry effect on
+  // holder side; keep vanilla item-find for backward compat.
+  [
+    AbilityId.PICKUP,
+    ab => {
+      ab.attrs.push(new EntryEffectAbAttr({ kind: "self-stat-boost", stat: Stat.ATK, stages: 0 }));
+      // Note: hazard-clearing on holder-side is best modeled via a one-shot
+      // PostSummon — leveraging the same TypeGatedStatTriggerOnAttack's
+      // clearHazards helper would require its predicate to match. Skip the
+      // hazard-clear rider for now (no clean primitive); the patch is a
+      // placeholder for future PostSummonClearHazardsAbAttr.
+    },
+  ],
+  // 50 RUN_AWAY: vanilla "guaranteed flee". ER adds "Raises Speed if stats
+  // lowered by an enemy" rider. The trigger is the StatTriggerOnStatLowered
+  // primitive from the archetype layer.
+  [
+    AbilityId.RUN_AWAY,
+    ab => {
+      ab.attrs.push(new StatTriggerOnStatLoweredAbAttr({ stats: [{ stat: Stat.SPD, stages: 1 }] }));
+    },
+  ],
 ]);
+
+/**
+ * MAJOR rider for PRESSURE — clear all positive stat stages on opponents
+ * when this ability's holder is summoned (entry effect).
+ */
+class ClearOpponentStatBuffsOnSummonAbAttr extends PostSummonAbAttr {
+  constructor() {
+    super(true);
+  }
+
+  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+    return pokemon.getOpponents().length > 0;
+  }
+
+  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
+    if (simulated) {
+      return;
+    }
+    for (const opp of pokemon.getOpponents()) {
+      if (!opp || opp.isFainted()) {
+        continue;
+      }
+      // Reset positive stages by emitting a -X stage change matched to the
+      // current positive total. Simpler: just reset the summonData stages.
+      const stats: BattleStat[] = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD, Stat.ACC, Stat.EVA];
+      for (const stat of stats) {
+        const cur = opp.summonData?.statStages?.[stat as number] ?? 0;
+        if (cur > 0) {
+          opp.summonData.statStages[stat as number] = 0;
+        }
+      }
+      opp.updateInfo();
+    }
+  }
+}
 
 /**
  * Apply ER's stat rebalances to vanilla pokerogue moves and abilities.
