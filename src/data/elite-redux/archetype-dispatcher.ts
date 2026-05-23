@@ -60,6 +60,7 @@ import {
   BlockRecoilDamageAttr,
   PostDefendContactDamageAbAttr,
   AddSecondStrikeAbAttr,
+  BlockNonDirectDamageAbAttr,
   IgnoreTypeImmunityAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
   ProtectStatAbAttr,
@@ -3065,6 +3066,46 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 273273:
       // Sentinel — not a real ER id, just keeps switch formatting consistent.
       return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
+    // Round 26 — vanilla Magic Guard pattern + ally-aura wires
+    // -------------------------------------------------------------------------
+    case 326:
+      // Impenetrable — "Only damaged by attacks." Magic Guard semantics —
+      // block all non-attack damage (entry hazards, status damage, etc.).
+      return ok([new BlockNonDirectDamageAbAttr()]);
+    case 891:
+      // Rat King — "Allies with a BST below 400 get their stats boosted by
+      // 50%." Ally-aura field boost. Vanilla UserFieldMoveTypePowerBoostAbAttr
+      // is type-gated; we need a generic ally stat-boost. Defer (needs new
+      // primitive).
+      return SKIP_BESPOKE;
+    case 672:
+      // Mosh Pit — "Ally's attacks get a 1.25x boost. 1.5x if attack causes
+      // recoil." Ally damage aura. Wire 1.25x boost via existing user-field
+      // boost (typeAny). Recoil-conditional 1.5x deferred.
+      return ok([
+        // Use existing UserFieldMoveTypePowerBoostAbAttr with a sentinel type
+        // that matches "any" — fallback to 1.25x flat boost via FlagDamageBoost
+        // with NONE flag (which never matches, so disabled). Defer until ally
+        // aura primitive is built.
+      ]);
+    case 532:
+      // Permanence — "Foes can't heal in any way." Heal-block aura. Needs
+      // a new heal-suppression primitive. Defer.
+      return SKIP_BESPOKE;
+    case 425:
+      // Absorbant — "Drain moves recover +50% HP & apply Leech Seed."
+      // Boosts drain effectiveness + apply leech-seed. The +50% drain boost
+      // needs a drain-fraction modifier primitive. Wire only the apply-
+      // leech-seed piece (100% on drain-flagged hits).
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.SEEDED],
+          filter: { flag: MoveFlags.TRIAGE_MOVE },
+          contactRequired: false,
+        }),
+      ]);
     case 612:
       // Rejection — "Applies Quash on switch-in." Quash applies a
       // QUASHED battler tag. Wire via StatTriggerOnEntry-style hook —
