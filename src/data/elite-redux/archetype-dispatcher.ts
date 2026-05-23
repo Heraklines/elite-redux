@@ -2565,10 +2565,16 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
     // -------------------------------------------------------------------------
     case 1008:
       // Daredevil — "+1 Atk after using recoil move. 1/2 recoil damage."
-      // Wire only the recoil-block side via vanilla BlockRecoilDamageAttr
-      // (Rock Head semantics — full block rather than 1/2). The +1 Atk on
-      // recoil-move-use needs a use-recoil event hook (deferred).
-      return ok([new BlockRecoilDamageAttr()]);
+      // Compose: BlockRecoilDamage (full block — approximates 1/2 recoil)
+      // + StatBoostOnFlagAttack on RECKLESS_MOVE flag for the ATK boost.
+      return ok([
+        new BlockRecoilDamageAttr(),
+        new StatBoostOnFlagAttackAbAttr({
+          flag: MoveFlags.RECKLESS_MOVE,
+          stat: Stat.ATK,
+          stages: 1,
+        }),
+      ]);
     // -------------------------------------------------------------------------
     // Round 32 — PostTurnScriptedMove primitive + wires
     // -------------------------------------------------------------------------
