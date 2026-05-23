@@ -34,6 +34,7 @@
 // =============================================================================
 
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
+import { allMoves } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
 import type { MoveId } from "#enums/move-id";
@@ -101,6 +102,15 @@ export function initEliteReduxMovesets(): InitEliteReduxMovesetsResult {
     for (const lvm of draft.levelUpMoves) {
       const pokerogueMoveId = ER_ID_MAP.moves[lvm.id];
       if (pokerogueMoveId === undefined) {
+        result.moveIdsDropped++;
+        continue;
+      }
+      // SECOND defense: verify the resolved pokerogue id actually has a
+      // registered Move in `allMoves`. ER-custom ids that failed to register
+      // in `initEliteReduxCustomMoves` would otherwise slip through to a
+      // trainer's moveset and crash later reads (getMatchupScore,
+      // loadAssets, etc.).
+      if (!allMoves[pokerogueMoveId]) {
         result.moveIdsDropped++;
         continue;
       }
