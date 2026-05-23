@@ -104,6 +104,7 @@ import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effec
 import { PostAllyFaintStatChangeAbAttr } from "#data/elite-redux/archetypes/post-ally-faint";
 import { CounterAttackOnHitAbAttr } from "#data/elite-redux/archetypes/counter-attack-on-hit";
 import { SpeedBonusToStatAbAttr } from "#data/elite-redux/archetypes/speed-bonus-to-stat";
+import { PostTurnScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-turn-scripted-move";
 import { PassiveRecoveryAbAttr, type PassiveRecoveryCondition } from "#data/elite-redux/archetypes/passive-recovery";
 import { PreFaintReviveAbAttr } from "#data/elite-redux/archetypes/pre-faint-revive";
 import {
@@ -2521,6 +2522,33 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // (Rock Head semantics — full block rather than 1/2). The +1 Atk on
       // recoil-move-use needs a use-recoil event hook (deferred).
       return ok([new BlockRecoilDamageAttr()]);
+    // -------------------------------------------------------------------------
+    // Round 32 — PostTurnScriptedMove primitive + wires
+    // -------------------------------------------------------------------------
+    case 937:
+      // Sumo Wrestler — "Uses 20BP Circle Throw at the end of each 2nd turn."
+      return ok([
+        new PostTurnScriptedMoveAbAttr({ moveId: MoveId.CIRCLE_THROW, everyNTurns: 2 }),
+      ]);
+    case 940:
+      // Cool Exit — "Uses Chilly Reception at the end of your 2nd turn."
+      return ok([
+        new PostTurnScriptedMoveAbAttr({ moveId: MoveId.CHILLY_RECEPTION, everyNTurns: 2 }),
+      ]);
+    case 737:
+      // Life Steal — "Steals 1/10 HP from foes each turn." Approximate as
+      // a per-turn scripted small drain move. ABSORB is closest vanilla
+      // (20BP, 50% drain — over-fires but matches drain intent).
+      return ok([
+        new PostTurnScriptedMoveAbAttr({ moveId: MoveId.ABSORB, everyNTurns: 1 }),
+      ]);
+    case 820:
+      // Soul Tap — "Drain 10% HP from foes at the end of each turn in fog."
+      // Same shape as 737 but fog-gated. Fog primitive missing; wire
+      // unconditionally as approximation.
+      return ok([
+        new PostTurnScriptedMoveAbAttr({ moveId: MoveId.ABSORB, everyNTurns: 1 }),
+      ]);
     case 456:
       // Cryomancy — "Moves inflict frostbite 5x as often." Same shape as
       // Pyromancy (270): flat 30% ER_FROSTBITE on hit.
