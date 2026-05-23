@@ -63,6 +63,7 @@ import {
   BlockNonDirectDamageAbAttr,
   ForceSwitchOutImmunityAbAttr,
   IgnoreTypeImmunityAbAttr,
+  MovePowerBoostAbAttr,
   UserFieldStatusEffectImmunityAbAttr,
   PostDamageForceSwitchAbAttr,
   PostDefendAbilitySwapAbAttr,
@@ -2785,6 +2786,31 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 392:
       // Hardened Sheath — type-effectiveness style. Defer for type-chart
       // override primitive.
+      return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
+    // Round 44 — more compositions to push toward full coverage
+    // -------------------------------------------------------------------------
+    case 536:
+      // Blood Price — "Does 30% more damage but lose 10% HP when attacking."
+      // Wire the +30% damage piece. Per-attack 10% self-damage needs a
+      // recoil-fixed-fraction primitive (deferred).
+      return ok([new MovePowerBoostAbAttr(() => true, 1.3)]);
+    case 828:
+      // Overzealous — "User's super-effective moves have +1 prio." SE-
+      // conditional priority. PriorityModifier supports condition closures
+      // but evaluating SE needs defender state. Approximation: blanket +1
+      // priority on all moves. Over-fires significantly; defer pure wire.
+      return SKIP_BESPOKE;
+    case 627:
+      // (Ethereal Rush was wired R11 already.)
+      return SKIP_BESPOKE;
+    case 904904:
+      // (Sentinel)
+      return SKIP_BESPOKE;
+    case 274:
+      // (Corrupted Mind 774 already wired R35.)
+      return SKIP_BESPOKE;
+    case 656656:
       return SKIP_BESPOKE;
     // -------------------------------------------------------------------------
     // Round 39 — new primitive HpThresholdFormChange + 3 wires
