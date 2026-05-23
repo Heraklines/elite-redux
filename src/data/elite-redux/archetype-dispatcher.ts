@@ -2978,8 +2978,18 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       return SKIP_BESPOKE;
     case 979:
       // Hollow Ice Zone — "Ice-type moves apply Ice Statue and then make
-      // the user switch." Complex multi-step. Defer.
-      return SKIP_BESPOKE;
+      // the user switch." Ice Statue tag missing in pokerogue; approximate
+      // via FROSTBITE + force-switch on ICE moves. Wire the FROSTBITE
+      // piece via ChanceBattlerTag on type=ICE filter; force-switch
+      // deferred.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.ER_FROSTBITE],
+          filter: { type: PokemonType.ICE },
+          contactRequired: false,
+        }),
+      ]);
     case 981:
       // Cryostasis — wired R12 already.
       return SKIP_BESPOKE;
