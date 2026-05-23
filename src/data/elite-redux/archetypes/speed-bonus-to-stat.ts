@@ -47,6 +47,12 @@ export interface SpeedBonusToStatOptions {
   readonly speedFraction: number;
   /** Optional gate on the move being used. */
   readonly filter?: SpeedBonusFilter;
+  /**
+   * Optional override for the source stat. Defaults to {@linkcode Stat.SPD}
+   * (matching the original primitive purpose). Set to e.g. {@linkcode Stat.DEF}
+   * to wire abilities like Power Core ("+20% Def during moves").
+   */
+  readonly sourceStat?: BattleStat;
 }
 
 /**
@@ -59,6 +65,7 @@ export class SpeedBonusToStatAbAttr extends StatMultiplierAbAttr {
   private readonly bonusStat: BattleStat;
   private readonly speedFraction: number;
   private readonly bonusFilter: SpeedBonusFilter;
+  private readonly sourceStat: BattleStat;
 
   constructor(options: SpeedBonusToStatOptions) {
     // Pass multiplier=1 to the parent so the base stat is unchanged; we add
@@ -70,6 +77,7 @@ export class SpeedBonusToStatAbAttr extends StatMultiplierAbAttr {
     this.bonusStat = options.stat;
     this.speedFraction = options.speedFraction;
     this.bonusFilter = options.filter ?? {};
+    this.sourceStat = options.sourceStat ?? Stat.SPD;
   }
 
   override canApply(params: StatMultiplierAbAttrParams): boolean {
@@ -97,7 +105,7 @@ export class SpeedBonusToStatAbAttr extends StatMultiplierAbAttr {
 
   override apply(params: StatMultiplierAbAttrParams): void {
     const { pokemon, statVal } = params;
-    const speedValue = pokemon.getStat(Stat.SPD, false);
-    statVal.value += Math.floor(speedValue * this.speedFraction);
+    const sourceValue = pokemon.getStat(this.sourceStat, false);
+    statVal.value += Math.floor(sourceValue * this.speedFraction);
   }
 }

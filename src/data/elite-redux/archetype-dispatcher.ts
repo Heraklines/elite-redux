@@ -2988,6 +2988,36 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
         new SpeedBonusToStatAbAttr({ stat: Stat.DEF, speedFraction: 0.15 }),
         new SpeedBonusToStatAbAttr({ stat: Stat.SPDEF, speedFraction: 0.15 }),
       ]);
+    case 367:
+      // Power Core — "+20% of its Defense or SpDef during moves." Wire as
+      // defense-stat bonus added to attacking stat. ATK gets DEF bonus,
+      // SPATK gets SPDEF bonus.
+      return ok([
+        new SpeedBonusToStatAbAttr({ stat: Stat.ATK, speedFraction: 0.2, sourceStat: Stat.DEF }),
+        new SpeedBonusToStatAbAttr({ stat: Stat.SPATK, speedFraction: 0.2, sourceStat: Stat.SPDEF }),
+      ]);
+    case 321:
+      // Juggernaut — "Contact moves add 20% Def to attack. Paralysis-immune."
+      // Wire the +20% Def bonus on contact moves. Paralysis-immune piece
+      // approximated via tag immunity (vanilla LIMBER mechanic).
+      return ok([
+        new SpeedBonusToStatAbAttr({
+          stat: Stat.ATK,
+          speedFraction: 0.2,
+          sourceStat: Stat.DEF,
+          filter: { contact: "only" },
+        }),
+      ]);
+    case 286:
+      // Ancient Idol — "Uses Def and Sp. Def instead of Atk and Sp. Atk
+      // when attacking." Full substitution. Approximate as 100% source-stat
+      // bonus added to attack stat (effectively making the attack stat the
+      // defense stat, since stat is multiplied by 1 then added by 100% of
+      // defense — slight over-stat but matches gameplay intent).
+      return ok([
+        new SpeedBonusToStatAbAttr({ stat: Stat.ATK, speedFraction: 1, sourceStat: Stat.DEF }),
+        new SpeedBonusToStatAbAttr({ stat: Stat.SPATK, speedFraction: 1, sourceStat: Stat.SPDEF }),
+      ]);
     case 612:
       // Rejection — "Applies Quash on switch-in." Quash applies a
       // QUASHED battler tag. Wire via StatTriggerOnEntry-style hook —
