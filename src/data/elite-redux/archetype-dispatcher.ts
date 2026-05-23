@@ -2700,6 +2700,40 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       return SKIP_BESPOKE;
     case 282282:
       return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
+    // Round 38 — last batch of wires using existing primitives
+    // -------------------------------------------------------------------------
+    case 424:
+      // Equinox — "Boosts Atk or SpAtk to match the higher value." Stat-
+      // sync primitive missing. Approximation: +1 to both ATK and SPATK
+      // on entry (equalizes via stat-stage).
+      return ok([
+        new StatTriggerOnEntryAbAttr({
+          stats: [
+            { stat: Stat.ATK, stages: 1 },
+            { stat: Stat.SPATK, stages: 1 },
+          ],
+        }),
+      ]);
+    case 598:
+      // Malicious — "Lowers the foe's highest Attack and Defense stat."
+      // Pick-highest-stat targeting needs new primitive. Approximation:
+      // entry-effect dropping both ATK and DEF on opposing target via
+      // intimidate-like pattern. Use vanilla PostSummonStatStageChange
+      // for opponent.
+      // For now wire as self-stat-trigger flip → defer
+      return SKIP_BESPOKE;
+    case 896:
+      // Spyware — "Sharply raises a stat based on foe's strong point."
+      // Needs foe-stat-introspection primitive. Defer.
+      return SKIP_BESPOKE;
+    case 928:
+      // (Sentinel)
+      return SKIP_BESPOKE;
+    case 392:
+      // Hardened Sheath — type-effectiveness style. Defer for type-chart
+      // override primitive.
+      return SKIP_BESPOKE;
     case 456:
       // Cryomancy — "Moves inflict frostbite 5x as often." Same shape as
       // Pyromancy (270): flat 30% ER_FROSTBITE on hit.
