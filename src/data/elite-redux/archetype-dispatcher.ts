@@ -2703,6 +2703,76 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Wire just the vanilla Desolate Land piece for now; Air Blower
       // (terrain-clear) needs a new primitive.
       return ok([...(allAbilities[236]?.attrs ?? [])]);
+    // -------------------------------------------------------------------------
+    // Round 18 — more flag-boost siblings + composites
+    // -------------------------------------------------------------------------
+    case 658:
+      // Power Edge — "Keen Edge moves target Special Defense and get a 1.3x
+      // boost." Same shape as 273 Power Fists / 505 Mystic Blades — wire
+      // the 1.3x on SLICING_MOVE. Def→SpDef target deferred.
+      return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.SLICING_MOVE, multiplier: 1.3 })]);
+    case 967: {
+      // Hand Barnacles — "Multi-Headed + Water STAB." Multi-headed needs a
+      // hit-count primitive (deferred). Wire only Water STAB-add via the
+      // R9 StabAdd primitive: holder gets 1.5x on WATER moves regardless
+      // of self-type. Approximation; ER intent matches.
+      return ok([new StabAddAbAttr({ multiplier: 1.5, targetType: PokemonType.WATER })]);
+    }
+    case 866:
+      // Relic Stone — "Other battlers don't benefit from STAB." Field-aura
+      // that suppresses opponent STAB. Needs a new field-suppression
+      // primitive. Defer.
+      return SKIP_BESPOKE;
+    case 884:
+      // Locust Swarm — "Changes into Hivemind form until 1/4 HP or less."
+      // HP-threshold form change. Form-change-on-hp-threshold needs a new
+      // primitive bridging into pokemonFormChanges. Defer.
+      return SKIP_BESPOKE;
+    case 885:
+      // Revelation — same shape as 884 Locust Swarm. Defer.
+      return SKIP_BESPOKE;
+    case 1005:
+      // Power Outage — "Boosts first Electric attack by 2x then loses
+      // Electric type." First-use + type-loss combo. Defer (needs uses-
+      // counter primitive + type-remove on-use).
+      return SKIP_BESPOKE;
+    case 1008:
+      // Daredevil — "+1 Atk after using recoil move. 1/2 recoil damage."
+      // Recoil-event hook missing. Defer.
+      return SKIP_BESPOKE;
+    case 879:
+      // Chilling Pellets — "Uses 13BP Icicle Spear when hit by contact."
+      // Counter-attack-on-hit needs a scripted-move primitive. Defer.
+      return SKIP_BESPOKE;
+    case 998:
+      // Acid Reflux — "Uses 20BP Acid when it takes damage." Same shape as
+      // 879. Defer.
+      return SKIP_BESPOKE;
+    case 993:
+      // Thunder Clouds — "After using a special move, launch a 35 BP
+      // Thunderbolt." Post-attack-followup primitive missing. Defer.
+      return SKIP_BESPOKE;
+    case 876:
+      // Sludge Spit — "Follows up with 35BP Venom Bolt after using an
+      // attack." Same shape as 993. Defer.
+      return SKIP_BESPOKE;
+    case 937:
+      // Sumo Wrestler — "Uses 20BP Circle Throw at the end of each 2nd
+      // turn." Turn-counter scripted-move. Defer.
+      return SKIP_BESPOKE;
+    case 940:
+      // Cool Exit — "Uses Chilly Reception at the end of your 2nd turn."
+      // Same shape as 937. Defer.
+      return SKIP_BESPOKE;
+    case 1000:
+      // Survivor Bias — "Not very effective moves can't cause fainting."
+      // Damage-cap-on-resist primitive missing. Defer.
+      return SKIP_BESPOKE;
+    case 914:
+      // Home Run — "Landing a crit boosts your 3 lowest stats once per
+      // turn." On-deal-crit hook + lowest-3-stats selector both missing.
+      // Defer.
+      return SKIP_BESPOKE;
     default:
       return SKIP_BESPOKE;
   }
