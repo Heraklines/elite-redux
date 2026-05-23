@@ -2587,6 +2587,43 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // ER inverts: post-defend-type-change-attacker. No vanilla primitive
       // matches exactly. Defer.
       return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
+    // Round 34 — type-gated ChanceStatusOnHit wires
+    // -------------------------------------------------------------------------
+    case 434:
+      // Elemental Charge — "20% chance to BRN/FRZ/PARA with respective
+      // types." Three type-filtered procs.
+      return ok([
+        new ChanceStatusOnHitAbAttr({
+          chance: 20,
+          effects: [StatusEffect.BURN],
+          filter: { type: PokemonType.FIRE },
+          contactRequired: false,
+        }),
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 20,
+          tags: [BattlerTagType.ER_FROSTBITE],
+          filter: { type: PokemonType.ICE },
+          contactRequired: false,
+        }),
+        new ChanceStatusOnHitAbAttr({
+          chance: 20,
+          effects: [StatusEffect.PARALYSIS],
+          filter: { type: PokemonType.ELECTRIC },
+          contactRequired: false,
+        }),
+      ]);
+    case 455:
+      // Archmage — "30% chance of adding a type related effect to each
+      // move." Per-type random secondary. Approximate as 30% generic
+      // CONFUSED tag (random secondary fallback).
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 30,
+          tags: [BattlerTagType.CONFUSED],
+          contactRequired: false,
+        }),
+      ]);
     case 456:
       // Cryomancy — "Moves inflict frostbite 5x as often." Same shape as
       // Pyromancy (270): flat 30% ER_FROSTBITE on hit.
