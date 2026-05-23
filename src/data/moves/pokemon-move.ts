@@ -55,6 +55,11 @@ export class PokemonMove {
    */
   public isUsable(pokemon: Pokemon, ignorePp = false, forSelection = false): [usable: boolean, preventionText: string] {
     const move = this.getMove();
+    // Defend against id-map drift: an unresolved Move (allMoves[moveId]
+    // returns undefined) shouldn't crash isUsable — just report not-usable.
+    if (!move) {
+      return [false, ""];
+    }
     const moveName = move.name;
 
     // TODO: Add Sky Drop's 1 turn stall
