@@ -62,6 +62,7 @@ import {
   AddSecondStrikeAbAttr,
   BlockNonDirectDamageAbAttr,
   IgnoreTypeImmunityAbAttr,
+  PostDefendAbilitySwapAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
   ProtectStatAbAttr,
   StatMultiplierAbAttr,
@@ -3106,6 +3107,24 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
           contactRequired: false,
         }),
       ]);
+    // -------------------------------------------------------------------------
+    // Round 27 — vanilla PostDefend specialty wires
+    // -------------------------------------------------------------------------
+    case 254:
+      // Wandering Spirit — "Trades ability with attacker on contact."
+      // Direct port of vanilla Wandering Spirit (already in pokerogue
+      // for AbilityId.WANDERING_SPIRIT). Wire its attr.
+      return ok([new PostDefendAbilitySwapAbAttr()]);
+    case 808:
+      // Malodor — "Suppresses attacker's abilities on contact." Wire as
+      // PostDefendAbilityGive with a "no-op" ability so the attacker
+      // effectively loses theirs. Approximation — true suppression needs
+      // a SuppressAbilityAbAttr. Defer.
+      return SKIP_BESPOKE;
+    case 597:
+      // Olé! — Already wired R21 with StatTriggerOnEntry(EVA +1).
+      // Sentinel skip to keep round formatting consistent.
+      return SKIP_BESPOKE;
     case 612:
       // Rejection — "Applies Quash on switch-in." Quash applies a
       // QUASHED battler tag. Wire via StatTriggerOnEntry-style hook —
