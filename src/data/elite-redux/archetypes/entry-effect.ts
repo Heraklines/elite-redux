@@ -46,9 +46,11 @@
 
 import { PostSummonAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { PokemonMove } from "#data/moves/pokemon-move";
 import type { TerrainType } from "#data/terrain";
 import type { ArenaTagSide } from "#enums/arena-tag-side";
 import type { ArenaTagType } from "#enums/arena-tag-type";
+import { MoveUseMode } from "#enums/move-use-mode";
 import type { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
 import type { PokemonType } from "#enums/pokemon-type";
@@ -237,15 +239,27 @@ export class EntryEffectAbAttr extends PostSummonAbAttr {
         );
         return;
       case "first-move-priority":
-      case "scripted-move":
-        // C1 records the configuration but defers full integration to the
-        // turn-queue work scheduled later in Phase C. Both sub-effects need
-        // hooks the existing pokerogue infra doesn't expose generically yet
-        // (per-move priority bracket override, OR injecting a free move into
-        // the turn). We intentionally no-op here so the AbAttr can be wired
-        // onto an ER ability today without crashing — the wiring side will
-        // get its real behavior in a later C task.
+        // first-move-priority still requires a per-move priority bracket
+        // override hook that pokerogue doesn't expose generically — defer.
         return;
+      case "scripted-move": {
+        // Inject the configured move via MovePhase in INDIRECT mode (mirrors
+        // Dancer's copy-move and other AbAttr-driven move spawns). The first
+        // opponent is selected as the default target; status moves resolve
+        // to the user's own side automatically via pokerogue's targeting.
+        const opponents = pokemon.getOpponents().filter(o => o && !o.isFainted());
+        const target = opponents[0]?.getBattlerIndex();
+        const targets = target !== undefined ? [target] : [pokemon.getBattlerIndex()];
+        const pokemonMove = new PokemonMove(this.effect.move);
+        globalScene.phaseManager.unshiftNew(
+          "MovePhase",
+          pokemon,
+          targets,
+          pokemonMove,
+          MoveUseMode.INDIRECT,
+        );
+        return;
+      }
     }
   }
 
