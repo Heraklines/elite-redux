@@ -2433,14 +2433,15 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([
         new ChanceBattlerTagOnHitAbAttr({ chance: 20, tags: [BattlerTagType.ER_BLEED] }),
       ]);
-    case 953:
+    case 953: {
       // Hypnotic Trance — "Hypnosis never misses and also causes Confusion."
-      // The "Hypnosis never misses" piece needs a per-move accuracy override.
-      // Wire only the confusion piece (any sleep-move hit also confuses) —
-      // sleep-detect via status-cascade primitive deferred.
+      // Compose accuracy-override for Hypnosis-only + 100% confuse on hit.
+      const isHypnosis = (_p: unknown, _t: unknown, move: { id: number }) => move.id === MoveId.HYPNOSIS;
       return ok([
+        new StatMultiplierAbAttr(Stat.ACC, Number.POSITIVE_INFINITY, isHypnosis),
         new ChanceBattlerTagOnHitAbAttr({ chance: 100, tags: [BattlerTagType.CONFUSED] }),
       ]);
+    }
     case 268:
       // Chloroplast — "Weather Ball, Solar Beam/Blade, Growth act as if used
       // in sun." Per-move-presumption primitive doesn't exist; approximate
@@ -2541,6 +2542,15 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
           contactRequired: false,
         }),
       ]);
+    // Round 42 cases for 376 / 340 were merged into the R29 case blocks
+    // above to avoid duplicate switch labels. The 953 Hypnotic Trance
+    // accuracy override below is the remaining R42 wire.
+    case 953953: {
+      // Sentinel — Hypnotic Trance was wired R29 with confuse-on-hit.
+      // Pure accuracy override for Hypnosis-only is duplicate-labeled, so
+      // we instead enhance the R29 case (no separate dispatch).
+      return SKIP_BESPOKE;
+    }
     case 556:
       // Subdue — "Doubles stat drop effects used by this pokemon." Boost
       // outgoing stat-drop magnitude (e.g. Growl → -2 instead of -1).
@@ -3494,20 +3504,26 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // disables the attacker's move on contact. Adapts the "delete PP"
       // intent to "disable for several turns".
       return ok([new PostDefendMoveDisableAbAttr(100)]);
-    case 376:
+    case 376: {
       // Deadeye — "Arrow & cannon moves never miss. Crits hit weakest
-      // defense." Per-flag accuracy override needs new primitive. Wire
-      // only the crit-stage bonus on ARROW_BASED + BALLBOMB_MOVE.
+      // defense." Compose: never-miss for ARROW_BASED/BALLBOMB_MOVE +
+      // crit-stage bonus on those flags.
+      const isArrowOrCannon = (_p: unknown, _t: unknown, move: { hasFlag: (f: number) => boolean }) =>
+        move.hasFlag(MoveFlags.ARROW_BASED) || move.hasFlag(MoveFlags.BALLBOMB_MOVE);
       return ok([
+        new StatMultiplierAbAttr(Stat.ACC, Number.POSITIVE_INFINITY, isArrowOrCannon),
         new CritStageBonusAbAttr({ bonus: 1, filter: { flag: MoveFlags.ARROW_BASED } }),
         new CritStageBonusAbAttr({ bonus: 1, filter: { flag: MoveFlags.BALLBOMB_MOVE } }),
       ]);
+    }
     case 340:
       // Fatal Precision — "Super-effective moves never miss and always
-      // crit." Per-move-effectiveness override primitive missing. Wire
-      // only crit-stage bonus broadly (every move gets +1 crit) — not
-      // SE-only but the simplest approximation.
-      return ok([new CritStageBonusAbAttr({ bonus: 1 })]);
+      // crit." SE-conditional needs new primitive. Approximate as broad
+      // accuracy +2x boost + always-crit-via-+stage.
+      return ok([
+        new StatMultiplierAbAttr(Stat.ACC, 2),
+        new CritStageBonusAbAttr({ bonus: 1 }),
+      ]);
     case 374:
       // (No ER ability 374 in audit — sentinel to keep formatting.)
       return SKIP_BESPOKE;
