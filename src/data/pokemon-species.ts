@@ -240,6 +240,21 @@ export abstract class PokemonSpeciesForm {
    *                    to this instance's `formIndex`.
    */
   getPassiveAbilities(formIndex = this.formIndex): readonly [AbilityId, AbilityId, AbilityId] {
+    // Form-aware lookup: when called on a PokemonSpecies with a formIndex
+    // pointing to a real form, delegate to that form's _passives. Without
+    // this, every form would return the BASE species's passive triple —
+    // e.g. Mega Meganium would show Overgrow/Sun's Bounty/Aroma Veil
+    // (base) instead of Forest Rage/Flower Necklace/Aroma Veil (Mega form).
+    //
+    // `this.forms` only exists on PokemonSpecies (not PokemonForm); the
+    // duck-type check keeps the base PokemonSpeciesForm method form-agnostic.
+    const formsArr = (this as unknown as { forms?: readonly PokemonSpeciesForm[] }).forms;
+    if (formsArr && formIndex >= 0 && formIndex < formsArr.length) {
+      const form = formsArr[formIndex];
+      if (form && form !== (this as unknown as PokemonSpeciesForm) && form._passives) {
+        return form._passives;
+      }
+    }
     if (this._passives) {
       return this._passives;
     }

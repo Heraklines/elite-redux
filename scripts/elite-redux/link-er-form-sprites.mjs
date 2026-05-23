@@ -40,6 +40,7 @@ const SUFFIX_TO_FORMKEY = [
   ["_defense", "defense"],
   ["_speed", "speed"],
   ["_heat", "heat"],
+  ["_redux", "redux"], // ER region-variant-style alternate forms (TAUROS_REDUX, MINCCINO_REDUX, etc.)
 ];
 
 // Read the auto-generated ER species table to map slug → species id.

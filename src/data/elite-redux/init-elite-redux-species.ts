@@ -305,6 +305,17 @@ const ER_FORM_SUFFIXES: readonly { suffix: string; formKey: string; formName: st
   { suffix: "_DEFENSE", formKey: "defense", formName: "Defense" },
   { suffix: "_SPEED", formKey: "speed", formName: "Speed" },
   { suffix: "_HEAT", formKey: "heat", formName: "Heat" },
+  // Elite Redux "Redux" variants — region-variant-style alternate forms ER
+  // added for vanilla mons (e.g. SPECIES_TAUROS_REDUX, SPECIES_MINCCINO_REDUX,
+  // SPECIES_SINISTEA_REDUX). They're chosen at start like Alolan/Galarian
+  // variants, NOT reached via leveling/evolving. Must be LAST in the table —
+  // longest-match-first ensures more-specific suffixes (_MEGA_REDUX,
+  // _REDUX_MEGA) win first.
+  //
+  // Pure `_REDUX` species without a vanilla base (e.g. SPECIES_CRABRUISER_REDUX,
+  // SPECIES_BEWARDEN_REDUX — entirely new ER mons) fall through to the
+  // standalone-species branch and stay as their own dex entries.
+  { suffix: "_REDUX", formKey: "redux", formName: "Redux" },
 ];
 
 /**
