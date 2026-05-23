@@ -66,6 +66,7 @@ import {
   PostDamageForceSwitchAbAttr,
   PostDefendAbilitySwapAbAttr,
   PostDefendMoveDisableAbAttr,
+  SuppressWeatherEffectAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
   ProtectStatAbAttr,
   StatMultiplierAbAttr,
@@ -2481,11 +2482,10 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
         new ChanceBattlerTagOnHitAbAttr({ chance: 100, tags: [BattlerTagType.SEEDED] }),
       ]);
     case 426:
-      // Clueless — "Negates Weather, Rooms and Terrains." Cloud-Nine-style
-      // weather suppression. Vanilla SuppressWeatherEffectAbAttr is not
-      // exported via the dispatcher import surface yet — defer until the
-      // import surface is extended.
-      return SKIP_BESPOKE;
+      // Clueless — "Negates Weather, Rooms and Terrains." Wire vanilla
+      // SuppressWeatherEffectAbAttr (Cloud Nine). Room and terrain
+      // suppression need separate primitives — deferred.
+      return ok([new SuppressWeatherEffectAbAttr()]);
     case 456:
       // Cryomancy — "Moves inflict frostbite 5x as often." Same shape as
       // Pyromancy (270): flat 30% ER_FROSTBITE on hit.
