@@ -2424,6 +2424,98 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
           multiplier: 1.2,
         }),
       ]);
+    // -------------------------------------------------------------------------
+    // Round 14 — defensive / utility / type-cluster wires
+    // -------------------------------------------------------------------------
+    case 334:
+      // Bad Luck — "Foes can't crit, deal min damage, 5% less acc, & no
+      // effect chance." Min-damage-roll, accuracy debuff, effect-chance
+      // suppression all need new primitives. Wire only the crit-block side
+      // via CritImmunity (reuses BlockCritAbAttr under the hood).
+      return ok([new CritImmunityAbAttr()]);
+    case 357:
+      // Molten Down — "Fire-type is super effective against Rock-type."
+      // Offensive-only TypeEffectivenessMod targeting ROCK with 1.5x
+      // offensive multiplier. Approximates SE-vs-Rock since pokerogue's
+      // type chart already has Fire 0.5x vs Rock; this wires an ER override.
+      return ok([
+        ...buildTypeEffectivenessModAttrs({
+          type: PokemonType.ROCK,
+          offensiveMultiplier: 1.5,
+          defensiveMultiplier: 1,
+        }),
+      ]);
+    case 388:
+      // Discipline — "Can switch while rampaging. Can't be confused or
+      // intimidated." Wire the BattlerTag immunity side (CONFUSED). The
+      // rampage-switch piece needs a movestate primitive.
+      return ok([
+        new BattlerTagImmunityAbAttrEr({ tags: [BattlerTagType.CONFUSED] }),
+      ]);
+    case 398:
+      // Fungal Infection — "Contact moves inflict Leech Seed on the target."
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({ chance: 100, tags: [BattlerTagType.SEEDED] }),
+      ]);
+    case 426:
+      // Clueless — "Negates Weather, Rooms and Terrains." Cloud-Nine-style
+      // weather suppression. Vanilla SuppressWeatherEffectAbAttr is not
+      // exported via the dispatcher import surface yet — defer until the
+      // import surface is extended.
+      return SKIP_BESPOKE;
+    case 456:
+      // Cryomancy — "Moves inflict frostbite 5x as often." Same shape as
+      // Pyromancy (270): flat 30% ER_FROSTBITE on hit.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({ chance: 30, tags: [BattlerTagType.ER_FROSTBITE], contactRequired: false }),
+      ]);
+    case 444:
+      // Evaporate — "Takes no damage and sets Mist if hit by water." Water-
+      // immunity piece needs a typed-immunity primitive; the Mist-on-hit
+      // side needs a typed filter on SetArenaTagOnHit that's not yet
+      // supported. Defer.
+      return SKIP_BESPOKE;
+    case 412:
+      // Desert Cloak — "Protects its side from status and secondary effects
+      // in sand." Weather-gated status immunity. Approximation: blanket
+      // CONFUSED-tag immunity (the most common secondary effect via
+      // existing primitive). Refine later with weather-gated filter.
+      return ok([
+        new BattlerTagImmunityAbAttrEr({ tags: [BattlerTagType.CONFUSED] }),
+      ]);
+    case 285:
+      // Ground Shock — "Target Grounds aren't immune to Electric but resist
+      // it instead." Type-chart override — needs a per-type-pair filter
+      // primitive that doesn't exist. Defer.
+      return SKIP_BESPOKE;
+    case 349:
+      // Overcharge — "Electric is super effective vs Electric." Same
+      // type-effectiveness-override shape as Molten Down but for the
+      // self-type. Wire offensive-only.
+      return ok([
+        ...buildTypeEffectivenessModAttrs({
+          type: PokemonType.ELECTRIC,
+          offensiveMultiplier: 1.5,
+          defensiveMultiplier: 1,
+        }),
+      ]);
+    case 342:
+      // Seaweed — "Takes 1/2 dmg from Fire if Grass. Grass deals x2 dmg to
+      // Fire." Compose: defensive 0.5 from Fire + offensive 2x vs Fire.
+      // The "if Grass" predicate is type-self gated; type-effectiveness-mod
+      // doesn't currently gate on self-type — approximation lands the
+      // damage shape on any holder.
+      return ok([
+        ...buildTypeEffectivenessModAttrs({
+          type: PokemonType.FIRE,
+          offensiveMultiplier: 2.0,
+          defensiveMultiplier: 0.5,
+        }),
+      ]);
+    case 369:
+      // Bad Company — "Not implemented right now. Has no effect." Genuinely
+      // no-op per ER source. Empty wire.
+      return ok([]);
     default:
       return SKIP_BESPOKE;
   }
