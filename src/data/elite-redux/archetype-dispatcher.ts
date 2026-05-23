@@ -65,6 +65,7 @@ import {
   IgnoreTypeImmunityAbAttr,
   PostDamageForceSwitchAbAttr,
   PostDefendAbilitySwapAbAttr,
+  PostDefendMoveDisableAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
   ProtectStatAbAttr,
   StatMultiplierAbAttr,
@@ -3154,6 +3155,32 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // target." Similar to 690 with a once-per-entry gate. Same wire as
       // 690 for the force-switch side; damage reduction deferred.
       return ok([new PostDamageForceSwitchAbAttr(1.0)]);
+    // -------------------------------------------------------------------------
+    // Round 29 — PostDefendMoveDisable / PerishBody-style wires
+    // -------------------------------------------------------------------------
+    case 570:
+      // Ill Will — "Deletes the PP of the move that faints this Pokemon."
+      // PostDefendMoveDisable is the closest vanilla shape (Cursed Body):
+      // disables the attacker's move on contact. Adapts the "delete PP"
+      // intent to "disable for several turns".
+      return ok([new PostDefendMoveDisableAbAttr(100)]);
+    case 376:
+      // Deadeye — "Arrow & cannon moves never miss. Crits hit weakest
+      // defense." Per-flag accuracy override needs new primitive. Wire
+      // only the crit-stage bonus on ARROW_BASED + BALLBOMB_MOVE.
+      return ok([
+        new CritStageBonusAbAttr({ bonus: 1, filter: { flag: MoveFlags.ARROW_BASED } }),
+        new CritStageBonusAbAttr({ bonus: 1, filter: { flag: MoveFlags.BALLBOMB_MOVE } }),
+      ]);
+    case 340:
+      // Fatal Precision — "Super-effective moves never miss and always
+      // crit." Per-move-effectiveness override primitive missing. Wire
+      // only crit-stage bonus broadly (every move gets +1 crit) — not
+      // SE-only but the simplest approximation.
+      return ok([new CritStageBonusAbAttr({ bonus: 1 })]);
+    case 374:
+      // (No ER ability 374 in audit — sentinel to keep formatting.)
+      return SKIP_BESPOKE;
     case 612:
       // Rejection — "Applies Quash on switch-in." Quash applies a
       // QUASHED battler tag. Wire via StatTriggerOnEntry-style hook —
