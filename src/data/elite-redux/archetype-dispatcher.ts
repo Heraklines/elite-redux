@@ -61,7 +61,9 @@ import {
   PostDefendContactDamageAbAttr,
   AddSecondStrikeAbAttr,
   BlockNonDirectDamageAbAttr,
+  ForceSwitchOutImmunityAbAttr,
   IgnoreTypeImmunityAbAttr,
+  PostDamageForceSwitchAbAttr,
   PostDefendAbilitySwapAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
   ProtectStatAbAttr,
@@ -3125,6 +3127,33 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Olé! — Already wired R21 with StatTriggerOnEntry(EVA +1).
       // Sentinel skip to keep round formatting consistent.
       return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
+    // Round 28 — vanilla ForceSwitchOutImmunity / PostDamageForceSwitch
+    // -------------------------------------------------------------------------
+    case 904:
+      // Strong Foundation — "Takes 1/2 Water and Ground dmg and can't be
+      // forced out." Wire only the force-switch-immune piece via vanilla
+      // ForceSwitchOutImmunityAbAttr. The typed damage-reduction pieces
+      // need filter-kind extensions (deferred earlier).
+      return ok([new ForceSwitchOutImmunityAbAttr()]);
+    case 668:
+      // No Turning Back — already wired R20 with stat boosts. The
+      // "can't retreat below 1/2 HP" piece would compose with
+      // ForceSwitchOutImmunityAbAttr but the existing R20 wire fires
+      // unconditionally — adding a second AbAttr here would clobber. Defer
+      // refinement; keep R20 wire.
+      return SKIP_BESPOKE;
+    case 690:
+      // Restraining Order — "Forces the attacker out when hit, once each
+      // switch-in." Vanilla PostDamageForceSwitch is HP-threshold based,
+      // not on-hit. Approximation: wire PostDamageForceSwitch with hpRatio=1
+      // (fires on any damage). Once-per-switch gate deferred.
+      return ok([new PostDamageForceSwitchAbAttr(1.0)]);
+    case 864:
+      // Chuckster — "Once per entry, take 1/2 damage and force-switch the
+      // target." Similar to 690 with a once-per-entry gate. Same wire as
+      // 690 for the force-switch side; damage reduction deferred.
+      return ok([new PostDamageForceSwitchAbAttr(1.0)]);
     case 612:
       // Rejection — "Applies Quash on switch-in." Quash applies a
       // QUASHED battler tag. Wire via StatTriggerOnEntry-style hook —
