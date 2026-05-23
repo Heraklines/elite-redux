@@ -202,18 +202,19 @@ describe("ER integration — fusion + 4-ability interactions", () => {
       expect(passives[2]!.id).toBe(AbilityId.FLAME_BODY);
     });
 
-    // TODO(er-fusion-transform-followup): customPokemonData.passive on the
-    // target interferes with species._passives[0] resolution — target's slot 0
-    // returns the custom passive id, not BLAZE. Needs a separate fix that
-    // either layers _passives ON TOP of customPokemonData.passive, OR clears
-    // customPokemonData.passive when species.setPassives is called. Synchronous
-    // setTempPassives is now wired in pokemon-transform-phase.ts (verified by
-    // the other 15 fusion tests in this file). Tracking under task #88.
-    it.skip("PokemonTransformPhase copies all 3 target passives onto the user", async () => {
+    it("PokemonTransformPhase copies all 3 target passives onto the user", async () => {
       // The integration test: a transformed Pokemon should expose the
       // target's 3-passive set via `getPassiveAbilities()`. Closes the
       // "transform copies all 3 passives" gap from the user task.
-      game.override.enemySpecies(SpeciesId.CHARMANDER);
+      //
+      // Disable the enemy passive override installed by the file-level
+      // `beforeEach`: that override is meant for tests that want a *forced*
+      // single passive on the enemy, but this test installs its own explicit
+      // 3-passive triple on Charmander's species and needs `getPassiveAbilities()`
+      // to resolve through species `_passives`, not the slot-0 override.
+      // Without this, the override hijacks slot 0 and the transform copies
+      // the override's id instead of the species triple.
+      game.override.enemySpecies(SpeciesId.CHARMANDER).enemyPassiveAbility(AbilityId.NONE);
       await game.classicMode.startBattle(SpeciesId.DITTO);
 
       const ditto = game.field.getPlayerPokemon();
