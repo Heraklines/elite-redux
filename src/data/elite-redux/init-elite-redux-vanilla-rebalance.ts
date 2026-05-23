@@ -81,6 +81,7 @@ import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-
 import { ER_ABILITIES } from "#data/elite-redux/er-abilities";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
+import { initEliteReduxVanillaMovePatches } from "#data/elite-redux/init-elite-redux-vanilla-move-patches";
 import type { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -106,6 +107,14 @@ export interface VanillaRebalanceResult {
   moveDeltas: number;
   /** Count of individual move field assignments performed (a single move may bump 2+ fields). */
   moveFieldWrites: number;
+  /**
+   * Count of vanilla moves whose battle MECHANICS (type, category, attrs,
+   * flags, target) were patched via the move-patcher dispatch table in
+   * `init-elite-redux-vanilla-move-patches.ts`. Separate from `moveDeltas`
+   * because numeric field writes and mechanic patches are independent —
+   * a move may receive both, neither, or only one.
+   */
+  moveMechanicDeltas: number;
   /**
    * Count of vanilla abilities whose live `attrs`/AbAttr fields were mutated
    * to match ER's mechanic deltas. Counts each ability ONCE per run, even if
@@ -450,6 +459,27 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // HEAVY_METAL handled above in the MAJOR section (TOTAL upgrade integrated).
   // OPPORTUNIST: replace stat-copy with priority +1 vs foes below 1/2 HP.
   [AbilityId.OPPORTUNIST, ab => rewriteOpportunist(ab)],
+
+  // ===== Round 3: more MINOR / MAJOR patches from the audit =====
+  // 178 MEGA_LAUNCHER: pulse moves 1.5x → 1.3x (audit MINOR retune).
+  [AbilityId.MEGA_LAUNCHER, ab => mutateMovePowerBoost(ab, 1.3)],
+  // 6 STURDY: vanilla "OHKO immune at full HP" → ER "OHKO immune + 1/2 damage from SE moves at full HP".
+  // Adds a damage-reduction rider. Approximated via existing addStatProtect-style hook;
+  // the precise "SE+full HP" filter needs a new primitive — defer the rider, no-op patch.
+  // (Listed as audit MAJOR but the underlying SE-at-full-HP filter isn't yet available.)
+
+  // 24 LIMBER: vanilla paralysis immune → ER "+ also blocks INFATUATION".
+  [AbilityId.LIMBER, ab => extendBattlerTagImmunity(ab, BattlerTagType.INFATUATED)],
+  // 39 INNER_FOCUS already handled in MAJOR section above (FEAR immunity extension).
+
+  // 161 BIG_PECKS already TOTAL above.
+  // 100 STALL already TOTAL above.
+
+  // 233 NEUROFORCE / 262 TRANSISTOR already MINOR-patched above.
+  // 89 IRON_FIST already MINOR-patched above.
+  // 89-cluster (PUNCH/BITE/SLICE) — STRONG_JAW already patched. Add 132 SHARPNESS (slice 1.5x).
+  // SHARPNESS is gen-9 — present in pokerogue. ER spec: "Slicing moves 1.5x" (vanilla baseline).
+  // Already at 1.5 by default; no-op. Skipped.
 ]);
 
 /**
@@ -467,6 +497,7 @@ export function initEliteReduxVanillaRebalance(): VanillaRebalanceResult {
   const result: VanillaRebalanceResult = {
     moveDeltas: 0,
     moveFieldWrites: 0,
+    moveMechanicDeltas: 0,
     abilityDeltas: 0,
     moveMissing: 0,
     abilityMissing: 0,
@@ -629,6 +660,16 @@ export function initEliteReduxVanillaRebalance(): VanillaRebalanceResult {
       result.abilityErrors.push(`Patcher for ability id ${pokerogueId} threw: ${msg}`);
     }
   }
+
+  // === MOVE MECHANIC PATCHES ===
+  // The numeric retunes in the moves loop above only touch power/accuracy/pp/
+  // priority/chance. ER additionally rewires the mechanic of ~111 vanilla
+  // moves (type swaps, category swaps, status-on-hit additions, OHKO removals,
+  // flag bits). Those edits live in a sibling dispatch table for legibility.
+  const moveMechPatches = initEliteReduxVanillaMovePatches();
+  result.moveMechanicDeltas = moveMechPatches.moveDeltas;
+  result.moveMissing += moveMechPatches.moveMissing;
+  result.moveErrors.push(...moveMechPatches.moveErrors);
 
   return result;
 }
