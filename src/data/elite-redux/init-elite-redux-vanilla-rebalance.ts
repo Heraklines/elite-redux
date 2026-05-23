@@ -88,6 +88,7 @@ import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { initEliteReduxVanillaMovePatches } from "#data/elite-redux/init-elite-redux-vanilla-move-patches";
 import type { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
+import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
 import { MoveCategory } from "#enums/move-category";
@@ -634,6 +635,67 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     AbilityId.RUN_AWAY,
     ab => {
       ab.attrs.push(new StatTriggerOnStatLoweredAbAttr({ stats: [{ stat: Stat.SPD, stages: 1 }] }));
+    },
+  ],
+
+  // ===== Round 8: more ER-specific deltas =====
+  // 57 PLUS / 58 MINUS: vanilla +50% SpAtk if ally has Plus/Minus. ER
+  // "Deals double damage" — close to vanilla's effect; we mutate the
+  // baseline AllyStatMultiplier to 2.0 from 1.5 (functionally doubles
+  // outgoing damage when ally is present).
+  [AbilityId.PLUS, ab => mutateStatMultiplier(ab, Stat.SPATK, 2.0)],
+  [AbilityId.MINUS, ab => mutateStatMultiplier(ab, Stat.SPATK, 2.0)],
+
+  // 73 WHITE_SMOKE: vanilla "stat-drop immunity". ER COMPLETELY DIFFERENT
+  // — "Sets Smokescreen for 3 turns on switch-in". Add a Mist arena tag
+  // on entry (Mist is the engine equivalent of vanilla Smokescreen with
+  // stat-drop protection extended to side).
+  [
+    AbilityId.WHITE_SMOKE,
+    ab => {
+      ab.attrs.push(
+        new EntryEffectAbAttr({
+          kind: "set-screen-or-room",
+          tag: ArenaTagType.MIST,
+          turns: 3,
+        }),
+      );
+    },
+  ],
+
+  // 147 WONDER_SKIN: vanilla "status moves 50% acc on user". ER COMPLETELY
+  // DIFFERENT — "Blocks most damage boosting and multihit abilities".
+  // Reuse the Fort Knox-style damage-suppression (0.77x to neutralize
+  // typical 1.3x boost).
+  [
+    AbilityId.WONDER_SKIN,
+    ab => {
+      ab.attrs.push(new ReceivedMoveDamageMultiplierAbAttr(() => true, 0.77));
+    },
+  ],
+
+  // 119 FRISK: vanilla "reveal foe item". ER "disables their items for 2
+  // turns" — no engine primitive for that. Defer.
+
+  // 112 SLOW_START: vanilla halves ATK + SPD for 5 turns. ER also halves
+  // SPATK — add the missing offense slow. Approximated as additional
+  // StatMultiplier on SPATK that's gated on a turn counter — pokerogue's
+  // existing implementation uses a SlowStartTag with turn-based decay.
+  // The easiest correct path: layer a second StatMultiplier on SPATK
+  // that mirrors the ATK one.
+  [AbilityId.SLOW_START, ab => mutateStatMultiplier(ab, Stat.SPATK, 0.5)],
+
+  // 215 INNARDS_OUT: vanilla deals fatal-hit damage on KO. Same as ER.
+  // Add an extra ATK +1 rider via existing OnFaintEffect path is overkill;
+  // vanilla covers the gameplay-essential effect.
+
+  // 82 GLUTTONY: vanilla eats berries early (<= 50% HP). ER adds 1/3 HP
+  // heal on berry consumption. The HealFromBerryUseAbAttr exists in vanilla
+  // — patch its heal factor to 1/3.
+  [
+    AbilityId.GLUTTONY,
+    ab => {
+      ab.attrs.push(new HealFromBerryUseAbAttr(1 / 3));
     },
   ],
 ]);
