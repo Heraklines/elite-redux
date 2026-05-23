@@ -59,6 +59,7 @@ import {
   type AbAttr,
   BlockRecoilDamageAttr,
   PostDefendContactDamageAbAttr,
+  IgnoreTypeImmunityAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
   ProtectStatAbAttr,
   StatMultiplierAbAttr,
@@ -3017,6 +3018,33 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([
         new SpeedBonusToStatAbAttr({ stat: Stat.ATK, speedFraction: 1, sourceStat: Stat.DEF }),
         new SpeedBonusToStatAbAttr({ stat: Stat.SPATK, speedFraction: 1, sourceStat: Stat.SPDEF }),
+      ]);
+    // -------------------------------------------------------------------------
+    // Round 24 — type-immunity bypass cluster (vanilla IgnoreTypeImmunityAbAttr).
+    // -------------------------------------------------------------------------
+    case 285:
+      // Ground Shock — "Target Grounds aren't immune to Electric but resist
+      // it instead." Bypass FLYING type's Ground-immunity? No — actually
+      // "Ground type isn't immune to Electric". Wire IgnoreTypeImmunity:
+      // defender FLYING with allowedMoveTypes = [ELECTRIC] is the vanilla
+      // shape used for Volt Absorb hits on Ground. Our case is different.
+      // Defer.
+      return SKIP_BESPOKE;
+    case 353:
+      // Bone Zone — "Bone moves ignore immunities and deal 2x on not very
+      // effective." Wire IgnoreTypeImmunity for the GHOST defender (Normal
+      // Bone moves hitting Ghost is the common case ER targets). The 2x-
+      // on-not-very-effective piece needs a new effectiveness-multiplier
+      // primitive (defer).
+      return ok([
+        new IgnoreTypeImmunityAbAttr(PokemonType.GHOST, [PokemonType.NORMAL, PokemonType.FIGHTING, PokemonType.GROUND]),
+      ]);
+    case 457:
+      // Phantom Pain — "Ghost-type moves deal normal damage to Normal."
+      // Bypass Normal-type's Ghost-immunity (Ghost moves vs Normal). Same
+      // IgnoreTypeImmunity shape.
+      return ok([
+        new IgnoreTypeImmunityAbAttr(PokemonType.NORMAL, [PokemonType.GHOST]),
       ]);
     case 612:
       // Rejection — "Applies Quash on switch-in." Quash applies a

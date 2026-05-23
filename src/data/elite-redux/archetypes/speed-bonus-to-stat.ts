@@ -25,7 +25,8 @@
 // =============================================================================
 
 import { StatMultiplierAbAttr, type StatMultiplierAbAttrParams } from "#abilities/ab-attrs";
-import { Stat, type BattleStat } from "#enums/stat";
+import type { EffectiveStat, BattleStat } from "#enums/stat";
+import { Stat } from "#enums/stat";
 
 /** Filter shape — which moves trigger the speed bonus. */
 export interface SpeedBonusFilter {
@@ -50,9 +51,11 @@ export interface SpeedBonusToStatOptions {
   /**
    * Optional override for the source stat. Defaults to {@linkcode Stat.SPD}
    * (matching the original primitive purpose). Set to e.g. {@linkcode Stat.DEF}
-   * to wire abilities like Power Core ("+20% Def during moves").
+   * to wire abilities like Power Core ("+20% Def during moves"). Must be an
+   * EffectiveStat (HP/ATK/DEF/SPATK/SPDEF/SPD) — accuracy/evasion are not
+   * meaningful "source" stats.
    */
-  readonly sourceStat?: BattleStat;
+  readonly sourceStat?: EffectiveStat;
 }
 
 /**
@@ -65,7 +68,7 @@ export class SpeedBonusToStatAbAttr extends StatMultiplierAbAttr {
   private readonly bonusStat: BattleStat;
   private readonly speedFraction: number;
   private readonly bonusFilter: SpeedBonusFilter;
-  private readonly sourceStat: BattleStat;
+  private readonly sourceStat: EffectiveStat;
 
   constructor(options: SpeedBonusToStatOptions) {
     // Pass multiplier=1 to the parent so the base stat is unchanged; we add
