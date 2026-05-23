@@ -981,19 +981,32 @@ export class SummaryUiHandler extends UiHandler {
           profileContainer.add(this.abilityPrompt);
         }
 
-        allAbilityInfo.forEach(abilityInfo => {
-          abilityInfo.labelImage.setPosition(17, 47);
+        // ER-style stacked list: each ability gets its own row instead of
+        // overlaying at the same position. Active ability at the top, then
+        // each non-empty innate stacked below. Row height tuned to fit 4
+        // entries within the profile panel without overflowing the existing
+        // stats / level / nature region.
+        const ROW_HEIGHT = 22;
+        allAbilityInfo.forEach((abilityInfo, index) => {
+          const rowOffsetY = index * ROW_HEIGHT;
+          abilityInfo.labelImage.setPosition(17, 47 + rowOffsetY);
           abilityInfo.labelImage.setVisible(true);
           abilityInfo.labelImage.setOrigin(0, 0.5);
           profileContainer.add(abilityInfo.labelImage);
 
-          abilityInfo.nameText = addTextObject(7, 68, abilityInfo.ability?.name!, TextStyle.SUMMARY_ALT); // TODO: is this bang correct?
+          abilityInfo.nameText = addTextObject(7, 56 + rowOffsetY, abilityInfo.ability?.name!, TextStyle.SUMMARY_ALT); // TODO: is this bang correct?
           abilityInfo.nameText.setOrigin(0, 1);
           profileContainer.add(abilityInfo.nameText);
 
-          abilityInfo.descriptionText = addTextObject(7, 71, abilityInfo.ability?.description!, TextStyle.WINDOW_ALT, {
-            wordWrap: { width: 1224 },
-          }); // TODO: is this bang correct?
+          abilityInfo.descriptionText = addTextObject(
+            7,
+            59 + rowOffsetY,
+            abilityInfo.ability?.description!,
+            TextStyle.WINDOW_ALT,
+            {
+              wordWrap: { width: 1224 },
+            },
+          ); // TODO: is this bang correct?
           abilityInfo.descriptionText.setOrigin(0, 0);
           profileContainer.add(abilityInfo.descriptionText);
 
