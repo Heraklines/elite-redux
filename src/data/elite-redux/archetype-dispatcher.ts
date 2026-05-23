@@ -1411,7 +1411,12 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
  *   - 975 Talon Trap → {@linkcode ChanceBattlerTagOnHitAbAttr} (50%, TRAPPED,
  *     contact). "100% if entered this turn" piece deferred. Partial wire.
  */
-function dispatchBespoke(erAbilityId: number): DispatchResult {
+/**
+ * Per-id dispatch for bespoke ER abilities (those classified as
+ * `archetype: "bespoke"` in `er-ability-archetypes.ts`). Exported so
+ * verification scripts/tests can exercise it directly.
+ */
+export function dispatchBespoke(erAbilityId: number): DispatchResult {
   switch (erAbilityId) {
     case 289:
       // Growing Tooth — Atk +1 after a biting move resolves.
@@ -3638,14 +3643,10 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       return SKIP_BESPOKE;
     case 672:
       // Mosh Pit — "Ally's attacks get a 1.25x boost. 1.5x if attack causes
-      // recoil." Ally damage aura. Wire 1.25x boost via existing user-field
-      // boost (typeAny). Recoil-conditional 1.5x deferred.
-      return ok([
-        // Use existing UserFieldMoveTypePowerBoostAbAttr with a sentinel type
-        // that matches "any" — fallback to 1.25x flat boost via FlagDamageBoost
-        // with NONE flag (which never matches, so disabled). Defer until ally
-        // aura primitive is built.
-      ]);
+      // recoil." Ally damage aura. Defer until ally-aura primitive
+      // supports an "any-type" mode (vanilla UserFieldMoveTypePowerBoost
+      // requires a type gate).
+      return SKIP_BESPOKE;
     case 532:
       // Permanence — "Foes can't heal in any way." Heal-block aura. Needs
       // a new heal-suppression primitive. Defer.
