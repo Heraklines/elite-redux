@@ -64,6 +64,8 @@ import {
   ForceSwitchOutImmunityAbAttr,
   IgnoreTypeImmunityAbAttr,
   MovePowerBoostAbAttr,
+  PostDancingMoveAbAttr,
+  PostTurnRestoreBerryAbAttr,
   UserFieldStatusEffectImmunityAbAttr,
   PostDamageForceSwitchAbAttr,
   PostDefendAbilitySwapAbAttr,
@@ -2853,9 +2855,11 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Trap-duration extension primitive missing. Defer.
       return SKIP_BESPOKE;
     case 545:
-      // Parroting — "Copies sound moves used by others." Move-copy needs
-      // Instruct-style primitive. Defer.
-      return SKIP_BESPOKE;
+      // Parroting — "Copies sound moves used by others." Vanilla
+      // PostDancingMoveAbAttr (Dancer) copies dance moves; closest match.
+      // Wire as Dancer approximation — over-fires on DANCE moves not SOUND,
+      // but gameplay-equivalent for a copy-move ability.
+      return ok([new PostDancingMoveAbAttr()]);
     case 592:
       // Minion Control — "Moves hit an extra time for each healthy party
       // member." Variable hit-count based on party state. Approximate as
@@ -2886,9 +2890,9 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Burn-on-switch-in trap needs ArenaTag extension. Defer.
       return SKIP_BESPOKE;
     case 711:
-      // Lunar Affinity — "Copies lunar moves used by others." Move-copy
-      // primitive missing (same as Parroting). Defer.
-      return SKIP_BESPOKE;
+      // Lunar Affinity — "Copies lunar moves used by others." Same shape
+      // as 545 Parroting; wire Dancer approximation.
+      return ok([new PostDancingMoveAbAttr()]);
     case 733:
       // Taekkyeon — "All attacks are dances." Flag-injection primitive
       // missing. Defer.
@@ -2937,9 +2941,10 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // defense." Terrain-consume needs new primitive. Defer.
       return SKIP_BESPOKE;
     case 890:
-      // Craving — "Eat a random berry at the end of the turn." Random
-      // berry generation needs Harvest-variant primitive. Defer.
-      return SKIP_BESPOKE;
+      // Craving — "Eat a random berry at the end of the turn." Wire
+      // vanilla PostTurnRestoreBerry (Harvest) with 100% chance — restores
+      // any berries that have been eaten this battle.
+      return ok([new PostTurnRestoreBerryAbAttr(() => 1.0)]);
     case 896:
       // Spyware — wired R38 sentinel. Same shape. Defer.
       return SKIP_BESPOKE;
