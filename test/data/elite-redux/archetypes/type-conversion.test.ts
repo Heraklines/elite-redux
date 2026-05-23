@@ -34,8 +34,14 @@ function makeStubPokemon(): Pokemon {
 
 function makeStubMove(opts: { type?: PokemonType; flags?: MoveFlags }): Move {
   const flags = opts.flags ?? MoveFlags.NONE;
+  const resolvedType = opts.type ?? PokemonType.NORMAL;
   return {
-    _type: opts.type ?? PokemonType.NORMAL,
+    _type: resolvedType,
+    // Public `type` getter mirrors the real Move class — matchesSource()
+    // reads `move.type` directly (not `user.getMoveType(move)`) to avoid
+    // the PreAttack-AbAttr recursion bug fixed in
+    // src/data/elite-redux/archetypes/type-conversion.ts.
+    type: resolvedType,
     flags,
     hasFlag(flag: MoveFlags) {
       return (flags & flag) !== MoveFlags.NONE;

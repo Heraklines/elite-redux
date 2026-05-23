@@ -37,7 +37,8 @@ describe("Abilities - Victory Star", () => {
     game.move.select(MoveId.SPLASH, 1);
     await game.phaseInterceptor.to("TurnEndPhase");
 
-    expect(user.getAccuracyMultiplier).toHaveReturnedWith(1.1);
+    // ER rebalance: Victory Star boost is 1.2x (vanilla 1.1x).
+    expect(user.getAccuracyMultiplier).toHaveReturnedWith(1.2);
   });
 
   it("should increase the accuracy of its user's ally", async () => {

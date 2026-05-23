@@ -157,15 +157,22 @@ export class TypeConversionAbAttr extends MoveTypeChangeAbAttr {
    * for tests and for the power-boost sibling class to reuse without
    * re-implementing the predicate.
    */
-  public static matchesSource(source: TypeConversionSource, user: Pokemon, move: Move): boolean {
+  public static matchesSource(source: TypeConversionSource, _user: Pokemon, move: Move): boolean {
+    // IMPORTANT: use `move.type` (the move's BASE type from its data) not
+    // `user.getMoveType(move)`. The latter runs PreAttack AbAttrs including
+    // this one, which causes an infinite recursion: getMoveType → applyAbAttrs
+    // → TypeConversionAbAttr.canApply → matchesSource → getMoveType. This
+    // bug manifested in real battles by freezing the fight UI when the
+    // player tried to pick a move (the moveset render path calls
+    // `m.getMove().id` AFTER move type resolution).
     switch (source.kind) {
       case "type":
-        return user.getMoveType(move) === source.type;
+        return move.type === source.type;
       case "flag":
         if (!move.hasFlag(source.flag)) {
           return false;
         }
-        if (source.requireType !== undefined && user.getMoveType(move) !== source.requireType) {
+        if (source.requireType !== undefined && move.type !== source.requireType) {
           return false;
         }
         return true;
