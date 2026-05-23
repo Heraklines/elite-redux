@@ -2831,6 +2831,54 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // as self-only sound-move immunity via PreApplyBattlerTagImmunity —
       // there's no SOUND-specific battler tag; defer the full wiring.
       return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
+    // Round 20 — HP-conditional stat boost cluster using vanilla
+    // StatMultiplierAbAttr with HP-threshold predicates.
+    // -------------------------------------------------------------------------
+    case 668: {
+      // No Turning Back — "Boosts all stats but can't retreat when below
+      // 1/2 max HP." The switch-block piece needs a force-stay primitive;
+      // wire the boost: ATK / DEF / SPATK / SPDEF / SPD all 1.2x below 50% HP.
+      const halfHpGate = (pokemon: { hp: number; getMaxHp(): number }) =>
+        pokemon.hp / pokemon.getMaxHp() <= 0.5;
+      return ok([
+        new StatMultiplierAbAttr(Stat.ATK, 1.2, halfHpGate),
+        new StatMultiplierAbAttr(Stat.DEF, 1.2, halfHpGate),
+        new StatMultiplierAbAttr(Stat.SPATK, 1.2, halfHpGate),
+        new StatMultiplierAbAttr(Stat.SPDEF, 1.2, halfHpGate),
+        new StatMultiplierAbAttr(Stat.SPD, 1.2, halfHpGate),
+      ]);
+    }
+    case 634: {
+      // Last Stand — "Def and SpDef increase as HP drops. Max 1.6x."
+      // Approximate as a single tier: 1.6x DEF and SPDEF below 50% HP.
+      // Multi-tier gradient (1.2/1.4/1.6) is a future refinement.
+      const halfHpGate = (pokemon: { hp: number; getMaxHp(): number }) =>
+        pokemon.hp / pokemon.getMaxHp() <= 0.5;
+      return ok([
+        new StatMultiplierAbAttr(Stat.DEF, 1.6, halfHpGate),
+        new StatMultiplierAbAttr(Stat.SPDEF, 1.6, halfHpGate),
+      ]);
+    }
+    case 703: {
+      // Rage Point — "Gets a 1.5x boost while statused. Raises offenses
+      // when crit." Wire 1.5x ATK + SPATK when holder has any non-NONE
+      // status. The on-crit-raise piece composes with vanilla Anger Point
+      // and is deferred.
+      const statusedGate = (pokemon: { status: { effect: StatusEffect } | null }) =>
+        pokemon.status !== null && pokemon.status?.effect !== StatusEffect.NONE;
+      return ok([
+        new StatMultiplierAbAttr(Stat.ATK, 1.5, statusedGate),
+        new StatMultiplierAbAttr(Stat.SPATK, 1.5, statusedGate),
+      ]);
+    }
+    case 506: {
+      // Determination — "Ups Special Attack by 50% if suffering."
+      // "Suffering" in ER context = statused.
+      const statusedGate = (pokemon: { status: { effect: StatusEffect } | null }) =>
+        pokemon.status !== null && pokemon.status?.effect !== StatusEffect.NONE;
+      return ok([new StatMultiplierAbAttr(Stat.SPATK, 1.5, statusedGate)]);
+    }
     default:
       return SKIP_BESPOKE;
   }
