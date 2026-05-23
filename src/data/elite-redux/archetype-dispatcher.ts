@@ -63,6 +63,7 @@ import {
   BlockNonDirectDamageAbAttr,
   ForceSwitchOutImmunityAbAttr,
   IgnoreTypeImmunityAbAttr,
+  UserFieldStatusEffectImmunityAbAttr,
   PostDamageForceSwitchAbAttr,
   PostDefendAbilitySwapAbAttr,
   PostDefendMoveDisableAbAttr,
@@ -2682,6 +2683,22 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       return SKIP_BESPOKE;
     case 282:
       // (Sentinel — Aerodynamics was wired R12.)
+      return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
+    // Round 37 — ally/field protection wires using UserField* vanilla attrs
+    // -------------------------------------------------------------------------
+    case 463:
+      // Jungle's Guard — "Protects Grass-type allies from status and stat
+      // drops." Wire UserFieldStatusEffectImmunity for the status side.
+      // Grass-type-only filter not directly supported (UserField applies to
+      // all allies); approximation grants all allies status immunity.
+      return ok([
+        new UserFieldStatusEffectImmunityAbAttr(),
+      ]);
+    case 838838:
+      // (Sentinel — Guardian Coat wired R35.)
+      return SKIP_BESPOKE;
+    case 282282:
       return SKIP_BESPOKE;
     case 456:
       // Cryomancy — "Moves inflict frostbite 5x as often." Same shape as
