@@ -2486,6 +2486,32 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // SuppressWeatherEffectAbAttr (Cloud Nine). Room and terrain
       // suppression need separate primitives — deferred.
       return ok([new SuppressWeatherEffectAbAttr()]);
+    // -------------------------------------------------------------------------
+    // Round 30 — PostStatStageChange + stat-trigger-on-stat-lowered wires
+    // -------------------------------------------------------------------------
+    case 564:
+      // Tactical Retreat — "Flees when stats are lowered." Force-switch
+      // primitive on stat-lower not yet wired; approximate via SPD +2 stage
+      // when any stat is lowered (Competitive/Defiant pattern).
+      return ok([
+        new StatTriggerOnStatLoweredAbAttr({
+          stats: [{ stat: Stat.SPD, stages: 2 }],
+        }),
+      ]);
+    case 555:
+      // Egoist — "Raises its own stats when foes raise theirs." Mirror
+      // opponent stat raises. Pokerogue's OPPORTUNIST is similar but
+      // direction-flipped. Defer (needs opponent-stat-stage-change observer).
+      return SKIP_BESPOKE;
+    case 556:
+      // Subdue — "Doubles stat drop effects used by this pokemon." Boost
+      // outgoing stat-drop magnitude (e.g. Growl → -2 instead of -1).
+      // Needs stat-drop-magnitude modifier primitive. Defer.
+      return SKIP_BESPOKE;
+    case 577:
+      // Sharing Is Caring — "Stat changes are shared between all battlers."
+      // Field-wide stat-change propagation. Complex; defer.
+      return SKIP_BESPOKE;
     case 456:
       // Cryomancy — "Moves inflict frostbite 5x as often." Same shape as
       // Pyromancy (270): flat 30% ER_FROSTBITE on hit.
