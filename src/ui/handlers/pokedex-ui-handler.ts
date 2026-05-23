@@ -1471,7 +1471,10 @@ export class PokedexUiHandler extends MessageUiHandler {
       // Move filter
       // TODO: There can be fringe cases where the two moves belong to mutually exclusive forms, these must be handled separately (Pikachu);
       // On the other hand, in some cases it is possible to switch between different forms and combine (Deoxys)
-      const levelMoves = pokemonSpeciesLevelMoves[species.speciesId].map(m => allMoves[m[1]].name);
+      // Defensive `?? []`: ER-custom species (id ≥ 10000) without populated
+      // entries shouldn't crash the entire dex render — they'd hide everything
+      // after them in the iteration.
+      const levelMoves = pokemonSpeciesLevelMoves[species.speciesId]?.map(m => allMoves[m[1]].name) ?? [];
       // This always gets egg moves from the starter
       const eggMoves = speciesEggMoves[starterId]?.map(m => allMoves[m].name) ?? [];
       const tmMoves = speciesTmMoves[species.speciesId]?.map(m => allMoves[Array.isArray(m) ? m[1] : m].name) ?? [];
