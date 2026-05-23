@@ -12,8 +12,62 @@
 // pokerogue-expected path so the dex / battle scene can find it. Idempotent.
 // =============================================================================
 
-import { copyFile, mkdir, stat } from "node:fs/promises";
+import { copyFile, mkdir, stat, writeFile, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+
+/**
+ * Read PNG dimensions from the IHDR header (bytes 16-23). PNG signature is
+ * 8 bytes, then IHDR chunk starts: length (4) + "IHDR" (4) + width (4) +
+ * height (4). Total offset for width = 8+8 = 16; height = 20.
+ */
+async function pngDimensions(path) {
+  const buf = await readFile(path);
+  if (buf.length < 24) return { w: 0, h: 0 };
+  const w = buf.readUInt32BE(16);
+  const h = buf.readUInt32BE(20);
+  return { w, h };
+}
+
+/**
+ * Generate a minimal single-frame Phaser texture-atlas JSON next to the PNG
+ * so pokerogue's `loadAtlas` resolves the sprite. Single static-frame
+ * sprites (ER's source format) get exactly one frame covering the entire
+ * image. Vanilla pokerogue species use multi-frame atlases for animation —
+ * we use single-frame for static parity with the source asset.
+ */
+async function writeAtlasJson(pngPath) {
+  const jsonPath = pngPath.replace(/\.png$/, ".json");
+  try {
+    await stat(jsonPath);
+    return false; // already exists
+  } catch {}
+  const { w, h } = await pngDimensions(pngPath);
+  if (w === 0 || h === 0) return false;
+  const basename = pngPath.split(/[\\/]/).pop();
+  const atlas = {
+    textures: [
+      {
+        image: basename,
+        format: "RGBA8888",
+        size: { w, h },
+        scale: 1,
+        frames: [
+          {
+            filename: "0001.png",
+            rotated: false,
+            trimmed: false,
+            sourceSize: { w, h },
+            spriteSourceSize: { x: 0, y: 0, w, h },
+            frame: { x: 0, y: 0, w, h },
+          },
+        ],
+      },
+    ],
+    meta: { app: "er-link-form-sprites", version: "1.0", smartupdate: "" },
+  };
+  await writeFile(jsonPath, JSON.stringify(atlas, null, 2), "utf-8");
+  return true;
+}
 
 const REPO_ROOT = new URL("../..", import.meta.url).pathname.slice(1); // strip leading "/" on Windows
 const ER_SPRITE_DIR = join(REPO_ROOT, "assets", "images", "pokemon", "elite-redux");
@@ -89,13 +143,22 @@ async function copyIfMissing(src, dst, report) {
     report.missingSource++;
     return;
   }
-  if (await exists(dst)) {
+  let copied = false;
+  if (!(await exists(dst))) {
+    await ensureDir(dst);
+    await copyFile(src, dst);
+    report.copied++;
+    copied = true;
+  } else {
     report.skippedExisting++;
-    return;
   }
-  await ensureDir(dst);
-  await copyFile(src, dst);
-  report.copied++;
+  // Always ensure the atlas JSON exists next to the PNG — pokerogue's
+  // `loadAtlas` needs both. Idempotent (skips if .json already there).
+  if (dst.endsWith(".png")) {
+    const wrote = await writeAtlasJson(dst);
+    if (wrote) report.atlasWritten = (report.atlasWritten ?? 0) + 1;
+  }
+  return copied;
 }
 
 async function main() {
