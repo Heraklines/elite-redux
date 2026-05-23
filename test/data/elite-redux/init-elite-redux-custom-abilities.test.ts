@@ -262,7 +262,9 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     // so future rounds adding more bespoke wirings don't invalidate this
     // assertion.
     expect(wiredCounts.bespoke ?? 0).toBeGreaterThanOrEqual(15);
-    expect(wiredCounts.bespoke ?? 0).toBeLessThanOrEqual(80);
+    // Round 12 raised the upper bound from 80 to 130 — round 12 added 11 new
+    // bespoke wires and the cumulative count is now ~90 (~30% of 258).
+    expect(wiredCounts.bespoke ?? 0).toBeLessThanOrEqual(130);
   });
 
   it("init result reports per-archetype wired counts (fresh run on a clean baseline)", () => {

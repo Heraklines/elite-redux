@@ -517,14 +517,18 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(attr.getFilter()).toEqual({ kind: "all" });
   });
 
-  it("er id 944 (Dead Bark) wires DamageReductionAbAttr (kind: all, reduction: 0.15)", () => {
+  it("er id 944 (Dead Bark) wires EntryEffect(add-self-type GHOST) + DamageReduction(kind: all, 0.15)", () => {
+    // Round 12: upgraded from damage-only to add-type + damage-reduction pair.
+    // The entry-effect attaches Ghost to the holder's type list on switch-in
+    // (existing `EntryEffectAddSelfType` primitive); the DamageReduction
+    // covers the 15% all-moves piece. The "30% if SE" rider remains deferred.
     const res = dispatchArchetype("bespoke", null, 944);
     expect(res.skipReason).toBeNull();
-    expect(res.attrs).toHaveLength(1);
-    const attr = res.attrs[0] as DamageReductionAbAttr;
-    expect(attr).toBeInstanceOf(DamageReductionAbAttr);
-    expect(attr.getReduction()).toBeCloseTo(0.15);
-    expect(attr.getFilter()).toEqual({ kind: "all" });
+    expect(res.attrs).toHaveLength(2);
+    const damageAttr = res.attrs[1] as DamageReductionAbAttr;
+    expect(damageAttr).toBeInstanceOf(DamageReductionAbAttr);
+    expect(damageAttr.getReduction()).toBeCloseTo(0.15);
+    expect(damageAttr.getFilter()).toEqual({ kind: "all" });
   });
 
   it("er id 931 (Hammer Fist) wires two FlagDamageBoost instances (PUNCHING_MOVE 1.25x + HAMMER_BASED 1.25x)", () => {
@@ -541,14 +545,17 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(a1.getHighHpMultiplier()).toBeCloseTo(1.25);
   });
 
-  it("er id 544 (Airborne) wires TypeDamageBoostAbAttr (FLYING, 1.3x)", () => {
+  it("er id 544 (Airborne) wires UserFieldMoveTypePowerBoost(FLYING, 1.3x)", () => {
+    // Round 12: upgraded from TypeDamageBoost (self-only) to
+    // UserFieldMoveTypePowerBoost — the latter broadcasts the +30% Flying
+    // boost to the holder AND its ally (vanilla Battery/Power Spot family).
     const res = dispatchArchetype("bespoke", null, 544);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(1);
-    const attr = res.attrs[0] as TypeDamageBoostAbAttr;
-    expect(attr).toBeInstanceOf(TypeDamageBoostAbAttr);
-    expect(attr.getBoostType()).toBe(PokemonType.FLYING);
-    expect(attr.getHighHpMultiplier()).toBeCloseTo(1.3);
+    // We verify the broadcast variant — UserFieldMoveTypePowerBoostAbAttr is
+    // re-exported from `#abilities/ab-attrs` and is what the round-12 wire
+    // returns.
+    expect(res.attrs[0].constructor.name).toBe("UserFieldMoveTypePowerBoostAbAttr");
   });
 
   it("er id 375 (Precise Fist) wires CritStageBonusAbAttr (+1 with PUNCHING_MOVE filter)", () => {

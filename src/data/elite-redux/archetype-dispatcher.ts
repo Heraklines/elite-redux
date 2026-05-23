@@ -61,7 +61,10 @@ import {
   PostDefendContactDamageAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
   ProtectStatAbAttr,
+  StatMultiplierAbAttr,
+  UserFieldMoveTypePowerBoostAbAttr,
 } from "#abilities/ab-attrs";
+import { globalScene } from "#app/global-scene";
 import { allAbilities } from "#data/data-lists";
 import { PostTurnHurtNonTypedAbAttr } from "#data/elite-redux/abilities/post-turn-hurt-non-typed";
 import { PpReductionOnContactAbAttr } from "#data/elite-redux/abilities/pp-reduction-on-contact";
@@ -1814,13 +1817,17 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([new DamageReductionAbAttr({ reduction: 0.1, filter: { kind: "all" } })]);
     case 944:
       // Dead Bark — "Adds Ghost type. Takes 15% less damage. 30% less damage
-      // if SE." Wire the flat 15% reduction via DamageReductionAbAttr({all}).
-      // The "Adds Ghost type" entry-effect piece composes via TypeConversion
-      // (add-type variant doesn't exist yet); the "30% if SE" piece needs a
-      // super-effective override (existing super-effective filter is for a
-      // separate 30% reduction, but stacking two DamageReductions would
-      // multiply incorrectly). Both pieces deferred. Partial wire.
-      return ok([new DamageReductionAbAttr({ reduction: 0.15, filter: { kind: "all" } })]);
+      // if SE." Round 12: extended from damage-only to also include the
+      // entry-effect "add Ghost type" piece via the existing
+      // `EntryEffectAbAttr({ kind: "add-self-type" })` primitive. The "30% if
+      // SE" piece would need a stacked DamageReduction with a super-effective
+      // override (existing super-effective filter would compose as a flat 30%
+      // reduction but multiplying with the 15% all-moves piece would yield an
+      // incorrect total); deferred. Partial wire.
+      return ok([
+        new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.GHOST }),
+        new DamageReductionAbAttr({ reduction: 0.15, filter: { kind: "all" } }),
+      ]);
     case 931:
       // Hammer Fist — "Boosts punch and hammer moves by 25%." Wire as two
       // FlagDamageBoost instances — PUNCHING_MOVE and HAMMER_BASED at 1.25x
@@ -1835,12 +1842,13 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
         new FlagDamageBoostAbAttr({ flag: MoveFlags.HAMMER_BASED, multiplier: 1.25 }),
       ]);
     case 544:
-      // Airborne — "Boosts own & ally's Flying-type moves by 1.3x." Wire the
-      // self-boost via TypeDamageBoost(FLYING, 1.3). The ally-boost piece
-      // requires a field-aura primitive (similar to how vanilla Fairy Aura
-      // / Dark Aura broadcast to allies); pokerogue has FieldMoveTypePowerBoost
-      // for that but the archetype layer doesn't expose it yet. Partial wire.
-      return ok([new TypeDamageBoostAbAttr({ type: PokemonType.FLYING, multiplier: 1.3 })]);
+      // Airborne — "Boosts own & ally's Flying-type moves by 1.3x." Round 12:
+      // upgraded to full wire — `UserFieldMoveTypePowerBoostAbAttr` is the
+      // vanilla field-aura primitive (Battery / Power Spot pattern) that
+      // broadcasts a type-keyed power boost to the holder AND its allies. The
+      // self-boost is also covered by this attr since the user is part of its
+      // own "user field" — no need for a separate `TypeDamageBoostAbAttr`.
+      return ok([new UserFieldMoveTypePowerBoostAbAttr(PokemonType.FLYING, 1.3)]);
     case 375:
       // Precise Fist — "Punching moves get +1 crit and 5x effect chance."
       // Wire the +1 crit-stage gate on PUNCHING_MOVE via CritStageBonus. The
@@ -2172,9 +2180,157 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
           weathers: [WeatherType.HAIL, WeatherType.SNOW],
         }),
       ]);
+    // -------------------------------------------------------------------------
+    // Round 12 — `UserFieldMoveTypePowerBoostAbAttr` (vanilla field-aura)
+    // first use + `EntryEffectAddSelfType` cluster (existing primitive, new
+    // wires) + `StatMultiplierAbAttr` static stat-multiplier cluster (vanilla
+    // Huge-Power-style primitive applied to ER's "boost own SpAtk by N%"
+    // shape) + `TypeAbsorbStatBoostAbAttr` Aerodynamics wire + bonus
+    // composition wires.
+    //
+    // No new primitives introduced this round — every wire uses existing
+    // primitives (round 1-11) plus vanilla pokerogue AbAttrs imported into
+    // the dispatcher. See round-11 leverage pattern.
+    // -------------------------------------------------------------------------
+    case 715:
+      // Hover — "Adds Psychic type to itself. Avoids Ground attacks." Wire the
+      // entry-effect "add Psychic type" piece via the existing
+      // {@linkcode EntryEffectAddSelfType} primitive. The Ground-immunity piece
+      // requires a Levitate-style type-immunity grant (already on a vanilla
+      // AbAttr family — `TypeImmunityAbAttr`) — defer to a follow-up round
+      // where we wire the dual entry+immunity composition explicitly.
+      // Partial wire.
+      return ok([new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.PSYCHIC })]);
+    case 843:
+      // Fey Flight — "Adds Fairy-type and levitates." Same shape as 715 Hover
+      // but for Fairy + Flying-style levitate. Wire the add-self-type piece;
+      // the levitate piece is deferred (same TypeImmunity dependency).
+      // Partial wire.
+      return ok([new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.FAIRY })]);
+    case 282:
+      // Aerodynamics — "Boosts Speed instead of being hit by Flying-type moves."
+      // Classic Motor-Drive shape — wire via
+      // {@linkcode TypeAbsorbStatBoostAbAttr}. The +1 Speed delta matches the
+      // pokerogue Motor Drive parent's default (and ER's own copies use the
+      // same convention).
+      return ok([
+        new TypeAbsorbStatBoostAbAttr({
+          type: PokemonType.FLYING,
+          stat: Stat.SPD,
+          stages: 1,
+        }),
+      ]);
+    case 301:
+      // Cryptic Power — "Doubles own Sp. Atk stat. Boosts raw stat, not base
+      // stat." Vanilla pokerogue `StatMultiplierAbAttr` is exactly the right
+      // primitive — Huge Power / Pure Power family. The ER "boosts raw stat,
+      // not base stat" comment is informational; pokerogue's
+      // `getEffectiveStat` calls the multiplier AFTER stat-stage application,
+      // matching ER's "raw stat" wording.
+      return ok([new StatMultiplierAbAttr(Stat.SPATK, 2)]);
+    case 323:
+      // Majestic Bird — "Boosts own Sp. Atk by 1.5x. Boosts raw stat, not base
+      // stat." Same shape as 301 Cryptic Power but at 1.5x instead of 2x.
+      return ok([new StatMultiplierAbAttr(Stat.SPATK, 1.5)]);
+    case 352:
+      // Sage Power — "Ups Special Attack by 50% and locks move." Wire the
+      // SpAtk x1.5 piece via StatMultiplierAbAttr. The "locks move" piece
+      // (Gorilla Tactics-style move-lock) composes via vanilla
+      // `GorillaTacticsAbAttr` but the lock semantics are not exactly the same
+      // — ER's text doesn't specify the lock-on-first-attack vs lock-globally
+      // distinction. Defer for clarity. Partial wire.
+      return ok([new StatMultiplierAbAttr(Stat.SPATK, 1.5)]);
+    case 599: {
+      // Dead Power — "1.5x Attack boost. 20% chance to curse on contact moves."
+      // Wire both pieces: StatMultiplier(ATK, 1.5) for the attack boost +
+      // ChanceBattlerTagOnHit(20%, CURSED, contact) for the curse-on-contact
+      // proc. Two independent attrs that fire on different surfaces (stat
+      // calc vs. post-defend tag application).
+      return ok([
+        new StatMultiplierAbAttr(Stat.ATK, 1.5),
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 20,
+          tags: [BattlerTagType.CURSED],
+          contactRequired: true,
+        }),
+      ]);
+    }
+    case 892:
+      // Crispy Cream — "30% to inflict burn/frostbite when hit by contact."
+      // Compose two ChanceBattlerTagOnHit / ChanceStatusOnHit instances —
+      // 30% burn (vanilla StatusEffect.BURN) + 30% frostbite (ER_FROSTBITE
+      // battler tag). Pokerogue's status apply already gates on type immunity
+      // (Fire-type can't burn, Ice-type can't frostbite), so the two chances
+      // are effectively mutually exclusive on real-mon usage.
+      return ok([
+        new ChanceStatusOnHitAbAttr({
+          chance: 30,
+          effects: [StatusEffect.BURN],
+          contactRequired: true,
+        }),
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 30,
+          tags: [BattlerTagType.ER_FROSTBITE],
+          contactRequired: true,
+        }),
+      ]);
+    case 1027:
+      // Jungle Fever — "If Grassy Terrain is active, gets a 1.5x Speed boost."
+      // Terrain-gated stat multiplier. The existing
+      // {@linkcode WeatherStatMultiplierAbAttr} only models weather conditions,
+      // not terrain. Use the existing
+      // {@linkcode StatMultiplierAbAttr} with a condition closure — pokerogue's
+      // constructor accepts a {@linkcode PokemonAttackCondition} that's checked
+      // at canApply time. The condition checks the active terrain via the
+      // global scene. The `_user, _target, _move` params are unused — we only
+      // gate on the global terrain state.
+      return ok([
+        new StatMultiplierAbAttr(Stat.SPD, 1.5, (_user, _target, _move) => globalSceneTerrainIs(TerrainType.GRASSY)),
+      ]);
+    case 731:
+      // To The Bone — "Critical hits get a 1.5x boost and inflict bleeding."
+      // The crit-power-boost piece IS wirable via
+      // {@linkcode CritDamageMultiplierAbAttr} (round 1 primitive). The
+      // crit-bleed piece has the same deferral as 730 Razor Sharp. Partial
+      // wire.
+      return ok([new CritDamageMultiplierAbAttr({ multiplier: 1.5 })]);
+    case 462:
+      // Combat Specialist — "Boosts the power of punching and kicking moves by
+      // 1.3x." Wire as two FlagDamageBoost instances — PUNCHING_MOVE +
+      // KICKING_MOVE (ER's kick flag, mapped through ER_CLASSIFIER_FLAG_TO_MOVE_FLAG).
+      // ER's vanilla wiring already has PUNCHING_MOVE on punching moves; the
+      // KICKING_MOVE flag is ER-specific.
+      return ok([
+        new FlagDamageBoostAbAttr({ flag: MoveFlags.PUNCHING_MOVE, multiplier: 1.3 }),
+        new FlagDamageBoostAbAttr({ flag: MoveFlags.KICKING_MOVE, multiplier: 1.3 }),
+      ]);
+    case 1023:
+      // Overwhelming Mind — "Boosts Psychic-type moves by 1.3x, or 1.8x when
+      // below 1/3 HP." TypeDamageBoost already supports an optional
+      // `lowHpMultiplier` + `lowHpThreshold` payload — this is exactly the
+      // shape (1.3x base, 1.8x below 1/3 HP).
+      return ok([
+        new TypeDamageBoostAbAttr({
+          type: PokemonType.PSYCHIC,
+          multiplier: 1.3,
+          lowHpMultiplier: 1.8,
+          lowHpThreshold: 1 / 3,
+        }),
+      ]);
     default:
       return SKIP_BESPOKE;
   }
+}
+
+/**
+ * Helper: check whether the currently-active terrain matches the given type.
+ * Used by case 1027 (Jungle Fever) which needs a stat-multiplier closure that
+ * reads the live terrain state from `globalScene.arena.terrain`. We extract
+ * this into a top-level function so the dispatch site stays readable, and so
+ * future terrain-gated wires can compose with the same helper.
+ */
+function globalSceneTerrainIs(terrain: TerrainType): boolean {
+  return globalScene.arena.terrain?.terrainType === terrain;
 }
 
 /**
