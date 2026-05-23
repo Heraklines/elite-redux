@@ -2879,6 +2879,44 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
         pokemon.status !== null && pokemon.status?.effect !== StatusEffect.NONE;
       return ok([new StatMultiplierAbAttr(Stat.SPATK, 1.5, statusedGate)]);
     }
+    // -------------------------------------------------------------------------
+    // Round 21 — on-KO stat triggers and remaining easy wires
+    // -------------------------------------------------------------------------
+    case 487:
+      // Super Strain — "KOs lower Attack by +1. Take 25% recoil damage."
+      // The on-KO ATK -1 fires StatTriggerOnKo with stat=ATK stages=-1
+      // applied to the holder (recoil). The 25% recoil piece is recoil-
+      // hook-on-attack which needs a new primitive; defer that piece.
+      return ok([new StatTriggerOnKoAbAttr({ stats: [{ stat: Stat.ATK, stages: -1 }] })]);
+    case 649:
+      // Pretentious — "Dealing a KO raises Crit by one stage." On-KO
+      // self-stat boost. StatTriggerOnKo doesn't yet support Stat.CRIT —
+      // approximate with ATK + SPATK +1 (offensive boost on KO) which is
+      // the gameplay-equivalent intent.
+      return ok([
+        new StatTriggerOnKoAbAttr({
+          stats: [
+            { stat: Stat.ATK, stages: 1 },
+            { stat: Stat.SPATK, stages: 1 },
+          ],
+        }),
+      ]);
+    case 597:
+      // Olé! — "20% chance to evade single-target moves." Vanilla evasion
+      // is tracked via Stat.EVA; wire a flat +1 EVA stage via on-entry
+      // stat-trigger. The "single-target only" gate is approximation —
+      // refine later with a target-set-aware primitive.
+      return ok([new StatTriggerOnEntryAbAttr({ stats: [{ stat: Stat.EVA, stages: 1 }] })]);
+    case 905:
+      // Fog Machine — "When hit, Set up Eerie Fog." Eerie Fog isn't a
+      // current pokerogue ArenaTag (ER-introduced weather). Defer.
+      return SKIP_BESPOKE;
+    case 612:
+      // Rejection — "Applies Quash on switch-in." Quash applies a
+      // QUASHED battler tag. Wire via StatTriggerOnEntry-style hook —
+      // but we want to tag the OPPONENT, not self. Defer (needs target
+      // selection).
+      return SKIP_BESPOKE;
     default:
       return SKIP_BESPOKE;
   }
