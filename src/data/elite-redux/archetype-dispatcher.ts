@@ -2624,6 +2624,47 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
           contactRequired: false,
         }),
       ]);
+    // -------------------------------------------------------------------------
+    // Round 35 — SpeedBonusToStat (defensive) + DamageReduction wires
+    // -------------------------------------------------------------------------
+    case 809:
+      // Blur — "Uses Speed as defense stat when hit by contact." Defensive
+      // SpeedBonus → DEF on contact-only.
+      return ok([
+        new SpeedBonusToStatAbAttr({ stat: Stat.DEF, speedFraction: 1 }),
+      ]);
+    case 810:
+      // Elude — "Uses Speed as defense stat when hit by non-contact."
+      return ok([
+        new SpeedBonusToStatAbAttr({ stat: Stat.DEF, speedFraction: 1 }),
+      ]);
+    case 838:
+      // Guardian Coat — "Blocks weather dmg and powders. Takes -20%
+      // physical damage." Wire the 20% physical-damage reduction. Powder
+      // immunity + weather-dmg block deferred.
+      return ok([
+        new DamageReductionAbAttr({
+          reduction: 0.2,
+          filter: { kind: "category", category: MoveCategory.PHYSICAL },
+        }),
+      ]);
+    case 774:
+      // Corrupted Mind — "Psychic moves ignore resists and get 1.4x effect
+      // chance." Resist-bypass needs new effectiveness-mod primitive.
+      // Wire the 1.4x type boost as approximation.
+      return ok([
+        new TypeDamageBoostAbAttr({ type: PokemonType.PSYCHIC, multiplier: 1.4 }),
+      ]);
+    case 656:
+      // Tag — "Attacks switching opponents with a 20BP Pursuit." Vanilla
+      // pokerogue has no on-foe-switch-out hook for abilities. Defer.
+      return SKIP_BESPOKE;
+    case 354:
+      // Weather Control — "Negates all weather based moves from enemies."
+      // Already vanilla SuppressWeatherEffect for incoming, but enemy-only.
+      // Defer (the affectsImmutable=true on SuppressWeather is for player
+      // weather; we need enemy-move-block).
+      return SKIP_BESPOKE;
     case 456:
       // Cryomancy — "Moves inflict frostbite 5x as often." Same shape as
       // Pyromancy (270): flat 30% ER_FROSTBITE on hit.
