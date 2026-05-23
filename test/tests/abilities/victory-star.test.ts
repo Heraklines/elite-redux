@@ -38,6 +38,9 @@ describe("Abilities - Victory Star", () => {
     await game.phaseInterceptor.to("TurnEndPhase");
 
     // ER rebalance: Victory Star boost is 1.2x (vanilla 1.1x).
+    // NOTE: pre-existing pokerogue regression — getAccuracyMultiplier
+    // returns 1 in this test setup regardless of the configured ability
+    // multiplier. Tracked separately.
     expect(user.getAccuracyMultiplier).toHaveReturnedWith(1.2);
   });
 
