@@ -37,6 +37,14 @@ export class PokemonTransformPhase extends PokemonPhase {
     user.summonData.ability = target.getAbility().id;
     user.summonData.gender = target.getGender();
 
+    // ER 3-passive: copy the target's full passive triple synchronously so
+    // `getPassiveAbilities()` reflects the transform immediately (mirrors the
+    // sync `summonData.ability` assignment above). The async `setTempPassives`
+    // call later still runs after loadAssets so the displayed ability icon /
+    // PostSummon triggers fire in the right phase order, but the data model
+    // is already correct before any animation work.
+    user.setTempPassives(target.getPassiveAbilities());
+
     // Power Trick's effect is removed after using Transform
     user.removeTag(BattlerTagType.POWER_TRICK);
 
@@ -81,6 +89,11 @@ export class PokemonTransformPhase extends PokemonPhase {
         user.updateInfo();
         // If the new ability activates immediately, it needs to happen after all the transform animations
         user.setTempAbility(target.getAbility());
+        // ER 3-passive: also copy the target's full passive triple so transform reflects
+        // the target's complete ability identity, not just its active ability.
+        // Matches the "transform copies all 3 passives" requirement from the
+        // elite-redux fusion/transform 4-ability audit (task #77).
+        user.setTempPassives(target.getPassiveAbilities());
       }),
     );
 

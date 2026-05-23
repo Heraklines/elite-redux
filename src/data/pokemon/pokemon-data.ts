@@ -85,6 +85,15 @@ interface SerializedPokemonSummonData {
   fusionSpeciesForm?: SerializedSpeciesForm | undefined;
   ability?: AbilityId | undefined;
   passiveAbility?: AbilityId | undefined;
+  /**
+   * ER 3-passive transform override. When set (non-null), `getPassiveAbilities()`
+   * uses this triple in place of the species-derived passives. Each slot is an
+   * `AbilityId` or `undefined` for "no override on this slot" (the species
+   * derivation still applies for that slot). Set by {@linkcode Pokemon.setTempPassives}
+   * (called from `PokemonTransformPhase` so a transformed Pokemon takes the
+   * target's full passive set, not just its active ability).
+   */
+  passiveAbilities?: (AbilityId | undefined)[] | undefined;
   gender?: Gender | undefined;
   fusionGender?: Gender | undefined;
   stats: number[];
@@ -124,6 +133,13 @@ export class PokemonSummonData {
   public fusionSpeciesForm: PokemonSpeciesForm | null = null;
   public ability: AbilityId | undefined;
   public passiveAbility: AbilityId | undefined;
+  /**
+   * ER 3-passive transform override. When non-null, replaces the species-derived
+   * passive triple slot-by-slot in {@linkcode Pokemon.getPassiveAbilities}. Entries
+   * are `AbilityId`s; an `undefined` slot means "no override for this slot".
+   * Populated by {@linkcode Pokemon.setTempPassives} (used by transform).
+   */
+  public passiveAbilities: (AbilityId | undefined)[] | undefined;
   public gender: Gender | undefined;
   public fusionGender: Gender | undefined;
   public stats: number[] = [0, 0, 0, 0, 0, 0];

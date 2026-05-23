@@ -2104,6 +2104,22 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * {@linkcode getPassiveAbility}, so legacy single-passive behavior is
    * preserved when no 3-passive override has been installed on the species.
    *
+   * When this Pokemon is a fusion, the base and fusion species' passive
+   * triples are interleaved (slot 0 from base, slot 1 from fusion, slot 2
+   * picked from the remaining non-NONE entries with dedup by ability id) so
+   * both parents contribute to the final passive set. This matches the
+   * "both parents inherit passives" semantic for ER's 4-ability model. Vanilla
+   * fusion behavior (base species drives passives) is preserved when only one
+   * side has multi-passive `_passives` installed, because the fusion side
+   * falls back to its legacy single passive and dedup keeps the base triple
+   * intact.
+   *
+   * When a transform override has been installed via
+   * {@linkcode setTempPassives} (`summonData.passiveAbilities`), each
+   * non-undefined slot in the override replaces the corresponding derived
+   * passive — used by `PokemonTransformPhase` to copy the target's full
+   * passive set.
+   *
    * Used by {@linkcode applyAbAttrs} to iterate all 3 passive slots when
    * applying ability attributes (ER 3-passive model).
    */
@@ -2126,15 +2142,77 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
     }
 
-    const ids = this.species.getPassiveAbilities(this.formIndex);
+    // Build the derived passive triple from species data, merging base + fusion
+    // for fusions (Option C from the fusion/transform audit, generalized:
+    // interleave with dedup so both parents contribute when both are ER-custom).
+    const derivedIds = this.resolveDerivedPassiveIds();
+
     if (slot0 === null) {
-      slot0 = ids[0] === AbilityId.NONE ? null : allAbilities[ids[0]];
+      slot0 = derivedIds[0] === AbilityId.NONE ? null : allAbilities[derivedIds[0]];
+    }
+
+    // Apply transform override (`summonData.passiveAbilities`) per-slot. A slot
+    // override of `undefined` means "no override for this slot" (keep derived).
+    // A slot override of `AbilityId.NONE` means "explicitly empty this slot".
+    const transformOverride = this.summonData.passiveAbilities;
+    const slot1Id = transformOverride?.[1] ?? derivedIds[1];
+    const slot2Id = transformOverride?.[2] ?? derivedIds[2];
+    if (transformOverride?.[0] != null) {
+      slot0 = transformOverride[0] === AbilityId.NONE ? null : allAbilities[transformOverride[0]];
     }
     return [
       slot0,
-      ids[1] === AbilityId.NONE ? null : allAbilities[ids[1]],
-      ids[2] === AbilityId.NONE ? null : allAbilities[ids[2]],
+      slot1Id === AbilityId.NONE ? null : allAbilities[slot1Id],
+      slot2Id === AbilityId.NONE ? null : allAbilities[slot2Id],
     ];
+  }
+
+  /**
+   * Resolve the 3-slot passive id tuple from species data, interleaving base
+   * and fusion species passives when this Pokemon is a fusion.
+   *
+   * Merge strategy (deterministic, dedupe-aware):
+   * - Non-fusion: returns `this.species.getPassiveAbilities(this.formIndex)`.
+   * - Fusion: slot 0 from base[0], slot 1 from fusion[0], slot 2 picked from
+   *   `[base[1], base[2], fusion[1], fusion[2]]` — the first non-NONE entry
+   *   whose ability id hasn't already been placed in slot 0 or slot 1.
+   *
+   * This preserves vanilla fusion's "base species drives identity" feel
+   * (slot 0 is always the base's primary passive) while letting the fusion
+   * species contribute its primary passive in slot 1 — addressing the
+   * fusion-passive gap from the elite-redux-fusion-transform-audit (Option C
+   * generalized for both parents being ER-custom).
+   */
+  private resolveDerivedPassiveIds(): readonly [AbilityId, AbilityId, AbilityId] {
+    const baseIds = this.species.getPassiveAbilities(this.formIndex);
+    if (!this.isFusion() || !this.fusionSpecies) {
+      return baseIds;
+    }
+    const fusionIds = this.fusionSpecies.getPassiveAbilities(this.fusionFormIndex);
+
+    const slot0 = baseIds[0];
+    // slot 1: take fusion's primary passive. If fusion's primary is the same
+    // id as slot 0, fall through to base's slot 1 so we don't waste a slot
+    // on a duplicate.
+    let slot1: AbilityId = AbilityId.NONE;
+    if (fusionIds[0] !== AbilityId.NONE && fusionIds[0] !== slot0) {
+      slot1 = fusionIds[0];
+    } else if (baseIds[1] !== AbilityId.NONE && baseIds[1] !== slot0) {
+      slot1 = baseIds[1];
+    }
+
+    // slot 2: first remaining non-NONE id from the prioritized pool.
+    let slot2: AbilityId = AbilityId.NONE;
+    const candidates: AbilityId[] = [baseIds[1], baseIds[2], fusionIds[1], fusionIds[2]];
+    for (const candidate of candidates) {
+      if (candidate === AbilityId.NONE || candidate === slot0 || candidate === slot1) {
+        continue;
+      }
+      slot2 = candidate;
+      break;
+    }
+
+    return [slot0, slot1, slot2];
   }
 
   /**
@@ -2175,6 +2253,37 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       this.summonData.ability = ability.id;
     }
     applyOnGainAbAttrs({ pokemon: this, passive });
+  }
+
+  /**
+   * Set this Pokémon's temporary passive ability triple. Used by transform/
+   * Imposter to copy the target's full ER 3-passive set in addition to its
+   * active ability.
+   *
+   * Each non-null entry replaces the corresponding species-derived passive
+   * slot in {@linkcode getPassiveAbilities}. Calls
+   * {@linkcode applyOnLoseAbAttrs}/{@linkcode applyOnGainAbAttrs} per slot so
+   * abilities with on-summon hooks re-trigger correctly when the passive
+   * changes mid-battle.
+   * @param passives - A triple of passive `Ability`s (or `null` for an empty
+   *   slot), e.g. the result of `target.getPassiveAbilities()`.
+   */
+  public setTempPassives(passives: readonly [Ability | null, Ability | null, Ability | null]): void {
+    // Capture the previous resolved passives so we can fire onLose attrs per slot.
+    const previous = this.getPassiveAbilities();
+    for (let slot = 0; slot < 3; slot++) {
+      // Fire onLose for any pre-existing slot whose id differs from the new value
+      // so abilities like Drought (primal weather) correctly clean up.
+      if (previous[slot] !== null && previous[slot]?.id !== passives[slot]?.id) {
+        applyOnLoseAbAttrs({ pokemon: this, passive: true, passiveSlot: slot as 0 | 1 | 2 });
+      }
+    }
+    this.summonData.passiveAbilities = passives.map(p => (p === null ? AbilityId.NONE : p.id));
+    for (let slot = 0; slot < 3; slot++) {
+      if (passives[slot] !== null && previous[slot]?.id !== passives[slot]?.id) {
+        applyOnGainAbAttrs({ pokemon: this, passive: true, passiveSlot: slot as 0 | 1 | 2 });
+      }
+    }
   }
 
   /** Mark the Pokémon's ability as revealed. */
