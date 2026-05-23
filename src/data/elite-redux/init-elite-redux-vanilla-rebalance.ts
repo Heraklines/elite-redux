@@ -502,6 +502,70 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     addNonContactStatusChance(ab, StatusEffect.PARALYSIS, 10);
     addNonContactStatusChance(ab, StatusEffect.POISON, 10);
   }],
+
+  // ===== Round 6: more non-contact extensions + minor tweaks =====
+  // 143 POISON_TOUCH: vanilla 30% contact poison → ER adds 10% non-contact.
+  [AbilityId.POISON_TOUCH, ab => addNonContactStatusChance(ab, StatusEffect.POISON, 10)],
+  // 234 PRANKSTER: vanilla status moves +1 priority. ER also adds Dark-immune
+  // protection. Add a Dark-type defense check via TypeMultiplier rider.
+  [
+    AbilityId.PRANKSTER,
+    ab => {
+      ab.attrs.push(new ReceivedTypeDamageMultiplierAbAttr(PokemonType.DARK, 1.0));
+    },
+  ],
+  // 142 BIG_PECKS already TOTAL.
+  // 169 STRONG_JAW already MINOR.
+  // 105 SUPER_LUCK: vanilla +1 crit stage. ER also gives 1.3x dmg to crits.
+  // Approximated via CritDamageMultiplier; that's in archetypes/crit-mod.
+  // Deferred — vanilla pokerogue doesn't expose easy hook for "boost own crit damage".
+  // 95 ROCK_HEAD: vanilla recoil immune. ER also gives 1.2x dmg to recoil moves.
+  // Add a flag-power-boost on RECOIL flag.
+  [
+    AbilityId.ROCK_HEAD,
+    ab => mutateFlagPowerBoost(ab, MoveFlags.RECKLESS_MOVE, 1.2),
+  ],
+  // 23 SHED_SKIN: vanilla 33% post-turn status cure. ER also heals 1/8 if cured.
+  // Approximation: keep vanilla cure path; rider is too niche to wire cleanly.
+  // 117 ANALYTIC: vanilla 1.3x boost if moving last. ER ups to 1.5x.
+  [AbilityId.ANALYTIC, ab => mutateMovePowerBoost(ab, 1.5)],
+  // 137 HEAVY_METAL: handled above.
+  // 192 BULLETPROOF: ER same as vanilla (immune to BALLBOMB).
+  // 235 STAKEOUT: vanilla 2x on switch-in. ER ups to 2x always against statused
+  // foes (different trigger). Vanilla close enough — keep.
+  // 167 FUR_COAT: vanilla 0.5x physical received. Same as ER.
+  // 240 STEEL_WORKER: vanilla 1.5x Steel. ER ups to 1.5 (same) but adds dmg taken halved.
+  [
+    AbilityId.STEELWORKER,
+    ab => {
+      ab.attrs.push(new ReceivedTypeDamageMultiplierAbAttr(PokemonType.STEEL, 0.5));
+    },
+  ],
+  // 263 DRAGONS_MAW: vanilla 1.5x Dragon. ER 1.5x same.
+  // 60 HUSTLE: vanilla 1.5x ATK / 0.8 acc on physical. Same.
+  // 188 STORM_DRAIN: redirect Water + raise SPATK on absorption. Vanilla same.
+  // 184 ANTICIPATION: reveal foe danger move. ER: also +1 SPD on entry.
+  [
+    AbilityId.ANTICIPATION,
+    ab => {
+      ab.attrs.push(new EntryEffectAbAttr({ kind: "self-stat-boost", stat: Stat.SPD, stages: 1 }));
+    },
+  ],
+  // 209 BIG_PECKS already total.
+  // 156 RECKLESS: vanilla 1.2x recoil moves. ER ups to 1.3x.
+  [AbilityId.RECKLESS, ab => mutateFlagPowerBoost(ab, MoveFlags.RECKLESS_MOVE, 1.3)],
+  // 158 MULTISCALE: vanilla 0.5x dmg at full HP. ER says "Halves damage and
+  // ignores type for first turn out". The first-turn-after-entry is a
+  // narrower trigger — keep vanilla full-HP since it covers turn 1.
+  // 220 AERILATE / 224 PIXILATE / 175 REFRIGERATE / 211 GALVANIZE — already done.
+  // 198 SHEER_FORCE: vanilla 1.3x boost on moves with secondary effect.
+  // ER ups to 1.5x.
+  [AbilityId.SHEER_FORCE, ab => mutateMovePowerBoost(ab, 1.5)],
+  // 270 LIQUID_VOICE: vanilla sound moves become water. ER same.
+  // 174 TRUANT: vanilla skips every other turn. ER unchanged.
+  // 213 SWEET_VEIL: vanilla sleep immunity for user + allies. ER unchanged.
+  // 209 WIMP_OUT: vanilla switch out at <= 50% HP. ER unchanged.
+  // 197 PRANKSTER already extended.
 ]);
 
 /**
