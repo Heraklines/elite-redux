@@ -18,18 +18,21 @@
 // matching what the init layer does for `bespoke` rows.
 // =============================================================================
 
-import { dispatchMoveArchetype } from "#data/elite-redux/move-archetype-dispatcher";
+import { dispatchMoveArchetype, MoveConditionAttr } from "#data/elite-redux/move-archetype-dispatcher";
 import {
   AddArenaTagAttr,
   AddArenaTrapTagAttr,
   ForceSwitchOutAttr,
   HitHealAttr,
+  MovePowerMultiplierAttr,
   MultiHitAttr,
   RemoveTypeAttr,
   SacrificialAttr,
   StatStageChangeAttr,
   StatusEffectAttr,
+  WeatherChangeAttr,
 } from "#data/moves/move";
+import { failIfTargetNotAttackingCondition } from "#data/moves/move-condition";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { MoveFlags } from "#enums/move-flags";
 import { PokemonType } from "#enums/pokemon-type";
@@ -255,6 +258,65 @@ describe("dispatchMoveArchetype('bespoke', null, erMoveId): per-id wiring", () =
     expect(stat.stats).toEqual([Stat.SPATK]);
     expect(stat.stages).toBe(1);
     expect(stat.selfTarget).toBe(true);
+  });
+
+  it("er id 950 (Eerie Fog) wires WeatherChangeAttr(FOG)", () => {
+    const res = dispatchMoveArchetype("bespoke", null, 950);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    expect(res.attrs[0]).toBeInstanceOf(WeatherChangeAttr);
+  });
+
+  it("er id 1008 (Sky Quake) sets WIND_MOVE flag only", () => {
+    const res = dispatchMoveArchetype("bespoke", null, 1008);
+    expect(res.skipReason).toBeNull();
+    expect(res.flags & MoveFlags.WIND_MOVE).toBeTruthy();
+    expect(res.attrs).toHaveLength(0);
+  });
+
+  it("er id 1023 (Hacksaw) wires MovePowerMultiplierAttr (vs Steel)", () => {
+    const res = dispatchMoveArchetype("bespoke", null, 1023);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    expect(res.attrs[0]).toBeInstanceOf(MovePowerMultiplierAttr);
+  });
+
+  it("er id 1024 (Godspeed) wires MovePowerMultiplierAttr (vs Steel)", () => {
+    const res = dispatchMoveArchetype("bespoke", null, 1024);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    expect(res.attrs[0]).toBeInstanceOf(MovePowerMultiplierAttr);
+  });
+
+  it("er id 1029 (Obscured Shot) wires MoveConditionAttr (target-must-be-attacking)", () => {
+    const res = dispatchMoveArchetype("bespoke", null, 1029);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0];
+    expect(attr).toBeInstanceOf(MoveConditionAttr);
+    // The condition pulled via getCondition() should be the shared
+    // failIfTargetNotAttackingCondition singleton (Sucker Punch's vanilla
+    // condition).
+    expect((attr as MoveConditionAttr).getCondition()).toBe(failIfTargetNotAttackingCondition);
+  });
+
+  it("er id 844 (Inverse Room) is deferred — INVERSE_ROOM arena tag missing in vanilla", () => {
+    const res = dispatchMoveArchetype("bespoke", null, 844);
+    expect(res.skipReason).toMatch(/Inverse Room/);
+    expect(res.attrs).toHaveLength(0);
+    expect(res.flags).toBe(0);
+  });
+
+  it("er id 970 (Transmute) is deferred — needs item-regen primitive", () => {
+    const res = dispatchMoveArchetype("bespoke", null, 970);
+    expect(res.skipReason).toMatch(/Transmute/);
+    expect(res.attrs).toHaveLength(0);
+  });
+
+  it("er id 1010 (Tempest Storm) is deferred — needs per-turn-damage storm arena tag", () => {
+    const res = dispatchMoveArchetype("bespoke", null, 1010);
+    expect(res.skipReason).toMatch(/Tempest Storm/);
+    expect(res.attrs).toHaveLength(0);
   });
 
   it("unwired ER bespoke id falls through to generic SKIP_BESPOKE", () => {

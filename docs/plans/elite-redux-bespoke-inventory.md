@@ -376,3 +376,17 @@ are typically multi-mechanic abilities that don't fit any one archetype.
 | 1027 | Rain Flush | A powerful rain attack. Lowers the user's defenses. | `unclassified` |
 | 1028 | Ice Wall | Sets reflect with ice. | `unclassified` |
 | 1029 | Obscured Shot | Strikes first if the foe is preparing an attack. | `unclassified` |
+
+## Deferred bespoke moves (need new cross-system primitives)
+
+These bespoke move IDs cannot be wired through pokerogue's existing
+`MoveAttr` / `MoveFlags` / `ArenaTagType` primitives without first adding new
+core support. Tracked here so a future round can reach 100% bespoke coverage
+once the listed primitives land. The dispatcher returns `skip(reason)` for
+each, surfacing the same string in init diagnostics.
+
+| ER ID | Name | Deferred reason |
+|---|---|---|
+| 844 | Inverse Room | Requires a custom `INVERSE_ROOM` `ArenaTagType` plus damage-pipeline hook that inverts the type chart for 5 turns. Pokerogue only ships `TRICK_ROOM`. |
+| 970 | Transmute | Requires an on-KO item-regen primitive in the modifier system. Vanilla `STEAL`/`PLUCK`/`INCINERATE` consume the foe's item; none re-create the user's. |
+| 1010 | Tempest Storm (N) | Requires a custom per-turn-damage arena tag for "thundershock storm" (2-5 turns, hits both sides). `DelayedAttackAttr` is single-strike on one future turn, not a per-turn aura. |

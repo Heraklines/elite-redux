@@ -63,7 +63,7 @@ import {
   HitHealAttr,
   IgnoreOpponentStatStagesAttr,
   type Move,
-  type MoveAttr,
+  MoveAttr,
   MovePowerMultiplierAttr,
   MultiHitAttr,
   RecoilAttr,
@@ -73,7 +73,9 @@ import {
   StatusEffectAttr,
   SuppressAbilitiesAttr,
   VariableMoveTypeAttr,
+  WeatherChangeAttr,
 } from "#data/moves/move";
+import { failIfTargetNotAttackingCondition, type MoveCondition } from "#data/moves/move-condition";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveFlags } from "#enums/move-flags";
@@ -380,6 +382,40 @@ export class BestEffectivenessTypeAttr extends VariableMoveTypeAttr {
 }
 
 /**
+ * Sentinel `MoveAttr` that contributes a `MoveCondition` (via `getCondition()`)
+ * but has no apply-side effect. Used to attach pre-built move conditions
+ * (e.g. {@linkcode failIfTargetNotAttackingCondition} for Sucker Punch-style
+ * moves) through the dispatcher's flags+attrs pipeline.
+ *
+ * Pokerogue's `Move.addAttr(...)` automatically reads `attr.getCondition()`
+ * and pushes the resulting condition onto the Move's `conditions` array, so
+ * this attr acts as a transport for the condition without doing any work in
+ * its `apply()` method.
+ */
+export class MoveConditionAttr extends MoveAttr {
+  private readonly condition: MoveCondition;
+
+  constructor(condition: MoveCondition) {
+    super();
+    this.condition = condition;
+  }
+
+  override getCondition(): MoveCondition {
+    return this.condition;
+  }
+}
+
+/**
+ * Custom `VariablePowerAttr`-style helper: boost power by `multiplier` when
+ * the target is of the configured `PokemonType`. Composed atop
+ * `MovePowerMultiplierAttr` rather than subclassing — the closure captures the
+ * target type and multiplier and is invoked on every damage calc.
+ */
+function powerBoostVsType(targetType: PokemonType, multiplier: number): MovePowerMultiplierAttr {
+  return new MovePowerMultiplierAttr((_user, target, _move) => (target.isOfType(targetType) ? multiplier : 1));
+}
+
+/**
  * Dispatch a `type-conversion` classifier row. The only mode the classifier
  * emits today is `best-effectiveness` with a candidate types array. The
  * status-chance sibling (if present) wires the same way as flag-tagged-move.
@@ -553,6 +589,12 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // applied at construction). HighCritAttr gives the "sharp gem" flavor
       // a 1/8 crit rate boost, consistent with other priority-strike moves.
       return ok(0, [new HighCritAttr()]);
+    case 844:
+      // Inverse Room — psychic status move that "reverses type matchups for
+      // 5 turns". Pokerogue's `ArenaTagType` has no `INVERSE_ROOM` (only
+      // TRICK_ROOM). Implementing the type-chart flip needs a dedicated arena
+      // tag + handler in the damage pipeline — deferred to a future round.
+      return skip("Inverse Room (er id 844): requires custom INVERSE_ROOM arena tag and type-chart flip");
     case 846:
       // Karma — self-status: raises SpAtk and SpDef by 1, lowers Speed by 1.
       // Two separate StatStageChangeAttrs since stage delta differs.
@@ -574,6 +616,13 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
     case 949:
       // Beatdown — hits 2-5 times.
       return ok(0, [new MultiHitAttr(MultiHitType.TWO_TO_FIVE)]);
+    case 950:
+      // Eerie Fog — ghost status move that sets fog weather for 8 turns. The
+      // "drains stat boosts from non-Ghost/Psychic mons" piece is bespoke (no
+      // vanilla weather → stat-strip primitive). First-pass: WeatherChangeAttr
+      // sets FOG; ER abilities keyed on fog (e.g. Rest in Peace, Soul Tap)
+      // then activate around it.
+      return ok(0, [new WeatherChangeAttr(WeatherType.FOG)]);
     case 951:
       // Mystic Dance — self-status: raises user's SpAtk and Speed by 1 each.
       // DANCE_MOVE flag triggers Dancer-style ability copies.
@@ -619,6 +668,13 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // item" piece is bespoke and deferred — pokerogue's item system doesn't
       // cleanly model "lost items"). ForceSwitchOutAttr(true) matches Teleport.
       return ok(0, [new ForceSwitchOutAttr(true)]);
+    case 970:
+      // Transmute — power 80 psychic move that "remakes the user's item on KO".
+      // Pokerogue's modifier/item system doesn't surface a clean "regenerate
+      // consumed item on KO" primitive (RIPEN, PLUCK, INCINERATE etc. all
+      // consume the FOE's item). Deferred until an ER item-regen primitive
+      // exists; the 80 BP body from the draft remains.
+      return skip("Transmute (er id 970): requires custom on-KO item-regen primitive in modifier system");
     case 971:
       // Clear Skies — clears the current weather, regardless of type. The
       // "prevents new weather for 5 turns" piece is bespoke and deferred
@@ -695,10 +751,23 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
     case 1007:
       // Sky Quake — physical wind move; same shape as Jetstream Burst.
       return ok(MoveFlags.WIND_MOVE, []);
+    case 1008:
+      // Sky Quake (real id) — physical wind move hitting both foes. WIND_MOVE
+      // flag triggers Wind Rider. The previous round's case 1007 comment
+      // mislabels the move name (1007 is actually Jetstream Burst); this case
+      // applies the same WIND_MOVE wire-up to the correct Sky Quake id.
+      return ok(MoveFlags.WIND_MOVE, []);
     case 1009:
       // Sunstrike (N) — ignores opponent's stat boosts (matches Sacred Sword).
       // The "negates evs, items, lowest defense" pieces are bespoke and deferred.
       return ok(0, [new IgnoreOpponentStatStagesAttr()]);
+    case 1010:
+      // Tempest Storm (N) — electric status move that sets a thundershock
+      // storm "hitting both sides for 2-5 turns". There's no vanilla
+      // continuous-end-of-turn-damage arena tag of this shape (DelayedAttackAttr
+      // is single-strike on a later turn, not a per-turn aura). Implementing
+      // this needs a custom arena-tag-based storm; deferred to a future round.
+      return skip("Tempest Storm (er id 1010): requires custom per-turn-damage arena tag (no vanilla storm primitive)");
     case 1016:
       // Party Favors — Fairy damaging move that also heals user's ally by 25%.
       // HealOnAllyAttr with healRatio 0.25 matches Pollen Puff's ally-heal shape.
@@ -720,6 +789,16 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // Concoction — damaging Grass move that also consumes one of the user's
       // berries. EatBerryAttr(selfTarget=true) matches the Stuff Cheeks shape.
       return ok(0, [new EatBerryAttr(true)]);
+    case 1023:
+      // Hacksaw — power 80 steel move that's "stronger vs Steel". Pokerogue
+      // already supports type-conditional power boosts via MovePowerMultiplierAttr.
+      // 1.5x mirrors the magnitude of similar ER super-effective-on-X moves
+      // (e.g. Drainpipe, Bone Crush patterns).
+      return ok(0, [powerBoostVsType(PokemonType.STEEL, 1.5)]);
+    case 1024:
+      // Godspeed — power 65 flying move, +2 priority (draft.priority), that's
+      // "stronger vs Steel". Same shape as Hacksaw (1023).
+      return ok(0, [powerBoostVsType(PokemonType.STEEL, 1.5)]);
     case 1027:
       // Rain Flush — lowers user's Defense and SpDefense by 1 each
       // (effectChance is 100 on the draft = unconditional).
@@ -727,6 +806,13 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
     case 1028:
       // Ice Wall — damages and sets Reflect on user's side for 5 turns.
       return ok(0, [new AddArenaTagAttr(ArenaTagType.REFLECT, 5, true, true)]);
+    case 1029:
+      // Obscured Shot — Sucker Punch analog. +1 priority dark move (already
+      // applied via draft.priority); fails when the target isn't selecting
+      // an attacking move. Routes pokerogue's `failIfTargetNotAttackingCondition`
+      // through `MoveConditionAttr` so `Move.addAttr(...)` registers the
+      // condition on the Move's `conditions` array.
+      return ok(0, [new MoveConditionAttr(failIfTargetNotAttackingCondition)]);
     default:
       return SKIP_BESPOKE;
   }
