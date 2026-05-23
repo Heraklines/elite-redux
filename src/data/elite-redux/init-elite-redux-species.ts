@@ -46,9 +46,17 @@ export interface InitEliteReduxSpeciesResult {
  * (`SPECIES_VENUSAUR`) + the form's pokerogue key (`mega` → `MEGA`) + the
  * `_REDUX` suffix ER uses for its custom species names.
  */
-function deriveErFormSpeciesConst(baseConst: string, formKey: string): string {
+function deriveErFormSpeciesConst(baseConst: string, formKey: string): readonly string[] {
   const upperFormKey = formKey.toUpperCase().replace(/-/g, "_");
-  return `${baseConst}_${upperFormKey}_REDUX`;
+  // ER ships mega forms under TWO naming conventions:
+  //   1. `SPECIES_X_MEGA_REDUX` — NEW megas Redux added (43 forms — e.g.
+  //      `ALAKAZAM_MEGA_REDUX`, `MACHAMP_MEGA_REDUX`).
+  //   2. `SPECIES_X_MEGA` — canonical-name megas Redux rebalanced (227 forms —
+  //      e.g. `VENUSAUR_MEGA`, `CHARIZARD_MEGA_X`).
+  // Try the REDUX-suffixed variant FIRST so newly-added Redux-only megas
+  // override the canonical name when both exist. If only the canonical
+  // exists, fall through to it.
+  return [`${baseConst}_${upperFormKey}_REDUX`, `${baseConst}_${upperFormKey}`];
 }
 
 /**
@@ -113,6 +121,24 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
     ];
 
     species.setPassives(passives);
+
+    // ER `abis[]` is the active-ability TRIPLE the player picks one from
+    // (mapped to pokerogue's ability1 / ability2 / abilityHidden). Without
+    // this, vanilla species silently use pokerogue's actives — e.g.
+    // Bulbasaur shows Overgrow when ER actually offers Chloroplast / Pastel
+    // Veil / Chlorophyll.
+    const actives: readonly [AbilityId, AbilityId, AbilityId] = [
+      mapAbilityId(draft.abilities[0]),
+      mapAbilityId(draft.abilities[1]),
+      mapAbilityId(draft.abilities[2]),
+    ];
+    if (actives[0] !== AbilityId.NONE) {
+      // Only apply when the ER source actually has a primary active — defensive
+      // against species whose `abis` is all zeros (none in current data, but
+      // future ROM revisions may add such rows).
+      species.setActiveAbilities(actives);
+    }
+
     result.vanillaCount++;
 
     // Also install ER innates on each non-base FORM of this species (mega,
@@ -125,8 +151,14 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
       if (!form.formKey) {
         continue;
       }
-      const candidateConst = deriveErFormSpeciesConst(draft.speciesConst, form.formKey);
-      const formDraft = erDraftByConst.get(candidateConst);
+      const candidates = deriveErFormSpeciesConst(draft.speciesConst, form.formKey);
+      let formDraft: (typeof ER_SPECIES)[number] | undefined;
+      for (const candidate of candidates) {
+        formDraft = erDraftByConst.get(candidate);
+        if (formDraft) {
+          break;
+        }
+      }
       if (!formDraft) {
         // No ER counterpart for this form — silently skip. Acceptable: many
         // pokerogue forms (regional variants, alolan/galarian, etc.) don't
@@ -139,6 +171,19 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
         mapAbilityId(formDraft.innates[2]),
       ];
       form.setPassives(formPassives);
+
+      // Same active-ability override as the base species. Mega forms in ER
+      // (e.g. SPECIES_VENUSAUR_MEGA_REDUX) carry their own `abis[]` triple
+      // — without this they keep the base form's actives.
+      const formActives: readonly [AbilityId, AbilityId, AbilityId] = [
+        mapAbilityId(formDraft.abilities[0]),
+        mapAbilityId(formDraft.abilities[1]),
+        mapAbilityId(formDraft.abilities[2]),
+      ];
+      if (formActives[0] !== AbilityId.NONE) {
+        form.setActiveAbilities(formActives);
+      }
+
       result.formCount++;
     }
   }
