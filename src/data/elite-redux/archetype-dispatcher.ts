@@ -107,6 +107,7 @@ import { CounterAttackOnHitAbAttr } from "#data/elite-redux/archetypes/counter-a
 import { SpeedBonusToStatAbAttr } from "#data/elite-redux/archetypes/speed-bonus-to-stat";
 import { PostTurnScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-turn-scripted-move";
 import { HpThresholdFormChangeAbAttr } from "#data/elite-redux/archetypes/hp-threshold-form-change";
+import { OnOpponentStatRaiseAbAttr } from "#data/elite-redux/archetypes/on-opponent-stat-raise";
 import { PassiveRecoveryAbAttr, type PassiveRecoveryCondition } from "#data/elite-redux/archetypes/passive-recovery";
 import { PreFaintReviveAbAttr } from "#data/elite-redux/archetypes/pre-faint-revive";
 import {
@@ -2502,10 +2503,18 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 555:
-      // Egoist — "Raises its own stats when foes raise theirs." Mirror
-      // opponent stat raises. Pokerogue's OPPORTUNIST is similar but
-      // direction-flipped. Defer (needs opponent-stat-stage-change observer).
-      return SKIP_BESPOKE;
+      // Egoist — "Raises its own stats when foes raise theirs." Wire via
+      // new OnOpponentStatRaiseAbAttr — boosts holder's ATK/SPATK/SPD +1
+      // whenever any opponent raises any stat.
+      return ok([
+        new OnOpponentStatRaiseAbAttr({
+          stats: [
+            { stat: Stat.ATK, stages: 1 },
+            { stat: Stat.SPATK, stages: 1 },
+            { stat: Stat.SPD, stages: 1 },
+          ],
+        }),
+      ]);
     case 556:
       // Subdue — "Doubles stat drop effects used by this pokemon." Boost
       // outgoing stat-drop magnitude (e.g. Growl → -2 instead of -1).
