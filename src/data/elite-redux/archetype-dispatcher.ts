@@ -106,6 +106,7 @@ import { PostAllyFaintStatChangeAbAttr } from "#data/elite-redux/archetypes/post
 import { CounterAttackOnHitAbAttr } from "#data/elite-redux/archetypes/counter-attack-on-hit";
 import { SpeedBonusToStatAbAttr } from "#data/elite-redux/archetypes/speed-bonus-to-stat";
 import { PostTurnScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-turn-scripted-move";
+import { HpThresholdFormChangeAbAttr } from "#data/elite-redux/archetypes/hp-threshold-form-change";
 import { PassiveRecoveryAbAttr, type PassiveRecoveryCondition } from "#data/elite-redux/archetypes/passive-recovery";
 import { PreFaintReviveAbAttr } from "#data/elite-redux/archetypes/pre-faint-revive";
 import {
@@ -2734,6 +2735,39 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Hardened Sheath — type-effectiveness style. Defer for type-chart
       // override primitive.
       return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
+    // Round 39 — new primitive HpThresholdFormChange + 3 wires
+    // -------------------------------------------------------------------------
+    case 734:
+      // Ape Shift — "Transforms below 50% HP, curing status and always
+      // critting." Wire HP-threshold form change (50%) + status cure. The
+      // always-crit piece composes with vanilla LASER_FOCUS / Merciless,
+      // deferred.
+      return ok([
+        new HpThresholdFormChangeAbAttr({
+          hpThreshold: 0.5,
+          targetFormKey: "transformed",
+          cureStatus: true,
+        }),
+      ]);
+    case 884:
+      // Locust Swarm — "Changes into Hivemind form until 1/4 HP or less."
+      // Interpretation: changes to Hivemind when HP <= 1/4. Same primitive
+      // gated at 0.25.
+      return ok([
+        new HpThresholdFormChangeAbAttr({
+          hpThreshold: 0.25,
+          targetFormKey: "hivemind",
+        }),
+      ]);
+    case 885:
+      // Revelation — same shape as Locust Swarm (884).
+      return ok([
+        new HpThresholdFormChangeAbAttr({
+          hpThreshold: 0.25,
+          targetFormKey: "revelation",
+        }),
+      ]);
     case 456:
       // Cryomancy — "Moves inflict frostbite 5x as often." Same shape as
       // Pyromancy (270): flat 30% ER_FROSTBITE on hit.
