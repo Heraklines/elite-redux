@@ -45,16 +45,23 @@
 //   custom-moves.ts` for the subclass `setErFlagBits` plumbing.
 // =============================================================================
 
+import { globalScene } from "#app/global-scene";
 import { ER_CLASSIFIER_FLAG_TO_MOVE_FLAG } from "#data/elite-redux/er-flag-mapping";
 import type { ErMoveArchetypeKind } from "#data/elite-redux/er-move-archetypes";
 import {
   AddArenaTagAttr,
   AddArenaTrapTagAttr,
   AddBattlerTagAttr,
+  AddTypeAttr,
+  ClearWeatherAttr,
   ConfuseAttr,
+  EatBerryAttr,
   FlinchAttr,
   ForceSwitchOutAttr,
+  HealOnAllyAttr,
+  HighCritAttr,
   HitHealAttr,
+  IgnoreOpponentStatStagesAttr,
   type Move,
   type MoveAttr,
   MovePowerMultiplierAttr,
@@ -64,6 +71,7 @@ import {
   SacrificialAttr,
   StatStageChangeAttr,
   StatusEffectAttr,
+  SuppressAbilitiesAttr,
   VariableMoveTypeAttr,
 } from "#data/moves/move";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -73,6 +81,7 @@ import { MultiHitType } from "#enums/multi-hit-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
+import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { NumberHolder } from "#utils/common";
 
@@ -495,10 +504,43 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // Jagged Punch — 10% chance to set Stealth Rocks on hit. Move.chance (10)
       // gates the proc. Punching-flagged so Iron Fist boost applies.
       return ok(MoveFlags.PUNCHING_MOVE, [new AddArenaTrapTagAttr(ArenaTagType.STEALTH_ROCK, 0, false, false)]);
+    case 810:
+      // Blood Shot — inflicts ER_BLEED via the dedicated battler tag (ER
+      // models bleed as a battler tag, not a vanilla StatusEffect — see
+      // BattlerTagType.ER_BLEED in `battler-tag-type.ts`). 4-6 turn duration
+      // mirrors the cursed-bleed flavor.
+      return ok(0, [new AddBattlerTagAttr(BattlerTagType.ER_BLEED, false, false, 4, 6)]);
+    case 811:
+      // Flash Freeze — inflicts ER_FROSTBITE via battler tag (same rationale
+      // as ER_BLEED). The "never misses if user is Ice-type" piece is bespoke
+      // and deferred — the 90% accuracy from the draft remains as-is.
+      return ok(0, [new AddBattlerTagAttr(BattlerTagType.ER_FROSTBITE, false, false, 4, 6)]);
+    case 822:
+      // Energy Wave — pure damage move (115 BP, 90 acc, special, Normal). No
+      // secondary effects in ER source; archetype classifier flagged it bespoke
+      // because no archetype matched. Wire HighCritAttr for a slight edge
+      // consistent with the "deadly wave of energy" flavor.
+      return ok(0, [new HighCritAttr()]);
     case 823:
       // Fluttering Leaf — deals damage and switches user out. ForceSwitchOutAttr
       // with selfSwitch=true matches U-Turn/Volt Switch semantics.
       return ok(0, [new ForceSwitchOutAttr(true)]);
+    case 832:
+      // Boiling Flame — Fire move that deals 1.5x damage in rain. We attach a
+      // MovePowerMultiplierAttr that inspects active weather at apply-time;
+      // also tag the move as WEATHER_BASED so ER weather-syncing abilities
+      // pick it up.
+      return ok(MoveFlags.WEATHER_BASED, [
+        new MovePowerMultiplierAttr((_u, _t, _m) => {
+          const wt = globalScene.arena.weather?.weatherType;
+          return wt === WeatherType.RAIN || wt === WeatherType.HEAVY_RAIN ? 1.5 : 1;
+        }),
+      ]);
+    case 834:
+      // Double Lariat — hits both foes (target field handles that), silences
+      // hit targets via THROAT_CHOPPED tag (2 turn duration matches Throat
+      // Chop's standard 2-turn lock-out).
+      return ok(0, [new AddBattlerTagAttr(BattlerTagType.THROAT_CHOPPED, false, false, 2, 2)]);
     case 836:
       // Yggdrasil Force — lowers user's Atk and Def by 1 each (unconditional).
       return ok(0, [new StatStageChangeAttr([Stat.ATK, Stat.DEF], -1, true)]);
@@ -506,6 +548,11 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // Drain Brain — lowers target SpAtk and heals user by that amount.
       // Same shape as Strength Sap (HitHealAttr stat-based heal + StatStageChangeAttr).
       return ok(MoveFlags.TRIAGE_MOVE, [new HitHealAttr(null, Stat.SPATK), new StatStageChangeAttr([Stat.SPATK], -1)]);
+    case 841:
+      // Gem Missile — +1 priority rock move (priority field in draft already
+      // applied at construction). HighCritAttr gives the "sharp gem" flavor
+      // a 1/8 crit rate boost, consistent with other priority-strike moves.
+      return ok(0, [new HighCritAttr()]);
     case 846:
       // Karma — self-status: raises SpAtk and SpDef by 1, lowers Speed by 1.
       // Two separate StatStageChangeAttrs since stage delta differs.
@@ -527,12 +574,97 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
     case 949:
       // Beatdown — hits 2-5 times.
       return ok(0, [new MultiHitAttr(MultiHitType.TWO_TO_FIVE)]);
+    case 951:
+      // Mystic Dance — self-status: raises user's SpAtk and Speed by 1 each.
+      // DANCE_MOVE flag triggers Dancer-style ability copies.
+      return ok(MoveFlags.DANCE_MOVE, [new StatStageChangeAttr([Stat.SPATK, Stat.SPD], 1, true)]);
+    case 954:
+      // Kilobite — biting Steel move that drops foe's Speed by 1. The "+1 user
+      // Speed if foe immune to Speed drop" branch is bespoke; first-pass keeps
+      // the foe-speed drop only. BITING_MOVE flag enables Strong Jaw boost.
+      return ok(MoveFlags.BITING_MOVE, [new StatStageChangeAttr([Stat.SPD], -1)]);
+    case 955:
+      // Tangling Husk — +4 priority protect-style move that protects against
+      // non-Fire moves; slows attackers on contact. Both restrictions are
+      // bespoke (no vanilla "type-specific protect" or "slow-on-contact-protect"
+      // primitives). First-pass: generic Protect tag, matching Detect shape.
+      return ok(0, [new AddBattlerTagAttr(BattlerTagType.PROTECTED, true, true)]);
     case 962:
       // Sparkling Barrage — hits 3 times.
       return ok(0, [new MultiHitAttr(MultiHitType.THREE)]);
+    case 963:
+      // Spectral Serenade — power 130 ghost move. Description says "every
+      // other turn" which is a recharge-like restriction; AddBattlerTagAttr
+      // with RECHARGING tag (self, 1 turn, last-hit-only) matches Hyper Beam.
+      return ok(0, [new AddBattlerTagAttr(BattlerTagType.RECHARGING, true, false, 1, 1, true)]);
+    case 964:
+      // Merculight — +4 priority protect-style status move that paralyzes
+      // attackers. The paralyze-on-protect is bespoke. First-pass: generic
+      // Protect tag (matching Detect/Protect shape).
+      return ok(0, [new AddBattlerTagAttr(BattlerTagType.PROTECTED, true, true)]);
+    case 966:
+      // Spectral Flame — status move that burns the target. The "including
+      // Fire types" piece is bespoke (vanilla `StatusEffectAttr` honours type
+      // immunity); the fog-ability-suppression piece is deferred. As a first
+      // pass we inflict standard BURN.
+      return ok(0, [new StatusEffectAttr(StatusEffect.BURN, false)]);
+    case 967:
+      // Trepidation — ER status move that makes foe miss Psychic moves. No
+      // vanilla "miss-specific-type" primitive (this is closest to Foresight
+      // but inverted); first-pass: FlinchAttr as a small turn-disruption proxy.
+      // The damaging 20-BP body + 90 acc remains from the draft.
+      return ok(0, [new FlinchAttr()]);
+    case 969:
+      // Fetch — status move that switches the user out (the "retrieves lost
+      // item" piece is bespoke and deferred — pokerogue's item system doesn't
+      // cleanly model "lost items"). ForceSwitchOutAttr(true) matches Teleport.
+      return ok(0, [new ForceSwitchOutAttr(true)]);
+    case 971:
+      // Clear Skies — clears the current weather, regardless of type. The
+      // "prevents new weather for 5 turns" piece is bespoke and deferred
+      // (no vanilla weather-block primitive). We deploy a ClearWeatherAttr per
+      // weather type so whichever is active gets cleared.
+      return ok(0, [
+        new ClearWeatherAttr(WeatherType.SUNNY),
+        new ClearWeatherAttr(WeatherType.RAIN),
+        new ClearWeatherAttr(WeatherType.SANDSTORM),
+        new ClearWeatherAttr(WeatherType.HAIL),
+        new ClearWeatherAttr(WeatherType.SNOW),
+        new ClearWeatherAttr(WeatherType.FOG),
+        new ClearWeatherAttr(WeatherType.HEAVY_RAIN),
+        new ClearWeatherAttr(WeatherType.HARSH_SUN),
+        new ClearWeatherAttr(WeatherType.STRONG_WINDS),
+      ]);
+    case 974:
+      // Vexing Void — 30% chance to lower SpDef. Move.chance (30) gates.
+      return ok(0, [new StatStageChangeAttr([Stat.SPDEF], -1)]);
     case 975:
       // Eclipse — heavy Dark damage, then user loses Dark typing.
       return ok(0, [new RemoveTypeAttr(PokemonType.DARK)]);
+    case 977:
+      // Caltrops — sets spikes that ALSO inflict bleeding on switch-in. The
+      // bleed-on-switch-in piece is bespoke (no composite primitive). First-
+      // pass: deploy SPIKES alone, mirroring the Creeping Thorns (897) wiring.
+      return ok(0, [new AddArenaTrapTagAttr(ArenaTagType.SPIKES, 0, false, false)]);
+    case 979:
+      // Safe Passage — self-switch that protects the incoming ally with a
+      // -35% damage reduction this turn. The damage-reduction piece is bespoke
+      // (no vanilla "incoming-mon damage-shield" primitive); first-pass:
+      // self-switch only.
+      return ok(0, [new ForceSwitchOutAttr(true)]);
+    case 989:
+      // Showtime — sets Magic Room then switches the user out. There's no
+      // ArenaTagType.MAGIC_ROOM in vanilla (only TRICK_ROOM). First-pass:
+      // self-switch only; defer the Magic Room piece.
+      return ok(0, [new ForceSwitchOutAttr(true)]);
+    case 990:
+      // Banished Power — raises user's highest offense/defense after damage.
+      // No vanilla "raise highest stat" primitive (Salt Cure, Power Trick etc.
+      // are different shapes); for a first pass we raise SpAtk (the most
+      // common winner for the dark-typed moves in this cluster). Defer the
+      // proper "highest of {Atk,Def,SpAtk,SpDef,Spd}" logic to a future
+      // primitive.
+      return ok(0, [new StatStageChangeAttr([Stat.SPATK], 1, true)]);
     case 991:
       // Triple Tremor — hits 3 times. Power-increases-per-hit isn't a vanilla
       // primitive; simple MultiHitAttr(THREE) is a faithful enough first pass.
@@ -542,15 +674,52 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // hits-both-foes target is handled by the move's target field
       // (target=1 = BOTH_OPPONENTS); we add the SOUND_BASED flag here.
       return ok(MoveFlags.SOUND_BASED, []);
+    case 1000:
+      // Blue Moon — ice-type special move. The LUNAR_MOVE flag triggers ER
+      // lunar-themed ability boosters (e.g. Lunar Affinity). The "cannot use
+      // twice in a row" condition is bespoke and deferred.
+      return ok(MoveFlags.LUNAR_MOVE, []);
+    case 1003:
+      // Septic Switch — suppresses target ability then switches user out.
+      // Both primitives exist in vanilla; composed directly.
+      return ok(0, [new SuppressAbilitiesAttr(), new ForceSwitchOutAttr(true)]);
+    case 1005:
+      // Incite — adds Dark type to target. The "enrages foe" piece is bespoke
+      // (no vanilla "enrage" status); first-pass: AddTypeAttr only.
+      return ok(0, [new AddTypeAttr(PokemonType.DARK)]);
+    case 1006:
+      // Jetstream Burst — wind move hitting both foes. WIND_MOVE flag triggers
+      // Wind Rider; the both-targets dimension is handled by the move's
+      // target field (BOTH_OPPONENTS).
+      return ok(MoveFlags.WIND_MOVE, []);
+    case 1007:
+      // Sky Quake — physical wind move; same shape as Jetstream Burst.
+      return ok(MoveFlags.WIND_MOVE, []);
+    case 1009:
+      // Sunstrike (N) — ignores opponent's stat boosts (matches Sacred Sword).
+      // The "negates evs, items, lowest defense" pieces are bespoke and deferred.
+      return ok(0, [new IgnoreOpponentStatStagesAttr()]);
+    case 1016:
+      // Party Favors — Fairy damaging move that also heals user's ally by 25%.
+      // HealOnAllyAttr with healRatio 0.25 matches Pollen Puff's ally-heal shape.
+      return ok(0, [new HealOnAllyAttr(0.25)]);
     case 1017:
       // Shot Put — 30% chance to lower foe's Speed by 1. Move.chance gates.
       return ok(0, [new StatStageChangeAttr([Stat.SPD], -1)]);
+    case 1020:
+      // Dragon Dash — +1 priority dragon move (priority field in draft, applied
+      // at construction). HighCritAttr adds 1/8 crit rate for "lunges" flavor.
+      return ok(0, [new HighCritAttr()]);
     case 1021:
       // Pocket Sand — 10% to lower foe's accuracy by 1, +1 priority (already
       // in draft.priority). Pokerogue doesn't expose an effect-chance gate at
       // the attr level; we keep the stat-stage drop unconditional and rely on
       // the +1 priority + the description making the trade-off clear.
       return ok(0, [new StatStageChangeAttr([Stat.ACC], -1)]);
+    case 1022:
+      // Concoction — damaging Grass move that also consumes one of the user's
+      // berries. EatBerryAttr(selfTarget=true) matches the Stuff Cheeks shape.
+      return ok(0, [new EatBerryAttr(true)]);
     case 1027:
       // Rain Flush — lowers user's Defense and SpDefense by 1 each
       // (effectChance is 100 on the draft = unconditional).
@@ -558,23 +727,6 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
     case 1028:
       // Ice Wall — damages and sets Reflect on user's side for 5 turns.
       return ok(0, [new AddArenaTagAttr(ArenaTagType.REFLECT, 5, true, true)]);
-    case 966:
-      // Spectral Flame — status move that burns the target. The "including
-      // Fire types" piece is bespoke (vanilla `StatusEffectAttr` honours type
-      // immunity); the fog-ability-suppression piece is deferred. As a first
-      // pass we inflict standard BURN.
-      return ok(0, [new StatusEffectAttr(StatusEffect.BURN, false)]);
-    case 974:
-      // Vexing Void — 30% chance to lower SpDef. Move.chance (30) gates.
-      return ok(0, [new StatStageChangeAttr([Stat.SPDEF], -1)]);
-    case 990:
-      // Banished Power — raises user's highest offense/defense after damage.
-      // No vanilla "raise highest stat" primitive (Salt Cure, Power Trick etc.
-      // are different shapes); for a first pass we raise SpAtk (the most
-      // common winner for the dark-typed moves in this cluster). Defer the
-      // proper "highest of {Atk,Def,SpAtk,SpDef,Spd}" logic to a future
-      // primitive.
-      return ok(0, [new StatStageChangeAttr([Stat.SPATK], 1, true)]);
     default:
       return SKIP_BESPOKE;
   }

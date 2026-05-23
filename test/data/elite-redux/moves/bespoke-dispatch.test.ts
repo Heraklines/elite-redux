@@ -258,8 +258,10 @@ describe("dispatchMoveArchetype('bespoke', null, erMoveId): per-id wiring", () =
   });
 
   it("unwired ER bespoke id falls through to generic SKIP_BESPOKE", () => {
-    // 822 (Energy Wave) is bespoke but has no per-id wire (just deals damage).
-    const res = dispatchMoveArchetype("bespoke", null, 822);
+    // Sentinel id outside the dispatchBespokeMove switch — falls through to
+    // SKIP_BESPOKE default. Avoids coupling the test to which specific
+    // bespoke ids are wired in any given round.
+    const res = dispatchMoveArchetype("bespoke", null, 99999);
     expect(res.skipReason).toMatch(/bespoke entry/);
     expect(res.attrs).toHaveLength(0);
     expect(res.flags).toBe(0);
