@@ -83,8 +83,25 @@ export class SummaryUiHandler extends UiHandler {
   private abilityPrompt: Phaser.GameObjects.Image;
   /** Object holding everything needed to display an ability */
   private abilityContainer: AbilityContainer;
-  /** Object holding everything needed to display a passive */
+  /**
+   * Object holding everything needed to display the legacy single passive.
+   * In ER 3-passive mode this is the first non-empty slot in {@link passiveContainers}
+   * — kept as a separate field for back-compat with any direct reads.
+   */
   private passiveContainer: AbilityContainer;
+  /**
+   * ER 3-passive: per-slot ability containers. `null` entries correspond to
+   * empty slots (`AbilityId.NONE`) that aren't rendered. Slots index by ER's
+   * 0..2 passive slot order — slot 0 mirrors {@link passiveContainer}.
+   */
+  private passiveContainers: (AbilityContainer | null)[] = [];
+  /**
+   * Index into the [ability, ...passiveContainers] visible cycle. 0 = ability,
+   * 1..3 = passive slot 0..2. The {@link Button.ACTION} handler on the PROFILE
+   * page advances this cursor, hiding the previous container and revealing
+   * the next non-null one.
+   */
+  private abilityCycleIndex = 0;
   private summaryPageContainer: Phaser.GameObjects.Container;
   private movesContainer: Phaser.GameObjects.Container;
   private movesContainerMovesTitle: Phaser.GameObjects.Image;
@@ -611,15 +628,9 @@ export class SummaryUiHandler extends UiHandler {
         this.showMoveSelect();
         success = true;
       } else if (this.cursor === Page.PROFILE && this.pokemon?.hasPassive()) {
-        // if we're on the PROFILE page and this pokemon has a passive unlocked..
-        // Since abilities are displayed by default, all we need to do is toggle visibility on all elements to show passives
-        this.abilityContainer.nameText?.setVisible(!this.abilityContainer.descriptionText?.visible);
-        this.abilityContainer.descriptionText?.setVisible(!this.abilityContainer.descriptionText.visible);
-        this.abilityContainer.labelImage.setVisible(!this.abilityContainer.labelImage.visible);
-
-        this.passiveContainer.nameText?.setVisible(!this.passiveContainer.descriptionText?.visible);
-        this.passiveContainer.descriptionText?.setVisible(!this.passiveContainer.descriptionText.visible);
-        this.passiveContainer.labelImage.setVisible(!this.passiveContainer.labelImage.visible);
+        // ER 3-passive: cycle through ability → passive[0] → passive[1] → passive[2] → ability.
+        // For vanilla species (1 passive) this collapses to the legacy 2-step toggle.
+        this.advanceAbilityCycle();
       } else if (this.cursor === Page.STATS) {
         //Show IVs
         this.permStatsContainer.setVisible(!this.permStatsContainer.visible);
@@ -927,28 +938,35 @@ export class SummaryUiHandler extends UiHandler {
         };
 
         const allAbilityInfo = [this.abilityContainer]; // Creates an array to iterate through
+        // ER 3-passive: reset per-slot containers each populate(). Empty slots
+        // (AbilityId.NONE) keep `null` entries so the cycle skips over them.
+        this.passiveContainers = [null, null, null];
         // Only add to the array and set up displaying a passive if it's unlocked
         if (this.pokemon?.hasPassive()) {
           // Elite Redux: append every non-null passive slot. Vanilla pokerogue
           // species fill slots 1/2 with NONE so this is a 1-entry append; ER
           // species (post-B1a) get up to 3 passive entries.
           const passiveAbilities = this.pokemon.getPassiveAbilities();
-          for (const passiveAbility of passiveAbilities) {
+          for (let slot = 0; slot < passiveAbilities.length; slot++) {
+            const passiveAbility = passiveAbilities[slot];
             if (!passiveAbility) {
               continue;
             }
-            allAbilityInfo.push({
+            const container: AbilityContainer = {
               labelImage: globalScene.add.image(0, 0, getLocalizedSpriteKey("summary_profile_passive")), // Pixel text 'PASSIVE'
               ability: passiveAbility,
               nameText: null,
               descriptionText: null,
-            });
+            };
+            allAbilityInfo.push(container);
+            this.passiveContainers[slot] = container;
           }
-          // Keep the legacy passiveContainer reference pointing at slot 0 for
-          // back-compat with any other code path that reads it directly. (Only
-          // assigned when at least one passive landed in the array.)
-          if (allAbilityInfo.length > 1) {
-            this.passiveContainer = allAbilityInfo[1];
+          // Keep the legacy passiveContainer reference pointing at the first
+          // non-empty slot for back-compat with any other code path that reads
+          // it directly.
+          const firstPassive = this.passiveContainers.find((c): c is AbilityContainer => c !== null);
+          if (firstPassive) {
+            this.passiveContainer = firstPassive;
           }
 
           // Sets up the pixel button prompt image
@@ -1005,10 +1023,16 @@ export class SummaryUiHandler extends UiHandler {
             });
           }
         });
-        // Turn off visibility of passive info by default
-        this.passiveContainer?.labelImage.setVisible(false);
-        this.passiveContainer?.nameText?.setVisible(false);
-        this.passiveContainer?.descriptionText?.setVisible(false);
+        // Turn off visibility of passive info by default — ALL slots, not just
+        // the legacy slot 0. The {@link Button.ACTION} handler cycles through
+        // ability → passive[0] → passive[1] → passive[2] → ability.
+        for (const passive of this.passiveContainers) {
+          passive?.labelImage.setVisible(false);
+          passive?.nameText?.setVisible(false);
+          passive?.descriptionText?.setVisible(false);
+        }
+        // Start the cycle at index 0 (ability shown) on each populate().
+        this.abilityCycleIndex = 0;
 
         const closeFragment = getBBCodeFrag("", TextStyle.WINDOW_ALT);
         const rawNature = toCamelCase(Nature[this.pokemon?.getNature()!]); // TODO: is this bang correct?
@@ -1398,6 +1422,48 @@ export class SummaryUiHandler extends UiHandler {
       duration: instant ? 0 : 250,
       ease: "Sine.easeIn",
     });
+  }
+
+  /**
+   * Advance the ability-cycle on the PROFILE page by one step. Order:
+   *   index 0 = ability
+   *   index 1 = passive slot 0
+   *   index 2 = passive slot 1
+   *   index 3 = passive slot 2
+   * Empty passive slots (`AbilityId.NONE`) are skipped — for a vanilla species
+   * with one passive this collapses to the legacy 2-step ability↔passive toggle.
+   *
+   * Visibility invariant: exactly one container is visible at a time. We hide
+   * the current container, advance the cursor to the next non-null container,
+   * then show that one.
+   */
+  private advanceAbilityCycle(): void {
+    // Build the visible cycle: [ability, passive[0], passive[1], passive[2]]
+    // with null entries pruned. `passiveContainers` already has nulls for empty
+    // slots; we just prepend abilityContainer.
+    const cycle: AbilityContainer[] = [
+      this.abilityContainer,
+      ...this.passiveContainers.filter((c): c is AbilityContainer => c !== null),
+    ];
+    // No passives → toggle is a no-op (vanilla pokerogue UX preserved when
+    // hasPassive() is false but we got here defensively).
+    if (cycle.length < 2) {
+      return;
+    }
+    const current = cycle[this.abilityCycleIndex % cycle.length];
+    this.abilityCycleIndex = (this.abilityCycleIndex + 1) % cycle.length;
+    const next = cycle[this.abilityCycleIndex];
+
+    // Hide current, show next. All ability containers share the same (x, y)
+    // anchor in the profile panel — only one visible at a time prevents the
+    // overlap that would otherwise occur with multi-passive species.
+    current.labelImage.setVisible(false);
+    current.nameText?.setVisible(false);
+    current.descriptionText?.setVisible(false);
+
+    next.labelImage.setVisible(true);
+    next.nameText?.setVisible(true);
+    next.descriptionText?.setVisible(true);
   }
 
   clear() {
