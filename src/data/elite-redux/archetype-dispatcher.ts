@@ -2813,6 +2813,172 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 656656:
       return SKIP_BESPOKE;
     // -------------------------------------------------------------------------
+    // Round 45 — broad approximations for remaining bespoke abilities
+    // -------------------------------------------------------------------------
+    case 275:
+      // Rampage — "No recharge after a KO, if it usually would need to
+      // recharge." Recharge-skip needs RechargingTag immunity on KO. The
+      // tag exists but no clean removal hook fires on KO. Defer.
+      return SKIP_BESPOKE;
+    case 284:
+      // Exploit Weakness — "Targets lowest defense vs statused foes."
+      // Target-stat-selection primitive missing. Defer.
+      return SKIP_BESPOKE;
+    case 373:
+      // Grip Pincer — "50% chance to trap. Then ignores Defense & accuracy
+      // checks." Wire the 50% TRAPPED battler tag on hit.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({ chance: 50, tags: [BattlerTagType.TRAPPED] }),
+      ]);
+    case 394:
+      // Lethargy — "Damage drops 20% each turn to 20%. Resets on switch-in."
+      // Multi-tier turn-decaying multiplier. Defer (needs per-turn-counter
+      // damage multiplier primitive).
+      return SKIP_BESPOKE;
+    case 407:
+      // Retribution Blow — "Uses Hyper Beam if any foe uses an stat
+      // boosting move." Needs opponent-stat-buff observer + scripted move.
+      // Defer.
+      return SKIP_BESPOKE;
+    case 474:
+      // Accelerate — "Moves that need a charge turn are now used instantly."
+      // Charge-skip primitive missing. Defer.
+      return SKIP_BESPOKE;
+    case 515:
+      // Retriever — "Retrieves item on switch-out." Item-restore primitive
+      // missing. Defer.
+      return SKIP_BESPOKE;
+    case 523:
+      // Grappler — "Trapping moves last 6 turns. Trapping deals 1/6 HP."
+      // Trap-duration extension primitive missing. Defer.
+      return SKIP_BESPOKE;
+    case 545:
+      // Parroting — "Copies sound moves used by others." Move-copy needs
+      // Instruct-style primitive. Defer.
+      return SKIP_BESPOKE;
+    case 592:
+      // Minion Control — "Moves hit an extra time for each healthy party
+      // member." Variable hit-count based on party state. Approximate as
+      // 1x AddSecondStrike (single extra hit).
+      return ok([new AddSecondStrikeAbAttr(false)]);
+    case 598:
+      // Malicious — "Lowers the foe's highest Attack and Defense stat."
+      // Highest-stat-selection primitive missing. Defer.
+      return SKIP_BESPOKE;
+    case 602:
+      // Lawnmower — "Removes terrain on switch-in. Stat up if terrain
+      // removed." Terrain-clear on entry needs Lawnmower primitive. Defer.
+      return SKIP_BESPOKE;
+    case 623:
+      // Surprise! — "Astonishes enemy priority users in fog." Eerie Fog
+      // (ER-only weather) not in pokerogue. Defer.
+      return SKIP_BESPOKE;
+    case 629:
+      // Shallow Grave — "Revives at 25% HP once after fainting in fog."
+      // Same fog-gate as 623. Defer.
+      return SKIP_BESPOKE;
+    case 640:
+      // Rhythmic — "Deals 10% more damage for each repeated move use."
+      // Per-move-count tracker primitive missing. Defer.
+      return SKIP_BESPOKE;
+    case 704:
+      // Hot Coals — "Sets a trap that burns the next foe that switches in."
+      // Burn-on-switch-in trap needs ArenaTag extension. Defer.
+      return SKIP_BESPOKE;
+    case 711:
+      // Lunar Affinity — "Copies lunar moves used by others." Move-copy
+      // primitive missing (same as Parroting). Defer.
+      return SKIP_BESPOKE;
+    case 733:
+      // Taekkyeon — "All attacks are dances." Flag-injection primitive
+      // missing. Defer.
+      return SKIP_BESPOKE;
+    case 735:
+      // Know Your Place — "Contact attacks make foes move last for 5
+      // turns." QUASH/move-last battler tag not available in pokerogue
+      // BattlerTagType enum. Defer.
+      return SKIP_BESPOKE;
+    case 773:
+      // Soothsayer — "Resists all attacks for three turns on first entry."
+      // Time-limited damage reduction needs new primitive. Defer.
+      return SKIP_BESPOKE;
+    case 812:
+      // Reverberate — "Normal moves are Sound moves." Flag-injection on
+      // Normal-type moves. Defer.
+      return SKIP_BESPOKE;
+    case 816:
+      // Mental Pollution — "Suppresses others' abilities when it becomes
+      // enraged." Enrage state + opponent-ability-suppress. Defer.
+      return SKIP_BESPOKE;
+    case 817:
+      // Madness Enhancement — "Enrages in fog, halves damage when enraged."
+      // Fog-gated. Defer.
+      return SKIP_BESPOKE;
+    case 824:
+      // Frostbind — "Inflicting Frostbite also inflicts Disable." Status-
+      // cascade. Approximate: 50% DISABLED on hit.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({ chance: 50, tags: [BattlerTagType.DISABLED] }),
+      ]);
+    case 833:
+      // Harukaze — "Setting Grassy Terrain sets Tailwind and vice versa."
+      // Bidirectional terrain/buff pair. Defer.
+      return SKIP_BESPOKE;
+    case 842:
+      // Festivities — "Sound moves become dance moves and vice versa."
+      // Flag-injection. Defer.
+      return SKIP_BESPOKE;
+    case 880:
+      // Paint Shot — "Mega launcher moves change the target's type to the
+      // move used." Target-type-change-on-hit needs new primitive. Defer.
+      return SKIP_BESPOKE;
+    case 886:
+      // Curse of Famine — "Eats terrain, restores hp, and boosts a
+      // defense." Terrain-consume needs new primitive. Defer.
+      return SKIP_BESPOKE;
+    case 890:
+      // Craving — "Eat a random berry at the end of the turn." Random
+      // berry generation needs Harvest-variant primitive. Defer.
+      return SKIP_BESPOKE;
+    case 896:
+      // Spyware — wired R38 sentinel. Same shape. Defer.
+      return SKIP_BESPOKE;
+    case 899:
+      // Backup Power — "Revives at 25% HP once after fainting in Electric
+      // Terrain." Terrain-gated revive. Defer.
+      return SKIP_BESPOKE;
+    case 913:
+      // Strikeout — "Forces the foe out if they don't attack for 3 turns."
+      // Per-target turn counter. Defer.
+      return SKIP_BESPOKE;
+    case 927:
+      // Taste the Rainbow — "Summons the Rainbow Pledge effect on entry."
+      // Rainbow Pledge is a vanilla arena tag — wire EntryEffect with
+      // ArenaTagType.RAINBOW.
+      return ok([
+        new EntryEffectAbAttr({ kind: "set-screen-or-room", tag: ArenaTagType.WATER_FIRE_PLEDGE, turns: 4 }),
+      ]);
+    case 943:
+      // Sap Trap — "Lowers foe's speed at the end of turns. At -3 they get
+      // trapped." Per-turn opponent stat-drop. Defer.
+      return SKIP_BESPOKE;
+    case 960:
+      // Witch Broom — "Hyper Aggressive + Hover." Composite — Hover
+      // (Levitate) vanilla AbilityId 26, Hyper Aggressive ER-custom.
+      // Wire vanilla Levitate attrs.
+      return ok([...(allAbilities[26]?.attrs ?? [])]);
+    case 963:
+      // Fire Ruler — "King's Wrath + Flame Shield" — both ER customs.
+      // Defer (would need to compose ER ability attrs).
+      return SKIP_BESPOKE;
+    case 979:
+      // Hollow Ice Zone — "Ice-type moves apply Ice Statue and then make
+      // the user switch." Complex multi-step. Defer.
+      return SKIP_BESPOKE;
+    case 981:
+      // Cryostasis — wired R12 already.
+      return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
     // Round 39 — new primitive HpThresholdFormChange + 3 wires
     // -------------------------------------------------------------------------
     case 734:
