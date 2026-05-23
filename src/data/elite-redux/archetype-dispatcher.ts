@@ -95,6 +95,7 @@ import { LifestealOnHitAbAttr, LifestealOnKoAbAttr } from "#data/elite-redux/arc
 import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
 import { PostAllyFaintStatChangeAbAttr } from "#data/elite-redux/archetypes/post-ally-faint";
 import { CounterAttackOnHitAbAttr } from "#data/elite-redux/archetypes/counter-attack-on-hit";
+import { SpeedBonusToStatAbAttr } from "#data/elite-redux/archetypes/speed-bonus-to-stat";
 import { PassiveRecoveryAbAttr, type PassiveRecoveryCondition } from "#data/elite-redux/archetypes/passive-recovery";
 import { PreFaintReviveAbAttr } from "#data/elite-redux/archetypes/pre-faint-revive";
 import {
@@ -2922,6 +2923,71 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Fog Machine — "When hit, Set up Eerie Fog." Eerie Fog isn't a
       // current pokerogue ArenaTag (ER-introduced weather). Defer.
       return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
+    // Round 23 — SpeedBonusToStat cluster (new primitive).
+    // -------------------------------------------------------------------------
+    case 695:
+      // Slipstream — "Moves use 20% of its Speed stat additionally."
+      // Wire ATK and SPATK both with 20% speed bonus.
+      return ok([
+        new SpeedBonusToStatAbAttr({ stat: Stat.ATK, speedFraction: 0.2 }),
+        new SpeedBonusToStatAbAttr({ stat: Stat.SPATK, speedFraction: 0.2 }),
+      ]);
+    case 552:
+      // Terminal Velocity — "Special moves use 20% of its Speed stat
+      // additionally."
+      return ok([
+        new SpeedBonusToStatAbAttr({
+          stat: Stat.SPATK,
+          speedFraction: 0.2,
+          filter: { category: "special" },
+        }),
+      ]);
+    case 355:
+      // Speed Force — "Contact moves use 20% of its Speed stat additionally."
+      return ok([
+        new SpeedBonusToStatAbAttr({
+          stat: Stat.ATK,
+          speedFraction: 0.2,
+          filter: { contact: "only" },
+        }),
+        new SpeedBonusToStatAbAttr({
+          stat: Stat.SPATK,
+          speedFraction: 0.2,
+          filter: { contact: "only" },
+        }),
+      ]);
+    case 372:
+      // Momentum — "Contact moves use the Speed stat for damage calculation."
+      // Approximate as full Speed addition (effectively replacing the stat).
+      return ok([
+        new SpeedBonusToStatAbAttr({
+          stat: Stat.ATK,
+          speedFraction: 1,
+          filter: { contact: "only" },
+        }),
+      ]);
+    case 551:
+      // Impulse — "Non-contact moves use the Speed stat for damage."
+      return ok([
+        new SpeedBonusToStatAbAttr({
+          stat: Stat.ATK,
+          speedFraction: 1,
+          filter: { contact: "non" },
+        }),
+        new SpeedBonusToStatAbAttr({
+          stat: Stat.SPATK,
+          speedFraction: 1,
+          filter: { contact: "non" },
+        }),
+      ]);
+    case 1030:
+      // Sleek Scales — "Uses +15% of its Speed when defending."
+      // Defensive variant: bonus to DEF + SPDEF.
+      return ok([
+        new SpeedBonusToStatAbAttr({ stat: Stat.DEF, speedFraction: 0.15 }),
+        new SpeedBonusToStatAbAttr({ stat: Stat.SPDEF, speedFraction: 0.15 }),
+      ]);
     case 612:
       // Rejection — "Applies Quash on switch-in." Quash applies a
       // QUASHED battler tag. Wire via StatTriggerOnEntry-style hook —
