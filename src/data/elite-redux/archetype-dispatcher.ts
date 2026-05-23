@@ -93,6 +93,7 @@ import { HitMultiplierAbAttr, HitMultiplierPowerAbAttr } from "#data/elite-redux
 import { TypeAbsorbHealAbAttr, TypeAbsorbStatBoostAbAttr } from "#data/elite-redux/archetypes/immunity-with-absorb";
 import { LifestealOnHitAbAttr, LifestealOnKoAbAttr } from "#data/elite-redux/archetypes/lifesteal";
 import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
+import { PostAllyFaintStatChangeAbAttr } from "#data/elite-redux/archetypes/post-ally-faint";
 import { PassiveRecoveryAbAttr, type PassiveRecoveryCondition } from "#data/elite-redux/archetypes/passive-recovery";
 import { PreFaintReviveAbAttr } from "#data/elite-redux/archetypes/pre-faint-revive";
 import {
@@ -2917,6 +2918,38 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // but we want to tag the OPPONENT, not self. Defer (needs target
       // selection).
       return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
+    // Round 22 — PostAllyFaint cluster (new primitive).
+    // -------------------------------------------------------------------------
+    case 292:
+      // Avenger — "If a party Pokémon fainted last turn, next move gets
+      // 1.5x boost." The "next move only" gate (one-shot consumed on use)
+      // needs a single-use marker. Approximation: +1 ATK + SPATK after an
+      // ally faints (persistent offensive boost). Stacks with other ally
+      // faints over the battle.
+      return ok([
+        new PostAllyFaintStatChangeAbAttr({
+          stats: [
+            { stat: Stat.ATK, stages: 1 },
+            { stat: Stat.SPATK, stages: 1 },
+          ],
+        }),
+      ]);
+    case 888:
+      // Soul Harvest — "Fainted Pokemon increase your offenses and spdef
+      // by 5%." Per-faint percentage boost. Stat-stage maps 1 stage = +50%
+      // for the holder, so we use a single +1 across ATK/SPATK/SPDEF as
+      // an approximation; the 5%-per-faint compounding gradient needs a
+      // bespoke counter primitive (deferred).
+      return ok([
+        new PostAllyFaintStatChangeAbAttr({
+          stats: [
+            { stat: Stat.ATK, stages: 1 },
+            { stat: Stat.SPATK, stages: 1 },
+            { stat: Stat.SPDEF, stages: 1 },
+          ],
+        }),
+      ]);
     default:
       return SKIP_BESPOKE;
   }
