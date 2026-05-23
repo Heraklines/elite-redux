@@ -1,0 +1,650 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Elite Redux — Phase B Task B3 round 3: vanilla move mechanic patches.
+//
+// Numeric retunes (power/accuracy/PP/chance/priority) are already applied to
+// every vanilla pokerogue move with an ER counterpart by
+// `init-elite-redux-vanilla-rebalance.ts`. That covers the 577 NONE-bucket
+// moves entirely, but leaves 111 MAJOR + TOTAL moves with stale battle
+// mechanics, plus ~32 MINOR-flag moves silently missing ER ability-boost flag
+// bits.
+//
+// This file applies the MECHANIC deltas — type swaps, category swaps, target
+// widenings, status-on-hit additions, OHKO→regular conversions, and so on —
+// via a dispatch table identical in shape to the ABILITY_PATCHERS table in
+// the sibling file. Each entry receives the live `Move` instance and mutates
+// it in place.
+//
+// Mutability surface (verified by reading `src/data/moves/move.ts`):
+//   - `Move.power/accuracy/pp/priority/chance/moveTarget`: declared `public`
+//     non-readonly. Safe direct assignment.
+//   - `Move._type/_category`: declared `private readonly`. At runtime these
+//     are plain JS properties — `readonly` is structural-only. We cast via
+//     `Move & { _type, _category }` to mutate. ER's audit explicitly requires
+//     this for the 25 type-swap entries and the 5 category swaps.
+//   - `Move.flags`: declared `private` with a private `setFlag()` helper.
+//     OR'd directly via a narrow cast — same pattern as
+//     `init-elite-redux-custom-moves.ts::applyErArchetypeToMove`.
+//   - `Move.attrs`: declared `public` MoveAttr[]. Push/splice freely.
+//
+// Idempotency: a `PATCHED_MARKER` symbol is installed on each patched Move so
+// re-running the init is a no-op (same pattern as the ability patcher).
+// =============================================================================
+
+import { allMoves } from "#data/data-lists";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { ER_MOVES } from "#data/elite-redux/er-moves";
+import {
+  ConfuseAttr,
+  DefDefAttr,
+  FlinchAttr,
+  HealStatusEffectAttr,
+  HighCritAttr,
+  HitHealAttr,
+  IgnoreOpponentStatStagesAttr,
+  type Move,
+  type MoveAttr,
+  MultiHitAttr,
+  OneHitKOAccuracyAttr,
+  OneHitKOAttr,
+  PhotonGeyserCategoryAttr,
+  RecoilAttr,
+  SheerColdAccuracyAttr,
+  StatStageChangeAttr,
+  StatusEffectAttr,
+} from "#data/moves/move";
+import { MoveCategory } from "#enums/move-category";
+import { MoveFlags } from "#enums/move-flags";
+import { MoveId } from "#enums/move-id";
+import { MoveTarget } from "#enums/move-target";
+import { MultiHitType } from "#enums/multi-hit-type";
+import { PokemonType } from "#enums/pokemon-type";
+import { Stat } from "#enums/stat";
+import { StatusEffect } from "#enums/status-effect";
+
+/** Numeric cutoff: anything ≥ this is an ER custom (registered by B2). */
+const VANILLA_ID_CUTOFF = 5000;
+
+/** Sentinel marker installed on each patched Move so re-runs are no-ops. */
+const MOVE_PATCHED_MARKER = Symbol.for("er-vanilla-rebalance/move-patched");
+
+/**
+ * Result of applying the move-mechanic patches. Mirrors the ability side of
+ * the rebalance result.
+ */
+export interface VanillaMovePatchResult {
+  /** Count of vanilla moves whose mechanics were mutated. */
+  moveDeltas: number;
+  /** Count of vanilla move ids the patcher table targets that aren't in `allMoves`. */
+  moveMissing: number;
+  /** Non-fatal patcher errors (one entry per failed patch). */
+  moveErrors: string[];
+}
+
+/**
+ * Per-move patcher dispatch table. Key: pokerogue {@linkcode MoveId}. Value:
+ * function that mutates the live `Move` instance to ER's mechanics.
+ *
+ * Categories follow the audit at `docs/plans/elite-redux-vanilla-move-audit.md`:
+ *   - **TOTAL**: complete rewrite (OHKO removal, STATUS→damaging, both type
+ *     AND category change).
+ *   - **MAJOR**: add or replace a single `MoveAttr` (status-on-hit,
+ *     UseHighestOffense, target widening, etc).
+ *   - **MINOR-flag**: pure flag bit OR (no MoveAttr changes).
+ */
+const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map([
+  // =====================================================================
+  // TOTAL rewrites — 4 OHKO nerfs
+  // =====================================================================
+  // GUILLOTINE: vanilla OHKO Normal → ER Bug 120bp/80acc, high crit, slicing.
+  [
+    MoveId.GUILLOTINE,
+    move => {
+      retypeMove(move, PokemonType.BUG);
+      removeAttrsByCtor(move, [OneHitKOAttr, OneHitKOAccuracyAttr]);
+      orFlag(move, MoveFlags.SLICING_MOVE);
+      addAttrUnique(move, new HighCritAttr());
+    },
+  ],
+  // HORN_DRILL: vanilla OHKO → ER Normal 95bp, high-crit, ignores abilities/stat changes.
+  [
+    MoveId.HORN_DRILL,
+    move => {
+      removeAttrsByCtor(move, [OneHitKOAttr, OneHitKOAccuracyAttr]);
+      orFlag(move, MoveFlags.IGNORE_ABILITIES);
+      orFlag(move, MoveFlags.HORN_BASED);
+      addAttrUnique(move, new HighCritAttr());
+      addAttrUnique(move, new IgnoreOpponentStatStagesAttr());
+    },
+  ],
+  // FISSURE: vanilla OHKO Ground → ER Ground 120bp spread (hits both foes).
+  [
+    MoveId.FISSURE,
+    move => {
+      removeAttrsByCtor(move, [OneHitKOAttr, OneHitKOAccuracyAttr]);
+      move.moveTarget = MoveTarget.ALL_NEAR_ENEMIES;
+    },
+  ],
+  // SHEER_COLD: vanilla OHKO Ice → ER Ice 100bp regular damage + 20% frostbite.
+  [
+    MoveId.SHEER_COLD,
+    move => {
+      removeAttrsByCtor(move, [OneHitKOAttr, OneHitKOAccuracyAttr, SheerColdAccuracyAttr]);
+      // ER's frostbite is wired via the ER FREEZE-status remap in B2 (status-effect
+      // pathway). We add the StatusEffectAttr; the chance is the existing
+      // `move.chance` patched by the numeric pass.
+      addAttrUnique(move, new StatusEffectAttr(StatusEffect.FREEZE));
+    },
+  ],
+
+  // =====================================================================
+  // TOTAL rewrites — STATUS → damaging conversions
+  // =====================================================================
+  // WHIRLWIND: vanilla force-switch → ER Special Flying damaging wind move.
+  [
+    MoveId.WHIRLWIND,
+    move => {
+      // Clear vanilla force-switch attr by name (avoids importing
+      // ForceSwitchOutAttr, which would expand the import surface).
+      removeAttrsByName(move, ["ForceSwitchOutAttr"]);
+      setCategory(move, MoveCategory.SPECIAL);
+      retypeMove(move, PokemonType.FLYING);
+      orFlag(move, MoveFlags.WIND_MOVE);
+    },
+  ],
+  // GROWL: vanilla status (Atk -1) → ER Special Normal sound damaging move
+  // that also drops Atk.
+  [
+    MoveId.GROWL,
+    move => {
+      setCategory(move, MoveCategory.SPECIAL);
+      // Vanilla GROWL already has a StatStageChange(ATK, -1) attr. Keep it.
+      orFlag(move, MoveFlags.SOUND_BASED);
+    },
+  ],
+  // POISON_GAS: vanilla status (poison) → ER Special Poison damaging, spread.
+  [
+    MoveId.POISON_GAS,
+    move => {
+      setCategory(move, MoveCategory.SPECIAL);
+      move.moveTarget = MoveTarget.ALL_NEAR_ENEMIES;
+      // Keep StatusEffectAttr(POISON) — vanilla wires it. ER adds 30% chance
+      // (numeric-patched) on top.
+    },
+  ],
+  // FLASH: vanilla status (accuracy -1) → ER Special Electric damaging, ACC drop.
+  [
+    MoveId.FLASH,
+    move => {
+      setCategory(move, MoveCategory.SPECIAL);
+      retypeMove(move, PokemonType.ELECTRIC);
+      orFlag(move, MoveFlags.FIELD_BASED);
+      // Vanilla FLASH already has StatStageChange(ACC, -1); keep.
+    },
+  ],
+  // NIGHTMARE: vanilla status (NightmareTag) → ER Special Ghost damaging.
+  [
+    MoveId.NIGHTMARE,
+    move => {
+      removeAttrsByName(move, ["AddBattlerTagAttr"]); // strips NightmareTag attr
+      setCategory(move, MoveCategory.SPECIAL);
+    },
+  ],
+  // OCTOLOCK: vanilla status (OctolockTag) → ER Physical damaging.
+  // Vanilla wires OctolockTag via AddBattlerTagAttr — keep it (provides
+  // Def/SpDef drain + trap). We just need to change category to damaging.
+  [
+    MoveId.OCTOLOCK,
+    move => {
+      setCategory(move, MoveCategory.PHYSICAL);
+    },
+  ],
+  // DECORATE: vanilla status (ally Atk/SpAtk +2) → ER Special Fairy damaging.
+  // The ally-boost rider stays via the existing StatStageChange(self/ally) attrs.
+  [
+    MoveId.DECORATE,
+    move => {
+      setCategory(move, MoveCategory.SPECIAL);
+    },
+  ],
+  // CAPTIVATE: vanilla status (SpAtk -2 opposite-gender) → ER Special Fairy damaging.
+  [
+    MoveId.CAPTIVATE,
+    move => {
+      setCategory(move, MoveCategory.SPECIAL);
+      retypeMove(move, PokemonType.FAIRY);
+    },
+  ],
+
+  // =====================================================================
+  // TOTAL rewrites — type/category swaps
+  // =====================================================================
+  [MoveId.VISE_GRIP, move => retypeMove(move, PokemonType.BUG)],
+  [
+    MoveId.CUT,
+    move => {
+      retypeMove(move, PokemonType.STEEL);
+      orFlag(move, MoveFlags.FIELD_BASED);
+    },
+  ],
+  [
+    MoveId.RAZOR_WIND,
+    move => {
+      retypeMove(move, PokemonType.FLYING);
+    },
+  ],
+  [
+    MoveId.TAKE_DOWN,
+    move => {
+      retypeMove(move, PokemonType.FIGHTING);
+      addAttrUnique(move, new StatStageChangeAttr([Stat.SPD], -1, false, { effectChanceOverride: 20 }) as MoveAttr);
+    },
+  ],
+  [
+    MoveId.STRENGTH,
+    move => {
+      retypeMove(move, PokemonType.ROCK);
+      orFlag(move, MoveFlags.FIELD_BASED);
+    },
+  ],
+  [
+    MoveId.EGG_BOMB,
+    move => {
+      retypeMove(move, PokemonType.FIRE);
+      orFlag(move, MoveFlags.THROW_BASED);
+      addAttrUnique(move, new StatusEffectAttr(StatusEffect.BURN));
+      // Fire-typed moves cure freeze on target — AttackMove constructor adds
+      // HealStatusEffectAttr(FREEZE) only when constructed as Fire. Add it
+      // manually since we re-typed post-construction.
+      addAttrUnique(move, new HealStatusEffectAttr(false, StatusEffect.FREEZE));
+    },
+  ],
+  [
+    MoveId.SPIKE_CANNON,
+    move => {
+      retypeMove(move, PokemonType.WATER);
+      orFlag(move, MoveFlags.PULSE_MOVE);
+    },
+  ],
+  [MoveId.BARRAGE, move => retypeMove(move, PokemonType.STEEL)],
+  [MoveId.RAGE, move => retypeMove(move, PokemonType.FIGHTING)],
+  [MoveId.MIND_READER, move => retypeMove(move, PokemonType.PSYCHIC)],
+  [MoveId.FRUSTRATION, move => retypeMove(move, PokemonType.DARK)],
+  [MoveId.SMELLING_SALTS, move => retypeMove(move, PokemonType.FIGHTING)],
+  // MUDDY_WATER: ER's dual-type Water+Ground requires a bespoke
+  // type-resolution attr — deferred. The accuracy-drop rider is already in
+  // vanilla and the numeric pass handles power/accuracy/PP.
+  [
+    MoveId.ROCK_CLIMB,
+    move => {
+      retypeMove(move, PokemonType.ROCK);
+      orFlag(move, MoveFlags.FIELD_BASED);
+    },
+  ],
+  [MoveId.QUASH, move => retypeMove(move, PokemonType.PSYCHIC)],
+  [MoveId.HYPERSPACE_HOLE, move => retypeMove(move, PokemonType.GHOST)],
+  [
+    MoveId.HOLD_BACK,
+    move => {
+      retypeMove(move, PokemonType.FIGHTING);
+      addAttrUnique(move, new ConfuseAttr(false));
+    },
+  ],
+  [MoveId.JAW_LOCK, move => retypeMove(move, PokemonType.FIGHTING)],
+  [MoveId.SNAP_TRAP, move => retypeMove(move, PokemonType.STEEL)],
+  [
+    MoveId.AXE_KICK,
+    move => {
+      retypeMove(move, PokemonType.DARK);
+      addAttrUnique(move, new ConfuseAttr(false));
+    },
+  ],
+
+  // =====================================================================
+  // MAJOR — UseHighestOffenseAttr (reuse PhotonGeyserCategoryAttr)
+  // =====================================================================
+  // ER's USE_HIGHEST_OFFENSE category-derivation matches pokerogue's
+  // PhotonGeyserCategoryAttr semantics exactly (set category to PHYSICAL if
+  // user's Atk > SpAtk). Re-use that attr on all ER USE_HIGHEST_OFFENSE moves.
+  [MoveId.BLAST_BURN, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.HYDRO_CANNON, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.FRENZY_PLANT, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.TRI_ATTACK, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.ATTACK_ORDER, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [
+    MoveId.ROCK_WRECKER,
+    move => {
+      addAttrUnique(move, new PhotonGeyserCategoryAttr());
+      orFlag(move, MoveFlags.THROW_BASED);
+    },
+  ],
+  [MoveId.MULTI_ATTACK, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.PIKA_PAPOW, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.VEEVEE_VOLLEY, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.RELIC_SONG, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [
+    MoveId.PRISMATIC_LASER,
+    move => {
+      addAttrUnique(move, new PhotonGeyserCategoryAttr());
+      orFlag(move, MoveFlags.PULSE_MOVE);
+    },
+  ],
+  [MoveId.WATER_PLEDGE, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.FIRE_PLEDGE, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.GRASS_PLEDGE, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.SPRINGTIDE_STORM, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.MYSTICAL_POWER, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.BLEAKWIND_STORM, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.WILDBOLT_STORM, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.SANDSEAR_STORM, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.TACHYON_CUTTER, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.MALIGNANT_CHAIN, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [MoveId.TERA_STARSTORM, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+
+  // =====================================================================
+  // MAJOR — status-on-hit / stat-on-hit additions
+  // =====================================================================
+  // DOUBLE_SLAP: 10% confuse chance after 2nd hit (approximated as ConfuseAttr).
+  [MoveId.DOUBLE_SLAP, move => addAttrUnique(move, new ConfuseAttr(false))],
+  // VINE_WHIP: 30% flinch chance (numeric-patched on top).
+  [MoveId.VINE_WHIP, move => addAttrUnique(move, new FlinchAttr())],
+  // PSYBEAM: lowers SpAtk on hit (chance patched separately).
+  [MoveId.PSYBEAM, move => addAttrUnique(move, new StatStageChangeAttr([Stat.SPATK], -1, false))],
+  // PSYWAVE: +1 priority (numeric) + 10% confuse.
+  [MoveId.PSYWAVE, move => addAttrUnique(move, new ConfuseAttr(false))],
+  // ROUND: 20% flinch chance.
+  [MoveId.ROUND, move => addAttrUnique(move, new FlinchAttr())],
+  // CHIP_AWAY: 40% chance to lower Atk and/or Def on hit.
+  [
+    MoveId.CHIP_AWAY,
+    move => {
+      addAttrUnique(move, new StatStageChangeAttr([Stat.ATK, Stat.DEF], -1, false));
+    },
+  ],
+  // DRAGON_RUSH: now 33% recoil.
+  [MoveId.DRAGON_RUSH, move => addAttrUnique(move, new RecoilAttr(false, 0.33))],
+  // CROSS_POISON: hits twice (multi-hit type TWO).
+  [MoveId.CROSS_POISON, move => addAttrUnique(move, new MultiHitAttr(MultiHitType.TWO))],
+  // BOOMBURST: 50% recoil after.
+  [MoveId.BOOMBURST, move => addAttrUnique(move, new RecoilAttr(false, 0.5))],
+  // WILD_CHARGE: 10% paralyze chance.
+  [MoveId.WILD_CHARGE, move => addAttrUnique(move, new StatusEffectAttr(StatusEffect.PARALYSIS))],
+  // BEAK_BLAST: direct burn proc (not just the header).
+  [MoveId.BEAK_BLAST, move => addAttrUnique(move, new StatusEffectAttr(StatusEffect.BURN))],
+  // STEEL_BEAM: ER replaces HalfSacrificial with flat 50% recoil.
+  [
+    MoveId.STEEL_BEAM,
+    move => {
+      removeAttrsByName(move, ["HalfSacrificialAttr"]);
+      addAttrUnique(move, new RecoilAttr(false, 0.5));
+    },
+  ],
+  // GLITZY_GLOW: also lowers foe SpAtk on hit.
+  [MoveId.GLITZY_GLOW, move => addAttrUnique(move, new StatStageChangeAttr([Stat.SPATK], -1, false))],
+  // BADDY_BAD: also lowers foe Atk on hit.
+  [MoveId.BADDY_BAD, move => addAttrUnique(move, new StatStageChangeAttr([Stat.ATK], -1, false))],
+  // PECK: now multi-hit (2-5).
+  [
+    MoveId.PECK,
+    move => {
+      addAttrUnique(move, new MultiHitAttr());
+      orFlag(move, MoveFlags.HORN_BASED);
+    },
+  ],
+  // ESPER_WING: adds 50% drain.
+  [MoveId.ESPER_WING, move => addAttrUnique(move, new HitHealAttr(0.5))],
+  // STOMP: now also destroys terrain (omit — bespoke ClearTerrainAttr, deferred).
+
+  // =====================================================================
+  // MAJOR — spread-target widenings
+  // =====================================================================
+  [MoveId.ACID, move => (move.moveTarget = MoveTarget.ALL_NEAR_ENEMIES)],
+  [MoveId.BUBBLE, move => (move.moveTarget = MoveTarget.ALL_NEAR_ENEMIES)],
+  [MoveId.BULLDOZE, move => (move.moveTarget = MoveTarget.ALL_NEAR_ENEMIES)],
+  [MoveId.PLAY_NICE, move => (move.moveTarget = MoveTarget.ALL_NEAR_ENEMIES)],
+  [
+    MoveId.MOUNTAIN_GALE,
+    move => {
+      move.moveTarget = MoveTarget.ALL_NEAR_ENEMIES;
+      orFlag(move, MoveFlags.AIR_BASED);
+    },
+  ],
+
+  // =====================================================================
+  // MAJOR — category swaps
+  // =====================================================================
+  [MoveId.BIND, move => setCategory(move, MoveCategory.SPECIAL)],
+  [MoveId.PRESENT, move => setCategory(move, MoveCategory.SPECIAL)],
+  [MoveId.AIR_CUTTER, move => setCategory(move, MoveCategory.PHYSICAL)],
+  [MoveId.MAGNET_BOMB, move => setCategory(move, MoveCategory.SPECIAL)],
+  [MoveId.DIAMOND_STORM, move => setCategory(move, MoveCategory.SPECIAL)],
+  [MoveId.CORE_ENFORCER, move => setCategory(move, MoveCategory.PHYSICAL)],
+  [MoveId.SKITTER_SMACK, move => setCategory(move, MoveCategory.SPECIAL)],
+  [MoveId.MORTAL_SPIN, move => setCategory(move, MoveCategory.SPECIAL)],
+
+  // =====================================================================
+  // MAJOR — defender-stat selector / always-crit / bypass-abilities riders
+  // =====================================================================
+  // MAGICAL_LEAF: hits Def (Body Press-style).
+  [MoveId.MAGICAL_LEAF, move => addAttrUnique(move, new DefDefAttr())],
+  // RAZOR_LEAF: always crits.
+  [
+    MoveId.RAZOR_LEAF,
+    move => {
+      // No AlwaysCritAttr in pokerogue. The closest available is HighCritAttr
+      // (boosts crit ratio by 1 stage). Apply it to bring crit rate to high
+      // tier; ER's "always crits" can be approximated this way until a
+      // bespoke attr is added.
+      addAttrUnique(move, new HighCritAttr());
+    },
+  ],
+
+  // =====================================================================
+  // MINOR-flag fixes — silently-uncovered flag bits
+  // =====================================================================
+  // FIELD_BASED entries (per audit — only the gap-uncovered moves)
+  [MoveId.EARTHQUAKE, move => orFlag(move, MoveFlags.FIELD_BASED)],
+  [MoveId.MAGNITUDE, move => orFlag(move, MoveFlags.FIELD_BASED)],
+  [MoveId.DIG, move => orFlag(move, MoveFlags.FIELD_BASED)],
+  [MoveId.MUD_SHOT, move => orFlag(move, MoveFlags.FIELD_BASED)],
+  // ICE_SPINNER already field-based per audit; verify
+  [MoveId.ICE_SPINNER, move => orFlag(move, MoveFlags.FIELD_BASED)],
+
+  // THROW_BASED + BONE_BASED composite entries (bone moves are also throws).
+  [MoveId.BEAT_UP, move => orFlag(move, MoveFlags.THROW_BASED)],
+  [
+    MoveId.BONEMERANG,
+    move => {
+      orFlag(move, MoveFlags.THROW_BASED);
+      orFlag(move, MoveFlags.BONE_BASED);
+    },
+  ],
+  [
+    MoveId.BONE_CLUB,
+    move => {
+      orFlag(move, MoveFlags.THROW_BASED);
+      orFlag(move, MoveFlags.BONE_BASED);
+    },
+  ],
+  [
+    MoveId.BONE_RUSH,
+    move => {
+      orFlag(move, MoveFlags.THROW_BASED);
+      orFlag(move, MoveFlags.BONE_BASED);
+    },
+  ],
+  [MoveId.SHADOW_BONE, move => orFlag(move, MoveFlags.BONE_BASED)],
+
+  // MIGHTY_HORN entries (HORN_BASED for already-horn moves not auto-flagged)
+  [MoveId.MEGAHORN, move => orFlag(move, MoveFlags.HORN_BASED)],
+  [MoveId.HORN_ATTACK, move => orFlag(move, MoveFlags.HORN_BASED)],
+  [MoveId.HORN_LEECH, move => orFlag(move, MoveFlags.HORN_BASED)],
+  [MoveId.SMART_STRIKE, move => orFlag(move, MoveFlags.HORN_BASED)],
+
+  // HAMMER_BASED entries (per audit ~5 moves)
+  [MoveId.WOOD_HAMMER, move => orFlag(move, MoveFlags.HAMMER_BASED)],
+  [MoveId.HAMMER_ARM, move => orFlag(move, MoveFlags.HAMMER_BASED)],
+  [MoveId.ICE_HAMMER, move => orFlag(move, MoveFlags.HAMMER_BASED)],
+
+  // ARROW_BASED entries (rare — Pin Missile is dart-like in ER)
+  [MoveId.PIN_MISSILE, move => orFlag(move, MoveFlags.ARROW_BASED)],
+
+  // =====================================================================
+  // MULTI-HIT additions — vanilla single-hit moves that ER turned into 2-5x
+  // =====================================================================
+  // PECK: ER description: "Hits 2-5x with a horn or beak. Mighty Horn boost."
+  // Vanilla pokerogue Peck is single-hit; ER bumps it to 2-5 hits and adds
+  // the HORN_BASED flag for Mighty Horn ability scaling. User-reported: a
+  // Fletchling 3-shot the player's mon with three Peck hits in a single
+  // turn — exactly the multi-hit shape.
+  [
+    MoveId.PECK,
+    move => {
+      addAttrUnique(move, new MultiHitAttr(MultiHitType.TWO_TO_FIVE));
+      orFlag(move, MoveFlags.HORN_BASED);
+    },
+  ],
+]);
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+/**
+ * Convenience type: a shape that exposes the otherwise-private mutable fields
+ * on `Move` for ER's rebalance. We can't `Move & { _type: … }` because TS
+ * sees the `_type` field as private on Move and the intersection collapses
+ * to `never`. Instead we declare a fresh shape that includes only the
+ * surface we touch, plus a passthrough for everything else via index access.
+ *
+ * All writes performed via this shape are runtime-safe — the `private`
+ * modifier in TS is a compile-time check only, and the fields are plain
+ * JS properties at runtime.
+ */
+interface MutableMove {
+  _type: PokemonType;
+  _category: MoveCategory;
+  flags: number;
+  attrs: MoveAttr[];
+  moveTarget: MoveTarget;
+  addAttr(attr: MoveAttr): Move;
+  [MOVE_PATCHED_MARKER]?: true;
+}
+
+/** Re-type the move (mutates the private `_type` field). */
+function retypeMove(move: MutableMove, type: PokemonType): void {
+  move._type = type;
+}
+
+/** Swap the move's category (mutates the private `_category` field). */
+function setCategory(move: MutableMove, category: MoveCategory): void {
+  move._category = category;
+}
+
+/** OR a {@linkcode MoveFlags} bit into the move's private `flags` bitmask. */
+function orFlag(move: MutableMove, flag: MoveFlags): void {
+  move.flags |= flag;
+}
+
+/**
+ * Add a pre-built `MoveAttr` to the move's attrs array, unless an attr of the
+ * same exact constructor is already present (idempotency safeguard for
+ * re-runs / overlapping audits).
+ */
+function addAttrUnique(move: MutableMove, attr: MoveAttr): void {
+  const ctor = attr.constructor;
+  for (const existing of move.attrs) {
+    if (existing.constructor === ctor) {
+      return;
+    }
+  }
+  move.addAttr(attr);
+}
+
+/**
+ * Remove all attrs whose constructor matches one of the provided constructors.
+ * Used by TOTAL rewrites that strip vanilla mechanics (e.g. OHKO removal).
+ */
+function removeAttrsByCtor(move: MutableMove, ctors: ReadonlyArray<new (...args: never[]) => MoveAttr>): void {
+  move.attrs = move.attrs.filter(a => !ctors.some(c => a.constructor === c));
+}
+
+/**
+ * Remove all attrs whose constructor name matches one of the provided names.
+ * String-based to avoid an import for every attr we strip (e.g.
+ * ForceSwitchOutAttr, HalfSacrificialAttr) — only the constructor's runtime
+ * `name` property is consulted.
+ */
+function removeAttrsByName(move: MutableMove, names: readonly string[]): void {
+  move.attrs = move.attrs.filter(a => !names.includes(a.constructor.name));
+}
+
+/**
+ * Apply ER's mechanic deltas to every vanilla pokerogue move with an entry
+ * in {@linkcode MOVE_PATCHERS}. Idempotent via {@linkcode MOVE_PATCHED_MARKER}.
+ *
+ * Invoked from `initEliteReduxVanillaRebalance()` after the numeric retunes
+ * have run, so the numeric values are already in place by the time the
+ * mechanic patcher sees the Move.
+ */
+export function initEliteReduxVanillaMovePatches(): VanillaMovePatchResult {
+  const result: VanillaMovePatchResult = {
+    moveDeltas: 0,
+    moveMissing: 0,
+    moveErrors: [],
+  };
+
+  const moveById = new Map<number, Move>();
+  for (const move of allMoves) {
+    moveById.set(move.id, move);
+  }
+
+  // Defensive: also collect the set of MoveIds that have ER vanilla entries,
+  // so we can spot patchers that target ids ER doesn't ship. (Currently we
+  // patch unconditionally — the dispatch table only lists ER-shipped vanilla
+  // ids per the audit.)
+  const erVanillaIds = new Set<number>();
+  for (const draft of ER_MOVES) {
+    const pokerogueId = ER_ID_MAP.moves[draft.id];
+    if (pokerogueId !== undefined && pokerogueId < VANILLA_ID_CUTOFF && draft.archetype === "vanilla") {
+      erVanillaIds.add(pokerogueId);
+    }
+  }
+
+  for (const [moveId, patcher] of MOVE_PATCHERS) {
+    const move = moveById.get(moveId);
+    if (!move) {
+      result.moveMissing++;
+      continue;
+    }
+    const mutable = move as unknown as MutableMove;
+    if (mutable[MOVE_PATCHED_MARKER]) {
+      continue;
+    }
+    try {
+      patcher(mutable);
+      Object.defineProperty(mutable, MOVE_PATCHED_MARKER, {
+        value: true,
+        enumerable: false,
+        configurable: false,
+        writable: false,
+      });
+      result.moveDeltas++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      result.moveErrors.push(`Patcher for move ${MoveId[moveId] ?? moveId} threw: ${msg}`);
+    }
+  }
+
+  return result;
+}
+
+/** Exported for tests: which move ids does the patcher table touch? */
+export function getPatchedMoveIds(): readonly MoveId[] {
+  return Array.from(MOVE_PATCHERS.keys());
+}
