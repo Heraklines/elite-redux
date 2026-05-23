@@ -178,3 +178,82 @@ export {
   WeatherTypeBoostAbAttr,
   type WeatherTypeBoostOptions,
 } from "./weather-terrain-interaction";
+// =============================================================================
+// New primitives (round-30+ batch) for remaining bespoke ability wires.
+// =============================================================================
+export { BstConditionalAllyAuraAbAttr, type BstConditionalAllyAuraOptions } from "./bst-conditional-ally-aura";
+export { ContactQuashAbAttr, type ContactQuashOptions } from "./contact-quash";
+export { DamageCapOnResistAbAttr } from "./damage-cap-on-resist";
+export { DefenseStatSwapOnStatusedFoeAbAttr } from "./defense-stat-swap-on-statused-foe";
+export { FieldStatShareAbAttr } from "./field-stat-share";
+export {
+  FoeStrongestStatSelfBoostAbAttr,
+  type FoeStrongestStatSelfBoostOptions,
+} from "./foe-strongest-stat-self-boost";
+export { OnCritStatBoostLowestAbAttr, type OnCritStatBoostLowestOptions } from "./on-crit-stat-boost-lowest";
+export {
+  OneShotTypeBoostAbAttr,
+  OneShotTypeBoostFollowupAbAttr,
+  type OneShotTypeBoostOptions,
+} from "./one-shot-type-boost-then-lose-type";
+export {
+  OutgoingStatDropMultiplierAbAttr,
+  type OutgoingStatDropMultiplierOptions,
+} from "./outgoing-stat-drop-multiplier";
+export {
+  PostDefendChangeAttackerTypeAbAttr,
+  type PostDefendChangeAttackerTypeOptions,
+} from "./post-defend-change-attacker-type";
+export { PostDefendSuppressOpponentDamageBoostAbAttr } from "./post-defend-suppress-opponent-damage-boost";
+export { PostFaintReviveAbAttr, type PostFaintReviveOptions } from "./post-faint-revive";
+export { PostSummonClearTerrainAbAttr, type PostSummonClearTerrainOptions } from "./post-summon-clear-terrain";
+export { PostSummonQuashFoesAbAttr, type PostSummonQuashFoesOptions } from "./post-summon-quash-foes";
+export {
+  PostSummonStackSetEffectsAbAttr,
+  type PostSummonStackSetEffectsOptions,
+} from "./post-summon-stack-set-effects";
+export { PostTurnFoeStatDropAbAttr, type PostTurnFoeStatDropOptions } from "./post-turn-foe-stat-drop";
+export { PostVictoryClearTagAbAttr, type PostVictoryClearTagOptions } from "./post-victory-clear-tag";
+export { PreSwitchOutItemRestoreAbAttr } from "./pre-switch-out-item-restore";
+export { RepeatMovePowerBoostAbAttr, type RepeatMovePowerBoostOptions } from "./repeat-move-power-boost";
+export { SePriorityBonusAbAttr, type SePriorityBonusOptions } from "./se-priority-bonus";
+export { SkipChargeTurnAbAttr } from "./skip-charge-turn";
+export { StabSuppressAuraAbAttr } from "./stab-suppress-aura";
+export { StatusCascadeAbAttr, type StatusCascadeChange, type StatusCascadeOptions } from "./status-cascade";
+export {
+  SuperEffectiveMultiplierBoostAbAttr,
+  type SuperEffectiveMultiplierBoostOptions,
+} from "./super-effective-multiplier-boost";
+export {
+  SuppressAttackerAbilityAbAttr,
+  type SuppressAttackerAbilityOptions,
+} from "./suppress-attacker-ability";
+export {
+  TargetHighestStatDropAbAttr,
+  type TargetHighestStatDropOptions,
+  type TargetHighestStatDropRule,
+} from "./target-highest-stat-drop";
+export {
+  TimeLimitedDamageReductionAbAttr,
+  type TimeLimitedDamageReductionOptions,
+} from "./time-limited-damage-reduction";
+export { TrapDurationModifierAbAttr, type TrapDurationModifierOptions } from "./trap-duration-modifier";
+export {
+  TurnDecayDamageMultiplierAbAttr,
+  type TurnDecayDamageMultiplierOptions,
+} from "./turn-decay-damage-multiplier";
+export {
+  TypeChartOverrideAbAttr,
+  type TypeChartOverrideOptions,
+  type TypeChartOverrideRule,
+} from "./type-chart-override";
+export {
+  TypeGatedStatTriggerOnAttackAbAttr,
+  type TypeGatedStatTriggerOnAttackOptions,
+} from "./type-gated-stat-trigger-on-attack";
+export {
+  TypedImmunityWithArenaTagAbAttr,
+  type TypedImmunityWithArenaTagOptions,
+} from "./typed-immunity-with-arena-tag";
+export { UserFieldFlagImmunityAbAttr, type UserFieldFlagImmunityOptions } from "./user-field-flag-immunity";
+export { WeatherBasedMoveBlockAbAttr } from "./weather-based-move-block";

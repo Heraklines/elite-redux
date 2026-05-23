@@ -57,6 +57,7 @@ import { ReceivedMoveDamageMultiplierAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { MoveCategory, type MoveDamageCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
+import type { PokemonType } from "#enums/pokemon-type";
 import type { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
@@ -79,7 +80,9 @@ export type DamageReductionFilter =
       readonly kind: "category-in-weather";
       readonly category: MoveDamageCategory;
       readonly weather: WeatherType;
-    };
+    }
+  /** Type-of-move filter — Thick Blubber ("1/4 fire/ice dmg"), Strong Foundation. */
+  | { readonly kind: "move-type"; readonly type: PokemonType };
 
 /** Construction options for {@linkcode DamageReductionAbAttr}. */
 export interface DamageReductionOptions {
@@ -207,6 +210,12 @@ export class DamageReductionAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
       case "category-in-weather": {
         const currentWeather = globalScene?.arena?.weather?.weatherType;
         return move.category === filter.category && currentWeather === filter.weather;
+      }
+      case "move-type": {
+        if (move.category === MoveCategory.STATUS) {
+          return false;
+        }
+        return attacker.getMoveType(move) === filter.type;
       }
     }
   }

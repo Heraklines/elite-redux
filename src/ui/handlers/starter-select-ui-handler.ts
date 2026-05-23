@@ -1070,7 +1070,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // The font size should be set per language
     const instructionTextSize = textSettings.instructionTextSize;
 
-    this.instructionsContainer = globalScene.add.container(4, 156).setVisible(true);
+    // y=156 collides with the ER 3-passive expansion: slot 3 sits at y=150 and
+    // the shifted nature row at y=157. Push the instruction stack below the
+    // expanded info panel so cycle-key hints don't overlap the nature label.
+    this.instructionsContainer = globalScene.add.container(4, 172).setVisible(true);
 
     const iRowX = this.instructionRowX;
     const iRowY = this.instructionRowY;

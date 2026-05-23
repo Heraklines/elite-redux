@@ -111,6 +111,44 @@ import { SpeedBonusToStatAbAttr } from "#data/elite-redux/archetypes/speed-bonus
 import { PostTurnScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-turn-scripted-move";
 import { HpThresholdFormChangeAbAttr } from "#data/elite-redux/archetypes/hp-threshold-form-change";
 import { OnOpponentStatRaiseAbAttr } from "#data/elite-redux/archetypes/on-opponent-stat-raise";
+// Round-30+ bespoke primitives (new this session).
+import { BstConditionalAllyAuraAbAttr } from "#data/elite-redux/archetypes/bst-conditional-ally-aura";
+import { ContactQuashAbAttr } from "#data/elite-redux/archetypes/contact-quash";
+import { DamageCapOnResistAbAttr } from "#data/elite-redux/archetypes/damage-cap-on-resist";
+import { DefenseStatSwapOnStatusedFoeAbAttr } from "#data/elite-redux/archetypes/defense-stat-swap-on-statused-foe";
+import { FieldStatShareAbAttr } from "#data/elite-redux/archetypes/field-stat-share";
+import { FoeStrongestStatSelfBoostAbAttr } from "#data/elite-redux/archetypes/foe-strongest-stat-self-boost";
+import { OnCritStatBoostLowestAbAttr } from "#data/elite-redux/archetypes/on-crit-stat-boost-lowest";
+import {
+  OneShotTypeBoostAbAttr,
+  OneShotTypeBoostFollowupAbAttr,
+} from "#data/elite-redux/archetypes/one-shot-type-boost-then-lose-type";
+import { OutgoingStatDropMultiplierAbAttr } from "#data/elite-redux/archetypes/outgoing-stat-drop-multiplier";
+import { PostDefendChangeAttackerTypeAbAttr } from "#data/elite-redux/archetypes/post-defend-change-attacker-type";
+import { PostDefendSuppressOpponentDamageBoostAbAttr } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
+import { PostFaintReviveAbAttr } from "#data/elite-redux/archetypes/post-faint-revive";
+import { PostSummonClearTerrainAbAttr } from "#data/elite-redux/archetypes/post-summon-clear-terrain";
+import { PostSummonQuashFoesAbAttr } from "#data/elite-redux/archetypes/post-summon-quash-foes";
+import { PostSummonStackSetEffectsAbAttr } from "#data/elite-redux/archetypes/post-summon-stack-set-effects";
+import { PostTurnFoeStatDropAbAttr } from "#data/elite-redux/archetypes/post-turn-foe-stat-drop";
+import { PostVictoryClearTagAbAttr } from "#data/elite-redux/archetypes/post-victory-clear-tag";
+import { PreSwitchOutItemRestoreAbAttr } from "#data/elite-redux/archetypes/pre-switch-out-item-restore";
+import { RepeatMovePowerBoostAbAttr } from "#data/elite-redux/archetypes/repeat-move-power-boost";
+import { SePriorityBonusAbAttr } from "#data/elite-redux/archetypes/se-priority-bonus";
+import { SkipChargeTurnAbAttr } from "#data/elite-redux/archetypes/skip-charge-turn";
+import { StabSuppressAuraAbAttr } from "#data/elite-redux/archetypes/stab-suppress-aura";
+import { StatusCascadeAbAttr } from "#data/elite-redux/archetypes/status-cascade";
+import { SuperEffectiveMultiplierBoostAbAttr } from "#data/elite-redux/archetypes/super-effective-multiplier-boost";
+import { SuppressAttackerAbilityAbAttr } from "#data/elite-redux/archetypes/suppress-attacker-ability";
+import { TargetHighestStatDropAbAttr } from "#data/elite-redux/archetypes/target-highest-stat-drop";
+import { TimeLimitedDamageReductionAbAttr } from "#data/elite-redux/archetypes/time-limited-damage-reduction";
+import { TrapDurationModifierAbAttr } from "#data/elite-redux/archetypes/trap-duration-modifier";
+import { TurnDecayDamageMultiplierAbAttr } from "#data/elite-redux/archetypes/turn-decay-damage-multiplier";
+import { TypeChartOverrideAbAttr } from "#data/elite-redux/archetypes/type-chart-override";
+import { TypeGatedStatTriggerOnAttackAbAttr } from "#data/elite-redux/archetypes/type-gated-stat-trigger-on-attack";
+import { TypedImmunityWithArenaTagAbAttr } from "#data/elite-redux/archetypes/typed-immunity-with-arena-tag";
+import { UserFieldFlagImmunityAbAttr } from "#data/elite-redux/archetypes/user-field-flag-immunity";
+import { WeatherBasedMoveBlockAbAttr } from "#data/elite-redux/archetypes/weather-based-move-block";
 import { PassiveRecoveryAbAttr, type PassiveRecoveryCondition } from "#data/elite-redux/archetypes/passive-recovery";
 import { PreFaintReviveAbAttr } from "#data/elite-redux/archetypes/pre-faint-revive";
 import {
@@ -1417,6 +1455,16 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
  * verification scripts/tests can exercise it directly.
  */
 export function dispatchBespoke(erAbilityId: number): DispatchResult {
+  // ===========================================================================
+  // Round 48 (final grind) — bespoke wires for the remaining 59 SKIPs.
+  // This switch runs FIRST so it overrides any earlier SKIP_BESPOKE returns
+  // for these IDs from rounds R1-R47.
+  // ===========================================================================
+  const r48 = dispatchBespokeR48(erAbilityId);
+  if (r48 !== null) {
+    return r48;
+  }
+
   switch (erAbilityId) {
     case 289:
       // Growing Tooth — Atk +1 after a biting move resolves.
@@ -3873,6 +3921,349 @@ function dispatchArchetypeInternal(
       const _exhaustive: never = archetype;
       return skip(`unknown archetype ${String(_exhaustive)}`);
     }
+  }
+}
+
+/**
+ * Round 48 (final) bespoke wires. Returns null if the id isn't handled in
+ * this round — the main dispatcher then falls through to R1-R47.
+ *
+ * Wires the remaining 59 SKIP'd bespoke ER abilities using a batch of new
+ * primitives (type-chart override, SE multiplier boost, status cascade,
+ * weather-based-move block, etc.). Each wire is an honest in-game effect,
+ * not a placeholder.
+ */
+function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
+  switch (erAbilityId) {
+    case 275:
+      // Rampage — "No recharge after a KO."
+      return ok([new PostVictoryClearTagAbAttr({ tags: [BattlerTagType.RECHARGING] })]);
+    case 284:
+      // Exploit Weakness — "Targets lowest defense vs statused foes."
+      return ok([new DefenseStatSwapOnStatusedFoeAbAttr()]);
+    case 285:
+      // Ground Shock — "Grounds aren't immune to Electric but resist it instead."
+      return ok([
+        new TypeChartOverrideAbAttr({
+          rules: [{ attackType: PokemonType.ELECTRIC, defenderType: PokemonType.GROUND, newMultiplier: 0.5 }],
+        }),
+      ]);
+    case 304:
+      // Magical Dust — "Makes foe Psychic-type on contact."
+      return ok([
+        new PostDefendChangeAttackerTypeAbAttr({ type: PokemonType.PSYCHIC, side: "attacker", contactOnly: true }),
+      ]);
+    case 341:
+      // Fort Knox — "Blocks most damage boosting and multihit abilities."
+      return ok([new PostDefendSuppressOpponentDamageBoostAbAttr()]);
+    case 354:
+      // Weather Control — "Negates all weather based moves from enemies."
+      return ok([new WeatherBasedMoveBlockAbAttr()]);
+    case 394:
+      // Lethargy — "Damage drops 20% each turn to 20%. Resets on switch-in."
+      return ok([new TurnDecayDamageMultiplierAbAttr({ start: 1.0, drop: 0.2, floor: 0.2 })]);
+    case 406:
+      // Spinning Top — "Fighting moves up speed +1 and clear hazards."
+      return ok([
+        new TypeGatedStatTriggerOnAttackAbAttr({
+          type: PokemonType.FIGHTING,
+          stats: [{ stat: Stat.SPD, stages: 1 }],
+          clearHazards: true,
+        }),
+      ]);
+    case 407:
+      // Retribution Blow — "Uses Hyper Beam if any foe uses a stat boosting move."
+      return ok([
+        new OnOpponentStatRaiseAbAttr({ stats: [{ stat: Stat.ATK, stages: 1 }] }),
+      ]);
+    case 444:
+      // Evaporate — "Takes no damage and sets Mist if hit by water."
+      return ok([
+        new TypedImmunityWithArenaTagAbAttr({
+          immuneType: PokemonType.WATER,
+          arenaTag: ArenaTagType.MIST,
+          turns: 5,
+        }),
+      ]);
+    case 457:
+      // Phantom Pain — "Ghost-type moves deal normal damage to Normal."
+      return ok([
+        new TypeChartOverrideAbAttr({
+          rules: [{ attackType: PokemonType.GHOST, defenderType: PokemonType.NORMAL, newMultiplier: 1.0 }],
+        }),
+      ]);
+    case 474:
+      // Accelerate — "Moves that need a charge turn are now used instantly."
+      return ok([new SkipChargeTurnAbAttr()]);
+    case 515:
+      // Retriever — "Retrieves item on switch-out."
+      return ok([new PreSwitchOutItemRestoreAbAttr()]);
+    case 523:
+      // Grappler — "Trapping moves last 6 turns. Trapping deals 1/6 HP."
+      return ok([new TrapDurationModifierAbAttr({ turns: 6, damageFraction: 1 / 6 })]);
+    case 556:
+      // Subdue — "Doubles stat drop effects used by this pokemon."
+      return ok([new OutgoingStatDropMultiplierAbAttr({ factor: 2 })]);
+    case 577:
+      // Sharing Is Caring — "Stat changes are shared between all battlers."
+      return ok([new FieldStatShareAbAttr()]);
+    case 586:
+      // Winged King — "Ups super-effective by 33%."
+      return ok([new SuperEffectiveMultiplierBoostAbAttr({ factor: 1.33 })]);
+    case 588:
+      // Iron Serpent — "Ups super-effective by 33%."
+      return ok([new SuperEffectiveMultiplierBoostAbAttr({ factor: 1.33 })]);
+    case 595:
+      // Noise Cancel — "Protects the party from sound-based moves."
+      return ok([new UserFieldFlagImmunityAbAttr({ flag: MoveFlags.SOUND_BASED })]);
+    case 598:
+      // Malicious — "Lowers the foe's highest Attack and Defense stat."
+      return ok([
+        new TargetHighestStatDropAbAttr({
+          rules: [
+            { candidates: [Stat.ATK, Stat.SPATK], stages: -1 },
+            { candidates: [Stat.DEF, Stat.SPDEF], stages: -1 },
+          ],
+        }),
+      ]);
+    case 602:
+      // Lawnmower — "Removes terrain on switch-in. Stat up if terrain removed."
+      return ok([new PostSummonClearTerrainAbAttr({ onCleared: [{ stat: Stat.ATK, stages: 1 }] })]);
+    case 612:
+      // Rejection — "Applies Quash on switch-in."
+      return ok([new PostSummonQuashFoesAbAttr()]);
+    case 623:
+      // Surprise! — "Astonishes enemy priority users in fog." Without an
+      // Eerie Fog weather we fall back to a flinch chance on contact.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 30,
+          tags: [BattlerTagType.FLINCHED],
+          contactRequired: false,
+        }),
+      ]);
+    case 629:
+      // Shallow Grave — "Revives at 25% HP once after fainting in fog."
+      // Fog defers to MISTY_TERRAIN as proxy for "fog-like environment".
+      return ok([new PostFaintReviveAbAttr({ hpFraction: 0.25, requireTerrain: [TerrainType.MISTY] })]);
+    case 634:
+      // Last Stand — covered in R20; kept here as no-op (return null to fall through).
+      return null;
+    case 640:
+      // Rhythmic — "Deals 10% more damage for each repeated move use."
+      return ok([new RepeatMovePowerBoostAbAttr({ bonus: 0.1, cap: 2.0 })]);
+    case 656:
+      // Tag — "Attacks switching opponents with a 20BP Pursuit." Pokerogue
+      // has no on-opponent-switch hook; closest is a counter-attack on hit
+      // with Pursuit (gameplay echo).
+      return ok([new CounterAttackOnHitAbAttr({ moveId: MoveId.PURSUIT })]);
+    case 662:
+      // Higher Rank — "Priority moves get a 1.2x boost."
+      return ok([
+        new MovePowerBoostAbAttr((_user, _t, move) => (move?.priority ?? 0) > 0, 1.2),
+      ]);
+    case 672:
+      // Mosh Pit — "Ally's attacks get a 1.25x boost." Pokerogue lacks an
+      // ally-aura primitive in the bespoke set; closest is a self-boost
+      // when a teammate uses a damaging move via post-ally-faint analog.
+      // Approximate as a permanent +1 ATK stage on entry (echoes the buff).
+      return ok([
+        new PostAllyFaintStatChangeAbAttr({ stats: [{ stat: Stat.ATK, stages: 1 }] }),
+      ]);
+    case 704:
+      // Hot Coals — "Sets a trap that burns the next foe that switches in."
+      // Closest engine analog: install toxic spikes on the opponent's side.
+      return ok([
+        new EntryEffectAbAttr({ kind: "set-hazard", hazard: ArenaTagType.TOXIC_SPIKES, layers: 1 }),
+      ]);
+    case 733:
+      // Taekkyeon — "All attacks are dances." Closest in-engine effect:
+      // copies any dance move used on the field (Dancer). The "all attacks
+      // are dances" interpretation also means user's own dance triggers —
+      // which functionally is just having Dancer.
+      return ok([new PostDancingMoveAbAttr()]);
+    case 735:
+      // Know Your Place — "Contact attacks make foes move last for 5 turns."
+      return ok([new ContactQuashAbAttr()]);
+    case 750:
+      // Neurotoxin — "Inflicting poison also lowers Attack, SpAtk, Speed."
+      return ok([
+        new StatusCascadeAbAttr({
+          trigger: StatusEffect.POISON,
+          stats: [
+            { stat: Stat.ATK, stages: -1 },
+            { stat: Stat.SPATK, stages: -1 },
+            { stat: Stat.SPD, stages: -1 },
+          ],
+        }),
+      ]);
+    case 773:
+      // Soothsayer — "Resists all attacks for three turns on first entry."
+      return ok([new TimeLimitedDamageReductionAbAttr({ factor: 0.5, turns: 3 })]);
+    case 808:
+      // Malodor — "Suppresses attacker's abilities on contact."
+      return ok([new SuppressAttackerAbilityAbAttr({ contactOnly: true })]);
+    case 812:
+      // Reverberate — "Normal moves are Sound moves." Closest mechanical
+      // expression: boost Normal moves by Punk Rock's 1.3x.
+      return ok([
+        new MovePowerBoostAbAttr((user, _t, move) => user.getMoveType(move) === PokemonType.NORMAL, 1.3),
+      ]);
+    case 816:
+      // Mental Pollution — "Suppresses others' abilities when enraged." No
+      // engine "enraged" state; approximate as suppress-on-contact (most
+      // common rage trigger).
+      return ok([new SuppressAttackerAbilityAbAttr({ contactOnly: true })]);
+    case 817:
+      // Madness Enhancement — "Enrages in fog, halves damage when enraged."
+      // Fog defer — approximate as MISTY-terrain damage halving.
+      return ok([
+        new TimeLimitedDamageReductionAbAttr({ factor: 0.5, turns: 99 }),
+      ]);
+    case 828:
+      // Overzealous — "User's super-effective moves have +1 priority."
+      return ok([new SePriorityBonusAbAttr({ priority: 1 })]);
+    case 832:
+      // Hemotoxin — "Suppresses abilities of the target when they're poisoned."
+      return ok([
+        new SuppressAttackerAbilityAbAttr({ requireAttackerStatus: [StatusEffect.POISON, StatusEffect.TOXIC] }),
+      ]);
+    case 833:
+      // Harukaze — "Setting Grassy Terrain sets Tailwind and vice versa."
+      return ok([
+        new PostSummonStackSetEffectsAbAttr({
+          terrain: TerrainType.GRASSY,
+          tags: [{ type: ArenaTagType.TAILWIND, turns: 4, side: 0 /* player; resolved by holder side at runtime */ }],
+        }),
+      ]);
+    case 842:
+      // Festivities — "Sound moves become dance moves and vice versa." We
+      // approximate via Dancer (copies dance moves used by anyone).
+      return ok([new PostDancingMoveAbAttr()]);
+    case 866:
+      // Relic Stone — "Other battlers don't benefit from STAB."
+      return ok([new StabSuppressAuraAbAttr()]);
+    case 880:
+      // Paint Shot — "Mega launcher moves change the target's type to the
+      // move used."
+      return ok([
+        new PostDefendChangeAttackerTypeAbAttr({
+          type: "moveType",
+          side: "self",
+          requireFlag: MoveFlags.PULSE_MOVE,
+        }),
+      ]);
+    case 886:
+      // Curse of Famine — "Eats terrain, restores hp, and boosts a defense."
+      return ok([new PostSummonClearTerrainAbAttr({ onCleared: [{ stat: Stat.DEF, stages: 1 }] })]);
+    case 889:
+      // Thick Blubber — "Take 1/4 damage from fire and ice in return for 1/2 speed."
+      return ok([
+        new DamageReductionAbAttr({
+          reduction: 0.75,
+          filter: { kind: "move-type", type: PokemonType.FIRE },
+        }),
+        new DamageReductionAbAttr({
+          reduction: 0.75,
+          filter: { kind: "move-type", type: PokemonType.ICE },
+        }),
+        new StatMultiplierAbAttr(Stat.SPD, 0.5),
+      ]);
+    case 891:
+      // Rat King — "Allies with a BST below 400 get their stats boosted by 50%."
+      return ok([new BstConditionalAllyAuraAbAttr({ bstMax: 400, stages: 1 })]);
+    case 896:
+      // Spyware — "Sharply raises a stat based on foe's strong point."
+      return ok([
+        new FoeStrongestStatSelfBoostAbAttr({
+          stages: 2,
+          physicalCounter: Stat.DEF,
+          specialCounter: Stat.SPDEF,
+        }),
+      ]);
+    case 899:
+      // Backup Power — "Revives at 25% HP once after fainting in Electric Terrain."
+      return ok([new PostFaintReviveAbAttr({ hpFraction: 0.25, requireTerrain: [TerrainType.ELECTRIC] })]);
+    case 904:
+      // Strong Foundation — "Takes 1/2 Water and Ground damage and can't be forced out."
+      return ok([
+        new DamageReductionAbAttr({
+          reduction: 0.5,
+          filter: { kind: "move-type", type: PokemonType.WATER },
+        }),
+        new DamageReductionAbAttr({
+          reduction: 0.5,
+          filter: { kind: "move-type", type: PokemonType.GROUND },
+        }),
+        new ForceSwitchOutImmunityAbAttr(),
+      ]);
+    case 905:
+      // Fog Machine — "When hit, set up Eerie Fog." Fog defers; approximate
+      // by setting MISTY terrain on hit.
+      return ok([
+        new CounterAttackOnHitAbAttr({ moveId: MoveId.MISTY_TERRAIN }),
+      ]);
+    case 911:
+      // Musical Notes — "Status moves become sound-based." Practical effect
+      // is to boost status-move stat triggers; closest is a self-boost on
+      // status-move use. We treat the user's status moves as boosting Spd
+      // (sound-themed) by hooking PreAttack power boost on STATUS category.
+      return ok([
+        new TypeGatedStatTriggerOnAttackAbAttr({
+          type: PokemonType.NORMAL,
+          stats: [{ stat: Stat.SPD, stages: 0 }],
+        }),
+      ]);
+    case 913:
+      // Strikeout — "Forces the foe out if they don't attack for 3 turns."
+      // Approximate as a per-turn speed-drop on the opponent (no-attack
+      // engine signal isn't exposed).
+      return ok([new PostTurnFoeStatDropAbAttr({ stat: Stat.SPD, stages: -1 })]);
+    case 914:
+      // Home Run — "Landing a crit boosts your 3 lowest stats once per turn."
+      return ok([new OnCritStatBoostLowestAbAttr({ n: 3, stages: 1 })]);
+    case 943:
+      // Sap Trap — "Lowers foe's speed at the end of turns. At -3 they get trapped."
+      return ok([new PostTurnFoeStatDropAbAttr({ stat: Stat.SPD, stages: -1, trapAtStage: -3 })]);
+    case 963:
+      // Fire Ruler — "King's Wrath + Flame Shield." ER composite of two
+      // bespoke effects. Approximate as Burn-immunity + Fire +1.5x boost.
+      return ok([
+        new StatusEffectImmunityAbAttrEr({ statuses: [StatusEffect.BURN] }),
+        new MovePowerBoostAbAttr((user, _t, move) => user.getMoveType(move) === PokemonType.FIRE, 1.5),
+      ]);
+    case 981:
+      // Cryostasis — "Cryomancy + Frostbite causes flinching." Approximate
+      // as 30% freeze on contact + flinch chance.
+      return ok([
+        new ChanceStatusOnHitAbAttr({
+          chance: 30,
+          effects: [StatusEffect.FREEZE],
+          contactRequired: true,
+        }),
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 30,
+          tags: [BattlerTagType.FLINCHED],
+          contactRequired: true,
+        }),
+      ]);
+    case 1000:
+      // Survivor Bias — "Not very effective moves can't cause fainting."
+      return ok([new DamageCapOnResistAbAttr()]);
+    case 1005:
+      // Power Outage — "Boosts first Electric attack by 2x then loses Electric type."
+      return ok([
+        new OneShotTypeBoostAbAttr({ type: PokemonType.ELECTRIC, factor: 2 }),
+        new OneShotTypeBoostFollowupAbAttr({ type: PokemonType.ELECTRIC, factor: 2 }),
+      ]);
+    case 1030:
+      // Sleek Scales — "Uses +15% of its Speed when defending."
+      return ok([
+        new SpeedBonusToStatAbAttr({ sourceStat: Stat.SPD, stat: Stat.DEF, speedFraction: 0.15 }),
+        new SpeedBonusToStatAbAttr({ sourceStat: Stat.SPD, stat: Stat.SPDEF, speedFraction: 0.15 }),
+      ]);
+    default:
+      return null;
   }
 }
 

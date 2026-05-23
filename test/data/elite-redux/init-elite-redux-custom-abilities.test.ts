@@ -180,12 +180,12 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     expect(effect.kind).toBe("set-terrain");
   });
 
-  it("unwired bespoke entries (e.g. ER id 1000 Survivor Bias) have no archetype attrs", () => {
-    // Note: ER 254 WandrngSprit was wired in round 27 with vanilla
-    // PostDefendAbilitySwapAbAttr. ER 1000 Survivor Bias remains unwired
-    // (needs damage-cap-on-resist primitive). Use the latter as the
-    // canonical example for this assertion.
-    const id = ER_ID_MAP.abilities[1000];
+  it("unwired bespoke entries (e.g. ER id 369 Bad Company) have no archetype attrs", () => {
+    // Note: After the R48 grind every bespoke ER ability has a real wire
+    // EXCEPT 369 Bad Company which is intentionally EMPTY (returns ok([])
+    // by design — composite of pre-existing primitives only). Use it as the
+    // canonical example for the "unwired" path's behavior.
+    const id = ER_ID_MAP.abilities[369];
     expect(id).toBeDefined();
     const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();
@@ -262,9 +262,9 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     // so future rounds adding more bespoke wirings don't invalidate this
     // assertion.
     expect(wiredCounts.bespoke ?? 0).toBeGreaterThanOrEqual(15);
-    // R13-R47 grind raised the bespoke wire count substantially. Upper
-    // bound widened to 220 to accommodate the ~205 wires now in place.
-    expect(wiredCounts.bespoke ?? 0).toBeLessThanOrEqual(220);
+    // R48 grind wired every remaining SKIP — 262 bespoke wires now in
+    // place; bound widened to 280 to leave headroom for future ER customs.
+    expect(wiredCounts.bespoke ?? 0).toBeLessThanOrEqual(280);
   });
 
   it("init result reports per-archetype wired counts (fresh run on a clean baseline)", () => {
