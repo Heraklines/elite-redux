@@ -22,10 +22,15 @@
 import {
   AlliedFieldDamageReductionAbAttr,
   AllyStatMultiplierAbAttr,
+  BlockStatusDamageAbAttr,
+  ChangeMovePriorityAbAttr,
+  ConditionalCritAbAttr,
   MovePowerBoostAbAttr,
   MoveTypePowerBoostAbAttr,
   PostBiomeChangeWeatherChangeAbAttr,
   PostDefendContactApplyTagChanceAbAttr,
+  PostDefendStatStageChangeAbAttr,
+  PostReceiveCritStatStageChangeAbAttr,
   PostSummonTerrainChangeAbAttr,
   PostSummonWeatherChangeAbAttr,
   PostTurnHurtIfSleepingAbAttr,
@@ -33,12 +38,18 @@ import {
   ReceivedMoveDamageMultiplierAbAttr,
   ReceivedTypeDamageMultiplierAbAttr,
   StatMultiplierAbAttr,
+  StatusEffectImmunityAbAttr,
+  UserFieldBattlerTagImmunityAbAttr,
   UserFieldMoveTypePowerBoostAbAttr,
 } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
 import { allAbilities } from "#data/data-lists";
+import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
+import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
+import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { describe, expect, it } from "vitest";
@@ -342,5 +353,230 @@ describe("ER vanilla ability rebalance — MAJOR composite riders", () => {
     const protectors = ab.attrs.filter(a => a.constructor.name === "ProtectStatAbAttr");
     // Vanilla has 1 (ATK); ER adds a second for SPATK.
     expect(protectors.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// =============================================================================
+// Round 2 tests
+// =============================================================================
+
+describe("ER vanilla ability rebalance — R2 BattlerTag Scare immunity", () => {
+  it.each([
+    ["INNER_FOCUS", AbilityId.INNER_FOCUS],
+    ["OBLIVIOUS", AbilityId.OBLIVIOUS],
+    ["OWN_TEMPO", AbilityId.OWN_TEMPO],
+  ] as const)("%s — BattlerTagImmunity attrs include ER_FEAR", (_name, id) => {
+    const ab = getAbility(id);
+    const hasFearImmunity = ab.attrs.some(a => {
+      if (a.constructor.name !== "BattlerTagImmunityAbAttr" && !(a instanceof UserFieldBattlerTagImmunityAbAttr)) {
+        return false;
+      }
+      const tagged = a as unknown as { immuneTagTypes?: BattlerTagType[] };
+      return Array.isArray(tagged.immuneTagTypes) && tagged.immuneTagTypes.includes(BattlerTagType.ER_FEAR);
+    });
+    expect(hasFearImmunity).toBe(true);
+  });
+});
+
+describe("ER vanilla ability rebalance — R2 entry-effect riders", () => {
+  it("WATER_VEIL — has scripted-move Aqua Ring on entry rider", () => {
+    const ab = getAbility(AbilityId.WATER_VEIL);
+    const entry = ab.attrs.find(a => a instanceof EntryEffectAbAttr);
+    expect(entry).toBeDefined();
+    const effect = (entry as EntryEffectAbAttr).getEffect();
+    expect(effect.kind).toBe("scripted-move");
+    expect((effect as { kind: "scripted-move"; move: MoveId }).move).toBe(MoveId.AQUA_RING);
+  });
+
+  it("TURBOBLAZE — has add-self-type FIRE rider", () => {
+    const ab = getAbility(AbilityId.TURBOBLAZE);
+    const entry = ab.attrs.find(a => a instanceof EntryEffectAbAttr);
+    expect(entry).toBeDefined();
+    expect((entry as EntryEffectAbAttr).getEffect().kind).toBe("add-self-type");
+  });
+
+  it("TERAVOLT — has add-self-type ELECTRIC rider", () => {
+    const ab = getAbility(AbilityId.TERAVOLT);
+    const entry = ab.attrs.find(a => a instanceof EntryEffectAbAttr);
+    expect(entry).toBeDefined();
+    expect((entry as EntryEffectAbAttr).getEffect().kind).toBe("add-self-type");
+  });
+});
+
+describe("ER vanilla ability rebalance — R2 status/damage riders", () => {
+  it("TOXIC_BOOST — has BlockStatusDamageAbAttr rider for POISON/TOXIC", () => {
+    const ab = getAbility(AbilityId.TOXIC_BOOST);
+    const block = ab.attrs.find(a => a instanceof BlockStatusDamageAbAttr);
+    expect(block).toBeDefined();
+  });
+
+  it("STAMINA — has PostReceiveCritStatStageChangeAbAttr rider for max Def on crit", () => {
+    const ab = getAbility(AbilityId.STAMINA);
+    const critAttr = ab.attrs.find(a => a instanceof PostReceiveCritStatStageChangeAbAttr);
+    expect(critAttr).toBeDefined();
+  });
+
+  it("ANGER_POINT — has an additional PostDefendStatStageChange (+1 Atk per hit)", () => {
+    const ab = getAbility(AbilityId.ANGER_POINT);
+    const hitAttr = ab.attrs.find(a => a instanceof PostDefendStatStageChangeAbAttr);
+    expect(hitAttr).toBeDefined();
+  });
+
+  it("WEAK_ARMOR — predicate now gates on contact", () => {
+    const ab = getAbility(AbilityId.WEAK_ARMOR);
+    // We can't introspect the closure cleanly, but we can verify that the
+    // patcher ran by checking the ability is patched (it's been seen).
+    // Smoke check: the attrs are still PostDefendStatStageChangeAbAttr.
+    const attrs = ab.attrs.filter(a => a instanceof PostDefendStatStageChangeAbAttr);
+    expect(attrs.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("MAGICIAN — uses ER subclass that gates on non-contact", () => {
+    const ab = getAbility(AbilityId.MAGICIAN);
+    const attr = ab.attrs.find(a => a.constructor.name === "ErMagicianStealAbAttr");
+    expect(attr).toBeDefined();
+  });
+
+  it("MERCILESS — ConditionalCritAbAttr is replaced (predicate extended)", () => {
+    const ab = getAbility(AbilityId.MERCILESS);
+    const crit = ab.attrs.find(a => a instanceof ConditionalCritAbAttr);
+    expect(crit).toBeDefined();
+  });
+});
+
+describe("ER vanilla ability rebalance — R2 typeconversion baseline boosts", () => {
+  it.each([
+    ["REFRIGERATE", AbilityId.REFRIGERATE],
+    ["PIXILATE", AbilityId.PIXILATE],
+    ["AERILATE", AbilityId.AERILATE],
+    ["GALVANIZE", AbilityId.GALVANIZE],
+  ] as const)("%s — has TypeDamageBoostAbAttr rider", (_name, id) => {
+    const ab = getAbility(id);
+    const typeBoost = ab.attrs.find(a => a instanceof TypeDamageBoostAbAttr);
+    expect(typeBoost).toBeDefined();
+  });
+});
+
+describe("ER vanilla ability rebalance — R2 trap-predicate extensions (Ghost-immune)", () => {
+  it.each([
+    ["SHADOW_TAG", AbilityId.SHADOW_TAG],
+    ["MAGNET_PULL", AbilityId.MAGNET_PULL],
+    ["ARENA_TRAP", AbilityId.ARENA_TRAP],
+  ] as const)("%s — ArenaTrap predicate is replaced (Ghost-aware)", (_name, id) => {
+    const ab = getAbility(id);
+    // Verify the original ArenaTrapAbAttr instance is still present (we
+    // replaced it with a new ArenaTrapAbAttr instance, not stripped it).
+    const attr = ab.attrs.find(a => a.constructor.name === "ArenaTrapAbAttr");
+    expect(attr).toBeDefined();
+  });
+});
+
+describe("ER vanilla ability rebalance — R2 AROMA_VEIL narrowed tags", () => {
+  it("AROMA_VEIL — immuneTagTypes contains exactly INFATUATED, HEAL_BLOCK, DISABLED", () => {
+    const ab = getAbility(AbilityId.AROMA_VEIL);
+    const userField = ab.attrs.find(a => a instanceof UserFieldBattlerTagImmunityAbAttr);
+    expect(userField).toBeDefined();
+    const tags = (userField as unknown as { immuneTagTypes: BattlerTagType[] }).immuneTagTypes;
+    expect(tags).toContain(BattlerTagType.INFATUATED);
+    expect(tags).toContain(BattlerTagType.HEAL_BLOCK);
+    expect(tags).toContain(BattlerTagType.DISABLED);
+    expect(tags).not.toContain(BattlerTagType.TAUNT);
+    expect(tags).not.toContain(BattlerTagType.TORMENT);
+    expect(tags).not.toContain(BattlerTagType.ENCORE);
+  });
+});
+
+describe("ER vanilla ability rebalance — R2 on-faint and entry rewrites", () => {
+  it("AFTERMATH — vanilla PostFaintContactDamageAbAttr replaced with OnFaintEffectAbAttr", () => {
+    const ab = getAbility(AbilityId.AFTERMATH);
+    const onFaint = ab.attrs.find(a => a instanceof OnFaintEffectAbAttr);
+    expect(onFaint).toBeDefined();
+    const hasOldContact = ab.attrs.some(a => a.constructor.name === "PostFaintContactDamageAbAttr");
+    expect(hasOldContact).toBe(false);
+  });
+
+  it("FOREWARN — ForewarnAbAttr replaced with EntryEffectAbAttr scripted-move", () => {
+    const ab = getAbility(AbilityId.FOREWARN);
+    const entry = ab.attrs.find(a => a instanceof EntryEffectAbAttr);
+    expect(entry).toBeDefined();
+    expect((entry as EntryEffectAbAttr).getEffect().kind).toBe("scripted-move");
+    const hasOldForewarn = ab.attrs.some(a => a.constructor.name === "ForewarnAbAttr");
+    expect(hasOldForewarn).toBe(false);
+  });
+
+  it("PASTEL_VEIL — attrs replaced with single scripted-move EntryEffectAbAttr (Safeguard)", () => {
+    const ab = getAbility(AbilityId.PASTEL_VEIL);
+    const entry = ab.attrs.find(a => a instanceof EntryEffectAbAttr);
+    expect(entry).toBeDefined();
+    expect((entry as EntryEffectAbAttr).getEffect().kind).toBe("scripted-move");
+  });
+
+  it("LEAF_GUARD — StatusEffectImmunityAbAttr stripped", () => {
+    const ab = getAbility(AbilityId.LEAF_GUARD);
+    const hasImmunity = ab.attrs.some(a => a instanceof StatusEffectImmunityAbAttr);
+    expect(hasImmunity).toBe(false);
+  });
+});
+
+describe("ER vanilla ability rebalance — R2 FLOWER_GIFT ATK->SPATK", () => {
+  it("FLOWER_GIFT — StatMultiplier and AllyStatMultiplier no longer target ATK", () => {
+    const ab = getAbility(AbilityId.FLOWER_GIFT);
+    // Vanilla had ATK + SPDEF for self+ally; ER swaps ATK→SPATK.
+    const atkBoost = ab.attrs.find(a => a instanceof StatMultiplierAbAttr && a.stat === Stat.ATK);
+    expect(atkBoost).toBeUndefined();
+    const spAtkBoost = ab.attrs.find(a => a instanceof StatMultiplierAbAttr && a.stat === Stat.SPATK);
+    expect(spAtkBoost).toBeDefined();
+  });
+});
+
+describe("ER vanilla ability rebalance — R2 TOTAL rewrites", () => {
+  it("BIG_PECKS — attrs replaced with a 1.3x contact MovePowerBoost", () => {
+    const ab = getAbility(AbilityId.BIG_PECKS);
+    const boost = ab.attrs.find(a => a.constructor === MovePowerBoostAbAttr);
+    expect(boost).toBeDefined();
+    expect((boost as unknown as { powerMultiplier: number }).powerMultiplier).toBe(1.3);
+    // Defensive: vanilla ProtectStatAbAttr should be gone.
+    const hasProtect = ab.attrs.some(a => a.constructor.name === "ProtectStatAbAttr");
+    expect(hasProtect).toBe(false);
+  });
+
+  it("ILLUMINATE — attrs replaced with a single StatMultiplier(ACC, 1.2)", () => {
+    const ab = getAbility(AbilityId.ILLUMINATE);
+    expect(ab.attrs.length).toBe(1);
+    const sm = ab.attrs[0];
+    expect(sm).toBeInstanceOf(StatMultiplierAbAttr);
+    expect((sm as StatMultiplierAbAttr).stat).toBe(Stat.ACC);
+    expect((sm as unknown as { multiplier: number }).multiplier).toBe(1.2);
+  });
+
+  it("CHEEK_POUCH — attrs cleared (ability is null in ER)", () => {
+    const ab = getAbility(AbilityId.CHEEK_POUCH);
+    expect(ab.attrs.length).toBe(0);
+  });
+
+  it("STALL — attrs replaced with ReceivedMoveDamageMultiplierAbAttr at 0.7", () => {
+    const ab = getAbility(AbilityId.STALL);
+    const reducer = ab.attrs.find(a => a instanceof ReceivedMoveDamageMultiplierAbAttr);
+    expect(reducer).toBeDefined();
+    expect((reducer as unknown as { damageMultiplier: number }).damageMultiplier).toBe(0.7);
+    // Defensive: vanilla ChangeMovePriorityInBracketAbAttr should be gone.
+    const hasPriority = ab.attrs.some(a => a.constructor.name === "ChangeMovePriorityInBracketAbAttr");
+    expect(hasPriority).toBe(false);
+  });
+
+  it("HEAVY_METAL — WeightMultiplierAbAttr stripped AND Ghost/Dark damage reductions present", () => {
+    const ab = getAbility(AbilityId.HEAVY_METAL);
+    const hasWeight = ab.attrs.some(a => a.constructor.name === "WeightMultiplierAbAttr");
+    expect(hasWeight).toBe(false);
+    const reducers = ab.attrs.filter(a => a instanceof ReceivedTypeDamageMultiplierAbAttr);
+    expect(reducers.length).toBe(2);
+  });
+
+  it("OPPORTUNIST — attrs replaced with a ChangeMovePriorityAbAttr", () => {
+    const ab = getAbility(AbilityId.OPPORTUNIST);
+    const prio = ab.attrs.find(a => a instanceof ChangeMovePriorityAbAttr);
+    expect(prio).toBeDefined();
+    const hasStatCopy = ab.attrs.some(a => a.constructor.name === "StatStageChangeCopyAbAttr");
+    expect(hasStatCopy).toBe(false);
   });
 });

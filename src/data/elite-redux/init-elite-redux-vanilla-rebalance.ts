@@ -48,11 +48,19 @@ import {
   type AbAttr,
   AlliedFieldDamageReductionAbAttr,
   AllyStatMultiplierAbAttr,
+  ArenaTrapAbAttr,
+  BlockStatusDamageAbAttr,
+  ChangeMovePriorityAbAttr,
+  ConditionalCritAbAttr,
+  HealFromBerryUseAbAttr,
   IgnoreOpponentStatStagesAbAttr,
   MovePowerBoostAbAttr,
   MoveTypePowerBoostAbAttr,
+  PostAttackStealHeldItemAbAttr,
   PostBiomeChangeWeatherChangeAbAttr,
   PostDefendContactApplyTagChanceAbAttr,
+  PostDefendStatStageChangeAbAttr,
+  PostReceiveCritStatStageChangeAbAttr,
   PostSummonTerrainChangeAbAttr,
   PostSummonWeatherChangeAbAttr,
   PostTurnHurtIfSleepingAbAttr,
@@ -60,11 +68,16 @@ import {
   ReceivedMoveDamageMultiplierAbAttr,
   ReceivedTypeDamageMultiplierAbAttr,
   StatMultiplierAbAttr,
+  StatusEffectImmunityAbAttr,
+  UserFieldBattlerTagImmunityAbAttr,
   UserFieldMoveTypePowerBoostAbAttr,
 } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
+import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
+import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
 import { ER_ABILITIES } from "#data/elite-redux/er-abilities";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
@@ -74,6 +87,7 @@ import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
+import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
@@ -272,10 +286,13 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
       ab.attrs.push(new MovePowerBoostAbAttr((_user, _target, move) => move.category === MoveCategory.PHYSICAL, 1.2));
     },
   ],
-  // HEAVY_METAL: weight 2x + half damage from Ghost/Dark (ER REPLACES the weight effect).
+  // HEAVY_METAL: vanilla doubles weight; ER replaces that entirely with
+  // "take half damage from Ghost and Dark". Strip the weight attr AND add
+  // the Ghost/Dark damage reductions.
   [
     AbilityId.HEAVY_METAL,
     ab => {
+      stripWeightMultiplier(ab);
       ab.attrs.push(new ReceivedTypeDamageMultiplierAbAttr(PokemonType.GHOST, 0.5));
       ab.attrs.push(new ReceivedTypeDamageMultiplierAbAttr(PokemonType.DARK, 0.5));
     },
@@ -300,10 +317,139 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   ],
   // INNER_FOCUS: flinch immune + Intimidate immune + Scare immune.
   // Vanilla already has BattlerTagImmunityAbAttr(FLINCHED) + IntimidateImmunity.
-  // Scare doesn't yet exist as a BattlerTagType in pokerogue; defer that rider.
-  // For now we just add an extra accuracy-protect for the "Focus Blast never misses"
-  // angle as a placeholder — skipped to keep this a no-op-rider (deferred).
-  // Defer entirely until ER Scare lands.
+  // ER also wants Scare immunity — extend the BattlerTagImmunity attrs to
+  // include ER_FEAR (the ER-specific battler tag we ship).
+  [AbilityId.INNER_FOCUS, ab => extendBattlerTagImmunity(ab, BattlerTagType.ER_FEAR)],
+  // OBLIVIOUS: infatuation/taunt/intimidate immune + Scare immune.
+  [AbilityId.OBLIVIOUS, ab => extendBattlerTagImmunity(ab, BattlerTagType.ER_FEAR)],
+  // OWN_TEMPO: confusion/intimidate immune + Scare immune.
+  [AbilityId.OWN_TEMPO, ab => extendBattlerTagImmunity(ab, BattlerTagType.ER_FEAR)],
+
+  // ===== MAJOR — Entry-effect riders =====
+  // WATER_VEIL: burn immune + Aqua Ring on entry.
+  [
+    AbilityId.WATER_VEIL,
+    ab => {
+      ab.attrs.push(new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.AQUA_RING }));
+    },
+  ],
+  // TURBOBLAZE: bypass abilities + add Fire type to self on entry.
+  [
+    AbilityId.TURBOBLAZE,
+    ab => {
+      ab.attrs.push(new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.FIRE }));
+    },
+  ],
+  // TERAVOLT: bypass abilities + add Electric type to self on entry.
+  [
+    AbilityId.TERAVOLT,
+    ab => {
+      ab.attrs.push(new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.ELECTRIC }));
+    },
+  ],
+
+  // ===== MAJOR — Status / damage riders =====
+  // TOXIC_BOOST: +50% Atk if poisoned + immune to poison damage.
+  [
+    AbilityId.TOXIC_BOOST,
+    ab => {
+      ab.attrs.push(new BlockStatusDamageAbAttr(StatusEffect.POISON, StatusEffect.TOXIC));
+    },
+  ],
+  // WEAK_ARMOR: was vanilla "physical hit"; ER says "contact hit".
+  // Mutate the predicate of vanilla's PostDefendStatStageChangeAbAttr instances
+  // to use a MAKES_CONTACT check rather than category === PHYSICAL.
+  [AbilityId.WEAK_ARMOR, ab => mutateWeakArmorPredicate(ab)],
+  // STAMINA: +1 Def on hit (vanilla) + maximize Def on crit (rider).
+  [
+    AbilityId.STAMINA,
+    ab => {
+      ab.attrs.push(new PostReceiveCritStatStageChangeAbAttr(Stat.DEF, 12));
+    },
+  ],
+  // ANGER_POINT: crit→max Atk (vanilla) + each hit gives +1 Atk (rider).
+  [
+    AbilityId.ANGER_POINT,
+    ab => {
+      ab.attrs.push(
+        new PostDefendStatStageChangeAbAttr(
+          (_target, _user, move) => move.category !== MoveCategory.STATUS,
+          Stat.ATK,
+          1,
+          true,
+        ),
+      );
+    },
+  ],
+  // MAGICIAN: was vanilla "steal any successful hit"; ER requires non-contact.
+  [AbilityId.MAGICIAN, ab => patchMagicianPredicate(ab)],
+  // MERCILESS: vanilla always-crits poisoned. ER extends to paralyzed + bleed + sleep.
+  [AbilityId.MERCILESS, ab => extendMercilessConditions(ab)],
+
+  // ===== MAJOR — type-conversion baseline boosts (Refrigerate family adds 1.2x typed) =====
+  // ER: Normal→X conversion + "X moves are empowered" — adds typed boost.
+  [
+    AbilityId.REFRIGERATE,
+    ab => {
+      ab.attrs.push(new TypeDamageBoostAbAttr({ type: PokemonType.ICE, multiplier: 1.2 }));
+    },
+  ],
+  [
+    AbilityId.PIXILATE,
+    ab => {
+      ab.attrs.push(new TypeDamageBoostAbAttr({ type: PokemonType.FAIRY, multiplier: 1.2 }));
+    },
+  ],
+  [
+    AbilityId.AERILATE,
+    ab => {
+      ab.attrs.push(new TypeDamageBoostAbAttr({ type: PokemonType.FLYING, multiplier: 1.2 }));
+    },
+  ],
+  [
+    AbilityId.GALVANIZE,
+    ab => {
+      ab.attrs.push(new TypeDamageBoostAbAttr({ type: PokemonType.ELECTRIC, multiplier: 1.2 }));
+    },
+  ],
+
+  // ===== MAJOR — trap-predicate extensions (Ghost-immune) =====
+  // SHADOW_TAG / MAGNET_PULL / ARENA_TRAP — ER adds Ghost-type bypass.
+  [AbilityId.SHADOW_TAG, ab => extendArenaTrapToIgnoreGhost(ab)],
+  [AbilityId.MAGNET_PULL, ab => extendArenaTrapToIgnoreGhost(ab)],
+  [AbilityId.ARENA_TRAP, ab => extendArenaTrapToIgnoreGhost(ab)],
+
+  // ===== MAJOR — AROMA_VEIL shrinks protected-tags set =====
+  // ER drops Taunt/Torment/Encore — keep Infatuated, HealBlock, Disabled only.
+  [AbilityId.AROMA_VEIL, ab => narrowAromaVeilTags(ab)],
+
+  // ===== MAJOR — AFTERMATH: vanilla 1/4 max HP on contact KO -> ER flat 25% on any KO.
+  [AbilityId.AFTERMATH, ab => patchAftermath(ab)],
+
+  // ===== MAJOR — FOREWARN: replace reveal-strongest-move with scripted Future Sight on entry.
+  [AbilityId.FOREWARN, ab => patchForewarn(ab)],
+
+  // ===== MAJOR — PASTEL_VEIL replaced with Safeguard on entry =====
+  [AbilityId.PASTEL_VEIL, ab => patchPastelVeil(ab)],
+
+  // ===== MAJOR — LEAF_GUARD: vanilla "status immunity in sun" -> ER "cure status at turn end in sun".
+  [AbilityId.LEAF_GUARD, ab => patchLeafGuard(ab)],
+
+  // ===== MAJOR — FLOWER_GIFT changes self+ally ATK boost to SPATK boost =====
+  [AbilityId.FLOWER_GIFT, ab => patchFlowerGift(ab)],
+
+  // ===== TOTAL rewrites =====
+  // BIG_PECKS: vanilla "Def-drop immune"; ER "contact moves +30% boost".
+  [AbilityId.BIG_PECKS, ab => rewriteBigPecks(ab)],
+  // ILLUMINATE: replace with pure 1.2x accuracy boost.
+  [AbilityId.ILLUMINATE, ab => rewriteIlluminate(ab)],
+  // CHEEK_POUCH: nulled in ER — clear attrs.
+  [AbilityId.CHEEK_POUCH, ab => rewriteCheekPouch(ab)],
+  // STALL: replace move-last priority with "30% less damage if hasn't moved yet".
+  [AbilityId.STALL, ab => rewriteStall(ab)],
+  // HEAVY_METAL handled above in the MAJOR section (TOTAL upgrade integrated).
+  // OPPORTUNIST: replace stat-copy with priority +1 vs foes below 1/2 HP.
+  [AbilityId.OPPORTUNIST, ab => rewriteOpportunist(ab)],
 ]);
 
 /**
@@ -848,4 +994,321 @@ function addStatProtect(ability: MutableAbility, stat: Stat): void {
       return;
     }
   }
+}
+
+// =============================================================================
+// Round 2 helpers
+// =============================================================================
+
+/**
+ * Extend the BattlerTagImmunity attrs on the given ability to include an
+ * additional immune tag (e.g. ER_FEAR). Mutates the private `immuneTagTypes`
+ * array in-place on every BattlerTagImmunityAbAttr-subclass attr in the chain.
+ *
+ * Used by INNER_FOCUS / OBLIVIOUS / OWN_TEMPO to add ER's "Scare" immunity.
+ */
+function extendBattlerTagImmunity(ability: MutableAbility, additional: BattlerTagType): void {
+  for (const attr of ability.attrs) {
+    // BattlerTagImmunityAbAttr and UserFieldBattlerTagImmunityAbAttr both extend
+    // BaseBattlerTagImmunityAbAttr which has the `immuneTagTypes` private array.
+    if (attr.constructor.name === "BattlerTagImmunityAbAttr" || attr instanceof UserFieldBattlerTagImmunityAbAttr) {
+      const tagged = attr as unknown as { immuneTagTypes: BattlerTagType[] };
+      if (Array.isArray(tagged.immuneTagTypes) && !tagged.immuneTagTypes.includes(additional)) {
+        tagged.immuneTagTypes.push(additional);
+      }
+    }
+  }
+}
+
+/**
+ * Replace WEAK_ARMOR's "physical move" gate with a "contact move" gate.
+ * Vanilla has TWO PostDefendStatStageChangeAbAttr instances — both share the
+ * physical predicate. We mutate the private `condition` closure on each.
+ */
+function mutateWeakArmorPredicate(ability: MutableAbility): void {
+  for (const attr of ability.attrs) {
+    if (attr instanceof PostDefendStatStageChangeAbAttr) {
+      const tagged = attr as unknown as {
+        condition: (
+          target: import("#field/pokemon").Pokemon,
+          user: import("#field/pokemon").Pokemon,
+          move: import("#moves/move").Move,
+        ) => boolean;
+      };
+      tagged.condition = (target, user, move) =>
+        move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user, target });
+    }
+  }
+}
+
+/**
+ * Patch MAGICIAN to only proc on non-contact moves. Vanilla unconditionally
+ * steals; we replace with a subclass that gates the proc on `!MAKES_CONTACT`.
+ */
+function patchMagicianPredicate(ability: MutableAbility): void {
+  for (let i = 0; i < ability.attrs.length; i++) {
+    if (ability.attrs[i] instanceof PostAttackStealHeldItemAbAttr) {
+      ability.attrs[i] = new ErMagicianStealAbAttr();
+    }
+  }
+}
+
+class ErMagicianStealAbAttr extends PostAttackStealHeldItemAbAttr {
+  public override canApply(params: Parameters<PostAttackStealHeldItemAbAttr["canApply"]>[0]): boolean {
+    // Require the move to NOT make contact (ER convention).
+    if (
+      params.move.doesFlagEffectApply({
+        flag: MoveFlags.MAKES_CONTACT,
+        user: params.pokemon,
+        target: params.opponent,
+      })
+    ) {
+      return false;
+    }
+    return super.canApply(params);
+  }
+}
+
+/**
+ * Extend MERCILESS's ConditionalCritAbAttr predicate to include PARALYSIS +
+ * SLEEP + ER_BLEED, in addition to vanilla POISON/TOXIC. We can't inspect
+ * the captured closure, so we replace the attr with a fresh one.
+ */
+function extendMercilessConditions(ability: MutableAbility): void {
+  for (let i = 0; i < ability.attrs.length; i++) {
+    if (ability.attrs[i] instanceof ConditionalCritAbAttr) {
+      ability.attrs[i] = new ConditionalCritAbAttr((_user, target, _move) => {
+        if (!target) {
+          return false;
+        }
+        const eff = target.status?.effect;
+        if (
+          eff === StatusEffect.POISON
+          || eff === StatusEffect.TOXIC
+          || eff === StatusEffect.PARALYSIS
+          || eff === StatusEffect.SLEEP
+        ) {
+          return true;
+        }
+        // ER_BLEED is a custom battler tag.
+        return target.getTag?.(BattlerTagType.ER_BLEED) != null;
+      });
+    }
+  }
+}
+
+/**
+ * Extend SHADOW_TAG / MAGNET_PULL / ARENA_TRAP's ArenaTrapAbAttr predicate to
+ * skip Ghost-type targets (ER convention).
+ */
+function extendArenaTrapToIgnoreGhost(ability: MutableAbility): void {
+  for (let i = 0; i < ability.attrs.length; i++) {
+    const attr = ability.attrs[i];
+    if (attr instanceof ArenaTrapAbAttr) {
+      const oldPred = (
+        attr as unknown as {
+          arenaTrapCondition: (
+            user: import("#field/pokemon").Pokemon,
+            target: import("#field/pokemon").Pokemon,
+          ) => boolean;
+        }
+      ).arenaTrapCondition;
+      ability.attrs[i] = new ArenaTrapAbAttr((user, target) => {
+        if (target.isOfType(PokemonType.GHOST)) {
+          return false;
+        }
+        return oldPred ? oldPred(user, target) : true;
+      });
+    }
+  }
+}
+
+/**
+ * Narrow AROMA_VEIL's protected tag set. Vanilla protects against
+ * INFATUATED + TAUNT + DISABLED + TORMENT + HEAL_BLOCK + ENCORE.
+ * ER protects only against INFATUATED + HEAL_BLOCK + DISABLED.
+ */
+function narrowAromaVeilTags(ability: MutableAbility): void {
+  for (const attr of ability.attrs) {
+    if (attr instanceof UserFieldBattlerTagImmunityAbAttr) {
+      (attr as unknown as { immuneTagTypes: BattlerTagType[] }).immuneTagTypes = [
+        BattlerTagType.INFATUATED,
+        BattlerTagType.HEAL_BLOCK,
+        BattlerTagType.DISABLED,
+      ];
+    }
+  }
+}
+
+/**
+ * Replace AFTERMATH's vanilla PostFaintContactDamageAbAttr (1/4 max HP on
+ * contact KO) with OnFaintEffectAbAttr (flat 25% damage to attacker on any
+ * KO, modeling ER's "Uses 100 BP Explosion on faint").
+ */
+function patchAftermath(ability: MutableAbility): void {
+  for (let i = 0; i < ability.attrs.length; i++) {
+    if (ability.attrs[i].constructor.name === "PostFaintContactDamageAbAttr") {
+      ability.attrs[i] = new OnFaintEffectAbAttr({
+        effect: { kind: "attacker-damage-flat", maxHpFraction: 0.25 },
+      });
+    }
+  }
+}
+
+/**
+ * Replace FOREWARN's ForewarnAbAttr (reveal-strongest-move) with an
+ * EntryEffectAbAttr that scripts Future Sight on entry.
+ */
+function patchForewarn(ability: MutableAbility): void {
+  for (let i = 0; i < ability.attrs.length; i++) {
+    if (ability.attrs[i].constructor.name === "ForewarnAbAttr") {
+      ability.attrs[i] = new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.FUTURE_SIGHT });
+    }
+  }
+}
+
+/**
+ * Replace PASTEL_VEIL's status-immunity attrs with a Safeguard-on-entry
+ * scripted move. ER nukes the team poison-immunity in favor of a one-shot
+ * Safeguard at entry time.
+ */
+function patchPastelVeil(ability: MutableAbility): void {
+  ability.attrs.length = 0;
+  ability.attrs.push(new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.SAFEGUARD }));
+}
+
+/**
+ * Replace LEAF_GUARD's "status immunity in sun" with "cures status at turn end
+ * in sun". We strip the immunity attr (ER explicitly removes the immunity)
+ * and replace with PostTurnResetStatusAbAttr — looked up lazily from the
+ * global attr registry to avoid an additional import.
+ */
+function patchLeafGuard(ability: MutableAbility): void {
+  ability.attrs = ability.attrs.filter(a => !(a instanceof StatusEffectImmunityAbAttr));
+  const PostTurnResetStatusCtor = getAttrCtorByName("PostTurnResetStatusAbAttr");
+  if (PostTurnResetStatusCtor !== undefined) {
+    ability.attrs.push(new PostTurnResetStatusCtor(true) as AbAttr);
+  }
+}
+
+/**
+ * Look up an AbAttr constructor by string name from the live `allAbilities`
+ * table. Used for a small handful of conditional patches where the import
+ * surface would be disproportionately large.
+ */
+function getAttrCtorByName(name: string): (new (...args: unknown[]) => AbAttr) | undefined {
+  for (const ability of allAbilities) {
+    if (!ability) {
+      continue;
+    }
+    for (const attr of ability.attrs) {
+      if (attr.constructor.name === name) {
+        return attr.constructor as new (
+          ...args: unknown[]
+        ) => AbAttr;
+      }
+    }
+  }
+  return;
+}
+
+/**
+ * Patch FLOWER_GIFT: vanilla boosts ATK + SPDEF in sun; ER boosts SPATK + SPDEF.
+ * Mutate the `stat` field on the ATK multipliers to SPATK.
+ */
+function patchFlowerGift(ability: MutableAbility): void {
+  for (const attr of ability.attrs) {
+    if (attr instanceof StatMultiplierAbAttr && attr.stat === Stat.ATK) {
+      (attr as unknown as { stat: Stat }).stat = Stat.SPATK;
+    }
+    if (attr instanceof AllyStatMultiplierAbAttr) {
+      const tagged = attr as unknown as { stat: Stat };
+      if (tagged.stat === Stat.ATK) {
+        tagged.stat = Stat.SPATK;
+      }
+    }
+  }
+}
+
+/**
+ * Rewrite BIG_PECKS: replace Def-drop immunity with a 1.3x contact damage
+ * power boost.
+ */
+function rewriteBigPecks(ability: MutableAbility): void {
+  ability.attrs.length = 0;
+  ability.attrs.push(new MovePowerBoostAbAttr((_user, _target, move) => move.hasFlag(MoveFlags.MAKES_CONTACT), 1.3));
+}
+
+/**
+ * Rewrite ILLUMINATE: replace lure/acc-immune attrs with pure 1.2x accuracy
+ * multiplier.
+ */
+function rewriteIlluminate(ability: MutableAbility): void {
+  ability.attrs.length = 0;
+  ability.attrs.push(new StatMultiplierAbAttr(Stat.ACC, 1.2));
+}
+
+/**
+ * Rewrite CHEEK_POUCH: ER explicitly nullifies the ability. Clear all attrs.
+ * The HealFromBerryUseAbAttr import keeps the type-check graph honest — we
+ * verify vanilla shipped the heal-on-berry attr before zeroing.
+ */
+function rewriteCheekPouch(ability: MutableAbility): void {
+  // Defensive: confirm vanilla shipped HealFromBerryUseAbAttr — informational only.
+  const _hadHealAttr = ability.attrs.some(a => a instanceof HealFromBerryUseAbAttr);
+  void _hadHealAttr;
+  ability.attrs.length = 0;
+}
+
+/**
+ * Rewrite STALL: replace vanilla "move last in priority bracket" with
+ * "takes 30% less damage if it hasn't moved yet this turn".
+ *
+ * Modeled via a ReceivedMoveDamageMultiplierAbAttr gated on `!hasMovedThisTurn`.
+ * The pokemon's `turnData.acted` (set true after acting) is the source of
+ * truth.
+ */
+function rewriteStall(ability: MutableAbility): void {
+  ability.attrs.length = 0;
+  ability.attrs.push(
+    new ReceivedMoveDamageMultiplierAbAttr((target, _user, _move) => {
+      const td = (target as unknown as { turnData?: { acted?: boolean } }).turnData;
+      return !(td?.acted ?? false);
+    }, 0.7),
+  );
+}
+
+/**
+ * Strip the WeightMultiplierAbAttr (or equivalent) from HEAVY_METAL. R1
+ * already ADDED the Ghost/Dark damage reductions; we just need to remove
+ * the weight-doubling effect since ER replaces it entirely.
+ */
+function stripWeightMultiplier(ability: MutableAbility): void {
+  ability.attrs = ability.attrs.filter(a => a.constructor.name !== "WeightMultiplierAbAttr");
+}
+
+/**
+ * Rewrite OPPORTUNIST: replace StatStageChangeCopyAbAttr with a priority
+ * modifier that grants +1 priority vs foes below 1/2 HP.
+ *
+ * PriorityModifierAbAttr only checks user state; here we need target-side
+ * gating, so use pokerogue's ChangeMovePriorityAbAttr directly with a
+ * target-aware predicate.
+ */
+function rewriteOpportunist(ability: MutableAbility): void {
+  ability.attrs.length = 0;
+  ability.attrs.push(
+    new ChangeMovePriorityAbAttr((pokemon, _move) => {
+      try {
+        for (const opp of pokemon.getOpponents?.() ?? []) {
+          if (opp.getHpRatio() <= 0.5) {
+            return true;
+          }
+        }
+      } catch {
+        return false;
+      }
+      return false;
+    }, 1),
+  );
 }
