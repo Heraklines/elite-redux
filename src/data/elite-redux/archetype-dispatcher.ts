@@ -94,6 +94,7 @@ import { TypeAbsorbHealAbAttr, TypeAbsorbStatBoostAbAttr } from "#data/elite-red
 import { LifestealOnHitAbAttr, LifestealOnKoAbAttr } from "#data/elite-redux/archetypes/lifesteal";
 import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
 import { PostAllyFaintStatChangeAbAttr } from "#data/elite-redux/archetypes/post-ally-faint";
+import { CounterAttackOnHitAbAttr } from "#data/elite-redux/archetypes/counter-attack-on-hit";
 import { PassiveRecoveryAbAttr, type PassiveRecoveryCondition } from "#data/elite-redux/archetypes/passive-recovery";
 import { PreFaintReviveAbAttr } from "#data/elite-redux/archetypes/pre-faint-revive";
 import {
@@ -2743,20 +2744,29 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       return SKIP_BESPOKE;
     case 879:
       // Chilling Pellets — "Uses 13BP Icicle Spear when hit by contact."
-      // Counter-attack-on-hit needs a scripted-move primitive. Defer.
-      return SKIP_BESPOKE;
+      return ok([
+        new CounterAttackOnHitAbAttr({
+          moveId: MoveId.ICICLE_SPEAR,
+          filter: { contactRequired: true },
+        }),
+      ]);
     case 998:
-      // Acid Reflux — "Uses 20BP Acid when it takes damage." Same shape as
-      // 879. Defer.
-      return SKIP_BESPOKE;
+      // Acid Reflux — "Uses 20BP Acid when it takes damage." Any hit triggers.
+      return ok([new CounterAttackOnHitAbAttr({ moveId: MoveId.ACID })]);
     case 993:
       // Thunder Clouds — "After using a special move, launch a 35 BP
-      // Thunderbolt." Post-attack-followup primitive missing. Defer.
-      return SKIP_BESPOKE;
+      // Thunderbolt." Post-USE-of-special-move rather than post-hit-by;
+      // approximate via PostDefend (counter on any hit) for now.
+      return ok([new CounterAttackOnHitAbAttr({ moveId: MoveId.THUNDERBOLT })]);
     case 876:
       // Sludge Spit — "Follows up with 35BP Venom Bolt after using an
-      // attack." Same shape as 993. Defer.
-      return SKIP_BESPOKE;
+      // attack." Same post-USE shape; approximate via PostDefend counter.
+      // Venom Bolt is an ER custom (id 6160+) — fall back to vanilla Sludge.
+      return ok([new CounterAttackOnHitAbAttr({ moveId: MoveId.SLUDGE })]);
+    case 491:
+      // Aftershock — "Triggers Magnitude 4-7 after using a damaging move."
+      // Post-USE follow-up; approximate via PostDefend counter with MAGNITUDE.
+      return ok([new CounterAttackOnHitAbAttr({ moveId: MoveId.MAGNITUDE })]);
     case 937:
       // Sumo Wrestler — "Uses 20BP Circle Throw at the end of each 2nd
       // turn." Turn-counter scripted-move. Defer.

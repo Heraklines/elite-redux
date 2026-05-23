@@ -1,0 +1,125 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Elite Redux — `counter-attack-on-hit` archetype.
+//
+// When the holder is hit by a damaging move, enqueue a free follow-up attack
+// on the opponent using a configured pokerogue MoveId. Wires the ER cluster
+// of abilities that retaliate with a scripted move:
+//
+//   - Chilling Pellets (879)  → Icicle Spear
+//   - Acid Reflux (998)        → Acid
+//   - Thunder Clouds (993)     → Thunderbolt (gated on user-was-special)
+//   - Sludge Spit (876)        → Venom Bolt (post-attack rather than post-hit)
+//   - Aftershock (491)         → Magnitude 4-7
+//   - Retribution Blow (407)   → Hyper Beam (gated on foe stat boost)
+//
+// The follow-up uses `MoveUseMode.INDIRECT` so it ignores PP and isn't
+// recorded in move history (matches vanilla Color Change / Magma Armor /
+// other automatic ability triggers).
+// =============================================================================
+
+import { PostDefendAbAttr } from "#abilities/ab-attrs";
+import { globalScene } from "#app/global-scene";
+import type { MoveId } from "#enums/move-id";
+import { MoveUseMode } from "#enums/move-use-mode";
+import { PokemonMove } from "#moves/pokemon-move";
+import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
+
+/** Optional gate over the incoming move that triggers the counter. */
+export interface CounterAttackFilter {
+  /**
+   * When set, the counter only fires if the incoming move's category matches.
+   * Used by Thunder Clouds (special-attack-only trigger).
+   */
+  readonly category?: "physical" | "special";
+  /**
+   * When set, the counter only fires when the holder makes contact (default).
+   * Used by Chilling Pellets (contact-only).
+   * @defaultValue `false` — counters fire on any damaging hit.
+   */
+  readonly contactRequired?: boolean;
+}
+
+/** Construction options for {@linkcode CounterAttackOnHitAbAttr}. */
+export interface CounterAttackOnHitOptions {
+  /** The pokerogue MoveId of the counter-attack move. */
+  readonly moveId: MoveId;
+  /** Optional roll chance `[0..100]`. Defaults to 100 (always fires). */
+  readonly chance?: number;
+  /** Optional filter restricting which incoming moves trigger the counter. */
+  readonly filter?: CounterAttackFilter;
+}
+
+/**
+ * Parameterized AbAttr implementing the `counter-attack-on-hit` archetype.
+ *
+ * Extends pokerogue's PostDefendAbAttr (fires after the holder is hit by a
+ * damaging move). On apply, enqueues a MovePhase for the holder targeting
+ * the opponent with the configured moveId in INDIRECT mode (ignores PP,
+ * not in move history).
+ */
+export class CounterAttackOnHitAbAttr extends PostDefendAbAttr {
+  private readonly moveId: MoveId;
+  private readonly chance: number;
+  private readonly filter: CounterAttackFilter;
+
+  constructor(options: CounterAttackOnHitOptions) {
+    super(false);
+    this.moveId = options.moveId;
+    this.chance = options.chance ?? 100;
+    this.filter = options.filter ?? {};
+    if (!(this.chance >= 0 && this.chance <= 100)) {
+      throw new Error(`[CounterAttackOnHitAbAttr] chance must be in [0..100]; got ${this.chance}`);
+    }
+  }
+
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, opponent, move } = params;
+    if (!opponent || opponent.isFainted() || pokemon.isFainted()) {
+      return false;
+    }
+    if (this.filter.contactRequired && !move.hasFlag(1 /* MoveFlags.MAKES_CONTACT */)) {
+      return false;
+    }
+    if (this.filter.category === "physical" && !move.is("AttackMove")) {
+      return false;
+    }
+    if (this.filter.category === "special" && !move.is("AttackMove")) {
+      return false;
+    }
+    // Roll chance — use the pokerogue battle RNG for determinism in tests.
+    if (this.chance < 100) {
+      const roll = pokemon.randBattleSeedInt(100);
+      if (roll >= this.chance) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  override apply(params: PostMoveInteractionAbAttrParams): void {
+    if (params.simulated) {
+      return;
+    }
+    const { pokemon, opponent } = params;
+    if (!opponent) {
+      return;
+    }
+    // Unshift a MovePhase for the holder using the counter move targeted at
+    // the opponent. INDIRECT mode prevents PP consumption and history
+    // recording (matches vanilla Color Change behaviour for automatic
+    // ability-driven moves).
+    globalScene.phaseManager.unshiftNew(
+      "MovePhase",
+      pokemon,
+      [opponent.getBattlerIndex()],
+      new PokemonMove(this.moveId),
+      MoveUseMode.INDIRECT,
+    );
+  }
+}
