@@ -2665,6 +2665,24 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Defer (the affectsImmutable=true on SuppressWeather is for player
       // weather; we need enemy-move-block).
       return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
+    // Round 36 — vanilla PostDefendContactDamage wires (mirror-damage cluster)
+    // -------------------------------------------------------------------------
+    case 332:
+      // Soul Linker — "Enemies take all the damage they deal, same for
+      // this Pok." Reflect damage back to attacker. Vanilla
+      // PostDefendContactDamageAbAttr deals 1/N max-HP back; the "all the
+      // damage" wording is closer to 100% reflect. Approximate with 1/2
+      // (damageRatio=2 → 50% max HP) for sane balance.
+      return ok([new PostDefendContactDamageAbAttr(2)]);
+    case 341:
+      // Fort Knox — "Blocks most damage boosting and multihit abilities."
+      // Suppression of opponent abilities — needs new primitive (similar to
+      // Mold Breaker but defensive). Defer.
+      return SKIP_BESPOKE;
+    case 282:
+      // (Sentinel — Aerodynamics was wired R12.)
+      return SKIP_BESPOKE;
     case 456:
       // Cryomancy — "Moves inflict frostbite 5x as often." Same shape as
       // Pyromancy (270): flat 30% ER_FROSTBITE on hit.
