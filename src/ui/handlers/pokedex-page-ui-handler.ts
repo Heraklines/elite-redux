@@ -2,7 +2,6 @@ import { globalScene } from "#app/global-scene";
 import { starterColors } from "#app/global-vars/starter-colors";
 import Overrides from "#app/overrides";
 import { speciesEggMoves } from "#balance/moves/egg-moves";
-import { starterPassiveAbilities } from "#balance/passives";
 import type { SpeciesFormEvolution } from "#balance/pokemon-evolutions";
 import {
   getEvolutions,
@@ -30,7 +29,7 @@ import { pokemonFormChanges } from "#data/pokemon-forms";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { normalForm } from "#data/pokemon-species";
 import { AbilityAttr } from "#enums/ability-attr";
-import type { AbilityId } from "#enums/ability-id";
+import { AbilityId } from "#enums/ability-id";
 import { BiomeId } from "#enums/biome-id";
 import { BiomePoolTier } from "#enums/biome-pool-tier";
 import { Button } from "#enums/buttons";
@@ -39,7 +38,6 @@ import { DexAttr } from "#enums/dex-attr";
 import { EggSourceType } from "#enums/egg-source-types";
 import type { MoveId } from "#enums/move-id";
 import type { Nature } from "#enums/nature";
-import { Passive as PassiveAttr } from "#enums/passive";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { TextStyle } from "#enums/text-style";
@@ -59,6 +57,14 @@ import { MessageUiHandler } from "#ui/message-ui-handler";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { PokedexInfoOverlay } from "#ui/pokedex-info-overlay";
 import { RibbonTray } from "#ui/ribbon-tray-container";
+import {
+  isSlotEnabled,
+  isSlotUnlocked,
+  PASSIVE_SLOTS,
+  type PassiveSlot,
+  toggleSlotEnabled,
+  unlockSlot,
+} from "#ui/starter-select-ui-handler";
 import { StatsContainer } from "#ui/stats-container";
 import {
   addBBCodeTextObject,
@@ -293,8 +299,6 @@ export class PokedexPageUiHandler extends MessageUiHandler {
   private ability1: AbilityId; // TODO: add `| undefined`?
   private ability2: AbilityId | undefined;
   private abilityHidden: AbilityId | undefined;
-  private passive: AbilityId;
-  private hasPassive: boolean;
   private hasAbilities: [ability1: number, ability2: number, hiddenAbility: number];
   private biomes: readonly BiomeTierTimeOfDay[] = [];
   private baseStats: number[];
@@ -897,17 +901,8 @@ export class PokedexPageUiHandler extends MessageUiHandler {
         .map(m => (Array.isArray(m) ? m[1] : m))
         .sort((a, b) => (allMoves[a].name > allMoves[b].name ? 1 : -1)) ?? [];
 
-    const passiveId = Object.hasOwn(starterPassiveAbilities, species.speciesId)
-      ? species.speciesId
-      : Object.hasOwn(starterPassiveAbilities, this.starterId)
-        ? this.starterId
-        : pokemonPrevolutions[this.starterId];
-    const passives = starterPassiveAbilities[passiveId];
-    this.passive = this.formIndex in passives ? passives[formIndex] : passives[0];
-
     const starterData = globalScene.gameData.starterData[this.starterId];
     const abilityAttr = starterData.abilityAttr;
-    this.hasPassive = starterData.passiveAttr > 0;
 
     const hasAbility1 = abilityAttr & AbilityAttr.ABILITY_1;
     const hasAbility2 = abilityAttr & AbilityAttr.ABILITY_2;
@@ -1514,7 +1509,14 @@ export class PokedexPageUiHandler extends MessageUiHandler {
                   });
                 }
 
-                if (this.passive) {
+                // ER 3-passive rendering: one row per slot, with per-slot lock/enable
+                // state. Vanilla species (no `setPassives()` install) return
+                // [passive1, NONE, NONE] from `getPassiveAbilities()` — we skip
+                // NONE slots so vanilla collapses cleanly to a single passive row.
+                const passiveAbilityIds = this.species.getPassiveAbilities(this.formIndex);
+                const passiveAttrForDisplay = globalScene.gameData.starterData[this.starterId].passiveAttr;
+                const hasAnyPassive = passiveAbilityIds.some(a => a !== AbilityId.NONE);
+                if (hasAnyPassive) {
                   options.push({
                     label: i18next.t("pokedexUiHandler:passive"),
                     skip: true,
@@ -1522,13 +1524,31 @@ export class PokedexPageUiHandler extends MessageUiHandler {
                     handler: () => false,
                     onHover: () => this.infoOverlay.clear(),
                   });
-                  const ability = allAbilities.at(this.passive) ?? { name: "", description: "" };
-                  options.push({
-                    label: ability.name,
-                    style: this.hasPassive ? TextStyle.SETTINGS_VALUE : TextStyle.SHADOW_TEXT,
-                    handler: () => false,
-                    onHover: () => this.infoOverlay.show(ability.description),
-                  });
+                  for (let slot = 0; slot < PASSIVE_SLOTS.length; slot++) {
+                    const abilityId = passiveAbilityIds[slot];
+                    if (abilityId === AbilityId.NONE) {
+                      continue;
+                    }
+                    const slotIndex = slot as PassiveSlot;
+                    const unlocked = isSlotUnlocked(passiveAttrForDisplay, slotIndex);
+                    const enabled = isSlotEnabled(passiveAttrForDisplay, slotIndex);
+                    const ability = allAbilities.at(abilityId) ?? { name: "", description: "" };
+                    // Visual state mapping mirrors the starter-select 3-slot panel:
+                    //   UNLOCKED + ENABLED   → SETTINGS_VALUE (full color)
+                    //   UNLOCKED + disabled  → SHADOW_TEXT     (faded — disable badge)
+                    //   LOCKED               → SHADOW_TEXT     (faded — lock badge)
+                    const statusSuffix = unlocked
+                      ? enabled
+                        ? ""
+                        : ` (${i18next.t("pokedexUiHandler:disabled")})`
+                      : ` (${i18next.t("pokedexUiHandler:locked")})`;
+                    options.push({
+                      label: `${ability.name}${statusSuffix}`,
+                      style: unlocked && enabled ? TextStyle.SETTINGS_VALUE : TextStyle.SHADOW_TEXT,
+                      handler: () => false,
+                      onHover: () => this.infoOverlay.show(ability.description),
+                    });
+                  }
                 }
 
                 options.push({
@@ -1993,36 +2013,77 @@ export class PokedexPageUiHandler extends MessageUiHandler {
             const passiveAttr = starterData.passiveAttr;
             const candyCount = starterData.candyCount;
 
-            if (!(passiveAttr & PassiveAttr.UNLOCKED)) {
-              const passiveCost = getPassiveCandyCount(speciesStarterCosts[this.starterId]);
-              options.push({
-                label: `×${passiveCost} ${i18next.t("pokedexUiHandler:unlockPassive")}`,
-                handler: () => {
-                  if (!Overrides.FREE_CANDY_UPGRADE_OVERRIDE && candyCount < passiveCost) {
-                    return false;
-                  }
-
-                  starterData.passiveAttr |= PassiveAttr.UNLOCKED | PassiveAttr.ENABLED;
-                  if (!Overrides.FREE_CANDY_UPGRADE_OVERRIDE) {
-                    starterData.candyCount -= passiveCost;
-                  }
-                  this.pokemonCandyCountText.setText(`×${starterData.candyCount}`);
-                  updateCandyCountTextStyle(this.pokemonCandyCountText, starterData.candyCount);
-                  globalScene.gameData.saveSystem().then(saveSuccess => {
-                    if (!saveSuccess) {
-                      return globalScene.reset(true);
+            // ER 3-passive candy menu:
+            //   - For each LOCKED slot, emit an "Unlock Passive N" candy option.
+            //     Per-slot cost uses `PASSIVE_SLOTS[slot].costMultiplier` (1x / 2x / 4x).
+            //   - For each UNLOCKED slot, emit a toggle (Enable/Disable Passive N)
+            //     with no candy cost.
+            // Vanilla species (passives = null) return [passive1, NONE, NONE] from
+            // `getPassiveAbilities()` — the NONE slots are skipped so vanilla
+            // collapses to slot 1 only (one unlock row, then one toggle row after
+            // unlock).
+            const baseCandyCost = getPassiveCandyCount(speciesStarterCosts[this.starterId]);
+            const slotPassiveAbilityIds = this.species.getPassiveAbilities(this.formIndex);
+            const nonEmptySlotCount = slotPassiveAbilityIds.filter(a => a !== AbilityId.NONE).length;
+            for (let slot = 0; slot < PASSIVE_SLOTS.length; slot++) {
+              const abilityId = slotPassiveAbilityIds[slot];
+              if (abilityId === AbilityId.NONE) {
+                continue;
+              }
+              const slotIndex = slot as PassiveSlot;
+              const abilityName = (allAbilities.at(abilityId) ?? { name: "" }).name;
+              // Only prefix `N.` when there are multiple slots — keeps vanilla
+              // species' single-passive UX unchanged.
+              const slotNumberLabel = nonEmptySlotCount > 1 ? `${slot + 1}. ` : "";
+              if (isSlotUnlocked(passiveAttr, slotIndex)) {
+                const enabled = isSlotEnabled(passiveAttr, slotIndex);
+                options.push({
+                  label: `${slotNumberLabel}${abilityName}: ${i18next.t(
+                    enabled ? "starterSelectUiHandler:disablePassive" : "starterSelectUiHandler:enablePassive",
+                  )}`,
+                  handler: () => {
+                    starterData.passiveAttr = toggleSlotEnabled(starterData.passiveAttr, slotIndex);
+                    globalScene.gameData.saveSystem().then(saveSuccess => {
+                      if (!saveSuccess) {
+                        return globalScene.reset(true);
+                      }
+                    });
+                    this.setSpeciesDetails(this.species);
+                    ui.setMode(UiMode.POKEDEX_PAGE, "refresh");
+                    return true;
+                  },
+                  style: TextStyle.WINDOW,
+                });
+              } else {
+                const slotCost = baseCandyCost * PASSIVE_SLOTS[slot].costMultiplier;
+                const canAfford = Overrides.FREE_CANDY_UPGRADE_OVERRIDE || candyCount >= slotCost;
+                options.push({
+                  label: `×${slotCost} ${slotNumberLabel}${abilityName}: ${i18next.t("pokedexUiHandler:unlockPassive")}`,
+                  handler: () => {
+                    if (!Overrides.FREE_CANDY_UPGRADE_OVERRIDE && candyCount < slotCost) {
+                      return false;
                     }
-                  });
-                  this.setSpeciesDetails(this.species);
-                  globalScene.playSound("se/buy");
-                  ui.setMode(UiMode.POKEDEX_PAGE, "refresh");
-
-                  return true;
-                },
-                style: this.isPassiveAvailable() ? TextStyle.WINDOW : TextStyle.SHADOW_TEXT,
-                item: "candy",
-                itemArgs: this.isPassiveAvailable() ? starterColors[this.starterId] : ["808080", "808080"],
-              });
+                    starterData.passiveAttr = unlockSlot(starterData.passiveAttr, slotIndex);
+                    if (!Overrides.FREE_CANDY_UPGRADE_OVERRIDE) {
+                      starterData.candyCount -= slotCost;
+                    }
+                    this.pokemonCandyCountText.setText(`×${starterData.candyCount}`);
+                    updateCandyCountTextStyle(this.pokemonCandyCountText, starterData.candyCount);
+                    globalScene.gameData.saveSystem().then(saveSuccess => {
+                      if (!saveSuccess) {
+                        return globalScene.reset(true);
+                      }
+                    });
+                    this.setSpeciesDetails(this.species);
+                    globalScene.playSound("se/buy");
+                    ui.setMode(UiMode.POKEDEX_PAGE, "refresh");
+                    return true;
+                  },
+                  style: canAfford ? TextStyle.WINDOW : TextStyle.SHADOW_TEXT,
+                  item: "candy",
+                  itemArgs: canAfford ? starterColors[this.starterId] : ["808080", "808080"],
+                });
+              }
             }
 
             // Reduce cost option
@@ -2364,19 +2425,6 @@ export class PokedexPageUiHandler extends MessageUiHandler {
     const friendshipCap = getStarterValueFriendshipCap(speciesStarterCosts[this.starterId]);
 
     return { currentFriendship, friendshipCap };
-  }
-
-  /**
-   * Determines if a passive upgrade is available for the current species
-   * @returns Whether the user has enough candies and a passive has not been unlocked already
-   */
-  private isPassiveAvailable(): boolean {
-    const starterData = globalScene.gameData.starterData[this.starterId];
-
-    return (
-      starterData.candyCount >= getPassiveCandyCount(speciesStarterCosts[this.starterId])
-      && !(starterData.passiveAttr & PassiveAttr.UNLOCKED)
-    );
   }
 
   /**
