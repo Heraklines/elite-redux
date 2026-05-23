@@ -2512,6 +2512,15 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Sharing Is Caring — "Stat changes are shared between all battlers."
       // Field-wide stat-change propagation. Complex; defer.
       return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
+    // Round 31 — Daredevil partial wire (recoil block)
+    // -------------------------------------------------------------------------
+    case 1008:
+      // Daredevil — "+1 Atk after using recoil move. 1/2 recoil damage."
+      // Wire only the recoil-block side via vanilla BlockRecoilDamageAttr
+      // (Rock Head semantics — full block rather than 1/2). The +1 Atk on
+      // recoil-move-use needs a use-recoil event hook (deferred).
+      return ok([new BlockRecoilDamageAttr()]);
     case 456:
       // Cryomancy — "Moves inflict frostbite 5x as often." Same shape as
       // Pyromancy (270): flat 30% ER_FROSTBITE on hit.
