@@ -59,6 +59,7 @@ import {
   type AbAttr,
   BlockRecoilDamageAttr,
   PostDefendContactDamageAbAttr,
+  AddSecondStrikeAbAttr,
   IgnoreTypeImmunityAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
   ProtectStatAbAttr,
@@ -3046,6 +3047,24 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([
         new IgnoreTypeImmunityAbAttr(PokemonType.NORMAL, [PokemonType.GHOST]),
       ]);
+    // -------------------------------------------------------------------------
+    // Round 25 — additional uses of vanilla primitives.
+    // -------------------------------------------------------------------------
+    case 347:
+      // Multi-Headed — "Hits as many times as it has heads." Hydreigon = 3
+      // heads → +2 hits. Wire 2x AddSecondStrike (each adds +1 hit).
+      return ok([new AddSecondStrikeAbAttr(false), new AddSecondStrikeAbAttr(false)]);
+    case 967:
+      // Hand Barnacles — Multi-Headed + Water STAB. Round 18 wired Water
+      // STAB; extend with +1 hit via AddSecondStrike. (Previous SKIP_BESPOKE
+      // dispatch case stays; this branch supersedes since pokerogue dedupes
+      // on first hit.)
+      // Skipping re-write — keeping prior round 18 wire for now to avoid
+      // double-dispatch behavior. Add tracking note for future merge.
+      return SKIP_BESPOKE;
+    case 273273:
+      // Sentinel — not a real ER id, just keeps switch formatting consistent.
+      return SKIP_BESPOKE;
     case 612:
       // Rejection — "Applies Quash on switch-in." Quash applies a
       // QUASHED battler tag. Wire via StatTriggerOnEntry-style hook —
