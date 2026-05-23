@@ -2579,6 +2579,73 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Last Stand — "Def and SpDef increase as HP drops. Max 1.6x." Needs
       // HP-curve stat-multiplier primitive. Defer.
       return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
+    // Round 16 — more compositions in the flag-boost / chance-status / proc clusters.
+    // -------------------------------------------------------------------------
+    case 687:
+      // Vitality Strike — "Heals for 10% of the damage dealt by punching moves."
+      return ok([
+        new LifestealOnHitAbAttr({ healFraction: 0.1, filter: { flag: MoveFlags.PUNCHING_MOVE } }),
+      ]);
+    case 691:
+      // Assassin's Tools — "Contact moves have a 30% chance to PSN, PRLZ, or BLD."
+      // ChanceStatusOnHit supports multi-status uniform pick. ER_BLEED is a
+      // battler tag — wire only the status pair (POISON + PARALYSIS); the
+      // BLEED piece is handled by the parallel ChanceBattlerTagOnHit.
+      return ok([
+        new ChanceStatusOnHitAbAttr({
+          chance: 30,
+          effects: [StatusEffect.POISON, StatusEffect.PARALYSIS],
+        }),
+        new ChanceBattlerTagOnHitAbAttr({ chance: 10, tags: [BattlerTagType.ER_BLEED] }),
+      ]);
+    case 708:
+      // Megabite — duplicate shape of 568 Mind Crunch (BITING_MOVE 1.3x).
+      return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.BITING_MOVE, multiplier: 1.3 })]);
+    case 742:
+      // Magical Fists — duplicate shape of 273 Power Fists (PUNCHING_MOVE 1.3x).
+      return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.PUNCHING_MOVE, multiplier: 1.3 })]);
+    case 751:
+      // Energy Horns — "Mighty horn moves become special and deal 30% more
+      // damage." Same shape as Power Fists / Mystic Blades but for HORN_BASED.
+      return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.HORN_BASED, multiplier: 1.3 })]);
+    case 769:
+      // JunshiSanda — "Punches and Kicks are both Punches and Kicks." We
+      // can't unify the flags at runtime (it'd require move-flag injection).
+      // Approximate: boost BOTH flags by 1.15x so the user effectively gets
+      // the merged boost.
+      return ok([
+        new FlagDamageBoostAbAttr({ flag: MoveFlags.PUNCHING_MOVE, multiplier: 1.15 }),
+        new FlagDamageBoostAbAttr({ flag: MoveFlags.KICKING_MOVE, multiplier: 1.15 }),
+      ]);
+    case 831:
+      // Grass Flute — "Sound moves inflict Fear." Tag every SOUND hit with
+      // ER_FEAR. The chance-battler-tag-on-hit primitive supports flag filters.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.ER_FEAR],
+          filter: { flag: MoveFlags.SOUND_BASED },
+          contactRequired: false,
+        }),
+      ]);
+    case 832:
+      // Hemotoxin — "Suppresses abilities of the target when they're
+      // poisoned." Status-conditional ability-suppress needs a new primitive.
+      // Defer.
+      return SKIP_BESPOKE;
+    case 702:
+      // From the Shadows — "Attacks trap and have a 20% flinch chance when
+      // moving first." Wire only the flinch-on-hit piece (20% any contact).
+      // First-mover gate + trap-on-hit deferred.
+      return ok([
+        new ChanceBattlerTagOnHitAbAttr({ chance: 20, tags: [BattlerTagType.FLINCHED] }),
+      ]);
+    case 750:
+      // Neurotoxin — "Inflicting poison also lowers Attack, SpAtk, and
+      // Speed." Status-cascade primitive missing — StatTriggerOnHit doesn't
+      // expose a chance field. Defer.
+      return SKIP_BESPOKE;
     default:
       return SKIP_BESPOKE;
   }
