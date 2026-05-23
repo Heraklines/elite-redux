@@ -30,7 +30,7 @@ async function importDispatcher() {
 describe("Bespoke ability dispatch verification (CSV report)", () => {
   it("classifies every bespoke ER ability via dispatchBespoke and writes CSV", async () => {
     const dispatcher = await importDispatcher();
-    const dispatchBespoke = (dispatcher as { dispatchBespoke?: (id: number) => { attrs?: unknown[]; skipReason?: string | null } }).dispatchBespoke;
+    const dispatchBespoke = (dispatcher as unknown as { dispatchBespoke?: (id: number) => { attrs?: unknown[]; skipReason?: string | null } }).dispatchBespoke;
     if (!dispatchBespoke) {
       throw new Error("dispatchBespoke not exported");
     }

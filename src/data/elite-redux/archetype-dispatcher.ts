@@ -3143,10 +3143,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 586:
       // Winged King — same shape as Iron Serpent. Defer.
       return SKIP_BESPOKE;
-    case 634:
-      // Last Stand — "Def and SpDef increase as HP drops. Max 1.6x." Needs
-      // HP-curve stat-multiplier primitive. Defer.
-      return SKIP_BESPOKE;
+    // (Last Stand 634 deferral note moved here; the real wire is below in R20.)
     // -------------------------------------------------------------------------
     // Round 16 — more compositions in the flag-boost / chance-status / proc clusters.
     // -------------------------------------------------------------------------
