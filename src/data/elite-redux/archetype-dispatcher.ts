@@ -113,6 +113,7 @@ import { HpThresholdFormChangeAbAttr } from "#data/elite-redux/archetypes/hp-thr
 import { OnOpponentStatRaiseAbAttr } from "#data/elite-redux/archetypes/on-opponent-stat-raise";
 // Round-30+ bespoke primitives (new this session).
 import { BstConditionalAllyAuraAbAttr } from "#data/elite-redux/archetypes/bst-conditional-ally-aura";
+import { CowardOnceProtectAbAttr } from "#data/elite-redux/archetypes/coward-once-protect";
 import { ContactQuashAbAttr } from "#data/elite-redux/archetypes/contact-quash";
 import { DamageCapOnResistAbAttr } from "#data/elite-redux/archetypes/damage-cap-on-resist";
 import { DefenseStatSwapOnStatusedFoeAbAttr } from "#data/elite-redux/archetypes/defense-stat-swap-on-statused-foe";
@@ -1718,11 +1719,11 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 429:
-      // Coward — sets up Protect on switch-in (once per ability evaluation).
-      // The `scripted-move` sub-effect is a configuration-only stub today: the
-      // dispatcher records the wiring and the full per-turn Protect injection
-      // is deferred to the later C-phase turn-queue integration. Partial wire.
-      return ok([new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.PROTECT })]);
+      // Coward — sets up Protect on switch-in. Only works ONCE per battle.
+      // The Protect is applied via a battler tag (PROTECTED) on first entry.
+      // Subsequent entries (e.g. after switching out and back in) do NOT
+      // re-fire because we mark a per-pokemon flag.
+      return ok([new CowardOnceProtectAbAttr()]);
     case 431:
       // Dune Terror — sand reduces incoming damage by 35%. The "+20% Ground
       // moves" piece composes via `WeatherTypeBoostAbAttr` but isn't wired

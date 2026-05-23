@@ -1016,6 +1016,20 @@ export class EggGachaUiHandler extends MessageUiHandler {
    * @returns - Whether an input event occured.
    */
   processInput(button: Button): boolean {
+    // ER dev cheat: DEV_CUSTOM (default keybind: Backquote `) grants 999 of
+    // every voucher type and refreshes the displayed counts. Useful for
+    // testing without spending hours grinding classic mode.
+    if (button === Button.DEV_CUSTOM) {
+      const counts = globalScene.gameData.voucherCounts;
+      counts[VoucherType.REGULAR] = 999;
+      counts[VoucherType.PLUS] = 999;
+      counts[VoucherType.PREMIUM] = 999;
+      counts[VoucherType.GOLDEN] = 999;
+      this.updateVoucherCounts();
+      this.getUi().playSelect();
+      return true;
+    }
+
     let success: boolean | undefined;
     if (this.transitioning) {
       success = this.processTransitionInput(button);
