@@ -2549,6 +2549,44 @@ function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([
         new PostTurnScriptedMoveAbAttr({ moveId: MoveId.ABSORB, everyNTurns: 1 }),
       ]);
+    // -------------------------------------------------------------------------
+    // Round 33 — more wires + StabAdd / TypeDamageBoost compositions
+    // -------------------------------------------------------------------------
+    case 423:
+      // Hydro Circuit — "Electric moves +50%; Water moves siphon 25% damage."
+      // Wire the 1.5x Electric type boost. Water-drain piece needs a drain
+      // modifier primitive (deferred).
+      return ok([
+        new TypeDamageBoostAbAttr({ type: PokemonType.ELECTRIC, multiplier: 1.5 }),
+      ]);
+    case 700:
+      // Color Spectrum — "Same-type attacks get a 1.2x boost. Changes type
+      // each turn." Wire the STAB-add 1.2 piece. Per-turn type change
+      // needs a new primitive (deferred).
+      return ok([new StabAddAbAttr({ multiplier: 1.2 })]);
+    case 589:
+      // Catastrophe — "Sun boosts Water. Rain boosts Fire." Compose:
+      // weather-stat-multiplier on SPATK when sun (for Water-type holder)
+      // OR rain (for Fire-type holder). Simplified: just boost SPATK in
+      // both weathers.
+      return ok([
+        new WeatherStatMultiplierAbAttr({
+          weathers: [WeatherType.SUNNY, WeatherType.RAIN],
+          stat: Stat.SPATK,
+          multiplier: 1.3,
+        }),
+      ]);
+    case 406:
+      // Spinning Top — "Fighting moves up speed +1 and clear hazards."
+      // No FIGHTING-type flag in MoveFlags; would need a type-gated stat-
+      // trigger primitive. Defer.
+      return SKIP_BESPOKE;
+    case 304:
+      // Magical Dust — "Makes foe Psychic-type on contact. Also works on
+      // offense." Vanilla Color Change is post-defend-type-change-self.
+      // ER inverts: post-defend-type-change-attacker. No vanilla primitive
+      // matches exactly. Defer.
+      return SKIP_BESPOKE;
     case 456:
       // Cryomancy — "Moves inflict frostbite 5x as often." Same shape as
       // Pyromancy (270): flat 30% ER_FROSTBITE on hit.
