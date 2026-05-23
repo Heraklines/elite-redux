@@ -17,6 +17,52 @@ import { allSpecies } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
 import { AbilityId } from "#enums/ability-id";
+import { PokemonType } from "#enums/pokemon-type";
+
+/**
+ * ER's `typeT` ordering differs from pokerogue's `PokemonType` enum. This map
+ * resolves an ER type id (0..19) to the matching pokerogue `PokemonType`.
+ *
+ * ER order: Normal, Fighting, Fire, Ice, Electric, Bug, Flying, Steel, Grass,
+ *           Ground, Poison, Dark, Water, Psychic, Rock, Dragon, Ghost, Fairy,
+ *           Mystery, None.
+ * Pokerogue order: Normal, Fighting, Flying, Poison, Ground, Rock, Bug, Ghost,
+ *                  Steel, Fire, Water, Grass, Electric, Psychic, Ice, Dragon,
+ *                  Dark, Fairy.
+ *
+ * Sentinel 18 (Mystery) and 19 (None) map to `null` to signal "no type" —
+ * callers should treat that as the absence of a secondary type, NOT
+ * `PokemonType.UNKNOWN` (which is gameplay-typeless rather than data-absent).
+ */
+const ER_TYPE_TO_POKEROGUE: readonly (PokemonType | null)[] = [
+  PokemonType.NORMAL, // 0
+  PokemonType.FIGHTING, // 1
+  PokemonType.FIRE, // 2
+  PokemonType.ICE, // 3
+  PokemonType.ELECTRIC, // 4
+  PokemonType.BUG, // 5
+  PokemonType.FLYING, // 6
+  PokemonType.STEEL, // 7
+  PokemonType.GRASS, // 8
+  PokemonType.GROUND, // 9
+  PokemonType.POISON, // 10
+  PokemonType.DARK, // 11
+  PokemonType.WATER, // 12
+  PokemonType.PSYCHIC, // 13
+  PokemonType.ROCK, // 14
+  PokemonType.DRAGON, // 15
+  PokemonType.GHOST, // 16
+  PokemonType.FAIRY, // 17
+  null, // 18 Mystery
+  null, // 19 None
+];
+
+function mapErType(erTypeId: number | null): PokemonType | null {
+  if (erTypeId === null || erTypeId < 0 || erTypeId >= ER_TYPE_TO_POKEROGUE.length) {
+    return null;
+  }
+  return ER_TYPE_TO_POKEROGUE[erTypeId];
+}
 
 /**
  * Numeric cutoff for "vanilla pokerogue" species ids. ER-custom species are
@@ -122,6 +168,21 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
 
     species.setPassives(passives);
 
+    // ER base stats — vanilla pokerogue keeps gen-X canon, but ER rebalances
+    // many species (e.g. Meganium SpA 83→93 BST 525→535). Without applying
+    // these, every species in the port runs with pokerogue's stat line, not
+    // ER's, leading to silently-wrong damage calculations in battle.
+    species.setBaseStats(draft.baseStats);
+
+    // ER type changes — many species are re-typed (e.g. Meganium becomes
+    // Grass/Fairy instead of pure Grass). type1 is required; type2 is
+    // optional (null = single type).
+    const type1 = mapErType(draft.types[0]);
+    const type2 = mapErType(draft.types[1]);
+    if (type1 !== null) {
+      species.setTypes(type1, type2);
+    }
+
     // ER `abis[]` is the active-ability TRIPLE the player picks one from
     // (mapped to pokerogue's ability1 / ability2 / abilityHidden). Without
     // this, vanilla species silently use pokerogue's actives — e.g.
@@ -171,6 +232,15 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
         mapAbilityId(formDraft.innates[2]),
       ];
       form.setPassives(formPassives);
+
+      // Mega forms have their own stat lines and type assignments in ER
+      // (Mega Venusaur is Grass/Poison with different stats than the base).
+      form.setBaseStats(formDraft.baseStats);
+      const formType1 = mapErType(formDraft.types[0]);
+      const formType2 = mapErType(formDraft.types[1]);
+      if (formType1 !== null) {
+        form.setTypes(formType1, formType2);
+      }
 
       // Same active-ability override as the base species. Mega forms in ER
       // (e.g. SPECIES_VENUSAUR_MEGA_REDUX) carry their own `abis[]` triple

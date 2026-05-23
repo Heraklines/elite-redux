@@ -260,6 +260,69 @@ export abstract class PokemonSpeciesForm {
     return this.getPassiveAbilities(formIndex).filter(a => a !== AbilityId.NONE).length;
   }
 
+  /**
+   * Override the base stat array for this species form. Called by Phase B's
+   * `init-elite-redux-species.ts` to install ER's `baseStats` over
+   * pokerogue's vanilla values. Recomputes `baseTotal` from the new stats.
+   *
+   * Without this, vanilla species in the port use pokerogue's stat lines
+   * (e.g. Meganium SpA 83 BST 525) even though ER may have rebalanced them
+   * (Meganium SpA 93 BST 535).
+   *
+   * @param stats - 6-tuple in HP/Atk/Def/SpA/SpD/Spd order.
+   */
+  setBaseStats(stats: readonly [number, number, number, number, number, number]): void {
+    const mut = this as unknown as {
+      baseStats: readonly number[];
+      baseTotal: number;
+    };
+    mut.baseStats = [stats[0], stats[1], stats[2], stats[3], stats[4], stats[5]];
+    mut.baseTotal = stats[0] + stats[1] + stats[2] + stats[3] + stats[4] + stats[5];
+  }
+
+  /**
+   * Override the type assignment (type1 / type2) for this species form. ER
+   * frequently retypes vanilla species (e.g. Meganium becomes Grass/Fairy
+   * instead of pure Grass). Pass `null` for `type2` to assign a single type.
+   *
+   * @param type1 - Primary type (required).
+   * @param type2 - Secondary type, or `null` for single-type.
+   */
+  setTypes(type1: PokemonType, type2: PokemonType | null): void {
+    const mut = this as unknown as { type1: PokemonType; type2: PokemonType | null };
+    mut.type1 = type1;
+    mut.type2 = type2;
+  }
+
+  /**
+   * Override the active ability triple (ability1 / ability2 / abilityHidden)
+   * for this species. Called by Phase B's `init-elite-redux-species.ts` to
+   * install ER's `abis[]` triple over pokerogue's vanilla active abilities.
+   *
+   * Without this override, vanilla species end up showing pokerogue's active
+   * abilities (e.g. Bulbasaur = Overgrow) instead of ER's (Bulbasaur =
+   * Chloroplast / Pastel Veil / Chlorophyll).
+   *
+   * @param abilities - Triple of AbilityIds (ability1, ability2, abilityHidden).
+   *   Use AbilityId.NONE for empty slots — they will be normalized like the
+   *   constructor's NONE-fallback (ability2/Hidden NONE → ability1).
+   */
+  setActiveAbilities(abilities: readonly [AbilityId, AbilityId, AbilityId]): void {
+    // ability1/2/Hidden are declared `readonly` for compile-time safety, but
+    // the Phase B init path is the explicit single writer at runtime. Cast
+    // through a mutable view rather than via `as any` to preserve typing.
+    const mut = this as unknown as {
+      ability1: AbilityId;
+      ability2: AbilityId;
+      abilityHidden: AbilityId;
+    };
+    mut.ability1 = abilities[0];
+    // Mirror the constructor's NONE normalization so downstream code that
+    // assumes a non-NONE ability2 keeps working.
+    mut.ability2 = abilities[1] === AbilityId.NONE ? abilities[0] : abilities[1];
+    mut.abilityHidden = abilities[2];
+  }
+
   getLevelMoves(): LevelMoves {
     if (
       Object.hasOwn(pokemonSpeciesFormLevelMoves, this.speciesId)
