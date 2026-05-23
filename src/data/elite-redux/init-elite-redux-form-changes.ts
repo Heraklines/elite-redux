@@ -65,6 +65,10 @@
 
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES, type ErEvolutionDraft } from "#data/elite-redux/er-species";
+import { pokemonFormChanges, SpeciesFormChange } from "#data/pokemon-forms";
+import { SpeciesFormChangeItemTrigger } from "#data/pokemon-forms/form-change-triggers";
+import { FormChangeItem } from "#enums/form-change-item";
+import { SpeciesFormKey } from "#enums/species-form-key";
 
 /**
  * Decoded form-change kind. Mirrors the `evoKindT` table from the v2.65
@@ -281,10 +285,79 @@ export function initEliteReduxFormChanges(): InitEliteReduxFormChangesResult {
       pushToBucket(entry);
       bumpKindCounter(result, kind);
       result.formChangesRegistered++;
+
+      // Bridge into pokerogue's `pokemonFormChanges` so the dex Evolutions
+      // menu picks up the form change. The Phase B1a form-injection step
+      // ensures the corresponding `SpeciesFormKey` form exists on the
+      // source species (e.g. Meganium has a "mega" formKey injected). The
+      // trigger here uses FormChangeItem.NONE since ER's mega-stone items
+      // (~284 of them) mostly have no FormChangeItem enum equivalent —
+      // the registry above still carries the authoritative requirement
+      // string for battle-layer use.
+      bridgeEntryToPokerogueFormChanges(entry);
     }
   }
 
   return result;
+}
+
+/**
+ * Map an ER target species-const suffix to the pokerogue `SpeciesFormKey`
+ * value the form-injection step seeds onto the source species. Returns
+ * `null` for targets that don't match any known suffix — those stay in
+ * the ER-only registry but won't surface in the dex Evolutions menu.
+ */
+function targetFormKey(targetSpeciesConst: string, sourceSpeciesConst: string): string | null {
+  if (!targetSpeciesConst.startsWith(`${sourceSpeciesConst}_`)) {
+    return null;
+  }
+  const suffix = targetSpeciesConst.slice(sourceSpeciesConst.length);
+  // Order matters — longest match wins (e.g. "_MEGA_X" before "_MEGA").
+  if (suffix === "_MEGA_X" || suffix === "_MEGA_X_REDUX") {
+    return SpeciesFormKey.MEGA_X;
+  }
+  if (suffix === "_MEGA_Y" || suffix === "_MEGA_Y_REDUX") {
+    return SpeciesFormKey.MEGA_Y;
+  }
+  if (suffix === "_PRIMAL" || suffix === "_PRIMAL_REDUX") {
+    return SpeciesFormKey.PRIMAL;
+  }
+  if (suffix === "_ORIGIN" || suffix === "_ORIGIN_REDUX") {
+    return SpeciesFormKey.ORIGIN;
+  }
+  if (suffix === "_MEGA" || suffix === "_MEGA_REDUX" || suffix === "_REDUX_MEGA") {
+    return SpeciesFormKey.MEGA;
+  }
+  return null;
+}
+
+/**
+ * Push a `SpeciesFormChange` into pokerogue's `pokemonFormChanges` table
+ * so the source species's dex page surfaces the mega/primal in its
+ * Evolutions menu.
+ */
+function bridgeEntryToPokerogueFormChanges(entry: ErFormChangeRegistryEntry): void {
+  const formKey = targetFormKey(entry.targetSpeciesConst, entry.sourceSpeciesConst);
+  if (formKey === null) {
+    return;
+  }
+  const change = new SpeciesFormChange(
+    entry.sourceSpeciesId,
+    "", // preFormKey: from base form
+    formKey,
+    new SpeciesFormChangeItemTrigger(FormChangeItem.NONE),
+  );
+  if (!pokemonFormChanges[entry.sourceSpeciesId]) {
+    pokemonFormChanges[entry.sourceSpeciesId] = [];
+  }
+  // Idempotency: skip if same (preFormKey, formKey) pair already exists.
+  const existing = pokemonFormChanges[entry.sourceSpeciesId].some(fc => fc.preFormKey === "" && fc.formKey === formKey);
+  if (!existing) {
+    // pokemonFormChanges entries are typed `readonly SpeciesFormChange[]`,
+    // but the table itself is mutable — pokerogue's own data tables push
+    // into these arrays during init too. Cast through a mutable view.
+    (pokemonFormChanges[entry.sourceSpeciesId] as SpeciesFormChange[]).push(change);
+  }
 }
 
 /**
