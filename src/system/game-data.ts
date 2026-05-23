@@ -2034,9 +2034,12 @@ export class GameData {
    * `valueReduction` only needs to be provided when testing a value reduction other than the one currently unlocked
    */
   getSpeciesStarterValue(speciesId: SpeciesId, valueReduction?: number): number {
-    // TODO: is this bang correct?
-    const baseValue = speciesStarterCosts[speciesId]!;
-    const reduction = valueReduction ?? this.starterData[speciesId].valueReduction;
+    // ER-custom species (id >= 10000) aren't in `speciesStarterCosts` —
+    // default to 4 (matching mid-tier starters) so the dex filter loop
+    // doesn't NaN-out and silently drop the row. Real cost assignment for
+    // ER customs is a follow-up.
+    const baseValue = speciesStarterCosts[speciesId] ?? 4;
+    const reduction = valueReduction ?? this.starterData[speciesId]?.valueReduction ?? 0;
     let value = baseValue;
 
     const decrementValue = (v: number) => {
