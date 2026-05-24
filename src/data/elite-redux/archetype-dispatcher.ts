@@ -144,6 +144,7 @@ import { PostDefendChangeAttackerTypeAbAttr } from "#data/elite-redux/archetypes
 import { PostDefendSuppressOpponentDamageBoostAbAttr } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import { PostAttackContactSuppressTargetAbilityAbAttr } from "#data/elite-redux/archetypes/post-attack-contact-suppress-target-ability";
 import { PostAttackScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-attack-scripted-move";
+import { PostSummonScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-summon-scripted-move";
 import { PostFaintReviveAbAttr } from "#data/elite-redux/archetypes/post-faint-revive";
 import { PostSummonClearTerrainAbAttr } from "#data/elite-redux/archetypes/post-summon-clear-terrain";
 import { PostSummonQuashFoesAbAttr } from "#data/elite-redux/archetypes/post-summon-quash-foes";
@@ -2169,6 +2170,25 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           typeFilter: [PokemonType.GHOST],
         }),
       ]);
+    case 384:
+      // Low Blow — "Attacks with 40BP Feint Attack on switch-in."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.FEINT_ATTACK })]);
+    case 479:
+      // Dust Cloud — "Attacks with Sand Attack on switch-in."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.SAND_ATTACK })]);
+    case 521:
+      // Phantom Thief — "Attacks with 40BP Spectral Thief on switch-in."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.SPECTRAL_THIEF })]);
+    case 717:
+      // Wildfire — "Attacks with Fire Spin on entry."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.FIRE_SPIN })]);
+    case 718:
+      // Jumpscare — "Attacks with Astonish on first switch-in."
+      // PostSummon only fires once per switch-in, so "first" is implicit.
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.ASTONISH })]);
+    case 745:
+      // Sand Pit — "Attacks with 20BP Sand Tomb on switch-in."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.SAND_TOMB })]);
     case 442:
       // Fae Hunter — 1.5x to Fairy, 0.5x from Fairy.
       return ok([
