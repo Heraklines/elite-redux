@@ -2189,6 +2189,35 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 745:
       // Sand Pit — "Attacks with 20BP Sand Tomb on switch-in."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.SAND_TOMB })]);
+    case 461:
+      // Monkey Business — "Uses Tickle on entry."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TICKLE })]);
+    case 481:
+      // Trickster — "Uses Disable on switch-in."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.DISABLE })]);
+    case 496:
+      // Wishmaker — "Uses Wish on switch-in. Three uses per battle."
+      // The 3-use cap is harder to model; ship the wire and accept that
+      // it activates every switch-in. Partial wire.
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.WISH })]);
+    case 541:
+      // Web Spinner — "Uses String Shot on switch-in."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.STRING_SHOT })]);
+    case 670:
+      // Draco Morale — "Uses Dragon Cheer on switch-in."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.DRAGON_CHEER })]);
+    case 710:
+      // Dream Whimsy — "Uses Yawn on switch-in."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.YAWN })]);
+    case 719:
+      // Tar Toss — "Uses Tar Shot on switch-in."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TAR_SHOT })]);
+    case 839:
+      // Neutralizing Fog — "Uses Defog on entry."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.DEFOG })]);
+    case 878:
+      // Frosty Presence — "Uses Mist on entry."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.MIST })]);
     case 442:
       // Fae Hunter — 1.5x to Fairy, 0.5x from Fairy.
       return ok([
