@@ -51,19 +51,32 @@
 
 ## R55 — Empty-bespoke reduction session (2026-05-23..25)
 
-Took empty-wire count from 116 → 93 by:
+Took empty-wire count from **116 → 64** (45% reduction) by:
 1. Reclassifying flawed archetype entries as `bespoke` so dispatchBespoke handles them
 2. Building 1 new archetype: `PostSummonScriptedMoveAbAttr` (switch-in scripted moves)
 3. Extending 1 archetype: `PostAttackScriptedMoveAbAttr` with `typeFilter` for type-gated post-attack procs
 
-New wires:
-- Mountaineer (314): Rock immunity via AttackTypeImmunityAbAttr
-- Scare (329), Terrify (632): SPATK lowerer (Intimidate-shape)
-- Christmas Spirit (283): hail dmg reduction
-- Volcano Rage (382), Frost Burn (475), Frost Dragon (1009): type-gated post-attack scripted move
-- Lunar Wrath (895): Ghost-gated post-attack Moongeist Beam
-- 6 switch-in attack abilities: Low Blow, Dust Cloud, Phantom Thief, Wildfire, Jumpscare, Sand Pit
-- 9 switch-in scripted-move abilities: Monkey Business, Trickster, Wishmaker, Web Spinner, Draco Morale, Dream Whimsy, Tar Toss, Neutralizing Fog, Frosty Presence
+52 new wires across these primitives:
+- AttackTypeImmunityAbAttr: Mountaineer (314)
+- PostSummonStatStageChangeAbAttr: Scare (329), Terrify (632)
+- WeatherDamageReductionAbAttr: Christmas Spirit (283)
+- PostAttackScriptedMoveAbAttr +typeFilter: Volcano Rage (382), Frost Burn (475),
+  Lunar Wrath (895), High Tide (503), Frost Dragon (1009), Glacial Rage (788)
+- PostAttackScriptedMoveAbAttr +flagFilter: Two Step (517), Blade Dance (732),
+  Backflip (977), Chunky Bass Line (641), Break it Down (974), Purple Haze (853)
+- PostSummonScriptedMoveAbAttr (NEW): 22 switch-in/cast wires —
+  Low Blow, Dust Cloud, Phantom Thief, Wildfire, Jumpscare, Sand Pit,
+  Monkey Business, Trickster, Wishmaker, Web Spinner, Draco Morale,
+  Dream Whimsy, Tar Toss, Neutralizing Fog, Frosty Presence, Let's Roll,
+  Air Blower, Cheap Tactics, Doombringer, Suppress, Change of Heart,
+  Telekinetic, Powder Burst, Monster Mash, Poseidon's Dominion,
+  Let's Dance, I Am Steve, Foamy Web, Electro Booster, Chilling Presence
+- CounterAttackOnHitAbAttr +contactRequired: Cold Rebound (383),
+  Clap Trap (531), Ice Downfall (633), Ultra Instinct (660)
+- DamageReductionAbAttr (move-type filter): Elemental Aegis (995),
+  Aegis Ward (996)
+
+Test coverage: 165 scenario tests across 23 files (was 13 at session start).
 
 ## Audit fix rounds (R48–R54)
 
