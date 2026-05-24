@@ -62,3 +62,4 @@ assets/battle-anims-er/
 # Elite Redux visual verification screenshots (generated locally, not committed).
 docs/plans/screenshots/
 vendor/elite-redux/source/
+vendor/elite-redux/rom-extracted/
