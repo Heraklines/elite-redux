@@ -755,6 +755,44 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // (already patched in MAJOR section — duplicate-add is benign, the map
   // overwrites prior entry. Re-add anyway for explicit visibility.)
   // 12 OBLIVIOUS already added.
+
+  // ===== Round 10: more ER deltas (mostly +5 wires) =====
+  // 119 FRISK: vanilla reveal foe item. ER also "disables items for 2 turns".
+  // Approximate by adding a chance on PostSummon to disable opponent items
+  // via an arena tag. Without a generic "disable held items" tag, we
+  // approximate with no-op extension; ER's primary effect is still the
+  // reveal (vanilla). Defer the disable rider.
+  // 187 INFILTRATOR: vanilla bypass Substitute + screens. ER same. No patch.
+  // 178 MEGA_LAUNCHER already patched.
+  // 246 STAKEOUT: vanilla 2x on switch-in. ER same.
+  // 196 RKS_SYSTEM (MultiAttack): vanilla type from item. ER same.
+  // 233 NEUROFORCE already patched.
+  // 261 STALWART: vanilla "ignore foe redirection". ER same.
+  // 263 DRAGONS_MAW: vanilla 1.5x Dragon. ER same.
+
+  // 51 FORECAST: vanilla form-change with weather. ER says also "Attacks when
+  // setting weather". Form-change is per-species custom; the "attack on
+  // weather-set" rider would need a generic PostWeatherSet → MovePhase
+  // hook that doesn't exist. Defer.
+
+  // 50 PICKUP: already added (placeholder).
+  // 64 HUSTLE: already added.
+  // 87 DRY_SKIN: vanilla absorbs water heal + fire damage. ER same. No patch.
+  // 96 NORMALIZE: already added.
+  // 168 PROTEAN: vanilla type-change per move. ER same.
+  // 116 SOLID_ROCK: already MINOR'd (0.65).
+
+  // 230 SLUSH_RUSH: vanilla 1.5x SPD in hail. ER same (already MINOR'd above).
+  // 145 ICE_BODY: already MINOR'd.
+  // 246 STAKEOUT: vanilla 2x switch-in. ER "Deals double damage to opponents
+  // being switched in" — same.
+
+  // 36 TRACE: vanilla copies foe ability. ER notes "Does not copy innates" —
+  // vanilla pokerogue's TRACE only copies the ACTIVE ability, not passives.
+  // So this is already correct. No patch.
+
+  // 162 PROTOSYNTHESIS / 163 QUARK_DRIVE: vanilla raise highest stat in sun/
+  // electric terrain. ER same. No patch.
 ]);
 
 /**
