@@ -2320,6 +2320,40 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([
         new PostAttackScriptedMoveAbAttr({ moveId: MoveId.POISON_GAS }),
       ]);
+    case 383:
+      // Cold Rebound — "Attacks with Icy Wind when hit by a contact move."
+      return ok([
+        new CounterAttackOnHitAbAttr({
+          moveId: MoveId.ICY_WIND,
+          filter: { contactRequired: true },
+        }),
+      ]);
+    case 531:
+      // Clap Trap — "Counters contact with 50BP Snap Trap."
+      return ok([
+        new CounterAttackOnHitAbAttr({
+          moveId: MoveId.SNAP_TRAP,
+          filter: { contactRequired: true },
+        }),
+      ]);
+    case 633:
+      // Ice Downfall — "Counters contact with 60BP Icicle Crash."
+      return ok([
+        new CounterAttackOnHitAbAttr({
+          moveId: MoveId.ICICLE_CRASH,
+          filter: { contactRequired: true },
+        }),
+      ]);
+    case 660:
+      // Ultra Instinct — "Counters contact with 20BP Vacuum Wave. Takes .8x damage."
+      // Wire both pieces: counter on contact + 20% damage reduction on all hits.
+      return ok([
+        new CounterAttackOnHitAbAttr({
+          moveId: MoveId.VACUUM_WAVE,
+          filter: { contactRequired: true },
+        }),
+        new DamageReductionAbAttr({ reduction: 0.2, filter: { kind: "all" } }),
+      ]);
     case 442:
       // Fae Hunter — 1.5x to Fairy, 0.5x from Fairy.
       return ok([
