@@ -86,6 +86,7 @@ import {
 import {
   TypeImmunityHighestAttackStatStageAbAttr,
 } from "#data/elite-redux/archetypes/type-immunity-highest-attack-stat-stage";
+import { CritStageBonusAbAttr } from "#data/elite-redux/archetypes/crit-mod";
 import { StatTriggerOnStatLoweredAbAttr } from "#data/elite-redux/archetypes/stat-trigger-on-event";
 import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
@@ -305,12 +306,13 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
       ab.attrs.push(new ReceivedTypeDamageMultiplierAbAttr(PokemonType.WATER, 0.5));
     },
   ],
-  // KEEN_EYE: acc-drop immune + ignore foe evasion + 1.2x accuracy boost.
-  // Vanilla already has ProtectStatAbAttr(ACC). We add evasion-ignore + acc boost.
+  // KEEN_EYE: ER spec is "Immune to accuracy drops. Grants a 1.2x accuracy
+  // boost." Vanilla already has ProtectStatAbAttr(ACC) for the immunity.
+  // Audit-fix: prior wire pushed IgnoreOpponentStatStages([EVA]) — NOT in
+  // the ER spec. Removed; only the 1.2x ACC multiplier is added.
   [
     AbilityId.KEEN_EYE,
     ab => {
-      ab.attrs.push(new IgnoreOpponentStatStagesAbAttr([Stat.EVA]));
       ab.attrs.push(new StatMultiplierAbAttr(Stat.ACC, 1.2));
     },
   ],
@@ -339,15 +341,15 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
       ab.attrs.push(new StatMultiplierAbAttr(Stat.SPD, 1.3));
     },
   ],
-  // HYPER_CUTTER: Atk-drop immune + SpAtk-drop immune + contact +1 crit stage.
-  // (Vanilla has ProtectStatAbAttr(ATK). We extend protection to SPATK; crit-stage
-  // boost needs a bespoke attr we don't have wired — defer crit boost to round 2.)
+  // HYPER_CUTTER: ER spec is "Enemies can't lower Atk/SpAtk. Contact moves
+  // get +1 Crit." Vanilla has ProtectStatAbAttr(ATK); we extend to SPATK
+  // and now ALSO add CritStageBonusAbAttr({bonus:1, filter:MAKES_CONTACT})
+  // (audit-fix: was deferred to "round 2"; round-2 lands here).
   [
     AbilityId.HYPER_CUTTER,
     ab => {
-      // Push another stat protector for SPATK.
-      // We import nothing extra — use the vanilla attr we already use for ATK.
       addStatProtect(ab, Stat.SPATK);
+      ab.attrs.push(new CritStageBonusAbAttr({ bonus: 1, filter: { flag: MoveFlags.MAKES_CONTACT } }));
     },
   ],
   // INNER_FOCUS: flinch immune + Intimidate immune + Scare immune.

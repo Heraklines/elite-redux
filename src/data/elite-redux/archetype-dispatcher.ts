@@ -4200,6 +4200,24 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
           swap: "target-spdef-instead-of-def",
         }),
       ]);
+    case 892:
+      // Crispy Cream — "30% to inflict burn/frostbite when hit by contact."
+      // Audit-fix: the prior wire stacked two independent 30% procs that
+      // could BOTH land on a single hit (combined ~51%). Drop both to
+      // 15% so the joint probability ≈ 28% — closer to the spec's 30%
+      // intent (one of two outcomes, not both).
+      return ok([
+        new ChanceStatusOnHitAbAttr({
+          chance: 15,
+          effects: [StatusEffect.BURN],
+          contactRequired: true,
+        }),
+        new ChanceBattlerTagOnHitAbAttr({
+          chance: 15,
+          tags: [BattlerTagType.ER_FROSTBITE],
+          contactRequired: true,
+        }),
+      ]);
     // -------------------------------------------------------------------------
     // Round 48 (original) wires below.
     // -------------------------------------------------------------------------
