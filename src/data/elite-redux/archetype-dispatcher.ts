@@ -66,6 +66,7 @@ import {
   BlockWeatherDamageAttr,
   GorillaTacticsAbAttr,
   MovePowerBoostAbAttr,
+  ReceivedMoveDamageMultiplierAbAttr,
   PostAttackApplyBattlerTagAbAttr,
   PostAttackApplyStatusEffectAbAttr,
   PostDancingMoveAbAttr,
@@ -117,6 +118,7 @@ import { HpThresholdFormChangeAbAttr } from "#data/elite-redux/archetypes/hp-thr
 import { OnOpponentStatRaiseAbAttr } from "#data/elite-redux/archetypes/on-opponent-stat-raise";
 import { OnOpponentSwitchOutAbAttr } from "#data/elite-redux/archetypes/on-opponent-switch-out";
 import { PostItemLostScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-item-lost-scripted-move";
+import { SetFogOnHitAbAttr } from "#data/elite-redux/archetypes/set-fog-on-hit";
 // Round-30+ bespoke primitives (new this session).
 import { BstConditionalAllyAuraAbAttr } from "#data/elite-redux/archetypes/bst-conditional-ally-aura";
 import { ChanceDodgeAbAttr } from "#data/elite-redux/archetypes/chance-dodge";
@@ -4012,9 +4014,21 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // 100BP and +1 crit." Move-specific patch; defer.
       return SKIP_BESPOKE;
     case 967:
-      // Logical id 967 is Foggy Eye — "While in Fog, boost Ghost moves by
-      // 50% and resist Ghost moves." Fog defers; SKIP.
-      return SKIP_BESPOKE;
+      // Foggy Eye — "While in Fog, boost Ghost moves by 50% and resist
+      // Ghost moves." Uses real WeatherType.FOG.
+      return ok([
+        new MovePowerBoostAbAttr(
+          (user, _t, move) => {
+            const w = globalScene.arena.weather?.weatherType;
+            return w === WeatherType.FOG && user.getMoveType(move) === PokemonType.GHOST;
+          },
+          1.5,
+        ),
+        new DamageReductionAbAttr({
+          reduction: 0.5,
+          filter: { kind: "move-type", type: PokemonType.GHOST },
+        }),
+      ]);
     case 979:
       // Logical id 979 is Eternal Flower — "Reduces the stats of other Megas
       // by 20%." Field-specific Mega introspection. Defer.
@@ -4407,9 +4421,13 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       return ok([new SuppressAttackerAbilityAbAttr({ contactOnly: true })]);
     case 817:
       // Madness Enhancement — "Enrages in fog, halves damage when enraged."
-      // Fog defer — approximate as MISTY-terrain damage halving.
+      // Real WeatherType.FOG gate via ReceivedMoveDamageMultiplier with a
+      // weather condition closure.
       return ok([
-        new TimeLimitedDamageReductionAbAttr({ factor: 0.5, turns: 99 }),
+        new ReceivedMoveDamageMultiplierAbAttr(
+          (_t, _u, _m) => globalScene.arena.weather?.weatherType === WeatherType.FOG,
+          0.5,
+        ),
       ]);
     case 828:
       // Overzealous — "User's super-effective moves have +1 priority."
@@ -4489,11 +4507,12 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         new ForceSwitchOutImmunityAbAttr(),
       ]);
     case 905:
-      // Fog Machine — "When hit, set up Eerie Fog." Fog defers; approximate
-      // by setting MISTY terrain on hit.
-      return ok([
-        new CounterAttackOnHitAbAttr({ moveId: MoveId.MISTY_TERRAIN }),
-      ]);
+      // Fog Machine — "When hit, set up Eerie Fog." Pokerogue's
+      // WeatherType.FOG exists; we hook via the existing CounterAttack
+      // surface using a custom HAZE-style approach. Since we can't
+      // directly enqueue a SetWeather phase via a move, we install fog
+      // via a PostDefend hook that directly calls arena.trySetWeather.
+      return ok([new SetFogOnHitAbAttr()]);
     case 911:
       // Greedy — "Uses Thief when it loses an item." Pokerogue already
       // has PostItemLostAbAttr (Cud Chew uses it). We piggyback by adding
