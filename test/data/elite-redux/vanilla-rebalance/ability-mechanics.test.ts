@@ -580,3 +580,33 @@ describe("ER vanilla ability rebalance — R2 TOTAL rewrites", () => {
     expect(hasStatCopy).toBe(false);
   });
 });
+
+describe("ER vanilla ability rebalance — R4/R5 non-contact tier (contactExcluded gate)", () => {
+  // User-reported regression: "flame body triggers on anything even non
+  // contact moves and it seems close to 100% of burning someone". Fixed
+  // in commit 1b854a3 by adding contactExcluded:true to the helper.
+  //
+  // These tests pin the invariant: the ER-added ChanceStatusOnHitAbAttr
+  // for each of these abilities must NOT fire on contact moves — the
+  // pre-existing vanilla PostDefendContactApplyStatusEffectAbAttr already
+  // handles those. Stacking two procs inflated the perceived rate.
+  const cases: { id: AbilityId; name: string }[] = [
+    { id: AbilityId.STATIC, name: "STATIC" },
+    { id: AbilityId.FLAME_BODY, name: "FLAME_BODY" },
+    { id: AbilityId.POISON_POINT, name: "POISON_POINT" },
+    { id: AbilityId.EFFECT_SPORE, name: "EFFECT_SPORE" },
+    { id: AbilityId.POISON_TOUCH, name: "POISON_TOUCH" },
+  ];
+
+  for (const { id, name } of cases) {
+    it(`${name} — every ER-added ChanceStatusOnHit attr is contactExcluded`, () => {
+      const ab = getAbility(id);
+      const erAttrs = ab.attrs.filter(a => a.constructor.name === "ChanceStatusOnHitAbAttr");
+      expect(erAttrs.length).toBeGreaterThanOrEqual(1);
+      for (const attr of erAttrs) {
+        const ce = (attr as unknown as { contactExcluded: boolean }).contactExcluded;
+        expect(ce, `${name}: ChanceStatusOnHitAbAttr.contactExcluded`).toBe(true);
+      }
+    });
+  }
+});
