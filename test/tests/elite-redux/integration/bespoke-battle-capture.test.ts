@@ -205,13 +205,91 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
     }
   });
 
-  // FULL-262 battle capture — gated behind ER_BATTLE_FULL=1 env. Iterates
-  // every bespoke ability with a wired dispatch and runs the same
-  // one-turn battle as the sample tests. Writes to a SEPARATE CSV at
-  // docs/plans/bespoke-battle-capture-full.csv so the 20-sample CSV
-  // stays as the quick reference. Expect ~2-3 hours wall-clock.
-  it.skipIf(process.env.ER_BATTLE_FULL !== "1")(
-    "FULL-262 — every wired bespoke ability survives a one-turn battle",
+  // FULL-262: one it() per ability — required because GameManager has
+  // per-test lifecycle hooks (prompt-handler must be cleared between
+  // battles, etc.). Looping inside a single test triggers "Prompt
+  // handler run interval was not properly cleared on test end!".
+  // Gated behind ER_BATTLE_FULL=1.
+  const FULL_BESPOKE = Object.values(ER_ABILITY_ARCHETYPES)
+    .filter(e => e.archetype === "bespoke" && e.erAbilityId > 0)
+    .map(e => e.erAbilityId);
+
+  const fullResults: BattleCapture[] = [];
+  const FULL_REPORT_PATH = join(process.cwd(), "docs", "plans", "bespoke-battle-capture-full.csv");
+
+  function emitFullCsv(): void {
+    const csv = ["er_id,pokerogue_id,status,observable,error"];
+    for (const r of fullResults) {
+      const safe = (s: string) => s.replace(/,/g, ";").replace(/\n/g, " ").replace(/"/g, "'");
+      csv.push(`${r.erId},${r.pokerogueId},${r.status},"${safe(r.observable)}","${safe(r.error)}"`);
+    }
+    writeFileSync(FULL_REPORT_PATH, csv.join("\n"));
+  }
+
+  for (const erId of FULL_BESPOKE) {
+    it.skipIf(process.env.ER_BATTLE_FULL !== "1")(
+      `FULL-262 — er ${erId} survives a one-turn battle`,
+      async () => {
+        const pkrgId = ER_ID_MAP.abilities[erId];
+        if (pkrgId === undefined || !allAbilities[pkrgId]) {
+          fullResults.push({ erId, pokerogueId: pkrgId ?? -1, status: "INIT-FAILED", observable: "", error: "no pokerogue ability" });
+          emitFullCsv();
+          return;
+        }
+        const res = dispatchBespoke(erId);
+        if ((res.attrs?.length ?? 0) === 0) {
+          fullResults.push({ erId, pokerogueId: pkrgId, status: "INIT-FAILED", observable: "", error: "empty wire" });
+          emitFullCsv();
+          return;
+        }
+
+        let observable = "", error = "";
+        let status: BattleCapture["status"] = "OK";
+        try {
+          game.override
+            .battleStyle("single")
+            .enemySpecies(SpeciesId.RATTATA)
+            .enemyAbility(pkrgId as AbilityId)
+            .enemyMoveset(MoveId.SPLASH)
+            .moveset(MoveId.TACKLE)
+            .hasPassiveAbility(true);
+
+          await game.classicMode.startBattle(SpeciesId.PIKACHU);
+          const enemy = game.field.getEnemyPokemon();
+          const player = game.field.getPlayerPokemon();
+          const eHp0 = enemy.hp, pHp0 = player.hp;
+          const eTags0 = enemy.summonData.tags.length;
+          const pTags0 = player.summonData.tags.length;
+
+          game.move.use(MoveId.TACKLE);
+          await game.toEndOfTurn();
+
+          const obs: string[] = [];
+          if (eHp0 !== enemy.hp) obs.push(`eHp:${eHp0}→${enemy.hp}`);
+          if (pHp0 !== player.hp) obs.push(`pHp:${pHp0}→${player.hp}`);
+          if (eTags0 !== enemy.summonData.tags.length) obs.push(`eTags:${eTags0}→${enemy.summonData.tags.length}`);
+          if (pTags0 !== player.summonData.tags.length) obs.push(`pTags:${pTags0}→${player.summonData.tags.length}`);
+          if (enemy.status) obs.push(`eStatus:${enemy.status.effect}`);
+          if (player.status) obs.push(`pStatus:${player.status.effect}`);
+          observable = obs.join("; ") || "none";
+          if (observable === "none") status = "NO-OBSERVABLE";
+        } catch (err) {
+          status = "CRASHED";
+          error = err instanceof Error ? err.message : String(err);
+        }
+        fullResults.push({ erId, pokerogueId: pkrgId, status, observable, error });
+        emitFullCsv();
+        expect(status, `er ${erId}: ${error}`).not.toBe("CRASHED");
+      },
+      /* timeout: */ 60_000,
+    );
+  }
+
+  // FULL-262 disabled-block — left for backward-compat reference (older
+  // single-it loop pattern that crashed with "Prompt handler" cleanup
+  // error). New per-ability it() block above is the working version.
+  it.skipIf(true)(
+    "FULL-262 (DEPRECATED — single-it loop crashed; use per-ability instead)",
     async () => {
       const FULL_REPORT_PATH = join(process.cwd(), "docs", "plans", "bespoke-battle-capture-full.csv");
       const bespoke = Object.values(ER_ABILITY_ARCHETYPES).filter(
