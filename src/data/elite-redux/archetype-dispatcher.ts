@@ -116,6 +116,7 @@ import { OnOpponentStatRaiseAbAttr } from "#data/elite-redux/archetypes/on-oppon
 // Round-30+ bespoke primitives (new this session).
 import { BstConditionalAllyAuraAbAttr } from "#data/elite-redux/archetypes/bst-conditional-ally-aura";
 import { ChanceDodgeAbAttr } from "#data/elite-redux/archetypes/chance-dodge";
+import { DefenseStatSwapOnFlagAbAttr } from "#data/elite-redux/archetypes/defense-stat-swap-on-flag";
 import { CowardOnceProtectAbAttr } from "#data/elite-redux/archetypes/coward-once-protect";
 import { ContactQuashAbAttr } from "#data/elite-redux/archetypes/contact-quash";
 import { DamageCapOnResistAbAttr } from "#data/elite-redux/archetypes/damage-cap-on-resist";
@@ -4166,6 +4167,39 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // accuracy reduction, not a per-hit 20% dodge with single-target
       // gating). New ChanceDodgeAbAttr primitive does the correct thing.
       return ok([new ChanceDodgeAbAttr({ chance: 20, singleTargetOnly: true })]);
+
+    // -------------------------------------------------------------------------
+    // AUDIT-FIX: defensive-stat-swap rebuilds. Previously the abilities
+    // wired ONLY the FlagDamageBoost (1.3x) without the "target opposite
+    // defense" piece. Now wires both via DefenseStatSwapOnFlagAbAttr +
+    // the original FlagDamageBoost.
+    // -------------------------------------------------------------------------
+    case 273:
+      // Power Fists — "Iron Fist moves target Special Defense and get a
+      // 1.3x boost." PUNCHING_MOVE flag.
+      return ok([
+        new FlagDamageBoostAbAttr({ flag: MoveFlags.PUNCHING_MOVE, multiplier: 1.3 }),
+        new DefenseStatSwapOnFlagAbAttr({
+          flag: MoveFlags.PUNCHING_MOVE,
+          swap: "target-spdef-instead-of-def",
+        }),
+      ]);
+    case 645:
+      // Soul Crusher — "Hammer moves target Special Defense." HAMMER_BASED flag.
+      return ok([
+        new DefenseStatSwapOnFlagAbAttr({
+          flag: MoveFlags.HAMMER_BASED,
+          swap: "target-spdef-instead-of-def",
+        }),
+      ]);
+    case 658:
+      // Power Edge — "Slicing moves target Special Defense."
+      return ok([
+        new DefenseStatSwapOnFlagAbAttr({
+          flag: MoveFlags.SLICING_MOVE,
+          swap: "target-spdef-instead-of-def",
+        }),
+      ]);
     // -------------------------------------------------------------------------
     // Round 48 (original) wires below.
     // -------------------------------------------------------------------------

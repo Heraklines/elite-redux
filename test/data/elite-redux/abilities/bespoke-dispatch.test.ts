@@ -775,11 +775,14 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(attr.getWeathers()).toEqual([WeatherType.FOG]);
   });
 
-  it("er id 645 (Soul Crusher) wires FlagDamageBoost(HAMMER_BASED, 1.1)", () => {
+  it("er id 645 (Soul Crusher) wires DefenseStatSwapOnFlag(HAMMER_BASED → SpDef)", () => {
+    // R50 audit-fix: spec is "Hammer moves target Special Defense" — the
+    // earlier FlagDamageBoost(HAMMER_BASED, 1.1) was the partial-wire
+    // approximation. New wire uses DefenseStatSwapOnFlagAbAttr.
     const res = dispatchArchetype("bespoke", null, 645);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(1);
-    expect(res.attrs[0]).toBeInstanceOf(FlagDamageBoostAbAttr);
+    expect(res.attrs[0].constructor.name).toBe("DefenseStatSwapOnFlagAbAttr");
   });
 
   it("er id 655 (Smokey Maneuvers) wires WeatherStatMultiplier(EVA, 1.25, [FOG])", () => {
