@@ -2161,6 +2161,14 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           typeFilter: [PokemonType.DRAGON, PokemonType.ICE],
         }),
       ]);
+    case 895:
+      // Lunar Wrath — "After using a Ghost move, follow up with a 50BP Moongeist Beam."
+      return ok([
+        new PostAttackScriptedMoveAbAttr({
+          moveId: MoveId.MOONGEIST_BEAM,
+          typeFilter: [PokemonType.GHOST],
+        }),
+      ]);
     case 442:
       // Fae Hunter — 1.5x to Fairy, 0.5x from Fairy.
       return ok([

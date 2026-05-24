@@ -642,7 +642,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   892: { erAbilityId: 892, archetype: "bespoke", params: null },
   893: { erAbilityId: 893, archetype: "entry-effect", params: {"effect":{"kind":"set-misc","target":"A_SEA_OF_FIRE"}} },
   894: { erAbilityId: 894, archetype: "composite-vanilla-mashup", params: {"parts":["Hospitality","Friend Guard"]} },
-  895: { erAbilityId: 895, archetype: "proc-followup-attack", params: {"followup":"MOONGEIST_BEAM","followupBp":50,"trigger":{}} },
+  895: { erAbilityId: 895, archetype: "bespoke", params: null },
   896: { erAbilityId: 896, archetype: "bespoke", params: null },
   897: { erAbilityId: 897, archetype: "chance-status-on-hit", params: {"chance":30,"status":"POISON","onContactOnly":false} },
   898: { erAbilityId: 898, archetype: "bespoke", params: null },
