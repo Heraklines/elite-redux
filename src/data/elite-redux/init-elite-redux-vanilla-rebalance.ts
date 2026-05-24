@@ -841,6 +841,18 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     },
   ],
 
+  // 204 LIQUID_VOICE: vanilla converts Normal sound moves → Water.
+  // ER adds a 1.2x boost on sound moves.
+  [
+    AbilityId.LIQUID_VOICE,
+    ab => {
+      ab.attrs.push(new MovePowerBoostAbAttr(
+        (_user, _t, move) => !!move && move.hasFlag(MoveFlags.SOUND_BASED),
+        1.2,
+      ));
+    },
+  ],
+
   // ===== Round 11: TypeImmunity-with-highest-Atk rewrites =====
   // Vanilla Lightning Rod / Storm Drain / Sap Sipper redirect their type
   // and boost ONLY SPATK by +1 on absorb. ER text changes this to "ups
