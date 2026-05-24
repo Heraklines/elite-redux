@@ -819,6 +819,28 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // overwrites prior entry. Re-add anyway for explicit visibility.)
   // 12 OBLIVIOUS already added.
 
+  // ===== Round 54 — ER deltas vs vanilla pokerogue (audit-found) =====
+  // 74 PURE_POWER: vanilla doubles ATK. ER spec says SP.ATK instead.
+  // We strip the vanilla ATK ×2 attr and add SPATK ×2.
+  [
+    AbilityId.PURE_POWER,
+    ab => {
+      ab.attrs = ab.attrs.filter(
+        a => !(a instanceof StatMultiplierAbAttr && a.stat === Stat.ATK && a.multiplier === 2),
+      );
+      ab.attrs.push(new StatMultiplierAbAttr(Stat.SPATK, 2));
+    },
+  ],
+
+  // 26 LEVITATE: vanilla Ground immunity. ER adds "Ups own Flying moves
+  // by 1.25x" rider.
+  [
+    AbilityId.LEVITATE,
+    ab => {
+      ab.attrs.push(new MoveTypePowerBoostAbAttr(PokemonType.FLYING, 1.25));
+    },
+  ],
+
   // ===== Round 11: TypeImmunity-with-highest-Atk rewrites =====
   // Vanilla Lightning Rod / Storm Drain / Sap Sipper redirect their type
   // and boost ONLY SPATK by +1 on absorb. ER text changes this to "ups
