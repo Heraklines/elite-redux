@@ -29,12 +29,18 @@ import { PokemonMove } from "#data/moves/pokemon-move";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
+import type { PokemonType } from "#enums/pokemon-type";
 
 export interface PostAttackScriptedMoveOptions {
   /** Move id to enqueue after the holder's attack lands. */
   readonly moveId: MoveId;
   /** Optional gate — only fire when the holder's move matches this category. */
   readonly categoryFilter?: MoveCategory;
+  /**
+   * Optional gate — only fire when the holder's move is one of these types.
+   * E.g. `[PokemonType.FIRE]` for Volcano Rage's "after Fire-type move" trigger.
+   */
+  readonly typeFilter?: readonly PokemonType[];
 }
 
 export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
@@ -48,6 +54,9 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
       return false;
     }
     if (this.opts.categoryFilter !== undefined && move.category !== this.opts.categoryFilter) {
+      return false;
+    }
+    if (this.opts.typeFilter !== undefined && !this.opts.typeFilter.includes(move.type)) {
       return false;
     }
     return true;

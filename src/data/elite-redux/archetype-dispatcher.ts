@@ -2136,6 +2136,31 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           multiplier: 0.5,
         }),
       ]);
+    case 382:
+      // Volcano Rage — "Triggers 50 BP Eruption after using a Fire-type move."
+      // Post-attack scripted Eruption follow-up, gated to FIRE-type triggers.
+      return ok([
+        new PostAttackScriptedMoveAbAttr({
+          moveId: MoveId.ERUPTION,
+          typeFilter: [PokemonType.FIRE],
+        }),
+      ]);
+    case 475:
+      // Frost Burn — "Triggers 40BP Ice Beam after using a Fire-type move."
+      return ok([
+        new PostAttackScriptedMoveAbAttr({
+          moveId: MoveId.ICE_BEAM,
+          typeFilter: [PokemonType.FIRE],
+        }),
+      ]);
+    case 1009:
+      // Frost Dragon — "Triggers 50 BP Blizzard after using a Dragon or Ice-type move."
+      return ok([
+        new PostAttackScriptedMoveAbAttr({
+          moveId: MoveId.BLIZZARD,
+          typeFilter: [PokemonType.DRAGON, PokemonType.ICE],
+        }),
+      ]);
     case 442:
       // Fae Hunter — 1.5x to Fairy, 0.5x from Fairy.
       return ok([
