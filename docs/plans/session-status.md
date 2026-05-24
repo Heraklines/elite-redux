@@ -4,7 +4,7 @@
 
 | Layer | Status |
 |---|---|
-| Bespoke ability wires | **262 WIRED / 0 SKIP / 1 EMPTY** (Bad Company by design) |
+| Bespoke ability wires | **262 WIRED + 16 net empty-fixes this session / 1 EMPTY** (Bad Company by design) |
 | Vanilla ability rebalance | 69 of ~150 patches (most remaining match vanilla pokerogue) |
 | Bespoke move wires | 57 / 57 (100%) |
 | Vanilla move rebalance | 71 of 111 MAJOR+TOTAL patches |
@@ -48,6 +48,22 @@
 | LZ77 graphics blocks | **2000 decompressed** (5.4MB) → `graphics/*.4bpp` + `.pgm` atlas |
 | RGB555 palette candidates | 5000 found, first 500 saved as `.gpl` → `palettes/` |
 | Ghidra import + decomp | Running in background (heap fluctuating 0.8-2.0GB) |
+
+## R55 — Empty-bespoke reduction session (2026-05-23..25)
+
+Took empty-wire count from 116 → 93 by:
+1. Reclassifying flawed archetype entries as `bespoke` so dispatchBespoke handles them
+2. Building 1 new archetype: `PostSummonScriptedMoveAbAttr` (switch-in scripted moves)
+3. Extending 1 archetype: `PostAttackScriptedMoveAbAttr` with `typeFilter` for type-gated post-attack procs
+
+New wires:
+- Mountaineer (314): Rock immunity via AttackTypeImmunityAbAttr
+- Scare (329), Terrify (632): SPATK lowerer (Intimidate-shape)
+- Christmas Spirit (283): hail dmg reduction
+- Volcano Rage (382), Frost Burn (475), Frost Dragon (1009): type-gated post-attack scripted move
+- Lunar Wrath (895): Ghost-gated post-attack Moongeist Beam
+- 6 switch-in attack abilities: Low Blow, Dust Cloud, Phantom Thief, Wildfire, Jumpscare, Sand Pit
+- 9 switch-in scripted-move abilities: Monkey Business, Trickster, Wishmaker, Web Spinner, Draco Morale, Dream Whimsy, Tar Toss, Neutralizing Fog, Frosty Presence
 
 ## Audit fix rounds (R48–R54)
 
