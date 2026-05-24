@@ -1148,7 +1148,17 @@ class ErTerrainSummonAbAttr extends PostSummonTerrainChangeAbAttr {
  * via the PATCHED_MARKER on the parent ability.
  */
 function addNonContactStatusChance(ability: MutableAbility, effect: StatusEffect, chance: number): void {
-  ability.attrs.push(new ChanceStatusOnHitAbAttr({ chance, effects: [effect], contactRequired: false }));
+  // IMPORTANT: must use contactExcluded (not contactRequired:false) so the
+  // proc fires ONLY on non-contact moves. Otherwise the new layer would
+  // stack with the pre-existing contact-only vanilla proc on contact moves
+  // — user-reported as "Flame Body burns nearly 100% of the time" during
+  // testing (1 - 0.7*0.8 = 44% on contact when stacking, vs the spec's
+  // intended 30% contact + 20% non-contact disjoint procs).
+  ability.attrs.push(new ChanceStatusOnHitAbAttr({
+    chance,
+    effects: [effect],
+    contactExcluded: true,
+  }));
 }
 
 /**

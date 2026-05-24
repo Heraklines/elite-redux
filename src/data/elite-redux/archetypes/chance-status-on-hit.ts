@@ -116,6 +116,17 @@ export interface ChanceStatusOnHitOptions {
    * contact). Both gates are AND'd.
    */
   readonly filter?: ChanceStatusFilter;
+  /**
+   * When true, the proc fires ONLY on non-contact moves. Mutually exclusive
+   * with `contactRequired`. Used by ER's vanilla-rebalance round 4/5 layers
+   * that add a low-chance non-contact tier on top of vanilla's contact tier
+   * (e.g. Flame Body's "30% contact + 20% non-contact"). Without this gate,
+   * a `contactRequired: false` proc fires on BOTH contact and non-contact,
+   * stacking with the vanilla contact proc and inflating the perceived
+   * trigger rate.
+   * @defaultValue `false`
+   */
+  readonly contactExcluded?: boolean;
 }
 
 /**
@@ -141,6 +152,7 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
   private readonly chance: number;
   private readonly effects: readonly StatusEffect[];
   private readonly contactRequired: boolean;
+  private readonly contactExcluded: boolean;
   private readonly filter: ChanceStatusFilter | undefined;
 
   constructor(opts: ChanceStatusOnHitOptions) {
@@ -150,12 +162,16 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
     if (opts.effects.length === 0) {
       throw new Error("[ChanceStatusOnHitAbAttr] must configure at least one status effect");
     }
+    if (opts.contactRequired === true && opts.contactExcluded === true) {
+      throw new Error("[ChanceStatusOnHitAbAttr] contactRequired and contactExcluded are mutually exclusive");
+    }
     super();
     this.chance = opts.chance;
     this.effects = opts.effects;
     // When a filter is configured, default contactRequired to false (the
     // filter itself is the gate). Callers can still set true explicitly.
     this.contactRequired = opts.contactRequired ?? opts.filter === undefined;
+    this.contactExcluded = opts.contactExcluded ?? false;
     this.filter = opts.filter;
   }
 
@@ -192,11 +208,17 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
    */
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, move, opponent: attacker } = params;
+    const isContact = move.doesFlagEffectApply({
+      flag: MoveFlags.MAKES_CONTACT,
+      user: attacker,
+      target: pokemon,
+    });
+    // Contact-excluded gate — proc fires ONLY on non-contact attacks.
+    if (this.contactExcluded && isContact) {
+      return false;
+    }
     // Contact-required gate, when configured.
-    if (
-      this.contactRequired
-      && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
-    ) {
+    if (this.contactRequired && !isContact) {
       return false;
     }
     // Filter gate (move-flag or type).
