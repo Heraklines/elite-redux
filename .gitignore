@@ -63,3 +63,5 @@ assets/battle-anims-er/
 docs/plans/screenshots/
 vendor/elite-redux/source/
 vendor/elite-redux/rom-extracted/
+vendor/elite-redux/tools/
+vendor/elite-redux/ghidra-project/
