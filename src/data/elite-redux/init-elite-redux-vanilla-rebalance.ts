@@ -74,9 +74,13 @@ import {
   ReceivedTypeDamageMultiplierAbAttr,
   StatMultiplierAbAttr,
   StatusEffectImmunityAbAttr,
+  TypeImmunityStatStageChangeAbAttr,
   UserFieldBattlerTagImmunityAbAttr,
   UserFieldMoveTypePowerBoostAbAttr,
 } from "#abilities/ab-attrs";
+import {
+  TypeImmunityHighestAttackStatStageAbAttr,
+} from "#data/elite-redux/archetypes/type-immunity-highest-attack-stat-stage";
 import { StatTriggerOnStatLoweredAbAttr } from "#data/elite-redux/archetypes/stat-trigger-on-event";
 import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
@@ -781,6 +785,31 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // overwrites prior entry. Re-add anyway for explicit visibility.)
   // 12 OBLIVIOUS already added.
 
+  // ===== Round 11: TypeImmunity-with-highest-Atk rewrites =====
+  // Vanilla Lightning Rod / Storm Drain / Sap Sipper redirect their type
+  // and boost ONLY SPATK by +1 on absorb. ER text changes this to "ups
+  // highest Atk" — whichever of ATK or SPATK is higher.
+  // We swap the vanilla TypeImmunityStatStageChangeAbAttr (SPATK) for the
+  // new TypeImmunityHighestAttackStatStageAbAttr primitive.
+  [
+    AbilityId.LIGHTNING_ROD,
+    ab => {
+      patchTypeImmunityHighestAtk(ab, PokemonType.ELECTRIC);
+    },
+  ],
+  [
+    AbilityId.STORM_DRAIN,
+    ab => {
+      patchTypeImmunityHighestAtk(ab, PokemonType.WATER);
+    },
+  ],
+  [
+    AbilityId.SAP_SIPPER,
+    ab => {
+      patchTypeImmunityHighestAtk(ab, PokemonType.GRASS);
+    },
+  ],
+
   // ===== Round 10: more ER deltas (mostly +5 wires) =====
   // 119 FRISK: vanilla reveal foe item. ER also "disables items for 2 turns".
   // Approximate by adding a chance on PostSummon to disable opponent items
@@ -1202,6 +1231,20 @@ function addOffenseContactStatusChance(
   chance: number,
 ): void {
   ability.attrs.push(new PostAttackContactApplyStatusEffectAbAttr(chance, effect));
+}
+
+/**
+ * Replace vanilla's fixed-SPATK TypeImmunityStatStageChange with the ER
+ * "highest Atk" variant (whichever of ATK/SPATK is higher gets +1). Used
+ * by Lightning Rod / Storm Drain / Sap Sipper per ER v2.65 text.
+ */
+function patchTypeImmunityHighestAtk(ability: MutableAbility, immuneType: PokemonType): void {
+  // Strip the vanilla SPATK-only entry.
+  const filtered = ability.attrs.filter(a => !(a instanceof TypeImmunityStatStageChangeAbAttr));
+  // Mutate in place — `attrs` is a public readonly binding but the array
+  // contents are mutable. Use splice + push to preserve the binding.
+  ability.attrs.splice(0, ability.attrs.length, ...filtered);
+  ability.attrs.push(new TypeImmunityHighestAttackStatStageAbAttr({ immuneType, stages: 1 }));
 }
 
 /**
