@@ -62,10 +62,10 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
     // GameManager handles its own cleanup.
   });
 
-  // Sample 10 bespoke abilities per shape — full coverage would take an
-  // hour. The "real battle" test is heavy (~30s/ability with phase
-  // interception); we cap the run at a representative sample plus an
-  // explicit list of high-risk ones from the audit.
+  // SAMPLE_ABILITIES: 20 high-leverage abilities tested per shape. The
+  // full-262 run lives in the "every bespoke ability survives one turn"
+  // it() below, gated behind `ER_BATTLE_FULL=1` because it takes ~30s
+  // per ability ≈ 2 hours total.
   const SAMPLE_ABILITIES: { erId: number; label: string }[] = [
     { erId: 270, label: "Pyromancy (post-attack burn)" },
     { erId: 879, label: "Chilling Pellets (counter-attack on hit)" },
@@ -204,6 +204,101 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
       expect(isWired || isSkip, `${sample.label} is either wired or skip`).toBe(true);
     }
   });
+
+  // FULL-262 battle capture — gated behind ER_BATTLE_FULL=1 env. Iterates
+  // every bespoke ability with a wired dispatch and runs the same
+  // one-turn battle as the sample tests. Writes to a SEPARATE CSV at
+  // docs/plans/bespoke-battle-capture-full.csv so the 20-sample CSV
+  // stays as the quick reference. Expect ~2-3 hours wall-clock.
+  it.skipIf(process.env.ER_BATTLE_FULL !== "1")(
+    "FULL-262 — every wired bespoke ability survives a one-turn battle",
+    async () => {
+      const FULL_REPORT_PATH = join(process.cwd(), "docs", "plans", "bespoke-battle-capture-full.csv");
+      const bespoke = Object.values(ER_ABILITY_ARCHETYPES).filter(
+        e => e.archetype === "bespoke" && e.erAbilityId > 0,
+      );
+      const allResults: BattleCapture[] = [];
+
+      for (const entry of bespoke) {
+        const erId = entry.erAbilityId;
+        const pkrgId = ER_ID_MAP.abilities[erId];
+        if (pkrgId === undefined || !allAbilities[pkrgId]) {
+          allResults.push({
+            erId, pokerogueId: pkrgId ?? -1, status: "INIT-FAILED",
+            observable: "", error: "no pokerogue ability for er id",
+          });
+          continue;
+        }
+        // Skip 369 Bad Company (empty wire by design).
+        const res = dispatchBespoke(erId);
+        if ((res.attrs?.length ?? 0) === 0) {
+          allResults.push({
+            erId, pokerogueId: pkrgId, status: "INIT-FAILED",
+            observable: "", error: "empty wire (no attrs)",
+          });
+          continue;
+        }
+
+        let observable = "";
+        let status: BattleCapture["status"] = "OK";
+        let error = "";
+
+        try {
+          game = new GameManager(phaserGame);
+          game.override
+            .battleStyle("single")
+            .enemySpecies(SpeciesId.RATTATA)
+            .enemyAbility(pkrgId as AbilityId)
+            .enemyMoveset(MoveId.SPLASH)
+            .moveset(MoveId.TACKLE)
+            .hasPassiveAbility(true);
+
+          await game.classicMode.startBattle(SpeciesId.PIKACHU);
+          const enemy = game.field.getEnemyPokemon();
+          const player = game.field.getPlayerPokemon();
+          const eHp0 = enemy.hp, pHp0 = player.hp;
+          const eTags0 = enemy.summonData.tags.length;
+          const pTags0 = player.summonData.tags.length;
+
+          game.move.use(MoveId.TACKLE);
+          await game.toEndOfTurn();
+
+          const obs: string[] = [];
+          if (eHp0 !== enemy.hp) obs.push(`eHp:${eHp0}→${enemy.hp}`);
+          if (pHp0 !== player.hp) obs.push(`pHp:${pHp0}→${player.hp}`);
+          if (eTags0 !== enemy.summonData.tags.length) obs.push(`eTags:${eTags0}→${enemy.summonData.tags.length}`);
+          if (pTags0 !== player.summonData.tags.length) obs.push(`pTags:${pTags0}→${player.summonData.tags.length}`);
+          if (enemy.status) obs.push(`eStatus:${enemy.status.effect}`);
+          if (player.status) obs.push(`pStatus:${player.status.effect}`);
+          observable = obs.join("; ") || "none";
+          if (observable === "none") status = "NO-OBSERVABLE";
+        } catch (err) {
+          status = "CRASHED";
+          error = err instanceof Error ? err.message : String(err);
+        }
+
+        allResults.push({ erId, pokerogueId: pkrgId, status, observable, error });
+
+        // Incremental CSV write — survives partial runs.
+        const csv = ["er_id,pokerogue_id,status,observable,error"];
+        for (const r of allResults) {
+          const safe = (s: string) => s.replace(/,/g, ";").replace(/\n/g, " ").replace(/"/g, "'");
+          csv.push(`${r.erId},${r.pokerogueId},${r.status},"${safe(r.observable)}","${safe(r.error)}"`);
+        }
+        writeFileSync(FULL_REPORT_PATH, csv.join("\n"));
+      }
+
+      const crashed = allResults.filter(r => r.status === "CRASHED");
+      console.info(
+        `\nFULL-262 capture: ${allResults.length} ran, ${allResults.filter(r => r.status === "OK").length} OK, `
+        + `${allResults.filter(r => r.status === "NO-OBSERVABLE").length} no-observable, `
+        + `${crashed.length} crashed, `
+        + `${allResults.filter(r => r.status === "INIT-FAILED").length} init-failed.`,
+      );
+      expect(crashed, `${crashed.length} abilities crashed in battle`).toHaveLength(0);
+    },
+    /* timeout: */ 7_200_000, // 2 hours
+  );
 
   it("classifies coverage across every bespoke ability via dispatchBespoke", () => {
     const bespoke = Object.values(ER_ABILITY_ARCHETYPES).filter(

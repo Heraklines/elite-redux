@@ -16,13 +16,23 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
 const FAST = process.argv.includes("--fast");
+const FULL_262 = process.argv.includes("--full-262");
 
 const env = { ...process.env };
 if (FAST) {
   env.ER_FAST = "1";
 }
+if (FULL_262) {
+  env.ER_BATTLE_FULL = "1";
+}
 
-console.log(`\n=== Bespoke battle capture (${FAST ? "FAST mode — sanity only" : "FULL mode — heavy"}) ===\n`);
+const modeLabel = FAST
+  ? "FAST — sanity only"
+  : FULL_262
+    ? "FULL-262 — every wired bespoke ability (~2h)"
+    : "SAMPLE-20 — representative shapes (~10min)";
+
+console.log(`\n=== Bespoke battle capture (${modeLabel}) ===\n`);
 
 const result = spawnSync(
   process.platform === "win32" ? "pnpm.cmd" : "pnpm",
@@ -30,11 +40,13 @@ const result = spawnSync(
   {
     env,
     stdio: "inherit",
-    timeout: FAST ? 60_000 : 900_000,
+    timeout: FAST ? 60_000 : FULL_262 ? 7_500_000 : 900_000,
   },
 );
 
-const csvPath = "docs/plans/bespoke-battle-capture.csv";
+const csvPath = FULL_262
+  ? "docs/plans/bespoke-battle-capture-full.csv"
+  : "docs/plans/bespoke-battle-capture.csv";
 if (!existsSync(csvPath)) {
   console.warn(`\n[capture] no CSV emitted at ${csvPath}; vitest may have crashed.`);
   process.exit(result.status ?? 1);
