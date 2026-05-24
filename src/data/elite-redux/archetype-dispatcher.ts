@@ -2218,6 +2218,38 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 878:
       // Frosty Presence — "Uses Mist on entry."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.MIST })]);
+    case 293:
+      // Let's Roll — "Casts Defense Curl on entry."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.DEFENSE_CURL })]);
+    case 320:
+      // Air Blower — "Casts a 3-turn Tailwind on entry."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TAILWIND })]);
+    case 428:
+      // Cheap Tactics — "Attacks with Scratch on switch-in."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.SCRATCH })]);
+    case 495:
+      // Doombringer — "Uses Doom Desire on switch-in."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.DOOM_DESIRE })]);
+    case 498:
+      // Suppress — "Casts Torment on entry."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TORMENT })]);
+    case 504:
+      // Change of Heart — "Uses Heart Swap on switch-in."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.HEART_SWAP })]);
+    case 511:
+      // Telekinetic — "Casts Telekinesis on entry."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TELEKINESIS })]);
+    case 514:
+      // Powder Burst — "Casts Powder on entry."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.POWDER })]);
+    case 503:
+      // High Tide — "Triggers 50 BP Surf after using a Water-type move."
+      return ok([
+        new PostAttackScriptedMoveAbAttr({
+          moveId: MoveId.SURF,
+          typeFilter: [PokemonType.WATER],
+        }),
+      ]);
     case 442:
       // Fae Hunter — 1.5x to Fairy, 0.5x from Fairy.
       return ok([
