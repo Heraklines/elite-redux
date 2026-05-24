@@ -1,6 +1,7 @@
 import type { PreAttackModifyDamageAbAttrParams } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
 import { applyAbAttrs, applyOnGainAbAttrs, applyOnLoseAbAttrs } from "#abilities/apply-ab-attrs";
+import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
 import { generateMoveset } from "#app/ai/ai-moveset-gen";
 import type { Battle } from "#app/battle";
 import type { AnySound, BattleScene } from "#app/battle-scene";
@@ -1523,6 +1524,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         move: move ?? allMoves[MoveId.NONE],
         ignoreAbility: move?.hasFlag(MoveFlags.IGNORE_ABILITIES) || ignoreAllyAbility,
       });
+    }
+
+    // ER field-aura hook: scan on-field battlers for any
+    // PersistentFieldAuraAbAttr that should boost `subject`'s stat. Direct
+    // constructor.name lookup avoids touching pokerogue's AbilityAttrs map.
+    if (!ignoreAbility) {
+      PersistentFieldAuraAbAttr.applyAuras(this, stat, statVal);
     }
 
     let ret =

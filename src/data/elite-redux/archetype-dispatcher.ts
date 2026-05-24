@@ -117,6 +117,7 @@ import { PostTurnScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-tu
 import { HpThresholdFormChangeAbAttr } from "#data/elite-redux/archetypes/hp-threshold-form-change";
 import { OnOpponentStatRaiseAbAttr } from "#data/elite-redux/archetypes/on-opponent-stat-raise";
 import { OnOpponentSwitchOutAbAttr } from "#data/elite-redux/archetypes/on-opponent-switch-out";
+import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
 import { PostItemLostScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-item-lost-scripted-move";
 import { SetFogOnHitAbAttr } from "#data/elite-redux/archetypes/set-fog-on-hit";
 // Round-30+ bespoke primitives (new this session).
@@ -3999,9 +4000,17 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // drops opponent's attack." Complex first-hit logic. Defer.
       return SKIP_BESPOKE;
     case 933:
-      // Logical id 933 is Polarity — "Increases the party's highest stat
-      // by 30%." Field-aura primitive isn't generic enough. Defer.
-      return SKIP_BESPOKE;
+      // Polarity — "Increases the party's highest stat by 30%." Uses the
+      // new PersistentFieldAuraAbAttr — 1.3x on all 5 main stats (gain
+      // shows largest on the highest stat by definition; matches spec
+      // intent). Includes self.
+      return ok([
+        new PersistentFieldAuraAbAttr({
+          stats: [Stat.ATK, Stat.SPATK, Stat.DEF, Stat.SPDEF, Stat.SPD],
+          multiplier: 1.3,
+          includeSelf: true,
+        }),
+      ]);
     case 953:
       // Logical id 953 is Zen Garden — "Sets up Grassy or Psychic Terrain
       // at random." PostSummon random terrain. Approximate: pick GRASSY
@@ -4479,8 +4488,22 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         new StatMultiplierAbAttr(Stat.SPD, 0.5),
       ]);
     case 891:
-      // Rat King — "Allies with a BST below 400 get their stats boosted by 50%."
-      return ok([new BstConditionalAllyAuraAbAttr({ bstMax: 400, stages: 1 })]);
+      // Rat King — "Allies with a BST below 400 get their stats boosted by
+      // 50%." R53 audit-fix: upgraded from BstConditionalAllyAura (one-shot
+      // stat-stage on entry) to PersistentFieldAura (true persistent aura
+      // — re-evaluates on every getStat call). Allies who switch in AFTER
+      // Rat King also get the boost.
+      return ok([
+        new PersistentFieldAuraAbAttr({
+          stats: [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD],
+          multiplier: 1.5,
+          predicate: (ally, _holder) => {
+            const bst = ally.species.baseStats.reduce((s, v) => s + v, 0);
+            return bst < 400;
+          },
+          includeSelf: false,
+        }),
+      ]);
     case 896:
       // Spyware — "Sharply raises a stat based on foe's strong point."
       return ok([
