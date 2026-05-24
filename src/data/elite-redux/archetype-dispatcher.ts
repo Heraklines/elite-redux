@@ -115,6 +115,7 @@ import { HpThresholdFormChangeAbAttr } from "#data/elite-redux/archetypes/hp-thr
 import { OnOpponentStatRaiseAbAttr } from "#data/elite-redux/archetypes/on-opponent-stat-raise";
 // Round-30+ bespoke primitives (new this session).
 import { BstConditionalAllyAuraAbAttr } from "#data/elite-redux/archetypes/bst-conditional-ally-aura";
+import { ChanceDodgeAbAttr } from "#data/elite-redux/archetypes/chance-dodge";
 import { CowardOnceProtectAbAttr } from "#data/elite-redux/archetypes/coward-once-protect";
 import { ContactQuashAbAttr } from "#data/elite-redux/archetypes/contact-quash";
 import { DamageCapOnResistAbAttr } from "#data/elite-redux/archetypes/damage-cap-on-resist";
@@ -4159,6 +4160,12 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
           requireTargetStatus: [StatusEffect.POISON, StatusEffect.TOXIC],
         }),
       ]);
+    case 597:
+      // Olé! — "20% chance to evade single-target moves." Was wired as
+      // permanent +1 EVA stat boost (not equivalent — that's a flat 1.33x
+      // accuracy reduction, not a per-hit 20% dodge with single-target
+      // gating). New ChanceDodgeAbAttr primitive does the correct thing.
+      return ok([new ChanceDodgeAbAttr({ chance: 20, singleTargetOnly: true })]);
     // -------------------------------------------------------------------------
     // Round 48 (original) wires below.
     // -------------------------------------------------------------------------
