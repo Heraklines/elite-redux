@@ -2278,6 +2278,48 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 1006:
       // Electro Booster — "Uses Magnet Rise on entry."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.MAGNET_RISE })]);
+    case 517:
+      // Two Step — "Triggers 50BP Revelation Dance after using a Dance move."
+      return ok([
+        new PostAttackScriptedMoveAbAttr({
+          moveId: MoveId.REVELATION_DANCE,
+          flagFilter: MoveFlags.DANCE_MOVE,
+        }),
+      ]);
+    case 732:
+      // Blade Dance — "Triggers 50 BP Leaf Blade after using a dance move."
+      return ok([
+        new PostAttackScriptedMoveAbAttr({
+          moveId: MoveId.LEAF_BLADE,
+          flagFilter: MoveFlags.DANCE_MOVE,
+        }),
+      ]);
+    case 977:
+      // Backflip — "After using a Dance move, follow up with a 50BP Chip Away."
+      return ok([
+        new PostAttackScriptedMoveAbAttr({
+          moveId: MoveId.CHIP_AWAY,
+          flagFilter: MoveFlags.DANCE_MOVE,
+        }),
+      ]);
+    case 641:
+      // Chunky Bass Line — "Triggers a 40BP Earthquake after using a sound move."
+      return ok([
+        new PostAttackScriptedMoveAbAttr({
+          moveId: MoveId.EARTHQUAKE,
+          flagFilter: MoveFlags.SOUND_BASED,
+        }),
+      ]);
+    case 974:
+      // Break it Down — "After using an attack, follow up with a 20BP Rapid Spin."
+      return ok([
+        new PostAttackScriptedMoveAbAttr({ moveId: MoveId.RAPID_SPIN }),
+      ]);
+    case 853:
+      // Purple Haze — "Triggers a 20BP Poison Gas after using a move."
+      return ok([
+        new PostAttackScriptedMoveAbAttr({ moveId: MoveId.POISON_GAS }),
+      ]);
     case 442:
       // Fae Hunter — 1.5x to Fairy, 0.5x from Fairy.
       return ok([

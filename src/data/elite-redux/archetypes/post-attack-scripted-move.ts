@@ -26,6 +26,7 @@ import { PostAttackAbAttr } from "#abilities/ab-attrs";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 import { globalScene } from "#app/global-scene";
 import { PokemonMove } from "#data/moves/pokemon-move";
+import type { MoveFlags } from "#enums/move-flags";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
@@ -41,6 +42,11 @@ export interface PostAttackScriptedMoveOptions {
    * E.g. `[PokemonType.FIRE]` for Volcano Rage's "after Fire-type move" trigger.
    */
   readonly typeFilter?: readonly PokemonType[];
+  /**
+   * Optional gate — only fire when the holder's move has this flag set
+   * (e.g. `MoveFlags.DANCE_MOVE` for "after dance move" triggers).
+   */
+  readonly flagFilter?: MoveFlags;
 }
 
 export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
@@ -57,6 +63,9 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
       return false;
     }
     if (this.opts.typeFilter !== undefined && !this.opts.typeFilter.includes(move.type)) {
+      return false;
+    }
+    if (this.opts.flagFilter !== undefined && !move.hasFlag(this.opts.flagFilter)) {
       return false;
     }
     return true;
