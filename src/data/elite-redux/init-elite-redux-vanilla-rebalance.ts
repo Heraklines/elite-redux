@@ -57,6 +57,8 @@ import {
   IgnoreOpponentStatStagesAbAttr,
   MovePowerBoostAbAttr,
   MoveTypePowerBoostAbAttr,
+  PostAttackApplyStatusEffectAbAttr,
+  PostAttackContactApplyStatusEffectAbAttr,
   PostAttackStealHeldItemAbAttr,
   PostBiomeChangeWeatherChangeAbAttr,
   PostDefendContactApplyTagChanceAbAttr,
@@ -488,19 +490,29 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
 
   // ===== Round 4: chance-status composite additions =====
   // 9 STATIC: vanilla 30% contact paralysis → ER adds 10% non-contact PRZ.
+  // No "also on offense" in ER spec for STATIC — keep defend-side only.
   [AbilityId.STATIC, ab => addNonContactStatusChance(ab, StatusEffect.PARALYSIS, 10)],
   // 49 FLAME_BODY: vanilla 30% contact burn → ER adds 20% non-contact burn.
-  [AbilityId.FLAME_BODY, ab => addNonContactStatusChance(ab, StatusEffect.BURN, 20)],
+  // ER spec: "Also works on offense" — add 30% on-attack contact proc too.
+  [AbilityId.FLAME_BODY, ab => {
+    addNonContactStatusChance(ab, StatusEffect.BURN, 20);
+    addOffenseContactStatusChance(ab, StatusEffect.BURN, 30);
+  }],
 
   // 115 ICE_BODY duplicate-flagged in MAJOR for the 2x heal-rate. Already
   // patched above; no double-add.
 
   // ===== Round 5: more poison/non-contact procs from the audit =====
   // 38 POISON_POINT: vanilla 30% contact poison → ER adds 10% non-contact poison.
-  [AbilityId.POISON_POINT, ab => addNonContactStatusChance(ab, StatusEffect.POISON, 10)],
+  // ER spec: "Also works on offense" — add 30% on-attack contact proc.
+  [AbilityId.POISON_POINT, ab => {
+    addNonContactStatusChance(ab, StatusEffect.POISON, 10);
+    addOffenseContactStatusChance(ab, StatusEffect.POISON, 30);
+  }],
   // 27 EFFECT_SPORE: vanilla 30% contact SLP/PRZ/PSN → ER adds 10% non-contact each.
   // EFFECT_SPORE picks one of three statuses randomly per proc. Append a
-  // separate non-contact proc per status (lower chance to balance).
+  // separate non-contact proc per status (lower chance to balance). No
+  // "also on offense" in ER spec for EFFECT_SPORE — keep defend-side only.
   [AbilityId.EFFECT_SPORE, ab => {
     addNonContactStatusChance(ab, StatusEffect.SLEEP, 10);
     addNonContactStatusChance(ab, StatusEffect.PARALYSIS, 10);
@@ -509,7 +521,11 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
 
   // ===== Round 6: more non-contact extensions + minor tweaks =====
   // 143 POISON_TOUCH: vanilla 30% contact poison → ER adds 10% non-contact.
-  [AbilityId.POISON_TOUCH, ab => addNonContactStatusChance(ab, StatusEffect.POISON, 10)],
+  // ER spec: "Also works on offense" — add offense-side proc too.
+  [AbilityId.POISON_TOUCH, ab => {
+    addNonContactStatusChance(ab, StatusEffect.POISON, 10);
+    addOffenseContactStatusChance(ab, StatusEffect.POISON, 30);
+  }],
   // 234 PRANKSTER: vanilla status moves +1 priority. ER also adds Dark-immune
   // protection. Add a Dark-type defense check via TypeMultiplier rider.
   [
@@ -1159,6 +1175,24 @@ function addNonContactStatusChance(ability: MutableAbility, effect: StatusEffect
     effects: [effect],
     contactExcluded: true,
   }));
+}
+
+/**
+ * Add a PostAttack (offense-side) version of the status proc — ER's "Also
+ * works on offense" rider on Flame Body / Poison Point / Static / Cute
+ * Charm / etc. When the holder uses a contact move against an opponent,
+ * the proc rolls against THEM (mirrors vanilla's defend-side proc but in
+ * the opposite direction).
+ *
+ * Pokerogue exposes PostAttackContactApplyStatusEffectAbAttr — same
+ * mechanic, same RNG path.
+ */
+function addOffenseContactStatusChance(
+  ability: MutableAbility,
+  effect: StatusEffect,
+  chance: number,
+): void {
+  ability.attrs.push(new PostAttackContactApplyStatusEffectAbAttr(chance, effect));
 }
 
 /**
