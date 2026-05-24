@@ -313,4 +313,33 @@ describe.skipIf(!RUN_SCENARIOS)("ER bespoke scenario suite (heavy battles)", () 
       expect(damage).toBeGreaterThan(enemy.getMaxHp() * 0.5);
     });
   });
+
+  // ===========================================================================
+  // FOG WEATHER: 905 Fog Machine sets FOG on hit
+  // ===========================================================================
+  describe("fog weather interactions", () => {
+    it("Fog Machine (905) sets FOG weather when holder is hit", async () => {
+      const erIdMap = (await import("#data/elite-redux/er-id-map")).ER_ID_MAP;
+      const pkrgId = erIdMap.abilities[905];
+      if (pkrgId === undefined) return;
+      game.override
+        .battleStyle("single")
+        .ability(AbilityId.NO_GUARD)
+        .enemyAbility(pkrgId as AbilityId)
+        .enemySpecies(SpeciesId.SNORLAX)
+        .enemyLevel(50)
+        .startingLevel(50)
+        .enemyMoveset(MoveId.SPLASH)
+        .moveset(MoveId.TACKLE)
+        .criticalHits(false);
+      await game.classicMode.startBattle(SpeciesId.PIKACHU);
+      game.move.use(MoveId.TACKLE);
+      await game.toEndOfTurn();
+      // After holder takes a hit, FOG weather should be active.
+      // (WeatherType.FOG is a real value in pokerogue's enum; we set
+      // it directly in SetFogOnHitAbAttr.)
+      const w = game.scene.arena.weather?.weatherType;
+      expect(w).toBe(6); // WeatherType.FOG = 6
+    });
+  });
 });
