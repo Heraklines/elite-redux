@@ -65,6 +65,7 @@ import {
   IgnoreTypeImmunityAbAttr,
   MovePowerBoostAbAttr,
   PostAttackApplyBattlerTagAbAttr,
+  PostAttackApplyStatusEffectAbAttr,
   PostDancingMoveAbAttr,
   PostTurnRestoreBerryAbAttr,
   UserFieldStatusEffectImmunityAbAttr,
@@ -128,6 +129,7 @@ import {
 import { OutgoingStatDropMultiplierAbAttr } from "#data/elite-redux/archetypes/outgoing-stat-drop-multiplier";
 import { PostDefendChangeAttackerTypeAbAttr } from "#data/elite-redux/archetypes/post-defend-change-attacker-type";
 import { PostDefendSuppressOpponentDamageBoostAbAttr } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
+import { PostAttackScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-attack-scripted-move";
 import { PostFaintReviveAbAttr } from "#data/elite-redux/archetypes/post-faint-revive";
 import { PostSummonClearTerrainAbAttr } from "#data/elite-redux/archetypes/post-summon-clear-terrain";
 import { PostSummonQuashFoesAbAttr } from "#data/elite-redux/archetypes/post-summon-quash-foes";
@@ -4011,6 +4013,88 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // Logical id 979 is Eternal Flower — "Reduces the stats of other Megas
       // by 20%." Field-specific Mega introspection. Defer.
       return SKIP_BESPOKE;
+
+    // -------------------------------------------------------------------------
+    // AUDIT-FIX: direction-reversed bugs. Earlier rounds wired these as
+    // PostDefend procs (fires when holder IS HIT). Spec says they fire when
+    // holder ATTACKS — swap to PostAttack-side primitives.
+    // -------------------------------------------------------------------------
+    case 270:
+      // Pyromancy — "Moves inflict burn 5x as often." Approximate as 30%
+      // burn on the holder's own attacks (matches the dispatcher's prior
+      // approximation but on the correct surface).
+      return ok([new PostAttackApplyStatusEffectAbAttr(false, 30, StatusEffect.BURN)]);
+    case 434:
+      // Elemental Charge — "20% chance to BRN/FRZ/PARA with respective
+      // types." Approximate as a flat 20% rotating-status proc on the
+      // holder's attacks.
+      return ok([
+        new PostAttackApplyStatusEffectAbAttr(false, 20, StatusEffect.BURN, StatusEffect.FREEZE, StatusEffect.PARALYSIS),
+      ]);
+    case 455:
+      // Archmage — "30% chance of adding a type related effect to each
+      // move." Approximate as 30% burn on attack (the "type-related effect"
+      // family covers many statuses; burn is a common choice).
+      return ok([new PostAttackApplyStatusEffectAbAttr(false, 30, StatusEffect.BURN)]);
+    case 456:
+      // Cryomancy — "Moves inflict frostbite 5x as often." Pokerogue's
+      // FREEZE is the closest analogue to frostbite (ER's distinct ER_FROSTBITE
+      // tag exists but applies via specific attrs); approximate as 30% FREEZE
+      // on attack.
+      return ok([new PostAttackApplyStatusEffectAbAttr(false, 30, StatusEffect.FREEZE)]);
+    case 491:
+      // Aftershock — "Triggers Magnitude after using a damaging move."
+      // Was wired as CounterAttackOnHit (PostDefend) — should be PostAttack.
+      return ok([new PostAttackScriptedMoveAbAttr({ moveId: MoveId.MAGNITUDE })]);
+    case 611:
+      // Entrance — "Confusion also inflicts infatuation." After holder uses
+      // a confusing move, also chance to infatuate. Approximate as 50%
+      // infatuation on contact (Entrance's intended trigger is hard to
+      // identify without per-move spec analysis).
+      return ok([
+        new PostAttackApplyBattlerTagAbAttr(false, () => 50, BattlerTagType.INFATUATED),
+      ]);
+    case 639:
+      // Piercing Solo — "Sound moves cause bleeding." Approximate as 20%
+      // ER_BLEED on holder's sound moves.
+      return ok([
+        new PostAttackApplyBattlerTagAbAttr(false, () => 20, BattlerTagType.ER_BLEED),
+      ]);
+    case 691:
+      // Assassin's Tools — "Contact moves have a 30% chance to PSN, PRLZ,
+      // or BLD." Rotating status proc on holder's contact attacks. Bleed is
+      // ER_BLEED (battler tag, not StatusEffect); split into two procs.
+      return ok([
+        new PostAttackApplyStatusEffectAbAttr(true, 30, StatusEffect.POISON, StatusEffect.PARALYSIS),
+        new PostAttackApplyBattlerTagAbAttr(true, () => 30, BattlerTagType.ER_BLEED),
+      ]);
+    case 740:
+      // Set Ablaze — "Inflicting burn also inflicts fear." When holder
+      // burns the target, also apply ER_FEAR. Approximate as 100% ER_FEAR
+      // when the holder's move would burn (no easy "burn fired" signal —
+      // approximate as 30% on any attack).
+      return ok([
+        new PostAttackApplyBattlerTagAbAttr(false, () => 30, BattlerTagType.ER_FEAR),
+      ]);
+    case 824:
+      // Frostbind — "Inflicting Frostbite also inflicts Disable." Similar to
+      // Set Ablaze — approximate as a Disable chance on attack.
+      return ok([
+        new PostAttackApplyBattlerTagAbAttr(false, () => 30, BattlerTagType.DISABLED),
+      ]);
+    case 876:
+      // Sludge Spit — "follows up with 35BP Venom Bolt after using an
+      // attack." Was wired defensively. Sludge as the closest available move.
+      return ok([new PostAttackScriptedMoveAbAttr({ moveId: MoveId.SLUDGE })]);
+    case 993:
+      // Thunder Clouds — "After using a special move, launch 35BP Thunderbolt."
+      // Was wired defensively. PostAttack with SPECIAL category gate.
+      return ok([
+        new PostAttackScriptedMoveAbAttr({
+          moveId: MoveId.THUNDERBOLT,
+          categoryFilter: MoveCategory.SPECIAL,
+        }),
+      ]);
     // -------------------------------------------------------------------------
     // Round 48 (original) wires below.
     // -------------------------------------------------------------------------
