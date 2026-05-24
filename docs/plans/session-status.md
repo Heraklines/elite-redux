@@ -18,8 +18,36 @@
 |---|---|
 | ER data tests | **1047/1047 passing** |
 | Bespoke battle smoke | 13/13 passing |
-| Bespoke scenario suite | **13/13 passing** (ER_SCENARIO=1) |
+| Bespoke scenario suite | **117/117 passing** (ER_SCENARIO=1, 11 files) |
 | FULL-262 battle capture | 261 OK / 1 NO-OB / 1 INIT-FAIL / **0 CRASHED** |
+
+## Scenario test breakdown (117 across 11 files)
+
+| File | Tests | Focus |
+|---|---|---|
+| `bespoke-battle-capture.test.ts` | 22 | FULL-262 + classifier |
+| `bespoke-battle-smoke.test.ts` | 18 | Original smoke |
+| `bespoke-scenario-suite.test.ts` | 14 | Original scenarios |
+| `bespoke-interactions.test.ts` | 11 | Stat + status + type + bypass |
+| `er-bespoke-deep.test.ts` | 11 | Scripted moves + multipliers + tags |
+| `er-weird-timings.test.ts` | 9 | Switch-out + weather + Trace + procs |
+| `er-doubles-mayhem.test.ts` | 8 | 4-mon doubles + spread moves |
+| `er-status-interactions.test.ts` | 7 | Status-immune ability gates |
+| `er-full-playthrough.test.ts` | 7 | Multi-turn + terrain + sandstorm |
+| `er-damage-sanity.test.ts` | 5 | Numerical damage verification |
+| `er-multi-hit-procs.test.ts` | 5 | Bullet Seed + Skill Link |
+
+## v2.65.3b ROM extraction
+
+| Artifact | Status |
+|---|---|
+| ROM | `vendor/elite-redux/rom-extracted/er-v2.65.3b.gba` (32MB) |
+| ASCII strings | 193k extracted to `strings.txt` |
+| Pokemon-text strings | 37k extracted to `pkmn-strings.txt` |
+| Move name table | Inline @ 0x9c826d (855 entries) → `inline-13byte-table-best.json` |
+| LZ77 graphics blocks | **2000 decompressed** (5.4MB) → `graphics/*.4bpp` + `.pgm` atlas |
+| RGB555 palette candidates | 5000 found, first 500 saved as `.gpl` → `palettes/` |
+| Ghidra import + decomp | Running in background (heap fluctuating 0.8-2.0GB) |
 
 ## Audit fix rounds (R48–R54)
 
