@@ -351,15 +351,15 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
   // chance-battler-tag for ER_BLEED, lifesteal-on-KO, scripted-move Protect).
   // ---------------------------------------------------------------------------
 
-  it("er id 429 (Coward) wires EntryEffect (scripted-move PROTECT)", () => {
+  it("er id 429 (Coward) wires CowardOnceProtectAbAttr (once-per-battle PROTECT)", () => {
     const res = dispatchArchetype("bespoke", null, 429);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(1);
-    const attr = res.attrs[0] as EntryEffectAbAttr;
-    expect(attr).toBeInstanceOf(EntryEffectAbAttr);
-    expect(attr.getKind()).toBe("scripted-move");
-    const effect = attr.getEffect();
-    expect(effect.kind === "scripted-move" && effect.move).toBe(MoveId.PROTECT);
+    // Round 11: Coward upgraded from the EntryEffect scripted-move stub to
+    // a real CowardOnceProtectAbAttr that adds the PROTECTED tag on first
+    // entry only.
+    const attr = res.attrs[0];
+    expect(attr.constructor.name).toBe("CowardOnceProtectAbAttr");
   });
 
   it("er id 431 (Dune Terror) wires WeatherDamageReduction (SANDSTORM, 0.65)", () => {

@@ -360,6 +360,30 @@ export class EggGachaUiHandler extends MessageUiHandler {
       const icon = globalScene.add.sprite(-19, 2, "items", iconImage).setOrigin(0).setScale(0.5);
       container.add(icon);
 
+      // ER dev cheat: clicking a voucher count container grants 999 of EACH
+      // voucher type. The voucher icons are conveniently placed at the
+      // top-right of the gacha UI and aren't otherwise interactive.
+      bg.setInteractive(
+        new Phaser.Geom.Rectangle(-56, 0, 56, 22),
+        Phaser.Geom.Rectangle.Contains,
+      );
+      bg.on("pointerdown", () => {
+        const counts = globalScene.gameData.voucherCounts;
+        counts[VoucherType.REGULAR] = 999;
+        counts[VoucherType.PLUS] = 999;
+        counts[VoucherType.PREMIUM] = 999;
+        counts[VoucherType.GOLDEN] = 999;
+        this.updateVoucherCounts();
+        this.getUi().playSelect();
+        this.showText(
+          "Granted 999 of each voucher type! (ER dev cheat)",
+          0,
+          undefined,
+          undefined,
+          false,
+        );
+      });
+
       this.eggGachaContainer.add(container);
     }
 
