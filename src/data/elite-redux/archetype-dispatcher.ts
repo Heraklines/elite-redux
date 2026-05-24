@@ -2354,6 +2354,41 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
         new DamageReductionAbAttr({ reduction: 0.2, filter: { kind: "all" } }),
       ]);
+    case 823:
+      // Chilling Presence — "10BP Icy Wind on entry."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.ICY_WIND })]);
+    case 995:
+      // Elemental Aegis — "Takes 1/2 damage from Fire, Electric and Water-type attacks."
+      return ok([
+        new DamageReductionAbAttr({
+          reduction: 0.5,
+          filter: { kind: "move-type", type: PokemonType.FIRE },
+        }),
+        new DamageReductionAbAttr({
+          reduction: 0.5,
+          filter: { kind: "move-type", type: PokemonType.ELECTRIC },
+        }),
+        new DamageReductionAbAttr({
+          reduction: 0.5,
+          filter: { kind: "move-type", type: PokemonType.WATER },
+        }),
+      ]);
+    case 996:
+      // Aegis Ward — "Takes 1/2 damage from Dark, Ghost and Psychic-type attacks."
+      return ok([
+        new DamageReductionAbAttr({
+          reduction: 0.5,
+          filter: { kind: "move-type", type: PokemonType.DARK },
+        }),
+        new DamageReductionAbAttr({
+          reduction: 0.5,
+          filter: { kind: "move-type", type: PokemonType.GHOST },
+        }),
+        new DamageReductionAbAttr({
+          reduction: 0.5,
+          filter: { kind: "move-type", type: PokemonType.PSYCHIC },
+        }),
+      ]);
     case 442:
       // Fae Hunter — 1.5x to Fairy, 0.5x from Fairy.
       return ok([
