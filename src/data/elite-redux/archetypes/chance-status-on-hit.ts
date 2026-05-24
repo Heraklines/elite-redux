@@ -168,10 +168,15 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
     super();
     this.chance = opts.chance;
     this.effects = opts.effects;
-    // When a filter is configured, default contactRequired to false (the
-    // filter itself is the gate). Callers can still set true explicitly.
-    this.contactRequired = opts.contactRequired ?? opts.filter === undefined;
+    // contactRequired defaults:
+    //  - TRUE when no filter and not contactExcluded (vanilla shape)
+    //  - FALSE when a filter is set (filter is the gate)
+    //  - FALSE when contactExcluded is set (mutually exclusive at intent
+    //    level — contactExcluded implies "this proc cares about hits but
+    //    only the NON-contact ones", so contactRequired must default off
+    //    or the proc would never fire).
     this.contactExcluded = opts.contactExcluded ?? false;
+    this.contactRequired = opts.contactRequired ?? (opts.filter === undefined && !this.contactExcluded);
     this.filter = opts.filter;
   }
 
