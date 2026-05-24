@@ -56,10 +56,12 @@ import {
   HealFromBerryUseAbAttr,
   IgnoreOpponentStatStagesAbAttr,
   MovePowerBoostAbAttr,
+  MoveTypeChangeAbAttr,
   MoveTypePowerBoostAbAttr,
   PostAttackApplyBattlerTagAbAttr,
   PostAttackApplyStatusEffectAbAttr,
   PostAttackContactApplyStatusEffectAbAttr,
+  ProtectStatAbAttr,
   PostAttackStealHeldItemAbAttr,
   PostBiomeChangeWeatherChangeAbAttr,
   PostDefendContactApplyTagChanceAbAttr,
@@ -492,8 +494,16 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // the precise "SE+full HP" filter needs a new primitive — defer the rider, no-op patch.
   // (Listed as audit MAJOR but the underlying SE-at-full-HP filter isn't yet available.)
 
-  // 24 LIMBER: vanilla paralysis immune → ER "+ also blocks INFATUATION".
-  [AbilityId.LIMBER, ab => extendBattlerTagImmunity(ab, BattlerTagType.INFATUATED)],
+  // 7 LIMBER: ER spec is "Para immune, takes half recoil, immune to self
+  // stat drops." Vanilla pokerogue Limber covers paralysis immunity; ER
+  // adds (a) ProtectStatAbAttr for the self-stat-drop guard (Clear-Body
+  // parity) and (b) half recoil — the latter needs engine support that
+  // doesn't yet exist (BlockRecoilDamageAttr is binary all-or-nothing),
+  // so we wire the stat-protect piece and leave half-recoil as a partial.
+  // Prior code mistakenly extended INFATUATED-immunity which is NOT in
+  // the ER 7 spec; that rider is removed by overwriting the attrs in
+  // patchLimber() rather than appending.
+  [AbilityId.LIMBER, ab => patchLimber(ab)],
   // 39 INNER_FOCUS already handled in MAJOR section above (FEAR immunity extension).
 
   // 161 BIG_PECKS already TOTAL above.
@@ -571,11 +581,24 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // 235 STAKEOUT: vanilla 2x on switch-in. ER ups to 2x always against statused
   // foes (different trigger). Vanilla close enough — keep.
   // 167 FUR_COAT: vanilla 0.5x physical received. Same as ER.
-  // 240 STEEL_WORKER: vanilla 1.5x Steel. ER ups to 1.5 (same) but adds dmg taken halved.
+  // 200 STEELWORKER: ER spec — "Normal moves become Steel. Steel resists
+  // Ghost and Dark." Prior wire halved INCOMING Steel damage (wrong) and
+  // kept the vanilla MoveTypePowerBoost (not in spec). Replace with:
+  //  - MoveTypeChangeAbAttr (Normal → Steel) — Refrigerate-family shape
+  //  - ReceivedTypeDamageMultiplier (Ghost, 0.5) + (Dark, 0.5)
+  //  - Strip the spurious vanilla Steel power-boost
   [
     AbilityId.STEELWORKER,
     ab => {
-      ab.attrs.push(new ReceivedTypeDamageMultiplierAbAttr(PokemonType.STEEL, 0.5));
+      ab.attrs = ab.attrs.filter(a => a.constructor.name !== "MoveTypePowerBoostAbAttr");
+      ab.attrs.push(
+        new MoveTypeChangeAbAttr(
+          PokemonType.STEEL,
+          (_user, _t, move) => !!move && move.type === PokemonType.NORMAL,
+        ),
+      );
+      ab.attrs.push(new ReceivedTypeDamageMultiplierAbAttr(PokemonType.GHOST, 0.5));
+      ab.attrs.push(new ReceivedTypeDamageMultiplierAbAttr(PokemonType.DARK, 0.5));
     },
   ],
   // 263 DRAGONS_MAW: vanilla 1.5x Dragon. ER 1.5x same.
@@ -1685,6 +1708,33 @@ function patchPastelVeil(ability: MutableAbility): void {
  * and replace with PostTurnResetStatusAbAttr — looked up lazily from the
  * global attr registry to avoid an additional import.
  */
+/**
+ * Patch LIMBER per ER 7 spec: paralysis-immune (kept from vanilla) +
+ * self-stat-drop immunity (ProtectStat, all stats) + half recoil (PARTIAL
+ * — engine doesn't expose a recoil-multiplier hook; deferred). Prior code
+ * mistakenly extended INFATUATED-immunity which is NOT in the spec.
+ */
+function patchLimber(ability: MutableAbility): void {
+  // Add the self-stat-drop guard.
+  ability.attrs.push(new ProtectStatAbAttr());
+  // Remove any prior INFATUATED-immunity extension that an earlier helper
+  // may have added (defensive — if extendBattlerTagImmunity ran before this
+  // patcher in a prior session it may have left behind an extra entry on
+  // the vanilla UserFieldBattlerTagImmunity. Use a string-name probe to
+  // avoid binding to a specific class reference here).
+  ability.attrs = ability.attrs.filter(a => {
+    if (a.constructor.name !== "UserFieldBattlerTagImmunityAbAttr") {
+      return true;
+    }
+    // Drop the field-wide INFATUATED-immunity that ER didn't ask for.
+    const tagSet = (a as unknown as { immuneTagTypes?: unknown }).immuneTagTypes;
+    if (Array.isArray(tagSet) && tagSet.length === 1 && tagSet[0] === BattlerTagType.INFATUATED) {
+      return false;
+    }
+    return true;
+  });
+}
+
 function patchLeafGuard(ability: MutableAbility): void {
   ability.attrs = ability.attrs.filter(a => !(a instanceof StatusEffectImmunityAbAttr));
   const PostTurnResetStatusCtor = getAttrCtorByName("PostTurnResetStatusAbAttr");
