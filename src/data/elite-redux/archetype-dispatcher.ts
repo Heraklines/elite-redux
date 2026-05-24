@@ -2121,6 +2121,21 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([
         new PostSummonStatStageChangeAbAttr([Stat.SPATK], -1, false, true),
       ]);
+    case 632:
+      // Terrify — "Lowers foes' Sp. Atk by two stages on entry."
+      // Same shape as Scare but -2 stages.
+      return ok([
+        new PostSummonStatStageChangeAbAttr([Stat.SPATK], -2, false, true),
+      ]);
+    case 283:
+      // Christmas Spirit — "Takes 50% less damage if hail is active."
+      // Uses WeatherDamageReductionAbAttr gated to HAIL/SNOW.
+      return ok([
+        new WeatherDamageReductionAbAttr({
+          weathers: [WeatherType.HAIL, WeatherType.SNOW],
+          multiplier: 0.5,
+        }),
+      ]);
     case 442:
       // Fae Hunter — 1.5x to Fairy, 0.5x from Fairy.
       return ok([
