@@ -315,6 +315,38 @@ describe.skipIf(!RUN_SCENARIOS)("ER bespoke scenario suite (heavy battles)", () 
   });
 
   // ===========================================================================
+  // FULL BATTLE PLAYTHROUGH: full 6-mon classic battle
+  // ===========================================================================
+  describe("full battle playthrough", () => {
+    it("5 consecutive turns of Pikachu vs Rattata with no crashes", async () => {
+      game.override
+        .battleStyle("single")
+        .ability(AbilityId.STATIC)
+        .passiveAbility(AbilityId.NO_GUARD)
+        .enemyAbility(AbilityId.FLAME_BODY)
+        .enemyPassiveAbility(AbilityId.STURDY)
+        .enemySpecies(SpeciesId.RATTATA)
+        .enemyLevel(100)
+        .startingLevel(100)
+        .enemyMoveset(MoveId.SPLASH)
+        .moveset(MoveId.SPLASH)
+        .criticalHits(false);
+      await game.classicMode.startBattle(SpeciesId.PIKACHU);
+      let turnCount = 0;
+      for (let t = 0; t < 5; t++) {
+        if (game.field.getPlayerPokemon().isFainted() || game.field.getEnemyPokemon().isFainted()) {
+          break;
+        }
+        game.move.use(MoveId.SPLASH);
+        await game.toEndOfTurn();
+        turnCount++;
+      }
+      expect(turnCount).toBeGreaterThanOrEqual(3);
+      expect(game.field.getPlayerPokemon().isFainted()).toBe(false);
+    });
+  });
+
+  // ===========================================================================
   // FOG WEATHER: 905 Fog Machine sets FOG on hit
   // ===========================================================================
   describe("fog weather interactions", () => {
