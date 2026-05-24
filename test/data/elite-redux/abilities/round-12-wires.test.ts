@@ -171,10 +171,12 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): round 12 wires", () =
     expect(attr).toBeInstanceOf(UserFieldMoveTypePowerBoostAbAttr);
   });
 
-  it("er id 944 (Dead Bark) upgrades to EntryEffect(add-type GHOST) + DamageReduction(0.15)", () => {
+  it("er id 944 (Dead Bark) wires add-type GHOST + DamageReduction(all) + DamageReduction(SE)", () => {
+    // R52 audit-fix: added SE-only second damage reduction so combined
+    // SE reduction matches spec's 30%.
     const res = dispatchArchetype("bespoke", null, 944);
     expect(res.skipReason).toBeNull();
-    expect(res.attrs).toHaveLength(2);
+    expect(res.attrs).toHaveLength(3);
     expect(res.attrs[0]).toBeInstanceOf(EntryEffectAbAttr);
     const entry = res.attrs[0] as EntryEffectAbAttr;
     const eff = entry.getEffect();
@@ -182,5 +184,6 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): round 12 wires", () =
       expect(eff.type).toBe(PokemonType.GHOST);
     }
     expect(res.attrs[1]).toBeInstanceOf(DamageReductionAbAttr);
+    expect(res.attrs[2]).toBeInstanceOf(DamageReductionAbAttr);
   });
 });

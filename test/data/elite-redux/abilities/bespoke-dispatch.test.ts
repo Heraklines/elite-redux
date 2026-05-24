@@ -517,18 +517,27 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(attr.getFilter()).toEqual({ kind: "all" });
   });
 
-  it("er id 944 (Dead Bark) wires EntryEffect(add-self-type GHOST) + DamageReduction(kind: all, 0.15)", () => {
-    // Round 12: upgraded from damage-only to add-type + damage-reduction pair.
-    // The entry-effect attaches Ghost to the holder's type list on switch-in
-    // (existing `EntryEffectAddSelfType` primitive); the DamageReduction
-    // covers the 15% all-moves piece. The "30% if SE" rider remains deferred.
+  it("er id 944 (Dead Bark) wires add-type GHOST + DamageReduction(all 15%) + DamageReduction(SE 17.6%)", () => {
+    // R52 audit-fix: previously a 2-attr wire missing the "30% if SE"
+    // piece. Now stacks a second DamageReduction (super-effective filter,
+    // ~17.6%) so combined SE reduction = 1 - 0.85*0.824 ≈ 30%.
     const res = dispatchArchetype("bespoke", null, 944);
     expect(res.skipReason).toBeNull();
-    expect(res.attrs).toHaveLength(2);
-    const damageAttr = res.attrs[1] as DamageReductionAbAttr;
-    expect(damageAttr).toBeInstanceOf(DamageReductionAbAttr);
-    expect(damageAttr.getReduction()).toBeCloseTo(0.15);
-    expect(damageAttr.getFilter()).toEqual({ kind: "all" });
+    expect(res.attrs).toHaveLength(3);
+    const allReducer = res.attrs.find(a => {
+      if (!(a instanceof DamageReductionAbAttr)) return false;
+      const f = a.getFilter();
+      return f.kind === "all";
+    }) as DamageReductionAbAttr;
+    expect(allReducer).toBeDefined();
+    expect(allReducer.getReduction()).toBeCloseTo(0.15);
+    const seReducer = res.attrs.find(a => {
+      if (!(a instanceof DamageReductionAbAttr)) return false;
+      const f = a.getFilter();
+      return f.kind === "super-effective";
+    }) as DamageReductionAbAttr;
+    expect(seReducer).toBeDefined();
+    expect(seReducer.getReduction()).toBeCloseTo(0.176);
   });
 
   it("er id 931 (Hammer Fist) wires two FlagDamageBoost instances (PUNCHING_MOVE 1.25x + HAMMER_BASED 1.25x)", () => {

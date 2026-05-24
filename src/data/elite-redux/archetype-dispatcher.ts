@@ -1896,16 +1896,14 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([new DamageReductionAbAttr({ reduction: 0.1, filter: { kind: "all" } })]);
     case 944:
       // Dead Bark — "Adds Ghost type. Takes 15% less damage. 30% less damage
-      // if SE." Round 12: extended from damage-only to also include the
-      // entry-effect "add Ghost type" piece via the existing
-      // `EntryEffectAbAttr({ kind: "add-self-type" })` primitive. The "30% if
-      // SE" piece would need a stacked DamageReduction with a super-effective
-      // override (existing super-effective filter would compose as a flat 30%
-      // reduction but multiplying with the 15% all-moves piece would yield an
-      // incorrect total); deferred. Partial wire.
+      // if SE." R52 audit-fix: stack a SECOND DamageReduction with the
+      // super-effective filter so SE attacks see the higher reduction.
+      // Math: total SE reduction = 1 - (1-0.15) * (1-x) = 0.30 → x ≈ 0.176.
+      // Combined on SE = 30% reduction ✓; non-SE = 15% ✓.
       return ok([
         new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.GHOST }),
         new DamageReductionAbAttr({ reduction: 0.15, filter: { kind: "all" } }),
+        new DamageReductionAbAttr({ reduction: 0.176, filter: { kind: "super-effective" } }),
       ]);
     case 931:
       // Hammer Fist — "Boosts punch and hammer moves by 25%." Wire as two
