@@ -57,6 +57,7 @@ import {
   IgnoreOpponentStatStagesAbAttr,
   MovePowerBoostAbAttr,
   MoveTypePowerBoostAbAttr,
+  PostAttackApplyBattlerTagAbAttr,
   PostAttackApplyStatusEffectAbAttr,
   PostAttackContactApplyStatusEffectAbAttr,
   PostAttackStealHeldItemAbAttr,
@@ -202,8 +203,16 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   [AbilityId.ICE_BODY, ab => mutateHealFactor(ab, 2)],
 
   // ===== MINOR — Status proc chance =====
-  // CUTE_CHARM: 30% → 50% (also outgoing — that's MAJOR, deferred)
-  [AbilityId.CUTE_CHARM, ab => mutateContactTagChance(ab, BattlerTagType.INFATUATED, 50)],
+  // CUTE_CHARM: 30% → 50% on defend + ER's "Also works on offense" — wire
+  // the PostAttack contact-tag-apply for the offense direction. The defend
+  // side stays on the original PostDefendContactApplyTagChance attr.
+  [
+    AbilityId.CUTE_CHARM,
+    ab => {
+      mutateContactTagChance(ab, BattlerTagType.INFATUATED, 50);
+      ab.attrs.push(new PostAttackApplyBattlerTagAbAttr(true, () => 50, BattlerTagType.INFATUATED));
+    },
+  ],
   // HEALER: 50% → 30% (also extends target to self — minor variant, just the chance for now)
   [AbilityId.HEALER, ab => patchHealerChance(ab)],
 
