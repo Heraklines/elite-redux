@@ -104,6 +104,7 @@ import { HitResult } from "#enums/hit-result";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
+import type { Pokemon } from "#field/pokemon";
 import { PokemonType } from "#enums/pokemon-type";
 import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
@@ -1690,6 +1691,16 @@ function patchLeafGuard(ability: MutableAbility): void {
   if (PostTurnResetStatusCtor !== undefined) {
     ability.attrs.push(new PostTurnResetStatusCtor(true) as AbAttr);
   }
+  // ER spec adds an "in sun" gate. The cure should ONLY fire while sun is
+  // active. ability.conditions is a mutable array — pushing onto it gates
+  // the entire ability via pokemon.ts:2424's condition.find check, which
+  // is fine here because vanilla Leaf Guard does nothing outside sun
+  // anyway (the immunity it would grant is also weather-gated).
+  const conditions = ability.conditions as Array<(p: Pokemon) => boolean>;
+  conditions.push((p: Pokemon) => {
+    const w = globalScene.arena.weather?.weatherType;
+    return w === WeatherType.SUNNY || w === WeatherType.HARSH_SUN;
+  });
 }
 
 /**
