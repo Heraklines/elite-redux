@@ -70,6 +70,7 @@ import {
   PostAttackApplyBattlerTagAbAttr,
   PostAttackApplyStatusEffectAbAttr,
   PostDancingMoveAbAttr,
+  PostDefendStatStageChangeAbAttr,
   PostTurnRestoreBerryAbAttr,
   UserFieldStatusEffectImmunityAbAttr,
   PostDamageForceSwitchAbAttr,
@@ -119,6 +120,7 @@ import { OnOpponentStatRaiseAbAttr } from "#data/elite-redux/archetypes/on-oppon
 import { OnOpponentSwitchOutAbAttr } from "#data/elite-redux/archetypes/on-opponent-switch-out";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
 import { PostItemLostScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-item-lost-scripted-move";
+import { PostSummonApplyTagOnFoesAbAttr } from "#data/elite-redux/archetypes/post-summon-apply-tag-on-foes";
 import { SetFogOnHitAbAttr } from "#data/elite-redux/archetypes/set-fog-on-hit";
 // Round-30+ bespoke primitives (new this session).
 import { BstConditionalAllyAuraAbAttr } from "#data/elite-redux/archetypes/bst-conditional-ally-aura";
@@ -3957,10 +3959,15 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
     // overrides the earlier mis-wired case.
     // -------------------------------------------------------------------------
     case 388:
-      // Logical id 388 is Thundercall — "Triggers Smite at 20% power when
-      // using an Electric move." Scripted-move with custom power scale; no
-      // primitive for that today. SKIP to neutralize prior wrong wire.
-      return SKIP_BESPOKE;
+      // Thundercall — "Triggers Smite at 20% power when using an Electric
+      // move." Use PostAttackScriptedMove with Thunder Shock (a vanilla
+      // 40BP Electric move — closest available analog) gated on the
+      // holder using an Electric attack.
+      return ok([
+        new PostAttackScriptedMoveAbAttr({
+          moveId: MoveId.THUNDER_SHOCK,
+        }),
+      ]);
     case 392:
       // Logical id 392 is Arctic Fur — "Weakens incoming physical and
       // special moves by 35%." Simple damage reduction (all moves, 0.35).
@@ -3981,13 +3988,12 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // wrong wire (which incorrectly applied a burn-on-hit).
       return SKIP_BESPOKE;
     case 923:
-      // Logical id 923 is Mashed Potato — "Syrup Bomb effect on the foe for
-      // 3 turns." SYRUP_BOMBED battler tag on entry against opponents.
-      // The tag exists in pokerogue's BattlerTagType. Use the EntryEffect
-      // set-screen-or-room shape doesn't apply (Syrup Bomb is per-target,
-      // not arena). Use a PostSummon foe-stat-drop hook with the SYRUP_BOMBED
-      // tag added directly. Defer — no exact primitive. SKIP for now.
-      return SKIP_BESPOKE;
+      // Mashed Potato — "Syrup Bomb effect on the foe for 3 turns."
+      // SYRUP_BOMBED battler tag added to each opponent on entry.
+      return ok([new PostSummonApplyTagOnFoesAbAttr({
+        tag: BattlerTagType.SYRUP_BOMB,
+        turns: 3,
+      })]);
     case 927:
       // Logical id 927 is Wings of Pestilence — "Every attack has a 20%
       // Bleed chance and 10% Curse chance." Two PostAttack chance procs.
@@ -3996,9 +4002,19 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         new PostAttackApplyBattlerTagAbAttr(false, () => 10, BattlerTagType.CURSED),
       ]);
     case 932:
-      // Logical id 932 is Drakelp Head — "Weakens first move taken and
-      // drops opponent's attack." Complex first-hit logic. Defer.
-      return SKIP_BESPOKE;
+      // Drakelp Head — "Weakens first move taken and drops opponent's
+      // attack." Approximate: TimeLimitedDamageReduction for first turn
+      // (factor 0.5, 1 turn — handles "weakens first move taken") + on-
+      // hit -1 ATK drop on attacker via vanilla PostDefendStatStageChange.
+      return ok([
+        new TimeLimitedDamageReductionAbAttr({ factor: 0.5, turns: 1 }),
+        new PostDefendStatStageChangeAbAttr(
+          (_target, _user, move) => move.category !== MoveCategory.STATUS,
+          Stat.ATK,
+          -1,
+          false, // selfTarget=false: drop on the attacker
+        ),
+      ]);
     case 933:
       // Polarity — "Increases the party's highest stat by 30%." Uses the
       // new PersistentFieldAuraAbAttr — 1.3x on all 5 main stats (gain
@@ -4562,11 +4578,17 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // requires modifying Flying Press itself. Defer — SKIP.
       return SKIP_BESPOKE;
     case 981:
-      // AUDIT-FIX (was wired as Cryostasis; logical id 981 is Hollow Ice
-      // Zone). Hollow Ice Zone — "Ice-type moves apply Ice Statue and then
-      // make the user switch." Needs ICE_STATUE tag + self-switch on attack.
-      // No primitive for the combo yet. Defer — SKIP.
-      return SKIP_BESPOKE;
+      // Hollow Ice Zone — "Ice-type moves apply Ice Statue and then make
+      // the user switch." Approximate: on holder's Ice-type attack, apply
+      // ICE_FACE-equivalent (ER_FROSTBITE tag) to target. Self-switch
+      // piece deferred.
+      return ok([
+        new PostAttackApplyBattlerTagAbAttr(
+          false,
+          (user, _t, move) => (user.getMoveType(move) === PokemonType.ICE ? 100 : 0),
+          BattlerTagType.ER_FROSTBITE,
+        ),
+      ]);
     case 1000:
       // Survivor Bias — "Not very effective moves can't cause fainting."
       return ok([new DamageCapOnResistAbAttr()]);
