@@ -129,6 +129,7 @@ import {
 import { OutgoingStatDropMultiplierAbAttr } from "#data/elite-redux/archetypes/outgoing-stat-drop-multiplier";
 import { PostDefendChangeAttackerTypeAbAttr } from "#data/elite-redux/archetypes/post-defend-change-attacker-type";
 import { PostDefendSuppressOpponentDamageBoostAbAttr } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
+import { PostAttackContactSuppressTargetAbilityAbAttr } from "#data/elite-redux/archetypes/post-attack-contact-suppress-target-ability";
 import { PostAttackScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-attack-scripted-move";
 import { PostFaintReviveAbAttr } from "#data/elite-redux/archetypes/post-faint-revive";
 import { PostSummonClearTerrainAbAttr } from "#data/elite-redux/archetypes/post-summon-clear-terrain";
@@ -4116,6 +4117,46 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         new PostAttackScriptedMoveAbAttr({
           moveId: MoveId.THUNDERBOLT,
           categoryFilter: MoveCategory.SPECIAL,
+        }),
+      ]);
+
+    // -------------------------------------------------------------------------
+    // AUDIT-FIX: more direction-reversed + wrong-mechanic bespoke wires.
+    // -------------------------------------------------------------------------
+    case 700:
+      // Color Spectrum — "Same-type attacks get a 1.2x boost." Was wired
+      // with StabAddAbAttr which boosts OFF-type moves (the opposite of
+      // what's wanted). Use MovePowerBoost gated on STAB instead.
+      return ok([
+        new MovePowerBoostAbAttr(
+          (user, _t, move) => user.isOfType(user.getMoveType(move)),
+          1.2,
+        ),
+      ]);
+    case 702:
+      // From the Shadows — "Attacks trap and have a 20% flinch chance when
+      // moving first." Was wired defensively. Move flinch to PostAttack
+      // (no "moving first" gate available cleanly); trap-on-attack piece
+      // remains deferred (per-turn TRAPPED tag on target after attack).
+      return ok([
+        new PostAttackApplyBattlerTagAbAttr(false, () => 20, BattlerTagType.FLINCHED),
+      ]);
+    case 831:
+      // Grass Flute — "Sound moves inflict Fear." Was wired defensively.
+      // Move to PostAttack with sound-move gate (approximate via 100%
+      // chance on attack — sound-move flag filter would require subclass).
+      return ok([
+        new PostAttackApplyBattlerTagAbAttr(false, () => 100, BattlerTagType.ER_FEAR),
+      ]);
+    case 832:
+      // Hemotoxin — "Suppresses abilities of the target when they're
+      // poisoned." Was wired as SuppressAttacker (defensive — fires when
+      // poisoned attacker hits holder). Should be PostAttack — suppress
+      // TARGET's ability when target is poisoned. Use the same vanilla-
+      // Mummy-shape PostAttack contact suppression with a status gate.
+      return ok([
+        new PostAttackContactSuppressTargetAbilityAbAttr({
+          requireTargetStatus: [StatusEffect.POISON, StatusEffect.TOXIC],
         }),
       ]);
     // -------------------------------------------------------------------------
