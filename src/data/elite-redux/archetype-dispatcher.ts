@@ -2250,6 +2250,34 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           typeFilter: [PokemonType.WATER],
         }),
       ]);
+    case 516:
+      // Monster Mash — "Casts Trick-or-Treat on entry."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TRICK_OR_TREAT })]);
+    case 784:
+      // Poseidon's Dominion — "Attacks with Whirlpool on entry."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.WHIRLPOOL })]);
+    case 788:
+      // Glacial Rage — "Triggers 50 BP Blizzard after using a Ice-type move."
+      return ok([
+        new PostAttackScriptedMoveAbAttr({
+          moveId: MoveId.BLIZZARD,
+          typeFilter: [PokemonType.ICE],
+        }),
+      ]);
+    case 917:
+      // Let's Dance — "Uses Teeter Dance on entry, Confusing the field."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TEETER_DANCE })]);
+    case 949:
+      // I Am Steve — "Uses No Retreat on entry."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.NO_RETREAT })]);
+    case 951:
+      // Foamy Web — "Casts an unremovable Sticky Web on entry. Lasts 5 turns."
+      // We wire just the Sticky Web part; the "unremovable" piece is a
+      // different layer (arena tag remove-immunity) that needs deeper work.
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.STICKY_WEB })]);
+    case 1006:
+      // Electro Booster — "Uses Magnet Rise on entry."
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.MAGNET_RISE })]);
     case 442:
       // Fae Hunter — 1.5x to Fairy, 0.5x from Fairy.
       return ok([
