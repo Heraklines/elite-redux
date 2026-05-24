@@ -64,6 +64,7 @@ import {
   ForceSwitchOutImmunityAbAttr,
   IgnoreTypeImmunityAbAttr,
   BlockWeatherDamageAttr,
+  GorillaTacticsAbAttr,
   MovePowerBoostAbAttr,
   PostAttackApplyBattlerTagAbAttr,
   PostAttackApplyStatusEffectAbAttr,
@@ -2310,13 +2311,14 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // stat." Same shape as 301 Cryptic Power but at 1.5x instead of 2x.
       return ok([new StatMultiplierAbAttr(Stat.SPATK, 1.5)]);
     case 352:
-      // Sage Power — "Ups Special Attack by 50% and locks move." Wire the
-      // SpAtk x1.5 piece via StatMultiplierAbAttr. The "locks move" piece
-      // (Gorilla Tactics-style move-lock) composes via vanilla
-      // `GorillaTacticsAbAttr` but the lock semantics are not exactly the same
-      // — ER's text doesn't specify the lock-on-first-attack vs lock-globally
-      // distinction. Defer for clarity. Partial wire.
-      return ok([new StatMultiplierAbAttr(Stat.SPATK, 1.5)]);
+      // Sage Power — "Ups Special Attack by 50% and locks move." R52
+      // audit-fix: previously SpAtk-only partial; now also adds vanilla
+      // GorillaTacticsAbAttr for the move-lock piece (locks after the
+      // holder's first move of the wave).
+      return ok([
+        new StatMultiplierAbAttr(Stat.SPATK, 1.5),
+        new GorillaTacticsAbAttr(),
+      ]);
     case 599: {
       // Dead Power — "1.5x Attack boost. 20% chance to curse on contact moves."
       // Wire both pieces: StatMultiplier(ATK, 1.5) for the attack boost +

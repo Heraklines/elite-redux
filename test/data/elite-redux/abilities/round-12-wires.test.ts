@@ -88,13 +88,16 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): round 12 wires", () =
     expect(attr.multiplier).toBeCloseTo(1.5);
   });
 
-  it("er id 352 (Sage Power) wires StatMultiplier(SPATK, 1.5x) — lock-move piece deferred", () => {
+  it("er id 352 (Sage Power) wires StatMultiplier(SPATK, 1.5x) + GorillaTactics (move-lock)", () => {
+    // R52 audit-fix: previously SpAtk-only; now also includes the
+    // vanilla GorillaTacticsAbAttr move-lock piece.
     const res = dispatchArchetype("bespoke", null, 352);
     expect(res.skipReason).toBeNull();
-    expect(res.attrs).toHaveLength(1);
+    expect(res.attrs).toHaveLength(2);
     const attr = res.attrs[0] as StatMultiplierAbAttr;
     expect(attr.stat).toBe(Stat.SPATK);
     expect(attr.multiplier).toBeCloseTo(1.5);
+    expect(res.attrs[1].constructor.name).toBe("GorillaTacticsAbAttr");
   });
 
   // ---------- compositions ----------
