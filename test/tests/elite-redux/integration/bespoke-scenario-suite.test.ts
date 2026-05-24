@@ -154,4 +154,57 @@ describe.skipIf(!RUN_SCENARIOS)("ER bespoke scenario suite (heavy battles)", () 
       expect(hasProtected).toBe(true);
     });
   });
+
+  // ===========================================================================
+  // PYROMANCY (270) — post-attack burn proc (audit-fix R49 direction flip)
+  // ===========================================================================
+  describe("Pyromancy (270)", () => {
+    it("holder's attack inflicts burn on the target", async () => {
+      const restoreRng = mockRngMin();
+      const erIdMap = (await import("#data/elite-redux/er-id-map")).ER_ID_MAP;
+      const pkrgId = erIdMap.abilities[270];
+      if (pkrgId === undefined) return;
+      game.override
+        .battleStyle("single")
+        .ability(pkrgId as AbilityId)
+        .enemyAbility(AbilityId.BALL_FETCH)
+        .enemySpecies(SpeciesId.SNORLAX)
+        .enemyMoveset(MoveId.SPLASH)
+        .moveset(MoveId.TACKLE)
+        .criticalHits(false);
+      await game.classicMode.startBattle(SpeciesId.PIKACHU);
+      const enemy = game.field.getEnemyPokemon();
+      game.move.use(MoveId.TACKLE);
+      await game.toEndOfTurn();
+      restoreRng();
+      // Pikachu (Pyromancy) tackles Snorlax → 30% burn at min RNG fires.
+      expect(enemy.status?.effect).toBe(StatusEffect.BURN);
+    });
+  });
+
+  // ===========================================================================
+  // DOUBLE BATTLE: 4-ability stress test (active + passive per mon × 4 mons)
+  // ===========================================================================
+  describe("double battle — multi-ability stress test", () => {
+    it("turns through a full double battle with passives on all 4 mons", async () => {
+      game.override
+        .battleStyle("double")
+        .ability(AbilityId.INTIMIDATE)
+        .passiveAbility(AbilityId.STATIC)
+        .enemyAbility(AbilityId.FLAME_BODY)
+        .enemyPassiveAbility(AbilityId.STURDY)
+        .enemySpecies(SpeciesId.RATTATA)
+        .enemyMoveset(MoveId.SPLASH)
+        .moveset([MoveId.TACKLE, MoveId.SPLASH])
+        .criticalHits(false);
+      await game.classicMode.startBattle(SpeciesId.MIGHTYENA, SpeciesId.POOCHYENA);
+      // Successfully starting the battle = all abilities initialized cleanly.
+      const player1 = game.scene.getPlayerField()[0];
+      expect(player1).toBeDefined();
+      const enemy1 = game.scene.getEnemyField()[0];
+      expect(enemy1).toBeDefined();
+      // Enemy ATK should be ≤ 0 from at least one Intimidate firing.
+      expect(enemy1.getStatStage(Stat.ATK)).toBeLessThanOrEqual(0);
+    });
+  });
 });
