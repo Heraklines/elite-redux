@@ -79,6 +79,9 @@ import {
   UserFieldMoveTypePowerBoostAbAttr,
 } from "#abilities/ab-attrs";
 import {
+  PostDefendSuppressOpponentDamageBoostAbAttr,
+} from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
+import {
   TypeImmunityHighestAttackStatStageAbAttr,
 } from "#data/elite-redux/archetypes/type-immunity-highest-attack-stat-stage";
 import { StatTriggerOnStatLoweredAbAttr } from "#data/elite-redux/archetypes/stat-trigger-on-event";
@@ -693,13 +696,15 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   ],
 
   // 147 WONDER_SKIN: vanilla "status moves 50% acc on user". ER COMPLETELY
-  // DIFFERENT — "Blocks most damage boosting and multihit abilities".
-  // Reuse the Fort Knox-style damage-suppression (0.77x to neutralize
-  // typical 1.3x boost).
+  // DIFFERENT — "Blocks most damage boosting and multihit abilities". The
+  // audit flagged the prior 0.77x blanket damage reduction as wrong-shape:
+  // it fires on every hit, including non-boosted ones. Replace with the
+  // PostDefendSuppressOpponentDamageBoostAbAttr primitive (used for Fort
+  // Knox) which is the correct surface for "suppress opponent boosts".
   [
     AbilityId.WONDER_SKIN,
     ab => {
-      ab.attrs.push(new ReceivedMoveDamageMultiplierAbAttr(() => true, 0.77));
+      ab.attrs.push(new PostDefendSuppressOpponentDamageBoostAbAttr());
     },
   ],
 

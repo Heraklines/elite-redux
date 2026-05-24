@@ -4015,6 +4015,29 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       return SKIP_BESPOKE;
 
     // -------------------------------------------------------------------------
+    // AUDIT-FIX: wrong-filter bugs (boost applied to ALL moves instead of
+    // specific type-pair). Replace the broad TypeEffectivenessMod wires with
+    // narrow TypeChartOverride entries.
+    // -------------------------------------------------------------------------
+    case 349:
+      // Overcharge — "Electric is super effective vs Electric. Can paralyze
+      // Electric." TypeChartOverride: Electric vs Electric goes 0.5x → 2x.
+      // The paralyze-electric piece (immunity bypass) is deferred.
+      return ok([
+        new TypeChartOverrideAbAttr({
+          rules: [{ attackType: PokemonType.ELECTRIC, defenderType: PokemonType.ELECTRIC, newMultiplier: 2 }],
+        }),
+      ]);
+    case 357:
+      // Molten Down — "Fire-type is super effective against Rock-type."
+      // TypeChartOverride: Fire vs Rock 0.5x → 2x.
+      return ok([
+        new TypeChartOverrideAbAttr({
+          rules: [{ attackType: PokemonType.FIRE, defenderType: PokemonType.ROCK, newMultiplier: 2 }],
+        }),
+      ]);
+
+    // -------------------------------------------------------------------------
     // AUDIT-FIX: direction-reversed bugs. Earlier rounds wired these as
     // PostDefend procs (fires when holder IS HIT). Spec says they fire when
     // holder ATTACKS — swap to PostAttack-side primitives.
