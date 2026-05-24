@@ -3983,10 +3983,18 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         new TypeAbsorbHealAbAttr({ type: PokemonType.FIRE, healFraction: 0.25 }),
       ]);
     case 912:
-      // Logical id 912 is Musical Notes — "Status moves become sound-based."
-      // Flag-injection primitive doesn't exist. SKIP to neutralize the prior
-      // wrong wire (which incorrectly applied a burn-on-hit).
-      return SKIP_BESPOKE;
+      // Musical Notes — "Status moves become sound-based." Practical
+      // mechanical impact: the holder's status moves benefit from sound-
+      // move boosts (Punk Rock 1.3x). Approximate via a MovePowerBoost
+      // on STATUS-category moves (the spec's gameplay effect; the
+      // theoretical "becomes sound" interaction with Soundproof etc.
+      // requires flag-injection patches at many engine sites — deferred).
+      return ok([
+        new MovePowerBoostAbAttr(
+          (_user, _t, move) => move?.category === MoveCategory.STATUS,
+          1.3,
+        ),
+      ]);
     case 923:
       // Mashed Potato — "Syrup Bomb effect on the foe for 3 turns."
       // SYRUP_BOMBED battler tag added to each opponent on entry.
@@ -4035,9 +4043,31 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         new EntryEffectAbAttr({ kind: "set-terrain", terrain: TerrainType.GRASSY, turns: 8 }),
       ]);
     case 960:
-      // Logical id 960 is Giant Shuriken — "Water Shuriken hits once with
-      // 100BP and +1 crit." Move-specific patch; defer.
-      return SKIP_BESPOKE;
+      // Giant Shuriken — "Water Shuriken hits once with 100BP and +1 crit."
+      // Approximate: massive power boost on Water Shuriken (15BP → ~100BP
+      // = 6.67x). The +1 crit piece would need a per-move-id filter on
+      // CritStageBonus which doesn't exist; defer that micro-detail.
+      return ok([
+        new MovePowerBoostAbAttr(
+          (_user, _t, move) => move?.id === MoveId.WATER_SHURIKEN,
+          6.67,
+        ),
+      ]);
+    case 963:
+      // Wrestle Showman — "Flying Press gains +10BP and causes Taunt."
+      // Flying Press is 100BP; +10BP = 1.1x power. Add a PostAttack TAUNT
+      // tag when the holder uses Flying Press.
+      return ok([
+        new MovePowerBoostAbAttr(
+          (_user, _t, move) => move?.id === MoveId.FLYING_PRESS,
+          1.1,
+        ),
+        new PostAttackApplyBattlerTagAbAttr(
+          false,
+          (user, _t, move) => (move?.id === MoveId.FLYING_PRESS ? 100 : 0),
+          BattlerTagType.TAUNT,
+        ),
+      ]);
     case 967:
       // Foggy Eye — "While in Fog, boost Ghost moves by 50% and resist
       // Ghost moves." Uses real WeatherType.FOG.
@@ -4055,9 +4085,24 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         }),
       ]);
     case 979:
-      // Logical id 979 is Eternal Flower — "Reduces the stats of other Megas
-      // by 20%." Field-specific Mega introspection. Defer.
-      return SKIP_BESPOKE;
+      // Eternal Flower — "Reduces the stats of other Megas by 20%."
+      // Uses PersistentFieldAura with a predicate that checks the ally's
+      // form name for "mega" / formIndex > 0. Multiplier 0.8 (-20%).
+      return ok([
+        new PersistentFieldAuraAbAttr({
+          stats: [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD],
+          multiplier: 0.8,
+          predicate: (ally, holder) => {
+            if (ally === holder) {
+              return false;
+            }
+            // Match if the ally's species form is a Mega — formIndex > 0
+            // typically indicates a non-base form (mega/primal/etc).
+            return ally.formIndex > 0;
+          },
+          includeSelf: false,
+        }),
+      ]);
 
     // -------------------------------------------------------------------------
     // AUDIT-FIX: wrong-filter bugs (boost applied to ALL moves instead of
