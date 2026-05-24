@@ -63,6 +63,7 @@ import {
   BlockNonDirectDamageAbAttr,
   ForceSwitchOutImmunityAbAttr,
   IgnoreTypeImmunityAbAttr,
+  BlockWeatherDamageAttr,
   MovePowerBoostAbAttr,
   PostAttackApplyBattlerTagAbAttr,
   PostAttackApplyStatusEffectAbAttr,
@@ -2167,12 +2168,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // -------------------------------------------------------------------------
     case 348:
       // North Wind — "3 turns Aurora Veil on entry. Immune to Hail damage."
-      // Wire the entry-effect side via EntryEffectAbAttr (set-screen-or-room
-      // AURORA_VEIL, 3 turns). The "immune to Hail damage" piece would compose
-      // via a weather-status-immunity primitive that doesn't exist yet
-      // (Ice-types are already hail-immune via the base type immunity, so this
-      // matters only for non-Ice holders of the ability). Partial wire.
-      return ok([new EntryEffectAbAttr({ kind: "set-screen-or-room", tag: ArenaTagType.AURORA_VEIL, turns: 3 })]);
+      // Wire BOTH: EntryEffectAbAttr (Aurora Veil 3 turns) +
+      // BlockWeatherDamageAttr (HAIL — vanilla Ice Body family).
+      return ok([
+        new EntryEffectAbAttr({ kind: "set-screen-or-room", tag: ArenaTagType.AURORA_VEIL, turns: 3 }),
+        new BlockWeatherDamageAttr(WeatherType.HAIL),
+      ]);
     case 378:
       // Amplifier — "Ups sound moves by 30% and makes them hit both foes."
       // Wire the FlagDamageBoost(SOUND_BASED, 1.3) piece. The multi-target

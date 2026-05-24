@@ -723,19 +723,24 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
   // Round 11 — composition wires using existing primitives.
   // ---------------------------------------------------------------------------
 
-  it("er id 348 (North Wind) wires EntryEffect(set-screen-or-room AURORA_VEIL 3 turns)", () => {
+  it("er id 348 (North Wind) wires EntryEffect(AURORA_VEIL 3t) + BlockWeatherDamage(HAIL)", () => {
+    // R51 audit-fix: ER spec is "3 turns Aurora Veil on entry. Immune to
+    // Hail damage." Prior wire was AURORA_VEIL only; now also includes
+    // BlockWeatherDamageAttr for HAIL.
     const res = dispatchArchetype("bespoke", null, 348);
     expect(res.skipReason).toBeNull();
-    expect(res.attrs).toHaveLength(1);
-    const attr = res.attrs[0] as EntryEffectAbAttr;
-    expect(attr).toBeInstanceOf(EntryEffectAbAttr);
-    expect(attr.getKind()).toBe("set-screen-or-room");
-    const effect = attr.getEffect();
+    expect(res.attrs).toHaveLength(2);
+    const entry = res.attrs.find(a => a instanceof EntryEffectAbAttr) as EntryEffectAbAttr;
+    expect(entry).toBeDefined();
+    expect(entry.getKind()).toBe("set-screen-or-room");
+    const effect = entry.getEffect();
     if (effect.kind !== "set-screen-or-room") {
       throw new Error("expected set-screen-or-room effect kind");
     }
     expect(effect.tag).toBe(ArenaTagType.AURORA_VEIL);
     expect(effect.turns).toBe(3);
+    const blockHail = res.attrs.find(a => a.constructor.name === "BlockWeatherDamageAttr");
+    expect(blockHail).toBeDefined();
   });
 
   it("er id 378 (Amplifier) wires FlagDamageBoost(SOUND_BASED, 1.3)", () => {
