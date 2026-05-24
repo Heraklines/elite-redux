@@ -64,6 +64,7 @@ import {
   ForceSwitchOutImmunityAbAttr,
   IgnoreTypeImmunityAbAttr,
   MovePowerBoostAbAttr,
+  PostAttackApplyBattlerTagAbAttr,
   PostDancingMoveAbAttr,
   PostTurnRestoreBerryAbAttr,
   UserFieldStatusEffectImmunityAbAttr,
@@ -3936,6 +3937,83 @@ function dispatchArchetypeInternal(
  */
 function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
   switch (erAbilityId) {
+    // -------------------------------------------------------------------------
+    // AUDIT-FIX overrides (Round 49) — earlier rounds wired the WRONG ability
+    // because the ER dump's array-index drifts from logical .id starting at
+    // index 386. So `dump.abilities[N]` for N>=386 is not the ability with
+    // .id===N. The R1-R47 wires below 386 are fine; from 386 onward we need
+    // to either re-wire to the correct spec or SKIP. Each entry here
+    // overrides the earlier mis-wired case.
+    // -------------------------------------------------------------------------
+    case 388:
+      // Logical id 388 is Thundercall — "Triggers Smite at 20% power when
+      // using an Electric move." Scripted-move with custom power scale; no
+      // primitive for that today. SKIP to neutralize prior wrong wire.
+      return SKIP_BESPOKE;
+    case 392:
+      // Logical id 392 is Arctic Fur — "Weakens incoming physical and
+      // special moves by 35%." Simple damage reduction (all moves, 0.35).
+      return ok([
+        new DamageReductionAbAttr({ reduction: 0.35, filter: { kind: "all" } }),
+      ]);
+    case 871:
+      // Logical id 871 is Fire Aspect — "Absorbs fire moves and always
+      // burns with fire." Fire immunity (heal) + auto-burn rider. The auto-
+      // burn-on-defend portion needs PreDefend status-on-immunity, which
+      // doesn't exist as a single primitive. Wire the heal portion only.
+      return ok([
+        new TypeAbsorbHealAbAttr({ type: PokemonType.FIRE, healFraction: 0.25 }),
+      ]);
+    case 912:
+      // Logical id 912 is Musical Notes — "Status moves become sound-based."
+      // Flag-injection primitive doesn't exist. SKIP to neutralize the prior
+      // wrong wire (which incorrectly applied a burn-on-hit).
+      return SKIP_BESPOKE;
+    case 923:
+      // Logical id 923 is Mashed Potato — "Syrup Bomb effect on the foe for
+      // 3 turns." SYRUP_BOMBED battler tag on entry against opponents.
+      // The tag exists in pokerogue's BattlerTagType. Use the EntryEffect
+      // set-screen-or-room shape doesn't apply (Syrup Bomb is per-target,
+      // not arena). Use a PostSummon foe-stat-drop hook with the SYRUP_BOMBED
+      // tag added directly. Defer — no exact primitive. SKIP for now.
+      return SKIP_BESPOKE;
+    case 927:
+      // Logical id 927 is Wings of Pestilence — "Every attack has a 20%
+      // Bleed chance and 10% Curse chance." Two PostAttack chance procs.
+      return ok([
+        new PostAttackApplyBattlerTagAbAttr(false, () => 20, BattlerTagType.ER_BLEED),
+        new PostAttackApplyBattlerTagAbAttr(false, () => 10, BattlerTagType.CURSED),
+      ]);
+    case 932:
+      // Logical id 932 is Drakelp Head — "Weakens first move taken and
+      // drops opponent's attack." Complex first-hit logic. Defer.
+      return SKIP_BESPOKE;
+    case 933:
+      // Logical id 933 is Polarity — "Increases the party's highest stat
+      // by 30%." Field-aura primitive isn't generic enough. Defer.
+      return SKIP_BESPOKE;
+    case 953:
+      // Logical id 953 is Zen Garden — "Sets up Grassy or Psychic Terrain
+      // at random." PostSummon random terrain. Approximate: pick GRASSY
+      // (matches half the spec).
+      return ok([
+        new EntryEffectAbAttr({ kind: "set-terrain", terrain: TerrainType.GRASSY, turns: 8 }),
+      ]);
+    case 960:
+      // Logical id 960 is Giant Shuriken — "Water Shuriken hits once with
+      // 100BP and +1 crit." Move-specific patch; defer.
+      return SKIP_BESPOKE;
+    case 967:
+      // Logical id 967 is Foggy Eye — "While in Fog, boost Ghost moves by
+      // 50% and resist Ghost moves." Fog defers; SKIP.
+      return SKIP_BESPOKE;
+    case 979:
+      // Logical id 979 is Eternal Flower — "Reduces the stats of other Megas
+      // by 20%." Field-specific Mega introspection. Defer.
+      return SKIP_BESPOKE;
+    // -------------------------------------------------------------------------
+    // Round 48 (original) wires below.
+    // -------------------------------------------------------------------------
     case 275:
       // Rampage — "No recharge after a KO."
       return ok([new PostVictoryClearTagAbAttr({ tags: [BattlerTagType.RECHARGING] })]);
@@ -4205,16 +4283,11 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         new CounterAttackOnHitAbAttr({ moveId: MoveId.MISTY_TERRAIN }),
       ]);
     case 911:
-      // Musical Notes — "Status moves become sound-based." Practical effect
-      // is to boost status-move stat triggers; closest is a self-boost on
-      // status-move use. We treat the user's status moves as boosting Spd
-      // (sound-themed) by hooking PreAttack power boost on STATUS category.
-      return ok([
-        new TypeGatedStatTriggerOnAttackAbAttr({
-          type: PokemonType.NORMAL,
-          stats: [{ stat: Stat.SPD, stages: 0 }],
-        }),
-      ]);
+      // AUDIT-FIX (was wired as Musical Notes; logical id 911 is Greedy).
+      // Greedy — "Uses Thief when it loses an item." Needs a PostItemLoss
+      // primitive that doesn't exist today. Mark SKIP to neutralize the
+      // wrong no-op wire from the previous round.
+      return SKIP_BESPOKE;
     case 913:
       // Strikeout — "Forces the foe out if they don't attack for 3 turns."
       // Approximate as a per-turn speed-drop on the opponent (no-attack
@@ -4227,27 +4300,17 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // Sap Trap — "Lowers foe's speed at the end of turns. At -3 they get trapped."
       return ok([new PostTurnFoeStatDropAbAttr({ stat: Stat.SPD, stages: -1, trapAtStage: -3 })]);
     case 963:
-      // Fire Ruler — "King's Wrath + Flame Shield." ER composite of two
-      // bespoke effects. Approximate as Burn-immunity + Fire +1.5x boost.
-      return ok([
-        new StatusEffectImmunityAbAttrEr({ statuses: [StatusEffect.BURN] }),
-        new MovePowerBoostAbAttr((user, _t, move) => user.getMoveType(move) === PokemonType.FIRE, 1.5),
-      ]);
+      // AUDIT-FIX (was wired as Fire Ruler; logical id 963 is Wrestle
+      // Showman per `byId(963)` in the ER dump). Wrestle Showman —
+      // "Flying Press gains +10BP and causes Taunt." Move-specific patch
+      // requires modifying Flying Press itself. Defer — SKIP.
+      return SKIP_BESPOKE;
     case 981:
-      // Cryostasis — "Cryomancy + Frostbite causes flinching." Approximate
-      // as 30% freeze on contact + flinch chance.
-      return ok([
-        new ChanceStatusOnHitAbAttr({
-          chance: 30,
-          effects: [StatusEffect.FREEZE],
-          contactRequired: true,
-        }),
-        new ChanceBattlerTagOnHitAbAttr({
-          chance: 30,
-          tags: [BattlerTagType.FLINCHED],
-          contactRequired: true,
-        }),
-      ]);
+      // AUDIT-FIX (was wired as Cryostasis; logical id 981 is Hollow Ice
+      // Zone). Hollow Ice Zone — "Ice-type moves apply Ice Statue and then
+      // make the user switch." Needs ICE_STATUE tag + self-switch on attack.
+      // No primitive for the combo yet. Defer — SKIP.
+      return SKIP_BESPOKE;
     case 1000:
       // Survivor Bias — "Not very effective moves can't cause fainting."
       return ok([new DamageCapOnResistAbAttr()]);
