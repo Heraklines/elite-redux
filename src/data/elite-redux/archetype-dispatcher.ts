@@ -63,6 +63,8 @@ import {
   BlockNonDirectDamageAbAttr,
   ForceSwitchOutImmunityAbAttr,
   IgnoreTypeImmunityAbAttr,
+  AttackTypeImmunityAbAttr,
+  PostSummonStatStageChangeAbAttr,
   BlockWeatherDamageAttr,
   GorillaTacticsAbAttr,
   MovePowerBoostAbAttr,
@@ -2105,6 +2107,19 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           offensiveMultiplier: 1.5,
           defensiveMultiplier: 0.5,
         }),
+      ]);
+    case 314:
+      // Mountaineer — "Immune to Rock-type attacks and Stealth Rock damage."
+      // Full Rock immunity via AttackTypeImmunityAbAttr (vanilla primitive,
+      // same shape as Levitate's Ground immunity). The Stealth Rock piece
+      // would need an arena-hazard immunity path; deferred.
+      return ok([new AttackTypeImmunityAbAttr(PokemonType.ROCK)]);
+    case 329:
+      // Scare — "Lowers foes' Sp. Atk by one stage on entry."
+      // Same shape as Intimidate but targeting SPATK. Uses the vanilla
+      // intimidate primitive (selfTarget=false, intimidate=true).
+      return ok([
+        new PostSummonStatStageChangeAbAttr([Stat.SPATK], -1, false, true),
       ]);
     case 442:
       // Fae Hunter — 1.5x to Fairy, 0.5x from Fairy.
