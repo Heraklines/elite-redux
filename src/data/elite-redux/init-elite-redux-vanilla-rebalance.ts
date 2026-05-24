@@ -84,6 +84,9 @@ import {
   PostDefendSuppressOpponentDamageBoostAbAttr,
 } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import {
+  RecoilDamageMultiplierAbAttr,
+} from "#data/elite-redux/archetypes/recoil-damage-multiplier";
+import {
   TypeImmunityHighestAttackStatStageAbAttr,
 } from "#data/elite-redux/archetypes/type-immunity-highest-attack-stat-stage";
 import { CritStageBonusAbAttr } from "#data/elite-redux/archetypes/crit-mod";
@@ -1719,6 +1722,10 @@ function patchPastelVeil(ability: MutableAbility): void {
 function patchLimber(ability: MutableAbility): void {
   // Add the self-stat-drop guard.
   ability.attrs.push(new ProtectStatAbAttr());
+  // Add half-recoil via the new RecoilDamageMultiplierAbAttr primitive
+  // (move.ts:RecoilAttr.apply scans for this constructor name and
+  // applies the factor before computing recoil damage).
+  ability.attrs.push(new RecoilDamageMultiplierAbAttr({ factor: 0.5 }));
   // Remove any prior INFATUATED-immunity extension that an earlier helper
   // may have added (defensive — if extendBattlerTagImmunity ran before this
   // patcher in a prior session it may have left behind an extra entry on

@@ -140,6 +140,29 @@ export class SwitchSummonPhase extends SummonPhase {
 
     applyAbAttrs("PreSummonAbAttr", { pokemon: switchedInPokemon });
     applyAbAttrs("PreSwitchOutAbAttr", { pokemon: this.lastPokemon });
+    // ER: fire any "on-opponent-switch-out" handlers (Tag — 656) on each
+    // pokemon on the OPPOSITE side. We use a direct constructor.name scan
+    // rather than going through pokerogue's centralised applyAbAttrs map
+    // because that requires registering the AbAttr class in the global
+    // AbilityAttrs object (touching a 6000-line file). The ER hook is
+    // small enough to do inline.
+    const opposingField = this.lastPokemon.isPlayer() ? globalScene.getEnemyField() : globalScene.getPlayerField();
+    for (const observer of opposingField) {
+      if (!observer || observer.isFainted()) {
+        continue;
+      }
+      const allAttrs = [
+        ...observer.getAbility().attrs,
+        ...observer.getPassiveAbilities().flatMap(pa => pa?.attrs ?? []),
+      ];
+      for (const attr of allAttrs) {
+        if (attr && attr.constructor.name === "OnOpponentSwitchOutAbAttr") {
+          (attr as unknown as {
+            fire: (holder: Pokemon, leavingOpponent: Pokemon) => void;
+          }).fire(observer, this.lastPokemon);
+        }
+      }
+    }
     if (!switchedInPokemon) {
       this.end();
       return;

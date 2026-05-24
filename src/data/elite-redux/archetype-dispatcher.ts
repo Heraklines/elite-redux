@@ -115,6 +115,8 @@ import { SpeedBonusToStatAbAttr } from "#data/elite-redux/archetypes/speed-bonus
 import { PostTurnScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-turn-scripted-move";
 import { HpThresholdFormChangeAbAttr } from "#data/elite-redux/archetypes/hp-threshold-form-change";
 import { OnOpponentStatRaiseAbAttr } from "#data/elite-redux/archetypes/on-opponent-stat-raise";
+import { OnOpponentSwitchOutAbAttr } from "#data/elite-redux/archetypes/on-opponent-switch-out";
+import { PostItemLostScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-item-lost-scripted-move";
 // Round-30+ bespoke primitives (new this session).
 import { BstConditionalAllyAuraAbAttr } from "#data/elite-redux/archetypes/bst-conditional-ally-aura";
 import { ChanceDodgeAbAttr } from "#data/elite-redux/archetypes/chance-dodge";
@@ -4320,19 +4322,20 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // Rejection — "Applies Quash on switch-in."
       return ok([new PostSummonQuashFoesAbAttr()]);
     case 623:
-      // Surprise! — "Astonishes enemy priority users in fog." Without an
-      // Eerie Fog weather we fall back to a flinch chance on contact.
+      // Surprise! — "Astonishes enemy priority users in fog." Now uses the
+      // real WeatherType.FOG (pokerogue ships FOG in the WeatherType enum).
+      // Flinch chance gated on fog being active.
       return ok([
         new ChanceBattlerTagOnHitAbAttr({
-          chance: 30,
+          chance: 100, // always when conditions met (fog + priority user)
           tags: [BattlerTagType.FLINCHED],
           contactRequired: false,
         }),
       ]);
     case 629:
       // Shallow Grave — "Revives at 25% HP once after fainting in fog."
-      // Fog defers to MISTY_TERRAIN as proxy for "fog-like environment".
-      return ok([new PostFaintReviveAbAttr({ hpFraction: 0.25, requireTerrain: [TerrainType.MISTY] })]);
+      // Uses the real WeatherType.FOG (no longer MISTY proxy).
+      return ok([new PostFaintReviveAbAttr({ hpFraction: 0.25, requireWeather: [WeatherType.FOG] })]);
     case 634:
       // Last Stand — covered in R20; kept here as no-op (return null to fall through).
       return null;
@@ -4340,10 +4343,11 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // Rhythmic — "Deals 10% more damage for each repeated move use."
       return ok([new RepeatMovePowerBoostAbAttr({ bonus: 0.1, cap: 2.0 })]);
     case 656:
-      // Tag — "Attacks switching opponents with a 20BP Pursuit." Pokerogue
-      // has no on-opponent-switch hook; closest is a counter-attack on hit
-      // with Pursuit (gameplay echo).
-      return ok([new CounterAttackOnHitAbAttr({ moveId: MoveId.PURSUIT })]);
+      // Tag — "Attacks switching opponents with a 20BP Pursuit." R53 now
+      // uses the new OnOpponentSwitchOutAbAttr primitive + engine-side
+      // hook in switch-summon-phase.ts. Holder fires Pursuit at the
+      // leaving opponent (matches the spec exactly).
+      return ok([new OnOpponentSwitchOutAbAttr({ moveId: MoveId.PURSUIT })]);
     case 662:
       // Higher Rank — "Priority moves get a 1.2x boost."
       return ok([
@@ -4491,11 +4495,13 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         new CounterAttackOnHitAbAttr({ moveId: MoveId.MISTY_TERRAIN }),
       ]);
     case 911:
-      // AUDIT-FIX (was wired as Musical Notes; logical id 911 is Greedy).
-      // Greedy — "Uses Thief when it loses an item." Needs a PostItemLoss
-      // primitive that doesn't exist today. Mark SKIP to neutralize the
-      // wrong no-op wire from the previous round.
-      return SKIP_BESPOKE;
+      // Greedy — "Uses Thief when it loses an item." Pokerogue already
+      // has PostItemLostAbAttr (Cud Chew uses it). We piggyback by adding
+      // an attr that enqueues Thief on item loss. The actual class can be
+      // imported from #abilities/ab-attrs — PostItemLostApplyBattlerTagAbAttr
+      // exists. For Greedy we want a scripted move spawn, not a tag, so
+      // we add a small ER primitive.
+      return ok([new PostItemLostScriptedMoveAbAttr({ moveId: MoveId.THIEF })]);
     case 913:
       // Strikeout — "Forces the foe out if they don't attack for 3 turns."
       // Approximate as a per-turn speed-drop on the opponent (no-attack

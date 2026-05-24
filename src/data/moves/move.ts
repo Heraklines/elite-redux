@@ -2218,7 +2218,22 @@ export class RecoilAttr extends MoveEffectAttr {
       return false;
     }
 
-    const damageValue = (this.useHp ? user.getMaxHp() : user.turnData.totalDamageDealt) * this.damageRatio;
+    let damageValue = (this.useHp ? user.getMaxHp() : user.turnData.totalDamageDealt) * this.damageRatio;
+    // ER: ability-driven recoil multiplier — Limber (7) and similar
+    // halve recoil. Scan the user's attrs for the ER-specific
+    // RecoilDamageMultiplierAbAttr constructor by name (no central
+    // registry edit required).
+    const recoilMult = new NumberHolder(1);
+    const userAttrs = [
+      ...user.getAbility().attrs,
+      ...user.getPassiveAbilities().flatMap(pa => pa?.attrs ?? []),
+    ];
+    for (const attr of userAttrs) {
+      if (attr && attr.constructor.name === "RecoilDamageMultiplierAbAttr") {
+        (attr as unknown as { fire: (mult: NumberHolder) => void }).fire(recoilMult);
+      }
+    }
+    damageValue *= recoilMult.value;
     const minValue = user.turnData.totalDamageDealt ? 1 : 0;
     const recoilDamage = toDmgValue(damageValue, minValue);
     if (!recoilDamage) {
