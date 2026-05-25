@@ -57,6 +57,24 @@ def main() -> int:
             except ValueError:
                 return None
 
+        # Flags can have #if/#else branches. We prefer the modern GEN_5+ branch
+        # if present, else fall back to the only .flags = ... line.
+        # First, strip #else/#endif blocks and keep the #if GEN_5 branch:
+        cleaned_body = body
+        # Strip the #else block + #endif
+        cleaned_body = re.sub(r"#else.*?#endif", "", cleaned_body, flags=re.DOTALL)
+        # Strip the #if itself (just remove the directive line)
+        cleaned_body = re.sub(r"#if\s+[^\n]+\n", "", cleaned_body)
+        # Strip any other preproc lines
+        cleaned_body = re.sub(r"#(endif|else|ifdef|ifndef)[^\n]*", "", cleaned_body)
+        flags_match = re.search(r"\.flags\s*=\s*([^,]+(?:\s*\|\s*[^,|]+)*)\s*,", cleaned_body, re.DOTALL)
+        flags_list: list[str] = []
+        if flags_match:
+            raw = flags_match.group(1)
+            for f in raw.split("|"):
+                f = f.strip()
+                if f.startswith("FLAG_"):
+                    flags_list.append(f)
         results.append({
             "name": name,
             "effect": find("effect"),
@@ -68,7 +86,7 @@ def main() -> int:
             "target": find("target"),
             "priority": find_int("priority"),
             "split": find("split"),
-            "flags": find("flags"),
+            "flags": flags_list,
         })
 
     print(f"Parsed {len(results)} moves from {SRC}")

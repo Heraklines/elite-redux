@@ -1,4 +1,4 @@
-ER move-stats vs pokerogue diff — generated 2026-05-25T19:49:53.341Z
+ER move-stats vs pokerogue diff — generated 2026-05-25T20:02:32.353Z
 Total diffs found: 17
 
   ER 18 →  18 WHIRLWIND                 : power 60→0, acc 100→0

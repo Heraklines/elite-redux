@@ -102,7 +102,7 @@ export function initializeGame() {
   // so we overwrite stale beta-JSON values with the v2.65.3b ROM C source.
   const cSrcResult = initEliteReduxCSourceCorrections();
   console.info(
-    `[er-r57] C-source corrections applied: ${cSrcResult.movesPatched} moves patched, ${cSrcResult.movesMissing} missing`,
+    `[er-r57] C-source corrections applied: ${cSrcResult.movesPatched} move stats, ${cSrcResult.flagsPatched} flag patches, ${cSrcResult.movesMissing} missing`,
   );
   // Elite Redux Phase B4: populate the ER trainer registry. Must run AFTER
   // initEliteReduxCustomSpecies() and initEliteReduxCustomMoves() so the

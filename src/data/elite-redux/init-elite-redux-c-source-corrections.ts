@@ -28,6 +28,7 @@ import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import type { Move } from "#data/moves/move";
 import type { MoveId } from "#enums/move-id";
+import { MoveFlags } from "#enums/move-flags";
 
 // Embedded snapshot of the C-source-derived move stats — kept inline rather
 // than as a separate JSON import to keep this self-contained. Generated via
@@ -379,8 +380,106 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<string, {
   ["MOVE_SMITE", { chance: 100 }],
 ]);
 
+// =============================================================================
+// FLAG corrections — moves missing ER-gameplay-relevant flags
+// (BITING_MOVE, PUNCHING_MOVE, SLICING_MOVE, KICKING_MOVE, PULSE_MOVE,
+// SOUND_BASED, BALLBOMB_MOVE, POWDER_MOVE, AIR_BASED, BONE_BASED,
+// HORN_BASED, FIELD_BASED, WEATHER_BASED, RECKLESS_MOVE, DANCE_MOVE).
+// Source: er-battle-moves.json (parsed from v2.65.3b C source).
+// =============================================================================
+const C_SOURCE_FLAG_PATCHES: ReadonlyMap<string, MoveFlags> = new Map([
+  ["MOVE_FLY", MoveFlags.FIELD_BASED],
+  ["MOVE_STOMP", MoveFlags.KICKING_MOVE],
+  ["MOVE_DOUBLE_KICK", MoveFlags.KICKING_MOVE],
+  ["MOVE_MEGA_KICK", MoveFlags.KICKING_MOVE],
+  ["MOVE_JUMP_KICK", MoveFlags.KICKING_MOVE],
+  ["MOVE_ROLLING_KICK", MoveFlags.KICKING_MOVE],
+  ["MOVE_HEADBUTT", MoveFlags.FIELD_BASED],
+  ["MOVE_TWINEEDLE", MoveFlags.MAKES_CONTACT],
+  ["MOVE_WATER_GUN", MoveFlags.PULSE_MOVE | MoveFlags.BALLBOMB_MOVE],
+  ["MOVE_HYDRO_PUMP", MoveFlags.PULSE_MOVE],
+  ["MOVE_SURF", MoveFlags.FIELD_BASED],
+  ["MOVE_ICE_BEAM", MoveFlags.PULSE_MOVE],
+  ["MOVE_BLIZZARD", MoveFlags.WEATHER_BASED],
+  ["MOVE_PSYBEAM", MoveFlags.PULSE_MOVE],
+  ["MOVE_BUBBLE_BEAM", MoveFlags.PULSE_MOVE],
+  ["MOVE_AURORA_BEAM", MoveFlags.PULSE_MOVE],
+  ["MOVE_HYPER_BEAM", MoveFlags.PULSE_MOVE],
+  ["MOVE_LOW_KICK", MoveFlags.KICKING_MOVE],
+  ["MOVE_SOLAR_BEAM", MoveFlags.WEATHER_BASED | MoveFlags.PULSE_MOVE],
+  ["MOVE_THUNDER", MoveFlags.WEATHER_BASED],
+  ["MOVE_WATERFALL", MoveFlags.FIELD_BASED],
+  ["MOVE_SPIKE_CANNON", MoveFlags.BALLBOMB_MOVE],
+  ["MOVE_HIGH_JUMP_KICK", MoveFlags.KICKING_MOVE],
+  ["MOVE_LEECH_LIFE", MoveFlags.BITING_MOVE],
+  ["MOVE_SUPER_FANG", MoveFlags.BITING_MOVE],
+  ["MOVE_TRIPLE_KICK", MoveFlags.KICKING_MOVE],
+  ["MOVE_OCTAZOOKA", MoveFlags.PULSE_MOVE],
+  ["MOVE_ZAP_CANNON", MoveFlags.PULSE_MOVE],
+  ["MOVE_FALSE_SWIPE", MoveFlags.SLICING_MOVE],
+  ["MOVE_WHIRLPOOL", MoveFlags.FIELD_BASED],
+  ["MOVE_ERUPTION", MoveFlags.PULSE_MOVE],
+  ["MOVE_SECRET_POWER", MoveFlags.FIELD_BASED],
+  ["MOVE_DIVE", MoveFlags.FIELD_BASED],
+  ["MOVE_BLAZE_KICK", MoveFlags.KICKING_MOVE],
+  ["MOVE_NEEDLE_ARM", MoveFlags.PUNCHING_MOVE],
+  ["MOVE_HYDRO_CANNON", MoveFlags.PULSE_MOVE],
+  ["MOVE_WEATHER_BALL", MoveFlags.WEATHER_BASED],
+  ["MOVE_WATER_SPOUT", MoveFlags.PULSE_MOVE],
+  ["MOVE_SIGNAL_BEAM", MoveFlags.PULSE_MOVE],
+  ["MOVE_DRAGON_CLAW", MoveFlags.SLICING_MOVE],
+  ["MOVE_FRENZY_PLANT", MoveFlags.PULSE_MOVE],
+  ["MOVE_MUD_SHOT", MoveFlags.PULSE_MOVE | MoveFlags.BALLBOMB_MOVE],
+  ["MOVE_PLUCK", MoveFlags.BITING_MOVE],
+  ["MOVE_CLOSE_COMBAT", MoveFlags.PUNCHING_MOVE],
+  ["MOVE_POISON_JAB", MoveFlags.PUNCHING_MOVE],
+  ["MOVE_VACUUM_WAVE", MoveFlags.PULSE_MOVE],
+  ["MOVE_FOCUS_BLAST", MoveFlags.PULSE_MOVE],
+  ["MOVE_SHADOW_CLAW", MoveFlags.SLICING_MOVE],
+  ["MOVE_ZEN_HEADBUTT", MoveFlags.FIELD_BASED],
+  ["MOVE_MIRROR_SHOT", MoveFlags.PULSE_MOVE],
+  ["MOVE_FLASH_CANNON", MoveFlags.PULSE_MOVE | MoveFlags.BALLBOMB_MOVE],
+  ["MOVE_GUNK_SHOT", MoveFlags.PULSE_MOVE | MoveFlags.BALLBOMB_MOVE],
+  ["MOVE_STONE_EDGE", MoveFlags.SLICING_MOVE],
+  ["MOVE_BUG_BITE", MoveFlags.BITING_MOVE],
+  ["MOVE_CHARGE_BEAM", MoveFlags.PULSE_MOVE],
+  ["MOVE_ROAR_OF_TIME", MoveFlags.SOUND_BASED],
+  ["MOVE_FLAME_BURST", MoveFlags.PULSE_MOVE],
+  ["MOVE_INFERNO", MoveFlags.PULSE_MOVE],
+  ["MOVE_DRILL_RUN", MoveFlags.HORN_BASED],
+  ["MOVE_DUAL_CHOP", MoveFlags.SLICING_MOVE],
+  ["MOVE_HURRICANE", MoveFlags.WEATHER_BASED],
+  ["MOVE_SEARING_SHOT", MoveFlags.PULSE_MOVE],
+  ["MOVE_PARTING_SHOT", MoveFlags.PULSE_MOVE],
+  ["MOVE_STEAM_ERUPTION", MoveFlags.PULSE_MOVE],
+  ["MOVE_HIGH_HORSEPOWER", MoveFlags.KICKING_MOVE],
+  ["MOVE_SOLAR_BLADE", MoveFlags.WEATHER_BASED],
+  ["MOVE_ANCHOR_SHOT", MoveFlags.PULSE_MOVE | MoveFlags.BALLBOMB_MOVE],
+  ["MOVE_TROP_KICK", MoveFlags.KICKING_MOVE],
+  ["MOVE_FLEUR_CANNON", MoveFlags.PULSE_MOVE],
+  ["MOVE_PSYCHIC_FANGS", MoveFlags.PUNCHING_MOVE],
+  ["MOVE_SUNSTEEL_STRIKE", MoveFlags.PULSE_MOVE],
+  ["MOVE_MOONGEIST_BEAM", MoveFlags.PULSE_MOVE],
+  ["MOVE_NATURES_MADNESS", MoveFlags.MAKES_CONTACT],
+  ["MOVE_PHOTON_GEYSER", MoveFlags.PULSE_MOVE],
+  ["MOVE_DYNAMAX_CANNON", MoveFlags.PULSE_MOVE],
+  ["MOVE_SNIPE_SHOT", MoveFlags.PULSE_MOVE | MoveFlags.BALLBOMB_MOVE],
+  ["MOVE_TAR_SHOT", MoveFlags.PULSE_MOVE | MoveFlags.BALLBOMB_MOVE],
+  ["MOVE_PYRO_BALL", MoveFlags.KICKING_MOVE],
+  ["MOVE_BREAKING_SWIPE", MoveFlags.SLICING_MOVE],
+  ["MOVE_METEOR_ASSAULT", MoveFlags.SLICING_MOVE],
+  ["MOVE_ETERNABEAM", MoveFlags.PULSE_MOVE],
+  ["MOVE_STEEL_BEAM", MoveFlags.PULSE_MOVE | MoveFlags.BALLBOMB_MOVE],
+  ["MOVE_SCALE_SHOT", MoveFlags.PULSE_MOVE | MoveFlags.BALLBOMB_MOVE],
+  ["MOVE_METEOR_BEAM", MoveFlags.PULSE_MOVE],
+  ["MOVE_TRIPLE_AXEL", MoveFlags.KICKING_MOVE],
+  ["MOVE_DRAGON_ENERGY", MoveFlags.PULSE_MOVE],
+  ["MOVE_THUNDEROUS_KICK", MoveFlags.KICKING_MOVE],
+]);
+
 export interface CSourceCorrectionResult {
   movesPatched: number;
+  flagsPatched: number;
   movesMissing: number;
 }
 
@@ -393,6 +492,7 @@ export interface CSourceCorrectionResult {
 export function initEliteReduxCSourceCorrections(): CSourceCorrectionResult {
   const result: CSourceCorrectionResult = {
     movesPatched: 0,
+    flagsPatched: 0,
     movesMissing: 0,
   };
 
@@ -433,6 +533,18 @@ export function initEliteReduxCSourceCorrections(): CSourceCorrectionResult {
     if (override.pp !== undefined) target.pp = override.pp;
     if (override.chance !== undefined) target.chance = override.chance;
     result.movesPatched++;
+  }
+
+  // Apply flag patches: OR the missing flag bits into each move's flag mask.
+  // Move.flags is private; we cast to access it.
+  for (const [moveConst, flagBits] of C_SOURCE_FLAG_PATCHES) {
+    const pkrgId = constToPkrgId.get(moveConst);
+    if (pkrgId === undefined) continue;
+    const move = byId.get(pkrgId);
+    if (!move) continue;
+    const target = move as unknown as { flags: number };
+    target.flags = (target.flags ?? 0) | flagBits;
+    result.flagsPatched++;
   }
 
   return result;
