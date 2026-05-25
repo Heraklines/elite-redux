@@ -1558,6 +1558,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     const starterData = globalScene.gameData.starterData[speciesId];
     const starterCost = speciesStarterCosts[speciesId];
 
+    // ER: ER-custom species (id >= 5000 or otherwise unregistered in
+    // starterData) may not have a starter entry yet. Treat as "passive not
+    // available" rather than crashing on undefined access.
+    if (!starterData) {
+      return false;
+    }
+
     // TODO(er-phase-b): widen to "any slot still locked && enough candies for any slot".
     // For Phase A this stays slot-1-only; vanilla species have only one slot.
     return (
@@ -1577,6 +1584,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     const starterData = globalScene.gameData.starterData[speciesId];
     const starterCost = speciesStarterCosts[speciesId];
 
+    // ER: guard for ER-custom species missing from starterData.
+    if (!starterData) {
+      return false;
+    }
+
     return (
       starterCost != null
       && starterData.candyCount >= getValueReductionCandyCounts(starterCost)[starterData.valueReduction]
@@ -1592,7 +1604,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   isSameSpeciesEggAvailable(speciesId: SpeciesId): boolean {
     const starterData = globalScene.gameData.starterData[speciesId];
     const starterCost = speciesStarterCosts[speciesId];
-    const hatchedCount = globalScene.gameData.dexData[speciesId].hatchedCount;
+    const dexData = globalScene.gameData.dexData[speciesId];
+
+    // ER: guard for ER-custom species missing from starterData / dexData.
+    if (!starterData || !dexData) {
+      return false;
+    }
+    const hatchedCount = dexData.hatchedCount;
 
     return starterCost != null && starterData.candyCount >= getSameSpeciesEggCandyCounts(starterCost, hatchedCount);
   }

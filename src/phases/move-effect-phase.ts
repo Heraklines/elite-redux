@@ -22,6 +22,25 @@ import { MoveTarget } from "#enums/move-target";
 import { isReflected, MoveUseMode } from "#enums/move-use-mode";
 import { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
+import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
+
+/**
+ * Elite Redux: walk both `user.getAbility()` and `user.getPassiveAbility()`,
+ * and check each ability's attrs for any `ConditionalAlwaysHitAbAttr` whose
+ * predicate matches the current move. Returns true if at least one matches.
+ */
+function erUserHasConditionalAlwaysHit(user: Pokemon, move: import("#moves/move").Move, target: Pokemon): boolean {
+  const abilities = [user.getAbility(), user.getPassiveAbility()];
+  for (const ab of abilities) {
+    if (!ab) continue;
+    for (const attr of ab.attrs) {
+      if (attr instanceof ConditionalAlwaysHitAbAttr && attr.matches(move, user, target)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 import {
   ContactHeldItemTransferChanceModifier,
   DamageMoneyRewardModifier,
@@ -455,6 +474,13 @@ export class MoveEffectPhase extends PokemonPhase {
   public checkBypassAccAndInvuln(target: Pokemon) {
     const user = this.getUserPokemon();
     if (user.hasAbilityWithAttr("AlwaysHitAbAttr") || target.hasAbilityWithAttr("AlwaysHitAbAttr")) {
+      return true;
+    }
+    // Elite Redux: per-move conditional always-hit (Hypnotist on Hypnosis,
+    // Roundhouse on KICKING_MOVE, Artillery on PULSE_MOVE, Sweeping Edge on
+    // SLICING_MOVE, Gifted Mind on status moves, Angel's Wrath on specific
+    // move IDs). See src/data/elite-redux/archetypes/conditional-always-hit.ts.
+    if (erUserHasConditionalAlwaysHit(user, this.move, target)) {
       return true;
     }
     if (this.move.hasAttr("ToxicAccuracyAttr") && user.isOfType(PokemonType.POISON)) {

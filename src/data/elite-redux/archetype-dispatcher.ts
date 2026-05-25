@@ -157,6 +157,8 @@ import { PostSummonScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-
 import { SelfHighestStatMultiplierAbAttr } from "#data/elite-redux/archetypes/self-highest-stat-multiplier";
 import { SelfHighestStatBoostOnSummonAbAttr } from "#data/elite-redux/archetypes/self-highest-stat-boost-on-summon";
 import { FirstTurnBoostAbAttr } from "#data/elite-redux/archetypes/first-turn-boost";
+import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
+import { FirstTurnStatMultiplierAbAttr } from "#data/elite-redux/archetypes/first-turn-stat-multiplier";
 import { PostFaintReviveAbAttr } from "#data/elite-redux/archetypes/post-faint-revive";
 import { PostSummonClearTerrainAbAttr } from "#data/elite-redux/archetypes/post-summon-clear-terrain";
 import { PostSummonQuashFoesAbAttr } from "#data/elite-redux/archetypes/post-summon-quash-foes";
@@ -2413,15 +2415,17 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new PostAttackApplyStatusEffectAbAttr(false, 10, StatusEffect.BURN),
       ]);
     case 350:
-      // Violent Rush — "Boosts Speed by 50% + Attack by 20% on first turn."
-      // Model as +2 SPD + +1 ATK on entry (stat stages, not %).
+      // Violent Rush — ER ROM C source (battle_main.c:4892 + battle_util.c:13305):
+      //   - speed = (speed * 150) / 100  (1.5× speed multiplier on first turn)
+      //   - MulModifier(&modifier, UQ_4_12(1.2))  (1.2× damage on first turn)
+      // Both gated on `gDisableStructs[battlerId].isFirstTurn`. Wire as
+      // proper multipliers (NOT stat stages) gated on first-turn predicate.
       return ok([
-        new FirstTurnBoostAbAttr({
-          boosts: [
-            { stat: Stat.SPD, stages: 2 },
-            { stat: Stat.ATK, stages: 1 },
-          ],
-        }),
+        new FirstTurnStatMultiplierAbAttr({ stat: Stat.SPD, multiplier: 1.5 }),
+        new MovePowerBoostAbAttr(
+          (user) => !!user && (!user.summonData?.moveHistory || user.summonData.moveHistory.length === 0),
+          1.2,
+        ),
       ]);
     case 557:
       // Readied Action — "Doubles attack on first turn."
@@ -2505,42 +2509,48 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // ensures multi-hit is rolled. True 2-5 range needs a new primitive.
       return ok([new MaxMultiHitAbAttr()]);
     case 368:
-      // Sighting System — "Moves always hit. Moves last for moves less than
-      // 80% accuracy." Wire the always-hit piece; "moves last" is engine work.
+      // Sighting System — ER ROM C source (battle_script_commands.c:1924):
+      // ALL moves get moveAcc = 100. Unconditional always-hit.
       return ok([new AlwaysHitAbAttr()]);
     case 377:
-      // Artillery — "Mega Launcher moves always hit and hit both foes."
-      // Wire always-hit. Spread-to-both-foes is per-move engine work.
-      return ok([new AlwaysHitAbAttr()]);
+      // Artillery — ER ROM C source (battle_script_commands.c:1930): moves
+      // with FLAG_MEGA_LAUNCHER_BOOST (= PULSE_MOVE in pokerogue) get
+      // moveAcc = 100. Faithful wire via flag-gated always-hit.
+      // The "hit both foes" piece is per-move engine work (deferred).
+      return ok([new ConditionalAlwaysHitAbAttr({ flag: MoveFlags.PULSE_MOVE })]);
     case 403:
-      // Roundhouse — "Kicks always hit. Damages foes' weaker defenses."
-      // Wire always-hit. Defense-stat-swap on kicks defer.
-      return ok([new AlwaysHitAbAttr()]);
+      // Roundhouse — ER ROM C source (battle_script_commands.c:1926): moves
+      // with FLAG_STRIKER_BOOST (= KICKING_MOVE) get moveAcc = 100. The
+      // "damages foes' weaker defenses" piece is the def-stat-swap primitive
+      // (deferred).
+      return ok([new ConditionalAlwaysHitAbAttr({ flag: MoveFlags.KICKING_MOVE })]);
     case 421:
-      // Sweeping Edge — "Keen Edge moves always hit and hit both foes."
-      // Wire always-hit. Spread-to-both deferred.
-      return ok([new AlwaysHitAbAttr()]);
+      // Sweeping Edge — ER ROM C source (battle_script_commands.c:1932):
+      // moves with FLAG_KEEN_EDGE_BOOST (= SLICING_MOVE) get moveAcc = 100.
+      return ok([new ConditionalAlwaysHitAbAttr({ flag: MoveFlags.SLICING_MOVE })]);
     case 698:
       // Pinnacle Blade — "Slashing moves always hit and break protection and barriers."
-      // Wire always-hit. Protect-break deferred.
-      return ok([new AlwaysHitAbAttr()]);
+      // Same shape as Sweeping Edge (the protect-break piece is engine work).
+      return ok([new ConditionalAlwaysHitAbAttr({ flag: MoveFlags.SLICING_MOVE })]);
     case 794:
       // Deadly Precision — "Super-effective moves never miss and ignore abilities."
-      // Wire always-hit + ability bypass (Mold Breaker shape).
+      // No SE-detection primitive in pokerogue. Wire as full always-hit +
+      // ability bypass — broader than spec but the SE gate is engine work.
+      // ER C source doesn't implement this ability either (not in abilities.h).
       return ok([new AlwaysHitAbAttr(), new MoveAbilityBypassAbAttr()]);
     case 921:
-      // Flawless Precision — "Fatal + Deadly Precision."
-      // Composite — wire the Deadly Precision piece.
+      // Flawless Precision — "Fatal + Deadly Precision." Same shape as Deadly.
       return ok([new AlwaysHitAbAttr(), new MoveAbilityBypassAbAttr()]);
     case 422:
-      // Gifted Mind — "Nulls Psychic weakness; status moves always hit."
-      // Wire Psychic damage reduction (1.0 → 0.5 = nullify weakness) + always-hit.
+      // Gifted Mind — ER ROM C source (battle_script_commands.c:1936):
+      // when holder uses a STATUS move, moveAcc = 100. The "nulls Psychic
+      // weakness" piece is a defensive type-modifier; wire via damage reduction.
       return ok([
         new DamageReductionAbAttr({
           reduction: 0.5,
           filter: { kind: "move-type", type: PokemonType.PSYCHIC },
         }),
-        new AlwaysHitAbAttr(),
+        new ConditionalAlwaysHitAbAttr({ categories: [MoveCategory.STATUS] }),
       ]);
     case 955:
       // Hypnotic Trance — "Hypnosis never misses and also causes Confusion."
@@ -2554,19 +2564,24 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Deliberate empty wire — match ER spec exactly.
       return ok([]);
     case 327:
-      // Hypnotist — "Hypnosis accuracy is 90%" (ER ROM C source actually
-      // sets it to 100%). Pokerogue lacks a per-move accuracy override
-      // primitive — approximate via 1.5x ACC multiplier on all moves.
-      // Broader than spec but functional.
-      return ok([new StatMultiplierAbAttr(Stat.ACC, 1.5)]);
+      // Hypnotist — ER ROM C source (battle_script_commands.c:1910): when
+      // holder uses MOVE_HYPNOSIS, moveAcc = 100. Faithful wire via
+      // ConditionalAlwaysHitAbAttr gated to MoveId.HYPNOSIS.
+      return ok([new ConditionalAlwaysHitAbAttr({ moveIds: [MoveId.HYPNOSIS] })]);
     case 786:
       // Lullaby — "Sing accuracy is 90%" (presumably 100% in ER ROM by
       // analogy with Hypnotist). Same approximation as Hypnotist.
       return ok([new StatMultiplierAbAttr(Stat.ACC, 1.5)]);
     case 439:
-      // Angel's Wrath — "Drastically alters all of the users moves."
-      // Vague spec. Approximate as 1.3x all-move damage boost.
-      return ok([new MovePowerBoostAbAttr(() => true, 1.3)]);
+      // Angel's Wrath — ER ROM C source (battle_script_commands.c:1938-1947):
+      // moves in fixed list (TACKLE, POISON_STING, ELECTROWEB, BUG_BITE) get
+      // moveAcc = 100. NO damage boost; that part of the JSON dump's
+      // description is misleading.
+      return ok([
+        new ConditionalAlwaysHitAbAttr({
+          moveIds: [MoveId.TACKLE, MoveId.POISON_STING, MoveId.ELECTROWEB, MoveId.BUG_BITE],
+        }),
+      ]);
     case 473:
       // Inversion — "Sets up Inverse Room on entry, lasts 3 turns."
       // Pokerogue lacks Inverse Room arena tag. Approximate by giving the
