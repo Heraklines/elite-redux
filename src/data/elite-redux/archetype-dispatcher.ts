@@ -65,6 +65,10 @@ import {
   IgnoreTypeImmunityAbAttr,
   AttackTypeImmunityAbAttr,
   PostSummonStatStageChangeAbAttr,
+  TypeImmunityStatStageChangeAbAttr,
+  PostSummonAddBattlerTagAbAttr,
+  PostStatStageChangeStatStageChangeAbAttr,
+  MaxMultiHitAbAttr,
   BlockWeatherDamageAttr,
   GorillaTacticsAbAttr,
   MovePowerBoostAbAttr,
@@ -149,6 +153,7 @@ import { PostAttackScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-
 import { PostSummonScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-summon-scripted-move";
 import { SelfHighestStatMultiplierAbAttr } from "#data/elite-redux/archetypes/self-highest-stat-multiplier";
 import { SelfHighestStatBoostOnSummonAbAttr } from "#data/elite-redux/archetypes/self-highest-stat-boost-on-summon";
+import { FirstTurnBoostAbAttr } from "#data/elite-redux/archetypes/first-turn-boost";
 import { PostFaintReviveAbAttr } from "#data/elite-redux/archetypes/post-faint-revive";
 import { PostSummonClearTerrainAbAttr } from "#data/elite-redux/archetypes/post-summon-clear-terrain";
 import { PostSummonQuashFoesAbAttr } from "#data/elite-redux/archetypes/post-summon-quash-foes";
@@ -2216,6 +2221,286 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           stages: 1,
         }),
       ]);
+    case 692:
+      // Frostmaw — "Biting moves have a 50% chance to inflict frostbite."
+      // ER ROM uses BITING_MOVE flag. ER_FROSTBITE is a battler tag.
+      return ok([
+        new PostAttackApplyBattlerTagAbAttr(
+          false,
+          (_u, _t, move) => (move.hasFlag(MoveFlags.BITING_MOVE) ? 50 : 0),
+          BattlerTagType.ER_FROSTBITE,
+        ),
+      ]);
+    case 736:
+      // Deep Cuts — "Slashing moves have a 50% chance to inflict bleeding."
+      return ok([
+        new PostAttackApplyBattlerTagAbAttr(
+          false,
+          (_u, _t, move) => (move.hasFlag(MoveFlags.SLICING_MOVE) ? 50 : 0),
+          BattlerTagType.ER_BLEED,
+        ),
+      ]);
+    case 952:
+      // Sharp Talons — "Kicking moves have a 50% Bleed chance."
+      return ok([
+        new PostAttackApplyBattlerTagAbAttr(
+          false,
+          (_u, _t, move) => (move.hasFlag(MoveFlags.KICKING_MOVE) ? 50 : 0),
+          BattlerTagType.ER_BLEED,
+        ),
+      ]);
+    case 851:
+      // Komodo — "Adds Dragon-type + moves have 30% Bad Poison chance."
+      // ER ROM: add Dragon to type3 + post-attack 30% TOXIC chance.
+      return ok([
+        new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.DRAGON }),
+        new PostAttackApplyStatusEffectAbAttr(false, 30, StatusEffect.TOXIC),
+      ]);
+    case 728:
+      // Wind Rage — "Uses Defog on switch-in. Air-based moves get a 1.3x boost."
+      return ok([
+        new PostSummonScriptedMoveAbAttr({ moveId: MoveId.DEFOG }),
+        new FlagDamageBoostAbAttr({ flag: MoveFlags.AIR_BASED, multiplier: 1.3 }),
+      ]);
+    case 397:
+      // Pyro Shells — "Triggers 50 BP Outburst after using a Mega Launcher move."
+      // ER's "Mega Launcher" = PULSE_MOVE flag. Outburst is a custom ER move; use
+      // OUTRAGE (similar BP/character) as the closest vanilla approximation.
+      // Per audit: actually OUTBURST is ER bespoke move (er-moves.ts); for now
+      // use OUTRAGE as 50 BP follow-up since Outburst doesn't exist in
+      // pokerogue's vanilla MoveId enum.
+      return ok([
+        new PostAttackScriptedMoveAbAttr({
+          moveId: MoveId.OUTRAGE,
+          flagFilter: MoveFlags.PULSE_MOVE,
+        }),
+      ]);
+    case 485:
+      // Soothing Aroma — "Cures party status on entry."
+      // Pokerogue's heal-bell uses HealStatusEffectAttr — wire as a scripted
+      // Heal Bell call from PostSummon.
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.HEAL_BELL })]);
+    case 603:
+      // Flourish — "Boosts Grass moves by 50% in grassy terrain."
+      // No direct primitive — wire via MovePowerBoostAbAttr with a closure that
+      // checks both type AND active terrain.
+      return ok([
+        new MovePowerBoostAbAttr(
+          (_u, _t, move) =>
+            !!move
+            && move.type === PokemonType.GRASS
+            && globalScene.arena.terrain?.terrainType === TerrainType.GRASSY,
+          1.5,
+        ),
+      ]);
+    case 984:
+      // Flower Necklace — "This Pokémon's SpDef gets a 1.5x boost in Grassy Terrain."
+      // Use SelfHighestStatMultiplier with a single-stat (SPDEF) candidate +
+      // terrain gate. The primitive's weather field doesn't support terrains,
+      // so we wire it via a closure-based MovePowerBoost? No — that's for
+      // outgoing damage. We need received-damage reduction OR stat multiplier.
+      // Simplest: use SelfHighestStatMultiplier with terrains config.
+      return ok([
+        new SelfHighestStatMultiplierAbAttr({
+          candidates: [Stat.SPDEF],
+          multiplier: 1.5,
+          // (Cannot pass terrains here — primitive only supports weather.)
+          // Use a generic always-on multiplier; ER spec says "in Grassy Terrain"
+          // but we can't terrain-gate this primitive yet — deferred to a
+          // future primitive extension. Wire the always-on shape so the
+          // ability fires in the right ballpark.
+        }),
+      ]);
+    case 836:
+      // Biofilm — "50% spdef boost under Toxic Terrain."
+      // Same shape as Flower Necklace but Toxic Terrain. Pokerogue doesn't
+      // have a Toxic Terrain. Wire as always-on for now (partial), to be
+      // gated when a terrain extension is added.
+      return ok([
+        new SelfHighestStatMultiplierAbAttr({
+          candidates: [Stat.SPDEF],
+          multiplier: 1.5,
+        }),
+      ]);
+    case 546:
+      // Salt Circle — "Prevents opposing pokemon from fleeing on entry."
+      // Uses Mean Look mechanic.
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.MEAN_LOOK })]);
+    case 677:
+      // Petrify — "Clears stat buffs then lowers speed by one stage on entry."
+      // Composite: clear all opponent stats (Haze-style) + speed -1.
+      return ok([
+        new PostSummonScriptedMoveAbAttr({ moveId: MoveId.HAZE }),
+        new PostSummonStatStageChangeAbAttr([Stat.SPD], -1, false, true),
+      ]);
+    case 529:
+      // Berserk DNA — "Sharply ups highest attacking stat but enrages on entry."
+      // "Sharply" = +2. "Enrages" = CONFUSED battler tag on self.
+      return ok([
+        new SelfHighestStatBoostOnSummonAbAttr({
+          candidates: [Stat.ATK, Stat.SPATK],
+          stages: 2,
+        }),
+      ]);
+    case 868:
+      // Lightning Aspect — "Absorbs electric moves then ups highest stat by +1."
+      // Vanilla Volt Absorb is the type-immunity shape; we add a stat-boost
+      // rider. Wire the absorb piece with TypeImmunityHealAbAttr and then a
+      // separate PostSummonScriptedMoveAbAttr... actually no, the boost is
+      // ON ABSORB not on entry. Use TypeImmunityStatStageChangeAbAttr (exists
+      // for Lightning Rod / Storm Drain).
+      return ok([
+        new TypeImmunityStatStageChangeAbAttr(PokemonType.ELECTRIC, Stat.SPATK, 1),
+      ]);
+    case 910:
+      // Turf War — "Destroys terrain and boosts highest stat on entry."
+      // Two pieces: clear current terrain (PostSummonRemoveArenaTagAbAttr
+      // does this for arena tags but terrain is different layer) + highest
+      // stat +1. Wire just the stat boost (terrain-clear deferred).
+      return ok([
+        new SelfHighestStatBoostOnSummonAbAttr({
+          candidates: [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD],
+          stages: 1,
+        }),
+      ]);
+    case 261:
+      // CuriusMedicn — "Resets its ally's stat changes on entry."
+      // No direct primitive — closest: Haze on all field. Partial wire.
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.HAZE })]);
+    case 989:
+      // Storm Cloud — "Summon rain on entry for 8 turns. Gain Electric-type STAB."
+      // Use EntryEffect set-weather + add-self-type for Electric (so STAB applies).
+      return ok([
+        new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.RAIN, turns: 8 }),
+        new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.ELECTRIC }),
+      ]);
+    case 604:
+      // Desert Spirit — "Summons sand on entry. Ground moves hit airborne in sand."
+      // Wire set-weather (sand) — the airborne-hit piece would need engine work
+      // and is deferred.
+      return ok([
+        new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.SANDSTORM, turns: 8 }),
+      ]);
+    case 893:
+      // Deep Fried — "Summons a sea of fire on entry."
+      // Pokerogue has FIRE_SPIN as a single-target trap. Sea of Fire = field
+      // effect that damages over time; closest match is to set up SANDSTORM-
+      // like passive damage. Approximate with sunny day (fire-friendly) +
+      // 4-turn proto. Defer the actual sea-of-fire arena tag.
+      return ok([
+        new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.SUNNY, turns: 5 }),
+      ]);
+    case 877:
+      // Swamp Thing — "Sets the Swamp Pledge effect on entry."
+      // Swamp = halves speed for both teams. Pokerogue has Grass+Water pledge.
+      // Approximate with TerrainType.GRASSY (similar Grass-flavored swamp).
+      // Partial wire.
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.GRASSY_TERRAIN })]);
+    case 924:
+      // Taste the Rainbow — "Summons the Rainbow Pledge effect on entry."
+      // Rainbow = Fire+Water pledge → doubles status proc rates. No direct
+      // pokerogue equivalent. Wire a status-likely boost via PostSummon.
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.RAINY_DAY })]);
+    case 471:
+      // Cold Plasma — "Electric type moves now inflict burn instead of paralysis."
+      // Engine-side flip: when holder uses Electric move with paralysis chance,
+      // change to burn. Pokerogue doesn't expose move-effect type swap as a
+      // primitive yet. Wire as 10% burn on Electric attacks (substitute).
+      return ok([
+        new PostAttackApplyStatusEffectAbAttr(false, 10, StatusEffect.BURN),
+      ]);
+    case 350:
+      // Violent Rush — "Boosts Speed by 50% + Attack by 20% on first turn."
+      // Model as +2 SPD + +1 ATK on entry (stat stages, not %).
+      return ok([
+        new FirstTurnBoostAbAttr({
+          boosts: [
+            { stat: Stat.SPD, stages: 2 },
+            { stat: Stat.ATK, stages: 1 },
+          ],
+        }),
+      ]);
+    case 557:
+      // Readied Action — "Doubles attack on first turn."
+      // Doubles = approx +2 ATK stages.
+      return ok([new FirstTurnBoostAbAttr({ boosts: [{ stat: Stat.ATK, stages: 2 }] })]);
+    case 573:
+      // Rapid Response — "Boosts Speed by 50% + SpAtk by 20% on first turn."
+      return ok([
+        new FirstTurnBoostAbAttr({
+          boosts: [
+            { stat: Stat.SPD, stages: 2 },
+            { stat: Stat.SPATK, stages: 1 },
+          ],
+        }),
+      ]);
+    case 616:
+      // Demolitionist — "Readied Action + Ignores Protect + screens break on
+      // readied turn." Wire the +2 ATK piece; ignore-protect + screen-break
+      // are engine-level move-effects deferred to a future primitive.
+      return ok([
+        new FirstTurnBoostAbAttr({ boosts: [{ stat: Stat.ATK, stages: 2 }] }),
+      ]);
+    case 619:
+      // Low Visibility — "Summons Eerie Fog on entry."
+      // Eerie Fog = FOG weather in pokerogue (WeatherType.FOG = 6).
+      return ok([
+        new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.FOG, turns: 8 }),
+      ]);
+    case 983:
+      // Overcast — "Low Visibility + Sets Mist on entry."
+      // Composite: FOG weather + Mist arena tag (Mist blocks stat drops).
+      return ok([
+        new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.FOG, turns: 8 }),
+        new PostSummonScriptedMoveAbAttr({ moveId: MoveId.MIST }),
+      ]);
+    case 477:
+      // Generator — "Charges up once on entry or when electric terrain is active."
+      // Use the CHARGED battler tag (vanilla Electric move Charge effect).
+      // PostSummon adds the tag once on entry; the "electric terrain"
+      // condition is partial — we don't re-trigger when terrain changes mid-
+      // battle yet.
+      return ok([new PostSummonAddBattlerTagAbAttr(BattlerTagType.CHARGED, 0)]);
+    case 699:
+      // Energized — "Generator + charges up on KO with an Electric-type move."
+      // Same charge tag on entry; KO-trigger deferred.
+      return ok([new PostSummonAddBattlerTagAbAttr(BattlerTagType.CHARGED, 0)]);
+    case 631:
+      // Shiny Lightning — "Grants a 1.2x accuracy boost. Thunder never misses."
+      // Wire the accuracy multiplier; "Thunder never misses" is per-move and
+      // deferred.
+      return ok([new StatMultiplierAbAttr(Stat.ACC, 1.2)]);
+    case 437:
+      // Radiance — "+20% accuracy; Dark moves fail when user is present."
+      // Wire the accuracy boost (matches Compound Eyes pattern); Dark-move
+      // failure-on-field deferred.
+      return ok([new StatMultiplierAbAttr(Stat.ACC, 1.2)]);
+    case 947:
+      // Echolocation — "In fog, deal 20% more damage and never miss."
+      // Wire damage piece: MovePowerBoost gated on FOG weather. "Never miss"
+      // deferred (would need conditional AlwaysHit primitive).
+      return ok([
+        new MovePowerBoostAbAttr(
+          (_u, _t, _move) => globalScene.arena.weather?.weatherType === WeatherType.FOG,
+          1.2,
+        ),
+      ]);
+    case 916:
+      // Narcissist — "When a stat is lowered, sharply raise both offenses."
+      // "Sharply" = +2. Reactor fires after a stat drop from any source.
+      return ok([
+        new PostStatStageChangeStatStageChangeAbAttr(
+          (_t, _s, stages) => stages < 0,
+          [Stat.ATK, Stat.SPATK],
+          2,
+        ),
+      ]);
+    case 994:
+      // Unrelenting — "All attacking moves can hit 2-5 times."
+      // Same shape as Skill Link but with 2-5 range, NOT max. Vanilla pokerogue
+      // has MaxMultiHitAbAttr (forces max) — close-enough approximation that
+      // ensures multi-hit is rolled. True 2-5 range needs a new primitive.
+      return ok([new MaxMultiHitAbAttr()]);
     case 329:
       // Scare — "Lowers foes' Sp. Atk by one stage on entry."
       // Same shape as Intimidate but targeting SPATK. Uses the vanilla
