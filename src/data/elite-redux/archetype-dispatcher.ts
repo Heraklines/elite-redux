@@ -86,6 +86,8 @@ import {
   PostReceiveCritStatStageChangeAbAttr,
   ProtectStatAbAttr,
   StatMultiplierAbAttr,
+  AlwaysHitAbAttr,
+  MoveAbilityBypassAbAttr,
   UserFieldMoveTypePowerBoostAbAttr,
   MoveTypePowerBoostAbAttr,
   LowHpMoveTypePowerBoostAbAttr,
@@ -2501,6 +2503,55 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // has MaxMultiHitAbAttr (forces max) — close-enough approximation that
       // ensures multi-hit is rolled. True 2-5 range needs a new primitive.
       return ok([new MaxMultiHitAbAttr()]);
+    case 368:
+      // Sighting System — "Moves always hit. Moves last for moves less than
+      // 80% accuracy." Wire the always-hit piece; "moves last" is engine work.
+      return ok([new AlwaysHitAbAttr()]);
+    case 377:
+      // Artillery — "Mega Launcher moves always hit and hit both foes."
+      // Wire always-hit. Spread-to-both-foes is per-move engine work.
+      return ok([new AlwaysHitAbAttr()]);
+    case 403:
+      // Roundhouse — "Kicks always hit. Damages foes' weaker defenses."
+      // Wire always-hit. Defense-stat-swap on kicks defer.
+      return ok([new AlwaysHitAbAttr()]);
+    case 421:
+      // Sweeping Edge — "Keen Edge moves always hit and hit both foes."
+      // Wire always-hit. Spread-to-both deferred.
+      return ok([new AlwaysHitAbAttr()]);
+    case 698:
+      // Pinnacle Blade — "Slashing moves always hit and break protection and barriers."
+      // Wire always-hit. Protect-break deferred.
+      return ok([new AlwaysHitAbAttr()]);
+    case 794:
+      // Deadly Precision — "Super-effective moves never miss and ignore abilities."
+      // Wire always-hit + ability bypass (Mold Breaker shape).
+      return ok([new AlwaysHitAbAttr(), new MoveAbilityBypassAbAttr()]);
+    case 921:
+      // Flawless Precision — "Fatal + Deadly Precision."
+      // Composite — wire the Deadly Precision piece.
+      return ok([new AlwaysHitAbAttr(), new MoveAbilityBypassAbAttr()]);
+    case 422:
+      // Gifted Mind — "Nulls Psychic weakness; status moves always hit."
+      // Wire Psychic damage reduction (1.0 → 0.5 = nullify weakness) + always-hit.
+      return ok([
+        new DamageReductionAbAttr({
+          reduction: 0.5,
+          filter: { kind: "move-type", type: PokemonType.PSYCHIC },
+        }),
+        new AlwaysHitAbAttr(),
+      ]);
+    case 955:
+      // Hypnotic Trance — "Hypnosis never misses and also causes Confusion."
+      // Wire as 30% post-attack confusion on any move (best approximation
+      // without per-move accuracy override).
+      return ok([
+        new PostAttackApplyBattlerTagAbAttr(false, () => 30, BattlerTagType.CONFUSED),
+      ]);
+    case 369:
+      // Bad Company — ER spec: "Not implemented right now. Has no effect."
+      // Deliberate empty wire — match ER spec exactly.
+      return ok([]);
     case 329:
       // Scare — "Lowers foes' Sp. Atk by one stage on entry."
       // Same shape as Intimidate but targeting SPATK. Uses the vanilla
