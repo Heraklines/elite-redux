@@ -304,13 +304,38 @@ export class EntryEffectAbAttr extends PostSummonAbAttr {
     const { pokemon } = params;
     const effect = this.effect as EntryEffectAddSelfType;
     const summonData = pokemon.summonData as { types: PokemonType[] | null };
-    const existing = summonData.types ?? [...pokemon.getTypes()];
-    if (existing.includes(effect.type)) {
-      // Already present — write back the materialized list so subsequent
-      // changes see a stable array, but don't append a duplicate.
-      summonData.types = existing;
+
+    // ER ROM semantics: each Pokemon has at most 3 type slots (type1, type2,
+    // type3). Type-adding abilities (Aquatic, Grounded, Ice Age, Half Drake,
+    // Metallic, Dragonfly, Phantom, etc.) write to type3 ONLY IF the Pokemon
+    // doesn't already have that type via type1/type2. Multiple add-type
+    // abilities on the same Pokemon fight for the type3 slot — the most
+    // recent one wins. Maximum is always exactly 3 types.
+    //
+    // We mirror this here: keep first 2 base types intact (slots 0/1), use
+    // slot 2 for the added type. If the type already exists or the holder
+    // is already pure-typed-as-this, no-op.
+
+    // Get the holder's CURRENT effective types (respects any prior overrides).
+    const current = summonData.types && summonData.types.length > 0
+      ? summonData.types
+      : [...pokemon.getTypes()];
+
+    // Already has this type → no-op (matches ER's `!IS_BATTLER_OF_TYPE` guard).
+    if (current.includes(effect.type)) {
+      summonData.types = current;
+      return;
+    }
+
+    // ER's type3-slot model: at most 3 types total. Reuse the existing slot-2
+    // if present (replace whatever's there), else append.
+    if (current.length >= 3) {
+      // Replace the last (slot-2 / type3) entry with the new type. This
+      // matches ER's overwrite-on-conflict behavior when multiple add-type
+      // abilities are active.
+      summonData.types = [...current.slice(0, 2), effect.type];
     } else {
-      summonData.types = [...existing, effect.type];
+      summonData.types = [...current, effect.type];
     }
   }
 }
