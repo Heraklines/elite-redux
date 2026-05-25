@@ -1,0 +1,20 @@
+ER move-stats vs pokerogue diff — generated 2026-05-25T19:49:53.341Z
+Total diffs found: 17
+
+  ER 18 →  18 WHIRLWIND                 : power 60→0, acc 100→0
+  ER 45 →  45 GROWL                     : power 60→0
+  ER129 → 129 SWIFT                     : acc 100→0
+  ER139 → 139 POISON_GAS                : power 65→0
+  ER150 → 150 SPLASH                    : power 1→0, acc 100→0
+  ER171 → 171 NIGHTMARE                 : power 120→0
+  ER267 → 267 NATURE_POWER              : power 50→0, acc 100→0
+  ER376 → 376 TRUMP_CARD                : power 85→0, acc 100→0
+  ER378 → 378 WRING_OUT                 : power 80→0
+  ER445 → 445 CAPTIVATE                 : power 65→0
+  ER699 → 753 OCTOLOCK                  : power 20→0
+  ER705 → 777 DECORATE                  : power 80→0, acc 100→0
+  ER738 → 810 CORROSIVE_GAS             : power 40→0
+  ER755 → 5000 DEATHROLL                 : acc 100→95
+  ER756 → 5001 EXCALIBUR                 : chance 20→0
+  ER757 → 5002 AQUA_FANG                 : power 85→80, chance 20→10
+  ER759 → 5003 SMITE                     : chance 20→100

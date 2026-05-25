@@ -15,6 +15,7 @@ import { initEliteReduxMovesets } from "#data/elite-redux/init-elite-redux-moves
 import { initEliteReduxSpecies } from "#data/elite-redux/init-elite-redux-species";
 import { initEliteReduxTrainers } from "#data/elite-redux/init-elite-redux-trainers";
 import { initEliteReduxVanillaRebalance } from "#data/elite-redux/init-elite-redux-vanilla-rebalance";
+import { initEliteReduxCSourceCorrections } from "#data/elite-redux/init-elite-redux-c-source-corrections";
 import { initPokemonForms } from "#data/pokemon-forms";
 import { initBiomeBgmLoopPoints } from "#init/init-biome-bgm-loop-points";
 import { initBiomeDepths } from "#init/init-biome-depths";
@@ -96,6 +97,12 @@ export function initializeGame() {
   }
   console.info(
     `[er-b3] vanilla rebalance applied: ${rebalanceResult.moveDeltas} move deltas (${rebalanceResult.moveFieldWrites} field writes), ${rebalanceResult.abilityDeltas} ability deltas, ${rebalanceResult.moveMissing} moves + ${rebalanceResult.abilityMissing} abilities skipped (id-map drift)`,
+  );
+  // R57: C-source corrections. Must run AFTER initEliteReduxVanillaRebalance
+  // so we overwrite stale beta-JSON values with the v2.65.3b ROM C source.
+  const cSrcResult = initEliteReduxCSourceCorrections();
+  console.info(
+    `[er-r57] C-source corrections applied: ${cSrcResult.movesPatched} moves patched, ${cSrcResult.movesMissing} missing`,
   );
   // Elite Redux Phase B4: populate the ER trainer registry. Must run AFTER
   // initEliteReduxCustomSpecies() and initEliteReduxCustomMoves() so the

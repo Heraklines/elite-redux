@@ -509,6 +509,29 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       orFlag(move, MoveFlags.HORN_BASED);
     },
   ],
+
+  // =====================================================================
+  // R57 — Effect-chance restorations
+  //
+  // Discovered via er-move-diff-audit: pokerogue had `move.chance = 0`
+  // for these moves while ER spec gives them non-zero secondary chance.
+  // Each entry sets `move.chance` to the ER value so the secondary
+  // effect rolls at the right rate.
+  // =====================================================================
+  [MoveId.ROLLING_KICK, move => { move.chance = 30; }],
+  [MoveId.BUBBLE_BEAM, move => { move.chance = 10; }],
+  [MoveId.SKY_ATTACK, move => { move.chance = 30; }],
+  [MoveId.FLAME_WHEEL, move => { move.chance = 10; }],
+  [MoveId.MUD_SLAP, move => { move.chance = 100; }],
+  [MoveId.RAPID_SPIN, move => { move.chance = 100; }],
+  [MoveId.SECRET_POWER, move => { move.chance = 30; }],
+  [MoveId.POWER_SWAP, move => { move.chance = 100; }],
+  [MoveId.GUARD_SWAP, move => { move.chance = 100; }],
+  [MoveId.STRUGGLE_BUG, move => { move.chance = 100; }],
+  [MoveId.STEAMROLLER, move => { move.chance = 30; }],
+  [MoveId.NIGHT_DAZE, move => { move.chance = 40; }],
+  [MoveId.THROAT_CHOP, move => { move.chance = 100; }],
+  [MoveId.EERIE_SPELL, move => { move.chance = 100; }],
 ]);
 
 // =============================================================================
