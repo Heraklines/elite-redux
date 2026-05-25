@@ -47,7 +47,32 @@
 | Move name table | Inline @ 0x9c826d (855 entries) → `inline-13byte-table-best.json` |
 | LZ77 graphics blocks | **2000 decompressed** (5.4MB) → `graphics/*.4bpp` + `.pgm` atlas |
 | RGB555 palette candidates | 5000 found, first 500 saved as `.gpl` → `palettes/` |
-| Ghidra import + decomp | Running in background (heap fluctuating 0.8-2.0GB) |
+| Ghidra import + decomp | **ABANDONED** — see "Ghidra postmortem" below |
+
+## Ghidra postmortem
+
+Two full attempts, both killed:
+1. **PID 71940** (~5 hours): auto-analyzer stuck in ARM/Thumb disambiguation loop on
+   the same handful of addresses. Same "Unable to resolve constructor" warnings
+   cycling indefinitely. Killed.
+2. **PID 53532** (~1 hour with Thumb pre-script): forward progress (errors moved
+   from 0x0830 → 0x0957) but still grinding on thunk-function creation failures.
+   No output files produced. Killed.
+
+**Decision**: Ghidra abandoned. The Python-based extraction already covers
+everything the port needs:
+- 193k ASCII strings + 37k Pokémon-text strings (essentially all in-game text)
+- 1029/1034 ability names + 1028/1032 move names matched between ROM and JSON dump
+- 2000 LZ77 graphics blocks (5.4MB) — covers sprites/UI
+- 500 RGB555 palettes
+- Inline 13-byte move name table located at ROM offset 0x9c826d (855 entries)
+
+The JSON dump (`v2.65beta.json`) + Python extractor gave us 99.5%+ name coverage.
+Decompiled C source from Ghidra would only matter for re-implementing bespoke
+mechanical primitives — and we have the full pret/pokeemerald-style C source in
+`vendor/elite-redux/source/src/` already (mirrored from the GitHub repo —
+includes `battle_ai_main.c`, `battle_ai_util.c`, `battle_ai_switch_items.c`,
+etc.). For any ability where we need the C truth, grep that mirror directly.
 
 ## R55 — Empty-bespoke reduction session (2026-05-23..25)
 
