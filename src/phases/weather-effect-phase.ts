@@ -15,11 +15,10 @@ export class WeatherEffectPhase extends CommonAnimPhase {
   public weather: Weather | null;
 
   constructor() {
-    super(
-      undefined,
-      undefined,
-      CommonAnim.SUNNY + ((globalScene?.arena?.weather?.weatherType || WeatherType.NONE) - 1),
-    );
+    const w = globalScene?.arena?.weather?.weatherType || WeatherType.NONE;
+    // ER: special-case FOG so it picks CommonAnim.FOG instead of CommonAnim.WIND.
+    const anim = w === WeatherType.FOG ? CommonAnim.FOG : CommonAnim.SUNNY + (w - 1);
+    super(undefined, undefined, anim);
     this.weather = globalScene?.arena?.weather;
   }
 
@@ -31,7 +30,9 @@ export class WeatherEffectPhase extends CommonAnimPhase {
       return this.end();
     }
 
-    this.setAnimation(CommonAnim.SUNNY + (this.weather.weatherType - 1));
+    const w = this.weather.weatherType;
+    const anim = w === WeatherType.FOG ? CommonAnim.FOG : CommonAnim.SUNNY + (w - 1);
+    this.setAnimation(anim);
 
     if (this.weather.isDamaging()) {
       const cancelled = new BooleanHolder(false);

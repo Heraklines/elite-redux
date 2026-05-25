@@ -262,12 +262,8 @@ export class Arena {
       this.weather?.isImmutable()
       && ![WeatherType.HARSH_SUN, WeatherType.HEAVY_RAIN, WeatherType.STRONG_WINDS, WeatherType.NONE].includes(weather)
     ) {
-      globalScene.phaseManager.unshiftNew(
-        "CommonAnimPhase",
-        undefined,
-        undefined,
-        CommonAnim.SUNNY + (oldWeatherType - 1),
-      );
+      const oldAnim = oldWeatherType === WeatherType.FOG ? CommonAnim.FOG : CommonAnim.SUNNY + (oldWeatherType - 1);
+      globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, oldAnim);
       globalScene.phaseManager.queueMessage(getLegendaryWeatherContinuesMessage(oldWeatherType)!);
       return false;
     }
@@ -285,7 +281,10 @@ export class Arena {
     ); // TODO: this `x?.y!` is dumb, fix this
 
     if (this.weather) {
-      globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, CommonAnim.SUNNY + (weather - 1));
+      // Elite Redux: FOG (=6) maps to CommonAnim.WIND via the SUNNY+(weather-1)
+      // math, which is wrong. Use the dedicated CommonAnim.FOG slot instead.
+      const anim = weather === WeatherType.FOG ? CommonAnim.FOG : CommonAnim.SUNNY + (weather - 1);
+      globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, anim);
       globalScene.phaseManager.queueMessage(getWeatherStartMessage(weather)!); // TODO: is this bang correct?
     } else {
       globalScene.phaseManager.queueMessage(getWeatherClearMessage(oldWeatherType)!); // TODO: is this bang correct?

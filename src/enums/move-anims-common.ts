@@ -87,6 +87,13 @@ export enum CommonAnim {
   HEAVY_RAIN,
   HARSH_SUN,
   STRONG_WINDS,
+  /**
+   * Elite Redux: FOG weather animation. Slot 2109 (after STRONG_WINDS).
+   * NOT part of the `SUNNY + (weather - 1)` arithmetic dispatch in
+   * `Arena.trySetWeather` — that math gives WIND for FOG=6, which is
+   * incorrect. Callers special-case FOG to pick CommonAnim.FOG explicitly.
+   */
+  FOG = 2109,
   MISTY_TERRAIN = 2110,
   ELECTRIC_TERRAIN,
   GRASSY_TERRAIN,
