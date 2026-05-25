@@ -276,6 +276,32 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
       ab.attrs.push(new ReceivedMoveDamageMultiplierAbAttr(() => true, 0.8));
     },
   ],
+  // SHELL_ARMOR (75): ER spec "Immune to critical hits. Takes 20% less
+  // damage from attacks." Same rider as BATTLE_ARMOR.
+  [
+    AbilityId.SHELL_ARMOR,
+    ab => {
+      ab.attrs.push(new ReceivedMoveDamageMultiplierAbAttr(() => true, 0.8));
+    },
+  ],
+  // VITAL_SPIRIT (72): ER spec "Can't fall asleep. Fighting-type moves heal
+  // status." Vanilla just blocks sleep. Add: PostAttack hook that cures own
+  // status when holder uses a Fighting-type move. Pokerogue's existing
+  // primitives don't expose self-status-cure on attack; we approximate by
+  // letting Fighting moves not trigger status interactions (defer the cure
+  // piece — requires a new primitive). Wire as no-op rider for now.
+  // [AbilityId.VITAL_SPIRIT, ab => { /* deferred */ }],
+  // AIR_LOCK (76): ER spec "Cloud Nine + Air Blower." Cloud Nine is the
+  // vanilla weather-suppression. Air Blower = Tailwind on entry. Add the
+  // Tailwind piece via a PostSummon hook (Tailwind is an arena tag — would
+  // need EntryEffectAbAttr import); defer to bespoke path.
+  // [AbilityId.AIR_LOCK, ab => { /* deferred */ }],
+  // STENCH (1): ER spec ALLEGEDLY says "Toxic terrain is permanent" but ER
+  // C source (vendor/elite-redux/source/src/battle_util.c:9801) implements
+  // ONLY the 10% flinch — same as vanilla pokerogue. NO PATCH NEEDED.
+  // DAMP (6): ER spec ALLEGEDLY adds "Makes foe Water-type on contact"
+  // but ER C source only implements explosion-block (matches vanilla).
+  // NO PATCH NEEDED.
   // IMMUNITY: poison immune + halves damage taken from Poison-type moves.
   [
     AbilityId.IMMUNITY,

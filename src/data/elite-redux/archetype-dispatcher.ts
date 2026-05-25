@@ -88,6 +88,7 @@ import {
   StatMultiplierAbAttr,
   AlwaysHitAbAttr,
   MoveAbilityBypassAbAttr,
+  BattlerTagImmunityAbAttr,
   UserFieldMoveTypePowerBoostAbAttr,
   MoveTypePowerBoostAbAttr,
   LowHpMoveTypePowerBoostAbAttr,
@@ -2552,6 +2553,82 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Bad Company — ER spec: "Not implemented right now. Has no effect."
       // Deliberate empty wire — match ER spec exactly.
       return ok([]);
+    case 327:
+      // Hypnotist — "Hypnosis accuracy is 90%" (ER ROM C source actually
+      // sets it to 100%). Pokerogue lacks a per-move accuracy override
+      // primitive — approximate via 1.5x ACC multiplier on all moves.
+      // Broader than spec but functional.
+      return ok([new StatMultiplierAbAttr(Stat.ACC, 1.5)]);
+    case 786:
+      // Lullaby — "Sing accuracy is 90%" (presumably 100% in ER ROM by
+      // analogy with Hypnotist). Same approximation as Hypnotist.
+      return ok([new StatMultiplierAbAttr(Stat.ACC, 1.5)]);
+    case 439:
+      // Angel's Wrath — "Drastically alters all of the users moves."
+      // Vague spec. Approximate as 1.3x all-move damage boost.
+      return ok([new MovePowerBoostAbAttr(() => true, 1.3)]);
+    case 473:
+      // Inversion — "Sets up Inverse Room on entry, lasts 3 turns."
+      // Pokerogue lacks Inverse Room arena tag. Approximate by giving the
+      // holder a 1.5x boost on moves that would normally be resisted —
+      // proxy: just generic 1.2x damage boost on entry (deferred to a
+      // proper inverse-type-chart tag in a future engine pass).
+      return ok([new MovePowerBoostAbAttr(() => true, 1.2)]);
+    case 636:
+      // Blood Bath — "Immune to bleed. Inflict fear when inflicting bleed."
+      // Wire ER_BLEED tag immunity + ER_FEAR on attack (post-attack apply
+      // tag whenever holder deals damage with a bleeding move, approximated
+      // as 30% chance on slicing moves).
+      return ok([
+        new BattlerTagImmunityAbAttr(BattlerTagType.ER_BLEED),
+        new PostAttackApplyBattlerTagAbAttr(
+          false,
+          (_u, _t, move) => (move.hasFlag(MoveFlags.SLICING_MOVE) ? 30 : 0),
+          BattlerTagType.ER_FEAR,
+        ),
+      ]);
+    case 648:
+      // On the Prowl — "+1 priority for the first turn. Negative priority
+      // becomes +0." Pokerogue lacks per-turn priority-bracket modifier.
+      // Approximate as +2 SPD on entry (acts like priority surrogate).
+      return ok([new FirstTurnBoostAbAttr({ boosts: [{ stat: Stat.SPD, stages: 2 }] })]);
+    case 669:
+      // Flammable Coat — "Changes forms when using or hit by a Fire-type move."
+      // Form change requires species-specific bespoke data. Approximate as
+      // halved Fire damage taken (defensive piece — the form change is
+      // typically defensive in nature).
+      return ok([
+        new DamageReductionAbAttr({
+          reduction: 0.5,
+          filter: { kind: "move-type", type: PokemonType.FIRE },
+        }),
+      ]);
+    case 676:
+      // Sidewinder — "First biting move each entry gets +1 priority."
+      // Approximate with +1 SPD on entry (priority bracket too complex).
+      return ok([new FirstTurnBoostAbAttr({ boosts: [{ stat: Stat.SPD, stages: 1 }] })]);
+    case 791:
+      // DNA Scramble — "Changes forms based on the the move used."
+      // Form change requires bespoke per-species data. Approximate as 1.2x
+      // damage on all moves (generic "scrambled" buff).
+      return ok([new MovePowerBoostAbAttr(() => true, 1.2)]);
+    case 813:
+      // Mixed Martial Arts — "Normal moves are flagged as Punch + Kick moves."
+      // Flag injection is engine work. Approximate as a Normal-type damage
+      // boost since the practical effect is Iron Fist/Skill Smasher synergy
+      // with Normal moves on the holder.
+      return ok([new MoveTypePowerBoostAbAttr(PokemonType.NORMAL, 1.2)]);
+    case 830:
+      // Temporal Rupture — "Roar of Time is altered drastically."
+      // Approximate as 1.5x boost on Roar of Time specifically.
+      return ok([
+        new MovePowerBoostAbAttr((_u, _t, move) => move.id === MoveId.ROAR_OF_TIME, 1.5),
+      ]);
+    case 834:
+      // Toxic Surge — "Sets Toxic Terrain on entry."
+      // Pokerogue has no Toxic Terrain. Approximate with Toxic Spikes (closest
+      // toxic-themed field effect that exists).
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TOXIC_SPIKES })]);
     case 329:
       // Scare — "Lowers foes' Sp. Atk by one stage on entry."
       // Same shape as Intimidate but targeting SPATK. Uses the vanilla
