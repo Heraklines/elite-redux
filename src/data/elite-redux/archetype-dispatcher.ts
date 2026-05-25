@@ -2428,26 +2428,23 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         ),
       ]);
     case 557:
-      // Readied Action — "Doubles attack on first turn."
-      // Doubles = approx +2 ATK stages.
-      return ok([new FirstTurnBoostAbAttr({ boosts: [{ stat: Stat.ATK, stages: 2 }] })]);
+      // Readied Action — "Doubles attack on first turn." Faithful: ATK × 2.0
+      // ONLY on first turn (multiplier, not stat stage).
+      return ok([new FirstTurnStatMultiplierAbAttr({ stat: Stat.ATK, multiplier: 2.0 })]);
     case 573:
       // Rapid Response — "Boosts Speed by 50% + SpAtk by 20% on first turn."
       return ok([
-        new FirstTurnBoostAbAttr({
-          boosts: [
-            { stat: Stat.SPD, stages: 2 },
-            { stat: Stat.SPATK, stages: 1 },
-          ],
-        }),
+        new FirstTurnStatMultiplierAbAttr({ stat: Stat.SPD, multiplier: 1.5 }),
+        new FirstTurnStatMultiplierAbAttr({ stat: Stat.SPATK, multiplier: 1.2 }),
       ]);
     case 616:
       // Demolitionist — "Readied Action + Ignores Protect + screens break on
-      // readied turn." Wire the +2 ATK piece; ignore-protect + screen-break
-      // are engine-level move-effects deferred to a future primitive.
-      return ok([
-        new FirstTurnBoostAbAttr({ boosts: [{ stat: Stat.ATK, stages: 2 }] }),
-      ]);
+      // readied turn." Wire ATK × 2.0 on first turn. Ignore-Protect and
+      // screen-break are engine-level move-effects that need a per-move
+      // attribute injection; deferred (require new MoveAttr primitive that
+      // checks user's ability + first-turn predicate). For the player-facing
+      // damage component, the 2x ATK alone is functional.
+      return ok([new FirstTurnStatMultiplierAbAttr({ stat: Stat.ATK, multiplier: 2.0 })]);
     case 619:
       // Low Visibility — "Summons Eerie Fog on entry."
       // Eerie Fog = FOG weather in pokerogue (WeatherType.FOG = 6).

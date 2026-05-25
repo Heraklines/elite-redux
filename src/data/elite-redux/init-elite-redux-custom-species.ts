@@ -19,10 +19,18 @@ import { allSpecies } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import type { ErSpeciesDraft } from "#data/elite-redux/er-species";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
+import { ER_SPRITE_MANIFEST } from "#data/elite-redux/er-sprite-manifest";
 import { GrowthRate } from "#data/exp";
 import { PokemonSpecies } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
 import { PokemonType } from "#enums/pokemon-type";
+import { globalScene } from "#app/global-scene";
+import type { Variant } from "#sprites/variant";
+
+/** Lookup: ER species id → kebab-case sprite slug ("phantowl", "abyssand"...). */
+const ER_SPRITE_BY_SPECIES_ID = new Map<number, string>(
+  ER_SPRITE_MANIFEST.map(e => [e.speciesId, e.slug]),
+);
 
 /**
  * Numeric cutoff for "vanilla pokerogue" species ids. ER-custom species are
@@ -172,6 +180,8 @@ function mapGenderRatio(erGender: number): number | null {
 class ErCustomSpecies extends PokemonSpecies {
   /** Fallback display name from the ER draft (set pre-construction). */
   private static readonly _draftNames = new Map<number, string>();
+  /** Pokerogue speciesId → ER sprite slug (e.g. 10000 → "phantowl"). */
+  private static readonly _spriteSlugs = new Map<number, string>();
 
   /**
    * Override of the base `localize()`. Looks up the draft name installed
@@ -186,6 +196,116 @@ class ErCustomSpecies extends PokemonSpecies {
   /** Stash the draft name keyed by pokerogue species id before construction. */
   static registerDraftName(id: number, name: string): void {
     ErCustomSpecies._draftNames.set(id, name);
+  }
+
+  /** Register the ER sprite slug for a pokerogue species id. */
+  static registerSpriteSlug(id: number, slug: string): void {
+    ErCustomSpecies._spriteSlugs.set(id, slug);
+  }
+
+  /**
+   * Override the sprite atlas path so ER-custom species load from
+   * `elite-redux/{slug}/{front,back,shiny,...}` instead of the vanilla
+   * `images/pokemon/{id}` path (which has no asset on disk for id >= 10000).
+   */
+  override getSpriteAtlasPath(
+    _female: boolean,
+    _formIndex?: number,
+    shiny?: boolean,
+    variant?: number,
+    back?: boolean,
+  ): string {
+    const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
+    if (!slug) {
+      // Fall through to vanilla path (will 404 — log once)
+      return super.getSpriteAtlasPath(_female, _formIndex, shiny, variant, back);
+    }
+    // ER sprite directory layout (all relative to public root, hence the
+    // leading `pokemon/elite-redux/{slug}/`):
+    //   front.png  back.png  icon.png
+    //   shiny.png  shiny-back.png         (tier 1)
+    //   shiny-2.png  shiny-back-2.png     (tier 2 — variant === 1)
+    //   shiny-3.png  shiny-back-3.png     (tier 3 — variant === 2)
+    let filename: string;
+    if (shiny) {
+      const tier = variant ?? 0;
+      const suffix = tier === 0 ? "" : `-${tier + 1}`;
+      filename = back ? `shiny-back${suffix}` : `shiny${suffix}`;
+    } else {
+      filename = back ? "back" : "front";
+    }
+    return `elite-redux/${slug}/${filename}`;
+  }
+
+  /**
+   * Override sprite ID/key to match the path scheme. Returns the slug-based
+   * key so atlas-cache lookups (e.g. animation creation) use the same key
+   * regardless of whether the sprite is being loaded or displayed.
+   */
+  override getSpriteId(
+    _female: boolean,
+    _formIndex?: number,
+    shiny?: boolean,
+    variant?: number,
+    back?: boolean,
+  ): string {
+    const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
+    if (!slug) {
+      return super.getSpriteId(_female, _formIndex, shiny, variant ?? 0, back);
+    }
+    const suffix = shiny ? (variant ? `_shiny${variant + 1}` : "_shiny") : "";
+    const backPrefix = back ? "back__" : "";
+    return `${backPrefix}er__${slug}${suffix}`;
+  }
+
+  /**
+   * Icons for ER-custom species live at `elite-redux/{slug}/icon.png`.
+   * Use a per-slug atlas key so each one is loaded lazily by
+   * `loadPokemonAtlas` rather than expecting the bundled `pokemon_icons_N`
+   * sheet (which has no frames for id >= 10000).
+   */
+  override getIconAtlasKey(_formIndex?: number, _shiny?: boolean, _variant?: number): string {
+    const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
+    if (!slug) {
+      return super.getIconAtlasKey(_formIndex, _shiny, _variant);
+    }
+    return `er_icon__${slug}`;
+  }
+
+  /**
+   * Frame ID inside the per-slug icon atlas. Our generated atlas JSON has
+   * a single frame "0001.png" — return that string.
+   */
+  override getIconId(female: boolean, formIndex?: number, shiny?: boolean, variant?: number): string {
+    const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
+    if (!slug) {
+      return super.getIconId(female, formIndex, shiny, variant);
+    }
+    return "0001.png";
+  }
+
+  /**
+   * Extend `loadAssets` to also load the per-slug icon atlas alongside the
+   * sprite. Without this, `pokemon_icons_N` is consulted for ER-custom IDs
+   * (no frame exists) and the icon falls back to a blank.
+   */
+  override async loadAssets(
+    female = false,
+    formIndex?: number,
+    shiny = false,
+    variant?: Variant,
+    startLoad = false,
+    back = false,
+  ): Promise<void> {
+    const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
+    if (slug) {
+      // Preload the icon atlas (key matches getIconAtlasKey output).
+      const iconKey = `er_icon__${slug}`;
+      if (!globalScene.textures.exists(iconKey)) {
+        globalScene.loadPokemonAtlas(iconKey, `elite-redux/${slug}/icon`);
+      }
+    }
+    return super.loadAssets(female, formIndex, shiny, variant, startLoad, back);
   }
 }
 
@@ -234,6 +354,12 @@ export function initEliteReduxCustomSpecies(): InitEliteReduxCustomSpeciesResult
         mapAbilityId(draft.innates[1]),
         mapAbilityId(draft.innates[2]),
       ]);
+      // Register the ER sprite slug for this species so getSpriteAtlasPath
+      // resolves to assets/images/pokemon/elite-redux/{slug}/*.
+      const slug = ER_SPRITE_BY_SPECIES_ID.get(draft.id);
+      if (slug) {
+        ErCustomSpecies.registerSpriteSlug(pokerogueId, slug);
+      }
       (allSpecies as PokemonSpecies[]).push(species);
       existingIds.add(pokerogueId);
       result.customsAdded++;
