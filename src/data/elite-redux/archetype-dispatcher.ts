@@ -83,6 +83,8 @@ import {
   ProtectStatAbAttr,
   StatMultiplierAbAttr,
   UserFieldMoveTypePowerBoostAbAttr,
+  MoveTypePowerBoostAbAttr,
+  LowHpMoveTypePowerBoostAbAttr,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { allAbilities } from "#data/data-lists";
@@ -145,6 +147,8 @@ import { PostDefendSuppressOpponentDamageBoostAbAttr } from "#data/elite-redux/a
 import { PostAttackContactSuppressTargetAbilityAbAttr } from "#data/elite-redux/archetypes/post-attack-contact-suppress-target-ability";
 import { PostAttackScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-attack-scripted-move";
 import { PostSummonScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-summon-scripted-move";
+import { SelfHighestStatMultiplierAbAttr } from "#data/elite-redux/archetypes/self-highest-stat-multiplier";
+import { SelfHighestStatBoostOnSummonAbAttr } from "#data/elite-redux/archetypes/self-highest-stat-boost-on-summon";
 import { PostFaintReviveAbAttr } from "#data/elite-redux/archetypes/post-faint-revive";
 import { PostSummonClearTerrainAbAttr } from "#data/elite-redux/archetypes/post-summon-clear-terrain";
 import { PostSummonQuashFoesAbAttr } from "#data/elite-redux/archetypes/post-summon-quash-foes";
@@ -2115,6 +2119,103 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // same shape as Levitate's Ground immunity). The Stealth Rock piece
       // would need an arena-hazard immunity path; deferred.
       return ok([new AttackTypeImmunityAbAttr(PokemonType.ROCK)]);
+    case 271:
+      // Keen Edge — "Boosts the power of slashing moves by 1.3x."
+      return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.SLICING_MOVE, multiplier: 1.3 })]);
+    case 276:
+      // Vengeance — "Boosts Ghost-type moves by 1.2x, or 1.5x when below 1/3 HP."
+      // Wire as base Ghost 1.2x (always-on) + a stacked 1.25x conditional on
+      // low HP (1.2 × 1.25 = 1.5x). MovePowerBoostAbAttr takes a predicate.
+      return ok([
+        new MoveTypePowerBoostAbAttr(PokemonType.GHOST, 1.2),
+        new MovePowerBoostAbAttr(
+          (user, _t, move) => !!move && move.type === PokemonType.GHOST && !!user && user.getHpRatio() < 1 / 3,
+          1.25,
+        ),
+      ]);
+    case 299:
+      // Earthbound — "Boosts Ground-type moves by 1.2x, or 1.5x when under 1/3 HP."
+      return ok([
+        new MoveTypePowerBoostAbAttr(PokemonType.GROUND, 1.2),
+        new MovePowerBoostAbAttr(
+          (user, _t, move) => !!move && move.type === PokemonType.GROUND && !!user && user.getHpRatio() < 1 / 3,
+          1.25,
+        ),
+      ]);
+    case 269:
+      // Whiteout — "Ups highest attacking stat by 1.5x in hail."
+      return ok([
+        new SelfHighestStatMultiplierAbAttr({
+          candidates: [Stat.ATK, Stat.SPATK],
+          multiplier: 1.5,
+          weathers: [WeatherType.HAIL, WeatherType.SNOW],
+        }),
+      ]);
+    case 621:
+      // Ectoplasm — "Ups highest attacking stat by 1.5x in fog."
+      return ok([
+        new SelfHighestStatMultiplierAbAttr({
+          candidates: [Stat.ATK, Stat.SPATK],
+          multiplier: 1.5,
+          weathers: [WeatherType.FOG],
+        }),
+      ]);
+    case 935:
+      // Raging Storm — "Ups highest attacking stat by 1.5x in rain."
+      return ok([
+        new SelfHighestStatMultiplierAbAttr({
+          candidates: [Stat.ATK, Stat.SPATK],
+          multiplier: 1.5,
+          weathers: [WeatherType.RAIN, WeatherType.HEAVY_RAIN],
+        }),
+      ]);
+    case 627:
+      // Ethereal Rush — "This Pokémon's Speed gets a 1.5x boost in fog."
+      // Single-stat (SPD) so use SelfHighestStatMultiplier with just SPD — it
+      // is trivially "highest" of the candidate list, gated on fog.
+      return ok([
+        new SelfHighestStatMultiplierAbAttr({
+          candidates: [Stat.SPD],
+          multiplier: 1.5,
+          weathers: [WeatherType.FOG],
+        }),
+      ]);
+    case 380:
+      // Sun Worship — "Ups highest stat by +1 on entry when sunny."
+      return ok([
+        new SelfHighestStatBoostOnSummonAbAttr({
+          candidates: [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD],
+          stages: 1,
+          weathers: [WeatherType.SUNNY, WeatherType.HARSH_SUN],
+        }),
+      ]);
+    case 356:
+      // Sea Guardian — "Ups highest stat by +1 on entry when it rains."
+      return ok([
+        new SelfHighestStatBoostOnSummonAbAttr({
+          candidates: [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD],
+          stages: 1,
+          weathers: [WeatherType.RAIN, WeatherType.HEAVY_RAIN],
+        }),
+      ]);
+    case 625:
+      // Greater Spirit — "Ups highest stat by +1 on entry in fog."
+      return ok([
+        new SelfHighestStatBoostOnSummonAbAttr({
+          candidates: [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD],
+          stages: 1,
+          weathers: [WeatherType.FOG],
+        }),
+      ]);
+    case 330:
+      // Majestic Moth — "On entry, raises highest calculated stat by one stage."
+      // No weather/terrain gate.
+      return ok([
+        new SelfHighestStatBoostOnSummonAbAttr({
+          candidates: [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD],
+          stages: 1,
+        }),
+      ]);
     case 329:
       // Scare — "Lowers foes' Sp. Atk by one stage on entry."
       // Same shape as Intimidate but targeting SPATK. Uses the vanilla
