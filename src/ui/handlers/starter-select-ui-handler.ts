@@ -459,12 +459,6 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private canCycleTera: boolean;
 
   private assetLoadCancelled: BooleanHolder | null;
-  // Track which species the pokemonSprite is currently animating. If a
-  // load fails/stalls and a later re-render (candy unlock, ability swap)
-  // omits shiny/form/gender changes, we'd otherwise leave the wrong
-  // species's animation playing. Using this to detect drift forces a
-  // re-load whenever the displayed species differs from the selected one.
-  private currentDisplayedSpeciesId: number | null = null;
   public cursorObj: Phaser.GameObjects.Image;
   private starterCursorObjs: Phaser.GameObjects.Image[];
   private pokerusCursorObjs: Phaser.GameObjects.Image[];
@@ -3081,37 +3075,6 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   }
 
   /**
-   * Kick off background loads for the species likely to be selected next
-   * — the 8 grid neighbors of the current cursor (one left, one right,
-   * one row up, one row down, and the 4 diagonals). Fire-and-forget;
-   * each loadAssets short-circuits if the texture is already cached, so
-   * repeat calls cost nothing. The result is that arrow-key navigation
-   * (left/right/up/down) almost always hits a pre-warmed cache.
-   */
-  private prefetchSpriteNeighbors(): void {
-    const cursor = this.cursor;
-    const containers = this.filteredStarterContainers;
-    if (!containers || containers.length === 0) {
-      return;
-    }
-    const offsets = [-10, -9, -8, -1, 1, 8, 9, 10];
-    for (const offset of offsets) {
-      const idx = cursor + offset;
-      if (idx < 0 || idx >= containers.length) {
-        continue;
-      }
-      const species = containers[idx]?.species;
-      if (!species) {
-        continue;
-      }
-      const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(species.speciesId));
-      // Fire-and-forget. Errors swallowed — neighbor prefetch is
-      // strictly speculative and shouldn't break the main flow.
-      species.loadAssets(props.female, props.formIndex, props.shiny, props.variant, true).catch(() => {});
-    }
-  }
-
-  /**
    * Puts a move at the requested index in the current highlighted Pokemon's moveset.
    * If the move was already present in the moveset, swap its position with the one at the requested index.
    *
@@ -4262,20 +4225,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.teraCursor = PokemonType.UNKNOWN;
     // We will only update the sprite if there is a change to form, shiny/variant
     // or gender for species with gender sprite differences
-    // Force sprite update when the species has changed since the last
-    // play() — prior loads may have failed/stalled (rapid grid navigation)
-    // leaving the sprite GameObject playing the WRONG species's animation.
-    // Without this, a subsequent re-render (candy unlock, ability swap,
-    // etc.) that omits shiny/form/gender would keep the stale animation
-    // playing and show the wrong Pokemon entirely.
-    const speciesChanged =
-      species != null && this.currentDisplayedSpeciesId !== (species.speciesId as unknown as number);
+    // We will only update the sprite if there is a change to form, shiny/variant
+    // or gender for species with gender sprite differences
     const shouldUpdateSprite =
-      speciesChanged
-      || (species?.genderDiffs && female != null)
-      || formIndex != null
-      || shiny != null
-      || variant != null;
+      (species?.genderDiffs && female != null) || formIndex != null || shiny != null || variant != null;
 
     const isFreshStartChallenge = globalScene.gameMode.hasChallenge(Challenges.FRESH_START);
 
@@ -4320,19 +4273,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       }
     }
 
-    // NOTE: we DO NOT hide the sprite here. Previously this code did
-    // `pokemonSprite.setVisible(false)` unconditionally, then re-enabled
-    // visibility INSIDE the async .then() of loadAssets. If the load
-    // bailed (cancellation token tripped, texture cache miss, anim cache
-    // miss, missing/404 atlas, network blip) the sprite was left
-    // permanently HIDDEN — the user saw a blank panel and assumed the
-    // sprite never loaded. The actual issue was just that setVisible(true)
-    // was unreachable.
-    //
-    // Instead: leave the sprite showing its prior animation. When the
-    // new texture lands, .play() swaps the animation. If the load fails,
-    // the sprite continues showing the prior animation — visually wrong
-    // for one frame but recoverable on the next interaction.
+    this.pokemonSprite.setVisible(false);
     this.pokemonPassiveLabelText.setVisible(false);
     this.pokemonPassiveText.setVisible(false);
     this.pokemonPassiveDisabledIcon.setVisible(false);
@@ -4394,14 +4335,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         getTextColor(shiny ? TextStyle.SUMMARY_DEX_NUM_GOLD : TextStyle.SUMMARY_DEX_NUM, true),
       );
 
-      const hasDexEntry = forSeen
-        ? this.speciesStarterDexEntry?.seenAttr
-        : this.speciesStarterDexEntry?.caughtAttr;
-      if (!hasDexEntry) {
-        // Uncaught/unseen species shouldn't show a sprite.
-        this.pokemonSprite.setVisible(false);
-      }
-      if (hasDexEntry) {
+      if (forSeen ? this.speciesStarterDexEntry?.seenAttr : this.speciesStarterDexEntry?.caughtAttr) {
         const starterIndex = this.starterSpecies.indexOf(species);
 
         if (starterIndex > -1) {
@@ -4420,68 +4354,23 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         this.assetLoadCancelled = assetLoadCancelled;
 
         female ??= false;
-        // Always make the sprite visible — it'll show its prior animation
-        // until the new one swaps in. This eliminates the "blank sprite"
-        // failure mode where a load bail leaves the sprite invisible.
-        this.pokemonSprite.setVisible(!this.statsMode);
         if (shouldUpdateSprite) {
-          const loadFemale = female;
-          const loadFormIndex = formIndex;
-          const loadShiny = shiny;
-          const loadVariant = variant;
-          const loadSpecies = species;
-          const spriteKey = loadSpecies.getSpriteKey(loadFemale, loadFormIndex, loadShiny, loadVariant);
-          // Prefetch grid neighbors in the background so navigation
-          // hits cache. The grid is 9 wide; left/right/up/down neighbors
-          // of the current cursor are the next likely selections.
-          this.prefetchSpriteNeighbors();
-          // Fire load immediately. No debounce. loadAssets short-circuits
-          // when the texture is cached so repeat selections are
-          // effectively synchronous. assetLoadCancelled gates the .then()
-          // so stale loads from prior clicks don't overwrite the latest
-          // selection.
-          const debug = (globalThis as { __SPRITE_DEBUG?: boolean }).__SPRITE_DEBUG;
-          if (debug) {
-            console.log("[sprite] setSpeciesDetails: loadAssets", spriteKey);
-          }
-          loadSpecies.loadAssets(loadFemale, loadFormIndex, loadShiny, loadVariant, true).then(() => {
-            if (debug) {
-              console.log(
-                "[sprite] .then fired",
-                spriteKey,
-                "cancelled?",
-                assetLoadCancelled.value,
-                "tex?",
-                globalScene.textures.exists(spriteKey),
-                "anim?",
-                globalScene.anims.exists(spriteKey),
-              );
-            }
+          species.loadAssets(female, formIndex, shiny, variant, true).then(() => {
             if (assetLoadCancelled.value) {
               return;
             }
-            if (this.assetLoadCancelled === assetLoadCancelled) {
-              this.assetLoadCancelled = null;
-            }
-            this.speciesLoaded.set(loadSpecies.speciesId, true);
-            // Only mark "displayed" if the texture actually landed —
-            // failed loads shouldn't poison future re-render logic into
-            // thinking the right sprite is showing.
-            if (globalScene.textures.exists(spriteKey)) {
-              this.currentDisplayedSpeciesId = loadSpecies.speciesId as unknown as number;
-            }
-            // play() with a missing key is a harmless warning; the sprite
-            // keeps its prior animation rather than blanking. This is the
-            // graceful-degradation we want.
+            this.assetLoadCancelled = null;
+            this.speciesLoaded.set(species.speciesId, true);
+            // Note: bangs are correct due to `female ??= false` above
             this.pokemonSprite
-              .play(spriteKey)
-              .setPipelineData("shiny", loadShiny)
-              .setPipelineData("variant", loadVariant)
-              .setPipelineData("spriteKey", spriteKey);
-            if (debug) {
-              console.log("[sprite] play complete", spriteKey);
-            }
+              .play(species.getSpriteKey(female!, formIndex, shiny, variant))
+              .setPipelineData("shiny", shiny)
+              .setPipelineData("variant", variant)
+              .setPipelineData("spriteKey", species.getSpriteKey(female!, formIndex, shiny, variant))
+              .setVisible(!this.statsMode);
           });
+        } else {
+          this.pokemonSprite.setVisible(!this.statsMode);
         }
 
         const currentFilteredContainer = this.filteredStarterContainers.find(

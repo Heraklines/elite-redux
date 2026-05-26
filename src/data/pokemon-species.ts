@@ -762,82 +762,59 @@ export abstract class PokemonSpeciesForm {
     startLoad = false,
     back = false,
   ): Promise<void> {
+    // VANILLA POKEROGUE behavior. After many failed attempts at
+    // "improving" this with direct fetch / AbortController / etc., the
+    // simplest path that matches upstream pokerogue's behavior is to
+    // just queue on the shared Phaser loader and wait for COMPLETE.
     const spriteKey = this.getSpriteKey(female, formIndex, shiny, variant, back);
-    const atlasPath = this.getSpriteAtlasPath(female, formIndex, shiny, variant, back);
-
-    const buildAnim = (): void => {
-      const originalWarn = console.warn;
-      console.warn = () => {};
-      const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
-        zeroPad: 4,
-        suffix: ".png",
-        start: 1,
-        end: 400,
-      });
-      console.warn = originalWarn;
-      if (globalScene.anims.exists(spriteKey)) {
-        globalScene.anims.get(spriteKey).frameRate = 10;
-      } else {
-        globalScene.anims.create({
-          key: spriteKey,
-          frames: frameNames,
-          frameRate: 10,
-          repeat: -1,
-        });
-      }
-    };
-
-    const finalize = async (): Promise<void> => {
-      buildAnim();
-      if (variant != null) {
-        const spritePath = atlasPath.replace("variant/", "").replace(/_[1-3]$/, "");
-        await loadPokemonVariantAssets(spriteKey, spritePath, variant);
-      }
-    };
-
-    // Fast path: texture already in cache. finalize() just creates the
-    // anim if missing (no-op otherwise) + handles variant colors. Returns
-    // in a single microtask — effectively synchronous for repeat selects.
-    if (globalScene.textures.exists(spriteKey)) {
-      await finalize();
-      return;
-    }
-
+    globalScene.loadPokemonAtlas(spriteKey, this.getSpriteAtlasPath(female, formIndex, shiny, variant, back));
+    globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
     if (variant != null) {
       await this.loadVariantColors(spriteKey, female, variant, back, formIndex);
     }
-
-    try {
-      globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
-      if (startLoad && !globalScene.load.isLoading()) {
-        globalScene.load.start();
+    return new Promise<void>(resolve => {
+      globalScene.load.once(Phaser.Loader.Events.COMPLETE, () => {
+        const originalWarn = console.warn;
+        // Ignore warnings for missing frames, because there will be a lot
+        console.warn = () => {};
+        const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
+          zeroPad: 4,
+          suffix: ".png",
+          start: 1,
+          end: 400,
+        });
+        console.warn = originalWarn;
+        if (globalScene.anims.exists(spriteKey)) {
+          globalScene.anims.get(spriteKey).frameRate = 10;
+        } else {
+          globalScene.anims.create({
+            key: this.getSpriteKey(female, formIndex, shiny, variant, back),
+            frames: frameNames,
+            frameRate: 10,
+            repeat: -1,
+          });
+        }
+        const spritePath = this.getSpriteAtlasPath(female, formIndex, shiny, variant, back)
+          .replace("variant/", "")
+          .replace(/_[1-3]$/, "");
+        if (variant != null) {
+          loadPokemonVariantAssets(spriteKey, spritePath, variant).then(() => resolve());
+        } else {
+          // BUGFIX vs vanilla pokerogue: the original code only calls
+          // resolve() when variant != null, so calls with no variant
+          // would hang forever. Resolve here so the caller's .then()
+          // always fires.
+          resolve();
+        }
+      });
+      if (startLoad) {
+        if (!globalScene.load.isLoading()) {
+          globalScene.load.start();
+        }
+      } else {
+        resolve();
       }
-    } catch {
-      /* ignore */
-    }
-
-    // Build the URLs the same way BattleScene.loadPokemonAtlas does.
-    const isVariantPath = atlasPath.includes("variant/") || /_[0-3]$/.test(atlasPath);
-    const cleanPath = isVariantPath ? atlasPath.replace("variant/", "") : atlasPath;
-    let experimental = (globalScene as { experimentalSprites?: boolean }).experimentalSprites ?? false;
-    if (experimental) {
-      try {
-        experimental = hasExpSprite(spriteKey);
-      } catch {
-        experimental = false;
-      }
-    }
-    const pngUrl = `./images/pokemon/${isVariantPath ? "variant/" : ""}${experimental ? "exp/" : ""}${cleanPath}.png`;
-    const jsonUrl = `./images/pokemon/${isVariantPath ? "variant/" : ""}${experimental ? "exp/" : ""}${cleanPath}.json`;
-
-    try {
-      await loadAtlasDirect(spriteKey, pngUrl, jsonUrl);
-    } catch {
-      // Direct fetch failed (404, network, etc). Leave the caller to
-      // handle a missing texture — sprite stays on its prior animation.
-      return;
-    }
-    await finalize();
+    });
   }
 
   cry(soundConfig?: Phaser.Types.Sound.SoundConfig, ignorePlay?: boolean): AnySound | null {
@@ -916,101 +893,6 @@ export abstract class PokemonSpeciesForm {
 
     return Array.from(paletteColors.keys()).map(c => Object.values(rgbaFromArgb(c)) as number[]);
   }
-}
-
-/**
- * Diagnostic log helper. Toggle via DevTools:
- *   window.__SPRITE_DEBUG = true
- * Logs every sprite-load lifecycle event so we can see what's happening
- * during rapid starter-select cycling.
- */
-function spriteDebug(...args: unknown[]): void {
-  if ((globalThis as { __SPRITE_DEBUG?: boolean }).__SPRITE_DEBUG) {
-    console.log("[sprite]", ...args);
-  }
-}
-
-/**
- * Fetch a TexturePacker JSONArray atlas (PNG + JSON pair) and feed it
- * directly to Phaser's TextureManager. Bypasses Phaser's LoaderPlugin
- * queue so concurrent calls don't serialize behind each other.
- *
- * Skips work entirely if the texture is already cached. Never calls
- * `textures.remove` on a live key (the prior attempt did this — the
- * renderer crashed mid-frame trying to read disposed Frame data).
- */
-/**
- * Per-spriteKey in-flight atlas fetches. SAME-KEY calls (user reselects
- * the same species rapidly, or cursor clamps) share the existing
- * promise — no duplicate fetches. Cross-key fetches run in parallel
- * subject to the browser's ~6 concurrent HTTP limit; the .then()
- * cancellation token in starter-select ensures only the latest
- * selection's load drives the visible sprite.
- *
- * No AbortController: empirically (verified via Puppeteer) aborting
- * prior fetches causes subsequent fetches to hang indefinitely. The
- * browser doesn't immediately recycle the network slots from aborted
- * requests, and the in-flight tracking gets into a degraded state
- * where new fetches sit unresponsive for 5s+. Letting fetches run to
- * completion (even if abandoned) is faster than aborting them.
- */
-const inFlightAtlasFetches = new Map<string, Promise<void>>();
-
-function loadAtlasDirect(key: string, pngUrl: string, jsonUrl: string): Promise<void> {
-  if (globalScene.textures.exists(key)) {
-    spriteDebug("loadAtlasDirect: already cached", key);
-    return Promise.resolve();
-  }
-  const existing = inFlightAtlasFetches.get(key);
-  if (existing) {
-    spriteDebug("loadAtlasDirect: joining in-flight fetch", key);
-    return existing;
-  }
-  spriteDebug("loadAtlasDirect: fetching", key, pngUrl);
-  const promise = (async () => {
-    try {
-      // priority: 'high' tells the browser to prioritize this fetch
-      // over lower-priority requests competing for the ~6 concurrent
-      // HTTP slots. Audio cry fetches (default priority) won't block
-      // the sprite atlas this way. Supported in Chromium-based browsers
-      // and safe-to-ignore in others.
-      const fetchOpts: RequestInit & { priority?: string } = { priority: "high" };
-      const [pngRes, jsonRes] = await Promise.all([fetch(pngUrl, fetchOpts), fetch(jsonUrl, fetchOpts)]);
-      if (!pngRes.ok) {
-        throw new Error(`fetch ${pngUrl} → ${pngRes.status}`);
-      }
-      if (!jsonRes.ok) {
-        throw new Error(`fetch ${jsonUrl} → ${jsonRes.status}`);
-      }
-      const [pngBlob, jsonData] = await Promise.all([pngRes.blob(), jsonRes.json()]);
-      const imgUrl = URL.createObjectURL(pngBlob);
-      try {
-        const img = new Image();
-        await new Promise<void>((res, rej) => {
-          img.onload = () => res();
-          img.onerror = () => rej(new Error(`decode ${pngUrl}`));
-          img.src = imgUrl;
-        });
-        if (globalScene.textures.exists(key)) {
-          spriteDebug("loadAtlasDirect: cache won the race", key);
-          return;
-        }
-        const tex = globalScene.textures.addAtlasJSONArray(key, img, jsonData);
-        spriteDebug("loadAtlasDirect: addAtlasJSONArray returned", key, tex == null ? "null" : "ok");
-      } finally {
-        URL.revokeObjectURL(imgUrl);
-      }
-    } catch (e) {
-      spriteDebug("loadAtlasDirect: threw", key, String(e));
-      throw e;
-    } finally {
-      if (inFlightAtlasFetches.get(key) === promise) {
-        inFlightAtlasFetches.delete(key);
-      }
-    }
-  })();
-  inFlightAtlasFetches.set(key, promise);
-  return promise;
 }
 
 export class PokemonSpecies extends PokemonSpeciesForm implements Localizable {
