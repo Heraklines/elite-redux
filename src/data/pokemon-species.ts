@@ -807,14 +807,14 @@ export abstract class PokemonSpeciesForm {
       await this.loadVariantColors(spriteKey, female, variant, back, formIndex);
     }
 
-    // NOTE: we deliberately do NOT queue the cry audio here. Audio
-    // fetches compete with the atlas fetch for the browser's ~6
-    // concurrent HTTP slots — during rapid starter-select cycling,
-    // each click was queuing both an atlas AND an audio, saturating
-    // the network connection pool. After ~20 cycles, atlas fetches
-    // would stall behind audio fetches and never complete. The cry
-    // sound can lazy-load when actually needed (PokemonSpecies.cry()
-    // queues + plays on demand).
+    try {
+      globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
+      if (startLoad && !globalScene.load.isLoading()) {
+        globalScene.load.start();
+      }
+    } catch {
+      /* ignore */
+    }
 
     // Build the URLs the same way BattleScene.loadPokemonAtlas does.
     const isVariantPath = atlasPath.includes("variant/") || /_[0-3]$/.test(atlasPath);

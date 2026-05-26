@@ -166,14 +166,14 @@ async function main() {
     });
     console.log(`sprite anim BEFORE cycling: ${startSpriteAnim}`);
 
-    // Test scenario: SLOW cycling — pause between each click. Sprite
-    // should update for EACH selection, matching it. If it stays stuck
-    // on one species, my fix is wrong.
-    console.log("=== SLOW cycle test: 200ms between each ===");
+    // SLOW cycle: 1.5s between each click — far more than any fetch
+    // could take. If sprites still don't update, the bug is in the
+    // load/play logic, not the network.
+    console.log("=== SLOW cycle test: 1500ms between each ===");
     const checkpoints = [];
     for (let i = 1; i <= 10; i++) {
       await page.evaluate(idx => globalThis.globalScene?.ui?.getHandler?.()?.setCursor?.(idx), i);
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 1500));
       const snapshot = await page.evaluate(() => {
         const h = globalThis.globalScene?.ui?.getHandler?.();
         const sprite = h?.pokemonSprite;
@@ -197,8 +197,7 @@ async function main() {
     const mismatches = checkpoints.filter(c => !c.match);
     console.log(`\n${mismatches.length}/10 mismatches in SLOW cycle.`);
 
-    console.log("\n=== RAPID cycle test: 30ms between each (faster than load) ===");
-    // Reset cursor and clear logs.
+    console.log("\n=== RAPID cycle test: 30ms forward+back+forward, end on cursor=17 ===");
     await page.evaluate(() => globalThis.globalScene?.ui?.getHandler?.()?.setCursor?.(0));
     await new Promise(r => setTimeout(r, 300));
     logs.length = 0;
@@ -206,7 +205,15 @@ async function main() {
       await page.evaluate(idx => globalThis.globalScene?.ui?.getHandler?.()?.setCursor?.(idx), i);
       await new Promise(r => setTimeout(r, 30));
     }
-    console.log("paused on cursor=26, waiting for latest load...");
+    for (let i = 25; i >= 0; i--) {
+      await page.evaluate(idx => globalThis.globalScene?.ui?.getHandler?.()?.setCursor?.(idx), i);
+      await new Promise(r => setTimeout(r, 30));
+    }
+    for (let i = 1; i <= 17; i++) {
+      await page.evaluate(idx => globalThis.globalScene?.ui?.getHandler?.()?.setCursor?.(idx), i);
+      await new Promise(r => setTimeout(r, 30));
+    }
+    console.log("paused on cursor=17, waiting for latest load...");
     await new Promise(r => setTimeout(r, 3000));
     await page.screenshot({ path: "scripts/debug-screenshot-6-after-cycle.png" });
 
