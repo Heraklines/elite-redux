@@ -765,8 +765,6 @@ export abstract class PokemonSpeciesForm {
     const spriteKey = this.getSpriteKey(female, formIndex, shiny, variant, back);
     const atlasPath = this.getSpriteAtlasPath(female, formIndex, shiny, variant, back);
 
-    // Helper: build the per-spriteKey animation. Idempotent. Only ever
-    // creates the animation AFTER the texture is in the cache.
     const buildAnim = (): void => {
       const originalWarn = console.warn;
       console.warn = () => {};
@@ -797,61 +795,104 @@ export abstract class PokemonSpeciesForm {
       }
     };
 
-    // Already cached — skip the load entirely.
     if (globalScene.textures.exists(spriteKey)) {
       await finalize();
       return;
     }
 
-    globalScene.loadPokemonAtlas(spriteKey, atlasPath);
-    globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
     if (variant != null) {
       await this.loadVariantColors(spriteKey, female, variant, back, formIndex);
     }
 
+    // Audio loads on the GLOBAL loader. Audio failures don't block the
+    // sprite (cry is best-effort) and never poison the loader queue for
+    // future atlas requests because we don't depend on its completion.
+    try {
+      globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
+      if (!globalScene.load.isLoading()) {
+        globalScene.load.start();
+      }
+    } catch {
+      // ignore audio queue errors
+    }
+
+    // Build atlas URL using the same conventions as BattleScene.loadPokemonAtlas.
+    const isVariantPath = atlasPath.includes("variant/") || /_[0-3]$/.test(atlasPath);
+    const cleanPath = isVariantPath ? atlasPath.replace("variant/", "") : atlasPath;
+    let experimental = (globalScene as { experimentalSprites?: boolean }).experimentalSprites ?? false;
+    if (experimental) {
+      try {
+        experimental = hasExpSprite(spriteKey);
+      } catch {
+        experimental = false;
+      }
+    }
+    const pngUrl = `images/pokemon/${isVariantPath ? "variant/" : ""}${experimental ? "exp/" : ""}${cleanPath}.png`;
+    const jsonUrl = `images/pokemon/${isVariantPath ? "variant/" : ""}${experimental ? "exp/" : ""}${cleanPath}.json`;
+
+    // CRITICAL: use a DEDICATED LoaderPlugin instance for this atlas. The
+    // shared globalScene.load has a `keyExists` check that silently drops
+    // duplicates AND keeps polluted keys (from prior failed loads) in its
+    // inflight tracking forever — once a key is poisoned, future queues
+    // for that key are silently dropped and the texture never lands.
+    //
+    // A dedicated loader has its own queue, state machine, and COMPLETE
+    // event. It shares the global TextureManager so loaded atlases land
+    // in the same texture cache the renderer reads from. Per-call loaders
+    // can fail independently without affecting any other load.
     return new Promise<void>(resolve => {
-      // KEY INSIGHT: the real signal we want is "the texture is in the
-      // cache and fully usable". Loader file events fire at intermediate
-      // points (JSON parsed, PNG decoded) but the atlas only becomes
-      // queryable AFTER both pieces are merged and `textures.addAtlas`
-      // is invoked. Phaser's TextureManager emits `addtexture-${key}`
-      // at exactly that moment. Listen there — no loader-queue races,
-      // no event-type guessing, just the actual cache state we care about.
-      const onTextureAdded = (): void => {
-        // Re-check existence in case the cache mutates again before we run.
-        if (!globalScene.textures.exists(spriteKey)) {
-          resolve();
+      const tempLoader = new Phaser.Loader.LoaderPlugin(globalScene);
+      let resolved = false;
+      const settle = (): void => {
+        if (resolved) {
           return;
         }
-        finalize().then(() => resolve());
-      };
-
-      if (globalScene.textures.exists(spriteKey)) {
-        // Texture appeared between the earlier check and now (e.g., a
-        // sibling load.atlas() finished). Skip event registration.
-        finalize().then(() => resolve());
-        return;
-      }
-
-      globalScene.textures.once(`addtexture-${spriteKey}`, onTextureAdded);
-
-      if (startLoad) {
-        if (!globalScene.load.isLoading()) {
-          globalScene.load.start();
-        } else {
-          // Phaser does not auto-process files added during an active
-          // load. Queue a one-shot kickstart when the current batch
-          // empties — keeps the queue draining without restarting an
-          // in-progress load.
-          globalScene.load.once(Phaser.Loader.Events.COMPLETE, () => {
-            if (globalScene.load.totalToLoad - globalScene.load.totalComplete > 0) {
-              globalScene.load.start();
-            }
-          });
+        resolved = true;
+        try {
+          tempLoader.removeAllListeners();
+          tempLoader.destroy();
+        } catch {
+          // loader may already be partially torn down — ignore
         }
+        if (globalScene.textures.exists(spriteKey)) {
+          finalize().then(() => resolve());
+        } else {
+          // Texture didn't land — the load failed. Resolve so the caller
+          // chain doesn't hang. The sprite stays on its previous frame
+          // and any retry attempt creates a fresh loader (no pollution).
+          resolve();
+        }
+      };
+      tempLoader.atlas(spriteKey, pngUrl, jsonUrl);
+      tempLoader.once(Phaser.Loader.Events.COMPLETE, settle);
+      tempLoader.once(Phaser.Loader.Events.LOAD_COMPLETE, settle);
+      // Safety net: if neither event fires within 10s (network stall, bad
+      // CDN, etc.), resolve so the caller can move on. The sprite stays
+      // blank for this attempt only; subsequent attempts get a fresh
+      // loader and try again.
+      const timeoutId = setTimeout(() => {
+        if (!resolved) {
+          settle();
+        }
+      }, 10000);
+      // Wrap settle to also clear the timeout.
+      const onSettle = () => {
+        clearTimeout(timeoutId);
+      };
+      tempLoader.once(Phaser.Loader.Events.COMPLETE, onSettle);
+      tempLoader.once(Phaser.Loader.Events.LOAD_COMPLETE, onSettle);
+      if (startLoad) {
+        tempLoader.start();
       } else {
-        // Caller manages start. Resolve immediately; the texture event
-        // will still build the anim when the load lands.
+        // Caller said don't start. Resolve immediately; the dedicated
+        // loader will sit idle and get garbage-collected.
+        resolved = true;
+        clearTimeout(timeoutId);
+        try {
+          tempLoader.destroy();
+        } catch {
+          /* ignore */
+        }
         resolve();
       }
     });

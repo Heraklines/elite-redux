@@ -467,6 +467,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   // panel info still updates immediately, only the (expensive) sprite
   // load is deferred.
   private pendingSpriteLoadTimer: ReturnType<typeof setTimeout> | null = null;
+  // Track which species the pokemonSprite is currently animating. If the
+  // user switches species and the load fails/stalls (Phaser loader pollution
+  // during rapid clicks), the sprite stays on the prior species. A later
+  // re-render (candy, ability swap) without shiny/form/gender changes would
+  // skip updating the sprite and visually show the WRONG Pokemon. We use
+  // this to force a re-load whenever the displayed species drifts from the
+  // currently-selected one.
+  private currentDisplayedSpeciesId: number | null = null;
   public cursorObj: Phaser.GameObjects.Image;
   private starterCursorObjs: Phaser.GameObjects.Image[];
   private pokerusCursorObjs: Phaser.GameObjects.Image[];
@@ -4233,8 +4241,20 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.teraCursor = PokemonType.UNKNOWN;
     // We will only update the sprite if there is a change to form, shiny/variant
     // or gender for species with gender sprite differences
+    // Force sprite update when the species has changed since the last
+    // play() — prior loads may have failed/stalled (rapid grid navigation)
+    // leaving the sprite GameObject playing the WRONG species's animation.
+    // Without this, a subsequent re-render (candy unlock, ability swap,
+    // etc.) that omits shiny/form/gender would keep the stale animation
+    // playing and show the wrong Pokemon entirely.
+    const speciesChanged =
+      species != null && this.currentDisplayedSpeciesId !== (species.speciesId as unknown as number);
     const shouldUpdateSprite =
-      (species?.genderDiffs && female != null) || formIndex != null || shiny != null || variant != null;
+      speciesChanged ||
+      (species?.genderDiffs && female != null) ||
+      formIndex != null ||
+      shiny != null ||
+      variant != null;
 
     const isFreshStartChallenge = globalScene.gameMode.hasChallenge(Challenges.FRESH_START);
 
@@ -4389,6 +4409,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 this.assetLoadCancelled = null;
                 this.speciesLoaded.set(loadSpecies.speciesId, true);
                 const spriteKey = loadSpecies.getSpriteKey(loadFemale, loadFormIndex, loadShiny, loadVariant);
+                // Only mark the displayed species AFTER the texture is in
+                // cache — otherwise a failed load would convince future
+                // re-renders that the right sprite is showing when it isn't.
+                if (globalScene.textures.exists(spriteKey)) {
+                  this.currentDisplayedSpeciesId = loadSpecies.speciesId as unknown as number;
+                }
                 this.pokemonSprite
                   .play(spriteKey)
                   .setPipelineData("shiny", loadShiny)
