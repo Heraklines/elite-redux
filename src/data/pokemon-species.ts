@@ -960,7 +960,12 @@ async function loadAtlasDirect(key: string, atlasPath: string): Promise<void> {
   if (globalScene.textures.exists(key)) {
     globalScene.textures.remove(key);
   }
-  globalScene.textures.addAtlas(key, img, jsonData);
+  // Use addAtlasJSONArray explicitly — pokerogue's atlases use the
+  // TexturePacker JSONArray format. The generic `addAtlas` dispatcher
+  // sometimes fails to populate Frame.sourceSize causing
+  // "Cannot read properties of null (reading 'sourceSize')" when the
+  // renderer tries to compute realWidth.
+  globalScene.textures.addAtlasJSONArray(key, img, jsonData);
   URL.revokeObjectURL(imgUrl);
 }
 
