@@ -762,47 +762,94 @@ export abstract class PokemonSpeciesForm {
     startLoad = false,
     back = false,
   ): Promise<void> {
-    // We need to populate the color cache for this species' variant
     const spriteKey = this.getSpriteKey(female, formIndex, shiny, variant, back);
-    globalScene.loadPokemonAtlas(spriteKey, this.getSpriteAtlasPath(female, formIndex, shiny, variant, back));
+    const atlasPath = this.getSpriteAtlasPath(female, formIndex, shiny, variant, back);
+
+    // Helper: build the per-spriteKey animation. Idempotent. Only ever
+    // creates the animation AFTER the texture is in the cache.
+    const buildAnim = (): void => {
+      const originalWarn = console.warn;
+      console.warn = () => {};
+      const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
+        zeroPad: 4,
+        suffix: ".png",
+        start: 1,
+        end: 400,
+      });
+      console.warn = originalWarn;
+      if (globalScene.anims.exists(spriteKey)) {
+        globalScene.anims.get(spriteKey).frameRate = 10;
+      } else {
+        globalScene.anims.create({
+          key: spriteKey,
+          frames: frameNames,
+          frameRate: 10,
+          repeat: -1,
+        });
+      }
+    };
+
+    const finalize = async (): Promise<void> => {
+      buildAnim();
+      if (variant != null) {
+        const spritePath = atlasPath.replace("variant/", "").replace(/_[1-3]$/, "");
+        await loadPokemonVariantAssets(spriteKey, spritePath, variant);
+      }
+    };
+
+    // Already cached — skip the load entirely.
+    if (globalScene.textures.exists(spriteKey)) {
+      await finalize();
+      return;
+    }
+
+    globalScene.loadPokemonAtlas(spriteKey, atlasPath);
     globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
     if (variant != null) {
       await this.loadVariantColors(spriteKey, female, variant, back, formIndex);
     }
+
     return new Promise<void>(resolve => {
-      globalScene.load.once(Phaser.Loader.Events.COMPLETE, () => {
-        const originalWarn = console.warn;
-        // Ignore warnings for missing frames, because there will be a lot
-        console.warn = () => {};
-        const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
-          zeroPad: 4,
-          suffix: ".png",
-          start: 1,
-          end: 400,
-        });
-        console.warn = originalWarn;
-        if (globalScene.anims.exists(spriteKey)) {
-          globalScene.anims.get(spriteKey).frameRate = 10;
+      let settled = false;
+      const settle = (): void => {
+        if (settled) return;
+        settled = true;
+        // Verify the texture actually landed; if not, the renderer would
+        // crash on play(spriteKey). Build the anim only if cache is ready.
+        if (globalScene.textures.exists(spriteKey)) {
+          finalize().then(() => resolve());
         } else {
-          globalScene.anims.create({
-            key: this.getSpriteKey(female, formIndex, shiny, variant, back),
-            frames: frameNames,
-            frameRate: 10,
-            repeat: -1,
-          });
+          // Texture didn't load (race). Resolve anyway so the caller's
+          // .then() runs and the cancellation-token machinery cleans up.
+          // The renderer should fail to .play() gracefully on a missing
+          // key; pokerogue's vanilla error path handles that.
+          resolve();
         }
-        const spritePath = this.getSpriteAtlasPath(female, formIndex, shiny, variant, back)
-          .replace("variant/", "")
-          .replace(/_[1-3]$/, "");
-        if (variant != null) {
-          loadPokemonVariantAssets(spriteKey, spritePath, variant).then(() => resolve());
-        }
-      });
+      };
+
+      // Per-file event: fires when OUR atlas JSON has been parsed.
+      const onFile = (key: string) => {
+        if (key !== spriteKey) return;
+        globalScene.load.off(`filecomplete-atlasjson-${spriteKey}`, onFile);
+        settle();
+      };
+      globalScene.load.on(`filecomplete-atlasjson-${spriteKey}`, onFile);
+
       if (startLoad) {
         if (!globalScene.load.isLoading()) {
           globalScene.load.start();
+        } else {
+          // The loader is mid-batch; queue a kickstart after current batch
+          // completes so newly-added files get processed.
+          globalScene.load.once(Phaser.Loader.Events.COMPLETE, () => {
+            if (globalScene.load.totalToLoad - globalScene.load.totalComplete > 0) {
+              globalScene.load.start();
+            }
+          });
         }
       } else {
+        // Caller manages start. Resolve immediately; per-file event still
+        // builds the anim when the texture eventually lands.
         resolve();
       }
     });
