@@ -285,6 +285,16 @@ class ErCustomSpecies extends PokemonSpecies {
   }
 
   /**
+   * Override base `getExpandedSpeciesName` so it doesn't crash on ER-custom
+   * species ids (which aren't in the SpeciesId enum). The base looks up
+   * `SpeciesId[this.speciesId].split("_")` — which is undefined for IDs
+   * >= 10000 and throws "Cannot read properties of undefined (reading 'split')".
+   */
+  override getExpandedSpeciesName(): string {
+    return this.name;
+  }
+
+  /**
    * Extend `loadAssets` to also load the per-slug icon atlas alongside the
    * sprite. Without this, `pokemon_icons_N` is consulted for ER-custom IDs
    * (no frame exists) and the icon falls back to a blank.
