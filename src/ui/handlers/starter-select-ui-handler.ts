@@ -459,6 +459,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private canCycleTera: boolean;
 
   private assetLoadCancelled: BooleanHolder | null;
+  // Debounce sprite-load requests. Rapid grid navigation (arrow keys,
+  // scroll wheel) can fire setSpeciesDetails 10+ times per second. Each
+  // call previously queued a fresh atlas + audio load on Phaser's shared
+  // loader, thrashing its queue until later loads stalled. We coalesce
+  // rapid calls to a single load triggered ~80ms after the last input —
+  // panel info still updates immediately, only the (expensive) sprite
+  // load is deferred.
+  private pendingSpriteLoadTimer: ReturnType<typeof setTimeout> | null = null;
   public cursorObj: Phaser.GameObjects.Image;
   private starterCursorObjs: Phaser.GameObjects.Image[];
   private pokerusCursorObjs: Phaser.GameObjects.Image[];
@@ -4291,6 +4299,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.assetLoadCancelled.value = true;
       this.assetLoadCancelled = null;
     }
+    // Cancel any deferred sprite load from a previous setSpeciesDetails
+    // call — only the most recent selection should actually trigger a
+    // load.
+    if (this.pendingSpriteLoadTimer != null) {
+      clearTimeout(this.pendingSpriteLoadTimer);
+      this.pendingSpriteLoadTimer = null;
+    }
 
     this.starterMoveset = null;
     this.speciesStarterMoves = [];
@@ -4353,20 +4368,35 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
         female ??= false;
         if (shouldUpdateSprite) {
-          species.loadAssets(female, formIndex, shiny, variant, true).then(() => {
+          // Capture the params at scheduling time — by the time the timer
+          // fires they may have been mutated by a subsequent call.
+          const loadFemale = female;
+          const loadFormIndex = formIndex;
+          const loadShiny = shiny;
+          const loadVariant = variant;
+          const loadSpecies = species;
+          this.pendingSpriteLoadTimer = setTimeout(() => {
+            this.pendingSpriteLoadTimer = null;
             if (assetLoadCancelled.value) {
               return;
             }
-            this.assetLoadCancelled = null;
-            this.speciesLoaded.set(species.speciesId, true);
-            // Note: Bangs are correct due to `female ??= false` above
-            this.pokemonSprite
-              .play(species.getSpriteKey(female!, formIndex, shiny, variant))
-              .setPipelineData("shiny", shiny)
-              .setPipelineData("variant", variant)
-              .setPipelineData("spriteKey", species.getSpriteKey(female!, formIndex, shiny, variant))
-              .setVisible(!this.statsMode);
-          });
+            loadSpecies
+              .loadAssets(loadFemale, loadFormIndex, loadShiny, loadVariant, true)
+              .then(() => {
+                if (assetLoadCancelled.value) {
+                  return;
+                }
+                this.assetLoadCancelled = null;
+                this.speciesLoaded.set(loadSpecies.speciesId, true);
+                const spriteKey = loadSpecies.getSpriteKey(loadFemale, loadFormIndex, loadShiny, loadVariant);
+                this.pokemonSprite
+                  .play(spriteKey)
+                  .setPipelineData("shiny", loadShiny)
+                  .setPipelineData("variant", loadVariant)
+                  .setPipelineData("spriteKey", spriteKey)
+                  .setVisible(!this.statsMode);
+              });
+          }, 80);
         } else {
           this.pokemonSprite.setVisible(!this.statsMode);
         }
