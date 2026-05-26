@@ -969,7 +969,13 @@ function loadAtlasDirect(key: string, pngUrl: string, jsonUrl: string): Promise<
   spriteDebug("loadAtlasDirect: fetching", key, pngUrl);
   const promise = (async () => {
     try {
-      const [pngRes, jsonRes] = await Promise.all([fetch(pngUrl), fetch(jsonUrl)]);
+      // priority: 'high' tells the browser to prioritize this fetch
+      // over lower-priority requests competing for the ~6 concurrent
+      // HTTP slots. Audio cry fetches (default priority) won't block
+      // the sprite atlas this way. Supported in Chromium-based browsers
+      // and safe-to-ignore in others.
+      const fetchOpts: RequestInit & { priority?: string } = { priority: "high" };
+      const [pngRes, jsonRes] = await Promise.all([fetch(pngUrl, fetchOpts), fetch(jsonUrl, fetchOpts)]);
       if (!pngRes.ok) {
         throw new Error(`fetch ${pngUrl} → ${pngRes.status}`);
       }

@@ -3081,6 +3081,37 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   }
 
   /**
+   * Kick off background loads for the species likely to be selected next
+   * — the 8 grid neighbors of the current cursor (one left, one right,
+   * one row up, one row down, and the 4 diagonals). Fire-and-forget;
+   * each loadAssets short-circuits if the texture is already cached, so
+   * repeat calls cost nothing. The result is that arrow-key navigation
+   * (left/right/up/down) almost always hits a pre-warmed cache.
+   */
+  private prefetchSpriteNeighbors(): void {
+    const cursor = this.cursor;
+    const containers = this.filteredStarterContainers;
+    if (!containers || containers.length === 0) {
+      return;
+    }
+    const offsets = [-10, -9, -8, -1, 1, 8, 9, 10];
+    for (const offset of offsets) {
+      const idx = cursor + offset;
+      if (idx < 0 || idx >= containers.length) {
+        continue;
+      }
+      const species = containers[idx]?.species;
+      if (!species) {
+        continue;
+      }
+      const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(species.speciesId));
+      // Fire-and-forget. Errors swallowed — neighbor prefetch is
+      // strictly speculative and shouldn't break the main flow.
+      species.loadAssets(props.female, props.formIndex, props.shiny, props.variant, true).catch(() => {});
+    }
+  }
+
+  /**
    * Puts a move at the requested index in the current highlighted Pokemon's moveset.
    * If the move was already present in the moveset, swap its position with the one at the requested index.
    *
@@ -4400,6 +4431,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           const loadVariant = variant;
           const loadSpecies = species;
           const spriteKey = loadSpecies.getSpriteKey(loadFemale, loadFormIndex, loadShiny, loadVariant);
+          // Prefetch grid neighbors in the background so navigation
+          // hits cache. The grid is 9 wide; left/right/up/down neighbors
+          // of the current cursor are the next likely selections.
+          this.prefetchSpriteNeighbors();
           // Fire load immediately. No debounce. loadAssets short-circuits
           // when the texture is cached so repeat selections are
           // effectively synchronous. assetLoadCancelled gates the .then()
