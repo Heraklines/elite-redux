@@ -459,21 +459,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private canCycleTera: boolean;
 
   private assetLoadCancelled: BooleanHolder | null;
-  // Debounce sprite-load requests. Rapid grid navigation (arrow keys,
-  // scroll wheel) can fire setSpeciesDetails 10+ times per second. Each
-  // call previously queued a fresh atlas + audio load on Phaser's shared
-  // loader, thrashing its queue until later loads stalled. We coalesce
-  // rapid calls to a single load triggered ~150ms after the last input —
-  // panel info still updates immediately, only the (expensive) sprite
-  // load is deferred.
-  private pendingSpriteLoadTimer: ReturnType<typeof setTimeout> | null = null;
-  // Track which species the pokemonSprite is currently animating. If the
-  // user switches species and the load fails/stalls (Phaser loader pollution
-  // during rapid clicks), the sprite stays on the prior species. A later
-  // re-render (candy, ability swap) without shiny/form/gender changes would
-  // skip updating the sprite and visually show the WRONG Pokemon. We use
-  // this to force a re-load whenever the displayed species drifts from the
-  // currently-selected one.
+  // Track which species the pokemonSprite is currently animating. If a
+  // load fails/stalls and a later re-render (candy unlock, ability swap)
+  // omits shiny/form/gender changes, we'd otherwise leave the wrong
+  // species's animation playing. Using this to detect drift forces a
+  // re-load whenever the displayed species differs from the selected one.
   private currentDisplayedSpeciesId: number | null = null;
   public cursorObj: Phaser.GameObjects.Image;
   private starterCursorObjs: Phaser.GameObjects.Image[];
@@ -4299,7 +4289,19 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       }
     }
 
-    this.pokemonSprite.setVisible(false);
+    // NOTE: we DO NOT hide the sprite here. Previously this code did
+    // `pokemonSprite.setVisible(false)` unconditionally, then re-enabled
+    // visibility INSIDE the async .then() of loadAssets. If the load
+    // bailed (cancellation token tripped, texture cache miss, anim cache
+    // miss, missing/404 atlas, network blip) the sprite was left
+    // permanently HIDDEN — the user saw a blank panel and assumed the
+    // sprite never loaded. The actual issue was just that setVisible(true)
+    // was unreachable.
+    //
+    // Instead: leave the sprite showing its prior animation. When the
+    // new texture lands, .play() swaps the animation. If the load fails,
+    // the sprite continues showing the prior animation — visually wrong
+    // for one frame but recoverable on the next interaction.
     this.pokemonPassiveLabelText.setVisible(false);
     this.pokemonPassiveText.setVisible(false);
     this.pokemonPassiveDisabledIcon.setVisible(false);
@@ -4318,13 +4320,6 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     if (this.assetLoadCancelled) {
       this.assetLoadCancelled.value = true;
       this.assetLoadCancelled = null;
-    }
-    // Cancel any deferred sprite load from a previous setSpeciesDetails
-    // call — only the most recent selection should actually trigger a
-    // load.
-    if (this.pendingSpriteLoadTimer != null) {
-      clearTimeout(this.pendingSpriteLoadTimer);
-      this.pendingSpriteLoadTimer = null;
     }
 
     this.starterMoveset = null;
@@ -4368,7 +4363,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         getTextColor(shiny ? TextStyle.SUMMARY_DEX_NUM_GOLD : TextStyle.SUMMARY_DEX_NUM, true),
       );
 
-      if (forSeen ? this.speciesStarterDexEntry?.seenAttr : this.speciesStarterDexEntry?.caughtAttr) {
+      const hasDexEntry = forSeen
+        ? this.speciesStarterDexEntry?.seenAttr
+        : this.speciesStarterDexEntry?.caughtAttr;
+      if (!hasDexEntry) {
+        // Uncaught/unseen species shouldn't show a sprite.
+        this.pokemonSprite.setVisible(false);
+      }
+      if (hasDexEntry) {
         const starterIndex = this.starterSpecies.indexOf(species);
 
         if (starterIndex > -1) {
@@ -4387,48 +4389,45 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         this.assetLoadCancelled = assetLoadCancelled;
 
         female ??= false;
+        // Always make the sprite visible — it'll show its prior animation
+        // until the new one swaps in. This eliminates the "blank sprite"
+        // failure mode where a load bail leaves the sprite invisible.
+        this.pokemonSprite.setVisible(!this.statsMode);
         if (shouldUpdateSprite) {
-          // Capture the params at scheduling time — by the time the timer
-          // fires they may have been mutated by a subsequent call.
           const loadFemale = female;
           const loadFormIndex = formIndex;
           const loadShiny = shiny;
           const loadVariant = variant;
           const loadSpecies = species;
-          this.pendingSpriteLoadTimer = setTimeout(() => {
-            this.pendingSpriteLoadTimer = null;
+          const spriteKey = loadSpecies.getSpriteKey(loadFemale, loadFormIndex, loadShiny, loadVariant);
+          // Fire load immediately. No debounce — clicks should respond
+          // NOW. loadAssets short-circuits when the texture is cached so
+          // repeat selections are effectively synchronous (microtask).
+          // assetLoadCancelled gates the .then() so stale loads from
+          // prior clicks don't overwrite the latest selection.
+          loadSpecies.loadAssets(loadFemale, loadFormIndex, loadShiny, loadVariant, true).then(() => {
             if (assetLoadCancelled.value) {
               return;
             }
-            loadSpecies.loadAssets(loadFemale, loadFormIndex, loadShiny, loadVariant, true).then(() => {
-              if (assetLoadCancelled.value) {
-                return;
-              }
-              const spriteKey = loadSpecies.getSpriteKey(loadFemale, loadFormIndex, loadShiny, loadVariant);
-              // Only mark the displayed species AFTER the texture is in
-              // cache — otherwise a failed load would convince future
-              // re-renders that the right sprite is showing when it isn't.
-              if (!globalScene.textures.exists(spriteKey) || !globalScene.anims.exists(spriteKey)) {
-                if (this.assetLoadCancelled === assetLoadCancelled) {
-                  this.assetLoadCancelled = null;
-                }
-                return;
-              }
-              if (this.assetLoadCancelled === assetLoadCancelled) {
-                this.assetLoadCancelled = null;
-              }
-              this.speciesLoaded.set(loadSpecies.speciesId, true);
+            if (this.assetLoadCancelled === assetLoadCancelled) {
+              this.assetLoadCancelled = null;
+            }
+            this.speciesLoaded.set(loadSpecies.speciesId, true);
+            // Only mark "displayed" if the texture actually landed —
+            // failed loads shouldn't poison future re-render logic into
+            // thinking the right sprite is showing.
+            if (globalScene.textures.exists(spriteKey)) {
               this.currentDisplayedSpeciesId = loadSpecies.speciesId as unknown as number;
-              this.pokemonSprite
-                .play(spriteKey)
-                .setPipelineData("shiny", loadShiny)
-                .setPipelineData("variant", loadVariant)
-                .setPipelineData("spriteKey", spriteKey)
-                .setVisible(!this.statsMode);
-            });
-          }, 150);
-        } else {
-          this.pokemonSprite.setVisible(!this.statsMode);
+            }
+            // play() with a missing key is a harmless warning; the sprite
+            // keeps its prior animation rather than blanking. This is the
+            // graceful-degradation we want.
+            this.pokemonSprite
+              .play(spriteKey)
+              .setPipelineData("shiny", loadShiny)
+              .setPipelineData("variant", loadVariant)
+              .setPipelineData("spriteKey", spriteKey);
+          });
         }
 
         const currentFilteredContainer = this.filteredStarterContainers.find(

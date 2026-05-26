@@ -795,6 +795,9 @@ export abstract class PokemonSpeciesForm {
       }
     };
 
+    // Fast path: texture already in cache. finalize() just creates the
+    // anim if missing (no-op otherwise) + handles variant colors. Returns
+    // in a single microtask — effectively synchronous for repeat selects.
     if (globalScene.textures.exists(spriteKey)) {
       await finalize();
       return;
@@ -804,95 +807,50 @@ export abstract class PokemonSpeciesForm {
       await this.loadVariantColors(spriteKey, female, variant, back, formIndex);
     }
 
-    // Audio loads on the GLOBAL loader. Audio failures don't block the
-    // sprite (cry is best-effort) and never poison the loader queue for
-    // future atlas requests because we don't depend on its completion.
-    try {
-      globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
-      if (!globalScene.load.isLoading()) {
-        globalScene.load.start();
-      }
-    } catch {
-      // ignore audio queue errors
-    }
+    // Queue atlas + audio on the shared loader. Audio is best-effort
+    // (missing files just trigger a loaderror Phaser swallows). The
+    // shared loader's `keyExists` check makes duplicate queues a no-op,
+    // and the TextureManager's per-key event fires only once the texture
+    // is fully usable from the cache.
+    globalScene.loadPokemonAtlas(spriteKey, atlasPath);
+    globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
 
-    // Build atlas URL using the same conventions as BattleScene.loadPokemonAtlas.
-    const isVariantPath = atlasPath.includes("variant/") || /_[0-3]$/.test(atlasPath);
-    const cleanPath = isVariantPath ? atlasPath.replace("variant/", "") : atlasPath;
-    let experimental = (globalScene as { experimentalSprites?: boolean }).experimentalSprites ?? false;
-    if (experimental) {
-      try {
-        experimental = hasExpSprite(spriteKey);
-      } catch {
-        experimental = false;
-      }
-    }
-    const pngUrl = `images/pokemon/${isVariantPath ? "variant/" : ""}${experimental ? "exp/" : ""}${cleanPath}.png`;
-    const jsonUrl = `images/pokemon/${isVariantPath ? "variant/" : ""}${experimental ? "exp/" : ""}${cleanPath}.json`;
-
-    // CRITICAL: use a DEDICATED LoaderPlugin instance for this atlas. The
-    // shared globalScene.load has a `keyExists` check that silently drops
-    // duplicates AND keeps polluted keys (from prior failed loads) in its
-    // inflight tracking forever — once a key is poisoned, future queues
-    // for that key are silently dropped and the texture never lands.
-    //
-    // A dedicated loader has its own queue, state machine, and COMPLETE
-    // event. It shares the global TextureManager so loaded atlases land
-    // in the same texture cache the renderer reads from. Per-call loaders
-    // can fail independently without affecting any other load.
     return new Promise<void>(resolve => {
-      const tempLoader = new Phaser.Loader.LoaderPlugin(globalScene);
-      let resolved = false;
-      const settle = (): void => {
-        if (resolved) {
-          return;
-        }
-        resolved = true;
-        try {
-          tempLoader.removeAllListeners();
-          tempLoader.destroy();
-        } catch {
-          // loader may already be partially torn down — ignore
-        }
+      // Listen for THIS specific texture landing in the cache. The
+      // TextureManager emits `addtexture-${key}` from addAtlasJSONArray
+      // (verified: phaser/src/textures/TextureManager.js:899-900) at the
+      // exact moment the texture is queryable. No loader-event guessing,
+      // no batch races — we hook the actual cache-state signal.
+      const onAdded = (): void => {
+        finalize().then(() => resolve());
+      };
+      globalScene.textures.once(`addtexture-${spriteKey}`, onAdded);
+
+      // Safety net: resolve even if the load fails or takes too long.
+      // The caller .then() handles missing textures gracefully (sprite
+      // stays on prior anim, the next selection retries).
+      const timeoutId = setTimeout(() => {
+        globalScene.textures.off(`addtexture-${spriteKey}`, onAdded);
         if (globalScene.textures.exists(spriteKey)) {
           finalize().then(() => resolve());
         } else {
-          // Texture didn't land — the load failed. Resolve so the caller
-          // chain doesn't hang. The sprite stays on its previous frame
-          // and any retry attempt creates a fresh loader (no pollution).
           resolve();
         }
-      };
-      tempLoader.atlas(spriteKey, pngUrl, jsonUrl);
-      tempLoader.once(Phaser.Loader.Events.COMPLETE, settle);
-      tempLoader.once(Phaser.Loader.Events.LOAD_COMPLETE, settle);
-      // Safety net: if neither event fires within 10s (network stall, bad
-      // CDN, etc.), resolve so the caller can move on. The sprite stays
-      // blank for this attempt only; subsequent attempts get a fresh
-      // loader and try again.
-      const timeoutId = setTimeout(() => {
-        if (!resolved) {
-          settle();
-        }
-      }, 10000);
-      // Wrap settle to also clear the timeout.
-      const onSettle = () => {
+      }, 5000);
+      // Clear the timeout when the event fires successfully.
+      globalScene.textures.once(`addtexture-${spriteKey}`, () => {
         clearTimeout(timeoutId);
-      };
-      tempLoader.once(Phaser.Loader.Events.COMPLETE, onSettle);
-      tempLoader.once(Phaser.Loader.Events.LOAD_COMPLETE, onSettle);
+      });
+
       if (startLoad) {
-        tempLoader.start();
-      } else {
-        // Caller said don't start. Resolve immediately; the dedicated
-        // loader will sit idle and get garbage-collected.
-        resolved = true;
-        clearTimeout(timeoutId);
-        try {
-          tempLoader.destroy();
-        } catch {
-          /* ignore */
+        if (!globalScene.load.isLoading()) {
+          globalScene.load.start();
         }
+      } else {
+        // Caller manages start. Resolve immediately so the caller chain
+        // proceeds; the per-key event will still finalize the anim when
+        // the texture eventually lands.
+        clearTimeout(timeoutId);
         resolve();
       }
     });
