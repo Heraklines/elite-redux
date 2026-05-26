@@ -764,45 +764,85 @@ export abstract class PokemonSpeciesForm {
   ): Promise<void> {
     // We need to populate the color cache for this species' variant
     const spriteKey = this.getSpriteKey(female, formIndex, shiny, variant, back);
-    globalScene.loadPokemonAtlas(spriteKey, this.getSpriteAtlasPath(female, formIndex, shiny, variant, back));
+    const atlasPath = this.getSpriteAtlasPath(female, formIndex, shiny, variant, back);
+    const isAlreadyCached = globalScene.textures.exists(spriteKey);
+    if (!isAlreadyCached) {
+      globalScene.loadPokemonAtlas(spriteKey, atlasPath);
+    }
     globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
     if (variant != null) {
       await this.loadVariantColors(spriteKey, female, variant, back, formIndex);
     }
-    return new Promise<void>(resolve => {
-      globalScene.load.once(Phaser.Loader.Events.COMPLETE, () => {
-        const originalWarn = console.warn;
-        // Ignore warnings for missing frames, because there will be a lot
-        console.warn = () => {};
-        const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
-          zeroPad: 4,
-          suffix: ".png",
-          start: 1,
-          end: 400,
-        });
-        console.warn = originalWarn;
-        if (globalScene.anims.exists(spriteKey)) {
-          globalScene.anims.get(spriteKey).frameRate = 10;
-        } else {
-          globalScene.anims.create({
-            key: this.getSpriteKey(female, formIndex, shiny, variant, back),
-            frames: frameNames,
-            frameRate: 10,
-            repeat: -1,
-          });
-        }
-        const spritePath = this.getSpriteAtlasPath(female, formIndex, shiny, variant, back)
-          .replace("variant/", "")
-          .replace(/_[1-3]$/, "");
-        if (variant != null) {
-          loadPokemonVariantAssets(spriteKey, spritePath, variant).then(() => resolve());
-        }
+
+    // Helper: build the per-spriteKey animation once the texture is in
+    // the cache. Idempotent — re-creating an existing anim resets frameRate.
+    const buildAnim = (): void => {
+      const originalWarn = console.warn;
+      // Ignore warnings for missing frames, because there will be a lot
+      console.warn = () => {};
+      const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
+        zeroPad: 4,
+        suffix: ".png",
+        start: 1,
+        end: 400,
       });
+      console.warn = originalWarn;
+      if (globalScene.anims.exists(spriteKey)) {
+        globalScene.anims.get(spriteKey).frameRate = 10;
+      } else {
+        globalScene.anims.create({
+          key: spriteKey,
+          frames: frameNames,
+          frameRate: 10,
+          repeat: -1,
+        });
+      }
+    };
+
+    return new Promise<void>(resolve => {
+      // Helper that finalizes the load: builds the anim, optionally loads
+      // variant color json, then resolves.
+      const finalize = (): void => {
+        buildAnim();
+        if (variant != null) {
+          const spritePath = atlasPath.replace("variant/", "").replace(/_[1-3]$/, "");
+          loadPokemonVariantAssets(spriteKey, spritePath, variant).then(() => resolve());
+        } else {
+          // BUG FIX (R58): previously `resolve()` was inside the
+          // `if (variant != null)` block, so when variant was null/
+          // undefined the promise hung forever when startLoad=true —
+          // the caller's .then() never fired, the sprite stayed blank.
+          resolve();
+        }
+      };
+
+      // If the atlas is already in the texture cache, finalize immediately —
+      // no need to wait on the loader.
+      if (isAlreadyCached) {
+        finalize();
+        return;
+      }
+
+      // BUG FIX (R58): use Phaser's per-file event instead of the global
+      // COMPLETE event. The global event fires when the loader QUEUE
+      // empties, which can happen BEFORE our specific atlas finishes if
+      // multiple loads are racing. The per-file event fires only when
+      // OUR atlas JSON has been parsed and is in the texture cache.
+      const onFile = (key: string, _type: string) => {
+        if (key !== spriteKey) return;
+        globalScene.load.off(`filecomplete-atlasjson-${spriteKey}`, onFile);
+        finalize();
+      };
+      globalScene.load.on(`filecomplete-atlasjson-${spriteKey}`, onFile);
+
       if (startLoad) {
         if (!globalScene.load.isLoading()) {
           globalScene.load.start();
         }
       } else {
+        // Caller will manage the load start; resolve immediately so the
+        // caller can chain its own continuation. The per-file event still
+        // fires later and builds the anim.
         resolve();
       }
     });

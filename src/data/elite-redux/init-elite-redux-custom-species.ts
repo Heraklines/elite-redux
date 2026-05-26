@@ -295,21 +295,10 @@ class ErCustomSpecies extends PokemonSpecies {
   }
 
   /**
-   * Robust ER sprite loader that fixes pokerogue's vanilla sprite race.
-   *
-   * The vanilla `PokemonSpecies.loadAssets` listens for the global
-   * `Phaser.Loader.Events.COMPLETE` event — that fires when the loader
-   * QUEUE finishes, NOT necessarily when our specific atlas finishes. If
-   * the user clicks Pokemon A→B→C rapidly:
-   *   1. A's atlas queued + load.start()
-   *   2. B's atlas queued (joins in-progress batch)
-   *   3. A finishes loading → COMPLETE fires → B's listener fires too even
-   *      though B isn't loaded yet → animation created with 0 frames →
-   *      blank sprite forever
-   *
-   * Our fix: listen for the per-file `filecomplete-atlasjson-{key}` event
-   * (or skip the wait if the texture already exists in cache). This
-   * resolves only when OUR specific atlas is ready.
+   * Extend `loadAssets` to also preload the per-slug icon atlas alongside
+   * the main sprite. The base `PokemonSpecies.loadAssets` (patched in R58
+   * to use per-file events instead of the global COMPLETE event) handles
+   * the actual sprite-load race correctly.
    */
   override async loadAssets(
     female = false,
@@ -320,71 +309,15 @@ class ErCustomSpecies extends PokemonSpecies {
     back = false,
   ): Promise<void> {
     const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
-    if (!slug) {
-      return super.loadAssets(female, formIndex, shiny, variant, startLoad, back);
-    }
-
-    // Preload the icon atlas (key matches getIconAtlasKey output).
-    const iconKey = `er_icon__${slug}`;
-    if (!globalScene.textures.exists(iconKey)) {
-      globalScene.loadPokemonAtlas(iconKey, `elite-redux/${slug}/icon`);
-    }
-
-    const spriteKey = this.getSpriteKey(female, formIndex, shiny, variant, back);
-    const atlasPath = this.getSpriteAtlasPath(female, formIndex, shiny, variant, back);
-
-    // Atlas already loaded? Skip the load + just create the animation if missing.
-    if (globalScene.textures.exists(spriteKey)) {
-      createSpriteAnim(spriteKey);
-      return;
-    }
-
-    // Not loaded — queue it.
-    globalScene.loadPokemonAtlas(spriteKey, atlasPath);
-
-    // Wait for THIS atlas (not the global queue) using Phaser's per-file event.
-    // Event name format: `filecomplete-atlasjson-{key}`.
-    return new Promise<void>(resolve => {
-      const onFile = (key: string, _type: string) => {
-        if (key !== spriteKey) return;
-        globalScene.load.off(`filecomplete-atlasjson-${spriteKey}`, onFile);
-        createSpriteAnim(spriteKey);
-        resolve();
-      };
-      globalScene.load.on(`filecomplete-atlasjson-${spriteKey}`, onFile);
-      if (startLoad && !globalScene.load.isLoading()) {
-        globalScene.load.start();
+    if (slug) {
+      // Preload the icon atlas (key matches getIconAtlasKey output).
+      const iconKey = `er_icon__${slug}`;
+      if (!globalScene.textures.exists(iconKey)) {
+        globalScene.loadPokemonAtlas(iconKey, `elite-redux/${slug}/icon`);
       }
-    });
+    }
+    return super.loadAssets(female, formIndex, shiny, variant, startLoad, back);
   }
-}
-
-/**
- * Create the Phaser sprite animation for a freshly loaded ER atlas. Idempotent —
- * re-creating an existing animation is a no-op (just reset its frameRate).
- */
-function createSpriteAnim(spriteKey: string): void {
-  if (globalScene.anims.exists(spriteKey)) {
-    globalScene.anims.get(spriteKey).frameRate = 10;
-    return;
-  }
-  // ER atlases have exactly one frame ("0001.png"). Use generateFrameNames
-  // with end:1 to avoid the noisy missing-frame warnings.
-  const originalWarn = console.warn;
-  console.warn = () => {};
-  const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
-    zeroPad: 4,
-    suffix: ".png",
-    start: 1,
-    end: 1,
-  });
-  console.warn = originalWarn;
-  globalScene.anims.create({
-    key: spriteKey,
-    frames: frameNames,
-    frameRate: 10,
-    repeat: -1,
-  });
 }
 
 /**
