@@ -45,7 +45,7 @@ function loadEnum(path) {
 function nameToEnumKey(rawName) {
   return rawName
     .toUpperCase()
-    .replace(/['’‘]/g, "")
+    .replace(/['’‘]/g, "_")
     .replace(/[â]/g, "")
     .replace(/[^A-Z0-9 _\-]/g, "")
     .trim()
@@ -57,14 +57,37 @@ function nameToEnumKey(rawName) {
 function resyncSection(idMapPairs, erEntries, enumMap, sectionName) {
   let fixed = 0;
   let unmapped = 0;
+  // BUG FIX (R58): the previous version did `erEntries[erId]` treating ER ID
+  // as a dump-array INDEX. The dump array is a flat list — its ARRAY INDEX
+  // does NOT equal the entry's `id` field. We now build a proper id→entry
+  // map up front so lookups by ER ID are correct.
+  const byErId = new Map();
+  for (const entry of erEntries) {
+    if (entry && typeof entry.id === "number") {
+      byErId.set(entry.id, entry);
+    }
+  }
   for (const [erIdStr, pokerogueId] of Object.entries(idMapPairs)) {
     const erId = Number(erIdStr);
     if (pokerogueId < 5000 && sectionName !== "species") continue;
     if (sectionName === "species" && pokerogueId < 10000) continue;
-    if (erId < 0 || erId >= erEntries.length) continue;
-    const entry = erEntries[erId];
+    const entry = byErId.get(erId);
     if (!entry) continue;
-    const rawName = entry.name || (sectionName === "species" ? (entry.NAME || "").replace(/^SPECIES_/, "") : "");
+    // R58: prefer the NAME field (e.g. "SPECIES_CRAWDAUNTLES") over name
+    // ("Crawdauntless") since the enum is built from NAME. Display names
+    // can diverge from consts (typos, formatting) — e.g. "Crawdauntless"
+    // (double-L) vs SPECIES_CRAWDAUNTLES (single-L). Using NAME guarantees
+    // enum-key consistency.
+    let rawName;
+    if (sectionName === "species") {
+      rawName = (entry.NAME || "").replace(/^SPECIES_/, "") || entry.name || "";
+    } else if (sectionName === "moves") {
+      rawName = (entry.NAME || "").replace(/^MOVE_/, "") || entry.name || "";
+    } else {
+      // abilities have no const-NAME prefix — use `name` (human-readable
+      // form like "Overgrow") which normalizeName handles.
+      rawName = entry.name || "";
+    }
     if (!rawName) continue;
     const enumKey = nameToEnumKey(rawName);
     const canonical = enumMap.get(enumKey);
