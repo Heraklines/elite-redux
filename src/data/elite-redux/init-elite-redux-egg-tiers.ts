@@ -53,14 +53,20 @@ function pickTier(draft: (typeof ER_SPECIES)[number]): EggTier {
   if (/Mega|Primal/i.test(name)) {
     return EggTier.LEGENDARY;
   }
-  // BST-based tiering. ER stats live under `stats.base` as a 6-tuple.
-  const stats = (draft as unknown as { stats?: { base?: number[] } }).stats?.base;
+  // BST-based tiering. The field is `baseStats: readonly [hp,atk,def,spatk,spdef,spd]`.
+  const stats = draft.baseStats;
   if (Array.isArray(stats) && stats.length === 6) {
     const bst = stats.reduce((s, v) => s + v, 0);
     if (bst >= 600) {
       return EggTier.EPIC;
     }
     if (bst >= 540) {
+      return EggTier.RARE;
+    }
+    if (bst >= 470) {
+      // Mid-BST → uncommon. Without an UNCOMMON tier in pokerogue, this
+      // bucket also lands in RARE eggs (less likely than EPIC, more likely
+      // than COMMON spam).
       return EggTier.RARE;
     }
   }

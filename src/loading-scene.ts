@@ -2,6 +2,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { initializeGame } from "#app/init/init";
 import { SceneBase } from "#app/scene-base";
 import { isMobile } from "#app/touch-controls";
+import { ER_SPRITE_MANIFEST } from "#data/elite-redux/er-sprite-manifest";
 import { BiomeId } from "#enums/biome-id";
 import { GachaType } from "#enums/gacha-types";
 import { getBiomeHasProps } from "#field/arena";
@@ -618,7 +619,24 @@ export class LoadingScene extends SceneBase {
         this.loadAtlas(`pokemon_icons_${i}v`, "");
       }
     }
-
+    this.loadEliteReduxCustomIcons();
     return this;
+  }
+
+  /**
+   * Elite Redux: pre-load every ER-custom species icon atlas so the
+   * starter-select grid doesn't flash blank slots while atlases stream
+   * in lazily. Each ER custom has its own per-slug atlas
+   * (`er_icon__{slug}`) — pokerogue's vanilla bundled `pokemon_icons_N`
+   * has no frames for id >= 10000.
+   */
+  private loadEliteReduxCustomIcons(): void {
+    for (const entry of ER_SPRITE_MANIFEST) {
+      // ER species id >= 1026 → custom (Phantowl onward). Vanilla species ids
+      // 1..1025 share pokerogue's bundled icons; we only need icons for the
+      // ER customs the runtime hasn't otherwise loaded.
+      if (entry.speciesId < 1026) continue;
+      this.loadAtlas(`er_icon__${entry.slug}`, `pokemon/elite-redux/${entry.slug}`, "icon");
+    }
   }
 }
