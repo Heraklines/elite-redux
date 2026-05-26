@@ -807,22 +807,14 @@ export abstract class PokemonSpeciesForm {
       await this.loadVariantColors(spriteKey, female, variant, back, formIndex);
     }
 
-    // Audio goes through the shared loader (best-effort, missing files
-    // just log a loaderror Phaser swallows). Atlas does NOT — Phaser's
-    // shared loader processes files FIFO and rapid-click selections
-    // would wait for ALL prior queued atlases before the latest user
-    // selection's sprite shows. Direct fetch + addAtlasJSONArray makes
-    // each atlas load INDEPENDENT — the latest click's atlas can land
-    // in cache before all the abandoned earlier ones, so the sprite
-    // visually updates as fast as the network responds.
-    try {
-      globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
-      if (startLoad && !globalScene.load.isLoading()) {
-        globalScene.load.start();
-      }
-    } catch {
-      /* ignore audio queue errors */
-    }
+    // NOTE: we deliberately do NOT queue the cry audio here. Audio
+    // fetches compete with the atlas fetch for the browser's ~6
+    // concurrent HTTP slots — during rapid starter-select cycling,
+    // each click was queuing both an atlas AND an audio, saturating
+    // the network connection pool. After ~20 cycles, atlas fetches
+    // would stall behind audio fetches and never complete. The cry
+    // sound can lazy-load when actually needed (PokemonSpecies.cry()
+    // queues + plays on demand).
 
     // Build the URLs the same way BattleScene.loadPokemonAtlas does.
     const isVariantPath = atlasPath.includes("variant/") || /_[0-3]$/.test(atlasPath);

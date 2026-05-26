@@ -166,27 +166,48 @@ async function main() {
     });
     console.log(`sprite anim BEFORE cycling: ${startSpriteAnim}`);
 
-    // Drive cursor across the full filtered list (27 species) rapidly,
-    // then BACK, then forward, simulating a user holding arrow keys
-    // back and forth. End on a NEW position so we can verify the
-    // latest selection loads correctly.
-    console.log("rapid forward...");
+    // Test scenario: SLOW cycling — pause between each click. Sprite
+    // should update for EACH selection, matching it. If it stays stuck
+    // on one species, my fix is wrong.
+    console.log("=== SLOW cycle test: 200ms between each ===");
+    const checkpoints = [];
+    for (let i = 1; i <= 10; i++) {
+      await page.evaluate(idx => globalThis.globalScene?.ui?.getHandler?.()?.setCursor?.(idx), i);
+      await new Promise(r => setTimeout(r, 200));
+      const snapshot = await page.evaluate(() => {
+        const h = globalThis.globalScene?.ui?.getHandler?.();
+        const sprite = h?.pokemonSprite;
+        const anim = sprite?.anims?.currentAnim;
+        const filtered = h?.filteredStarterContainers;
+        const species = filtered?.[h?.cursor]?.species;
+        return {
+          cursor: h?.cursor,
+          selectedId: species?.speciesId,
+          selectedName: species?.name,
+          spriteAnimKey: anim?.key,
+          expected: species?.getSpriteKey?.(false, 0, false, 0, false),
+          match: anim?.key === species?.getSpriteKey?.(false, 0, false, 0, false),
+        };
+      });
+      checkpoints.push(snapshot);
+      console.log(
+        `  i=${i} cursor=${snapshot.cursor} expected=${snapshot.expected} sprite=${snapshot.spriteAnimKey} ${snapshot.match ? "✓" : "✗ MISMATCH"}`,
+      );
+    }
+    const mismatches = checkpoints.filter(c => !c.match);
+    console.log(`\n${mismatches.length}/10 mismatches in SLOW cycle.`);
+
+    console.log("\n=== RAPID cycle test: 30ms between each (faster than load) ===");
+    // Reset cursor and clear logs.
+    await page.evaluate(() => globalThis.globalScene?.ui?.getHandler?.()?.setCursor?.(0));
+    await new Promise(r => setTimeout(r, 300));
+    logs.length = 0;
     for (let i = 1; i <= 26; i++) {
       await page.evaluate(idx => globalThis.globalScene?.ui?.getHandler?.()?.setCursor?.(idx), i);
-      await new Promise(r => setTimeout(r, 50));
+      await new Promise(r => setTimeout(r, 30));
     }
-    console.log("rapid backward...");
-    for (let i = 25; i >= 0; i--) {
-      await page.evaluate(idx => globalThis.globalScene?.ui?.getHandler?.()?.setCursor?.(idx), i);
-      await new Promise(r => setTimeout(r, 50));
-    }
-    console.log("rapid forward to a middle-ish position...");
-    for (let i = 1; i <= 12; i++) {
-      await page.evaluate(idx => globalThis.globalScene?.ui?.getHandler?.()?.setCursor?.(idx), i);
-      await new Promise(r => setTimeout(r, 50));
-    }
-    console.log("paused on cursor=12, waiting for latest load...");
-    await new Promise(r => setTimeout(r, 2500));
+    console.log("paused on cursor=26, waiting for latest load...");
+    await new Promise(r => setTimeout(r, 3000));
     await page.screenshot({ path: "scripts/debug-screenshot-6-after-cycle.png" });
 
     const cycleState = await page.evaluate(() => {
