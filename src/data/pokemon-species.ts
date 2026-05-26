@@ -810,37 +810,39 @@ export abstract class PokemonSpeciesForm {
     }
 
     return new Promise<void>(resolve => {
-      let settled = false;
-      const settle = (): void => {
-        if (settled) return;
-        settled = true;
-        // Verify the texture actually landed; if not, the renderer would
-        // crash on play(spriteKey). Build the anim only if cache is ready.
-        if (globalScene.textures.exists(spriteKey)) {
-          finalize().then(() => resolve());
-        } else {
-          // Texture didn't load (race). Resolve anyway so the caller's
-          // .then() runs and the cancellation-token machinery cleans up.
-          // The renderer should fail to .play() gracefully on a missing
-          // key; pokerogue's vanilla error path handles that.
+      // KEY INSIGHT: the real signal we want is "the texture is in the
+      // cache and fully usable". Loader file events fire at intermediate
+      // points (JSON parsed, PNG decoded) but the atlas only becomes
+      // queryable AFTER both pieces are merged and `textures.addAtlas`
+      // is invoked. Phaser's TextureManager emits `addtexture-${key}`
+      // at exactly that moment. Listen there — no loader-queue races,
+      // no event-type guessing, just the actual cache state we care about.
+      const onTextureAdded = (): void => {
+        // Re-check existence in case the cache mutates again before we run.
+        if (!globalScene.textures.exists(spriteKey)) {
           resolve();
+          return;
         }
+        finalize().then(() => resolve());
       };
 
-      // Per-file event: fires when OUR atlas JSON has been parsed.
-      const onFile = (key: string) => {
-        if (key !== spriteKey) return;
-        globalScene.load.off(`filecomplete-atlasjson-${spriteKey}`, onFile);
-        settle();
-      };
-      globalScene.load.on(`filecomplete-atlasjson-${spriteKey}`, onFile);
+      if (globalScene.textures.exists(spriteKey)) {
+        // Texture appeared between the earlier check and now (e.g., a
+        // sibling load.atlas() finished). Skip event registration.
+        finalize().then(() => resolve());
+        return;
+      }
+
+      globalScene.textures.once(`addtexture-${spriteKey}`, onTextureAdded);
 
       if (startLoad) {
         if (!globalScene.load.isLoading()) {
           globalScene.load.start();
         } else {
-          // The loader is mid-batch; queue a kickstart after current batch
-          // completes so newly-added files get processed.
+          // Phaser does not auto-process files added during an active
+          // load. Queue a one-shot kickstart when the current batch
+          // empties — keeps the queue draining without restarting an
+          // in-progress load.
           globalScene.load.once(Phaser.Loader.Events.COMPLETE, () => {
             if (globalScene.load.totalToLoad - globalScene.load.totalComplete > 0) {
               globalScene.load.start();
@@ -848,8 +850,8 @@ export abstract class PokemonSpeciesForm {
           });
         }
       } else {
-        // Caller manages start. Resolve immediately; per-file event still
-        // builds the anim when the texture eventually lands.
+        // Caller manages start. Resolve immediately; the texture event
+        // will still build the anim when the load lands.
         resolve();
       }
     });
