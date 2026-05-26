@@ -22,7 +22,6 @@ import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import type { PokemonSpecies } from "#data/pokemon-species";
-import { cancelInFlightAtlasFetchesExcept } from "#data/pokemon-species";
 import { AbilityAttr } from "#enums/ability-attr";
 import { AbilityId } from "#enums/ability-id";
 import { Button } from "#enums/buttons";
@@ -4401,17 +4400,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           const loadVariant = variant;
           const loadSpecies = species;
           const spriteKey = loadSpecies.getSpriteKey(loadFemale, loadFormIndex, loadShiny, loadVariant);
-          // Abort prior in-flight atlas fetches so the latest selection's
-          // fetch claims one of the browser's ~6 concurrent network slots
-          // immediately. Verified via Puppeteer: without this, ~25/30
-          // rapid clicks have their fetches stuck behind earlier ones
-          // and never complete.
-          cancelInFlightAtlasFetchesExcept(spriteKey);
-          // Fire load immediately. No debounce — clicks should respond
-          // NOW. loadAssets short-circuits when the texture is cached so
-          // repeat selections are effectively synchronous (microtask).
-          // assetLoadCancelled gates the .then() so stale loads from
-          // prior clicks don't overwrite the latest selection.
+          // Fire load immediately. No debounce. loadAssets short-circuits
+          // when the texture is cached so repeat selections are
+          // effectively synchronous. assetLoadCancelled gates the .then()
+          // so stale loads from prior clicks don't overwrite the latest
+          // selection.
           const debug = (globalThis as { __SPRITE_DEBUG?: boolean }).__SPRITE_DEBUG;
           if (debug) {
             console.log("[sprite] setSpeciesDetails: loadAssets", spriteKey);

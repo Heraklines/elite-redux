@@ -197,10 +197,10 @@ async function main() {
     const mismatches = checkpoints.filter(c => !c.match);
     console.log(`\n${mismatches.length}/10 mismatches in SLOW cycle.`);
 
-    console.log("\n=== RAPID cycle test: 30ms forward+back+forward, end on cursor=17 ===");
+    // Rapid 30ms cycle test.
+    console.log("\n=== RAPID cycle test ===");
     await page.evaluate(() => globalThis.globalScene?.ui?.getHandler?.()?.setCursor?.(0));
     await new Promise(r => setTimeout(r, 300));
-    logs.length = 0;
     for (let i = 1; i <= 26; i++) {
       await page.evaluate(idx => globalThis.globalScene?.ui?.getHandler?.()?.setCursor?.(idx), i);
       await new Promise(r => setTimeout(r, 30));
@@ -209,12 +209,62 @@ async function main() {
       await page.evaluate(idx => globalThis.globalScene?.ui?.getHandler?.()?.setCursor?.(idx), i);
       await new Promise(r => setTimeout(r, 30));
     }
-    for (let i = 1; i <= 17; i++) {
+    for (let i = 1; i <= 12; i++) {
       await page.evaluate(idx => globalThis.globalScene?.ui?.getHandler?.()?.setCursor?.(idx), i);
       await new Promise(r => setTimeout(r, 30));
     }
-    console.log("paused on cursor=17, waiting for latest load...");
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise(r => setTimeout(r, 1500));
+    const rapidState = await page.evaluate(() => {
+      const h = globalThis.globalScene?.ui?.getHandler?.();
+      const sprite = h?.pokemonSprite;
+      const filtered = h?.filteredStarterContainers;
+      const species = filtered?.[h?.cursor]?.species;
+      const expected = species?.getSpriteKey?.(false, 0, false, 0, false);
+      return {
+        cursor: h?.cursor,
+        expected,
+        actual: sprite?.anims?.currentAnim?.key,
+        match: expected === sprite?.anims?.currentAnim?.key,
+      };
+    });
+    console.log(
+      `RAPID final: cursor=${rapidState.cursor} expected=${rapidState.expected} actual=${rapidState.actual} ${rapidState.match ? "✓" : "✗"}`,
+    );
+
+    // Measure how long each fetch takes from setCursor to texture-in-cache.
+    console.log("\n=== TIMING test: cycle slowly + measure latency ===");
+    await page.evaluate(() => globalThis.globalScene?.ui?.getHandler?.()?.setCursor?.(0));
+    await new Promise(r => setTimeout(r, 300));
+    const timings = [];
+    for (let i = 1; i <= 15; i++) {
+      const t0 = Date.now();
+      await page.evaluate(idx => globalThis.globalScene?.ui?.getHandler?.()?.setCursor?.(idx), i);
+      const targetKey = await page.evaluate(() => {
+        const h = globalThis.globalScene?.ui?.getHandler?.();
+        const filtered = h?.filteredStarterContainers;
+        const species = filtered?.[h?.cursor]?.species;
+        return species?.getSpriteKey?.(false, 0, false, 0, false);
+      });
+      // Poll for texture-in-cache.
+      const inCache = await page.evaluate(
+        async key => {
+          const start = Date.now();
+          while (Date.now() - start < 5000) {
+            if (globalThis.globalScene?.textures?.exists?.(key)) {
+              return true;
+            }
+            await new Promise(r => setTimeout(r, 10));
+          }
+          return false;
+        },
+        targetKey,
+      );
+      const elapsed = Date.now() - t0;
+      timings.push({ i, key: targetKey, elapsed, inCache });
+      console.log(`  i=${i} key=${targetKey} cache?=${inCache} elapsed=${elapsed}ms`);
+    }
+    const avg = Math.round(timings.reduce((s, t) => s + t.elapsed, 0) / timings.length);
+    console.log(`avg latency: ${avg}ms per species`);
     await page.screenshot({ path: "scripts/debug-screenshot-6-after-cycle.png" });
 
     const cycleState = await page.evaluate(() => {

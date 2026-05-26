@@ -939,53 +939,37 @@ function spriteDebug(...args: unknown[]): void {
  * `textures.remove` on a live key (the prior attempt did this — the
  * renderer crashed mid-frame trying to read disposed Frame data).
  */
-interface InFlightAtlas {
-  controller: AbortController;
-  promise: Promise<void>;
-}
-
 /**
- * Per-spriteKey in-flight atlas fetches. Browser caps concurrent HTTP at
- * ~6 per origin. Two concerns:
- *   1. ABANDONED fetches (user moved off the species) keep occupying
- *      slots — `cancelInFlightAtlasFetchesExcept(latestKey)` aborts them.
- *   2. SAME-KEY repeat calls (user re-selects same species rapidly, or
- *      cursor clamps to a fixed cursor) must NOT abort the existing fetch
- *      and start a new one — that loops forever, never completing. We
- *      coalesce same-key calls to SHARE the existing promise.
+ * Per-spriteKey in-flight atlas fetches. SAME-KEY calls (user reselects
+ * the same species rapidly, or cursor clamps) share the existing
+ * promise — no duplicate fetches. Cross-key fetches run in parallel
+ * subject to the browser's ~6 concurrent HTTP limit; the .then()
+ * cancellation token in starter-select ensures only the latest
+ * selection's load drives the visible sprite.
+ *
+ * No AbortController: empirically (verified via Puppeteer) aborting
+ * prior fetches causes subsequent fetches to hang indefinitely. The
+ * browser doesn't immediately recycle the network slots from aborted
+ * requests, and the in-flight tracking gets into a degraded state
+ * where new fetches sit unresponsive for 5s+. Letting fetches run to
+ * completion (even if abandoned) is faster than aborting them.
  */
-const inFlightAtlasFetches = new Map<string, InFlightAtlas>();
-
-export function cancelInFlightAtlasFetchesExcept(keepKey: string): void {
-  for (const [key, entry] of inFlightAtlasFetches) {
-    if (key === keepKey) {
-      continue;
-    }
-    entry.controller.abort();
-    inFlightAtlasFetches.delete(key);
-  }
-}
+const inFlightAtlasFetches = new Map<string, Promise<void>>();
 
 function loadAtlasDirect(key: string, pngUrl: string, jsonUrl: string): Promise<void> {
   if (globalScene.textures.exists(key)) {
     spriteDebug("loadAtlasDirect: already cached", key);
     return Promise.resolve();
   }
-  // SAME-KEY COALESCING: if a fetch for this key is already in flight,
-  // return its promise. Starting a new fetch + aborting the prior would
-  // cause every rapid same-key call to abort itself before completing.
   const existing = inFlightAtlasFetches.get(key);
   if (existing) {
     spriteDebug("loadAtlasDirect: joining in-flight fetch", key);
-    return existing.promise;
+    return existing;
   }
-  const controller = new AbortController();
-  const signal = controller.signal;
   spriteDebug("loadAtlasDirect: fetching", key, pngUrl);
   const promise = (async () => {
     try {
-      const [pngRes, jsonRes] = await Promise.all([fetch(pngUrl, { signal }), fetch(jsonUrl, { signal })]);
-      spriteDebug("loadAtlasDirect: fetch got responses", key, pngRes.status, jsonRes.status);
+      const [pngRes, jsonRes] = await Promise.all([fetch(pngUrl), fetch(jsonUrl)]);
       if (!pngRes.ok) {
         throw new Error(`fetch ${pngUrl} → ${pngRes.status}`);
       }
@@ -1001,7 +985,6 @@ function loadAtlasDirect(key: string, pngUrl: string, jsonUrl: string): Promise<
           img.onerror = () => rej(new Error(`decode ${pngUrl}`));
           img.src = imgUrl;
         });
-        spriteDebug("loadAtlasDirect: img decoded", key, img.naturalWidth);
         if (globalScene.textures.exists(key)) {
           spriteDebug("loadAtlasDirect: cache won the race", key);
           return;
@@ -1015,15 +998,12 @@ function loadAtlasDirect(key: string, pngUrl: string, jsonUrl: string): Promise<
       spriteDebug("loadAtlasDirect: threw", key, String(e));
       throw e;
     } finally {
-      // Only clear if this controller is still the registered one —
-      // although with coalescing this should always be true.
-      const cur = inFlightAtlasFetches.get(key);
-      if (cur && cur.controller === controller) {
+      if (inFlightAtlasFetches.get(key) === promise) {
         inFlightAtlasFetches.delete(key);
       }
     }
   })();
-  inFlightAtlasFetches.set(key, { controller, promise });
+  inFlightAtlasFetches.set(key, promise);
   return promise;
 }
 
