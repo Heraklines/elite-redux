@@ -37,23 +37,25 @@ function makeAtlasJson(pngPath) {
   const size = pngSize(pngPath);
   if (!size) return null;
   const filename = pngPath.split(/[/\\]/).pop();
-  // Frame name format pokerogue expects: zero-padded 0001.png ... 9999.png
-  // For static single-frame ER sprites, emit one frame.
+  // Pokerogue's Phaser atlas format uses "w"/"h" keys (not "width"/"height").
+  // The "size" object also uses w/h. Get this wrong and the atlas loads as
+  // 0x0 → invisible sprites.
+  const sz = { w: size.width, h: size.height };
   return {
     textures: [
       {
         image: filename,
         format: "RGBA8888",
-        size,
+        size: sz,
         scale: 1,
         frames: [
           {
             filename: "0001.png",
             rotated: false,
             trimmed: false,
-            sourceSize: size,
-            spriteSourceSize: { x: 0, y: 0, w: size.width, h: size.height },
-            frame: { x: 0, y: 0, w: size.width, h: size.height },
+            sourceSize: sz,
+            spriteSourceSize: { x: 0, y: 0, w: sz.w, h: sz.h },
+            frame: { x: 0, y: 0, w: sz.w, h: sz.h },
           },
         ],
       },
