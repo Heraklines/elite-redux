@@ -762,72 +762,50 @@ export abstract class PokemonSpeciesForm {
     startLoad = false,
     back = false,
   ): Promise<void> {
+    // We need to populate the color cache for this species' variant
     const spriteKey = this.getSpriteKey(female, formIndex, shiny, variant, back);
-    const atlasPath = this.getSpriteAtlasPath(female, formIndex, shiny, variant, back);
-
-    // Helper: build the per-spriteKey animation once the texture is in
-    // the cache. Idempotent — re-creating an existing anim resets frameRate.
-    const buildAnim = (): void => {
-      const originalWarn = console.warn;
-      // Ignore warnings for missing frames, because there will be a lot
-      console.warn = () => {};
-      const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
-        zeroPad: 4,
-        suffix: ".png",
-        start: 1,
-        end: 400,
-      });
-      console.warn = originalWarn;
-      if (globalScene.anims.exists(spriteKey)) {
-        globalScene.anims.get(spriteKey).frameRate = 10;
-      } else {
-        globalScene.anims.create({
-          key: spriteKey,
-          frames: frameNames,
-          frameRate: 10,
-          repeat: -1,
-        });
-      }
-    };
-
-    const finalize = async (): Promise<void> => {
-      buildAnim();
-      if (variant != null) {
-        const spritePath = atlasPath.replace("variant/", "").replace(/_[1-3]$/, "");
-        await loadPokemonVariantAssets(spriteKey, spritePath, variant);
-      }
-    };
-
-    // Already in cache — short-circuit and finalize.
-    if (globalScene.textures.exists(spriteKey)) {
-      await finalize();
-      return;
-    }
-
-    // Audio loads through the standard Phaser loader (less prone to race).
+    globalScene.loadPokemonAtlas(spriteKey, this.getSpriteAtlasPath(female, formIndex, shiny, variant, back));
     globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
     if (variant != null) {
       await this.loadVariantColors(spriteKey, female, variant, back, formIndex);
     }
-
-    // BUG FIX (R58): Phaser's Loader.start() doesn't auto-process files
-    // added during an active load — rapid sprite switches stranded
-    // newly-queued atlases. We bypass the queue entirely for the sprite
-    // PNG+JSON pair and call `globalScene.textures.addAtlas` directly.
-    // Each load is independent, no shared queue state.
-    try {
-      await loadAtlasDirect(spriteKey, atlasPath);
-      await finalize();
-    } catch (err) {
-      // If the direct load fails (network 404, etc.), fall back to the
-      // standard pokerogue loader so existing error-handling behavior
-      // (default sprite, etc.) kicks in.
-      console.warn(`[er-sprites] direct load failed for ${spriteKey}; falling back`, err);
-      globalScene.loadPokemonAtlas(spriteKey, atlasPath);
-      if (startLoad && !globalScene.load.isLoading()) {
-        globalScene.load.start();
+    return new Promise<void>(resolve => {
+      globalScene.load.once(Phaser.Loader.Events.COMPLETE, () => {
+        const originalWarn = console.warn;
+        // Ignore warnings for missing frames, because there will be a lot
+        console.warn = () => {};
+        const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
+          zeroPad: 4,
+          suffix: ".png",
+          start: 1,
+          end: 400,
+        });
+        console.warn = originalWarn;
+        if (globalScene.anims.exists(spriteKey)) {
+          globalScene.anims.get(spriteKey).frameRate = 10;
+        } else {
+          globalScene.anims.create({
+            key: this.getSpriteKey(female, formIndex, shiny, variant, back),
+            frames: frameNames,
+            frameRate: 10,
+            repeat: -1,
+          });
+        }
+        const spritePath = this.getSpriteAtlasPath(female, formIndex, shiny, variant, back)
+          .replace("variant/", "")
+          .replace(/_[1-3]$/, "");
+        if (variant != null) {
+          loadPokemonVariantAssets(spriteKey, spritePath, variant).then(() => resolve());
+        }
+      });
+      if (startLoad) {
+        if (!globalScene.load.isLoading()) {
+          globalScene.load.start();
+        }
+      } else {
+        resolve();
       }
-    }
+    });
   }
 
   cry(soundConfig?: Phaser.Types.Sound.SoundConfig, ignorePlay?: boolean): AnySound | null {
@@ -906,67 +884,6 @@ export abstract class PokemonSpeciesForm {
 
     return Array.from(paletteColors.keys()).map(c => Object.values(rgbaFromArgb(c)) as number[]);
   }
-}
-
-/**
- * BUG FIX (R58): bypass Phaser's loader queue for sprite-atlas loads.
- *
- * Phaser's `Loader.start()` does NOT pick up files added during an active
- * load — they sit dormant in the queue until the next manual `start()`
- * call. Rapid sprite switching in starter-select would strand newly
- * queued atlases, causing sprites to stop loading after a while.
- *
- * This helper loads the PNG + JSON pair via plain `fetch` and calls
- * `globalScene.textures.addAtlas` directly. Each load is independent
- * (no shared queue state) and resolves only when its specific texture
- * is in the cache.
- *
- * @param key - texture cache key (same key the renderer will look up)
- * @param atlasPath - path passed to loadPokemonAtlas (without prefix)
- */
-async function loadAtlasDirect(key: string, atlasPath: string): Promise<void> {
-  // Replicate loadPokemonAtlas's path computation: prefix `images/pokemon/`,
-  // with `variant/` interjected when the atlas path already implies variant
-  // sprites. The atlas path may include a `variant/` prefix already; if so,
-  // dedupe.
-  const variantPrefix = atlasPath.includes("variant/") ? "" : "variant/";
-  const inferVariant = /_[0-3]$/.test(atlasPath);
-  const subdir = inferVariant ? variantPrefix : "";
-  const cleanPath = atlasPath.replace("variant/", "");
-  const pngUrl = `images/pokemon/${subdir}${cleanPath}.png`;
-  const jsonUrl = `images/pokemon/${subdir}${cleanPath}.json`;
-
-  const [pngRes, jsonRes] = await Promise.all([fetch(pngUrl), fetch(jsonUrl)]);
-  if (!pngRes.ok) {
-    throw new Error(`Failed to fetch ${pngUrl} — ${pngRes.status}`);
-  }
-  if (!jsonRes.ok) {
-    throw new Error(`Failed to fetch ${jsonUrl} — ${jsonRes.status}`);
-  }
-  const [pngBlob, jsonData] = await Promise.all([pngRes.blob(), jsonRes.json()]);
-
-  // Decode the PNG into a HTMLImageElement so Phaser's textures plugin
-  // can ingest it directly.
-  const imgUrl = URL.createObjectURL(pngBlob);
-  const img = new Image();
-  await new Promise<void>((res, rej) => {
-    img.onload = () => res();
-    img.onerror = () => rej(new Error(`Image decode failed for ${pngUrl}`));
-    img.src = imgUrl;
-  });
-
-  // Add the atlas to Phaser's texture cache. If the key already exists
-  // (race-recovery), remove it first to avoid duplicate-key errors.
-  if (globalScene.textures.exists(key)) {
-    globalScene.textures.remove(key);
-  }
-  // Use addAtlasJSONArray explicitly — pokerogue's atlases use the
-  // TexturePacker JSONArray format. The generic `addAtlas` dispatcher
-  // sometimes fails to populate Frame.sourceSize causing
-  // "Cannot read properties of null (reading 'sourceSize')" when the
-  // renderer tries to compute realWidth.
-  globalScene.textures.addAtlasJSONArray(key, img, jsonData);
-  URL.revokeObjectURL(imgUrl);
 }
 
 export class PokemonSpecies extends PokemonSpeciesForm implements Localizable {
