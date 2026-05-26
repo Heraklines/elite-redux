@@ -463,7 +463,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   // scroll wheel) can fire setSpeciesDetails 10+ times per second. Each
   // call previously queued a fresh atlas + audio load on Phaser's shared
   // loader, thrashing its queue until later loads stalled. We coalesce
-  // rapid calls to a single load triggered ~80ms after the last input —
+  // rapid calls to a single load triggered ~150ms after the last input —
   // panel info still updates immediately, only the (expensive) sprite
   // load is deferred.
   private pendingSpriteLoadTimer: ReturnType<typeof setTimeout> | null = null;
@@ -4250,11 +4250,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     const speciesChanged =
       species != null && this.currentDisplayedSpeciesId !== (species.speciesId as unknown as number);
     const shouldUpdateSprite =
-      speciesChanged ||
-      (species?.genderDiffs && female != null) ||
-      formIndex != null ||
-      shiny != null ||
-      variant != null;
+      speciesChanged
+      || (species?.genderDiffs && female != null)
+      || formIndex != null
+      || shiny != null
+      || variant != null;
 
     const isFreshStartChallenge = globalScene.gameMode.hasChallenge(Challenges.FRESH_START);
 
@@ -4400,29 +4400,33 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             if (assetLoadCancelled.value) {
               return;
             }
-            loadSpecies
-              .loadAssets(loadFemale, loadFormIndex, loadShiny, loadVariant, true)
-              .then(() => {
-                if (assetLoadCancelled.value) {
-                  return;
+            loadSpecies.loadAssets(loadFemale, loadFormIndex, loadShiny, loadVariant, true).then(() => {
+              if (assetLoadCancelled.value) {
+                return;
+              }
+              const spriteKey = loadSpecies.getSpriteKey(loadFemale, loadFormIndex, loadShiny, loadVariant);
+              // Only mark the displayed species AFTER the texture is in
+              // cache — otherwise a failed load would convince future
+              // re-renders that the right sprite is showing when it isn't.
+              if (!globalScene.textures.exists(spriteKey) || !globalScene.anims.exists(spriteKey)) {
+                if (this.assetLoadCancelled === assetLoadCancelled) {
+                  this.assetLoadCancelled = null;
                 }
+                return;
+              }
+              if (this.assetLoadCancelled === assetLoadCancelled) {
                 this.assetLoadCancelled = null;
-                this.speciesLoaded.set(loadSpecies.speciesId, true);
-                const spriteKey = loadSpecies.getSpriteKey(loadFemale, loadFormIndex, loadShiny, loadVariant);
-                // Only mark the displayed species AFTER the texture is in
-                // cache — otherwise a failed load would convince future
-                // re-renders that the right sprite is showing when it isn't.
-                if (globalScene.textures.exists(spriteKey)) {
-                  this.currentDisplayedSpeciesId = loadSpecies.speciesId as unknown as number;
-                }
-                this.pokemonSprite
-                  .play(spriteKey)
-                  .setPipelineData("shiny", loadShiny)
-                  .setPipelineData("variant", loadVariant)
-                  .setPipelineData("spriteKey", spriteKey)
-                  .setVisible(!this.statsMode);
-              });
-          }, 80);
+              }
+              this.speciesLoaded.set(loadSpecies.speciesId, true);
+              this.currentDisplayedSpeciesId = loadSpecies.speciesId as unknown as number;
+              this.pokemonSprite
+                .play(spriteKey)
+                .setPipelineData("shiny", loadShiny)
+                .setPipelineData("variant", loadVariant)
+                .setPipelineData("spriteKey", spriteKey)
+                .setVisible(!this.statsMode);
+            });
+          }, 150);
         } else {
           this.pokemonSprite.setVisible(!this.statsMode);
         }
