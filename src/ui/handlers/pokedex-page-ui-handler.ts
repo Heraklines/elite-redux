@@ -917,7 +917,11 @@ export class PokedexPageUiHandler extends MessageUiHandler {
     ]);
     const speciesBiomes: Set<BiomeTierTimeOfDay> = new Set();
     for (const sId of evoLine) {
-      for (const bttod of catchableSpecies[sId]) {
+      // ER: catchableSpecies[sId] is undefined for species without biome
+      // entries (some vanilla mons + all ER customs). Skip rather than crash.
+      const entries = catchableSpecies[sId];
+      if (!entries) continue;
+      for (const bttod of entries) {
         speciesBiomes.add(bttod);
       }
     }
