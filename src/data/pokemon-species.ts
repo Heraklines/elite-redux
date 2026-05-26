@@ -947,42 +947,92 @@ function spriteDebug(...args: unknown[]): void {
  * `textures.remove` on a live key (the prior attempt did this — the
  * renderer crashed mid-frame trying to read disposed Frame data).
  */
-async function loadAtlasDirect(key: string, pngUrl: string, jsonUrl: string): Promise<void> {
+interface InFlightAtlas {
+  controller: AbortController;
+  promise: Promise<void>;
+}
+
+/**
+ * Per-spriteKey in-flight atlas fetches. Browser caps concurrent HTTP at
+ * ~6 per origin. Two concerns:
+ *   1. ABANDONED fetches (user moved off the species) keep occupying
+ *      slots — `cancelInFlightAtlasFetchesExcept(latestKey)` aborts them.
+ *   2. SAME-KEY repeat calls (user re-selects same species rapidly, or
+ *      cursor clamps to a fixed cursor) must NOT abort the existing fetch
+ *      and start a new one — that loops forever, never completing. We
+ *      coalesce same-key calls to SHARE the existing promise.
+ */
+const inFlightAtlasFetches = new Map<string, InFlightAtlas>();
+
+export function cancelInFlightAtlasFetchesExcept(keepKey: string): void {
+  for (const [key, entry] of inFlightAtlasFetches) {
+    if (key === keepKey) {
+      continue;
+    }
+    entry.controller.abort();
+    inFlightAtlasFetches.delete(key);
+  }
+}
+
+function loadAtlasDirect(key: string, pngUrl: string, jsonUrl: string): Promise<void> {
   if (globalScene.textures.exists(key)) {
     spriteDebug("loadAtlasDirect: already cached", key);
-    return;
+    return Promise.resolve();
   }
-  spriteDebug("loadAtlasDirect: fetching", key);
-  const [pngRes, jsonRes] = await Promise.all([fetch(pngUrl), fetch(jsonUrl)]);
-  if (!pngRes.ok) {
-    throw new Error(`fetch ${pngUrl} → ${pngRes.status}`);
+  // SAME-KEY COALESCING: if a fetch for this key is already in flight,
+  // return its promise. Starting a new fetch + aborting the prior would
+  // cause every rapid same-key call to abort itself before completing.
+  const existing = inFlightAtlasFetches.get(key);
+  if (existing) {
+    spriteDebug("loadAtlasDirect: joining in-flight fetch", key);
+    return existing.promise;
   }
-  if (!jsonRes.ok) {
-    throw new Error(`fetch ${jsonUrl} → ${jsonRes.status}`);
-  }
-  const [pngBlob, jsonData] = await Promise.all([pngRes.blob(), jsonRes.json()]);
-  const imgUrl = URL.createObjectURL(pngBlob);
-  try {
-    const img = new Image();
-    await new Promise<void>((res, rej) => {
-      img.onload = () => res();
-      img.onerror = () => rej(new Error(`decode ${pngUrl}`));
-      img.src = imgUrl;
-    });
-    if (globalScene.textures.exists(key)) {
-      spriteDebug("loadAtlasDirect: cache won the race", key);
-      return;
+  const controller = new AbortController();
+  const signal = controller.signal;
+  spriteDebug("loadAtlasDirect: fetching", key, pngUrl);
+  const promise = (async () => {
+    try {
+      const [pngRes, jsonRes] = await Promise.all([fetch(pngUrl, { signal }), fetch(jsonUrl, { signal })]);
+      spriteDebug("loadAtlasDirect: fetch got responses", key, pngRes.status, jsonRes.status);
+      if (!pngRes.ok) {
+        throw new Error(`fetch ${pngUrl} → ${pngRes.status}`);
+      }
+      if (!jsonRes.ok) {
+        throw new Error(`fetch ${jsonUrl} → ${jsonRes.status}`);
+      }
+      const [pngBlob, jsonData] = await Promise.all([pngRes.blob(), jsonRes.json()]);
+      const imgUrl = URL.createObjectURL(pngBlob);
+      try {
+        const img = new Image();
+        await new Promise<void>((res, rej) => {
+          img.onload = () => res();
+          img.onerror = () => rej(new Error(`decode ${pngUrl}`));
+          img.src = imgUrl;
+        });
+        spriteDebug("loadAtlasDirect: img decoded", key, img.naturalWidth);
+        if (globalScene.textures.exists(key)) {
+          spriteDebug("loadAtlasDirect: cache won the race", key);
+          return;
+        }
+        const tex = globalScene.textures.addAtlasJSONArray(key, img, jsonData);
+        spriteDebug("loadAtlasDirect: addAtlasJSONArray returned", key, tex == null ? "null" : "ok");
+      } finally {
+        URL.revokeObjectURL(imgUrl);
+      }
+    } catch (e) {
+      spriteDebug("loadAtlasDirect: threw", key, String(e));
+      throw e;
+    } finally {
+      // Only clear if this controller is still the registered one —
+      // although with coalescing this should always be true.
+      const cur = inFlightAtlasFetches.get(key);
+      if (cur && cur.controller === controller) {
+        inFlightAtlasFetches.delete(key);
+      }
     }
-    // Use addAtlasJSONArray explicitly. The generic `addAtlas` checks
-    // `data.frames` at top level — but pokerogue atlases nest `frames`
-    // inside `textures[0].frames`. So `addAtlas` mis-routes to
-    // `addAtlasJSONHash`. `addAtlasJSONArray` handles both layouts
-    // (Phaser/textures/parsers/JSONArray.js:39).
-    const tex = globalScene.textures.addAtlasJSONArray(key, img, jsonData);
-    spriteDebug("loadAtlasDirect: addAtlasJSONArray returned", key, tex == null ? "null" : "ok");
-  } finally {
-    URL.revokeObjectURL(imgUrl);
-  }
+  })();
+  inFlightAtlasFetches.set(key, { controller, promise });
+  return promise;
 }
 
 export class PokemonSpecies extends PokemonSpeciesForm implements Localizable {
