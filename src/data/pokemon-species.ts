@@ -836,7 +836,24 @@ export abstract class PokemonSpeciesForm {
       globalScene.load.on(`filecomplete-atlasjson-${spriteKey}`, onFile);
 
       if (startLoad) {
-        if (!globalScene.load.isLoading()) {
+        // BUG FIX (R58): Phaser's loader does NOT auto-process files
+        // queued DURING an active load — they sit idle until the next
+        // start() call. Previously we gated start() on `!isLoading()`
+        // which left rapid-fire queued atlases stuck (rapid clicks in
+        // starter-select stopped loading sprites entirely). Now we
+        // always re-trigger start(): Phaser handles the "already in
+        // progress" case as a no-op for current files, and ensures the
+        // newly-queued file gets picked up.
+        if (globalScene.load.isLoading()) {
+          // The loader is mid-batch; queue a kickstart for the next
+          // batch via the COMPLETE event so newly-added files get
+          // processed without restarting an in-progress load.
+          globalScene.load.once(Phaser.Loader.Events.COMPLETE, () => {
+            if (globalScene.load.totalToLoad - globalScene.load.totalComplete > 0) {
+              globalScene.load.start();
+            }
+          });
+        } else {
           globalScene.load.start();
         }
       } else {
