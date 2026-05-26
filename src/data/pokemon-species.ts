@@ -927,40 +927,21 @@ export abstract class PokemonSpeciesForm {
 }
 
 /**
- * Per-spriteKey AbortControllers for in-flight atlas fetches. When a new
- * load starts for a key that's already in flight, the prior fetch is
- * aborted so it stops occupying one of the browser's ~6 concurrent HTTP
- * slots — critical for rapid starter-select cycling, where 10+ clicks
- * would otherwise queue at the network layer and the LATEST selection's
- * fetch would block behind abandoned ones.
+ * Diagnostic log helper. Toggle via DevTools:
+ *   window.__SPRITE_DEBUG = true
+ * Logs every sprite-load lifecycle event so we can see what's happening
+ * during rapid starter-select cycling.
  */
-const inFlightAtlasFetches = new Map<string, AbortController>();
-
-/**
- * Aborts every in-flight atlas fetch EXCEPT for the specified key. Called
- * by starter-select when the user changes selection — we want the latest
- * selection's fetch to claim a network slot ASAP, even if prior fetches
- * for now-abandoned selections are still pending.
- */
-export function cancelInFlightAtlasFetchesExcept(keepKey: string): void {
-  for (const [key, controller] of inFlightAtlasFetches) {
-    if (key === keepKey) {
-      continue;
-    }
-    controller.abort();
-    inFlightAtlasFetches.delete(key);
+function spriteDebug(...args: unknown[]): void {
+  if ((globalThis as { __SPRITE_DEBUG?: boolean }).__SPRITE_DEBUG) {
+    console.log("[sprite]", ...args);
   }
 }
 
 /**
  * Fetch a TexturePacker JSONArray atlas (PNG + JSON pair) and feed it
  * directly to Phaser's TextureManager. Bypasses Phaser's LoaderPlugin
- * queue entirely so concurrent calls don't serialize behind each other.
- *
- * Cancellation: if another loadAtlasDirect call for the SAME key arrives
- * while this one is mid-fetch, the prior fetch is aborted. The caller
- * (loadAssets) supplies a per-call AbortSignal for clean cancellation
- * from setSpeciesDetails's cycle-cancel logic.
+ * queue so concurrent calls don't serialize behind each other.
  *
  * Skips work entirely if the texture is already cached. Never calls
  * `textures.remove` on a live key (the prior attempt did this — the
@@ -968,61 +949,39 @@ export function cancelInFlightAtlasFetchesExcept(keepKey: string): void {
  */
 async function loadAtlasDirect(key: string, pngUrl: string, jsonUrl: string): Promise<void> {
   if (globalScene.textures.exists(key)) {
+    spriteDebug("loadAtlasDirect: already cached", key);
     return;
   }
-  // Abort any prior fetch for this same key — only the latest call
-  // should be allowed to complete and populate the cache.
-  const prior = inFlightAtlasFetches.get(key);
-  if (prior) {
-    prior.abort();
+  spriteDebug("loadAtlasDirect: fetching", key);
+  const [pngRes, jsonRes] = await Promise.all([fetch(pngUrl), fetch(jsonUrl)]);
+  if (!pngRes.ok) {
+    throw new Error(`fetch ${pngUrl} → ${pngRes.status}`);
   }
-  const controller = new AbortController();
-  inFlightAtlasFetches.set(key, controller);
-  const signal = controller.signal;
+  if (!jsonRes.ok) {
+    throw new Error(`fetch ${jsonUrl} → ${jsonRes.status}`);
+  }
+  const [pngBlob, jsonData] = await Promise.all([pngRes.blob(), jsonRes.json()]);
+  const imgUrl = URL.createObjectURL(pngBlob);
   try {
-    const [pngRes, jsonRes] = await Promise.all([fetch(pngUrl, { signal }), fetch(jsonUrl, { signal })]);
-    if (!pngRes.ok) {
-      throw new Error(`fetch ${pngUrl} → ${pngRes.status}`);
+    const img = new Image();
+    await new Promise<void>((res, rej) => {
+      img.onload = () => res();
+      img.onerror = () => rej(new Error(`decode ${pngUrl}`));
+      img.src = imgUrl;
+    });
+    if (globalScene.textures.exists(key)) {
+      spriteDebug("loadAtlasDirect: cache won the race", key);
+      return;
     }
-    if (!jsonRes.ok) {
-      throw new Error(`fetch ${jsonUrl} → ${jsonRes.status}`);
-    }
-    const [pngBlob, jsonData] = await Promise.all([pngRes.blob(), jsonRes.json()]);
-    if (signal.aborted) {
-      throw new DOMException("aborted", "AbortError");
-    }
-    const imgUrl = URL.createObjectURL(pngBlob);
-    try {
-      const img = new Image();
-      await new Promise<void>((res, rej) => {
-        img.onload = () => res();
-        img.onerror = () => rej(new Error(`decode ${pngUrl}`));
-        img.src = imgUrl;
-      });
-      if (signal.aborted) {
-        throw new DOMException("aborted", "AbortError");
-      }
-      // Re-check after async: another concurrent call may have already
-      // added it to the cache. Skip in that case — `addAtlasJSONArray`
-      // returns null when the key exists, which would silently no-op.
-      if (globalScene.textures.exists(key)) {
-        return;
-      }
-      // Use addAtlasJSONArray explicitly. The generic `addAtlas` checks
-      // `data.frames` at top level — but pokerogue atlases nest `frames`
-      // inside `textures[0].frames`. So `addAtlas` mis-routes to
-      // `addAtlasJSONHash`. `addAtlasJSONArray` handles both layouts
-      // (Phaser/textures/parsers/JSONArray.js:39).
-      globalScene.textures.addAtlasJSONArray(key, img, jsonData);
-    } finally {
-      URL.revokeObjectURL(imgUrl);
-    }
+    // Use addAtlasJSONArray explicitly. The generic `addAtlas` checks
+    // `data.frames` at top level — but pokerogue atlases nest `frames`
+    // inside `textures[0].frames`. So `addAtlas` mis-routes to
+    // `addAtlasJSONHash`. `addAtlasJSONArray` handles both layouts
+    // (Phaser/textures/parsers/JSONArray.js:39).
+    const tex = globalScene.textures.addAtlasJSONArray(key, img, jsonData);
+    spriteDebug("loadAtlasDirect: addAtlasJSONArray returned", key, tex == null ? "null" : "ok");
   } finally {
-    // Only clear if this controller is still the registered one — a
-    // newer fetch may have replaced it.
-    if (inFlightAtlasFetches.get(key) === controller) {
-      inFlightAtlasFetches.delete(key);
-    }
+    URL.revokeObjectURL(imgUrl);
   }
 }
 

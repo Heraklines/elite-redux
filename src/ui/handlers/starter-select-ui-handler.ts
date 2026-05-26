@@ -22,7 +22,6 @@ import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import type { PokemonSpecies } from "#data/pokemon-species";
-import { cancelInFlightAtlasFetchesExcept } from "#data/pokemon-species";
 import { AbilityAttr } from "#enums/ability-attr";
 import { AbilityId } from "#enums/ability-id";
 import { Button } from "#enums/buttons";
@@ -4401,19 +4400,28 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           const loadVariant = variant;
           const loadSpecies = species;
           const spriteKey = loadSpecies.getSpriteKey(loadFemale, loadFormIndex, loadShiny, loadVariant);
-          // Free up browser network slots: abort every in-flight atlas
-          // fetch EXCEPT for the species we're about to load. Browsers
-          // limit concurrent HTTP requests per origin (~6); rapid
-          // cycling would otherwise pile up abandoned fetches blocking
-          // the latest selection. By aborting prior, the latest fetch
-          // gets a slot immediately.
-          cancelInFlightAtlasFetchesExcept(spriteKey);
           // Fire load immediately. No debounce — clicks should respond
           // NOW. loadAssets short-circuits when the texture is cached so
           // repeat selections are effectively synchronous (microtask).
           // assetLoadCancelled gates the .then() so stale loads from
           // prior clicks don't overwrite the latest selection.
+          const debug = (globalThis as { __SPRITE_DEBUG?: boolean }).__SPRITE_DEBUG;
+          if (debug) {
+            console.log("[sprite] setSpeciesDetails: loadAssets", spriteKey);
+          }
           loadSpecies.loadAssets(loadFemale, loadFormIndex, loadShiny, loadVariant, true).then(() => {
+            if (debug) {
+              console.log(
+                "[sprite] .then fired",
+                spriteKey,
+                "cancelled?",
+                assetLoadCancelled.value,
+                "tex?",
+                globalScene.textures.exists(spriteKey),
+                "anim?",
+                globalScene.anims.exists(spriteKey),
+              );
+            }
             if (assetLoadCancelled.value) {
               return;
             }
@@ -4435,6 +4443,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               .setPipelineData("shiny", loadShiny)
               .setPipelineData("variant", loadVariant)
               .setPipelineData("spriteKey", spriteKey);
+            if (debug) {
+              console.log("[sprite] play complete", spriteKey);
+            }
           });
         }
 
