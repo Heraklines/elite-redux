@@ -807,53 +807,45 @@ export abstract class PokemonSpeciesForm {
       await this.loadVariantColors(spriteKey, female, variant, back, formIndex);
     }
 
-    // Queue atlas + audio on the shared loader. Audio is best-effort
-    // (missing files just trigger a loaderror Phaser swallows). The
-    // shared loader's `keyExists` check makes duplicate queues a no-op,
-    // and the TextureManager's per-key event fires only once the texture
-    // is fully usable from the cache.
-    globalScene.loadPokemonAtlas(spriteKey, atlasPath);
-    globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
-
-    return new Promise<void>(resolve => {
-      // Listen for THIS specific texture landing in the cache. The
-      // TextureManager emits `addtexture-${key}` from addAtlasJSONArray
-      // (verified: phaser/src/textures/TextureManager.js:899-900) at the
-      // exact moment the texture is queryable. No loader-event guessing,
-      // no batch races — we hook the actual cache-state signal.
-      const onAdded = (): void => {
-        finalize().then(() => resolve());
-      };
-      globalScene.textures.once(`addtexture-${spriteKey}`, onAdded);
-
-      // Safety net: resolve even if the load fails or takes too long.
-      // The caller .then() handles missing textures gracefully (sprite
-      // stays on prior anim, the next selection retries).
-      const timeoutId = setTimeout(() => {
-        globalScene.textures.off(`addtexture-${spriteKey}`, onAdded);
-        if (globalScene.textures.exists(spriteKey)) {
-          finalize().then(() => resolve());
-        } else {
-          resolve();
-        }
-      }, 5000);
-      // Clear the timeout when the event fires successfully.
-      globalScene.textures.once(`addtexture-${spriteKey}`, () => {
-        clearTimeout(timeoutId);
-      });
-
-      if (startLoad) {
-        if (!globalScene.load.isLoading()) {
-          globalScene.load.start();
-        }
-      } else {
-        // Caller manages start. Resolve immediately so the caller chain
-        // proceeds; the per-key event will still finalize the anim when
-        // the texture eventually lands.
-        clearTimeout(timeoutId);
-        resolve();
+    // Audio goes through the shared loader (best-effort, missing files
+    // just log a loaderror Phaser swallows). Atlas does NOT — Phaser's
+    // shared loader processes files FIFO and rapid-click selections
+    // would wait for ALL prior queued atlases before the latest user
+    // selection's sprite shows. Direct fetch + addAtlasJSONArray makes
+    // each atlas load INDEPENDENT — the latest click's atlas can land
+    // in cache before all the abandoned earlier ones, so the sprite
+    // visually updates as fast as the network responds.
+    try {
+      globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
+      if (startLoad && !globalScene.load.isLoading()) {
+        globalScene.load.start();
       }
-    });
+    } catch {
+      /* ignore audio queue errors */
+    }
+
+    // Build the URLs the same way BattleScene.loadPokemonAtlas does.
+    const isVariantPath = atlasPath.includes("variant/") || /_[0-3]$/.test(atlasPath);
+    const cleanPath = isVariantPath ? atlasPath.replace("variant/", "") : atlasPath;
+    let experimental = (globalScene as { experimentalSprites?: boolean }).experimentalSprites ?? false;
+    if (experimental) {
+      try {
+        experimental = hasExpSprite(spriteKey);
+      } catch {
+        experimental = false;
+      }
+    }
+    const pngUrl = `./images/pokemon/${isVariantPath ? "variant/" : ""}${experimental ? "exp/" : ""}${cleanPath}.png`;
+    const jsonUrl = `./images/pokemon/${isVariantPath ? "variant/" : ""}${experimental ? "exp/" : ""}${cleanPath}.json`;
+
+    try {
+      await loadAtlasDirect(spriteKey, pngUrl, jsonUrl);
+    } catch {
+      // Direct fetch failed (404, network, etc). Leave the caller to
+      // handle a missing texture — sprite stays on its prior animation.
+      return;
+    }
+    await finalize();
   }
 
   cry(soundConfig?: Phaser.Types.Sound.SoundConfig, ignorePlay?: boolean): AnySound | null {
@@ -931,6 +923,56 @@ export abstract class PokemonSpeciesForm {
     Math.random = originalRandom;
 
     return Array.from(paletteColors.keys()).map(c => Object.values(rgbaFromArgb(c)) as number[]);
+  }
+}
+
+/**
+ * Fetch a TexturePacker JSONArray atlas (PNG + JSON pair) and feed it
+ * directly to Phaser's TextureManager. Bypasses Phaser's LoaderPlugin
+ * queue entirely so concurrent calls don't serialize behind each other —
+ * this is what makes rapid starter-select cycling responsive.
+ *
+ * If the texture key is already in cache, returns immediately without
+ * re-fetching or replacing it. (Don't `textures.remove` an in-use key —
+ * the renderer will crash on the next frame trying to read Frame data
+ * from a freshly-disposed texture.)
+ */
+async function loadAtlasDirect(key: string, pngUrl: string, jsonUrl: string): Promise<void> {
+  if (globalScene.textures.exists(key)) {
+    return;
+  }
+  const [pngRes, jsonRes] = await Promise.all([fetch(pngUrl), fetch(jsonUrl)]);
+  if (!pngRes.ok) {
+    throw new Error(`fetch ${pngUrl} → ${pngRes.status}`);
+  }
+  if (!jsonRes.ok) {
+    throw new Error(`fetch ${jsonUrl} → ${jsonRes.status}`);
+  }
+  const [pngBlob, jsonData] = await Promise.all([pngRes.blob(), jsonRes.json()]);
+  const imgUrl = URL.createObjectURL(pngBlob);
+  try {
+    const img = new Image();
+    await new Promise<void>((res, rej) => {
+      img.onload = () => res();
+      img.onerror = () => rej(new Error(`decode ${pngUrl}`));
+      img.src = imgUrl;
+    });
+    // Re-check after async: another concurrent call may have already
+    // added it to the cache. Skip in that case — `addAtlasJSONArray`
+    // returns null when the key exists, which would silently no-op.
+    if (globalScene.textures.exists(key)) {
+      return;
+    }
+    // Use addAtlasJSONArray explicitly. The generic `addAtlas` dispatches
+    // based on `data.frames` being an array at TOP LEVEL — but pokerogue
+    // atlases nest `frames` inside `textures[0].frames`. So `addAtlas`
+    // would mistakenly route to `addAtlasJSONHash` which can't parse
+    // them. `addAtlasJSONArray` handles both top-level `frames` AND the
+    // nested `textures[0].frames` correctly (see Phaser/textures/parsers/
+    // JSONArray.js:39).
+    globalScene.textures.addAtlasJSONArray(key, img, jsonData);
+  } finally {
+    URL.revokeObjectURL(imgUrl);
   }
 }
 
