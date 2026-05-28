@@ -103,6 +103,16 @@ export function installDevTools(scene: BattleScene): void {
       return scene.ui.setOverlayMode(UiMode.POKEDEX_PAGE, species, null);
     },
 
+    /**
+     * Open the starter-select (status selection) screen. Sets CLASSIC mode
+     * first. Call from the title screen. Useful for iterating on the
+     * starter panel / passive placement / hotkey layout.
+     */
+    starterSelect() {
+      scene.gameMode = getGameMode(GameModes.CLASSIC);
+      return scene.ui.setMode(UiMode.STARTER_SELECT, () => {});
+    },
+
     /** Jump the UI to an arbitrary mode (advanced). */
     setMode(mode: number, ...args: unknown[]) {
       return scene.ui.setMode(mode, ...args);

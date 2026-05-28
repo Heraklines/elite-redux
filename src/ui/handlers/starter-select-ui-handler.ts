@@ -1082,10 +1082,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // The font size should be set per language
     const instructionTextSize = textSettings.instructionTextSize;
 
-    // y=156 collides with the ER 3-passive expansion: slot 3 sits at y=150 and
-    // the shifted nature row at y=157. Push the instruction stack below the
-    // expanded info panel so cycle-key hints don't overlap the nature label.
-    this.instructionsContainer = globalScene.add.container(4, 172).setVisible(true);
+    // ER layout: the 3-passive expansion (slots y=136/143/150) + nature (157)
+    // push the cycle-hotkey strip down. At y=172 with a 3-row wrap the bottom
+    // hotkeys fell past the 180px UI height and were clipped. y=166 with a
+    // 2-row/3-column wrap (see updateButtonIcon) keeps all 6 visible and clear
+    // of the nature row.
+    this.instructionsContainer = globalScene.add.container(4, 166).setVisible(true);
 
     const iRowX = this.instructionRowX;
     const iRowY = this.instructionRowY;
@@ -3184,7 +3186,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       .setVisible(true);
     this.instructionsContainer.add([iconElement, controlLabel]);
     this.instructionRowY += 8;
-    if (this.instructionRowY >= 24) {
+    // ER: wrap after 2 rows (not 3) → a 3-column × 2-row grid. Combined with
+    // the higher container y (see constructor), all 6 cycle-hotkeys stay
+    // within the 180px-tall UI space instead of being clipped off the bottom.
+    if (this.instructionRowY >= 16) {
       this.instructionRowY = 0;
       this.instructionRowX += 50;
     }

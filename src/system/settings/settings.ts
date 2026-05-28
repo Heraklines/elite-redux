@@ -359,9 +359,11 @@ export const Setting: Setting[] = [
   },
   {
     key: SettingKeys.Tutorials,
+    // ER: tutorials default OFF — the ER port assumes an experienced player
+    // and the tutorial message boxes obscure the (already dense) UI.
     label: i18next.t("settings:tutorials"),
     options: OFF_ON,
-    default: 1,
+    default: 0,
     type: SettingType.GENERAL,
   },
   {
