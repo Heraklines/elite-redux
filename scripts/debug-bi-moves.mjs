@@ -63,10 +63,12 @@ const sets = await p.evaluate(() => {
 });
 console.log("movesets:", JSON.stringify(sets));
 
-// open overlay (STATS=8) → stats
+// open overlay (STATS=8) → lands on the Party VS panel
 await press(8);
 await new Promise(r => setTimeout(r, 400));
-// DOWN(1) to enemy target, then RIGHT(3) twice to reach moves panel
+await p.screenshot({ path: "scripts/bi-party.png" });
+// RIGHT(3) → stats, then DOWN(1) to enemy target, RIGHT twice to reach moves panel
+await press(3);
 await press(1);
 await new Promise(r => setTimeout(r, 200));
 await press(3); // abilities

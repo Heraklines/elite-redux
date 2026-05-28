@@ -8,6 +8,7 @@
 // closes it.
 //
 // Panels:
+//   PARTY     — both full teams side by side (name, level, current HP, fainted)
 //   STATS     — actual current stats + stat-stage arrows, types, item, nature
 //   ABILITIES — main ability + innates (abbreviated ER descriptions)
 //   MOVES     — each move: type, power, accuracy, category, PP, STAB
@@ -36,8 +37,8 @@ import type { Pokemon } from "#field/pokemon";
 import { addTextObject, getTextColor } from "#ui/text";
 import i18next from "i18next";
 
-type PanelKind = "stats" | "abilities" | "moves" | "weather" | "sides";
-const PANELS: PanelKind[] = ["stats", "abilities", "moves", "weather", "sides"];
+type PanelKind = "party" | "stats" | "abilities" | "moves" | "weather" | "sides";
+const PANELS: PanelKind[] = ["party", "stats", "abilities", "moves", "weather", "sides"];
 
 const STAT_ROWS: { stat: Stat; label: string }[] = [
   { stat: Stat.HP, label: "HP" },
@@ -138,7 +139,9 @@ export class BattleInfoOverlay {
     c.add(navHint);
 
     let y = 16;
-    if (panel === "weather") {
+    if (panel === "party") {
+      this.renderParty(c, y);
+    } else if (panel === "weather") {
       this.renderWeather(c, y);
     } else if (panel === "sides") {
       this.renderSides(c, y);
@@ -171,6 +174,8 @@ export class BattleInfoOverlay {
 
   private panelTitle(panel: PanelKind): string {
     switch (panel) {
+      case "party":
+        return i18next.t("pokemonSummary:infoParty", { defaultValue: "Party VS" });
       case "stats":
         return i18next.t("pokemonSummary:infoStats", { defaultValue: "Stats" });
       case "abilities":
@@ -182,6 +187,38 @@ export class BattleInfoOverlay {
       case "sides":
         return i18next.t("pokemonSummary:infoSides", { defaultValue: "Field Effects" });
     }
+  }
+
+  /** Party VS: both full teams in two columns (name, level, current HP, fainted). */
+  private renderParty(c: Phaser.GameObjects.Container, y0: number): void {
+    const drawColumn = (mons: Pokemon[], x: number, header: string): void => {
+      const head = addTextObject(x, y0, header, TextStyle.SUMMARY_GOLD, { fontSize: "56px" });
+      head.setOrigin(0, 0);
+      c.add(head);
+      let y = y0 + 13;
+      for (const m of mons.slice(0, 6)) {
+        const fainted = m.isFainted();
+        const name = addTextObject(x, y, m.getNameToRender(), fainted ? TextStyle.WINDOW_ALT : TextStyle.SUMMARY, {
+          fontSize: "48px",
+        });
+        name.setOrigin(0, 0);
+        if (fainted) {
+          name.setColor(getTextColor(TextStyle.SUMMARY_RED));
+        }
+        c.add(name);
+        const hpStr = fainted ? "Fainted" : `L${m.level}  ${m.hp}/${m.getMaxHp()}`;
+        const hp = addTextObject(x, y + 8, hpStr, TextStyle.WINDOW_ALT, { fontSize: "40px" });
+        hp.setOrigin(0, 0);
+        c.add(hp);
+        y += 19;
+      }
+    };
+    drawColumn(
+      globalScene.getPlayerParty(),
+      6,
+      i18next.t("pokemonSummary:infoYourTeam", { defaultValue: "Your team" }),
+    );
+    drawColumn(globalScene.getEnemyParty(), 130, i18next.t("pokemonSummary:infoFoeTeam", { defaultValue: "Foe team" }));
   }
 
   private renderStats(c: Phaser.GameObjects.Container, y0: number, mon: Pokemon): void {
