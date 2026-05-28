@@ -27,6 +27,7 @@ import { achvs } from "#system/achv";
 import { addBBCodeTextObject, addTextObject, getBBCodeFrag, getTextColor, updateCandyCountTextStyle } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { argbFromRgba, rgbHexToRgba } from "#utils/color-utils";
+import { getErAbilityDescription } from "#data/elite-redux/er-ability-descriptions";
 import { fixedInt, formatStat, getBiomeName, getLocalizedSpriteKey, getShinyDescriptor, padInt } from "#utils/common";
 import { getEnumValues } from "#utils/enums";
 import { getDexNumber } from "#utils/pokemon-utils";
@@ -981,66 +982,58 @@ export class SummaryUiHandler extends UiHandler {
           profileContainer.add(this.abilityPrompt);
         }
 
-        allAbilityInfo.forEach(abilityInfo => {
-          abilityInfo.labelImage.setPosition(17, 47);
+        // ER-style ability stack: render all 4 entries (main Ability + up to
+        // 3 Innates) simultaneously stacked vertically. Each row is:
+        //   labelImage  nameText
+        //               descriptionText (short ER desc; full pokerogue desc
+        //                                 wraps in the mask if no ER short is set)
+        // Mirrors the ER ROM ability page layout (see Scrafster reference
+        // screenshot the user shared).
+        //
+        // Row y-spacing fits 4 rows in the available ability column without
+        // overlapping the TRAINER MEMO title (which we push to y=130 below
+        // to make room).
+        const ABILITY_ROW_BASE_Y = 47;
+        const ABILITY_ROW_STEP = allAbilityInfo.length > 1 ? 18 : 22;
+        allAbilityInfo.forEach((abilityInfo, slotIndex) => {
+          const rowY = ABILITY_ROW_BASE_Y + slotIndex * ABILITY_ROW_STEP;
+
+          abilityInfo.labelImage.setPosition(17, rowY);
           abilityInfo.labelImage.setVisible(true);
           abilityInfo.labelImage.setOrigin(0, 0.5);
           profileContainer.add(abilityInfo.labelImage);
 
-          abilityInfo.nameText = addTextObject(7, 68, abilityInfo.ability?.name!, TextStyle.SUMMARY_ALT); // TODO: is this bang correct?
+          abilityInfo.nameText = addTextObject(7, rowY + 9, abilityInfo.ability?.name ?? "", TextStyle.SUMMARY_ALT);
           abilityInfo.nameText.setOrigin(0, 1);
           profileContainer.add(abilityInfo.nameText);
 
-          abilityInfo.descriptionText = addTextObject(7, 71, abilityInfo.ability?.description!, TextStyle.WINDOW_ALT, {
+          // Prefer the short ER description (matches the ROM page) when the
+          // ability has one. Fall back to pokerogue's wrapped description.
+          const erShortDesc = abilityInfo.ability ? getErAbilityDescription(abilityInfo.ability.id) : null;
+          const descText = erShortDesc ?? abilityInfo.ability?.description ?? "";
+          abilityInfo.descriptionText = addTextObject(7, rowY + 11, descText, TextStyle.WINDOW_ALT, {
             wordWrap: { width: 1224 },
-          }); // TODO: is this bang correct?
+          });
           abilityInfo.descriptionText.setOrigin(0, 0);
           profileContainer.add(abilityInfo.descriptionText);
-
-          // Sets up the mask that hides the description text to give an illusion of scrolling
-          const descriptionTextMaskRect = globalScene.make.graphics({});
-          descriptionTextMaskRect.setScale(6);
-          descriptionTextMaskRect.fillStyle(0xffffff);
-          descriptionTextMaskRect.beginPath();
-          descriptionTextMaskRect.fillRect(110, 90.5, 206, 31);
-
-          const abilityDescriptionTextMask = descriptionTextMaskRect.createGeometryMask();
-
-          abilityInfo.descriptionText.setMask(abilityDescriptionTextMask);
-
-          const abilityDescriptionLineCount = Math.floor(abilityInfo.descriptionText.displayHeight / 14.83);
-
-          // Animates the description text moving upwards
-          if (abilityDescriptionLineCount > 2) {
-            abilityInfo.descriptionText.setY(69);
-            this.descriptionScrollTween = globalScene.tweens.add({
-              targets: abilityInfo.descriptionText,
-              delay: fixedInt(2000),
-              loop: -1,
-              hold: fixedInt(2000),
-              duration: fixedInt((abilityDescriptionLineCount - 2) * 2000),
-              y: `-=${14.83 * (abilityDescriptionLineCount - 2)}`,
-            });
-          }
         });
-        // Turn off visibility of passive info by default — ALL slots, not just
-        // the legacy slot 0. The {@link Button.ACTION} handler cycles through
-        // ability → passive[0] → passive[1] → passive[2] → ability.
-        for (const passive of this.passiveContainers) {
-          passive?.labelImage.setVisible(false);
-          passive?.nameText?.setVisible(false);
-          passive?.descriptionText?.setVisible(false);
-        }
-        // Start the cycle at index 0 (ability shown) on each populate().
+        // The legacy single-ability cycle is now redundant — all rows are
+        // visible at once. Keep the cycle index initialized for any external
+        // code that still pokes it.
         this.abilityCycleIndex = 0;
 
         const closeFragment = getBBCodeFrag("", TextStyle.WINDOW_ALT);
         const rawNature = toCamelCase(Nature[this.pokemon?.getNature()!]); // TODO: is this bang correct?
         const nature = `${getBBCodeFrag(toTitleCase(getNatureName(this.pokemon?.getNature()!)), TextStyle.SUMMARY_RED)}${closeFragment}`; // TODO: is this bang correct?
 
+        // Push memo title/text down when we have multiple ability rows
+        // (ER 3-passive species) so they don't overlap the ability stack.
+        // Vanilla single-passive species keep the legacy y=107 position.
+        const memoTitleY = allAbilityInfo.length > 1 ? 130 : 107;
+        const memoTextY = memoTitleY + 6;
         const profileContainerMemoTitle = globalScene.add.image(
           7,
-          107,
+          memoTitleY,
           getLocalizedSpriteKey("summary_profile_memo_title"), // Pixel text 'TRAINER MEMO'
         );
         profileContainerMemoTitle.setOrigin(0, 0.5);
@@ -1058,7 +1051,7 @@ export class SummaryUiHandler extends UiHandler {
           natureFragment: i18next.t(`pokemonSummary:natureFragment.${rawNature}`, { nature }),
         });
 
-        const memoText = addBBCodeTextObject(7, 113, String(memoString), TextStyle.WINDOW_ALT);
+        const memoText = addBBCodeTextObject(7, memoTextY, String(memoString), TextStyle.WINDOW_ALT);
         memoText.setOrigin(0, 0);
         profileContainer.add(memoText);
         break;
@@ -1438,32 +1431,10 @@ export class SummaryUiHandler extends UiHandler {
    * then show that one.
    */
   private advanceAbilityCycle(): void {
-    // Build the visible cycle: [ability, passive[0], passive[1], passive[2]]
-    // with null entries pruned. `passiveContainers` already has nulls for empty
-    // slots; we just prepend abilityContainer.
-    const cycle: AbilityContainer[] = [
-      this.abilityContainer,
-      ...this.passiveContainers.filter((c): c is AbilityContainer => c !== null),
-    ];
-    // No passives → toggle is a no-op (vanilla pokerogue UX preserved when
-    // hasPassive() is false but we got here defensively).
-    if (cycle.length < 2) {
-      return;
-    }
-    const current = cycle[this.abilityCycleIndex % cycle.length];
-    this.abilityCycleIndex = (this.abilityCycleIndex + 1) % cycle.length;
-    const next = cycle[this.abilityCycleIndex];
-
-    // Hide current, show next. All ability containers share the same (x, y)
-    // anchor in the profile panel — only one visible at a time prevents the
-    // overlap that would otherwise occur with multi-passive species.
-    current.labelImage.setVisible(false);
-    current.nameText?.setVisible(false);
-    current.descriptionText?.setVisible(false);
-
-    next.labelImage.setVisible(true);
-    next.nameText?.setVisible(true);
-    next.descriptionText?.setVisible(true);
+    // ER 4-ability stacked layout: all rows are now visible simultaneously
+    // (stacked vertically at distinct y offsets — see the per-slot rowY in
+    // populate()). The cycle button is now a no-op; we leave it wired up so
+    // controllers and key bindings don't error, but there's nothing to do.
   }
 
   clear() {
