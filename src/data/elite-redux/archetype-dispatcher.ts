@@ -1754,14 +1754,15 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // re-fire because we mark a per-pokemon flag.
       return ok([new CowardOnceProtectAbAttr()]);
     case 431:
-      // Dune Terror — sand reduces incoming damage by 35%. The "+20% Ground
-      // moves" piece composes via `WeatherTypeBoostAbAttr` but isn't wired
-      // here yet — partial wire. Multiplier is `1 - 0.35 = 0.65`.
+      // Dune Terror — C-source (battle_util.c ABILITY_DUNE_TERROR) + description:
+      // sand reduces incoming damage by 35% (x0.65) AND Ground-type moves get a
+      // +20% power boost (x1.2). The Ground boost was previously unwired.
       return ok([
         new WeatherDamageReductionAbAttr({
           weathers: [WeatherType.SANDSTORM],
           multiplier: 0.65,
         }),
+        new TypeDamageBoostAbAttr({ type: PokemonType.GROUND, multiplier: 1.2 }),
       ]);
     case 464:
       // Hunter's Horn — "Boost horn moves and heals 1/4 HP when defeating an
