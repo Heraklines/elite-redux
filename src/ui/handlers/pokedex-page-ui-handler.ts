@@ -1051,6 +1051,16 @@ export class PokedexPageUiHandler extends MessageUiHandler {
       species.getFullUnlocksData();
     }
 
+    // ER customs (id >= 10000): treat as inspectable in the Pokedex
+    // regardless of actual caught state. User wants to read stats /
+    // abilities / evolutions / moves to plan, not gated behind catching
+    // each one first. This is display-only — game logic that uses
+    // gameData.dexData[id].caughtAttr directly still respects the real
+    // save state.
+    if (species && species.speciesId >= 10000) {
+      return species.getFullUnlocksData();
+    }
+
     const dexEntry = globalScene.gameData.dexData[species.speciesId];
 
     return (dexEntry?.caughtAttr ?? 0n) & species.getFullUnlocksData();
@@ -1083,6 +1093,10 @@ export class PokedexPageUiHandler extends MessageUiHandler {
 
   private isSeen(): boolean {
     if (this.speciesStarterDexEntry?.seenAttr) {
+      return true;
+    }
+    // ER customs always inspectable — see comment on isCaught above.
+    if (this.species && this.species.speciesId >= 10000) {
       return true;
     }
     const starterCaughtAttr = this.isCaught(this.getStarterSpecies(this.species));
@@ -1725,7 +1739,13 @@ export class PokedexPageUiHandler extends MessageUiHandler {
                         this.savedStarterAttributes.form = newFormIndex;
                         this.moveInfoOverlay.clear();
                         this.clearText();
-                        ui.setMode(UiMode.POKEDEX_PAGE, newSpecies, this.savedStarterAttributes);
+                        // setModeForceTransition (not setMode) because the
+                        // current mode is already POKEDEX_PAGE — same-mode
+                        // setMode early-returns without calling show(), so
+                        // the species reference never updates and the
+                        // displayed name/sprite/etc all stay stuck on the
+                        // previous species.
+                        ui.setModeForceTransition(UiMode.POKEDEX_PAGE, newSpecies, this.savedStarterAttributes);
                         return true;
                       },
                       onHover: () => this.showText(conditionText),
@@ -1768,7 +1788,10 @@ export class PokedexPageUiHandler extends MessageUiHandler {
                         this.savedStarterAttributes.form = newFormIndex;
                         this.moveInfoOverlay.clear();
                         this.clearText();
-                        ui.setMode(UiMode.POKEDEX_PAGE, evoSpecies, this.savedStarterAttributes);
+                        // setModeForceTransition: same as the prevolution
+                        // handler above — same-mode setMode skips show()
+                        // and leaves the species stale.
+                        ui.setModeForceTransition(UiMode.POKEDEX_PAGE, evoSpecies, this.savedStarterAttributes);
                         return true;
                       },
                       onHover: () => this.showText(conditionText),
@@ -1809,7 +1832,12 @@ export class PokedexPageUiHandler extends MessageUiHandler {
                         this.savedStarterAttributes.form = newBattleFormIndex;
                         this.moveInfoOverlay.clear();
                         this.clearText();
-                        ui.setMode(UiMode.POKEDEX_PAGE, newSpecies, this.savedStarterAttributes, this.filteredIndices);
+                        ui.setModeForceTransition(
+                          UiMode.POKEDEX_PAGE,
+                          newSpecies,
+                          this.savedStarterAttributes,
+                          this.filteredIndices,
+                        );
                         return true;
                       },
                       onHover: () => this.showText(conditionText),

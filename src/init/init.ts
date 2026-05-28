@@ -11,6 +11,7 @@ import { initEliteReduxCustomMoves } from "#data/elite-redux/init-elite-redux-cu
 import { initEliteReduxCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
 import { initEliteReduxEggTiers } from "#data/elite-redux/init-elite-redux-egg-tiers";
 import { initEliteReduxEvolutions } from "#data/elite-redux/init-elite-redux-evolutions";
+import { initEliteReduxTmMoves } from "#data/elite-redux/init-elite-redux-tm-moves";
 import { initEliteReduxFormChanges } from "#data/elite-redux/init-elite-redux-form-changes";
 import { initEliteReduxMovesets } from "#data/elite-redux/init-elite-redux-movesets";
 import { initEliteReduxSpecies } from "#data/elite-redux/init-elite-redux-species";
@@ -165,5 +166,12 @@ export function initializeGame() {
   const eggResult = initEliteReduxEggTiers();
   console.info(
     `[er-egg-tiers] added ${eggResult.eggTiersAdded} ER customs to egg pool (+${eggResult.starterCostsAdded} starter-costs; skipped ${eggResult.skippedPrevolutions} evolved + ${eggResult.skippedFormChanges} form-change + ${eggResult.alreadyPresent} already present)`,
+  );
+
+  // Elite Redux: extend TM-learnable pool with each species's tutor moves.
+  // Must run AFTER move/species init so id lookups resolve.
+  const tmResult = initEliteReduxTmMoves();
+  console.info(
+    `[er-tm] added ${tmResult.pairsAdded} (species, move) pairs to TM-learnable pool (${tmResult.movesAddedToPool} new moves added to drop pool; skipped ${tmResult.pairsSkippedDup} duplicates + ${tmResult.pairsSkippedUnmapped} unmapped)`,
   );
 }
