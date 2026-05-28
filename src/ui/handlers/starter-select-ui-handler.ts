@@ -73,8 +73,8 @@ import {
   truncateString,
 } from "#utils/common";
 import type { StarterPreferences } from "#utils/data";
-import { deepCopy, loadStarterPreferences, saveLastTeam, saveStarterPreferences } from "#utils/data";
-import { getDexNumber, getPokemonSpeciesForm, getPokerusStarters } from "#utils/pokemon-utils";
+import { deepCopy, loadLastTeam, loadStarterPreferences, saveLastTeam, saveStarterPreferences } from "#utils/data";
+import { getDexNumber, getPokemonSpecies, getPokemonSpeciesForm, getPokerusStarters } from "#utils/pokemon-utils";
 import { toCamelCase, toTitleCase } from "#utils/strings";
 import i18next from "i18next";
 import type { GameObjects } from "phaser";
@@ -215,9 +215,13 @@ const valueReductionMax = 2;
 const filterBarHeight = 17;
 const speciesContainerX = 109; // if team on the RIGHT: 109 / if on the LEFT: 143
 const teamWindowX = 285; // if team on the RIGHT: 285 / if on the LEFT: 109
-const teamWindowY = 38;
+// ER: pushed down 20px and the team box compressed by 20px to make room for a
+// second action row above "Random" — the "Use Last Team" button. The bottom
+// window (teamWindowY + teamWindowHeight) stays at its original y so nothing
+// below the team box shifts.
+const teamWindowY = 58;
 const teamWindowWidth = 34;
-const teamWindowHeight = 107;
+const teamWindowHeight = 87;
 const randomSelectionWindowHeight = 20;
 
 /**
@@ -479,6 +483,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private valueLimitLabel: Phaser.GameObjects.Text;
   private startCursorObj: Phaser.GameObjects.NineSlice;
   private randomCursorObj: Phaser.GameObjects.NineSlice;
+  /** ER: cursor for the "Use Last Team" action (sits above the Random button). */
+  private lastTeamCursorObj: Phaser.GameObjects.NineSlice;
 
   private iconAnimHandler: PokemonIconAnimHelper;
 
@@ -861,15 +867,29 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       .setVisible(false)
       .setOrigin(0);
 
-    const randomSelectLabel = addTextObject(
+    // ER: "Use Last Team" row sits in the top action slot (18-38); "Random" is
+    // pushed down one row (38-58). Both labels/cursors are positioned to match.
+    const lastTeamSelectLabel = addTextObject(
       teamWindowX + 17,
       23,
+      i18next.t("starterSelectUiHandler:useLastTeam"),
+      TextStyle.TOOLTIP_CONTENT,
+    ).setOrigin(0.5, 0);
+
+    this.lastTeamCursorObj = globalScene.add
+      .nineslice(teamWindowX + 4, 21, "select_cursor", undefined, 26, 15, 6, 6, 6, 6)
+      .setVisible(false)
+      .setOrigin(0);
+
+    const randomSelectLabel = addTextObject(
+      teamWindowX + 17,
+      43,
       i18next.t("starterSelectUiHandler:randomize"),
       TextStyle.TOOLTIP_CONTENT,
     ).setOrigin(0.5, 0);
 
     this.randomCursorObj = globalScene.add
-      .nineslice(teamWindowX + 4, 21, "select_cursor", undefined, 26, 15, 6, 6, 6, 6)
+      .nineslice(teamWindowX + 4, 41, "select_cursor", undefined, 26, 15, 6, 6, 6, 6)
       .setVisible(false)
       .setOrigin(0);
 
@@ -1243,6 +1263,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       starterDexNoLabel,
       this.shinyOverlay,
       starterContainerBg,
+      // ER: "Use Last Team" window (top action row).
+      addWindow(
+        teamWindowX,
+        teamWindowY - 2 * randomSelectionWindowHeight,
+        teamWindowWidth,
+        randomSelectionWindowHeight,
+        true,
+      ),
       addWindow(
         teamWindowX,
         teamWindowY - randomSelectionWindowHeight,
@@ -1274,6 +1302,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.valueLimitLabel,
       startLabel,
       this.startCursorObj,
+      lastTeamSelectLabel,
+      this.lastTeamCursorObj,
       randomSelectLabel,
       this.randomCursorObj,
       this.starterIconsCursorObj,
@@ -1907,10 +1937,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           if (this.filterBar.openDropDown) {
             success = this.filterBar.incDropDownCursor();
           } else if (this.filterBarCursor === this.filterBar.numFilters - 1) {
-            // DOWN from the last filter, move to random selection label
+            // DOWN from the last filter, move to the top action row (Use Last Team).
             this.setFilterMode(false);
             this.cursorObj.setVisible(false);
-            this.randomCursorObj.setVisible(true);
+            this.lastTeamCursorObj.setVisible(true);
             success = true;
           } else if (numberOfStarters > 0) {
             // DOWN from filter bar to top of Pokemon list
@@ -1988,9 +2018,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           break;
         }
         case Button.UP:
+          // ER: move up to the "Use Last Team" row instead of the filter bar.
           this.randomCursorObj.setVisible(false);
-          this.filterBarCursor = this.filterBar.numFilters - 1;
-          this.setFilterMode(true);
+          this.lastTeamCursorObj.setVisible(true);
           success = true;
           break;
         case Button.DOWN:
@@ -2017,6 +2047,44 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             this.randomCursorObj.setVisible(false);
             this.cursorObj.setVisible(true);
             this.setCursor(onScreenFirstIndex); // set first column
+            success = true;
+          }
+          break;
+      }
+    } else if (this.lastTeamCursorObj.visible) {
+      // ER: "Use Last Team" action row (sits directly above "Random").
+      switch (button) {
+        case Button.ACTION:
+          if (!this.restoreLastTeam()) {
+            error = true;
+          }
+          break;
+        case Button.UP:
+          // Above this row is the filter bar.
+          this.lastTeamCursorObj.setVisible(false);
+          this.filterBarCursor = this.filterBar.numFilters - 1;
+          this.setFilterMode(true);
+          success = true;
+          break;
+        case Button.DOWN:
+          // Below is the "Random" row.
+          this.lastTeamCursorObj.setVisible(false);
+          this.randomCursorObj.setVisible(true);
+          success = true;
+          break;
+        case Button.LEFT:
+          if (numberOfStarters > 0) {
+            this.lastTeamCursorObj.setVisible(false);
+            this.cursorObj.setVisible(true);
+            this.setCursor(onScreenFirstIndex + 8); // last column
+            success = true;
+          }
+          break;
+        case Button.RIGHT:
+          if (numberOfStarters > 0) {
+            this.lastTeamCursorObj.setVisible(false);
+            this.cursorObj.setVisible(true);
+            this.setCursor(onScreenFirstIndex); // first column
             success = true;
           }
           break;
@@ -4903,6 +4971,75 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         19,
       );
     });
+  }
+
+  /**
+   * ER: re-select the player's previous run team (persisted via saveLastTeam) into
+   * the current selection. Skips species not caught in this save, and stops adding
+   * once the point-value limit would be exceeded. Returns false if there is no
+   * stored team or none of it can be added (so the caller can play an error tone).
+   */
+  restoreLastTeam(): boolean {
+    const lastTeam = loadLastTeam();
+    if (!lastTeam || lastTeam.length === 0) {
+      return false;
+    }
+
+    // Resolve which saved starters are usable (caught) and precompute their dex
+    // attributes before mutating any selection state.
+    const entries: { saved: Starter; species: PokemonSpecies; dexAttr: bigint }[] = [];
+    for (const saved of lastTeam.slice(0, 6)) {
+      const species = getPokemonSpecies(saved.speciesId);
+      if (!species || !this.getSpeciesData(saved.speciesId).dexEntry.caughtAttr) {
+        continue;
+      }
+      let dexAttr = saved.shiny ? DexAttr.SHINY : DexAttr.NON_SHINY;
+      dexAttr |= saved.female ? DexAttr.FEMALE : DexAttr.MALE;
+      dexAttr |=
+        saved.variant === 2 ? DexAttr.VARIANT_3 : saved.variant === 1 ? DexAttr.VARIANT_2 : DexAttr.DEFAULT_VARIANT;
+      dexAttr |= globalScene.gameData.getFormAttr(saved.formIndex);
+      entries.push({ saved, species, dexAttr });
+    }
+    if (entries.length === 0) {
+      return false;
+    }
+
+    // Clear the current selection, then load all sprites before adding so the
+    // party icons appear together (mirrors the random-select flow).
+    while (this.starterSpecies.length > 0) {
+      this.popStarter(this.starterSpecies.length - 1);
+    }
+    this.tryUpdateValue(0);
+
+    const loads = entries.map(e => {
+      const props = globalScene.gameData.getSpeciesDexAttrProps(e.species, e.dexAttr);
+      return getPokemonSpeciesForm(e.species.speciesId, props.formIndex).loadAssets(
+        props.female,
+        props.formIndex,
+        props.shiny,
+        props.variant,
+        true,
+      );
+    });
+    Promise.all(loads).then(() => {
+      for (const e of entries) {
+        const cost = globalScene.gameData.getSpeciesStarterValue(e.species.speciesId);
+        if (!this.tryUpdateValue(cost, true)) {
+          break; // remaining starters would exceed the value limit
+        }
+        this.addToParty(
+          e.species,
+          e.dexAttr,
+          e.saved.abilityIndex,
+          e.saved.nature,
+          e.saved.moveset?.slice(0) as StarterMoveset,
+          e.saved.teraType ?? e.species.type1,
+          true,
+        );
+      }
+      this.getUi().playSelect();
+    });
+    return true;
   }
 
   tryStart(manualTrigger = false): boolean {
