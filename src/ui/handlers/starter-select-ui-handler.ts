@@ -73,7 +73,7 @@ import {
   truncateString,
 } from "#utils/common";
 import type { StarterPreferences } from "#utils/data";
-import { deepCopy, loadStarterPreferences, saveStarterPreferences } from "#utils/data";
+import { deepCopy, loadStarterPreferences, saveLastTeam, saveStarterPreferences } from "#utils/data";
 import { getDexNumber, getPokemonSpeciesForm, getPokerusStarters } from "#utils/pokemon-utils";
 import { toCamelCase, toTitleCase } from "#utils/strings";
 import i18next from "i18next";
@@ -4930,6 +4930,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             const startRun = () => {
               globalScene.money = globalScene.gameMode.getStartingMoney();
               const starters = this.starters.slice(0);
+              // ER: remember this team so it can be re-selected next run.
+              saveLastTeam(starters);
               ui.setMode(UiMode.STARTER_SELECT);
               const originalStarterSelectCallback = this.starterSelectCallback;
               this.starterSelectCallback = null;

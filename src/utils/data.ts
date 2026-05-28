@@ -1,6 +1,6 @@
 import { loggedInUser } from "#app/account";
 import { saveKey } from "#app/constants";
-import type { StarterAttributes } from "#types/save-data";
+import type { Starter, StarterAttributes } from "#types/save-data";
 import { AES, enc } from "crypto-js";
 
 /**
@@ -106,4 +106,36 @@ export function saveStarterPreferences(prefs: StarterPreferences): void {
     // update the latest prefs
     StarterPrefers_private_latest = pStr;
   }
+}
+
+// =============================================================================
+// ER "last team" persistence — remembers the exact Starter[] from the player's
+// previous run so starter-select can offer a one-tap "use my last team" action.
+// User-namespaced raw JSON in localStorage, mirroring the starterPrefs pattern.
+// =============================================================================
+
+function lastTeamKey(): string {
+  return `lastTeam_${loggedInUser?.username}`;
+}
+
+/** Returns the player's previously-used team, or `null` if none is stored / it is malformed. */
+export function loadLastTeam(): Starter[] | null {
+  const raw = localStorage.getItem(lastTeamKey());
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? (parsed as Starter[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the finalized {@linkcode Starter} array used to start a run. */
+export function saveLastTeam(starters: Starter[]): void {
+  if (!Array.isArray(starters) || starters.length === 0) {
+    return;
+  }
+  localStorage.setItem(lastTeamKey(), JSON.stringify(starters));
 }
