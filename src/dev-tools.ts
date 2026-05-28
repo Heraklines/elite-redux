@@ -20,6 +20,11 @@ import type { BattleScene } from "#app/battle-scene";
 import { allSpecies } from "#data/data-lists";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { GameModes, getGameMode } from "#app/game-mode";
+import defaultOverrides from "#app/overrides";
+import { PlayerPokemon } from "#field/pokemon";
+import { SelectStarterPhase } from "#phases/select-starter-phase";
+import { Gender } from "#data/gender";
+import type { Starter } from "#ui/handlers/starter-select-ui-handler";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -101,6 +106,75 @@ export function installDevTools(scene: BattleScene): void {
     /** Jump the UI to an arbitrary mode (advanced). */
     setMode(mode: number, ...args: unknown[]) {
       return scene.ui.setMode(mode, ...args);
+    },
+
+    /**
+     * Start a Classic-mode battle immediately with a chosen party + enemy —
+     * bypasses title/starter-select. For testing ER abilities, innates, moves
+     * and asset loading in real combat.
+     *
+     * MUST be called from the title screen (TitlePhase active). The puppeteer
+     * helper presses Enter to reach the title first.
+     *
+     * @example dev.battle({ player: ["BOUFFALANT","ABOMASNOW_MEGA"], enemy: "GYARADOS", enemyLevel: 50 })
+     */
+    battle(
+      opts: {
+        player?: (number | string)[];
+        enemy?: number | string;
+        level?: number;
+        enemyLevel?: number;
+        passive?: boolean;
+      } = {},
+    ) {
+      const ovr = defaultOverrides as unknown as Record<string, unknown>;
+      if (opts.enemy !== undefined) {
+        ovr.ENEMY_SPECIES_OVERRIDE = resolveSpecies(opts.enemy).speciesId;
+      }
+      if (opts.enemyLevel !== undefined) {
+        ovr.ENEMY_LEVEL_OVERRIDE = opts.enemyLevel;
+      }
+      if (opts.level !== undefined) {
+        ovr.STARTING_LEVEL_OVERRIDE = opts.level;
+      }
+
+      scene.gameMode = getGameMode(GameModes.CLASSIC);
+
+      const speciesRefs = opts.player && opts.player.length > 0 ? opts.player : ["BOUFFALANT"];
+      const startingLevel = scene.gameMode.getStartingLevel();
+      const starters: Starter[] = speciesRefs.slice(0, 6).map(ref => {
+        const species = resolveSpecies(ref);
+        const probe = new PlayerPokemon(species, startingLevel, undefined, 0);
+        const gender =
+          species.malePercent === null ? Gender.GENDERLESS : probe.gender;
+        const starter: Starter = {
+          speciesId: species.speciesId,
+          shiny: probe.shiny,
+          variant: probe.variant,
+          formIndex: probe.formIndex,
+          female: gender === Gender.FEMALE,
+          ivs: probe.ivs,
+          abilityIndex: probe.abilityIndex,
+          passive: opts.passive ?? true,
+          nature: probe.getNature(),
+          pokerus: probe.pokerus,
+        } as Starter;
+        return starter;
+      });
+
+      // initBattle() calls SoundFade.fadeOut(scene.sound.get("menu")) — that
+      // sound only exists if the menu BGM is playing. We bypass
+      // SelectStarterPhase.start() (which normally plays it), so play it now
+      // to give the fade a valid target (otherwise it throws on null.volume).
+      scene.playBgm("menu");
+
+      // Proven test pattern (classic-mode-helper.runToSummon): construct a
+      // detached SelectStarterPhase, queue the EncounterPhase, then run
+      // initBattle to build the party + first battle. The live phase manager
+      // then advances into the encounter automatically.
+      const phase = new SelectStarterPhase();
+      scene.phaseManager.pushNew("EncounterPhase", false);
+      phase.initBattle(starters);
     },
   };
 
