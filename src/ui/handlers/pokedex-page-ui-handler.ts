@@ -761,6 +761,21 @@ export class PokedexPageUiHandler extends MessageUiHandler {
   }
 
   public override show(args: any[]): boolean {
+    // Guard the entire show() with try/catch so an unhandled exception
+    // for an ER custom species surfaces in the console with a stack
+    // trace, instead of silently tearing down the Phaser scene to a
+    // black screen.
+    try {
+      return this._showImpl(args);
+    } catch (err) {
+      console.error("[pokedex-page] show() crashed:", err);
+      // Fall back to returning false so the UI mode-switch doesn't
+      // succeed and the user can press Cancel to back out.
+      return false;
+    }
+  }
+
+  private _showImpl(args: any[]): boolean {
     // Allow the use of candies if we are in one of the whitelisted phases
     this.canUseCandies = ["TitlePhase", "SelectStarterPhase", "CommandPhase"].includes(
       globalScene.phaseManager.getCurrentPhase().phaseName,
@@ -777,6 +792,12 @@ export class PokedexPageUiHandler extends MessageUiHandler {
       form: 0,
     };
     this.formIndex = this.savedStarterAttributes.form ?? 0;
+    // ER customs can have fewer forms than savedAttributes suggests.
+    // Clamp to a valid form index up front so every species.forms[formIndex]
+    // access in starterSetup gets a real form (or 0 for formless species).
+    if (this.species?.forms?.length > 0 && this.formIndex >= this.species.forms.length) {
+      this.formIndex = 0;
+    }
     this.filteredIndices = args[2] ?? null;
     this.starterSetup();
 
@@ -840,7 +861,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
 
     // TODO: why are we doing `species = this.species` and then still using `this.species`?
     // TODO: if `this.species` can be `undefined`, why is that not in its type signature?
-    let formKey = this.species?.forms.length > 0 ? this.species.forms[this.formIndex].formKey : "";
+    let formKey = this.species?.forms.length > 0 ? (this.species.forms[this.formIndex]?.formKey ?? "") : "";
     this.isFormGender = formKey === "male" || formKey === "female";
     if (
       this.isFormGender
@@ -848,7 +869,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
         || (this.savedStarterAttributes.female === false && formKey === "female"))
     ) {
       this.formIndex = (this.formIndex + 1) % 2;
-      formKey = this.species.forms[this.formIndex].formKey;
+      formKey = this.species.forms[this.formIndex]?.formKey ?? "";
     }
 
     // TODO: if `this.formIndex` can be `undefined`, then why is that not in its type signature; or why not initialize it with a value of `0`?
@@ -861,7 +882,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
       ? pokemonEvolutions[species.speciesId]
       : [];
 
-    if (species.forms.length > 0) {
+    if (species.forms.length > 0 && species.forms[formIndex]) {
       const form = species.forms[formIndex];
 
       // If this form has a specific set of moves, we get them.
@@ -930,7 +951,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
     const allFormChanges = Object.hasOwn(pokemonFormChanges, species.speciesId)
       ? pokemonFormChanges[species.speciesId]
       : [];
-    this.battleForms = allFormChanges.filter(f => f.preFormKey === this.species.forms[this.formIndex].formKey);
+    this.battleForms = allFormChanges.filter(
+      f => f.preFormKey === (this.species.forms[this.formIndex]?.formKey ?? ""),
+    );
 
     const preSpecies = Object.hasOwn(pokemonPrevolutions, this.species.speciesId)
       ? allSpecies.find(sp => sp.speciesId === pokemonPrevolutions[this.species.speciesId])
