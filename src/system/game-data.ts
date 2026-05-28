@@ -330,7 +330,15 @@ export class GameData {
     this.saveSetting(SettingKeys.Player_Gender, systemData.gender === PlayerGender.FEMALE ? 1 : 0);
 
     if (systemData.starterData) {
-      this.starterData = systemData.starterData;
+      // ER fix: init FIRST (seeds ER custom entries for id >= 10000),
+      // then merge saved data on top. Otherwise loading a save made
+      // before ER customs were added (or any save period — saved data
+      // never includes ER customs since they weren't in starterCosts at
+      // save time) wipes the ER entries we seeded in initStarterData,
+      // and pokedex/starter-select crash with "Cannot read property
+      // 'eggMoves' of undefined" on ER custom hover.
+      this.initStarterData();
+      this.starterData = Object.assign(this.starterData, systemData.starterData);
     } else {
       this.initStarterData();
 
