@@ -3,10 +3,12 @@ import { globalScene } from "#app/global-scene";
 import { getTypeRgb } from "#data/type";
 import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
+import { Device } from "#enums/devices";
 import { PokemonType } from "#enums/pokemon-type";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import type { CommandPhase } from "#phases/command-phase";
+import { SettingKeyboard } from "#system/settings-keyboard";
 import { BattleInfoOverlay } from "#ui/battle-info-overlay";
 import { PartyUiHandler, PartyUiMode } from "#ui/party-ui-handler";
 import { addTextObject } from "#ui/text";
@@ -20,8 +22,11 @@ export class CommandUiHandler extends UiHandler {
 
   private teraButton: Phaser.GameObjects.Sprite;
 
-  /** ER: multi-panel in-battle info overlay (toggled with the Stats key). */
+  /** ER: multi-panel in-battle info overlay (opened with the Stats key / Info hint). */
   private battleInfo = new BattleInfoOverlay();
+  /** ER: "Info" hotkey hint shown in the command window (glyph + label). */
+  private infoHintIcon: Phaser.GameObjects.Sprite;
+  private infoHintLabel: Phaser.GameObjects.Text;
 
   protected fieldIndex = 0;
   protected cursor2 = 0;
@@ -66,6 +71,41 @@ export class CommandUiHandler extends UiHandler {
       commandText.setName(commands[c]);
       this.commandsContainer.add(commandText);
     }
+
+    // ER: "Info" hotkey hint — a key glyph + label above the command grid that
+    // advertises the Battle Info screen (opened with the Stats key). The glyph
+    // frame is refreshed per input method in show()/updateInfoHint().
+    this.infoHintIcon = globalScene.add
+      .sprite(-1, -14, "keyboard", "C.png")
+      .setName("info-hint-icon")
+      .setScale(0.6)
+      .setOrigin(0, 0);
+    this.infoHintLabel = addTextObject(9, -15, i18next.t("commandUiHandler:info"), TextStyle.INSTRUCTIONS_TEXT, {
+      fontSize: "42px",
+    }).setName("info-hint-label");
+    this.commandsContainer.add([this.infoHintIcon, this.infoHintLabel]);
+  }
+
+  /** Refresh the Info-hint key glyph to match the player's current input method/binding. */
+  private updateInfoHint(): void {
+    let gamepadType: string;
+    if (globalScene.inputMethod === "gamepad") {
+      const device = globalScene.inputController.selectedDevice[Device.GAMEPAD];
+      gamepadType = device == null ? "keyboard" : globalScene.inputController.getConfig(device).padType;
+    } else {
+      gamepadType = globalScene.inputMethod;
+    }
+    let iconPath: string | undefined;
+    if (gamepadType === "touch") {
+      gamepadType = "keyboard";
+      iconPath = "C.png";
+    } else {
+      iconPath = globalScene.inputController?.getIconForLatestInputRecorded(SettingKeyboard.BUTTON_STATS);
+    }
+    if (gamepadType && iconPath) {
+      this.infoHintIcon.setTexture(gamepadType, iconPath).setVisible(true);
+      this.infoHintLabel.setVisible(true);
+    }
   }
 
   show(args: any[]): boolean {
@@ -74,6 +114,7 @@ export class CommandUiHandler extends UiHandler {
     this.fieldIndex = args.length > 0 ? (args[0] as number) : 0;
 
     this.commandsContainer.setVisible(true);
+    this.updateInfoHint();
 
     let commandPhase: CommandPhase;
     const currentPhase = globalScene.phaseManager.getCurrentPhase();

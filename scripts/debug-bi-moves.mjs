@@ -29,8 +29,9 @@ await p.evaluate(() => {
   globalThis.dev.scene.enableTutorials = false;
   globalThis.dev.battle({ player: ["BOUFFALANT"], enemy: "ABOMASNOW", enemyLevel: 50, level: 50 });
 });
-// Wait for currentBattle before sending input (avoids the TitlePhase→EncounterPhase
-// race where currentBattle is still null → waveIndex crash).
+// CRITICAL: do NOT send input until currentBattle is set. Pressing Enter ends
+// TitlePhase early, which can jump into the queued EncounterPhase before
+// initBattle's async newBattle() runs (currentBattle null → waveIndex crash).
 await p.waitForFunction(() => globalThis.dev.scene.currentBattle != null, { timeout: 60000, polling: 200 });
 let ready = false;
 for (let i = 0; i < 60; i++) {
@@ -47,42 +48,32 @@ for (let i = 0; i < 60; i++) {
 }
 console.log("ready on command:", ready);
 const press = btn => p.evaluate(b => globalThis.dev.scene.ui.getHandler().processInput(b), btn);
-// Open (STATS=8) → stats panel.
-console.log("open:", await press(8));
-await new Promise(r => setTimeout(r, 500));
-await p.screenshot({ path: "scripts/bi-stats.png" });
-// RIGHT(3) → abilities
-await press(3);
+
+// 0) clean command menu (no overlay) — for Info-hint placement planning
+await p.screenshot({ path: "scripts/bi-cmd-clean.png" });
+
+// dump player + enemy movesets to confirm what should render
+const sets = await p.evaluate(() => {
+  const s = globalThis.dev.scene;
+  const fmt = m => (m?.getMoveset?.() ?? []).filter(Boolean).map(mv => mv.getName?.() ?? mv.moveId);
+  return {
+    player: s.getPlayerField?.().map(fmt),
+    enemy: s.getEnemyField?.().map(fmt),
+  };
+});
+console.log("movesets:", JSON.stringify(sets));
+
+// open overlay (STATS=8) → stats
+await press(8);
 await new Promise(r => setTimeout(r, 400));
-await p.screenshot({ path: "scripts/bi-abilities.png" });
-// RIGHT → moves
-await press(3);
-await new Promise(r => setTimeout(r, 400));
-await p.screenshot({ path: "scripts/bi-moves.png" });
-// RIGHT → weather
-await press(3);
-await new Promise(r => setTimeout(r, 400));
-await p.screenshot({ path: "scripts/bi-weather.png" });
-// RIGHT → sides
-await press(3);
-await new Promise(r => setTimeout(r, 400));
-await p.screenshot({ path: "scripts/bi-sides.png" });
-// back to stats(RIGHT wraps), then DOWN to next mon (enemy), screenshot stats
-await press(3);
+// DOWN(1) to enemy target, then RIGHT(3) twice to reach moves panel
+await press(1);
 await new Promise(r => setTimeout(r, 200));
-await press(1);
-await press(1);
+await press(3); // abilities
+await press(3); // moves
 await new Promise(r => setTimeout(r, 400));
-await p.screenshot({ path: "scripts/bi-stats2.png" });
-const st = await p.evaluate(() => ({ open: globalThis.dev.scene.ui.getHandler().battleInfo?.isOpen }));
-// close via ACTION(5)
-await press(5);
-await new Promise(r => setTimeout(r, 300));
-const after = await p.evaluate(() => ({
-  open: globalThis.dev.scene.ui.getHandler().battleInfo?.isOpen,
-  h: globalThis.dev.scene.ui.getHandler()?.constructor?.name,
-}));
-console.log("during:", JSON.stringify(st), "after close:", JSON.stringify(after));
+await p.screenshot({ path: "scripts/bi-enemy-moves.png" });
+
 console.log(`pageerrors: ${errors.length}`);
-errors.slice(0, 3).forEach(e => console.log(e.slice(0, 1000)));
+errors.slice(0, 3).forEach(e => console.log(e.slice(0, 800)));
 await b.close();
