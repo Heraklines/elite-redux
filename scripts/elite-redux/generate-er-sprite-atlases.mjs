@@ -38,9 +38,20 @@ function makeAtlasJson(pngPath) {
   if (!size) return null;
   const filename = pngPath.split(/[/\\]/).pop();
   // Pokerogue's Phaser atlas format uses "w"/"h" keys (not "width"/"height").
-  // The "size" object also uses w/h. Get this wrong and the atlas loads as
-  // 0x0 → invisible sprites.
   const sz = { w: size.width, h: size.height };
+
+  // Pokemon Emerald icon convention: icon PNGs are 32x64 with TWO frames
+  // stacked vertically (frame 1 = static icon, frame 2 = animation
+  // alternate). The grid cell in pokerogue is 32x32 — if we map the whole
+  // 32x64 image as one frame, the second frame visually overflows into
+  // the next row's cell. Detect the doubled-height case and only use the
+  // TOP half (frame 1) as the icon frame.
+  const isStackedIcon = filename === "icon.png" && size.height === size.width * 2;
+  const frameRect = isStackedIcon
+    ? { x: 0, y: 0, w: size.width, h: size.width }
+    : { x: 0, y: 0, w: sz.w, h: sz.h };
+  const frameSize = isStackedIcon ? { w: size.width, h: size.width } : sz;
+
   return {
     textures: [
       {
@@ -53,9 +64,9 @@ function makeAtlasJson(pngPath) {
             filename: "0001.png",
             rotated: false,
             trimmed: false,
-            sourceSize: sz,
-            spriteSourceSize: { x: 0, y: 0, w: sz.w, h: sz.h },
-            frame: { x: 0, y: 0, w: sz.w, h: sz.h },
+            sourceSize: frameSize,
+            spriteSourceSize: { x: 0, y: 0, ...frameSize },
+            frame: frameRect,
           },
         ],
       },
