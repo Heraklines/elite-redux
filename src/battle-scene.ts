@@ -67,6 +67,7 @@ import type { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerType } from "#enums/trainer-type";
 import { TrainerVariant } from "#enums/trainer-variant";
 import { UiTheme } from "#enums/ui-theme";
+import { WeatherType } from "#enums/weather-type";
 import { NewArenaEvent } from "#events/battle-scene";
 import { Arena } from "#field/arena";
 import { ArenaBase } from "#field/arena-base";
@@ -329,6 +330,8 @@ export class BattleScene extends SceneBase {
   public arenaFlyout: ArenaFlyout;
 
   private fieldOverlay: Phaser.GameObjects.Rectangle;
+  /** ER: scrolling fog overlay shown while {@linkcode WeatherType.FOG} is active (ROM fog sprite). */
+  private erFogOverlay: Phaser.GameObjects.TileSprite | null = null;
   private shopOverlay: Phaser.GameObjects.Rectangle;
   private shopOverlayShown = false;
   private shopOverlayOpacity = 0.8;
@@ -456,6 +459,29 @@ export class BattleScene extends SceneBase {
 
   update() {
     this.ui?.update();
+    this.updateErFogOverlay();
+  }
+
+  /**
+   * ER: drive the in-battle fog overlay. Eases its alpha toward visible while
+   * FOG weather is active (and toward 0 otherwise) and scrolls the tiled ROM fog
+   * sprite for a drifting-haze effect. Cheap enough to run every frame.
+   */
+  private updateErFogOverlay(): void {
+    const overlay = this.erFogOverlay;
+    if (!overlay) {
+      return;
+    }
+    const foggy = this.arena?.weatherType === WeatherType.FOG;
+    const targetAlpha = foggy ? 0.4 : 0;
+    if (overlay.alpha !== targetAlpha) {
+      const next = Phaser.Math.Linear(overlay.alpha, targetAlpha, 0.04);
+      overlay.setAlpha(Math.abs(next - targetAlpha) < 0.01 ? targetAlpha : next);
+    }
+    if (overlay.alpha > 0) {
+      overlay.tilePositionX += 0.35;
+      overlay.tilePositionY += 0.04;
+    }
   }
 
   // TODO: Split this up into multiple sub-methods
@@ -534,6 +560,14 @@ export class BattleScene extends SceneBase {
       .setName("rect-shop-overlay")
       .setOrigin(0)
       .setAlpha(0);
+    // ER: scrolling fog overlay (ROM fog sprite) — sits over the battlefield while
+    // FOG weather is active. Mirrors the fieldOverlay geometry; alpha + scroll are
+    // driven in update() / updateErFogOverlay().
+    this.erFogOverlay = this.add
+      .tileSprite(0, overlayHeight * -1 - 48, overlayWidth, overlayHeight, "fog_horizontal")
+      .setName("er-fog-overlay")
+      .setOrigin(0)
+      .setAlpha(0);
 
     this.modifiers = [];
     this.enemyModifiers = [];
@@ -604,6 +638,7 @@ export class BattleScene extends SceneBase {
 
     this.fieldUI
       .add([
+        this.erFogOverlay,
         this.fieldOverlay,
         this.shopOverlay,
         this.charSprite,

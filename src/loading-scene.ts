@@ -35,6 +35,8 @@ export class LoadingScene extends SceneBase {
       .loadImage("logo", "")
       .loadImage("logo_fake", "")
       .loadImage("snow", "")
+      // ER: ROM-extracted fog overlay sprite (scrolling in-battle fog visual).
+      .loadImage("fog_horizontal", "elite-redux/weather")
       .loadAtlas("bg", "ui")
       .loadAtlas("prompt", "ui")
       .loadImage("candy", "ui")
@@ -635,7 +637,9 @@ export class LoadingScene extends SceneBase {
       // ER species id >= 1026 → custom (Phantowl onward). Vanilla species ids
       // 1..1025 share pokerogue's bundled icons; we only need icons for the
       // ER customs the runtime hasn't otherwise loaded.
-      if (entry.speciesId < 1026) continue;
+      if (entry.speciesId < 1026) {
+        continue;
+      }
       this.loadAtlas(`er_icon__${entry.slug}`, `pokemon/elite-redux/${entry.slug}`, "icon");
     }
   }
