@@ -74,6 +74,18 @@ export class SummaryUiHandler extends UiHandler {
    * page; hidden (tabSprite shown) on all vanilla pages.
    */
   private abilitiesTabText: Phaser.GameObjects.Text;
+  /** ER ABILITIES page: which row (0=main ability, 1-3=innates) is selected. */
+  private abilitiesCursor = 0;
+  /** ER ABILITIES page: number of rendered rows (main + present innates). */
+  private abilitiesRowCount = 0;
+  /** Per-row metadata for the ABILITIES page, indexed by row. */
+  private abilitiesRows: { ability: Ability; y: number; locked: boolean }[] = [];
+  /** Selection-highlight box drawn over the selected ability row. */
+  private abilitiesCursorObj: Phaser.GameObjects.NineSlice | null = null;
+  /** "Ⓐ Detail" prompt shown on the selected ability row's header. */
+  private abilitiesDetailPrompt: Phaser.GameObjects.Text | null = null;
+  /** Full-screen ability-detail overlay (long description); null when closed. */
+  private abilitiesDetailContainer: Phaser.GameObjects.Container | null = null;
   private shinyOverlay: Phaser.GameObjects.Image;
   private numberText: Phaser.GameObjects.Text;
   private pokemonSprite: Phaser.GameObjects.Sprite;
@@ -660,7 +672,15 @@ export class SummaryUiHandler extends UiHandler {
         }
       }
     } else if (button === Button.ACTION) {
-      if (this.cursor === Page.MOVES) {
+      if (this.cursor === Page.ABILITIES) {
+        // Toggle the full-screen ability detail overlay.
+        if (this.abilitiesDetailContainer) {
+          this.closeAbilityDetail();
+        } else {
+          this.openAbilityDetail();
+        }
+        success = true;
+      } else if (this.cursor === Page.MOVES) {
         this.showMoveSelect();
         success = true;
       } else if (this.cursor === Page.PROFILE && this.pokemon?.hasPassive()) {
@@ -673,7 +693,11 @@ export class SummaryUiHandler extends UiHandler {
         this.ivContainer.setVisible(!this.ivContainer.visible);
       }
     } else if (button === Button.CANCEL) {
-      if (this.summaryUiMode === SummaryUiMode.LEARN_MOVE) {
+      if (this.cursor === Page.ABILITIES && this.abilitiesDetailContainer) {
+        // Close the detail overlay rather than leaving the summary.
+        this.closeAbilityDetail();
+        success = true;
+      } else if (this.summaryUiMode === SummaryUiMode.LEARN_MOVE) {
         this.hideMoveSelect();
       } else {
         if (this.selectCallback instanceof Function) {
@@ -695,6 +719,20 @@ export class SummaryUiHandler extends UiHandler {
         case Button.UP:
         case Button.DOWN: {
           if (this.summaryUiMode === SummaryUiMode.LEARN_MOVE) {
+            break;
+          }
+          // ER ABILITIES page: Up/Down moves the ability-row selection
+          // cursor instead of switching party members. (Detail overlay
+          // open → ignore.)
+          if (this.cursor === Page.ABILITIES) {
+            if (this.abilitiesDetailContainer || this.abilitiesRowCount === 0) {
+              break;
+            }
+            const delta = button === Button.DOWN ? 1 : -1;
+            this.abilitiesCursor =
+              (this.abilitiesCursor + delta + this.abilitiesRowCount) % this.abilitiesRowCount;
+            this.refreshAbilitiesCursor();
+            success = true;
             break;
           }
           if (!fromPartyMode) {
@@ -810,6 +848,10 @@ export class SummaryUiHandler extends UiHandler {
     } else {
       changed = this.cursor !== cursor;
       if (changed) {
+        // Leaving the ABILITIES page → tear down its detail overlay.
+        if (this.cursor === Page.ABILITIES && cursor !== Page.ABILITIES) {
+          this.closeAbilityDetail();
+        }
         const forward = this.cursor < cursor;
         this.cursor = cursor;
 
@@ -1550,11 +1592,26 @@ export class SummaryUiHandler extends UiHandler {
       });
     }
 
-    // Rows are stacked top-to-bottom; each advances by its own rendered
-    // height (computed after the description wraps) so they never overlap.
-    let y = 6;
-    for (const row of rows) {
-      // Determine lock state.
+    // Fixed even grid (matches the ER ROM's clean N-row separation). Panel is
+    // 214x159 (summary_profile frame). Each row: an accent header bar with the
+    // aligned label + name, then the abbreviated description below.
+    const panelW = pageBg.width; // 214
+    const panelH = pageBg.height; // 159
+    const rowH = Math.floor((panelH - 4) / Math.max(rows.length, 1));
+    const headerH = 13;
+    const labelX = 5;
+    const nameX = 72;
+
+    this.abilitiesRows = [];
+    this.abilitiesRowCount = rows.length;
+    if (this.abilitiesCursor >= rows.length) {
+      this.abilitiesCursor = 0;
+    }
+
+    rows.forEach((row, i) => {
+      const top = 2 + i * rowH;
+
+      // Lock state.
       let locked = false;
       let lockIconKey: string | null = null;
       let reason = "";
@@ -1578,44 +1635,128 @@ export class SummaryUiHandler extends UiHandler {
         }
       }
 
-      // Header line: label (accent) + ability name + (if locked) lock icon
-      // and reason — kept on one line so the description below stays clean.
-      const labelText = addTextObject(6, y, row.label, TextStyle.SUMMARY_GOLD, { fontSize: "70px" });
+      // Accent header bar spanning the panel width.
+      const bar = globalScene.add.rectangle(1, top, panelW - 2, headerH, 0x4a4a63, 1).setOrigin(0, 0);
+      container.add(bar);
+
+      const labelText = addTextObject(labelX, top + 1, row.label, TextStyle.SUMMARY_GOLD, { fontSize: "64px" });
       labelText.setOrigin(0, 0);
       container.add(labelText);
 
-      const nameText = addTextObject(80, y, row.ability?.name ?? "", TextStyle.SUMMARY, { fontSize: "70px" });
+      const nameText = addTextObject(nameX, top + 1, row.ability?.name ?? "", TextStyle.SUMMARY, { fontSize: "64px" });
       nameText.setOrigin(0, 0);
       nameText.setColor(getTextColor(locked ? TextStyle.SUMMARY_GRAY : TextStyle.SUMMARY));
       container.add(nameText);
 
-      let headerRightX = nameText.x + nameText.displayWidth + 4;
       if (lockIconKey) {
-        const icon = globalScene.add.sprite(headerRightX, y + 5, lockIconKey);
-        icon.setOrigin(0, 0).setScale(0.45);
+        const icon = globalScene.add.sprite(panelW - 10, top + headerH / 2, lockIconKey);
+        icon.setOrigin(1, 0.5).setScale(0.4);
         container.add(icon);
-        headerRightX += icon.displayWidth + 4;
-      }
-      if (reason) {
-        const reasonText = addTextObject(headerRightX, y + 2, reason, TextStyle.SUMMARY_RED, { fontSize: "48px" });
-        reasonText.setOrigin(0, 0);
-        container.add(reasonText);
       }
 
-      // Description line (abbreviated ER text).
+      // Description (abbreviated ER text). On the light page area below the bar.
       const erShortDesc = getErAbilityDescription(row.ability.id) ?? row.ability?.description ?? "";
-      const descText = addTextObject(8, y + 12, erShortDesc, TextStyle.WINDOW_ALT, {
-        fontSize: "52px",
-        wordWrap: { width: 1340 },
+      const descText = addTextObject(labelX, top + headerH + 1, erShortDesc, TextStyle.WINDOW_ALT, {
+        fontSize: "48px",
+        wordWrap: { width: 1230 },
       });
       descText.setOrigin(0, 0);
       descText.setColor(getTextColor(locked ? TextStyle.SUMMARY_GRAY : TextStyle.WINDOW_ALT));
       container.add(descText);
 
-      // Advance past this row's actual rendered height, so multi-line
-      // descriptions never overlap the next row. Bounded minimum keeps
-      // single-line rows from bunching.
-      y += Math.max(32, 14 + descText.displayHeight + 6);
+      if (reason) {
+        const reasonText = addTextObject(labelX, top + headerH + descText.displayHeight + 1, reason, TextStyle.SUMMARY_RED, {
+          fontSize: "42px",
+        });
+        reasonText.setOrigin(0, 0);
+        container.add(reasonText);
+      }
+
+      this.abilitiesRows.push({ ability: row.ability, y: top, locked });
+    });
+
+    // Selection cursor + "Ⓐ Detail" prompt over the selected row.
+    this.abilitiesCursorObj = globalScene.add
+      .nineslice(0, 0, "select_cursor", undefined, panelW - 2, headerH + 2, 1, 1, 1, 1)
+      .setOrigin(0, 0)
+      .setVisible(false);
+    container.add(this.abilitiesCursorObj);
+
+    this.abilitiesDetailPrompt = addTextObject(
+      panelW - 4,
+      -11,
+      i18next.t("pokemonSummary:abilityDetailPrompt"),
+      TextStyle.SUMMARY,
+      { fontSize: "48px" },
+    );
+    this.abilitiesDetailPrompt.setOrigin(1, 1);
+    container.add(this.abilitiesDetailPrompt);
+
+    this.refreshAbilitiesCursor();
+  }
+
+  /** Reposition the ABILITIES-page selection cursor on the active row. */
+  private refreshAbilitiesCursor(): void {
+    if (!this.abilitiesCursorObj || this.abilitiesRows.length === 0) {
+      return;
+    }
+    const row = this.abilitiesRows[Math.min(this.abilitiesCursor, this.abilitiesRows.length - 1)];
+    this.abilitiesCursorObj.setPosition(0, row.y - 1).setVisible(true);
+  }
+
+  /**
+   * Open the full-screen detail overlay for the currently-selected ability
+   * (ER ROM "Detail" view): ability name header + expanded description.
+   */
+  private openAbilityDetail(): void {
+    if (this.abilitiesDetailContainer || this.abilitiesRows.length === 0) {
+      return;
+    }
+    const row = this.abilitiesRows[Math.min(this.abilitiesCursor, this.abilitiesRows.length - 1)];
+    const ability = row.ability;
+
+    // Cover only the right page panel (214x159 at summaryPageContainer's
+    // x=106), keeping the mon box visible — matches the ER ROM detail view.
+    const panelW = 214;
+    const panelH = 159;
+    const c = globalScene.add.container(106, -panelH);
+
+    // Fully opaque scrim, slightly oversized, covering the whole page panel
+    // so the ability list underneath is hidden completely.
+    const scrim = globalScene.add.rectangle(-2, -2, panelW + 4, panelH + 4, 0x1a1a2e, 1).setOrigin(0, 0);
+    c.add(scrim);
+
+    // Name header bar.
+    const headerBar = globalScene.add.rectangle(3, 5, panelW - 6, 16, 0x4a4a63, 1).setOrigin(0, 0);
+    c.add(headerBar);
+    const nameHeader = addTextObject(7, 6, ability.name, TextStyle.SUMMARY_GOLD, { fontSize: "70px" });
+    nameHeader.setOrigin(0, 0);
+    c.add(nameHeader);
+
+    // Expanded description (long text when available; falls back to short).
+    const longDesc = getErAbilityDescription(ability.id) ?? ability.description ?? "";
+    const descText = addTextObject(7, 28, longDesc, TextStyle.WINDOW_ALT, {
+      fontSize: "64px",
+      wordWrap: { width: 1230 },
+    });
+    descText.setOrigin(0, 0);
+    c.add(descText);
+
+    const backHint = addTextObject(panelW - 6, panelH - 6, i18next.t("pokemonSummary:abilityDetailBack"), TextStyle.SUMMARY, {
+      fontSize: "44px",
+    });
+    backHint.setOrigin(1, 1);
+    c.add(backHint);
+
+    this.summaryContainer.add(c);
+    this.abilitiesDetailContainer = c;
+  }
+
+  /** Close the ability detail overlay. */
+  private closeAbilityDetail(): void {
+    if (this.abilitiesDetailContainer) {
+      this.abilitiesDetailContainer.destroy();
+      this.abilitiesDetailContainer = null;
     }
   }
 
@@ -1684,6 +1825,12 @@ export class SummaryUiHandler extends UiHandler {
       }
       this.hideMoveEffect(true);
     }
+    // Tear down ER ABILITIES-page detail overlay + reset its state.
+    this.closeAbilityDetail();
+    this.abilitiesRows = [];
+    this.abilitiesRowCount = 0;
+    this.abilitiesCursorObj = null;
+    this.abilitiesDetailPrompt = null;
     this.summaryContainer.setVisible(false);
     this.summaryPageContainer.setVisible(false);
   }

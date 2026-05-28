@@ -46,12 +46,29 @@ async function main() {
   // RIGHT → ABILITIES page.
   await page.keyboard.press("ArrowRight");
   await new Promise(r => setTimeout(r, 1400));
-  const st = await page.evaluate(() => {
-    const h = globalThis.dev.scene.ui.getHandler();
-    return { cursor: h?.cursor };
-  });
-  console.log("on ABILITIES, cursor =", JSON.stringify(st));
+  console.log("ABILITIES cursor =", await page.evaluate(() => globalThis.dev.scene.ui.getHandler()?.abilitiesCursor));
   await page.screenshot({ path: "scripts/dbg-summary-abilities.png" });
+
+  // DOWN twice → cursor moves to the 3rd ability (Whiteout-equivalent).
+  await page.keyboard.press("ArrowDown");
+  await new Promise(r => setTimeout(r, 300));
+  await page.keyboard.press("ArrowDown");
+  await new Promise(r => setTimeout(r, 400));
+  console.log("after 2x DOWN, cursor =", await page.evaluate(() => globalThis.dev.scene.ui.getHandler()?.abilitiesCursor));
+  await page.screenshot({ path: "scripts/dbg-summary-abilities-sel.png" });
+
+  // ENTER (A) → open detail overlay.
+  await page.keyboard.press("Enter");
+  await new Promise(r => setTimeout(r, 600));
+  const detailOpen = await page.evaluate(() => globalThis.dev.scene.ui.getHandler()?.abilitiesDetailContainer != null);
+  console.log("detail overlay open =", detailOpen);
+  await page.screenshot({ path: "scripts/dbg-summary-detail.png" });
+
+  // Backspace (B/CANCEL) → close detail.
+  await page.keyboard.press("Backspace");
+  await new Promise(r => setTimeout(r, 500));
+  const detailClosed = await page.evaluate(() => globalThis.dev.scene.ui.getHandler()?.abilitiesDetailContainer == null);
+  console.log("detail closed on B =", detailClosed);
 
   // RIGHT → STATS, RIGHT → MOVES (verify downstream pages still fine).
   await page.keyboard.press("ArrowRight");
