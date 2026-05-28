@@ -25,7 +25,7 @@ type AbAttrPredicate<T extends AbAttrString> = (attr: AbAttrMap[T]) => boolean;
  * gate only restricts the 3 passive (innate) iteration; the active ability
  * always fires regardless of level.
  */
-function getEnemyPassiveSlotLimit(pokemon: { isEnemy?: () => boolean; level?: number }): number {
+export function getEnemyPassiveSlotLimit(pokemon: { isEnemy?: () => boolean; level?: number }): number {
   // Defensive: harness-test mock pokemon lack `isEnemy`/`level` fields. Treat
   // missing fields as "not gated" so unit tests that exercise apply-ab-attrs
   // directly still see all 3 passive slots fire.
@@ -33,8 +33,12 @@ function getEnemyPassiveSlotLimit(pokemon: { isEnemy?: () => boolean; level?: nu
     return 3;
   }
   const lvl = pokemon.level ?? 100;
-  if (lvl >= 24) return 3;
-  if (lvl >= 15) return 2;
+  if (lvl >= 24) {
+    return 3;
+  }
+  if (lvl >= 15) {
+    return 2;
+  }
   return 1;
 }
 

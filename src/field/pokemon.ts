@@ -1,7 +1,11 @@
 import type { PreAttackModifyDamageAbAttrParams } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
-import { applyAbAttrs, applyOnGainAbAttrs, applyOnLoseAbAttrs } from "#abilities/apply-ab-attrs";
-import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
+import {
+  applyAbAttrs,
+  applyOnGainAbAttrs,
+  applyOnLoseAbAttrs,
+  getEnemyPassiveSlotLimit,
+} from "#abilities/apply-ab-attrs";
 import { generateMoveset } from "#app/ai/ai-moveset-gen";
 import type { Battle } from "#app/battle";
 import type { AnySound, BattleScene } from "#app/battle-scene";
@@ -51,6 +55,7 @@ import {
 import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/daily-seed/daily-run";
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
 import { getLevelTotalExp } from "#data/exp";
 import {
   SpeciesFormChangeActiveTrigger,
@@ -2249,12 +2254,29 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   public getAbilityAttrs<T extends AbAttrString>(attrType: T, canApply = true, ignoreOverride = false): AbAttrMap[T][] {
     const abilityAttrs: AbAttrMap[T][] = [];
 
+    // ER 3-passive model: gather attrs from the active ability AND all eligible
+    // innate (passive) slots, not just slot 0. Mirrors applyAbAttrsInternal's
+    // gating (enemy level slot-limit + per-slot canApplyAbility + id dedup) so
+    // query methods agree with what applyAbAttrs actually fires. Previously this
+    // only consulted getPassiveAbility() (slot 0), making innates in slots 1-2
+    // invisible (e.g. innate Rock Head failing to block recoil).
+    const active = this.getAbility(ignoreOverride);
+    const seen = new Set<number>([active.id]);
     if (!canApply || this.canApplyAbility()) {
-      abilityAttrs.push(...this.getAbility(ignoreOverride).getAttrs(attrType));
+      abilityAttrs.push(...active.getAttrs(attrType));
     }
 
-    if (!canApply || this.canApplyAbility(true)) {
-      abilityAttrs.push(...this.getPassiveAbility().getAttrs(attrType));
+    const passives = this.getPassiveAbilities();
+    const slotLimit = getEnemyPassiveSlotLimit(this);
+    for (let slot = 0; slot < 3 && slot < slotLimit; slot++) {
+      const pa = passives[slot as 0 | 1 | 2];
+      if (!pa || seen.has(pa.id)) {
+        continue;
+      }
+      if (!canApply || this.canApplyAbility(true, slot as 0 | 1 | 2)) {
+        abilityAttrs.push(...pa.getAttrs(attrType));
+        seen.add(pa.id);
+      }
     }
 
     return abilityAttrs;
@@ -2444,7 +2466,19 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (this.getAbility(ignoreOverride).id === ability && (!canApply || this.canApplyAbility())) {
       return true;
     }
-    return this.getPassiveAbility().id === ability && this.hasPassive() && (!canApply || this.canApplyAbility(true));
+    // ER 3-passive model: check every eligible innate slot, not just slot 0.
+    if (!this.hasPassive()) {
+      return false;
+    }
+    const passives = this.getPassiveAbilities();
+    const slotLimit = getEnemyPassiveSlotLimit(this);
+    for (let slot = 0; slot < 3 && slot < slotLimit; slot++) {
+      const pa = passives[slot as 0 | 1 | 2];
+      if (pa?.id === ability && (!canApply || this.canApplyAbility(true, slot as 0 | 1 | 2))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -2459,7 +2493,19 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if ((!canApply || this.canApplyAbility()) && this.getAbility(ignoreOverride).hasAttr(attrType)) {
       return true;
     }
-    return this.hasPassive() && (!canApply || this.canApplyAbility(true)) && this.getPassiveAbility().hasAttr(attrType);
+    // ER 3-passive model: check every eligible innate slot, not just slot 0.
+    if (!this.hasPassive()) {
+      return false;
+    }
+    const passives = this.getPassiveAbilities();
+    const slotLimit = getEnemyPassiveSlotLimit(this);
+    for (let slot = 0; slot < 3 && slot < slotLimit; slot++) {
+      const pa = passives[slot as 0 | 1 | 2];
+      if (pa?.hasAttr(attrType) && (!canApply || this.canApplyAbility(true, slot as 0 | 1 | 2))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
