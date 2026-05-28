@@ -118,6 +118,15 @@ export function installDevTools(scene: BattleScene): void {
       return scene.ui.setMode(mode, ...args);
     },
 
+    /** Open the summary (ABILITIES page) for the current enemy — inspect test. */
+    inspectEnemy(page = 1) {
+      const enemy = scene.getEnemyParty?.()[0];
+      if (!enemy) {
+        throw new Error("dev.inspectEnemy: no enemy on field");
+      }
+      return scene.ui.setOverlayMode(UiMode.SUMMARY, enemy, undefined, page);
+    },
+
     /**
      * Start a Classic-mode battle immediately with a chosen party + enemy —
      * bypasses title/starter-select. For testing ER abilities, innates, moves
