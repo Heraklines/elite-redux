@@ -74,6 +74,14 @@ import {
 } from "#utils/common";
 import type { StarterPreferences } from "#utils/data";
 import { deepCopy, loadLastTeam, loadStarterPreferences, saveLastTeam, saveStarterPreferences } from "#utils/data";
+import {
+  isSlotEnabled,
+  isSlotUnlocked,
+  PASSIVE_SLOTS,
+  type PassiveSlot,
+  toggleSlotEnabled,
+  unlockSlot,
+} from "#utils/passive-utils";
 import { getDexNumber, getPokemonSpecies, getPokemonSpeciesForm, getPokerusStarters } from "#utils/pokemon-utils";
 import { toCamelCase, toTitleCase } from "#utils/strings";
 import i18next from "i18next";
@@ -325,35 +333,11 @@ interface StarterSpriteLoadRequest {
 // Cost multiplier per slot: slot 1 = 1x (base), slot 2 = 2x, slot 3 = 4x.
 // =============================================================================
 
-/** Slot index into the 3-passive bitmask. */
-export type PassiveSlot = 0 | 1 | 2;
-
-/** Static metadata for the 3 passive slots: bit positions + cost multiplier. */
-export const PASSIVE_SLOTS = [
-  { unlocked: PassiveAttr.UNLOCKED_1, enabled: PassiveAttr.ENABLED_1, costMultiplier: 1 },
-  { unlocked: PassiveAttr.UNLOCKED_2, enabled: PassiveAttr.ENABLED_2, costMultiplier: 2 },
-  { unlocked: PassiveAttr.UNLOCKED_3, enabled: PassiveAttr.ENABLED_3, costMultiplier: 4 },
-] as const;
-
-/** True if the given passive slot is unlocked in `passiveAttr`. */
-export function isSlotUnlocked(passiveAttr: number, slot: PassiveSlot): boolean {
-  return (passiveAttr & PASSIVE_SLOTS[slot].unlocked) !== 0;
-}
-
-/** True if the given passive slot is enabled in `passiveAttr`. */
-export function isSlotEnabled(passiveAttr: number, slot: PassiveSlot): boolean {
-  return (passiveAttr & PASSIVE_SLOTS[slot].enabled) !== 0;
-}
-
-/** Return `passiveAttr` with the given slot's enabled bit flipped. */
-export function toggleSlotEnabled(passiveAttr: number, slot: PassiveSlot): number {
-  return passiveAttr ^ PASSIVE_SLOTS[slot].enabled;
-}
-
-/** Return `passiveAttr` with the given slot's unlocked AND enabled bits set. */
-export function unlockSlot(passiveAttr: number, slot: PassiveSlot): number {
-  return passiveAttr | PASSIVE_SLOTS[slot].unlocked | PASSIVE_SLOTS[slot].enabled;
-}
+export type { PassiveSlot };
+// The 3-slot passive helpers now live in #utils/passive-utils (so the field
+// layer can use them without importing this UI handler). Re-exported here for
+// back-compat with existing importers (pokedex, summary).
+export { isSlotEnabled, isSlotUnlocked, PASSIVE_SLOTS, toggleSlotEnabled, unlockSlot };
 
 export class StarterSelectUiHandler extends MessageUiHandler {
   private starterSelectContainer: Phaser.GameObjects.Container;

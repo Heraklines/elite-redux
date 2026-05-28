@@ -187,6 +187,7 @@ import {
 import { calculateBossSegmentDamage } from "#utils/damage";
 import { getEnumValues } from "#utils/enums";
 import { cachedFetch } from "#utils/fetch-utils";
+import { hasAnyActiveSlot, isSlotActive } from "#utils/passive-utils";
 import { decodeNickname, getFusedSpeciesName, getPokemonSpecies, getPokemonSpeciesForm } from "#utils/pokemon-utils";
 import { inSpeedOrder } from "#utils/speed-order-generator";
 import { ValueHolder } from "#utils/value-holder";
@@ -2386,7 +2387,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return true;
     }
 
-    const hasPassive = new BooleanHolder(this.passive);
+    // ER 3-passive model: for the player, "has passive" means ANY of the 3 innate
+    // slots is unlocked AND enabled in starterData. The legacy single `this.passive`
+    // flag reflected slot 0 only, so unlocking 2+ slots (or only slot 2) broke it.
+    let basePassive = this.passive;
+    if (this.isPlayer()) {
+      const passiveAttr = globalScene.gameData.starterData[this.species.getRootSpeciesId()]?.passiveAttr ?? 0;
+      basePassive = hasAnyActiveSlot(passiveAttr);
+    }
+    const hasPassive = new BooleanHolder(basePassive);
     applyChallenges(ChallengeType.PASSIVE_ACCESS, this, hasPassive);
 
     return hasPassive.value || this.isBoss();
@@ -2409,6 +2418,19 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   public canApplyAbility(passive = false, passiveSlot: 0 | 1 | 2 = 0): boolean {
     if (passive && !this.hasPassive()) {
       return false;
+    }
+    // ER 3-passive model: gate each innate slot individually for the player by its
+    // candy unlock + enable state. Skipped when a passive override forces passives
+    // on (tests/dev). Enemy slot gating is by level, applied in applyAbAttrsInternal.
+    if (passive && this.isPlayer()) {
+      const overridden =
+        Overrides.HAS_PASSIVE_ABILITY_OVERRIDE === true || Overrides.PASSIVE_ABILITY_OVERRIDE !== AbilityId.NONE;
+      if (!overridden) {
+        const passiveAttr = globalScene.gameData.starterData[this.species.getRootSpeciesId()]?.passiveAttr ?? 0;
+        if (!isSlotActive(passiveAttr, passiveSlot)) {
+          return false;
+        }
+      }
     }
     // ER 3-passive: resolve directly from the slot-indexed array. We avoid
     // falling back to `this.getAbility()` for an empty slot because that would
