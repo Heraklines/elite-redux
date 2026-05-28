@@ -28,6 +28,9 @@ import { addBBCodeTextObject, addTextObject, getBBCodeFrag, getTextColor, update
 import { UiHandler } from "#ui/ui-handler";
 import { argbFromRgba, rgbHexToRgba } from "#utils/color-utils";
 import { getErAbilityDescription } from "#data/elite-redux/er-ability-descriptions";
+import { allAbilities } from "#data/data-lists";
+import { AbilityId } from "#enums/ability-id";
+import { isSlotEnabled, isSlotUnlocked, type PassiveSlot } from "#app/ui/handlers/starter-select-ui-handler";
 import { fixedInt, formatStat, getBiomeName, getLocalizedSpriteKey, getShinyDescriptor, padInt } from "#utils/common";
 import { getEnumValues } from "#utils/enums";
 import { getDexNumber } from "#utils/pokemon-utils";
@@ -65,6 +68,12 @@ export class SummaryUiHandler extends UiHandler {
   private summaryContainer: Phaser.GameObjects.Container;
   private summaryContainerDexNoLabel: Phaser.GameObjects.Image;
   private tabSprite: Phaser.GameObjects.Sprite;
+  /**
+   * Elite Redux: text label shown in the tab area for the ABILITIES page,
+   * which has no baked tab sprite. Shown (and tabSprite hidden) only on that
+   * page; hidden (tabSprite shown) on all vanilla pages.
+   */
+  private abilitiesTabText: Phaser.GameObjects.Text;
   private shinyOverlay: Phaser.GameObjects.Image;
   private numberText: Phaser.GameObjects.Text;
   private pokemonSprite: Phaser.GameObjects.Sprite;
@@ -167,6 +176,17 @@ export class SummaryUiHandler extends UiHandler {
     this.tabSprite = globalScene.add.sprite(81, -summaryBg.displayHeight + 16, getLocalizedSpriteKey("summary_tabs_1")); // Pixel text 'STATUS' tab
     this.tabSprite.setOrigin(0, 1);
     this.summaryContainer.add(this.tabSprite);
+
+    // ER: text label rendered in the tab area for the ABILITIES page (no
+    // baked tab sprite exists). Positioned to align with the tab title text.
+    this.abilitiesTabText = addTextObject(
+      111,
+      -summaryBg.displayHeight + 3,
+      i18next.t("pokemonSummary:abilities"),
+      TextStyle.SUMMARY_HEADER,
+    );
+    this.abilitiesTabText.setOrigin(0.5, 0).setVisible(false);
+    this.summaryContainer.add(this.abilitiesTabText);
 
     const summaryLabel = addTextObject(4, -165, i18next.t("pokemonSummary:pokemonInfo"), TextStyle.SUMMARY_HEADER);
     summaryLabel.setOrigin(0, 1);
@@ -345,6 +365,12 @@ export class SummaryUiHandler extends UiHandler {
     if (page === undefined) {
       page = this.cursor;
     }
+    // Elite Redux ABILITIES page has no dedicated background asset — reuse the
+    // profile frame (it's just borders/dividers; the section titles are
+    // separate overlays we control in populate()).
+    if (page === Page.ABILITIES) {
+      return "summary_profile";
+    }
     return `summary_${Page[page].toLowerCase()}`;
   }
 
@@ -394,7 +420,14 @@ export class SummaryUiHandler extends UiHandler {
 
     this.shinyOverlay.setVisible(this.pokemon.isShiny());
 
-    const colorScheme = starterColors[this.pokemon.species.getRootSpeciesId()];
+    // Defense-in-depth: starterColors can lack an entry (ER custom species,
+    // or the async starter-colors.json load racing summary open). Default to
+    // white so the candy-icon tint never crashes the whole summary screen.
+    const rootSpeciesId = this.pokemon.species.getRootSpeciesId();
+    if (!starterColors[rootSpeciesId]) {
+      starterColors[rootSpeciesId] = ["ffffff", "ffffff"];
+    }
+    const colorScheme = starterColors[rootSpeciesId];
     this.candyIcon.setTint(argbFromRgba(rgbHexToRgba(colorScheme[0])));
     this.candyOverlay.setTint(argbFromRgba(rgbHexToRgba(colorScheme[1])));
 
@@ -780,26 +813,31 @@ export class SummaryUiHandler extends UiHandler {
         const forward = this.cursor < cursor;
         this.cursor = cursor;
 
-        // Tab visual mapping. ER added an ABILITIES page between PROFILE and
-        // STATS — there's no summary_tabs_4 asset yet, so ABILITIES reuses
-        // the STATUS visual as a placeholder. The other tabs keep their
-        // legacy sprites (1=STATUS, 2=STATS, 3=MOVES).
-        let tabSpriteIndex: number;
-        switch (this.cursor as Page) {
-          case Page.PROFILE:
-            tabSpriteIndex = 1;
-            break;
-          case Page.ABILITIES:
-            tabSpriteIndex = 1; // placeholder; needs custom asset later
-            break;
-          case Page.STATS:
-            tabSpriteIndex = 2;
-            break;
-          case Page.MOVES:
-            tabSpriteIndex = 3;
-            break;
+        // Tab visual mapping. The 3 vanilla pages use baked tab sprites
+        // (1=STATUS, 2=STATS, 3=MOVES). ER's ABILITIES page has no baked
+        // asset, so we hide the tab sprite and show a text label instead.
+        if ((this.cursor as Page) === Page.ABILITIES) {
+          this.tabSprite.setVisible(false);
+          this.abilitiesTabText.setVisible(true);
+        } else {
+          this.abilitiesTabText.setVisible(false);
+          this.tabSprite.setVisible(true);
+          let tabSpriteIndex: number;
+          switch (this.cursor as Page) {
+            case Page.PROFILE:
+              tabSpriteIndex = 1;
+              break;
+            case Page.STATS:
+              tabSpriteIndex = 2;
+              break;
+            case Page.MOVES:
+              tabSpriteIndex = 3;
+              break;
+            default:
+              tabSpriteIndex = 1;
+          }
+          this.tabSprite.setTexture(getLocalizedSpriteKey(`summary_tabs_${tabSpriteIndex}`));
         }
-        this.tabSprite.setTexture(getLocalizedSpriteKey(`summary_tabs_${tabSpriteIndex}`));
 
         this.getUi().hideTooltip();
 
@@ -1086,65 +1124,7 @@ export class SummaryUiHandler extends UiHandler {
         break;
       }
       case Page.ABILITIES: {
-        // Elite Redux: dedicated ability page that stacks main Ability + up
-        // to 3 Innates simultaneously, matching the ER ROM ability page
-        // layout. See the user's Scrafster reference screenshot.
-        const abilitiesContainer = globalScene.add.container(0, -pageBg.height);
-        pageContainer.add(abilitiesContainer);
-
-        const stackedAbilityInfo: AbilityContainer[] = [];
-
-        // Main ability slot (always present).
-        const mainAbility = this.pokemon?.getAbility(true);
-        if (mainAbility) {
-          stackedAbilityInfo.push({
-            labelImage: globalScene.add.image(0, 0, getLocalizedSpriteKey("summary_profile_ability")),
-            ability: mainAbility,
-            nameText: null,
-            descriptionText: null,
-          });
-        }
-
-        // Up to 3 ER innate slots.
-        if (this.pokemon?.hasPassive()) {
-          const passiveAbilities = this.pokemon.getPassiveAbilities();
-          for (const passive of passiveAbilities) {
-            if (!passive) {
-              continue;
-            }
-            stackedAbilityInfo.push({
-              labelImage: globalScene.add.image(0, 0, getLocalizedSpriteKey("summary_profile_passive")),
-              ability: passive,
-              nameText: null,
-              descriptionText: null,
-            });
-          }
-        }
-
-        // Render each row. Rows stack vertically — label image on the left,
-        // ability name in bold below, short description below that.
-        const ABILITY_ROW_BASE_Y = 12;
-        const ABILITY_ROW_STEP = 30;
-        stackedAbilityInfo.forEach((info, slotIndex) => {
-          const rowY = ABILITY_ROW_BASE_Y + slotIndex * ABILITY_ROW_STEP;
-
-          info.labelImage.setPosition(7, rowY);
-          info.labelImage.setOrigin(0, 0);
-          info.labelImage.setVisible(true);
-          abilitiesContainer.add(info.labelImage);
-
-          info.nameText = addTextObject(7, rowY + 12, info.ability?.name ?? "", TextStyle.SUMMARY_ALT);
-          info.nameText.setOrigin(0, 0);
-          abilitiesContainer.add(info.nameText);
-
-          const erShortDesc = info.ability ? getErAbilityDescription(info.ability.id) : null;
-          const descText = erShortDesc ?? info.ability?.description ?? "";
-          info.descriptionText = addTextObject(7, rowY + 21, descText, TextStyle.WINDOW_ALT, {
-            wordWrap: { width: 1380 },
-          });
-          info.descriptionText.setOrigin(0, 0);
-          abilitiesContainer.add(info.descriptionText);
-        });
+        this.populateAbilitiesPage(pageContainer, pageBg);
         break;
       }
       case Page.STATS: {
@@ -1506,6 +1486,137 @@ export class SummaryUiHandler extends UiHandler {
       duration: instant ? 0 : 250,
       ease: "Sine.easeIn",
     });
+  }
+
+  /**
+   * Elite Redux ABILITIES page. Renders the main Ability plus all 3 innate
+   * slots, stacked vertically. Every innate is ALWAYS shown — even when
+   * locked — with a lock/disabled icon and a one-line reason, so the player
+   * can read descriptions and plan before unlocking. Mirrors the ER ROM
+   * ability page (Ability + Innate rows with abbreviated descriptions).
+   *
+   * Lock states (player pokemon, from candy-unlock `passiveAttr`):
+   *   - not candy-unlocked  → lock icon  + "Locked — unlock with candy"
+   *   - unlocked but toggled off → stop icon + "Disabled"
+   *   - unlocked + enabled  → no icon (active)
+   * Enemy pokemon additionally gate innate slots by level (slot 2 @ Lv15,
+   * slot 3 @ Lv24) — shown as a level lock when inspecting an enemy.
+   */
+  private populateAbilitiesPage(
+    pageContainer: Phaser.GameObjects.Container,
+    pageBg: Phaser.GameObjects.Sprite,
+  ): void {
+    const container = globalScene.add.container(0, -pageBg.height);
+    pageContainer.add(container);
+
+    const mon = this.pokemon;
+    if (!mon) {
+      return;
+    }
+
+    // Resolve the candy-unlock bitmask for this mon's starter (root species).
+    const rootSpeciesId = mon.species.getRootSpeciesId();
+    const passiveAttr = globalScene.gameData.starterData[rootSpeciesId]?.passiveAttr ?? 0;
+
+    // Enemy innate level gate (slot 2 @ Lv15, slot 3 @ Lv24) — only enemies
+    // are level-gated in this port; players get all slots.
+    const isEnemy = mon.isEnemy?.() === true;
+    const enemyLevelForSlot = [0, 15, 24];
+
+    interface Row {
+      label: string;
+      ability: Ability;
+      /** undefined for the main ability (always active). */
+      slot?: PassiveSlot;
+    }
+    const rows: Row[] = [];
+
+    const mainAbility = mon.getAbility(true);
+    if (mainAbility) {
+      rows.push({ label: i18next.t("pokemonSummary:abilityLabel"), ability: mainAbility });
+    }
+
+    // All 3 innate slots from the species (ids regardless of unlock state).
+    const innateIds = mon.species.getPassiveAbilities(mon.formIndex);
+    for (let slot = 0; slot < 3; slot++) {
+      const abilityId = innateIds[slot];
+      if (abilityId === undefined || abilityId === AbilityId.NONE) {
+        continue;
+      }
+      rows.push({
+        label: i18next.t("pokemonSummary:innateLabel"),
+        ability: allAbilities[abilityId],
+        slot: slot as PassiveSlot,
+      });
+    }
+
+    // Rows are stacked top-to-bottom; each advances by its own rendered
+    // height (computed after the description wraps) so they never overlap.
+    let y = 6;
+    for (const row of rows) {
+      // Determine lock state.
+      let locked = false;
+      let lockIconKey: string | null = null;
+      let reason = "";
+      if (row.slot !== undefined) {
+        const unlocked = isSlotUnlocked(passiveAttr, row.slot);
+        const enabled = isSlotEnabled(passiveAttr, row.slot);
+        const levelReq = isEnemy ? enemyLevelForSlot[row.slot] : 0;
+        const levelLocked = isEnemy && mon.level < levelReq;
+        if (levelLocked) {
+          locked = true;
+          lockIconKey = "icon_lock";
+          reason = i18next.t("pokemonSummary:innateLockedLevel", { level: levelReq });
+        } else if (!unlocked && !isEnemy) {
+          locked = true;
+          lockIconKey = "icon_lock";
+          reason = i18next.t("pokemonSummary:innateLockedCandy");
+        } else if (!enabled && !isEnemy) {
+          locked = true;
+          lockIconKey = "icon_stop";
+          reason = i18next.t("pokemonSummary:innateDisabled");
+        }
+      }
+
+      // Header line: label (accent) + ability name + (if locked) lock icon
+      // and reason — kept on one line so the description below stays clean.
+      const labelText = addTextObject(6, y, row.label, TextStyle.SUMMARY_GOLD, { fontSize: "70px" });
+      labelText.setOrigin(0, 0);
+      container.add(labelText);
+
+      const nameText = addTextObject(80, y, row.ability?.name ?? "", TextStyle.SUMMARY, { fontSize: "70px" });
+      nameText.setOrigin(0, 0);
+      nameText.setColor(getTextColor(locked ? TextStyle.SUMMARY_GRAY : TextStyle.SUMMARY));
+      container.add(nameText);
+
+      let headerRightX = nameText.x + nameText.displayWidth + 4;
+      if (lockIconKey) {
+        const icon = globalScene.add.sprite(headerRightX, y + 5, lockIconKey);
+        icon.setOrigin(0, 0).setScale(0.45);
+        container.add(icon);
+        headerRightX += icon.displayWidth + 4;
+      }
+      if (reason) {
+        const reasonText = addTextObject(headerRightX, y + 2, reason, TextStyle.SUMMARY_RED, { fontSize: "48px" });
+        reasonText.setOrigin(0, 0);
+        container.add(reasonText);
+      }
+
+      // Description line (abbreviated ER text).
+      const erShortDesc = getErAbilityDescription(row.ability.id) ?? row.ability?.description ?? "";
+      const descText = addTextObject(8, y + 12, erShortDesc, TextStyle.WINDOW_ALT, {
+        fontSize: "52px",
+        wordWrap: { width: 1340 },
+      });
+      descText.setOrigin(0, 0);
+      descText.setColor(getTextColor(locked ? TextStyle.SUMMARY_GRAY : TextStyle.WINDOW_ALT));
+      container.add(descText);
+
+      // Advance past this row's actual rendered height, so multi-line
+      // descriptions never overlap the next row. Bounded minimum keeps
+      // single-line rows from bunching.
+      y += Math.max(32, 14 + descText.displayHeight + 6);
+    }
   }
 
   /**

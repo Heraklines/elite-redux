@@ -264,6 +264,14 @@ export class BattleScene extends SceneBase {
   public gameData: GameData;
   /** The numeric slot number of the current save slot being played. */
   public sessionSlotId: number;
+  /**
+   * Whether `starter-colors.json` has been fetched + merged. Tracked
+   * separately from `Object.keys(starterColors).length` because Elite Redux
+   * pre-seeds `starterColors` with ER-custom defaults during game init — an
+   * emptiness check would then wrongly skip the vanilla color load, leaving
+   * every vanilla species without a color (crashing the summary candy icon).
+   */
+  private starterColorsLoaded = false;
 
   /** Manager for the phases active in the battle scene */
   public readonly phaseManager: PhaseManager;
@@ -376,6 +384,11 @@ export class BattleScene extends SceneBase {
     this.phaseManager = new PhaseManager();
     this.updateGameInfo();
     initGlobalScene(this);
+    // Dev-only test harness (window.dev). Dynamic import keeps it out of
+    // production bundles.
+    if (import.meta.env.DEV) {
+      import("#app/dev-tools").then(m => m.installDevTools(this)).catch(() => {});
+    }
   }
 
   loadPokemonAtlas(key: string, atlasPath: string, experimental?: boolean) {
@@ -732,13 +745,19 @@ export class BattleScene extends SceneBase {
   }
 
   async initStarterColors(): Promise<void> {
-    if (Object.keys(starterColors).length > 0) {
-      // already initialized
+    if (this.starterColorsLoaded) {
+      // already loaded the json this session
       return;
     }
+    this.starterColorsLoaded = true;
     const sc = await cachedFetch("./starter-colors.json").then(res => res.json());
     for (const key of Object.keys(sc)) {
-      starterColors[key] = sc[key];
+      // Don't clobber Elite Redux's pre-seeded custom-species colors (ids
+      // >= 10000). The json only contains vanilla species, so this only
+      // ever fills the gaps the emptiness-guard regression used to leave.
+      if (starterColors[key] === undefined) {
+        starterColors[key] = sc[key];
+      }
     }
   }
 
