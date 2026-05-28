@@ -345,7 +345,9 @@ export abstract class PokemonSpeciesForm {
     ) {
       return pokemonSpeciesFormLevelMoves[this.speciesId][this.formIndex].slice(0);
     }
-    return pokemonSpeciesLevelMoves[this.speciesId].slice(0);
+    // ER customs may be missing from pokemonSpeciesLevelMoves if all their
+    // ER moves were dropped during init — guard against undefined.
+    return (pokemonSpeciesLevelMoves[this.speciesId] ?? []).slice(0);
   }
 
   getRegion(): Region {
@@ -708,7 +710,7 @@ export abstract class PokemonSpeciesForm {
         if (!pokemonFormLevelMoves[this.speciesId][this.formIndex].find(lm => lm[0] <= 5 && lm[1] === moveId)) {
           return false;
         }
-      } else if (!pokemonSpeciesLevelMoves[this.speciesId].find(lm => lm[0] <= 5 && lm[1] === moveId)) {
+      } else if (!(pokemonSpeciesLevelMoves[this.speciesId] ?? []).find(lm => lm[0] <= 5 && lm[1] === moveId)) {
         return false;
       }
     }

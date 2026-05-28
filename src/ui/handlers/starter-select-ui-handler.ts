@@ -4558,6 +4558,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         } else {
           levelMoves = pokemonSpeciesLevelMoves[species.speciesId];
         }
+        // ER custom species can be missing from pokemonSpeciesLevelMoves
+        // if all their ER moves were dropped during init (no allMoves
+        // entry). Without this guard, .filter() crashes the scene to
+        // black on navigation. Empty levelMoves means the starter just
+        // has no early-level moves auto-selected; user can still pick
+        // them manually.
+        if (!levelMoves) {
+          levelMoves = [];
+        }
         this.speciesStarterMoves.push(...levelMoves.filter(lm => lm[0] > 0 && lm[0] <= 5).map(lm => lm[1]));
         if (Object.hasOwn(speciesEggMoves, species.speciesId)) {
           for (let em = 0; em < 4; em++) {

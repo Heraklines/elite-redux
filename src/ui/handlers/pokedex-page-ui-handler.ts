@@ -866,11 +866,11 @@ export class PokedexPageUiHandler extends MessageUiHandler {
 
       // If this form has a specific set of moves, we get them.
       this.levelMoves =
-        formIndex > 0
+        (formIndex > 0
         && Object.hasOwn(pokemonFormLevelMoves, species.speciesId)
         && Object.hasOwn(pokemonFormLevelMoves[species.speciesId], formIndex)
           ? pokemonFormLevelMoves[species.speciesId][formIndex]
-          : pokemonSpeciesLevelMoves[species.speciesId];
+          : pokemonSpeciesLevelMoves[species.speciesId]) ?? [];
       this.ability1 = form.ability1;
       this.ability2 = form.ability2 === form.ability1 ? undefined : form.ability2;
       this.abilityHidden = form.abilityHidden === form.ability1 ? undefined : form.abilityHidden;
@@ -879,7 +879,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
       this.baseStats = form.baseStats.slice();
       this.baseTotal = form.baseTotal;
     } else {
-      this.levelMoves = pokemonSpeciesLevelMoves[species.speciesId];
+      this.levelMoves = pokemonSpeciesLevelMoves[species.speciesId] ?? [];
       this.ability1 = species.ability1;
       this.ability2 = species.ability2 === species.ability1 ? undefined : species.ability2;
       this.abilityHidden = species.abilityHidden === species.ability1 ? undefined : species.abilityHidden;
