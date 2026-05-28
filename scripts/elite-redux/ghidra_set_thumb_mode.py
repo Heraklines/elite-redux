@@ -7,7 +7,7 @@
 # functions are entered via BX with bit 0 = 0; Ghidra's auto-analyzer
 # detects those switches correctly once Thumb is the default.
 #
-# Run via: -preScript ghidra-set-thumb-mode.py
+# Run via: -preScript ghidra_set_thumb_mode.py
 #
 # Reference: https://github.com/pret/pokeemerald/wiki/Disassembling
 # @category ER

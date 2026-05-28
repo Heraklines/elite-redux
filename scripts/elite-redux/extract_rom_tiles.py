@@ -13,8 +13,8 @@
 #
 # Output: vendor/elite-redux/rom-extracted/tiles/region-<hex>.png
 #
-# Usage: python scripts/elite-redux/extract-rom-tiles.py
-#        python scripts/elite-redux/extract-rom-tiles.py --offset 0x400000 --count 1024
+# Usage: python scripts/elite-redux/extract_rom_tiles.py
+#        python scripts/elite-redux/extract_rom_tiles.py --offset 0x400000 --count 1024
 # =============================================================================
 
 from __future__ import annotations

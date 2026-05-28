@@ -1,17 +1,15 @@
 import { MAX_TERAS_PER_ARENA } from "#app/constants";
 import { globalScene } from "#app/global-scene";
-import { allAbilities } from "#data/data-lists";
-import { getErAbilityDescription } from "#data/elite-redux/er-ability-descriptions";
 import { getTypeRgb } from "#data/type";
-import { AbilityId } from "#enums/ability-id";
 import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { PokemonType } from "#enums/pokemon-type";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import type { CommandPhase } from "#phases/command-phase";
+import { BattleInfoOverlay } from "#ui/battle-info-overlay";
 import { PartyUiHandler, PartyUiMode } from "#ui/party-ui-handler";
-import { addTextObject, getTextColor } from "#ui/text";
+import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { canTerastallize } from "#utils/pokemon-utils";
 import i18next from "i18next";
@@ -22,8 +20,8 @@ export class CommandUiHandler extends UiHandler {
 
   private teraButton: Phaser.GameObjects.Sprite;
 
-  /** ER: enemy ability/innate inspect overlay (toggled with the Stats key). */
-  private enemyInspectContainer: Phaser.GameObjects.Container | null = null;
+  /** ER: multi-panel in-battle info overlay (toggled with the Stats key). */
+  private battleInfo = new BattleInfoOverlay();
 
   protected fieldIndex = 0;
   protected cursor2 = 0;
@@ -120,15 +118,15 @@ export class CommandUiHandler extends UiHandler {
 
     const cursor = this.getCursor();
 
-    // ER: enemy ability/innate inspect overlay. While open, any button
-    // dismisses it (and is consumed so it doesn't also act on the menu).
-    if (this.enemyInspectContainer) {
-      this.closeEnemyInspect();
+    // ER: in-battle info overlay. While open it owns input (Left/Right page
+    // panels, Up/Down page the inspected Pokémon, any other button closes).
+    if (this.battleInfo.isOpen) {
+      this.battleInfo.handleInput(button);
       return true;
     }
-    // Stats button toggles the inspect overlay open.
+    // Stats button opens the info overlay.
     if (button === Button.STATS) {
-      this.openEnemyInspect();
+      this.battleInfo.open();
       return true;
     }
 
@@ -259,92 +257,9 @@ export class CommandUiHandler extends UiHandler {
     return changed;
   }
 
-  /**
-   * ER: open a self-contained overlay showing the active enemy's ability and
-   * innates (name + abbreviated description). Toggled by the Stats button;
-   * any subsequent input closes it. Implemented as a plain container (no UI
-   * mode switch) so it never disturbs the battle command flow.
-   */
-  private openEnemyInspect(): void {
-    if (this.enemyInspectContainer) {
-      return;
-    }
-    const enemy = globalScene.getEnemyField?.()[0];
-    if (!enemy) {
-      return;
-    }
-
-    // The `ui` container's coordinate space has its origin at the bottom-left
-    // with content drawn at NEGATIVE y (top of screen ≈ -scaledCanvas.height).
-    // Anchor the panel near the top and draw children downward in positive y.
-    const W = 230;
-    const H = globalScene.scaledCanvas.height;
-    const c = globalScene.add.container(45, -H + 6).setDepth(1000);
-
-    const scrim = globalScene.add.rectangle(0, 0, W, H - 12, 0x1a1a2e, 0.96).setOrigin(0, 0);
-    c.add(scrim);
-
-    const title = addTextObject(6, 3, `${enemy.getNameToRender()}`, TextStyle.SUMMARY_GOLD, { fontSize: "64px" });
-    title.setOrigin(0, 0);
-    c.add(title);
-
-    // Build the row list: main ability + present innates.
-    const entries: { label: string; abilityId: number }[] = [];
-    const mainAbility = enemy.getAbility(true);
-    if (mainAbility) {
-      entries.push({ label: i18next.t("pokemonSummary:abilityLabel"), abilityId: mainAbility.id });
-    }
-    const innateIds = enemy.species.getPassiveAbilities(enemy.formIndex);
-    for (let slot = 0; slot < 3; slot++) {
-      const id = innateIds[slot];
-      if (id !== undefined && id !== AbilityId.NONE) {
-        entries.push({ label: i18next.t("pokemonSummary:innateLabel"), abilityId: id });
-      }
-    }
-
-    let y = 16;
-    for (const e of entries) {
-      const bar = globalScene.add.rectangle(2, y, W - 4, 12, 0x4a4a63, 1).setOrigin(0, 0);
-      c.add(bar);
-      const label = addTextObject(5, y + 1, e.label, TextStyle.SUMMARY_GOLD, { fontSize: "56px" });
-      label.setOrigin(0, 0);
-      c.add(label);
-      const name = addTextObject(58, y + 1, allAbilities[e.abilityId]?.name ?? "", TextStyle.SUMMARY, {
-        fontSize: "56px",
-      });
-      name.setOrigin(0, 0);
-      c.add(name);
-      const desc = getErAbilityDescription(e.abilityId) ?? allAbilities[e.abilityId]?.description ?? "";
-      const descText = addTextObject(5, y + 12, desc, TextStyle.WINDOW_ALT, {
-        fontSize: "44px",
-        wordWrap: { width: 1280 },
-      });
-      descText.setOrigin(0, 0);
-      descText.setColor(getTextColor(TextStyle.WINDOW_ALT));
-      c.add(descText);
-      y += 14 + Math.max(11, descText.displayHeight) + 2;
-    }
-
-    const hint = addTextObject(W - 4, H - 16, i18next.t("pokemonSummary:abilityDetailBack"), TextStyle.SUMMARY, {
-      fontSize: "42px",
-    });
-    hint.setOrigin(1, 1);
-    c.add(hint);
-
-    this.getUi().add(c);
-    this.enemyInspectContainer = c;
-  }
-
-  private closeEnemyInspect(): void {
-    if (this.enemyInspectContainer) {
-      this.enemyInspectContainer.destroy();
-      this.enemyInspectContainer = null;
-    }
-  }
-
   clear(): void {
     super.clear();
-    this.closeEnemyInspect();
+    this.battleInfo.close();
     this.getUi().getMessageHandler().commandWindow.setVisible(false);
     this.commandsContainer.setVisible(false);
     this.getUi().getMessageHandler().clearText();

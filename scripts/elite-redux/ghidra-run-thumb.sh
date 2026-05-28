@@ -21,8 +21,8 @@ echo "[ghidra-run-thumb] Starting headless analysis with Thumb pre-script..."
   -loader-baseAddr 0x08000000 \
   -processor "ARM:LE:32:v4t" \
   -scriptPath scripts/elite-redux/ \
-  -preScript ghidra-set-thumb-mode.py \
-  -postScript ghidra-dump-strings.py \
+  -preScript ghidra_set_thumb_mode.py \
+  -postScript ghidra_dump_strings.py \
   2>&1 | tail -200
 
 echo "[ghidra-run-thumb] Done. Output files:"

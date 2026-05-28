@@ -22,7 +22,7 @@ echo "[postprocess] Ghidra import complete, running post-script..."
 # Process the existing project's binary to dump strings + functions.
 "$GHIDRA" "$PROJECT_DIR" "$PROJECT_NAME" \
   -process er-v2.65.3b.gba \
-  -postScript scripts/elite-redux/ghidra-dump-strings.py \
+  -postScript scripts/elite-redux/ghidra_dump_strings.py \
   -scriptPath scripts/elite-redux/ \
   -noanalysis \
   2>&1 | tail -30

@@ -15,7 +15,7 @@
 #   - abilities-2.65.3b.json  (vs the v2.65beta JSON dump for diffing)
 #
 # Usage:
-#   python scripts/elite-redux/decomp-rom.py
+#   python scripts/elite-redux/decomp_rom.py
 # =============================================================================
 
 from __future__ import annotations

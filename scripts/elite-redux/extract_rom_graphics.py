@@ -10,7 +10,7 @@
 # greyscale).
 #
 # Usage:
-#   python scripts/elite-redux/extract-rom-graphics.py
+#   python scripts/elite-redux/extract_rom_graphics.py
 # =============================================================================
 
 from __future__ import annotations

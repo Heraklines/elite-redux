@@ -11,7 +11,7 @@
 # Output: vendor/elite-redux/rom-extracted/palettes/
 #   - pal_0xXXXXXXXX.gpl (Gimp Palette format)
 #
-# Usage: python scripts/elite-redux/extract-rom-palettes.py
+# Usage: python scripts/elite-redux/extract_rom_palettes.py
 # =============================================================================
 
 from __future__ import annotations
