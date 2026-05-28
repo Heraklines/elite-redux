@@ -57,6 +57,11 @@ export class CandyBar extends Phaser.GameObjects.Container {
           .then(() => resolve());
       }
 
+      // ER custom species (id >= 10000) aren't pre-populated in starterColors;
+      // default to white so candy display doesn't crash on undefined.
+      if (!starterColors[starterSpeciesId]) {
+        starterColors[starterSpeciesId] = ["ffffff", "ffffff"];
+      }
       const colorScheme = starterColors[starterSpeciesId];
 
       this.candyIcon.setTint(argbFromRgba(rgbHexToRgba(colorScheme[0])));

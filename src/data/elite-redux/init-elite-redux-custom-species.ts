@@ -16,6 +16,7 @@
 // =============================================================================
 
 import { allSpecies } from "#data/data-lists";
+import { starterColors } from "#app/global-vars/starter-colors";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import type { ErSpeciesDraft } from "#data/elite-redux/er-species";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
@@ -370,6 +371,14 @@ export function initEliteReduxCustomSpecies(): InitEliteReduxCustomSpeciesResult
       const slug = ER_SPRITE_BY_SPECIES_ID.get(draft.id);
       if (slug) {
         ErCustomSpecies.registerSpriteSlug(pokerogueId, slug);
+      }
+      // Seed starterColors with a sensible default so UI code (candy
+      // bar, hatch info, pokedex page) that reads starterColors[id][0/1]
+      // doesn't crash on undefined. starterColors is otherwise populated
+      // by an async fetch of starter-colors.json at scene boot, which
+      // has no entries for ER ids >= 10000.
+      if (!starterColors[pokerogueId]) {
+        starterColors[pokerogueId] = ["ffffff", "ffffff"];
       }
       (allSpecies as PokemonSpecies[]).push(species);
       existingIds.add(pokerogueId);

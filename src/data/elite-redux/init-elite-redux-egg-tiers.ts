@@ -14,23 +14,23 @@
 // any of the ER customs (Phantowl, Anubisn't, the regional-variant slot
 // and so on).
 //
-// This init pass adds every ER-custom base-form species to
+// This init pass adds every ER-custom base/root species to
 // `speciesEggTiers` with a sensible default tier, and to
 // `speciesStarterCosts` with a default cost so the egg-weight calculation
 // has a value to read. Both are runtime extensions of upstream tables.
 //
 // Tier picking heuristic:
-//   - "Mega" or "Primal" form name → LEGENDARY tier
 //   - BST >= 600 → EPIC tier
 //   - BST >= 540 → RARE tier
 //   - Otherwise → COMMON tier
 // =============================================================================
 
-import { speciesStarterCosts } from "#balance/starters";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
-import { ER_SPECIES } from "#data/elite-redux/er-species";
+import { speciesStarterCosts } from "#balance/starters";
+import { findErFormChangeByTarget } from "#data/elite-redux/er-form-change-overlay";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { ER_SPECIES } from "#data/elite-redux/er-species";
 import { EggTier } from "#enums/egg-type";
 import type { SpeciesId } from "#enums/species-id";
 
@@ -45,14 +45,11 @@ export interface InitEliteReduxEggTiersResult {
   alreadyPresent: number;
   /** Number of ER customs skipped because they have a prevolution (only base forms hatch). */
   skippedPrevolutions: number;
+  /** Number of ER custom form-change targets skipped (megas, primals, move-megas). */
+  skippedFormChanges: number;
 }
 
 function pickTier(draft: (typeof ER_SPECIES)[number]): EggTier {
-  // ER drafts have a `name` field — check for Mega/Primal naming patterns.
-  const name = draft.name ?? "";
-  if (/Mega|Primal/i.test(name)) {
-    return EggTier.LEGENDARY;
-  }
   // BST-based tiering. The field is `baseStats: readonly [hp,atk,def,spatk,spdef,spd]`.
   const stats = draft.baseStats;
   if (Array.isArray(stats) && stats.length === 6) {
@@ -86,10 +83,26 @@ function pickStarterCost(tier: EggTier): number {
   }
 }
 
+function isErFormChangeTarget(draft: (typeof ER_SPECIES)[number], speciesId: number): boolean {
+  return (
+    findErFormChangeByTarget(speciesId) !== undefined
+    || /(?:^|_)MEGA(?:_|$)|(?:^|_)PRIMAL(?:_|$)/.test(draft.speciesConst)
+    || /\b(Mega|Primal)\b/i.test(draft.name ?? "")
+  );
+}
+
+function removeRuntimeStarterRegistration(speciesId: number): void {
+  const tiers = speciesEggTiers as Record<number, EggTier | undefined>;
+  const costs = speciesStarterCosts as Record<number, number | undefined>;
+  delete tiers[speciesId];
+  delete costs[speciesId];
+}
+
 /**
  * Add every ER-custom species to `speciesEggTiers` + `speciesStarterCosts`
  * so they become valid egg-hatch targets. Skips species that have a
- * prevolution (only base-form mons hatch from eggs).
+ * prevolution and species that are form-change targets (only base/root mons
+ * hatch from eggs or appear as starters).
  */
 export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
   const result: InitEliteReduxEggTiersResult = {
@@ -97,6 +110,7 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
     starterCostsAdded: 0,
     alreadyPresent: 0,
     skippedPrevolutions: 0,
+    skippedFormChanges: 0,
   };
 
   const tiers = speciesEggTiers as Record<number, EggTier>;
@@ -107,8 +121,14 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
     if (pkrgId === undefined || pkrgId < VANILLA_ID_CUTOFF) {
       continue;
     }
+    if (isErFormChangeTarget(draft, pkrgId)) {
+      removeRuntimeStarterRegistration(pkrgId);
+      result.skippedFormChanges++;
+      continue;
+    }
     // Skip if already prevolution-gated (non-base forms can't hatch).
     if (Object.hasOwn(pokemonPrevolutions, pkrgId as SpeciesId)) {
+      removeRuntimeStarterRegistration(pkrgId);
       result.skippedPrevolutions++;
       continue;
     }

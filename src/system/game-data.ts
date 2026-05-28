@@ -73,6 +73,7 @@ import type {
   SeenDialogues,
   SessionSaveData,
   StarterData,
+  StarterDataEntry,
   SystemSaveData,
   TutorialFlags,
   Unlocks,
@@ -197,6 +198,7 @@ export class GameData {
     this.llmDirectorState = defaultDirectorState();
     this.initDexData();
     this.initStarterData();
+    this.applyLocalAllStartersDebug();
   }
 
   public getSystemSaveData(): SystemSaveData {
@@ -1542,16 +1544,7 @@ export class GameData {
     const starterSpeciesIds = Object.keys(speciesStarterCosts).map(k => Number.parseInt(k) as SpeciesId);
 
     for (const speciesId of starterSpeciesIds) {
-      starterData[speciesId] = {
-        moveset: null,
-        eggMoves: 0,
-        candyCount: 0,
-        friendship: 0,
-        abilityAttr: defaultStarterSpecies.includes(speciesId) ? AbilityAttr.ABILITY_1 : 0,
-        passiveAttr: 0,
-        valueReduction: 0,
-        classicWinCount: 0,
-      };
+      starterData[speciesId] = this.createStarterDataEntry(speciesId);
     }
 
     // Elite Redux: seed default starterData entries for ER-custom species
@@ -1561,20 +1554,51 @@ export class GameData {
     // module dependency (init.ts imports game-data.ts).
     for (const species of allSpecies) {
       if (species.speciesId >= 10000 && starterData[species.speciesId] === undefined) {
-        starterData[species.speciesId] = {
-          moveset: null,
-          eggMoves: 0,
-          candyCount: 0,
-          friendship: 0,
-          abilityAttr: 0,
-          passiveAttr: 0,
-          valueReduction: 0,
-          classicWinCount: 0,
-        };
+        starterData[species.speciesId] = this.createStarterDataEntry(species.speciesId);
       }
     }
 
     this.starterData = starterData;
+  }
+
+  private createStarterDataEntry(speciesId: number): StarterDataEntry {
+    return {
+      moveset: null,
+      eggMoves: 0,
+      candyCount: 0,
+      friendship: 0,
+      abilityAttr: defaultStarterSpecies.includes(speciesId as SpeciesId) ? AbilityAttr.ABILITY_1 : 0,
+      passiveAttr: 0,
+      valueReduction: 0,
+      classicWinCount: 0,
+    };
+  }
+
+  public getStarterDataEntry(speciesId: number): StarterDataEntry {
+    return (this.starterData[speciesId] ??= this.createStarterDataEntry(speciesId));
+  }
+
+  private applyLocalAllStartersDebug(): void {
+    if (!isDev || !globalThis.location || !new URLSearchParams(globalThis.location.search).has("codexAllStarters")) {
+      return;
+    }
+
+    const caughtAttr =
+      DexAttr.NON_SHINY | DexAttr.MALE | DexAttr.FEMALE | DexAttr.DEFAULT_VARIANT | DexAttr.DEFAULT_FORM;
+    for (const species of allSpecies) {
+      const dexEntry = this.dexData[species.speciesId];
+      if (dexEntry) {
+        dexEntry.seenAttr = caughtAttr;
+        dexEntry.caughtAttr = caughtAttr;
+        dexEntry.natureAttr ||= 1 << (Nature.HARDY + 1);
+        dexEntry.ivs = dexEntry.ivs.map(() => 31);
+      }
+
+      const starterEntry = this.getStarterDataEntry(species.speciesId);
+      starterEntry.abilityAttr = AbilityAttr.ABILITY_1 | AbilityAttr.ABILITY_2 | AbilityAttr.ABILITY_HIDDEN;
+    }
+
+    globalScene.enableTutorials = false;
   }
 
   setPokemonSeen(pokemon: Pokemon, incrementCount = true, trainer = false): void {
@@ -1691,7 +1715,7 @@ export class GameData {
 
     // Unlock ability
     if (Object.hasOwn(speciesStarterCosts, species.speciesId)) {
-      this.starterData[species.speciesId].abilityAttr |=
+      this.getStarterDataEntry(species.speciesId).abilityAttr |=
         pokemon.abilityIndex !== 1 || pokemon.species.ability2 ? 1 << pokemon.abilityIndex : AbilityAttr.ABILITY_HIDDEN;
     }
 
@@ -1784,12 +1808,13 @@ export class GameData {
    */
   incrementRibbonCount(species: PokemonSpecies, forStarter = false): number {
     const speciesIdToIncrement: SpeciesId = species.getRootSpeciesId(forStarter);
+    const starterEntry = this.getStarterDataEntry(speciesIdToIncrement);
 
-    if (!this.starterData[speciesIdToIncrement].classicWinCount) {
-      this.starterData[speciesIdToIncrement].classicWinCount = 0;
+    if (!starterEntry.classicWinCount) {
+      starterEntry.classicWinCount = 0;
     }
 
-    if (!this.starterData[speciesIdToIncrement].classicWinCount) {
+    if (!starterEntry.classicWinCount) {
       globalScene.gameData.gameStats.ribbonsOwned++;
     }
 
@@ -1811,7 +1836,7 @@ export class GameData {
       globalScene.validateAchv(achvs._10_RIBBONS);
     }
 
-    return ++this.starterData[speciesIdToIncrement].classicWinCount;
+    return ++starterEntry.classicWinCount;
   }
 
   /**
@@ -1821,14 +1846,15 @@ export class GameData {
    * @returns Whether the candy count was incremented
    */
   public addStarterCandy(speciesId: SpeciesId, count: number): boolean {
-    const { candyCount } = this.starterData[speciesId];
+    const starterEntry = this.getStarterDataEntry(speciesId);
+    const { candyCount } = starterEntry;
 
     if (candyCount >= MAX_STARTER_CANDY_COUNT) {
       return false;
     }
 
     globalScene.candyBar.showStarterSpeciesCandy(speciesId, count);
-    this.starterData[speciesId].candyCount = Math.min(candyCount + count, MAX_STARTER_CANDY_COUNT);
+    starterEntry.candyCount = Math.min(candyCount + count, MAX_STARTER_CANDY_COUNT);
 
     return true;
   }
@@ -1848,17 +1874,18 @@ export class GameData {
       return false;
     }
 
-    if (!this.starterData[speciesId].eggMoves) {
-      this.starterData[speciesId].eggMoves = 0;
+    const starterEntry = this.getStarterDataEntry(speciesId);
+    if (!starterEntry.eggMoves) {
+      starterEntry.eggMoves = 0;
     }
 
     const value = 1 << eggMoveIndex;
 
-    if (this.starterData[speciesId].eggMoves & value) {
+    if (starterEntry.eggMoves & value) {
       return false;
     }
 
-    this.starterData[speciesId].eggMoves |= value;
+    starterEntry.eggMoves |= value;
     if (!showMessage) {
       return true;
     }
@@ -1993,7 +2020,7 @@ export class GameData {
   }
 
   getStarterSpeciesDefaultAbilityIndex(species: PokemonSpecies, abilityAttr?: number): number {
-    abilityAttr ??= this.starterData[species.speciesId].abilityAttr;
+    abilityAttr ??= this.getStarterDataEntry(species.speciesId).abilityAttr;
     return abilityAttr & AbilityAttr.ABILITY_1 ? 0 : !species.ability2 || abilityAttr & AbilityAttr.ABILITY_2 ? 1 : 2;
   }
 

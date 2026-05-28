@@ -2746,6 +2746,11 @@ export class PokedexPageUiHandler extends MessageUiHandler {
 
       // Caught and hatched
       if (isFormCaught) {
+        // ER custom species (id >= 10000) aren't pre-populated in starterColors;
+        // default to white so this page doesn't crash on undefined.
+        if (!starterColors[this.starterId]) {
+          starterColors[this.starterId] = ["ffffff", "ffffff"];
+        }
         const colorScheme = starterColors[this.starterId];
 
         this.pokemonUncaughtText.setVisible(false);

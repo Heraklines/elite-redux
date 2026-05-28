@@ -159,6 +159,11 @@ export class PokemonHatchInfoContainer extends PokemonInfoContainer {
     this.displayPokemon(pokemon);
 
     super.show(pokemon, false, 1, hatchInfo.getDex(), hatchInfo.getStarterEntry(), true);
+    // ER custom species (id >= 10000) aren't pre-populated in starterColors;
+    // default to white so the candy icon tint doesn't crash on undefined.
+    if (!starterColors[species.speciesId]) {
+      starterColors[species.speciesId] = ["ffffff", "ffffff"];
+    }
     const colorScheme = starterColors[species.speciesId];
 
     this.pokemonCandyIcon.setTint(argbFromRgba(rgbHexToRgba(colorScheme[0])));

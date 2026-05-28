@@ -5,6 +5,7 @@ import { initPokemonPrevolutions, initPokemonStarters } from "#balance/pokemon-e
 import { initSpecies } from "#balance/pokemon-species";
 import { initChallenges } from "#data/challenge";
 import { initTrainerTypeDialogue } from "#data/dialogue";
+import { initEliteReduxCSourceCorrections } from "#data/elite-redux/init-elite-redux-c-source-corrections";
 import { initEliteReduxCustomAbilities } from "#data/elite-redux/init-elite-redux-custom-abilities";
 import { initEliteReduxCustomMoves } from "#data/elite-redux/init-elite-redux-custom-moves";
 import { initEliteReduxCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
@@ -15,7 +16,6 @@ import { initEliteReduxMovesets } from "#data/elite-redux/init-elite-redux-moves
 import { initEliteReduxSpecies } from "#data/elite-redux/init-elite-redux-species";
 import { initEliteReduxTrainers } from "#data/elite-redux/init-elite-redux-trainers";
 import { initEliteReduxVanillaRebalance } from "#data/elite-redux/init-elite-redux-vanilla-rebalance";
-import { initEliteReduxCSourceCorrections } from "#data/elite-redux/init-elite-redux-c-source-corrections";
 import { initPokemonForms } from "#data/pokemon-forms";
 import { initBiomeBgmLoopPoints } from "#init/init-biome-bgm-loop-points";
 import { initBiomeDepths } from "#init/init-biome-depths";
@@ -164,6 +164,6 @@ export function initializeGame() {
   // `pokemonPrevolutions` which evolution-init populates.
   const eggResult = initEliteReduxEggTiers();
   console.info(
-    `[er-egg-tiers] added ${eggResult.eggTiersAdded} ER customs to egg pool (+${eggResult.starterCostsAdded} starter-costs; skipped ${eggResult.skippedPrevolutions} non-base-form + ${eggResult.alreadyPresent} already present)`,
+    `[er-egg-tiers] added ${eggResult.eggTiersAdded} ER customs to egg pool (+${eggResult.starterCostsAdded} starter-costs; skipped ${eggResult.skippedPrevolutions} evolved + ${eggResult.skippedFormChanges} form-change + ${eggResult.alreadyPresent} already present)`,
   );
 }

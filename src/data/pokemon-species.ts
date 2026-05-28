@@ -762,56 +762,91 @@ export abstract class PokemonSpeciesForm {
     startLoad = false,
     back = false,
   ): Promise<void> {
-    // VANILLA POKEROGUE behavior. After many failed attempts at
-    // "improving" this with direct fetch / AbortController / etc., the
-    // simplest path that matches upstream pokerogue's behavior is to
-    // just queue on the shared Phaser loader and wait for COMPLETE.
     const spriteKey = this.getSpriteKey(female, formIndex, shiny, variant, back);
-    globalScene.loadPokemonAtlas(spriteKey, this.getSpriteAtlasPath(female, formIndex, shiny, variant, back));
+    const atlasPath = this.getSpriteAtlasPath(female, formIndex, shiny, variant, back);
+
+    const buildAnim = (): void => {
+      const originalWarn = console.warn;
+      // Ignore warnings for missing frames, because there will be a lot.
+      console.warn = () => {};
+      const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
+        zeroPad: 4,
+        suffix: ".png",
+        start: 1,
+        end: 400,
+      });
+      console.warn = originalWarn;
+      if (globalScene.anims.exists(spriteKey)) {
+        globalScene.anims.get(spriteKey).frameRate = 10;
+      } else {
+        globalScene.anims.create({
+          key: spriteKey,
+          frames: frameNames,
+          frameRate: 10,
+          repeat: -1,
+        });
+      }
+    };
+
+    const finalize = async (): Promise<void> => {
+      if (!globalScene.textures.exists(spriteKey)) {
+        return;
+      }
+      buildAnim();
+      if (variant != null) {
+        const spritePath = atlasPath.replace("variant/", "").replace(/_[1-3]$/, "");
+        await loadPokemonVariantAssets(spriteKey, spritePath, variant);
+      }
+    };
+
+    if (globalScene.textures.exists(spriteKey)) {
+      await finalize();
+      return;
+    }
+
+    globalScene.loadPokemonAtlas(spriteKey, atlasPath);
     globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
     if (variant != null) {
       await this.loadVariantColors(spriteKey, female, variant, back, formIndex);
     }
+
     return new Promise<void>(resolve => {
-      globalScene.load.once(Phaser.Loader.Events.COMPLETE, () => {
-        const originalWarn = console.warn;
-        // Ignore warnings for missing frames, because there will be a lot
-        console.warn = () => {};
-        const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
-          zeroPad: 4,
-          suffix: ".png",
-          start: 1,
-          end: 400,
-        });
-        console.warn = originalWarn;
-        if (globalScene.anims.exists(spriteKey)) {
-          globalScene.anims.get(spriteKey).frameRate = 10;
-        } else {
-          globalScene.anims.create({
-            key: this.getSpriteKey(female, formIndex, shiny, variant, back),
-            frames: frameNames,
-            frameRate: 10,
-            repeat: -1,
-          });
+      let settled = false;
+      const cleanup = (): void => {
+        globalScene.load.off(`filecomplete-atlasjson-${spriteKey}`, onFileComplete);
+        globalScene.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onLoadError);
+      };
+      const settle = (): void => {
+        if (settled) {
+          return;
         }
-        const spritePath = this.getSpriteAtlasPath(female, formIndex, shiny, variant, back)
-          .replace("variant/", "")
-          .replace(/_[1-3]$/, "");
-        if (variant != null) {
-          loadPokemonVariantAssets(spriteKey, spritePath, variant).then(() => resolve());
-        } else {
-          // BUGFIX vs vanilla pokerogue: the original code only calls
-          // resolve() when variant != null, so calls with no variant
-          // would hang forever. Resolve here so the caller's .then()
-          // always fires.
-          resolve();
+        settled = true;
+        cleanup();
+        finalize()
+          .catch(() => {})
+          .then(() => resolve());
+      };
+      const onFileComplete = (key: string): void => {
+        if (key === spriteKey) {
+          settle();
         }
-      });
+      };
+      const onLoadError = (file: Phaser.Loader.File): void => {
+        if (file.key === spriteKey && file.multiFile?.type === "atlasjson") {
+          settle();
+        }
+      };
+
+      globalScene.load.on(`filecomplete-atlasjson-${spriteKey}`, onFileComplete);
+      globalScene.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onLoadError);
+
       if (startLoad) {
         if (!globalScene.load.isLoading()) {
           globalScene.load.start();
         }
       } else {
+        // The caller owns starting the loader. Keep the per-file listener
+        // installed so the animation is built when the atlas eventually lands.
         resolve();
       }
     });

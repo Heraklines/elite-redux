@@ -295,6 +295,16 @@ interface SpeciesDetails {
   teraType?: PokemonType | undefined;
 }
 
+interface StarterSpriteLoadRequest {
+  species: PokemonSpecies;
+  female: boolean;
+  formIndex: number | undefined;
+  shiny: boolean | undefined;
+  variant: Variant | undefined;
+  spriteKey: string;
+  cancelled: BooleanHolder;
+}
+
 // =============================================================================
 // Elite Redux — 3-slot passive helpers
 //
@@ -459,6 +469,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private canCycleTera: boolean;
 
   private assetLoadCancelled: BooleanHolder | null;
+  private pendingStarterSpriteLoad: StarterSpriteLoadRequest | null = null;
+  private starterSpriteLoadActive = false;
   public cursorObj: Phaser.GameObjects.Image;
   private starterCursorObjs: Phaser.GameObjects.Image[];
   private pokerusCursorObjs: Phaser.GameObjects.Image[];
@@ -1555,15 +1567,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    */
   isPassiveAvailable(speciesId: SpeciesId): boolean {
     // Get this species ID's starter data
-    const starterData = globalScene.gameData.starterData[speciesId];
+    const starterData = globalScene.gameData.getStarterDataEntry(speciesId);
     const starterCost = speciesStarterCosts[speciesId];
-
-    // ER: ER-custom species (id >= 5000 or otherwise unregistered in
-    // starterData) may not have a starter entry yet. Treat as "passive not
-    // available" rather than crashing on undefined access.
-    if (!starterData) {
-      return false;
-    }
 
     // TODO(er-phase-b): widen to "any slot still locked && enough candies for any slot".
     // For Phase A this stays slot-1-only; vanilla species have only one slot.
@@ -1581,13 +1586,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    */
   isValueReductionAvailable(speciesId: SpeciesId): boolean {
     // Get this species ID's starter data
-    const starterData = globalScene.gameData.starterData[speciesId];
+    const starterData = globalScene.gameData.getStarterDataEntry(speciesId);
     const starterCost = speciesStarterCosts[speciesId];
-
-    // ER: guard for ER-custom species missing from starterData.
-    if (!starterData) {
-      return false;
-    }
 
     return (
       starterCost != null
@@ -1602,12 +1602,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * @returns true if the user has enough candies
    */
   isSameSpeciesEggAvailable(speciesId: SpeciesId): boolean {
-    const starterData = globalScene.gameData.starterData[speciesId];
+    const starterData = globalScene.gameData.getStarterDataEntry(speciesId);
     const starterCost = speciesStarterCosts[speciesId];
     const dexData = globalScene.gameData.dexData[speciesId];
 
-    // ER: guard for ER-custom species missing from starterData / dexData.
-    if (!starterData || !dexData) {
+    // ER: guard for ER-custom species missing from dexData.
+    if (!dexData) {
       return false;
     }
     const hatchedCount = dexData.hatchedCount;
@@ -2024,7 +2024,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       // The temporary, duplicated starter data to show info
       const starterData = this.getSpeciesData(this.lastSpecies.speciesId).starterDataEntry;
       // The persistent starter data to apply e.g. candy upgrades
-      const persistentStarterData = globalScene.gameData.starterData[this.lastSpecies.speciesId];
+      const persistentStarterData = globalScene.gameData.getStarterDataEntry(this.lastSpecies.speciesId);
       // The sanitized starter preferences
       if (this.starterPreferences[this.lastSpecies.speciesId] === undefined) {
         this.starterPreferences[this.lastSpecies.speciesId] = {};
@@ -2632,7 +2632,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 ui.setOverlayMode(UiMode.POKEDEX_PAGE, this.lastSpecies, attributes, null, null, () => {
                   if (this.lastSpecies) {
                     starterContainer = this.filteredStarterContainers[this.cursor];
-                    const persistentStarterData = globalScene.gameData.starterData[this.lastSpecies.speciesId];
+                    const persistentStarterData = globalScene.gameData.getStarterDataEntry(this.lastSpecies.speciesId);
                     this.updateCandyUpgradeDisplay(starterContainer);
                     this.updateStarterValueLabel(starterContainer);
                     starterContainer.starterPassiveBgs.setVisible(
@@ -3099,7 +3099,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
     const updatedMoveset = starterMoveset.slice() as StarterMoveset;
     const formIndex = globalScene.gameData.getSpeciesDexAttrProps(this.lastSpecies, this.dexAttrCursor).formIndex;
-    const starterDataEntry = globalScene.gameData.starterData[speciesId];
+    const starterDataEntry = globalScene.gameData.getStarterDataEntry(speciesId);
     // species has different forms
     if (Object.hasOwn(pokemonFormLevelMoves, speciesId)) {
       // Species has forms with different movesets
@@ -3563,8 +3563,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         case SortCriteria.COST:
           return (a.cost - b.cost) * -sort.dir;
         case SortCriteria.CANDY: {
-          const candyCountA = globalScene.gameData.starterData[a.species.speciesId].candyCount;
-          const candyCountB = globalScene.gameData.starterData[b.species.speciesId].candyCount;
+          const candyCountA = globalScene.gameData.getStarterDataEntry(a.species.speciesId).candyCount;
+          const candyCountB = globalScene.gameData.getStarterDataEntry(b.species.speciesId).candyCount;
           return (candyCountA - candyCountB) * -sort.dir;
         }
         case SortCriteria.IV: {
@@ -3764,7 +3764,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   }
 
   getFriendship(speciesId: number) {
-    let currentFriendship = globalScene.gameData.starterData[speciesId].friendship;
+    let currentFriendship = globalScene.gameData.getStarterDataEntry(speciesId).friendship;
     if (!currentFriendship || currentFriendship === undefined) {
       currentFriendship = 0;
     }
@@ -3850,6 +3850,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.truncateName();
 
       if (this.speciesStarterDexEntry?.caughtAttr) {
+        // ER custom species (id >= 10000) aren't pre-populated in starterColors;
+        // default to white so this panel doesn't crash on undefined.
+        if (!starterColors[species.speciesId]) {
+          starterColors[species.speciesId] = ["ffffff", "ffffff"];
+        }
         const colorScheme = starterColors[species.speciesId];
 
         const luck = globalScene.gameData.getDexAttrLuck(this.speciesStarterDexEntry.caughtAttr);
@@ -3902,11 +3907,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           this.pokemonShinyIcon.setY(117);
           this.pokemonCandyIcon.setTint(argbFromRgba(rgbHexToRgba(colorScheme[0])));
           this.pokemonCandyOverlayIcon.setTint(argbFromRgba(rgbHexToRgba(colorScheme[1])));
-          this.pokemonCandyCountText.setText(`×${globalScene.gameData.starterData[species.speciesId].candyCount}`);
-          updateCandyCountTextStyle(
-            this.pokemonCandyCountText,
-            globalScene.gameData.starterData[species.speciesId].candyCount,
-          );
+          const starterDataEntry = globalScene.gameData.getStarterDataEntry(species.speciesId);
+          this.pokemonCandyCountText.setText(`×${starterDataEntry.candyCount}`);
+          updateCandyCountTextStyle(this.pokemonCandyCountText, starterDataEntry.candyCount);
           this.pokemonFormText.setY(42);
           this.pokemonHatchedIcon.setVisible(true);
           this.pokemonHatchedCountText.setVisible(true);
@@ -4073,12 +4076,72 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
   }
 
+  private queueStarterSpriteLoad(request: StarterSpriteLoadRequest): void {
+    this.pendingStarterSpriteLoad = request;
+    if (!this.starterSpriteLoadActive) {
+      void this.processStarterSpriteLoadQueue();
+    }
+  }
+
+  private async processStarterSpriteLoadQueue(): Promise<void> {
+    if (this.starterSpriteLoadActive) {
+      return;
+    }
+
+    this.starterSpriteLoadActive = true;
+    try {
+      while (this.pendingStarterSpriteLoad) {
+        const request = this.pendingStarterSpriteLoad;
+        this.pendingStarterSpriteLoad = null;
+        await this.loadStarterSprite(request);
+      }
+    } finally {
+      this.starterSpriteLoadActive = false;
+    }
+
+    if (this.pendingStarterSpriteLoad) {
+      void this.processStarterSpriteLoadQueue();
+    }
+  }
+
+  private async loadStarterSprite(request: StarterSpriteLoadRequest): Promise<void> {
+    await request.species
+      .loadAssets(request.female, request.formIndex, request.shiny, request.variant, true)
+      .catch(() => {});
+
+    if (
+      request.cancelled.value
+      || this.assetLoadCancelled !== request.cancelled
+      || this.lastSpecies !== request.species
+      || !globalScene.textures.exists(request.spriteKey)
+      || !globalScene.anims.exists(request.spriteKey)
+    ) {
+      if (!request.cancelled.value && this.assetLoadCancelled === request.cancelled) {
+        this.assetLoadCancelled = null;
+      }
+      return;
+    }
+
+    this.applyStarterSprite(request);
+  }
+
+  private applyStarterSprite(request: StarterSpriteLoadRequest): void {
+    this.assetLoadCancelled = null;
+    this.speciesLoaded.set(request.species.speciesId, true);
+    this.pokemonSprite
+      .play(request.spriteKey)
+      .setPipelineData("shiny", request.shiny)
+      .setPipelineData("variant", request.variant)
+      .setPipelineData("spriteKey", request.spriteKey)
+      .setVisible(!this.statsMode);
+  }
+
   getSpeciesData(
     speciesId: SpeciesId,
     applyChallenge = true,
   ): { dexEntry: DexEntry; starterDataEntry: StarterDataEntry } {
     const dexEntry = globalScene.gameData.dexData[speciesId];
-    const starterDataEntry = globalScene.gameData.starterData[speciesId];
+    const starterDataEntry = globalScene.gameData.getStarterDataEntry(speciesId);
 
     // Unpacking to make a copy by values, not references
     const copiedDexEntry = { ...dexEntry };
@@ -4223,12 +4286,6 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.abilityCursor = -1;
     this.natureCursor = -1;
     this.teraCursor = PokemonType.UNKNOWN;
-    // We will only update the sprite if there is a change to form, shiny/variant
-    // or gender for species with gender sprite differences
-    // We will only update the sprite if there is a change to form, shiny/variant
-    // or gender for species with gender sprite differences
-    const shouldUpdateSprite =
-      (species?.genderDiffs && female != null) || formIndex != null || shiny != null || variant != null;
 
     const isFreshStartChallenge = globalScene.gameMode.hasChallenge(Challenges.FRESH_START);
 
@@ -4273,7 +4330,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       }
     }
 
-    this.pokemonSprite.setVisible(false);
+    if (!(species && (forSeen ? this.speciesStarterDexEntry?.seenAttr : this.speciesStarterDexEntry?.caughtAttr))) {
+      this.pokemonSprite.setVisible(false);
+    }
     this.pokemonPassiveLabelText.setVisible(false);
     this.pokemonPassiveText.setVisible(false);
     this.pokemonPassiveDisabledIcon.setVisible(false);
@@ -4293,6 +4352,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.assetLoadCancelled.value = true;
       this.assetLoadCancelled = null;
     }
+    this.pendingStarterSpriteLoad = null;
 
     this.starterMoveset = null;
     this.speciesStarterMoves = [];
@@ -4350,25 +4410,29 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           starter.teraType = this.teraCursor;
         }
 
-        const assetLoadCancelled = new BooleanHolder(false);
-        this.assetLoadCancelled = assetLoadCancelled;
-
         female ??= false;
+        const spriteKey = species.getSpriteKey(female, formIndex, shiny, variant);
+        const spriteReady = globalScene.textures.exists(spriteKey) && globalScene.anims.exists(spriteKey);
+        const shouldUpdateSprite = this.pokemonSprite.pipelineData["spriteKey"] !== spriteKey || !spriteReady;
+
         if (shouldUpdateSprite) {
-          species.loadAssets(female, formIndex, shiny, variant, true).then(() => {
-            if (assetLoadCancelled.value) {
-              return;
-            }
-            this.assetLoadCancelled = null;
-            this.speciesLoaded.set(species.speciesId, true);
-            // Note: bangs are correct due to `female ??= false` above
-            this.pokemonSprite
-              .play(species.getSpriteKey(female!, formIndex, shiny, variant))
-              .setPipelineData("shiny", shiny)
-              .setPipelineData("variant", variant)
-              .setPipelineData("spriteKey", species.getSpriteKey(female!, formIndex, shiny, variant))
-              .setVisible(!this.statsMode);
-          });
+          const assetLoadCancelled = new BooleanHolder(false);
+          const request: StarterSpriteLoadRequest = {
+            species,
+            female,
+            formIndex,
+            shiny,
+            variant,
+            spriteKey,
+            cancelled: assetLoadCancelled,
+          };
+          this.assetLoadCancelled = assetLoadCancelled;
+
+          if (spriteReady) {
+            this.applyStarterSprite(request);
+          } else {
+            this.queueStarterSpriteLoad(request);
+          }
         } else {
           this.pokemonSprite.setVisible(!this.statsMode);
         }
