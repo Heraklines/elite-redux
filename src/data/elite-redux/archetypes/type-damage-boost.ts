@@ -37,7 +37,9 @@
 // =============================================================================
 
 import { MovePowerBoostAbAttr } from "#abilities/ab-attrs";
+import { globalScene } from "#app/global-scene";
 import type { PokemonType } from "#enums/pokemon-type";
+import type { WeatherType } from "#enums/weather-type";
 
 /** Construction options for {@linkcode TypeDamageBoostAbAttr}. */
 export interface TypeDamageBoostAbAttrOptions {
@@ -62,6 +64,13 @@ export interface TypeDamageBoostAbAttrOptions {
    * `Vengeance`-cluster semantics.
    */
   readonly lowHpThreshold?: number;
+  /**
+   * Optional weather gate. When set, the boost only applies while one of these
+   * weather types is active AND not effect-suppressed (Cloud Nine / Air Lock).
+   * Covers ER abilities like `Whiteout` (Ice moves ×1.5 in hail). Omit for an
+   * always-on type boost.
+   */
+  readonly weathers?: readonly WeatherType[];
 }
 
 /**
@@ -90,6 +99,7 @@ export class TypeDamageBoostAbAttr extends MovePowerBoostAbAttr {
   private readonly highHpMultiplier: number;
   private readonly lowHpMultiplier: number | null;
   private readonly lowHpThreshold: number;
+  private readonly weathers: readonly WeatherType[] | null;
 
   constructor(opts: TypeDamageBoostAbAttrOptions) {
     if (!(opts.multiplier > 0)) {
@@ -98,15 +108,37 @@ export class TypeDamageBoostAbAttr extends MovePowerBoostAbAttr {
     if (opts.lowHpMultiplier !== undefined && !(opts.lowHpMultiplier > 0)) {
       throw new Error(`[TypeDamageBoostAbAttr] lowHpMultiplier must be > 0 when set; got ${opts.lowHpMultiplier}`);
     }
+    const weathers = opts.weathers && opts.weathers.length > 0 ? opts.weathers : null;
     // Pass the *baseline* multiplier to the super; we override apply() below
     // to swap in lowHpMultiplier when appropriate. Super's `canApply` calls
-    // the condition closure which checks type-match — we pass that closure
-    // directly so the super's existing gating works as-is.
-    super((pokemon, _defender, move) => pokemon?.getMoveType(move) === opts.type, opts.multiplier, false);
+    // the condition closure which checks type-match (and the optional weather
+    // gate) so the super's existing gating works as-is.
+    super(
+      (pokemon, _defender, move) => {
+        if (pokemon?.getMoveType(move) !== opts.type) {
+          return false;
+        }
+        if (weathers) {
+          if (globalScene.arena.weather?.isEffectSuppressed()) {
+            return false;
+          }
+          return weathers.includes(globalScene.arena.weatherType);
+        }
+        return true;
+      },
+      opts.multiplier,
+      false,
+    );
     this.type = opts.type;
     this.highHpMultiplier = opts.multiplier;
     this.lowHpMultiplier = opts.lowHpMultiplier ?? null;
     this.lowHpThreshold = opts.lowHpThreshold ?? 1 / 3;
+    this.weathers = weathers;
+  }
+
+  /** The configured weather gate, or `null` for an always-on type boost. */
+  public getWeathers(): readonly WeatherType[] | null {
+    return this.weathers;
   }
 
   /** The configured boost type (read-only accessor for tests / introspection). */
