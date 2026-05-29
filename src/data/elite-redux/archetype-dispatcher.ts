@@ -1377,6 +1377,16 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
           filter: { type: PokemonType.ROCK },
         }),
       ];
+    // "X STAB" riders — the holder gets STAB (1.5x) on moves of the named type
+    // even when it isn't that type. StabAddAbAttr already guards against
+    // double-STAB on real-STAB moves.
+    case 620: // Old Mariner: "Water STAB"
+    case 969: // Hand Barnacles: "Water STAB"
+      return [new StabAddAbAttr({ targetType: PokemonType.WATER })];
+    case 760: // Acidic Slime: "Poison STAB"
+      return [new StabAddAbAttr({ targetType: PokemonType.POISON })];
+    case 826: // Tender Affection: "Fairy STAB"
+      return [new StabAddAbAttr({ targetType: PokemonType.FAIRY })];
     default:
       return [];
   }

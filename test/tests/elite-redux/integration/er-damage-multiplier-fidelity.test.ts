@@ -336,4 +336,17 @@ describe.skipIf(!RUN_SCENARIOS)("ER damage-multiplier fidelity (#103 Batch A)", 
   it("Psychic Mind: Psychic moves x1.2 (full HP)", async () => {
     await expectOffensiveTypeBoost({ erAbilityId: 343, move: MoveId.PSYCHIC, expected: 1.2 });
   });
+
+  // Composite "X STAB" riders — the holder gets +1.5x on off-type moves of the
+  // named type. Tested on composites whose OTHER part doesn't touch damage:
+  // Acidic Slime (Corrosion + Poison STAB) and Tender Affection (Cute Charm +
+  // Fairy STAB). User is Normal-type Snorlax (no natural STAB on the test move),
+  // enemy Snorlax (Poison/Fairy both neutral vs Normal — no effectiveness skew).
+  it("Acidic Slime (760 rider): Poison STAB gives off-type Poison moves x1.5", async () => {
+    await expectOffensiveTypeBoost({ erAbilityId: 760, move: MoveId.SLUDGE_BOMB, expected: 1.5 });
+  });
+
+  it("Tender Affection (826 rider): Fairy STAB gives off-type Fairy moves x1.5", async () => {
+    await expectOffensiveTypeBoost({ erAbilityId: 826, move: MoveId.MOONBLAST, expected: 1.5 });
+  });
 });
