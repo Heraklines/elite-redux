@@ -2895,12 +2895,10 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 473:
-      // Inversion — "Sets up Inverse Room on entry, lasts 3 turns."
-      // Pokerogue lacks Inverse Room arena tag. Approximate by giving the
-      // holder a 1.5x boost on moves that would normally be resisted —
-      // proxy: just generic 1.2x damage boost on entry (deferred to a
-      // proper inverse-type-chart tag in a future engine pass).
-      return ok([new MovePowerBoostAbAttr(() => true, 1.2)]);
+      // Inversion — "Sets up Inverse Room on entry, lasts 3 turns." Sets the
+      // ER INVERSE_ROOM arena tag (inverts the type chart, like the move of the
+      // same name) for 3 turns.
+      return ok([new EntryEffectAbAttr({ kind: "set-screen-or-room", tag: ArenaTagType.INVERSE_ROOM, turns: 3 })]);
     case 636:
       // Blood Bath — "Immune to bleed. Inflict fear when inflicting bleed."
       // Wire ER_BLEED tag immunity + ER_FEAR on attack (post-attack apply
