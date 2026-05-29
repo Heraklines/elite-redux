@@ -2,12 +2,16 @@ import type { Ability } from "#abilities/ability";
 import { loggedInUser } from "#app/account";
 import { globalScene } from "#app/global-scene";
 import { starterColors } from "#app/global-vars/starter-colors";
+import { isSlotEnabled, isSlotUnlocked, type PassiveSlot } from "#app/ui/handlers/starter-select-ui-handler";
 import { getStarterValueFriendshipCap, speciesStarterCosts } from "#balance/starters";
+import { allAbilities } from "#data/data-lists";
+import { getErAbilityDescription, getErAbilityRomDescription } from "#data/elite-redux/er-ability-descriptions";
 import { getLevelRelExp, getLevelTotalExp } from "#data/exp";
 import { getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { getPokeballAtlasKey } from "#data/pokeball";
 import { getTypeRgb } from "#data/type";
+import { AbilityId } from "#enums/ability-id";
 import { Button } from "#enums/buttons";
 import { MoveCategory } from "#enums/move-category";
 import { Nature } from "#enums/nature";
@@ -27,10 +31,6 @@ import { achvs } from "#system/achv";
 import { addBBCodeTextObject, addTextObject, getBBCodeFrag, getTextColor, updateCandyCountTextStyle } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { argbFromRgba, rgbHexToRgba } from "#utils/color-utils";
-import { getErAbilityDescription } from "#data/elite-redux/er-ability-descriptions";
-import { allAbilities } from "#data/data-lists";
-import { AbilityId } from "#enums/ability-id";
-import { isSlotEnabled, isSlotUnlocked, type PassiveSlot } from "#app/ui/handlers/starter-select-ui-handler";
 import { fixedInt, formatStat, getBiomeName, getLocalizedSpriteKey, getShinyDescriptor, padInt } from "#utils/common";
 import { getEnumValues } from "#utils/enums";
 import { getDexNumber } from "#utils/pokemon-utils";
@@ -729,8 +729,7 @@ export class SummaryUiHandler extends UiHandler {
               break;
             }
             const delta = button === Button.DOWN ? 1 : -1;
-            this.abilitiesCursor =
-              (this.abilitiesCursor + delta + this.abilitiesRowCount) % this.abilitiesRowCount;
+            this.abilitiesCursor = (this.abilitiesCursor + delta + this.abilitiesRowCount) % this.abilitiesRowCount;
             this.refreshAbilitiesCursor();
             success = true;
             break;
@@ -1544,10 +1543,7 @@ export class SummaryUiHandler extends UiHandler {
    * Enemy pokemon additionally gate innate slots by level (slot 2 @ Lv15,
    * slot 3 @ Lv24) — shown as a level lock when inspecting an enemy.
    */
-  private populateAbilitiesPage(
-    pageContainer: Phaser.GameObjects.Container,
-    pageBg: Phaser.GameObjects.Sprite,
-  ): void {
+  private populateAbilitiesPage(pageContainer: Phaser.GameObjects.Container, pageBg: Phaser.GameObjects.Sprite): void {
     const container = globalScene.add.container(0, -pageBg.height);
     pageContainer.add(container);
 
@@ -1665,9 +1661,15 @@ export class SummaryUiHandler extends UiHandler {
       container.add(descText);
 
       if (reason) {
-        const reasonText = addTextObject(labelX, top + headerH + descText.displayHeight + 1, reason, TextStyle.SUMMARY_RED, {
-          fontSize: "42px",
-        });
+        const reasonText = addTextObject(
+          labelX,
+          top + headerH + descText.displayHeight + 1,
+          reason,
+          TextStyle.SUMMARY_RED,
+          {
+            fontSize: "42px",
+          },
+        );
         reasonText.setOrigin(0, 0);
         container.add(reasonText);
       }
@@ -1733,8 +1735,10 @@ export class SummaryUiHandler extends UiHandler {
     nameHeader.setOrigin(0, 0);
     c.add(nameHeader);
 
-    // Expanded description (long text when available; falls back to short).
-    const longDesc = getErAbilityDescription(ability.id) ?? ability.description ?? "";
+    // Expanded description: prefer the full in-game ROM text (extracted from
+    // v2.65.3b), then the short ER desc, then pokerogue's own description.
+    const longDesc =
+      getErAbilityRomDescription(ability.name) ?? getErAbilityDescription(ability.id) ?? ability.description ?? "";
     const descText = addTextObject(7, 28, longDesc, TextStyle.WINDOW_ALT, {
       fontSize: "64px",
       wordWrap: { width: 1230 },
@@ -1742,9 +1746,15 @@ export class SummaryUiHandler extends UiHandler {
     descText.setOrigin(0, 0);
     c.add(descText);
 
-    const backHint = addTextObject(panelW - 6, panelH - 6, i18next.t("pokemonSummary:abilityDetailBack"), TextStyle.SUMMARY, {
-      fontSize: "44px",
-    });
+    const backHint = addTextObject(
+      panelW - 6,
+      panelH - 6,
+      i18next.t("pokemonSummary:abilityDetailBack"),
+      TextStyle.SUMMARY,
+      {
+        fontSize: "44px",
+      },
+    );
     backHint.setOrigin(1, 1);
     c.add(backHint);
 

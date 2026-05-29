@@ -15,6 +15,7 @@
 // allAbilities[id].description when absent.
 // =============================================================================
 
+import { ER_ABILITY_ROM_DESCRIPTIONS } from "#data/elite-redux/er-ability-rom-descriptions";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import erDump from "../../../vendor/elite-redux/v2.65beta.json";
 
@@ -46,4 +47,22 @@ for (const ab of dump.abilities) {
  */
 export function getErAbilityDescription(pokerogueAbilityId: number): string | null {
   return map.get(pokerogueAbilityId) ?? null;
+}
+
+/** Canonical (lowercase alphanumerics-only) key — matches the ROM-desc generator. */
+function canonicalAbilityName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Look up the full in-game ROM ability description (the expanded text shown on
+ * the ability "Detail" view) by the ability's display name. Returns null for
+ * abilities not present in the v2.65.3b ROM (beta-only customs) — callers fall
+ * back to the short description.
+ */
+export function getErAbilityRomDescription(abilityName: string | undefined | null): string | null {
+  if (!abilityName) {
+    return null;
+  }
+  return ER_ABILITY_ROM_DESCRIPTIONS[canonicalAbilityName(abilityName)] ?? null;
 }

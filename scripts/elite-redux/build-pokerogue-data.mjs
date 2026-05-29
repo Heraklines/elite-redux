@@ -32,6 +32,8 @@ const BUILDERS = {
   // as idmap (custom IDs start at 5000), emitted to src/enums/.
   erAbilityIdEnum: () => import("./builders/er-ability-id-enum.mjs"),
   erMoveIdEnum: () => import("./builders/er-move-id-enum.mjs"),
+  // Full in-game ability descriptions extracted from the ER ROM text source.
+  abilityRomDescriptions: () => import("./builders/ability-rom-descriptions.mjs"),
 };
 
 async function main() {
