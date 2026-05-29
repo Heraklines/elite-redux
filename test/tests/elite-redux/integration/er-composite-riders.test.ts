@@ -137,4 +137,42 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
     expect(ratio, `expected ~0.7x taken (got ${ratio.toFixed(3)})`).toBeGreaterThan(0.65);
     expect(ratio, `expected ~0.7x taken (got ${ratio.toFixed(3)})`).toBeLessThan(0.75);
   });
+
+  it("Dreamscape (859): all moves deal 20% more damage", async () => {
+    const ability = await erId(859);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(MoveId.TACKLE)
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
+    const enemy = game.field.getEnemyPokemon();
+    const player = game.field.getPlayerPokemon();
+
+    let hp0 = enemy.hp;
+    game.move.use(MoveId.TACKLE);
+    await game.toNextTurn();
+    const dmgBoosted = hp0 - enemy.hp;
+
+    player.summonData.abilitySuppressed = true;
+    enemy.hp = enemy.getMaxHp();
+    hp0 = enemy.hp;
+    game.move.use(MoveId.TACKLE);
+    await game.toEndOfTurn();
+    const dmgBase = hp0 - enemy.hp;
+
+    expect(dmgBase, "baseline dealt damage").toBeGreaterThan(0);
+    const ratio = dmgBoosted / dmgBase;
+    expect(ratio, `expected ~1.2x (got ${ratio.toFixed(3)})`).toBeGreaterThan(1.15);
+    expect(ratio, `expected ~1.2x (got ${ratio.toFixed(3)})`).toBeLessThan(1.25);
+  });
 });

@@ -1407,6 +1407,10 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       ];
     case 986: // Mucus Membrane: "Takes 30% less damage from attacks" (reduction = fraction removed)
       return [new DamageReductionAbAttr({ reduction: 0.3, filter: { kind: "all" } })];
+    case 859: // Dreamscape: "Comatose + Dreamcatcher + Deal 20% more damage" — the
+      // bare "+20% damage" rider is an unconditional all-moves power boost.
+      // (Comatose is the auto-resolved part; Dreamcatcher remains a named rider.)
+      return [new MovePowerBoostAbAttr(() => true, 1.2)];
     default:
       return [];
   }
