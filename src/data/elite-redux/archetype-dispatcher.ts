@@ -70,7 +70,6 @@ import {
   MaxMultiHitAbAttr,
   MoveAbilityBypassAbAttr,
   MovePowerBoostAbAttr,
-  MoveTypeChangeAbAttr,
   MoveTypePowerBoostAbAttr,
   PostAttackApplyBattlerTagAbAttr,
   PostAttackApplyStatusEffectAbAttr,
@@ -3600,16 +3599,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // (Sentinel)
       return SKIP_BESPOKE;
     case 274:
-      // Sand Song — C-source + description: "Sound moves get a 1.2x boost and
-      // become Ground if Normal." Convert Normal sound moves to Ground, then
-      // boost all sound moves by 1.2x. (Was an unwired SKIP.)
-      return ok([
-        new MoveTypeChangeAbAttr(
-          PokemonType.GROUND,
-          (_user, _target, move) => move?.type === PokemonType.NORMAL && move.hasFlag(MoveFlags.SOUND_BASED),
-        ),
-        new FlagDamageBoostAbAttr({ flag: MoveFlags.SOUND_BASED, multiplier: 1.2 }),
-      ]);
+      // Sand Song is handled by the `type-conversion` archetype (Normal sound ->
+      // Ground + 1.2x), matching its in-game description — so this bespoke branch
+      // is UNREACHABLE (274's archetype != "bespoke"). NOTE (#103 divergence): the
+      // v2.65.3b C-source header reads "Sound moves become Ground type. No damage
+      // boost" (ALL sound, no 1.2x). We keep the description-faithful archetype
+      // behavior per the project's beta-description precedent (cf. Whiteout).
+      return SKIP_BESPOKE;
     case 656656:
       return SKIP_BESPOKE;
     // -------------------------------------------------------------------------
