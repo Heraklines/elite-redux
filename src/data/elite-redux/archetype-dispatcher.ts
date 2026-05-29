@@ -2057,9 +2057,11 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     case 494:
       // Arcane Force — "All moves gain STAB. Ups super-effective by 10%."
-      // Wire the all-moves StabAdd. The "+10% super-effective" piece is a
-      // type-effectiveness override (super-effective multiplier rider) —
-      // no archetype primitive exists for that yet; deferred. Partial wire.
+      // All-moves StabAdd. The +10% super-effective rider (factor 1.1 via
+      // SuperEffectiveMultiplierBoostAbAttr) is ready to add, BUT a harness test
+      // revealed StabAddAbAttr() (no-arg, all-moves) reduces damage on an
+      // already-STAB move (active dealt ~0.41x), so the no-arg StabAdd needs
+      // fixing first — tracked separately. Keeping StabAdd-only for now.
       return ok([new StabAddAbAttr()]);
     // -------------------------------------------------------------------------
     // Round 9 — bonus composition wires using existing primitives.
