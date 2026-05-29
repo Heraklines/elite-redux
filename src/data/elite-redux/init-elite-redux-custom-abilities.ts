@@ -150,6 +150,42 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
     }
   }
 
+  // ER id-resync drift: the four "Embody Aspect" variants collapsed to a single
+  // id (795) in the auto-generated ER_ABILITIES, so only the Speed variant gets
+  // a draft and is built above. The Attack/Defense/SpDef variants (er 796-798 →
+  // pokerogue 5497-5499) have no draft, so we construct them here from synthetic
+  // drafts — registering their AbilityId reverse-map keys (otherwise a species
+  // using ability 5497 throws `enumValueToKey`) and wiring the entry-effect
+  // stat boost via their ER_ABILITY_ARCHETYPES rows. Idempotent.
+  const embodyDriftDrafts: { draft: ErAbilityDraft; pokerogueId: number }[] = [
+    {
+      draft: { id: 796, name: "Embody Aspect", description: "+1 Attack on Entry.", archetype: "unknown" },
+      pokerogueId: ER_ID_MAP.abilities[796],
+    },
+    {
+      draft: { id: 797, name: "Embody Aspect", description: "+1 Defense on Entry.", archetype: "unknown" },
+      pokerogueId: ER_ID_MAP.abilities[797],
+    },
+    {
+      draft: { id: 798, name: "Embody Aspect", description: "+1 Sp. Def on Entry.", archetype: "unknown" },
+      pokerogueId: ER_ID_MAP.abilities[798],
+    },
+  ];
+  for (const { draft, pokerogueId } of embodyDriftDrafts) {
+    if (pokerogueId === undefined || pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
+      continue;
+    }
+    try {
+      const ability = buildCustomAbility(draft, pokerogueId, result);
+      (allAbilities as Ability[])[pokerogueId] = ability;
+      existingIds.add(pokerogueId);
+      result.customsAdded++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      result.errors.push(`Failed to construct Embody Aspect (er id ${draft.id} → ${pokerogueId}): ${msg}`);
+    }
+  }
+
   return result;
 }
 

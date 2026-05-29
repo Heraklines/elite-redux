@@ -545,10 +545,14 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   793: { erAbilityId: 793, archetype: "composite-vanilla-mashup", params: {"parts":["Analytic","Neuroforce"]} },
   794: { erAbilityId: 794, archetype: "bespoke", params: null },
   795: { erAbilityId: 795, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"SPD","stages":1}} },
-  // 796-798 (Embody Aspect Atk/Def/SpDef on entry) intentionally NOT wired: their
-  // mapped pokerogue ids (e.g. 5497) are not registered in the AbilityId reverse-
-  // map, so dispatching them throws `enumValueToKey` at runtime. Blocked on an
-  // id-registration fix (id-resync drift), not an ability-effect gap. See #103.
+  // 796-798 (Embody Aspect Atk/Def/SpDef on entry). NOTE: the auto-generated
+  // ER_ABILITIES collapsed all four Embody variants to id 795 (generator
+  // id-drift), so 796-798 have no draft and aren't built by the main init loop.
+  // initEliteReduxCustomAbilities constructs them explicitly from synthetic
+  // drafts (registering 5497-5499) and wires the entry-effect via these rows.
+  796: { erAbilityId: 796, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"ATK","stages":1}} },
+  797: { erAbilityId: 797, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"DEF","stages":1}} },
+  798: { erAbilityId: 798, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"SPDEF","stages":1}} },
   799: { erAbilityId: 799, archetype: "type-damage-boost", params: {"type":"ROCK","multiplier":1.3,"lowHpMultiplier":1.8,"lowHpThreshold":0.3333333333333333} },
   800: { erAbilityId: 800, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"DARK","multiplier":1.2} },
   801: { erAbilityId: 801, archetype: "composite-vanilla-mashup", params: {"parts":["Leaf Guard","Harvest"]} },
