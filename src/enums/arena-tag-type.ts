@@ -18,6 +18,8 @@ export enum ArenaTagType {
   STEALTH_ROCK = "STEALTH_ROCK",
   STICKY_WEB = "STICKY_WEB",
   TRICK_ROOM = "TRICK_ROOM",
+  /** Elite Redux — Inverse Room: reverses type matchups field-wide for a few turns. */
+  INVERSE_ROOM = "INVERSE_ROOM",
   GRAVITY = "GRAVITY",
   REFLECT = "REFLECT",
   LIGHT_SCREEN = "LIGHT_SCREEN",

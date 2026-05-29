@@ -624,11 +624,10 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // unfaithful "flavor" embellishment not in the ER source — removed.
       return ok(0, []);
     case 844:
-      // Inverse Room — psychic status move that "reverses type matchups for
-      // 5 turns". Pokerogue's `ArenaTagType` has no `INVERSE_ROOM` (only
-      // TRICK_ROOM). Implementing the type-chart flip needs a dedicated arena
-      // tag + handler in the damage pipeline — deferred to a future round.
-      return skip("Inverse Room (er id 844): requires custom INVERSE_ROOM arena tag and type-chart flip");
+      // Inverse Room — status move that reverses type matchups field-wide for
+      // 5 turns. Sets the ER INVERSE_ROOM arena tag; the type-chart inversion is
+      // applied in getTypeDamageMultiplier while the tag is active.
+      return ok(0, [new AddArenaTagAttr(ArenaTagType.INVERSE_ROOM, 5)]);
     case 846:
       // Karma — self-status: raises SpAtk and SpDef by 1, lowers Speed by 1.
       // Two separate StatStageChangeAttrs since stage delta differs.

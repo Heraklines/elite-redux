@@ -1,3 +1,5 @@
+import { globalScene } from "#app/global-scene";
+import { ArenaTagType } from "#enums/arena-tag-type";
 import { ChallengeType } from "#enums/challenge-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { applyChallenges } from "#utils/challenge-utils";
@@ -19,6 +21,17 @@ export type SingleTypeDamageMultiplier = 0 | 0.5 | 1 | 2;
 export function getTypeDamageMultiplier(attackType: PokemonType, defType: PokemonType): SingleTypeDamageMultiplier {
   const multi = new NumberHolder(getTypeChartMultiplier(attackType, defType));
   applyChallenges(ChallengeType.TYPE_EFFECTIVENESS, multi);
+  // Elite Redux — Inverse Room reverses each single-type matchup field-wide
+  // while active (super-effective ↔ not-very-effective, immunities → 2x), the
+  // same inversion an Inverse Battle applies. Done per single type because the
+  // inversion does not commute with the dual-type product.
+  if (globalScene?.arena?.hasTag(ArenaTagType.INVERSE_ROOM)) {
+    if (multi.value < 1) {
+      multi.value = 2;
+    } else if (multi.value > 1) {
+      multi.value = 0.5;
+    }
+  }
   return multi.value as SingleTypeDamageMultiplier;
 }
 

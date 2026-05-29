@@ -1201,6 +1201,28 @@ export class TrickRoomTag extends RoomArenaTag {
 }
 
 /**
+ * Elite Redux — `Inverse Room`. While active, reverses type matchups field-wide
+ * (super-effective ↔ not-very-effective, immunities → super-effective), exactly
+ * like an Inverse Battle. The inversion is applied per single-type matchup in
+ * {@linkcode getTypeDamageMultiplier} (it checks for this tag); this tag itself
+ * is a pure presence marker (no `apply` effect). Removed on overlap (Room-style).
+ */
+export class InverseRoomTag extends RoomArenaTag {
+  public readonly tagType = ArenaTagType.INVERSE_ROOM;
+  constructor(turnCount: number, sourceMove?: MoveId, sourceId?: number) {
+    super(turnCount, sourceMove ?? MoveId.NONE, sourceId);
+  }
+
+  protected override get onAddMessageKey(): string {
+    return ""; // no locale message — cosmetic text omitted, effect is faithful
+  }
+
+  protected override get onRemoveMessageKey(): string {
+    return "";
+  }
+}
+
+/**
  * Arena Tag class for {@link https://bulbapedia.bulbagarden.net/wiki/Gravity_(move) Gravity}.
  * Grounds all Pokémon on the field, including Flying-types and those with
  * {@linkcode AbilityId.LEVITATE} for the duration of the arena tag, usually 5 turns.
@@ -1770,6 +1792,8 @@ export function getArenaTag(
       return new StickyWebTag(sourceId, side);
     case ArenaTagType.TRICK_ROOM:
       return new TrickRoomTag(turnCount, sourceId);
+    case ArenaTagType.INVERSE_ROOM:
+      return new InverseRoomTag(turnCount, sourceMove, sourceId);
     case ArenaTagType.GRAVITY:
       return new GravityTag(turnCount, sourceId);
     case ArenaTagType.REFLECT:
