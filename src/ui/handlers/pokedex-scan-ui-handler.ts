@@ -66,6 +66,9 @@ export class PokedexScanUiHandler extends FormModalUiHandler {
       case FilterTextRow.ABILITY_2: {
         return [{ label: i18next.t("pokedexUiHandler:scanLabelPassive") }];
       }
+      case FilterTextRow.ABILITY_TEXT: {
+        return [{ label: i18next.t("filterText:abilityTextField") }];
+      }
       default: {
         return [{ label: "" }];
       }
@@ -86,6 +89,12 @@ export class PokedexScanUiHandler extends FormModalUiHandler {
       case FilterTextRow.ABILITY_1:
       case FilterTextRow.ABILITY_2: {
         this.reducedKeys = this.abilityKeys;
+        break;
+      }
+      case FilterTextRow.ABILITY_TEXT: {
+        // Free-text regex search over detailed ability descriptions — no
+        // autocomplete suggestions, the player types whatever they want.
+        this.reducedKeys = [];
         break;
       }
       default: {

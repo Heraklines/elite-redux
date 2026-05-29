@@ -15,6 +15,8 @@ export enum FilterTextRow {
   MOVE_2,
   ABILITY_1,
   ABILITY_2,
+  /** ER: free-text regex search against the FULL detailed ability text. */
+  ABILITY_TEXT,
 }
 
 export class FilterText extends Phaser.GameObjects.Container {
@@ -149,7 +151,10 @@ export class FilterText extends Phaser.GameObjects.Container {
         this.onChange;
       },
     ];
-    ui.setOverlayMode(UiMode.POKEDEX_SCAN, buttonAction, prefilledText, index);
+    // `index` is the cursor position; the scan handler keys autocomplete off the
+    // FilterTextRow enum, so translate position → row (they coincide only when
+    // every row is added in contiguous enum order).
+    ui.setOverlayMode(UiMode.POKEDEX_SCAN, buttonAction, prefilledText, this.rows[index] ?? index);
   }
 
   setCursor(cursor: number): void {
@@ -195,7 +200,11 @@ export class FilterText extends Phaser.GameObjects.Container {
   }
 
   getValue(row: number): string {
-    return this.selections[row].getWrappedText()[0];
+    // `row` is a FilterTextRow enum; `selections` is indexed by add order.
+    // Map enum → position so non-contiguous row subsets work.
+    const idx = this.rows.indexOf(row);
+    const sel = this.selections[idx >= 0 ? idx : row];
+    return sel ? sel.getWrappedText()[0] : this.defaultText;
   }
 
   /**
@@ -205,7 +214,8 @@ export class FilterText extends Phaser.GameObjects.Container {
    * @param value - The text to set for the filter row
    */
   setValue(row: FilterTextRow, value: string) {
-    this.selections[row].setText(value);
+    const idx = this.rows.indexOf(row);
+    this.selections[idx >= 0 ? idx : row]?.setText(value);
     this.onChange();
   }
 

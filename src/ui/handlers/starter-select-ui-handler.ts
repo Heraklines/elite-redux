@@ -17,6 +17,7 @@ import {
 } from "#balance/starters";
 import { allAbilities, allMoves, allSpecies } from "#data/data-lists";
 import { Egg, getEggTierForSpecies, MAX_EGG_COUNT } from "#data/egg";
+import { getErAbilityRomDescription } from "#data/elite-redux/er-ability-descriptions";
 import { GrowthRate, getGrowthRateColor } from "#data/exp";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
@@ -53,6 +54,7 @@ import type { Starter, StarterAttributes, StarterDataEntry, StarterMoveset } fro
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { DropDown, DropDownLabel, DropDownOption, DropDownState, DropDownType, SortCriteria } from "#ui/dropdown";
 import { FilterBar } from "#ui/filter-bar";
+import { FilterText, FilterTextRow } from "#ui/filter-text";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { PokemonIconAnimHelper, PokemonIconAnimMode } from "#ui/pokemon-icon-anim-helper";
@@ -247,6 +249,47 @@ function calcStarterPosition(index: number, scrollCursor = 0): { x: number; y: n
 }
 
 /**
+ * ER ability-text search: does any of a species' abilities (main + 3 innates)
+ * match `query` (case-insensitive regex, falling back to substring on an
+ * invalid pattern)? Matches against the FULL detailed ROM ability text — not
+ * the abbreviated one-liners — plus the ability name.
+ */
+function matchesAbilityText(species: PokemonSpecies, query: string): boolean {
+  const q = query.trim();
+  if (q === "") {
+    return true;
+  }
+  let re: RegExp | null = null;
+  try {
+    re = new RegExp(q, "i");
+  } catch {
+    re = null; // invalid regex → substring fallback below
+  }
+  const ql = q.toLowerCase();
+  const ids = new Set<number>([
+    species.ability1,
+    species.ability2,
+    species.abilityHidden,
+    ...species.getPassiveAbilities(0),
+  ]);
+  for (const id of ids) {
+    if (!id) {
+      continue;
+    }
+    const ability = allAbilities[id];
+    if (!ability) {
+      continue;
+    }
+    const detailed = getErAbilityRomDescription(ability.name) ?? ability.description ?? "";
+    const haystack = `${ability.name}\n${detailed}`;
+    if (re ? re.test(haystack) : haystack.toLowerCase().includes(ql)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Calculates the y position for the icon of stater pokemon selected for the team
  * @param index index of the Pokemon in the team (0-5)
  * @returns the y position to use for the icon
@@ -344,6 +387,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private starterSelectScrollBar: ScrollBar;
   private filterBarContainer: Phaser.GameObjects.Container;
   private filterBar: FilterBar;
+  // ER: free-text search (Name substring + Ability-text regex over detailed
+  // ability descriptions). Entered by pressing the filter key again from the
+  // filter bar; a self-contained mode (CANCEL returns to the grid).
+  private filterTextContainer: Phaser.GameObjects.Container;
+  private filterText: FilterText;
+  private filterTextMode = false;
+  private filterTextCursor = 0;
   private shinyOverlay: Phaser.GameObjects.Image;
   private starterContainers: StarterContainer[] = [];
   private filteredStarterContainers: StarterContainer[] = [];
@@ -678,6 +728,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
     // Offset the generation filter dropdown to avoid covering the filtered pokemon
     this.filterBar.offsetHybridFilters();
+
+    // ER: free-text search panel (Name substring + Ability-text regex over the
+    // FULL detailed ability descriptions). Hidden until entered from the filter
+    // bar (press the filter key again).
+    this.filterTextContainer = globalScene.add.container(0, 0);
+    this.filterText = new FilterText(speciesContainerX + 7, filterBarHeight + 8, 160, 40, this.updateStarters);
+    this.filterText.addFilter(FilterTextRow.NAME, i18next.t("filterText:nameField"));
+    this.filterText.addFilter(FilterTextRow.ABILITY_TEXT, i18next.t("filterText:abilityTextField"));
+    this.filterTextContainer.add(this.filterText);
+    this.filterTextContainer.setVisible(false);
 
     if (globalScene.uiTheme === UiTheme.DEFAULT) {
       starterContainerWindow.setVisible(false);
@@ -1311,6 +1371,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       // Filter bar sits above everything, except the tutorial overlay and message box.
       // Do not put anything below this unless it must appear below the filter bar.
       this.filterBarContainer,
+      this.filterTextContainer,
     ]);
 
     this.initTutorialOverlay(this.starterSelectContainer);
@@ -1513,6 +1574,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    */
   public resetFilters(): void {
     this.filterBar.setValsToDefault();
+    this.filterText?.setValsToDefault();
     this.resetCaughtDropdown();
   }
 
@@ -1789,7 +1851,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         error = true;
       }
     } else if (button === Button.CANCEL) {
-      if (this.filterMode && this.filterBar.openDropDown) {
+      if (this.filterTextMode) {
+        // ER text search: first Cancel clears a non-empty field; else leave panel.
+        if (this.filterText.getValue(this.filterTextCursor) === this.filterText.defaultText) {
+          this.setFilterTextMode(false);
+          this.setCursor(this.cursor);
+        } else {
+          this.filterText.resetSelection(this.filterTextCursor);
+        }
+        success = true;
+      } else if (this.filterMode && this.filterBar.openDropDown) {
         // CANCEL with a filter menu open > close it
         this.filterBar.toggleDropDown(this.filterBarCursor);
         success = true;
@@ -1816,8 +1887,17 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         success = true;
       }
     } else if (button === Button.STATS) {
-      // if stats button is pressed, go to filter directly
-      if (!this.filterMode) {
+      // ER: cycle the filter key — grid → dropdown filter bar → text search → off.
+      if (this.filterTextMode) {
+        this.setFilterTextMode(false);
+      } else if (this.filterMode) {
+        // From the dropdown filter bar, switch to the free-text search panel.
+        this.filterBar.hideDropDowns();
+        this.filterBar.cursorObj.setVisible(false);
+        this.filterMode = false;
+        this.filterTextCursor = 0;
+        this.setFilterTextMode(true);
+      } else {
         this.startCursorObj.setVisible(false);
         this.starterIconsCursorObj.setVisible(false);
         this.randomCursorObj.setVisible(false);
@@ -1826,6 +1906,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         this.setFilterMode(true);
         this.filterBar.toggleDropDown(this.filterBarCursor);
       }
+      success = true;
     } else if (this.startCursorObj.visible) {
       // this checks to see if the start button is selected
       switch (button) {
@@ -1871,6 +1952,32 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             this.setCursor(onScreenFirstIndex + (onScreenNumberOfRows - 1) * 9); // set first column
             success = true;
           }
+          break;
+      }
+    } else if (this.filterTextMode) {
+      // ER free-text search panel — self-contained: Up/Down picks a field,
+      // Action opens text entry, Cancel returns to the grid.
+      switch (button) {
+        case Button.UP:
+          this.filterTextCursor = (this.filterTextCursor - 1 + this.filterText.numFilters) % this.filterText.numFilters;
+          this.filterText.setCursor(this.filterTextCursor);
+          success = true;
+          break;
+        case Button.DOWN:
+          this.filterTextCursor = (this.filterTextCursor + 1) % this.filterText.numFilters;
+          this.filterText.setCursor(this.filterTextCursor);
+          success = true;
+          break;
+        case Button.ACTION:
+          this.filterText.startSearch(this.filterTextCursor, this.getUi());
+          success = true;
+          break;
+        case Button.LEFT:
+        case Button.RIGHT:
+          // Step out to the grid.
+          this.setFilterTextMode(false);
+          this.setCursor(this.cursor);
+          success = true;
           break;
       }
     } else if (this.filterMode) {
@@ -3445,6 +3552,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       const caughtAttr = dexEntry?.caughtAttr ?? BigInt(0);
       const isStarterProgressable = Object.hasOwn(speciesEggMoves, container.species.speciesId);
 
+      // ER free-text search: Name (substring) + Ability Text (regex over the
+      // FULL detailed ability descriptions of the main ability + all innates).
+      const nameQuery = this.filterText.getValue(FilterTextRow.NAME);
+      const fitsName =
+        nameQuery === this.filterText.defaultText
+        || container.species.name.toLowerCase().includes(nameQuery.toLowerCase());
+      const abilityQuery = this.filterText.getValue(FilterTextRow.ABILITY_TEXT);
+      const fitsAbilityText =
+        abilityQuery === this.filterText.defaultText || matchesAbilityText(container.species, abilityQuery);
+
       // Gen filter
       const fitsGen = this.filterBar.getVals(DropDownColumn.GEN).includes(container.species.generation);
 
@@ -3610,6 +3727,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         && fitsHA
         && fitsEgg
         && fitsPokerus
+        && fitsName
+        && fitsAbilityText
       ) {
         this.filteredStarterContainers.push(container);
       }
@@ -3810,6 +3929,18 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
 
     return false;
+  }
+
+  /** ER: toggle the free-text search panel (Name + Ability-text). */
+  setFilterTextMode(on: boolean): void {
+    this.filterTextMode = on;
+    this.filterTextContainer.setVisible(on);
+    this.filterText.cursorObj.setVisible(on);
+    this.cursorObj.setVisible(!on && !this.filterMode);
+    if (on) {
+      this.setSpecies(null);
+      this.filterText.setCursor(this.filterTextCursor);
+    }
   }
 
   moveStarterIconsCursor(index: number): void {
