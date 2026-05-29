@@ -198,7 +198,7 @@ import { TrapDurationModifierAbAttr } from "#data/elite-redux/archetypes/trap-du
 import { TurnDecayDamageMultiplierAbAttr } from "#data/elite-redux/archetypes/turn-decay-damage-multiplier";
 import { TypeChartOverrideAbAttr } from "#data/elite-redux/archetypes/type-chart-override";
 import { TypeConversionAbAttr, TypeConversionPowerBoostAbAttr } from "#data/elite-redux/archetypes/type-conversion";
-import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
+import { TypeDamageBoostAbAttr, TypeRecoilAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
 import { buildTypeEffectivenessModAttrs } from "#data/elite-redux/archetypes/type-effectiveness-mod";
 import { TypeGatedStatTriggerOnAttackAbAttr } from "#data/elite-redux/archetypes/type-gated-stat-trigger-on-attack";
 import { TypedImmunityWithArenaTagAbAttr } from "#data/elite-redux/archetypes/typed-immunity-with-arena-tag";
@@ -410,10 +410,11 @@ function isObject(v: unknown): v is Record<string, unknown> {
 // =============================================================================
 
 /**
- * Dispatch a `type-damage-boost` classifier row. Optional `recoilPct` is
- * intentionally ignored — recoil is a separate effect that would need a
- * sibling AbAttr; the classifier emits it as a hint but the archetype layer
- * doesn't yet handle it. The damage boost still wires.
+ * Dispatch a `type-damage-boost` classifier row. When the row carries a
+ * `recoilPct` (the "… but have N% recoil" abilities — Electric Burst, Infernal
+ * Rage, Doom Blast), a sibling {@linkcode TypeRecoilAbAttr} is emitted so the
+ * recoil downside is wired alongside the boost (otherwise those abilities would
+ * be a pure, over-powered boost).
  */
 function dispatchTypeDamageBoost(params: Record<string, unknown>): DispatchResult {
   const type = lookupPokemonType(params.type);
@@ -426,14 +427,19 @@ function dispatchTypeDamageBoost(params: Record<string, unknown>): DispatchResul
   }
   const lowHpMultiplier = params.lowHpMultiplier;
   const lowHpThreshold = params.lowHpThreshold;
-  return ok([
+  const attrs: AbAttr[] = [
     new TypeDamageBoostAbAttr({
       type,
       multiplier,
       ...(typeof lowHpMultiplier === "number" ? { lowHpMultiplier } : {}),
       ...(typeof lowHpThreshold === "number" ? { lowHpThreshold } : {}),
     }),
-  ]);
+  ];
+  const recoilPct = params.recoilPct;
+  if (typeof recoilPct === "number" && recoilPct > 0) {
+    attrs.push(new TypeRecoilAbAttr({ type, recoilPct }));
+  }
+  return ok(attrs);
 }
 
 /** Dispatch a `flag-damage-boost` classifier row. */

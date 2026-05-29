@@ -36,10 +36,14 @@
 //     → `Hellblaze` (1.2× normally, 1.5× under 1/3 HP).
 // =============================================================================
 
-import { MovePowerBoostAbAttr } from "#abilities/ab-attrs";
+import { MovePowerBoostAbAttr, PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
+import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { HitResult } from "#enums/hit-result";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { WeatherType } from "#enums/weather-type";
+import { toDmgValue } from "#utils/common";
+import { BooleanHolder } from "#utils/value-holder";
 
 /** Construction options for {@linkcode TypeDamageBoostAbAttr}. */
 export interface TypeDamageBoostAbAttrOptions {
@@ -192,5 +196,72 @@ export class TypeDamageBoostAbAttr extends MovePowerBoostAbAttr {
       return this.lowHpMultiplier;
     }
     return this.highHpMultiplier;
+  }
+}
+
+/** Construction options for {@linkcode TypeRecoilAbAttr}. */
+export interface TypeRecoilAbAttrOptions {
+  /** The move type that triggers recoil (matched via `getMoveType`). */
+  readonly type: PokemonType;
+  /** Recoil fraction of damage dealt, e.g. `0.1` for 10% recoil. Must be > 0. */
+  readonly recoilPct: number;
+}
+
+/**
+ * Recoil rider for the `type-damage-boost` "… but have N% recoil" abilities
+ * (Electric Burst, Infernal Rage, Doom Blast). When the holder lands a damaging
+ * move of the configured {@linkcode type}, it takes `recoilPct` of the damage
+ * dealt as recoil — the downside that pairs with the type-damage boost. Without
+ * it those abilities would be a pure (over-powered) boost.
+ *
+ * Mirrors the move-side {@linkcode RecoilAttr}: respects recoil-blocking
+ * abilities (Rock Head / Magic Guard) and uses `HitResult.INDIRECT`. Uses the
+ * per-hit `damage` from the params so multi-strike moves accrue recoil per hit
+ * (summing to `recoilPct` of total damage), matching `RecoilAttr` semantics.
+ */
+export class TypeRecoilAbAttr extends PostAttackAbAttr {
+  private readonly type: PokemonType;
+  private readonly recoilPct: number;
+
+  constructor(opts: TypeRecoilAbAttrOptions) {
+    if (!(opts.recoilPct > 0)) {
+      throw new Error(`[TypeRecoilAbAttr] recoilPct must be > 0; got ${opts.recoilPct}`);
+    }
+    super();
+    this.type = opts.type;
+    this.recoilPct = opts.recoilPct;
+  }
+
+  /** The configured recoil fraction (read-only accessor for tests). */
+  public getRecoilPct(): number {
+    return this.recoilPct;
+  }
+
+  public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    // super.canApply gates on a damaging move; then require the type match.
+    return super.canApply(params) && params.pokemon.getMoveType(params.move) === this.type;
+  }
+
+  public override apply(params: PostMoveInteractionAbAttrParams): void {
+    if (params.simulated) {
+      return;
+    }
+    const { pokemon, damage } = params;
+    if (!damage || damage <= 0) {
+      return;
+    }
+    // Respect recoil-blocking abilities (Rock Head / Magic Guard), same as RecoilAttr.
+    const cancelled = new BooleanHolder(false);
+    applyAbAttrs("BlockRecoilDamageAttr", { pokemon, cancelled });
+    applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon, cancelled });
+    if (cancelled.value) {
+      return;
+    }
+    const recoil = toDmgValue(damage * this.recoilPct, 1);
+    if (!recoil) {
+      return;
+    }
+    pokemon.damageAndUpdate(recoil, { result: HitResult.INDIRECT, ignoreSegments: true });
+    pokemon.turnData.damageTaken += recoil;
   }
 }

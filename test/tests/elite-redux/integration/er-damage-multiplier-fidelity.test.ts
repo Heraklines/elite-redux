@@ -282,6 +282,10 @@ describe.skipIf(!RUN_SCENARIOS)("ER damage-multiplier fidelity (#103 Batch A)", 
     expected: number;
     enemy?: SpeciesId;
     user?: SpeciesId;
+    /** When set, the user's HP is pinned to this fraction of max before each
+     * measurement — used to exercise the low-HP boost tier (e.g. 0.25 to be
+     * below a 1/3 threshold). */
+    userHpFraction?: number;
   }): Promise<void> {
     const ability = await erId(opts.erAbilityId);
     if (ability === undefined) {
@@ -301,11 +305,18 @@ describe.skipIf(!RUN_SCENARIOS)("ER damage-multiplier fidelity (#103 Batch A)", 
     vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
     const enemy = game.field.getEnemyPokemon();
     const player = game.field.getPlayerPokemon();
+    const pinHp = () => {
+      if (opts.userHpFraction !== undefined) {
+        player.hp = Math.max(1, Math.floor(player.getMaxHp() * opts.userHpFraction));
+      }
+    };
+    pinHp();
     let hp0 = enemy.hp;
     game.move.use(opts.move);
     await game.toNextTurn();
     const dmgBoosted = hp0 - enemy.hp;
     player.summonData.abilitySuppressed = true;
+    pinHp();
     enemy.hp = enemy.getMaxHp();
     hp0 = enemy.hp;
     game.move.use(opts.move);
@@ -355,5 +366,64 @@ describe.skipIf(!RUN_SCENARIOS)("ER damage-multiplier fidelity (#103 Batch A)", 
   // confound the x1.3 Steel-type boost.
   it("Atomic Punch (681 rider): Steel moves x1.3", async () => {
     await expectOffensiveTypeBoost({ erAbilityId: 681, move: MoveId.FLASH_CANNON, expected: 1.3 });
+  });
+
+  // Low-HP boost tier — these abilities swap to a higher multiplier below 1/3 HP
+  // (the `lowHpMultiplier`/`lowHpThreshold` params). Pin the user to 25% HP to
+  // exercise the low-HP branch; full-HP is checked separately to prove the swap.
+  it("Hellblaze (417): Fire moves x1.3 at full HP", async () => {
+    await expectOffensiveTypeBoost({ erAbilityId: 417, move: MoveId.FLAMETHROWER, expected: 1.3 });
+  });
+
+  it("Hellblaze (417): Fire moves x1.8 below 1/3 HP", async () => {
+    await expectOffensiveTypeBoost({
+      erAbilityId: 417,
+      move: MoveId.FLAMETHROWER,
+      expected: 1.8,
+      userHpFraction: 0.25,
+    });
+  });
+
+  it("Short Circuit (322): Electric moves x1.5 below 1/3 HP", async () => {
+    await expectOffensiveTypeBoost({
+      erAbilityId: 322,
+      move: MoveId.THUNDERBOLT,
+      expected: 1.5,
+      userHpFraction: 0.25,
+    });
+  });
+
+  // Recoil rider — "boosts X-type moves but they have N% recoil". The boost is
+  // covered above; here we confirm the recoil DOWNSIDE is wired (previously the
+  // dispatcher dropped recoilPct, making these a pure over-powered boost).
+  it("Electric Burst (336): Electric moves deal 10% recoil to the user", async () => {
+    const ability = await erId(336);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability) // Electric Burst — not Rock Head / Magic Guard
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(MoveId.THUNDERBOLT)
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
+    const enemy = game.field.getEnemyPokemon();
+    const player = game.field.getPlayerPokemon();
+    const enemyHp0 = enemy.hp;
+    const playerHp0 = player.hp;
+    game.move.use(MoveId.THUNDERBOLT);
+    await game.toEndOfTurn();
+    const dmgDealt = enemyHp0 - enemy.hp;
+    const recoilTaken = playerHp0 - player.hp;
+    expect(dmgDealt, "move dealt damage").toBeGreaterThan(0);
+    expect(recoilTaken, "user took recoil").toBeGreaterThan(0);
+    const expected = Math.floor(dmgDealt * 0.1);
+    expect(Math.abs(recoilTaken - expected)).toBeLessThanOrEqual(2);
   });
 });
