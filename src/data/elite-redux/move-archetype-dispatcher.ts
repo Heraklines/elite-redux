@@ -74,10 +74,12 @@ import {
   StatStageChangeAttr,
   StatusEffectAttr,
   SuppressAbilitiesAttr,
+  TerrainChangeAttr,
   VariableMoveTypeAttr,
   WeatherChangeAttr,
 } from "#data/moves/move";
 import { failIfTargetNotAttackingCondition, type MoveCondition } from "#data/moves/move-condition";
+import { TerrainType } from "#data/terrain";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveFlags } from "#enums/move-flags";
@@ -773,18 +775,18 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // (no vanilla "enrage" status); first-pass: AddTypeAttr only.
       return ok(0, [new AddTypeAttr(PokemonType.DARK)]);
     case 1006:
-      // Jetstream Burst — wind move hitting both foes. WIND_MOVE flag triggers
-      // Wind Rider; the both-targets dimension is handled by the move's
-      // target field (BOTH_OPPONENTS).
-      return ok(MoveFlags.WIND_MOVE, []);
+      // Toxic Terrain (er internal id 1006) — "Boosts Poison-type moves for 8
+      // turns and deals 1/16 HP damage." Sets the ER-custom Toxic Terrain.
+      // (The id-resync: array-index 1006 is Jetstream Burst, but runtime keys by
+      // the internal id, where 1006 is Toxic Terrain — see er-moves.ts.)
+      return ok(0, [new TerrainChangeAttr(TerrainType.TOXIC, 8)]);
     case 1007:
-      // Sky Quake — physical wind move; same shape as Jetstream Burst.
+      // Jetstream Burst (er internal id 1007) — wind move hitting both foes.
+      // WIND_MOVE flag triggers Wind Rider; both-targets is the move's target.
       return ok(MoveFlags.WIND_MOVE, []);
     case 1008:
-      // Sky Quake (real id) — physical wind move hitting both foes. WIND_MOVE
-      // flag triggers Wind Rider. The previous round's case 1007 comment
-      // mislabels the move name (1007 is actually Jetstream Burst); this case
-      // applies the same WIND_MOVE wire-up to the correct Sky Quake id.
+      // Sky Quake (er internal id 1008) — physical wind move hitting both foes.
+      // WIND_MOVE flag triggers Wind Rider.
       return ok(MoveFlags.WIND_MOVE, []);
     case 1009:
       // Sunstrike (N) — ignores opponent's stat boosts (matches Sacred Sword).

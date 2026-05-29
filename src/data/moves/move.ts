@@ -2224,10 +2224,7 @@ export class RecoilAttr extends MoveEffectAttr {
     // RecoilDamageMultiplierAbAttr constructor by name (no central
     // registry edit required).
     const recoilMult = new NumberHolder(1);
-    const userAttrs = [
-      ...user.getAbility().attrs,
-      ...user.getPassiveAbilities().flatMap(pa => pa?.attrs ?? []),
-    ];
+    const userAttrs = [...user.getAbility().attrs, ...user.getPassiveAbilities().flatMap(pa => pa?.attrs ?? [])];
     for (const attr of userAttrs) {
       if (attr && attr.constructor.name === "RecoilDamageMultiplierAbAttr") {
         (attr as unknown as { fire: (mult: NumberHolder) => void }).fire(recoilMult);
@@ -3631,15 +3628,18 @@ export class ClearWeatherAttr extends MoveEffectAttr {
 
 export class TerrainChangeAttr extends MoveEffectAttr {
   private readonly terrainType: TerrainType;
+  /** Optional explicit duration (ER terrains specify their own, e.g. Toxic Terrain's 8 turns). */
+  private readonly turnsOverride?: number;
 
-  constructor(terrainType: TerrainType) {
+  constructor(terrainType: TerrainType, turnsOverride?: number) {
     super();
 
     this.terrainType = terrainType;
+    this.turnsOverride = turnsOverride;
   }
 
   apply(user: Pokemon, _target: Pokemon, _move: Move, _args: any[]): boolean {
-    return globalScene.arena.trySetTerrain(this.terrainType, true, user);
+    return globalScene.arena.trySetTerrain(this.terrainType, true, user, this.turnsOverride);
   }
 
   getCondition(): MoveConditionFunc {

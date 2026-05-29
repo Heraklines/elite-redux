@@ -2597,17 +2597,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       flowerNecklace.addCondition(() => globalScene.arena.terrain?.terrainType === TerrainType.GRASSY);
       return ok([flowerNecklace]);
     }
-    case 836:
-      // Biofilm — "50% spdef boost under Toxic Terrain."
-      // Same shape as Flower Necklace but Toxic Terrain. Pokerogue doesn't
-      // have a Toxic Terrain. Wire as always-on for now (partial), to be
-      // gated when a terrain extension is added.
-      return ok([
-        new SelfHighestStatMultiplierAbAttr({
-          candidates: [Stat.SPDEF],
-          multiplier: 1.5,
-        }),
-      ]);
+    case 836: {
+      // Biofilm — "50% spdef boost under Toxic Terrain." Same shape as Flower
+      // Necklace (Grass Pelt pattern) but gated on the ER-custom Toxic Terrain.
+      const biofilm = new StatMultiplierAbAttr(Stat.SPDEF, 1.5);
+      biofilm.addCondition(() => globalScene.arena.terrain?.terrainType === TerrainType.TOXIC);
+      return ok([biofilm]);
+    }
     case 546:
       // Salt Circle — "Prevents opposing pokemon from fleeing on entry."
       // Uses Mean Look mechanic.
@@ -2898,10 +2894,10 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Approximate as 1.5x boost on Roar of Time specifically.
       return ok([new MovePowerBoostAbAttr((_u, _t, move) => move.id === MoveId.ROAR_OF_TIME, 1.5)]);
     case 834:
-      // Toxic Surge — "Sets Toxic Terrain on entry."
-      // Pokerogue has no Toxic Terrain. Approximate with Toxic Spikes (closest
-      // toxic-themed field effect that exists).
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TOXIC_SPIKES })]);
+      // Toxic Surge — "Sets Toxic Terrain on entry." Sets the ER-custom Toxic
+      // Terrain (boosts Poison moves + chips grounded non-Poison mons) for 8
+      // turns, mirroring the Electric/Misty/Grassy/Psychic Surge entry pattern.
+      return ok([new EntryEffectAbAttr({ kind: "set-terrain", terrain: TerrainType.TOXIC, turns: 8 })]);
     case 329:
       // Scare — "Lowers foes' Sp. Atk by one stage on entry."
       // Same shape as Intimidate but targeting SPATK. Uses the vanilla

@@ -13,6 +13,15 @@ export enum TerrainType {
   ELECTRIC,
   GRASSY,
   PSYCHIC,
+  /**
+   * Elite Redux custom terrain. v2.65.3b ships no toxic-terrain background asset
+   * (only the four canonical terrains exist in the ROM's battle engine), so it
+   * renders by reusing the Psychic Terrain animation tinted poison-violet via
+   * {@linkcode getTerrainColor}. Boosts Poison-type moves ×1.3 and chips
+   * grounded non-Poison Pokémon for 1/16 max HP each turn — per the in-game
+   * description "Boosts Poison-type moves for 8 turns and deals 1/16 HP damage."
+   */
+  TOXIC,
 }
 
 export interface SerializedTerrain {
@@ -61,9 +70,28 @@ export class Terrain {
           return 1.3;
         }
         break;
+      case TerrainType.TOXIC:
+        if (attackType === PokemonType.POISON) {
+          return 1.3;
+        }
+        break;
     }
 
     return 1;
+  }
+
+  /** Whether this terrain chips grounded Pokémon at end of turn (Toxic Terrain). */
+  isDamaging(): boolean {
+    return this.terrainType === TerrainType.TOXIC;
+  }
+
+  /**
+   * Whether a Pokémon of {@linkcode type} is immune to this terrain's end-of-turn
+   * chip. Poison-types are at home in Toxic Terrain (mirrors every terrain's
+   * type-affinity convention), so they take no damage.
+   */
+  isTypeDamageImmune(type: PokemonType): boolean {
+    return this.terrainType === TerrainType.TOXIC && type === PokemonType.POISON;
   }
 
   isMoveTerrainCancelled(user: Pokemon, targets: BattlerIndex[], move: Move): boolean {
@@ -92,6 +120,9 @@ export function getTerrainName(terrainType: TerrainType): string {
       return i18next.t("terrain:grassy");
     case TerrainType.PSYCHIC:
       return i18next.t("terrain:psychic");
+    case TerrainType.TOXIC:
+      // ER custom terrain — English-only (shared locales submodule has no key).
+      return "Toxic";
   }
 
   return "";
@@ -107,6 +138,9 @@ export function getTerrainColor(terrainType: TerrainType): RGBArray {
       return [120, 200, 80];
     case TerrainType.PSYCHIC:
       return [160, 64, 160];
+    case TerrainType.TOXIC:
+      // Poison-violet tint (recolours the reused Psychic Terrain visual).
+      return [148, 56, 188];
   }
 
   return [0, 0, 0];
@@ -127,6 +161,9 @@ export function getTerrainStartMessage(terrainType: TerrainType): string {
       return i18next.t("terrain:grassyStartMessage");
     case TerrainType.PSYCHIC:
       return i18next.t("terrain:psychicStartMessage");
+    case TerrainType.TOXIC:
+      // ER custom terrain — English-only (shared locales submodule has no key).
+      return "Toxins flooded the battlefield!";
     case TerrainType.NONE:
     default:
       terrainType satisfies TerrainType.NONE;
@@ -150,6 +187,8 @@ export function getTerrainClearMessage(terrainType: TerrainType): string {
       return i18next.t("terrain:grassyClearMessage");
     case TerrainType.PSYCHIC:
       return i18next.t("terrain:psychicClearMessage");
+    case TerrainType.TOXIC:
+      return "The toxins drained away.";
     case TerrainType.NONE:
     default:
       terrainType satisfies TerrainType.NONE;

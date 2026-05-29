@@ -65,6 +65,20 @@ function weatherCommonAnim(weather: WeatherType): CommonAnim {
   return CommonAnim.SUNNY + (weather - 1);
 }
 
+/**
+ * Map a {@linkcode TerrainType} to the {@linkcode CommonAnim} used for its
+ * visual. The default `CommonAnim.MISTY_TERRAIN + (terrain - 1)` math lines up
+ * for the four vanilla terrains; ER's TOXIC has no dedicated background asset,
+ * so it reuses the Psychic Terrain animation (poison-violet tinted via
+ * {@linkcode getTerrainColor}).
+ */
+function terrainCommonAnim(terrain: TerrainType): CommonAnim {
+  if (terrain === TerrainType.TOXIC) {
+    return CommonAnim.PSYCHIC_TERRAIN;
+  }
+  return CommonAnim.MISTY_TERRAIN + (terrain - 1);
+}
+
 export class Arena {
   public readonly biomeId: BiomeId;
 
@@ -402,7 +416,7 @@ export class Arena {
    * @param user - (Optional) The {@linkcode Pokemon} creating the terrain
    * @returns Whether the terrain was successfully set.
    */
-  public trySetTerrain(terrain: TerrainType, ignoreAnim = false, user?: Pokemon): boolean {
+  public trySetTerrain(terrain: TerrainType, ignoreAnim = false, user?: Pokemon, turnsOverride?: number): boolean {
     if (!this.canSetTerrain(terrain)) {
       return false;
     }
@@ -411,7 +425,11 @@ export class Arena {
 
     const terrainDuration = new NumberHolder(0);
 
-    if (user != null) {
+    if (turnsOverride != null) {
+      // Explicit duration (ER terrains specify their own turn count, e.g. Toxic
+      // Terrain's 8 turns) — bypass the default 5 + Terrain Extender math.
+      terrainDuration.value = turnsOverride;
+    } else if (user != null) {
       terrainDuration.value = 5;
       globalScene.applyModifier(FieldEffectModifier, user.isPlayer(), user, terrainDuration);
     }
@@ -424,12 +442,7 @@ export class Arena {
 
     if (this.terrain) {
       if (!ignoreAnim) {
-        globalScene.phaseManager.unshiftNew(
-          "CommonAnimPhase",
-          undefined,
-          undefined,
-          CommonAnim.MISTY_TERRAIN + (terrain - 1),
-        );
+        globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, terrainCommonAnim(terrain));
       }
       globalScene.phaseManager.queueMessage(getTerrainStartMessage(terrain));
     } else {
@@ -455,12 +468,7 @@ export class Arena {
     this.eventTarget.dispatchEvent(
       new TerrainChangedEvent(TerrainType.NONE, this.terrain.terrainType, this.terrain.turnsLeft),
     );
-    globalScene.phaseManager.unshiftNew(
-      "CommonAnimPhase",
-      undefined,
-      undefined,
-      CommonAnim.MISTY_TERRAIN + (terrain - 1),
-    );
+    globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, terrainCommonAnim(terrain));
     globalScene.phaseManager.queueMessage(getTerrainStartMessage(terrain) ?? ""); // TODO: Remove `?? ""` when terrain-fail-msg branch removes `null` from these signatures
   }
 

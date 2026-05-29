@@ -244,7 +244,14 @@ export class EntryEffectAbAttr extends PostSummonAbAttr {
         globalScene.arena.trySetWeather(this.effect.weather, pokemon);
         return;
       case "set-terrain":
-        globalScene.arena.trySetTerrain(this.effect.terrain, false, pokemon);
+        // `turns` (when > 0) overrides pokerogue's default 5-turn terrain so ER
+        // terrains keep their own duration (e.g. Toxic Surge's 8 turns).
+        globalScene.arena.trySetTerrain(
+          this.effect.terrain,
+          false,
+          pokemon,
+          this.effect.turns > 0 ? this.effect.turns : undefined,
+        );
         return;
       case "set-hazard": {
         const layers = this.effect.layers ?? 1;

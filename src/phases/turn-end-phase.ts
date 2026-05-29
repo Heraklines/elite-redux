@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { TerrainType } from "#data/terrain";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
+import { HitResult } from "#enums/hit-result";
 import { WeatherType } from "#enums/weather-type";
 import { TurnEndEvent } from "#events/battle-scene";
 import type { Pokemon } from "#field/pokemon";
@@ -14,6 +15,7 @@ import {
   TurnStatusEffectModifier,
 } from "#modifiers/modifier";
 import { FieldPhase } from "#phases/field-phase";
+import { BooleanHolder, toDmgValue } from "#utils/common";
 import i18next from "i18next";
 
 export class TurnEndPhase extends FieldPhase {
@@ -45,6 +47,25 @@ export class TurnEndPhase extends FieldPhase {
             }),
             true,
           );
+        }
+
+        // ER Toxic Terrain — grounded non-Poison Pokémon take 1/16 max HP each
+        // turn (Magic Guard / Block-non-direct-damage abilities exempt them).
+        if (
+          globalScene.arena.terrain?.terrainType === TerrainType.TOXIC
+          && pokemon.isGrounded()
+          && !pokemon.getTypes(true, true).some(t => globalScene.arena.terrain?.isTypeDamageImmune(t))
+        ) {
+          const cancelled = new BooleanHolder(false);
+          applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon, cancelled });
+          if (!cancelled.value) {
+            // ER custom terrain — English-only (shared locales submodule).
+            globalScene.phaseManager.queueMessage(`${getPokemonNameWithAffix(pokemon)} is hurt by the toxic terrain!`);
+            pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() / 16), {
+              result: HitResult.INDIRECT,
+              ignoreSegments: true,
+            });
+          }
         }
 
         if (!pokemon.isPlayer()) {
