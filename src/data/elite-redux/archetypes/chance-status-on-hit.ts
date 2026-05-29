@@ -54,8 +54,8 @@
 //       chance: 100, effects: [StatusEffect.BURN], contactRequired: true })`
 // =============================================================================
 
-import { PostDefendAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
-import type { BattlerTagType } from "#enums/battler-tag-type";
+import { PostAttackAbAttr, PostDefendAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveFlags } from "#enums/move-flags";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { StatusEffect } from "#enums/status-effect";
@@ -411,7 +411,7 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
     }
     const { pokemon, opponent: attacker } = params;
     const tag = this.pickTag(pokemon);
-    attacker.addTag(tag, this.turns, undefined, pokemon.id);
+    attacker.addTag(tag, resolveTagTurns(tag, this.turns, pokemon), undefined, pokemon.id);
   }
 
   /**
@@ -431,13 +431,234 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
   }
 }
 
+// =============================================================================
+// OFFENSIVE flavors (PostAttack) — the holder's own move inflicts the status /
+// tag on the TARGET. Many ER chance-status abilities are offensive, not
+// defensive: their descriptions read "X moves have N% chance to STATUS the
+// foe/target" (e.g. Shocking Jaws "Biting moves have 50% chance to paralyze the
+// target", Loud Bang "Sound-based moves have 50% chance to confuse the foe").
+// In the v2.65.3b C-source these live in the post-attack ability block
+// (`battle_util.c` ~9316/9536, alongside Poison Touch) where `battler ==
+// gBattlerAttacker` and the effect lands on `gBattlerTarget`.
+//
+// The defensive {@linkcode ChanceStatusOnHitAbAttr} above procs the WRONG
+// direction for these (it fires when the holder is hit). These PostAttack
+// variants mirror pokerogue's `PostAttackApplyStatusEffectAbAttr` /
+// `PostAttackApplyBattlerTagAbAttr` (Poison Touch is the canonical example) but
+// add the flag/type filter the vanilla classes lack, so biting/sound/type-gated
+// ER abilities stay faithful.
+//
+// `contactRequired`/`contactExcluded`/`filter` semantics match the defensive
+// flavors exactly (AND'd gates). For offensive abilities `pokemon` is the
+// attacker (holder) and `opponent` is the target receiving the status/tag.
+// =============================================================================
+
+/**
+ * Offensive (PostAttack) counterpart of {@linkcode ChanceStatusOnHitAbAttr}.
+ * The holder's damaging move has a chance to inflict a {@linkcode StatusEffect}
+ * on the move's target. Used by ER abilities like `Shocking Jaws`
+ * (BITING_MOVE-gated PARALYSIS), `Flaming Jaws` (BITING_MOVE-gated BURN),
+ * `Envenom` (POISON on any move), `Virus` (ELECTRIC-type-gated POISON), etc.
+ */
+export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
+  private readonly chance: number;
+  private readonly effects: readonly StatusEffect[];
+  private readonly contactRequired: boolean;
+  private readonly contactExcluded: boolean;
+  private readonly filter: ChanceStatusFilter | undefined;
+
+  constructor(opts: ChanceStatusOnHitOptions) {
+    if (!(opts.chance >= 0 && opts.chance <= 100)) {
+      throw new Error(`[ChanceStatusOnAttackAbAttr] chance must be in [0, 100]; got ${opts.chance}`);
+    }
+    if (opts.effects.length === 0) {
+      throw new Error("[ChanceStatusOnAttackAbAttr] must configure at least one status effect");
+    }
+    if (opts.contactRequired === true && opts.contactExcluded === true) {
+      throw new Error("[ChanceStatusOnAttackAbAttr] contactRequired and contactExcluded are mutually exclusive");
+    }
+    super();
+    this.chance = opts.chance;
+    this.effects = opts.effects;
+    this.contactExcluded = opts.contactExcluded ?? false;
+    this.contactRequired = opts.contactRequired ?? (opts.filter === undefined && !this.contactExcluded);
+    this.filter = opts.filter;
+  }
+
+  /** The configured proc chance (0-100). */
+  public getChance(): number {
+    return this.chance;
+  }
+
+  /** The configured status-effect list (read-only). */
+  public getEffects(): readonly StatusEffect[] {
+    return this.effects;
+  }
+
+  /** The configured move filter, or `undefined` when no filter is set. */
+  public getFilter(): ChanceStatusFilter | undefined {
+    return this.filter;
+  }
+
+  public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    const { simulated, pokemon, move, opponent: target } = params;
+    if (!super.canApply(params)) {
+      return false;
+    }
+    if (simulated) {
+      return true;
+    }
+    if (target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") || pokemon === target) {
+      return false;
+    }
+    const isContact = move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target });
+    if (this.contactExcluded && isContact) {
+      return false;
+    }
+    if (this.contactRequired && !isContact) {
+      return false;
+    }
+    if (this.filter !== undefined && !checkChanceStatusFilter(this.filter, move)) {
+      return false;
+    }
+    if (this.chance !== 100 && pokemon.randBattleSeedInt(100) >= this.chance) {
+      return false;
+    }
+    const effect = this.pickEffect(pokemon);
+    return target.canSetStatus(effect, true, false, pokemon);
+  }
+
+  public override apply(params: PostMoveInteractionAbAttrParams): void {
+    if (params.simulated) {
+      return;
+    }
+    const { pokemon, opponent: target } = params;
+    const effect = this.pickEffect(pokemon);
+    target.trySetStatus(effect, pokemon);
+  }
+
+  private pickEffect(pokemon: Parameters<PostAttackAbAttr["apply"]>[0]["pokemon"]): StatusEffect {
+    if (this.effects.length === 1) {
+      return this.effects[0];
+    }
+    return this.effects[pokemon.randBattleSeedInt(this.effects.length)];
+  }
+}
+
+/**
+ * Offensive (PostAttack) counterpart of {@linkcode ChanceBattlerTagOnHitAbAttr}.
+ * The holder's damaging move has a chance to inflict a {@linkcode BattlerTagType}
+ * on the move's target. Used by ER abilities like `Loud Bang`
+ * (SOUND_BASED-gated CONFUSED), `Beautiful Music` (SOUND_BASED-gated INFATUATED),
+ * `Radio Jam` (SOUND_BASED-gated DISABLED), `Haunting Frenzy` (FLINCHED), etc.
+ */
+export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
+  private readonly chance: number;
+  private readonly tags: readonly BattlerTagType[];
+  private readonly contactRequired: boolean;
+  private readonly turns: number | undefined;
+  private readonly filter: ChanceStatusFilter | undefined;
+
+  constructor(opts: ChanceBattlerTagOnHitOptions) {
+    if (!(opts.chance >= 0 && opts.chance <= 100)) {
+      throw new Error(`[ChanceBattlerTagOnAttackAbAttr] chance must be in [0, 100]; got ${opts.chance}`);
+    }
+    if (opts.tags.length === 0) {
+      throw new Error("[ChanceBattlerTagOnAttackAbAttr] must configure at least one battler tag");
+    }
+    super(undefined, false);
+    this.chance = opts.chance;
+    this.tags = opts.tags;
+    this.contactRequired = opts.contactRequired ?? opts.filter === undefined;
+    this.turns = opts.turns;
+    this.filter = opts.filter;
+  }
+
+  /** The configured move filter, or `undefined` when no filter is set. */
+  public getFilter(): ChanceStatusFilter | undefined {
+    return this.filter;
+  }
+
+  /** The configured proc chance (0-100). */
+  public getChance(): number {
+    return this.chance;
+  }
+
+  /** The configured battler-tag list (read-only). */
+  public getTags(): readonly BattlerTagType[] {
+    return this.tags;
+  }
+
+  public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, move, opponent: target } = params;
+    if (!super.canApply(params)) {
+      return false;
+    }
+    if (target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") || pokemon === target) {
+      return false;
+    }
+    if (this.contactRequired && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target })) {
+      return false;
+    }
+    if (this.filter !== undefined && !checkChanceStatusFilter(this.filter, move)) {
+      return false;
+    }
+    if (this.chance !== 100 && pokemon.randBattleSeedInt(100) >= this.chance) {
+      return false;
+    }
+    const tag = this.pickTag(pokemon);
+    return target.canAddTag(tag);
+  }
+
+  public override apply(params: PostMoveInteractionAbAttrParams): void {
+    if (params.simulated) {
+      return;
+    }
+    const { pokemon, opponent: target } = params;
+    const tag = this.pickTag(pokemon);
+    target.addTag(tag, resolveTagTurns(tag, this.turns, pokemon), undefined, pokemon.id);
+  }
+
+  private pickTag(pokemon: Parameters<PostAttackAbAttr["apply"]>[0]["pokemon"]): BattlerTagType {
+    if (this.tags.length === 1) {
+      return this.tags[0];
+    }
+    return this.tags[pokemon.randBattleSeedInt(this.tags.length)];
+  }
+}
+
+/**
+ * Resolve the turn count to pass to `addTag` for an inflicted battler tag.
+ *
+ * Only {@linkcode BattlerTagType.CONFUSED} actually consumes the count —
+ * `ConfusedTag` is a CUSTOM-lapse tag, so a `0` count (the `addTag` default)
+ * makes it expire on the very next lapse without ever taking effect. Every
+ * other tag we emit (`DISABLED`, `INFATUATED`, `FLINCHED`, and the ER-specific
+ * `ER_BLEED`/`ER_FROSTBITE`/`ER_FEAR`) self-manages its own duration and
+ * ignores the passed count.
+ *
+ * When no explicit `turns` override is supplied we roll 2-5 turns for CONFUSED,
+ * matching move-based confusion (`ConfuseAttr`, `move.ts`); other tags fall
+ * through to the `addTag` default.
+ */
+function resolveTagTurns(
+  tag: BattlerTagType,
+  turns: number | undefined,
+  pokemon: { randBattleSeedIntRange(min: number, max: number): number },
+): number | undefined {
+  if (turns !== undefined) {
+    return turns;
+  }
+  if (tag === BattlerTagType.CONFUSED) {
+    return pokemon.randBattleSeedIntRange(2, 5);
+  }
+  return;
+}
+
 /**
  * Check whether the incoming `move` satisfies the given filter. Shared by
  * both {@linkcode ChanceStatusOnHitAbAttr} and
  * {@linkcode ChanceBattlerTagOnHitAbAttr}.
- *
- * The `Move` instance is structurally typed via the AbAttr params; we only
- * need `hasFlag` and `type` from it. Imports remain narrow.
  */
 function checkChanceStatusFilter(
   filter: ChanceStatusFilter,

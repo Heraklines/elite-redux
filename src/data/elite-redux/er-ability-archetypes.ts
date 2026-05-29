@@ -81,7 +81,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   292: { erAbilityId: 292, archetype: "bespoke", params: null },
   293: { erAbilityId: 293, archetype: "bespoke", params: null },
   294: { erAbilityId: 294, archetype: "entry-effect", params: {"effect":{"kind":"add-self-type","type":"WATER"}} },
-  295: { erAbilityId: 295, archetype: "chance-status-on-hit", params: {"chance":50,"status":"CONFUSION","onContactOnly":false} },
+  295: { erAbilityId: 295, archetype: "chance-status-on-hit", params: {"chance":50,"status":"CONFUSION","filter":{"flag":"SOUND_BASED"},"direction":"offense"} }, // Loud Bang: holder's SOUND move confuses the foe (C-source attacker block ~9316)
   296: { erAbilityId: 296, archetype: "damage-reduction-generic", params: {"filter":{"kind":"physical"},"reduction":0.4} },
   297: { erAbilityId: 297, archetype: "bespoke", params: null },
   298: { erAbilityId: 298, archetype: "entry-effect", params: {"effect":{"kind":"add-self-type","type":"GROUND"}} },
@@ -124,7 +124,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   335: { erAbilityId: 335, archetype: "bespoke", params: null },
   336: { erAbilityId: 336, archetype: "type-damage-boost", params: {"type":"ELECTRIC","multiplier":1.35,"recoilPct":0.1} },
   337: { erAbilityId: 337, archetype: "bespoke", params: null }, // Raw Wood: Grass +20% offense AND halves Grass dmg taken (composite — see dispatchBespoke)
-  338: { erAbilityId: 338, archetype: "chance-status-on-hit", params: {"chance":50,"status":"TOXIC","onContactOnly":false} },
+  338: { erAbilityId: 338, archetype: "chance-status-on-hit", params: {"chance":50,"status":"TOXIC","filter":{"flag":"STRONG_JAW"},"direction":"offense"} }, // Solenoglyphs: holder's BITING move badly poisons target (C-source attacker block ~9524)
   339: { erAbilityId: 339, archetype: "entry-effect", params: {"effect":{"kind":"set-hazard","hazard":"STICKY_WEB","layers":1}} },
   340: { erAbilityId: 340, archetype: "bespoke", params: null },
   341: { erAbilityId: 341, archetype: "bespoke", params: null },
@@ -171,7 +171,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   383: { erAbilityId: 383, archetype: "bespoke", params: null },
   384: { erAbilityId: 384, archetype: "bespoke", params: null },
   385: { erAbilityId: 385, archetype: "lifesteal", params: {"trigger":"on-hit-deal","healFraction":0.5} },
-  386: { erAbilityId: 386, archetype: "chance-status-on-hit", params: {"chance":30,"status":"TOXIC","onContactOnly":false} },
+  386: { erAbilityId: 386, archetype: "chance-status-on-hit", params: {"chance":30,"status":"TOXIC","direction":"offense"} }, // Spectral Shroud: holder's move badly poisons the foe (C-source attacker block ~9577)
   387: { erAbilityId: 387, archetype: "status-immunity", params: {"statuses":["CONFUSION"],"tags":["INTIMIDATE"]} },
   388: { erAbilityId: 388, archetype: "bespoke", params: null },
   389: { erAbilityId: 389, archetype: "composite-vanilla-mashup", params: {"parts":["50% more damage to Water-types","Infiltrator"]} },
@@ -225,7 +225,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   438: { erAbilityId: 438, archetype: "bespoke", params: null },
   439: { erAbilityId: 439, archetype: "bespoke", params: null },
   440: { erAbilityId: 440, archetype: "composite-vanilla-mashup", params: {"parts":["Color Change","Protean","Fur Coat","Ice Scales"]} },
-  441: { erAbilityId: 441, archetype: "chance-status-on-hit", params: {"chance":50,"status":"PARALYSIS","onContactOnly":false} },
+  441: { erAbilityId: 441, archetype: "chance-status-on-hit", params: {"chance":50,"status":"PARALYSIS","filter":{"flag":"STRONG_JAW"},"direction":"offense"} }, // Shocking Jaws: holder's BITING move paralyzes target (C-source attacker block ~9536)
   442: { erAbilityId: 442, archetype: "bespoke", params: null },
   443: { erAbilityId: 443, archetype: "entry-effect", params: {"effect":{"kind":"set-screen-or-room","tag":"GRAVITY","turns":5}} },
   444: { erAbilityId: 444, archetype: "bespoke", params: null },
@@ -275,7 +275,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   494: { erAbilityId: 494, archetype: "bespoke", params: null },
   495: { erAbilityId: 495, archetype: "bespoke", params: null },
   496: { erAbilityId: 496, archetype: "bespoke", params: null },
-  497: { erAbilityId: 497, archetype: "chance-status-on-hit", params: {"chance":30,"status":"INFATUATION","onContactOnly":false} },
+  497: { erAbilityId: 497, archetype: "chance-status-on-hit", params: {"chance":30,"status":"INFATUATION","direction":"offense"} }, // Yuki Onna: 30% infatuate on hit (offensive per desc)
   498: { erAbilityId: 498, archetype: "bespoke", params: null },
   499: { erAbilityId: 499, archetype: "composite-vanilla-mashup", params: {"parts":["Filter","Illuminate"]} },
   500: { erAbilityId: 500, archetype: "bespoke", params: null },
@@ -302,7 +302,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   522: { erAbilityId: 522, archetype: "priority-modifier", params: {"condition":{"kind":"max-hp"},"priority":1,"filter":{"type":"GHOST"}} },
   523: { erAbilityId: 523, archetype: "bespoke", params: null },
   524: { erAbilityId: 524, archetype: "composite-vanilla-mashup", params: {"parts":["Amplifier","Punk Rock"]} },
-  525: { erAbilityId: 525, archetype: "chance-status-on-hit", params: {"chance":50,"status":"BURN","onContactOnly":false} },
+  525: { erAbilityId: 525, archetype: "chance-status-on-hit", params: {"chance":50,"status":"BURN","filter":{"flag":"STRONG_JAW"},"direction":"offense"} }, // Flaming Jaws: holder's BITING move burns target (desc)
   526: { erAbilityId: 526, archetype: "bespoke", params: null },
   527: { erAbilityId: 527, archetype: "composite-vanilla-mashup", params: {"parts":["Intrepid Sword","Anger Point"]} },
   528: { erAbilityId: 528, archetype: "composite-vanilla-mashup", params: {"parts":["Dauntless Shield","Stamina"]} },
@@ -313,7 +313,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   533: { erAbilityId: 533, archetype: "stat-trigger-on-event", params: {"trigger":"on-ko","stats":[{"stat":"SPATK","stages":1}]} },
   534: { erAbilityId: 534, archetype: "conditional-damage", params: {"condition":{"kind":"target-confused"},"multiplier":2} },
   536: { erAbilityId: 536, archetype: "bespoke", params: null },
-  537: { erAbilityId: 537, archetype: "chance-status-on-hit", params: {"chance":30,"status":"BLEED","onContactOnly":true} },
+  537: { erAbilityId: 537, archetype: "chance-status-on-hit", params: {"chance":30,"status":"BLEED","onContactOnly":true,"direction":"both"} }, // Spike Armor: bleed on contact (defense) or offense (desc)
   538: { erAbilityId: 538, archetype: "chance-status-on-hit", params: {"chance":30,"status":"BLEED","onContactOnly":false} },
   539: { erAbilityId: 539, archetype: "damage-reduction-generic", params: {"filter":{"kind":"special"},"reduction":0.4} },
   540: { erAbilityId: 540, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"GHOST","multiplier":1.2,"flag":"SOUND_BASED"} },
@@ -348,10 +348,10 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   590: { erAbilityId: 590, archetype: "composite-vanilla-mashup", params: {"parts":["Sweeping Edge","Keen Edge"]} },
   591: { erAbilityId: 591, archetype: "bespoke", params: null },
   592: { erAbilityId: 592, archetype: "bespoke", params: null },
-  593: { erAbilityId: 593, archetype: "chance-status-on-hit", params: {"chance":20,"status":"BURN","onContactOnly":false} },
-  594: { erAbilityId: 594, archetype: "chance-status-on-hit", params: {"chance":20,"status":"FLINCH","onContactOnly":false} },
+  593: { erAbilityId: 593, archetype: "chance-status-on-hit", params: {"chance":20,"status":"BURN","filter":{"flag":"KEEN_EDGE"},"direction":"offense"} }, // Molten Blades: holder's KEEN-EDGE move burns (desc)
+  594: { erAbilityId: 594, archetype: "chance-status-on-hit", params: {"chance":20,"status":"FLINCH","direction":"offense"} }, // Haunting Frenzy: holder's move flinches the opponent (desc)
   595: { erAbilityId: 595, archetype: "bespoke", params: null },
-  596: { erAbilityId: 596, archetype: "chance-status-on-hit", params: {"chance":20,"status":"DISABLE","filter":{"flag":"SOUND_BASED"}} },
+  596: { erAbilityId: 596, archetype: "chance-status-on-hit", params: {"chance":20,"status":"DISABLE","filter":{"flag":"SOUND_BASED"},"direction":"offense"} }, // Radio Jam: holder's SOUND move disables target (desc)
   597: { erAbilityId: 597, archetype: "bespoke", params: null },
   598: { erAbilityId: 598, archetype: "bespoke", params: null },
   599: { erAbilityId: 599, archetype: "bespoke", params: null },
@@ -374,15 +374,15 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   619: { erAbilityId: 619, archetype: "bespoke", params: null },
   620: { erAbilityId: 620, archetype: "composite-vanilla-mashup", params: {"parts":["Seaweed","Water STAB"]} },
   621: { erAbilityId: 621, archetype: "bespoke", params: null },
-  622: { erAbilityId: 622, archetype: "chance-status-on-hit", params: {"chance":50,"status":"INFATUATION","onContactOnly":false} },
+  622: { erAbilityId: 622, archetype: "chance-status-on-hit", params: {"chance":50,"status":"INFATUATION","filter":{"flag":"SOUND_BASED"},"direction":"offense"} }, // Beautiful Music: holder's SOUND move infatuates (desc)
   623: { erAbilityId: 623, archetype: "bespoke", params: null },
   624: { erAbilityId: 624, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"ICE","multiplier":1.2,"flag":"SOUND_BASED"} },
   625: { erAbilityId: 625, archetype: "bespoke", params: null },
-  626: { erAbilityId: 626, archetype: "chance-status-on-hit", params: {"chance":30,"status":"BLEED","filter":{"flag":"SOUND_BASED"}} },
+  626: { erAbilityId: 626, archetype: "chance-status-on-hit", params: {"chance":30,"status":"BLEED","filter":{"flag":"SOUND_BASED"},"direction":"offense"} }, // Resonance: holder's SOUND move bleeds (desc)
   627: { erAbilityId: 627, archetype: "bespoke", params: null },
   628: { erAbilityId: 628, archetype: "priority-modifier", params: {"condition":{"kind":"max-hp"},"priority":1,"filter":{"type":"FAIRY"}} },
   629: { erAbilityId: 629, archetype: "bespoke", params: null },
-  630: { erAbilityId: 630, archetype: "chance-status-on-hit", params: {"chance":30,"status":"FEAR","onContactOnly":true} },
+  630: { erAbilityId: 630, archetype: "chance-status-on-hit", params: {"chance":30,"status":"FEAR","onContactOnly":true,"direction":"both"} }, // Menacing Situation: Fear on contact (defense) + offense (desc)
   631: { erAbilityId: 631, archetype: "bespoke", params: null },
   632: { erAbilityId: 632, archetype: "bespoke", params: null },
   633: { erAbilityId: 633, archetype: "bespoke", params: null },
@@ -402,7 +402,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   647: { erAbilityId: 647, archetype: "composite-vanilla-mashup", params: {"parts":["Mighty Horn","Pixilate"]} },
   648: { erAbilityId: 648, archetype: "bespoke", params: null },
   649: { erAbilityId: 649, archetype: "bespoke", params: null },
-  650: { erAbilityId: 650, archetype: "chance-status-on-hit", params: {"chance":20,"status":"BURN","onContactOnly":false} },
+  650: { erAbilityId: 650, archetype: "chance-status-on-hit", params: {"chance":20,"status":"BURN","direction":"offense"} }, // Venoblaze Pincers: holder's move burns (desc; 1.2x physical handled separately)
   651: { erAbilityId: 651, archetype: "composite-vanilla-mashup", params: {"parts":["Celestial Blessing","Regenerator"]} },
   652: { erAbilityId: 652, archetype: "composite-vanilla-mashup", params: {"parts":["Unburden","Ripen"]} },
   653: { erAbilityId: 653, archetype: "bespoke", params: null },
@@ -471,7 +471,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   717: { erAbilityId: 717, archetype: "bespoke", params: null },
   718: { erAbilityId: 718, archetype: "bespoke", params: null },
   719: { erAbilityId: 719, archetype: "bespoke", params: null },
-  720: { erAbilityId: 720, archetype: "chance-status-on-hit", params: {"chance":60,"status":"PARALYSIS","onContactOnly":false} },
+  720: { erAbilityId: 720, archetype: "chance-status-on-hit", params: {"chance":60,"status":"PARALYSIS","direction":"offense"} }, // Stun Shock: holder's attack paralyzes target (desc; "or poison" approximated to paralysis)
   721: { erAbilityId: 721, archetype: "composite-vanilla-mashup", params: {"parts":["Rampage","Hyper Aggressive"]} },
   722: { erAbilityId: 722, archetype: "bespoke", params: null },
   724: { erAbilityId: 724, archetype: "bespoke", params: null },
@@ -496,7 +496,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   744: { erAbilityId: 744, archetype: "composite-vanilla-mashup", params: {"parts":["Sand Stream","Sand Force"]} },
   745: { erAbilityId: 745, archetype: "bespoke", params: null },
   746: { erAbilityId: 746, archetype: "composite-vanilla-mashup", params: {"parts":["Desolate Land","Earth Eater"]} },
-  747: { erAbilityId: 747, archetype: "chance-status-on-hit", params: {"chance":100,"status":"BURN","onContactOnly":true} },
+  747: { erAbilityId: 747, archetype: "chance-status-on-hit", params: {"chance":100,"status":"BURN","onContactOnly":true,"direction":"both"} }, // Daybreak: burns foe on contact (defense) + offense (desc)
   748: { erAbilityId: 748, archetype: "lifesteal", params: {"trigger":"on-hit-deal","healFraction":0.25} },
   749: { erAbilityId: 749, archetype: "composite-vanilla-mashup", params: {"parts":["Water Absorb","Storm Drain"]} },
   750: { erAbilityId: 750, archetype: "bespoke", params: null },
@@ -602,7 +602,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   849: { erAbilityId: 849, archetype: "composite-vanilla-mashup", params: {"parts":["Long Reach","Grip Pincer"]} },
   850: { erAbilityId: 850, archetype: "composite-vanilla-mashup", params: {"parts":["Serene Grace","Giant Wings"]} },
   851: { erAbilityId: 851, archetype: "bespoke", params: null },
-  852: { erAbilityId: 852, archetype: "chance-status-on-hit", params: {"chance":30,"status":"POISON","onContactOnly":false} },
+  852: { erAbilityId: 852, archetype: "chance-status-on-hit", params: {"chance":30,"status":"POISON","direction":"offense"} }, // Envenom: holder's move poisons the target (desc)
   853: { erAbilityId: 853, archetype: "bespoke", params: null },
   854: { erAbilityId: 854, archetype: "composite-vanilla-mashup", params: {"parts":["Mega Launcher","Mind Crunch"]} },
   855: { erAbilityId: 855, archetype: "bespoke", params: null },
@@ -647,7 +647,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   894: { erAbilityId: 894, archetype: "composite-vanilla-mashup", params: {"parts":["Hospitality","Friend Guard"]} },
   895: { erAbilityId: 895, archetype: "bespoke", params: null },
   896: { erAbilityId: 896, archetype: "bespoke", params: null },
-  897: { erAbilityId: 897, archetype: "chance-status-on-hit", params: {"chance":30,"status":"POISON","onContactOnly":false} },
+  897: { erAbilityId: 897, archetype: "chance-status-on-hit", params: {"chance":30,"status":"POISON","filter":{"type":"ELECTRIC"},"direction":"offense"} }, // Virus: holder's ELECTRIC move poisons (desc)
   898: { erAbilityId: 898, archetype: "bespoke", params: null },
   899: { erAbilityId: 899, archetype: "bespoke", params: null },
   900: { erAbilityId: 900, archetype: "composite-vanilla-mashup", params: {"parts":["Sand Force","Sand Guard"]} },
@@ -657,8 +657,8 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   904: { erAbilityId: 904, archetype: "bespoke", params: null },
   905: { erAbilityId: 905, archetype: "bespoke", params: null },
   906: { erAbilityId: 906, archetype: "bespoke", params: null },
-  907: { erAbilityId: 907, archetype: "chance-status-on-hit", params: {"chance":50,"status":"BURN","filter":{"flag":"MIGHTY_HORN"}} },
-  908: { erAbilityId: 908, archetype: "chance-status-on-hit", params: {"chance":25,"status":"BURN","filter":{"flag":"KEEN_EDGE"}} },
+  907: { erAbilityId: 907, archetype: "chance-status-on-hit", params: {"chance":50,"status":"BURN","filter":{"flag":"MIGHTY_HORN"},"direction":"offense"} }, // Laser Drill: holder's HORN move burns (desc)
+  908: { erAbilityId: 908, archetype: "chance-status-on-hit", params: {"chance":25,"status":"BURN","filter":{"flag":"KEEN_EDGE"},"direction":"offense"} }, // Lightsaber: holder's KEEN-EDGE move burns (desc; "or paralysis" approximated to burn; Fire-type add separate)
   909: { erAbilityId: 909, archetype: "bespoke", params: null },
   910: { erAbilityId: 910, archetype: "bespoke", params: null },
   911: { erAbilityId: 911, archetype: "bespoke", params: null },
@@ -676,7 +676,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   923: { erAbilityId: 923, archetype: "bespoke", params: null },
   924: { erAbilityId: 924, archetype: "bespoke", params: null },
   925: { erAbilityId: 925, archetype: "composite-vanilla-mashup", params: {"parts":["Fire Scales","Taste the Rainbow"]} },
-  926: { erAbilityId: 926, archetype: "chance-status-on-hit", params: {"chance":20,"status":"SLEEP","onContactOnly":true} },
+  926: { erAbilityId: 926, archetype: "chance-status-on-hit", params: {"chance":20,"status":"SLEEP","onContactOnly":true,"direction":"both"} }, // Hypnotic Touch: sleep on contact (defense) + offense (desc)
   927: { erAbilityId: 927, archetype: "bespoke", params: null },
   928: { erAbilityId: 928, archetype: "composite-vanilla-mashup", params: {"parts":["Multi-Headed","Hubris"]} },
   929: { erAbilityId: 929, archetype: "composite-vanilla-mashup", params: {"parts":["Snow Warning","Ice Body"]} },
@@ -764,7 +764,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   1011: { erAbilityId: 1011, archetype: "composite-vanilla-mashup", params: {"parts":["Mystic Blades","Keen Edge moves lower SpDef"]} },
   1012: { erAbilityId: 1012, archetype: "bespoke", params: null },
   1013: { erAbilityId: 1013, archetype: "composite-vanilla-mashup", params: {"parts":["Terrify","Deviate"]} },
-  1014: { erAbilityId: 1014, archetype: "chance-status-on-hit", params: {"chance":30,"status":"BURN","filter":{"type":"GRASS"}} },
+  1014: { erAbilityId: 1014, archetype: "chance-status-on-hit", params: {"chance":30,"status":"BURN","filter":{"type":"GRASS"},"direction":"offense"} }, // Ghost Pepper: holder's GRASS move burns (desc)
   1015: { erAbilityId: 1015, archetype: "composite-vanilla-mashup", params: {"parts":["Heatproof","Shell Armor"]} },
   1016: { erAbilityId: 1016, archetype: "composite-vanilla-mashup", params: {"parts":["Multi-Headed","Riptide"]} },
   1017: { erAbilityId: 1017, archetype: "composite-vanilla-mashup", params: {"parts":["Iron Fist"]} },

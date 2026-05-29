@@ -102,8 +102,10 @@ import { StatChangeOnCategoryAttackAbAttr } from "#data/elite-redux/abilities/st
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
 import { ChanceDodgeAbAttr } from "#data/elite-redux/archetypes/chance-dodge";
 import {
+  ChanceBattlerTagOnAttackAbAttr,
   ChanceBattlerTagOnHitAbAttr,
   type ChanceStatusFilter,
+  ChanceStatusOnAttackAbAttr,
   ChanceStatusOnHitAbAttr,
 } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
@@ -653,8 +655,12 @@ function lookupChanceStatusFilter(value: unknown): ChanceStatusFilter | null | u
     return null;
   }
   if (typeof value.flag === "string") {
-    const flag = ER_CLASSIFIER_FLAG_TO_MOVE_FLAG[value.flag];
-    if (flag === undefined || flag === null) {
+    // Use the shared resolver so both pokerogue-native enum names
+    // ("BITING_MOVE", "PUNCHING_MOVE") and classifier-form keys
+    // ("STRONG_JAW", "IRON_FIST", "SOUND_BASED") are accepted — the classifier
+    // and hand-authored fixups have used both spellings interchangeably.
+    const flag = lookupMoveFlag(value.flag);
+    if (flag === null) {
       return null;
     }
     return { flag };
@@ -666,17 +672,57 @@ function lookupChanceStatusFilter(value: unknown): ChanceStatusFilter | null | u
   return null;
 }
 
+/** Proc direction for `chance-status-on-hit` rows (see `dispatchChanceStatusOnHit`). */
+type ChanceStatusDirection = "defense" | "offense" | "both";
+
+/**
+ * Parse the optional `direction` param. Controls whether the proc fires on
+ * DEFENSE (holder is hit → status the attacker, Static/Effect-Spore style),
+ * OFFENSE (holder's move → status the target, Poison-Touch/Shocking-Jaws
+ * style), or BOTH ("also works on offense" composites like Daybreak). Absent
+ * defaults to "defense" to preserve the original (vanilla-reactive) behavior
+ * for unannotated rows; an unrecognised value returns `null`.
+ */
+function parseChanceStatusDirection(value: unknown): ChanceStatusDirection | null {
+  if (value === undefined) {
+    return "defense";
+  }
+  if (value === "defense" || value === "offense" || value === "both") {
+    return value;
+  }
+  return null;
+}
+
+/**
+ * Build the defensive and/or offensive attrs for the resolved direction.
+ * `makeDefense`/`makeOffense` are thunks so only the needed attrs are
+ * constructed.
+ */
+function buildDirectionalAttrs(
+  direction: ChanceStatusDirection,
+  makeDefense: () => AbAttr,
+  makeOffense: () => AbAttr,
+): AbAttr[] {
+  const attrs: AbAttr[] = [];
+  if (direction === "defense" || direction === "both") {
+    attrs.push(makeDefense());
+  }
+  if (direction === "offense" || direction === "both") {
+    attrs.push(makeOffense());
+  }
+  return attrs;
+}
+
 /** Dispatch a `chance-status-on-hit` classifier row. */
 function dispatchChanceStatusOnHit(params: Record<string, unknown>): DispatchResult {
   const chance = params.chance;
   if (typeof chance !== "number" || chance < 0 || chance > 100) {
     return skip("chance-status-on-hit: missing/invalid chance");
   }
-  // Prefer the vanilla StatusEffect path first; only fall back to the
-  // battler-tag flavor when the status string is a tag concept (CONFUSION,
-  // INFATUATION, FLINCH, DISABLE) or an ER-specific one (BLEED, FROSTBITE,
-  // FEAR) routed through `lookupBattlerTagFromStatus`.
-  const status = lookupStatusEffect(params.status);
+  const direction = parseChanceStatusDirection(params.direction);
+  if (direction === null) {
+    return skip(`chance-status-on-hit: unknown direction ${String(params.direction)}`);
+  }
   const contactRequired = params.onContactOnly;
   const contactOpt = typeof contactRequired === "boolean" ? { contactRequired } : {};
   const filter = lookupChanceStatusFilter(params.filter);
@@ -684,26 +730,31 @@ function dispatchChanceStatusOnHit(params: Record<string, unknown>): DispatchRes
     return skip(`chance-status-on-hit: unparseable filter ${JSON.stringify(params.filter)}`);
   }
   const filterOpt = filter === undefined ? {} : { filter };
+  // Prefer the vanilla StatusEffect path first; only fall back to the
+  // battler-tag flavor when the status string is a tag concept (CONFUSION,
+  // INFATUATION, FLINCH, DISABLE) or an ER-specific one (BLEED, FROSTBITE,
+  // FEAR) routed through `lookupBattlerTagFromStatus`.
+  const status = lookupStatusEffect(params.status);
   if (status !== null) {
-    return ok([
-      new ChanceStatusOnHitAbAttr({
-        chance,
-        effects: [status],
-        ...contactOpt,
-        ...filterOpt,
-      }),
-    ]);
+    const opts = { chance, effects: [status], ...contactOpt, ...filterOpt };
+    return ok(
+      buildDirectionalAttrs(
+        direction,
+        () => new ChanceStatusOnHitAbAttr(opts),
+        () => new ChanceStatusOnAttackAbAttr(opts),
+      ),
+    );
   }
   const tag = lookupBattlerTagFromStatus(params.status);
   if (tag !== null) {
-    return ok([
-      new ChanceBattlerTagOnHitAbAttr({
-        chance,
-        tags: [tag],
-        ...contactOpt,
-        ...filterOpt,
-      }),
-    ]);
+    const opts = { chance, tags: [tag], ...contactOpt, ...filterOpt };
+    return ok(
+      buildDirectionalAttrs(
+        direction,
+        () => new ChanceBattlerTagOnHitAbAttr(opts),
+        () => new ChanceBattlerTagOnAttackAbAttr(opts),
+      ),
+    );
   }
   return skip(`chance-status-on-hit: status ${String(params.status)} not a vanilla StatusEffect or BattlerTag`);
 }
