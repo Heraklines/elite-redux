@@ -25,7 +25,10 @@ const SPLIT_REPLACE_VALUE = "$1\0$2";
  * @todo Consider tests into [in-source testing](https://vitest.dev/guide/in-source.html) and converting this to unexported
  */
 export function splitWords(value: string): string[] {
-  let result = value.trim();
+  // ER: defensive — ER-custom ids aren't in enums (e.g. SpeciesId[10859] is
+  // undefined), so callers like toCamelCase(SpeciesId[id]) pass undefined and
+  // would crash here, softlocking screens (e.g. the Pokédex Evolutions menu).
+  let result = (value ?? "").trim();
   result = result.replace(SPLIT_LOWER_UPPER_RE, SPLIT_REPLACE_VALUE).replace(SPLIT_UPPER_UPPER_RE, SPLIT_REPLACE_VALUE);
   result = result.replace(DELIM_STRIP_REGEXP, "\0");
 

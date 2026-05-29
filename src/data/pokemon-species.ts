@@ -1081,7 +1081,11 @@ export class PokemonSpecies extends PokemonSpeciesForm implements Localizable {
   getFormNameToDisplay(formIndex = 0, append = false): string {
     const formKey = this.forms[formIndex]?.formKey ?? "";
     const formText = toPascalCase(formKey);
-    const speciesName = toCamelCase(SpeciesId[this.speciesId]);
+    // ER customs (id >= 10000) aren't in the SpeciesId enum, so SpeciesId[id]
+    // is undefined and toCamelCase(undefined) crashes (.trim of undefined),
+    // softlocking the Pokédex Evolutions menu on any Redux line. Fall back to
+    // the display name.
+    const speciesName = toCamelCase(SpeciesId[this.speciesId] ?? this.name);
     let ret = "";
 
     const region = this.getRegion();
@@ -1112,7 +1116,7 @@ export class PokemonSpecies extends PokemonSpeciesForm implements Localizable {
       if (i18next.exists(i18key)) {
         ret = i18next.t(i18key);
       } else {
-        const rootSpeciesName = toCamelCase(SpeciesId[this.getRootSpeciesId()]);
+        const rootSpeciesName = toCamelCase(SpeciesId[this.getRootSpeciesId()] ?? this.name);
         const i18RootKey = `pokemonForm:${rootSpeciesName}${formText}`;
         ret = i18next.exists(i18RootKey) ? i18next.t(i18RootKey) : formText;
       }

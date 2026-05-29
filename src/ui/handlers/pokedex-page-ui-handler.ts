@@ -21,6 +21,7 @@ import {
 import { speciesTmMoves } from "#balance/tms";
 import { allAbilities, allMoves, allSpecies, catchableSpecies } from "#data/data-lists";
 import { Egg, getEggTierForSpecies, MAX_EGG_COUNT } from "#data/egg";
+import { getErFormChangesFor } from "#data/elite-redux/er-form-change-overlay";
 import { GrowthRate, getGrowthRateColor } from "#data/exp";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
@@ -1692,7 +1693,20 @@ export class PokedexPageUiHandler extends MessageUiHandler {
             ui.setMode(UiMode.POKEDEX_PAGE, "refresh").then(() => {
               const options: OptionSelectItem[] = [];
 
-              if (this.preEvolutions.length === 0 && this.evolutions.length === 0 && this.battleForms.length === 0) {
+              // ER: mega/primal targets of ER-custom species are SEPARATE species
+              // (e.g. Snorlax Redux → Snorlax Redux Mega), tracked in a dedicated
+              // registry rather than pokerogue's form-change table. Surface them in
+              // the Evolutions menu as navigable entries. Vanilla mons keep their
+              // normal battle-form handling, so this is gated to ER customs to
+              // avoid duplicating standard megas.
+              const erFormChanges = this.species.speciesId >= 10000 ? getErFormChangesFor(this.species.speciesId) : [];
+
+              if (
+                this.preEvolutions.length === 0
+                && this.evolutions.length === 0
+                && this.battleForms.length === 0
+                && erFormChanges.length === 0
+              ) {
                 ui.showText(i18next.t("pokedexUiHandler:noEvolutions"));
                 ui.playError();
                 this.blockInput = false;
@@ -1835,6 +1849,50 @@ export class PokedexPageUiHandler extends MessageUiHandler {
                         ui.setModeForceTransition(
                           UiMode.POKEDEX_PAGE,
                           newSpecies,
+                          this.savedStarterAttributes,
+                          this.filteredIndices,
+                        );
+                        return true;
+                      },
+                      onHover: () => this.showText(conditionText),
+                    });
+                  }
+                }
+
+                if (erFormChanges.length > 0) {
+                  // Only add the "Forms" header if the vanilla battle-forms block
+                  // above didn't already add one.
+                  if (this.battleForms.length === 0) {
+                    options.push({
+                      label: i18next.t("pokedexUiHandler:forms"),
+                      style: TextStyle.MONEY_WINDOW,
+                      skip: true,
+                      handler: () => false,
+                    });
+                  }
+
+                  for (const fc of erFormChanges) {
+                    const target = allSpecies.find(sp => sp.speciesId === fc.targetSpeciesId);
+                    if (!target) {
+                      continue;
+                    }
+                    const isTargetCaught = !!this.isCaught(target);
+                    const conditionText = fc.requirement?.replace(/^ITEM_/, "").replace(/_/g, " ") ?? "";
+                    options.push({
+                      label: target.getExpandedSpeciesName(),
+                      style: isTargetCaught ? TextStyle.WINDOW : TextStyle.SHADOW_TEXT,
+                      handler: () => {
+                        // Navigate to the mega/primal SPECIES (a real species with
+                        // its own Pokédex page, not a form of this one).
+                        this.previousSpecies.push(this.species);
+                        this.previousStarterAttributes.push({ ...this.savedStarterAttributes });
+                        this.starterAttributes.form = 0;
+                        this.savedStarterAttributes.form = 0;
+                        this.moveInfoOverlay.clear();
+                        this.clearText();
+                        ui.setModeForceTransition(
+                          UiMode.POKEDEX_PAGE,
+                          target,
                           this.savedStarterAttributes,
                           this.filteredIndices,
                         );
