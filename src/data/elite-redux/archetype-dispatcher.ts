@@ -1485,6 +1485,13 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
           flag: MoveFlags.SLICING_MOVE,
         }),
       ];
+    case 762: // Qigong: "Rampage + Always hits" — the holder's moves never miss
+      // (No Guard's no-miss half). Rampage is the auto-resolved part.
+      return [new AlwaysHitAbAttr()];
+    case 881: // Stonecutter: "Fossilized + Rock moves ignore abilities" — the
+      // holder's Rock-type moves bypass the target's ability (type-gated Mold
+      // Breaker). Fossilized is the auto-resolved part.
+      return [new MoveAbilityBypassAbAttr((pokemon, move) => pokemon.getMoveType(move) === PokemonType.ROCK)];
     default:
       return [];
   }
