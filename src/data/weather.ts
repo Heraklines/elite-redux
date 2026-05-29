@@ -55,6 +55,7 @@ export class Weather {
     switch (this.weatherType) {
       case WeatherType.SANDSTORM:
       case WeatherType.HAIL:
+      case WeatherType.TEMPEST_STORM:
         return true;
     }
 
@@ -67,6 +68,9 @@ export class Weather {
         return type === PokemonType.GROUND || type === PokemonType.ROCK || type === PokemonType.STEEL;
       case WeatherType.HAIL:
         return type === PokemonType.ICE;
+      case WeatherType.TEMPEST_STORM:
+        // Electric-types are at home in a thundershock storm.
+        return type === PokemonType.ELECTRIC;
     }
 
     return false;
@@ -153,6 +157,8 @@ export function getWeatherStartMessage(weatherType: WeatherType): string | null 
       return i18next.t("weather:harshSunStartMessage");
     case WeatherType.STRONG_WINDS:
       return i18next.t("weather:strongWindsStartMessage");
+    case WeatherType.TEMPEST_STORM:
+      return i18next.t("weather:tempestStormStartMessage");
   }
 
   return null;
@@ -178,6 +184,8 @@ export function getWeatherLapseMessage(weatherType: WeatherType): string | null 
       return i18next.t("weather:harshSunLapseMessage");
     case WeatherType.STRONG_WINDS:
       return i18next.t("weather:strongWindsLapseMessage");
+    case WeatherType.TEMPEST_STORM:
+      return i18next.t("weather:tempestStormLapseMessage");
   }
 
   return null;
@@ -191,6 +199,10 @@ export function getWeatherDamageMessage(weatherType: WeatherType, pokemon: Pokem
       });
     case WeatherType.HAIL:
       return i18next.t("weather:hailDamageMessage", {
+        pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+      });
+    case WeatherType.TEMPEST_STORM:
+      return i18next.t("weather:tempestStormDamageMessage", {
         pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
       });
   }
@@ -218,6 +230,8 @@ export function getWeatherClearMessage(weatherType: WeatherType): string | null 
       return i18next.t("weather:harshSunClearMessage");
     case WeatherType.STRONG_WINDS:
       return i18next.t("weather:strongWindsClearMessage");
+    case WeatherType.TEMPEST_STORM:
+      return i18next.t("weather:tempestStormClearMessage");
   }
 
   return null;

@@ -9,4 +9,6 @@ export enum WeatherType {
   HEAVY_RAIN,
   HARSH_SUN,
   STRONG_WINDS,
+  /** Elite Redux — Tempest Storm: a thundershock storm that chips both sides each turn (Electric-types immune). */
+  TEMPEST_STORM,
 }

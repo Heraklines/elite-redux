@@ -48,6 +48,23 @@ import { weightedPick } from "#utils/random";
 import { inSpeedOrder } from "#utils/speed-order-generator";
 import type { NonEmptyTuple } from "type-fest";
 
+/**
+ * Map a {@linkcode WeatherType} to the {@linkcode CommonAnim} used for its
+ * visual. The default `CommonAnim.SUNNY + (weather - 1)` math only lines up for
+ * the contiguous vanilla weathers (1-9); FOG and ER's TEMPEST_STORM need
+ * explicit slots — FOG has its own anim, and Tempest Storm reuses the RAIN anim
+ * as a storm visual (it has no dedicated asset).
+ */
+function weatherCommonAnim(weather: WeatherType): CommonAnim {
+  if (weather === WeatherType.FOG) {
+    return CommonAnim.FOG;
+  }
+  if (weather === WeatherType.TEMPEST_STORM) {
+    return CommonAnim.RAIN;
+  }
+  return CommonAnim.SUNNY + (weather - 1);
+}
+
 export class Arena {
   public readonly biomeId: BiomeId;
 
@@ -262,7 +279,7 @@ export class Arena {
       this.weather?.isImmutable()
       && ![WeatherType.HARSH_SUN, WeatherType.HEAVY_RAIN, WeatherType.STRONG_WINDS, WeatherType.NONE].includes(weather)
     ) {
-      const oldAnim = oldWeatherType === WeatherType.FOG ? CommonAnim.FOG : CommonAnim.SUNNY + (oldWeatherType - 1);
+      const oldAnim = weatherCommonAnim(oldWeatherType);
       globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, oldAnim);
       globalScene.phaseManager.queueMessage(getLegendaryWeatherContinuesMessage(oldWeatherType)!);
       return false;
@@ -281,9 +298,7 @@ export class Arena {
     ); // TODO: this `x?.y!` is dumb, fix this
 
     if (this.weather) {
-      // Elite Redux: FOG (=6) maps to CommonAnim.WIND via the SUNNY+(weather-1)
-      // math, which is wrong. Use the dedicated CommonAnim.FOG slot instead.
-      const anim = weather === WeatherType.FOG ? CommonAnim.FOG : CommonAnim.SUNNY + (weather - 1);
+      const anim = weatherCommonAnim(weather);
       globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, anim);
       globalScene.phaseManager.queueMessage(getWeatherStartMessage(weather)!); // TODO: is this bang correct?
     } else {

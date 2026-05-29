@@ -791,12 +791,10 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // The "negates evs, items, lowest defense" pieces are bespoke and deferred.
       return ok(0, [new IgnoreOpponentStatStagesAttr()]);
     case 1010:
-      // Tempest Storm (N) — electric status move that sets a thundershock
-      // storm "hitting both sides for 2-5 turns". There's no vanilla
-      // continuous-end-of-turn-damage arena tag of this shape (DelayedAttackAttr
-      // is single-strike on a later turn, not a per-turn aura). Implementing
-      // this needs a custom arena-tag-based storm; deferred to a future round.
-      return skip("Tempest Storm (er id 1010): requires custom per-turn-damage arena tag (no vanilla storm primitive)");
+      // Tempest Storm (N) — sets the ER TEMPEST_STORM weather, a thundershock
+      // storm that chips both sides each turn (Electric-types immune), modeled
+      // on Sandstorm/Hail. Duration is the move-set default (5).
+      return ok(0, [new WeatherChangeAttr(WeatherType.TEMPEST_STORM)]);
     case 1016:
       // Party Favors — Fairy damaging move that also heals user's ally by 25%.
       // HealOnAllyAttr with healRatio 0.25 matches Pollen Puff's ally-heal shape.
