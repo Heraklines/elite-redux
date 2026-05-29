@@ -23,6 +23,7 @@ import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
+import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import { Pokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
@@ -504,6 +505,29 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
     expect(healed, "user healed off the infatuated target").toBeGreaterThan(0);
     const expected = Math.floor(dmg * 0.25);
     expect(Math.abs(healed - expected)).toBeLessThanOrEqual(2);
+  });
+
+  it("Royal Decree (857): paralyzes the foe with Glare on entry", async () => {
+    const ability = await erId(857);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(MoveId.SPLASH)
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    const enemy = game.field.getEnemyPokemon();
+    game.move.use(MoveId.SPLASH);
+    await game.toEndOfTurn();
+    // Glare-on-entry (once per battle) paralyzes the foe.
+    expect(enemy.status?.effect).toBe(StatusEffect.PARALYSIS);
   });
 
   it("Pure Love (508): does NOT heal off a non-infatuated target", async () => {

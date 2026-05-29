@@ -1437,6 +1437,10 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       return [new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.MIST })];
     case 493: // Cryo Proficiency: "triggers hail when hit" — PostDefend weather set.
       return [new PostDefendWeatherChangeAbAttr(WeatherType.HAIL)];
+    case 857: // Royal Decree: "Queenly Majesty + Glare on entry once per battle" —
+      // cast Glare (paralyze the foe) on summon, gated to ONCE per battle so a
+      // switch-out/in within the encounter doesn't re-paralyze.
+      return [new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.GLARE }, true)];
     case 508: // Pure Love: "Cute Charm + heal 25% damage vs infatuated" — lifesteal
       // (1/4 of damage dealt) gated on the target being INFATUATED. Cute Charm
       // (the auto-resolved part) is what infatuates the target on contact.

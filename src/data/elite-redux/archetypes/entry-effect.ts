@@ -50,9 +50,9 @@ import { PokemonMove } from "#data/moves/pokemon-move";
 import type { TerrainType } from "#data/terrain";
 import type { ArenaTagSide } from "#enums/arena-tag-side";
 import type { ArenaTagType } from "#enums/arena-tag-type";
-import { MoveUseMode } from "#enums/move-use-mode";
 import type { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
+import { MoveUseMode } from "#enums/move-use-mode";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { BattleStat } from "#enums/stat";
 import type { WeatherType } from "#enums/weather-type";
@@ -176,15 +176,36 @@ export type EntryEffectKind = EntryEffect["kind"];
  */
 export class EntryEffectAbAttr extends PostSummonAbAttr {
   private readonly effect: EntryEffect;
+  private readonly once: boolean;
 
-  constructor(effect: EntryEffect) {
+  /**
+   * @param effect The on-entry sub-effect to apply.
+   * @param once When true, the effect fires only ONCE per battle (per wave) for
+   *   the holder — re-entries during the same encounter are no-ops. Used by ER
+   *   abilities like Royal Decree ("Glare on entry once per battle"). Tracked
+   *   via {@linkcode PokemonWaveData.entryEffectsFired}.
+   */
+  constructor(effect: EntryEffect, once = false) {
     super(true);
     this.effect = effect;
+    this.once = once;
   }
 
   /** Read-only accessor for the configured payload (used in tests). */
   public getEffect(): EntryEffect {
     return this.effect;
+  }
+
+  /** Whether this entry effect is gated to once-per-battle. */
+  public isOnce(): boolean {
+    return this.once;
+  }
+
+  /** Stable per-effect key for the once-per-battle tracker. */
+  private onceKey(): string {
+    const e = this.effect as Record<string, unknown>;
+    const disc = e.move ?? e.type ?? e.weather ?? e.stat ?? "";
+    return `entry-once:${this.effect.kind}:${String(disc)}`;
   }
 
   /** Convenience: the discriminator tag. */
@@ -209,6 +230,15 @@ export class EntryEffectAbAttr extends PostSummonAbAttr {
       return;
     }
     const { pokemon } = params;
+    // Once-per-battle gate: skip (and don't re-fire) if this effect already
+    // fired this wave for the holder (survives switch-out/in within the wave).
+    if (this.once) {
+      const key = this.onceKey();
+      if (pokemon.waveData.entryEffectsFired.has(key)) {
+        return;
+      }
+      pokemon.waveData.entryEffectsFired.add(key);
+    }
     switch (this.effect.kind) {
       case "set-weather":
         globalScene.arena.trySetWeather(this.effect.weather, pokemon);
@@ -249,15 +279,9 @@ export class EntryEffectAbAttr extends PostSummonAbAttr {
         // to the user's own side automatically via pokerogue's targeting.
         const opponents = pokemon.getOpponents().filter(o => o && !o.isFainted());
         const target = opponents[0]?.getBattlerIndex();
-        const targets = target !== undefined ? [target] : [pokemon.getBattlerIndex()];
+        const targets = target === undefined ? [pokemon.getBattlerIndex()] : [target];
         const pokemonMove = new PokemonMove(this.effect.move);
-        globalScene.phaseManager.unshiftNew(
-          "MovePhase",
-          pokemon,
-          targets,
-          pokemonMove,
-          MoveUseMode.INDIRECT,
-        );
+        globalScene.phaseManager.unshiftNew("MovePhase", pokemon, targets, pokemonMove, MoveUseMode.INDIRECT);
         return;
       }
     }
@@ -317,9 +341,7 @@ export class EntryEffectAbAttr extends PostSummonAbAttr {
     // is already pure-typed-as-this, no-op.
 
     // Get the holder's CURRENT effective types (respects any prior overrides).
-    const current = summonData.types && summonData.types.length > 0
-      ? summonData.types
-      : [...pokemon.getTypes()];
+    const current = summonData.types && summonData.types.length > 0 ? summonData.types : [...pokemon.getTypes()];
 
     // Already has this type → no-op (matches ER's `!IS_BATTLER_OF_TYPE` guard).
     if (current.includes(effect.type)) {

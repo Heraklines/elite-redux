@@ -326,6 +326,14 @@ export class PokemonWaveData {
   /** Whether the pokemon's ability has been revealed or not */
   // TODO: this doesn't account for passives
   public abilityRevealed = false;
+  /**
+   * Keys of "once per battle" on-entry effects that have already fired this
+   * wave for this Pokémon. Used by ER's once-per-battle entry effects (e.g.
+   * Royal Decree's "Glare on entry once per battle") to avoid re-firing when
+   * the holder switches out and back in during the same encounter. Resets with
+   * the rest of the wave data; transient (not serialized).
+   */
+  public entryEffectsFired: Set<string> = new Set<string>();
 }
 
 /**
