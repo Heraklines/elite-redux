@@ -64,6 +64,7 @@ import {
   IgnoreOpponentStatStagesAttr,
   type Move,
   MoveAttr,
+  MoveEffectAttr,
   MovePowerMultiplierAttr,
   MultiHitAttr,
   MultiHitPowerIncrementAttr,
@@ -407,6 +408,36 @@ export class MoveConditionAttr extends MoveAttr {
 }
 
 /**
+ * Move effect that raises the USER's highest offensive/defensive stat
+ * ({@linkcode Stat.ATK}/{@linkcode Stat.DEF}/{@linkcode Stat.SPATK}/
+ * {@linkcode Stat.SPDEF}, ties → first listed) by one stage after the move
+ * connects. ER's `Banished Power` shape ("raises the user's highest attack or
+ * defense by 1"). Pokerogue has no built-in "raise highest stat" move attr, so
+ * we resolve the stat at apply-time and enqueue a self-targeted
+ * `StatStageChangePhase`.
+ */
+export class RaiseHighestOffenseDefenseStatAttr extends MoveEffectAttr {
+  constructor() {
+    super(true); // selfTarget
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args?: any[]): boolean {
+    if (!super.apply(user, target, move, args)) {
+      return false;
+    }
+    const candidates = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF] as const;
+    let best: (typeof candidates)[number] = candidates[0];
+    for (const s of candidates) {
+      if (user.getStat(s, false) > user.getStat(best, false)) {
+        best = s;
+      }
+    }
+    globalScene.phaseManager.unshiftNew("StatStageChangePhase", user.getBattlerIndex(), true, [best], 1);
+    return true;
+  }
+}
+
+/**
  * Custom `VariablePowerAttr`-style helper: boost power by `multiplier` when
  * the target is of the configured `PokemonType`. Composed atop
  * `MovePowerMultiplierAttr` rather than subclassing — the closure captures the
@@ -717,13 +748,9 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // self-switch only; defer the Magic Room piece.
       return ok(0, [new ForceSwitchOutAttr(true)]);
     case 990:
-      // Banished Power — raises user's highest offense/defense after damage.
-      // No vanilla "raise highest stat" primitive (Salt Cure, Power Trick etc.
-      // are different shapes); for a first pass we raise SpAtk (the most
-      // common winner for the dark-typed moves in this cluster). Defer the
-      // proper "highest of {Atk,Def,SpAtk,SpDef,Spd}" logic to a future
-      // primitive.
-      return ok(0, [new StatStageChangeAttr([Stat.SPATK], 1, true)]);
+      // Banished Power — "raises the user's highest attack or defense by 1"
+      // (highest of ATK/DEF/SPATK/SPDEF, resolved at apply-time).
+      return ok(0, [new RaiseHighestOffenseDefenseStatAttr()]);
     case 991:
       // Triple Tremor — hits 3 times, power increasing per hit (Triple Kick /
       // Triple Axel shape): MultiHitAttr(THREE) + MultiHitPowerIncrementAttr(3).
