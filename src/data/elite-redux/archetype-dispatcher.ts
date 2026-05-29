@@ -1396,7 +1396,7 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
     // even when it isn't that type. StabAddAbAttr already guards against
     // double-STAB on real-STAB moves.
     case 620: // Old Mariner: "Water STAB"
-    case 969: // Hand Barnacles: "Water STAB"
+    case 967: // Hand Barnacles: "Water STAB"
       return [new StabAddAbAttr({ targetType: PokemonType.WATER })];
     case 760: // Acidic Slime: "Poison STAB"
       return [new StabAddAbAttr({ targetType: PokemonType.POISON })];
@@ -1414,9 +1414,9 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
         new TypeRecoilAbAttr({ type: PokemonType.ELECTRIC, recoilPct: 0.1 }),
         new TypeRecoilAbAttr({ type: PokemonType.DARK, recoilPct: 0.1 }),
       ];
-    case 986: // Mucus Membrane: "Takes 30% less damage from attacks" (reduction = fraction removed)
+    case 984: // Mucus Membrane: "Takes 30% less damage from attacks" (reduction = fraction removed)
       return [new DamageReductionAbAttr({ reduction: 0.3, filter: { kind: "all" } })];
-    case 908: // Lightsaber: "Adds Fire-type. Keen Edge moves 25% burn or paralysis."
+    case 909: // Lightsaber: "Adds Fire-type. Keen Edge moves 25% burn or paralysis."
       // Fire type-add (on summon) + offensive KEEN-EDGE 25% burn ("or paralysis"
       // approximated to burn). Converted from chance-status archetype so both
       // halves can be emitted.
@@ -1432,7 +1432,7 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       // bare "+20% damage" rider is an unconditional all-moves power boost.
       // (Comatose is the auto-resolved part; Dreamcatcher remains a named rider.)
       return [new MovePowerBoostAbAttr(() => true, 1.2)];
-    case 983: // Overcast: "Low Visibility + Sets Mist on entry" — cast Mist on
+    case 980: // Overcast: "Low Visibility + Sets Mist on entry" — cast Mist on
       // summon (the Mist move sets the side's Mist tag, blocking stat drops).
       return [new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.MIST })];
     case 493: // Cryo Proficiency: "triggers hail when hit" — PostDefend weather set.
@@ -1461,14 +1461,14 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
           return user?.getMoveType(move) === PokemonType.WATER;
         }, 2.0),
       ];
-    case 870: // Molten Core: "Absorbs Rock-moves/Stealth Rocks" — Rock-move absorb
+    case 872: // Molten Core: "Absorbs Rock-moves/Stealth Rocks" — Rock-move absorb
       // (immune + heal 1/4, like Water Absorb). The Stealth Rock immunity is a
       // separate hazard mechanic — partial wire of the main absorb effect.
       return [new TypeAbsorbHealAbAttr({ type: PokemonType.ROCK })];
     case 848: // Superheavy: "blocks phasing moves" — immune to forced switch-out
       // (Roar/Whirlwind/Dragon Tail), exactly Suction Cups' effect.
       return [new ForceSwitchOutImmunityAbAttr()];
-    case 389: // Marine Apex: "50% more damage to Water-types + Infiltrator"
+    case 390: // Marine Apex: "50% more damage to Water-types + Infiltrator"
       // (Infiltrator is the auto-resolved part). +50% when the TARGET is Water.
       return [
         new MovePowerBoostAbAttr(
@@ -1810,7 +1810,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           effect: { kind: "attacker-battler-tag", tagType: BattlerTagType.CURSED },
         }),
       ]);
-    case 391:
+    case 392:
       // Hardened Sheath — Atk +1 after a horn move resolves.
       return ok([
         new StatBoostOnFlagAttackAbAttr({
@@ -1992,7 +1992,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 906:
       // Drop Blocks — set Spikes on attacker side when hit.
       return ok([new SetArenaTagOnHitAbAttr({ tagType: ArenaTagType.SPIKES, side: "attacker" })]);
-    case 909:
+    case 910:
       // Loose Thorns — Creeping Thorns when hit by contact. ER's Creeping
       // Thorns isn't in vanilla `ArenaTagType`; we deploy Spikes as a
       // stand-in so the proc is at least observable in test runs.
@@ -2014,7 +2014,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           requiredWeathers: [WeatherType.HAIL, WeatherType.SNOW],
         }),
       ]);
-    case 945:
+    case 922:
       // Chainsaw — Keen edge (slicing) moves drop the target's Defense by -1.
       return ok([
         new StatDebuffOnFlagAttackAbAttr({
@@ -2023,10 +2023,10 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           stages: -1,
         }),
       ]);
-    case 956:
+    case 954:
       // Brain Overload — set Psychic Terrain when hit.
       return ok([new SetTerrainOnHitAbAttr({ terrain: TerrainType.PSYCHIC })]);
-    case 957:
+    case 955:
       // Brain Mass — halves damage taken at full HP.
       return ok([new DamageReductionAbAttr({ reduction: 0.5, filter: { kind: "full-hp" } })]);
     case 991:
@@ -2221,7 +2221,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new DamageReductionAbAttr({ reduction: 0.15, filter: { kind: "all" } }),
         new DamageReductionAbAttr({ reduction: 0.176, filter: { kind: "super-effective" } }),
       ]);
-    case 931:
+    case 933:
       // Hammer Fist — "Boosts punch and hammer moves by 25%." Wire as two
       // FlagDamageBoost instances — PUNCHING_MOVE and HAMMER_BASED at 1.25x
       // each. The two flags are typically not both set on a single move
@@ -2270,7 +2270,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new TypeDamageBoostAbAttr({ type: PokemonType.STEEL, multiplier: 1.3 }),
         new TypeDamageBoostAbAttr({ type: PokemonType.FIGHTING, multiplier: 1.3 }),
       ]);
-    case 975:
+    case 973:
       // Talon Trap — "50% chance to trap on contact. 100% if entered this
       // turn." Wire the contact-trap proc at 50% via ChanceBattlerTagOnHit
       // applying BattlerTagType.TRAPPED. The "100% if entered this turn"
@@ -2536,7 +2536,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           BattlerTagType.ER_BLEED,
         ),
       ]);
-    case 952:
+    case 950:
       // Sharp Talons — "Kicking moves have a 50% Bleed chance."
       return ok([
         new PostAttackApplyBattlerTagAbAttr(
@@ -2587,7 +2587,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           1.5,
         ),
       ]);
-    case 984:
+    case 982:
       // Flower Necklace — "This Pokémon's SpDef gets a 1.5x boost in Grassy Terrain."
       // Use SelfHighestStatMultiplier with a single-stat (SPDEF) candidate +
       // terrain gate. The primitive's weather field doesn't support terrains,
@@ -2644,7 +2644,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // ON ABSORB not on entry. Use TypeImmunityStatStageChangeAbAttr (exists
       // for Lightning Rod / Storm Drain).
       return ok([new TypeImmunityStatStageChangeAbAttr(PokemonType.ELECTRIC, Stat.SPATK, 1)]);
-    case 910:
+    case 907:
       // Turf War — "Destroys terrain and boosts highest stat on entry."
       // Two pieces: clear current terrain (PostSummonRemoveArenaTagAbAttr
       // does this for arena tags but terrain is different layer) + highest
@@ -2659,7 +2659,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // CuriusMedicn — "Resets its ally's stat changes on entry."
       // No direct primitive — closest: Haze on all field. Partial wire.
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.HAZE })]);
-    case 989:
+    case 987:
       // Storm Cloud — "Summon rain on entry for 8 turns. Gain Electric-type STAB."
       // Use EntryEffect set-weather + add-self-type for Electric (so STAB applies).
       return ok([
@@ -2684,7 +2684,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Approximate with TerrainType.GRASSY (similar Grass-flavored swamp).
       // Partial wire.
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.GRASSY_TERRAIN })]);
-    case 924:
+    case 927:
       // Taste the Rainbow — "Summons the Rainbow Pledge effect on entry."
       // Rainbow = Fire+Water pledge → doubles status proc rates. No direct
       // pokerogue equivalent. Wire a status-likely boost via PostSummon.
@@ -2731,7 +2731,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Low Visibility — "Summons Eerie Fog on entry."
       // Eerie Fog = FOG weather in pokerogue (WeatherType.FOG = 6).
       return ok([new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.FOG, turns: 8 })]);
-    case 983:
+    case 980:
       // Overcast — "Low Visibility + Sets Mist on entry."
       // Composite: FOG weather + Mist arena tag (Mist blocks stat drops).
       return ok([
@@ -2759,7 +2759,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Wire the accuracy boost (matches Compound Eyes pattern); Dark-move
       // failure-on-field deferred.
       return ok([new StatMultiplierAbAttr(Stat.ACC, 1.2)]);
-    case 947:
+    case 945:
       // Echolocation — "In fog, deal 20% more damage and never miss."
       // Wire damage piece: MovePowerBoost gated on FOG weather. "Never miss"
       // deferred (would need conditional AlwaysHit primitive).
@@ -2822,7 +2822,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
         new ConditionalAlwaysHitAbAttr({ categories: [MoveCategory.STATUS] }),
       ]);
-    case 955:
+    case 953:
       // Hypnotic Trance — "Hypnosis never misses and also causes Confusion."
       // Wire as 30% post-attack confusion on any move (best approximation
       // without per-move accuracy override).
@@ -3058,10 +3058,10 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 917:
       // Let's Dance — "Uses Teeter Dance on entry, Confusing the field."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TEETER_DANCE })]);
-    case 949:
+    case 947:
       // I Am Steve — "Uses No Retreat on entry."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.NO_RETREAT })]);
-    case 951:
+    case 949:
       // Foamy Web — "Casts an unremovable Sticky Web on entry. Lasts 5 turns."
       // We wire just the Sticky Web part; the "unremovable" piece is a
       // different layer (arena tag remove-immunity) that needs deeper work.
@@ -3085,7 +3085,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           flagFilter: MoveFlags.DANCE_MOVE,
         }),
       ]);
-    case 977:
+    case 975:
       // Backflip — "After using a Dance move, follow up with a 50BP Chip Away."
       return ok([
         new PostAttackScriptedMoveAbAttr({
@@ -3101,7 +3101,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           flagFilter: MoveFlags.SOUND_BASED,
         }),
       ]);
-    case 974:
+    case 972:
       // Break it Down — "After using an attack, follow up with a 20BP Rapid Spin."
       return ok([new PostAttackScriptedMoveAbAttr({ moveId: MoveId.RAPID_SPIN })]);
     case 853:
@@ -3303,7 +3303,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           contactRequired: true,
         }),
       ]);
-    case 987:
+    case 959:
       // Rain Shroud — "Ups evasion by 30% in rain." WeatherStatMultiplier with
       // Stat.EVA * 1.3 on WeatherType.RAIN and HEAVY_RAIN (the parent
       // weather pair).
@@ -3478,7 +3478,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // flag exists in MoveFlags; this needs a priority-aware power-boost
       // primitive (move's priority > 0 → boost). Deferred to a future primitive.
       return SKIP_BESPOKE;
-    case 923:
+    case 925:
       // Galeforce Wings — "Flying moves get +1 Priority."
       return ok([
         new PriorityModifierAbAttr({
@@ -3498,7 +3498,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new ChanceStatusOnHitAbAttr({ chance: 30, effects: [StatusEffect.BURN] }),
         new StatTriggerOnHitAbAttr({ stats: [{ stat: Stat.SPD, stages: -1 }] }),
       ]);
-    case 912:
+    case 911:
       // Laser Drill — "Horn moves have a 50% burn chance."
       return ok([
         new ChanceStatusOnHitAbAttr({
@@ -3550,7 +3550,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Razor Sharp — "Critical hits also inflict bleeding." On-deal-crit
       // hook not yet primitive; wire a 20% ER_BLEED on any hit as approximation.
       return ok([new ChanceBattlerTagOnHitAbAttr({ chance: 20, tags: [BattlerTagType.ER_BLEED] })]);
-    case 953: {
+    case 951: {
       // Hypnotic Trance — "Hypnosis never misses and also causes Confusion."
       // Compose accuracy-override for Hypnosis-only + 100% confuse on hit.
       const isHypnosis = (_p: unknown, _t: unknown, move: { id: number }) => move.id === MoveId.HYPNOSIS;
@@ -3591,7 +3591,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           defensiveMultiplier: 1,
         }),
       ]);
-    case 388:
+    case 389:
       // Discipline — "Can switch while rampaging. Can't be confused or
       // intimidated." Wire the BattlerTag immunity side (CONFUSED). The
       // rampage-switch piece needs a movestate primitive.
@@ -3868,10 +3868,10 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Spyware — "Sharply raises a stat based on foe's strong point."
       // Needs foe-stat-introspection primitive. Defer.
       return SKIP_BESPOKE;
-    case 928:
+    case 929:
       // (Sentinel)
       return SKIP_BESPOKE;
-    case 392:
+    case 393:
       // Hardened Sheath — type-effectiveness style. Defer for type-chart
       // override primitive.
       return SKIP_BESPOKE;
@@ -4033,7 +4033,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Strikeout — "Forces the foe out if they don't attack for 3 turns."
       // Per-target turn counter. Defer.
       return SKIP_BESPOKE;
-    case 927:
+    case 930:
       // Taste the Rainbow — "Summons the Rainbow Pledge effect on entry."
       // Rainbow Pledge is a vanilla arena tag — wire EntryEffect with
       // ArenaTagType.RAINBOW.
@@ -4042,16 +4042,16 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Sap Trap — "Lowers foe's speed at the end of turns. At -3 they get
       // trapped." Per-turn opponent stat-drop. Defer.
       return SKIP_BESPOKE;
-    case 960:
+    case 958:
       // Witch Broom — "Hyper Aggressive + Hover." Composite — Hover
       // (Levitate) vanilla AbilityId 26, Hyper Aggressive ER-custom.
       // Wire vanilla Levitate attrs.
       return ok([...(allAbilities[26]?.attrs ?? [])]);
-    case 963:
+    case 962:
       // Fire Ruler — "King's Wrath + Flame Shield" — both ER customs.
       // Defer (would need to compose ER ability attrs).
       return SKIP_BESPOKE;
-    case 979:
+    case 977:
       // Hollow Ice Zone — "Ice-type moves apply Ice Statue and then make
       // the user switch." Ice Statue tag missing in pokerogue; approximate
       // via FROSTBITE + force-switch on ICE moves. Wire the FROSTBITE
@@ -4065,7 +4065,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           contactRequired: false,
         }),
       ]);
-    case 981:
+    case 979:
       // Cryostasis — wired R12 already.
       return SKIP_BESPOKE;
     // -------------------------------------------------------------------------
@@ -4272,13 +4272,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // -------------------------------------------------------------------------
     // Round 17 — composites and more flag-boost wires
     // -------------------------------------------------------------------------
-    case 933:
+    case 990:
       // Hammer Fist — "Boosts punch and hammer moves by 25%."
       return ok([
         new FlagDamageBoostAbAttr({ flag: MoveFlags.PUNCHING_MOVE, multiplier: 1.25 }),
         new FlagDamageBoostAbAttr({ flag: MoveFlags.HAMMER_BASED, multiplier: 1.25 }),
       ]);
-    case 932: {
+    case 989: {
       // Ice Picks — "Tough Claws + Slush Rush." Compose vanilla AbilityIds:
       // TOUGH_CLAWS (181) gives contact moves 1.3x; SLUSH_RUSH (202) gives
       // 1.5x SPD in hail. Copy vanilla attrs from allAbilities.
@@ -4316,11 +4316,11 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Sleek Scales — "Uses +15% of its Speed when defending." Needs a
       // stat-substitution primitive (Speed → Def). Defer.
       return SKIP_BESPOKE;
-    case 911:
+    case 908:
       // Musical Notes — "Status moves become sound-based." Move-flag
       // injection primitive missing. Defer.
       return SKIP_BESPOKE;
-    case 871:
+    case 869:
       // Blistering Sun — "Desolate Land + Air Blower." Compose vanilla
       // DESOLATE_LAND (236) attrs + a partial Air Blower stand-in.
       // Wire just the vanilla Desolate Land piece for now; Air Blower
@@ -4334,7 +4334,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // boost." Same shape as 273 Power Fists / 505 Mystic Blades — wire
       // the 1.3x on SLICING_MOVE. Def→SpDef target deferred.
       return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.SLICING_MOVE, multiplier: 1.3 })]);
-    case 967: {
+    case 965: {
       // Hand Barnacles — "Multi-Headed + Water STAB." Multi-headed needs a
       // hit-count primitive (deferred). Wire only Water STAB-add via the
       // R9 StabAdd primitive: holder gets 1.5x on WATER moves regardless
@@ -4869,7 +4869,7 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
     // to either re-wire to the correct spec or SKIP. Each entry here
     // overrides the earlier mis-wired case.
     // -------------------------------------------------------------------------
-    case 388:
+    case 389:
       // Thundercall — "Triggers Smite at 20% power when using an Electric
       // move." Use PostAttackScriptedMove with Thunder Shock (a vanilla
       // 40BP Electric move — closest available analog) gated on the
@@ -4879,17 +4879,17 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
           moveId: MoveId.THUNDER_SHOCK,
         }),
       ]);
-    case 392:
+    case 393:
       // Logical id 392 is Arctic Fur — "Weakens incoming physical and
       // special moves by 35%." Simple damage reduction (all moves, 0.35).
       return ok([new DamageReductionAbAttr({ reduction: 0.35, filter: { kind: "all" } })]);
-    case 871:
+    case 869:
       // Logical id 871 is Fire Aspect — "Absorbs fire moves and always
       // burns with fire." Fire immunity (heal) + auto-burn rider. The auto-
       // burn-on-defend portion needs PreDefend status-on-immunity, which
       // doesn't exist as a single primitive. Wire the heal portion only.
       return ok([new TypeAbsorbHealAbAttr({ type: PokemonType.FIRE, healFraction: 0.25 })]);
-    case 912:
+    case 911:
       // Musical Notes — "Status moves become sound-based." Practical
       // mechanical impact: the holder's status moves benefit from sound-
       // move boosts (Punk Rock 1.3x). Approximate via a MovePowerBoost
@@ -4897,7 +4897,7 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // theoretical "becomes sound" interaction with Soundproof etc.
       // requires flag-injection patches at many engine sites — deferred).
       return ok([new MovePowerBoostAbAttr((_user, _t, move) => move?.category === MoveCategory.STATUS, 1.3)]);
-    case 923:
+    case 925:
       // Mashed Potato — "Syrup Bomb effect on the foe for 3 turns."
       // SYRUP_BOMBED battler tag added to each opponent on entry.
       return ok([
@@ -4906,14 +4906,14 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
           turns: 3,
         }),
       ]);
-    case 927:
+    case 930:
       // Logical id 927 is Wings of Pestilence — "Every attack has a 20%
       // Bleed chance and 10% Curse chance." Two PostAttack chance procs.
       return ok([
         new PostAttackApplyBattlerTagAbAttr(false, () => 20, BattlerTagType.ER_BLEED),
         new PostAttackApplyBattlerTagAbAttr(false, () => 10, BattlerTagType.CURSED),
       ]);
-    case 932:
+    case 989:
       // Drakelp Head — "Weakens first move taken and drops opponent's
       // attack." Approximate: TimeLimitedDamageReduction for first turn
       // (factor 0.5, 1 turn — handles "weakens first move taken") + on-
@@ -4927,7 +4927,7 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
           false, // selfTarget=false: drop on the attacker
         ),
       ]);
-    case 933:
+    case 990:
       // Polarity — "Increases the party's highest stat by 30%." Uses the
       // new PersistentFieldAuraAbAttr — 1.3x on all 5 main stats (gain
       // shows largest on the highest stat by definition; matches spec
@@ -4939,18 +4939,18 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
           includeSelf: true,
         }),
       ]);
-    case 953:
+    case 951:
       // Logical id 953 is Zen Garden — "Sets up Grassy or Psychic Terrain
       // at random." PostSummon random terrain. Approximate: pick GRASSY
       // (matches half the spec).
       return ok([new EntryEffectAbAttr({ kind: "set-terrain", terrain: TerrainType.GRASSY, turns: 8 })]);
-    case 960:
+    case 958:
       // Giant Shuriken — "Water Shuriken hits once with 100BP and +1 crit."
       // Approximate: massive power boost on Water Shuriken (15BP → ~100BP
       // = 6.67x). The +1 crit piece would need a per-move-id filter on
       // CritStageBonus which doesn't exist; defer that micro-detail.
       return ok([new MovePowerBoostAbAttr((_user, _t, move) => move?.id === MoveId.WATER_SHURIKEN, 6.67)]);
-    case 963:
+    case 962:
       // Wrestle Showman — "Flying Press gains +10BP and causes Taunt."
       // Flying Press is 100BP; +10BP = 1.1x power. Add a PostAttack TAUNT
       // tag when the holder uses Flying Press.
@@ -4962,7 +4962,7 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
           BattlerTagType.TAUNT,
         ),
       ]);
-    case 967:
+    case 965:
       // Foggy Eye — "While in Fog, boost Ghost moves by 50% and resist
       // Ghost moves." Uses real WeatherType.FOG.
       return ok([
@@ -4975,7 +4975,7 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
           filter: { kind: "move-type", type: PokemonType.GHOST },
         }),
       ]);
-    case 979:
+    case 977:
       // Eternal Flower — "Reduces the stats of other Megas by 20%."
       // Uses PersistentFieldAura with a predicate that checks the ally's
       // form name for "mega" / formIndex > 0. Multiplier 0.8 (-20%).
@@ -5462,7 +5462,7 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // directly enqueue a SetWeather phase via a move, we install fog
       // via a PostDefend hook that directly calls arena.trySetWeather.
       return ok([new SetFogOnHitAbAttr()]);
-    case 911:
+    case 908:
       // Greedy — "Uses Thief when it loses an item." Pokerogue already
       // has PostItemLostAbAttr (Cud Chew uses it). We piggyback by adding
       // an attr that enqueues Thief on item loss. The actual class can be
@@ -5481,7 +5481,7 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
     case 943:
       // Sap Trap — "Lowers foe's speed at the end of turns. At -3 they get trapped."
       return ok([new PostTurnFoeStatDropAbAttr({ stat: Stat.SPD, stages: -1, trapAtStage: -3 })]);
-    case 981:
+    case 979:
       // Hollow Ice Zone — "Ice-type moves apply Ice Statue and then make
       // the user switch." Approximate: on holder's Ice-type attack, apply
       // ICE_FACE-equivalent (ER_FROSTBITE tag) to target. Self-switch

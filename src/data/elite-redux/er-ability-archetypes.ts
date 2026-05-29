@@ -1,7 +1,21 @@
 // =============================================================================
-// AUTO-GENERATED FILE — DO NOT EDIT BY HAND.
-// Source: vendor/elite-redux/v2.65beta.json
-// Regenerate with: pnpm run er:build
+// AUTO-GENERATED then HAND-MAINTAINED. Source: vendor/elite-redux/v2.65beta.json
+//
+// ⚠️  DO NOT blindly `pnpm run er:classify-abilities` over this file. It carries
+//     hand-applied fixups that a regeneration would clobber:
+//       • This table was RE-KEYED to the current er-abilities draft ids after
+//         commit cfd9c8d realigned 81 draft ids to the v2.65 JSON positions
+//         (the classifier had keyed by the pre-realignment ids, so every drifted
+//         ability — Marine Apex 390, Lightsaber 909, Lucha Libre 985, … — was
+//         silently wired with a NEIGHBOUR ability's archetype). Keys + the
+//         `erAbilityId` field now match `er-abilities.ts`/`er-id-map.ts`.
+//       • 21 chance-status rows carry a manual `direction:"offense"`/`"both"`
+//         annotation (+ C-source line refs) that the classifier does not emit.
+//       • Embody Aspect 795-798 entry-effect rows (the generator collapsed the
+//         four variants to one id; 796-798 are constructed from synthetic
+//         drafts — see init-elite-redux-custom-abilities.ts).
+//     If you DO regenerate, re-apply the above and re-run the er-composite-riders
+//     + er-offensive-chance-status harness tests before committing.
 // =============================================================================
 
 // Phase C task C2: auto-classified ER abilities → archetype primitives.
@@ -53,7 +67,6 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   261: { erAbilityId: 261, archetype: "bespoke", params: null },
   264: { erAbilityId: 264, archetype: "stat-trigger-on-event", params: {"trigger":"on-ko","stats":[{"stat":"ATK","stages":1}]} },
   266: { erAbilityId: 266, archetype: "composite-vanilla-mashup", params: {"parts":["Unnerve","Chilling Neigh"]} },
-  // 267 stripped — id-resync drift; entry no longer points to a real draft.
   268: { erAbilityId: 268, archetype: "bespoke", params: null },
   269: { erAbilityId: 269, archetype: "bespoke", params: null },
   270: { erAbilityId: 270, archetype: "bespoke", params: null },
@@ -171,14 +184,14 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   383: { erAbilityId: 383, archetype: "bespoke", params: null },
   384: { erAbilityId: 384, archetype: "bespoke", params: null },
   385: { erAbilityId: 385, archetype: "lifesteal", params: {"trigger":"on-hit-deal","healFraction":0.5} },
-  386: { erAbilityId: 386, archetype: "chance-status-on-hit", params: {"chance":30,"status":"TOXIC","direction":"offense"} }, // Spectral Shroud: holder's move badly poisons the foe (C-source attacker block ~9577)
-  387: { erAbilityId: 387, archetype: "status-immunity", params: {"statuses":["CONFUSION"],"tags":["INTIMIDATE"]} },
-  388: { erAbilityId: 388, archetype: "bespoke", params: null },
-  389: { erAbilityId: 389, archetype: "composite-vanilla-mashup", params: {"parts":["50% more damage to Water-types","Infiltrator"]} },
-  390: { erAbilityId: 390, archetype: "flag-damage-boost", params: {"flag":"MIGHTY_HORN","multiplier":1.3} },
-  391: { erAbilityId: 391, archetype: "bespoke", params: null },
-  392: { erAbilityId: 392, archetype: "damage-reduction-generic", params: {"filter":{"kind":"all"},"reduction":0.35} },
-  393: { erAbilityId: 393, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"GHOST","multiplier":1.2} },
+  386: { erAbilityId: 386, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"GHOST","multiplier":1.2} },
+  387: { erAbilityId: 387, archetype: "chance-status-on-hit", params: {"chance":30,"status":"TOXIC","direction":"offense"} }, // Spectral Shroud: holder's move badly poisons the foe (C-source attacker block ~9577)
+  388: { erAbilityId: 388, archetype: "status-immunity", params: {"statuses":["CONFUSION"],"tags":["INTIMIDATE"]} },
+  389: { erAbilityId: 389, archetype: "bespoke", params: null },
+  390: { erAbilityId: 390, archetype: "composite-vanilla-mashup", params: {"parts":["50% more damage to Water-types","Infiltrator"]} },
+  391: { erAbilityId: 391, archetype: "flag-damage-boost", params: {"flag":"MIGHTY_HORN","multiplier":1.3} },
+  392: { erAbilityId: 392, archetype: "bespoke", params: null },
+  393: { erAbilityId: 393, archetype: "damage-reduction-generic", params: {"filter":{"kind":"all"},"reduction":0.35} },
   394: { erAbilityId: 394, archetype: "bespoke", params: null },
   395: { erAbilityId: 395, archetype: "composite-vanilla-mashup", params: {"parts":["Mega Launcher","Sighting System"]} },
   396: { erAbilityId: 396, archetype: "bespoke", params: null },
@@ -545,11 +558,6 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   793: { erAbilityId: 793, archetype: "composite-vanilla-mashup", params: {"parts":["Analytic","Neuroforce"]} },
   794: { erAbilityId: 794, archetype: "bespoke", params: null },
   795: { erAbilityId: 795, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"SPD","stages":1}} },
-  // 796-798 (Embody Aspect Atk/Def/SpDef on entry). NOTE: the auto-generated
-  // ER_ABILITIES collapsed all four Embody variants to id 795 (generator
-  // id-drift), so 796-798 have no draft and aren't built by the main init loop.
-  // initEliteReduxCustomAbilities constructs them explicitly from synthetic
-  // drafts (registering 5497-5499) and wires the entry-effect via these rows.
   796: { erAbilityId: 796, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"ATK","stages":1}} },
   797: { erAbilityId: 797, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"DEF","stages":1}} },
   798: { erAbilityId: 798, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"SPDEF","stages":1}} },
@@ -623,11 +631,11 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   866: { erAbilityId: 866, archetype: "bespoke", params: null },
   867: { erAbilityId: 867, archetype: "composite-vanilla-mashup", params: {"parts":["Drizzle","Electro Surge"]} },
   868: { erAbilityId: 868, archetype: "bespoke", params: null },
-  869: { erAbilityId: 869, archetype: "composite-vanilla-mashup", params: {"parts":["Desolate Land","Air Blower"]} },
-  870: { erAbilityId: 870, archetype: "composite-vanilla-mashup", params: {"parts":["Furnace","Absorbs Rock-moves/Stealth Rocks"]} },
-  871: { erAbilityId: 871, archetype: "bespoke", params: null },
-  872: { erAbilityId: 872, archetype: "composite-vanilla-mashup", params: {"parts":["Majestic Bird","North Wind"]} },
-  873: { erAbilityId: 873, archetype: "damage-reduction-generic", params: {"filter":{"kind":"special"},"reduction":0.5} },
+  869: { erAbilityId: 869, archetype: "bespoke", params: null },
+  870: { erAbilityId: 870, archetype: "damage-reduction-generic", params: {"filter":{"kind":"special"},"reduction":0.5} },
+  871: { erAbilityId: 871, archetype: "composite-vanilla-mashup", params: {"parts":["Desolate Land","Air Blower"]} },
+  872: { erAbilityId: 872, archetype: "composite-vanilla-mashup", params: {"parts":["Furnace","Absorbs Rock-moves/Stealth Rocks"]} },
+  873: { erAbilityId: 873, archetype: "composite-vanilla-mashup", params: {"parts":["Majestic Bird","North Wind"]} },
   874: { erAbilityId: 874, archetype: "bespoke", params: null },
   875: { erAbilityId: 875, archetype: "lifesteal", params: {"trigger":"on-hit-deal","healFraction":0.125} },
   876: { erAbilityId: 876, archetype: "bespoke", params: null },
@@ -661,32 +669,32 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   904: { erAbilityId: 904, archetype: "bespoke", params: null },
   905: { erAbilityId: 905, archetype: "bespoke", params: null },
   906: { erAbilityId: 906, archetype: "bespoke", params: null },
-  907: { erAbilityId: 907, archetype: "chance-status-on-hit", params: {"chance":50,"status":"BURN","filter":{"flag":"MIGHTY_HORN"},"direction":"offense"} }, // Laser Drill: holder's HORN move burns (desc)
-  908: { erAbilityId: 908, archetype: "composite-vanilla-mashup", params: {} }, // Lightsaber: "Adds Fire-type. Keen Edge moves 25% burn" — both halves wired via compositeRiderAttrs (chance-status was archetype-only and couldn't carry the type-add)
-  909: { erAbilityId: 909, archetype: "bespoke", params: null },
+  907: { erAbilityId: 907, archetype: "bespoke", params: null },
+  908: { erAbilityId: 908, archetype: "bespoke", params: null },
+  909: { erAbilityId: 909, archetype: "composite-vanilla-mashup", params: {} }, // Lightsaber: "Adds Fire-type. Keen Edge moves 25% burn" — both halves wired via compositeRiderAttrs (chance-status was archetype-only and couldn't carry the type-add)
   910: { erAbilityId: 910, archetype: "bespoke", params: null },
   911: { erAbilityId: 911, archetype: "bespoke", params: null },
-  912: { erAbilityId: 912, archetype: "bespoke", params: null },
+  912: { erAbilityId: 912, archetype: "chance-status-on-hit", params: {"chance":50,"status":"BURN","filter":{"flag":"MIGHTY_HORN"},"direction":"offense"} }, // Laser Drill: holder's HORN move burns (desc)
   913: { erAbilityId: 913, archetype: "bespoke", params: null },
   914: { erAbilityId: 914, archetype: "bespoke", params: null },
   915: { erAbilityId: 915, archetype: "entry-effect", params: {"effect":{"kind":"add-self-type","type":"FIGHTING"}} },
   916: { erAbilityId: 916, archetype: "bespoke", params: null },
   917: { erAbilityId: 917, archetype: "bespoke", params: null },
   918: { erAbilityId: 918, archetype: "composite-vanilla-mashup", params: {"parts":["Half Drake","Rough Skin"]} },
-  919: { erAbilityId: 919, archetype: "composite-vanilla-mashup", params: {"parts":["Tough Claws","Mineralize"]} },
-  920: { erAbilityId: 920, archetype: "entry-effect", params: {"effect":{"kind":"add-self-type","type":"ROCK"}} },
+  919: { erAbilityId: 919, archetype: "entry-effect", params: {"effect":{"kind":"add-self-type","type":"ROCK"}} },
+  920: { erAbilityId: 920, archetype: "composite-vanilla-mashup", params: {"parts":["Tough Claws","Mineralize"]} },
   921: { erAbilityId: 921, archetype: "bespoke", params: null },
-  922: { erAbilityId: 922, archetype: "composite-vanilla-mashup", params: {"parts":["Queenly Majesty","Rivalry"]} },
-  923: { erAbilityId: 923, archetype: "bespoke", params: null },
-  924: { erAbilityId: 924, archetype: "bespoke", params: null },
-  925: { erAbilityId: 925, archetype: "composite-vanilla-mashup", params: {"parts":["Fire Scales","Taste the Rainbow"]} },
-  926: { erAbilityId: 926, archetype: "chance-status-on-hit", params: {"chance":20,"status":"SLEEP","onContactOnly":true,"direction":"both"} }, // Hypnotic Touch: sleep on contact (defense) + offense (desc)
+  922: { erAbilityId: 922, archetype: "bespoke", params: null },
+  923: { erAbilityId: 923, archetype: "priority-modifier", params: {"priority":1} },
+  924: { erAbilityId: 924, archetype: "composite-vanilla-mashup", params: {"parts":["Queenly Majesty","Rivalry"]} },
+  925: { erAbilityId: 925, archetype: "bespoke", params: null },
+  926: { erAbilityId: 926, archetype: "composite-vanilla-mashup", params: {"parts":["Fire Scales","Taste the Rainbow"]} },
   927: { erAbilityId: 927, archetype: "bespoke", params: null },
-  928: { erAbilityId: 928, archetype: "composite-vanilla-mashup", params: {"parts":["Multi-Headed","Hubris"]} },
-  929: { erAbilityId: 929, archetype: "composite-vanilla-mashup", params: {"parts":["Snow Warning","Ice Body"]} },
-  930: { erAbilityId: 930, archetype: "composite-vanilla-mashup", params: {"parts":["Tough Claws","Slush Rush"]} },
-  931: { erAbilityId: 931, archetype: "bespoke", params: null },
-  932: { erAbilityId: 932, archetype: "bespoke", params: null },
+  928: { erAbilityId: 928, archetype: "chance-status-on-hit", params: {"chance":20,"status":"SLEEP","onContactOnly":true,"direction":"both"} }, // Hypnotic Touch: sleep on contact (defense) + offense (desc)
+  929: { erAbilityId: 929, archetype: "composite-vanilla-mashup", params: {"parts":["Multi-Headed","Hubris"]} },
+  930: { erAbilityId: 930, archetype: "bespoke", params: null },
+  931: { erAbilityId: 931, archetype: "composite-vanilla-mashup", params: {"parts":["Snow Warning","Ice Body"]} },
+  932: { erAbilityId: 932, archetype: "composite-vanilla-mashup", params: {"parts":["Tough Claws","Slush Rush"]} },
   933: { erAbilityId: 933, archetype: "bespoke", params: null },
   934: { erAbilityId: 934, archetype: "composite-vanilla-mashup", params: {"parts":["Deadly Precision","Slipstream"]} },
   935: { erAbilityId: 935, archetype: "bespoke", params: null },
@@ -700,51 +708,51 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   943: { erAbilityId: 943, archetype: "bespoke", params: null },
   944: { erAbilityId: 944, archetype: "bespoke", params: null },
   945: { erAbilityId: 945, archetype: "bespoke", params: null },
-  946: { erAbilityId: 946, archetype: "priority-modifier", params: {"priority":1} },
+  946: { erAbilityId: 946, archetype: "composite-vanilla-mashup", params: {"parts":["Tangling Hair","Fluffy"]} },
   947: { erAbilityId: 947, archetype: "bespoke", params: null },
-  948: { erAbilityId: 948, archetype: "composite-vanilla-mashup", params: {"parts":["Tangling Hair","Fluffy"]} },
+  948: { erAbilityId: 948, archetype: "composite-vanilla-mashup", params: {"parts":["Know Your Place","Grappler"]} },
   949: { erAbilityId: 949, archetype: "bespoke", params: null },
-  950: { erAbilityId: 950, archetype: "composite-vanilla-mashup", params: {"parts":["Know Your Place","Grappler"]} },
+  950: { erAbilityId: 950, archetype: "bespoke", params: null },
   951: { erAbilityId: 951, archetype: "bespoke", params: null },
-  952: { erAbilityId: 952, archetype: "bespoke", params: null },
+  952: { erAbilityId: 952, archetype: "composite-vanilla-mashup", params: {"parts":["Thick Fat","Corrosion"]} },
   953: { erAbilityId: 953, archetype: "bespoke", params: null },
-  954: { erAbilityId: 954, archetype: "composite-vanilla-mashup", params: {"parts":["Thick Fat","Corrosion"]} },
+  954: { erAbilityId: 954, archetype: "bespoke", params: null },
   955: { erAbilityId: 955, archetype: "bespoke", params: null },
-  956: { erAbilityId: 956, archetype: "bespoke", params: null },
-  957: { erAbilityId: 957, archetype: "bespoke", params: null },
-  958: { erAbilityId: 958, archetype: "composite-vanilla-mashup", params: {"parts":["Impenetrable","Bulletproof"]} },
-  959: { erAbilityId: 959, archetype: "composite-vanilla-mashup", params: {"parts":["Keen edge","Grass moves become Keen Edge boosted"]} },
-  960: { erAbilityId: 960, archetype: "bespoke", params: null },
-  961: { erAbilityId: 961, archetype: "composite-vanilla-mashup", params: {"parts":["Hyper Aggressive","Hover"]} },
-  962: { erAbilityId: 962, archetype: "composite-vanilla-mashup", params: {"parts":["Prism Scales","Huge Wings"]} },
-  963: { erAbilityId: 963, archetype: "bespoke", params: null },
-  964: { erAbilityId: 964, archetype: "composite-vanilla-mashup", params: {"parts":["Dazzling","Defiant"]} },
-  965: { erAbilityId: 965, archetype: "composite-vanilla-mashup", params: {"parts":["King's Wrath","Flame Shield"]} },
-  966: { erAbilityId: 966, archetype: "composite-vanilla-mashup", params: {"parts":["Illuminate","Pyromancy"]} },
-  967: { erAbilityId: 967, archetype: "bespoke", params: null },
-  968: { erAbilityId: 968, archetype: "composite-vanilla-mashup", params: {"parts":["Shell Armor","Poison Point"]} },
-  969: { erAbilityId: 969, archetype: "composite-vanilla-mashup", params: {"parts":["Multi-Headed","Water STAB"]} },
-  970: { erAbilityId: 970, archetype: "composite-vanilla-mashup", params: {"parts":["Metallic","Battle Armor"]} },
-  971: { erAbilityId: 971, archetype: "composite-vanilla-mashup", params: {"parts":["Intimidate","Scare"],"rider":"10% burn chance on non contact moves"} },
-  972: { erAbilityId: 972, archetype: "composite-vanilla-mashup", params: {"parts":["King's Wrath","Queen's Mourning"]} },
-  973: { erAbilityId: 973, archetype: "composite-vanilla-mashup", params: {"parts":["Swarm","Unaware"]} },
-  974: { erAbilityId: 974, archetype: "bespoke", params: null },
+  956: { erAbilityId: 956, archetype: "composite-vanilla-mashup", params: {"parts":["Impenetrable","Bulletproof"]} },
+  957: { erAbilityId: 957, archetype: "composite-vanilla-mashup", params: {"parts":["Keen edge","Grass moves become Keen Edge boosted"]} },
+  958: { erAbilityId: 958, archetype: "bespoke", params: null },
+  959: { erAbilityId: 959, archetype: "bespoke", params: null },
+  960: { erAbilityId: 960, archetype: "composite-vanilla-mashup", params: {"parts":["Hyper Aggressive","Hover"]} },
+  961: { erAbilityId: 961, archetype: "composite-vanilla-mashup", params: {"parts":["Prism Scales","Huge Wings"]} },
+  962: { erAbilityId: 962, archetype: "bespoke", params: null },
+  963: { erAbilityId: 963, archetype: "composite-vanilla-mashup", params: {"parts":["King's Wrath","Flame Shield"]} },
+  964: { erAbilityId: 964, archetype: "composite-vanilla-mashup", params: {"parts":["Illuminate","Pyromancy"]} },
+  965: { erAbilityId: 965, archetype: "bespoke", params: null },
+  966: { erAbilityId: 966, archetype: "composite-vanilla-mashup", params: {"parts":["Shell Armor","Poison Point"]} },
+  967: { erAbilityId: 967, archetype: "composite-vanilla-mashup", params: {"parts":["Multi-Headed","Water STAB"]} },
+  968: { erAbilityId: 968, archetype: "composite-vanilla-mashup", params: {"parts":["Metallic","Battle Armor"]} },
+  969: { erAbilityId: 969, archetype: "composite-vanilla-mashup", params: {"parts":["Intimidate","Scare"],"rider":"10% burn chance on non contact moves"} },
+  970: { erAbilityId: 970, archetype: "composite-vanilla-mashup", params: {"parts":["King's Wrath","Queen's Mourning"]} },
+  971: { erAbilityId: 971, archetype: "composite-vanilla-mashup", params: {"parts":["Swarm","Unaware"]} },
+  972: { erAbilityId: 972, archetype: "bespoke", params: null },
+  973: { erAbilityId: 973, archetype: "bespoke", params: null },
+  974: { erAbilityId: 974, archetype: "composite-vanilla-mashup", params: {"parts":["Striker"]} },
   975: { erAbilityId: 975, archetype: "bespoke", params: null },
-  976: { erAbilityId: 976, archetype: "composite-vanilla-mashup", params: {"parts":["Striker"]} },
+  976: { erAbilityId: 976, archetype: "composite-vanilla-mashup", params: {"parts":["Strong Jaw"]} },
   977: { erAbilityId: 977, archetype: "bespoke", params: null },
-  978: { erAbilityId: 978, archetype: "composite-vanilla-mashup", params: {"parts":["Strong Jaw"]} },
+  978: { erAbilityId: 978, archetype: "composite-vanilla-mashup", params: {"parts":["Aura Break","Mega Launcher"]} },
   979: { erAbilityId: 979, archetype: "bespoke", params: null },
-  980: { erAbilityId: 980, archetype: "composite-vanilla-mashup", params: {"parts":["Aura Break","Mega Launcher"]} },
-  981: { erAbilityId: 981, archetype: "bespoke", params: null },
-  982: { erAbilityId: 982, archetype: "composite-vanilla-mashup", params: {"parts":["Cryomancy","Frostbite causes flinching"]} },
-  983: { erAbilityId: 983, archetype: "bespoke", params: null },
-  984: { erAbilityId: 984, archetype: "bespoke", params: null },
-  985: { erAbilityId: 985, archetype: "composite-vanilla-mashup", params: {"parts":["Mighty Horn","all Drill moves are 30% stronger"]} },
-  986: { erAbilityId: 986, archetype: "composite-vanilla-mashup", params: {"parts":["Takes 30% less damage from attacks","Gooey"]} },
+  980: { erAbilityId: 980, archetype: "bespoke", params: null },
+  981: { erAbilityId: 981, archetype: "composite-vanilla-mashup", params: {"parts":["Cryomancy","Frostbite causes flinching"]} },
+  982: { erAbilityId: 982, archetype: "bespoke", params: null },
+  983: { erAbilityId: 983, archetype: "composite-vanilla-mashup", params: {"parts":["Mighty Horn","all Drill moves are 30% stronger"]} },
+  984: { erAbilityId: 984, archetype: "composite-vanilla-mashup", params: {"parts":["Takes 30% less damage from attacks","Gooey"]} },
+  985: { erAbilityId: 985, archetype: "composite-vanilla-mashup", params: {"parts":["Dazzling","Defiant"]} },
+  986: { erAbilityId: 986, archetype: "composite-vanilla-mashup", params: {"parts":["Let's Roll","Coil Up"]} },
   987: { erAbilityId: 987, archetype: "bespoke", params: null },
-  988: { erAbilityId: 988, archetype: "composite-vanilla-mashup", params: {"parts":["Let's Roll","Coil Up"]} },
+  988: { erAbilityId: 988, archetype: "composite-vanilla-mashup", params: {"parts":["Aquatic","Adaptability"]} },
   989: { erAbilityId: 989, archetype: "bespoke", params: null },
-  990: { erAbilityId: 990, archetype: "composite-vanilla-mashup", params: {"parts":["Aquatic","Adaptability"]} },
+  990: { erAbilityId: 990, archetype: "bespoke", params: null },
   991: { erAbilityId: 991, archetype: "bespoke", params: null },
   992: { erAbilityId: 992, archetype: "composite-vanilla-mashup", params: {"parts":["Berserk","Rampage"]} },
   993: { erAbilityId: 993, archetype: "bespoke", params: null },
@@ -779,8 +787,8 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   1022: { erAbilityId: 1022, archetype: "damage-reduction-generic", params: {"filter":{"kind":"all"},"reduction":0.2} },
   1023: { erAbilityId: 1023, archetype: "type-damage-boost", params: {"type":"PSYCHIC","multiplier":1.3,"lowHpMultiplier":1.8,"lowHpThreshold":0.3333333333333333} },
   1024: { erAbilityId: 1024, archetype: "composite-vanilla-mashup", params: {"parts":["Infiltrator","Competitive"]} },
-  1025: { erAbilityId: 1025, archetype: "type-damage-boost", params: {"type":"DARK","multiplier":1.2,"lowHpMultiplier":1.5,"lowHpThreshold":0.3333333333333333} },
-  1026: { erAbilityId: 1026, archetype: "composite-vanilla-mashup", params: {"parts":["Tough Claws","Foul Energy"]} },
+  1025: { erAbilityId: 1025, archetype: "composite-vanilla-mashup", params: {"parts":["Tough Claws","Foul Energy"]} },
+  1026: { erAbilityId: 1026, archetype: "type-damage-boost", params: {"type":"DARK","multiplier":1.2,"lowHpMultiplier":1.5,"lowHpThreshold":0.3333333333333333} },
   1027: { erAbilityId: 1027, archetype: "bespoke", params: null },
   1028: { erAbilityId: 1028, archetype: "bespoke", params: null },
   1029: { erAbilityId: 1029, archetype: "composite-vanilla-mashup", params: {"parts":["Mighty Horn","Fighting Spirit"]} },
@@ -788,4 +796,10 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   1031: { erAbilityId: 1031, archetype: "damage-reduction-generic", params: {"filter":{"kind":"all"},"reduction":0.1} },
   1032: { erAbilityId: 1032, archetype: "composite-vanilla-mashup", params: {"parts":["Raw Wood","Flame Body"]} },
   1033: { erAbilityId: 1033, archetype: "composite-vanilla-mashup", params: {"parts":["Sticky Hold","Gooey"]} },
+  // 267 stripped — id-resync drift; entry no longer points to a real draft.
+  // 796-798 (Embody Aspect Atk/Def/SpDef on entry). NOTE: the auto-generated
+  // ER_ABILITIES collapsed all four Embody variants to id 795 (generator
+  // id-drift), so 796-798 have no draft and aren't built by the main init loop.
+  // initEliteReduxCustomAbilities constructs them explicitly from synthetic
+  // drafts (registering 5497-5499) and wires the entry-effect via these rows.
 };

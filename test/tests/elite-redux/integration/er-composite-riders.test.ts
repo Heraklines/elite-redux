@@ -105,7 +105,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
   });
 
   it("Mucus Membrane (986): takes 30% less damage from attacks", async () => {
-    const ability = await erId(986);
+    const ability = await erId(984);
     if (ability === undefined) {
       return;
     }
@@ -182,7 +182,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
   });
 
   it("Marine Apex (389): +50% damage vs Water-type targets", async () => {
-    const ability = await erId(389);
+    const ability = await erId(390);
     if (ability === undefined) {
       return;
     }
@@ -281,7 +281,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
   });
 
   it("Lightsaber (908): adds Fire type on summon", async () => {
-    const ability = await erId(908);
+    const ability = await erId(909);
     if (ability === undefined) {
       return;
     }
@@ -301,7 +301,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
   });
 
   it("Overcast (983): sets Mist on entry (blocks enemy stat drops)", async () => {
-    const ability = await erId(983);
+    const ability = await erId(980);
     if (ability === undefined) {
       return;
     }
@@ -345,7 +345,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
   });
 
   it("Molten Core (870): absorbs Rock-type moves (immune + heals)", async () => {
-    const ability = await erId(870);
+    const ability = await erId(872);
     if (ability === undefined) {
       return;
     }

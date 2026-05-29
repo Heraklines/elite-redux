@@ -1,7 +1,13 @@
 // =============================================================================
-// AUTO-GENERATED FILE — DO NOT EDIT BY HAND.
-// Source: vendor/elite-redux/v2.65beta.json
-// Regenerate with: pnpm run er:build
+// AUTO-GENERATED then HAND-MAINTAINED. Source: vendor/elite-redux/v2.65beta.json
+//
+// ⚠️  RE-KEYED to current er-abilities draft ids after commit cfd9c8d realigned
+//     81 draft ids to the v2.65 JSON positions. BOTH the row keys (+`erAbilityId`
+//     field) AND the nested `{ kind: "er", erAbilityId }` part references were
+//     remapped, so they match `er-abilities.ts`/`er-id-map.ts`. A naive
+//     `pnpm run er:classify-composites` would re-key only against the (now
+//     correct) draft ids — verify against the er-composite-riders harness tests
+//     after any regeneration.
 // =============================================================================
 
 // Phase D task D3b: per-composite resolved part references.
@@ -51,10 +57,9 @@ export interface ErCompositeEntry {
 
 export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   266: { erAbilityId: 266, parts: [{ kind: "pokerogue", abilityId: 127 }, { kind: "pokerogue", abilityId: 264 }], hasRider: false },
-  // 267 stripped (id-resync orphan; archetype entry removed in commit 6803b22).
   366: { erAbilityId: 366, parts: [{ kind: "er", erAbilityId: 268 }, { kind: "er", erAbilityId: 279 }], hasRider: false },
   374: { erAbilityId: 374, parts: [{ kind: "er", erAbilityId: 268 }, { kind: "pokerogue", abilityId: 34 }, { kind: "pokerogue", abilityId: 102 }, { kind: "pokerogue", abilityId: 139 }, { kind: "pokerogue", abilityId: 94 }], hasRider: false },
-  389: { erAbilityId: 389, parts: [{ kind: "pokerogue", abilityId: 151 }], unresolvedParts: ["50% more damage to Water-types"], hasRider: true },
+  390: { erAbilityId: 390, parts: [{ kind: "pokerogue", abilityId: 151 }], unresolvedParts: ["50% more damage to Water-types"], hasRider: true },
   395: { erAbilityId: 395, parts: [{ kind: "pokerogue", abilityId: 178 }, { kind: "er", erAbilityId: 368 }], hasRider: false },
   415: { erAbilityId: 415, parts: [{ kind: "er", erAbilityId: 307 }, { kind: "pokerogue", abilityId: 30 }], hasRider: false },
   416: { erAbilityId: 416, parts: [{ kind: "pokerogue", abilityId: 280 }, { kind: "pokerogue", abilityId: 206 }], hasRider: false },
@@ -91,7 +96,7 @@ export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   620: { erAbilityId: 620, parts: [{ kind: "er", erAbilityId: 342 }], unresolvedParts: ["Water STAB"], hasRider: true },
   635: { erAbilityId: 635, parts: [{ kind: "er", erAbilityId: 357 }, { kind: "pokerogue", abilityId: 212 }], hasRider: false },
   638: { erAbilityId: 638, parts: [{ kind: "er", erAbilityId: 636 }, { kind: "er", erAbilityId: 331 }], hasRider: false },
-  647: { erAbilityId: 647, parts: [{ kind: "er", erAbilityId: 390 }, { kind: "pokerogue", abilityId: 182 }], hasRider: false },
+  647: { erAbilityId: 647, parts: [{ kind: "er", erAbilityId: 391 }, { kind: "pokerogue", abilityId: 182 }], hasRider: false },
   651: { erAbilityId: 651, parts: [{ kind: "er", erAbilityId: 591 }, { kind: "pokerogue", abilityId: 144 }], hasRider: false },
   652: { erAbilityId: 652, parts: [{ kind: "pokerogue", abilityId: 84 }, { kind: "pokerogue", abilityId: 247 }], hasRider: false },
   654: { erAbilityId: 654, parts: [{ kind: "pokerogue", abilityId: 9 }], unresolvedParts: ["Rest in Peace"], hasRider: true },
@@ -139,7 +144,7 @@ export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   772: { erAbilityId: 772, parts: [{ kind: "er", erAbilityId: 284 }, { kind: "pokerogue", abilityId: 196 }], hasRider: false },
   776: { erAbilityId: 776, parts: [{ kind: "er", erAbilityId: 287 }], hasRider: false },
   777: { erAbilityId: 777, parts: [{ kind: "pokerogue", abilityId: 178 }, { kind: "er", erAbilityId: 377 }], hasRider: false },
-  778: { erAbilityId: 778, parts: [{ kind: "pokerogue", abilityId: 38 }, { kind: "er", erAbilityId: 390 }], hasRider: false },
+  778: { erAbilityId: 778, parts: [{ kind: "pokerogue", abilityId: 38 }, { kind: "er", erAbilityId: 391 }], hasRider: false },
   779: { erAbilityId: 779, parts: [{ kind: "pokerogue", abilityId: 136 }, { kind: "pokerogue", abilityId: 38 }], hasRider: false },
   780: { erAbilityId: 780, parts: [{ kind: "pokerogue", abilityId: 178 }], unresolvedParts: ["Status moves are Mega Launcher moves"], hasRider: true },
   781: { erAbilityId: 781, parts: [{ kind: "er", erAbilityId: 435 }, { kind: "er", erAbilityId: 376 }], hasRider: false },
@@ -166,7 +171,7 @@ export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   840: { erAbilityId: 840, parts: [{ kind: "pokerogue", abilityId: 24 }, { kind: "pokerogue", abilityId: 38 }], hasRider: false },
   841: { erAbilityId: 841, parts: [{ kind: "er", erAbilityId: 413 }, { kind: "er", erAbilityId: 310 }], hasRider: false },
   844: { erAbilityId: 844, parts: [{ kind: "er", erAbilityId: 505 }], unresolvedParts: ["use 20% of spdef during moves"], hasRider: true },
-  845: { erAbilityId: 845, parts: [{ kind: "er", erAbilityId: 390 }], unresolvedParts: ["30% Bleed chance on horn moves"], hasRider: true },
+  845: { erAbilityId: 845, parts: [{ kind: "er", erAbilityId: 391 }], unresolvedParts: ["30% Bleed chance on horn moves"], hasRider: true },
   846: { erAbilityId: 846, parts: [{ kind: "er", erAbilityId: 433 }, { kind: "er", erAbilityId: 844 }], hasRider: false },
   848: { erAbilityId: 848, parts: [{ kind: "pokerogue", abilityId: 80 }], unresolvedParts: ["blocks phasing moves"], hasRider: true },
   849: { erAbilityId: 849, parts: [{ kind: "pokerogue", abilityId: 203 }, { kind: "er", erAbilityId: 373 }], hasRider: false },
@@ -180,9 +185,9 @@ export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   861: { erAbilityId: 861, parts: [{ kind: "pokerogue", abilityId: 173 }], unresolvedParts: ["Jaws of Carnage"], hasRider: true },
   863: { erAbilityId: 863, parts: [{ kind: "er", erAbilityId: 270 }, { kind: "er", erAbilityId: 456 }], hasRider: false },
   867: { erAbilityId: 867, parts: [{ kind: "pokerogue", abilityId: 2 }, { kind: "er", erAbilityId: 226 }], hasRider: false },
-  869: { erAbilityId: 869, parts: [{ kind: "pokerogue", abilityId: 190 }, { kind: "er", erAbilityId: 320 }], hasRider: false },
-  870: { erAbilityId: 870, parts: [{ kind: "er", erAbilityId: 447 }], unresolvedParts: ["Absorbs Rock-moves/Stealth Rocks"], hasRider: true },
-  872: { erAbilityId: 872, parts: [{ kind: "er", erAbilityId: 323 }, { kind: "er", erAbilityId: 348 }], hasRider: false },
+  871: { erAbilityId: 871, parts: [{ kind: "pokerogue", abilityId: 190 }, { kind: "er", erAbilityId: 320 }], hasRider: false },
+  872: { erAbilityId: 872, parts: [{ kind: "er", erAbilityId: 447 }], unresolvedParts: ["Absorbs Rock-moves/Stealth Rocks"], hasRider: true },
+  873: { erAbilityId: 873, parts: [{ kind: "er", erAbilityId: 323 }, { kind: "er", erAbilityId: 348 }], hasRider: false },
   881: { erAbilityId: 881, parts: [{ kind: "er", erAbilityId: 303 }], unresolvedParts: ["Rock moves ignore abilities"], hasRider: true },
   894: { erAbilityId: 894, parts: [{ kind: "pokerogue", abilityId: 301 }, { kind: "pokerogue", abilityId: 132 }], hasRider: false },
   900: { erAbilityId: 900, parts: [{ kind: "pokerogue", abilityId: 159 }, { kind: "er", erAbilityId: 482 }], hasRider: false },
@@ -190,48 +195,48 @@ export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   902: { erAbilityId: 902, parts: [{ kind: "er", erAbilityId: 360 }, { kind: "pokerogue", abilityId: 35 }], hasRider: false },
   903: { erAbilityId: 903, parts: [{ kind: "er", erAbilityId: 412 }, { kind: "er", erAbilityId: 307 }], hasRider: false },
   918: { erAbilityId: 918, parts: [{ kind: "er", erAbilityId: 310 }, { kind: "pokerogue", abilityId: 24 }], hasRider: false },
-  919: { erAbilityId: 919, parts: [{ kind: "pokerogue", abilityId: 181 }, { kind: "er", erAbilityId: 404 }], hasRider: false },
+  920: { erAbilityId: 920, parts: [{ kind: "pokerogue", abilityId: 181 }, { kind: "er", erAbilityId: 404 }], hasRider: false },
   921: { erAbilityId: 921, parts: [{ kind: "er", erAbilityId: 794 }], unresolvedParts: ["Fatal"], hasRider: true },
-  922: { erAbilityId: 922, parts: [{ kind: "pokerogue", abilityId: 214 }, { kind: "pokerogue", abilityId: 79 }], hasRider: false },
-  925: { erAbilityId: 925, parts: [{ kind: "er", erAbilityId: 571 }, { kind: "er", erAbilityId: 924 }], hasRider: false },
-  928: { erAbilityId: 928, parts: [{ kind: "er", erAbilityId: 347 }, { kind: "er", erAbilityId: 533 }], hasRider: false },
-  929: { erAbilityId: 929, parts: [{ kind: "pokerogue", abilityId: 117 }, { kind: "pokerogue", abilityId: 115 }], hasRider: false },
-  930: { erAbilityId: 930, parts: [{ kind: "pokerogue", abilityId: 181 }, { kind: "pokerogue", abilityId: 202 }], hasRider: false },
+  924: { erAbilityId: 924, parts: [{ kind: "pokerogue", abilityId: 214 }, { kind: "pokerogue", abilityId: 79 }], hasRider: false },
+  926: { erAbilityId: 926, parts: [{ kind: "er", erAbilityId: 571 }, { kind: "er", erAbilityId: 927 }], hasRider: false },
+  929: { erAbilityId: 929, parts: [{ kind: "er", erAbilityId: 347 }, { kind: "er", erAbilityId: 533 }], hasRider: false },
+  931: { erAbilityId: 931, parts: [{ kind: "pokerogue", abilityId: 117 }, { kind: "pokerogue", abilityId: 115 }], hasRider: false },
+  932: { erAbilityId: 932, parts: [{ kind: "pokerogue", abilityId: 181 }, { kind: "pokerogue", abilityId: 202 }], hasRider: false },
   934: { erAbilityId: 934, parts: [{ kind: "er", erAbilityId: 794 }, { kind: "er", erAbilityId: 695 }], hasRider: false },
   936: { erAbilityId: 936, parts: [{ kind: "er", erAbilityId: 321 }, { kind: "pokerogue", abilityId: 47 }], hasRider: false },
   939: { erAbilityId: 939, parts: [{ kind: "pokerogue", abilityId: 98 }, { kind: "er", erAbilityId: 534 }], hasRider: false },
-  948: { erAbilityId: 948, parts: [{ kind: "pokerogue", abilityId: 221 }, { kind: "pokerogue", abilityId: 218 }], hasRider: false },
-  950: { erAbilityId: 950, parts: [{ kind: "er", erAbilityId: 735 }, { kind: "er", erAbilityId: 523 }], hasRider: false },
-  954: { erAbilityId: 954, parts: [{ kind: "pokerogue", abilityId: 47 }, { kind: "pokerogue", abilityId: 212 }], hasRider: false },
-  958: { erAbilityId: 958, parts: [{ kind: "er", erAbilityId: 326 }, { kind: "pokerogue", abilityId: 171 }], hasRider: false },
-  959: { erAbilityId: 959, parts: [{ kind: "er", erAbilityId: 271 }], unresolvedParts: ["Grass moves become Keen Edge boosted"], hasRider: true },
-  961: { erAbilityId: 961, parts: [{ kind: "er", erAbilityId: 358 }, { kind: "er", erAbilityId: 715 }], hasRider: false },
-  962: { erAbilityId: 962, parts: [{ kind: "er", erAbilityId: 272 }], unresolvedParts: ["Huge Wings"], hasRider: true },
-  964: { erAbilityId: 964, parts: [{ kind: "pokerogue", abilityId: 219 }, { kind: "pokerogue", abilityId: 128 }], hasRider: false },
-  965: { erAbilityId: 965, parts: [{ kind: "er", erAbilityId: 409 }, { kind: "er", erAbilityId: 712 }], hasRider: false },
-  966: { erAbilityId: 966, parts: [{ kind: "pokerogue", abilityId: 35 }, { kind: "er", erAbilityId: 270 }], hasRider: false },
-  968: { erAbilityId: 968, parts: [{ kind: "pokerogue", abilityId: 75 }, { kind: "pokerogue", abilityId: 38 }], hasRider: false },
-  969: { erAbilityId: 969, parts: [{ kind: "er", erAbilityId: 347 }], unresolvedParts: ["Water STAB"], hasRider: true },
-  970: { erAbilityId: 970, parts: [{ kind: "er", erAbilityId: 316 }, { kind: "pokerogue", abilityId: 4 }], hasRider: false },
-  971: { erAbilityId: 971, parts: [{ kind: "pokerogue", abilityId: 22 }, { kind: "er", erAbilityId: 329 }], hasRider: true, riderText: "10% burn chance on non contact moves" },
-  972: { erAbilityId: 972, parts: [{ kind: "er", erAbilityId: 409 }, { kind: "er", erAbilityId: 410 }], hasRider: false },
-  973: { erAbilityId: 973, parts: [{ kind: "pokerogue", abilityId: 68 }, { kind: "pokerogue", abilityId: 109 }], hasRider: false },
-  976: { erAbilityId: 976, parts: [{ kind: "er", erAbilityId: 361 }], hasRider: false },
-  978: { erAbilityId: 978, parts: [{ kind: "pokerogue", abilityId: 173 }], hasRider: false },
-  980: { erAbilityId: 980, parts: [{ kind: "pokerogue", abilityId: 188 }, { kind: "pokerogue", abilityId: 178 }], hasRider: false },
-  982: { erAbilityId: 982, parts: [{ kind: "er", erAbilityId: 456 }], unresolvedParts: ["Frostbite causes flinching"], hasRider: true },
-  983: { erAbilityId: 983, parts: [{ kind: "er", erAbilityId: 619 }], unresolvedParts: ["Sets Mist on entry"], hasRider: true },
-  985: { erAbilityId: 985, parts: [{ kind: "er", erAbilityId: 390 }], unresolvedParts: ["all Drill moves are 30% stronger"], hasRider: true },
-  986: { erAbilityId: 986, parts: [{ kind: "pokerogue", abilityId: 183 }], unresolvedParts: ["Takes 30% less damage from attacks"], hasRider: true },
-  988: { erAbilityId: 988, parts: [{ kind: "er", erAbilityId: 293 }, { kind: "er", erAbilityId: 302 }], hasRider: false },
-  990: { erAbilityId: 990, parts: [{ kind: "er", erAbilityId: 294 }, { kind: "pokerogue", abilityId: 91 }], hasRider: false },
+  946: { erAbilityId: 946, parts: [{ kind: "pokerogue", abilityId: 221 }, { kind: "pokerogue", abilityId: 218 }], hasRider: false },
+  948: { erAbilityId: 948, parts: [{ kind: "er", erAbilityId: 735 }, { kind: "er", erAbilityId: 523 }], hasRider: false },
+  952: { erAbilityId: 952, parts: [{ kind: "pokerogue", abilityId: 47 }, { kind: "pokerogue", abilityId: 212 }], hasRider: false },
+  956: { erAbilityId: 956, parts: [{ kind: "er", erAbilityId: 326 }, { kind: "pokerogue", abilityId: 171 }], hasRider: false },
+  957: { erAbilityId: 957, parts: [{ kind: "er", erAbilityId: 271 }], unresolvedParts: ["Grass moves become Keen Edge boosted"], hasRider: true },
+  960: { erAbilityId: 960, parts: [{ kind: "er", erAbilityId: 358 }, { kind: "er", erAbilityId: 715 }], hasRider: false },
+  961: { erAbilityId: 961, parts: [{ kind: "er", erAbilityId: 272 }], unresolvedParts: ["Huge Wings"], hasRider: true },
+  963: { erAbilityId: 963, parts: [{ kind: "er", erAbilityId: 409 }, { kind: "er", erAbilityId: 712 }], hasRider: false },
+  964: { erAbilityId: 964, parts: [{ kind: "pokerogue", abilityId: 35 }, { kind: "er", erAbilityId: 270 }], hasRider: false },
+  966: { erAbilityId: 966, parts: [{ kind: "pokerogue", abilityId: 75 }, { kind: "pokerogue", abilityId: 38 }], hasRider: false },
+  967: { erAbilityId: 967, parts: [{ kind: "er", erAbilityId: 347 }], unresolvedParts: ["Water STAB"], hasRider: true },
+  968: { erAbilityId: 968, parts: [{ kind: "er", erAbilityId: 316 }, { kind: "pokerogue", abilityId: 4 }], hasRider: false },
+  969: { erAbilityId: 969, parts: [{ kind: "pokerogue", abilityId: 22 }, { kind: "er", erAbilityId: 329 }], hasRider: true, riderText: "10% burn chance on non contact moves" },
+  970: { erAbilityId: 970, parts: [{ kind: "er", erAbilityId: 409 }, { kind: "er", erAbilityId: 410 }], hasRider: false },
+  971: { erAbilityId: 971, parts: [{ kind: "pokerogue", abilityId: 68 }, { kind: "pokerogue", abilityId: 109 }], hasRider: false },
+  974: { erAbilityId: 974, parts: [{ kind: "er", erAbilityId: 361 }], hasRider: false },
+  976: { erAbilityId: 976, parts: [{ kind: "pokerogue", abilityId: 173 }], hasRider: false },
+  978: { erAbilityId: 978, parts: [{ kind: "pokerogue", abilityId: 188 }, { kind: "pokerogue", abilityId: 178 }], hasRider: false },
+  980: { erAbilityId: 980, parts: [{ kind: "er", erAbilityId: 619 }], unresolvedParts: ["Sets Mist on entry"], hasRider: true },
+  981: { erAbilityId: 981, parts: [{ kind: "er", erAbilityId: 456 }], unresolvedParts: ["Frostbite causes flinching"], hasRider: true },
+  983: { erAbilityId: 983, parts: [{ kind: "er", erAbilityId: 391 }], unresolvedParts: ["all Drill moves are 30% stronger"], hasRider: true },
+  984: { erAbilityId: 984, parts: [{ kind: "pokerogue", abilityId: 183 }], unresolvedParts: ["Takes 30% less damage from attacks"], hasRider: true },
+  985: { erAbilityId: 985, parts: [{ kind: "pokerogue", abilityId: 219 }, { kind: "pokerogue", abilityId: 128 }], hasRider: false },
+  986: { erAbilityId: 986, parts: [{ kind: "er", erAbilityId: 293 }, { kind: "er", erAbilityId: 302 }], hasRider: false },
+  988: { erAbilityId: 988, parts: [{ kind: "er", erAbilityId: 294 }, { kind: "pokerogue", abilityId: 91 }], hasRider: false },
   992: { erAbilityId: 992, parts: [{ kind: "pokerogue", abilityId: 201 }, { kind: "er", erAbilityId: 275 }], hasRider: false },
   997: { erAbilityId: 997, parts: [{ kind: "pokerogue", abilityId: 4 }, { kind: "er", erAbilityId: 400 }], hasRider: false },
   999: { erAbilityId: 999, parts: [{ kind: "er", erAbilityId: 358 }, { kind: "er", erAbilityId: 331 }], hasRider: false },
   1001: { erAbilityId: 1001, parts: [{ kind: "er", erAbilityId: 345 }, { kind: "pokerogue", abilityId: 101 }], hasRider: false },
   1002: { erAbilityId: 1002, parts: [{ kind: "pokerogue", abilityId: 111 }, { kind: "pokerogue", abilityId: 75 }], hasRider: false },
   1003: { erAbilityId: 1003, parts: [{ kind: "pokerogue", abilityId: 145 }, { kind: "pokerogue", abilityId: 113 }], hasRider: false },
-  1007: { erAbilityId: 1007, parts: [{ kind: "pokerogue", abilityId: 120 }, { kind: "er", erAbilityId: 388 }], hasRider: false },
+  1007: { erAbilityId: 1007, parts: [{ kind: "pokerogue", abilityId: 120 }, { kind: "er", erAbilityId: 389 }], hasRider: false },
   1010: { erAbilityId: 1010, parts: [{ kind: "pokerogue", abilityId: 270 }, { kind: "pokerogue", abilityId: 85 }], hasRider: false },
   1011: { erAbilityId: 1011, parts: [{ kind: "er", erAbilityId: 505 }], unresolvedParts: ["Keen Edge moves lower SpDef"], hasRider: true },
   1013: { erAbilityId: 1013, parts: [{ kind: "er", erAbilityId: 632 }, { kind: "er", erAbilityId: 800 }], hasRider: false },
@@ -241,12 +246,13 @@ export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   1019: { erAbilityId: 1019, parts: [{ kind: "er", erAbilityId: 378 }], unresolvedParts: ["attacks with 30 BP Hyper Voice when hit"], hasRider: true },
   1020: { erAbilityId: 1020, parts: [{ kind: "er", erAbilityId: 367 }, { kind: "pokerogue", abilityId: 106 }], hasRider: false },
   1024: { erAbilityId: 1024, parts: [{ kind: "pokerogue", abilityId: 151 }, { kind: "pokerogue", abilityId: 172 }], hasRider: false },
-  1026: { erAbilityId: 1026, parts: [{ kind: "pokerogue", abilityId: 181 }, { kind: "er", erAbilityId: 1025 }], hasRider: false },
+  1025: { erAbilityId: 1025, parts: [{ kind: "pokerogue", abilityId: 181 }, { kind: "er", erAbilityId: 1026 }], hasRider: false },
+  1029: { erAbilityId: 1029, parts: [{ kind: "er", erAbilityId: 391 }, { kind: "er", erAbilityId: 300 }], hasRider: false },
+  1032: { erAbilityId: 1032, parts: [{ kind: "er", erAbilityId: 337 }, { kind: "pokerogue", abilityId: 49 }], hasRider: false },
+  1033: { erAbilityId: 1033, parts: [{ kind: "pokerogue", abilityId: 60 }, { kind: "pokerogue", abilityId: 183 }], hasRider: false },
+  // 267 stripped (id-resync orphan; archetype entry removed in commit 6803b22).
   // 1028 (King of the Jungle) was flipped from composite-vanilla-mashup to
   // bespoke in round 11 — the dispatcher's bespoke branch wires Infiltrator's
   // attrs + an OffensiveTypeMultiplier(GRASS, 1.5) for the unresolved rider.
   // The side-table entry was removed to keep the per-archetype count balance.
-  1029: { erAbilityId: 1029, parts: [{ kind: "er", erAbilityId: 390 }, { kind: "er", erAbilityId: 300 }], hasRider: false },
-  1032: { erAbilityId: 1032, parts: [{ kind: "er", erAbilityId: 337 }, { kind: "pokerogue", abilityId: 49 }], hasRider: false },
-  1033: { erAbilityId: 1033, parts: [{ kind: "pokerogue", abilityId: 60 }, { kind: "pokerogue", abilityId: 183 }], hasRider: false },
 };
