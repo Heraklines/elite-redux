@@ -179,6 +179,7 @@ import { SkipChargeTurnAbAttr } from "#data/elite-redux/archetypes/skip-charge-t
 import { SpeedBonusToStatAbAttr } from "#data/elite-redux/archetypes/speed-bonus-to-stat";
 import { StabAddAbAttr } from "#data/elite-redux/archetypes/stab-add";
 import { StabSuppressAuraAbAttr } from "#data/elite-redux/archetypes/stab-suppress-aura";
+import { StatBlendAbAttr } from "#data/elite-redux/archetypes/stat-blend";
 import { StatChangeOnAttackAbAttr } from "#data/elite-redux/archetypes/stat-change-on-attack";
 import {
   type StatChange,
@@ -1501,6 +1502,10 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       // holder's Rock-type moves bypass the target's ability (type-gated Mold
       // Breaker). Fossilized is the auto-resolved part.
       return [new MoveAbilityBypassAbAttr((pokemon, move) => pokemon.getMoveType(move) === PokemonType.ROCK)];
+    case 844: // Best Offense: "Mystic blades + use 20% of spdef during moves" —
+      // the holder's offensive stat (ATK physical / SPATK special) gains 20% of
+      // its Sp. Def while attacking. Mystic blades is the auto-resolved part.
+      return [new StatBlendAbAttr({ appliesTo: [Stat.ATK, Stat.SPATK], sourceStat: Stat.SPDEF, fraction: 0.2 })];
     case 957: // Chestnut Axe: "Keen edge + Grass moves become Keen Edge boosted"
       // — Grass moves gain the Keen Edge / Sharpness 1.5x slicing boost (wired as
       // the OUTCOME: a Grass-type 1.5x power boost, since pokerogue has no
