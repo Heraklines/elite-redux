@@ -1905,12 +1905,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // piece is deferred. Partial wire.
       return ok([new StatusEffectImmunityAbAttrEr({ statuses: [] })]);
     case 855:
-      // Hyper Cleanse — "Immune to status. Halves poison damage taken." Same
-      // empty-list block-all pattern as Blood Stigma for the immunity piece.
-      // The "halves poison damage" piece would compose via a type-keyed
-      // DamageReduction (POISON), but the current filter union doesn't carry a
-      // `type` variant; deferred. Partial wire.
-      return ok([new StatusEffectImmunityAbAttrEr({ statuses: [] })]);
+      // Hyper Cleanse — "Immune to status. Halves poison damage taken." Status
+      // immunity (empty list = block all) + defensive 0.5 from incoming Poison
+      // moves (move-type damage-reduction filter, now available).
+      return ok([
+        new StatusEffectImmunityAbAttrEr({ statuses: [] }),
+        new DamageReductionAbAttr({ reduction: 0.5, filter: { kind: "move-type", type: PokemonType.POISON } }),
+      ]);
     case 1004:
       // Feathercoat — "Takes 10% less damage from attacks, 20% if resisted."
       // Wire the flat 10% reduction via DamageReductionAbAttr({all}). The
@@ -2073,16 +2074,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new TypeDamageBoostAbAttr({ type: PokemonType.ELECTRIC, multiplier: 1.2 }),
       ]);
     case 764:
-      // Deep Freeze — "Boosts Water and Ice by 1.25x. Halves Fire damage
-      // taken." Wire all three pieces: two TypeDamageBoost (WATER, ICE)
-      // and a DamageReduction(FIRE) — but the damage-reduction filter union
-      // doesn't carry a `type` variant today, so the Fire half-damage piece
-      // composes via the kind:"all" filter at 0.5 only when paired with a
-      // type-keyed gate, which we lack. Partial wire — emit only the offense
-      // boost.
+      // Deep Freeze — "Boosts Water and Ice by 1.25x. Halves Fire damage taken."
+      // Offensive Water/Ice x1.25 + defensive 0.5 from incoming Fire moves (the
+      // move-type damage-reduction filter is now available). Previously offense-only.
       return ok([
         new TypeDamageBoostAbAttr({ type: PokemonType.WATER, multiplier: 1.25 }),
         new TypeDamageBoostAbAttr({ type: PokemonType.ICE, multiplier: 1.25 }),
+        new DamageReductionAbAttr({ reduction: 0.5, filter: { kind: "move-type", type: PokemonType.FIRE } }),
       ]);
     case 941:
       // Devious Present — "Boosts Ice and throwing moves by 50%." Wire as

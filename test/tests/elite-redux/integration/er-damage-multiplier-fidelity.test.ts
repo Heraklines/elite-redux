@@ -174,4 +174,45 @@ describe.skipIf(!RUN_SCENARIOS)("ER damage-multiplier fidelity (#103 Batch A)", 
     expect(dmgConverted, "Sand Song should let Normal sound hit a Ghost (as Ground)").toBeGreaterThan(0);
     expect(dmgImmune, "without Sand Song, Normal is immune vs Ghost").toBe(0);
   });
+
+  // Deep Freeze (ER 764): "Boosts Water and Ice by 1.25x. Halves Fire damage
+  // taken." The Fire-halving defensive piece was previously unwired. Verify the
+  // holder takes half damage from an incoming Fire move.
+  it("Deep Freeze: halves incoming Fire-move damage", async () => {
+    const deepFreeze = await erId(764);
+    if (deepFreeze === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(deepFreeze)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.CHARIZARD) // Fire attacker
+      .enemyMoveset(MoveId.FLAMETHROWER)
+      .moveset(MoveId.SPLASH)
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]); // Normal: Fire is neutral
+
+    vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
+    const player = game.field.getPlayerPokemon();
+
+    let hp0 = player.hp;
+    game.move.use(MoveId.SPLASH);
+    await game.toNextTurn();
+    const dmgReduced = hp0 - player.hp;
+
+    player.summonData.abilitySuppressed = true;
+    player.hp = player.getMaxHp();
+    hp0 = player.hp;
+    game.move.use(MoveId.SPLASH);
+    await game.toEndOfTurn();
+    const dmgFull = hp0 - player.hp;
+
+    expect(dmgFull, "baseline Flamethrower dealt damage").toBeGreaterThan(0);
+    const ratio = dmgReduced / dmgFull;
+    expect(ratio, `Deep Freeze should halve Fire damage (~0.5x, got ${ratio.toFixed(3)})`).toBeGreaterThan(0.45);
+    expect(ratio, `Deep Freeze should halve Fire damage (~0.5x, got ${ratio.toFixed(3)})`).toBeLessThan(0.55);
+  });
 });
