@@ -260,6 +260,15 @@ export class Egg {
           randSeedInt(MANAPHY_EGG_MANAPHY_RATE) ? SpeciesId.PHIONE : SpeciesId.MANAPHY,
         );
       }
+      // ER safety net: eggs must always hatch a BASE form. Stale eggs created
+      // before the egg pool excluded evolved ER customs may have stored an
+      // evolved species (e.g. Infernape Redux); traverse to its root so it
+      // hatches the proper base form (which has valid abilities/passives).
+      const rootSpeciesId = pokemonSpecies.getRootSpeciesId();
+      if (rootSpeciesId !== pokemonSpecies.speciesId) {
+        pokemonSpecies = getPokemonSpecies(rootSpeciesId);
+        this._species = rootSpeciesId;
+      }
 
       // Sets the hidden ability if a hidden ability exists and
       // the override is set or the egg hits the chance
