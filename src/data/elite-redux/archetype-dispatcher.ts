@@ -5105,10 +5105,52 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         }),
       ]);
     case 455:
-      // Archmage — "30% chance of adding a type related effect to each
-      // move." Approximate as 30% burn on attack (the "type-related effect"
-      // family covers many statuses; burn is a common choice).
-      return ok([new PostAttackApplyStatusEffectAbAttr(false, 30, StatusEffect.BURN)]);
+      // Archmage — "30% chance of adding a type related effect to each move."
+      // 30% chance to inflict each type's signature secondary, gated on the
+      // holder's move type: Fire→burn, Electric→paralysis, Ice→frostbite,
+      // Poison→poison, Ghost→fear, Psychic→confusion, Dark→flinch, Grass→seed.
+      return ok([
+        new ChanceStatusOnAttackAbAttr({
+          chance: 30,
+          effects: [StatusEffect.BURN],
+          filter: { type: PokemonType.FIRE },
+        }),
+        new ChanceStatusOnAttackAbAttr({
+          chance: 30,
+          effects: [StatusEffect.PARALYSIS],
+          filter: { type: PokemonType.ELECTRIC },
+        }),
+        new ChanceStatusOnAttackAbAttr({
+          chance: 30,
+          effects: [StatusEffect.POISON],
+          filter: { type: PokemonType.POISON },
+        }),
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 30,
+          tags: [BattlerTagType.ER_FROSTBITE],
+          filter: { type: PokemonType.ICE },
+        }),
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 30,
+          tags: [BattlerTagType.ER_FEAR],
+          filter: { type: PokemonType.GHOST },
+        }),
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 30,
+          tags: [BattlerTagType.CONFUSED],
+          filter: { type: PokemonType.PSYCHIC },
+        }),
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 30,
+          tags: [BattlerTagType.FLINCHED],
+          filter: { type: PokemonType.DARK },
+        }),
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 30,
+          tags: [BattlerTagType.SEEDED],
+          filter: { type: PokemonType.GRASS },
+        }),
+      ]);
     case 456:
       // Cryomancy — "Moves inflict frostbite 5x as often." Pokerogue's
       // FREEZE is the closest analogue to frostbite (ER's distinct ER_FROSTBITE
