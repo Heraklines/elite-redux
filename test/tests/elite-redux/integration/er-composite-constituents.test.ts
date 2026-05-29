@@ -26,7 +26,10 @@ async function attrsOf(erId: number, attrName: string): Promise<unknown[]> {
   if (pkrg === undefined || !allAbilities[pkrg]) {
     return [];
   }
-  return allAbilities[pkrg].getAttrs(attrName as never);
+  // Inspect the raw attrs by constructor name — getAttrs() matches against a
+  // registry that excludes custom ER attr classes (CounterAttackOnHitAbAttr,
+  // etc.), so it would false-negative on those.
+  return allAbilities[pkrg].attrs.filter(a => a.constructor.name === attrName);
 }
 
 describe.skipIf(!RUN)("ER composite constituents (#130)", () => {
@@ -36,5 +39,13 @@ describe.skipIf(!RUN)("ER composite constituents (#130)", () => {
 
   it("Stonecutter (881) wires its 'Rock moves ignore abilities' half (MoveAbilityBypassAbAttr)", async () => {
     expect((await attrsOf(881, "MoveAbilityBypassAbAttr")).length).toBeGreaterThan(0);
+  });
+
+  it("Faraday Cage (759) wires its 'Thunder Cage when hit by contact' half (CounterAttackOnHitAbAttr)", async () => {
+    expect((await attrsOf(759, "CounterAttackOnHitAbAttr")).length).toBeGreaterThan(0);
+  });
+
+  it("Wind Chimes (1019) wires its '30 BP Hyper Voice when hit' half (CounterAttackOnHitAbAttr)", async () => {
+    expect((await attrsOf(1019, "CounterAttackOnHitAbAttr")).length).toBeGreaterThan(0);
   });
 });

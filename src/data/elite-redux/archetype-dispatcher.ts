@@ -1485,6 +1485,15 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
           flag: MoveFlags.SLICING_MOVE,
         }),
       ];
+    case 759: // Faraday Cage: "Shell Armor + 50BP Thunder Cage when hit by
+      // contact" — retaliate with Thunder Cage when struck by a contact move
+      // (Shell Armor is the auto-resolved part). The counter casts the real
+      // Thunder Cage move at the attacker.
+      return [new CounterAttackOnHitAbAttr({ moveId: MoveId.THUNDER_CAGE, filter: { contactRequired: true } })];
+    case 1019: // Wind Chimes: "Amplifier + attacks with 30 BP Hyper Voice when
+      // hit" — retaliate with Hyper Voice on any hit (Amplifier is the
+      // auto-resolved part).
+      return [new CounterAttackOnHitAbAttr({ moveId: MoveId.HYPER_VOICE })];
     case 762: // Qigong: "Rampage + Always hits" — the holder's moves never miss
       // (No Guard's no-miss half). Rampage is the auto-resolved part.
       return [new AlwaysHitAbAttr()];
