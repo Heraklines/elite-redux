@@ -426,4 +426,19 @@ describe.skipIf(!RUN_SCENARIOS)("ER damage-multiplier fidelity (#103 Batch A)", 
     const expected = Math.floor(dmgDealt * 0.1);
     expect(Math.abs(recoilTaken - expected)).toBeLessThanOrEqual(2);
   });
+
+  // Arcane Force (494): "All moves gain STAB. Ups super-effective by 10%."
+  // Isolate the +10% SE rider with a STAB super-effective move (Water Gun on a
+  // Water user vs a Fire enemy): the all-moves StabAdd skips real-STAB moves, so
+  // only the 1.1x SE rider is left to measure. (40-BP Water Gun avoids an OHKO
+  // that would mask the ratio — the earlier "0.41x" was such a test artifact.)
+  it("Arcane Force (494): super-effective STAB moves get the +10% rider", async () => {
+    await expectOffensiveTypeBoost({
+      erAbilityId: 494,
+      move: MoveId.WATER_GUN,
+      expected: 1.1,
+      user: SpeciesId.BLASTOISE,
+      enemy: SpeciesId.ARCANINE, // Fire: Water Gun is 2x super-effective
+    });
+  });
 });

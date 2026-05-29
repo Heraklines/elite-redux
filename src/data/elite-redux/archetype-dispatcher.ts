@@ -2184,12 +2184,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     case 494:
       // Arcane Force — "All moves gain STAB. Ups super-effective by 10%."
-      // All-moves StabAdd. The +10% super-effective rider (factor 1.1 via
-      // SuperEffectiveMultiplierBoostAbAttr) is ready to add, BUT a harness test
-      // revealed StabAddAbAttr() (no-arg, all-moves) reduces damage on an
-      // already-STAB move (active dealt ~0.41x), so the no-arg StabAdd needs
-      // fixing first — tracked separately. Keeping StabAdd-only for now.
-      return ok([new StabAddAbAttr()]);
+      // All-moves StabAdd (off-type moves get +1.5x; real-STAB moves are
+      // skipped by the primitive's condition) PLUS a +10% super-effective rider
+      // (factor 1.1, same primitive as Winged King 586 / Iron Serpent 588). The
+      // earlier "~0.41x" concern was a test-setup artifact, not a code bug — the
+      // no-arg StabAdd correctly no-ops on already-STAB moves. Verified with an
+      // isolation test (STAB super-effective move → only the 1.1 SE rider fires).
+      return ok([new StabAddAbAttr(), new SuperEffectiveMultiplierBoostAbAttr({ factor: 1.1 })]);
     // -------------------------------------------------------------------------
     // Round 9 — bonus composition wires using existing primitives.
     // Picked up while the stab-add primitive was in flight; each composes
