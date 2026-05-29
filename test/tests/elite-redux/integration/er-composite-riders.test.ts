@@ -432,4 +432,42 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
     await game.toEndOfTurn();
     expect(enemy.hp).toBeLessThan(hp0);
   });
+
+  it("Nika (469): Water moves ignore the sun damage penalty", async () => {
+    const ability = await erId(469);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(MoveId.WATER_GUN)
+      .weather(WeatherType.SUNNY) // sun normally halves Water moves
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
+    const enemy = game.field.getEnemyPokemon();
+    const player = game.field.getPlayerPokemon();
+    // Nika active: x2.0 power cancels the x0.5 sun penalty (net normal damage).
+    let hp0 = enemy.hp;
+    game.move.use(MoveId.WATER_GUN);
+    await game.toNextTurn();
+    const dmgNika = hp0 - enemy.hp;
+    // Suppress Nika: sun's x0.5 penalty applies.
+    player.summonData.abilitySuppressed = true;
+    enemy.hp = enemy.getMaxHp();
+    hp0 = enemy.hp;
+    game.move.use(MoveId.WATER_GUN);
+    await game.toEndOfTurn();
+    const dmgPenalized = hp0 - enemy.hp;
+    expect(dmgPenalized, "penalized damage > 0").toBeGreaterThan(0);
+    const ratio = dmgNika / dmgPenalized;
+    expect(ratio, `expected ~2.0x vs the sun-penalized baseline (got ${ratio.toFixed(3)})`).toBeGreaterThan(1.9);
+    expect(ratio, `expected ~2.0x vs the sun-penalized baseline (got ${ratio.toFixed(3)})`).toBeLessThan(2.1);
+  });
 });

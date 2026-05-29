@@ -1437,6 +1437,22 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       return [new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.MIST })];
     case 493: // Cryo Proficiency: "triggers hail when hit" — PostDefend weather set.
       return [new PostDefendWeatherChangeAbAttr(WeatherType.HAIL)];
+    case 469: // Nika: "Water moves function normally under sun" — cancel the 0.5x
+      // sun penalty on the holder's Water moves. A x2.0 power boost gated on
+      // active (non-suppressed) sun nets x1.0 against the weather's x0.5.
+      return [
+        new MovePowerBoostAbAttr((user, _target, move) => {
+          const w = globalScene.arena.weather;
+          if (!w || w.isEffectSuppressed()) {
+            return false;
+          }
+          const wt = w.weatherType;
+          if (wt !== WeatherType.SUNNY && wt !== WeatherType.HARSH_SUN) {
+            return false;
+          }
+          return user?.getMoveType(move) === PokemonType.WATER;
+        }, 2.0),
+      ];
     case 870: // Molten Core: "Absorbs Rock-moves/Stealth Rocks" — Rock-move absorb
       // (immune + heal 1/4, like Water Absorb). The Stealth Rock immunity is a
       // separate hazard mechanic — partial wire of the main absorb effect.
