@@ -3794,26 +3794,24 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // Round 34 — type-gated ChanceStatusOnHit wires
     // -------------------------------------------------------------------------
     case 434:
-      // Elemental Charge — "20% chance to BRN/FRZ/PARA with respective
-      // types." Three type-filtered procs.
+      // Elemental Charge — "20% chance to BRN/FRZ/PARA with respective types."
+      // The HOLDER's Fire move burns, Ice move frostbites, Electric move
+      // paralyzes the target (offensive), so use the PostAttack variants.
       return ok([
-        new ChanceStatusOnHitAbAttr({
+        new ChanceStatusOnAttackAbAttr({
           chance: 20,
           effects: [StatusEffect.BURN],
           filter: { type: PokemonType.FIRE },
-          contactRequired: false,
         }),
-        new ChanceBattlerTagOnHitAbAttr({
+        new ChanceBattlerTagOnAttackAbAttr({
           chance: 20,
           tags: [BattlerTagType.ER_FROSTBITE],
           filter: { type: PokemonType.ICE },
-          contactRequired: false,
         }),
-        new ChanceStatusOnHitAbAttr({
+        new ChanceStatusOnAttackAbAttr({
           chance: 20,
           effects: [StatusEffect.PARALYSIS],
           filter: { type: PokemonType.ELECTRIC },
-          contactRequired: false,
         }),
       ]);
     case 455:
@@ -4291,14 +4289,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new FlagDamageBoostAbAttr({ flag: MoveFlags.KICKING_MOVE, multiplier: 1.15 }),
       ]);
     case 831:
-      // Grass Flute — "Sound moves inflict Fear." Tag every SOUND hit with
-      // ER_FEAR. The chance-battler-tag-on-hit primitive supports flag filters.
+      // Grass Flute — "Sound moves inflict Fear." The HOLDER's SOUND moves fear
+      // the target (offensive), so use the PostAttack variant.
       return ok([
-        new ChanceBattlerTagOnHitAbAttr({
+        new ChanceBattlerTagOnAttackAbAttr({
           chance: 100,
           tags: [BattlerTagType.ER_FEAR],
           filter: { flag: MoveFlags.SOUND_BASED },
-          contactRequired: false,
         }),
       ]);
     case 832:
@@ -4467,14 +4464,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // contact.
       return ok([new ChanceBattlerTagOnHitAbAttr({ chance: 100, tags: [BattlerTagType.INFESTATION] })]);
     case 639:
-      // Piercing Solo — "Sound moves cause bleeding." Same as 831 Grass
-      // Flute but with ER_BLEED instead of ER_FEAR.
+      // Piercing Solo — "Sound moves cause bleeding." The HOLDER's SOUND moves
+      // bleed the target (offensive), so use the PostAttack variant.
       return ok([
-        new ChanceBattlerTagOnHitAbAttr({
+        new ChanceBattlerTagOnAttackAbAttr({
           chance: 100,
           tags: [BattlerTagType.ER_BLEED],
           filter: { flag: MoveFlags.SOUND_BASED },
-          contactRequired: false,
         }),
       ]);
     case 637:
@@ -5076,17 +5072,25 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // approximation but on the correct surface).
       return ok([new PostAttackApplyStatusEffectAbAttr(false, 30, StatusEffect.BURN)]);
     case 434:
-      // Elemental Charge — "20% chance to BRN/FRZ/PARA with respective
-      // types." Approximate as a flat 20% rotating-status proc on the
-      // holder's attacks.
+      // Elemental Charge — "20% chance to BRN/FRZ/PARA with respective types."
+      // Type-gated: the holder's Fire move burns, Ice move frostbites, Electric
+      // move paralyzes (20% each). Frostbite is the ER_FROSTBITE battler tag.
       return ok([
-        new PostAttackApplyStatusEffectAbAttr(
-          false,
-          20,
-          StatusEffect.BURN,
-          StatusEffect.FREEZE,
-          StatusEffect.PARALYSIS,
-        ),
+        new ChanceStatusOnAttackAbAttr({
+          chance: 20,
+          effects: [StatusEffect.BURN],
+          filter: { type: PokemonType.FIRE },
+        }),
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 20,
+          tags: [BattlerTagType.ER_FROSTBITE],
+          filter: { type: PokemonType.ICE },
+        }),
+        new ChanceStatusOnAttackAbAttr({
+          chance: 20,
+          effects: [StatusEffect.PARALYSIS],
+          filter: { type: PokemonType.ELECTRIC },
+        }),
       ]);
     case 455:
       // Archmage — "30% chance of adding a type related effect to each
@@ -5110,9 +5114,15 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // identify without per-move spec analysis).
       return ok([new PostAttackApplyBattlerTagAbAttr(false, () => 50, BattlerTagType.INFATUATED)]);
     case 639:
-      // Piercing Solo — "Sound moves cause bleeding." Approximate as 20%
-      // ER_BLEED on holder's sound moves.
-      return ok([new PostAttackApplyBattlerTagAbAttr(false, () => 20, BattlerTagType.ER_BLEED)]);
+      // Piercing Solo — "Sound moves cause bleeding." The holder's SOUND moves
+      // bleed the target (100%, SOUND-flag gated).
+      return ok([
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.ER_BLEED],
+          filter: { flag: MoveFlags.SOUND_BASED },
+        }),
+      ]);
     case 691:
       // Assassin's Tools — "Contact moves have a 30% chance to PSN, PRLZ,
       // or BLD." Rotating status proc on holder's contact attacks. Bleed is
@@ -5160,10 +5170,15 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // remains deferred (per-turn TRAPPED tag on target after attack).
       return ok([new PostAttackApplyBattlerTagAbAttr(false, () => 20, BattlerTagType.FLINCHED)]);
     case 831:
-      // Grass Flute — "Sound moves inflict Fear." Was wired defensively.
-      // Move to PostAttack with sound-move gate (approximate via 100%
-      // chance on attack — sound-move flag filter would require subclass).
-      return ok([new PostAttackApplyBattlerTagAbAttr(false, () => 100, BattlerTagType.ER_FEAR)]);
+      // Grass Flute — "Sound moves inflict Fear." The holder's SOUND moves fear
+      // the target (100%, SOUND-flag gated).
+      return ok([
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.ER_FEAR],
+          filter: { flag: MoveFlags.SOUND_BASED },
+        }),
+      ]);
     case 832:
       // Hemotoxin — "Suppresses abilities of the target when they're
       // poisoned." Was wired as SuppressAttacker (defensive — fires when
