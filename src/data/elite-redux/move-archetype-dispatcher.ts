@@ -552,11 +552,12 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // and deferred — the 90% accuracy from the draft remains as-is.
       return ok(0, [new AddBattlerTagAttr(BattlerTagType.ER_FROSTBITE, false, false, 4, 6)]);
     case 822:
-      // Energy Wave — pure damage move (115 BP, 90 acc, special, Normal). No
-      // secondary effects in ER source; archetype classifier flagged it bespoke
-      // because no archetype matched. Wire HighCritAttr for a slight edge
-      // consistent with the "deadly wave of energy" flavor.
-      return ok(0, [new HighCritAttr()]);
+      // Energy Wave — pure damage move (115 BP, 90 acc, special, Normal).
+      // ER description is "Deals damage." with NO secondary effect, so the move
+      // is intentionally effect-less (base stats only). A previously-added
+      // HighCritAttr was an unfaithful "flavor" embellishment — removed to match
+      // the source.
+      return ok(0, []);
     case 823:
       // Fluttering Leaf — deals damage and switches user out. ForceSwitchOutAttr
       // with selfSwitch=true matches U-Turn/Volt Switch semantics.
@@ -585,10 +586,11 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // Same shape as Strength Sap (HitHealAttr stat-based heal + StatStageChangeAttr).
       return ok(MoveFlags.TRIAGE_MOVE, [new HitHealAttr(null, Stat.SPATK), new StatStageChangeAttr([Stat.SPATK], -1)]);
     case 841:
-      // Gem Missile — +1 priority rock move (priority field in draft already
-      // applied at construction). HighCritAttr gives the "sharp gem" flavor
-      // a 1/8 crit rate boost, consistent with other priority-strike moves.
-      return ok(0, [new HighCritAttr()]);
+      // Gem Missile — "+1 priority." rock move. The +1 priority is the entire
+      // effect (priority field already applied at construction), so the move is
+      // intentionally effect-less here. A previously-added HighCritAttr was an
+      // unfaithful "flavor" embellishment not in the ER source — removed.
+      return ok(0, []);
     case 844:
       // Inverse Room — psychic status move that "reverses type matchups for
       // 5 turns". Pokerogue's `ArenaTagType` has no `INVERSE_ROOM` (only
