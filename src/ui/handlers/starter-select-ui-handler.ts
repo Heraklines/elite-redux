@@ -3431,6 +3431,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.validStarterContainers.forEach(container => {
       container.setVisible(false);
 
+      // ER: only BASE forms are selectable starters. Hide any evolved species
+      // that slipped a starterCost or was caught directly (e.g. a hatched
+      // "Infernape Redux"), which would otherwise show with blank abilities.
+      if (Object.hasOwn(pokemonPrevolutions, container.species.speciesId)) {
+        return;
+      }
+
       container.cost = globalScene.gameData.getSpeciesStarterValue(container.species.speciesId);
 
       // First, ensure you have the caught attributes for the species else default to bigint 0
