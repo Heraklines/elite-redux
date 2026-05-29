@@ -212,10 +212,12 @@ import {
   WeatherDamageReductionAbAttr,
   WeatherTypeBoostAbAttr,
 } from "#data/elite-redux/archetypes/weather-terrain-interaction";
+import { ER_ABILITIES } from "#data/elite-redux/er-abilities";
 import { ER_ABILITY_ARCHETYPES, type ErArchetypeKind } from "#data/elite-redux/er-ability-archetypes";
 import { ER_COMPOSITE_PARTS, type ErCompositePartRef } from "#data/elite-redux/er-composite-parts";
 import { ER_CLASSIFIER_FLAG_TO_MOVE_FLAG } from "#data/elite-redux/er-flag-mapping";
 import { TerrainType } from "#data/terrain";
+import { AbilityId } from "#enums/ability-id";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
@@ -1464,6 +1466,61 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
   }
 }
 
+/** Canonical (lowercase alphanumerics-only) form for ability-name matching. */
+function canonicalizeAbilityName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Cheap pre-filter for whether a rider string could be an ability NAME (vs a
+ * free-text effect sentence). We deliberately keep this loose — the index
+ * lookup in {@linkcode getNamedRiderIndex} is the real filter. We only reject
+ * the obvious non-names: anything carrying a digit/percent (effect numbers like
+ * "50% more damage…") or too long to be a name. Crucially we do NOT ban
+ * prepositions ("of", "the", "on") — that would wrongly reject multi-word
+ * ability names like "Sword of Ruin", "Jaws of Carnage", "On the Prowl" (the
+ * very reason the offline classifier left them unresolved).
+ */
+function riderLooksLikeAbilityName(part: string): boolean {
+  return part.length <= 28 && !/[%\d]/.test(part);
+}
+
+/** Lazily-built canonical-name → composite part ref index (memoized). */
+let namedRiderIndex: Map<string, ErCompositePartRef> | null = null;
+
+/**
+ * Build (once) a canonical-name → {@linkcode ErCompositePartRef} index covering
+ * both the pokerogue `AbilityId` enum and the ER ability names. Pokerogue wins
+ * ties (its abilities have real AbAttr wiring), matching the classifier's
+ * resolution order. Used to late-bind composite riders that are actually
+ * ability NAMES the generator's name-match missed (e.g. "Sword of Ruin",
+ * "Stakeout", "On the Prowl").
+ */
+function getNamedRiderIndex(): Map<string, ErCompositePartRef> {
+  if (namedRiderIndex !== null) {
+    return namedRiderIndex;
+  }
+  const idx = new Map<string, ErCompositePartRef>();
+  for (const key of Object.keys(AbilityId)) {
+    if (!Number.isNaN(Number(key))) {
+      continue; // skip the enum's reverse numeric keys
+    }
+    const id = (AbilityId as unknown as Record<string, number>)[key];
+    const c = canonicalizeAbilityName(key);
+    if (c.length > 0 && !idx.has(c)) {
+      idx.set(c, { kind: "pokerogue", abilityId: id });
+    }
+  }
+  for (const a of ER_ABILITIES) {
+    const c = canonicalizeAbilityName(a.name);
+    if (c.length > 0 && !idx.has(c)) {
+      idx.set(c, { kind: "er", erAbilityId: a.id });
+    }
+  }
+  namedRiderIndex = idx;
+  return idx;
+}
+
 /**
  * Dispatch a `composite-vanilla-mashup` row. Looks up the per-ability resolved
  * parts table (`ER_COMPOSITE_PARTS`), walks each part through
@@ -1487,11 +1544,6 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
       `composite-vanilla-mashup: no resolved-parts entry for er ability ${erAbilityId} (run er:classify-composites)`,
     );
   }
-  if (entry.parts.length === 0 && riderAttrs.length === 0) {
-    return skip(
-      `composite-vanilla-mashup: er ability ${erAbilityId} had no resolvable parts (riders: ${entry.unresolvedParts?.join(", ") ?? "(none)"})`,
-    );
-  }
   // Defensive: track the visited set with the composite's own id added BEFORE
   // recursion so self-references (rare but possible if the classifier emits a
   // composite that names itself) abort cleanly.
@@ -1509,13 +1561,34 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
       out.push(attr);
     }
   }
+  // Late-bind named riders: free-text `unresolvedParts` that are actually
+  // ability NAMES (vanilla or ER) the generator's name-match missed. Resolve
+  // them at runtime and dispatch like a normal part. The heuristic keeps real
+  // free-text effect sentences out (those are handled by compositeRiderAttrs).
+  for (const rider of entry.unresolvedParts ?? []) {
+    if (!riderLooksLikeAbilityName(rider)) {
+      continue;
+    }
+    const ref = getNamedRiderIndex().get(canonicalizeAbilityName(rider));
+    if (ref === undefined) {
+      continue;
+    }
+    const partResult = resolveCompositePartAttrs(ref, nextVisited);
+    if (partResult.skipReason !== null) {
+      subSkips.push(partResult.skipReason);
+      continue;
+    }
+    for (const attr of partResult.attrs) {
+      out.push(attr);
+    }
+  }
   // Append hand-wired riders after the auto-resolved parts.
   for (const attr of riderAttrs) {
     out.push(attr);
   }
   if (out.length === 0) {
     return skip(
-      `composite-vanilla-mashup: er ability ${erAbilityId} resolved ${entry.parts.length} part(s) but none produced attrs (${subSkips.join("; ")})`,
+      `composite-vanilla-mashup: er ability ${erAbilityId} produced 0 attrs from ${entry.parts.length} part(s) + ${entry.unresolvedParts?.length ?? 0} rider(s) (${subSkips.join("; ") || "no resolvable parts"})`,
     );
   }
   // Compose order matches the parts order in ER's source description.

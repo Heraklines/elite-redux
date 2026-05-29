@@ -388,6 +388,28 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
     expect(player.hasAbilityWithAttr("ForceSwitchOutImmunityAbAttr")).toBe(true);
   });
 
+  it("Sword of Damnation (689): named rider 'Sword of Ruin' is resolved (Def-lower field attr)", async () => {
+    const ability = await erId(689);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(MoveId.SPLASH)
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    const player = game.field.getPlayerPokemon();
+    // The runtime named-rider resolver maps "Sword of Ruin" → vanilla
+    // SWORD_OF_RUIN and copies its FieldMultiplyStatAbAttr (Def x0.75).
+    expect(player.hasAbilityWithAttr("FieldMultiplyStatAbAttr")).toBe(true);
+  });
+
   it("Demolitionist (616): contact move ignores the foe's Protect", async () => {
     const ability = await erId(616);
     if (ability === undefined) {
