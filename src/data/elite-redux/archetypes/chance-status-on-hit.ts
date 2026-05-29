@@ -317,6 +317,12 @@ export interface ChanceBattlerTagOnHitOptions {
    * are identical, just inflicting a battler tag instead of a status effect.
    */
   readonly filter?: ChanceStatusFilter;
+  /**
+   * Optional gate on the TARGET's state: the proc only fires when the target
+   * already carries this battler tag. Used by Cryostasis (981) — "Frostbite
+   * causes flinching": the holder's hits flinch targets that are frostbitten.
+   */
+  readonly targetHasTag?: BattlerTagType;
 }
 
 /**
@@ -558,6 +564,7 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
   private readonly contactRequired: boolean;
   private readonly turns: number | undefined;
   private readonly filter: ChanceStatusFilter | undefined;
+  private readonly targetHasTag: BattlerTagType | undefined;
 
   constructor(opts: ChanceBattlerTagOnHitOptions) {
     if (!(opts.chance >= 0 && opts.chance <= 100)) {
@@ -569,9 +576,11 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
     super(undefined, false);
     this.chance = opts.chance;
     this.tags = opts.tags;
-    this.contactRequired = opts.contactRequired ?? opts.filter === undefined;
+    // A target-state gate (targetHasTag) replaces contact as the trigger when set.
+    this.contactRequired = opts.contactRequired ?? (opts.filter === undefined && opts.targetHasTag === undefined);
     this.turns = opts.turns;
     this.filter = opts.filter;
+    this.targetHasTag = opts.targetHasTag;
   }
 
   /** The configured move filter, or `undefined` when no filter is set. */
@@ -601,6 +610,9 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
       return false;
     }
     if (this.filter !== undefined && !checkChanceStatusFilter(this.filter, move)) {
+      return false;
+    }
+    if (this.targetHasTag !== undefined && !target.getTag(this.targetHasTag)) {
       return false;
     }
     if (this.chance !== 100 && pokemon.randBattleSeedInt(100) >= this.chance) {

@@ -52,4 +52,12 @@ describe.skipIf(!RUN)("ER composite constituents (#130)", () => {
   it("Chestnut Axe (957) wires its 'Grass moves become Keen Edge boosted' half (Grass power boost)", async () => {
     expect((await attrsOf(957, "MoveTypePowerBoostAbAttr")).length).toBeGreaterThan(0);
   });
+
+  it("Best Offense (844) wires its '20% of spdef' half (StatBlendAbAttr)", async () => {
+    expect((await attrsOf(844, "StatBlendAbAttr")).length).toBeGreaterThan(0);
+  });
+
+  it("Cryostasis (981) wires its 'Frostbite causes flinching' half (ChanceBattlerTagOnAttackAbAttr)", async () => {
+    expect((await attrsOf(981, "ChanceBattlerTagOnAttackAbAttr")).length).toBeGreaterThan(0);
+  });
 });

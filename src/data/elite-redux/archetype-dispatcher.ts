@@ -1525,6 +1525,16 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       // the holder's offensive stat (ATK physical / SPATK special) gains 20% of
       // its Sp. Def while attacking. Mystic blades is the auto-resolved part.
       return [new StatBlendAbAttr({ appliesTo: [Stat.ATK, Stat.SPATK], sourceStat: Stat.SPDEF, fraction: 0.2 })];
+    case 981: // Cryostasis: "Cryomancy + Frostbite causes flinching" — the
+      // holder's hits flinch a target that is already frostbitten (Cryomancy,
+      // the auto-resolved part, is what applies frostbite 5x as often).
+      return [
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.FLINCHED],
+          targetHasTag: BattlerTagType.ER_FROSTBITE,
+        }),
+      ];
     case 957: // Chestnut Axe: "Keen edge + Grass moves become Keen Edge boosted"
       // — Grass moves gain the Keen Edge / Sharpness 1.5x slicing boost (wired as
       // the OUTCOME: a Grass-type 1.5x power boost, since pokerogue has no
