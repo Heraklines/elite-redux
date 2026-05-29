@@ -19,6 +19,7 @@
 
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import { Pokemon } from "#field/pokemon";
@@ -254,5 +255,25 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
     game.move.use(MoveId.TACKLE);
     await game.toEndOfTurn();
     expect(enemy.getStatStage(Stat.SPDEF)).toBe(0);
+  });
+
+  it("Komodo (851): adds Dragon type on summon", async () => {
+    const ability = await erId(851);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(MoveId.SPLASH)
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]); // Normal-type base
+    const player = game.field.getPlayerPokemon();
+    expect(player.getTypes()).toContain(PokemonType.DRAGON);
   });
 });

@@ -1373,9 +1373,13 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
           filter: { flag: MoveFlags.HORN_BASED },
         }),
       ];
-    case 851: // Komodo: "moves have 30% Bad Poison chance" (the Dragon-type add
-      // is a passive typing change handled outside the AbAttr layer).
-      return [new ChanceStatusOnAttackAbAttr({ chance: 30, effects: [StatusEffect.TOXIC] })];
+    case 851: // Komodo: "Adds Dragon-type, moves have 30% Bad Poison chance" —
+      // the Dragon type-add (on summon, via the same add-self-type path as
+      // Aquatic/Grounded) plus the offensive 30% TOXIC rider.
+      return [
+        new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.DRAGON }),
+        new ChanceStatusOnAttackAbAttr({ chance: 30, effects: [StatusEffect.TOXIC] }),
+      ];
     case 856: // Molten Coat: "Rock moves have 50% burn chance"
       return [
         new ChanceStatusOnAttackAbAttr({
