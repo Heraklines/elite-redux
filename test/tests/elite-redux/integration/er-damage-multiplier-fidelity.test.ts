@@ -131,4 +131,47 @@ describe.skipIf(!RUN_SCENARIOS)("ER damage-multiplier fidelity (#103 Batch A)", 
     expect(ratio, `Fossilized should halve Rock damage (~0.5x, got ${ratio.toFixed(3)})`).toBeGreaterThan(0.45);
     expect(ratio, `Fossilized should halve Rock damage (~0.5x, got ${ratio.toFixed(3)})`).toBeLessThan(0.55);
   });
+
+  // Sand Song (ER 274): description — "Sound moves get a 1.2x boost and become
+  // Ground if Normal." Was an unwired SKIP. Verify the Normal->Ground conversion
+  // by hitting a Ghost (immune to Normal): with Sand Song the Normal sound move
+  // becomes Ground and connects; suppressed, it does nothing.
+  it("Sand Song: Normal sound moves become Ground (hit a Ghost)", async () => {
+    const sandSong = await erId(274);
+    if (sandSong === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(sandSong)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.GENGAR) // Ghost: immune to Normal, neutral to Ground
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(MoveId.HYPER_VOICE) // Normal, sound-based
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+
+    vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
+    const player = game.field.getPlayerPokemon();
+    const enemy = game.field.getEnemyPokemon();
+
+    // Ability active: Hyper Voice converts Normal -> Ground, connects on Ghost.
+    let hp0 = enemy.hp;
+    game.move.use(MoveId.HYPER_VOICE);
+    await game.toNextTurn();
+    const dmgConverted = hp0 - enemy.hp;
+
+    // Suppress: Normal vs Ghost = immune = 0 damage.
+    player.summonData.abilitySuppressed = true;
+    enemy.hp = enemy.getMaxHp();
+    hp0 = enemy.hp;
+    game.move.use(MoveId.HYPER_VOICE);
+    await game.toEndOfTurn();
+    const dmgImmune = hp0 - enemy.hp;
+
+    expect(dmgConverted, "Sand Song should let Normal sound hit a Ghost (as Ground)").toBeGreaterThan(0);
+    expect(dmgImmune, "without Sand Song, Normal is immune vs Ghost").toBe(0);
+  });
 });
