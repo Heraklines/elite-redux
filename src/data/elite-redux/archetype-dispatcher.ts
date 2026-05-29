@@ -1387,6 +1387,9 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       return [new StabAddAbAttr({ targetType: PokemonType.POISON })];
     case 826: // Tender Affection: "Fairy STAB"
       return [new StabAddAbAttr({ targetType: PokemonType.FAIRY })];
+    case 681: // Atomic Punch: "Iron Fist + 30% Steel type damage" — Steel moves x1.3
+      // (the Iron Fist half is the auto-resolved pokerogue part).
+      return [new TypeDamageBoostAbAttr({ type: PokemonType.STEEL, multiplier: 1.3 })];
     default:
       return [];
   }

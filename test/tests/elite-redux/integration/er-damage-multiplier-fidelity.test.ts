@@ -349,4 +349,11 @@ describe.skipIf(!RUN_SCENARIOS)("ER damage-multiplier fidelity (#103 Batch A)", 
   it("Tender Affection (826 rider): Fairy STAB gives off-type Fairy moves x1.5", async () => {
     await expectOffensiveTypeBoost({ erAbilityId: 826, move: MoveId.MOONBLAST, expected: 1.5 });
   });
+
+  // Atomic Punch (681): "Iron Fist + 30% Steel type damage". Tested with Flash
+  // Cannon — a Steel move that is NOT a punch, so the Iron Fist half doesn't
+  // confound the x1.3 Steel-type boost.
+  it("Atomic Punch (681 rider): Steel moves x1.3", async () => {
+    await expectOffensiveTypeBoost({ erAbilityId: 681, move: MoveId.FLASH_CANNON, expected: 1.3 });
+  });
 });
