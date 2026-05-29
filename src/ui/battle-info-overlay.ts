@@ -188,20 +188,34 @@ export class BattleInfoOverlay {
     this.container = c;
   }
 
-  /** Left column: 6 party slots with icons; selected slot gets the selector. */
+  /**
+   * Left column: 6 party slots, drawn over the panel's own (4-battler, v2.65.3b)
+   * column so it matches the newer 6-slot screenshots — orange rounded tiles
+   * (green for the selected one) + each Pokémon's icon + the corner-bracket
+   * selector.
+   */
   private renderPartyColumn(c: Phaser.GameObjects.Container): void {
     const party = this.party();
+    const sel = Math.min(this.slotIndex, Math.max(0, party.length - 1));
+    const x0 = 3;
+    const w = 46;
     for (let i = 0; i < SLOT_COUNT; i++) {
-      const cy = COL_TOP + i * COL_SLOT_H + COL_SLOT_H / 2;
+      const top = COL_TOP + i * COL_SLOT_H;
+      const cy = top + COL_SLOT_H / 2;
+      const isSel = i === sel && party.length > 0;
+      const g = globalScene.add.graphics();
+      g.fillStyle(isSel ? 0x90c050 : 0xf0aa38, 1);
+      g.fillRoundedRect(x0, top + 1, w, COL_SLOT_H - 2, 5);
+      c.add(g);
       const mon = party[i];
       if (mon) {
-        const icon = globalScene.addPokemonIcon(mon, COL_ICON_X, cy - 14, 0.5, 0.5);
-        icon.setScale(0.6);
+        const icon = globalScene.addPokemonIcon(mon, COL_ICON_X, cy - 13, 0.5, 0.5);
+        icon.setScale(0.62);
         c.add(icon);
       }
-      if (i === Math.min(this.slotIndex, Math.max(0, party.length - 1)) && party.length > 0) {
-        const sel = globalScene.add.image(COL_ICON_X, cy, "er_binfo_selector").setOrigin(0.5, 0.5).setScale(0.62);
-        c.add(sel);
+      if (isSel) {
+        const brackets = globalScene.add.image(COL_ICON_X, cy, "er_binfo_selector").setOrigin(0.5, 0.5).setScale(0.62);
+        c.add(brackets);
       }
     }
   }
@@ -217,63 +231,47 @@ export class BattleInfoOverlay {
   }
 
   // --- per-Pokémon: STATS (blue) -------------------------------------------
+  // Box geometry measured from the assembled ROM panel (stats.png):
+  //   name box     x64-191 y32-63   (name+Lv line, types line)
+  //   dot-grid box x64-143 y72-143  (baked 5x6 dot grid; cols x91..131 step8,
+  //                                  rows y75..107 step8 — overlay arrows)
+  //   numbers box  x152-235 y72-119 (6 stat rows)
+  //   nature box   x153-234 y128-143
   private renderStats(c: Phaser.GameObjects.Container, mon: Pokemon): void {
     const gender = mon.gender === 0 ? " ♂" : mon.gender === 1 ? " ♀" : "";
-    const name = addTextObject(
-      CONTENT_X + 6,
-      20,
-      `${mon.getNameToRender()}${gender}  Lv${mon.level}`,
-      TextStyle.WINDOW_ALT,
-      {
-        fontSize: "56px",
-      },
-    );
+    const name = addTextObject(68, 34, `${mon.getNameToRender()}${gender} Lv${mon.level}`, TextStyle.WINDOW_ALT, {
+      fontSize: "54px",
+    });
     name.setOrigin(0, 0);
     c.add(name);
     const types = mon
       .getTypes()
       .map(t => i18nType(t))
       .join(" / ");
-    const typeText = addTextObject(CONTENT_X + 6, 30, `Types: ${types}`, TextStyle.WINDOW_ALT, { fontSize: "52px" });
+    const typeText = addTextObject(68, 49, `Type: ${types}`, TextStyle.WINDOW_ALT, { fontSize: "50px" });
     typeText.setOrigin(0, 0);
     c.add(typeText);
-    const item = mon.getHeldItems()[0];
-    const itemText = addTextObject(
-      CONTENT_X + 6,
-      40,
-      `Held Item: ${item ? item.type.name : "None"}`,
-      TextStyle.WINDOW_ALT,
-      {
-        fontSize: "52px",
-      },
-    );
-    itemText.setOrigin(0, 0);
-    c.add(itemText);
 
-    // Stat-stage dot grid (left box) — one row per stat, 6 dots, filled = +1.
-    let gy = 64;
-    for (const row of STAT_GRID) {
-      const lbl = addTextObject(CONTENT_X + 4, gy, row.label, TextStyle.WINDOW_ALT, { fontSize: "48px" });
+    // Stat-stage labels + arrow overlays on the baked dot grid.
+    const DOT_X0 = 91;
+    const DOT_STEP = 8;
+    const DOT_ROWS = [75, 83, 91, 99, 107];
+    STAT_GRID.forEach((row, ri) => {
+      const ry = DOT_ROWS[ri];
+      const lbl = addTextObject(67, ry - 4, row.label, TextStyle.WINDOW_ALT, { fontSize: "44px" });
       lbl.setOrigin(0, 0);
       c.add(lbl);
       const stage = mon.getStatStage(row.stat); // -6..+6
-      for (let d = 0; d < 6; d++) {
-        const on = d < Math.abs(stage);
-        const up = stage >= 0;
-        const dot = globalScene.add
-          .image(
-            CONTENT_X + 30 + d * 8,
-            gy + 3,
-            on ? (up ? "er_binfo_stat_up" : "er_binfo_stat_down") : "er_binfo_check",
-          )
-          .setOrigin(0, 0.5)
-          .setAlpha(on ? 1 : 0.25);
-        c.add(dot);
+      const up = stage >= 0;
+      for (let d = 0; d < Math.min(6, Math.abs(stage)); d++) {
+        const arrow = globalScene.add
+          .image(DOT_X0 + d * DOT_STEP, ry, up ? "er_binfo_stat_up" : "er_binfo_stat_down")
+          .setOrigin(0.5, 0.5);
+        c.add(arrow);
       }
-      gy += 11;
-    }
+    });
 
-    // Actual stat numbers (right box).
+    // Actual stat numbers (right box) — 6 rows, step 8.
     const numbers: [string, string][] = [
       ["HP", `${mon.hp}/${mon.getMaxHp()}`],
       ["Atk", `${mon.getStat(Stat.ATK)}`],
@@ -282,22 +280,21 @@ export class BattleInfoOverlay {
       ["SpD", `${mon.getStat(Stat.SPDEF)}`],
       ["Spe", `${mon.getStat(Stat.SPD)}`],
     ];
-    let ny = 64;
+    let ny = 73;
     for (const [lbl, val] of numbers) {
-      const l = addTextObject(155, ny, lbl, TextStyle.WINDOW_ALT, { fontSize: "48px" });
+      const l = addTextObject(156, ny, lbl, TextStyle.WINDOW_ALT, { fontSize: "44px" });
       l.setOrigin(0, 0);
       c.add(l);
-      const v = addTextObject(185, ny, val, TextStyle.WINDOW_ALT, { fontSize: "48px" });
-      v.setOrigin(0, 0);
+      const v = addTextObject(234, ny, val, TextStyle.WINDOW_ALT, { fontSize: "44px" });
+      v.setOrigin(1, 0);
       c.add(v);
-      ny += 11;
+      ny += 8;
     }
 
-    // Nature (bottom right).
+    // Nature (bottom-right box, one line).
     const nat = mon.getNature();
-    const plus = naturePlusMinus(nat);
-    const natText = addTextObject(155, 138, `Nature: ${getNatureName(nat)}\n${plus}`, TextStyle.WINDOW_ALT, {
-      fontSize: "44px",
+    const natText = addTextObject(156, 130, `${getNatureName(nat)} ${naturePlusMinus(nat)}`, TextStyle.WINDOW_ALT, {
+      fontSize: "42px",
     });
     natText.setOrigin(0, 0);
     c.add(natText);
@@ -316,46 +313,46 @@ export class BattleInfoOverlay {
         rows.push({ label: "Innate", abilityId: id });
       }
     }
-    let y = 22;
-    for (const r of rows) {
+    let y = 33;
+    for (const r of rows.slice(0, 4)) {
       const ability = allAbilities[r.abilityId];
-      const head = addTextObject(CONTENT_X + 4, y, `${r.label}: ${ability?.name ?? ""}`, TextStyle.SUMMARY, {
-        fontSize: "52px",
+      const head = addTextObject(68, y, `${r.label}: ${ability?.name ?? ""}`, TextStyle.SUMMARY, {
+        fontSize: "48px",
       });
       head.setOrigin(0, 0);
       c.add(head);
       const desc = getErAbilityDescription(r.abilityId) ?? ability?.description ?? "";
-      const d = addTextObject(CONTENT_X + 4, y + 9, desc, TextStyle.WINDOW_ALT, {
-        fontSize: "44px",
-        wordWrap: { width: 700 },
+      const d = addTextObject(68, y + 9, desc, TextStyle.WINDOW_ALT, {
+        fontSize: "40px",
+        wordWrap: { width: 660 },
       });
       d.setOrigin(0, 0);
       c.add(d);
-      y += 30;
+      y += 32;
     }
   }
 
   // --- per-Pokémon: MOVES (green) ------------------------------------------
   private renderMoves(c: Phaser.GameObjects.Container, mon: Pokemon): void {
-    let y = 22;
-    for (const mv of mon.getMoveset()) {
+    let y = 33;
+    for (const mv of mon.getMoveset().slice(0, 4)) {
       if (!mv) {
         continue;
       }
       const move = mv.getMove();
-      const head = addTextObject(CONTENT_X + 4, y, move.name, TextStyle.SUMMARY, { fontSize: "52px" });
+      const head = addTextObject(68, y, move.name, TextStyle.SUMMARY, { fontSize: "48px" });
       head.setOrigin(0, 0);
       c.add(head);
       const meta = addTextObject(
-        BG_W - 4,
-        y,
+        228,
+        y + 10,
         `${i18nType(move.type)}  Pw ${move.power > 0 ? move.power : "—"}  PP ${mv.ppUsed}/${mv.getMovePp()}`,
         TextStyle.WINDOW_ALT,
-        { fontSize: "42px" },
+        { fontSize: "40px" },
       );
       meta.setOrigin(1, 0);
       c.add(meta);
-      y += 22;
+      y += 32;
     }
   }
 
@@ -389,18 +386,19 @@ export class BattleInfoOverlay {
 
   /** Render up to 6 "pill" rows (name left, turns right, on the striped panel). */
   private renderPills(c: Phaser.GameObjects.Container, rows: [string, string][]): void {
-    let y = 22;
-    for (const [name, turns] of rows.slice(0, 6)) {
-      const n = addTextObject(CONTENT_X + 6, y, name, TextStyle.WINDOW_ALT, { fontSize: "52px" });
+    // 3 pill boxes (x64-235): tops y32, y72, y112.
+    const tops = [38, 78, 118];
+    rows.slice(0, 3).forEach(([name, turns], i) => {
+      const y = tops[i];
+      const n = addTextObject(70, y, name, TextStyle.SUMMARY, { fontSize: "50px" });
       n.setOrigin(0, 0);
       c.add(n);
       if (turns) {
-        const t = addTextObject(BG_W - 6, y, turns, TextStyle.WINDOW_ALT, { fontSize: "52px" });
-        t.setOrigin(1, 0);
+        const t = addTextObject(70, y + 11, turns, TextStyle.WINDOW_ALT, { fontSize: "44px" });
+        t.setOrigin(0, 0);
         c.add(t);
       }
-      y += 38;
-    }
+    });
   }
 }
 
