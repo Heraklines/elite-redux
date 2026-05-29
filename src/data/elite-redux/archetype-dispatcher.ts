@@ -1501,6 +1501,12 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       // holder's Rock-type moves bypass the target's ability (type-gated Mold
       // Breaker). Fossilized is the auto-resolved part.
       return [new MoveAbilityBypassAbAttr((pokemon, move) => pokemon.getMoveType(move) === PokemonType.ROCK)];
+    case 957: // Chestnut Axe: "Keen edge + Grass moves become Keen Edge boosted"
+      // — Grass moves gain the Keen Edge / Sharpness 1.5x slicing boost (wired as
+      // the OUTCOME: a Grass-type 1.5x power boost, since pokerogue has no
+      // per-holder move-flag grant). The Keen Edge part (slicing 1.5x) is the
+      // auto-resolved part; this adds the same multiplier for Grass moves.
+      return [new MoveTypePowerBoostAbAttr(PokemonType.GRASS, 1.5)];
     default:
       return [];
   }

@@ -48,4 +48,8 @@ describe.skipIf(!RUN)("ER composite constituents (#130)", () => {
   it("Wind Chimes (1019) wires its '30 BP Hyper Voice when hit' half (CounterAttackOnHitAbAttr)", async () => {
     expect((await attrsOf(1019, "CounterAttackOnHitAbAttr")).length).toBeGreaterThan(0);
   });
+
+  it("Chestnut Axe (957) wires its 'Grass moves become Keen Edge boosted' half (Grass power boost)", async () => {
+    expect((await attrsOf(957, "MoveTypePowerBoostAbAttr")).length).toBeGreaterThan(0);
+  });
 });
