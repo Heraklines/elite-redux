@@ -16,6 +16,28 @@ for (const m of archTxt.matchAll(/^\s*(\d+):\s*\{\s*erMoveId:\s*\d+,\s*archetype
   archetypeOf[+m[1]] = m[2];
 }
 
+// dispatchBespokeMove handles archetype "bespoke" moves — parse which ids it
+// actually wires (return ok) vs leaves as SKIP_BESPOKE.
+const disp = readFileSync("src/data/elite-redux/move-archetype-dispatcher.ts", "utf8").split("\n");
+const bespokeStart = disp.findIndex(l => /function dispatchBespokeMove/.test(l));
+const bespokeKind = {};
+{
+  let id = null;
+  for (let i = bespokeStart + 1; i < disp.length && i < bespokeStart + 320; i++) {
+    const c = disp[i].match(/^\s*case (\d+):/);
+    if (c) {
+      id = +c[1];
+      continue;
+    }
+    if (id != null && /return\s/.test(disp[i])) {
+      if (!(id in bespokeKind)) {
+        bespokeKind[id] = /SKIP_BESPOKE|return skip\(|return ok\(0?,?\s*\[\]\)/.test(disp[i]) ? "skip" : "ok";
+      }
+      id = null;
+    }
+  }
+}
+
 // ER move id -> pokerogue MoveId (ids <5000 are vanilla, implemented by base game)
 const idMap = readFileSync("src/data/elite-redux/er-id-map.ts", "utf8").split("\n");
 const movesStart = idMap.findIndex(l => /^\s*"moves":\s*\{/.test(l));
@@ -41,8 +63,12 @@ for (const idStr of Object.keys(archetypeOf)) {
     continue;
   }
   if (archetypeOf[id] === "bespoke") {
-    const m = byId[id];
-    gaps.push({ id, pkrg, name: m?.name ?? "?", desc: m?.desc ?? "?" });
+    if (bespokeKind[id] === "ok") {
+      wired++;
+    } else {
+      const m = byId[id];
+      gaps.push({ id, pkrg, name: m?.name ?? "?", desc: m?.desc ?? "?", kind: bespokeKind[id] ?? "no-case" });
+    }
   } else {
     wired++;
   }
