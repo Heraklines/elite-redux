@@ -366,4 +366,25 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
     // Rock Slide is absorbed: no damage taken, and the holder heals instead.
     expect(player.hp).toBeGreaterThan(hpBefore);
   });
+
+  it("Superheavy (848): carries force-switch immunity (blocks phasing)", async () => {
+    const ability = await erId(848);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(MoveId.SPLASH)
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    const player = game.field.getPlayerPokemon();
+    // The composite wires Suction-Cups-style force-switch immunity.
+    expect(player.hasAbilityWithAttr("ForceSwitchOutImmunityAbAttr")).toBe(true);
+  });
 });

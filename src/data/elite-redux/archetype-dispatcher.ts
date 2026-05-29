@@ -1438,6 +1438,9 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       // (immune + heal 1/4, like Water Absorb). The Stealth Rock immunity is a
       // separate hazard mechanic — partial wire of the main absorb effect.
       return [new TypeAbsorbHealAbAttr({ type: PokemonType.ROCK })];
+    case 848: // Superheavy: "blocks phasing moves" — immune to forced switch-out
+      // (Roar/Whirlwind/Dragon Tail), exactly Suction Cups' effect.
+      return [new ForceSwitchOutImmunityAbAttr()];
     case 389: // Marine Apex: "50% more damage to Water-types + Infiltrator"
       // (Infiltrator is the auto-resolved part). +50% when the TARGET is Water.
       return [
