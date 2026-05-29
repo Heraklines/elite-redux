@@ -177,6 +177,7 @@ import { SkipChargeTurnAbAttr } from "#data/elite-redux/archetypes/skip-charge-t
 import { SpeedBonusToStatAbAttr } from "#data/elite-redux/archetypes/speed-bonus-to-stat";
 import { StabAddAbAttr } from "#data/elite-redux/archetypes/stab-add";
 import { StabSuppressAuraAbAttr } from "#data/elite-redux/archetypes/stab-suppress-aura";
+import { StatChangeOnAttackAbAttr } from "#data/elite-redux/archetypes/stat-change-on-attack";
 import {
   type StatChange,
   StatTriggerOnEntryAbAttr,
@@ -1411,6 +1412,23 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       // bare "+20% damage" rider is an unconditional all-moves power boost.
       // (Comatose is the auto-resolved part; Dreamcatcher remains a named rider.)
       return [new MovePowerBoostAbAttr(() => true, 1.2)];
+    case 389: // Marine Apex: "50% more damage to Water-types + Infiltrator"
+      // (Infiltrator is the auto-resolved part). +50% when the TARGET is Water.
+      return [
+        new MovePowerBoostAbAttr(
+          (_user, target, _move) => !!target && target.getTypes().includes(PokemonType.WATER),
+          1.5,
+        ),
+      ];
+    case 1011: // Sinister Claws: "Keen Edge moves lower SpDef" — holder's SLICING
+      // move lowers the target's Sp. Def by 1.
+      return [
+        new StatChangeOnAttackAbAttr({
+          stats: [Stat.SPDEF],
+          stages: -1,
+          flag: MoveFlags.SLICING_MOVE,
+        }),
+      ];
     default:
       return [];
   }

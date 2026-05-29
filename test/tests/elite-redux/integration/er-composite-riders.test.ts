@@ -20,6 +20,7 @@
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { Stat } from "#enums/stat";
 import { Pokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
@@ -174,5 +175,84 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
     const ratio = dmgBoosted / dmgBase;
     expect(ratio, `expected ~1.2x (got ${ratio.toFixed(3)})`).toBeGreaterThan(1.15);
     expect(ratio, `expected ~1.2x (got ${ratio.toFixed(3)})`).toBeLessThan(1.25);
+  });
+
+  it("Marine Apex (389): +50% damage vs Water-type targets", async () => {
+    const ability = await erId(389);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.VAPOREON) // pure Water; Tackle is neutral vs Water
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(MoveId.TACKLE)
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
+    const enemy = game.field.getEnemyPokemon();
+    const player = game.field.getPlayerPokemon();
+    let hp0 = enemy.hp;
+    game.move.use(MoveId.TACKLE);
+    await game.toNextTurn();
+    const dmgBoosted = hp0 - enemy.hp;
+    player.summonData.abilitySuppressed = true;
+    enemy.hp = enemy.getMaxHp();
+    hp0 = enemy.hp;
+    game.move.use(MoveId.TACKLE);
+    await game.toEndOfTurn();
+    const dmgBase = hp0 - enemy.hp;
+    expect(dmgBase, "baseline dealt damage").toBeGreaterThan(0);
+    const ratio = dmgBoosted / dmgBase;
+    expect(ratio, `expected ~1.5x vs Water (got ${ratio.toFixed(3)})`).toBeGreaterThan(1.45);
+    expect(ratio, `expected ~1.5x vs Water (got ${ratio.toFixed(3)})`).toBeLessThan(1.55);
+  });
+
+  it("Sinister Claws (1011): a slicing move lowers the target's Sp. Def", async () => {
+    const ability = await erId(1011);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset([MoveId.SLASH, MoveId.TACKLE]) // SLASH is a slicing move
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    const enemy = game.field.getEnemyPokemon();
+    game.move.use(MoveId.SLASH);
+    await game.toEndOfTurn();
+    expect(enemy.getStatStage(Stat.SPDEF)).toBe(-1);
+  });
+
+  it("Sinister Claws (1011): a NON-slicing move does NOT lower Sp. Def", async () => {
+    const ability = await erId(1011);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset([MoveId.TACKLE, MoveId.SLASH])
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    const enemy = game.field.getEnemyPokemon();
+    game.move.use(MoveId.TACKLE);
+    await game.toEndOfTurn();
+    expect(enemy.getStatStage(Stat.SPDEF)).toBe(0);
   });
 });
