@@ -16,7 +16,6 @@
 
 import { allMoves } from "#data/data-lists";
 import { AbilityId } from "#enums/ability-id";
-import type { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
@@ -26,10 +25,9 @@ const RUN_SCENARIOS = process.env.ER_SCENARIO === "1";
 
 // All 57 bespoke ER move IDs from move-archetype-dispatcher.ts switch.
 const BESPOKE_ER_MOVE_IDS = [
-  760, 761, 769, 788, 810, 811, 822, 823, 832, 834, 836, 837, 841, 844, 846,
-  853, 897, 935, 949, 950, 951, 954, 955, 962, 963, 964, 966, 967, 969, 970,
-  971, 974, 975, 977, 979, 989, 990, 991, 999, 1000, 1003, 1005, 1006, 1007,
-  1008, 1009, 1010, 1016, 1017, 1020, 1021, 1022, 1023, 1024, 1027, 1028, 1029,
+  760, 761, 769, 788, 810, 811, 822, 823, 832, 834, 836, 837, 841, 844, 846, 853, 897, 935, 949, 950, 951, 954, 955,
+  962, 963, 964, 966, 967, 969, 970, 971, 974, 975, 977, 979, 989, 990, 991, 999, 1000, 1003, 1005, 1006, 1007, 1008,
+  1009, 1010, 1016, 1017, 1020, 1021, 1022, 1023, 1024, 1027, 1028, 1029,
 ];
 
 describe.skipIf(!RUN_SCENARIOS)("ER bespoke moves smoke", () => {
@@ -57,10 +55,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER bespoke moves smoke", () => {
 
   it("All bespoke moves exist in allMoves after game init", async () => {
     // Boot a game to trigger initMoves() + custom-moves init.
-    game.override
-      .battleStyle("single")
-      .enemyAbility(AbilityId.BALL_FETCH)
-      .enemySpecies(SpeciesId.RATTATA);
+    game.override.battleStyle("single").enemyAbility(AbilityId.BALL_FETCH).enemySpecies(SpeciesId.RATTATA);
     await game.classicMode.startBattle(SpeciesId.PIKACHU);
 
     const erIdMap = (await import("#data/elite-redux/er-id-map")).ER_ID_MAP;
@@ -68,7 +63,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER bespoke moves smoke", () => {
     const missing: number[] = [];
     for (const erMoveId of BESPOKE_ER_MOVE_IDS) {
       const pkrgId = erIdMap.moves[erMoveId];
-      if (pkrgId !== undefined && allMoves.find(m => m.id === pkrgId)) {
+      if (pkrgId !== undefined && allMoves.find(m => m?.id === pkrgId)) {
         existsCount++;
       } else {
         missing.push(erMoveId);
@@ -81,28 +76,26 @@ describe.skipIf(!RUN_SCENARIOS)("ER bespoke moves smoke", () => {
   });
 
   it("Every bespoke ER move has a non-empty name after game init", async () => {
-    game.override
-      .battleStyle("single")
-      .enemyAbility(AbilityId.BALL_FETCH)
-      .enemySpecies(SpeciesId.RATTATA);
+    game.override.battleStyle("single").enemyAbility(AbilityId.BALL_FETCH).enemySpecies(SpeciesId.RATTATA);
     await game.classicMode.startBattle(SpeciesId.PIKACHU);
 
     const erIdMap = (await import("#data/elite-redux/er-id-map")).ER_ID_MAP;
     let namedCount = 0;
     for (const erMoveId of BESPOKE_ER_MOVE_IDS) {
       const pkrgId = erIdMap.moves[erMoveId];
-      if (pkrgId === undefined) continue;
-      const m = allMoves.find(m => m.id === pkrgId);
-      if (m && m.name && m.name.length > 0) namedCount++;
+      if (pkrgId === undefined) {
+        continue;
+      }
+      const m = allMoves.find(m => m?.id === pkrgId);
+      if (m && m.name && m.name.length > 0) {
+        namedCount++;
+      }
     }
     expect(namedCount).toBe(57);
   });
 
   it("Damaging bespoke ER moves have non-zero base power", async () => {
-    game.override
-      .battleStyle("single")
-      .enemyAbility(AbilityId.BALL_FETCH)
-      .enemySpecies(SpeciesId.RATTATA);
+    game.override.battleStyle("single").enemyAbility(AbilityId.BALL_FETCH).enemySpecies(SpeciesId.RATTATA);
     await game.classicMode.startBattle(SpeciesId.PIKACHU);
 
     const erIdMap = (await import("#data/elite-redux/er-id-map")).ER_ID_MAP;
@@ -110,8 +103,10 @@ describe.skipIf(!RUN_SCENARIOS)("ER bespoke moves smoke", () => {
     let totalBp = 0;
     for (const erMoveId of BESPOKE_ER_MOVE_IDS) {
       const pkrgId = erIdMap.moves[erMoveId];
-      if (pkrgId === undefined) continue;
-      const m = allMoves.find(m => m.id === pkrgId);
+      if (pkrgId === undefined) {
+        continue;
+      }
+      const m = allMoves.find(m => m?.id === pkrgId);
       if (m && m.power > 0) {
         damagingCount++;
         totalBp += m.power;
@@ -122,19 +117,20 @@ describe.skipIf(!RUN_SCENARIOS)("ER bespoke moves smoke", () => {
   });
 
   it("Status-class bespoke moves are properly configured", async () => {
-    game.override
-      .battleStyle("single")
-      .enemyAbility(AbilityId.BALL_FETCH)
-      .enemySpecies(SpeciesId.RATTATA);
+    game.override.battleStyle("single").enemyAbility(AbilityId.BALL_FETCH).enemySpecies(SpeciesId.RATTATA);
     await game.classicMode.startBattle(SpeciesId.PIKACHU);
 
     const erIdMap = (await import("#data/elite-redux/er-id-map")).ER_ID_MAP;
     let statusCount = 0;
     for (const erMoveId of BESPOKE_ER_MOVE_IDS) {
       const pkrgId = erIdMap.moves[erMoveId];
-      if (pkrgId === undefined) continue;
-      const m = allMoves.find(m => m.id === pkrgId);
-      if (m && m.power === 0) statusCount++;
+      if (pkrgId === undefined) {
+        continue;
+      }
+      const m = allMoves.find(m => m?.id === pkrgId);
+      if (m && m.power === 0) {
+        statusCount++;
+      }
     }
     expect(statusCount).toBeGreaterThan(0);
   });

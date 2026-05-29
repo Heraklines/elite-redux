@@ -16,10 +16,10 @@ import { AbilityId } from "#enums/ability-id";
 import { MoveFlags } from "#enums/move-flags";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
-import Phaser from "phaser";
-import { beforeAll, describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import Phaser from "phaser";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const RUN_SCENARIOS = process.env.ER_SCENARIO === "1";
 
@@ -56,10 +56,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER move flags audit", () => {
 
   it("emits move-flag diff report", async () => {
     const game = new GameManager(phaserGame);
-    game.override
-      .battleStyle("single")
-      .enemyAbility(AbilityId.BALL_FETCH)
-      .enemySpecies(SpeciesId.RATTATA);
+    game.override.battleStyle("single").enemyAbility(AbilityId.BALL_FETCH).enemySpecies(SpeciesId.RATTATA);
     await game.classicMode.startBattle(SpeciesId.PIKACHU);
 
     const erIdMap = (await import("#data/elite-redux/er-id-map")).ER_ID_MAP;
@@ -78,15 +75,23 @@ describe.skipIf(!RUN_SCENARIOS)("ER move flags audit", () => {
     const missing: Array<{ move: string; pkrgId: number; missing: string[] }> = [];
     for (const cm of cMoves) {
       const erId = constToErId.get(cm.name);
-      if (erId === undefined || erId < 1 || erId > 759) continue;
+      if (erId === undefined || erId < 1 || erId > 759) {
+        continue;
+      }
       const pkrgId = erIdMap.moves[erId];
-      if (pkrgId === undefined) continue;
-      const move = allMoves.find(x => x.id === pkrgId);
-      if (!move) continue;
+      if (pkrgId === undefined) {
+        continue;
+      }
+      const move = allMoves.find(x => x?.id === pkrgId);
+      if (!move) {
+        continue;
+      }
       const localMissing: string[] = [];
       for (const cFlag of cm.flags) {
         const pkrgFlag = FLAG_MAP[cFlag];
-        if (pkrgFlag === undefined) continue; // skip irrelevant
+        if (pkrgFlag === undefined) {
+          continue; // skip irrelevant
+        }
         // pokerogue Move.flags is a private bitmask; use hasFlag
         if (!move.hasFlag(pkrgFlag)) {
           localMissing.push(cFlag);

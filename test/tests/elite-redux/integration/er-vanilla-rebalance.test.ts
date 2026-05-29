@@ -41,6 +41,10 @@ function shouldConsiderDraft(draft: ErMoveDraft): boolean {
 function tallyRebalanceMatches(): RebalanceTally {
   const movesById = new Map<number, (typeof allMoves)[number]>();
   for (const m of allMoves) {
+    // allMoves is sparse (custom moves at id-indexed positions ≥5000).
+    if (!m) {
+      continue;
+    }
     movesById.set(m.id, m);
   }
 

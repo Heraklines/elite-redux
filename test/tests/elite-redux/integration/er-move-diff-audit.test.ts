@@ -9,14 +9,13 @@
 // which moves need additional vanilla-move patches.
 
 import { allMoves } from "#data/data-lists";
-import type { MoveId } from "#enums/move-id";
 import { AbilityId } from "#enums/ability-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
-import Phaser from "phaser";
-import { beforeAll, describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import Phaser from "phaser";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const RUN_SCENARIOS = process.env.ER_SCENARIO === "1";
 
@@ -30,10 +29,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER move diff audit", () => {
   it("emits diff report of ER vs pokerogue move stats", async () => {
     // Bootstrap pokerogue state.
     const game = new GameManager(phaserGame);
-    game.override
-      .battleStyle("single")
-      .enemyAbility(AbilityId.BALL_FETCH)
-      .enemySpecies(SpeciesId.RATTATA);
+    game.override.battleStyle("single").enemyAbility(AbilityId.BALL_FETCH).enemySpecies(SpeciesId.RATTATA);
     await game.classicMode.startBattle(SpeciesId.PIKACHU);
 
     const erIdMap = (await import("#data/elite-redux/er-id-map")).ER_ID_MAP;
@@ -64,17 +60,27 @@ describe.skipIf(!RUN_SCENARIOS)("ER move diff audit", () => {
       diffs: string[];
     }> = [];
     const norm = (v: number | null | undefined) => {
-      if (v === undefined || v === null || v === -1 || v === 0) return null;
+      if (v === undefined || v === null || v === -1 || v === 0) {
+        return null;
+      }
       return v;
     };
     for (const cm of cMoves) {
       const erId = constToErId.get(cm.name);
-      if (erId === undefined) continue;
-      if (erId < 1 || erId > 759) continue;
+      if (erId === undefined) {
+        continue;
+      }
+      if (erId < 1 || erId > 759) {
+        continue;
+      }
       const pkrgId = erIdMap.moves[erId];
-      if (pkrgId === undefined) continue;
-      const move = allMoves.find(x => x.id === pkrgId);
-      if (!move) continue;
+      if (pkrgId === undefined) {
+        continue;
+      }
+      const move = allMoves.find(x => x?.id === pkrgId);
+      if (!move) {
+        continue;
+      }
       const localDiffs: string[] = [];
       if (norm(cm.power) !== norm(move.power)) {
         localDiffs.push(`power ${move.power}→${cm.power}`);
@@ -100,7 +106,9 @@ describe.skipIf(!RUN_SCENARIOS)("ER move diff audit", () => {
       "",
     ];
     for (const d of diffs) {
-      lines.push(`  ER${d.erId.toString().padStart(3)} → ${d.pkrgId.toString().padStart(3)} ${d.name.padEnd(25)} : ${d.diffs.join(", ")}`);
+      lines.push(
+        `  ER${d.erId.toString().padStart(3)} → ${d.pkrgId.toString().padStart(3)} ${d.name.padEnd(25)} : ${d.diffs.join(", ")}`,
+      );
     }
     fs.writeFileSync(reportPath, lines.join("\n"), "utf-8");
     console.log(`Wrote ${reportPath} with ${diffs.length} diffs`);

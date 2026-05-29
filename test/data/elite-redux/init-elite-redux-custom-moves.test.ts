@@ -68,7 +68,7 @@ describe("initEliteReduxCustomMoves (B2 + D4)", () => {
     // as having no overlap.
     const eerieFogId = ErMoveId.EERIE_FOG as number;
     expect(eerieFogId).toBeGreaterThanOrEqual(VANILLA_ID_CUTOFF);
-    const eerieFog = allMoves.find(m => m.id === eerieFogId);
+    const eerieFog = allMoves.find(m => m?.id === eerieFogId);
     expect(eerieFog).toBeDefined();
     if (!eerieFog) {
       return;
@@ -101,7 +101,7 @@ describe("initEliteReduxCustomMoves (B2 + D4)", () => {
 
   it("flag-tagged-move: AQUA_FANG (Strong Jaw boost) has the BITING_MOVE flag set", () => {
     const id = ErMoveId.AQUA_FANG as number;
-    const move = allMoves.find(m => m.id === id);
+    const move = allMoves.find(m => m?.id === id);
     expect(move, `AQUA_FANG (id ${id}) should be in allMoves`).toBeDefined();
     if (!move) {
       return;
@@ -112,7 +112,7 @@ describe("initEliteReduxCustomMoves (B2 + D4)", () => {
 
   it("flag-tagged-move: SQUEAKY_HAMMER has the HAMMER_BASED flag set", () => {
     const id = ErMoveId.SQUEAKY_HAMMER as number;
-    const move = allMoves.find(m => m.id === id);
+    const move = allMoves.find(m => m?.id === id);
     expect(move, `SQUEAKY_HAMMER (id ${id}) should be in allMoves`).toBeDefined();
     if (!move) {
       return;
@@ -122,7 +122,7 @@ describe("initEliteReduxCustomMoves (B2 + D4)", () => {
 
   it("chance-status-on-hit: SMITE has a StatusEffectAttr (paralysis)", () => {
     const id = ErMoveId.SMITE as number;
-    const move = allMoves.find(m => m.id === id);
+    const move = allMoves.find(m => m?.id === id);
     expect(move, `SMITE (id ${id}) should be in allMoves`).toBeDefined();
     if (!move) {
       return;
@@ -133,7 +133,7 @@ describe("initEliteReduxCustomMoves (B2 + D4)", () => {
 
   it("recoil-or-drain (recoil): STAR_CRASH has RecoilAttr + RECKLESS_MOVE flag", () => {
     const id = ErMoveId.STAR_CRASH as number;
-    const move = allMoves.find(m => m.id === id);
+    const move = allMoves.find(m => m?.id === id);
     expect(move, `STAR_CRASH (id ${id}) should be in allMoves`).toBeDefined();
     if (!move) {
       return;
@@ -144,7 +144,7 @@ describe("initEliteReduxCustomMoves (B2 + D4)", () => {
 
   it("recoil-or-drain (drain): SOIL_DRAIN has HitHealAttr + TRIAGE_MOVE flag", () => {
     const id = ErMoveId.SOIL_DRAIN as number;
-    const move = allMoves.find(m => m.id === id);
+    const move = allMoves.find(m => m?.id === id);
     expect(move, `SOIL_DRAIN (id ${id}) should be in allMoves`).toBeDefined();
     if (!move) {
       return;
@@ -155,7 +155,7 @@ describe("initEliteReduxCustomMoves (B2 + D4)", () => {
 
   it("conditional-damage: BRAVADO has a MovePowerMultiplierAttr", () => {
     const id = ErMoveId.BRAVADO as number;
-    const move = allMoves.find(m => m.id === id);
+    const move = allMoves.find(m => m?.id === id);
     expect(move, `BRAVADO (id ${id}) should be in allMoves`).toBeDefined();
     if (!move) {
       return;
@@ -165,7 +165,7 @@ describe("initEliteReduxCustomMoves (B2 + D4)", () => {
 
   it("type-conversion: SABER_SLASHES has a VariableMoveTypeAttr", () => {
     const id = ErMoveId.SABER_SLASHES as number;
-    const move = allMoves.find(m => m.id === id);
+    const move = allMoves.find(m => m?.id === id);
     expect(move, `SABER_SLASHES (id ${id}) should be in allMoves`).toBeDefined();
     if (!move) {
       return;
@@ -209,7 +209,7 @@ describe("initEliteReduxCustomMoves (B2 + D4)", () => {
   // -------------------------------------------------------------------------
 
   it("bespoke wire: SEISMIC_FIST has a StatStageChangeAttr attached", () => {
-    const move = allMoves.find(m => m.id === (ErMoveId.SEISMIC_FIST as number));
+    const move = allMoves.find(m => m?.id === (ErMoveId.SEISMIC_FIST as number));
     expect(move).toBeDefined();
     if (!move) {
       return;
@@ -219,7 +219,7 @@ describe("initEliteReduxCustomMoves (B2 + D4)", () => {
   });
 
   it("bespoke wire: BEATDOWN has a MultiHitAttr attached", () => {
-    const move = allMoves.find(m => m.id === (ErMoveId.BEATDOWN as number));
+    const move = allMoves.find(m => m?.id === (ErMoveId.BEATDOWN as number));
     expect(move).toBeDefined();
     if (!move) {
       return;
@@ -228,7 +228,7 @@ describe("initEliteReduxCustomMoves (B2 + D4)", () => {
   });
 
   it("bespoke wire: MEGATON_HAMMER has IGNORE_PROTECT flag set", () => {
-    const move = allMoves.find(m => m.id === (ErMoveId.MEGATON_HAMMER as number));
+    const move = allMoves.find(m => m?.id === (ErMoveId.MEGATON_HAMMER as number));
     expect(move).toBeDefined();
     if (!move) {
       return;
@@ -237,7 +237,7 @@ describe("initEliteReduxCustomMoves (B2 + D4)", () => {
   });
 
   it("bespoke wire: OUTBURST has a SacrificialAttr attached", () => {
-    const move = allMoves.find(m => m.id === (ErMoveId.OUTBURST as number));
+    const move = allMoves.find(m => m?.id === (ErMoveId.OUTBURST as number));
     expect(move).toBeDefined();
     if (!move) {
       return;
@@ -246,7 +246,7 @@ describe("initEliteReduxCustomMoves (B2 + D4)", () => {
   });
 
   it("bespoke wire: FLUTTERING_LEAF has a ForceSwitchOutAttr attached", () => {
-    const move = allMoves.find(m => m.id === (ErMoveId.FLUTTERING_LEAF as number));
+    const move = allMoves.find(m => m?.id === (ErMoveId.FLUTTERING_LEAF as number));
     expect(move).toBeDefined();
     if (!move) {
       return;

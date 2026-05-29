@@ -60,7 +60,7 @@ describe("initEliteReduxVanillaRebalance (B3)", () => {
     // ER ships POUND with pp: 20; pokerogue's initMoves() constructs it with
     // pp: 35. After the harness ran the rebalance, the live `allMoves` entry
     // must match ER's value.
-    const pound = allMoves.find(m => m.id === MoveId.POUND);
+    const pound = allMoves.find(m => m?.id === MoveId.POUND);
     expect(pound).toBeDefined();
     if (!pound) {
       return;
@@ -71,7 +71,7 @@ describe("initEliteReduxVanillaRebalance (B3)", () => {
   it("patches KARATE_CHOP (id 2) to ER's power 90 / pp 10 (pokerogue baseline ships power 50 / pp 25)", () => {
     // ER's KARATE_CHOP: power 90, pp 10, accuracy 100.
     // Pokerogue baseline: power 50, pp 25, accuracy 100.
-    const karateChop = allMoves.find(m => m.id === MoveId.KARATE_CHOP);
+    const karateChop = allMoves.find(m => m?.id === MoveId.KARATE_CHOP);
     expect(karateChop).toBeDefined();
     if (!karateChop) {
       return;
@@ -128,7 +128,7 @@ describe("initEliteReduxVanillaRebalance (B3)", () => {
     type Snap = { power: number; accuracy: number; pp: number; priority: number; chance: number };
     const snapshot = new Map<number, Snap>();
     for (const move of allMoves) {
-      if (move.id >= VANILLA_ID_CUTOFF) {
+      if (!move || move.id >= VANILLA_ID_CUTOFF) {
         continue;
       }
       snapshot.set(move.id, {
@@ -145,7 +145,7 @@ describe("initEliteReduxVanillaRebalance (B3)", () => {
       // overwrite the fields where ER's value > 0 (or priority differs);
       // anything left at -999 was a no-op slot for the ER draft.
       for (const move of allMoves) {
-        if (move.id >= VANILLA_ID_CUTOFF) {
+        if (!move || move.id >= VANILLA_ID_CUTOFF) {
           continue;
         }
         const m = move as { power: number; accuracy: number; pp: number; priority: number; chance: number };
@@ -168,7 +168,7 @@ describe("initEliteReduxVanillaRebalance (B3)", () => {
       // Always restore so subsequent tests in this file (and any file ordering
       // dependency in the suite) see the post-ER state.
       for (const [id, vals] of snapshot) {
-        const move = allMoves.find(m => m.id === id);
+        const move = allMoves.find(m => m?.id === id);
         if (!move) {
           continue;
         }
