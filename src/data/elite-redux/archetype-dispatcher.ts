@@ -1434,6 +1434,10 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       return [new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.MIST })];
     case 493: // Cryo Proficiency: "triggers hail when hit" — PostDefend weather set.
       return [new PostDefendWeatherChangeAbAttr(WeatherType.HAIL)];
+    case 870: // Molten Core: "Absorbs Rock-moves/Stealth Rocks" — Rock-move absorb
+      // (immune + heal 1/4, like Water Absorb). The Stealth Rock immunity is a
+      // separate hazard mechanic — partial wire of the main absorb effect.
+      return [new TypeAbsorbHealAbAttr({ type: PokemonType.ROCK })];
     case 389: // Marine Apex: "50% more damage to Water-types + Infiltrator"
       // (Infiltrator is the auto-resolved part). +50% when the TARGET is Water.
       return [

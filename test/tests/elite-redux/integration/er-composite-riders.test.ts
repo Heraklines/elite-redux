@@ -341,4 +341,29 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
     await game.toEndOfTurn();
     expect(game.scene.arena.weather?.weatherType).toBe(WeatherType.HAIL);
   });
+
+  it("Molten Core (870): absorbs Rock-type moves (immune + heals)", async () => {
+    const ability = await erId(870);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.NO_GUARD) // guarantee Rock Slide connects
+      .enemySpecies(SpeciesId.RHYPERIOR)
+      .enemyMoveset(MoveId.ROCK_SLIDE)
+      .moveset(MoveId.SPLASH)
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    const player = game.field.getPlayerPokemon();
+    player.hp = Math.floor(player.getMaxHp() / 2); // below max so the absorb-heal is observable
+    const hpBefore = player.hp;
+    game.move.use(MoveId.SPLASH);
+    await game.toEndOfTurn();
+    // Rock Slide is absorbed: no damage taken, and the holder heals instead.
+    expect(player.hp).toBeGreaterThan(hpBefore);
+  });
 });
