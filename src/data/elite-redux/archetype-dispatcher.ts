@@ -3654,10 +3654,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Fungal Infection — "Contact moves inflict Leech Seed on the target."
       return ok([new ChanceBattlerTagOnHitAbAttr({ chance: 100, tags: [BattlerTagType.SEEDED] })]);
     case 426:
-      // Clueless — "Negates Weather, Rooms and Terrains." Wire vanilla
-      // SuppressWeatherEffectAbAttr (Cloud Nine). Room and terrain
-      // suppression need separate primitives — deferred.
-      return ok([new SuppressWeatherEffectAbAttr()]);
+      // Clueless — "Negates Weather, Rooms and Terrains." Cloud Nine continuously
+      // suppresses weather effects; terrain is cleared on entry. (Room tags —
+      // Trick/Magic/Wonder Room, Gravity — would need a continuous field-effect
+      // suppression hook pokerogue lacks; weather suppression + on-entry terrain
+      // clear cover the common cases.)
+      return ok([new SuppressWeatherEffectAbAttr(), new PostSummonClearTerrainAbAttr()]);
     // -------------------------------------------------------------------------
     // Round 30 — PostStatStageChange + stat-trigger-on-stat-lowered wires
     // -------------------------------------------------------------------------
