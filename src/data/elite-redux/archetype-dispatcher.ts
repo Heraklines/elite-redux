@@ -57,6 +57,7 @@
 
 import {
   type AbAttr,
+  AddMoveFlagAbAttr,
   AddSecondStrikeAbAttr,
   AlwaysHitAbAttr,
   AttackTypeImmunityAbAttr,
@@ -1502,6 +1503,24 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       // holder's Rock-type moves bypass the target's ability (type-gated Mold
       // Breaker). Fossilized is the auto-resolved part.
       return [new MoveAbilityBypassAbAttr((pokemon, move) => pokemon.getMoveType(move) === PokemonType.ROCK)];
+    case 600: // Brawling Wyvern: "No guard + Dragon type moves become punching
+      // moves" — the holder's Dragon moves gain the PUNCHING flag (so Iron Fist
+      // etc. boost them). No Guard is the auto-resolved part.
+      return [
+        new AddMoveFlagAbAttr({
+          filter: (user, move) => user.getMoveType(move) === PokemonType.DRAGON,
+          flags: [MoveFlags.PUNCHING_MOVE],
+        }),
+      ];
+    case 780: // Gunman: "Mega Launcher + Status moves are Mega Launcher moves" —
+      // the holder's Status moves gain the PULSE flag (Mega Launcher, the
+      // auto-resolved part, then treats them as pulse moves).
+      return [
+        new AddMoveFlagAbAttr({
+          filter: (_user, move) => move.category === MoveCategory.STATUS,
+          flags: [MoveFlags.PULSE_MOVE],
+        }),
+      ];
     case 844: // Best Offense: "Mystic blades + use 20% of spdef during moves" —
       // the holder's offensive stat (ATK physical / SPATK special) gains 20% of
       // its Sp. Def while attacking. Mystic blades is the auto-resolved part.
@@ -2912,10 +2931,15 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([new MovePowerBoostAbAttr(() => true, 1.2)]);
     case 813:
       // Mixed Martial Arts — "Normal moves are flagged as Punch + Kick moves."
-      // Flag injection is engine work. Approximate as a Normal-type damage
-      // boost since the practical effect is Iron Fist/Skill Smasher synergy
-      // with Normal moves on the holder.
-      return ok([new MoveTypePowerBoostAbAttr(PokemonType.NORMAL, 1.2)]);
+      // The holder's Normal moves gain the PUNCHING + KICKING flags (so Iron
+      // Fist etc. on the same holder boost them). Faithful to the description:
+      // it grants flags rather than an unconditional damage boost.
+      return ok([
+        new AddMoveFlagAbAttr({
+          filter: (user, move) => user.getMoveType(move) === PokemonType.NORMAL,
+          flags: [MoveFlags.PUNCHING_MOVE, MoveFlags.KICKING_MOVE],
+        }),
+      ]);
     case 830:
       // Temporal Rupture — "Roar of Time is altered drastically."
       // Approximate as 1.5x boost on Roar of Time specifically.

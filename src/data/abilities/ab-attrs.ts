@@ -1547,6 +1547,53 @@ export abstract class VariableMovePowerAbAttr extends PreAttackAbAttr {
   override apply(_params: Closed<PreAttackModifyPowerAbAttrParams>): void {}
 }
 
+/**
+ * Elite Redux: grant extra {@linkcode MoveFlags} to the holder's own moves that
+ * match a filter (e.g. Brawling Wyvern makes the holder's Dragon moves PUNCHING,
+ * so Iron Fist boosts them). Pokerogue has no per-holder move-flag override, so
+ * this is a passive marker scanned by {@linkcode AddMoveFlagAbAttr.userGrantsFlag}
+ * from the flag-consuming conditions (Iron Fist / Sharpness) — it never fires
+ * through the normal dispatch (canApply is always false).
+ */
+export class AddMoveFlagAbAttr extends AbAttr {
+  private readonly filter: (user: Pokemon, move: Move) => boolean;
+  private readonly grantedFlags: MoveFlags[];
+
+  constructor(options: { filter: (user: Pokemon, move: Move) => boolean; flags: MoveFlags[] }) {
+    super(false);
+    this.filter = options.filter;
+    this.grantedFlags = options.flags;
+  }
+
+  override canApply(): boolean {
+    return false;
+  }
+
+  override apply(): void {}
+
+  /**
+   * Whether `user` has an {@linkcode AddMoveFlagAbAttr} (on its main, passive or
+   * innate abilities) granting `flag` to `move`. Direct constructor-name scan —
+   * the class isn't in the {@linkcode AbilityAttrs} registry.
+   */
+  static userGrantsFlag(user: Pokemon | undefined, move: Move, flag: MoveFlags): boolean {
+    if (!user || user.summonData?.abilitySuppressed) {
+      return false;
+    }
+    const attrs = [...user.getAbility().attrs, ...user.getPassiveAbilities().flatMap(pa => pa?.attrs ?? [])];
+    for (const attr of attrs) {
+      if (attr?.constructor?.name !== "AddMoveFlagAbAttr") {
+        continue;
+      }
+      const a = attr as AddMoveFlagAbAttr;
+      if (a.grantedFlags.includes(flag) && a.filter(user, move)) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
 export class MovePowerBoostAbAttr extends VariableMovePowerAbAttr {
   private readonly condition: PokemonAttackCondition;
   private readonly powerMultiplier: number;

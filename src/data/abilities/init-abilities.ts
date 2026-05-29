@@ -1,4 +1,5 @@
 import {
+  AddMoveFlagAbAttr,
   AddSecondStrikeAbAttr,
   AiMovegenMoveStatsAbAttr,
   AlliedFieldDamageReductionAbAttr,
@@ -654,7 +655,13 @@ export function initAbilities() {
       .attr(DownloadAbAttr)
       .build(),
     new AbBuilder(AbilityId.IRON_FIST, 4) //
-      .attr(MovePowerBoostAbAttr, (_user, _target, move) => move.hasFlag(MoveFlags.PUNCHING_MOVE), 1.2)
+      .attr(
+        MovePowerBoostAbAttr,
+        (user, _target, move) =>
+          move.hasFlag(MoveFlags.PUNCHING_MOVE)
+          || AddMoveFlagAbAttr.userGrantsFlag(user, move, MoveFlags.PUNCHING_MOVE),
+        1.2,
+      )
       .build(),
     new AbBuilder(AbilityId.POISON_HEAL, 4) //
       .attr(PostTurnStatusHealAbAttr, StatusEffect.TOXIC, StatusEffect.POISON)
@@ -2049,7 +2056,12 @@ export function initAbilities() {
       .attr(CudChewRecordBerryAbAttr)
       .build(),
     new AbBuilder(AbilityId.SHARPNESS, 9) //
-      .attr(MovePowerBoostAbAttr, (_user, _target, move) => move.hasFlag(MoveFlags.SLICING_MOVE), 1.5)
+      .attr(
+        MovePowerBoostAbAttr,
+        (user, _target, move) =>
+          move.hasFlag(MoveFlags.SLICING_MOVE) || AddMoveFlagAbAttr.userGrantsFlag(user, move, MoveFlags.SLICING_MOVE),
+        1.5,
+      )
       .build(),
     new AbBuilder(AbilityId.SUPREME_OVERLORD, 9) //
       .conditionalAttr(
