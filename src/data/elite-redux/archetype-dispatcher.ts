@@ -1396,6 +1396,17 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
     case 681: // Atomic Punch: "Iron Fist + 30% Steel type damage" — Steel moves x1.3
       // (the Iron Fist half is the auto-resolved pokerogue part).
       return [new TypeDamageBoostAbAttr({ type: PokemonType.STEEL, multiplier: 1.3 })];
+    case 785: // Two-Faced: "Hunger Switch + Elec and Dark deal 1.35x with 10% recoil"
+      // (Hunger Switch is the auto-resolved part). Both type boosts come WITH a
+      // 10% recoil downside — now wirable via TypeRecoilAbAttr.
+      return [
+        new TypeDamageBoostAbAttr({ type: PokemonType.ELECTRIC, multiplier: 1.35 }),
+        new TypeDamageBoostAbAttr({ type: PokemonType.DARK, multiplier: 1.35 }),
+        new TypeRecoilAbAttr({ type: PokemonType.ELECTRIC, recoilPct: 0.1 }),
+        new TypeRecoilAbAttr({ type: PokemonType.DARK, recoilPct: 0.1 }),
+      ];
+    case 986: // Mucus Membrane: "Takes 30% less damage from attacks" (reduction = fraction removed)
+      return [new DamageReductionAbAttr({ reduction: 0.3, filter: { kind: "all" } })];
     default:
       return [];
   }
