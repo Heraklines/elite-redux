@@ -17,17 +17,18 @@
 // =============================================================================
 
 import type { BattleScene } from "#app/battle-scene";
-import { allSpecies } from "#data/data-lists";
-import type { PokemonSpecies } from "#data/pokemon-species";
 import { GameModes, getGameMode } from "#app/game-mode";
 import defaultOverrides from "#app/overrides";
-import { PlayerPokemon } from "#field/pokemon";
-import { SelectStarterPhase } from "#phases/select-starter-phase";
+import { allSpecies } from "#data/data-lists";
 import { Gender } from "#data/gender";
-import type { Starter } from "#ui/handlers/starter-select-ui-handler";
+import type { PokemonSpecies } from "#data/pokemon-species";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
+import { PlayerPokemon } from "#field/pokemon";
+import { SelectStarterPhase } from "#phases/select-starter-phase";
+import type { Starter } from "#ui/handlers/starter-select-ui-handler";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
+import { AES, enc } from "crypto-js";
 
 /** Resolve a species by numeric id, SpeciesId enum key, or display name. */
 function resolveSpecies(ref: number | string): PokemonSpecies {
@@ -113,6 +114,24 @@ export function installDevTools(scene: BattleScene): void {
       return scene.ui.setMode(UiMode.STARTER_SELECT, () => {});
     },
 
+    /**
+     * Load a .prsv system save programmatically (no file picker), e.g. a
+     * fully-unlocked save for reproducing dex/starter/form bugs. Pass the raw
+     * encrypted .prsv file contents. Returns a promise that resolves when the
+     * system data is applied. Reload the relevant screen afterwards.
+     *
+     * @example
+     *   await dev.loadSave(await (await fetch('/full_unlocks.prsv')).text())
+     */
+    async loadSave(prsvContents: string): Promise<boolean> {
+      const saveKey = "x0i2O7WRiANTqPmZ";
+      let dataStr = AES.decrypt(prsvContents, saveKey).toString(enc.Utf8);
+      dataStr = scene.gameData.convertSystemDataStr(dataStr);
+      await scene.gameData.initSystem(dataStr);
+      console.log("[dev-tools] save loaded");
+      return true;
+    },
+
     /** Jump the UI to an arbitrary mode (advanced). */
     setMode(mode: number, ...args: unknown[]) {
       return scene.ui.setMode(mode, ...args);
@@ -164,8 +183,7 @@ export function installDevTools(scene: BattleScene): void {
       const starters: Starter[] = speciesRefs.slice(0, 6).map(ref => {
         const species = resolveSpecies(ref);
         const probe = new PlayerPokemon(species, startingLevel, undefined, 0);
-        const gender =
-          species.malePercent === null ? Gender.GENDERLESS : probe.gender;
+        const gender = species.malePercent === null ? Gender.GENDERLESS : probe.gender;
         const starter: Starter = {
           speciesId: species.speciesId,
           shiny: probe.shiny,

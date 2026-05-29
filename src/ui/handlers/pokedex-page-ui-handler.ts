@@ -941,7 +941,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
       // ER: catchableSpecies[sId] is undefined for species without biome
       // entries (some vanilla mons + all ER customs). Skip rather than crash.
       const entries = catchableSpecies[sId];
-      if (!entries) continue;
+      if (!entries) {
+        continue;
+      }
       for (const bttod of entries) {
         speciesBiomes.add(bttod);
       }
@@ -951,9 +953,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
     const allFormChanges = Object.hasOwn(pokemonFormChanges, species.speciesId)
       ? pokemonFormChanges[species.speciesId]
       : [];
-    this.battleForms = allFormChanges.filter(
-      f => f.preFormKey === (this.species.forms[this.formIndex]?.formKey ?? ""),
-    );
+    this.battleForms = allFormChanges.filter(f => f.preFormKey === (this.species.forms[this.formIndex]?.formKey ?? ""));
 
     const preSpecies = Object.hasOwn(pokemonPrevolutions, this.species.speciesId)
       ? allSpecies.find(sp => sp.speciesId === pokemonPrevolutions[this.species.speciesId])
@@ -1999,12 +1999,17 @@ export class PokedexPageUiHandler extends MessageUiHandler {
 
             const formCount = this.species.forms.length;
             let newFormIndex = this.formIndex;
-            do {
+            // Bounded scan for the next selectable form. The original do/while
+            // could spin forever when the CURRENT form is unobtainable and no
+            // form is starter-selectable (the termination clause never went
+            // false) — that froze the whole game on ER Redux/mega forms. Try
+            // each form at most once; if none qualifies, stay put.
+            for (let i = 0; i < formCount; i++) {
               newFormIndex = (newFormIndex + 1) % formCount;
               if (this.species.forms[newFormIndex].isStarterSelectable || globalScene.dexForDevs) {
                 break;
               }
-            } while (newFormIndex !== props.formIndex || this.species.forms[newFormIndex].isUnobtainable);
+            }
             starterAttributes.form = newFormIndex;
             this.savedStarterAttributes.form = starterAttributes.form;
             this.formIndex = newFormIndex;
