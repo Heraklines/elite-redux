@@ -387,4 +387,27 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
     // The composite wires Suction-Cups-style force-switch immunity.
     expect(player.hasAbilityWithAttr("ForceSwitchOutImmunityAbAttr")).toBe(true);
   });
+
+  it("Demolitionist (616): contact move ignores the foe's Protect", async () => {
+    const ability = await erId(616);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.PROTECT)
+      .moveset(MoveId.TACKLE) // contact move — bypasses Protect via Unseen-Fist effect
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    const enemy = game.field.getEnemyPokemon();
+    const hp0 = enemy.hp;
+    game.move.use(MoveId.TACKLE);
+    await game.toEndOfTurn();
+    expect(enemy.hp).toBeLessThan(hp0);
+  });
 });

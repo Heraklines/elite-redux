@@ -66,6 +66,7 @@ import {
   BlockWeatherDamageAttr,
   ForceSwitchOutImmunityAbAttr,
   GorillaTacticsAbAttr,
+  IgnoreProtectOnContactAbAttr,
   IgnoreTypeImmunityAbAttr,
   MaxMultiHitAbAttr,
   MoveAbilityBypassAbAttr,
@@ -2622,12 +2623,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     case 616:
       // Demolitionist — "Readied Action + Ignores Protect + screens break on
-      // readied turn." Wire ATK × 2.0 on first turn. Ignore-Protect and
-      // screen-break are engine-level move-effects that need a per-move
-      // attribute injection; deferred (require new MoveAttr primitive that
-      // checks user's ability + first-turn predicate). For the player-facing
-      // damage component, the 2x ATK alone is functional.
-      return ok([new FirstTurnStatMultiplierAbAttr({ stat: Stat.ATK, multiplier: 2.0 })]);
+      // readied turn." Wire ATK × 2.0 on first turn + ignore-Protect on contact
+      // moves (Unseen Fist's IgnoreProtectOnContactAbAttr). The screen-break
+      // half is still an engine-level move-effect — deferred (partial wire).
+      return ok([
+        new FirstTurnStatMultiplierAbAttr({ stat: Stat.ATK, multiplier: 2.0 }),
+        new IgnoreProtectOnContactAbAttr(),
+      ]);
     case 619:
       // Low Visibility — "Summons Eerie Fog on entry."
       // Eerie Fog = FOG weather in pokerogue (WeatherType.FOG = 6).
