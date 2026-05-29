@@ -2901,16 +2901,15 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([new EntryEffectAbAttr({ kind: "set-screen-or-room", tag: ArenaTagType.INVERSE_ROOM, turns: 3 })]);
     case 636:
       // Blood Bath — "Immune to bleed. Inflict fear when inflicting bleed."
-      // Wire ER_BLEED tag immunity + ER_FEAR on attack (post-attack apply
-      // tag whenever holder deals damage with a bleeding move, approximated
-      // as 30% chance on slicing moves).
+      // ER_BLEED immunity + ER_FEAR whenever the holder's hit leaves the target
+      // bleeding (status-cascade via the targetHasTag gate).
       return ok([
         new BattlerTagImmunityAbAttr(BattlerTagType.ER_BLEED),
-        new PostAttackApplyBattlerTagAbAttr(
-          false,
-          (_u, _t, move) => (move.hasFlag(MoveFlags.SLICING_MOVE) ? 30 : 0),
-          BattlerTagType.ER_FEAR,
-        ),
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.ER_FEAR],
+          targetHasTag: BattlerTagType.ER_BLEED,
+        }),
       ]);
     case 648:
       // On the Prowl — "+1 priority for the first turn. Negative priority
@@ -5108,11 +5107,16 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // Was wired as CounterAttackOnHit (PostDefend) — should be PostAttack.
       return ok([new PostAttackScriptedMoveAbAttr({ moveId: MoveId.MAGNITUDE })]);
     case 611:
-      // Entrance — "Confusion also inflicts infatuation." After holder uses
-      // a confusing move, also chance to infatuate. Approximate as 50%
-      // infatuation on contact (Entrance's intended trigger is hard to
-      // identify without per-move spec analysis).
-      return ok([new PostAttackApplyBattlerTagAbAttr(false, () => 50, BattlerTagType.INFATUATED)]);
+      // Entrance — "Confusion also inflicts infatuation." When the holder's hit
+      // leaves the target confused, also infatuate it (status-cascade via the
+      // targetHasTag gate).
+      return ok([
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.INFATUATED],
+          targetHasTag: BattlerTagType.CONFUSED,
+        }),
+      ]);
     case 639:
       // Piercing Solo — "Sound moves cause bleeding." The holder's SOUND moves
       // bleed the target (100%, SOUND-flag gated).
@@ -5132,15 +5136,26 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         new PostAttackApplyBattlerTagAbAttr(true, () => 30, BattlerTagType.ER_BLEED),
       ]);
     case 740:
-      // Set Ablaze — "Inflicting burn also inflicts fear." When holder
-      // burns the target, also apply ER_FEAR. Approximate as 100% ER_FEAR
-      // when the holder's move would burn (no easy "burn fired" signal —
-      // approximate as 30% on any attack).
-      return ok([new PostAttackApplyBattlerTagAbAttr(false, () => 30, BattlerTagType.ER_FEAR)]);
+      // Set Ablaze — "Inflicting burn also inflicts fear." When the holder's hit
+      // leaves the target burned, also apply ER_FEAR (status-cascade via the
+      // targetHasStatus gate).
+      return ok([
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.ER_FEAR],
+          targetHasStatus: StatusEffect.BURN,
+        }),
+      ]);
     case 824:
-      // Frostbind — "Inflicting Frostbite also inflicts Disable." Similar to
-      // Set Ablaze — approximate as a Disable chance on attack.
-      return ok([new PostAttackApplyBattlerTagAbAttr(false, () => 30, BattlerTagType.DISABLED)]);
+      // Frostbind — "Inflicting Frostbite also inflicts Disable." When the
+      // holder's hit leaves the target frostbitten, also Disable it.
+      return ok([
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.DISABLED],
+          targetHasTag: BattlerTagType.ER_FROSTBITE,
+        }),
+      ]);
     case 876:
       // Sludge Spit — "follows up with 35BP Venom Bolt after using an
       // attack." Was wired defensively. Sludge as the closest available move.

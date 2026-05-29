@@ -323,6 +323,12 @@ export interface ChanceBattlerTagOnHitOptions {
    * causes flinching": the holder's hits flinch targets that are frostbitten.
    */
   readonly targetHasTag?: BattlerTagType;
+  /**
+   * Optional gate on the TARGET's status condition: the proc only fires when
+   * the target currently has this status. Used by status-cascade abilities like
+   * Set Ablaze (740) — "inflicting burn also inflicts fear".
+   */
+  readonly targetHasStatus?: StatusEffect;
 }
 
 /**
@@ -565,6 +571,7 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
   private readonly turns: number | undefined;
   private readonly filter: ChanceStatusFilter | undefined;
   private readonly targetHasTag: BattlerTagType | undefined;
+  private readonly targetHasStatus: StatusEffect | undefined;
 
   constructor(opts: ChanceBattlerTagOnHitOptions) {
     if (!(opts.chance >= 0 && opts.chance <= 100)) {
@@ -577,10 +584,13 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
     this.chance = opts.chance;
     this.tags = opts.tags;
     // A target-state gate (targetHasTag) replaces contact as the trigger when set.
-    this.contactRequired = opts.contactRequired ?? (opts.filter === undefined && opts.targetHasTag === undefined);
+    this.contactRequired =
+      opts.contactRequired
+      ?? (opts.filter === undefined && opts.targetHasTag === undefined && opts.targetHasStatus === undefined);
     this.turns = opts.turns;
     this.filter = opts.filter;
     this.targetHasTag = opts.targetHasTag;
+    this.targetHasStatus = opts.targetHasStatus;
   }
 
   /** The configured move filter, or `undefined` when no filter is set. */
@@ -613,6 +623,9 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
       return false;
     }
     if (this.targetHasTag !== undefined && !target.getTag(this.targetHasTag)) {
+      return false;
+    }
+    if (this.targetHasStatus !== undefined && target.status?.effect !== this.targetHasStatus) {
       return false;
     }
     if (this.chance !== 100 && pokemon.randBattleSeedInt(100) >= this.chance) {
