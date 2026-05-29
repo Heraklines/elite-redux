@@ -272,4 +272,68 @@ describe.skipIf(!RUN_SCENARIOS)("ER damage-multiplier fidelity (#103 Batch A)", 
     expect(healed, `Winter Throne should heal ~1/8 (${eighth}); got ${healed}`).toBeGreaterThanOrEqual(eighth - 1);
     expect(healed, `Winter Throne should heal ~1/8 (${eighth}); got ${healed}`).toBeLessThanOrEqual(eighth + 1);
   });
+
+  // Reusable exact-multiplier check for an unconditional offensive type-boost
+  // ability: deal `move` (of the boosted type) with the ability active vs
+  // suppressed and assert the damage ratio ~= the expected multiplier.
+  async function expectOffensiveTypeBoost(opts: {
+    erAbilityId: number;
+    move: MoveId;
+    expected: number;
+    enemy?: SpeciesId;
+    user?: SpeciesId;
+  }): Promise<void> {
+    const ability = await erId(opts.erAbilityId);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(opts.enemy ?? SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(opts.move)
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([opts.user ?? SpeciesId.SNORLAX]);
+    vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
+    const enemy = game.field.getEnemyPokemon();
+    const player = game.field.getPlayerPokemon();
+    let hp0 = enemy.hp;
+    game.move.use(opts.move);
+    await game.toNextTurn();
+    const dmgBoosted = hp0 - enemy.hp;
+    player.summonData.abilitySuppressed = true;
+    enemy.hp = enemy.getMaxHp();
+    hp0 = enemy.hp;
+    game.move.use(opts.move);
+    await game.toEndOfTurn();
+    const dmgBase = hp0 - enemy.hp;
+    expect(dmgBase, "baseline dealt damage").toBeGreaterThan(0);
+    const ratio = dmgBoosted / dmgBase;
+    expect(ratio, `expected ~${opts.expected}x (got ${ratio.toFixed(3)})`).toBeGreaterThan(opts.expected - 0.05);
+    expect(ratio, `expected ~${opts.expected}x (got ${ratio.toFixed(3)})`).toBeLessThan(opts.expected + 0.05);
+  }
+
+  // Electrocytes (281): Electric moves x1.25 (C-source + description agree).
+  it("Electrocytes: Electric moves x1.25", async () => {
+    await expectOffensiveTypeBoost({ erAbilityId: 281, move: MoveId.THUNDERBOLT, expected: 1.25 });
+  });
+
+  // Nocturnal (306): Dark moves x1.25 (C-source + description agree).
+  it("Nocturnal: Dark moves x1.25", async () => {
+    await expectOffensiveTypeBoost({ erAbilityId: 306, move: MoveId.DARK_PULSE, expected: 1.25 });
+  });
+
+  // Earthbound (299): Ground moves x1.2 at full HP (1.5x under 1/3 HP — not tested here).
+  it("Earthbound: Ground moves x1.2 (full HP)", async () => {
+    await expectOffensiveTypeBoost({ erAbilityId: 299, move: MoveId.EARTHQUAKE, expected: 1.2 });
+  });
+
+  // Psychic Mind (343): Psychic moves x1.2 at full HP (1.5x under 1/3 HP).
+  it("Psychic Mind: Psychic moves x1.2 (full HP)", async () => {
+    await expectOffensiveTypeBoost({ erAbilityId: 343, move: MoveId.PSYCHIC, expected: 1.2 });
+  });
 });
