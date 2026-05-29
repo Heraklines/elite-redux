@@ -158,7 +158,9 @@ export function getWeatherStartMessage(weatherType: WeatherType): string | null 
     case WeatherType.STRONG_WINDS:
       return i18next.t("weather:strongWindsStartMessage");
     case WeatherType.TEMPEST_STORM:
-      return i18next.t("weather:tempestStormStartMessage");
+      // ER custom weather — hardcoded English (the shared locales submodule has
+      // no key for it; ER's custom content is English-only).
+      return "A thundershock storm brewed!";
   }
 
   return null;
@@ -185,7 +187,7 @@ export function getWeatherLapseMessage(weatherType: WeatherType): string | null 
     case WeatherType.STRONG_WINDS:
       return i18next.t("weather:strongWindsLapseMessage");
     case WeatherType.TEMPEST_STORM:
-      return i18next.t("weather:tempestStormLapseMessage");
+      return "The thundershock storm rages.";
   }
 
   return null;
@@ -202,9 +204,7 @@ export function getWeatherDamageMessage(weatherType: WeatherType, pokemon: Pokem
         pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
       });
     case WeatherType.TEMPEST_STORM:
-      return i18next.t("weather:tempestStormDamageMessage", {
-        pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
-      });
+      return `${getPokemonNameWithAffix(pokemon)} is struck\nby the thundershock storm!`;
   }
 
   return null;
