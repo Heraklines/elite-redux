@@ -276,4 +276,24 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
     const player = game.field.getPlayerPokemon();
     expect(player.getTypes()).toContain(PokemonType.DRAGON);
   });
+
+  it("Lightsaber (908): adds Fire type on summon", async () => {
+    const ability = await erId(908);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(MoveId.SPLASH)
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]); // Normal-type base
+    const player = game.field.getPlayerPokemon();
+    expect(player.getTypes()).toContain(PokemonType.FIRE);
+  });
 });

@@ -1412,6 +1412,18 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       ];
     case 986: // Mucus Membrane: "Takes 30% less damage from attacks" (reduction = fraction removed)
       return [new DamageReductionAbAttr({ reduction: 0.3, filter: { kind: "all" } })];
+    case 908: // Lightsaber: "Adds Fire-type. Keen Edge moves 25% burn or paralysis."
+      // Fire type-add (on summon) + offensive KEEN-EDGE 25% burn ("or paralysis"
+      // approximated to burn). Converted from chance-status archetype so both
+      // halves can be emitted.
+      return [
+        new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.FIRE }),
+        new ChanceStatusOnAttackAbAttr({
+          chance: 25,
+          effects: [StatusEffect.BURN],
+          filter: { flag: MoveFlags.SLICING_MOVE },
+        }),
+      ];
     case 859: // Dreamscape: "Comatose + Dreamcatcher + Deal 20% more damage" — the
       // bare "+20% damage" rider is an unconditional all-moves power boost.
       // (Comatose is the auto-resolved part; Dreamcatcher remains a named rider.)

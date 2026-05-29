@@ -658,7 +658,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   905: { erAbilityId: 905, archetype: "bespoke", params: null },
   906: { erAbilityId: 906, archetype: "bespoke", params: null },
   907: { erAbilityId: 907, archetype: "chance-status-on-hit", params: {"chance":50,"status":"BURN","filter":{"flag":"MIGHTY_HORN"},"direction":"offense"} }, // Laser Drill: holder's HORN move burns (desc)
-  908: { erAbilityId: 908, archetype: "chance-status-on-hit", params: {"chance":25,"status":"BURN","filter":{"flag":"KEEN_EDGE"},"direction":"offense"} }, // Lightsaber: holder's KEEN-EDGE move burns (desc; "or paralysis" approximated to burn; Fire-type add separate)
+  908: { erAbilityId: 908, archetype: "composite-vanilla-mashup", params: {} }, // Lightsaber: "Adds Fire-type. Keen Edge moves 25% burn" — both halves wired via compositeRiderAttrs (chance-status was archetype-only and couldn't carry the type-add)
   909: { erAbilityId: 909, archetype: "bespoke", params: null },
   910: { erAbilityId: 910, archetype: "bespoke", params: null },
   911: { erAbilityId: 911, archetype: "bespoke", params: null },
