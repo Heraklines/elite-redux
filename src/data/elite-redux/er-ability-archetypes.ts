@@ -545,7 +545,10 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   793: { erAbilityId: 793, archetype: "composite-vanilla-mashup", params: {"parts":["Analytic","Neuroforce"]} },
   794: { erAbilityId: 794, archetype: "bespoke", params: null },
   795: { erAbilityId: 795, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"SPD","stages":1}} },
-  // 796-798 stripped — id-resync drift; entries no longer match real drafts.
+  // 796-798 (Embody Aspect Atk/Def/SpDef on entry) intentionally NOT wired: their
+  // mapped pokerogue ids (e.g. 5497) are not registered in the AbilityId reverse-
+  // map, so dispatching them throws `enumValueToKey` at runtime. Blocked on an
+  // id-registration fix (id-resync drift), not an ability-effect gap. See #103.
   799: { erAbilityId: 799, archetype: "type-damage-boost", params: {"type":"ROCK","multiplier":1.3,"lowHpMultiplier":1.8,"lowHpThreshold":0.3333333333333333} },
   800: { erAbilityId: 800, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"DARK","multiplier":1.2} },
   801: { erAbilityId: 801, archetype: "composite-vanilla-mashup", params: {"parts":["Leaf Guard","Harvest"]} },
