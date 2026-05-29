@@ -5608,7 +5608,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   //#region Sprite and Animation Methods
   setFrameRate(frameRate: number) {
-    globalScene.anims.get(this.getBattleSpriteKey()).frameRate = frameRate;
+    // `anims.get` returns undefined when the sprite's animation isn't registered
+    // (e.g. the HEADLESS test environment) — guard the assignment so applying a
+    // status (which sets a status-specific frame rate) doesn't crash there.
+    const anim = globalScene.anims.get(this.getBattleSpriteKey());
+    if (anim) {
+      anim.frameRate = frameRate;
+    }
     try {
       this.getSprite().play(this.getBattleSpriteKey());
     } catch (err: unknown) {
