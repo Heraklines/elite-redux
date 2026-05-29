@@ -145,7 +145,7 @@ export const ER_MOVE_ARCHETYPES: Readonly<Record<number, ErMoveArchetypeEntry>> 
   954: { erMoveId: 954, archetype: "bespoke", params: null },
   955: { erMoveId: 955, archetype: "bespoke", params: null },
   956: { erMoveId: 956, archetype: "chance-status-on-hit", params: {"chance":50,"status":"BLEED"} },
-  957: { erMoveId: 957, archetype: "conditional-damage", params: {"condition":{"kind":"self-statused","statuses":["BURN","POISON","PARALYSIS"]},"multiplier":1.5} },
+  957: { erMoveId: 957, archetype: "conditional-damage", params: {"condition":{"kind":"self-statused","statuses":["BURN","POISON","PARALYSIS"]},"multiplier":2.0} }, // Bravado: "Doubles damage if burned/paralyzed/poisoned" (was 1.5x — desc says 2x, Facade-like)
   958: { erMoveId: 958, archetype: "chance-status-on-hit", params: {"chance":50,"status":"BLEED"} },
   959: { erMoveId: 959, archetype: "flag-tagged-move", params: {"flags":["KEEN_EDGE"],"statusChance":{"chance":30,"status":"BLEED"}} },
   960: { erMoveId: 960, archetype: "chance-status-on-hit", params: {"chance":10,"status":"DROWSY"} },
