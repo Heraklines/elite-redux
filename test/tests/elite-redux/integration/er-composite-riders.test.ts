@@ -17,6 +17,7 @@
 // Gated behind ER_SCENARIO=1.
 // =============================================================================
 
+import { InfatuatedTag } from "#data/battler-tags";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
@@ -469,5 +470,64 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
     const ratio = dmgNika / dmgPenalized;
     expect(ratio, `expected ~2.0x vs the sun-penalized baseline (got ${ratio.toFixed(3)})`).toBeGreaterThan(1.9);
     expect(ratio, `expected ~2.0x vs the sun-penalized baseline (got ${ratio.toFixed(3)})`).toBeLessThan(2.1);
+  });
+
+  it("Pure Love (508): heals 25% of damage dealt to an INFATUATED target", async () => {
+    const ability = await erId(508);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(MoveId.TACKLE)
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
+    const enemy = game.field.getEnemyPokemon();
+    const player = game.field.getPlayerPokemon();
+    // Force the target infatuated (bypass gender check) so the lifesteal gate fires.
+    enemy.summonData.tags.push(new InfatuatedTag(MoveId.NONE, player.id));
+    player.hp = Math.floor(player.getMaxHp() / 2); // below max so the heal is observable
+    const hpBefore = player.hp;
+    const eHp0 = enemy.hp;
+    game.move.use(MoveId.TACKLE);
+    await game.toEndOfTurn();
+    const dmg = eHp0 - enemy.hp;
+    const healed = player.hp - hpBefore;
+    expect(dmg, "move dealt damage").toBeGreaterThan(0);
+    expect(healed, "user healed off the infatuated target").toBeGreaterThan(0);
+    const expected = Math.floor(dmg * 0.25);
+    expect(Math.abs(healed - expected)).toBeLessThanOrEqual(2);
+  });
+
+  it("Pure Love (508): does NOT heal off a non-infatuated target", async () => {
+    const ability = await erId(508);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(MoveId.TACKLE)
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    const player = game.field.getPlayerPokemon();
+    player.hp = Math.floor(player.getMaxHp() / 2);
+    const hpBefore = player.hp;
+    game.move.use(MoveId.TACKLE);
+    await game.toEndOfTurn();
+    // Target isn't infatuated → the conditional lifesteal does not fire.
+    expect(player.hp).toBe(hpBefore);
   });
 });

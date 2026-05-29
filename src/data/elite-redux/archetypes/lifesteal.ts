@@ -58,6 +58,7 @@ import type { PostKnockOutAbAttrParams } from "#abilities/ab-attrs";
 import { PostAttackAbAttr, PostKnockOutAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import type { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import type { PokemonType } from "#enums/pokemon-type";
@@ -78,6 +79,13 @@ export interface LifestealFilter {
   readonly type?: PokemonType;
   /** Move flag(s) that triggers the lifesteal heal. Omit to accept any flags. */
   readonly flag?: MoveFlags;
+  /**
+   * Optional gate on the TARGET carrying a battler tag (e.g.
+   * {@linkcode BattlerTagType.INFATUATED} for `Pure Love` — "heal vs
+   * infatuated"). Omit to ignore the target's tags. Checked in the attack
+   * condition closure (which has the target), not in {@linkcode matchesFilter}.
+   */
+  readonly targetTag?: BattlerTagType;
 }
 
 // -----------------------------------------------------------------------------
@@ -139,6 +147,10 @@ export class LifestealOnHitAbAttr extends PostAttackAbAttr {
       }
       // target may be null in pokerogue's PostAttack signature — defensive.
       if (target === null) {
+        return false;
+      }
+      // Optional target-tag gate (e.g. heal only vs an INFATUATED target).
+      if (filter.targetTag !== undefined && target.getTag(filter.targetTag) === undefined) {
         return false;
       }
       return LifestealOnHitAbAttr.matchesFilter(filter, user, move);

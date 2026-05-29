@@ -1437,6 +1437,10 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       return [new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.MIST })];
     case 493: // Cryo Proficiency: "triggers hail when hit" — PostDefend weather set.
       return [new PostDefendWeatherChangeAbAttr(WeatherType.HAIL)];
+    case 508: // Pure Love: "Cute Charm + heal 25% damage vs infatuated" — lifesteal
+      // (1/4 of damage dealt) gated on the target being INFATUATED. Cute Charm
+      // (the auto-resolved part) is what infatuates the target on contact.
+      return [new LifestealOnHitAbAttr({ healFraction: 0.25, filter: { targetTag: BattlerTagType.INFATUATED } })];
     case 469: // Nika: "Water moves function normally under sun" — cancel the 0.5x
       // sun penalty on the holder's Water moves. A x2.0 power boost gated on
       // active (non-suppressed) sun nets x1.0 against the weather's x0.5.
