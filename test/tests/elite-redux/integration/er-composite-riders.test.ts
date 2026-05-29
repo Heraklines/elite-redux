@@ -296,4 +296,27 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
     const player = game.field.getPlayerPokemon();
     expect(player.getTypes()).toContain(PokemonType.FIRE);
   });
+
+  it("Overcast (983): sets Mist on entry (blocks enemy stat drops)", async () => {
+    const ability = await erId(983);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.GROWL) // would lower the player's Atk by 1...
+      .moveset(MoveId.SPLASH)
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    const player = game.field.getPlayerPokemon();
+    game.move.use(MoveId.SPLASH);
+    await game.toEndOfTurn();
+    // ...but Mist (set on entry) blocks the drop.
+    expect(player.getStatStage(Stat.ATK)).toBe(0);
+  });
 });

@@ -1428,6 +1428,9 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       // bare "+20% damage" rider is an unconditional all-moves power boost.
       // (Comatose is the auto-resolved part; Dreamcatcher remains a named rider.)
       return [new MovePowerBoostAbAttr(() => true, 1.2)];
+    case 983: // Overcast: "Low Visibility + Sets Mist on entry" — cast Mist on
+      // summon (the Mist move sets the side's Mist tag, blocking stat drops).
+      return [new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.MIST })];
     case 389: // Marine Apex: "50% more damage to Water-types + Infiltrator"
       // (Infiltrator is the auto-resolved part). +50% when the TARGET is Water.
       return [
