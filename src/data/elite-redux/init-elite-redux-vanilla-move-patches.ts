@@ -518,20 +518,90 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
   // Each entry sets `move.chance` to the ER value so the secondary
   // effect rolls at the right rate.
   // =====================================================================
-  [MoveId.ROLLING_KICK, move => { move.chance = 30; }],
-  [MoveId.BUBBLE_BEAM, move => { move.chance = 10; }],
-  [MoveId.SKY_ATTACK, move => { move.chance = 30; }],
-  [MoveId.FLAME_WHEEL, move => { move.chance = 10; }],
-  [MoveId.MUD_SLAP, move => { move.chance = 100; }],
-  [MoveId.RAPID_SPIN, move => { move.chance = 100; }],
-  [MoveId.SECRET_POWER, move => { move.chance = 30; }],
-  [MoveId.POWER_SWAP, move => { move.chance = 100; }],
-  [MoveId.GUARD_SWAP, move => { move.chance = 100; }],
-  [MoveId.STRUGGLE_BUG, move => { move.chance = 100; }],
-  [MoveId.STEAMROLLER, move => { move.chance = 30; }],
-  [MoveId.NIGHT_DAZE, move => { move.chance = 40; }],
-  [MoveId.THROAT_CHOP, move => { move.chance = 100; }],
-  [MoveId.EERIE_SPELL, move => { move.chance = 100; }],
+  [
+    MoveId.ROLLING_KICK,
+    move => {
+      move.chance = 30;
+    },
+  ],
+  [
+    MoveId.BUBBLE_BEAM,
+    move => {
+      move.chance = 10;
+    },
+  ],
+  [
+    MoveId.SKY_ATTACK,
+    move => {
+      move.chance = 30;
+    },
+  ],
+  [
+    MoveId.FLAME_WHEEL,
+    move => {
+      move.chance = 10;
+    },
+  ],
+  [
+    MoveId.MUD_SLAP,
+    move => {
+      move.chance = 100;
+    },
+  ],
+  [
+    MoveId.RAPID_SPIN,
+    move => {
+      move.chance = 100;
+    },
+  ],
+  [
+    MoveId.SECRET_POWER,
+    move => {
+      move.chance = 30;
+    },
+  ],
+  [
+    MoveId.POWER_SWAP,
+    move => {
+      move.chance = 100;
+    },
+  ],
+  [
+    MoveId.GUARD_SWAP,
+    move => {
+      move.chance = 100;
+    },
+  ],
+  [
+    MoveId.STRUGGLE_BUG,
+    move => {
+      move.chance = 100;
+    },
+  ],
+  [
+    MoveId.STEAMROLLER,
+    move => {
+      move.chance = 30;
+    },
+  ],
+  [
+    MoveId.NIGHT_DAZE,
+    move => {
+      move.chance = 40;
+    },
+  ],
+  [
+    MoveId.THROAT_CHOP,
+    move => {
+      move.chance = 100;
+    },
+  ],
+  [
+    MoveId.EERIE_SPELL,
+    move => {
+      move.chance = 100;
+    },
+  ],
 ]);
 
 // =============================================================================
@@ -624,6 +694,10 @@ export function initEliteReduxVanillaMovePatches(): VanillaMovePatchResult {
 
   const moveById = new Map<number, Move>();
   for (const move of allMoves) {
+    // `allMoves` is sparse (custom moves are id-indexed ≥5000); skip the holes.
+    if (move === undefined) {
+      continue;
+    }
     moveById.set(move.id, move);
   }
 

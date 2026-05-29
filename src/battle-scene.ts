@@ -1284,7 +1284,10 @@ export class BattleScene extends SceneBase {
     if (reloadI18n) {
       const localizable: Localizable[] = [
         ...allSpecies,
-        ...allMoves,
+        // `allMoves` is sparse — ER custom moves are id-indexed at positions
+        // ≥5000, so spreading it directly would include `undefined` holes that
+        // crash the `item.localize()` loop below. Filter the gaps.
+        ...allMoves.filter(m => m !== undefined),
         ...getEnumValues(ModifierPoolType)
           .map(mpt => getModifierPoolForType(mpt))
           .flatMap(mp =>

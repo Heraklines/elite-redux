@@ -47,7 +47,7 @@ import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { dispatchMoveArchetype } from "#data/elite-redux/move-archetype-dispatcher";
 import { AttackMove, type Move, type MoveAttr, SelfStatusMove, StatusMove } from "#data/moves/move";
 import { MoveCategory } from "#enums/move-category";
-import type { MoveId } from "#enums/move-id";
+import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 
 /**
@@ -278,9 +278,14 @@ export function initEliteReduxCustomMoves(): InitEliteReduxCustomMovesResult {
     totalFlagBitsApplied: 0,
   };
 
-  // Build a O(1) id → bool lookup for idempotency.
+  // Build a O(1) id → bool lookup for idempotency. `allMoves` is sparse after a
+  // prior run (custom moves are id-indexed ≥5000); for…of yields `undefined`
+  // for the holes between the vanilla and custom id ranges.
   const existingIds = new Set<number>();
   for (const move of allMoves) {
+    if (move === undefined) {
+      continue;
+    }
     existingIds.add(move.id);
   }
 
@@ -300,7 +305,15 @@ export function initEliteReduxCustomMoves(): InitEliteReduxCustomMovesResult {
 
     try {
       const move = buildCustomMove(draft, pokerogueId, result);
-      (allMoves as Move[]).push(move);
+      // Index-assign by id (NOT push). `allMoves` is read via `allMoves[id]` in
+      // ~130 places (getMoveset, Mimic/Sketch/Copycat, etc.); a push would land
+      // the custom move at index ~900 (next free slot), so `allMoves[5065]`
+      // would be undefined → the move gets filtered out of every Pokémon's
+      // moveset and crashes loadAssets. Mirrors initEliteReduxCustomAbilities,
+      // which assigns `allAbilities[id]` for the same reason. This makes the
+      // array sparse (holes between the vanilla and custom id ranges); every
+      // `for…of`/spread/`.map` over `allMoves` guards against the holes.
+      (allMoves as Move[])[pokerogueId] = move;
       existingIds.add(pokerogueId);
       result.customsAdded++;
     } catch (err) {
@@ -331,6 +344,19 @@ export function initEliteReduxCustomMoves(): InitEliteReduxCustomMovesResult {
  * @param pokerogueId - pokerogue move id (≥ VANILLA_ID_CUTOFF) from `ER_ID_MAP.moves`
  * @param result - aggregate result object — mutated to record per-archetype wired/skip counts
  */
+/**
+ * Convert an ER move display name to its `MoveId` enum-key form (uppercase,
+ * non-alphanumerics collapsed to `_`). Mirrors `abilityNameToEnumKey` so the
+ * reverse-mapping installed for custom moves matches the vanilla key style
+ * (e.g. "Spine Breaker" → "SPINE_BREAKER").
+ */
+function moveNameToEnumKey(moveName: string): string {
+  return moveName
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 function buildCustomMove(
   draft: {
     id: number;
@@ -347,6 +373,14 @@ function buildCustomMove(
   pokerogueId: number,
   result: InitEliteReduxCustomMovesResult,
 ): Move {
+  // Runtime reverse-mapping injection (mirrors initEliteReduxCustomAbilities):
+  // install `MoveId[5140] = "SPINE_BREAKER"` so external `enumValueToKey(MoveId,
+  // id)` callers (move history, battle log, UI, test override helpers) can name
+  // the custom move. The per-instance `name` getter is overridden separately via
+  // `registerDraft`, so this only feeds the enum-key reverse-lookup paths.
+  // Idempotent; the forward mapping is intentionally NOT installed.
+  (MoveId as unknown as Record<number, string>)[pokerogueId] = moveNameToEnumKey(draft.name);
+
   const type = mapType(draft.types[0] ?? 0);
   const category = mapSplit(draft.split);
   // ER ships -1/0 for "no effect chance"; pokerogue's StatusMove/AttackMove

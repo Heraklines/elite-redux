@@ -511,6 +511,10 @@ export function initEliteReduxCSourceCorrections(): CSourceCorrectionResult {
   // Build pokerogue MoveId → Move lookup.
   const byId = new Map<number, Move>();
   for (const move of allMoves) {
+    // `allMoves` is sparse (custom moves are id-indexed ≥5000); skip the holes.
+    if (move === undefined) {
+      continue;
+    }
     byId.set(move.id, move);
   }
 

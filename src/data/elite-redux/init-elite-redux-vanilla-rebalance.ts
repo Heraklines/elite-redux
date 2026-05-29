@@ -54,14 +54,11 @@ import {
   ChangeMovePriorityAbAttr,
   ConditionalCritAbAttr,
   HealFromBerryUseAbAttr,
-  IgnoreOpponentStatStagesAbAttr,
   MovePowerBoostAbAttr,
   MoveTypeChangeAbAttr,
   MoveTypePowerBoostAbAttr,
   PostAttackApplyBattlerTagAbAttr,
-  PostAttackApplyStatusEffectAbAttr,
   PostAttackContactApplyStatusEffectAbAttr,
-  ProtectStatAbAttr,
   PostAttackStealHeldItemAbAttr,
   PostBiomeChangeWeatherChangeAbAttr,
   PostDefendContactApplyTagChanceAbAttr,
@@ -72,6 +69,7 @@ import {
   PostSummonWeatherChangeAbAttr,
   PostTurnHurtIfSleepingAbAttr,
   PostWeatherLapseHealAbAttr,
+  ProtectStatAbAttr,
   ReceivedMoveDamageMultiplierAbAttr,
   ReceivedTypeDamageMultiplierAbAttr,
   StatMultiplierAbAttr,
@@ -80,24 +78,18 @@ import {
   UserFieldBattlerTagImmunityAbAttr,
   UserFieldMoveTypePowerBoostAbAttr,
 } from "#abilities/ab-attrs";
-import {
-  PostDefendSuppressOpponentDamageBoostAbAttr,
-} from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
-import {
-  RecoilDamageMultiplierAbAttr,
-} from "#data/elite-redux/archetypes/recoil-damage-multiplier";
-import {
-  TypeImmunityHighestAttackStatStageAbAttr,
-} from "#data/elite-redux/archetypes/type-immunity-highest-attack-stat-stage";
-import { CritStageBonusAbAttr } from "#data/elite-redux/archetypes/crit-mod";
-import { StatTriggerOnStatLoweredAbAttr } from "#data/elite-redux/archetypes/stat-trigger-on-event";
 import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { ChanceStatusOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
+import { CritStageBonusAbAttr } from "#data/elite-redux/archetypes/crit-mod";
 import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
 import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
+import { PostDefendSuppressOpponentDamageBoostAbAttr } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
+import { RecoilDamageMultiplierAbAttr } from "#data/elite-redux/archetypes/recoil-damage-multiplier";
+import { StatTriggerOnStatLoweredAbAttr } from "#data/elite-redux/archetypes/stat-trigger-on-event";
 import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
+import { TypeImmunityHighestAttackStatStageAbAttr } from "#data/elite-redux/archetypes/type-immunity-highest-attack-stat-stage";
 import { ER_ABILITIES } from "#data/elite-redux/er-abilities";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
@@ -110,11 +102,11 @@ import { HitResult } from "#enums/hit-result";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
-import type { Pokemon } from "#field/pokemon";
 import { PokemonType } from "#enums/pokemon-type";
 import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
+import type { Pokemon } from "#field/pokemon";
 
 /**
  * Numeric cutoff for "vanilla pokerogue" ids — anything ≥ this is an ER
@@ -552,10 +544,13 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   [AbilityId.STATIC, ab => addNonContactStatusChance(ab, StatusEffect.PARALYSIS, 10)],
   // 49 FLAME_BODY: vanilla 30% contact burn → ER adds 20% non-contact burn.
   // ER spec: "Also works on offense" — add 30% on-attack contact proc too.
-  [AbilityId.FLAME_BODY, ab => {
-    addNonContactStatusChance(ab, StatusEffect.BURN, 20);
-    addOffenseContactStatusChance(ab, StatusEffect.BURN, 30);
-  }],
+  [
+    AbilityId.FLAME_BODY,
+    ab => {
+      addNonContactStatusChance(ab, StatusEffect.BURN, 20);
+      addOffenseContactStatusChance(ab, StatusEffect.BURN, 30);
+    },
+  ],
 
   // 115 ICE_BODY duplicate-flagged in MAJOR for the 2x heal-rate. Already
   // patched above; no double-add.
@@ -563,27 +558,36 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // ===== Round 5: more poison/non-contact procs from the audit =====
   // 38 POISON_POINT: vanilla 30% contact poison → ER adds 10% non-contact poison.
   // ER spec: "Also works on offense" — add 30% on-attack contact proc.
-  [AbilityId.POISON_POINT, ab => {
-    addNonContactStatusChance(ab, StatusEffect.POISON, 10);
-    addOffenseContactStatusChance(ab, StatusEffect.POISON, 30);
-  }],
+  [
+    AbilityId.POISON_POINT,
+    ab => {
+      addNonContactStatusChance(ab, StatusEffect.POISON, 10);
+      addOffenseContactStatusChance(ab, StatusEffect.POISON, 30);
+    },
+  ],
   // 27 EFFECT_SPORE: vanilla 30% contact SLP/PRZ/PSN → ER adds 10% non-contact each.
   // EFFECT_SPORE picks one of three statuses randomly per proc. Append a
   // separate non-contact proc per status (lower chance to balance). No
   // "also on offense" in ER spec for EFFECT_SPORE — keep defend-side only.
-  [AbilityId.EFFECT_SPORE, ab => {
-    addNonContactStatusChance(ab, StatusEffect.SLEEP, 10);
-    addNonContactStatusChance(ab, StatusEffect.PARALYSIS, 10);
-    addNonContactStatusChance(ab, StatusEffect.POISON, 10);
-  }],
+  [
+    AbilityId.EFFECT_SPORE,
+    ab => {
+      addNonContactStatusChance(ab, StatusEffect.SLEEP, 10);
+      addNonContactStatusChance(ab, StatusEffect.PARALYSIS, 10);
+      addNonContactStatusChance(ab, StatusEffect.POISON, 10);
+    },
+  ],
 
   // ===== Round 6: more non-contact extensions + minor tweaks =====
   // 143 POISON_TOUCH: vanilla 30% contact poison → ER adds 10% non-contact.
   // ER spec: "Also works on offense" — add offense-side proc too.
-  [AbilityId.POISON_TOUCH, ab => {
-    addNonContactStatusChance(ab, StatusEffect.POISON, 10);
-    addOffenseContactStatusChance(ab, StatusEffect.POISON, 30);
-  }],
+  [
+    AbilityId.POISON_TOUCH,
+    ab => {
+      addNonContactStatusChance(ab, StatusEffect.POISON, 10);
+      addOffenseContactStatusChance(ab, StatusEffect.POISON, 30);
+    },
+  ],
   // 234 PRANKSTER: vanilla status moves +1 priority. ER also adds Dark-immune
   // protection. Add a Dark-type defense check via TypeMultiplier rider.
   [
@@ -599,10 +603,7 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // Deferred — vanilla pokerogue doesn't expose easy hook for "boost own crit damage".
   // 95 ROCK_HEAD: vanilla recoil immune. ER also gives 1.2x dmg to recoil moves.
   // Add a flag-power-boost on RECOIL flag.
-  [
-    AbilityId.ROCK_HEAD,
-    ab => mutateFlagPowerBoost(ab, MoveFlags.RECKLESS_MOVE, 1.2),
-  ],
+  [AbilityId.ROCK_HEAD, ab => mutateFlagPowerBoost(ab, MoveFlags.RECKLESS_MOVE, 1.2)],
   // 23 SHED_SKIN: vanilla 33% post-turn status cure. ER also heals 1/8 if cured.
   // Approximation: keep vanilla cure path; rider is too niche to wire cleanly.
   // 117 ANALYTIC: vanilla 1.3x boost if moving last. ER ups to 1.5x.
@@ -623,10 +624,7 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     ab => {
       ab.attrs = ab.attrs.filter(a => a.constructor.name !== "MoveTypePowerBoostAbAttr");
       ab.attrs.push(
-        new MoveTypeChangeAbAttr(
-          PokemonType.STEEL,
-          (_user, _t, move) => !!move && move.type === PokemonType.NORMAL,
-        ),
+        new MoveTypeChangeAbAttr(PokemonType.STEEL, (_user, _t, move) => !!move && move.type === PokemonType.NORMAL),
       );
       ab.attrs.push(new ReceivedTypeDamageMultiplierAbAttr(PokemonType.GHOST, 0.5));
       ab.attrs.push(new ReceivedTypeDamageMultiplierAbAttr(PokemonType.DARK, 0.5));
@@ -668,9 +666,7 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   [
     AbilityId.NORMALIZE,
     ab => {
-      ab.attrs.push(
-        new MovePowerBoostAbAttr((_user, _t, move) => move?.type === PokemonType.NORMAL, 1.1),
-      );
+      ab.attrs.push(new MovePowerBoostAbAttr((_user, _t, move) => move?.type === PokemonType.NORMAL, 1.1));
     },
   ],
   // 113 SCRAPPY: vanilla Normal/Fighting hits Ghost. ER adds ER_FEAR-immune
@@ -815,12 +811,7 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     AbilityId.BERSERK,
     ab => {
       ab.attrs.push(
-        new PostDefendStatStageChangeAbAttr(
-          (target, _user, _move) => target.getHpRatio() <= 0.5,
-          Stat.ATK,
-          1,
-          true,
-        ),
+        new PostDefendStatStageChangeAbAttr((target, _user, _move) => target.getHpRatio() <= 0.5, Stat.ATK, 1, true),
       );
     },
   ],
@@ -872,10 +863,7 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   [
     AbilityId.LIQUID_VOICE,
     ab => {
-      ab.attrs.push(new MovePowerBoostAbAttr(
-        (_user, _t, move) => !!move && move.hasFlag(MoveFlags.SOUND_BASED),
-        1.2,
-      ));
+      ab.attrs.push(new MovePowerBoostAbAttr((_user, _t, move) => !!move && move.hasFlag(MoveFlags.SOUND_BASED), 1.2));
     },
   ],
 
@@ -1005,6 +993,11 @@ export function initEliteReduxVanillaRebalance(): VanillaRebalanceResult {
   // allAbilities are arrays; we don't assume the index equals the id.
   const moveById = new Map<number, (typeof allMoves)[number]>();
   for (const move of allMoves) {
+    // `allMoves` is sparse (custom moves are id-indexed ≥5000); skip the holes
+    // (same as the allAbilities handling below).
+    if (!move) {
+      continue;
+    }
     moveById.set(move.id, move);
   }
   const abilityById = new Map<number, (typeof allAbilities)[number]>();
@@ -1302,11 +1295,13 @@ function addNonContactStatusChance(ability: MutableAbility, effect: StatusEffect
   // — user-reported as "Flame Body burns nearly 100% of the time" during
   // testing (1 - 0.7*0.8 = 44% on contact when stacking, vs the spec's
   // intended 30% contact + 20% non-contact disjoint procs).
-  ability.attrs.push(new ChanceStatusOnHitAbAttr({
-    chance,
-    effects: [effect],
-    contactExcluded: true,
-  }));
+  ability.attrs.push(
+    new ChanceStatusOnHitAbAttr({
+      chance,
+      effects: [effect],
+      contactExcluded: true,
+    }),
+  );
 }
 
 /**
@@ -1319,11 +1314,7 @@ function addNonContactStatusChance(ability: MutableAbility, effect: StatusEffect
  * Pokerogue exposes PostAttackContactApplyStatusEffectAbAttr — same
  * mechanic, same RNG path.
  */
-function addOffenseContactStatusChance(
-  ability: MutableAbility,
-  effect: StatusEffect,
-  chance: number,
-): void {
+function addOffenseContactStatusChance(ability: MutableAbility, effect: StatusEffect, chance: number): void {
   ability.attrs.push(new PostAttackContactApplyStatusEffectAbAttr(chance, effect));
 }
 
@@ -1816,7 +1807,7 @@ function patchLeafGuard(ability: MutableAbility): void {
   // is fine here because vanilla Leaf Guard does nothing outside sun
   // anyway (the immunity it would grant is also weather-gated).
   const conditions = ability.conditions as Array<(p: Pokemon) => boolean>;
-  conditions.push((p: Pokemon) => {
+  conditions.push((_p: Pokemon) => {
     const w = globalScene.arena.weather?.weatherType;
     return w === WeatherType.SUNNY || w === WeatherType.HARSH_SUN;
   });

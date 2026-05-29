@@ -21,8 +21,8 @@ export class PokedexScanUiHandler extends FormModalUiHandler {
     super.setup();
 
     this.nameKeys = allSpecies.map(a => a.name).filter((value, index, self) => self.indexOf(value) === index);
-    this.moveKeys = allMoves.map(a => a.name);
-    // allAbilities is sparse (ER customs at id-indexed positions ≥5000). Filter undefined gaps.
+    // allMoves & allAbilities are sparse (ER customs at id-indexed positions ≥5000). Filter undefined gaps.
+    this.moveKeys = allMoves.filter(a => !!a).map(a => a.name);
     this.abilityKeys = allAbilities.filter(a => !!a).map(a => a.name);
   }
 
