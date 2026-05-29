@@ -3836,6 +3836,22 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           defensiveMultiplier: 1,
         }),
       ]);
+    case 303:
+      // Fossilized — C-source + description: "Halves dmg taken by Rock moves.
+      // Boosts own Rock moves by 1.2x." Composite: offensive Rock x1.2 +
+      // defensive 0.5 from incoming Rock moves. (Defensive half was missing.)
+      return ok([
+        new TypeDamageBoostAbAttr({ type: PokemonType.ROCK, multiplier: 1.2 }),
+        new DamageReductionAbAttr({ reduction: 0.5, filter: { kind: "move-type", type: PokemonType.ROCK } }),
+      ]);
+    case 337:
+      // Raw Wood — C-source + description: "Halves dmg taken by Grass moves.
+      // Boosts own Grass moves by 1.2x." Composite: offensive Grass x1.2 +
+      // defensive 0.5 from incoming Grass moves. (Defensive half was missing.)
+      return ok([
+        new TypeDamageBoostAbAttr({ type: PokemonType.GRASS, multiplier: 1.2 }),
+        new DamageReductionAbAttr({ reduction: 0.5, filter: { kind: "move-type", type: PokemonType.GRASS } }),
+      ]);
     case 342:
       // Seaweed — "Takes 1/2 dmg from Fire if Grass. Grass deals x2 dmg to
       // Fire." Compose: defensive 0.5 from Fire + offensive 2x vs Fire.

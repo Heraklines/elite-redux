@@ -89,7 +89,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   300: { erAbilityId: 300, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"FIGHTING","multiplier":1.2} },
   301: { erAbilityId: 301, archetype: "bespoke", params: null },
   302: { erAbilityId: 302, archetype: "priority-modifier", params: {"priority":1} },
-  303: { erAbilityId: 303, archetype: "type-damage-boost", params: {"type":"ROCK","multiplier":1.2} },
+  303: { erAbilityId: 303, archetype: "bespoke", params: null }, // Fossilized: Rock +20% offense AND halves Rock dmg taken (composite — see dispatchBespoke)
   304: { erAbilityId: 304, archetype: "bespoke", params: null },
   305: { erAbilityId: 305, archetype: "conditional-damage", params: {"condition":{"kind":"target-asleep"},"multiplier":2} },
   306: { erAbilityId: 306, archetype: "type-damage-boost", params: {"type":"DARK","multiplier":1.25} },
@@ -123,7 +123,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   334: { erAbilityId: 334, archetype: "bespoke", params: null },
   335: { erAbilityId: 335, archetype: "bespoke", params: null },
   336: { erAbilityId: 336, archetype: "type-damage-boost", params: {"type":"ELECTRIC","multiplier":1.35,"recoilPct":0.1} },
-  337: { erAbilityId: 337, archetype: "type-damage-boost", params: {"type":"GRASS","multiplier":1.2} },
+  337: { erAbilityId: 337, archetype: "bespoke", params: null }, // Raw Wood: Grass +20% offense AND halves Grass dmg taken (composite — see dispatchBespoke)
   338: { erAbilityId: 338, archetype: "chance-status-on-hit", params: {"chance":50,"status":"TOXIC","onContactOnly":false} },
   339: { erAbilityId: 339, archetype: "entry-effect", params: {"effect":{"kind":"set-hazard","hazard":"STICKY_WEB","layers":1}} },
   340: { erAbilityId: 340, archetype: "bespoke", params: null },

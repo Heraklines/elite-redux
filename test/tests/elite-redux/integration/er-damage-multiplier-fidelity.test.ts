@@ -88,4 +88,47 @@ describe.skipIf(!RUN_SCENARIOS)("ER damage-multiplier fidelity (#103 Batch A)", 
     expect(ratio, `Dune Terror should boost Ground moves ~1.2x (got ${ratio.toFixed(3)})`).toBeGreaterThan(1.15);
     expect(ratio, `Dune Terror should boost Ground moves ~1.2x (got ${ratio.toFixed(3)})`).toBeLessThan(1.25);
   });
+
+  // Fossilized (ER 303): C-source + description — "Halves dmg taken by Rock moves.
+  // Boosts own Rock moves by 1.2x." The defensive half was previously unwired.
+  // Verify the holder takes HALF damage from an incoming Rock move.
+  it("Fossilized: halves incoming Rock-move damage (defensive half)", async () => {
+    const fossilized = await erId(303);
+    if (fossilized === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(fossilized)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.RHYPERIOR) // high Atk Rock user
+      .enemyMoveset(MoveId.ROCK_SLIDE)
+      .moveset(MoveId.SPLASH)
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]); // Normal: Rock is neutral
+
+    vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
+    const player = game.field.getPlayerPokemon();
+
+    // Turn 1 — ability active: reduced Rock damage taken.
+    let hp0 = player.hp;
+    game.move.use(MoveId.SPLASH);
+    await game.toNextTurn();
+    const dmgReduced = hp0 - player.hp;
+
+    // Suppress ability, heal, take the hit again at full.
+    player.summonData.abilitySuppressed = true;
+    player.hp = player.getMaxHp();
+    hp0 = player.hp;
+    game.move.use(MoveId.SPLASH);
+    await game.toEndOfTurn();
+    const dmgFull = hp0 - player.hp;
+
+    expect(dmgFull, "baseline Rock Slide dealt damage").toBeGreaterThan(0);
+    const ratio = dmgReduced / dmgFull;
+    expect(ratio, `Fossilized should halve Rock damage (~0.5x, got ${ratio.toFixed(3)})`).toBeGreaterThan(0.45);
+    expect(ratio, `Fossilized should halve Rock damage (~0.5x, got ${ratio.toFixed(3)})`).toBeLessThan(0.55);
+  });
 });
