@@ -5,9 +5,11 @@
  */
 
 // =============================================================================
-// #120 — full in-game ability descriptions extracted from the v2.65.3b ROM
-// (src/data/text/abilities.h) into er-ability-rom-descriptions.ts, surfaced via
-// getErAbilityRomDescription() and shown on the ability "Detail" view.
+// #120 — FULL expanded ability descriptions extracted directly from the
+// v2.65.3b ROM binary (gAbilitiesInfo struct array; detailed-desc field) into
+// er-ability-rom-descriptions.ts, surfaced via getErAbilityRomDescription() and
+// shown on the ability "Detail" view. These are the long in-game texts (e.g.
+// North Wind / Snow Warning), not the abbreviated one-liners.
 //
 // Pure data assertions — no GameManager.
 // =============================================================================
@@ -16,26 +18,32 @@ import { getErAbilityRomDescription } from "#data/elite-redux/er-ability-descrip
 import { ER_ABILITY_ROM_DESCRIPTIONS } from "#data/elite-redux/er-ability-rom-descriptions";
 import { describe, expect, it } from "vitest";
 
-describe("ER ROM ability descriptions (#120)", () => {
-  it("extracted the full v2.65.3b ROM description set (~447)", () => {
-    expect(Object.keys(ER_ABILITY_ROM_DESCRIPTIONS).length).toBeGreaterThan(440);
+describe("ER ROM detailed ability descriptions (#120)", () => {
+  it("extracted the full struct-array description set (~1000)", () => {
+    expect(Object.keys(ER_ABILITY_ROM_DESCRIPTIONS).length).toBeGreaterThan(900);
   });
 
-  it("returns the ROM text (with line breaks) for rebalanced vanilla abilities", () => {
-    // ER's Battle Armor is rebalanced (blocks crits + 20% less damage).
-    expect(getErAbilityRomDescription("Battle Armor")).toBe("Blocks critical hits.\nTakes 20% less damage.");
-    expect(getErAbilityRomDescription("Stench")).toContain("flinch");
+  it("returns the FULL detail text matching the in-game Detail view", () => {
+    const northWind = getErAbilityRomDescription("North Wind");
+    expect(northWind).toContain("Aurora Veil lasts 3 turns");
+    expect(northWind).toContain("immune to Hail damage");
+    expect((northWind ?? "").length).toBeGreaterThan(150); // long, not the one-liner
+
+    const snow = getErAbilityRomDescription("Snow Warning");
+    expect(snow).toContain("Icy Rock");
+    expect(snow).toContain("non-Ice");
   });
 
-  it("resolves ER custom abilities present in the ROM (through Furnace)", () => {
-    expect(getErAbilityRomDescription("Furnace")).toBeTruthy();
+  it("covers ER custom abilities including beta-only ones beyond the text source", () => {
+    // Flammable Coat exists only in the ROM struct array (not abilities.h text).
+    expect(getErAbilityRomDescription("Flammable Coat")).toContain("Lumbering Sloth");
+    expect(getErAbilityRomDescription("Best Offense")).toContain("Special Defense");
     // Apostrophe handling: "Angel's Wrath" ↔ ABILITY_ANGELS_WRATH.
     expect(getErAbilityRomDescription("Angel's Wrath")).toBeTruthy();
   });
 
-  it("returns null for beta-only abilities beyond the v2.65.3b ROM", () => {
-    // Flammable Coat / Best Offense exist only in the beta JSON, not the ROM.
-    expect(getErAbilityRomDescription("Flammable Coat")).toBeNull();
+  it("returns null for an unknown ability name", () => {
+    expect(getErAbilityRomDescription("Definitely Not An Ability")).toBeNull();
     expect(getErAbilityRomDescription("")).toBeNull();
   });
 });
