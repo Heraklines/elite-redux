@@ -65,6 +65,7 @@ import {
   BlockNonDirectDamageAbAttr,
   BlockRecoilDamageAttr,
   BlockWeatherDamageAttr,
+  ChangeMovePriorityAbAttr,
   ForceSwitchOutImmunityAbAttr,
   GorillaTacticsAbAttr,
   IgnoreProtectOnContactAbAttr,
@@ -130,7 +131,6 @@ import { DefenseStatSwapOnFlagAbAttr } from "#data/elite-redux/archetypes/defens
 import { DefenseStatSwapOnStatusedFoeAbAttr } from "#data/elite-redux/archetypes/defense-stat-swap-on-statused-foe";
 import { type EntryEffect, EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
 import { FieldStatShareAbAttr } from "#data/elite-redux/archetypes/field-stat-share";
-import { FirstTurnBoostAbAttr } from "#data/elite-redux/archetypes/first-turn-boost";
 import { FirstTurnStatMultiplierAbAttr } from "#data/elite-redux/archetypes/first-turn-stat-multiplier";
 import { FlagDamageBoostAbAttr } from "#data/elite-redux/archetypes/flag-damage-boost";
 import { FoeStrongestStatSelfBoostAbAttr } from "#data/elite-redux/archetypes/foe-strongest-stat-self-boost";
@@ -2912,10 +2912,11 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 648:
-      // On the Prowl — "+1 priority for the first turn. Negative priority
-      // becomes +0." Pokerogue lacks per-turn priority-bracket modifier.
-      // Approximate as +2 SPD on entry (acts like priority surrogate).
-      return ok([new FirstTurnBoostAbAttr({ boosts: [{ stat: Stat.SPD, stages: 2 }] })]);
+      // On the Prowl — "+1 priority for the first turn." All of the holder's
+      // moves get +1 priority on its first turn after entry (tempSummonData
+      // .turnCount resets on switch). The "negative priority becomes +0"
+      // nuance is a minor secondary, deferred.
+      return ok([new ChangeMovePriorityAbAttr(pokemon => pokemon.tempSummonData.waveTurnCount === 1, 1)]);
     case 669:
       // Flammable Coat — "Changes forms when using or hit by a Fire-type move."
       // Form change requires species-specific bespoke data. Approximate as
@@ -2928,9 +2929,16 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 676:
-      // Sidewinder — "First biting move each entry gets +1 priority."
-      // Approximate with +1 SPD on entry (priority bracket too complex).
-      return ok([new FirstTurnBoostAbAttr({ boosts: [{ stat: Stat.SPD, stages: 1 }] })]);
+      // Sidewinder — "First biting move each entry gets +1 priority." The
+      // holder's BITING moves get +1 priority on its first turn after entry
+      // (approximates "first biting move each entry" without a per-move-use
+      // once-gate; tempSummonData.turnCount resets on switch).
+      return ok([
+        new ChangeMovePriorityAbAttr(
+          (pokemon, move) => pokemon.tempSummonData.waveTurnCount === 1 && move.hasFlag(MoveFlags.BITING_MOVE),
+          1,
+        ),
+      ]);
     case 791:
       // DNA Scramble — "Changes forms based on the the move used."
       // Form change requires bespoke per-species data. Approximate as 1.2x
