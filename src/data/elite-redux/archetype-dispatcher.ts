@@ -1685,15 +1685,18 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // type to attacker" primitive. Partial wire.
       return ok([new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.FORESTS_CURSE })]);
     case 874:
-      // Winter Throne — non-Ice foes take 1/8 dmg every turn. The "heals
-      // self-Ice 1/8 each turn" piece is deferred — partial wire. (A second
-      // `PassiveRecoveryAbAttr` could compose with this, but it'd fire for
-      // every owner regardless of type; gating heal-on-self-type requires a
-      // new condition kind.)
+      // Winter Throne — "1/8 Damage each turn to non-ice. Heals Ice 1/8 each
+      // turn." non-Ice foes take 1/8 each turn + the holder heals 1/8 each turn
+      // IF it is Ice-type (new self-type PassiveRecovery condition). Heal half
+      // was previously deferred.
       return ok([
         new PostTurnHurtNonTypedAbAttr({
           safeTypes: [PokemonType.ICE],
           damageFraction: 1 / 8,
+        }),
+        new PassiveRecoveryAbAttr({
+          healFraction: 1 / 8,
+          condition: { kind: "self-type", type: PokemonType.ICE },
         }),
       ]);
     case 898:
@@ -1812,14 +1815,16 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 705:
-      // Terastal Treasure — takes 40% less damage from all moves. The "-20%
-      // Speed" tradeoff composes via a stat-multiplier primitive that doesn't
-      // exist yet — partial wire.
+      // Terastal Treasure — "Reduces damage taken by 40%, but lowers speed by
+      // 20%." 40% all-damage reduction + an always-on SPD x0.8 penalty (the
+      // base StatMultiplierAbAttr applies it unconditionally). Speed half was
+      // previously unwired.
       return ok([
         new DamageReductionAbAttr({
           reduction: 0.4,
           filter: { kind: "all" },
         }),
+        new StatMultiplierAbAttr(Stat.SPD, 0.8),
       ]);
     case 771:
       // Forsaken Heart — Attack +1 whenever any Pokemon is KO'd. Uses the

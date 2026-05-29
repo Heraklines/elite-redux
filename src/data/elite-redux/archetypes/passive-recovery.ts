@@ -53,6 +53,7 @@ import { PostTurnHealAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import type { TerrainType } from "#data/terrain";
+import type { PokemonType } from "#enums/pokemon-type";
 import type { StatusEffect } from "#enums/status-effect";
 import type { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
@@ -81,7 +82,10 @@ export type PassiveRecoveryCondition =
       readonly kind: "hp-below-fraction";
       /** Threshold fraction of max HP. Must be in `(0, 1)`. Typical: `0.5`. */
       readonly fraction: number;
-    };
+    }
+  /** Gate the heal on the subject being of a given type (e.g. Winter Throne
+   * "Heals Ice 1/8 each turn" — only heals Ice-type holders). */
+  | { readonly kind: "self-type"; readonly type: PokemonType };
 
 /** Construction options for {@linkcode PassiveRecoveryAbAttr}. */
 export interface PassiveRecoveryOptions {
@@ -208,6 +212,8 @@ export class PassiveRecoveryAbAttr extends PostTurnHealAbAttr {
         return condition.terrains.includes(globalScene.arena.terrainType);
       case "hp-below-fraction":
         return pokemon.hp <= toDmgValue(pokemon.getMaxHp() * condition.fraction);
+      case "self-type":
+        return pokemon.getTypes().includes(condition.type);
     }
   }
 }

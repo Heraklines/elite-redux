@@ -18,6 +18,7 @@
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { Stat } from "#enums/stat";
 import { Pokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
@@ -214,5 +215,61 @@ describe.skipIf(!RUN_SCENARIOS)("ER damage-multiplier fidelity (#103 Batch A)", 
     const ratio = dmgReduced / dmgFull;
     expect(ratio, `Deep Freeze should halve Fire damage (~0.5x, got ${ratio.toFixed(3)})`).toBeGreaterThan(0.45);
     expect(ratio, `Deep Freeze should halve Fire damage (~0.5x, got ${ratio.toFixed(3)})`).toBeLessThan(0.55);
+  });
+
+  // Terastal Treasure (ER 705): "Reduces damage taken by 40%, but lowers speed by
+  // 20%." The speed penalty was previously unwired. Verify effective Speed is 0.8x.
+  it("Terastal Treasure: effective Speed is 0.8x (the -20% tradeoff)", async () => {
+    const terastal = await erId(705);
+    if (terastal === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(terastal)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(MoveId.SPLASH)
+      .startingLevel(100)
+      .enemyLevel(100);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    const player = game.field.getPlayerPokemon();
+    const spdWith = player.getEffectiveStat(Stat.SPD);
+    player.summonData.abilitySuppressed = true;
+    const spdWithout = player.getEffectiveStat(Stat.SPD);
+    expect(spdWithout, "baseline speed").toBeGreaterThan(0);
+    const ratio = spdWith / spdWithout;
+    expect(ratio, `Terastal Treasure should give 0.8x Speed (got ${ratio.toFixed(3)})`).toBeGreaterThan(0.78);
+    expect(ratio, `Terastal Treasure should give 0.8x Speed (got ${ratio.toFixed(3)})`).toBeLessThan(0.82);
+  });
+
+  // Winter Throne (ER 874): "1/8 Damage each turn to non-ice. Heals Ice 1/8 each
+  // turn." The Ice self-heal was previously deferred. Verify an Ice-type holder
+  // heals ~1/8 max HP per turn (when below full).
+  it("Winter Throne: Ice-type holder heals 1/8 max HP per turn", async () => {
+    const winterThrone = await erId(874);
+    if (winterThrone === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(winterThrone)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(MoveId.SPLASH)
+      .startingLevel(100)
+      .enemyLevel(100);
+    await game.classicMode.startBattle([SpeciesId.GLALIE]); // pure Ice
+    const player = game.field.getPlayerPokemon();
+    player.hp = Math.floor(player.getMaxHp() / 2); // below full so heal fires
+    const hpBefore = player.hp;
+    game.move.use(MoveId.SPLASH);
+    await game.toNextTurn();
+    const healed = player.hp - hpBefore;
+    const eighth = Math.floor(player.getMaxHp() / 8);
+    expect(healed, `Winter Throne should heal ~1/8 (${eighth}); got ${healed}`).toBeGreaterThanOrEqual(eighth - 1);
+    expect(healed, `Winter Throne should heal ~1/8 (${eighth}); got ${healed}`).toBeLessThanOrEqual(eighth + 1);
   });
 });
