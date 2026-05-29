@@ -79,6 +79,7 @@ import {
   PostDefendContactDamageAbAttr,
   PostDefendMoveDisableAbAttr,
   PostDefendStatStageChangeAbAttr,
+  PostDefendWeatherChangeAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
   PostStatStageChangeStatStageChangeAbAttr,
   PostSummonAddBattlerTagAbAttr,
@@ -1431,6 +1432,8 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
     case 983: // Overcast: "Low Visibility + Sets Mist on entry" — cast Mist on
       // summon (the Mist move sets the side's Mist tag, blocking stat drops).
       return [new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.MIST })];
+    case 493: // Cryo Proficiency: "triggers hail when hit" — PostDefend weather set.
+      return [new PostDefendWeatherChangeAbAttr(WeatherType.HAIL)];
     case 389: // Marine Apex: "50% more damage to Water-types + Infiltrator"
       // (Infiltrator is the auto-resolved part). +50% when the TARGET is Water.
       return [

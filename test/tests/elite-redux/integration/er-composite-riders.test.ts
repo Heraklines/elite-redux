@@ -22,6 +22,7 @@ import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
+import { WeatherType } from "#enums/weather-type";
 import { Pokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
@@ -318,5 +319,26 @@ describe.skipIf(!RUN_SCENARIOS)("ER composite riders (#127)", () => {
     await game.toEndOfTurn();
     // ...but Mist (set on entry) blocks the drop.
     expect(player.getStatStage(Stat.ATK)).toBe(0);
+  });
+
+  it("Cryo Proficiency (493): sets Hail when the holder is hit", async () => {
+    const ability = await erId(493);
+    if (ability === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.TACKLE) // hits the holder → triggers the PostDefend weather
+      .moveset(MoveId.SPLASH)
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    game.move.use(MoveId.SPLASH);
+    await game.toEndOfTurn();
+    expect(game.scene.arena.weather?.weatherType).toBe(WeatherType.HAIL);
   });
 });
