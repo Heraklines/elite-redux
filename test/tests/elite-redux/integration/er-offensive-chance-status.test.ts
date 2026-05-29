@@ -254,4 +254,102 @@ describe.skipIf(!RUN_SCENARIOS)("ER offensive chance-status abilities (#126)", (
     await game.toEndOfTurn();
     expect(enemy.status?.effect).toBe(StatusEffect.BURN);
   });
+
+  // --- Composite RIDERS (hand-wired offensive chance-status on top of the
+  // auto-resolved composite parts). Each rider matches its ability description.
+  it("Shocking Maw (706 rider): biting move paralyzes the target", async () => {
+    const ability = await erId(706);
+    if (ability === undefined) {
+      return;
+    }
+    const restoreRng = mockRngMin();
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset([MoveId.CRUNCH, MoveId.SPLASH])
+      .startingLevel(50)
+      .enemyLevel(50)
+      .criticalHits(false);
+    await game.classicMode.startBattle(SpeciesId.FERALIGATR);
+    const enemy = game.field.getEnemyPokemon();
+    game.move.use(MoveId.CRUNCH);
+    await game.toEndOfTurn();
+    restoreRng();
+    expect(enemy.status?.effect).toBe(StatusEffect.PARALYSIS);
+  });
+
+  it("Impaler (845 rider): horn move inflicts bleed", async () => {
+    const ability = await erId(845);
+    if (ability === undefined) {
+      return;
+    }
+    const restoreRng = mockRngMin();
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset([MoveId.MEGAHORN, MoveId.SPLASH])
+      .startingLevel(50)
+      .enemyLevel(50)
+      .criticalHits(false);
+    await game.classicMode.startBattle(SpeciesId.RHYPERIOR);
+    const enemy = game.field.getEnemyPokemon();
+    game.move.use(MoveId.MEGAHORN);
+    await game.toEndOfTurn();
+    restoreRng();
+    expect(enemy.getTag(BattlerTagType.ER_BLEED)).toBeDefined();
+  });
+
+  it("Komodo (851 rider): move badly poisons the target", async () => {
+    const ability = await erId(851);
+    if (ability === undefined) {
+      return;
+    }
+    const restoreRng = mockRngMin();
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset([MoveId.TACKLE, MoveId.SPLASH])
+      .startingLevel(50)
+      .enemyLevel(50)
+      .criticalHits(false);
+    await game.classicMode.startBattle(SpeciesId.SCEPTILE);
+    const enemy = game.field.getEnemyPokemon();
+    game.move.use(MoveId.TACKLE);
+    await game.toEndOfTurn();
+    restoreRng();
+    expect(enemy.status?.effect).toBe(StatusEffect.TOXIC);
+  });
+
+  it("Molten Coat (856 rider): rock move burns the target", async () => {
+    const ability = await erId(856);
+    if (ability === undefined) {
+      return;
+    }
+    const restoreRng = mockRngMin();
+    game.override
+      .battleStyle("single")
+      .ability(ability)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset([MoveId.ROCK_SLIDE, MoveId.SPLASH])
+      .startingLevel(50)
+      .enemyLevel(50)
+      .criticalHits(false);
+    await game.classicMode.startBattle(SpeciesId.MAGCARGO);
+    const enemy = game.field.getEnemyPokemon();
+    game.move.use(MoveId.ROCK_SLIDE);
+    await game.toEndOfTurn();
+    restoreRng();
+    expect(enemy.status?.effect).toBe(StatusEffect.BURN);
+  });
 });

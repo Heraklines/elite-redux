@@ -1336,6 +1336,53 @@ function resolveCompositePartAttrs(
 }
 
 /**
+ * Hand-maintained wiring for composite RIDERS — free-text effect sentences that
+ * the auto-generated `ER_COMPOSITE_PARTS` table records under `unresolvedParts`
+ * (they aren't ability names, so the classifier can't resolve them). We can't
+ * regenerate that table to add them (it has hand-applied fixups that a rebuild
+ * would clobber), so riders that map cleanly onto an existing archetype
+ * primitive are wired here and merged into the composite's attr list.
+ *
+ * Currently covers the chance-status OFFENSIVE riders (the holder's flagged/
+ * typed move statuses the target) — mechanically identical to the abilities
+ * fixed under #126, just attached to a composite instead of standing alone.
+ * Faithful to each ability's in-game description.
+ */
+function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
+  switch (erAbilityId) {
+    case 706: // Shocking Maw: "Bite moves have 50% paralysis chance"
+      return [
+        new ChanceStatusOnAttackAbAttr({
+          chance: 50,
+          effects: [StatusEffect.PARALYSIS],
+          filter: { flag: MoveFlags.BITING_MOVE },
+        }),
+      ];
+    case 845: // Impaler: "30% Bleed chance on horn moves"
+      return [
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 30,
+          tags: [BattlerTagType.ER_BLEED],
+          filter: { flag: MoveFlags.HORN_BASED },
+        }),
+      ];
+    case 851: // Komodo: "moves have 30% Bad Poison chance" (the Dragon-type add
+      // is a passive typing change handled outside the AbAttr layer).
+      return [new ChanceStatusOnAttackAbAttr({ chance: 30, effects: [StatusEffect.TOXIC] })];
+    case 856: // Molten Coat: "Rock moves have 50% burn chance"
+      return [
+        new ChanceStatusOnAttackAbAttr({
+          chance: 50,
+          effects: [StatusEffect.BURN],
+          filter: { type: PokemonType.ROCK },
+        }),
+      ];
+    default:
+      return [];
+  }
+}
+
+/**
  * Dispatch a `composite-vanilla-mashup` row. Looks up the per-ability resolved
  * parts table (`ER_COMPOSITE_PARTS`), walks each part through
  * `resolveCompositePartAttrs`, and concatenates the resulting AbAttr lists.
@@ -1347,12 +1394,18 @@ function resolveCompositePartAttrs(
  */
 function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchResult {
   const entry = ER_COMPOSITE_PARTS[erAbilityId];
+  // Hand-wired riders (free-text effects) supplement the auto-resolved parts.
+  // They may exist even when the parts table has zero resolvable parts.
+  const riderAttrs = compositeRiderAttrs(erAbilityId);
   if (entry === undefined) {
+    if (riderAttrs.length > 0) {
+      return ok(riderAttrs);
+    }
     return skip(
       `composite-vanilla-mashup: no resolved-parts entry for er ability ${erAbilityId} (run er:classify-composites)`,
     );
   }
-  if (entry.parts.length === 0) {
+  if (entry.parts.length === 0 && riderAttrs.length === 0) {
     return skip(
       `composite-vanilla-mashup: er ability ${erAbilityId} had no resolvable parts (riders: ${entry.unresolvedParts?.join(", ") ?? "(none)"})`,
     );
@@ -1373,6 +1426,10 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
     for (const attr of partResult.attrs) {
       out.push(attr);
     }
+  }
+  // Append hand-wired riders after the auto-resolved parts.
+  for (const attr of riderAttrs) {
+    out.push(attr);
   }
   if (out.length === 0) {
     return skip(
