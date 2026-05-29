@@ -2587,24 +2587,16 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           1.5,
         ),
       ]);
-    case 982:
-      // Flower Necklace — "This Pokémon's SpDef gets a 1.5x boost in Grassy Terrain."
-      // Use SelfHighestStatMultiplier with a single-stat (SPDEF) candidate +
-      // terrain gate. The primitive's weather field doesn't support terrains,
-      // so we wire it via a closure-based MovePowerBoost? No — that's for
-      // outgoing damage. We need received-damage reduction OR stat multiplier.
-      // Simplest: use SelfHighestStatMultiplier with terrains config.
-      return ok([
-        new SelfHighestStatMultiplierAbAttr({
-          candidates: [Stat.SPDEF],
-          multiplier: 1.5,
-          // (Cannot pass terrains here — primitive only supports weather.)
-          // Use a generic always-on multiplier; ER spec says "in Grassy Terrain"
-          // but we can't terrain-gate this primitive yet — deferred to a
-          // future primitive extension. Wire the always-on shape so the
-          // ability fires in the right ballpark.
-        }),
-      ]);
+    case 982: {
+      // Flower Necklace — "This Pokémon's SpDef gets a 1.5x boost in Grassy
+      // Terrain." Exactly Grass Pelt's shape (DEF*1.5 in Grassy Terrain) but on
+      // SPDEF: a StatMultiplierAbAttr gated by an extra terrain condition — the
+      // same getTerrainCondition pattern init-abilities uses via
+      // conditionalAttr → addCondition.
+      const flowerNecklace = new StatMultiplierAbAttr(Stat.SPDEF, 1.5);
+      flowerNecklace.addCondition(() => globalScene.arena.terrain?.terrainType === TerrainType.GRASSY);
+      return ok([flowerNecklace]);
+    }
     case 836:
       // Biofilm — "50% spdef boost under Toxic Terrain."
       // Same shape as Flower Necklace but Toxic Terrain. Pokerogue doesn't
