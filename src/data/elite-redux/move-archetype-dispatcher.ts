@@ -66,6 +66,7 @@ import {
   MoveAttr,
   MovePowerMultiplierAttr,
   MultiHitAttr,
+  MultiHitPowerIncrementAttr,
   RecoilAttr,
   RemoveTypeAttr,
   SacrificialAttr,
@@ -724,9 +725,9 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // primitive.
       return ok(0, [new StatStageChangeAttr([Stat.SPATK], 1, true)]);
     case 991:
-      // Triple Tremor — hits 3 times. Power-increases-per-hit isn't a vanilla
-      // primitive; simple MultiHitAttr(THREE) is a faithful enough first pass.
-      return ok(0, [new MultiHitAttr(MultiHitType.THREE)]);
+      // Triple Tremor — hits 3 times, power increasing per hit (Triple Kick /
+      // Triple Axel shape): MultiHitAttr(THREE) + MultiHitPowerIncrementAttr(3).
+      return ok(0, [new MultiHitAttr(MultiHitType.THREE), new MultiHitPowerIncrementAttr(3)]);
     case 999:
       // Metallic Melody — sound move that hits both opponents. The
       // hits-both-foes target is handled by the move's target field
