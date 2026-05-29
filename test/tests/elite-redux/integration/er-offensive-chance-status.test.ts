@@ -207,4 +207,51 @@ describe.skipIf(!RUN_SCENARIOS)("ER offensive chance-status abilities (#126)", (
     restoreRng();
     expect(enemy.status?.effect).toBe(StatusEffect.POISON);
   });
+
+  // --- Daybreak (747): "Burns the foe on contact. Also works on offense."
+  // direction:"both" — must proc on BOTH the holder's contact attack AND when
+  // the holder is hit by a contact move. chance is 100, so no RNG needed.
+  it("Daybreak (both): holder's CONTACT move burns the target", async () => {
+    const daybreak = await erId(747);
+    if (daybreak === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(daybreak)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.MILTANK)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset([MoveId.TACKLE, MoveId.SPLASH]) // Tackle makes contact
+      .startingLevel(50)
+      .enemyLevel(50)
+      .criticalHits(false);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    const enemy = game.field.getEnemyPokemon();
+    game.move.use(MoveId.TACKLE);
+    await game.toEndOfTurn();
+    expect(enemy.status?.effect).toBe(StatusEffect.BURN);
+  });
+
+  it("Daybreak (both): holder burns an attacker that makes contact (defensive side intact)", async () => {
+    const daybreak = await erId(747);
+    if (daybreak === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(daybreak)
+      .enemyAbility(AbilityId.NO_GUARD)
+      .enemySpecies(SpeciesId.MILTANK)
+      .enemyMoveset(MoveId.TACKLE) // enemy makes contact with the holder
+      .moveset(MoveId.SPLASH)
+      .startingLevel(50)
+      .enemyLevel(50)
+      .criticalHits(false);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    const enemy = game.field.getEnemyPokemon();
+    game.move.use(MoveId.SPLASH);
+    await game.toEndOfTurn();
+    expect(enemy.status?.effect).toBe(StatusEffect.BURN);
+  });
 });
