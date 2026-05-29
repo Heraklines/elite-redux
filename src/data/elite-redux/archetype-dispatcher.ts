@@ -66,6 +66,7 @@ import {
   BlockRecoilDamageAttr,
   BlockWeatherDamageAttr,
   ChangeMovePriorityAbAttr,
+  ConditionalCritAbAttr,
   ForceSwitchOutImmunityAbAttr,
   GorillaTacticsAbAttr,
   IgnoreProtectOnContactAbAttr,
@@ -4127,15 +4128,17 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // -------------------------------------------------------------------------
     case 734:
       // Ape Shift — "Transforms below 50% HP, curing status and always
-      // critting." Wire HP-threshold form change (50%) + status cure. The
-      // always-crit piece composes with vanilla LASER_FOCUS / Merciless,
-      // deferred.
+      // critting." HP-threshold form change (50%) + status cure, plus the
+      // always-crit-while-below-50%-HP combat effect (ConditionalCritAbAttr,
+      // Merciless-style) so the transformed state's guaranteed crits land even
+      // without dedicated form sprites.
       return ok([
         new HpThresholdFormChangeAbAttr({
           hpThreshold: 0.5,
           targetFormKey: "transformed",
           cureStatus: true,
         }),
+        new ConditionalCritAbAttr(pokemon => pokemon.getHpRatio() < 0.5),
       ]);
     case 884:
       // Locust Swarm — "Changes into Hivemind form until 1/4 HP or less."
