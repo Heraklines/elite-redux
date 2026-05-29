@@ -1,47 +1,75 @@
 // =============================================================================
-// Elite Redux — in-battle "Battle Info" overlay.
+// Elite Redux — in-battle "Info" screen, rebuilt to match the ER ROM's
+// gAbilitiesInfo menu pixel-faithfully.
 //
-// A self-contained panel (no UI-mode switch) opened from the command menu.
-// Left/Right cycle info panels; Up/Down cycle the inspected Pokémon (player
-// party + active enemies). Implemented as a plain container at high depth so
-// it never disturbs the battle command flow — any non-navigation button
-// closes it.
+// Visual structure (assets extracted from the v2.65.3b ROM —
+// scripts/elite-redux/build_battle_info_backgrounds.py):
+//   • A full 240x160 page background (the shared tile panel recoloured per page:
+//     Player Side Info = red, Enemy Side Info = yellow, Field = green,
+//     Pokémon Stats = blue, Abilities = red, Moves = green).
+//   • A left column of 6 party slots (orange) drawn with each Pokémon's party
+//     icon; the selected slot gets the red corner-bracket selector + green tile.
+//   • A header bar with the page title + control hints
+//     ("Ⓐ Scroll  ✛ Switch  ✛ Page").
 //
-// Panels:
-//   PARTY     — both full teams side by side (name, level, current HP, fainted)
-//   STATS     — actual current stats + stat-stage arrows, types, item, nature
-//   ABILITIES — main ability + innates (abbreviated ER descriptions)
-//   MOVES     — each move: type, power, accuracy, category, PP, STAB
-//   WEATHER   — current weather + turns remaining
-//   SIDES     — player/enemy side conditions (screens, Aurora Veil, terrain…)
+// Controls (matching the ROM):
+//   UP/DOWN  → switch the selected party Pokémon (left column).
+//   LEFT/RIGHT → cycle pages.
+//   anything else → close.
 //
-// Coordinate note: the `ui` container draws content at NEGATIVE y (origin
-// bottom-left), so the panel anchors at y = -scaledCanvas.height + margin and
-// lays children out downward in positive local y.
+// Coordinate note: the `ui` container draws at NEGATIVE y (origin bottom-left),
+// so the panel anchors at y = -canvasHeight + topMargin and lays out downward.
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
 import { allAbilities } from "#data/data-lists";
 import { getErAbilityDescription } from "#data/elite-redux/er-ability-descriptions";
-import { getNatureName } from "#data/nature";
-import { AbilityId } from "#enums/ability-id";
+import { getNatureName, getNatureStatMultiplier } from "#data/nature";
+import { TerrainType as TerrainTypeEnum } from "#data/terrain";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { Button } from "#enums/buttons";
 import { Button as Btn } from "#enums/buttons";
-import { MoveCategory } from "#enums/move-category";
-import { PokemonType } from "#enums/pokemon-type";
+import { PokemonType as PokemonTypeEnum } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { TextStyle } from "#enums/text-style";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
-import { addTextObject, getTextColor } from "#ui/text";
-import i18next from "i18next";
+import { addTextObject } from "#ui/text";
 
-type PanelKind = "party" | "stats" | "abilities" | "moves" | "weather" | "sides";
-const PANELS: PanelKind[] = ["party", "stats", "abilities", "moves", "weather", "sides"];
+/** Page identity → background texture key + accent palette colour. */
+type Page = "side-player" | "side-enemy" | "field" | "stats" | "abilities" | "moves";
+const PAGES: Page[] = ["stats", "abilities", "moves", "field", "side-player", "side-enemy"];
 
-const STAT_ROWS: { stat: Stat; label: string }[] = [
-  { stat: Stat.HP, label: "HP" },
+const BG_KEY: Record<Page, string> = {
+  stats: "er_binfo_stats",
+  abilities: "er_binfo_abilities",
+  moves: "er_binfo_moves",
+  field: "er_binfo_field",
+  "side-player": "er_binfo_side_player",
+  "side-enemy": "er_binfo_side_enemy",
+};
+
+const PAGE_TITLE: Record<Page, string> = {
+  stats: "Pokémon Stats",
+  abilities: "Abilities Info",
+  moves: "Moves Info",
+  field: "Field Info",
+  "side-player": "Player Side Info",
+  "side-enemy": "Enemy Side Info",
+};
+
+// Native GBA screen the backgrounds were authored for; centered in the UI.
+const BG_W = 240;
+const BG_H = 160;
+// Left party column geometry (6 slots), measured from the ROM panel.
+const COL_ICON_X = 26;
+const COL_TOP = 6;
+const COL_SLOT_H = 25;
+const SLOT_COUNT = 6;
+// Right content area.
+const CONTENT_X = 60;
+
+const STAT_GRID: { stat: Stat; label: string }[] = [
   { stat: Stat.ATK, label: "Atk" },
   { stat: Stat.DEF, label: "Def" },
   { stat: Stat.SPATK, label: "SpA" },
@@ -51,26 +79,23 @@ const STAT_ROWS: { stat: Stat; label: string }[] = [
 
 export class BattleInfoOverlay {
   private container: Phaser.GameObjects.Container | null = null;
-  private panelIndex = 0;
-  private targetIndex = 0;
+  private pageIndex = 0;
+  private slotIndex = 0;
 
   get isOpen(): boolean {
     return this.container != null;
   }
 
-  /** Pokémon the user can page through: player field/party then enemy field. */
-  private getTargets(): Pokemon[] {
-    const players = globalScene.getPlayerParty().filter(p => !p.isFainted());
-    const enemies = globalScene.getEnemyField().filter(p => p?.isActive());
-    return [...players, ...enemies];
+  private party(): Pokemon[] {
+    return globalScene.getPlayerParty().slice(0, SLOT_COUNT);
   }
 
   open(): void {
     if (this.container) {
       return;
     }
-    this.panelIndex = 0;
-    this.targetIndex = 0;
+    this.pageIndex = 0;
+    this.slotIndex = 0;
     this.render();
   }
 
@@ -81,31 +106,25 @@ export class BattleInfoOverlay {
     }
   }
 
-  /**
-   * Handle a button while open. Returns true if consumed. Navigation buttons
-   * (Left/Right/Up/Down) page panels / targets; anything else closes.
-   */
   handleInput(button: Button): boolean {
     if (!this.container) {
       return false;
     }
     switch (button) {
       case Btn.LEFT:
-        this.panelIndex = (this.panelIndex - 1 + PANELS.length) % PANELS.length;
+        this.pageIndex = (this.pageIndex - 1 + PAGES.length) % PAGES.length;
         this.render();
         return true;
       case Btn.RIGHT:
-        this.panelIndex = (this.panelIndex + 1) % PANELS.length;
+        this.pageIndex = (this.pageIndex + 1) % PAGES.length;
         this.render();
         return true;
       case Btn.UP:
       case Btn.DOWN: {
-        const targets = this.getTargets();
-        if (targets.length > 1) {
-          const d = button === Btn.DOWN ? 1 : -1;
-          this.targetIndex = (this.targetIndex + d + targets.length) % targets.length;
-          this.render();
-        }
+        const n = Math.max(1, this.party().length);
+        const d = button === Btn.DOWN ? 1 : -1;
+        this.slotIndex = (this.slotIndex + d + n) % n;
+        this.render();
         return true;
       }
       default:
@@ -117,264 +136,299 @@ export class BattleInfoOverlay {
   private render(): void {
     this.close();
     const H = globalScene.scaledCanvas.height;
-    const W = 250;
-    const c = globalScene.add.container(40, -H + 6).setDepth(1000);
+    const W = globalScene.scaledCanvas.width;
+    const page = PAGES[this.pageIndex];
 
-    const scrim = globalScene.add.rectangle(0, 0, W, H - 12, 0x1a1a2e, 0.97).setOrigin(0, 0);
+    // Center the 240x160 ROM panel in the UI canvas.
+    const offX = Math.floor((W - BG_W) / 2);
+    const offY = Math.floor((H - BG_H) / 2);
+    const c = globalScene.add.container(offX, -H + offY).setDepth(1000);
+
+    // Dim the battle behind the panel.
+    const scrim = globalScene.add.rectangle(-offX, -offY, W, H, 0x000000, 0.5).setOrigin(0, 0);
     c.add(scrim);
 
-    const targets = this.getTargets();
-    if (this.targetIndex >= targets.length) {
-      this.targetIndex = 0;
-    }
-    const mon = targets[this.targetIndex];
-    const panel = PANELS[this.panelIndex];
+    // Page background (recoloured ROM tile panel).
+    const bg = globalScene.add.image(0, 0, BG_KEY[page]).setOrigin(0, 0);
+    c.add(bg);
 
-    // Header: panel title + nav hints.
-    const title = addTextObject(6, 2, this.panelTitle(panel), TextStyle.SUMMARY_GOLD, { fontSize: "64px" });
-    title.setOrigin(0, 0);
-    c.add(title);
-    const navHint = addTextObject(W - 4, 2, "◄ ► panel   ▲ ▼ mon   B close", TextStyle.SUMMARY, { fontSize: "40px" });
-    navHint.setOrigin(1, 0);
-    c.add(navHint);
+    this.renderPartyColumn(c);
+    this.renderHeader(c, page);
 
-    let y = 16;
-    if (panel === "party") {
-      this.renderParty(c, y);
-    } else if (panel === "weather") {
-      this.renderWeather(c, y);
-    } else if (panel === "sides") {
-      this.renderSides(c, y);
-    } else if (mon) {
-      // Per-Pokémon panels: show whose info this is.
-      const who = addTextObject(
-        6,
-        y,
-        `${mon.getNameToRender()}  Lv.${mon.level}${mon.isEnemy() ? "  (Foe)" : ""}`,
-        TextStyle.SUMMARY,
-        {
-          fontSize: "56px",
-        },
-      );
-      who.setOrigin(0, 0);
-      c.add(who);
-      y += 12;
-      if (panel === "stats") {
-        this.renderStats(c, y, mon);
-      } else if (panel === "abilities") {
-        this.renderAbilities(c, y, mon);
-      } else if (panel === "moves") {
-        this.renderMoves(c, y, mon);
-      }
+    const party = this.party();
+    const mon = party[Math.min(this.slotIndex, party.length - 1)];
+    switch (page) {
+      case "stats":
+        if (mon) {
+          this.renderStats(c, mon);
+        }
+        break;
+      case "abilities":
+        if (mon) {
+          this.renderAbilities(c, mon);
+        }
+        break;
+      case "moves":
+        if (mon) {
+          this.renderMoves(c, mon);
+        }
+        break;
+      case "field":
+        this.renderField(c);
+        break;
+      case "side-player":
+        this.renderSide(c, ArenaTagSide.PLAYER);
+        break;
+      case "side-enemy":
+        this.renderSide(c, ArenaTagSide.ENEMY);
+        break;
     }
 
     globalScene.ui.add(c);
     this.container = c;
   }
 
-  private panelTitle(panel: PanelKind): string {
-    switch (panel) {
-      case "party":
-        return i18next.t("pokemonSummary:infoParty", { defaultValue: "Party VS" });
-      case "stats":
-        return i18next.t("pokemonSummary:infoStats", { defaultValue: "Stats" });
-      case "abilities":
-        return i18next.t("pokemonSummary:abilities", { defaultValue: "Abilities" });
-      case "moves":
-        return i18next.t("pokemonSummary:infoMoves", { defaultValue: "Moves" });
-      case "weather":
-        return i18next.t("pokemonSummary:infoWeather", { defaultValue: "Weather" });
-      case "sides":
-        return i18next.t("pokemonSummary:infoSides", { defaultValue: "Field Effects" });
+  /** Left column: 6 party slots with icons; selected slot gets the selector. */
+  private renderPartyColumn(c: Phaser.GameObjects.Container): void {
+    const party = this.party();
+    for (let i = 0; i < SLOT_COUNT; i++) {
+      const cy = COL_TOP + i * COL_SLOT_H + COL_SLOT_H / 2;
+      const mon = party[i];
+      if (mon) {
+        const icon = globalScene.addPokemonIcon(mon, COL_ICON_X, cy - 14, 0.5, 0.5);
+        icon.setScale(0.6);
+        c.add(icon);
+      }
+      if (i === Math.min(this.slotIndex, Math.max(0, party.length - 1)) && party.length > 0) {
+        const sel = globalScene.add.image(COL_ICON_X, cy, "er_binfo_selector").setOrigin(0.5, 0.5).setScale(0.62);
+        c.add(sel);
+      }
     }
   }
 
-  /** Party VS: both full teams in two columns (name, level, current HP, fainted). */
-  private renderParty(c: Phaser.GameObjects.Container, y0: number): void {
-    const drawColumn = (mons: Pokemon[], x: number, header: string): void => {
-      const head = addTextObject(x, y0, header, TextStyle.SUMMARY_GOLD, { fontSize: "56px" });
-      head.setOrigin(0, 0);
-      c.add(head);
-      let y = y0 + 13;
-      for (const m of mons.slice(0, 6)) {
-        const fainted = m.isFainted();
-        const name = addTextObject(x, y, m.getNameToRender(), fainted ? TextStyle.WINDOW_ALT : TextStyle.SUMMARY, {
-          fontSize: "48px",
-        });
-        name.setOrigin(0, 0);
-        if (fainted) {
-          name.setColor(getTextColor(TextStyle.SUMMARY_RED));
-        }
-        c.add(name);
-        const hpStr = fainted ? "Fainted" : `L${m.level}  ${m.hp}/${m.getMaxHp()}`;
-        const hp = addTextObject(x, y + 8, hpStr, TextStyle.WINDOW_ALT, { fontSize: "40px" });
-        hp.setOrigin(0, 0);
-        c.add(hp);
-        y += 19;
-      }
-    };
-    drawColumn(
-      globalScene.getPlayerParty(),
-      6,
-      i18next.t("pokemonSummary:infoYourTeam", { defaultValue: "Your team" }),
-    );
-    drawColumn(globalScene.getEnemyParty(), 130, i18next.t("pokemonSummary:infoFoeTeam", { defaultValue: "Foe team" }));
+  /** Header bar: page title (left) + control hints (right). */
+  private renderHeader(c: Phaser.GameObjects.Container, page: Page): void {
+    const title = addTextObject(CONTENT_X, 3, PAGE_TITLE[page], TextStyle.SUMMARY, { fontSize: "60px" });
+    title.setOrigin(0, 0);
+    c.add(title);
+    const hint = addTextObject(BG_W - 3, 4, "Ⓐ Scroll  ✛ Switch  ✛ Page", TextStyle.SUMMARY, { fontSize: "40px" });
+    hint.setOrigin(1, 0);
+    c.add(hint);
   }
 
-  private renderStats(c: Phaser.GameObjects.Container, y0: number, mon: Pokemon): void {
-    // Types + held item + nature.
-    const t1 = PokemonType[mon.getTypes()[0]];
-    const t2 = mon.getTypes()[1] == null ? "" : `/${PokemonType[mon.getTypes()[1]]}`;
-    const typeText = addTextObject(6, y0, `Type: ${t1}${t2}`, TextStyle.WINDOW_ALT, { fontSize: "48px" });
-    typeText.setOrigin(0, 0);
-    c.add(typeText);
-
-    let y = y0 + 12;
-    for (const row of STAT_ROWS) {
-      const value = row.stat === Stat.HP ? `${mon.hp}/${mon.getMaxHp()}` : `${mon.getStat(row.stat)}`;
-      const label = addTextObject(8, y, row.label, TextStyle.SUMMARY, { fontSize: "52px" });
-      label.setOrigin(0, 0);
-      c.add(label);
-      const valText = addTextObject(70, y, value, TextStyle.WINDOW_ALT, { fontSize: "52px" });
-      valText.setOrigin(0, 0);
-      c.add(valText);
-      // Stat-stage arrow (Atk/Def/SpA/SpD/Spe only).
-      if (row.stat !== Stat.HP) {
-        const stage = mon.getStatStage(row.stat as unknown as Parameters<typeof mon.getStatStage>[0]);
-        if (stage !== 0) {
-          const arrow = `${stage > 0 ? "▲" : "▼"}${Math.abs(stage)}`;
-          const arrowText = addTextObject(150, y, arrow, TextStyle.SUMMARY, { fontSize: "52px" });
-          arrowText.setOrigin(0, 0);
-          arrowText.setColor(getTextColor(stage > 0 ? TextStyle.SUMMARY_GREEN : TextStyle.SUMMARY_RED));
-          c.add(arrowText);
-        }
-      }
-      y += 11;
-    }
-
-    const nature = addTextObject(
-      8,
-      y + 2,
-      `Nature: ${getNatureName(mon.getNature(), true, false, true)}`,
+  // --- per-Pokémon: STATS (blue) -------------------------------------------
+  private renderStats(c: Phaser.GameObjects.Container, mon: Pokemon): void {
+    const gender = mon.gender === 0 ? " ♂" : mon.gender === 1 ? " ♀" : "";
+    const name = addTextObject(
+      CONTENT_X + 6,
+      20,
+      `${mon.getNameToRender()}${gender}  Lv${mon.level}`,
       TextStyle.WINDOW_ALT,
       {
-        fontSize: "44px",
+        fontSize: "56px",
       },
     );
-    nature.setOrigin(0, 0);
-    c.add(nature);
+    name.setOrigin(0, 0);
+    c.add(name);
+    const types = mon
+      .getTypes()
+      .map(t => i18nType(t))
+      .join(" / ");
+    const typeText = addTextObject(CONTENT_X + 6, 30, `Types: ${types}`, TextStyle.WINDOW_ALT, { fontSize: "52px" });
+    typeText.setOrigin(0, 0);
+    c.add(typeText);
+    const item = mon.getHeldItems()[0];
+    const itemText = addTextObject(
+      CONTENT_X + 6,
+      40,
+      `Held Item: ${item ? item.type.name : "None"}`,
+      TextStyle.WINDOW_ALT,
+      {
+        fontSize: "52px",
+      },
+    );
+    itemText.setOrigin(0, 0);
+    c.add(itemText);
+
+    // Stat-stage dot grid (left box) — one row per stat, 6 dots, filled = +1.
+    let gy = 64;
+    for (const row of STAT_GRID) {
+      const lbl = addTextObject(CONTENT_X + 4, gy, row.label, TextStyle.WINDOW_ALT, { fontSize: "48px" });
+      lbl.setOrigin(0, 0);
+      c.add(lbl);
+      const stage = mon.getStatStage(row.stat); // -6..+6
+      for (let d = 0; d < 6; d++) {
+        const on = d < Math.abs(stage);
+        const up = stage >= 0;
+        const dot = globalScene.add
+          .image(
+            CONTENT_X + 30 + d * 8,
+            gy + 3,
+            on ? (up ? "er_binfo_stat_up" : "er_binfo_stat_down") : "er_binfo_check",
+          )
+          .setOrigin(0, 0.5)
+          .setAlpha(on ? 1 : 0.25);
+        c.add(dot);
+      }
+      gy += 11;
+    }
+
+    // Actual stat numbers (right box).
+    const numbers: [string, string][] = [
+      ["HP", `${mon.hp}/${mon.getMaxHp()}`],
+      ["Atk", `${mon.getStat(Stat.ATK)}`],
+      ["Def", `${mon.getStat(Stat.DEF)}`],
+      ["SpA", `${mon.getStat(Stat.SPATK)}`],
+      ["SpD", `${mon.getStat(Stat.SPDEF)}`],
+      ["Spe", `${mon.getStat(Stat.SPD)}`],
+    ];
+    let ny = 64;
+    for (const [lbl, val] of numbers) {
+      const l = addTextObject(155, ny, lbl, TextStyle.WINDOW_ALT, { fontSize: "48px" });
+      l.setOrigin(0, 0);
+      c.add(l);
+      const v = addTextObject(185, ny, val, TextStyle.WINDOW_ALT, { fontSize: "48px" });
+      v.setOrigin(0, 0);
+      c.add(v);
+      ny += 11;
+    }
+
+    // Nature (bottom right).
+    const nat = mon.getNature();
+    const plus = naturePlusMinus(nat);
+    const natText = addTextObject(155, 138, `Nature: ${getNatureName(nat)}\n${plus}`, TextStyle.WINDOW_ALT, {
+      fontSize: "44px",
+    });
+    natText.setOrigin(0, 0);
+    c.add(natText);
   }
 
-  private renderAbilities(c: Phaser.GameObjects.Container, y0: number, mon: Pokemon): void {
+  // --- per-Pokémon: ABILITIES (red) ----------------------------------------
+  private renderAbilities(c: Phaser.GameObjects.Container, mon: Pokemon): void {
     const rows: { label: string; abilityId: number }[] = [];
     const main = mon.getAbility(true);
     if (main) {
-      rows.push({ label: i18next.t("pokemonSummary:abilityLabel"), abilityId: main.id });
+      rows.push({ label: "Ability", abilityId: main.id });
     }
-    const innateIds = mon.species.getPassiveAbilities(mon.formIndex);
-    for (let slot = 0; slot < 3; slot++) {
-      const id = innateIds[slot];
-      if (id !== undefined && id !== AbilityId.NONE) {
-        rows.push({ label: i18next.t("pokemonSummary:innateLabel"), abilityId: id });
+    const innates = mon.species.getPassiveAbilities(mon.formIndex);
+    for (const id of innates) {
+      if (id) {
+        rows.push({ label: "Innate", abilityId: id });
       }
     }
-    let y = y0;
+    let y = 22;
     for (const r of rows) {
-      const bar = globalScene.add.rectangle(2, y, 246, 11, 0x4a4a63, 1).setOrigin(0, 0);
-      c.add(bar);
-      const label = addTextObject(5, y, r.label, TextStyle.SUMMARY_GOLD, { fontSize: "52px" });
-      label.setOrigin(0, 0);
-      c.add(label);
-      const name = addTextObject(56, y, allAbilities[r.abilityId]?.name ?? "", TextStyle.SUMMARY, { fontSize: "52px" });
-      name.setOrigin(0, 0);
-      c.add(name);
-      const desc = getErAbilityDescription(r.abilityId) ?? allAbilities[r.abilityId]?.description ?? "";
-      const descText = addTextObject(5, y + 11, desc, TextStyle.WINDOW_ALT, {
-        fontSize: "44px",
-        wordWrap: { width: 1400 },
+      const ability = allAbilities[r.abilityId];
+      const head = addTextObject(CONTENT_X + 4, y, `${r.label}: ${ability?.name ?? ""}`, TextStyle.SUMMARY, {
+        fontSize: "52px",
       });
-      descText.setOrigin(0, 0);
-      c.add(descText);
-      y += 11 + Math.max(11, descText.displayHeight) + 2;
+      head.setOrigin(0, 0);
+      c.add(head);
+      const desc = getErAbilityDescription(r.abilityId) ?? ability?.description ?? "";
+      const d = addTextObject(CONTENT_X + 4, y + 9, desc, TextStyle.WINDOW_ALT, {
+        fontSize: "44px",
+        wordWrap: { width: 700 },
+      });
+      d.setOrigin(0, 0);
+      c.add(d);
+      y += 30;
     }
   }
 
-  private renderMoves(c: Phaser.GameObjects.Container, y0: number, mon: Pokemon): void {
-    const moves = mon.getMoveset();
-    let y = y0;
-    if (!moves || moves.length === 0) {
-      const none = addTextObject(6, y, "—", TextStyle.WINDOW_ALT, { fontSize: "52px" });
-      none.setOrigin(0, 0);
-      c.add(none);
-      return;
-    }
-    for (const pm of moves) {
-      const m = pm?.getMove();
-      if (!m) {
+  // --- per-Pokémon: MOVES (green) ------------------------------------------
+  private renderMoves(c: Phaser.GameObjects.Container, mon: Pokemon): void {
+    let y = 22;
+    for (const mv of mon.getMoveset()) {
+      if (!mv) {
         continue;
       }
-      const stab = mon.getTypes().includes(m.type);
-      const bar = globalScene.add.rectangle(2, y, 246, 11, 0x3a5a3a, 1).setOrigin(0, 0);
-      c.add(bar);
-      const name = addTextObject(5, y, m.name, TextStyle.SUMMARY, { fontSize: "52px" });
-      name.setOrigin(0, 0);
-      c.add(name);
-      const typeText = addTextObject(246, y, PokemonType[m.type], TextStyle.SUMMARY, { fontSize: "44px" });
-      typeText.setOrigin(1, 0);
-      c.add(typeText);
-      const cat = MoveCategory[m.category];
-      const detail = `Pow ${m.power < 0 ? "—" : m.power}  Acc ${m.accuracy < 0 ? "—" : m.accuracy}  ${cat}${stab ? "  STAB" : ""}`;
-      const detailText = addTextObject(5, y + 10, detail, TextStyle.WINDOW_ALT, { fontSize: "42px" });
-      detailText.setOrigin(0, 0);
-      c.add(detailText);
+      const move = mv.getMove();
+      const head = addTextObject(CONTENT_X + 4, y, move.name, TextStyle.SUMMARY, { fontSize: "52px" });
+      head.setOrigin(0, 0);
+      c.add(head);
+      const meta = addTextObject(
+        BG_W - 4,
+        y,
+        `${i18nType(move.type)}  Pw ${move.power > 0 ? move.power : "—"}  PP ${mv.ppUsed}/${mv.getMovePp()}`,
+        TextStyle.WINDOW_ALT,
+        { fontSize: "42px" },
+      );
+      meta.setOrigin(1, 0);
+      c.add(meta);
       y += 22;
     }
   }
 
-  private renderWeather(c: Phaser.GameObjects.Container, y0: number): void {
+  // --- FIELD (green): weather / terrain / room -----------------------------
+  private renderField(c: Phaser.GameObjects.Container): void {
+    const rows: [string, string][] = [];
     const weather = globalScene.arena.weather;
-    const wt = weather?.weatherType ?? WeatherType.NONE;
-    const name = wt === WeatherType.NONE ? "Clear" : WeatherType[wt].replace(/_/g, " ");
-    const head = addTextObject(6, y0, `Weather: ${name}`, TextStyle.SUMMARY, { fontSize: "56px" });
-    head.setOrigin(0, 0);
-    c.add(head);
-    if (weather && wt !== WeatherType.NONE) {
-      const turns = addTextObject(6, y0 + 12, `Turns left: ${weather.turnsLeft}`, TextStyle.WINDOW_ALT, {
-        fontSize: "48px",
-      });
-      turns.setOrigin(0, 0);
-      c.add(turns);
+    if (weather && weather.weatherType !== WeatherType.NONE) {
+      rows.push([WeatherType[weather.weatherType].replace(/_/g, " "), `Turns Left:${weather.turnsLeft}`]);
     }
+    const terrain = globalScene.arena.terrain;
+    if (terrain) {
+      rows.push([`${terrainName(terrain.terrainType)} Terrain`, `Turns Left:${terrain.turnsLeft}`]);
+    }
+    this.renderPills(c, rows.length > 0 ? rows : [["No field effects", ""]]);
   }
 
-  private renderSides(c: Phaser.GameObjects.Container, y0: number): void {
-    const tags = globalScene.arena.tags;
-    let y = y0;
-    for (const [sideLabel, side] of [
-      ["Your side", ArenaTagSide.PLAYER],
-      ["Foe side", ArenaTagSide.ENEMY],
-      ["Field", ArenaTagSide.BOTH],
-    ] as const) {
-      const sideTags = tags.filter(t => t.side === side);
-      const head = addTextObject(6, y, sideLabel, TextStyle.SUMMARY_GOLD, { fontSize: "52px" });
-      head.setOrigin(0, 0);
-      c.add(head);
-      y += 11;
-      if (sideTags.length === 0) {
-        const none = addTextObject(12, y, "—", TextStyle.WINDOW_ALT, { fontSize: "44px" });
-        none.setOrigin(0, 0);
-        c.add(none);
-        y += 10;
-      } else {
-        for (const t of sideTags) {
-          const label = `${String(t.tagType).replace(/_/g, " ")}  (${t.turnCount} turns)`;
-          const tagText = addTextObject(12, y, label, TextStyle.WINDOW_ALT, { fontSize: "44px" });
-          tagText.setOrigin(0, 0);
-          c.add(tagText);
-          y += 10;
-        }
+  // --- SIDE (red/yellow): side conditions as pill rows ---------------------
+  private renderSide(c: Phaser.GameObjects.Container, side: ArenaTagSide): void {
+    const rows: [string, string][] = [];
+    for (const tag of globalScene.arena.tags) {
+      if (tag.side !== side && tag.side !== ArenaTagSide.BOTH) {
+        continue;
       }
-      y += 4;
+      const name = tagDisplayName(tag);
+      const turns = tag.turnCount > 0 ? `Turns Left:${tag.turnCount}` : "";
+      rows.push([name, turns]);
+    }
+    this.renderPills(c, rows.length > 0 ? rows : [["No side effects", ""]]);
+  }
+
+  /** Render up to 6 "pill" rows (name left, turns right, on the striped panel). */
+  private renderPills(c: Phaser.GameObjects.Container, rows: [string, string][]): void {
+    let y = 22;
+    for (const [name, turns] of rows.slice(0, 6)) {
+      const n = addTextObject(CONTENT_X + 6, y, name, TextStyle.WINDOW_ALT, { fontSize: "52px" });
+      n.setOrigin(0, 0);
+      c.add(n);
+      if (turns) {
+        const t = addTextObject(BG_W - 6, y, turns, TextStyle.WINDOW_ALT, { fontSize: "52px" });
+        t.setOrigin(1, 0);
+        c.add(t);
+      }
+      y += 38;
     }
   }
+}
+
+// --- helpers ----------------------------------------------------------------
+/** "Fire", "Water"… from the numeric PokemonType. */
+function i18nType(type: number): string {
+  const name = (PokemonTypeEnum as unknown as Record<number, string>)[type] ?? "";
+  return name.charAt(0) + name.slice(1).toLowerCase();
+}
+
+function naturePlusMinus(nature: number): string {
+  let plus = "";
+  let minus = "";
+  for (const s of [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD]) {
+    const m = getNatureStatMultiplier(nature, s);
+    if (m > 1) {
+      plus = STAT_GRID.find(g => g.stat === s)?.label ?? "";
+    } else if (m < 1) {
+      minus = STAT_GRID.find(g => g.stat === s)?.label ?? "";
+    }
+  }
+  return plus && minus ? `(+${plus}, -${minus})` : "(neutral)";
+}
+
+function terrainName(t: number): string {
+  return (TerrainTypeEnum as unknown as Record<number, string>)[t] ?? "";
+}
+
+function tagDisplayName(tag: { tagType: string }): string {
+  return tag.tagType.replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
 }

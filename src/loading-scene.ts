@@ -37,6 +37,20 @@ export class LoadingScene extends SceneBase {
       .loadImage("snow", "")
       // ER: ROM-extracted fog overlay sprite (scrolling in-battle fog visual).
       .loadImage("fog_horizontal", "elite-redux/weather")
+      // ER: in-battle "Info" screen backgrounds (ROM gAbilitiesInfo menu, tiles
+      // recoloured per page) + overlay sprites.
+      .loadImage("er_binfo_side_player", "elite-redux/battle-info", "side-player.png")
+      .loadImage("er_binfo_side_enemy", "elite-redux/battle-info", "side-enemy.png")
+      .loadImage("er_binfo_field", "elite-redux/battle-info", "field.png")
+      .loadImage("er_binfo_stats", "elite-redux/battle-info", "stats.png")
+      .loadImage("er_binfo_abilities", "elite-redux/battle-info", "abilities.png")
+      .loadImage("er_binfo_moves", "elite-redux/battle-info", "moves.png")
+      .loadImage("er_binfo_speed", "elite-redux/battle-info", "speed.png")
+      .loadImage("er_binfo_selector", "elite-redux/battle-info", "selector.png")
+      .loadImage("er_binfo_field_tile", "elite-redux/battle-info", "field-forest.png")
+      .loadImage("er_binfo_stat_up", "elite-redux/battle-info", "stat_up_arrow.png")
+      .loadImage("er_binfo_stat_down", "elite-redux/battle-info", "stat_down_arrow.png")
+      .loadImage("er_binfo_check", "elite-redux/battle-info", "check.png")
       .loadAtlas("bg", "ui")
       .loadAtlas("prompt", "ui")
       .loadImage("candy", "ui")
