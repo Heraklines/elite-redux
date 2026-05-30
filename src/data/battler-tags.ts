@@ -3853,6 +3853,20 @@ export class ErFearTag extends SerializableBattlerTag {
 }
 
 /**
+ * ER Frisk's "disable held items" rider. Applied to a foe on the holder's
+ * switch-in for 2 turns; while present, {@linkcode PokemonHeldItemModifier}s on
+ * the tagged Pokémon do not apply (gated in `PokemonHeldItemModifier.shouldApply`).
+ * Ticks down at each turn end (TURN_END lapse). Serializable so it survives a
+ * mid-battle save.
+ */
+export class ErItemDisabledTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_ITEM_DISABLED;
+  constructor(turnCount = 2) {
+    super(BattlerTagType.ER_ITEM_DISABLED, BattlerTagLapseType.TURN_END, turnCount);
+  }
+}
+
+/**
  * Retrieves a {@linkcode BattlerTag} based on the provided tag type, turn count, source move, and source ID.
  * @param sourceId - The ID of the pokemon adding the tag
  * @returns The corresponding {@linkcode BattlerTag} object.
@@ -4056,6 +4070,8 @@ export function getBattlerTag(
       return new ErFrostbiteTag();
     case BattlerTagType.ER_FEAR:
       return new ErFearTag();
+    case BattlerTagType.ER_ITEM_DISABLED:
+      return new ErItemDisabledTag(turnCount || 2);
   }
 }
 
@@ -4192,6 +4208,7 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.ER_BLEED]: ErBleedTag;
   [BattlerTagType.ER_FROSTBITE]: ErFrostbiteTag;
   [BattlerTagType.ER_FEAR]: ErFearTag;
+  [BattlerTagType.ER_ITEM_DISABLED]: ErItemDisabledTag;
 };
 
 /**

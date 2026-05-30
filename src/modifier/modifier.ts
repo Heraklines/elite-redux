@@ -687,7 +687,17 @@ export abstract class PokemonHeldItemModifier extends PersistentModifier {
    * @returns if {@linkcode PokemonHeldItemModifier} should be applied
    */
   override shouldApply(pokemon?: Pokemon, ..._args: unknown[]): boolean {
-    return !!pokemon && (this.pokemonId === -1 || pokemon.id === this.pokemonId);
+    if (!pokemon || !(this.pokemonId === -1 || pokemon.id === this.pokemonId)) {
+      return false;
+    }
+    // ER Frisk's "disable held items" rider: while the holder carries the
+    // ER_ITEM_DISABLED tag, none of its held-item effects apply (berries,
+    // leftovers, choice items, etc.). Mega Stones / form-change items are not
+    // gated through this path, matching ER's "does not prevent Mega Stones".
+    if (pokemon.getTag(BattlerTagType.ER_ITEM_DISABLED)) {
+      return false;
+    }
+    return true;
   }
 
   isIconVisible(): boolean {

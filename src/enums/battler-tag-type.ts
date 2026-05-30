@@ -102,4 +102,11 @@ export enum BattlerTagType {
   ER_BLEED = "ER_BLEED",
   ER_FROSTBITE = "ER_FROSTBITE",
   ER_FEAR = "ER_FEAR",
+  /**
+   * ER Frisk's "disable held items" rider. While present, the holder's
+   * {@linkcode PokemonHeldItemModifier}s do not apply (berries, leftovers,
+   * choice items, etc.). Mega Stones / form-change items are unaffected since
+   * they are not gated through the held-item apply path.
+   */
+  ER_ITEM_DISABLED = "ER_ITEM_DISABLED",
 }

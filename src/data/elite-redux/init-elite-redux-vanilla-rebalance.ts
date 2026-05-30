@@ -84,7 +84,11 @@ import { globalScene } from "#app/global-scene";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { ChanceStatusOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { CritStageBonusAbAttr } from "#data/elite-redux/archetypes/crit-mod";
+import { DisableFoeItemsOnEntryAbAttr } from "#data/elite-redux/archetypes/disable-foe-items-on-entry";
+import { DodgeFirstSuperEffectiveAbAttr } from "#data/elite-redux/archetypes/dodge-first-super-effective";
 import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
+import { EntryTailwindClearWeatherAbAttr } from "#data/elite-redux/archetypes/entry-tailwind-clear-weather";
+import { HealStatusOnMoveTypeAbAttr } from "#data/elite-redux/archetypes/heal-status-on-move-type";
 import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
 import { PostDefendSuppressOpponentDamageBoostAbAttr } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import { RecoilDamageMultiplierAbAttr } from "#data/elite-redux/archetypes/recoil-damage-multiplier";
@@ -278,17 +282,25 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     },
   ],
   // VITAL_SPIRIT (72): ER spec "Can't fall asleep. Fighting-type moves heal
-  // status." Vanilla just blocks sleep. Add: PostAttack hook that cures own
-  // status when holder uses a Fighting-type move. Pokerogue's existing
-  // primitives don't expose self-status-cure on attack; we approximate by
-  // letting Fighting moves not trigger status interactions (defer the cure
-  // piece — requires a new primitive). Wire as no-op rider for now.
-  // [AbilityId.VITAL_SPIRIT, ab => { /* deferred */ }],
-  // AIR_LOCK (76): ER spec "Cloud Nine + Air Blower." Cloud Nine is the
-  // vanilla weather-suppression. Air Blower = Tailwind on entry. Add the
-  // Tailwind piece via a PostSummon hook (Tailwind is an arena tag — would
-  // need EntryEffectAbAttr import); defer to bespoke path.
-  // [AbilityId.AIR_LOCK, ab => { /* deferred */ }],
+  // status." Vanilla just blocks sleep; the HealStatusOnMoveType primitive adds
+  // the cure-on-Fighting-attack rider (PostAttack hook), curing the holder's
+  // primary status immediately after a Fighting-type move connects.
+  [
+    AbilityId.VITAL_SPIRIT,
+    ab => {
+      ab.attrs.push(new HealStatusOnMoveTypeAbAttr(PokemonType.FIGHTING));
+    },
+  ],
+  // AIR_LOCK (76): ER spec "Cloud Nine + Air Blower." Cloud Nine (weather
+  // suppression while on field) is the vanilla base ability. The Air Blower half
+  // — set Tailwind 3 turns + clear current (mutable) weather on entry — is added
+  // by the EntryTailwindClearWeather PostSummon primitive.
+  [
+    AbilityId.AIR_LOCK,
+    ab => {
+      ab.attrs.push(new EntryTailwindClearWeatherAbAttr());
+    },
+  ],
   // STENCH (1): ER spec ALLEGEDLY says "Toxic terrain is permanent" but ER
   // C source (vendor/elite-redux/source/src/battle_util.c:9801) implements
   // ONLY the 10% flinch — same as vanilla pokerogue. NO PATCH NEEDED.
@@ -513,10 +525,11 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // ===== Round 3: more MINOR / MAJOR patches from the audit =====
   // 178 MEGA_LAUNCHER: pulse moves 1.5x → 1.3x (audit MINOR retune).
   [AbilityId.MEGA_LAUNCHER, ab => mutateMovePowerBoost(ab, 1.3)],
-  // 6 STURDY: vanilla "OHKO immune at full HP" → ER "OHKO immune + 1/2 damage from SE moves at full HP".
-  // Adds a damage-reduction rider. Approximated via existing addStatProtect-style hook;
-  // the precise "SE+full HP" filter needs a new primitive — defer the rider, no-op patch.
-  // (Listed as audit MAJOR but the underlying SE-at-full-HP filter isn't yet available.)
+  // 6 STURDY: ER ROM description — "When at full HP, survive any single attack
+  // with at least 1 HP remaining. Functions like a Focus Sash; does not protect
+  // against multihit or follow-up attacks." This is IDENTICAL to vanilla pokerogue
+  // STURDY (SturdyAbAttr / PreventBerryUseAbAttr-style full-HP survival). No rider
+  // needed — earlier audit note about a "SE + full-HP damage cut" was incorrect.
 
   // 7 LIMBER: ER spec is "Para immune, takes half recoil, immune to self
   // stat drops." Vanilla pokerogue Limber covers paralysis immunity; ER
@@ -636,10 +649,16 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // 188 STORM_DRAIN: redirect Water + raise SPATK on absorption. Vanilla same.
   // 184 ANTICIPATION: ER spec is "Senses Super-effective moves. Dodges one
   // Super-effective hit." The vanilla base already does the sense/shudder on
-  // entry. The previous "+1 SPD on entry" rider was NOT in the spec (a wrong
-  // approximation) — removed. The "dodge one SE hit" rider needs a per-battle
-  // PreDefend primitive (tracked in #141); keep the faithful vanilla sense
-  // until then rather than a contradicting effect.
+  // entry. The DodgeFirstSuperEffective primitive adds the dodge rider: the
+  // first super-effective hit received each battle is nullified (once-per-battle
+  // charge tracked on battleData.anticipationDodgeUsed). The previous "+1 SPD on
+  // entry" rider was NOT in the spec (a wrong approximation) — stays removed.
+  [
+    AbilityId.ANTICIPATION,
+    ab => {
+      ab.attrs.push(new DodgeFirstSuperEffectiveAbAttr());
+    },
+  ],
   // 209 BIG_PECKS already total.
   // 156 RECKLESS: vanilla 1.2x recoil moves. ER ups to 1.3x.
   [AbilityId.RECKLESS, ab => mutateFlagPowerBoost(ab, MoveFlags.RECKLESS_MOVE, 1.3)],
@@ -762,8 +781,16 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     },
   ],
 
-  // 119 FRISK: vanilla "reveal foe item". ER "disables their items for 2
-  // turns" — no engine primitive for that. Defer.
+  // 119 FRISK: vanilla "reveal foe item". ER adds "disables their items for 2
+  // turns" via the DisableFoeItemsOnEntry PostSummon rider (applies the
+  // ER_ITEM_DISABLED tag to each foe; Mega Stones unaffected). See also the
+  // duplicate note in Round 10 below.
+  [
+    AbilityId.FRISK,
+    ab => {
+      ab.attrs.push(new DisableFoeItemsOnEntryAbAttr());
+    },
+  ],
 
   // 112 SLOW_START: vanilla halves ATK + SPD for 5 turns. ER also halves
   // SPATK — add the missing offense slow. Approximated as additional
@@ -896,11 +923,9 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   ],
 
   // ===== Round 10: more ER deltas (mostly +5 wires) =====
-  // 119 FRISK: vanilla reveal foe item. ER also "disables items for 2 turns".
-  // Approximate by adding a chance on PostSummon to disable opponent items
-  // via an arena tag. Without a generic "disable held items" tag, we
-  // approximate with no-op extension; ER's primary effect is still the
-  // reveal (vanilla). Defer the disable rider.
+  // 119 FRISK: the "disable foe items 2 turns" rider is wired above via
+  // DisableFoeItemsOnEntryAbAttr + the ER_ITEM_DISABLED battler tag (gated in
+  // PokemonHeldItemModifier.shouldApply). No longer deferred.
   // 187 INFILTRATOR: vanilla bypass Substitute + screens. ER same. No patch.
   // 178 MEGA_LAUNCHER already patched.
   // 246 STAKEOUT: vanilla 2x on switch-in. ER same.

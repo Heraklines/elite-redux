@@ -301,12 +301,19 @@ export class PokemonBattleData {
   public hasEatenBerry = false;
   /** Array containing all berries eaten and not yet recovered during this current battle; used by {@linkcode AbilityId.HARVEST} */
   public berriesEaten: BerryType[] = [];
+  /**
+   * Whether this Pokémon's ER {@linkcode AbilityId.ANTICIPATION} has already
+   * spent its once-per-battle "dodge the first super-effective hit" charge.
+   * Resets with the rest of the per-battle data; transient (not serialized).
+   */
+  public anticipationDodgeUsed = false;
 
   constructor(source?: PokemonBattleData | Partial<PokemonBattleData>) {
     if (source != null) {
       this.hitCount = source.hitCount ?? 0;
       this.hasEatenBerry = source.hasEatenBerry ?? false;
       this.berriesEaten = source.berriesEaten ?? [];
+      this.anticipationDodgeUsed = source.anticipationDodgeUsed ?? false;
     }
   }
 }
