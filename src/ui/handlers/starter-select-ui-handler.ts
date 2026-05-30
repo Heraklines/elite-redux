@@ -1845,13 +1845,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       }
     } else if (button === Button.CANCEL) {
       if (this.filterTextMode) {
-        // ER text search: first Cancel clears a non-empty field; else leave panel.
-        if (this.filterText.getValue(this.filterTextCursor) === this.filterText.defaultText) {
-          this.setFilterTextMode(false);
-          this.setCursor(this.cursor);
-        } else {
-          this.filterText.resetSelection(this.filterTextCursor);
-        }
+        // ER text search: Cancel leaves the search panel and returns to the
+        // grid, KEEPING any active text filter applied so the player can browse
+        // the filtered results. (To change/clear the search, re-open the panel
+        // and edit the field — emptying it shows everything again.)
+        this.setFilterTextMode(false);
+        this.setCursor(this.cursor);
         success = true;
       } else if (this.filterMode && this.filterBar.openDropDown) {
         // CANCEL with a filter menu open > close it
