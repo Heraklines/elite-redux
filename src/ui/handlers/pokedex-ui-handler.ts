@@ -755,8 +755,9 @@ export class PokedexUiHandler extends MessageUiHandler {
     const dexEntry = this.gameData.dexData[species.speciesId];
     const starterData = this.gameData.starterData[species.speciesId];
 
-    // no preferences or Pokemon wasn't caught, return empty attribute
-    if (!starterAttributes || !dexEntry.caughtAttr) {
+    // no preferences or Pokemon wasn't caught, return empty attribute (ER: a
+    // custom species with no dex entry has nothing to restore — guard the read).
+    if (!starterAttributes || !dexEntry?.caughtAttr) {
       return {};
     }
 
@@ -921,10 +922,14 @@ export class PokedexUiHandler extends MessageUiHandler {
    */
   isPassiveAvailable(speciesId: number): boolean {
     // Get this species ID's starter data
-    const starterData = this.gameData.starterData[this.getStarterSpeciesId(speciesId)];
-
+    const starterId = this.getStarterSpeciesId(speciesId);
+    const starterData = this.gameData.starterData[starterId];
+    // ER: custom species without starter data / starter cost can't unlock a passive.
+    if (!starterData || speciesStarterCosts[starterId] === undefined) {
+      return false;
+    }
     return (
-      starterData.candyCount >= getPassiveCandyCount(speciesStarterCosts[this.getStarterSpeciesId(speciesId)])
+      starterData.candyCount >= getPassiveCandyCount(speciesStarterCosts[starterId])
       && !(starterData.passiveAttr & PassiveAttr.UNLOCKED)
     );
   }
@@ -936,13 +941,15 @@ export class PokedexUiHandler extends MessageUiHandler {
    */
   isValueReductionAvailable(speciesId: number): boolean {
     // Get this species ID's starter data
-    const starterData = this.gameData.starterData[this.getStarterSpeciesId(speciesId)];
-
+    const starterId = this.getStarterSpeciesId(speciesId);
+    const starterData = this.gameData.starterData[starterId];
+    // ER: custom species without starter data / starter cost can't reduce value.
+    if (!starterData || speciesStarterCosts[starterId] === undefined) {
+      return false;
+    }
     return (
-      starterData.candyCount
-        >= getValueReductionCandyCounts(speciesStarterCosts[this.getStarterSpeciesId(speciesId)])[
-          starterData.valueReduction
-        ] && starterData.valueReduction < valueReductionMax
+      starterData.candyCount >= getValueReductionCandyCounts(speciesStarterCosts[starterId])[starterData.valueReduction]
+      && starterData.valueReduction < valueReductionMax
     );
   }
 
@@ -955,10 +962,15 @@ export class PokedexUiHandler extends MessageUiHandler {
     // Get this species ID's starter data
     const { gameData } = this;
     const starterId = this.getStarterSpeciesId(speciesId);
-    const candyCount = gameData.starterData[starterId].candyCount;
-    const hatchCount = gameData.dexData[starterId].hatchedCount;
-
-    return candyCount >= getSameSpeciesEggCandyCounts(speciesStarterCosts[starterId], hatchCount);
+    // ER: custom species without starter/dex entries can't buy a same-species
+    // egg — guard the reads (and the missing starter-cost) instead of crashing.
+    const candyCount = gameData.starterData[starterId]?.candyCount ?? 0;
+    const hatchCount = gameData.dexData[starterId]?.hatchedCount ?? 0;
+    const starterCost = speciesStarterCosts[starterId];
+    if (starterCost === undefined) {
+      return false;
+    }
+    return candyCount >= getSameSpeciesEggCandyCounts(starterCost, hatchCount);
   }
 
   /**
@@ -1528,7 +1540,7 @@ export class PokedexUiHandler extends MessageUiHandler {
       }
 
       // Ability filter
-      const abilities = [species.ability1, species.ability2, species.abilityHidden].map(a => allAbilities[a].name);
+      const abilities = [species.ability1, species.ability2, species.abilityHidden].map(a => allAbilities[a]?.name);
       // get the passive ability for the species
       const passives = [species.getPassiveAbility()];
       for (const form of species.forms) {
@@ -1537,19 +1549,19 @@ export class PokedexUiHandler extends MessageUiHandler {
 
       const selectedAbility1 = this.filterText.getValue(FilterTextRow.ABILITY_1);
       const fitsFormAbility1 = species.forms.some(form =>
-        [form.ability1, form.ability2, form.abilityHidden].map(a => allAbilities[a].name).includes(selectedAbility1),
+        [form.ability1, form.ability2, form.abilityHidden].map(a => allAbilities[a]?.name).includes(selectedAbility1),
       );
       const fitsAbility1 =
         abilities.includes(selectedAbility1) || fitsFormAbility1 || selectedAbility1 === this.filterText.defaultText;
-      const fitsPassive1 = Object.values(passives).some(p => allAbilities[p].name === selectedAbility1);
+      const fitsPassive1 = Object.values(passives).some(p => allAbilities[p]?.name === selectedAbility1);
 
       const selectedAbility2 = this.filterText.getValue(FilterTextRow.ABILITY_2);
       const fitsFormAbility2 = species.forms.some(form =>
-        [form.ability1, form.ability2, form.abilityHidden].map(a => allAbilities[a].name).includes(selectedAbility2),
+        [form.ability1, form.ability2, form.abilityHidden].map(a => allAbilities[a]?.name).includes(selectedAbility2),
       );
       const fitsAbility2 =
         abilities.includes(selectedAbility2) || fitsFormAbility2 || selectedAbility2 === this.filterText.defaultText;
-      const fitsPassive2 = Object.values(passives).some(p => allAbilities[p].name === selectedAbility2);
+      const fitsPassive2 = Object.values(passives).some(p => allAbilities[p]?.name === selectedAbility2);
 
       // If both fields have been set to the same ability, show both ability and passive
       const fitsAbilities =
@@ -1837,31 +1849,31 @@ export class PokedexUiHandler extends MessageUiHandler {
         case SortCriteria.COST:
           return (a.cost - b.cost) * -sort.dir;
         case SortCriteria.CANDY: {
-          const candyCountA = this.gameData.starterData[this.getStarterSpeciesId(a.species.speciesId)].candyCount;
-          const candyCountB = this.gameData.starterData[this.getStarterSpeciesId(b.species.speciesId)].candyCount;
+          // ER hardening: custom species may lack starter/dex entries; missing
+          // data sorts as 0 instead of crashing the whole grid sort.
+          const candyCountA = this.gameData.starterData[this.getStarterSpeciesId(a.species.speciesId)]?.candyCount ?? 0;
+          const candyCountB = this.gameData.starterData[this.getStarterSpeciesId(b.species.speciesId)]?.candyCount ?? 0;
           return (candyCountA - candyCountB) * -sort.dir;
         }
         case SortCriteria.IV: {
-          const avgIVsA =
-            this.gameData.dexData[a.species.speciesId].ivs.reduce((a, b) => a + b, 0)
-            / this.gameData.dexData[a.species.speciesId].ivs.length;
-          const avgIVsB =
-            this.gameData.dexData[b.species.speciesId].ivs.reduce((a, b) => a + b, 0)
-            / this.gameData.dexData[b.species.speciesId].ivs.length;
+          const ivsA = this.gameData.dexData[a.species.speciesId]?.ivs;
+          const ivsB = this.gameData.dexData[b.species.speciesId]?.ivs;
+          const avgIVsA = ivsA?.length > 0 ? ivsA.reduce((x, y) => x + y, 0) / ivsA.length : 0;
+          const avgIVsB = ivsB?.length > 0 ? ivsB.reduce((x, y) => x + y, 0) / ivsB.length : 0;
           return (avgIVsA - avgIVsB) * -sort.dir;
         }
         case SortCriteria.NAME:
           return a.species.name.localeCompare(b.species.name) * -sort.dir;
         case SortCriteria.CAUGHT:
           return (
-            (this.gameData.dexData[a.species.speciesId].caughtCount
-              - this.gameData.dexData[b.species.speciesId].caughtCount)
+            ((this.gameData.dexData[a.species.speciesId]?.caughtCount ?? 0)
+              - (this.gameData.dexData[b.species.speciesId]?.caughtCount ?? 0))
             * -sort.dir
           );
         case SortCriteria.HATCHED:
           return (
-            (this.gameData.dexData[this.getStarterSpeciesId(a.species.speciesId)].hatchedCount
-              - this.gameData.dexData[this.getStarterSpeciesId(b.species.speciesId)].hatchedCount)
+            ((this.gameData.dexData[this.getStarterSpeciesId(a.species.speciesId)]?.hatchedCount ?? 0)
+              - (this.gameData.dexData[this.getStarterSpeciesId(b.species.speciesId)]?.hatchedCount ?? 0))
             * -sort.dir
           );
         default:
@@ -1906,9 +1918,11 @@ export class PokedexUiHandler extends MessageUiHandler {
 
         const speciesId = data.species.speciesId;
         const dexEntry = this.gameData.dexData[speciesId];
+        // ER hardening: a filtered custom species may lack a dex entry; treat
+        // missing caught data as 0 so the grid render never crashes mid-loop.
         const caughtAttr =
-          dexEntry.caughtAttr
-          & this.gameData.dexData[this.getStarterSpeciesId(speciesId)].caughtAttr
+          (dexEntry?.caughtAttr ?? BigInt(0))
+          & (this.gameData.dexData[this.getStarterSpeciesId(speciesId)]?.caughtAttr ?? BigInt(0))
           & data.species.getFullUnlocksData();
 
         if (caughtAttr & data.species.getFullUnlocksData() || globalScene.dexForDevs) {
@@ -1966,15 +1980,12 @@ export class PokedexUiHandler extends MessageUiHandler {
             }
           }
 
-          container.starterPassiveBgs.setVisible(
-            !!this.gameData.starterData[this.getStarterSpeciesId(speciesId)].passiveAttr,
-          );
+          const cStarterData = this.gameData.starterData[this.getStarterSpeciesId(speciesId)];
+          container.starterPassiveBgs.setVisible(!!cStarterData?.passiveAttr);
           container.hiddenAbilityIcon.setVisible(
-            !!caughtAttr && !!(this.gameData.starterData[this.getStarterSpeciesId(speciesId)].abilityAttr & 4),
+            !!caughtAttr && !!(cStarterData?.abilityAttr ?? 0) && !!(cStarterData.abilityAttr & 4),
           );
-          container.classicWinIcon.setVisible(
-            this.gameData.starterData[this.getStarterSpeciesId(speciesId)].classicWinCount > 0,
-          );
+          container.classicWinIcon.setVisible((cStarterData?.classicWinCount ?? 0) > 0);
           container.favoriteIcon.setVisible(this.starterPreferences[speciesId]?.favorite ?? false);
 
           // 'Candy Icon' mode
@@ -2176,7 +2187,7 @@ export class PokedexUiHandler extends MessageUiHandler {
   }
 
   getFriendship(speciesId: number) {
-    let currentFriendship = this.gameData.starterData[this.getStarterSpeciesId(speciesId)].friendship;
+    let currentFriendship = this.gameData.starterData[this.getStarterSpeciesId(speciesId)]?.friendship;
     if (!currentFriendship || currentFriendship === undefined) {
       currentFriendship = 0;
     }
@@ -2296,8 +2307,8 @@ export class PokedexUiHandler extends MessageUiHandler {
     if (species) {
       const dexEntry = this.gameData.dexData[species.speciesId];
       const caughtAttr =
-        dexEntry.caughtAttr
-        & this.gameData.dexData[this.getStarterSpeciesId(species.speciesId)].caughtAttr
+        (dexEntry?.caughtAttr ?? BigInt(0))
+        & (this.gameData.dexData[this.getStarterSpeciesId(species.speciesId)]?.caughtAttr ?? BigInt(0))
         & species.getFullUnlocksData();
 
       if (caughtAttr) {
@@ -2468,8 +2479,8 @@ export class PokedexUiHandler extends MessageUiHandler {
     let props = 0n;
     const species = allSpecies.find(sp => sp.speciesId === speciesId);
     const caughtAttr =
-      this.gameData.dexData[speciesId].caughtAttr
-      & this.gameData.dexData[this.getStarterSpeciesId(speciesId)].caughtAttr
+      (this.gameData.dexData[speciesId]?.caughtAttr ?? 0n)
+      & (this.gameData.dexData[this.getStarterSpeciesId(speciesId)]?.caughtAttr ?? 0n)
       & (species?.getFullUnlocksData() ?? 0n);
 
     /*  this checks the gender of the pokemon; this works by checking a) that the starter preferences for the species exist, and if so, is it female. If so, it'll add DexAttr.FEMALE to our temp props
