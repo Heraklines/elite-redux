@@ -5,11 +5,12 @@ import Overrides from "#app/overrides";
 import { FusionSpeciesFormEvolution, pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { FRIENDSHIP_GAIN_FROM_RARE_CANDY } from "#balance/starters";
 import { getBerryEffectFunc, getBerryPredicate } from "#data/berry";
-import { allMoves, modifierTypes } from "#data/data-lists";
+import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { getLevelTotalExp } from "#data/exp";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { MAX_PER_TYPE_POKEBALLS } from "#data/pokeball";
 import { getStatusEffectHealText } from "#data/status-effect";
+import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { BerryType } from "#enums/berry-type";
 import { Color, ShadowColor } from "#enums/color";
@@ -42,7 +43,7 @@ import type { VoucherType } from "#system/voucher";
 import type { ModifierInstanceMap, ModifierString } from "#types/modifier-types";
 import { addTextObject } from "#ui/text";
 import { hslToHex } from "#utils/color-utils";
-import { BooleanHolder, NumberHolder, randSeedFloat, toDmgValue } from "#utils/common";
+import { BooleanHolder, NumberHolder, randSeedFloat, randSeedItem, toDmgValue } from "#utils/common";
 import { getModifierType } from "#utils/modifier-utils";
 import i18next from "i18next";
 
@@ -2254,6 +2255,64 @@ export class PokemonNatureChangeModifier extends ConsumablePokemonModifier {
     playerPokemon.setCustomNature(this.nature);
     globalScene.gameData.unlockSpeciesNature(playerPokemon.species, this.nature);
 
+    return true;
+  }
+}
+
+/**
+ * ER Rogue-tier consumable: randomizes a Pokémon's active ability to any
+ * ability in the game (except Truant and Slow Start, which are pure
+ * downsides). The new ability is stored as a per-Pokémon override on
+ * {@linkcode CustomPokemonData.ability}, so it persists across the run.
+ */
+export class PokemonRandomizeAbilityModifier extends ConsumablePokemonModifier {
+  /** Abilities that the randomizer must never roll (pure-downside abilities). */
+  private static readonly EXCLUDED: ReadonlySet<AbilityId> = new Set([
+    AbilityId.NONE,
+    AbilityId.TRUANT,
+    AbilityId.SLOW_START,
+  ]);
+
+  override apply(playerPokemon: PlayerPokemon): boolean {
+    const current = playerPokemon.getAbility().id;
+    // Build the candidate pool from every registered ability, minus the
+    // excluded set and the holder's current ability (so it always changes).
+    const pool = allAbilities
+      .filter(a => a != null && !PokemonRandomizeAbilityModifier.EXCLUDED.has(a.id) && a.id !== current)
+      .map(a => a.id);
+    if (pool.length === 0) {
+      return false;
+    }
+    const chosen = randSeedItem(pool);
+    playerPokemon.customPokemonData.ability = chosen;
+    playerPokemon.updateInfo();
+    return true;
+  }
+}
+
+/**
+ * ER Rogue-tier consumable: grants a Pokémon a 5th move slot by raising its
+ * per-Pokémon move cap from 4 to 5 (stored on
+ * {@linkcode CustomPokemonData.bonusMoveSlots}). The cap is consumed by
+ * {@linkcode Pokemon.getMaxMoveCount}; the extra slot is honored in the
+ * learn-move flow and the fight/summary UIs. Capped at one extra slot.
+ */
+export class PokemonAddMoveSlotModifier extends ConsumablePokemonModifier {
+  /** The maximum number of bonus move slots a single Pokémon may hold. */
+  public static readonly MAX_BONUS_SLOTS = 1;
+
+  override shouldApply(playerPokemon?: PlayerPokemon): boolean {
+    return (
+      super.shouldApply(playerPokemon)
+      && (playerPokemon?.customPokemonData.bonusMoveSlots ?? 0) < PokemonAddMoveSlotModifier.MAX_BONUS_SLOTS
+    );
+  }
+
+  override apply(playerPokemon: PlayerPokemon): boolean {
+    if (playerPokemon.customPokemonData.bonusMoveSlots >= PokemonAddMoveSlotModifier.MAX_BONUS_SLOTS) {
+      return false;
+    }
+    playerPokemon.customPokemonData.bonusMoveSlots += 1;
     return true;
   }
 }

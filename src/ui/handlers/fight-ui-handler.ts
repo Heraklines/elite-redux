@@ -181,7 +181,9 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
         }
         break;
       case Button.DOWN:
-        if (cursor < 2) {
+        // Allow descending into a third row only if a cell exists there (e.g.
+        // a 5th move slot granted by ER's consumable).
+        if (cursor + 2 < this.getMoveCellCount()) {
           success = this.setCursor(cursor + 2);
         }
         break;
@@ -191,7 +193,7 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
         }
         break;
       case Button.RIGHT:
-        if (cursor % 2 === 0) {
+        if (cursor % 2 === 0 && cursor + 1 < this.getMoveCellCount()) {
           success = this.setCursor(cursor + 1);
         }
         break;
@@ -232,6 +234,19 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
 
   getCursor(): number {
     return this.fieldIndex ? this.cursor2 : this.cursor;
+  }
+
+  /**
+   * Number of move cells in the fight grid for the acting Pokémon (normally 4,
+   * 5 if granted an extra slot by ER's "5th move slot" consumable). Used to
+   * bound cursor navigation. Falls back to 4 if the phase/pokemon is unavailable.
+   */
+  private getMoveCellCount(): number {
+    const phase = globalScene.phaseManager.getCurrentPhase();
+    if (phase?.is("CommandPhase")) {
+      return phase.getPokemon().getMaxMoveCount();
+    }
+    return 4;
   }
 
   /** @returns TextStyle according to percentage of PP remaining */
@@ -314,7 +329,7 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
       ui.add(this.cursorObj);
     }
 
-    this.cursorObj.setPosition(13 + (cursor % 2 === 1 ? 114 : 0), -31 + (cursor >= 2 ? 15 : 0));
+    this.cursorObj.setPosition(13 + (cursor % 2 === 1 ? 114 : 0), -31 + Math.floor(cursor / 2) * 15);
 
     return changed;
   }
@@ -345,10 +360,14 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     const pokemon = (globalScene.phaseManager.getCurrentPhase() as CommandPhase).getPokemon();
     const moveset = pokemon.getMoveset();
 
-    for (let moveIndex = 0; moveIndex < 4; moveIndex++) {
+    // Number of move cells to render: 4 normally, more if this Pokémon has been
+    // granted extra slots by ER's "5th move slot" consumable. Laid out 2-per-row
+    // so a 5th move starts a third row.
+    const cellCount = pokemon.getMaxMoveCount();
+    for (let moveIndex = 0; moveIndex < cellCount; moveIndex++) {
       const moveText = addTextObject(
         moveIndex % 2 === 0 ? 0 : 114,
-        moveIndex < 2 ? 0 : 16,
+        Math.floor(moveIndex / 2) * 16,
         "-",
         TextStyle.WINDOW,
       ).setName("text-empty-move");

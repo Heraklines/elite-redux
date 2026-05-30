@@ -49,9 +49,10 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     this.messageMode =
       globalScene.ui.getHandler() instanceof EvolutionSceneUiHandler ? UiMode.EVOLUTION_SCENE : UiMode.MESSAGE;
     globalScene.ui.setMode(this.messageMode);
-    // If the Pokemon has less than 4 moves, the new move is added to the largest empty moveset index
-    // If it has 4 moves, the phase then checks if the player wants to replace the move itself.
-    if (currentMoveset.length < 4) {
+    // If the Pokemon has an empty move slot, the new move is added to the largest empty moveset index.
+    // Otherwise the phase checks if the player wants to replace a move. The cap is normally 4 but ER's
+    // "5th move slot" consumable can raise it (see Pokemon.getMaxMoveCount).
+    if (currentMoveset.length < pokemon.getMaxMoveCount()) {
       this.learnMove(currentMoveset.length, move, pokemon);
     } else {
       this.replaceMoveCheck(move, pokemon);
@@ -112,7 +113,10 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       SummaryUiMode.LEARN_MOVE,
       move,
       (moveIndex: number) => {
-        if (moveIndex === 4) {
+        // The summary returns the "new move" row index to signal rejection. That
+        // row sits below the existing moves, so it equals the move cap (4, or 5
+        // with ER's extra slot).
+        if (moveIndex === pokemon.getMaxMoveCount()) {
           globalScene.ui.setMode(this.messageMode).then(() => this.rejectMoveAndEnd(move, pokemon));
           return;
         }

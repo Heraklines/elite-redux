@@ -1917,6 +1917,16 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   /**
+   * The maximum number of moves this Pokémon may know at once. Base cap is 4,
+   * raised by ER's "5th move slot" consumable (stored on
+   * {@linkcode CustomPokemonData.bonusMoveSlots}). Used by the learn-move flow
+   * and the fight/summary UIs in place of a hardcoded `4`.
+   */
+  public getMaxMoveCount(): number {
+    return 4 + (this.customPokemonData?.bonusMoveSlots ?? 0);
+  }
+
+  /**
    * Check which egg moves have been unlocked for this {@linkcode Pokemon}.
    * Looks at either the species it was met at or the first {@linkcode Species} in its evolution
    * line that can act as a starter and provides those egg moves.

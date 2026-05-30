@@ -77,6 +77,7 @@ import {
   MoneyRewardModifier,
   MultipleParticipantExpBonusModifier,
   type PersistentModifier,
+  PokemonAddMoveSlotModifier,
   PokemonAllMovePpRestoreModifier,
   PokemonBaseStatFlatModifier,
   PokemonBaseStatTotalModifier,
@@ -94,6 +95,7 @@ import {
   PokemonNatureWeightModifier,
   PokemonPpRestoreModifier,
   PokemonPpUpModifier,
+  PokemonRandomizeAbilityModifier,
   PokemonStatusHealModifier,
   PreserveBerryModifier,
   RememberMoveModifier,
@@ -716,6 +718,57 @@ export class PokemonNatureChangeModifierType extends PokemonModifierType {
     return i18next.t("modifierType:ModifierType.PokemonNatureChangeModifierType.description", {
       natureName: getNatureName(this.nature, true, true, true),
     });
+  }
+}
+
+/**
+ * ER Rogue-tier consumable: randomizes a Pokémon's ability to any ability in
+ * the game (except Truant / Slow Start). Names/descriptions are hardcoded in
+ * English here as this is an ER-custom item not present in the shared locales.
+ */
+export class PokemonRandomizeAbilityModifierType extends PokemonModifierType {
+  constructor() {
+    super(
+      "",
+      "ability_capsule",
+      (_type, args) => new PokemonRandomizeAbilityModifier(this, (args[0] as PlayerPokemon).id),
+      undefined,
+      "ability_capsule",
+    );
+  }
+
+  get name(): string {
+    return "Ability Randomizer";
+  }
+
+  getDescription(): string {
+    return "Randomizes a Pokémon's ability into any ability (except Truant and Slow Start).";
+  }
+}
+
+/**
+ * ER Rogue-tier consumable: grants a Pokémon a permanent 5th move slot. Only
+ * applicable once per Pokémon (the select filter blocks re-use).
+ */
+export class PokemonAddMoveSlotModifierType extends PokemonModifierType {
+  constructor() {
+    super(
+      "",
+      "pp_up",
+      (_type, args) => new PokemonAddMoveSlotModifier(this, (args[0] as PlayerPokemon).id),
+      (pokemon: PlayerPokemon) =>
+        pokemon.customPokemonData.bonusMoveSlots >= PokemonAddMoveSlotModifier.MAX_BONUS_SLOTS
+          ? PartyUiHandler.NoEffectMessage
+          : null,
+    );
+  }
+
+  get name(): string {
+    return "Move Slot Expander";
+  }
+
+  getDescription(): string {
+    return "Permanently grants a Pokémon a 5th move slot.";
   }
 }
 
@@ -1895,6 +1948,10 @@ const modifierTypeInitObj = Object.freeze({
 
   PP_UP: () => new PokemonPpUpModifierType("modifierType:ModifierType.PP_UP", "pp_up", 1),
   PP_MAX: () => new PokemonPpUpModifierType("modifierType:ModifierType.PP_MAX", "pp_max", 3),
+
+  // ER Rogue-tier consumables.
+  ABILITY_RANDOMIZER: () => new PokemonRandomizeAbilityModifierType(),
+  MOVE_SLOT_EXPANDER: () => new PokemonAddMoveSlotModifierType(),
 
   /*REPEL: () => new DoubleBattleChanceBoosterModifierType('Repel', 5),
   SUPER_REPEL: () => new DoubleBattleChanceBoosterModifierType('Super Repel', 10),

@@ -641,7 +641,7 @@ export class SummaryUiHandler extends UiHandler {
             }
           }
           success = true;
-        } else if (this.moveCursor === 4) {
+        } else if (this.moveCursor === this.getNewMoveRowIndex()) {
           return this.processInput(Button.CANCEL);
         } else {
           error = true;
@@ -652,10 +652,10 @@ export class SummaryUiHandler extends UiHandler {
       } else {
         switch (button) {
           case Button.UP:
-            success = this.setCursor(this.moveCursor ? this.moveCursor - 1 : 4);
+            success = this.setCursor(this.moveCursor ? this.moveCursor - 1 : this.getNewMoveRowIndex());
             break;
           case Button.DOWN:
-            success = this.setCursor(this.moveCursor < 4 ? this.moveCursor + 1 : 0);
+            success = this.setCursor(this.moveCursor < this.getNewMoveRowIndex() ? this.moveCursor + 1 : 0);
             break;
           case Button.LEFT:
             this.moveSelect = false;
@@ -1333,7 +1333,10 @@ export class SummaryUiHandler extends UiHandler {
         this.movesContainerDescriptionsTitle.setOrigin(0, 0.5);
         this.movesContainer.add(this.movesContainerDescriptionsTitle);
 
-        this.extraMoveRowContainer = globalScene.add.container(0, 64);
+        // The "new move" row sits just below the existing move rows (16px each),
+        // so its Y depends on the move cap: 64 for 4 moves, 80 with ER's 5th slot.
+        const maxMoveRows = this.pokemon?.getMaxMoveCount() ?? 4;
+        this.extraMoveRowContainer = globalScene.add.container(0, 16 * maxMoveRows);
         this.extraMoveRowContainer.setVisible(false);
         this.movesContainer.add(this.extraMoveRowContainer);
 
@@ -1375,7 +1378,7 @@ export class SummaryUiHandler extends UiHandler {
         this.moveRowsContainer = globalScene.add.container(0, 0);
         this.movesContainer.add(this.moveRowsContainer);
 
-        for (let m = 0; m < 4; m++) {
+        for (let m = 0; m < maxMoveRows; m++) {
           const move: PokemonMove | null =
             this.pokemon && this.pokemon.moveset.length > m ? this.pokemon?.moveset[m] : null;
           const moveRowContainer = globalScene.add.container(0, 16 * m);
@@ -1452,15 +1455,24 @@ export class SummaryUiHandler extends UiHandler {
     });
   }
 
+  /**
+   * Row index of the LEARN_MOVE "new move" (a.k.a. cancel) entry on the moves
+   * page. This sits just below the existing move rows, so it equals the
+   * Pokémon's move cap — 4 normally, 5 if it has ER's extra move slot.
+   */
+  private getNewMoveRowIndex(): number {
+    return this.pokemon?.getMaxMoveCount() ?? 4;
+  }
+
   getSelectedMove(): Move | null {
     if (this.cursor !== Page.MOVES) {
       return null;
     }
 
-    if (this.moveCursor < 4 && this.pokemon && this.moveCursor < this.pokemon.moveset.length) {
+    if (this.moveCursor < this.getNewMoveRowIndex() && this.pokemon && this.moveCursor < this.pokemon.moveset.length) {
       return this.pokemon.moveset[this.moveCursor].getMove();
     }
-    if (this.summaryUiMode === SummaryUiMode.LEARN_MOVE && this.moveCursor === 4) {
+    if (this.summaryUiMode === SummaryUiMode.LEARN_MOVE && this.moveCursor === this.getNewMoveRowIndex()) {
       return this.newMove;
     }
     return null;
@@ -1470,13 +1482,13 @@ export class SummaryUiHandler extends UiHandler {
     this.moveSelect = true;
     this.extraMoveRowContainer.setVisible(true);
     this.selectedMoveIndex = -1;
-    this.setCursor(this.summaryUiMode === SummaryUiMode.LEARN_MOVE ? 4 : 0);
+    this.setCursor(this.summaryUiMode === SummaryUiMode.LEARN_MOVE ? this.getNewMoveRowIndex() : 0);
     this.showMoveEffect();
   }
 
   hideMoveSelect() {
     if (this.summaryUiMode === SummaryUiMode.LEARN_MOVE) {
-      this.moveSelectFunction?.(4);
+      this.moveSelectFunction?.(this.getNewMoveRowIndex());
       return;
     }
 

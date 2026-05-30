@@ -32,6 +32,12 @@ export class CustomPokemonData {
   public ability: AbilityId | -1;
   public passive: AbilityId | -1;
   public nature: Nature | -1;
+  /**
+   * Extra move slots granted by ER's "5th move slot" consumable. Added on top
+   * of the base cap of 4 (see {@linkcode Pokemon.getMaxMoveCount}). Defaults to
+   * `0`; the consumable raises it to `1`.
+   */
+  public bonusMoveSlots = 0;
   // TODO: Change default value from `PokemonType.UNKNOWN` to `null` for easier checking;
   public types: PokemonType[];
   /** Deprecated but needed for session save migration */
@@ -43,6 +49,7 @@ export class CustomPokemonData {
     this.ability = data?.ability ?? -1;
     this.passive = data?.passive ?? -1;
     this.nature = data?.nature ?? -1;
+    this.bonusMoveSlots = data?.bonusMoveSlots ?? 0;
     this.types = data?.types ?? [];
     this.hitsRecCount = data?.hitsRecCount ?? null;
   }
