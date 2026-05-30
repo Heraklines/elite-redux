@@ -92,17 +92,6 @@ export type PokemonSpeciesFilter = (species: PokemonSpecies) => boolean;
  */
 const inFlightAtlasLoads = new Set<string>();
 
-/**
- * Clears the in-flight atlas dedupe set. Called when a caller force-resets the
- * shared Phaser loader (e.g. the starter-select watchdog recovering from a
- * wedged loader), so subsequent {@linkcode PokemonSpeciesForm.loadAssets} calls
- * re-issue their `loadPokemonAtlas` instead of being deduped against keys whose
- * underlying loader files were just discarded.
- */
-export function clearInFlightAtlasLoads(): void {
-  inFlightAtlasLoads.clear();
-}
-
 export abstract class PokemonSpeciesForm {
   public speciesId: SpeciesId;
   protected _formIndex: number;
@@ -921,10 +910,16 @@ export abstract class PokemonSpeciesForm {
           }
           if (globalScene.textures.exists(spriteKey)) {
             settle(); // texture landed (possibly via a missed event) — finalize + resolve
-          } else if (++polls >= 50) {
-            // ~5s with no texture: genuinely failed/dropped. Stop polling and
-            // unblock the awaiter; the 150ms reconcile re-kicks a fresh load (so
-            // a later retry still recovers), avoiding a leaked repeating timer.
+          } else if (++polls >= 100) {
+            // ~10s with no texture: a genuine hang (very rare — the dev server
+            // serves atlases in well under 2s even under load, per measurement).
+            // We deliberately do NOT abort the request here: aborting an in-flight
+            // Image element doesn't reliably cancel the underlying browser request
+            // (so it "leaks" anyway), and abandoning a merely-slow request at a
+            // short timeout is what caused requests to pile up and exhaust the
+            // connection pool. Concurrency is bounded by the caller instead, so
+            // requests complete and free their connections; here we only unblock
+            // the awaiter so a truly-stuck promise can't wedge the queue forever.
             cleanup();
             resolve();
           }

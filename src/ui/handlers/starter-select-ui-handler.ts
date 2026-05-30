@@ -22,7 +22,7 @@ import { GrowthRate, getGrowthRateColor } from "#data/exp";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
 import { pokemonFormChanges } from "#data/pokemon-forms";
-import { clearInFlightAtlasLoads, type PokemonSpecies } from "#data/pokemon-species";
+import type { PokemonSpecies } from "#data/pokemon-species";
 import { AbilityAttr } from "#enums/ability-attr";
 import { AbilityId } from "#enums/ability-id";
 import { Button } from "#enums/buttons";
@@ -478,11 +478,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * sprite load runs at a time — preventing fast cycling from flooding Phaser's
    * shared loader (which otherwise wedges, freezing the preview).
    */
-  private spriteLoadInFlight = false;
-  /** Reconcile ticks the current single-flight load has been pending (watchdog). */
-  private spriteLoadWatchdog = 0;
-  /** Generation token so an abandoned load's resolve can't clear a newer load's flag. */
-  private spriteLoadGen = 0;
+  /** The sprite key the cursor's preview is currently loading (null = none); at most one cursor load at a time. */
+  private cursorLoadKey: string | null = null;
+  /** Species the cursor rested on last reconcile tick + how many consecutive ticks it's been stable (load debounce). */
+  private lastReconcileSpeciesId = -1;
+  private cursorStableTicks = 0;
+  /** Atlas keys currently being preloaded in the background (bounded so total concurrency stays under the browser's per-host connection limit). */
+  private preloadingKeys = new Set<string>();
   public cursorObj: Phaser.GameObjects.Image;
   private starterCursorObjs: Phaser.GameObjects.Image[];
   private pokerusCursorObjs: Phaser.GameObjects.Image[];
@@ -1395,7 +1397,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.spriteReconcileTimer = globalScene.time.addEvent({
         delay: 150,
         loop: true,
-        callback: () => this.reconcileStarterSprite(),
+        callback: () => {
+          this.reconcileStarterSprite();
+          // Warm the visible grid into the texture cache, but ONLY once the
+          // cursor has been idle for ~1s (>=6 ticks) — never mid-scroll and not
+          // during the brief pause right after stopping, so the cursor's own
+          // load gets the connections first and isn't queued behind preloads.
+          if (this.cursorStableTicks >= 6) {
+            this.preloadNextVisibleSprite();
+          }
+        },
       });
 
       this.starterPreferences = loadStarterPreferences();
@@ -4365,6 +4376,22 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     if (!dexEntry?.caughtAttr && !dexEntry?.seenAttr) {
       return; // no sprite shown for fully-unseen species
     }
+    // Load debounce: track how long the cursor has rested on this species. Only
+    // the timer calls (allowLoad) advance the counter. During fast scrolling the
+    // species changes every tick (counter stays 0), so we never kick a load for
+    // a species the player is merely flying past — that backlog of flown-past
+    // requests (the dev server serves ~6-at-a-time, ~0.5s each) is exactly what
+    // left the landed-on sprite stuck behind a long queue. We only load once the
+    // cursor has settled (>=1 stable tick), i.e. the player paused/stopped.
+    if (allowLoad) {
+      if (species.speciesId === this.lastReconcileSpeciesId) {
+        this.cursorStableTicks++;
+      } else {
+        this.lastReconcileSpeciesId = species.speciesId;
+        this.cursorStableTicks = 0;
+      }
+    }
+    const cursorSettled = this.cursorStableTicks >= 1;
     const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(species.speciesId));
     const female = props.female ?? false;
     const spriteKey = species.getSpriteKey(female, props.formIndex, props.shiny, props.variant);
@@ -4398,48 +4425,96 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         .setPipelineData("spriteKey", baseKey)
         .setVisible(!this.statsMode);
     }
-    // STRICT SINGLE-FLIGHT: issue at most ONE sprite load at a time, ever.
-    // `spriteLoadInFlight` is true while a load is pending. We only kick a new
-    // load when nothing is in flight — even if the cursor has since moved to a
-    // different key. This is the crucial guarantee:
-    // during sustained fast cycling the per-tick keys differ, so a "one load per
-    // key" guard would still launch a fresh load every 150ms and pile up dozens
-    // of concurrent atlas loads, wedging Phaser's shared loader (files stuck in
-    // flight, never completing) so EVERYTHING starves. Serializing to one load
-    // at a time keeps the loader healthy; the timer simply loads wherever the
-    // cursor rests once the previous load settles, always converging.
-    if (allowLoad) {
-      if (!this.spriteLoadInFlight) {
-        this.spriteLoadWatchdog = 0;
-        this.spriteLoadInFlight = true;
-        const gen = ++this.spriteLoadGen;
+    // Load the cursor's sprite — at most ONE cursor load at a time (re-kicked
+    // for the new key only after the previous resolves). This is bounded so it,
+    // together with the background preloader (capped separately), keeps total
+    // in-flight loads under the browser's per-host connection limit. `loadAssets`
+    // dedupes by atlas key, so if the preloader is already fetching this sprite
+    // the two coalesce into one request.
+    if (allowLoad && cursorSettled && this.cursorLoadKey === null) {
+      // ALWAYS load the BASE (non-shiny, variant 0) sprite first: it's a single
+      // fast atlas request (no variant-colour files), so the base-fallback above
+      // shows the CORRECT species almost immediately on stop. Only once the base
+      // is cached AND the cursor has lingered (~1s) do we refine to the exact
+      // shiny/variant — so fast browsing never waits behind slow variant files.
+      const baseCached = globalScene.textures.exists(baseKey);
+      const refineShiny = baseCached && this.cursorStableTicks >= 6 && (props.shiny || props.variant);
+      if (!baseCached) {
+        this.cursorLoadKey = baseKey;
+        species
+          .loadAssets(female, props.formIndex, false, 0, true, false, true)
+          .catch(() => {})
+          .then(() => {
+            if (this.cursorLoadKey === baseKey) {
+              this.cursorLoadKey = null;
+            }
+          });
+      } else if (refineShiny && !globalScene.textures.exists(spriteKey)) {
+        this.cursorLoadKey = spriteKey;
         species
           .loadAssets(female, props.formIndex, props.shiny, props.variant, true, false, true)
           .catch(() => {})
           .then(() => {
-            // Release the single-flight slot — but only if this is still the
-            // current load (the watchdog may have invalidated it). The next
-            // timer tick re-evaluates the cursor and loads it if still needed.
-            if (this.spriteLoadGen === gen) {
-              this.spriteLoadInFlight = false;
+            if (this.cursorLoadKey === spriteKey) {
+              this.cursorLoadKey = null;
             }
           });
-      } else if (++this.spriteLoadWatchdog >= 12) {
-        // A single load has been pending ~1.8s without producing its texture:
-        // Phaser's shared loader is wedged (zombie in-flight requests that never
-        // complete or fail — observed under sustained rapid cycling). Force-reset
-        // the loader and retry from scratch on the next tick. `spriteLoadGen` is
-        // bumped so the abandoned load's resolve can't clear the new flag.
-        this.spriteLoadWatchdog = 0;
-        this.spriteLoadInFlight = false;
-        this.spriteLoadGen++;
-        clearInFlightAtlasLoads();
-        try {
-          globalScene.load.reset();
-        } catch {
-          // Loader reset is best-effort; the next tick re-kicks regardless.
-        }
       }
+    }
+  }
+
+  /**
+   * Background-warm the visible grid's base preview sprites into the texture
+   * cache, ONE per idle reconcile tick (single-flight, shared with the cursor
+   * load so it never competes). Once the visible page is warm, moving the cursor
+   * to any of those species is an instant cache hit that makes ZERO network
+   * requests — which is what makes furious cycling (especially down through rows)
+   * immune to the dev-server request stalls that otherwise freeze the preview on
+   * the previous Pokémon. We warm the base (non-shiny, variant 0) sprite — the
+   * exact key the reconcile's fallback shows — so the correct species always
+   * appears immediately even while a shiny/variant refines.
+   */
+  /** Max concurrent background preloads. Kept under the browser's ~6 per-host
+   * connection limit (leaving headroom for the cursor load + HMR/account polls)
+   * so the visible grid warms quickly WITHOUT overflowing into an ever-growing
+   * backlog (which is what made fast cycling freeze). */
+  private static readonly PRELOAD_CONCURRENCY = 2;
+
+  private preloadNextVisibleSprite(): void {
+    // Yield hard to the cursor: never preload while the cursor's own sprite is
+    // loading, so the previewed sprite's request is never queued behind warm-up
+    // requests on the slow dev server.
+    if (this.cursorLoadKey !== null || this.statsMode || !this.starterSelectContainer.visible) {
+      return;
+    }
+    const maxColumns = 9;
+    const maxRows = 9;
+    const first = this.scrollCursor * maxColumns;
+    const last = Math.min(this.filteredStarterContainers.length - 1, first + maxRows * maxColumns - 1);
+    // Kick uncached visible sprites until the concurrency cap is reached. Each
+    // tick tops the pool back up as loads complete, warming ~4-in-parallel.
+    for (let i = first; i <= last && this.preloadingKeys.size < StarterSelectUiHandler.PRELOAD_CONCURRENCY; i++) {
+      const species = this.filteredStarterContainers[i]?.species;
+      if (!species) {
+        continue;
+      }
+      const dexEntry = this.getSpeciesData(species.speciesId).dexEntry;
+      if (!dexEntry?.caughtAttr && !dexEntry?.seenAttr) {
+        continue;
+      }
+      const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(species.speciesId));
+      const female = props.female ?? false;
+      const baseKey = species.getSpriteKey(female, props.formIndex, false, 0);
+      if (globalScene.textures.exists(baseKey) || this.preloadingKeys.has(baseKey) || baseKey === this.cursorLoadKey) {
+        continue; // already warm or already loading
+      }
+      this.preloadingKeys.add(baseKey);
+      species
+        .loadAssets(female, props.formIndex, false, 0, true, false, true)
+        .catch(() => {})
+        .then(() => {
+          this.preloadingKeys.delete(baseKey);
+        });
     }
   }
 

@@ -16,14 +16,8 @@ import puppeteer from "puppeteer";
 const prsv = readFileSync("test/utils/saves/full_unlocks_sanitized.prsv", "utf8");
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const b = await puppeteer.launch({
-  headless: "new",
-  args: [
-    "--use-gl=angle",
-    "--use-angle=swiftshader",
-    "--enable-unsafe-swiftshader",
-    "--ignore-gpu-blocklist",
-    "--no-sandbox",
-  ],
+  headless: false,
+  args: ["--no-sandbox"],
 });
 const p = await b.newPage();
 await p.setViewport({ width: 1280, height: 720 });
