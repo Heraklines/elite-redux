@@ -22,17 +22,21 @@ import { getErAbilityDescription } from "#data/elite-redux/er-ability-descriptio
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { TerrainType as TerrainTypeEnum } from "#data/terrain";
 import { ArenaTagSide } from "#enums/arena-tag-side";
+import { ArenaTagType } from "#enums/arena-tag-type";
 import type { Button } from "#enums/buttons";
 import { Button as Btn } from "#enums/buttons";
+import { MoveCategory } from "#enums/move-category";
 import { PokemonType as PokemonTypeEnum } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { TextStyle } from "#enums/text-style";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
+import { DamageCalculatorModifier, SpeedOrderModifier } from "#modifiers/modifier";
 import { addTextObject } from "#ui/text";
 
 /** Page identity → background texture key + accent palette colour. */
-type Page = "side-player" | "side-enemy" | "field" | "stats" | "abilities" | "moves";
+type Page = "side-player" | "side-enemy" | "field" | "stats" | "abilities" | "moves" | "damage-calc" | "speed-order";
+/** Always-available pages. Damage-calc / speed-order are appended when unlocked. */
 const PAGES: Page[] = ["stats", "abilities", "moves", "field", "side-player", "side-enemy"];
 
 const BG_KEY: Record<Page, string> = {
@@ -42,6 +46,9 @@ const BG_KEY: Record<Page, string> = {
   field: "er_binfo_field",
   "side-player": "er_binfo_side_player",
   "side-enemy": "er_binfo_side_enemy",
+  // ER-custom pages have no ROM background; they always use the graphics fallback.
+  "damage-calc": "er_binfo_damage_calc",
+  "speed-order": "er_binfo_speed_order",
 };
 
 const PAGE_TITLE: Record<Page, string> = {
@@ -51,6 +58,8 @@ const PAGE_TITLE: Record<Page, string> = {
   field: "Field Info",
   "side-player": "Player Side Info",
   "side-enemy": "Enemy Side Info",
+  "damage-calc": "Damage Calculator",
+  "speed-order": "Speed Order",
 };
 
 /** Accent colour per page (matches the ROM tab palette). */
@@ -61,6 +70,8 @@ const PAGE_ACCENT: Record<Page, number> = {
   field: 0x5bb05b,
   "side-player": 0xd65a52,
   "side-enemy": 0xd7af2e,
+  "damage-calc": 0xb05bb0,
+  "speed-order": 0x4a8ad6,
 };
 
 // Native GBA panel the layout is authored for; centered in the UI canvas.
@@ -119,6 +130,22 @@ export class BattleInfoOverlay {
     return [...globalScene.getPlayerField(true), ...globalScene.getEnemyField(true)];
   }
 
+  /**
+   * The cyclable pages: the always-available set plus the item-gated Damage
+   * Calculator (Rogue-tier unlock) and Speed Order (Ultra-tier unlock) pages,
+   * each shown only when the player owns the corresponding unlock.
+   */
+  private getPages(): Page[] {
+    const pages: Page[] = [...PAGES];
+    if (globalScene.findModifier(m => m instanceof DamageCalculatorModifier)) {
+      pages.push("damage-calc");
+    }
+    if (globalScene.findModifier(m => m instanceof SpeedOrderModifier)) {
+      pages.push("speed-order");
+    }
+    return pages;
+  }
+
   open(): void {
     if (this.container) {
       return;
@@ -140,14 +167,18 @@ export class BattleInfoOverlay {
       return false;
     }
     switch (button) {
-      case Btn.LEFT:
-        this.pageIndex = (this.pageIndex - 1 + PAGES.length) % PAGES.length;
+      case Btn.LEFT: {
+        const n = this.getPages().length;
+        this.pageIndex = (this.pageIndex - 1 + n) % n;
         this.render();
         return true;
-      case Btn.RIGHT:
-        this.pageIndex = (this.pageIndex + 1) % PAGES.length;
+      }
+      case Btn.RIGHT: {
+        const n = this.getPages().length;
+        this.pageIndex = (this.pageIndex + 1) % n;
         this.render();
         return true;
+      }
       case Btn.UP:
       case Btn.DOWN: {
         const n = Math.max(1, this.onField().length);
@@ -166,7 +197,9 @@ export class BattleInfoOverlay {
     this.close();
     const H = globalScene.scaledCanvas.height;
     const W = globalScene.scaledCanvas.width;
-    const page = PAGES[this.pageIndex];
+    const pages = this.getPages();
+    this.pageIndex = Math.min(this.pageIndex, pages.length - 1);
+    const page = pages[this.pageIndex];
 
     const offX = Math.floor((W - BG_W) / 2);
     const offY = Math.floor((H - BG_H) / 2);
@@ -214,6 +247,14 @@ export class BattleInfoOverlay {
       case "side-enemy":
         this.renderSide(c, ArenaTagSide.ENEMY);
         break;
+      case "damage-calc":
+        if (mon) {
+          this.renderDamageCalc(c, mon);
+        }
+        break;
+      case "speed-order":
+        this.renderSpeedOrder(c);
+        break;
     }
 
     globalScene.ui.add(c);
@@ -232,7 +273,12 @@ export class BattleInfoOverlay {
       g.fillRect(56, y, BG_W - 60, 1);
     }
     // Cream content boxes.
-    const boxes = page === "stats" ? STATS_BOXES : page === "abilities" || page === "moves" ? ROW4_BOXES : PILL_BOXES;
+    const boxes =
+      page === "stats"
+        ? STATS_BOXES
+        : page === "abilities" || page === "moves" || page === "damage-calc" || page === "speed-order"
+          ? ROW4_BOXES
+          : PILL_BOXES;
     for (const [x, y, w, h] of boxes) {
       g.fillStyle(CREAM_EDGE, 1);
       g.fillRoundedRect(x - 1, y - 1, w + 2, h + 2, 5);
@@ -441,6 +487,89 @@ export class BattleInfoOverlay {
       );
       meta.setOrigin(1, 0);
       c.add(meta);
+    });
+  }
+
+  // --- DAMAGE CALCULATOR (Rogue-tier unlock) -------------------------------
+  // Shows the inspected Pokémon's moves and the damage each would deal to the
+  // primary opposing target (single rolled estimate, % of the target's max HP).
+  private renderDamageCalc(c: Phaser.GameObjects.Container, mon: Pokemon): void {
+    const target = mon.getOpponents()[0];
+    const moves = mon.getMoveset().filter(Boolean).slice(0, 4);
+    if (!target) {
+      const t = addTextObject(68, ROW4_BOXES[0][1] + 6, "No target on the field.", TextStyle.WINDOW_ALT, {
+        fontSize: "44px",
+      });
+      t.setOrigin(0, 0);
+      c.add(t);
+      return;
+    }
+    // Sub-header: who we're calculating against.
+    const sub = addTextObject(PANEL_X, 14, `vs ${target.getNameToRender()}`, TextStyle.WINDOW_ALT, {
+      fontSize: "42px",
+    });
+    sub.setOrigin(0, 0);
+    c.add(sub);
+
+    ROW4_BOXES.slice(0, Math.max(1, moves.length)).forEach(([, by], i) => {
+      const mv = moves[i];
+      if (!mv) {
+        return;
+      }
+      const move = mv.getMove();
+      const head = addTextObject(68, by + 3, move.name, TextStyle.SUMMARY, { fontSize: "46px" });
+      head.setOrigin(0, 0);
+      c.add(head);
+
+      let info: string;
+      if (move.category === MoveCategory.STATUS || move.power <= 0) {
+        info = "—  (status)";
+      } else {
+        let dmg = 0;
+        try {
+          dmg = target.getAttackDamage({ source: mon, move, simulated: true }).damage;
+        } catch {
+          dmg = 0;
+        }
+        const pct = Math.max(0, Math.round((dmg / Math.max(1, target.getMaxHp())) * 100));
+        const ko = dmg >= target.hp ? "  KO!" : "";
+        info = `${dmg} dmg (${pct}%)${ko}`;
+      }
+      const meta = addTextObject(230, by + 11, info, TextStyle.WINDOW_ALT, { fontSize: "40px" });
+      meta.setOrigin(1, 0);
+      c.add(meta);
+    });
+  }
+
+  // --- SPEED ORDER (Ultra-tier unlock) -------------------------------------
+  // Lists every on-field Pokémon ordered by effective Speed (accounting for
+  // Trick Room), so the player can read the turn order at a glance.
+  private renderSpeedOrder(c: Phaser.GameObjects.Container): void {
+    const field = this.onField();
+    const trickRoom = !!globalScene.arena.getTag(ArenaTagType.TRICK_ROOM);
+    const ranked = field
+      .map(p => ({ p, spd: p.getEffectiveStat(Stat.SPD) }))
+      .sort((a, b) => (trickRoom ? a.spd - b.spd : b.spd - a.spd));
+
+    if (trickRoom) {
+      const tr = addTextObject(PANEL_X, 14, "Trick Room active (slowest first)", TextStyle.WINDOW_ALT, {
+        fontSize: "40px",
+      });
+      tr.setOrigin(0, 0);
+      c.add(tr);
+    }
+
+    ranked.slice(0, ROW4_BOXES.length).forEach(({ p, spd }, i) => {
+      const [, by] = ROW4_BOXES[i];
+      const side = p.isEnemy() ? "Foe" : "Ally";
+      const head = addTextObject(68, by + 6, `${i + 1}.  ${p.getNameToRender()} (${side})`, TextStyle.SUMMARY, {
+        fontSize: "46px",
+      });
+      head.setOrigin(0, 0);
+      c.add(head);
+      const v = addTextObject(230, by + 8, `Spe ${spd}`, TextStyle.WINDOW_ALT, { fontSize: "44px" });
+      v.setOrigin(1, 0);
+      c.add(v);
     });
   }
 

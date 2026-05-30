@@ -41,6 +41,7 @@ import {
   ContactHeldItemTransferChanceModifier,
   CritBoosterModifier,
   CriticalCatchChanceBoosterModifier,
+  DamageCalculatorModifier,
   DamageMoneyRewardModifier,
   DoubleBattleChanceBoosterModifier,
   EnemyAttackStatusEffectChanceModifier,
@@ -103,6 +104,7 @@ import {
   ShinyRateBoosterModifier,
   SpeciesCritBoosterModifier,
   SpeciesStatBoosterModifier,
+  SpeedOrderModifier,
   SurviveDamageModifier,
   SwitchEffectTransferModifier,
   TempCritBoosterModifier,
@@ -739,7 +741,7 @@ export class PokemonRandomizeAbilityModifierType extends PokemonAbilityModifierT
   constructor() {
     super(
       "",
-      "ability_capsule",
+      "ability_randomizer",
       (_type, args) =>
         new PokemonRandomizeAbilityModifier(this, (args[0] as PlayerPokemon).id, (args[1] as number) ?? 0),
       undefined,
@@ -764,7 +766,7 @@ export class PokemonAddMoveSlotModifierType extends PokemonModifierType {
   constructor() {
     super(
       "",
-      "pp_up",
+      "move_slot_expander",
       (_type, args) => new PokemonAddMoveSlotModifier(this, (args[0] as PlayerPokemon).id),
       (pokemon: PlayerPokemon) =>
         pokemon.customPokemonData.bonusMoveSlots >= PokemonAddMoveSlotModifier.MAX_BONUS_SLOTS
@@ -2265,6 +2267,28 @@ const modifierTypeInitObj = Object.freeze({
 
   IV_SCANNER: () =>
     new ModifierType("modifierType:ModifierType.IV_SCANNER", "scanner", (type, _args) => new IvScannerModifier(type)),
+
+  // ER Battle-Info unlocks (reuse the scanner icon). Names/descriptions are
+  // hardcoded in English here as these are ER-custom items not in the locales.
+  DAMAGE_CALCULATOR: () =>
+    new (class extends ModifierType {
+      get name(): string {
+        return "Damage Calculator";
+      }
+      getDescription(): string {
+        return "Unlocks the Damage Calculator page in the in-battle Info screen.";
+      }
+    })("", "scanner", (type, _args) => new DamageCalculatorModifier(type)),
+
+  SPEED_ORDER: () =>
+    new (class extends ModifierType {
+      get name(): string {
+        return "Speed Order";
+      }
+      getDescription(): string {
+        return "Unlocks the Speed Order page in the in-battle Info screen.";
+      }
+    })("", "scanner", (type, _args) => new SpeedOrderModifier(type)),
 
   DNA_SPLICERS: () => new FusePokemonModifierType("modifierType:ModifierType.DNA_SPLICERS", "dna_splicers"),
 

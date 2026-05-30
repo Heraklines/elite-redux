@@ -3411,6 +3411,51 @@ export class IvScannerModifier extends PersistentModifier {
   }
 }
 
+/**
+ * ER Rogue-tier unlock: owning this enables the Damage Calculator page in the
+ * in-battle Info overlay. Like IV Scanner, it is a single owned modifier with
+ * no per-turn effect (the overlay checks for its presence).
+ */
+export class DamageCalculatorModifier extends PersistentModifier {
+  match(modifier: Modifier): boolean {
+    return modifier instanceof DamageCalculatorModifier;
+  }
+
+  clone(): DamageCalculatorModifier {
+    return new DamageCalculatorModifier(this.type);
+  }
+
+  override apply(): boolean {
+    return true;
+  }
+
+  getMaxStackCount(): number {
+    return 1;
+  }
+}
+
+/**
+ * ER Ultra-tier unlock: owning this enables the Speed Order page in the
+ * in-battle Info overlay. Single owned modifier with no per-turn effect.
+ */
+export class SpeedOrderModifier extends PersistentModifier {
+  match(modifier: Modifier): boolean {
+    return modifier instanceof SpeedOrderModifier;
+  }
+
+  clone(): SpeedOrderModifier {
+    return new SpeedOrderModifier(this.type);
+  }
+
+  override apply(): boolean {
+    return true;
+  }
+
+  getMaxStackCount(): number {
+    return 1;
+  }
+}
+
 export class ExtraModifierModifier extends PersistentModifier {
   match(modifier: Modifier): boolean {
     return modifier instanceof ExtraModifierModifier;

@@ -14,8 +14,10 @@ import { Unlockables } from "#enums/unlockables";
 import type { Pokemon } from "#field/pokemon";
 import {
   BerryModifier,
+  DamageCalculatorModifier,
   DoubleBattleChanceBoosterModifier,
   SpeciesCritBoosterModifier,
+  SpeedOrderModifier,
   TurnStatusEffectModifier,
 } from "#modifiers/modifier";
 import {
@@ -349,6 +351,8 @@ function initUltraModifierPool() {
     new WeightedModifierType(modifierTypes.BIG_NUGGET, skipInLastClassicWaveOrDefault(12)),
     new WeightedModifierType(modifierTypes.PP_MAX, 3),
     new WeightedModifierType(modifierTypes.MINT, 4),
+    // ER: unlocks the Speed Order page in the in-battle Info screen (once).
+    new WeightedModifierType(modifierTypes.SPEED_ORDER, () => (hasSpeedOrder() ? 0 : 4), 4),
     new WeightedModifierType(
       modifierTypes.RARE_EVOLUTION_ITEM,
       () => Math.min(Math.ceil(globalScene.currentBattle.waveIndex / 15) * 4, 32),
@@ -582,6 +586,8 @@ function initRogueModifierPool() {
     // ER custom Rogue-tier consumables.
     new WeightedModifierType(modifierTypes.ABILITY_RANDOMIZER, 4),
     new WeightedModifierType(modifierTypes.MOVE_SLOT_EXPANDER, 4),
+    // ER: unlocks the Damage Calculator page in the in-battle Info screen (once).
+    new WeightedModifierType(modifierTypes.DAMAGE_CALCULATOR, () => (hasDamageCalculator() ? 0 : 4), 4),
     new WeightedModifierType(modifierTypes.FOCUS_BAND, 5),
     new WeightedModifierType(modifierTypes.KINGS_ROCK, 3),
     new WeightedModifierType(modifierTypes.LOCK_CAPSULE, () => (globalScene.gameMode.isClassic ? 0 : 3)),
@@ -857,4 +863,14 @@ function lureWeightFunc(maxBattles: number, weight: number): WeightedModifierTyp
  */
 function hasMaximumBalls(ballType: PokeballType): boolean {
   return globalScene.gameMode.isClassic && globalScene.pokeballCounts[ballType] >= MAX_PER_TYPE_POKEBALLS;
+}
+
+/** @returns whether the player already owns the ER Damage Calculator unlock. */
+function hasDamageCalculator(): boolean {
+  return !!globalScene.findModifier(m => m instanceof DamageCalculatorModifier);
+}
+
+/** @returns whether the player already owns the ER Speed Order unlock. */
+function hasSpeedOrder(): boolean {
+  return !!globalScene.findModifier(m => m instanceof SpeedOrderModifier);
 }
