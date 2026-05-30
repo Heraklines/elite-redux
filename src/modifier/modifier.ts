@@ -2260,10 +2260,11 @@ export class PokemonNatureChangeModifier extends ConsumablePokemonModifier {
 }
 
 /**
- * ER Rogue-tier consumable: randomizes a Pokémon's active ability to any
- * ability in the game (except Truant and Slow Start, which are pure
- * downsides). The new ability is stored as a per-Pokémon override on
- * {@linkcode CustomPokemonData.ability}, so it persists across the run.
+ * ER Rogue-tier consumable: randomizes one of a Pokémon's ability slots (the
+ * active ability or any of its ER innate slots — chosen by the player when the
+ * item is used) to any ability in the game (except Truant and Slow Start, which
+ * are pure downsides). The new ability is stored as a per-Pokémon override on
+ * {@linkcode CustomPokemonData}, so it persists across the run.
  */
 export class PokemonRandomizeAbilityModifier extends ConsumablePokemonModifier {
   /** Abilities that the randomizer must never roll (pure-downside abilities). */
@@ -2273,10 +2274,22 @@ export class PokemonRandomizeAbilityModifier extends ConsumablePokemonModifier {
     AbilityId.SLOW_START,
   ]);
 
+  /** Which ability slot to reroll: 0 = active ability, 1-3 = ER innate slots. */
+  public abilitySlot: number;
+
+  constructor(type: ModifierType, pokemonId: number, abilitySlot = 0) {
+    super(type, pokemonId);
+    this.abilitySlot = abilitySlot;
+  }
+
   override apply(playerPokemon: PlayerPokemon): boolean {
-    const current = playerPokemon.getAbility().id;
-    // Build the candidate pool from every registered ability, minus the
-    // excluded set and the holder's current ability (so it always changes).
+    // Resolve the targeted slot (falling back to the active ability if the
+    // requested innate slot is absent for this Pokémon).
+    const slots = playerPokemon.getAbilitySlots();
+    const target = slots.find(s => s.slot === this.abilitySlot) ?? slots[0];
+    const current = target.ability.id;
+    // Build the candidate pool from every registered ability, minus the excluded
+    // set and the current occupant of this slot (so it always changes).
     const pool = allAbilities
       .filter(a => a != null && !PokemonRandomizeAbilityModifier.EXCLUDED.has(a.id) && a.id !== current)
       .map(a => a.id);
@@ -2284,7 +2297,7 @@ export class PokemonRandomizeAbilityModifier extends ConsumablePokemonModifier {
       return false;
     }
     const chosen = randSeedItem(pool);
-    playerPokemon.customPokemonData.ability = chosen;
+    playerPokemon.setAbilityOverrideForSlot(target.slot, chosen);
     playerPokemon.updateInfo();
     return true;
   }

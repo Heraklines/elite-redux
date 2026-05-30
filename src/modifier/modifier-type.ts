@@ -722,16 +722,26 @@ export class PokemonNatureChangeModifierType extends PokemonModifierType {
 }
 
 /**
- * ER Rogue-tier consumable: randomizes a Pokémon's ability to any ability in
- * the game (except Truant / Slow Start). Names/descriptions are hardcoded in
- * English here as this is an ER-custom item not present in the shared locales.
+ * Marker base for ER ability-targeting consumables. Modifiers of this type make
+ * the SelectModifierPhase open the party in {@linkcode PartyUiMode.ABILITY_MODIFIER}
+ * so the player can pick which ability slot to act on; the chosen slot index is
+ * forwarded to `newModifier(pokemon, slotIndex)`.
  */
-export class PokemonRandomizeAbilityModifierType extends PokemonModifierType {
+export abstract class PokemonAbilityModifierType extends PokemonModifierType {}
+
+/**
+ * ER Rogue-tier consumable: randomizes one chosen ability slot of a Pokémon
+ * (active ability or an ER innate) to any ability in the game (except Truant /
+ * Slow Start). Names/descriptions are hardcoded in English here as this is an
+ * ER-custom item not present in the shared locales.
+ */
+export class PokemonRandomizeAbilityModifierType extends PokemonAbilityModifierType {
   constructor() {
     super(
       "",
       "ability_capsule",
-      (_type, args) => new PokemonRandomizeAbilityModifier(this, (args[0] as PlayerPokemon).id),
+      (_type, args) =>
+        new PokemonRandomizeAbilityModifier(this, (args[0] as PlayerPokemon).id, (args[1] as number) ?? 0),
       undefined,
       "ability_capsule",
     );
@@ -742,7 +752,7 @@ export class PokemonRandomizeAbilityModifierType extends PokemonModifierType {
   }
 
   getDescription(): string {
-    return "Randomizes a Pokémon's ability into any ability (except Truant and Slow Start).";
+    return "Randomizes one chosen ability (or innate) into any ability (except Truant and Slow Start).";
   }
 }
 

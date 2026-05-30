@@ -31,6 +31,14 @@ export class CustomPokemonData {
   public spriteScale = -1;
   public ability: AbilityId | -1;
   public passive: AbilityId | -1;
+  /**
+   * Persistent overrides for the ER 2nd/3rd innate (passive) slots. `passive`
+   * above overrides innate slot 0; these override slots 1 and 2. Each is an
+   * {@linkcode AbilityId} or `-1` for "no override (use species-derived)".
+   * Currently set by the ER "Ability Randomizer" consumable.
+   */
+  public passive2: AbilityId | -1;
+  public passive3: AbilityId | -1;
   public nature: Nature | -1;
   /**
    * Extra move slots granted by ER's "5th move slot" consumable. Added on top
@@ -48,6 +56,8 @@ export class CustomPokemonData {
     this.spriteScale = data?.spriteScale ?? -1;
     this.ability = data?.ability ?? -1;
     this.passive = data?.passive ?? -1;
+    this.passive2 = data?.passive2 ?? -1;
+    this.passive3 = data?.passive3 ?? -1;
     this.nature = data?.nature ?? -1;
     this.bonusMoveSlots = data?.bonusMoveSlots ?? 0;
     this.types = data?.types ?? [];

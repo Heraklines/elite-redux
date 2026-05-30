@@ -2193,8 +2193,19 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // override of `undefined` means "no override for this slot" (keep derived).
     // A slot override of `AbilityId.NONE` means "explicitly empty this slot".
     const transformOverride = this.summonData.passiveAbilities;
-    const slot1Id = transformOverride?.[1] ?? derivedIds[1];
-    const slot2Id = transformOverride?.[2] ?? derivedIds[2];
+    // Persistent per-Pokémon overrides for innate slots 1/2 (e.g. the ER Ability
+    // Randomizer consumable) take priority over the species-derived ids, mirroring
+    // how `customPokemonData.passive` overrides slot 0 above.
+    const customSlot1 =
+      this.customPokemonData.passive2 != null && this.customPokemonData.passive2 !== -1
+        ? this.customPokemonData.passive2
+        : undefined;
+    const customSlot2 =
+      this.customPokemonData.passive3 != null && this.customPokemonData.passive3 !== -1
+        ? this.customPokemonData.passive3
+        : undefined;
+    const slot1Id = customSlot1 ?? transformOverride?.[1] ?? derivedIds[1];
+    const slot2Id = customSlot2 ?? transformOverride?.[2] ?? derivedIds[2];
     if (transformOverride?.[0] != null) {
       slot0 = transformOverride[0] === AbilityId.NONE ? null : allAbilities[transformOverride[0]];
     }
@@ -2203,6 +2214,46 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       slot1Id === AbilityId.NONE ? null : allAbilities[slot1Id],
       slot2Id === AbilityId.NONE ? null : allAbilities[slot2Id],
     ];
+  }
+
+  /**
+   * The selectable ability "slots" for this Pokémon, used by the ER Ability
+   * Randomizer: slot 0 is the active ability, slots 1-3 are the ER innate
+   * (passive) slots that resolve to a real ability. Returns one entry per
+   * present slot, each with the {@linkcode Ability} currently occupying it.
+   */
+  public getAbilitySlots(): { slot: number; ability: Ability }[] {
+    const slots: { slot: number; ability: Ability }[] = [{ slot: 0, ability: this.getAbility() }];
+    const passives = this.getPassiveAbilities();
+    for (let i = 0; i < passives.length; i++) {
+      const ability = passives[i];
+      if (ability != null && ability.id !== AbilityId.NONE) {
+        slots.push({ slot: i + 1, ability });
+      }
+    }
+    return slots;
+  }
+
+  /**
+   * Persistently override the ability occupying a given slot (0 = active
+   * ability, 1-3 = ER innate slots). Stored on {@linkcode CustomPokemonData} so
+   * it survives the run. Used by the ER Ability Randomizer consumable.
+   */
+  public setAbilityOverrideForSlot(slot: number, abilityId: AbilityId): void {
+    switch (slot) {
+      case 0:
+        this.customPokemonData.ability = abilityId;
+        break;
+      case 1:
+        this.customPokemonData.passive = abilityId;
+        break;
+      case 2:
+        this.customPokemonData.passive2 = abilityId;
+        break;
+      case 3:
+        this.customPokemonData.passive3 = abilityId;
+        break;
+    }
   }
 
   /**

@@ -15,6 +15,7 @@ import {
   FusePokemonModifierType,
   getPlayerModifierTypeOptions,
   getPlayerShopModifierTypeOptionsForWave,
+  PokemonAbilityModifierType,
   PokemonModifierType,
   PokemonMoveModifierType,
   PokemonPpRestoreModifierType,
@@ -332,17 +333,20 @@ export class SelectModifierPhase extends BattlePhase {
     const party = globalScene.getPlayerParty();
     const pokemonModifierType = modifierType as PokemonModifierType;
     const isMoveModifier = modifierType instanceof PokemonMoveModifierType;
+    const isAbilityModifier = modifierType instanceof PokemonAbilityModifierType;
     const isTmModifier = modifierType instanceof TmModifierType;
     const isRememberMoveModifier = modifierType instanceof RememberMoveModifierType;
     const isPpRestoreModifier =
       modifierType instanceof PokemonPpRestoreModifierType || modifierType instanceof PokemonPpUpModifierType;
     const partyUiMode = isMoveModifier
       ? PartyUiMode.MOVE_MODIFIER
-      : isTmModifier
-        ? PartyUiMode.TM_MODIFIER
-        : isRememberMoveModifier
-          ? PartyUiMode.REMEMBER_MOVE_MODIFIER
-          : PartyUiMode.MODIFIER;
+      : isAbilityModifier
+        ? PartyUiMode.ABILITY_MODIFIER
+        : isTmModifier
+          ? PartyUiMode.TM_MODIFIER
+          : isRememberMoveModifier
+            ? PartyUiMode.REMEMBER_MOVE_MODIFIER
+            : PartyUiMode.MODIFIER;
     const tmMoveId = isTmModifier ? (modifierType as TmModifierType).moveId : undefined;
     globalScene.ui.setModeWithoutClear(
       UiMode.PARTY,
@@ -353,9 +357,11 @@ export class SelectModifierPhase extends BattlePhase {
           globalScene.ui.setMode(UiMode.MODIFIER_SELECT, this.isPlayer()).then(() => {
             const modifier = isMoveModifier
               ? modifierType.newModifier(party[slotIndex], option - PartyOption.MOVE_1)
-              : isRememberMoveModifier
-                ? modifierType.newModifier(party[slotIndex], option as number)
-                : modifierType.newModifier(party[slotIndex]);
+              : isAbilityModifier
+                ? modifierType.newModifier(party[slotIndex], option - PartyOption.ABILITY_SLOT_0)
+                : isRememberMoveModifier
+                  ? modifierType.newModifier(party[slotIndex], option as number)
+                  : modifierType.newModifier(party[slotIndex]);
             this.applyModifier(modifier!, cost, true); // TODO: is the bang correct?
           });
         } else {

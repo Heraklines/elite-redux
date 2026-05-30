@@ -31,11 +31,12 @@ describe("ER Rogue consumables — Ability Randomizer / Move Slot Expander", () 
     game.override.battleStyle("single").startingLevel(50).enemySpecies(SpeciesId.SHUCKLE);
   });
 
-  test("Ability Randomizer changes the ability and never rolls Truant/Slow Start", async () => {
+  test("Ability Randomizer changes the active ability (slot 0) and never rolls Truant/Slow Start", async () => {
     await game.classicMode.startBattle([SpeciesId.BULBASAUR]);
     const pokemon = game.field.getPlayerPokemon();
     const original = pokemon.getAbility().id;
 
+    // Default slot 0 = active ability.
     const modifier = modifierTypes.ABILITY_RANDOMIZER().newModifier(pokemon)!;
     const applied = modifier.apply(pokemon);
 
@@ -48,6 +49,29 @@ describe("ER Rogue consumables — Ability Randomizer / Move Slot Expander", () 
     expect(pokemon.getAbility().id).toBe(pokemon.customPokemonData.ability);
     // And it actually changed.
     expect(pokemon.getAbility().id).not.toBe(original);
+  });
+
+  test("Ability Randomizer targets the chosen innate slot, leaving the active ability untouched", async () => {
+    await game.classicMode.startBattle([SpeciesId.BULBASAUR]);
+    const pokemon = game.field.getPlayerPokemon();
+
+    // Give the Pokémon a concrete innate in slot 1 (passive slot 0) so that slot
+    // is selectable, then randomize slot 1 specifically.
+    pokemon.customPokemonData.passive = AbilityId.LEVITATE;
+    const activeBefore = pokemon.getAbility().id;
+
+    // args[1] = ability slot index (1 = first innate).
+    const modifier = modifierTypes.ABILITY_RANDOMIZER().newModifier(pokemon, 1)!;
+    expect(modifier.apply(pokemon)).toBe(true);
+
+    // The innate slot changed, away from Levitate, into a non-excluded ability.
+    expect(pokemon.customPokemonData.passive).not.toBe(AbilityId.LEVITATE);
+    expect(pokemon.customPokemonData.passive).not.toBe(AbilityId.TRUANT);
+    expect(pokemon.customPokemonData.passive).not.toBe(AbilityId.SLOW_START);
+    expect(pokemon.getPassiveAbilities()[0]?.id).toBe(pokemon.customPokemonData.passive);
+    // The active ability (slot 0) was NOT touched.
+    expect(pokemon.getAbility().id).toBe(activeBefore);
+    expect(pokemon.customPokemonData.ability).toBe(-1);
   });
 
   test("Move Slot Expander raises the move cap from 4 to 5, once only", async () => {

@@ -75,6 +75,12 @@ export enum PartyUiMode {
    */
   MOVE_MODIFIER,
   /**
+   * Indicates that the party UI is open to select a mon and one of its ability
+   * slots (active ability or an ER innate) to apply an ability modifier to,
+   * such as the ER Ability Randomizer. This type of selection can be cancelled.
+   */
+  ABILITY_MODIFIER,
+  /**
    * Indicates that the party UI is open to select a mon to teach a TM.  This
    * type of selection can be cancelled.
    */
@@ -141,6 +147,11 @@ export enum PartyOption {
   MOVE_3,
   MOVE_4,
   ALL = 4000,
+  /** ER ability-slot sub-options: slot 0 = active ability, 1-3 = innate slots. */
+  ABILITY_SLOT_0 = 5000,
+  ABILITY_SLOT_1,
+  ABILITY_SLOT_2,
+  ABILITY_SLOT_3,
 }
 
 export type PartySelectCallback = (cursor: number, option: PartyOption) => void;
@@ -930,6 +941,10 @@ export class PartyUiHandler extends MessageUiHandler {
         PartyOption.MOVE_2,
         PartyOption.MOVE_3,
         PartyOption.MOVE_4,
+        PartyOption.ABILITY_SLOT_0,
+        PartyOption.ABILITY_SLOT_1,
+        PartyOption.ABILITY_SLOT_2,
+        PartyOption.ABILITY_SLOT_3,
         PartyOption.SELECT,
       ].includes(option)
       && this.selectCallback
@@ -1317,6 +1332,9 @@ export class PartyUiHandler extends MessageUiHandler {
       case PartyUiMode.MOVE_MODIFIER:
         optionsMessage = i18next.t("partyUiHandler:selectAMove");
         break;
+      case PartyUiMode.ABILITY_MODIFIER:
+        optionsMessage = "Select an ability to randomize";
+        break;
       case PartyUiMode.MODIFIER_TRANSFER:
         if (!this.transferMode) {
           optionsMessage = i18next.t("partyUiHandler:changeQuantity");
@@ -1405,6 +1423,13 @@ export class PartyUiHandler extends MessageUiHandler {
     }
   }
 
+  private updateOptionsWithAbilityModifierMode(pokemon): void {
+    // One option per present ability slot (active ability + ER innates).
+    for (const { slot } of pokemon.getAbilitySlots()) {
+      this.options.push(PartyOption.ABILITY_SLOT_0 + slot);
+    }
+  }
+
   private updateOptionsWithModifierTransferMode(pokemon): void {
     const itemModifiers = this.getItemModifiers(pokemon);
     for (let im = 0; im < itemModifiers.length; im++) {
@@ -1471,6 +1496,9 @@ export class PartyUiHandler extends MessageUiHandler {
     switch (this.partyUiMode) {
       case PartyUiMode.MOVE_MODIFIER:
         this.updateOptionsWithMoveModifierMode(pokemon);
+        break;
+      case PartyUiMode.ABILITY_MODIFIER:
+        this.updateOptionsWithAbilityModifierMode(pokemon);
         break;
       case PartyUiMode.REMEMBER_MOVE_MODIFIER:
         this.updateOptionsWithRememberMoveModifierMode(pokemon);
@@ -1636,6 +1664,16 @@ export class PartyUiHandler extends MessageUiHandler {
             } else {
               optionName = move.getName();
             }
+            break;
+          }
+          case PartyOption.ABILITY_SLOT_0:
+          case PartyOption.ABILITY_SLOT_1:
+          case PartyOption.ABILITY_SLOT_2:
+          case PartyOption.ABILITY_SLOT_3: {
+            const slot = option - PartyOption.ABILITY_SLOT_0;
+            const entry = pokemon.getAbilitySlots().find(s => s.slot === slot);
+            const slotLabel = slot === 0 ? "Ability" : `Innate ${slot}`;
+            optionName = `${slotLabel}: ${entry?.ability.name ?? "-"}`;
             break;
           }
           default: {
