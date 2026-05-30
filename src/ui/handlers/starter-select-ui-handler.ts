@@ -4333,13 +4333,21 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * called whenever a load settles and on a short watchdog after each cursor
    * move, so a missed queue apply can never leave the wrong sprite on screen.
    */
-  private reconcileStarterSprite(): void {
-    // AUTHORITATIVE anti-stuck check, run on a 150ms timer. It does NOT trust
-    // the load queue or desiredSprite — it recomputes the sprite the currently
-    // selected species SHOULD show (same exact key the harness verifies) and
-    // makes the on-screen sprite match it, loading the assets if needed. So no
-    // matter how the cursor got here or what the queue did, the preview can
-    // never stay stuck on (or showing) the wrong Pokémon.
+  /**
+   * AUTHORITATIVE anti-stuck check, run on a 150ms timer. It recomputes the
+   * sprite the currently selected species SHOULD show and makes the on-screen
+   * sprite match it, loading the assets if needed — so the preview can never
+   * stay stuck on the wrong Pokémon.
+   *
+   * @param allowLoad - When `false` (the per-keypress call from setSpeciesDetails)
+   *   the method only PLAYS already-cached sprites (exact or current-species
+   *   base) and never issues a `loadAssets`. Kicking a load on every keypress
+   *   during rapid cycling floods Phaser's shared loader until it wedges and all
+   *   sprite loads starve. Only the 150ms timer (allowLoad `true`) issues loads,
+   *   so loads are debounced to one in-flight request for wherever the cursor
+   *   currently rests, regardless of cycling speed.
+   */
+  private reconcileStarterSprite(allowLoad = true): void {
     const species = this.lastSpecies;
     if (!species || this.statsMode || !this.starterSelectContainer.visible) {
       return;
@@ -4355,7 +4363,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.reconcileLoadKey = null;
       return; // already showing the right sprite
     }
-    if (globalScene.textures.exists(spriteKey) && globalScene.anims.exists(spriteKey)) {
+    const playable = (key: string): boolean => globalScene.textures.exists(key) && globalScene.anims.exists(key);
+    if (playable(spriteKey)) {
       this.pokemonSprite
         .play(spriteKey)
         .setPipelineData("shiny", props.shiny)
@@ -4364,11 +4373,30 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         .setVisible(!this.statsMode);
       this.speciesLoaded.set(species.speciesId, true);
       this.reconcileLoadKey = null;
-    } else if (this.reconcileLoadKey !== spriteKey) {
-      // Assets missing — kick a (spriteOnly) load once per key; a later tick
-      // applies it. If the load resolves WITHOUT producing the texture (a
-      // failed/lost load), clear the guard so the next tick retries instead of
-      // staying stuck forever.
+      return;
+    }
+    // The exact (e.g. shiny/variant) sprite isn't ready yet. CRITICAL: never
+    // leave the preview showing a DIFFERENT, previously-selected Pokémon (the
+    // "stuck on the wrong sprite" bug). Fall back to the current species' base
+    // (non-shiny, variant 0) sprite if it's loaded, so at minimum the RIGHT
+    // Pokémon is shown; the exact variant then refines once its load lands. We
+    // deliberately set pipelineData to the fallback key (not the desired one) so
+    // the next tick keeps trying to upgrade to the exact sprite.
+    const baseKey = species.getSpriteKey(female, props.formIndex, false, 0);
+    if (baseKey !== spriteKey && this.pokemonSprite.pipelineData["spriteKey"] !== baseKey && playable(baseKey)) {
+      this.pokemonSprite
+        .play(baseKey)
+        .setPipelineData("shiny", false)
+        .setPipelineData("variant", 0)
+        .setPipelineData("spriteKey", baseKey)
+        .setVisible(!this.statsMode);
+    }
+    // Kick a (spriteOnly) load for the desired sprite once per key; a later tick
+    // applies it. If the load resolves WITHOUT producing the texture (a
+    // failed/lost load), clear the guard so the next tick retries instead of
+    // staying stuck forever. Only the timer (allowLoad) issues loads — see the
+    // method doc: this debounces loads so rapid cycling can't flood the loader.
+    if (allowLoad && this.reconcileLoadKey !== spriteKey) {
       this.reconcileLoadKey = spriteKey;
       species
         .loadAssets(female, props.formIndex, props.shiny, props.variant, true, false, true)
@@ -4684,13 +4712,25 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           };
           this.assetLoadCancelled = assetLoadCancelled;
           // Remember what the cursor currently wants so reconcileStarterSprite()
-          // can self-heal if the queued apply is missed during rapid cycling.
+          // applies/loads it.
           this.desiredSprite = request;
 
           if (spriteReady) {
+            // Cached → show immediately.
             this.applyStarterSprite(request);
           } else {
-            this.queueStarterSpriteLoad(request);
+            // NOT cached. Do NOT kick a load here. During rapid cycling
+            // setSpeciesDetails fires on every keypress; kicking a `loadAssets`
+            // each time floods Phaser's shared loader until it wedges (files
+            // stuck "in flight", never completing) and EVERY sprite load
+            // starves — the "preview frozen on the previous Pokémon" bug.
+            // Instead the 150ms reconcile timer is the SOLE loader: it
+            // single-flights one load for wherever the cursor currently rests,
+            // so loads are naturally debounced (≤~6/s) regardless of how fast
+            // the player cycles. Show any already-cached sprite for this species
+            // immediately (allowLoad=false → no load kicked here); the timer
+            // performs the actual (debounced) load on its next tick.
+            this.reconcileStarterSprite(false);
           }
         } else {
           this.pokemonSprite.setVisible(!this.statsMode);

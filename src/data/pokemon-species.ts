@@ -79,6 +79,19 @@ export const normalForm: SpeciesId[] = [
 
 export type PokemonSpeciesFilter = (species: PokemonSpecies) => boolean;
 
+/**
+ * Sprite-atlas keys currently being loaded by {@linkcode PokemonSpeciesForm.loadAssets}.
+ * Rapid cycling in the starter-select / egg-hatch previews fires many overlapping
+ * `loadAssets` calls (the serial queue AND the reconcile timer can each request
+ * the same key). Issuing `loadPokemonAtlas` twice for an in-flight key corrupts
+ * Phaser's shared loader — orphaned files sit "in flight" but never complete or
+ * fail, so the loader never drains and EVERY subsequent sprite load starves
+ * (the "preview stuck on the previous Pokémon" bug). This set dedupes: a second
+ * request for an in-flight key skips the redundant `loadPokemonAtlas` and simply
+ * polls for the texture to land (see the poll in `loadAssets`).
+ */
+const inFlightAtlasLoads = new Set<string>();
+
 export abstract class PokemonSpeciesForm {
   public speciesId: SpeciesId;
   protected _formIndex: number;
@@ -813,11 +826,20 @@ export abstract class PokemonSpeciesForm {
       return;
     }
 
-    globalScene.loadPokemonAtlas(spriteKey, atlasPath);
-    if (!spriteOnly) {
+    // Dedupe overlapping loads of the same atlas. Issuing `loadPokemonAtlas`
+    // again for a key already in flight corrupts Phaser's shared loader (files
+    // get orphaned "in flight" and never complete, wedging ALL sprite loads).
+    // A duplicate request instead skips straight to the poll below and settles
+    // when the in-flight load's texture lands.
+    const alreadyInFlight = inFlightAtlasLoads.has(spriteKey);
+    if (!alreadyInFlight) {
+      inFlightAtlasLoads.add(spriteKey);
+      globalScene.loadPokemonAtlas(spriteKey, atlasPath);
+    }
+    if (!alreadyInFlight && !spriteOnly) {
       globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
     }
-    if (variant != null && !spriteOnly) {
+    if (!alreadyInFlight && variant != null && !spriteOnly) {
       // Skipped in preview mode: this CPU-heavy variant-colour processing is
       // awaited BEFORE the atlas listener is attached, so a slow run delays the
       // atlas/anim and the sprite can't appear for seconds. In preview the tint
@@ -827,9 +849,16 @@ export abstract class PokemonSpeciesForm {
 
     return new Promise<void>(resolve => {
       let settled = false;
+      let safetyTimer: Phaser.Time.TimerEvent | null = null;
       const cleanup = (): void => {
         globalScene.load.off(`filecomplete-atlasjson-${spriteKey}`, onFileComplete);
         globalScene.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onLoadError);
+        safetyTimer?.remove();
+        safetyTimer = null;
+        // Release the dedupe slot so a future (post-failure) retry can re-issue
+        // the atlas load. By the time we cleanup the texture is either present
+        // (future calls early-return) or genuinely failed (a retry is wanted).
+        inFlightAtlasLoads.delete(spriteKey);
       };
       const settle = (): void => {
         if (settled) {
@@ -846,14 +875,50 @@ export abstract class PokemonSpeciesForm {
           settle();
         }
       };
+      // Settle on ANY load error for this atlas. The previous guard also required
+      // `multiFile?.type === "atlasjson"`, which a missing/404 atlas (e.g. an ER
+      // custom with no shiny sprite) can fail to satisfy — leaving this promise
+      // (and the serial starter-sprite queue + the reconcile timer that awaits
+      // it) hung forever, freezing the preview on the previous Pokémon. The
+      // sub-file key for an atlas load is the sprite key, so a bare key check is
+      // both sufficient and robust.
       const onLoadError = (file: Phaser.Loader.File): void => {
-        if (file.key === spriteKey && file.multiFile?.type === "atlasjson") {
+        if (file.key === spriteKey) {
           settle();
         }
       };
 
       globalScene.load.on(`filecomplete-atlasjson-${spriteKey}`, onFileComplete);
       globalScene.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onLoadError);
+
+      // Authoritative completion detector: POLL for the texture rather than
+      // relying solely on the `filecomplete-atlasjson` event. When the shared
+      // Phaser loader is already mid-run (the common case during rapid cycling),
+      // the atlas can finish between `loadPokemonAtlas` and our listener attach,
+      // so the event is missed and the promise (plus the serial starter-sprite
+      // queue + reconcile that await it) would hang — leaving the preview frozen
+      // on the previous Pokémon. Polling settles reliably whenever the texture
+      // actually lands (settle→finalize still builds the animation), and a
+      // backstop UNBLOCKS the awaiter even if the load was silently dropped.
+      let polls = 0;
+      safetyTimer = globalScene.time.addEvent({
+        delay: 100,
+        loop: true,
+        callback: () => {
+          if (settled) {
+            return;
+          }
+          if (globalScene.textures.exists(spriteKey)) {
+            settle(); // texture landed (possibly via a missed event) — finalize + resolve
+          } else if (++polls >= 50) {
+            // ~5s with no texture: genuinely failed/dropped. Stop polling and
+            // unblock the awaiter; the 150ms reconcile re-kicks a fresh load (so
+            // a later retry still recovers), avoiding a leaked repeating timer.
+            cleanup();
+            resolve();
+          }
+        },
+      });
 
       if (startLoad) {
         if (!globalScene.load.isLoading()) {
