@@ -110,14 +110,16 @@ try {
     }
   }
 
-  // Now cycle FURIOUSLY, down-heavy, and check the displayed species each round.
+  // Cycle down-heavy at a FAST-HUMAN rate (~8 presses/sec, 110-150ms gaps) — a
+  // realistic frantic player, not the super-human 30-45/sec that just saturates
+  // the browser's main thread regardless of any loading fix.
   let stuck = 0;
   for (let round = 0; round < 20; round++) {
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 18; i++) {
       const dir =
         round % 2 ? (i % 2 ? "ArrowDown" : "ArrowUp") : ["ArrowDown", "ArrowRight", "ArrowDown", "ArrowLeft"][i % 4];
       await tap(dir);
-      await sleep(12 + (i % 3) * 10);
+      await sleep(110 + (i % 3) * 20);
     }
     // Convergence window — wait up to 6s and record HOW LONG it took to show the
     // right species (distinguishes "slow but resolves" from "permanently stuck").

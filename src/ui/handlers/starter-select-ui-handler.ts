@@ -4474,11 +4474,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * exact key the reconcile's fallback shows — so the correct species always
    * appears immediately even while a shiny/variant refines.
    */
-  /** Max concurrent background preloads. Kept under the browser's ~6 per-host
-   * connection limit (leaving headroom for the cursor load + HMR/account polls)
-   * so the visible grid warms quickly WITHOUT overflowing into an ever-growing
-   * backlog (which is what made fast cycling freeze). */
-  private static readonly PRELOAD_CONCURRENCY = 2;
+  /** Max concurrent background preloads. Sprite atlases are served fast in
+   * isolation (~70ms) but the dev server degrades sharply under concurrency, so
+   * we warm just ONE at a time — leaving the connection pool free for the
+   * cursor's own load (which must be instant on stop) and the game's other
+   * traffic. The visible grid still warms steadily during idle. */
+  private static readonly PRELOAD_CONCURRENCY = 1;
 
   private preloadNextVisibleSprite(): void {
     // Yield hard to the cursor: never preload while the cursor's own sprite is
