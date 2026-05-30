@@ -634,13 +634,12 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // 263 DRAGONS_MAW: vanilla 1.5x Dragon. ER 1.5x same.
   // 60 HUSTLE: vanilla 1.5x ATK / 0.8 acc on physical. Same.
   // 188 STORM_DRAIN: redirect Water + raise SPATK on absorption. Vanilla same.
-  // 184 ANTICIPATION: reveal foe danger move. ER: also +1 SPD on entry.
-  [
-    AbilityId.ANTICIPATION,
-    ab => {
-      ab.attrs.push(new EntryEffectAbAttr({ kind: "self-stat-boost", stat: Stat.SPD, stages: 1 }));
-    },
-  ],
+  // 184 ANTICIPATION: ER spec is "Senses Super-effective moves. Dodges one
+  // Super-effective hit." The vanilla base already does the sense/shudder on
+  // entry. The previous "+1 SPD on entry" rider was NOT in the spec (a wrong
+  // approximation) — removed. The "dodge one SE hit" rider needs a per-battle
+  // PreDefend primitive (tracked in #141); keep the faithful vanilla sense
+  // until then rather than a contradicting effect.
   // 209 BIG_PECKS already total.
   // 156 RECKLESS: vanilla 1.2x recoil moves. ER ups to 1.3x.
   [AbilityId.RECKLESS, ab => mutateFlagPowerBoost(ab, MoveFlags.RECKLESS_MOVE, 1.3)],
