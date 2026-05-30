@@ -40,12 +40,19 @@ const cur = () =>
     const h = window.dev.scene.ui.getHandler();
     return { id: h.lastSpecies?.speciesId, have: h.pokemonSprite?.pipelineData?.spriteKey };
   });
+// EXACT match: the displayed sprite key must equal the key the current cursor
+// species+props resolve to (substring matching gives false positives, e.g.
+// "pkmn__140" contains "4", masking a stuck Charmander on Kabuto).
 const match = () =>
   p.evaluate(() => {
     const h = window.dev.scene.ui.getHandler();
     const sp = h.lastSpecies;
-    const have = h.pokemonSprite?.pipelineData?.spriteKey;
-    return !!have && !!sp && have.includes(String(sp.speciesId));
+    if (!sp) {
+      return false;
+    }
+    const props = window.dev.scene.gameData.getSpeciesDexAttrProps(sp, h.getCurrentDexProps(sp.speciesId));
+    const expected = sp.getSpriteKey(props.female, props.formIndex, props.shiny, props.variant);
+    return h.pokemonSprite?.pipelineData?.spriteKey === expected;
   });
 async function settle(timeout = 12000) {
   const t0 = Date.now();

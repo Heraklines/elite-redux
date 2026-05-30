@@ -470,6 +470,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private starterSpriteLoadActive = false;
   /** The sprite the cursor currently wants shown — used by reconcileStarterSprite(). */
   private desiredSprite: StarterSpriteLoadRequest | null = null;
+  /** Repeating timer that keeps the shown sprite in sync with the cursor (anti-stuck). */
+  private spriteReconcileTimer: Phaser.Time.TimerEvent | null = null;
   public cursorObj: Phaser.GameObjects.Image;
   private starterCursorObjs: Phaser.GameObjects.Image[];
   private pokerusCursorObjs: Phaser.GameObjects.Image[];
@@ -1372,6 +1374,18 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.starterSelectCallback = args[0] as StarterSelectCallback;
 
       this.starterSelectContainer.setVisible(true);
+
+      // Anti-stuck: continuously keep the previewed sprite in sync with the
+      // cursor. If a load is slow or a queue apply is missed, reconcile snaps
+      // the correct sprite in within ~150ms of its assets being present — so the
+      // preview can never stay stuck on a previous Pokémon. Cheap (early-returns
+      // when already correct).
+      this.spriteReconcileTimer?.remove();
+      this.spriteReconcileTimer = globalScene.time.addEvent({
+        delay: 150,
+        loop: true,
+        callback: () => this.reconcileStarterSprite(),
+      });
 
       this.starterPreferences = loadStarterPreferences();
       // Deep copy the JSON (avoid re-loading from disk)
@@ -4257,12 +4271,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     if (!this.starterSpriteLoadActive) {
       void this.processStarterSpriteLoadQueue();
     }
-    // Watchdog: reconcile a few times shortly after the move, so even if the
-    // queued apply is missed (stale-check race), the correct sprite snaps in
-    // as soon as its assets are present — no permanent "stuck on previous".
-    for (const delay of [250, 600, 1200, 2500]) {
-      setTimeout(() => this.reconcileStarterSprite(), delay);
-    }
+    // (The repeating spriteReconcileTimer started in show() keeps the displayed
+    // sprite in sync, so no per-move watchdog is needed here.)
   }
 
   private async processStarterSpriteLoadQueue(): Promise<void> {
@@ -5397,6 +5407,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
     this.starterSelectContainer.setVisible(false);
     this.blockInput = false;
+    this.spriteReconcileTimer?.remove();
+    this.spriteReconcileTimer = null;
 
     while (this.starterSpecies.length > 0) {
       this.popStarter(this.starterSpecies.length - 1);

@@ -40,11 +40,17 @@ const cur = () =>
     const h = window.dev.scene.ui.getHandler();
     const sp = h.lastSpecies;
     const have = h.pokemonSprite?.pipelineData?.spriteKey;
+    let expected = null;
+    if (sp) {
+      const props = window.dev.scene.gameData.getSpeciesDexAttrProps(sp, h.getCurrentDexProps(sp.speciesId));
+      expected = sp.getSpriteKey(props.female, props.formIndex, props.shiny, props.variant);
+    }
     return {
       id: sp?.speciesId,
       name: sp?.name,
       have,
-      match: !!have && !!sp && have.includes(String(sp.speciesId)),
+      expected,
+      match: !!have && have === expected, // EXACT — substring gave false positives
       active: h.starterSpriteLoadActive,
       pending: !!h.pendingStarterSpriteLoad,
     };
