@@ -468,6 +468,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private assetLoadCancelled: BooleanHolder | null;
   private pendingStarterSpriteLoad: StarterSpriteLoadRequest | null = null;
   private starterSpriteLoadActive = false;
+  /** The sprite the cursor currently wants shown — used by reconcileStarterSprite(). */
+  private desiredSprite: StarterSpriteLoadRequest | null = null;
   public cursorObj: Phaser.GameObjects.Image;
   private starterCursorObjs: Phaser.GameObjects.Image[];
   private pokerusCursorObjs: Phaser.GameObjects.Image[];
@@ -4255,6 +4257,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     if (!this.starterSpriteLoadActive) {
       void this.processStarterSpriteLoadQueue();
     }
+    // Watchdog: reconcile a few times shortly after the move, so even if the
+    // queued apply is missed (stale-check race), the correct sprite snaps in
+    // as soon as its assets are present — no permanent "stuck on previous".
+    for (const delay of [250, 600, 1200, 2500]) {
+      setTimeout(() => this.reconcileStarterSprite(), delay);
+    }
   }
 
   private async processStarterSpriteLoadQueue(): Promise<void> {
@@ -4268,10 +4276,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         const request = this.pendingStarterSpriteLoad;
         this.pendingStarterSpriteLoad = null;
         await this.loadStarterSprite(request);
+        // After each load, make sure the on-screen sprite matches the cursor.
+        this.reconcileStarterSprite();
       }
     } finally {
       this.starterSpriteLoadActive = false;
     }
+    this.reconcileStarterSprite();
 
     if (this.pendingStarterSpriteLoad) {
       void this.processStarterSpriteLoadQueue();
@@ -4293,10 +4304,34 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       if (!request.cancelled.value && this.assetLoadCancelled === request.cancelled) {
         this.assetLoadCancelled = null;
       }
+      // Self-heal: even if THIS (now-stale) request can't apply, the asset it
+      // just loaded may be exactly what the cursor currently needs.
+      this.reconcileStarterSprite();
       return;
     }
 
     this.applyStarterSprite(request);
+  }
+
+  /**
+   * Self-healing safety net for the "sprite stuck on a previous Pokémon during
+   * rapid cycling" bug: if the sprite for the CURRENTLY-selected species is
+   * loaded but not the one being displayed, apply it. Idempotent and cheap —
+   * called whenever a load settles and on a short watchdog after each cursor
+   * move, so a missed queue apply can never leave the wrong sprite on screen.
+   */
+  private reconcileStarterSprite(): void {
+    const req = this.desiredSprite;
+    if (
+      !req
+      || this.lastSpecies !== req.species
+      || this.pokemonSprite.pipelineData["spriteKey"] === req.spriteKey
+      || !globalScene.textures.exists(req.spriteKey)
+      || !globalScene.anims.exists(req.spriteKey)
+    ) {
+      return;
+    }
+    this.applyStarterSprite(req);
   }
 
   private applyStarterSprite(request: StarterSpriteLoadRequest): void {
@@ -4601,6 +4636,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             cancelled: assetLoadCancelled,
           };
           this.assetLoadCancelled = assetLoadCancelled;
+          // Remember what the cursor currently wants so reconcileStarterSprite()
+          // can self-heal if the queued apply is missed during rapid cycling.
+          this.desiredSprite = request;
 
           if (spriteReady) {
             this.applyStarterSprite(request);
