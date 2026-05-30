@@ -951,9 +951,15 @@ export class PokedexPageUiHandler extends MessageUiHandler {
     }
     this.biomes = this.filterBiomeFormIndexes(speciesBiomes, species.speciesId);
 
-    const allFormChanges = Object.hasOwn(pokemonFormChanges, species.speciesId)
-      ? pokemonFormChanges[species.speciesId]
-      : [];
+    // ER customs (id >= 10000) have no real `forms` array, so any
+    // pokemonFormChanges entry keyed to their id is spurious (e.g. a bogus
+    // "regionalForm." on Snorlax Redux) and navigating it softlocks. Their real
+    // mega/primal forms are surfaced from the ER form-change registry instead
+    // (see the Evolutions menu). So skip the vanilla battle-forms for them.
+    const allFormChanges =
+      species.speciesId < 10000 && Object.hasOwn(pokemonFormChanges, species.speciesId)
+        ? pokemonFormChanges[species.speciesId]
+        : [];
     this.battleForms = allFormChanges.filter(f => f.preFormKey === (this.species.forms[this.formIndex]?.formKey ?? ""));
 
     const preSpecies = Object.hasOwn(pokemonPrevolutions, this.species.speciesId)
