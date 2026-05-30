@@ -21,6 +21,8 @@ import { PokemonInfoContainer } from "./pokemon-info-container";
  */
 export class PokemonHatchInfoContainer extends PokemonInfoContainer {
   private currentPokemonSprite: Phaser.GameObjects.Sprite;
+  /** Bumped on every displayPokemon() so out-of-order async loads can't apply a stale sprite. */
+  private displayToken = 0;
   private pokemonNumberText: Phaser.GameObjects.Text;
   private pokemonNameText: Phaser.GameObjects.Text;
   private pokemonEggMovesContainer: Phaser.GameObjects.Container;
@@ -136,12 +138,21 @@ export class PokemonHatchInfoContainer extends PokemonInfoContainer {
     const shiny = pokemon.shiny;
     const variant = pokemon.variant;
     this.currentPokemonSprite.setVisible(false);
+    // Guard against the rapid-cycling race: when the player flips between
+    // hatched Pokémon quickly, an earlier (slower) loadAssets can resolve AFTER
+    // a later one and play the wrong sprite, leaving it stuck on a previous
+    // Pokémon. Only the latest displayPokemon() call may apply its sprite.
+    const token = ++this.displayToken;
+    const spriteKey = species.getSpriteKey(female, formIndex, shiny, variant);
     species.loadAssets(female, formIndex, shiny, variant, true).then(() => {
+      if (token !== this.displayToken) {
+        return;
+      }
       getPokemonSpeciesForm(species.speciesId, pokemon.formIndex).cry();
-      this.currentPokemonSprite.play(species.getSpriteKey(female, formIndex, shiny, variant));
+      this.currentPokemonSprite.play(spriteKey);
       this.currentPokemonSprite.setPipelineData("shiny", shiny);
       this.currentPokemonSprite.setPipelineData("variant", variant);
-      this.currentPokemonSprite.setPipelineData("spriteKey", species.getSpriteKey(female, formIndex, shiny, variant));
+      this.currentPokemonSprite.setPipelineData("spriteKey", spriteKey);
       this.currentPokemonSprite.setVisible(true);
     });
   }
