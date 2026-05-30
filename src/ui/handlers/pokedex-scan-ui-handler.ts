@@ -178,7 +178,11 @@ export class PokedexScanUiHandler extends FormModalUiHandler {
       this.submitAction = () => {
         if (ui.getMode() === UiMode.POKEDEX_SCAN) {
           this.sanitizeInputs();
-          const outputName = this.reducedKeys.includes(this.inputs[0].text) ? this.inputs[0].text : "";
+          // ER: the ABILITY_TEXT row is a free-text regex search (no autocomplete
+          // list), so accept whatever the player typed. Other rows still require
+          // a match from their suggestion list.
+          const freeText = this.row === FilterTextRow.ABILITY_TEXT;
+          const outputName = freeText || this.reducedKeys.includes(this.inputs[0].text) ? this.inputs[0].text : "";
           const sanitizedName = btoa(unescape(encodeURIComponent(outputName)));
           config.buttonActions[0](sanitizedName);
           return true;

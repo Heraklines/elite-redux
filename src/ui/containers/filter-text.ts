@@ -141,8 +141,13 @@ export class FilterText extends Phaser.GameObjects.Container {
         const dialogueName = decodeURIComponent(escape(atob(dialogueTestName)));
         const handler = ui.getHandler() as AwaitableUiHandler;
         handler.tutorialActive = true;
-        // Switch to the dialog test window
-        this.selections[index].setText(dialogueName === "" ? this.defaultText : String(i18next.t(dialogueName)));
+        // ER: free-text rows (ABILITY_TEXT) hold a raw search/regex string, so set
+        // it verbatim — don't run it through i18next.t (which would treat ":" / "."
+        // as namespace/key separators and mangle the query). Other rows resolve a
+        // localized label as before.
+        const isFreeText = this.rows[index] === FilterTextRow.ABILITY_TEXT;
+        const displayText = isFreeText ? dialogueName : String(i18next.t(dialogueName));
+        this.selections[index].setText(dialogueName === "" ? this.defaultText : displayText);
         ui.revertMode();
         this.onChange();
       },
