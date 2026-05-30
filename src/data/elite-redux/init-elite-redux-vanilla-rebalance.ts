@@ -65,6 +65,7 @@ import {
   PostDefendStatStageChangeAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
   PostSummonAbAttr,
+  PostSummonRemoveArenaTagAbAttr,
   PostSummonTerrainChangeAbAttr,
   PostSummonWeatherChangeAbAttr,
   PostTurnHurtIfSleepingAbAttr,
@@ -698,17 +699,20 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     },
   ],
   // 53 PICKUP: vanilla "find items post-battle" → ER "Removes all hazards on
-  // entry". Completely different effect. Add hazard-clear entry effect on
-  // holder side; keep vanilla item-find for backward compat.
+  // entry". Clear the entry hazards on switch-in. (The previous placeholder
+  // pushed a 0-stage ATK self-boost, which did nothing but spam "ATK won't go
+  // higher" on every entry — replaced with the real hazard-clear.)
   [
     AbilityId.PICKUP,
     ab => {
-      ab.attrs.push(new EntryEffectAbAttr({ kind: "self-stat-boost", stat: Stat.ATK, stages: 0 }));
-      // Note: hazard-clearing on holder-side is best modeled via a one-shot
-      // PostSummon — leveraging the same TypeGatedStatTriggerOnAttack's
-      // clearHazards helper would require its predicate to match. Skip the
-      // hazard-clear rider for now (no clean primitive); the patch is a
-      // placeholder for future PostSummonClearHazardsAbAttr.
+      ab.attrs.push(
+        new PostSummonRemoveArenaTagAbAttr([
+          ArenaTagType.SPIKES,
+          ArenaTagType.TOXIC_SPIKES,
+          ArenaTagType.STEALTH_ROCK,
+          ArenaTagType.STICKY_WEB,
+        ]),
+      );
     },
   ],
   // 50 RUN_AWAY: vanilla "guaranteed flee". ER adds "Raises Speed if stats
