@@ -472,6 +472,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private desiredSprite: StarterSpriteLoadRequest | null = null;
   /** Repeating timer that keeps the shown sprite in sync with the cursor (anti-stuck). */
   private spriteReconcileTimer: Phaser.Time.TimerEvent | null = null;
+  /** The sprite key reconcile last kicked a load for, so it doesn't re-queue every tick. */
+  private reconcileLoadKey: string | null = null;
   public cursorObj: Phaser.GameObjects.Image;
   private starterCursorObjs: Phaser.GameObjects.Image[];
   private pokerusCursorObjs: Phaser.GameObjects.Image[];
@@ -4333,17 +4335,51 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * move, so a missed queue apply can never leave the wrong sprite on screen.
    */
   private reconcileStarterSprite(): void {
-    const req = this.desiredSprite;
-    if (
-      !req
-      || this.lastSpecies !== req.species
-      || this.pokemonSprite.pipelineData["spriteKey"] === req.spriteKey
-      || !globalScene.textures.exists(req.spriteKey)
-      || !globalScene.anims.exists(req.spriteKey)
-    ) {
+    // AUTHORITATIVE anti-stuck check, run on a 150ms timer. It does NOT trust
+    // the load queue or desiredSprite — it recomputes the sprite the currently
+    // selected species SHOULD show (same exact key the harness verifies) and
+    // makes the on-screen sprite match it, loading the assets if needed. So no
+    // matter how the cursor got here or what the queue did, the preview can
+    // never stay stuck on (or showing) the wrong Pokémon.
+    const species = this.lastSpecies;
+    if (!species || this.statsMode || !this.starterSelectContainer.visible) {
       return;
     }
-    this.applyStarterSprite(req);
+    const dexEntry = this.getSpeciesData(species.speciesId).dexEntry;
+    if (!dexEntry?.caughtAttr && !dexEntry?.seenAttr) {
+      return; // no sprite shown for fully-unseen species
+    }
+    const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(species.speciesId));
+    const female = props.female ?? false;
+    const spriteKey = species.getSpriteKey(female, props.formIndex, props.shiny, props.variant);
+    if (this.pokemonSprite.pipelineData["spriteKey"] === spriteKey) {
+      this.reconcileLoadKey = null;
+      return; // already showing the right sprite
+    }
+    if (globalScene.textures.exists(spriteKey) && globalScene.anims.exists(spriteKey)) {
+      this.pokemonSprite
+        .play(spriteKey)
+        .setPipelineData("shiny", props.shiny)
+        .setPipelineData("variant", props.variant)
+        .setPipelineData("spriteKey", spriteKey)
+        .setVisible(!this.statsMode);
+      this.speciesLoaded.set(species.speciesId, true);
+      this.reconcileLoadKey = null;
+    } else if (this.reconcileLoadKey !== spriteKey) {
+      // Assets missing — kick a (spriteOnly) load once per key; a later tick
+      // applies it. If the load resolves WITHOUT producing the texture (a
+      // failed/lost load), clear the guard so the next tick retries instead of
+      // staying stuck forever.
+      this.reconcileLoadKey = spriteKey;
+      species
+        .loadAssets(female, props.formIndex, props.shiny, props.variant, true, false, true)
+        .catch(() => {})
+        .then(() => {
+          if (this.reconcileLoadKey === spriteKey && !globalScene.textures.exists(spriteKey)) {
+            this.reconcileLoadKey = null;
+          }
+        });
+    }
   }
 
   private applyStarterSprite(request: StarterSpriteLoadRequest): void {
