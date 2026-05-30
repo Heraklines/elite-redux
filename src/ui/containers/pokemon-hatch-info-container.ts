@@ -12,7 +12,7 @@ import type { PlayerPokemon } from "#field/pokemon";
 import { addTextObject, updateCandyCountTextStyle } from "#ui/text";
 import { argbFromRgba, rgbHexToRgba } from "#utils/color-utils";
 import { padInt } from "#utils/common";
-import { getDexNumber, getPokemonSpeciesForm } from "#utils/pokemon-utils";
+import { getDexNumber } from "#utils/pokemon-utils";
 import { PokemonInfoContainer } from "./pokemon-info-container";
 
 /**
@@ -144,17 +144,23 @@ export class PokemonHatchInfoContainer extends PokemonInfoContainer {
     // Pokémon. Only the latest displayPokemon() call may apply its sprite.
     const token = ++this.displayToken;
     const spriteKey = species.getSpriteKey(female, formIndex, shiny, variant);
-    species.loadAssets(female, formIndex, shiny, variant, true).then(() => {
+    // spriteOnly: load just the sprite (no cry audio) so the display is fast
+    // during rapid cycling — the pile-up of .m4a cries otherwise saturates the
+    // loader and lags sprites for seconds. The cry is loaded separately below.
+    species.loadAssets(female, formIndex, shiny, variant, true, false, true).then(() => {
       if (token !== this.displayToken) {
         return;
       }
-      getPokemonSpeciesForm(species.speciesId, pokemon.formIndex).cry();
       this.currentPokemonSprite.play(spriteKey);
       this.currentPokemonSprite.setPipelineData("shiny", shiny);
       this.currentPokemonSprite.setPipelineData("variant", variant);
       this.currentPokemonSprite.setPipelineData("spriteKey", spriteKey);
       this.currentPokemonSprite.setVisible(true);
     });
+    // Note: the per-entry cry is intentionally not played here. It would require
+    // loading the .m4a (re-introducing the loader backlog that lags sprites) and
+    // is cacophonous during rapid cycling; the cry already plays in the hatch
+    // animation itself.
   }
 
   /**

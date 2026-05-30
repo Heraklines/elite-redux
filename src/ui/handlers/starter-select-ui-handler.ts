@@ -4291,7 +4291,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
   private async loadStarterSprite(request: StarterSpriteLoadRequest): Promise<void> {
     await request.species
-      .loadAssets(request.female, request.formIndex, request.shiny, request.variant, true)
+      // spriteOnly: skip the cry audio — it isn't played while cycling and the
+      // pile-up of .m4a loads is what makes sprites lag during rapid cycling.
+      .loadAssets(request.female, request.formIndex, request.shiny, request.variant, true, false, true)
       .catch(() => {});
 
     if (

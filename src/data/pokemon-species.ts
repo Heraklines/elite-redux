@@ -763,6 +763,13 @@ export abstract class PokemonSpeciesForm {
     variant?: Variant,
     startLoad = false,
     back = false,
+    /**
+     * ER: when true, only the sprite atlas is queued — the cry audio is skipped.
+     * Used by preview screens (starter-select / egg-hatch) during rapid cycling,
+     * where 40+ queued .m4a cries (and their Web-Audio decodes) saturate the
+     * shared loader and make sprite atlases wait seconds behind them.
+     */
+    spriteOnly = false,
   ): Promise<void> {
     const spriteKey = this.getSpriteKey(female, formIndex, shiny, variant, back);
     const atlasPath = this.getSpriteAtlasPath(female, formIndex, shiny, variant, back);
@@ -807,8 +814,14 @@ export abstract class PokemonSpeciesForm {
     }
 
     globalScene.loadPokemonAtlas(spriteKey, atlasPath);
-    globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
-    if (variant != null) {
+    if (!spriteOnly) {
+      globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
+    }
+    if (variant != null && !spriteOnly) {
+      // Skipped in preview mode: this CPU-heavy variant-colour processing is
+      // awaited BEFORE the atlas listener is attached, so a slow run delays the
+      // atlas/anim and the sprite can't appear for seconds. In preview the tint
+      // self-corrects once the colours land via the variant assets in finalize.
       await this.loadVariantColors(spriteKey, female, variant, back, formIndex);
     }
 
@@ -850,20 +863,13 @@ export abstract class PokemonSpeciesForm {
         // appends to it and the atlas can finish before this listener is
         // attached (there's an awaited step above) — the `filecomplete` event
         // is then missed and this promise would hang forever, stalling the
-        // serial starter-sprite queue (the "sprite stuck / takes forever to
-        // load" bug during rapid cycling). If the texture is already present,
-        // settle immediately.
+        // serial starter-sprite queue (the "sprite stuck during rapid cycling"
+        // bug). If the texture is already present, settle now; otherwise the
+        // normal filecomplete listener will settle when it lands (no premature
+        // timeout — settling before the texture exists would skip buildAnim and
+        // leave the sprite permanently animation-less for slow loads).
         if (globalScene.textures.exists(spriteKey)) {
           settle();
-        } else {
-          // Belt-and-suspenders: never let a missed/lost event block the queue.
-          // A plain timer (not the scene clock) so it fires regardless of scene
-          // state; settle() is idempotent, so a real filecomplete still wins.
-          setTimeout(() => {
-            if (!settled) {
-              settle();
-            }
-          }, 2500);
         }
       } else {
         // The caller owns starting the loader. Keep the per-file listener
