@@ -6,4 +6,6 @@ export enum DropDownColumn {
   UNLOCKS,
   MISC,
   SORT,
+  /** ER: a label-only tab that opens the free-text Name/Ability-text search panel. */
+  SEARCH,
 }

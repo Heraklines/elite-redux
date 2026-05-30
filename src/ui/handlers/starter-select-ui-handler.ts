@@ -683,6 +683,22 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       i18next.t("filterBar:sortFilter"),
       new DropDown(0, 0, sortOptions, this.updateStarters, DropDownType.SINGLE),
     );
+    // ER: "Search" tab. Its dropdown holds a single placeholder option (an empty
+    // dropdown crashes when rendered during tab navigation); pressing Action on
+    // the tab opens the free-text Name/Ability-text panel instead of toggling the
+    // dropdown (handled in processInput). updateStarters never reads this column,
+    // so it doesn't affect filtering.
+    this.filterBar.addFilter(
+      DropDownColumn.SEARCH,
+      i18next.t("filterBar:searchFilter"),
+      new DropDown(
+        0,
+        0,
+        [new DropDownOption("SEARCH", new DropDownLabel(i18next.t("filterBar:searchFilter")))],
+        this.updateStarters,
+        DropDownType.SINGLE,
+      ),
+    );
     this.filterBarContainer.add(this.filterBar);
 
     // Offset the generation filter dropdown to avoid covering the filtered pokemon
@@ -1846,17 +1862,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         success = true;
       }
     } else if (button === Button.STATS) {
-      // ER: cycle the filter key — grid → dropdown filter bar → text search → off.
+      // Stats key → jump to the filter bar (the "Search" tab there opens the
+      // free-text Name/Ability-text panel). Pressing it from the panel closes it.
       if (this.filterTextMode) {
         this.setFilterTextMode(false);
-      } else if (this.filterMode) {
-        // From the dropdown filter bar, switch to the free-text search panel.
-        this.filterBar.hideDropDowns();
-        this.filterBar.cursorObj.setVisible(false);
-        this.filterMode = false;
-        this.filterTextCursor = 0;
-        this.setFilterTextMode(true);
-      } else {
+        this.setCursor(this.cursor);
+      } else if (!this.filterMode) {
         this.startCursorObj.setVisible(false);
         this.starterIconsCursorObj.setVisible(false);
         this.randomCursorObj.setVisible(false);
@@ -2004,7 +2015,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           }
           break;
         case Button.ACTION:
-          if (this.filterBar.openDropDown) {
+          if (this.filterBar.getColumn(this.filterBarCursor) === DropDownColumn.SEARCH) {
+            // ER: the Search tab opens the free-text Name/Ability-text panel.
+            // Checked first since the (empty) Search dropdown may be "open" from
+            // navigating across tabs.
+            this.filterBar.hideDropDowns();
+            this.filterBar.cursorObj.setVisible(false);
+            this.filterMode = false;
+            this.filterTextCursor = 0;
+            this.setFilterTextMode(true);
+          } else if (this.filterBar.openDropDown) {
             this.filterBar.toggleOptionState();
           } else {
             this.filterBar.toggleDropDown(this.filterBarCursor);
