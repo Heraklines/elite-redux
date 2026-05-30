@@ -22,7 +22,7 @@ import { GrowthRate, getGrowthRateColor } from "#data/exp";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
 import { pokemonFormChanges } from "#data/pokemon-forms";
-import type { PokemonSpecies } from "#data/pokemon-species";
+import { clearInFlightAtlasLoads, type PokemonSpecies } from "#data/pokemon-species";
 import { AbilityAttr } from "#enums/ability-attr";
 import { AbilityId } from "#enums/ability-id";
 import { Button } from "#enums/buttons";
@@ -472,8 +472,17 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private desiredSprite: StarterSpriteLoadRequest | null = null;
   /** Repeating timer that keeps the shown sprite in sync with the cursor (anti-stuck). */
   private spriteReconcileTimer: Phaser.Time.TimerEvent | null = null;
-  /** The sprite key reconcile last kicked a load for, so it doesn't re-queue every tick. */
-  private reconcileLoadKey: string | null = null;
+  /**
+   * Strict single-flight guard for preview sprite loads: `true` while a
+   * `loadAssets` kicked by the reconcile timer is pending. Only one preview
+   * sprite load runs at a time — preventing fast cycling from flooding Phaser's
+   * shared loader (which otherwise wedges, freezing the preview).
+   */
+  private spriteLoadInFlight = false;
+  /** Reconcile ticks the current single-flight load has been pending (watchdog). */
+  private spriteLoadWatchdog = 0;
+  /** Generation token so an abandoned load's resolve can't clear a newer load's flag. */
+  private spriteLoadGen = 0;
   public cursorObj: Phaser.GameObjects.Image;
   private starterCursorObjs: Phaser.GameObjects.Image[];
   private pokerusCursorObjs: Phaser.GameObjects.Image[];
@@ -4360,7 +4369,6 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     const female = props.female ?? false;
     const spriteKey = species.getSpriteKey(female, props.formIndex, props.shiny, props.variant);
     if (this.pokemonSprite.pipelineData["spriteKey"] === spriteKey) {
-      this.reconcileLoadKey = null;
       return; // already showing the right sprite
     }
     const playable = (key: string): boolean => globalScene.textures.exists(key) && globalScene.anims.exists(key);
@@ -4372,7 +4380,6 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         .setPipelineData("spriteKey", spriteKey)
         .setVisible(!this.statsMode);
       this.speciesLoaded.set(species.speciesId, true);
-      this.reconcileLoadKey = null;
       return;
     }
     // The exact (e.g. shiny/variant) sprite isn't ready yet. CRITICAL: never
@@ -4391,21 +4398,48 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         .setPipelineData("spriteKey", baseKey)
         .setVisible(!this.statsMode);
     }
-    // Kick a (spriteOnly) load for the desired sprite once per key; a later tick
-    // applies it. If the load resolves WITHOUT producing the texture (a
-    // failed/lost load), clear the guard so the next tick retries instead of
-    // staying stuck forever. Only the timer (allowLoad) issues loads — see the
-    // method doc: this debounces loads so rapid cycling can't flood the loader.
-    if (allowLoad && this.reconcileLoadKey !== spriteKey) {
-      this.reconcileLoadKey = spriteKey;
-      species
-        .loadAssets(female, props.formIndex, props.shiny, props.variant, true, false, true)
-        .catch(() => {})
-        .then(() => {
-          if (this.reconcileLoadKey === spriteKey && !globalScene.textures.exists(spriteKey)) {
-            this.reconcileLoadKey = null;
-          }
-        });
+    // STRICT SINGLE-FLIGHT: issue at most ONE sprite load at a time, ever.
+    // `spriteLoadInFlight` is true while a load is pending. We only kick a new
+    // load when nothing is in flight — even if the cursor has since moved to a
+    // different key. This is the crucial guarantee:
+    // during sustained fast cycling the per-tick keys differ, so a "one load per
+    // key" guard would still launch a fresh load every 150ms and pile up dozens
+    // of concurrent atlas loads, wedging Phaser's shared loader (files stuck in
+    // flight, never completing) so EVERYTHING starves. Serializing to one load
+    // at a time keeps the loader healthy; the timer simply loads wherever the
+    // cursor rests once the previous load settles, always converging.
+    if (allowLoad) {
+      if (!this.spriteLoadInFlight) {
+        this.spriteLoadWatchdog = 0;
+        this.spriteLoadInFlight = true;
+        const gen = ++this.spriteLoadGen;
+        species
+          .loadAssets(female, props.formIndex, props.shiny, props.variant, true, false, true)
+          .catch(() => {})
+          .then(() => {
+            // Release the single-flight slot — but only if this is still the
+            // current load (the watchdog may have invalidated it). The next
+            // timer tick re-evaluates the cursor and loads it if still needed.
+            if (this.spriteLoadGen === gen) {
+              this.spriteLoadInFlight = false;
+            }
+          });
+      } else if (++this.spriteLoadWatchdog >= 12) {
+        // A single load has been pending ~1.8s without producing its texture:
+        // Phaser's shared loader is wedged (zombie in-flight requests that never
+        // complete or fail — observed under sustained rapid cycling). Force-reset
+        // the loader and retry from scratch on the next tick. `spriteLoadGen` is
+        // bumped so the abandoned load's resolve can't clear the new flag.
+        this.spriteLoadWatchdog = 0;
+        this.spriteLoadInFlight = false;
+        this.spriteLoadGen++;
+        clearInFlightAtlasLoads();
+        try {
+          globalScene.load.reset();
+        } catch {
+          // Loader reset is best-effort; the next tick re-kicks regardless.
+        }
+      }
     }
   }
 

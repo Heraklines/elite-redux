@@ -92,6 +92,17 @@ export type PokemonSpeciesFilter = (species: PokemonSpecies) => boolean;
  */
 const inFlightAtlasLoads = new Set<string>();
 
+/**
+ * Clears the in-flight atlas dedupe set. Called when a caller force-resets the
+ * shared Phaser loader (e.g. the starter-select watchdog recovering from a
+ * wedged loader), so subsequent {@linkcode PokemonSpeciesForm.loadAssets} calls
+ * re-issue their `loadPokemonAtlas` instead of being deduped against keys whose
+ * underlying loader files were just discarded.
+ */
+export function clearInFlightAtlasLoads(): void {
+  inFlightAtlasLoads.clear();
+}
+
 export abstract class PokemonSpeciesForm {
   public speciesId: SpeciesId;
   protected _formIndex: number;

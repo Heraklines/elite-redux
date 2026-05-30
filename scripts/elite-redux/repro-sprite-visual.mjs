@@ -80,6 +80,27 @@ function visualOk(v) {
   return speciesIdOf(v.texKey) === speciesIdOf(v.expected);
 }
 
+// Dump handler + Phaser-loader internals to classify a stuck state.
+const grabDiag = () =>
+  p.evaluate(() => {
+    const h = window.dev.scene.ui.getHandler();
+    const sp = h.lastSpecies;
+    const props = window.dev.scene.gameData.getSpeciesDexAttrProps(sp, h.getCurrentDexProps(sp.speciesId));
+    const exp = sp.getSpriteKey(props.female, props.formIndex, props.shiny, props.variant);
+    return {
+      exp,
+      texExists: window.dev.scene.textures.exists(exp),
+      animExists: window.dev.scene.anims.exists(exp),
+      spriteLoadInFlight: h.spriteLoadInFlight,
+      hasReconcileTimer: !!h.spriteReconcileTimer,
+      loaderIsLoading: window.dev.scene.load.isLoading(),
+      loaderTotalToLoad: window.dev.scene.load.totalToLoad,
+      loaderTotalComplete: window.dev.scene.load.totalComplete,
+      loaderTotalFailed: window.dev.scene.load.totalFailed,
+      loaderInflight: window.dev.scene.load.inflight?.size ?? null,
+    };
+  });
+
 async function settleVisual(timeout = 12000) {
   const t0 = Date.now();
   let last;
@@ -134,26 +155,47 @@ try {
     }
   }
 
-  // PASS 2: rapid bursts (the reported repro), check the FINAL rendered texture.
-  for (let burst = 0; burst < 8; burst++) {
-    const n = 6 + (burst % 5);
-    for (let i = 0; i < n; i++) {
+  // PASS 2: FURIOUS sustained cycling — exactly the user's repro ("cycle back
+  // and forth 10-20 times, you'll see it immediately"). Long oscillation runs
+  // with no settle pauses, varying speed, then a TIGHT user-perceived
+  // convergence window (2s). A failure here = the displayed sprite is still the
+  // wrong Pokémon 2s after the player stopped — i.e. visibly stuck.
+  let furiousFail = 0;
+  let furiousStuck = 0;
+  for (let round = 0; round < 16; round++) {
+    const len = 12 + round * 2; // 12 → 42 oscillations
+    const gap = 8 + (round % 5) * 8; // 8–40ms between taps (machine-gun → fast)
+    for (let i = 0; i < len; i++) {
       await tap(i % 2 ? "ArrowLeft" : "ArrowRight");
-      await sleep(15 + (i % 3) * 12);
+      await sleep(gap);
     }
-    // mix in up/down too
-    await tap("ArrowDown");
-    await sleep(25);
-    const { ms, v } = await settleVisual(15000);
-    if (!visualOk(v)) {
-      visualMismatch++;
-      bad.push(
-        `burst ${burst}: VISUAL MISMATCH exp=${v.expected} tex=${v.texKey} anim=${v.animKey} pipe=${v.pipelineKey} name=${v.name}`,
-      );
-    } else if (ms > 1500) {
-      bad.push(`burst ${burst}: slow settle ${ms}ms`);
+    // Occasionally jump rows mid-storm too (the user moves in all directions).
+    if (round % 3 === 0) {
+      await tap("ArrowDown");
+      await sleep(gap);
+      await tap("ArrowUp");
+      await sleep(gap);
+    }
+    // User-perceived window: must show the right species within 2s of stopping.
+    const quick = await settleVisual(2000);
+    if (quick.ms < 0) {
+      // Not converged in 2s — give it the full window to classify stuck-forever.
+      const long = await settleVisual(15000);
+      if (long.ms < 0) {
+        furiousStuck++;
+        bad.push(
+          `furious ${round} (len=${len},gap=${gap}): STUCK exp=${long.v.expected} tex=${long.v.texKey} pipe=${long.v.pipelineKey} name=${long.v.name}`,
+        );
+        bad.push("DIAG " + JSON.stringify(await grabDiag()));
+      } else {
+        furiousFail++;
+        bad.push(`furious ${round} (len=${len},gap=${gap}): slow ${long.ms}ms (converged late)`);
+      }
     }
   }
+  console.log(
+    `FURIOUS: visiblyStuck(>2s)=${furiousFail + furiousStuck} stuckForever(>15s)=${furiousStuck} of 16 rounds`,
+  );
 
   // PASS 3: settle, then read the steady-state visual repeatedly (catch a sprite
   // that "looks" settled by pipeline but is visually wrong and never corrects).
@@ -168,31 +210,7 @@ try {
       );
       if (!globalThis.__dumped) {
         globalThis.__dumped = true;
-        // Dump the handler internals + asset state for the FIRST stuck case.
-        const diag = await p.evaluate(() => {
-          const h = window.dev.scene.ui.getHandler();
-          const sp = h.lastSpecies;
-          const props = window.dev.scene.gameData.getSpeciesDexAttrProps(sp, h.getCurrentDexProps(sp.speciesId));
-          const exp = sp.getSpriteKey(props.female, props.formIndex, props.shiny, props.variant);
-          return {
-            exp,
-            texExists: window.dev.scene.textures.exists(exp),
-            animExists: window.dev.scene.anims.exists(exp),
-            reconcileLoadKey: h.reconcileLoadKey,
-            starterSpriteLoadActive: h.starterSpriteLoadActive,
-            pendingStarterSpriteLoad: !!h.pendingStarterSpriteLoad,
-            hasReconcileTimer: !!h.spriteReconcileTimer,
-            // Phaser loader internals — is the shared loader wedged?
-            loaderIsLoading: window.dev.scene.load.isLoading(),
-            loaderTotalToLoad: window.dev.scene.load.totalToLoad,
-            loaderTotalComplete: window.dev.scene.load.totalComplete,
-            loaderTotalFailed: window.dev.scene.load.totalFailed,
-            loaderInflight: window.dev.scene.load.inflight?.size ?? null,
-            loaderQueueSize: window.dev.scene.load.queue?.size ?? null,
-            loaderListSize: window.dev.scene.load.list?.size ?? null,
-          };
-        });
-        bad.push("DIAG " + JSON.stringify(diag));
+        bad.push("DIAG " + JSON.stringify(await grabDiag()));
       }
     }
   }
