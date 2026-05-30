@@ -17,7 +17,7 @@ import {
 } from "#balance/starters";
 import { allAbilities, allMoves, allSpecies } from "#data/data-lists";
 import { Egg, getEggTierForSpecies, MAX_EGG_COUNT } from "#data/egg";
-import { getErAbilityRomDescription } from "#data/elite-redux/er-ability-descriptions";
+import { matchesAbilityText } from "#data/elite-redux/er-ability-search";
 import { GrowthRate, getGrowthRateColor } from "#data/exp";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
@@ -246,47 +246,6 @@ function calcStarterPosition(index: number, scrollCursor = 0): { x: number; y: n
   const y = yOffset + (Math.floor(index / 9) - scrollCursor) * height;
 
   return { x, y };
-}
-
-/**
- * ER ability-text search: does any of a species' abilities (main + 3 innates)
- * match `query` (case-insensitive regex, falling back to substring on an
- * invalid pattern)? Matches against the FULL detailed ROM ability text — not
- * the abbreviated one-liners — plus the ability name.
- */
-function matchesAbilityText(species: PokemonSpecies, query: string): boolean {
-  const q = query.trim();
-  if (q === "") {
-    return true;
-  }
-  let re: RegExp | null = null;
-  try {
-    re = new RegExp(q, "i");
-  } catch {
-    re = null; // invalid regex → substring fallback below
-  }
-  const ql = q.toLowerCase();
-  const ids = new Set<number>([
-    species.ability1,
-    species.ability2,
-    species.abilityHidden,
-    ...species.getPassiveAbilities(0),
-  ]);
-  for (const id of ids) {
-    if (!id) {
-      continue;
-    }
-    const ability = allAbilities[id];
-    if (!ability) {
-      continue;
-    }
-    const detailed = getErAbilityRomDescription(ability.name) ?? ability.description ?? "";
-    const haystack = `${ability.name}\n${detailed}`;
-    if (re ? re.test(haystack) : haystack.toLowerCase().includes(ql)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 /**

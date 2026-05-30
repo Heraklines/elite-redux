@@ -13,6 +13,7 @@ import {
 } from "#balance/starters";
 import { speciesTmMoves } from "#balance/tms";
 import { allAbilities, allMoves, allSpecies, catchableSpecies } from "#data/data-lists";
+import { matchesAbilityText } from "#data/elite-redux/er-ability-search";
 import type { PokemonForm, PokemonSpecies } from "#data/pokemon-species";
 import { normalForm } from "#data/pokemon-species";
 import { AbilityAttr } from "#enums/ability-attr";
@@ -336,6 +337,8 @@ export class PokedexUiHandler extends MessageUiHandler {
     this.filterText.addFilter(FilterTextRow.MOVE_2, i18next.t("filterText:move2Field"));
     this.filterText.addFilter(FilterTextRow.ABILITY_1, i18next.t("filterText:ability1Field"));
     this.filterText.addFilter(FilterTextRow.ABILITY_2, i18next.t("filterText:ability2Field"));
+    // ER: free-text regex search over the FULL detailed ability descriptions.
+    this.filterText.addFilter(FilterTextRow.ABILITY_TEXT, i18next.t("filterText:abilityTextField"));
 
     this.filterTextContainer.add(this.filterText);
     this.starterSelectContainer.add(this.filterTextContainer);
@@ -1466,6 +1469,12 @@ export class PokedexUiHandler extends MessageUiHandler {
         & (this.gameData.dexData[this.getStarterSpeciesId(species.speciesId)]?.caughtAttr || BigInt(0))
         & species.getFullUnlocksData();
       const starterData = this.gameData.starterData[starterId];
+      // ER: some species (data gaps / non-starter custom forms like mega
+      // species) have no starterData; their downstream .passiveAttr/.eggMoves/
+      // .valueReduction reads would crash the whole Pokédex grid. Skip them.
+      if (!starterData) {
+        continue;
+      }
       const isStarterProgressable = Object.hasOwn(speciesEggMoves, starterId);
 
       // Name filter
@@ -1547,6 +1556,12 @@ export class PokedexUiHandler extends MessageUiHandler {
         (fitsAbility1 && (fitsPassive2 || selectedAbility2 === this.filterText.defaultText))
         || (fitsAbility2 && (fitsPassive1 || selectedAbility1 === this.filterText.defaultText));
 
+      // ER: free-text regex over the FULL detailed ability descriptions (main +
+      // innates), e.g. "sun" → every mon whose ability text mentions the sun.
+      const abilityTextQuery = this.filterText.getValue(FilterTextRow.ABILITY_TEXT);
+      const fitsAbilityText =
+        abilityTextQuery === this.filterText.defaultText || matchesAbilityText(species, abilityTextQuery);
+
       if (fitsPassive1 || fitsPassive2) {
         if (fitsPassive1) {
           if (starterData.passiveAttr > 0) {
@@ -1581,9 +1596,13 @@ export class PokedexUiHandler extends MessageUiHandler {
         ...getEvolutions(species.speciesId).values(),
       ]);
 
-      const biomes: Set<string> = new Set(catchableSpecies[starterId].map(b => enumValueToKey(BiomeId, b.biome)));
+      // ER: catchableSpecies has no entry for ER customs (and some vanilla mons),
+      // so guard against undefined/non-iterable to avoid crashing the grid.
+      const biomes: Set<string> = new Set(
+        (catchableSpecies[starterId] ?? []).map(b => enumValueToKey(BiomeId, b.biome)),
+      );
       for (const sId of evoLine) {
-        for (const bttod of catchableSpecies[sId]) {
+        for (const bttod of catchableSpecies[sId] ?? []) {
           biomes.add(enumValueToKey(BiomeId, bttod.biome));
         }
       }
@@ -1785,6 +1804,7 @@ export class PokedexUiHandler extends MessageUiHandler {
       if (
         fitsName
         && fitsAbilities
+        && fitsAbilityText
         && fitsMoves
         && fitsGen
         && fitsBiome
