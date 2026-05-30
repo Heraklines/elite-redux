@@ -846,6 +846,25 @@ export abstract class PokemonSpeciesForm {
         if (!globalScene.load.isLoading()) {
           globalScene.load.start();
         }
+        // Race guard: when the loader was ALREADY running, `loadPokemonAtlas`
+        // appends to it and the atlas can finish before this listener is
+        // attached (there's an awaited step above) — the `filecomplete` event
+        // is then missed and this promise would hang forever, stalling the
+        // serial starter-sprite queue (the "sprite stuck / takes forever to
+        // load" bug during rapid cycling). If the texture is already present,
+        // settle immediately.
+        if (globalScene.textures.exists(spriteKey)) {
+          settle();
+        } else {
+          // Belt-and-suspenders: never let a missed/lost event block the queue.
+          // A plain timer (not the scene clock) so it fires regardless of scene
+          // state; settle() is idempotent, so a real filecomplete still wins.
+          setTimeout(() => {
+            if (!settled) {
+              settle();
+            }
+          }, 2500);
+        }
       } else {
         // The caller owns starting the loader. Keep the per-file listener
         // installed so the animation is built when the atlas eventually lands.
