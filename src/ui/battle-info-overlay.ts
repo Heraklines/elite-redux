@@ -27,7 +27,7 @@ import type { Button } from "#enums/buttons";
 import { Button as Btn } from "#enums/buttons";
 import { MoveCategory } from "#enums/move-category";
 import { PokemonType as PokemonTypeEnum } from "#enums/pokemon-type";
-import { Stat } from "#enums/stat";
+import { type EffectiveStat, Stat } from "#enums/stat";
 import { TextStyle } from "#enums/text-style";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
@@ -413,22 +413,51 @@ export class BattleInfoOverlay {
       c.add(g);
     });
 
-    // Actual stat numbers (right box), 6 rows.
-    const numbers: [string, string][] = [
-      ["HP", `${mon.hp}/${mon.getMaxHp()}`],
-      ["Atk", `${mon.getStat(Stat.ATK)}`],
-      ["Def", `${mon.getStat(Stat.DEF)}`],
-      ["SpA", `${mon.getStat(Stat.SPATK)}`],
-      ["SpD", `${mon.getStat(Stat.SPDEF)}`],
-      ["Spe", `${mon.getStat(Stat.SPD)}`],
+    // Stat numbers (right box), 6 rows. For the 5 battle stats we show the value
+    // after the in-battle STAT-STAGE multiplier next to the base when a stage is
+    // active — e.g. a +1 Atk reads "147(220)", coloured green for a boost / red for
+    // a drop. We deliberately apply ONLY stat stages (the visible up/down arrows),
+    // NOT held-item/ability passives like Eviolite — those have no stage arrow, so
+    // folding them in (via getEffectiveStat) made stats "look changed" with nothing
+    // to explain it. The base already folds in vitamins, EVs, IVs and nature
+    // (getStat). HP has no stat stages → current/max.
+    const numbers: { lbl: string; stat: EffectiveStat | null }[] = [
+      { lbl: "HP", stat: null },
+      { lbl: "Atk", stat: Stat.ATK },
+      { lbl: "Def", stat: Stat.DEF },
+      { lbl: "SpA", stat: Stat.SPATK },
+      { lbl: "SpD", stat: Stat.SPDEF },
+      { lbl: "Spe", stat: Stat.SPD },
     ];
     let ny = 74;
-    for (const [lbl, val] of numbers) {
+    for (const { lbl, stat } of numbers) {
       const l = addTextObject(156, ny, lbl, TextStyle.WINDOW_ALT, { fontSize: "44px" });
       l.setOrigin(0, 0);
       c.add(l);
-      const v = addTextObject(232, ny, val, TextStyle.WINDOW_ALT, { fontSize: "44px" });
+
+      let text: string;
+      let dir = 0; // -1 net drop, 0 unchanged, +1 net boost
+      if (stat === null) {
+        text = `${mon.hp}/${mon.getMaxHp()}`;
+      } else {
+        const base = mon.getStat(stat);
+        const stage = mon.getStatStage(stat); // -6..+6
+        if (stage === 0) {
+          text = `${base}`;
+        } else {
+          // Canonical battle-stat stage multiplier: max(2,2+s)/max(2,2-s).
+          const eff = Math.floor((base * Math.max(2, 2 + stage)) / Math.max(2, 2 - stage));
+          text = `${base}(${eff})`;
+          dir = stage > 0 ? 1 : -1;
+        }
+      }
+      const v = addTextObject(232, ny, text, TextStyle.WINDOW_ALT, { fontSize: "44px" });
       v.setOrigin(1, 0);
+      if (dir > 0) {
+        v.setColor("#3aa83a").setShadowColor("#1f5e1f");
+      } else if (dir < 0) {
+        v.setColor("#d64a4a").setShadowColor("#7a2a2a");
+      }
       c.add(v);
       ny += 7.5;
     }

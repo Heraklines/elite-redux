@@ -205,6 +205,40 @@ export function applyAbAttrs<T extends CallableAbAttrString>(
   applyAbAttrsInternal(attrType, params, { messages });
 }
 
+/**
+ * Apply `PostSummonAbAttr` for ALL of a Pokémon's passive (innate) slots.
+ *
+ * The switch-in flow queues one "passive" {@linkcode PostSummonActivateAbilityPhase}
+ * that called `applyAbAttrs("PostSummonAbAttr", { passive: true })` with no
+ * `passiveSlot`, which defaults to slot 0 — so ER innate slots 1 and 2 (e.g.
+ * Grimmsnarl's Intimidate in slot 1 and Scare in slot 2) never fired on entry,
+ * even though slot-0 passives (e.g. Gyarados's Intimidate) did. This iterates
+ * every non-empty slot with the same gating as {@linkcode applyAbAttrsInternal}'s
+ * passive loop (enemy slot-limit + dedup vs the active ability and across slots),
+ * matching the form-change path that already handles all 3 slots.
+ */
+export function applyPostSummonPassiveAbAttrs(pokemon: AbAttrBaseParams["pokemon"]): void {
+  const seenIds = new Set<number>();
+  seenIds.add(pokemon.getAbility().id);
+  const passiveAbilities = pokemon.getPassiveAbilities();
+  const enemySlotLimit = getEnemyPassiveSlotLimit(pokemon);
+  for (let slot = 0; slot < 3; slot++) {
+    if (slot >= enemySlotLimit) {
+      continue;
+    }
+    const slotAbility = passiveAbilities[slot];
+    if (slotAbility === null || seenIds.has(slotAbility.id)) {
+      continue;
+    }
+    seenIds.add(slotAbility.id);
+    applySingleAbAttrs("PostSummonAbAttr", {
+      pokemon,
+      passive: true,
+      passiveSlot: slot as 0 | 1 | 2,
+    } as AbAttrParamMap["PostSummonAbAttr"]);
+  }
+}
+
 // TODO: Improve the type signatures of the following methods / refactor the apply methods
 
 /**

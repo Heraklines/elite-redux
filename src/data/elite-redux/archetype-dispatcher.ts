@@ -105,6 +105,10 @@ import { SetArenaTagOnHitAbAttr, SetTerrainOnHitAbAttr } from "#data/elite-redux
 import { StatBoostOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-boost-on-flag-attack";
 import { StatChangeOnCategoryAttackAbAttr } from "#data/elite-redux/abilities/stat-change-on-category-attack";
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
+import { AddTypeToAttackerOnContactAbAttr } from "#data/elite-redux/archetypes/add-type-to-attacker-on-contact";
+import { AllyAttackPowerBoostAbAttr } from "#data/elite-redux/archetypes/ally-attack-power-boost";
+import { AttackStatSubstituteAbAttr } from "#data/elite-redux/archetypes/attack-stat-substitute";
+import { BoneMoveTypeChartAbAttr } from "#data/elite-redux/archetypes/bone-move-type-chart";
 import { ChanceDodgeAbAttr } from "#data/elite-redux/archetypes/chance-dodge";
 import {
   ChanceBattlerTagOnAttackAbAttr,
@@ -116,6 +120,7 @@ import {
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
 import { ConditionalDamageAbAttr, type DamageCondition } from "#data/elite-redux/archetypes/conditional-damage";
 import { ContactQuashAbAttr } from "#data/elite-redux/archetypes/contact-quash";
+import { CopyMoveByFilterAbAttr } from "#data/elite-redux/archetypes/copy-move-by-filter";
 import { CounterAttackOnHitAbAttr } from "#data/elite-redux/archetypes/counter-attack-on-hit";
 import { CowardOnceProtectAbAttr } from "#data/elite-redux/archetypes/coward-once-protect";
 import {
@@ -123,6 +128,7 @@ import {
   CritImmunityAbAttr,
   CritStageBonusAbAttr,
 } from "#data/elite-redux/archetypes/crit-mod";
+import { CritStackOnKoAbAttr } from "#data/elite-redux/archetypes/crit-stack-on-ko";
 import { DamageCapOnResistAbAttr } from "#data/elite-redux/archetypes/damage-cap-on-resist";
 import {
   DamageReductionAbAttr,
@@ -130,15 +136,22 @@ import {
 } from "#data/elite-redux/archetypes/damage-reduction-generic";
 import { DefenseStatSwapOnFlagAbAttr } from "#data/elite-redux/archetypes/defense-stat-swap-on-flag";
 import { DefenseStatSwapOnStatusedFoeAbAttr } from "#data/elite-redux/archetypes/defense-stat-swap-on-statused-foe";
+import { EntryArenaTagOnFoeSideAbAttr } from "#data/elite-redux/archetypes/entry-arena-tag-on-foe-side";
 import { type EntryEffect, EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
+import { FieldCritBoostAbAttr } from "#data/elite-redux/archetypes/field-crit-boost";
 import { FieldStatShareAbAttr } from "#data/elite-redux/archetypes/field-stat-share";
 import { FirstTurnStatMultiplierAbAttr } from "#data/elite-redux/archetypes/first-turn-stat-multiplier";
 import { FlagDamageBoostAbAttr } from "#data/elite-redux/archetypes/flag-damage-boost";
 import { FoeStrongestStatSelfBoostAbAttr } from "#data/elite-redux/archetypes/foe-strongest-stat-self-boost";
+import { ForceFoeOutOnInactivityAbAttr } from "#data/elite-redux/archetypes/force-foe-out-on-inactivity";
 import { HitMultiplierAbAttr, HitMultiplierPowerAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
 import { HpThresholdFormChangeAbAttr } from "#data/elite-redux/archetypes/hp-threshold-form-change";
 import { TypeAbsorbHealAbAttr, TypeAbsorbStatBoostAbAttr } from "#data/elite-redux/archetypes/immunity-with-absorb";
 import { LifestealOnHitAbAttr, LifestealOnKoAbAttr } from "#data/elite-redux/archetypes/lifesteal";
+import { MoveFlagInjectionAbAttr } from "#data/elite-redux/archetypes/move-flag-injection";
+import { MovingFirstTrapFlinchAbAttr } from "#data/elite-redux/archetypes/moving-first-trap-flinch";
+import { NullifyFirstNHitsAbAttr } from "#data/elite-redux/archetypes/nullify-first-n-hits";
+import { OffensiveTypeChartOverrideAbAttr } from "#data/elite-redux/archetypes/offensive-type-chart-override";
 import { OnCritStatBoostLowestAbAttr } from "#data/elite-redux/archetypes/on-crit-stat-boost-lowest";
 import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
 import { OnOpponentStatRaiseAbAttr } from "#data/elite-redux/archetypes/on-opponent-stat-raise";
@@ -148,9 +161,10 @@ import {
   OneShotTypeBoostFollowupAbAttr,
 } from "#data/elite-redux/archetypes/one-shot-type-boost-then-lose-type";
 import { OutgoingStatDropMultiplierAbAttr } from "#data/elite-redux/archetypes/outgoing-stat-drop-multiplier";
+import { PartyCountMultiHitAbAttr } from "#data/elite-redux/archetypes/party-count-multi-hit";
 import { PassiveRecoveryAbAttr, type PassiveRecoveryCondition } from "#data/elite-redux/archetypes/passive-recovery";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
-import { PostAllyFaintStatChangeAbAttr } from "#data/elite-redux/archetypes/post-ally-faint";
+import { PoisonedFoePurgeAbAttr } from "#data/elite-redux/archetypes/poisoned-foe-purge";
 import { PostAttackContactSuppressTargetAbilityAbAttr } from "#data/elite-redux/archetypes/post-attack-contact-suppress-target-ability";
 import { PostAttackScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-attack-scripted-move";
 import { PostDefendChangeAttackerTypeAbAttr } from "#data/elite-redux/archetypes/post-defend-change-attacker-type";
@@ -162,9 +176,16 @@ import { PostSummonClearTerrainAbAttr } from "#data/elite-redux/archetypes/post-
 import { PostSummonQuashFoesAbAttr } from "#data/elite-redux/archetypes/post-summon-quash-foes";
 import { PostSummonScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-summon-scripted-move";
 import { PostSummonStackSetEffectsAbAttr } from "#data/elite-redux/archetypes/post-summon-stack-set-effects";
+import { PostTurnApplyTagOnFoesAbAttr } from "#data/elite-redux/archetypes/post-turn-apply-tag-on-foes";
+import { PostTurnDrainAbAttr } from "#data/elite-redux/archetypes/post-turn-drain";
 import { PostTurnFoeStatDropAbAttr } from "#data/elite-redux/archetypes/post-turn-foe-stat-drop";
 import { PostTurnScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-turn-scripted-move";
 import { PostVictoryClearTagAbAttr } from "#data/elite-redux/archetypes/post-victory-clear-tag";
+import {
+  AllyFaintPowerBoostAbAttr,
+  AllyFaintPowerBoostExpireAbAttr,
+  AllyFaintPowerBoostTriggerAbAttr,
+} from "#data/elite-redux/archetypes/power-boost-on-ally-faint";
 import { PreFaintReviveAbAttr } from "#data/elite-redux/archetypes/pre-faint-revive";
 import { PreSwitchOutItemRestoreAbAttr } from "#data/elite-redux/archetypes/pre-switch-out-item-restore";
 import {
@@ -172,17 +193,28 @@ import {
   PriorityModifierAbAttr,
   type PriorityModifierFilter,
 } from "#data/elite-redux/archetypes/priority-modifier";
+import { ReflectDamageOnDefendAbAttr } from "#data/elite-redux/archetypes/reflect-damage-on-defend";
 import { RepeatMovePowerBoostAbAttr } from "#data/elite-redux/archetypes/repeat-move-power-boost";
+import { SandSecondaryEffectImmunityAbAttr, SandStatusImmunityAbAttr } from "#data/elite-redux/archetypes/sand-cloak";
 import { SePriorityBonusAbAttr } from "#data/elite-redux/archetypes/se-priority-bonus";
+import { SelfDamageOnAttackAbAttr } from "#data/elite-redux/archetypes/self-damage-on-attack";
 import { SelfHighestStatBoostOnSummonAbAttr } from "#data/elite-redux/archetypes/self-highest-stat-boost-on-summon";
 import { SelfHighestStatMultiplierAbAttr } from "#data/elite-redux/archetypes/self-highest-stat-multiplier";
+import { SelfPersistentBleedAbAttr } from "#data/elite-redux/archetypes/self-persistent-bleed";
+import { SelfSwitchOnMoveTypeAbAttr } from "#data/elite-redux/archetypes/self-switch-on-move-type";
+import { SelfSwitchOnStatLowerAbAttr } from "#data/elite-redux/archetypes/self-switch-on-stat-lower";
 import { SetFogOnHitAbAttr } from "#data/elite-redux/archetypes/set-fog-on-hit";
+import { SetTargetAbilityOnMoveAbAttr } from "#data/elite-redux/archetypes/set-target-ability-on-move";
 import { SkipChargeTurnAbAttr } from "#data/elite-redux/archetypes/skip-charge-turn";
 import { SpeedBonusToStatAbAttr } from "#data/elite-redux/archetypes/speed-bonus-to-stat";
 import { StabAddAbAttr } from "#data/elite-redux/archetypes/stab-add";
 import { StabSuppressAuraAbAttr } from "#data/elite-redux/archetypes/stab-suppress-aura";
 import { StatBlendAbAttr } from "#data/elite-redux/archetypes/stat-blend";
 import { StatChangeOnAttackAbAttr } from "#data/elite-redux/archetypes/stat-change-on-attack";
+import {
+  FaintCountTriggerAbAttr,
+  PerFaintStatMultiplierAbAttr,
+} from "#data/elite-redux/archetypes/stat-multiplier-per-faint";
 import {
   type StatChange,
   StatTriggerOnEntryAbAttr,
@@ -191,6 +223,7 @@ import {
   StatTriggerOnStatLoweredAbAttr,
 } from "#data/elite-redux/archetypes/stat-trigger-on-event";
 import { StatusCascadeAbAttr } from "#data/elite-redux/archetypes/status-cascade";
+import { StatusChanceMultiplierAbAttr } from "#data/elite-redux/archetypes/status-chance-multiplier";
 import {
   BattlerTagImmunityAbAttrEr,
   IntimidateImmunityAbAttrEr,
@@ -202,7 +235,6 @@ import { TargetHighestStatDropAbAttr } from "#data/elite-redux/archetypes/target
 import { TimeLimitedDamageReductionAbAttr } from "#data/elite-redux/archetypes/time-limited-damage-reduction";
 import { TrapDurationModifierAbAttr } from "#data/elite-redux/archetypes/trap-duration-modifier";
 import { TurnDecayDamageMultiplierAbAttr } from "#data/elite-redux/archetypes/turn-decay-damage-multiplier";
-import { TypeChartOverrideAbAttr } from "#data/elite-redux/archetypes/type-chart-override";
 import { TypeConversionAbAttr, TypeConversionPowerBoostAbAttr } from "#data/elite-redux/archetypes/type-conversion";
 import { TypeDamageBoostAbAttr, TypeRecoilAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
 import { buildTypeEffectivenessModAttrs } from "#data/elite-redux/archetypes/type-effectiveness-mod";
@@ -210,6 +242,7 @@ import { TypeGatedStatTriggerOnAttackAbAttr } from "#data/elite-redux/archetypes
 import { TypedImmunityWithArenaTagAbAttr } from "#data/elite-redux/archetypes/typed-immunity-with-arena-tag";
 import { UserFieldFlagImmunityAbAttr } from "#data/elite-redux/archetypes/user-field-flag-immunity";
 import { WeatherBasedMoveBlockAbAttr } from "#data/elite-redux/archetypes/weather-based-move-block";
+import { WeatherGroundAirborneAbAttr } from "#data/elite-redux/archetypes/weather-ground-airborne";
 import { WeatherStatMultiplierAbAttr } from "#data/elite-redux/archetypes/weather-stat-multiplier";
 import {
   WeatherDamageReductionAbAttr,
@@ -913,6 +946,47 @@ function buildStatChanges(rawStats: unknown): StatChange[] {
   return out;
 }
 
+/**
+ * Parse an `on-hit` filter row (`{ types?: string[], flags?: string[] }`) into the
+ * type/flag gate consumed by {@linkcode StatTriggerOnHitAbAttr}. Returns null when
+ * no usable type/flag is present so an unfiltered trigger stays unfiltered.
+ *
+ * Without this, the filter on filtered procs (e.g. Inflatable's `[FLYING, FIRE]`)
+ * was silently dropped, so they fired on EVERY hit regardless of move type.
+ */
+function parseOnHitFilter(raw: unknown): { types?: PokemonType[]; flags?: MoveFlags[] } | null {
+  if (raw === null || typeof raw !== "object") {
+    return null;
+  }
+  const r = raw as { types?: unknown; flags?: unknown };
+  const types: PokemonType[] = [];
+  if (Array.isArray(r.types)) {
+    for (const t of r.types) {
+      const pt = typeof t === "string" ? PokemonType[t as keyof typeof PokemonType] : undefined;
+      if (typeof pt === "number") {
+        types.push(pt);
+      }
+    }
+  }
+  const flags: MoveFlags[] = [];
+  if (Array.isArray(r.flags)) {
+    for (const f of r.flags) {
+      const mf = typeof f === "string" ? MoveFlags[f as keyof typeof MoveFlags] : undefined;
+      if (typeof mf === "number") {
+        flags.push(mf);
+      }
+    }
+  }
+  const filter: { types?: PokemonType[]; flags?: MoveFlags[] } = {};
+  if (types.length > 0) {
+    filter.types = types;
+  }
+  if (flags.length > 0) {
+    filter.flags = flags;
+  }
+  return filter.types || filter.flags ? filter : null;
+}
+
 /** Dispatch a `stat-trigger-on-event` classifier row. */
 function dispatchStatTriggerOnEvent(params: Record<string, unknown>): DispatchResult {
   const trigger = params.trigger;
@@ -927,7 +1001,7 @@ function dispatchStatTriggerOnEvent(params: Record<string, unknown>): DispatchRe
     case "on-ko":
       return ok([new StatTriggerOnKoAbAttr({ stats })]);
     case "on-hit":
-      return ok([new StatTriggerOnHitAbAttr({ stats })]);
+      return ok([new StatTriggerOnHitAbAttr({ stats, filter: parseOnHitFilter(params.filter) ?? undefined })]);
     case "on-entry":
       return ok([new StatTriggerOnEntryAbAttr({ stats })]);
     case "on-stat-lowered":
@@ -1419,18 +1493,9 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       ];
     case 984: // Mucus Membrane: "Takes 30% less damage from attacks" (reduction = fraction removed)
       return [new DamageReductionAbAttr({ reduction: 0.3, filter: { kind: "all" } })];
-    case 909: // Lightsaber: "Adds Fire-type. Keen Edge moves 25% burn or paralysis."
-      // Fire type-add (on summon) + offensive KEEN-EDGE 25% burn ("or paralysis"
-      // approximated to burn). Converted from chance-status archetype so both
-      // halves can be emitted.
-      return [
-        new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.FIRE }),
-        new ChanceStatusOnAttackAbAttr({
-          chance: 25,
-          effects: [StatusEffect.BURN],
-          filter: { flag: MoveFlags.SLICING_MOVE },
-        }),
-      ];
+    // (er 909 Lightsaber relocated to dispatchBespokeR48 — it's a pure
+    // hand-wired ability with no vanilla-ability parts, so it's classified
+    // `bespoke` rather than `composite-vanilla-mashup`.)
     case 859: // Dreamscape: "Comatose + Dreamcatcher + Deal 20% more damage" — the
       // bare "+20% damage" rider is an unconditional all-moves power boost.
       // (Comatose is the auto-resolved part; Dreamcatcher remains a named rider.)
@@ -2024,10 +2089,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 807:
-      // Woodland Curse — uses Forest's Curse on entry. The "Adds Grass type
-      // on contact" piece is deferred — needs a separate post-defend "add
-      // type to attacker" primitive. Partial wire.
-      return ok([new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.FORESTS_CURSE })]);
+      // Woodland Curse — "Uses Forest's Curse on Entry. Adds Grass type on
+      // contact." Entry scripted move + a post-defend rider that gives any
+      // contact attacker an extra Grass type.
+      return ok([
+        new EntryEffectAbAttr({ kind: "scripted-move", move: MoveId.FORESTS_CURSE }),
+        new AddTypeToAttackerOnContactAbAttr(PokemonType.GRASS),
+      ]);
     case 874:
       // Winter Throne — "1/8 Damage each turn to non-ice. Heals Ice 1/8 each
       // turn." non-Ice foes take 1/8 each turn + the holder heals 1/8 each turn
@@ -2137,12 +2205,19 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 673:
-      // Blood Stain — bleeds spread on contact: 100% chance to apply ER_BLEED
-      // when the holder is touched. The "is always bleeding if not immune"
-      // self-bleed piece composes via an entry-effect that adds the tag to
-      // self, but isn't wired here yet — partial wire.
+      // Blood Stain — "Is always bleeding if not immune. Spreads on contact."
+      // Full wire: holder bleeds on entry and stays bleeding (re-applied each
+      // turn end if cured), and spreads ER_BLEED on contact both offensively
+      // (its contact moves) and defensively (when touched).
       return ok([
+        new PostSummonAddBattlerTagAbAttr(BattlerTagType.ER_BLEED, 99),
+        new SelfPersistentBleedAbAttr(),
         new ChanceBattlerTagOnHitAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.ER_BLEED],
+          contactRequired: true,
+        }),
+        new ChanceBattlerTagOnAttackAbAttr({
           chance: 100,
           tags: [BattlerTagType.ER_BLEED],
           contactRequired: true,
@@ -2177,19 +2252,10 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // text).
       return ok([new StatTriggerOnKoAbAttr({ stats: [{ stat: Stat.ATK, stages: 1 }] })]);
     case 427:
-      // Cheating Death — "Gets no damage for the first two hits." Modeled as
-      // the endure-shaped subset (clamp lethal damage to leave 1 HP) for the
-      // first two incoming hits of the battle. Non-lethal-clamping
-      // (full damage immunity) is a partial wire — the existing pre-faint
-      // revive primitive only intercepts one-shot KOs, not arbitrary damage.
-      // Full no-damage-for-N-hits semantics would need a separate primitive
-      // hooking the pre-damage-application path; deferred.
-      return ok([
-        new PreFaintReviveAbAttr({
-          gate: { kind: "hp-threshold", threshold: 0 },
-          usage: { kind: "first-n-hits", n: 2 },
-        }),
-      ]);
+      // Cheating Death — "Negates the first two instances of damage received."
+      // Full no-damage-for-N-hits: the first 2 damaging instances are set to 0
+      // (moves still connect and secondary effects still apply).
+      return ok([new NullifyFirstNHitsAbAttr(2)]);
     case 583:
       // Gallantry — "Gets no damage for first hit." Same endure-shaped subset
       // as Cheating Death with N=1. Partial wire vs the full "no-damage" text.
@@ -2328,14 +2394,19 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new TypeDamageBoostAbAttr({ type: PokemonType.FIGHTING, multiplier: 1.3 }),
       ]);
     case 973:
-      // Talon Trap — "50% chance to trap on contact. 100% if entered this
-      // turn." Wire the contact-trap proc at 50% via ChanceBattlerTagOnHit
-      // applying BattlerTagType.TRAPPED. The "100% if entered this turn"
-      // piece needs a switch-in-turn condition that the chance-status
-      // primitive doesn't carry today; deferred. Partial wire.
+      // Talon Trap — "50% chance to trap on contact (offense AND defense),
+      // 100% if entered this turn." Contact-trap proc on both being hit and
+      // landing a contact hit, guaranteed on the holder's first turn.
       return ok([
         new ChanceBattlerTagOnHitAbAttr({
           chance: 50,
+          firstTurnChance: 100,
+          tags: [BattlerTagType.TRAPPED],
+          contactRequired: true,
+        }),
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 50,
+          firstTurnChance: 100,
           tags: [BattlerTagType.TRAPPED],
           contactRequired: true,
         }),
@@ -2529,11 +2600,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     case 627:
       // Ethereal Rush — "This Pokémon's Speed gets a 1.5x boost in fog."
-      // Single-stat (SPD) so use SelfHighestStatMultiplier with just SPD — it
-      // is trivially "highest" of the candidate list, gated on fog.
+      // A weather-gated single-stat multiplier, wired with the same
+      // WeatherStatMultiplier primitive as the other weather-stat abilities
+      // (959 Rain Shroud, 1018 Abominable Monster) for consistency.
       return ok([
-        new SelfHighestStatMultiplierAbAttr({
-          candidates: [Stat.SPD],
+        new WeatherStatMultiplierAbAttr({
+          stat: Stat.SPD,
           multiplier: 1.5,
           weathers: [WeatherType.FOG],
         }),
@@ -2691,10 +2763,9 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([new TypeImmunityStatStageChangeAbAttr(PokemonType.ELECTRIC, Stat.SPATK, 1)]);
     case 907:
       // Turf War — "Destroys terrain and boosts highest stat on entry."
-      // Two pieces: clear current terrain (PostSummonRemoveArenaTagAbAttr
-      // does this for arena tags but terrain is different layer) + highest
-      // stat +1. Wire just the stat boost (terrain-clear deferred).
+      // Clear the active terrain on entry + raise the holder's highest stat.
       return ok([
+        new PostSummonClearTerrainAbAttr(),
         new SelfHighestStatBoostOnSummonAbAttr({
           candidates: [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD],
           stages: 1,
@@ -2712,23 +2783,23 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.ELECTRIC }),
       ]);
     case 604:
-      // Desert Spirit — "Summons sand on entry. Ground moves hit airborne in sand."
-      // Wire set-weather (sand) — the airborne-hit piece would need engine work
-      // and is deferred.
-      return ok([new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.SANDSTORM, turns: 8 })]);
+      // Desert Spirit — "Summons sand on entry. Ground moves hit airborne in
+      // sand." Sand-on-entry + a sand-gated Ground type-chart override that
+      // rewrites Ground-vs-Flying immunity (0x) to neutral (1x).
+      return ok([
+        new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.SANDSTORM, turns: 8 }),
+        new WeatherGroundAirborneAbAttr([WeatherType.SANDSTORM]),
+      ]);
     case 893:
-      // Deep Fried — "Summons a sea of fire on entry."
-      // Pokerogue has FIRE_SPIN as a single-target trap. Sea of Fire = field
-      // effect that damages over time; closest match is to set up SANDSTORM-
-      // like passive damage. Approximate with sunny day (fire-friendly) +
-      // 4-turn proto. Defer the actual sea-of-fire arena tag.
-      return ok([new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.SUNNY, turns: 5 })]);
+      // Deep Fried — "Summons a sea of fire on entry." Drops the Fire+Grass
+      // pledge sea-of-fire arena tag on the foes' side (damages non-Fire
+      // Pokemon there each turn).
+      return ok([new EntryArenaTagOnFoeSideAbAttr(ArenaTagType.FIRE_GRASS_PLEDGE)]);
     case 877:
-      // Swamp Thing — "Sets the Swamp Pledge effect on entry."
-      // Swamp = halves speed for both teams. Pokerogue has Grass+Water pledge.
-      // Approximate with TerrainType.GRASSY (similar Grass-flavored swamp).
-      // Partial wire.
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.GRASSY_TERRAIN })]);
+      // Swamp Thing — "Sets the Swamp Pledge effect on entry." Drops the
+      // Grass+Water pledge swamp arena tag on the foes' side (quarters their
+      // Speed).
+      return ok([new EntryArenaTagOnFoeSideAbAttr(ArenaTagType.GRASS_WATER_PLEDGE)]);
     case 927:
       // Taste the Rainbow — "Summons the Rainbow Pledge effect on entry."
       // Rainbow = Fire+Water pledge → doubles status proc rates. No direct
@@ -2796,20 +2867,22 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([new PostSummonAddBattlerTagAbAttr(BattlerTagType.CHARGED, 0)]);
     case 631:
       // Shiny Lightning — "Grants a 1.2x accuracy boost. Thunder never misses."
-      // Wire the accuracy multiplier; "Thunder never misses" is per-move and
-      // deferred.
-      return ok([new StatMultiplierAbAttr(Stat.ACC, 1.2)]);
+      // 1.2x accuracy + Thunder always hits.
+      return ok([
+        new StatMultiplierAbAttr(Stat.ACC, 1.2),
+        new ConditionalAlwaysHitAbAttr({ moveIds: [MoveId.THUNDER] }),
+      ]);
     case 437:
       // Radiance — "+20% accuracy; Dark moves fail when user is present."
       // Wire the accuracy boost (matches Compound Eyes pattern); Dark-move
       // failure-on-field deferred.
       return ok([new StatMultiplierAbAttr(Stat.ACC, 1.2)]);
     case 945:
-      // Echolocation — "In fog, deal 20% more damage and never miss."
-      // Wire damage piece: MovePowerBoost gated on FOG weather. "Never miss"
-      // deferred (would need conditional AlwaysHit primitive).
+      // Echolocation — "In fog, deal 20% more damage and never miss." +20%
+      // power in fog and all moves always hit while fog is active.
       return ok([
         new MovePowerBoostAbAttr((_u, _t, _move) => globalScene.arena.weather?.weatherType === WeatherType.FOG, 1.2),
+        new ConditionalAlwaysHitAbAttr({ weather: [WeatherType.FOG] }),
       ]);
     case 916:
       // Narcissist — "When a stat is lowered, sharply raise both offenses."
@@ -2919,10 +2992,15 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // nuance is a minor secondary, deferred.
       return ok([new ChangeMovePriorityAbAttr(pokemon => pokemon.tempSummonData.waveTurnCount === 1, 1)]);
     case 669:
-      // Flammable Coat — "Changes forms when using or hit by a Fire-type move."
-      // Form change requires species-specific bespoke data. Approximate as
-      // halved Fire damage taken (defensive piece — the form change is
-      // typically defensive in nature).
+      // Flammable Coat — "Transforms Lumbering Sloth into its Engulfed form when
+      // hit by/using Fire moves. Cannot be copied or suppressed." The
+      // "cannot be copied or suppressed" clause is implemented faithfully via
+      // the uncopiable/unsuppressable/unreplaceable builder flags (see
+      // init-elite-redux-custom-abilities.ts). The form change itself is ENGINE-
+      // BLOCKED: ER's Engulfed is a SEPARATE species (SPECIES_LUMBERING_SLOTH_
+      // ENGULFED, id 1847), not a form of Lumbering Sloth, and PokeRogue has no
+      // mid-battle species-swap mechanic (only intra-species form changes). The
+      // in-battle Fire interaction is kept as halved Fire damage taken.
       return ok([
         new DamageReductionAbAttr({
           reduction: 0.5,
@@ -2941,10 +3019,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         ),
       ]);
     case 791:
-      // DNA Scramble — "Changes forms based on the the move used."
-      // Form change requires bespoke per-species data. Approximate as 1.2x
-      // damage on all moves (generic "scrambled" buff).
-      return ok([new MovePowerBoostAbAttr(() => true, 1.2)]);
+      // DNA Scramble — "Changes forms based on the move used." Implemented
+      // data-driven (Aegislash Stance-Change pattern): the Deoxys form-change
+      // table in pokemon-forms.ts carries PreMove triggers gated on this
+      // ability (Damaging → Attack, Recover → Defense, other status → Speed).
+      // The ability itself is a pure marker — no AbAttr behavior to attach.
+      return ok([]);
     case 813:
       // Mixed Martial Arts — "Normal moves are flagged as Punch + Kick moves."
       // The holder's Normal moves gain the PUNCHING + KICKING flags (so Iron
@@ -2957,9 +3037,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 830:
-      // Temporal Rupture — "Roar of Time is altered drastically."
-      // Approximate as 1.5x boost on Roar of Time specifically.
-      return ok([new MovePowerBoostAbAttr((_u, _t, move) => move.id === MoveId.ROAR_OF_TIME, 1.5)]);
+      // Temporal Rupture — "Roar of Time becomes a 100 BP +0 priority attack
+      // that changes the target's Ability to Slow Start but no longer forces
+      // recharge." Signature rider: on hitting with Roar of Time, set the
+      // target's ability to Slow Start. (The BP/priority/no-recharge stat
+      // tweaks are Roar-of-Time move-data overrides handled in the move layer.)
+      return ok([new SetTargetAbilityOnMoveAbAttr(MoveId.ROAR_OF_TIME, AbilityId.SLOW_START)]);
     case 834:
       // Toxic Surge — "Sets Toxic Terrain on entry." Sets the ER-custom Toxic
       // Terrain (boosts Poison moves + chips grounded non-Poison mons) for 8
@@ -3395,17 +3478,19 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Hover — "Adds Psychic type to itself. Avoids Ground attacks." Wire the
       // entry-effect "add Psychic type" piece via the existing
       // {@linkcode EntryEffectAddSelfType} primitive. The Ground-immunity piece
-      // requires a Levitate-style type-immunity grant (already on a vanilla
-      // AbAttr family — `TypeImmunityAbAttr`) — defer to a follow-up round
-      // where we wire the dual entry+immunity composition explicitly.
-      // Partial wire.
-      return ok([new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.PSYCHIC })]);
+      // requires a Levitate-style type-immunity grant — AttackTypeImmunity
+      // (Ground), same shape as Mountaineer's Rock immunity.
+      return ok([
+        new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.PSYCHIC }),
+        new AttackTypeImmunityAbAttr(PokemonType.GROUND),
+      ]);
     case 843:
-      // Fey Flight — "Adds Fairy-type and levitates." Same shape as 715 Hover
-      // but for Fairy + Flying-style levitate. Wire the add-self-type piece;
-      // the levitate piece is deferred (same TypeImmunity dependency).
-      // Partial wire.
-      return ok([new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.FAIRY })]);
+      // Fey Flight — "Adds Fairy-type and levitates." add-self-type (Fairy) +
+      // Ground immunity (Levitate-style).
+      return ok([
+        new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.FAIRY }),
+        new AttackTypeImmunityAbAttr(PokemonType.GROUND),
+      ]);
     case 282:
       // Aerodynamics — "Boosts Speed instead of being hit by Flying-type moves."
       // Classic Motor-Drive shape — wire via
@@ -3486,11 +3571,11 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     case 731:
       // To The Bone — "Critical hits get a 1.5x boost and inflict bleeding."
-      // The crit-power-boost piece IS wirable via
-      // {@linkcode CritDamageMultiplierAbAttr} (round 1 primitive). The
-      // crit-bleed piece has the same deferral as 730 Razor Sharp. Partial
-      // wire.
-      return ok([new CritDamageMultiplierAbAttr({ multiplier: 1.5 })]);
+      // Crit-power-boost via CritDamageMultiplier + crit-gated ER_BLEED.
+      return ok([
+        new CritDamageMultiplierAbAttr({ multiplier: 1.5 }),
+        new ChanceBattlerTagOnAttackAbAttr({ chance: 100, tags: [BattlerTagType.ER_BLEED], critRequired: true }),
+      ]);
     case 462:
       // Combat Specialist — "Boosts the power of punching and kicking moves by
       // 1.3x." Wire as two FlagDamageBoost instances — PUNCHING_MOVE +
@@ -3602,9 +3687,11 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // as approximation; the binding-only gate deferred.
       return ok([new StatTriggerOnHitAbAttr({ stats: [{ stat: Stat.SPD, stages: -1 }] })]);
     case 730:
-      // Razor Sharp — "Critical hits also inflict bleeding." On-deal-crit
-      // hook not yet primitive; wire a 20% ER_BLEED on any hit as approximation.
-      return ok([new ChanceBattlerTagOnHitAbAttr({ chance: 20, tags: [BattlerTagType.ER_BLEED] })]);
+      // Razor Sharp — "Inflict bleed when landing a critical hit." Crit-gated
+      // 100% ER_BLEED on the target.
+      return ok([
+        new ChanceBattlerTagOnAttackAbAttr({ chance: 100, tags: [BattlerTagType.ER_BLEED], critRequired: true }),
+      ]);
     case 951: {
       // Hypnotic Trance — "Hypnosis never misses and also causes Confusion."
       // Compose accuracy-override for Hypnosis-only + 100% confuse on hit.
@@ -3615,16 +3702,14 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     }
     case 268:
-      // Chloroplast — "Weather Ball, Solar Beam/Blade, Growth act as if used
-      // in sun." Per-move-presumption primitive doesn't exist; approximate
-      // via SpAtk multiplier in sun.
-      return ok([
-        new WeatherStatMultiplierAbAttr({
-          weathers: [WeatherType.SUNNY],
-          stat: Stat.SPATK,
-          multiplier: 1.2,
-        }),
-      ]);
+      // Chloroplast — "Weather Ball, Solar Beam/Blade, Growth, and the recovery
+      // moves act as if used in sun." Implemented move-side via the shared
+      // `userActsInSun(user)` hook (move.ts), which the relevant move attrs
+      // consult and which returns true for a Chloroplast holder regardless of
+      // weather: Solar moves charge instantly, Growth gives +2, Weather Ball
+      // becomes Fire-type, Moonlight/Synthesis/Morning Sun recover 2/3. The
+      // ability itself is a pure marker.
+      return ok([]);
     // -------------------------------------------------------------------------
     // Round 14 — defensive / utility / type-cluster wires
     // -------------------------------------------------------------------------
@@ -3665,14 +3750,9 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // Round 30 — PostStatStageChange + stat-trigger-on-stat-lowered wires
     // -------------------------------------------------------------------------
     case 564:
-      // Tactical Retreat — "Flees when stats are lowered." Force-switch
-      // primitive on stat-lower not yet wired; approximate via SPD +2 stage
-      // when any stat is lowered (Competitive/Defiant pattern).
-      return ok([
-        new StatTriggerOnStatLoweredAbAttr({
-          stats: [{ stat: Stat.SPD, stages: 2 }],
-        }),
-      ]);
+      // Tactical Retreat — "Flees when stats are lowered." Switches the holder
+      // out when any stat is lowered (incl. self-drops), once per battle.
+      return ok([new SelfSwitchOnStatLowerAbAttr()]);
     case 555:
       // Egoist — "Raises its own stats when foes raise theirs." Wire via
       // new OnOpponentStatRaiseAbAttr — boosts holder's ATK/SPATK/SPD +1
@@ -3690,28 +3770,19 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // Round 41 — heal-block via HEAL_BLOCK BattlerTag application
     // -------------------------------------------------------------------------
     case 532:
-      // Permanence — "Foes can't heal in any way." Apply HEAL_BLOCK to
-      // every attacker on hit (100% chance). True aura would need a field
-      // primitive; this approximation lands the heal-block on whoever
-      // attacks the holder.
+      // Permanence — "Foes can't heal in any way." Heal-block every opponent
+      // on entry and refresh it each turn end, so foes stay heal-blocked while
+      // the holder is on the field (lapses shortly after it leaves).
       return ok([
-        new ChanceBattlerTagOnHitAbAttr({
-          chance: 100,
-          tags: [BattlerTagType.HEAL_BLOCK],
-          contactRequired: false,
-        }),
+        new PostSummonApplyTagOnFoesAbAttr({ tag: BattlerTagType.HEAL_BLOCK, turns: 5 }),
+        new PostTurnApplyTagOnFoesAbAttr({ tag: BattlerTagType.HEAL_BLOCK, turns: 2 }),
       ]);
     case 782:
-      // Hemolysis — "Poisoned foes lose all stat buffs and can't heal."
-      // Wire HEAL_BLOCK on hit; stat-buff-reset rider needs a new
-      // primitive (defer). Poison-conditional gate also deferred.
-      return ok([
-        new ChanceBattlerTagOnHitAbAttr({
-          chance: 100,
-          tags: [BattlerTagType.HEAL_BLOCK],
-          contactRequired: false,
-        }),
-      ]);
+      // Hemolysis — "Poisoned foes lose all stat buffs and can't heal." After
+      // the holder attacks a poisoned target, that target's stat raises are
+      // cleared and it is given HEAL_BLOCK (poison-gated, offensive — not the
+      // defensive on-hit wire it had before).
+      return ok([new PoisonedFoePurgeAbAttr()]);
     // Round 42 cases for 376 / 340 were merged into the R29 case blocks
     // above to avoid duplicate switch labels. The 953 Hypnotic Trance
     // accuracy override below is the remaining R42 wire.
@@ -3755,15 +3826,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Cool Exit — "Uses Chilly Reception at the end of your 2nd turn."
       return ok([new PostTurnScriptedMoveAbAttr({ moveId: MoveId.CHILLY_RECEPTION, everyNTurns: 2 })]);
     case 737:
-      // Life Steal — "Steals 1/10 HP from foes each turn." Approximate as
-      // a per-turn scripted small drain move. ABSORB is closest vanilla
-      // (20BP, 50% drain — over-fires but matches drain intent).
-      return ok([new PostTurnScriptedMoveAbAttr({ moveId: MoveId.ABSORB, everyNTurns: 1 })]);
+      // Life Steal — "Steals 1/10 HP from foes each turn." Drain 10% of each
+      // foe's max HP at turn end and heal the holder by the total.
+      return ok([new PostTurnDrainAbAttr({ fraction: 0.1 })]);
     case 820:
       // Soul Tap — "Drain 10% HP from foes at the end of each turn in fog."
-      // Same shape as 737 but fog-gated. Fog primitive missing; wire
-      // unconditionally as approximation.
-      return ok([new PostTurnScriptedMoveAbAttr({ moveId: MoveId.ABSORB, everyNTurns: 1 })]);
+      // Same as Life Steal but only while fog is active.
+      return ok([new PostTurnDrainAbAttr({ fraction: 0.1, weather: [WeatherType.FOG] })]);
     // -------------------------------------------------------------------------
     // Round 33 — more wires + StabAdd / TypeDamageBoost compositions
     // -------------------------------------------------------------------------
@@ -3856,10 +3925,20 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 774:
-      // Corrupted Mind — "Psychic moves ignore resists and get 1.4x effect
-      // chance." Resist-bypass needs new effectiveness-mod primitive.
-      // Wire the 1.4x type boost as approximation.
-      return ok([new TypeDamageBoostAbAttr({ type: PokemonType.PSYCHIC, multiplier: 1.4 })]);
+      // Corrupted Mind — "Psychic moves bypass type resistances and immunities,
+      // hitting for at least neutral." Offensive type-chart override clamps the
+      // resisting/immune matchups (Steel/Psychic 0.5x, Dark 0x) up to 1.0. The
+      // 1.4x secondary-effect-chance piece needs an effect-chance primitive and
+      // is deferred.
+      return ok([
+        new OffensiveTypeChartOverrideAbAttr({
+          rules: [
+            { attackType: PokemonType.PSYCHIC, defenderType: PokemonType.STEEL, newMultiplier: 1 },
+            { attackType: PokemonType.PSYCHIC, defenderType: PokemonType.PSYCHIC, newMultiplier: 1 },
+            { attackType: PokemonType.PSYCHIC, defenderType: PokemonType.DARK, newMultiplier: 1 },
+          ],
+        }),
+      ]);
     case 656:
       // Tag — "Attacks switching opponents with a 20BP Pursuit." Vanilla
       // pokerogue has no on-foe-switch-out hook for abilities. Defer.
@@ -3874,12 +3953,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // Round 36 — vanilla PostDefendContactDamage wires (mirror-damage cluster)
     // -------------------------------------------------------------------------
     case 332:
-      // Soul Linker — "Enemies take all the damage they deal, same for
-      // this Pok." Reflect damage back to attacker. Vanilla
-      // PostDefendContactDamageAbAttr deals 1/N max-HP back; the "all the
-      // damage" wording is closer to 100% reflect. Approximate with 1/2
-      // (damageRatio=2 → 50% max HP) for sane balance.
-      return ok([new PostDefendContactDamageAbAttr(2)]);
+      // Soul Linker — "Enemies take all the damage they deal, same for this
+      // Pokemon." Full reflect: attacker takes the damage it dealt to the
+      // holder, AND the holder takes the damage it deals (offensive side).
+      return ok([
+        new ReflectDamageOnDefendAbAttr(),
+        new SelfDamageOnAttackAbAttr({ basis: "damageDealt", fraction: 1.0 }),
+      ]);
     case 341:
       // Fort Knox — "Blocks most damage boosting and multihit abilities."
       // Suppression of opponent abilities — needs new primitive (similar to
@@ -3900,17 +3980,9 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // Round 38 — last batch of wires using existing primitives
     // -------------------------------------------------------------------------
     case 424:
-      // Equinox — "Boosts Atk or SpAtk to match the higher value." Stat-
-      // sync primitive missing. Approximation: +1 to both ATK and SPATK
-      // on entry (equalizes via stat-stage).
-      return ok([
-        new StatTriggerOnEntryAbAttr({
-          stats: [
-            { stat: Stat.ATK, stages: 1 },
-            { stat: Stat.SPATK, stages: 1 },
-          ],
-        }),
-      ]);
+      // Equinox — "Uses the higher of Attack / Special Attack for all attacks."
+      // True stat substitution to the holder's higher offensive stat.
+      return ok([new AttackStatSubstituteAbAttr({ useHigherOffense: true })]);
     case 598:
       // Malicious — "Lowers the foe's highest Attack and Defense stat."
       // Pick-highest-stat targeting needs new primitive. Approximation:
@@ -3934,10 +4006,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // Round 44 — more compositions to push toward full coverage
     // -------------------------------------------------------------------------
     case 536:
-      // Blood Price — "Does 30% more damage but lose 10% HP when attacking."
-      // Wire the +30% damage piece. Per-attack 10% self-damage needs a
-      // recoil-fixed-fraction primitive (deferred).
-      return ok([new MovePowerBoostAbAttr(() => true, 1.3)]);
+      // Blood Price — "Boosts all attacking moves by 30%, but the user loses
+      // 10% of max HP when landing an attack." +30% power + 10%-maxHP self-
+      // damage once per move.
+      return ok([
+        new MovePowerBoostAbAttr(() => true, 1.3),
+        new SelfDamageOnAttackAbAttr({ basis: "maxHp", fraction: 0.1 }),
+      ]);
     case 828:
       // Overzealous — "User's super-effective moves have +1 prio." SE-
       // conditional priority. PriorityModifier supports condition closures
@@ -3996,16 +4071,14 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Trap-duration extension primitive missing. Defer.
       return SKIP_BESPOKE;
     case 545:
-      // Parroting — "Copies sound moves used by others." Vanilla
-      // PostDancingMoveAbAttr (Dancer) copies dance moves; closest match.
-      // Wire as Dancer approximation — over-fires on DANCE moves not SOUND,
-      // but gameplay-equivalent for a copy-move ability.
-      return ok([new PostDancingMoveAbAttr()]);
+      // Parroting — "Copies sound moves used by others." Copies any SOUND_BASED
+      // move used by another battler (the PostMoveUsed trigger now fires for all
+      // moves; this gates on the sound flag).
+      return ok([new CopyMoveByFilterAbAttr({ flag: MoveFlags.SOUND_BASED })]);
     case 592:
       // Minion Control — "Moves hit an extra time for each healthy party
-      // member." Variable hit-count based on party state. Approximate as
-      // 1x AddSecondStrike (single extra hit).
-      return ok([new AddSecondStrikeAbAttr(false)]);
+      // member (max 6 hits)." +1 hit per non-fainted, unstatused party member.
+      return ok([new PartyCountMultiHitAbAttr(6)]);
     case 602:
       // Lawnmower — "Removes terrain on switch-in. Stat up if terrain
       // removed." Terrain-clear on entry needs Lawnmower primitive. Defer.
@@ -4027,9 +4100,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Burn-on-switch-in trap needs ArenaTag extension. Defer.
       return SKIP_BESPOKE;
     case 711:
-      // Lunar Affinity — "Copies lunar moves used by others." Same shape
-      // as 545 Parroting; wire Dancer approximation.
-      return ok([new PostDancingMoveAbAttr()]);
+      // Lunar Affinity — "Copies lunar moves used by others." Moonlight,
+      // Moonblast, Lunar Dance, Lunar Blessing.
+      return ok([
+        new CopyMoveByFilterAbAttr({
+          moveIds: [MoveId.MOONLIGHT, MoveId.MOONBLAST, MoveId.LUNAR_DANCE, MoveId.LUNAR_BLESSING],
+        }),
+      ]);
     case 733:
       // Taekkyeon — "All attacks are dances." Flag-injection primitive
       // missing. Defer.
@@ -4171,11 +4248,10 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // supported. Defer.
       return SKIP_BESPOKE;
     case 412:
-      // Desert Cloak — "Protects its side from status and secondary effects
-      // in sand." Weather-gated status immunity. Approximation: blanket
-      // CONFUSED-tag immunity (the most common secondary effect via
-      // existing primitive). Refine later with weather-gated filter.
-      return ok([new BattlerTagImmunityAbAttrEr({ tags: [BattlerTagType.CONFUSED] })]);
+      // Desert Cloak — "Protects its side from status and secondary effects in
+      // sand." While a sandstorm is active: side-wide status immunity (all
+      // status effects) + secondary-effect (Shield-Dust-style) immunity.
+      return ok([new SandStatusImmunityAbAttr(), new SandSecondaryEffectImmunityAbAttr()]);
     case 285:
       // Ground Shock — "Target Grounds aren't immune to Electric but resist
       // it instead." Type-chart override — needs a per-type-pair filter
@@ -4486,10 +4562,9 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 637:
-      // Battle Aura — "Boosts each battler's crit rate by +2." Field-wide
-      // crit-stage bonus needs an ally-side aura primitive. Approximate
-      // as self-only +2 crit-stage.
-      return ok([new CritStageBonusAbAttr({ bonus: 2 })]);
+      // Battle Aura — "Boosts each battler's crit rate by +2 (allies AND
+      // opponents)." Field-wide crit aura, read by Pokemon.getCritStage.
+      return ok([new FieldCritBoostAbAttr(2)]);
     case 595:
       // Noise Cancel — "Protects the party from sound-based moves." Party-
       // wide sound-move immunity needs a field-aura primitive. Approximate
@@ -4524,15 +4599,17 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     }
     case 703: {
-      // Rage Point — "Gets a 1.5x boost while statused. Raises offenses
-      // when crit." Wire 1.5x ATK + SPATK when holder has any non-NONE
-      // status. The on-crit-raise piece composes with vanilla Anger Point
-      // and is deferred.
+      // Rage Point — "Boosts offensive moves by 50% while statused. When the
+      // Pokemon takes a critical hit, both Attack and Special Attack are
+      // raised by one stage." 1.5x ATK+SPATK while statused + on-receive-crit
+      // ATK+1 / SPATK+1.
       const statusedGate = (pokemon: { status: { effect: StatusEffect } | null }) =>
         pokemon.status !== null && pokemon.status?.effect !== StatusEffect.NONE;
       return ok([
         new StatMultiplierAbAttr(Stat.ATK, 1.5, statusedGate),
         new StatMultiplierAbAttr(Stat.SPATK, 1.5, statusedGate),
+        new PostReceiveCritStatStageChangeAbAttr(Stat.ATK, 1),
+        new PostReceiveCritStatStageChangeAbAttr(Stat.SPATK, 1),
       ]);
     }
     case 506: {
@@ -4546,24 +4623,17 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // Round 21 — on-KO stat triggers and remaining easy wires
     // -------------------------------------------------------------------------
     case 487:
-      // Super Strain — "KOs lower Attack by +1. Take 25% recoil damage."
-      // The on-KO ATK -1 fires StatTriggerOnKo with stat=ATK stages=-1
-      // applied to the holder (recoil). The 25% recoil piece is recoil-
-      // hook-on-attack which needs a new primitive; defer that piece.
-      return ok([new StatTriggerOnKoAbAttr({ stats: [{ stat: Stat.ATK, stages: -1 }] })]);
-    case 649:
-      // Pretentious — "Dealing a KO raises Crit by one stage." On-KO
-      // self-stat boost. StatTriggerOnKo doesn't yet support Stat.CRIT —
-      // approximate with ATK + SPATK +1 (offensive boost on KO) which is
-      // the gameplay-equivalent intent.
+      // Super Strain — "The user's moves deal 25% of the damage done as
+      // recoil. When the user KOs with a direct attack, its Attack drops 1."
+      // On-KO ATK -1 via StatTriggerOnKo + per-hit 25%-of-damage recoil.
       return ok([
-        new StatTriggerOnKoAbAttr({
-          stats: [
-            { stat: Stat.ATK, stages: 1 },
-            { stat: Stat.SPATK, stages: 1 },
-          ],
-        }),
+        new StatTriggerOnKoAbAttr({ stats: [{ stat: Stat.ATK, stages: -1 }] }),
+        new SelfDamageOnAttackAbAttr({ basis: "damageDealt", fraction: 0.25 }),
       ]);
+    case 649:
+      // Pretentious — "Dealing a KO raises Crit by one stage." Accumulating
+      // crit-stage bonus per KO (read in getCritStage).
+      return ok([new CritStackOnKoAbAttr(1)]);
     case 597:
       // Olé! — "20% chance to evade single-target moves." Vanilla evasion
       // is tracked via Stat.EVA; wire a flat +1 EVA stage via on-entry
@@ -4610,14 +4680,8 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     case 372:
       // Momentum — "Contact moves use the Speed stat for damage calculation."
-      // Approximate as full Speed addition (effectively replacing the stat).
-      return ok([
-        new SpeedBonusToStatAbAttr({
-          stat: Stat.ATK,
-          speedFraction: 1,
-          filter: { contact: "only" },
-        }),
-      ]);
+      // True substitution: contact moves use Speed as the attacking stat.
+      return ok([new AttackStatSubstituteAbAttr({ physicalStat: Stat.SPD, specialStat: Stat.SPD, contactOnly: true })]);
     case 551:
       // Impulse — "Non-contact moves use the Speed stat for damage."
       return ok([
@@ -4642,8 +4706,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     case 321:
       // Juggernaut — "Contact moves add 20% Def to attack. Paralysis-immune."
-      // Wire the +20% Def bonus on contact moves. Paralysis-immune piece
-      // approximated via tag immunity (vanilla LIMBER mechanic).
+      // +20% Def bonus on contact moves + Limber-style paralysis immunity.
       return ok([
         new SpeedBonusToStatAbAttr({
           stat: Stat.ATK,
@@ -4651,29 +4714,20 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           sourceStat: Stat.DEF,
           filter: { contact: "only" },
         }),
+        new StatusEffectImmunityAbAttrEr({ statuses: [StatusEffect.PARALYSIS] }),
       ]);
     case 286:
-      // Ancient Idol — "Uses Def and Sp. Def instead of Atk and Sp. Atk
-      // when attacking." Full substitution. Approximate as 100% source-stat
-      // bonus added to attack stat (effectively making the attack stat the
-      // defense stat, since stat is multiplied by 1 then added by 100% of
-      // defense — slight over-stat but matches gameplay intent).
-      return ok([
-        new SpeedBonusToStatAbAttr({ stat: Stat.ATK, speedFraction: 1, sourceStat: Stat.DEF }),
-        new SpeedBonusToStatAbAttr({ stat: Stat.SPATK, speedFraction: 1, sourceStat: Stat.SPDEF }),
-      ]);
+      // Ancient Idol — "Uses Def and Sp. Def instead of Atk and Sp. Atk when
+      // attacking." True stat substitution (physical -> Def, special -> SpDef).
+      return ok([new AttackStatSubstituteAbAttr({ physicalStat: Stat.DEF, specialStat: Stat.SPDEF })]);
     // -------------------------------------------------------------------------
     // Round 24 — type-immunity bypass cluster (vanilla IgnoreTypeImmunityAbAttr).
     // -------------------------------------------------------------------------
     case 353:
       // Bone Zone — "Bone moves ignore immunities and deal 2x on not very
-      // effective." Wire IgnoreTypeImmunity for the GHOST defender (Normal
-      // Bone moves hitting Ghost is the common case ER targets). The 2x-
-      // on-not-very-effective piece needs a new effectiveness-multiplier
-      // primitive (defer).
-      return ok([
-        new IgnoreTypeImmunityAbAttr(PokemonType.GHOST, [PokemonType.NORMAL, PokemonType.FIGHTING, PokemonType.GROUND]),
-      ]);
+      // effective." BONE_BASED-flagged moves: immune (0x) → 1x, resisted (<1x)
+      // → ×2, neutral/SE unchanged. Handled in getAttackTypeEffectiveness.
+      return ok([new BoneMoveTypeChartAbAttr()]);
     case 347:
       // Multi-Headed — "Hits as many times as it has heads." Hydreigon = 3
       // heads → +2 hits. Wire 2x AddSecondStrike (each adds +1 hit).
@@ -4760,10 +4814,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     }
     case 340:
-      // Fatal Precision — "Super-effective moves never miss and always
-      // crit." SE-conditional needs new primitive. Approximate as broad
-      // accuracy +2x boost + always-crit-via-+stage.
-      return ok([new StatMultiplierAbAttr(Stat.ACC, 2), new CritStageBonusAbAttr({ bonus: 1 })]);
+      // Fatal Precision — "Super-effective damaging moves never miss and always
+      // land critical hits." SE-gated always-hit + SE-gated guaranteed crit
+      // (Merciless-style ConditionalCrit).
+      return ok([
+        new ConditionalAlwaysHitAbAttr({ superEffective: true }),
+        new ConditionalCritAbAttr((user, target, move) => target.getMoveEffectiveness(user, move) > 1),
+      ]);
     case 374:
       // (No ER ability 374 in audit — sentinel to keep formatting.)
       return SKIP_BESPOKE;
@@ -4777,33 +4834,24 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // Round 22 — PostAllyFaint cluster (new primitive).
     // -------------------------------------------------------------------------
     case 292:
-      // Avenger — "If a party Pokémon fainted last turn, next move gets
-      // 1.5x boost." The "next move only" gate (one-shot consumed on use)
-      // needs a single-use marker. Approximation: +1 ATK + SPATK after an
-      // ally faints (persistent offensive boost). Stacks with other ally
-      // faints over the battle.
+      // Avenger — "Boosts the power of all moves by 50% for one turn after any
+      // party Pokemon faints." Faithful: a one-turn ×1.5 move-power boost armed
+      // on ally KO and expired at the following turn end (not a persistent
+      // stat boost).
       return ok([
-        new PostAllyFaintStatChangeAbAttr({
-          stats: [
-            { stat: Stat.ATK, stages: 1 },
-            { stat: Stat.SPATK, stages: 1 },
-          ],
-        }),
+        new AllyFaintPowerBoostTriggerAbAttr(),
+        new AllyFaintPowerBoostAbAttr(1.5),
+        new AllyFaintPowerBoostExpireAbAttr(),
       ]);
     case 888:
-      // Soul Harvest — "Fainted Pokemon increase your offenses and spdef
-      // by 5%." Per-faint percentage boost. Stat-stage maps 1 stage = +50%
-      // for the holder, so we use a single +1 across ATK/SPATK/SPDEF as
-      // an approximation; the 5%-per-faint compounding gradient needs a
-      // bespoke counter primitive (deferred).
+      // Soul Harvest — "Fainted Pokemon increase your offenses and spdef by
+      // 5%." Faithful: each faint (either side) raises a per-holder counter;
+      // ATK/SPATK/SPDEF are multiplied by (1 + 0.05 × count).
       return ok([
-        new PostAllyFaintStatChangeAbAttr({
-          stats: [
-            { stat: Stat.ATK, stages: 1 },
-            { stat: Stat.SPATK, stages: 1 },
-            { stat: Stat.SPDEF, stages: 1 },
-          ],
-        }),
+        new FaintCountTriggerAbAttr(),
+        new PerFaintStatMultiplierAbAttr(Stat.ATK, 0.05),
+        new PerFaintStatMultiplierAbAttr(Stat.SPATK, 0.05),
+        new PerFaintStatMultiplierAbAttr(Stat.SPDEF, 0.05),
       ]);
     default:
       return SKIP_BESPOKE;
@@ -4916,6 +4964,19 @@ function dispatchArchetypeInternal(
  */
 function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
   switch (erAbilityId) {
+    case 909:
+      // Lightsaber: "Adds Fire-type. Keen Edge moves 25% burn or paralysis."
+      // Fire type-add (on summon) + offensive KEEN-EDGE 25% burn ("or paralysis"
+      // approximated to burn). Pure hand-wired ability (no vanilla-ability parts)
+      // so it lives here rather than as a composite-vanilla-mashup.
+      return ok([
+        new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.FIRE }),
+        new ChanceStatusOnAttackAbAttr({
+          chance: 25,
+          effects: [StatusEffect.BURN],
+          filter: { flag: MoveFlags.SLICING_MOVE },
+        }),
+      ]);
     // -------------------------------------------------------------------------
     // AUDIT-FIX overrides (Round 49) — earlier rounds wired the WRONG ability
     // because the ER dump's array-index drifts from logical .id starting at
@@ -4945,13 +5006,12 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // doesn't exist as a single primitive. Wire the heal portion only.
       return ok([new TypeAbsorbHealAbAttr({ type: PokemonType.FIRE, healFraction: 0.25 })]);
     case 911:
-      // Musical Notes — "Status moves become sound-based." Practical
-      // mechanical impact: the holder's status moves benefit from sound-
-      // move boosts (Punk Rock 1.3x). Approximate via a MovePowerBoost
-      // on STATUS-category moves (the spec's gameplay effect; the
-      // theoretical "becomes sound" interaction with Soundproof etc.
-      // requires flag-injection patches at many engine sites — deferred).
-      return ok([new MovePowerBoostAbAttr((_user, _t, move) => move?.category === MoveCategory.STATUS, 1.3)]);
+      // Musical Notes — "Status moves become sound-based." Injects SOUND_BASED
+      // onto the holder's status moves; consumers routed through the user-aware
+      // doesFlagEffectApply respect it (e.g. the holder's status moves now hit
+      // through Substitute, like a sound move). (Soundproof/Punk Rock still read
+      // the static hasFlag, so those interactions remain native-sound-only.)
+      return ok([new MoveFlagInjectionAbAttr(MoveFlags.SOUND_BASED, "status-moves")]);
     case 925:
       // Mashed Potato — "Syrup Bomb effect on the foe for 3 turns."
       // SYRUP_BOMBED battler tag added to each opponent on entry.
@@ -4995,16 +5055,23 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         }),
       ]);
     case 951:
-      // Logical id 953 is Zen Garden — "Sets up Grassy or Psychic Terrain
-      // at random." PostSummon random terrain. Approximate: pick GRASSY
-      // (matches half the spec).
-      return ok([new EntryEffectAbAttr({ kind: "set-terrain", terrain: TerrainType.GRASSY, turns: 8 })]);
+      // Zen Garden — "Sets up Grassy or Psychic Terrain at random." 50/50 pick
+      // via the holder's battle seed.
+      return ok([
+        new EntryEffectAbAttr({
+          kind: "set-terrain-random",
+          terrains: [TerrainType.GRASSY, TerrainType.PSYCHIC],
+          turns: 8,
+        }),
+      ]);
     case 958:
       // Giant Shuriken — "Water Shuriken hits once with 100BP and +1 crit."
-      // Approximate: massive power boost on Water Shuriken (15BP → ~100BP
-      // = 6.67x). The +1 crit piece would need a per-move-id filter on
-      // CritStageBonus which doesn't exist; defer that micro-detail.
-      return ok([new MovePowerBoostAbAttr((_user, _t, move) => move?.id === MoveId.WATER_SHURIKEN, 6.67)]);
+      // Power boost on Water Shuriken (15BP -> ~100BP = 6.67x) + the +1 crit
+      // stage gated on the Water Shuriken move id.
+      return ok([
+        new MovePowerBoostAbAttr((_user, _t, move) => move?.id === MoveId.WATER_SHURIKEN, 6.67),
+        new CritStageBonusAbAttr({ bonus: 1, filter: { moveIds: [MoveId.WATER_SHURIKEN] } }),
+      ]);
     case 962:
       // Wrestle Showman — "Flying Press gains +10BP and causes Taunt."
       // Flying Press is 100BP; +10BP = 1.1x power. Add a PostAttack TAUNT
@@ -5056,19 +5123,21 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
     // narrow TypeChartOverride entries.
     // -------------------------------------------------------------------------
     case 349:
-      // Overcharge — "Electric is super effective vs Electric. Can paralyze
-      // Electric." TypeChartOverride: Electric vs Electric goes 0.5x → 2x.
-      // The paralyze-electric piece (immunity bypass) is deferred.
+      // Overcharge — "The user's Electric moves are super effective vs Electric
+      // (0.5x -> 2x)." OFFENSIVE override. The paralyze-Electric piece (status
+      // immunity-bypass) is a separate engine hook, deferred.
       return ok([
-        new TypeChartOverrideAbAttr({
+        new OffensiveTypeChartOverrideAbAttr({
           rules: [{ attackType: PokemonType.ELECTRIC, defenderType: PokemonType.ELECTRIC, newMultiplier: 2 }],
         }),
       ]);
     case 357:
-      // Molten Down — "Fire-type is super effective against Rock-type."
-      // TypeChartOverride: Fire vs Rock 0.5x → 2x.
+      // Molten Down — "Fire-type is super effective against Rock-type." This is
+      // OFFENSIVE: the holder's Fire moves hit Rock targets for 2x (vanilla
+      // 0.5x). Defensive TypeChartOverride would wrongly change how the holder
+      // is hit instead.
       return ok([
-        new TypeChartOverrideAbAttr({
+        new OffensiveTypeChartOverrideAbAttr({
           rules: [{ attackType: PokemonType.FIRE, defenderType: PokemonType.ROCK, newMultiplier: 2 }],
         }),
       ]);
@@ -5079,10 +5148,10 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
     // holder ATTACKS — swap to PostAttack-side primitives.
     // -------------------------------------------------------------------------
     case 270:
-      // Pyromancy — "Moves inflict burn 5x as often." Approximate as 30%
-      // burn on the holder's own attacks (matches the dispatcher's prior
-      // approximation but on the correct surface).
-      return ok([new PostAttackApplyStatusEffectAbAttr(false, 30, StatusEffect.BURN)]);
+      // Pyromancy — "Moves inflict burn 5x as often." Multiply the burn chance
+      // of the holder's burn-inflicting moves by 5 (does NOT add burn to moves
+      // that never burned).
+      return ok([new StatusChanceMultiplierAbAttr(StatusEffect.BURN, 5)]);
     case 434:
       // Elemental Charge — "20% chance to BRN/FRZ/PARA with respective types."
       // Type-gated: the holder's Fire move burns, Ice move frostbites, Electric
@@ -5152,11 +5221,11 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         }),
       ]);
     case 456:
-      // Cryomancy — "Moves inflict frostbite 5x as often." Pokerogue's
-      // FREEZE is the closest analogue to frostbite (ER's distinct ER_FROSTBITE
-      // tag exists but applies via specific attrs); approximate as 30% FREEZE
-      // on attack.
-      return ok([new PostAttackApplyStatusEffectAbAttr(false, 30, StatusEffect.FREEZE)]);
+      // Cryomancy — "Moves inflict frostbite 5x as often." Multiply the FREEZE
+      // chance of the holder's freeze-inflicting moves by 5 (ER treats freeze
+      // as the frostbite analogue at the move-chance layer); does not add
+      // freeze to moves that never froze.
+      return ok([new StatusChanceMultiplierAbAttr(StatusEffect.FREEZE, 5)]);
     case 491:
       // Aftershock — "Triggers Magnitude after using a damaging move."
       // Was wired as CounterAttackOnHit (PostDefend) — should be PostAttack.
@@ -5235,10 +5304,9 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       return ok([new MovePowerBoostAbAttr((user, _t, move) => user.isOfType(user.getMoveType(move)), 1.2)]);
     case 702:
       // From the Shadows — "Attacks trap and have a 20% flinch chance when
-      // moving first." Was wired defensively. Move flinch to PostAttack
-      // (no "moving first" gate available cleanly); trap-on-attack piece
-      // remains deferred (per-turn TRAPPED tag on target after attack).
-      return ok([new PostAttackApplyBattlerTagAbAttr(false, () => 20, BattlerTagType.FLINCHED)]);
+      // moving first." Gated on moving-first (target hasn't acted yet): trap
+      // the target on every such hit + 20% flinch roll.
+      return ok([new MovingFirstTrapFlinchAbAttr(20)]);
     case 831:
       // Grass Flute — "Sound moves inflict Fear." The holder's SOUND moves fear
       // the target (100%, SOUND-flag gated).
@@ -5292,12 +5360,14 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         }),
       ]);
     case 658:
-      // Power Edge — "Slicing moves target Special Defense."
+      // Power Edge — "Keen Edge moves target Special Defense and get a 1.3x
+      // boost." SpDef-targeting + 30% power on slicing moves.
       return ok([
         new DefenseStatSwapOnFlagAbAttr({
           flag: MoveFlags.SLICING_MOVE,
           swap: "target-spdef-instead-of-def",
         }),
+        new FlagDamageBoostAbAttr({ flag: MoveFlags.SLICING_MOVE, multiplier: 1.3 }),
       ]);
     case 892:
       // Crispy Cream — "30% to inflict burn/frostbite when hit by contact."
@@ -5327,9 +5397,11 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // Exploit Weakness — "Targets lowest defense vs statused foes."
       return ok([new DefenseStatSwapOnStatusedFoeAbAttr()]);
     case 285:
-      // Ground Shock — "Grounds aren't immune to Electric but resist it instead."
+      // Ground Shock — "Target Grounds aren't immune to Electric but resist it
+      // instead." OFFENSIVE: the holder's Electric moves hit Ground targets for
+      // 0.5x instead of 0x.
       return ok([
-        new TypeChartOverrideAbAttr({
+        new OffensiveTypeChartOverrideAbAttr({
           rules: [{ attackType: PokemonType.ELECTRIC, defenderType: PokemonType.GROUND, newMultiplier: 0.5 }],
         }),
       ]);
@@ -5369,12 +5441,10 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         }),
       ]);
     case 457:
-      // Phantom Pain — "Ghost-type moves deal normal damage to Normal."
-      return ok([
-        new TypeChartOverrideAbAttr({
-          rules: [{ attackType: PokemonType.GHOST, defenderType: PokemonType.NORMAL, newMultiplier: 1.0 }],
-        }),
-      ]);
+      // Phantom Pain — "Ghost-type moves deal normal damage to Normal." This is
+      // OFFENSIVE: the holder's Ghost moves bypass Normal's Ghost immunity,
+      // landing for 1.0x (Normal is mono-immune, so the bypass yields neutral).
+      return ok([new IgnoreTypeImmunityAbAttr(PokemonType.NORMAL, [PokemonType.GHOST])]);
     case 474:
       // Accelerate — "Moves that need a charge turn are now used instantly."
       return ok([new SkipChargeTurnAbAttr()]);
@@ -5410,8 +5480,19 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         }),
       ]);
     case 602:
-      // Lawnmower — "Removes terrain on switch-in. Stat up if terrain removed."
-      return ok([new PostSummonClearTerrainAbAttr({ onCleared: [{ stat: Stat.ATK, stages: 1 }] })]);
+      // Lawnmower — "Removes terrain on switch-in. Def+1 when clearing Grassy/
+      // Electric, SpDef+1 when clearing Misty/Psychic/Toxic."
+      return ok([
+        new PostSummonClearTerrainAbAttr({
+          byTerrain: [
+            { terrain: TerrainType.GRASSY, stat: Stat.DEF, stages: 1 },
+            { terrain: TerrainType.ELECTRIC, stat: Stat.DEF, stages: 1 },
+            { terrain: TerrainType.MISTY, stat: Stat.SPDEF, stages: 1 },
+            { terrain: TerrainType.PSYCHIC, stat: Stat.SPDEF, stages: 1 },
+            { terrain: TerrainType.TOXIC, stat: Stat.SPDEF, stages: 1 },
+          ],
+        }),
+      ]);
     case 612:
       // Rejection — "Applies Quash on switch-in."
       return ok([new PostSummonQuashFoesAbAttr()]);
@@ -5446,21 +5527,20 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // Higher Rank — "Priority moves get a 1.2x boost."
       return ok([new MovePowerBoostAbAttr((_user, _t, move) => (move?.priority ?? 0) > 0, 1.2)]);
     case 672:
-      // Mosh Pit — "Ally's attacks get a 1.25x boost." Pokerogue lacks an
-      // ally-aura primitive in the bespoke set; closest is a self-boost
-      // when a teammate uses a damaging move via post-ally-faint analog.
-      // Approximate as a permanent +1 ATK stage on entry (echoes the buff).
-      return ok([new PostAllyFaintStatChangeAbAttr({ stats: [{ stat: Stat.ATK, stages: 1 }] })]);
+      // Mosh Pit — "Ally's attacks get a 1.25x boost. 1.5x if attack causes
+      // recoil." Faithful ally-damage aura: boosts the HOLDER'S ALLY'S
+      // damaging moves via the same move.ts path as Power Spot/Battery, with
+      // the 1.5x recoil-move variant.
+      return ok([new AllyAttackPowerBoostAbAttr({ baseMultiplier: 1.25, recoilMultiplier: 1.5 })]);
     case 704:
       // Hot Coals — "Sets a trap that burns the next foe that switches in."
       // Closest engine analog: install toxic spikes on the opponent's side.
       return ok([new EntryEffectAbAttr({ kind: "set-hazard", hazard: ArenaTagType.TOXIC_SPIKES, layers: 1 })]);
     case 733:
-      // Taekkyeon — "All attacks are dances." Closest in-engine effect:
-      // copies any dance move used on the field (Dancer). The "all attacks
-      // are dances" interpretation also means user's own dance triggers —
-      // which functionally is just having Dancer.
-      return ok([new PostDancingMoveAbAttr()]);
+      // Taekkyeon — "All attacks are dances." Injects the DANCE flag onto all
+      // of the holder's non-status moves, so they count as dances (e.g. trigger
+      // opposing Dancer, dance-based interactions).
+      return ok([new MoveFlagInjectionAbAttr(MoveFlags.DANCE_MOVE, "all-attacks")]);
     case 735:
       // Know Your Place — "Contact attacks make foes move last for 5 turns."
       return ok([new ContactQuashAbAttr()]);
@@ -5487,10 +5567,13 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // expression: boost Normal moves by Punk Rock's 1.3x.
       return ok([new MovePowerBoostAbAttr((user, _t, move) => user.getMoveType(move) === PokemonType.NORMAL, 1.3)]);
     case 816:
-      // Mental Pollution — "Suppresses others' abilities when enraged." No
-      // engine "enraged" state; approximate as suppress-on-contact (most
-      // common rage trigger).
-      return ok([new SuppressAttackerAbilityAbAttr({ contactOnly: true })]);
+      // Mental Pollution — "Suppresses others' abilities when it becomes
+      // enraged." This ER port models "enraged" as FOG weather (the same proxy
+      // Madness Enhancement 817 uses). While fog is active, any attacking foe
+      // has its ability suppressed for the rest of the battle. (A true global
+      // enrage status doesn't exist in the engine; fog is the established
+      // stand-in.)
+      return ok([new SuppressAttackerAbilityAbAttr({ weathers: [WeatherType.FOG] })]);
     case 817:
       // Madness Enhancement — "Enrages in fog, halves damage when enraged."
       // Real WeatherType.FOG gate via ReceivedMoveDamageMultiplier with a
@@ -5513,9 +5596,13 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         }),
       ]);
     case 842:
-      // Festivities — "Sound moves become dance moves and vice versa." We
-      // approximate via Dancer (copies dance moves used by anyone).
-      return ok([new PostDancingMoveAbAttr()]);
+      // Festivities — "Sound moves become dance moves and vice versa."
+      // Sound→Dance (faithful): inject DANCE_MOVE on the holder's sound moves
+      // so they trigger Dancer (via the user-aware doesFlagEffectApply), plus
+      // the holder itself dances (PostDancingMove). Dance→Sound is engine-
+      // blocked — sound consumers (Soundproof/Punk Rock) read the static
+      // hasFlag, which AbAttr injection cannot reach.
+      return ok([new MoveFlagInjectionAbAttr(MoveFlags.DANCE_MOVE, "sound-moves"), new PostDancingMoveAbAttr()]);
     case 866:
       // Relic Stone — "Other battlers don't benefit from STAB."
       return ok([new StabSuppressAuraAbAttr()]);
@@ -5604,9 +5691,9 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       return ok([new PostItemLostScriptedMoveAbAttr({ moveId: MoveId.THIEF })]);
     case 913:
       // Strikeout — "Forces the foe out if they don't attack for 3 turns."
-      // Approximate as a per-turn speed-drop on the opponent (no-attack
-      // engine signal isn't exposed).
-      return ok([new PostTurnFoeStatDropAbAttr({ stat: Stat.SPD, stages: -1 })]);
+      // Tracks each foe's consecutive idle (no damaging move) turns from its
+      // move history; forces it out at 3.
+      return ok([new ForceFoeOutOnInactivityAbAttr(3)]);
     case 914:
       // Home Run — "Landing a crit boosts your 3 lowest stats once per turn."
       return ok([new OnCritStatBoostLowestAbAttr({ n: 3, stages: 1 })]);
@@ -5615,15 +5702,16 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       return ok([new PostTurnFoeStatDropAbAttr({ stat: Stat.SPD, stages: -1, trapAtStage: -3 })]);
     case 979:
       // Hollow Ice Zone — "Ice-type moves apply Ice Statue and then make
-      // the user switch." Approximate: on holder's Ice-type attack, apply
-      // ICE_FACE-equivalent (ER_FROSTBITE tag) to target. Self-switch
-      // piece deferred.
+      // the user switch." On the holder's Ice-type attack: apply the
+      // ICE_FACE-equivalent (ER_FROSTBITE tag) to the target, then U-turn
+      // the holder out.
       return ok([
         new PostAttackApplyBattlerTagAbAttr(
           false,
           (user, _t, move) => (user.getMoveType(move) === PokemonType.ICE ? 100 : 0),
           BattlerTagType.ER_FROSTBITE,
         ),
+        new SelfSwitchOnMoveTypeAbAttr(PokemonType.ICE),
       ]);
     case 1000:
       // Survivor Bias — "Not very effective moves can't cause fainting."

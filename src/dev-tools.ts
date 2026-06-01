@@ -163,6 +163,8 @@ export function installDevTools(scene: BattleScene): void {
         level?: number;
         enemyLevel?: number;
         passive?: boolean;
+        /** Force a TRAINER battle. `true` = ACE_TRAINER, or pass a TrainerType id. */
+        trainer?: boolean | number;
       } = {},
     ) {
       const ovr = defaultOverrides as unknown as Record<string, unknown>;
@@ -174,6 +176,14 @@ export function installDevTools(scene: BattleScene): void {
       }
       if (opts.level !== undefined) {
         ovr.STARTING_LEVEL_OVERRIDE = opts.level;
+      }
+      if (opts.trainer) {
+        // 2 = BattleType.TRAINER; 1 = TrainerType.ACE_TRAINER (default).
+        ovr.BATTLE_TYPE_OVERRIDE = 2;
+        ovr.RANDOM_TRAINER_OVERRIDE = { trainerType: typeof opts.trainer === "number" ? opts.trainer : 1 };
+      } else {
+        ovr.BATTLE_TYPE_OVERRIDE = null;
+        ovr.RANDOM_TRAINER_OVERRIDE = null;
       }
 
       scene.gameMode = getGameMode(GameModes.CLASSIC);

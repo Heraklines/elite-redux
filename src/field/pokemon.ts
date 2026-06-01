@@ -92,6 +92,7 @@ import { BiomeId } from "#enums/biome-id";
 import { ChallengeType } from "#enums/challenge-type";
 import { Challenges } from "#enums/challenges";
 import { DexAttr } from "#enums/dex-attr";
+import { ErAbilityId } from "#enums/er-ability-id";
 import { FieldPosition } from "#enums/field-position";
 import { HitResult } from "#enums/hit-result";
 import { LearnMoveSituation } from "#enums/learn-move-situation";
@@ -798,10 +799,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     );
 
     if (this.isPlayer() || this.getFusionSpeciesForm(false, useIllusion)) {
-      globalScene.loadPokemonAtlas(
-        this.getBattleSpriteKey(true, ignoreOverride),
-        this.getBattleSpriteAtlasPath(true, ignoreOverride),
-      );
+      // Guard against re-issuing an already-loaded (or in-flight) atlas: a
+      // duplicate `loadPokemonAtlas` for the same key orphans files in Phaser's
+      // shared loader and can wedge ALL sprite loads (the species loader has the
+      // same guard). loadAssets is called repeatedly (illusion break, transform,
+      // form change), so this matters.
+      const playerBattleKey = this.getBattleSpriteKey(true, ignoreOverride);
+      if (!globalScene.textures.exists(playerBattleKey)) {
+        globalScene.loadPokemonAtlas(playerBattleKey, this.getBattleSpriteAtlasPath(true, ignoreOverride));
+      }
     }
     if (this.getFusionSpeciesForm()) {
       const { fusionFormIndex, fusionShiny, fusionVariant } = useIllusion ? illusion! : this;
@@ -813,10 +819,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
           fusionVariant,
         ),
       );
-      globalScene.loadPokemonAtlas(
-        this.getFusionBattleSpriteKey(true, ignoreOverride),
-        this.getFusionBattleSpriteAtlasPath(true, ignoreOverride),
-      );
+      const fusionBattleKey = this.getFusionBattleSpriteKey(true, ignoreOverride);
+      if (!globalScene.textures.exists(fusionBattleKey)) {
+        globalScene.loadPokemonAtlas(fusionBattleKey, this.getFusionBattleSpriteAtlasPath(true, ignoreOverride));
+      }
     }
 
     if (this.isShiny(true)) {
@@ -1439,6 +1445,27 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (critBoostTag) {
       // Dragon cheer only gives +1 crit stage to non-dragon types
       critStage.value += critBoostTag.critStages;
+    }
+
+    // ER Battle Aura: while any holder is on the field, every battler gets a
+    // crit-stage bonus. Scanned by name (registration-free); max, not sum.
+    let fieldCritBonus = 0;
+    for (const p of globalScene.getField(true)) {
+      const attrs = [...p.getAbility().attrs, ...p.getPassiveAbilities().flatMap(pa => pa?.attrs ?? [])];
+      for (const attr of attrs) {
+        if (attr?.constructor?.name === "FieldCritBoostAbAttr") {
+          fieldCritBonus = Math.max(fieldCritBonus, (attr as unknown as { bonus: number }).bonus);
+        }
+      }
+    }
+    critStage.value += fieldCritBonus;
+
+    // ER Pretentious: the attacker's accumulated KO crit-stacks. Scanned by name.
+    const sourceAttrs = [...source.getAbility().attrs, ...source.getPassiveAbilities().flatMap(pa => pa?.attrs ?? [])];
+    for (const attr of sourceAttrs) {
+      if (attr?.constructor?.name === "CritStackOnKoAbAttr") {
+        critStage.value += (attr as unknown as { currentStacks: (p: Pokemon) => number }).currentStacks(source);
+      }
     }
 
     console.log(`crit stage: +${critStage.value}`);
@@ -2102,7 +2129,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (abilityId === AbilityId.NONE) {
       abilityId = this.species.ability1;
     }
-    return allAbilities[abilityId];
+    // Defensive: an unregistered or out-of-range ability id must never yield
+    // `undefined` here — callers (e.g. hasAbility/hasAbilityWithAttr) deref
+    // `.id`/`.hasAttr`, and an undefined slip-through softlocks the phase queue
+    // (notably EggLapsePhase generating an ER-custom species whose ability id
+    // isn't in `allAbilities`). Fall back to the species' primary ability, then
+    // to NONE, so a valid Ability is always returned.
+    return allAbilities[abilityId] ?? allAbilities[this.species.ability1] ?? allAbilities[AbilityId.NONE];
   }
 
   /**
@@ -2455,6 +2488,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (this.isPlayer()) {
       const passiveAttr = globalScene.gameData.starterData[this.species.getRootSpeciesId()]?.passiveAttr ?? 0;
       basePassive = hasAnyActiveSlot(passiveAttr);
+    } else if (this.isEnemy()) {
+      // ER: enemies ALWAYS have their innates active (no candy-unlock gate) — unlike
+      // the player, whose innate slots are gated by `passiveAttr` above. This only
+      // enables the passive at all; the NUMBER of enemy innate slots still ramps
+      // with level via `getEnemyPassiveSlotLimit()`. Final/endless bosses were
+      // already excluded by the earlier guard.
+      basePassive = this.getPassiveAbilities().some(a => a != null);
     }
     const hasPassive = new BooleanHolder(basePassive);
     applyChallenges(ChallengeType.PASSIVE_ACCESS, this, hasPassive);
@@ -2695,7 +2735,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     const side = this.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
     return (
-      trapped.value || !!this.getTag(TrappedTag) || !!globalScene.arena.getTagOnSide(ArenaTagType.FAIRY_LOCK, side)
+      trapped.value
+      || !!this.getTag(TrappedTag) // ER FEAR traps the bearer (ROM). Ghost's early-return above still lets // Ghosts switch out, matching vanilla trap rules.
+      || !!this.getTag(BattlerTagType.ER_FEAR)
+      || !!globalScene.arena.getTagOnSide(ArenaTagType.FAIRY_LOCK, side)
     );
   }
 
@@ -2889,6 +2932,35 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // Apply any typing changes from Freeze-Dry, etc.
     if (move) {
       applyMoveAttrs("MoveTypeChartOverrideAttr", source ?? null, this, move, multi, types, moveType);
+    }
+
+    // ER OFFENSIVE type-chart overrides: the attacker's ability can rewrite how
+    // its own move type interacts with the defender's types (e.g. Ground Shock,
+    // Molten Down). Scanned by name (same registration-free pattern as
+    // RecoilDamageMultiplierAbAttr) so no central AbAttr-map edit is needed.
+    if (source) {
+      const sourceAttrs = [
+        ...source.getAbility().attrs,
+        ...source.getPassiveAbilities().flatMap(pa => pa?.attrs ?? []),
+      ];
+      for (const attr of sourceAttrs) {
+        if (attr?.constructor?.name === "OffensiveTypeChartOverrideAbAttr") {
+          (attr as unknown as { fire: (mt: PokemonType, dts: PokemonType[], h: NumberHolder) => void }).fire(
+            moveType,
+            types,
+            multi,
+          );
+        }
+        // ER Bone Zone: bone-flagged moves bypass type immunities (0x → 1x) and
+        // double resisted damage (<1x → ×2). Needs the move, so gate on it.
+        if (move && attr?.constructor?.name === "BoneMoveTypeChartAbAttr") {
+          (attr as unknown as { fire: (m: typeof move, h: NumberHolder) => void }).fire(move, multi);
+        }
+        // ER Desert Spirit: in sand, Ground moves hit airborne (0x → 1x).
+        if (attr?.constructor?.name === "WeatherGroundAirborneAbAttr") {
+          (attr as unknown as { fire: (mt: PokemonType, h: NumberHolder) => void }).fire(moveType, multi);
+        }
+      }
     }
 
     // Handle strong winds lowering effectiveness of types super effective against pure flying
@@ -3714,6 +3786,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     const statStage = new NumberHolder(this.getStatStage(stat));
     const ignoreStatStage = new BooleanHolder(false);
 
+    // ER BLEED negates the effects of the bearer's stat stages (offensive and
+    // defensive) while preserving the stored stages for when it is cured.
+    if (this.getTag(BattlerTagType.ER_BLEED)) {
+      statStage.value = 0;
+    }
+
     if (opponent) {
       if (isCritical) {
         switch (stat) {
@@ -3875,6 +3953,32 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       ),
     );
     applyMoveAttrs("VariableAtkAttr", source, this, move, sourceAtk);
+
+    // ER attack-stat substitution abilities (Ancient Idol: use Def/SpDef;
+    // Momentum: use Speed on contact). Scanned by name — registration-free,
+    // same pattern as OffensiveTypeChartOverrideAbAttr.
+    if (!ignoreSourceAbility) {
+      const subAttrs = [...source.getAbility().attrs, ...source.getPassiveAbilities().flatMap(pa => pa?.attrs ?? [])];
+      for (const attr of subAttrs) {
+        if (attr?.constructor?.name === "AttackStatSubstituteAbAttr") {
+          const sub = (
+            attr as unknown as { resolveStat: (m: Move, p: boolean, s: Pokemon) => EffectiveStat | null }
+          ).resolveStat(move, isPhysical, source);
+          if (sub != null) {
+            sourceAtk.value = source.getEffectiveStat(
+              sub,
+              this,
+              undefined,
+              ignoreSourceAbility,
+              ignoreAbility,
+              ignoreAllyAbility,
+              isCritical,
+              simulated,
+            );
+          }
+        }
+      }
+    }
 
     /**
      * This Pokemon's defensive stat for the given move's category.
@@ -4104,6 +4208,21 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       multiStrikeEnhancementMultiplier,
     );
 
+    // ER Multi-Headed: the extra "head" strikes deal reduced damage — for a
+    // 2-headed mon the 2nd hit is 25%; for a 3-headed mon the 2nd is 20% and the
+    // 3rd is 15% (the 1st head always hits at full power). The strikes themselves
+    // are added by the ability's AddSecondStrikeAbAttr wiring; this only scales
+    // their damage. Pokerogue's AddSecondStrike (Parental Bond) otherwise deals
+    // full damage on every strike, so without this Multi-Headed hit 2-3× at 100%.
+    // Scoped to Multi-Headed holders only — Multi-Lens, Parental Bond and ordinary
+    // multi-hit moves are untouched.
+    if (source.hasAbility(ErAbilityId.MULTI_HEADED as unknown as AbilityId)) {
+      const strikeIndex = source.turnData.hitCount - source.turnData.hitsLeft; // 0-based
+      if (strikeIndex > 0) {
+        multiStrikeEnhancementMultiplier.value *= source.turnData.hitCount <= 2 ? 0.25 : strikeIndex === 1 ? 0.2 : 0.15;
+      }
+    }
+
     /** Doubles damage if this Pokemon's last move was Glaive Rush */
     const glaiveRushMultiplier = new NumberHolder(1);
     if (this.getTag(BattlerTagType.RECEIVE_DOUBLE_DAMAGE)) {
@@ -4161,6 +4280,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       frostbiteMultiplier = 0.5;
     }
 
+    /** ER FEAR: the feared target takes 50% more damage (ROM). */
+    const fearMultiplier = this.getTag(BattlerTagType.ER_FEAR) ? 1.5 : 1;
+
     /** Reduces damage if this Pokemon has a relevant screen (e.g. Light Screen for special attacks) */
     const screenMultiplier = new NumberHolder(1);
 
@@ -4205,6 +4327,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         * typeMultiplier
         * burnMultiplier
         * frostbiteMultiplier
+        * fearMultiplier
         * screenMultiplier.value
         * hitsTagMultiplier.value
         * mistyTerrainMultiplier,
@@ -4226,6 +4349,18 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
     if (!this.isPlayer()) {
       globalScene.applyModifiers(EnemyDamageReducerModifier, false, damage);
+    }
+
+    // ER recreated Life Orb (held by the attacker): ×1.3 outgoing damage. The
+    // matching ~1/10 max-HP recoil is applied in the move-effect phase. Scanned
+    // by class name to avoid a load-order import cycle (modifier ↔ pokemon).
+    if (
+      globalScene.findModifier(
+        m => m.constructor?.name === "ErLifeOrbModifier" && (m as { pokemonId?: number }).pokemonId === source.id,
+        source.isPlayer(),
+      )
+    ) {
+      damage.value = toDmgValue(damage.value * 1.3);
     }
 
     const abAttrParams: PreAttackModifyDamageAbAttrParams = {

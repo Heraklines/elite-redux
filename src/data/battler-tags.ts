@@ -3782,7 +3782,19 @@ export class SupremeOverlordTag extends AbilityBattlerTag {
 // later via composite parts.
 // =============================================================================
 
-/** ER `BLEED` — 1/16 max-HP chip per turn-end. Persists until cured. */
+/**
+ * ER `BLEED` — per the v2.65.3b ROM: deals 1/16 max-HP chip per turn-end,
+ * PREVENTS HEALING, and NEGATES THE EFFECTS OF STAT STAGES on the bearer. Rock
+ * and Ghost types are immune. Persists until cured.
+ *
+ * - Chip: applied in `lapse` below.
+ * - Heal prevention: gated in `pokemon-heal-phase.ts`. A heal restores no HP
+ *   while bleeding; the heal is consumed to CURE the bleed instead (matches the
+ *   ROM "bleeding was healed!" message).
+ * - Stat-stage negation: gated in `Pokemon.getStatStageMultiplier` (a bleeding
+ *   bearer's stage multipliers collapse to neutral while the stored stages are
+ *   preserved for when the bleed is cured).
+ */
 export class ErBleedTag extends SerializableBattlerTag {
   public override readonly tagType = BattlerTagType.ER_BLEED;
   constructor() {
@@ -3790,14 +3802,8 @@ export class ErBleedTag extends SerializableBattlerTag {
   }
 
   override canAdd(pokemon: Pokemon): boolean {
-    // Type immunity hook — ER convention is that Grass/Steel/Rock are
-    // immune to bleed (no blood). Mirrors ER source. Keep it conservative
-    // here; classifier rejects via canApply, so an extra guard is fine.
-    return (
-      !pokemon.isOfType(PokemonType.GRASS)
-      && !pokemon.isOfType(PokemonType.STEEL)
-      && !pokemon.isOfType(PokemonType.ROCK)
-    );
+    // ROM: "Rock and Ghost types are immune to bleeding."
+    return !pokemon.isOfType(PokemonType.ROCK) && !pokemon.isOfType(PokemonType.GHOST);
   }
 
   override lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {
@@ -3805,10 +3811,17 @@ export class ErBleedTag extends SerializableBattlerTag {
     if (!ret) {
       return false;
     }
-    const cancelled = new BooleanHolder(false);
-    applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon, cancelled });
-    if (!cancelled.value) {
-      pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() / 16), { result: HitResult.INDIRECT });
+    // Defensive: this fires every turn-end; an uncaught throw here breaks
+    // TurnEndPhase and softlocks the battle ("fight won't resolve"). Isolate
+    // the chip so a bad state skips the tick instead of stalling the queue.
+    try {
+      const cancelled = new BooleanHolder(false);
+      applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon, cancelled });
+      if (!cancelled.value) {
+        pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() / 16), { result: HitResult.INDIRECT });
+      }
+    } catch (err) {
+      console.warn("[ER] ErBleedTag.lapse chip failed; skipping tick:", err);
     }
     return true;
   }
@@ -3831,24 +3844,34 @@ export class ErFrostbiteTag extends SerializableBattlerTag {
     if (!ret) {
       return false;
     }
-    const cancelled = new BooleanHolder(false);
-    applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon, cancelled });
-    if (!cancelled.value) {
-      pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() / 16), { result: HitResult.INDIRECT });
+    try {
+      const cancelled = new BooleanHolder(false);
+      applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon, cancelled });
+      if (!cancelled.value) {
+        pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() / 16), { result: HitResult.INDIRECT });
+      }
+    } catch (err) {
+      console.warn("[ER] ErFrostbiteTag.lapse chip failed; skipping tick:", err);
     }
     return true;
   }
 }
 
 /**
- * ER `FEAR` — marker tag (stub). Real semantics (25% chance to flinch / fail
- * to move) defer to a later round; the tag's presence is enough for the
- * dispatcher to route the proc, which is the goal of this round.
+ * ER `FEAR` — per the v2.65.3b ROM: "Fear traps the target for 2 turns and they
+ * take 50% more damage. If forced out by moves like Whirlwind, the target loses
+ * Fear."
+ *
+ * - 2-turn duration via the TURN_END lapse decrement.
+ * - Trapping: gated in `Pokemon.isTrapped` (the bearer can't switch out).
+ * - +50% damage taken: applied as `fearMultiplier` in `Pokemon.getAttackDamage`.
+ * - "Lost on force-out" is automatic: a forced switch resets the new Pokémon's
+ *   battler tags, so Fear does not carry over.
  */
 export class ErFearTag extends SerializableBattlerTag {
   public override readonly tagType = BattlerTagType.ER_FEAR;
   constructor() {
-    super(BattlerTagType.ER_FEAR, BattlerTagLapseType.TURN_END, 99);
+    super(BattlerTagType.ER_FEAR, BattlerTagLapseType.TURN_END, 2);
   }
 }
 

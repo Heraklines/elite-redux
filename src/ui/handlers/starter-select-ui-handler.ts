@@ -66,7 +66,7 @@ import { addWindow } from "#ui/ui-theme";
 import { applyChallenges, checkStarterValidForChallenge } from "#utils/challenge-utils";
 import { argbFromRgba, rgbHexToRgba } from "#utils/color-utils";
 import {
-  BooleanHolder,
+  type BooleanHolder,
   fixedInt,
   getLocalizedSpriteKey,
   NumberHolder,
@@ -309,16 +309,6 @@ interface SpeciesDetails {
   teraType?: PokemonType | undefined;
 }
 
-interface StarterSpriteLoadRequest {
-  species: PokemonSpecies;
-  female: boolean;
-  formIndex: number | undefined;
-  shiny: boolean | undefined;
-  variant: Variant | undefined;
-  spriteKey: string;
-  cancelled: BooleanHolder;
-}
-
 // =============================================================================
 // Elite Redux — 3-slot passive helpers
 //
@@ -466,25 +456,6 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private canCycleTera: boolean;
 
   private assetLoadCancelled: BooleanHolder | null;
-  private pendingStarterSpriteLoad: StarterSpriteLoadRequest | null = null;
-  private starterSpriteLoadActive = false;
-  /** The sprite the cursor currently wants shown — used by reconcileStarterSprite(). */
-  private desiredSprite: StarterSpriteLoadRequest | null = null;
-  /** Repeating timer that keeps the shown sprite in sync with the cursor (anti-stuck). */
-  private spriteReconcileTimer: Phaser.Time.TimerEvent | null = null;
-  /**
-   * Strict single-flight guard for preview sprite loads: `true` while a
-   * `loadAssets` kicked by the reconcile timer is pending. Only one preview
-   * sprite load runs at a time — preventing fast cycling from flooding Phaser's
-   * shared loader (which otherwise wedges, freezing the preview).
-   */
-  /** The sprite key the cursor's preview is currently loading (null = none); at most one cursor load at a time. */
-  private cursorLoadKey: string | null = null;
-  /** Species the cursor rested on last reconcile tick + how many consecutive ticks it's been stable (load debounce). */
-  private lastReconcileSpeciesId = -1;
-  private cursorStableTicks = 0;
-  /** Atlas keys currently being preloaded in the background (bounded so total concurrency stays under the browser's per-host connection limit). */
-  private preloadingKeys = new Set<string>();
   public cursorObj: Phaser.GameObjects.Image;
   private starterCursorObjs: Phaser.GameObjects.Image[];
   private pokerusCursorObjs: Phaser.GameObjects.Image[];
@@ -495,6 +466,32 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private randomCursorObj: Phaser.GameObjects.NineSlice;
   /** ER: cursor for the "Use Last Team" action (sits above the Random button). */
   private lastTeamCursorObj: Phaser.GameObjects.NineSlice;
+
+  /** ER: single-flight guard for the preview sprite load. Only ONE preview
+   * loadAssets runs at a time; when it finishes we re-drive to wherever the
+   * cursor is NOW (latest-wins). The dev server degrades sharply under concurrent
+   * sprite loads (measured: ~20ms solo vs ~2000ms with a dozen in flight), so
+   * uncapped per-selection loads pile up and freeze the preview — this caps it. */
+  private spriteLoadInFlight = false;
+  /** ER: failed-load attempt count per sprite key. Some sprites never land their
+   * texture (e.g. a dev-server request that stalls/errors); without a cap the
+   * single-flight re-drive retries the SAME key forever, freezing the preview on
+   * the previous Pokémon. After {@link MAX_SPRITE_LOAD_ATTEMPTS} failures we give
+   * up on that key for this visit. Reset in show() so a fresh visit retries. */
+  private spriteLoadAttempts = new Map<string, number>();
+  private static readonly MAX_SPRITE_LOAD_ATTEMPTS = 2;
+  /** ER: timestamp (scene clock) of the last cursor-driven sprite selection. The
+   * background grid pre-warmer only runs once the cursor has been idle past
+   * {@link SPRITE_PREWARM_IDLE_MS}, so warming never competes with active
+   * scrolling (the cursor's own load always gets the single-flight slot first). */
+  private lastSpriteSelectionTime = 0;
+  private spritePrewarmTimer: Phaser.Time.TimerEvent | null = null;
+  private static readonly SPRITE_PREWARM_IDLE_MS = 250;
+  /** ER: separate single-flight slot for the background pre-warmer, so it can warm
+   * the grid CONCURRENTLY with (never behind) the cursor's own load — the cursor's
+   * transition is never delayed waiting on a warm-up. Caps at 2 total in-flight
+   * (cursor + prewarm), which the single dev server handles fine (~2ms/file). */
+  private spritePrewarmInFlight = false;
 
   private iconAnimHandler: PokemonIconAnimHelper;
 
@@ -1387,26 +1384,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.starterSelectCallback = args[0] as StarterSelectCallback;
 
       this.starterSelectContainer.setVisible(true);
-
-      // Anti-stuck: continuously keep the previewed sprite in sync with the
-      // cursor. If a load is slow or a queue apply is missed, reconcile snaps
-      // the correct sprite in within ~150ms of its assets being present — so the
-      // preview can never stay stuck on a previous Pokémon. Cheap (early-returns
-      // when already correct).
-      this.spriteReconcileTimer?.remove();
-      this.spriteReconcileTimer = globalScene.time.addEvent({
+      this.spriteLoadAttempts.clear(); // fresh visit: allow previously-failed sprites to retry
+      // Background grid pre-warmer (idle-gated, single-flight — see prewarmVisibleSprites).
+      this.spritePrewarmTimer?.remove();
+      this.spritePrewarmTimer = globalScene.time.addEvent({
         delay: 150,
         loop: true,
-        callback: () => {
-          this.reconcileStarterSprite();
-          // Warm the visible grid into the texture cache, but ONLY once the
-          // cursor has been idle for ~1s (>=6 ticks) — never mid-scroll and not
-          // during the brief pause right after stopping, so the cursor's own
-          // load gets the connections first and isn't queued behind preloads.
-          if (this.cursorStableTicks >= 6) {
-            this.preloadNextVisibleSprite();
-          }
-        },
+        callback: () => this.prewarmVisibleSprites(),
       });
 
       this.starterPreferences = loadStarterPreferences();
@@ -4287,214 +4271,98 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
   }
 
-  private queueStarterSpriteLoad(request: StarterSpriteLoadRequest): void {
-    this.pendingStarterSpriteLoad = request;
-    if (!this.starterSpriteLoadActive) {
-      void this.processStarterSpriteLoadQueue();
-    }
-    // (The repeating spriteReconcileTimer started in show() keeps the displayed
-    // sprite in sync, so no per-move watchdog is needed here.)
-  }
-
-  private async processStarterSpriteLoadQueue(): Promise<void> {
-    if (this.starterSpriteLoadActive) {
-      return;
-    }
-
-    this.starterSpriteLoadActive = true;
-    try {
-      while (this.pendingStarterSpriteLoad) {
-        const request = this.pendingStarterSpriteLoad;
-        this.pendingStarterSpriteLoad = null;
-        await this.loadStarterSprite(request);
-        // After each load, make sure the on-screen sprite matches the cursor.
-        this.reconcileStarterSprite();
-      }
-    } finally {
-      this.starterSpriteLoadActive = false;
-    }
-    this.reconcileStarterSprite();
-
-    if (this.pendingStarterSpriteLoad) {
-      void this.processStarterSpriteLoadQueue();
-    }
-  }
-
-  private async loadStarterSprite(request: StarterSpriteLoadRequest): Promise<void> {
-    await request.species
-      // spriteOnly: skip the cry audio — it isn't played while cycling and the
-      // pile-up of .m4a loads is what makes sprites lag during rapid cycling.
-      .loadAssets(request.female, request.formIndex, request.shiny, request.variant, true, false, true)
-      .catch(() => {});
-
-    if (
-      request.cancelled.value
-      || this.assetLoadCancelled !== request.cancelled
-      || this.lastSpecies !== request.species
-      || !globalScene.textures.exists(request.spriteKey)
-      || !globalScene.anims.exists(request.spriteKey)
-    ) {
-      if (!request.cancelled.value && this.assetLoadCancelled === request.cancelled) {
-        this.assetLoadCancelled = null;
-      }
-      // Self-heal: even if THIS (now-stale) request can't apply, the asset it
-      // just loaded may be exactly what the cursor currently needs.
-      this.reconcileStarterSprite();
-      return;
-    }
-
-    this.applyStarterSprite(request);
-  }
-
   /**
-   * Self-healing safety net for the "sprite stuck on a previous Pokémon during
-   * rapid cycling" bug: if the sprite for the CURRENTLY-selected species is
-   * loaded but not the one being displayed, apply it. Idempotent and cheap —
-   * called whenever a load settles and on a short watchdog after each cursor
-   * move, so a missed queue apply can never leave the wrong sprite on screen.
-   */
-  /**
-   * AUTHORITATIVE anti-stuck check, run on a 150ms timer. It recomputes the
-   * sprite the currently selected species SHOULD show and makes the on-screen
-   * sprite match it, loading the assets if needed — so the preview can never
-   * stay stuck on the wrong Pokémon.
+   * Drive the previewed Pokémon sprite to match the current cursor selection.
    *
-   * @param allowLoad - When `false` (the per-keypress call from setSpeciesDetails)
-   *   the method only PLAYS already-cached sprites (exact or current-species
-   *   base) and never issues a `loadAssets`. Kicking a load on every keypress
-   *   during rapid cycling floods Phaser's shared loader until it wedges and all
-   *   sprite loads starve. Only the 150ms timer (allowLoad `true`) issues loads,
-   *   so loads are debounced to one in-flight request for wherever the cursor
-   *   currently rests, regardless of cycling speed.
+   * - Plays an already-cached sprite IMMEDIATELY (instant feedback while
+   *   scrolling through owned mons).
+   * - Loads an uncached sprite with a strict SINGLE-FLIGHT guard: only one
+   *   `loadAssets` runs at a time. When it resolves we call ourselves again,
+   *   which recomputes the CURRENT cursor selection (latest-wins) and either
+   *   plays it (now cached) or kicks the next load. Species merely scrolled past
+   *   while a load was in flight are never fetched — the chain jumps straight to
+   *   wherever the cursor ended up.
+   *
+   * This caps concurrent preview loads at 1. The dev server degrades sharply
+   * under concurrency (≈20ms solo vs ≈2000ms with a dozen in flight), so the old
+   * uncapped per-selection loads piled up and froze the preview on a previous
+   * Pokémon; serialising them keeps every load fast and the preview converging.
    */
-  private reconcileStarterSprite(allowLoad = true): void {
+  private refreshPreviewSprite(): void {
     const species = this.lastSpecies;
     if (!species || this.statsMode || !this.starterSelectContainer.visible) {
       return;
     }
     const dexEntry = this.getSpeciesData(species.speciesId).dexEntry;
     if (!dexEntry?.caughtAttr && !dexEntry?.seenAttr) {
-      return; // no sprite shown for fully-unseen species
+      return; // nothing shown for a fully-unseen species
     }
-    // Load debounce: track how long the cursor has rested on this species. Only
-    // the timer calls (allowLoad) advance the counter. During fast scrolling the
-    // species changes every tick (counter stays 0), so we never kick a load for
-    // a species the player is merely flying past — that backlog of flown-past
-    // requests (the dev server serves ~6-at-a-time, ~0.5s each) is exactly what
-    // left the landed-on sprite stuck behind a long queue. We only load once the
-    // cursor has settled (>=1 stable tick), i.e. the player paused/stopped.
-    if (allowLoad) {
-      if (species.speciesId === this.lastReconcileSpeciesId) {
-        this.cursorStableTicks++;
-      } else {
-        this.lastReconcileSpeciesId = species.speciesId;
-        this.cursorStableTicks = 0;
-      }
-    }
-    const cursorSettled = this.cursorStableTicks >= 1;
     const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(species.speciesId));
     const female = props.female ?? false;
     const spriteKey = species.getSpriteKey(female, props.formIndex, props.shiny, props.variant);
     if (this.pokemonSprite.pipelineData["spriteKey"] === spriteKey) {
       return; // already showing the right sprite
     }
-    const playable = (key: string): boolean => globalScene.textures.exists(key) && globalScene.anims.exists(key);
-    if (playable(spriteKey)) {
+    if (globalScene.textures.exists(spriteKey) && globalScene.anims.exists(spriteKey)) {
+      this.speciesLoaded.set(species.speciesId, true);
       this.pokemonSprite
         .play(spriteKey)
         .setPipelineData("shiny", props.shiny)
         .setPipelineData("variant", props.variant)
         .setPipelineData("spriteKey", spriteKey)
         .setVisible(!this.statsMode);
-      this.speciesLoaded.set(species.speciesId, true);
       return;
     }
-    // The exact (e.g. shiny/variant) sprite isn't ready yet. CRITICAL: never
-    // leave the preview showing a DIFFERENT, previously-selected Pokémon (the
-    // "stuck on the wrong sprite" bug). Fall back to the current species' base
-    // (non-shiny, variant 0) sprite if it's loaded, so at minimum the RIGHT
-    // Pokémon is shown; the exact variant then refines once its load lands. We
-    // deliberately set pipelineData to the fallback key (not the desired one) so
-    // the next tick keeps trying to upgrade to the exact sprite.
-    const baseKey = species.getSpriteKey(female, props.formIndex, false, 0);
-    if (baseKey !== spriteKey && this.pokemonSprite.pipelineData["spriteKey"] !== baseKey && playable(baseKey)) {
-      this.pokemonSprite
-        .play(baseKey)
-        .setPipelineData("shiny", false)
-        .setPipelineData("variant", 0)
-        .setPipelineData("spriteKey", baseKey)
-        .setVisible(!this.statsMode);
+    if ((this.spriteLoadAttempts.get(spriteKey) ?? 0) >= StarterSelectUiHandler.MAX_SPRITE_LOAD_ATTEMPTS) {
+      return; // this sprite won't load — stop retrying so the preview doesn't freeze
     }
-    // Load the cursor's sprite — at most ONE cursor load at a time (re-kicked
-    // for the new key only after the previous resolves). This is bounded so it,
-    // together with the background preloader (capped separately), keeps total
-    // in-flight loads under the browser's per-host connection limit. `loadAssets`
-    // dedupes by atlas key, so if the preloader is already fetching this sprite
-    // the two coalesce into one request.
-    if (allowLoad && cursorSettled && this.cursorLoadKey === null) {
-      // ALWAYS load the BASE (non-shiny, variant 0) sprite first: it's a single
-      // fast atlas request (no variant-colour files), so the base-fallback above
-      // shows the CORRECT species almost immediately on stop. Only once the base
-      // is cached AND the cursor has lingered (~1s) do we refine to the exact
-      // shiny/variant — so fast browsing never waits behind slow variant files.
-      const baseCached = globalScene.textures.exists(baseKey);
-      const refineShiny = baseCached && this.cursorStableTicks >= 6 && (props.shiny || props.variant);
-      if (!baseCached) {
-        this.cursorLoadKey = baseKey;
-        species
-          .loadAssets(female, props.formIndex, false, 0, true, false, true)
-          .catch(() => {})
-          .then(() => {
-            if (this.cursorLoadKey === baseKey) {
-              this.cursorLoadKey = null;
-            }
-          });
-      } else if (refineShiny && !globalScene.textures.exists(spriteKey)) {
-        this.cursorLoadKey = spriteKey;
-        species
-          .loadAssets(female, props.formIndex, props.shiny, props.variant, true, false, true)
-          .catch(() => {})
-          .then(() => {
-            if (this.cursorLoadKey === spriteKey) {
-              this.cursorLoadKey = null;
-            }
-          });
-      }
+    if (this.spriteLoadInFlight) {
+      return; // a load is running; its completion re-drives to the current cursor
     }
+    this.spriteLoadInFlight = true;
+    this.spriteLoadAttempts.set(spriteKey, (this.spriteLoadAttempts.get(spriteKey) ?? 0) + 1);
+    species
+      // spriteOnly: ER customs have no cry, and vanilla cries aren't needed in
+      // the preview — skipping audio is what keeps the loader from piling up.
+      // ER-custom species route through ErCustomSpecies.loadAssets here (its
+      // `_shiny`/`_shiny2`/`_shiny3` paths), so all custom sprites still load.
+      .loadAssets(female, props.formIndex, props.shiny, props.variant, true, false, true)
+      .catch(() => {})
+      .then(() => {
+        this.spriteLoadInFlight = false;
+        if (globalScene.textures.exists(spriteKey) && globalScene.anims.exists(spriteKey)) {
+          this.spriteLoadAttempts.delete(spriteKey); // landed — clear the counter
+        }
+        // Re-drive: play this sprite if the cursor is still on it, otherwise kick
+        // the load for wherever the cursor has since moved (single-flight chain).
+        this.refreshPreviewSprite();
+      });
   }
 
   /**
-   * Background-warm the visible grid's base preview sprites into the texture
-   * cache, ONE per idle reconcile tick (single-flight, shared with the cursor
-   * load so it never competes). Once the visible page is warm, moving the cursor
-   * to any of those species is an instant cache hit that makes ZERO network
-   * requests — which is what makes furious cycling (especially down through rows)
-   * immune to the dev-server request stalls that otherwise freeze the preview on
-   * the previous Pokémon. We warm the base (non-shiny, variant 0) sprite — the
-   * exact key the reconcile's fallback shows — so the correct species always
-   * appears immediately even while a shiny/variant refines.
+   * Background pre-warmer: while the cursor is idle, load ONE uncached visible-grid
+   * preview sprite into the texture cache so that scrolling onto it later is an
+   * instant cache hit (the big vanilla animation atlases otherwise cost 1–3s on
+   * first encounter on the dev server). Shares {@link spriteLoadInFlight} with the
+   * cursor load, so it never runs concurrently with — or delays — the cursor's own
+   * sprite, and the idle gate means it never fires mid-scroll. Runs one sprite per
+   * tick; its completion re-drives {@link refreshPreviewSprite} so the cursor keeps
+   * priority.
    */
-  /** Max concurrent background preloads. Sprite atlases are served fast in
-   * isolation (~70ms) but the dev server degrades sharply under concurrency, so
-   * we warm just ONE at a time — leaving the connection pool free for the
-   * cursor's own load (which must be instant on stop) and the game's other
-   * traffic. The visible grid still warms steadily during idle. */
-  private static readonly PRELOAD_CONCURRENCY = 1;
-
-  private preloadNextVisibleSprite(): void {
-    // Yield hard to the cursor: never preload while the cursor's own sprite is
-    // loading, so the previewed sprite's request is never queued behind warm-up
-    // requests on the slow dev server.
-    if (this.cursorLoadKey !== null || this.statsMode || !this.starterSelectContainer.visible) {
-      return;
+  private prewarmVisibleSprites(): void {
+    if (
+      this.spritePrewarmInFlight
+      || this.statsMode
+      || !this.starterSelectContainer.visible
+      || globalScene.time.now - this.lastSpriteSelectionTime < StarterSelectUiHandler.SPRITE_PREWARM_IDLE_MS
+    ) {
+      return; // a warm-up is running, not idle long enough, or screen not active
     }
     const maxColumns = 9;
     const maxRows = 9;
     const first = this.scrollCursor * maxColumns;
     const last = Math.min(this.filteredStarterContainers.length - 1, first + maxRows * maxColumns - 1);
-    // Kick uncached visible sprites until the concurrency cap is reached. Each
-    // tick tops the pool back up as loads complete, warming ~4-in-parallel.
-    for (let i = first; i <= last && this.preloadingKeys.size < StarterSelectUiHandler.PRELOAD_CONCURRENCY; i++) {
+    for (let i = first; i <= last; i++) {
       const species = this.filteredStarterContainers[i]?.species;
       if (!species) {
         continue;
@@ -4505,29 +4373,31 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       }
       const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(species.speciesId));
       const female = props.female ?? false;
-      const baseKey = species.getSpriteKey(female, props.formIndex, false, 0);
-      if (globalScene.textures.exists(baseKey) || this.preloadingKeys.has(baseKey) || baseKey === this.cursorLoadKey) {
-        continue; // already warm or already loading
+      const spriteKey = species.getSpriteKey(female, props.formIndex, props.shiny, props.variant);
+      if (globalScene.textures.exists(spriteKey) && globalScene.anims.exists(spriteKey)) {
+        continue; // already warm
       }
-      this.preloadingKeys.add(baseKey);
+      if ((this.spriteLoadAttempts.get(spriteKey) ?? 0) >= StarterSelectUiHandler.MAX_SPRITE_LOAD_ATTEMPTS) {
+        continue; // gave up on this one
+      }
+      // Warm exactly the key the cursor would request (same dex props), in the
+      // prewarm slot — concurrent with, never blocking, the cursor's own load.
+      this.spritePrewarmInFlight = true;
+      this.spriteLoadAttempts.set(spriteKey, (this.spriteLoadAttempts.get(spriteKey) ?? 0) + 1);
       species
-        .loadAssets(female, props.formIndex, false, 0, true, false, true)
+        .loadAssets(female, props.formIndex, props.shiny, props.variant, true, false, true)
         .catch(() => {})
         .then(() => {
-          this.preloadingKeys.delete(baseKey);
+          this.spritePrewarmInFlight = false;
+          if (globalScene.textures.exists(spriteKey) && globalScene.anims.exists(spriteKey)) {
+            this.spriteLoadAttempts.delete(spriteKey);
+          }
+          // If the player landed on an uncached sprite while this was warming,
+          // service it now (the cursor's own slot handles it).
+          this.refreshPreviewSprite();
         });
+      return; // one sprite per tick
     }
-  }
-
-  private applyStarterSprite(request: StarterSpriteLoadRequest): void {
-    this.assetLoadCancelled = null;
-    this.speciesLoaded.set(request.species.speciesId, true);
-    this.pokemonSprite
-      .play(request.spriteKey)
-      .setPipelineData("shiny", request.shiny)
-      .setPipelineData("variant", request.variant)
-      .setPipelineData("spriteKey", request.spriteKey)
-      .setVisible(!this.statsMode);
   }
 
   getSpeciesData(
@@ -4746,7 +4616,6 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.assetLoadCancelled.value = true;
       this.assetLoadCancelled = null;
     }
-    this.pendingStarterSpriteLoad = null;
 
     this.starterMoveset = null;
     this.speciesStarterMoves = [];
@@ -4805,46 +4674,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         }
 
         female ??= false;
-        const spriteKey = species.getSpriteKey(female, formIndex, shiny, variant);
-        const spriteReady = globalScene.textures.exists(spriteKey) && globalScene.anims.exists(spriteKey);
-        const shouldUpdateSprite = this.pokemonSprite.pipelineData["spriteKey"] !== spriteKey || !spriteReady;
-
-        if (shouldUpdateSprite) {
-          const assetLoadCancelled = new BooleanHolder(false);
-          const request: StarterSpriteLoadRequest = {
-            species,
-            female,
-            formIndex,
-            shiny,
-            variant,
-            spriteKey,
-            cancelled: assetLoadCancelled,
-          };
-          this.assetLoadCancelled = assetLoadCancelled;
-          // Remember what the cursor currently wants so reconcileStarterSprite()
-          // applies/loads it.
-          this.desiredSprite = request;
-
-          if (spriteReady) {
-            // Cached → show immediately.
-            this.applyStarterSprite(request);
-          } else {
-            // NOT cached. Do NOT kick a load here. During rapid cycling
-            // setSpeciesDetails fires on every keypress; kicking a `loadAssets`
-            // each time floods Phaser's shared loader until it wedges (files
-            // stuck "in flight", never completing) and EVERY sprite load
-            // starves — the "preview frozen on the previous Pokémon" bug.
-            // Instead the 150ms reconcile timer is the SOLE loader: it
-            // single-flights one load for wherever the cursor currently rests,
-            // so loads are naturally debounced (≤~6/s) regardless of how fast
-            // the player cycles. Show any already-cached sprite for this species
-            // immediately (allowLoad=false → no load kicked here); the timer
-            // performs the actual (debounced) load on its next tick.
-            this.reconcileStarterSprite(false);
-          }
-        } else {
-          this.pokemonSprite.setVisible(!this.statsMode);
-        }
+        // Drive the preview sprite through the single-flight refresher: it plays
+        // cached sprites instantly and serialises uncached loads (latest-wins) so
+        // scrolling can never pile up concurrent loads and freeze the preview.
+        this.lastSpriteSelectionTime = globalScene.time.now; // gate the idle pre-warmer
+        this.refreshPreviewSprite();
 
         const currentFilteredContainer = this.filteredStarterContainers.find(
           p => p.species.speciesId === species.speciesId,
@@ -5082,7 +4916,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       .setText(`(+${Math.max(this.speciesStarterMoves.length - 4, 0)})`)
       .setVisible(this.speciesStarterMoves.length > 4);
 
-    this.tryUpdateValue();
+    // Preview/cursor-move: party cost is unchanged, so skip the whole-dex
+    // affordability re-shade (the per-keypress hot path). The sweep still runs on
+    // party add/remove (addToParty/popStarter), restoreLastTeam, and first open.
+    this.tryUpdateValue(undefined, undefined, true);
 
     this.updateInstructions();
 
@@ -5184,7 +5021,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     starter.label.setColor(getTextColor(textStyle)).setShadowColor(getTextColor(textStyle, true));
   }
 
-  tryUpdateValue(add?: number, addingToParty?: boolean): boolean {
+  /**
+   * @param skipAffordabilitySweep - When true, skip the O(all-species) loop that
+   *   re-shades every grid icon by affordability. That sweep only changes when the
+   *   PARTY changes (cost) — never on a mere cursor/preview move — yet it ran on
+   *   every `setSpeciesDetails`, doing ~1900× `checkStarterValidForChallenge` +
+   *   `getCurrentDexProps` per keypress and saturating the main thread (which also
+   *   stalled the sprite loader's completion events). Preview calls now pass true;
+   *   party add/remove + first open still run the full sweep.
+   */
+  tryUpdateValue(add?: number, addingToParty?: boolean, skipAffordabilitySweep = false): boolean {
     const value = this.starterSpecies
       .map(s => s.generation)
       .reduce(
@@ -5207,6 +5053,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       globalScene.time.delayedCall(fixedInt(500), () => this.tryUpdateValue());
       return false;
     }
+    // Pure preview (cursor move) → affordability hasn't changed, so skip the
+    // whole-dex re-shade. This is the single biggest per-keypress cost.
+    if (skipAffordabilitySweep) {
+      return true;
+    }
+
     let isPartyValid = this.isPartyValid();
     if (addingToParty) {
       const species = this.filteredStarterContainers[this.cursor].species;
@@ -5592,8 +5444,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
     this.starterSelectContainer.setVisible(false);
     this.blockInput = false;
-    this.spriteReconcileTimer?.remove();
-    this.spriteReconcileTimer = null;
+    this.spritePrewarmTimer?.remove();
+    this.spritePrewarmTimer = null;
 
     while (this.starterSpecies.length > 0) {
       this.popStarter(this.starterSpecies.length - 1);

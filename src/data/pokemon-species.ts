@@ -1433,7 +1433,20 @@ export class PokemonSpecies extends PokemonSpeciesForm implements Localizable {
         variantDataIndex = `${variantDataIndex}-${formKey}`;
       }
     }
-    return Object.hasOwn(variantData, variantDataIndex) || Object.hasOwn(variantData, this.speciesId);
+    // ER-custom species (id ≥ 10000) render their shiny tiers from dedicated
+    // sprite files (`_shiny` / `_shiny2` / `_shiny3`, via the ER species'
+    // getSpriteId override) rather than the vanilla `variantData` colour-swap
+    // registry — so they're absent from `variantData` and were wrongly pinned
+    // to the STANDARD tier, never able to roll the higher RARE/EPIC shiny tiers
+    // from eggs (an artificial block, not rarity). Mark them variant-capable so
+    // the egg roll isn't forced to STANDARD; their own variant sprites then
+    // render, and the colour-swap path simply no-ops (its callers guard on
+    // `variantData[index]`).
+    return (
+      Object.hasOwn(variantData, variantDataIndex)
+      || Object.hasOwn(variantData, this.speciesId)
+      || this.speciesId >= 10000
+    );
   }
 
   getFormSpriteKey(formIndex?: number) {

@@ -15,8 +15,9 @@
 // localization keys.
 // =============================================================================
 
-import { allSpecies } from "#data/data-lists";
+import { globalScene } from "#app/global-scene";
 import { starterColors } from "#app/global-vars/starter-colors";
+import { allSpecies } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import type { ErSpeciesDraft } from "#data/elite-redux/er-species";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
@@ -25,13 +26,10 @@ import { GrowthRate } from "#data/exp";
 import { PokemonSpecies } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
 import { PokemonType } from "#enums/pokemon-type";
-import { globalScene } from "#app/global-scene";
 import type { Variant } from "#sprites/variant";
 
 /** Lookup: ER species id → kebab-case sprite slug ("phantowl", "abyssand"...). */
-const ER_SPRITE_BY_SPECIES_ID = new Map<number, string>(
-  ER_SPRITE_MANIFEST.map(e => [e.speciesId, e.slug]),
-);
+const ER_SPRITE_BY_SPECIES_ID = new Map<number, string>(ER_SPRITE_MANIFEST.map(e => [e.speciesId, e.slug]));
 
 /**
  * Numeric cutoff for "vanilla pokerogue" species ids. ER-custom species are
@@ -308,6 +306,9 @@ class ErCustomSpecies extends PokemonSpecies {
     variant?: Variant,
     startLoad = false,
     back = false,
+    // Accepted for signature parity with the base; ER customs always run
+    // sprite-only regardless (see below), so the caller's value is irrelevant.
+    _spriteOnly = false,
   ): Promise<void> {
     const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
     if (slug) {
@@ -317,7 +318,17 @@ class ErCustomSpecies extends PokemonSpecies {
         globalScene.loadPokemonAtlas(iconKey, `elite-redux/${slug}/icon`);
       }
     }
-    return super.loadAssets(female, formIndex, shiny, variant, startLoad, back);
+    // ER-custom species have NO cry audio and aren't in the vanilla `variantData`
+    // colour-swap registry, so we ALWAYS load sprite-only (force `spriteOnly`):
+    //  - queuing the nonexistent `audio/<key>.m4a` cry 404s AND burns shared-loader
+    //    slots, starving real sprite atlases behind dozens of failed cry fetches —
+    //    the root of "Missing animation / substitute shown" and inconsistent shiny
+    //    sprites during rapid starter/pokédex/egg cycling (it also hurt vanilla
+    //    species sharing the loader);
+    //  - `loadVariantColors` is a no-op for ER customs anyway (no variantData entry).
+    // The shiny variant sprite atlas (shiny/shiny-2/shiny-3) still loads — it's not
+    // gated by spriteOnly — so ER custom shiny tiers render correctly.
+    return super.loadAssets(female, formIndex, shiny, variant, startLoad, back, true);
   }
 }
 

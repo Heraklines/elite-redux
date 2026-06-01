@@ -332,6 +332,11 @@ function dispatchRecoilOrDrain(params: Record<string, unknown>): MoveDispatchRes
  * effectiveness data is available (e.g. simulated move-gen contexts).
  */
 function pickBestEffectivenessType(user: Pokemon, target: Pokemon, types: readonly PokemonType[]): PokemonType {
+  // No concrete target (e.g. weather move-type checks call getMoveType with a
+  // null target) — there's no effectiveness data, so use the first candidate.
+  if (!target) {
+    return types[0];
+  }
   let bestType: PokemonType = types[0];
   let bestMult = Number.NEGATIVE_INFINITY;
   for (const t of types) {
@@ -371,6 +376,13 @@ export class BestEffectivenessTypeAttr extends VariableMoveTypeAttr {
     }
     if (this.candidates.length === 0) {
       return false;
+    }
+    // `getMoveType` is also invoked outside real targeting (e.g. weather
+    // cancellation checks) with a null target; fall back to the first candidate
+    // there instead of dereferencing null.
+    if (!target) {
+      holder.value = this.candidates[0];
+      return true;
     }
     holder.value = pickBestEffectivenessType(user, target, this.candidates);
     return true;

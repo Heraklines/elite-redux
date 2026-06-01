@@ -211,6 +211,17 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
     // transform audit (post-Phase-B).
     for (const form of species.forms) {
       if (!form.formKey) {
+        // Base form (formKey === "", formIndex 0). For a multi-form species
+        // (e.g. Gyarados = base + Mega) pokerogue resolves a battler's ability
+        // and passives THROUGH its active form, so the species-level
+        // setActiveAbilities/setPassives above never reach the in-battle base
+        // form — it kept its vanilla constructor abilities (Gyarados showed
+        // Intimidate instead of Moxie/Sea Guardian/Rampage). Mirror the species'
+        // ER actives + innates (this species' own draft) onto the base form.
+        form.setPassives(passives);
+        if (actives[0] !== AbilityId.NONE) {
+          form.setActiveAbilities(actives);
+        }
         continue;
       }
       const candidates = deriveErFormSpeciesConst(draft.speciesConst, form.formKey);
