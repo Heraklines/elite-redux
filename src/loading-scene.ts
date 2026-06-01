@@ -37,6 +37,10 @@ export class LoadingScene extends SceneBase {
       .loadImage("snow", "")
       // ER: ROM-extracted fog overlay sprite (scrolling in-battle fog visual).
       .loadImage("fog_horizontal", "elite-redux/weather")
+      // ER: ROM item icons for the recreated trainer-only held items.
+      .loadImage("er_life_orb", "items/er")
+      .loadImage("er_assault_vest", "items/er")
+      .loadImage("er_rocky_helmet", "items/er")
       // ER: in-battle "Info" screen backgrounds (ROM gAbilitiesInfo menu, tiles
       // recoloured per page) + overlay sprites.
       .loadImage("er_binfo_side_player", "elite-redux/battle-info", "side-player.png")

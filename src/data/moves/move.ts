@@ -44,6 +44,7 @@ import { BattlerTagType } from "#enums/battler-tag-type";
 import { BiomeId } from "#enums/biome-id";
 import { ChallengeType } from "#enums/challenge-type";
 import { Command } from "#enums/command";
+import { ErAbilityId } from "#enums/er-ability-id";
 import { FieldPosition } from "#enums/field-position";
 import { HitResult } from "#enums/hit-result";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
@@ -488,7 +489,14 @@ export abstract class Move implements Localizable {
     // TODO: Allow this to be simulated
     applyAbAttrs("InfiltratorAbAttr", { pokemon: user, bypassed });
 
-    return !bypassed.value && !this.hasFlag(MoveFlags.SOUND_BASED) && !this.hasFlag(MoveFlags.IGNORE_SUBSTITUTE);
+    // Sound check is user-aware so ER move-flag injection (Musical Notes:
+    // "status moves become sound-based") lets injected-sound moves bypass
+    // Substitute just like natively-sound moves.
+    return (
+      !bypassed.value
+      && !this.doesFlagEffectApply({ flag: MoveFlags.SOUND_BASED, user })
+      && !this.hasFlag(MoveFlags.IGNORE_SUBSTITUTE)
+    );
   }
 
   /**
@@ -923,6 +931,25 @@ export abstract class Move implements Localizable {
           return true;
         }
         break;
+      case MoveFlags.DANCE_MOVE:
+      case MoveFlags.SOUND_BASED: {
+        // ER move-flag injection — e.g. Taekkyeon ("all attacks are dances",
+        // DANCE), Festivities ("sound moves are dances", DANCE on sound moves),
+        // Musical Notes ("status moves become sound-based", SOUND on status
+        // moves). Scanned by name (registration-free). Consumers that route
+        // their flag check through `doesFlagEffectApply` (the user-aware path)
+        // therefore respect the injected flag.
+        const injectAttrs = [...user.getAbility().attrs, ...user.getPassiveAbilities().flatMap(pa => pa?.attrs ?? [])];
+        for (const attr of injectAttrs) {
+          if (
+            attr?.constructor?.name === "MoveFlagInjectionAbAttr"
+            && (attr as unknown as { injects: (f: MoveFlags, m: Move) => boolean }).injects(flag, this)
+          ) {
+            return true;
+          }
+        }
+        break;
+      }
     }
 
     return this.hasFlag(flag);
@@ -2728,19 +2755,25 @@ export abstract class WeatherHealAttr extends HealAttr {
 
   apply(user: Pokemon, _target: Pokemon, _move: Move, _args: any[]): boolean {
     let healRatio = 0.5;
-    if (!globalScene.arena.weather?.isEffectSuppressed()) {
+    if (globalScene.arena.weather?.isEffectSuppressed()) {
+      healRatio = this.getWeatherHealRatio(WeatherType.NONE, user);
+    } else {
       const weatherType = globalScene.arena.weather?.weatherType || WeatherType.NONE;
-      healRatio = this.getWeatherHealRatio(weatherType);
+      healRatio = this.getWeatherHealRatio(weatherType, user);
     }
     this.addHealPhase(user, healRatio);
     return true;
   }
 
-  abstract getWeatherHealRatio(weatherType: WeatherType): number;
+  abstract getWeatherHealRatio(weatherType: WeatherType, user: Pokemon): number;
 }
 
 export class PlantHealAttr extends WeatherHealAttr {
-  getWeatherHealRatio(weatherType: WeatherType): number {
+  getWeatherHealRatio(weatherType: WeatherType, user: Pokemon): number {
+    // ER Chloroplast: recover 2/3 as if in sun, regardless of weather.
+    if (userActsInSun(user)) {
+      return 2 / 3;
+    }
     switch (weatherType) {
       case WeatherType.SUNNY:
       case WeatherType.HARSH_SUN:
@@ -2759,7 +2792,7 @@ export class PlantHealAttr extends WeatherHealAttr {
 }
 
 export class SandHealAttr extends WeatherHealAttr {
-  getWeatherHealRatio(weatherType: WeatherType): number {
+  getWeatherHealRatio(weatherType: WeatherType, _user: Pokemon): number {
     switch (weatherType) {
       case WeatherType.SANDSTORM:
         return 2 / 3;
@@ -3719,13 +3752,38 @@ export class InstantChargeAttr extends MoveAttr {
  * Attribute that allows charge moves to resolve in 1 turn while specific {@linkcode WeatherType | Weather}
  * is active. Should only be used for {@linkcode ChargingMove | ChargingMoves} as a `chargeAttr`.
  */
+/**
+ * Elite Redux — Chloroplast (er 268): "Weather Ball, Solar Beam/Blade, Growth,
+ * and the recovery moves act as if used in sun." Returns true when real
+ * (un-suppressed) sun is active OR the user holds Chloroplast — letting the
+ * sun-gated branches of those moves fire for the holder regardless of weather.
+ */
+export function userActsInSun(user: Pokemon | null | undefined): boolean {
+  if (user?.hasAbility(ErAbilityId.CHLOROPLAST as unknown as AbilityId)) {
+    return true;
+  }
+  const weather = globalScene.arena.weather;
+  return (
+    !!weather
+    && !weather.isEffectSuppressed()
+    && (weather.weatherType === WeatherType.SUNNY || weather.weatherType === WeatherType.HARSH_SUN)
+  );
+}
+
 export class WeatherInstantChargeAttr extends InstantChargeAttr {
   /**
    * The weather types that allow the move to be charged instantly.
    */
   public readonly weatherTypes: WeatherType[];
   constructor(weatherTypes: WeatherType[]) {
-    super(() => {
+    super((user: Pokemon) => {
+      // ER Chloroplast: solar moves charge instantly as if in sun.
+      if (
+        (this.weatherTypes.includes(WeatherType.SUNNY) || this.weatherTypes.includes(WeatherType.HARSH_SUN))
+        && userActsInSun(user)
+      ) {
+        return true;
+      }
       const currentWeather = globalScene.arena.weather;
 
       if (currentWeather?.weatherType == null) {
@@ -4247,12 +4305,10 @@ export class GrowthStatStageChangeAttr extends StatStageChangeAttr {
     super([Stat.ATK, Stat.SPATK], 1, true);
   }
 
-  getLevels(_user: Pokemon): number {
-    if (!globalScene.arena.weather?.isEffectSuppressed()) {
-      const weatherType = globalScene.arena.weather?.weatherType;
-      if (weatherType === WeatherType.SUNNY || weatherType === WeatherType.HARSH_SUN) {
-        return this.stages + 1;
-      }
+  getLevels(user: Pokemon): number {
+    // +2 in sun — or for a Chloroplast holder in any weather (ER).
+    if (userActsInSun(user)) {
+      return this.stages + 1;
     }
     return this.stages;
   }
@@ -5905,10 +5961,17 @@ export class IvyCudgelTypeAttr extends VariableMoveTypeAttr {
 }
 
 export class WeatherBallTypeAttr extends VariableMoveTypeAttr {
-  apply(_user: Pokemon, _target: Pokemon, move: Move, args: any[]): boolean {
+  apply(user: Pokemon, _target: Pokemon, move: Move, args: any[]): boolean {
     const moveType = args[0];
     if (!(moveType instanceof NumberHolder)) {
       return false;
+    }
+
+    // ER Chloroplast: Weather Ball becomes Fire-type as if in sun, regardless of
+    // (or absent) weather.
+    if (user?.hasAbility(ErAbilityId.CHLOROPLAST as unknown as AbilityId)) {
+      moveType.value = PokemonType.FIRE;
+      return true;
     }
 
     if (!globalScene.arena.weather?.isEffectSuppressed()) {

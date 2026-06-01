@@ -1,5 +1,5 @@
 import { allAbilities } from "#data/data-lists";
-import { ChanceStatusOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
+import { ChanceStatusOnAttackAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
 import { FlagDamageBoostAbAttr } from "#data/elite-redux/archetypes/flag-damage-boost";
 import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
@@ -149,21 +149,22 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     expect(attr.getLowHpMultiplier()).toBeNull();
   });
 
-  it("SPECTRAL_SHROUD (er id 386, chance-status-on-hit) has a ChanceStatusOnHitAbAttr for TOXIC", () => {
-    const id = ER_ID_MAP.abilities[386];
+  it("SPECTRAL_SHROUD (er id 387, chance-status-on-hit OFFENSE) has a ChanceStatusOnAttackAbAttr for TOXIC", () => {
+    // Spectral Shroud = "Spectralize + 30% chance to badly poison the foe" —
+    // an OFFENSIVE chance-status (the holder's moves poison the target), so it
+    // wires ChanceStatusOnAttackAbAttr, not the defensive on-hit variant.
+    const id = ER_ID_MAP.abilities[387];
     expect(id).toBeDefined();
     const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();
     if (!ability) {
       return;
     }
-    const attrs = ability.attrs.filter((a): a is ChanceStatusOnHitAbAttr => a instanceof ChanceStatusOnHitAbAttr);
+    const attrs = ability.attrs.filter((a): a is ChanceStatusOnAttackAbAttr => a instanceof ChanceStatusOnAttackAbAttr);
     expect(attrs.length).toBe(1);
     const attr = attrs[0];
     expect(attr.getChance()).toBe(30);
     expect(attr.getEffects()).toEqual([StatusEffect.TOXIC]);
-    // onContactOnly: false in the classifier → contactRequired: false.
-    expect(attr.requiresContact()).toBe(false);
   });
 
   it("ELECTRO_SURGE (er id 226, entry-effect set-terrain) has an EntryEffectAbAttr", () => {
@@ -262,9 +263,10 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     // so future rounds adding more bespoke wirings don't invalidate this
     // assertion.
     expect(wiredCounts.bespoke ?? 0).toBeGreaterThanOrEqual(15);
-    // R48 grind wired every remaining SKIP — 262 bespoke wires now in
-    // place; bound widened to 280 to leave headroom for future ER customs.
-    expect(wiredCounts.bespoke ?? 0).toBeLessThanOrEqual(280);
+    // R48 grind wired every remaining SKIP, and composites-with-only-riders
+    // (e.g. 909 Lightsaber) were reclassified composite → bespoke — ~381
+    // bespoke wires now in place; bound widened to 400 for headroom.
+    expect(wiredCounts.bespoke ?? 0).toBeLessThanOrEqual(400);
   });
 
   it("init result reports per-archetype wired counts (fresh run on a clean baseline)", () => {

@@ -5,6 +5,8 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { ConditionalProtectTag } from "#data/arena-tag";
 import { MoveAnim } from "#data/battle-anims";
 import { ProtectedTag, SemiInvulnerableTag, SubstituteTag, TypeBoostTag } from "#data/battler-tags";
+import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
+import { applyErLifeOrbRecoil, applyErRockyHelmet } from "#data/elite-redux/er-recreated-items";
 import { SpeciesFormChangePostMoveTrigger } from "#data/form-change-triggers";
 import type { TypeDamageMultiplier } from "#data/type";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -22,7 +24,6 @@ import { MoveTarget } from "#enums/move-target";
 import { isReflected, MoveUseMode } from "#enums/move-use-mode";
 import { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
-import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
 
 /**
  * Elite Redux: walk both `user.getAbility()` and `user.getPassiveAbility()`,
@@ -32,7 +33,9 @@ import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditi
 function erUserHasConditionalAlwaysHit(user: Pokemon, move: import("#moves/move").Move, target: Pokemon): boolean {
   const abilities = [user.getAbility(), user.getPassiveAbility()];
   for (const ab of abilities) {
-    if (!ab) continue;
+    if (!ab) {
+      continue;
+    }
     for (const attr of ab.attrs) {
       if (attr instanceof ConditionalAlwaysHitAbAttr && attr.matches(move, user, target)) {
         return true;
@@ -41,6 +44,7 @@ function erUserHasConditionalAlwaysHit(user: Pokemon, move: import("#moves/move"
   }
   return false;
 }
+
 import {
   ContactHeldItemTransferChanceModifier,
   DamageMoneyRewardModifier,
@@ -730,6 +734,11 @@ export class MoveEffectPhase extends PokemonPhase {
     user.turnData.singleHitDamageDealt = finalDmg;
     target.battleData.hitCount++;
     target.turnData.damageTaken += finalDmg;
+
+    // ER recreated held items: Life Orb recoil on the attacker, Rocky Helmet
+    // contact damage from the target. Both gated on damage actually dealt.
+    applyErLifeOrbRecoil(user, finalDmg);
+    applyErRockyHelmet(user, target, this.move, finalDmg);
 
     target.turnData.attacksReceived.unshift({
       move: this.move.id,

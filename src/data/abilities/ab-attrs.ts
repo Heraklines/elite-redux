@@ -4560,7 +4560,7 @@ export class PostMoveUsedAbAttr extends AbAttr {
 
 /** Triggers after a dance move is used either by the opponent or the player */
 export class PostDancingMoveAbAttr extends PostMoveUsedAbAttr {
-  override canApply({ source, pokemon }: PostMoveUsedAbAttrParams): boolean {
+  override canApply({ source, pokemon, move }: PostMoveUsedAbAttrParams): boolean {
     /** Tags that prevent Dancer from replicating the move */
     const forbiddenTags = [
       BattlerTagType.FLYING,
@@ -4568,9 +4568,14 @@ export class PostDancingMoveAbAttr extends PostMoveUsedAbAttr {
       BattlerTagType.UNDERGROUND,
       BattlerTagType.HIDDEN,
     ];
-    // The move to replicate cannot come from the Dancer
+    // Only dance moves (the PostMoveUsed trigger now fires for ALL moves so ER
+    // copy-by-filter abilities can hook it; gate the vanilla Dancer here).
+    // Uses the user-aware flag check so ER move-flag injection (Taekkyeon:
+    // "all attacks are dances") makes the source's attacks count as dances.
+    // The move to replicate cannot come from the Dancer.
     return (
-      source.getBattlerIndex() !== pokemon.getBattlerIndex()
+      move.getMove().doesFlagEffectApply({ flag: MoveFlags.DANCE_MOVE, user: source })
+      && source.getBattlerIndex() !== pokemon.getBattlerIndex()
       && !pokemon.summonData.tags.some(tag => forbiddenTags.includes(tag.tagType))
     );
   }
@@ -5737,7 +5742,7 @@ export class TerrainEventTypeChangeAbAttr extends PostSummonAbAttr {
   }
 }
 
-class ForceSwitchOutHelper {
+export class ForceSwitchOutHelper {
   private readonly switchType: SwitchType;
   constructor(switchType: SwitchType) {
     this.switchType = switchType;

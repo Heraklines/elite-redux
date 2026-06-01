@@ -26,7 +26,12 @@
 // =============================================================================
 
 import { findErTrainersForType, selectErRoster } from "#data/elite-redux/er-trainer-overlay";
-import { clearErTrainerCacheForTests, hasErRosterOverride } from "#data/elite-redux/er-trainer-runtime-hook";
+import {
+  clearErTrainerCacheForTests,
+  getErTrainerForTrainer,
+  hasErRosterOverride,
+  pickTierForWave,
+} from "#data/elite-redux/er-trainer-runtime-hook";
 import { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
 import { MoveId } from "#enums/move-id";
@@ -53,21 +58,15 @@ describe("ER integration — trainer-overlay runtime hook spawns ER rosters", ()
 
   it("Trainer.genPartyMember substitutes an ER roster species for ACE_TRAINER battles", async () => {
     // Many ER trainer classes resolve to TrainerType.ACE_TRAINER (pokerogue
-    // id = 1). We pick the FIRST ER trainer for that class as our oracle.
+    // id = 1). The hook now picks an ER trainer wave-seeded across ALL
+    // candidates (not just the first) and a wave-scaled tier — so the oracle is
+    // derived from the actual selection AFTER the battle starts.
     const erCandidates = findErTrainersForType(TrainerType.ACE_TRAINER);
     expect(erCandidates.length).toBeGreaterThan(0);
-    const expectedTrainer = erCandidates[0];
-    const expectedRoster = selectErRoster(expectedTrainer, "party");
-    expect(expectedRoster.length).toBeGreaterThan(0);
-    const expectedSpeciesId = expectedRoster[0].speciesId;
 
-    // Force a trainer wave with the chosen class. The trainer's first
-    // party member should come from `expectedRoster[0]` via the hook.
     game.override.battleType(BattleType.TRAINER).randomTrainer({ trainerType: TrainerType.ACE_TRAINER });
-
     await game.classicMode.startBattle(SpeciesId.MAGIKARP);
 
-    // After startBattle, the enemy party is generated via genPartyMember.
     const trainer = game.scene.currentBattle.trainer;
     expect(trainer).toBeDefined();
     if (!trainer) {
@@ -75,9 +74,15 @@ describe("ER integration — trainer-overlay runtime hook spawns ER rosters", ()
     }
     expect(hasErRosterOverride(trainer)).toBe(true);
 
+    // The actual ER trainer + tier the hook chose for this wave.
+    const chosen = getErTrainerForTrainer(trainer);
+    expect(chosen).not.toBeNull();
+    const roster = selectErRoster(chosen!, pickTierForWave(trainer));
+    expect(roster.length).toBeGreaterThan(0);
+
     const enemyParty = game.scene.getEnemyParty();
     expect(enemyParty.length).toBeGreaterThan(0);
-    expect(enemyParty[0].species.speciesId).toBe(expectedSpeciesId);
+    expect(enemyParty[0].species.speciesId).toBe(roster[0].speciesId);
   });
 
   it("hasErRosterOverride is false for trainer classes not in the ER registry", () => {
@@ -89,13 +94,13 @@ describe("ER integration — trainer-overlay runtime hook spawns ER rosters", ()
   it("ER substituted member inherits IVs and moves from the ER roster (not a random roll)", async () => {
     const erCandidates = findErTrainersForType(TrainerType.ACE_TRAINER);
     expect(erCandidates.length).toBeGreaterThan(0);
-    const expected = erCandidates[0];
-    const member = selectErRoster(expected, "party")[0];
 
     game.override.battleType(BattleType.TRAINER).randomTrainer({ trainerType: TrainerType.ACE_TRAINER });
 
     await game.classicMode.startBattle(SpeciesId.MAGIKARP);
 
+    const trainer = game.scene.currentBattle.trainer!;
+    const member = selectErRoster(getErTrainerForTrainer(trainer)!, pickTierForWave(trainer))[0];
     const enemy = game.scene.getEnemyParty()[0];
     // IVs are deterministic from the ER member draft.
     for (let i = 0; i < 6; i++) {

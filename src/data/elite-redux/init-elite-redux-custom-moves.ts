@@ -193,6 +193,31 @@ function applyErArchetypeToMove(move: Move, flagBits: number, attrs: readonly Mo
   }
 }
 
+interface ErMoveText {
+  readonly name: string;
+  readonly description: string;
+  readonly longDescription: string;
+}
+
+/** Placeholder descriptions the ER ROM left on not-yet-finalised moves. */
+const ER_PLACEHOLDER_DESC = /^\s*$|not done yet|not implemented|^\s*deals damage\.?\s*$/i;
+
+/**
+ * The in-game move description: the short `description` unless it's a ROM
+ * placeholder ("Not done yet."), in which case fall back to the detailed
+ * `longDescription` (which carries the real effect text), and only if THAT is
+ * also a placeholder fall back to the raw description.
+ */
+function bestErMoveDescription(t?: ErMoveText): string {
+  if (!t) {
+    return "";
+  }
+  if (ER_PLACEHOLDER_DESC.test(t.description) && t.longDescription && !ER_PLACEHOLDER_DESC.test(t.longDescription)) {
+    return t.longDescription;
+  }
+  return t.description;
+}
+
 /**
  * Thin `AttackMove` subclass for ER-custom attack moves. Overrides
  * `localize()` to read the draft's display name/description from a static
@@ -201,47 +226,47 @@ function applyErArchetypeToMove(move: Move, flagBits: number, attrs: readonly Mo
  */
 class ErCustomAttackMove extends AttackMove {
   /** Fallback display name/description from the ER draft (set pre-construction). */
-  private static readonly _draftTexts = new Map<number, { name: string; description: string }>();
+  private static readonly _draftTexts = new Map<number, ErMoveText>();
 
   override localize(): void {
     const draft = ErCustomAttackMove._draftTexts.get(this.id);
     this.name = draft?.name ?? "Unknown";
-    this.effect = draft?.description ?? "";
+    this.effect = bestErMoveDescription(draft);
   }
 
   /** Stash the draft name/description keyed by pokerogue move id before construction. */
-  static registerDraft(id: number, name: string, description: string): void {
-    ErCustomAttackMove._draftTexts.set(id, { name, description });
+  static registerDraft(id: number, name: string, description: string, longDescription: string): void {
+    ErCustomAttackMove._draftTexts.set(id, { name, description, longDescription });
   }
 }
 
 /** Thin `StatusMove` subclass — see {@link ErCustomAttackMove} for the override rationale. */
 class ErCustomStatusMove extends StatusMove {
-  private static readonly _draftTexts = new Map<number, { name: string; description: string }>();
+  private static readonly _draftTexts = new Map<number, ErMoveText>();
 
   override localize(): void {
     const draft = ErCustomStatusMove._draftTexts.get(this.id);
     this.name = draft?.name ?? "Unknown";
-    this.effect = draft?.description ?? "";
+    this.effect = bestErMoveDescription(draft);
   }
 
-  static registerDraft(id: number, name: string, description: string): void {
-    ErCustomStatusMove._draftTexts.set(id, { name, description });
+  static registerDraft(id: number, name: string, description: string, longDescription: string): void {
+    ErCustomStatusMove._draftTexts.set(id, { name, description, longDescription });
   }
 }
 
 /** Thin `SelfStatusMove` subclass — see {@link ErCustomAttackMove} for the override rationale. */
 class ErCustomSelfStatusMove extends SelfStatusMove {
-  private static readonly _draftTexts = new Map<number, { name: string; description: string }>();
+  private static readonly _draftTexts = new Map<number, ErMoveText>();
 
   override localize(): void {
     const draft = ErCustomSelfStatusMove._draftTexts.get(this.id);
     this.name = draft?.name ?? "Unknown";
-    this.effect = draft?.description ?? "";
+    this.effect = bestErMoveDescription(draft);
   }
 
-  static registerDraft(id: number, name: string, description: string): void {
-    ErCustomSelfStatusMove._draftTexts.set(id, { name, description });
+  static registerDraft(id: number, name: string, description: string, longDescription: string): void {
+    ErCustomSelfStatusMove._draftTexts.set(id, { name, description, longDescription });
   }
 }
 
@@ -403,7 +428,7 @@ function buildCustomMove(
     // This is a coarse mapping — Phase C will refine via MoveTarget.
     const isSelfStatus = (draft as { target?: number }).target === 2;
     if (isSelfStatus) {
-      ErCustomSelfStatusMove.registerDraft(pokerogueId, draft.name, draft.description);
+      ErCustomSelfStatusMove.registerDraft(pokerogueId, draft.name, draft.description, draft.longDescription);
       move = new ErCustomSelfStatusMove(
         pokerogueId as MoveId,
         type,
@@ -414,13 +439,13 @@ function buildCustomMove(
         9, // generation — TODO(Phase D): derive from archetype
       );
     } else {
-      ErCustomStatusMove.registerDraft(pokerogueId, draft.name, draft.description);
+      ErCustomStatusMove.registerDraft(pokerogueId, draft.name, draft.description, draft.longDescription);
       move = new ErCustomStatusMove(pokerogueId as MoveId, type, accuracy, pp, chance, draft.priority, 9);
     }
   } else {
     // AttackMove (PHYSICAL/SPECIAL/etc.). Default target is NEAR_OTHER (set
     // by AttackMove). Per-move MoveTarget refinement is Phase C.
-    ErCustomAttackMove.registerDraft(pokerogueId, draft.name, draft.description);
+    ErCustomAttackMove.registerDraft(pokerogueId, draft.name, draft.description, draft.longDescription);
     move = new ErCustomAttackMove(
       pokerogueId as MoveId,
       type,

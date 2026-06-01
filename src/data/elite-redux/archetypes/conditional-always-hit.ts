@@ -26,12 +26,14 @@
 // =============================================================================
 
 import { AbAttr } from "#abilities/ab-attrs";
-import type { AbAttrBaseParams } from "#types/ability-types";
+import { globalScene } from "#app/global-scene";
 import type { Move } from "#data/moves/move";
-import type { Pokemon } from "#field/pokemon";
 import type { MoveCategory } from "#enums/move-category";
 import type { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
+import { WeatherType } from "#enums/weather-type";
+import type { Pokemon } from "#field/pokemon";
+import type { AbAttrBaseParams } from "#types/ability-types";
 
 export interface ConditionalAlwaysHitOptions {
   /** When provided, only fires when the move has this flag set. */
@@ -40,6 +42,14 @@ export interface ConditionalAlwaysHitOptions {
   readonly categories?: readonly MoveCategory[];
   /** When provided, only fires when move.id is in this list. */
   readonly moveIds?: readonly MoveId[];
+  /** When provided, only fires while the active weather is one of these. */
+  readonly weather?: readonly WeatherType[];
+  /**
+   * When true, only fires when the move is super-effective against the target
+   * (type effectiveness > 1). Used by Fatal Precision ("Super-effective moves
+   * never miss").
+   */
+  readonly superEffective?: boolean;
 }
 
 /**
@@ -64,7 +74,7 @@ export class ConditionalAlwaysHitAbAttr extends AbAttr {
   /**
    * Returns true if the configured predicate matches the move/user/target.
    */
-  public matches(move: Move, _user: Pokemon, _target: Pokemon): boolean {
+  public matches(move: Move, user: Pokemon, target: Pokemon): boolean {
     if (this.opts.flag !== undefined && !move.hasFlag(this.opts.flag)) {
       return false;
     }
@@ -72,6 +82,15 @@ export class ConditionalAlwaysHitAbAttr extends AbAttr {
       return false;
     }
     if (this.opts.moveIds !== undefined && !this.opts.moveIds.includes(move.id)) {
+      return false;
+    }
+    if (this.opts.weather !== undefined) {
+      const current = globalScene.arena.weather?.weatherType ?? WeatherType.NONE;
+      if (!this.opts.weather.includes(current)) {
+        return false;
+      }
+    }
+    if (this.opts.superEffective && target.getMoveEffectiveness(user, move) <= 1) {
       return false;
     }
     return true;

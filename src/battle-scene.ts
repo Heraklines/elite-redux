@@ -30,6 +30,7 @@ import { initCommonAnims, initMoveAnim, loadCommonAnimAssets, loadMoveAnimAssets
 import { getDailyMysteryEncounter } from "#data/daily-seed/daily-run";
 import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
+import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
 import type { SpeciesFormChangeTrigger } from "#data/form-change-triggers";
 import { SpeciesFormChangeManualTrigger, SpeciesFormChangeTimeOfDayTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
@@ -2166,6 +2167,11 @@ export class BattleScene extends SceneBase {
   }
 
   updateBiomeWaveText(): void {
+    // Defensive: this can be invoked mid-transition (e.g. session init before
+    // the first battle is constructed) when `currentBattle` is momentarily null.
+    if (!this.currentBattle) {
+      return;
+    }
     const isBoss = !(this.currentBattle.waveIndex % 10);
     const biomeString: string = getBiomeName(this.arena.biomeId);
     this.fieldUI.moveAbove(this.biomeWaveText, this.luckText);
@@ -3162,6 +3168,9 @@ export class BattleScene extends SceneBase {
         }
         return true;
       });
+      // ER: layer the soft ER → PokeRogue held-item conversion on top of the
+      // baseline roll for any ER-roster trainer mons in the party.
+      applyErTrainerHeldItems(party);
       this.updateModifiers(false);
       resolve();
     });

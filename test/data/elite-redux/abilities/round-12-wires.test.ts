@@ -16,9 +16,10 @@
 // Bark, both upgraded from partial to fuller coverage).
 // =============================================================================
 
-import { StatMultiplierAbAttr, UserFieldMoveTypePowerBoostAbAttr } from "#abilities/ab-attrs";
+import { AttackTypeImmunityAbAttr, StatMultiplierAbAttr, UserFieldMoveTypePowerBoostAbAttr } from "#abilities/ab-attrs";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
 import {
+  ChanceBattlerTagOnAttackAbAttr,
   ChanceBattlerTagOnHitAbAttr,
   ChanceStatusOnHitAbAttr,
 } from "#data/elite-redux/archetypes/chance-status-on-hit";
@@ -28,6 +29,7 @@ import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
 import { FlagDamageBoostAbAttr } from "#data/elite-redux/archetypes/flag-damage-boost";
 import { TypeAbsorbStatBoostAbAttr } from "#data/elite-redux/archetypes/immunity-with-absorb";
 import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveFlags } from "#enums/move-flags";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
@@ -35,10 +37,12 @@ import { describe, expect, it } from "vitest";
 
 describe("dispatchArchetype('bespoke', null, erAbilityId): round 12 wires", () => {
   // ---------- entry-effect add-self-type cluster ----------
-  it("er id 715 (Hover) wires EntryEffectAbAttr(add-self-type PSYCHIC)", () => {
+  it("er id 715 (Hover) wires add-self-type PSYCHIC + Ground immunity", () => {
+    // "Adds Psychic type to itself. Avoids Ground attacks." — both halves:
+    // the entry add-self-type and the Levitate-style Ground type-immunity.
     const res = dispatchArchetype("bespoke", null, 715);
     expect(res.skipReason).toBeNull();
-    expect(res.attrs).toHaveLength(1);
+    expect(res.attrs).toHaveLength(2);
     const attr = res.attrs[0] as EntryEffectAbAttr;
     expect(attr).toBeInstanceOf(EntryEffectAbAttr);
     const eff = attr.getEffect();
@@ -46,18 +50,21 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): round 12 wires", () =
     if (eff.kind === "add-self-type") {
       expect(eff.type).toBe(PokemonType.PSYCHIC);
     }
+    expect(res.attrs[1]).toBeInstanceOf(AttackTypeImmunityAbAttr);
   });
 
-  it("er id 843 (Fey Flight) wires EntryEffectAbAttr(add-self-type FAIRY)", () => {
+  it("er id 843 (Fey Flight) wires add-self-type FAIRY + Ground immunity", () => {
+    // "Adds Fairy-type and levitates." — add-self-type (Fairy) + Ground immunity.
     const res = dispatchArchetype("bespoke", null, 843);
     expect(res.skipReason).toBeNull();
-    expect(res.attrs).toHaveLength(1);
+    expect(res.attrs).toHaveLength(2);
     const attr = res.attrs[0] as EntryEffectAbAttr;
     expect(attr).toBeInstanceOf(EntryEffectAbAttr);
     const eff = attr.getEffect();
     if (eff.kind === "add-self-type") {
       expect(eff.type).toBe(PokemonType.FAIRY);
     }
+    expect(res.attrs[1]).toBeInstanceOf(AttackTypeImmunityAbAttr);
   });
 
   // ---------- type-absorb-stat-boost ----------
@@ -130,11 +137,16 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): round 12 wires", () =
     expect(attr.multiplier).toBeCloseTo(1.5);
   });
 
-  it("er id 731 (To The Bone) wires CritDamageMultiplier(1.5x) — bleed piece deferred", () => {
+  it("er id 731 (To The Bone) wires CritDamageMultiplier(1.5x) + crit-gated ER_BLEED", () => {
+    // "Critical hits get a 1.5x boost and inflict bleeding." — both the
+    // crit damage multiplier and the crit-gated bleed-on-attack are wired now.
     const res = dispatchArchetype("bespoke", null, 731);
     expect(res.skipReason).toBeNull();
-    expect(res.attrs).toHaveLength(1);
+    expect(res.attrs).toHaveLength(2);
     expect(res.attrs[0]).toBeInstanceOf(CritDamageMultiplierAbAttr);
+    const bleed = res.attrs[1] as ChanceBattlerTagOnAttackAbAttr;
+    expect(bleed).toBeInstanceOf(ChanceBattlerTagOnAttackAbAttr);
+    expect(bleed.getTags()).toEqual([BattlerTagType.ER_BLEED]);
   });
 
   it("er id 462 (Combat Specialist) wires FlagDamageBoost(PUNCHING + KICKING, 1.3x)", () => {

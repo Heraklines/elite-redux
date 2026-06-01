@@ -1,0 +1,1031 @@
+1	1	Pound	(none)	Pounds the foe with forelegs or tail.	
+2	2	Karate Chop	(none)	A chopping attack with a high critical-hit ratio.	HighCritAttr
+3	3	Double Slap	(none)	Slaps the foe at least twice. May cause confusion.	MultiHitAttr,ConfuseAttr
+4	4	Comet Punch	(none)	Repeatedly punches the foe 2 to 5 times. +1 priority.	MultiHitAttr
+5	5	Mega Punch	(none)	A strong punch thrown with incredible power.	
+6	6	Pay Day	(none)	Throws coins at the foe. Money is recovered after.	MoneyAttr
+7	7	Fire Punch	(none)	A fiery punch that may burn the foe.	HealStatusEffectAttr,StatusEffectAttr
+8	8	Ice Punch	(none)	An icy punch that may leave the foe with frostbite.	StatusEffectAttr
+9	9	Thunder Punch	(none)	An electrified punch that may paralyze the foe.	StatusEffectAttr
+10	10	Scratch	(none)	Scratches the foe with sharp claws.	
+11	11	Vise Grip	(none)	Grips the foe with large and powerful pincers.	
+12	12	Guillotine	(none)	A powerful pincer attack High critical ratio.	HighCritAttr
+13	13	Razor Wind	(none)	Wind slices through Rock for super effective damage.	HighCritAttr
+14	14	Swords Dance	(none)	A fighting dance that sharply raises Attack.	StatStageChangeAttr
+15	15	Cut	(none)	Cuts the foe. Always crits.	
+16	16	Gust	(none)	A sudden gust of wind. Has +1 priority.	HitsTagForDoubleDamageAttr
+17	17	Wing Attack	(none)	Strikes the foe with wings spread wide.	
+18	18	Whirlwind	(none)	Blows away the foe with wind and ends the battle.	
+19	19	Fly	(none)	Flies up on the first turn, then strikes the next turn.	
+20	20	Bind	(none)	Binds and squeezes the foe for 2 to 5 turns.	TrapAttr
+21	21	Slam	(none)	Slams the foe with a long tail, vine, etc.	
+22	22	Vine Whip	(none)	Strikes with slender vines. Has 30% flinch chance.	FlinchAttr
+23	23	Stomp	(none)	Stomps the foe and terrain flat. May cause flinching.	AlwaysHitMinimizeAttr,HitsTagForDoubleDamageAttr,FlinchAttr
+24	24	Double Kick	(none)	A double-kicking attack that strikes the foe twice.	MultiHitAttr
+25	25	Mega Kick	(none)	An extremely powerful kick with intense force.	
+26	26	Jump Kick	(none)	A strong jumping kick. May miss and hurt the kicker.	MissEffectAttr,NoEffectAttr
+27	27	Rolling Kick	(none)	A fast kick delivered from a rapid spin.	FlinchAttr
+28	28	Sand Attack	(none)	Reduces the foe's accuracy by hurling sand in its face.	StatStageChangeAttr
+29	29	Headbutt	(none)	A ramming attack that may cause flinching.	FlinchAttr
+30	30	Horn Attack	(none)	Jabs the foe with sharp horns. High crit chance.	
+31	31	Fury Attack	(none)	Jabs the foe 2 to 5 times with sharp horns, etc.	MultiHitAttr
+32	32	Horn Drill	(none)	Ignores abilities and stat changes. High crit.	HighCritAttr,IgnoreOpponentStatStagesAttr
+33	33	Tackle	(none)	Charges the foe with a full-body tackle.	
+34	34	Body Slam	(none)	A full-body slam that may cause paralysis.	AlwaysHitMinimizeAttr,HitsTagForDoubleDamageAttr,StatusEffectAttr
+35	35	Wrap	(none)	Wraps and squeezes the foe 2 to 5 times with vines, etc.	TrapAttr
+36	36	Take Down	(none)	Slams into the foe, knocking them back and lowering speed.	RecoilAttr,StatStageChangeAttr
+37	37	Thrash	(none)	A rampage of 2 to 3 turns that confuses the user.	FrenzyAttr,MissEffectAttr,NoEffectAttr
+38	38	Double-Edge	(none)	A life-risking tackle that also hurts the user.	RecoilAttr
+39	39	Tail Whip	(none)	Wags the tail to lower the foe's Defense.	StatStageChangeAttr
+40	40	Poison Sting	(none)	Has 10% poison chance and +1 priority.	StatusEffectAttr
+41	41	Twineedle	(none)	Stingers on the forelegs jab the foe twice.	MultiHitAttr,StatusEffectAttr
+42	42	Pin Missile	(none)	Sharp pins are fired to strike 2 to 5 times.	MultiHitAttr
+43	43	Leer	(none)	Frightens the foe with a leer to lower Defense.	StatStageChangeAttr
+44	44	Bite	(none)	Bites with vicious fangs. May cause flinching.	FlinchAttr
+45	45	Growl	(none)	Growls cutely to reduce the foe's Attack.	StatStageChangeAttr
+46	46	Roar	(none)	Makes the foe flee to end the battle.	ForceSwitchOutAttr
+47	47	Sing	(none)	A soothing song lulls the foe into a deep slumber.	StatusEffectAttr
+48	48	Supersonic	(none)	Emits bizarre sound waves that may confuse foes.	ConfuseAttr
+49	49	Sonic Boom	(none)	Launches shock waves that are super effective vs rock.	FixedDamageAttr
+50	50	Disable	(none)	Psychically disables one of the foe's moves.	AddBattlerTagAttr
+51	51	Acid	(none)	Super effective vs Steel. May lower Defense.	StatStageChangeAttr
+52	52	Ember	(none)	A weak fire attack that burns the target.	HealStatusEffectAttr,StatusEffectAttr
+53	53	Flamethrower	(none)	A powerful fire attack that may inflict a burn.	HealStatusEffectAttr,StatusEffectAttr
+54	54	Mist	(none)	Creates a mist that stops reduction of abilities.	AddArenaTagAttr
+55	55	Water Gun	(none)	Squirts water to attack the foe.	
+56	56	Hydro Pump	(none)	Blasts water at high power to strike the foe.	
+57	57	Surf	(none)	Creates a huge wave, then crashes it down on the foe.	HitsTagForDoubleDamageAttr,GulpMissileTagAttr
+58	58	Ice Beam	(none)	Blasts the foe with an icy beam. May cause frostbite.	StatusEffectAttr
+59	59	Blizzard	(none)	Hits the foe with an icy storm. May cause frostbite.	BlizzardAccuracyAttr,StatusEffectAttr
+60	60	Psybeam	(none)	Fires a peculiar ray that lowers Special Attack.	ConfuseAttr,StatStageChangeAttr
+61	61	Bubble Beam	(none)	Forcefully sprays bubbles that hit repeatedly.	StatStageChangeAttr
+62	62	Aurora Beam	(none)	A rainbow-colored beam which lowers the foe's Attack 100%.	StatStageChangeAttr
+63	63	Hyper Beam	(none)	Powerful, but leaves the user immobile the next turn.	RechargeAttr
+64	64	Peck	(none)	Attacks the foe with a jabbing beak, etc.	MultiHitAttr
+65	65	Drill Peck	(none)	A corkscrewing attack with a high critical-hit ratio.	
+66	66	Submission	(none)	A reckless body slam that also hurts the user.	RecoilAttr
+67	67	Low Kick	(none)	A kick that inflicts more damage on heavier foes.	WeightPowerAttr
+68	68	Counter	(none)	Retaliates any physical hit with double the power.	CounterDamageAttr,CounterRedirectAttr
+69	69	Seismic Toss	(none)	Carries the foe into the sky then deals damage based on level.	LevelDamageAttr
+70	70	Strength	(none)	A powerful slam attack. Lowers the user's defenses.	
+71	71	Absorb	(none)	Covers the foe with plants that remove stat changes	HitHealAttr
+72	72	Mega Drain	(none)	An attack that absorbs 75% of the damage inflicted.	HitHealAttr
+73	73	Leech Seed	(none)	Plants a seed on the foe to steal HP on every turn.	LeechSeedAttr
+74	74	Growth	(none)	Forces the body to grow. Ups Attack and SpAtk	GrowthStatStageChangeAttr
+75	75	Razor Leaf	(none)	Cuts both foes with sharp leaves. Always crits.	HighCritAttr
+76	76	Solar Beam	(none)	Absorbs light in one turn, then attacks next turn.	AntiSunlightPowerDecreaseAttr
+77	77	Poison Powder	(none)	Scatters a toxic powder that may poison the foe.	StatusEffectAttr
+78	78	Stun Spore	(none)	Scatters a powder that may paralyze the foe.	StatusEffectAttr
+79	79	Sleep Powder	(none)	Scatters a powder that may cause the foe to sleep.	StatusEffectAttr
+80	80	Petal Dance	(none)	A rampage of 2 to 3 turns that confuses the user.	FrenzyAttr,MissEffectAttr,NoEffectAttr
+81	81	String Shot	(none)	Binds the foes with string to harshly reduce Speed.	StatStageChangeAttr
+82	82	Dragon Rage	(none)	Launches shock waves that can damage Fairy mons.	FixedDamageAttr
+83	83	Fire Spin	(none)	Traps the foe in a ring of fire for 2 to 5 turns.	HealStatusEffectAttr,TrapAttr
+84	84	Thunder Shock	(none)	An electrical attack that may flinch the foe.	StatusEffectAttr
+85	85	Thunderbolt	(none)	A strong electrical attack that may paralyze the foe.	StatusEffectAttr
+86	86	Thunder Wave	(none)	A weak jolt of electricity that paralyzes the foe.	StatusEffectAttr,RespectAttackTypeImmunityAttr
+87	87	Thunder	(none)	A lightning attack that may cause paralysis.	StatusEffectAttr,ThunderAccuracyAttr,HitsTagAttr
+88	88	Rock Throw	(none)	Throws small rocks to strike the foe.	
+89	89	Earthquake	(none)	A powerful quake, but has no effect on flying foes.	HitsTagForDoubleDamageAttr,MovePowerMultiplierAttr
+90	90	Fissure	(none)	Very powerful attack. Hits both foes.	HitsTagAttr
+91	91	Dig	(none)	Digs underground the first turn and strikes next turn.	
+92	92	Toxic	(none)	Poisons the foe with an intensifying toxin.	StatusEffectAttr,ToxicAccuracyAttr
+93	93	Confusion	(none)	A psychic attack that causes confusion.	ConfuseAttr
+94	94	Psychic	(none)	A powerful psychic attack that may lower Sp. Def.	StatStageChangeAttr
+95	95	Hypnosis	(none)	A hypnotizing move that may induce sleep.	StatusEffectAttr
+96	96	Meditate	(none)	Meditates peacefully to raise Attack and SpDef.	StatStageChangeAttr
+97	97	Agility	(none)	Relaxes the body to sharply boost Speed.	StatStageChangeAttr
+98	98	Quick Attack	(none)	An extremely fast attack that always strikes first.	
+99	99	Rage	(none)	A rampage of 2 to 3 turns that confuses the user.	
+100	100	Teleport	(none)	A psychic move for fleeing from battle instantly.	ForceSwitchOutAttr
+101	101	Night Shade	(none)	Inflicts damage identical to the user's level.	LevelDamageAttr
+102	102	Mimic	(none)	Copies a move used by the foe during one battle.	MovesetCopyMoveAttr
+103	103	Screech	(none)	Emits a screech to sharply reduce the foe's Defense.	StatStageChangeAttr
+104	104	Double Team	(none)	Creates illusory copies to raise evasiveness.	StatStageChangeAttr
+105	105	Recover	(none)	Recovers up to half the user's maximum HP.	HealAttr
+106	106	Harden	(none)	Stiffens the body's muscles to raise Defense.	StatStageChangeAttr
+107	107	Minimize	(none)	Minimizes the user's size to raise evasiveness.	AddBattlerTagAttr,StatStageChangeAttr
+108	108	Smokescreen	(none)	Obscures the user's party in smoke for 5 turns.	StatStageChangeAttr
+109	109	Confuse Ray	(none)	A sinister ray that confuses the foe.	ConfuseAttr
+110	110	Withdraw	(none)	Withdraws the body into its hard shell to raise Defense.	StatStageChangeAttr
+111	111	Defense Curl	(none)	Curls up to conceal weak spots and raise Defense.	StatStageChangeAttr
+112	112	Barrier	(none)	Forms the Psychic Terrain into a powerful barrier.	StatStageChangeAttr
+113	113	Light Screen	(none)	Creates a wall of light that lowers Sp. Atk damage.	AddArenaTagAttr
+114	114	Haze	(none)	Creates a black haze that eliminates all stat changes.	ResetStatsAttr
+115	115	Reflect	(none)	Creates a wall of light that weakens physical attacks.	AddArenaTagAttr
+116	116	Focus Energy	(none)	Focuses power to raise the critical-hit ratio.	AddBattlerTagAttr
+117	117	Bide	(none)	Endures attack for 2 turns to retaliate double.	
+118	118	Metronome	(none)	An unknown power uses any Pokémon move at random.	RandomMoveAttr
+119	119	Mirror Move	(none)	Counters the foe's attack with the same move.	CopyMoveAttr
+120	120	Self-Destruct	(none)	Inflicts severe damage but makes the user faint.	SacrificialAttr
+121	121	Egg Bomb	(none)	An egg is forcibly hurled at the foe.	StatusEffectAttr,HealStatusEffectAttr
+122	122	Lick	(none)	Licks with a long tongue to injure. May also flinch.	StatusEffectAttr
+123	123	Smog	(none)	An exhaust-gas attack that may also poison.	StatusEffectAttr
+124	124	Sludge	(none)	Super effective vs Water. May poison foes.	StatusEffectAttr
+125	125	Bone Club	(none)	Clubs the foe with a bone. May cause flinching.	FlinchAttr
+126	126	Fire Blast	(none)	Incinerates everything it strikes. May cause a burn.	HealStatusEffectAttr,StatusEffectAttr
+127	127	Waterfall	(none)	Charges the foe with speed to climb waterfalls.	FlinchAttr
+128	128	Clamp	(none)	Traps and squeezes the foe for 2 to 5 turns.	TrapAttr
+129	129	Swift	(none)	Sprays star-shaped rays that never miss.	
+130	130	Skull Bash	(none)	Tucks in the head, then attacks on the next turn.	
+131	131	Spike Cannon	(none)	Launches sharp spikes that strike 2 to 5 times.	MultiHitAttr
+132	132	Constrict	(none)	Constricts to inflict pain. May lower Speed.	StatStageChangeAttr
+133	133	Amnesia	(none)	Forgets about something and sharply raises Sp. Def.	StatStageChangeAttr
+134	134	Kinesis	(none)	Animates the foe's item, surprising them.	StatStageChangeAttr
+135	135	Soft-Boiled	(none)	Recovers up to half the user's maximum HP.	HealAttr
+136	136	High Jump Kick	(none)	A jumping knee kick. If it misses, the user is hurt.	MissEffectAttr,NoEffectAttr
+137	137	Glare	(none)	Intimidates and frightens the foe into paralysis.	StatusEffectAttr
+138	138	Dream Eater	(none)	Takes one half the damage inflicted on a sleeping foe.	HitHealAttr
+139	139	Poison Gas	(none)	Super effective vs Flying. gas that may poison.	StatusEffectAttr
+140	140	Barrage	(none)	Hurls round objects at the foe 2 to 5 times.	MultiHitAttr
+141	141	Leech Life	(none)	An attack that steals half the damage inflicted.	HitHealAttr
+142	142	Lovely Kiss	(none)	Demands a kiss with a scary face that induces sleep.	StatusEffectAttr
+143	143	Sky Attack	(none)	Searches out weak spots, then strikes the next turn.	HighCritAttr,FlinchAttr
+144	144	Transform	(none)	Alters the user's cells to become a copy of the foe.	TransformAttr
+145	145	Bubble	(none)	An attack using bubbles. Always lowers foe's Speed.	StatStageChangeAttr
+146	146	Dizzy Punch	(none)	A rhythmic punch that may confuse the foe.	ConfuseAttr
+147	147	Spore	(none)	Scatters a cloud of spores that always induce sleep.	StatusEffectAttr
+148	148	Flash	(none)	Looses a blast of light. 50% chance to drop Atk.	StatStageChangeAttr
+149	149	Psywave	(none)	Quick wave of psychic energy. Has +1 priority.	RandomLevelDamageAttr,ConfuseAttr
+150	150	Splash	(none)	Does more damage if the user outweighs the foe.	MessageAttr
+151	151	Acid Armor	(none)	Liquifies the user's body to sharply raise Defense.	StatStageChangeAttr
+152	152	Crabhammer	(none)	Hammers with a pincer. Has a high critical-hit ratio.	HighCritAttr
+153	153	Explosion	(none)	Inflicts severe damage but makes the user faint.	SacrificialAttr
+154	154	Fury Swipes	(none)	Rakes the foe with sharp claws, etc., 2 to 5 times.	MultiHitAttr
+155	155	Bonemerang	(none)	Throws a bone. Hits airborne targets and strikes twice.	MultiHitAttr
+156	156	Rest	(none)	The user sleeps for 2 turns, restoring HP and status.	RestAttr
+157	157	Rock Slide	(none)	Large boulders are hurled. May cause flinching.	FlinchAttr
+158	158	Hyper Fang	(none)	Attacks with sharp fangs. May cause flinching.	FlinchAttr
+159	159	Sharpen	(none)	Sharpens its edges to boost Attack and Crit.	StatStageChangeAttr
+160	160	Conversion	(none)	Boosts SpAtk and Speed and changes type.	FirstMoveTypeAttr
+161	161	Tri Attack	(none)	Fires three types of beams at the same time.	MultiStatusEffectAttr,PhotonGeyserCategoryAttr
+162	162	Super Fang	(none)	Attacks with sharp fangs and cuts half the foe's HP.	TargetHalfHpDamageAttr
+163	163	Slash	(none)	Slashes with claws, etc. Always crits.	HighCritAttr
+164	164	Substitute	(none)	Creates a decoy using 1/4 of the user's maximum HP.	AddSubstituteAttr
+165	165	Struggle	(none)	Used only if all PP are gone. Also hurts the user a little.	RecoilAttr,TypelessAttr,PreMoveMessageAttr
+166	166	Sketch	(none)	Copies the foe's last move permanently.	SketchAttr
+167	167	Triple Kick	(none)	Kicks the foe 3 times in a row with rising intensity.	MultiHitAttr,MultiHitPowerIncrementAttr
+168	168	Thief	(none)	While attacking, it may steal the foe's held item.	StealHeldItemChanceAttr
+169	169	Spider Web	(none)	Ensnares the foe to stop it from fleeing or switching.	AddBattlerTagAttr
+170	170	Mind Reader	(none)	Reads the opponent's mind to dodge their attack.	AddBattlerTagAttr,MessageAttr
+171	171	Nightmare	(none)	Haunts the foe with a terrifying nightmare doing heavy damage.	
+172	172	Flame Wheel	(none)	Rolls into a wheel to strike with rising intensity.	HealStatusEffectAttr,HealStatusEffectAttr,StatusEffectAttr
+173	173	Snore	(none)	A loud attack that can be used only while asleep.	BypassSleepAttr,FlinchAttr
+174	174	Curse	(none)	A move that functions differently for GHOSTS.	CurseAttr
+175	175	Flail	(none)	Inflicts critical damage when the user's HP is low.	LowHpPowerAttr
+176	176	Conversion 2	(none)	Boosts SpAtk and Speed and changes type.	ResistLastMoveTypeAttr
+177	177	Aeroblast	(none)	Launches a vacuumed blast. High crit ratio.	HighCritAttr
+178	178	Cotton Spore	(none)	Spores cling to the foe, sharply reducing Speed.	StatStageChangeAttr
+179	179	Reversal	(none)	Inflicts critical damage when the user's HP is low.	LowHpPowerAttr
+180	180	Spite	(none)	Spitefully cuts the PP of the foe's last move.	ReducePpMoveAttr
+181	181	Powder Snow	(none)	Blasts the foe with a snowy gust. May cause freezing.	StatusEffectAttr
+182	182	Protect	(none)	Evades attack, but may fail if used in succession.	ProtectAttr
+183	183	Mach Punch	(none)	A punch is thrown at wicked speed to strike first.	
+184	184	Scary Face	(none)	Frightens with a scary face to sharply reduce Speed.	StatStageChangeAttr
+185	185	Feint Attack	(none)	Draws the foe close, then strikes without fail.	
+186	186	Sweet Kiss	(none)	Demands a kiss, causing confusion and infatuation.	ConfuseAttr
+187	187	Belly Drum	(none)	Maximizes Attack while sacrificing HP.	CutHpStatStageBoostAttr
+188	188	Sludge Bomb	(none)	Sludge is hurled to inflict damage. May also poison.	StatusEffectAttr
+189	189	Mud-Slap	(none)	Hurls mud in the foe's face dealing repeated damage.	StatStageChangeAttr
+190	190	Octazooka	(none)	Fires a lump of ink to damage and cut accuracy.	StatStageChangeAttr
+191	191	Spikes	(none)	Sets spikes that hurt a foe switching in.	AddArenaTrapTagAttr
+192	192	Zap Cannon	(none)	Powerful and sure to cause paralysis, but inaccurate.	StatusEffectAttr
+193	193	Foresight	(none)	Negates the foe's efforts to heighten evasiveness.	ExposedMoveAttr
+194	194	Destiny Bond	(none)	If the user faints, the foe is also made to faint.	DestinyBondAttr
+195	195	Perish Song	(none)	Any Pokémon hearing this song faints in 3 turns.	AddBattlerTagAttr,MessageAttr
+196	196	Icy Wind	(none)	A chilling attack that lowers the foe's Speed.	StatStageChangeAttr
+197	197	Detect	(none)	Evades attack, but may fail if used in succession.	ProtectAttr
+198	198	Bone Rush	(none)	Strikes with a bone 2 to 5 times. Always goes first.	MultiHitAttr
+199	199	Lock-On	(none)	Locks on to the foe to ensure the next move hits.	AddBattlerTagAttr,MessageAttr
+200	200	Outrage	(none)	A rampage of 2 to 3 turns that confuses the user.	FrenzyAttr,MissEffectAttr,NoEffectAttr
+201	201	Sandstorm	(none)	Causes a sandstorm that rages for several turns.	WeatherChangeAttr
+202	202	Giga Drain	(none)	An attack that steals half the damage inflicted.	HitHealAttr
+203	203	Endure	(none)	Endures any attack for 1 turn, leaving at least 1HP.	ProtectAttr
+204	204	Charm	(none)	Charms the foe and sharply reduces its Attack.	StatStageChangeAttr
+205	205	Rollout	(none)	Rolls into a ball to strike with rising intensity.	ConsecutiveUseDoublePowerAttr
+206	206	False Swipe	(none)	An attack that leaves the foe with at least 1 HP.	SurviveDamageAttr
+207	207	Swagger	(none)	Enrages the foe, but also sharply raises Attack.	StatStageChangeAttr,ConfuseAttr
+208	208	Milk Drink	(none)	Recovers up to half the user's maximum HP.	HealAttr
+209	209	Spark	(none)	An electrified tackle with +2 priority. May paralyze.	StatusEffectAttr
+210	210	Fury Cutter	(none)	Slices the foe 3 times in a row with rising intensity.	ConsecutiveUseDoublePowerAttr
+211	211	Steel Wing	(none)	Strikes the foe with hard wings spread wide.	StatStageChangeAttr
+212	212	Mean Look	(none)	Fixes the foe with a mean look that prevents escape.	AddBattlerTagAttr
+213	213	Attract	(none)	Halves the Atk & SpAtk of the opposite gender.	AddBattlerTagAttr
+214	214	Sleep Talk	(none)	Uses an available move randomly while asleep.	BypassSleepAttr,RandomMovesetMoveAttr
+215	215	Heal Bell	(none)	Chimes soothingly to heal all status abnormalities.	PartyStatusCureAttr
+216	216	Return	(none)	A reliable and strong Normal-type attack.	FriendshipPowerAttr
+217	217	Present	(none)	A sly attack that damages foes and heals allies.	PresentPowerAttr
+218	218	Frustration	(none)	Deals double damage if the last move failed.	FriendshipPowerAttr
+219	219	Safeguard	(none)	A mystical force prevents all status problems.	AddArenaTagAttr
+220	220	Pain Split	(none)	Adds the user and foe's HP, then shares them equally.	HpSplitAttr
+221	221	Sacred Fire	(none)	A mystical fire attack that may inflict a burn.	HealStatusEffectAttr,HealStatusEffectAttr,StatusEffectAttr
+222	222	Magnitude	(none)	A ground-shaking attack of random intensity.	PreMoveMessageAttr,MagnitudePowerAttr,MovePowerMultiplierAttr,HitsTagForDoubleDamageAttr
+223	223	Dynamic Punch	(none)	Powerful and sure to cause confusion, but inaccurate.	ConfuseAttr
+224	224	Megahorn	(none)	A brutal ramming attack using out-thrust horns.	
+225	225	Dragon Breath	(none)	Strikes the foe with an incredible blast of breath.	StatusEffectAttr
+226	226	Baton Pass	(none)	Switches out the user while keeping effects in play.	ForceSwitchOutAttr
+227	227	Encore	(none)	Makes the foe repeat its last move over 2 to 6 turns.	AddBattlerTagAttr
+228	228	Pursuit	(none)	Inflicts bad damage if used on a foe switching out.	
+229	229	Rapid Spin	(none)	Clears some hazards. Ups speed by +1.	StatStageChangeAttr,RemoveBattlerTagAttr,RemoveArenaTrapAttr
+230	230	Sweet Scent	(none)	Allures the foe to harshly reduce evasiveness.	StatStageChangeAttr
+231	231	Iron Tail	(none)	Attacks with a rock-hard tail. May lower Defense.	StatStageChangeAttr
+232	232	Metal Claw	(none)	A claw attack that may raise the user's Attack.	StatStageChangeAttr
+233	233	Vital Throw	(none)	Makes the user's move last, but it never misses.	
+234	234	Morning Sun	(none)	Restores HP. The amount varies with the weather.	PlantHealAttr
+235	235	Synthesis	(none)	Restores HP. The amount varies with the weather.	PlantHealAttr
+236	236	Moonlight	(none)	Restores HP. The amount varies with the weather.	PlantHealAttr
+237	237	Hidden Power	(none)	The effectiveness varies with the user.	HiddenPowerTypeAttr
+238	238	Cross Chop	(none)	A double-chopping attack. High critical-hit ratio.	HighCritAttr
+239	239	Twister	(none)	Whips up a vicious twister to engulf the foe.	HitsTagForDoubleDamageAttr,FlinchAttr
+240	240	Rain Dance	(none)	Boosts the power of Water-type moves for 5 turns.	WeatherChangeAttr
+241	241	Sunny Day	(none)	Boosts the power of Fire-type moves for 5 turns.	WeatherChangeAttr
+242	242	Crunch	(none)	Crunches with sharp fangs. May lower Defense.	StatStageChangeAttr
+243	243	Mirror Coat	(none)	Counters the foe's special attack at double the power.	CounterDamageAttr,CounterRedirectAttr
+244	244	Psych Up	(none)	Copies the foe's effect(s) and gives to the user.	CopyStatsAttr
+245	245	Extreme Speed	(none)	An extremely fast and powerful attack.	
+246	246	Ancient Power	(none)	An attack that may raise all stats.	StatStageChangeAttr
+247	247	Shadow Ball	(none)	Hurls a black blob that may lower the foe's Sp. Def.	StatStageChangeAttr
+248	248	Future Sight	(none)	Heightens inner power to strike 2 turns later.	DelayedAttackAttr
+249	249	Rock Smash	(none)	A rock-crushing attack that lowers the foe's Defense.	StatStageChangeAttr
+250	250	Whirlpool	(none)	Traps and hurts the foe in a whirlpool for 2 to 5 turns.	TrapAttr,HitsTagForDoubleDamageAttr
+251	251	Beat Up	(none)	Summons party Pokémon to join in the attack.	MultiHitAttr,BeatUpAttr
+252	252	Fake Out	(none)	A 1st-turn, 1st-strike move that causes flinching.	FlinchAttr
+253	253	Uproar	(none)	A tantrum of 2 to 3 turns that confuses the user.	
+254	254	Stockpile	(none)	Charges up power for up to 3 turns.	AddBattlerTagAttr
+255	255	Spit Up	(none)	Spits up stored stockpiles for heavy damage.	SpitUpPowerAttr,RemoveBattlerTagAttr
+256	256	Swallow	(none)	Swallows down Stockpiles to restore HP.	SwallowHealAttr,RemoveBattlerTagAttr
+257	257	Heat Wave	(none)	Exhales a hot breath on the foe. May inflict a burn.	HealStatusEffectAttr,HealStatusEffectAttr,StatusEffectAttr
+258	258	Hail	(none)	Summons a hailstorm that strikes every turn.	WeatherChangeAttr
+259	259	Torment	(none)	Torments the foe and stops successive use of a move.	AddBattlerTagAttr
+260	260	Flatter	(none)	Enrages the foe, but raises its SpAtk	StatStageChangeAttr,ConfuseAttr
+261	261	Will-O-Wisp	(none)	Inflicts a burn on the foe with intense fire.	StatusEffectAttr
+262	262	Memento	(none)	The user faints and lowers the foe's abilities.	SacrificialAttrOnHit,StatStageChangeAttr
+263	263	Facade	(none)	Doubles damage if burned, paralyzed, or poisoned.	MovePowerMultiplierAttr,BypassBurnDamageReductionAttr
+264	264	Focus Punch	(none)	A powerful loyalty attack. Damage is reduced if hit.	MessageHeaderAttr,PreUseInterruptAttr
+265	265	Smelling Salts	(none)	Deals damage and cures the user of their status.	MovePowerMultiplierAttr,HealStatusEffectAttr
+266	266	Follow Me	(none)	Draws attention to make foes attack only the user.	AddBattlerTagAttr
+267	267	Nature Power	(none)	Type and power changes depending on the terrain.	NaturePowerAttr
+268	268	Charge	(none)	Charges power to boost the electric move used next.	StatStageChangeAttr,AddBattlerTagAttr
+269	269	Taunt	(none)	Taunts the foe into only using attack moves.	AddBattlerTagAttr
+270	270	Helping Hand	(none)	Boosts the power of the recipient's moves.	AddBattlerTagAttr
+271	271	Trick	(none)	Tricks the foe into trading held items.	
+272	272	Role Play	(none)	Mimics the target and copies its special ability.	AbilityCopyAttr
+273	273	Wish	(none)	A wish that restores HP. It takes time to work.	WishAttr
+274	274	Assist	(none)	Attacks randomly with one of the partner's moves.	RandomMovesetMoveAttr
+275	275	Ingrain	(none)	Lays roots that restore HP. The user can't switch out.	AddBattlerTagAttr,AddBattlerTagAttr,RemoveBattlerTagAttr
+276	276	Superpower	(none)	Boosts strength sharply, but lowers abilities.	StatStageChangeAttr
+277	277	Magic Coat	(none)	Reflects special effects back to the attacker.	AddBattlerTagAttr
+278	278	Recycle	(none)	Recycles a used item for one more use.	
+279	279	Revenge	(none)	An attack that gains power if injured by the foe.	TurnDamagedDoublePowerAttr
+280	280	Brick Break	(none)	Destroys barriers such as Reflect and causes damage.	RemoveScreensAttr
+281	281	Yawn	(none)	Lulls the foe into yawning, then sleeping next turn.	AddBattlerTagAttr
+282	282	Knock Off	(none)	Knocks down the foe's held item to prevent its use.	MovePowerMultiplierAttr,RemoveHeldItemAttr
+283	283	Endeavor	(none)	Gains power if the user's HP is lower than the foe's HP.	MatchHpAttr
+284	284	Eruption	(none)	The higher the user's HP, the more damage caused.	HealStatusEffectAttr,HpPowerAttr
+285	285	Skill Swap	(none)	The user swaps special abilities with the target.	SwitchAbilitiesAttr
+286	286	Imprison	(none)	Prevents foes from using moves known by the user.	AddArenaTagAttr
+287	287	Refresh	(none)	Rests for a moment to cure status and heal.	HealStatusEffectAttr
+288	288	Grudge	(none)	If the user faints, deletes all PP of foe's last move.	AddBattlerTagAttr
+289	289	Snatch	(none)	Steals the effects of the move the target uses next.	
+290	290	Secret Power	(none)	Physical Hidden Power. Varies with the user.	SecretPowerAttr
+291	291	Dive	(none)	Dives underwater the first turn and strikes next turn.	
+292	292	Arm Thrust	(none)	Straight-arm punches that strike the foe 2 to 5 times.	MultiHitAttr
+293	293	Camouflage	(none)	Shields the user from an attack and becomes that type.	CopyBiomeTypeAttr
+294	294	Tail Glow	(none)	Flashes a light that raises Sp. Atk by +3.	StatStageChangeAttr
+295	295	Luster Purge	(none)	Attacks with a burst of light. May lower Sp. Def.	StatStageChangeAttr
+296	296	Mist Ball	(none)	Attacks with a flurry of down. May lower SpAtk	StatStageChangeAttr
+297	297	Feather Dance	(none)	Envelops the foe with down to sharply reduce Attack.	StatStageChangeAttr
+298	298	Teeter Dance	(none)	Confuses all Pokémon on the scene.	ConfuseAttr
+299	299	Blaze Kick	(none)	A kick with a high critical-hit ratio. May cause a burn.	HealStatusEffectAttr,HighCritAttr,StatusEffectAttr
+300	300	Mud Sport	(none)	Covers the user in mud to raise electrical resistance.	AddArenaTagAttr
+301	301	Ice Ball	(none)	Rolls into a ball to strike with rising intensity.	ConsecutiveUseDoublePowerAttr
+302	302	Needle Arm	(none)	Attacks with thorny arms. May cause flinching.	FlinchAttr
+303	303	Slack Off	(none)	Slacks off and restores half the maximum HP.	HealAttr
+304	304	Hyper Voice	(none)	A loud attack that uses sound waves to injure.	
+305	305	Poison Fang	(none)	A sharp-fanged attack. May badly poison the foe.	StatusEffectAttr
+306	306	Crush Claw	(none)	Tears at the foe with sharp claws. May lower Defense.	StatStageChangeAttr
+307	307	Blast Burn	(none)	Powerful, but can't be used next turn.	HealStatusEffectAttr,RechargeAttr,PhotonGeyserCategoryAttr
+308	308	Hydro Cannon	(none)	Powerful, but can't be used the next turn.	RechargeAttr,PhotonGeyserCategoryAttr
+309	309	Meteor Mash	(none)	Fires a meteor-like punch. May raise Attack.	StatStageChangeAttr
+310	310	Astonish	(none)	An attack that shocks the foe into flinching.	FlinchAttr
+311	311	Weather Ball	(none)	The move's type and power change with the weather.	WeatherBallTypeAttr,MovePowerMultiplierAttr
+312	312	Aromatherapy	(none)	Heals all status problems with a soothing scent.	PartyStatusCureAttr
+313	313	Fake Tears	(none)	Feigns crying to sharply lower the foe's Sp. Def.	StatStageChangeAttr
+314	314	Air Cutter	(none)	Hacks with razorlike wind. High critical-hit ratio.	HighCritAttr
+315	315	Overheat	(none)	Allows a full-power attack, but sharply lowers SpAtk	HealStatusEffectAttr,StatStageChangeAttr,HealStatusEffectAttr
+316	316	Odor Sleuth	(none)	Negates the foe's efforts to heighten evasiveness.	ExposedMoveAttr
+317	317	Rock Tomb	(none)	Stops the foe from moving with rocks and cuts Speed.	StatStageChangeAttr
+318	318	Silver Wind	(none)	A powdery attack that may raise abilities.	StatStageChangeAttr
+319	319	Metal Sound	(none)	Emits a horrible screech that sharply lowers Sp. Def.	StatStageChangeAttr
+320	320	Grass Whistle	(none)	Lulls the foe into sleep with a pleasant melody.	StatusEffectAttr
+321	321	Tickle	(none)	Makes the foe laugh to lower Attack and Defense.	StatStageChangeAttr
+322	322	Cosmic Power	(none)	Raises Defense and Sp. Def with a mystic power.	StatStageChangeAttr
+323	323	Water Spout	(none)	Inflicts more damage if the user's HP is high.	HpPowerAttr
+324	324	Signal Beam	(none)	A strange beam attack that may confuse the foe.	ConfuseAttr
+325	325	Shadow Punch	(none)	An unavoidable punch that is thrown from shadows.	
+326	326	Extrasensory	(none)	Attacks with a peculiar power. May cause flinching.	FlinchAttr
+327	327	Sky Uppercut	(none)	An uppercut thrown as if leaping into the sky.	HitsTagAttr
+328	328	Sand Tomb	(none)	Traps and hurts the foe in quicksand for 2 to 5 turns.	TrapAttr
+329	329	Sheer Cold	(none)	Super effective on Water. 20% frostbite chance.	IceNoEffectTypeAttr,StatusEffectAttr
+330	330	Muddy Water	(none)	Attacks with muddy water. May lower accuracy.	StatStageChangeAttr
+331	331	Bullet Seed	(none)	Shoots 2 to 5 seeds in a row to strike the foe.	MultiHitAttr
+332	332	Aerial Ace	(none)	An extremely speedy and unavoidable attack.	
+333	333	Icicle Spear	(none)	Attacks the foe by firing 2 to 5 icicles in a row.	MultiHitAttr
+334	334	Iron Defense	(none)	Hardens the body's surface to sharply raise Defense.	StatStageChangeAttr
+335	335	Block	(none)	Blocks the foe's way to prevent escape.	AddBattlerTagAttr
+336	336	Howl	(none)	Howls to raise the spirit and boosts Attack.	StatStageChangeAttr
+337	337	Dragon Claw	(none)	Slashes the foe with sharp claws.	
+338	338	Frenzy Plant	(none)	Powerful, but can't be used next turn.	RechargeAttr,PhotonGeyserCategoryAttr
+339	339	Bulk Up	(none)	Bulks up the body to boost both Attack and Defense.	StatStageChangeAttr
+340	340	Bounce	(none)	Bounces up, then down the next turn. May paralyze.	StatusEffectAttr
+341	341	Mud Shot	(none)	10% Speed drop chance. Has +1 priority.	StatStageChangeAttr
+342	342	Poison Tail	(none)	Forces the target to Switch. May also poison.	HighCritAttr,StatusEffectAttr
+343	343	Covet	(none)	Cutely begs to obtain an item held by the foe.	StealHeldItemChanceAttr
+344	344	Volt Tackle	(none)	A life-risking tackle that slightly hurts the user.	RecoilAttr,StatusEffectAttr
+345	345	Magical Leaf	(none)	Attacks with a strange leaf that cannot be evaded.	DefDefAttr
+346	346	Water Sport	(none)	The user becomes soaked to raise resistance to fire.	AddArenaTagAttr
+347	347	Calm Mind	(none)	Raises Sp. Atk and Sp. Def by focusing the mind.	StatStageChangeAttr
+348	348	Leaf Blade	(none)	Slashes with a sharp leaf. High critical-hit ratio.	HighCritAttr
+349	349	Dragon Dance	(none)	A mystical dance that ups Attack and Speed.	StatStageChangeAttr
+350	350	Rock Blast	(none)	Hurls boulders at the foe 2 to 5 times in a row.	MultiHitAttr
+351	351	Shock Wave	(none)	A fast and unavoidable +2 priority attack.	
+352	352	Water Pulse	(none)	Attacks with ultrasonic waves. May confuse the foe.	ConfuseAttr
+353	353	Doom Desire	(none)	Summons strong sunlight to attack 2 turns later.	DelayedAttackAttr
+354	354	Psycho Boost	(none)	Allows a full-power attack, but sharply lowers SpAtk	StatStageChangeAttr
+355	355	Roost	(none)	Restores the user's HP by half of its max HP.	HealAttr,AddBattlerTagAttr
+356	356	Gravity	(none)	Gravity is intensified negating levitation.	AddArenaTagAttr
+357	357	Miracle Eye	(none)	Inverts the target's type matchups.	ExposedMoveAttr
+358	358	Wake-Up Slap	(none)	Powerful against sleeping foes, but also heals them.	MovePowerMultiplierAttr,HealStatusEffectAttr
+359	359	Hammer Arm	(none)	A swinging fist attack that also lowers Speed.	StatStageChangeAttr
+360	360	Gyro Ball	(none)	A high-speed spin that does more damage to faster foes.	GyroBallPowerAttr
+361	361	Healing Wish	(none)	The user faints to heal up the recipient.	SacrificialFullRestoreAttr
+362	362	Brine	(none)	Deals Super Effective damage vs Water.	MovePowerMultiplierAttr
+363	363	Natural Gift	(none)	The effectiveness varies with the held Berry.	
+364	364	Feint	(none)	An attack that hits foes using moves like Protect.	RemoveBattlerTagAttr,RemoveArenaTagsAttr
+365	365	Pluck	(none)	Plucks the foe's item away, eating it if it's a Berry.	StealEatBerryAttr
+366	366	Tailwind	(none)	Whips up a turbulent breeze that raises Speed.	AddArenaTagAttr
+367	367	Acupressure	(none)	The user sharply raises one of its stats.	AcupressureStatStageChangeAttr
+368	368	Metal Burst	(none)	Retaliates any hit with greater power.	CounterDamageAttr,CounterRedirectAttr
+369	369	U-turn	(none)	Does damage then switches out the user.	ForceSwitchOutAttr
+370	370	Close Combat	(none)	A strong attack but lowers the defensive stats.	StatStageChangeAttr
+371	371	Payback	(none)	An attack that gains power if the user moves last.	MovePowerMultiplierAttr
+372	372	Assurance	(none)	An attack that gains power if the foe has been hurt.	MovePowerMultiplierAttr
+373	373	Embargo	(none)	Prevents the foe from using any items.	
+374	374	Fling	(none)	The effectiveness varies with the held item.	
+375	375	Psycho Shift	(none)	Transfers status problems to the foe.	PsychoShiftEffectAttr
+376	376	Trump Card	(none)	Inflicts critical damage when the user's HP is low.	LessPPMorePowerAttr
+377	377	Heal Block	(none)	Prevents the foe from recovering any HP.	AddBattlerTagAttr
+378	378	Wring Out	(none)	Crushes quicker foes, nullifying their ability.	OpponentHighHpPowerAttr
+379	379	Power Trick	(none)	The user swaps its Attack and Defense stats.	AddBattlerTagAttr
+380	380	Gastro Acid	(none)	Suppresses the foe's ability and poisons it.	SuppressAbilitiesAttr
+381	381	Lucky Chant	(none)	Prevents the foe from landing critical hits.	AddArenaTagAttr
+382	382	Me First	(none)	Executes the foe's attack with greater power.	
+383	383	Copycat	(none)	The user mimics the last move used by a foe.	CopyMoveAttr
+384	384	Power Swap	(none)	Swaps Attack and Special Attack with the foe.	SwapStatStagesAttr
+385	385	Guard Swap	(none)	Swaps Defense and Special Defense with the foe.	SwapStatStagesAttr
+386	386	Punishment	(none)	Does more damage if the foe has powered up.	PunishmentPowerAttr
+387	387	Last Resort	(none)	Can only be used if every other move has been used.	
+388	388	Worry Seed	(none)	Plants a seed that causes Fear and gives Insomina.	AbilityChangeAttr
+389	389	Sucker Punch	(none)	Strikes first if the foe is preparing an attack.	
+390	390	Toxic Spikes	(none)	Sets spikes that poison a foe switching in.	AddArenaTrapTagAttr
+391	391	Heart Swap	(none)	Swaps any stat changes with the foe.	SwapStatStagesAttr
+392	392	Aqua Ring	(none)	Forms a veil of water that restores HP.	AddBattlerTagAttr
+393	393	Magnet Rise	(none)	The user levitates with electromagnetism.	AddBattlerTagAttr
+394	394	Flare Blitz	(none)	A charge that may burn the foe. Also hurts the user.	HealStatusEffectAttr,RecoilAttr,HealStatusEffectAttr,StatusEffectAttr
+395	395	Force Palm	(none)	Sends a shock wave through the foe, clearing their stats.	StatusEffectAttr
+396	396	Aura Sphere	(none)	Attacks with an aura blast that cannot be evaded.	
+397	397	Rock Polish	(none)	Polishes the body to sharply raise Speed.	StatStageChangeAttr
+398	398	Poison Jab	(none)	A stabbing attack that may poison the foe.	StatusEffectAttr
+399	399	Dark Pulse	(none)	Attacks with a horrible aura. May cause flinching.	FlinchAttr
+400	400	Night Slash	(none)	Hits as soon as possible. High critical-hit ratio.	HighCritAttr
+401	401	Aqua Tail	(none)	The user swings its tail like a wave to attack.	
+402	402	Seed Bomb	(none)	A barrage of hard seeds is fired at the foe.	
+403	403	Air Slash	(none)	Attacks with a blade of air. May cause flinching.	FlinchAttr
+404	404	X-Scissor	(none)	Cuts like scissors. High critical-hit ratio.	
+405	405	Bug Buzz	(none)	A damaging sound wave that may lower Sp. Def.	StatStageChangeAttr
+406	406	Dragon Pulse	(none)	Generates a shock wave to damage the foe.	
+407	407	Dragon Rush	(none)	Tackles the foe with menace. Damages the user.	AlwaysHitMinimizeAttr,HitsTagForDoubleDamageAttr,FlinchAttr,RecoilAttr
+408	408	Power Gem	(none)	Attacks with rays of light that sparkle like diamonds.	
+409	409	Drain Punch	(none)	A punch that absorbs over 30% of damage inflicted.	HitHealAttr
+410	410	Vacuum Wave	(none)	Whirls its fists to send a wave that strikes first.	
+411	411	Focus Blast	(none)	Attacks at full power. May lower Sp. Def.	StatStageChangeAttr
+412	412	Energy Ball	(none)	Draws power from nature to attack. May lower Sp. Def.	StatStageChangeAttr
+413	413	Brave Bird	(none)	A low altitude charge that also hurts the user.	RecoilAttr
+414	414	Earth Power	(none)	Makes the ground erupt with power. May lower Sp. Def.	StatStageChangeAttr
+415	415	Switcheroo	(none)	Swaps items with the foe faster than the eye can see.	
+416	416	Giga Impact	(none)	Powerful, but leaves the user immobile the next turn.	RechargeAttr
+417	417	Nasty Plot	(none)	Thinks bad thoughts to sharply boost SpAtk	StatStageChangeAttr
+418	418	Bullet Punch	(none)	Punches as fast as a bul-let. It always hits first.	
+419	419	Avalanche	(none)	An attack that gains power if injured by the foe.	TurnDamagedDoublePowerAttr
+420	420	Ice Shard	(none)	Hurls a chunk of ice that always strike first.	
+421	421	Shadow Claw	(none)	Strikes with a shadow claw. High critical-hit ratio.	HighCritAttr
+422	422	Thunder Fang	(none)	May cause flinching or leave the foe paralyzed.	FlinchAttr,StatusEffectAttr
+423	423	Ice Fang	(none)	May cause flinching or leave the foe frostbiten.	FlinchAttr,StatusEffectAttr
+424	424	Fire Fang	(none)	May cause flinching or leave the foe with a burn.	HealStatusEffectAttr,FlinchAttr,StatusEffectAttr
+425	425	Shadow Sneak	(none)	Extends the user's shadow to strike first.	
+426	426	Mud Bomb	(none)	Can hit Flying foes, then knocks them to the ground.	StatStageChangeAttr
+427	427	Psycho Cut	(none)	Tears with psychic blades. High critical-hit ratio.	HighCritAttr
+428	428	Zen Headbutt	(none)	Hits with a strong head-butt. May cause flinching.	FlinchAttr
+429	429	Mirror Shot	(none)	Emits a flash of energy to damage and cut SpDef.	StatStageChangeAttr
+430	430	Flash Cannon	(none)	Releases a blast of light that may lower Sp. Def.	StatStageChangeAttr
+431	431	Rock Climb	(none)	A charging attack that may confuse the foe.	ConfuseAttr
+432	432	Defog	(none)	Removes obstacles and lowers evasion.	StatStageChangeAttr,ClearWeatherAttr,ClearTerrainAttr,RemoveScreensAttr,RemoveArenaTrapAttr,RemoveArenaTagsAttr
+433	433	Trick Room	(none)	Slower Pokémon get to move first for 5 turns.	AddArenaTagAttr
+434	434	Draco Meteor	(none)	Casts comets onto the foe. Harshly lowers the SpAtk	StatStageChangeAttr
+435	435	Discharge	(none)	Zaps the field with electri-city. May cause paralysis.	StatusEffectAttr
+436	436	Lava Plume	(none)	Scarlet flames torch everything around the user.	HealStatusEffectAttr,StatusEffectAttr
+437	437	Leaf Storm	(none)	Whips up a storm of leaves. Harshly lowers SpAtk	StatStageChangeAttr
+438	438	Power Whip	(none)	Violently lashes the foe with vines or tentacles.	
+439	439	Rock Wrecker	(none)	Powerful, but leaves the user immobile the next turn.	RechargeAttr,PhotonGeyserCategoryAttr
+440	440	Cross Poison	(none)	Two slashes that may poison a foe and do critical damage.	HighCritAttr,StatusEffectAttr,MultiHitAttr
+441	441	Gunk Shot	(none)	Shoots filthy garbage at the foe. May also poison.	StatusEffectAttr
+442	442	Iron Head	(none)	Slams the foe with a hard head. May cause flinching.	FlinchAttr
+443	443	Magnet Bomb	(none)	Launches a magnet that is Super Effective vs Steel.	
+444	444	Stone Edge	(none)	Stabs the foe with stones. High critical-hit ratio.	HighCritAttr
+445	445	Captivate	(none)	Deals additional damage if the target is infatuated.	StatStageChangeAttr
+446	446	Stealth Rock	(none)	Sets floating stones that hurt a foe switching in.	AddArenaTrapTagAttr
+447	447	Grass Knot	(none)	A snare attack that does more damage to heavier foes.	WeightPowerAttr
+448	448	Chatter	(none)	Attacks with a sound wave that causes confusion.	ConfuseAttr
+449	449	Judgment	(none)	The type varies with the kind of Plate held.	FormChangeItemTypeAttr
+450	450	Bug Bite	(none)	Tears away the foe's item, eating it if it's a Berry.	StealEatBerryAttr
+451	451	Charge Beam	(none)	Fires a beam of electricity. Raises Sp. Atk by one stage.	StatStageChangeAttr
+452	452	Wood Hammer	(none)	Slams the body into a foe The user gets hurt too.	RecoilAttr
+453	453	Aqua Jet	(none)	Strikes first by dashing at the foe at a high speed.	
+454	454	Attack Order	(none)	Underlings pummel the foe. High critical-hit ratio.	HighCritAttr,PhotonGeyserCategoryAttr
+455	455	Defend Order	(none)	Raises Defense and Sp. Def with a living shield.	StatStageChangeAttr
+456	456	Heal Order	(none)	The user's underlings show up to heal half its max HP.	HealAttr
+457	457	Head Smash	(none)	A life-risking headbutt that seriously hurts the user.	RecoilAttr
+458	458	Double Hit	(none)	Slams the foe with a tail etc. Strikes twice.	MultiHitAttr
+459	459	Roar of Time	(none)	Moves last, but forces the target to switch out.	RechargeAttr
+460	460	Spacial Rend	(none)	Tears the foe, and space. High critical-hit ratio.	HighCritAttr
+461	461	Lunar Dance	(none)	The user faints to heal up the recipient.	SacrificialFullRestoreAttr
+462	462	Crush Grip	(none)	Crushes quicker foes, nullifying their ability.	OpponentHighHpPowerAttr
+463	463	Magma Storm	(none)	Traps the foe in a vortex of fire for 2 to 5 turns.	HealStatusEffectAttr,TrapAttr
+464	464	Dark Void	(none)	Drags the foe into total darkness, inducing Sleep.	StatusEffectAttr
+465	465	Seed Flare	(none)	Generates a shock wave that sharply reduces Sp. Def.	StatStageChangeAttr
+466	466	Ominous Wind	(none)	A repulsive attack that may raise all stats.	StatStageChangeAttr
+467	467	Shadow Force	(none)	Vanishes on the first turn then strikes the next turn.	
+468	468	Hone Claws	(none)	Sharpens its claws to raise Attack and Accuracy.	StatStageChangeAttr
+469	469	Wide Guard	(none)	Evades wide-ranging attacks for one turn.	AddArenaTagAttr
+470	470	Guard Split	(none)	Averages changes to Defense and Sp. Def with the foe.	AverageStatsAttr
+471	471	Power Split	(none)	Averages changes to Attack and Sp. Atk with the foe.	AverageStatsAttr
+472	472	Wonder Room	(none)	Attack and SpAtk stats are swapped for 5 turns.	
+473	473	Psyshock	(none)	Attacks with a psychic wave that does physical damage.	DefDefAttr
+474	474	Venoshock	(none)	Does double damage if the foe is poisoned.	MovePowerMultiplierAttr
+475	475	Autotomize	(none)	Sheds additional weight to sharply boost Speed.	StatStageChangeAttr,AddBattlerTagAttr
+476	476	Rage Powder	(none)	Scatters powder to make foes attack only the user.	AddBattlerTagAttr
+477	477	Telekinesis	(none)	Makes the foe float. It is easier to hit for 3 turns.	AddBattlerTagAttr,AddBattlerTagAttr
+478	478	Magic Room	(none)	Disables stones and passive DMG for 5 turns.	
+479	479	Smack Down	(none)	Throws a rock to knock the foe down to the ground.	FallDownAttr,AddBattlerTagAttr,RemoveBattlerTagAttr,HitsTagAttr
+480	480	Storm Throw	(none)	This attack always results in a critical hit.	CritOnlyAttr
+481	481	Flame Burst	(none)	Also hits the foe's ally for 1/4 dmg. Has +1 priority.	HealStatusEffectAttr,FlameBurstAttr
+482	482	Sludge Wave	(none)	Swamps the foe with a wave of sludge. May also poison.	StatusEffectAttr
+483	483	Quiver Dance	(none)	Dances to raise Sp. Atk Sp. Def and Speed.	StatStageChangeAttr
+484	484	Heavy Slam	(none)	Does more damage if the user outweighs the foe.	AlwaysHitMinimizeAttr,CompareWeightPowerAttr,HitsTagForDoubleDamageAttr
+485	485	Synchronoise	(none)	An odd shock wave that Matches user's second type.	HitsSameTypeAttr
+486	486	Electro Ball	(none)	Hurls an orb that does more damage to slower foes.	ElectroBallPowerAttr
+487	487	Soak	(none)	Sprays water at the foe making it Water-type.	ChangeTypeAttr
+488	488	Flame Charge	(none)	Attacks in a cloak of flames. Raises Speed.	HealStatusEffectAttr,StatStageChangeAttr
+489	489	Coil	(none)	Coils up to raise Attack Defense and Accuracy.	StatStageChangeAttr
+490	490	Low Sweep	(none)	Attacks the foe's legs lowering its Speed.	StatStageChangeAttr
+491	491	Acid Spray	(none)	Sprays a hide-melting acid. Sharply reduces Sp. Def.	StatStageChangeAttr
+492	492	Foul Play	(none)	The higher the foe's Attack the more damage caused.	TargetAtkUserAtkAttr
+493	493	Simple Beam	(none)	A beam that changes the foe's ability to Simple.	AbilityChangeAttr
+494	494	Entrainment	(none)	Makes the foe mimic the user, gaining its ability.	AbilityGiveAttr
+495	495	After You	(none)	Helps out the foe, letting it move next.	AfterYouAttr
+496	496	Round	(none)	A song that inflicts damage. Others can join in too.	CueNextRoundAttr,RoundPowerAttr,FlinchAttr
+497	497	Echoed Voice	(none)	Slices the foe 3 times in a with rising intensity.	ConsecutiveUseMultiBasePowerAttr
+498	498	Chip Away	(none)	Chips away at the foe's attack and defense.	IgnoreOpponentStatStagesAttr,StatStageChangeAttr
+499	499	Clear Smog	(none)	Attacks with white haze that eliminates all stat changes.	ResetStatsAttr
+500	500	Stored Power	(none)	The higher the user's stats the more damage caused.	PositiveStatStagePowerAttr
+501	501	Quick Guard	(none)	Protects against priority attacks for 3 turns.	AddArenaTagAttr
+502	502	Ally Switch	(none)	The user switches places with its partner.	
+503	503	Scald	(none)	Shoots boiling water at the foe. May inflict a burn.	HealStatusEffectAttr,HealStatusEffectAttr,StatusEffectAttr
+504	504	Shell Smash	(none)	Raises offensive stats, but lowers defensive stats.	StatStageChangeAttr,StatStageChangeAttr
+505	505	Heal Pulse	(none)	Recovers up to half the target's maximum HP.	HealAttr
+506	506	Hex	(none)	Does double damage if the foe has a status problem.	MovePowerMultiplierAttr
+507	507	Sky Drop	(none)	Takes the foe into the sky then drops it the next turn.	
+508	508	Shift Gear	(none)	Rotates its gears to raise Attack and Speed.	StatStageChangeAttr,StatStageChangeAttr
+509	509	Circle Throw	(none)	Knocks the foe away to end the battle.	ForceSwitchOutAttr
+510	510	Incinerate	(none)	Burns up Berries and Gems preventing their use.	HealStatusEffectAttr,RemoveHeldItemAttr
+511	511	Quash	(none)	Suppresses distortions that let battlers move first.	ForceLastAttr
+512	512	Acrobatics	(none)	Does 1.5x damage if the user has no item.	MovePowerMultiplierAttr
+513	513	Reflect Type	(none)	The user makes the foe reflect the user's type.	CopyTypeAttr
+514	514	Retaliate	(none)	An attack that does more damage if an ally fainted.	MovePowerMultiplierAttr
+515	515	Final Gambit	(none)	The user faints to damage the foe equal to its HP.	UserHpDamageAttr,SacrificialAttrOnHit
+516	516	Bestow	(none)	The user gives its item and status to the foe.	
+517	517	Inferno	(none)	Powerful and sure to inflict a burn, but inaccurate.	HealStatusEffectAttr,StatusEffectAttr
+518	518	Water Pledge	(none)	Attacks with a column of water. May make a rainbow.	AwaitCombinedPledgeAttr,CombinedPledgeTypeAttr,CombinedPledgePowerAttr,CombinedPledgeStabBoostAttr,AddPledgeEffectAttr,AddPledgeEffectAttr,BypassRedirectAttr,PhotonGeyserCategoryAttr
+519	519	Fire Pledge	(none)	Attacks with a column of fire. May burn the grass.	HealStatusEffectAttr,AwaitCombinedPledgeAttr,CombinedPledgeTypeAttr,CombinedPledgePowerAttr,CombinedPledgeStabBoostAttr,AddPledgeEffectAttr,AddPledgeEffectAttr,BypassRedirectAttr,PhotonGeyserCategoryAttr
+520	520	Grass Pledge	(none)	Attacks with a column of grass. May create a swamp.	AwaitCombinedPledgeAttr,CombinedPledgeTypeAttr,CombinedPledgePowerAttr,CombinedPledgeStabBoostAttr,AddPledgeEffectAttr,AddPledgeEffectAttr,BypassRedirectAttr,PhotonGeyserCategoryAttr
+521	521	Volt Switch	(none)	Does damage then switches out the user.	ForceSwitchOutAttr
+522	522	Struggle Bug	(none)	Inflicts critical damage when the user's HP is low.	StatStageChangeAttr
+523	523	Bulldoze	(none)	Stomps down on the ground. Lowers Speed.	StatStageChangeAttr,MovePowerMultiplierAttr
+524	524	Frost Breath	(none)	This attack always results in a critical hit.	CritOnlyAttr
+525	525	Dragon Tail	(none)	Knocks the foe away to end the battle.	ForceSwitchOutAttr
+526	526	Work Up	(none)	The user is roused. Ups Attack and SpAtk	StatStageChangeAttr
+527	527	Electroweb	(none)	Snares the foe with an electric net. Lowers Speed.	StatStageChangeAttr
+528	528	Wild Charge	(none)	An electrical tackle with 10% paralyze chance.	RecoilAttr,StatusEffectAttr
+529	529	Drill Run	(none)	Spins its body like a drill. High critical-hit ratio.	HighCritAttr
+530	530	Dual Chop	(none)	Attacks with brutal hits that strike twice.	MultiHitAttr
+531	531	Heart Stamp	(none)	A sudden blow after a cute act. May cause flinching.	FlinchAttr
+532	532	Horn Leech	(none)	An attack that absorbs half the damage inflicted.	HitHealAttr
+533	533	Sacred Sword	(none)	Strikes through the foe's stat changes.	IgnoreOpponentStatStagesAttr
+534	534	Razor Shell	(none)	Tears at the foe with sharp shells. May lower Defense.	StatStageChangeAttr
+535	535	Heat Crash	(none)	Does more damage if the user outweighs the foe.	HealStatusEffectAttr,AlwaysHitMinimizeAttr,CompareWeightPowerAttr,HitsTagForDoubleDamageAttr
+536	536	Leaf Tornado	(none)	Traps and hurts the foe in a tornado for 2 to 5 turns.	StatStageChangeAttr
+537	537	Steamroller	(none)	A speedy attack that crushes the foe with the user's body.	AlwaysHitMinimizeAttr,HitsTagForDoubleDamageAttr,FlinchAttr
+538	538	Cotton Guard	(none)	Wraps its body in cotton. Drastically raises Defense.	StatStageChangeAttr
+539	539	Night Daze	(none)	Looses a pitch-black shock wave. Has +1 priority.	StatStageChangeAttr
+540	540	Psystrike	(none)	Attacks with a psychic wave that does physical damage.	DefDefAttr
+541	541	Tail Slap	(none)	Strikes the foe with its tail 2 to 5 times.	MultiHitAttr
+542	542	Hurricane	(none)	Traps the foe in a fierce wind. May cause confusion.	ThunderAccuracyAttr,ConfuseAttr,HitsTagAttr
+543	543	Head Charge	(none)	A charge using guard hair. It hurts the user a little.	RecoilAttr
+544	544	Gear Grind	(none)	Throws two steel gears that strike twice.	MultiHitAttr
+545	545	Searing Shot	(none)	Scarlet flames torch everything around the user.	HealStatusEffectAttr,StatusEffectAttr
+546	546	Techno Blast	(none)	The type varies based on the user.	TechnoBlastTypeAttr
+547	547	Relic Song	(none)	Attacks with an ancient song. May induce sleep.	StatusEffectAttr,PhotonGeyserCategoryAttr
+548	548	Secret Sword	(none)	Cuts with a long horn that does physical damage.	DefDefAttr
+549	549	Glaciate	(none)	Blows very cold air at the foe. It lowers their Speed.	StatStageChangeAttr
+550	550	Bolt Strike	(none)	Strikes with a great amount of lightning. May paralyze.	StatusEffectAttr
+551	551	Blue Flare	(none)	Engulfs the foe in a blue flame. May inflict a burn.	HealStatusEffectAttr,StatusEffectAttr
+552	552	Fiery Dance	(none)	Dances cloaked in flames. May raise SpAtk	HealStatusEffectAttr,StatStageChangeAttr
+553	553	Freeze Shock	(none)	A powerful 2-turn move that may paralyze the foe.	StatusEffectAttr
+554	554	Ice Burn	(none)	A powerful 2-turn move that may inflict a burn.	StatusEffectAttr
+555	555	Snarl	(none)	Yells and rants at the foe lowering its SpAtk	StatStageChangeAttr
+556	556	Icicle Crash	(none)	Drops large icicles on the foe. May cause flinching.	FlinchAttr
+557	557	V-create	(none)	Very powerful, but lowers Defense, Sp. Def and Speed.	HealStatusEffectAttr,StatStageChangeAttr
+558	558	Fusion Flare	(none)	Summons a fireball. Works well with a thunderbolt.	HealStatusEffectAttr,HealStatusEffectAttr,LastMoveDoublePowerAttr
+559	559	Fusion Bolt	(none)	Summons a thunderbolt. Works well with a fireball.	LastMoveDoublePowerAttr
+560	560	Flying Press	(none)	This attack does Fighting and Flying-type damage.	AlwaysHitMinimizeAttr,FlyingTypeMultiplierAttr,HitsTagForDoubleDamageAttr
+561	561	Mat Block	(none)	Evades damaging moves for one turn.	AddArenaTagAttr
+562	562	Belch	(none)	Lets out a loud belch. Must eat a Berry to use it.	
+563	563	Rototiller	(none)	Ups the Attack and Sp. Atk of Grass-type Pokémon.	StatStageChangeAttr
+564	564	Sticky Web	(none)	Weaves a sticky net that slows foes switching in.	AddArenaTrapTagAttr
+565	565	Fell Stinger	(none)	If it knocks out a foe the Attack stat is raised.	PostVictoryStatStageChangeAttr
+566	566	Phantom Force	(none)	Vanishes on the first turn then strikes the next turn.	
+567	567	Trick-Or-Treat	(none)	Goes trick-or-treating making the foe Ghost-type.	AddTypeAttr
+568	568	Noble Roar	(none)	Intimidates foes, cutting their Attack and SpAtk	StatStageChangeAttr
+569	569	Ion Deluge	(none)	Electrifies Normal-type moves with charged atoms.	AddArenaTagAttr
+570	570	Parabolic Charge	(none)	Damages adjacent Pokémon and heals up by 1/4 of it.	HitHealAttr
+571	571	Forest's Curse	(none)	Puts a curse on the foe making the foe Grass-type.	AddTypeAttr
+572	572	Petal Blizzard	(none)	Stirs up a violent storm of petals to attack.	
+573	573	Freeze-Dry	(none)	Super effective on Water-types. May cause freezing.	StatusEffectAttr,FreezeDryAttr
+574	574	Disarming Voice	(none)	Lets out a charming cry that cannot be evaded.	
+575	575	Parting Shot	(none)	Lowers the foe's Attack and Sp. Atk, then switches out.	StatStageChangeAttr,ForceSwitchOutAttr
+576	576	Topsy-Turvy	(none)	Swaps all stat changes that affect the target.	InvertStatsAttr
+577	577	Draining Kiss	(none)	An attack that absorbs over 50% of damage inflicted.	HitHealAttr
+578	578	Crafty Shield	(none)	Evades status moves for one turn.	AddArenaTagAttr
+579	579	Flower Shield	(none)	Raises the Defense of Grass-type Pokémon.	StatStageChangeAttr
+580	580	Grassy Terrain	(none)	The ground turns to grass for 8 turns. Restores HP.	TerrainChangeAttr
+581	581	Misty Terrain	(none)	Covers the ground with mist for 8 turns. Blocks status.	TerrainChangeAttr
+582	582	Electrify	(none)	Electrifies the foe, making its next move Electric-type.	AddBattlerTagAttr
+583	583	Play Rough	(none)	Plays rough with the foe. May lower Attack.	StatStageChangeAttr
+584	584	Fairy Wind	(none)	Quick cloud of pixie dust. Has +1 priority.	
+585	585	Moonblast	(none)	Attacks with the power of the moon. May lower SpAtk	StatStageChangeAttr
+586	586	Boomburst	(none)	Attack everything then take recoil.	RecoilAttr
+587	587	Fairy Lock	(none)	Locks down the battlefield preventing escape next turn.	AddArenaTagAttr
+588	588	King's Shield	(none)	Evades damage, and reduces Attack if struck.	ProtectAttr
+589	589	Play Nice	(none)	Befriend the foe, lowering its Attack without fail.	StatStageChangeAttr
+590	590	Confide	(none)	Shares a secret with the foe, lowering SpAtk	StatStageChangeAttr
+591	591	Diamond Storm	(none)	Whips up a storm of diamonds. May up Defense.	StatStageChangeAttr
+592	592	Steam Eruption	(none)	Immerses the foe in heated steam. May inflict a burn.	HealStatusEffectAttr,HealStatusEffectAttr,StatusEffectAttr
+593	593	Hyperspace Hole	(none)	Uses a warp hole to attack. Can't be evaded.	
+594	594	Water Shuriken	(none)	Throws 2 to 5 stars that are sure to strike first.	MultiHitAttr,WaterShurikenPowerAttr,WaterShurikenMultiHitTypeAttr
+595	595	Mystical Fire	(none)	Breathes a special, hot fire. May lower SpAtk	HealStatusEffectAttr,StatStageChangeAttr
+596	596	Spiky Shield	(none)	Evades attack, and causes bleeding if struck.	ProtectAttr
+597	597	Aromatic Mist	(none)	Raises the Special Defense of the user and its partner.	StatStageChangeAttr
+598	598	Eerie Impulse	(none)	Exposes the foe to a pulse that sharply cuts SpAtk	StatStageChangeAttr
+599	599	Venom Drench	(none)	Lowers the Attack, Sp. Atk and Speed of a poisoned foe.	StatStageChangeAttr
+600	600	Powder	(none)	Damages the foe if it uses a Fire-type move.	AddBattlerTagAttr
+601	601	Geomancy	(none)	Raises Sp. Atk, Sp. Def and Speed on the 2nd turn.	StatStageChangeAttr
+602	602	Magnetic Flux	(none)	Boosts the defenses of those with Plus or Minus.	StatStageChangeAttr
+603	603	Happy Hour	(none)	Doubles the amount of Prize Money received.	AddArenaTagAttr
+604	604	Electric Terrain	(none)	Electrifies the ground for 8 turns. Prevents sleep.	TerrainChangeAttr
+605	605	Dazzling Gleam	(none)	Damages foes by emitting a bright flash.	
+606	606	Celebrate	(none)	Congratulates you on your special day.	MessageAttr,MoneyAttr
+607	607	Hold Hands	(none)	The user and ally hold hands making them happy.	
+608	608	Baby-Doll Eyes	(none)	Lowers the foe's Attack before it can move.	StatStageChangeAttr
+609	609	Nuzzle	(none)	Rubs its cheeks against the foe, paralyzing it.	StatusEffectAttr
+610	610	Hold Back	(none)	An attack that leaves the foe with at least 1 HP.	SurviveDamageAttr,ConfuseAttr
+611	611	Infestation	(none)	The foe is infested and attacked for 2 to 5 turns.	TrapAttr
+612	612	Power-Up Punch	(none)	A hard punch that raises the user's Attack.	StatStageChangeAttr
+613	613	Oblivion Wing	(none)	An attack that absorbs over 75% of damage inflicted.	HitHealAttr
+614	614	Thousand Arrows	(none)	Can hit Flying foes, then knocks them to the ground.	NeutralDamageAgainstFlyingTypeAttr,FallDownAttr,HitsTagAttr,HitsTagAttr,AddBattlerTagAttr,RemoveBattlerTagAttr
+615	615	Thousand Waves	(none)	Those hit by the wave can no longer escape.	AddBattlerTagAttr
+616	616	Land's Wrath	(none)	Gathers the energy of the land to attack every foe.	
+617	617	Light Of Ruin	(none)	Fires a great beam of light that also hurts the user.	RecoilAttr
+618	618	Origin Pulse	(none)	Beams of glowing blue light blast both foes.	
+619	619	Precipice Blades	(none)	Fearsome blades of stone attack both foes.	
+620	620	Dragon Ascent	(none)	A strong attack but lowers the defensive stats.	StatStageChangeAttr
+621	621	Hyperspace Fury	(none)	Uses a warp hole to attack. Can't be evaded.	StatStageChangeAttr
+622	659	Shore Up	(none)	Restores the user's HP. More HP in a sandstorm.	SandHealAttr
+623	660	First Impression	(none)	Hits hard and first. Only works first turn.	
+624	661	Baneful Bunker	(none)	Protects user and poisons foes on contact.	ProtectAttr
+625	662	Spirit Shackle	(none)	After being hit, foes can no longer escape.	AddBattlerTagAttr
+626	663	Darkest Lariat	(none)	Swings the arms to strike It ignores stat changes.	IgnoreOpponentStatStagesAttr
+627	664	Sparkling Aria	(none)	Sings with bubbles. Cures burns on contact.	HealStatusEffectAttr
+628	665	Ice Hammer	(none)	Swings a fist to strike. Deals good, consistent damage.	StatStageChangeAttr
+629	666	Floral Healing	(none)	Restores an ally's HP. Heals more on grass.	BoostHealAttr
+630	667	High Horsepower	(none)	Slams hard into the foe with its entire body.	
+631	668	Strength Sap	(none)	Saps the foe's Attack to heal HP, then drops Attack.	HitHealAttr,StatStageChangeAttr
+632	669	Solar Blade	(none)	Charges first turn, then chops with a blade of light.	AntiSunlightPowerDecreaseAttr
+633	670	Leafage	(none)	Attacks with a flurry of small leaves.	
+634	671	Spotlight	(none)	Makes the foe attack the spotlighted Pokémon.	AddBattlerTagAttr
+635	672	Toxic Thread	(none)	Attacks with a thread that poisons and drops Speed.	StatusEffectAttr,StatStageChangeAttr
+636	673	Laser Focus	(none)	Guarantees the next move will be a critical hit.	AddBattlerTagAttr,MessageAttr
+637	674	Gear Up	(none)	Boosts the attacks of those with Plus or Minus.	StatStageChangeAttr
+638	675	Throat Chop	(none)	Chops the throat to disable sound moves for 2 turns.	AddBattlerTagAttr
+639	676	Pollen Puff	(none)	Explodes on foes, but restores ally's HP.	StatusCategoryOnAllyAttr,HealOnAllyAttr
+640	677	Anchor Shot	(none)	Strangles the foe with a chain. The foe can't switch.	AddBattlerTagAttr
+641	678	Psychic Terrain	(none)	The ground turns weird for 8 turns. Blocks priority.	TerrainChangeAttr
+642	679	Lunge	(none)	Lunges at the foe to lower its Attack stat.	StatStageChangeAttr
+643	680	Fire Lash	(none)	Whips the foe with fire lowering its Defense.	HealStatusEffectAttr,StatStageChangeAttr
+644	681	Power Trip	(none)	It hits harder the more stat boosts the user has.	PositiveStatStagePowerAttr
+645	682	Burn Up	(none)	Burns out the user fully removing the Fire type.	HealStatusEffectAttr,HealStatusEffectAttr,AddBattlerTagAttr,RemoveTypeAttr
+646	683	Speed Swap	(none)	Swaps Speed with the foe.	SwapStatAttr
+647	684	Smart Strike	(none)	Hits with an accurate horn that never misses.	
+648	685	Purify	(none)	Cures the foe's status to restore HP.	HealAttr,HealStatusEffectAttr
+649	686	Revelation Dance	(none)	Dances with mystical power. Matches user's first type.	MatchUserTypeAttr
+650	687	Core Enforcer	(none)	Hits with a ray that nullifies the foe's ability.	SuppressAbilitiesIfActedAttr
+651	688	Trop Kick	(none)	An intense kick from the tropics. Lowers Attack.	StatStageChangeAttr
+652	689	Instruct	(none)	Orders the target to use its last move again.	RepeatMoveAttr
+653	690	Beak Blast	(none)	Heats up beak to attack. Burns foe on contact.	BeakBlastHeaderAttr,StatusEffectAttr
+654	691	Clanging Scales	(none)	Makes a big noise with its scales. Drops Defense.	StatStageChangeAttr
+655	692	Dragon Hammer	(none)	Swings its whole body like a hammer to damage.	
+656	693	Brutal Swing	(none)	Violently swings around to hurt everyone nearby.	
+657	694	Aurora Veil	(none)	Weakens all attacks, but only usable with hail.	AddArenaTagAttr
+658	704	Shell Trap	(none)	Sets a shell trap that damages on contact.	HealStatusEffectAttr,AddBattlerTagHeaderAttr
+659	705	Fleur Cannon	(none)	A strong ray that harshly lowers Sp. Attack.	StatStageChangeAttr
+660	706	Psychic Fangs	(none)	Chomps with psychic fangs. Destroys any barriers.	RemoveScreensAttr
+661	707	Stomping Tantrum	(none)	Stomps around angrily. Stronger after a failure.	MovePowerMultiplierAttr
+662	708	Shadow Bone	(none)	Strikes with a haunted bone. Might drop Defense.	StatStageChangeAttr
+663	709	Accelerock	(none)	Hits with a high-speed rock that always goes first.	
+664	710	Liquidation	(none)	Slams the foe with water. Can lower Defense.	StatStageChangeAttr
+665	711	Prismatic Laser	(none)	A high power laser that can't be used next turn.	RechargeAttr,PhotonGeyserCategoryAttr
+666	712	Spectral Thief	(none)	Steals the target's stat boosts, then attacks.	SpectralThiefAttr
+667	713	Sunsteel Strike	(none)	A sun-fueled strike that ignores abilities.	
+668	714	Moongeist Beam	(none)	A moon-powered beam that ignores abilities.	
+669	715	Tearful Look	(none)	The user tears up, dropping Special Attack.	StatStageChangeAttr
+670	716	Zing Zap	(none)	An electrified impact that can cause flinching.	FlinchAttr
+671	717	Nature's Madness	(none)	Halves the foe's HP with the power of nature.	TargetHalfHpDamageAttr
+672	718	Multi-Attack	(none)	An attack that changes with Memories.	FormChangeItemTypeAttr,PhotonGeyserCategoryAttr
+673	720	Mind Blown	(none)	It explodes the user's head to damage everything around.	HealStatusEffectAttr,HalfSacrificialAttr
+674	721	Plasma Fists	(none)	Hits with electrical fists. Normal moves become Electric.	AddArenaTagAttr
+675	722	Photon Geyser	(none)	User's highest attack stat determines its category.	PhotonGeyserCategoryAttr
+676	729	Zippy Zap	(none)	Electric bursts always go first and land a critical hit.	CritOnlyAttr
+677	730	Splishy Splash	(none)	A huge electrified wave that may paralyze the foe.	StatusEffectAttr
+678	731	Floaty Fall	(none)	Floats in air and dives at angle. May cause flinching.	FlinchAttr
+679	732	Pika Papow	(none)	A reliable and strong Electric type attack. Uses best offense.	FriendshipPowerAttr,PhotonGeyserCategoryAttr
+680	733	Bouncy Bubble	(none)	An attack that absorbs all the damage inflicted.	HitHealAttr
+681	734	Buzzy Buzz	(none)	Shoots a jolt of electricity that always paralyzes.	StatusEffectAttr
+682	735	Sizzly Slide	(none)	User cloaked in fire charges. Leaves the foe with a burn.	HealStatusEffectAttr,StatusEffectAttr
+683	736	Glitzy Glow	(none)	Telekinetic force that sets wall, lowering Sp. Atk damage.	AddArenaTagAttr,StatStageChangeAttr
+684	737	Baddy Bad	(none)	Acting badly, attacks. Sets wall, lowering Attack damage.	AddArenaTagAttr,StatStageChangeAttr
+685	738	Sappy Seed	(none)	Giant stalk scatters seeds that drain HP every turn.	LeechSeedAttr
+686	739	Freezy Frost	(none)	Crystal from cold haze hits. Eliminates all stat changes.	ResetStatsAttr
+687	740	Sparkly Swirl	(none)	Wrap foe with whirlwind of scent. Heals party's status.	PartyStatusCureAttr
+688	741	Veevee Volley	(none)	A reliable and strong Normal type attack. Uses best offense.	FriendshipPowerAttr,PhotonGeyserCategoryAttr
+689	742	Double Iron Bash	(none)	The user spins and hits with its arms. May cause flinch.	MultiHitAttr,FlinchAttr
+690	744	Dynamax Cannon	(none)	Fires a strong beam. Deals 2x damage to Mega foes.	MovePowerMultiplierAttr
+691	745	Snipe Shot	(none)	The user ignores effects that draw in moves.	HighCritAttr,BypassRedirectAttr
+692	746	Jaw Lock	(none)	Prevents the user and the target from escaping.	JawLockAttr
+693	747	Stuff Cheeks	(none)	Consumes the user's Berry, then sharply raises Def.	EatBerryAttr,StatStageChangeAttr
+694	748	No Retreat	(none)	Raises all of the user's stats but prevents escape.	StatStageChangeAttr,AddBattlerTagAttr
+695	749	Tar Shot	(none)	Lowers the foe's Speed and makes it weak to Fire.	StatStageChangeAttr,AddBattlerTagAttr
+696	750	Magic Powder	(none)	Magic powder changes the target into a Psychic-type.	ChangeTypeAttr
+697	751	Dragon Darts	(none)	The user attacks twice. Parental Bond boost.	MultiHitAttr
+698	752	Teatime	(none)	All Pokémon have teatime and eat their Berries.	EatBerryAttr
+699	753	Octolock	(none)	Traps the foe to lower Def and Sp. Def fall each turn.	AddBattlerTagAttr
+700	754	Bolt Beak	(none)	Double power if the user moves before the target.	MovePowerMultiplierAttr
+701	755	Fishious Rend	(none)	Double power if the user moves before the target.	MovePowerMultiplierAttr
+702	756	Court Change	(none)	The user swaps effects on either side of the field.	SwapArenaTagsAttr
+703	775	Clangorous Soul	(none)	The user uses some of its HP to raise all its stats.	CutHpStatStageBoostAttr
+704	776	Body Press	(none)	Does more damage the higher the user's Def.	DefAtkAttr
+705	777	Decorate	(none)	Strikes foes with a brush or decorates allies to buff them.	StatStageChangeAttr
+706	778	Drum Beating	(none)	Plays a drum to attack. The foe's Speed is lowered.	StatStageChangeAttr
+707	779	Snap Trap	(none)	Snares the target in a snap trap for four to five turns.	TrapAttr
+708	780	Pyro Ball	(none)	Launches a fiery ball at the target. It may cause a burn.	HealStatusEffectAttr,HealStatusEffectAttr,StatusEffectAttr
+709	781	Behemoth Blade	(none)	Strikes as a sword. It deals 2x damage to Dynamaxed foes.	
+710	782	Behemoth Bash	(none)	Does more damage the higher the user's Def.	
+711	783	Aura Wheel	(none)	Raises Speed to attack. Both Electric-and Dark-type.	StatStageChangeAttr,AuraWheelTypeAttr
+712	784	Breaking Swipe	(none)	Swings its tail to attack. Lowers the Atk of those hit.	StatStageChangeAttr
+713	785	Branch Poke	(none)	The user pokes the target with a pointed branch.	
+714	786	Overdrive	(none)	The user twangs its guitar, causing strong vibrations.	
+715	787	Apple Acid	(none)	Attacks with tart apple acid to lower the foe's Sp. Def.	StatStageChangeAttr
+716	788	Grav Apple	(none)	Drops an apple from above. Lowers the foe's Defense.	StatStageChangeAttr,MovePowerMultiplierAttr
+717	789	Spirit Break	(none)	Attacks with spirit-breaking force. Lowers SpAtk	StatStageChangeAttr
+718	790	Strange Steam	(none)	Emits a strange steam to potentially confuse the foe.	ConfuseAttr
+719	791	Life Dew	(none)	Scatters water to restore the HP of itself and allies.	HealAttr
+720	792	Obstruct	(none)	Protects itself, harshly lowering Def on contact.	ProtectAttr
+721	793	False Surrender	(none)	Bows to stab the foe with hair. It never misses.	
+722	794	Meteor Assault	(none)	Attacks with a thick leek. Can't be used next turn.	RechargeAttr
+723	795	Eternabeam	(none)	Eternatus' strongest move. The user rests next turn.	RechargeAttr
+724	796	Steel Beam	(none)	Fires a beam of steel from its body. It hurts the user.	RecoilAttr
+725	797	Expanding Force	(none)	Power goes up and damages all foes on Psychic Terrain.	MovePowerMultiplierAttr,VariableTargetAttr
+726	798	Steel Roller	(none)	Rolls over the opponent while destroying terrain.	ClearTerrainAttr
+727	799	Scale Shot	(none)	Shoots scales 2 to 5 times. Ups Speed, lowers defense.	StatStageChangeAttr,StatStageChangeAttr,MultiHitAttr
+728	800	Meteor Beam	(none)	A 2-turn move that raises Sp. Attack before attacking.	
+729	801	Shell Side Arm	(none)	Deals better of physical and special damage. May poison.	ShellSideArmCategoryAttr,StatusEffectAttr
+730	802	Mistsplosion	(none)	Hit everything and faint. Powers up on Misty Terrain.	SacrificialAttr,MovePowerMultiplierAttr
+731	803	Grassy Glide	(none)	Gliding on ground, hits. Goes first on Grassy Terrain.	IncrementMovePriorityAttr
+732	804	Rising Voltage	(none)	This move's power doubles when on Electric Terrain.	MovePowerMultiplierAttr
+733	805	Terrain Pulse	(none)	Type and power changes depending on the terrain.	TerrainPulseTypeAttr,MovePowerMultiplierAttr
+734	806	Skitter Smack	(none)	User skitters behind foe to attack. Lowers foe's SpAtk	StatStageChangeAttr
+735	807	Burning Jealousy	(none)	Attacks both foes with a 50% chance to burn boosted foes.	HealStatusEffectAttr,StatusIfBoostedAttr
+736	808	Lash Out	(none)	Increases in damage as the user's stats are lowered	MovePowerMultiplierAttr
+737	809	Poltergeist	(none)	Control foe's item to attack. Fails if foe has no item.	PreMoveMessageAttr
+738	810	Corrosive Gas	(none)	Highly acidic gas melts items held by surrounding Pokémon.	
+739	811	Coaching	(none)	Properly coaches allies to up their Attack and Defense.	StatStageChangeAttr
+740	812	Flip Turn	(none)	Attacks and rushes back to switch with a party Pokémon.	ForceSwitchOutAttr
+741	813	Triple Axel	(none)	A 3-kick attack that gets more powerful with each hit.	MultiHitAttr,MultiHitPowerIncrementAttr
+742	814	Dual Wingbeat	(none)	User slams the target with wings and hits twice in a row.	MultiHitAttr
+743	815	Scorchng Sands	(none)	Throws scorching sand at the target. May leave a burn.	HealStatusEffectAttr,HealStatusEffectAttr,StatusEffectAttr
+744	816	Jungle Healing	(none)	Heals HP and status of itself and allies in battle.	HealAttr,HealStatusEffectAttr
+745	817	Wicked Blow	(none)	Mastering the Dark style, strikes with a critical hit.	CritOnlyAttr
+746	818	Surging Strikes	(none)	Mastering the Water style, strikes with 3 critical hits.	MultiHitAttr,CritOnlyAttr
+747	819	Thunder Cage	(none)	Traps the foe in a cage of electricity for 2 to 5 turns.	TrapAttr
+748	820	Dragon Energy	(none)	The higher the user's HP the more damage caused.	HpPowerAttr
+749	821	Freezing Glare	(none)	Shoots psychic power from the eyes. May frostbite the foe.	StatusEffectAttr
+750	822	Fiery Wrath	(none)	An attack fueled by your wrath. May cause flinching.	FlinchAttr
+751	823	Thunderous Kick	(none)	Uses a lightning-like kick to hit. Lowers foe's Defense.	StatStageChangeAttr
+752	824	Glacial Lance	(none)	Strikes by hurling a blizzard-cloaked icicle lance at a foe.	
+753	825	Astral Barrage	(none)	Strikes by sending a frightful amount of ghosts at a foe.	
+754	826	Eerie Spell	(none)	Attacks with psychic power. Foe's last move has 3 PP cut.	AttackReducePpMoveAttr
+755	5000	Deathroll	flag-tagged-move	Does a deadly roll in water. Ignores target's stat changes.	ConfuseAttr
+756	5001	Excalibur	flag-tagged-move	Double damage on Dragon-types. High critical ratio.	
+757	5002	Aqua Fang	flag-tagged-move	Has 10% flinch chance. Strong Jaw boost.	FlinchAttr
+758	834	Wave Crash	(none)	A life-risking tackle that with 33% recoil damage.	RecoilAttr
+759	5003	Smite	chance-status-on-hit	Attacks from above with strong electricity. Smack Down effect.	StatusEffectAttr
+760	5004	Outburst	bespoke	Severe special damage but makes the user faint.	SacrificialAttr
+761	5005	Seismic Fist	bespoke	A ground-breaking punch. 20% chance to drop Def.	StatStageChangeAttr
+762	5006	Iron Fangs	flag-tagged-move	Chomps with hard fangs. Destroys any barriers.	
+763	5007	Shadow Fangs	flag-tagged-move	A bone-chilling bite. 10% curse chance.	AddBattlerTagAttr
+764	5008	Lovely Bite	flag-tagged-move	Bites the foe with love. 10% chance to infatuate.	AddBattlerTagAttr
+765	5009	Jagged Fangs	flag-tagged-move	Bites aggressively. 10% chance to up Atk.	
+766	5010	Scorched Earth	type-conversion	Precisely burns the ground under the foe. May burn.	HealStatusEffectAttr,BestEffectivenessTypeAttr,StatusEffectAttr
+767	833	Raging Fury	(none)	A rampage of 2 to 3 turns that confuses the user.	HealStatusEffectAttr,FrenzyAttr,MissEffectAttr,NoEffectAttr
+768	5011	Plasma Pulse	flag-tagged-move	Double damage to foes with status problems.	StatusEffectAttr
+769	5012	Primal Beam	bespoke	An strange beam that uses the user's Attack, may rise it.	StatStageChangeAttr
+770	5013	Draconic Fangs	flag-tagged-move	Bites with draconic fangs. May cause flinching.	FlinchAttr
+771	5014	Pixie Beam	flag-tagged-move	A powerfull magic beam 30% chance to drop user SpAtk.	
+772	5015	Pixie Slash	flag-tagged-move	The foe is slashed with a whimsical blade. High Crit ratio.	
+773	5016	Seismic Blade	flag-tagged-move	The foe is slashed with a tectonic blade. High Crit ratio.	
+774	5017	Mountain Chunk	flag-tagged-move	Hurls a chunk of a mountain at the opponent. Can flinch.	FlinchAttr
+775	5018	Archer Shot	flag-tagged-move	Shoots a dead center arrow at the target. Archer boost.	
+776	5019	Frost Brand	flag-tagged-move	The foe is slashed with an icy blade. May inflict frostbite.	
+777	5020	Frost Bolt	flag-tagged-move	Not done yet.	
+778	5021	Glacier Crash	flag-tagged-move	Not done yet.	
+779	5022	Supersonic Shot	flag-tagged-move	An arrow attack. always crits.	
+780	5023	Zephyr Rush	flag-tagged-move	Not done yet.	
+781	5024	Shocking Jab	flag-tagged-move	Not done yet.	StatusEffectAttr
+782	5025	Shocking Edge	flag-tagged-move	Not done yet.	StatusEffectAttr
+783	5026	Lightning Strike	flag-tagged-move	A rapid strike with a lightning bolt, maybe raising Speed.	
+784	5027	Volt Bolt	flag-tagged-move	Not done yet.	
+785	5028	Kinetic Barrage	flag-tagged-move	Throws nearby objects using telekinesis. May Confuse.	ConfuseAttr
+786	5029	Fertile Fangs	flag-tagged-move	User inserts its ingraining fangs. May apply leech seed.	
+787	5030	Scatter Blast	flag-tagged-move	Not done yet.	
+788	5031	Jagged Punch	bespoke	Not done yet.	AddArenaTrapTagAttr
+789	5032	Cutsie Slap	flag-tagged-move	Slaps the foe cutely. May cause infatuation.	AddBattlerTagAttr
+790	5033	Fairy Spheres	flag-tagged-move	Not done yet.	
+791	5034	Bramble Blast	flag-tagged-move	30% chance to apply leech seed. Archer boost.	
+792	5035	Asteroid Shot	flag-tagged-move	Launches a asteroid onto the target. Cannot miss.	
+793	5036	Aqua Bash	flag-tagged-move	A mystical jab strikes the foe. 20% flinch chance.	FlinchAttr
+794	5037	Tectonic Fangs	flag-tagged-move	User inserts its ground shaking fangs. 10% chance to flinch.	FlinchAttr
+795	5038	Cupid Shot	flag-tagged-move	Not done yet.	AddBattlerTagAttr
+796	5039	Clay Dart	flag-tagged-move	Not done yet.	
+797	5040	Diamond Arrow	flag-tagged-move	Not done yet.	
+798	5041	Diamond Blade	flag-tagged-move	Not done yet.	
+799	5042	Venom Bolt	flag-tagged-move	Not done yet.	StatusEffectAttr
+800	5043	Fumigation Bomb	flag-tagged-move	Not done yet.	
+801	5044	Black Magic	chance-status-on-hit	Not done yet.	
+802	5045	Flame Tongue	flag-tagged-move	Not done yet.	HealStatusEffectAttr,StatusEffectAttr
+803	5046	Blazing Arrow	flag-tagged-move	Not done yet.	HealStatusEffectAttr,StatusEffectAttr
+804	5047	Rocket Shot	flag-tagged-move	Not done yet.	
+805	5048	Web Shot	flag-tagged-move	Not done yet.	
+806	5049	Aura Force	flag-tagged-move	Not done yet.	
+807	5050	Draco Missile	flag-tagged-move	Not done yet.	
+808	5051	Lotus Shower	flag-tagged-move	Not done yet.	StatusEffectAttr
+809	5052	Jagged Horns	flag-tagged-move	Not done yet.	FlinchAttr
+810	5053	Blood Shot	bespoke	Makes the target bleed with black magic.	AddBattlerTagAttr
+811	5054	Flash Freeze	bespoke	Drains the heat from the target, causing frostbite.	AddBattlerTagAttr
+812	5055	Phantom Glove	flag-tagged-move	Not done yet.	
+813	5056	Homing Fletch	flag-tagged-move	Not done yet.	
+814	841	Bitter Malice	(none)	Attacks with spine-chilling resentment. May cause frostbite.	StatStageChangeAttr
+815	844	Infernal Parade	(none)	Not done yet.	StatusEffectAttr,MovePowerMultiplierAttr
+816	5057	Devious Shot	flag-tagged-move	Not done yet.	
+817	5058	Starburst	flag-tagged-move	The user crashes a large star onto the opponent. May flinch.	FlinchAttr
+818	5059	Cheap Shot	flag-tagged-move	The user sneaks into the shadows, then attacks.	
+819	5060	Torrent Fist	flag-tagged-move	20% chance to drop speed. Iron Fist boost.	
+820	5061	Star Crash	recoil-or-drain	33% recoil damage.	RecoilAttr
+821	830	Stone Axe	(none)	Deals damage and sets stealth rock. Keen edge.	AddArenaTrapTagHitAttr
+822	5062	Energy Wave	bespoke	Deals damage.	
+823	5063	Fluttering Leaf	bespoke	Deals damage and switches.	ForceSwitchOutAttr
+824	838	Headlong Rush	(none)	Drops Def and SpDef.	StatStageChangeAttr
+825	895	Revival Blessing	(none)	Revives a fainted teammate with 50% HP.	HighCritAttr
+826	5064	Whirling Strikes	flag-tagged-move	Hits 3 times. Each hit does more damage.	
+827	5065	Mind Break	chance-status-on-hit	20% confuse chance.	ConfuseAttr
+828	5066	Wyrm Wind	flag-tagged-move	Hits 2-5 times. Drops SpDef, raises Speed.	
+829	912	Shed Tail	(none)	Uses 50% HP to create substitute and switch out.	OpponentHighHpPowerAttr
+830	5067	Berry Smash	flag-tagged-move	Deals damage. User eats their berry.	
+831	908	Hydro Steam	(none)	The user blasts the target with boiling-hot water.	ProtectAttr
+832	5068	Boiling Flame	bespoke	Deals damage. Does increase damage in rain.	HealStatusEffectAttr,MovePowerMultiplierAttr
+833	843	Triple Arrows	(none)	50% chance to lower Def. 30% chance to flinch. High-crit.	HighCritAttr,StatStageChangeAttr,FlinchAttr
+834	5069	Double Lariat	bespoke	Hits both targets. Silences hit targets.	AddBattlerTagAttr
+835	5070	Leech Blade	flag-tagged-move	Heals 50% damage done.	
+836	5071	Yggdrasil Force	bespoke	Lowers user's Atk and Def.	StatStageChangeAttr
+837	5072	Drain Brain	bespoke	Lowers targets SpAtk. Heals that much HP.	HitHealAttr,StatStageChangeAttr
+838	5073	Psychokinetic Slam	recoil-or-drain	Deals damage. 33% recoil damage.	RecoilAttr
+839	840	Esper Wing	(none)	Deals damage. Drains 50% hp.	HighCritAttr,StatStageChangeAttr,HitHealAttr
+840	898	Mortal Spin	(none)	Deals damage. Removes hazards. Poisons targets.	StatusEffectAttr
+841	5074	Gem Missile	bespoke	+1 priority.	
+842	5075	Rider Kick	flag-tagged-move	Deals damage that can't miss. Ignores target ability.	
+843	895	Aqua Cutter	(none)	20% chance to bleed. High-crit.	HighCritAttr
+844	5076	Inverse Room	bespoke	Reverses type matchups for 5 turns.	AddArenaTagAttr
+845	5077	Blazing Bone	flag-tagged-move	Hits 2-5 times. +1 priority.	HealStatusEffectAttr
+846	5078	Karma	bespoke	Raises SpAtk and SpDef. Lowers Speed.	StatStageChangeAttr,StatStageChangeAttr
+847	918	Chilling Water	(none)	Shoots ice-cold water at the foe. May cause frostbite.	FlinchAttr
+848	5079	Ghastly Echo	flag-tagged-move	Deals damage and switches out, empowring the ally.	
+849	913	Chilly Reception	(none)	Sets hail and switches.	AddBattlerTagAttr
+850	893	Ice Spinner	(none)	Deals damage and removes terrain.	
+851	914	Tidy Up	(none)	Removes hazards. Boosts Atk and Speed.	AddBattlerTagIfBoostedAttr
+852	892	Population Bomb	(none)	Hits 10 times.	AddBattlerTagAttr,RemoveTypeAttr
+853	5080	Raging Souls	bespoke	Sharply lowers user's SpAtk.	StatStageChangeAttr
+854	888	Twin Beam	(none)	Hits twice.	MultiHitAttr
+855	5081	Requiem	flag-tagged-move	10% chance to curse.	AddBattlerTagAttr
+856	890	Armor Cannon	(none)	Lowers user's Atk and Def.	HealStatusEffectAttr,StatStageChangeAttr
+857	891	Bitter Blade	(none)	Heals 50% damage done.	HealStatusEffectAttr,HitHealAttr
+858	5082	Soil Drain	recoil-or-drain	Heals 50% damage done.	HitHealAttr
+859	893	Gigaton Hammer	(none)	Super effective vs Steel. Can't be used twice in a row.	
+860	897	Triple Dive	(none)	Hits 3 times.	StatusEffectAttr
+861	889	Jet Punch	(none)	+1 priority.	RageFistPowerAttr
+862	889	Rage Fist	(none)	+20 base power per time damaged.	RageFistPowerAttr
+863	897	Wicked Torque	(none)	10% chance to sleep.	StatusEffectAttr
+864	896	Blazing Torque	(none)	30% chance to burn.	HealStatusEffectAttr,StatusEffectAttr
+865	898	Noxious Torque	(none)	30% chance to poison.	StatusEffectAttr
+866	900	Magical Torque	(none)	30% chance to confuse.	ConfuseAttr
+867	899	Combat Torque	(none)	30% chance to paralyze	StatusEffectAttr
+868	901	Kowtow Cleave	(none)	Can't miss. High-crit.	
+869	902	Flower Trick	(none)	Can't miss. Always crits.	HitHealAttr,HealStatusEffectAttr,HealStatusEffectAttr,StatusEffectAttr
+870	904	Aqua Step	(none)	Deals damage. Raises speed.	IvyCudgelTypeAttr,HighCritAttr
+871	903	Torch Song	(none)	Deals damage. Raises SpAtk.	AddBattlerTagAttr
+872	894	Glaive Rush	(none)	Deals damage. User takes double damage for rest of turn.	CounterDamageAttr,CounterRedirectAttr
+873	884	Silk Trap	(none)	The user spins a silken trap protects and lowers target speed	StatStageChangeAttr
+874	886	Last Respects	(none)	An avenging attack empowered by lost allies.	StatStageChangeAttr
+875	887	Lumina Crash	(none)	Lowers SpDef with a peculiar light.	
+876	888	Order Up	(none)	The user attacks with elegant poise Boosts stat with Tatsugiri.	MultiHitAttr
+877	890	Spicy Extract	(none)	A spicy extract sharply raises Atk and lowers Def.	HealStatusEffectAttr,StatStageChangeAttr
+878	891	Spin Out	(none)	The user spins furiously by straining its legs. Lowers speed	HealStatusEffectAttr,HitHealAttr
+879	896	Salt Cure	(none)	The user salt cures the target, inflicting damage every turn.	HealStatusEffectAttr,StatusEffectAttr
+880	899	Doodle	(none)	Copies the foe's ability to the user and its ally.	StatusEffectAttr
+881	900	Fillet Away	(none)	The user sharply boosts stats using its own HP.	ConfuseAttr
+882	905	Raging Bull	(none)	Smashes barriers like a raging bull.	
+883	906	Make It Rain	(none)	The user attacks by throwing out a mass of coins Lower's user SPA	TeraMoveCategoryAttr,TeraStarstormTypeAttr,VariableTargetAttr,PhotonGeyserCategoryAttr
+884	907	Psyblade	(none)	The user rends the target with an ethereal blade.	PreMoveMessageAttr,DoublePowerChanceAttr
+885	909	Ruination	(none)	The user summons a ruinous disaster that cuts HP in half.	
+886	910	Collision Course	(none)	Causes an ancient explosion. Deals more damage on weakness.	
+887	911	Electro Drift	(none)	Attacks with future power. Deals more damage on weakness.	MultiHitAttr,PhotonGeyserCategoryAttr
+888	916	Pounce	(none)	The user pounces on the target, lowering their Speed.	AlwaysHitMinimizeAttr,HitsTagForDoubleDamageAttr,MissEffectAttr,NoEffectAttr
+889	917	Trailblaze	(none)	Deals damage and boosts the user's Speed stat.	AddBattlerTagAttr
+890	919	Hyper Drill	(none)	Spins and pierces the target Hits through protect.	StatusEffectAttr,PhotonGeyserCategoryAttr
+891	892	Double Shock	(none)	Unleashes two strong shocks, then loses the Electric-type.	AddBattlerTagAttr,RemoveTypeAttr
+892	894	Comeuppance	(none)	Retaliates against an attacker with great force.	CounterDamageAttr,CounterRedirectAttr
+893	901	Blood Moon	(none)	The user unleashes the spirit from a full red moon.	
+894	885	Axe Kick	(none)	An all-in, reckless kick that might confuse the foe.	StatStageChangeAttr
+895	839	Barb Barrage	(none)	The user launches countless toxic barbs 30% chance to poison	MovePowerMultiplierAttr,StatusEffectAttr
+896	5083	Smashin' Realities	flag-tagged-move	smashes the realities around it. Removes weather and terrain	
+897	5084	Creeping Thorns	bespoke	Thorns surround the foe. Hurts foes on switch in.	AddArenaTrapTagAttr
+898	902	Matcha Gotcha	(none)	Fires a blast of tea. May burn and heals 50% dmg dealt.	HitHealAttr,HealStatusEffectAttr,HealStatusEffectAttr,StatusEffectAttr
+899	903	Syrup Bomb	(none)	An explosion of sugary syrup slows the foe over 3 turns.	AddBattlerTagAttr
+900	904	Ivy Cudgel	(none)	Strikes the foe with an ivy-wrapped cudgel.	IvyCudgelTypeAttr,HighCritAttr
+901	905	Electro Shot	(none)	gathers electricity for a high-voltage shot. +1 SPA	
+902	907	Fickle Beam	(none)	Shoots a strange beam of light that might deal double damage.	PreMoveMessageAttr,DoublePowerChanceAttr
+903	908	Burning Bulwark	(none)	The user's intensely hot fur protects from attacks.	ProtectAttr
+904	909	Thunderclap	(none)	Preempts the foe's attack with a flash of lightning.	
+905	911	Tachyon Cutter	(none)	Launches particle blades at the target twice in a row.	MultiHitAttr,PhotonGeyserCategoryAttr
+906	912	Hard Press	(none)	Crushes quicker foes, nullifying their ability.	OpponentHighHpPowerAttr
+907	913	Dragon Cheer	(none)	Raises crit by one stage for all allies. +2 if DRAGON	AddBattlerTagAttr
+908	914	Alluring Voice	(none)	Attacks the target using its angelic voice. May confuse.	AddBattlerTagIfBoostedAttr
+909	910	Mighty Cleave	(none)	Wields a light blade. Hits through protect.	
+910	915	Temper Flare	(none)	Attacks desperately, Doubles dmg if it missed the previous turn	HealStatusEffectAttr,MovePowerMultiplierAttr
+911	916	Supercell Slam	(none)	Tackles with its shock body. Hurts on miss.	AlwaysHitMinimizeAttr,HitsTagForDoubleDamageAttr,MissEffectAttr,NoEffectAttr
+912	917	Psychic Noise	(none)	Attacks with sound waves. Target can't heal.	AddBattlerTagAttr
+913	918	Upper Hand	(none)	Deals damage and flinches if the target uses a prio. move.	FlinchAttr
+914	919	Malignant Chain	(none)	The user pours toxins into the target. Badly poisons the target	StatusEffectAttr,PhotonGeyserCategoryAttr
+915	849	Lunar Blessing	(none)	Heals HP and status of itself and allies in battle.	HealAttr,HealStatusEffectAttr
+916	835	Chloroblast	(none)	Deal powerful damage. Take 50% max HP damage.	RecoilAttr
+917	828	Psyshield Bash	(none)	Deals damage. Raises Defense by 1 stage.	StatStageChangeAttr
+918	845	Ceaseless Edge	(none)	Deals damage. Applies spikes.	AddArenaTrapTagHitAttr
+919	837	Victory Dance	(none)	Raises Attack, Defense, and Speed by 1 stage.	StatStageChangeAttr
+920	846	Bleakwind Storm	(none)	Attacks with savage, roaring winds. Sets tailwind.	StormAccuracyAttr,StatStageChangeAttr,PhotonGeyserCategoryAttr
+921	847	Wildbolt Storm	(none)	Savagely attacks the foe with a thunderous tempest. Sets rain.	StormAccuracyAttr,StatusEffectAttr,PhotonGeyserCategoryAttr
+922	848	Sandsear Storm	(none)	Attacks with searing winds and hot sand. Sets sandstorm.	StormAccuracyAttr,StatusEffectAttr,PhotonGeyserCategoryAttr
+923	831	Springtide Storm	(none)	Attacks with winds of love and hate. Sets fairy terrain.	StatStageChangeAttr,PhotonGeyserCategoryAttr
+924	827	Dire Claw	(none)	Slices the foe. Might paralyze, poison, or bleed.	MultiStatusEffectAttr
+925	842	Shelter	(none)	Sharply raises the Defense of the user and their partner.	StatStageChangeAttr
+926	5085	Wild Swing	flag-tagged-move	Takes a mighty swing that forces the foe to retreat.	
+927	5086	Femur Breaker	flag-tagged-move	The foe is struck fearsomely on the legs. Paralyzes the target.	
+928	5087	Squeaky Hammer	flag-tagged-move	The user hits the opponent with an cute sounding attack.	
+929	5088	Primitive Strike	flag-tagged-move	A slow but mighty strike from the ancient past.	
+930	5089	Smashing Pumpkins	flag-tagged-move	Smashes the foe with a seed-filled pumpkin.	
+931	5090	Airborne Slam	flag-tagged-move	Slams the user, always aiming for the head. 20% chance to confuse.	ConfuseAttr
+932	5091	Spine Breaker	chance-status-on-hit	The foe is struck fearsomely on the back. 30% chance to paralyze.	StatusEffectAttr
+933	5092	Crackle Slam	flag-tagged-move	Strikes with a conductive hammer. Super-effective vs Steel.	
+934	5093	Squall Hammer	flag-tagged-move	Hammers the foe with winds that might remove hazards.	
+935	5094	Megaton Hammer	bespoke	A devistating blow delivered with a heavy weapon.	
+936	5095	Battering Ram	flag-tagged-move	Charges its whole body forwards with the force of a hammer.	
+937	5096	Pitfall	flag-tagged-move	An overhead strike that attempts to bury the opponent.	
+938	5097	Viral Strike	flag-tagged-move	Slams the foe and transfers the user's status.	
+939	5098	Shadow Hammer	recoil-or-drain	The user forms a part of their body into a hammer and strikes.	RecoilAttr
+940	5099	Bonk	flag-tagged-move	Strikes the foe on the head, possibly causing drowsiness.	
+941	5100	Molten Strike	flag-tagged-move	Slams the foe like a molten hammer, but lowers Speed.	HealStatusEffectAttr
+942	5101	Mirage Slam	flag-tagged-move	A psychedelic slam that hits again in the Future.	
+943	5102	Earthsplitter	flag-tagged-move	A might slam that can lower defense.	
+944	5103	Beetle Bash	flag-tagged-move	Attacks with a beetle-like hammer. May confuse.	
+945	5104	Pebble Shower	chance-status-on-hit	20% chance to flinch. Hits both targets.	FlinchAttr
+946	5105	Rapid River	flag-tagged-move	Hits twice. Mega Launcher boost.	
+947	5106	Toxic Needles	chance-status-on-hit	Hits 2-5 times. 10% chance to poison.	StatusEffectAttr
+948	5107	Smolder Bash	flag-tagged-move	A scorching jab that has a 10% chance to burn.	HealStatusEffectAttr,StatusEffectAttr
+949	5108	Beatdown	bespoke	Hits 2-5 times with an attack flurry.	MultiHitAttr
+950	5109	Eerie Fog	bespoke	An unnatural fog descends, draining stat boosts.	WeatherChangeAttr
+951	5110	Mystic Dance	bespoke	Not implemented.	StatStageChangeAttr
+952	5111	Relentless Clobber	flag-tagged-move	Hits 2-5 times with an attack flurry.	
+953	5112	Popping Mayhem	chance-status-on-hit	Hits 2-5 times and can burn.	HealStatusEffectAttr,StatusEffectAttr
+954	5113	Kilobite	bespoke	Rushes forward and bites the foe's weak spot.	StatStageChangeAttr
+955	5114	Tangling Husk	bespoke	Slows attackers while avoiding damage from non-Fire moves.	AddBattlerTagAttr
+956	5115	Rip and Tear	chance-status-on-hit	The user tears into the foe with its fangs.	
+957	5116	Bravado	conditional-damage	Doubles damage if burned, paralyzed, or poisoned.	MovePowerMultiplierAttr
+958	5117	Terror Charge	chance-status-on-hit	A frightening headbutt that may bleed or fear.	
+959	5118	Terror Locks	flag-tagged-move	Cut the foe with long, black hair.	
+960	5119	Dream Invasion	chance-status-on-hit	Strikes through dreams, hitting sleeping foes hard.	AddBattlerTagAttr
+961	906	Tera Starstorm	(none)	Strikes both foes with a rain of crystals.	TeraMoveCategoryAttr,TeraStarstormTypeAttr,VariableTargetAttr,PhotonGeyserCategoryAttr
+962	5120	Sparkling Barrage	bespoke	Hits 3 Times with light rays.	MultiHitAttr
+963	5121	Spectral Serenade	bespoke	Not Implemented.	AddBattlerTagAttr
+964	5122	Merculight	bespoke	Evades attacks and paralyzes the attacker.	AddBattlerTagAttr
+965	5123	Big Bang	chance-status-on-hit	Does Damage. Small burn chance.	StatusEffectAttr
+966	5124	Spectral Flame	bespoke	Emits a flame that moves as if alive and inflicts burn.	StatusEffectAttr
+967	5125	Trepidation	bespoke	The foe falls into despair and misses all Psychic moves.	FlinchAttr
+968	5126	Astral Hand	flag-tagged-move	Projects a fist to strike the foe.	
+969	5127	Fetch	bespoke	The user runs off the field in search of its lost item.	ForceSwitchOutAttr
+970	5128	Transmute	bespoke	Strikes the foe, remaking the user's item on KO.	
+971	5129	Clear Skies	bespoke	Clears the weather and prevents new weather.	ClearWeatherAttr,ClearWeatherAttr,ClearWeatherAttr,ClearWeatherAttr,ClearWeatherAttr,ClearWeatherAttr,ClearWeatherAttr,ClearWeatherAttr,ClearWeatherAttr
+972	5130	Ready or Not	chance-status-on-hit	Hides on the first turn and then surprises the foe.	FlinchAttr
+973	5131	Giant Gale	flag-tagged-move	Strikes the foe with a mighty gale, but lowers Speed.	
+974	5132	Vexing Void	bespoke	A terrifying void engulfs the foe.	StatStageChangeAttr
+975	5133	Eclipse	bespoke	The darkness within erupts from the user for heavy damage.	RemoveTypeAttr
+976	5134	Take Flight	flag-tagged-move	Blasts the foe with wind and takes to the sky.	
+977	5135	Caltrops	bespoke	Spreads dangerous spikes that inflict bleeding.	AddArenaTrapTagAttr
+978	850	Take Heart	(none)	Steadies itself, healing its status and boosting Special.	StatStageChangeAttr,HealStatusEffectAttr
+979	5136	Safe Passage	bespoke	Guides an ally onto the field, shielding them from harm.	ForceSwitchOutAttr
+980	5137	Esper Waltz	flag-tagged-move	A mesmerizing waltz that may raise Special Attack.	
+981	5138	Zap Jive	flag-tagged-move	An electrifying dance that may raise Speed.	
+982	5139	Hex Trot	flag-tagged-move	A lively yet haunting dance that may raise Speed.	
+983	836	Mountain Gale	(none)	A bone chilling wind buffets foes. May flinch.	FlinchAttr
+984	5140	Bad Egg	chance-status-on-hit	Throws an egg filled with toxins. Poisons on hit.	StatusEffectAttr
+985	832	Mystical Power	(none)	Strikes with a strange power that empowers the user.	StatStageChangeAttr,PhotonGeyserCategoryAttr
+986	5141	Dragon Jab	flag-tagged-move	Jabs with a horn. can bleed on hit.	
+987	5142	Icicle Impale	flag-tagged-move	Jabs with a horn. May lower defense.	
+988	5143	Toxic Plunge	chance-status-on-hit	Dives into a pool of poison then strikes on the next turn.	StatusEffectAttr
+989	5144	Showtime	bespoke	Sets the stage with a Magic Room then bows out.	ForceSwitchOutAttr
+990	5145	Banished Power	bespoke	Strikes with a forbidden power that empowers the user.	RaiseHighestOffenseDefenseStatAttr
+991	5146	Triple Tremor	bespoke	Strikes with three intensifying shockwaves.	MultiHitAttr,MultiHitPowerIncrementAttr
+992	5147	Fire Glaive	flag-tagged-move	The user strikes with a white hot horn.	HealStatusEffectAttr
+993	5148	Depletion Beam	flag-tagged-move	Attacks with metallic power. Foe's last move has 3 PP cut.	
+994	5149	One-Inch Punch	flag-tagged-move	Picks a weak spot and then strikes with immense force.	
+995	5150	Berserker Horn	flag-tagged-move	Spins its body like a drill. High critical-hit ratio.	
+996	5151	Oni Fist	flag-tagged-move	An unavoidable punch that is thrown from shadows.	
+997	5152	Insect Impact	flag-tagged-move	A punch that may drop the target's defense stat.	
+998	5153	Lightning Bullet	flag-tagged-move	Shoots a powerful energy projectile that may paralyze.	StatusEffectAttr
+999	5154	Metallic Melody	bespoke	Hits the body rhythmically to damage the opponent with sound.	
+1000	5155	Blue Moon	bespoke	The user unleashes the spirit from a full blue moon.	
+1001	5156	Five-Star Fury	flag-tagged-move	Repeatedly punches the foe 2 to 5 times. +1 priority.	
+1002	5157	Tsunami Hammer	flag-tagged-move	Super effective vs Water. Can't be used twice in a row.	
+1003	5158	Septic Switch	bespoke	Supress abilities then switch.	SuppressAbilitiesAttr,ForceSwitchOutAttr
+1004	5159	Waterlog	chance-status-on-hit	Target moves last and may be drenched.	
+1005	5160	Incite	bespoke	Adds dark type and enrages foe.	AddTypeAttr
+1007	5161	Jetstream Burst	bespoke	Strikes by using flurries of wind.	
+1008	5162	Sky Quake	bespoke	Strikes with harsh winds.	
+1006	5163	Toxic Terrain	bespoke	Boosts Poison and damages mons for 8 turns.	TerrainChangeAttr
+1009	5164	Sunstrike (N)	bespoke	Strikes with harsh winds.	HealStatusEffectAttr,IgnoreOpponentStatStagesAttr
+1010	5165	Tempest Storm (N)	bespoke	Sets a thundershock storm.	WeatherChangeAttr
+1011	5166	Prism Blast	chance-status-on-hit	Deals damage, lowers accuracy, and may confuse.	ConfuseAttr
+1012	5167	Seismic Slam	recoil-or-drain	Deals damage. 33% recoil damage.	RecoilAttr
+1013	5168	Chiller	chance-status-on-hit	Hits 3 times with snowballs.	
+1014	5169	Spread Bomb	chance-status-on-hit	Hits everyone else. 30% Burn chance.	HealStatusEffectAttr,StatusEffectAttr
+1015	5170	Ball Toss	chance-status-on-hit	A ball attack. 20% flinch.	FlinchAttr
+1016	5171	Party Favors	bespoke	Damages the foe and heals allies.	HealOnAllyAttr
+1017	5172	Shot Put	bespoke	A ball attack. 30% speed drop.	StatStageChangeAttr
+1018	5173	Block Dropper	chance-status-on-hit	A ball attack. 20% flinch.	FlinchAttr
+1019	5174	Saber Slashes	type-conversion	A ball attack. 20% flinch.	HealStatusEffectAttr,BestEffectivenessTypeAttr,FlinchAttr
+1020	5175	Dragon Dash	bespoke	+1 priority attack.	HighCritAttr
+1021	5176	Pocket Sand	bespoke	+1 priority, 10% acc drop.	StatStageChangeAttr
+1022	5177	Concoction	bespoke	Damages and uses a berry.	EatBerryAttr
+1023	5178	Hacksaw	bespoke	Super effective vs Steel.	MovePowerMultiplierAttr
+1024	5179	Godspeed	bespoke	Super effective vs Steel.	MovePowerMultiplierAttr
+1025	5180	Psycho Wave	recoil-or-drain	A life-risking energy with 50% recoil.	RecoilAttr
+1026	5181	Atomic Fire	recoil-or-drain	A life-risking energy with 50% recoil.	HealStatusEffectAttr,RecoilAttr
+1027	5182	Rain Flush	bespoke	A powerful rain attack. Lowers the user's defenses.	StatStageChangeAttr
+1028	5183	Ice Wall	bespoke	Sets reflect with ice.	AddArenaTagAttr
+1029	5184	Obscured Shot	bespoke	Strikes first if the foe is preparing an attack.	MoveConditionAttr
+1030	5185	Blitz Arrow	flag-tagged-move	20% flinch chance. arrow based.	FlinchAttr
+1031	5186	Rumble Kick	flag-tagged-move	May down attack. Striker.	

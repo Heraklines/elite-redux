@@ -47,9 +47,13 @@ describe("ER_COMPOSITE_PARTS (D3b): side-table coverage", () => {
     expect(fullyResolved.length).toBeGreaterThanOrEqual(100);
   });
 
-  it("resolves ≥ 190 composites with at least one named part (≥ 1 part wired)", () => {
+  it("resolves ≥ 180 composites with at least one named part (≥ 1 part wired)", () => {
+    // The composite side-table shrank from ~194 to 188 as composites whose only
+    // extra was a non-vanilla effect (e.g. 909 Lightsaber) were reclassified to
+    // `bespoke` and their vestigial parts entries removed. All 188 surviving
+    // entries carry ≥ 1 named part.
     const withAtLeastOnePart = Object.values(ER_COMPOSITE_PARTS).filter(e => e.parts.length > 0);
-    expect(withAtLeastOnePart.length).toBeGreaterThanOrEqual(190);
+    expect(withAtLeastOnePart.length).toBeGreaterThanOrEqual(180);
   });
 
   it("As One (er id 266) resolves to Unnerve (127) + Chilling Neigh (264)", () => {
@@ -80,8 +84,12 @@ describe("ER_COMPOSITE_PARTS (D3b): side-table coverage", () => {
     expect(ids).toContain(265);
   });
 
-  it("captures the rider sentence on composites that have one (e.g. er id 971)", () => {
-    const entry = ER_COMPOSITE_PARTS[971];
+  it("captures the rider sentence on composites that have one (e.g. er id 969)", () => {
+    // 969 (Intimidate + Scare + "10% burn chance on non contact moves") is a
+    // composite-vanilla-mashup whose extra rider sentence is captured as
+    // `riderText`. (Composites whose only extra is a non-vanilla effect get
+    // reclassified to `bespoke`, so the surviving rider examples live here.)
+    const entry = ER_COMPOSITE_PARTS[969];
     expect(entry).toBeDefined();
     if (!entry) {
       return;

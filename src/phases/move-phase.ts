@@ -892,11 +892,14 @@ export class MovePhase extends PokemonPhase {
 
     globalScene.phaseManager.unshiftNew("MoveEffectPhase", user.getBattlerIndex(), targets, move, this.useMode);
 
-    // Handle Dancer, which triggers immediately after a move is used (rather than waiting on `this.end()`).
-    // Note the MoveUseMode check here prevents an infinite Dancer loop.
+    // Handle Dancer (and ER copy-by-filter abilities like Parroting/Lunar
+    // Affinity), which trigger immediately after a move is used. The trigger
+    // now fires for ALL moves; each PostMoveUsed attr gates itself in canApply
+    // (vanilla Dancer checks the DANCE flag). The MoveUseMode check prevents an
+    // infinite copy loop.
     // TODO: This needs to go at the end of `MoveEffectPhase` to check move results
     const dancerModes: MoveUseMode[] = [MoveUseMode.INDIRECT, MoveUseMode.REFLECTED] as const;
-    if (this.move.getMove().hasFlag(MoveFlags.DANCE_MOVE) && !dancerModes.includes(this.useMode)) {
+    if (!dancerModes.includes(this.useMode)) {
       for (const pokemon of inSpeedOrder(ArenaTagSide.BOTH)) {
         applyAbAttrs("PostMoveUsedAbAttr", { pokemon, move: this.move, source: user, targets });
       }

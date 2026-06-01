@@ -2314,6 +2314,14 @@ export class PokemonAddMoveSlotModifier extends ConsumablePokemonModifier {
   /** The maximum number of bonus move slots a single Pokémon may hold. */
   public static readonly MAX_BONUS_SLOTS = 1;
 
+  /** Index into {@linkcode PlayerPokemon.getLearnableLevelMoves} chosen by the player. */
+  public readonly levelMoveIndex: number;
+
+  constructor(type: ModifierType, pokemonId: number, levelMoveIndex: number) {
+    super(type, pokemonId);
+    this.levelMoveIndex = levelMoveIndex;
+  }
+
   override shouldApply(playerPokemon?: PlayerPokemon): boolean {
     return (
       super.shouldApply(playerPokemon)
@@ -2325,7 +2333,21 @@ export class PokemonAddMoveSlotModifier extends ConsumablePokemonModifier {
     if (playerPokemon.customPokemonData.bonusMoveSlots >= PokemonAddMoveSlotModifier.MAX_BONUS_SLOTS) {
       return false;
     }
+    // Open the 5th slot FIRST so the subsequent learn fills it without prompting
+    // the player to forget an existing move.
     playerPokemon.customPokemonData.bonusMoveSlots += 1;
+
+    // Teach the player-chosen move from the learnable pool into the new slot.
+    const learnable = playerPokemon.getLearnableLevelMoves();
+    const moveId = learnable[this.levelMoveIndex];
+    if (moveId != null) {
+      globalScene.phaseManager.unshiftNew(
+        "LearnMovePhase",
+        globalScene.getPlayerParty().indexOf(playerPokemon),
+        moveId,
+        LearnMoveType.MEMORY,
+      );
+    }
     return true;
   }
 }

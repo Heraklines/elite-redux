@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getTypeRgb } from "#data/type";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
@@ -54,6 +55,8 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   protected lastName: string | null;
   protected lastTeraType: PokemonType;
   protected lastStatus: StatusEffect;
+  /** Last status-indicator frame shown (primary status name or an ER tag label). */
+  protected lastStatusFrame: string | null = null;
   protected lastHp: number;
   protected lastMaxHp: number;
   protected lastHpFrame: string | null;
@@ -441,14 +444,30 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
    * @param xOffset - The offset from the name text
    */
   updateStatusIcon(pokemon: Pokemon, xOffset = 0) {
-    if (this.lastStatus !== (pokemon.status?.effect || StatusEffect.NONE)) {
-      this.lastStatus = pokemon.status?.effect || StatusEffect.NONE;
-
-      if (this.lastStatus !== StatusEffect.NONE) {
-        this.statusIndicator.setFrame(StatusEffect[this.lastStatus].toLowerCase());
+    // The primary status (BRN/PSN/PAR/…) takes precedence; when there is none,
+    // surface the ER status-tag labels (bleed/frostbite/fear) in the same slot
+    // so they read like vanilla statuses in combat.
+    const status = pokemon.status?.effect || StatusEffect.NONE;
+    let frame: string | null = status === StatusEffect.NONE ? null : StatusEffect[status].toLowerCase();
+    if (frame === null) {
+      if (pokemon.getTag(BattlerTagType.ER_BLEED)) {
+        frame = "bleed";
+      } else if (pokemon.getTag(BattlerTagType.ER_FROSTBITE)) {
+        frame = "frostbite";
+      } else if (pokemon.getTag(BattlerTagType.ER_FEAR)) {
+        frame = "fear";
       }
+    }
 
-      this.statusIndicator.setVisible(!!this.lastStatus).setPositionRelative(this.nameText, xOffset, 11.5);
+    if (this.lastStatusFrame !== frame) {
+      this.lastStatusFrame = frame;
+      this.lastStatus = status;
+      if (frame !== null) {
+        // setFrame tolerates a missing frame (Phaser logs and falls back), so
+        // localized `statuses` atlases without the ER labels won't throw.
+        this.statusIndicator.setFrame(frame);
+      }
+      this.statusIndicator.setVisible(frame !== null).setPositionRelative(this.nameText, xOffset, 11.5);
     }
   }
 

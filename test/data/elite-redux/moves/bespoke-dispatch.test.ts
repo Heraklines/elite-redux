@@ -18,7 +18,11 @@
 // matching what the init layer does for `bespoke` rows.
 // =============================================================================
 
-import { dispatchMoveArchetype, MoveConditionAttr } from "#data/elite-redux/move-archetype-dispatcher";
+import {
+  dispatchMoveArchetype,
+  MoveConditionAttr,
+  RaiseHighestOffenseDefenseStatAttr,
+} from "#data/elite-redux/move-archetype-dispatcher";
 import {
   AddArenaTagAttr,
   AddArenaTrapTagAttr,
@@ -26,6 +30,7 @@ import {
   HitHealAttr,
   MovePowerMultiplierAttr,
   MultiHitAttr,
+  MultiHitPowerIncrementAttr,
   RemoveTypeAttr,
   SacrificialAttr,
   StatStageChangeAttr,
@@ -38,6 +43,7 @@ import { MoveFlags } from "#enums/move-flags";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
+import { WeatherType } from "#enums/weather-type";
 import { describe, expect, it } from "vitest";
 
 describe("dispatchMoveArchetype('bespoke', null, erMoveId): per-id wiring", () => {
@@ -176,11 +182,13 @@ describe("dispatchMoveArchetype('bespoke', null, erMoveId): per-id wiring", () =
     expect((attr as unknown as { removedType: PokemonType }).removedType).toBe(PokemonType.DARK);
   });
 
-  it("er id 991 (Triple Tremor) wires MultiHitAttr (THREE)", () => {
+  it("er id 991 (Triple Tremor) wires MultiHitAttr (THREE) + MultiHitPowerIncrement", () => {
+    // "Hits 3 times, power increasing per hit" (Triple Kick / Triple Axel shape).
     const res = dispatchMoveArchetype("bespoke", null, 991);
     expect(res.skipReason).toBeNull();
-    expect(res.attrs).toHaveLength(1);
+    expect(res.attrs).toHaveLength(2);
     expect(res.attrs[0]).toBeInstanceOf(MultiHitAttr);
+    expect(res.attrs[1]).toBeInstanceOf(MultiHitPowerIncrementAttr);
   });
 
   it("er id 999 (Metallic Melody) wires SOUND_BASED flag", () => {
@@ -250,14 +258,13 @@ describe("dispatchMoveArchetype('bespoke', null, erMoveId): per-id wiring", () =
     expect(stat.selfTarget).toBe(false);
   });
 
-  it("er id 990 (Banished Power) wires StatStageChangeAttr(SpAtk +1 self)", () => {
+  it("er id 990 (Banished Power) wires RaiseHighestOffenseDefenseStat", () => {
+    // "Raises the user's highest attack or defense by 1" (highest of
+    // ATK/DEF/SPATK/SPDEF, resolved at apply-time) — not a fixed SpAtk boost.
     const res = dispatchMoveArchetype("bespoke", null, 990);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(1);
-    const stat = res.attrs[0] as StatStageChangeAttr;
-    expect(stat.stats).toEqual([Stat.SPATK]);
-    expect(stat.stages).toBe(1);
-    expect(stat.selfTarget).toBe(true);
+    expect(res.attrs[0]).toBeInstanceOf(RaiseHighestOffenseDefenseStatAttr);
   });
 
   it("er id 950 (Eerie Fog) wires WeatherChangeAttr(FOG)", () => {
@@ -300,11 +307,16 @@ describe("dispatchMoveArchetype('bespoke', null, erMoveId): per-id wiring", () =
     expect((attr as MoveConditionAttr).getCondition()).toBe(failIfTargetNotAttackingCondition);
   });
 
-  it("er id 844 (Inverse Room) is deferred — INVERSE_ROOM arena tag missing in vanilla", () => {
+  it("er id 844 (Inverse Room) wires AddArenaTagAttr(INVERSE_ROOM, 5 turns)", () => {
+    // Now wired: the ER INVERSE_ROOM arena tag exists and reverses type
+    // matchups field-wide for 5 turns (applied in getTypeDamageMultiplier).
     const res = dispatchMoveArchetype("bespoke", null, 844);
-    expect(res.skipReason).toMatch(/Inverse Room/);
-    expect(res.attrs).toHaveLength(0);
-    expect(res.flags).toBe(0);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    const attr = res.attrs[0] as AddArenaTagAttr;
+    expect(attr).toBeInstanceOf(AddArenaTagAttr);
+    expect(attr.tagType).toBe(ArenaTagType.INVERSE_ROOM);
+    expect(attr.turnCount).toBe(5);
   });
 
   it("er id 970 (Transmute) is deferred — needs item-regen primitive", () => {
@@ -313,10 +325,14 @@ describe("dispatchMoveArchetype('bespoke', null, erMoveId): per-id wiring", () =
     expect(res.attrs).toHaveLength(0);
   });
 
-  it("er id 1010 (Tempest Storm) is deferred — needs per-turn-damage storm arena tag", () => {
+  it("er id 1010 (Tempest Storm) wires WeatherChangeAttr(TEMPEST_STORM)", () => {
+    // Now wired: the ER TEMPEST_STORM weather exists (Sandstorm/Hail-shaped
+    // chip storm) and is set by the move.
     const res = dispatchMoveArchetype("bespoke", null, 1010);
-    expect(res.skipReason).toMatch(/Tempest Storm/);
-    expect(res.attrs).toHaveLength(0);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(1);
+    expect(res.attrs[0]).toBeInstanceOf(WeatherChangeAttr);
+    expect((res.attrs[0] as WeatherChangeAttr).weatherType).toBe(WeatherType.TEMPEST_STORM);
   });
 
   it("unwired ER bespoke id falls through to generic SKIP_BESPOKE", () => {

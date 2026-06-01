@@ -38,7 +38,9 @@ import {
   type ErPartyMemberRegistered,
   type ErTrainerRegistryEntry,
 } from "#data/elite-redux/init-elite-redux-trainers";
-import { findErTrainersForType, selectErRoster } from "#data/elite-redux/er-trainer-overlay";
+import { type ErRosterTier, findErTrainersForType, selectErRoster } from "#data/elite-redux/er-trainer-overlay";
+import { ER_ITEM_CONVERT_CHANCE, resolveErTrainerItem } from "#data/elite-redux/er-trainer-item-map";
+import type { PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { Nature } from "#enums/nature";
 import { TrainerSlot } from "#enums/trainer-slot";
 import type { EnemyPokemon } from "#field/pokemon";
@@ -55,6 +57,13 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 let TRAINER_CACHE: WeakMap<Trainer, ErTrainerRegistryEntry | null> = new WeakMap();
 
 /**
+ * The ER held-item id the roster member carried, stashed per generated enemy so
+ * `applyErTrainerHeldItems` (run after PokeRogue's baseline item roll) can apply
+ * the soft ER → PokeRogue item conversion.
+ */
+const ER_ITEM_BY_POKEMON = new WeakMap<EnemyPokemon, number>();
+
+/**
  * Inspect the live Trainer and decide which ER roster (if any) drives
  * its party. Side-effect: caches the choice on the Trainer instance so
  * downstream calls for the same trainer return the same registry entry.
@@ -69,11 +78,34 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
   }
   const trainerType = trainer.config.trainerType;
   const candidates = findErTrainersForType(trainerType);
-  // First candidate. Future enhancement: seed off `battle.waveIndex` so
-  // the same wave deterministically picks the same ER trainer.
-  const choice = candidates.length > 0 ? candidates[0] : null;
+  // Seed the pick off the wave index so EVERY ER trainer of a class is reachable
+  // across a run (rotating through them), not just the first. Deterministic per
+  // wave; cached per Trainer instance so all party members agree.
+  let choice: ErTrainerRegistryEntry | null = null;
+  if (candidates.length > 0) {
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
+    choice = candidates[wave % candidates.length];
+  }
   TRAINER_CACHE.set(trainer, choice);
   return choice;
+}
+
+/**
+ * Pick the ER roster tier for the current wave so team size + difficulty scale
+ * with PokeRogue's curve: easy rosters early, the full (insane/hell) rosters at
+ * boss-tier waves. Boss waves are every 10th wave (PokeRogue's classic cadence)
+ * or any trainer flagged as a boss/major encounter.
+ */
+export function pickTierForWave(trainer: Trainer): ErRosterTier {
+  const wave = globalScene.currentBattle?.waveIndex ?? 1;
+  const isBoss = trainer.config.isBoss || wave % 10 === 0;
+  if (isBoss || wave >= 100) {
+    return "hell";
+  }
+  if (wave >= 40) {
+    return "insane";
+  }
+  return "party";
 }
 
 /**
@@ -118,8 +150,8 @@ export function applyErRosterOverride(trainer: Trainer, index: number): EnemyPok
   if (erTrainer === null) {
     return null;
   }
-  // Tier selection: fixed to "party" until a difficulty flag exists.
-  const roster: readonly ErPartyMemberRegistered[] = selectErRoster(erTrainer, "party");
+  // Tier scales with the wave (easy early → full insane/hell roster at bosses).
+  const roster: readonly ErPartyMemberRegistered[] = selectErRoster(erTrainer, pickTierForWave(trainer));
   if (index >= roster.length) {
     return null;
   }
@@ -148,8 +180,69 @@ export function applyErRosterOverride(trainer: Trainer, index: number): EnemyPok
     enemy.moveset = moves;
     enemy.summonData.moveset = moves;
   }
+  // Stash the ER held-item id; the soft conversion runs after PokeRogue's
+  // baseline trainer item roll (see applyErTrainerHeldItems).
+  ER_ITEM_BY_POKEMON.set(enemy, member.itemId);
   enemy.generateName();
   return enemy;
+}
+
+/**
+ * After PokeRogue rolls its baseline trainer held items, apply the soft ER
+ * conversion: with {@linkcode ER_ITEM_CONVERT_CHANCE} probability, if the ER
+ * roster member held a translatable competitive item, give the mapped
+ * PokeRogue held item. Balls / berries / consumables / unmapped items are left
+ * to the baseline roll. (Recreated ER-only items and mega-stone force-evolves
+ * are layered on separately.)
+ */
+export function applyErTrainerHeldItems(party: readonly EnemyPokemon[]): void {
+  for (const enemy of party) {
+    const itemId = ER_ITEM_BY_POKEMON.get(enemy);
+    if (itemId === undefined) {
+      continue;
+    }
+    const res = resolveErTrainerItem(itemId);
+    if (!res) {
+      continue; // balls / berries / consumables / unmapped — baseline roll stands
+    }
+    if (res.kind === "mega") {
+      // Mega stone → force the holder's Mega form (always — it's a boss mon).
+      // The fitting held items are whatever PokeRogue's baseline roll already
+      // gave it (we don't strip those).
+      forceErMega(enemy);
+      continue;
+    }
+    // Soft conversion: only sometimes override the baseline roll with the
+    // ER-faithful item.
+    if (enemy.randBattleSeedInt(100) >= ER_ITEM_CONVERT_CHANCE * 100) {
+      continue;
+    }
+    const modifier = res.make().newModifier(enemy) as PokemonHeldItemModifier | null;
+    if (modifier) {
+      globalScene.addEnemyModifier(modifier, true, true);
+    }
+  }
+}
+
+/**
+ * Force an ER trainer mon that held a Mega Stone into its Mega form (boss
+ * treatment). Defensive: only changes form if the species actually has a Mega
+ * form registered — otherwise no-op.
+ */
+function forceErMega(enemy: EnemyPokemon): void {
+  const forms = enemy.species.forms ?? [];
+  const megaIndex = forms.findIndex(f => /mega/i.test(f.formKey));
+  if (megaIndex <= 0 || enemy.formIndex === megaIndex) {
+    return;
+  }
+  enemy.formIndex = megaIndex;
+  // Keep the ability slot in range for the new form.
+  const abilityCount = enemy.getSpeciesForm().getAbilityCount();
+  if (enemy.abilityIndex >= abilityCount) {
+    enemy.abilityIndex = abilityCount - 1;
+  }
+  enemy.calculateStats();
+  enemy.generateName();
 }
 
 /**

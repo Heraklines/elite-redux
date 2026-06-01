@@ -67,6 +67,7 @@ import type { AbAttrBaseParams } from "#types/ability-types";
 export type EntryEffect =
   | EntryEffectSetWeather
   | EntryEffectSetTerrain
+  | EntryEffectSetTerrainRandom
   | EntryEffectSetHazard
   | EntryEffectSetScreenOrRoom
   | EntryEffectAddSelfType
@@ -79,6 +80,18 @@ export interface EntryEffectSetWeather {
   readonly kind: "set-weather";
   readonly weather: WeatherType;
   /** Number of turns the weather should persist (ER customs commonly use 8). */
+  readonly turns: number;
+}
+
+/**
+ * Set one of several terrains chosen at random on entry (e.g. Zen Garden:
+ * Grassy or Psychic at 50/50). A held seed item can force a specific choice.
+ */
+export interface EntryEffectSetTerrainRandom {
+  readonly kind: "set-terrain-random";
+  /** Candidate terrains; one is picked via the holder's battle seed. */
+  readonly terrains: readonly TerrainType[];
+  /** Turns the terrain persists (>0 overrides pokerogue's default). */
   readonly turns: number;
 }
 
@@ -253,6 +266,15 @@ export class EntryEffectAbAttr extends PostSummonAbAttr {
           this.effect.turns > 0 ? this.effect.turns : undefined,
         );
         return;
+      case "set-terrain-random": {
+        const choices = this.effect.terrains;
+        if (choices.length === 0) {
+          return;
+        }
+        const pick = choices[pokemon.randBattleSeedInt(choices.length)];
+        globalScene.arena.trySetTerrain(pick, false, pokemon, this.effect.turns > 0 ? this.effect.turns : undefined);
+        return;
+      }
       case "set-hazard": {
         const layers = this.effect.layers ?? 1;
         for (let i = 0; i < layers; i++) {

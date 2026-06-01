@@ -239,6 +239,13 @@ function buildCustomAbility(
     wireArchetypeAttrs(builder, draft.id, archetypeRow.archetype, archetypeRow.params, result);
   }
 
+  // ER abilities whose ROM text marks them uncopiable / unsuppressable. Keyed by
+  // ER source id (draft.id).
+  if (draft.id === 669) {
+    // Flammable Coat — "Cannot be copied or suppressed."
+    builder.unsuppressable().uncopiable().unreplaceable();
+  }
+
   const ability = builder.build();
 
   // Override the prototype-level `name`/`description` getters with verbatim

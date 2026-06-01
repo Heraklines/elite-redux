@@ -767,11 +767,18 @@ export class PokemonAddMoveSlotModifierType extends PokemonModifierType {
     super(
       "",
       "move_slot_expander",
-      (_type, args) => new PokemonAddMoveSlotModifier(this, (args[0] as PlayerPokemon).id),
-      (pokemon: PlayerPokemon) =>
-        pokemon.customPokemonData.bonusMoveSlots >= PokemonAddMoveSlotModifier.MAX_BONUS_SLOTS
-          ? PartyUiHandler.NoEffectMessage
-          : null,
+      // args[1] is the learnable-move index chosen in the REMEMBER_MOVE party UI.
+      (type, args) => new PokemonAddMoveSlotModifier(type, (args[0] as PlayerPokemon).id, args[1] as number),
+      (pokemon: PlayerPokemon) => {
+        if (pokemon.customPokemonData.bonusMoveSlots >= PokemonAddMoveSlotModifier.MAX_BONUS_SLOTS) {
+          return PartyUiHandler.NoEffectMessage;
+        }
+        // Needs at least one learnable move to fill the new slot.
+        if (pokemon.getLearnableLevelMoves().length === 0) {
+          return PartyUiHandler.NoEffectMessage;
+        }
+        return null;
+      },
     );
   }
 

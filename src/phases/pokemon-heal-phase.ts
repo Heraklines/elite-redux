@@ -75,6 +75,18 @@ export class PokemonHealPhase extends CommonAnimPhase {
       return super.end();
     }
 
+    // ER BLEED: healing restores no HP — instead the heal CURES the bleed (ROM:
+    // "prevents healing" + the "bleeding was healed!" message). The HP gain is
+    // consumed to remove the bleed.
+    if (pokemon.getTag(BattlerTagType.ER_BLEED) && this.hpHealed > 0) {
+      pokemon.removeTag(BattlerTagType.ER_BLEED);
+      globalScene.phaseManager.queueMessage(
+        i18next.t("battlerTags:erBleedHealed", { pokemonNameWithAffix: getPokemonNameWithAffix(pokemon) }),
+      );
+      this.message = null;
+      return super.end();
+    }
+
     if (healOrDamage) {
       const hpRestoreMultiplier = new NumberHolder(1);
       if (!this.revive) {

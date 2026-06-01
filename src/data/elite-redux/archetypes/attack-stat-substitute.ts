@@ -1,0 +1,71 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Elite Redux — `attack-stat-substitute` archetype.
+//
+// Replaces the attacking stat used in the damage formula with a different stat
+// (the ability-driven analogue of Body Press's VariableAtkAttr). Distinct from
+// SpeedBonusToStat, which ADDS a fraction of another stat — this fully
+// SUBSTITUTES, matching ER descriptions like "uses Def instead of Attack".
+//
+// Hooked by `Pokemon.getBaseDamage` via a by-name scan of the attacker's
+// ability/passive attrs (registration-free, like RecoilDamageMultiplierAbAttr
+// and OffensiveTypeChartOverrideAbAttr).
+//
+// Wires:
+//   - 286 Ancient Idol — physical moves use Def, special moves use SpDef.
+//   - 372 Momentum — contact moves use Speed as the attacking stat.
+// =============================================================================
+
+import { AbAttr } from "#abilities/ab-attrs";
+import { MoveFlags } from "#enums/move-flags";
+import { type EffectiveStat, Stat } from "#enums/stat";
+import type { Pokemon } from "#field/pokemon";
+import type { Move } from "#moves/move";
+
+export interface AttackStatSubstituteOptions {
+  /** Stat to use instead of ATK for physical moves (omit to leave ATK). */
+  readonly physicalStat?: EffectiveStat;
+  /** Stat to use instead of SPATK for special moves (omit to leave SPATK). */
+  readonly specialStat?: EffectiveStat;
+  /** When true, only substitutes for contact moves. */
+  readonly contactOnly?: boolean;
+  /**
+   * When true, all attacks use the HIGHER of the holder's Attack / Special
+   * Attack as the offensive stat (Equinox). Overrides physicalStat/specialStat.
+   */
+  readonly useHigherOffense?: boolean;
+}
+
+export class AttackStatSubstituteAbAttr extends AbAttr {
+  private readonly physicalStat?: EffectiveStat;
+  private readonly specialStat?: EffectiveStat;
+  private readonly contactOnly: boolean;
+  private readonly useHigherOffense: boolean;
+
+  constructor(options: AttackStatSubstituteOptions) {
+    super(false);
+    this.physicalStat = options.physicalStat;
+    this.specialStat = options.specialStat;
+    this.contactOnly = options.contactOnly ?? false;
+    this.useHigherOffense = options.useHigherOffense ?? false;
+  }
+
+  /**
+   * The stat to use instead of the move's default offensive stat, or `null`
+   * when this ability does not substitute for the given move.
+   */
+  public resolveStat(move: Move, isPhysical: boolean, source: Pokemon): EffectiveStat | null {
+    if (this.contactOnly && !move.hasFlag(MoveFlags.MAKES_CONTACT)) {
+      return null;
+    }
+    if (this.useHigherOffense) {
+      return source.getStat(Stat.ATK, false) >= source.getStat(Stat.SPATK, false) ? Stat.ATK : Stat.SPATK;
+    }
+    return (isPhysical ? this.physicalStat : this.specialStat) ?? null;
+  }
+}

@@ -249,6 +249,16 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     return 4;
   }
 
+  /**
+   * Row spacing and vertical shift for the move grid. With the normal 4 moves
+   * (2×2) this returns the exact vanilla values. With a 5th slot (ER consumable)
+   * a third row is needed, so the rows are compressed and nudged up to stay
+   * within the move window. Keyed off {@linkcode getMoveCellCount}.
+   */
+  private getMoveGridMetrics(): { rowSpacing: number; yShift: number } {
+    return this.getMoveCellCount() > 4 ? { rowSpacing: 12, yShift: -8 } : { rowSpacing: 16, yShift: 0 };
+  }
+
   /** @returns TextStyle according to percentage of PP remaining */
   private static ppRatioToColor(ppRatio: number): TextStyle {
     if (ppRatio > 0.25 && ppRatio <= 0.5) {
@@ -329,7 +339,11 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
       ui.add(this.cursorObj);
     }
 
-    this.cursorObj.setPosition(13 + (cursor % 2 === 1 ? 114 : 0), -31 + Math.floor(cursor / 2) * 15);
+    const { rowSpacing, yShift } = this.getMoveGridMetrics();
+    this.cursorObj.setPosition(
+      13 + (cursor % 2 === 1 ? 114 : 0),
+      -31 + yShift + Math.floor(cursor / 2) * (rowSpacing - 1),
+    );
 
     return changed;
   }
@@ -364,10 +378,11 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     // granted extra slots by ER's "5th move slot" consumable. Laid out 2-per-row
     // so a 5th move starts a third row.
     const cellCount = pokemon.getMaxMoveCount();
+    const { rowSpacing, yShift } = this.getMoveGridMetrics();
     for (let moveIndex = 0; moveIndex < cellCount; moveIndex++) {
       const moveText = addTextObject(
         moveIndex % 2 === 0 ? 0 : 114,
-        Math.floor(moveIndex / 2) * 16,
+        yShift + Math.floor(moveIndex / 2) * rowSpacing,
         "-",
         TextStyle.WINDOW,
       ).setName("text-empty-move");

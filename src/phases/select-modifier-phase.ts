@@ -16,6 +16,7 @@ import {
   getPlayerModifierTypeOptions,
   getPlayerShopModifierTypeOptionsForWave,
   PokemonAbilityModifierType,
+  PokemonAddMoveSlotModifierType,
   PokemonModifierType,
   PokemonMoveModifierType,
   PokemonPpRestoreModifierType,
@@ -335,7 +336,10 @@ export class SelectModifierPhase extends BattlePhase {
     const isMoveModifier = modifierType instanceof PokemonMoveModifierType;
     const isAbilityModifier = modifierType instanceof PokemonAbilityModifierType;
     const isTmModifier = modifierType instanceof TmModifierType;
-    const isRememberMoveModifier = modifierType instanceof RememberMoveModifierType;
+    // The Move Slot Expander also uses the relearn move-picker: the player
+    // chooses which learnable move fills the new 5th slot.
+    const isRememberMoveModifier =
+      modifierType instanceof RememberMoveModifierType || modifierType instanceof PokemonAddMoveSlotModifierType;
     const isPpRestoreModifier =
       modifierType instanceof PokemonPpRestoreModifierType || modifierType instanceof PokemonPpUpModifierType;
     const partyUiMode = isMoveModifier

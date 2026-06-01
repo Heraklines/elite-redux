@@ -17,6 +17,7 @@ import {
   SpeciesFormChangeWeatherTrigger,
 } from "#data/form-change-triggers";
 import { AbilityId } from "#enums/ability-id";
+import { ErAbilityId } from "#enums/er-ability-id";
 import { FormChangeItem } from "#enums/form-change-item";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
@@ -297,7 +298,30 @@ export const pokemonFormChanges: PokemonFormChanges = {
   [SpeciesId.DEOXYS]: [
     new SpeciesFormChange(SpeciesId.DEOXYS, "normal", "attack", new SpeciesFormChangeItemTrigger(FormChangeItem.SHARP_METEORITE)),
     new SpeciesFormChange(SpeciesId.DEOXYS, "normal", "defense", new SpeciesFormChangeItemTrigger(FormChangeItem.HARD_METEORITE)),
-    new SpeciesFormChange(SpeciesId.DEOXYS, "normal", "speed", new SpeciesFormChangeItemTrigger(FormChangeItem.SMOOTH_METEORITE))
+    new SpeciesFormChange(SpeciesId.DEOXYS, "normal", "speed", new SpeciesFormChangeItemTrigger(FormChangeItem.SMOOTH_METEORITE)),
+    // Elite Redux — DNA Scramble (er 791): Deoxys shifts form by the move it
+    // uses. Damaging → Attack, Recover → Defense, other status → Speed. Modeled
+    // on Aegislash's Stance Change (PreMove trigger gated on the ability), so
+    // the form is set before the move resolves and uses the new form's stats.
+    ...((): SpeciesFormChange[] => {
+      const dna = new SpeciesFormChangeCondition(p => p.hasAbility(ErAbilityId.DNA_SCRAMBLE as unknown as AbilityId));
+      const damaging = (m: MoveId): boolean => allMoves[m].category !== MoveCategory.STATUS;
+      const otherStatus = (m: MoveId): boolean => allMoves[m].category === MoveCategory.STATUS && m !== MoveId.RECOVER;
+      const forms = ["normal", "attack", "defense", "speed"] as const;
+      const entries: SpeciesFormChange[] = [];
+      for (const from of forms) {
+        if (from !== "attack") {
+          entries.push(new SpeciesFormChange(SpeciesId.DEOXYS, from, "attack", new SpeciesFormChangePreMoveTrigger(damaging), true, dna));
+        }
+        if (from !== "defense") {
+          entries.push(new SpeciesFormChange(SpeciesId.DEOXYS, from, "defense", new SpeciesFormChangePreMoveTrigger(MoveId.RECOVER), true, dna));
+        }
+        if (from !== "speed") {
+          entries.push(new SpeciesFormChange(SpeciesId.DEOXYS, from, "speed", new SpeciesFormChangePreMoveTrigger(otherStatus), true, dna));
+        }
+      }
+      return entries;
+    })()
   ],
   [SpeciesId.CHERRIM]: [
     new SpeciesFormChange(SpeciesId.CHERRIM, "overcast", "sunshine", new SpeciesFormChangeWeatherTrigger(AbilityId.FLOWER_GIFT, [ WeatherType.SUNNY, WeatherType.HARSH_SUN ]), true),

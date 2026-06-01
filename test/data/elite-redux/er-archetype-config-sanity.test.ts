@@ -798,9 +798,15 @@ describe("ER archetype-config sanity (C5)", () => {
 describe("ER archetype cross-data integrity (C5)", () => {
   it("every ability id in ER_ABILITY_ARCHETYPES exists in ER_ABILITIES", () => {
     const abilityIds = new Set<number>(ER_ABILITIES.map(a => a.id));
+    // ER id-resync drift: the four "Embody Aspect" variants collapsed to a
+    // single id (795) in the auto-generated ER_ABILITIES. The Attack/Defense/
+    // SpDef variants (796-798) are constructed at runtime from synthetic drafts
+    // (see init-elite-redux-custom-abilities.ts) and have archetype rows but no
+    // ER_ABILITIES entry — so they're a documented, allowlisted exception.
+    const SYNTHETIC_DRIFT_IDS = new Set<number>([796, 797, 798]);
     const orphans: number[] = [];
     for (const entry of Object.values(ER_ABILITY_ARCHETYPES) as ErAbilityArchetypeEntry[]) {
-      if (!abilityIds.has(entry.erAbilityId)) {
+      if (!abilityIds.has(entry.erAbilityId) && !SYNTHETIC_DRIFT_IDS.has(entry.erAbilityId)) {
         orphans.push(entry.erAbilityId);
       }
     }
@@ -872,11 +878,15 @@ describe("ER Phase C coverage sanity (C5)", () => {
     // — if either side drifts, the audit script regenerates the doc and this
     // test should be updated to match. We pin TOTAL but allow the per-bucket
     // distribution to grow as the classifier improves.
-    expect(total, "total ability archetype rows").toBe(732);
-    expect(bespoke).toBeGreaterThan(200);
-    expect(bespoke).toBeLessThan(300);
-    expect(classified).toBeGreaterThan(400);
-    expect(classified).toBeLessThan(550);
+    // Total = 735 (the +3 over the older 732 snapshot are the synthetic Embody
+    // Aspect drift variants 796-798). The bespoke bucket grew substantially as
+    // later rounds (the R48 grind) hand-wired the long tail and reclassified
+    // composites-with-only-riders (e.g. 909 Lightsaber) from composite → bespoke.
+    expect(total, "total ability archetype rows").toBe(735);
+    expect(bespoke).toBeGreaterThan(300);
+    expect(bespoke).toBeLessThan(450);
+    expect(classified).toBeGreaterThan(250);
+    expect(classified).toBeLessThan(450);
   });
 
   it("move archetype counts match the documented coverage snapshot", () => {

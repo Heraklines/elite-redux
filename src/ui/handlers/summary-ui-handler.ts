@@ -76,6 +76,13 @@ export class SummaryUiHandler extends UiHandler {
   private abilitiesTabText: Phaser.GameObjects.Text;
   /** ER ABILITIES page: which row (0=main ability, 1-3=innates) is selected. */
   private abilitiesCursor = 0;
+  /**
+   * ER ABILITIES page: whether ability-row selection is active. While `false`
+   * (the default on entering the page), Up/Down switch party members like every
+   * other summary page. Pressing {@link Button.ACTION} enters selection mode so
+   * Up/Down move the row cursor; {@link Button.CANCEL} exits back to browsing.
+   */
+  private abilitiesSelectMode = false;
   /** ER ABILITIES page: number of rendered rows (main + present innates). */
   private abilitiesRowCount = 0;
   /** Per-row metadata for the ABILITIES page, indexed by row. */
@@ -673,11 +680,18 @@ export class SummaryUiHandler extends UiHandler {
       }
     } else if (button === Button.ACTION) {
       if (this.cursor === Page.ABILITIES) {
-        // Toggle the full-screen ability detail overlay.
         if (this.abilitiesDetailContainer) {
+          // Detail overlay open → close it.
           this.closeAbilityDetail();
-        } else {
+        } else if (this.abilitiesSelectMode) {
+          // Already selecting → open the full-screen detail for the chosen row.
           this.openAbilityDetail();
+        } else {
+          // First press: enter ability-selection mode (cursor appears). Up/Down
+          // now move between abilities instead of switching party members.
+          this.abilitiesSelectMode = true;
+          this.abilitiesCursor = 0;
+          this.refreshAbilitiesCursor();
         }
         success = true;
       } else if (this.cursor === Page.MOVES) {
@@ -696,6 +710,11 @@ export class SummaryUiHandler extends UiHandler {
       if (this.cursor === Page.ABILITIES && this.abilitiesDetailContainer) {
         // Close the detail overlay rather than leaving the summary.
         this.closeAbilityDetail();
+        success = true;
+      } else if (this.cursor === Page.ABILITIES && this.abilitiesSelectMode) {
+        // Exit ability-selection mode back to party browsing (Up/Down switch mon).
+        this.abilitiesSelectMode = false;
+        this.refreshAbilitiesCursor();
         success = true;
       } else if (this.summaryUiMode === SummaryUiMode.LEARN_MOVE) {
         this.hideMoveSelect();
@@ -721,10 +740,10 @@ export class SummaryUiHandler extends UiHandler {
           if (this.summaryUiMode === SummaryUiMode.LEARN_MOVE) {
             break;
           }
-          // ER ABILITIES page: Up/Down moves the ability-row selection
-          // cursor instead of switching party members. (Detail overlay
-          // open → ignore.)
-          if (this.cursor === Page.ABILITIES) {
+          // ER ABILITIES page: in selection mode, Up/Down move the ability-row
+          // cursor. Otherwise (the default), fall through to party-member
+          // switching like every other page. (Detail overlay open → ignore.)
+          if (this.cursor === Page.ABILITIES && this.abilitiesSelectMode) {
             if (this.abilitiesDetailContainer || this.abilitiesRowCount === 0) {
               break;
             }
@@ -733,6 +752,9 @@ export class SummaryUiHandler extends UiHandler {
             this.refreshAbilitiesCursor();
             success = true;
             break;
+          }
+          if (this.cursor === Page.ABILITIES && this.abilitiesDetailContainer) {
+            break; // detail overlay open — don't switch party members
           }
           if (!fromPartyMode) {
             break;
@@ -851,6 +873,9 @@ export class SummaryUiHandler extends UiHandler {
         if (this.cursor === Page.ABILITIES && cursor !== Page.ABILITIES) {
           this.closeAbilityDetail();
         }
+        // Any page change resets ability-selection mode so the page is always
+        // entered in the default party-browsing state.
+        this.abilitiesSelectMode = false;
         const forward = this.cursor < cursor;
         this.cursor = cursor;
 
@@ -1715,7 +1740,10 @@ export class SummaryUiHandler extends UiHandler {
       return;
     }
     const row = this.abilitiesRows[Math.min(this.abilitiesCursor, this.abilitiesRows.length - 1)];
-    this.abilitiesCursorObj.setPosition(0, row.y - 1).setVisible(true);
+    // The cursor + "Ⓐ Detail" prompt only show while in ability-selection mode;
+    // in the default browsing mode Up/Down switch party members.
+    this.abilitiesCursorObj.setPosition(0, row.y - 1).setVisible(this.abilitiesSelectMode);
+    this.abilitiesDetailPrompt?.setVisible(this.abilitiesSelectMode);
   }
 
   /**
@@ -1851,6 +1879,7 @@ export class SummaryUiHandler extends UiHandler {
     this.closeAbilityDetail();
     this.abilitiesRows = [];
     this.abilitiesRowCount = 0;
+    this.abilitiesSelectMode = false;
     this.abilitiesCursorObj = null;
     this.abilitiesDetailPrompt = null;
     this.summaryContainer.setVisible(false);

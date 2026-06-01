@@ -28,6 +28,7 @@
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
+import { allSpecies } from "#data/data-lists";
 import { findErFormChangeByTarget } from "#data/elite-redux/er-form-change-overlay";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
@@ -116,6 +117,27 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
   const tiers = speciesEggTiers as Record<number, EggTier>;
   const costs = speciesStarterCosts as Record<number, number>;
 
+  // Robust evolved-form guard. #104's species renumbering left some ER
+  // evolution `into` ids stale, so a few evolved customs (e.g. the Redux
+  // Chimchar line → Infernape Redux) never get a prevolution registered and
+  // wrongly leak into eggs. As a name-based safety net: an ER custom whose name
+  // (minus its form qualifier) matches a vanilla species that itself has a
+  // prevolution is an evolved stage and must not hatch. (Chimchar Redux →
+  // "chimchar" has no prevo → still hatches; Infernape Redux → "infernape" has
+  // a prevo → skipped.)
+  const vanillaByName = new Map<string, number>();
+  for (const sp of allSpecies) {
+    if (sp.speciesId < VANILLA_ID_CUTOFF) {
+      vanillaByName.set(sp.name.toLowerCase(), sp.speciesId);
+    }
+  }
+  const formQualifier = /\s+(redux mega|redux b|redux c|redux|primal|mega|hisuian|alolan|galarian|paldean)$/i;
+  const vanillaBaseIsEvolved = (draftName: string): boolean => {
+    const base = draftName.replace(formQualifier, "").trim().toLowerCase();
+    const vanillaId = vanillaByName.get(base);
+    return vanillaId !== undefined && Object.hasOwn(pokemonPrevolutions, vanillaId as SpeciesId);
+  };
+
   for (const draft of ER_SPECIES) {
     const pkrgId = ER_ID_MAP.species[draft.id];
     if (pkrgId === undefined || pkrgId < VANILLA_ID_CUTOFF) {
@@ -128,6 +150,13 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
     }
     // Skip if already prevolution-gated (non-base forms can't hatch).
     if (Object.hasOwn(pokemonPrevolutions, pkrgId as SpeciesId)) {
+      removeRuntimeStarterRegistration(pkrgId);
+      result.skippedPrevolutions++;
+      continue;
+    }
+    // Name-based evolved-form guard (catches stale-`into` lines like Infernape
+    // Redux whose prevolution never registered).
+    if (vanillaBaseIsEvolved(draft.name)) {
       removeRuntimeStarterRegistration(pkrgId);
       result.skippedPrevolutions++;
       continue;

@@ -61,6 +61,7 @@
 
 import { BlockCritAbAttr, BonusCritAbAttr, MultCritAbAttr } from "#abilities/ab-attrs";
 import { MoveFlags } from "#enums/move-flags";
+import type { MoveId } from "#enums/move-id";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
@@ -76,6 +77,8 @@ export interface CritModFilter {
   readonly type?: PokemonType;
   /** Move flag(s) that trigger the crit-stage bonus. Omit to accept any flags. */
   readonly flag?: MoveFlags;
+  /** Specific move ids that trigger the bonus. Omit to accept any move id. */
+  readonly moveIds?: readonly MoveId[];
 }
 
 // -----------------------------------------------------------------------------
@@ -198,6 +201,9 @@ export class CritStageBonusAbAttr extends BonusCritAbAttr {
       return false;
     }
     if (filter.flag !== undefined && !move.hasFlag(filter.flag)) {
+      return false;
+    }
+    if (filter.moveIds !== undefined && !filter.moveIds.includes(move.id)) {
       return false;
     }
     return true;

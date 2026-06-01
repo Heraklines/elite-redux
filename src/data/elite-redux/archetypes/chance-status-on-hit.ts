@@ -154,6 +154,9 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
   private readonly contactRequired: boolean;
   private readonly contactExcluded: boolean;
   private readonly filter: ChanceStatusFilter | undefined;
+  // Status procs don't use a first-turn override; declared (always undefined)
+  // so the shared chance-roll expression type-checks.
+  private readonly firstTurnChance: number | undefined = undefined;
 
   constructor(opts: ChanceStatusOnHitOptions) {
     if (!(opts.chance >= 0 && opts.chance <= 100)) {
@@ -235,8 +238,14 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
       return false;
     }
     // Roll the proc — 100% always passes, 0% never does.
-    if (this.chance !== 100 && pokemon.randBattleSeedInt(100) >= this.chance) {
-      return false;
+    {
+      const effChance =
+        this.firstTurnChance !== undefined && pokemon.tempSummonData?.waveTurnCount === 1
+          ? this.firstTurnChance
+          : this.chance;
+      if (effChance !== 100 && pokemon.randBattleSeedInt(100) >= effChance) {
+        return false;
+      }
     }
     // Pick a status (uniform random if multiple configured) and verify the
     // attacker can actually receive it. The same effect index is recomputed
@@ -329,6 +338,20 @@ export interface ChanceBattlerTagOnHitOptions {
    * Set Ablaze (740) — "inflicting burn also inflicts fear".
    */
   readonly targetHasStatus?: StatusEffect;
+  /**
+   * When true, the proc only fires when the holder's attack landed a CRITICAL
+   * hit on the target this interaction (offensive `OnAttack` variant only).
+   * Implies contact is NOT required, since crits can be non-contact. Used by
+   * the crit-bleed abilities Razor Sharp (730) and To The Bone (731).
+   * @defaultValue `false`
+   */
+  readonly critRequired?: boolean;
+  /**
+   * Overrides `chance` on the holder's first turn after entering (or gaining
+   * the ability), i.e. while `tempSummonData.waveTurnCount === 1`. Used by
+   * Talon Trap (973): "50% to trap on contact, 100% if entered this turn."
+   */
+  readonly firstTurnChance?: number;
 }
 
 /**
@@ -358,6 +381,7 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
   private readonly contactRequired: boolean;
   private readonly turns: number | undefined;
   private readonly filter: ChanceStatusFilter | undefined;
+  private readonly firstTurnChance: number | undefined;
 
   constructor(opts: ChanceBattlerTagOnHitOptions) {
     if (!(opts.chance >= 0 && opts.chance <= 100)) {
@@ -372,6 +396,7 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
     this.contactRequired = opts.contactRequired ?? opts.filter === undefined;
     this.turns = opts.turns;
     this.filter = opts.filter;
+    this.firstTurnChance = opts.firstTurnChance;
   }
 
   /** The configured move filter, or `undefined` when no filter is set. */
@@ -410,8 +435,14 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
     if (this.filter !== undefined && !checkChanceStatusFilter(this.filter, move)) {
       return false;
     }
-    if (this.chance !== 100 && pokemon.randBattleSeedInt(100) >= this.chance) {
-      return false;
+    {
+      const effChance =
+        this.firstTurnChance !== undefined && pokemon.tempSummonData?.waveTurnCount === 1
+          ? this.firstTurnChance
+          : this.chance;
+      if (effChance !== 100 && pokemon.randBattleSeedInt(100) >= effChance) {
+        return false;
+      }
     }
     const tag = this.pickTag(pokemon);
     return attacker.canAddTag(tag);
@@ -478,6 +509,9 @@ export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
   private readonly contactRequired: boolean;
   private readonly contactExcluded: boolean;
   private readonly filter: ChanceStatusFilter | undefined;
+  // Status procs don't use a first-turn override; declared (always undefined)
+  // so the shared chance-roll expression type-checks.
+  private readonly firstTurnChance: number | undefined = undefined;
 
   constructor(opts: ChanceStatusOnHitOptions) {
     if (!(opts.chance >= 0 && opts.chance <= 100)) {
@@ -533,8 +567,14 @@ export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
     if (this.filter !== undefined && !checkChanceStatusFilter(this.filter, move)) {
       return false;
     }
-    if (this.chance !== 100 && pokemon.randBattleSeedInt(100) >= this.chance) {
-      return false;
+    {
+      const effChance =
+        this.firstTurnChance !== undefined && pokemon.tempSummonData?.waveTurnCount === 1
+          ? this.firstTurnChance
+          : this.chance;
+      if (effChance !== 100 && pokemon.randBattleSeedInt(100) >= effChance) {
+        return false;
+      }
     }
     const effect = this.pickEffect(pokemon);
     return target.canSetStatus(effect, true, false, pokemon);
@@ -572,6 +612,8 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
   private readonly filter: ChanceStatusFilter | undefined;
   private readonly targetHasTag: BattlerTagType | undefined;
   private readonly targetHasStatus: StatusEffect | undefined;
+  private readonly critRequired: boolean;
+  private readonly firstTurnChance: number | undefined;
 
   constructor(opts: ChanceBattlerTagOnHitOptions) {
     if (!(opts.chance >= 0 && opts.chance <= 100)) {
@@ -583,10 +625,15 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
     super(undefined, false);
     this.chance = opts.chance;
     this.tags = opts.tags;
-    // A target-state gate (targetHasTag) replaces contact as the trigger when set.
+    this.critRequired = opts.critRequired ?? false;
+    this.firstTurnChance = opts.firstTurnChance;
+    // A target-state gate (targetHasTag) or crit gate replaces contact as the trigger when set.
     this.contactRequired =
       opts.contactRequired
-      ?? (opts.filter === undefined && opts.targetHasTag === undefined && opts.targetHasStatus === undefined);
+      ?? (opts.filter === undefined
+        && opts.targetHasTag === undefined
+        && opts.targetHasStatus === undefined
+        && !this.critRequired);
     this.turns = opts.turns;
     this.filter = opts.filter;
     this.targetHasTag = opts.targetHasTag;
@@ -628,8 +675,20 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
     if (this.targetHasStatus !== undefined && target.status?.effect !== this.targetHasStatus) {
       return false;
     }
-    if (this.chance !== 100 && pokemon.randBattleSeedInt(100) >= this.chance) {
+    // Crit gate: only fire when this interaction landed a critical hit on the
+    // target (mirrors OnCritStatBoostLowest's detection via the target's
+    // most-recent received attack).
+    if (this.critRequired && !target.turnData?.attacksReceived?.[0]?.critical) {
       return false;
+    }
+    {
+      const effChance =
+        this.firstTurnChance !== undefined && pokemon.tempSummonData?.waveTurnCount === 1
+          ? this.firstTurnChance
+          : this.chance;
+      if (effChance !== 100 && pokemon.randBattleSeedInt(100) >= effChance) {
+        return false;
+      }
     }
     const tag = this.pickTag(pokemon);
     return target.canAddTag(tag);

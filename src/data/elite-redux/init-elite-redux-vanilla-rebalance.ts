@@ -1102,8 +1102,12 @@ export function initEliteReduxVanillaRebalance(): VanillaRebalanceResult {
       result.moveFieldWrites++;
       movedirty = true;
     }
-    // priority: signed; 0 is a legitimate value, so we compare directly.
-    if (target.priority !== draft.priority) {
+    // priority: signed; 0 is a legitimate value, so we can't use a `> 0` guard
+    // like the other fields. But we MUST guard against a non-finite draft value
+    // (undefined / NaN): writing that leaves `target.priority` coerced back to a
+    // number, so a bare `!==` comparison would re-fire every run (a spurious,
+    // non-idempotent delta on ~56 moves whose ER draft omits priority).
+    if (Number.isFinite(draft.priority) && target.priority !== draft.priority) {
       target.priority = draft.priority;
       result.moveFieldWrites++;
       movedirty = true;

@@ -24,6 +24,7 @@
 // =============================================================================
 
 import { allMoves } from "#data/data-lists";
+import { ER_FLAG_NAMES_LIST, ER_FLAG_TO_MOVE_FLAG } from "#data/elite-redux/er-flag-mapping";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import type { Move } from "#data/moves/move";
@@ -498,6 +499,82 @@ export function initEliteReduxCSourceCorrections(): CSourceCorrectionResult {
     flagsPatched: 0,
     movesMissing: 0,
   };
+
+  // ---------------------------------------------------------------------------
+  // Repair ER move ids that the build mapped to an EMPTY pokerogue slot. Newer
+  // (Gen-9) moves like Aqua Cutter got the wrong pkrg id (e.g. 927, a hole)
+  // instead of their real MoveId (895). Pokerogue already implements these, and
+  // `allMoves` is correctly id-indexed, so we resolve the real id by the move's
+  // display name and repoint the ER id. Only touches mappings that currently
+  // land on a hole AND whose name matches a built move. Runs before
+  // movesets/trainers/TMs consume the map.
+  // ---------------------------------------------------------------------------
+  {
+    const movesMap = ER_ID_MAP.moves as Record<number, number>;
+    const idByName = new Map<string, number>();
+    for (const mv of allMoves) {
+      if (mv !== undefined) {
+        idByName.set(mv.name.toLowerCase(), mv.id);
+      }
+    }
+    let remapped = 0;
+    for (const drf of ER_MOVES) {
+      const current = movesMap[drf.id];
+      if (current === undefined || current >= 5000 || allMoves[current] !== undefined) {
+        continue; // custom, unmapped, or already resolves to a real move
+      }
+      const realId = drf.name ? idByName.get(drf.name.toLowerCase()) : undefined;
+      if (realId !== undefined && realId !== current) {
+        movesMap[drf.id] = realId;
+        remapped++;
+      }
+    }
+    if (remapped > 0) {
+      console.info(`[er-csrc] remapped ${remapped} ER moves from empty slots to real MoveIds (by name)`);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Apply each ER move's FULL ROM flag set onto its built move. The ROM stores
+  // flags as numeric indices into ER_FLAG_NAMES_LIST; we map each to its
+  // pokerogue MoveFlag and OR it on (additive — never clears a pokerogue flag).
+  // The hand-curated vanilla-move-patches only covered a subset, leaving ~140
+  // flag bits (Air/Throw/Horn/Hammer-Based, contact, sound, …) missing — which
+  // silently broke ER flag-gated abilities (e.g. wing/throw/horn boosters) and
+  // contact/sound interactions on many moves. This guarantees full coverage.
+  // ---------------------------------------------------------------------------
+  {
+    const movesMap = ER_ID_MAP.moves as Record<number, number>;
+    let movesFlagged = 0;
+    for (const drf of ER_MOVES) {
+      const pkrgId = movesMap[drf.id];
+      if (pkrgId === undefined) {
+        continue;
+      }
+      const move = allMoves[pkrgId];
+      if (move === undefined) {
+        continue;
+      }
+      let bits = 0;
+      for (const idx of (drf as { flags?: number[] }).flags ?? []) {
+        const name = ER_FLAG_NAMES_LIST[idx];
+        const mf = name === undefined ? undefined : ER_FLAG_TO_MOVE_FLAG[name];
+        if (mf != null) {
+          bits |= mf;
+        }
+      }
+      if (bits !== 0) {
+        const target = move as unknown as { flags: number };
+        if ((target.flags & bits) !== bits) {
+          target.flags |= bits;
+          movesFlagged++;
+        }
+      }
+    }
+    if (movesFlagged > 0) {
+      console.info(`[er-csrc] applied ROM flag sets to ${movesFlagged} moves (full flag coverage)`);
+    }
+  }
 
   // Build moveConst → pokerogue MoveId map.
   const constToPkrgId = new Map<string, MoveId>();
