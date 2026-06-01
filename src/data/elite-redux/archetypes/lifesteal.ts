@@ -63,9 +63,22 @@ import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
+import { PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { Move } from "#moves/move";
 import { toDmgValue } from "#utils/common";
 import i18next from "i18next";
+
+/**
+ * True when `params.pokemon` is the Pokémon that landed the knockout on
+ * `params.victim` with a DIRECT hit this turn. The faint phase fans
+ * `PostKnockOutAbAttr` out to BOTH sides of the field, so on-KO rewards
+ * (heal / loot) must gate on this — otherwise they fire for bystanders and on
+ * indirect KOs (weather / status / hazards, which leave no `attacksReceived`).
+ */
+function koLandedByDirectHit(params: PostKnockOutAbAttrParams): boolean {
+  const lastAttack = params.victim.turnData.attacksReceived?.[0];
+  return !!lastAttack && lastAttack.sourceId === params.pokemon.id;
+}
 
 /**
  * Filter narrowing which outgoing moves trigger the per-hit lifesteal heal.
@@ -280,6 +293,14 @@ export class LifestealOnKoAbAttr extends PostKnockOutAbAttr {
     if (!super.canApply(params)) {
       return false;
     }
+    // ER: only the Pokémon that actually landed the KNOCKOUT (with a direct hit)
+    // benefits — NOT every Pokémon on the field whenever any KO happens. The
+    // faint phase applies PostKnockOut to BOTH sides, so we gate on "this holder
+    // dealt the last (direct) attack to the victim". An indirect KO (weather,
+    // status, hazards — no attacksReceived) credits nobody.
+    if (!koLandedByDirectHit(params)) {
+      return false;
+    }
     return !params.pokemon.isFainted() && !params.pokemon.isFullHp();
   }
 
@@ -307,6 +328,83 @@ export class LifestealOnKoAbAttr extends PostKnockOutAbAttr {
       }),
       true,
     );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// ScavengerLootAbAttr — Scavenger's "loot a held item on KO" sub-shape.
+// -----------------------------------------------------------------------------
+
+/** Construction options for {@linkcode ScavengerLootAbAttr}. */
+export interface ScavengerLootOptions {
+  /** Probability in `(0, 1]` to loot a random held item on a direct-hit KO. */
+  readonly chance: number;
+}
+
+/**
+ * On a direct-hit knockout, has a {@linkcode chance} to steal one random
+ * transferable held item from the defeated Pokémon (ER `Scavenger`). Gated to
+ * the Pokémon that actually landed the KO (see {@linkcode koLandedByDirectHit})
+ * so it never loots from bystander/indirect faints.
+ */
+export class ScavengerLootAbAttr extends PostKnockOutAbAttr {
+  private readonly lootChance: number;
+  private lootItem?: PokemonHeldItemModifier;
+
+  constructor(opts: ScavengerLootOptions) {
+    if (!(opts.chance > 0 && opts.chance <= 1)) {
+      throw new Error(`[ScavengerLootAbAttr] chance must be in (0, 1]; got ${opts.chance}`);
+    }
+    super();
+    this.lootChance = opts.chance;
+  }
+
+  /** Read-only accessor for the configured loot chance. */
+  public getChance(): number {
+    return this.lootChance;
+  }
+
+  public override canApply(params: PostKnockOutAbAttrParams): boolean {
+    this.lootItem = undefined;
+    if (!super.canApply(params) || params.simulated) {
+      return false;
+    }
+    const { pokemon, victim } = params;
+    if (pokemon.isFainted() || !koLandedByDirectHit(params)) {
+      return false;
+    }
+    if (pokemon.randBattleSeedInt(100) >= Math.round(this.lootChance * 100)) {
+      return false; // failed the loot roll
+    }
+    const transferable = (
+      globalScene.findModifiers(
+        m => m instanceof PokemonHeldItemModifier && m.pokemonId === victim.id,
+        victim.isPlayer(),
+      ) as PokemonHeldItemModifier[]
+    ).filter(i => i.isTransferable);
+    if (transferable.length === 0) {
+      return false;
+    }
+    this.lootItem = transferable[pokemon.randBattleSeedInt(transferable.length)];
+    return globalScene.canTransferHeldItemModifier(this.lootItem, pokemon);
+  }
+
+  public override apply(params: PostKnockOutAbAttrParams): void {
+    const { simulated, pokemon, victim } = params;
+    if (simulated || !this.lootItem) {
+      this.lootItem = undefined;
+      return;
+    }
+    if (globalScene.tryTransferHeldItemModifier(this.lootItem, pokemon, false)) {
+      globalScene.phaseManager.queueMessage(
+        i18next.t("abilityTriggers:postAttackStealHeldItem", {
+          pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+          defenderName: victim.name,
+          stolenItemType: this.lootItem.type.name,
+        }),
+      );
+    }
+    this.lootItem = undefined;
   }
 }
 

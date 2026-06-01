@@ -48,7 +48,7 @@ import { PostSummonAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import type { TerrainType } from "#data/terrain";
-import type { ArenaTagSide } from "#enums/arena-tag-side";
+import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { ArenaTagType } from "#enums/arena-tag-type";
 import type { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
@@ -282,9 +282,15 @@ export class EntryEffectAbAttr extends PostSummonAbAttr {
         }
         return;
       }
-      case "set-screen-or-room":
-        globalScene.arena.addTag(this.effect.tag, this.effect.turns, undefined, pokemon.id, this.effect.side);
+      case "set-screen-or-room": {
+        // Side screens (Aurora Veil / Reflect / Light Screen, e.g. North Wind)
+        // protect the HOLDER's side only — default to it when no side is given.
+        // Field-wide effects (Gravity / Trick Room / Magic Room) ignore the side
+        // arg, so this is a no-op for them.
+        const side = this.effect.side ?? (pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY);
+        globalScene.arena.addTag(this.effect.tag, this.effect.turns, undefined, pokemon.id, side);
         return;
+      }
       case "add-self-type":
         this.applyAddSelfType(params);
         return;

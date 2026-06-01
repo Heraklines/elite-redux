@@ -210,32 +210,33 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
     // This fixes the "mega-form-passives" gap documented in the fusion +
     // transform audit (post-Phase-B).
     for (const form of species.forms) {
-      if (!form.formKey) {
-        // Base form (formKey === "", formIndex 0). For a multi-form species
-        // (e.g. Gyarados = base + Mega) pokerogue resolves a battler's ability
-        // and passives THROUGH its active form, so the species-level
-        // setActiveAbilities/setPassives above never reach the in-battle base
-        // form — it kept its vanilla constructor abilities (Gyarados showed
-        // Intimidate instead of Moxie/Sea Guardian/Rampage). Mirror the species'
-        // ER actives + innates (this species' own draft) onto the base form.
+      // Resolve an ER form-SPECIFIC draft (mega / primal / origin variants ship
+      // as their own ER species records, e.g. SPECIES_VENUSAUR_MEGA_REDUX). The
+      // base form (formKey === "") never has one.
+      let formDraft: (typeof ER_SPECIES)[number] | undefined;
+      if (form.formKey) {
+        for (const candidate of deriveErFormSpeciesConst(draft.speciesConst, form.formKey)) {
+          formDraft = erDraftByConst.get(candidate);
+          if (formDraft) {
+            break;
+          }
+        }
+      }
+
+      if (!formDraft) {
+        // No ER form-specific data: the base form (formIndex 0) OR a vanilla
+        // form-change ER doesn't re-stat (e.g. Eiscue Ice/Noice Face, Aegislash
+        // Shield/Blade, Cramorant Gulping). pokerogue resolves a battler's
+        // ability/passives THROUGH its active form, so the species-level
+        // setActiveAbilities/setPassives above never reach these forms — they
+        // kept their VANILLA constructor abilities. That is exactly how Eiscue
+        // showed Ice Face (its vanilla ability, which is also an ER innate) and
+        // Gyarados showed Intimidate. Inherit the species' ER actives + innates
+        // so the form matches what the starter/pokedex screens display.
         form.setPassives(passives);
         if (actives[0] !== AbilityId.NONE) {
           form.setActiveAbilities(actives);
         }
-        continue;
-      }
-      const candidates = deriveErFormSpeciesConst(draft.speciesConst, form.formKey);
-      let formDraft: (typeof ER_SPECIES)[number] | undefined;
-      for (const candidate of candidates) {
-        formDraft = erDraftByConst.get(candidate);
-        if (formDraft) {
-          break;
-        }
-      }
-      if (!formDraft) {
-        // No ER counterpart for this form — silently skip. Acceptable: many
-        // pokerogue forms (regional variants, alolan/galarian, etc.) don't
-        // exist in ER's mega-centric custom set.
         continue;
       }
       const formPassives: readonly [AbilityId, AbilityId, AbilityId] = [

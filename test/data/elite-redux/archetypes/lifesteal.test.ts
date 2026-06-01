@@ -188,17 +188,31 @@ describe("LifestealOnHitAbAttr archetype (C1e)", () => {
 });
 
 describe("LifestealOnKoAbAttr archetype (C1e)", () => {
-  function makeStubKoer(opts: { fullHp?: boolean; fainted?: boolean } = {}): Pokemon {
+  function makeStubKoer(opts: { fullHp?: boolean; fainted?: boolean; id?: number } = {}): Pokemon {
     return {
+      id: opts.id ?? 7,
       isFullHp: () => opts.fullHp ?? false,
       isFainted: () => opts.fainted ?? false,
     } as unknown as Pokemon;
   }
 
-  function runOnKo(opts: { attr: LifestealOnKoAbAttr; pokemon: Pokemon; victim?: Pokemon }): boolean {
+  /**
+   * @param koSourceId - the id credited with the last (direct) attack on the
+   *   victim. Defaults to the koer's own id (so the direct-hit-KO guard passes);
+   *   pass a different id (or null) to exercise the "didn't land the KO" path.
+   */
+  function runOnKo(opts: {
+    attr: LifestealOnKoAbAttr;
+    pokemon: Pokemon;
+    victim?: Pokemon;
+    koSourceId?: number | null;
+  }): boolean {
+    const victim = (opts.victim ?? makeStubDefender()) as unknown as { turnData: unknown };
+    const sourceId = opts.koSourceId === undefined ? (opts.pokemon as unknown as { id: number }).id : opts.koSourceId;
+    victim.turnData = { attacksReceived: sourceId === null ? [] : [{ sourceId }] };
     const params = {
       pokemon: opts.pokemon,
-      victim: opts.victim ?? makeStubDefender(),
+      victim,
       simulated: true,
     } as unknown as Parameters<LifestealOnKoAbAttr["canApply"]>[0];
     return opts.attr.canApply(params);
@@ -218,6 +232,17 @@ describe("LifestealOnKoAbAttr archetype (C1e)", () => {
     it("does NOT fire when the user is fainted", () => {
       const attr = new LifestealOnKoAbAttr({ healFraction: 0.25 });
       expect(runOnKo({ attr, pokemon: makeStubKoer({ fainted: true }) })).toBe(false);
+    });
+
+    it("does NOT fire when a DIFFERENT Pokémon landed the KO (not on any field KO)", () => {
+      const attr = new LifestealOnKoAbAttr({ healFraction: 0.25 });
+      // KO credited to id 999, but the ability holder is id 7 → must not heal.
+      expect(runOnKo({ attr, pokemon: makeStubKoer({ id: 7 }), koSourceId: 999 })).toBe(false);
+    });
+
+    it("does NOT fire on an indirect KO (no attacksReceived — weather/status)", () => {
+      const attr = new LifestealOnKoAbAttr({ healFraction: 0.25 });
+      expect(runOnKo({ attr, pokemon: makeStubKoer({ id: 7 }), koSourceId: null })).toBe(false);
     });
   });
 

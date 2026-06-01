@@ -353,7 +353,7 @@ export const ER_ABILITY_ROM_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "seaweed": "If user is Grass-type, they take half damage from Fire-type attacks and deals 2x damage to Fire-type Pokemon with Grass- type moves. Multiplicative with other sources of damage reduction.",
   "psychicmind": "Boosts the power of Psychic- type moves by 20%, or by 50% at 1/3 HP or lower.",
   "poisonabsorb": "The user draws in Poison-type moves and gains immunity to them, healing for 1/4th of max HP instead. Additionally, heals 1/8th of max HP per turn on Toxic Terrain.",
-  "scavenger": "When this Pokemon defeats an opponent with a direct hit, it immediately regains 25% of its maximum HP.",
+  "scavenger": "When this Pokemon defeats an opponent with a direct hit, it immediately regains 25% of its maximum HP and has a 50% chance to scavenge (steal) one of the defeated Pokemon's held items.",
   "twistdimension": "Sets up Trick Room on entry, lasts 3 turns.",
   "multiheaded": "Attack 2-3 times per move based on number of heads. Two-headed Pokemon strike twice (1st hit does 100%, 2nd does 25%), three- headed hit thrice (1st hit does 100%, 2nd does 20%, 3rd does 15%). Each hit rolls secondary effects independently (except flinch). Bypasses Fort Knox/Wonder Skin.",
   "northwind": "Sets up Aurora Veil upon entering battle, cutting physical and special damage recieved by half for your entire team. Aurora Veil lasts 3 turns, or 5 turns with Light Clay. The user is also immune to Hail damage. Cannot trigger again if Aurora Veil is already active.",

@@ -147,7 +147,7 @@ import { ForceFoeOutOnInactivityAbAttr } from "#data/elite-redux/archetypes/forc
 import { HitMultiplierAbAttr, HitMultiplierPowerAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
 import { HpThresholdFormChangeAbAttr } from "#data/elite-redux/archetypes/hp-threshold-form-change";
 import { TypeAbsorbHealAbAttr, TypeAbsorbStatBoostAbAttr } from "#data/elite-redux/archetypes/immunity-with-absorb";
-import { LifestealOnHitAbAttr, LifestealOnKoAbAttr } from "#data/elite-redux/archetypes/lifesteal";
+import { LifestealOnHitAbAttr, LifestealOnKoAbAttr, ScavengerLootAbAttr } from "#data/elite-redux/archetypes/lifesteal";
 import { MoveFlagInjectionAbAttr } from "#data/elite-redux/archetypes/move-flag-injection";
 import { MovingFirstTrapFlinchAbAttr } from "#data/elite-redux/archetypes/moving-first-trap-flinch";
 import { NullifyFirstNHitsAbAttr } from "#data/elite-redux/archetypes/nullify-first-n-hits";
@@ -3380,6 +3380,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // primitives we don't yet expose (per-flag accuracy-mod, ally auras,
     // BattlerTag-keyed damage filters). Those are marked partial wire.
     // -------------------------------------------------------------------------
+    case 345:
+      // Scavenger — "Dealing a (direct-hit) KO heals 1/4 max HP, and has a 50%
+      // chance to loot a random held item from the defeated foe." Both gated to
+      // the Pokémon that actually landed the knockout (LifestealOnKo +
+      // ScavengerLoot share the same direct-hit-KO guard).
+      return ok([new LifestealOnKoAbAttr({ healFraction: 0.25 }), new ScavengerLootAbAttr({ chance: 0.5 })]);
     case 348:
       // North Wind — "3 turns Aurora Veil on entry. Immune to Hail damage."
       // Wire BOTH: EntryEffectAbAttr (Aurora Veil 3 turns) +

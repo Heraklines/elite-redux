@@ -144,7 +144,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   342: { erAbilityId: 342, archetype: "bespoke", params: null },
   343: { erAbilityId: 343, archetype: "type-damage-boost", params: {"type":"PSYCHIC","multiplier":1.2,"lowHpMultiplier":1.5,"lowHpThreshold":0.3333333333333333} },
   344: { erAbilityId: 344, archetype: "type-resist-or-absorb", params: {"type":"POISON","effect":{"kind":"absorb","redirect":true,"healPct":0.25}} },
-  345: { erAbilityId: 345, archetype: "lifesteal", params: {"trigger":"on-ko","healFraction":0.25} },
+  345: { erAbilityId: 345, archetype: "bespoke", params: null },
   346: { erAbilityId: 346, archetype: "entry-effect", params: {"effect":{"kind":"set-screen-or-room","tag":"TRICK_ROOM","turns":3}} },
   347: { erAbilityId: 347, archetype: "bespoke", params: null },
   348: { erAbilityId: 348, archetype: "bespoke", params: null },
