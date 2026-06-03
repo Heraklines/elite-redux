@@ -27,11 +27,13 @@ type StubPokemonOpts = {
   hpRatio?: number;
   status?: StatusEffect | null;
   confused?: boolean;
+  tags?: readonly BattlerTagType[];
   statStages?: Partial<Record<Stat, number>>;
 };
 
 function makeStubPokemon(opts: StubPokemonOpts = {}): Pokemon {
   const stages: Partial<Record<Stat, number>> = opts.statStages ?? {};
+  const tags = new Set<BattlerTagType>(opts.tags ?? []);
   return {
     getHpRatio: () => opts.hpRatio ?? 1,
     status: opts.status == null ? null : { effect: opts.status },
@@ -39,7 +41,7 @@ function makeStubPokemon(opts: StubPokemonOpts = {}): Pokemon {
       if (tag === BattlerTagType.CONFUSED && opts.confused) {
         return {};
       }
-      return null;
+      return tags.has(tag) ? {} : null;
     },
     getStatStage: (stat: Stat) => stages[stat] ?? 0,
   } as unknown as Pokemon;
@@ -229,6 +231,37 @@ describe("ConditionalDamageAbAttr archetype (C1)", () => {
         attr,
         subject: makeStubPokemon(),
         target: makeStubPokemon({ confused: false }),
+        initialPower: 100,
+      });
+      expect(result.fired).toBe(false);
+    });
+  });
+
+  describe("target-has-tag condition (Blood Stigma — 2x vs bleeding)", () => {
+    it("fires when the target carries the configured tag (ER_BLEED)", () => {
+      const attr = new ConditionalDamageAbAttr({
+        condition: { kind: "target-has-tag", tag: BattlerTagType.ER_BLEED },
+        multiplier: 2.0,
+      });
+      const result = runBoost({
+        attr,
+        subject: makeStubPokemon(),
+        target: makeStubPokemon({ tags: [BattlerTagType.ER_BLEED] }),
+        initialPower: 100,
+      });
+      expect(result.fired).toBe(true);
+      expect(result.finalPower).toBe(200);
+    });
+
+    it("does NOT fire when the target lacks the tag", () => {
+      const attr = new ConditionalDamageAbAttr({
+        condition: { kind: "target-has-tag", tag: BattlerTagType.ER_BLEED },
+        multiplier: 2.0,
+      });
+      const result = runBoost({
+        attr,
+        subject: makeStubPokemon(),
+        target: makeStubPokemon({ tags: [] }),
         initialPower: 100,
       });
       expect(result.fired).toBe(false);

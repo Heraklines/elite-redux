@@ -2,10 +2,12 @@
  * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
  * SPDX-License-Identifier: AGPL-3.0-only
  */
-// ER trainer import adapts to PokeRogue's curve: the roster TIER scales with
-// the wave (easy early → insane/hell at boss waves), and ER-trainer selection
-// is wave-seeded so every trainer of a class is reachable across a run.
+// ER trainer roster TIER is driven by the player's chosen run difficulty
+// (Ace → party, Elite → insane, Hell → hell), with a one-notch bump on boss
+// waves. ER-trainer selection is wave-seeded so every trainer of a class is
+// reachable across a run.
 
+import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { findErTrainersForType } from "#data/elite-redux/er-trainer-overlay";
 import { clearErTrainerCacheForTests, pickTierForWave } from "#data/elite-redux/er-trainer-runtime-hook";
 import { AbilityId } from "#enums/ability-id";
@@ -26,6 +28,7 @@ describe("ER trainer import — curve adaptation", () => {
   beforeEach(() => {
     game = new GameManager(phaserGame);
     clearErTrainerCacheForTests();
+    resetErDifficulty(); // default = "ace"
     game.override
       .criticalHits(false)
       .battleStyle("single")
@@ -35,14 +38,30 @@ describe("ER trainer import — curve adaptation", () => {
       .randomTrainer({ trainerType: TrainerType.ACE_TRAINER });
   });
 
-  it("uses the easy 'party' tier at an early wave", async () => {
+  it("Ace difficulty uses the easy 'party' tier at a normal wave", async () => {
     game.override.startingWave(5);
     await game.classicMode.startBattle(SpeciesId.MAGIKARP);
     const trainer = game.scene.currentBattle.trainer!;
     expect(pickTierForWave(trainer)).toBe("party");
   });
 
-  it("uses the full 'hell' tier at a boss wave (wave % 10 === 0)", async () => {
+  it("Ace difficulty bumps to 'insane' on a boss wave (wave % 10 === 0)", async () => {
+    game.override.startingWave(10);
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    const trainer = game.scene.currentBattle.trainer!;
+    expect(pickTierForWave(trainer)).toBe("insane");
+  });
+
+  it("Hell difficulty uses 'hell' at normal AND boss waves", async () => {
+    setErDifficulty("hell");
+    game.override.startingWave(5);
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    const trainer = game.scene.currentBattle.trainer!;
+    expect(pickTierForWave(trainer)).toBe("hell");
+  });
+
+  it("Elite difficulty uses 'insane' normally and bumps to 'hell' on a boss wave", async () => {
+    setErDifficulty("elite");
     game.override.startingWave(10);
     await game.classicMode.startBattle(SpeciesId.MAGIKARP);
     const trainer = game.scene.currentBattle.trainer!;

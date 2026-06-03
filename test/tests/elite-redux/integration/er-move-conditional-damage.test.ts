@@ -48,17 +48,22 @@ describe.skipIf(!RUN_SCENARIOS)("ER move conditional-damage (#125)", () => {
     if (move === undefined) {
       return;
     }
+    // Use a high-SpAtk attacker (Mewtwo) into a high-HP / moderate-SpDef wall
+    // (Wobbuffet) so the per-hit damage is large. The damage formula's additive
+    // "+2" term and integer flooring make power->damage badly non-linear at low
+    // damage magnitudes (a Snorlax->Snorlax special hit deals ~30, where 2x power
+    // measured ~3.6x damage); at ~130+ damage the ratio tracks the power multiplier.
     game.override
       .battleStyle("single")
       .ability(AbilityId.NO_GUARD)
       .enemyAbility(AbilityId.BALL_FETCH)
-      .enemySpecies(SpeciesId.SNORLAX)
+      .enemySpecies(SpeciesId.WOBBUFFET)
       .enemyMoveset(MoveId.SPLASH)
       .moveset([move])
       .startingLevel(100)
       .enemyLevel(100)
       .criticalHits(false);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle([SpeciesId.MEWTWO]);
     vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
     const enemy = game.field.getEnemyPokemon();
     const player = game.field.getPlayerPokemon();

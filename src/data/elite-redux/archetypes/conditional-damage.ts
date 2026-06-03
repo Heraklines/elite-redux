@@ -58,6 +58,8 @@ export type DamageCondition =
   | DamageConditionTargetLowHp
   | DamageConditionSelfLowHp
   | DamageConditionTargetConfused
+  | DamageConditionTargetHasTag
+  | DamageConditionTargetHasAnyTag
   | DamageConditionTargetHasLoweredStat;
 
 /**
@@ -94,6 +96,27 @@ export interface DamageConditionSelfLowHp {
 /** Boost when the target has the {@linkcode BattlerTagType.CONFUSED} tag. */
 export interface DamageConditionTargetConfused {
   readonly kind: "target-confused";
+}
+
+/**
+ * Boost when the target carries a specific {@linkcode BattlerTagType} (e.g.
+ * `ER_BLEED` for Blood Stigma's "2x vs bleeding foes"). Generalizes the
+ * confused-only variant to any tag.
+ */
+export interface DamageConditionTargetHasTag {
+  readonly kind: "target-has-tag";
+  readonly tag: BattlerTagType;
+}
+
+/**
+ * Boost when the target carries ANY of the listed {@linkcode BattlerTagType}s.
+ * Used by Cosmic Daze's "2× vs confused AND enraged foes" — in ER, "enraged"
+ * is the vanilla {@linkcode BattlerTagType.TAUNT} tag, so the condition is
+ * `CONFUSED ∪ TAUNT`. Boost is applied once regardless of how many match.
+ */
+export interface DamageConditionTargetHasAnyTag {
+  readonly kind: "target-has-any-tag";
+  readonly tags: readonly BattlerTagType[];
 }
 
 /**
@@ -205,6 +228,10 @@ export class ConditionalDamageAbAttr extends MovePowerBoostAbAttr {
         return pokemon.getHpRatio() <= (condition.threshold ?? 0.5);
       case "target-confused":
         return target.getTag(BattlerTagType.CONFUSED) != null;
+      case "target-has-tag":
+        return target.getTag(condition.tag) != null;
+      case "target-has-any-tag":
+        return condition.tags.some(tag => target.getTag(tag) != null);
       case "target-has-lowered-stat":
         return ConditionalDamageAbAttr.evalAnyStatLowered(target);
     }

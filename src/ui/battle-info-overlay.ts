@@ -478,9 +478,13 @@ export class BattleInfoOverlay {
     if (main) {
       rows.push({ label: "Ability", abilityId: main.id });
     }
-    for (const id of mon.species.getPassiveAbilities(mon.formIndex)) {
-      if (id) {
-        rows.push({ label: "Innate", abilityId: id });
+    // Use the POKEMON-level passive resolver (not the species-level one): it
+    // honors per-Pokémon overrides written by the Ability Randomizer
+    // (`customPokemonData.passive/passive2/passive3`) and transform overrides,
+    // so the panel reflects runtime ability changes rather than static species data.
+    for (const ability of mon.getPassiveAbilities()) {
+      if (ability && ability.id) {
+        rows.push({ label: "Innate", abilityId: ability.id });
       }
     }
     ROW4_BOXES.slice(0, rows.length).forEach(([, by], i) => {

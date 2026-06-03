@@ -1206,6 +1206,14 @@ export class PartyUiHandler extends MessageUiHandler {
   }
 
   populatePartySlots() {
+    // Always start from a clean slate. `show()` can be re-entered via
+    // `setModeWithoutClear` (e.g. consuming a TM and then an Ability Randomizer
+    // in the same shop visit) without the previous mode being cleared; without
+    // this, stale slots from the prior mode accumulate in the container — the
+    // old slots keep rendering their labels (e.g. TM "Able/Not able") while the
+    // options menu reflects the new mode (e.g. the ability-randomizer slots).
+    this.clearPartySlots();
+
     const party = globalScene.getPlayerParty();
 
     if (this.cursor < 6 && this.cursor >= party.length) {

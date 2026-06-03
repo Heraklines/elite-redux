@@ -71,21 +71,35 @@ describe("Moves - Entry Hazards", () => {
       expect(game).toHaveArenaTag(tagType, ArenaTagSide.ENEMY);
     });
 
-    // TODO: re-enable after re-fixing hazards moves
-    it.todo("should work when all targets fainted", async () => {
+    // Regression (ER): a hazard move resolving against an already-empty enemy
+    // field used to crash (`isOpponent(undefined)` in `MovePhase.thirdFailureCheck`)
+    // and then, once that was guarded, hang the turn — either way softlocking the
+    // battle (repro: double battle, KO both foes, then an ally's queued Sticky
+    // Web / Stealth Rock resolves). With no live target the hazard now fails
+    // gracefully so the turn finishes instead of softlocking. (Actually landing
+    // the hazard on a fully-empty side is a separate unimplemented feature; an
+    // empty enemy side means the wave is already won, so nothing is lost.)
+    it("fails gracefully (no softlock) when all targets have fainted", async () => {
       game.override.battleStyle("double");
       await game.classicMode.startBattle(SpeciesId.RAYQUAZA, SpeciesId.SHUCKLE);
 
       const [enemy1, enemy2] = game.scene.getEnemyField();
+      const ally = game.scene.getPlayerField()[1];
 
       game.move.use(MoveId.SPLASH, BattlerIndex.PLAYER);
       game.move.use(move, BattlerIndex.PLAYER_2);
       await game.doKillOpponents();
-      await game.toEndOfTurn();
+      // Killing the whole enemy side ends the wave in victory, so wait for the
+      // post-battle reward phase rather than an end-of-turn that never comes.
+      // Reaching it at all proves the turn resolved instead of softlocking on the
+      // hazard move that had no live target.
+      await game.phaseInterceptor.to("SelectModifierPhase", false);
 
       expect(enemy1).toHaveFainted();
       expect(enemy2).toHaveFainted();
-      expect(game).toHaveArenaTag(tagType, ArenaTagSide.ENEMY);
+      // The hazard move failed (no live target) rather than landing on the empty side.
+      expect(ally).toHaveUsedMove({ move, result: MoveResult.FAIL });
+      expect(game).not.toHaveArenaTag(tagType, ArenaTagSide.ENEMY);
     });
 
     const maxLayers = tagType === ArenaTagType.SPIKES ? 3 : tagType === ArenaTagType.TOXIC_SPIKES ? 2 : 1;

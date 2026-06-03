@@ -87,7 +87,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   285: { erAbilityId: 285, archetype: "bespoke", params: null },
   286: { erAbilityId: 286, archetype: "bespoke", params: null },
   287: { erAbilityId: 287, archetype: "bespoke", params: null },
-  288: { erAbilityId: 288, archetype: "priority-modifier", params: {"priority":1} },
+  288: { erAbilityId: 288, archetype: "bespoke", params: null },
   289: { erAbilityId: 289, archetype: "bespoke", params: null },
   290: { erAbilityId: 290, archetype: "stat-trigger-on-event", params: {"trigger":"on-hit","stats":[{"stat":"DEF","stages":1},{"stat":"SPDEF","stages":1}],"filter":{"types":["FLYING","FIRE"]}} },
   291: { erAbilityId: 291, archetype: "bespoke", params: null },
@@ -95,23 +95,23 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   293: { erAbilityId: 293, archetype: "bespoke", params: null },
   294: { erAbilityId: 294, archetype: "entry-effect", params: {"effect":{"kind":"add-self-type","type":"WATER"}} },
   295: { erAbilityId: 295, archetype: "chance-status-on-hit", params: {"chance":50,"status":"CONFUSION","filter":{"flag":"SOUND_BASED"},"direction":"offense"} }, // Loud Bang: holder's SOUND move confuses the foe (C-source attacker block ~9316)
-  296: { erAbilityId: 296, archetype: "damage-reduction-generic", params: {"filter":{"kind":"physical"},"reduction":0.4} },
+  296: { erAbilityId: 296, archetype: "bespoke", params: null }, // Lead Coat: 40% physical damage reduction AND 0.9x Speed (composite — see dispatchBespoke)
   297: { erAbilityId: 297, archetype: "bespoke", params: null },
   298: { erAbilityId: 298, archetype: "entry-effect", params: {"effect":{"kind":"add-self-type","type":"GROUND"}} },
   299: { erAbilityId: 299, archetype: "bespoke", params: null },
   300: { erAbilityId: 300, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"FIGHTING","multiplier":1.2} },
   301: { erAbilityId: 301, archetype: "bespoke", params: null },
-  302: { erAbilityId: 302, archetype: "priority-modifier", params: {"priority":1} },
+  302: { erAbilityId: 302, archetype: "bespoke", params: null },
   303: { erAbilityId: 303, archetype: "bespoke", params: null }, // Fossilized: Rock +20% offense AND halves Rock dmg taken (composite — see dispatchBespoke)
   304: { erAbilityId: 304, archetype: "bespoke", params: null },
   305: { erAbilityId: 305, archetype: "conditional-damage", params: {"condition":{"kind":"target-asleep"},"multiplier":2} },
-  306: { erAbilityId: 306, archetype: "type-damage-boost", params: {"type":"DARK","multiplier":1.25} },
+  306: { erAbilityId: 306, archetype: "bespoke", params: null }, // Nocturnal: Dark moves +1.25x AND -25% dmg from Dark/Fairy (composite — see dispatchBespoke)
   307: { erAbilityId: 307, archetype: "passive-recovery", params: {"healFraction":0.0625} },
   308: { erAbilityId: 308, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"GROUND","multiplier":1.2} },
   309: { erAbilityId: 309, archetype: "entry-effect", params: {"effect":{"kind":"add-self-type","type":"ICE"}} },
   310: { erAbilityId: 310, archetype: "entry-effect", params: {"effect":{"kind":"add-self-type","type":"DRAGON"}} },
-  311: { erAbilityId: 311, archetype: "damage-reduction-generic", params: {"filter":{"kind":"contact"},"reduction":0.5} },
-  312: { erAbilityId: 312, archetype: "entry-effect", params: {"effect":{"kind":"add-self-type","type":"DRAGON"}} },
+  311: { erAbilityId: 311, archetype: "bespoke", params: null }, // Liquified: 1/2 contact dmg AND takes 2x from Water moves (composite — see dispatchBespoke)
+  312: { erAbilityId: 312, archetype: "bespoke", params: null }, // Dragonfly: add Dragon type on entry AND Ground immunity (composite — see dispatchBespoke)
   313: { erAbilityId: 313, archetype: "bespoke", params: null },
   314: { erAbilityId: 314, archetype: "bespoke", params: null },
   315: { erAbilityId: 315, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"WATER","multiplier":1.2} },
@@ -127,7 +127,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   325: { erAbilityId: 325, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"POISON","multiplier":1.2} },
   326: { erAbilityId: 326, archetype: "bespoke", params: null },
   327: { erAbilityId: 327, archetype: "bespoke", params: null },
-  328: { erAbilityId: 328, archetype: "status-immunity", params: {"statuses":[],"tags":["INTIMIDATE","SCARE"]} },
+  328: { erAbilityId: 328, archetype: "bespoke", params: null }, // Overwhelm: Dragon hits Fairy for neutral AND immune to Intimidate/Scare (composite — see dispatchBespoke)
   329: { erAbilityId: 329, archetype: "bespoke", params: null },
   330: { erAbilityId: 330, archetype: "bespoke", params: null },
   331: { erAbilityId: 331, archetype: "lifesteal", params: {"trigger":"on-ko","healFraction":0.25} },
@@ -138,12 +138,16 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   336: { erAbilityId: 336, archetype: "type-damage-boost", params: {"type":"ELECTRIC","multiplier":1.35,"recoilPct":0.1} },
   337: { erAbilityId: 337, archetype: "bespoke", params: null }, // Raw Wood: Grass +20% offense AND halves Grass dmg taken (composite — see dispatchBespoke)
   338: { erAbilityId: 338, archetype: "chance-status-on-hit", params: {"chance":50,"status":"TOXIC","filter":{"flag":"STRONG_JAW"},"direction":"offense"} }, // Solenoglyphs: holder's BITING move badly poisons target (C-source attacker block ~9524)
-  339: { erAbilityId: 339, archetype: "entry-effect", params: {"effect":{"kind":"set-hazard","hazard":"STICKY_WEB","layers":1}} },
+  // Spider Lair — "Sets Sticky Web on the OPPONENT's field. Lasts 5 turns,
+  // unremovable." Mechanically identical to Foamy Web (949): use the dedicated
+  // FOAMY_WEB hazard on the foe side (5-turn, absent from Rapid Spin/Defog lists).
+  // Was STICKY_WEB with no side → laid a permanent, removable web on BOTH sides.
+  339: { erAbilityId: 339, archetype: "entry-effect", params: {"effect":{"kind":"set-hazard","hazard":"FOAMY_WEB","side":"foe","layers":1}} },
   340: { erAbilityId: 340, archetype: "bespoke", params: null },
   341: { erAbilityId: 341, archetype: "bespoke", params: null },
   342: { erAbilityId: 342, archetype: "bespoke", params: null },
   343: { erAbilityId: 343, archetype: "type-damage-boost", params: {"type":"PSYCHIC","multiplier":1.2,"lowHpMultiplier":1.5,"lowHpThreshold":0.3333333333333333} },
-  344: { erAbilityId: 344, archetype: "type-resist-or-absorb", params: {"type":"POISON","effect":{"kind":"absorb","redirect":true,"healPct":0.25}} },
+  344: { erAbilityId: 344, archetype: "bespoke", params: null }, // Poison Absorb: absorb Poison moves (heal 25%) AND heal 1/8 each turn on Toxic Terrain (composite — see dispatchBespoke)
   345: { erAbilityId: 345, archetype: "bespoke", params: null },
   346: { erAbilityId: 346, archetype: "entry-effect", params: {"effect":{"kind":"set-screen-or-room","tag":"TRICK_ROOM","turns":3}} },
   347: { erAbilityId: 347, archetype: "bespoke", params: null },
@@ -179,14 +183,14 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   378: { erAbilityId: 378, archetype: "bespoke", params: null },
   379: { erAbilityId: 379, archetype: "type-resist-or-absorb", params: {"type":"ICE","effect":{"kind":"absorb","redirect":true,"statBoost":{"stat":"ATK","stages":1}}} },
   380: { erAbilityId: 380, archetype: "bespoke", params: null },
-  381: { erAbilityId: 381, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"BUG","multiplier":1.2} },
+  381: { erAbilityId: 381, archetype: "bespoke", params: null },
   382: { erAbilityId: 382, archetype: "bespoke", params: null },
   383: { erAbilityId: 383, archetype: "bespoke", params: null },
   384: { erAbilityId: 384, archetype: "bespoke", params: null },
-  385: { erAbilityId: 385, archetype: "lifesteal", params: {"trigger":"on-hit-deal","healFraction":0.5} },
+  385: { erAbilityId: 385, archetype: "bespoke", params: null }, // Nosferatu: contact moves +20% dmg AND heal 1/2 of dmg dealt (composite — see dispatchBespoke)
   386: { erAbilityId: 386, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"GHOST","multiplier":1.2} },
-  387: { erAbilityId: 387, archetype: "chance-status-on-hit", params: {"chance":30,"status":"TOXIC","direction":"offense"} }, // Spectral Shroud: holder's move badly poisons the foe (C-source attacker block ~9577)
-  388: { erAbilityId: 388, archetype: "status-immunity", params: {"statuses":["CONFUSION"],"tags":["INTIMIDATE"]} },
+  387: { erAbilityId: 387, archetype: "bespoke", params: null }, // Spectral Shroud: Spectralize (Normal→Ghost +1.2x) AND moves 30% badly-poison (composite — see dispatchBespoke)
+  388: { erAbilityId: 388, archetype: "bespoke", params: null }, // Discipline: immune to confusion + Intimidate/Scare (CONFUSION isn't a vanilla StatusEffect — needs BattlerTagImmunity; see dispatchBespoke)
   389: { erAbilityId: 389, archetype: "bespoke", params: null },
   390: { erAbilityId: 390, archetype: "composite-vanilla-mashup", params: {"parts":["50% more damage to Water-types","Infiltrator"]} },
   391: { erAbilityId: 391, archetype: "flag-damage-boost", params: {"flag":"MIGHTY_HORN","multiplier":1.3} },
@@ -197,7 +201,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   396: { erAbilityId: 396, archetype: "bespoke", params: null },
   397: { erAbilityId: 397, archetype: "bespoke", params: null },
   398: { erAbilityId: 398, archetype: "bespoke", params: null },
-  399: { erAbilityId: 399, archetype: "damage-reduction-generic", params: {"filter":{"kind":"all"},"reduction":0.2} },
+  399: { erAbilityId: 399, archetype: "bespoke", params: null }, // Parry: 20% all-damage reduction AND counters contact with 20 BP Mach Punch (composite — see dispatchBespoke)
   400: { erAbilityId: 400, archetype: "bespoke", params: null },
   401: { erAbilityId: 401, archetype: "bespoke", params: null },
   403: { erAbilityId: 403, archetype: "bespoke", params: null },
@@ -205,7 +209,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   405: { erAbilityId: 405, archetype: "bespoke", params: null },
   406: { erAbilityId: 406, archetype: "bespoke", params: null },
   407: { erAbilityId: 407, archetype: "bespoke", params: null },
-  408: { erAbilityId: 408, archetype: "chance-status-on-hit", params: {"chance":10,"status":"FEAR","onContactOnly":false} },
+  408: { erAbilityId: 408, archetype: "bespoke", params: null }, // Fearmonger: Intimidate+Scare on entry (ATK+SpAtk -1 to foes) AND 10% fear on contact (composite — see dispatchBespoke)
   409: { erAbilityId: 409, archetype: "stat-trigger-on-event", params: {"trigger":"on-stat-lowered","stats":[{"stat":"ATK","stages":1},{"stat":"DEF","stages":1}]} },
   410: { erAbilityId: 410, archetype: "stat-trigger-on-event", params: {"trigger":"on-stat-lowered","stats":[{"stat":"SPATK","stages":1},{"stat":"SPDEF","stages":1}]} },
   411: { erAbilityId: 411, archetype: "bespoke", params: null },
@@ -230,7 +234,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   430: { erAbilityId: 430, archetype: "priority-modifier", params: {"condition":{"kind":"max-hp"},"priority":1,"filter":{"type":"ELECTRIC"}} },
   431: { erAbilityId: 431, archetype: "bespoke", params: null },
   432: { erAbilityId: 432, archetype: "type-damage-boost", params: {"type":"FIRE","multiplier":1.35,"recoilPct":0.05} },
-  433: { erAbilityId: 433, archetype: "multi-hit-override", params: {"filter":{"kind":"flag","flag":"KEEN_EDGE"},"hits":2} },
+  433: { erAbilityId: 433, archetype: "bespoke", params: null }, // Dual Wield: Mega Launcher AND Keen Edge moves hit twice, both hits 70% (composite — see dispatchBespoke)
   434: { erAbilityId: 434, archetype: "bespoke", params: null },
   435: { erAbilityId: 435, archetype: "bespoke", params: null },
   436: { erAbilityId: 436, archetype: "entry-effect", params: {"effect":{"kind":"set-screen-or-room","tag":"GRAVITY","turns":8}} },
@@ -254,10 +258,10 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   459: { erAbilityId: 459, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"PSYCHIC","multiplier":1.2} },
   460: { erAbilityId: 460, archetype: "composite-vanilla-mashup", params: {"parts":["Technician","Skill Link"]} },
   461: { erAbilityId: 461, archetype: "bespoke", params: null },
-  462: { erAbilityId: 462, archetype: "flag-damage-boost", params: {"flag":"PUNCHING_MOVE","multiplier":1.3} },
+  462: { erAbilityId: 462, archetype: "bespoke", params: null }, // Combat Specialist: punching AND kicking +30% — the flag-damage-boost row only covered PUNCHING; bespoke case wires both (see dispatchBespoke)
   463: { erAbilityId: 463, archetype: "bespoke", params: null },
   464: { erAbilityId: 464, archetype: "bespoke", params: null },
-  465: { erAbilityId: 465, archetype: "type-damage-boost", params: {"type":"FAIRY","multiplier":1.33} },
+  465: { erAbilityId: 465, archetype: "bespoke", params: null }, // Pixie Power: field-wide Fairy +1.33x (Fairy-Aura style, Aura-Break-affected) AND 1.2x accuracy (composite — see dispatchBespoke)
   466: { erAbilityId: 466, archetype: "bespoke", params: null },
   467: { erAbilityId: 467, archetype: "composite-vanilla-mashup", params: {"parts":["Predator","Molten Down"]} },
   468: { erAbilityId: 468, archetype: "bespoke", params: null },
@@ -288,7 +292,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   494: { erAbilityId: 494, archetype: "bespoke", params: null },
   495: { erAbilityId: 495, archetype: "bespoke", params: null },
   496: { erAbilityId: 496, archetype: "bespoke", params: null },
-  497: { erAbilityId: 497, archetype: "chance-status-on-hit", params: {"chance":30,"status":"INFATUATION","direction":"offense"} }, // Yuki Onna: 30% infatuate on hit (offensive per desc)
+  497: { erAbilityId: 497, archetype: "bespoke", params: null }, // Yuki Onna: entry Intimidate+Scare (ATK/SpAtk -1) AND 30% infatuate offensively+defensively (composite — see dispatchBespoke)
   498: { erAbilityId: 498, archetype: "bespoke", params: null },
   499: { erAbilityId: 499, archetype: "composite-vanilla-mashup", params: {"parts":["Filter","Illuminate"]} },
   500: { erAbilityId: 500, archetype: "bespoke", params: null },
@@ -324,11 +328,11 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   531: { erAbilityId: 531, archetype: "bespoke", params: null },
   532: { erAbilityId: 532, archetype: "bespoke", params: null },
   533: { erAbilityId: 533, archetype: "stat-trigger-on-event", params: {"trigger":"on-ko","stats":[{"stat":"SPATK","stages":1}]} },
-  534: { erAbilityId: 534, archetype: "conditional-damage", params: {"condition":{"kind":"target-confused"},"multiplier":2} },
+  534: { erAbilityId: 534, archetype: "bespoke", params: null },
   536: { erAbilityId: 536, archetype: "bespoke", params: null },
   537: { erAbilityId: 537, archetype: "chance-status-on-hit", params: {"chance":30,"status":"BLEED","onContactOnly":true,"direction":"both"} }, // Spike Armor: bleed on contact (defense) or offense (desc)
   538: { erAbilityId: 538, archetype: "chance-status-on-hit", params: {"chance":30,"status":"BLEED","onContactOnly":false} },
-  539: { erAbilityId: 539, archetype: "damage-reduction-generic", params: {"filter":{"kind":"special"},"reduction":0.4} },
+  539: { erAbilityId: 539, archetype: "bespoke", params: null }, // Chrome Coat: 40% special damage reduction AND 0.9x Speed (special-side twin of Lead Coat 296 — see dispatchBespoke)
   540: { erAbilityId: 540, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"GHOST","multiplier":1.2,"flag":"SOUND_BASED"} },
   541: { erAbilityId: 541, archetype: "bespoke", params: null },
   542: { erAbilityId: 542, archetype: "composite-vanilla-mashup", params: {"parts":["Ambush","Violent Rush"]} },
@@ -361,8 +365,8 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   590: { erAbilityId: 590, archetype: "composite-vanilla-mashup", params: {"parts":["Sweeping Edge","Keen Edge"]} },
   591: { erAbilityId: 591, archetype: "bespoke", params: null },
   592: { erAbilityId: 592, archetype: "bespoke", params: null },
-  593: { erAbilityId: 593, archetype: "chance-status-on-hit", params: {"chance":20,"status":"BURN","filter":{"flag":"KEEN_EDGE"},"direction":"offense"} }, // Molten Blades: holder's KEEN-EDGE move burns (desc)
-  594: { erAbilityId: 594, archetype: "chance-status-on-hit", params: {"chance":20,"status":"FLINCH","direction":"offense"} }, // Haunting Frenzy: holder's move flinches the opponent (desc)
+  593: { erAbilityId: 593, archetype: "bespoke", params: null }, // Molten Blades: Keen Edge moves +30% AND 20% burn (composite — see dispatchBespoke)
+  594: { erAbilityId: 594, archetype: "bespoke", params: null }, // Haunting Frenzy: 20% flinch AND +1 Speed on KO (composite — see dispatchBespoke)
   595: { erAbilityId: 595, archetype: "bespoke", params: null },
   596: { erAbilityId: 596, archetype: "chance-status-on-hit", params: {"chance":20,"status":"DISABLE","filter":{"flag":"SOUND_BASED"},"direction":"offense"} }, // Radio Jam: holder's SOUND move disables target (desc)
   597: { erAbilityId: 597, archetype: "bespoke", params: null },
@@ -383,7 +387,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   615: { erAbilityId: 615, archetype: "composite-vanilla-mashup", params: {"parts":["Strong Jaw","Flaming Jaws"]} },
   616: { erAbilityId: 616, archetype: "bespoke", params: null },
   617: { erAbilityId: 617, archetype: "type-damage-boost", params: {"type":"ROCK","multiplier":1.2,"lowHpMultiplier":1.5,"lowHpThreshold":0.3333333333333333} },
-  618: { erAbilityId: 618, archetype: "chance-status-on-hit", params: {"chance":30,"status":"CONFUSION","onContactOnly":true} },
+  618: { erAbilityId: 618, archetype: "bespoke", params: null }, // Fragrant Daze: 30% confuse on contact, offensively AND defensively (composite — see dispatchBespoke)
   619: { erAbilityId: 619, archetype: "bespoke", params: null },
   620: { erAbilityId: 620, archetype: "composite-vanilla-mashup", params: {"parts":["Seaweed","Water STAB"]} },
   621: { erAbilityId: 621, archetype: "bespoke", params: null },
@@ -407,11 +411,11 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   639: { erAbilityId: 639, archetype: "bespoke", params: null },
   640: { erAbilityId: 640, archetype: "bespoke", params: null },
   641: { erAbilityId: 641, archetype: "bespoke", params: null },
-  642: { erAbilityId: 642, archetype: "multi-hit-override", params: {"filter":{"kind":"all"},"hits":2} },
+  642: { erAbilityId: 642, archetype: "bespoke", params: null }, // Jackhammer: Hammer moves hit twice at 70% (was all-moves, full power) — see dispatchBespoke
   643: { erAbilityId: 643, archetype: "bespoke", params: null },
-  644: { erAbilityId: 644, archetype: "multi-hit-override", params: {"filter":{"kind":"all"},"hits":2} },
+  644: { erAbilityId: 644, archetype: "bespoke", params: null }, // Ice Cold Hunter: Ice moves hit twice IN HAIL (full power) + hail immunity (composite — see dispatchBespoke)
   645: { erAbilityId: 645, archetype: "bespoke", params: null },
-  646: { erAbilityId: 646, archetype: "chance-status-on-hit", params: {"chance":50,"status":"BURN","onContactOnly":false} },
+  646: { erAbilityId: 646, archetype: "bespoke", params: null }, // Arc Flash: 50% burn when hit AND 50% paralyze when attacking on contact (composite — see dispatchBespoke)
   647: { erAbilityId: 647, archetype: "composite-vanilla-mashup", params: {"parts":["Mighty Horn","Pixilate"]} },
   648: { erAbilityId: 648, archetype: "bespoke", params: null },
   649: { erAbilityId: 649, archetype: "bespoke", params: null },
@@ -443,7 +447,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   675: { erAbilityId: 675, archetype: "composite-vanilla-mashup", params: {"parts":["Speed Boost","Slipstream"]} },
   676: { erAbilityId: 676, archetype: "bespoke", params: null },
   677: { erAbilityId: 677, archetype: "bespoke", params: null },
-  678: { erAbilityId: 678, archetype: "damage-reduction-generic", params: {"filter":{"kind":"contact"},"reduction":0.75} },
+  678: { erAbilityId: 678, archetype: "bespoke", params: null }, // Fluffiest: 1/4 contact dmg AND takes 4x from Fire (composite — see dispatchBespoke)
   679: { erAbilityId: 679, archetype: "composite-vanilla-mashup", params: {"parts":["Inner Focus","Precise Fist"]} },
   680: { erAbilityId: 680, archetype: "composite-vanilla-mashup", params: {"parts":["Pretentious","Swift Swim"]} },
   681: { erAbilityId: 681, archetype: "composite-vanilla-mashup", params: {"parts":["Iron Fist","30% Steel type damage"]} },
@@ -473,18 +477,18 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   706: { erAbilityId: 706, archetype: "composite-vanilla-mashup", params: {"parts":["Strong Jaw","Bite moves have 50% paralysis chance"]} },
   707: { erAbilityId: 707, archetype: "composite-vanilla-mashup", params: {"parts":["Frisk","Scare"]} },
   708: { erAbilityId: 708, archetype: "bespoke", params: null },
-  709: { erAbilityId: 709, archetype: "crit-mod", params: {"mod":{"kind":"immune"}} },
+  709: { erAbilityId: 709, archetype: "bespoke", params: null },
   710: { erAbilityId: 710, archetype: "bespoke", params: null },
   711: { erAbilityId: 711, archetype: "bespoke", params: null },
   712: { erAbilityId: 712, archetype: "damage-reduction-generic", params: {"filter":{"kind":"super-effective"},"reduction":0.35} },
-  713: { erAbilityId: 713, archetype: "type-damage-boost", params: {"type":"WATER","multiplier":1.5} },
+  713: { erAbilityId: 713, archetype: "bespoke", params: null },
   714: { erAbilityId: 714, archetype: "composite-vanilla-mashup", params: {"parts":["Self Sufficient","Ripen"]} },
   715: { erAbilityId: 715, archetype: "bespoke", params: null },
   716: { erAbilityId: 716, archetype: "composite-vanilla-mashup", params: {"parts":["Merciless","Overcharge"]} },
   717: { erAbilityId: 717, archetype: "bespoke", params: null },
   718: { erAbilityId: 718, archetype: "bespoke", params: null },
   719: { erAbilityId: 719, archetype: "bespoke", params: null },
-  720: { erAbilityId: 720, archetype: "chance-status-on-hit", params: {"chance":60,"status":"PARALYSIS","direction":"offense"} }, // Stun Shock: holder's attack paralyzes target (desc; "or poison" approximated to paralysis)
+  720: { erAbilityId: 720, archetype: "bespoke", params: null }, // Stun Shock: 60% to paralyze OR poison (random) — bespoke for the two-effect roll
   721: { erAbilityId: 721, archetype: "composite-vanilla-mashup", params: {"parts":["Rampage","Hyper Aggressive"]} },
   722: { erAbilityId: 722, archetype: "bespoke", params: null },
   724: { erAbilityId: 724, archetype: "bespoke", params: null },
@@ -501,7 +505,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   735: { erAbilityId: 735, archetype: "bespoke", params: null },
   736: { erAbilityId: 736, archetype: "bespoke", params: null },
   737: { erAbilityId: 737, archetype: "bespoke", params: null },
-  738: { erAbilityId: 738, archetype: "status-immunity", params: {"statuses":["SLEEP"]} },
+  738: { erAbilityId: 738, archetype: "bespoke", params: null },
   740: { erAbilityId: 740, archetype: "bespoke", params: null },
   741: { erAbilityId: 741, archetype: "composite-vanilla-mashup", params: {"parts":["Swift Swim","Stall"]} },
   742: { erAbilityId: 742, archetype: "bespoke", params: null },
@@ -515,10 +519,10 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   750: { erAbilityId: 750, archetype: "bespoke", params: null },
   751: { erAbilityId: 751, archetype: "bespoke", params: null },
   752: { erAbilityId: 752, archetype: "entry-effect", params: {"effect":{"kind":"set-hazard","hazard":"STICKY_WEB","layers":1}} },
-  753: { erAbilityId: 753, archetype: "crit-mod", params: {"mod":{"kind":"immune"}} },
-  754: { erAbilityId: 754, archetype: "damage-reduction-generic", params: {"filter":{"kind":"contact"},"reduction":0.5} },
+  753: { erAbilityId: 753, archetype: "bespoke", params: null },
+  754: { erAbilityId: 754, archetype: "bespoke", params: null },
   755: { erAbilityId: 755, archetype: "composite-vanilla-mashup", params: {"parts":["Inflatable","Hyper Aggressive"]} },
-  756: { erAbilityId: 756, archetype: "flag-damage-boost", params: {"flag":"KICKING_MOVE","multiplier":1.3} },
+  756: { erAbilityId: 756, archetype: "bespoke", params: null },
   757: { erAbilityId: 757, archetype: "type-damage-boost", params: {"type":"DARK","multiplier":1.35,"recoilPct":0.1} },
   758: { erAbilityId: 758, archetype: "composite-vanilla-mashup", params: {"parts":["Rock Head","Reckless"]} },
   759: { erAbilityId: 759, archetype: "composite-vanilla-mashup", params: {"parts":["Shell Armor","50BP Thunder Cage when hit by contact"]} },
@@ -562,7 +566,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   797: { erAbilityId: 797, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"DEF","stages":1}} },
   798: { erAbilityId: 798, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"SPDEF","stages":1}} },
   799: { erAbilityId: 799, archetype: "type-damage-boost", params: {"type":"ROCK","multiplier":1.3,"lowHpMultiplier":1.8,"lowHpThreshold":0.3333333333333333} },
-  800: { erAbilityId: 800, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"DARK","multiplier":1.2} },
+  800: { erAbilityId: 800, archetype: "bespoke", params: null },
   801: { erAbilityId: 801, archetype: "composite-vanilla-mashup", params: {"parts":["Leaf Guard","Harvest"]} },
   802: { erAbilityId: 802, archetype: "composite-vanilla-mashup", params: {"parts":["Chlorophyll","Solar Power"]} },
   803: { erAbilityId: 803, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"SPDEF","stages":1}} },
@@ -576,8 +580,8 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   811: { erAbilityId: 811, archetype: "composite-vanilla-mashup", params: {"parts":["Tinted Lens","Rampage"]} },
   812: { erAbilityId: 812, archetype: "bespoke", params: null },
   813: { erAbilityId: 813, archetype: "bespoke", params: null },
-  814: { erAbilityId: 814, archetype: "crit-mod", params: {"mod":{"kind":"rate-bonus","bonus":2}} },
-  815: { erAbilityId: 815, archetype: "crit-mod", params: {"mod":{"kind":"post-crit-mult","multiplier":2,"condition":"resists"}} },
+  814: { erAbilityId: 814, archetype: "bespoke", params: null },
+  815: { erAbilityId: 815, archetype: "bespoke", params: null },
   816: { erAbilityId: 816, archetype: "bespoke", params: null },
   817: { erAbilityId: 817, archetype: "bespoke", params: null },
   818: { erAbilityId: 818, archetype: "composite-vanilla-mashup", params: {"parts":["Grappler","Serpent Bind"]} },
@@ -614,7 +618,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   849: { erAbilityId: 849, archetype: "composite-vanilla-mashup", params: {"parts":["Long Reach","Grip Pincer"]} },
   850: { erAbilityId: 850, archetype: "composite-vanilla-mashup", params: {"parts":["Serene Grace","Giant Wings"]} },
   851: { erAbilityId: 851, archetype: "bespoke", params: null },
-  852: { erAbilityId: 852, archetype: "chance-status-on-hit", params: {"chance":30,"status":"POISON","direction":"offense"} }, // Envenom: holder's move poisons the target (desc)
+  852: { erAbilityId: 852, archetype: "chance-status-on-hit", params: {"chance":30,"status":"POISON","direction":"offense","onContactOnly":false} }, // Envenom: holder's move poisons the target after landing ANY move (not contact-only)
   853: { erAbilityId: 853, archetype: "bespoke", params: null },
   854: { erAbilityId: 854, archetype: "composite-vanilla-mashup", params: {"parts":["Mega Launcher","Mind Crunch"]} },
   855: { erAbilityId: 855, archetype: "bespoke", params: null },
@@ -649,7 +653,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   884: { erAbilityId: 884, archetype: "bespoke", params: null },
   885: { erAbilityId: 885, archetype: "bespoke", params: null },
   886: { erAbilityId: 886, archetype: "bespoke", params: null },
-  887: { erAbilityId: 887, archetype: "crit-mod", params: {"mod":{"kind":"immune"}} },
+  887: { erAbilityId: 887, archetype: "bespoke", params: null },
   888: { erAbilityId: 888, archetype: "bespoke", params: null },
   889: { erAbilityId: 889, archetype: "bespoke", params: null },
   890: { erAbilityId: 890, archetype: "bespoke", params: null },
@@ -784,7 +788,10 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   1019: { erAbilityId: 1019, archetype: "composite-vanilla-mashup", params: {"parts":["Amplifier","attacks with 30 BP Hyper Voice when hit"]} },
   1020: { erAbilityId: 1020, archetype: "composite-vanilla-mashup", params: {"parts":["Power Core","Aftermath"]} },
   1021: { erAbilityId: 1021, archetype: "damage-reduction-generic", params: {"filter":{"kind":"all"},"reduction":0.35} },
-  1022: { erAbilityId: 1022, archetype: "damage-reduction-generic", params: {"filter":{"kind":"all"},"reduction":0.2} },
+  // Deflect — "Counters with 20BP Vacuum Wave when hit. Takes 20% less damage."
+  // Bespoke: the damage-reduction-generic archetype only emits the reduction;
+  // the Vacuum Wave counter half needs a CounterAttackOnHit (see dispatcher).
+  1022: { erAbilityId: 1022, archetype: "bespoke", params: null },
   1023: { erAbilityId: 1023, archetype: "type-damage-boost", params: {"type":"PSYCHIC","multiplier":1.3,"lowHpMultiplier":1.8,"lowHpThreshold":0.3333333333333333} },
   1024: { erAbilityId: 1024, archetype: "composite-vanilla-mashup", params: {"parts":["Infiltrator","Competitive"]} },
   1025: { erAbilityId: 1025, archetype: "composite-vanilla-mashup", params: {"parts":["Tough Claws","Foul Energy"]} },
@@ -793,7 +800,10 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   1028: { erAbilityId: 1028, archetype: "bespoke", params: null },
   1029: { erAbilityId: 1029, archetype: "composite-vanilla-mashup", params: {"parts":["Mighty Horn","Fighting Spirit"]} },
   1030: { erAbilityId: 1030, archetype: "bespoke", params: null },
-  1031: { erAbilityId: 1031, archetype: "damage-reduction-generic", params: {"filter":{"kind":"all"},"reduction":0.1} },
+  // Rock Armor — "Rocky Exterior + takes 10% less damage from attacks." Bespoke:
+  // the damage-reduction-generic archetype only emits the 10% reduction; the
+  // Rocky Exterior half (add Rock type on entry, er-919) needs an EntryEffect.
+  1031: { erAbilityId: 1031, archetype: "bespoke", params: null },
   1032: { erAbilityId: 1032, archetype: "composite-vanilla-mashup", params: {"parts":["Raw Wood","Flame Body"]} },
   1033: { erAbilityId: 1033, archetype: "composite-vanilla-mashup", params: {"parts":["Sticky Hold","Gooey"]} },
   // 267 stripped — id-resync drift; entry no longer points to a real draft.

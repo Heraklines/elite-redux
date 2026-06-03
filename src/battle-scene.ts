@@ -30,6 +30,8 @@ import { initCommonAnims, initMoveAnim, loadCommonAnimAssets, loadMoveAnimAssets
 import { getDailyMysteryEncounter } from "#data/daily-seed/daily-run";
 import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
+import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
+import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
 import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
 import type { SpeciesFormChangeTrigger } from "#data/form-change-triggers";
 import { SpeciesFormChangeManualTrigger, SpeciesFormChangeTimeOfDayTrigger } from "#data/form-change-triggers";
@@ -1517,11 +1519,59 @@ export class BattleScene extends SceneBase {
    */
   private handleNonFixedBattle(resolved: NewBattleInitialProps): void {
     const { waveIndex } = resolved;
+    // ER ghost gauntlet (#217): begin pre-fetching ghost teams well before the
+    // endgame waves where they spawn (no-op except once, around wave 150).
+    maybePrefetchGhostTeams(waveIndex);
+
     resolved.battleType =
       !this.gameMode.hasTrainers || Overrides.DISABLE_STANDARD_TRAINERS_OVERRIDE
         ? BattleType.WILD
         : (Overrides.BATTLE_TYPE_OVERRIDE
           ?? (this.gameMode.isWaveTrainer(waveIndex) ? BattleType.TRAINER : BattleType.WILD));
+
+    // ER Elite/Hell: inject extra rival (May/Brendan) encounters between the
+    // canonical rival waves. Done BEFORE the mystery-encounter check so the
+    // forced rival isn't pre-empted by an ME (which only replaces wild waves).
+    const erRivalType = erExtraRivalTypeForWave(waveIndex);
+    if (
+      erRivalType !== null
+      && this.gameMode.hasTrainers
+      && !Overrides.DISABLE_STANDARD_TRAINERS_OVERRIDE
+      && Overrides.BATTLE_TYPE_OVERRIDE == null
+    ) {
+      resolved.battleType = BattleType.TRAINER;
+      // Mirror the canonical fixed rival construction: the rival shows as the
+      // player's opposite-gender counterpart (drives the ER May/Brendan mapping).
+      const rival = new Trainer(
+        erRivalType,
+        this.gameData.gender === PlayerGender.MALE ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT,
+      );
+      this.field.add(rival);
+      resolved.trainer = rival;
+      return;
+    }
+
+    // ER ghost gauntlet (#217): on designated endgame waves, field a stored
+    // cross-player ghost team as a "Veteran" trainer. Only when a ghost is
+    // actually available (fetch resolved / local pool non-empty); otherwise the
+    // wave proceeds normally. Done before the ME check for the same reason as rivals.
+    const ghost = takeGhostForWave(waveIndex);
+    if (
+      ghost !== null
+      && this.gameMode.hasTrainers
+      && !Overrides.DISABLE_STANDARD_TRAINERS_OVERRIDE
+      && Overrides.BATTLE_TYPE_OVERRIDE == null
+    ) {
+      resolved.battleType = BattleType.TRAINER;
+      const ghostTrainer = new Trainer(
+        TrainerType.VETERAN,
+        randSeedInt(2) ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT,
+      );
+      markTrainerAsGhost(ghostTrainer, ghost);
+      this.field.add(ghostTrainer);
+      resolved.trainer = ghostTrainer;
+      return;
+    }
 
     // Check for mystery encounter
     // Can only occur in place of a standard (non-boss) wild battle, waves 10-180

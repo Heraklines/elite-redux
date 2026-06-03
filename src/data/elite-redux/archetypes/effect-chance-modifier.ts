@@ -46,7 +46,8 @@
 //   - ER "Doubly Serene" custom: `new EffectChanceModifierAbAttr({ multiplier: 3 })`
 // =============================================================================
 
-import { MoveEffectChanceMultiplierAbAttr } from "#abilities/ab-attrs";
+import { type ModifyMoveEffectChanceAbAttrParams, MoveEffectChanceMultiplierAbAttr } from "#abilities/ab-attrs";
+import type { MoveFlags } from "#enums/move-flags";
 
 /** Construction options for {@linkcode EffectChanceModifierAbAttr}. */
 export interface EffectChanceModifierOptions {
@@ -62,6 +63,13 @@ export interface EffectChanceModifierOptions {
    * `[0, 100]` so very-high multipliers don't exceed 100%.
    */
   readonly multiplier: number;
+  /**
+   * Optional move-flag gate. When set, the multiplier applies ONLY to the
+   * holder's moves carrying this flag (e.g. `MoveFlags.PUNCHING_MOVE` for
+   * Precise Fist's "punching moves get 5x effect chance"). Omit to apply to
+   * every move (vanilla Serene Grace / Sheer Force behavior).
+   */
+  readonly flag?: MoveFlags;
 }
 
 /**
@@ -86,6 +94,7 @@ export interface EffectChanceModifierOptions {
  */
 export class EffectChanceModifierAbAttr extends MoveEffectChanceMultiplierAbAttr {
   private readonly configuredMultiplier: number;
+  private readonly flag: MoveFlags | undefined;
 
   constructor(opts: EffectChanceModifierOptions) {
     if (!(opts.multiplier >= 0)) {
@@ -94,11 +103,28 @@ export class EffectChanceModifierAbAttr extends MoveEffectChanceMultiplierAbAttr
     }
     super(opts.multiplier);
     this.configuredMultiplier = opts.multiplier;
+    this.flag = opts.flag;
   }
 
   /** Read-only accessor for the configured chance multiplier. */
   public getMultiplier(): number {
     return this.configuredMultiplier;
+  }
+
+  /** Read-only accessor for the optional move-flag gate. */
+  public getFlag(): MoveFlags | undefined {
+    return this.flag;
+  }
+
+  /**
+   * Gate the multiplier on the optional move flag, then defer to the parent's
+   * positive-chance / except-move checks.
+   */
+  public override canApply(params: ModifyMoveEffectChanceAbAttrParams): boolean {
+    if (this.flag !== undefined && !params.move.hasFlag(this.flag)) {
+      return false;
+    }
+    return super.canApply(params);
   }
 
   /**

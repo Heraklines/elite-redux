@@ -143,6 +143,12 @@ export class PokemonSummonData {
   public tags: BattlerTag[] = [];
   public abilitySuppressed = false;
   public abilitiesApplied: Set<AbilityId> = new Set();
+  /**
+   * Whether this Pokémon's ER {@linkcode AbilityId.CHUCKSTER} (864) has already
+   * spent its once-per-ENTRY charge (the contact-hit 50% damage reduction). As
+   * part of `summonData` it resets each send-out, matching "once per entry".
+   */
+  public chuckusterReductionUsed = false;
 
   // Overrides for transform and company.
   // TODO: Move these into a separate class & add rage fist hit count
@@ -324,6 +330,15 @@ export class PokemonBattleData {
    * Resets with the rest of the per-battle data; transient (not serialized).
    */
   public anticipationDodgeUsed = false;
+  /**
+   * Whether this Pokémon's ER {@linkcode AbilityId.RUDE_AWAKENING} has already
+   * fired its once-per-battle on-wake trigger (+1 all stats, then permanent
+   * sleep immunity for the rest of the battle). While `false` the holder is NOT
+   * sleep-immune (so it can be put to sleep the first time); once it wakes this
+   * flips `true`, granting the omniboost and gating the sleep immunity on.
+   * Resets with the rest of the per-battle data; transient (not serialized).
+   */
+  public rudeAwakeningTriggered = false;
 
   constructor(source?: PokemonBattleData | Partial<PokemonBattleData>) {
     if (source != null) {
@@ -331,6 +346,7 @@ export class PokemonBattleData {
       this.hasEatenBerry = source.hasEatenBerry ?? false;
       this.berriesEaten = source.berriesEaten ?? [];
       this.anticipationDodgeUsed = source.anticipationDodgeUsed ?? false;
+      this.rudeAwakeningTriggered = source.rudeAwakeningTriggered ?? false;
     }
   }
 }

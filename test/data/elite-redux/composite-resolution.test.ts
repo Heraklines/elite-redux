@@ -261,3 +261,77 @@ describe("composite dispatch wiring (D3b): sub-archetype reuse evidence", () => 
     throw new Error("no composite found with a type-damage-boost ER part — dispatch may be incomplete");
   });
 });
+
+describe("composite dispatch wiring (D3b): batch 955–974 appended riders", () => {
+  it("Fire's Wrath (er id 969) appends a non-contact 10% BURN proc (ChanceStatusOnAttack)", () => {
+    const id = ER_ID_MAP.abilities[969];
+    expect(id).toBeDefined();
+    const ability = allAbilities.find(a => a?.id === id);
+    expect(ability).toBeDefined();
+    if (!ability) {
+      return;
+    }
+    // Intimidate + Scare give the two PostSummonStatStageChange attrs; the
+    // appended rider is the offensive burn proc.
+    const burn = ability.attrs.find(a => a.constructor.name === "ChanceStatusOnAttackAbAttr");
+    expect(burn).toBeDefined();
+  });
+
+  it("Backstreet Boy (er id 974) wires the kick↔dance crossover (dance boost + DANCE injection)", () => {
+    const id = ER_ID_MAP.abilities[974];
+    expect(id).toBeDefined();
+    const ability = allAbilities.find(a => a?.id === id);
+    expect(ability).toBeDefined();
+    if (!ability) {
+      return;
+    }
+    // Two FlagDamageBoosts (Striker kicking ×1.3 from er-361 + appended dance ×1.3)
+    // and the MoveFlagInjection that makes kicking moves count as dances.
+    const flagBoosts = ability.attrs.filter(a => a.constructor.name === "FlagDamageBoostAbAttr");
+    expect(flagBoosts.length).toBeGreaterThanOrEqual(2);
+    const injection = ability.attrs.find(a => a.constructor.name === "MoveFlagInjectionAbAttr");
+    expect(injection).toBeDefined();
+  });
+});
+
+describe("composite dispatch wiring (D3b): batch 975–994 appended riders", () => {
+  it("Crushing Jaw (er id 976) appends a biting-flag 50% DEF-drop (StatDebuffOnFlagAttack)", () => {
+    const id = ER_ID_MAP.abilities[976];
+    expect(id).toBeDefined();
+    const ability = allAbilities.find(a => a?.id === id);
+    expect(ability).toBeDefined();
+    if (!ability) {
+      return;
+    }
+    // Strong Jaw gives the ×1.3 biting boost; the appended rider is the DEF drop.
+    const debuff = ability.attrs.find(a => a.constructor.name === "StatDebuffOnFlagAttackAbAttr");
+    expect(debuff).toBeDefined();
+  });
+
+  it("Mega Drill (er id 983) wires both the horn boost and the appended drill boost", () => {
+    const id = ER_ID_MAP.abilities[983];
+    expect(id).toBeDefined();
+    const ability = allAbilities.find(a => a?.id === id);
+    expect(ability).toBeDefined();
+    if (!ability) {
+      return;
+    }
+    // Mighty Horn (HORN_BASED ×1.3) + appended DRILL_BASED ×1.3.
+    const flagBoosts = ability.attrs.filter(a => a.constructor.name === "FlagDamageBoostAbAttr");
+    expect(flagBoosts.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("composite dispatch wiring (D3b): batch 1015–1033 appended riders", () => {
+  it("Icicle Fist (er id 1017) appends a punch-flag frostbite rider", () => {
+    const id = ER_ID_MAP.abilities[1017];
+    expect(id).toBeDefined();
+    const ability = allAbilities.find(a => a?.id === id);
+    expect(ability).toBeDefined();
+    if (!ability) {
+      return;
+    }
+    // Iron Fist gives the ×1.3 punch boost; the appended rider is the frostbite proc.
+    expect(ability.attrs.some(a => a.constructor.name === "PostAttackApplyBattlerTagAbAttr")).toBe(true);
+  });
+});

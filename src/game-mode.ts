@@ -12,6 +12,7 @@ import {
 } from "#data/daily-seed/daily-run";
 import { parseDailySeed } from "#data/daily-seed/daily-seed-utils";
 import { allSpecies } from "#data/data-lists";
+import { erForcesTrainerWave } from "#data/elite-redux/er-battle-frequency";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { BiomeId } from "#enums/biome-id";
 import { ChallengeType } from "#enums/challenge-type";
@@ -254,6 +255,12 @@ export class GameMode implements GameModeConfig {
             }
           }
         }
+      }
+      // ER Elite/Hell: once an otherwise-eligible wave clears the fixed-battle
+      // proximity guard, force a trainer on the difficulty cadence (in addition
+      // to — not instead of — the normal biome trainer roll). Ace is untouched.
+      if (allowTrainerBattle && erForcesTrainerWave(waveIndex)) {
+        return true;
       }
       return Boolean(allowTrainerBattle && trainerChance && !randSeedInt(trainerChance));
     }

@@ -32,6 +32,16 @@ function readEnv(name: string): string {
   return typeof value === "string" ? value : "";
 }
 
+/**
+ * Side-effect-free check for whether the LLM Director is configured (both env
+ * vars present). Unlike {@link getDirectorRuntime} this never logs, caches, or
+ * constructs anything — it is safe to call from UI hot paths (e.g. the title
+ * menu) to decide whether to surface the Director / "Story Mode" entry.
+ */
+export function isDirectorConfigured(): boolean {
+  return readEnv("VITE_NANOGPT_API_KEY") !== "" && readEnv("VITE_NANOGPT_BASE_URL") !== "";
+}
+
 export function getDirectorRuntime(): DirectorRuntime | null {
   if (cacheValid) {
     return cached;

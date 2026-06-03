@@ -149,10 +149,11 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     expect(attr.getLowHpMultiplier()).toBeNull();
   });
 
-  it("SPECTRAL_SHROUD (er id 387, chance-status-on-hit OFFENSE) has a ChanceStatusOnAttackAbAttr for TOXIC", () => {
-    // Spectral Shroud = "Spectralize + 30% chance to badly poison the foe" —
-    // an OFFENSIVE chance-status (the holder's moves poison the target), so it
-    // wires ChanceStatusOnAttackAbAttr, not the defensive on-hit variant.
+  it("SPECTRAL_SHROUD (er id 387, bespoke) wires Spectralize (Normal→Ghost) + 30% Toxic chance", () => {
+    // Spectral Shroud = "Spectralize + 30% chance to badly poison the foe".
+    // Audit-fix: reclassified from chance-status-on-hit to bespoke so it carries
+    // BOTH halves — the Spectralize identity (Normal→Ghost type conversion +
+    // 1.2x boost) AND the offensive 30% Toxic chance.
     const id = ER_ID_MAP.abilities[387];
     expect(id).toBeDefined();
     const ability = allAbilities.find(a => a?.id === id);
@@ -165,6 +166,8 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     const attr = attrs[0];
     expect(attr.getChance()).toBe(30);
     expect(attr.getEffects()).toEqual([StatusEffect.TOXIC]);
+    // The restored Spectralize half: a Normal→Ghost type conversion.
+    expect(ability.attrs.some(a => a.constructor.name === "TypeConversionAbAttr")).toBe(true);
   });
 
   it("ELECTRO_SURGE (er id 226, entry-effect set-terrain) has an EntryEffectAbAttr", () => {
@@ -245,13 +248,18 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     //   - entry-effect (76 rows total but only ~30 wire — the classifier
     //     emits `scripted-move` (23), `set-misc` (11), `misc` (10), and
     //     `lower-foe-stat` (2) which the archetype doesn't yet model).
-    expect(wiredCounts["type-damage-boost"] ?? 0).toBeGreaterThanOrEqual(20);
-    expect(wiredCounts["flag-damage-boost"] ?? 0).toBeGreaterThanOrEqual(6);
-    // Round 2 raised the chance-status-on-hit minimum from 10 to 15 — the
-    // BattlerTag routing now picks up CONFUSION/INFATUATION/FLINCH/DISABLE
-    // rows that previously skipped.
+    // NOTE: these are loose "meaningful fraction wires" sanity bounds. The ER
+    // faithfulness audit progressively RECLASSIFIES archetype rows to `bespoke`
+    // when a single-archetype wire can't capture a multi-clause ability (e.g.
+    // 713 Aquatic Dweller → bespoke to add the entry Water-type-add alongside
+    // the 1.5× boost), so these per-archetype counts drift DOWN over time. The
+    // bounds are kept just under the current counts as a floor.
+    expect(wiredCounts["type-damage-boost"] ?? 0).toBeGreaterThanOrEqual(18);
+    // (Was 6; 756 Twinkle Toes reclassified to bespoke to add its Pixilate
+    // conversion + Fairy STAB + infatuate alongside the kicking boost.)
+    expect(wiredCounts["flag-damage-boost"] ?? 0).toBeGreaterThanOrEqual(5);
     expect(wiredCounts["chance-status-on-hit"] ?? 0).toBeGreaterThanOrEqual(15);
-    expect(wiredCounts["entry-effect"] ?? 0).toBeGreaterThanOrEqual(20);
+    expect(wiredCounts["entry-effect"] ?? 0).toBeGreaterThanOrEqual(19);
     // D3b: composite-vanilla-mashup now wires attrs via the resolved-parts side
     // table — at least 100 of the 196 composites should have ≥1 attr each.
     expect(wiredCounts["composite-vanilla-mashup"] ?? 0).toBeGreaterThanOrEqual(100);
@@ -264,9 +272,13 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     // assertion.
     expect(wiredCounts.bespoke ?? 0).toBeGreaterThanOrEqual(15);
     // R48 grind wired every remaining SKIP, and composites-with-only-riders
-    // (e.g. 909 Lightsaber) were reclassified composite → bespoke — ~381
-    // bespoke wires now in place; bound widened to 400 for headroom.
-    expect(wiredCounts.bespoke ?? 0).toBeLessThanOrEqual(400);
+    // (e.g. 909 Lightsaber) were reclassified composite → bespoke. The ER
+    // faithfulness audit (chunks 7-26) further reclassified ~15 archetype rows
+    // to bespoke to wire missing composite clauses (Lead/Chrome Coat, Nocturnal,
+    // Liquified, Dragonfly, Overwhelm, Nosferatu, Spectral Shroud, Parry,
+    // Fearmonger, Yuki Onna, Fragrant Daze, Jackhammer, Arc Flash, Poison
+    // Absorb, etc.) — ~403 bespoke wires now. Bound widened to 450 for headroom.
+    expect(wiredCounts.bespoke ?? 0).toBeLessThanOrEqual(450);
   });
 
   it("init result reports per-archetype wired counts (fresh run on a clean baseline)", () => {

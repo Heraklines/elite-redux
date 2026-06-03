@@ -35,6 +35,12 @@ export interface AttackStatSubstituteOptions {
   /** When true, only substitutes for contact moves. */
   readonly contactOnly?: boolean;
   /**
+   * When set, only substitutes for moves carrying this flag (e.g.
+   * `MoveFlags.BITING_MOVE` for Mind Crunch's "biting moves use SpAtk").
+   * Composes with {@linkcode contactOnly}.
+   */
+  readonly flag?: MoveFlags;
+  /**
    * When true, all attacks use the HIGHER of the holder's Attack / Special
    * Attack as the offensive stat (Equinox). Overrides physicalStat/specialStat.
    */
@@ -45,6 +51,7 @@ export class AttackStatSubstituteAbAttr extends AbAttr {
   private readonly physicalStat?: EffectiveStat;
   private readonly specialStat?: EffectiveStat;
   private readonly contactOnly: boolean;
+  private readonly flag?: MoveFlags;
   private readonly useHigherOffense: boolean;
 
   constructor(options: AttackStatSubstituteOptions) {
@@ -52,6 +59,7 @@ export class AttackStatSubstituteAbAttr extends AbAttr {
     this.physicalStat = options.physicalStat;
     this.specialStat = options.specialStat;
     this.contactOnly = options.contactOnly ?? false;
+    this.flag = options.flag;
     this.useHigherOffense = options.useHigherOffense ?? false;
   }
 
@@ -61,6 +69,9 @@ export class AttackStatSubstituteAbAttr extends AbAttr {
    */
   public resolveStat(move: Move, isPhysical: boolean, source: Pokemon): EffectiveStat | null {
     if (this.contactOnly && !move.hasFlag(MoveFlags.MAKES_CONTACT)) {
+      return null;
+    }
+    if (this.flag !== undefined && !move.hasFlag(this.flag)) {
       return null;
     }
     if (this.useHigherOffense) {

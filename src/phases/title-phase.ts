@@ -5,7 +5,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { Phase } from "#app/phase";
-import { bypassLogin } from "#constants/app-constants";
+import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-seed/daily-run";
 import { modifierTypes } from "#data/data-lists";
 import { Gender } from "#data/gender";
@@ -17,6 +17,7 @@ import { Unlockables } from "#enums/unlockables";
 import { getBiomeKey } from "#field/arena";
 import type { Modifier } from "#modifiers/modifier";
 import { getDailyRunStarterModifiers, regenerateModifierPoolThresholds } from "#modifiers/modifier-type";
+import { isDirectorConfigured } from "#system/llm-director/director-runtime";
 import { vouchers } from "#system/voucher";
 import type { OptionSelectConfig, OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
@@ -108,13 +109,30 @@ export class TitlePhase extends Phase {
               return true;
             },
           });
-          options.push({
-            label: GameMode.getModeName(GameModes.LLM_DIRECTOR),
-            handler: () => {
-              setModeAndEnd(GameModes.LLM_DIRECTOR);
-              return true;
-            },
-          });
+          // The LLM "Director" (Story Mode) is only playable when its NanoGPT
+          // env vars are configured (dev/beta builds, or a deploy that opts in).
+          // In a public production build without the key it would silently
+          // degrade to Classic, which is confusing — so there we show a
+          // non-selectable "Story Mode (Coming Soon)" placeholder instead.
+          if (isDev || isBeta || isDirectorConfigured()) {
+            options.push({
+              label: GameMode.getModeName(GameModes.LLM_DIRECTOR),
+              handler: () => {
+                setModeAndEnd(GameModes.LLM_DIRECTOR);
+                return true;
+              },
+            });
+          } else {
+            options.push({
+              label: i18next.t("menu:storyModeComingSoon"),
+              handler: () => {
+                // Not yet available in this build: reject the selection (keeps
+                // the mode menu open) with the standard error feedback.
+                globalScene.ui.playError();
+                return false;
+              },
+            });
+          }
           options.push({
             label: i18next.t("menu:dailyRun"),
             handler: () => {

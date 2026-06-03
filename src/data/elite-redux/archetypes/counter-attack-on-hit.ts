@@ -25,9 +25,9 @@
 
 import { PostDefendAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
 import type { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
-import { PokemonMove } from "#moves/pokemon-move";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 
 /** Optional gate over the incoming move that triggers the counter. */
@@ -49,6 +49,11 @@ export interface CounterAttackFilter {
 export interface CounterAttackOnHitOptions {
   /** The pokerogue MoveId of the counter-attack move. */
   readonly moveId: MoveId;
+  /**
+   * Optional ER-specified base-power override (e.g. Clap Trap's "50 BP Snap
+   * Trap"). Omit to use the move's registered full power.
+   */
+  readonly power?: number;
   /** Optional roll chance `[0..100]`. Defaults to 100 (always fires). */
   readonly chance?: number;
   /** Optional filter restricting which incoming moves trigger the counter. */
@@ -65,12 +70,14 @@ export interface CounterAttackOnHitOptions {
  */
 export class CounterAttackOnHitAbAttr extends PostDefendAbAttr {
   private readonly moveId: MoveId;
+  private readonly power: number | undefined;
   private readonly chance: number;
   private readonly filter: CounterAttackFilter;
 
   constructor(options: CounterAttackOnHitOptions) {
     super(false);
     this.moveId = options.moveId;
+    this.power = options.power;
     this.chance = options.chance ?? 100;
     this.filter = options.filter ?? {};
     if (!(this.chance >= 0 && this.chance <= 100)) {
@@ -118,7 +125,7 @@ export class CounterAttackOnHitAbAttr extends PostDefendAbAttr {
       "MovePhase",
       pokemon,
       [opponent.getBattlerIndex()],
-      new PokemonMove(this.moveId),
+      scriptedPokemonMove(this.moveId, this.power),
       MoveUseMode.INDIRECT,
     );
   }

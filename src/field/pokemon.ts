@@ -834,26 +834,47 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     await Promise.allSettled(loadPromises);
 
-    // This must be initiated before we queue loading, otherwise the load could have finished before
-    // we reach the line of code that adds the listener, causing a deadlock.
-    const waitOnLoadPromise = new Promise<void>(resolve =>
-      globalScene.load.once(Phaser.Loader.Events.COMPLETE, resolve),
-    );
+    // Wait for any queued sprite/atlas loads to finish. Every `loadPokemonAtlas`
+    // above is guarded by `textures.exists(...)`, so on a cached load (save-load,
+    // repeat encounter, transform/illusion refresh on an already-loaded form)
+    // NOTHING gets queued. Calling `load.start()` on an empty/idle loader does
+    // NOT emit COMPLETE, so a bare `await once(COMPLETE)` would hang forever — the
+    // user-visible "mon shows a placeholder/substitute sprite and the game freezes
+    // when it attacks" (the attack phase awaits loadAssets). Guard against that by
+    // resolving immediately when, after `start()`, the loader is still idle (i.e.
+    // there was nothing to load). Uses only `isLoading()`/`start()` so it stays
+    // correct under the test harness's mocked loader too.
+    await new Promise<void>(resolve => {
+      const onComplete = () => resolve();
+      globalScene.load.once(Phaser.Loader.Events.COMPLETE, onComplete);
+      if (!globalScene.load.isLoading()) {
+        globalScene.load.start();
+      }
+      // If start() found nothing to load, the loader stays idle and COMPLETE
+      // will never fire — detach the listener and resolve now.
+      if (!globalScene.load.isLoading()) {
+        globalScene.load.off(Phaser.Loader.Events.COMPLETE, onComplete);
+        resolve();
+      }
+    });
 
-    if (!globalScene.load.isLoading()) {
-      globalScene.load.start();
-    }
-
-    // Wait for the assets we queued to load to finish loading, then...
-    // See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Using_promises#creating_a_promise_around_an_old_callback_api
-    await waitOnLoadPromise;
-
-    // With the sprites loaded, generate the animation frame information
-    if (this.isPlayer()) {
+    // With the sprites loaded, generate the animation frame information.
+    //
+    // Do this for BOTH the player and the enemy battle sprite. The enemy's
+    // front-sprite anim is normally built by the species-form `loadAssets` above,
+    // but that only builds it inside `finalize()` (which requires the atlas
+    // texture to be present): if that call settled via its ~10s safety-backstop
+    // on a slow/contended load (the common trigger is loading a save, where the
+    // whole party + both wild mons request atlases at once), the anim can be
+    // missing — leaving the mon stuck on a substitute placeholder and logging
+    // "Missing animation: pkmn__<id>". Rebuilding here closes that gap. It is
+    // strictly gap-filling: guarded by `textures.exists` (never build frames for
+    // an unloaded atlas) AND `!anims.exists` (never clobber an existing anim).
+    const battleSpriteKey = this.getBattleSpriteKey(this.isPlayer(), ignoreOverride);
+    if (globalScene.textures.exists(battleSpriteKey) && !globalScene.anims.exists(battleSpriteKey)) {
       const originalWarn = console.warn;
       // Ignore warnings for missing frames, because there will be a lot
       console.warn = () => {};
-      const battleSpriteKey = this.getBattleSpriteKey(this.isPlayer(), ignoreOverride);
       const battleFrameNames = globalScene.anims.generateFrameNames(battleSpriteKey, {
         zeroPad: 4,
         suffix: ".png",
@@ -861,14 +882,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         end: 400,
       });
       console.warn = originalWarn;
-      if (!globalScene.anims.exists(battleSpriteKey)) {
-        globalScene.anims.create({
-          key: battleSpriteKey,
-          frames: battleFrameNames,
-          frameRate: 10,
-          repeat: -1,
-        });
-      }
+      globalScene.anims.create({
+        key: battleSpriteKey,
+        frames: battleFrameNames,
+        frameRate: 10,
+        repeat: -1,
+      });
     }
     // With everything loaded, now begin playing the animation.
     this.playAnim();
@@ -958,14 +977,36 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   // They may be all similar, but what each one actually _does_ is quite unclear at first glance
 
   getSpriteAtlasPath(ignoreOverride = false): string {
-    const spriteId = this.getSpriteId(ignoreOverride).replace(/_{2}/g, "/");
-
-    return `${/_[1-3]$/.test(spriteId) ? "variant/" : ""}${spriteId}`;
+    // Delegate to the species form's `getSpriteAtlasPath` rather than deriving
+    // the path from the sprite id. ER-custom species (`ErCustomSpecies`) use a
+    // different atlas-path scheme than their sprite-key scheme (key `er__{slug}`
+    // vs path `elite-redux/{slug}/front`), so the old id→path string-replace
+    // produced a wrong path (`er/{slug}`) and 404'd. The override is authoritative.
+    const formIndex = this.summonData.illusion?.formIndex ?? this.formIndex;
+    return this.getSpeciesForm(ignoreOverride, true).getSpriteAtlasPath(
+      this.getGender(ignoreOverride, true) === Gender.FEMALE,
+      formIndex,
+      this.shiny,
+      this.variant,
+    );
   }
 
   getBattleSpriteAtlasPath(back?: boolean, ignoreOverride?: boolean): string {
-    const spriteId = this.getBattleSpriteId(back, ignoreOverride).replace(/_{2}/g, "/");
-    return `${/_[1-3]$/.test(spriteId) ? "variant/" : ""}${spriteId}`;
+    if (back === undefined) {
+      back = this.isPlayer();
+    }
+    // Same rationale as `getSpriteAtlasPath`: delegate to the species form's
+    // override so ER-custom BACK sprites resolve to `elite-redux/{slug}/back`
+    // instead of the bogus `back/er/{slug}` the id→path replace produced (which
+    // 404'd → missing player back sprite → battle softlock).
+    const formIndex = this.summonData.illusion?.formIndex ?? this.formIndex;
+    return this.getSpeciesForm(ignoreOverride, true).getSpriteAtlasPath(
+      this.getGender(ignoreOverride, true) === Gender.FEMALE,
+      formIndex,
+      this.shiny,
+      this.variant,
+      back,
+    );
   }
 
   getSpriteId(ignoreOverride?: boolean): string {
@@ -1038,7 +1079,21 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   getFusionBattleSpriteAtlasPath(back?: boolean, ignoreOverride?: boolean): string {
-    return this.getFusionBattleSpriteId(back, ignoreOverride).replace(/_{2}/g, "/");
+    if (back === undefined) {
+      back = this.isPlayer();
+    }
+    // Delegate to the fusion species form's `getSpriteAtlasPath` override (same
+    // ER-custom key-vs-path scheme fix as `getBattleSpriteAtlasPath`), so an
+    // ER-custom fusion partner's back sprite resolves to `elite-redux/{slug}/back`
+    // rather than the bogus `back/er/{slug}`.
+    const fusionFormIndex = this.summonData.illusion?.fusionFormIndex ?? this.fusionFormIndex;
+    return this.getFusionSpeciesForm(ignoreOverride, true).getSpriteAtlasPath(
+      this.getFusionGender(ignoreOverride, true) === Gender.FEMALE,
+      fusionFormIndex,
+      this.fusionShiny,
+      this.fusionVariant,
+      back,
+    );
   }
 
   getIconAtlasKey(ignoreOverride = false, useIllusion = true): string {
@@ -2116,7 +2171,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
       return allAbilities[this.getFusionSpeciesForm(ignoreOverride).getAbility(this.fusionAbilityIndex)];
     }
-    if (this.customPokemonData.ability != null && this.customPokemonData.ability !== -1) {
+    if (
+      this.customPokemonData.ability != null
+      && this.customPokemonData.ability !== -1
+      && !this.usesFormDerivedAbilities()
+    ) {
       return allAbilities[this.customPokemonData.ability];
     }
     if (this.isBoss() && isDailyFinalBoss()) {
@@ -2152,7 +2211,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (Overrides.ENEMY_PASSIVE_ABILITY_OVERRIDE && this.isEnemy()) {
       return allAbilities[Overrides.ENEMY_PASSIVE_ABILITY_OVERRIDE];
     }
-    if (this.customPokemonData.passive != null && this.customPokemonData.passive !== -1) {
+    if (
+      this.customPokemonData.passive != null
+      && this.customPokemonData.passive !== -1
+      && !this.usesFormDerivedAbilities()
+    ) {
       return allAbilities[this.customPokemonData.passive];
     }
     if (this.isBoss() && isDailyFinalBoss()) {
@@ -2204,7 +2267,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       slot0 = allAbilities[Overrides.PASSIVE_ABILITY_OVERRIDE];
     } else if (Overrides.ENEMY_PASSIVE_ABILITY_OVERRIDE && this.isEnemy()) {
       slot0 = allAbilities[Overrides.ENEMY_PASSIVE_ABILITY_OVERRIDE];
-    } else if (this.customPokemonData.passive != null && this.customPokemonData.passive !== -1) {
+    } else if (
+      this.customPokemonData.passive != null
+      && this.customPokemonData.passive !== -1
+      && !this.usesFormDerivedAbilities()
+    ) {
       slot0 = allAbilities[this.customPokemonData.passive];
     } else if (this.isBoss() && isDailyFinalBoss()) {
       const eventBoss = getDailyEventSeedBoss();
@@ -2229,12 +2296,16 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // Persistent per-Pokémon overrides for innate slots 1/2 (e.g. the ER Ability
     // Randomizer consumable) take priority over the species-derived ids, mirroring
     // how `customPokemonData.passive` overrides slot 0 above.
+    // Battle-only forms (mega/max) use their own species innates — skip the
+    // per-Pokémon innate-slot overrides while in such a form (see
+    // {@linkcode usesFormDerivedAbilities}). Overrides are preserved for revert.
+    const useFormInnates = this.usesFormDerivedAbilities();
     const customSlot1 =
-      this.customPokemonData.passive2 != null && this.customPokemonData.passive2 !== -1
+      !useFormInnates && this.customPokemonData.passive2 != null && this.customPokemonData.passive2 !== -1
         ? this.customPokemonData.passive2
         : undefined;
     const customSlot2 =
-      this.customPokemonData.passive3 != null && this.customPokemonData.passive3 !== -1
+      !useFormInnates && this.customPokemonData.passive3 != null && this.customPokemonData.passive3 !== -1
         ? this.customPokemonData.passive3
         : undefined;
     const slot1Id = customSlot1 ?? transformOverride?.[1] ?? derivedIds[1];
@@ -2503,6 +2574,34 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   /**
+   * Whether an ability "drives a form change" — i.e. it IS a species' form
+   * mechanic (Forecast, Hunger Switch, Flower Gift, Zen Mode, Ice Face, …).
+   *
+   * ER relocates several of these signature abilities from the active slot into
+   * an INNATE. Innates are normally gated behind the candy passive unlock, which
+   * would stop those species from ever changing form until unlocked (Castform
+   * ignoring weather, Morpeko never toggling hunger form, …). Allowing a
+   * form-change ability to drive its form change is always safe — it is identity,
+   * not a power bonus — so the unlock gates in {@linkcode canApplyAbility},
+   * {@linkcode hasAbility} and {@linkcode hasAbilityWithAttr} carve it out.
+   */
+  private static readonly FORM_CHANGE_DRIVER_ATTRS = [
+    "PostSummonFormChangeByWeatherAbAttr",
+    "PostWeatherChangeFormChangeAbAttr",
+    "PostTurnFormChangeAbAttr",
+    "PostSummonFormChangeAbAttr",
+    "PostBattleInitFormChangeAbAttr",
+    "PreSwitchOutFormChangeAbAttr",
+    "PostFaintFormChangeAbAttr",
+    "PostVictoryFormChangeAbAttr",
+    "IceFaceFormChangeAbAttr",
+  ] as const satisfies readonly AbAttrString[];
+
+  private abilityDrivesFormChange(ability: Ability | null | undefined): boolean {
+    return !!ability && Pokemon.FORM_CHANGE_DRIVER_ATTRS.some(attr => ability.hasAttr(attr));
+  }
+
+  /**
    * Check whether this Pokémon can apply its current ability
    *
    * @remarks
@@ -2517,13 +2616,27 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    *   {@linkcode applySingleAbAttrs} short-circuits without falling back to slot 0).
    */
   public canApplyAbility(passive = false, passiveSlot: 0 | 1 | 2 = 0): boolean {
-    if (passive && !this.hasPassive()) {
+    // ER 3-passive: resolve the candidate ability first (before the unlock gates
+    // below) so we can special-case form-change-driving innates. We avoid falling
+    // back to `this.getAbility()` for an empty passive slot because that would
+    // double-fire on legacy species (slots 1/2 are NONE), and callers explicitly
+    // requesting an empty slot should get `false` (nothing to apply).
+    const ability = passive ? this.getPassiveAbilities()[passiveSlot] : this.getAbility();
+    if (!ability) {
+      return false;
+    }
+    // Form-change-driving innates (Forecast/Hunger Switch/Flower Gift/… relocated
+    // by ER into an innate slot) are species identity and must never be gated
+    // behind the candy passive unlock — see {@linkcode abilityDrivesFormChange}.
+    const drivesFormChange = passive && this.abilityDrivesFormChange(ability);
+    if (passive && !this.hasPassive() && !drivesFormChange) {
       return false;
     }
     // ER 3-passive model: gate each innate slot individually for the player by its
     // candy unlock + enable state. Skipped when a passive override forces passives
-    // on (tests/dev). Enemy slot gating is by level, applied in applyAbAttrsInternal.
-    if (passive && this.isPlayer()) {
+    // on (tests/dev) or the slot drives a form change. Enemy slot gating is by
+    // level, applied in applyAbAttrsInternal.
+    if (passive && this.isPlayer() && !drivesFormChange) {
       const overridden =
         Overrides.HAS_PASSIVE_ABILITY_OVERRIDE === true || Overrides.PASSIVE_ABILITY_OVERRIDE !== AbilityId.NONE;
       if (!overridden) {
@@ -2532,14 +2645,6 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
           return false;
         }
       }
-    }
-    // ER 3-passive: resolve directly from the slot-indexed array. We avoid
-    // falling back to `this.getAbility()` for an empty slot because that would
-    // double-fire on legacy species (slots 1/2 are NONE), and callers explicitly
-    // requesting an empty slot should get `false` (nothing to apply).
-    const ability = passive ? this.getPassiveAbilities()[passiveSlot] : this.getAbility();
-    if (!ability) {
-      return false;
     }
     if (this.isFusion() && ability.hasAttr("NoFusionAbilityAbAttr")) {
       return false;
@@ -2590,7 +2695,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return true;
     }
     // ER 3-passive model: check every eligible innate slot, not just slot 0.
-    if (!this.hasPassive()) {
+    // Short-circuit on "no usable passive" EXCEPT when the queried ability is a
+    // form-change driver (Forecast/Hunger Switch/Flower Gift relocated into an
+    // innate slot) — those are never candy-gated, so we must still scan the slots
+    // to find them (covers both the "changes form" canApply path and the "revert
+    // to normal" canApply=false path, e.g. Air Lock / switch-out).
+    if (!this.hasPassive() && !this.abilityDrivesFormChange(allAbilities[ability])) {
       return false;
     }
     const passives = this.getPassiveAbilities();
@@ -2617,7 +2727,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return true;
     }
     // ER 3-passive model: check every eligible innate slot, not just slot 0.
-    if (!this.hasPassive()) {
+    // Short-circuit on "no usable passive" EXCEPT when the queried attribute is a
+    // form-change driver — those innates are never candy-gated (see `hasAbility`).
+    if (!this.hasPassive() && !(Pokemon.FORM_CHANGE_DRIVER_ATTRS as readonly AbAttrString[]).includes(attrType)) {
       return false;
     }
     const passives = this.getPassiveAbilities();
@@ -2697,7 +2809,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     return (
       !!this.getTag(GroundedTag)
       || (!this.isOfType(PokemonType.FLYING, true, true)
-        && !this.hasAbility(AbilityId.LEVITATE)
+        && !this.hasAbility(AbilityId.LEVITATE) // Elite Redux: `FloatAbAttr` (Hover, Fey Flight, …) ungrounds like Levitate.
+        && !this.hasAbilityWithAttr("FloatAbAttr")
         && !this.getTag(BattlerTagType.FLOATING)
         && !this.getTag(SemiInvulnerableTag))
     );
@@ -2975,6 +3088,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       if (!simulated) {
         globalScene.phaseManager.queueMessage(i18next.t("weather:strongWindsEffectMessage"));
       }
+    }
+    // ER Ice Statue: the afflicted target has NO resistances — any sub-neutral
+    // multiplier (resistances and immunities) is clamped up to neutral. Its
+    // weaknesses (already pure Ice via the type override) still apply.
+    if (multi.value < 1 && this.getTag(BattlerTagType.ER_ICE_STATUE) != null) {
+      multi.value = 1;
     }
     return multi.value as TypeDamageMultiplier;
   }
@@ -3983,10 +4102,32 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     /**
      * This Pokemon's defensive stat for the given move's category.
      * Critical hits cause positive stat stages to be ignored.
+     *
+     * Elite Redux: `DefensiveStatSubstituteAbAttr` (Tangled Feet) may swap which
+     * stat the formula reads here (e.g. Speed in place of Def/SpDef when confused
+     * or enraged); the attr is gated, so this is a no-op for every other ability.
      */
+    const defensiveStatHolder = new NumberHolder(isPhysical ? Stat.DEF : Stat.SPDEF);
+    if (!ignoreAbility) {
+      applyAbAttrs("DefensiveStatSubstituteAbAttr", {
+        pokemon: this,
+        simulated,
+        statHolder: defensiveStatHolder,
+      });
+    }
+    // Elite Redux: on a critical hit, an attacker ability may retarget the
+    // defender's WEAKER defensive stat (Deadeye 376). Source-side, crit-only.
+    if (isCritical && !ignoreSourceAbility) {
+      applyAbAttrs("CritUseLowerDefensiveStatAbAttr", {
+        pokemon: source,
+        simulated,
+        defender: this,
+        statHolder: defensiveStatHolder,
+      });
+    }
     const targetDef = new NumberHolder(
       this.getEffectiveStat(
-        isPhysical ? Stat.DEF : Stat.SPDEF,
+        defensiveStatHolder.value,
         source,
         move,
         ignoreAbility,
@@ -4237,7 +4378,18 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
      * A multiplier for random damage spread in the range [0.85, 1]
      * This is always 1 for simulated calls.
      */
-    const randomMultiplier = simulated ? 1 : this.randBattleSeedIntRange(85, 100) / 100;
+    const randomMultiplierHolder = new NumberHolder(simulated ? 1 : this.randBattleSeedIntRange(85, 100) / 100);
+    // Elite Redux: abilities like Bad Luck / Bad Omen force attacks against the
+    // holder (`this` = the defender) to roll minimum damage. No-op for every
+    // ability lacking EnemyMinDamageRollAbAttr.
+    if (!simulated) {
+      applyAbAttrs("EnemyMinDamageRollAbAttr", {
+        pokemon: this,
+        simulated,
+        rollMultiplier: randomMultiplierHolder,
+      });
+    }
+    const randomMultiplier = randomMultiplierHolder.value;
 
     /** A damage multiplier for when the attack is of the attacker's type and/or Tera type. */
     const stabMultiplier = this.calculateStabMultiplier(source, move, ignoreSourceAbility, simulated);
@@ -4271,13 +4423,25 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
      * battler-tag presence rather than a dedicated `StatusEffect` because ER's
      * FROSTBITE is modeled as a battler tag rather than a primary status (so
      * we don't have to mutate pokerogue's `StatusEffect` enum). The BURN
-     * `Bypass` ability hook is not mirrored — Elite Redux does not ship a
-     * frostbite-bypass ability yet; one can be added if/when it appears.
-     * (Round 7 of the ER bespoke ability grind.)
+     * `Bypass` ability hook IS now mirrored: Rage Point (703) "negates burn's
+     * Attack drop and freeze's Special Attack drop" — it carries
+     * `BypassBurnDamageReductionAbAttr`, which we consult here too so the same
+     * ability waives both halvings. (Round 7 of the ER bespoke ability grind;
+     * frostbite bypass added in the 695–714 audit follow-up.)
      */
     let frostbiteMultiplier = 1;
     if (!isPhysical && source.getTag(BattlerTagType.ER_FROSTBITE)) {
-      frostbiteMultiplier = 0.5;
+      const frostbiteReductionCancelled = new BooleanHolder(false);
+      if (!ignoreSourceAbility) {
+        applyAbAttrs("BypassBurnDamageReductionAbAttr", {
+          pokemon: source,
+          cancelled: frostbiteReductionCancelled,
+          simulated,
+        });
+      }
+      if (!frostbiteReductionCancelled.value) {
+        frostbiteMultiplier = 0.5;
+      }
     }
 
     /** ER FEAR: the feared target takes 50% more damage (ROM). */
@@ -4333,6 +4497,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         * mistyTerrainMultiplier,
     );
 
+    // ER Overrule 815: on a CRITICAL hit, the holder's attacks deal double damage
+    // if they are resisted (negating the not-very-effective penalty). No-op for
+    // every Pokémon lacking the OverruleCritAbAttr marker.
+    if (isCritical && !ignoreSourceAbility && typeMultiplier < 1 && source.hasAbilityWithAttr("OverruleCritAbAttr")) {
+      damage.value = toDmgValue(damage.value * 2);
+    }
+
     if (!ignoreSourceAbility) {
       applyAbAttrs("MoveDamageBoostAbAttr", {
         pokemon: source,
@@ -4370,8 +4541,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       simulated,
       damage,
     };
+    // ER Overrule 815: on a CRITICAL hit, the holder's attacks ignore the
+    // defender's damage-reducing abilities (Multiscale, Filter, Fur Coat, …).
+    // No-op for every attacker lacking the OverruleCritAbAttr marker.
+    const overruleIgnoresDefAbilities =
+      isCritical && !ignoreSourceAbility && source.hasAbilityWithAttr("OverruleCritAbAttr");
     // Apply this Pokemon's post-calc defensive modifiers (e.g. Fur Coat)
-    if (!ignoreAbility) {
+    if (!ignoreAbility && !overruleIgnoresDefAbilities) {
       applyAbAttrs("ReceivedMoveDamageMultiplierAbAttr", abAttrParams);
 
       const ally = this.getAlly();
@@ -4599,6 +4775,26 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       megaForms.includes(this.getFormKey())
       || (!!this.getFusionFormKey() && megaForms.includes(this.getFusionFormKey()!))
     );
+  }
+
+  /**
+   * ER: Mega / Gigantamax / Eternamax / Primal forms carry their OWN ability
+   * set in species data (active ability + the 3 innate slots). Per-Pokémon
+   * ability overrides written for the BASE form — by the Ability Randomizer,
+   * custom-starter config, or mystery encounters via
+   * `customPokemonData.ability/passive/passive2/passive3` — must NOT shadow the
+   * form's abilities while the Pokémon is in such a form. When this returns
+   * true, {@linkcode getAbility} / {@linkcode getPassiveAbility} /
+   * {@linkcode getPassiveAbilities} skip those overrides and fall through to the
+   * form's species abilities.
+   *
+   * The overrides are NOT cleared (they remain in `customPokemonData`), so if
+   * the Pokémon ever reverts to its base form the base-form ability set is
+   * restored — correct whether mega/max is permanent (the PokeRogue default) or
+   * manually reverted.
+   */
+  public usesFormDerivedAbilities(): boolean {
+    return this.isMega() || this.isMax();
   }
 
   /**

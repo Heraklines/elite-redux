@@ -9,6 +9,7 @@ import { tmPoolTiers } from "#balance/tms";
 import { getBerryEffectDescription, getBerryName } from "#data/berry";
 import { getDailyEventSeedLuck } from "#data/daily-seed/daily-run";
 import { allMoves, modifierTypes } from "#data/data-lists";
+import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-stones";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { getPokeballCatchMultiplier, getPokeballName } from "#data/pokeball";
@@ -1294,7 +1295,11 @@ export class FormChangeItemModifierType extends PokemonModifierType implements G
   constructor(formChangeItem: FormChangeItem) {
     super(
       "",
-      FormChangeItem[formChangeItem].toLowerCase(),
+      // ER custom stones reuse an existing items-atlas icon frame (the decomp
+      // doesn't ship art for ~200 of them); vanilla stones use their own frame.
+      isErMegaStone(formChangeItem)
+        ? (erMegaStoneIconFrame(formChangeItem) ?? FormChangeItem[formChangeItem].toLowerCase())
+        : FormChangeItem[formChangeItem].toLowerCase(),
       (_type, args) => new PokemonFormChangeItemModifier(this, (args[0] as PlayerPokemon).id, formChangeItem, true),
       (pokemon: PlayerPokemon) => {
         // Make sure the Pokemon has alternate forms
@@ -1320,6 +1325,15 @@ export class FormChangeItemModifierType extends PokemonModifierType implements G
   }
 
   get name(): string {
+    // ER custom stones have no locale entry — title-case the enum name
+    // (BUTTERFRENITE -> "Butterfrenite", VENUSAURITE_X -> "Venusaurite X").
+    if (isErMegaStone(this.formChangeItem)) {
+      return FormChangeItem[this.formChangeItem]
+        .toLowerCase()
+        .split("_")
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+    }
     return i18next.t(`modifierType:FormChangeItem.${FormChangeItem[this.formChangeItem]}`);
   }
 

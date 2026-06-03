@@ -64,6 +64,7 @@
 // =============================================================================
 
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { resolveErStoneFormChangeItem } from "#data/elite-redux/er-mega-stones";
 import { ER_SPECIES, type ErEvolutionDraft } from "#data/elite-redux/er-species";
 import { pokemonFormChanges, SpeciesFormChange } from "#data/pokemon-forms";
 import { SpeciesFormChangeItemTrigger } from "#data/pokemon-forms/form-change-triggers";
@@ -341,11 +342,16 @@ function bridgeEntryToPokerogueFormChanges(entry: ErFormChangeRegistryEntry): vo
   if (formKey === null) {
     return;
   }
+  // Use the real mega/primal stone as the trigger (vanilla FormChangeItem where
+  // the name matches, else the ER-custom enum value) so the reward pool offers
+  // it and holding it triggers the base mon's mega form. Falls back to NONE only
+  // for stones the enum doesn't know (dex-display only, as before).
+  const stone = resolveErStoneFormChangeItem((entry as { requirement?: string }).requirement) ?? FormChangeItem.NONE;
   const change = new SpeciesFormChange(
     entry.sourceSpeciesId,
     "", // preFormKey: from base form
     formKey,
-    new SpeciesFormChangeItemTrigger(FormChangeItem.NONE),
+    new SpeciesFormChangeItemTrigger(stone),
   );
   if (!pokemonFormChanges[entry.sourceSpeciesId]) {
     pokemonFormChanges[entry.sourceSpeciesId] = [];

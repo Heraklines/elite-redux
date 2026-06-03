@@ -23,18 +23,23 @@
 // =============================================================================
 
 import { PostAttackAbAttr } from "#abilities/ab-attrs";
-import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 import { globalScene } from "#app/global-scene";
-import { PokemonMove } from "#data/moves/pokemon-move";
+import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
+import type { MoveCategory } from "#enums/move-category";
 import type { MoveFlags } from "#enums/move-flags";
-import { MoveCategory } from "#enums/move-category";
-import { MoveId } from "#enums/move-id";
+import type { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
 import type { PokemonType } from "#enums/pokemon-type";
+import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 
 export interface PostAttackScriptedMoveOptions {
   /** Move id to enqueue after the holder's attack lands. */
   readonly moveId: MoveId;
+  /**
+   * Optional ER-specified base-power override for the scripted move (e.g. Frost
+   * Burn's "40 BP Ice Beam"). Omit to use the move's registered full power.
+   */
+  readonly power?: number;
   /** Optional gate — only fire when the holder's move matches this category. */
   readonly categoryFilter?: MoveCategory;
   /**
@@ -80,7 +85,7 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
       "MovePhase",
       pokemon,
       [opponent.getBattlerIndex()],
-      new PokemonMove(this.opts.moveId),
+      scriptedPokemonMove(this.opts.moveId, this.opts.power),
       MoveUseMode.INDIRECT,
     );
   }

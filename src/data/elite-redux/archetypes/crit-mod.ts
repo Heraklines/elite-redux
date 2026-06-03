@@ -79,6 +79,12 @@ export interface CritModFilter {
   readonly flag?: MoveFlags;
   /** Specific move ids that trigger the bonus. Omit to accept any move id. */
   readonly moveIds?: readonly MoveId[];
+  /**
+   * Only moves whose base power is `<=` this value trigger the bonus (e.g.
+   * Perfectionist's "+1 crit stage for moves with 50 BP or lower"). Omit for
+   * no base-power gate.
+   */
+  readonly maxBasePower?: number;
 }
 
 // -----------------------------------------------------------------------------
@@ -204,6 +210,9 @@ export class CritStageBonusAbAttr extends BonusCritAbAttr {
       return false;
     }
     if (filter.moveIds !== undefined && !filter.moveIds.includes(move.id)) {
+      return false;
+    }
+    if (filter.maxBasePower !== undefined && move.power > filter.maxBasePower) {
       return false;
     }
     return true;

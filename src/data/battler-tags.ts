@@ -3835,8 +3835,10 @@ export class ErFrostbiteTag extends SerializableBattlerTag {
   }
 
   override canAdd(pokemon: Pokemon): boolean {
-    // Ice types are immune to frostbite (Gen 9 mainline behavior).
-    return !pokemon.isOfType(PokemonType.ICE);
+    // Ice types are immune to frostbite (Gen 9 mainline behavior) — EXCEPT a
+    // target afflicted by ER Ice Statue, which is Ice-type but explicitly loses
+    // that immunity.
+    return !pokemon.isOfType(PokemonType.ICE) || pokemon.getTag(BattlerTagType.ER_ICE_STATUE) != null;
   }
 
   override lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {
@@ -3886,6 +3888,37 @@ export class ErItemDisabledTag extends SerializableBattlerTag {
   public override readonly tagType = BattlerTagType.ER_ITEM_DISABLED;
   constructor(turnCount = 2) {
     super(BattlerTagType.ER_ITEM_DISABLED, BattlerTagLapseType.TURN_END, turnCount);
+  }
+}
+
+/**
+ * ER `ICE_STATUE` — applied by Hollow Ice Zone's Ice-type moves. While present:
+ *  - the holder's typing is overwritten to pure Ice (set on add via
+ *    `summonData.types`), so it takes Ice's weaknesses and gives Ice STAB;
+ *  - it gains NO resistances — `Pokemon.getAttackTypeEffectiveness` clamps any
+ *    incoming multiplier below 1 up to 1 while this tag is present (so the lone
+ *    Ice-resists-Ice matchup becomes neutral);
+ *  - it loses the Ice-type frostbite immunity (see `ErFrostbiteTag.canAdd`).
+ *
+ * Persists until the holder switches out (its `summonData` — including the type
+ * override and this tag — is reset on send-out). Indefinite duration (99).
+ */
+export class ErIceStatueTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_ICE_STATUE;
+  constructor() {
+    super(BattlerTagType.ER_ICE_STATUE, BattlerTagLapseType.TURN_END, 99);
+  }
+
+  override canAdd(pokemon: Pokemon): boolean {
+    // Don't re-apply if already an Ice Statue.
+    return pokemon.getTag(BattlerTagType.ER_ICE_STATUE) == null;
+  }
+
+  override onAdd(pokemon: Pokemon): void {
+    super.onAdd(pokemon);
+    // Overwrite the holder's typing to pure Ice for the duration.
+    pokemon.summonData.types = [PokemonType.ICE];
+    pokemon.updateInfo();
   }
 }
 
@@ -4095,6 +4128,8 @@ export function getBattlerTag(
       return new ErFearTag();
     case BattlerTagType.ER_ITEM_DISABLED:
       return new ErItemDisabledTag(turnCount || 2);
+    case BattlerTagType.ER_ICE_STATUE:
+      return new ErIceStatueTag();
   }
 }
 
@@ -4232,6 +4267,7 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.ER_FROSTBITE]: ErFrostbiteTag;
   [BattlerTagType.ER_FEAR]: ErFearTag;
   [BattlerTagType.ER_ITEM_DISABLED]: ErItemDisabledTag;
+  [BattlerTagType.ER_ICE_STATUE]: ErIceStatueTag;
 };
 
 /**

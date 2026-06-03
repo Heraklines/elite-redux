@@ -53,11 +53,40 @@ export function isSpreadMove(move: Move): boolean {
   return false;
 }
 
+/**
+ * Elite Redux — abilities (Artillery / Amplifier / Sweeping Edge) that grant the
+ * user's single-target enemy moves SPREAD targeting ("hit both opposing
+ * Pokemon") when the move carries the matching flag. Returns true when the
+ * user's active ability/innates include a {@link SpreadTargetByFlagAbAttr} whose
+ * flag is set on the move. Per ER spec, multihit moves never spread.
+ */
+function userGrantsSpreadTargeting(user: Pokemon, move: Move): boolean {
+  if (move.hasAttr("MultiHitAttr") || !user.hasAbilityWithAttr("SpreadTargetByFlagAbAttr")) {
+    return false;
+  }
+  const attrs = [
+    ...user.getAbility().getAttrs("SpreadTargetByFlagAbAttr"),
+    ...user.getPassiveAbilities().flatMap(pa => pa?.getAttrs("SpreadTargetByFlagAbAttr") ?? []),
+  ];
+  return attrs.some(a => move.hasFlag(a.flag));
+}
+
 export function getMoveTargets(user: Pokemon, move: MoveId, replaceTarget?: MoveTarget): MoveTargetSet {
   const variableTarget = new ValueHolder(replaceTarget ?? allMoves[move].moveTarget);
   user.getOpponents(false).forEach(p => applyMoveAttrs("VariableTargetAttr", user, p, allMoves[move], variableTarget));
 
-  const moveTarget: MoveTarget = variableTarget.value;
+  let moveTarget: MoveTarget = variableTarget.value;
+  // Elite Redux: promote a single-target enemy move to a both-foes spread move
+  // when the user's ability grants spread targeting for the move's flag. Most
+  // single-target damaging moves default to NEAR_OTHER (can pick an ally in
+  // doubles); a few are NEAR_ENEMY. Both become ALL_NEAR_ENEMIES per the ER
+  // spec ("hit both opposing Pokemon").
+  if (
+    (moveTarget === MoveTarget.NEAR_OTHER || moveTarget === MoveTarget.NEAR_ENEMY)
+    && userGrantsSpreadTargeting(user, allMoves[move])
+  ) {
+    moveTarget = MoveTarget.ALL_NEAR_ENEMIES;
+  }
   const opponents = user.getOpponents(false);
 
   let set: Pokemon[] = [];

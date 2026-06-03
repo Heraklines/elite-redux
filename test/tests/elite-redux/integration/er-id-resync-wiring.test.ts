@@ -29,11 +29,16 @@ import { describe, expect, it } from "vitest";
 /** Representative drifted abilities: {draftId, name, expected archetype}. */
 const PINS: { id: number; name: string; archetype: string }[] = [
   { id: 386, name: "Spectralize", archetype: "type-conversion" },
-  { id: 387, name: "Spectral Shroud", archetype: "chance-status-on-hit" },
+  // 387 Spectral Shroud was reclassified to bespoke (audit-fix): the prior
+  // chance-status-on-hit row wired only the 30% poison and dropped the
+  // Spectralize (Normal→Ghost +1.2x) identity. Bespoke now wires both halves.
+  { id: 387, name: "Spectral Shroud", archetype: "bespoke" },
   { id: 390, name: "Marine Apex", archetype: "composite-vanilla-mashup" },
   { id: 391, name: "Mighty Horn", archetype: "flag-damage-boost" },
   { id: 872, name: "Molten Core", archetype: "composite-vanilla-mashup" },
-  { id: 909, name: "Lightsaber", archetype: "composite-vanilla-mashup" },
+  // 909 Lightsaber is bespoke (pure hand-wired, no vanilla parts) — both halves
+  // ("Adds Fire-type. Keen Edge moves 25% burn") wired in dispatchBespokeR48.
+  { id: 909, name: "Lightsaber", archetype: "bespoke" },
   { id: 912, name: "Laser Drill", archetype: "chance-status-on-hit" },
   { id: 980, name: "Overcast", archetype: "bespoke" },
   { id: 984, name: "Mucus Membrane", archetype: "composite-vanilla-mashup" },
@@ -42,8 +47,9 @@ const PINS: { id: number; name: string; archetype: string }[] = [
   { id: 1026, name: "Foul Energy", archetype: "type-damage-boost" },
 ];
 
-/** Offensive chance-status abilities whose `direction` annotation must survive. */
-const OFFENSE_DIRECTION_IDS = [387, 912, 295, 441];
+/** Offensive chance-status abilities whose `direction` annotation must survive.
+ * (387 Spectral Shroud was moved to bespoke — its poison is now wired directly.) */
+const OFFENSE_DIRECTION_IDS = [912, 295, 441];
 
 describe("ER id-resync wiring consistency (#103)", () => {
   const byId = new Map<number, string>();

@@ -22,15 +22,20 @@
 
 import { PostTurnAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
 import type { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
-import { PokemonMove } from "#moves/pokemon-move";
 import type { AbAttrBaseParams } from "#types/ability-types";
 
 /** Construction options for {@linkcode PostTurnScriptedMoveAbAttr}. */
 export interface PostTurnScriptedMoveOptions {
   /** Pokerogue MoveId of the scripted move. */
   readonly moveId: MoveId;
+  /**
+   * Optional ER-specified base-power override (e.g. Sumo Wrestler's "20 BP
+   * Circle Throw"). Omit to use the move's registered full power.
+   */
+  readonly power?: number;
   /**
    * Fire every N-th turn (1 = every turn, 2 = every other turn, etc.).
    * Counted against pokemon.summonData.turnCount.
@@ -44,11 +49,13 @@ export interface PostTurnScriptedMoveOptions {
  */
 export class PostTurnScriptedMoveAbAttr extends PostTurnAbAttr {
   private readonly moveId: MoveId;
+  private readonly power: number | undefined;
   private readonly everyNTurns: number;
 
   constructor(options: PostTurnScriptedMoveOptions) {
     super();
     this.moveId = options.moveId;
+    this.power = options.power;
     this.everyNTurns = options.everyNTurns ?? 1;
     if (!(this.everyNTurns >= 1 && Number.isInteger(this.everyNTurns))) {
       throw new Error(`[PostTurnScriptedMoveAbAttr] everyNTurns must be a positive integer; got ${this.everyNTurns}`);
@@ -79,7 +86,7 @@ export class PostTurnScriptedMoveAbAttr extends PostTurnAbAttr {
       "MovePhase",
       pokemon,
       [target.getBattlerIndex()],
-      new PokemonMove(this.moveId),
+      scriptedPokemonMove(this.moveId, this.power),
       MoveUseMode.INDIRECT,
     );
   }

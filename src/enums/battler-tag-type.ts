@@ -109,4 +109,12 @@ export enum BattlerTagType {
    * they are not gated through the held-item apply path.
    */
   ER_ITEM_DISABLED = "ER_ITEM_DISABLED",
+  /**
+   * ER Ice Statue (applied by Hollow Ice Zone's Ice-type moves). The holder's
+   * typing becomes pure Ice, but — unlike a real Ice-type — it gains NO
+   * resistances (any incoming type multiplier below 1 is treated as neutral)
+   * and LOSES the Ice-type immunity to frostbite. Persists until the holder
+   * switches out.
+   */
+  ER_ICE_STATUE = "ER_ICE_STATUE",
 }

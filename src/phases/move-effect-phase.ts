@@ -5,7 +5,10 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { ConditionalProtectTag } from "#data/arena-tag";
 import { MoveAnim } from "#data/battle-anims";
 import { ProtectedTag, SemiInvulnerableTag, SubstituteTag, TypeBoostTag } from "#data/battler-tags";
-import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
+import {
+  ConditionalAlwaysHitAbAttr,
+  erMoveAlwaysHitsForUserType,
+} from "#data/elite-redux/archetypes/conditional-always-hit";
 import { applyErLifeOrbRecoil, applyErRockyHelmet } from "#data/elite-redux/er-recreated-items";
 import { SpeciesFormChangePostMoveTrigger } from "#data/form-change-triggers";
 import type { TypeDamageMultiplier } from "#data/type";
@@ -174,6 +177,8 @@ export class MoveEffectPhase extends PokemonPhase {
       applyMoveAttrs("MultiHitAttr", user, this.getFirstTarget() ?? null, move, hitCount);
       // If Parental Bond is applicable, add another hit
       applyAbAttrs("AddSecondStrikeAbAttr", { pokemon: user, move, hitCount, opponent: this.getFirstTarget() });
+      // ER Unrelenting (994): turn an eligible single-hit move into a 2-5-hit move.
+      applyAbAttrs("AllAttacksMultiHitAbAttr", { pokemon: user, move, hitCount, opponent: this.getFirstTarget() });
       // If Multi-Lens is applicable, add hits equal to the number of held Multi-Lenses
       globalScene.applyModifiers(PokemonMultiHitModifier, user.isPlayer(), user, move.id, hitCount);
       // Set the user's relevant turnData fields to reflect the final hit count
@@ -488,6 +493,11 @@ export class MoveEffectPhase extends PokemonPhase {
       return true;
     }
     if (this.move.hasAttr("ToxicAccuracyAttr") && user.isOfType(PokemonType.POISON)) {
+      return true;
+    }
+    // Elite Redux: move-intrinsic "never misses if user is <Type>-type" clause
+    // (Leech Seed/Grass, Thunder Wave/Electric, Will-O-Wisp/Fire, Flash Freeze/Ice).
+    if (erMoveAlwaysHitsForUserType(this.move, user)) {
       return true;
     }
     // TODO: Fix lock on / mind reader check to belong to the battler tag - this is really ugly

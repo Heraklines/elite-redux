@@ -1,0 +1,19 @@
+# Cloudflare Worker — Elite Redux ghost-team API (#217).
+# Deploy: see README.md. Free tier (Workers + KV) is sufficient.
+
+name = "er-ghost-api"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# Workers KV namespace that stores ghost teams. Create it once with:
+#   npx wrangler kv namespace create GHOSTS
+# then paste the returned id below (and a preview_id for `wrangler dev`).
+[[kv_namespaces]]
+binding = "GHOSTS"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_YOUR_PREVIEW_KV_NAMESPACE_ID"
+
+# Optional: restrict which site origin may call the API. "*" (or unset) allows
+# any origin. For a locked-down deploy set this to your Pages URL.
+[vars]
+ALLOWED_ORIGIN = "*"

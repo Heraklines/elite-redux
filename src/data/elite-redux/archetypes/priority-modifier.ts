@@ -66,6 +66,19 @@ export interface PriorityModifierFilter {
   readonly type?: PokemonType;
   /** Move flag(s) that trigger the priority bonus. Omit to accept any flags. */
   readonly flag?: MoveFlags;
+  /**
+   * Only moves whose base power is `<=` this value trigger the bonus (e.g.
+   * Perfectionist's "+1 priority to moves with 25 BP or lower"). Status moves
+   * (power 0) qualify under any threshold. Omit for no base-power gate.
+   */
+  readonly maxBasePower?: number;
+  /**
+   * Only moves whose base accuracy is `<` this value trigger the modifier (e.g.
+   * Sighting System's "moves with less than 80% base accuracy receive -3
+   * priority"). Always-hit moves (accuracy `-1`/`<0`) never qualify. Omit for
+   * no accuracy gate.
+   */
+  readonly maxAccuracy?: number;
 }
 
 /**
@@ -179,6 +192,12 @@ export class PriorityModifierAbAttr extends ChangeMovePriorityAbAttr {
       return false;
     }
     if (filter.flag !== undefined && !move.hasFlag(filter.flag)) {
+      return false;
+    }
+    if (filter.maxBasePower !== undefined && move.power > filter.maxBasePower) {
+      return false;
+    }
+    if (filter.maxAccuracy !== undefined && !(move.accuracy >= 0 && move.accuracy < filter.maxAccuracy)) {
       return false;
     }
     return true;

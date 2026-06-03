@@ -57,6 +57,7 @@
 import { PostAttackAbAttr, PostDefendAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveFlags } from "#enums/move-flags";
+import type { MoveId } from "#enums/move-id";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { StatusEffect } from "#enums/status-effect";
 
@@ -81,7 +82,10 @@ import type { StatusEffect } from "#enums/status-effect";
  * classifier emits today. If more filter kinds appear (e.g. category), extend
  * the union here rather than introducing a separate primitive.
  */
-export type ChanceStatusFilter = { readonly flag: MoveFlags } | { readonly type: PokemonType };
+export type ChanceStatusFilter =
+  | { readonly flag: MoveFlags }
+  | { readonly type: PokemonType }
+  | { readonly moveId: MoveId };
 
 /** Construction payload for {@linkcode ChanceStatusOnHitAbAttr}. */
 export interface ChanceStatusOnHitOptions {
@@ -352,6 +356,16 @@ export interface ChanceBattlerTagOnHitOptions {
    * Talon Trap (973): "50% to trap on contact, 100% if entered this turn."
    */
   readonly firstTurnChance?: number;
+  /**
+   * Optional gate on the holder's OWN move id(s): the proc only fires when the
+   * holder used one of these specific moves. Unlike {@linkcode filter} and
+   * {@linkcode contactRequired}, setting `moveIds` permits STATUS moves to
+   * trigger the proc (the default PostAttack gate excludes them), since these
+   * are by-name riders on a known move. Used by Hypnotic Trance (953):
+   * "Hypnosis never misses and also causes Confusion" — the confusion is a
+   * 100% rider tied to the status move Hypnosis itself. OnAttack variant only.
+   */
+  readonly moveIds?: readonly MoveId[];
 }
 
 /**
@@ -614,6 +628,7 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
   private readonly targetHasStatus: StatusEffect | undefined;
   private readonly critRequired: boolean;
   private readonly firstTurnChance: number | undefined;
+  private readonly moveIds: readonly MoveId[] | undefined;
 
   constructor(opts: ChanceBattlerTagOnHitOptions) {
     if (!(opts.chance >= 0 && opts.chance <= 100)) {
@@ -622,17 +637,23 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
     if (opts.tags.length === 0) {
       throw new Error("[ChanceBattlerTagOnAttackAbAttr] must configure at least one battler tag");
     }
-    super(undefined, false);
+    // When gated to specific move ids, override the default PostAttack
+    // attackCondition (which excludes status moves) so by-name riders on a
+    // status move (e.g. Hypnosis) can trigger.
+    super(opts.moveIds === undefined ? undefined : (_u, _t, move) => opts.moveIds!.includes(move.id), false);
     this.chance = opts.chance;
     this.tags = opts.tags;
     this.critRequired = opts.critRequired ?? false;
     this.firstTurnChance = opts.firstTurnChance;
-    // A target-state gate (targetHasTag) or crit gate replaces contact as the trigger when set.
+    this.moveIds = opts.moveIds;
+    // A target-state gate (targetHasTag), crit gate, or move-id gate replaces
+    // contact as the trigger when set.
     this.contactRequired =
       opts.contactRequired
       ?? (opts.filter === undefined
         && opts.targetHasTag === undefined
         && opts.targetHasStatus === undefined
+        && opts.moveIds === undefined
         && !this.critRequired);
     this.turns = opts.turns;
     this.filter = opts.filter;
@@ -661,6 +682,9 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
       return false;
     }
     if (target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") || pokemon === target) {
+      return false;
+    }
+    if (this.moveIds !== undefined && !this.moveIds.includes(move.id)) {
       return false;
     }
     if (this.contactRequired && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target })) {
@@ -746,10 +770,13 @@ function resolveTagTurns(
  */
 function checkChanceStatusFilter(
   filter: ChanceStatusFilter,
-  move: { hasFlag(flag: MoveFlags): boolean; readonly type: PokemonType },
+  move: { hasFlag(flag: MoveFlags): boolean; readonly type: PokemonType; readonly id: MoveId },
 ): boolean {
   if ("flag" in filter) {
     return move.hasFlag(filter.flag);
+  }
+  if ("moveId" in filter) {
+    return move.id === filter.moveId;
   }
   return move.type === filter.type;
 }

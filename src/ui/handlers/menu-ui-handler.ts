@@ -3,6 +3,7 @@ import { loggedInUser, updateUserInfo } from "#app/account";
 import { globalScene } from "#app/global-scene";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import { bypassLogin, isApp, isBeta, isDev } from "#constants/app-constants";
+import { submitBugReport } from "#data/elite-redux/er-bug-report";
 import { AdminMode, getAdminModeName } from "#enums/admin-mode";
 import { Button } from "#enums/buttons";
 import { GameDataType } from "#enums/game-data-type";
@@ -29,6 +30,7 @@ enum MenuOptions {
   POKEDEX,
   MANAGE_DATA,
   COMMUNITY,
+  REPORT_BUG,
   SAVE_AND_QUIT,
   LOG_OUT,
 }
@@ -641,6 +643,24 @@ export class MenuUiHandler extends MessageUiHandler {
           break;
         case MenuOptions.COMMUNITY:
           ui.setOverlayMode(UiMode.MENU_OPTION_SELECT, this.communityConfig);
+          success = true;
+          break;
+        case MenuOptions.REPORT_BUG:
+          ui.setOverlayMode(UiMode.BUG_REPORT_FORM, {
+            buttonActions: [
+              (description: string) => {
+                // Close the form, then submit (clipboard + download + optional
+                // POST) and confirm via a transient message.
+                ui.revertMode().then(() => {
+                  submitBugReport(description).then(result => {
+                    const key = result.sent ? "menuUiHandler:reportBugSent" : "menuUiHandler:reportBugSaved";
+                    ui.showText(i18next.t(key), null, () => ui.showText("", 0), 1500);
+                  });
+                });
+              },
+              () => ui.revertMode(),
+            ],
+          });
           success = true;
           break;
         case MenuOptions.SAVE_AND_QUIT: {

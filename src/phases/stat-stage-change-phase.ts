@@ -88,7 +88,9 @@ export class StatStageChangePhase extends PokemonPhase {
       if (this.comingFromStickyWeb) {
         /** If this SSCP is from sticky web, then check if pokemon that last sucessfully used sticky web is on field */
         const stickyTagID = globalScene.arena.findTagsOnSide(
-          (t: ArenaTag) => t.tagType === ArenaTagType.STICKY_WEB,
+          // ER Foamy Web (FOAMY_WEB) is a Sticky Web variant and shares this
+          // attribution path (used to credit the drop to its source for Mirror Armor).
+          (t: ArenaTag) => t.tagType === ArenaTagType.STICKY_WEB || t.tagType === ArenaTagType.FOAMY_WEB,
           ArenaTagSide.PLAYER,
         )[0].sourceId;
         globalScene.getEnemyField().forEach(e => {
@@ -101,7 +103,9 @@ export class StatStageChangePhase extends PokemonPhase {
       }
     } else if (this.comingFromStickyWeb) {
       const stickyTagID = globalScene.arena.findTagsOnSide(
-        (t: ArenaTag) => t.tagType === ArenaTagType.STICKY_WEB,
+        // ER Foamy Web (FOAMY_WEB) is a Sticky Web variant and shares this
+        // attribution path (used to credit the drop to its source for Mirror Armor).
+        (t: ArenaTag) => t.tagType === ArenaTagType.STICKY_WEB || t.tagType === ArenaTagType.FOAMY_WEB,
         ArenaTagSide.ENEMY,
       )[0].sourceId;
       globalScene.getPlayerField().forEach(e => {

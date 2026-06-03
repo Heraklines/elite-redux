@@ -1491,6 +1491,28 @@ export class AddSecondStrikeAbAttr extends PreAttackAbAttr {
 }
 
 /**
+ * Elite Redux — Unrelenting (994): "All attacking moves can hit 2-5 times."
+ * Turns every eligible single-hit damaging move into a 2-5-hit move, using the
+ * same hit-count distribution (and Skill Link interaction) as the vanilla
+ * {@linkcode MultiHitType.TWO_TO_FIVE}. Only fires when the move is still a
+ * single hit (so it never shrinks an existing multi-hit move) and passes the
+ * standard multi-strike eligibility filter (excludes OHKO/charge/etc.).
+ */
+export class AllAttacksMultiHitAbAttr extends PreAttackAbAttr {
+  override canApply({ pokemon, opponent, move, hitCount }: AddSecondStrikeAbAttrParams): boolean {
+    return hitCount.value === 1 && move.canBeMultiStrikeEnhanced(pokemon, true, opponent);
+  }
+
+  override apply({ pokemon, hitCount }: AddSecondStrikeAbAttrParams): void {
+    // Mirror MultiHitAttr.getHitCount's TWO_TO_FIVE roll, including the
+    // Skill Link (MaxMultiHitAbAttr) override, so the distribution matches.
+    const hitValue = new NumberHolder(pokemon.randBattleSeedInt(20));
+    applyAbAttrs("MaxMultiHitAbAttr", { pokemon, hits: hitValue });
+    hitCount.value = hitValue.value >= 13 ? 2 : hitValue.value >= 6 ? 3 : hitValue.value >= 3 ? 4 : 5;
+  }
+}
+
+/**
  * Common interface for parameters used by abilities that modify damage/power of a move before an attack
  */
 export interface PreAttackModifyDamageAbAttrParams extends AugmentMoveInteractionAbAttrParams {
@@ -3540,6 +3562,209 @@ export class BlockCritAbAttr extends AbAttr {
   }
 }
 
+export interface EnemyMinDamageRollAbAttrParams extends AbAttrBaseParams {
+  /** The damage-variance multiplier (normally a random 0.85–1.0); forced to the floor (0.85). */
+  readonly rollMultiplier: NumberHolder;
+}
+
+/**
+ * Elite Redux — forces attacks AGAINST the holder to roll minimum damage (the
+ * 85% floor) instead of the random 0.85–1.0 spread. Wired on the DEFENDER
+ * (Bad Luck 334, Bad Omen 671: "foes always roll minimum damage"). Invoked by a
+ * single gated `applyAbAttrs` call in `Pokemon.getAttackDamage` — a no-op for
+ * every ability that lacks this attr.
+ */
+export class EnemyMinDamageRollAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+
+  override apply({ rollMultiplier }: EnemyMinDamageRollAbAttrParams): void {
+    rollMultiplier.value = 0.85;
+  }
+}
+
+export interface DefensiveStatSubstituteAbAttrParams extends AbAttrBaseParams {
+  /** Holds the `Stat` the damage formula will read as the holder's defensive stat; overwritten in place. */
+  readonly statHolder: NumberHolder;
+}
+
+/**
+ * Elite Redux — substitutes a different stat for the holder's DEFENSIVE stat
+ * (Def/SpDef) in the damage formula. Tangled Feet 77: "When the user is confused
+ * or enraged, the Pokemon uses its Speed stat instead of Defense or Special
+ * Defense for damage calculations." Wired on the DEFENDER and gated by an
+ * `extraCondition` (confused tag, or the ER `FOG` enrage proxy) so it is inert
+ * otherwise. Invoked by a single gated `applyAbAttrs` in `Pokemon.getAttackDamage`.
+ */
+export class DefensiveStatSubstituteAbAttr extends AbAttr {
+  private readonly substituteStat: Stat;
+
+  constructor(substituteStat: Stat = Stat.SPD) {
+    super(false);
+    this.substituteStat = substituteStat;
+  }
+
+  override apply({ statHolder }: DefensiveStatSubstituteAbAttrParams): void {
+    statHolder.value = this.substituteStat;
+  }
+}
+
+export interface CritUseLowerDefensiveStatAbAttrParams extends AbAttrBaseParams {
+  /** The Pokemon being hit (whose Def/SpDef are compared). */
+  readonly defender: Pokemon;
+  /** Holds the `Stat` the damage formula will read as the defender's defensive stat; overwritten in place. */
+  readonly statHolder: NumberHolder;
+}
+
+/**
+ * Elite Redux — on a CRITICAL hit, the holder's attack targets the opponent's
+ * WEAKER defensive stat (Deadeye 376: "when landing critical hits, the attack
+ * targets the opponent's weaker defensive stat"). Wired on the ATTACKER and
+ * invoked only when `isCritical`, by a gated `applyAbAttrs` in
+ * `Pokemon.getAttackDamage`. Picks whichever of the defender's effective
+ * Def/SpDef is lower so the crit hits for maximum damage.
+ */
+export class CritUseLowerDefensiveStatAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+
+  override apply({ defender, statHolder }: CritUseLowerDefensiveStatAbAttrParams): void {
+    const def = defender.getEffectiveStat(Stat.DEF);
+    const spDef = defender.getEffectiveStat(Stat.SPDEF);
+    statHolder.value = def <= spDef ? Stat.DEF : Stat.SPDEF;
+  }
+}
+
+/**
+ * Elite Redux — pure marker: the holder is immune to Bad Dreams' end-of-turn
+ * sleep damage (Sweet Dreams 333 / Peaceful Slumber 490: "grants immunity to
+ * Bad Dreams damage"). Consulted by {@link PostTurnHurtIfSleepingAbAttr}. Unlike
+ * `BlockNonDirectDamageAbAttr` (Magic Guard) this blocks ONLY Bad Dreams, so a
+ * Sweet-Dreams sleeper still takes weather/status chip damage.
+ */
+export class BadDreamsImmunityAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+
+  override apply(_params: AbAttrBaseParams): void {}
+}
+
+/**
+ * Elite Redux — pure marker: while the holder is Bug-type it is immune to powder
+ * moves (Pollinate 381 / Steel Beetle 701: "Immune to powder if Bug-type").
+ * Consulted by `Move.isTypeImmune` (the BUG-type branch) together with the
+ * holder's actual typing, so a non-Bug Pollinate holder is still hit by powder.
+ */
+export class BugPowderImmunityAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+
+  override apply(_params: AbAttrBaseParams): void {}
+}
+
+/**
+ * Elite Redux — pure marker that makes the holder UNGROUNDED, like Levitate
+ * (Hover 715, Fey Flight 843, etc. — "levitates / immune to Ground effects such
+ * as Spikes and terrains"). Consulted by `Pokemon.isGrounded()`. Pair it with an
+ * `AttackTypeImmunityAbAttr(GROUND)` for the Ground-move immunity; this marker
+ * additionally lifts the holder off the ground for Spikes / terrain / Arena Trap.
+ */
+export class FloatAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+
+  override apply(_params: AbAttrBaseParams): void {}
+}
+
+/**
+ * Elite Redux — lifecycle hook fired when the holder **wakes up from sleep**.
+ * Invoked by `MovePhase.checkSleep` immediately after the natural-wake
+ * `cureStatus(SLEEP)`. The base is an inert marker; concrete subclasses (e.g.
+ * ER's Rude Awakening) implement the on-wake effect. Used via
+ * `applyAbAttrs("PostWakeUpAbAttr", { pokemon })`.
+ */
+export class PostWakeUpAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+
+  override apply(_params: AbAttrBaseParams): void {}
+}
+
+/**
+ * Elite Redux — pure marker for Overrule 815: "when this Pokémon's moves land
+ * critical hits, they ignore defensive abilities that reduce damage AND deal
+ * double damage if they are resisted." No `apply` behavior of its own — the two
+ * crit-gated effects are read at the relevant points in `Pokemon.getAttackDamage`
+ * via `source.hasAbilityWithAttr("OverruleCritAbAttr")` (so they are strict
+ * no-ops for every other Pokémon).
+ */
+export class OverruleCritAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+
+  override apply(_params: AbAttrBaseParams): void {}
+}
+
+/**
+ * Elite Redux — grants the holder's single-target enemy moves SPREAD targeting
+ * (hit both opposing Pokemon) when the move carries `flag`. Used by Artillery
+ * 377 (PULSE_MOVE), Amplifier 378 (SOUND_BASED) and Sweeping Edge 421
+ * (SLICING_MOVE). A pure marker carrying the flag; the promotion (NEAR_ENEMY →
+ * ALL_NEAR_ENEMIES) is performed synchronously in `getMoveTargets`, which reads
+ * the `flag` field. Per ER spec the promotion excludes multihit moves.
+ */
+export class SpreadTargetByFlagAbAttr extends AbAttr {
+  public readonly flag: MoveFlags;
+
+  constructor(flag: MoveFlags) {
+    super(false);
+    this.flag = flag;
+  }
+
+  override apply(_params: AbAttrBaseParams): void {}
+}
+
+export interface SetMoveAccuracyAbAttrParams extends AbAttrBaseParams {
+  /** The move whose base accuracy is being calculated. */
+  readonly move: Move;
+  /** Holds the move's base accuracy (pre evasion/accuracy stages); overwritten in place. */
+  readonly accuracy: NumberHolder;
+}
+
+/**
+ * Elite Redux — sets a specific move's BASE accuracy when used by the holder
+ * (Hypnotist 327 / Lunar Eclipse 365: "Boosts Hypnosis' accuracy to 90%. Does
+ * not lock accuracy to 90% — the move is still affected by accuracy/evasiveness
+ * changes."). Applied in `Move.calculateBattleAccuracy` BEFORE the evasion /
+ * accuracy-stage multiplier, so stage modifiers still apply on top. Only raises
+ * accuracy (never lowers a naturally higher value).
+ */
+export class SetMoveAccuracyAbAttr extends AbAttr {
+  public readonly moveIds: readonly MoveId[];
+  private readonly accuracyValue: number;
+
+  constructor(moveIds: readonly MoveId[], accuracyValue: number) {
+    super(false);
+    this.moveIds = moveIds;
+    this.accuracyValue = accuracyValue;
+  }
+
+  override canApply({ move, accuracy }: SetMoveAccuracyAbAttrParams): boolean {
+    return this.moveIds.includes(move.id) && accuracy.value !== -1 && accuracy.value < this.accuracyValue;
+  }
+
+  override apply({ accuracy }: SetMoveAccuracyAbAttrParams): void {
+    accuracy.value = this.accuracyValue;
+  }
+}
+
 export interface BonusCritAbAttrParams extends AbAttrBaseParams {
   /** Holds the crit stage that may be modified by ability application */
   critStage: NumberHolder;
@@ -4443,6 +4668,7 @@ export class PostTurnHurtIfSleepingAbAttr extends PostTurnAbAttr {
         opp =>
           (opp.status?.effect === StatusEffect.SLEEP || opp.hasAbility(AbilityId.COMATOSE))
           && !opp.hasAbilityWithAttr("BlockNonDirectDamageAbAttr")
+          && !opp.hasAbilityWithAttr("BadDreamsImmunityAbAttr")
           && !opp.switchOutStatus,
       );
   }
@@ -4454,7 +4680,11 @@ export class PostTurnHurtIfSleepingAbAttr extends PostTurnAbAttr {
     }
 
     for (const opp of pokemon.getOpponentsGenerator()) {
-      if ((opp.status?.effect !== StatusEffect.SLEEP && !opp.hasAbility(AbilityId.COMATOSE)) || opp.switchOutStatus) {
+      if (
+        (opp.status?.effect !== StatusEffect.SLEEP && !opp.hasAbility(AbilityId.COMATOSE))
+        || opp.switchOutStatus
+        || opp.hasAbilityWithAttr("BadDreamsImmunityAbAttr")
+      ) {
         continue;
       }
 
@@ -5262,6 +5492,23 @@ export class MoveAbilityBypassAbAttr extends AbAttr {
 /** Attribute for abilities that allow moves that make contact to ignore protection (i.e. Unseen Fist) */
 export class IgnoreProtectOnContactAbAttr extends AbAttr {
   private declare readonly _: never;
+}
+
+/**
+ * Elite Redux — the holder's moves carrying `flag` bypass protection moves
+ * (Pinnacle Blade 698: "Keen Edge moves bypass protection"). A pure marker
+ * carrying the flag; consulted by `Move.doesFlagEffectApply` for the
+ * IGNORE_PROTECT flag, alongside the contact-only `IgnoreProtectOnContactAbAttr`.
+ */
+export class IgnoreProtectByFlagAbAttr extends AbAttr {
+  public readonly flag: MoveFlags;
+
+  constructor(flag: MoveFlags) {
+    super(false);
+    this.flag = flag;
+  }
+
+  override apply(_params: AbAttrBaseParams): void {}
 }
 
 export interface InfiltratorAbAttrParams extends AbAttrBaseParams {
@@ -6126,6 +6373,7 @@ export function getWeatherCondition(...weatherTypes: WeatherType[]): AbAttrCondi
 /** Map of all ability attribute constructors, for use with the `.is` method. */
 export const AbilityAttrs = Object.freeze({
   AddSecondStrikeAbAttr,
+  AllAttacksMultiHitAbAttr,
   AlliedFieldDamageReductionAbAttr,
   AllyMoveCategoryPowerBoostAbAttr,
   AllyStatMultiplierAbAttr,
@@ -6159,6 +6407,17 @@ export const AbilityAttrs = Object.freeze({
   DoubleBerryEffectAbAttr,
   DownloadAbAttr,
   EffectSporeAbAttr,
+  EnemyMinDamageRollAbAttr,
+  DefensiveStatSubstituteAbAttr,
+  CritUseLowerDefensiveStatAbAttr,
+  BadDreamsImmunityAbAttr,
+  BugPowderImmunityAbAttr,
+  FloatAbAttr,
+  PostWakeUpAbAttr,
+  OverruleCritAbAttr,
+  IgnoreProtectByFlagAbAttr,
+  SpreadTargetByFlagAbAttr,
+  SetMoveAccuracyAbAttr,
   ExecutedMoveAbAttr,
   FetchBallAbAttr,
   FieldMovePowerBoostAbAttr,

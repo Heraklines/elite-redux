@@ -14,6 +14,8 @@ import { EntryHazardTag } from "#data/arena-tag";
 import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed/daily-seed-utils";
 import { allMoves, allSpecies } from "#data/data-lists";
 import type { Egg } from "#data/egg";
+import { getErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { loadPositionalTag } from "#data/positional-tags/load-positional-tag";
@@ -840,6 +842,9 @@ export class GameData {
       mysteryEncounterType: globalScene.currentBattle.mysteryEncounter?.encounterType ?? -1,
       mysteryEncounterSaveData: globalScene.mysteryEncounterSaveData,
       playerFaints: globalScene.arena.playerFaints,
+      // ER: persist the run difficulty so a reload keeps using the chosen ER
+      // trainer roster tier (otherwise it resets to "ace" = vanilla trainers).
+      erDifficulty: getErDifficulty(),
     } as SessionSaveData;
   }
 
@@ -946,6 +951,13 @@ export class GameData {
     if (fromSession.challenges) {
       globalScene.gameMode.challenges = fromSession.challenges.map(c => c.toChallenge());
     }
+
+    // ER: restore the run difficulty (drives the ER trainer roster tier). Legacy
+    // saves predate this field — default to "ace" (vanilla trainers). Reset the
+    // per-run "already encountered" ER trainer set so the loaded run's pool is
+    // fresh rather than inheriting a prior run's used-trainer state.
+    setErDifficulty(fromSession.erDifficulty ?? "ace");
+    resetErRunTrainerTracking();
 
     globalScene.setSeed(fromSession.seed || globalScene.game.config.seed[0]);
     globalScene.resetSeed();

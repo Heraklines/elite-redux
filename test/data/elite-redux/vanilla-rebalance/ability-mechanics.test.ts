@@ -45,7 +45,7 @@ import {
 import type { Ability } from "#abilities/ability";
 import { allAbilities } from "#data/data-lists";
 import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
-import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
+import { PostFaintDetonateAbAttr } from "#data/elite-redux/archetypes/post-faint-detonate";
 import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -487,10 +487,10 @@ describe("ER vanilla ability rebalance — R2 AROMA_VEIL narrowed tags", () => {
 });
 
 describe("ER vanilla ability rebalance — R2 on-faint and entry rewrites", () => {
-  it("AFTERMATH — vanilla PostFaintContactDamageAbAttr replaced with OnFaintEffectAbAttr", () => {
+  it("AFTERMATH — vanilla PostFaintContactDamageAbAttr replaced with PostFaintDetonateAbAttr", () => {
     const ab = getAbility(AbilityId.AFTERMATH);
-    const onFaint = ab.attrs.find(a => a instanceof OnFaintEffectAbAttr);
-    expect(onFaint).toBeDefined();
+    const detonate = ab.attrs.find(a => a instanceof PostFaintDetonateAbAttr);
+    expect(detonate).toBeDefined();
     const hasOldContact = ab.attrs.some(a => a.constructor.name === "PostFaintContactDamageAbAttr");
     expect(hasOldContact).toBe(false);
   });

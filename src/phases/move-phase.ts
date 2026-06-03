@@ -336,6 +336,9 @@ export class MovePhase extends PokemonPhase {
     user.status.sleepTurnsRemaining = turnsRemaining.value;
     if (user.status.sleepTurnsRemaining <= 0) {
       user.cureStatus(StatusEffect.SLEEP);
+      // ER: fire any on-wake ability hook (e.g. Rude Awakening's once-per-battle
+      // +1-all-stats + permanent sleep immunity) now that the holder has woken.
+      applyAbAttrs("PostWakeUpAbAttr", { pokemon: user });
       return false;
     }
 
@@ -763,10 +766,15 @@ export class MovePhase extends PokemonPhase {
     const targets = this.getActiveTargetPokemon();
     const moveQueue = this.pokemon.getMoveQueue();
 
-    if (
-      (targets.length === 0 && !this.move.getMove().hasAttr("AddArenaTrapTagAttr"))
-      || (moveQueue.length > 0 && moveQueue[0].move === MoveId.NONE)
-    ) {
+    // A move with no remaining active target fails. This includes hazard moves
+    // (`AddArenaTrapTagAttr`, e.g. Sticky Web / Stealth Rock): in normal play an
+    // enemy-side hazard still has targets (the side's *active* opponents — see
+    // `getMoveTargetSet`), so `targets.length === 0` only happens when the entire
+    // opposing field has already fainted (the wave is effectively won). Letting a
+    // hazard through in that state reached an unfinished "set hazard on an empty
+    // side" path that hung the turn and softlocked the battle, so we fail it
+    // gracefully instead — there is no one to switch in, so nothing is lost.
+    if (targets.length === 0 || (moveQueue.length > 0 && moveQueue[0].move === MoveId.NONE)) {
       this.showFailedText();
       this.fail();
       // clear out 2 turn moves
@@ -864,7 +872,15 @@ export class MovePhase extends PokemonPhase {
     const failedDueToTerrain = arena.isMoveTerrainCancelled(user, this.targets, move);
     let failed = failsConditions || failedDueToTerrain;
 
-    if (!failed && user.isOpponent(targets[0])) {
+    // `targets[0]` is undefined when the move has no active target — this happens
+    // legitimately for hazard moves (Sticky Web / Stealth Rock / etc., flagged
+    // `AddArenaTrapTagAttr`) used when the entire opposing field has already
+    // fainted: the earlier no-target failure check (see `start`) deliberately
+    // lets those through so the hazard still lands on the empty side. Guard the
+    // deref so we don't call `isOpponent(undefined)` (which crashed the turn and
+    // softlocked the battle). With no defending target, the field-priority-move
+    // immunity check (Queenly Majesty / Dazzling / Damp) is moot, so skip it.
+    if (!failed && targets[0] && user.isOpponent(targets[0])) {
       const defendingSidePlayField = user.isPlayer() ? globalScene.getEnemyField() : globalScene.getPlayerField();
       const cancelled = new ValueHolder(false);
       defendingSidePlayField.forEach((pokemon: Pokemon) => {

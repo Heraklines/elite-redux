@@ -1,0 +1,176 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Elite Redux — in-game bug report assembly + submission (#220).
+//
+// Collects the player's free-text description plus a concise game-state snapshot
+// and the recent console-log ring buffer, then:
+//   1. POSTs it to a configurable form-to-email relay (VITE_BUGREPORT_ENDPOINT,
+//      e.g. a Web3Forms submit URL) so it lands in the maintainer's inbox with
+//      no account required from the player; and ALWAYS
+//   2. copies the report to the clipboard and downloads it as a .json file, as
+//      an offline fallback the player can paste/attach manually.
+//
+// Backend-less by design — works in a static (Guest-mode) deploy. Never throws.
+// =============================================================================
+
+import { globalScene } from "#app/global-scene";
+import { version } from "#package.json";
+import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { formatConsoleSnapshot } from "#utils/console-ring-buffer";
+
+interface BugReportState {
+  version: string;
+  url: string;
+  userAgent: string;
+  timestamp: string;
+  gameModeId: number | null;
+  waveIndex: number | null;
+  erDifficulty: string;
+  seed: string | null;
+  party: { species: string; level: number; hp: string }[];
+}
+
+export interface BugReport {
+  description: string;
+  state: BugReportState;
+  logs: string;
+}
+
+export interface BugReportResult {
+  /** True if the report was successfully POSTed to the configured endpoint. */
+  sent: boolean;
+  /** True if the report was downloaded as a file. */
+  downloaded: boolean;
+  /** True if the report was copied to the clipboard. */
+  copied: boolean;
+}
+
+function readEnv(name: string): string {
+  const value = (import.meta.env as Record<string, unknown> | undefined)?.[name];
+  return typeof value === "string" ? value : "";
+}
+
+/** Capture a concise snapshot of the current run state. Guards everything. */
+function captureState(): BugReportState {
+  const party =
+    globalScene
+      ?.getPlayerParty?.()
+      ?.map(p => ({
+        species: p?.species?.name ?? "?",
+        level: p?.level ?? 0,
+        hp: `${p?.hp ?? "?"}/${typeof p?.getMaxHp === "function" ? p.getMaxHp() : "?"}`,
+      }))
+      .slice(0, 6) ?? [];
+
+  return {
+    version,
+    url: typeof location !== "undefined" ? location.href : "",
+    userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+    timestamp: new Date().toISOString(),
+    gameModeId: globalScene?.gameMode?.modeId ?? null,
+    waveIndex: globalScene?.currentBattle?.waveIndex ?? null,
+    erDifficulty: getErDifficulty(),
+    seed: globalScene?.seed ?? null,
+    party,
+  };
+}
+
+/** Assemble the full bug report payload. */
+export function buildBugReport(description: string): BugReport {
+  return {
+    description,
+    state: captureState(),
+    logs: formatConsoleSnapshot(),
+  };
+}
+
+/** A human-readable subject line for the report. */
+function reportSubject(report: BugReport): string {
+  const { waveIndex, erDifficulty } = report.state;
+  const where = waveIndex != null ? `wave ${waveIndex}` : "menu";
+  return `[ER bug] ${erDifficulty} @ ${where}: ${report.description.slice(0, 60)}`;
+}
+
+function downloadReport(report: BugReport): boolean {
+  if (typeof document === "undefined" || typeof URL?.createObjectURL !== "function") {
+    return false;
+  }
+  try {
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `er-bug-report-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Revoke after a tick so the download has a chance to start.
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function copyReport(report: BugReport): Promise<boolean> {
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
+      return true;
+    }
+  } catch {
+    // Clipboard can reject (permissions / non-secure context) — non-fatal.
+  }
+  return false;
+}
+
+async function postReport(report: BugReport): Promise<boolean> {
+  const endpoint = readEnv("VITE_BUGREPORT_ENDPOINT");
+  if (!endpoint || typeof fetch !== "function") {
+    return false;
+  }
+  const accessKey = readEnv("VITE_BUGREPORT_KEY");
+  // Body shaped to be compatible with form-to-email relays such as Web3Forms
+  // (which expect `access_key` + arbitrary fields) while also being a plain,
+  // self-describing JSON payload for a custom endpoint / Discord-style webhook.
+  const body: Record<string, unknown> = {
+    subject: reportSubject(report),
+    from_name: "Elite Redux Bug Reporter",
+    description: report.description,
+    state: report.state,
+    logs: report.logs,
+    // `content` mirrors the Discord-webhook field name so the same endpoint var
+    // can target a webhook too (truncated to keep within typical limits).
+    content: `${reportSubject(report)}\n\n${report.description}`.slice(0, 1800),
+  };
+  if (accessKey) {
+    body.access_key = accessKey;
+  }
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(body),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Submit a bug report. Always attempts the local fallbacks (clipboard +
+ * download) and, when an endpoint is configured, also POSTs it. Never throws —
+ * returns a result describing which channels succeeded.
+ */
+export async function submitBugReport(description: string): Promise<BugReportResult> {
+  const report = buildBugReport(description);
+  const [copied, sent] = await Promise.all([copyReport(report), postReport(report)]);
+  const downloaded = downloadReport(report);
+  return { sent, downloaded, copied };
+}

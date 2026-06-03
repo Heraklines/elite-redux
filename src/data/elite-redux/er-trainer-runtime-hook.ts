@@ -35,14 +35,19 @@
 
 import { globalScene } from "#app/global-scene";
 import {
+  ER_TRAINER_BY_KEY,
   type ErPartyMemberRegistered,
   type ErTrainerRegistryEntry,
 } from "#data/elite-redux/init-elite-redux-trainers";
+import { erDifficultyToRosterTier, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { type ErRosterTier, findErTrainersForType, selectErRoster } from "#data/elite-redux/er-trainer-overlay";
 import { ER_ITEM_CONVERT_CHANCE, resolveErTrainerItem } from "#data/elite-redux/er-trainer-item-map";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { Nature } from "#enums/nature";
+import { PlayerGender } from "#enums/player-gender";
 import { TrainerSlot } from "#enums/trainer-slot";
+import { TrainerType } from "#enums/trainer-type";
+import { TrainerVariant } from "#enums/trainer-variant";
 import type { EnemyPokemon } from "#field/pokemon";
 import type { Trainer } from "#field/trainer";
 import { PokemonMove } from "#moves/pokemon-move";
@@ -71,41 +76,75 @@ const ER_ITEM_BY_POKEMON = new WeakMap<EnemyPokemon, number>();
  * Returns `null` when no ER trainer matches — caller should let vanilla
  * generation proceed.
  */
+/**
+ * ER trainer stableKeys already used this run, so a difficulty's pool doesn't
+ * repeat the same ER trainer. Run-scoped; reset at run start via
+ * {@link resetErRunTrainerTracking} (called from starter-select on launch).
+ */
+const USED_ER_TRAINER_KEYS = new Set<string>();
+
+/** Reset the per-run "already encountered" ER trainer set (new run start). */
+export function resetErRunTrainerTracking(): void {
+  USED_ER_TRAINER_KEYS.clear();
+}
+
+/** True if the trainer ships a roster for the given difficulty tier. */
+function trainerHasTier(t: ErTrainerRegistryEntry, tier: ErRosterTier): boolean {
+  if (tier === "hell") {
+    return (t.hellParty?.length ?? 0) > 0 || (t.insaneParty?.length ?? 0) > 0;
+  }
+  if (tier === "insane") {
+    return (t.insaneParty?.length ?? 0) > 0;
+  }
+  return true; // "party" roster is always present for a registered trainer
+}
+
 export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry | null {
   const cached = TRAINER_CACHE.get(trainer);
   if (cached !== undefined) {
     return cached;
   }
-  const trainerType = trainer.config.trainerType;
-  const candidates = findErTrainersForType(trainerType);
-  // Seed the pick off the wave index so EVERY ER trainer of a class is reachable
-  // across a run (rotating through them), not just the first. Deterministic per
-  // wave; cached per Trainer instance so all party members agree.
   let choice: ErTrainerRegistryEntry | null = null;
-  if (candidates.length > 0) {
-    const wave = globalScene.currentBattle?.waveIndex ?? 0;
-    choice = candidates[wave % candidates.length];
+  // ACE difficulty = pure vanilla PokeRogue trainers (no ER roster override).
+  // ELITE / HELL pull from the ER pool at the insane / hell tier.
+  if (getErDifficulty() !== "ace") {
+    const tier = erDifficultyToRosterTier();
+    const all = findErTrainersForType(trainer.config.trainerType);
+    // Prefer trainers that actually ship the chosen difficulty's roster, then
+    // those not yet seen this run (a difficulty shouldn't repeat trainers).
+    const tierMatched = all.filter(t => trainerHasTier(t, tier));
+    const base = tierMatched.length > 0 ? tierMatched : all;
+    const unused = base.filter(t => !USED_ER_TRAINER_KEYS.has(t.stableKey));
+    const pool = unused.length > 0 ? unused : base;
+    if (pool.length > 0) {
+      // Seed the pick off the wave index so the pool rotates across a run.
+      const wave = globalScene.currentBattle?.waveIndex ?? 0;
+      choice = pool[wave % pool.length];
+      USED_ER_TRAINER_KEYS.add(choice.stableKey);
+    }
   }
   TRAINER_CACHE.set(trainer, choice);
   return choice;
 }
 
 /**
- * Pick the ER roster tier for the current wave so team size + difficulty scale
- * with PokeRogue's curve: easy rosters early, the full (insane/hell) rosters at
- * boss-tier waves. Boss waves are every 10th wave (PokeRogue's classic cadence)
- * or any trainer flagged as a boss/major encounter.
+ * Pick the ER roster tier for the current trainer. The player's chosen run
+ * difficulty (Ace / Elite / Hell — see `er-run-difficulty`) sets the BASE tier;
+ * boss waves bump it up one notch so a major encounter is always at least as
+ * hard as the picked floor (Ace boss → insane, Elite boss → hell, Hell → hell).
  */
 export function pickTierForWave(trainer: Trainer): ErRosterTier {
+  const base = erDifficultyToRosterTier();
   const wave = globalScene.currentBattle?.waveIndex ?? 1;
   const isBoss = trainer.config.isBoss || wave % 10 === 0;
-  if (isBoss || wave >= 100) {
-    return "hell";
+  if (!isBoss) {
+    return base;
   }
-  if (wave >= 40) {
+  // Boss bump: party → insane → hell (hell stays hell).
+  if (base === "party") {
     return "insane";
   }
-  return "party";
+  return "hell";
 }
 
 /**
@@ -155,25 +194,32 @@ export function applyErRosterOverride(trainer: Trainer, index: number): EnemyPok
   if (index >= roster.length) {
     return null;
   }
-  const member = roster[index];
+  return buildErEnemyFromMember(trainer, index, roster[index]);
+}
+
+/**
+ * Construct a single ER-overridden {@linkcode EnemyPokemon} for `index` from one
+ * ER roster member — species / ability slot / moveset / IVs / nature, with the
+ * level taken from the engine's wave-scaled `enemyLevels[index]` (so PokeRogue's
+ * curve, which runs past Lv 100, still applies). Returns `null` if the member's
+ * species can't be resolved (id-map drift). Shared by the generic trainer
+ * override and the ER rival override.
+ */
+function buildErEnemyFromMember(
+  trainer: Trainer,
+  index: number,
+  member: ErPartyMemberRegistered,
+): EnemyPokemon | null {
   const species = getPokemonSpecies(member.speciesId);
   if (!species) {
     return null;
   }
   const battle = globalScene.currentBattle;
   const level = battle.enemyLevels?.[index] ?? member.level;
-  const trainerSlot
-    = !trainer.isDouble() || !(index % 2) ? TrainerSlot.TRAINER : TrainerSlot.TRAINER_PARTNER;
+  const trainerSlot = !trainer.isDouble() || !(index % 2) ? TrainerSlot.TRAINER : TrainerSlot.TRAINER_PARTNER;
   const enemy: EnemyPokemon = globalScene.addEnemyPokemon(species, level, trainerSlot);
   enemy.abilityIndex = member.abilitySlot;
-  enemy.ivs = [
-    member.ivs[0],
-    member.ivs[1],
-    member.ivs[2],
-    member.ivs[3],
-    member.ivs[4],
-    member.ivs[5],
-  ];
+  enemy.ivs = [member.ivs[0], member.ivs[1], member.ivs[2], member.ivs[3], member.ivs[4], member.ivs[5]];
   enemy.nature = member.nature as Nature;
   if (member.moves.length > 0) {
     const moves = member.moves.map(id => new PokemonMove(id));
@@ -185,6 +231,119 @@ export function applyErRosterOverride(trainer: Trainer, index: number): EnemyPok
   ER_ITEM_BY_POKEMON.set(enemy, member.itemId);
   enemy.generateName();
   return enemy;
+}
+
+// =============================================================================
+// ER rival (May / Brendan) — mirror the Hoenn rival battles onto PokeRogue's
+// rival encounters (RIVAL, RIVAL_2 … RIVAL_6). Elite/Hell only (Ace = vanilla).
+// =============================================================================
+
+/** ER rival stages, weakest → strongest (used to scale onto PokeRogue's rivals). */
+const ER_RIVAL_STAGES = ["Route 103", "Rustboro", "Route 110", "Route 119", "Lilycove"] as const;
+
+/** The three starter-dependent rival team variants. */
+const ER_RIVAL_STARTERS = ["Treecko", "Mudkip", "Torchic"] as const;
+
+/** Map a PokeRogue rival TrainerType to its 0-based encounter index (RIVAL = 0 … RIVAL_6 = 5). */
+function rivalEncounterIndex(trainerType: TrainerType): number | null {
+  switch (trainerType) {
+    case TrainerType.RIVAL:
+      return 0;
+    case TrainerType.RIVAL_2:
+      return 1;
+    case TrainerType.RIVAL_3:
+      return 2;
+    case TrainerType.RIVAL_4:
+      return 3;
+    case TrainerType.RIVAL_5:
+      return 4;
+    case TrainerType.RIVAL_6:
+      return 5;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Scale PokeRogue's 6 rival encounters onto ER's 5 stages so that the FINAL
+ * PokeRogue rival (RIVAL_6, the ~Lv 195 endgame fight) always maps to ER's final
+ * rival battle (Lilycove), and earlier encounters map proportionally back through
+ * the progression. The actual mon levels come from the engine's wave curve — this
+ * only chooses which ER stage's species/movesets to use.
+ */
+export function erRivalStageForEncounter(encounterIndex: number): (typeof ER_RIVAL_STAGES)[number] {
+  const lastEncounter = 5; // RIVAL_6
+  const lastStage = ER_RIVAL_STAGES.length - 1;
+  const idx = Math.round((encounterIndex / lastEncounter) * lastStage);
+  return ER_RIVAL_STAGES[Math.min(Math.max(idx, 0), lastStage)];
+}
+
+/**
+ * Pick the rival's starter-variant team for the run. ER's rival chooses the
+ * starter type-advantaged against yours; PokeRogue players rarely run a Hoenn
+ * starter, so we instead pick one of the three variants pseudo-randomly but
+ * STABLY per run — derived from the run seed so it stays consistent across save
+ * reloads (no extra persistence needed) and is the same for every rival battle
+ * in the run.
+ */
+function erRivalStarterVariant(): (typeof ER_RIVAL_STARTERS)[number] {
+  const seed = globalScene.seed ?? "";
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+  }
+  return ER_RIVAL_STARTERS[Math.abs(hash) % ER_RIVAL_STARTERS.length];
+}
+
+/**
+ * The ER rival registry entry for a given live rival Trainer, or `null` when the
+ * ER rival shouldn't apply (Ace difficulty, or not a rival encounter). The rival
+ * identity mirrors the on-screen rival's gender: the female variant (Ivy) → May,
+ * otherwise (Finn) → Brendan, matching ER's "rival is your counterpart" framing.
+ */
+export function getErRivalEntry(trainer: Trainer): ErTrainerRegistryEntry | null {
+  if (getErDifficulty() === "ace") {
+    return null;
+  }
+  const encounterIndex = rivalEncounterIndex(trainer.config.trainerType);
+  if (encounterIndex === null) {
+    return null;
+  }
+  // Mirror the on-screen rival's gender: PokeRogue shows the female rival (Ivy)
+  // as the FEMALE trainer variant, otherwise the male rival (Finn). ER's
+  // counterparts are May (female) and Brendan (male). Fall back to the Emerald
+  // rule (rival is the player's opposite gender) if the variant is unset.
+  const isFemaleRival =
+    trainer.variant === TrainerVariant.FEMALE
+    || (trainer.variant !== TrainerVariant.DOUBLE && globalScene.gameData.gender === PlayerGender.MALE);
+  const rivalName = isFemaleRival ? "May" : "Brendan";
+  const stage = erRivalStageForEncounter(encounterIndex);
+  const starter = erRivalStarterVariant();
+  return ER_TRAINER_BY_KEY.get(`${rivalName} ${stage} ${starter}`) ?? null;
+}
+
+/**
+ * Build an ER-rival-overridden EnemyPokemon for `index`, or `null` to fall
+ * through to PokeRogue's generated rival. Mirrors {@linkcode applyErRosterOverride}
+ * but keyed off the ER rival progression instead of the trainer-class registry.
+ * Must be consulted BEFORE the rival's `partyMemberFuncs` in `genPartyMember`,
+ * since the rival defines its whole team via those funcs.
+ */
+export function applyErRivalOverride(trainer: Trainer, index: number): EnemyPokemon | null {
+  const entry = getErRivalEntry(trainer);
+  if (entry === null) {
+    return null;
+  }
+  const roster = selectErRoster(entry, pickTierForWave(trainer));
+  if (index >= roster.length) {
+    return null;
+  }
+  return buildErEnemyFromMember(trainer, index, roster[index]);
+}
+
+/** True if this trainer is an ER-overridden rival (used to gate the rival hook). */
+export function hasErRivalOverride(trainer: Trainer): boolean {
+  return getErRivalEntry(trainer) !== null;
 }
 
 /**

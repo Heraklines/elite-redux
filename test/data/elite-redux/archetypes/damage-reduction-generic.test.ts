@@ -207,6 +207,42 @@ describe("DamageReductionAbAttr archetype (C1e)", () => {
     });
   });
 
+  describe("filter — resisted (Feathercoat)", () => {
+    it("fires when effectiveness < 1 (not-very-effective)", () => {
+      const attr = new DamageReductionAbAttr({ reduction: 0.1111, filter: { kind: "resisted" } });
+      const result = runReduce({
+        attr,
+        target: makeStubDefender({ effectiveness: 0.5 }),
+        attacker: makeStubAttacker(),
+        move: makeStubMove(),
+        initialDamage: 100,
+      });
+      expect(result.fired).toBe(true);
+      // 100 * (1 - 0.1111) = 88.89, floored by toDmgValue → 88.
+      expect(result.finalDamage).toBe(88);
+    });
+
+    it("does NOT fire on neutral (eff = 1) or immune (eff = 0)", () => {
+      const attr = new DamageReductionAbAttr({ reduction: 0.1111, filter: { kind: "resisted" } });
+      expect(
+        runReduce({
+          attr,
+          target: makeStubDefender({ effectiveness: 1 }),
+          attacker: makeStubAttacker(),
+          move: makeStubMove(),
+        }).fired,
+      ).toBe(false);
+      expect(
+        runReduce({
+          attr,
+          target: makeStubDefender({ effectiveness: 0 }),
+          attacker: makeStubAttacker(),
+          move: makeStubMove(),
+        }).fired,
+      ).toBe(false);
+    });
+  });
+
   describe("filter — full HP", () => {
     it("fires at full HP (Brain-Mass-style)", () => {
       const attr = new DamageReductionAbAttr({ reduction: 0.5, filter: { kind: "full-hp" } });

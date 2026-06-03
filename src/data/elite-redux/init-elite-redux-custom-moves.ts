@@ -40,15 +40,55 @@
 // is a regular property).
 // =============================================================================
 
+import { ChargeAnim } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVE_ARCHETYPES, type ErMoveArchetypeKind } from "#data/elite-redux/er-move-archetypes";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { dispatchMoveArchetype } from "#data/elite-redux/move-archetype-dispatcher";
-import { AttackMove, type Move, type MoveAttr, SelfStatusMove, StatusMove } from "#data/moves/move";
+import {
+  AddArenaTrapTagAttr,
+  AddBattlerTagAttr,
+  AttackMove,
+  ClearTerrainAttr,
+  ClearWeatherAttr,
+  ConfuseAttr,
+  CritOnlyAttr,
+  crashDamageFunc,
+  DelayedAttackAttr,
+  FallDownAttr,
+  ForceSwitchOutAttr,
+  HighCritAttr,
+  IgnoreOpponentStatStagesAttr,
+  LeechSeedAttr,
+  MissEffectAttr,
+  type Move,
+  type MoveAttr,
+  MovePowerMultiplierAttr,
+  MultiHitAttr,
+  MultiHitPowerIncrementAttr,
+  PsychoShiftEffectAttr,
+  RemoveArenaTrapAttr,
+  RemoveScreensAttr,
+  ResetStatsAttr,
+  SelfStatusMove,
+  StatStageChangeAttr,
+  StatusEffectAttr,
+  StatusMove,
+  TerrainChangeAttr,
+} from "#data/moves/move";
+import { consecutiveUseRestriction } from "#data/moves/move-condition";
+import { TerrainType } from "#data/terrain";
+import { ArenaTagSide } from "#enums/arena-tag-side";
+import { ArenaTagType } from "#enums/arena-tag-type";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
+import { MultiHitType } from "#enums/multi-hit-type";
 import { PokemonType } from "#enums/pokemon-type";
+import { Stat } from "#enums/stat";
+import { StatusEffect } from "#enums/status-effect";
+import { WeatherType } from "#enums/weather-type";
 
 /**
  * Numeric cutoff for "vanilla pokerogue" move ids. ER-custom moves are
@@ -469,7 +509,270 @@ function buildCustomMove(
     wireArchetypeToMove(move, archetypeRow.archetype, archetypeRow.params, draft.id, result);
   }
 
+  // Layer on per-move secondary effects the auto-classifier under-wired. The
+  // archetype rows reliably capture boost-type flags + a single status chance,
+  // but miss high-crit, stat riders, multi-hit, leech-seed, conditional damage,
+  // self-switch, and "cannot miss" — those are added here by ER move id (the
+  // move analog of the ability composite-append). Additive: keeps the
+  // archetype's flags. All stat/status/tag riders gate on Move.chance.
+  applyErMoveBespokeRiders(move, draft.id);
+
   return move;
+}
+
+/**
+ * Augment an ER-custom move with secondary effects the archetype classifier
+ * missed (audited against each move's in-game description). Keyed by ER move id.
+ * Chance-based riders inherit the move's `chance` (set from `effectChance`).
+ */
+function applyErMoveBespokeRiders(move: Move, erId: number): void {
+  switch (erId) {
+    // ---- High critical-hit ratio ----
+    case 772: // Pixie Slash
+    case 773: // Seismic Blade
+    case 995: // Berserker Horn
+      move.attr(HighCritAttr);
+      break;
+    case 994: // One-Inch Punch — high crit + never misses
+      move.attr(HighCritAttr);
+      move.accuracy = -1;
+      break;
+    case 813: // Homing Fletch — +1 crit (high crit) + cannot miss
+      move.attr(HighCritAttr);
+      move.accuracy = -1;
+      break;
+    case 779: // Supersonic Shot — always crits
+      move.attr(CritOnlyAttr);
+      break;
+    // ---- Cannot miss (perfect accuracy) ----
+    case 792: // Asteroid Shot
+    case 996: // Oni Fist
+      move.accuracy = -1;
+      break;
+    // ---- Self stat raise (chance-gated by Move.chance) ----
+    case 765: // Jagged Fangs — 10% raise user Atk
+      move.attr(StatStageChangeAttr, [Stat.ATK], 1, true);
+      break;
+    case 783: // Lightning Strike — 20% raise user Speed
+    case 981: // Zap Jive — 50% raise user Speed
+    case 982: // Hex Trot — 50% raise user Speed
+      move.attr(StatStageChangeAttr, [Stat.SPD], 1, true);
+      break;
+    case 980: // Esper Waltz — 50% raise user SpAtk
+      move.attr(StatStageChangeAttr, [Stat.SPATK], 1, true);
+      break;
+    // ---- Self stat drop (always, Move.chance 100) ----
+    case 941: // Molten Strike — lowers user Speed
+    case 973: // Giant Gale — lowers user Speed
+      move.attr(StatStageChangeAttr, [Stat.SPD], -1, true);
+      break;
+    // ---- Foe stat drop (chance-gated) ----
+    case 771: // Pixie Beam — chance to lower the USER's SpAtk (Overheat-style;
+      // ABBR: "drop user SpAtk"). Self-target.
+      move.attr(StatStageChangeAttr, [Stat.SPATK], -1, true);
+      break;
+    case 812: // Phantom Glove — 30% lower foe Speed
+    case 819: // Torrent Fist — 20% lower foe Speed
+      move.attr(StatStageChangeAttr, [Stat.SPD], -1);
+      break;
+    case 943: // Earthsplitter — 50% lower foe Def
+    case 987: // Icicle Impale — 30% lower foe Def
+    case 997: // Insect Impact — 30% lower foe Def
+      move.attr(StatStageChangeAttr, [Stat.DEF], -1);
+      break;
+    case 1031: // Rumble Kick — 20% lower foe Atk
+      move.attr(StatStageChangeAttr, [Stat.ATK], -1);
+      break;
+    // ---- Status / tag chances (gated by Move.chance) ----
+    // NOTE: 776/777 frostbite is supplied by their flag-tagged statusChance row
+    // (now that resolveStatusName maps FROSTBITE) — do NOT re-add it here.
+    case 759: // Smite — Smack Down effect (grounds the target; +paralyze via row)
+      move.attr(FallDownAttr);
+      break;
+    case 927: // Femur Breaker — always paralyzes
+      move.attr(StatusEffectAttr, StatusEffect.PARALYSIS);
+      break;
+    case 928: // Squeaky Hammer — 20% infatuate
+      move.attr(AddBattlerTagAttr, BattlerTagType.INFATUATED, false, false, 0, 0);
+      break;
+    case 944: // Beetle Bash — 30% confuse
+      move.attr(ConfuseAttr);
+      break;
+    // ---- Leech Seed chance ----
+    case 786: // Fertile Fangs — 10% Leech Seed
+    case 791: // Bramble Blast — 30% Leech Seed
+      move.attr(LeechSeedAttr);
+      break;
+    // ---- Multi-hit (2–5) ----
+    case 790: // Fairy Spheres
+    case 845: // Blazing Bone (fiery bone ×2–5; +1 priority is move data)
+    case 947: // Toxic Needles (already has poison status)
+    case 952: // Relentless Clobber
+    case 953: // Popping Mayhem (already has burn status)
+    case 1001: // Five-Star Fury
+    case 1018: // Block Dropper (2–5 "blocks"; row flipped off the bogus flinch)
+      move.attr(MultiHitAttr);
+      break;
+    case 828: // Wyrm Wind — 2–5 hits, lowers foe SpDef + raises user Speed (ch100)
+      move.attr(MultiHitAttr);
+      move.attr(StatStageChangeAttr, [Stat.SPDEF], -1);
+      move.attr(StatStageChangeAttr, [Stat.SPD], 1, true);
+      break;
+    case 1013: // Chiller — 3 snowballs; 10% frostbite handled by chance-status row
+      move.attr(MultiHitAttr, MultiHitType.THREE);
+      break;
+    // ---- Multi-hit (3, escalating power) ----
+    case 826: // Whirling Strikes
+      move.attr(MultiHitAttr, MultiHitType.THREE);
+      move.attr(MultiHitPowerIncrementAttr, 3);
+      break;
+    // ---- Conditional 2× damage by target status ----
+    case 768: // Plasma Pulse — 2× vs statused foe
+      move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.status && t.status.effect !== StatusEffect.NONE ? 2 : 1));
+      break;
+    case 784: // Volt Bolt — 2× vs paralyzed
+      move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.status?.effect === StatusEffect.PARALYSIS ? 2 : 1));
+      break;
+    case 960: // Dream Invasion — 2× vs sleeping
+      move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.status?.effect === StatusEffect.SLEEP ? 2 : 1));
+      break;
+    // ---- Self-switch after damage ----
+    case 848: // Ghastly Echo
+    case 976: // Take Flight
+      move.attr(ForceSwitchOutAttr, true);
+      break;
+    // ---- Double damage / super-effective vs a specific defender type ----
+    // ER's "double damage on X" / "super-effective vs X" — a ×2 power multiplier
+    // when the target is of that type (matches the stated damage outcome).
+    case 756: // Excalibur — high crit + 2× vs Dragon
+      move.attr(HighCritAttr);
+      move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.isOfType(PokemonType.DRAGON) ? 2 : 1));
+      break;
+    case 796: // Clay Dart — super-effective vs Flying
+      move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.isOfType(PokemonType.FLYING) ? 2 : 1));
+      break;
+    case 800: // Fumigation Bomb — super-effective vs Bug
+      move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.isOfType(PokemonType.BUG) ? 2 : 1));
+      break;
+    case 806: // Aura Force — super-effective vs Ghost
+      move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.isOfType(PokemonType.GHOST) ? 2 : 1));
+      break;
+    case 933: // Crackle Slam — super-effective vs Steel
+      move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.isOfType(PokemonType.STEEL) ? 2 : 1));
+      break;
+    case 1002: // Tsunami Hammer — super-effective vs Poison + can't be used twice
+      move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.isOfType(PokemonType.POISON) ? 2 : 1));
+      move.restriction(consecutiveUseRestriction);
+      break;
+    // ---- Ignore the target's stat-stage changes (Chip Away-style) ----
+    case 755: // Deathroll — also ignores target's stat changes (has ConfuseAttr)
+      move.attr(IgnoreOpponentStatStagesAttr);
+      break;
+    // ---- Accuracy drop on the foe ----
+    case 1011: // Prism Blast — reduces foe accuracy (also has ConfuseAttr)
+      move.attr(StatStageChangeAttr, [Stat.ACC], -1);
+      break;
+    // ---- Bleed / fear riders (ER tags), gated by Move.chance ----
+    case 956: // Rip and Tear — lowers foe Speed + can't be used twice
+      // (50% bleed comes from its chance-status BLEED row).
+      move.attr(StatStageChangeAttr, [Stat.SPD], -1);
+      move.restriction(consecutiveUseRestriction);
+      break;
+    case 958: // Terror Charge — 50% fear + 2× on the turn it switches in
+      // (50% bleed comes from its chance-status BLEED row).
+      move.attr(AddBattlerTagAttr, BattlerTagType.ER_FEAR, false, false, 2, 2);
+      move.attr(MovePowerMultiplierAttr, u => (u?.tempSummonData?.waveTurnCount === 1 ? 2 : 1));
+      break;
+    // ---- Trap + make the target always-hittable ----
+    case 937: // Pitfall — 30% trap the foe and make attacks always hit it
+      move.attr(AddBattlerTagAttr, BattlerTagType.TRAPPED, false, false, 4, 5);
+      move.attr(AddBattlerTagAttr, BattlerTagType.ALWAYS_GET_HIT, false, false, 0, 0);
+      break;
+    // ---- Boost-drain (clears the target's stat stages) ----
+    case 950: // Eerie Fog — sets fog (WeatherChange wired) + drains foe boosts
+      move.attr(ResetStatsAttr, false);
+      break;
+    // ---- Break the target's screens (Light Screen / Reflect / Aurora Veil) ----
+    case 762: // Iron Fangs
+      move.attr(RemoveScreensAttr, false);
+      break;
+    // ---- Sets Stealth Rock on the foe's field ----
+    case 787: // Scatter Blast — scatters Stealth Rocks onto the foe's side
+      move.attr(AddArenaTrapTagAttr, ArenaTagType.STEALTH_ROCK);
+      break;
+    // ---- Crash damage on miss (High Jump Kick-style) ----
+    case 780: // Zephyr Rush — hurts the user on miss
+      move.attr(MissEffectAttr, crashDamageFunc);
+      break;
+    // ---- "Can't be used twice in a row" (consecutive-use restriction) ----
+    case 859: // Hacksaw
+    case 893: // Blue Moon (crimson)
+    case 963: // Spectral Serenade (every-other turn)
+    case 964: // Merculight (may fail if used in succession)
+    case 1000: // Blue Moon (azure)
+      move.restriction(consecutiveUseRestriction);
+      break;
+    // ---- Field manipulation ----
+    case 896: // Smashin' Realities — removes weather AND terrain (any active)
+      move.attr(ClearTerrainAttr);
+      for (const w of [
+        WeatherType.SUNNY,
+        WeatherType.RAIN,
+        WeatherType.SANDSTORM,
+        WeatherType.HAIL,
+        WeatherType.SNOW,
+        WeatherType.FOG,
+        WeatherType.HEAVY_RAIN,
+        WeatherType.HARSH_SUN,
+        WeatherType.STRONG_WINDS,
+      ]) {
+        move.attr(ClearWeatherAttr, w);
+      }
+      break;
+    case 930: // Smashing Pumpkins — sets Grassy Terrain
+      move.attr(TerrainChangeAttr, TerrainType.GRASSY);
+      break;
+    case 934: // Squall Hammer — clears hazards from both sides
+      move.attr(RemoveArenaTrapAttr, () => ArenaTagSide.BOTH);
+      break;
+    // ---- Force the foe to switch out ----
+    case 926: // Wild Swing — forces the target to switch (-6 priority is move data)
+      move.attr(ForceSwitchOutAttr);
+      break;
+    // ---- Break the target's screens ----
+    case 936: // Battering Ram — breaks barriers (Light Screen/Reflect/Aurora Veil)
+      move.attr(RemoveScreensAttr, false);
+      break;
+    // ---- Transfer the user's status to the target, curing the user (Psycho Shift) ----
+    case 938: // Viral Strike
+      move.attr(PsychoShiftEffectAttr);
+      break;
+    // ---- Drowsiness (Yawn-style sleep-next-turn) ----
+    case 940: // Bonk — 50% chance to drowse
+      move.attr(AddBattlerTagAttr, BattlerTagType.DROWSY, false, false, 1, 1);
+      break;
+    // ---- Delayed attack (Future Sight-style) ----
+    case 942: // Mirage Slam — predicts a delayed hit
+      move.attr(DelayedAttackAttr, ChargeAnim.FUTURE_SIGHT_CHARGING, "moveTriggers:foresawAnAttack");
+      break;
+    // ---- Multi-hit (2 fixed) ----
+    case 946: // Rapid River — hits twice
+      move.attr(MultiHitAttr, MultiHitType.TWO);
+      break;
+    // ---- Conditional 1.5× vs a bleeding target ----
+    case 959: // Terror Locks — 50% more damage if the foe is bleeding (+30% bleed via row)
+      move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.getTag(BattlerTagType.ER_BLEED) ? 1.5 : 1));
+      break;
+    // ---- Ignore the target's stat-stage boosts (Sacred Sword / Chip Away) ----
+    case 968: // Astral Hand — "Strikes with a projected fist. Ignores stat boosts."
+    case 992: // Fire Glaive — "Strikes with a white hot horn, ignoring stat changes."
+      move.attr(IgnoreOpponentStatStagesAttr);
+      break;
+    // ---- 30% chance to inflict bleeding (effectChance gates via move.chance) ----
+    case 986: // Dragon Jab — "30% chance to inflict bleeding."
+      move.attr(AddBattlerTagAttr, BattlerTagType.ER_BLEED, false, false, 4, 6);
+      break;
+  }
 }
 
 /**

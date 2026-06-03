@@ -5,13 +5,15 @@
 // Flammable Coat — "Cannot be copied or suppressed" (the implementable clauses;
 // the Engulfed form-change is a separate species → engine-blocked).
 // Mental Pollution — "Suppresses others' abilities when enraged" — modeled with
-// FOG as the established ER enrage proxy (cf. Madness Enhancement).
+// the vanilla TAUNT tag as the established ER "enrage" proxy (cf. Madness
+// Enhancement). The suppress attr carries an `addCondition(holder has TAUNT)`
+// gate, evaluated by the ability framework alongside `canApply`.
 import { allAbilities, allMoves } from "#data/data-lists";
 import { AbilityId } from "#enums/ability-id";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
-import { WeatherType } from "#enums/weather-type";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, test } from "vitest";
@@ -49,27 +51,30 @@ describe("ER Abilities - Flammable Coat & Mental Pollution (engine-limited claus
     [...player.getAbility().attrs].find((a: any) => a?.constructor?.name === "SuppressAttackerAbilityAbAttr");
   const anAttackMove = () => allMoves.find(m => m?.is("AttackMove"))!;
 
-  test("Mental Pollution suppresses an attacking foe's ability while fog (enrage) is active", async () => {
-    game.override.ability(ErAbilityId.MENTAL_POLLUTION as unknown as AbilityId).weather(WeatherType.FOG);
+  test("Mental Pollution suppresses an attacking foe's ability while enraged (TAUNT)", async () => {
+    game.override.ability(ErAbilityId.MENTAL_POLLUTION as unknown as AbilityId);
     await game.classicMode.startBattle(SpeciesId.MAGIKARP);
-    expect(game.scene.arena.weather?.weatherType).toBe(WeatherType.FOG); // sanity: enraged
     const player = game.field.getPlayerPokemon();
     const enemy = game.field.getEnemyPokemon();
+    player.addTag(BattlerTagType.TAUNT); // ER "enrage"
     const attr = suppressAttr(player) as any;
     expect(attr).toBeDefined();
+    // The enrage gate lives in the attr's added condition (evaluated by the
+    // ability framework). While enraged it opens.
+    expect(attr.getCondition()?.(player)).toBe(true);
     const params = { pokemon: player, opponent: enemy, move: anAttackMove(), simulated: false } as any;
     expect(attr.canApply(params)).toBe(true);
     attr.apply(params);
     expect(enemy.summonData.abilitySuppressed).toBe(true);
   });
 
-  test("Mental Pollution does NOT suppress without fog (not enraged)", async () => {
-    game.override.ability(ErAbilityId.MENTAL_POLLUTION as unknown as AbilityId).weather(WeatherType.NONE);
+  test("Mental Pollution does NOT suppress while not enraged (no TAUNT)", async () => {
+    game.override.ability(ErAbilityId.MENTAL_POLLUTION as unknown as AbilityId);
     await game.classicMode.startBattle(SpeciesId.MAGIKARP);
     const player = game.field.getPlayerPokemon();
-    const enemy = game.field.getEnemyPokemon();
     const attr = suppressAttr(player) as any;
-    const params = { pokemon: player, opponent: enemy, move: anAttackMove(), simulated: false } as any;
-    expect(attr.canApply(params)).toBe(false); // no fog → not enraged → no suppression
+    // No TAUNT → the enrage condition is closed, so the framework never applies
+    // the suppress (canApply itself is only a move-shape guard).
+    expect(attr.getCondition()?.(player)).toBe(false);
   });
 });

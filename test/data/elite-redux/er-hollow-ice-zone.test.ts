@@ -7,8 +7,8 @@ import { describe, expect, it, vi } from "vitest";
 
 /**
  * Hollow Ice Zone — "Ice-type moves apply Ice Statue and then make the user
- * switch." The ER_FROSTBITE-on-attack tag is covered by the bleed/frostbite
- * status suite; here we verify the self-switch-on-Ice-move piece in isolation.
+ * switch." The ER_ICE_STATUE-on-attack tag is covered by er-ice-statue.test.ts;
+ * here we verify the self-switch-on-Ice-move piece in isolation.
  */
 describe("ER ability - Hollow Ice Zone (self-switch on Ice move)", () => {
   const makeParams = (moveType: PokemonType, hitResult: HitResult, hitsLeft = 1) => {

@@ -488,6 +488,57 @@ export interface CSourceCorrectionResult {
 }
 
 /**
+ * Repair vanilla ER move ids that the build mapped to the WRONG pokerogue move.
+ *
+ * Two failure modes from the beta-JSON build:
+ *   1. Newer (Gen-9) moves like Aqua Cutter got an id pointing at an empty slot
+ *      (a "hole") instead of their real, implemented `MoveId`.
+ *   2. A scrambled gen8/9 block where ER ids landed on the WRONG built move
+ *      (e.g. Kowtow Cleave -> Blood Moon, Axe Kick -> Trailblaze) — so the move
+ *      silently received another move's rebalance + effects (#151).
+ *
+ * Both are repaired the same way: `allMoves` is correctly id-indexed, so we
+ * resolve each ER move's real id by its display name and repoint the ER id when
+ * it currently lands on a different move (or a hole). Only ER moves whose name
+ * matches a built pokerogue move are touched; correctly-mapped moves and moves
+ * with no name-match (e.g. ER-renamed) are left untouched. Idempotent.
+ *
+ * MUST run BEFORE {@linkcode initEliteReduxVanillaRebalance} / move-patches /
+ * movesets so every downstream consumer sees the corrected id-map and applies
+ * stats + effects to the right move. (Also invoked from
+ * {@linkcode initEliteReduxCSourceCorrections} as an idempotent safety net.)
+ *
+ * @returns the number of ER move ids repointed this run.
+ */
+export function remapEliteReduxMoveIdsByName(): number {
+  const movesMap = ER_ID_MAP.moves as Record<number, number>;
+  const idByName = new Map<string, number>();
+  for (const mv of allMoves) {
+    if (mv !== undefined) {
+      idByName.set(mv.name.toLowerCase(), mv.id);
+    }
+  }
+  let remapped = 0;
+  for (const drf of ER_MOVES) {
+    const current = movesMap[drf.id];
+    if (current === undefined || current >= 5000) {
+      continue; // custom or unmapped
+    }
+    const realId = drf.name ? idByName.get(drf.name.toLowerCase()) : undefined;
+    // Repoint whenever the ER move resolves (by name) to a different real move
+    // than its current mapping — covers both holes and wrong-built-move landings.
+    if (realId !== undefined && realId !== current) {
+      movesMap[drf.id] = realId;
+      remapped++;
+    }
+  }
+  if (remapped > 0) {
+    console.info(`[er-csrc] remapped ${remapped} ER moves to their real MoveIds (by name)`);
+  }
+  return remapped;
+}
+
+/**
  * Apply C-source corrective overrides to {@linkcode allMoves}.
  *
  * Call AFTER {@linkcode initEliteReduxVanillaRebalance} so the JSON-derived
@@ -500,39 +551,10 @@ export function initEliteReduxCSourceCorrections(): CSourceCorrectionResult {
     movesMissing: 0,
   };
 
-  // ---------------------------------------------------------------------------
-  // Repair ER move ids that the build mapped to an EMPTY pokerogue slot. Newer
-  // (Gen-9) moves like Aqua Cutter got the wrong pkrg id (e.g. 927, a hole)
-  // instead of their real MoveId (895). Pokerogue already implements these, and
-  // `allMoves` is correctly id-indexed, so we resolve the real id by the move's
-  // display name and repoint the ER id. Only touches mappings that currently
-  // land on a hole AND whose name matches a built move. Runs before
-  // movesets/trainers/TMs consume the map.
-  // ---------------------------------------------------------------------------
-  {
-    const movesMap = ER_ID_MAP.moves as Record<number, number>;
-    const idByName = new Map<string, number>();
-    for (const mv of allMoves) {
-      if (mv !== undefined) {
-        idByName.set(mv.name.toLowerCase(), mv.id);
-      }
-    }
-    let remapped = 0;
-    for (const drf of ER_MOVES) {
-      const current = movesMap[drf.id];
-      if (current === undefined || current >= 5000 || allMoves[current] !== undefined) {
-        continue; // custom, unmapped, or already resolves to a real move
-      }
-      const realId = drf.name ? idByName.get(drf.name.toLowerCase()) : undefined;
-      if (realId !== undefined && realId !== current) {
-        movesMap[drf.id] = realId;
-        remapped++;
-      }
-    }
-    if (remapped > 0) {
-      console.info(`[er-csrc] remapped ${remapped} ER moves from empty slots to real MoveIds (by name)`);
-    }
-  }
+  // Idempotent safety net: ensure the move id-map is name-correct here too, so
+  // tests that invoke only this function (and any path that reaches corrections
+  // before the early remap) still observe the fixed mappings.
+  remapEliteReduxMoveIdsByName();
 
   // ---------------------------------------------------------------------------
   // Apply each ER move's FULL ROM flag set onto its built move. The ROM stores

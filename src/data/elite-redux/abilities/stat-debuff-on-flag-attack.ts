@@ -64,6 +64,13 @@ export interface StatDebuffOnFlagAttackOptions {
    * ER today).
    */
   readonly stages: number;
+  /**
+   * Percent chance (0-100) for the proc to fire on a matching attack.
+   * @defaultValue `100` (always fires — matches the original flag-attack procs
+   * like Denting Blows). Used by Crushing Jaw (976): "Biting moves have a 50%
+   * chance to lower defense."
+   */
+  readonly chance?: number;
 }
 
 /**
@@ -84,15 +91,20 @@ export class StatDebuffOnFlagAttackAbAttr extends PostAttackAbAttr {
   private readonly flag: MoveFlags;
   private readonly stat: BattleStat;
   private readonly stages: number;
+  private readonly chance: number;
 
   constructor(opts: StatDebuffOnFlagAttackOptions) {
     if (opts.stages === 0 || !Number.isInteger(opts.stages)) {
       throw new Error(`[StatDebuffOnFlagAttackAbAttr] stages must be a non-zero integer; got ${opts.stages}`);
     }
+    if (opts.chance !== undefined && !(opts.chance >= 0 && opts.chance <= 100)) {
+      throw new Error(`[StatDebuffOnFlagAttackAbAttr] chance must be in [0, 100]; got ${opts.chance}`);
+    }
     super();
     this.flag = opts.flag;
     this.stat = opts.stat;
     this.stages = opts.stages;
+    this.chance = opts.chance ?? 100;
   }
 
   /** Read-only accessor: the configured flag filter. */
@@ -115,7 +127,10 @@ export class StatDebuffOnFlagAttackAbAttr extends PostAttackAbAttr {
       return false;
     }
     const { pokemon, opponent, move } = params;
-    return move.doesFlagEffectApply({ flag: this.flag, user: pokemon, target: opponent });
+    if (!move.doesFlagEffectApply({ flag: this.flag, user: pokemon, target: opponent })) {
+      return false;
+    }
+    return this.chance >= 100 || pokemon.randBattleSeedInt(100) < this.chance;
   }
 
   public override apply(params: PostMoveInteractionAbAttrParams): void {

@@ -4,8 +4,11 @@ import { globalScene } from "#app/global-scene";
 import { starterColors } from "#app/global-vars/starter-colors";
 import { isSlotEnabled, isSlotUnlocked, type PassiveSlot } from "#app/ui/handlers/starter-select-ui-handler";
 import { getStarterValueFriendshipCap, speciesStarterCosts } from "#balance/starters";
-import { allAbilities } from "#data/data-lists";
-import { getErAbilityDescription, getErAbilityRomDescription } from "#data/elite-redux/er-ability-descriptions";
+import {
+  getErAbilityDescription,
+  getErAbilityRomDescription,
+  getErCompositeDetailedDescription,
+} from "#data/elite-redux/er-ability-descriptions";
 import { getLevelRelExp, getLevelTotalExp } from "#data/exp";
 import { getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
@@ -1611,16 +1614,19 @@ export class SummaryUiHandler extends UiHandler {
       rows.push({ label: i18next.t("pokemonSummary:abilityLabel"), ability: mainAbility });
     }
 
-    // All 3 innate slots from the species (ids regardless of unlock state).
-    const innateIds = mon.species.getPassiveAbilities(mon.formIndex);
+    // All 3 innate slots from the POKEMON-level resolver (not the species-level
+    // one): it honors per-Pokémon overrides written by the Ability Randomizer
+    // (`customPokemonData.passive/passive2/passive3`) and transform overrides,
+    // so the page reflects runtime ability changes rather than static species data.
+    const innateAbilities = mon.getPassiveAbilities();
     for (let slot = 0; slot < 3; slot++) {
-      const abilityId = innateIds[slot];
-      if (abilityId === undefined || abilityId === AbilityId.NONE) {
+      const ability = innateAbilities[slot];
+      if (ability == null || ability.id === AbilityId.NONE) {
         continue;
       }
       rows.push({
         label: i18next.t("pokemonSummary:innateLabel"),
-        ability: allAbilities[abilityId],
+        ability,
         slot: slot as PassiveSlot,
       });
     }
@@ -1777,8 +1783,13 @@ export class SummaryUiHandler extends UiHandler {
 
     // Expanded description: prefer the full in-game ROM text (extracted from
     // v2.65.3b), then the short ER desc, then pokerogue's own description.
-    const longDesc =
+    const baseDesc =
       getErAbilityRomDescription(ability.name) ?? getErAbilityDescription(ability.id) ?? ability.description ?? "";
+    // For composite abilities (which carry only the short composite line in ROM),
+    // append the constituent abilities' detailed descriptions back-to-back so the
+    // detail view explains what each half actually does.
+    const compositeDetail = getErCompositeDetailedDescription(ability.id);
+    const longDesc = compositeDetail ? `${baseDesc}\n\n${compositeDetail}`.trim() : baseDesc;
     const descText = addTextObject(7, 28, longDesc, TextStyle.WINDOW_ALT, {
       fontSize: "64px",
       wordWrap: { width: 1230 },

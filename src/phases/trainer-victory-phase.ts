@@ -2,6 +2,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
+import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { BiomeId } from "#enums/biome-id";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerType } from "#enums/trainer-type";
@@ -23,6 +24,13 @@ export class TrainerVictoryPhase extends BattlePhase {
     const modifierRewardFuncs = globalScene.currentBattle.trainer?.config.modifierRewardFuncs!; // TODO: is this bang correct?
     for (const modifierRewardFunc of modifierRewardFuncs) {
       globalScene.phaseManager.unshiftNew("ModifierRewardPhase", modifierRewardFunc);
+    }
+
+    // ER: every trainer win grants small (1-egg) egg vouchers, scaled by the
+    // run difficulty — Ace 1, Elite 2, Hell 3.
+    const erVoucherCount = { ace: 1, elite: 2, hell: 3 }[getErDifficulty()];
+    for (let i = 0; i < erVoucherCount; i++) {
+      globalScene.phaseManager.unshiftNew("ModifierRewardPhase", modifierTypes.VOUCHER);
     }
 
     const trainerType = globalScene.currentBattle.trainer?.config.trainerType!; // TODO: is this bang correct?

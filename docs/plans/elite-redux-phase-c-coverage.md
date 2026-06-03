@@ -2,7 +2,7 @@
 
 > Auto-generated. Regenerate: `pnpm run er:audit-archetype-coverage`.
 >
-> Last regenerated: 2026-05-22T03:33:20.196Z.
+> Last regenerated: 2026-06-01T14:48:39.243Z.
 
 Snapshot of Phase C structural work. Captures the per-bucket distribution of
 ER abilities + moves across:
@@ -23,35 +23,29 @@ bespoke fraction is the remaining hand-write backlog Phase D has to clear.
 
 - Total ER abilities: **1034**
 - Vanilla (pokerogue equivalent): **298**
-- Archetype-classified: **478** (across 22 archetype kinds — breakdown below)
-- Bespoke long-tail: **258** (needs hand implementation)
-- **Coverage: 75.0% wired**
+- Archetype-classified: **349** (across 16 archetype kinds — breakdown below)
+- Bespoke long-tail: **386** (needs hand implementation)
+- **Coverage: 62.6% wired**
 
 ### Ability archetype breakdown
 
 | Archetype | Count |
 |---|---|
-| `composite-vanilla-mashup` | 196 |
-| `entry-effect` | 76 |
-| `chance-status-on-hit` | 29 |
-| `type-damage-boost` | 25 |
-| `damage-reduction-generic` | 18 |
+| `composite-vanilla-mashup` | 188 |
+| `chance-status-on-hit` | 25 |
+| `entry-effect` | 24 |
+| `type-damage-boost` | 21 |
 | `type-conversion` | 18 |
-| `priority-modifier` | 16 |
-| `accuracy-mod` | 13 |
-| `proc-followup-attack` | 13 |
-| `stat-trigger-on-event` | 11 |
-| `conditional-damage` | 8 |
-| `flag-damage-boost` | 8 |
-| `multi-hit-override` | 8 |
-| `lifesteal` | 7 |
-| `type-resist-or-absorb` | 7 |
-| `weather-or-terrain-interaction` | 6 |
+| `damage-reduction-generic` | 17 |
+| `priority-modifier` | 14 |
+| `flag-damage-boost` | 7 |
+| `multi-hit-override` | 7 |
+| `stat-trigger-on-event` | 7 |
+| `lifesteal` | 6 |
 | `crit-mod` | 5 |
-| `on-hit-counter-attack` | 4 |
-| `status-immunity` | 4 |
-| `move-replacement` | 3 |
-| `form-change` | 2 |
+| `conditional-damage` | 3 |
+| `status-immunity` | 3 |
+| `type-resist-or-absorb` | 3 |
 | `passive-recovery` | 1 |
 
 ## Moves

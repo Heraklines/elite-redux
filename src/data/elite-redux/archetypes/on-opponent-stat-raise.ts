@@ -7,34 +7,33 @@
 // =============================================================================
 // Elite Redux — `on-opponent-stat-raise` archetype.
 //
-// Subclasses pokerogue's PostStatStageChangeAbAttr. Fires when an OPPOSING
-// pokemon (not the holder) gains stat stages (positive delta); dispatches
-// the configured stat-stage changes on the holder. Mirrors vanilla
-// Opportunist (which copies the opponent's exact buff) but parameterizable
-// for ER's variants:
+// Rides pokerogue's `StatStageChangeCopyAbAttr` hook — the SAME mechanism
+// vanilla Opportunist uses. When a Pokemon makes a *copyable* positive stat
+// raise, `StatStageChangePhase` calls
+// `applyAbAttrs("StatStageChangeCopyAbAttr", { pokemon: opponent, ... })` on
+// each of the raiser's opponents (see stat-stage-change-phase.ts). So an
+// instance of this attr (which IS a StatStageChangeCopyAbAttr via subclassing)
+// fires on the HOLDER with `params.pokemon` = the holder itself — exactly the
+// "react when a foe raises its stats" semantics we need.
 //
+// Wires:
 //   - Egoist (555) — "Raises its own stats when foes raise theirs."
-//     Wire: ATK + SPATK + SPD +1 when any opponent raises any stat.
+//     `new OnOpponentStatRaiseAbAttr({ stats: [{ATK,+1},{SPATK,+1},{SPD,+1}] })`
 //
-// The discriminator over "opposing pokemon" is the standard `selfTarget`
-// false path in PostStatStageChangeAbAttrParams: when selfTarget is false,
-// the change happened TO the holder (not from it). For Egoist we want
-// the inverse — when the change happened FROM an opponent to itself
-// (selfTarget true on the opponent's side, i.e. opponent's PostStat
-// fires with selfTarget=true and pokemon=opponent). We hook PostStat as
-// holder side and check `params.pokemon !== holder` && stages > 0.
-//
-// Wired indirectly via the dispatcher's PostStatStageChange iteration —
-// pokerogue applies PostStatStageChange to ALL on-field pokemon when ANY
-// pokemon's stats change, so our AbAttr fires when an opponent's stats go
-// up, and we filter accordingly inside canApply.
+// (The earlier implementation extended PostStatStageChangeAbAttr, which fires
+// on the SUBJECT of the change, not the reacting holder, and whose canApply had
+// a `!pokemon.isPlayer` method-reference bug that made it ALWAYS return false —
+// so Egoist never triggered. This rewrite fixes both.)
 // =============================================================================
 
-import { PostStatStageChangeAbAttr, type PostStatStageChangeAbAttrParams } from "#abilities/ab-attrs";
+import { StatStageChangeCopyAbAttr, type StatStageChangeCopyAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
+import type { MoveId } from "#enums/move-id";
+import { MoveUseMode } from "#enums/move-use-mode";
 import type { BattleStat } from "#enums/stat";
 
-/** A single stat-stage delta the holder gains in response to opponent's raise. */
+/** A single stat-stage delta the holder gains in response to a foe's raise. */
 export interface OnOpponentStatRaiseChange {
   readonly stat: BattleStat;
   readonly stages: number;
@@ -42,18 +41,19 @@ export interface OnOpponentStatRaiseChange {
 
 /** Construction options for {@linkcode OnOpponentStatRaiseAbAttr}. */
 export interface OnOpponentStatRaiseOptions {
-  /** Stat-stage deltas dispatched on the holder when an opponent raises any stat. */
+  /** Stat-stage deltas dispatched on the holder when a foe makes a copyable raise. */
   readonly stats: readonly OnOpponentStatRaiseChange[];
 }
 
 /**
- * Parameterized AbAttr implementing the `on-opponent-stat-raise` archetype.
+ * Parameterized AbAttr implementing the `on-opponent-stat-raise` archetype by
+ * extending the registered `StatStageChangeCopyAbAttr` (Opportunist) hook.
  */
-export class OnOpponentStatRaiseAbAttr extends PostStatStageChangeAbAttr {
+export class OnOpponentStatRaiseAbAttr extends StatStageChangeCopyAbAttr {
   private readonly stats: readonly OnOpponentStatRaiseChange[];
 
   constructor(options: OnOpponentStatRaiseOptions) {
-    super(true);
+    super();
     if (options.stats.length === 0) {
       throw new Error("[OnOpponentStatRaiseAbAttr] options.stats must be non-empty");
     }
@@ -65,45 +65,64 @@ export class OnOpponentStatRaiseAbAttr extends PostStatStageChangeAbAttr {
     this.stats = options.stats;
   }
 
-  override canApply(params: PostStatStageChangeAbAttrParams): boolean {
-    const { pokemon, stages, selfTarget } = params;
-    // Holder must not be the subject of the change. selfTarget tells us
-    // whether the stage change was self-inflicted; we want the case where
-    // an OPPONENT raised THEIR stats. For Egoist's holder, `pokemon` here
-    // refers to whoever's PostStat is being iterated — we want to detect
-    // opponent-raise events. The simplest correct check: the AbAttr fires
-    // on the subject `pokemon`. We need the HOLDER context — which comes
-    // from `this` ownership. PostStatStageChange iteration in pokerogue
-    // calls applyAbAttrs for the subject. Returning false here when the
-    // subject is the holder OR when the change isn't a positive delta.
-    return selfTarget && stages > 0 && !pokemon.isPlayer ? true : false;
+  /** Read-only accessor (tests). */
+  public getStats(): readonly OnOpponentStatRaiseChange[] {
+    return this.stats;
   }
 
-  override apply(params: PostStatStageChangeAbAttrParams): void {
-    if (params.simulated) {
+  override apply({ pokemon, simulated }: StatStageChangeCopyAbAttrParams): void {
+    if (simulated) {
       return;
     }
-    // The HOLDER applies the boost to itself. We need the holder context —
-    // params.pokemon is the SUBJECT of the original stat change, which is
-    // the opponent. To find the holder, we need to iterate active pokemon
-    // and find one with this AbAttr. Pokerogue's standard apply path passes
-    // the holder context via the dispatcher; here we approximate by checking
-    // globalScene.getField for any pokemon with this AbAttr.
-    //
-    // Note: this is a simplification — proper field-aura primitives need a
-    // dedicated apply-on-each-ally path. For Egoist (single-mon), this
-    // approximation lands the boost on the first non-fainted ally.
-    const allies = globalScene.getField().filter(p => p && !p.isFainted() && p.isPlayer() === !params.pokemon.isPlayer());
-    for (const holder of allies) {
-      for (const change of this.stats) {
-        globalScene.phaseManager.unshiftNew(
-          "StatStageChangePhase",
-          holder.getBattlerIndex(),
-          true,
-          [change.stat],
-          change.stages,
-        );
-      }
+    // `pokemon` is the HOLDER (the foe of whoever raised). Apply the configured
+    // boost to it — NOT a copy of the exact buff (that's vanilla Opportunist).
+    for (const change of this.stats) {
+      globalScene.phaseManager.unshiftNew(
+        "StatStageChangePhase",
+        pokemon.getBattlerIndex(),
+        true,
+        [change.stat],
+        change.stages,
+      );
     }
+  }
+}
+
+/** Construction options for {@linkcode OnOpponentStatRaiseScriptedMoveAbAttr}. */
+export interface OnOpponentStatRaiseScriptedMoveOptions {
+  /** The move the holder uses in response to a foe's copyable stat raise. */
+  readonly moveId: MoveId;
+  /** Optional base-power override for the scripted cast. */
+  readonly power?: number;
+}
+
+/**
+ * `on-opponent-stat-raise` variant that makes the HOLDER immediately use a
+ * scripted move (INDIRECT — ignores PP) against a foe when an opponent makes a
+ * copyable positive stat raise. Rides the same Opportunist hook.
+ *
+ * Wires: Retribution Blow (407) — "Uses a 150 BP Hyper Beam against opponents
+ * that boost stats."
+ */
+export class OnOpponentStatRaiseScriptedMoveAbAttr extends StatStageChangeCopyAbAttr {
+  constructor(private readonly opts: OnOpponentStatRaiseScriptedMoveOptions) {
+    super();
+  }
+
+  override apply({ pokemon, simulated }: StatStageChangeCopyAbAttrParams): void {
+    if (simulated) {
+      return;
+    }
+    const opponents = pokemon.getOpponents().filter(o => !o.isFainted());
+    if (opponents.length === 0) {
+      return;
+    }
+    globalScene.phaseManager.unshiftNew(
+      "MovePhase",
+      pokemon,
+      [opponents[0].getBattlerIndex()],
+      scriptedPokemonMove(this.opts.moveId, this.opts.power, { alwaysHit: true }),
+      MoveUseMode.INDIRECT,
+    );
   }
 }

@@ -202,7 +202,10 @@ export const ER_MOVE_ARCHETYPES: Readonly<Record<number, ErMoveArchetypeEntry>> 
   1015: { erMoveId: 1015, archetype: "chance-status-on-hit", params: {"chance":20,"status":"FLINCH"} },
   1016: { erMoveId: 1016, archetype: "bespoke", params: null },
   1017: { erMoveId: 1017, archetype: "bespoke", params: null },
-  1018: { erMoveId: 1018, archetype: "chance-status-on-hit", params: {"chance":20,"status":"FLINCH"} },
+  // Block Dropper — "Drops 2 to 5 blocks onto the target." Multi-hit, NOT a
+  // flinch move (the classifier mis-tagged it FLINCH). Bespoke → the rider adds
+  // MultiHit; routing through bespoke drops the bogus FlinchAttr.
+  1018: { erMoveId: 1018, archetype: "bespoke", params: null },
   1019: { erMoveId: 1019, archetype: "type-conversion", params: {"mode":"best-effectiveness","types":["ELECTRIC","FIRE"],"statusChance":{"chance":20,"status":"FLINCH"}} },
   1020: { erMoveId: 1020, archetype: "bespoke", params: null },
   1021: { erMoveId: 1021, archetype: "bespoke", params: null },

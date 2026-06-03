@@ -59,7 +59,6 @@ import {
   FlinchAttr,
   ForceSwitchOutAttr,
   HealOnAllyAttr,
-  HighCritAttr,
   HitHealAttr,
   IgnoreOpponentStatStagesAttr,
   type Move,
@@ -216,7 +215,15 @@ function resolveStatusName(raw: string): ResolvedStatus | null {
       return { kind: "tag", tag: BattlerTagType.CURSED };
     case "DROWSY":
       return { kind: "tag", tag: BattlerTagType.DROWSY };
-    // ER-specific statuses (BLEED, FROSTBITE, DRENCH) — no vanilla wiring.
+    // ER-specific statuses backed by ER battler tags (chip/flinch/trap effects
+    // implemented in battler-tags.ts). Routing them here lets chance-status-on-hit
+    // moves (e.g. Chiller's 10% frostbite) actually apply them.
+    case "FROSTBITE":
+      return { kind: "tag", tag: BattlerTagType.ER_FROSTBITE };
+    case "BLEED":
+      return { kind: "tag", tag: BattlerTagType.ER_BLEED };
+    case "FEAR":
+      return { kind: "tag", tag: BattlerTagType.ER_FEAR };
     default:
       return null;
   }
@@ -783,9 +790,10 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // Both primitives exist in vanilla; composed directly.
       return ok(0, [new SuppressAbilitiesAttr(), new ForceSwitchOutAttr(true)]);
     case 1005:
-      // Incite — adds Dark type to target. The "enrages foe" piece is bespoke
-      // (no vanilla "enrage" status); first-pass: AddTypeAttr only.
-      return ok(0, [new AddTypeAttr(PokemonType.DARK)]);
+      // Incite — adds the Dark type to the target AND enrages it. In ER,
+      // "enraged" is the vanilla TAUNT tag (per ER's TM12/Taunt text), so the
+      // enrage piece is AddBattlerTagAttr(TAUNT) on the foe.
+      return ok(0, [new AddTypeAttr(PokemonType.DARK), new AddBattlerTagAttr(BattlerTagType.TAUNT, false)]);
     case 1006:
       // Toxic Terrain (er internal id 1006) — "Boosts Poison-type moves for 8
       // turns and deals 1/16 HP damage." Sets the ER-custom Toxic Terrain.
@@ -817,9 +825,10 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // Shot Put — 30% chance to lower foe's Speed by 1. Move.chance gates.
       return ok(0, [new StatStageChangeAttr([Stat.SPD], -1)]);
     case 1020:
-      // Dragon Dash — +1 priority dragon move (priority field in draft, applied
-      // at construction). HighCritAttr adds 1/8 crit rate for "lunges" flavor.
-      return ok(0, [new HighCritAttr()]);
+      // Dragon Dash — "Lunges at the target quickly. +1 prio." The ER move data
+      // carries no secondary effect (effect=0) and the description mentions no
+      // crit boost, so the +1 priority (draft.priority) is the whole move.
+      return ok(0, []);
     case 1021:
       // Pocket Sand — 10% to lower foe's accuracy by 1, +1 priority (already
       // in draft.priority). Pokerogue doesn't expose an effect-chance gate at
@@ -837,9 +846,11 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // (e.g. Drainpipe, Bone Crush patterns).
       return ok(0, [powerBoostVsType(PokemonType.STEEL, 1.5)]);
     case 1024:
-      // Godspeed — power 65 flying move, +2 priority (draft.priority), that's
-      // "stronger vs Steel". Same shape as Hacksaw (1023).
-      return ok(0, [powerBoostVsType(PokemonType.STEEL, 1.5)]);
+      // Godspeed — Flying physical move, +2 priority (draft.priority). Its ABBR
+      // ("Super effective vs Steel.") gives it a Steel-targeted boost; "super
+      // effective" maps to ×2 power vs Steel (the convention used by the ER
+      // custom super-effective-vs-type moves, e.g. Excalibur ×2 vs Dragon).
+      return ok(0, [powerBoostVsType(PokemonType.STEEL, 2.0)]);
     case 1027:
       // Rain Flush — lowers user's Defense and SpDefense by 1 each
       // (effectChance is 100 on the draft = unconditional).

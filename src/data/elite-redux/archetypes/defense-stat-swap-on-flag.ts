@@ -37,8 +37,8 @@
 // =============================================================================
 
 import { MovePowerBoostAbAttr } from "#abilities/ab-attrs";
-import type { MoveFlags } from "#enums/move-flags";
 import { MoveCategory } from "#enums/move-category";
+import type { MoveFlags } from "#enums/move-flags";
 import { Stat } from "#enums/stat";
 
 export interface DefenseStatSwapOnFlagOptions {
@@ -50,8 +50,13 @@ export interface DefenseStatSwapOnFlagOptions {
    *    (multiplier = target.DEF / target.SPDEF)
    *  - "target-def-instead-of-spdef" — special move now hits DEF
    *    (multiplier = target.SPDEF / target.DEF)
+   *  - "target-lower-defense" — the move always hits the target's LOWER
+   *    defensive stat regardless of category (Roundhouse: "kicks damage the
+   *    foe's weaker defense"). A physical move vs a target with SPDEF < DEF
+   *    routes to SPDEF; a special move vs DEF < SPDEF routes to DEF; otherwise
+   *    it already hits the lower/equal stat and is left unchanged.
    */
-  readonly swap: "target-spdef-instead-of-def" | "target-def-instead-of-spdef";
+  readonly swap: "target-spdef-instead-of-def" | "target-def-instead-of-spdef" | "target-lower-defense";
 }
 
 export class DefenseStatSwapOnFlagAbAttr extends MovePowerBoostAbAttr {
@@ -73,6 +78,15 @@ export class DefenseStatSwapOnFlagAbAttr extends MovePowerBoostAbAttr {
       power.value *= def / spdef;
     } else if (this.opts.swap === "target-def-instead-of-spdef" && move.category === MoveCategory.SPECIAL) {
       power.value *= spdef / def;
+    } else if (this.opts.swap === "target-lower-defense") {
+      // Route the move to whichever defensive stat is lower. Physical normally
+      // hits DEF; if SPDEF is lower, scale power by def/spdef. Special normally
+      // hits SPDEF; if DEF is lower, scale by spdef/def. Already-lower/equal → no-op.
+      if (move.category === MoveCategory.PHYSICAL && spdef < def) {
+        power.value *= def / spdef;
+      } else if (move.category === MoveCategory.SPECIAL && def < spdef) {
+        power.value *= spdef / def;
+      }
     }
   }
 }

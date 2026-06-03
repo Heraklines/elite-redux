@@ -58,6 +58,7 @@ import type { PostKnockOutAbAttrParams } from "#abilities/ab-attrs";
 import { PostAttackAbAttr, PostKnockOutAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { allMoves } from "#data/data-lists";
 import type { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
@@ -251,6 +252,13 @@ export interface LifestealOnKoOptions {
    * (Soul Eater / Scavenger / Predator / Looter cluster). Must be in `(0, 1]`.
    */
   readonly healFraction: number;
+  /**
+   * Optional move-flag-gated bonus fraction: when the KOing move carries
+   * `flag`, heal `fraction` of max HP instead of {@linkcode healFraction}.
+   * Models Hungry Maws 861 ("50% on biting KOs, 25% otherwise" →
+   * `healFraction: 0.25, flagBonus: { flag: BITING_MOVE, fraction: 0.5 }`).
+   */
+  readonly flagBonus?: { readonly flag: MoveFlags; readonly fraction: number };
 }
 
 /**
@@ -270,13 +278,18 @@ export interface LifestealOnKoOptions {
  */
 export class LifestealOnKoAbAttr extends PostKnockOutAbAttr {
   private readonly koHealFraction: number;
+  private readonly flagBonus: { readonly flag: MoveFlags; readonly fraction: number } | undefined;
 
   constructor(opts: LifestealOnKoOptions) {
     if (!(opts.healFraction > 0 && opts.healFraction <= 1)) {
       throw new Error(`[LifestealOnKoAbAttr] healFraction must be in (0, 1]; got ${opts.healFraction}`);
     }
+    if (opts.flagBonus && !(opts.flagBonus.fraction > 0 && opts.flagBonus.fraction <= 1)) {
+      throw new Error(`[LifestealOnKoAbAttr] flagBonus.fraction must be in (0, 1]; got ${opts.flagBonus.fraction}`);
+    }
     super();
     this.koHealFraction = opts.healFraction;
+    this.flagBonus = opts.flagBonus;
   }
 
   /** Read-only accessor for the configured heal fraction. */
@@ -313,7 +326,16 @@ export class LifestealOnKoAbAttr extends PostKnockOutAbAttr {
     if (simulated) {
       return;
     }
-    const healAmount = toDmgValue(pokemon.getMaxHp() * this.koHealFraction);
+    // If a flag-bonus is configured and the KOing move carries that flag, heal
+    // the larger fraction (e.g. Hungry Maws: 50% on a biting KO, 25% otherwise).
+    let fraction = this.koHealFraction;
+    if (this.flagBonus !== undefined) {
+      const koMoveId = params.victim.turnData.attacksReceived?.[0]?.move;
+      if (koMoveId !== undefined && allMoves[koMoveId]?.hasFlag(this.flagBonus.flag)) {
+        fraction = this.flagBonus.fraction;
+      }
+    }
+    const healAmount = toDmgValue(pokemon.getMaxHp() * fraction);
     if (healAmount <= 0) {
       return;
     }

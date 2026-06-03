@@ -288,7 +288,9 @@ describe("dispatchMoveArchetype('bespoke', null, erMoveId): per-id wiring", () =
     expect(res.attrs[0]).toBeInstanceOf(MovePowerMultiplierAttr);
   });
 
-  it("er id 1024 (Godspeed) wires MovePowerMultiplierAttr (vs Steel)", () => {
+  it("er id 1024 (Godspeed) wires MovePowerMultiplierAttr (super effective vs Steel)", () => {
+    // ER ABBR: "Super effective vs Steel." — modeled as a x2 power multiplier vs
+    // Steel (same convention as the other super-effective-vs-type customs).
     const res = dispatchMoveArchetype("bespoke", null, 1024);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(1);

@@ -1022,6 +1022,44 @@ class ToxicSpikesTag extends EntryHazardTag {
 }
 
 /**
+ * Elite Redux — Hot Coals (ability 704). A single-use entry hazard laid on the
+ * foe's side: the next GROUNDED, burnable Pokémon to switch in is burned, then
+ * the trap is consumed. Burns happen via the standard status path (so Fire-types
+ * / already-statused mons are unaffected, and the grounding gate is handled by
+ * {@linkcode EntryHazardTag.apply}). Not from a move, so the trigger messages
+ * are suppressed (empty i18n keys).
+ */
+class HotCoalsTag extends EntryHazardTag {
+  public readonly tagType = ArenaTagType.HOT_COALS;
+  override get maxLayers() {
+    return 1 as const;
+  }
+
+  constructor(sourceId: number | undefined, side: ArenaTagSide) {
+    super(MoveId.NONE, sourceId, side);
+  }
+
+  protected override get onAddMessageKey(): string {
+    return "";
+  }
+
+  protected override get onRemoveMessageKey(): string {
+    return "";
+  }
+
+  override activateTrap(simulated: boolean, pokemon: Pokemon): boolean {
+    if (simulated) {
+      return true;
+    }
+    const burned = pokemon.trySetStatus(StatusEffect.BURN, undefined, 0, undefined, false, true);
+    // Single-use: consumed once a grounded foe triggers it (the EntryHazardTag
+    // grounding gate ensures only grounded switch-ins reach here).
+    globalScene.arena.removeTagOnSide(this.tagType, this.side);
+    return burned;
+  }
+}
+
+/**
  * Arena Tag class for {@link https://bulbapedia.bulbagarden.net/wiki/Sticky_Web_(move) | Sticky Web}.
  * Applies a single-layer trap that lowers the Speed of all grounded Pokémon switching in.
  */
@@ -1081,6 +1119,35 @@ class StickyWebTag extends EntryHazardTag {
       true,
     );
     return true;
+  }
+}
+
+/**
+ * Elite Redux — Foamy Web (ability 949): "Casts an unremovable Sticky Web on
+ * entry. Lasts 5 turns."
+ *
+ * Behaves exactly like {@linkcode StickyWebTag} (single-layer trap, lowers the
+ * Speed of grounded switch-ins by 1 stage — `activateTrap` is inherited) with
+ * two ER-specific differences:
+ *
+ *   - **Lasts 5 turns.** Standard entry hazards have `turnCount === 0`
+ *     (permanent); we set it to 5 so the shared {@linkcode Arena.lapseTags}
+ *     loop counts it down and removes it after 5 turns. The remaining count is
+ *     serialized like any other tag, so it survives save/reload.
+ *   - **Unremovable.** Because this is its own {@linkcode ArenaTagType.FOAMY_WEB}
+ *     (distinct from `STICKY_WEB`), it is intentionally absent from the removal
+ *     lists used by Rapid Spin (`arenaTrapTags`) and Defog, so neither clears
+ *     it. It still expires naturally after 5 turns.
+ */
+class FoamyWebTag extends StickyWebTag {
+  public override readonly tagType = ArenaTagType.FOAMY_WEB;
+
+  constructor(sourceId: number | undefined, side: ArenaTagSide) {
+    super(sourceId, side);
+    // Override the EntryHazardTag default of 0 (permanent) so lapseTags expires
+    // this hazard after 5 turns.
+    this.turnCount = 5;
+    this.maxDuration = 5;
   }
 }
 
@@ -1786,6 +1853,10 @@ export function getArenaTag(
       return new SpikesTag(sourceId, side);
     case ArenaTagType.TOXIC_SPIKES:
       return new ToxicSpikesTag(sourceId, side);
+    case ArenaTagType.HOT_COALS:
+      return new HotCoalsTag(sourceId, side);
+    case ArenaTagType.FOAMY_WEB:
+      return new FoamyWebTag(sourceId, side);
     case ArenaTagType.STEALTH_ROCK:
       return new StealthRockTag(sourceId, side);
     case ArenaTagType.STICKY_WEB:
@@ -1854,6 +1925,8 @@ export type ArenaTagTypeMap = {
   [ArenaTagType.CRAFTY_SHIELD]: CraftyShieldTag;
   [ArenaTagType.NO_CRIT]: NoCritTag;
   [ArenaTagType.TOXIC_SPIKES]: ToxicSpikesTag;
+  [ArenaTagType.HOT_COALS]: HotCoalsTag;
+  [ArenaTagType.FOAMY_WEB]: FoamyWebTag;
   [ArenaTagType.STEALTH_ROCK]: StealthRockTag;
   [ArenaTagType.STICKY_WEB]: StickyWebTag;
   [ArenaTagType.TRICK_ROOM]: TrickRoomTag;

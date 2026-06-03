@@ -59,6 +59,27 @@ describe("ER Ability - Chloroplast", () => {
     // Moonlight/Synthesis/Morning Sun → 2/3 heal
     const ph = plantHeal();
     expect(ph.attr.getWeatherHealRatio(0 as any, player)).toBeCloseTo(2 / 3, 5);
+    // Weather Ball → doubled power (base 50 → 100) as if in sun.
+    const enemy = game.field.getEnemyPokemon();
+    expect(weatherBall().calculateBattlePower(player, enemy)).toBe(weatherBall().power * 2);
+  });
+
+  test("with Solar Flare (366) and NO weather: sun behaviors fire too", async () => {
+    game.override.ability(ErAbilityId.SOLAR_FLARE as unknown as AbilityId);
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    const player = game.field.getPlayerPokemon();
+    const enemy = game.field.getEnemyPokemon();
+
+    expect(growthAttr().getLevels(player)).toBe(2);
+    expect(player.getMoveType(weatherBall())).toBe(PokemonType.FIRE);
+    // Sun-double (×2) fires; Solar Flare's Immolate part (Normal→Fire +20%)
+    // stacks multiplicatively on top, so power is at least the doubled value.
+    expect(weatherBall().calculateBattlePower(player, enemy)).toBeGreaterThanOrEqual(weatherBall().power * 2);
+    const instant = new BooleanHolder(false);
+    const solarCharge = new WeatherInstantChargeAttr([WeatherType.SUNNY, WeatherType.HARSH_SUN]);
+    solarCharge.apply(player, null, weatherBall(), [instant]);
+    expect(instant.value).toBe(true);
+    expect(plantHeal().attr.getWeatherHealRatio(0 as any, player)).toBeCloseTo(2 / 3, 5);
   });
 
   test("without Chloroplast and NO weather: normal (non-sun) behavior", async () => {

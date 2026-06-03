@@ -1,5 +1,6 @@
 import type { PokeballCounts } from "#app/battle-scene";
 import type { Tutorial } from "#app/tutorial";
+import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import type { BattleType } from "#enums/battle-type";
 import type { GameModes } from "#enums/game-modes";
 import type { MoveId } from "#enums/move-id";
@@ -76,6 +77,15 @@ export interface SessionSaveData {
    * Counts the amount of pokemon fainted in your party during the current arena encounter.
    */
   playerFaints: number;
+  /**
+   * Elite Redux: the run difficulty (Ace / Elite / Hell) chosen at team select.
+   * Drives which ER trainer roster tier the run uses. Persisted so it survives
+   * a save reload — without it the module-level difficulty resets to the default
+   * ("ace" = vanilla trainers) on every page load, so a run started on Elite/Hell
+   * would silently stop spawning ER trainers after reloading. Optional for
+   * backwards compatibility with pre-existing saves (treated as "ace").
+   */
+  erDifficulty?: ErDifficulty;
 }
 
 export interface Unlocks {

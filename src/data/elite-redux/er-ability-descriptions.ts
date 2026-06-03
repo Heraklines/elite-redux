@@ -15,8 +15,10 @@
 // allAbilities[id].description when absent.
 // =============================================================================
 
+import { allAbilities } from "#data/data-lists";
 import { ER_ABILITIES } from "#data/elite-redux/er-abilities";
 import { ER_ABILITY_ROM_DESCRIPTIONS } from "#data/elite-redux/er-ability-rom-descriptions";
+import { ER_COMPOSITE_PARTS, type ErCompositePartRef } from "#data/elite-redux/er-composite-parts";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 
 // IMPORTANT: build this map from ER_ABILITIES (the auto-generated draft list),
@@ -65,4 +67,62 @@ export function getErAbilityRomDescription(abilityName: string | undefined | nul
     return null;
   }
   return ER_ABILITY_ROM_DESCRIPTIONS[canonicalAbilityName(abilityName)] ?? null;
+}
+
+// Reverse pokerogue-ability-id → ER-ability-id map (first match wins), built
+// lazily so it sees the fully-resolved ER_ID_MAP. Used to find a composite's
+// constituent parts from the live pokerogue ability id shown in the UI.
+let pokerogueToErAbility: Map<number, number> | null = null;
+function erAbilityIdFromPokerogueId(pokerogueAbilityId: number): number | undefined {
+  if (pokerogueToErAbility === null) {
+    pokerogueToErAbility = new Map();
+    for (const ab of ER_ABILITIES) {
+      const pk = ER_ID_MAP.abilities[ab.id];
+      if (pk !== undefined && !pokerogueToErAbility.has(pk)) {
+        pokerogueToErAbility.set(pk, ab.id);
+      }
+    }
+  }
+  return pokerogueToErAbility.get(pokerogueAbilityId);
+}
+
+/** Resolve a composite part reference to its live pokerogue ability id. */
+function partPokerogueId(part: ErCompositePartRef): number | undefined {
+  return part.kind === "pokerogue" ? part.abilityId : ER_ID_MAP.abilities[part.erAbilityId];
+}
+
+/**
+ * For a `composite-vanilla-mashup` ability, build a detailed description by
+ * concatenating the detailed (ROM, else short) descriptions of each constituent
+ * part, back-to-back and labelled by the part's ability name. Returns null when
+ * the ability isn't a composite (or has no resolvable parts) so callers fall
+ * back to the ability's own description.
+ */
+export function getErCompositeDetailedDescription(pokerogueAbilityId: number): string | null {
+  const erId = erAbilityIdFromPokerogueId(pokerogueAbilityId);
+  if (erId === undefined) {
+    return null;
+  }
+  const entry = ER_COMPOSITE_PARTS[erId];
+  if (!entry || entry.parts.length === 0) {
+    return null;
+  }
+  const blocks: string[] = [];
+  const seen = new Set<number>();
+  for (const part of entry.parts) {
+    const pk = partPokerogueId(part);
+    if (pk === undefined || seen.has(pk)) {
+      continue;
+    }
+    seen.add(pk);
+    const ability = allAbilities[pk];
+    if (!ability) {
+      continue;
+    }
+    const detail = getErAbilityRomDescription(ability.name) ?? map.get(pk) ?? ability.description ?? "";
+    if (detail) {
+      blocks.push(`${ability.name}: ${detail}`);
+    }
+  }
+  return blocks.length > 0 ? blocks.join("\n\n") : null;
 }

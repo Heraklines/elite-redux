@@ -17,6 +17,8 @@ export enum FilterTextRow {
   ABILITY_2,
   /** ER: free-text regex search against the FULL detailed ability text. */
   ABILITY_TEXT,
+  /** ER: non-editable action row that clears every search field in place. */
+  CLEAR,
 }
 
 export class FilterText extends Phaser.GameObjects.Container {
@@ -118,6 +120,39 @@ export class FilterText extends Phaser.GameObjects.Container {
     return true;
   }
 
+  /**
+   * Add a non-editable action row (e.g. a "Clear search" button) — a label with
+   * no value column. A hidden placeholder selection is pushed to keep the
+   * `labels`/`selections`/`rows` arrays index-aligned and to make value-scan
+   * helpers (getValue / hasAnyValue / setValsToDefault) treat it as empty.
+   */
+  addActionRow(row: FilterTextRow, title: string): boolean {
+    const paddingX = 6;
+    const cursorOffset = 8;
+
+    if (this.rows.includes(row)) {
+      return false;
+    }
+    this.rows.push(row);
+
+    const label = addTextObject(paddingX + cursorOffset, 3, title, TextStyle.TOOLTIP_CONTENT);
+    this.labels.push(label);
+    this.add(label);
+
+    const placeholder = addTextObject(0, 0, this.defaultText, TextStyle.TOOLTIP_CONTENT).setVisible(false);
+    this.selections.push(placeholder);
+    this.add(placeholder);
+
+    this.calcFilterPositions();
+    this.numFilters++;
+    return true;
+  }
+
+  /** The {@linkcode FilterTextRow} shown at a given cursor position, if any. */
+  getRow(index: number): FilterTextRow | undefined {
+    return this.rows[index];
+  }
+
   resetSelection(index: number): void {
     this.selections[index].setText(this.defaultText);
     this.onChange();
@@ -127,6 +162,11 @@ export class FilterText extends Phaser.GameObjects.Container {
     for (let i = 0; i < this.numFilters; i++) {
       this.resetSelection(i);
     }
+  }
+
+  /** True if any filter row currently holds a non-default (active) search value. */
+  hasAnyValue(): boolean {
+    return this.selections.some(sel => sel.text !== this.defaultText);
   }
 
   startSearch(index: number, ui: UI): void {

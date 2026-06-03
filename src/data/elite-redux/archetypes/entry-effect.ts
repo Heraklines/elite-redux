@@ -112,6 +112,12 @@ export interface EntryEffectSetHazard {
   readonly hazard: ArenaTagType;
   /** Number of hazard layers to apply in a single dispatch. @defaultValue `1` */
   readonly layers?: number;
+  /**
+   * Which side the hazard is laid on, relative to the holder. `"foe"` = the
+   * opponent's side (the usual entry-hazard target, e.g. Hot Coals); `"self"` =
+   * the holder's own side. @defaultValue `"both"` (legacy behaviour)
+   */
+  readonly side?: "self" | "foe" | "both";
 }
 
 /**
@@ -277,8 +283,12 @@ export class EntryEffectAbAttr extends PostSummonAbAttr {
       }
       case "set-hazard": {
         const layers = this.effect.layers ?? 1;
+        const sideOpt = this.effect.side ?? "both";
+        const playerSide = pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
+        const foeSide = pokemon.isPlayer() ? ArenaTagSide.ENEMY : ArenaTagSide.PLAYER;
+        const side = sideOpt === "both" ? ArenaTagSide.BOTH : sideOpt === "self" ? playerSide : foeSide;
         for (let i = 0; i < layers; i++) {
-          globalScene.arena.addTag(this.effect.hazard, 0, undefined, pokemon.id);
+          globalScene.arena.addTag(this.effect.hazard, 0, undefined, pokemon.id, side);
         }
         return;
       }

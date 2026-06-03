@@ -20,15 +20,20 @@
 // =============================================================================
 
 import { PostSummonAbAttr } from "#abilities/ab-attrs";
-import type { AbAttrBaseParams } from "#types/ability-types";
 import { globalScene } from "#app/global-scene";
-import { PokemonMove } from "#data/moves/pokemon-move";
+import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
 import type { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
+import type { AbAttrBaseParams } from "#types/ability-types";
 
 export interface PostSummonScriptedMoveOptions {
   /** Move to enqueue against an opponent on switch-in. */
   readonly moveId: MoveId;
+  /**
+   * Optional ER-specified base-power override (e.g. Phantom Thief's "40 BP
+   * Spectral Thief"). Omit to use the move's registered full power.
+   */
+  readonly power?: number;
 }
 
 export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
@@ -38,7 +43,9 @@ export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
 
   override canApply(params: AbAttrBaseParams): boolean {
     const { pokemon, simulated } = params;
-    if (simulated) return true;
+    if (simulated) {
+      return true;
+    }
     // Need an opposing target on the field.
     const opponents = pokemon.getOpponents().filter(o => !o.isFainted());
     return opponents.length > 0;
@@ -46,16 +53,20 @@ export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
 
   override apply(params: AbAttrBaseParams): void {
     const { pokemon, simulated } = params;
-    if (simulated) return;
+    if (simulated) {
+      return;
+    }
     const opponents = pokemon.getOpponents().filter(o => !o.isFainted());
-    if (opponents.length === 0) return;
+    if (opponents.length === 0) {
+      return;
+    }
     // Pick the first available opponent (in doubles, prefer the leftmost).
     const target = opponents[0];
     globalScene.phaseManager.unshiftNew(
       "MovePhase",
       pokemon,
       [target.getBattlerIndex()],
-      new PokemonMove(this.opts.moveId),
+      scriptedPokemonMove(this.opts.moveId, this.opts.power),
       MoveUseMode.INDIRECT,
     );
   }

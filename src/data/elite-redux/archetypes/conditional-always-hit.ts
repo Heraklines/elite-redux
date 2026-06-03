@@ -27,10 +27,12 @@
 
 import { AbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import type { Move } from "#data/moves/move";
 import type { MoveCategory } from "#enums/move-category";
 import type { MoveFlags } from "#enums/move-flags";
-import type { MoveId } from "#enums/move-id";
+import { MoveId } from "#enums/move-id";
+import { PokemonType } from "#enums/pokemon-type";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import type { AbAttrBaseParams } from "#types/ability-types";
@@ -95,4 +97,65 @@ export class ConditionalAlwaysHitAbAttr extends AbAttr {
     }
     return true;
   }
+}
+
+// =============================================================================
+// Move-intrinsic type-conditional always-hit.
+//
+// Several ER moves carry a "Never misses if user is <Type>-type" clause that is
+// a property of the MOVE, not of any ability (so it applies to every user of
+// that type). This mirrors pokerogue's built-in Toxic rule (Toxic never misses
+// when used by a Poison-type, hardcoded in `MoveEffectPhase`). We model the ER
+// additions the same way: a small registry keyed by pokerogue move id, consulted
+// once in `MoveEffectPhase.checkBypassAccAndInvuln`.
+// =============================================================================
+
+/**
+ * ER moves whose accuracy check is bypassed entirely when the user is of a
+ * specific type. Keyed by pokerogue move id (vanilla `MoveId` or the resolved
+ * id of an ER custom).
+ */
+export const ER_USER_TYPE_ALWAYS_HIT: ReadonlyMap<number, PokemonType> = new Map<number, PokemonType>([
+  [MoveId.LEECH_SEED, PokemonType.GRASS], // er 73
+  [MoveId.THUNDER_WAVE, PokemonType.ELECTRIC], // er 86
+  [MoveId.WILL_O_WISP, PokemonType.FIRE], // er 261
+  // Flash Freeze (er 811) is an ER custom — resolve its runtime id; Ice-typed.
+  ...(ER_ID_MAP.moves[811] === undefined ? [] : ([[ER_ID_MAP.moves[811], PokemonType.ICE]] as [number, PokemonType][])),
+]);
+
+/**
+ * ER moves whose accuracy check is bypassed while a specific weather is active
+ * ("Never misses in fog"). Keyed by pokerogue move id. Vexing Void is an ER
+ * custom (stable id); Eerie Spell is keyed by its vanilla `MoveId`.
+ */
+export const ER_WEATHER_ALWAYS_HIT: ReadonlyMap<number, readonly WeatherType[]> = new Map<
+  number,
+  readonly WeatherType[]
+>([
+  [MoveId.EERIE_SPELL, [WeatherType.FOG]], // er 754 — "Never misses in fog"
+  // Vexing Void (er 974) is an ER custom — resolve its runtime id.
+  ...(ER_ID_MAP.moves[974] === undefined
+    ? []
+    : ([[ER_ID_MAP.moves[974], [WeatherType.FOG]]] as [number, readonly WeatherType[]][])),
+]);
+
+/**
+ * True when `move` has a move-intrinsic "never misses" clause that is currently
+ * satisfied — either a "never misses if user is <Type>-type" clause met by the
+ * user's type, or a "never misses in <weather>" clause met by the active
+ * weather. Consulted by `MoveEffectPhase.checkBypassAccAndInvuln`.
+ */
+export function erMoveAlwaysHitsForUserType(move: Move, user: Pokemon): boolean {
+  const requiredType = ER_USER_TYPE_ALWAYS_HIT.get(move.id);
+  if (requiredType !== undefined && user.isOfType(requiredType)) {
+    return true;
+  }
+  const weathers = ER_WEATHER_ALWAYS_HIT.get(move.id);
+  if (weathers !== undefined) {
+    const current = globalScene.arena.weather?.weatherType ?? WeatherType.NONE;
+    if (weathers.includes(current)) {
+      return true;
+    }
+  }
+  return false;
 }

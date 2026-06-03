@@ -29,6 +29,7 @@
 // (i18next would otherwise return the missing-key placeholder).
 // =============================================================================
 
+import type { AbAttr } from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities } from "#data/data-lists";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
@@ -186,6 +187,77 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
     }
   }
 
+  return result;
+}
+
+/** Aggregated result of a single `refreshEliteReduxComposites()` run. */
+export interface RefreshEliteReduxCompositesResult {
+  /** Number of composite abilities whose attrs were re-resolved. */
+  refreshed: number;
+  /** Non-fatal errors encountered while re-dispatching. */
+  errors: string[];
+}
+
+/**
+ * Re-resolve every `composite-vanilla-mashup` ability AFTER the vanilla
+ * rebalance and C-source corrections have run.
+ *
+ * Why this exists
+ * ---------------
+ * Composites are first built in {@linkcode initEliteReduxCustomAbilities}
+ * (init.ts step ~71), which snapshots each part ability's `attrs` at that
+ * moment. But the vanilla rebalance (init.ts ~92) and C-source corrections
+ * (~104) run LATER and may REPLACE a vanilla part's attrs entirely — e.g.
+ * `patchAftermath` swaps Aftermath's `PostFaintContactDamageAbAttr` for the ER
+ * detonation, `patchForewarn`/`patchPastelVeil` swap their attrs for scripted
+ * moves, etc. Any composite embedding such a part (e.g. 614 Balloon Bomb =
+ * "Aftermath + Inflatable") therefore froze the STALE pre-patch behavior.
+ *
+ * The fix is order-independent and idempotent: re-dispatch each composite from
+ * its archetype row. The dispatcher rebuilds the whole attr list from the
+ * CURRENT (patched) state of every sub-part — vanilla parts now copy their
+ * patched attrs, ER and nested-composite parts re-resolve recursively — so a
+ * single pass per composite picks up every upstream patch regardless of which
+ * order the composites are visited in. Must run AFTER both rebalance and
+ * C-source corrections.
+ *
+ * Composites get their attrs EXCLUSIVELY from the dispatcher
+ * ({@linkcode buildCustomAbility} adds no hand-wired attrs beyond the archetype
+ * dispatch — only builder flags), so replacing the attr list wholesale is safe.
+ */
+export function refreshEliteReduxComposites(): RefreshEliteReduxCompositesResult {
+  const result: RefreshEliteReduxCompositesResult = { refreshed: 0, errors: [] };
+  for (const draft of ER_ABILITIES) {
+    const row = ER_ABILITY_ARCHETYPES[draft.id];
+    if (row === undefined || row.archetype !== "composite-vanilla-mashup") {
+      continue;
+    }
+    const pokerogueId = ER_ID_MAP.abilities[draft.id];
+    if (pokerogueId === undefined || pokerogueId < VANILLA_ID_CUTOFF) {
+      continue;
+    }
+    const ability = allAbilities[pokerogueId];
+    if (!ability) {
+      continue;
+    }
+    try {
+      const dispatched = dispatchArchetype(row.archetype, row.params, draft.id);
+      // Only overwrite when the re-dispatch produced something; a now-empty
+      // result means "still unresolvable", and we keep whatever was there.
+      if (dispatched.attrs.length === 0) {
+        continue;
+      }
+      const attrs = (ability as unknown as { attrs: AbAttr[] }).attrs;
+      attrs.length = 0;
+      for (const attr of dispatched.attrs) {
+        attrs.push(attr);
+      }
+      result.refreshed++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      result.errors.push(`Composite refresh failed for er ability ${draft.id} → ${pokerogueId}: ${msg}`);
+    }
+  }
   return result;
 }
 

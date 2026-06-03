@@ -2,7 +2,8 @@ import { globalScene } from "#app/global-scene";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { signatureSpecies } from "#balance/signature-species";
 import { EntryHazardTag } from "#data/arena-tag";
-import { applyErRosterOverride } from "#data/elite-redux/er-trainer-runtime-hook";
+import { applyErGhostOverride } from "#data/elite-redux/er-ghost-teams";
+import { applyErRivalOverride, applyErRosterOverride } from "#data/elite-redux/er-trainer-runtime-hook";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { PartyMemberStrength } from "#enums/party-member-strength";
@@ -331,6 +332,27 @@ export class Trainer extends Phaser.GameObjects.Container {
       () => {
         const template = this.getPartyTemplate();
         const strength: PartyMemberStrength = template.getStrength(index);
+
+        // ER ghost hook (#217): if this trainer was flagged as a cross-player
+        // "ghost" (endgame gauntlet), field the stored team. Checked FIRST so it
+        // wins over the rival / ER-roster overrides and the trainer's own funcs.
+        const erGhost = applyErGhostOverride(this, index);
+        if (erGhost !== null) {
+          ret = erGhost;
+          return;
+        }
+
+        // ER rival hook (Elite/Hell only): mirror the Hoenn rival (May/Brendan)
+        // onto PokeRogue's RIVAL..RIVAL_6 encounters. Checked BEFORE the rival's
+        // own `partyMemberFuncs` below, because the rival defines its entire team
+        // through those funcs — so the ER roster must win first. Returns null for
+        // non-rival (or Ace) trainers and for indices beyond the ER rival roster
+        // (those fall through to the vanilla rival member).
+        const erRival = applyErRivalOverride(this, index);
+        if (erRival !== null) {
+          ret = erRival;
+          return;
+        }
 
         // If the battle is not one of the named trainer doubles
         if (!(this.config.trainerTypeDouble && this.isDouble() && !this.config.doubleOnly)) {

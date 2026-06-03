@@ -50,13 +50,20 @@ import {
   AlliedFieldDamageReductionAbAttr,
   AllyStatMultiplierAbAttr,
   ArenaTrapAbAttr,
+  BlockCritAbAttr,
+  BlockItemTheftAbAttr,
   BlockStatusDamageAbAttr,
+  BlockWeatherDamageAttr,
   ChangeMovePriorityAbAttr,
   ConditionalCritAbAttr,
+  DefensiveStatSubstituteAbAttr,
+  FullHpResistTypeAbAttr,
+  getWeatherCondition,
   HealFromBerryUseAbAttr,
   MovePowerBoostAbAttr,
   MoveTypeChangeAbAttr,
   MoveTypePowerBoostAbAttr,
+  PokemonTypeChangeAbAttr,
   PostAttackApplyBattlerTagAbAttr,
   PostAttackContactApplyStatusEffectAbAttr,
   PostAttackStealHeldItemAbAttr,
@@ -73,6 +80,7 @@ import {
   ProtectStatAbAttr,
   ReceivedMoveDamageMultiplierAbAttr,
   ReceivedTypeDamageMultiplierAbAttr,
+  StabBoostAbAttr,
   StatMultiplierAbAttr,
   StatusEffectImmunityAbAttr,
   TypeImmunityStatStageChangeAbAttr,
@@ -83,14 +91,20 @@ import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { ChanceStatusOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
+import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
 import { CritStageBonusAbAttr } from "#data/elite-redux/archetypes/crit-mod";
-import { DisableFoeItemsOnEntryAbAttr } from "#data/elite-redux/archetypes/disable-foe-items-on-entry";
+import {
+  DisableFoeItemsOnEntryAbAttr,
+  DisableTargetItemOnContactAbAttr,
+} from "#data/elite-redux/archetypes/disable-foe-items-on-entry";
 import { DodgeFirstSuperEffectiveAbAttr } from "#data/elite-redux/archetypes/dodge-first-super-effective";
 import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
 import { EntryTailwindClearWeatherAbAttr } from "#data/elite-redux/archetypes/entry-tailwind-clear-weather";
 import { HealStatusOnMoveTypeAbAttr } from "#data/elite-redux/archetypes/heal-status-on-move-type";
-import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
+import { PostAttackChangeTargetTypeAbAttr } from "#data/elite-redux/archetypes/post-attack-change-target-type";
+import { PostDefendChangeAttackerTypeAbAttr } from "#data/elite-redux/archetypes/post-defend-change-attacker-type";
 import { PostDefendSuppressOpponentDamageBoostAbAttr } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
+import { PostFaintDetonateAbAttr } from "#data/elite-redux/archetypes/post-faint-detonate";
 import { RecoilDamageMultiplierAbAttr } from "#data/elite-redux/archetypes/recoil-damage-multiplier";
 import { StatTriggerOnStatLoweredAbAttr } from "#data/elite-redux/archetypes/stat-trigger-on-event";
 import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
@@ -205,8 +219,31 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   [AbilityId.SWIFT_SWIM, ab => mutateStatMultiplier(ab, Stat.SPD, 1.5)],
   [AbilityId.CHLOROPHYLL, ab => mutateStatMultiplier(ab, Stat.SPD, 1.5)],
   [AbilityId.SAND_RUSH, ab => mutateStatMultiplier(ab, Stat.SPD, 1.5)],
-  [AbilityId.SLUSH_RUSH, ab => mutateStatMultiplier(ab, Stat.SPD, 1.5)],
+  // Slush Rush: ER spec is "1.5x Speed in hail/snow AND immune to hail damage".
+  // Vanilla pokerogue only grants the speed boost, so add the hail/snow damage
+  // block to match the description.
+  [
+    AbilityId.SLUSH_RUSH,
+    ab => {
+      mutateStatMultiplier(ab, Stat.SPD, 1.5);
+      if (!ab.attrs.some(a => a instanceof BlockWeatherDamageAttr)) {
+        ab.attrs.push(new BlockWeatherDamageAttr(WeatherType.HAIL, WeatherType.SNOW));
+      }
+    },
+  ],
   [AbilityId.SURGE_SURFER, ab => mutateStatMultiplier(ab, Stat.SPD, 1.5)],
+
+  // Teraform Zero (739): ER spec is "Tera Shell + clears weather and terrain on
+  // first entry". Vanilla pokerogue only wired the weather/terrain clear, so add
+  // the Tera Shell full-HP resist (FullHpResistTypeAbAttr) on top.
+  [
+    AbilityId.TERAFORM_ZERO,
+    ab => {
+      if (!ab.attrs.some(a => a instanceof FullHpResistTypeAbAttr)) {
+        ab.attrs.push(new FullHpResistTypeAbAttr());
+      }
+    },
+  ],
 
   // ===== MINOR — HP-regen fractions (1/16 → 1/8) =====
   // PostWeatherLapseHealAbAttr healFactor: vanilla=1 (→ 1/16), ER=2 (→ 1/8).
@@ -386,11 +423,53 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
       ab.attrs.push(new CritStageBonusAbAttr({ bonus: 1, filter: { flag: MoveFlags.MAKES_CONTACT } }));
     },
   ],
-  // INNER_FOCUS: flinch immune + Intimidate immune + Scare immune.
-  // Vanilla already has BattlerTagImmunityAbAttr(FLINCHED) + IntimidateImmunity.
-  // ER also wants Scare immunity — extend the BattlerTagImmunity attrs to
-  // include ER_FEAR (the ER-specific battler tag we ship).
-  [AbilityId.INNER_FOCUS, ab => extendBattlerTagImmunity(ab, BattlerTagType.ER_FEAR)],
+  // INNER_FOCUS: flinch immune + Intimidate immune + Scare immune + "Focus
+  // Blast never misses". Vanilla already has BattlerTagImmunityAbAttr(FLINCHED)
+  // + IntimidateImmunity. ER also wants Scare immunity (extend BattlerTagImmunity
+  // to ER_FEAR) AND the ER "Focus Blast never misses" clause. The latter
+  // cascades to the composites that embed Inner Focus (489 Enlightened, 661
+  // Unlocked Potential, 679 Way of Precision) since they copy its attrs.
+  [
+    AbilityId.INNER_FOCUS,
+    ab => {
+      extendBattlerTagImmunity(ab, BattlerTagType.ER_FEAR);
+      if (!ab.attrs.some(a => a instanceof ConditionalAlwaysHitAbAttr)) {
+        ab.attrs.push(new ConditionalAlwaysHitAbAttr({ moveIds: [MoveId.FOCUS_BLAST] }));
+      }
+    },
+  ],
+  // ANGER_SHELL: ER spec (abbr "applies Shell Smash" + full "by 2 stages each")
+  // is FULL Shell Smash on dropping below 1/2 HP — +2 ATK/SpAtk/Spd, -1 Def/SpDef.
+  // Vanilla pokerogue wires the offensive boost at +1; bump the positive
+  // PostDefendHpGated rider to +2 (the -1 defensive rider is already correct).
+  [
+    AbilityId.ANGER_SHELL,
+    ab => {
+      for (const a of ab.attrs) {
+        if (a.constructor.name === "PostDefendHpGatedStatStageChangeAbAttr") {
+          const gated = a as unknown as { stages: number };
+          if (gated.stages === 1) {
+            gated.stages = 2;
+          }
+        }
+      }
+    },
+  ],
+  // TANGLED_FEET: ER spec "uses Speed as defensive stat when confused or enraged"
+  // (FULL: "uses its Speed stat instead of Defense or Special Defense for damage
+  // calculations"). Vanilla pokerogue wired the unrelated Gen-IV behaviour
+  // (confusion-gated evasion ×2) — strip it and add the defensive-stat substitute,
+  // gated on the CONFUSED tag or "enraged". In ER, "enraged" is the vanilla TAUNT
+  // tag (per ER's TM12/Taunt text: "Enrages the foe so it can only use attack moves").
+  [
+    AbilityId.TANGLED_FEET,
+    ab => {
+      ab.attrs = ab.attrs.filter(a => !(a instanceof StatMultiplierAbAttr && a.stat === Stat.EVA));
+      const sub = new DefensiveStatSubstituteAbAttr(Stat.SPD);
+      sub.addCondition(pokemon => !!pokemon.getTag(BattlerTagType.CONFUSED) || !!pokemon.getTag(BattlerTagType.TAUNT));
+      ab.attrs.push(sub);
+    },
+  ],
   // OBLIVIOUS: infatuation/taunt/intimidate immune + Scare immune.
   [AbilityId.OBLIVIOUS, ab => extendBattlerTagImmunity(ab, BattlerTagType.ER_FEAR)],
   // OWN_TEMPO: confusion/intimidate immune + Scare immune.
@@ -493,6 +572,10 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // ===== MAJOR — AROMA_VEIL shrinks protected-tags set =====
   // ER drops Taunt/Torment/Encore — keep Infatuated, HealBlock, Disabled only.
   [AbilityId.AROMA_VEIL, ab => narrowAromaVeilTags(ab)],
+
+  // ===== MAJOR — DAMP: ER repurposes it from "prevent explosions" to "makes the
+  // attacker Water-type on contact" (offense+defense). Code had kept vanilla Damp.
+  [AbilityId.DAMP, ab => patchDamp(ab)],
 
   // ===== MAJOR — AFTERMATH: vanilla 1/4 max HP on contact KO -> ER flat 25% on any KO.
   [AbilityId.AFTERMATH, ab => patchAftermath(ab)],
@@ -739,7 +822,53 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   [
     AbilityId.RUN_AWAY,
     ab => {
-      ab.attrs.push(new StatTriggerOnStatLoweredAbAttr({ stats: [{ stat: Stat.SPD, stages: 1 }] }));
+      ab.attrs.push(new StatTriggerOnStatLoweredAbAttr({ stats: [{ stat: Stat.SPD, stages: 2 }] }));
+    },
+  ],
+
+  // 225 RKS_SYSTEM (MultiAttack / Silvally): vanilla only carries the
+  // NoFusionAbilityAbAttr form-marker (memory disc determines type). ER spec
+  // adds two more clauses: Protean (the holder's type becomes the type of the
+  // move it is about to use) and Adaptability (STAB rises from 1.5x to 2.0x).
+  // Wire both vanilla attrs so the description matches.
+  [
+    AbilityId.RKS_SYSTEM,
+    ab => {
+      if (!ab.attrs.some(a => a instanceof PokemonTypeChangeAbAttr)) {
+        ab.attrs.push(new PokemonTypeChangeAbAttr());
+      }
+      if (!ab.attrs.some(a => a instanceof StabBoostAbAttr)) {
+        ab.attrs.push(new StabBoostAbAttr());
+      }
+    },
+  ],
+
+  // 239 PROPELLER_TAIL: ER spec is "Swift Swim + Redirection Immunity". Vanilla
+  // pokerogue only wires the BlockRedirect half, so add the rain Speed boost
+  // (1.5x in rain/heavy rain, matching ER's reduced Swift Swim multiplier). The
+  // boost is gated per-attr on weather so the redirection immunity stays
+  // unconditional.
+  [
+    AbilityId.PROPELLER_TAIL,
+    ab => {
+      if (!ab.attrs.some(a => a instanceof StatMultiplierAbAttr)) {
+        ab.attrs.push(
+          new StatMultiplierAbAttr(Stat.SPD, 1.5, getWeatherCondition(WeatherType.RAIN, WeatherType.HEAVY_RAIN)),
+        );
+      }
+    },
+  ],
+
+  // 242 STALWART: ER spec is "isn't affected by redirection, crits, or ability
+  // suppression". Vanilla pokerogue wires only BlockRedirect (and the builder's
+  // uncopiable/unsuppressable flags cover suppression). Add crit immunity to
+  // match the description.
+  [
+    AbilityId.STALWART,
+    ab => {
+      if (!ab.attrs.some(a => a instanceof BlockCritAbAttr)) {
+        ab.attrs.push(new BlockCritAbAttr());
+      }
     },
   ],
 
@@ -876,6 +1005,19 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
         a => !(a instanceof StatMultiplierAbAttr && a.stat === Stat.ATK && a.multiplier === 2),
       );
       ab.attrs.push(new StatMultiplierAbAttr(Stat.SPATK, 2));
+    },
+  ],
+
+  // 300 SUPERSWEET_SYRUP: vanilla pokerogue lowers the foe's evasion on entry.
+  // ER repurposes it as "Sticky Hold + disable the foe's item for 2 turns on
+  // contact." Strip the entry evasion-drop, add BlockItemTheft (item can't be
+  // removed/stolen) + the on-contact item-disable.
+  [
+    AbilityId.SUPERSWEET_SYRUP,
+    ab => {
+      ab.attrs = ab.attrs.filter(a => a.constructor.name !== "PostSummonStatStageChangeAbAttr");
+      ab.attrs.push(new BlockItemTheftAbAttr());
+      ab.attrs.push(new DisableTargetItemOnContactAbAttr());
     },
   ],
 
@@ -1754,16 +1896,46 @@ function narrowAromaVeilTags(ability: MutableAbility): void {
 }
 
 /**
+ * Replace DAMP's vanilla `FieldPreventExplosiveMovesAbAttr` (block Explosion/
+ * Self-Destruct) with ER's repurposed behavior: when an opponent makes contact
+ * with the holder, the attacker's type becomes pure Water
+ * ({@linkcode PostDefendChangeAttackerTypeAbAttr}). The "also works on offense"
+ * (holder's contact move turns the TARGET Water) clause needs a post-attack
+ * add-type-to-target primitive that doesn't exist yet — deferred. ER drops
+ * explosion-blocking entirely, so nothing else carries that attr afterward.
+ */
+function patchDamp(ability: MutableAbility): void {
+  for (let i = 0; i < ability.attrs.length; i++) {
+    if (ability.attrs[i].constructor.name === "FieldPreventExplosiveMovesAbAttr") {
+      ability.attrs[i] = new PostDefendChangeAttackerTypeAbAttr({
+        type: PokemonType.WATER,
+        contactOnly: true,
+        side: "attacker",
+      });
+    }
+  }
+  // ER Damp is "Makes foe Water-type on contact, offense & defense." The loop
+  // above wires the defensive half (holder is hit by contact → attacker becomes
+  // Water); add the offensive half (holder hits with contact → target becomes
+  // Water).
+  if (!ability.attrs.some(a => a instanceof PostAttackChangeTargetTypeAbAttr)) {
+    ability.attrs.push(new PostAttackChangeTargetTypeAbAttr({ type: PokemonType.WATER, contactOnly: true }));
+  }
+}
+
+/**
  * Replace AFTERMATH's vanilla PostFaintContactDamageAbAttr (1/4 max HP on
- * contact KO) with OnFaintEffectAbAttr (flat 25% damage to attacker on any
- * KO, modeling ER's "Uses 100 BP Explosion on faint").
+ * contact KO) with the ER faithful behavior: on a lethal damaging hit the
+ * holder uses a 100 BP Explosion (physical) / Outburst (special) that hits all
+ * adjacent Pokemon (including its own ally in doubles), always flinches, plays
+ * the explosion animation, and self-KOs. See {@linkcode PostFaintDetonateAbAttr}
+ * for why this is a PreDefend clamp rather than a post-faint hook (a fainted
+ * Pokemon cannot run a move).
  */
 function patchAftermath(ability: MutableAbility): void {
   for (let i = 0; i < ability.attrs.length; i++) {
     if (ability.attrs[i].constructor.name === "PostFaintContactDamageAbAttr") {
-      ability.attrs[i] = new OnFaintEffectAbAttr({
-        effect: { kind: "attacker-damage-flat", maxHpFraction: 0.25 },
-      });
+      ability.attrs[i] = new PostFaintDetonateAbAttr({ power: 100, flinch: true });
     }
   }
 }
@@ -1831,7 +2003,12 @@ function patchLeafGuard(ability: MutableAbility): void {
   ability.attrs = ability.attrs.filter(a => !(a instanceof StatusEffectImmunityAbAttr));
   const PostTurnResetStatusCtor = getAttrCtorByName("PostTurnResetStatusAbAttr");
   if (PostTurnResetStatusCtor !== undefined) {
-    ability.attrs.push(new PostTurnResetStatusCtor(true) as AbAttr);
+    // allyTarget=false → cures the HOLDER's own status (Leaf Guard / Sun's Bounty
+    // are self-protective per their text: "cures all status conditions at the end
+    // of the turn"). Previously passed `true`, which cured the ally instead — so
+    // the holder never cured itself (and Sun's Bounty 801, which composites this,
+    // inherited the same bug).
+    ability.attrs.push(new PostTurnResetStatusCtor(false) as AbAttr);
   }
   // ER spec adds an "in sun" gate. The cure should ONLY fire while sun is
   // active. ability.conditions is a mutable array — pushing onto it gates

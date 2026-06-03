@@ -72,6 +72,7 @@ export type DamageReductionFilter =
   | { readonly kind: "category"; readonly category: MoveDamageCategory }
   | { readonly kind: "contact" }
   | { readonly kind: "super-effective" }
+  | { readonly kind: "resisted" }
   | { readonly kind: "full-hp" }
   /** Crit-received reduction — Bad Omen ("takes 1/4 damage from crits"). */
   | { readonly kind: "crit" }
@@ -195,6 +196,16 @@ export class DamageReductionAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
         const moveType = attacker.getMoveType(move);
         const eff = target.getAttackTypeEffectiveness(moveType, { source: attacker, move });
         return eff > 1;
+      }
+      case "resisted": {
+        // Symmetric to super-effective: the incoming move is not-very-effective
+        // (type-chart multiplier in (0, 1)). Immunity (0) does not count.
+        if (move.category === MoveCategory.STATUS) {
+          return false;
+        }
+        const moveType = attacker.getMoveType(move);
+        const eff = target.getAttackTypeEffectiveness(moveType, { source: attacker, move });
+        return eff > 0 && eff < 1;
       }
       case "full-hp":
         return target.isFullHp() && move.category !== MoveCategory.STATUS;

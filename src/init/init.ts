@@ -5,16 +5,23 @@ import { initPokemonPrevolutions, initPokemonStarters } from "#balance/pokemon-e
 import { initSpecies } from "#balance/pokemon-species";
 import { initChallenges } from "#data/challenge";
 import { initTrainerTypeDialogue } from "#data/dialogue";
-import { initEliteReduxCSourceCorrections } from "#data/elite-redux/init-elite-redux-c-source-corrections";
-import { initEliteReduxCustomAbilities } from "#data/elite-redux/init-elite-redux-custom-abilities";
+import {
+  initEliteReduxCSourceCorrections,
+  remapEliteReduxMoveIdsByName,
+} from "#data/elite-redux/init-elite-redux-c-source-corrections";
+import {
+  initEliteReduxCustomAbilities,
+  refreshEliteReduxComposites,
+} from "#data/elite-redux/init-elite-redux-custom-abilities";
 import { initEliteReduxCustomMoves } from "#data/elite-redux/init-elite-redux-custom-moves";
 import { initEliteReduxCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
+import { initEliteReduxEggMoves } from "#data/elite-redux/init-elite-redux-egg-moves";
 import { initEliteReduxEggTiers } from "#data/elite-redux/init-elite-redux-egg-tiers";
 import { initEliteReduxEvolutions } from "#data/elite-redux/init-elite-redux-evolutions";
-import { initEliteReduxTmMoves } from "#data/elite-redux/init-elite-redux-tm-moves";
 import { initEliteReduxFormChanges } from "#data/elite-redux/init-elite-redux-form-changes";
 import { initEliteReduxMovesets } from "#data/elite-redux/init-elite-redux-movesets";
 import { initEliteReduxSpecies } from "#data/elite-redux/init-elite-redux-species";
+import { initEliteReduxTmMoves } from "#data/elite-redux/init-elite-redux-tm-moves";
 import { initEliteReduxTrainers } from "#data/elite-redux/init-elite-redux-trainers";
 import { initEliteReduxVanillaRebalance } from "#data/elite-redux/init-elite-redux-vanilla-rebalance";
 import { initPokemonForms } from "#data/pokemon-forms";
@@ -85,6 +92,13 @@ export function initializeGame() {
   console.info(
     `[er-b2] registered ${moveResult.customsAdded} ER-custom moves (skipped ${moveResult.customsAlreadyPresent} already present)`,
   );
+  // Elite Redux #151: repair scrambled gen8/9 move id-map entries (by name)
+  // BEFORE the rebalance + move-patches consume the map, so stats and effects
+  // land on the correct pokerogue move (e.g. Kowtow Cleave, not Blood Moon).
+  const moveRemapped = remapEliteReduxMoveIdsByName();
+  if (moveRemapped > 0) {
+    console.info(`[er-151] repointed ${moveRemapped} vanilla ER move ids to their name-matched MoveIds`);
+  }
   // Elite Redux Phase B3: patch ER's stat rebalances onto vanilla moves +
   // abilities. Must run AFTER initEliteReduxCustomAbilities() and
   // initEliteReduxCustomMoves() so we know which ids are customs (skipped)
@@ -104,6 +118,14 @@ export function initializeGame() {
   const cSrcResult = initEliteReduxCSourceCorrections();
   console.info(
     `[er-r57] C-source corrections applied: ${cSrcResult.movesPatched} move stats, ${cSrcResult.flagsPatched} flag patches, ${cSrcResult.movesMissing} missing`,
+  );
+  // Re-resolve composite-vanilla-mashup abilities NOW that every vanilla part
+  // has its final (rebalance- + C-source-patched) attrs. Composites were first
+  // built before those patches ran, so any embedding a patched vanilla part
+  // (e.g. 614 Balloon Bomb embeds the rewired Aftermath) froze stale behavior.
+  const compositeRefresh = refreshEliteReduxComposites();
+  console.info(
+    `[er-composite-refresh] re-resolved ${compositeRefresh.refreshed} composite abilities against patched parts${compositeRefresh.errors.length > 0 ? ` (${compositeRefresh.errors.length} errors)` : ""}`,
   );
   // Elite Redux Phase B4: populate the ER trainer registry. Must run AFTER
   // initEliteReduxCustomSpecies() and initEliteReduxCustomMoves() so the
@@ -166,6 +188,13 @@ export function initializeGame() {
   const eggResult = initEliteReduxEggTiers();
   console.info(
     `[er-egg-tiers] added ${eggResult.eggTiersAdded} ER customs to egg pool (+${eggResult.starterCostsAdded} starter-costs; skipped ${eggResult.skippedPrevolutions} evolved + ${eggResult.skippedFormChanges} form-change + ${eggResult.alreadyPresent} already present)`,
+  );
+
+  // Elite Redux: inject hand-audited egg moves for ER-custom base species into
+  // `speciesEggMoves` (vanilla only covers vanilla species).
+  const eggMoveResult = initEliteReduxEggMoves();
+  console.info(
+    `[er-egg-moves] registered egg moves for ${eggMoveResult.added} ER species (skipped ${eggMoveResult.alreadyPresent} already present + ${eggMoveResult.skippedUnmapped} unmapped)`,
   );
 
   // Elite Redux: extend TM-learnable pool with each species's tutor moves.

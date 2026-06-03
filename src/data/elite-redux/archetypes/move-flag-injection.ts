@@ -17,6 +17,8 @@
 // Wires:
 //   - 733 Taekkyeon — "All attacks are dances." (inject DANCE_MOVE on all
 //     non-status moves, so the holder's attacks trigger Dancer)
+//   - 974 Backstreet Boy — "Kicking moves are Dance moves and vice-versa."
+//     (inject DANCE_MOVE on the holder's KICKING moves, so kicks trigger Dancer)
 // =============================================================================
 
 import { AbAttr } from "#abilities/ab-attrs";
@@ -24,7 +26,7 @@ import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import type { Move } from "#moves/move";
 
-export type FlagInjectionScope = "all-attacks" | "all-moves" | "sound-moves" | "status-moves";
+export type FlagInjectionScope = "all-attacks" | "all-moves" | "sound-moves" | "status-moves" | "kicking-moves";
 
 export class MoveFlagInjectionAbAttr extends AbAttr {
   public readonly injectFlag: MoveFlags;
@@ -46,6 +48,8 @@ export class MoveFlagInjectionAbAttr extends AbAttr {
         return true;
       case "sound-moves":
         return move.hasFlag(MoveFlags.SOUND_BASED);
+      case "kicking-moves":
+        return move.hasFlag(MoveFlags.KICKING_MOVE);
       case "status-moves":
         return move.category === MoveCategory.STATUS;
       default:

@@ -1,4 +1,5 @@
 import "#app/polyfills"; // All polyfills MUST be loaded first for side effects
+import "#utils/console-ring-buffer"; // installs the console ring buffer ASAP so the bug reporter can capture early logs
 import "#init/init-manifest"; // initializes the manifest, must be done *before* i18n is initialized due to being used for caching
 import "#app/i18n"; // Initializes i18n on import
 

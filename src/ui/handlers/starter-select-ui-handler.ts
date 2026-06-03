@@ -18,6 +18,9 @@ import {
 import { allAbilities, allMoves, allSpecies } from "#data/data-lists";
 import { Egg, getEggTierForSpecies, MAX_EGG_COUNT } from "#data/egg";
 import { matchesAbilityText } from "#data/elite-redux/er-ability-search";
+import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
+import { type ErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { GrowthRate, getGrowthRateColor } from "#data/exp";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
@@ -725,6 +728,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.filterText = new FilterText(speciesContainerX + 7, filterBarHeight + 8, 160, 40, this.updateStarters);
     this.filterText.addFilter(FilterTextRow.NAME, i18next.t("filterText:nameField"));
     this.filterText.addFilter(FilterTextRow.ABILITY_TEXT, i18next.t("filterText:abilityTextField"));
+    // Dedicated row to wipe the active search in place (Action on this row).
+    this.filterText.addActionRow(FilterTextRow.CLEAR, i18next.t("filterText:clearSearch"));
     this.filterTextContainer.add(this.filterText);
     this.filterTextContainer.setVisible(false);
 
@@ -1290,9 +1295,20 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       y: globalScene.scaledCanvas.height - MoveInfoOverlay.getHeight() - 29,
     });
 
+    // ER: the lower-left info panel (Ability / Passive / Nature) is baked into
+    // `starter_select_bg` and was sized for a single passive. ER shows 3 passive
+    // rows (main innate + 2 slots), so the last slot + Nature spill below the
+    // baked white. Overlay a white strip that overlaps the baked panel's bottom
+    // (white-on-white, seamless) and extends down to cover all rows. Sits just
+    // above the bg and below every text object, so the text stays on white.
+    const starterInfoPanelExtension = globalScene.add
+      .rectangle(1, 145 + starterInfoYOffset, 157, 24, 0xffffff)
+      .setOrigin(0, 0);
+
     this.starterSelectContainer.add([
       bgColor,
       starterSelectBg,
+      starterInfoPanelExtension,
       starterDexNoLabel,
       this.shinyOverlay,
       starterContainerBg,
@@ -1851,8 +1867,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       if (this.filterTextMode) {
         // ER text search: Cancel leaves the search panel and returns to the
         // grid, KEEPING any active text filter applied so the player can browse
-        // the filtered results. (To change/clear the search, re-open the panel
-        // and edit the field — emptying it shows everything again.)
+        // the filtered results. (Use the dedicated "Clear search" row in the
+        // panel to wipe the query in place.)
         this.setFilterTextMode(false);
         this.setCursor(this.cursor);
         success = true;
@@ -1960,7 +1976,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           success = true;
           break;
         case Button.ACTION:
-          this.filterText.startSearch(this.filterTextCursor, this.getUi());
+          if (this.filterText.getRow(this.filterTextCursor) === FilterTextRow.CLEAR) {
+            // "Clear search" row — reset every field + re-filter, staying in the panel.
+            this.filterText.setValsToDefault();
+          } else {
+            this.filterText.startSearch(this.filterTextCursor, this.getUi());
+          }
           success = true;
           break;
         case Button.LEFT:
@@ -5252,7 +5273,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         ui.setModeWithoutClear(
           UiMode.CONFIRM,
           () => {
-            const startRun = () => {
+            const startRun = (difficulty: ErDifficulty) => {
+              // ER: lock in the chosen run difficulty (drives the ER trainer
+              // roster tier for the whole run) and reset the per-run "already
+              // encountered" ER trainer set so the new run starts fresh.
+              setErDifficulty(difficulty);
+              resetErRunTrainerTracking();
+              resetErGhostRunState();
               globalScene.money = globalScene.gameMode.getStartingMoney();
               const starters = this.starters.slice(0);
               // ER: remember this team so it can be re-selected next run.
@@ -5262,7 +5289,32 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               this.starterSelectCallback = null;
               originalStarterSelectCallback?.(starters);
             };
-            startRun();
+            // ER: pick a run difficulty (Ace / Elite / Hell) before launching.
+            ui.setOverlayMode(UiMode.OPTION_SELECT, {
+              options: [
+                {
+                  label: i18next.t("starterSelectUiHandler:difficultyAce"),
+                  handler: () => {
+                    startRun("ace");
+                    return true;
+                  },
+                },
+                {
+                  label: i18next.t("starterSelectUiHandler:difficultyElite"),
+                  handler: () => {
+                    startRun("elite");
+                    return true;
+                  },
+                },
+                {
+                  label: i18next.t("starterSelectUiHandler:difficultyHell"),
+                  handler: () => {
+                    startRun("hell");
+                    return true;
+                  },
+                },
+              ],
+            });
           },
           cancel,
           null,

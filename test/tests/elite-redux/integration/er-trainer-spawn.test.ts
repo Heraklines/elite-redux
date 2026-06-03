@@ -25,21 +25,24 @@
 // species the vanilla speciesPool rolled.
 // =============================================================================
 
+import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { findErTrainersForType, selectErRoster } from "#data/elite-redux/er-trainer-overlay";
 import {
   clearErTrainerCacheForTests,
   getErTrainerForTrainer,
   hasErRosterOverride,
   pickTierForWave,
+  resetErRunTrainerTracking,
 } from "#data/elite-redux/er-trainer-runtime-hook";
 import { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerType } from "#enums/trainer-type";
+import type { Trainer } from "#field/trainer";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 describe("ER integration — trainer-overlay runtime hook spawns ER rosters", () => {
   let phaserGame: Phaser.Game;
@@ -53,7 +56,14 @@ describe("ER integration — trainer-overlay runtime hook spawns ER rosters", ()
     game = new GameManager(phaserGame);
     // Drop the WeakMap cache so every test gets a fresh ER-trainer pick.
     clearErTrainerCacheForTests();
+    resetErRunTrainerTracking();
+    // ER override only fires on Elite/Hell (Ace = pure vanilla trainers).
+    setErDifficulty("elite");
     game.override.criticalHits(false).battleStyle("single").moveset([MoveId.SPLASH]).ability(AbilityId.BALL_FETCH);
+  });
+
+  afterEach(() => {
+    resetErDifficulty();
   });
 
   it("Trainer.genPartyMember substitutes an ER roster species for ACE_TRAINER battles", async () => {
@@ -118,5 +128,26 @@ describe("ER integration — trainer-overlay runtime hook spawns ER rosters", ()
         expect(member.moves).toContain(mv);
       }
     }
+  });
+
+  // ---- #208: per-difficulty pool behaviour (no battle needed) ----
+
+  it("Ace difficulty yields NO ER override (pure vanilla trainers)", () => {
+    setErDifficulty("ace");
+    clearErTrainerCacheForTests();
+    const trainer = { config: { trainerType: TrainerType.ACE_TRAINER } } as unknown as Trainer;
+    expect(getErTrainerForTrainer(trainer)).toBeNull();
+  });
+
+  it("Elite/Hell do not repeat the same ER trainer within a run", () => {
+    setErDifficulty("elite");
+    clearErTrainerCacheForTests();
+    resetErRunTrainerTracking();
+    const make = () => ({ config: { trainerType: TrainerType.ACE_TRAINER } }) as unknown as Trainer;
+    const a = getErTrainerForTrainer(make());
+    const b = getErTrainerForTrainer(make());
+    expect(a).not.toBeNull();
+    expect(b).not.toBeNull();
+    expect(a!.stableKey).not.toBe(b!.stableKey); // distinct picks across the run
   });
 });

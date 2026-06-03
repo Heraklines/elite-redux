@@ -462,6 +462,13 @@ export abstract class Move implements Localizable {
           return true;
         }
         break;
+      case PokemonType.BUG:
+        // ER Pollinate / Steel Beetle: a Bug-type holder of the ability is
+        // immune to powder moves (this case only runs when the target IS Bug).
+        if (this.hasFlag(MoveFlags.POWDER_MOVE) && target.hasAbilityWithAttr("BugPowderImmunityAbAttr")) {
+          return true;
+        }
+        break;
       case PokemonType.DARK:
         if (user.hasAbility(AbilityId.PRANKSTER) && this.category === MoveCategory.STATUS && user.isOpponent(target)) {
           return true;
@@ -930,6 +937,18 @@ export abstract class Move implements Localizable {
         ) {
           return true;
         }
+        // ER flag-gated protect bypass (Pinnacle Blade — Keen Edge/slicing moves
+        // bypass protection). The holder carries IgnoreProtectByFlagAbAttr(flag);
+        // bypass applies when this move has that flag.
+        if (user.hasAbilityWithAttr("IgnoreProtectByFlagAbAttr")) {
+          const byFlag = [
+            ...user.getAbility().getAttrs("IgnoreProtectByFlagAbAttr"),
+            ...user.getPassiveAbilities().flatMap(pa => pa?.getAttrs("IgnoreProtectByFlagAbAttr") ?? []),
+          ];
+          if (byFlag.some(a => this.hasFlag(a.flag))) {
+            return true;
+          }
+        }
         break;
       case MoveFlags.DANCE_MOVE:
       case MoveFlags.SOUND_BASED: {
@@ -1080,6 +1099,15 @@ export abstract class Move implements Localizable {
       opponent: user,
       move: this,
       simulated,
+      accuracy: moveAccuracy,
+    });
+    // Elite Redux: a USER ability may set a specific move's base accuracy
+    // (Hypnotist / Lunar Eclipse — Hypnosis → 90%). Applied before the
+    // evasion/accuracy-stage multiplier, so stage modifiers still stack on top.
+    applyAbAttrs("SetMoveAccuracyAbAttr", {
+      pokemon: user,
+      simulated,
+      move: this,
       accuracy: moveAccuracy,
     });
 
@@ -3032,6 +3060,8 @@ export class MultiHitAttr extends MoveAttr {
         }
         return 5;
       }
+      case MultiHitType.ONE:
+        return 1;
       case MultiHitType.TWO:
         return 2;
       case MultiHitType.THREE:
@@ -3109,6 +3139,12 @@ export class ChangeMultiHitTypeAttr extends MoveAttr {
 
 export class WaterShurikenMultiHitTypeAttr extends ChangeMultiHitTypeAttr {
   apply(user: Pokemon, _target: Pokemon, _move: Move, args: any[]): boolean {
+    // Elite Redux — Giant Shuriken (958): Water Shuriken "hits once with 100BP"
+    // (the 6.67× power boost is applied by the ability's MovePowerBoost attr).
+    if (user.hasAbility(ErAbilityId.GIANT_SHURIKEN as unknown as AbilityId)) {
+      (args[0] as NumberHolder).value = MultiHitType.ONE;
+      return true;
+    }
     if (
       user.species.speciesId === SpeciesId.GRENINJA
       && user.hasAbility(AbilityId.BATTLE_BOND)
@@ -3757,9 +3793,16 @@ export class InstantChargeAttr extends MoveAttr {
  * and the recovery moves act as if used in sun." Returns true when real
  * (un-suppressed) sun is active OR the user holds Chloroplast — letting the
  * sun-gated branches of those moves fire for the holder regardless of weather.
+ * Solar Flare (er 366 = Chloroplast + Immolate) FULL: "Additionally activates
+ * any Sun related effects for the user's moves" — so it counts too. (Solar Flare
+ * is a distinct ability id from Chloroplast, so it must be checked explicitly;
+ * the composite's copied attrs do not change which `hasAbility` id matches.)
  */
 export function userActsInSun(user: Pokemon | null | undefined): boolean {
-  if (user?.hasAbility(ErAbilityId.CHLOROPLAST as unknown as AbilityId)) {
+  if (
+    user?.hasAbility(ErAbilityId.CHLOROPLAST as unknown as AbilityId)
+    || user?.hasAbility(ErAbilityId.SOLAR_FLARE as unknown as AbilityId)
+  ) {
     return true;
   }
   const weather = globalScene.arena.weather;
@@ -5967,9 +6010,9 @@ export class WeatherBallTypeAttr extends VariableMoveTypeAttr {
       return false;
     }
 
-    // ER Chloroplast: Weather Ball becomes Fire-type as if in sun, regardless of
-    // (or absent) weather.
-    if (user?.hasAbility(ErAbilityId.CHLOROPLAST as unknown as AbilityId)) {
+    // ER Chloroplast / Solar Flare: Weather Ball becomes Fire-type as if in sun,
+    // regardless of (or absent) weather.
+    if (userActsInSun(user)) {
       moveType.value = PokemonType.FIRE;
       return true;
     }
@@ -6485,7 +6528,7 @@ export class NoEffectAttr extends MoveAttr {
 /**
  * Function to deal Crash Damage (1/2 max hp) to the user on apply.
  */
-const crashDamageFunc: UserMoveConditionFunc = (user: Pokemon, _move: Move) => {
+export const crashDamageFunc: UserMoveConditionFunc = (user: Pokemon, _move: Move) => {
   const cancelled = new BooleanHolder(false);
   applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon: user, cancelled });
   if (cancelled.value) {
@@ -7103,6 +7146,108 @@ export class RemoveArenaTrapAttr extends RemoveArenaTagsAttr {
   constructor(getTagSideFunc: GetRemoveArenaTagSideFunc) {
     // TODO: This triggers at a different time than `RemoveArenaTagsAbAttr`...
     super(arenaTrapTags, getTagSideFunc, { trigger: MoveEffectTrigger.PRE_APPLY });
+  }
+}
+
+// =============================================================================
+// Elite Redux — Angel's Wrath (er 439): "Drastically alters the user's moves."
+// These move-effect attrs are attached to the relevant vanilla moves but ONLY
+// apply when the *user* actually has Angel's Wrath, so a Pokémon without the
+// ability uses the move normally. The gate is `user.hasAbility(ANGEL_S_WRATH)`
+// (which also covers ER innate slots).
+// =============================================================================
+
+/** True iff the move's user currently has the Angel's Wrath ability/innate. */
+function userHasAngelsWrath(user: Pokemon | null | undefined): boolean {
+  return !!user?.hasAbility(ErAbilityId.ANGEL_S_WRATH as unknown as AbilityId);
+}
+
+/** Bug Bite under Angel's Wrath also drains HP equal to the damage dealt. */
+export class AngelsWrathDrainAttr extends HitHealAttr {
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    if (!userHasAngelsWrath(user)) {
+      return false;
+    }
+    return super.apply(user, target, move, args);
+  }
+}
+
+/**
+ * String Shot under Angel's Wrath also lays an entry hazard on the foe's side.
+ * Never fails the move (overrides the trap-overlap fail condition) so the base
+ * effect still resolves, and only deploys the hazard for an Angel's Wrath user.
+ */
+export class AngelsWrathHazardAttr extends MoveEffectAttr {
+  private readonly hazardTag: ArenaTagType;
+
+  constructor(hazardTag: ArenaTagType) {
+    super(false);
+    this.hazardTag = hazardTag;
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    if (!super.apply(user, target, move, args) || !userHasAngelsWrath(user)) {
+      return false;
+    }
+    // Deploy the hazard on the FOE's side (the side opposite the user).
+    const foeSide = user.isPlayer() ? ArenaTagSide.ENEMY : ArenaTagSide.PLAYER;
+    globalScene.arena.addTag(this.hazardTag, 0, move.id, user.id, foeSide);
+    return true;
+  }
+
+  /** Read-only accessor (tests): the hazard this attr lays. */
+  public getHazardTag(): ArenaTagType {
+    return this.hazardTag;
+  }
+}
+
+/**
+ * Iron Defense under Angel's Wrath becomes King's Shield (a protect that
+ * punishes contact). The vanilla +2 Def is conditioned off for Angel's Wrath
+ * users (see the move definition), so this fully replaces the effect.
+ */
+export class AngelsWrathKingsShieldAttr extends ProtectAttr {
+  constructor() {
+    super(BattlerTagType.KINGS_SHIELD);
+  }
+
+  override getCondition(): MoveConditionFunc {
+    const base = super.getCondition();
+    return (user, target, move): boolean => {
+      // Only impose King's Shield's protect-spam fail condition on the users
+      // that actually turn Iron Defense into a shield.
+      if (!userHasAngelsWrath(user)) {
+        return true;
+      }
+      return typeof base === "function" ? base(user, target, move) : true;
+    };
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    if (!userHasAngelsWrath(user)) {
+      return false;
+    }
+    return super.apply(user, target, move, args);
+  }
+}
+
+/**
+ * Poison Sting under Angel's Wrath is super-effective on Steel (Poison is
+ * normally 0× — immune — against Steel). Overrides the type-effectiveness
+ * multiplier to 2× against Steel targets, but only for an Angel's Wrath user.
+ */
+export class AngelsWrathSteelSuperEffectiveAttr extends MoveTypeChartOverrideAttr {
+  public override apply(
+    user: Pokemon,
+    _target: Pokemon,
+    _move: Move,
+    args: [multiplier: NumberHolder, types: readonly PokemonType[], moveType: PokemonType],
+  ): boolean {
+    if (!userHasAngelsWrath(user) || !args[1].includes(PokemonType.STEEL)) {
+      return false;
+    }
+    args[0].value = Math.max(args[0].value, 2);
+    return true;
   }
 }
 
@@ -9486,6 +9631,8 @@ export function initMoves() {
       .reflectable(),
     new AttackMove(MoveId.POISON_STING, PokemonType.POISON, MoveCategory.PHYSICAL, 15, 100, 35, 30, 0, 1)
       .attr(StatusEffectAttr, StatusEffect.POISON)
+      // ER Angel's Wrath: super-effective on Steel (no-op for other users).
+      .attr(AngelsWrathSteelSuperEffectiveAttr)
       .makesContact(false),
     new AttackMove(MoveId.TWINEEDLE, PokemonType.BUG, MoveCategory.PHYSICAL, 25, 100, 20, 20, 0, 1)
       .attr(MultiHitAttr, MultiHitType.TWO)
@@ -9617,6 +9764,12 @@ export function initMoves() {
       .target(MoveTarget.RANDOM_NEAR_ENEMY),
     new StatusMove(MoveId.STRING_SHOT, PokemonType.BUG, 95, 40, -1, 0, 1)
       .attr(StatStageChangeAttr, [Stat.SPD], -2)
+      // ER Angel's Wrath: also sets every entry hazard on the foe's side
+      // (no-op for users without the ability; never fails the move).
+      .attr(AngelsWrathHazardAttr, ArenaTagType.SPIKES)
+      .attr(AngelsWrathHazardAttr, ArenaTagType.TOXIC_SPIKES)
+      .attr(AngelsWrathHazardAttr, ArenaTagType.STICKY_WEB)
+      .attr(AngelsWrathHazardAttr, ArenaTagType.STEALTH_ROCK)
       .target(MoveTarget.ALL_NEAR_ENEMIES)
       .reflectable(),
     new AttackMove(MoveId.DRAGON_RAGE, PokemonType.DRAGON, MoveCategory.SPECIAL, -1, 100, 10, -1, 0, 1) //
@@ -9689,7 +9842,12 @@ export function initMoves() {
       .attr(HealAttr, 0.5)
       .triageMove(),
     new SelfStatusMove(MoveId.HARDEN, PokemonType.NORMAL, -1, 30, -1, 0, 1) //
-      .attr(StatStageChangeAttr, [Stat.DEF], 1, true),
+      .attr(StatStageChangeAttr, [Stat.DEF], 1, true)
+      // ER Angel's Wrath: omniboost — also raise Atk/SpAtk/SpDef/Spd by 1 (the
+      // Def +1 above is shared with normal users). Gated to Angel's Wrath users.
+      .attr(StatStageChangeAttr, [Stat.ATK, Stat.SPATK, Stat.SPDEF, Stat.SPD], 1, true, {
+        condition: user => userHasAngelsWrath(user),
+      }),
     new SelfStatusMove(MoveId.MINIMIZE, PokemonType.NORMAL, -1, 10, -1, 0, 1)
       .attr(AddBattlerTagAttr, BattlerTagType.MINIMIZED, true, false)
       .attr(StatStageChangeAttr, [Stat.EVA], 2, true),
@@ -10421,7 +10579,12 @@ export function initMoves() {
       .attr(FlinchAttr),
     new AttackMove(MoveId.WEATHER_BALL, PokemonType.NORMAL, MoveCategory.SPECIAL, 50, 100, 10, -1, 0, 3)
       .attr(WeatherBallTypeAttr)
-      .attr(MovePowerMultiplierAttr, (_user, _target, _move) => {
+      .attr(MovePowerMultiplierAttr, (user, _target, _move) => {
+        // ER Chloroplast / Solar Flare: Weather Ball acts as if in sun, so it
+        // doubles power even with no (or suppressed) weather.
+        if (userActsInSun(user)) {
+          return 2;
+        }
         const weather = globalScene.arena.weather;
         if (!weather) {
           return 1;
@@ -10511,7 +10674,11 @@ export function initMoves() {
       .attr(MultiHitAttr)
       .makesContact(false),
     new SelfStatusMove(MoveId.IRON_DEFENSE, PokemonType.STEEL, -1, 15, -1, 0, 3) //
-      .attr(StatStageChangeAttr, [Stat.DEF], 2, true),
+      // ER Angel's Wrath turns Iron Defense into a King's Shield: the vanilla
+      // +2 Def applies only to users WITHOUT the ability; Angel's Wrath users
+      // instead get the King's Shield protect (punishes contact attackers).
+      .attr(StatStageChangeAttr, [Stat.DEF], 2, true, { condition: user => !userHasAngelsWrath(user) })
+      .attr(AngelsWrathKingsShieldAttr),
     new StatusMove(MoveId.BLOCK, PokemonType.NORMAL, -1, 5, -1, 0, 3)
       .condition(failIfGhostTypeCondition)
       .attr(AddBattlerTagAttr, BattlerTagType.TRAPPED, false, true, 1)
@@ -10879,7 +11046,9 @@ export function initMoves() {
     new AttackMove(MoveId.JUDGMENT, PokemonType.NORMAL, MoveCategory.SPECIAL, 100, 100, 10, -1, 0, 4) //
       .attr(FormChangeItemTypeAttr),
     new AttackMove(MoveId.BUG_BITE, PokemonType.BUG, MoveCategory.PHYSICAL, 60, 100, 20, -1, 0, 4) //
-      .attr(StealEatBerryAttr),
+      .attr(StealEatBerryAttr)
+      // ER Angel's Wrath: also heals the user for the damage dealt (no-op otherwise).
+      .attr(AngelsWrathDrainAttr, 1),
     new AttackMove(MoveId.CHARGE_BEAM, PokemonType.ELECTRIC, MoveCategory.SPECIAL, 50, 90, 10, 70, 0, 4) //
       .attr(StatStageChangeAttr, [Stat.SPATK], 1, true),
     new AttackMove(MoveId.WOOD_HAMMER, PokemonType.GRASS, MoveCategory.PHYSICAL, 120, 100, 15, -1, 0, 4)

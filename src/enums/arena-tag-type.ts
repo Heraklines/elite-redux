@@ -40,4 +40,13 @@ export enum ArenaTagType {
   FAIRY_LOCK = "FAIRY_LOCK",
   NEUTRALIZING_GAS = "NEUTRALIZING_GAS",
   PENDING_HEAL = "PENDING_HEAL",
+  /** Elite Redux — Hot Coals: single-use foe-side trap that burns the next grounded, burnable switch-in. */
+  HOT_COALS = "HOT_COALS",
+  /**
+   * Elite Redux — Foamy Web (ability 949): a Sticky Web variant laid on the
+   * foe's side that lasts only 5 turns and cannot be removed by Rapid Spin or
+   * Defog (it is intentionally absent from those moves' removal lists). Lowers
+   * the Speed of grounded switch-ins by 1 stage, exactly like Sticky Web.
+   */
+  FOAMY_WEB = "FOAMY_WEB",
 }

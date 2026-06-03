@@ -28,11 +28,13 @@ import type { AbAttrBaseParams } from "#types/ability-types";
 export class EntryArenaTagOnFoeSideAbAttr extends PostSummonAbAttr {
   private readonly tag: ArenaTagType;
   private readonly turns: number;
+  private readonly side: "foe" | "self";
 
-  constructor(tag: ArenaTagType, turns = 4) {
+  constructor(tag: ArenaTagType, turns = 4, side: "foe" | "self" = "foe") {
     super(true);
     this.tag = tag;
     this.turns = turns;
+    this.side = side;
   }
 
   override canApply(_params: AbAttrBaseParams): boolean {
@@ -43,7 +45,8 @@ export class EntryArenaTagOnFoeSideAbAttr extends PostSummonAbAttr {
     if (simulated) {
       return;
     }
+    const ownSide = pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
     const foeSide = pokemon.isPlayer() ? ArenaTagSide.ENEMY : ArenaTagSide.PLAYER;
-    globalScene.arena.addTag(this.tag, this.turns, undefined, pokemon.id, foeSide);
+    globalScene.arena.addTag(this.tag, this.turns, undefined, pokemon.id, this.side === "self" ? ownSide : foeSide);
   }
 }

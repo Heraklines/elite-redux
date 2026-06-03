@@ -13,6 +13,7 @@
 // =============================================================================
 
 import { EffectChanceModifierAbAttr } from "#data/elite-redux/archetypes/effect-chance-modifier";
+import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import type { Move } from "#moves/move";
 import { NumberHolder } from "#utils/value-holder";
@@ -127,6 +128,34 @@ describe("EffectChanceModifierAbAttr archetype (C1d)", () => {
 
     it("rejects NaN multiplier", () => {
       expect(() => new EffectChanceModifierAbAttr({ multiplier: Number.NaN })).toThrow(/must be ≥ 0/);
+    });
+  });
+
+  describe("flag gate (Precise Fist — punching-only 5x)", () => {
+    function makeFlaggedMove(hasPunch: boolean): Move {
+      return {
+        id: MoveId.MACH_PUNCH,
+        hasFlag: (flag: MoveFlags) => hasPunch && flag === MoveFlags.PUNCHING_MOVE,
+      } as unknown as Move;
+    }
+
+    it("amplifies effect chance for a move carrying the gated flag", () => {
+      const attr = new EffectChanceModifierAbAttr({ multiplier: 5, flag: MoveFlags.PUNCHING_MOVE });
+      const result = runMod({ attr, initialChance: 10, move: makeFlaggedMove(true) });
+      expect(result.fired).toBe(true);
+      expect(result.finalChance).toBe(50);
+    });
+
+    it("does NOT fire for a move missing the gated flag", () => {
+      const attr = new EffectChanceModifierAbAttr({ multiplier: 5, flag: MoveFlags.PUNCHING_MOVE });
+      const result = runMod({ attr, initialChance: 10, move: makeFlaggedMove(false) });
+      expect(result.fired).toBe(false);
+      expect(result.finalChance).toBe(10); // unchanged
+    });
+
+    it("exposes the configured flag", () => {
+      const attr = new EffectChanceModifierAbAttr({ multiplier: 5, flag: MoveFlags.PUNCHING_MOVE });
+      expect(attr.getFlag()).toBe(MoveFlags.PUNCHING_MOVE);
     });
   });
 });

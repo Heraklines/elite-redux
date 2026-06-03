@@ -20,6 +20,7 @@
 import { PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import type { MoveFlags } from "#enums/move-flags";
+import type { PokemonType } from "#enums/pokemon-type";
 import type { BattleStat } from "#enums/stat";
 
 /** Construction options for {@linkcode StatChangeOnAttackAbAttr}. */
@@ -40,6 +41,12 @@ export interface StatChangeOnAttackOptions {
    */
   readonly flag?: MoveFlags;
   /**
+   * Optional move-TYPE gate — the proc only fires when the holder's move is of
+   * this type (e.g. `PokemonType.FIGHTING` for Archmage's "Fighting → +SpAtk").
+   * Omit to fire on any damaging move.
+   */
+  readonly type?: PokemonType;
+  /**
    * Roll chance `[0,100]`; defaults to 100 (always). Uses
    * `pokemon.randBattleSeedInt(100) < chance`.
    * @defaultValue `100`
@@ -57,6 +64,7 @@ export class StatChangeOnAttackAbAttr extends PostAttackAbAttr {
   private readonly stages: number;
   private readonly selfTarget: boolean;
   private readonly flag: MoveFlags | undefined;
+  private readonly moveType: PokemonType | undefined;
   private readonly chance: number;
 
   constructor(opts: StatChangeOnAttackOptions) {
@@ -71,6 +79,7 @@ export class StatChangeOnAttackAbAttr extends PostAttackAbAttr {
     this.stages = opts.stages;
     this.selfTarget = opts.selfTarget ?? false;
     this.flag = opts.flag;
+    this.moveType = opts.type;
     this.chance = opts.chance ?? 100;
   }
 
@@ -93,6 +102,9 @@ export class StatChangeOnAttackAbAttr extends PostAttackAbAttr {
       return false;
     }
     if (this.flag !== undefined && !move.hasFlag(this.flag)) {
+      return false;
+    }
+    if (this.moveType !== undefined && move.type !== this.moveType) {
       return false;
     }
     if (this.chance !== 100 && pokemon.randBattleSeedInt(100) >= this.chance) {

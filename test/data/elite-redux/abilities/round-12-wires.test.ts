@@ -37,12 +37,13 @@ import { describe, expect, it } from "vitest";
 
 describe("dispatchArchetype('bespoke', null, erAbilityId): round 12 wires", () => {
   // ---------- entry-effect add-self-type cluster ----------
-  it("er id 715 (Hover) wires add-self-type PSYCHIC + Ground immunity", () => {
-    // "Adds Psychic type to itself. Avoids Ground attacks." — both halves:
-    // the entry add-self-type and the Levitate-style Ground type-immunity.
+  it("er id 715 (Hover) wires add-self-type PSYCHIC + Ground immunity + Float", () => {
+    // "Adds Psychic type to itself. Avoids Ground attacks." — add-self-type,
+    // the Ground type-immunity, AND FloatAbAttr (Levitate-style ungrounding so
+    // Spikes / terrain / Arena Trap no longer apply).
     const res = dispatchArchetype("bespoke", null, 715);
     expect(res.skipReason).toBeNull();
-    expect(res.attrs).toHaveLength(2);
+    expect(res.attrs).toHaveLength(3);
     const attr = res.attrs[0] as EntryEffectAbAttr;
     expect(attr).toBeInstanceOf(EntryEffectAbAttr);
     const eff = attr.getEffect();
@@ -51,13 +52,15 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): round 12 wires", () =
       expect(eff.type).toBe(PokemonType.PSYCHIC);
     }
     expect(res.attrs[1]).toBeInstanceOf(AttackTypeImmunityAbAttr);
+    expect(res.attrs.some(a => a.constructor.name === "FloatAbAttr")).toBe(true);
   });
 
-  it("er id 843 (Fey Flight) wires add-self-type FAIRY + Ground immunity", () => {
-    // "Adds Fairy-type and levitates." — add-self-type (Fairy) + Ground immunity.
+  it("er id 843 (Fey Flight) wires add-self-type FAIRY + Ground immunity + Float + Flying boost", () => {
+    // "Adds Fairy-type, levitates, and boosts Flying-type moves by 25%." —
+    // add-self-type (Fairy) + Ground immunity + FloatAbAttr + Flying ×1.25.
     const res = dispatchArchetype("bespoke", null, 843);
     expect(res.skipReason).toBeNull();
-    expect(res.attrs).toHaveLength(2);
+    expect(res.attrs).toHaveLength(4);
     const attr = res.attrs[0] as EntryEffectAbAttr;
     expect(attr).toBeInstanceOf(EntryEffectAbAttr);
     const eff = attr.getEffect();
@@ -65,6 +68,8 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): round 12 wires", () =
       expect(eff.type).toBe(PokemonType.FAIRY);
     }
     expect(res.attrs[1]).toBeInstanceOf(AttackTypeImmunityAbAttr);
+    expect(res.attrs.some(a => a.constructor.name === "FloatAbAttr")).toBe(true);
+    expect(res.attrs.some(a => a.constructor.name === "TypeDamageBoostAbAttr")).toBe(true);
   });
 
   // ---------- type-absorb-stat-boost ----------

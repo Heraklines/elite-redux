@@ -37,10 +37,13 @@
 // =============================================================================
 
 import { allMoves } from "#data/data-lists";
+import { ER_FLAG_NAMES_LIST } from "#data/elite-redux/er-flag-mapping";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import {
+  AddBattlerTagAttr,
   ConfuseAttr,
+  CritOnlyAttr,
   DefDefAttr,
   FlinchAttr,
   HealStatusEffectAttr,
@@ -49,15 +52,18 @@ import {
   IgnoreOpponentStatStagesAttr,
   type Move,
   type MoveAttr,
+  MovePowerMultiplierAttr,
   MultiHitAttr,
   OneHitKOAccuracyAttr,
   OneHitKOAttr,
   PhotonGeyserCategoryAttr,
   RecoilAttr,
+  RemoveHeldItemAttr,
   SheerColdAccuracyAttr,
   StatStageChangeAttr,
   StatusEffectAttr,
 } from "#data/moves/move";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
@@ -602,6 +608,99 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       move.chance = 100;
     },
   ],
+  // KINESIS: vanilla status (accuracy -1) → ER "Causes the foe's item to fly
+  // away, removing it and flinching the target." +1 priority (numeric-patched).
+  // Drop the vanilla accuracy-drop; add Knock-Off-style item removal + flinch.
+  [
+    MoveId.KINESIS,
+    move => {
+      removeAttrsByCtor(move, [StatStageChangeAttr]);
+      addAttrUnique(move, new RemoveHeldItemAttr(false));
+      addAttrUnique(move, new FlinchAttr());
+    },
+  ],
+  // Tachyon Cutter — ER's authored description says "Never misses". Keyed by
+  // the MoveId enum here (in addition to the ER-id pass below) because this
+  // move sits in the #151 id-map collision zone where the static ER_ID_MAP row
+  // and the runtime-resolved id diverge; patching both targets ensures the
+  // move the battle engine actually uses gets the never-miss sentinel.
+  [
+    MoveId.TACHYON_CUTTER,
+    move => {
+      move.accuracy = -1;
+    },
+  ],
+  // Gigaton Hammer — ER ABBR "Super effective vs Steel." Same #151 collision
+  // zone as Tachyon Cutter, so key by the MoveId enum here (the ER-id SE pass
+  // below targets the diverging static id). x2 power vs Steel.
+  [
+    MoveId.GIGATON_HAMMER,
+    move => {
+      addAttrUnique(move, new MovePowerMultiplierAttr((_u, target) => (target.isOfType(PokemonType.STEEL) ? 2 : 1)));
+    },
+  ],
+  // FLOWER_TRICK — ER ABBR "Can't miss. Always crits." (#151 collision zone, so
+  // keyed by MoveId.) Never-miss (accuracy -1) + guaranteed crit.
+  [
+    MoveId.FLOWER_TRICK,
+    move => {
+      move.accuracy = -1;
+      removeAttrsByCtor(move, [HighCritAttr]);
+      addAttrUnique(move, new CritOnlyAttr());
+    },
+  ],
+  // BITTER_MALICE — ER reworks the vanilla 100%-Atk-drop Ghost move into a
+  // "30% frostbite chance, +50% damage if the target is statused" attack.
+  // (#151 collision zone — keyed by MoveId.) Drop the vanilla Atk-drop; add
+  // frostbite (chance-gated by the numeric-patched move.chance) + the conditional
+  // power boost vs a statused target.
+  [
+    MoveId.BITTER_MALICE,
+    move => {
+      removeAttrsByCtor(move, [StatStageChangeAttr]);
+      addAttrUnique(move, new AddBattlerTagAttr(BattlerTagType.ER_FROSTBITE, false, false, 4, 6));
+      addAttrUnique(
+        move,
+        new MovePowerMultiplierAttr((_u, target) => (target.status && target.status.effect ? 1.5 : 1)),
+      );
+    },
+  ],
+]);
+
+/**
+ * Per-ER-id mechanic patches, keyed by the ER move id (NOT the pokerogue
+ * MoveId). Resolved through `ER_ID_MAP.moves[erId]` so the patch lands on the
+ * exact Move the game (and the audit worktable) treats as that ER move — this
+ * is robust to the handful of vanilla id-map collisions (#151) where the ER id
+ * maps to a pokerogue id whose `MoveId` enum constant differs (e.g. ER 868
+ * "Kowtow Cleave" -> pk 901). Applied alongside the systemic crit pass below,
+ * which uses the same keying.
+ */
+const ER_ID_MECHANIC_PATCHERS: ReadonlyMap<number, (move: MutableMove) => void> = new Map([
+  // Secondary-effect swap: ER replaced the vanilla paralyze-on-hit with a
+  // flinch chance (ROM effect 12, 30% — descriptions read "30% flinch chance").
+  // Drop the inherited StatusEffectAttr(paralysis); move.chance (30) gates Flinch.
+  [
+    84, // Thunder Shock
+    (move: MutableMove) => {
+      removeAttrsByName(move, ["StatusEffectAttr"]);
+      addAttrUnique(move, new FlinchAttr());
+    },
+  ],
+  [
+    122, // Lick
+    (move: MutableMove) => {
+      removeAttrsByName(move, ["StatusEffectAttr"]);
+      addAttrUnique(move, new FlinchAttr());
+    },
+  ],
+  // Absolute never-miss: ER's authored long-description states the move "Never
+  // misses" / "Can't miss" unconditionally. pokerogue models never-miss as
+  // accuracy = -1, but the numeric rebalance overwrote it with ER's nominal ROM
+  // accuracy. Restore the sentinel. (Crit attrs come from the systemic crit pass.)
+  [326, (move: MutableMove) => (move.accuracy = -1)], // Extrasensory
+  [868, (move: MutableMove) => (move.accuracy = -1)], // Kowtow Cleave
+  [905, (move: MutableMove) => (move.accuracy = -1)], // Tachyon Cutter
 ]);
 
 // =============================================================================
@@ -623,6 +722,8 @@ interface MutableMove {
   _type: PokemonType;
   _category: MoveCategory;
   flags: number;
+  accuracy: number;
+  chance: number;
   attrs: MoveAttr[];
   moveTarget: MoveTarget;
   addAttr(attr: MoveAttr): Move;
@@ -738,8 +839,125 @@ export function initEliteReduxVanillaMovePatches(): VanillaMovePatchResult {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Systemic crit pass — ER encodes "High Crit Rate" and "Always Crits" as ROM
+  // flag bits (indices into ER_FLAG_NAMES_LIST), but pokerogue models them as
+  // MoveAttrs (HighCritAttr / CritOnlyAttr), so the numeric rebalance loop never
+  // applies them. Walk every ER vanilla move and graft the matching crit attr
+  // from its ROM flags. This catches the whole class at once (Cut/Slash/Aerial
+  // Ace -> always-crit; Horn Attack/Aqua Tail/X-Scissor/etc -> high-crit) instead
+  // of hand-listing each move in MOVE_PATCHERS. Idempotent via addAttrUnique.
+  // ---------------------------------------------------------------------------
+  const ALWAYS_CRIT_FLAG = ER_FLAG_NAMES_LIST.indexOf("Always Crits");
+  const HIGH_CRIT_FLAG = ER_FLAG_NAMES_LIST.indexOf("High Crit Rate");
+  for (const draft of ER_MOVES) {
+    const pokerogueId = ER_ID_MAP.moves[draft.id];
+    if (pokerogueId === undefined || pokerogueId >= VANILLA_ID_CUTOFF || draft.archetype !== "vanilla") {
+      continue;
+    }
+    const flags = draft.flags;
+    if (!Array.isArray(flags)) {
+      continue;
+    }
+    const move = moveById.get(pokerogueId);
+    if (!move) {
+      continue;
+    }
+    const mutable = move as unknown as MutableMove;
+    if (ALWAYS_CRIT_FLAG >= 0 && flags.includes(ALWAYS_CRIT_FLAG)) {
+      // Always-crit supersedes high-crit; drop the now-redundant HighCritAttr.
+      const hadCrit = mutable.attrs.some(a => a.constructor === CritOnlyAttr);
+      removeAttrsByCtor(mutable, [HighCritAttr]);
+      addAttrUnique(mutable, new CritOnlyAttr());
+      if (!hadCrit) {
+        result.moveDeltas++;
+      }
+    } else if (HIGH_CRIT_FLAG >= 0 && flags.includes(HIGH_CRIT_FLAG)) {
+      const hadCrit = mutable.attrs.some(a => a.constructor === HighCritAttr || a.constructor === CritOnlyAttr);
+      addAttrUnique(mutable, new HighCritAttr());
+      if (!hadCrit) {
+        result.moveDeltas++;
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Per-ER-id mechanic patches (flinch swaps, absolute never-miss). Keyed by ER
+  // id and resolved via ER_ID_MAP so they land on the same Move the game treats
+  // as that ER move, robust to the #151 id-map collisions.
+  // ---------------------------------------------------------------------------
+  for (const [erId, patcher] of ER_ID_MECHANIC_PATCHERS) {
+    const pokerogueId = ER_ID_MAP.moves[erId];
+    if (pokerogueId === undefined || pokerogueId >= VANILLA_ID_CUTOFF) {
+      continue;
+    }
+    const move = moveById.get(pokerogueId);
+    if (!move) {
+      result.moveMissing++;
+      continue;
+    }
+    const mutable = move as unknown as MutableMove;
+    // Snapshot so re-runs (the patchers are idempotent in effect) don't inflate
+    // the delta counter — the idempotency test asserts moveDeltas is 0 on re-run.
+    const accBefore = mutable.accuracy;
+    const sigBefore = mutable.attrs.map(a => a.constructor.name).join(",");
+    try {
+      patcher(mutable);
+      const changed =
+        mutable.accuracy !== accBefore || mutable.attrs.map(a => a.constructor.name).join(",") !== sigBefore;
+      if (changed) {
+        result.moveDeltas++;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      result.moveErrors.push(`ER-id mechanic patcher for er ${erId} threw: ${msg}`);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // "Super effective vs <Type>" boosts. Several ER vanilla moves gained a
+  // type-targeted damage boost (e.g. Acid super-effective vs Steel). We model it
+  // as a x2 power multiplier vs that type — the same convention the ER custom
+  // super-effective-vs-type moves use (Clay Dart, Aura Force, etc. via
+  // `powerBoostVsType`). Keyed by ER id (resolved through ER_ID_MAP) so it lands
+  // on the move the game uses, robust to #151 id-map collisions. Idempotent via
+  // addAttrUnique. (Sonic Boom is excluded — it deals fixed damage, so a power
+  // multiplier is a no-op there.)
+  // ---------------------------------------------------------------------------
+  for (const [erId, targetType] of ER_ID_SUPER_EFFECTIVE_VS_TYPE) {
+    const pokerogueId = ER_ID_MAP.moves[erId];
+    if (pokerogueId === undefined || pokerogueId >= VANILLA_ID_CUTOFF) {
+      continue;
+    }
+    const move = moveById.get(pokerogueId);
+    if (!move) {
+      result.moveMissing++;
+      continue;
+    }
+    const mutable = move as unknown as MutableMove;
+    const had = mutable.attrs.some(a => a.constructor === MovePowerMultiplierAttr);
+    addAttrUnique(mutable, new MovePowerMultiplierAttr((_user, target) => (target.isOfType(targetType) ? 2 : 1)));
+    if (!had) {
+      result.moveDeltas++;
+    }
+  }
+
   return result;
 }
+
+/**
+ * ER vanilla moves with a "super effective vs <Type>" clause, keyed by ER id.
+ * Modeled as a x2 power multiplier vs the listed type (see the pass above).
+ */
+const ER_ID_SUPER_EFFECTIVE_VS_TYPE: ReadonlyMap<number, PokemonType> = new Map<number, PokemonType>([
+  [13, PokemonType.ROCK], // Razor Wind
+  [51, PokemonType.STEEL], // Acid
+  [124, PokemonType.WATER], // Sludge
+  [139, PokemonType.FLYING], // Poison Gas
+  [329, PokemonType.WATER], // Sheer Cold
+  [443, PokemonType.STEEL], // Magnet Bomb
+  [859, PokemonType.STEEL], // Gigaton Hammer
+]);
 
 /** Exported for tests: which move ids does the patcher table touch? */
 export function getPatchedMoveIds(): readonly MoveId[] {

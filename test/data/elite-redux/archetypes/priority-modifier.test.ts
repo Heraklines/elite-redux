@@ -236,4 +236,37 @@ describe("PriorityModifierAbAttr archetype (C1c)", () => {
       );
     });
   });
+
+  describe("maxBasePower filter (Perfectionist)", () => {
+    const stubPkmn = {} as unknown as Pokemon;
+    const moveWithPower = (power: number) => ({ power, hasFlag: () => false }) as unknown as Move;
+
+    it("matches a move at or below the base-power cap", () => {
+      expect(PriorityModifierAbAttr.matchesFilter({ maxBasePower: 25 }, stubPkmn, moveWithPower(25))).toBe(true);
+      expect(PriorityModifierAbAttr.matchesFilter({ maxBasePower: 25 }, stubPkmn, moveWithPower(10))).toBe(true);
+    });
+
+    it("rejects a move above the base-power cap", () => {
+      expect(PriorityModifierAbAttr.matchesFilter({ maxBasePower: 25 }, stubPkmn, moveWithPower(40))).toBe(false);
+    });
+  });
+
+  describe("maxAccuracy filter (Sighting System -3 priority)", () => {
+    const stubPkmn = {} as unknown as Pokemon;
+    const moveWithAcc = (accuracy: number) => ({ accuracy, hasFlag: () => false }) as unknown as Move;
+
+    it("matches moves with base accuracy below the cap", () => {
+      expect(PriorityModifierAbAttr.matchesFilter({ maxAccuracy: 80 }, stubPkmn, moveWithAcc(50))).toBe(true);
+      expect(PriorityModifierAbAttr.matchesFilter({ maxAccuracy: 80 }, stubPkmn, moveWithAcc(79))).toBe(true);
+    });
+
+    it("rejects moves at or above the accuracy cap", () => {
+      expect(PriorityModifierAbAttr.matchesFilter({ maxAccuracy: 80 }, stubPkmn, moveWithAcc(80))).toBe(false);
+      expect(PriorityModifierAbAttr.matchesFilter({ maxAccuracy: 80 }, stubPkmn, moveWithAcc(100))).toBe(false);
+    });
+
+    it("rejects always-hit moves (accuracy < 0)", () => {
+      expect(PriorityModifierAbAttr.matchesFilter({ maxAccuracy: 80 }, stubPkmn, moveWithAcc(-1))).toBe(false);
+    });
+  });
 });
