@@ -1,0 +1,312 @@
+{
+  "achievements": {
+    "name": "Errungenschaften"
+  },
+  "locked": {
+    "name": "Gesperrt"
+  },
+  "moneyAchv": {
+    "description": "Häufe eine Gesamtsumme von {{moneyAmount}} ₽ an."
+  },
+  "10KMoney": {
+    "name": "Besserverdiener",
+    "name_female": "Besserverdienerin"
+  },
+  "100KMoney": {
+    "name": "Reich",
+    "name_female": "Reich"
+  },
+  "1MMoney": {
+    "name": "Millionär",
+    "name_female": "Millionärin"
+  },
+  "10MMoney": {
+    "name": "Einprozenter",
+    "name_female": "Einprozenter"
+  },
+  "damageAchv": {
+    "description": "Füge mit einem Treffer {{damageAmount}} Schaden zu."
+  },
+  "250Dmg": {
+    "name": "Harte Treffer"
+  },
+  "1000Dmg": {
+    "name": "Härtere Treffer",
+    "name_female": "Härtere Treffer"
+  },
+  "2500Dmg": {
+    "name": "Das ist ’ne Menge Schaden!",
+    "name_female": "Das ist ’ne Menge Schaden!"
+  },
+  "10000Dmg": {
+    "name": "One Punch Man",
+    "name_female": "One Punch Woman"
+  },
+  "healAchv": {
+    "description": "Heile {{healAmount}} {{HP}} auf einmal mit einer Attacke, einer Fähigkeit oder einem gehaltenen Gegenstand."
+  },
+  "250Heal": {
+    "name": "Anfänger-Heiler",
+    "name_female": "Anfänger-Heilerin"
+  },
+  "1000Heal": {
+    "name": "Gesundheitsprofi",
+    "name_female": "Gesundheitsprofi"
+  },
+  "2500Heal": {
+    "name": "Kleriker",
+    "name_female": "Klerikerin"
+  },
+  "10000Heal": {
+    "name": "Wiederherstellungsmeister",
+    "name_female": "Wiederherstellungsmeisterin"
+  },
+  "levelAchv": {
+    "description": "Erhöhe das Level eines Pokémon auf {{level}}."
+  },
+  "lv100": {
+    "name": "Warte, es gibt mehr!"
+  },
+  "lv250": {
+    "name": "Elite",
+    "name_female": "Elite"
+  },
+  "lv1000": {
+    "name": "Geh noch höher hinaus!"
+  },
+  "ribbonAchv": {
+    "description": "Sammle insgesamt {{ribbonAmount}} Bänder."
+  },
+  "10Ribbons": {
+    "name": "Champion der Pokémon-Liga",
+    "name_female": "Champion der Pokémon-Liga"
+  },
+  "25Ribbons": {
+    "name": "Bänder-Sammler",
+    "name_female": "Bänder-Sammlerin"
+  },
+  "50Ribbons": {
+    "name": "Bänder-Experte",
+    "name_female": "Bänder-Expertin"
+  },
+  "75Ribbons": {
+    "name": "Bänder-Guru",
+    "name_female": "Bänder-Guru"
+  },
+  "100Ribbons": {
+    "name": "Bänder-Meister",
+    "name_female": "Bänder-Meisterin"
+  },
+  "transferMaxStatStage": {
+    "name": "Teamwork",
+    "description": "Nutze Staffette, während der Anwender mindestens einen Statuswert maximiert hat."
+  },
+  "maxFriendship": {
+    "name": "Freundschaftsmaximierung",
+    "description": "Erreiche maximale Freundschaft bei einem Pokémon."
+  },
+  "megaEvolve": {
+    "name": "Megaverwandlung",
+    "description": "Mega-entwickle ein Pokémon."
+  },
+  "gigantamax": {
+    "name": "Absolute Einheit",
+    "description": "Gigadynamaximiere ein Pokémon."
+  },
+  "terastallize": {
+    "name": "Typen-Bonus-Enthusiast",
+    "description": "Terakristallisiere ein Pokémon."
+  },
+  "stellarTerastallize": {
+    "name": "Der geheime Typ",
+    "description": "Terakristallisiere ein Pokémon zum Typen Stellar."
+  },
+  "splice": {
+    "name": "Unendliche Fusion",
+    "description": "Kombiniere zwei Pokémon mit einem DNS-Keil."
+  },
+  "miniBlackHole": {
+    "name": "Ein Loch voller Items",
+    "description": "Erlange ein Mini-Schwarzes Loch."
+  },
+  "catchMythical": {
+    "name": "Mysteriöses!",
+    "description": "Fange ein mysteriöses Pokémon."
+  },
+  "catchSubLegendary": {
+    "name": "Sub-Legendär",
+    "description": "Fange ein sub-legendäres Pokémon."
+  },
+  "catchLegendary": {
+    "name": "Legendär",
+    "description": "Fange ein legendäres Pokémon."
+  },
+  "seeShiny": {
+    "name": "Schillerndes Licht",
+    "description": "Finde ein wildes schillerndes Pokémon."
+  },
+  "shinyParty": {
+    "name": "Das ist Hingabe",
+    "name_female": "Das ist Hingabe",
+    "description": "Habe ein Team aus schillernden Pokémon."
+  },
+  "hatchMythical": {
+    "name": "Mysteriöses Ei",
+    "description": "Lass ein mysteriöses Pokémon aus einem Ei schlüpfen."
+  },
+  "hatchSubLegendary": {
+    "name": "Sub-Legendäres Ei",
+    "description": "Lass ein sub-legendäres Pokémon aus einem Ei schlüpfen."
+  },
+  "hatchLegendary": {
+    "name": "Legendäres Ei",
+    "description": "Lass ein legendäres Pokémon aus einem Ei schlüpfen."
+  },
+  "hatchShiny": {
+    "name": "Schillerndes Ei",
+    "description": "Lass ein schillerndes Pokémon aus einem Ei schlüpfen."
+  },
+  "hiddenAbility": {
+    "name": "Geheimes Talent",
+    "description": "Fange ein Pokémon mit versteckter Fähigkeit."
+  },
+  "perfectIvs": {
+    "name": "Echtheitszertifikat",
+    "description": "Erhalte ein Pokémon mit perfekten IS-Werten."
+  },
+  "classicVictory": {
+    "name": "Ungeschlagen",
+    "name_female": "Ungeschlagen",
+    "description": "Beende den klassischen Modus erfolgreich."
+  },
+  "unevolvedClassicVictory": {
+    "name": "“Bringe dein Kind mit zur Arbeit”-Tag",
+    "description": "Beende den klassischen Modus erfolgreich mit mindestens einem nicht entwickelten Pokémon in deinem Team."
+  },
+  "monoGenOne": {
+    "name": "Der ursprüngliche Rivale",
+    "description": "Beende die “Mono-Generation: Eins”-Herausforderung."
+  },
+  "monoGenTwo": {
+    "name": "Generation 1.5",
+    "description": "Beende die “Mono-Generation: Zwei”-Herausforderung."
+  },
+  "monoGenThree": {
+    "name": "Zu viel Wasser?",
+    "description": "Beende die “Mono-Generation: Drei”-Herausforderung."
+  },
+  "monoGenFour": {
+    "name": "Ist SIE wirklich die Stärkste?",
+    "description": "Beende die “Mono-Generation: Vier”-Herausforderung."
+  },
+  "monoGenFive": {
+    "name": "Komplett Original",
+    "description": "Beende die “Mono-Generation: Fünf”-Herausforderung."
+  },
+  "monoGenSix": {
+    "name": "Fast Königlich",
+    "description": "Beende die “Mono-Generation: Sechs”-Herausforderung."
+  },
+  "monoGenSeven": {
+    "name": "Technisch gesehen",
+    "description": "Beende die “Mono-Generation: Sieben”-Herausforderung."
+  },
+  "monoGenEight": {
+    "name": "Die Zeit des Champions",
+    "description": "Beende die “Mono-Generation: Acht”-Herausforderung."
+  },
+  "monoGenNine": {
+    "name": "Sie hat es dir leicht gemacht …",
+    "description": "Beende die “Mono-Generation: Neun”-Herausforderung."
+  },
+  "monoType": {
+    "description": "Beende die 'Mono-Typ: {{type}}'-Herausforderung."
+  },
+  "monoNormal": {
+    "name": "Normaler Typ"
+  },
+  "monoFighting": {
+    "name": "Ich kann Kung-Fu!"
+  },
+  "monoFlying": {
+    "name": "Ich glaube, ich kann fliegen!"
+  },
+  "monoPoison": {
+    "name": "Kantos Liebling"
+  },
+  "monoGround": {
+    "name": "Auf dem Boden bleiben"
+  },
+  "monoRock": {
+    "name": "So hart wie Rocko"
+  },
+  "monoBug": {
+    "name": "Stich wie ein Bibor!"
+  },
+  "monoGhost": {
+    "name": "Wer wird angerufen?"
+  },
+  "monoSteel": {
+    "name": "Stahlharte Entschlossenheit"
+  },
+  "monoFire": {
+    "name": "Brennende Leidenschaft"
+  },
+  "monoWater": {
+    "name": "Wenn es regnet, schüttet es!"
+  },
+  "monoGrass": {
+    "name": "Grüner Daumen"
+  },
+  "monoElectric": {
+    "name": "Elektrisierend"
+  },
+  "monoPsychic": {
+    "name": "Übernatürliches Talent"
+  },
+  "monoIce": {
+    "name": "Eis Eis Baby"
+  },
+  "monoDragon": {
+    "name": "Siegfried, bist du es?"
+  },
+  "monoDark": {
+    "name": "Es ist nur eine Phase!"
+  },
+  "monoFairy": {
+    "name": "Ein ewiges Abenteuer!"
+  },
+  "freshStart": {
+    "name": "Hussa, noch einmal von vorn!",
+    "description": "Schließe die “Neuanfang: Kompletter Reset”-Herausforderung ab"
+  },
+  "inverseBattle": {
+    "name": "Spieglein, Spieglein an der Wand",
+    "description": "Schließe die “Umkehrkampf”-Herausforderung ab."
+  },
+  "flipStats": {
+    "name": "Äquivalenter Austausch",
+    "description": "Schließe die “Statuswert-Flip”-Herausforderung ab."
+  },
+  "flipInverse": {
+    "name": "Umgekehrte Spiegelung",
+    "description": "Schließe die “Statuswert-Flip”-Herausforderung zusammen mit der “Umkehrkampf”-Herausforderung ab."
+  },
+  "nuzlocke": {
+    "name": "Nuzlocke gemeistert!",
+    "description": "Beende die \"Neuanfang\", \"Hardcore\", und \"Fangbegrenzung\"-Herausforderung zur selben Zeit."
+  },
+  "breedersInSpace": {
+    "name": "Züchter im Weltall!",
+    "description": "Besiege einen Pokémon-Züchter, eine Pokémon-Züchterin oder die Pokémon-Züchter-Expertin im Stratosphären-Biom."
+  },
+  "dailyVictory": {
+    "name": "Ein Run pro Tag...",
+    "description": "Beende einen täglichen Run."
+  },
+  "passives": {
+    "name": "Passiv gemeistert!",
+    "name_female": "Passiv gemeistert!",
+    "description": "Schließe die “Aktive Passiven”-Herausforderung ab."
+  }
+}

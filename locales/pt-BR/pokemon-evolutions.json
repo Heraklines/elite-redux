@@ -1,0 +1,48 @@
+{
+  "atLevel": "No Nível {{lv}}",
+  "levelUp": "Subir de nível",
+  "using": "Use {{item}} ({{tier}})",
+  "great": "Super",
+  "ultra": "Ultra",
+  "connector": ", ",
+  "gender": "(somente {{gender}})",
+  "timeOfDay": {
+    "day": "Durante Dia ou Amanhecer",
+    "dusk": "Durante o Crepúsculo",
+    "night": "Durante Noite ou Crepúsculo",
+    "dawn": "Durante o Amanhecer"
+  },
+  "move": "Sabendo o movimento {{move}}",
+  "moveType": "Sabendo um movimento do tipo {{type}}",
+  "friendship": "Tendo amizade alta",
+  "shedinja": "Se tiver um espaço vazio na equipe",
+  "partyType": "Se um Pokémon do tipo {{type}} estiver na equipe",
+  "caught": "Se {{species}} já foi capturado",
+  "weather": "Com determinado clima",
+  "treasure": "Após reunir tesouros suficientes",
+  "moveUseCount": "Depois de usar o movimento {{move}} {{count}} vezes",
+  "nature": "Ser de uma natureza específica",
+  "biome": "Em um determinado bioma",
+  "heldItem": {
+    "deepSeaTooth": "Enquanto segura Dente Marinho",
+    "deepSeaScale": "Enquanto segura Escama Marinha"
+  },
+  "forms": {
+    "ability": "Devido à sua habilidade",
+    "item": "Ativando {{item}}",
+    "deactivateItem": "Desativando {{item}}",
+    "timeOfDay": "Em determinadas horas do dia",
+    "enter": "Após entrar no campo de batalha",
+    "leave": "Após sair do campo de batalha",
+    "statusEffect": "Quando afetado por determinadas mudanças de estado",
+    "moveLearned": "Por aprender {{move}}",
+    "moveForgotten": "Por esquecer {{move}}",
+    "move": "Por usar {{move}}",
+    "tera": "Por Terastalizar",
+    "teraLapse": "Quando terastalização acabar",
+    "weather": "Quando o clima está bom",
+    "weatherRevert": "Quando o clima muda",
+    "preMove": "Antes de usar certos movimentos",
+    "postMove": "Após usar certos movimentos"
+  }
+}

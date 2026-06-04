@@ -1,0 +1,17 @@
+{
+  "mega": "Mega {{pokemonName}}",
+  "megaX": "Mega {{pokemonName}} X",
+  "megaY": "Mega {{pokemonName}} Y",
+  "megaZ": "Mega {{pokemonName}} Z",
+  "primal": "Primal {{pokemonName}}",
+  "gigantamax": "G-Max {{pokemonName}}",
+  "gigantamaxSingle": "G-Max Single Strike {{pokemonName}}",
+  "gigantamaxRapid": "G-Max Rapid Strike {{pokemonName}}",
+  "eternamax": "E-Max {{pokemonName}}",
+  "megaChange": "{{preName}} Mega Evolved\ninto {{pokemonName}}!",
+  "gigantamaxChange": "{{preName}} Gigantamaxed\ninto {{pokemonName}}!",
+  "eternamaxChange": "{{preName}} Eternamaxed\ninto {{pokemonName}}!",
+  "revertChange": "{{pokemonName}} reverted\nto its original form!",
+  "formChange": "{{preName}} changed form!",
+  "disguiseChange": "Its disguise served it as a decoy!"
+}

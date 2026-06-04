@@ -1,0 +1,7 @@
+{
+  "paidMoney": "Вы заплатили {{amount, number}} ₽.",
+  "receiveMoney": "Вы получили {{amount, number}} ₽!",
+  "affectsPokedex": "Влияет на данные Покедекса",
+  "cancelOption": "Вернуться к выбору опций столкновения.",
+  "viewPartyButton": "Проверить команду"
+}

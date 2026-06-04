@@ -7,7 +7,3 @@
 	path = assets
 	url = https://github.com/pagefaultgames/pokerogue-assets.git
 	branch = beta
-[submodule "locales"]
-	path = locales
-	url = https://github.com/Heraklines/pokerogue-locales.git
-	branch = elite-redux-locales

@@ -1,0 +1,8 @@
+{
+  "pp": "KP",
+  "power": "Kraft",
+  "accuracy": "Träffsäkerhet",
+  "abilityFlyInText": "{{pokemonName}}s {{passive}}:\n{{abilityName}}",
+  "passive": "passiv: ",
+  "teraHover": "Teratyp: {{type}}"
+}

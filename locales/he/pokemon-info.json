@@ -1,0 +1,37 @@
+{
+  "stat": {
+    "hpShortened": "HP",
+    "atk": "התקפה",
+    "atkShortened": "תקפ",
+    "def": "הגנה",
+    "defShortened": "הגנ",
+    "spatkShortened": "תקפ-מי",
+    "spdefShortened": "הגנ-מי",
+    "spd": "מהירות",
+    "spdShortened": "מהר",
+    "acc": "דיוק",
+    "eva": "התחמקות"
+  },
+  "type": {
+    "unknown": "לא ידוע",
+    "normal": "נורמאלי",
+    "fighting": "לחימה",
+    "flying": "תעופה",
+    "poison": "רעל",
+    "ground": "אדמה",
+    "rock": "אבן",
+    "bug": "חרק",
+    "ghost": "רוח",
+    "steel": "מתכת",
+    "fire": "אש",
+    "water": "מים",
+    "grass": "דשא",
+    "electric": "חשמל",
+    "psychic": "על-חושי",
+    "ice": "קרח",
+    "dragon": "דרקון",
+    "dark": "אופל",
+    "fairy": "פיה",
+    "stellar": "כוכבי"
+  }
+}

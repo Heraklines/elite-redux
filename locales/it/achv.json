@@ -1,0 +1,312 @@
+{
+  "achievements": {
+    "name": "Obiettivi"
+  },
+  "locked": {
+    "name": "Bloccato"
+  },
+  "moneyAchv": {
+    "description": "Accumula {{moneyAmount}} ₽"
+  },
+  "10KMoney": {
+    "name": "Benestante",
+    "name_female": "Benestante"
+  },
+  "100KMoney": {
+    "name": "Ricco",
+    "name_female": "Ricca"
+  },
+  "1MMoney": {
+    "name": "Milionario",
+    "name_female": "Milionaria"
+  },
+  "10MMoney": {
+    "name": "Il numero uno",
+    "name_female": "La numero uno"
+  },
+  "damageAchv": {
+    "description": "Infliggi {{damageAmount}} danni in un colpo."
+  },
+  "250Dmg": {
+    "name": "Grandi danni!"
+  },
+  "1000Dmg": {
+    "name": "Incredibili danni",
+    "name_female": "Incredibili danni"
+  },
+  "2500Dmg": {
+    "name": "Danni a palate!",
+    "name_female": "Danni a palate!"
+  },
+  "10000Dmg": {
+    "name": "One Punch Man",
+    "name_female": "One Punch Woman"
+  },
+  "healAchv": {
+    "description": "Cura {{healAmount}} {{HP}} tramite mossa, abilità, o oggetto."
+  },
+  "250Heal": {
+    "name": "Paramedico",
+    "name_female": "Paramedica"
+  },
+  "1000Heal": {
+    "name": "Dottore",
+    "name_female": "Dottoressa"
+  },
+  "2500Heal": {
+    "name": "Chierico",
+    "name_female": "Chierica"
+  },
+  "10000Heal": {
+    "name": "Mastro Curatore",
+    "name_female": "Mastra Curatrice"
+  },
+  "levelAchv": {
+    "description": "Porta un Pokémon al Livello {{level}}."
+  },
+  "lv100": {
+    "name": "E Non Finisce Qui!"
+  },
+  "lv250": {
+    "name": "Elite",
+    "name_female": "Elite"
+  },
+  "lv1000": {
+    "name": "Verso l’Infinito ed Oltre!"
+  },
+  "ribbonAchv": {
+    "description": "Accumula un Totale di {{ribbonAmount}} Nastri."
+  },
+  "10Ribbons": {
+    "name": "Campione Lega Pokémon",
+    "name_female": "Campionessa Lega Pokémon"
+  },
+  "25Ribbons": {
+    "name": "Campione Lega Estesa",
+    "name_female": "Campionessa Lega Estesa"
+  },
+  "50Ribbons": {
+    "name": "Campione Lega Ultra",
+    "name_female": "Campionessa Lega Ultra"
+  },
+  "75Ribbons": {
+    "name": "Campione Lega Rogue",
+    "name_female": "Campionessa Lega Rogue"
+  },
+  "100Ribbons": {
+    "name": "Campione Lega Assoluta",
+    "name_female": "Campionessa Lega Assoluta"
+  },
+  "transferMaxStatStage": {
+    "name": "Lavoro di Squadra",
+    "description": "Usa Staffetta con almeno una statistica aumentata al massimo."
+  },
+  "maxFriendship": {
+    "name": "Amiconi",
+    "description": "Raggiungi amicizia massima con un Pokémon."
+  },
+  "megaEvolve": {
+    "name": "Megamorfosi",
+    "description": "Megaevolvi un Pokémon."
+  },
+  "gigantamax": {
+    "name": "Grosso e Cattivo",
+    "description": "Gigamaxizza un Pokémon."
+  },
+  "terastallize": {
+    "name": "STAB Per Tutti",
+    "description": "Teracristallizza un Pokémon."
+  },
+  "stellarTerastallize": {
+    "name": "Tipo Segreto",
+    "description": "Teracristallizza un Pokémon nel Tipo Astrale."
+  },
+  "splice": {
+    "name": "Fusione Infinita",
+    "description": "Fondi due Pokémon insieme tramite Cuneo DNA."
+  },
+  "miniBlackHole": {
+    "name": "Universo di Oggetti",
+    "description": "Ottieni un Mini Buco Nero."
+  },
+  "catchMythical": {
+    "name": "Mitico",
+    "description": "Cattura un Pokémon mitico."
+  },
+  "catchSubLegendary": {
+    "name": "(Semi)Leggendario",
+    "description": "Cattura un Pokémon semi-leggendario."
+  },
+  "catchLegendary": {
+    "name": "Leggendario",
+    "description": "Cattura un Pokémon leggendario."
+  },
+  "seeShiny": {
+    "name": "Cromatico",
+    "description": "Trova un Pokémon cromatico in natura."
+  },
+  "shinyParty": {
+    "name": "Dedizione Totale",
+    "name_female": "Dedizione Totale",
+    "description": "Riempi la squadra di Pokémon cromatici."
+  },
+  "hatchMythical": {
+    "name": "Uovo Mitico",
+    "description": "Schiudi l’uovo di un Pokémon mitico."
+  },
+  "hatchSubLegendary": {
+    "name": "Uovo (Semi)Leggendario",
+    "description": "Schiudi l’uovo di un Pokémon semi-leggendario."
+  },
+  "hatchLegendary": {
+    "name": "Uovo Leggendario",
+    "description": "Schiudi l’uovo di un Pokémon leggendario."
+  },
+  "hatchShiny": {
+    "name": "Uovo Cromatico",
+    "description": "Schiudi l’Uovo di un Pokémon cromatico."
+  },
+  "hiddenAbility": {
+    "name": "Potenziale Nascosto",
+    "description": "Cattura un Pokémon con abilità nascosta."
+  },
+  "perfectIvs": {
+    "name": "Certificato di Autenticità",
+    "description": "Ottieni un Pokémon con IV perfetti."
+  },
+  "classicVictory": {
+    "name": "Imbattuto",
+    "name_female": "Imbattuta",
+    "description": "Vinci in modalità classica."
+  },
+  "unevolvedClassicVictory": {
+    "name": "Alternanza scuola-lavoro",
+    "description": "Completa la modalità classica con almeno un membro della squadra non evoluto completamente."
+  },
+  "monoGenOne": {
+    "name": "Rivale Originale",
+    "description": "Completa la sfida monogenerazione di Prima Generazione."
+  },
+  "monoGenTwo": {
+    "name": "Generazione 1.5",
+    "description": "Completa la sfida monogenerazione di Seconda Generazione."
+  },
+  "monoGenThree": {
+    "name": "Troppa Acqua?",
+    "description": "Completa la sfida monogenerazione di Terza Generazione."
+  },
+  "monoGenFour": {
+    "name": "È Davvero La Più Forte?",
+    "description": "Completa la sfida monogenerazione di Quarta Generazione."
+  },
+  "monoGenFive": {
+    "name": "Tutti Originali",
+    "description": "Completa la sfida monogenerazione di Quinta Generazione."
+  },
+  "monoGenSix": {
+    "name": "Vita e Morte",
+    "description": "Completa la sfida monogenerazione di Sesta Generazione."
+  },
+  "monoGenSeven": {
+    "name": "Troppo amichevoli?",
+    "description": "Completa la sfida monogenerazione di Settima Generazione."
+  },
+  "monoGenEight": {
+    "name": "It’s champion time!",
+    "description": "Completa la sfida monogenerazione di Ottava Generazione."
+  },
+  "monoGenNine": {
+    "name": "Paradossalmente sbalorditivi",
+    "description": "Completa la sfida monogenerazione di Nona Generazione."
+  },
+  "monoType": {
+    "description": "Completa la modalità sfida monotipo {{type}}"
+  },
+  "monoNormal": {
+    "name": "Un tipo semplice"
+  },
+  "monoFighting": {
+    "name": "Conosco il Kung-fu"
+  },
+  "monoFlying": {
+    "name": "È un uccello? È un aereo?"
+  },
+  "monoPoison": {
+    "name": "I migliori di Kanto"
+  },
+  "monoGround": {
+    "name": "Con i piedi per terra"
+  },
+  "monoRock": {
+    "name": "Forte come una roccia!"
+  },
+  "monoBug": {
+    "name": "Metodo Guzma"
+  },
+  "monoGhost": {
+    "name": "Sono fantasmi, caro Watson"
+  },
+  "monoSteel": {
+    "name": "Pugno di ferro"
+  },
+  "monoFire": {
+    "name": "Giocare col fuoco"
+  },
+  "monoWater": {
+    "name": "Piove sul bagnato"
+  },
+  "monoGrass": {
+    "name": "L’erba del vicino è sempre più verde"
+  },
+  "monoElectric": {
+    "name": "Elettrizzante"
+  },
+  "monoPsychic": {
+    "name": "Mentalista"
+  },
+  "monoIce": {
+    "name": "Rompere il ghiaccio"
+  },
+  "monoDragon": {
+    "name": "Sangue di drago"
+  },
+  "monoDark": {
+    "name": "Solo una fase"
+  },
+  "monoFairy": {
+    "name": "Follettini e follettine"
+  },
+  "freshStart": {
+    "name": "Buona la prima!",
+    "description": "Completa la modalità sfida ’Un nuovo inizio’: Ripristino."
+  },
+  "inverseBattle": {
+    "name": "Specchio oihccepS",
+    "description": "Completa la modalità sfida Battaglia invertita.\n.atitrevni ailgattaB adifs àtiladom al atelpmoC"
+  },
+  "flipStats": {
+    "name": "Scambio Equivalente",
+    "description": "Completa la modalità sfida \"Invertistat\""
+  },
+  "flipInverse": {
+    "name": "Un Mondo Distorto",
+    "description": "Completa le modalità sfida \"Invertistat\" e Battaglia invertita allo stesso tempo."
+  },
+  "nuzlocke": {
+    "name": "Nuzlocke completata!",
+    "description": "Completa una partita con le modalità «Un Nuovo Inizio», «Zero Revitalizzanti» e «Catture Limitate» attive."
+  },
+  "breedersInSpace": {
+    "name": "Allevapokémon nello spazio!",
+    "description": "Sconfiggi un allevapokémon o l’allevapokémon esperta nel bioma dello spazio."
+  },
+  "dailyVictory": {
+    "name": "Una partita al giorno…",
+    "description": "Completa una Sfida giornaliera."
+  },
+  "passives": {
+    "name": "Maestria Passiva",
+    "name_female": "Maestria Passiva",
+    "description": "Completa la sfida \"Passivi\"."
+  }
+}

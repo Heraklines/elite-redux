@@ -1,0 +1,92 @@
+{
+  "achievements": {
+    "name": "Başarımlar"
+  },
+  "locked": {
+    "name": "Kilitli"
+  },
+  "moneyAchv": {
+    "description": "Toplam {{moneyAmount}}₽ biriktir"
+  },
+  "10KMoney": {
+    "name": "Para sahibi",
+    "name_female": "Para sahibi"
+  },
+  "100KMoney": {
+    "name": "Zengin",
+    "name_female": "Zengin"
+  },
+  "1MMoney": {
+    "name": "Milyoner",
+    "name_female": "Milyoner"
+  },
+  "10MMoney": {
+    "name": "Yüzde Birlik",
+    "name_female": "Yüzde Birlik"
+  },
+  "damageAchv": {
+    "description": "Tek vuruşta {{damageAmount}} hasar ver"
+  },
+  "250Dmg": {
+    "name": "Sert Vuran"
+  },
+  "1000Dmg": {
+    "name": "Daha Ser Vuran",
+    "name_female": "Daha Ser Vuran"
+  },
+  "2500Dmg": {
+    "name": "Çok Fazla Hasar!",
+    "name_female": "Çok Fazla Hasar!"
+  },
+  "10000Dmg": {
+    "name": "Tek Yumruk Adam",
+    "name_female": "Tek Yumruk Kadın"
+  },
+  "healAchv": {
+    "description": "Bir haraket, özellik yada eşya ile {{healAmount}} {{HP}} iyileştir"
+  },
+  "250Heal": {
+    "name": "Acemi Şifacı",
+    "name_female": "Acemi Şifacı"
+  },
+  "1000Heal": {
+    "name": "Büyük Şifacı",
+    "name_female": "Büyük Şifacı"
+  },
+  "2500Heal": {
+    "name": "Rahip",
+    "name_female": "Rahip"
+  },
+  "10000Heal": {
+    "name": "İyileşme Ustası",
+    "name_female": "İyileşme Ustası"
+  },
+  "levelAchv": {
+    "description": "Bir Pokémonu Sv. {{level}}e getir"
+  },
+  "lv100": {
+    "name": "Ama bekle, Dahası var!"
+  },
+  "lv250": {
+    "name": "Elit",
+    "name_female": "Elit"
+  },
+  "lv1000": {
+    "name": "Daha İleriye Gitmek İçin"
+  },
+  "ribbonAchv": {
+    "description": "Toplam {{ribbonAmount}} Kurdeleye Sahip Ol"
+  },
+  "10Ribbons": {
+    "name": "Pokémon Ligi Şanmpiyonu",
+    "name_female": "Pokémon Ligi Şanmpiyonu"
+  },
+  "25Ribbons": {
+    "name": "Süper Lig Şampiyonu",
+    "name_female": "Süper Lig Şampiyonu"
+  },
+  "50Ribbons": {
+    "name": "Ultra Lig Şampiyonu",
+    "name_female": "Ultra Lig Şampiyonu"
+  }
+}

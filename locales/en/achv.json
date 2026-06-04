@@ -1,0 +1,312 @@
+{
+  "achievements": {
+    "name": "Achievements"
+  },
+  "locked": {
+    "name": "Locked"
+  },
+  "moneyAchv": {
+    "description": "Accumulate a total of ₽{{moneyAmount}}."
+  },
+  "10KMoney": {
+    "name": "Money Haver",
+    "name_female": "Money Haver"
+  },
+  "100KMoney": {
+    "name": "Rich",
+    "name_female": "Rich"
+  },
+  "1MMoney": {
+    "name": "Millionaire",
+    "name_female": "Millionaire"
+  },
+  "10MMoney": {
+    "name": "One Percenter",
+    "name_female": "One Percenter"
+  },
+  "damageAchv": {
+    "description": "Inflict {{damageAmount}} damage in one hit."
+  },
+  "250Dmg": {
+    "name": "Hard Hitter"
+  },
+  "1000Dmg": {
+    "name": "Harder Hitter",
+    "name_female": "Harder Hitter"
+  },
+  "2500Dmg": {
+    "name": "That’s a Lotta Damage!",
+    "name_female": "That’s a Lotta Damage!"
+  },
+  "10000Dmg": {
+    "name": "One Punch Man",
+    "name_female": "One Punch Woman"
+  },
+  "healAchv": {
+    "description": "Heal {{healAmount}} {{HP}} at once with a move, ability, or held item."
+  },
+  "250Heal": {
+    "name": "Novice Healer",
+    "name_female": "Novice Healer"
+  },
+  "1000Heal": {
+    "name": "Big Healer",
+    "name_female": "Big Healer"
+  },
+  "2500Heal": {
+    "name": "Cleric",
+    "name_female": "Cleric"
+  },
+  "10000Heal": {
+    "name": "Recovery Master",
+    "name_female": "Recovery Master"
+  },
+  "levelAchv": {
+    "description": "Level up a Pokémon to Lv{{level}}."
+  },
+  "lv100": {
+    "name": "But Wait, There’s More!"
+  },
+  "lv250": {
+    "name": "Elite",
+    "name_female": "Elite"
+  },
+  "lv1000": {
+    "name": "To Go Even Further Beyond"
+  },
+  "ribbonAchv": {
+    "description": "Accumulate a total of {{ribbonAmount}} Ribbons."
+  },
+  "10Ribbons": {
+    "name": "Pokémon League Champion",
+    "name_female": "Pokémon League Champion"
+  },
+  "25Ribbons": {
+    "name": "Great League Champion",
+    "name_female": "Great League Champion"
+  },
+  "50Ribbons": {
+    "name": "Ultra League Champion",
+    "name_female": "Ultra League Champion"
+  },
+  "75Ribbons": {
+    "name": "Rogue League Champion",
+    "name_female": "Rogue League Champion"
+  },
+  "100Ribbons": {
+    "name": "Master League Champion",
+    "name_female": "Master League Champion"
+  },
+  "transferMaxStatStage": {
+    "name": "Teamwork!",
+    "description": "Baton Pass to another party member with at least one stat stage maxed out."
+  },
+  "maxFriendship": {
+    "name": "Friendmaxxing",
+    "description": "Reach max friendship on a Pokémon."
+  },
+  "megaEvolve": {
+    "name": "Beyond Evolution!",
+    "description": "Mega evolve a Pokémon."
+  },
+  "gigantamax": {
+    "name": "Giga-Sized Power!",
+    "description": "Gigantamax a Pokémon."
+  },
+  "terastallize": {
+    "name": "STAB Enthusiast",
+    "description": "Terastallize a Pokémon."
+  },
+  "stellarTerastallize": {
+    "name": "The Hidden Type",
+    "description": "Stellar Terastallize a Pokémon."
+  },
+  "splice": {
+    "name": "Infinite Fusion",
+    "description": "Splice two Pokémon together with DNA Splicers."
+  },
+  "miniBlackHole": {
+    "name": "A Hole Lot of Items",
+    "description": "Acquire a Mini Black Hole."
+  },
+  "catchMythical": {
+    "name": "Mythical",
+    "description": "Catch a Mythical Pokémon."
+  },
+  "catchSubLegendary": {
+    "name": "(Sub-)Legendary",
+    "description": "Catch a Sub-Legendary Pokémon."
+  },
+  "catchLegendary": {
+    "name": "Legendary",
+    "description": "Catch a Legendary Pokémon."
+  },
+  "seeShiny": {
+    "name": "Shiny",
+    "description": "Find a shiny Pokémon in the wild."
+  },
+  "shinyParty": {
+    "name": "That’s Dedication",
+    "name_female": "That’s Dedication",
+    "description": "Have a full party of shiny Pokémon."
+  },
+  "hatchMythical": {
+    "name": "Mythical Egg",
+    "description": "Hatch a Mythical Pokémon from an Egg."
+  },
+  "hatchSubLegendary": {
+    "name": "Sub-Legendary Egg",
+    "description": "Hatch a Sub-Legendary Pokémon from an Egg."
+  },
+  "hatchLegendary": {
+    "name": "Legendary Egg",
+    "description": "Hatch a Legendary Pokémon from an Egg."
+  },
+  "hatchShiny": {
+    "name": "Shiny Egg",
+    "description": "Hatch a shiny Pokémon from an Egg."
+  },
+  "hiddenAbility": {
+    "name": "Hidden Potential",
+    "description": "Catch a Pokémon with its hidden ability."
+  },
+  "perfectIvs": {
+    "name": "Certificate of Authenticity",
+    "description": "Get perfect IVs on a Pokémon."
+  },
+  "classicVictory": {
+    "name": "Undefeated",
+    "name_female": "Undefeated",
+    "description": "Beat the game in Classic Mode."
+  },
+  "unevolvedClassicVictory": {
+    "name": "Bring Your Child To Work Day",
+    "description": "Beat the game in Classic Mode with at least one unevolved party member."
+  },
+  "monoGenOne": {
+    "name": "The Original Rival",
+    "description": "Complete the Mono Gen: One challenge."
+  },
+  "monoGenTwo": {
+    "name": "Generation 1.5",
+    "description": "Complete the Mono Gen: Two challenge."
+  },
+  "monoGenThree": {
+    "name": "Too much water?",
+    "description": "Complete the Mono Gen: Three challenge."
+  },
+  "monoGenFour": {
+    "name": "Is she really the hardest?",
+    "description": "Complete the Mono Gen: Four challenge."
+  },
+  "monoGenFive": {
+    "name": "All Original",
+    "description": "Complete the Mono Gen: Five challenge."
+  },
+  "monoGenSix": {
+    "name": "Almost Royalty",
+    "description": "Complete the Mono Gen: Six challenge."
+  },
+  "monoGenSeven": {
+    "name": "Only Technically",
+    "description": "Complete the Mono Gen: Seven challenge."
+  },
+  "monoGenEight": {
+    "name": "A Champion Time!",
+    "description": "Complete the Mono Gen: Eight challenge."
+  },
+  "monoGenNine": {
+    "name": "She was going easy on you",
+    "description": "Complete the Mono Gen: Nine challenge."
+  },
+  "monoType": {
+    "description": "Complete the Mono Type: {{type}} challenge."
+  },
+  "monoNormal": {
+    "name": "Extra Ordinary"
+  },
+  "monoFighting": {
+    "name": "I Know Kung Fu!"
+  },
+  "monoFlying": {
+    "name": "Some Angry Birds!"
+  },
+  "monoPoison": {
+    "name": "Kanto’s Favorite"
+  },
+  "monoGround": {
+    "name": "Forecast: Earthquakes"
+  },
+  "monoRock": {
+    "name": "Brock Hard"
+  },
+  "monoBug": {
+    "name": "You Like Jazz?"
+  },
+  "monoGhost": {
+    "name": "Who You Gonna Call?"
+  },
+  "monoSteel": {
+    "name": "Iron Giants"
+  },
+  "monoFire": {
+    "name": "I Cast Fireball!"
+  },
+  "monoWater": {
+    "name": "When It Rains, It Pours"
+  },
+  "monoGrass": {
+    "name": "Can’t Touch This"
+  },
+  "monoElectric": {
+    "name": "Aim For The Horn!"
+  },
+  "monoPsychic": {
+    "name": "Big Brain Energy"
+  },
+  "monoIce": {
+    "name": "Walking On Thin Ice"
+  },
+  "monoDragon": {
+    "name": "Pseudo-Legend Club"
+  },
+  "monoDark": {
+    "name": "It’s Just A Phase!"
+  },
+  "monoFairy": {
+    "name": "Hey! Listen!"
+  },
+  "freshStart": {
+    "name": "First Try!",
+    "description": "Complete the Fresh Start: Full Reset challenge."
+  },
+  "inverseBattle": {
+    "name": "Mirror rorriM",
+    "description": "Complete the Inverse Battle challenge.\n.egnellahc elttaB esrevnI eht etelpmoC"
+  },
+  "flipStats": {
+    "name": "Equivalent Exchange",
+    "description": "Complete the Flip Stat challenge."
+  },
+  "flipInverse": {
+    "name": "A Distorted World",
+    "description": "Complete the Inverse challenge at the same time as the Flip Stat challenge."
+  },
+  "nuzlocke": {
+    "name": "Nuzlocke Complete!",
+    "description": "Complete the game with any Fresh Start challenge, Hardcore challenge, and the Limited Catch challenge all active."
+  },
+  "breedersInSpace": {
+    "name": "Breeders in Space!",
+    "description": "Beat a Pokémon Breeder or the Expert Pokémon Breeder in the Space Biome."
+  },
+  "dailyVictory": {
+    "name": "A Run a Day…",
+    "description": "Complete a Daily Run."
+  },
+  "passives": {
+    "name": "Passive Mastery",
+    "name_female": "Passive Mastery",
+    "description": "Complete the Active Passives challenge."
+  }
+}

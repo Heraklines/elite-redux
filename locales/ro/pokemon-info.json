@@ -1,0 +1,23 @@
+{
+  "type": {
+    "normal": "Normal",
+    "fighting": "Luptă",
+    "flying": "Zbor",
+    "poison": "Otravă",
+    "ground": "Pământ",
+    "rock": "Piatră",
+    "bug": "Insectă",
+    "ghost": "Fantomă",
+    "steel": "Oţel",
+    "fire": "Foc",
+    "water": "Apă",
+    "grass": "Iarbă",
+    "electric": "Electricitate",
+    "psychic": "Psihic",
+    "ice": "Gheaţă",
+    "dragon": "Dragon",
+    "dark": "Întuneric",
+    "fairy": "Zână",
+    "stellar": "Stelar"
+  }
+}

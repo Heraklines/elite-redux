@@ -1,0 +1,40 @@
+{
+  "stat": {
+    "hp": "PS Max",
+    "hpShortened": "PS",
+    "atk": "Attacco",
+    "atkShortened": "Att",
+    "def": "Difesa",
+    "defShortened": "Dif",
+    "spatk": "Att. Sp.",
+    "spatkShortened": "AttSp",
+    "spdef": "Dif. Sp.",
+    "spdefShortened": "DifSp",
+    "spd": "Velocità",
+    "spdShortened": "Vel",
+    "acc": "Precisione",
+    "eva": "Elusione"
+  },
+  "type": {
+    "unknown": "Sconosciuto",
+    "normal": "Normale",
+    "fighting": "Lotta",
+    "flying": "Volante",
+    "poison": "Veleno",
+    "ground": "Terra",
+    "rock": "Roccia",
+    "bug": "Coleottero",
+    "ghost": "Spettro",
+    "steel": "Acciaio",
+    "fire": "Fuoco",
+    "water": "Acqua",
+    "grass": "Erba",
+    "electric": "Elettro",
+    "psychic": "Psico",
+    "ice": "Ghiaccio",
+    "dragon": "Drago",
+    "dark": "Buio",
+    "fairy": "Folletto",
+    "stellar": "Astrale"
+  }
+}

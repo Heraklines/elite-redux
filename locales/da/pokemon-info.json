@@ -1,0 +1,40 @@
+{
+  "stat": {
+    "hp": "HP",
+    "hpShortened": "HP",
+    "atk": "Angreb",
+    "atkShortened": "Ang",
+    "def": "Forsvar",
+    "defShortened": "For",
+    "spatk": "Sp. Ang.",
+    "spatkShortened": "SpAng",
+    "spdef": "Sp. For.",
+    "spdefShortened": "SpFor",
+    "spd": "Hastighed",
+    "spdShortened": "Has",
+    "acc": "Præcision",
+    "eva": "Undvigelsesevne"
+  },
+  "type": {
+    "unknown": "???",
+    "normal": "Normal",
+    "fighting": "Kamp",
+    "flying": "Flyve",
+    "poison": "Gift",
+    "ground": "Jord",
+    "rock": "Sten",
+    "bug": "Insekt",
+    "ghost": "Spøgelse",
+    "steel": "Stål",
+    "fire": "Ild",
+    "water": "Vand",
+    "grass": "Græs",
+    "electric": "Elektrisk",
+    "psychic": "Psykisk",
+    "ice": "Is",
+    "dragon": "Drage",
+    "dark": "Mørke",
+    "fairy": "Fe",
+    "stellar": "Astral"
+  }
+}

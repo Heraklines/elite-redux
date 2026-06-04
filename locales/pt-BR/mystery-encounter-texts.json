@@ -1,0 +1,7 @@
+{
+  "paidMoney": "Você pagou ₽{{amount, number}}.",
+  "receiveMoney": "Você recebeu ₽{{amount, number}}!",
+  "affectsPokedex": "Afeta Dados da Pokédex",
+  "cancelOption": "Voltar para a seleção de opções de encontro.",
+  "viewPartyButton": "Ver Equipe"
+}

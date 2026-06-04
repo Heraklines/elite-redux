@@ -1,0 +1,40 @@
+{
+  "stat": {
+    "hp": "PS",
+    "hpShortened": "PS",
+    "atk": "Atac",
+    "atkShortened": "Atc",
+    "def": "Defensa",
+    "defShortened": "Def",
+    "spatk": "Atc. Esp.",
+    "spatkShortened": "AtcEs",
+    "spdef": "Def. Esp.",
+    "spdefShortened": "DefEs",
+    "spd": "Velocitat",
+    "spdShortened": "Vel",
+    "acc": "Precisió",
+    "eva": "Evasió"
+  },
+  "type": {
+    "unknown": "???",
+    "normal": "Normal",
+    "fighting": "Lluita",
+    "flying": "Volador",
+    "poison": "Verí",
+    "ground": "Terra",
+    "rock": "Roca",
+    "bug": "Insecte",
+    "ghost": "Fantasma",
+    "steel": "Acer",
+    "fire": "Foc",
+    "water": "Aigua",
+    "grass": "Planta",
+    "electric": "Elèctric",
+    "psychic": "Psíquic",
+    "ice": "Gel",
+    "dragon": "Drac",
+    "dark": "Sinistre",
+    "fairy": "Fada",
+    "stellar": "Astral"
+  }
+}

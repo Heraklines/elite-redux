@@ -1,0 +1,40 @@
+{
+  "stat": {
+    "hp": "PV",
+    "hpShortened": "PV",
+    "atk": "Attaque",
+    "atkShortened": "Atq",
+    "def": "Défense",
+    "defShortened": "Déf",
+    "spatk": "Atq. Spé.",
+    "spatkShortened": "AtqSp",
+    "spdef": "Déf. Spé.",
+    "spdefShortened": "DéfSp",
+    "spd": "Vitesse",
+    "spdShortened": "Vit",
+    "acc": "Précision",
+    "eva": "Esquive"
+  },
+  "type": {
+    "unknown": "???",
+    "normal": "Normal",
+    "fighting": "Combat",
+    "flying": "Vol",
+    "poison": "Poison",
+    "ground": "Sol",
+    "rock": "Roche",
+    "bug": "Insecte",
+    "ghost": "Spectre",
+    "steel": "Acier",
+    "fire": "Feu",
+    "water": "Eau",
+    "grass": "Plante",
+    "electric": "Électrik",
+    "psychic": "Psy",
+    "ice": "Glace",
+    "dragon": "Dragon",
+    "dark": "Ténèbres",
+    "fairy": "Fée",
+    "stellar": "Stellaire"
+  }
+}
