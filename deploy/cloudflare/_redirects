@@ -1,0 +1,10 @@
+/images/*            https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/images/:splat            302
+/audio/*             https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/audio/:splat             302
+/battle-anims/*      https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/battle-anims/:splat       302
+/battle-anims-er/*   https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/battle-anims-er/:splat    302
+/fonts/*             https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/fonts/:splat              302
+/starter-colors.json          https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/starter-colors.json          302
+/exp-sprites.json             https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/exp-sprites.json             302
+/biome-bgm-loop-points.json   https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/biome-bgm-loop-points.json   302
+/logo128.png                  https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/logo128.png                  302
+/logo512.png                  https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/logo512.png                  302
