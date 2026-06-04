@@ -1,0 +1,312 @@
+{
+  "achievements": {
+    "name": "Succès"
+  },
+  "locked": {
+    "name": "Verrouillé"
+  },
+  "moneyAchv": {
+    "description": "Récolter un total de {{moneyAmount}} ₽."
+  },
+  "10KMoney": {
+    "name": "Épargnant",
+    "name_female": "Épargnante"
+  },
+  "100KMoney": {
+    "name": "Je possède des thunes",
+    "name_female": "Je possède des thunes"
+  },
+  "1MMoney": {
+    "name": "Banquier",
+    "name_female": "Banquière"
+  },
+  "10MMoney": {
+    "name": "Évadé fiscal",
+    "name_female": "Évadée fiscale"
+  },
+  "damageAchv": {
+    "description": "Infliger {{damageAmount}} de dégâts en un coup."
+  },
+  "250Dmg": {
+    "name": "Caïd"
+  },
+  "1000Dmg": {
+    "name": "Boxeur",
+    "name_female": "Boxeuse"
+  },
+  "2500Dmg": {
+    "name": "Distributeur de pains",
+    "name_female": "Distributrice de pains"
+  },
+  "10000Dmg": {
+    "name": "One Punch Man",
+    "name_female": "One Punch Woman"
+  },
+  "healAchv": {
+    "description": "Soigner {{healAmount}} {{HP}} en une fois avec une capacité,\nun talent ou un objet tenu."
+  },
+  "250Heal": {
+    "name": "Infirmier",
+    "name_female": "Infirmière"
+  },
+  "1000Heal": {
+    "name": "Médecin",
+    "name_female": "Médecin"
+  },
+  "2500Heal": {
+    "name": "Clerc",
+    "name_female": "Clerc"
+  },
+  "10000Heal": {
+    "name": "Centre Pokémon",
+    "name_female": "Centre Pokémon"
+  },
+  "levelAchv": {
+    "description": "Monter un Pokémon au N.{{level}}."
+  },
+  "lv100": {
+    "name": "Et c’est pas fini !"
+  },
+  "lv250": {
+    "name": "Élite",
+    "name_female": "Élite"
+  },
+  "lv1000": {
+    "name": "Vers l’infini et au-delà"
+  },
+  "ribbonAchv": {
+    "description": "Accumuler un total de {{ribbonAmount}} Rubans."
+  },
+  "10Ribbons": {
+    "name": "Maitre de la Ligue",
+    "name_female": "Maitresse de la Ligue"
+  },
+  "25Ribbons": {
+    "name": "Super Maitre de la Ligue",
+    "name_female": "Super Maitresse de la Ligue"
+  },
+  "50Ribbons": {
+    "name": "Hyper Maitre de la Ligue",
+    "name_female": "Hyper Maitresse de la Ligue"
+  },
+  "75Ribbons": {
+    "name": "Rogue Maitre de la Ligue",
+    "name_female": "Rogue Maitresse de la Ligue"
+  },
+  "100Ribbons": {
+    "name": "Master Maitre de la Ligue",
+    "name_female": "Master Maitresse de la Ligue"
+  },
+  "transferMaxStatStage": {
+    "name": "Travail d’équipe",
+    "description": "Utiliser Relais avec au moins une statistique montée à fond."
+  },
+  "maxFriendship": {
+    "name": "Copinage",
+    "description": "Atteindre le niveau de bonheur maximal avec un Pokémon."
+  },
+  "megaEvolve": {
+    "name": "Mégamorph",
+    "description": "Méga-évoluer un Pokémon."
+  },
+  "gigantamax": {
+    "name": "Kaijū",
+    "description": "Gigamaxer un Pokémon."
+  },
+  "terastallize": {
+    "name": "J’aime les STAB",
+    "description": "Téracristalliser un Pokémon."
+  },
+  "stellarTerastallize": {
+    "name": "Le type enfoui",
+    "description": "Téracristalliser un Pokémon en type Stellaire."
+  },
+  "splice": {
+    "name": "Infinite Fusion",
+    "description": "Fusionner deux Pokémon avec le Pointeau ADN."
+  },
+  "miniBlackHole": {
+    "name": "Item-stellar",
+    "description": "Obtenir un Mini Trou Noir."
+  },
+  "catchMythical": {
+    "name": "Fabuleux",
+    "description": "Capturer un Pokémon fabuleux."
+  },
+  "catchSubLegendary": {
+    "name": "(Semi-)Légendaire",
+    "description": "Capturer un Pokémon semi-légendaire."
+  },
+  "catchLegendary": {
+    "name": "Légendaire",
+    "description": "Capturer un Pokémon légendaire."
+  },
+  "seeShiny": {
+    "name": "Chromatique",
+    "description": "Trouver un Pokémon sauvage chromatique."
+  },
+  "shinyParty": {
+    "name": "Shasseur",
+    "name_female": "Shasseuse",
+    "description": "Avoir une équipe exclusivement composée de Pokémon chromatiques."
+  },
+  "hatchMythical": {
+    "name": "Œuf fabuleux",
+    "description": "Obtenir un Pokémon fabuleux dans un Œuf."
+  },
+  "hatchSubLegendary": {
+    "name": "Œuf semi-légendaire",
+    "description": "Obtenir un Pokémon semi-légendaire dans un Œuf."
+  },
+  "hatchLegendary": {
+    "name": "Œuf légendaire",
+    "description": "Obtenir un Pokémon légendaire dans un Œuf."
+  },
+  "hatchShiny": {
+    "name": "Œuf chromatique",
+    "description": "Obtenir un Pokémon chromatique dans un Œuf."
+  },
+  "hiddenAbility": {
+    "name": "Potentiel enfoui",
+    "description": "Capturer un Pokémon possédant un talent caché."
+  },
+  "perfectIvs": {
+    "name": "Certificat d’authenticité",
+    "description": "Avoir des IV parfaits sur un Pokémon."
+  },
+  "classicVictory": {
+    "name": "Invaincu",
+    "name_female": "Invaincue",
+    "description": "Terminer le jeu en mode Classique."
+  },
+  "unevolvedClassicVictory": {
+    "name": "Le stagiaire de 3ᵉ",
+    "description": "Terminer le mode Classique avec au moins un Pokémon non-évolué dans l’équipe."
+  },
+  "monoGenOne": {
+    "name": "Le rival originel",
+    "description": "Terminer un challenge monogénération de 1ʳᵉ génération."
+  },
+  "monoGenTwo": {
+    "name": "Entre tradition et modernité",
+    "description": "Terminer un challenge monogénération de 2ᵉ génération."
+  },
+  "monoGenThree": {
+    "name": "Too much water ?",
+    "description": "Terminer un challenge monogénération de 3ᵉ génération."
+  },
+  "monoGenFour": {
+    "name": "Réellement la plus difficile ?",
+    "description": "Terminer un challenge monogénération de 4ᵉ génération."
+  },
+  "monoGenFive": {
+    "name": "Recast complet",
+    "description": "Terminer un challenge monogénération de 5ᵉ génération."
+  },
+  "monoGenSix": {
+    "name": "Aristocrate",
+    "description": "Terminer un challenge monogénération de 6ᵉ génération."
+  },
+  "monoGenSeven": {
+    "name": "Seulement techniquement",
+    "description": "Terminer un challenge monogénération de 7ᵉ génération."
+  },
+  "monoGenEight": {
+    "name": "L’heure de gloire",
+    "description": "Terminer un challenge monogénération de 8ᵉ génération."
+  },
+  "monoGenNine": {
+    "name": "Ça va, c’était EZ",
+    "description": "Terminer un challenge monogénération de 9ᵉ génération."
+  },
+  "monoType": {
+    "description": "Terminer un challenge monotype {{type}}."
+  },
+  "monoNormal": {
+    "name": "Extraordinairement banal"
+  },
+  "monoFighting": {
+    "name": "Je connais le kung-fu"
+  },
+  "monoFlying": {
+    "name": "Angry Birds"
+  },
+  "monoPoison": {
+    "name": "Touche moi je t’empoisonne !"
+  },
+  "monoGround": {
+    "name": "Prévisions : Séisme"
+  },
+  "monoRock": {
+    "name": "Comme un roc"
+  },
+  "monoBug": {
+    "name": "Une chenille !"
+  },
+  "monoGhost": {
+    "name": "SOS Fantômes"
+  },
+  "monoSteel": {
+    "name": "De type Acier !"
+  },
+  "monoFire": {
+    "name": "Allumer le feu"
+  },
+  "monoWater": {
+    "name": "Vacances en Bretagne"
+  },
+  "monoGrass": {
+    "name": "Ne pas toucher !"
+  },
+  "monoElectric": {
+    "name": "À la masse"
+  },
+  "monoPsychic": {
+    "name": "Grocervo"
+  },
+  "monoIce": {
+    "name": "Froid comme la glace"
+  },
+  "monoDragon": {
+    "name": "Légendes du club, ou presque"
+  },
+  "monoDark": {
+    "name": "Ça va lui passer"
+  },
+  "monoFairy": {
+    "name": "Hey ! Listen !"
+  },
+  "freshStart": {
+    "name": "Du premier coup !",
+    "description": "Terminer un challenge « Nouveau départ » en mode « Réinitialisation » ."
+  },
+  "inverseBattle": {
+    "name": "La teuté à verlan",
+    "description": "Terminer un challenge en « Combat Inversé ».\nMineter un lenjcha en « Ba-con Versin »."
+  },
+  "flipStats": {
+    "name": "Échange équivalent",
+    "description": "Terminer un challenge « Stats Inversées »."
+  },
+  "flipInverse": {
+    "name": "ésrevnituoT",
+    "description": "Terminer un challenge avec « Stats Inversées » et « Combat Inversé » activés."
+  },
+  "nuzlocke": {
+    "name": "Nuzlocke terminé !",
+    "description": "Terminer un challenge avec « Nouveau Départ » au choix, « Zéro Résurrection » et « Capture Limitée » activés."
+  },
+  "breedersInSpace": {
+    "name": "Éleveurs de l’espace !",
+    "description": "Vaincre un Éleveur, une Éleveuse ou l’Éleveuse Experte\ndans le biome Espace."
+  },
+  "dailyVictory": {
+    "name": "À chaque jour suffit sa run",
+    "description": "Terminer un Défi du jour."
+  },
+  "passives": {
+    "name": "Maitre Passif",
+    "name_female": "Maitresse Passive",
+    "description": "Terminer un challenge « Passifs Actifs »."
+  }
+}

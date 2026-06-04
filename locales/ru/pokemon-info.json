@@ -1,0 +1,40 @@
+{
+  "stat": {
+    "hp": "ОЖ",
+    "hpShortened": "ОЖ",
+    "atk": "Атака",
+    "atkShortened": "Атк",
+    "def": "Защита",
+    "defShortened": "Зщт",
+    "spatk": "Сп. Атк",
+    "spatkShortened": "СпАтк",
+    "spdef": "Сп. Зщт",
+    "spdefShortened": "СпЗщт",
+    "spd": "Скорость",
+    "spdShortened": "Скр",
+    "acc": "Точность",
+    "eva": "Уворотливость"
+  },
+  "type": {
+    "unknown": "???",
+    "normal": "Обычный",
+    "fighting": "Боевой",
+    "flying": "Летающий",
+    "poison": "Яд",
+    "ground": "Земля",
+    "rock": "Камень",
+    "bug": "Насекомое",
+    "ghost": "Привидение",
+    "steel": "Сталь",
+    "fire": "Огонь",
+    "water": "Вода",
+    "grass": "Трава",
+    "electric": "Электро",
+    "psychic": "Психо",
+    "ice": "Лёд",
+    "dragon": "Дракон",
+    "dark": "Тёмный",
+    "fairy": "Фея",
+    "stellar": "Звёздный"
+  }
+}

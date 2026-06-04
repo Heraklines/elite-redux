@@ -1,0 +1,37 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// Unit tests for the in-game bug reporter assembly + console ring buffer (#220).
+
+import { buildBugReport } from "#data/elite-redux/er-bug-report";
+import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { formatConsoleSnapshot, getConsoleSnapshot, installConsoleRingBuffer } from "#utils/console-ring-buffer";
+import { afterEach, describe, expect, it } from "vitest";
+
+describe("ER bug report", () => {
+  afterEach(() => {
+    resetErDifficulty();
+  });
+
+  it("console ring buffer captures recent console output", () => {
+    installConsoleRingBuffer();
+    const marker = `er-bug-report-test-${Math.floor(performance.now())}`;
+    console.log(marker);
+    const snapshot = getConsoleSnapshot();
+    expect(snapshot.some(e => e.message.includes(marker))).toBe(true);
+    expect(formatConsoleSnapshot()).toContain(marker);
+  });
+
+  it("buildBugReport bundles description, state and logs", () => {
+    setErDifficulty("hell");
+    const report = buildBugReport("the game froze after EXP");
+    expect(report.description).toBe("the game froze after EXP");
+    expect(report.state.erDifficulty).toBe("hell");
+    expect(report.state.version).toBeTruthy();
+    expect(typeof report.logs).toBe("string");
+    // party is captured defensively even with no active scene.
+    expect(Array.isArray(report.state.party)).toBe(true);
+  });
+});

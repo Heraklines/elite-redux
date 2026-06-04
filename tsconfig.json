@@ -1,0 +1,100 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2025 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    // Modifying this option requires all values to be set manually because the defaults get overridden
+    // Values other than "ES2024.Promise" taken from https://github.com/microsoft/TypeScript/blob/main/src/lib/es2023.full.d.ts
+    "lib": [
+      // ES2022 stdlibs
+      "ES2022",
+      "DOM",
+      "ScriptHost",
+      "WebWorker.ImportScripts",
+      // future libs
+      "ES2023.Array",
+      "ES2024.Promise",
+      "ES2024.Object",
+      // NOTE: Be *very* mindful of these when updating typescript versions,
+      // as their definitions may change in breaking ways
+      "ESNext.Iterator",
+      "ESNext.Collection"
+    ],
+    "types": ["@commander-js/extra-typings"],
+    // Skip typechecking `.d.ts` files for a ~20% speed boost
+    // Won't be necessary if https://github.com/microsoft/TypeScript/issues/30511 is ever resolved
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "sourceMap": false,
+    "strict": false, // TODO: Enable this eventually
+    "exactOptionalPropertyTypes": true,
+    "strictNullChecks": true,
+    "strictBindCallApply": true,
+    "strictBuiltinIteratorReturn": true,
+    "strictFunctionTypes": true,
+    // TODO: Enable this when possible
+    "strictPropertyInitialization": false,
+    // TODO: Enable this when possible.
+    "noImplicitAny": false,
+    "noImplicitThis": true,
+    // Even with strict mode on, this is not useful as we do not throw non Errors,
+    // and it just makes it more cumbersome to catch errors.
+    "useUnknownInCatchVariables": false,
+    "rootDir": ".",
+    "outDir": "./build",
+    "noEmit": true,
+    "paths": {
+      "#abilities/*": ["./src/data/abilities/*.ts"],
+      "#api/*": ["./src/api/*.ts"],
+      "#biomes/*": ["./src/data/balance/biomes/*.ts"],
+      "#balance/*": ["./src/data/balance/*.ts"],
+      "#constants/*": ["./src/constants/*.ts"],
+      "#enums/*": ["./src/enums/*.ts"],
+      "#events/*": ["./src/events/*.ts"],
+      "#field/*": ["./src/field/*.ts"],
+      "#init/*": ["./src/init/*.ts"],
+      "#inputs/*": ["./src/configs/inputs/*.ts"],
+      "#modifiers/*": ["./src/modifier/*.ts"],
+      "#moves/*": ["./src/data/moves/*.ts"],
+      "#mystery-encounters/*": [
+        "./src/data/mystery-encounters/utils/*.ts",
+        "./src/data/mystery-encounters/encounters/*.ts",
+        "./src/data/mystery-encounters/requirements/*.ts",
+        "./src/data/mystery-encounters/*.ts"
+      ],
+      "#package.json": ["./package.json"],
+      "#phases/*": ["./src/phases/*.ts"],
+      "#plugins/*": ["./plugins/phaser/*.ts"],
+      "#sprites/*": ["./src/sprites/*.ts"],
+      "#system/*": [
+        "./src/system/settings/*.ts",
+        "./src/system/version-migration/versions/*.ts",
+        "./src/system/version-migration/*.ts",
+        "./src/system/*.ts"
+      ],
+      "#trainers/*": ["./src/data/trainers/*.ts"],
+      "#types/*": ["./src/@types/*.ts"],
+      "#ui/*": [
+        "./src/ui/battle-info/*.ts",
+        "./src/ui/containers/*.ts",
+        "./src/ui/handlers/*.ts",
+        "./src/ui/settings/*.ts",
+        "./src/ui/utils/*.ts",
+        "./src/ui/*.ts"
+      ],
+      "#utils/*": ["./src/utils/*.ts"],
+      "#data/*": ["./src/data/pokemon-forms/*.ts", "./src/data/pokemon/*.ts", "./src/data/*.ts"],
+      "#test/*": ["./test/*.ts"],
+      "#app/*": ["./src/*.ts"]
+    }
+  },
+  // Exclude checking for script JS files as those are covered by the folder's `jsconfig.json`
+  "include": ["**/*.ts", "**/*.d.ts", "**/*.mts", ".github/**/*.mts"],
+  "exclude": ["dist", "node_modules"]
+}

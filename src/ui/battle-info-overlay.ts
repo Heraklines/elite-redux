@@ -1,0 +1,688 @@
+// =============================================================================
+// Elite Redux — in-battle "Info" screen (opened with the Stats key from the
+// command menu), modelled on the ER ROM's gAbilitiesInfo menu.
+//
+// Robustness: the panel is drawn with Phaser graphics primitives (an accent-
+// coloured panel + cream "pill" boxes) so it ALWAYS renders, even before the
+// ROM-extracted background textures have streamed in. When those textures are
+// present we overlay the authentic ROM panel on top; if they are missing we
+// kick off a one-shot lazy load and re-render when it completes.
+//
+// Left column: only the Pokémon CURRENTLY ON THE FIELD — player side first,
+// then enemy side (2 icons in singles, 4 in doubles). Up/Down switches which
+// on-field Pokémon is inspected; Left/Right cycles pages; anything else closes.
+//
+// Coordinate note: the `ui` container draws at NEGATIVE y (origin bottom-left),
+// so the panel anchors at y = -canvasHeight + topMargin and lays out downward.
+// =============================================================================
+
+import { globalScene } from "#app/global-scene";
+import { allAbilities } from "#data/data-lists";
+import { getErAbilityDescription } from "#data/elite-redux/er-ability-descriptions";
+import { getNatureName, getNatureStatMultiplier } from "#data/nature";
+import { TerrainType as TerrainTypeEnum } from "#data/terrain";
+import { ArenaTagSide } from "#enums/arena-tag-side";
+import { ArenaTagType } from "#enums/arena-tag-type";
+import type { Button } from "#enums/buttons";
+import { Button as Btn } from "#enums/buttons";
+import { MoveCategory } from "#enums/move-category";
+import { PokemonType as PokemonTypeEnum } from "#enums/pokemon-type";
+import { type EffectiveStat, Stat } from "#enums/stat";
+import { TextStyle } from "#enums/text-style";
+import { WeatherType } from "#enums/weather-type";
+import type { Pokemon } from "#field/pokemon";
+import { DamageCalculatorModifier, SpeedOrderModifier } from "#modifiers/modifier";
+import { addTextObject } from "#ui/text";
+
+/** Page identity → background texture key + accent palette colour. */
+type Page = "side-player" | "side-enemy" | "field" | "stats" | "abilities" | "moves" | "damage-calc" | "speed-order";
+/** Always-available pages. Damage-calc / speed-order are appended when unlocked. */
+const PAGES: Page[] = ["stats", "abilities", "moves", "field", "side-player", "side-enemy"];
+
+const BG_KEY: Record<Page, string> = {
+  stats: "er_binfo_stats",
+  abilities: "er_binfo_abilities",
+  moves: "er_binfo_moves",
+  field: "er_binfo_field",
+  "side-player": "er_binfo_side_player",
+  "side-enemy": "er_binfo_side_enemy",
+  // ER-custom pages have no ROM background; they always use the graphics fallback.
+  "damage-calc": "er_binfo_damage_calc",
+  "speed-order": "er_binfo_speed_order",
+};
+
+const PAGE_TITLE: Record<Page, string> = {
+  stats: "Pokémon Stats",
+  abilities: "Abilities Info",
+  moves: "Moves Info",
+  field: "Field Info",
+  "side-player": "Player Side Info",
+  "side-enemy": "Enemy Side Info",
+  "damage-calc": "Damage Calculator",
+  "speed-order": "Speed Order",
+};
+
+/** Accent colour per page (matches the ROM tab palette). */
+const PAGE_ACCENT: Record<Page, number> = {
+  stats: 0x4a8ad6,
+  abilities: 0xd65a52,
+  moves: 0x5bb05b,
+  field: 0x5bb05b,
+  "side-player": 0xd65a52,
+  "side-enemy": 0xd7af2e,
+  "damage-calc": 0xb05bb0,
+  "speed-order": 0x4a8ad6,
+};
+
+// Native GBA panel the layout is authored for; centered in the UI canvas.
+const BG_W = 240;
+const BG_H = 160;
+// Cream "pill" box fills.
+const CREAM = 0xf7f7c8;
+const CREAM_EDGE = 0xfdfde8;
+// Left on-field icon column.
+const COL_X = 3;
+const COL_W = 48;
+const PANEL_X = 60;
+
+/** A cream content box {x,y,w,h}. */
+type Box = [number, number, number, number];
+
+const STAT_GRID: { stat: Stat; label: string }[] = [
+  { stat: Stat.ATK, label: "Atk" },
+  { stat: Stat.DEF, label: "Def" },
+  { stat: Stat.SPATK, label: "SpA" },
+  { stat: Stat.SPDEF, label: "SpD" },
+  { stat: Stat.SPD, label: "Spe" },
+];
+
+// Cream-box layouts per page (drawn as the fallback panel; content placed inside).
+const STATS_BOXES: Box[] = [
+  [64, 32, 128, 32], // name + type
+  [64, 72, 80, 71], // stat-stage grid
+  [152, 72, 84, 48], // stat numbers
+  [152, 128, 84, 15], // nature
+];
+const ROW4_BOXES: Box[] = [
+  [64, 32, 172, 24],
+  [64, 64, 172, 24],
+  [64, 96, 172, 24],
+  [64, 128, 172, 24],
+];
+const PILL_BOXES: Box[] = [
+  [64, 32, 172, 24],
+  [64, 72, 172, 24],
+  [64, 112, 172, 24],
+];
+
+export class BattleInfoOverlay {
+  private container: Phaser.GameObjects.Container | null = null;
+  private pageIndex = 0;
+  private slotIndex = 0;
+  private assetsRequested = false;
+
+  get isOpen(): boolean {
+    return this.container != null;
+  }
+
+  /** On-field Pokémon: player side first, then enemy side (2 singles / 4 doubles). */
+  private onField(): Pokemon[] {
+    return [...globalScene.getPlayerField(true), ...globalScene.getEnemyField(true)];
+  }
+
+  /**
+   * The cyclable pages: the always-available set plus the item-gated Damage
+   * Calculator (Rogue-tier unlock) and Speed Order (Ultra-tier unlock) pages,
+   * each shown only when the player owns the corresponding unlock.
+   */
+  private getPages(): Page[] {
+    const pages: Page[] = [...PAGES];
+    if (globalScene.findModifier(m => m instanceof DamageCalculatorModifier)) {
+      pages.push("damage-calc");
+    }
+    if (globalScene.findModifier(m => m instanceof SpeedOrderModifier)) {
+      pages.push("speed-order");
+    }
+    return pages;
+  }
+
+  open(): void {
+    if (this.container) {
+      return;
+    }
+    this.pageIndex = 0;
+    this.slotIndex = 0;
+    this.render();
+  }
+
+  close(): void {
+    if (this.container) {
+      this.container.destroy();
+      this.container = null;
+    }
+  }
+
+  handleInput(button: Button): boolean {
+    if (!this.container) {
+      return false;
+    }
+    switch (button) {
+      case Btn.LEFT: {
+        const n = this.getPages().length;
+        this.pageIndex = (this.pageIndex - 1 + n) % n;
+        this.render();
+        return true;
+      }
+      case Btn.RIGHT: {
+        const n = this.getPages().length;
+        this.pageIndex = (this.pageIndex + 1) % n;
+        this.render();
+        return true;
+      }
+      case Btn.UP:
+      case Btn.DOWN: {
+        const n = Math.max(1, this.onField().length);
+        const d = button === Btn.DOWN ? 1 : -1;
+        this.slotIndex = (this.slotIndex + d + n) % n;
+        this.render();
+        return true;
+      }
+      default:
+        this.close();
+        return true;
+    }
+  }
+
+  private render(): void {
+    this.close();
+    const H = globalScene.scaledCanvas.height;
+    const W = globalScene.scaledCanvas.width;
+    const pages = this.getPages();
+    this.pageIndex = Math.min(this.pageIndex, pages.length - 1);
+    const page = pages[this.pageIndex];
+
+    const offX = Math.floor((W - BG_W) / 2);
+    const offY = Math.floor((H - BG_H) / 2);
+    const c = globalScene.add.container(offX, -H + offY).setDepth(1000);
+
+    // Dim the battle behind the panel (full screen, regardless of centering).
+    const scrim = globalScene.add.rectangle(-offX, -offY, W, H, 0x000000, 0.62).setOrigin(0, 0);
+    c.add(scrim);
+
+    // Panel: authentic ROM background if streamed in, else a graphics fallback.
+    if (globalScene.textures.exists(BG_KEY[page])) {
+      c.add(globalScene.add.image(0, 0, BG_KEY[page]).setOrigin(0, 0));
+    } else {
+      this.drawPanel(c, page);
+      this.ensureAssets();
+    }
+
+    this.renderIconColumn(c);
+    this.renderHeader(c, page);
+
+    const field = this.onField();
+    const mon = field[Math.min(this.slotIndex, field.length - 1)];
+    switch (page) {
+      case "stats":
+        if (mon) {
+          this.renderStats(c, mon);
+        }
+        break;
+      case "abilities":
+        if (mon) {
+          this.renderAbilities(c, mon);
+        }
+        break;
+      case "moves":
+        if (mon) {
+          this.renderMoves(c, mon);
+        }
+        break;
+      case "field":
+        this.renderField(c);
+        break;
+      case "side-player":
+        this.renderSide(c, ArenaTagSide.PLAYER);
+        break;
+      case "side-enemy":
+        this.renderSide(c, ArenaTagSide.ENEMY);
+        break;
+      case "damage-calc":
+        if (mon) {
+          this.renderDamageCalc(c, mon);
+        }
+        break;
+      case "speed-order":
+        this.renderSpeedOrder(c);
+        break;
+    }
+
+    globalScene.ui.add(c);
+    this.container = c;
+  }
+
+  /** Graphics fallback panel: accent backing + cream pill boxes for this page. */
+  private drawPanel(c: Phaser.GameObjects.Container, page: Page): void {
+    const g = globalScene.add.graphics();
+    // Accent backing across the content area (left column kept clear).
+    g.fillStyle(PAGE_ACCENT[page], 1);
+    g.fillRoundedRect(54, 14, BG_W - 56, BG_H - 16, 6);
+    // Subtle ROM-like horizontal striping.
+    g.fillStyle(0xffffff, 0.07);
+    for (let y = 18; y < BG_H - 4; y += 4) {
+      g.fillRect(56, y, BG_W - 60, 1);
+    }
+    // Cream content boxes.
+    const boxes =
+      page === "stats"
+        ? STATS_BOXES
+        : page === "abilities" || page === "moves" || page === "damage-calc" || page === "speed-order"
+          ? ROW4_BOXES
+          : PILL_BOXES;
+    for (const [x, y, w, h] of boxes) {
+      g.fillStyle(CREAM_EDGE, 1);
+      g.fillRoundedRect(x - 1, y - 1, w + 2, h + 2, 5);
+      g.fillStyle(CREAM, 1);
+      g.fillRoundedRect(x, y, w, h, 4);
+    }
+    c.add(g);
+  }
+
+  /** Lazy-load the ROM panel/overlay textures, re-render when ready. */
+  private ensureAssets(): void {
+    if (this.assetsRequested) {
+      return;
+    }
+    this.assetsRequested = true;
+    const files: [string, string][] = [
+      ["er_binfo_stats", "stats.png"],
+      ["er_binfo_abilities", "abilities.png"],
+      ["er_binfo_moves", "moves.png"],
+      ["er_binfo_field", "field.png"],
+      ["er_binfo_side_player", "side-player.png"],
+      ["er_binfo_side_enemy", "side-enemy.png"],
+    ];
+    let queued = 0;
+    for (const [key, file] of files) {
+      if (!globalScene.textures.exists(key)) {
+        globalScene.loadImage(key, "elite-redux/battle-info", file);
+        queued++;
+      }
+    }
+    if (queued === 0) {
+      return;
+    }
+    globalScene.load.once(Phaser.Loader.Events.COMPLETE, () => {
+      if (this.container) {
+        this.render();
+      }
+    });
+    if (!globalScene.load.isLoading()) {
+      globalScene.load.start();
+    }
+  }
+
+  /**
+   * Left column: only the Pokémon currently on the field (player side, then
+   * enemy side). Each slot is a rounded tile + party icon + name; the inspected
+   * one is highlighted and bracketed.
+   */
+  private renderIconColumn(c: Phaser.GameObjects.Container): void {
+    const field = this.onField();
+    const n = Math.max(1, field.length);
+    const sel = Math.min(this.slotIndex, n - 1);
+    const slotH = n <= 2 ? 44 : 30;
+    const gap = 4;
+    const total = field.length * slotH + (field.length - 1) * gap;
+    let top = Math.max(6, Math.floor((BG_H - total) / 2));
+    for (let i = 0; i < field.length; i++) {
+      const mon = field[i];
+      const isSel = i === sel;
+      const isEnemy = mon.isEnemy();
+      const cy = top + slotH / 2;
+      const g = globalScene.add.graphics();
+      g.fillStyle(isSel ? 0xf5d23a : isEnemy ? 0xc06868 : 0x68a0c0, 1);
+      g.fillRoundedRect(COL_X, top, COL_W, slotH, 6);
+      if (isSel) {
+        g.lineStyle(2, 0xffffff, 1);
+        g.strokeRoundedRect(COL_X, top, COL_W, slotH, 6);
+      }
+      c.add(g);
+      const icon = globalScene.addPokemonIcon(mon, COL_X + COL_W / 2, cy - 4, 0.5, 0.5);
+      icon.setScale(0.7);
+      c.add(icon);
+      const tag = addTextObject(COL_X + COL_W / 2, top + slotH - 8, isEnemy ? "Foe" : "Ally", TextStyle.WINDOW_ALT, {
+        fontSize: "38px",
+      });
+      tag.setOrigin(0.5, 0);
+      c.add(tag);
+      top += slotH + gap;
+    }
+  }
+
+  /** Header bar: page title (left) + control hints (right). */
+  private renderHeader(c: Phaser.GameObjects.Container, page: Page): void {
+    const title = addTextObject(PANEL_X, 2, PAGE_TITLE[page], TextStyle.SUMMARY, { fontSize: "60px" });
+    title.setOrigin(0, 0);
+    c.add(title);
+    const hint = addTextObject(BG_W - 3, 4, "Ⓐ Scroll  ✛ Switch  ✛ Page", TextStyle.SUMMARY, { fontSize: "38px" });
+    hint.setOrigin(1, 0);
+    c.add(hint);
+  }
+
+  // --- per-Pokémon: STATS --------------------------------------------------
+  private renderStats(c: Phaser.GameObjects.Container, mon: Pokemon): void {
+    const gender = mon.gender === 0 ? " ♂" : mon.gender === 1 ? " ♀" : "";
+    const name = addTextObject(68, 34, `${mon.getNameToRender()}${gender} Lv${mon.level}`, TextStyle.WINDOW_ALT, {
+      fontSize: "54px",
+    });
+    name.setOrigin(0, 0);
+    c.add(name);
+    const types = mon
+      .getTypes()
+      .map(t => i18nType(t))
+      .join(" / ");
+    const typeText = addTextObject(68, 49, `Type: ${types}`, TextStyle.WINDOW_ALT, { fontSize: "50px" });
+    typeText.setOrigin(0, 0);
+    c.add(typeText);
+
+    // Stat-stage rows (label + up/down arrow chips) in the left box.
+    const ROWS = [76, 88, 100, 112, 124];
+    STAT_GRID.forEach((row, ri) => {
+      const ry = ROWS[ri];
+      const lbl = addTextObject(68, ry - 5, row.label, TextStyle.WINDOW_ALT, { fontSize: "46px" });
+      lbl.setOrigin(0, 0);
+      c.add(lbl);
+      const stage = mon.getStatStage(row.stat); // -6..+6
+      const g = globalScene.add.graphics();
+      for (let d = 0; d < 6; d++) {
+        const on = d < Math.abs(stage);
+        const cx = 94 + d * 8;
+        if (on) {
+          g.fillStyle(stage >= 0 ? 0x3aa83a : 0xd64a4a, 1);
+          if (stage >= 0) {
+            g.fillTriangle(cx - 3, ry + 2, cx + 3, ry + 2, cx, ry - 3);
+          } else {
+            g.fillTriangle(cx - 3, ry - 2, cx + 3, ry - 2, cx, ry + 3);
+          }
+        } else {
+          g.fillStyle(0x000000, 0.18);
+          g.fillCircle(cx, ry, 1.4);
+        }
+      }
+      c.add(g);
+    });
+
+    // Stat numbers (right box), 6 rows. For the 5 battle stats we show the value
+    // after the in-battle STAT-STAGE multiplier next to the base when a stage is
+    // active — e.g. a +1 Atk reads "147(220)", coloured green for a boost / red for
+    // a drop. We deliberately apply ONLY stat stages (the visible up/down arrows),
+    // NOT held-item/ability passives like Eviolite — those have no stage arrow, so
+    // folding them in (via getEffectiveStat) made stats "look changed" with nothing
+    // to explain it. The base already folds in vitamins, EVs, IVs and nature
+    // (getStat). HP has no stat stages → current/max.
+    const numbers: { lbl: string; stat: EffectiveStat | null }[] = [
+      { lbl: "HP", stat: null },
+      { lbl: "Atk", stat: Stat.ATK },
+      { lbl: "Def", stat: Stat.DEF },
+      { lbl: "SpA", stat: Stat.SPATK },
+      { lbl: "SpD", stat: Stat.SPDEF },
+      { lbl: "Spe", stat: Stat.SPD },
+    ];
+    let ny = 74;
+    for (const { lbl, stat } of numbers) {
+      const l = addTextObject(156, ny, lbl, TextStyle.WINDOW_ALT, { fontSize: "44px" });
+      l.setOrigin(0, 0);
+      c.add(l);
+
+      let text: string;
+      let dir = 0; // -1 net drop, 0 unchanged, +1 net boost
+      if (stat === null) {
+        text = `${mon.hp}/${mon.getMaxHp()}`;
+      } else {
+        const base = mon.getStat(stat);
+        const stage = mon.getStatStage(stat); // -6..+6
+        if (stage === 0) {
+          text = `${base}`;
+        } else {
+          // Canonical battle-stat stage multiplier: max(2,2+s)/max(2,2-s).
+          const eff = Math.floor((base * Math.max(2, 2 + stage)) / Math.max(2, 2 - stage));
+          text = `${base}(${eff})`;
+          dir = stage > 0 ? 1 : -1;
+        }
+      }
+      const v = addTextObject(232, ny, text, TextStyle.WINDOW_ALT, { fontSize: "44px" });
+      v.setOrigin(1, 0);
+      if (dir > 0) {
+        v.setColor("#3aa83a").setShadowColor("#1f5e1f");
+      } else if (dir < 0) {
+        v.setColor("#d64a4a").setShadowColor("#7a2a2a");
+      }
+      c.add(v);
+      ny += 7.5;
+    }
+
+    // Nature (bottom-right box).
+    const nat = mon.getNature();
+    const natText = addTextObject(156, 130, `${getNatureName(nat)} ${naturePlusMinus(nat)}`, TextStyle.WINDOW_ALT, {
+      fontSize: "40px",
+    });
+    natText.setOrigin(0, 0);
+    c.add(natText);
+  }
+
+  // --- per-Pokémon: ABILITIES ----------------------------------------------
+  private renderAbilities(c: Phaser.GameObjects.Container, mon: Pokemon): void {
+    const rows: { label: string; abilityId: number }[] = [];
+    const main = mon.getAbility(true);
+    if (main) {
+      rows.push({ label: "Ability", abilityId: main.id });
+    }
+    // Use the POKEMON-level passive resolver (not the species-level one): it
+    // honors per-Pokémon overrides written by the Ability Randomizer
+    // (`customPokemonData.passive/passive2/passive3`) and transform overrides,
+    // so the panel reflects runtime ability changes rather than static species data.
+    for (const ability of mon.getPassiveAbilities()) {
+      if (ability && ability.id) {
+        rows.push({ label: "Innate", abilityId: ability.id });
+      }
+    }
+    ROW4_BOXES.slice(0, rows.length).forEach(([, by], i) => {
+      const r = rows[i];
+      const ability = allAbilities[r.abilityId];
+      const head = addTextObject(68, by + 1, `${r.label}: ${ability?.name ?? ""}`, TextStyle.SUMMARY, {
+        fontSize: "46px",
+      });
+      head.setOrigin(0, 0);
+      c.add(head);
+      const desc = getErAbilityDescription(r.abilityId) ?? ability?.description ?? "";
+      const d = addTextObject(68, by + 10, desc, TextStyle.WINDOW_ALT, { fontSize: "38px", wordWrap: { width: 670 } });
+      d.setOrigin(0, 0);
+      c.add(d);
+    });
+  }
+
+  // --- per-Pokémon: MOVES --------------------------------------------------
+  private renderMoves(c: Phaser.GameObjects.Container, mon: Pokemon): void {
+    const moves = mon.getMoveset().filter(Boolean).slice(0, 4);
+    ROW4_BOXES.slice(0, moves.length).forEach(([, by], i) => {
+      const mv = moves[i];
+      const move = mv.getMove();
+      const head = addTextObject(68, by + 3, move.name, TextStyle.SUMMARY, { fontSize: "48px" });
+      head.setOrigin(0, 0);
+      c.add(head);
+      const meta = addTextObject(
+        230,
+        by + 11,
+        `${i18nType(move.type)}  Pw ${move.power > 0 ? move.power : "—"}  PP ${mv.ppUsed}/${mv.getMovePp()}`,
+        TextStyle.WINDOW_ALT,
+        { fontSize: "38px" },
+      );
+      meta.setOrigin(1, 0);
+      c.add(meta);
+    });
+  }
+
+  // --- DAMAGE CALCULATOR (Rogue-tier unlock) -------------------------------
+  // Shows the inspected Pokémon's moves and the damage each would deal to the
+  // primary opposing target (single rolled estimate, % of the target's max HP).
+  private renderDamageCalc(c: Phaser.GameObjects.Container, mon: Pokemon): void {
+    const target = mon.getOpponents()[0];
+    const moves = mon.getMoveset().filter(Boolean).slice(0, 4);
+    if (!target) {
+      const t = addTextObject(68, ROW4_BOXES[0][1] + 6, "No target on the field.", TextStyle.WINDOW_ALT, {
+        fontSize: "44px",
+      });
+      t.setOrigin(0, 0);
+      c.add(t);
+      return;
+    }
+    // Sub-header: who we're calculating against.
+    const sub = addTextObject(PANEL_X, 14, `vs ${target.getNameToRender()}`, TextStyle.WINDOW_ALT, {
+      fontSize: "42px",
+    });
+    sub.setOrigin(0, 0);
+    c.add(sub);
+
+    ROW4_BOXES.slice(0, Math.max(1, moves.length)).forEach(([, by], i) => {
+      const mv = moves[i];
+      if (!mv) {
+        return;
+      }
+      const move = mv.getMove();
+      const head = addTextObject(68, by + 3, move.name, TextStyle.SUMMARY, { fontSize: "46px" });
+      head.setOrigin(0, 0);
+      c.add(head);
+
+      let info: string;
+      if (move.category === MoveCategory.STATUS || move.power <= 0) {
+        info = "—  (status)";
+      } else {
+        let dmg = 0;
+        try {
+          dmg = target.getAttackDamage({ source: mon, move, simulated: true }).damage;
+        } catch {
+          dmg = 0;
+        }
+        const pct = Math.max(0, Math.round((dmg / Math.max(1, target.getMaxHp())) * 100));
+        const ko = dmg >= target.hp ? "  KO!" : "";
+        info = `${dmg} dmg (${pct}%)${ko}`;
+      }
+      const meta = addTextObject(230, by + 11, info, TextStyle.WINDOW_ALT, { fontSize: "40px" });
+      meta.setOrigin(1, 0);
+      c.add(meta);
+    });
+  }
+
+  // --- SPEED ORDER (Ultra-tier unlock) -------------------------------------
+  // Lists every on-field Pokémon ordered by effective Speed (accounting for
+  // Trick Room), so the player can read the turn order at a glance.
+  private renderSpeedOrder(c: Phaser.GameObjects.Container): void {
+    const field = this.onField();
+    const trickRoom = !!globalScene.arena.getTag(ArenaTagType.TRICK_ROOM);
+    const ranked = field
+      .map(p => ({ p, spd: p.getEffectiveStat(Stat.SPD) }))
+      .sort((a, b) => (trickRoom ? a.spd - b.spd : b.spd - a.spd));
+
+    if (trickRoom) {
+      const tr = addTextObject(PANEL_X, 14, "Trick Room active (slowest first)", TextStyle.WINDOW_ALT, {
+        fontSize: "40px",
+      });
+      tr.setOrigin(0, 0);
+      c.add(tr);
+    }
+
+    ranked.slice(0, ROW4_BOXES.length).forEach(({ p, spd }, i) => {
+      const [, by] = ROW4_BOXES[i];
+      const side = p.isEnemy() ? "Foe" : "Ally";
+      const head = addTextObject(68, by + 6, `${i + 1}.  ${p.getNameToRender()} (${side})`, TextStyle.SUMMARY, {
+        fontSize: "46px",
+      });
+      head.setOrigin(0, 0);
+      c.add(head);
+      const v = addTextObject(230, by + 8, `Spe ${spd}`, TextStyle.WINDOW_ALT, { fontSize: "44px" });
+      v.setOrigin(1, 0);
+      c.add(v);
+    });
+  }
+
+  // --- FIELD: weather / terrain --------------------------------------------
+  private renderField(c: Phaser.GameObjects.Container): void {
+    const rows: [string, string][] = [];
+    const weather = globalScene.arena.weather;
+    if (weather && weather.weatherType !== WeatherType.NONE) {
+      rows.push([WeatherType[weather.weatherType].replace(/_/g, " "), `Turns Left: ${weather.turnsLeft}`]);
+    }
+    const terrain = globalScene.arena.terrain;
+    if (terrain) {
+      rows.push([`${terrainName(terrain.terrainType)} Terrain`, `Turns Left: ${terrain.turnsLeft}`]);
+    }
+    this.renderPills(c, rows.length > 0 ? rows : [["No field effects", ""]]);
+  }
+
+  // --- SIDE: side conditions as pill rows ----------------------------------
+  private renderSide(c: Phaser.GameObjects.Container, side: ArenaTagSide): void {
+    const rows: [string, string][] = [];
+    for (const tag of globalScene.arena.tags) {
+      if (tag.side !== side && tag.side !== ArenaTagSide.BOTH) {
+        continue;
+      }
+      const turns = tag.turnCount > 0 ? `Turns Left: ${tag.turnCount}` : "";
+      rows.push([tagDisplayName(tag), turns]);
+    }
+    this.renderPills(c, rows.length > 0 ? rows : [["No side effects", ""]]);
+  }
+
+  /** Up to 3 pill rows (name + turns) in the 3 pill boxes. */
+  private renderPills(c: Phaser.GameObjects.Container, rows: [string, string][]): void {
+    PILL_BOXES.slice(0, Math.min(3, rows.length)).forEach(([, by], i) => {
+      const [name, turns] = rows[i];
+      const n = addTextObject(70, by + 2, name, TextStyle.SUMMARY, { fontSize: "48px" });
+      n.setOrigin(0, 0);
+      c.add(n);
+      if (turns) {
+        const t = addTextObject(70, by + 12, turns, TextStyle.WINDOW_ALT, { fontSize: "40px" });
+        t.setOrigin(0, 0);
+        c.add(t);
+      }
+    });
+  }
+}
+
+// --- helpers ----------------------------------------------------------------
+/** "Fire", "Water"… from the numeric PokemonType. */
+function i18nType(type: number): string {
+  const name = (PokemonTypeEnum as unknown as Record<number, string>)[type] ?? "";
+  return name.charAt(0) + name.slice(1).toLowerCase();
+}
+
+function naturePlusMinus(nature: number): string {
+  let plus = "";
+  let minus = "";
+  for (const s of [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD]) {
+    const m = getNatureStatMultiplier(nature, s);
+    if (m > 1) {
+      plus = STAT_GRID.find(g => g.stat === s)?.label ?? "";
+    } else if (m < 1) {
+      minus = STAT_GRID.find(g => g.stat === s)?.label ?? "";
+    }
+  }
+  return plus && minus ? `(+${plus}, -${minus})` : "(neutral)";
+}
+
+function titleCase(raw: string): string {
+  return raw
+    .toLowerCase()
+    .split("_")
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function terrainName(t: number): string {
+  return titleCase((TerrainTypeEnum as unknown as Record<number, string>)[t] ?? "");
+}
+
+/** ArenaTagType is a string enum (e.g. "STEALTH_ROCK") → "Stealth Rock". */
+function tagDisplayName(tag: { tagType: string }): string {
+  return titleCase(tag.tagType);
+}

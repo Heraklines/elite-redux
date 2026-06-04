@@ -1,0 +1,44 @@
+name: Deploy Beta
+
+on:
+  push:
+    branches:
+      - beta
+      - release
+  workflow_run:
+    types: completed
+    workflows: ["Post Release Deleted"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.repository == 'pagefaultgames/pokerogue' && github.ref_name == (vars.BETA_DEPLOY_BRANCH || 'beta')
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: "recursive"
+          ref: ${{ vars.BETA_DEPLOY_BRANCH || 'beta'}}
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Build
+        run: pnpm build:beta
+        env:
+          NODE_ENV: beta
+
+      - name: Set up SSH
+        run: |
+          mkdir ~/.ssh
+          echo "${{ secrets.BETA_SSH_PUBLIC_KEY }}" > ~/.ssh/id_ed25519.pub
+          echo "${{ secrets.BETA_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/*
+          ssh-keyscan -H ${{ secrets.BETA_SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy build on server
+        run: |
+          rsync --del --no-times --checksum -vrm dist/* ${{ secrets.BETA_SSH_USER }}@${{ secrets.BETA_SSH_HOST }}:${{ secrets.BETA_DESTINATION_DIR }}

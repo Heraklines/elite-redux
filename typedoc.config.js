@@ -1,0 +1,83 @@
+/*
+ * SPDX-FileCopyrightText: 2025 Pagefault Games
+ * SPDX-FileContributor: Bertie690
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+/// <reference path="./global.d.ts" />
+
+import { globSync } from "node:fs";
+
+const dryRun = !!process.env.DRY_RUN?.match(/true/gi);
+
+/**
+ * <!-- @satisfies {Partial<import("typedoc").TypeDocOptions>} -->
+ */
+const config = {
+  entryPoints: ["./src", "./test/framework", "./test/helpers", "./test/matchers", "./test/utils"],
+  entryPointStrategy: "expand",
+  exclude: [
+    "src/polyfills.ts",
+    "src/extensions.ts",
+    "src/vite.env.d.ts",
+    "**/*+.test.ts",
+    "**/*+.test-d.ts",
+    "test/setup",
+    "test/reporters",
+    "test/@types/matcher-helpers.ts",
+    "test/@types/vitest.d.ts",
+  ],
+  excludePrivate: false, // Private members are useful in the docs for contributors
+  excludeReferences: true, // prevent documenting re-exports
+  requiredToBeDocumented: [
+    "Enum",
+    "EnumMember",
+    "Variable",
+    "Function",
+    "Class",
+    "Interface",
+    "Property",
+    "Method",
+    "Accessor",
+    "TypeAlias",
+  ],
+  highlightLanguages: ["javascript", "json", "jsonc", "json5", "tsx", "typescript", "markdown"],
+  plugin: [
+    "typedoc-github-theme",
+    "typedoc-plugin-coverage",
+    "typedoc-plugin-mdn-links",
+    "typedoc-plugin-missing-exports",
+    ...globSync("./plugins/typedoc/**/*.js").map(plugin => "./" + plugin),
+  ],
+  // Avoid emitting docs for branches other than main/beta
+  emit: dryRun ? "none" : "docs",
+  out: process.env.CI ? "/tmp/docs" : "./typedoc",
+  name: "PokéRogue",
+  readme: "./README.md",
+  projectDocuments: ["docs/*.md", "CONTRIBUTING.md"],
+  coverageLabel: "Documented",
+  coverageSvgWidth: 120, // Increased from 104 baseline due to adding 2 extra letters
+  favicon: "./favicon.ico",
+  theme: "typedoc-github-theme",
+  customFooterHtml: `<p>Copyright <strong>Pagefault Games</strong> ${new Date().getFullYear() === 2025 ? "2025" : "2025 - " + new Date().getFullYear()}</p>`,
+  customFooterHtmlDisableWrapper: true,
+  navigationLinks: {
+    GitHub: "https://github.com/pagefaultgames/pokerogue",
+  },
+  includeDocCommentReferences: true,
+  placeInternalsInOwningModule: true,
+};
+
+// If generating docs for main/beta, check the ref name and add an appropriate navigation header
+if (!dryRun && process.env.REF_NAME) {
+  const otherRefName = process.env.REF_NAME === "main" ? "beta" : "main";
+  config.navigationLinks = {
+    ...config.navigationLinks,
+    // This will be "Switch to Beta" when on main, and vice versa
+    [`Switch to ${otherRefName.charAt(0).toUpperCase() + otherRefName.slice(1).toLowerCase()}`]: `https://pagefaultgames.github.io/pokerogue/${otherRefName}`,
+  };
+}
+
+// biome-ignore lint/style/noDefaultExport: required by TypeDoc
+export default config;

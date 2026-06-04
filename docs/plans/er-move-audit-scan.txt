@@ -1,0 +1,163 @@
+13	v	Razor Wind	[cond/typed-damage] {pow 90!=70}	:: Wind slices through Rock for super effective damage. super effective vs Rock. +1 priority 
+18	v	Whirlwind	[self-switch]	:: Blows away the foe with wind and ends the battle. The foe is made to switch out with an al
+30	v	Horn Attack	[stat-change] {pow 80!=85}	:: Jabs the foe with sharp horns. High crit chance. Jabs with sharply pointed horn. High crit
+34	v	Body Slam	[stat-change]	:: A full-body slam that may cause paralysis. The user drops its full body on the foe. 30% pa
+37	v	Thrash	[confuse] {pow 120!=130}	:: A rampage of 2 to 3 turns that confuses the user. The user rampages about for two to three
+49	v	Sonic Boom	[cond/typed-damage] {pow 1!=70;acc 90!=100}	:: Launches shock waves that are super effective vs rock. The foe is hit with a shock wave th
+51	v	Acid	[cond/typed-damage] {pow 40!=70}	:: Super effective vs Steel. May lower Defense. Super effective vs Steel. Hits both foes. 30%
+61	v	Bubble Beam	[multi-hit] {pow 65!=25}	:: Forcefully sprays bubbles that hit repeatedly. A spray of bubbles strikes the foe 2-5 time
+70	v	Strength	[stat-change] {pow 100!=110}	:: A powerful slam attack. Lowers the user's defenses. The foe is slugged at maximum power. D
+73	v	Leech Seed	[always-hit]	:: Plants a seed on the foe to steal HP on every turn. Plants a seed that steals HP every tur
+76	v	Solar Beam	[drain]	:: Absorbs light in one turn, then attacks next turn. Strong 2-turn move. Weather-based. Mega
+80	v	Petal Dance	[confuse]	:: A rampage of 2 to 3 turns that confuses the user. The user attacks with petals for two to 
+86	v	Thunder Wave	[always-hit]	:: A weak jolt of electricity that paralyzes the foe. A weak shock paralyzes the foe. Never m
+90	v	Fissure	[stat-change]	:: Very powerful attack. Hits both foes. The foe is dropped into a fissure. Hits both foes.
+92	v	Toxic	[always-hit]	:: Poisons the foe with an intensifying toxin. Inflicts a poison that gets worse every turn. 
+99	v	Rage	[confuse] {pow 40!=120}	:: A rampage of 2 to 3 turns that confuses the user. The user thrashes about for two to three
+105	v	Recover	[drain]	:: Recovers up to half the user's maximum HP. A self-healing move that restores HP by up to h
+113	v	Light Screen	[stat-change]	:: Creates a wall of light that lowers Sp. Atk damage. A wall of light cuts damage from Sp. A
+116	v	Focus Energy	[high-crit,stat-change]	:: Focuses power to raise the critical-hit ratio. The user takes a deep breath and focuses to
+120	v	Self-Destruct	[cond/typed-damage]	:: Inflicts severe damage but makes the user faint. The user blows up to inflict severe damag
+124	v	Sludge	[cond/typed-damage] {pow 65!=70}	:: Super effective vs Water. May poison foes. Hurls toxic sludge at the foe. Super-effective 
+129	v	Swift	[always-hit] {pow 60!=65}	:: Sprays star-shaped rays that never miss. Special-based extreme speed. Has +2 priority.
+130	v	Skull Bash	[stat-change] {pow 130!=120}	:: Tucks in the head, then attacks on the next turn. The user raises its Attack on the 1st tu
+134	v	Kinesis	[flinch] {acc 80!=100}	:: Animates the foe's item, surprising them. Causes the foe's item to fly away, removing it a
+135	v	Soft-Boiled	[drain]	:: Recovers up to half the user's maximum HP. Heals the user by up to half its full HP. It ca
+139	v	Poison Gas	[cond/typed-damage] {acc 90!=100}	:: Super effective vs Flying. gas that may poison. Super effective vs Flying. Hits both foes.
+143	v	Sky Attack	[stat-change]	:: Searches out weak spots, then strikes the next turn. Raises its Attack on the first turn, 
+161	v	Tri Attack	[burn,paralyze,frostbite]	:: Fires three types of beams at the same time. 30% chance to paralyze, burn, or frostbite fo
+169	v	Spider Web	[self-switch]	:: Ensnares the foe to stop it from fleeing or switching. Ensnares the foe with sticky string
+170	v	Mind Reader	[stat-change]	:: Reads the opponent's mind to dodge their attack. Dodges all attacks and lowers the SpDef o
+174	v	Curse	[stat-change]	:: A move that functions differently for GHOSTS. Inflicts a curse when used in fog or by Ghos
+186	v	Sweet Kiss	[infatuate]	:: Demands a kiss, causing confusion and infatuation. Kisses the foe with a sweet cuteness th
+189	v	Mud-Slap	[multi-hit] {pow 20!=25}	:: Hurls mud in the foe's face dealing repeated damage. Mud is hurled in the foe's face to in
+194	v	Destiny Bond	[sacrifice]	:: If the user faints, the foe is also made to faint. If the user faints, the foe delivering 
+200	v	Outrage	[confuse]	:: A rampage of 2 to 3 turns that confuses the user. The user thrashes about for two to three
+208	v	Milk Drink	[drain]	:: Recovers up to half the user's maximum HP. Heals the user by up to half its full HP. It ca
+215	v	Heal Bell	[drain]	:: Chimes soothingly to heal all status abnormalities. Heals the status problems of allies an
+217	v	Present	[drain] {pow 1!=80;acc 90!=100}	:: A sly attack that damages foes and heals allies. Deals typeless damage to foes, restores 5
+218	v	Frustration	[cond/typed-damage] {pow 95!=75}	:: Deals double damage if the last move failed. The user unleashes its frustration. Failing m
+229	v	Rapid Spin	[leech-seed]	:: Clears some hazards. Ups speed by +1. Frees the user from Bind, Leech Seed, Spikes etc. Up
+233	v	Vital Throw	[always-hit] {pow 70!=120}	:: Makes the user's move last, but it never misses. Makes the user attack after the foe. In r
+253	v	Uproar	[confuse] {pow 90!=120}	:: A tantrum of 2 to 3 turns that confuses the user. The user throws a tantrum for two to thr
+254	v	Stockpile	[multi-3]	:: Charges up power for up to 3 turns. The user charges up power for use later. It can be use
+261	v	Will-O-Wisp	[always-hit] {acc 85!=90}	:: Inflicts a burn on the foe with intense fire. A blueish-white flame burns the target. Neve
+262	v	Memento	[sacrifice]	:: The user faints and lowers the foe's abilities. The user faints, but sharply lowers the fo
+263	v	Facade	[burn,paralyze,poison]	:: Doubles damage if burned, paralyzed, or poisoned. An attack that is boosted if user is bur
+273	v	Wish	[drain]	:: A wish that restores HP. It takes time to work. A self-healing move that restores half the
+275	v	Ingrain	[self-switch]	:: Lays roots that restore HP. The user can't switch out. The user lays roots that restore HP
+283	v	Endeavor	[stat-change]	:: Gains power if the user's HP is lower than the foe's HP. Gains power the fewer HP the user
+287	v	Refresh	[drain]	:: Rests for a moment to cure status and heal. Cures status and heals the user for 25% HP.
+288	v	Grudge	[sacrifice]	:: If the user faints, deletes all PP of foe's last move. If the user faints, this move delet
+300	v	Mud Sport	[stat-change]	:: Covers the user in mud to raise electrical resistance. Weakens Electric-type attacks while
+312	v	Aromatherapy	[drain]	:: Heals all status problems with a soothing scent. Heals the status problems of allies and r
+322	v	Cosmic Power	[drain]	:: Raises Defense and Sp. Def with a mystic power. The user absorbs a mystic power to raise i
+325	v	Shadow Punch	[always-hit]	:: An unavoidable punch that is thrown from shadows. A strong punch from the shadows. Always 
+326	v	Extrasensory	[always-hit]	:: Attacks with a peculiar power. May cause flinching. Attacks with an odd power. 10% flinch 
+329	v	Sheer Cold	[cond/typed-damage]	:: Super effective on Water. 20% frostbite chance. This move is super effective on Water. 20%
+332	v	Aerial Ace	[always-hit]	:: An extremely speedy and unavoidable attack. Always crits and never misses. Keen Edge boost
+346	v	Water Sport	[stat-change]	:: The user becomes soaked to raise resistance to fire. Weakens Fire-type attacks while the u
+351	v	Shock Wave	[always-hit]	:: A fast and unavoidable +2 priority attack. A rapid jolt of electricity strikes. Never miss
+360	v	Gyro Ball	[stat-change]	:: A high-speed spin that does more damage to faster foes. A fast spin. The slower the user, 
+361	v	Healing Wish	[drain,sacrifice]	:: The user faints to heal up the recipient. The user faints. Its replacement has its HP rest
+366	v	Tailwind	[stat-change]	:: Whips up a turbulent breeze that raises Speed. A turbulent whirl-wind that ups the Speed s
+367	v	Acupressure	[stat-change]	:: The user sharply raises one of its stats. The user applies pressure to stress points, shar
+377	v	Heal Block	[drain]	:: Prevents the foe from recovering any HP. The foe cannot use any moves, held items or Abili
+378	v	Wring Out	[self-switch]	:: Crushes quicker foes, nullifying their ability. Negates abilities until switch out if the 
+380	v	Gastro Acid	[poison]	:: Suppresses the foe's ability and poisons it. Spews stomach acid at the foe, negating its a
+390	v	Toxic Spikes	[poison]	:: Sets spikes that poison a foe switching in. Poison spikes are laid at the foe's feet. They
+396	v	Aura Sphere	[always-hit] {pow 80!=85}	:: Attacks with an aura blast that cannot be evaded. A strong blast of aura power. Always hit
+418	v	Bullet Punch	[always-hit]	:: Punches as fast as a bul-let. It always hits first. Bullet-fast punches barrage the target
+433	v	Trick Room	[stat-change]	:: Slower Pokémon get to move first for 5 turns. A bizarre area is constructed for 5 turns wh
+443	v	Magnet Bomb	[always-hit,cond/typed-damage] {pow 60!=70}	:: Launches a magnet that is Super Effective vs Steel. Launches a magnetic bomb that is Super
+445	v	Captivate	[infatuate,cond/typed-damage]	:: Deals additional damage if the target is infatuated. Deals double damage vs infatuated foe
+456	v	Heal Order	[drain]	:: The user's underlings show up to heal half its max HP. The user calls out its underlings t
+459	v	Roar of Time	[self-switch]	:: Moves last, but forces the target to switch out. A blast which distorts even time. Forces 
+461	v	Lunar Dance	[drain,sacrifice]	:: The user faints to heal up the recipient. The user faints. Its replacement has its HP rest
+466	v	Ominous Wind	[cond/typed-damage] {pow 60!=55}	:: A repulsive attack that may raise all stats. 10% chance to raise all user's stats. Deals d
+474	v	Venoshock	[poison]	:: Does double damage if the foe is poisoned. A special liquid that damages for double the po
+486	v	Electro Ball	[stat-change]	:: Hurls an orb that does more damage to slower foes. An electric orb is hurled at the foe. F
+496	v	Round	[cond/typed-damage]	:: A song that inflicts damage. Others can join in too. A loud song attack. Deals 2x damage i
+500	v	Stored Power	[stat-change]	:: The higher the user's stats the more damage caused. The more the user's stats are raised, 
+502	v	Ally Switch	[self-switch]	:: The user switches places with its partner. The user teleports using a strange power and sw
+505	v	Heal Pulse	[drain]	:: Recovers up to half the target's maximum HP. A pulse is loosed, healing the target by up t
+507	v	Sky Drop	[stat-change]	:: Takes the foe into the sky then drops it the next turn. Immobilizes and then slams the foe
+515	v	Final Gambit	[sacrifice]	:: The user faints to damage the foe equal to its HP. This attack causes the user to faint, b
+531	v	Heart Stamp	[stat-change] {pow 60!=80}	:: A sudden blow after a cute act. May cause flinching. The foe's guard drops, and the user s
+556	v	Icicle Crash	[stat-change]	:: Drops large icicles on the foe. May cause flinching. Sharp icicles fall onto the foe, with
+564	v	Sticky Web	[stat-change]	:: Weaves a sticky net that slows foes switching in. A sticky net woven around the foe that d
+565	v	Fell Stinger	[stat-change]	:: If it knocks out a foe the Attack stat is raised. If this attack knocks out a foe, the use
+573	v	Freeze-Dry	[cond/typed-damage]	:: Super effective on Water-types. May cause freezing. This move is super effective on Water.
+574	v	Disarming Voice	[always-hit]	:: Lets out a charming cry that cannot be evaded. The user cries out with a disarmingly cute 
+581	v	Misty Terrain	[stat-change]	:: Covers the ground with mist for 8 turns. Blocks status. Boosts Fairy-type moves for 8 turn
+588	v	King's Shield	[stat-change]	:: Evades damage, and reduces Attack if struck. A protective stance is assumed. Contact by th
+589	v	Play Nice	[always-hit]	:: Befriend the foe, lowering its Attack without fail. Lowers all foes' Attack by 1 stage. Al
+599	v	Venom Drench	[poison]	:: Lowers the Attack, Sp. Atk and Speed of a poisoned foe. Poisoned foes suffer lowered Attac
+622	v	Shore Up	[drain]	:: Restores the user's HP. More HP in a sandstorm. Heals the user by up to half its full HP, 
+624	v	Baneful Bunker	[poison]	:: Protects user and poisons foes on contact. This move protects the user and poisons any foe
+629	v	Floral Healing	[drain]	:: Restores an ally's HP. Heals more on grass. Heals the target by up to half its max HP. It 
+644	v	Power Trip	[stat-change]	:: It hits harder the more stat boosts the user has. The more the user's stats are raised, th
+647	v	Smart Strike	[always-hit] {pow 70!=80}	:: Hits with an accurate horn that never misses. Stabs the foe with a sharp horn. Ignores Abi
+648	v	Purify	[drain]	:: Cures the foe's status to restore HP. The user tries to heal the target's status condition
+666	v	Spectral Thief	[stat-change]	:: Steals the target's stat boosts, then attacks. Hiding in the foe's shadow, the user steals
+679	v	Pika Papow	[stat-change,always-hit] {pow 1!=110}	:: A reliable and strong Electric type attack. Uses best offense. Pikachu's love for its trai
+685	v	Sappy Seed	[drain]	:: Giant stalk scatters seeds that drain HP every turn. Grows a giant stalk, scattering seeds
+688	v	Veevee Volley	[stat-change,always-hit] {pow 1!=110}	:: A reliable and strong Normal type attack. Uses best offense. Eevee's love for its trainer 
+694	v	No Retreat	[self-switch]	:: Raises all of the user's stats but prevents escape. Ups all the user's stats. However, the
+699	v	Octolock	[stat-change]	:: Traps the foe to lower Def and Sp. Def fall each turn. Prevents escape, and lowers the Sp.
+703	v	Clangorous Soul	[stat-change]	:: The user uses some of its HP to raise all its stats. The user raises all its stats by usin
+709	v	Behemoth Blade	[cond/typed-damage]	:: Strikes as a sword. It deals 2x damage to Dynamaxed foes. The user strikes as a sword, dea
+710	v	Behemoth Bash	[cond/typed-damage]	:: Does more damage the higher the user's Def. Uses defense for damage calculation. Double da
+713	v	Branch Poke	[stat-change]	:: The user pokes the target with a pointed branch. The user attacks the foe by poking it wit
+720	v	Obstruct	[stat-change]	:: Protects itself, harshly lowering Def on contact. Protects the user, and lowers the Defens
+721	v	False Surrender	[always-hit]	:: Bows to stab the foe with hair. It never misses. The user pretends to bow, then stabs its 
+728	v	Meteor Beam	[stat-change]	:: A 2-turn move that raises Sp. Attack before attacking. A 2-turn move that gathers space po
+735	v	Burning Jealousy	[stat-change]	:: Attacks both foes with a 50% chance to burn boosted foes. Attacks both foes jealously. 50%
+736	v	Lash Out	[stat-change] {pow 75!=80}	:: Increases in damage as the user's stats are lowered +20 BP for each negative stat stage an
+744	v	Jungle Healing	[drain]	:: Heals HP and status of itself and allies in battle. Becomes one with the jungle, healing H
+754	v	Eerie Spell	[always-hit] {pow 80!=110;acc 100!=80}	:: Attacks with psychic power. Foe's last move has 3 PP cut. Foe's last move has 6 PP cut. Ne
+755	C	Deathroll	[stat-change]	:: Does a deadly roll in water. Ignores target's stat changes. 20% confusion chance. Strong J
+767	v	Raging Fury	[confuse]	:: A rampage of 2 to 3 turns that confuses the user. The user thrashes about for two to three
+784	C	Volt Bolt	[paralyze]	:: Not done yet. Doubles damage if foe is paralyzed. Arrow move. Archer boost.
+792	C	Asteroid Shot	[always-hit]	:: Launches a asteroid onto the target. Cannot miss. Launches a small asteroid onto the targe
+811	C	Flash Freeze	[drain,always-hit]	:: Drains the heat from the target, causing frostbite. Rapidly chills the foe, causing frostb
+813	C	Homing Fletch	[always-hit]	:: Not done yet. User fires a seeking arrow. Cannot miss. Has +1 crit chance. Archer boost.
+814	v	Bitter Malice	[frostbite]	:: Attacks with spine-chilling resentment. May cause frostbite. A spine-chilling strike. 30% 
+829	v	Shed Tail	[self-switch]	:: Uses 50% HP to create substitute and switch out. The user creates a substitute using its o
+847	v	Chilling Water	[frostbite]	:: Shoots ice-cold water at the foe. May cause frostbite. Fires ice-cold water at the foe. 30
+859	v	Gigaton Hammer	[cond/typed-damage] {pow 80!=140}	:: Super effective vs Steel. Can't be used twice in a row. Super effective vs Steel. Can't be
+860	v	Triple Dive	[multi-3]	:: Hits 3 times. The user performs a perfectly timed triple dive, hitting the foe three times
+869	v	Flower Trick	[always-hit]	:: Can't miss. Always crits. The user throws a bouquet at the foe. This move always hits and 
+870	v	Aqua Step	[stat-change]	:: Deals damage. Raises speed. The user attacks the foe with light and fluid dance steps. Rai
+871	v	Torch Song	[stat-change]	:: Deals damage. Raises SpAtk. The user blows fire as if singing a song. Raises SpAtk by +1. 
+872	v	Glaive Rush	[cond/typed-damage]	:: Deals damage. User takes double damage for rest of turn. Charges at the foe. The foe's nex
+875	v	Lumina Crash	[stat-change]	:: Lowers SpDef with a peculiar light. The user unleashes a peculiar light which harshly lowe
+876	v	Order Up	[stat-change]	:: The user attacks with elegant poise Boosts stat with Tatsugiri. The user attacks with pois
+878	v	Spin Out	[stat-change]	:: The user spins furiously by straining its legs. Lowers speed The user furiously spins to a
+881	v	Fillet Away	[stat-change]	:: The user sharply boosts stats using its own HP. The user sharply boosts its Atk, Sp. Atk, 
+883	v	Make It Rain	[stat-change]	:: The user attacks by throwing out a mass of coins Lower's user SPA The user attacks by thro
+888	v	Pounce	[stat-change]	:: The user pounces on the target, lowering their Speed. The user attacks by pouncing on the 
+889	v	Trailblaze	[stat-change]	:: Deals damage and boosts the user's Speed stat. The user attacks suddenly as leaping from t
+894	v	Axe Kick	[confuse]	:: An all-in, reckless kick that might confuse the foe. Slams its heel. 30% confusion chance.
+895	v	Barb Barrage	[stat-change]	:: The user launches countless toxic barbs 30% chance to poison Barbs are shot at the foe. 30
+902	v	Fickle Beam	[cond/typed-damage] {pow 85!=80}	:: Shoots a strange beam of light that might deal double damage. Shoots a beam of light to in
+903	v	Burning Bulwark	[burn]	:: The user's intensely hot fur protects from attacks. The user's hot fur shields from attack
+905	v	Tachyon Cutter	[always-hit] {pow 100!=50}	:: Launches particle blades at the target twice in a row. Launches particle blades twice. Nev
+907	v	Dragon Cheer	[stat-change]	:: Raises crit by one stage for all allies. +2 if DRAGON Raises crit by +1 for all allies. +2
+908	v	Alluring Voice	[confuse]	:: Attacks the target using its angelic voice. May confuse. Attacks with an angelic voice. Ca
+911	v	Supercell Slam	[recoil] {pow 50!=100;acc 100!=95}	:: Tackles with its shock body. Hurts on miss. The user takes 50% HP in recoil on miss. Hamme
+915	v	Lunar Blessing	[drain]	:: Heals HP and status of itself and allies in battle. Heals 25% HP to all allied battlers an
+918	v	Ceaseless Edge	[high-crit]	:: Deals damage. Applies spikes. The user slashes the foe with shell blade. Leaves Splinters.
+924	v	Dire Claw	[paralyze,poison]	:: Slices the foe. Might paralyze, poison, or bleed. A slice that has a 50% chance to cause p
+937	C	Pitfall	[always-hit]	:: An overhead strike that attempts to bury the opponent. 30% chance to trap and make attacks
+950	C	Eerie Fog	[drain]	:: An unnatural fog descends, draining stat boosts. An eerie fog lasting eight turns drains b
+957	C	Bravado	[burn,paralyze,poison]	:: Doubles damage if burned, paralyzed, or poisoned. An attack that is boosted if user is bur
+964	C	Merculight	[paralyze]	:: Evades attacks and paralyzes the attacker. Evades attacks with certainty, paralyzing attac
+974	C	Vexing Void	[always-hit]	:: A terrifying void engulfs the foe. 30% chance to lower Special Defense. Never misses in fo
+990	C	Banished Power	[stat-change]	:: Strikes with a forbidden power that empowers the user. Deals damage and raises the user's 
+994	C	One-Inch Punch	[always-hit]	:: Picks a weak spot and then strikes with immense force. A powerful punch that never misses.
+996	C	Oni Fist	[always-hit]	:: An unavoidable punch that is thrown from shadows. A strong punch from the shadows. Always 
+1002	C	Tsunami Hammer	[poison]	:: Super effective vs Water. Can't be used twice in a row. Super effective vs Poison. Can't b
+1006	C	Toxic Terrain	[poison]	:: Boosts Poison and damages mons for 8 turns. Boosts Poison-type moves for 8 turns and deals
+1018	C	Block Dropper	[flinch,stat-change]	:: A ball attack. 20% flinch. Drops 2 to 5 blocks onto the target.
+1024	C	Godspeed	[cond/typed-damage]	:: Super effective vs Steel. Swoops with incredible speed. +2 prio.

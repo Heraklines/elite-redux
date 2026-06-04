@@ -1,0 +1,17 @@
+{
+  "mega": "Mega-{{pokemonName}}",
+  "megaX": "Mega-{{pokemonName}} X",
+  "megaY": "Mega-{{pokemonName}} Y",
+  "megaZ": "Mega-{{pokemonName}} Z",
+  "primal": "Proto-{{pokemonName}}",
+  "gigantamax": "G-Dyna-{{pokemonName}}",
+  "gigantamaxSingle": "G-Dyna Fokussierter Stil {{pokemonName}}",
+  "gigantamaxRapid": "G-Dyna Fließender Stil {{pokemonName}}",
+  "eternamax": "U-Dyna-{{pokemonName}}",
+  "megaChange": "{{preName}} hat sich zu {{pokemonName}} mega-entwickelt!",
+  "gigantamaxChange": "{{preName}} hat sich zu {{pokemonName}} gigadynamaximiert!",
+  "eternamaxChange": "{{preName}} hat sich zu {{pokemonName}} unendynamaximiert!",
+  "revertChange": "{{pokemonName}} hat seine ursprüngliche Form zurückerlangt!",
+  "formChange": "{{preName}} hat seine Form geändert!",
+  "disguiseChange": "Sein Kostüm hat die Attacke absorbiert!"
+}

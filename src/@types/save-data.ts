@@ -1,0 +1,185 @@
+import type { PokeballCounts } from "#app/battle-scene";
+import type { Tutorial } from "#app/tutorial";
+import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import type { BattleType } from "#enums/battle-type";
+import type { GameModes } from "#enums/game-modes";
+import type { MoveId } from "#enums/move-id";
+import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import type { Nature } from "#enums/nature";
+import type { PlayerGender } from "#enums/player-gender";
+import type { PokemonType } from "#enums/pokemon-type";
+import type { SpeciesId } from "#enums/species-id";
+import type { MysteryEncounterSaveData } from "#mystery-encounters/mystery-encounter-save-data";
+import type { Variant } from "#sprites/variant";
+import type { ArenaData } from "#system/arena-data";
+import type { AutoEggRestockSettings } from "#system/auto-egg-restock-settings";
+import type { ChallengeData } from "#system/challenge-data";
+import type { EggData } from "#system/egg-data";
+import type { GameStats } from "#system/game-stats";
+import type { LLMDirectorState } from "#system/llm-director/director-state";
+import type { ModifierData } from "#system/modifier-data";
+import type { PokemonData } from "#system/pokemon-data";
+import type { TrainerData } from "#system/trainer-data";
+import type { SerializedDailyRunConfig } from "./daily-run";
+import type { DexData } from "./dex-data";
+
+export interface SystemSaveData {
+  trainerId: number;
+  secretId: number;
+  gender: PlayerGender;
+  dexData: DexData;
+  starterData: StarterData;
+  gameStats: GameStats;
+  unlocks: Unlocks;
+  achvUnlocks: AchvUnlocks;
+  voucherUnlocks: VoucherUnlocks;
+  voucherCounts: VoucherCounts;
+  eggs: EggData[];
+  gameVersion: string;
+  timestamp: number;
+  eggPity: number[];
+  unlockPity: number[];
+  /** Optional for back-compat with saves created before the auto-restock feature. */
+  autoEggRestock?: AutoEggRestockSettings;
+  /** Optional for back-compat with saves created before the LLM Director feature. */
+  llmDirectorState?: LLMDirectorState;
+}
+
+export interface SessionSaveData {
+  seed: string;
+  playTime: number;
+  gameMode: GameModes;
+  dailyConfig?: SerializedDailyRunConfig;
+  party: PokemonData[];
+  enemyParty: PokemonData[];
+  modifiers: ModifierData[];
+  enemyModifiers: ModifierData[];
+  arena: ArenaData;
+  pokeballCounts: PokeballCounts;
+  money: number;
+  score: number;
+  waveIndex: number;
+  // TODO: This enum being inside save data is basically useless, being inferrable from the presence or absence of `trainer` and `mysteryEncounterType`.
+  // Remove this later on to reduce save size and improve clarity.
+  battleType: Exclude<BattleType, BattleType.CLEAR>;
+  // TODO: This being nullable NEEDS to be reflected in the type signature
+  trainer: TrainerData;
+  gameVersion: string;
+  /** The player-chosen name of the run */
+  name: string;
+  timestamp: number;
+  challenges: ChallengeData[];
+  // TODO: Change default value to `undefined` to both save space and ease nullishness checks
+  mysteryEncounterType: MysteryEncounterType | -1; // Only defined when current wave is ME,
+  // TODO: This can be `undefined` - reflect that in the type signature
+  mysteryEncounterSaveData: MysteryEncounterSaveData;
+  /**
+   * Counts the amount of pokemon fainted in your party during the current arena encounter.
+   */
+  playerFaints: number;
+  /**
+   * Elite Redux: the run difficulty (Ace / Elite / Hell) chosen at team select.
+   * Drives which ER trainer roster tier the run uses. Persisted so it survives
+   * a save reload — without it the module-level difficulty resets to the default
+   * ("ace" = vanilla trainers) on every page load, so a run started on Elite/Hell
+   * would silently stop spawning ER trainers after reloading. Optional for
+   * backwards compatibility with pre-existing saves (treated as "ace").
+   */
+  erDifficulty?: ErDifficulty;
+}
+
+export interface Unlocks {
+  [key: number]: boolean;
+}
+
+export interface AchvUnlocks {
+  [key: string]: number;
+}
+
+export interface VoucherUnlocks {
+  [key: string]: number;
+}
+
+export interface VoucherCounts {
+  [type: string]: number;
+}
+
+export type StarterMoveset = [MoveId] | [MoveId, MoveId] | [MoveId, MoveId, MoveId] | [MoveId, MoveId, MoveId, MoveId];
+
+export interface StarterFormMoveData {
+  [key: number]: StarterMoveset;
+}
+
+export interface StarterMoveData {
+  [key: number]: StarterMoveset | StarterFormMoveData;
+}
+
+export interface StarterAttributes {
+  nature?: number | undefined;
+  ability?: number | undefined;
+  variant?: number | undefined;
+  form?: number | undefined;
+  female?: boolean | undefined;
+  shiny?: boolean | undefined;
+  favorite?: boolean | undefined;
+  nickname?: string | undefined;
+  tera?: PokemonType | undefined;
+}
+
+export interface DexAttrProps {
+  shiny: boolean;
+  female: boolean;
+  variant: Variant;
+  formIndex: number;
+}
+
+export interface Starter {
+  speciesId: SpeciesId;
+  shiny: boolean;
+  variant: Variant;
+  formIndex: number;
+  female?: boolean | undefined;
+  abilityIndex: number;
+  passive: boolean;
+  nature: Nature;
+  moveset?: StarterMoveset | undefined;
+  pokerus: boolean;
+  nickname?: string | undefined;
+  teraType?: PokemonType | undefined;
+  ivs: number[];
+}
+
+// TODO: What type of number does this store?
+export type RunHistoryData = Record<number, RunEntry>;
+
+export interface RunEntry {
+  entry: SessionSaveData;
+  isVictory: boolean;
+  /** Automatically set to false at the moment - implementation TBD */
+  isFavorite: boolean;
+}
+
+export interface StarterDataEntry {
+  moveset: StarterMoveset | StarterFormMoveData | null;
+  eggMoves: number;
+  candyCount: number;
+  friendship: number;
+  abilityAttr: number;
+  passiveAttr: number;
+  valueReduction: number;
+  classicWinCount: number;
+}
+
+export interface StarterData {
+  [key: number]: StarterDataEntry;
+}
+
+// TODO: Rework into a bitmask
+export type TutorialFlags = {
+  [key in Tutorial]: boolean;
+};
+
+// TODO: Rework into a bitmask
+export interface SeenDialogues {
+  [key: string]: boolean;
+}

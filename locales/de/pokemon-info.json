@@ -1,0 +1,40 @@
+{
+  "stat": {
+    "hp": "KP",
+    "hpShortened": "KP",
+    "atk": "Angriff",
+    "atkShortened": "Ang",
+    "def": "Vert.",
+    "defShortened": "Vert",
+    "spatk": "Sp.-Ang",
+    "spatkShortened": "SpAng",
+    "spdef": "Sp.-Vert",
+    "spdefShortened": "SpVert",
+    "spd": "Initiative",
+    "spdShortened": "Init",
+    "acc": "Genauigkeit",
+    "eva": "Fluchtwert"
+  },
+  "type": {
+    "unknown": "Unbekannt",
+    "normal": "Normal",
+    "fighting": "Kampf",
+    "flying": "Flug",
+    "poison": "Gift",
+    "ground": "Boden",
+    "rock": "Gestein",
+    "bug": "Käfer",
+    "ghost": "Geist",
+    "steel": "Stahl",
+    "fire": "Feuer",
+    "water": "Wasser",
+    "grass": "Pflanze",
+    "electric": "Elektro",
+    "psychic": "Psycho",
+    "ice": "Eis",
+    "dragon": "Drache",
+    "dark": "Unlicht",
+    "fairy": "Fee",
+    "stellar": "Stellar"
+  }
+}

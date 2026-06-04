@@ -1,0 +1,67 @@
+# SPDX-FileCopyrightText: 2024-2025 NONE
+#
+# SPDX-License-Identifier: CC0-1.0
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+temp
+node_modules
+/dist/
+dist-ssr
+*.local
+build
+.pnpm-store
+
+# Editor/OS directories and files (excluding `extensions.json` for devcontainer)
+*.code-workspace
+.vscode/*
+.zed
+!.vscode/extensions.json
+!.vscode/spdx.code-snippets
+.idea
+.DS_Store
+desktop.ini
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+/.vs
+
+src/data/battle-anim-raw-data*.ts
+src/data/battle-anim-data.ts
+
+coverage
+
+# Local Documentation
+/typedoc
+/dependency-graph.svg
+
+# Script outputs
+*.csv
+
+# Local env overrides (Vite convention) - never committed
+.env.local
+.env.*.local
+llm-director-trace.jsonl
+
+# Elite Redux source data — fetched at build time, not redistributed.
+vendor/elite-redux/*.json
+vendor/elite-redux/sprites/
+assets/images/pokemon/elite-redux/
+assets/images/elite-redux/
+assets/battle-anims-er/
+
+# Elite Redux visual verification screenshots (generated locally, not committed).
+docs/plans/screenshots/
+vendor/elite-redux/source/
+vendor/elite-redux/rom-extracted/
+vendor/elite-redux/tools/
+vendor/elite-redux/ghidra-project/

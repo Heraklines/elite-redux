@@ -1,0 +1,21 @@
+{
+  "guest": "Guest",
+  "start": "Start",
+  "luckIndicator": "Luck:",
+  "shinyOnHover": "Shiny",
+  "commonShiny": "Common",
+  "rareShiny": "Rare",
+  "epicShiny": "Epic",
+  "money": "₽{{amount, number}}",
+  "abrThousand": "k",
+  "abrMillion": "M",
+  "abrBillion": "B",
+  "abrTrillion": "t",
+  "abrQuadrillion": "q",
+  "abrQuintillion": "Q",
+  "abrSextillion": "s",
+  "abrSeptillion": "S",
+  "abrOctillion": "o",
+  "abrNonillion": "n",
+  "abrDecillion": "d"
+}

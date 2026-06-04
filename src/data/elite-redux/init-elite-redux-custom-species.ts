@@ -1,0 +1,466 @@
+// =============================================================================
+// Elite Redux — Phase B Task B1b: register ER-custom species in `allSpecies`.
+//
+// Reads `er-species.ts` and, for every entry whose pokerogue id resolves to
+// ≥ VANILLA_ID_CUTOFF (the ER-custom range — see `er-id-map.ts`), constructs
+// a fresh `PokemonSpecies` instance and pushes it onto `allSpecies`.
+//
+// Vanilla species (id < VANILLA_ID_CUTOFF) are handled by B1a's
+// `initEliteReduxSpecies()` and skipped here.
+//
+// Localization note: pokerogue's `PokemonSpecies.localize()` uses
+// `SpeciesId[this.speciesId]` to look up the i18n key, but ER-custom ids
+// are not in the `SpeciesId` enum. We override `localize()` in a thin
+// subclass to take the draft name verbatim — Phase C will wire proper
+// localization keys.
+// =============================================================================
+
+import { globalScene } from "#app/global-scene";
+import { starterColors } from "#app/global-vars/starter-colors";
+import { allSpecies } from "#data/data-lists";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import type { ErSpeciesDraft } from "#data/elite-redux/er-species";
+import { ER_SPECIES } from "#data/elite-redux/er-species";
+import { ER_SPRITE_MANIFEST } from "#data/elite-redux/er-sprite-manifest";
+import { GrowthRate } from "#data/exp";
+import { PokemonSpecies } from "#data/pokemon-species";
+import { AbilityId } from "#enums/ability-id";
+import { PokemonType } from "#enums/pokemon-type";
+import type { Variant } from "#sprites/variant";
+
+/** Lookup: ER species id → kebab-case sprite slug ("phantowl", "abyssand"...). */
+const ER_SPRITE_BY_SPECIES_ID = new Map<number, string>(ER_SPRITE_MANIFEST.map(e => [e.speciesId, e.slug]));
+
+/**
+ * Numeric cutoff for "vanilla pokerogue" species ids. ER-custom species are
+ * assigned fresh ids ≥ 10000 by the id-map builder (see `er-id-map.ts`).
+ * Mirrors B1a's constant — kept here as a local literal so the two files
+ * don't import from one another.
+ */
+const VANILLA_ID_CUTOFF = 10000;
+
+/** Aggregated result of a single `initEliteReduxCustomSpecies()` run. */
+export interface InitEliteReduxCustomSpeciesResult {
+  /** Number of ER-custom species newly constructed and pushed onto allSpecies. */
+  customsAdded: number;
+  /** Number of ER-custom species skipped because an entry already existed (idempotent re-run). */
+  customsAlreadyPresent: number;
+  /** Non-fatal issues — e.g. constructor failures with a usable error message. */
+  errors: string[];
+}
+
+/**
+ * Map ER's numeric type id (decoded by `ER_TYPE_NAMES` in `er-move-tables.ts`)
+ * to pokerogue's `PokemonType` enum. Returns `null` for the ER sentinels
+ * "Mystery" (18) and "None" (19) — `PokemonSpecies` accepts a nullable type2
+ * for mono-typed mons.
+ */
+function mapType(erTypeId: number | null): PokemonType | null {
+  if (erTypeId === null) {
+    return null;
+  }
+  switch (erTypeId) {
+    case 0:
+      return PokemonType.NORMAL;
+    case 1:
+      return PokemonType.FIGHTING;
+    case 2:
+      return PokemonType.FIRE;
+    case 3:
+      return PokemonType.ICE;
+    case 4:
+      return PokemonType.ELECTRIC;
+    case 5:
+      return PokemonType.BUG;
+    case 6:
+      return PokemonType.FLYING;
+    case 7:
+      return PokemonType.STEEL;
+    case 8:
+      return PokemonType.GRASS;
+    case 9:
+      return PokemonType.GROUND;
+    case 10:
+      return PokemonType.POISON;
+    case 11:
+      return PokemonType.DARK;
+    case 12:
+      return PokemonType.WATER;
+    case 13:
+      return PokemonType.PSYCHIC;
+    case 14:
+      return PokemonType.ROCK;
+    case 15:
+      return PokemonType.DRAGON;
+    case 16:
+      return PokemonType.GHOST;
+    case 17:
+      return PokemonType.FAIRY;
+    case 20:
+      return PokemonType.STELLAR;
+    // 18 Mystery, 19 None → treat as untyped (null)
+    default:
+      return null;
+  }
+}
+
+/**
+ * Resolve an ER ability id (0-N or 0 = "----" sentinel) to a pokerogue
+ * `AbilityId`. Same shape as B1a's `mapAbilityId` — kept local to avoid a
+ * cross-file import.
+ */
+function mapAbilityId(erAbilityId: number): AbilityId {
+  if (erAbilityId === 0) {
+    return AbilityId.NONE;
+  }
+  const mapped = ER_ID_MAP.abilities[erAbilityId];
+  if (mapped === undefined) {
+    return AbilityId.NONE;
+  }
+  return mapped as AbilityId;
+}
+
+/**
+ * Map ER's `growthRate` index (0-5, see PokeEmerald `gGrowthRates`) to
+ * pokerogue's `GrowthRate` enum. ER ships `0` in the v2.65 dump for every
+ * species (the engine resolves growth elsewhere), so this is mostly a
+ * defensive mapping — anything out of range falls back to MEDIUM_FAST.
+ *
+ * Gen3 mapping per upstream `gGrowthRates`:
+ *  0 = Medium Fast, 1 = Erratic, 2 = Fluctuating, 3 = Medium Slow,
+ *  4 = Fast, 5 = Slow
+ */
+function mapGrowthRate(erGrowthRate: number): GrowthRate {
+  switch (erGrowthRate) {
+    case 1:
+      return GrowthRate.ERRATIC;
+    case 2:
+      return GrowthRate.FLUCTUATING;
+    case 3:
+      return GrowthRate.MEDIUM_SLOW;
+    case 4:
+      return GrowthRate.FAST;
+    case 5:
+      return GrowthRate.SLOW;
+    default:
+      return GrowthRate.MEDIUM_FAST;
+  }
+}
+
+/**
+ * Map ER's `genderRatio` (gen3-style 0-255 ratio, with 255 = genderless)
+ * to pokerogue's `malePercent: number | null`. The v2.65 dump ships
+ * placeholder values (e.g. Bulbasaur = 12700) for many species, so we
+ * clamp out-of-range values to the safe 50/50 default. Real-data alignment
+ * is Phase C work.
+ */
+function mapGenderRatio(erGender: number): number | null {
+  if (erGender === 255) {
+    return null;
+  }
+  if (erGender < 0 || erGender > 254) {
+    // Out-of-range placeholder — default to 50% male.
+    return 50;
+  }
+  // gen3 convention: gender value is the chance of being FEMALE in 256ths.
+  // malePercent = 100 * (1 - gender/256).
+  return Math.round((1 - erGender / 256) * 100);
+}
+
+/**
+ * Thin `PokemonSpecies` subclass for ER-custom species. Overrides
+ * `localize()` to take the draft's display name verbatim — the vanilla
+ * implementation looks up `SpeciesId[this.speciesId]` which is `undefined`
+ * for ids ≥ VANILLA_ID_CUTOFF.
+ *
+ * The display name is stored on the prototype (via the constructor) before
+ * the base-class `localize()` call clobbers it; we restore it afterwards.
+ */
+class ErCustomSpecies extends PokemonSpecies {
+  /** Fallback display name from the ER draft (set pre-construction). */
+  private static readonly _draftNames = new Map<number, string>();
+  /** Pokerogue speciesId → ER sprite slug (e.g. 10000 → "phantowl"). */
+  private static readonly _spriteSlugs = new Map<number, string>();
+
+  /**
+   * Override of the base `localize()`. Looks up the draft name installed
+   * by `registerDraftName()` before the constructor ran; falls back to
+   * `Unknown` if absent.
+   */
+  override localize(): void {
+    this.name = ErCustomSpecies._draftNames.get(this.speciesId) ?? "Unknown";
+    this.category = "??? Pokémon";
+  }
+
+  /** Stash the draft name keyed by pokerogue species id before construction. */
+  static registerDraftName(id: number, name: string): void {
+    ErCustomSpecies._draftNames.set(id, name);
+  }
+
+  /** Register the ER sprite slug for a pokerogue species id. */
+  static registerSpriteSlug(id: number, slug: string): void {
+    ErCustomSpecies._spriteSlugs.set(id, slug);
+  }
+
+  /**
+   * Override the sprite atlas path so ER-custom species load from
+   * `elite-redux/{slug}/{front,back,shiny,...}` instead of the vanilla
+   * `images/pokemon/{id}` path (which has no asset on disk for id >= 10000).
+   */
+  override getSpriteAtlasPath(
+    _female: boolean,
+    _formIndex?: number,
+    shiny?: boolean,
+    variant?: number,
+    back?: boolean,
+  ): string {
+    const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
+    if (!slug) {
+      // Fall through to vanilla path (will 404 — log once)
+      return super.getSpriteAtlasPath(_female, _formIndex, shiny, variant, back);
+    }
+    // ER sprite directory layout (all relative to public root, hence the
+    // leading `pokemon/elite-redux/{slug}/`):
+    //   front.png  back.png  icon.png
+    //   shiny.png  shiny-back.png         (tier 1)
+    //   shiny-2.png  shiny-back-2.png     (tier 2 — variant === 1)
+    //   shiny-3.png  shiny-back-3.png     (tier 3 — variant === 2)
+    let filename: string;
+    if (shiny) {
+      const tier = variant ?? 0;
+      const suffix = tier === 0 ? "" : `-${tier + 1}`;
+      filename = back ? `shiny-back${suffix}` : `shiny${suffix}`;
+    } else {
+      filename = back ? "back" : "front";
+    }
+    return `elite-redux/${slug}/${filename}`;
+  }
+
+  /**
+   * Override sprite ID/key to match the path scheme. Returns the slug-based
+   * key so atlas-cache lookups (e.g. animation creation) use the same key
+   * regardless of whether the sprite is being loaded or displayed.
+   */
+  override getSpriteId(
+    _female: boolean,
+    _formIndex?: number,
+    shiny?: boolean,
+    variant?: number,
+    back?: boolean,
+  ): string {
+    const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
+    if (!slug) {
+      return super.getSpriteId(_female, _formIndex, shiny, variant ?? 0, back);
+    }
+    const suffix = shiny ? (variant ? `_shiny${variant + 1}` : "_shiny") : "";
+    const backPrefix = back ? "back__" : "";
+    return `${backPrefix}er__${slug}${suffix}`;
+  }
+
+  /**
+   * Icons for ER-custom species live at `elite-redux/{slug}/icon.png`.
+   * Use a per-slug atlas key so each one is loaded lazily by
+   * `loadPokemonAtlas` rather than expecting the bundled `pokemon_icons_N`
+   * sheet (which has no frames for id >= 10000).
+   */
+  override getIconAtlasKey(_formIndex?: number, _shiny?: boolean, _variant?: number): string {
+    const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
+    if (!slug) {
+      return super.getIconAtlasKey(_formIndex, _shiny, _variant);
+    }
+    return `er_icon__${slug}`;
+  }
+
+  /**
+   * Frame ID inside the per-slug icon atlas. Our generated atlas JSON has
+   * a single frame "0001.png" — return that string.
+   */
+  override getIconId(female: boolean, formIndex?: number, shiny?: boolean, variant?: number): string {
+    const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
+    if (!slug) {
+      return super.getIconId(female, formIndex, shiny, variant);
+    }
+    return "0001.png";
+  }
+
+  /**
+   * Override base `getExpandedSpeciesName` so it doesn't crash on ER-custom
+   * species ids (which aren't in the SpeciesId enum). The base looks up
+   * `SpeciesId[this.speciesId].split("_")` — which is undefined for IDs
+   * >= 10000 and throws "Cannot read properties of undefined (reading 'split')".
+   */
+  override getExpandedSpeciesName(): string {
+    return this.name;
+  }
+
+  /**
+   * Extend `loadAssets` to also preload the per-slug icon atlas alongside
+   * the main sprite. The base `PokemonSpecies.loadAssets` (patched in R58
+   * to use per-file events instead of the global COMPLETE event) handles
+   * the actual sprite-load race correctly.
+   */
+  override async loadAssets(
+    female = false,
+    formIndex?: number,
+    shiny = false,
+    variant?: Variant,
+    startLoad = false,
+    back = false,
+    // Accepted for signature parity with the base; ER customs always run
+    // sprite-only regardless (see below), so the caller's value is irrelevant.
+    _spriteOnly = false,
+  ): Promise<void> {
+    const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
+    if (slug) {
+      // Preload the icon atlas (key matches getIconAtlasKey output).
+      const iconKey = `er_icon__${slug}`;
+      if (!globalScene.textures.exists(iconKey)) {
+        globalScene.loadPokemonAtlas(iconKey, `elite-redux/${slug}/icon`);
+      }
+    }
+    // ER-custom species have NO cry audio and aren't in the vanilla `variantData`
+    // colour-swap registry, so we ALWAYS load sprite-only (force `spriteOnly`):
+    //  - queuing the nonexistent `audio/<key>.m4a` cry 404s AND burns shared-loader
+    //    slots, starving real sprite atlases behind dozens of failed cry fetches —
+    //    the root of "Missing animation / substitute shown" and inconsistent shiny
+    //    sprites during rapid starter/pokédex/egg cycling (it also hurt vanilla
+    //    species sharing the loader);
+    //  - `loadVariantColors` is a no-op for ER customs anyway (no variantData entry).
+    // The shiny variant sprite atlas (shiny/shiny-2/shiny-3) still loads — it's not
+    // gated by spriteOnly — so ER custom shiny tiers render correctly.
+    return super.loadAssets(female, formIndex, shiny, variant, startLoad, back, true);
+  }
+}
+
+/**
+ * Construct `PokemonSpecies` instances for the ER-custom species and push
+ * them onto `allSpecies`. Idempotent: a re-run skips species that are
+ * already present (by `speciesId` match).
+ *
+ * Order constraint: must run AFTER `initSpecies()` (so the vanilla baseline
+ * is in place) and AFTER `initAbilities()` (so ability ids resolve at
+ * activation time). Typically called from `init/init.ts:initializeGame()`
+ * right after `initEliteReduxSpecies()`.
+ */
+export function initEliteReduxCustomSpecies(): InitEliteReduxCustomSpeciesResult {
+  const result: InitEliteReduxCustomSpeciesResult = {
+    customsAdded: 0,
+    customsAlreadyPresent: 0,
+    errors: [],
+  };
+
+  // Build a O(1) speciesId → bool lookup for idempotency.
+  const existingIds = new Set<number>();
+  for (const species of allSpecies) {
+    existingIds.add(species.speciesId);
+  }
+
+  for (const draft of ER_SPECIES) {
+    const pokerogueId = ER_ID_MAP.species[draft.id];
+    if (pokerogueId === undefined) {
+      // SPECIES_NONE sentinel falls here — B1a already reports it.
+      continue;
+    }
+    if (pokerogueId < VANILLA_ID_CUTOFF) {
+      // Vanilla — B1a's job.
+      continue;
+    }
+    if (existingIds.has(pokerogueId)) {
+      result.customsAlreadyPresent++;
+      continue;
+    }
+
+    try {
+      const species = buildCustomSpecies(draft, pokerogueId);
+      species.setPassives([
+        mapAbilityId(draft.innates[0]),
+        mapAbilityId(draft.innates[1]),
+        mapAbilityId(draft.innates[2]),
+      ]);
+      // Register the ER sprite slug for this species so getSpriteAtlasPath
+      // resolves to assets/images/pokemon/elite-redux/{slug}/*.
+      const slug = ER_SPRITE_BY_SPECIES_ID.get(draft.id);
+      if (slug) {
+        ErCustomSpecies.registerSpriteSlug(pokerogueId, slug);
+      }
+      // Seed starterColors with a sensible default so UI code (candy
+      // bar, hatch info, pokedex page) that reads starterColors[id][0/1]
+      // doesn't crash on undefined. starterColors is otherwise populated
+      // by an async fetch of starter-colors.json at scene boot, which
+      // has no entries for ER ids >= 10000.
+      if (!starterColors[pokerogueId]) {
+        starterColors[pokerogueId] = ["ffffff", "ffffff"];
+      }
+      (allSpecies as PokemonSpecies[]).push(species);
+      existingIds.add(pokerogueId);
+      result.customsAdded++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      result.errors.push(
+        `Failed to construct species ${draft.speciesConst} (er id ${draft.id} → ${pokerogueId}): ${msg}`,
+      );
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Construct a single ER-custom `PokemonSpecies` (subclass) from its draft.
+ * Defaults applied to fields ER does not ship per-species:
+ *  - height: 1.0m, weight: 30.0kg (TODO: pull from ER dex hw[] in Phase C)
+ *  - catchRate: 45 if draft.catchRate is 0 (ER ships 0 for most entries)
+ *  - baseFriendship: 50 (vanilla default)
+ *  - baseExp: 100 if draft.baseExp is 0
+ *  - generation: 9 — all ER customs treated as gen9 for now (TODO: archetype)
+ *
+ * @param draft - ER species draft from `er-species.ts`
+ * @param speciesId - pokerogue species id (≥ VANILLA_ID_CUTOFF) from `ER_ID_MAP.species`
+ */
+function buildCustomSpecies(draft: ErSpeciesDraft, speciesId: number): PokemonSpecies {
+  const type1 = mapType(draft.types[0]) ?? PokemonType.NORMAL;
+  const type2 = mapType(draft.types[1]);
+
+  const baseTotal = draft.baseStats.reduce((sum, n) => sum + n, 0);
+
+  // Pre-stash the display name so the constructor's localize() picks it up.
+  ErCustomSpecies.registerDraftName(speciesId, draft.name);
+
+  // PokemonSpecies constructor signature (verified against
+  // src/data/pokemon-species.ts:823):
+  //   id, generation, subLegendary, legendary, mythical,
+  //   category, type1, type2, height, weight,
+  //   ability1, ability2, abilityHidden,
+  //   baseTotal, hp, atk, def, spatk, spdef, spd,
+  //   catchRate, baseFriendship, baseExp,
+  //   growthRate, malePercent, genderDiffs, canChangeForm, ...forms
+  return new ErCustomSpecies(
+    speciesId,
+    9, // generation — TODO(B/C): derive from ER archetype/source-gen
+    false, // subLegendary
+    false, // legendary
+    false, // mythical
+    "??? Pokémon", // category — placeholder; localize() overrides
+    type1,
+    type2,
+    1.0, // height (m) — TODO: extract from dex.hw[0]
+    30.0, // weight (kg) — TODO: extract from dex.hw[1]
+    mapAbilityId(draft.abilities[0]),
+    mapAbilityId(draft.abilities[1]),
+    mapAbilityId(draft.abilities[2]),
+    baseTotal,
+    draft.baseStats[0],
+    draft.baseStats[1],
+    draft.baseStats[2],
+    draft.baseStats[3],
+    draft.baseStats[4],
+    draft.baseStats[5],
+    draft.catchRate > 0 ? draft.catchRate : 45,
+    draft.friendship > 0 ? draft.friendship : 50,
+    draft.baseExp > 0 ? draft.baseExp : 100,
+    mapGrowthRate(draft.growthRate),
+    mapGenderRatio(draft.genderRatio),
+    false, // genderDiffs
+    false, // canChangeForm — TODO: support forms in Phase C
+  );
+}

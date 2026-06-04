@@ -1,0 +1,8 @@
+{
+  "fight": "たたかう",
+  "ball": "ボール",
+  "pokemon": "ポケモン",
+  "run": "にげる",
+  "actionMessage": "{{pokemonName}}は\nどうする？",
+  "ballCancel": "キャンセル"
+}

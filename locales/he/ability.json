@@ -1,0 +1,307 @@
+{
+  "stench": {
+    "name": "צחנה"
+  },
+  "drizzle": {
+    "name": "טפטוף",
+    "description": "הפוקימון גורם לגשם לרדת כשהוא נכנס לקרב."
+  },
+  "speedBoost": {
+    "name": "האצה"
+  },
+  "battleArmor": {
+    "name": "שריון קרב",
+    "description": "שריון קשוח מגן על הפוקימון ממכות קריטיות."
+  },
+  "sturdy": {
+    "name": "חוסן"
+  },
+  "damp": {
+    "name": "לחות"
+  },
+  "limber": {
+    "name": "גמישות"
+  },
+  "sandVeil": {
+    "name": "צעיף חול"
+  },
+  "static": {
+    "name": "חשמל סטטי"
+  },
+  "voltAbsorb": {
+    "name": "הורדת מתח"
+  },
+  "waterAbsorb": {
+    "name": "ספיגת מים"
+  },
+  "oblivious": {
+    "name": "אפס ביחסים"
+  },
+  "cloudNine": {
+    "name": "ראש בעננים",
+    "description": "מנטרל את האפקטים של מזג האוויר."
+  },
+  "compoundEyes": {
+    "name": "עיני פסיפס"
+  },
+  "insomnia": {
+    "name": "נדודי שינה"
+  },
+  "colorChange": {
+    "name": "שינוי צבע",
+    "description": "הסוג של הפוקימון משתנה לסוג של המהלך שפגע בו."
+  },
+  "immunity": {
+    "name": "חסינות"
+  },
+  "flashFire": {
+    "name": "אש יוקדת"
+  },
+  "shieldDust": {
+    "name": "אבק קסמים"
+  },
+  "ownTempo": {
+    "name": "קצב אישי"
+  },
+  "suctionCups": {
+    "name": "כפתורי יניקה"
+  },
+  "intimidate": {
+    "name": "הפחדה"
+  },
+  "shadowTag": {
+    "name": "תופסת צללים"
+  },
+  "roughSkin": {
+    "name": "עור מחוספס"
+  },
+  "wonderGuard": {
+    "name": "מגן קסם",
+    "description": "הכוח המסתורי של הפוקימון מאפשר לו להיפגע רק ממתקפות שטובות נגדו."
+  },
+  "levitate": {
+    "name": "ריחוף",
+    "description": "הפוקימון מרחף באוויר, מה שמקנה לו חסינות לכל המהלכים מסוג אדמה."
+  },
+  "effectSpore": {
+    "name": "נבגי השפעה"
+  },
+  "synchronize": {
+    "name": "סינכרון"
+  },
+  "clearBody": {
+    "name": "גוף נקי",
+    "description": "מונע ממהלכים או יכולות של פוקימונים אחרים להוריד את הנתונים שלו."
+  },
+  "naturalCure": {
+    "name": "תרופה טבעית"
+  },
+  "lightningRod": {
+    "name": "כליא ברק"
+  },
+  "sereneGrace": {
+    "name": "ברכה משמיים"
+  },
+  "swiftSwim": {
+    "name": "כמו דג במים"
+  },
+  "chlorophyll": {
+    "name": "כלורופיל"
+  },
+  "illuminate": {
+    "name": "הארה"
+  },
+  "trace": {
+    "name": "התחקות",
+    "description": "כשהוא נכנס לקרב, הפוקימון מעתיק יכולת של פוקימון אחר."
+  },
+  "hugePower": {
+    "name": "כוח אדיר",
+    "description": "מכפיל את נתון ההתקפה של הפוקימון."
+  },
+  "poisonPoint": {
+    "name": "רעלן"
+  },
+  "innerFocus": {
+    "name": "ריכוז פנימי"
+  },
+  "magmaArmor": {
+    "name": "שריון מאגמה"
+  },
+  "waterVeil": {
+    "name": "מגן מים"
+  },
+  "magnetPull": {
+    "name": "מגנטיות"
+  },
+  "soundproof": {
+    "name": "אטים קול",
+    "description": "בידוד אקוסטי מקנה לפוקימון חסינות מלאה לכל המהלכים מבוססי הקול."
+  },
+  "rainDish": {
+    "name": "ברכת הגשמים"
+  },
+  "sandStream": {
+    "name": "מחול החולות",
+    "description": "הפוקימון מזמן סופת חול כשהוא נכנס לקרב."
+  },
+  "pressure": {
+    "name": "לחץ"
+  },
+  "thickFat": {
+    "name": "שומן עבה",
+    "description": "הפוקימון מוגן על ידי שכבת שומן עבה, שמפחיתה בחצי את הנזק שנגרם ממתקפות מסוגי קרח ואש."
+  },
+  "earlyBird": {
+    "name": "משכים קום",
+    "description": "הפוקימון מתעורר משינה פי שניים מהר יותר מפוקימונים אחרים."
+  },
+  "flameBody": {
+    "name": "גוף דליק"
+  },
+  "runAway": {
+    "name": "הימלטות",
+    "description": "מאפשר מילוט בטוח מפוקימונים פראיים."
+  },
+  "keenEye": {
+    "name": "מבט חודר"
+  },
+  "hyperCutter": {
+    "name": "צבתות על"
+  },
+  "pickup": {
+    "name": "ליקוט"
+  },
+  "truant": {
+    "name": "שמיטה"
+  },
+  "hustle": {
+    "name": "מרץ"
+  },
+  "cuteCharm": {
+    "name": "כוח המשיכה"
+  },
+  "plus": {
+    "name": "פלוס"
+  },
+  "minus": {
+    "name": "מינוס"
+  },
+  "forecast": {
+    "name": "תחזית",
+    "description": "הפוקימון משתנה עם מזג האוויר, ומשנה את הסוג שלו למים, אש או קרח בהתאם."
+  },
+  "stickyHold": {
+    "name": "דבק מגע"
+  },
+  "shedSkin": {
+    "name": "השלת עור"
+  },
+  "guts": {
+    "name": "אומץ"
+  },
+  "marvelScale": {
+    "name": "קשקש פלא"
+  },
+  "liquidOoze": {
+    "name": "דליפת נוזלים"
+  },
+  "overgrow": {
+    "name": "גידול יתר"
+  },
+  "blaze": {
+    "name": "להבה"
+  },
+  "torrent": {
+    "name": "זרם עז"
+  },
+  "swarm": {
+    "name": "נחיל"
+  },
+  "rockHead": {
+    "name": "ראש סלע",
+    "description": "מגן על הפוקימון מנזקי הדף."
+  },
+  "drought": {
+    "name": "חמסין",
+    "description": "כשהפוקימון נכנס לשדה הקרב, אור השמש מתחזק."
+  },
+  "arenaTrap": {
+    "name": "מלכודת"
+  },
+  "vitalSpirit": {
+    "name": "נכונות",
+    "description": "הפוקימון מלא בחיוניות, מה שמונע ממנו להירדם."
+  },
+  "whiteSmoke": {
+    "name": "עשן לבן",
+    "description": "הפוקימון מוגן על ידי העשן הלבן שלו, שמונע מפוקימונים אחרים להוריד לו את הנתונים."
+  },
+  "purePower": {
+    "name": "כוח טהור",
+    "description": "באמצעות הכוח הטהור שלו, הפוקימון מכפיל את נתון ההתקפה שלו."
+  },
+  "shellArmor": {
+    "name": "שריון מגן",
+    "description": "שריון קשיח מגן על הפוקימון ממכות קריטיות."
+  },
+  "airLock": {
+    "name": "מנעול אוויר",
+    "description": "מנטרל את האפקטים של מזג האוויר."
+  },
+  "tangledFeet": {
+    "name": "רגליים סבוכות"
+  },
+  "motorDrive": {
+    "name": "מנוע חשמלי"
+  },
+  "rivalry": {
+    "name": "יריבות"
+  },
+  "steadfast": {
+    "name": "איתנות"
+  },
+  "snowCloak": {
+    "name": "צעיף שלג"
+  },
+  "gluttony": {
+    "name": "גרגרנות"
+  },
+  "angerPoint": {
+    "name": "הקש האחרון"
+  },
+  "unburden": {
+    "name": "פריקה"
+  },
+  "heatproof": {
+    "name": "עמידות לחום"
+  },
+  "simple": {
+    "name": "פשטנות"
+  },
+  "drySkin": {
+    "name": "עור יבש"
+  },
+  "download": {
+    "name": "הורדה"
+  },
+  "ironFist": {
+    "name": "אגרוף ברזל"
+  },
+  "poisonHeal": {
+    "name": "רעל מרפא"
+  },
+  "adaptability": {
+    "name": "הסתגלות"
+  },
+  "solarPower": {
+    "name": "כוח סולרי"
+  },
+  "stall": {
+    "name": "עיכוב"
+  },
+  "klutz": {
+    "name": "שלומיאל",
+    "description": "הפוקימון לא יכול להשתמש באף חפץ."
+  }
+}

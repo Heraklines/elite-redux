@@ -1,0 +1,11 @@
+{
+  "themePickerTitle": "Story Seed",
+  "themePickerSubtitle": "The Director will write a 200-wave run from this prompt.",
+  "themePickerReroll": "Reroll",
+  "themePickerAccept": "Accept",
+  "themePickerCancel": "Cancel",
+  "preparingStory": "Preparing your story...",
+  "directorUnavailable": "The Director is unavailable. Falling back to Classic mode.",
+  "beatContinue": "Continue",
+  "beatChoose": "Choose"
+}

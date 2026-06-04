@@ -1,0 +1,81 @@
+//  public (.*?): number;
+//    this.$1 = source?.$1 || 0;
+
+export class GameStats {
+  public playTime: number;
+  public battles: number;
+  public classicSessionsPlayed: number;
+  public sessionsWon: number;
+  public ribbonsOwned: number;
+  public dailyRunSessionsPlayed: number;
+  public dailyRunSessionsWon: number;
+  public endlessSessionsPlayed: number;
+  public highestEndlessWave: number;
+  public highestLevel: number;
+  public highestMoney: number;
+  public highestDamage: number;
+  public highestHeal: number;
+  public pokemonSeen: number;
+  public pokemonDefeated: number;
+  public pokemonCaught: number;
+  public pokemonHatched: number;
+  public subLegendaryPokemonSeen: number;
+  public subLegendaryPokemonCaught: number;
+  public subLegendaryPokemonHatched: number;
+  public legendaryPokemonSeen: number;
+  public legendaryPokemonCaught: number;
+  public legendaryPokemonHatched: number;
+  public mythicalPokemonSeen: number;
+  public mythicalPokemonCaught: number;
+  public mythicalPokemonHatched: number;
+  public shinyPokemonSeen: number;
+  public shinyPokemonCaught: number;
+  public shinyPokemonHatched: number;
+  public pokemonFused: number;
+  public trainersDefeated: number;
+  public eggsPulled: number;
+  public rareEggsPulled: number;
+  public epicEggsPulled: number;
+  public legendaryEggsPulled: number;
+  public manaphyEggsPulled: number;
+
+  constructor(source?: any) {
+    this.playTime = source?.playTime || 0;
+    this.battles = source?.battles || 0;
+    this.classicSessionsPlayed = source?.classicSessionsPlayed || 0;
+    this.sessionsWon = source?.sessionsWon || 0;
+    this.ribbonsOwned = source?.ribbonsOwned || 0;
+    this.dailyRunSessionsPlayed = source?.dailyRunSessionsPlayed || 0;
+    this.dailyRunSessionsWon = source?.dailyRunSessionsWon || 0;
+    this.endlessSessionsPlayed = source?.endlessSessionsPlayed || 0;
+    this.highestEndlessWave = source?.highestEndlessWave || 0;
+    this.highestLevel = source?.highestLevel || 0;
+    this.highestMoney = source?.highestMoney || 0;
+    this.highestDamage = source?.highestDamage || 0;
+    this.highestHeal = source?.highestHeal || 0;
+    this.pokemonSeen = source?.pokemonSeen || 0;
+    this.pokemonDefeated = source?.pokemonDefeated || 0;
+    this.pokemonCaught = source?.pokemonCaught || 0;
+    this.pokemonHatched = source?.pokemonHatched || 0;
+    // Currently handled by migration
+    this.subLegendaryPokemonSeen = source?.subLegendaryPokemonSeen ?? 0;
+    this.subLegendaryPokemonCaught = source?.subLegendaryPokemonCaught ?? 0;
+    this.subLegendaryPokemonHatched = source?.subLegendaryPokemonHatched ?? 0;
+    this.legendaryPokemonSeen = source?.legendaryPokemonSeen || 0;
+    this.legendaryPokemonCaught = source?.legendaryPokemonCaught || 0;
+    this.legendaryPokemonHatched = source?.legendaryPokemonHatched || 0;
+    this.mythicalPokemonSeen = source?.mythicalPokemonSeen || 0;
+    this.mythicalPokemonCaught = source?.mythicalPokemonCaught || 0;
+    this.mythicalPokemonHatched = source?.mythicalPokemonHatched || 0;
+    this.shinyPokemonSeen = source?.shinyPokemonSeen || 0;
+    this.shinyPokemonCaught = source?.shinyPokemonCaught || 0;
+    this.shinyPokemonHatched = source?.shinyPokemonHatched || 0;
+    this.pokemonFused = source?.pokemonFused || 0;
+    this.trainersDefeated = source?.trainersDefeated || 0;
+    this.eggsPulled = source?.eggsPulled || 0;
+    this.rareEggsPulled = source?.rareEggsPulled || 0;
+    this.epicEggsPulled = source?.epicEggsPulled || 0;
+    this.legendaryEggsPulled = source?.legendaryEggsPulled || 0;
+    this.manaphyEggsPulled = source?.manaphyEggsPulled || 0;
+  }
+}

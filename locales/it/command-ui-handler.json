@@ -1,0 +1,8 @@
+{
+  "fight": "Lotta",
+  "ball": "Ball",
+  "pokemon": "Pokémon",
+  "run": "Fuga",
+  "actionMessage": "Cosa deve fare\n{{pokemonName}}?",
+  "ballCancel": "Annulla"
+}

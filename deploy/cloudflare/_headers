@@ -1,0 +1,11 @@
+# Cloudflare Pages headers (#218). Copy into the Pages publish dir (dist/).
+
+# Long-cache the small loose asset files copied into dist (JSON / manifest / sw).
+/*.json
+  Cache-Control: public, max-age=86400
+/manifest.webmanifest
+  Cache-Control: public, max-age=86400
+
+# Never cache the service worker itself, so updates roll out.
+/service-worker.js
+  Cache-Control: no-cache

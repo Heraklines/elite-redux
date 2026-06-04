@@ -1,0 +1,20 @@
+export enum EggEventType {
+  /**
+   * Triggers when egg count is changed.
+   * @see {@linkcode MoveUsedEvent}
+   */
+  EGG_COUNT_CHANGED = "onEggCountChanged",
+}
+
+/**
+ * Container class for {@linkcode EggEventType.EGG_COUNT_CHANGED} events
+ */
+export class EggCountChangedEvent extends Event {
+  /** The updated egg count. */
+  public eggCount: number;
+
+  constructor(eggCount: number) {
+    super(EggEventType.EGG_COUNT_CHANGED);
+    this.eggCount = eggCount;
+  }
+}

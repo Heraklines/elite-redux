@@ -1,0 +1,10 @@
+{
+  "guest": "Гость",
+  "start": "Старт",
+  "luckIndicator": "Удача:",
+  "shinyOnHover": "Сияющий",
+  "commonShiny": "Обычный",
+  "rareShiny": "Редкий",
+  "epicShiny": "Ультра",
+  "money": "{{amount, number}} ₽"
+}

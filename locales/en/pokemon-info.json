@@ -1,0 +1,40 @@
+{
+  "stat": {
+    "hp": "Max. HP",
+    "hpShortened": "HP",
+    "atk": "Attack",
+    "atkShortened": "Atk",
+    "def": "Defense",
+    "defShortened": "Def",
+    "spatk": "Sp. Atk",
+    "spatkShortened": "SpAtk",
+    "spdef": "Sp. Def",
+    "spdefShortened": "SpDef",
+    "spd": "Speed",
+    "spdShortened": "Spd",
+    "acc": "Accuracy",
+    "eva": "Evasiveness"
+  },
+  "type": {
+    "unknown": "Unknown",
+    "normal": "Normal",
+    "fighting": "Fighting",
+    "flying": "Flying",
+    "poison": "Poison",
+    "ground": "Ground",
+    "rock": "Rock",
+    "bug": "Bug",
+    "ghost": "Ghost",
+    "steel": "Steel",
+    "fire": "Fire",
+    "water": "Water",
+    "grass": "Grass",
+    "electric": "Electric",
+    "psychic": "Psychic",
+    "ice": "Ice",
+    "dragon": "Dragon",
+    "dark": "Dark",
+    "fairy": "Fairy",
+    "stellar": "Stellar"
+  }
+}

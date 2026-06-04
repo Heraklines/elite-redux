@@ -1,0 +1,206 @@
+import "#app/extensions"; // Setup Phaser extension methods/etc
+
+import { initAbilities } from "#abilities/init-abilities";
+import { initPokemonPrevolutions, initPokemonStarters } from "#balance/pokemon-evolutions";
+import { initSpecies } from "#balance/pokemon-species";
+import { initChallenges } from "#data/challenge";
+import { initTrainerTypeDialogue } from "#data/dialogue";
+import {
+  initEliteReduxCSourceCorrections,
+  remapEliteReduxMoveIdsByName,
+} from "#data/elite-redux/init-elite-redux-c-source-corrections";
+import {
+  initEliteReduxCustomAbilities,
+  refreshEliteReduxComposites,
+} from "#data/elite-redux/init-elite-redux-custom-abilities";
+import { initEliteReduxCustomMoves } from "#data/elite-redux/init-elite-redux-custom-moves";
+import { initEliteReduxCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
+import { initEliteReduxEggMoves } from "#data/elite-redux/init-elite-redux-egg-moves";
+import { initEliteReduxEggTiers } from "#data/elite-redux/init-elite-redux-egg-tiers";
+import { initEliteReduxEvolutions } from "#data/elite-redux/init-elite-redux-evolutions";
+import { initEliteReduxFormChanges } from "#data/elite-redux/init-elite-redux-form-changes";
+import { initEliteReduxMovesets } from "#data/elite-redux/init-elite-redux-movesets";
+import { initEliteReduxSpecies } from "#data/elite-redux/init-elite-redux-species";
+import { initEliteReduxTmMoves } from "#data/elite-redux/init-elite-redux-tm-moves";
+import { initEliteReduxTrainers } from "#data/elite-redux/init-elite-redux-trainers";
+import { initEliteReduxVanillaRebalance } from "#data/elite-redux/init-elite-redux-vanilla-rebalance";
+import { initPokemonForms } from "#data/pokemon-forms";
+import { initBiomeBgmLoopPoints } from "#init/init-biome-bgm-loop-points";
+import { initBiomeDepths } from "#init/init-biome-depths";
+import { initBiomes } from "#init/init-biomes";
+import { initCatchableSpecies } from "#init/init-catchable-species";
+import { initModifierPools } from "#modifiers/init-modifier-pools";
+import { initModifierTypes } from "#modifiers/modifier-type";
+import { initMoves } from "#moves/move";
+import { initMysteryEncounters } from "#mystery-encounters/mystery-encounters";
+import { initAchievements } from "#system/achv";
+import { initVouchers } from "#system/voucher";
+import { initStatsKeys } from "#ui/game-stats-ui-handler";
+
+export function initializeGame() {
+  initBiomeBgmLoopPoints();
+  initModifierTypes();
+  initModifierPools();
+  initAchievements();
+  initVouchers();
+  initStatsKeys();
+  initPokemonPrevolutions();
+  initPokemonStarters();
+  initBiomes();
+  initCatchableSpecies();
+  initBiomeDepths();
+  initPokemonForms();
+  initTrainerTypeDialogue();
+  initSpecies();
+  initMoves();
+  initAbilities();
+  initChallenges();
+  initMysteryEncounters();
+  // Elite Redux Phase B1a: install ER 3-passive triples on vanilla species.
+  // Must run AFTER initSpecies() (needs allSpecies populated) and AFTER
+  // initAbilities() (so ability ids resolve cleanly when activated later).
+  initEliteReduxSpecies();
+  // Elite Redux Phase B1b: register 881 ER-custom species (ids ≥ 10000).
+  // Must run AFTER initEliteReduxSpecies() since it appends to allSpecies.
+  const customResult = initEliteReduxCustomSpecies();
+  if (customResult.errors.length > 0) {
+    console.warn(
+      `[er-b1b] ${customResult.errors.length} species construction errors:`,
+      customResult.errors.slice(0, 5),
+    );
+  }
+  console.info(
+    `[er-b1b] registered ${customResult.customsAdded} ER-custom species (skipped ${customResult.customsAlreadyPresent} already present)`,
+  );
+  // Elite Redux Phase B2: register ER-custom abilities + moves (ids ≥ 5000).
+  // Must run AFTER initAbilities() / initMoves() so the vanilla baselines
+  // are in place.
+  const abilityResult = initEliteReduxCustomAbilities();
+  if (abilityResult.errors.length > 0) {
+    console.warn(
+      `[er-b2] ${abilityResult.errors.length} ability construction errors:`,
+      abilityResult.errors.slice(0, 5),
+    );
+  }
+  console.info(
+    `[er-b2] registered ${abilityResult.customsAdded} ER-custom abilities (skipped ${abilityResult.customsAlreadyPresent} already present)`,
+  );
+  const moveResult = initEliteReduxCustomMoves();
+  if (moveResult.errors.length > 0) {
+    console.warn(`[er-b2] ${moveResult.errors.length} move construction errors:`, moveResult.errors.slice(0, 5));
+  }
+  console.info(
+    `[er-b2] registered ${moveResult.customsAdded} ER-custom moves (skipped ${moveResult.customsAlreadyPresent} already present)`,
+  );
+  // Elite Redux #151: repair scrambled gen8/9 move id-map entries (by name)
+  // BEFORE the rebalance + move-patches consume the map, so stats and effects
+  // land on the correct pokerogue move (e.g. Kowtow Cleave, not Blood Moon).
+  const moveRemapped = remapEliteReduxMoveIdsByName();
+  if (moveRemapped > 0) {
+    console.info(`[er-151] repointed ${moveRemapped} vanilla ER move ids to their name-matched MoveIds`);
+  }
+  // Elite Redux Phase B3: patch ER's stat rebalances onto vanilla moves +
+  // abilities. Must run AFTER initEliteReduxCustomAbilities() and
+  // initEliteReduxCustomMoves() so we know which ids are customs (skipped)
+  // and which are vanilla (patched).
+  const rebalanceResult = initEliteReduxVanillaRebalance();
+  if (rebalanceResult.moveErrors.length > 0 || rebalanceResult.abilityErrors.length > 0) {
+    console.warn(
+      `[er-b3] rebalance errors: ${rebalanceResult.moveErrors.length} moves, ${rebalanceResult.abilityErrors.length} abilities`,
+      [...rebalanceResult.moveErrors.slice(0, 3), ...rebalanceResult.abilityErrors.slice(0, 3)],
+    );
+  }
+  console.info(
+    `[er-b3] vanilla rebalance applied: ${rebalanceResult.moveDeltas} move deltas (${rebalanceResult.moveFieldWrites} field writes), ${rebalanceResult.abilityDeltas} ability deltas, ${rebalanceResult.moveMissing} moves + ${rebalanceResult.abilityMissing} abilities skipped (id-map drift)`,
+  );
+  // R57: C-source corrections. Must run AFTER initEliteReduxVanillaRebalance
+  // so we overwrite stale beta-JSON values with the v2.65.3b ROM C source.
+  const cSrcResult = initEliteReduxCSourceCorrections();
+  console.info(
+    `[er-r57] C-source corrections applied: ${cSrcResult.movesPatched} move stats, ${cSrcResult.flagsPatched} flag patches, ${cSrcResult.movesMissing} missing`,
+  );
+  // Re-resolve composite-vanilla-mashup abilities NOW that every vanilla part
+  // has its final (rebalance- + C-source-patched) attrs. Composites were first
+  // built before those patches ran, so any embedding a patched vanilla part
+  // (e.g. 614 Balloon Bomb embeds the rewired Aftermath) froze stale behavior.
+  const compositeRefresh = refreshEliteReduxComposites();
+  console.info(
+    `[er-composite-refresh] re-resolved ${compositeRefresh.refreshed} composite abilities against patched parts${compositeRefresh.errors.length > 0 ? ` (${compositeRefresh.errors.length} errors)` : ""}`,
+  );
+  // Elite Redux Phase B4: populate the ER trainer registry. Must run AFTER
+  // initEliteReduxCustomSpecies() and initEliteReduxCustomMoves() so the
+  // species/move ids the registry references are guaranteed-resolvable
+  // downstream (the registry itself only translates ER ids — the constraint
+  // is on consumers, not this initializer).
+  const trainerResult = initEliteReduxTrainers();
+  if (trainerResult.errors.length > 0) {
+    console.warn(
+      `[er-b4] ${trainerResult.errors.length} trainer registration errors:`,
+      trainerResult.errors.slice(0, 5),
+    );
+  }
+  console.info(
+    `[er-b4] registered ${trainerResult.trainersRegistered} ER trainers in registry (skipped ${trainerResult.trainersSkipped} already present, dropped ${trainerResult.trainersDroppedMissingSpecies} trainers + ${trainerResult.membersDroppedMissingSpecies} party members for missing-species drift)`,
+  );
+  // Elite Redux Phase B5: populate the ER form-change registry (megas +
+  // primals + move-megas). Must run AFTER initEliteReduxCustomSpecies() so
+  // the source/target species ids the registry references are
+  // guaranteed-resolvable downstream. ER models megas as separate species
+  // (not form keys), so the registry stores a (source → target) edge
+  // pair; pokerogue's `pokemonFormChanges` is NOT modified here — see
+  // file header on init-elite-redux-form-changes.ts.
+  const formResult = initEliteReduxFormChanges();
+  if (formResult.errors.length > 0) {
+    console.warn(`[er-b5] ${formResult.errors.length} form-change errors:`, formResult.errors.slice(0, 5));
+  }
+  console.info(
+    `[er-b5] registered ${formResult.formChangesRegistered} ER form changes (${formResult.megaRegistered} mega + ${formResult.primalRegistered} primal + ${formResult.moveMegaRegistered} move-mega), skipped ${formResult.skipped} already present, dropped ${formResult.droppedMissingSpecies} for missing-species drift`,
+  );
+  // Elite Redux Phase B6: wire ER per-species level-up movesets into
+  // pokerogue's `pokemonSpeciesLevelMoves` table. Must run AFTER
+  // initEliteReduxCustomMoves() (so ER-custom move ids ≥ 5000 are valid)
+  // and AFTER initEliteReduxCustomSpecies() (so ER-custom species ids
+  // ≥ 10000 have entries that can be keyed).
+  const movesetResult = initEliteReduxMovesets();
+  if (movesetResult.errors.length > 0) {
+    console.warn(`[er-b6] ${movesetResult.errors.length} moveset errors:`, movesetResult.errors.slice(0, 5));
+  }
+  console.info(
+    `[er-b6] patched ${movesetResult.speciesPatched} species' level-up movesets (${movesetResult.movesetEntriesApplied} [level, move] entries; skipped ${movesetResult.speciesSkippedNoMapping} no-mapping + ${movesetResult.speciesSkippedEmpty} empty; dropped ${movesetResult.moveIdsDropped} unmapped move ids)`,
+  );
+  // Elite Redux Phase B6: wire ER per-species level evolution requirements
+  // into pokerogue's `pokemonEvolutions` table (kinds 0/3/4 — LEVEL,
+  // LEVEL_MALE, LEVEL_FEMALE). Form changes (kinds 1/2/5 — MEGA, PRIMAL,
+  // MOVE_MEGA) are owned by B5 and live in the ER form-change registry.
+  // The initializer rebuilds `pokemonPrevolutions` + `pokemonStarters`
+  // after its patches.
+  const evoResult = initEliteReduxEvolutions();
+  if (evoResult.errors.length > 0) {
+    console.warn(`[er-b6] ${evoResult.errors.length} evolution errors:`, evoResult.errors.slice(0, 5));
+  }
+  console.info(
+    `[er-b6] patched ${evoResult.speciesPatched} species' evolution tables (${evoResult.evolutionEdgesApplied} level edges; skipped ${evoResult.speciesSkippedNoLevelEvos} no-level-evos + ${evoResult.formChangeEdgesSkipped} form-change edges + ${evoResult.speciesSkippedNoMapping} no-mapping; dropped ${evoResult.edgesDroppedMissingTarget} missing-target + ${evoResult.edgesDroppedBadLevel} bad-level)`,
+  );
+
+  // Elite Redux: register ER customs as egg-hatchable. Must run AFTER
+  // initEliteReduxEvolutions() because the skip-prevolution gate reads
+  // `pokemonPrevolutions` which evolution-init populates.
+  const eggResult = initEliteReduxEggTiers();
+  console.info(
+    `[er-egg-tiers] added ${eggResult.eggTiersAdded} ER customs to egg pool (+${eggResult.starterCostsAdded} starter-costs; skipped ${eggResult.skippedPrevolutions} evolved + ${eggResult.skippedFormChanges} form-change + ${eggResult.alreadyPresent} already present)`,
+  );
+
+  // Elite Redux: inject hand-audited egg moves for ER-custom base species into
+  // `speciesEggMoves` (vanilla only covers vanilla species).
+  const eggMoveResult = initEliteReduxEggMoves();
+  console.info(
+    `[er-egg-moves] registered egg moves for ${eggMoveResult.added} ER species (skipped ${eggMoveResult.alreadyPresent} already present + ${eggMoveResult.skippedUnmapped} unmapped)`,
+  );
+
+  // Elite Redux: extend TM-learnable pool with each species's tutor moves.
+  // Must run AFTER move/species init so id lookups resolve.
+  const tmResult = initEliteReduxTmMoves();
+  console.info(
+    `[er-tm] added ${tmResult.pairsAdded} (species, move) pairs to TM-learnable pool (${tmResult.movesAddedToPool} new moves added to drop pool; skipped ${tmResult.pairsSkippedDup} duplicates + ${tmResult.pairsSkippedUnmapped} unmapped)`,
+  );
+}

@@ -1,0 +1,40 @@
+{
+  "stat": {
+    "hp": "SP",
+    "hpShortened": "SP",
+    "atk": "Saldırı",
+    "atkShortened": "Sal",
+    "def": "Savunma",
+    "defShortened": "Sav",
+    "spatk": "Öz. Sal.",
+    "spatkShortened": "ÖzSal",
+    "spdef": "Öz. Sav.",
+    "spdefShortened": "ÖzSav",
+    "spd": "Hız",
+    "spdShortened": "Hız",
+    "acc": "İsabet",
+    "eva": "Atlatıcılık"
+  },
+  "type": {
+    "unknown": "Bilinmeyen",
+    "normal": "Normal",
+    "fighting": "Dövüşçü",
+    "flying": "Uçan",
+    "poison": "Zehir",
+    "ground": "Yer",
+    "rock": "Kaya",
+    "bug": "Böcek",
+    "ghost": "Hayalet",
+    "steel": "Çelik",
+    "fire": "Ateş",
+    "water": "Su",
+    "grass": "Bitki",
+    "electric": "Elektrik",
+    "psychic": "Psişik",
+    "ice": "Buz",
+    "dragon": "Ejderha",
+    "dark": "Karanlık",
+    "fairy": "Peri",
+    "stellar": "Yıldız"
+  }
+}

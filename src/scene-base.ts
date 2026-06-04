@@ -1,0 +1,91 @@
+import { coerceArray } from "#utils/array";
+import { getCachedUrl } from "#utils/fetch-utils";
+
+export const legacyCompatibleImages: string[] = [];
+
+export class SceneBase extends Phaser.Scene {
+  /**
+   * Since everything is scaled up by 6 by default using the game.canvas is annoying
+   * Until such point that we use the canvas normally, this will be easier than
+   * having to divide every width and heigh by 6 to position and scale the ui
+   * @readonly
+   * @defaultValue
+   * width: `320`
+   * height: `180`
+   */
+  public readonly scaledCanvas = {
+    width: 320, // (1920 / 6)
+    height: 180, // (1080 / 6)
+  } as const;
+
+  public init(): void {
+    this.load.on(Phaser.Loader.Events.FILE_LOAD, (file: Phaser.Loader.File) => {
+      if (file.key.endsWith("_legacy")) {
+        const fileKey = file.key.slice(0, -7);
+        legacyCompatibleImages.push(fileKey);
+      }
+    });
+  }
+
+  public loadImage(key: string, folder: string, filename = `${key}.png`): this {
+    const path = folder ? `images/${folder}/${filename}` : `images/${filename}`;
+    this.load.image(key, getCachedUrl(path));
+    if (folder.startsWith("ui")) {
+      folder = folder.replace("ui", "ui/legacy");
+      this.load.image(`${key}_legacy`, getCachedUrl(`images/${folder}/${filename}`));
+    }
+    return this;
+  }
+
+  public loadSpritesheet(key: string, folder: string, size: number, filename = `${key}.png`): this {
+    const path = folder ? `images/${folder}/${filename}` : `images/${filename}`;
+    this.load.spritesheet(key, getCachedUrl(path), {
+      frameWidth: size,
+      frameHeight: size,
+    });
+    if (folder.startsWith("ui")) {
+      folder = folder.replace("ui", "ui/legacy");
+      this.load.spritesheet(`${key}_legacy`, getCachedUrl(`images/${folder}/${filename}`), {
+        frameWidth: size,
+        frameHeight: size,
+      });
+    }
+    return this;
+  }
+
+  public loadAtlas(key: string, folder: string, filenameRoot = key): this {
+    if (folder) {
+      folder += "/";
+    }
+    this.load.atlas(
+      key,
+      getCachedUrl(`images/${folder}${filenameRoot}.png`),
+      getCachedUrl(`images/${folder}${filenameRoot}.json`),
+    );
+    if (folder.startsWith("ui")) {
+      folder = folder.replace("ui", "ui/legacy");
+      this.load.atlas(
+        `${key}_legacy`,
+        getCachedUrl(`images/${folder}${filenameRoot}.png`),
+        getCachedUrl(`images/${folder}${filenameRoot}.json`),
+      );
+    }
+    return this;
+  }
+
+  public loadSe(key: string, folder = "se", filenames: string | string[] = `${key}.wav`): this {
+    folder += "/";
+
+    filenames = coerceArray(filenames);
+    for (const f of filenames as string[]) {
+      // TODO: Use actual path joining logic
+      this.load.audio(folder + key, getCachedUrl(`audio/${folder}${f}`));
+    }
+    return this;
+  }
+
+  public loadBgm(key: string, filename = `${key}.mp3`): this {
+    this.load.audio(key, getCachedUrl(`audio/bgm/${filename}`));
+    return this;
+  }
+}

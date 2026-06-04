@@ -1,0 +1,14 @@
+# Order is important; the last matching pattern takes the most precedence.
+
+# everything (whole code-base) - Junior Devs
+* @pagefaultgames/junior-dev-team
+
+# Balance Files; contain actual code logic and must also be owned by dev team
+/src/data/balance @pagefaultgames/balance-team @pagefaultgames/junior-dev-team
+/src/data/trainers @pagefaultgames/balance-team @pagefaultgames/junior-dev-team
+
+# GitHub actions/templates etc. - Senior Devs
+# Should be defined last in the file to make sure these always override all other definitions
+/.github @pagefaultgames/senior-dev-team
+package.json @pagefaultgames/senior-dev-team
+pnpm-lock.yaml @pagefaultgames/senior-dev-team

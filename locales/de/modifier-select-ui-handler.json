@@ -1,0 +1,14 @@
+{
+  "manageItems": "Items verwalten",
+  "reroll": "Neu rollen",
+  "lockRarities": "Seltenheit festsetzen",
+  "checkTeam": "Team überprüfen",
+  "manageItemsDesc": "Verwalte getragene Items des Pokémons (Übertragen/Wegwerfen).",
+  "rerollDesc": "Nutze Geld um die Items neu zu rollen.",
+  "lockRaritiesDesc": "Setze die Seltenheit der Items fest. (Beeinflusst die Rollkosten).",
+  "checkTeamDesc": "Überprüfe dein Team or nutze Formänderungsitems.",
+  "rerollCost": "{{formattedMoney}}₽",
+  "itemCost": "{{formattedMoney}}₽",
+  "continueNextWaveButton": "Fortfahren",
+  "continueNextWaveDescription": "Zur nächsten Welle fortfahren."
+}

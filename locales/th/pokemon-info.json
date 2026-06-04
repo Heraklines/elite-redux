@@ -1,0 +1,40 @@
+{
+  "stat": {
+    "hp": "พลังชีวิต",
+    "hpShortened": "HP",
+    "atk": "โจมตี",
+    "atkShortened": "Atk",
+    "def": "ป้องกัน",
+    "defShortened": "Def",
+    "spatk": "โจมตีพิเศษ",
+    "spatkShortened": "SpAtk",
+    "spdef": "ป้องกันพิเศษ",
+    "spdefShortened": "SpDef",
+    "spd": "ความเร็ว",
+    "spdShortened": "Spd",
+    "acc": "ความแม่นยำ",
+    "eva": "หลบหลีก"
+  },
+  "type": {
+    "unknown": "ไม่รู้จัก",
+    "normal": "ปกติ",
+    "fighting": "ต่อสู้",
+    "flying": "บิน",
+    "poison": "พิษ",
+    "ground": "ดิน",
+    "rock": "หิน",
+    "bug": "แมลง",
+    "ghost": "ผี",
+    "steel": "โลหะ",
+    "fire": "ไฟ",
+    "water": "น้ำ",
+    "grass": "หญ้า",
+    "electric": "ไฟฟ้า",
+    "psychic": "พลังจิต",
+    "ice": "น้ำแข็ง",
+    "dragon": "มังกร",
+    "dark": "ความมืด",
+    "fairy": "แฟรี่",
+    "stellar": "สเตลลาร์"
+  }
+}
