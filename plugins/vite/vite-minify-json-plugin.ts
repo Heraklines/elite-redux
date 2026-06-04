@@ -17,6 +17,14 @@ const VERSION = "3.0.0";
 
 /** Patterns that should be excluded, meant to be excluded at any level */
 const EXCLUDE_PATTERNS = ["REUSE.toml", ".git", "LICENSE", "README.md", "package.json", "pnpm-lock.yaml"];
+const STANDALONE_ASSET_DIR_EXCLUDES = new Set([
+  "audio",
+  "battle-anims",
+  "battle-anims-er",
+  "fonts",
+  "images",
+  "LICENSES",
+]);
 
 function skipExcludes(file: string): boolean {
   for (const exclude of EXCLUDE_PATTERNS) {
@@ -31,6 +39,7 @@ function skipExcludes(file: string): boolean {
 export function minifyPublicJsonFiles(): VitePlugin {
   let logger: Logger;
   let count = 0;
+  let standalone = false;
   const errors: Error[] = [];
   const { cyan, gray, red, yellow, green } = chalk;
 
@@ -41,6 +50,7 @@ export function minifyPublicJsonFiles(): VitePlugin {
     enforce: "post", // run after other plugins/stuff
     configResolved(resolvedConfig): void {
       logger = resolvedConfig.logger;
+      standalone = resolvedConfig.mode === "standalone";
     },
     buildStart(): void {
       logger.info(cyan(`\t→ Plugin: ${NAME} v${VERSION}`));
@@ -54,6 +64,11 @@ export function minifyPublicJsonFiles(): VitePlugin {
           const fullPath = path.join(dir, file);
           const outputFilePath = path.join(outDir, file);
           const stat = fs.statSync(fullPath);
+
+          if (standalone && dir === assetsDir && stat.isDirectory() && STANDALONE_ASSET_DIR_EXCLUDES.has(file)) {
+            logger.info(yellow(`Skipping standalone CDN asset directory "${fullPath}".`));
+            continue;
+          }
 
           if (skipExcludes(file)) {
             logger.info(yellow(`Skipping "${fullPath}".`));

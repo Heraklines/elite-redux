@@ -12,7 +12,7 @@
     "build:beta": "vite build --mode beta",
     "build:dev": "vite build --mode development",
     "build:app": "vite build --mode app",
-    "build:standalone": "vite build --mode standalone",
+    "build:standalone": "vite build --mode standalone && node scripts/check-cloudflare-dist.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:profile": "node scripts/profiling/profiling.js",
