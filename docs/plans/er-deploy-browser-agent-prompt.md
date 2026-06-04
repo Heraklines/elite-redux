@@ -35,8 +35,14 @@ if it's browser-only, you run the two `git push`es and it does the rest.
 > ### A. Push two GitHub repos (terminal)
 > 1. Code repo. In `<PROJECT_PATH>`:
 >    ```
->    git init && git add -A && git commit -m "Elite Redux"
+>    git status -sb
+>    git ls-files vite.config.ts .env.standalone deploy/cloudflare/_routes.json functions/[[path]].ts
+>    git add -A && git commit -m "Elite Redux public deploy"
 >    ```
+>    If `<PROJECT_PATH>` is already a git worktree, do **not** run `git init`.
+>    `.env.standalone` must be committed; it has Guest-mode placeholders, not real
+>    secrets. `_routes.json` must include `/*` so loose root asset files can be
+>    routed to the proxy function.
 >    Create a repo `https://github.com/<GH_USER>/elite-redux` (public is fine), then:
 >    ```
 >    git branch -M main
@@ -71,6 +77,9 @@ if it's browser-only, you run the two `git push`es and it does the rest.
 >    - Framework preset: **None**
 >    - Build command: `pnpm install && pnpm build:standalone && cp deploy/cloudflare/_headers dist/_headers && cp deploy/cloudflare/_routes.json dist/_routes.json`
 >    - Build output directory: `dist`
+>    - Confirm the build log reports a `dist/` file count under 20,000. A correct
+>      standalone build is roughly 1,654 files after `_headers` and `_routes.json`
+>      are copied.
 > 3. **Environment variables** (Settings → add for Production):
 >    - `NODE_VERSION` = `24.9.0`
 >    - `ASSETS_CDN_BASE` = `https://cdn.jsdelivr.net/gh/<GH_USER>/er-assets@main`

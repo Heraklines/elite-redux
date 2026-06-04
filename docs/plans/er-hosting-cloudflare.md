@@ -71,19 +71,33 @@ jsDelivr then serves them at `https://cdn.jsdelivr.net/gh/<you>/er-assets@main/.
 (no setup — it just works for public repos). Optionally tag a release (`@v1`) so the
 URL is immutable.
 
-## 4. Deploy to Pages + point the Function at jsDelivr
+## 4. Deploy with Cloudflare Pages' Git build
 
-```bash
-npx wrangler pages project create er-game
-npx wrangler pages deploy dist --project-name er-game
-```
+Do **not** deploy the local `dist/` with Wrangler. The local directory can easily
+contain stale asset folders from earlier builds, and Cloudflare Pages rejects
+deployments over 20,000 files. Use the Git-connected Pages build so CI creates a
+fresh standalone `dist/` with the asset folders excluded.
 
-Then set the asset CDN base so the Pages Function knows where to proxy:
-**Dashboard → Pages → er-game → Settings → Environment variables →** add
-`ASSETS_CDN_BASE = https://cdn.jsdelivr.net/gh/<you>/er-assets@main` (Production).
-Redeploy.
+In the Cloudflare dashboard:
 
-Your game is now live at `https://er-game.pages.dev` (or your custom domain).
+1. Workers & Pages -> Create -> Pages -> Connect to Git.
+2. Pick the `elite-redux` GitHub repo.
+3. Build settings:
+   - Framework preset: None
+   - Build command: `pnpm install && pnpm build:standalone && cp deploy/cloudflare/_headers dist/_headers && cp deploy/cloudflare/_routes.json dist/_routes.json`
+   - Build output directory: `dist`
+4. Environment variables for Production:
+   - `NODE_VERSION=24.9.0`
+   - `ASSETS_CDN_BASE=https://cdn.jsdelivr.net/gh/<you>/er-assets@main`
+5. Save and deploy.
+
+The build log should include `Cloudflare Pages payload check passed` and a file
+count well under 20,000. The Pages Function stays in the repository root
+`functions/` directory; `_routes.json` is copied into `dist/` so every route can
+reach the proxy function, which calls `next()` for non-asset requests.
+
+Your game is then live at the Pages URL Cloudflare assigns, or at your custom
+domain after you attach one.
 
 ## 5. (Optional) Cross-player ghost teams (#217)
 
@@ -120,9 +134,9 @@ downloads it as a `.json` file for the player to send you manually.
   `VITE_NANOGPT_API_KEY` + `VITE_NANOGPT_BASE_URL` at build time (#219).
 - **Saves are local only** (no cloud sync in Guest mode) — clearing browser data
   wipes them. This is expected for a backend-less deploy.
-- R2 free tier: 10 GB storage easily fits the ~530 MB assets; 1M reads/day is plenty
-  for a community-sized audience (assets are `immutable`-cached, so repeat plays are
-  served from the browser/edge cache, not R2).
+- Keep R2 disabled for this setup. The large assets are served from jsDelivr over
+  the public `er-assets` GitHub repo, so no card-backed Cloudflare storage is
+  needed.
 - Update `index.html`'s OG/Twitter meta (currently `pokerogue.net`) to your URL for
   nice social previews.
 - See `docs/plans/er-open-source-readiness.md` for the secrets audit before going public.
