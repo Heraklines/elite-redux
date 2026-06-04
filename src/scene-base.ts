@@ -28,7 +28,8 @@ export class SceneBase extends Phaser.Scene {
   }
 
   public loadImage(key: string, folder: string, filename = `${key}.png`): this {
-    this.load.image(key, getCachedUrl(`images/${folder}/${filename}`));
+    const path = folder ? `images/${folder}/${filename}` : `images/${filename}`;
+    this.load.image(key, getCachedUrl(path));
     if (folder.startsWith("ui")) {
       folder = folder.replace("ui", "ui/legacy");
       this.load.image(`${key}_legacy`, getCachedUrl(`images/${folder}/${filename}`));
@@ -37,7 +38,8 @@ export class SceneBase extends Phaser.Scene {
   }
 
   public loadSpritesheet(key: string, folder: string, size: number, filename = `${key}.png`): this {
-    this.load.spritesheet(key, getCachedUrl(`images/${folder}/${filename}`), {
+    const path = folder ? `images/${folder}/${filename}` : `images/${filename}`;
+    this.load.spritesheet(key, getCachedUrl(path), {
       frameWidth: size,
       frameHeight: size,
     });
