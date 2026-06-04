@@ -475,8 +475,12 @@ export async function initCommonAnims(): Promise<void> {
   const commonAnimFetches: Promise<Map<CommonAnim, AnimConfig>>[] = [];
   for (const commonAnimName of getEnumKeys(CommonAnim)) {
     const commonAnimId = CommonAnim[commonAnimName];
+    const path =
+      commonAnimId === CommonAnim.FOG
+        ? "./battle-anims-er/eerie-fog.json"
+        : `./battle-anims/common-${toKebabCase(commonAnimName)}.json`;
     commonAnimFetches.push(
-      cachedFetch(`./battle-anims/common-${toKebabCase(commonAnimName)}.json`)
+      cachedFetch(path)
         .then(response => response.json())
         .then(cas => commonAnims.set(commonAnimId, new AnimConfig(cas))),
     );
