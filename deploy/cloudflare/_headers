@@ -1,11 +1,17 @@
-# Cloudflare Pages headers (#218). Copy into the Pages publish dir (dist/).
+# Cloudflare Pages headers (#218). Copied into the Pages publish dir (dist/).
+#
+# IMPORTANT: do NOT long-cache JSON/manifest/SW. A transient bad response (e.g.
+# an index.html fallback served for an asset URL during an outage) must never get
+# stuck in players' browser HTTP cache. The real game assets are served from
+# jsDelivr via _redirects and cached there as immutable, so these rules only
+# affect the few files Pages serves directly (locales, manifest, the SW) — for
+# those, "no-cache" = always revalidate (cheap 304s), never serve stale.
 
-# Long-cache the small loose asset files copied into dist (JSON / manifest / sw).
 /*.json
-  Cache-Control: public, max-age=86400
-/manifest.webmanifest
-  Cache-Control: public, max-age=86400
+  Cache-Control: no-cache
 
-# Never cache the service worker itself, so updates roll out.
+/manifest.webmanifest
+  Cache-Control: no-cache
+
 /service-worker.js
   Cache-Control: no-cache

@@ -44,16 +44,31 @@ SPDX-License-Identifier: AGPL-3.0-only
 	<link rel="stylesheet" type="text/css" href="./index.css" />
 	<link rel="manifest" href="./manifest.webmanifest">
   <script>
+    // Service worker is intentionally DISABLED. A past deploy poisoned the SW
+    // cache (index.html served for asset URLs), and the SW update lifecycle did
+    // not reliably replace it. So instead of registering a worker, every load
+    // unregisters any existing one and purges its caches, then reloads once so
+    // assets come fresh from the network. This self-heals stuck players with no
+    // manual steps and never affects localStorage (saves are untouched).
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {
-        navigator.serviceWorker.register("./service-worker.js").then(
-          function (registration) {
-            console.log("ServiceWorker registration successful");
-          },
-          function (err) {
-            console.log("ServiceWorker registration failed: ", err);
-          },
-        );
+        navigator.serviceWorker.getRegistrations().then(function (registrations) {
+          if (registrations.length === 0) {
+            return; // No worker present — nothing to clean up, no reload.
+          }
+          Promise.all(registrations.map(function (r) { return r.unregister(); }))
+            .then(function () {
+              if (window.caches && caches.keys) {
+                return caches.keys().then(function (keys) {
+                  return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+                });
+              }
+            })
+            .then(function () {
+              // Reload once now that the stale worker + its caches are gone.
+              window.location.reload();
+            });
+        });
       });
     }
 
