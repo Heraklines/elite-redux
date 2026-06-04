@@ -1,10 +1,12 @@
-import { readdir, stat } from "node:fs/promises";
+import { copyFile, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 const DIST_DIR = "dist";
+const CLOUDFLARE_DIR = "deploy/cloudflare";
 const MAX_FILES = 20_000;
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const LARGE_ASSET_DIRS = ["audio", "battle-anims", "battle-anims-er", "fonts", "images"];
+const PAGES_CONTROL_FILES = ["_headers", "_redirects"];
 
 async function countFiles(dir) {
   let count = 0;
@@ -46,9 +48,18 @@ async function exists(dir) {
   }
 }
 
+async function stageCloudflarePagesFiles() {
+  await rm(join(DIST_DIR, "_routes.json"), { force: true });
+  for (const file of PAGES_CONTROL_FILES) {
+    await copyFile(join(CLOUDFLARE_DIR, file), join(DIST_DIR, file));
+  }
+}
+
 if (!(await exists(DIST_DIR))) {
   throw new Error("dist/ does not exist; run the build before checking the Cloudflare Pages payload.");
 }
+
+await stageCloudflarePagesFiles();
 
 const fileCount = await countFiles(DIST_DIR);
 const oversizeFiles = await findOversizeFiles(DIST_DIR);
