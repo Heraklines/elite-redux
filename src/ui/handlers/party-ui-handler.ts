@@ -146,6 +146,8 @@ export enum PartyOption {
   MOVE_2,
   MOVE_3,
   MOVE_4,
+  /** ER "5th move slot" consumable raises the move cap to 5 (see Pokemon.getMaxMoveCount). */
+  MOVE_5,
   ALL = 4000,
   /** ER ability-slot sub-options: slot 0 = active ability, 1-3 = innate slots. */
   ABILITY_SLOT_0 = 5000,
@@ -941,6 +943,7 @@ export class PartyUiHandler extends MessageUiHandler {
         PartyOption.MOVE_2,
         PartyOption.MOVE_3,
         PartyOption.MOVE_4,
+        PartyOption.MOVE_5,
         PartyOption.ABILITY_SLOT_0,
         PartyOption.ABILITY_SLOT_1,
         PartyOption.ABILITY_SLOT_2,
@@ -1663,7 +1666,8 @@ export class PartyUiHandler extends MessageUiHandler {
           case PartyOption.MOVE_1:
           case PartyOption.MOVE_2:
           case PartyOption.MOVE_3:
-          case PartyOption.MOVE_4: {
+          case PartyOption.MOVE_4:
+          case PartyOption.MOVE_5: {
             const move = pokemon.moveset[option - PartyOption.MOVE_1];
             if (this.showMovePp) {
               const maxPP = move.getMovePp();
