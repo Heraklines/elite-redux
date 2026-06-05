@@ -46,6 +46,17 @@ export class CustomPokemonData {
    * `0`; the consumable raises it to `1`.
    */
   public bonusMoveSlots = 0;
+  /**
+   * When `true`, the per-Pokémon ability/passive overrides above apply even
+   * while the Pokémon is in a form that normally derives its abilities from the
+   * form's species data (mega / G-max — see
+   * {@linkcode Pokemon.usesFormDerivedAbilities}). Set by the ER Ability
+   * Randomizer when it is used on a Pokémon that is currently in such a form, so
+   * the reroll actually takes effect on (and is visible for) that form instead
+   * of being silently shadowed by the form's native ability. Defaults to
+   * `false` (legacy behaviour: overrides only show in the base form).
+   */
+  public abilityOverridesForm = false;
   // TODO: Change default value from `PokemonType.UNKNOWN` to `null` for easier checking;
   public types: PokemonType[];
   /** Deprecated but needed for session save migration */
@@ -60,6 +71,7 @@ export class CustomPokemonData {
     this.passive3 = data?.passive3 ?? -1;
     this.nature = data?.nature ?? -1;
     this.bonusMoveSlots = data?.bonusMoveSlots ?? 0;
+    this.abilityOverridesForm = data?.abilityOverridesForm ?? false;
     this.types = data?.types ?? [];
     this.hitsRecCount = data?.hitsRecCount ?? null;
   }

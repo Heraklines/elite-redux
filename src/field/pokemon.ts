@@ -2175,7 +2175,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (
       this.customPokemonData.ability != null
       && this.customPokemonData.ability !== -1
-      && !this.usesFormDerivedAbilities()
+      && this.customAbilityOverridesApply()
     ) {
       return allAbilities[this.customPokemonData.ability];
     }
@@ -2215,7 +2215,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (
       this.customPokemonData.passive != null
       && this.customPokemonData.passive !== -1
-      && !this.usesFormDerivedAbilities()
+      && this.customAbilityOverridesApply()
     ) {
       return allAbilities[this.customPokemonData.passive];
     }
@@ -2271,7 +2271,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     } else if (
       this.customPokemonData.passive != null
       && this.customPokemonData.passive !== -1
-      && !this.usesFormDerivedAbilities()
+      && this.customAbilityOverridesApply()
     ) {
       slot0 = allAbilities[this.customPokemonData.passive];
     } else if (this.isBoss() && isDailyFinalBoss()) {
@@ -2300,7 +2300,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // Battle-only forms (mega/max) use their own species innates — skip the
     // per-Pokémon innate-slot overrides while in such a form (see
     // {@linkcode usesFormDerivedAbilities}). Overrides are preserved for revert.
-    const useFormInnates = this.usesFormDerivedAbilities();
+    // Exception: an override the ER Ability Randomizer set on this very form
+    // (abilityOverridesForm) still applies — see {@linkcode customAbilityOverridesApply}.
+    const useFormInnates = !this.customAbilityOverridesApply();
     const customSlot1 =
       !useFormInnates && this.customPokemonData.passive2 != null && this.customPokemonData.passive2 !== -1
         ? this.customPokemonData.passive2
@@ -4811,6 +4813,21 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    */
   public usesFormDerivedAbilities(): boolean {
     return this.isMega() || this.isMax();
+  }
+
+  /**
+   * Whether this Pokémon's per-Pokémon ability/passive overrides
+   * ({@linkcode CustomPokemonData}) should be honored in its current form.
+   *
+   * Normally overrides are skipped while {@linkcode usesFormDerivedAbilities} is
+   * true (mega / G-max use their own species innates). The exception is when the
+   * ER Ability Randomizer was used on the Pokémon *while it was in that form* —
+   * it then sets {@linkcode CustomPokemonData.abilityOverridesForm}, so the
+   * reroll actually applies to (and is visible on) the form instead of being
+   * silently shadowed.
+   */
+  public customAbilityOverridesApply(): boolean {
+    return !this.usesFormDerivedAbilities() || this.customPokemonData.abilityOverridesForm;
   }
 
   /**

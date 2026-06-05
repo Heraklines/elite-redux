@@ -16,7 +16,7 @@ import { SpeciesId } from "#enums/species-id";
 import type { PokemonAddMoveSlotModifier } from "#modifiers/modifier";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, test } from "vitest";
+import { beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 
 describe("ER Rogue consumables — Ability Randomizer / Move Slot Expander", () => {
   let phaserGame: Phaser.Game;
@@ -72,6 +72,31 @@ describe("ER Rogue consumables — Ability Randomizer / Move Slot Expander", () 
     // The active ability (slot 0) was NOT touched.
     expect(pokemon.getAbility().id).toBe(activeBefore);
     expect(pokemon.customPokemonData.ability).toBe(-1);
+  });
+
+  test("Ability Randomizer works on a mega (form-derived) Pokémon", async () => {
+    await game.classicMode.startBattle([SpeciesId.BULBASAUR]);
+    const pokemon = game.field.getPlayerPokemon();
+
+    // Simulate being in a mega / G-max form (abilities derived from the form's
+    // species data — see Pokemon.usesFormDerivedAbilities).
+    vi.spyOn(pokemon, "usesFormDerivedAbilities").mockReturnValue(true);
+    const formAbility = pokemon.getAbility().id;
+
+    // A pre-existing BASE-form override is correctly shadowed while form-derived
+    // (the flag is off), so it must NOT leak onto the mega.
+    pokemon.customPokemonData.ability = AbilityId.LEVITATE;
+    expect(pokemon.customPokemonData.abilityOverridesForm).toBe(false);
+    expect(pokemon.getAbility().id).toBe(formAbility);
+
+    // Randomizing WHILE in the form sets the form-applicable flag, so the reroll
+    // actually takes effect on (and is visible for) the mega.
+    const modifier = modifierTypes.ABILITY_RANDOMIZER().newModifier(pokemon)!;
+    expect(modifier.apply(pokemon)).toBe(true);
+    expect(pokemon.customPokemonData.abilityOverridesForm).toBe(true);
+    expect(pokemon.customPokemonData.ability).not.toBe(-1);
+    expect(pokemon.getAbility().id).toBe(pokemon.customPokemonData.ability);
+    expect(pokemon.getAbility().id).not.toBe(formAbility);
   });
 
   test("Move Slot Expander raises the move cap from 4 to 5, once only", async () => {
