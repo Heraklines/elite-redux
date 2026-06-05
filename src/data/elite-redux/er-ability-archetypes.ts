@@ -241,7 +241,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   437: { erAbilityId: 437, archetype: "bespoke", params: null },
   438: { erAbilityId: 438, archetype: "bespoke", params: null },
   439: { erAbilityId: 439, archetype: "bespoke", params: null },
-  440: { erAbilityId: 440, archetype: "composite-vanilla-mashup", params: {"parts":["Color Change","Protean","Fur Coat","Ice Scales"]} },
+  440: { erAbilityId: 440, archetype: "bespoke", params: null }, // Prismatic Fur — bespoke: Color Change re-timed to a PRE-hit resist swap (see dispatchBespoke case 440)
   441: { erAbilityId: 441, archetype: "chance-status-on-hit", params: {"chance":50,"status":"PARALYSIS","filter":{"flag":"STRONG_JAW"},"direction":"offense"} }, // Shocking Jaws: holder's BITING move paralyzes target (C-source attacker block ~9536)
   442: { erAbilityId: 442, archetype: "bespoke", params: null },
   443: { erAbilityId: 443, archetype: "entry-effect", params: {"effect":{"kind":"set-screen-or-room","tag":"GRAVITY","turns":5}} },

@@ -11,6 +11,7 @@ import { pokemonFormChanges } from "#data/pokemon-forms";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { getStatusEffectDescriptor, getStatusEffectHealText } from "#data/status-effect";
 import { TerrainType } from "#data/terrain";
+import { getTypeDamageMultiplier } from "#data/type";
 import type { Weather } from "#data/weather";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -942,6 +943,56 @@ export class PostDefendTypeChangeAbAttr extends PostDefendAbAttr {
       abilityName,
       typeName: i18next.t(`pokemonInfo:type.${toCamelCase(PokemonType[this.type])}`),
     });
+  }
+}
+
+/**
+ * Elite Redux — Prismatic Fur's "Color Change" half. BEFORE an incoming damaging
+ * move lands, change the holder's (temporary) type to whichever single type best
+ * resists — or is immune to — that move's type. Unlike vanilla Color Change
+ * (which changes to the MOVE's type AFTER being hit), this is a PRE-hit defensive
+ * swap, so it must be applied right before the type-effectiveness check
+ * (move-effect-phase) for the reduced/zero damage to actually take effect.
+ */
+export class PreHitResistTypeChangeAbAttr extends AbAttr {
+  /** The best single type to resist `moveType`, or `null` if no type improves on the holder's current matchup. */
+  private static bestResistType(moveType: PokemonType, pokemon: Pokemon): PokemonType | null {
+    // Effectiveness of the move against the holder's CURRENT typing (product).
+    let currentMultiplier = 1;
+    for (const t of pokemon.getTypes(true, true)) {
+      currentMultiplier *= getTypeDamageMultiplier(moveType, t);
+    }
+    let bestType: PokemonType | null = null;
+    let bestMultiplier = currentMultiplier;
+    // Real types are NORMAL(0)…FAIRY(17); skip UNKNOWN(-1) and STELLAR.
+    for (let candidate = PokemonType.NORMAL; candidate <= PokemonType.FAIRY; candidate++) {
+      const multiplier = getTypeDamageMultiplier(moveType, candidate);
+      if (multiplier < bestMultiplier) {
+        bestMultiplier = multiplier;
+        bestType = candidate;
+      }
+    }
+    return bestType;
+  }
+
+  override canApply({ pokemon, opponent, move }: AugmentMoveInteractionAbAttrParams): boolean {
+    if (pokemon.isTerastallized || move.category === MoveCategory.STATUS || move.hasAttr("TypelessAttr")) {
+      return false;
+    }
+    const moveType = opponent.getMoveType(move);
+    return PreHitResistTypeChangeAbAttr.bestResistType(moveType, pokemon) !== null;
+  }
+
+  override apply({ pokemon, opponent, move, simulated }: AugmentMoveInteractionAbAttrParams): void {
+    if (simulated) {
+      return;
+    }
+    const moveType = opponent.getMoveType(move);
+    const bestType = PreHitResistTypeChangeAbAttr.bestResistType(moveType, pokemon);
+    if (bestType !== null) {
+      pokemon.summonData.types = [bestType];
+      pokemon.updateInfo();
+    }
   }
 }
 
@@ -5748,16 +5799,19 @@ export class FormBlockDamageAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
 
   override canApply({ pokemon, opponent, move, damage }: PreDefendModifyDamageAbAttrParams): boolean {
     // TODO: Investigate whether the substitute check can be removed, as it should be accounted for in the move effect phase
+    //
+    // canBreakForm: only nullify damage if the holder can actually break into its
+    // other form. Without this, a holder that has Disguise/Ice Face but NO busted/
+    // noice form change (an ER custom fusion like Mimikyu Rayquaza, or a
+    // randomized-on ability) would block EVERY hit forever — effectively
+    // invincible. Real Mimikyu / Eiscue have the form change registered, so they
+    // are unaffected.
     return (
       damage.value > 0
       && pokemon.formIndex === this.formIndex
       && this.condition(pokemon, opponent, move)
-      && !move.hitsSubstitute(opponent, pokemon) // Only nullify damage if the holder can actually break into its other form.
-      && // Without this, a holder that has Disguise/Ice Face but NO busted/noice form
-      // change (an ER custom fusion like Mimikyu Rayquaza, or a randomized-on
-      // ability) would block EVERY hit forever — effectively invincible. Real
-      // Mimikyu / Eiscue have the form change registered, so they are unaffected.
-      this.canBreakForm(pokemon)
+      && !move.hitsSubstitute(opponent, pokemon)
+      && this.canBreakForm(pokemon)
     );
   }
 
@@ -6595,6 +6649,7 @@ export const AbilityAttrs = Object.freeze({
   PreAttackFieldMoveTypePowerBoostAbAttr,
   PreDefendAbAttr,
   PreDefendFullHpEndureAbAttr,
+  PreHitResistTypeChangeAbAttr,
   PreLeaveFieldAbAttr,
   PreLeaveFieldClearWeatherAbAttr,
   PreLeaveFieldRemoveSuppressAbilitiesSourceAbAttr,

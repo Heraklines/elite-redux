@@ -89,6 +89,7 @@ import {
   MovePowerBoostAbAttr,
   MoveTypePowerBoostAbAttr,
   OverruleCritAbAttr,
+  PokemonTypeChangeAbAttr,
   PostAttackApplyBattlerTagAbAttr,
   PostAttackApplyStatusEffectAbAttr,
   PostDamageForceSwitchAbAttr,
@@ -105,6 +106,7 @@ import {
   PostSummonStatStageChangeAbAttr,
   PostTurnResetStatusAbAttr,
   PostTurnRestoreBerryAbAttr,
+  PreHitResistTypeChangeAbAttr,
   ProtectStatAbAttr,
   ReceivedMoveDamageMultiplierAbAttr,
   ReceivedTypeDamageMultiplierAbAttr,
@@ -2255,6 +2257,21 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           side: "attacker",
           contactRequired: true,
         }),
+      ]);
+    case 440:
+      // Prismatic Fur — "Color Change + Protean + Fur Coat + Ice Scales". The
+      // ER ROM text: changes type to resist/become immune to an attack BEFORE it
+      // hits (Color Change, re-timed to PRE-hit so the swap actually reduces the
+      // damage), changes type to match the user's move before it lands (Protean),
+      // halves physical damage taken (Fur Coat) and halves special damage taken
+      // (Ice Scales). Built bespoke (not composite) because vanilla Color Change
+      // is a POST-hit type swap — the wrong timing for ER. The PRE-hit resist
+      // swap runs in move-effect-phase before effectiveness is computed.
+      return ok([
+        new PreHitResistTypeChangeAbAttr(),
+        new PokemonTypeChangeAbAttr(),
+        new ReceivedMoveDamageMultiplierAbAttr((_target, _user, move) => move.category === MoveCategory.PHYSICAL, 0.5),
+        new ReceivedMoveDamageMultiplierAbAttr((_target, _user, move) => move.category === MoveCategory.SPECIAL, 0.5),
       ]);
     case 405:
       // Loose Rocks — Stealth Rock deploys when hit by a contact move.

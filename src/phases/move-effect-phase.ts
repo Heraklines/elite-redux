@@ -419,6 +419,13 @@ export class MoveEffectPhase extends PokemonPhase {
       return [HitCheckResult.HIT, 1];
     }
 
+    // Elite Redux — Prismatic Fur's "Color Change" half: change the TARGET's type
+    // to one that resists/is immune to the incoming move BEFORE effectiveness is
+    // computed below, so the swap actually reduces the damage taken. Gated to
+    // holders of PreHitResistTypeChangeAbAttr (only Prismatic Fur), so it is a
+    // no-op for everything else.
+    applyAbAttrs("PreHitResistTypeChangeAbAttr", { pokemon: target, opponent: user, move });
+
     const cancelNoEffectMessage = new BooleanHolder(false);
 
     /**
