@@ -359,9 +359,9 @@ export class GameChallengesUiHandler extends UiHandler {
     this.favourText.setVisible(show);
     if (show) {
       // The favour multiplier applies equally to shiny odds AND candy gain, so a
-      // single "x{mult}" covers both; the shiny-star + candy icons to its left
-      // show what's boosted. Right-aligned: text first, then icons leftward.
-      this.favourText.setText(`Favour ${favour}  x${multiplier.toFixed(1)}`);
+      // single rate covers both; the shiny-star + candy icons to its left echo
+      // what's boosted. Right-aligned: text first, then icons leftward.
+      this.favourText.setText(`Favour ${favour}  Shiny/Candy x${multiplier.toFixed(1)}`);
       this.favourIcon.setX(this.favourText.x - this.favourText.displayWidth - 3);
       this.favourCandyIcon.setX(this.favourIcon.x - this.favourIcon.displayWidth - 2);
     }
