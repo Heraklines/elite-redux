@@ -132,6 +132,28 @@ export function resetErRunTrainerTracking(): void {
 }
 
 /**
+ * Snapshot the per-run used-trainer set for saving with the session. Without
+ * this the set lived only in memory, so reloading/resuming a run wiped it and
+ * the difficulty's pool started over — re-fielding the same (weakest-first)
+ * trainers you'd already fought. Persisting it keeps the no-repeat guarantee
+ * across save/load.
+ */
+export function getErUsedTrainerKeys(): string[] {
+  return [...USED_ER_TRAINER_KEYS];
+}
+
+/**
+ * Restore the used-trainer set from saved session data (called on load instead
+ * of {@link resetErRunTrainerTracking}, so a continued run keeps its history).
+ */
+export function restoreErRunTrainerTracking(keys: readonly string[] | undefined): void {
+  USED_ER_TRAINER_KEYS.clear();
+  for (const k of keys ?? []) {
+    USED_ER_TRAINER_KEYS.add(k);
+  }
+}
+
+/**
  * Wave by which the strongest trainers of a type are reached. Maps a run's wave
  * depth onto a 0..1 fraction used to index the strength-ordered pool, so early
  * waves field the weakest (often-unevolved) teams and late waves the strongest.

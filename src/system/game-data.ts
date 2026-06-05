@@ -17,7 +17,7 @@ import { allMoves, allSpecies } from "#data/data-lists";
 import type { Egg } from "#data/egg";
 import { getErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ER_CANDY_GAIN_MULTIPLIER, getRunCandyMultiplier } from "#data/elite-redux/er-shiny-favour";
-import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
+import { getErUsedTrainerKeys, restoreErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { loadPositionalTag } from "#data/positional-tags/load-positional-tag";
@@ -847,6 +847,9 @@ export class GameData {
       // ER: persist the run difficulty so a reload keeps using the chosen ER
       // trainer roster tier (otherwise it resets to "ace" = vanilla trainers).
       erDifficulty: getErDifficulty(),
+      // ER: persist the set of trainers already fought this run, so reloading
+      // doesn't wipe the no-repeat tracking and re-field the same trainers.
+      erUsedTrainerKeys: getErUsedTrainerKeys(),
     } as SessionSaveData;
   }
 
@@ -955,11 +958,11 @@ export class GameData {
     }
 
     // ER: restore the run difficulty (drives the ER trainer roster tier). Legacy
-    // saves predate this field — default to "ace" (vanilla trainers). Reset the
-    // per-run "already encountered" ER trainer set so the loaded run's pool is
-    // fresh rather than inheriting a prior run's used-trainer state.
+    // saves predate this field — default to "ace" (vanilla trainers). Restore the
+    // per-run "already encountered" ER trainer set from the save so a continued
+    // run keeps its no-repeat history (older saves have no keys → fresh pool).
     setErDifficulty(fromSession.erDifficulty ?? "ace");
-    resetErRunTrainerTracking();
+    restoreErRunTrainerTracking(fromSession.erUsedTrainerKeys);
 
     globalScene.setSeed(fromSession.seed || globalScene.game.config.seed[0]);
     globalScene.resetSeed();

@@ -86,6 +86,12 @@ export interface SessionSaveData {
    * backwards compatibility with pre-existing saves (treated as "ace").
    */
   erDifficulty?: ErDifficulty;
+  /**
+   * ER: stableKeys of trainers already encountered this run, so the difficulty's
+   * trainer pool doesn't repeat across a save/load. Optional for backwards
+   * compatibility (older saves restore an empty set, i.e. a fresh pool).
+   */
+  erUsedTrainerKeys?: string[];
 }
 
 export interface Unlocks {
