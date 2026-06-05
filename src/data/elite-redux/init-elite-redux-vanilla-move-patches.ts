@@ -65,6 +65,7 @@ import {
   StatStageChangeAttr,
   StatusEffectAttr,
 } from "#data/moves/move";
+import { FirstMoveCondition } from "#data/moves/move-condition";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
@@ -687,12 +688,16 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
   // KINESIS: vanilla status (accuracy -1) → ER "Causes the foe's item to fly
   // away, removing it and flinching the target." +1 priority (numeric-patched).
   // Drop the vanilla accuracy-drop; add Knock-Off-style item removal + flinch.
+  // FIRST-TURN ONLY (Fake Out / Astonish #221 behavior): a repeatable +1-priority
+  // guaranteed-flinch move let the AI perma-flinch the player — gate it so it can
+  // only be used on the user's first turn after switch-in.
   [
     MoveId.KINESIS,
     move => {
       removeAttrsByCtor(move, [StatStageChangeAttr]);
       addAttrUnique(move, new RemoveHeldItemAttr(false));
       addAttrUnique(move, new FlinchAttr());
+      move.condition(new FirstMoveCondition(), 3);
     },
   ],
   // Tachyon Cutter — ER's authored description says "Never misses". Keyed by
