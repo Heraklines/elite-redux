@@ -31,7 +31,10 @@ describe("ER shiny favour", () => {
     // Mono-type 5, Inverse/Flip 3.
     expect(getChallengeFavour(challengeStub(Challenges.PASSIVES, 1))).toBe(10);
     expect(getChallengeFavour(challengeStub(Challenges.HARDCORE, 1))).toBe(8);
+    // Limited Support is tiered: no heal (1) → 6, no shop (2) → 8, both (3) → 10.
     expect(getChallengeFavour(challengeStub(Challenges.LIMITED_SUPPORT, 1))).toBe(6);
+    expect(getChallengeFavour(challengeStub(Challenges.LIMITED_SUPPORT, 2))).toBe(8);
+    expect(getChallengeFavour(challengeStub(Challenges.LIMITED_SUPPORT, 3))).toBe(10);
     expect(getChallengeFavour(challengeStub(Challenges.SINGLE_TYPE, 3))).toBe(5);
     expect(getChallengeFavour(challengeStub(Challenges.INVERSE_BATTLE, 1))).toBe(3);
     expect(getChallengeFavour(challengeStub(Challenges.FLIP_STAT, 1))).toBe(3);

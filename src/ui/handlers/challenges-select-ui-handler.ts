@@ -84,21 +84,22 @@ export class GameChallengesUiHandler extends UiHandler {
       .setOrigin(0)
       .setPositionRelative(headerBg, 8, 4);
 
-    // ER: Favour → shiny-odds readout in the otherwise-empty top-left header
-    // space, beside the title. Updated live as challenges are toggled
-    // (see updateFavourDisplay). The icon is the shiny star.
+    // ER: Favour → shiny-odds readout, RIGHT-aligned in the header so it sits
+    // clear of the (long) title. Compact font; the shiny-star icon sits just
+    // left of the text. The icon's x is recomputed in updateFavourDisplay since
+    // the text width varies. Updated live as challenges are toggled.
+    this.favourText = addTextObject(0, 0, "", TextStyle.SETTINGS_LABEL)
+      .setName("text-challenge-favour")
+      .setOrigin(1, 0.5)
+      .setVisible(false);
+    this.favourText.setPositionRelative(headerBg, headerBg.width - 6, headerBg.height / 2);
     this.favourIcon = globalScene.add
       .sprite(0, 0, "shiny_star")
       .setName("challenge-favour-icon")
-      .setOrigin(0, 0.5)
-      .setScale(0.5)
+      .setOrigin(1, 0.5)
+      .setScale(0.4)
       .setVisible(false);
-    this.favourIcon.setPositionRelative(headerBg, 96, 12);
-    this.favourText = addTextObject(0, 0, "", TextStyle.HEADER_LABEL)
-      .setName("text-challenge-favour")
-      .setOrigin(0, 0.5)
-      .setVisible(false);
-    this.favourText.setPositionRelative(this.favourIcon, 9, 1);
+    this.favourIcon.setPosition(this.favourText.x, this.favourText.y);
 
     this.optionsWidth = canvasWidth * 0.6;
     this.optionsBg = addWindow(0, headerBg.height, this.optionsWidth, canvasHeight - headerBg.height - 2)
@@ -345,6 +346,8 @@ export class GameChallengesUiHandler extends UiHandler {
     this.favourText.setVisible(show);
     if (show) {
       this.favourText.setText(`Favour ${favour}  Shiny x${multiplier.toFixed(1)}`);
+      // Place the icon just left of the (right-aligned) text.
+      this.favourIcon.setX(this.favourText.x - this.favourText.displayWidth - 3);
     }
   }
 

@@ -29,7 +29,7 @@ const FAVOUR_BY_CHALLENGE: Partial<Record<Challenges, number>> = {
   [Challenges.INVERSE_BATTLE]: 3,
   [Challenges.FLIP_STAT]: 3,
   [Challenges.LIMITED_CATCH]: 4,
-  [Challenges.LIMITED_SUPPORT]: 6,
+  // LIMITED_SUPPORT is tiered — see getChallengeFavour (no heal 6 / no shop 8 / both 10).
   [Challenges.HARDCORE]: 8,
   [Challenges.PASSIVES]: 10, // No Passives — by far the biggest ER handicap
   [Challenges.LOWER_MAX_STARTER_COST]: 3,
@@ -43,9 +43,22 @@ export const FAVOUR_SHINY_STEP_BONUS = 0.5;
 /** Hard cap on the shiny multiplier (triple the base rate). */
 export const FAVOUR_SHINY_MAX_MULT = 3;
 
+/**
+ * Favour for Limited Support by tier: value 1 = "no heal" (6), value 2 =
+ * "no shop" (8), value 3 = both (10). Removing both heals AND the shop is a much
+ * bigger handicap than either alone, so it grants the most favour.
+ */
+const LIMITED_SUPPORT_FAVOUR = [0, 6, 8, 10] as const;
+
 /** Favour a single challenge contributes right now (0 when inactive). */
 export function getChallengeFavour(challenge: Challenge): number {
-  return challenge.value > 0 ? (FAVOUR_BY_CHALLENGE[challenge.id] ?? 0) : 0;
+  if (challenge.value <= 0) {
+    return 0;
+  }
+  if (challenge.id === Challenges.LIMITED_SUPPORT) {
+    return LIMITED_SUPPORT_FAVOUR[challenge.value] ?? LIMITED_SUPPORT_FAVOUR[LIMITED_SUPPORT_FAVOUR.length - 1];
+  }
+  return FAVOUR_BY_CHALLENGE[challenge.id] ?? 0;
 }
 
 /** Total favour from all active challenges on the current run. */
