@@ -194,11 +194,14 @@ input:-internal-autofill-selected {
   display: none;
 }
 
-/* Show cycle buttons only on STARTER_SELECT and on touch configuration panel */
+/* Show cycle buttons only on STARTER_SELECT and on touch configuration panel.
+   SUMMARY is included for #apadOpenFilters so touch players get the [C] button
+   that cycles the move-detail pages on the Pokémon summary's Moves page. */
 #touchControls:not(.config-mode):not(
     [data-ui-mode="STARTER_SELECT"],
     [data-ui-mode="POKEDEX"],
-    [data-ui-mode="POKEDEX_PAGE"]
+    [data-ui-mode="POKEDEX_PAGE"],
+    [data-ui-mode="SUMMARY"]
   )
   #apadOpenFilters,
 #touchControls:not(.config-mode):not(
