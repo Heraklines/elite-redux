@@ -769,7 +769,7 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
       break;
     // ---- Break the target's screens (Light Screen / Reflect / Aurora Veil) ----
     case 762: // Iron Fangs
-      move.attr(RemoveScreensAttr, false);
+      move.attr(RemoveScreensAttr, (_user, target) => (target.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY));
       break;
     // ---- Sets Stealth Rock on the foe's field ----
     case 787: // Scatter Blast — scatters Stealth Rocks onto the foe's side
@@ -816,7 +816,7 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
       break;
     // ---- Break the target's screens ----
     case 936: // Battering Ram — breaks barriers (Light Screen/Reflect/Aurora Veil)
-      move.attr(RemoveScreensAttr, false);
+      move.attr(RemoveScreensAttr, (_user, target) => (target.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY));
       break;
     // ---- Transfer the user's status to the target, curing the user (Psycho Shift) ----
     case 938: // Viral Strike
