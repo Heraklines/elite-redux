@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// Verify Karate Chop / Cross Chop match the authoritative ER ROM (v2.65.3b,
-// vendor/elite-redux/rom-extracted/er-battle-moves.json):
-//   KARATE_CHOP: 60 / 100 / 25 ; CROSS_CHOP: 100 / 80 / 5
+// Verify Karate Chop / Cross Chop match the canonical Elite Redux Nextdex:
+//   KARATE_CHOP: 90 / 100 / 10 ; CROSS_CHOP: 100 / 80 / 5
+// (Karate Chop is a manual Nextdex override — the v2.65.3b ROM dump had 60/–/25,
+// but the live Nextdex shows 90/100/10, which is the balance source we follow.)
 
 import { allMoves } from "#data/data-lists";
 import { MoveId } from "#enums/move-id";
@@ -22,10 +23,10 @@ describe("ER chop moves match the ROM", () => {
     void new GameManager(phaserGame);
   });
 
-  it("Karate Chop = 60 / 100 / 25", () => {
+  it("Karate Chop = 90 / 100 / 10", () => {
     const m = allMoves[MoveId.KARATE_CHOP];
     console.log(`[chop] Karate Chop: power ${m.power}, acc ${m.accuracy}, pp ${m.pp}`);
-    expect([m.power, m.accuracy, m.pp]).toEqual([60, 100, 25]);
+    expect([m.power, m.accuracy, m.pp]).toEqual([90, 100, 10]);
   });
 
   it("Cross Chop = 100 / 80 / 5", () => {

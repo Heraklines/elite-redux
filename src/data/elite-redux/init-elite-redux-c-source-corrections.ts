@@ -54,7 +54,11 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   // Regenerate with: ER_SCENARIO=1 pnpm test test/tests/elite-redux/integration/er-move-diff-audit.test.ts
   // then run scripts/elite-redux/generate_c_source_overrides.py
   ["MOVE_POUND", { pp: 35 }],
-  ["MOVE_KARATE_CHOP", { power: 60, pp: 25 }],
+  // MANUAL Nextdex override (do NOT regenerate away): the v2.65.3b C source had
+  // Karate Chop at 60/–/25, but the live Elite Redux Nextdex shows 90 / 100 / 10
+  // (Fighting, high crit). The Nextdex is the canonical balance source the
+  // player base uses, so pin to it.
+  ["MOVE_KARATE_CHOP", { power: 90, accuracy: 100, pp: 10 }],
   ["MOVE_DOUBLE_SLAP", { chance: 0 }],
   ["MOVE_COMET_PUNCH", { power: 25, pp: 15 }],
   ["MOVE_FIRE_PUNCH", { power: 75 }],
