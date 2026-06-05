@@ -284,6 +284,25 @@ class ErCustomSpecies extends PokemonSpecies {
   }
 
   /**
+   * Override base `getCryKey` so it doesn't crash on ER-custom species ids.
+   *
+   * The base implementation does `speciesId %= 2000` (meant for vanilla form ids
+   * in the 2000–2999 range) and then `getPokemonSpecies(speciesId).forms` — for
+   * an ER custom (id >= 10000) the modulo lands on an id that isn't a real
+   * species, so `getPokemonSpecies(...)` is `undefined` and `.forms` throws
+   * "Cannot read properties of undefined (reading 'forms')". That fired from
+   * `cry()` on enemy entry and **froze the battle** (repro: Phantowl, #260).
+   *
+   * ER customs have no cry audio anyway (see {@linkcode loadAssets}), and
+   * {@linkcode BattleScene.playSound} tolerates a missing key (warns + returns
+   * null), so returning a well-formed key for our own id makes the cry simply
+   * silent instead of crashing.
+   */
+  override getCryKey(_formIndex?: number): string {
+    return `cry/${this.speciesId}`;
+  }
+
+  /**
    * Override base `getExpandedSpeciesName` so it doesn't crash on ER-custom
    * species ids (which aren't in the SpeciesId enum). The base looks up
    * `SpeciesId[this.speciesId].split("_")` — which is undefined for IDs
