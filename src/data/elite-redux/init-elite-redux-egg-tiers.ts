@@ -71,6 +71,17 @@ function pickTier(draft: (typeof ER_SPECIES)[number]): EggTier {
   return EggTier.COMMON;
 }
 
+/**
+ * Hand-tuned egg-tier overrides for ER customs by exact species name, taking
+ * precedence over the BST banding in {@linkcode pickTier}. The Lake Trio Redux
+ * (BST 580 → would band as RARE) are bumped to EPIC as requested.
+ */
+const EGG_TIER_OVERRIDES: Readonly<Record<string, EggTier>> = {
+  "Azelf Redux": EggTier.EPIC,
+  "Mesprit Redux": EggTier.EPIC,
+  "Uxie Redux": EggTier.EPIC,
+};
+
 function pickStarterCost(tier: EggTier): number {
   switch (tier) {
     case EggTier.LEGENDARY:
@@ -165,7 +176,7 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
       result.alreadyPresent++;
       continue;
     }
-    const tier = pickTier(draft);
+    const tier = EGG_TIER_OVERRIDES[draft.name ?? ""] ?? pickTier(draft);
     tiers[pkrgId] = tier;
     result.eggTiersAdded++;
     if (costs[pkrgId] === undefined) {
