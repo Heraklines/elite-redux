@@ -38,8 +38,9 @@ export class GameChallengesUiHandler extends UiHandler {
   private readonly challengeLabels: ChallengeLabel[] = [];
   private monoTypeValue: Phaser.GameObjects.Sprite;
 
-  // ER: "Favour" → shiny-odds readout shown in the top-left empty space.
+  // ER: "Favour" → shiny + candy readout shown in the header's empty space.
   private favourIcon: Phaser.GameObjects.Sprite;
+  private favourCandyIcon: Phaser.GameObjects.Sprite;
   private favourText: Phaser.GameObjects.Text;
 
   private cursorObj: Phaser.GameObjects.NineSlice | null;
@@ -100,6 +101,16 @@ export class GameChallengesUiHandler extends UiHandler {
       .setScale(0.4)
       .setVisible(false);
     this.favourIcon.setPosition(this.favourText.x, this.favourText.y);
+    // Candy icon sits just left of the shiny star — the favour multiplier
+    // applies equally to shiny odds and candy gain, so both icons share the
+    // single "x{mult}" readout. Positioned live in updateFavourDisplay.
+    this.favourCandyIcon = globalScene.add
+      .sprite(0, 0, "items", "candy")
+      .setName("challenge-favour-candy-icon")
+      .setOrigin(1, 0.5)
+      .setScale(0.4)
+      .setVisible(false);
+    this.favourCandyIcon.setPosition(this.favourText.x, this.favourText.y);
 
     this.optionsWidth = canvasWidth * 0.6;
     this.optionsBg = addWindow(0, headerBg.height, this.optionsWidth, canvasHeight - headerBg.height - 2)
@@ -188,6 +199,7 @@ export class GameChallengesUiHandler extends UiHandler {
     this.challengesContainer.add([
       headerBg,
       headerText,
+      this.favourCandyIcon,
       this.favourIcon,
       this.favourText,
       // difficultyBg,
@@ -343,11 +355,15 @@ export class GameChallengesUiHandler extends UiHandler {
     const multiplier = favourToShinyMultiplier(favour);
     const show = favour > 0;
     this.favourIcon.setVisible(show);
+    this.favourCandyIcon.setVisible(show);
     this.favourText.setVisible(show);
     if (show) {
-      this.favourText.setText(`Favour ${favour}  Shiny x${multiplier.toFixed(1)}`);
-      // Place the icon just left of the (right-aligned) text.
+      // The favour multiplier applies equally to shiny odds AND candy gain, so a
+      // single "x{mult}" covers both; the shiny-star + candy icons to its left
+      // show what's boosted. Right-aligned: text first, then icons leftward.
+      this.favourText.setText(`Favour ${favour}  x${multiplier.toFixed(1)}`);
       this.favourIcon.setX(this.favourText.x - this.favourText.displayWidth - 3);
+      this.favourCandyIcon.setX(this.favourIcon.x - this.favourIcon.displayWidth - 2);
     }
   }
 

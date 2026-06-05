@@ -16,6 +16,7 @@ import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed/da
 import { allMoves, allSpecies } from "#data/data-lists";
 import type { Egg } from "#data/egg";
 import { getErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { ER_CANDY_GAIN_MULTIPLIER, getRunCandyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import type { PokemonSpecies } from "#data/pokemon-species";
@@ -1932,6 +1933,13 @@ export class GameData {
 
     if (candyCount >= MAX_STARTER_CANDY_COUNT) {
       return false;
+    }
+
+    // Elite Redux candy buffs: a flat ~35% across-the-board boost, plus the
+    // current run's challenge-favour candy multiplier (same curve as shiny, up
+    // to 3×). A positive gain never rounds down to 0.
+    if (count > 0) {
+      count = Math.max(1, Math.round(count * ER_CANDY_GAIN_MULTIPLIER * getRunCandyMultiplier()));
     }
 
     globalScene.candyBar.showStarterSpeciesCandy(speciesId, count);

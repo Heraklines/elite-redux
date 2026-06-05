@@ -83,3 +83,19 @@ export function favourToShinyMultiplier(favour: number): number {
 export function getRunShinyMultiplier(): number {
   return favourToShinyMultiplier(getRunShinyFavour());
 }
+
+/**
+ * Flat, always-on Elite Redux buff to candy gains (applies in or out of a run,
+ * on top of any favour multiplier). ~35% more candy across the board.
+ */
+export const ER_CANDY_GAIN_MULTIPLIER = 1.35;
+
+/**
+ * The current run's candy-gain multiplier from its challenge favour. Uses the
+ * exact same curve as shiny ({@linkcode favourToShinyMultiplier}: +0.5× per 5
+ * favour, capped at 3×), so handicapping yourself rewards candy just as much as
+ * shininess.
+ */
+export function getRunCandyMultiplier(): number {
+  return favourToShinyMultiplier(getRunShinyFavour());
+}
