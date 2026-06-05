@@ -9,6 +9,7 @@ import {
   getErAbilityRomDescription,
   getErCompositeDetailedDescription,
 } from "#data/elite-redux/er-ability-descriptions";
+import { getErMoveDetailPages } from "#data/elite-redux/er-move-details";
 import { getLevelRelExp, getLevelTotalExp } from "#data/exp";
 import { getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
@@ -179,6 +180,9 @@ export class SummaryUiHandler extends UiHandler {
   private moveCursor: number;
   private selectedMoveIndex: number;
   private selectCallback: ((cursor: number) => void) | null;
+  /** ER: cyclable move-detail page on the Moves page (0 = description, 1-3 = property pages). */
+  private moveDetailPage = 0;
+  private moveDetailPageLabel: Phaser.GameObjects.Text | null = null;
 
   constructor() {
     super(UiMode.SUMMARY);
@@ -619,6 +623,13 @@ export class SummaryUiHandler extends UiHandler {
     let error = false;
 
     if (this.moveSelect) {
+      // ER: the info button cycles the highlighted move's detail pages
+      // (description → mechanics → combat → properties). Routed here via the
+      // buttonGoToFilter whitelist.
+      if (button === Button.STATS) {
+        this.cycleMoveDetail();
+        return true;
+      }
       if (button === Button.ACTION) {
         if (this.pokemon && this.moveCursor < this.pokemon.moveset.length) {
           if (this.summaryUiMode === SummaryUiMode.LEARN_MOVE) {
@@ -815,7 +826,7 @@ export class SummaryUiHandler extends UiHandler {
         this.hideMoveEffect();
       }
 
-      this.moveDescriptionText.setText(selectedMove?.effect || "");
+      this.renderMoveDetail(selectedMove);
       const moveDescriptionLineCount = Math.floor(this.moveDescriptionText.displayHeight / 14.83);
 
       if (this.descriptionScrollTween) {
@@ -1443,6 +1454,13 @@ export class SummaryUiHandler extends UiHandler {
         this.moveDescriptionText = addTextObject(2, 84, "", TextStyle.WINDOW_ALT, { wordWrap: { width: 1212 } });
         this.movesContainer.add(this.moveDescriptionText);
 
+        // ER: small page indicator for the cyclable move-detail (top-right of the
+        // description strip), e.g. "Mechanics 2/4". The info button cycles pages.
+        this.moveDetailPageLabel = addTextObject(212, 76, "", TextStyle.WINDOW_ALT, { fontSize: "48px" })
+          .setOrigin(1, 0)
+          .setVisible(false);
+        this.movesContainer.add(this.moveDetailPageLabel);
+
         const moveDescriptionTextMaskRect = globalScene.make.graphics({});
         moveDescriptionTextMaskRect.setScale(6);
         moveDescriptionTextMaskRect.fillStyle(0xffffff);
@@ -1510,8 +1528,39 @@ export class SummaryUiHandler extends UiHandler {
     this.moveSelect = true;
     this.extraMoveRowContainer.setVisible(true);
     this.selectedMoveIndex = -1;
+    this.moveDetailPage = 0; // each move starts on the description page
     this.setCursor(this.summaryUiMode === SummaryUiMode.LEARN_MOVE ? this.getNewMoveRowIndex() : 0);
     this.showMoveEffect();
+  }
+
+  /**
+   * ER: render the current move-detail page into the description strip + the
+   * page indicator. Page 0 is the description text; pages 1-3 are label/value
+   * property rows derived from the move's real wiring ({@linkcode getErMoveDetailPages}).
+   */
+  private renderMoveDetail(move: Move | null): void {
+    if (!move) {
+      this.moveDescriptionText.setText("");
+      this.moveDetailPageLabel?.setVisible(false);
+      return;
+    }
+    const pages = getErMoveDetailPages(move);
+    const pageIndex = Math.min(this.moveDetailPage, pages.length - 1);
+    const page = pages[pageIndex];
+    if (page.description === undefined) {
+      this.moveDescriptionText.setText((page.rows ?? []).map(r => `${r.label}:  ${r.value}`).join("\n"));
+    } else {
+      this.moveDescriptionText.setText(page.description || "");
+    }
+    this.moveDetailPageLabel?.setText(`${page.title}  ${pageIndex + 1}/${pages.length}`).setVisible(true);
+  }
+
+  /** ER: cycle the move-detail page (info button) and re-render the current move. */
+  private cycleMoveDetail(): void {
+    this.moveDetailPage = (this.moveDetailPage + 1) % 4;
+    // Re-run the cursor refresh so the description scroll recomputes for the new
+    // page's text; renderMoveDetail (called within) uses the new moveDetailPage.
+    this.setCursor(this.moveCursor, true);
   }
 
   hideMoveSelect() {
@@ -1523,6 +1572,8 @@ export class SummaryUiHandler extends UiHandler {
     this.moveSelect = false;
     this.extraMoveRowContainer.setVisible(false);
     this.moveDescriptionText.setText("");
+    this.moveDetailPageLabel?.setVisible(false);
+    this.moveDetailPage = 0;
 
     this.destroyBlinkCursor();
     this.hideMoveEffect();

@@ -16,6 +16,7 @@ import { SettingsGamepadUiHandler } from "#ui/settings-gamepad-ui-handler";
 import { SettingsKeyboardUiHandler } from "#ui/settings-keyboard-ui-handler";
 import { SettingsUiHandler } from "#ui/settings-ui-handler";
 import { StarterSelectUiHandler } from "#ui/starter-select-ui-handler";
+import { SummaryUiHandler } from "#ui/summary-ui-handler";
 import Phaser from "phaser";
 
 type ActionKeys = Record<Button, () => void>;
@@ -170,6 +171,8 @@ export class UiInputs {
       PokedexPageUiHandler,
       CommandUiHandler,
       FightUiHandler,
+      // SummaryUiHandler: the info key cycles move-detail pages on the Moves page.
+      SummaryUiHandler,
     ];
     const uiHandler = globalScene.ui?.getHandler();
     if (whitelist.some(handler => uiHandler instanceof handler)) {
