@@ -32,7 +32,8 @@ import { TextStyle } from "#enums/text-style";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { DamageCalculatorModifier, SpeedOrderModifier } from "#modifiers/modifier";
-import { addTextObject } from "#ui/text";
+import { addTextObject, getTextColor } from "#ui/text";
+import { isSlotEnabled, isSlotUnlocked, type PassiveSlot } from "#utils/passive-utils";
 
 /** Page identity → background texture key + accent palette colour. */
 type Page = "side-player" | "side-enemy" | "field" | "stats" | "abilities" | "moves" | "damage-calc" | "speed-order";
@@ -473,20 +474,51 @@ export class BattleInfoOverlay {
 
   // --- per-Pokémon: ABILITIES ----------------------------------------------
   private renderAbilities(c: Phaser.GameObjects.Container, mon: Pokemon): void {
-    const rows: { label: string; abilityId: number }[] = [];
+    const rows: { label: string; abilityId: number; locked: boolean }[] = [];
     const main = mon.getAbility(true);
     if (main) {
-      rows.push({ label: "Ability", abilityId: main.id });
+      rows.push({ label: "Ability", abilityId: main.id, locked: false });
     }
+
+    // Innate slots are NOT all active just because they exist: for the player
+    // each slot is gated behind its candy unlock (+ enable) in `passiveAttr`;
+    // enemies gate slot 2 @ Lv15 and slot 3 @ Lv24. Show every slot (so the
+    // player can read descriptions and plan), but mark the ones that aren't
+    // actually in effect as Locked/Disabled instead of pretending they're live.
+    const rootSpeciesId = mon.species.getRootSpeciesId();
+    const passiveAttr = globalScene.gameData.starterData[rootSpeciesId]?.passiveAttr ?? 0;
+    const isEnemy = mon.isEnemy?.() === true;
+    const enemyLevelForSlot = [0, 15, 24];
+
     // Use the POKEMON-level passive resolver (not the species-level one): it
     // honors per-Pokémon overrides written by the Ability Randomizer
     // (`customPokemonData.passive/passive2/passive3`) and transform overrides,
     // so the panel reflects runtime ability changes rather than static species data.
-    for (const ability of mon.getPassiveAbilities()) {
-      if (ability && ability.id) {
-        rows.push({ label: "Innate", abilityId: ability.id });
+    const innates = mon.getPassiveAbilities();
+    for (let slot = 0; slot < innates.length; slot++) {
+      const ability = innates[slot];
+      if (!ability || !ability.id) {
+        continue;
       }
+      const passiveSlot = slot as PassiveSlot;
+      let label = "Innate";
+      let locked = false;
+      if (isEnemy) {
+        const levelReq = enemyLevelForSlot[passiveSlot] ?? 0;
+        if (mon.level < levelReq) {
+          locked = true;
+          label = `Innate (Locked Lv${levelReq})`;
+        }
+      } else if (!isSlotUnlocked(passiveAttr, passiveSlot)) {
+        locked = true;
+        label = "Innate (Locked)";
+      } else if (!isSlotEnabled(passiveAttr, passiveSlot)) {
+        locked = true;
+        label = "Innate (Disabled)";
+      }
+      rows.push({ label, abilityId: ability.id, locked });
     }
+
     ROW4_BOXES.slice(0, rows.length).forEach(([, by], i) => {
       const r = rows[i];
       const ability = allAbilities[r.abilityId];
@@ -494,10 +526,17 @@ export class BattleInfoOverlay {
         fontSize: "46px",
       });
       head.setOrigin(0, 0);
+      // Gray out locked/disabled innates so it's clear at a glance which are live.
+      if (r.locked) {
+        head.setColor(getTextColor(TextStyle.SUMMARY_GRAY));
+      }
       c.add(head);
       const desc = getErAbilityDescription(r.abilityId) ?? ability?.description ?? "";
       const d = addTextObject(68, by + 10, desc, TextStyle.WINDOW_ALT, { fontSize: "38px", wordWrap: { width: 670 } });
       d.setOrigin(0, 0);
+      if (r.locked) {
+        d.setColor(getTextColor(TextStyle.SUMMARY_GRAY));
+      }
       c.add(d);
     });
   }
