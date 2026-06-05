@@ -1096,6 +1096,20 @@ export class BattleScene extends SceneBase {
       icon.setTexture(pokemon.getIconAtlasKey(ignoreOverride, useIllusion));
       icon.setFrame(pokemon.getIconId(true, useIllusion));
       pokemon.shiny = temp;
+
+      // Elite Redux: a vanilla species in its "redux" form asks for a
+      // "<id>-redux" icon frame that doesn't exist in the vanilla icon atlas
+      // (e.g. a wild redux Spearow → frame "21-redux"). The shiny-off retry above
+      // doesn't help — the form suffix is still there — so the sprite lands on a
+      // stale/wrong frame (it looked like a Mega Charizard). Fall back to the
+      // BASE-form icon of the same species, which always exists, so the party
+      // menu at least shows the correct Pokémon.
+      if (icon.frame.name !== pokemon.getIconId(true, useIllusion)) {
+        const baseFrame = pokemon.getSpeciesForm(ignoreOverride, useIllusion).getIconId(false, 0, false, 0);
+        if (icon.texture.has(baseFrame)) {
+          icon.setFrame(baseFrame);
+        }
+      }
     }
     icon.setOrigin(0.5, 0);
 
