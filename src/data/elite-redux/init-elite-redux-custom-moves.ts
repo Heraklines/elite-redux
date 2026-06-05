@@ -51,6 +51,7 @@ import {
   AddArenaTrapTagAttr,
   AddBattlerTagAttr,
   AttackMove,
+  ChargingAttackMove,
   ClearTerrainAttr,
   ClearWeatherAttr,
   ConfuseAttr,
@@ -73,6 +74,7 @@ import {
   RemoveScreensAttr,
   ResetStatsAttr,
   SelfStatusMove,
+  SemiInvulnerableAttr,
   StatStageChangeAttr,
   StatusEffectAttr,
   StatusMove,
@@ -90,6 +92,7 @@ import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
+import i18next from "i18next";
 
 /**
  * Numeric cutoff for "vanilla pokerogue" move ids. ER-custom moves are
@@ -283,6 +286,42 @@ class ErCustomAttackMove extends AttackMove {
     ErCustomAttackMove._draftTexts.set(id, { name, description, longDescription });
   }
 }
+
+/**
+ * Thin `ChargingAttackMove` subclass for ER-custom two-turn moves (Toxic Plunge
+ * etc. — "dives/charges turn 1, strikes turn 2"). Same `localize()` override as
+ * {@link ErCustomAttackMove} (vanilla reads `MoveId[this.id]`, undefined for
+ * custom ids). The charge text + semi-invulnerable tag are applied by the
+ * builder; the on-hit effects (e.g. the 20% poison) come from the archetype
+ * dispatcher as usual.
+ */
+class ErCustomChargingAttackMove extends ChargingAttackMove {
+  private static readonly _draftTexts = new Map<number, ErMoveText>();
+
+  override localize(): void {
+    const draft = ErCustomChargingAttackMove._draftTexts.get(this.id);
+    this.name = draft?.name ?? "Unknown";
+    this.effect = bestErMoveDescription(draft);
+  }
+
+  static registerDraft(id: number, name: string, description: string, longDescription: string): void {
+    ErCustomChargingAttackMove._draftTexts.set(id, { name, description, longDescription });
+  }
+}
+
+/**
+ * ER-custom attack moves that are TWO-TURN charge moves (charge turn 1, strike
+ * turn 2). The classifier wired their on-hit riders (status chance etc.) but not
+ * the charge — so they hit instantly like a normal jab. Keyed by ER move id;
+ * each entry supplies the charge flavour text and (optionally) the semi-
+ * invulnerable tag to hide in during the charge turn, mirroring the vanilla
+ * Dive / Dig / Fly clones.
+ */
+const ER_CHARGING_MOVES: Readonly<Record<number, { chargeTextKey: string; semiInvulnerable?: BattlerTagType }>> = {
+  // 988 Toxic Plunge — "Dives into a pool of poison then strikes the next turn."
+  // Dive clone: hide underwater during the charge, strike (+20% poison) turn 2.
+  988: { chargeTextKey: "moveTriggers:hidUnderwater", semiInvulnerable: BattlerTagType.UNDERWATER },
+};
 
 /** Thin `StatusMove` subclass — see {@link ErCustomAttackMove} for the override rationale. */
 class ErCustomStatusMove extends StatusMove {
@@ -487,6 +526,27 @@ function buildCustomMove(
       ErCustomStatusMove.registerDraft(pokerogueId, draft.name, draft.description, draft.longDescription);
       move = new ErCustomStatusMove(pokerogueId as MoveId, type, accuracy, pp, chance, draft.priority, 9);
     }
+  } else if (ER_CHARGING_MOVES[draft.id]) {
+    // Two-turn charge move (charge turn 1, strike turn 2). Built as a charging
+    // move so it actually charges instead of jabbing instantly; on-hit riders
+    // (poison etc.) are layered by the archetype dispatcher below.
+    const chargeCfg = ER_CHARGING_MOVES[draft.id];
+    ErCustomChargingAttackMove.registerDraft(pokerogueId, draft.name, draft.description, draft.longDescription);
+    const chargingMove = new ErCustomChargingAttackMove(
+      pokerogueId as MoveId,
+      type,
+      category,
+      draft.power > 0 ? draft.power : 0,
+      accuracy,
+      pp,
+      chance,
+      draft.priority,
+      9,
+    ).chargeText(i18next.t(chargeCfg.chargeTextKey, { pokemonName: "{USER}" }));
+    if (chargeCfg.semiInvulnerable !== undefined) {
+      chargingMove.chargeAttr(SemiInvulnerableAttr, chargeCfg.semiInvulnerable);
+    }
+    move = chargingMove;
   } else {
     // AttackMove (PHYSICAL/SPECIAL/etc.). Default target is NEAR_OTHER (set
     // by AttackMove). Per-move MoveTarget refinement is Phase C.
