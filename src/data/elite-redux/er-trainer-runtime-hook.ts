@@ -47,6 +47,21 @@ import type { Nature } from "#enums/nature";
 import { PlayerGender } from "#enums/player-gender";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerType } from "#enums/trainer-type";
+
+/**
+ * Deterministic FNV-1a hash → uint32. Drives the wave-appropriate trainer pick's
+ * variety from the RUN SEED (+ wave + type) WITHOUT touching the live battle RNG.
+ * This keeps selection reproducible (same encounter → same pick, so party
+ * generation stays stable) while making different runs field different trainers.
+ */
+function hashErSelectionSeed(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
 import { TrainerVariant } from "#enums/trainer-variant";
 import type { EnemyPokemon } from "#field/pokemon";
 import type { Trainer } from "#field/trainer";
@@ -247,7 +262,17 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
       const wave = globalScene.currentBattle?.waveIndex ?? 1;
       const frac = Math.min(1, Math.max(0, (wave - 1) / ER_WAVE_PROGRESSION_SPAN));
       const targetIdx = Math.round(frac * (ordered.length - 1));
-      choice = ordered[targetIdx];
+      // Pick from a window around the wave-appropriate strength, varied by the
+      // RUN SEED (+ wave + type) via a pure hash — NOT the live RNG (which would
+      // desync reproducible party generation). Same encounter in the same run →
+      // identical pick (generation-stable); different runs → different trainers,
+      // so each run is genuinely new instead of the same weakest-first sequence.
+      const radius = Math.max(2, Math.floor(ordered.length * 0.4));
+      const lo = Math.max(0, targetIdx - radius);
+      const hi = Math.min(ordered.length - 1, targetIdx + radius);
+      const span = hi - lo + 1;
+      const variety = hashErSelectionSeed(`${globalScene.seed}:${wave}:${trainer.config.trainerType}`);
+      choice = ordered[lo + (variety % span)];
       USED_ER_TRAINER_KEYS.add(choice.stableKey);
     }
   }

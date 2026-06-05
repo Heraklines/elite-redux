@@ -92,7 +92,10 @@ describe("ER integration — trainer-overlay runtime hook spawns ER rosters", ()
 
     const enemyParty = game.scene.getEnemyParty();
     expect(enemyParty.length).toBeGreaterThan(0);
-    expect(enemyParty[0].species.speciesId).toBe(roster[0].speciesId);
+    // The enemy is drawn FROM the chosen ER roster (the roster-order shuffle in
+    // applyErRosterOverride means it need not be roster[0] specifically).
+    const rosterSpecies = new Set(roster.map(m => m.speciesId));
+    expect(rosterSpecies.has(enemyParty[0].species.speciesId)).toBe(true);
   });
 
   it("hasErRosterOverride is false for trainer classes not in the ER registry", () => {
@@ -110,8 +113,15 @@ describe("ER integration — trainer-overlay runtime hook spawns ER rosters", ()
     await game.classicMode.startBattle(SpeciesId.MAGIKARP);
 
     const trainer = game.scene.currentBattle.trainer!;
-    const member = selectErRoster(getErTrainerForTrainer(trainer)!, pickTierForWave(trainer))[0];
+    const roster = selectErRoster(getErTrainerForTrainer(trainer)!, pickTierForWave(trainer));
     const enemy = game.scene.getEnemyParty()[0];
+    // Find the roster member that was actually placed in slot 0 (the roster-order
+    // shuffle means it isn't necessarily roster[0]).
+    const member = roster.find(m => m.speciesId === enemy.species.speciesId);
+    expect(member).toBeDefined();
+    if (!member) {
+      return;
+    }
     // IVs are deterministic from the ER member draft.
     for (let i = 0; i < 6; i++) {
       expect(enemy.ivs[i]).toBe(member.ivs[i]);
