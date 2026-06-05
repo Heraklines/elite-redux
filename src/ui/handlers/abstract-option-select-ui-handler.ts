@@ -240,7 +240,14 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
       }
       const option = this.config?.options[this.unskippedIndices[this.fullCursor]];
       if (option?.handler()) {
-        if (!option.keepOpen) {
+        if (option.keepOpen) {
+          // ER: a kept-open option (e.g. external community links, Import Session)
+          // must not be re-fired by a held / auto-repeating ACTION key — that
+          // spammed window.open / the import picker and locked the game. Re-block
+          // input briefly so one physical press triggers it exactly once.
+          this.blockInput = true;
+          globalScene.time.delayedCall(fixedInt(250), () => this.unblockInput());
+        } else {
           this.clear();
         }
         playSound = !option.overrideSound;
@@ -253,7 +260,14 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
       success = true;
       const option = this.config?.options[this.unskippedIndices[this.fullCursor]];
       if (option?.handler()) {
-        if (!option.keepOpen) {
+        if (option.keepOpen) {
+          // ER: a kept-open option (e.g. external community links, Import Session)
+          // must not be re-fired by a held / auto-repeating ACTION key — that
+          // spammed window.open / the import picker and locked the game. Re-block
+          // input briefly so one physical press triggers it exactly once.
+          this.blockInput = true;
+          globalScene.time.delayedCall(fixedInt(250), () => this.unblockInput());
+        } else {
           this.clear();
         }
         playSound = !option.overrideSound;
