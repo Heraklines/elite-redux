@@ -12,6 +12,7 @@
   "disguiseAvoidedDamage": "{{pokemonNameWithAffix}}’s disguise was busted!",
   "blockItemTheft": "{{pokemonNameWithAffix}}’s {{abilityName}}\nprevents item theft!",
   "typeImmunityHeal": "{{pokemonNameWithAffix}}’s {{abilityName}}\nrestored its HP a little!",
+  "postAttackHeal": "{{pokemonNameWithAffix}}’s {{abilityName}}\nrestored its HP!",
   "nonSuperEffectiveImmunity": "{{pokemonNameWithAffix}} avoided damage\nwith {{abilityName}}!",
   "fullHpResistType": "{{pokemonNameWithAffix}} made its shell gleam!\nIt’s distorting type matchups!",
   "moveImmunity": "It doesn’t affect {{pokemonNameWithAffix}}!",

@@ -361,21 +361,6 @@ export class EggGachaUiHandler extends MessageUiHandler {
       const icon = globalScene.add.sprite(-19, 2, "items", iconImage).setOrigin(0).setScale(0.5);
       container.add(icon);
 
-      // ER dev cheat: clicking a voucher count container grants 999 of EACH
-      // voucher type. The voucher icons are conveniently placed at the
-      // top-right of the gacha UI and aren't otherwise interactive.
-      bg.setInteractive(new Phaser.Geom.Rectangle(-56, 0, 56, 22), Phaser.Geom.Rectangle.Contains);
-      bg.on("pointerdown", () => {
-        const counts = globalScene.gameData.voucherCounts;
-        counts[VoucherType.REGULAR] = 999;
-        counts[VoucherType.PLUS] = 999;
-        counts[VoucherType.PREMIUM] = 999;
-        counts[VoucherType.GOLDEN] = 999;
-        this.updateVoucherCounts();
-        this.getUi().playSelect();
-        this.showText("Granted 999 of each voucher type! (ER dev cheat)", 0, undefined, undefined, false);
-      });
-
       this.eggGachaContainer.add(container);
     }
 
@@ -1073,25 +1058,6 @@ export class EggGachaUiHandler extends MessageUiHandler {
    * @returns - Whether an input event occured.
    */
   processInput(button: Button): boolean {
-    // ER dev cheat: grant 999 of every voucher and refresh the displayed
-    // counts. Triggered by EITHER:
-    //   - Button.DEV_CUSTOM (Q key, only bound in dev builds via
-    //     cfg-keyboard-qwerty.ts:253), or
-    //   - Button.CYCLE_TERA (V key, always bound — fallback for prod builds
-    //     and edge-case keymaps where Q isn't routed). Picked because V is
-    //     unused on the egg-gacha screen.
-    if (button === Button.DEV_CUSTOM || button === Button.CYCLE_TERA) {
-      const counts = globalScene.gameData.voucherCounts;
-      counts[VoucherType.REGULAR] = 999;
-      counts[VoucherType.PLUS] = 999;
-      counts[VoucherType.PREMIUM] = 999;
-      counts[VoucherType.GOLDEN] = 999;
-      this.updateVoucherCounts();
-      this.getUi().playSelect();
-      this.showText("Granted 999 of each voucher type! (ER dev cheat)", 0, undefined, undefined, false);
-      return true;
-    }
-
     let success: boolean | undefined;
     if (this.transitioning) {
       success = this.processTransitionInput(button);

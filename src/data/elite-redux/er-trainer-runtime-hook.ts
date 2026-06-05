@@ -500,23 +500,25 @@ export function applyErTrainerHeldItems(party: readonly EnemyPokemon[]): void {
 }
 
 /**
- * Minimum enemy level before an ER trainer mon will Mega-evolve. Mega forms are
- * an end-game power spike; without this gate, an early-Ace trainer holding a
- * mega stone showed a Mega-evolved mon ("megas in early Ace"). Level (not wave)
- * is used so it scales naturally with difficulty — Hell's higher early levels
- * reach megas sooner than Ace's.
+ * Earliest wave an ER trainer mon may Mega-evolve in **Ace / Elite**. Megas are
+ * an end-game power spike and shouldn't show up early in those modes. **Hell is
+ * intentionally exempt** — early megas are part of its difficulty.
  */
-const ER_MEGA_MIN_LEVEL = 60;
+const ER_MEGA_MIN_WAVE_NON_HELL = 50;
 
 /**
  * Force an ER trainer mon that held a Mega Stone into its Mega form (boss
  * treatment). Defensive: only changes form if the species actually has a Mega
- * form registered — otherwise no-op. Gated to {@linkcode ER_MEGA_MIN_LEVEL}+ so
- * megas don't show up in the early game.
+ * form registered — otherwise no-op. In Ace/Elite this is gated to
+ * {@linkcode ER_MEGA_MIN_WAVE_NON_HELL}+ so megas don't appear in the early
+ * game; Hell is left untouched.
  */
 function forceErMega(enemy: EnemyPokemon): void {
-  if (enemy.level < ER_MEGA_MIN_LEVEL) {
-    return;
+  if (getErDifficulty() !== "hell") {
+    const waveIndex = globalScene.currentBattle?.waveIndex ?? 0;
+    if (waveIndex < ER_MEGA_MIN_WAVE_NON_HELL) {
+      return;
+    }
   }
   const forms = enemy.species.forms ?? [];
   const megaIndex = forms.findIndex(f => /mega/i.test(f.formKey));
