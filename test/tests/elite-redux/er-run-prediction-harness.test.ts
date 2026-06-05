@@ -18,7 +18,7 @@ import { globalScene } from "#app/global-scene";
 import { getErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
-import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
+import { applyErTrainerHeldItems, resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { BattleType } from "#enums/battle-type";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { GameManager } from "#test/framework/game-manager";
@@ -48,10 +48,8 @@ describe("ER 1:1 full-run prediction harness (Hell, 200 waves)", () => {
    */
   const generateWave = (): WavePrediction => {
     const battle = globalScene.currentBattle;
-    const enemies: string[] = [];
     battle.enemyLevels?.forEach((level, e) => {
       if (battle.enemyParty[e]) {
-        enemies.push(battle.enemyParty[e].species.name);
         return;
       }
       if (battle.battleType === BattleType.TRAINER) {
@@ -72,7 +70,17 @@ describe("ER 1:1 full-run prediction harness (Hell, 200 waves)", () => {
           !!globalScene.getEncounterBossSegments(battle.waveIndex, level, enemySpecies),
         );
       }
-      enemies.push(battle.enemyParty[e].species.name);
+    });
+    // Apply the ER held-item / mega conversion exactly as the game does (it runs
+    // applyErTrainerHeldItems on the whole party in modifier generation), which
+    // includes the gated forceErMega. THEN read forms so megas are reflected.
+    if (battle.battleType === BattleType.TRAINER) {
+      applyErTrainerHeldItems(battle.enemyParty);
+    }
+    const enemies = (battle.enemyParty ?? []).map(mon => {
+      const formKey = mon.species.forms?.[mon.formIndex]?.formKey ?? "";
+      const isMega = /mega|primal/i.test(formKey);
+      return isMega ? `${mon.species.name} [MEGA]` : mon.species.name;
     });
     return {
       wave: battle.waveIndex,
@@ -131,6 +139,30 @@ describe("ER 1:1 full-run prediction harness (Hell, 200 waves)", () => {
     const diffs = runB.filter((w, i) => JSON.stringify(w.enemies) !== JSON.stringify(runA[i]?.enemies)).length;
     console.log(`[variety] ${diffs}/${runB.length} early waves differ between two seeds`);
     expect(diffs).toBeGreaterThan(0);
+  });
+
+  it("ACE mode: no trainer mega before wave 50 (probes several runs)", () => {
+    const MEGA_GATE = 50;
+    const earlyMegas: string[] = [];
+    for (const seed of ["ace-1", "ace-2", "ace-3", "ace-4", "ace-5"]) {
+      const run = predictRun(seed, 60, "ace");
+      for (const w of run) {
+        if (w.wave >= MEGA_GATE) {
+          continue;
+        }
+        for (const name of w.enemies) {
+          if (name.includes("[MEGA]")) {
+            earlyMegas.push(`seed ${seed} w${w.wave}: ${name}`);
+          }
+        }
+      }
+    }
+    console.log(`[mega-gate] early (<w${MEGA_GATE}) Ace megas found: ${earlyMegas.length}`);
+    for (const m of earlyMegas.slice(0, 20)) {
+      console.log(`   ${m}`);
+    }
+    // If the gate works, this is 0. (Reported as a bug — this assertion documents it.)
+    expect(earlyMegas.length).toBe(0);
   });
 
   it("predicts each difficulty (Ace / Elite / Hell) for the same seed", () => {
