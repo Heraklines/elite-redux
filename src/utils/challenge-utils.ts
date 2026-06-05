@@ -378,9 +378,14 @@ export function checkStarterValidForChallenge(species: PokemonSpecies, props: De
     }
     if (checking && Object.hasOwn(pokemonEvolutions, checking)) {
       pokemonEvolutions[checking].forEach(e => {
-        // Form check to deal with cases such as Basculin -> Basculegion
-        // TODO: does this miss anything if checking forms of a stage 2 Pokémon?
-        if (!e?.preFormKey || e.preFormKey === species.forms[props.formIndex].formKey) {
+        // Form check to deal with cases such as Basculin -> Basculegion.
+        // ER: `species.forms[props.formIndex]` can be undefined — many ER custom
+        // species (and some evolution targets) have an empty/short `forms` array,
+        // so reading `.formKey` threw here and blacked out the whole starter grid
+        // under any challenge (e.g. monotype). Guard with optional chaining: a
+        // formless species simply can't match a form-gated evolution.
+        const baseFormKey = species.forms[props.formIndex]?.formKey;
+        if (!e?.preFormKey || e.preFormKey === baseFormKey) {
           speciesToCheck.push(e.speciesId);
         }
       });
