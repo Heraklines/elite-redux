@@ -90,6 +90,14 @@ export class CounterAttackOnHitAbAttr extends PostDefendAbAttr {
     if (!opponent || opponent.isFainted() || pokemon.isFainted()) {
       return false;
     }
+    // Only retaliate against a damaging move from an ACTUAL opponent. Without
+    // these guards a self-targeted status move (e.g. Cosmic Power) registered
+    // the holder as its own "attacker", so the counter fired at itself, whose
+    // hit re-triggered the counter → an infinite self-Hyper-Voice loop
+    // (user-reported: "Cosmic Power made Mega Chimecho hit itself repeatedly").
+    if (opponent === pokemon || !move.is("AttackMove")) {
+      return false;
+    }
     if (this.filter.contactRequired && !move.hasFlag(1 /* MoveFlags.MAKES_CONTACT */)) {
       return false;
     }
