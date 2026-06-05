@@ -238,6 +238,30 @@ const teamWindowHeight = 87;
 const randomSelectionWindowHeight = 20;
 
 /**
+ * Gen-filter sentinel for the "Redux" tab. Real generations are 1–9; this
+ * pseudo-value groups Elite Redux's new-evolution "<Pokemon> Redux" custom
+ * species into their own generation tab instead of lumping them under Gen 9.
+ *
+ * We deliberately do NOT change these species' real `generation` field (it
+ * stays 9) — that field is load-bearing for mono-generation challenges, Pokédex
+ * completion counts and egg logic. The Redux tab is purely a starter-grid
+ * filter: {@linkcode isReduxFormSpecies} routes a species to one column or the
+ * other in the gen predicate.
+ */
+const REDUX_GEN_FILTER_VALUE = 10;
+
+/**
+ * True for an Elite Redux new-evolution "Redux" custom species — an ER custom
+ * (speciesId ≥ 10000) whose name contains "Redux" (e.g. "Minccino Redux",
+ * "Sinistea Redux"). These are the entries the Redux tab collects. Imported
+ * alternate forms (extra Arceus types and the like) and wholly-new customs
+ * (e.g. Phantowl) are not "Redux"-named, so they keep their assigned generation.
+ */
+function isReduxFormSpecies(species: PokemonSpecies): boolean {
+  return species.speciesId >= 10000 && /redux/i.test(species.name);
+}
+
+/**
  * Calculates the starter position for a Pokemon of a given UI index
  * @param index UI index to calculate the starter position of
  * @returns An interface with an x and y property
@@ -561,6 +585,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     const genOptions: DropDownOption[] = Array.from(
       { length: 9 },
       (_, i) => new DropDownOption(i + 1, new DropDownLabel(i18next.t(`starterSelectUiHandler:gen${i + 1}`))),
+    );
+    // Elite Redux: a dedicated "Redux" tab for the new-evolution Redux customs.
+    genOptions.push(
+      new DropDownOption(
+        REDUX_GEN_FILTER_VALUE,
+        new DropDownLabel(i18next.t("starterSelectUiHandler:genRedux", { defaultValue: "RDX" })),
+      ),
     );
     const genDropDown: DropDown = new DropDown(0, 0, genOptions, this.updateStarters, DropDownType.HYBRID);
     this.filterBar.addFilter(DropDownColumn.GEN, i18next.t("filterBar:genFilter"), genDropDown);
@@ -3604,8 +3635,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       const fitsAbilityText =
         abilityQuery === this.filterText.defaultText || matchesAbilityText(container.species, abilityQuery);
 
-      // Gen filter
-      const fitsGen = this.filterBar.getVals(DropDownColumn.GEN).includes(container.species.generation);
+      // Gen filter. Redux customs live under the dedicated "Redux" tab
+      // (REDUX_GEN_FILTER_VALUE) instead of Gen 9, so route them there and keep
+      // them out of their real (gen-9) column.
+      const genVals = this.filterBar.getVals(DropDownColumn.GEN);
+      const fitsGen = isReduxFormSpecies(container.species)
+        ? genVals.includes(REDUX_GEN_FILTER_VALUE)
+        : genVals.includes(container.species.generation);
 
       // Type filter
       const fitsType = this.filterBar
