@@ -582,9 +582,10 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // Power 250 already on the draft; this attr just enforces the faint.
       return ok(0, [new SacrificialAttr()]);
     case 761:
-      // Seismic Fist — 20% chance to drop foe's Def by 1.
+      // Seismic Fist — 20% chance to drop foe's Def by 1. Punching-flagged so
+      // Iron Fist / Raging Boxer (and other punch-boosting abilities) apply.
       // Move.chance (20) gates the proc via StatStageChangeAttr's getMoveChance().
-      return ok(0, [new StatStageChangeAttr([Stat.DEF], -1)]);
+      return ok(MoveFlags.PUNCHING_MOVE, [new StatStageChangeAttr([Stat.DEF], -1)]);
     case 769:
       // Primal Beam — 20% chance to raise user's Atk by 1 (selfTarget).
       // ER's "may rise own Atk" — Move.chance (20) gates the proc.

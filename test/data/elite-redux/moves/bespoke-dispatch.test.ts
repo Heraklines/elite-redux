@@ -55,10 +55,11 @@ describe("dispatchMoveArchetype('bespoke', null, erMoveId): per-id wiring", () =
     expect(res.attrs[0]).toBeInstanceOf(SacrificialAttr);
   });
 
-  it("er id 761 (Seismic Fist) wires StatStageChangeAttr(Def -1, foe)", () => {
+  it("er id 761 (Seismic Fist) wires StatStageChangeAttr(Def -1, foe) + PUNCHING_MOVE flag", () => {
     const res = dispatchMoveArchetype("bespoke", null, 761);
     expect(res.skipReason).toBeNull();
-    expect(res.flags).toBe(0);
+    // Seismic Fist is a punch — must carry PUNCHING_MOVE so Iron Fist / Raging Boxer apply.
+    expect(res.flags & MoveFlags.PUNCHING_MOVE).toBeTruthy();
     expect(res.attrs).toHaveLength(1);
     const attr = res.attrs[0];
     expect(attr).toBeInstanceOf(StatStageChangeAttr);
