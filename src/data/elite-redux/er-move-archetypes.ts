@@ -99,7 +99,7 @@ export const ER_MOVE_ARCHETYPES: Readonly<Record<number, ErMoveArchetypeEntry>> 
   830: { erMoveId: 830, archetype: "flag-tagged-move", params: {"flags":["HAMMER_BASED"]} },
   832: { erMoveId: 832, archetype: "bespoke", params: null },
   834: { erMoveId: 834, archetype: "bespoke", params: null },
-  835: { erMoveId: 835, archetype: "flag-tagged-move", params: {"flags":["KEEN_EDGE"]} },
+  835: { erMoveId: 835, archetype: "bespoke", params: null }, // Leech Blade — 50% drain + KEEN_EDGE/SLICING (see dispatchBespokeMove case 835)
   836: { erMoveId: 836, archetype: "bespoke", params: null },
   837: { erMoveId: 837, archetype: "bespoke", params: null },
   838: { erMoveId: 838, archetype: "recoil-or-drain", params: {"mode":"recoil","recoilPct":0.33} },

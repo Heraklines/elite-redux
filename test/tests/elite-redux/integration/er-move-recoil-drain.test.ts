@@ -116,4 +116,38 @@ describe.skipIf(!RUN_SCENARIOS)("ER move recoil/drain (#125)", () => {
     const expected = Math.floor(dmgDealt * 0.5);
     expect(Math.abs(healed - expected)).toBeLessThanOrEqual(2);
   });
+
+  it("Leech Blade (835): heals 50% of damage dealt (drain was previously dropped)", async () => {
+    // Regression: Leech Blade was wired as flag-tagged-move (KEEN_EDGE only), so
+    // the "Heals 50% of damage done" half was missing and it drained nothing.
+    const move = await erMove(835);
+    if (move === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(AbilityId.BALL_FETCH)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset([move])
+      .startingLevel(100)
+      .enemyLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    vi.spyOn(Pokemon.prototype, "randBattleSeedIntRange").mockImplementation((_min: number, max: number) => max);
+    const enemy = game.field.getEnemyPokemon();
+    const player = game.field.getPlayerPokemon();
+    // Damage the user so the drain heal is observable (not capped at max HP).
+    player.hp = Math.floor(player.getMaxHp() / 2);
+    const playerHpBefore = player.hp;
+    const enemyHp0 = enemy.hp;
+    game.move.use(move);
+    await game.toEndOfTurn();
+    const dmgDealt = enemyHp0 - enemy.hp;
+    const healed = player.hp - playerHpBefore;
+    expect(dmgDealt, "Leech Blade dealt damage").toBeGreaterThan(0);
+    expect(healed, "Leech Blade drained HP").toBeGreaterThan(0);
+    expect(Math.abs(healed - Math.floor(dmgDealt * 0.5))).toBeLessThanOrEqual(2);
+  });
 });

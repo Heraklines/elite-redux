@@ -631,6 +631,16 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // hit targets via THROAT_CHOPPED tag (2 turn duration matches Throat
       // Chop's standard 2-turn lock-out).
       return ok(0, [new AddBattlerTagAttr(BattlerTagType.THROAT_CHOPPED, false, false, 2, 2)]);
+    case 835:
+      // Leech Blade — "Heals 50% of damage done. Keen Edge boost." A draining
+      // slicing blade: the heal (HitHealAttr 0.5 + TRIAGE_MOVE) was previously
+      // dropped — the move was wired as flag-tagged-move with only the KEEN_EDGE
+      // (= SLICING_MOVE) flag, so it healed nothing. Wire both: the 50% drain and
+      // the slicing flag (ER's "Keen Edge boost" = SLICING_MOVE, which the
+      // rebalance pass grants +crit / 100% accuracy). The heal is a fraction of
+      // damage actually dealt, so a kill on an already-weakened target heals less
+      // (vanilla drain behaviour).
+      return ok(MoveFlags.TRIAGE_MOVE | MoveFlags.SLICING_MOVE, [new HitHealAttr(0.5)]);
     case 836:
       // Yggdrasil Force — lowers user's Atk and Def by 1 each (unconditional).
       return ok(0, [new StatStageChangeAttr([Stat.ATK, Stat.DEF], -1, true)]);
