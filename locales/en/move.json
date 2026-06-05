@@ -597,7 +597,7 @@
   },
   "splash": {
     "name": "Splash",
-    "effect": "The user just flops and splashes around to no effect at all…"
+    "effect": "The user slams into the foe with a splashing body blow. The more the user outweighs the target, the greater the damage."
   },
   "acidArmor": {
     "name": "Acid Armor",

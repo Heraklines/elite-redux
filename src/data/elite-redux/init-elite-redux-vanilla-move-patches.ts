@@ -43,6 +43,7 @@ import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { type ErPledgeRule, ErPledgeWeatherEffectAttr } from "#data/elite-redux/er-pledge-weather-effect";
 import {
   AddBattlerTagAttr,
+  CompareWeightPowerAttr,
   ConfuseAttr,
   CritOnlyAttr,
   DefDefAttr,
@@ -744,6 +745,32 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
         move,
         new MovePowerMultiplierAttr((_u, target) => (target.status && target.status.effect ? 1.5 : 1)),
       );
+    },
+  ],
+  // SPLASH: in Elite Redux, Splash is NOT the vanilla "nothing happens" status
+  // move — it's a WATER-type PHYSICAL attack whose power scales with how much
+  // the user outweighs the foe (Heavy-Slam curve), 100% accuracy, targeting the
+  // opponent. (ER move id 150: type Water, split physical, "Does more damage if
+  // the user outweighs the foe.") Convert the SelfStatusMove in-place:
+  //  - retype Normal → Water, category Status → Physical
+  //  - retarget USER → the opposing Pokémon, set 100% accuracy
+  //  - strip the do-nothing "But nothing happened!" MessageAttr
+  //  - add the weight-ratio power attr (base power -1 is computed by it)
+  // NOTE: ER also gives Splash a 20% "drench" chance, but DRENCH is an
+  // ER-specific status that isn't yet implemented anywhere in this fork
+  // (resolveStatusName returns null for it, so every DRENCH move currently
+  // skips that piece). The drench rider is intentionally omitted until the
+  // status exists; the move's core identity (Water physical weight attack) is
+  // faithful.
+  [
+    MoveId.SPLASH,
+    move => {
+      retypeMove(move, PokemonType.WATER);
+      setCategory(move, MoveCategory.PHYSICAL);
+      move.moveTarget = MoveTarget.NEAR_OTHER;
+      move.accuracy = 100;
+      removeAttrsByName(move, ["MessageAttr"]);
+      addAttrUnique(move, new CompareWeightPowerAttr());
     },
   ],
 ]);

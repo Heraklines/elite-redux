@@ -82,6 +82,30 @@ const EGG_TIER_OVERRIDES: Readonly<Record<string, EggTier>> = {
   "Uxie Redux": EggTier.EPIC,
 };
 
+/**
+ * Name-PREFIX egg-tier overrides, taking precedence over the BST banding in
+ * {@linkcode pickTier} (and applied like {@linkcode EGG_TIER_OVERRIDES}). Used
+ * for families where ER ships several custom mask/form entries that should all
+ * share a tier. The Ogerpon masks (Wellspring / Hearthflame / Cornerstone) are
+ * separate ER custom species at BST 550 — they'd band as RARE, but the vanilla
+ * base Ogerpon is EPIC, so the whole family is pinned to EPIC. (The mega forms
+ * are form-change targets and are removed from the egg pool earlier, so this
+ * never promotes a mega.)
+ */
+const EGG_TIER_PREFIX_OVERRIDES: ReadonlyArray<readonly [string, EggTier]> = [["Ogerpon", EggTier.EPIC]];
+
+function resolveEggTierOverride(name: string): EggTier | undefined {
+  if (name in EGG_TIER_OVERRIDES) {
+    return EGG_TIER_OVERRIDES[name];
+  }
+  for (const [prefix, tier] of EGG_TIER_PREFIX_OVERRIDES) {
+    if (name.startsWith(prefix)) {
+      return tier;
+    }
+  }
+  return;
+}
+
 function pickStarterCost(tier: EggTier): number {
   switch (tier) {
     case EggTier.LEGENDARY:
@@ -176,7 +200,7 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
       result.alreadyPresent++;
       continue;
     }
-    const tier = EGG_TIER_OVERRIDES[draft.name ?? ""] ?? pickTier(draft);
+    const tier = resolveEggTierOverride(draft.name ?? "") ?? pickTier(draft);
     tiers[pkrgId] = tier;
     result.eggTiersAdded++;
     if (costs[pkrgId] === undefined) {
