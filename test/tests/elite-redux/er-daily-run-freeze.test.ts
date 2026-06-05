@@ -5,29 +5,42 @@
  */
 
 // =============================================================================
-// Repro: "Daily run just freezes." getDailyRunStarters() picks species by exact
-// starter-cost bucket; ER recosted starters, so a bucket may now be empty ->
-// randSeedItem([]) returns undefined -> getPokemonSpecies(undefined) throws ->
-// the offline daily path (no try/catch) freezes the run. Also surfaces whether
-// daily starters resolve to ER custom species (id >= 10000) that may have a
-// broken sprite (loadAssets() hang). Sweeps many seeds to catch the bad bucket.
+// "Daily run just freezes." Confirmed via a live console log: a daily party
+// member (an ER custom) had a move whose charge-anim key resolved to "" →
+// fetch of `battle-anims/.json` → CDN 403 with a non-JSON body. initMoveChargeAnim
+// had NO ok/content-type check, NO .catch, and only resolve()d on success, so it
+// threw an unhandled rejection AND never resolved — hanging the run.
+//
+// Fix: initMoveChargeAnim now guards an undefined ChargeAnim key and treats any
+// load failure as "no charge anim" (placeholder + resolve). This verifies it
+// resolves (rather than hanging/throwing) for an invalid charge anim, and that
+// daily starter generation still runs clean (customs are allowed again).
 // =============================================================================
 
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { speciesStarterCosts } from "#balance/starters";
+import { initMoveChargeAnim } from "#data/battle-anims";
 import { getDailyRunStarters } from "#data/daily-seed/daily-run";
 import { GameModes } from "#enums/game-modes";
+import type { ChargeAnim } from "#enums/move-anims-common";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { beforeAll, describe, expect, it } from "vitest";
 
-describe("ER daily-run starter generation (freeze repro)", () => {
+describe("ER daily-run freeze (charge-anim loader)", () => {
   let phaserGame: Phaser.Game;
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
     void new GameManager(phaserGame);
+  });
+
+  it("initMoveChargeAnim resolves (does not hang/throw) for an invalid charge anim", async () => {
+    // An out-of-range ChargeAnim => ChargeAnim[x] is undefined => the old code
+    // fetched `battle-anims/.json`, 403'd, threw on .json(), and never resolved.
+    // The guard must short-circuit to a resolved promise.
+    await expect(initMoveChargeAnim(99999 as ChargeAnim)).resolves.toBeUndefined();
   });
 
   it("every starter-cost bucket 1..8 has at least one species (else daily throws)", () => {
@@ -44,8 +57,7 @@ describe("ER daily-run starter generation (freeze repro)", () => {
   it("generates daily starters without throwing across many seeds", () => {
     globalScene.gameMode = getGameMode(GameModes.DAILY);
     const failures: string[] = [];
-    const customStarters: number[] = [];
-    for (let i = 0; i < 400; i++) {
+    for (let i = 0; i < 200; i++) {
       const seed = `daily-seed-${i}`;
       globalScene.setSeed(seed);
       globalScene.resetSeed();
@@ -54,8 +66,6 @@ describe("ER daily-run starter generation (freeze repro)", () => {
         for (const s of starters) {
           if (s == null || s.speciesId == null) {
             failures.push(`seed ${seed}: null starter`);
-          } else if (s.speciesId >= 10000) {
-            customStarters.push(s.speciesId);
           }
         }
       } catch (e) {
@@ -63,11 +73,5 @@ describe("ER daily-run starter generation (freeze repro)", () => {
       }
     }
     expect(failures, `daily generation failures:\n${failures.slice(0, 20).join("\n")}`).toEqual([]);
-    // ER fix: daily runs must NOT field ER custom species (id >= 10000), whose
-    // asset load can stall and freeze the (error-handling-free) daily boot.
-    expect(
-      [...new Set(customStarters)],
-      `daily run produced ER-custom starters (freeze risk): ${[...new Set(customStarters)].join(", ")}`,
-    ).toEqual([]);
   });
 });

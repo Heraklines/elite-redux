@@ -28,15 +28,6 @@ import {
 type StarterTuple = TupleRange<1, 6, Starter>;
 
 /**
- * Elite Redux: pokerogue ids at/above this are ER CUSTOM species. They are
- * excluded from daily-run starter selection — daily runs use the curated
- * vanilla species set (the same reason the starter grid filters them out).
- * A custom daily starter could otherwise stall the asset loader during the
- * daily-run boot (which has no error handling), freezing the whole run.
- */
-const ER_CUSTOM_SPECIES_ID_START = 10000;
-
-/**
  * Generate the daily run starters.
  * @returns A tuple of 3 {@linkcode Starter}s
  */
@@ -63,22 +54,17 @@ export function getDailyRunStarters(): StarterTuple {
           .map(s => Number.parseInt(s) as SpeciesId) // TODO: Remove
           .filter(
             s =>
-              speciesStarterCosts[s] === cost // ER: keep daily runs on vanilla species (see ER_CUSTOM_SPECIES_ID_START).
-              && s < ER_CUSTOM_SPECIES_ID_START
+              speciesStarterCosts[s] === cost
               && !starters.some(st => s === st.speciesId || pokemonStarters[st.speciesId] === s),
           );
         const randPkmSpecies = getPokemonSpecies(randSeedItem(costSpecies));
-        const evolvedId = randPkmSpecies.getTrainerSpeciesForLevel(
-          startingLevel,
-          true,
-          PartyMemberStrength.STRONGER,
-          EvoLevelThresholdKind.STRONG,
-        );
-        // ER: an ER-patched evolution table can evolve a vanilla base INTO an ER
-        // custom final form — fall back to the (vanilla) base in that case so the
-        // daily run never fields a custom species.
         const starterSpecies = getPokemonSpecies(
-          evolvedId >= ER_CUSTOM_SPECIES_ID_START ? randPkmSpecies.speciesId : evolvedId,
+          randPkmSpecies.getTrainerSpeciesForLevel(
+            startingLevel,
+            true,
+            PartyMemberStrength.STRONGER,
+            EvoLevelThresholdKind.STRONG,
+          ),
         );
         starters.push(getDailyRunStarter(starterSpecies));
       }

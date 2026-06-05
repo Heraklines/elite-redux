@@ -619,15 +619,45 @@ export function initMoveChargeAnim(chargeAnim: ChargeAnim): Promise<void> {
       }
     } else {
       chargeAnims.set(chargeAnim, null);
-      cachedFetch(`./battle-anims/${toKebabCase(ChargeAnim[chargeAnim])}.json`)
-        .then(response => response.json())
+      // ER: an invalid/undefined ChargeAnim makes `ChargeAnim[chargeAnim]`
+      // undefined → `toKebabCase("")` → a fetch of `battle-anims/.json`, which
+      // the asset CDN 403s with a non-JSON body. The original code then called
+      // `response.json()` with NO ok/content-type check, NO `.catch`, and only
+      // `resolve()`d on success — so it threw an UNHANDLED rejection AND never
+      // resolved, hanging move-anim load → a hard freeze (user-reported on daily
+      // runs whose party had a move with a bad charge anim). Guard the empty key
+      // and treat any load failure as "no charge anim" (placeholder + resolve),
+      // mirroring the hardening already in `initMoveAnim`.
+      const chargeAnimKey = ChargeAnim[chargeAnim];
+      if (!chargeAnimKey) {
+        populateMoveChargeAnim(chargeAnim, undefined);
+        resolve();
+        return;
+      }
+      cachedFetch(`./battle-anims/${toKebabCase(chargeAnimKey)}.json`)
+        .then(response => {
+          const contentType = response.headers.get("content-type");
+          if (!response.ok || contentType?.indexOf("application/json") === -1) {
+            populateMoveChargeAnim(chargeAnim, undefined);
+            resolve();
+            return;
+          }
+          return response.json();
+        })
         .then(ca => {
+          if (ca === undefined) {
+            return; // already handled on the not-ok branch above
+          }
           if (Array.isArray(ca)) {
             populateMoveChargeAnim(chargeAnim, ca[0]);
             populateMoveChargeAnim(chargeAnim, ca[1]);
           } else {
             populateMoveChargeAnim(chargeAnim, ca);
           }
+          resolve();
+        })
+        .catch(() => {
+          populateMoveChargeAnim(chargeAnim, undefined);
           resolve();
         });
     }
