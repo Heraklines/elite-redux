@@ -7261,6 +7261,39 @@ export class AngelsWrathSteelSuperEffectiveAttr extends MoveTypeChartOverrideAtt
   }
 }
 
+/**
+ * ER models several moves as "super effective vs <Type>" (e.g. Poison Gas vs
+ * Flying, Acid vs Steel, Sheer Cold vs Water). Rather than a silent power
+ * multiplier — which deals the extra damage but never shows "It's super
+ * effective!", never colours the hit, and can't override a type immunity — this
+ * overrides the type-effectiveness multiplier itself, so the SE message and hit
+ * result follow automatically. Forces at least {@linkcode minMultiplier} (2× by
+ * default) against the listed type, overriding resistances/immunities, matching
+ * the ER convention used by {@linkcode AngelsWrathSteelSuperEffectiveAttr}.
+ */
+export class ErSuperEffectiveVsTypeAttr extends MoveTypeChartOverrideAttr {
+  constructor(
+    private readonly targetType: PokemonType,
+    private readonly minMultiplier = 2,
+  ) {
+    super();
+  }
+
+  public override apply(
+    _user: Pokemon,
+    _target: Pokemon,
+    _move: Move,
+    args: [multiplier: NumberHolder, types: readonly PokemonType[], moveType: PokemonType],
+  ): boolean {
+    const [multiplier, types] = args;
+    if (!types.includes(this.targetType) || multiplier.value >= this.minMultiplier) {
+      return false;
+    }
+    multiplier.value = this.minMultiplier;
+    return true;
+  }
+}
+
 const screenTags = [ArenaTagType.REFLECT, ArenaTagType.LIGHT_SCREEN, ArenaTagType.AURORA_VEIL] as const;
 
 export class RemoveScreensAttr extends RemoveArenaTagsAttr {
@@ -9460,6 +9493,7 @@ const MoveAttrs = Object.freeze({
   FlyingTypeMultiplierAttr,
   MoveTypeChartOverrideAttr,
   FreezeDryAttr,
+  ErSuperEffectiveVsTypeAttr,
   OneHitKOAccuracyAttr,
   HitsSameTypeAttr,
   SheerColdAccuracyAttr,

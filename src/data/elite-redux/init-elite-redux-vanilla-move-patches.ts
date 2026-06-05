@@ -46,6 +46,7 @@ import {
   ConfuseAttr,
   CritOnlyAttr,
   DefDefAttr,
+  ErSuperEffectiveVsTypeAttr,
   FlinchAttr,
   HealStatusEffectAttr,
   HighCritAttr,
@@ -1020,13 +1021,14 @@ export function initEliteReduxVanillaMovePatches(): VanillaMovePatchResult {
 
   // ---------------------------------------------------------------------------
   // "Super effective vs <Type>" boosts. Several ER vanilla moves gained a
-  // type-targeted damage boost (e.g. Acid super-effective vs Steel). We model it
-  // as a x2 power multiplier vs that type — the same convention the ER custom
-  // super-effective-vs-type moves use (Clay Dart, Aura Force, etc. via
-  // `powerBoostVsType`). Keyed by ER id (resolved through ER_ID_MAP) so it lands
-  // on the move the game uses, robust to #151 id-map collisions. Idempotent via
-  // addAttrUnique. (Sonic Boom is excluded — it deals fixed damage, so a power
-  // multiplier is a no-op there.)
+  // type-targeted super-effectiveness (e.g. Poison Gas vs Flying, Acid vs
+  // Steel). We override the type-effectiveness multiplier itself (not the power)
+  // so the game shows "It's super effective!", colours the hit, and the boost
+  // can override a resistance/immunity (e.g. Acid is normally 0× vs Steel). A
+  // silent power multiplier did none of that and players reported it as "doesn't
+  // do 2× vs <type>". Keyed by ER id (resolved through ER_ID_MAP) so it lands on
+  // the move the game uses, robust to #151 id-map collisions. Idempotent via
+  // addAttrUnique. (Sonic Boom is excluded — it deals fixed damage.)
   // ---------------------------------------------------------------------------
   for (const [erId, targetType] of ER_ID_SUPER_EFFECTIVE_VS_TYPE) {
     const pokerogueId = ER_ID_MAP.moves[erId];
@@ -1039,8 +1041,8 @@ export function initEliteReduxVanillaMovePatches(): VanillaMovePatchResult {
       continue;
     }
     const mutable = move as unknown as MutableMove;
-    const had = mutable.attrs.some(a => a.constructor === MovePowerMultiplierAttr);
-    addAttrUnique(mutable, new MovePowerMultiplierAttr((_user, target) => (target.isOfType(targetType) ? 2 : 1)));
+    const had = mutable.attrs.some(a => a.constructor === ErSuperEffectiveVsTypeAttr);
+    addAttrUnique(mutable, new ErSuperEffectiveVsTypeAttr(targetType));
     if (!had) {
       result.moveDeltas++;
     }
