@@ -5752,7 +5752,19 @@ export class FormBlockDamageAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
       damage.value > 0
       && pokemon.formIndex === this.formIndex
       && this.condition(pokemon, opponent, move)
-      && !move.hitsSubstitute(opponent, pokemon)
+      && !move.hitsSubstitute(opponent, pokemon) // Only nullify damage if the holder can actually break into its other form.
+      && // Without this, a holder that has Disguise/Ice Face but NO busted/noice form
+      // change (an ER custom fusion like Mimikyu Rayquaza, or a randomized-on
+      // ability) would block EVERY hit forever — effectively invincible. Real
+      // Mimikyu / Eiscue have the form change registered, so they are unaffected.
+      this.canBreakForm(pokemon)
+    );
+  }
+
+  /** Whether the holder has an ability-triggered form change to break into. */
+  private canBreakForm(pokemon: Pokemon): boolean {
+    return !!pokemonFormChanges[pokemon.species.speciesId]?.some(
+      fc => fc.findTrigger(SpeciesFormChangeAbilityTrigger) && fc.canChange(pokemon),
     );
   }
 
