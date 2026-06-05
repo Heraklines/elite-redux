@@ -9,7 +9,7 @@ import {
   getErAbilityRomDescription,
   getErCompositeDetailedDescription,
 } from "#data/elite-redux/er-ability-descriptions";
-import { getErMoveDetailPages } from "#data/elite-redux/er-move-details";
+import { getErMoveDetailPages, type MoveDetailRow } from "#data/elite-redux/er-move-details";
 import { getLevelRelExp, getLevelTotalExp } from "#data/exp";
 import { getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
@@ -1454,10 +1454,12 @@ export class SummaryUiHandler extends UiHandler {
         this.moveDescriptionText = addTextObject(2, 84, "", TextStyle.WINDOW_ALT, { wordWrap: { width: 1212 } });
         this.movesContainer.add(this.moveDescriptionText);
 
-        // ER: small page indicator for the cyclable move-detail (top-right of the
-        // description strip), e.g. "Mechanics 2/4". The info button cycles pages.
-        this.moveDetailPageLabel = addTextObject(212, 76, "", TextStyle.WINDOW_ALT, { fontSize: "48px" })
-          .setOrigin(1, 0)
+        // ER: prominent dynamic header for the cyclable move-detail, placed where
+        // the static "DESCRIPTIONS" banner is (which we hide while this shows), so
+        // the player clearly sees the current page + that the info (C) button
+        // cycles, e.g. "[C] ▶ Mechanics  2/4".
+        this.moveDetailPageLabel = addTextObject(2, 78, "", TextStyle.SUMMARY_GREEN)
+          .setOrigin(0, 0.5)
           .setVisible(false);
         this.movesContainer.add(this.moveDetailPageLabel);
 
@@ -1542,17 +1544,29 @@ export class SummaryUiHandler extends UiHandler {
     if (!move) {
       this.moveDescriptionText.setText("");
       this.moveDetailPageLabel?.setVisible(false);
+      this.movesContainerDescriptionsTitle?.setVisible(true);
       return;
     }
     const pages = getErMoveDetailPages(move);
     const pageIndex = Math.min(this.moveDetailPage, pages.length - 1);
     const page = pages[pageIndex];
+
+    // Replace the static "DESCRIPTIONS" banner with a dynamic page + cycle hint so
+    // the player sees the current page name and that the info (C) button cycles.
+    this.movesContainerDescriptionsTitle?.setVisible(false);
+    this.moveDetailPageLabel?.setText(`[C] ▶ ${page.title}  ${pageIndex + 1}/${pages.length}`).setVisible(true);
+
     if (page.description === undefined) {
-      this.moveDescriptionText.setText((page.rows ?? []).map(r => `${r.label}:  ${r.value}`).join("\n"));
+      // Two columns so all four property rows are visible at a glance (no scroll).
+      const rows = page.rows ?? [];
+      const cell = (r?: MoveDetailRow): string => (r ? `${r.label}: ${r.value}` : "");
+      const COL = 17;
+      const line1 = (cell(rows[0]).padEnd(COL) + cell(rows[1])).trimEnd();
+      const line2 = (cell(rows[2]).padEnd(COL) + cell(rows[3])).trimEnd();
+      this.moveDescriptionText.setText(`${line1}\n${line2}`.trimEnd());
     } else {
       this.moveDescriptionText.setText(page.description || "");
     }
-    this.moveDetailPageLabel?.setText(`${page.title}  ${pageIndex + 1}/${pages.length}`).setVisible(true);
   }
 
   /** ER: cycle the move-detail page (info button) and re-render the current move. */
@@ -1573,6 +1587,7 @@ export class SummaryUiHandler extends UiHandler {
     this.extraMoveRowContainer.setVisible(false);
     this.moveDescriptionText.setText("");
     this.moveDetailPageLabel?.setVisible(false);
+    this.movesContainerDescriptionsTitle?.setVisible(true);
     this.moveDetailPage = 0;
 
     this.destroyBlinkCursor();
