@@ -20,6 +20,13 @@ import { UiHandler } from "#ui/ui-handler";
 import { fixedInt, getLocalizedSpriteKey, padInt } from "#utils/common";
 import i18next from "i18next";
 
+/**
+ * TEMP (testing): when true, the Damage Calc panel is force-unlocked so it can
+ * be tried without finding a Damage Calculator. Set back to `false` to restore
+ * the normal item lock (the panel is locked by default).
+ */
+const ER_DAMAGE_CALC_FORCE_UNLOCK = true;
+
 export class FightUiHandler extends UiHandler implements InfoToggle {
   public static readonly MOVES_CONTAINER_NAME = "moves";
 
@@ -401,7 +408,8 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
    * roll, so the min is 85% of it — the standard damage spread.
    */
   private getDamageCalcText(pokemon: Pokemon, pokemonMove: PokemonMove): string {
-    const unlocked = !!globalScene.findModifier(m => m instanceof DamageCalculatorModifier);
+    const unlocked =
+      ER_DAMAGE_CALC_FORCE_UNLOCK || !!globalScene.findModifier(m => m instanceof DamageCalculatorModifier);
     if (!unlocked) {
       return "Locked\nFind a Damage\nCalculator";
     }
