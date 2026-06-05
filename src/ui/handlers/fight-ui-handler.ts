@@ -1,5 +1,6 @@
 import type { InfoToggle } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
+import { getErMoveDetailPages, type MoveDetailPage } from "#data/elite-redux/er-move-details";
 import { getTypeDamageMultiplierColor } from "#data/type";
 import { BattleType } from "#enums/battle-type";
 import { Button } from "#enums/buttons";
@@ -15,6 +16,7 @@ import type { CommandPhase } from "#phases/command-phase";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { addTextObject, getTextColor } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
+import { addWindow } from "#ui/ui-theme";
 import { fixedInt, getLocalizedSpriteKey, padInt } from "#utils/common";
 import i18next from "i18next";
 
@@ -33,6 +35,18 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
   private cursorObj: Phaser.GameObjects.Image | null;
   private moveCategoryIcon: Phaser.GameObjects.Sprite;
   private moveInfoOverlay: MoveInfoOverlay;
+
+  // ER move-detail panel (cycled with the info/STATS button). -1 = closed.
+  private moveDetailContainer: Phaser.GameObjects.Container;
+  private moveDetailTitle: Phaser.GameObjects.Text;
+  private moveDetailPageText: Phaser.GameObjects.Text;
+  private moveDetailDesc: Phaser.GameObjects.Text;
+  private moveDetailRowLabels: Phaser.GameObjects.Text[] = [];
+  private moveDetailRowValues: Phaser.GameObjects.Text[] = [];
+  private moveDetailPage = -1;
+  private moveDetailPages: MoveDetailPage[] = [];
+  private static readonly MOVE_DETAIL_ROWS = 4;
+  private static readonly MOVE_DETAIL_PAGES = 4;
 
   protected fieldIndex = 0;
   protected fromCommand: Command = Command.FIGHT;
@@ -118,6 +132,53 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     ui.add(this.moveInfoOverlay);
     // register the overlay to receive toggle events
     globalScene.addInfoToggle(this.moveInfoOverlay, this);
+
+    this.setupMoveDetailPanel();
+  }
+
+  /**
+   * ER move-detail panel: an elaborate, cyclable info box for the highlighted
+   * move (mirrors the ER ROM's move-select detail pages). Built once here; the
+   * info/STATS button cycles its pages (see {@linkcode cycleMoveDetail}). It
+   * reuses the move grid's footprint — the grid hides while it is open — so it
+   * never overlaps and works regardless of the move count (incl. the 5th slot).
+   */
+  private setupMoveDetailPanel(): void {
+    const ui = this.getUi();
+    const W = 158;
+    const H = 46;
+    const X = 4;
+    const Y = -H - 2; // anchor to the bottom of the moves window
+    this.moveDetailContainer = globalScene.add.container(0, 0).setName("er-move-detail").setVisible(false);
+
+    const bg = addWindow(X, Y, W, H);
+    bg.setOrigin(0, 0);
+    this.moveDetailContainer.add(bg);
+
+    this.moveDetailTitle = addTextObject(X + 6, Y + 3, "", TextStyle.WINDOW, { fontSize: "72px" }).setOrigin(0, 0);
+    this.moveDetailPageText = addTextObject(X + W - 6, Y + 4, "", TextStyle.MOVE_INFO_CONTENT, {
+      fontSize: "48px",
+    }).setOrigin(1, 0);
+    this.moveDetailContainer.add([this.moveDetailTitle, this.moveDetailPageText]);
+
+    // Page 1 (description) uses a single wrapped text object.
+    this.moveDetailDesc = addTextObject(X + 6, Y + 15, "", TextStyle.MOVE_INFO_CONTENT, {
+      fontSize: "48px",
+      wordWrap: { width: (W - 12) * 6 },
+    }).setOrigin(0, 0);
+    this.moveDetailContainer.add(this.moveDetailDesc);
+
+    // Pages 2-4 use up to 4 label/value rows.
+    for (let i = 0; i < FightUiHandler.MOVE_DETAIL_ROWS; i++) {
+      const rowY = Y + 15 + i * 8;
+      const label = addTextObject(X + 8, rowY, "", TextStyle.MOVE_INFO_CONTENT, { fontSize: "48px" }).setOrigin(0, 0);
+      const value = addTextObject(X + W - 8, rowY, "", TextStyle.WINDOW, { fontSize: "48px" }).setOrigin(1, 0);
+      this.moveDetailRowLabels.push(label);
+      this.moveDetailRowValues.push(value);
+      this.moveDetailContainer.add([label, value]);
+    }
+
+    ui.add(this.moveDetailContainer);
   }
 
   override show(args: [number?, Command?]): boolean {
@@ -137,6 +198,8 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
       this.setCursor(this.fieldIndex ? this.cursor2 : this.cursor);
     }
     this.displayMoves();
+    this.moveDetailPage = -1; // start with the detail panel closed
+    this.moveDetailContainer?.setVisible(false);
     this.toggleInfo(false); // in case cancel was pressed while info toggle is active
     this.active = true;
     return true;
@@ -153,6 +216,11 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     const cursor = this.getCursor();
 
     switch (button) {
+      // ER: the info/STATS button cycles the move-detail panel for the
+      // highlighted move (replaces the vanilla stat-arrow overlay in the fight
+      // menu — routed here via the buttonGoToFilter whitelist).
+      case Button.STATS:
+        return this.cycleMoveDetail();
       case Button.ACTION:
         if (
           (globalScene.phaseManager.getCurrentPhase() as CommandPhase).handleCommand(
@@ -167,6 +235,12 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
         }
         break;
       case Button.CANCEL: {
+        // While the detail panel is open, Cancel just closes it (back to the grid).
+        if (this.isMoveDetailOpen()) {
+          this.closeMoveDetail();
+          success = true;
+          break;
+        }
         // Cannot back out of fight menu if skipToFightInput is enabled
         const { battleType, mysteryEncounter } = globalScene.currentBattle;
         if (battleType !== BattleType.MYSTERY_ENCOUNTER || !mysteryEncounter?.skipToFightInput) {
@@ -211,6 +285,11 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
    * @param visible - The visibility of the info overlay; the move names and cursor's visibility will be set to the opposite
    */
   toggleInfo(visible: boolean): void {
+    // While the ER detail panel is open it owns the move-grid visibility — don't
+    // let the STATS-release info toggle restore the grid behind the open panel.
+    if (this.isMoveDetailOpen()) {
+      return;
+    }
     // The info overlay will already fade in, so we should hide the move name text and cursor immediately
     // rather than adjusting alpha via a tween.
     if (visible) {
@@ -315,6 +394,81 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     pokemon.getOpponents().forEach(opponent => {
       (opponent as EnemyPokemon).updateEffectiveness(this.getEffectivenessText(pokemon, opponent, pokemonMove));
     });
+
+    // Keep the ER detail panel in sync while navigating moves with it open.
+    if (this.moveDetailPage >= 0) {
+      this.renderMoveDetail();
+    }
+  }
+
+  /** True while the ER move-detail panel is open (drives input + grid visibility). */
+  isMoveDetailOpen(): boolean {
+    return this.moveDetailPage >= 0;
+  }
+
+  /**
+   * Advance the move-detail panel one page on each info/STATS press:
+   * closed → page 1 → 2 → 3 → 4 → closed. Always returns `true` (handled).
+   */
+  private cycleMoveDetail(): boolean {
+    if (this.moveDetailPage < 0) {
+      // Opening: hide the move grid behind the panel.
+      this.moveDetailPage = 0;
+      this.movesContainer.setVisible(false);
+      this.cursorObj?.setVisible(false);
+      this.moveInfoOverlay.clear();
+      this.moveDetailContainer.setVisible(true);
+    } else if (this.moveDetailPage >= FightUiHandler.MOVE_DETAIL_PAGES - 1) {
+      this.closeMoveDetail();
+      return true;
+    } else {
+      this.moveDetailPage++;
+    }
+    this.renderMoveDetail();
+    return true;
+  }
+
+  /** Close the detail panel and restore the move grid. */
+  private closeMoveDetail(): void {
+    this.moveDetailPage = -1;
+    this.moveDetailContainer.setVisible(false);
+    this.movesContainer.setVisible(true).setAlpha(1);
+    this.cursorObj?.setVisible(true).setAlpha(1);
+  }
+
+  /**
+   * Render the current detail page for the highlighted move. Page 0 shows the
+   * description text; pages 1-3 show label/value rows. Pure read of the move's
+   * wired flags/attrs via {@linkcode getErMoveDetailPages}.
+   */
+  private renderMoveDetail(): void {
+    const phase = globalScene.phaseManager.getCurrentPhase();
+    if (!phase?.is("CommandPhase")) {
+      return;
+    }
+    const moveset = phase.getPokemon().getMoveset();
+    const pokemonMove = moveset[this.getCursor()];
+    if (!pokemonMove) {
+      this.closeMoveDetail();
+      return;
+    }
+    const move = pokemonMove.getMove();
+    this.moveDetailPages = getErMoveDetailPages(move);
+    const pageIndex = Math.min(this.moveDetailPage, this.moveDetailPages.length - 1);
+    const page = this.moveDetailPages[pageIndex];
+
+    this.moveDetailTitle.setText(move.name);
+    this.moveDetailPageText.setText(`${pageIndex + 1}/${this.moveDetailPages.length}`);
+
+    const isDesc = page.description !== undefined;
+    this.moveDetailDesc.setText(isDesc ? (page.description ?? "") : "").setVisible(isDesc);
+    const rows = page.rows ?? [];
+    for (let i = 0; i < FightUiHandler.MOVE_DETAIL_ROWS; i++) {
+      const row = rows[i];
+      const visible = !isDesc && row !== undefined;
+      this.moveDetailRowLabels[i].setText(row?.label ?? "").setVisible(visible);
+      this.moveDetailRowValues[i].setText(row?.value ?? "").setVisible(visible);
+    }
   }
 
   setCursor(cursor: number): boolean {
@@ -442,6 +596,8 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     this.clearMoves();
     this.setInfoVis(false);
     this.moveInfoOverlay.clear();
+    this.moveDetailPage = -1;
+    this.moveDetailContainer?.setVisible(false);
     messageHandler.bg.setVisible(true);
     this.eraseCursor();
     this.active = false;
