@@ -34,6 +34,13 @@ export interface PostSummonScriptedMoveOptions {
    * Spectral Thief"). Omit to use the move's registered full power.
    */
   readonly power?: number;
+  /**
+   * When `true`, the scripted move targets the HOLDER itself (and the on-entry
+   * effect fires even with no opponent on the field). Required for self-side
+   * buffs cast on entry — e.g. Air Blower's Tailwind — which would otherwise
+   * never trigger when the holder is sent out first (no opponent yet).
+   */
+  readonly targetsSelf?: boolean;
 }
 
 export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
@@ -46,7 +53,11 @@ export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
     if (simulated) {
       return true;
     }
-    // Need an opposing target on the field.
+    // Self-targeting buffs (Tailwind) fire regardless of who's on the field.
+    if (this.opts.targetsSelf) {
+      return true;
+    }
+    // Offensive on-entry moves need an opposing target on the field.
     const opponents = pokemon.getOpponents().filter(o => !o.isFainted());
     return opponents.length > 0;
   }
@@ -56,16 +67,23 @@ export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
     if (simulated) {
       return;
     }
-    const opponents = pokemon.getOpponents().filter(o => !o.isFainted());
-    if (opponents.length === 0) {
-      return;
+    let targetIndex: number;
+    if (this.opts.targetsSelf) {
+      // Self-side move (e.g. Tailwind) — cast at the holder so it always lands,
+      // even when the holder is sent out before any opponent.
+      targetIndex = pokemon.getBattlerIndex();
+    } else {
+      const opponents = pokemon.getOpponents().filter(o => !o.isFainted());
+      if (opponents.length === 0) {
+        return;
+      }
+      // Pick the first available opponent (in doubles, prefer the leftmost).
+      targetIndex = opponents[0].getBattlerIndex();
     }
-    // Pick the first available opponent (in doubles, prefer the leftmost).
-    const target = opponents[0];
     globalScene.phaseManager.unshiftNew(
       "MovePhase",
       pokemon,
-      [target.getBattlerIndex()],
+      [targetIndex],
       scriptedPokemonMove(this.opts.moveId, this.opts.power),
       MoveUseMode.INDIRECT,
     );

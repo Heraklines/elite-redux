@@ -123,5 +123,6 @@
   "beatModeFirstTime": "{{speciesName}} beat {{gameMode}} Mode for the first time!\nYou received {{newModifier}}!",
   "ppReduced": "It reduced the PP of {{targetName}}’s\n{{moveName}} by {{reduction}}!",
   "mysteryEncounterAppeared": "What’s this?",
-  "pokemonTerastallized": "{{pokemonNameWithAffix}} Terastallized into the {{type}} type!"
+  "pokemonTerastallized": "{{pokemonNameWithAffix}} Terastallized into the {{type}} type!",
+  "eggHatchBatchDeferred": "{{count}} more Eggs are ready and will hatch a bit later."
 }

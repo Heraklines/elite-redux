@@ -3242,28 +3242,41 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * Fusion evolutions are also considered.
    * @returns The evolution this pokemon can currently evolve into, or `null` if it cannot evolve
    */
-  getEvolution(): SpeciesFormEvolution | null {
+  /**
+   * Collect every evolution whose conditions are currently satisfied.
+   *
+   * Most branched evolutions are disambiguated by their own conditions (time of
+   * day, gender, held item, …) so only one validates at a time. When two or more
+   * validate simultaneously — i.e. the line genuinely offers the player a choice
+   * (e.g. a species with multiple open level-up paths) — all of them are returned
+   * so the caller can prompt for a selection. Non-fusion paths come first, in
+   * declaration order, so `[0]` matches the legacy {@linkcode getEvolution} pick.
+   */
+  getValidEvolutions(): SpeciesFormEvolution[] {
+    const valid: SpeciesFormEvolution[] = [];
+
     if (Object.hasOwn(pokemonEvolutions, this.species.speciesId)) {
-      const evolutions = pokemonEvolutions[this.species.speciesId];
-      for (const e of evolutions) {
+      for (const e of pokemonEvolutions[this.species.speciesId]) {
         if (e.validate(this)) {
-          return e;
+          valid.push(e);
         }
       }
     }
 
     if (this.isFusion() && this.fusionSpecies && Object.hasOwn(pokemonEvolutions, this.fusionSpecies.speciesId)) {
-      const fusionEvolutions = pokemonEvolutions[this.fusionSpecies.speciesId].map(
-        e => new FusionSpeciesFormEvolution(this.species.speciesId, e),
-      );
-      for (const fe of fusionEvolutions) {
+      for (const e of pokemonEvolutions[this.fusionSpecies.speciesId]) {
+        const fe = new FusionSpeciesFormEvolution(this.species.speciesId, e);
         if (fe.validate(this, true)) {
-          return fe;
+          valid.push(fe);
         }
       }
     }
 
-    return null;
+    return valid;
+  }
+
+  getEvolution(): SpeciesFormEvolution | null {
+    return this.getValidEvolutions()[0] ?? null;
   }
 
   /**

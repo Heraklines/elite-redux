@@ -41,6 +41,19 @@ export type BattleInfoParamList = {
   };
 };
 
+/**
+ * Label + fill color for Elite Redux custom statuses, keyed by the status frame
+ * name used in {@linkcode BattleInfo.updateStatusIcon}. These have no sprite in
+ * the vanilla `statuses` atlas, so they render as a colored text badge instead.
+ * Colors are picked to read at a glance and echo the effect (red bleed, icy
+ * cyan frost, eerie purple fear) without clashing with the vanilla status pills.
+ */
+const ER_STATUS_BADGES: Record<string, { label: string; color: string }> = {
+  bleed: { label: "BLEED", color: "#ff5555" },
+  frostbite: { label: "FROST", color: "#8fe0ff" },
+  fear: { label: "FEAR", color: "#c98bff" },
+};
+
 export abstract class BattleInfo extends Phaser.GameObjects.Container {
   public static readonly EXP_GAINS_DURATION_BASE = 1650;
 
@@ -74,6 +87,12 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   protected fusionShinyIcon: Phaser.GameObjects.Sprite;
   protected splicedIcon: Phaser.GameObjects.Sprite;
   protected statusIndicator: Phaser.GameObjects.Sprite;
+  /**
+   * Elite Redux custom statuses (bleed/frostbite/fear) have no frame in the
+   * vanilla `statuses` atlas, so they're shown as a crisp colored text badge in
+   * the same slot as the status sprite instead of a faint fallback frame.
+   */
+  protected erStatusText: Phaser.GameObjects.Text;
   protected levelContainer: Phaser.GameObjects.Container;
   protected hpLabel: Phaser.GameObjects.Image;
   protected hpBar: Phaser.GameObjects.Image;
@@ -257,6 +276,15 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
       .setOrigin(0)
       .setPositionRelative(this.nameText, 0, 11.5);
     this.add(this.statusIndicator);
+
+    // ER custom-status badge (bleed/frostbite/fear). Shares the status slot;
+    // shown only when an ER status tag is active (see updateStatusIcon).
+    this.erStatusText = addTextObject(0, 0, "", TextStyle.BATTLE_INFO)
+      .setName("text_er_status")
+      .setOrigin(0)
+      .setVisible(false);
+    this.erStatusText.setFontSize("44px"); // a touch smaller than the name, reads as a compact badge
+    this.add(this.erStatusText);
 
     this.levelContainer = globalScene.add
       .container(posParams.levelContainerX, posParams.levelContainerY)
@@ -462,12 +490,24 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
     if (this.lastStatusFrame !== frame) {
       this.lastStatusFrame = frame;
       this.lastStatus = status;
-      if (frame !== null) {
-        // setFrame tolerates a missing frame (Phaser logs and falls back), so
-        // localized `statuses` atlases without the ER labels won't throw.
-        this.statusIndicator.setFrame(frame);
+      const erBadge = frame === null ? undefined : ER_STATUS_BADGES[frame];
+      if (erBadge) {
+        // ER custom status: the vanilla `statuses` atlas has no frame for it, so
+        // a setFrame fallback showed a faint/garbled icon. Render a crisp colored
+        // text badge in the same slot instead.
+        this.statusIndicator.setVisible(false);
+        this.erStatusText
+          .setText(erBadge.label)
+          .setColor(erBadge.color)
+          .setVisible(true)
+          .setPositionRelative(this.nameText, xOffset, 11.5);
+      } else {
+        this.erStatusText.setVisible(false);
+        if (frame !== null) {
+          this.statusIndicator.setFrame(frame);
+        }
+        this.statusIndicator.setVisible(frame !== null).setPositionRelative(this.nameText, xOffset, 11.5);
       }
-      this.statusIndicator.setVisible(frame !== null).setPositionRelative(this.nameText, xOffset, 11.5);
     }
   }
 

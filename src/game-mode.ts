@@ -256,10 +256,24 @@ export class GameMode implements GameModeConfig {
           }
         }
       }
-      // ER Elite/Hell: once an otherwise-eligible wave clears the fixed-battle
-      // proximity guard, force a trainer on the difficulty cadence (in addition
-      // to — not instead of — the normal biome trainer roll). Ace is untouched.
-      if (allowTrainerBattle && erForcesTrainerWave(waveIndex)) {
+      // ER Elite/Hell: force a trainer on the difficulty cadence (in addition to
+      // — not instead of — the normal biome trainer roll). Ace is untouched.
+      //
+      // This deliberately bypasses BOTH suppressors above:
+      //   - the *random* anti-clustering rolls (they only exist to thin out
+      //     generic trainers), and
+      //   - the ±2 proximity guard around gyms / fixed battles.
+      // Together those silently collapsed the intended "near-continuous
+      // gauntlet" back to ~vanilla density: the random rolls kicked in the
+      // moment the run left a `trainerChance: 0` biome (Town → Plains ~wave 10),
+      // and the ±2 guard blanked out the cadence waves flanking every rival/gym
+      // (e.g. the wave-25 rival killed forced trainers on 24 and 27, leaving
+      // waves 20–30 nearly empty — exactly the reported drop-off). For a
+      // gauntlet, trainers clustered next to a rival are the whole point.
+      //
+      // We still skip the EXACT gym / fixed-battle wave, since those already
+      // supply their own (scripted) trainer and take precedence downstream.
+      if (erForcesTrainerWave(waveIndex) && waveIndex % 30 !== (offsetGym ? 0 : 20) && !this.isFixedBattle(waveIndex)) {
         return true;
       }
       return Boolean(allowTrainerBattle && trainerChance && !randSeedInt(trainerChance));

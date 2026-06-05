@@ -68,10 +68,19 @@ export class LevelUpPhase extends PlayerPartyMemberPokemonPhase {
       }
     }
     if (!this.pokemon.pauseEvolutions) {
-      const evolution = this.pokemon.getEvolution();
-      if (evolution) {
+      const evolutions = this.pokemon.getValidEvolutions();
+      if (evolutions.length > 0) {
         this.pokemon.breakIllusion();
-        globalScene.phaseManager.unshiftNew("EvolutionPhase", this.pokemon, evolution, this.lastLevel);
+        // Pass the full candidate set so the phase prompts for a path when the
+        // line currently offers more than one valid evolution (branched evos).
+        globalScene.phaseManager.unshiftNew(
+          "EvolutionPhase",
+          this.pokemon,
+          evolutions[0],
+          this.lastLevel,
+          true,
+          evolutions,
+        );
       }
     }
     return super.end();

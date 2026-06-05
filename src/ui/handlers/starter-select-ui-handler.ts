@@ -1389,7 +1389,23 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.updateInstructions();
   }
 
+  /**
+   * Toggle the corner Discord/GitHub links (a DOM overlay defined in index.html).
+   * They should ONLY show on the starter-select screen, so we flip the element's
+   * display on enter/leave. Guarded for the headless test environment (no DOM).
+   */
+  private setErLinksVisible(visible: boolean): void {
+    if (typeof document === "undefined") {
+      return;
+    }
+    const el = document.getElementById("er-links");
+    if (el) {
+      el.style.display = visible ? "flex" : "none";
+    }
+  }
+
   show(args: any[]): boolean {
+    this.setErLinksVisible(true);
     this.moveInfoOverlay.clear(); // clear this when removing a menu; the cancel button doesn't seem to trigger this automatically on controllers
     this.pokerusSpecies = getPokerusStarters();
 
@@ -2616,7 +2632,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                   if (isSlotUnlocked(passiveAttr, slotIndex)) {
                     continue;
                   }
-                  const slotCost = baseCost * PASSIVE_SLOTS[slot].costMultiplier;
+                  // ER cost rework (#226): the old `baseCost × [1,2,4]` doubling
+                  // was too steep. Instead: halve the baseline for the 1st passive,
+                  // then add a flat +10 / +20 for the 2nd / 3rd. Rarity is already
+                  // baked into `baseCost` (rarer species have a lower base), so the
+                  // halved baseline + flat steps are naturally cheaper for rarities.
+                  const slotCost = Math.ceil(baseCost / 2) + slot * 10;
                   const abilityName = allAbilities[passiveAbilityIds[slot]].name;
                   options.push({
                     label: `×${slotCost} ${slot + 1}. ${abilityName}: ${i18next.t(
@@ -5485,6 +5506,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
   clear(): void {
     super.clear();
+    this.setErLinksVisible(false); // hide the Discord/GitHub corner links off the starter screen
 
     saveStarterPreferences(this.originalStarterPreferences);
 

@@ -77,9 +77,9 @@ import {
   PostSummonWeatherChangeAbAttr,
   PostTurnHurtIfSleepingAbAttr,
   PostWeatherLapseHealAbAttr,
-  ProtectStatAbAttr,
   ReceivedMoveDamageMultiplierAbAttr,
   ReceivedTypeDamageMultiplierAbAttr,
+  SelfStatDropImmunityAbAttr,
   StabBoostAbAttr,
   StatMultiplierAbAttr,
   StatusEffectImmunityAbAttr,
@@ -106,10 +106,14 @@ import { PostDefendChangeAttackerTypeAbAttr } from "#data/elite-redux/archetypes
 import { PostDefendSuppressOpponentDamageBoostAbAttr } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import { PostFaintDetonateAbAttr } from "#data/elite-redux/archetypes/post-faint-detonate";
 import { RecoilDamageMultiplierAbAttr } from "#data/elite-redux/archetypes/recoil-damage-multiplier";
-import { StatTriggerOnStatLoweredAbAttr } from "#data/elite-redux/archetypes/stat-trigger-on-event";
+import {
+  StatTriggerOnHitAbAttr,
+  StatTriggerOnStatLoweredAbAttr,
+} from "#data/elite-redux/archetypes/stat-trigger-on-event";
 import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
 import { TypeImmunityHighestAttackStatStageAbAttr } from "#data/elite-redux/archetypes/type-immunity-highest-attack-stat-stage";
 import { ER_ABILITIES } from "#data/elite-redux/er-abilities";
+import { getErAbilityDescription, getErAbilityRomDescription } from "#data/elite-redux/er-ability-descriptions";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { initEliteReduxVanillaMovePatches } from "#data/elite-redux/init-elite-redux-vanilla-move-patches";
@@ -517,18 +521,18 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
       ab.attrs.push(new PostReceiveCritStatStageChangeAbAttr(Stat.DEF, 12));
     },
   ],
-  // ANGER_POINT: crit→max Atk (vanilla) + each hit gives +1 Atk (rider).
+  // ANGER_POINT: ER spec (ability 83) is "Getting hit raises Atk by +1.
+  // Critical hits maximize Attack." — i.e. +1 on EVERY damaging hit, max on crit
+  // (mirrors Tipping Point/Fortitude). The base crit→max-Atk piece lives in
+  // init-abilities; here we add the +1-on-any-damaging-hit rider via the clean
+  // `StatTriggerOnHitAbAttr` primitive (gated to connected damaging moves, any
+  // category — NOT physical-only, NOT crit-only). A prior rider was removed under
+  // #224 ("triggers when it shouldn't"), but that contradicted the ER spec and
+  // left non-crit hits doing nothing (the reported "+0 and it didn't activate").
   [
     AbilityId.ANGER_POINT,
     ab => {
-      ab.attrs.push(
-        new PostDefendStatStageChangeAbAttr(
-          (_target, _user, move) => move.category !== MoveCategory.STATUS,
-          Stat.ATK,
-          1,
-          true,
-        ),
-      );
+      ab.attrs.push(new StatTriggerOnHitAbAttr({ stats: [{ stat: Stat.ATK, stages: 1 }] }));
     },
   ],
   // MAGICIAN: was vanilla "steal any successful hit"; ER requires non-contact.
@@ -1309,6 +1313,15 @@ export function initEliteReduxVanillaRebalance(): VanillaRebalanceResult {
 
     try {
       patcher(mutableAbility);
+      // ER rewrote this ability's MECHANICS — its i18n description still describes
+      // the vanilla behavior. Pin the ER description so every surface that reads
+      // `ability.description` (battle popups, info panels, Battle Info) is correct.
+      // Prefer the expanded ROM text; fall back to the short ER summary.
+      const erDescription =
+        getErAbilityRomDescription(mutableAbility.name) ?? getErAbilityDescription(pokerogueId as AbilityId);
+      if (erDescription) {
+        mutableAbility.descriptionOverride = erDescription;
+      }
       // Install the sentinel as a non-enumerable property so the marker
       // doesn't leak into for-in loops or JSON serialization.
       Object.defineProperty(mutableAbility, PATCHED_MARKER, {
@@ -1970,13 +1983,18 @@ function patchPastelVeil(ability: MutableAbility): void {
  */
 /**
  * Patch LIMBER per ER 7 spec: paralysis-immune (kept from vanilla) +
- * self-stat-drop immunity (ProtectStat, all stats) + half recoil (PARTIAL
- * — engine doesn't expose a recoil-multiplier hook; deferred). Prior code
- * mistakenly extended INFATUATED-immunity which is NOT in the spec.
+ * SELF-stat-drop immunity (SelfStatDropImmunityAbAttr — blocks the holder's own
+ * Overheat / Close Combat drops, NOT incoming Growl / Intimidate) + half recoil.
+ * A prior pass used ProtectStatAbAttr, which is the inverse (blocks incoming
+ * drops, never self) and wrongly let Growl/Intimidate be shrugged off.
  */
 function patchLimber(ability: MutableAbility): void {
-  // Add the self-stat-drop guard.
-  ability.attrs.push(new ProtectStatAbAttr());
+  // Add the self-stat-drop guard. ER Limber is "immune to SELF stat drops"
+  // (Overheat / Close Combat / Draco Meteor) — NOT incoming drops. The prior
+  // code used ProtectStatAbAttr (Clear Body), which is the opposite: it blocked
+  // Growl / Intimidate but never self-drops. SelfStatDropImmunityAbAttr fires in
+  // the stat-change phase's self-target branch instead.
+  ability.attrs.push(new SelfStatDropImmunityAbAttr());
   // Add half-recoil via the new RecoilDamageMultiplierAbAttr primitive
   // (move.ts:RecoilAttr.apply scans for this constructor name and
   // applies the factor before computing recoil damage).

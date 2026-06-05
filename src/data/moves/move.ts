@@ -162,6 +162,13 @@ export abstract class Move implements Localizable {
   public accuracy: number;
   public pp: number;
   public effect: string;
+  /**
+   * Optional description override that survives re-localization. When set (e.g.
+   * by an Elite Redux move patch that changes a vanilla move's mechanics), it
+   * takes precedence over the i18n `move:<key>.effect` string in
+   * {@linkcode localize}, so the ER tooltip persists across language changes.
+   */
+  public descriptionOverride?: string;
   /** The chance of a move's secondary effects activating */
   public chance: number;
   public priority: number;
@@ -297,7 +304,10 @@ export abstract class Move implements Localizable {
     }
 
     this.name = `${i18next.t(`move:${i18nKey}.name`)}${this.nameAppend}`;
-    this.effect = `${i18next.t(`move:${i18nKey}.effect`)}${this.nameAppend}`;
+    this.effect =
+      this.descriptionOverride === undefined
+        ? `${i18next.t(`move:${i18nKey}.effect`)}${this.nameAppend}`
+        : this.descriptionOverride;
   }
 
   /**
@@ -10575,8 +10585,11 @@ export function initMoves() {
     new AttackMove(MoveId.METEOR_MASH, PokemonType.STEEL, MoveCategory.PHYSICAL, 90, 90, 10, 20, 0, 3)
       .attr(StatStageChangeAttr, [Stat.ATK], 1, true)
       .punchingMove(),
-    new AttackMove(MoveId.ASTONISH, PokemonType.GHOST, MoveCategory.PHYSICAL, 30, 100, 15, 30, 0, 3) //
-      .attr(FlinchAttr),
+    // ER (#221): Astonish is a Ghost-type Fake Out — priority + first-turn-only +
+    // guaranteed flinch. (chance is finalised to 100 by the c-source corrections.)
+    new AttackMove(MoveId.ASTONISH, PokemonType.GHOST, MoveCategory.PHYSICAL, 30, 100, 15, 100, 3, 3) //
+      .attr(FlinchAttr)
+      .condition(new FirstMoveCondition(), 3),
     new AttackMove(MoveId.WEATHER_BALL, PokemonType.NORMAL, MoveCategory.SPECIAL, 50, 100, 10, -1, 0, 3)
       .attr(WeatherBallTypeAttr)
       .attr(MovePowerMultiplierAttr, (user, _target, _move) => {

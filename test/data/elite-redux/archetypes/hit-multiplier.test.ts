@@ -272,4 +272,54 @@ describe("HitMultiplierPowerAbAttr archetype (C1d)", () => {
       );
     });
   });
+
+  // The faithful "1st hit 100%, 2nd hit at N%" behaviour (Hyper Aggressive,
+  // Raging Boxer, Primal Maw). The parent `MoveDamageBoostAbAttr.canApply`
+  // evaluates the condition per strike; `extraStrikesOnly` gates it on the live
+  // strike index read from `turnData.{hitCount,hitsLeft}` so the first strike is
+  // left at full power.
+  describe("extraStrikesOnly per-strike gating", () => {
+    /** Stub a Pokemon mid-attack on strike `strikeIndex` (0-based) of `hitCount` total. */
+    function makeAttackingStub(hitCount: number, strikeIndex: number): Pokemon {
+      return {
+        id: 1,
+        getMoveType: (move: Move) => (move as unknown as { _type: PokemonType })._type,
+        turnData: { hitCount, hitsLeft: hitCount - strikeIndex },
+      } as unknown as Pokemon;
+    }
+
+    function canApplyOnStrike(attr: HitMultiplierPowerAbAttr, hitCount: number, strikeIndex: number): boolean {
+      const params = {
+        pokemon: makeAttackingStub(hitCount, strikeIndex),
+        opponent: makeStubPokemon(),
+        move: makeStubMove({}),
+        damage: new NumberHolder(100),
+        simulated: true,
+      } as unknown as Parameters<HitMultiplierPowerAbAttr["canApply"]>[0];
+      return attr.canApply(params);
+    }
+
+    it("does NOT scale the first strike (stays 100%)", () => {
+      const attr = new HitMultiplierPowerAbAttr({ multiplier: 0.25, extraStrikesOnly: true });
+      expect(canApplyOnStrike(attr, 2, 0)).toBe(false);
+    });
+
+    it("scales the second strike (the 25% hit)", () => {
+      const attr = new HitMultiplierPowerAbAttr({ multiplier: 0.25, extraStrikesOnly: true });
+      expect(canApplyOnStrike(attr, 2, 1)).toBe(true);
+    });
+
+    it("default (uniform) mode scales every strike including the first", () => {
+      const attr = new HitMultiplierPowerAbAttr({ multiplier: 0.7 });
+      expect(canApplyOnStrike(attr, 2, 0)).toBe(true);
+      expect(canApplyOnStrike(attr, 2, 1)).toBe(true);
+    });
+
+    it("exposes isExtraStrikesOnly()", () => {
+      expect(new HitMultiplierPowerAbAttr({ multiplier: 0.25, extraStrikesOnly: true }).isExtraStrikesOnly()).toBe(
+        true,
+      );
+      expect(new HitMultiplierPowerAbAttr({ multiplier: 0.7 }).isExtraStrikesOnly()).toBe(false);
+    });
+  });
 });

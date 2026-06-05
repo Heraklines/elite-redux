@@ -416,10 +416,16 @@ describe("ER vanilla ability rebalance — R2 status/damage riders", () => {
     expect(critAttr).toBeDefined();
   });
 
-  it("ANGER_POINT — has an additional PostDefendStatStageChange (+1 Atk per hit)", () => {
+  it("ANGER_POINT — is crit-only (no +1-Atk-per-hit rider, #224)", () => {
+    // The old ER rider added a PostDefendStatStageChange (+1 Atk on every
+    // non-status hit), which fired on ordinary non-crit hits and was reported as
+    // Anger Point "triggering when it shouldn't". It was removed — Anger Point is
+    // now purely crit → max Atk (the crit-gated PostReceiveCrit attr only).
     const ab = getAbility(AbilityId.ANGER_POINT);
     const hitAttr = ab.attrs.find(a => a instanceof PostDefendStatStageChangeAbAttr);
-    expect(hitAttr).toBeDefined();
+    expect(hitAttr).toBeUndefined();
+    const critAttr = ab.attrs.find(a => a instanceof PostReceiveCritStatStageChangeAbAttr);
+    expect(critAttr).toBeDefined();
   });
 
   it("WEAK_ARMOR — predicate now gates on contact", () => {

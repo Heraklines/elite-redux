@@ -6,6 +6,7 @@ import Overrides from "#app/overrides";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims";
 import { getCharVariantFromDialogue } from "#data/dialogue";
+import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { getNatureName } from "#data/nature";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
@@ -113,6 +114,14 @@ export class EncounterPhase extends BattlePhase {
           battle.enemyParty[e] = battle.trainer?.genPartyMember(e)!; // TODO:: is the bang correct here?
         } else {
           let enemySpecies = globalScene.randomSpecies(battle.waveIndex, level, true);
+          // Elite Redux: on Elite/Hell the classic final boss (Eternatus) is
+          // replaced by a two-phase Cascoon → Primal Cascoon encounter.
+          if (battle.isClassicFinalBoss) {
+            const erFinalBoss = getErFinalBossSpecies();
+            if (erFinalBoss) {
+              enemySpecies = erFinalBoss;
+            }
+          }
           // If player has golden bug net, rolls 10% chance to replace non-boss wave wild species from the golden bug net bug pool
           if (
             globalScene.findModifier(m => m instanceof BoostBugSpawnModifier)
@@ -155,7 +164,11 @@ export class EncounterPhase extends BattlePhase {
         );
       }
 
-      if (enemyPokemon.species.speciesId === SpeciesId.ETERNATUS) {
+      if (battle.isClassicFinalBoss && isErFinalBossSpecies(enemyPokemon.species.speciesId)) {
+        // Elite Redux final boss (Cascoon → Primal): set up phase-1 boss segments
+        // the same way the vanilla Eternatus final boss does.
+        enemyPokemon.setBoss();
+      } else if (enemyPokemon.species.speciesId === SpeciesId.ETERNATUS) {
         if (battle.isClassicFinalBoss) {
           enemyPokemon.setBoss();
         } else if (!(battle.waveIndex % 1000)) {

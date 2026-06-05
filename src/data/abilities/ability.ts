@@ -65,10 +65,21 @@ export class Ability {
   public readonly attrs: readonly AbAttr[];
   public readonly conditions: readonly AbAttrCondition[];
 
+  /**
+   * Elite Redux: when ER rewrites a vanilla ability's mechanics, the i18n
+   * description still describes the vanilla behavior. Setting this field pins the
+   * ER description so every surface that reads {@linkcode description} (battle
+   * popups, info panels, Battle Info, …) shows the correct text. Unset = vanilla.
+   */
+  public descriptionOverride?: string;
+
   /** The localized ability description */
   public get description(): string {
     if (this.id === AbilityId.NONE) {
       return "";
+    }
+    if (this.descriptionOverride !== undefined) {
+      return this.descriptionOverride;
     }
     return i18next.t(`ability:${this.i18nKey}.description`);
   }

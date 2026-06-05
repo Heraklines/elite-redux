@@ -40,6 +40,7 @@ import { allMoves } from "#data/data-lists";
 import { ER_FLAG_NAMES_LIST } from "#data/elite-redux/er-flag-mapping";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
+import { type ErPledgeRule, ErPledgeWeatherEffectAttr } from "#data/elite-redux/er-pledge-weather-effect";
 import {
   AddBattlerTagAttr,
   ConfuseAttr,
@@ -63,6 +64,7 @@ import {
   StatStageChangeAttr,
   StatusEffectAttr,
 } from "#data/moves/move";
+import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
@@ -103,6 +105,30 @@ export interface VanillaMovePatchResult {
  *     UseHighestOffense, target widening, etc).
  *   - **MINOR-flag**: pure flag bit OR (no MoveAttr changes).
  */
+/**
+ * ER Pledge patcher. The numeric retune (90 BP / 15 PP) is already applied by
+ * the rebalance; here we (1) keep the highest-attack category, (2) strip the
+ * vanilla two-Pledge *combine* machinery (ER Pledges are single-cast), (3)
+ * attach the single-cast weather/terrain field effect, and (4) rewrite the
+ * tooltip to match ER behaviour.
+ */
+function patchErPledge(move: MutableMove, rules: readonly ErPledgeRule[], description: string): void {
+  addAttrUnique(move, new PhotonGeyserCategoryAttr());
+  removeAttrsByName(move, [
+    "AwaitCombinedPledgeAttr",
+    "CombinedPledgeTypeAttr",
+    "CombinedPledgePowerAttr",
+    "CombinedPledgeStabBoostAttr",
+    "AddPledgeEffectAttr",
+    "BypassRedirectAttr",
+  ]);
+  addAttrUnique(move, new ErPledgeWeatherEffectAttr(rules) as MoveAttr);
+  // Set both the live text and the override: `descriptionOverride` makes the ER
+  // tooltip survive re-localization (language change re-runs Move.localize()).
+  move.descriptionOverride = description;
+  move.effect = description;
+}
+
 const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map([
   // =====================================================================
   // TOTAL rewrites — 4 OHKO nerfs
@@ -340,9 +366,44 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       orFlag(move, MoveFlags.PULSE_MOVE);
     },
   ],
-  [MoveId.WATER_PLEDGE, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
-  [MoveId.FIRE_PLEDGE, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
-  [MoveId.GRASS_PLEDGE, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  // ER Pledges: highest-attack 90 BP, single-cast field effects keyed to weather
+  // /terrain (no combining). Rainbow → user's side; swamp / sea of fire → foe.
+  [
+    MoveId.WATER_PLEDGE,
+    move =>
+      patchErPledge(
+        move,
+        [
+          { when: "sun", tag: ArenaTagType.WATER_FIRE_PLEDGE, selfSide: true }, // rainbow
+          { when: "grassy-terrain", tag: ArenaTagType.GRASS_WATER_PLEDGE, selfSide: false }, // swamp
+        ],
+        "Uses the higher of Atk/SpAtk. In harsh sunlight it makes a rainbow on your side (doubles added effects); on Grassy Terrain it makes a swamp under the foe (quarters Speed).",
+      ),
+  ],
+  [
+    MoveId.FIRE_PLEDGE,
+    move =>
+      patchErPledge(
+        move,
+        [
+          { when: "rain", tag: ArenaTagType.WATER_FIRE_PLEDGE, selfSide: true }, // rainbow
+          { when: "grassy-terrain", tag: ArenaTagType.FIRE_GRASS_PLEDGE, selfSide: false }, // sea of fire
+        ],
+        "Uses the higher of Atk/SpAtk. In rain it makes a rainbow on your side (doubles added effects); on Grassy Terrain it sets a sea of fire under the foe (chips HP each turn).",
+      ),
+  ],
+  [
+    MoveId.GRASS_PLEDGE,
+    move =>
+      patchErPledge(
+        move,
+        [
+          { when: "rain", tag: ArenaTagType.GRASS_WATER_PLEDGE, selfSide: false }, // swamp
+          { when: "sun", tag: ArenaTagType.FIRE_GRASS_PLEDGE, selfSide: false }, // sea of fire
+        ],
+        "Uses the higher of Atk/SpAtk. In rain it makes a swamp under the foe (quarters Speed); in harsh sunlight it sets a sea of fire under the foe (chips HP each turn).",
+      ),
+  ],
   [MoveId.SPRINGTIDE_STORM, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
   [MoveId.MYSTICAL_POWER, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
   [MoveId.BLEAKWIND_STORM, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
@@ -533,13 +594,27 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
   [
     MoveId.BUBBLE_BEAM,
     move => {
-      move.chance = 10;
+      // ER: 25-power Water pulse that strikes 2–5 times (Mega Launcher–boosted),
+      // NOT vanilla's 65-power single hit with a 10% Speed drop. Power (25) and
+      // the PULSE_MOVE flag are set by the c-source corrections; here we drop the
+      // Speed-drop secondary and graft the 2–5 multi-hit.
+      removeAttrsByName(move, ["StatStageChangeAttr"]);
+      move.chance = -1;
+      addAttrUnique(move, new MultiHitAttr(MultiHitType.TWO_TO_FIVE));
     },
   ],
   [
     MoveId.SKY_ATTACK,
     move => {
       move.chance = 30;
+      // ER: Sky Attack raises the user's Attack on the CHARGE turn (turn 1),
+      // then strikes on turn 2 — "Raises its Attack on the first turn, then
+      // makes a brutal strike on the second." Vanilla only charges + flinches.
+      // The boost is a charge-turn attr (like Skull Bash's Defense raise), so it
+      // applies during the charge, not on the hit. Idempotent.
+      if (move.chargeAttrs && !move.chargeAttrs.some(a => a instanceof StatStageChangeAttr)) {
+        move.chargeAttrs.push(new StatStageChangeAttr([Stat.ATK], 1, true));
+      }
     },
   ],
   [
@@ -725,6 +800,8 @@ interface MutableMove {
   accuracy: number;
   chance: number;
   attrs: MoveAttr[];
+  /** Present only on charge moves (ChargingAttackMove); attrs applied on the charge turn. */
+  chargeAttrs?: MoveAttr[];
   moveTarget: MoveTarget;
   addAttr(attr: MoveAttr): Move;
   [MOVE_PATCHED_MARKER]?: true;
@@ -807,12 +884,38 @@ export function initEliteReduxVanillaMovePatches(): VanillaMovePatchResult {
   // patch unconditionally — the dispatch table only lists ER-shipped vanilla
   // ids per the audit.)
   const erVanillaIds = new Set<number>();
+  // ER's per-move text, keyed by pokerogue move id. When ER rewrites a vanilla
+  // move's MECHANICS, its i18n description still describes the vanilla behavior
+  // (e.g. Dragon Rush gained 33% recoil + 20% flinch but read like vanilla).
+  // We pin `descriptionOverride` from the ER draft so every patched move reads
+  // correctly. Prefer the detailed `longDescription` (states the actual mechanic),
+  // fall back to the short `description`.
+  const erMoveDescByPokerogueId = new Map<number, string>();
   for (const draft of ER_MOVES) {
     const pokerogueId = ER_ID_MAP.moves[draft.id];
     if (pokerogueId !== undefined && pokerogueId < VANILLA_ID_CUTOFF && draft.archetype === "vanilla") {
       erVanillaIds.add(pokerogueId);
+      const desc = (draft.longDescription || draft.description || "").trim();
+      if (desc) {
+        erMoveDescByPokerogueId.set(pokerogueId, desc);
+      }
     }
   }
+  // Pin the ER description on a patched move, unless a patcher already set a
+  // bespoke override (e.g. the Pledge moves) — never clobber that.
+  const applyErMoveDescription = (mutable: MutableMove, pokerogueId: number): void => {
+    if (mutable.descriptionOverride !== undefined) {
+      return;
+    }
+    const desc = erMoveDescByPokerogueId.get(pokerogueId);
+    if (desc) {
+      // Set BOTH like the Pledge patch: `descriptionOverride` survives a future
+      // re-localize (language change), while `effect` is the live text the UI
+      // reads right now — `localize()` already ran at init, before this patch.
+      mutable.descriptionOverride = desc;
+      mutable.effect = desc;
+    }
+  };
 
   for (const [moveId, patcher] of MOVE_PATCHERS) {
     const move = moveById.get(moveId);
@@ -826,6 +929,7 @@ export function initEliteReduxVanillaMovePatches(): VanillaMovePatchResult {
     }
     try {
       patcher(mutable);
+      applyErMoveDescription(mutable, moveId);
       Object.defineProperty(mutable, MOVE_PATCHED_MARKER, {
         value: true,
         enumerable: false,

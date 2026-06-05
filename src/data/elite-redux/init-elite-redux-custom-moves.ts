@@ -42,6 +42,7 @@
 
 import { ChargeAnim } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
+import { ER_FLAG_NAMES_LIST } from "#data/elite-redux/er-flag-mapping";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVE_ARCHETYPES, type ErMoveArchetypeKind } from "#data/elite-redux/er-move-archetypes";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
@@ -193,6 +194,9 @@ function mapType(erTypeId: number): PokemonType {
  * (e.g. Foul Play already uses opponent's atk; HITS_DEF inverts the
  * defender's stat the same way Body Press does).
  */
+/** Index of "Makes Contact" in the ER flag-name list — a move is contact iff its flag array includes it. */
+const ER_CONTACT_FLAG_INDEX = ER_FLAG_NAMES_LIST.indexOf("Makes Contact");
+
 function mapSplit(erSplit: number): MoveCategory {
   switch (erSplit) {
     case 0:
@@ -434,6 +438,7 @@ function buildCustomMove(
     priority: number;
     split: number;
     effectChance: number;
+    flags?: readonly number[];
   },
   pokerogueId: number,
   result: InitEliteReduxCustomMovesResult,
@@ -516,6 +521,16 @@ function buildCustomMove(
   // move analog of the ability composite-append). Additive: keeps the
   // archetype's flags. All stat/status/tag riders gate on Move.chance.
   applyErMoveBespokeRiders(move, draft.id);
+
+  // CONTACT FIX: the Move constructor flags EVERY physical move as MAKES_CONTACT
+  // by default, and vanilla non-contact physical moves clear it with
+  // `.makesContact(false)`. ER custom moves never did — so all 132 custom
+  // physical moves (beams, blasts, throws like Primal Beam) were wrongly contact,
+  // triggering contact abilities (Static, Rough Skin) and taking contact damage
+  // reduction (Fluffy → "did only 25%"). ER's flag data is authoritative: a move
+  // makes contact iff its flag list includes "Makes Contact". Force the flag to
+  // match so non-contact customs stop behaving like contact moves.
+  move.makesContact(Array.isArray(draft.flags) && draft.flags.includes(ER_CONTACT_FLAG_INDEX));
 
   return move;
 }

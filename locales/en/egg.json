@@ -44,5 +44,9 @@
   "voucherPlus": "Plus",
   "voucherPremium": "Premium",
   "voucherGolden": "Golden",
-  "autoRestockEntry": "Auto Restock..."
+  "autoRestockEntry": "Auto Restock...",
+  "flushEggsEntry": "Discard Eggs...",
+  "flushEggsNone": "You don’t have any Eggs to discard.",
+  "flushEggsConfirm": "Discard ALL {{count}} of your Eggs?\nThis cannot be undone!",
+  "flushEggsDone": "Discarded {{count}} Eggs."
 }

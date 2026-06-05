@@ -655,6 +655,12 @@ const allStarterCandyCosts: readonly StarterCandyCosts[] = [
   { passive: 10, costReduction: [5, 15], eggCosts: [10, 9, 7, 5], eggCostReductionThresholds: [10, 20, 40] }, // 8 Cost
   { passive: 10, costReduction: [5, 15], eggCosts: [10, 9, 7, 5], eggCostReductionThresholds: [10, 20, 40] }, // 9 Cost
   { passive: 10, costReduction: [5, 15], eggCosts: [10, 9, 7, 5], eggCostReductionThresholds: [8, 16, 32] }, // 10 Cost
+  // Elite Redux: cost 11-12 tiers for high-end custom mons (Burmy Eterna 11,
+  // Kartana Fallen 11, Kecleong 12, …). Mirror the cheapest (10-cost) candy
+  // values so the candy-cost getters don't index past the array (which crashed
+  // the starter-select screen). Vanilla never assigns costs above 10.
+  { passive: 10, costReduction: [5, 15], eggCosts: [10, 9, 7, 5], eggCostReductionThresholds: [8, 16, 32] }, // 11 Cost
+  { passive: 10, costReduction: [5, 15], eggCosts: [10, 9, 7, 5], eggCostReductionThresholds: [8, 16, 32] }, // 12 Cost
 ];
 
 /**

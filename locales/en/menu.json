@@ -35,6 +35,7 @@
   "failedToLoadSession": "Your session data could not be loaded.\nIt may be corrupted.",
   "boyOrGirl": "Are you a boy or a girl?",
   "evolving": "What?\n{{pokemonName}} is evolving!",
+  "selectEvolution": "{{pokemonName}} can evolve in more than one way.\nChoose an evolution!",
   "stoppedEvolving": "{{pokemonName}} stopped evolving.",
   "pauseEvolutionsQuestion": "Would you like to pause evolutions for {{pokemonName}}?\nEvolutions can be re-enabled from the party screen.",
   "evolutionsPaused": "Evolutions have been paused for {{pokemonName}}.",

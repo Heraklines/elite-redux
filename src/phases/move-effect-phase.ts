@@ -425,7 +425,14 @@ export class MoveEffectPhase extends PokemonPhase {
      * The effectiveness of the move against the given target.
      * Accounts for type and move immunities from defensive typing, abilities, and other effects.
      */
-    const effectiveness = target.getMoveEffectiveness(user, move, false, false, cancelNoEffectMessage);
+    // Mold Breaker / Teravolt / Turboblaze / Sunsteel Strike / Photon Geyser /
+    // Mycelium Might etc. must be able to punch through type-immunity abilities
+    // (Levitate, Flash Fire, Water/Volt Absorb, Sap Sipper, …). `doesFlagEffectApply`
+    // evaluates the user's MoveAbilityBypassAbAttr (including its per-move
+    // condition) and the move's IGNORE_ABILITIES flag, so feed that into the
+    // effectiveness check rather than hardcoding `false`.
+    const ignoreDefAbility = move.doesFlagEffectApply({ flag: MoveFlags.IGNORE_ABILITIES, user, target });
+    const effectiveness = target.getMoveEffectiveness(user, move, ignoreDefAbility, false, cancelNoEffectMessage);
     if (effectiveness === 0) {
       return [
         cancelNoEffectMessage.value ? HitCheckResult.NO_EFFECT_NO_MESSAGE : HitCheckResult.NO_EFFECT,
@@ -677,10 +684,14 @@ export class MoveEffectPhase extends PokemonPhase {
      */
     applyMoveAttrs("StatChangeBeforeDmgCalcAttr", user, target, this.move);
 
+    // Mold Breaker & co. also ignore the target's damage-MODIFYING abilities
+    // (Multiscale, Thick Fat, Filter/Solid Rock, Fluffy, Heatproof, Ice Scales,
+    // Punk Rock, …), not just type immunities. Mirror the hitCheck computation.
+    const ignoreDefAbility = this.move.doesFlagEffectApply({ flag: MoveFlags.IGNORE_ABILITIES, user, target });
     const { result, damage: initialDmg } = target.getAttackDamage({
       source: user,
       move: this.move,
-      ignoreAbility: false,
+      ignoreAbility: ignoreDefAbility,
       ignoreSourceAbility: false,
       ignoreAllyAbility: false,
       ignoreSourceAllyAbility: false,

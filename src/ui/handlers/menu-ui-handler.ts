@@ -40,6 +40,9 @@ const discordUrl = "https://discord.gg/pokerogue";
 const githubUrl = "https://github.com/pagefaultgames/pokerogue";
 const redditUrl = "https://www.reddit.com/r/pokerogue";
 const donateUrl = "https://github.com/sponsors/pagefaultgames";
+// Elite Redux community + source (AGPL: the source link must be discoverable).
+const erDiscordUrl = "https://discord.gg/g6Gt448sp";
+const erSourceUrl = "https://github.com/Heraklines/elite-redux";
 
 export class MenuUiHandler extends MessageUiHandler {
   private readonly textPadding = 8;
@@ -240,7 +243,9 @@ export class MenuUiHandler extends MessageUiHandler {
       });
     };
 
-    if (isBeta || isDev || isApp) {
+    // ER: in a backend-less Guest deploy (bypassLogin) there's no account server,
+    // so import is the only way to restore data — surface it just like dev/beta.
+    if (isBeta || isDev || isApp || bypassLogin) {
       manageDataOptions.push({
         label: i18next.t("menuUiHandler:importSession"),
         handler: () => {
@@ -295,7 +300,7 @@ export class MenuUiHandler extends MessageUiHandler {
       },
       keepOpen: true,
     });
-    if (isBeta || isDev || isApp) {
+    if (isBeta || isDev || isApp || bypassLogin) {
       manageDataOptions.push({
         label: i18next.t("menuUiHandler:importData"),
         handler: () => {
@@ -398,6 +403,22 @@ export class MenuUiHandler extends MessageUiHandler {
     };
 
     const communityOptions: OptionSelectItem[] = [
+      {
+        label: "Elite Redux Discord",
+        handler: () => {
+          window.open(erDiscordUrl, "_blank")?.focus();
+          return true;
+        },
+        keepOpen: true,
+      },
+      {
+        label: "Elite Redux Source",
+        handler: () => {
+          window.open(erSourceUrl, "_blank")?.focus();
+          return true;
+        },
+        keepOpen: true,
+      },
       {
         label: "Wiki",
         handler: () => {

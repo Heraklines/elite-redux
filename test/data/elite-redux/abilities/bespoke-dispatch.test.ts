@@ -22,7 +22,7 @@ import {
   CritUseLowerDefensiveStatAbAttr,
   PostDefendContactDamageAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
-  ProtectStatAbAttr,
+  SelfStatDropImmunityAbAttr,
   SetMoveAccuracyAbAttr,
   SpreadTargetByFlagAbAttr,
   StatMultiplierAbAttr,
@@ -1021,11 +1021,11 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(attr.getUsage()).toEqual({ kind: "first-n-hits", n: 1 });
   });
 
-  it("er id 724 (Lucky Halo) wires ProtectStat + PreFaintRevive(first-n-hits:1)", () => {
+  it("er id 724 (Lucky Halo) wires SelfStatDropImmunity + PreFaintRevive(first-n-hits:1)", () => {
     const res = dispatchArchetype("bespoke", null, 724);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(2);
-    expect(res.attrs[0]).toBeInstanceOf(ProtectStatAbAttr);
+    expect(res.attrs[0]).toBeInstanceOf(SelfStatDropImmunityAbAttr);
     const reviveAttr = res.attrs[1] as PreFaintReviveAbAttr;
     expect(reviveAttr).toBeInstanceOf(PreFaintReviveAbAttr);
     expect(reviveAttr.getUsage()).toEqual({ kind: "first-n-hits", n: 1 });

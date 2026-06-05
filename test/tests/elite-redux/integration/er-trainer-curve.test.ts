@@ -60,12 +60,14 @@ describe("ER trainer import — curve adaptation", () => {
     expect(pickTierForWave(trainer)).toBe("hell");
   });
 
-  it("Elite difficulty uses 'insane' normally and bumps to 'hell' on a boss wave", async () => {
+  it("Elite difficulty stays on 'insane' even on a boss wave (no bump to hell)", async () => {
+    // Elite and Hell keep their own tier on bosses so the two difficulties stay
+    // distinct — only Ace bosses bump (party → insane). See pickTierForWave.
     setErDifficulty("elite");
     game.override.startingWave(10);
     await game.classicMode.startBattle(SpeciesId.MAGIKARP);
     const trainer = game.scene.currentBattle.trainer!;
-    expect(pickTierForWave(trainer)).toBe("hell");
+    expect(pickTierForWave(trainer)).toBe("insane");
   });
 
   it("wave-seeded selection can reach more than just the first candidate", () => {

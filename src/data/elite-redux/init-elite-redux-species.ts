@@ -19,6 +19,7 @@ import { ER_SPECIES } from "#data/elite-redux/er-species";
 import { PokemonForm } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
 import { PokemonType } from "#enums/pokemon-type";
+import { SpeciesId } from "#enums/species-id";
 
 /**
  * ER's `typeT` ordering differs from pokerogue's `PokemonType` enum. This map
@@ -93,17 +94,20 @@ export interface InitEliteReduxSpeciesResult {
  * (`SPECIES_VENUSAUR`) + the form's pokerogue key (`mega` → `MEGA`) + the
  * `_REDUX` suffix ER uses for its custom species names.
  */
-function deriveErFormSpeciesConst(baseConst: string, formKey: string): readonly string[] {
+function deriveErFormSpeciesConst(baseConst: string, formKey: string, hasReduxRegional: boolean): readonly string[] {
   const upperFormKey = formKey.toUpperCase().replace(/-/g, "_");
-  // ER ships mega forms under TWO naming conventions:
-  //   1. `SPECIES_X_MEGA_REDUX` — NEW megas Redux added (43 forms — e.g.
-  //      `ALAKAZAM_MEGA_REDUX`, `MACHAMP_MEGA_REDUX`).
-  //   2. `SPECIES_X_MEGA` — canonical-name megas Redux rebalanced (227 forms —
-  //      e.g. `VENUSAUR_MEGA`, `CHARIZARD_MEGA_X`).
-  // Try the REDUX-suffixed variant FIRST so newly-added Redux-only megas
-  // override the canonical name when both exist. If only the canonical
-  // exists, fall through to it.
-  return [`${baseConst}_${upperFormKey}_REDUX`, `${baseConst}_${upperFormKey}`];
+  const canonical = `${baseConst}_${upperFormKey}`; // e.g. SPECIES_BEEDRILL_MEGA
+  const redux = `${baseConst}_${upperFormKey}_REDUX`; // e.g. SPECIES_BEEDRILL_MEGA_REDUX
+  // `_X_MEGA_REDUX` is AMBIGUOUS:
+  //   - When the base species ALSO has a `_REDUX` regional form, `_X_MEGA_REDUX`
+  //     is that REGIONAL form's mega (different typing — e.g. Beedrill's regional
+  //     mega is Ice/Poison while canonical Mega Beedrill is Bug/Poison). The
+  //     CANONICAL mega form must use `_MEGA`, NOT `_MEGA_REDUX`.
+  //   - When there's no regional redux form, `_X_MEGA_REDUX` is a genuine new /
+  //     rebalanced canonical mega (e.g. Machamp), so prefer it.
+  // So: canonical-first when a regional redux exists; redux-first otherwise.
+  // (The fallback still covers the case where only one of the two records ships.)
+  return hasReduxRegional ? [canonical, redux] : [redux, canonical];
 }
 
 /**
@@ -215,7 +219,12 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
       // base form (formKey === "") never has one.
       let formDraft: (typeof ER_SPECIES)[number] | undefined;
       if (form.formKey) {
-        for (const candidate of deriveErFormSpeciesConst(draft.speciesConst, form.formKey)) {
+        // Whether this base species also ships a `_REDUX` regional form. If so,
+        // its `_X_MEGA_REDUX` record is that regional form's mega (different
+        // typing) and must NOT override the canonical mega form — see
+        // deriveErFormSpeciesConst.
+        const hasReduxRegional = erDraftByConst.has(`${draft.speciesConst}_REDUX`);
+        for (const candidate of deriveErFormSpeciesConst(draft.speciesConst, form.formKey, hasReduxRegional)) {
           formDraft = erDraftByConst.get(candidate);
           if (formDraft) {
             break;
@@ -236,6 +245,15 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
         form.setPassives(passives);
         if (actives[0] !== AbilityId.NONE) {
           form.setActiveAbilities(actives);
+        }
+        // The DEFAULT form (index 0) must also inherit the species' ER type
+        // override — otherwise a re-typed multi-form species shows its old
+        // vanilla typing on its base form (e.g. Lycanroc Midday displayed pure
+        // Rock instead of ER's Rock/Ground). Gated to the base form so NON-default
+        // forms that legitimately differ but lack their own ER record (Wormadam
+        // cloaks, Rotom appliances) keep their own vanilla types.
+        if (species.forms[0] === form && type1 !== null) {
+          form.setTypes(type1, type2);
         }
         continue;
       }
@@ -276,6 +294,47 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
     // no matching form key, inject a fresh PokemonForm onto species.forms so
     // the dex's form-cycle button can switch to it.
     injectMissingErMegaForms(species, draft, erDraftByConst, result);
+  }
+
+  // Paldea Tauros: ER ships the three breeds (Combat/Blaze/Aqua) as SEPARATE
+  // custom species records, but pokerogue models them as the three FORMS of
+  // PALDEA_TAUROS. The main loop only applied ER data to the custom-id species,
+  // so the pokerogue forms kept their VANILLA abilities + a single passive. Copy
+  // each breed draft's full ER kit (actives + 3 innates + stats + types) onto the
+  // matching form so every breed gets its proper abilities and passives.
+  const paldeaTaurosBreedByFormKey: Readonly<Record<string, string>> = {
+    combat: "SPECIES_TAUROS_PALDEAN_COMBAT_BREED",
+    blaze: "SPECIES_TAUROS_PALDEAN_BLAZE_BREED",
+    aqua: "SPECIES_TAUROS_PALDEAN_AQUA_BREED",
+  };
+  const paldeaTauros = byId.get(SpeciesId.PALDEA_TAUROS);
+  if (paldeaTauros) {
+    for (const form of paldeaTauros.forms) {
+      const breedDraft = erDraftByConst.get(paldeaTaurosBreedByFormKey[form.formKey] ?? "");
+      if (!breedDraft) {
+        continue;
+      }
+      form.setPassives([
+        mapAbilityId(breedDraft.innates[0]),
+        mapAbilityId(breedDraft.innates[1]),
+        mapAbilityId(breedDraft.innates[2]),
+      ]);
+      const breedActives: readonly [AbilityId, AbilityId, AbilityId] = [
+        mapAbilityId(breedDraft.abilities[0]),
+        mapAbilityId(breedDraft.abilities[1]),
+        mapAbilityId(breedDraft.abilities[2]),
+      ];
+      if (breedActives[0] !== AbilityId.NONE) {
+        form.setActiveAbilities(breedActives);
+      }
+      form.setBaseStats(breedDraft.baseStats);
+      const breedType1 = mapErType(breedDraft.types[0]);
+      const breedType2 = mapErType(breedDraft.types[1]);
+      if (breedType1 !== null) {
+        form.setTypes(breedType1, breedType2);
+      }
+      result.formCount++;
+    }
   }
 
   return result;

@@ -43,11 +43,11 @@
 //   - **Range-rolled extra strikes** (`Unrelenting` — "Moves hit 2-5 times"):
 //     needs a per-dispatch random roll over a range. Tracked as a follow-up
 //     primitive; one-off use until a second ability adopts the shape.
-//   - **Per-hit power scaling that differs across hits** (`Raging Boxer`'s
-//     "first hit at 100%, second at 40%"): our `multiplier` field applies the
-//     same scaling to every added strike. The "1st hit unchanged, 2nd hit at
-//     N%" shape is the common case and covered here; cases with per-hit
-//     scaling tables are deferred to bespoke.
+//   - **Per-hit power scaling tables that differ across 3+ hits** (e.g. a
+//     hypothetical "1st 100%, 2nd 50%, 3rd 25%"): not modelled. The common
+//     "1st hit 100%, 2nd hit at N%" two-strike shape IS supported now via
+//     `HitMultiplierPowerAbAttr({ extraStrikesOnly: true })`; only arbitrary
+//     per-index scaling tables remain deferred to bespoke.
 //
 // We expose three sibling classes following pokerogue's split convention:
 //
@@ -63,9 +63,10 @@
 // Examples (per taxonomy):
 //   - `Raging Boxer` — `new HitMultiplierAbAttr({ filter: { flag: PUNCHING },
 //       extraStrikes: 1 })` + `new HitMultiplierPowerAbAttr({ filter: { flag:
-//       PUNCHING }, multiplier: 0.4 })`
+//       PUNCHING }, multiplier: 0.4, extraStrikesOnly: true })`  (2nd hit 40%)
 //   - `Hyper Aggressive` — `new HitMultiplierAbAttr({ extraStrikes: 1 })` +
-//     `new HitMultiplierPowerAbAttr({ multiplier: 0.25 })`
+//     `new HitMultiplierPowerAbAttr({ multiplier: 0.25, extraStrikesOnly: true })`
+//     (1st hit 100%, 2nd hit 25%)
 // =============================================================================
 
 import { AddSecondStrikeAbAttr, type AddSecondStrikeAbAttrParams, MoveDamageBoostAbAttr } from "#abilities/ab-attrs";
@@ -189,14 +190,29 @@ export class HitMultiplierAbAttr extends AddSecondStrikeAbAttr {
 /** Construction options for {@linkcode HitMultiplierPowerAbAttr}. */
 export interface HitMultiplierPowerOptions {
   /**
-   * Damage multiplier applied to every dispatch of a matching move. Used to
-   * scale down the per-hit damage when an ability adds extra strikes. Typical
-   * values: `0.25`, `0.4`, `0.7`. Must be > 0 and ≤ 1 (we don't allow boosting
-   * via this class — that's `TypeDamageBoostAbAttr`'s job).
+   * Damage multiplier applied to a matching move's strike(s). Used to scale
+   * down the per-hit damage when an ability adds extra strikes. Typical values:
+   * `0.25`, `0.4`, `0.7`. Must be > 0 and ≤ 1 (we don't allow boosting via this
+   * class — that's `TypeDamageBoostAbAttr`'s job).
    */
   readonly multiplier: number;
   /** Optional move filter (same shape as {@linkcode HitMultiplierAbAttr}). */
   readonly filter?: HitMultiplierFilter;
+  /**
+   * When `true`, the multiplier applies ONLY to the extra (2nd-and-later)
+   * strikes that {@linkcode HitMultiplierAbAttr} adds — the **first** strike is
+   * left at full power. This yields the faithful ER "1st hit 100%, 2nd hit at
+   * N%" behaviour used by `Hyper Aggressive` (2nd at 25%), `Raging Boxer` /
+   * `Primal Maw` (2nd at 40%), etc.
+   *
+   * When omitted/`false` (the default), the multiplier applies to **every**
+   * strike uniformly — used by `Raging Moth` ("both Fire hits at 70%").
+   *
+   * The strike index is read per-dispatch from
+   * `pokemon.turnData.{hitCount,hitsLeft}`: the condition is evaluated once for
+   * each strike, so strike 0 (first) fails the gate and strikes ≥1 pass it.
+   */
+  readonly extraStrikesOnly?: boolean;
 }
 
 /**
@@ -212,19 +228,19 @@ export interface HitMultiplierPowerOptions {
  * constructor takes `(damageMultiplier, condition)`; we wrap the typed-options
  * shape into a condition closure that checks the filter.
  *
- * Important nuance: `MoveDamageBoostAbAttr` applies its multiplier to EVERY
- * dispatch of a matching move — including the first hit. To get true
- * "1st hit unchanged, 2nd hit at N%" semantics you would want a per-strike-
- * index multiplier, which pokerogue doesn't expose without modifying its
- * dispatch loop. The closest available shape, used by ER, is "both hits at
- * 70%" (Raging Moth) — where every dispatch is scaled and the strike count
- * is doubled. That's what this primitive enforces. The header comment above
- * documents this limitation; the deferred "per-strike scaling table" sub-
- * shape is the long-tail follow-up.
+ * Strike-index awareness: `MoveDamageBoostAbAttr` evaluates this attr's
+ * condition once per strike dispatch, so we can scope the multiplier to a
+ * specific strike. With `extraStrikesOnly: true` the multiplier fires only on
+ * the 2nd-and-later strikes (first hit stays at full power) — the faithful ER
+ * "1st hit 100%, 2nd hit at N%" behaviour (Hyper Aggressive 25%, Raging Boxer /
+ * Primal Maw 40%). With it omitted the multiplier applies to every strike
+ * uniformly (Raging Moth's "both Fire hits at 70%"). The strike index is read
+ * from `pokemon.turnData.{hitCount,hitsLeft}` per dispatch.
  */
 export class HitMultiplierPowerAbAttr extends MoveDamageBoostAbAttr {
   private readonly powerMultiplier: number;
   private readonly powerFilter: HitMultiplierFilter;
+  private readonly extraStrikesOnly: boolean;
 
   constructor(opts: HitMultiplierPowerOptions) {
     if (!(opts.multiplier > 0)) {
@@ -239,11 +255,32 @@ export class HitMultiplierPowerAbAttr extends MoveDamageBoostAbAttr {
       throw new Error("[HitMultiplierPowerAbAttr] filter.flag must be a non-NONE MoveFlags bit when set");
     }
     const filter = opts.filter ?? {};
-    super(opts.multiplier, (pokemon: Pokemon, _target: Pokemon | null, move: Move) =>
-      HitMultiplierAbAttr.matchesFilter(filter, pokemon, move),
-    );
+    const extraStrikesOnly = opts.extraStrikesOnly ?? false;
+    // The parent (`MoveDamageBoostAbAttr`) evaluates this condition once per
+    // strike dispatch and, when it returns true, multiplies that strike's
+    // damage. For `extraStrikesOnly` we additionally gate on the live strike
+    // index (`hitCount - hitsLeft`, 0-based) so the FIRST strike is left at full
+    // power and only the 2nd-and-later strikes are scaled — the faithful ER
+    // "1st hit 100%, 2nd hit at N%" behaviour. Without the gate the multiplier
+    // hits every strike uniformly (Raging Moth's "both hits at 70%").
+    super(opts.multiplier, (pokemon: Pokemon, _target: Pokemon | null, move: Move) => {
+      if (!HitMultiplierAbAttr.matchesFilter(filter, pokemon, move)) {
+        return false;
+      }
+      if (extraStrikesOnly) {
+        const strikeIndex = pokemon.turnData.hitCount - pokemon.turnData.hitsLeft; // 0-based
+        return strikeIndex > 0;
+      }
+      return true;
+    });
     this.powerMultiplier = opts.multiplier;
     this.powerFilter = filter;
+    this.extraStrikesOnly = extraStrikesOnly;
+  }
+
+  /** Whether this multiplier applies only to the extra (2nd+) strikes. */
+  public isExtraStrikesOnly(): boolean {
+    return this.extraStrikesOnly;
   }
 
   /** Read-only accessor for the configured damage multiplier. */

@@ -63,6 +63,26 @@ describe.skipIf(!RUN)("ER Aftermath (106) — detonates on KO", () => {
     expect(player.getInverseHp()).toBeGreaterThan(0);
   });
 
+  it("a MULTI-HIT KO still detonates (later sub-hits must not re-kill the clamped holder)", async () => {
+    // Repro: a multi-hit move clamps the holder to 1 HP on the lethal sub-hit,
+    // then keeps striking. Previously the post-arm sub-hits were NOT endured, so
+    // one of them killed the holder before the queued explosion could cast — the
+    // detonation silently vanished. With enemy HP at 5, hit 1 of a 2–5 multi-hit
+    // is already lethal, so at least one more sub-hit follows the clamp.
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+
+    const enemy = game.field.getEnemyPokemon();
+    enemy.hp = 5;
+    const player = game.field.getPlayerPokemon();
+
+    game.move.use(MoveId.BULLET_SEED); // 2–5 hits
+    await game.toEndOfTurn();
+
+    expect(enemy.isFainted()).toBe(true);
+    // Splash is the enemy's only move, so any player HP loss is the detonation.
+    expect(player.getInverseHp()).toBeGreaterThan(0);
+  });
+
   it("ER Damp does NOT block the detonation (Damp is repurposed to Water-on-contact)", async () => {
     // Vanilla Damp blocked explosions; ER repurposes Damp to "make the attacker
     // Water-type on contact", so it no longer prevents explosive moves. The

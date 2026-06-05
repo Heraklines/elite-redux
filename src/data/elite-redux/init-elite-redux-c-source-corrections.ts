@@ -84,7 +84,12 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_POISON_STING", { chance: 30 }],
   ["MOVE_LEER", { pp: 30 }],
   ["MOVE_BITE", { pp: 25 }],
-  ["MOVE_GROWL", { pp: 40, chance: 0 }],
+  // GROWL is rebalanced into a Special damaging move (see vanilla-move-patches)
+  // whose Attack drop is now a *secondary* effect gated by `move.chance`. The
+  // ROM's secondaryEffectChance is 0 (the drop is its PRIMARY effect there), but
+  // copying that 0 onto the converted damaging move would make the drop never
+  // fire. ER's move data lists effectChance 100, so the drop is guaranteed.
+  ["MOVE_GROWL", { pp: 40, chance: 100 }],
   ["MOVE_SING", { accuracy: 55 }],
   ["MOVE_SUPERSONIC", { accuracy: 55 }],
   ["MOVE_SONIC_BOOM", { power: 1, accuracy: 90 }],
@@ -96,7 +101,10 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_SURF", { chance: 0 }],
   ["MOVE_BLIZZARD", { accuracy: 80, chance: 10 }],
   ["MOVE_PSYBEAM", { chance: 10 }],
-  ["MOVE_BUBBLE_BEAM", { power: 65 }],
+  // ER turns Bubble Beam into a 25-power Water pulse that hits 2–5 times
+  // (Mega Launcher–boosted; PULSE_MOVE flag added below). The multi-hit attr +
+  // removal of the vanilla Speed-drop are wired in the move-patch table.
+  ["MOVE_BUBBLE_BEAM", { power: 25 }],
   ["MOVE_HYPER_BEAM", { accuracy: 90 }],
   ["MOVE_DRILL_PECK", { chance: 0 }],
   ["MOVE_SUBMISSION", { power: 150, accuracy: 80, pp: 15 }],
@@ -216,7 +224,7 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_HYPER_VOICE", { power: 90 }],
   ["MOVE_BLAST_BURN", { power: 150, accuracy: 90 }],
   ["MOVE_HYDRO_CANNON", { power: 150, accuracy: 90 }],
-  ["MOVE_ASTONISH", { pp: 15, chance: 30 }],
+  ["MOVE_ASTONISH", { pp: 15, chance: 100 }], // ER: Ghost Fake Out — guaranteed first-turn flinch (#221)
   ["MOVE_AIR_CUTTER", { power: 70, pp: 25 }],
   ["MOVE_ODOR_SLEUTH", { pp: 40 }],
   ["MOVE_ROCK_TOMB", { power: 60 }],

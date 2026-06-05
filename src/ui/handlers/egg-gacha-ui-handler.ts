@@ -254,8 +254,8 @@ export class EggGachaUiHandler extends MessageUiHandler {
         eggGachaOptionSelectWidth = 96;
     }
 
-    // 7 rows total: 5 voucher pull options + auto-restock entry + cancel.
-    this.eggGachaOptionSelectBg = addWindow(0, 0, eggGachaOptionSelectWidth, 16 + 672 * this.scale).setOrigin(1);
+    // 8 rows total: 5 voucher pull options + auto-restock + discard-eggs + cancel.
+    this.eggGachaOptionSelectBg = addWindow(0, 0, eggGachaOptionSelectWidth, 16 + 768 * this.scale).setOrigin(1);
     this.eggGachaOptionsContainer = globalScene.add
       .container(globalScene.scaledCanvas.width, 148)
       .add(this.eggGachaOptionSelectBg);
@@ -306,10 +306,11 @@ export class EggGachaUiHandler extends MessageUiHandler {
       .join("\n");
 
     const autoRestockEntryLine = `     ${i18next.t("egg:autoRestockEntry")}`;
+    const flushEggsEntryLine = `     ${i18next.t("egg:flushEggsEntry")}`;
     const optionText = addTextObject(
       0,
       0,
-      `${pullOptionsText}\n${autoRestockEntryLine}\n${i18next.t("menu:cancel")}`,
+      `${pullOptionsText}\n${autoRestockEntryLine}\n${flushEggsEntryLine}\n${i18next.t("menu:cancel")}`,
       TextStyle.WINDOW,
     )
       .setLineSpacing(28)
@@ -363,10 +364,7 @@ export class EggGachaUiHandler extends MessageUiHandler {
       // ER dev cheat: clicking a voucher count container grants 999 of EACH
       // voucher type. The voucher icons are conveniently placed at the
       // top-right of the gacha UI and aren't otherwise interactive.
-      bg.setInteractive(
-        new Phaser.Geom.Rectangle(-56, 0, 56, 22),
-        Phaser.Geom.Rectangle.Contains,
-      );
+      bg.setInteractive(new Phaser.Geom.Rectangle(-56, 0, 56, 22), Phaser.Geom.Rectangle.Contains);
       bg.on("pointerdown", () => {
         const counts = globalScene.gameData.voucherCounts;
         counts[VoucherType.REGULAR] = 999;
@@ -375,13 +373,7 @@ export class EggGachaUiHandler extends MessageUiHandler {
         counts[VoucherType.GOLDEN] = 999;
         this.updateVoucherCounts();
         this.getUi().playSelect();
-        this.showText(
-          "Granted 999 of each voucher type! (ER dev cheat)",
-          0,
-          undefined,
-          undefined,
-          false,
-        );
+        this.showText("Granted 999 of each voucher type! (ER dev cheat)", 0, undefined, undefined, false);
       });
 
       this.eggGachaContainer.add(container);
@@ -840,17 +832,20 @@ export class EggGachaUiHandler extends MessageUiHandler {
    */
   private handleVoucherSelectAction(cursor: number): boolean | undefined {
     // Cursors that are out of range should not be processed
-    if (cursor < 0 || cursor > 6) {
+    if (cursor < 0 || cursor > 7) {
       return;
     }
     const ui = this.getUi();
 
-    // Cursor 5 is the new "Auto Restock..." entry; cursor 6 is cancel.
+    // Cursor 5 = "Auto Restock...", 6 = "Discard Eggs...", 7 = cancel.
     if (cursor === 5) {
       void ui.setOverlayMode(UiMode.AUTO_EGG_RESTOCK);
       return true;
     }
     if (cursor === 6) {
+      return this.flushEggs();
+    }
+    if (cursor === 7) {
       ui.revertMode();
       return true;
     }
@@ -860,6 +855,44 @@ export class EggGachaUiHandler extends MessageUiHandler {
     // while in edit mode (see processQuantityEditInput).
     this.editingMultiplierRow = cursor;
     this.refreshMultiplierLabel(cursor);
+    return true;
+  }
+
+  /**
+   * ER recovery action: discard ALL of the player's Eggs, behind a Yes/No
+   * confirmation. Players who amassed enormous Egg backlogs could soft-lock the
+   * hatch/summary flow; this is their escape hatch. Persists immediately, the
+   * same way a pull does (run vs. title context).
+   */
+  private flushEggs(): boolean {
+    const ui = this.getUi();
+    const count = globalScene.gameData.eggs.length;
+    if (count === 0) {
+      this.showError(i18next.t("egg:flushEggsNone"));
+      return false;
+    }
+    ui.showText(i18next.t("egg:flushEggsConfirm", { count }), null, () => {
+      ui.setOverlayMode(
+        UiMode.CONFIRM,
+        () => {
+          ui.revertMode();
+          globalScene.gameData.eggs = [];
+          void (globalScene.currentBattle
+            ? globalScene.gameData.saveAll(true, true, true)
+            : globalScene.gameData.saveSystem());
+          this.showText(
+            i18next.t("egg:flushEggsDone", { count }),
+            undefined,
+            () => this.showText(this.defaultText),
+            fixedInt(1500),
+          );
+        },
+        () => {
+          ui.revertMode();
+          this.showText(this.defaultText);
+        },
+      );
+    });
     return true;
   }
 
@@ -969,7 +1002,7 @@ export class EggGachaUiHandler extends MessageUiHandler {
         }
         break;
       case Button.DOWN:
-        if (this.cursor < 6) {
+        if (this.cursor < 7) {
           success = this.setCursor(this.cursor + 1);
         }
         break;

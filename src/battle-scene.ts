@@ -1790,6 +1790,26 @@ export class BattleScene extends SceneBase {
   }
 
   // TODO: break this up
+  /**
+   * Pick a random form index for `species`, EXCLUDING battle-only forms (Mega /
+   * Mega-X/Y / regional-mega / Primal / G-Max). Elite Redux appends Mega forms
+   * to some multi-form species (e.g. Oricorio), so a blind
+   * `randSeedInt(forms.length)` could otherwise hatch or spawn a battle-only
+   * form. Falls back to the full range only if every form is battle-only.
+   */
+  public getRandomObtainableFormIndex(species: PokemonSpecies): number {
+    const obtainable: number[] = [];
+    for (let i = 0; i < species.forms.length; i++) {
+      const key = species.forms[i]?.formKey ?? "";
+      if (!/(?:^|-)(mega|primal|gmax|gigantamax|eternamax|ultra)(?:-|$)/i.test(key)) {
+        obtainable.push(i);
+      }
+    }
+    return obtainable.length > 0
+      ? obtainable[randSeedInt(obtainable.length)]
+      : randSeedInt(Math.max(1, species.forms.length));
+  }
+
   public getSpeciesFormIndex(species: PokemonSpecies, gender?: Gender, nature?: Nature, ignoreArena = false): number {
     if (species.forms == null) {
       console.warn(`Form data missing for ${species.name}!\n`, species);
@@ -1882,7 +1902,7 @@ export class BattleScene extends SceneBase {
       case SpeciesId.SQUAWKABILLY:
       case SpeciesId.TATSUGIRI:
       case SpeciesId.PALDEA_TAUROS:
-        return randSeedInt(species.forms.length);
+        return this.getRandomObtainableFormIndex(species);
       case SpeciesId.SINISTEA:
       case SpeciesId.POLTEAGEIST:
       case SpeciesId.MAUSHOLD:
@@ -1948,11 +1968,11 @@ export class BattleScene extends SceneBase {
         if (this.gameMode.hasMysteryEncounters && !isEggPhase) {
           return 1; // Wandering form
         }
-        return randSeedInt(species.forms.length);
+        return this.getRandomObtainableFormIndex(species);
       case SpeciesId.BURMY:
       case SpeciesId.WORMADAM:
         if (ignoreArena) {
-          return randSeedInt(species.forms.length);
+          return this.getRandomObtainableFormIndex(species);
         }
         switch (this.arena.biomeId) {
           case BiomeId.BEACH:
@@ -1963,7 +1983,7 @@ export class BattleScene extends SceneBase {
         return 0;
       case SpeciesId.LYCANROC:
         if (ignoreArena) {
-          return randSeedInt(species.forms.length);
+          return this.getRandomObtainableFormIndex(species);
         }
         switch (this.arena.getTimeOfDay()) {
           case TimeOfDay.DAWN:

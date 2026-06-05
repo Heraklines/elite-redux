@@ -9,8 +9,10 @@ import { getTypeRgb } from "#data/type";
 import { LearnMoveSituation } from "#enums/learn-move-situation";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon, Pokemon } from "#field/pokemon";
+import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import type { EvolutionSceneUiHandler } from "#ui/evolution-scene-ui-handler";
 import { fixedInt } from "#utils/common";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
 import SoundFade from "phaser3-rex-plugins/plugins/soundfade";
 
@@ -26,6 +28,12 @@ export class EvolutionPhase extends Phase {
   private preEvolvedPokemonName: string;
 
   private evolution: SpeciesFormEvolution | null;
+  /**
+   * When the species has more than one currently-valid evolution, the full set
+   * of candidates the player gets to choose between at the start of the phase.
+   * Empty/single-element means there is no choice and {@linkcode evolution} is used directly.
+   */
+  private evolutionChoices: SpeciesFormEvolution[];
   private fusionSpeciesEvolved: boolean; // Whether the evolution is of the fused species
   private evolutionBgm: AnySound | null;
   private evolutionHandler: EvolutionSceneUiHandler;
@@ -49,8 +57,16 @@ export class EvolutionPhase extends Phase {
    * @param evolution - The form being evolved into
    * @param lastLevel - The level at which the Pokemon is evolving
    * @param canCancel - Whether the evolution can be cancelled by the player
+   * @param evolutionChoices - When the line offers more than one valid evolution, the candidates to
+   *  let the player pick between. Defaults to just `evolution` (no choice).
    */
-  constructor(pokemon: PlayerPokemon, evolution: SpeciesFormEvolution | null, lastLevel: number, canCancel = true) {
+  constructor(
+    pokemon: PlayerPokemon,
+    evolution: SpeciesFormEvolution | null,
+    lastLevel: number,
+    canCancel = true,
+    evolutionChoices: SpeciesFormEvolution[] = [],
+  ) {
     super();
 
     this.pokemon = pokemon;
@@ -58,6 +74,7 @@ export class EvolutionPhase extends Phase {
     this.lastLevel = lastLevel;
     this.fusionSpeciesEvolved = evolution instanceof FusionSpeciesFormEvolution;
     this.canCancel = canCancel;
+    this.evolutionChoices = evolutionChoices;
   }
 
   validate(): boolean {
@@ -66,6 +83,49 @@ export class EvolutionPhase extends Phase {
 
   setMode(): Promise<void> {
     return globalScene.ui.setModeForceTransition(UiMode.EVOLUTION_SCENE);
+  }
+
+  /** Human-readable target for a candidate evolution (species name, plus form key when set). */
+  private getEvolutionChoiceLabel(evolution: SpeciesFormEvolution): string {
+    const name = getPokemonSpecies(evolution.speciesId).name;
+    return evolution.evoFormKey ? `${name} (${evolution.evoFormKey})` : name;
+  }
+
+  /**
+   * Present the player with every currently-valid evolution and resolve with the
+   * one they pick, or `null` if they back out (decline to evolve).
+   */
+  private promptEvolutionChoice(): Promise<SpeciesFormEvolution | null> {
+    return new Promise(resolve => {
+      const options: OptionSelectItem[] = this.evolutionChoices.map(evo => ({
+        label: this.getEvolutionChoiceLabel(evo),
+        handler: () => {
+          globalScene.ui.revertMode();
+          resolve(evo);
+          return true;
+        },
+      }));
+      // Trailing escape so the player can always decline to evolve.
+      options.push({
+        label: i18next.t("menu:cancel"),
+        handler: () => {
+          globalScene.ui.revertMode();
+          resolve(null);
+          return true;
+        },
+      });
+      globalScene.ui.showText(
+        i18next.t("menu:selectEvolution", { pokemonName: getPokemonNameWithAffix(this.pokemon) }),
+        null,
+        () => {
+          globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
+            options,
+            noCancel: true,
+          });
+        },
+        1000,
+      );
+    });
   }
 
   /**
@@ -193,6 +253,19 @@ export class EvolutionPhase extends Phase {
 
     if (!this.validate()) {
       return this.end();
+    }
+
+    // When the line currently offers more than one valid evolution, let the
+    // player pick the path first. Declining the choice (cancel) is treated like
+    // cancelling the evolution outright. Done after entering the evolution scene
+    // so we are in a known UI mode that supports the prompt overlay.
+    if (this.evolutionChoices.length > 1) {
+      const chosen = await this.promptEvolutionChoice();
+      if (!chosen) {
+        return this.end();
+      }
+      this.evolution = chosen;
+      this.fusionSpeciesEvolved = chosen instanceof FusionSpeciesFormEvolution;
     }
     this.setupEvolutionAssets();
     this.setupPokemonSprites();

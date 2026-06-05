@@ -64,6 +64,13 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
     if (!opponent || opponent.isFainted()) {
       return false;
     }
+    // Re-entry guard: the scripted follow-up is itself a damaging move, so when
+    // IT lands it would re-trigger this PostAttack hook and enqueue another copy
+    // — an infinite loop (reported as Aftershock firing continuously). Never fire
+    // when the move that just hit is our own scripted follow-up.
+    if (move.id === this.opts.moveId) {
+      return false;
+    }
     if (this.opts.categoryFilter !== undefined && move.category !== this.opts.categoryFilter) {
       return false;
     }

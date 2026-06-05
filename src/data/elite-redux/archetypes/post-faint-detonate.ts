@@ -190,13 +190,25 @@ export class PostFaintDetonateAbAttr extends PreDefendFullHpEndureAbAttr {
 
   public override canApply(params: PreDefendModifyDamageAbAttrParams): boolean {
     const { pokemon, damage } = params;
-    // Lethal damaging hit only; >1 max HP (so the 1 HP clamp is meaningful);
-    // STURDY tag absent (per-hit re-arm guard, shared with vanilla Sturdy).
-    if (pokemon.getMaxHp() <= 1 || damage.value < pokemon.hp || pokemon.getTag(BattlerTagType.STURDY)) {
+    // Only lethal damaging hits matter, and only when a 1-HP clamp is meaningful.
+    if (pokemon.getMaxHp() <= 1 || damage.value < pokemon.hp) {
       return false;
     }
-    // One-shot guard across the sub-hits of a multi-hit move.
+    // Already armed: a multi-hit move keeps striking after the arming hit clamped
+    // the holder to 1 HP, and EVERY remaining lethal sub-hit must be endured —
+    // otherwise one of them re-kills the holder before the queued explosion
+    // casts, and the cast bails (a fainted Pokemon cannot move). So once armed we
+    // keep clamping, bypassing the STURDY guard below: that guard exists only to
+    // avoid double-arming, but our own STURDY tag from the arming hit lingers
+    // into these sub-hits and would otherwise (wrongly) block the endure. At
+    // 1 HP the STURDY damage-clamp itself can't fire (it needs hp > 1), so
+    // `apply()` clamps the sub-hit's damage directly.
     if (DETONATED.has(pokemon)) {
+      return true;
+    }
+    // Arming hit: a pre-existing STURDY tag (vanilla Sturdy / Focus Sash) means
+    // this hit is already being survived elsewhere — don't arm on top of it.
+    if (pokemon.getTag(BattlerTagType.STURDY)) {
       return false;
     }
     // Damp blocks explosions: if any field Pokemon prevents explosive moves we
@@ -207,8 +219,24 @@ export class PostFaintDetonateAbAttr extends PreDefendFullHpEndureAbAttr {
   public override apply(params: PreDefendModifyDamageAbAttrParams): void {
     // super.apply adds the STURDY tag so the damage pipeline clamps this lethal
     // hit to leave the holder at 1 HP (pokemon.ts:4478).
+    const { pokemon, simulated, damage } = params;
+
+    // Subsequent lethal sub-hits of a multi-hit move (after the arming hit
+    // already clamped the holder to 1 HP): survive them so the holder is still
+    // alive when the queued explosion casts, but do NOT queue a second blast.
+    // The holder is at exactly 1 HP here, where the STURDY tag's clamp (hp > 1)
+    // no longer applies — so clamp this sub-hit's damage directly to leave it at
+    // 1 HP. (ENDURING is the Endure-move tag and would spam an "enduring!"
+    // message per sub-hit.)
+    if (DETONATED.has(pokemon)) {
+      if (!simulated) {
+        damage.value = Math.max(0, pokemon.hp - 1);
+      }
+      return;
+    }
+
+    // First (arming) hit: STURDY's clamp leaves the >1-HP holder at 1 HP.
     super.apply(params);
-    const { pokemon, simulated } = params;
     if (simulated) {
       return;
     }

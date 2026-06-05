@@ -65,3 +65,6 @@ vendor/elite-redux/source/
 vendor/elite-redux/rom-extracted/
 vendor/elite-redux/tools/
 vendor/elite-redux/ghidra-project/
+
+# Cloudflare Wrangler local state
+.wrangler/

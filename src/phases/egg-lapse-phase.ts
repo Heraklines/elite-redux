@@ -34,13 +34,33 @@ export class EggLapsePhase extends Phase {
   private eggHatchData: EggHatchData[] = [];
   private readonly minEggsToSkip: number = 2;
 
+  /**
+   * Max eggs hatched in a single lapse event. A massive backlog (players have
+   * amassed thousands) would otherwise try to hatch all at once and soft-lock
+   * the UI / summary. The overflow stays in `gameData.eggs` with `hatchWaves`
+   * already < 1, so it is re-collected and hatched 1000-at-a-time on subsequent
+   * lapse events until the queue drains.
+   */
+  private static readonly HATCH_BATCH_CAP = 1000;
+
   start() {
     super.start();
-    const eggsToHatch: Egg[] = globalScene.gameData.eggs.filter((egg: Egg) => {
+    const allReadyEggs: Egg[] = globalScene.gameData.eggs.filter((egg: Egg) => {
       return Overrides.EGG_IMMEDIATE_HATCH_OVERRIDE ? true : --egg.hatchWaves < 1;
     });
+    // Cap this batch; the rest stay queued (already past their hatch wave) and
+    // drain on later lapses. This is what "unclogs the pipe" 1000 at a time.
+    const eggsToHatch: Egg[] =
+      allReadyEggs.length > EggLapsePhase.HATCH_BATCH_CAP
+        ? allReadyEggs.slice(0, EggLapsePhase.HATCH_BATCH_CAP)
+        : allReadyEggs;
+    const deferredCount = allReadyEggs.length - eggsToHatch.length;
     const eggsToHatchCount: number = eggsToHatch.length;
     this.eggHatchData = [];
+
+    if (deferredCount > 0) {
+      globalScene.phaseManager.queueMessage(i18next.t("battle:eggHatchBatchDeferred", { count: deferredCount }));
+    }
 
     if (eggsToHatchCount > 0) {
       if (eggsToHatchCount >= this.minEggsToSkip && globalScene.eggSkipPreference === 1) {

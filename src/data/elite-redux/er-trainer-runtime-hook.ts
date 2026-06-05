@@ -88,6 +88,38 @@ export function resetErRunTrainerTracking(): void {
   USED_ER_TRAINER_KEYS.clear();
 }
 
+/**
+ * Wave by which the strongest trainers of a type are reached. Maps a run's wave
+ * depth onto a 0..1 fraction used to index the strength-ordered pool, so early
+ * waves field the weakest (often-unevolved) teams and late waves the strongest.
+ */
+const ER_WAVE_PROGRESSION_SPAN = 180;
+
+/** Cache of a trainer's team base-stat-total per tier (stableKey:tier → BST sum). */
+const TEAM_STRENGTH_CACHE = new Map<string, number>();
+
+/**
+ * Difficulty proxy for wave-appropriate trainer selection (#225): the summed
+ * base-stat-total of the trainer's roster at `tier`. Unevolved/early teams score
+ * low, so sorting a pool by this puts the "early-game" trainers first. Cached
+ * since the roster is static per trainer+tier.
+ *
+ * Exported for unit testing.
+ */
+export function teamStrength(t: ErTrainerRegistryEntry, tier: ErRosterTier): number {
+  const cacheKey = `${t.stableKey}:${tier}`;
+  const cached = TEAM_STRENGTH_CACHE.get(cacheKey);
+  if (cached !== undefined) {
+    return cached;
+  }
+  let total = 0;
+  for (const member of selectErRoster(t, tier)) {
+    total += getPokemonSpecies(member.speciesId)?.getBaseStatTotal() ?? 0;
+  }
+  TEAM_STRENGTH_CACHE.set(cacheKey, total);
+  return total;
+}
+
 /** True if the trainer ships a roster for the given difficulty tier. */
 function trainerHasTier(t: ErTrainerRegistryEntry, tier: ErRosterTier): boolean {
   if (tier === "hell") {
@@ -113,13 +145,44 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
     // Prefer trainers that actually ship the chosen difficulty's roster, then
     // those not yet seen this run (a difficulty shouldn't repeat trainers).
     const tierMatched = all.filter(t => trainerHasTier(t, tier));
-    const base = tierMatched.length > 0 ? tierMatched : all;
-    const unused = base.filter(t => !USED_ER_TRAINER_KEYS.has(t.stableKey));
-    const pool = unused.length > 0 ? unused : base;
+    const unusedTier = tierMatched.filter(t => !USED_ER_TRAINER_KEYS.has(t.stableKey));
+    const unusedAll = all.filter(t => !USED_ER_TRAINER_KEYS.has(t.stableKey));
+    // Never repeat a trainer while fresh ones remain (#225). Preference order:
+    //   1. unseen + tier-appropriate (insane/hell roster)
+    //   2. unseen of this type at all (avoids repeats even if its insane/hell
+    //      roster pool is small — falls back to the party roster via selectErRoster)
+    //   3. only once EVERY trainer of this type is used do we allow a repeat.
+    const pool =
+      unusedTier.length > 0
+        ? unusedTier
+        : unusedAll.length > 0
+          ? unusedAll
+          : tierMatched.length > 0
+            ? tierMatched
+            : all;
     if (pool.length > 0) {
-      // Seed the pick off the wave index so the pool rotates across a run.
-      const wave = globalScene.currentBattle?.waveIndex ?? 0;
-      choice = pool[wave % pool.length];
+      // Prefer trainers whose roster can field the ENTIRE encounter on its own,
+      // so we never mix ER mons with vanilla-generated ones: PokeRogue calls
+      // genPartyMember(0..size-1) and applyErRosterOverride falls back to vanilla
+      // for indices past the ER roster. Early (2-3 mon) encounters thus pull 2-3
+      // from a small ER team; a 6-mon battle pulls a full 6-mon ER team (#225).
+      // Falls back to the full pool if none are large enough.
+      // Optional-chained: getErTrainerForTrainer is also reachable from lighter
+      // contexts (e.g. hasErRosterOverride checks, tests) where the Trainer has
+      // no party template yet — skip the size preference there.
+      const partySize = trainer.getPartyTemplate?.()?.size ?? 0;
+      const bigEnough = partySize > 0 ? pool.filter(t => selectErRoster(t, tier).length >= partySize) : [];
+      const usablePool = bigEnough.length > 0 ? bigEnough : pool;
+      // Wave-appropriate, story-ordered pick (#225): sort the *unused* pool by
+      // team strength (weakest → strongest) and index into it by how deep the run
+      // is. Because early waves consume the weakest-unused trainers first, by the
+      // late game (wave ≈ ER_WAVE_PROGRESSION_SPAN) only the strongest remain — so
+      // E4 / champion-tier teams naturally show up at the end, not at wave 5.
+      const ordered = usablePool.slice().sort((a, b) => teamStrength(a, tier) - teamStrength(b, tier));
+      const wave = globalScene.currentBattle?.waveIndex ?? 1;
+      const frac = Math.min(1, Math.max(0, (wave - 1) / ER_WAVE_PROGRESSION_SPAN));
+      const targetIdx = Math.round(frac * (ordered.length - 1));
+      choice = ordered[targetIdx];
       USED_ER_TRAINER_KEYS.add(choice.stableKey);
     }
   }
@@ -140,11 +203,14 @@ export function pickTierForWave(trainer: Trainer): ErRosterTier {
   if (!isBoss) {
     return base;
   }
-  // Boss bump: party → insane → hell (hell stays hell).
+  // Boss bump applies to ACE only (party → insane). Elite and Hell keep their own
+  // tier on bosses — previously Elite bosses bumped to "hell", which collapsed the
+  // Elite and Hell rosters onto the same pool. Keeping Elite at "insane" and Hell
+  // at "hell" keeps the two difficulties distinct (#225).
   if (base === "party") {
     return "insane";
   }
-  return "hell";
+  return base;
 }
 
 /**

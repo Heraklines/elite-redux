@@ -3246,6 +3246,36 @@ export class ProtectStatAbAttr extends PreStatStageChangeAbAttr {
   }
 }
 
+/**
+ * Elite Redux — immunity to the holder's OWN (self-inflicted) stat drops, e.g.
+ * the Atk/SpAtk/Spe drops from Overheat, Close Combat, Draco Meteor, Leaf Storm.
+ *
+ * This is the COMPLEMENT of {@linkcode ProtectStatAbAttr} (Clear Body), which the
+ * stat-change phase applies only in its `!selfTarget` branch — i.e. Clear Body
+ * blocks *other* Pokémon's drops (Growl, Intimidate) but never self-drops. ER's
+ * `Limber` ("immune to self stat drops") and `Lucky Halo` ("negates self stat
+ * drops") want the opposite, so they wire THIS attr, which the phase applies in
+ * its `selfTarget` drop branch. A mon with only this attr still takes Growl /
+ * Intimidate normally.
+ */
+export class SelfStatDropImmunityAbAttr extends PreStatStageChangeAbAttr {
+  override canApply({ cancelled, stages }: PreStatStageChangeAbAttrParams): boolean {
+    return !cancelled.value && stages < 0;
+  }
+
+  override apply({ cancelled }: PreStatStageChangeAbAttrParams): void {
+    cancelled.value = true;
+  }
+
+  override getTriggerMessage({ pokemon }: PreStatStageChangeAbAttrParams, abilityName: string): string {
+    return i18next.t("abilityTriggers:protectStat", {
+      pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+      abilityName,
+      statName: i18next.t("battle:stats"),
+    });
+  }
+}
+
 export interface ConfusionOnStatusEffectAbAttrParams extends AbAttrBaseParams {
   /** The status effect that was applied */
   effect: StatusEffect;
@@ -6580,6 +6610,7 @@ export const AbilityAttrs = Object.freeze({
   ReflectStatusMoveAbAttr,
   ReverseDrainAbAttr,
   RunSuccessAbAttr,
+  SelfStatDropImmunityAbAttr,
   SpeedBoostAbAttr,
   StabBoostAbAttr,
   StatMultiplierAbAttr,

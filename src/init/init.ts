@@ -5,6 +5,7 @@ import { initPokemonPrevolutions, initPokemonStarters } from "#balance/pokemon-e
 import { initSpecies } from "#balance/pokemon-species";
 import { initChallenges } from "#data/challenge";
 import { initTrainerTypeDialogue } from "#data/dialogue";
+import { registerErFinalBossFormChange } from "#data/elite-redux/er-final-boss";
 import {
   initEliteReduxCSourceCorrections,
   remapEliteReduxMoveIdsByName,
@@ -21,6 +22,7 @@ import { initEliteReduxEvolutions } from "#data/elite-redux/init-elite-redux-evo
 import { initEliteReduxFormChanges } from "#data/elite-redux/init-elite-redux-form-changes";
 import { initEliteReduxMovesets } from "#data/elite-redux/init-elite-redux-movesets";
 import { initEliteReduxSpecies } from "#data/elite-redux/init-elite-redux-species";
+import { initEliteReduxStarterCosts } from "#data/elite-redux/init-elite-redux-starter-costs";
 import { initEliteReduxTmMoves } from "#data/elite-redux/init-elite-redux-tm-moves";
 import { initEliteReduxTrainers } from "#data/elite-redux/init-elite-redux-trainers";
 import { initEliteReduxVanillaRebalance } from "#data/elite-redux/init-elite-redux-vanilla-rebalance";
@@ -156,6 +158,19 @@ export function initializeGame() {
   console.info(
     `[er-b5] registered ${formResult.formChangesRegistered} ER form changes (${formResult.megaRegistered} mega + ${formResult.primalRegistered} primal + ${formResult.moveMegaRegistered} move-mega), skipped ${formResult.skipped} already present, dropped ${formResult.droppedMissingSpecies} for missing-species drift`,
   );
+  // Elite Redux: register the Elite/Hell classic-final-boss form change
+  // (Cascoon "" → "primal") so the two-phase boss transform works. Must run
+  // after the species/form tables are populated.
+  registerErFinalBossFormChange();
+  // Elite Redux: re-run the form-change reverse generator. `initPokemonForms()`
+  // (called far earlier, before ER's form changes existed) auto-creates the
+  // DEACTIVATE (revert) entry for every forward item-trigger — that's what lets
+  // the party menu turn a Mega back off. ER megas/primals are bridged into
+  // `pokemonFormChanges` AFTER that first pass, so without this they'd have no
+  // revert entry and couldn't be deactivated (the reported "can't revert some
+  // megas" bug). The generator is idempotent (it skips forwards that already
+  // have a matching reverse), so re-running only fills in the ER additions.
+  initPokemonForms();
   // Elite Redux Phase B6: wire ER per-species level-up movesets into
   // pokerogue's `pokemonSpeciesLevelMoves` table. Must run AFTER
   // initEliteReduxCustomMoves() (so ER-custom move ids ≥ 5000 are valid)
@@ -188,6 +203,14 @@ export function initializeGame() {
   const eggResult = initEliteReduxEggTiers();
   console.info(
     `[er-egg-tiers] added ${eggResult.eggTiersAdded} ER customs to egg pool (+${eggResult.starterCostsAdded} starter-costs; skipped ${eggResult.skippedPrevolutions} evolved + ${eggResult.skippedFormChanges} form-change + ${eggResult.alreadyPresent} already present)`,
+  );
+
+  // Elite Redux: re-tier ER-custom starter costs (BST bands + legendary/AG
+  // overrides) and pull ability/item-emergent battle forms out of the grid +
+  // egg pool. Must run AFTER egg tiers so its entries exist to delete.
+  const costResult = initEliteReduxStarterCosts();
+  console.info(
+    `[er-starter-costs] re-costed ${costResult.recosted} ER customs (${costResult.legendaryTiered} → Legendary eggs); removed ${costResult.removed} ability/item-emergent forms from grid + egg pool`,
   );
 
   // Elite Redux: inject hand-audited egg moves for ER-custom base species into

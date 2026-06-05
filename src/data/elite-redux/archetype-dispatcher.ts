@@ -110,6 +110,7 @@ import {
   ReceivedTypeDamageMultiplierAbAttr,
   RedirectTypeMoveAbAttr,
   ReflectStatStageChangeAbAttr,
+  SelfStatDropImmunityAbAttr,
   SetMoveAccuracyAbAttr,
   SpreadTargetByFlagAbAttr,
   StatMultiplierAbAttr,
@@ -1225,12 +1226,11 @@ function dispatchWeatherOrTerrainInteraction(params: Record<string, unknown>): D
  * Dispatch a `multi-hit-override` classifier row. The classifier emits
  * `{ filter: { kind, … }, hits, secondaryHitMultiplier?, allHitsMultiplier? }`.
  * We map to `HitMultiplierAbAttr` (the strike-count piece) plus optionally
- * `HitMultiplierPowerAbAttr` (the per-hit damage scaling). The archetype
- * only supports a single power multiplier per dispatch — when the classifier
- * emits `allHitsMultiplier`, we apply it to every strike; when it emits
- * `secondaryHitMultiplier`, the archetype's flat-multiplier model is an
- * approximation (every strike gets the same multiplier, not just the
- * secondary). The approximation is documented in the archetype's comment.
+ * `HitMultiplierPowerAbAttr` (the per-hit damage scaling). When the classifier
+ * emits `allHitsMultiplier` we scale every strike uniformly; when it emits
+ * `secondaryHitMultiplier` we scale ONLY the extra (2nd+) strikes via the
+ * archetype's `extraStrikesOnly` mode — so the first hit stays at full power
+ * (faithful "1st hit 100%, 2nd hit at N%").
  */
 /**
  * Translate the classifier's `multi-hit-override` filter shape into the
@@ -1275,13 +1275,24 @@ function dispatchMultiHitOverride(params: Record<string, unknown>): DispatchResu
       ...(hasFilter ? { filter: archetypeFilter } : {}),
     }),
   ];
+  // `allHitsMultiplier` scales EVERY strike uniformly (Raging Moth: both Fire
+  // hits at 70%). `secondaryHitMultiplier` scales ONLY the extra (2nd+) strike,
+  // leaving the first at full power (Hyper Aggressive: 1st 100% / 2nd 25%;
+  // Raging Boxer / Primal Maw: 1st 100% / 2nd 40%) — the faithful ER behaviour.
   const allMult = params.allHitsMultiplier;
   const secondaryMult = params.secondaryHitMultiplier;
-  const powerMult = typeof allMult === "number" ? allMult : typeof secondaryMult === "number" ? secondaryMult : null;
-  if (powerMult !== null && powerMult > 0 && powerMult <= 1) {
+  if (typeof allMult === "number" && allMult > 0 && allMult <= 1) {
     attrs.push(
       new HitMultiplierPowerAbAttr({
-        multiplier: powerMult,
+        multiplier: allMult,
+        ...(hasFilter ? { filter: archetypeFilter } : {}),
+      }),
+    );
+  } else if (typeof secondaryMult === "number" && secondaryMult > 0 && secondaryMult <= 1) {
+    attrs.push(
+      new HitMultiplierPowerAbAttr({
+        multiplier: secondaryMult,
+        extraStrikesOnly: true,
         ...(hasFilter ? { filter: archetypeFilter } : {}),
       }),
     );
@@ -2677,14 +2688,14 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 724:
-      // Lucky Halo — "Negates self stat drops. Endures the a single KO."
-      // Composes two AbAttrs: vanilla ProtectStatAbAttr (Clear Body parity —
-      // protects all stats from incoming reductions) + PreFaintReviveAbAttr
-      // with first-n-hits N=1 (endure once per battle). The "self stat drops"
-      // language in ER's text is the same predicate vanilla Clear Body covers:
-      // incoming stat-drop attempts get cancelled.
+      // Lucky Halo — "Negates self stat drops. Endures a single KO."
+      // Composes SelfStatDropImmunityAbAttr (cancels the holder's OWN stat drops
+      // — Overheat / Close Combat / Draco Meteor) + PreFaintReviveAbAttr with
+      // first-n-hits N=1 (endure once per battle). NOTE: this is "self stat
+      // drops" only — NOT Clear Body. A prior pass used ProtectStatAbAttr, which
+      // is the inverse (blocks INCOMING Growl/Intimidate, never self-drops).
       return ok([
-        new ProtectStatAbAttr(),
+        new SelfStatDropImmunityAbAttr(),
         new PreFaintReviveAbAttr({
           gate: { kind: "hp-threshold", threshold: 0 },
           usage: { kind: "first-n-hits", n: 1 },
@@ -3693,8 +3704,10 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Let's Roll — "Casts Defense Curl on entry."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.DEFENSE_CURL })]);
     case 320:
-      // Air Blower — "Casts a 3-turn Tailwind on entry."
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TAILWIND })]);
+      // Air Blower — "Casts a 3-turn Tailwind on entry." Tailwind is a self-side
+      // buff, so `targetsSelf` makes it fire even when Air Blower's holder is sent
+      // out before any opponent (otherwise it silently never triggered).
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TAILWIND, targetsSelf: true })]);
     case 428:
       // Cheap Tactics — "Attacks with Scratch on switch-in."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.SCRATCH })]);
