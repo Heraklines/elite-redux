@@ -59,4 +59,21 @@ describe.skipIf(!RUN)("ER Aerodynamics — absorb Flying + raise Speed", () => {
     expect(player.hp, "Flying move absorbed (no damage)").toBe(maxHp);
     expect(player.getStatStage(Stat.SPD), "Speed raised by Aerodynamics").toBe(1);
   });
+
+  it("absorbs the ATTACKER's Flying move too (player report scenario): enemy holder takes no damage and gains Speed", async () => {
+    // The reporter was ATTACKING into an enemy's Aerodynamics (Floaty Fall into
+    // Jumpluff) and the move "did nothing". Mirror that: player Gusts an enemy
+    // holding Aerodynamics — it must be absorbed AND raise the enemy's Speed.
+    game.override.ability(AbilityId.BALL_FETCH).enemyAbility(AERODYNAMICS);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    const enemy = game.field.getEnemyPokemon();
+    const maxHp = enemy.getMaxHp();
+    expect(enemy.getStatStage(Stat.SPD)).toBe(0);
+
+    game.move.use(MoveId.GUST);
+    await game.toEndOfTurn();
+
+    expect(enemy.hp, "attacker's Flying move absorbed (no damage)").toBe(maxHp);
+    expect(enemy.getStatStage(Stat.SPD), "enemy's Speed raised by Aerodynamics").toBe(1);
+  });
 });
