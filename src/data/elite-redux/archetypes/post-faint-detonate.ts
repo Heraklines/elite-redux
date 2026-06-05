@@ -96,15 +96,25 @@ export interface PostFaintDetonateOptions {
 }
 
 /**
- * One-shot guard: a holder that has already armed its detonation this lifetime
- * must not re-arm. The STURDY clamp (which we reuse to survive the lethal hit)
- * lapses per-hit (pokemon.ts:4479), so without this a multi-hit move would
- * re-trigger the clamp AND queue a fresh explosion on every lethal sub-hit.
+ * Per-holder arming record: the turn-key (`wave:turn`) on which the holder armed
+ * its detonation. The STURDY clamp we reuse lapses per-hit, so without this a
+ * multi-hit move would re-trigger the clamp AND queue a fresh explosion on every
+ * lethal sub-hit. We must therefore keep enduring the *remaining sub-hits of the
+ * arming move*, which all resolve within the same turn.
  *
- * A WeakSet keyed by the Pokemon object is GC-safe (entries drop with the
- * Pokemon) and survives across the sub-hits of a single multi-hit move.
+ * It is keyed by turn (not a permanent flag) so the endure window is BOUNDED:
+ * if the queued explosion fizzles (e.g. the holder KO'd the last foe with its
+ * own move, so the blast has no target and `SacrificialAttr` never self-KOs it),
+ * the holder is left alive at 1 HP — but the stale arming record is dropped on
+ * the next turn, so it is NOT permanently invincible. A WeakMap is GC-safe.
  */
-const DETONATED = new WeakSet<Pokemon>();
+const ARMED_TURN = new WeakMap<Pokemon, string>();
+
+/** Turn-scoped key for the current battle turn (`wave:turn`); arming is valid only within the same key. */
+function currentArmingKey(): string {
+  const battle = globalScene.currentBattle;
+  return `${battle?.waveIndex ?? 0}:${battle?.turn ?? 0}`;
+}
 
 /**
  * Build the detonation Move for one cast. We keep {@linkcode MoveId.EXPLOSION}
@@ -194,17 +204,24 @@ export class PostFaintDetonateAbAttr extends PreDefendFullHpEndureAbAttr {
     if (pokemon.getMaxHp() <= 1 || damage.value < pokemon.hp) {
       return false;
     }
-    // Already armed: a multi-hit move keeps striking after the arming hit clamped
-    // the holder to 1 HP, and EVERY remaining lethal sub-hit must be endured —
-    // otherwise one of them re-kills the holder before the queued explosion
-    // casts, and the cast bails (a fainted Pokemon cannot move). So once armed we
+    // Already armed THIS turn: a multi-hit move keeps striking after the arming
+    // hit clamped the holder to 1 HP, and EVERY remaining lethal sub-hit must be
+    // endured — otherwise one of them re-kills the holder before the queued
+    // explosion casts, and the cast bails (a fainted Pokemon cannot move). So we
     // keep clamping, bypassing the STURDY guard below: that guard exists only to
     // avoid double-arming, but our own STURDY tag from the arming hit lingers
     // into these sub-hits and would otherwise (wrongly) block the endure. At
     // 1 HP the STURDY damage-clamp itself can't fire (it needs hp > 1), so
     // `apply()` clamps the sub-hit's damage directly.
-    if (DETONATED.has(pokemon)) {
-      return true;
+    const armedKey = ARMED_TURN.get(pokemon);
+    if (armedKey !== undefined) {
+      if (armedKey === currentArmingKey()) {
+        return true;
+      }
+      // Stale arming from an earlier turn (the previous detonation fizzled and
+      // left the holder alive at 1 HP). Drop it so this hit is handled normally —
+      // the holder must NOT keep enduring forever (the "invincible Aftermath" bug).
+      ARMED_TURN.delete(pokemon);
     }
     // Arming hit: a pre-existing STURDY tag (vanilla Sturdy / Focus Sash) means
     // this hit is already being survived elsewhere — don't arm on top of it.
@@ -228,7 +245,7 @@ export class PostFaintDetonateAbAttr extends PreDefendFullHpEndureAbAttr {
     // no longer applies — so clamp this sub-hit's damage directly to leave it at
     // 1 HP. (ENDURING is the Endure-move tag and would spam an "enduring!"
     // message per sub-hit.)
-    if (DETONATED.has(pokemon)) {
+    if (ARMED_TURN.get(pokemon) === currentArmingKey()) {
       if (!simulated) {
         damage.value = Math.max(0, pokemon.hp - 1);
       }
@@ -240,7 +257,7 @@ export class PostFaintDetonateAbAttr extends PreDefendFullHpEndureAbAttr {
     if (simulated) {
       return;
     }
-    DETONATED.add(pokemon);
+    ARMED_TURN.set(pokemon, currentArmingKey());
     const category =
       pokemon.getEffectiveStat(Stat.SPATK) > pokemon.getEffectiveStat(Stat.ATK)
         ? MoveCategory.SPECIAL

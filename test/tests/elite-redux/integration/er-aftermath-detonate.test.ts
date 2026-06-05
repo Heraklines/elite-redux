@@ -13,13 +13,17 @@
 // explosion damage on the KO that dealt it), that Damp blocks it, and — for the
 // related "ability uses a move on switch-in" question — that Cheap Tactics (428)
 // actually lands its Scratch. Gated behind ER_SCENARIO=1.
+import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
+import { PostFaintDetonateAbAttr } from "#data/elite-redux/archetypes/post-faint-detonate";
 import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { AbilityId } from "#enums/ability-id";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
+import { NumberHolder } from "#utils/common";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -185,5 +189,61 @@ describe.skipIf(!RUN)("scriptedPokemonMove — reduced-power scripted casts", ()
     expect(scriptedPokemonMove(MoveId.SPECTRAL_THIEF).getMove().power).toBe(registered);
     // ...and the shared global move is NOT mutated.
     expect(allMoves[MoveId.SPECTRAL_THIEF].power).toBe(registered);
+  });
+});
+
+describe.skipIf(!RUN)("ER Aftermath — not invincible across turns (regression)", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+  beforeEach(() => {
+    game = new GameManager(phaserGame);
+    game.override.battleStyle("single").criticalHits(false).enemyLevel(100).startingLevel(100);
+  });
+
+  // Repro of the reported "Aftermath Pokémon are now invincible". The endure
+  // that lets a multi-hit KO still detonate used a permanent per-holder flag. If
+  // the queued explosion fizzled (no target — e.g. the holder KO'd the last foe
+  // with its OWN move that turn), the holder lived at 1 HP but stayed flagged,
+  // so EVERY future lethal hit was clamped to 1 HP forever. The flag is now
+  // turn-scoped: a stale arming from an earlier turn is dropped, so the holder
+  // is killable again.
+  it("a holder that armed last turn is not silently endured on a later turn", async () => {
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    const attr = new PostFaintDetonateAbAttr();
+    const holder = game.field.getPlayerPokemon();
+    const opponent = game.field.getEnemyPokemon();
+    const move = allMoves[MoveId.TACKLE];
+
+    // Turn 1: a lethal hit arms the holder (clamp + queued explosion).
+    globalScene.currentBattle.turn = 1;
+    holder.hp = holder.getMaxHp();
+    const arming = new NumberHolder(holder.hp + 100);
+    expect(attr.canApply({ pokemon: holder, opponent, move, damage: arming })).toBe(true);
+    attr.apply({ pokemon: holder, opponent, move, damage: arming });
+
+    // Same turn, a remaining sub-hit at 1 HP IS endured (damage clamped to 0) —
+    // this is the multi-hit behaviour we must preserve.
+    holder.hp = 1;
+    const subHit = new NumberHolder(100);
+    expect(attr.canApply({ pokemon: holder, opponent, move, damage: subHit })).toBe(true);
+    attr.apply({ pokemon: holder, opponent, move, damage: subHit });
+    expect(subHit.value).toBe(0);
+
+    // The detonation "fizzled": holder is still alive at 1 HP. Drop the lingering
+    // STURDY tag so we isolate the arming-flag logic from the Sturdy clamp.
+    holder.removeTag(BattlerTagType.STURDY);
+
+    // NEXT turn: a fresh lethal hit must NOT be clamped away (the old bug left
+    // the holder permanently surviving at 1 HP). It is handled as a brand-new
+    // interaction, so the lethal damage stands.
+    globalScene.currentBattle.turn = 2;
+    const nextTurnHit = new NumberHolder(100);
+    attr.canApply({ pokemon: holder, opponent, move, damage: nextTurnHit });
+    attr.apply({ pokemon: holder, opponent, move, damage: nextTurnHit });
+    expect(nextTurnHit.value).toBe(100);
   });
 });
