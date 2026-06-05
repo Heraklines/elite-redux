@@ -56,6 +56,7 @@ import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/dai
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
+import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import { getLevelTotalExp } from "#data/exp";
 import {
   SpeciesFormChangeActiveTrigger,
@@ -3498,6 +3499,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       if (this.isPlayer() || !this.hasTrainer()) {
         // Apply shiny modifiers only to Player or wild mons
         globalScene.applyModifiers(ShinyRateBoosterModifier, true, shinyThreshold);
+        // ER: challenge "Favour" raises shiny odds (up to 3x) on a challenge run.
+        shinyThreshold.value *= getRunShinyMultiplier();
       }
     } else {
       shinyThreshold.value = thresholdOverride;
