@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import type { Challenge } from "#data/challenge";
+import { favourToShinyMultiplier, getRunShinyFavour } from "#data/elite-redux/er-shiny-favour";
 import { Button } from "#enums/buttons";
 import { Challenges } from "#enums/challenges";
 import { Color, ShadowColor } from "#enums/color";
@@ -36,6 +37,10 @@ export class GameChallengesUiHandler extends UiHandler {
 
   private readonly challengeLabels: ChallengeLabel[] = [];
   private monoTypeValue: Phaser.GameObjects.Sprite;
+
+  // ER: "Favour" → shiny-odds readout shown in the top-left empty space.
+  private favourIcon: Phaser.GameObjects.Sprite;
+  private favourText: Phaser.GameObjects.Text;
 
   private cursorObj: Phaser.GameObjects.NineSlice | null;
 
@@ -78,6 +83,22 @@ export class GameChallengesUiHandler extends UiHandler {
       .setName("text-header")
       .setOrigin(0)
       .setPositionRelative(headerBg, 8, 4);
+
+    // ER: Favour → shiny-odds readout in the otherwise-empty top-left header
+    // space, beside the title. Updated live as challenges are toggled
+    // (see updateFavourDisplay). The icon is the shiny star.
+    this.favourIcon = globalScene.add
+      .sprite(0, 0, "shiny_star")
+      .setName("challenge-favour-icon")
+      .setOrigin(0, 0.5)
+      .setScale(0.5)
+      .setVisible(false);
+    this.favourIcon.setPositionRelative(headerBg, 96, 12);
+    this.favourText = addTextObject(0, 0, "", TextStyle.HEADER_LABEL)
+      .setName("text-challenge-favour")
+      .setOrigin(0, 0.5)
+      .setVisible(false);
+    this.favourText.setPositionRelative(this.favourIcon, 9, 1);
 
     this.optionsWidth = canvasWidth * 0.6;
     this.optionsBg = addWindow(0, headerBg.height, this.optionsWidth, canvasHeight - headerBg.height - 2)
@@ -166,6 +187,8 @@ export class GameChallengesUiHandler extends UiHandler {
     this.challengesContainer.add([
       headerBg,
       headerText,
+      this.favourIcon,
+      this.favourText,
       // difficultyBg,
       // this.difficultyText,
       // difficultyName,
@@ -286,6 +309,8 @@ export class GameChallengesUiHandler extends UiHandler {
     }
     tempText.destroy();
 
+    this.updateFavourDisplay();
+
     if (!monoTypeVisible) {
       this.monoTypeValue.setVisible(false);
     }
@@ -303,6 +328,24 @@ export class GameChallengesUiHandler extends UiHandler {
       .setPositionRelative(this.startBg, (this.startBg.width - this.startText.displayWidth) / 2, 4);
 
     this.challengesContainer.update();
+  }
+
+  /**
+   * ER: refresh the top-left "Favour → shiny" readout from the run's active
+   * challenges. Hidden when no challenge is selected (favour 0).
+   */
+  private updateFavourDisplay(): void {
+    if (!this.favourText) {
+      return;
+    }
+    const favour = getRunShinyFavour();
+    const multiplier = favourToShinyMultiplier(favour);
+    const show = favour > 0;
+    this.favourIcon.setVisible(show);
+    this.favourText.setVisible(show);
+    if (show) {
+      this.favourText.setText(`Favour ${favour}  Shiny x${multiplier.toFixed(1)}`);
+    }
   }
 
   public override show(args: any[]): boolean {
