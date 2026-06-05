@@ -502,9 +502,15 @@ export class Egg {
     for (const [idx, speciesId] of speciesPool.entries()) {
       // Accounts for species that have starter costs outside of the normal range for their EggTier
       const speciesCostClamped = Phaser.Math.Clamp(speciesStarterCosts[speciesId], minStarterValue, maxStarterValue);
-      const weight = Math.floor(
+      let weight = Math.floor(
         (((maxStarterValue - speciesCostClamped) / (maxStarterValue - minStarterValue + 1)) * 1.5 + 1) * 100,
       );
+      // ER: Unown is a 1-cost mon, so the cheap-mon weight boost made it dominate
+      // egg pulls (and it has 28 letter-forms on top). Knock its weight down to
+      // ~1/10 so it's a rare novelty pull rather than the default hatch.
+      if (speciesId === SpeciesId.UNOWN) {
+        weight = Math.max(1, Math.floor(weight * 0.1));
+      }
       speciesWeights[idx] = totalWeight + weight;
       totalWeight += weight;
     }
