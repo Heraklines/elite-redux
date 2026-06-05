@@ -239,13 +239,19 @@ function mergeOneEdge(
   }
   result.evolutionEdgesApplied++;
 
-  // Find a matching pokerogue edge by target species id. If found,
-  // update its level in-place (preserving any condition/item/formKey).
+  // Find a matching pokerogue edge by target species id. If found, update its
+  // level in-place AND clear any vanilla evolution ITEM. Elite Redux has NO
+  // stone/trade evolutions — everything evolves by level (the ER kind is always
+  // level / level-male / level-female here). So a vanilla Fire Stone, Linking
+  // Cord, etc. must be removed, leaving the ER level as the only requirement.
+  // Gender/form conditions (Gallade, Froslass, the Eevee branches) are KEPT, so
+  // those simply become level-up player-choice evolutions — the ER design.
   const match = merged.find(e => e.speciesId === resolved.targetSpeciesId);
   if (match) {
-    if (match.level !== resolved.level) {
+    if (match.level !== resolved.level || match.item != null) {
       match.level = resolved.level;
-      // Reset memoized description so the new level is picked up.
+      match.item = null;
+      // Reset memoized description so the new level/no-item is picked up.
       match.desc = "";
     }
     result.edgesLevelUpdated++;
