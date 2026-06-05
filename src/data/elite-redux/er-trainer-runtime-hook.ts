@@ -51,6 +51,7 @@ import { TrainerVariant } from "#enums/trainer-variant";
 import type { EnemyPokemon } from "#field/pokemon";
 import type { Trainer } from "#field/trainer";
 import { PokemonMove } from "#moves/pokemon-move";
+import { randSeedShuffle } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 /**
@@ -60,6 +61,48 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
  * Trainer instances don't keep the cache alive.
  */
 let TRAINER_CACHE: WeakMap<Trainer, ErTrainerRegistryEntry | null> = new WeakMap();
+
+/**
+ * Per-Trainer cache of the shuffled roster ordering. ER rosters are usually
+ * LARGER than the wave's party size, so without this the engine always takes
+ * `roster[0..size-1]` — the same Pokémon every run. We instead pick a random
+ * subset by shuffling the roster index order once and reading `order[index]`.
+ *
+ * The shuffle is seeded by the wave seed (with a fixed offset), so it is:
+ *   - stable WITHIN a battle — every `genPartyMember(0..size-1)` call and any
+ *     save/load reload of the same wave reproduce the same team, and
+ *   - varied ACROSS runs/encounters — a different wave seed reshuffles.
+ * Keyed by the live Trainer instance + tier (a WeakMap, so it GCs with the
+ * trainer). Recomputed if the tier changes (defensive; tier is wave-fixed).
+ */
+let ROSTER_ORDER_CACHE: WeakMap<Trainer, { tier: ErRosterTier; order: readonly number[] }> = new WeakMap();
+
+/** Fixed seed offset for the roster shuffle — distinct from the per-member index offsets (0..n). */
+const ER_ROSTER_SHUFFLE_SEED_OFFSET = 0x5e1ec7;
+
+/**
+ * Return a stable, wave-seeded permutation of `[0..rosterLength-1]` for this
+ * trainer + tier (see {@link ROSTER_ORDER_CACHE}). The engine then maps each
+ * requested party slot through it, so a larger ER roster rotates which members
+ * appear instead of always fielding the first N.
+ */
+export function getRosterOrder(trainer: Trainer, rosterLength: number, tier: ErRosterTier): readonly number[] {
+  const cached = ROSTER_ORDER_CACHE.get(trainer);
+  if (cached && cached.tier === tier && cached.order.length === rosterLength) {
+    return cached.order;
+  }
+  const indices = Array.from({ length: rosterLength }, (_, i) => i);
+  let order: number[] = indices;
+  globalScene.executeWithSeedOffset(
+    () => {
+      order = randSeedShuffle(indices);
+    },
+    ER_ROSTER_SHUFFLE_SEED_OFFSET,
+    globalScene.waveSeed,
+  );
+  ROSTER_ORDER_CACHE.set(trainer, { tier, order });
+  return order;
+}
 
 /**
  * The ER held-item id the roster member carried, stashed per generated enemy so
@@ -230,6 +273,7 @@ export function clearErTrainerCacheForTests(): void {
   // WeakMap has no clear() — recreate by reassigning the module-level
   // map. We do this defensively for testing scenarios only.
   TRAINER_CACHE = new WeakMap();
+  ROSTER_ORDER_CACHE = new WeakMap();
 }
 
 /**
@@ -256,11 +300,17 @@ export function applyErRosterOverride(trainer: Trainer, index: number): EnemyPok
     return null;
   }
   // Tier scales with the wave (easy early → full insane/hell roster at bosses).
-  const roster: readonly ErPartyMemberRegistered[] = selectErRoster(erTrainer, pickTierForWave(trainer));
+  const tier = pickTierForWave(trainer);
+  const roster: readonly ErPartyMemberRegistered[] = selectErRoster(erTrainer, tier);
   if (index >= roster.length) {
     return null;
   }
-  return buildErEnemyFromMember(trainer, index, roster[index]);
+  // Rotate which roster members appear: map the requested slot through a stable,
+  // wave-seeded shuffle so a roster bigger than the party size fields a random
+  // subset that varies across runs (instead of always the first N members).
+  const order = getRosterOrder(trainer, roster.length, tier);
+  const memberIndex = order[index] ?? index;
+  return buildErEnemyFromMember(trainer, index, roster[memberIndex]);
 }
 
 /**
