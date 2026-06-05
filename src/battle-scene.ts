@@ -1997,6 +1997,19 @@ export class BattleScene extends SceneBase {
         return 0;
     }
 
+    // ER: give wild/enemy spawns a chance at their "Redux" form. Un-special-cased
+    // species always returned the base form (index 0), so Redux forms essentially
+    // never appeared in the wild — this makes them slightly more common in all
+    // modes. Excludes the player side (ignoreArena) and egg hatches (eggs hand out
+    // base-form customs by design). 1-in-REDUX_FORM_SPAWN_ODDS per eligible spawn.
+    const REDUX_FORM_SPAWN_ODDS = 8;
+    if (!isEggPhase && !ignoreArena) {
+      const reduxFormIndex = species.forms.findIndex(f => f.formKey === "redux");
+      if (reduxFormIndex > 0 && !randSeedInt(REDUX_FORM_SPAWN_ODDS)) {
+        return reduxFormIndex;
+      }
+    }
+
     return 0;
   }
 

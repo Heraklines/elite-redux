@@ -85,6 +85,10 @@ const COST_OVERRIDES: Readonly<Record<string, number>> = {
   "Zygarde 50 Power Construct": 8,
   "Magearna Original": 8,
   "Bewear Angry": 8,
+  // Legendary Redux forms that are stronger than the generic 3-cost Redux band.
+  "Azelf Redux": 6,
+  "Mesprit Redux": 6,
+  "Uxie Redux": 6,
 };
 
 /** Default cost banding by base-form BST (the owner-approved "rest is fine" scale). */
