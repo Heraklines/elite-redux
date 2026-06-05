@@ -8,6 +8,7 @@ import { EntryHazardTag, getArenaTag } from "#data/arena-tag";
 import { biomeBgmLoopPoints } from "#data/biome-bgm-loop-points";
 import { getDailyForcedWaveBiomePoolTier } from "#data/daily-seed/daily-run";
 import { allBiomes } from "#data/data-lists";
+import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { SpeciesFormChangeRevertWeatherFormTrigger, SpeciesFormChangeWeatherTrigger } from "#data/form-change-triggers";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import type { PositionalTag } from "#data/positional-tags/positional-tag";
@@ -47,6 +48,16 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { weightedPick } from "#utils/random";
 import { inSpeedOrder } from "#utils/speed-order-generator";
 import type { NonEmptyTuple } from "type-fest";
+
+/**
+ * Elite Redux: in Ace / Elite, wild Pokémon at or above this base-stat total are
+ * rerolled before {@linkcode ER_EARLY_HIGH_BST_WAVE} so endgame-tier mons
+ * (pseudo-legends / box legendaries, BST ≥ 600) don't appear in the early game.
+ * Hell is exempt. See {@linkcode Arena.checkLegendBST}.
+ */
+const ER_EARLY_HIGH_BST_THRESHOLD = 600;
+/** Wave before which the Ace/Elite high-BST wild gate applies. */
+const ER_EARLY_HIGH_BST_WAVE = 55;
 
 /**
  * Map a {@linkcode WeatherType} to the {@linkcode CommonAnim} used for its
@@ -617,6 +628,23 @@ export class Arena {
   // TODO: Refactor so there is no rerolling required, instead modifying the pools directly
   private checkLegendBST(species: PokemonSpecies, adjustedWave: number): boolean {
     const isLegendLike = species.legendary || species.subLegendary || species.mythical;
+
+    // Elite Redux: in ACE and ELITE, keep endgame-tier (very high BST) wild mons
+    // out of the early game — a pseudo-legendary or box legendary should be a
+    // mid/late threat, not a wave-5 surprise (e.g. a stray Diancie leaking into a
+    // low fairy biome). This rerolls them before wave 55. HELL is exempt (early
+    // power spikes are part of its identity). Only WILD generation flows through
+    // here — trainer teams draw from the ER trainer roster, so they are unaffected
+    // and still field whatever their pool dictates.
+    const erDifficulty = getErDifficulty();
+    if (
+      (erDifficulty === "ace" || erDifficulty === "elite")
+      && adjustedWave < ER_EARLY_HIGH_BST_WAVE
+      && species.baseTotal >= ER_EARLY_HIGH_BST_THRESHOLD
+    ) {
+      return true;
+    }
+
     if (!isLegendLike) {
       return false;
     }
