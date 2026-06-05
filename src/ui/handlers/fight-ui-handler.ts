@@ -10,6 +10,7 @@ import { PokemonType } from "#enums/pokemon-type";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import type { EnemyPokemon, Pokemon } from "#field/pokemon";
+import { DamageCalculatorModifier } from "#modifiers/modifier";
 import type { PokemonMove } from "#moves/pokemon-move";
 import type { CommandPhase } from "#phases/command-phase";
 import { BattleInfoOverlay } from "#ui/battle-info-overlay";
@@ -33,6 +34,12 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
   private accuracyText: Phaser.GameObjects.Text;
   private cursorObj: Phaser.GameObjects.Image | null;
   private moveCategoryIcon: Phaser.GameObjects.Sprite;
+
+  // ER: the right panel can be cycled (R / RB) between the normal move stats and
+  // a "Damage Calc" view, which is locked until a Damage Calculator is held.
+  private damageCalcMode = false;
+  private dmgCalcHeader: Phaser.GameObjects.Text;
+  private dmgCalcBody: Phaser.GameObjects.Text;
   private moveInfoOverlay: MoveInfoOverlay;
 
   /** ER: the in-battle "Pokémon Stats" info overlay, also openable from move select (info/STATS key). */
@@ -97,6 +104,22 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
       .setOrigin(1, 0.5)
       .setVisible(false);
 
+    // ER Damage Calc view — occupies the same panel area as the move stats,
+    // shown instead of them when cycled to (R / RB).
+    this.dmgCalcHeader = addTextObject(
+      globalScene.scaledCanvas.width - 70,
+      -28,
+      "DMG CALC",
+      TextStyle.MOVE_INFO_CONTENT,
+    )
+      .setOrigin(0, 0.5)
+      .setVisible(false);
+    this.dmgCalcBody = addTextObject(globalScene.scaledCanvas.width - 70, -21, "", TextStyle.MOVE_INFO_CONTENT, {
+      wordWrap: { width: 320 },
+    })
+      .setOrigin(0, 0)
+      .setVisible(false);
+
     this.moveInfoContainer.add([
       this.typeIcon,
       this.moveCategoryIcon,
@@ -106,6 +129,8 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
       this.powerText,
       this.accuracyLabel,
       this.accuracyText,
+      this.dmgCalcHeader,
+      this.dmgCalcBody,
     ]);
 
     // prepare move overlay
@@ -167,6 +192,13 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     }
     if (button === Button.STATS) {
       this.battleInfo.open();
+      return true;
+    }
+    // ER: cycle the right panel between move stats and the Damage Calc view.
+    if (button === Button.CYCLE_SHINY) {
+      this.damageCalcMode = !this.damageCalcMode;
+      this.setMoveInfo(this.getCursor());
+      this.getUi().playSelect();
       return true;
     }
 
@@ -333,6 +365,66 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     pokemon.getOpponents().forEach(opponent => {
       (opponent as EnemyPokemon).updateEffectiveness(this.getEffectivenessText(pokemon, opponent, pokemonMove));
     });
+
+    this.applyPanelMode(pokemon, pokemonMove);
+  }
+
+  /**
+   * ER: show either the normal move stats or the Damage Calc view in the right
+   * panel, depending on {@linkcode damageCalcMode} (toggled with R / RB).
+   */
+  private applyPanelMode(pokemon: Pokemon, pokemonMove: PokemonMove): void {
+    const dmg = this.damageCalcMode;
+    for (const el of [
+      this.typeIcon,
+      this.moveCategoryIcon,
+      this.ppLabel,
+      this.ppText,
+      this.powerLabel,
+      this.powerText,
+      this.accuracyLabel,
+      this.accuracyText,
+    ]) {
+      el.setVisible(!dmg);
+    }
+    this.dmgCalcHeader.setVisible(dmg);
+    this.dmgCalcBody.setVisible(dmg);
+    if (dmg) {
+      this.dmgCalcBody.setText(this.getDamageCalcText(pokemon, pokemonMove));
+    }
+  }
+
+  /**
+   * ER: compute the Damage Calc panel body. Locked until a Damage Calculator is
+   * held; otherwise shows the highlighted move's damage range as a percentage of
+   * the primary opponent's current HP. `simulated` uses the max (100%) damage
+   * roll, so the min is 85% of it — the standard damage spread.
+   */
+  private getDamageCalcText(pokemon: Pokemon, pokemonMove: PokemonMove): string {
+    const unlocked = !!globalScene.findModifier(m => m instanceof DamageCalculatorModifier);
+    if (!unlocked) {
+      return "Locked\nFind a Damage\nCalculator";
+    }
+    const move = pokemonMove.getMove();
+    if (move.category === MoveCategory.STATUS || move.power <= 0) {
+      return "—\n(status move)";
+    }
+    const target = pokemon.getOpponents()[0];
+    if (!target) {
+      return "No target\non the field";
+    }
+    let max = 0;
+    try {
+      max = target.getAttackDamage({ source: pokemon, move, simulated: true }).damage;
+    } catch {
+      max = 0;
+    }
+    const min = Math.floor(max * 0.85);
+    const hp = Math.max(1, target.hp);
+    const minPct = Math.max(0, Math.round((min / hp) * 100));
+    const maxPct = Math.max(0, Math.round((max / hp) * 100));
+    const ko = min >= target.hp ? "\nGuaranteed KO" : max >= target.hp ? "\nPossible KO" : "";
+    return `${minPct}% – ${maxPct}%\nof foe's HP${ko}`;
   }
 
   setCursor(cursor: number): boolean {

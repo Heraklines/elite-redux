@@ -178,6 +178,13 @@ input:-internal-autofill-selected {
   display: none;
 }
 
+/* ER: also surface #apadNextTab (the [R] button) in the fight menu, where R
+   cycles the move panel to the Damage Calc view. Higher specificity than the
+   hide rule above, and excludes config-mode so touch-config stays unaffected. */
+#touchControls:not(.config-mode)[data-ui-mode="FIGHT"] #apadNextTab {
+  display: flex;
+}
+
 /* Show #apadInfo only in battle */
 #touchControls:not([data-ui-mode="COMMAND"]):not([data-ui-mode="FIGHT"]):not(
     [data-ui-mode="BALL"]
