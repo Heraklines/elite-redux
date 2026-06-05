@@ -183,6 +183,8 @@ export class SummaryUiHandler extends UiHandler {
   /** ER: cyclable move-detail page on the Moves page (0 = description, 1-3 = property pages). */
   private moveDetailPage = 0;
   private moveDetailPageLabel: Phaser.GameObjects.Text | null = null;
+  /** ER: right-hand column for the property pages (fixed x → clean alignment under the variable-width font). */
+  private moveDetailCol2Text: Phaser.GameObjects.Text | null = null;
 
   constructor() {
     super(UiMode.SUMMARY);
@@ -1454,11 +1456,17 @@ export class SummaryUiHandler extends UiHandler {
         this.moveDescriptionText = addTextObject(2, 84, "", TextStyle.WINDOW_ALT, { wordWrap: { width: 1212 } });
         this.movesContainer.add(this.moveDescriptionText);
 
+        // ER: second column for the property pages. Fixed x so the right column
+        // lines up cleanly (the pixel font is variable-width, so space-padding the
+        // left column can't align it). Hidden for the description page.
+        this.moveDetailCol2Text = addTextObject(116, 84, "", TextStyle.WINDOW_ALT).setVisible(false);
+        this.movesContainer.add(this.moveDetailCol2Text);
+
         // ER: prominent dynamic header for the cyclable move-detail, placed where
         // the static "DESCRIPTIONS" banner is (which we hide while this shows), so
         // the player clearly sees the current page + that the info (C) button
         // cycles, e.g. "[C] ▶ Mechanics  2/4".
-        this.moveDetailPageLabel = addTextObject(2, 78, "", TextStyle.SUMMARY_GREEN)
+        this.moveDetailPageLabel = addTextObject(2, 79, "", TextStyle.MOVE_INFO_CONTENT)
           .setOrigin(0, 0.5)
           .setVisible(false);
         this.movesContainer.add(this.moveDetailPageLabel);
@@ -1472,6 +1480,7 @@ export class SummaryUiHandler extends UiHandler {
         const moveDescriptionTextMask = moveDescriptionTextMaskRect.createGeometryMask();
 
         this.moveDescriptionText.setMask(moveDescriptionTextMask);
+        this.moveDetailCol2Text?.setMask(moveDescriptionTextMask);
         break;
       }
     }
@@ -1543,6 +1552,7 @@ export class SummaryUiHandler extends UiHandler {
   private renderMoveDetail(move: Move | null): void {
     if (!move) {
       this.moveDescriptionText.setText("");
+      this.moveDetailCol2Text?.setVisible(false);
       this.moveDetailPageLabel?.setVisible(false);
       this.movesContainerDescriptionsTitle?.setVisible(true);
       return;
@@ -1558,14 +1568,15 @@ export class SummaryUiHandler extends UiHandler {
 
     if (page.description === undefined) {
       // Two columns so all four property rows are visible at a glance (no scroll).
+      // Left column = rows 0/2, right column = rows 1/3, each in its own fixed-x
+      // text object so they align despite the variable-width pixel font.
       const rows = page.rows ?? [];
       const cell = (r?: MoveDetailRow): string => (r ? `${r.label}: ${r.value}` : "");
-      const COL = 17;
-      const line1 = (cell(rows[0]).padEnd(COL) + cell(rows[1])).trimEnd();
-      const line2 = (cell(rows[2]).padEnd(COL) + cell(rows[3])).trimEnd();
-      this.moveDescriptionText.setText(`${line1}\n${line2}`.trimEnd());
+      this.moveDescriptionText.setText(`${cell(rows[0])}\n${cell(rows[2])}`.trimEnd());
+      this.moveDetailCol2Text?.setText(`${cell(rows[1])}\n${cell(rows[3])}`.trimEnd()).setVisible(true);
     } else {
       this.moveDescriptionText.setText(page.description || "");
+      this.moveDetailCol2Text?.setVisible(false);
     }
   }
 
@@ -1586,6 +1597,7 @@ export class SummaryUiHandler extends UiHandler {
     this.moveSelect = false;
     this.extraMoveRowContainer.setVisible(false);
     this.moveDescriptionText.setText("");
+    this.moveDetailCol2Text?.setVisible(false);
     this.moveDetailPageLabel?.setVisible(false);
     this.movesContainerDescriptionsTitle?.setVisible(true);
     this.moveDetailPage = 0;
