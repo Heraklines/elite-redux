@@ -38,4 +38,15 @@ describe("ER Ogerpon forms are EPIC egg-tier", () => {
       expect(tiers[s.speciesId]).toBe(EggTier.EPIC);
     }
   });
+
+  it("every egg-poolable Thundurus / Silvally form is EPIC (none RARE/below)", () => {
+    const tiers = speciesEggTiers as Record<number, EggTier | undefined>;
+    const fams = allSpecies.filter(s => /^(Thundurus|Silvally)/.test(s.name ?? ""));
+    const poolable = fams.filter(s => tiers[s.speciesId] !== undefined);
+    expect(poolable.length).toBeGreaterThan(0);
+    for (const s of poolable) {
+      console.log(`[legend-forms] ${s.name} (#${s.speciesId}) → tier ${EggTier[tiers[s.speciesId]!]}`);
+      expect(tiers[s.speciesId]).toBe(EggTier.EPIC);
+    }
+  });
 });

@@ -92,7 +92,16 @@ const EGG_TIER_OVERRIDES: Readonly<Record<string, EggTier>> = {
  * are form-change targets and are removed from the egg pool earlier, so this
  * never promotes a mega.)
  */
-const EGG_TIER_PREFIX_OVERRIDES: ReadonlyArray<readonly [string, EggTier]> = [["Ogerpon", EggTier.EPIC]];
+const EGG_TIER_PREFIX_OVERRIDES: ReadonlyArray<readonly [string, EggTier]> = [
+  // Ogerpon masks (Wellspring/Hearthflame/Cornerstone) — see above.
+  ["Ogerpon", EggTier.EPIC],
+  // Legendary/quasi-legendary families ER ships as separate custom forms
+  // (Thundurus Therian, the Silvally type forms, …) at BST 570-580 → they band
+  // as RARE. Pin the whole family to EPIC, matching their vanilla base tier
+  // (THUNDURUS / TYPE_NULL are EPIC; a Therian/typed form shouldn't hatch lower).
+  ["Thundurus", EggTier.EPIC],
+  ["Silvally", EggTier.EPIC],
+];
 
 function resolveEggTierOverride(name: string): EggTier | undefined {
   if (name in EGG_TIER_OVERRIDES) {
