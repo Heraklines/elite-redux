@@ -868,8 +868,15 @@ export class RunInfoUiHandler extends UiHandler {
         [37, 35.5],
         [-6.5, 43.5],
         [37, 43.5],
+        // 5th slot (Move Slot Expander rogue item) — third row, left column.
+        // Without this entry a 5-move Pokémon would index `movePos[4]` as
+        // `undefined` and crash the whole run-history screen ("reading '0'").
+        [-6.5, 51.5],
       ];
-      for (let m = 0; m < pokemonMoveset?.length; m++) {
+      // Defensive bound: never index past the laid-out grid even if a future
+      // change raises the max move count again.
+      const moveSlotCount = Math.min(pokemonMoveset?.length ?? 0, movePos.length);
+      for (let m = 0; m < moveSlotCount; m++) {
         const moveContainer = globalScene.add.container(movePos[m][0], movePos[m][1]);
         moveContainer.setScale(0.5);
         const moveBg = globalScene.add.nineslice(0, 0, "type_bgs", "unknown", 85, 15, 2, 2, 2, 2);

@@ -27,9 +27,11 @@ describe("ER shiny favour", () => {
   });
 
   it("per-challenge favour (active vs inactive)", () => {
-    // Confirmed values: No Passives 10, Hardcore 8, Limited Support 6,
-    // Mono-type 5, Inverse/Flip 3.
-    expect(getChallengeFavour(challengeStub(Challenges.PASSIVES, 1))).toBe(10);
+    // Confirmed values: Hardcore 8, Limited Support 6, Mono-type 5, Inverse/Flip 3.
+    // "Active Passives" ENABLES passives (a convenience, not a handicap) and is on
+    // by default — it grants NO favour regardless of its value.
+    expect(getChallengeFavour(challengeStub(Challenges.PASSIVES, 1))).toBe(0);
+    expect(getChallengeFavour(challengeStub(Challenges.PASSIVES, 2))).toBe(0);
     expect(getChallengeFavour(challengeStub(Challenges.HARDCORE, 1))).toBe(8);
     // Limited Support is tiered: no heal (1) → 6, no shop (2) → 8, both (3) → 10.
     expect(getChallengeFavour(challengeStub(Challenges.LIMITED_SUPPORT, 1))).toBe(6);

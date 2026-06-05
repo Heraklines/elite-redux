@@ -31,7 +31,9 @@ const FAVOUR_BY_CHALLENGE: Partial<Record<Challenges, number>> = {
   [Challenges.LIMITED_CATCH]: 4,
   // LIMITED_SUPPORT is tiered — see getChallengeFavour (no heal 6 / no shop 8 / both 10).
   [Challenges.HARDCORE]: 8,
-  [Challenges.PASSIVES]: 10, // No Passives — by far the biggest ER handicap
+  // NOTE: Challenges.PASSIVES is "Active Passives" — it ENABLES passives (a
+  // convenience, not a handicap), and passives are on by default anyway. It
+  // grants NO favour. Deliberately omitted so getChallengeFavour returns 0.
   [Challenges.LOWER_MAX_STARTER_COST]: 3,
   [Challenges.LOWER_STARTER_POINTS]: 3,
 };
