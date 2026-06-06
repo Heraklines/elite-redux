@@ -28,6 +28,7 @@ import {
 } from "#balance/rates";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
+import { getErEggWeightDivisor } from "#data/elite-redux/init-elite-redux-egg-tiers";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { EggSourceType } from "#enums/egg-source-types";
 import { EggTier } from "#enums/egg-type";
@@ -471,10 +472,8 @@ export class Egg {
       .filter(
         s =>
           !Object.hasOwn(pokemonPrevolutions, s)
-          && ignoredSpecies.indexOf(s) === -1 // Defense in depth: never let a dangling egg-tier id (one that does not
-          && // resolve to a registered species) reach the variant filter / weight
-          // loop below, where it would deref undefined and freeze the hatch.
-          !!getPokemonSpecies(s),
+          && ignoredSpecies.indexOf(s) === -1 // Defense in depth: never let a dangling egg-tier id (one that does not // resolve to a registered species) reach the variant filter / weight // loop below, where it would deref undefined and freeze the hatch.
+          && !!getPokemonSpecies(s),
       );
 
     // If this is the 10th egg without unlocking something new, attempt to force it.
@@ -518,6 +517,11 @@ export class Egg {
       if (speciesId === SpeciesId.UNOWN) {
         weight = Math.max(1, Math.floor(weight * 0.1));
       }
+      // ER: multi-form families (Arceus's type plates, Silvally, Ogerpon masks,
+      // Therian forms, …) ship as many separate egg-pool species, so without
+      // this they'd collectively appear N× and swamp the pool. Divide each
+      // form's weight by its family size so the whole family totals ≈ one mon.
+      weight = Math.max(1, Math.floor(weight / getErEggWeightDivisor(speciesId)));
       speciesWeights[idx] = totalWeight + weight;
       totalWeight += weight;
     }

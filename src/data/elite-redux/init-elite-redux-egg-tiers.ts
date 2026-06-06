@@ -142,18 +142,15 @@ function pickStarterCost(tier: EggTier): number {
 
 function isErFormChangeTarget(draft: (typeof ER_SPECIES)[number], speciesId: number): boolean {
   return (
-    findErFormChangeByTarget(speciesId) !== undefined // HANGRY is Morpeko's in-battle alt-form (the Hunger Switch / Two-Faced // toggle target — SPECIES_MORPEKO_HANGRY / SPECIES_MORPEKYLL_HANGRY in the // ER dump). Like Mega/Primal it is a battle-only form, NOT a base/root mon, // so it must never hatch from eggs or appear in starter selection. ER models // it as a separate custom species with no prevolution, so it would otherwise // leak past the prevolution gate below. BOND / BLUNDER are Darmanitan Redux's // special Battle-Bond forms (SPECIES_DARMANITAN_REDUX_BOND / _BLUNDER) — also
-    || // battle-only forms reached via the Bond chain off the base Darmanitan Redux,
-    // never base/root mons, so they must be excluded the same way. AURA is
-    // Darmanitan Redux's Zen-Mode-style alternate battle form
+    findErFormChangeByTarget(speciesId) !== undefined // HANGRY is Morpeko's in-battle alt-form (the Hunger Switch / Two-Faced // toggle target — SPECIES_MORPEKO_HANGRY / SPECIES_MORPEKYLL_HANGRY in the // ER dump). Like Mega/Primal it is a battle-only form, NOT a base/root mon, // so it must never hatch from eggs or appear in starter selection. ER models // it as a separate custom species with no prevolution, so it would otherwise // leak past the prevolution gate below. BOND / BLUNDER are Darmanitan Redux's // special Battle-Bond forms (SPECIES_DARMANITAN_REDUX_BOND / _BLUNDER) — also // battle-only forms reached via the Bond chain off the base Darmanitan Redux, // never base/root mons, so they must be excluded the same way. AURA is
+    || // Darmanitan Redux's Zen-Mode-style alternate battle form
     // (SPECIES_DARMANITAN_REDUX_AURA, "Darmanitan Aura") — likewise a
     // battle-emergent form that must NOT hatch (it was leaking into RARE eggs).
     /(?:^|_)MEGA(?:_|$)|(?:^|_)PRIMAL(?:_|$)|(?:^|_)HANGRY(?:_|$)|(?:^|_)BOND(?:_|$)|(?:^|_)BLUNDER(?:_|$)|(?:^|_)AURA(?:_|$)/.test(
       draft.speciesConst,
     )
-    || /\b(Mega|Primal|Hangry|Bond|Blunder)\b/i.test(draft.name ?? "") // "Darmanitan Aura" by name (the speciesConst suffix _AURA covers the const
-    || // path; this catches the display name for robustness).
-    /^Darmanitan Aura$/i.test(draft.name ?? "")
+    || /\b(Mega|Primal|Hangry|Bond|Blunder)\b/i.test(draft.name ?? "") // "Darmanitan Aura" by name (the speciesConst suffix _AURA covers the const // path; this catches the display name for robustness).
+    || /^Darmanitan Aura$/i.test(draft.name ?? "")
   );
 }
 
@@ -307,4 +304,81 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
   }
 
   return result;
+}
+
+// =============================================================================
+// Multi-form family down-weighting.
+//
+// Many ER families ship as MANY separate egg-pool species (Arceus's type plates,
+// Silvally's type forms, the Ogerpon masks, Therian forms, …). Each is its own
+// egg entry, so collectively a family of N forms appears N× and dominates the
+// pool. To keep the WHOLE family at roughly a single mon's appearance rate, each
+// egg-pool form's weight is divided by the number of egg-eligible siblings in
+// its family (see `getErEggWeightDivisor`, consumed by `Egg.rollSpecies`).
+//
+// Family key: the longest leading word-prefix of the custom's name that matches
+// a vanilla species name (so "Arceus Fire"/"Arceus Water"/… → "arceus",
+// "Silvally Steel" → "silvally", "Tornadus Therian" → "tornadus"); a custom with
+// no vanilla-name prefix is its own family (divisor 1). Built lazily from the
+// LIVE `speciesEggTiers` so it reflects every add/removal done during init.
+// =============================================================================
+
+let erEggWeightDivisors: ReadonlyMap<number, number> | null = null;
+
+function buildErEggWeightDivisors(): Map<number, number> {
+  const tiers = speciesEggTiers as Record<number, EggTier | undefined>;
+  const vanillaNames = new Set<string>();
+  const idToName = new Map<number, string>();
+  for (const sp of allSpecies) {
+    idToName.set(sp.speciesId, sp.name);
+    if (sp.speciesId < VANILLA_ID_CUTOFF) {
+      vanillaNames.add(sp.name.toLowerCase());
+    }
+  }
+  const familyKey = (name: string): string => {
+    const words = name.split(/\s+/);
+    for (let n = words.length; n >= 1; n--) {
+      const prefix = words.slice(0, n).join(" ").toLowerCase();
+      if (vanillaNames.has(prefix)) {
+        return prefix;
+      }
+    }
+    return name.toLowerCase();
+  };
+  const idFamily = new Map<number, string>();
+  const familyCount = new Map<string, number>();
+  for (const key of Object.keys(tiers)) {
+    const id = Number(key);
+    if (id < VANILLA_ID_CUTOFF || tiers[id] === undefined) {
+      continue;
+    }
+    const name = idToName.get(id);
+    if (!name) {
+      continue;
+    }
+    const fam = familyKey(name);
+    idFamily.set(id, fam);
+    familyCount.set(fam, (familyCount.get(fam) ?? 0) + 1);
+  }
+  const divisors = new Map<number, number>();
+  for (const [id, fam] of idFamily) {
+    divisors.set(id, Math.max(1, familyCount.get(fam) ?? 1));
+  }
+  return divisors;
+}
+
+/**
+ * Egg-weight divisor for an ER-custom species: the number of egg-eligible forms
+ * in its family (so an N-form family totals ≈ 1× a single mon instead of N×).
+ * Returns 1 for vanilla ids and any custom that isn't part of a multi-form
+ * family. Lazily computed + cached on first call (after all init has run).
+ */
+export function getErEggWeightDivisor(speciesId: number): number {
+  if (speciesId < VANILLA_ID_CUTOFF) {
+    return 1;
+  }
+  if (erEggWeightDivisors === null) {
+    erEggWeightDivisors = buildErEggWeightDivisors();
+  }
+  return erEggWeightDivisors.get(speciesId) ?? 1;
 }
