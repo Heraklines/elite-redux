@@ -56,10 +56,30 @@
 
 import { PostAttackAbAttr, PostDefendAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { HitResult } from "#enums/hit-result";
 import { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { StatusEffect } from "#enums/status-effect";
+
+/**
+ * The set of {@linkcode HitResult}s that represent an actual *damaging attack*
+ * landing on the target. A `contactExcluded` (non-contact-tier) proc — e.g.
+ * Flame Body's "20% burn on non-contact" or Static's "10% paralyze on
+ * non-contact" — must only fire on these. The ER ROM descriptions read "...on
+ * non-contact **attacks**" / "Non-contact has a 20% chance" — i.e. damaging
+ * moves. A non-contact STATUS move (Growl, Leer, Sand Attack, …) reports
+ * {@linkcode HitResult.STATUS} (zero damage) and must NOT proc the non-contact
+ * tier; otherwise an opponent opening with a status move appears to burn the
+ * holder "before any attack was made" (user-reported as Flame Body burning at
+ * the start of battle / on switch-in).
+ */
+const DAMAGING_HIT_RESULTS: ReadonlySet<HitResult> = new Set([
+  HitResult.EFFECTIVE,
+  HitResult.SUPER_EFFECTIVE,
+  HitResult.NOT_VERY_EFFECTIVE,
+  HitResult.ONE_HIT_KO,
+]);
 
 /**
  * Optional filter restricting which incoming moves can trigger the proc. The
@@ -241,8 +261,19 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
     // flag unset, so the non-contact tier still fires on it as intended.
     const inherentlyMakesContact = move.hasFlag(MoveFlags.MAKES_CONTACT);
     // Contact-excluded gate — proc fires ONLY on inherently non-contact attacks.
-    if (this.contactExcluded && inherentlyMakesContact) {
-      return false;
+    if (this.contactExcluded) {
+      if (inherentlyMakesContact) {
+        return false;
+      }
+      // The non-contact tier is a "non-contact ATTACK" tier (per ER ROM text).
+      // It must NOT fire on STATUS-category moves (Growl/Leer/etc., which report
+      // HitResult.STATUS) or on no-damage interactions (NO_EFFECT/IMMUNE/etc.).
+      // Without this gate, a foe opening with a non-contact status move procs the
+      // burn/paralysis, which players saw as Flame Body burning them "before any
+      // move was made." Only genuine damaging attacks qualify.
+      if (!DAMAGING_HIT_RESULTS.has(params.hitResult)) {
+        return false;
+      }
     }
     // Contact-required gate, when configured.
     if (this.contactRequired && !makesContact) {

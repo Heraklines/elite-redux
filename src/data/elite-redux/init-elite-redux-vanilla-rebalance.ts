@@ -666,15 +666,13 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // patched above; no double-add.
 
   // ===== Round 5: more poison/non-contact procs from the audit =====
-  // 38 POISON_POINT: vanilla 30% contact poison → ER adds 10% non-contact poison.
-  // ER spec: "Also works on offense" — add 30% on-attack contact proc.
-  [
-    AbilityId.POISON_POINT,
-    ab => {
-      addNonContactStatusChance(ab, StatusEffect.POISON, 10);
-      addOffenseContactStatusChance(ab, StatusEffect.POISON, 30);
-    },
-  ],
+  // 38 POISON_POINT: vanilla 30% contact poison. ER ROM text: "Has a 30% chance
+  // to inflict poison on CONTACT MOVES, both when attacking and being attacked."
+  // → contact-only on BOTH sides; NO non-contact tier (unlike Static/Flame Body).
+  // Prior code added a 10% non-contact poison tier, which made ranged moves
+  // (Water Gun, Ember, …) poison the holder — a regression vs the ROM spec.
+  // Keep only the offense-side contact proc ("also works on offense").
+  [AbilityId.POISON_POINT, ab => addOffenseContactStatusChance(ab, StatusEffect.POISON, 30)],
   // 27 EFFECT_SPORE: vanilla 30% contact SLP/PRZ/PSN → ER adds 10% non-contact each.
   // EFFECT_SPORE picks one of three statuses randomly per proc. Append a
   // separate non-contact proc per status (lower chance to balance). No

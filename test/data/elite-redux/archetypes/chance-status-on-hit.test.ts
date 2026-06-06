@@ -70,12 +70,18 @@ function makeStubMove(opts: { makesContact?: boolean; flags?: MoveFlags; type?: 
  * for the archetype's canApply / apply. `pokemon` is the *defender* (the one
  * with this ability) and `opponent` is the attacker.
  */
-function makeParams(opts: { defender: Pokemon; attacker: Pokemon; move: Move; simulated?: boolean }) {
+function makeParams(opts: {
+  defender: Pokemon;
+  attacker: Pokemon;
+  move: Move;
+  simulated?: boolean;
+  hitResult?: HitResult;
+}) {
   return {
     pokemon: opts.defender,
     opponent: opts.attacker,
     move: opts.move,
-    hitResult: HitResult.EFFECTIVE,
+    hitResult: opts.hitResult ?? HitResult.EFFECTIVE,
     damage: 50,
     simulated: opts.simulated ?? false,
   };
@@ -217,6 +223,56 @@ describe("ChanceStatusOnHitAbAttr archetype (C1)", () => {
     expect(attr.getChance()).toBe(25);
     expect(attr.getEffects()).toEqual([StatusEffect.SLEEP, StatusEffect.POISON]);
     expect(attr.requiresContact()).toBe(false);
+  });
+
+  // ===========================================================================
+  // Regression: the non-contact (`contactExcluded`) tier — e.g. Flame Body's
+  // "20% burn on non-contact" and Static's "10% paralyze on non-contact" — must
+  // only fire on non-contact ATTACKS (damaging moves), NEVER on STATUS-category
+  // moves. The ER ROM text reads "...on non-contact attacks" / "Non-contact has
+  // a 20% chance" (i.e. attacks). A foe opening with Growl/Leer (status) used to
+  // proc the burn, which players reported as "Flame Body burned me before I made
+  // any move." See #(contact-ability) repro.
+  // ===========================================================================
+  it("contactExcluded tier does NOT fire on a STATUS-category hit (Growl/Leer)", () => {
+    const attr = new ChanceStatusOnHitAbAttr({
+      chance: 100,
+      effects: [StatusEffect.BURN],
+      contactExcluded: true,
+    });
+    const defender = makeStubPokemon();
+    const attacker = makeStubPokemon();
+    // A non-contact status move (e.g. Growl): inherentlyMakesContact=false so the
+    // contactExcluded gate would pass, but hitResult is STATUS (no damage) → reject.
+    const move = makeStubMove({ makesContact: false });
+    const params = makeParams({ defender, attacker, move, hitResult: HitResult.STATUS });
+    expect(attr.canApply(params)).toBe(false);
+  });
+
+  it("contactExcluded tier DOES fire on a non-contact damaging attack (Ember)", () => {
+    const attr = new ChanceStatusOnHitAbAttr({
+      chance: 100,
+      effects: [StatusEffect.BURN],
+      contactExcluded: true,
+    });
+    const defender = makeStubPokemon();
+    const attacker = makeStubPokemon();
+    const move = makeStubMove({ makesContact: false }); // inherently ranged
+    const params = makeParams({ defender, attacker, move, hitResult: HitResult.EFFECTIVE });
+    expect(attr.canApply(params)).toBe(true);
+  });
+
+  it("contactExcluded tier does NOT fire when there is no attack (NO_EFFECT)", () => {
+    const attr = new ChanceStatusOnHitAbAttr({
+      chance: 100,
+      effects: [StatusEffect.BURN],
+      contactExcluded: true,
+    });
+    const defender = makeStubPokemon();
+    const attacker = makeStubPokemon();
+    const move = makeStubMove({ makesContact: false });
+    const params = makeParams({ defender, attacker, move, hitResult: HitResult.NO_EFFECT });
+    expect(attr.canApply(params)).toBe(false);
   });
 });
 

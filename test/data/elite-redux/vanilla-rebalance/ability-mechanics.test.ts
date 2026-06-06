@@ -609,10 +609,16 @@ describe("ER vanilla ability rebalance — R4/R5 non-contact tier (contactExclud
   // for each of these abilities must NOT fire on contact moves — the
   // pre-existing vanilla PostDefendContactApplyStatusEffectAbAttr already
   // handles those. Stacking two procs inflated the perceived rate.
+  // Abilities whose ER ROM text gives them an explicit non-contact tier:
+  //   Static — "10% chance to paralyze on non-contact attacks ... 30% on contact"
+  //   Flame Body — "Contact ... 30% ... Non-contact has a 20% chance."
+  //   Effect Spore / Poison Touch — ER adds a low non-contact tier (defend side).
+  // For these the ER-added ChanceStatusOnHitAbAttr must be contactExcluded so it
+  // ONLY fires on non-contact moves (the pre-existing vanilla contact proc
+  // handles contact moves — stacking both inflated the perceived rate).
   const cases: { id: AbilityId; name: string }[] = [
     { id: AbilityId.STATIC, name: "STATIC" },
     { id: AbilityId.FLAME_BODY, name: "FLAME_BODY" },
-    { id: AbilityId.POISON_POINT, name: "POISON_POINT" },
     { id: AbilityId.EFFECT_SPORE, name: "EFFECT_SPORE" },
     { id: AbilityId.POISON_TOUCH, name: "POISON_TOUCH" },
   ];
@@ -628,4 +634,18 @@ describe("ER vanilla ability rebalance — R4/R5 non-contact tier (contactExclud
       }
     });
   }
+
+  // Poison Point is CONTACT-ONLY per the ER ROM text:
+  // "Has a 30% chance to inflict poison on CONTACT MOVES, both when attacking
+  // and being attacked." Unlike Static/Flame Body it has NO non-contact tier.
+  // A prior wire added a 10% non-contact poison, which made ranged moves
+  // (Water Gun, Ember, …) poison the holder — that regression is now removed.
+  it("POISON_POINT — has NO ER-added non-contact ChanceStatusOnHit tier (contact-only spec)", () => {
+    const ab = getAbility(AbilityId.POISON_POINT);
+    const erAttrs = ab.attrs.filter(a => a.constructor.name === "ChanceStatusOnHitAbAttr");
+    expect(erAttrs.length).toBe(0);
+    // The vanilla contact proc + the ER offense-side contact proc must remain.
+    expect(ab.attrs.some(a => a.constructor.name === "PostDefendContactApplyStatusEffectAbAttr")).toBe(true);
+    expect(ab.attrs.some(a => a.constructor.name === "PostAttackContactApplyStatusEffectAbAttr")).toBe(true);
+  });
 });
