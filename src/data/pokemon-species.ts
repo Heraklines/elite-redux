@@ -217,6 +217,26 @@ export abstract class PokemonSpeciesForm {
    */
   getPassiveAbility(formIndex = this.formIndex): AbilityId {
     // TODO: This logic is quite convoluted; besides, forms should not need to have their own `getPassiveAbility` functions
+    // ER 3-passive: when a `_passives` triple has been installed (Phase B init
+    // for vanilla rebalance + custom species), its slot-0 entry IS the legacy
+    // single passive. Consult it first so ER-custom species (id >= 10000) —
+    // which have no `starterPassiveAbilities` entry and no prevolution chain to
+    // walk — resolve correctly instead of falling through to the RUN_AWAY
+    // fallback (the "No passive ability found for <id>, using run away" log).
+    // We read `_passives` directly rather than via `getPassiveAbilities()` to
+    // avoid mutual recursion (that method falls back to `getPassiveAbility()`).
+    // Mirror the form-aware resolution used by `getPassiveAbilities()` so a
+    // form's own passive triple wins over the base species'.
+    const formsArr = (this as unknown as { forms?: readonly PokemonSpeciesForm[] }).forms;
+    if (formsArr && formIndex >= 0 && formIndex < formsArr.length) {
+      const form = formsArr[formIndex];
+      if (form && form !== (this as unknown as PokemonSpeciesForm) && form._passives) {
+        return form._passives[0];
+      }
+    }
+    if (this._passives) {
+      return this._passives[0];
+    }
     let starterSpeciesId = this.speciesId;
     while (
       !(starterSpeciesId in starterPassiveAbilities)

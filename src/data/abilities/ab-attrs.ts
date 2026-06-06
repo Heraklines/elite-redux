@@ -4726,7 +4726,19 @@ export class PostTurnFormChangeAbAttr extends PostTurnAbAttr {
   }
 
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
-    return this.formFunc(pokemon) !== pokemon.formIndex;
+    const targetForm = this.formFunc(pokemon);
+    // Only an EXISTING form is a valid switch target. ER relocates Hunger Switch
+    // (and its Two-Faced composite) onto custom species that have no alternate
+    // forms registered (`forms: []`) — Morpekyll Hangry, Morpeko Hangry, …. There
+    // `getFormKey()` is always "" so `formFunc` resolves to a phantom non-zero
+    // index. Without this bound check the attr reports "can apply" every turn,
+    // firing the passive popup and a no-op form change to a form that doesn't
+    // exist. Vanilla two-form Morpeko (full-belly/hangry) is unaffected — its
+    // target index is in range.
+    if (targetForm < 0 || targetForm >= pokemon.species.forms.length) {
+      return false;
+    }
+    return targetForm !== pokemon.formIndex;
   }
 
   override apply({ simulated, pokemon }: AbAttrBaseParams): void {

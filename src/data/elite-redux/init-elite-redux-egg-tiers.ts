@@ -130,9 +130,14 @@ function pickStarterCost(tier: EggTier): number {
 
 function isErFormChangeTarget(draft: (typeof ER_SPECIES)[number], speciesId: number): boolean {
   return (
-    findErFormChangeByTarget(speciesId) !== undefined
-    || /(?:^|_)MEGA(?:_|$)|(?:^|_)PRIMAL(?:_|$)/.test(draft.speciesConst)
-    || /\b(Mega|Primal)\b/i.test(draft.name ?? "")
+    findErFormChangeByTarget(speciesId) !== undefined // HANGRY is Morpeko's in-battle alt-form (the Hunger Switch / Two-Faced
+    || // toggle target — SPECIES_MORPEKO_HANGRY / SPECIES_MORPEKYLL_HANGRY in the
+    // ER dump). Like Mega/Primal it is a battle-only form, NOT a base/root mon,
+    // so it must never hatch from eggs or appear in starter selection. ER models
+    // it as a separate custom species with no prevolution, so it would otherwise
+    // leak past the prevolution gate below.
+    /(?:^|_)MEGA(?:_|$)|(?:^|_)PRIMAL(?:_|$)|(?:^|_)HANGRY(?:_|$)/.test(draft.speciesConst)
+    || /\b(Mega|Primal|Hangry)\b/i.test(draft.name ?? "")
   );
 }
 

@@ -37,6 +37,7 @@ const REMOVE_FROM_GRID_AND_EGGS: readonly RegExp[] = [
   /^Meloetta Pirouette$/, // Relic Song
   /^Wishiwashi School$/, // Schooling
   /^Morpeko Hangry$/, // Hunger Switch
+  /^Morpekyll Hangry$/, // Hunger Switch / Two-Faced (Morpekyll's Hangry alt-form)
   /^Hoopa Unbound$/, // Prison Bottle
   /^Wispywaspy Hivemind$/, // custom hive ability
   /^Slate$/, // owner: should only emerge, not be obtainable
