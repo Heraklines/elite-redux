@@ -32,6 +32,7 @@ import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lis
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
 import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
+import { chromaKeyErSpriteTexture } from "#data/elite-redux/er-sprite-chroma-key";
 import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
 import type { SpeciesFormChangeTrigger } from "#data/form-change-triggers";
 import { SpeciesFormChangeManualTrigger, SpeciesFormChangeTimeOfDayTrigger } from "#data/form-change-triggers";
@@ -413,6 +414,12 @@ export class BattleScene extends SceneBase {
       `images/pokemon/${variant ? "variant/" : ""}${experimental ? "exp/" : ""}${atlasPath}.png`,
       `images/pokemon/${variant ? "variant/" : ""}${experimental ? "exp/" : ""}${atlasPath}.json`,
     );
+    // ER: a few ER-custom sprites shipped without alpha (flat opaque background),
+    // so they render inside a coloured box. Key the background out once the atlas
+    // texture finishes loading. No-ops for keys/sprites that don't need it.
+    if (key.includes("er__")) {
+      this.load.once(`filecomplete-atlas-${key}`, () => chromaKeyErSpriteTexture(this, key));
+    }
   }
 
   /**
