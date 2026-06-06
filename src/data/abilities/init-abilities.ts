@@ -186,7 +186,9 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { GroundedTag } from "#data/battler-tags";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { SpeciesFormChangeAbilityTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
+import { pokemonFormChanges } from "#data/pokemon-forms";
 import { getNonVolatileStatusEffects } from "#data/status-effect";
 import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
@@ -210,6 +212,43 @@ import type { AbAttrCondition, AiMovegenMoveStatsAbAttrParams, PokemonAttackCond
 import type { Move } from "#types/move-types";
 import { NumberHolder, randSeedInt } from "#utils/common";
 import i18next from "i18next";
+
+/**
+ * Resolve the Battle Bond ability-trigger form change available to `pokemon`
+ * from its current form, if any. A Battle Bond form change is a
+ * {@linkcode SpeciesFormChangeAbilityTrigger} entry in {@linkcode pokemonFormChanges}
+ * whose `preFormKey` matches the Pokémon's current form key. Vanilla Greninja
+ * uses this exact shape (`battle-bond` → `ash`); Elite Redux reuses it for
+ * Battle-Bond builds such as Darmanitan Redux Bond → Blunder.
+ *
+ * @returns The form index to change INTO, or `null` when no such form change
+ *   applies (e.g. the Pokémon has no Battle Bond form change, or it is already
+ *   in the transformed form).
+ */
+function getBattleBondTargetFormIndex(pokemon: Pokemon): number | null {
+  const formChanges = pokemonFormChanges[pokemon.species.speciesId];
+  if (!formChanges) {
+    return null;
+  }
+  const currentFormKey = pokemon.getFormKey();
+  for (const fc of formChanges) {
+    if (fc.preFormKey === currentFormKey && fc.findTrigger(SpeciesFormChangeAbilityTrigger)) {
+      const targetIndex = pokemon.species.forms.findIndex(f => f.formKey === fc.formKey);
+      if (targetIndex >= 0) {
+        return targetIndex;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * @returns Whether `pokemon` has a Battle Bond ability-trigger form change it
+ *   can currently transition into (see {@linkcode getBattleBondTargetFormIndex}).
+ */
+function hasBattleBondFormChange(pokemon: Pokemon): boolean {
+  return getBattleBondTargetFormIndex(pokemon) !== null;
+}
 
 export function initAbilities() {
   (allAbilities as Ability[]).push(
@@ -1444,8 +1483,24 @@ export function initAbilities() {
         PostFaintFormChangeAbAttr,
         () => 1,
       )
+      // Elite Redux Battle-Bond builds (e.g. Darmanitan Redux Bond -> Blunder):
+      // any non-Greninja, non-fusion species that has a Battle Bond
+      // ability-trigger form change registered transforms on dealing a KO, the
+      // same way Greninja's `battle-bond` -> `ash` does. The target form is
+      // resolved from the species' form-change table rather than a hard-coded
+      // form index, so this works for any such species without bespoke wiring.
       .conditionalAttr(
-        p => !p.hasSpecies(SpeciesId.GRENINJA) && !p.summonData.abilitiesApplied.has(AbilityId.BATTLE_BOND),
+        p => p.species.speciesId !== SpeciesId.GRENINJA && !p.isFusion() && hasBattleBondFormChange(p),
+        PostVictoryFormChangeAbAttr,
+        p => getBattleBondTargetFormIndex(p) ?? p.formIndex,
+      )
+      // The generic stat-boost branch only applies to Battle Bond users that do
+      // NOT have a form change to perform (vanilla non-Greninja behavior).
+      .conditionalAttr(
+        p =>
+          !p.hasSpecies(SpeciesId.GRENINJA)
+          && !hasBattleBondFormChange(p)
+          && !p.summonData.abilitiesApplied.has(AbilityId.BATTLE_BOND),
         PostVictoryStatStageChangeAbAttr,
         [Stat.ATK, Stat.SPATK, Stat.SPD],
         1,

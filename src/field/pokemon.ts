@@ -6918,6 +6918,17 @@ export class PlayerPokemon extends Pokemon {
           this.formIndex = formIndex;
         }
       }
+      // Guard against landing on a transient battle-only form (mega / primal /
+      // Gigantamax / Eternamax) as an evolution result. These forms are never a
+      // valid evolution destination — they are reached only in-battle via a
+      // stone, orb, or Dynamax. The pre-evolution form index is otherwise
+      // carried over verbatim (Pokémon keep the same form slot when evolving,
+      // e.g. a regional form evolves into the same regional form). When the
+      // source and target species have mismatched form layouts (e.g. ER's
+      // "redux" Krabby at index 1 evolving into Kingler, whose index 1 is
+      // "gigantamax"), that carry-over can point at a battle-only form. Reset to
+      // the normal base form (the canonical index-0 form key "") in that case.
+      this.sanitizeEvolvedFormIndex(isFusion);
       this.generateName();
       if (isFusion) {
         const abilityCount = this.getFusionSpeciesForm().getAbilityCount();
@@ -6970,6 +6981,47 @@ export class PlayerPokemon extends Pokemon {
         updateAndResolve();
       }
     });
+  }
+
+  /**
+   * Ensure the (possibly carried-over) form index after evolving does not point
+   * at a transient battle-only form — Mega, Primal, Gigantamax, or Eternamax.
+   * Those forms are only reachable in-battle (stone / orb / Dynamax) and must
+   * never be a Pokémon's resting form after evolution. When the resolved form
+   * is battle-only, fall back to the species' normal base form (form key `""`,
+   * canonically index 0).
+   *
+   * @param isFusion - Whether to sanitize the fusion species' form index instead
+   *   of the base species'.
+   */
+  private sanitizeEvolvedFormIndex(isFusion: boolean): void {
+    const battleOnlyFormKeys: string[] = [
+      SpeciesFormKey.MEGA,
+      SpeciesFormKey.MEGA_X,
+      SpeciesFormKey.MEGA_Y,
+      SpeciesFormKey.PRIMAL,
+      SpeciesFormKey.GIGANTAMAX,
+      SpeciesFormKey.GIGANTAMAX_SINGLE,
+      SpeciesFormKey.GIGANTAMAX_RAPID,
+      SpeciesFormKey.ETERNAMAX,
+    ];
+    const species = isFusion ? this.fusionSpecies : this.species;
+    if (!species || !species.forms || species.forms.length === 0) {
+      return;
+    }
+    const currentFormIndex = isFusion ? this.fusionFormIndex : this.formIndex;
+    const currentForm = species.forms[currentFormIndex];
+    if (!currentForm || !battleOnlyFormKeys.includes(currentForm.formKey)) {
+      return;
+    }
+    // Prefer the canonical normal base form (form key ""); fall back to index 0.
+    const normalIndex = species.forms.findIndex(f => f.formKey === "");
+    const safeIndex = normalIndex >= 0 ? normalIndex : 0;
+    if (isFusion) {
+      this.fusionFormIndex = safeIndex;
+    } else {
+      this.formIndex = safeIndex;
+    }
   }
 
   private handleSpecialEvolutions(evolution: SpeciesFormEvolution) {
