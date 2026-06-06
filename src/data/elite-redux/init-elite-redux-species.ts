@@ -14,9 +14,11 @@
 // =============================================================================
 
 import { allSpecies } from "#data/data-lists";
+import { installErFormSpriteRedirect } from "#data/elite-redux/er-form-sprite-redirect";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
+import { ER_SPRITE_MANIFEST } from "#data/elite-redux/er-sprite-manifest";
 import { PokemonForm } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
 import { PokemonType } from "#enums/pokemon-type";
@@ -399,6 +401,16 @@ const ER_FORM_SUFFIXES: readonly { suffix: string; formKey: string; formName: st
 ];
 
 /**
+ * ER sprite slug keyed by ER species id (from the sprite manifest). Used to
+ * redirect injected ER mega forms to their `elite-redux/{slug}/…` art — ER-new
+ * megas (on species with no vanilla mega, e.g. Goodra, Meganium, Typhlosion)
+ * would otherwise resolve to the vanilla `{speciesId}-mega` path, which has no
+ * asset → 403 → "substitute" placeholder (and, on the live build, a loader
+ * stall). The ER art exists under the slug; this points the form at it.
+ */
+const ER_SLUG_BY_ER_ID = new Map<number, string>(ER_SPRITE_MANIFEST.map(e => [e.speciesId, e.slug]));
+
+/**
  * Look for ER `${baseConst}${suffix}` variants of this species. If the base
  * pokerogue species already has a form with the matching `formKey`, the
  * existing form loop above already patched it — skip. Otherwise construct a
@@ -523,6 +535,17 @@ function injectMissingErMegaForms(
     formMut.generation = species.generation;
 
     (species.forms as unknown as PokemonForm[]).push(form);
+
+    // Redirect the injected mega form's sprite/icon to its ER-custom art. ER-new
+    // megas (species with no vanilla mega) would otherwise resolve to the vanilla
+    // `{speciesId}-{formKey}` path (e.g. `6706-mega` for Goodra Hisuian Mega),
+    // which has no asset → 403 → substitute placeholder + a loader stall on the
+    // live build. The ER art lives under the slug, so point the form at it.
+    const megaSlug = ER_SLUG_BY_ER_ID.get(formDraft.id);
+    if (megaSlug) {
+      installErFormSpriteRedirect(form, megaSlug);
+    }
+
     result.formCount++;
   }
 }
