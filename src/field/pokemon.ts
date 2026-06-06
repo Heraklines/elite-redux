@@ -5778,6 +5778,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return false;
     }
 
+    // ER: the vanilla FREEZE status does not exist — it is replaced by Frostbite
+    // (an ER battler tag). Any attempt to freeze a Pokemon (vanilla Ice moves,
+    // abilities, etc.) instead inflicts ER_FROSTBITE, which carries its own
+    // immunity rules (Ice-types, already-frostbitten) in the tag's canAdd. This
+    // single intercept catches every freeze source so "FRZ" never appears.
+    if (effect === StatusEffect.FREEZE) {
+      return this.addTag(BattlerTagType.ER_FROSTBITE, 0, undefined, sourcePokemon?.id);
+    }
+
     if (!this.canSetStatus(effect, quiet, overrideStatus, sourcePokemon)) {
       return false;
     }
