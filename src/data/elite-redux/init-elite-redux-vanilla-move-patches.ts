@@ -464,6 +464,20 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
   [MoveId.WILD_CHARGE, move => addAttrUnique(move, new StatusEffectAttr(StatusEffect.PARALYSIS))],
   // BEAK_BLAST: direct burn proc (not just the header).
   [MoveId.BEAK_BLAST, move => addAttrUnique(move, new StatusEffectAttr(StatusEffect.BURN))],
+  // CHILLING_WATER: ER re-specs this to "Fires ice-cold water at the foe. 30%
+  // chance to inflict Frostbite." (75 power Water — power set by rebalance). The
+  // ER move (id 847) shares the vanilla name, so the c-source name-remap pins it
+  // to vanilla CHILLING_WATER, which keeps vanilla's GUARANTEED Attack drop. Drop
+  // that StatStageChangeAttr and graft the 30% ER_FROSTBITE secondary (gated by
+  // move.chance, same shape as every other ER frostbite move).
+  [
+    MoveId.CHILLING_WATER,
+    move => {
+      removeAttrsByName(move, ["StatStageChangeAttr"]);
+      move.chance = 30;
+      addAttrUnique(move, new AddBattlerTagAttr(BattlerTagType.ER_FROSTBITE, false));
+    },
+  ],
   // STEEL_BEAM: ER replaces HalfSacrificial with flat 50% recoil.
   [
     MoveId.STEEL_BEAM,
