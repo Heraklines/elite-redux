@@ -25,6 +25,7 @@ import { initEliteReduxSpecies, injectAllErMegaForms } from "#data/elite-redux/i
 import { initEliteReduxStarterCosts } from "#data/elite-redux/init-elite-redux-starter-costs";
 import { initEliteReduxTmMoves } from "#data/elite-redux/init-elite-redux-tm-moves";
 import { initEliteReduxTrainers } from "#data/elite-redux/init-elite-redux-trainers";
+import { initEliteReduxUnownSchool } from "#data/elite-redux/init-elite-redux-unown-school";
 import { initEliteReduxVanillaRebalance } from "#data/elite-redux/init-elite-redux-vanilla-rebalance";
 import { initPokemonForms } from "#data/pokemon-forms";
 import { initBiomeBgmLoopPoints } from "#init/init-biome-bgm-loop-points";
@@ -107,6 +108,17 @@ export function initializeGame() {
   }
   console.info(
     `[er-b2] registered ${moveResult.customsAdded} ER-custom moves (skipped ${moveResult.customsAlreadyPresent} already present)`,
+  );
+  // Elite Redux: wire Unown's Wishiwashi-style School (Revelation) form change.
+  // Must run AFTER initEliteReduxSpecies() (base Unown's letter forms exist) and
+  // AFTER initEliteReduxCustomAbilities() (the Revelation ability instance, id
+  // 5586, exists in allAbilities so its dispatcher-attached attr can be fixed).
+  const unownSchoolResult = initEliteReduxUnownSchool();
+  if (unownSchoolResult.errors.length > 0) {
+    console.warn("[er-unown-school] issues:", unownSchoolResult.errors.slice(0, 5));
+  }
+  console.info(
+    `[er-unown-school] form injected: ${unownSchoolResult.formInjected}, form changes: ${unownSchoolResult.formChangesRegistered}, ability rewired: ${unownSchoolResult.abilityRewired}`,
   );
   // Elite Redux #151: repair scrambled gen8/9 move id-map entries (by name)
   // BEFORE the rebalance + move-patches consume the map, so stats and effects
