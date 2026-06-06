@@ -220,17 +220,32 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
    */
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, move, opponent: attacker } = params;
-    const isContact = move.doesFlagEffectApply({
+    // User-aware contact: factors in the attacker's contact-suppressing
+    // abilities (Long Reach / Twinkle Toes → IgnoreContactAbAttr) and
+    // substitute hits. Used by the contact-REQUIRED gate so a Long Reach
+    // attacker correctly does NOT trigger a contact-required proc.
+    const makesContact = move.doesFlagEffectApply({
       flag: MoveFlags.MAKES_CONTACT,
       user: attacker,
       target: pokemon,
     });
-    // Contact-excluded gate — proc fires ONLY on non-contact attacks.
-    if (this.contactExcluded && isContact) {
+    // Inherent contact: the move's own MAKES_CONTACT flag, IGNORING the
+    // attacker's contact-suppression. Used by the contact-EXCLUDED gate so a
+    // physical contact move (e.g. Tackle) whose contact was suppressed by the
+    // attacker's Long Reach is NOT reclassified as "non-contact" and punished
+    // by a non-contact proc (e.g. Flame Body's 20% non-contact burn). Long
+    // Reach's purpose is to dodge the target's contact-reactive effects — it
+    // must not push the attacker into the non-contact-reactive branch instead.
+    // (See #254 — "non-contact moves trigger contact abilities" — same class of
+    // contact-classification bug.) An inherently ranged move (Ember) has the
+    // flag unset, so the non-contact tier still fires on it as intended.
+    const inherentlyMakesContact = move.hasFlag(MoveFlags.MAKES_CONTACT);
+    // Contact-excluded gate — proc fires ONLY on inherently non-contact attacks.
+    if (this.contactExcluded && inherentlyMakesContact) {
       return false;
     }
     // Contact-required gate, when configured.
-    if (this.contactRequired && !isContact) {
+    if (this.contactRequired && !makesContact) {
       return false;
     }
     // Filter gate (move-flag or type).
@@ -571,11 +586,17 @@ export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
     if (target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") || pokemon === target) {
       return false;
     }
-    const isContact = move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target });
-    if (this.contactExcluded && isContact) {
+    const makesContact = move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target });
+    // Inherent contact flag (ignores the holder's contact-suppression). The
+    // non-contact tier (`contactExcluded`) must key off whether the move is
+    // INHERENTLY ranged, not whether the holder's Long Reach made an otherwise-
+    // contact move "non-contact" — mirrors the defensive `ChanceStatusOnHitAbAttr`
+    // fix so the two contact-excluded gates classify contact identically.
+    const inherentlyMakesContact = move.hasFlag(MoveFlags.MAKES_CONTACT);
+    if (this.contactExcluded && inherentlyMakesContact) {
       return false;
     }
-    if (this.contactRequired && !isContact) {
+    if (this.contactRequired && !makesContact) {
       return false;
     }
     if (this.filter !== undefined && !checkChanceStatusFilter(this.filter, move)) {

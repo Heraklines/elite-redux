@@ -45,9 +45,54 @@ export interface InitEliteReduxCustomSpeciesResult {
   customsAdded: number;
   /** Number of ER-custom species skipped because an entry already existed (idempotent re-run). */
   customsAlreadyPresent: number;
+  /**
+   * Number of degenerate placeholder entries skipped — ER ships a few orphan
+   * "stub" species in its dump (all-zero base stats, no abilities/innates,
+   * zero catchRate/baseExp). They are not real Pokémon and must NOT be
+   * registered (they'd surface as junk obtainables, e.g. "Infernape Redux B").
+   */
+  skippedDegenerate: number;
   /** Non-fatal issues — e.g. constructor failures with a usable error message. */
   errors: string[];
 }
+
+/**
+ * A degenerate placeholder entry from the ER dump: every base stat is 0 AND no
+ * ability or innate slot is filled. These are orphan stubs (e.g. the abilities-
+ * less "Infernape Redux B"), not playable species — registering them surfaces a
+ * junk obtainable in the pokédex / starter grid / egg pool. `SPECIES_NONE`
+ * (er id -1) is already filtered earlier by the id-map gate; this catches the
+ * remaining in-range stubs. Legitimate ER customs (including real `_REDUX_B`
+ * branch forms like Flygon/Mawile Redux B) ship real stats and abilities, so
+ * they are unaffected.
+ */
+function isDegenerateDraft(draft: ErSpeciesDraft): boolean {
+  const stats = draft.baseStats;
+  const allStatsZero = Array.isArray(stats) && stats.length === 6 && stats.every(v => v === 0);
+  if (!allStatsZero) {
+    return false;
+  }
+  const noAbilities = (draft.abilities ?? []).every(a => a === 0);
+  const noInnates = (draft.innates ?? []).every(a => a === 0);
+  return noAbilities && noInnates;
+}
+
+/**
+ * Per-species ER sprite-slug corrections. A handful of upstream ER sprite
+ * directories ship the WRONG art (mislabeled / corrupt source frames), so the
+ * manifest-derived slug points at art for a different creature. Each entry maps
+ * the broken species const → a slug whose `elite-redux/<slug>/` directory holds
+ * the correct, complete sprite set (front/back/icon + all shiny tiers).
+ *
+ * - `SPECIES_INFERNAPE_REDUX`: its own `infernape_redux/` directory contains a
+ *   winged yellow/blue creature (not Infernape) for front/back/icon. The base
+ *   `infernape/` sprite set is the correct flaming-monkey art and is complete,
+ *   so we point Infernape Redux at it. (User report: Redux Infernape showed an
+ *   unrelated flaming sprite.)
+ */
+const ER_SPRITE_SLUG_OVERRIDES: Readonly<Record<string, string>> = {
+  SPECIES_INFERNAPE_REDUX: "infernape",
+};
 
 /**
  * Map ER's numeric type id (decoded by `ER_TYPE_NAMES` in `er-move-tables.ts`)
@@ -365,6 +410,7 @@ export function initEliteReduxCustomSpecies(): InitEliteReduxCustomSpeciesResult
   const result: InitEliteReduxCustomSpeciesResult = {
     customsAdded: 0,
     customsAlreadyPresent: 0,
+    skippedDegenerate: 0,
     errors: [],
   };
 
@@ -388,6 +434,13 @@ export function initEliteReduxCustomSpecies(): InitEliteReduxCustomSpeciesResult
       result.customsAlreadyPresent++;
       continue;
     }
+    if (isDegenerateDraft(draft)) {
+      // Orphan stub (all-zero stats, no abilities) — not a real species.
+      // Skip registration entirely so it never surfaces as an obtainable
+      // (e.g. the junk "Infernape Redux B").
+      result.skippedDegenerate++;
+      continue;
+    }
 
     try {
       const species = buildCustomSpecies(draft, pokerogueId);
@@ -397,8 +450,11 @@ export function initEliteReduxCustomSpecies(): InitEliteReduxCustomSpeciesResult
         mapAbilityId(draft.innates[2]),
       ]);
       // Register the ER sprite slug for this species so getSpriteAtlasPath
-      // resolves to assets/images/pokemon/elite-redux/{slug}/*.
-      const slug = ER_SPRITE_BY_SPECIES_ID.get(draft.id);
+      // resolves to assets/images/pokemon/elite-redux/{slug}/*. A per-species
+      // override takes precedence over the manifest slug for entries whose own
+      // upstream sprite directory ships the wrong art (see
+      // ER_SPRITE_SLUG_OVERRIDES — e.g. Infernape Redux).
+      const slug = ER_SPRITE_SLUG_OVERRIDES[draft.speciesConst] ?? ER_SPRITE_BY_SPECIES_ID.get(draft.id);
       if (slug) {
         ErCustomSpecies.registerSpriteSlug(pokerogueId, slug);
       }
