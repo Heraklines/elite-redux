@@ -34,6 +34,7 @@ import {
   PostSummonTerrainChangeAbAttr,
   PostSummonWeatherChangeAbAttr,
   PostTurnHurtIfSleepingAbAttr,
+  PostWeatherLapseDamageAbAttr,
   PostWeatherLapseHealAbAttr,
   ReceivedMoveDamageMultiplierAbAttr,
   ReceivedTypeDamageMultiplierAbAttr,
@@ -532,6 +533,18 @@ describe("ER vanilla ability rebalance — R2 FLOWER_GIFT ATK->SPATK", () => {
     expect(atkBoost).toBeUndefined();
     const spAtkBoost = ab.attrs.find(a => a instanceof StatMultiplierAbAttr && a.stat === Stat.SPATK);
     expect(spAtkBoost).toBeDefined();
+  });
+});
+
+describe("ER vanilla ability rebalance — SOLAR_POWER drops in-sun self-damage", () => {
+  it("SOLAR_POWER — PostWeatherLapseDamageAbAttr stripped, SpAtk 1.5x boost kept", () => {
+    const ab = getAbility(AbilityId.SOLAR_POWER);
+    // ER spec: pure Sp.Atk boost in sun, NO 1/8-per-turn HP loss.
+    const hasSelfDamage = ab.attrs.some(a => a instanceof PostWeatherLapseDamageAbAttr);
+    expect(hasSelfDamage, "Solar Power must NOT chip HP in sun under ER").toBe(false);
+    const spAtkBoost = ab.attrs.find(a => a instanceof StatMultiplierAbAttr && a.stat === Stat.SPATK);
+    expect(spAtkBoost, "Solar Power must keep its Sp.Atk boost").toBeDefined();
+    expect(readStatMultiplier(spAtkBoost as StatMultiplierAbAttr)).toBe(1.5);
   });
 });
 

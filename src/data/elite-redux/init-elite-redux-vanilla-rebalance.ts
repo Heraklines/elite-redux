@@ -76,6 +76,7 @@ import {
   PostSummonTerrainChangeAbAttr,
   PostSummonWeatherChangeAbAttr,
   PostTurnHurtIfSleepingAbAttr,
+  PostWeatherLapseDamageAbAttr,
   PostWeatherLapseHealAbAttr,
   ReceivedMoveDamageMultiplierAbAttr,
   ReceivedTypeDamageMultiplierAbAttr,
@@ -595,6 +596,14 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
 
   // ===== MAJOR — FLOWER_GIFT changes self+ally ATK boost to SPATK boost =====
   [AbilityId.FLOWER_GIFT, ab => patchFlowerGift(ab)],
+
+  // ===== MAJOR — SOLAR_POWER drops the in-sun self-damage =====
+  // ER spec (er-abilities.ts id 94 / er-ability-rom-descriptions.ts:
+  // "Boosts the Pokemon's highest attacking stat by 50% during sun.") is a
+  // PURE Sp.Atk boost in sun — it does NOT chip 1/8 max HP each turn the way
+  // vanilla pokerogue Solar Power does. Strip the PostWeatherLapseDamageAbAttr
+  // and keep the StatMultiplier(SPATK, 1.5).
+  [AbilityId.SOLAR_POWER, ab => patchSolarPower(ab)],
 
   // ===== TOTAL rewrites =====
   // BIG_PECKS: vanilla "Def-drop immune"; ER "contact moves +30% boost".
@@ -2077,6 +2086,17 @@ function patchFlowerGift(ability: MutableAbility): void {
       }
     }
   }
+}
+
+/**
+ * Patch SOLAR_POWER: ER drops the vanilla in-sun self-damage entirely. Vanilla
+ * pokerogue wires both a `PostWeatherLapseDamageAbAttr` (lose 1/8 max HP at the
+ * end of every turn in sun) and a `StatMultiplierAbAttr(SPATK, 1.5)`. ER's ROM
+ * text ("Boosts the Pokemon's highest attacking stat by 50% during sun.") has
+ * no HP cost, so strip only the damage attr and leave the Sp.Atk boost intact.
+ */
+function patchSolarPower(ability: MutableAbility): void {
+  ability.attrs = ability.attrs.filter(a => !(a instanceof PostWeatherLapseDamageAbAttr));
 }
 
 /**
