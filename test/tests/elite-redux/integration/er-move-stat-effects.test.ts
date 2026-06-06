@@ -74,4 +74,31 @@ describe.skipIf(!RUN_SCENARIOS)("ER move stat self-effects (#125)", () => {
       }
     }
   });
+
+  it("Wyrm Wind (828): self Speed +1 / SpDef -1 applied ONCE per move, not per hit", async () => {
+    // Special Scale Shot: multi-hit (2–5). With Skill Link it always lands 5
+    // hits, but the self stat changes must fire exactly once after the whole
+    // sequence (regression: previously +1/-1 per strike, e.g. +5/-5).
+    const move = await erMove(828);
+    if (move === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(AbilityId.SKILL_LINK) // force a full 5-hit sequence
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset([move])
+      .startingLevel(50)
+      .enemyLevel(50)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.LATIOS]);
+    const player = game.field.getPlayerPokemon();
+    game.move.use(move);
+    await game.toEndOfTurn();
+    // Exactly once, regardless of how many of the (up to 5) hits connected.
+    expect(player.getStatStage(Stat.SPD), "user Speed raised exactly +1").toBe(1);
+    expect(player.getStatStage(Stat.SPDEF), "user SpDef lowered exactly -1").toBe(-1);
+  });
 });

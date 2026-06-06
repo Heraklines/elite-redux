@@ -1097,15 +1097,22 @@ export class BattleScene extends SceneBase {
       icon.setFrame(pokemon.getIconId(true, useIllusion));
       pokemon.shiny = temp;
 
-      // Elite Redux: a vanilla species in its "redux" form asks for a
-      // "<id>-redux" icon frame that doesn't exist in the vanilla icon atlas
-      // (e.g. a wild redux Spearow → frame "21-redux"). The shiny-off retry above
-      // doesn't help — the form suffix is still there — so the sprite lands on a
-      // stale/wrong frame (it looked like a Mega Charizard). Fall back to the
-      // BASE-form icon of the same species, which always exists, so the party
-      // menu at least shows the correct Pokémon.
+      // Elite Redux: a vanilla species in an ER-added form (most commonly the
+      // "redux" form, but also megas/regionals ER injects) asks for a
+      // "<id>-<formKey>" icon frame that doesn't exist in the bundled
+      // `pokemon_icons_N` atlas (e.g. a wild redux Spearow → frame "21-redux").
+      // The shiny-off retry above doesn't help — the form suffix is still there —
+      // so the sprite lands on a stale/wrong frame (it looked like a Mega
+      // Charizard). Fall back to the BASE-form icon of the same species, which
+      // always exists, so the correct Pokémon is shown.
+      //
+      // NOTE: the previous fallback called `getSpeciesForm(...).getIconId(false, 0, …)`
+      // expecting formIndex 0 to give the base frame — but `PokemonForm.getFormSpriteKey`
+      // ignores the passed index and re-appends its own `formKey`, so it produced the
+      // SAME broken "<id>-redux" string and the icon stayed wrong. `getBaseIconId`
+      // resolves the base frame off the *species* object (forms[0]) correctly.
       if (icon.frame.name !== pokemon.getIconId(true, useIllusion)) {
-        const baseFrame = pokemon.getSpeciesForm(ignoreOverride, useIllusion).getIconId(false, 0, false, 0);
+        const baseFrame = pokemon.getBaseIconId(useIllusion);
         if (icon.texture.has(baseFrame)) {
           icon.setFrame(baseFrame);
         }

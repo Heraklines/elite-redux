@@ -1138,6 +1138,36 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       fusionVariant,
     );
   }
+
+  /**
+   * Icon frame id for this Pokemon's **base form** (formIndex 0), keeping the
+   * same gender / shiny / variant resolution as {@linkcode getIconId}.
+   *
+   * Elite Redux adds extra forms (e.g. `"redux"`) to many vanilla species, but
+   * those forms have no dedicated icon frame in the bundled `pokemon_icons_N`
+   * atlas — `getIconId` returns e.g. `"21-redux"` for a redux Spearow, a frame
+   * that does not exist. This resolves to the base-species frame (`"21"`,
+   * `"21s"` for shiny, `"521-f"` for gendered, etc.) which always exists and
+   * shows the correct Pokémon. Used as the icon fallback in
+   * {@linkcode BattleScene.addPokemonIcon}.
+   *
+   * Note: this calls {@linkcode PokemonSpecies.getIconId} on the *species*
+   * (not the {@linkcode PokemonSpeciesForm} returned by `getSpeciesForm`),
+   * because a form's `getFormSpriteKey` ignores the passed `formIndex` and
+   * always re-appends its own `formKey` — so calling it with `formIndex = 0`
+   * would still yield the broken `"<id>-<formKey>"` frame.
+   */
+  getBaseIconId(useIllusion = false): string {
+    const illusion = this.summonData.illusion;
+    const species = useIllusion && illusion ? getPokemonSpecies(illusion.species) : this.species;
+    const variant = useIllusion && illusion ? illusion.variant : this.variant;
+    return species.getIconId(
+      this.getGender(false, useIllusion) === Gender.FEMALE,
+      0,
+      this.isBaseShiny(useIllusion),
+      variant,
+    );
+  }
   //#endregion Atlas and sprite ID methods
 
   /**

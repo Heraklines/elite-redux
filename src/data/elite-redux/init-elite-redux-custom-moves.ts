@@ -688,10 +688,13 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
     case 1018: // Block Dropper (2–5 "blocks"; row flipped off the bogus flinch)
       move.attr(MultiHitAttr);
       break;
-    case 828: // Wyrm Wind — 2–5 hits, lowers foe SpDef + raises user Speed (ch100)
+    case 828: // Wyrm Wind — special Scale Shot: 2–5 hits, then raises user
+      // Speed +1 and lowers user SpDef -1. Like vanilla Scale Shot, the self
+      // stat changes fire ONCE after the full multi-hit sequence
+      // (lastHitOnly), not once per strike.
       move.attr(MultiHitAttr);
-      move.attr(StatStageChangeAttr, [Stat.SPDEF], -1);
-      move.attr(StatStageChangeAttr, [Stat.SPD], 1, true);
+      move.attr(StatStageChangeAttr, [Stat.SPD], 1, true, { lastHitOnly: true });
+      move.attr(StatStageChangeAttr, [Stat.SPDEF], -1, true, { lastHitOnly: true });
       break;
     case 1013: // Chiller — 3 snowballs; 10% frostbite handled by chance-status row
       move.attr(MultiHitAttr, MultiHitType.THREE);

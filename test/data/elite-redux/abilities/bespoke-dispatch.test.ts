@@ -1011,14 +1011,16 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(attr.getN()).toBe(2);
   });
 
-  it("er id 583 (Gallantry) wires PreFaintRevive (hp-threshold:0, first-n-hits:1)", () => {
+  it("er id 583 (Gallantry) wires NullifyFirstNHits(1)", () => {
+    // "Negates the first instance of damage received." — full damage-negation
+    // of the first incoming hit (set to 0), the N=1 sibling of Cheating Death.
+    // NOT an endure/Sturdy-shaped PreFaintRevive clamp.
     const res = dispatchArchetype("bespoke", null, 583);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(1);
-    const attr = res.attrs[0] as PreFaintReviveAbAttr;
-    expect(attr).toBeInstanceOf(PreFaintReviveAbAttr);
-    expect(attr.getGate()).toEqual({ kind: "hp-threshold", threshold: 0 });
-    expect(attr.getUsage()).toEqual({ kind: "first-n-hits", n: 1 });
+    const attr = res.attrs[0] as NullifyFirstNHitsAbAttr;
+    expect(attr).toBeInstanceOf(NullifyFirstNHitsAbAttr);
+    expect(attr.getN()).toBe(1);
   });
 
   it("er id 724 (Lucky Halo) wires SelfStatDropImmunity + PreFaintRevive(first-n-hits:1)", () => {

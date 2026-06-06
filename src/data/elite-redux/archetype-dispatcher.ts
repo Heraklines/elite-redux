@@ -2127,9 +2127,9 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
  *     hp-threshold:0, usage: first-n-hits:2). Endure-shaped (clamp to 1 HP)
  *     for the first two incoming hits — full "no damage" semantics is a
  *     partial wire.
- *   - 583 Gallantry → {@linkcode PreFaintReviveAbAttr} (gate: hp-threshold:0,
- *     usage: first-n-hits:1). Same endure-shaped clamp as Cheating Death
- *     with N=1.
+ *   - 583 Gallantry → {@linkcode NullifyFirstNHitsAbAttr} (n=1). Negates the
+ *     first incoming damage instance (set to 0); the N=1 sibling of Cheating
+ *     Death. NOT an endure/Sturdy-shaped clamp.
  *   - 724 Lucky Halo → {@linkcode ProtectStatAbAttr} (vanilla Clear Body
  *     parent) + {@linkcode PreFaintReviveAbAttr} (first-n-hits:1). The two
  *     compose at the wire-up layer; both attach to the same Ability.
@@ -2696,14 +2696,11 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // (moves still connect and secondary effects still apply).
       return ok([new NullifyFirstNHitsAbAttr(2)]);
     case 583:
-      // Gallantry — "Gets no damage for first hit." Same endure-shaped subset
-      // as Cheating Death with N=1. Partial wire vs the full "no-damage" text.
-      return ok([
-        new PreFaintReviveAbAttr({
-          gate: { kind: "hp-threshold", threshold: 0 },
-          usage: { kind: "first-n-hits", n: 1 },
-        }),
-      ]);
+      // Gallantry — "Negates the first instance of damage received. Moves still
+      // connect and secondary effects apply, but damage becomes 0." This is the
+      // N=1 sibling of Cheating Death (427): full damage-negation of the first
+      // incoming hit (set to 0), NOT an endure/Sturdy-shaped clamp-to-1-HP.
+      return ok([new NullifyFirstNHitsAbAttr(1)]);
     case 724:
       // Lucky Halo — "Negates self stat drops. Endures a single KO."
       // Composes SelfStatDropImmunityAbAttr (cancels the holder's OWN stat drops
