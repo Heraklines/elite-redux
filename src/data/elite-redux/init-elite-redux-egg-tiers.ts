@@ -48,6 +48,8 @@ export interface InitEliteReduxEggTiersResult {
   skippedPrevolutions: number;
   /** Number of ER custom form-change targets skipped (megas, primals, move-megas). */
   skippedFormChanges: number;
+  /** Number of drafts skipped because their pkrg id is not a registered species (degenerate stub / id-map drift). */
+  skippedUnregistered: number;
 }
 
 function pickTier(draft: (typeof ER_SPECIES)[number]): EggTier {
@@ -80,6 +82,8 @@ const EGG_TIER_OVERRIDES: Readonly<Record<string, EggTier>> = {
   "Azelf Redux": EggTier.EPIC,
   "Mesprit Redux": EggTier.EPIC,
   "Uxie Redux": EggTier.EPIC,
+  // Wooly Worm (BST 570 → bands as RARE) is a high-value custom; pin to EPIC.
+  "Wooly Worm": EggTier.EPIC,
 };
 
 /**
@@ -130,12 +134,15 @@ function pickStarterCost(tier: EggTier): number {
 
 function isErFormChangeTarget(draft: (typeof ER_SPECIES)[number], speciesId: number): boolean {
   return (
-    findErFormChangeByTarget(speciesId) !== undefined // HANGRY is Morpeko's in-battle alt-form (the Hunger Switch / Two-Faced // toggle target — SPECIES_MORPEKO_HANGRY / SPECIES_MORPEKYLL_HANGRY in the // ER dump). Like Mega/Primal it is a battle-only form, NOT a base/root mon,
-    || // so it must never hatch from eggs or appear in starter selection. ER models
-    // it as a separate custom species with no prevolution, so it would otherwise
-    // leak past the prevolution gate below.
-    /(?:^|_)MEGA(?:_|$)|(?:^|_)PRIMAL(?:_|$)|(?:^|_)HANGRY(?:_|$)/.test(draft.speciesConst)
-    || /\b(Mega|Primal|Hangry)\b/i.test(draft.name ?? "")
+    findErFormChangeByTarget(speciesId) !== undefined // HANGRY is Morpeko's in-battle alt-form (the Hunger Switch / Two-Faced // toggle target — SPECIES_MORPEKO_HANGRY / SPECIES_MORPEKYLL_HANGRY in the // ER dump). Like Mega/Primal it is a battle-only form, NOT a base/root mon, // so it must never hatch from eggs or appear in starter selection. ER models // it as a separate custom species with no prevolution, so it would otherwise
+    || // leak past the prevolution gate below. BOND / BLUNDER are Darmanitan Redux's
+    // special Battle-Bond forms (SPECIES_DARMANITAN_REDUX_BOND / _BLUNDER) — also
+    // battle-only forms reached via the Bond chain off the base Darmanitan Redux,
+    // never base/root mons, so they must be excluded the same way.
+    /(?:^|_)MEGA(?:_|$)|(?:^|_)PRIMAL(?:_|$)|(?:^|_)HANGRY(?:_|$)|(?:^|_)BOND(?:_|$)|(?:^|_)BLUNDER(?:_|$)/.test(
+      draft.speciesConst,
+    )
+    || /\b(Mega|Primal|Hangry|Bond|Blunder)\b/i.test(draft.name ?? "")
   );
 }
 
@@ -159,6 +166,7 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
     alreadyPresent: 0,
     skippedPrevolutions: 0,
     skippedFormChanges: 0,
+    skippedUnregistered: 0,
   };
 
   const tiers = speciesEggTiers as Record<number, EggTier>;
@@ -233,6 +241,18 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
   for (const draft of ER_SPECIES) {
     const pkrgId = ER_ID_MAP.species[draft.id];
     if (pkrgId === undefined || pkrgId < VANILLA_ID_CUTOFF) {
+      continue;
+    }
+    // A draft can map to a pkrg id that was NEVER registered into `allSpecies`
+    // (e.g. a degenerate all-zero stub dropped during species init, or id-map
+    // drift). Writing such an id into `speciesEggTiers` creates a dangling
+    // egg-pool entry: when an egg rolls that tier, `getPokemonSpecies(id)` is
+    // undefined and the variant filter (`getPokemonSpecies(s).hasVariants()`)
+    // hard-crashes the hatch. `idToName` is built from `allSpecies`, so a miss
+    // means the species isn't registered — skip it. (Fixes the EggLapsePhase
+    // freeze after a battle when auto-restock rolls a variant egg.)
+    if (!idToName.has(pkrgId)) {
+      result.skippedUnregistered++;
       continue;
     }
     if (isErFormChangeTarget(draft, pkrgId)) {

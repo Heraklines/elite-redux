@@ -468,7 +468,14 @@ export class Egg {
     let speciesPool = Object.keys(speciesEggTiers)
       .filter(s => speciesEggTiers[s] === this.tier)
       .map(s => Number.parseInt(s) as SpeciesId)
-      .filter(s => !Object.hasOwn(pokemonPrevolutions, s) && ignoredSpecies.indexOf(s) === -1);
+      .filter(
+        s =>
+          !Object.hasOwn(pokemonPrevolutions, s)
+          && ignoredSpecies.indexOf(s) === -1 // Defense in depth: never let a dangling egg-tier id (one that does not
+          && // resolve to a registered species) reach the variant filter / weight
+          // loop below, where it would deref undefined and freeze the hatch.
+          !!getPokemonSpecies(s),
+      );
 
     // If this is the 10th egg without unlocking something new, attempt to force it.
     if (globalScene.gameData.unlockPity[this.tier] >= 9) {

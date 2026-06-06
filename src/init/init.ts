@@ -228,7 +228,7 @@ export function initializeGame() {
   // `pokemonPrevolutions` which evolution-init populates.
   const eggResult = initEliteReduxEggTiers();
   console.info(
-    `[er-egg-tiers] added ${eggResult.eggTiersAdded} ER customs to egg pool (+${eggResult.starterCostsAdded} starter-costs; skipped ${eggResult.skippedPrevolutions} evolved + ${eggResult.skippedFormChanges} form-change + ${eggResult.alreadyPresent} already present)`,
+    `[er-egg-tiers] added ${eggResult.eggTiersAdded} ER customs to egg pool (+${eggResult.starterCostsAdded} starter-costs; skipped ${eggResult.skippedPrevolutions} evolved + ${eggResult.skippedFormChanges} form-change + ${eggResult.skippedUnregistered} unregistered + ${eggResult.alreadyPresent} already present)`,
   );
 
   // Elite Redux: re-tier ER-custom starter costs (BST bands + legendary/AG
