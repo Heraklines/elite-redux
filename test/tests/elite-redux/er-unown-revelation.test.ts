@@ -114,6 +114,16 @@ describe.skipIf(!RUN)("ER Unown Revelation (Schooling)", () => {
     // vanilla `201-revelation`); base letter forms are untouched.
     expect(unown.getSpriteAtlasPath(false, idx, false, 0, false)).toBe("elite-redux/unown_revelation/front");
     expect(unown.getSpriteAtlasPath(false, 0, false, 0, false)).not.toContain("unown_revelation");
+    // CRITICAL: the in-battle / party / summary code delegates to the FORM
+    // OBJECT's methods (`Pokemon.getSpriteAtlasPath` -> `getSpeciesForm().…`),
+    // NOT the species'. The species-only redirect still 404'd combat on
+    // `pokemon/shiny/201-revelation` — so the form object must redirect too.
+    expect(form.getSpriteAtlasPath(false, idx, false, 0, false)).toBe("elite-redux/unown_revelation/front");
+    expect(form.getSpriteAtlasPath(false, idx, false, 0, true)).toBe("elite-redux/unown_revelation/back");
+    expect(form.getSpriteAtlasPath(false, idx, true, 0, false)).toBe("elite-redux/unown_revelation/shiny");
+    expect(form.getSpriteId(false, idx, false, 0, false)).toBe("er__unown_revelation");
+    expect(form.getIconAtlasKey(idx, false, 0)).toBe("er_icon__unown_revelation");
+    expect(form.getIconId(false, idx, false, 0)).toBe("0001.png");
   });
 
   it("wires a PostFaint form-change so Revelation does not persist on faint", () => {

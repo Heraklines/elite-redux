@@ -59,6 +59,7 @@ import {
   PostSummonFormChangeAbAttr,
   PostTurnFormChangeAbAttr,
 } from "#abilities/ab-attrs";
+import { globalScene } from "#app/global-scene";
 import { allAbilities } from "#data/data-lists";
 import { HpThresholdFormChangeAbAttr } from "#data/elite-redux/archetypes/hp-threshold-form-change";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
@@ -266,19 +267,94 @@ function injectRevelationForm(unown: PokemonSpecies, result: InitEliteReduxUnown
   ]);
 
   (unown.forms as PokemonForm[]).push(form);
-  installRevelationSpriteRedirect(unown, formMut.formIndex);
+  installRevelationSpriteRedirect(unown, form, formMut.formIndex);
   result.formInjected = true;
   return formMut.formIndex;
 }
 
+/** ER-scheme sprite atlas PATH for the Revelation art (mirrors ErCustomSpecies). */
+function revelationAtlasPath(shiny?: boolean, variant?: number, back?: boolean): string {
+  const slug = REVELATION_SPRITE_SLUG;
+  let filename: string;
+  if (shiny) {
+    const tier = variant ?? 0;
+    const suffix = tier === 0 ? "" : `-${tier + 1}`;
+    filename = back ? `shiny-back${suffix}` : `shiny${suffix}`;
+  } else {
+    filename = back ? "back" : "front";
+  }
+  return `elite-redux/${slug}/${filename}`;
+}
+
+/** ER-scheme sprite ID (atlas KEY base) for the Revelation art (mirrors ErCustomSpecies). */
+function revelationSpriteId(shiny?: boolean, variant?: number, back?: boolean): string {
+  const slug = REVELATION_SPRITE_SLUG;
+  const suffix = shiny ? (variant ? `_shiny${variant + 1}` : "_shiny") : "";
+  const backPrefix = back ? "back__" : "";
+  return `${backPrefix}er__${slug}${suffix}`;
+}
+
 /**
  * Redirect the Revelation form's sprite + icon to the ER-custom `unown_revelation`
- * art (the form lives on vanilla Unown, whose scheme would resolve to a
- * non-existent `201-revelation`). Mirrors ErCustomSpecies' path scheme, but
- * STRICTLY gated to `formIndex === revelationIndex` — base Unown letter forms are
- * never touched, so this cannot regress them. Idempotent.
+ * art (the form lives on vanilla Unown, whose scheme would otherwise resolve to a
+ * non-existent `201-revelation`). Mirrors ErCustomSpecies' path scheme.
+ *
+ * Patches BOTH:
+ *   - the FORM object (`unown.forms[revelationIndex]`) — ALWAYS redirects. This is
+ *     the object the in-battle / party / summary code actually delegates to
+ *     (`Pokemon.getSpriteAtlasPath` -> `getSpeciesForm().getSpriteAtlasPath`, and
+ *     `Pokemon.loadAssets` -> `getSpeciesForm().loadAssets`). Without this the
+ *     combat sprite 404'd on `pokemon/shiny/201-revelation`. The form's
+ *     `loadAssets` is also wrapped to preload the per-slug ICON atlas (mirroring
+ *     ErCustomSpecies.loadAssets) so party/summary icons resolve, and to force
+ *     sprite-only (the ER art has no cry / no variantData colour entry).
+ *   - the SPECIES object (gated to `formIndex === revelationIndex`) — for callers
+ *     that hit the species method directly with a form index (pokédex / grid).
+ *     Base Unown letter forms are never touched.
+ * Idempotent via a per-object flag.
  */
-function installRevelationSpriteRedirect(unown: PokemonSpecies, revelationIndex: number): void {
+function installRevelationSpriteRedirect(unown: PokemonSpecies, form: PokemonForm, revelationIndex: number): void {
+  const slug = REVELATION_SPRITE_SLUG;
+
+  // --- FORM object: always redirect (the form IS Revelation). ---
+  const fm = form as unknown as {
+    getSpriteAtlasPath(female: boolean, formIndex?: number, shiny?: boolean, variant?: number, back?: boolean): string;
+    getSpriteId(female: boolean, formIndex?: number, shiny?: boolean, variant?: number, back?: boolean): string;
+    getIconAtlasKey(formIndex?: number, shiny?: boolean, variant?: number): string;
+    getIconId(female: boolean, formIndex?: number, shiny?: boolean, variant?: number): string;
+    loadAssets(
+      female?: boolean,
+      formIndex?: number,
+      shiny?: boolean,
+      variant?: number,
+      startLoad?: boolean,
+      back?: boolean,
+      spriteOnly?: boolean,
+    ): Promise<void>;
+    __erRevelationSpriteRedirect?: boolean;
+  };
+  if (!fm.__erRevelationSpriteRedirect) {
+    fm.__erRevelationSpriteRedirect = true;
+    fm.getSpriteAtlasPath = (_female, _formIndex, shiny, variant, back) => revelationAtlasPath(shiny, variant, back);
+    fm.getSpriteId = (_female, _formIndex, shiny, variant, back) => revelationSpriteId(shiny, variant, back);
+    fm.getIconAtlasKey = () => `er_icon__${slug}`;
+    fm.getIconId = () => "0001.png";
+    const origLoadAssets = fm.loadAssets.bind(fm);
+    fm.loadAssets = (female, formIndex, shiny, variant, startLoad, back) => {
+      // Preload the per-slug icon atlas (mirrors ErCustomSpecies.loadAssets) so
+      // party/summary/grid icons find their texture.
+      const iconKey = `er_icon__${slug}`;
+      if (!globalScene.textures.exists(iconKey)) {
+        globalScene.loadPokemonAtlas(iconKey, `elite-redux/${slug}/icon`);
+      }
+      // Force sprite-only: the ER Revelation art has no cry audio and no
+      // variantData colour entry, so the cry/variant-colour paths would 404 /
+      // no-op and only saturate the shared loader.
+      return origLoadAssets(female, formIndex, shiny, variant, startLoad, back, true);
+    };
+  }
+
+  // --- SPECIES object: gated redirect for direct species-method callers. ---
   const sp = unown as unknown as {
     getSpriteAtlasPath(female: boolean, formIndex?: number, shiny?: boolean, variant?: number, back?: boolean): string;
     getSpriteId(female: boolean, formIndex?: number, shiny?: boolean, variant?: number, back?: boolean): string;
@@ -291,46 +367,23 @@ function installRevelationSpriteRedirect(unown: PokemonSpecies, revelationIndex:
   }
   sp.__erRevelationSpriteRedirect = true;
 
-  const slug = REVELATION_SPRITE_SLUG;
   const origAtlasPath = sp.getSpriteAtlasPath.bind(sp);
   const origSpriteId = sp.getSpriteId.bind(sp);
   const origIconAtlasKey = sp.getIconAtlasKey.bind(sp);
   const origIconId = sp.getIconId.bind(sp);
 
-  sp.getSpriteAtlasPath = (female, formIndex, shiny, variant, back) => {
-    if (formIndex !== revelationIndex) {
-      return origAtlasPath(female, formIndex, shiny, variant, back);
-    }
-    let filename: string;
-    if (shiny) {
-      const tier = variant ?? 0;
-      const suffix = tier === 0 ? "" : `-${tier + 1}`;
-      filename = back ? `shiny-back${suffix}` : `shiny${suffix}`;
-    } else {
-      filename = back ? "back" : "front";
-    }
-    return `elite-redux/${slug}/${filename}`;
-  };
-  sp.getSpriteId = (female, formIndex, shiny, variant, back) => {
-    if (formIndex !== revelationIndex) {
-      return origSpriteId(female, formIndex, shiny, variant, back);
-    }
-    const suffix = shiny ? (variant ? `_shiny${variant + 1}` : "_shiny") : "";
-    const backPrefix = back ? "back__" : "";
-    return `${backPrefix}er__${slug}${suffix}`;
-  };
-  sp.getIconAtlasKey = (formIndex, shiny, variant) => {
-    if (formIndex !== revelationIndex) {
-      return origIconAtlasKey(formIndex, shiny, variant);
-    }
-    return `er_icon__${slug}`;
-  };
-  sp.getIconId = (female, formIndex, shiny, variant) => {
-    if (formIndex !== revelationIndex) {
-      return origIconId(female, formIndex, shiny, variant);
-    }
-    return "0001.png";
-  };
+  sp.getSpriteAtlasPath = (female, formIndex, shiny, variant, back) =>
+    formIndex === revelationIndex
+      ? revelationAtlasPath(shiny, variant, back)
+      : origAtlasPath(female, formIndex, shiny, variant, back);
+  sp.getSpriteId = (female, formIndex, shiny, variant, back) =>
+    formIndex === revelationIndex
+      ? revelationSpriteId(shiny, variant, back)
+      : origSpriteId(female, formIndex, shiny, variant, back);
+  sp.getIconAtlasKey = (formIndex, shiny, variant) =>
+    formIndex === revelationIndex ? `er_icon__${slug}` : origIconAtlasKey(formIndex, shiny, variant);
+  sp.getIconId = (female, formIndex, shiny, variant) =>
+    formIndex === revelationIndex ? "0001.png" : origIconId(female, formIndex, shiny, variant);
 }
 
 /**
