@@ -117,6 +117,11 @@ describe("ER Ace/Elite encounter audit (read by hand)", () => {
     expect(true).toBe(true);
   });
 
+  it("dumps a full-length (1..200) ACE run to see late rival/champion megas", async () => {
+    await dump("ace", ["ace-long"], 200);
+    expect(true).toBe(true);
+  });
+
   it("dumps full ELITE runs for manual reading", async () => {
     await dump("elite", ["elite-A", "elite-B"], 100);
     expect(true).toBe(true);
