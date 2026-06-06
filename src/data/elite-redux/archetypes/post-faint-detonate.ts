@@ -66,6 +66,7 @@ import { PokemonMove } from "#data/moves/pokemon-move";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
+import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
 import { MoveTarget } from "#enums/move-target";
 import { MoveUseMode } from "#enums/move-use-mode";
 import { PokemonType } from "#enums/pokemon-type";
@@ -264,12 +265,23 @@ export class PostFaintDetonateAbAttr extends PreDefendFullHpEndureAbAttr {
         : MoveCategory.PHYSICAL;
     const move = buildDetonationMove(this.power, category, this.flinch, this.type);
     const targets = getMoveTargets(pokemon, MoveId.EXPLOSION).targets;
+    // MovePhase is a *dynamic* phase: a plain `unshiftNew("MovePhase", ...)` is
+    // routed into the speed-sorted MovePhasePriorityQueue, NOT to the immediate
+    // front of execution. When the holder is KO'd by a FASTER attacker it is now
+    // clamped to 1 HP (alive) and STILL has its own (slower) move queued for this
+    // turn. Without forcing the timing, the holder's queued move could resolve
+    // BEFORE this explosion — the reported "it still attacks before it explodes",
+    // an illegitimate extra action. `MovePhaseTimingModifier.FIRST` forces the
+    // detonation ahead of any remaining queued move, so it resolves immediately
+    // on faint; the SacrificialAttr self-KO then re-faints the holder and its
+    // pending move is skipped (a fainted Pokemon cannot run a move).
     globalScene.phaseManager.unshiftNew(
       "MovePhase",
       pokemon,
       targets,
       new DetonationPokemonMove(move),
       MoveUseMode.INDIRECT,
+      MovePhaseTimingModifier.FIRST,
     );
   }
 

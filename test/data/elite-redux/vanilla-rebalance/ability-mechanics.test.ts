@@ -612,15 +612,15 @@ describe("ER vanilla ability rebalance — R4/R5 non-contact tier (contactExclud
   // Abilities whose ER ROM text gives them an explicit non-contact tier:
   //   Static — "10% chance to paralyze on non-contact attacks ... 30% on contact"
   //   Flame Body — "Contact ... 30% ... Non-contact has a 20% chance."
-  //   Effect Spore / Poison Touch — ER adds a low non-contact tier (defend side).
   // For these the ER-added ChanceStatusOnHitAbAttr must be contactExcluded so it
   // ONLY fires on non-contact moves (the pre-existing vanilla contact proc
   // handles contact moves — stacking both inflated the perceived rate).
+  // (Effect Spore & Poison Touch were previously here, but per their ER ROM text
+  // they are CONTACT-ONLY — their stray non-contact tiers were removed; see the
+  // contact-only assertions below.)
   const cases: { id: AbilityId; name: string }[] = [
     { id: AbilityId.STATIC, name: "STATIC" },
     { id: AbilityId.FLAME_BODY, name: "FLAME_BODY" },
-    { id: AbilityId.EFFECT_SPORE, name: "EFFECT_SPORE" },
-    { id: AbilityId.POISON_TOUCH, name: "POISON_TOUCH" },
   ];
 
   for (const { id, name } of cases) {
@@ -646,6 +646,24 @@ describe("ER vanilla ability rebalance — R4/R5 non-contact tier (contactExclud
     expect(erAttrs.length).toBe(0);
     // The vanilla contact proc + the ER offense-side contact proc must remain.
     expect(ab.attrs.some(a => a.constructor.name === "PostDefendContactApplyStatusEffectAbAttr")).toBe(true);
+    expect(ab.attrs.some(a => a.constructor.name === "PostAttackContactApplyStatusEffectAbAttr")).toBe(true);
+  });
+
+  // Effect Spore is CONTACT-ONLY per the ER ROM text. A prior wire added three
+  // non-contact tiers (SLP/PRZ/PSN) that let ranged moves proc it; removed. Only
+  // the vanilla contact proc (EffectSporeAbAttr) remains.
+  it("EFFECT_SPORE — has NO ER-added non-contact ChanceStatusOnHit tier (contact-only spec)", () => {
+    const ab = getAbility(AbilityId.EFFECT_SPORE);
+    expect(ab.attrs.filter(a => a.constructor.name === "ChanceStatusOnHitAbAttr").length).toBe(0);
+    expect(ab.attrs.some(a => a.constructor.name === "EffectSporeAbAttr")).toBe(true);
+  });
+
+  // Poison Touch is CONTACT-ONLY ("also works on offense") per the ER ROM text.
+  // The stray defend-side non-contact tier was removed; the offense-side contact
+  // proc (PostAttackContactApplyStatusEffectAbAttr) remains.
+  it("POISON_TOUCH — has NO ER-added non-contact ChanceStatusOnHit tier (contact-only spec)", () => {
+    const ab = getAbility(AbilityId.POISON_TOUCH);
+    expect(ab.attrs.filter(a => a.constructor.name === "ChanceStatusOnHitAbAttr").length).toBe(0);
     expect(ab.attrs.some(a => a.constructor.name === "PostAttackContactApplyStatusEffectAbAttr")).toBe(true);
   });
 });

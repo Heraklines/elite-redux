@@ -29,7 +29,7 @@ import type { MoveCategory } from "#enums/move-category";
 import type { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
-import { MoveUseMode } from "#enums/move-use-mode";
+import { isVirtual, MoveUseMode } from "#enums/move-use-mode";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 
@@ -61,15 +61,28 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
   }
 
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { move, opponent } = params;
+    const { pokemon, move, opponent } = params;
     if (!opponent || opponent.isFainted()) {
       return false;
     }
     // Re-entry guard: the scripted follow-up is itself a damaging move, so when
     // IT lands it would re-trigger this PostAttack hook and enqueue another copy
-    // — an infinite loop (reported as Aftershock firing continuously). Never fire
-    // when the move that just hit is our own scripted follow-up.
-    if (move.id === this.opts.moveId) {
+    // — an infinite loop (reported as Aftershock firing continuously). The
+    // follow-up is always cast in MoveUseMode.INDIRECT (a *virtual* use), while a
+    // genuine move the holder selects is NORMAL. So we gate on the use mode of
+    // the move that just landed rather than its id: this still blocks the loop
+    // (the INDIRECT cast never re-arms) but no longer mis-fires when the holder
+    // legitimately uses the SAME move that the ability scripts. That mis-fire was
+    // the reported "Thundercall doesn't trigger from Thunder Shock" bug —
+    // Thundercall's scripted follow-up IS Thunder Shock, so a real Thunder Shock
+    // hit the `move.id === moveId` guard and was silently swallowed.
+    //
+    // Move history is pushed in MoveEffectPhase.postAnimCallback() BEFORE the
+    // PostAttack hooks run (move-effect-phase.ts), so getLastXMoves(1)[0] is the
+    // move that is currently resolving — including for the non-first hits of a
+    // multi-hit move (which reuse the entry pushed on the first hit).
+    const lastUseMode = pokemon.getLastXMoves(1)[0]?.useMode;
+    if (lastUseMode !== undefined && isVirtual(lastUseMode)) {
       return false;
     }
     if (this.opts.categoryFilter !== undefined && move.category !== this.opts.categoryFilter) {
