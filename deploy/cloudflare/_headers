@@ -7,6 +7,18 @@
 # affect the few files Pages serves directly (locales, manifest, the SW) — for
 # those, "no-cache" = always revalidate (cheap 304s), never serve stale.
 
+# The HTML entry point MUST always revalidate: it references the content-hashed JS
+# bundle (assets/index-<hash>.js), so a stale cached index.html keeps players on the
+# OLD code even after a fresh deploy (e.g. they couldn't see the Ace/Elite/Hell run
+# changes). With no-cache the browser revalidates every load (cheap 304), and the
+# new index.html points at the new bundle hashes -> fresh code. No save impact
+# (saves live in localStorage, which the HTTP cache never touches).
+/
+  Cache-Control: no-cache
+
+/index.html
+  Cache-Control: no-cache
+
 /*.json
   Cache-Control: no-cache
 
