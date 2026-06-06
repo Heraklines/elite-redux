@@ -84,15 +84,13 @@ function isDegenerateDraft(draft: ErSpeciesDraft): boolean {
  * the broken species const → a slug whose `elite-redux/<slug>/` directory holds
  * the correct, complete sprite set (front/back/icon + all shiny tiers).
  *
- * - `SPECIES_INFERNAPE_REDUX`: its own `infernape_redux/` directory contains a
- *   winged yellow/blue creature (not Infernape) for front/back/icon. The base
- *   `infernape/` sprite set is the correct flaming-monkey art and is complete,
- *   so we point Infernape Redux at it. (User report: Redux Infernape showed an
- *   unrelated flaming sprite.)
+ * (Currently empty: the former `SPECIES_INFERNAPE_REDUX → "infernape"` entry was
+ * a MISREAD — `infernape_redux/`'s own art IS the correct blue Water/Fighting
+ * Redux Infernape; at 64×64 its white boots/blue tail-flame were mistaken for a
+ * "creature on a cloud," so it was wrongly pinned to vanilla Infernape. Removed
+ * so it uses its own slug. Re-add an entry only for genuinely mis-filed art.)
  */
-const ER_SPRITE_SLUG_OVERRIDES: Readonly<Record<string, string>> = {
-  SPECIES_INFERNAPE_REDUX: "infernape",
-};
+const ER_SPRITE_SLUG_OVERRIDES: Readonly<Record<string, string>> = {};
 
 /**
  * Map ER's numeric type id (decoded by `ER_TYPE_NAMES` in `er-move-tables.ts`)
