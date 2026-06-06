@@ -50,8 +50,10 @@
 // correct in archetype-dispatcher.ts / init-abilities.ts).
 // =============================================================================
 
+import { installErFormSpriteRedirect } from "#data/elite-redux/er-form-sprite-redirect";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
+import { getErSpriteSlug } from "#data/elite-redux/init-elite-redux-custom-species";
 import { SpeciesFormChangeAbilityTrigger, SpeciesFormChangeManualTrigger } from "#data/form-change-triggers";
 import { pokemonFormChanges, SpeciesFormChange } from "#data/pokemon-forms";
 import type { PokemonForm as PokemonFormType, PokemonSpecies } from "#data/pokemon-species";
@@ -266,6 +268,15 @@ function seedBaseForm(species: PokemonSpecies): void {
   baseMut.formIndex = 0;
   baseMut.generation = species.generation;
   (species.forms as PokemonFormType[]).push(baseForm);
+
+  // Seeding a base form makes `getSpeciesForm(0)` return THIS plain PokemonForm
+  // instead of the ErCustomSpecies (which carries the slug-based sprite/icon
+  // overrides). Redirect the base form back to the base species' ER slug so it
+  // doesn't 404 on the vanilla `{speciesId}` scheme.
+  const baseSlug = getErSpriteSlug(species.speciesId);
+  if (baseSlug) {
+    installErFormSpriteRedirect(baseForm, baseSlug);
+  }
 }
 
 /**
@@ -337,6 +348,17 @@ function injectAlternateForm(
   formMut.generation = base.generation;
 
   (base.forms as PokemonFormType[]).push(form);
+
+  // Redirect the injected form's sprite/icon to the SOURCE ER-custom species'
+  // art (e.g. "wispywaspy_hivemind", "darmanitan_redux_blunder"). The form
+  // lives on the base custom species, so without this it resolves to the
+  // base's `{speciesId}-{formKey}` scheme (e.g. `10065-hivemind`) and 404s.
+  const sourcePkrgId = ER_ID_MAP.species[spec.sourceErId];
+  const sourceSlug = sourcePkrgId === undefined ? undefined : getErSpriteSlug(sourcePkrgId);
+  if (sourceSlug) {
+    installErFormSpriteRedirect(form, sourceSlug);
+  }
+
   result.formsInjected++;
   return { formIndex: formMut.formIndex, injected: true };
 }

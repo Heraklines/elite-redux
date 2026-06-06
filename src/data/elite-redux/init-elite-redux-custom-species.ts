@@ -247,6 +247,11 @@ class ErCustomSpecies extends PokemonSpecies {
     ErCustomSpecies._spriteSlugs.set(id, slug);
   }
 
+  /** ER sprite slug for a pokerogue species id, or undefined if not an ER custom. */
+  static getSpriteSlug(id: number): string | undefined {
+    return ErCustomSpecies._spriteSlugs.get(id);
+  }
+
   /**
    * Override the sprite atlas path so ER-custom species load from
    * `elite-redux/{slug}/{front,back,shiny,...}` instead of the vanilla
@@ -394,6 +399,17 @@ class ErCustomSpecies extends PokemonSpecies {
     // gated by spriteOnly — so ER custom shiny tiers render correctly.
     return super.loadAssets(female, formIndex, shiny, variant, startLoad, back, true);
   }
+}
+
+/**
+ * The ER sprite slug for a pokerogue species id (e.g. 10065 → "wispywaspy"), or
+ * undefined if the id is not an ER-custom species. Used by the form-sprite
+ * redirect when injecting alternate forms onto ER-custom base species — the
+ * injected `PokemonForm` objects don't inherit ErCustomSpecies' slug-based
+ * sprite/icon overrides, so they must be redirected explicitly.
+ */
+export function getErSpriteSlug(speciesId: number): string | undefined {
+  return ErCustomSpecies.getSpriteSlug(speciesId);
 }
 
 /**

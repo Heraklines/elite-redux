@@ -59,9 +59,9 @@ import {
   PostSummonFormChangeAbAttr,
   PostTurnFormChangeAbAttr,
 } from "#abilities/ab-attrs";
-import { globalScene } from "#app/global-scene";
 import { allAbilities } from "#data/data-lists";
 import { HpThresholdFormChangeAbAttr } from "#data/elite-redux/archetypes/hp-threshold-form-change";
+import { installErFormSpriteRedirect } from "#data/elite-redux/er-form-sprite-redirect";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
 import { SpeciesFormChangeAbilityTrigger } from "#data/form-change-triggers";
@@ -316,43 +316,10 @@ function revelationSpriteId(shiny?: boolean, variant?: number, back?: boolean): 
 function installRevelationSpriteRedirect(unown: PokemonSpecies, form: PokemonForm, revelationIndex: number): void {
   const slug = REVELATION_SPRITE_SLUG;
 
-  // --- FORM object: always redirect (the form IS Revelation). ---
-  const fm = form as unknown as {
-    getSpriteAtlasPath(female: boolean, formIndex?: number, shiny?: boolean, variant?: number, back?: boolean): string;
-    getSpriteId(female: boolean, formIndex?: number, shiny?: boolean, variant?: number, back?: boolean): string;
-    getIconAtlasKey(formIndex?: number, shiny?: boolean, variant?: number): string;
-    getIconId(female: boolean, formIndex?: number, shiny?: boolean, variant?: number): string;
-    loadAssets(
-      female?: boolean,
-      formIndex?: number,
-      shiny?: boolean,
-      variant?: number,
-      startLoad?: boolean,
-      back?: boolean,
-      spriteOnly?: boolean,
-    ): Promise<void>;
-    __erRevelationSpriteRedirect?: boolean;
-  };
-  if (!fm.__erRevelationSpriteRedirect) {
-    fm.__erRevelationSpriteRedirect = true;
-    fm.getSpriteAtlasPath = (_female, _formIndex, shiny, variant, back) => revelationAtlasPath(shiny, variant, back);
-    fm.getSpriteId = (_female, _formIndex, shiny, variant, back) => revelationSpriteId(shiny, variant, back);
-    fm.getIconAtlasKey = () => `er_icon__${slug}`;
-    fm.getIconId = () => "0001.png";
-    const origLoadAssets = fm.loadAssets.bind(fm);
-    fm.loadAssets = (female, formIndex, shiny, variant, startLoad, back) => {
-      // Preload the per-slug icon atlas (mirrors ErCustomSpecies.loadAssets) so
-      // party/summary/grid icons find their texture.
-      const iconKey = `er_icon__${slug}`;
-      if (!globalScene.textures.exists(iconKey)) {
-        globalScene.loadPokemonAtlas(iconKey, `elite-redux/${slug}/icon`);
-      }
-      // Force sprite-only: the ER Revelation art has no cry audio and no
-      // variantData colour entry, so the cry/variant-colour paths would 404 /
-      // no-op and only saturate the shared loader.
-      return origLoadAssets(female, formIndex, shiny, variant, startLoad, back, true);
-    };
-  }
+  // --- FORM object: always redirect (the form IS Revelation). This is the
+  // object the in-battle / party / summary code delegates to. Shared with the
+  // ER-custom form injector (Hivemind / Blunder) via the common helper. ---
+  installErFormSpriteRedirect(form, slug);
 
   // --- SPECIES object: gated redirect for direct species-method callers. ---
   const sp = unown as unknown as {
