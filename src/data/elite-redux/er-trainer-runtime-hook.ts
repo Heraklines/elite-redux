@@ -205,6 +205,18 @@ export function teamStrength(t: ErTrainerRegistryEntry, tier: ErRosterTier): num
   return total;
 }
 
+// PokeRogue trainer-type ids that ER's MARQUEE trainers are registered under
+// (er-id-map: ROM Leader->200, Elite Four->300, Champion/Monotype->350, Johto
+// Champ->352, Magma Leader->102, Aqua Leader->104). The game's wave schedule
+// never spawns these types directly, so without routing, ER's 43 gym leaders,
+// 16 Elite Four, 25 champions and the evil-team leaders would never appear AS
+// bosses. At a boss trainer wave we pull from this pool so the hand-built ER
+// gym/E4/champion teams show up in their proper role (wave-scaled by strength).
+const ER_BOSS_TRAINER_TYPES: ReadonlySet<number> = new Set([200, 300, 350, 352, 102, 104]);
+// PokeRogue rival trainer types (RIVAL..RIVAL_6). Rivals are handled on their own
+// path and must NOT be replaced by a gym leader at a rival wave.
+const ER_RIVAL_TRAINER_TYPES: ReadonlySet<number> = new Set([375, 376, 377, 378, 379, 380]);
+
 /** True if the trainer ships a roster for the given difficulty tier. */
 function trainerHasTier(t: ErTrainerRegistryEntry, tier: ErRosterTier): boolean {
   if (tier === "hell") {
@@ -226,7 +238,17 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
   // ELITE / HELL pull from the ER pool at the insane / hell tier.
   if (getErDifficulty() !== "ace") {
     const tier = erDifficultyToRosterTier();
-    const all = findErTrainersForType(trainer.config.trainerType);
+    // Boss trainer waves (gym leader / Elite Four / Champion / evil-team leader,
+    // or any boss-marked / every-10th wave) pull from ER's marquee trainer pool
+    // so those hand-built teams actually appear in their boss role — the wave
+    // schedule never spawns their trainer types directly. Rivals are exempt
+    // (their own path) and Ace is already excluded above.
+    const waveIdx = globalScene.currentBattle?.waveIndex ?? 0;
+    const isRival = ER_RIVAL_TRAINER_TYPES.has(trainer.config.trainerType);
+    const isBossWave = !isRival && (trainer.config.isBoss || waveIdx % 10 === 0);
+    const all = isBossWave
+      ? ER_TRAINER_REGISTRY.filter(t => ER_BOSS_TRAINER_TYPES.has(t.trainerType))
+      : findErTrainersForType(trainer.config.trainerType);
     // Prefer trainers that actually ship the chosen difficulty's roster, then
     // those not yet seen this run (a difficulty shouldn't repeat trainers).
     const tierMatched = all.filter(t => trainerHasTier(t, tier));

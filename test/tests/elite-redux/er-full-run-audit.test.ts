@@ -103,7 +103,8 @@ describe("ER complete per-mode run audit (read by hand)", () => {
       boss = !!battle.trainer.config.isBoss;
       const erEntry = getErTrainerForTrainer(battle.trainer);
       if (erEntry) {
-        erKey = erEntry.stableKey ?? erEntry.name ?? null;
+        const cls = (erEntry as { trainerClassName?: string }).trainerClassName;
+        erKey = `${erEntry.stableKey ?? erEntry.name ?? "?"}${cls ? ` <${cls}>` : ""}`;
         erTier = pickTierForWave(battle.trainer);
       }
     }
