@@ -84,6 +84,10 @@ const EGG_TIER_OVERRIDES: Readonly<Record<string, EggTier>> = {
   "Uxie Redux": EggTier.EPIC,
   // Wooly Worm (BST 570 → bands as RARE) is a high-value custom; pin to EPIC.
   "Wooly Worm": EggTier.EPIC,
+  // ER-custom Typhlosion regional form (pokedex No 0439): "Lumbering Sloth
+  // Engulfed" (BST 570 → bands as RARE). A custom legendary-tier regional
+  // variant; pin to EPIC to match its vanilla-base-tier expectation.
+  "Lumbering Sloth Engulfed": EggTier.EPIC,
 };
 
 /**
@@ -105,6 +109,10 @@ const EGG_TIER_PREFIX_OVERRIDES: ReadonlyArray<readonly [string, EggTier]> = [
   // (THUNDURUS / TYPE_NULL are EPIC; a Therian/typed form shouldn't hatch lower).
   ["Thundurus", EggTier.EPIC],
   ["Silvally", EggTier.EPIC],
+  // Tornadus Therian (pokedex No 0268 region; ER custom, BST 580 → bands as
+  // RARE). Like Thundurus, the vanilla base (TORNADUS) is EPIC, so the Therian
+  // form is pinned to EPIC for parity. Prefix covers any other Tornadus customs.
+  ["Tornadus", EggTier.EPIC],
 ];
 
 function resolveEggTierOverride(name: string): EggTier | undefined {
@@ -134,15 +142,18 @@ function pickStarterCost(tier: EggTier): number {
 
 function isErFormChangeTarget(draft: (typeof ER_SPECIES)[number], speciesId: number): boolean {
   return (
-    findErFormChangeByTarget(speciesId) !== undefined // HANGRY is Morpeko's in-battle alt-form (the Hunger Switch / Two-Faced // toggle target — SPECIES_MORPEKO_HANGRY / SPECIES_MORPEKYLL_HANGRY in the // ER dump). Like Mega/Primal it is a battle-only form, NOT a base/root mon, // so it must never hatch from eggs or appear in starter selection. ER models // it as a separate custom species with no prevolution, so it would otherwise
-    || // leak past the prevolution gate below. BOND / BLUNDER are Darmanitan Redux's
-    // special Battle-Bond forms (SPECIES_DARMANITAN_REDUX_BOND / _BLUNDER) — also
-    // battle-only forms reached via the Bond chain off the base Darmanitan Redux,
-    // never base/root mons, so they must be excluded the same way.
-    /(?:^|_)MEGA(?:_|$)|(?:^|_)PRIMAL(?:_|$)|(?:^|_)HANGRY(?:_|$)|(?:^|_)BOND(?:_|$)|(?:^|_)BLUNDER(?:_|$)/.test(
+    findErFormChangeByTarget(speciesId) !== undefined // HANGRY is Morpeko's in-battle alt-form (the Hunger Switch / Two-Faced // toggle target — SPECIES_MORPEKO_HANGRY / SPECIES_MORPEKYLL_HANGRY in the // ER dump). Like Mega/Primal it is a battle-only form, NOT a base/root mon, // so it must never hatch from eggs or appear in starter selection. ER models // it as a separate custom species with no prevolution, so it would otherwise // leak past the prevolution gate below. BOND / BLUNDER are Darmanitan Redux's // special Battle-Bond forms (SPECIES_DARMANITAN_REDUX_BOND / _BLUNDER) — also
+    || // battle-only forms reached via the Bond chain off the base Darmanitan Redux,
+    // never base/root mons, so they must be excluded the same way. AURA is
+    // Darmanitan Redux's Zen-Mode-style alternate battle form
+    // (SPECIES_DARMANITAN_REDUX_AURA, "Darmanitan Aura") — likewise a
+    // battle-emergent form that must NOT hatch (it was leaking into RARE eggs).
+    /(?:^|_)MEGA(?:_|$)|(?:^|_)PRIMAL(?:_|$)|(?:^|_)HANGRY(?:_|$)|(?:^|_)BOND(?:_|$)|(?:^|_)BLUNDER(?:_|$)|(?:^|_)AURA(?:_|$)/.test(
       draft.speciesConst,
     )
-    || /\b(Mega|Primal|Hangry|Bond|Blunder)\b/i.test(draft.name ?? "")
+    || /\b(Mega|Primal|Hangry|Bond|Blunder)\b/i.test(draft.name ?? "") // "Darmanitan Aura" by name (the speciesConst suffix _AURA covers the const
+    || // path; this catches the display name for robustness).
+    /^Darmanitan Aura$/i.test(draft.name ?? "")
   );
 }
 

@@ -18,6 +18,7 @@ import { initEliteReduxCustomMoves } from "#data/elite-redux/init-elite-redux-cu
 import { initEliteReduxCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
 import { initEliteReduxEggMoves } from "#data/elite-redux/init-elite-redux-egg-moves";
 import { initEliteReduxEggTiers } from "#data/elite-redux/init-elite-redux-egg-tiers";
+import { initEliteReduxErCustomFormChanges } from "#data/elite-redux/init-elite-redux-er-custom-form-changes";
 import { initEliteReduxEvolutions } from "#data/elite-redux/init-elite-redux-evolutions";
 import { initEliteReduxFormChanges } from "#data/elite-redux/init-elite-redux-form-changes";
 import { initEliteReduxMovesets } from "#data/elite-redux/init-elite-redux-movesets";
@@ -119,6 +120,21 @@ export function initializeGame() {
   }
   console.info(
     `[er-unown-school] form injected: ${unownSchoolResult.formInjected}, form changes: ${unownSchoolResult.formChangesRegistered}, ability rewired: ${unownSchoolResult.abilityRewired}`,
+  );
+  // Elite Redux: inject ER-custom battle forms that ER ships as separate dump
+  // species (Wispywaspy → Hivemind for Locust Swarm 884; Darmanitan Redux Bond
+  // → Blunder for Battle Bond). pokerogue's form system only swaps formIndex on
+  // the SAME species, so the alternate form must be a FORM on the base custom
+  // species with its `<base> -> form` (+ revert) edges registered. The same
+  // three-step wiring the vanilla Unown got in initEliteReduxUnownSchool, but
+  // for ER-custom (id ≥ 10000) bases. Must run AFTER initEliteReduxCustomSpecies()
+  // (bases exist) and AFTER injectAllErMegaForms() (reuse any seeded base form).
+  const erCustomFormResult = initEliteReduxErCustomFormChanges();
+  if (erCustomFormResult.errors.length > 0) {
+    console.warn("[er-custom-forms] issues:", erCustomFormResult.errors.slice(0, 5));
+  }
+  console.info(
+    `[er-custom-forms] injected ${erCustomFormResult.formsInjected} battle forms, registered ${erCustomFormResult.formChangesRegistered} form-change edges`,
   );
   // Elite Redux #151: repair scrambled gen8/9 move id-map entries (by name)
   // BEFORE the rebalance + move-patches consume the map, so stats and effects
