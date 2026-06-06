@@ -4551,7 +4551,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       const lockedIcon = slotLockedIcons[slot];
       const abilityId = passiveAbilityIds[slot];
 
-      if (abilityId === AbilityId.NONE) {
+      // Treat a missing `allAbilities` entry the same as NONE: an ER-custom
+      // passive id can map (via ER_ID_MAP) to the custom range without a
+      // registered ability, which would otherwise crash on `ability.name`
+      // below. Render the faint "—" placeholder instead of black-screening.
+      if (abilityId === AbilityId.NONE || !allAbilities[abilityId]) {
         // Empty slot — render a faint "—" placeholder so the layout stays
         // visually consistent across vanilla (1 passive) and ER (3 passives).
         text
@@ -4604,10 +4608,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
 
     // If a PASSIVE tooltip is currently active, refresh its content to point at
-    // slot 1 (legacy behavior — slots 2/3 don't drive editTooltip).
+    // slot 1 (legacy behavior — slots 2/3 don't drive editTooltip). Guard a
+    // missing `allAbilities` entry (ER-custom id without a registered ability)
+    // so a stale-tooltip refresh never crashes on `.name`.
     if (this.activeTooltip === "PASSIVE" && passiveAbilityIds[0] !== AbilityId.NONE) {
       const slot0Ability = allAbilities[passiveAbilityIds[0]];
-      globalScene.ui.editTooltip(`${slot0Ability.name}`, `${slot0Ability.description}`);
+      if (slot0Ability) {
+        globalScene.ui.editTooltip(`${slot0Ability.name}`, `${slot0Ability.description}`);
+      }
     }
   }
 
@@ -4821,12 +4829,21 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       }
 
       if (dexEntry.caughtAttr) {
-        let ability: Ability;
-        if (this.lastSpecies.forms?.length > 1) {
-          ability = allAbilities[this.lastSpecies.forms[formIndex ?? 0].getAbility(abilityIndex!)];
-        } else {
-          ability = allAbilities[this.lastSpecies.getAbility(abilityIndex!)]; // TODO: is this bang correct?
-        }
+        // Resolve the ability via the active form, guarding two ER-custom edge
+        // cases that black-screened the scene (same class as #113/#114/#139):
+        //   1. `formIndex` out of range for `forms` — e.g. Floette Eternal
+        //      Flower (an ER custom whose injected mega makes forms.length 2)
+        //      or vanilla Mimikyu's Busted form, when an imported/stale dexAttr
+        //      yields a formIndex >= forms.length. `forms[formIndex]` was then
+        //      undefined and `.getAbility` threw. Fall back to the base species
+        //      (mirrors getPokemonSpeciesForm's out-of-range behavior).
+        //   2. The resolved AbilityId having no `allAbilities` entry. Fall back
+        //      to AbilityId.NONE (the "—" entry) so `.name` never crashes.
+        const formForAbility =
+          this.lastSpecies.forms?.length > 1
+            ? (this.lastSpecies.forms[formIndex ?? 0] ?? this.lastSpecies)
+            : this.lastSpecies;
+        const ability: Ability = allAbilities[formForAbility.getAbility(abilityIndex!)] ?? allAbilities[AbilityId.NONE];
 
         const isHidden = abilityIndex === (this.lastSpecies.ability2 ? 2 : 1);
         this.pokemonAbilityText
