@@ -269,16 +269,29 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
     //   2. unseen of this type at all (small insane/hell pool → party fallback)
     //   3. unseen of ANY type at the tier (variety — the big win)
     //   4. only once EVERY tier-eligible trainer is used do we allow a repeat.
-    const pool =
-      unusedTier.length > 0
+    // Regular (non-boss) waves rotate from the WHOLE tier pool (all types), not
+    // the tiny per-type pool. The per-type pools are 1-2 trainers for common
+    // early types (Youngster/Lass/…), so the run-seed selection window had
+    // nothing to rotate — two different runs landed on the SAME team at the same
+    // wave (#261 was only fixed WITHIN a run; across runs it still repeated).
+    // Drawing from the global unused-this-run tier pool gives the run-seed
+    // hundreds of candidates to pick from, so each run fields a genuinely
+    // different cast. The strength-window below keeps the pick wave-appropriate.
+    // Boss waves keep their thematic boss-type pool so gym leaders / E4 / the
+    // champion stay themselves.
+    const pool = isBossWave
+      ? unusedTier.length > 0
         ? unusedTier
         : unusedAll.length > 0
           ? unusedAll
-          : unusedTierGlobal.length > 0
-            ? unusedTierGlobal
-            : tierMatched.length > 0
-              ? tierMatched
-              : all;
+          : tierMatched.length > 0
+            ? tierMatched
+            : all
+      : unusedTierGlobal.length > 0
+        ? unusedTierGlobal
+        : tierMatched.length > 0
+          ? tierMatched
+          : all;
     if (pool.length > 0) {
       // Prefer trainers whose roster can field the ENTIRE encounter on its own,
       // so we never mix ER mons with vanilla-generated ones: PokeRogue calls
@@ -306,7 +319,12 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
       // desync reproducible party generation). Same encounter in the same run →
       // identical pick (generation-stable); different runs → different trainers,
       // so each run is genuinely new instead of the same weakest-first sequence.
-      const radius = Math.max(2, Math.floor(ordered.length * 0.4));
+      // Window is capped (~25 trainers) so that even when `ordered` is the big
+      // global tier pool, the pick stays STRENGTH-tight to the wave (no wave-5
+      // difficulty spikes from a 40%-of-the-pool window) while still being wide
+      // enough for the run-seed to rotate the cast across runs. Small per-type /
+      // boss pools are unaffected (0.4*len is already < the cap there).
+      const radius = Math.max(2, Math.min(Math.floor(ordered.length * 0.4), 12));
       const lo = Math.max(0, targetIdx - radius);
       const hi = Math.min(ordered.length - 1, targetIdx + radius);
       const span = hi - lo + 1;
