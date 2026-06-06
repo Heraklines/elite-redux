@@ -122,7 +122,9 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_PETAL_DANCE", { pp: 10 }],
   ["MOVE_STRING_SHOT", { accuracy: 95, pp: 40 }],
   ["MOVE_DRAGON_RAGE", { power: 1, pp: 10 }],
-  ["MOVE_THUNDER_SHOCK", { power: 40, pp: 30, chance: 10 }],
+  // ER data (er-moves.ts id 84) lists Thunder Shock at 80 power; the prior
+  // override value of 40 was a stale beta carry-over that under-powered it.
+  ["MOVE_THUNDER_SHOCK", { power: 80, pp: 30, chance: 10 }],
   ["MOVE_THUNDER_WAVE", { pp: 20 }],
   ["MOVE_THUNDER", { accuracy: 75, pp: 10 }],
   ["MOVE_ROCK_THROW", { power: 50, pp: 15 }],
@@ -293,7 +295,10 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_MIRROR_SHOT", { accuracy: 85, chance: 30 }],
   ["MOVE_ROCK_CLIMB", { power: 85, chance: 20 }],
   ["MOVE_ROCK_WRECKER", { power: 150, accuracy: 90 }],
-  ["MOVE_CROSS_POISON", { power: 90, pp: 15 }],
+  // ER data (er-moves.ts id 440) lists Cross Poison at 40 power; it hits twice
+  // (MultiHitType.TWO wired in init-elite-redux-vanilla-move-patches.ts), so the
+  // prior override of 90 per-hit was wrong (would deal 180 total).
+  ["MOVE_CROSS_POISON", { power: 40, pp: 15 }],
   ["MOVE_MAGNET_BOMB", { power: 60 }],
   ["MOVE_STONE_EDGE", { accuracy: 85, pp: 5, chance: 0 }],
   ["MOVE_JUDGMENT", { power: 100, pp: 10 }],

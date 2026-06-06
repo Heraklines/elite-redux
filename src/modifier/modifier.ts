@@ -2148,6 +2148,12 @@ export class PokemonStatusHealModifier extends ConsumablePokemonModifier {
    */
   override apply(playerPokemon: PlayerPokemon): boolean {
     playerPokemon.resetStatus(true, true, false, false);
+    // ER frostbite is modelled as a battler tag (BattlerTagType.ER_FROSTBITE)
+    // rather than a vanilla StatusEffect, so resetStatus alone does not clear
+    // it. A full-status cure (Full Heal) should also remove it. ER_BLEED is
+    // intentionally NOT cured here: it has its own heal-cure semantics wired in
+    // pokemon-heal-phase.ts (a heal is consumed to cure the bleed).
+    playerPokemon.removeTag(BattlerTagType.ER_FROSTBITE);
     return true;
   }
 }
