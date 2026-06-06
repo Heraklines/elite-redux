@@ -102,6 +102,14 @@ describe.skipIf(!RUN)("ER Unown Revelation (Schooling)", () => {
     expect(form.ability1).toBe(ER_ID_MAP.abilities[107]);
     expect(form.ability2).toBe(ER_ID_MAP.abilities[592]);
     expect(form.abilityHidden).toBe(ER_ID_MAP.abilities[156]);
+    // Per-form innates: Revelation / Wonder Skin / Unown Power (885/147/776),
+    // NOT base Unown's (Levitate / Regenerator). Base form differs.
+    expect(unown.getPassiveAbilities(idx)).toEqual([
+      ER_ID_MAP.abilities[885],
+      ER_ID_MAP.abilities[147],
+      ER_ID_MAP.abilities[776],
+    ]);
+    expect(unown.getPassiveAbilities(0)).not.toEqual(unown.getPassiveAbilities(idx));
     // Sprite redirected to the ER-custom unown_revelation art (was the missing
     // vanilla `201-revelation`); base letter forms are untouched.
     expect(unown.getSpriteAtlasPath(false, idx, false, 0, false)).toBe("elite-redux/unown_revelation/front");

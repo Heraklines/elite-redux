@@ -94,6 +94,14 @@ const REVELATION_SPRITE_SLUG = "unown_revelation";
  * (107 Anticipation / 592 Minion Control / 156 Magic Bounce, per the ER dump.)
  */
 const REVELATION_ABILITY_ER_IDS = [107, 592, 156] as const;
+/**
+ * The Revelation form's own INNATES (3-passive triple), distinct from base
+ * Unown's — set per-form so the abilities screen shows them while base letters
+ * keep their own. (885 Revelation / 147 Wonder Skin / 776 Unown Power, per the
+ * ER dump. 885 = the schooling ability itself, so the school/revert/faint logic
+ * keeps firing on the schooled form.)
+ */
+const REVELATION_INNATE_ER_IDS = [885, 147, 776] as const;
 
 function mapErAbilityId(erId: number): AbilityId {
   return (ER_ID_MAP.abilities[erId] ?? AbilityId.NONE) as AbilityId;
@@ -247,6 +255,15 @@ function injectRevelationForm(unown: PokemonSpecies, result: InitEliteReduxUnown
   formMut.speciesId = unown.speciesId;
   formMut.formIndex = unown.forms.length;
   formMut.generation = unown.generation;
+
+  // Per-form innates: getPassiveAbilities(formIndex) returns the FORM's own
+  // _passives when set (see pokemon-species.ts), so the schooled form shows its
+  // own innate triple — base Unown letters keep theirs.
+  form.setPassives([
+    mapErAbilityId(REVELATION_INNATE_ER_IDS[0]),
+    mapErAbilityId(REVELATION_INNATE_ER_IDS[1]),
+    mapErAbilityId(REVELATION_INNATE_ER_IDS[2]),
+  ]);
 
   (unown.forms as PokemonForm[]).push(form);
   installRevelationSpriteRedirect(unown, formMut.formIndex);
