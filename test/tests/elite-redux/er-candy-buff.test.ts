@@ -11,7 +11,9 @@
 // the flat 35% applies.
 
 import { globalScene } from "#app/global-scene";
-import { ER_CANDY_GAIN_MULTIPLIER } from "#data/elite-redux/er-shiny-favour";
+import { copyChallenge } from "#data/challenge";
+import { ER_CANDY_GAIN_MULTIPLIER, getRunCandyMultiplier } from "#data/elite-redux/er-shiny-favour";
+import { Challenges } from "#enums/challenges";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
@@ -50,5 +52,27 @@ describe("ER candy-gain buff", () => {
     expect(gain(4)).toBe(5);
     expect(gain(2)).toBe(3);
     expect(gain(1)).toBe(1);
+  });
+
+  it("egg-hatch candy ignores the run's challenge-favour multiplier (no loophole)", async () => {
+    await game.classicMode.startBattle([SpeciesId.BULBASAUR]);
+    const gd = globalScene.gameData;
+    const id = SpeciesId.BULBASAUR;
+
+    // Force a favour-granting challenge onto the active run. HARDCORE grants 8
+    // favour → 1 step → 1.5× candy multiplier (favour curve: +0.5× per 5 favour).
+    globalScene.gameMode.challenges = [copyChallenge({ id: Challenges.HARDCORE, value: 1, severity: 1 })];
+    expect(getRunCandyMultiplier()).toBeCloseTo(1.5, 5);
+
+    const gain = (base: number, fromEgg: boolean): number => {
+      const before = gd.getStarterDataEntry(id).candyCount;
+      gd.addStarterCandy(id, base, fromEgg);
+      return gd.getStarterDataEntry(id).candyCount - before;
+    };
+
+    // In-run candy (fromEgg=false) DOES get the favour bonus: round(10 * 1.35 * 1.5) = 20.
+    expect(gain(10, false)).toBe(20);
+    // Egg-hatch candy (fromEgg=true) does NOT: only the flat 35% applies: round(10 * 1.35 * 1) = 14.
+    expect(gain(10, true)).toBe(14);
   });
 });

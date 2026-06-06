@@ -1845,7 +1845,7 @@ export class GameData {
         // TODO: remove `?? 0`, `pokemon.variant` shouldn't be able to be nullish
         const shinyBonus = pokemon.isShiny() ? 5 * Math.pow(2, pokemon.variant ?? 0) : 1;
         const eggOrBossBonus = fromEgg || pokemon.isBoss() ? 2 : 1;
-        this.addStarterCandy(species.speciesId, shinyBonus * eggOrBossBonus);
+        this.addStarterCandy(species.speciesId, shinyBonus * eggOrBossBonus, fromEgg);
       }
     }
 
@@ -1928,9 +1928,11 @@ export class GameData {
    * Adds candy to the player's game data for a given {@linkcode PokemonSpecies}.
    * @remarks
    * Will not increase the candy count past {@linkcode MAX_STARTER_CANDY_COUNT}.
+   * @param fromEgg - Whether this candy comes from hatching an egg. Egg-hatch candy
+   *   does NOT inherit the run's challenge-favour multiplier (see below).
    * @returns Whether the candy count was incremented
    */
-  public addStarterCandy(speciesId: SpeciesId, count: number): boolean {
+  public addStarterCandy(speciesId: SpeciesId, count: number, fromEgg = false): boolean {
     const starterEntry = this.getStarterDataEntry(speciesId);
     const { candyCount } = starterEntry;
 
@@ -1941,8 +1943,16 @@ export class GameData {
     // Elite Redux candy buffs: a flat ~35% across-the-board boost, plus the
     // current run's challenge-favour candy multiplier (same curve as shiny, up
     // to 3×). A positive gain never rounds down to 0.
+    //
+    // The favour multiplier is a RUN-scoped reward for handicapping yourself in
+    // a challenge run, so it only applies to candy earned IN the run (catches,
+    // bosses, classic wins, friendship). Egg-hatch candy comes from eggs that
+    // were stockpiled outside the run, so it must NOT inherit the favour bonus —
+    // otherwise hatching a backlog of eggs during a trivial high-favour challenge
+    // would farm triple candy. Egg hatches still keep the always-on flat 35%.
     if (count > 0) {
-      count = Math.max(1, Math.round(count * ER_CANDY_GAIN_MULTIPLIER * getRunCandyMultiplier()));
+      const favourMultiplier = fromEgg ? 1 : getRunCandyMultiplier();
+      count = Math.max(1, Math.round(count * ER_CANDY_GAIN_MULTIPLIER * favourMultiplier));
     }
 
     globalScene.candyBar.showStarterSpeciesCandy(speciesId, count);
