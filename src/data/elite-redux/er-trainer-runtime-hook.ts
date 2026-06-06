@@ -36,6 +36,7 @@
 import { globalScene } from "#app/global-scene";
 import {
   ER_TRAINER_BY_KEY,
+  ER_TRAINER_REGISTRY,
   type ErPartyMemberRegistered,
   type ErTrainerRegistryEntry,
 } from "#data/elite-redux/init-elite-redux-trainers";
@@ -231,19 +232,31 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
     const tierMatched = all.filter(t => trainerHasTier(t, tier));
     const unusedTier = tierMatched.filter(t => !USED_ER_TRAINER_KEYS.has(t.stableKey));
     const unusedAll = all.filter(t => !USED_ER_TRAINER_KEYS.has(t.stableKey));
+    // GLOBAL unused pool (any trainer-type) with the chosen tier. The per-type
+    // pools are small, and a run hammers a few common types (Youngster/Lass/…),
+    // so type-only no-repeat exhausts those ~handful of rosters fast and then
+    // repeats — the audit showed only ~19-20 DISTINCT ER rosters per 200-wave
+    // run despite 428 tier-eligible trainers. Falling back to the global unused
+    // pool before allowing ANY repeat lets a run field dozens of distinct
+    // trainers (variety), only repeating once the entire tier pool is spent.
+    const unusedTierGlobal = ER_TRAINER_REGISTRY.filter(
+      t => trainerHasTier(t, tier) && !USED_ER_TRAINER_KEYS.has(t.stableKey),
+    );
     // Never repeat a trainer while fresh ones remain (#225). Preference order:
-    //   1. unseen + tier-appropriate (insane/hell roster)
-    //   2. unseen of this type at all (avoids repeats even if its insane/hell
-    //      roster pool is small — falls back to the party roster via selectErRoster)
-    //   3. only once EVERY trainer of this type is used do we allow a repeat.
+    //   1. unseen + tier-appropriate, OF THIS TYPE (thematic)
+    //   2. unseen of this type at all (small insane/hell pool → party fallback)
+    //   3. unseen of ANY type at the tier (variety — the big win)
+    //   4. only once EVERY tier-eligible trainer is used do we allow a repeat.
     const pool =
       unusedTier.length > 0
         ? unusedTier
         : unusedAll.length > 0
           ? unusedAll
-          : tierMatched.length > 0
-            ? tierMatched
-            : all;
+          : unusedTierGlobal.length > 0
+            ? unusedTierGlobal
+            : tierMatched.length > 0
+              ? tierMatched
+              : all;
     if (pool.length > 0) {
       // Prefer trainers whose roster can field the ENTIRE encounter on its own,
       // so we never mix ER mons with vanilla-generated ones: PokeRogue calls
