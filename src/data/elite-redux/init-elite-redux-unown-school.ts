@@ -61,11 +61,13 @@ import {
 } from "#abilities/ab-attrs";
 import { allAbilities } from "#data/data-lists";
 import { HpThresholdFormChangeAbAttr } from "#data/elite-redux/archetypes/hp-threshold-form-change";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
 import { SpeciesFormChangeAbilityTrigger } from "#data/form-change-triggers";
 import { pokemonFormChanges, SpeciesFormChange } from "#data/pokemon-forms";
 import type { PokemonForm, PokemonSpecies } from "#data/pokemon-species";
 import { PokemonForm as PokemonFormCtor } from "#data/pokemon-species";
+import { AbilityId } from "#enums/ability-id";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
@@ -78,6 +80,24 @@ const REVELATION_FORM_KEY = "revelation";
 const REVELATION_SPECIES_CONST = "SPECIES_UNOWN_REVELATION";
 /** HP fraction at/below which Unown reverts out of Revelation form. */
 const REVERT_HP_RATIO = 0.25;
+/**
+ * ER-custom sprite slug for the Revelation form's art (lives at
+ * `images/pokemon/elite-redux/unown_revelation/…`). The injected form sits on
+ * VANILLA Unown (species 201), whose sprite scheme would otherwise resolve to a
+ * non-existent `201-revelation` — so we redirect the revelation form's sprite /
+ * icon to this ER-custom slug (mirroring ErCustomSpecies' path scheme).
+ */
+const REVELATION_SPRITE_SLUG = "unown_revelation";
+/**
+ * The Revelation form's own ER abilities (main pool) — distinct from base
+ * Unown's. ER ids → mapped to pokerogue AbilityIds at injection time.
+ * (107 Anticipation / 592 Minion Control / 156 Magic Bounce, per the ER dump.)
+ */
+const REVELATION_ABILITY_ER_IDS = [107, 592, 156] as const;
+
+function mapErAbilityId(erId: number): AbilityId {
+  return (ER_ID_MAP.abilities[erId] ?? AbilityId.NONE) as AbilityId;
+}
 
 /**
  * ER `typeT` id -> pokerogue `PokemonType`. Mirrors the table in
@@ -187,9 +207,13 @@ function injectRevelationForm(unown: PokemonSpecies, result: InitEliteReduxUnown
   const [hp, atk, def, spatk, spdef, spd] = draft.baseStats;
   const baseTotal = hp + atk + def + spatk + spdef + spd;
 
-  // The Revelation form keeps the holder's existing ability slots. Stats / types
-  // come from the ER draft; abilities mirror the base Unown form so an existing
-  // (already-summoned) Unown keeps a valid abilityIndex across the swap.
+  // Stats / types / abilities all come from the ER Revelation draft so the
+  // schooled form shows its OWN ability pool (Anticipation / Minion Control /
+  // Magic Bounce), not base Unown's. All three map to real abilities, so any
+  // carried-over abilityIndex (0/1/2) stays valid across the swap.
+  const ability1 = mapErAbilityId(REVELATION_ABILITY_ER_IDS[0]);
+  const ability2 = mapErAbilityId(REVELATION_ABILITY_ER_IDS[1]);
+  const abilityHidden = mapErAbilityId(REVELATION_ABILITY_ER_IDS[2]);
   const form = new PokemonFormCtor(
     "Revelation",
     REVELATION_FORM_KEY,
@@ -197,9 +221,9 @@ function injectRevelationForm(unown: PokemonSpecies, result: InitEliteReduxUnown
     type2,
     unown.height,
     unown.weight,
-    unown.ability1,
-    unown.ability2,
-    unown.abilityHidden,
+    ability1,
+    ability2,
+    abilityHidden,
     baseTotal,
     hp,
     atk,
@@ -225,8 +249,71 @@ function injectRevelationForm(unown: PokemonSpecies, result: InitEliteReduxUnown
   formMut.generation = unown.generation;
 
   (unown.forms as PokemonForm[]).push(form);
+  installRevelationSpriteRedirect(unown, formMut.formIndex);
   result.formInjected = true;
   return formMut.formIndex;
+}
+
+/**
+ * Redirect the Revelation form's sprite + icon to the ER-custom `unown_revelation`
+ * art (the form lives on vanilla Unown, whose scheme would resolve to a
+ * non-existent `201-revelation`). Mirrors ErCustomSpecies' path scheme, but
+ * STRICTLY gated to `formIndex === revelationIndex` — base Unown letter forms are
+ * never touched, so this cannot regress them. Idempotent.
+ */
+function installRevelationSpriteRedirect(unown: PokemonSpecies, revelationIndex: number): void {
+  const sp = unown as unknown as {
+    getSpriteAtlasPath(female: boolean, formIndex?: number, shiny?: boolean, variant?: number, back?: boolean): string;
+    getSpriteId(female: boolean, formIndex?: number, shiny?: boolean, variant?: number, back?: boolean): string;
+    getIconAtlasKey(formIndex?: number, shiny?: boolean, variant?: number): string;
+    getIconId(female: boolean, formIndex?: number, shiny?: boolean, variant?: number): string;
+    __erRevelationSpriteRedirect?: boolean;
+  };
+  if (sp.__erRevelationSpriteRedirect) {
+    return;
+  }
+  sp.__erRevelationSpriteRedirect = true;
+
+  const slug = REVELATION_SPRITE_SLUG;
+  const origAtlasPath = sp.getSpriteAtlasPath.bind(sp);
+  const origSpriteId = sp.getSpriteId.bind(sp);
+  const origIconAtlasKey = sp.getIconAtlasKey.bind(sp);
+  const origIconId = sp.getIconId.bind(sp);
+
+  sp.getSpriteAtlasPath = (female, formIndex, shiny, variant, back) => {
+    if (formIndex !== revelationIndex) {
+      return origAtlasPath(female, formIndex, shiny, variant, back);
+    }
+    let filename: string;
+    if (shiny) {
+      const tier = variant ?? 0;
+      const suffix = tier === 0 ? "" : `-${tier + 1}`;
+      filename = back ? `shiny-back${suffix}` : `shiny${suffix}`;
+    } else {
+      filename = back ? "back" : "front";
+    }
+    return `elite-redux/${slug}/${filename}`;
+  };
+  sp.getSpriteId = (female, formIndex, shiny, variant, back) => {
+    if (formIndex !== revelationIndex) {
+      return origSpriteId(female, formIndex, shiny, variant, back);
+    }
+    const suffix = shiny ? (variant ? `_shiny${variant + 1}` : "_shiny") : "";
+    const backPrefix = back ? "back__" : "";
+    return `${backPrefix}er__${slug}${suffix}`;
+  };
+  sp.getIconAtlasKey = (formIndex, shiny, variant) => {
+    if (formIndex !== revelationIndex) {
+      return origIconAtlasKey(formIndex, shiny, variant);
+    }
+    return `er_icon__${slug}`;
+  };
+  sp.getIconId = (female, formIndex, shiny, variant) => {
+    if (formIndex !== revelationIndex) {
+      return origIconId(female, formIndex, shiny, variant);
+    }
+    return "0001.png";
+  };
 }
 
 /**

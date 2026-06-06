@@ -14,12 +14,14 @@
 // Gated behind ER_SCENARIO=1.
 
 import { allAbilities } from "#data/data-lists";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { SpeciesFormChangeAbilityTrigger } from "#data/form-change-triggers";
 import { AbilityId } from "#enums/ability-id";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -88,6 +90,22 @@ describe.skipIf(!RUN)("ER Unown Revelation (Schooling)", () => {
 
     console.log(`[unown-revert] hp%=${unown.getHpRatio()} formKey=${unown.getFormKey()}`);
     expect(unown.getFormKey()).not.toBe("revelation"); // reverted to a normal letter
+  });
+
+  it("revelation form carries Revelation's own abilities + ER-custom sprite path", () => {
+    const unown = getPokemonSpecies(SpeciesId.UNOWN);
+    const idx = unown.forms.findIndex(f => f.formKey === "revelation");
+    expect(idx).toBeGreaterThan(0);
+    const form = unown.forms[idx];
+    // Revelation's own ability pool (107 Anticipation / 592 Minion Control /
+    // 156 Magic Bounce), NOT base Unown's (which showed Run Away before).
+    expect(form.ability1).toBe(ER_ID_MAP.abilities[107]);
+    expect(form.ability2).toBe(ER_ID_MAP.abilities[592]);
+    expect(form.abilityHidden).toBe(ER_ID_MAP.abilities[156]);
+    // Sprite redirected to the ER-custom unown_revelation art (was the missing
+    // vanilla `201-revelation`); base letter forms are untouched.
+    expect(unown.getSpriteAtlasPath(false, idx, false, 0, false)).toBe("elite-redux/unown_revelation/front");
+    expect(unown.getSpriteAtlasPath(false, 0, false, 0, false)).not.toContain("unown_revelation");
   });
 
   it("wires a PostFaint form-change so Revelation does not persist on faint", () => {
