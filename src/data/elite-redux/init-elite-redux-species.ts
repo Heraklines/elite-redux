@@ -19,6 +19,7 @@ import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
 import { ER_SPRITE_MANIFEST } from "#data/elite-redux/er-sprite-manifest";
+import { getErSpriteSlug } from "#data/elite-redux/init-elite-redux-custom-species";
 import { PokemonForm } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
 import { PokemonType } from "#enums/pokemon-type";
@@ -605,6 +606,15 @@ function seedNormalBaseForm(species: (typeof allSpecies)[number]): void {
   baseMut.formIndex = 0;
   baseMut.generation = species.generation;
   (species.forms as unknown as PokemonForm[]).push(baseForm);
+
+  // For an ER-CUSTOM base species, seeding this base form makes getSpeciesForm(0)
+  // return THIS plain PokemonForm instead of the ErCustomSpecies (which carries
+  // the slug-based sprite overrides) — so the base form would 404 on the vanilla
+  // `{speciesId}` scheme. Redirect it back to the base species' ER slug.
+  const baseSlug = getErSpriteSlug(species.speciesId);
+  if (baseSlug) {
+    installErFormSpriteRedirect(baseForm, baseSlug);
+  }
 }
 
 /** Outcome of the data-driven mega-form injection pass. */
@@ -711,6 +721,16 @@ export function injectAllErMegaForms(): InjectErMegaFormsResult {
     formMut.formIndex = species.forms.length;
     formMut.generation = species.generation;
     (species.forms as unknown as PokemonForm[]).push(form);
+
+    // Redirect the injected mega/primal/origin form's sprite to its ER art. The
+    // form uses formSpriteKey null → vanilla `{speciesId}-{formKey}` path, which
+    // for ER-new megas (and ALL Redux-custom megas) has no asset → 404/403 →
+    // substitute + loader stall. The target form's ER art lives under its slug.
+    const megaSlug = ER_SLUG_BY_ER_ID.get(entry.targetErId);
+    if (megaSlug) {
+      installErFormSpriteRedirect(form, megaSlug);
+    }
+
     result.injected++;
   }
   return result;
