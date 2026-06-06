@@ -58,7 +58,6 @@
 import {
   type AbAttr,
   AddMoveFlagAbAttr,
-  AddSecondStrikeAbAttr,
   AllAttacksMultiHitAbAttr,
   AlwaysHitAbAttr,
   AttackTypeImmunityAbAttr,
@@ -176,6 +175,7 @@ import { IncomingAccuracyMultiplierAbAttr } from "#data/elite-redux/archetypes/i
 import { LifestealOnHitAbAttr, LifestealOnKoAbAttr, ScavengerLootAbAttr } from "#data/elite-redux/archetypes/lifesteal";
 import { MoveFlagInjectionAbAttr } from "#data/elite-redux/archetypes/move-flag-injection";
 import { MovingFirstTrapFlinchAbAttr } from "#data/elite-redux/archetypes/moving-first-trap-flinch";
+import { ErMultiHeadedAbAttr } from "#data/elite-redux/archetypes/multi-headed";
 import { NullifyFirstNHitsAbAttr } from "#data/elite-redux/archetypes/nullify-first-n-hits";
 import { OffensiveTypeChartOverrideAbAttr } from "#data/elite-redux/archetypes/offensive-type-chart-override";
 import { OnCritStatBoostLowestAbAttr } from "#data/elite-redux/archetypes/on-crit-stat-boost-lowest";
@@ -5642,9 +5642,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // → ×2, neutral/SE unchanged. Handled in getAttackTypeEffectiveness.
       return ok([new BoneMoveTypeChartAbAttr()]);
     case 347:
-      // Multi-Headed — "Hits as many times as it has heads." Hydreigon = 3
-      // heads → +2 hits. Wire 2x AddSecondStrike (each adds +1 hit).
-      return ok([new AddSecondStrikeAbAttr(false), new AddSecondStrikeAbAttr(false)]);
+      // Multi-Headed — "Hits as many times as it has heads." Head count is a
+      // per-species ROM flag (F_TWO_HEADED / F_THREE_HEADED): 2-headed → 2 hits,
+      // 3-headed → 3 hits. The old wiring hardcoded +2 strikes (3 hits) for
+      // EVERY holder, so 2-headed mons (Doduo, Mawile, …) wrongly hit 3×. The
+      // species-aware attr adds `headCount - 1` strikes; the reduced damage on
+      // later heads is applied in Pokemon.getBaseDamage.
+      return ok([new ErMultiHeadedAbAttr(false)]);
     case 273273:
       // Sentinel — not a real ER id, just keeps switch formatting consistent.
       return SKIP_BESPOKE;
