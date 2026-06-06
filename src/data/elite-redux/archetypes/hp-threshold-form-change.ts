@@ -27,8 +27,8 @@
 
 import { PostDefendAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
-import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 import { SpeciesFormChangeManualTrigger } from "#data/pokemon-forms/form-change-triggers";
+import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 
 /** Construction options for {@linkcode HpThresholdFormChangeAbAttr}. */
 export interface HpThresholdFormChangeOptions {
@@ -53,20 +53,36 @@ export interface HpThresholdFormChangeOptions {
 /**
  * Parameterized AbAttr implementing the `hp-threshold-form-change` archetype.
  *
- * Fires once per battle (tracked via `pokemon.summonData.transformedTurn`)
- * when the holder's post-damage HP drops below the configured threshold.
+ * Bidirectional and re-checkable every time the holder is hit:
+ *
+ *   - HP at/below the threshold AND not yet in the target form -> transform
+ *     into `targetFormKey` (the original "below X% HP -> transform" behavior).
+ *   - HP above the threshold AND currently in the target form -> revert toward
+ *     the base form (the previously-MISSING recovery path — e.g. Locust Swarm
+ *     stayed in Hivemind form even after healing back above 25%).
+ *
+ * Both edges fire through pokerogue's `triggerPokemonFormChange` pipeline, which
+ * REQUIRES (a) the target form to exist on the holder's species and (b) matching
+ * `pokemonFormChanges` entries for the `<base> -> targetFormKey` (transform) and
+ * `targetFormKey -> ""` (revert) edges. ER models several of these forms as
+ * separate dump species (e.g. SPECIES_WISPYWASPY_HIVEMIND, mirroring
+ * SPECIES_UNOWN_REVELATION) that are NOT automatically forms on the base
+ * species. Without a Revelation-style init wiring (form injection + form-change
+ * registration; see `init-elite-redux-unown-school.ts`) the form key is absent
+ * and the change is a no-op — now logged once via a console.warn so the missing
+ * wiring is VISIBLE rather than silently swallowed.
  */
 export class HpThresholdFormChangeAbAttr extends PostDefendAbAttr {
   private readonly hpThreshold: number;
   private readonly targetFormKey: string;
   private readonly cureStatus: boolean;
+  /** Guards the missing-form warning so it logs at most once per attr instance. */
+  private warnedMissingForm = false;
 
   constructor(options: HpThresholdFormChangeOptions) {
     super(false);
     if (!(options.hpThreshold > 0 && options.hpThreshold <= 1)) {
-      throw new Error(
-        `[HpThresholdFormChangeAbAttr] hpThreshold must be in (0, 1]; got ${options.hpThreshold}`,
-      );
+      throw new Error(`[HpThresholdFormChangeAbAttr] hpThreshold must be in (0, 1]; got ${options.hpThreshold}`);
     }
     if (!options.targetFormKey) {
       throw new Error("[HpThresholdFormChangeAbAttr] targetFormKey must be non-empty");
@@ -76,18 +92,21 @@ export class HpThresholdFormChangeAbAttr extends PostDefendAbAttr {
     this.cureStatus = options.cureStatus ?? false;
   }
 
+  /** Whether the holder is currently in the target (transformed) form. */
+  private isInTargetForm(pokemon: { species: { forms: { formKey: string }[] }; formIndex: number }): boolean {
+    return pokemon.species.forms[pokemon.formIndex]?.formKey === this.targetFormKey;
+  }
+
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon } = params;
     if (pokemon.isFainted()) {
       return false;
     }
-    // Don't re-fire if already in the target form.
-    const currentForm = pokemon.species.forms[pokemon.formIndex];
-    if (currentForm?.formKey === this.targetFormKey) {
-      return false;
-    }
-    // Only fire when HP is at or below the threshold.
-    return pokemon.hp / pokemon.getMaxHp() <= this.hpThreshold;
+    const belowThreshold = pokemon.hp / pokemon.getMaxHp() <= this.hpThreshold;
+    const inTargetForm = this.isInTargetForm(pokemon);
+    // Transform edge: below threshold and not yet transformed.
+    // Revert edge: recovered above threshold while still transformed.
+    return belowThreshold ? !inTargetForm : inTargetForm;
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {
@@ -95,17 +114,28 @@ export class HpThresholdFormChangeAbAttr extends PostDefendAbAttr {
       return;
     }
     const { pokemon } = params;
-    // Find the target form index by key.
+    // The target form must exist on this species for either edge to resolve.
     const targetIdx = pokemon.species.forms.findIndex(f => f.formKey === this.targetFormKey);
     if (targetIdx < 0) {
-      // Form not present on this species — silent no-op so the ability
-      // doesn't crash when injected onto a mon without the matching form.
+      // Form not injected — flag the missing wiring (once) instead of silently
+      // doing nothing, then bail so the ability doesn't crash.
+      if (!this.warnedMissingForm) {
+        console.warn(
+          `[HpThresholdFormChangeAbAttr] species ${pokemon.species.speciesId} has no "${this.targetFormKey}" form; `
+            + "form change is a no-op. Inject the form + register pokemonFormChanges edges "
+            + "(see init-elite-redux-unown-school.ts for the Revelation precedent).",
+        );
+        this.warnedMissingForm = true;
+      }
       return;
     }
-    // Trigger the form change via pokerogue's standard pipeline.
+    const belowThreshold = pokemon.hp / pokemon.getMaxHp() <= this.hpThreshold;
+    // Trigger the form change via pokerogue's standard pipeline. The registered
+    // `pokemonFormChanges` edges decide the direction (transform vs revert);
+    // `triggerPokemonFormChange` returns false (no-op) if no edge matches.
     globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeManualTrigger);
-    // Cure status if configured.
-    if (this.cureStatus && pokemon.status) {
+    // Cure status only on the transform edge (matches Ape Shift's rider).
+    if (belowThreshold && this.cureStatus && pokemon.status) {
       pokemon.resetStatus(false);
     }
   }

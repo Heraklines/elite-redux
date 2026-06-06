@@ -2837,7 +2837,17 @@ export class PokedexPageUiHandler extends MessageUiHandler {
 
       // Setting luck text and sparks
       if (isFormCaught) {
-        const luck = globalScene.gameData.getDexAttrLuck(this.isCaught());
+        // ER customs (id >= 10000) are "always inspectable", so isCaught()
+        // returns a synthetic fully-unlocked mask (SHINY + VARIANT_3) for them.
+        // Luck must reflect REAL save data, not that mask — otherwise an
+        // uncaught custom would falsely display Luck: 3. Read the actual
+        // caughtAttr for customs (0n when unseen/uncaught -> luck 0/hidden);
+        // every other species keeps using isCaught() unchanged.
+        const luckCaughtAttr =
+          species.speciesId >= 10000
+            ? (globalScene.gameData.dexData[species.speciesId]?.caughtAttr ?? 0n)
+            : this.isCaught();
+        const luck = globalScene.gameData.getDexAttrLuck(luckCaughtAttr);
         this.pokemonLuckText.setVisible(!!luck);
         this.pokemonLuckText.setText(luck.toString());
         this.pokemonLuckText.setTint(getVariantTint(Math.min(luck - 1, 2) as Variant));

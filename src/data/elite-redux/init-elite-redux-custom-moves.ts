@@ -850,6 +850,14 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
     case 986: // Dragon Jab — "30% chance to inflict bleeding."
       move.attr(AddBattlerTagAttr, BattlerTagType.ER_BLEED, false, false, 4, 6);
       break;
+    // ---- +1 crit chance + 50% bleed (effectChance gates via move.chance) ----
+    case 816: // Devious Shot — "+1 crit chance. 50% bleed chance."
+      // Archetype is "unknown" so the dispatcher skips it; wire the bleed here
+      // using the same ER_BLEED tag + 4-6 turn duration as Blood Shot (id 810).
+      // Move.chance (50, from effectChance) gates the bleed proc.
+      move.attr(HighCritAttr);
+      move.attr(AddBattlerTagAttr, BattlerTagType.ER_BLEED, false, false, 4, 6);
+      break;
   }
 }
 

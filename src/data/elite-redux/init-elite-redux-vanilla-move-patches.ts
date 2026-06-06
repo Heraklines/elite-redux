@@ -62,6 +62,7 @@ import {
   PhotonGeyserCategoryAttr,
   RecoilAttr,
   RemoveHeldItemAttr,
+  SetBasePowerAttr,
   SheerColdAccuracyAttr,
   StatStageChangeAttr,
   StatusEffectAttr,
@@ -210,6 +211,23 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       move.moveTarget = MoveTarget.ALL_NEAR_ENEMIES;
       // Keep StatusEffectAttr(POISON) — vanilla wires it. ER adds 30% chance
       // (numeric-patched) on top.
+    },
+  ],
+  // DRAGON_RAGE: vanilla fixed 40 damage → ER regular damaging Dragon move.
+  // Vanilla ships power -1 + FixedDamageAttr(40), so it always deals a flat 40
+  // regardless of stats/STAB/type. ER (er-moves.ts id 82) makes it a normal
+  // 80-BP Dragon attack. We strip FixedDamageAttr so the standard damage formula
+  // (stats/STAB/type chart/crits) applies. NOTE: the c-source correction
+  // (`MOVE_DRAGON_RAGE` → power:1) runs AFTER this patcher and overwrites the
+  // `.power` scalar back to 1 (its ROM dummy value, left over from the
+  // fixed-damage era). To make ER's 80 BP survive that late scalar clobber we
+  // pin the base power via a `SetBasePowerAttr` (attrs are not touched by the
+  // c-source pass) instead of relying on the scalar.
+  [
+    MoveId.DRAGON_RAGE,
+    move => {
+      removeAttrsByName(move, ["FixedDamageAttr"]);
+      addAttrUnique(move, new SetBasePowerAttr(80));
     },
   ],
   // FLASH: vanilla status (accuracy -1) → ER Special Electric damaging, ACC drop.

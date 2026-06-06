@@ -810,14 +810,23 @@ export class PostDefendHpGatedStatStageChangeAbAttr extends PostDefendAbAttr {
   private readonly stats: readonly BattleStat[];
   private readonly stages: number;
   private readonly selfTarget: boolean;
+  private readonly guardTag: BattlerTagType | undefined;
 
-  constructor(hpGate: number, stats: BattleStat[], stages: number, selfTarget = true) {
+  /**
+   * @param guardTag - optional battler tag that, when already present on the
+   *   holder, suppresses the boost. Used by Elite Redux's No Turning Back so the
+   *   one-time all-stats boost shares the same guard as its NO_RETREAT self-trap
+   *   sibling — otherwise the boost re-triggers every time HP re-crosses the gate
+   *   (e.g. after a Sitrus Berry heals back above it).
+   */
+  constructor(hpGate: number, stats: BattleStat[], stages: number, selfTarget = true, guardTag?: BattlerTagType) {
     super(true);
 
     this.hpGate = hpGate;
     this.stats = stats;
     this.stages = stages;
     this.selfTarget = selfTarget;
+    this.guardTag = guardTag;
   }
 
   // TODO: This should trigger after the final hit of multi-strike moves, which requires an aggregated damage total
@@ -825,6 +834,12 @@ export class PostDefendHpGatedStatStageChangeAbAttr extends PostDefendAbAttr {
   // The structure used for the former can likely be re-used for the latter.
   override canApply({ pokemon, move, damage }: PostMoveInteractionAbAttrParams): boolean {
     if (move.category === MoveCategory.STATUS) {
+      return false;
+    }
+
+    // One-time guard: if the configured tag is already present, the boost has
+    // already fired this battle — don't re-apply on a later threshold re-cross.
+    if (this.guardTag !== undefined && pokemon.getTag(this.guardTag) !== undefined) {
       return false;
     }
 

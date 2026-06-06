@@ -673,26 +673,21 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // (Water Gun, Ember, …) poison the holder — a regression vs the ROM spec.
   // Keep only the offense-side contact proc ("also works on offense").
   [AbilityId.POISON_POINT, ab => addOffenseContactStatusChance(ab, StatusEffect.POISON, 30)],
-  // 27 EFFECT_SPORE: vanilla 30% contact SLP/PRZ/PSN → ER adds 10% non-contact each.
-  // EFFECT_SPORE picks one of three statuses randomly per proc. Append a
-  // separate non-contact proc per status (lower chance to balance). No
-  // "also on offense" in ER spec for EFFECT_SPORE — keep defend-side only.
-  [
-    AbilityId.EFFECT_SPORE,
-    ab => {
-      addNonContactStatusChance(ab, StatusEffect.SLEEP, 10);
-      addNonContactStatusChance(ab, StatusEffect.PARALYSIS, 10);
-      addNonContactStatusChance(ab, StatusEffect.POISON, 10);
-    },
-  ],
+  // 27 EFFECT_SPORE: ER ROM spec is CONTACT-only (SLP/PRZ/PSN on contact).
+  // The earlier ER patch added a 10% non-contact tier per status, which made
+  // ranged moves proc Effect Spore — a regression vs the ROM spec (same class
+  // of bug as the Poison Point non-contact tier above). Removed entirely so
+  // only the vanilla contact proc (EffectSporeAbAttr) remains.
 
   // ===== Round 6: more non-contact extensions + minor tweaks =====
-  // 143 POISON_TOUCH: vanilla 30% contact poison → ER adds 10% non-contact.
-  // ER spec: "Also works on offense" — add offense-side proc too.
+  // 143 POISON_TOUCH: ER spec is CONTACT-only ("also works on offense"). The
+  // earlier ER patch added a 10% NON-contact poison tier, which made ranged
+  // moves proc Poison Touch on defense — a regression vs the ROM spec (same
+  // class of bug as Poison Point / Effect Spore). Removed the non-contact line;
+  // kept the offense-side contact proc.
   [
     AbilityId.POISON_TOUCH,
     ab => {
-      addNonContactStatusChance(ab, StatusEffect.POISON, 10);
       addOffenseContactStatusChance(ab, StatusEffect.POISON, 30);
     },
   ],

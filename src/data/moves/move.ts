@@ -4666,6 +4666,31 @@ export class MovePowerMultiplierAttr extends VariablePowerAttr {
 }
 
 /**
+ * Forces a move's base power to a fixed value at damage-calc time, regardless of
+ * the move's `.power` scalar. Unlike {@linkcode FixedDamageAttr} this does NOT
+ * bypass the damage formula — STAB, the type chart, stats, items and crits all
+ * still apply — it only pins the BASE power.
+ *
+ * ER use: Dragon Rage. Its ROM/C-source data keeps `.power = 1` (a dummy left
+ * over from when it was a fixed-40-damage move), and that scalar is written by a
+ * late C-source-correction pass that runs after the move-mechanic patcher, so a
+ * plain `move.power = 80` is clobbered back to 1. Attaching this attr instead
+ * makes ER's intended 80 BP survive (attrs aren't touched by that pass) while
+ * keeping the hit a normal damaging attack.
+ */
+export class SetBasePowerAttr extends VariablePowerAttr {
+  constructor(private readonly basePower: number) {
+    super();
+  }
+
+  override apply(_user: Pokemon, _target: Pokemon, _move: Move, args: any[]): boolean {
+    const power = args[0] as NumberHolder;
+    power.value = this.basePower;
+    return true;
+  }
+}
+
+/**
  * Helper function to calculate the the base power of an ally's hit when using Beat Up.
  * @param user The Pokemon that used Beat Up.
  * @param allyIndex The party position of the ally contributing to Beat Up.
@@ -7267,9 +7292,15 @@ export class AngelsWrathSteelSuperEffectiveAttr extends MoveTypeChartOverrideAtt
  * multiplier — which deals the extra damage but never shows "It's super
  * effective!", never colours the hit, and can't override a type immunity — this
  * overrides the type-effectiveness multiplier itself, so the SE message and hit
- * result follow automatically. Forces at least {@linkcode minMultiplier} (2× by
- * default) against the listed type, overriding resistances/immunities, matching
- * the ER convention used by {@linkcode AngelsWrathSteelSuperEffectiveAttr}.
+ * result follow automatically. The {@linkcode minMultiplier} (2× by default) is
+ * applied to the listed type's *own* contribution — replacing whatever the type
+ * chart said for moveType-vs-targetType — while every OTHER defender type keeps
+ * its natural contribution. So a dual-type target combines correctly: pure
+ * Flying = 2×, but Ground/Flying = (Poison-vs-Ground 0.5) × (forced Flying 2) =
+ * 1×, and Steel/Flying = (Steel immunity 0) × (forced Flying 2) = 0×. The
+ * targetType's own resistance/immunity is overridden (e.g. Acid is normally 0×
+ * vs Steel → 2×), matching the ER convention used by
+ * {@linkcode AngelsWrathSteelSuperEffectiveAttr}.
  */
 export class ErSuperEffectiveVsTypeAttr extends MoveTypeChartOverrideAttr {
   constructor(
@@ -7285,11 +7316,28 @@ export class ErSuperEffectiveVsTypeAttr extends MoveTypeChartOverrideAttr {
     _move: Move,
     args: [multiplier: NumberHolder, types: readonly PokemonType[], moveType: PokemonType],
   ): boolean {
-    const [multiplier, types] = args;
-    if (!types.includes(this.targetType) || multiplier.value >= this.minMultiplier) {
+    const [multiplier, types, moveType] = args;
+    if (!types.includes(this.targetType)) {
       return false;
     }
-    multiplier.value = this.minMultiplier;
+    // Recompute the combined multiplier, substituting the targetType's natural
+    // contribution with `minMultiplier`. Recomputing (rather than dividing the
+    // incoming value) avoids a divide-by-zero when the targetType is naturally
+    // immune (e.g. Poison vs Steel = 0×) and keeps each defender type's own
+    // contribution intact so dual-types combine correctly.
+    let value = 1;
+    let appliedOverride = false;
+    for (const defenderType of types) {
+      if (defenderType === this.targetType && !appliedOverride) {
+        // Only force the FIRST occurrence of the targetType to the SE multiplier
+        // (a target can't list the same type twice in practice, but guard anyway).
+        value *= this.minMultiplier;
+        appliedOverride = true;
+      } else {
+        value *= getTypeDamageMultiplier(moveType, defenderType);
+      }
+    }
+    multiplier.value = value;
     return true;
   }
 }

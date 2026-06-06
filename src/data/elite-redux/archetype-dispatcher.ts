@@ -3822,8 +3822,20 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Break it Down — "After using an attack, follow up with a 20BP Rapid Spin."
       return ok([new PostAttackScriptedMoveAbAttr({ moveId: MoveId.RAPID_SPIN, power: 20 })]);
     case 853:
-      // Purple Haze — "Triggers a 20BP Poison Gas after using a move."
-      return ok([new PostAttackScriptedMoveAbAttr({ moveId: MoveId.POISON_GAS })]);
+      // Purple Haze — "Triggers a 20BP Poison Gas after using a move." Two
+      // fixes: (1) the scripted follow-up now resolves immediately after the
+      // attack — the archetype forces MovePhaseTimingModifier.FIRST instead of
+      // letting the dynamic MovePhase queue re-sort it into turn speed-order;
+      // (2) the intended 20 BP is now honored.
+      //
+      // On the 20 BP: although VANILLA MoveId.POISON_GAS is a STATUS move
+      // (power -1), ER's vanilla-move-patches rebalance it at init into a SPECIAL
+      // Poison DAMAGING move (see init-elite-redux-vanilla-move-patches.ts) that
+      // still applies POISON. So the scripted cast IS damaging, and the `power`
+      // override (20) cleanly replaces the rebalanced ~65 BP for this cast alone
+      // via scriptedPokemonMove's power-overridden clone — nothing global is
+      // mutated, and we do NOT touch the POISON_GAS definition here.
+      return ok([new PostAttackScriptedMoveAbAttr({ moveId: MoveId.POISON_GAS, power: 20 })]);
     case 383:
       // Cold Rebound — "Attacks with Icy Wind when hit by a contact move."
       return ok([
@@ -4892,8 +4904,21 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     case 884:
       // Locust Swarm — "Changes into Hivemind form until 1/4 HP or less."
-      // Interpretation: changes to Hivemind when HP <= 1/4. Same primitive
-      // gated at 0.25.
+      // Interpretation: changes to Hivemind when HP <= 1/4, reverting once HP
+      // recovers above 1/4. The archetype is now bidirectional (transform +
+      // revert) — the revert path was previously missing, so a Sitrus-style heal
+      // left the holder stuck in Hivemind form.
+      //
+      // KNOWN GAP (flagged, not silently swallowed): ER ships the Hivemind form
+      // as a SEPARATE dump species (SPECIES_WISPYWASPY_HIVEMIND, id 10638),
+      // exactly like SPECIES_UNOWN_REVELATION. pokerogue's runtime form system
+      // only swaps formIndex on the SAME species, so "hivemind" must be injected
+      // as a FORM on base Wispywaspy AND its `<letter>->hivemind` / `hivemind->""`
+      // form-change edges registered — the same three-step wiring Revelation got
+      // in init-elite-redux-unown-school.ts. That wiring does not yet exist for
+      // Wispywaspy, so today the change is a no-op (the archetype now logs a
+      // one-time console.warn flagging the missing form). Completing it requires
+      // a dedicated init module (out of scope for this dispatcher change).
       return ok([
         new HpThresholdFormChangeAbAttr({
           hpThreshold: 0.25,
@@ -5459,8 +5484,18 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // the trap entirely — corrected.) NO_RETREAT (vs TRAPPED) is the right tag:
       // it traps without the Ghost-escape clause but still yields to Shed Shell /
       // Eject Button, exactly as the description states.
+      // The stat boost shares NO_RETREAT as a one-time guard with the self-trap
+      // sibling: once the trap tag is applied (same crossing hit), a later
+      // re-cross (e.g. after a Sitrus Berry heals above 50% then drops again)
+      // finds the tag present and skips the boost — so it boosts exactly once.
       return ok([
-        new PostDefendHpGatedStatStageChangeAbAttr(0.5, [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD], 1),
+        new PostDefendHpGatedStatStageChangeAbAttr(
+          0.5,
+          [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD],
+          1,
+          true,
+          BattlerTagType.NO_RETREAT,
+        ),
         new PostDefendHpGatedSelfTagAbAttr(0.5, BattlerTagType.NO_RETREAT),
       ]);
     case 634: {

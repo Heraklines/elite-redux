@@ -28,6 +28,7 @@ import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-
 import type { MoveCategory } from "#enums/move-category";
 import type { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
+import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
 import { MoveUseMode } from "#enums/move-use-mode";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
@@ -88,12 +89,20 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
     if (simulated || !opponent) {
       return;
     }
+    // MovePhase is a *dynamic* phase: a plain `unshiftNew("MovePhase", ...)` is
+    // routed into the speed-sorted MovePhasePriorityQueue (placed after the next
+    // MoveEndPhase), so the scripted follow-up would resolve in turn speed-order
+    // rather than right after the holder's attack (reported on Purple Haze).
+    // `MovePhaseTimingModifier.FIRST` forces it ahead of any remaining queued
+    // moves — i.e. it resolves immediately after the triggering attack, exactly
+    // how vanilla Dancer chains its replicated move.
     globalScene.phaseManager.unshiftNew(
       "MovePhase",
       pokemon,
       [opponent.getBattlerIndex()],
       scriptedPokemonMove(this.opts.moveId, this.opts.power),
       MoveUseMode.INDIRECT,
+      MovePhaseTimingModifier.FIRST,
     );
   }
 }
