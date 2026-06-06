@@ -39,6 +39,8 @@ import {
   type ErPartyMemberRegistered,
   type ErTrainerRegistryEntry,
 } from "#data/elite-redux/init-elite-redux-trainers";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { ER_MEGA_STONE_NAME_BY_ITEM } from "#data/elite-redux/er-mega-stone-item-ids";
 import { erDifficultyToRosterTier, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { type ErRosterTier, findErTrainersForType, selectErRoster } from "#data/elite-redux/er-trainer-overlay";
@@ -520,6 +522,13 @@ export function hasErRivalOverride(trainer: Trainer): boolean {
  * are layered on separately.)
  */
 export function applyErTrainerHeldItems(party: readonly EnemyPokemon[]): void {
+  // Ace / Elite: revert any mon that is ALREADY a mega before the wave gate.
+  // forceErMega gates the held-stone path, but some ER rosters field a mega
+  // DIRECTLY as the species (e.g. rival aces "Blaziken Mega" / "Sceptile Mega"),
+  // which would otherwise show a mega at wave < 50. Hell is exempt.
+  for (const enemy of party) {
+    revertEarlyMega(enemy);
+  }
   for (const enemy of party) {
     const itemId = ER_ITEM_BY_POKEMON.get(enemy);
     if (itemId === undefined) {
@@ -555,6 +564,68 @@ export function applyErTrainerHeldItems(party: readonly EnemyPokemon[]): void {
  * intentionally exempt** — early megas are part of its difficulty.
  */
 const ER_MEGA_MIN_WAVE_NON_HELL = 50;
+
+/**
+ * Lazily-built map: pokerogue species id of a DIRECT mega species → its base
+ * species id. ER rosters occasionally field a mega as the species itself (rival
+ * aces, boss teams), so reverting it for the Ace/Elite early-game gate means
+ * swapping the species, not just a form index. Derived from {@linkcode ER_MEGA_FORMS}.
+ */
+let ER_MEGA_SPECIES_TO_BASE: Map<number, number> | null = null;
+function megaSpeciesToBase(): Map<number, number> {
+  if (ER_MEGA_SPECIES_TO_BASE !== null) {
+    return ER_MEGA_SPECIES_TO_BASE;
+  }
+  const map = new Map<number, number>();
+  for (const entry of ER_MEGA_FORMS) {
+    const megaPk = ER_ID_MAP.species[entry.targetErId];
+    const basePk = ER_ID_MAP.species[entry.baseErId];
+    if (megaPk !== undefined && basePk !== undefined && megaPk !== basePk) {
+      map.set(megaPk, basePk);
+    }
+  }
+  ER_MEGA_SPECIES_TO_BASE = map;
+  return map;
+}
+
+/**
+ * Ace / Elite early-game gate (Hell exempt): if this enemy is already a mega —
+ * either because its SPECIES is a mega (direct roster mega) or because it
+ * spawned at a mega/primal/origin FORM index — revert it to its base before the
+ * {@linkcode ER_MEGA_MIN_WAVE_NON_HELL} threshold so megas never appear early.
+ */
+function revertEarlyMega(enemy: EnemyPokemon): void {
+  if (getErDifficulty() === "hell") {
+    return;
+  }
+  if ((globalScene.currentBattle?.waveIndex ?? 0) >= ER_MEGA_MIN_WAVE_NON_HELL) {
+    return;
+  }
+  // (a) The species itself is a mega → swap to the base species.
+  const baseId = megaSpeciesToBase().get(enemy.species.speciesId);
+  if (baseId !== undefined) {
+    const base = getPokemonSpecies(baseId);
+    if (base) {
+      enemy.species = base;
+      enemy.formIndex = 0;
+      const abilityCount = enemy.getSpeciesForm().getAbilityCount();
+      if (enemy.abilityIndex >= abilityCount) {
+        enemy.abilityIndex = abilityCount - 1;
+      }
+      enemy.calculateStats();
+      enemy.generateName();
+      return;
+    }
+  }
+  // (b) Base species but spawned at a mega/primal/origin form → reset to base form.
+  const forms = enemy.species.forms ?? [];
+  const formKey = forms[enemy.formIndex]?.formKey ?? "";
+  if (enemy.formIndex > 0 && /mega|primal|origin/i.test(formKey)) {
+    enemy.formIndex = 0;
+    enemy.calculateStats();
+    enemy.generateName();
+  }
+}
 
 /**
  * The mega/primal/origin target form key a given ER stone evolves into. ER stone

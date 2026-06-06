@@ -179,31 +179,40 @@ describe("ER 1:1 full-run prediction harness (Hell, 200 waves)", () => {
   const isMegaName = (name: string): boolean =>
     /\bmega\b|\bprimal\b|gigantamax|g-?max|eternamax|\bredux mega\b/i.test(name);
 
-  it("ACE mode: no early mega before wave 50 — printing EVERY name to read", async () => {
+  it("ACE + ELITE: no early mega before wave 50 (gate must hold after form injection)", async () => {
     const MEGA_GATE = 50;
-    const earlyMegas: string[] = [];
-    for (const seed of ["ace-1", "ace-2", "ace-3", "ace-4", "ace-5"]) {
-      const run = await predictRun(seed, 60, "ace");
-      console.log(`\n=== ACE (seed ${seed}) — every enemy name, waves 1..59 ===`);
-      for (const w of run) {
-        if (w.wave >= MEGA_GATE) {
-          continue;
-        }
-        // Print the literal generated names so they can be read directly.
-        console.log(`  w${w.wave} ${w.kind === "TRAINER" ? "[T]" : "   "}: ${w.enemies.join(", ")}`);
-        for (const name of w.enemies) {
-          if (isMegaName(name)) {
-            earlyMegas.push(`seed ${seed} w${w.wave}: ${name}`);
+    // Probe both Ace and Elite — both gate megas to wave >= 50 (only Hell is
+    // exempt). With ~106 newly-injected mega forms, far more enemies are now
+    // mega-capable, so this gate is the thing that must still hold.
+    for (const difficulty of ["ace", "elite"] as const) {
+      const earlyMegas: string[] = [];
+      for (const seed of [
+        `${difficulty}-1`,
+        `${difficulty}-2`,
+        `${difficulty}-3`,
+        `${difficulty}-4`,
+        `${difficulty}-5`,
+      ]) {
+        const run = await predictRun(seed, 60, difficulty);
+        for (const w of run) {
+          if (w.wave >= MEGA_GATE) {
+            continue;
+          }
+          for (const name of w.enemies) {
+            if (isMegaName(name)) {
+              earlyMegas.push(
+                `${difficulty} seed ${seed} w${w.wave} [${w.kind}#${w.trainerKey}]: ${name}  (full: ${w.enemies.join(", ")})`,
+              );
+            }
           }
         }
       }
+      console.log(`[mega-gate] early (<w${MEGA_GATE}) ${difficulty.toUpperCase()} megas: ${earlyMegas.length}`);
+      for (const m of earlyMegas.slice(0, 20)) {
+        console.log(`   ${m}`);
+      }
+      expect(earlyMegas.length).toBe(0);
     }
-    console.log(`\n[mega-gate] early (<w${MEGA_GATE}) Ace megas found by NAME: ${earlyMegas.length}`);
-    for (const m of earlyMegas) {
-      console.log(`   ${m}`);
-    }
-    // If the gate works AND no roster member is itself a mega species, this is 0.
-    expect(earlyMegas.length).toBe(0);
   });
 
   it("predicts each difficulty (Ace / Elite / Hell) for the same seed", async () => {

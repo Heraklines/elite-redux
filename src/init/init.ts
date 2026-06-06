@@ -21,7 +21,7 @@ import { initEliteReduxEggTiers } from "#data/elite-redux/init-elite-redux-egg-t
 import { initEliteReduxEvolutions } from "#data/elite-redux/init-elite-redux-evolutions";
 import { initEliteReduxFormChanges } from "#data/elite-redux/init-elite-redux-form-changes";
 import { initEliteReduxMovesets } from "#data/elite-redux/init-elite-redux-movesets";
-import { initEliteReduxSpecies } from "#data/elite-redux/init-elite-redux-species";
+import { initEliteReduxSpecies, injectAllErMegaForms } from "#data/elite-redux/init-elite-redux-species";
 import { initEliteReduxStarterCosts } from "#data/elite-redux/init-elite-redux-starter-costs";
 import { initEliteReduxTmMoves } from "#data/elite-redux/init-elite-redux-tm-moves";
 import { initEliteReduxTrainers } from "#data/elite-redux/init-elite-redux-trainers";
@@ -72,7 +72,21 @@ export function initializeGame() {
     );
   }
   console.info(
-    `[er-b1b] registered ${customResult.customsAdded} ER-custom species (skipped ${customResult.customsAlreadyPresent} already present)`,
+    `[er-b1b] registered ${customResult.customsAdded} ER-custom species (skipped ${customResult.customsAlreadyPresent} already present + ${customResult.skippedDegenerate} degenerate stubs)`,
+  );
+  // Elite Redux Phase B1c: data-driven mega/primal/origin FORM injection for
+  // every ER mega — including ER-custom (Redux) megas, which B1a skips. Must run
+  // AFTER initEliteReduxCustomSpecies() so custom bases exist in allSpecies, and
+  // BEFORE initEliteReduxFormChanges() so the form-change bridge sees the forms.
+  const megaFormResult = injectAllErMegaForms();
+  if (megaFormResult.errors.length > 0) {
+    console.warn(
+      `[er-b1c] ${megaFormResult.errors.length} mega-form injection issues:`,
+      megaFormResult.errors.slice(0, 5),
+    );
+  }
+  console.info(
+    `[er-b1c] injected ${megaFormResult.injected} ER mega forms (skipped ${megaFormResult.skippedExisting} already present)`,
   );
   // Elite Redux Phase B2: register ER-custom abilities + moves (ids ≥ 5000).
   // Must run AFTER initAbilities() / initMoves() so the vanilla baselines

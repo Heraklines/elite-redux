@@ -15,6 +15,7 @@
 
 import { allSpecies } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
 import { PokemonForm } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
@@ -532,4 +533,154 @@ function mapAbilityId(erAbilityId: number): AbilityId {
     return AbilityId.NONE;
   }
   return mapped as AbilityId;
+}
+
+/**
+ * Seed a "Normal" base form (formKey "") at index 0 onto a species whose forms
+ * array is empty, mirroring the species' own stats/types/abilities. Pokerogue
+ * requires formIndex 0 to be the base form; injecting a Mega onto an
+ * empty-forms species without this makes the dex default to formIndex 0 = Mega,
+ * crashing sprite/evolution renders.
+ */
+function seedNormalBaseForm(species: (typeof allSpecies)[number]): void {
+  const baseForm = new PokemonForm(
+    "Normal",
+    "",
+    species.type1,
+    species.type2,
+    species.height,
+    species.weight,
+    species.ability1,
+    species.ability2,
+    species.abilityHidden,
+    species.baseTotal,
+    species.baseStats[0],
+    species.baseStats[1],
+    species.baseStats[2],
+    species.baseStats[3],
+    species.baseStats[4],
+    species.baseStats[5],
+    species.catchRate,
+    species.baseFriendship,
+    species.baseExp,
+    false,
+    null,
+    true,
+    false,
+  );
+  baseForm.setPassives(species.getPassiveAbilities());
+  const baseMut = baseForm as unknown as { speciesId: number; formIndex: number; generation: number };
+  baseMut.speciesId = species.speciesId;
+  baseMut.formIndex = 0;
+  baseMut.generation = species.generation;
+  (species.forms as unknown as PokemonForm[]).push(baseForm);
+}
+
+/** Outcome of the data-driven mega-form injection pass. */
+export interface InjectErMegaFormsResult {
+  /** New mega/primal/origin forms injected. */
+  injected: number;
+  /** Entries whose form key already existed (legacy injector / vanilla). */
+  skippedExisting: number;
+  /** Non-fatal issues (unmapped base, missing target draft, etc.). */
+  errors: string[];
+}
+
+/**
+ * Data-driven mega / primal / origin FORM injection. The legacy name-suffix
+ * matcher (injectMissingErMegaForms) silently missed ~97 forms:
+ *   - non-standard target consts (Espeon's primal is SPECIES_ESPEON_GALAXY),
+ *   - regional-mega const mismatches (Slowbro-Galarian's mega is
+ *     SPECIES_SLOWBRO_MEGA_GALARIAN, not SPECIES_SLOWBRO_GALARIAN_MEGA),
+ *   - and EVERY ER-custom (Redux) mega, because the main species pass skips
+ *     custom species (pokerogue id >= VANILLA_ID_CUTOFF) entirely.
+ *
+ * This pass is driven by {@linkcode ER_MEGA_FORMS} — generated from ER's actual
+ * mega/primal/move-mega evolution entries — so every base species receives
+ * exactly the forms ER says it evolves into, with stats/types/abilities/innates
+ * sourced from the target form's own ER species record (by id, not by guessed
+ * name). MUST run AFTER {@linkcode initEliteReduxCustomSpecies} so custom bases
+ * are present in `allSpecies`. Idempotent: a form whose key already exists (e.g.
+ * the vanilla megas already wired) is skipped, so it never double-injects.
+ */
+export function injectAllErMegaForms(): InjectErMegaFormsResult {
+  const result: InjectErMegaFormsResult = { injected: 0, skippedExisting: 0, errors: [] };
+  const erDraftById = new Map<number, (typeof ER_SPECIES)[number]>();
+  for (const draft of ER_SPECIES) {
+    erDraftById.set(draft.id, draft);
+  }
+  const byId = new Map<number, (typeof allSpecies)[number]>();
+  for (const s of allSpecies) {
+    byId.set(s.speciesId, s);
+  }
+
+  for (const entry of ER_MEGA_FORMS) {
+    const pokerogueId = ER_ID_MAP.species[entry.baseErId];
+    if (pokerogueId === undefined) {
+      continue; // base species unmapped (id-map drift) — nothing to attach to
+    }
+    const species = byId.get(pokerogueId);
+    if (!species) {
+      continue;
+    }
+    if (species.forms.some(f => f.formKey === entry.formKey)) {
+      result.skippedExisting++;
+      continue;
+    }
+    const targetDraft = erDraftById.get(entry.targetErId);
+    if (!targetDraft) {
+      result.errors.push(
+        `ER mega target ${entry.targetErId} (${entry.formName} of ER ${entry.baseErId}) not found in ER_SPECIES`,
+      );
+      continue;
+    }
+    const formType1 = mapErType(targetDraft.types[0]);
+    if (formType1 === null) {
+      result.errors.push(`ER mega target ${entry.targetErId} has no primary type`);
+      continue;
+    }
+    // Base form must exist at index 0 before any mega lands at index >= 1.
+    if (species.forms.length === 0) {
+      seedNormalBaseForm(species);
+    }
+    const formType2 = mapErType(targetDraft.types[1]);
+    const [hp, atk, def, spatk, spdef, spd] = targetDraft.baseStats;
+    const form = new PokemonForm(
+      entry.formName,
+      entry.formKey,
+      formType1,
+      formType2,
+      species.height, // ER dump ships no per-form h/w — reuse base.
+      species.weight,
+      mapAbilityId(targetDraft.abilities[0]),
+      mapAbilityId(targetDraft.abilities[1]),
+      mapAbilityId(targetDraft.abilities[2]),
+      hp + atk + def + spatk + spdef + spd,
+      hp,
+      atk,
+      def,
+      spatk,
+      spdef,
+      spd,
+      species.catchRate,
+      species.baseFriendship,
+      species.baseExp,
+      false, // genderDiffs
+      null, // formSpriteKey — pokerogue derives from formKey
+      false, // isStarterSelectable
+      false, // isUnobtainable
+    );
+    form.setPassives([
+      mapAbilityId(targetDraft.innates[0]),
+      mapAbilityId(targetDraft.innates[1]),
+      mapAbilityId(targetDraft.innates[2]),
+    ]);
+    const formMut = form as unknown as { speciesId: number; formIndex: number; generation: number };
+    formMut.speciesId = species.speciesId;
+    formMut.formIndex = species.forms.length;
+    formMut.generation = species.generation;
+    (species.forms as unknown as PokemonForm[]).push(form);
+    result.injected++;
+  }
+  return result;
 }
