@@ -173,6 +173,16 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
       this.setCursor(this.fieldIndex ? this.cursor2 : this.cursor);
     }
     this.displayMoves();
+    // ER double-battle fix: clearMoves() (run when the fight menu closes for the
+    // previous acting Pokémon) hides the type-effectiveness indicator on EVERY
+    // active foe. When this menu re-opens with the cursor already on the same
+    // slot, setCursor() short-circuits the cursor-change bookkeeping, so without
+    // an explicit recompute the second foe's indicator would stay hidden until
+    // the first foe faints. Force a recompute for the current cursor so BOTH
+    // active foes' indicators are restored whenever the menu is shown. Idempotent
+    // with the setCursor() call above; getOpponents() defaults to on-field so
+    // both active foes are covered.
+    this.setMoveInfo(this.getCursor());
     this.toggleInfo(false); // in case cancel was pressed while info toggle is active
     this.active = true;
     return true;

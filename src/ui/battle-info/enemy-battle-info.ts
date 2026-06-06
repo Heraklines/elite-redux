@@ -160,6 +160,11 @@ export class EnemyBattleInfo extends BattleInfo {
     this.effectivenessContainer.setVisible(true);
   }
 
+  /** @returns Whether the type-effectiveness indicator window is currently visible. */
+  public isEffectivenessVisible(): boolean {
+    return this.effectivenessContainer.visible;
+  }
+
   /**
    * Request the flyoutMenu to toggle if available and hides or shows the effectiveness window where necessary
    */
