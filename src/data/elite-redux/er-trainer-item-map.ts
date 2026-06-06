@@ -25,6 +25,7 @@
 // =============================================================================
 
 import { TYPE_BOOST_ITEM_BOOST_PERCENT } from "#app/constants";
+import { ER_MEGA_STONE_ITEM_IDS } from "#data/elite-redux/er-mega-stone-item-ids";
 import {
   ER_ASSAULT_VEST_TYPE,
   ER_LIFE_ORB_TYPE,
@@ -99,12 +100,16 @@ export const ER_ITEM_TO_SPECIES_KEY: Readonly<Record<number, SpeciesStatBoosterI
 };
 
 /**
- * ER mega-stone id range. ER lists mega stones contiguously from Abomasite (748)
- * upward, plus "<species>ite R" custom-mega variants. Eviolite (310) and
- * Meteorite (661) are NOT mega stones despite the "-ite" suffix.
+ * True if the raw ER item id is a mega/primal stone (or a legendary mega-trigger
+ * orb/mask). ER's mega-stone item ids are NOT contiguous — they're scattered
+ * across the ~384..970 range intermixed with ordinary items — so a numeric
+ * threshold (the old `>= 748`) only caught a small fraction of them and silently
+ * left most mega-stone holders in their base form. The authoritative id set is
+ * generated from the vendor JSON (see er-mega-stone-item-ids.ts). Eviolite (310)
+ * and Meteorite are excluded there despite the "-ite" suffix.
  */
 export function isErMegaStone(itemId: number): boolean {
-  return itemId >= 748;
+  return ER_MEGA_STONE_ITEM_IDS.has(itemId);
 }
 
 /** Result of resolving an ER held item to a PokeRogue action. */

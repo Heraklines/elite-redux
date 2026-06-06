@@ -18,9 +18,11 @@ import { globalScene } from "#app/global-scene";
 import { getErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
-import { applyErTrainerHeldItems, resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
+import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { BattleType } from "#enums/battle-type";
+import { ModifierPoolType } from "#enums/modifier-pool-type";
 import { TrainerSlot } from "#enums/trainer-slot";
+import { regenerateModifierPoolThresholds } from "#modifiers/modifier-type";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -46,7 +48,7 @@ describe("ER 1:1 full-run prediction harness (Hell, 200 waves)", () => {
    * names. Mutates battle.enemyParty so RNG stays in lock-step with the real
    * generation (each addEnemyPokemon / genPartyMember consumes RNG in order).
    */
-  const generateWave = (): WavePrediction => {
+  const generateWave = async (): Promise<WavePrediction> => {
     const battle = globalScene.currentBattle;
     battle.enemyLevels?.forEach((level, e) => {
       if (battle.enemyParty[e]) {
@@ -71,17 +73,22 @@ describe("ER 1:1 full-run prediction harness (Hell, 200 waves)", () => {
         );
       }
     });
-    // Apply the ER held-item / mega conversion exactly as the game does (it runs
-    // applyErTrainerHeldItems on the whole party in modifier generation), which
-    // includes the gated forceErMega. THEN read forms so megas are reflected.
-    if (battle.battleType === BattleType.TRAINER) {
-      applyErTrainerHeldItems(battle.enemyParty);
-    }
-    const enemies = (battle.enemyParty ?? []).map(mon => {
-      const formKey = mon.species.forms?.[mon.formIndex]?.formKey ?? "";
-      const isMega = /mega|primal/i.test(formKey);
-      return isMega ? `${mon.species.name} [MEGA]` : mon.species.name;
-    });
+    // Run the EXACT modifier pipeline the encounter phase runs (encounter-phase.ts
+    // ~291-295): regenerate the pool thresholds, then generateEnemyModifiers().
+    // This is what actually attaches held items — including a Mega Stone, whose
+    // PokemonFormChangeItemModifier mega-evolves the holder ON ADD (battle-scene
+    // addEnemyModifier → modifier.apply), and the gated forceErMega for ER mons.
+    // So after this, a mega is reflected in the live form + rendered name.
+    // We read the ACTUAL generated name each Pokémon carries (getNameToRender →
+    // this.name, set by generateName()) — the only faithful way to see a mega:
+    // a form-key regex misses (a) ER custom mega *species* (id >= 10000) whose
+    // formKey isn't "mega", and (b) "Eternamax" (no "mega" substring).
+    regenerateModifierPoolThresholds(
+      globalScene.getEnemyField(),
+      battle.battleType === BattleType.TRAINER ? ModifierPoolType.TRAINER : ModifierPoolType.WILD,
+    );
+    await globalScene.generateEnemyModifiers();
+    const enemies = (battle.enemyParty ?? []).map(mon => mon.getNameToRender({ useIllusion: false }));
     return {
       wave: battle.waveIndex,
       kind: battle.battleType === BattleType.TRAINER ? "TRAINER" : "WILD",
@@ -90,7 +97,11 @@ describe("ER 1:1 full-run prediction harness (Hell, 200 waves)", () => {
     };
   };
 
-  const predictRun = (seed: string, maxWave: number, difficulty: ErDifficulty = "hell"): WavePrediction[] => {
+  const predictRun = async (
+    seed: string,
+    maxWave: number,
+    difficulty: ErDifficulty = "hell",
+  ): Promise<WavePrediction[]> => {
     setErDifficulty(difficulty);
     // Fresh run: clear the per-run no-repeat tracking so each prediction starts
     // from the same state (otherwise run 2 inherits run 1's used trainers).
@@ -103,6 +114,11 @@ describe("ER 1:1 full-run prediction harness (Hell, 200 waves)", () => {
     // does (title-phase) — so biome progression starts over (otherwise run 2's
     // wild encounters inherit run 1's ending biome).
     globalScene.newArena(globalScene.gameMode.getStartingBiome());
+    // generateEnemyModifiers() accumulates into globalScene.enemyModifiers; clear
+    // it so each predicted run starts clean (otherwise prior runs' modifiers leak
+    // and break run-to-run reproducibility).
+    // biome-ignore lint/suspicious/noExplicitAny: test reset
+    (globalScene as any).enemyModifiers.length = 0;
 
     const out: WavePrediction[] = [];
     while ((globalScene.currentBattle?.waveIndex ?? 0) < maxWave) {
@@ -110,13 +126,13 @@ describe("ER 1:1 full-run prediction harness (Hell, 200 waves)", () => {
       if ((globalScene.currentBattle?.waveIndex ?? 0) > maxWave) {
         break;
       }
-      out.push(generateWave());
+      out.push(await generateWave());
     }
     return out;
   };
 
-  it("predicts every wave's exact enemy for a Hell run, and runs differ by seed", () => {
-    const runA = predictRun("seed-alpha-1", 200);
+  it("predicts every wave's exact enemy for a Hell run, and runs differ by seed", async () => {
+    const runA = await predictRun("seed-alpha-1", 200);
 
     console.log(`\n=== HELL RUN (seed-alpha) — ${runA.length} waves ===`);
     for (const w of runA) {
@@ -129,45 +145,70 @@ describe("ER 1:1 full-run prediction harness (Hell, 200 waves)", () => {
     expect(runA.some(w => w.kind === "WILD")).toBe(true);
 
     // Same seed → identical prediction (proves determinism / 1:1 reproducibility).
-    const runA2 = predictRun("seed-alpha-1", 60);
+    const runA2 = await predictRun("seed-alpha-1", 60);
     for (let i = 0; i < runA2.length; i++) {
       expect(runA2[i].enemies).toEqual(runA[i].enemies);
     }
 
     // Different seed → a meaningfully different run.
-    const runB = predictRun("seed-bravo-2", 60);
+    const runB = await predictRun("seed-bravo-2", 60);
     const diffs = runB.filter((w, i) => JSON.stringify(w.enemies) !== JSON.stringify(runA[i]?.enemies)).length;
     console.log(`[variety] ${diffs}/${runB.length} early waves differ between two seeds`);
     expect(diffs).toBeGreaterThan(0);
+
+    // Diagnostic (run last so it can't perturb the assertions above): how many
+    // megas actually appear across a full 200-wave Hell run, for several seeds.
+    const megaRe = /\bMega\b|\bPrimal\b|\bOrigin\b|Eternamax|Gigantamax/i;
+    for (const seed of ["seed-alpha-1", "seed-beta-7", "seed-gamma-9", "seed-delta-3"]) {
+      const r = await predictRun(seed, 200);
+      const names: string[] = [];
+      for (const w of r) {
+        for (const n of w.enemies) {
+          if (megaRe.test(n)) {
+            names.push(`w${w.wave}:${n}`);
+          }
+        }
+      }
+      console.log(`[hell-mega-density] seed ${seed}: ${names.length} megas across ${r.length} waves`);
+      console.log(`   ${names.join(", ")}`);
+    }
   });
 
-  it("ACE mode: no trainer mega before wave 50 (probes several runs)", () => {
+  // Read the rendered NAME (not a form key) and decide if it's a mega/primal/
+  // gigantamax/eternamax by what the player would actually SEE on screen.
+  const isMegaName = (name: string): boolean =>
+    /\bmega\b|\bprimal\b|gigantamax|g-?max|eternamax|\bredux mega\b/i.test(name);
+
+  it("ACE mode: no early mega before wave 50 — printing EVERY name to read", async () => {
     const MEGA_GATE = 50;
     const earlyMegas: string[] = [];
     for (const seed of ["ace-1", "ace-2", "ace-3", "ace-4", "ace-5"]) {
-      const run = predictRun(seed, 60, "ace");
+      const run = await predictRun(seed, 60, "ace");
+      console.log(`\n=== ACE (seed ${seed}) — every enemy name, waves 1..59 ===`);
       for (const w of run) {
         if (w.wave >= MEGA_GATE) {
           continue;
         }
+        // Print the literal generated names so they can be read directly.
+        console.log(`  w${w.wave} ${w.kind === "TRAINER" ? "[T]" : "   "}: ${w.enemies.join(", ")}`);
         for (const name of w.enemies) {
-          if (name.includes("[MEGA]")) {
+          if (isMegaName(name)) {
             earlyMegas.push(`seed ${seed} w${w.wave}: ${name}`);
           }
         }
       }
     }
-    console.log(`[mega-gate] early (<w${MEGA_GATE}) Ace megas found: ${earlyMegas.length}`);
-    for (const m of earlyMegas.slice(0, 20)) {
+    console.log(`\n[mega-gate] early (<w${MEGA_GATE}) Ace megas found by NAME: ${earlyMegas.length}`);
+    for (const m of earlyMegas) {
       console.log(`   ${m}`);
     }
-    // If the gate works, this is 0. (Reported as a bug — this assertion documents it.)
+    // If the gate works AND no roster member is itself a mega species, this is 0.
     expect(earlyMegas.length).toBe(0);
   });
 
-  it("predicts each difficulty (Ace / Elite / Hell) for the same seed", () => {
+  it("predicts each difficulty (Ace / Elite / Hell) for the same seed", async () => {
     for (const diff of ["ace", "elite", "hell"] as const) {
-      const run = predictRun("seed-modecheck", 30, diff);
+      const run = await predictRun("seed-modecheck", 30, diff);
       console.log(`\n=== ${diff.toUpperCase()} (first 30 waves, seed-modecheck) ===`);
       for (const w of run) {
         const tag = w.kind === "TRAINER" ? `T#${w.trainerKey}` : "WILD";

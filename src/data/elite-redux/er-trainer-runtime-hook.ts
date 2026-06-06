@@ -39,9 +39,11 @@ import {
   type ErPartyMemberRegistered,
   type ErTrainerRegistryEntry,
 } from "#data/elite-redux/init-elite-redux-trainers";
+import { ER_MEGA_STONE_NAME_BY_ITEM } from "#data/elite-redux/er-mega-stone-item-ids";
 import { erDifficultyToRosterTier, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { type ErRosterTier, findErTrainersForType, selectErRoster } from "#data/elite-redux/er-trainer-overlay";
 import { ER_ITEM_CONVERT_CHANCE, resolveErTrainerItem } from "#data/elite-redux/er-trainer-item-map";
+import { SpeciesFormKey } from "#enums/species-form-key";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { Nature } from "#enums/nature";
 import { PlayerGender } from "#enums/player-gender";
@@ -530,8 +532,9 @@ export function applyErTrainerHeldItems(party: readonly EnemyPokemon[]): void {
     if (res.kind === "mega") {
       // Mega stone → force the holder's Mega form (always — it's a boss mon).
       // The fitting held items are whatever PokeRogue's baseline roll already
-      // gave it (we don't strip those).
-      forceErMega(enemy);
+      // gave it (we don't strip those). Pass the stone id so we can pick the
+      // EXACT target form (Mega-X vs Mega-Y vs Primal vs Origin).
+      forceErMega(enemy, itemId);
       continue;
     }
     // Soft conversion: only sometimes override the baseline roll with the
@@ -554,21 +557,69 @@ export function applyErTrainerHeldItems(party: readonly EnemyPokemon[]): void {
 const ER_MEGA_MIN_WAVE_NON_HELL = 50;
 
 /**
- * Force an ER trainer mon that held a Mega Stone into its Mega form (boss
- * treatment). Defensive: only changes form if the species actually has a Mega
- * form registered — otherwise no-op. In Ace/Elite this is gated to
+ * The mega/primal/origin target form key a given ER stone evolves into. ER stone
+ * enum names carry the same suffix convention as the species consts
+ * (`_X` → Mega-X, `_Y` → Mega-Y, the legendary orbs → Origin), so we can pick the
+ * EXACT target form instead of blindly grabbing the first `/mega/` form (which
+ * would mis-evolve Charizard-Y when it held Charizardite-X, and entirely miss
+ * Primal/Origin forms). Returns `null` for an unknown stone → caller falls back
+ * to a broad search.
+ */
+function erStoneTargetFormKey(itemId: number): SpeciesFormKey | null {
+  const name = ER_MEGA_STONE_NAME_BY_ITEM.get(itemId);
+  if (name === undefined) {
+    return null;
+  }
+  if (/_X(_|$)/.test(name)) {
+    return SpeciesFormKey.MEGA_X;
+  }
+  if (/_Y(_|$)/.test(name)) {
+    return SpeciesFormKey.MEGA_Y;
+  }
+  if (/PRIMAL/.test(name)) {
+    return SpeciesFormKey.PRIMAL;
+  }
+  if (/(ADAMANT|LUSTROUS|GRISEOUS|GALACTIC)_ORB/.test(name)) {
+    return SpeciesFormKey.ORIGIN;
+  }
+  return SpeciesFormKey.MEGA;
+}
+
+/**
+ * Pick the form index this mon should mega/primal-evolve into. Prefers the form
+ * key implied by the held stone (Mega-X vs Mega-Y vs Primal vs Origin); if the
+ * species has no exactly-matching form, falls back to the first
+ * mega/primal/origin form it does have (so a stone whose suffix doesn't line up
+ * with the species' registered form key still evolves rather than no-op'ing).
+ */
+function pickErMegaFormIndex(enemy: EnemyPokemon, itemId: number): number {
+  const forms = enemy.species.forms ?? [];
+  const desired = erStoneTargetFormKey(itemId);
+  if (desired !== null) {
+    const exact = forms.findIndex(f => f.formKey === desired);
+    if (exact > 0) {
+      return exact;
+    }
+  }
+  // Broad fallback: any non-base mega/primal/origin form.
+  return forms.findIndex(f => /mega|primal|origin/i.test(f.formKey));
+}
+
+/**
+ * Force an ER trainer mon that held a Mega Stone into its Mega/Primal/Origin form
+ * (boss treatment). Defensive: only changes form if the species actually has a
+ * matching form registered — otherwise no-op. In Ace/Elite this is gated to
  * {@linkcode ER_MEGA_MIN_WAVE_NON_HELL}+ so megas don't appear in the early
  * game; Hell is left untouched.
  */
-function forceErMega(enemy: EnemyPokemon): void {
+function forceErMega(enemy: EnemyPokemon, itemId: number): void {
   if (getErDifficulty() !== "hell") {
     const waveIndex = globalScene.currentBattle?.waveIndex ?? 0;
     if (waveIndex < ER_MEGA_MIN_WAVE_NON_HELL) {
       return;
     }
   }
-  const forms = enemy.species.forms ?? [];
-  const megaIndex = forms.findIndex(f => /mega/i.test(f.formKey));
+  const megaIndex = pickErMegaFormIndex(enemy, itemId);
   if (megaIndex <= 0 || enemy.formIndex === megaIndex) {
     return;
   }
