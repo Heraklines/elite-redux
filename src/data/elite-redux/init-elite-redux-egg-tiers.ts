@@ -130,10 +130,8 @@ function pickStarterCost(tier: EggTier): number {
 
 function isErFormChangeTarget(draft: (typeof ER_SPECIES)[number], speciesId: number): boolean {
   return (
-    findErFormChangeByTarget(speciesId) !== undefined // HANGRY is Morpeko's in-battle alt-form (the Hunger Switch / Two-Faced
-    || // toggle target — SPECIES_MORPEKO_HANGRY / SPECIES_MORPEKYLL_HANGRY in the
-    // ER dump). Like Mega/Primal it is a battle-only form, NOT a base/root mon,
-    // so it must never hatch from eggs or appear in starter selection. ER models
+    findErFormChangeByTarget(speciesId) !== undefined // HANGRY is Morpeko's in-battle alt-form (the Hunger Switch / Two-Faced // toggle target — SPECIES_MORPEKO_HANGRY / SPECIES_MORPEKYLL_HANGRY in the // ER dump). Like Mega/Primal it is a battle-only form, NOT a base/root mon,
+    || // so it must never hatch from eggs or appear in starter selection. ER models
     // it as a separate custom species with no prevolution, so it would otherwise
     // leak past the prevolution gate below.
     /(?:^|_)MEGA(?:_|$)|(?:^|_)PRIMAL(?:_|$)|(?:^|_)HANGRY(?:_|$)/.test(draft.speciesConst)
@@ -175,9 +173,20 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
   // "chimchar" has no prevo → still hatches; Infernape Redux → "infernape" has
   // a prevo → skipped.)
   const vanillaByName = new Map<string, number>();
+  const idToName = new Map<number, string>();
   for (const sp of allSpecies) {
+    idToName.set(sp.speciesId, sp.name);
     if (sp.speciesId < VANILLA_ID_CUTOFF) {
       vanillaByName.set(sp.name.toLowerCase(), sp.speciesId);
+    }
+  }
+  // Registered ER-custom species names (lowercased) — to detect whether a
+  // LOWER-stage custom of the same form exists in a line.
+  const erCustomNames = new Set<string>();
+  for (const d of ER_SPECIES) {
+    const id = ER_ID_MAP.species[d.id];
+    if (id !== undefined && id >= VANILLA_ID_CUTOFF && d.name) {
+      erCustomNames.add(d.name.toLowerCase());
     }
   }
   const formQualifier = /\s+(redux mega|redux b|redux c|redux|primal|mega|hisuian|alolan|galarian|paldean)$/i;
@@ -185,6 +194,40 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
     const base = draftName.replace(formQualifier, "").trim().toLowerCase();
     const vanillaId = vanillaByName.get(base);
     return vanillaId !== undefined && Object.hasOwn(pokemonPrevolutions, vanillaId as SpeciesId);
+  };
+  // For an orphaned evolved custom (no prevolution edge points to it), is there
+  // a LOWER-stage custom of the SAME form suffix to hatch instead? Walk the
+  // vanilla base's prevolution chain and check for "<lowerVanilla> <suffix>".
+  // (e.g. "Chandelure Redux" → is "Lampent Redux" or "Litwick Redux" a custom?)
+  const hasLowerSuffixCustom = (draftName: string): boolean => {
+    const suffix = draftName.match(formQualifier)?.[1];
+    if (!suffix) {
+      return false;
+    }
+    const base = draftName.replace(formQualifier, "").trim().toLowerCase();
+    let cur = vanillaByName.get(base);
+    let guard = 0;
+    while (cur !== undefined && Object.hasOwn(pokemonPrevolutions, cur as SpeciesId) && guard++ < 10) {
+      cur = pokemonPrevolutions[cur as SpeciesId] as unknown as number;
+      const lowerName = idToName.get(cur);
+      if (lowerName && erCustomNames.has(`${lowerName} ${suffix}`.toLowerCase())) {
+        return true;
+      }
+    }
+    return false;
+  };
+  // Vanilla evolution-stage depth (0 = base, 1 = 2nd stage, 2 = 3rd) of a custom
+  // from its base name — used to bump the cost when a non-base form hatches
+  // directly because its line has no lower custom.
+  const stageDepthOf = (draftName: string): number => {
+    const base = draftName.replace(formQualifier, "").trim().toLowerCase();
+    let cur = vanillaByName.get(base);
+    let depth = 0;
+    while (cur !== undefined && Object.hasOwn(pokemonPrevolutions, cur as SpeciesId) && depth < 5) {
+      cur = pokemonPrevolutions[cur as SpeciesId] as unknown as number;
+      depth++;
+    }
+    return depth;
   };
 
   for (const draft of ER_SPECIES) {
@@ -203,12 +246,21 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
       result.skippedPrevolutions++;
       continue;
     }
-    // Name-based evolved-form guard (catches stale-`into` lines like Infernape
-    // Redux whose prevolution never registered).
+    // Orphaned evolved custom: no prevolution edge points to it, but its vanilla
+    // base IS evolved (e.g. Weavile Redux, Flygon Redux B — ER ships only the
+    // evolved Redux, with no Sneasel/Vibrava/Trapinch Redux base). It can't be
+    // reached by evolving, so to keep EVERY line reachable it must hatch the
+    // lowest existing custom of its form directly — UNLESS a lower same-suffix
+    // custom exists (then hatch that one instead). Direct-hatched non-base forms
+    // pay a stage-bumped cost.
+    let orphanStageBump = 0;
     if (vanillaBaseIsEvolved(draft.name)) {
-      removeRuntimeStarterRegistration(pkrgId);
-      result.skippedPrevolutions++;
-      continue;
+      if (hasLowerSuffixCustom(draft.name)) {
+        removeRuntimeStarterRegistration(pkrgId);
+        result.skippedPrevolutions++;
+        continue;
+      }
+      orphanStageBump = stageDepthOf(draft.name) * 2;
     }
     if (tiers[pkrgId] !== undefined) {
       result.alreadyPresent++;
@@ -218,7 +270,7 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
     tiers[pkrgId] = tier;
     result.eggTiersAdded++;
     if (costs[pkrgId] === undefined) {
-      costs[pkrgId] = pickStarterCost(tier);
+      costs[pkrgId] = pickStarterCost(tier) + orphanStageBump;
       result.starterCostsAdded++;
     }
   }
