@@ -73,14 +73,23 @@ describe("ER mega coverage diagnostic (how many megas actually work)", () => {
       ["Kleavor", 900],
       ["Chandelure Redux", 2278],
       ["Kleavor Redux", 2648],
+      ["Reuniclus", 579],
+      ["Reuniclus Redux", 2537],
+      ["Calyrex", 898],
     ];
     for (const [label, erId] of probes) {
       const pkId = ER_ID_MAP.species[erId];
       const species = pkId === undefined ? undefined : getPokemonSpecies(pkId);
       const forms = (species?.forms ?? []).map(f => f.formKey || "(base)").join(", ");
+      const passives = species?.getPassiveAbilities?.() ?? [];
       console.log(
-        `[mega-probe] ${label} er#${erId} -> pk#${pkId ?? "UNMAPPED"} "${species?.name ?? "?"}" | mega? ${hasMegaForm(pkId)} | forms: [${forms}]`,
+        `[mega-probe] ${label} er#${erId} -> pk#${pkId ?? "UNMAPPED"} "${species?.name ?? "?"}" | mega? ${hasMegaForm(pkId)} | forms: [${forms}] | passives: [${passives.join(",")}]`,
       );
+      // Per-form passives (the user's Calyrex report is about the rider FORMS).
+      for (const f of species?.forms ?? []) {
+        const fp = (f as { getPassiveAbilities?: () => number[] }).getPassiveAbilities?.() ?? [];
+        console.log(`        form "${f.formKey || "(base)"}" passives: [${fp.join(",")}]`);
+      }
     }
     expect(true).toBe(true);
   });

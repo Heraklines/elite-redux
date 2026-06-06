@@ -108,7 +108,15 @@ function deriveErFormSpeciesConst(baseConst: string, formKey: string, hasReduxRe
   //     rebalanced canonical mega (e.g. Machamp), so prefer it.
   // So: canonical-first when a regional redux exists; redux-first otherwise.
   // (The fallback still covers the case where only one of the two records ships.)
-  return hasReduxRegional ? [canonical, redux] : [redux, canonical];
+  const candidates = hasReduxRegional ? [canonical, redux] : [redux, canonical];
+  // Calyrex's pokerogue form keys are "ice"/"shadow", but ER ships the form
+  // species as SPECIES_CALYREX_ICE_RIDER / _SHADOW_RIDER. Without the "_RIDER"
+  // suffix the lookup misses and the rider forms get no ER innates (user report:
+  // "Calyrex hasn't innates"). Add the "_RIDER" variants as fallbacks.
+  if (upperFormKey === "ICE" || upperFormKey === "SHADOW") {
+    candidates.push(`${baseConst}_${upperFormKey}_RIDER`);
+  }
+  return candidates;
 }
 
 /**
