@@ -14,7 +14,7 @@ import { MAX_STARTER_CANDY_COUNT } from "#constants/game-constants";
 import { EntryHazardTag } from "#data/arena-tag";
 import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed/daily-seed-utils";
 import { allMoves, allSpecies } from "#data/data-lists";
-import type { Egg } from "#data/egg";
+import { Egg } from "#data/egg";
 import { getErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ER_CANDY_GAIN_MULTIPLIER, getRunCandyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import { getErUsedTrainerKeys, restoreErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
@@ -27,6 +27,8 @@ import { BattleType } from "#enums/battle-type";
 import { ChallengeType } from "#enums/challenge-type";
 import { Device } from "#enums/devices";
 import { DexAttr } from "#enums/dex-attr";
+import { EggSourceType } from "#enums/egg-source-types";
+import { EggTier } from "#enums/egg-type";
 import { GameDataType } from "#enums/game-data-type";
 import { GameModes } from "#enums/game-modes";
 import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
@@ -158,6 +160,13 @@ export class GameData {
   public eggPity: number[];
   public unlockPity: number[];
 
+  /**
+   * One-time gift flag: set `true` once the player has received the free 2
+   * Legendary eggs grant. Persisted in `SystemSaveData` so the grant fires
+   * exactly once. See {@linkcode grantFreeLegendaryEggsOnce}.
+   */
+  public freeLegendaryEggsGranted = false;
+
   /** Settings controlling silent auto-restock of the egg queue between waves. */
   public autoEggRestock: AutoEggRestockSettings = defaultAutoEggRestockSettings();
 
@@ -224,7 +233,27 @@ export class GameData {
       unlockPity: this.unlockPity.slice(0),
       autoEggRestock: this.autoEggRestock,
       llmDirectorState: this.llmDirectorState,
+      freeLegendaryEggsGranted: this.freeLegendaryEggsGranted,
     };
+  }
+
+  /**
+   * One-time gift: grant the player 2 free Legendary eggs, exactly once. The
+   * {@linkcode freeLegendaryEggsGranted} flag is persisted in the system save
+   * (and therefore the cloud save), so once received this is a permanent no-op —
+   * it never re-triggers across reloads, sessions, or devices. Called from both
+   * the load path ({@linkcode initParsedSystem}) and the save path
+   * ({@linkcode saveSystem}) so every player — existing and brand-new — gets it.
+   */
+  public grantFreeLegendaryEggsOnce(): void {
+    if (this.freeLegendaryEggsGranted) {
+      return;
+    }
+    for (let i = 0; i < 2; i++) {
+      this.eggs.push(new Egg({ tier: EggTier.LEGENDARY, sourceType: EggSourceType.EVENT }));
+    }
+    this.freeLegendaryEggsGranted = true;
+    console.log("[er-gift] granted 2 free Legendary eggs (one-time)");
   }
 
   /**
@@ -241,6 +270,10 @@ export class GameData {
 
   public async saveSystem(): Promise<boolean> {
     globalScene.ui.savingIcon.show();
+    // Catch-all for the one-time Legendary-egg gift: a brand-new account never
+    // runs initParsedSystem on its first session (no save to parse yet), so the
+    // grant rides the first save instead. Idempotent (flag-guarded).
+    this.grantFreeLegendaryEggsOnce();
     const data = this.getSystemSaveData();
 
     const maxIntAttrValue = 0x80000000;
@@ -409,11 +442,19 @@ export class GameData {
 
     this.eggs = systemData.eggs ? systemData.eggs.map(e => e.toEgg()) : [];
 
+    // One-time gift: read the persisted flag (absent on older saves → false).
+    // The actual grant runs below, after eggPity/unlockPity are restored (egg
+    // species rolls read unlockPity).
+    this.freeLegendaryEggsGranted = systemData.freeLegendaryEggsGranted ?? false;
+
     this.autoEggRestock = mergeAutoEggRestockSettings(systemData.autoEggRestock);
     this.llmDirectorState = mergeDirectorState(systemData.llmDirectorState);
 
     this.eggPity = systemData.eggPity ? systemData.eggPity.slice(0) : [0, 0, 0, 0];
     this.unlockPity = systemData.unlockPity ? systemData.unlockPity.slice(0) : [0, 0, 0, 0];
+
+    // Grant the free 2 Legendary eggs once (idempotent; no-op if already given).
+    this.grantFreeLegendaryEggsOnce();
 
     this.dexData = Object.assign(this.dexData, systemData.dexData);
     this.consolidateDexData(this.dexData);

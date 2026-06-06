@@ -43,6 +43,13 @@ export interface SystemSaveData {
   autoEggRestock?: AutoEggRestockSettings;
   /** Optional for back-compat with saves created before the LLM Director feature. */
   llmDirectorState?: LLMDirectorState;
+  /**
+   * One-time gift flag: `true` once the player has received the free 2 Legendary
+   * eggs grant. Absent on saves predating the grant (treated as `false`, so the
+   * grant fires exactly once and never again). See
+   * {@linkcode GameData.grantFreeLegendaryEggsOnce}.
+   */
+  freeLegendaryEggsGranted?: boolean;
 }
 
 export interface SessionSaveData {
