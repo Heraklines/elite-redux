@@ -31,6 +31,7 @@ import {
 } from "#data/battler-tags";
 import { getBerryEffectFunc } from "#data/berry";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { clearErAilments } from "#data/elite-redux/er-status-cure";
 import { SpeciesFormChangeRevertWeatherFormTrigger } from "#data/form-change-triggers";
 import { getNonVolatileStatusEffects, getStatusEffectHealText, isNonVolatileStatusEffect } from "#data/status-effect";
 import { TerrainType } from "#data/terrain";
@@ -2591,6 +2592,12 @@ export class RestAttr extends HealAttr {
         pokemonName: getPokemonNameWithAffix(user),
       }),
     );
+    // ER: a full Rest also clears the user's ER ailment tags (FROSTBITE/BLEED/
+    // FEAR) — they're battler tags, not vanilla statuses, so trySetStatus(SLEEP)
+    // alone leaves them behind.
+    if (wasSet) {
+      clearErAilments(user);
+    }
     return wasSet && super.apply(user, target, move, args);
   }
 
@@ -2655,6 +2662,10 @@ export class PartyStatusCureAttr extends MoveEffectAttr {
     if (!pokemon.isOnField() || pokemon.id === userId) {
       // user always cures its own status, regardless of ability
       pokemon.resetStatus(false);
+      // ER: Heal Bell / Aromatherapy is a cure-ALL, so it also clears the
+      // team's ER ailment tags (FROSTBITE/BLEED/FEAR), which are not vanilla
+      // StatusEffects and so are untouched by resetStatus.
+      clearErAilments(pokemon);
       pokemon.updateInfo();
     } else if (pokemon.hasAbility(this.abilityCondition)) {
       // TODO: Ability displays should be handled by the ability
@@ -2670,6 +2681,8 @@ export class PartyStatusCureAttr extends MoveEffectAttr {
       );
     } else {
       pokemon.resetStatus();
+      // ER cure-ALL: also clear the ally's ER ailment tags (see above).
+      clearErAilments(pokemon);
       pokemon.updateInfo();
     }
   }

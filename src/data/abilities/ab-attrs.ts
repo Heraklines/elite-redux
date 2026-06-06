@@ -5,6 +5,7 @@ import type { EntryHazardTag, SuppressAbilitiesTag } from "#data/arena-tag";
 import { type BattlerTag, CritBoostTag } from "#data/battler-tags";
 import { getBerryEffectFunc } from "#data/berry";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { clearErAilments, hasErAilment } from "#data/elite-redux/er-status-cure";
 import { SpeciesFormChangeAbilityTrigger, SpeciesFormChangeWeatherTrigger } from "#data/form-change-triggers";
 import { getPokeballName } from "#data/pokeball";
 import { pokemonFormChanges } from "#data/pokemon-forms";
@@ -3138,12 +3139,15 @@ export class PreSwitchOutResetStatusAbAttr extends PreSwitchOutAbAttr {
   }
 
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
-    return pokemon.status != null;
+    // ER: also fire for a mon carrying only an ER ailment tag (FROSTBITE/BLEED/
+    // FEAR) — Natural Cure clears those on switch-out too.
+    return pokemon.status != null || hasErAilment(pokemon);
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (!simulated) {
       pokemon.resetStatus();
+      clearErAilments(pokemon);
       pokemon.updateInfo();
     }
   }
@@ -4532,17 +4536,23 @@ export class PostTurnResetStatusAbAttr extends PostTurnAbAttr {
     }
 
     const effect = this.target?.status?.effect;
-    return !!effect && effect !== StatusEffect.FAINT;
+    // ER: also fire for an ER ailment tag (FROSTBITE/BLEED/FEAR) even with no
+    // vanilla status — Shed Skin / Hydration / Healer should clear those too.
+    return (!!effect && effect !== StatusEffect.FAINT) || (this.target != null && hasErAilment(this.target));
   }
 
   override apply({ simulated }: AbAttrBaseParams): void {
-    if (!simulated && this.target?.status) {
+    if (simulated || !this.target) {
+      return;
+    }
+    if (this.target.status) {
       globalScene.phaseManager.queueMessage(
         getStatusEffectHealText(this.target.status?.effect, getPokemonNameWithAffix(this.target)),
       );
       this.target.resetStatus(false);
-      this.target.updateInfo();
     }
+    clearErAilments(this.target);
+    this.target.updateInfo();
   }
 }
 

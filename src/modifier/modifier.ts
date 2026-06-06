@@ -6,6 +6,7 @@ import { FusionSpeciesFormEvolution, pokemonEvolutions } from "#balance/pokemon-
 import { FRIENDSHIP_GAIN_FROM_RARE_CANDY } from "#balance/starters";
 import { getBerryEffectFunc, getBerryPredicate } from "#data/berry";
 import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
+import { clearErAilments, hasErAilment } from "#data/elite-redux/er-status-cure";
 import { getLevelTotalExp } from "#data/exp";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { MAX_PER_TYPE_POKEBALLS } from "#data/pokeball";
@@ -1827,7 +1828,17 @@ export class BerryModifier extends PokemonHeldItemModifier {
    * @returns `true` if {@linkcode BerryModifier} should be applied
    */
   override shouldApply(pokemon: Pokemon): boolean {
-    return !this.consumed && super.shouldApply(pokemon) && getBerryPredicate(this.berryType)(pokemon);
+    if (this.consumed || !super.shouldApply(pokemon)) {
+      return false;
+    }
+    // ER: Lum Berry cures ALL status. Its vanilla predicate only fires on a
+    // vanilla `pokemon.status` (or confusion), so a mon carrying ONLY an ER
+    // ailment tag (FROSTBITE/BLEED/FEAR) would never trigger it. Broaden the
+    // gate so Lum also activates to clear ER ailments.
+    if (this.berryType === BerryType.LUM && hasErAilment(pokemon)) {
+      return true;
+    }
+    return getBerryPredicate(this.berryType)(pokemon);
   }
 
   /**
@@ -1842,6 +1853,12 @@ export class BerryModifier extends PokemonHeldItemModifier {
 
     // munch the berry and trigger unburden-like effects
     getBerryEffectFunc(this.berryType)(pokemon);
+    // ER: Lum Berry is a cure-ALL, so it also clears every ER ailment tag
+    // (FROSTBITE/BLEED/FEAR) — the vanilla berry effect only resets
+    // `pokemon.status`/confusion and leaves the ER tags behind.
+    if (this.berryType === BerryType.LUM) {
+      clearErAilments(pokemon);
+    }
     applyAbAttrs("PostItemLostAbAttr", { pokemon });
 
     // Update berry eaten trackers for Belch, Harvest, Cud Chew, etc.
@@ -2148,12 +2165,13 @@ export class PokemonStatusHealModifier extends ConsumablePokemonModifier {
    */
   override apply(playerPokemon: PlayerPokemon): boolean {
     playerPokemon.resetStatus(true, true, false, false);
-    // ER frostbite is modelled as a battler tag (BattlerTagType.ER_FROSTBITE)
-    // rather than a vanilla StatusEffect, so resetStatus alone does not clear
-    // it. A full-status cure (Full Heal) should also remove it. ER_BLEED is
-    // intentionally NOT cured here: it has its own heal-cure semantics wired in
-    // pokemon-heal-phase.ts (a heal is consumed to cure the bleed).
-    playerPokemon.removeTag(BattlerTagType.ER_FROSTBITE);
+    // ER's custom statuses (FROSTBITE/BLEED/FEAR) are modelled as battler tags
+    // rather than vanilla StatusEffects, so resetStatus alone does not clear
+    // them. Full Heal / Full Restore is a full-status cure, so it clears every
+    // ER ailment. (Unlike the bleed heal-cure in pokemon-heal-phase.ts — which
+    // consumes an HP heal to cure bleed — Full Heal restores no HP, so we clear
+    // the tags directly here.)
+    clearErAilments(playerPokemon);
     return true;
   }
 }
