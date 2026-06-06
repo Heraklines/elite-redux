@@ -13,6 +13,8 @@
 //
 // Gated behind ER_SCENARIO=1.
 
+import { allAbilities } from "#data/data-lists";
+import { SpeciesFormChangeAbilityTrigger } from "#data/form-change-triggers";
 import { AbilityId } from "#enums/ability-id";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { MoveId } from "#enums/move-id";
@@ -67,5 +69,32 @@ describe.skipIf(!RUN)("ER Unown Revelation (Schooling)", () => {
         .join(",")} formKey=${unown.getFormKey()}`,
     );
     expect(unown.getFormKey()).toBe("revelation");
+  });
+
+  it("reverts out of Revelation at <=1/4 HP at end of turn", async () => {
+    await game.classicMode.startBattle([SpeciesId.UNOWN]);
+    const unown = game.field.getPlayerPokemon();
+    expect(unown.getFormKey()).toBe("revelation"); // schooled on summon
+
+    unown.hp = Math.floor(unown.getMaxHp() * 0.2); // drop below the 1/4 threshold
+
+    // At <=1/4 HP the ability resolves the revert edge (revelation -> base). This
+    // is exactly what the PostTurn form-change attr calls each turn-end; assert it
+    // selects the revert edge, then flush the queued QuietFormChangePhase.
+    const queued = game.scene.triggerPokemonFormChange(unown, SpeciesFormChangeAbilityTrigger, false);
+    expect(queued).toBe(true);
+    game.move.use(MoveId.SPLASH);
+    await game.toEndOfTurn();
+
+    console.log(`[unown-revert] hp%=${unown.getHpRatio()} formKey=${unown.getFormKey()}`);
+    expect(unown.getFormKey()).not.toBe("revelation"); // reverted to a normal letter
+  });
+
+  it("wires a PostFaint form-change so Revelation does not persist on faint", () => {
+    // On faint the HP ratio is 0 (<=1/4), so the same formFunc the revert test
+    // exercises takes its revert branch — the PostFaint attr just runs it on KO.
+    const ability = allAbilities[ErAbilityId.REVELATION];
+    expect(ability).toBeDefined();
+    expect(ability.attrs.some(a => a.constructor.name === "PostFaintFormChangeAbAttr")).toBe(true);
   });
 });

@@ -55,6 +55,7 @@
 import type { AbAttr } from "#abilities/ab-attrs";
 import {
   PostBattleInitFormChangeAbAttr,
+  PostFaintFormChangeAbAttr,
   PostSummonFormChangeAbAttr,
   PostTurnFormChangeAbAttr,
 } from "#abilities/ab-attrs";
@@ -317,5 +318,9 @@ function rewireRevelationAbility(revelationIndex: number, result: InitEliteRedux
   attrs.push(new PostBattleInitFormChangeAbAttr(formFunc));
   attrs.push(new PostSummonFormChangeAbAttr(formFunc));
   attrs.push(new PostTurnFormChangeAbAttr(formFunc));
+  // Revert out of Revelation on faint so a fainted Unown does not persist in the
+  // School form (its stored/party form returns to a normal letter). On faint the
+  // HP ratio is 0, so `formFunc` takes its revert branch automatically.
+  attrs.push(new PostFaintFormChangeAbAttr(formFunc));
   result.abilityRewired = true;
 }
