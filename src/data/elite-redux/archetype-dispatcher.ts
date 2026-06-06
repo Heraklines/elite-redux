@@ -293,6 +293,7 @@ import { WeatherStatMultiplierAbAttr } from "#data/elite-redux/archetypes/weathe
 import {
   WeatherDamageReductionAbAttr,
   WeatherTypeBoostAbAttr,
+  WeatherTypeDebuffCancelAbAttr,
 } from "#data/elite-redux/archetypes/weather-terrain-interaction";
 import { ER_ABILITIES } from "#data/elite-redux/er-abilities";
 import { ER_ABILITY_ARCHETYPES, type ErArchetypeKind } from "#data/elite-redux/er-ability-archetypes";
@@ -4460,26 +4461,39 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 589:
       // Catastrophe — FULL: "In Sun, Water moves gain the damage boost they
       // receive from rain. In Rain, Fire moves gain the damage boost they
-      // receive from sun." That boost is ×1.5, gated by MOVE TYPE × weather —
-      // not a flat stat multiplier. (Prior wiring approximated it as a
-      // continuous SPATK ×1.3 in either weather — corrected.)
+      // receive from sun." "Gain the damage boost" means the move behaves as if
+      // it were in its FAVORABLE weather — i.e. net ×1.5, NOT a flat stat mult.
+      //
+      // Two halves per weather→type pairing (mirrors Hydro Steam):
+      //   1. WeatherTypeBoostAbAttr   — applies the ×1.5 move-power boost.
+      //   2. WeatherTypeDebuffCancelAbAttr — cancels the ADVERSE arena weather
+      //      type multiplier (rain ×0.5 on Fire / sun ×0.5 on Water). Without
+      //      this, the ×1.5 power is swallowed by the ×0.5 weather penalty and
+      //      nets only ×0.75 — the bug where a Fire move in rain barely scratched.
+      // Both primitives honor weather suppression (Cloud Nine / Air Lock).
       return ok([
-        // Water move while the sun is up → the rain boost (×1.5).
-        new MovePowerBoostAbAttr(
-          (_user, _target, move) =>
-            move.type === PokemonType.WATER
-            && (globalScene.arena.weather?.weatherType === WeatherType.SUNNY
-              || globalScene.arena.weather?.weatherType === WeatherType.HARSH_SUN),
-          1.5,
-        ),
-        // Fire move while it rains → the sun boost (×1.5).
-        new MovePowerBoostAbAttr(
-          (_user, _target, move) =>
-            move.type === PokemonType.FIRE
-            && (globalScene.arena.weather?.weatherType === WeatherType.RAIN
-              || globalScene.arena.weather?.weatherType === WeatherType.HEAVY_RAIN),
-          1.5,
-        ),
+        // Water move while the sun is up → the rain boost (×1.5) + cancel sun's
+        // ×0.5 Water penalty.
+        new WeatherTypeBoostAbAttr({
+          weathers: [WeatherType.SUNNY, WeatherType.HARSH_SUN],
+          type: PokemonType.WATER,
+          multiplier: 1.5,
+        }),
+        new WeatherTypeDebuffCancelAbAttr({
+          weathers: [WeatherType.SUNNY, WeatherType.HARSH_SUN],
+          type: PokemonType.WATER,
+        }),
+        // Fire move while it rains → the sun boost (×1.5) + cancel rain's ×0.5
+        // Fire penalty.
+        new WeatherTypeBoostAbAttr({
+          weathers: [WeatherType.RAIN, WeatherType.HEAVY_RAIN],
+          type: PokemonType.FIRE,
+          multiplier: 1.5,
+        }),
+        new WeatherTypeDebuffCancelAbAttr({
+          weathers: [WeatherType.RAIN, WeatherType.HEAVY_RAIN],
+          type: PokemonType.FIRE,
+        }),
       ]);
     case 406:
       // Spinning Top — handled in dispatchBespokeR48 (consulted first). This

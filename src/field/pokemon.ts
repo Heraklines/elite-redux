@@ -4321,6 +4321,16 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       globalScene.arena.getAttackTypeMultiplier(moveType, source.isGrounded()),
     );
     applyMoveAttrs("IgnoreWeatherTypeDebuffAttr", source, this, move, arenaAttackTypeMultiplier);
+    // Ability-side analogue (ER Catastrophe): let the attacker's ability cancel an
+    // adverse weather type debuff for the resolved move type, matching Hydro Steam.
+    if (!ignoreSourceAbility) {
+      applyAbAttrs("IgnoreWeatherTypeDebuffAbAttr", {
+        pokemon: source,
+        simulated,
+        move,
+        arenaTypeMultiplier: arenaAttackTypeMultiplier,
+      });
+    }
 
     const isTypeImmune = typeMultiplier * arenaAttackTypeMultiplier.value === 0;
 

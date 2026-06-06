@@ -59,7 +59,11 @@ import { StatusEffectImmunityAbAttrEr } from "#data/elite-redux/archetypes/statu
 import { SuperEffectiveMultiplierBoostAbAttr } from "#data/elite-redux/archetypes/super-effective-multiplier-boost";
 import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
 import { WeatherStatMultiplierAbAttr } from "#data/elite-redux/archetypes/weather-stat-multiplier";
-import { WeatherDamageReductionAbAttr } from "#data/elite-redux/archetypes/weather-terrain-interaction";
+import {
+  WeatherDamageReductionAbAttr,
+  WeatherTypeBoostAbAttr,
+  WeatherTypeDebuffCancelAbAttr,
+} from "#data/elite-redux/archetypes/weather-terrain-interaction";
 import { TerrainType } from "#data/terrain";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -570,10 +574,19 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(res.attrs.some(a => a.constructor.name === "EntryEffectAbAttr")).toBe(true);
   });
 
-  it("er id 589 (Catastrophe) wires two type×weather MovePowerBoosts, no flat WeatherStatMultiplier", () => {
+  it("er id 589 (Catastrophe) wires two type×weather boosts AND two weather-debuff cancels, no flat WeatherStatMultiplier", () => {
     const res = dispatchArchetype("bespoke", null, 589);
     expect(res.skipReason).toBeNull();
-    expect(res.attrs.filter(a => a.constructor.name === "MovePowerBoostAbAttr")).toHaveLength(2);
+    // Each weather→type pairing (Water-in-sun, Fire-in-rain) gets a ×1.5 power
+    // boost PLUS a debuff-cancel so the adverse weather ×0.5 doesn't swallow it.
+    const boosts = res.attrs.filter((a): a is WeatherTypeBoostAbAttr => a instanceof WeatherTypeBoostAbAttr);
+    expect(boosts).toHaveLength(2);
+    const cancels = res.attrs.filter(
+      (a): a is WeatherTypeDebuffCancelAbAttr => a instanceof WeatherTypeDebuffCancelAbAttr,
+    );
+    expect(cancels).toHaveLength(2);
+    expect(boosts.every(b => b.getMultiplier() === 1.5)).toBe(true);
+    // The prior flat-stat approximation must remain absent.
     expect(res.attrs.some(a => a.constructor.name === "WeatherStatMultiplierAbAttr")).toBe(false);
   });
 

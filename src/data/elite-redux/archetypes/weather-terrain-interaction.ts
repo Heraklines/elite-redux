@@ -74,6 +74,8 @@
 // =============================================================================
 
 import {
+  IgnoreWeatherTypeDebuffAbAttr,
+  type IgnoreWeatherTypeDebuffAbAttrParams,
   MovePowerBoostAbAttr,
   PostSummonTerrainChangeAbAttr,
   PostSummonWeatherChangeAbAttr,
@@ -231,6 +233,84 @@ export class WeatherTypeBoostAbAttr extends MovePowerBoostAbAttr {
   /** The configured multiplier. */
   public getMultiplier(): number {
     return this.boostMultiplier;
+  }
+}
+
+/** Construction options for {@linkcode WeatherTypeDebuffCancelAbAttr}. */
+export interface WeatherTypeDebuffCancelOptions {
+  /**
+   * The weather conditions under which the adverse type-debuff is cancelled.
+   * Active weather must be in this set.
+   */
+  readonly weathers: readonly WeatherType[];
+  /** The outgoing move type whose weather debuff is cancelled. */
+  readonly type: PokemonType;
+}
+
+/**
+ * Parameterized `AbAttr` implementing the "cancel the adverse weather type
+ * debuff for X-type moves in WEATHER" sub-shape of the
+ * `weather-terrain-interaction` archetype.
+ *
+ * @remarks
+ * Extends the registered base {@linkcode IgnoreWeatherTypeDebuffAbAttr}, the
+ * ability-side analogue of the move-side `IgnoreWeatherTypeDebuffAttr` (used by
+ * Hydro Steam). The vanilla damage formula multiplies final damage by
+ * `arenaAttackTypeMultiplier`, which is ×0.5 for the disfavored type/weather
+ * pairing (Fire-in-rain, Water-in-sun). A pure move-power boost
+ * (`WeatherTypeBoostAbAttr`) cannot reach that factor, so without this companion
+ * a ×1.5 power boost is still net ×0.75 once the weather penalty applies.
+ *
+ * `Catastrophe` composes one of these per weather→type pairing alongside the
+ * matching {@linkcode WeatherTypeBoostAbAttr}, reproducing the ROM spec ("In
+ * Rain, Fire moves gain the damage boost they receive from sun") exactly:
+ * the debuff is cancelled (clamp to ≥1) AND the favorable ×1.5 is applied.
+ *
+ * Honors weather suppression (`weather?.isEffectSuppressed()`) so Cloud Nine /
+ * Air Lock disable the effect, matching the boost primitive's gating.
+ */
+export class WeatherTypeDebuffCancelAbAttr extends IgnoreWeatherTypeDebuffAbAttr {
+  private readonly weathers: readonly WeatherType[];
+  private readonly boostType: PokemonType;
+
+  constructor(opts: WeatherTypeDebuffCancelOptions) {
+    super(false);
+    if (opts.weathers.length === 0) {
+      throw new Error("[WeatherTypeDebuffCancelAbAttr] weathers must include at least one WeatherType");
+    }
+    this.weathers = opts.weathers;
+    this.boostType = opts.type;
+  }
+
+  override canApply({ pokemon, move, arenaTypeMultiplier }: IgnoreWeatherTypeDebuffAbAttrParams): boolean {
+    if (pokemon === undefined || pokemon === null) {
+      return false;
+    }
+    // Only act when there is actually a debuff to cancel (multiplier < 1).
+    if (arenaTypeMultiplier.value >= 1) {
+      return false;
+    }
+    if (pokemon.getMoveType(move) !== this.boostType) {
+      return false;
+    }
+    if (globalScene.arena.weather?.isEffectSuppressed()) {
+      return false;
+    }
+    return this.weathers.includes(globalScene.arena.weatherType);
+  }
+
+  override apply({ arenaTypeMultiplier }: IgnoreWeatherTypeDebuffAbAttrParams): void {
+    arenaTypeMultiplier.value = Math.max(arenaTypeMultiplier.value, 1);
+  }
+
+  /** The configured weather set (read-only accessor). */
+  public getWeathers(): readonly WeatherType[] {
+    return this.weathers;
+  }
+
+  /** The configured boost type. */
+  public getBoostType(): PokemonType {
+    return this.boostType;
   }
 }
 

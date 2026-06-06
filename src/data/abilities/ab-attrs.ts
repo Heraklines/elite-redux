@@ -1686,6 +1686,46 @@ export class MovePowerBoostAbAttr extends VariableMovePowerAbAttr {
   }
 }
 
+/**
+ * Parameters passed to {@linkcode IgnoreWeatherTypeDebuffAbAttr.apply}.
+ *
+ * The ability-side analogue of the move-side `IgnoreWeatherTypeDebuffAttr`: the
+ * damage calc in `Pokemon.getAttackDamage` passes the live `arenaAttackTypeMultiplier`
+ * holder so a subclass can clamp away an adverse weather type debuff.
+ */
+export interface IgnoreWeatherTypeDebuffAbAttrParams extends AbAttrBaseParams {
+  /** The outgoing move being evaluated. */
+  readonly move: Move;
+  /**
+   * Holder for the `arenaAttackTypeMultiplier` (weather field multiplier) computed
+   * in `Pokemon.getAttackDamage`. A subclass clamps this up to a minimum of 1 when
+   * its gates pass, cancelling the adverse weather type debuff (e.g. rain's ×0.5 on Fire).
+   */
+  readonly arenaTypeMultiplier: NumberHolder;
+}
+
+/**
+ * Base class for abilities that cancel an adverse weather type debuff for the
+ * holder's outgoing moves — the ability-side analogue of the move-side
+ * {@linkcode IgnoreWeatherTypeDebuffAttr} (Hydro Steam). Invoked from
+ * `Pokemon.getAttackDamage` right after the move-side debuff-ignore pass.
+ *
+ * The base is a no-op; ER subclasses (e.g. `WeatherTypeDebuffCancelAbAttr` for
+ * `Catastrophe`) supply the type/weather gating and the clamp. Registered so it
+ * can be dispatched by name via {@linkcode applyAbAttrs}.
+ */
+export class IgnoreWeatherTypeDebuffAbAttr extends AbAttr {
+  constructor(showAbility = false) {
+    super(showAbility);
+  }
+
+  override canApply(_params: IgnoreWeatherTypeDebuffAbAttrParams): boolean {
+    return false;
+  }
+
+  override apply(_params: IgnoreWeatherTypeDebuffAbAttrParams): void {}
+}
+
 export class MoveTypePowerBoostAbAttr extends MovePowerBoostAbAttr {
   // Need to use declare here to override the parent class's property, allows for modification in subclass' constructor
   protected declare readonly skipDuringMovesetGen: boolean;
@@ -6547,6 +6587,7 @@ export const AbilityAttrs = Object.freeze({
   IgnoreOpponentStatStagesAbAttr,
   IgnoreProtectOnContactAbAttr,
   IgnoreTypeImmunityAbAttr,
+  IgnoreWeatherTypeDebuffAbAttr,
   IgnoreTypeStatusEffectImmunityAbAttr,
   IllusionBreakAbAttr,
   IllusionPostBattleAbAttr,
