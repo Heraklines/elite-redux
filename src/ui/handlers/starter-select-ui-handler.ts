@@ -8,6 +8,7 @@ import { speciesEggMoves } from "#balance/moves/egg-moves";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { pokemonFormLevelMoves, pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import {
+  getErPassiveSlotCandyCost,
   getPassiveCandyCount,
   getSameSpeciesEggCandyCounts,
   getStarterValueFriendshipCap,
@@ -2663,12 +2664,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                   if (isSlotUnlocked(passiveAttr, slotIndex)) {
                     continue;
                   }
-                  // ER cost rework (#226): the old `baseCost × [1,2,4]` doubling
-                  // was too steep. Instead: halve the baseline for the 1st passive,
-                  // then add a flat +10 / +20 for the 2nd / 3rd. Rarity is already
-                  // baked into `baseCost` (rarer species have a lower base), so the
-                  // halved baseline + flat steps are naturally cheaper for rarities.
-                  const slotCost = Math.ceil(baseCost / 2) + slot * 10;
+                  // ER cost rework (#226): halved baseline + flat +10/slot. Shared
+                  // with the pokédex via getErPassiveSlotCandyCost so the two
+                  // screens never diverge (the pokédex previously kept the old
+                  // `baseCost × [1,2,4]` scheme and showed stale, higher costs).
+                  const slotCost = getErPassiveSlotCandyCost(baseCost, slot);
                   const abilityName = allAbilities[passiveAbilityIds[slot]].name;
                   options.push({
                     label: `×${slotCost} ${slot + 1}. ${abilityName}: ${i18next.t(

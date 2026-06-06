@@ -673,6 +673,21 @@ export function getPassiveCandyCount(starterCost: number): number {
 }
 
 /**
+ * Elite Redux 3-passive candy cost per slot (#226 rework). The old scheme
+ * doubled the base per slot (`base × [1,2,4]`), which was far too steep; this
+ * halves the baseline and adds a flat +10 per slot (slot 0/1/2 → +0/+10/+20).
+ * Rarity is already baked into `baseCost` (rarer species have a lower base), so
+ * the halved baseline keeps rarities naturally cheaper. SHARED by starter-select
+ * and the pokédex so the two screens never diverge.
+ *
+ * @param baseCost - {@linkcode getPassiveCandyCount} for the species' starter cost
+ * @param slot - 0-based passive slot index
+ */
+export function getErPassiveSlotCandyCost(baseCost: number, slot: number): number {
+  return Math.ceil(baseCost / 2) + slot * 10;
+}
+
+/**
  * Getter for {@linkcode allStarterCandyCosts} for value reduction unlock candy cost based on initial point cost
  * @param starterCost - The default point cost of the starter found in {@linkcode speciesStarterCosts}
  * @returns respective candy cost for the two cost reductions as an array 2 numbers

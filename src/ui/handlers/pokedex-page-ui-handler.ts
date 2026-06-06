@@ -12,6 +12,7 @@ import {
 } from "#balance/pokemon-evolutions";
 import { pokemonFormLevelMoves, pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import {
+  getErPassiveSlotCandyCost,
   getPassiveCandyCount,
   getSameSpeciesEggCandyCounts,
   getStarterValueFriendshipCap,
@@ -2181,7 +2182,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
                   style: TextStyle.WINDOW,
                 });
               } else {
-                const slotCost = baseCandyCost * PASSIVE_SLOTS[slot].costMultiplier;
+                const slotCost = getErPassiveSlotCandyCost(baseCandyCost, slot);
                 const canAfford = Overrides.FREE_CANDY_UPGRADE_OVERRIDE || candyCount >= slotCost;
                 options.push({
                   label: `×${slotCost} ${slotNumberLabel}${abilityName}: ${i18next.t("pokedexUiHandler:unlockPassive")}`,
