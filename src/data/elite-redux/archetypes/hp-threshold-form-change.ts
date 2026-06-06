@@ -48,6 +48,16 @@ export interface HpThresholdFormChangeOptions {
    * @defaultValue `false`
    */
   readonly cureStatus?: boolean;
+  /**
+   * Direction of the HP gate:
+   *  - `false` (default): the target form is the LOW-HP form — transform when HP
+   *    is AT/BELOW the threshold, revert when it recovers above (Ape Shift).
+   *  - `true`: the target form is the HIGH-HP form — be in it while ABOVE the
+   *    threshold, revert AT/BELOW it (Wishiwashi-style School; Locust Swarm /
+   *    Hivemind: "Hivemind form UNTIL 1/4 HP or less").
+   * @defaultValue `false`
+   */
+  readonly formAboveThreshold?: boolean;
 }
 
 /**
@@ -76,6 +86,7 @@ export class HpThresholdFormChangeAbAttr extends PostDefendAbAttr {
   private readonly hpThreshold: number;
   private readonly targetFormKey: string;
   private readonly cureStatus: boolean;
+  private readonly formAboveThreshold: boolean;
   /** Guards the missing-form warning so it logs at most once per attr instance. */
   private warnedMissingForm = false;
 
@@ -90,6 +101,7 @@ export class HpThresholdFormChangeAbAttr extends PostDefendAbAttr {
     this.hpThreshold = options.hpThreshold;
     this.targetFormKey = options.targetFormKey;
     this.cureStatus = options.cureStatus ?? false;
+    this.formAboveThreshold = options.formAboveThreshold ?? false;
   }
 
   /** Whether the holder is currently in the target (transformed) form. */
@@ -104,9 +116,13 @@ export class HpThresholdFormChangeAbAttr extends PostDefendAbAttr {
     }
     const belowThreshold = pokemon.hp / pokemon.getMaxHp() <= this.hpThreshold;
     const inTargetForm = this.isInTargetForm(pokemon);
-    // Transform edge: below threshold and not yet transformed.
-    // Revert edge: recovered above threshold while still transformed.
-    return belowThreshold ? !inTargetForm : inTargetForm;
+    // Whether the holder SHOULD currently be in the target form given its HP:
+    //  - default (low-HP form, Ape Shift): target form active at/below threshold.
+    //  - formAboveThreshold (high-HP form, Locust Swarm/Hivemind): target form
+    //    active ABOVE the threshold ("Hivemind UNTIL 1/4 HP or less").
+    const shouldBeInTargetForm = this.formAboveThreshold ? !belowThreshold : belowThreshold;
+    // Transform edge: should be in target but isn't. Revert edge: shouldn't but is.
+    return shouldBeInTargetForm ? !inTargetForm : inTargetForm;
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {
@@ -129,13 +145,16 @@ export class HpThresholdFormChangeAbAttr extends PostDefendAbAttr {
       }
       return;
     }
-    const belowThreshold = pokemon.hp / pokemon.getMaxHp() <= this.hpThreshold;
+    // The form-change phase is queued (runs next), so the holder is still in its
+    // CURRENT form here — i.e. on a transform edge it is NOT yet in the target.
+    const enteringTargetForm = !this.isInTargetForm(pokemon);
     // Trigger the form change via pokerogue's standard pipeline. The registered
     // `pokemonFormChanges` edges decide the direction (transform vs revert);
     // `triggerPokemonFormChange` returns false (no-op) if no edge matches.
     globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeManualTrigger);
-    // Cure status only on the transform edge (matches Ape Shift's rider).
-    if (belowThreshold && this.cureStatus && pokemon.status) {
+    // Cure status only on the transform edge — entering the target form (matches
+    // Ape Shift's rider; direction-agnostic so it's correct for both HP gates).
+    if (enteringTargetForm && this.cureStatus && pokemon.status) {
       pokemon.resetStatus(false);
     }
   }

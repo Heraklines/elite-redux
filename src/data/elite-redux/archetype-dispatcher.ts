@@ -4904,10 +4904,9 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     case 884:
       // Locust Swarm — "Changes into Hivemind form until 1/4 HP or less."
-      // Interpretation: changes to Hivemind when HP <= 1/4, reverting once HP
-      // recovers above 1/4. The archetype is now bidirectional (transform +
-      // revert) — the revert path was previously missing, so a Sitrus-style heal
-      // left the holder stuck in Hivemind form.
+      // Wishiwashi-style School: the holder is in Hivemind form while ABOVE 1/4
+      // HP and reverts to base once it drops to 1/4 or below (formAboveThreshold).
+      // (It was inverted — transforming INTO Hivemind at low HP.)
       //
       // KNOWN GAP (flagged, not silently swallowed): ER ships the Hivemind form
       // as a SEPARATE dump species (SPECIES_WISPYWASPY_HIVEMIND, id 10638),
@@ -4923,6 +4922,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new HpThresholdFormChangeAbAttr({
           hpThreshold: 0.25,
           targetFormKey: "hivemind",
+          formAboveThreshold: true,
         }),
       ]);
     case 885:
