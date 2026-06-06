@@ -2197,6 +2197,18 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return allAbilities[Overrides.ENEMY_ABILITY_OVERRIDE];
     }
     if (this.isFusion()) {
+      // An explicit active-ability override (e.g. the Ability Randomizer item,
+      // which writes customPokemonData.ability via setAbilityOverrideForSlot(0))
+      // must win for fused mons too. Previously this branch returned the
+      // fusion-derived ability and never consulted customPokemonData.ability, so
+      // rerolling a fused mon's ability silently no-opped.
+      if (
+        this.customPokemonData.ability != null
+        && this.customPokemonData.ability !== -1
+        && this.customAbilityOverridesApply()
+      ) {
+        return allAbilities[this.customPokemonData.ability];
+      }
       if (this.fusionCustomPokemonData?.ability != null && this.fusionCustomPokemonData.ability !== -1) {
         return allAbilities[this.fusionCustomPokemonData.ability];
       }
