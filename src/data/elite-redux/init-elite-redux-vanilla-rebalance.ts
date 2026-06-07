@@ -78,6 +78,7 @@ import {
   PostTurnHurtIfSleepingAbAttr,
   PostWeatherLapseDamageAbAttr,
   PostWeatherLapseHealAbAttr,
+  PreHitResistTypeChangeAbAttr,
   ReceivedMoveDamageMultiplierAbAttr,
   ReceivedTypeDamageMultiplierAbAttr,
   SelfStatDropImmunityAbAttr,
@@ -584,6 +585,10 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
 
   // ===== MAJOR — AFTERMATH: vanilla 1/4 max HP on contact KO -> ER flat 25% on any KO.
   [AbilityId.AFTERMATH, ab => patchAftermath(ab)],
+
+  // ===== MAJOR — COLOR_CHANGE: vanilla post-hit "become the move's type" -> ER
+  // pre-hit "become a type that resists/negates the move" (applied before damage).
+  [AbilityId.COLOR_CHANGE, ab => patchColorChange(ab)],
 
   // ===== MAJOR — FOREWARN: replace reveal-strongest-move with scripted Future Sight on entry.
   [AbilityId.FOREWARN, ab => patchForewarn(ab)],
@@ -1952,6 +1957,31 @@ function patchAftermath(ability: MutableAbility): void {
     if (ability.attrs[i].constructor.name === "PostFaintContactDamageAbAttr") {
       ability.attrs[i] = new PostFaintDetonateAbAttr({ power: 100, flinch: true });
     }
+  }
+}
+
+/**
+ * ER reworks COLOR_CHANGE: vanilla swaps the holder's type to the move's type
+ * AFTER being hit (`PostDefendTypeChangeAbAttr`). ER instead changes the holder's
+ * type to one that RESISTS / is immune to the move BEFORE the hit lands, so the
+ * swap actually reduces the damage (ROM: "Changes type to a resist or an immunity
+ * before getting hit"). Swap the post-hit attr for the pre-hit
+ * {@linkcode PreHitResistTypeChangeAbAttr}; the swap itself is applied from
+ * move-effect-phase before effectiveness is computed. The Sheer-Force-disable
+ * condition on the ability is preserved.
+ */
+function patchColorChange(ability: MutableAbility): void {
+  let replaced = false;
+  for (let i = 0; i < ability.attrs.length; i++) {
+    if (ability.attrs[i].constructor.name === "PostDefendTypeChangeAbAttr") {
+      ability.attrs[i] = new PreHitResistTypeChangeAbAttr();
+      replaced = true;
+    }
+  }
+  // Defensive: if the vanilla attr layout ever changes, still guarantee the
+  // pre-hit resist attr is present.
+  if (!replaced && !ability.attrs.some(a => a.constructor.name === "PreHitResistTypeChangeAbAttr")) {
+    ability.attrs.push(new PreHitResistTypeChangeAbAttr());
   }
 }
 
