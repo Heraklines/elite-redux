@@ -1519,7 +1519,11 @@ export class PokedexPageUiHandler extends MessageUiHandler {
 
             ui.setMode(UiMode.POKEDEX_PAGE, "refresh").then(() => {
               ui.showText(i18next.t("pokedexUiHandler:showAbilities"), null, () => {
-                this.infoOverlay.show(allAbilities[this.ability1].description);
+                // Guard: a form may have no main ability (e.g. ER Calyrex rider
+                // forms render a blank "Ability:" line). `allAbilities[undefined]`
+                // is undefined, so reading `.description` here crashed the Pokédex
+                // (user report: viewing Calyrex). Fall back to an empty overlay.
+                this.infoOverlay.show(allAbilities[this.ability1]?.description ?? "");
 
                 const options: OptionSelectItem[] = [];
 
