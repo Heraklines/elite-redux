@@ -3695,12 +3695,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       }
     });
     this.updateStarters();
+    // Auto-dismissing toast (no ▼ / keypress): show the summary briefly, then
+    // clear the message box on its own so the pop-up doesn't linger.
     globalScene.ui.showText(
       `Unlocked ${totals.slots} innate${totals.slots === 1 ? "" : "s"} across ${totals.species} Pokémon (−${totals.candy} candy).`,
       null,
       () => globalScene.ui.showText("", 0),
-      null,
-      true,
+      2500,
+      false,
     );
   }
 
