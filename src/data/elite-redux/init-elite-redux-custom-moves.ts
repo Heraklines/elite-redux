@@ -837,6 +837,12 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
     case 946: // Rapid River — hits twice
       move.attr(MultiHitAttr, MultiHitType.TWO);
       break;
+    case 1019: // Saber Slashes (Iron Saber) — "Hits twice. Uses elec. or fire based
+      // on effectiveness." The Electric/Fire best-effectiveness type pick + flinch
+      // come from the type-conversion archetype dispatch; only the 2nd hit was
+      // missing, so it struck once. Add the fixed 2-hit here.
+      move.attr(MultiHitAttr, MultiHitType.TWO);
+      break;
     // ---- Conditional 1.5× vs a bleeding target ----
     case 959: // Terror Locks — 50% more damage if the foe is bleeding (+30% bleed via row)
       move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.getTag(BattlerTagType.ER_BLEED) ? 1.5 : 1));

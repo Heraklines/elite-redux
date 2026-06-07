@@ -31,10 +31,12 @@ export class PartyCountMultiHitAbAttr extends AddSecondStrikeAbAttr {
   override apply(params: AddSecondStrikeAbAttrParams): void {
     const { pokemon, hitCount } = params;
     const party = pokemon.isPlayer() ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
-    const healthy = party.filter(
-      p => p && !p.isFainted() && (p.status?.effect ?? StatusEffect.NONE) === StatusEffect.NONE,
+    // One extra hit per healthy OTHER party member — the holder itself does NOT
+    // count (else a lone holder hit twice and a full party hit 7×). With a full
+    // healthy party of 6 that's +5 -> 6 hits, matching "max 6 hits".
+    const healthyAllies = party.filter(
+      p => p && p !== pokemon && !p.isFainted() && (p.status?.effect ?? StatusEffect.NONE) === StatusEffect.NONE,
     ).length;
-    // One extra hit per healthy member, capped at maxHits total.
-    hitCount.value = Math.min(hitCount.value + healthy, this.maxHits);
+    hitCount.value = Math.min(hitCount.value + healthyAllies, this.maxHits);
   }
 }

@@ -140,6 +140,13 @@ export class GameData {
   public trainerId: number;
   public secretId: number;
 
+  /**
+   * Set by {@linkcode loadSystem} when the logged-in account had NO cloud system
+   * save (a brand-new account / 404). The login flow reads this to offer a
+   * one-time "import your existing local save?" prompt (#229).
+   */
+  public cloudSaveMissing = false;
+
   public gender: PlayerGender;
 
   public dexData: DexData;
@@ -303,6 +310,7 @@ export class GameData {
 
   public async loadSystem(): Promise<boolean> {
     console.log("Client Session:", clientSessionId);
+    this.cloudSaveMissing = false;
 
     if (bypassLogin && !localStorage.getItem(`data_${loggedInUser?.username}`)) {
       return false;
@@ -315,6 +323,9 @@ export class GameData {
 
     if (typeof saveDataOrErr === "number" || !saveDataOrErr || saveDataOrErr.length === 0 || saveDataOrErr[0] !== "{") {
       if (saveDataOrErr === 404) {
+        // Brand-new account: no cloud save. Flag it so the login flow can offer
+        // a one-time "import your existing local save?" prompt (#229).
+        this.cloudSaveMissing = true;
         globalScene.phaseManager.queueMessage(
           "Save data could not be found. If this is a new account, you can safely ignore this message.",
           null,
@@ -338,6 +349,63 @@ export class GameData {
       saveDataOrErr,
       cachedSystem ? AES.decrypt(cachedSystem, saveKey).toString(enc.Utf8) : undefined,
     );
+  }
+
+  /**
+   * Find a locally-stored system save that could be imported into a freshly
+   * logged-in account that has no cloud save yet (#229). Returns the decrypted
+   * raw `SystemSaveData` JSON string, or `null` if none is found.
+   *
+   * Scans every `data_*` localStorage key except the current user's and any
+   * `_bak` backups, preferring the `data_Guest` save (the standalone/local-only
+   * default). Each candidate is tried with BOTH decryption schemes — Guest saves
+   * are base64 (`bypassLogin` encoding) while logged-in saves are AES — so a save
+   * written under either mode is recoverable.
+   */
+  public findImportableLocalSave(): string | null {
+    if (typeof localStorage === "undefined") {
+      return null;
+    }
+    const currentKey = `data_${loggedInUser?.username}`;
+    const candidates: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith("data_") || key.endsWith("_bak") || key === currentKey) {
+        continue;
+      }
+      candidates.push(key);
+    }
+    // Prefer the Guest save (the most common "I played locally then made an account" case).
+    candidates.sort((a, b) => (a === "data_Guest" ? -1 : b === "data_Guest" ? 1 : 0));
+    for (const key of candidates) {
+      const raw = localStorage.getItem(key);
+      if (!raw) {
+        continue;
+      }
+      for (const asGuest of [true, false]) {
+        try {
+          const decrypted = decrypt(raw, asGuest);
+          if (decrypted && decrypted[0] === "{") {
+            return decrypted;
+          }
+        } catch {
+          // Wrong scheme for this blob — try the other.
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Import a raw `SystemSaveData` JSON string into the current (logged-in)
+   * account and push it to the cloud (and local cache) via {@linkcode saveSystem}.
+   * Used by the first-login "import your local save?" prompt (#229).
+   * @returns whether the cloud save succeeded.
+   */
+  public async importSystemSaveString(rawSystemDataStr: string): Promise<boolean> {
+    await this.initSystem(rawSystemDataStr);
+    this.cloudSaveMissing = false;
+    return this.saveSystem();
   }
 
   /**

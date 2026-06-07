@@ -123,6 +123,9 @@ export class LoginPhase extends Phase {
         return;
       }
       await gameData.loadSystem();
+      if (this.maybeOfferLocalSaveImport()) {
+        return; // the import prompt owns end() from here
+      }
       this.end();
     };
     globalScene.playSound("ui/menu_open");
@@ -131,7 +134,7 @@ export class LoginPhase extends Phase {
   }
 
   public goToRegister(): void {
-    const { phaseManager, ui } = globalScene;
+    const { gameData, phaseManager, ui } = globalScene;
 
     const backButton = () => {
       phaseManager.unshiftNew("LoginPhase", false);
@@ -143,10 +146,57 @@ export class LoginPhase extends Phase {
       if (!success) {
         return;
       }
+      // A brand-new account has no cloud save; loadSystem() will 404 and set
+      // cloudSaveMissing, enabling the local-save import offer (#229).
+      await gameData.loadSystem();
+      if (this.maybeOfferLocalSaveImport()) {
+        return; // the import prompt owns end() from here
+      }
       this.end();
     };
     globalScene.playSound("ui/menu_open");
 
     ui.setMode(UiMode.REGISTRATION_FORM, { buttonActions: [registerButton, backButton] });
+  }
+
+  /**
+   * If the just-authenticated account has no cloud save (`cloudSaveMissing`) AND
+   * a local save exists on this device, offer a one-time CONFIRM prompt to import
+   * it into the account (#229). Returns `true` if it took over the flow (it will
+   * call {@linkcode end} itself), `false` if the caller should proceed normally.
+   */
+  private maybeOfferLocalSaveImport(): boolean {
+    const { gameData, ui } = globalScene;
+    if (bypassLogin || !gameData.cloudSaveMissing) {
+      return false;
+    }
+    const localSave = gameData.findImportableLocalSave();
+    if (!localSave) {
+      return false;
+    }
+    ui.showText(
+      "We found existing save data on this device. Import it into your account? (Choose No to start fresh.)",
+      null,
+      () => {
+        ui.setMode(
+          UiMode.CONFIRM,
+          () => {
+            ui.setMode(UiMode.LOADING, { buttonActions: [] });
+            gameData
+              .importSystemSaveString(localSave)
+              .catch(err => console.error("Local save import failed:", err))
+              .finally(() => {
+                ui.setMode(UiMode.MESSAGE);
+                this.end();
+              });
+          },
+          () => {
+            ui.setMode(UiMode.MESSAGE);
+            this.end();
+          },
+        );
+      },
+    );
+    return true;
   }
 }

@@ -68,3 +68,6 @@ vendor/elite-redux/ghidra-project/
 
 # Cloudflare Wrangler local state
 .wrangler/
+
+# Cloudflare Worker local dev secrets
+.dev.vars

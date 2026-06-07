@@ -443,8 +443,18 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
   [MoveId.VINE_WHIP, move => addAttrUnique(move, new FlinchAttr())],
   // PSYBEAM: lowers SpAtk on hit (chance patched separately).
   [MoveId.PSYBEAM, move => addAttrUnique(move, new StatStageChangeAttr([Stat.SPATK], -1, false))],
-  // PSYWAVE: +1 priority (numeric) + 10% confuse.
-  [MoveId.PSYWAVE, move => addAttrUnique(move, new ConfuseAttr(false))],
+  // PSYWAVE: ER makes it a normal 40-BP special move (+1 priority, 10% confuse),
+  // NOT vanilla's level-based fixed damage. Vanilla's RandomLevelDamageAttr
+  // (extends FixedDamageAttr) HARD-OVERWRITES the damage with `level * rand(50-150)%`,
+  // ignoring power/stats/STAB — which is why a +2 SpA attacker chipped ~9 dmg.
+  // Strip the fixed-damage attr so the 40-BP scalar drives the standard formula.
+  [
+    MoveId.PSYWAVE,
+    move => {
+      removeAttrsByName(move, ["FixedDamageAttr"]);
+      addAttrUnique(move, new ConfuseAttr(false));
+    },
+  ],
   // ROUND: 20% flinch chance.
   [MoveId.ROUND, move => addAttrUnique(move, new FlinchAttr())],
   // CHIP_AWAY: 40% chance to lower Atk and/or Def on hit.
