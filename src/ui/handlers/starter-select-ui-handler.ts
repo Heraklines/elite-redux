@@ -85,6 +85,7 @@ import {
   isSlotUnlocked,
   PASSIVE_SLOTS,
   type PassiveSlot,
+  planMassUnlock,
   toggleSlotEnabled,
   unlockSlot,
 } from "#utils/passive-utils";
@@ -542,6 +543,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private hasSwappedMoves = false;
 
   protected blockInput = false;
+  /** Guards the staggered mass-unlock-innates run from re-entry (#305). */
+  private isMassUnlocking = false;
   private allowTera: boolean;
 
   constructor() {
@@ -671,9 +674,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       new DropDownLabel(i18next.t("filterBar:costReductionLocked"), undefined, DropDownState.EXCLUDE),
     ];
 
+    // Action entry (not a filter): toggling it ON runs the staggered mass-unlock
+    // of every affordable innate, then resets itself. Detected in updateStarters.
+    const massUnlockLabels = [
+      new DropDownLabel(i18next.t("filterBar:passive"), undefined, DropDownState.OFF),
+      new DropDownLabel("» Unlock Affordable Innates", undefined, DropDownState.ON),
+    ];
     const unlocksOptions = [
       new DropDownOption("PASSIVE", passiveLabels),
       new DropDownOption("COST_REDUCTION", costReductionLabels),
+      new DropDownOption("MASS_UNLOCK", massUnlockLabels),
     ];
 
     this.filterBar.addFilter(
@@ -3607,7 +3617,116 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     return valueLimit.value;
   }
 
+  /**
+   * Confirm, then begin a staggered "unlock every affordable innate" run across
+   * every owned species (#305). Spends each species' own candy, cheapest slot
+   * first. Processing is chunked across frames so it can't freeze the game even
+   * with thousands of species; progress shows in the (red-bordered) message box.
+   */
+  private startMassUnlockInnates(): void {
+    const ui = globalScene.ui;
+    const ids = Object.keys(globalScene.gameData.starterData)
+      .map(Number)
+      .filter(id => speciesStarterCosts[id] != null);
+    ui.showText(
+      "Spend candy to unlock every affordable innate across all your Pokémon? (Candy spent can't be refunded.)",
+      null,
+      () => {
+        ui.setMode(
+          UiMode.CONFIRM,
+          () => {
+            this.isMassUnlocking = true;
+            this.blockInput = true;
+            ui.setMode(UiMode.STARTER_SELECT);
+            this.runMassUnlockChunk(ids, 0, { species: 0, slots: 0, candy: 0 });
+          },
+          () => {
+            ui.setMode(UiMode.STARTER_SELECT);
+          },
+        );
+      },
+    );
+  }
+
+  /** Process one chunk of the mass-unlock work list, then reschedule the next. */
+  private runMassUnlockChunk(
+    ids: number[],
+    start: number,
+    totals: { species: number; slots: number; candy: number },
+  ): void {
+    const CHUNK = 150;
+    const end = Math.min(start + CHUNK, ids.length);
+    for (let i = start; i < end; i++) {
+      const id = ids[i];
+      const starterData = globalScene.gameData.starterData[id];
+      const baseCost = speciesStarterCosts[id];
+      if (!starterData || starterData.candyCount <= 0 || baseCost == null) {
+        continue;
+      }
+      const passiveAbilityIds = getPokemonSpecies(id).getPassiveAbilities(0);
+      const plan = planMassUnlock(
+        starterData.passiveAttr,
+        starterData.candyCount,
+        slot => getErPassiveSlotCandyCost(baseCost, slot),
+        slot => passiveAbilityIds[slot] !== AbilityId.NONE,
+      );
+      if (plan.unlocked > 0) {
+        starterData.passiveAttr = plan.passiveAttr;
+        starterData.candyCount -= plan.candySpent;
+        totals.species++;
+        totals.slots += plan.unlocked;
+        totals.candy += plan.candySpent;
+      }
+    }
+    if (end < ids.length) {
+      globalScene.ui.showText(`Unlocking innates… ${end}/${ids.length}`);
+      globalScene.time.delayedCall(1, () => this.runMassUnlockChunk(ids, end, totals));
+      return;
+    }
+    // Finished: persist once, refresh the grid, report the summary.
+    this.isMassUnlocking = false;
+    this.blockInput = false;
+    globalScene.gameData.saveSystem().then(success => {
+      if (!success) {
+        globalScene.reset(true);
+      }
+    });
+    this.updateStarters();
+    globalScene.ui.showText(
+      `Unlocked ${totals.slots} innate${totals.slots === 1 ? "" : "s"} across ${totals.species} Pokémon (−${totals.candy} candy).`,
+      null,
+      () => globalScene.ui.showText("", 0),
+      null,
+      true,
+    );
+  }
+
+  /**
+   * If the Unlocks-dropdown "MASS_UNLOCK" action entry is toggled on, treat it as
+   * a one-shot button: reset it to OFF and kick off the staggered mass-unlock.
+   * Returns true if it fired (caller should bail out of the normal filter pass).
+   */
+  private handleMassUnlockTrigger(): boolean {
+    if (this.isMassUnlocking) {
+      return false;
+    }
+    const triggered = this.filterBar
+      .getVals(DropDownColumn.UNLOCKS)
+      .some(o => o.val === "MASS_UNLOCK" && o.state !== DropDownState.OFF);
+    if (!triggered) {
+      return false;
+    }
+    // Reset the action entry so it behaves like a button, not a sticky filter.
+    const dropDown = this.filterBar.getFilter(DropDownColumn.UNLOCKS);
+    dropDown.options.find(o => o.val === "MASS_UNLOCK")?.setOptionState(DropDownState.OFF);
+    this.startMassUnlockInnates();
+    return true;
+  }
+
   updateStarters = () => {
+    if (this.handleMassUnlockTrigger()) {
+      return;
+    }
     this.scrollCursor = 0;
     this.filteredStarterContainers = [];
     this.validStarterContainers = [];
