@@ -1705,17 +1705,30 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * @returns true if the user has enough candies and a passive has not been unlocked already
    */
   isPassiveAvailable(speciesId: SpeciesId): boolean {
-    // Get this species ID's starter data
     const starterData = globalScene.gameData.getStarterDataEntry(speciesId);
     const starterCost = speciesStarterCosts[speciesId];
-
-    // TODO(er-phase-b): widen to "any slot still locked && enough candies for any slot".
-    // For Phase A this stays slot-1-only; vanilla species have only one slot.
-    return (
-      starterCost != null
-      && starterData.candyCount >= getPassiveCandyCount(starterCost)
-      && !(starterData.passiveAttr & PassiveAttr.UNLOCKED)
-    );
+    if (starterCost == null) {
+      return false;
+    }
+    // ER 3-slot passives: available if ANY innate slot is still LOCKED, holds a
+    // real ability, and the player can afford that slot's candy cost. The legacy
+    // check only looked at slot 0 (`PassiveAttr.UNLOCKED`), so a mon with one slot
+    // unlocked wrongly read as "nothing to unlock" — hiding both the candy-upgrade
+    // icon and the "Can Unlock" filter (user report: Finneon). Cost mirrors the
+    // unlock menu via getErPassiveSlotCandyCost so the two screens never diverge.
+    const passiveAbilityIds = getPokemonSpecies(speciesId).getPassiveAbilities(0);
+    for (let slot = 0; slot < PASSIVE_SLOTS.length; slot++) {
+      if (passiveAbilityIds[slot] === AbilityId.NONE || isSlotUnlocked(starterData.passiveAttr, slot as PassiveSlot)) {
+        continue;
+      }
+      if (
+        Overrides.FREE_CANDY_UPGRADE_OVERRIDE
+        || starterData.candyCount >= getErPassiveSlotCandyCost(starterCost, slot)
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -3673,9 +3686,20 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         }
       });
 
-      // Passive Filter
-      const isPassiveUnlocked = starterData.passiveAttr > 0;
-      const isPassiveUnlockable = this.isPassiveAvailable(container.species.speciesId) && !isPassiveUnlocked;
+      // Passive Filter — ER 3-slot aware. The legacy logic treated passives as a
+      // single binary (`passiveAttr > 0`), so a mon with only ONE of its three
+      // innate slots unlocked counted as "fully unlocked" and never appeared under
+      // "Can Unlock" (user report: Finneon with slot 0 unlocked). Count slots:
+      //  - Unlocked (ON):   at least one slot unlocked
+      //  - Unlockable:      at least one slot still LOCKED and a passive is available
+      //  - Locked (EXCLUDE): no slot unlocked yet
+      const unlockedPassiveCount = PASSIVE_SLOTS.reduce(
+        (n, _slot, i) => n + (isSlotUnlocked(starterData.passiveAttr, i as 0 | 1 | 2) ? 1 : 0),
+        0,
+      );
+      const isPassiveUnlocked = unlockedPassiveCount > 0;
+      const isPassiveUnlockable =
+        this.isPassiveAvailable(container.species.speciesId) && unlockedPassiveCount < PASSIVE_SLOTS.length;
       const fitsPassive = this.filterBar.getVals(DropDownColumn.UNLOCKS).some(unlocks => {
         if (unlocks.val === "PASSIVE" && unlocks.state === DropDownState.ON) {
           return isPassiveUnlocked;
