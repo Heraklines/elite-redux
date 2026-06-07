@@ -552,6 +552,25 @@ function injectMissingErMegaForms(
 }
 
 /**
+ * ER source abilities that must resolve to an already-implemented VANILLA
+ * pokerogue ability rather than an ER-custom slot.
+ *
+ * The auto-generated ER export collapsed both "As One" variants onto id 266 and
+ * dropped id 267, so `ER_ID_MAP.abilities` sends 266→5004 / 267→5005 — ER-custom
+ * slots that are either a no-op placeholder (As One's archetype is "unknown", so
+ * the dispatcher wires zero AbAttrs) or never built at all (267 has no draft).
+ * Result: Calyrex Ice/Shadow Rider rendered a blank, non-functional main ability
+ * (user report + Pokédex crash). ER "As One" is mechanically identical to the
+ * vanilla ability (Unnerve + Chilling/Grim Neigh), which pokerogue already
+ * implements fully — so remap to the real abilities to get correct name,
+ * description, AND behavior.
+ */
+const ER_ABILITY_ID_REMAP: Readonly<Record<number, AbilityId>> = {
+  266: AbilityId.AS_ONE_GLASTRIER, // As One (Unnerve + Chilling Neigh) — Calyrex Ice Rider
+  267: AbilityId.AS_ONE_SPECTRIER, // As One (Unnerve + Grim Neigh) — Calyrex Shadow Rider
+};
+
+/**
  * Resolve an ER ability id to a pokerogue `AbilityId`. Returns `AbilityId.NONE`
  * for empty slots (ER stores `0` for "no innate") and for unmapped ids
  * (defensive — shouldn't happen if `er-id-map.ts` is complete).
@@ -559,6 +578,10 @@ function injectMissingErMegaForms(
 function mapAbilityId(erAbilityId: number): AbilityId {
   if (erAbilityId === 0) {
     return AbilityId.NONE;
+  }
+  const remapped = ER_ABILITY_ID_REMAP[erAbilityId];
+  if (remapped !== undefined) {
+    return remapped;
   }
   const mapped = ER_ID_MAP.abilities[erAbilityId];
   if (mapped === undefined) {
