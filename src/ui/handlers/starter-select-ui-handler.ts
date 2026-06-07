@@ -650,9 +650,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     );
 
     // unlocks filter
+    // ER 3-passive (innate) filter: count-based states instead of the legacy
+    // single-passive binary. (Literal labels — the filterBar locale source is
+    // external, so new count keys can't be added there.)
     const passiveLabels = [
       new DropDownLabel(i18next.t("filterBar:passive"), undefined, DropDownState.OFF),
-      new DropDownLabel(i18next.t("filterBar:passiveUnlocked"), undefined, DropDownState.ON),
+      new DropDownLabel("All Passives", undefined, DropDownState.THREE),
+      new DropDownLabel("2 Passives", undefined, DropDownState.TWO),
+      new DropDownLabel("1 Passive", undefined, DropDownState.ONE),
       new DropDownLabel(i18next.t("filterBar:passiveUnlockable"), undefined, DropDownState.UNLOCKABLE),
       new DropDownLabel(i18next.t("filterBar:passiveLocked"), undefined, DropDownState.EXCLUDE),
     ];
@@ -2854,6 +2859,54 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               item: "candy",
               itemArgs: starterColors[this.lastSpecies.speciesId],
             });
+
+            // Bulk "buy max eggs" — purchase as many same-species eggs as candies
+            // (and egg-list space) allow in one action. Per-egg cost is constant
+            // here (it scales with hatchCount, which buying doesn't change), so
+            // total = count × sameSpeciesEggCost. The count is highlighted.
+            const eggSpace = Overrides.UNLIMITED_EGG_COUNT_OVERRIDE
+              ? Number.POSITIVE_INFINITY
+              : Math.max(0, MAX_EGG_COUNT - globalScene.gameData.eggs.length);
+            const maxAffordableEggs = Overrides.FREE_CANDY_UPGRADE_OVERRIDE
+              ? eggSpace
+              : Math.floor(candyCount / sameSpeciesEggCost);
+            const maxEggs = Math.min(maxAffordableEggs, eggSpace);
+            if (maxEggs >= 2) {
+              const bulkCost = maxEggs * sameSpeciesEggCost;
+              options.push({
+                label: `×${bulkCost} ${i18next.t("starterSelectUiHandler:sameSpeciesEgg")} [color=#f8d030]×${maxEggs}[/color]`,
+                handler: () => {
+                  if (!(Overrides.FREE_CANDY_UPGRADE_OVERRIDE || candyCount >= bulkCost)) {
+                    return false;
+                  }
+                  for (let i = 0; i < maxEggs; i++) {
+                    new Egg({
+                      species: this.lastSpecies.speciesId,
+                      sourceType: EggSourceType.SAME_SPECIES_EGG,
+                    }).addEggToGameData();
+                  }
+                  if (!Overrides.FREE_CANDY_UPGRADE_OVERRIDE) {
+                    persistentStarterData.candyCount -= bulkCost;
+                    starterData.candyCount = persistentStarterData.candyCount;
+                  }
+                  this.pokemonCandyCountText.setText(`×${starterData.candyCount}`);
+                  updateCandyCountTextStyle(this.pokemonCandyCountText, starterData.candyCount);
+                  globalScene.gameData.saveSystem().then(success => {
+                    if (!success) {
+                      return globalScene.reset(true);
+                    }
+                  });
+                  ui.setMode(UiMode.STARTER_SELECT);
+                  globalScene.playSound("se/buy");
+                  if (starterContainer) {
+                    this.updateCandyUpgradeDisplay(starterContainer);
+                  }
+                  return true;
+                },
+                item: "candy",
+                itemArgs: starterColors[this.lastSpecies.speciesId],
+              });
+            }
             options.push({
               label: i18next.t("menu:cancel"),
               handler: () => {
@@ -3701,17 +3754,24 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       const isPassiveUnlockable =
         this.isPassiveAvailable(container.species.speciesId) && unlockedPassiveCount < PASSIVE_SLOTS.length;
       const fitsPassive = this.filterBar.getVals(DropDownColumn.UNLOCKS).some(unlocks => {
-        if (unlocks.val === "PASSIVE" && unlocks.state === DropDownState.ON) {
-          return isPassiveUnlocked;
+        if (unlocks.val !== "PASSIVE") {
+          return false;
         }
-        if (unlocks.val === "PASSIVE" && unlocks.state === DropDownState.EXCLUDE) {
-          return isStarterProgressable && !isPassiveUnlocked;
-        }
-        if (unlocks.val === "PASSIVE" && unlocks.state === DropDownState.UNLOCKABLE) {
-          return isPassiveUnlockable;
-        }
-        if (unlocks.val === "PASSIVE" && unlocks.state === DropDownState.OFF) {
-          return true;
+        switch (unlocks.state) {
+          case DropDownState.OFF:
+            return true;
+          case DropDownState.THREE: // all 3 innate slots unlocked
+            return unlockedPassiveCount === 3;
+          case DropDownState.TWO: // exactly 2 unlocked
+            return unlockedPassiveCount === 2;
+          case DropDownState.ONE: // exactly 1 unlocked
+            return unlockedPassiveCount === 1;
+          case DropDownState.UNLOCKABLE: // at least one more slot can be unlocked
+            return isPassiveUnlockable;
+          case DropDownState.EXCLUDE: // none unlocked yet
+            return isStarterProgressable && !isPassiveUnlocked;
+          default:
+            return false;
         }
       });
 
