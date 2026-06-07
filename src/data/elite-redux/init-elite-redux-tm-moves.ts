@@ -35,11 +35,11 @@
 // runtime call here is fine).
 // =============================================================================
 
+import { tmSpecies } from "#balance/tm-species-map";
+import { speciesTmMoves, tmPoolTiers } from "#balance/tms";
 import { allMoves } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
-import { speciesTmMoves, tmPoolTiers } from "#balance/tms";
-import { tmSpecies } from "#balance/tm-species-map";
 import { ModifierTier } from "#enums/modifier-tier";
 import type { MoveId } from "#enums/move-id";
 import type { SpeciesId } from "#enums/species-id";
@@ -69,6 +69,13 @@ export function initEliteReduxTmMoves(): InitEliteReduxTmMovesResult {
   const speciesByTm = tmSpecies as Record<number, Array<SpeciesId | Array<SpeciesId | string>>>;
   const tiers = tmPoolTiers as Record<number, ModifierTier>;
 
+  /** Extract the move id from a forward-map entry (plain id or [variant, id]). */
+  const entryMoveId = (entry: MoveId | [string | SpeciesId, MoveId]): number =>
+    Array.isArray(entry) ? (entry[1] as number) : (entry as number);
+  /** Whether a reverse-map entry refers to the given species id (plain or [id, …]). */
+  const reverseEntryIsSpecies = (entry: SpeciesId | Array<SpeciesId | string>, id: number): boolean =>
+    Array.isArray(entry) ? entry[0] === id : entry === id;
+
   for (const draft of ER_SPECIES) {
     const pokerogueSpeciesId = ER_ID_MAP.species[draft.id];
     if (pokerogueSpeciesId === undefined) {
@@ -76,57 +83,52 @@ export function initEliteReduxTmMoves(): InitEliteReduxTmMovesResult {
       continue;
     }
 
-    // Build a quick set of moves already TM-learnable for dedup.
-    const existing = tmsBySpecies[pokerogueSpeciesId];
-    const existingMoveSet = new Set<number>();
-    if (existing) {
-      for (const entry of existing) {
-        if (Array.isArray(entry)) {
-          existingMoveSet.add(entry[1] as number);
-        } else {
-          existingMoveSet.add(entry as number);
-        }
+    // ER's authoritative teachable-move set for a species is its `tutorMoves`
+    // (ER uses universal tutors instead of per-TM compatibility; every record
+    // ships `tmhmMoves: []`). The TM-learnable set must therefore be EXACTLY the
+    // mapped tutorMoves — NOT vanilla's TM compatibility plus ER additions. The
+    // old additive merge left vanilla-only moves reachable that ER never grants
+    // (e.g. enemy Salazzle using Scald). Build the ER set, then reconcile both
+    // the forward (species→moves) and reverse (move→species) maps to it.
+    const erSet = new Set<number>();
+    for (const tutorMoveId of draft.tutorMoves) {
+      const pokerogueMoveId = ER_ID_MAP.moves[tutorMoveId];
+      if (pokerogueMoveId === undefined || !allMoves[pokerogueMoveId]) {
+        result.pairsSkippedUnmapped++;
+        continue;
+      }
+      erSet.add(pokerogueMoveId);
+    }
+
+    // Previous forward list for this species (to compute removals).
+    const oldForward = tmsBySpecies[pokerogueSpeciesId] ?? [];
+    const oldMoveIds = new Set<number>(oldForward.map(entryMoveId));
+
+    // Reverse-map removals: drop this species from any move it no longer learns.
+    for (const oldMoveId of oldMoveIds) {
+      if (!erSet.has(oldMoveId) && speciesByTm[oldMoveId]) {
+        speciesByTm[oldMoveId] = speciesByTm[oldMoveId].filter(e => !reverseEntryIsSpecies(e, pokerogueSpeciesId));
       }
     }
 
-    for (const tutorMoveId of draft.tutorMoves) {
-      const pokerogueMoveId = ER_ID_MAP.moves[tutorMoveId];
-      if (pokerogueMoveId === undefined) {
-        result.pairsSkippedUnmapped++;
-        continue;
-      }
-      // Verify the move actually has an `allMoves` entry — a partial init
-      // could otherwise leak a phantom move id into the TM pool, crashing
-      // downstream consumers that index allMoves[moveId].
-      if (!allMoves[pokerogueMoveId]) {
-        result.pairsSkippedUnmapped++;
-        continue;
-      }
-      if (existingMoveSet.has(pokerogueMoveId)) {
+    // Forward map: replace wholesale with the ER set (deterministic order).
+    tmsBySpecies[pokerogueSpeciesId] = [...erSet] as MoveId[];
+
+    // Reverse-map additions + reward-pool registration for newly-learnable moves.
+    for (const moveId of erSet) {
+      if (oldMoveIds.has(moveId)) {
         result.pairsSkippedDup++;
-        continue;
+      } else {
+        if (!speciesByTm[moveId]) {
+          speciesByTm[moveId] = [];
+        }
+        speciesByTm[moveId].push(pokerogueSpeciesId as SpeciesId);
+        result.pairsAdded++;
       }
-      existingMoveSet.add(pokerogueMoveId);
-
-      // Forward: species → move
-      if (!tmsBySpecies[pokerogueSpeciesId]) {
-        tmsBySpecies[pokerogueSpeciesId] = [];
-      }
-      tmsBySpecies[pokerogueSpeciesId].push(pokerogueMoveId as MoveId);
-
-      // Reverse: move → species
-      if (!speciesByTm[pokerogueMoveId]) {
-        speciesByTm[pokerogueMoveId] = [];
-      }
-      speciesByTm[pokerogueMoveId].push(pokerogueSpeciesId as SpeciesId);
-
-      // Reward pool: ensure the move drops as a TM in runs.
-      if (tiers[pokerogueMoveId] === undefined) {
-        tiers[pokerogueMoveId] = ModifierTier.ULTRA;
+      if (tiers[moveId] === undefined) {
+        tiers[moveId] = ModifierTier.ULTRA;
         result.movesAddedToPool++;
       }
-
-      result.pairsAdded++;
     }
   }
 
