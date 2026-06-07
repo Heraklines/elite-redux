@@ -516,7 +516,11 @@ function injectMissingErMegaForms(
       species.baseExp,
       false, // genderDiffs
       null, // formSpriteKey — pokerogue derives from formKey
-      false, // isStarterSelectable
+      // Redux variants are region-variant-style forms chosen AT START (like
+      // Alolan/Galarian), so they must be starter-selectable — otherwise a player
+      // who only owns the Redux form (caught before the base) can't use it. Mega /
+      // Primal / Origin etc. stay non-selectable (battle/evolution-only forms).
+      formKey === "redux", // isStarterSelectable
       false, // isUnobtainable
     );
     // Wire the 3-passive override (PokemonForm extends PokemonSpeciesForm so

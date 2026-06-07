@@ -5651,6 +5651,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         this.queueStatusImmuneMessage(quiet, overrideStatus ? "overlap" : "other"); // having different status displays generic fail message
         return false;
       }
+      // ER: Frostbite is a MAJOR status implemented as a BattlerTag (not
+      // `this.status`), so the vanilla "already has a status" check above misses
+      // it — letting a frostbitten Pokemon also be paralyzed/burned/etc. A major
+      // status is exclusive, so a frostbitten holder blocks any new status (Rest's
+      // override path still works because it heals via its own flow).
+      if (!overrideStatus && this.getTag(BattlerTagType.ER_FROSTBITE)) {
+        this.queueStatusImmuneMessage(quiet, "other");
+        return false;
+      }
       if (this.isGrounded() && !ignoreField && globalScene.arena.terrain?.terrainType === TerrainType.MISTY) {
         this.queueStatusImmuneMessage(quiet, TerrainType.MISTY);
         return false;
@@ -6898,13 +6907,21 @@ export class PlayerPokemon extends Pokemon {
         this.fusionSpecies = originalFusionSpecies;
         this.fusionFormIndex = originalFusionFormIndex;
       } else {
-        const formIndex =
+        const carriedFormIndex =
           evolution.evoFormKey !== null && !isFusion
             ? Math.max(
                 evolutionSpecies.forms.findIndex(f => f.formKey === evolution.evoFormKey),
                 0,
               )
             : this.formIndex;
+        // Mirror evolve()'s guard so the PREVIEW sprite/name doesn't show a
+        // battle-only form (e.g. a Redux mon previewing as "Mega <evo>"); prefer
+        // the carried form's key (Redux -> Redux).
+        const formIndex = this.resolveSafeEvolvedFormIndex(
+          evolutionSpecies,
+          carriedFormIndex,
+          this.getSpeciesForm()?.formKey ?? "",
+        );
         ret = globalScene.addPlayerPokemon(
           isFusion ? this.species : evolutionSpecies,
           this.level,
@@ -6959,7 +6976,7 @@ export class PlayerPokemon extends Pokemon {
       // "redux" Krabby at index 1 evolving into Kingler, whose index 1 is
       // "gigantamax"), that carry-over can point at a battle-only form. Reset to
       // the normal base form (the canonical index-0 form key "") in that case.
-      this.sanitizeEvolvedFormIndex(isFusion);
+      this.sanitizeEvolvedFormIndex(isFusion, preEvolution.formKey);
       this.generateName();
       if (isFusion) {
         const abilityCount = this.getFusionSpeciesForm().getAbilityCount();
@@ -7025,7 +7042,25 @@ export class PlayerPokemon extends Pokemon {
    * @param isFusion - Whether to sanitize the fusion species' form index instead
    *   of the base species'.
    */
-  private sanitizeEvolvedFormIndex(isFusion: boolean): void {
+  /**
+   * Resolve a safe RESTING form index for a just-evolved Pokémon. Evolutions
+   * carry the pre-evolution form index over verbatim (so a regional/variant form
+   * evolves into the same variant), but when source and target have mismatched
+   * form layouts that can land on a battle-only form. Specifically: ER injects a
+   * "redux" form on many species, and the target species may have a "mega" at the
+   * same index — so a Redux Kadabra (index 1) carried into Alakazam (index 1 =
+   * "mega") would become Mega Alakazam.
+   *
+   * Logic: if the carried form is fine (exists and is not battle-only), keep it.
+   * Otherwise prefer a NON-battle-only form whose key matches the pre-evolution
+   * form key (Redux -> Redux, e.g. Kadabra Redux -> Alakazam Redux), then fall
+   * back to the canonical base form ("").
+   */
+  private resolveSafeEvolvedFormIndex(
+    species: PokemonSpecies | null,
+    carriedIndex: number,
+    preferredFormKey: string,
+  ): number {
     const battleOnlyFormKeys: string[] = [
       SpeciesFormKey.MEGA,
       SpeciesFormKey.MEGA_X,
@@ -7036,18 +7071,28 @@ export class PlayerPokemon extends Pokemon {
       SpeciesFormKey.GIGANTAMAX_RAPID,
       SpeciesFormKey.ETERNAMAX,
     ];
+    const forms = species?.forms;
+    if (!forms || forms.length === 0) {
+      return carriedIndex;
+    }
+    const carried = forms[carriedIndex];
+    if (carried && !battleOnlyFormKeys.includes(carried.formKey)) {
+      return carriedIndex;
+    }
+    if (preferredFormKey) {
+      const preferred = forms.findIndex(f => f.formKey === preferredFormKey && !battleOnlyFormKeys.includes(f.formKey));
+      if (preferred >= 0) {
+        return preferred;
+      }
+    }
+    const normalIndex = forms.findIndex(f => f.formKey === "");
+    return normalIndex >= 0 ? normalIndex : 0;
+  }
+
+  private sanitizeEvolvedFormIndex(isFusion: boolean, preferredFormKey = ""): void {
     const species = isFusion ? this.fusionSpecies : this.species;
-    if (!species || !species.forms || species.forms.length === 0) {
-      return;
-    }
     const currentFormIndex = isFusion ? this.fusionFormIndex : this.formIndex;
-    const currentForm = species.forms[currentFormIndex];
-    if (!currentForm || !battleOnlyFormKeys.includes(currentForm.formKey)) {
-      return;
-    }
-    // Prefer the canonical normal base form (form key ""); fall back to index 0.
-    const normalIndex = species.forms.findIndex(f => f.formKey === "");
-    const safeIndex = normalIndex >= 0 ? normalIndex : 0;
+    const safeIndex = this.resolveSafeEvolvedFormIndex(species, currentFormIndex, preferredFormKey);
     if (isFusion) {
       this.fusionFormIndex = safeIndex;
     } else {

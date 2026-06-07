@@ -562,12 +562,17 @@ function applyWeatherChange(effect: { weather: string; duration: string; waves?:
     console.warn(`[llm-director] weather_change unknown weather="${effect.weather}"`);
     return;
   }
-  // trySetWeather picks up at the start of next battle. Duration semantics
-  // (next_battle vs n_waves) are honored at a policy level by the arena: the
-  // weather persists until something else clears it. Tracking a multi-wave
-  // weather plan is a v2 feature; for now both durations behave identically
-  // (set + persist).
   globalScene.arena.trySetWeather(wt);
+  // `trySetWeather(wt)` with no `user` constructs the Weather with turnsLeft = 0,
+  // which `Weather.lapse()` treats as INFINITE (never decrements) — that's the
+  // "eternal Sunny day, Turns Left: 0, never ends" bug. Director weather must be
+  // finite: stamp a concrete duration on the freshly-set (non-legendary) weather.
+  const weather = globalScene.arena.weather;
+  if (weather && weather.weatherType === wt && !weather.isImmutable()) {
+    const turns = typeof effect.waves === "number" && effect.waves > 0 ? effect.waves : 5;
+    weather.turnsLeft = turns;
+    weather.maxDuration = turns;
+  }
   console.info(
     `[llm-director] weather_change weather=${effect.weather} duration=${effect.duration} waves=${effect.waves ?? "-"}`,
   );
