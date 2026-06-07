@@ -6917,11 +6917,7 @@ export class PlayerPokemon extends Pokemon {
         // Mirror evolve()'s guard so the PREVIEW sprite/name doesn't show a
         // battle-only form (e.g. a Redux mon previewing as "Mega <evo>"); prefer
         // the carried form's key (Redux -> Redux).
-        const formIndex = this.resolveSafeEvolvedFormIndex(
-          evolutionSpecies,
-          carriedFormIndex,
-          this.getSpeciesForm()?.formKey ?? "",
-        );
+        const formIndex = this.resolveSafeEvolvedFormIndex(evolutionSpecies, carriedFormIndex, this.getFormKey());
         ret = globalScene.addPlayerPokemon(
           isFusion ? this.species : evolutionSpecies,
           this.level,
@@ -6976,7 +6972,7 @@ export class PlayerPokemon extends Pokemon {
       // "redux" Krabby at index 1 evolving into Kingler, whose index 1 is
       // "gigantamax"), that carry-over can point at a battle-only form. Reset to
       // the normal base form (the canonical index-0 form key "") in that case.
-      this.sanitizeEvolvedFormIndex(isFusion, preEvolution.formKey);
+      this.sanitizeEvolvedFormIndex(isFusion, (preEvolution as { formKey?: string }).formKey ?? "");
       this.generateName();
       if (isFusion) {
         const abilityCount = this.getFusionSpeciesForm().getAbilityCount();
