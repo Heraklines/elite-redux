@@ -3630,26 +3630,22 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     const ids = Object.keys(globalScene.gameData.starterData)
       .map(Number)
       .filter(id => speciesStarterCosts[id] != null);
-    ui.showText(
-      "Spend candy to unlock every affordable innate across all your Pokémon? (Candy spent can't be refunded.)",
-      null,
-      () => {
-        // setModeWithoutClear (not setMode) so the question text stays visible
-        // under the Yes/No prompt — plain setMode wipes the message instantly.
-        ui.setModeWithoutClear(
-          UiMode.CONFIRM,
-          () => {
-            this.isMassUnlocking = true;
-            this.blockInput = true;
-            ui.setMode(UiMode.STARTER_SELECT);
-            this.runMassUnlockChunk(ids, 0, { species: 0, slots: 0, candy: 0 });
-          },
-          () => {
-            ui.setMode(UiMode.STARTER_SELECT);
-          },
-        );
-      },
-    );
+    ui.showText("Unlock all affordable innates? Spends candy.", null, () => {
+      // setModeWithoutClear (not setMode) so the question text stays visible
+      // under the Yes/No prompt — plain setMode wipes the message instantly.
+      ui.setModeWithoutClear(
+        UiMode.CONFIRM,
+        () => {
+          this.isMassUnlocking = true;
+          this.blockInput = true;
+          ui.setMode(UiMode.STARTER_SELECT);
+          this.runMassUnlockChunk(ids, 0, { species: 0, slots: 0, candy: 0 });
+        },
+        () => {
+          ui.setMode(UiMode.STARTER_SELECT);
+        },
+      );
+    });
   }
 
   /** Process one chunk of the mass-unlock work list, then reschedule the next. */
