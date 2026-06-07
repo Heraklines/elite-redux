@@ -3636,12 +3636,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       ui.setModeWithoutClear(
         UiMode.CONFIRM,
         () => {
-          this.isMassUnlocking = true;
+          // isMassUnlocking is already armed (set in handleMassUnlockTrigger) and
+          // stays armed through processing so no refresh can re-fire the prompt.
           this.blockInput = true;
           ui.setMode(UiMode.STARTER_SELECT);
           this.runMassUnlockChunk(ids, 0, { species: 0, slots: 0, candy: 0 });
         },
         () => {
+          // Declined: disarm and return.
+          this.isMassUnlocking = false;
           ui.setMode(UiMode.STARTER_SELECT);
         },
       );
@@ -3716,6 +3719,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     if (!triggered) {
       return false;
     }
+    // Arm the guard NOW (before the confirm) so no refresh during the confirm /
+    // staggered run can re-fire the prompt. Cleared on decline or on finish.
+    this.isMassUnlocking = true;
     // Reset the action entry so it behaves like a button, not a sticky filter.
     const dropDown = this.filterBar.getFilter(DropDownColumn.UNLOCKS);
     dropDown.options.find(o => o.val === "MASS_UNLOCK")?.setOptionState(DropDownState.OFF);
