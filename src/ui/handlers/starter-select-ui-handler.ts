@@ -676,9 +676,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
     // Action entry (not a filter): toggling it ON runs the staggered mass-unlock
     // of every affordable innate, then resets itself. Detected in updateStarters.
+    // Both states share the same descriptive label so the dropdown row always
+    // reads as the action (it resets to OFF after firing), never "Passive".
     const massUnlockLabels = [
-      new DropDownLabel(i18next.t("filterBar:passive"), undefined, DropDownState.OFF),
-      new DropDownLabel("» Unlock Affordable Innates", undefined, DropDownState.ON),
+      new DropDownLabel("✦ Unlock All Innates", undefined, DropDownState.OFF),
+      new DropDownLabel("✦ Unlock All Innates", undefined, DropDownState.ON),
     ];
     const unlocksOptions = [
       new DropDownOption("PASSIVE", passiveLabels),
@@ -3632,7 +3634,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       "Spend candy to unlock every affordable innate across all your Pokémon? (Candy spent can't be refunded.)",
       null,
       () => {
-        ui.setMode(
+        // setModeWithoutClear (not setMode) so the question text stays visible
+        // under the Yes/No prompt — plain setMode wipes the message instantly.
+        ui.setModeWithoutClear(
           UiMode.CONFIRM,
           () => {
             this.isMassUnlocking = true;
