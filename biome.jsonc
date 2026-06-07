@@ -321,7 +321,7 @@
       "arrowParentheses": "asNeeded",
       "operatorLinebreak": "before"
     },
-    "globals": ["Phaser"],
+    "globals": ["Phaser", "__BUILD_ID__"],
     "parser": {
       "jsxEverywhere": false
     }

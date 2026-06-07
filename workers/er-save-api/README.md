@@ -1,0 +1,116 @@
+# Elite Redux — Cloud-Save + Account API (Cloudflare Worker + D1)
+
+A free/low-cost backend that gives players **real accounts** (username + password)
+and **cloud saves**, so progress survives a cache wipe, a new device, or a cleared
+browser (#229). There is no login system today — saves live only in the browser's
+`localStorage` — so this is the durable backstop.
+
+It implements the subset of the PokéRogue `rogueserver` HTTP contract that the ER
+client already speaks (`src/api/*`). Because the client already does all the login
++ save-sync work when login isn't bypassed, turning this on is mostly:
+
+1. deploy this Worker,
+2. point the client build's `VITE_SERVER_URL` at it,
+3. build with `VITE_BYPASS_LOGIN=0`.
+
+## Capacity (how many players this hosts)
+
+The binding limits on Cloudflare's **free** tier are **Workers: 100k requests/day**
+and **D1: 100k writes/day** (reads 5M/day, storage 5 GB). The client syncs with
+debounce (~40 writes/day per active player), so:
+
+| Tier | Daily-active players | Notes |
+|------|----------------------|-------|
+| **Free** | **~1,000–1,500** | Write count is the ceiling; debounced sync keeps 1k players ≈ 40k writes/day. Storage (~1 GB for 1k players) is never the issue. |
+| **Workers Paid ($5/mo)** | **~40,000+** | 50M D1 writes/mo, 10M Worker req/mo included. |
+
+KV is **not** used — its ~1,000 writes/day cap can't host saves. D1 is the right store.
+
+## Routes (rogueserver-compatible)
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `POST` | `/account/register` | – | Create account (`username`, `password` form fields). |
+| `POST` | `/account/login` | – | Returns `{ token }`. |
+| `GET`  | `/account/logout` | – | No-op 200 (tokens are stateless; client clears its cookie). |
+| `GET`  | `/account/info` | ✓ | `{ username, lastSessionSlot, discordId:"", googleId:"", hasAdminRole }`. |
+| `POST` | `/account/changepw` | ✓ | Change password (`password` form field). |
+| `GET`  | `/savedata/system/get` | ✓ | Raw system save, or `404` for a new account. |
+| `GET`  | `/savedata/system/verify` | ✓ | `{ valid:true }` (no server-side anti-cheat). |
+| `POST` | `/savedata/system/update` | ✓ | Upsert system save (raw body). |
+| `GET`  | `/savedata/session/get?slot=N` | ✓ | Raw session save, or `404`. |
+| `POST` | `/savedata/session/update?slot=N` | ✓ | Upsert a session slot (raw body). |
+| `GET`  | `/savedata/session/delete?slot=N` | ✓ | Delete a session slot. |
+| `POST` | `/savedata/session/clear?slot=N` | ✓ | Persist the cleared run, `{ success:true }`. |
+| `GET`  | `/savedata/session/newclear?slot=N` | ✓ | `true`. |
+| `POST` | `/savedata/updateall` | ✓ | Upsert system + one session in one batched write. |
+| `GET`  | `/game/titlestats` | – | `{ playerCount, battleCount:0 }`. |
+| `GET`  | `/daily/seed` | – | Per-UTC-day seed string. |
+
+### Security model
+
+- Passwords are stored **only** as a PBKDF2-HMAC-SHA256 hash (100k iterations,
+  per-user 16-byte salt) — never in plaintext.
+- Login returns a stateless token: `base64url(payload).base64url(HMAC-SHA256)`,
+  signed with `SESSION_SECRET`. Verification is a pure HMAC check (no DB read),
+  which keeps request cost low.
+- Save blobs are opaque (the client encrypts them); the server never inspects them.
+
+## Deploy (one-time)
+
+```bash
+cd workers/er-save-api
+npm i -g wrangler            # or use: npx wrangler ...
+wrangler login
+
+# 1. Create the D1 database, then paste the printed database_id into wrangler.toml.
+wrangler d1 create er-saves
+
+# 2. Apply the schema (run BOTH so local `wrangler dev` and prod match).
+wrangler d1 execute er-saves --file ./schema.sql            # local
+wrangler d1 execute er-saves --remote --file ./schema.sql   # production
+
+# 3. Set the token-signing secret (use a long random string, e.g. `openssl rand -hex 32`).
+wrangler secret put SESSION_SECRET
+
+# 4. Deploy
+wrangler deploy
+```
+
+`wrangler deploy` prints the Worker URL, e.g.
+`https://er-save-api.<your-subdomain>.workers.dev`.
+
+> **Keep `SESSION_SECRET` stable.** Rotating it invalidates every issued token, so
+> all players are silently logged out (their saves are untouched — they just log
+> back in). Never commit the real value.
+
+## Wire the game to it
+
+Set these build-time env vars (e.g. in `.env.standalone` / the Pages build env), then
+rebuild + redeploy the **client**:
+
+```
+VITE_SERVER_URL=https://er-save-api.<your-subdomain>.workers.dev
+VITE_BYPASS_LOGIN=0
+```
+
+- Leave `VITE_DISCORD_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` **unset** — the client
+  hides the Discord/Google login buttons when they're absent, so players see a
+  clean username/password login only.
+- With `VITE_BYPASS_LOGIN=1` (today's default) the game stays 100% local — this
+  Worker is ignored. So you can deploy the Worker first and flip the client later.
+
+### Migration safety
+
+Flipping `VITE_BYPASS_LOGIN=0` does **not** delete anyone's existing local save —
+it changes which `localStorage` key the game reads (`..._<username>` vs `..._Guest`).
+Existing players should use **Manage Data → Import** (or the in-game import flow,
+#227) once after creating an account to push their local progress to the cloud.
+Consider a one-time "import your old save" prompt before switching the default.
+
+## Local dev
+
+```bash
+wrangler dev      # serves on http://localhost:8787
+# point a local client build at VITE_SERVER_URL=http://localhost:8787 + VITE_BYPASS_LOGIN=0
+```

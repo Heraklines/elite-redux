@@ -38,3 +38,7 @@ interface ImportMetaEnv {
 interface ViteTypeOptions {
   strictImportMetaEnv: unknown;
 }
+
+// Elite Redux — per-build id stamped into the bundle by `build-id-plugin`
+// (auto-reload on new version). Compared against `/version.json` at runtime.
+declare const __BUILD_ID__: string;

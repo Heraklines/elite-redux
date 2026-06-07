@@ -68,6 +68,7 @@ export const sharedConfig: UserConfigFnPromise = async ({ mode }) => {
       (await import("./plugins/vite/namespaces-i18n-plugin")).LocaleNamespace(),
       (await import("unplugin-inline-enum/vite")).default({ scanDir: "src" }),
       (await import("./plugins/vite/llm-director-log-plugin")).llmDirectorLogPlugin(),
+      (await import("./plugins/vite/build-id-plugin")).buildIdPlugin(),
     ];
   }
   return opts;

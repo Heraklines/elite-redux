@@ -614,10 +614,13 @@ export class MenuUiHandler extends MessageUiHandler {
                 || o.label === i18next.t("menuUiHandler:unlinkDiscord"),
             )
           ) {
-            this.manageDataConfig.options.splice(
-              this.manageDataConfig.options.length - 1,
-              0,
-              {
+            // Elite Redux: only offer account-linking for OAuth providers that are
+            // actually configured. The ER deploy is username/password-only (no
+            // client ids), so without this guard "Link Discord/Google" would show
+            // and open broken `client_id=undefined` URLs.
+            const linkOptions: OptionSelectItem[] = [];
+            if (import.meta.env.VITE_DISCORD_CLIENT_ID) {
+              linkOptions.push({
                 label:
                   loggedInUser?.discordId === ""
                     ? i18next.t("menuUiHandler:linkDiscord")
@@ -636,8 +639,10 @@ export class MenuUiHandler extends MessageUiHandler {
                   });
                   return true;
                 },
-              },
-              {
+              });
+            }
+            if (import.meta.env.VITE_GOOGLE_CLIENT_ID) {
+              linkOptions.push({
                 label:
                   loggedInUser?.googleId === ""
                     ? i18next.t("menuUiHandler:linkGoogle")
@@ -656,8 +661,11 @@ export class MenuUiHandler extends MessageUiHandler {
                   });
                   return true;
                 },
-              },
-            );
+              });
+            }
+            if (linkOptions.length > 0) {
+              this.manageDataConfig.options.splice(this.manageDataConfig.options.length - 1, 0, ...linkOptions);
+            }
           }
           ui.setOverlayMode(UiMode.MENU_OPTION_SELECT, this.manageDataConfig);
           success = true;

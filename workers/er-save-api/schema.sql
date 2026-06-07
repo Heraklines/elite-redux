@@ -1,0 +1,42 @@
+-- SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+-- SPDX-License-Identifier: AGPL-3.0-only
+--
+-- Elite Redux — cloud-save D1 schema (#229).
+--
+-- Three tables back the username/password account + cloud-save system. Apply with:
+--   npx wrangler d1 execute er-saves --file ./schema.sql           (local)
+--   npx wrangler d1 execute er-saves --remote --file ./schema.sql  (production)
+
+-- One row per account. Passwords are stored ONLY as a PBKDF2 hash
+-- ("pbkdf2$<iterations>$<saltB64>$<hashB64>") — never in plaintext.
+CREATE TABLE IF NOT EXISTS users (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  username       TEXT    NOT NULL,                 -- display form (as typed)
+  username_lower TEXT    NOT NULL UNIQUE,          -- case-insensitive uniqueness key
+  password_hash  TEXT    NOT NULL,
+  is_admin       INTEGER NOT NULL DEFAULT 0,
+  created_at     INTEGER NOT NULL,                 -- epoch ms
+  last_login     INTEGER                           -- epoch ms, null until first login
+);
+
+-- One system save per user (pokedex, unlocks, eggs, vouchers, settings).
+-- `data` is the raw, client-encrypted save string exactly as the game sends it;
+-- the server treats it as an opaque blob.
+CREATE TABLE IF NOT EXISTS system_saves (
+  user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  data       TEXT    NOT NULL,
+  trainer_id INTEGER,
+  secret_id  INTEGER,
+  updated_at INTEGER NOT NULL
+);
+
+-- Up to 5 session (run) saves per user, one per slot. Composite PK keeps an
+-- UPSERT per (user, slot) cheap — one D1 write per sync, which is what keeps
+-- us inside the free-tier write budget.
+CREATE TABLE IF NOT EXISTS session_saves (
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  slot       INTEGER NOT NULL,
+  data       TEXT    NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, slot)
+);

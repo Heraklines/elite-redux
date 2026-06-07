@@ -79,4 +79,7 @@ try {
   console.error("Error loading fonts:", err);
 } finally {
   await startGame();
+  // Poll for new deploys so long-open tabs auto-reload onto the latest build
+  // (no-op in dev/test/app). Saves live in localStorage, so reloads are safe.
+  (await import("#init/init-update-checker")).startUpdateChecker();
 }
