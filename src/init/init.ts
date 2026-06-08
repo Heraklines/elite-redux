@@ -259,7 +259,7 @@ export function initializeGame() {
   // `speciesEggMoves` (vanilla only covers vanilla species).
   const eggMoveResult = initEliteReduxEggMoves();
   console.info(
-    `[er-egg-moves] registered egg moves for ${eggMoveResult.added} ER species (skipped ${eggMoveResult.alreadyPresent} already present + ${eggMoveResult.skippedUnmapped} unmapped)`,
+    `[er-egg-moves] applied egg-move table: ${eggMoveResult.added} new + ${eggMoveResult.alreadyPresent} overridden species (skipped ${eggMoveResult.skippedUnmapped} unmapped)`,
   );
 
   // Elite Redux: extend TM-learnable pool with each species's tutor moves.

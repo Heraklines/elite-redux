@@ -1,8 +1,18 @@
 [
   {
+    "const": "SPECIES_ABRA",
+    "name": "Abra",
+    "slug": "abra"
+  },
+  {
     "const": "SPECIES_ABRA_REDUX",
     "name": "Abra Redux",
     "slug": "abra_redux"
+  },
+  {
+    "const": "SPECIES_ABSOL",
+    "name": "Absol",
+    "slug": "absol"
   },
   {
     "const": "SPECIES_AEGISLASH_BLADE",
@@ -15,9 +25,109 @@
     "slug": "aegislash_blade_redux"
   },
   {
+    "const": "SPECIES_AERODACTYL",
+    "name": "Aerodactyl",
+    "slug": "aerodactyl"
+  },
+  {
+    "const": "SPECIES_AIPOM",
+    "name": "Aipom",
+    "slug": "aipom"
+  },
+  {
+    "const": "SPECIES_ALOLA_DIGLETT",
+    "name": "Alola Diglett",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_ALOLA_GEODUDE",
+    "name": "Alola Geodude",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_ALOLA_GRIMER",
+    "name": "Alola Grimer",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_ALOLA_MEOWTH",
+    "name": "Alola Meowth",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_ALOLA_RATTATA",
+    "name": "Alola Rattata",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_ALOLA_SANDSHREW",
+    "name": "Alola Sandshrew",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_ALOLA_VULPIX",
+    "name": "Alola Vulpix",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_ALOMOMOLA",
+    "name": "Alomomola",
+    "slug": "alomomola"
+  },
+  {
+    "const": "SPECIES_AMAURA",
+    "name": "Amaura",
+    "slug": "amaura"
+  },
+  {
+    "const": "SPECIES_ANORITH",
+    "name": "Anorith",
+    "slug": "anorith"
+  },
+  {
+    "const": "SPECIES_APPLIN",
+    "name": "Applin",
+    "slug": "applin"
+  },
+  {
+    "const": "SPECIES_ARCEUS",
+    "name": "Arceus",
+    "slug": "arceus"
+  },
+  {
+    "const": "SPECIES_ARCHEN",
+    "name": "Archen",
+    "slug": "archen"
+  },
+  {
+    "const": "SPECIES_ARCTOVISH",
+    "name": "Arctovish",
+    "slug": "arctovish"
+  },
+  {
+    "const": "SPECIES_ARCTOZOLT",
+    "name": "Arctozolt",
+    "slug": "arctozolt"
+  },
+  {
+    "const": "SPECIES_ARON",
+    "name": "Aron",
+    "slug": "aron"
+  },
+  {
     "const": "SPECIES_ARON_REDUX",
     "name": "Aron Redux",
     "slug": "aron_redux"
+  },
+  {
+    "const": "SPECIES_ARROKUDA",
+    "name": "Arrokuda",
+    "slug": "arrokuda"
+  },
+  {
+    "const": "SPECIES_ARTICUNO",
+    "name": "Articuno",
+    "slug": "articuno"
   },
   {
     "const": "SPECIES_ARTICUNO_EX",
@@ -30,9 +140,49 @@
     "slug": "greninja_ash"
   },
   {
+    "const": "SPECIES_AUDINO",
+    "name": "Audino",
+    "slug": "audino"
+  },
+  {
+    "const": "SPECIES_AXEW",
+    "name": "Axew",
+    "slug": "axew"
+  },
+  {
+    "const": "SPECIES_AZELF",
+    "name": "Azelf",
+    "slug": "azelf"
+  },
+  {
     "const": "SPECIES_AZELF_REDUX",
     "name": "Azelf Redux",
     "slug": "azelf_redux"
+  },
+  {
+    "const": "SPECIES_AZURILL",
+    "name": "Azurill",
+    "slug": "azurill"
+  },
+  {
+    "const": "SPECIES_BAGON",
+    "name": "Bagon",
+    "slug": "bagon"
+  },
+  {
+    "const": "SPECIES_BALTOY",
+    "name": "Baltoy",
+    "slug": "baltoy"
+  },
+  {
+    "const": "SPECIES_BARBOACH",
+    "name": "Barboach",
+    "slug": "barboach"
+  },
+  {
+    "const": "SPECIES_BASCULIN",
+    "name": "Basculin",
+    "slug": "basculin"
   },
   {
     "const": "SPECIES_BASCULIN_BLUE_STRIPED",
@@ -45,14 +195,54 @@
     "slug": "basculin_whitestriped"
   },
   {
+    "const": "SPECIES_BELDUM",
+    "name": "Beldum",
+    "slug": "beldum"
+  },
+  {
+    "const": "SPECIES_BELLSPROUT",
+    "name": "Bellsprout",
+    "slug": "bellsprout"
+  },
+  {
     "const": "SPECIES_BELLSPROUT_REDUX",
     "name": "Bellsprout Redux",
     "slug": "bellsprout_redux"
   },
   {
+    "const": "SPECIES_BERGMITE",
+    "name": "Bergmite",
+    "slug": "bergmite"
+  },
+  {
     "const": "SPECIES_BEWEAR_ANGRY",
     "name": "Bewear Angry",
     "slug": "bewear_angry"
+  },
+  {
+    "const": "SPECIES_BIDOOF",
+    "name": "Bidoof",
+    "slug": "bidoof"
+  },
+  {
+    "const": "SPECIES_BINACLE",
+    "name": "Binacle",
+    "slug": "binacle"
+  },
+  {
+    "const": "SPECIES_BLACEPHALON",
+    "name": "Blacephalon",
+    "slug": "blacephalon"
+  },
+  {
+    "const": "SPECIES_BLIPBUG",
+    "name": "Blipbug",
+    "slug": "blipbug"
+  },
+  {
+    "const": "SPECIES_BLITZLE",
+    "name": "Blitzle",
+    "slug": "blitzle"
   },
   {
     "const": "SPECIES_BLIZZARD_MAW",
@@ -65,9 +255,34 @@
     "slug": "blocli"
   },
   {
+    "const": "SPECIES_BLOODMOON_URSALUNA",
+    "name": "Bloodmoon Ursaluna",
+    "slug": null
+  },
+  {
     "const": "SPECIES_DARMANITAN_REDUX_BLUNDER",
     "name": "Blunder-Darmanitan",
     "slug": "darmanitan_redux_blunder"
+  },
+  {
+    "const": "SPECIES_BOMBIRDIER",
+    "name": "Bombirdier",
+    "slug": "bombirdier"
+  },
+  {
+    "const": "SPECIES_BONSLY",
+    "name": "Bonsly",
+    "slug": "bonsly"
+  },
+  {
+    "const": "SPECIES_BOUFFALANT",
+    "name": "Bouffalant",
+    "slug": "bouffalant"
+  },
+  {
+    "const": "SPECIES_BOUNSWEET",
+    "name": "Bounsweet",
+    "slug": "bounsweet"
   },
   {
     "const": "SPECIES_BOUNSWEET_REDUX",
@@ -75,14 +290,64 @@
     "slug": "bounsweet_redux"
   },
   {
+    "const": "SPECIES_BRAMBLIN",
+    "name": "Bramblin",
+    "slug": "bramblin"
+  },
+  {
+    "const": "SPECIES_BRONZOR",
+    "name": "Bronzor",
+    "slug": "bronzor"
+  },
+  {
+    "const": "SPECIES_BRUTE_BONNET",
+    "name": "Brute Bonnet",
+    "slug": "brute_bonnet"
+  },
+  {
+    "const": "SPECIES_BRUXISH",
+    "name": "Bruxish",
+    "slug": "bruxish"
+  },
+  {
     "const": "SPECIES_BUBBLEO",
     "name": "Bubbleo",
     "slug": "bubbleo"
   },
   {
+    "const": "SPECIES_BUDEW",
+    "name": "Budew",
+    "slug": "budew"
+  },
+  {
+    "const": "SPECIES_BUIZEL",
+    "name": "Buizel",
+    "slug": "buizel"
+  },
+  {
     "const": "SPECIES_BUIZEL_REDUX",
     "name": "Buizel Redux",
     "slug": "buizel_redux"
+  },
+  {
+    "const": "SPECIES_BULBASAUR",
+    "name": "Bulbasaur",
+    "slug": "bulbasaur"
+  },
+  {
+    "const": "SPECIES_BUNEARY",
+    "name": "Buneary",
+    "slug": "buneary"
+  },
+  {
+    "const": "SPECIES_BUNNELBY",
+    "name": "Bunnelby",
+    "slug": "bunnelby"
+  },
+  {
+    "const": "SPECIES_BURMY",
+    "name": "Burmy",
+    "slug": "burmy"
   },
   {
     "const": "SPECIES_BURMY_ETERNA",
@@ -100,6 +365,21 @@
     "slug": "burmy_trash_cloak"
   },
   {
+    "const": "SPECIES_BUZZWOLE",
+    "name": "Buzzwole",
+    "slug": "buzzwole"
+  },
+  {
+    "const": "SPECIES_CACNEA",
+    "name": "Cacnea",
+    "slug": "cacnea"
+  },
+  {
+    "const": "SPECIES_CALYREX",
+    "name": "Calyrex",
+    "slug": "calyrex"
+  },
+  {
     "const": "SPECIES_CALYREX_CLOUD_RIDER",
     "name": "Calyrex Cloud Rider",
     "slug": "calyrex_cloud_rider"
@@ -113,6 +393,31 @@
     "const": "SPECIES_CALYREX_SHADOW_RIDER",
     "name": "Calyrex Shadow Rider",
     "slug": "calyrex_shadow_rider"
+  },
+  {
+    "const": "SPECIES_CAPSAKID",
+    "name": "Capsakid",
+    "slug": "capsakid"
+  },
+  {
+    "const": "SPECIES_CARBINK",
+    "name": "Carbink",
+    "slug": "carbink"
+  },
+  {
+    "const": "SPECIES_CARNIVINE",
+    "name": "Carnivine",
+    "slug": "carnivine"
+  },
+  {
+    "const": "SPECIES_CARVANHA",
+    "name": "Carvanha",
+    "slug": "carvanha"
+  },
+  {
+    "const": "SPECIES_CASTFORM",
+    "name": "Castform",
+    "slug": "castform"
   },
   {
     "const": "SPECIES_CASTFORM_FOGGY",
@@ -140,9 +445,44 @@
     "slug": "castform_sunny"
   },
   {
+    "const": "SPECIES_CATERPIE",
+    "name": "Caterpie",
+    "slug": "caterpie"
+  },
+  {
+    "const": "SPECIES_CELEBI",
+    "name": "Celebi",
+    "slug": "celebi"
+  },
+  {
+    "const": "SPECIES_CELESTEELA",
+    "name": "Celesteela",
+    "slug": "celesteela"
+  },
+  {
+    "const": "SPECIES_CETODDLE",
+    "name": "Cetoddle",
+    "slug": "cetoddle"
+  },
+  {
     "const": "SPECIES_CETODDLE_REDUX",
     "name": "Cetoddle Redux",
     "slug": "cetoddle_redux"
+  },
+  {
+    "const": "SPECIES_CHARCADET",
+    "name": "Charcadet",
+    "slug": "charcadet"
+  },
+  {
+    "const": "SPECIES_CHARMANDER",
+    "name": "Charmander",
+    "slug": "charmander"
+  },
+  {
+    "const": "SPECIES_CHATOT",
+    "name": "Chatot",
+    "slug": "chatot"
   },
   {
     "const": "SPECIES_CHERRIM_SUNSHINE",
@@ -150,14 +490,74 @@
     "slug": "cherrim_sunshine"
   },
   {
+    "const": "SPECIES_CHERUBI",
+    "name": "Cherubi",
+    "slug": "cherubi"
+  },
+  {
     "const": "SPECIES_CHESNAUGHT_BATTLE_BOND",
     "name": "Chesnaught Battle Bond",
     "slug": "chesnaught_battle_bond"
   },
   {
+    "const": "SPECIES_CHESPIN",
+    "name": "Chespin",
+    "slug": "chespin"
+  },
+  {
+    "const": "SPECIES_CHEWTLE",
+    "name": "Chewtle",
+    "slug": "chewtle"
+  },
+  {
+    "const": "SPECIES_CHI_YU",
+    "name": "Chi Yu",
+    "slug": "chi_yu"
+  },
+  {
+    "const": "SPECIES_CHIEN_PAO",
+    "name": "Chien Pao",
+    "slug": "chien_pao"
+  },
+  {
+    "const": "SPECIES_CHIKORITA",
+    "name": "Chikorita",
+    "slug": "chikorita"
+  },
+  {
+    "const": "SPECIES_CHIMCHAR",
+    "name": "Chimchar",
+    "slug": "chimchar"
+  },
+  {
     "const": "SPECIES_CHIMCHAR_REDUX",
     "name": "Chimchar Redux",
     "slug": "chimchar_redux"
+  },
+  {
+    "const": "SPECIES_CHINCHOU",
+    "name": "Chinchou",
+    "slug": "chinchou"
+  },
+  {
+    "const": "SPECIES_CHINGLING",
+    "name": "Chingling",
+    "slug": "chingling"
+  },
+  {
+    "const": "SPECIES_CLAMPERL",
+    "name": "Clamperl",
+    "slug": "clamperl"
+  },
+  {
+    "const": "SPECIES_CLAUNCHER",
+    "name": "Clauncher",
+    "slug": "clauncher"
+  },
+  {
+    "const": "SPECIES_CLEFFA",
+    "name": "Cleffa",
+    "slug": "cleffa"
   },
   {
     "const": "SPECIES_CLEFFA_REDUX",
@@ -170,6 +570,26 @@
     "slug": "chesnaught_clemont"
   },
   {
+    "const": "SPECIES_CLOBBOPUS",
+    "name": "Clobbopus",
+    "slug": "clobbopus"
+  },
+  {
+    "const": "SPECIES_COBALION",
+    "name": "Cobalion",
+    "slug": "cobalion"
+  },
+  {
+    "const": "SPECIES_COMBEE",
+    "name": "Combee",
+    "slug": "combee"
+  },
+  {
+    "const": "SPECIES_COMFEY",
+    "name": "Comfey",
+    "slug": "comfey"
+  },
+  {
     "const": "SPECIES_CORM",
     "name": "Corm",
     "slug": "corm"
@@ -178,6 +598,31 @@
     "const": "SPECIES_HARVESTING_TYRANT",
     "name": "Corn Tyrant",
     "slug": "harvesting_tyrant"
+  },
+  {
+    "const": "SPECIES_CORPHISH",
+    "name": "Corphish",
+    "slug": "corphish"
+  },
+  {
+    "const": "SPECIES_CORSOLA",
+    "name": "Corsola",
+    "slug": "corsola"
+  },
+  {
+    "const": "SPECIES_COSMOG",
+    "name": "Cosmog",
+    "slug": "cosmog"
+  },
+  {
+    "const": "SPECIES_COTTONEE",
+    "name": "Cottonee",
+    "slug": "cottonee"
+  },
+  {
+    "const": "SPECIES_CRABRAWLER",
+    "name": "Crabrawler",
+    "slug": "crabrawler"
   },
   {
     "const": "SPECIES_CRABRAWLER_REDUX",
@@ -190,6 +635,11 @@
     "slug": "jagged_chungulis"
   },
   {
+    "const": "SPECIES_CRAMORANT",
+    "name": "Cramorant",
+    "slug": "cramorant"
+  },
+  {
     "const": "SPECIES_CRAMORANT_GORGING",
     "name": "Cramorant Gorging",
     "slug": "cramorant_gorging"
@@ -198,6 +648,61 @@
     "const": "SPECIES_CRAMORANT_GULPING",
     "name": "Cramorant Gulping",
     "slug": "cramorant_gulping"
+  },
+  {
+    "const": "SPECIES_CRANIDOS",
+    "name": "Cranidos",
+    "slug": "cranidos"
+  },
+  {
+    "const": "SPECIES_CRESSELIA",
+    "name": "Cresselia",
+    "slug": "cresselia"
+  },
+  {
+    "const": "SPECIES_CROAGUNK",
+    "name": "Croagunk",
+    "slug": "croagunk"
+  },
+  {
+    "const": "SPECIES_CRYOGONAL",
+    "name": "Cryogonal",
+    "slug": "cryogonal"
+  },
+  {
+    "const": "SPECIES_CUBCHOO",
+    "name": "Cubchoo",
+    "slug": "cubchoo"
+  },
+  {
+    "const": "SPECIES_CUBONE",
+    "name": "Cubone",
+    "slug": "cubone"
+  },
+  {
+    "const": "SPECIES_CUFANT",
+    "name": "Cufant",
+    "slug": "cufant"
+  },
+  {
+    "const": "SPECIES_CUTIEFLY",
+    "name": "Cutiefly",
+    "slug": "cutiefly"
+  },
+  {
+    "const": "SPECIES_CYCLIZAR",
+    "name": "Cyclizar",
+    "slug": "cyclizar"
+  },
+  {
+    "const": "SPECIES_CYNDAQUIL",
+    "name": "Cyndaquil",
+    "slug": "cyndaquil"
+  },
+  {
+    "const": "SPECIES_DARKRAI",
+    "name": "Darkrai",
+    "slug": "darkrai"
   },
   {
     "const": "SPECIES_DARKRAI_NIGHTMARE",
@@ -225,9 +730,24 @@
     "slug": "darmanitan_zen_mode_galarian"
   },
   {
+    "const": "SPECIES_DARUMAKA",
+    "name": "Darumaka",
+    "slug": "darumaka"
+  },
+  {
     "const": "SPECIES_DARUMAKA_REDUX",
     "name": "Darumaka Redux",
     "slug": "darumaka_redux"
+  },
+  {
+    "const": "SPECIES_DEDENNE",
+    "name": "Dedenne",
+    "slug": "dedenne"
+  },
+  {
+    "const": "SPECIES_DEERLING",
+    "name": "Deerling",
+    "slug": "deerling"
   },
   {
     "const": "SPECIES_DEERLING_AUTUMN",
@@ -245,9 +765,24 @@
     "slug": "deerling_winter"
   },
   {
+    "const": "SPECIES_DEINO",
+    "name": "Deino",
+    "slug": "deino"
+  },
+  {
     "const": "SPECIES_DEINO_REDUX",
     "name": "Deino Redux",
     "slug": "deino_redux"
+  },
+  {
+    "const": "SPECIES_DELIBIRD",
+    "name": "Delibird",
+    "slug": "delibird"
+  },
+  {
+    "const": "SPECIES_DEOXYS",
+    "name": "Deoxys",
+    "slug": "deoxys"
   },
   {
     "const": "SPECIES_DEOXYS_ATTACK",
@@ -265,9 +800,44 @@
     "slug": "deoxys_speed"
   },
   {
+    "const": "SPECIES_DEWPIDER",
+    "name": "Dewpider",
+    "slug": "dewpider"
+  },
+  {
     "const": "SPECIES_DEWPIDER_REDUX",
     "name": "Dewpider Redux",
     "slug": "dewpider_redux"
+  },
+  {
+    "const": "SPECIES_DHELMISE",
+    "name": "Dhelmise",
+    "slug": "dhelmise"
+  },
+  {
+    "const": "SPECIES_DIALGA",
+    "name": "Dialga",
+    "slug": "dialga"
+  },
+  {
+    "const": "SPECIES_DIANCIE",
+    "name": "Diancie",
+    "slug": "diancie"
+  },
+  {
+    "const": "SPECIES_DIGLETT",
+    "name": "Diglett",
+    "slug": "diglett"
+  },
+  {
+    "const": "SPECIES_DITTO",
+    "name": "Ditto",
+    "slug": "ditto"
+  },
+  {
+    "const": "SPECIES_DODUO",
+    "name": "Doduo",
+    "slug": "doduo"
   },
   {
     "const": "SPECIES_DODUO_REDUX",
@@ -275,9 +845,49 @@
     "slug": "doduo_redux"
   },
   {
+    "const": "SPECIES_DONDOZO",
+    "name": "Dondozo",
+    "slug": "dondozo"
+  },
+  {
+    "const": "SPECIES_DRACOVISH",
+    "name": "Dracovish",
+    "slug": "dracovish"
+  },
+  {
+    "const": "SPECIES_DRACOZOLT",
+    "name": "Dracozolt",
+    "slug": "dracozolt"
+  },
+  {
     "const": "SPECIES_DRAGONITE_DELIVERY",
     "name": "Dragonite Delivery",
     "slug": "dragonite_delivery"
+  },
+  {
+    "const": "SPECIES_DRAMPA",
+    "name": "Drampa",
+    "slug": "drampa"
+  },
+  {
+    "const": "SPECIES_DRATINI",
+    "name": "Dratini",
+    "slug": "dratini"
+  },
+  {
+    "const": "SPECIES_DREEPY",
+    "name": "Dreepy",
+    "slug": "dreepy"
+  },
+  {
+    "const": "SPECIES_DRIFLOON",
+    "name": "Drifloon",
+    "slug": "drifloon"
+  },
+  {
+    "const": "SPECIES_DRILBUR",
+    "name": "Drilbur",
+    "slug": "drilbur"
   },
   {
     "const": "SPECIES_DRILBUR_REDUX",
@@ -285,9 +895,59 @@
     "slug": "drilbur_redux"
   },
   {
+    "const": "SPECIES_DROWZEE",
+    "name": "Drowzee",
+    "slug": "drowzee"
+  },
+  {
+    "const": "SPECIES_DRUDDIGON",
+    "name": "Druddigon",
+    "slug": "druddigon"
+  },
+  {
+    "const": "SPECIES_DUCKLETT",
+    "name": "Ducklett",
+    "slug": "ducklett"
+  },
+  {
+    "const": "SPECIES_DUNSPARCE",
+    "name": "Dunsparce",
+    "slug": "dunsparce"
+  },
+  {
+    "const": "SPECIES_DURALUDON",
+    "name": "Duraludon",
+    "slug": "duraludon"
+  },
+  {
+    "const": "SPECIES_DURANT",
+    "name": "Durant",
+    "slug": "durant"
+  },
+  {
+    "const": "SPECIES_DUSKULL",
+    "name": "Duskull",
+    "slug": "duskull"
+  },
+  {
+    "const": "SPECIES_DWEBBLE",
+    "name": "Dwebble",
+    "slug": "dwebble"
+  },
+  {
+    "const": "SPECIES_EEVEE",
+    "name": "Eevee",
+    "slug": "eevee"
+  },
+  {
     "const": "SPECIES_EEVEE_PARTNER",
     "name": "Eevee Partner",
     "slug": "eevee_partner"
+  },
+  {
+    "const": "SPECIES_EISCUE",
+    "name": "Eiscue",
+    "slug": "eiscue"
   },
   {
     "const": "SPECIES_EISCUE_NOICE_FACE",
@@ -295,9 +955,64 @@
     "slug": "eiscue_noice_face"
   },
   {
+    "const": "SPECIES_EKANS",
+    "name": "Ekans",
+    "slug": "ekans"
+  },
+  {
+    "const": "SPECIES_ELECTRIKE",
+    "name": "Electrike",
+    "slug": "electrike"
+  },
+  {
+    "const": "SPECIES_ELEKID",
+    "name": "Elekid",
+    "slug": "elekid"
+  },
+  {
+    "const": "SPECIES_ELGYEM",
+    "name": "Elgyem",
+    "slug": "elgyem"
+  },
+  {
+    "const": "SPECIES_EMOLGA",
+    "name": "Emolga",
+    "slug": "emolga"
+  },
+  {
+    "const": "SPECIES_ENAMORUS",
+    "name": "Enamorus",
+    "slug": "enamorus"
+  },
+  {
     "const": "SPECIES_ENAMORUS_THERIAN",
     "name": "Enamorus Therian",
     "slug": "enamorus_therian"
+  },
+  {
+    "const": "SPECIES_ENTEI",
+    "name": "Entei",
+    "slug": "entei"
+  },
+  {
+    "const": "SPECIES_ESPURR",
+    "name": "Espurr",
+    "slug": "espurr"
+  },
+  {
+    "const": "SPECIES_ETERNAL_FLOETTE",
+    "name": "Eternal Floette",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_ETERNATUS",
+    "name": "Eternatus",
+    "slug": "eternatus"
+  },
+  {
+    "const": "SPECIES_EXEGGCUTE",
+    "name": "Exeggcute",
+    "slug": "exeggcute"
   },
   {
     "const": "SPECIES_EXEGGCUTE_REDUX",
@@ -305,9 +1020,79 @@
     "slug": "exeggcute_redux"
   },
   {
+    "const": "SPECIES_FALINKS",
+    "name": "Falinks",
+    "slug": "falinks"
+  },
+  {
+    "const": "SPECIES_FARFETCHD",
+    "name": "Farfetch'd",
+    "slug": "farfetchd"
+  },
+  {
+    "const": "SPECIES_FEEBAS",
+    "name": "Feebas",
+    "slug": "feebas"
+  },
+  {
+    "const": "SPECIES_FENNEKIN",
+    "name": "Fennekin",
+    "slug": "fennekin"
+  },
+  {
+    "const": "SPECIES_FERROSEED",
+    "name": "Ferroseed",
+    "slug": "ferroseed"
+  },
+  {
+    "const": "SPECIES_FEZANDIPITI",
+    "name": "Fezandipiti",
+    "slug": "fezandipiti"
+  },
+  {
+    "const": "SPECIES_FIDOUGH",
+    "name": "Fidough",
+    "slug": "fidough"
+  },
+  {
+    "const": "SPECIES_FINIZEN",
+    "name": "Finizen",
+    "slug": "finizen"
+  },
+  {
+    "const": "SPECIES_FINNEON",
+    "name": "Finneon",
+    "slug": "finneon"
+  },
+  {
+    "const": "SPECIES_FLABEBE",
+    "name": "Flabébé",
+    "slug": "flabebe"
+  },
+  {
+    "const": "SPECIES_FLAMIGO",
+    "name": "Flamigo",
+    "slug": "flamigo"
+  },
+  {
+    "const": "SPECIES_FLETCHLING",
+    "name": "Fletchling",
+    "slug": "fletchling"
+  },
+  {
+    "const": "SPECIES_FLITTLE",
+    "name": "Flittle",
+    "slug": "flittle"
+  },
+  {
     "const": "SPECIES_FLOETTE_ETERNAL_FLOWER",
     "name": "Floette Eternal Flower",
     "slug": "floette_eternal_flower"
+  },
+  {
+    "const": "SPECIES_FLUTTER_MANE",
+    "name": "Flutter Mane",
+    "slug": "flutter_mane"
   },
   {
     "const": "SPECIES_FOGGING",
@@ -315,9 +1100,129 @@
     "slug": "fogging"
   },
   {
+    "const": "SPECIES_FOMANTIS",
+    "name": "Fomantis",
+    "slug": "fomantis"
+  },
+  {
+    "const": "SPECIES_FOONGUS",
+    "name": "Foongus",
+    "slug": "foongus"
+  },
+  {
+    "const": "SPECIES_FRIGIBAX",
+    "name": "Frigibax",
+    "slug": "frigibax"
+  },
+  {
+    "const": "SPECIES_FRILLISH",
+    "name": "Frillish",
+    "slug": "frillish"
+  },
+  {
+    "const": "SPECIES_FROAKIE",
+    "name": "Froakie",
+    "slug": "froakie"
+  },
+  {
+    "const": "SPECIES_FUECOCO",
+    "name": "Fuecoco",
+    "slug": "fuecoco"
+  },
+  {
+    "const": "SPECIES_FURFROU",
+    "name": "Furfrou",
+    "slug": "furfrou"
+  },
+  {
+    "const": "SPECIES_GALAR_ARTICUNO",
+    "name": "Galar Articuno",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_GALAR_CORSOLA",
+    "name": "Galar Corsola",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_GALAR_DARUMAKA",
+    "name": "Galar Darumaka",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_GALAR_FARFETCHD",
+    "name": "Galar Farfetchd",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_GALAR_MEOWTH",
+    "name": "Galar Meowth",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_GALAR_MOLTRES",
+    "name": "Galar Moltres",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_GALAR_PONYTA",
+    "name": "Galar Ponyta",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_GALAR_SLOWPOKE",
+    "name": "Galar Slowpoke",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_GALAR_STUNFISK",
+    "name": "Galar Stunfisk",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_GALAR_YAMASK",
+    "name": "Galar Yamask",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_GALAR_ZAPDOS",
+    "name": "Galar Zapdos",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_GALAR_ZIGZAGOON",
+    "name": "Galar Zigzagoon",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_GASTLY",
+    "name": "Gastly",
+    "slug": "gastly"
+  },
+  {
+    "const": "SPECIES_GENESECT",
+    "name": "Genesect",
+    "slug": "genesect"
+  },
+  {
+    "const": "SPECIES_GEODUDE",
+    "name": "Geodude",
+    "slug": "geodude"
+  },
+  {
+    "const": "SPECIES_GIBLE",
+    "name": "Gible",
+    "slug": "gible"
+  },
+  {
     "const": "SPECIES_GIBLE_REDUX",
     "name": "Gible Redux",
     "slug": "gible_redux"
+  },
+  {
+    "const": "SPECIES_GIMMIGHOUL",
+    "name": "Gimmighoul",
+    "slug": "gimmighoul"
   },
   {
     "const": "SPECIES_GIMMIGHOUL_ROAMING",
@@ -325,14 +1230,94 @@
     "slug": "gimmighoul_roaming"
   },
   {
+    "const": "SPECIES_GIRAFARIG",
+    "name": "Girafarig",
+    "slug": "girafarig"
+  },
+  {
+    "const": "SPECIES_GIRATINA",
+    "name": "Giratina",
+    "slug": "giratina"
+  },
+  {
+    "const": "SPECIES_GLAMEOW",
+    "name": "Glameow",
+    "slug": "glameow"
+  },
+  {
+    "const": "SPECIES_GLASTRIER",
+    "name": "Glastrier",
+    "slug": "glastrier"
+  },
+  {
+    "const": "SPECIES_GLIGAR",
+    "name": "Gligar",
+    "slug": "gligar"
+  },
+  {
     "const": "SPECIES_GLIGAR_REDUX",
     "name": "Gligar Redux",
     "slug": "gligar_redux"
   },
   {
+    "const": "SPECIES_GLIMMET",
+    "name": "Glimmet",
+    "slug": "glimmet"
+  },
+  {
+    "const": "SPECIES_GOLDEEN",
+    "name": "Goldeen",
+    "slug": "goldeen"
+  },
+  {
+    "const": "SPECIES_GOLETT",
+    "name": "Golett",
+    "slug": "golett"
+  },
+  {
+    "const": "SPECIES_GOOMY",
+    "name": "Goomy",
+    "slug": "goomy"
+  },
+  {
+    "const": "SPECIES_GOSSIFLEUR",
+    "name": "Gossifleur",
+    "slug": "gossifleur"
+  },
+  {
+    "const": "SPECIES_GOTHITA",
+    "name": "Gothita",
+    "slug": "gothita"
+  },
+  {
+    "const": "SPECIES_GOUGING_FIRE",
+    "name": "Gouging Fire",
+    "slug": "gouging_fire"
+  },
+  {
+    "const": "SPECIES_GREAT_TUSK",
+    "name": "Great Tusk",
+    "slug": "great_tusk"
+  },
+  {
+    "const": "SPECIES_GREAVARD",
+    "name": "Greavard",
+    "slug": "greavard"
+  },
+  {
     "const": "SPECIES_GRENINJA_BATTLE_BOND",
     "name": "Greninja Battle Bond",
     "slug": "greninja_battle_bond"
+  },
+  {
+    "const": "SPECIES_GRIMER",
+    "name": "Grimer",
+    "slug": "grimer"
+  },
+  {
+    "const": "SPECIES_GROOKEY",
+    "name": "Grookey",
+    "slug": "grookey"
   },
   {
     "const": "SPECIES_GROTOM",
@@ -365,9 +1350,39 @@
     "slug": "grotom_roll"
   },
   {
+    "const": "SPECIES_GROUDON",
+    "name": "Groudon",
+    "slug": "groudon"
+  },
+  {
+    "const": "SPECIES_GROWLITHE",
+    "name": "Growlithe",
+    "slug": "growlithe"
+  },
+  {
     "const": "SPECIES_GROWLITHE_REDUX",
     "name": "Growlithe Redux",
     "slug": "growlithe_redux"
+  },
+  {
+    "const": "SPECIES_GRUBBIN",
+    "name": "Grubbin",
+    "slug": "grubbin"
+  },
+  {
+    "const": "SPECIES_GULPIN",
+    "name": "Gulpin",
+    "slug": "gulpin"
+  },
+  {
+    "const": "SPECIES_GUZZLORD",
+    "name": "Guzzlord",
+    "slug": "guzzlord"
+  },
+  {
+    "const": "SPECIES_HAPPINY",
+    "name": "Happiny",
+    "slug": "happiny"
   },
   {
     "const": "SPECIES_HAPPINY_REDUX",
@@ -375,9 +1390,44 @@
     "slug": "happiny_redux"
   },
   {
+    "const": "SPECIES_HATENNA",
+    "name": "Hatenna",
+    "slug": "hatenna"
+  },
+  {
+    "const": "SPECIES_HAWLUCHA",
+    "name": "Hawlucha",
+    "slug": "hawlucha"
+  },
+  {
+    "const": "SPECIES_HEATMOR",
+    "name": "Heatmor",
+    "slug": "heatmor"
+  },
+  {
+    "const": "SPECIES_HEATRAN",
+    "name": "Heatran",
+    "slug": "heatran"
+  },
+  {
+    "const": "SPECIES_HELIOPTILE",
+    "name": "Helioptile",
+    "slug": "helioptile"
+  },
+  {
     "const": "SPECIES_HERACREUS",
     "name": "Heracreus",
     "slug": "heracreus"
+  },
+  {
+    "const": "SPECIES_HERACROSS",
+    "name": "Heracross",
+    "slug": "heracross"
+  },
+  {
+    "const": "SPECIES_HIPPOPOTAS",
+    "name": "Hippopotas",
+    "slug": "hippopotas"
   },
   {
     "const": "SPECIES_HIPPOPOTATO",
@@ -385,9 +1435,49 @@
     "slug": "hippopotato"
   },
   {
+    "const": "SPECIES_HISUI_GROWLITHE",
+    "name": "Hisui Growlithe",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_HISUI_QWILFISH",
+    "name": "Hisui Qwilfish",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_HISUI_SNEASEL",
+    "name": "Hisui Sneasel",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_HISUI_VOLTORB",
+    "name": "Hisui Voltorb",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_HISUI_ZORUA",
+    "name": "Hisui Zorua",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_HO_OH",
+    "name": "Ho-Oh",
+    "slug": "ho_oh"
+  },
+  {
+    "const": "SPECIES_HONEDGE",
+    "name": "Honedge",
+    "slug": "honedge"
+  },
+  {
     "const": "SPECIES_HONEDGE_REDUX",
     "name": "Honedge Redux",
     "slug": "honedge_redux"
+  },
+  {
+    "const": "SPECIES_HOOPA",
+    "name": "Hoopa",
+    "slug": "hoopa"
   },
   {
     "const": "SPECIES_HOOPA_UNBOUND",
@@ -395,9 +1485,49 @@
     "slug": "hoopa_unbound"
   },
   {
+    "const": "SPECIES_HOOTHOOT",
+    "name": "Hoothoot",
+    "slug": "hoothoot"
+  },
+  {
+    "const": "SPECIES_HOPPIP",
+    "name": "Hoppip",
+    "slug": "hoppip"
+  },
+  {
+    "const": "SPECIES_HORSEA",
+    "name": "Horsea",
+    "slug": "horsea"
+  },
+  {
+    "const": "SPECIES_HOUNDOUR",
+    "name": "Houndour",
+    "slug": "houndour"
+  },
+  {
     "const": "SPECIES_HOUNDOUR_REDUX",
     "name": "Houndour Redux",
     "slug": "houndour_redux"
+  },
+  {
+    "const": "SPECIES_IGGLYBUFF",
+    "name": "Igglybuff",
+    "slug": "igglybuff"
+  },
+  {
+    "const": "SPECIES_ILLUMISE",
+    "name": "Illumise",
+    "slug": "illumise"
+  },
+  {
+    "const": "SPECIES_IMPIDIMP",
+    "name": "Impidimp",
+    "slug": "impidimp"
+  },
+  {
+    "const": "SPECIES_INDEEDEE",
+    "name": "Indeedee",
+    "slug": "indeedee"
   },
   {
     "const": "SPECIES_INDEEDEE_FEMALE",
@@ -405,9 +1535,29 @@
     "slug": "indeedee_female"
   },
   {
+    "const": "SPECIES_INKAY",
+    "name": "Inkay",
+    "slug": "inkay"
+  },
+  {
+    "const": "SPECIES_IRON_BOULDER",
+    "name": "Iron Boulder",
+    "slug": "iron_boulder"
+  },
+  {
+    "const": "SPECIES_IRON_BUNDLE",
+    "name": "Iron Bundle",
+    "slug": "iron_bundle"
+  },
+  {
     "const": "SPECIES_IRON_CARAPACE",
     "name": "Iron Carapace",
     "slug": "iron_carapace"
+  },
+  {
+    "const": "SPECIES_IRON_CROWN",
+    "name": "Iron Crown",
+    "slug": "iron_crown"
   },
   {
     "const": "SPECIES_IRON_EXO",
@@ -415,9 +1565,29 @@
     "slug": "iron_exo"
   },
   {
+    "const": "SPECIES_IRON_HANDS",
+    "name": "Iron Hands",
+    "slug": "iron_hands"
+  },
+  {
     "const": "SPECIES_LEDIAN_PARADOX",
     "name": "Iron Heart",
     "slug": "ledian_paradox"
+  },
+  {
+    "const": "SPECIES_IRON_JUGULIS",
+    "name": "Iron Jugulis",
+    "slug": "iron_jugulis"
+  },
+  {
+    "const": "SPECIES_IRON_LEAVES",
+    "name": "Iron Leaves",
+    "slug": "iron_leaves"
+  },
+  {
+    "const": "SPECIES_IRON_MOTH",
+    "name": "Iron Moth",
+    "slug": "iron_moth"
   },
   {
     "const": "SPECIES_IRON_PALETTE",
@@ -440,9 +1610,59 @@
     "slug": "iron_spirals"
   },
   {
+    "const": "SPECIES_IRON_THORNS",
+    "name": "Iron Thorns",
+    "slug": "iron_thorns"
+  },
+  {
+    "const": "SPECIES_IRON_TREADS",
+    "name": "Iron Treads",
+    "slug": "iron_treads"
+  },
+  {
+    "const": "SPECIES_IRON_VALIANT",
+    "name": "Iron Valiant",
+    "slug": "iron_valiant"
+  },
+  {
     "const": "SPECIES_IRON_VOCA",
     "name": "Iron Voca",
     "slug": "iron_voca"
+  },
+  {
+    "const": "SPECIES_JANGMO_O",
+    "name": "Jangmo-o",
+    "slug": "jangmo_o"
+  },
+  {
+    "const": "SPECIES_JIRACHI",
+    "name": "Jirachi",
+    "slug": "jirachi"
+  },
+  {
+    "const": "SPECIES_JOLTIK",
+    "name": "Joltik",
+    "slug": "joltik"
+  },
+  {
+    "const": "SPECIES_KABUTO",
+    "name": "Kabuto",
+    "slug": "kabuto"
+  },
+  {
+    "const": "SPECIES_KANGASKHAN",
+    "name": "Kangaskhan",
+    "slug": "kangaskhan"
+  },
+  {
+    "const": "SPECIES_KARRABLAST",
+    "name": "Karrablast",
+    "slug": "karrablast"
+  },
+  {
+    "const": "SPECIES_KARTANA",
+    "name": "Kartana",
+    "slug": "kartana"
   },
   {
     "const": "SPECIES_KARTANA_FALLEN",
@@ -450,9 +1670,19 @@
     "slug": "kartana_fallen"
   },
   {
+    "const": "SPECIES_KECLEON",
+    "name": "Kecleon",
+    "slug": "kecleon"
+  },
+  {
     "const": "SPECIES_KECLEONG",
     "name": "Kecleong",
     "slug": "kecleong"
+  },
+  {
+    "const": "SPECIES_KELDEO",
+    "name": "Keldeo",
+    "slug": "keldeo"
   },
   {
     "const": "SPECIES_KELDEO_RESOLUTE",
@@ -465,14 +1695,69 @@
     "slug": "kipmodo"
   },
   {
+    "const": "SPECIES_KLAWF",
+    "name": "Klawf",
+    "slug": "klawf"
+  },
+  {
+    "const": "SPECIES_KLEFKI",
+    "name": "Klefki",
+    "slug": "klefki"
+  },
+  {
     "const": "SPECIES_KLEFKI_REDUX",
     "name": "Klefki Redux",
     "slug": "klefki_redux"
   },
   {
+    "const": "SPECIES_KLINK",
+    "name": "Klink",
+    "slug": "klink"
+  },
+  {
+    "const": "SPECIES_KOFFING",
+    "name": "Koffing",
+    "slug": "koffing"
+  },
+  {
+    "const": "SPECIES_KOMALA",
+    "name": "Komala",
+    "slug": "komala"
+  },
+  {
+    "const": "SPECIES_KORAIDON",
+    "name": "Koraidon",
+    "slug": "koraidon"
+  },
+  {
+    "const": "SPECIES_KRABBY",
+    "name": "Krabby",
+    "slug": "krabby"
+  },
+  {
     "const": "SPECIES_KRABBY_REDUX",
     "name": "Krabby Redux",
     "slug": "krabby_redux"
+  },
+  {
+    "const": "SPECIES_KRICKETOT",
+    "name": "Kricketot",
+    "slug": "kricketot"
+  },
+  {
+    "const": "SPECIES_KUBFU",
+    "name": "Kubfu",
+    "slug": "kubfu"
+  },
+  {
+    "const": "SPECIES_KYOGRE",
+    "name": "Kyogre",
+    "slug": "kyogre"
+  },
+  {
+    "const": "SPECIES_KYUREM",
+    "name": "Kyurem",
+    "slug": "kyurem"
   },
   {
     "const": "SPECIES_KYUREM_BLACK",
@@ -485,9 +1770,24 @@
     "slug": "kyurem_white"
   },
   {
+    "const": "SPECIES_LANDORUS",
+    "name": "Landorus",
+    "slug": "landorus"
+  },
+  {
     "const": "SPECIES_LANDORUS_THERIAN",
     "name": "Landorus Therian",
     "slug": "landorus_therian"
+  },
+  {
+    "const": "SPECIES_LAPRAS",
+    "name": "Lapras",
+    "slug": "lapras"
+  },
+  {
+    "const": "SPECIES_LARVESTA",
+    "name": "Larvesta",
+    "slug": "larvesta"
   },
   {
     "const": "SPECIES_LARVESTA_REDUX",
@@ -495,14 +1795,79 @@
     "slug": "larvesta_redux"
   },
   {
+    "const": "SPECIES_LARVITAR",
+    "name": "Larvitar",
+    "slug": "larvitar"
+  },
+  {
     "const": "SPECIES_LARVITAR_REDUX",
     "name": "Larvitar Redux",
     "slug": "larvitar_redux"
   },
   {
+    "const": "SPECIES_LATIAS",
+    "name": "Latias",
+    "slug": "latias"
+  },
+  {
+    "const": "SPECIES_LATIOS",
+    "name": "Latios",
+    "slug": "latios"
+  },
+  {
+    "const": "SPECIES_LECHONK",
+    "name": "Lechonk",
+    "slug": "lechonk"
+  },
+  {
+    "const": "SPECIES_LEDYBA",
+    "name": "Ledyba",
+    "slug": "ledyba"
+  },
+  {
+    "const": "SPECIES_LICKITUNG",
+    "name": "Lickitung",
+    "slug": "lickitung"
+  },
+  {
+    "const": "SPECIES_LILEEP",
+    "name": "Lileep",
+    "slug": "lileep"
+  },
+  {
+    "const": "SPECIES_LILLIPUP",
+    "name": "Lillipup",
+    "slug": "lillipup"
+  },
+  {
+    "const": "SPECIES_LITLEO",
+    "name": "Litleo",
+    "slug": "litleo"
+  },
+  {
+    "const": "SPECIES_LITTEN",
+    "name": "Litten",
+    "slug": "litten"
+  },
+  {
+    "const": "SPECIES_LITWICK",
+    "name": "Litwick",
+    "slug": "litwick"
+  },
+  {
     "const": "SPECIES_LITWICK_REDUX",
     "name": "Litwick Redux",
     "slug": "litwick_redux"
+  },
+  {
+    "const": "SPECIES_LOTAD",
+    "name": "Lotad",
+    "slug": "lotad"
+  },
+  {
+    "const": "SPECIES_LUGIA",
+    "name": "Lugia",
+    "slug": "lugia"
   },
   {
     "const": "SPECIES_LUMBERING_SLOTH",
@@ -515,9 +1880,34 @@
     "slug": "lumbering_sloth_engulfed"
   },
   {
+    "const": "SPECIES_LUNATONE",
+    "name": "Lunatone",
+    "slug": "lunatone"
+  },
+  {
+    "const": "SPECIES_LUVDISC",
+    "name": "Luvdisc",
+    "slug": "luvdisc"
+  },
+  {
+    "const": "SPECIES_MACHOP",
+    "name": "Machop",
+    "slug": "machop"
+  },
+  {
     "const": "SPECIES_MACHOP_REDUX",
     "name": "Machop Redux",
     "slug": "machop_redux"
+  },
+  {
+    "const": "SPECIES_MAGBY",
+    "name": "Magby",
+    "slug": "magby"
+  },
+  {
+    "const": "SPECIES_MAGEARNA",
+    "name": "Magearna",
+    "slug": "magearna"
   },
   {
     "const": "SPECIES_MAGEARNA_ORIGINAL_COLOR",
@@ -525,14 +1915,74 @@
     "slug": "magearna_original_color"
   },
   {
+    "const": "SPECIES_MAGIKARP",
+    "name": "Magikarp",
+    "slug": "magikarp"
+  },
+  {
+    "const": "SPECIES_MAGNEMITE",
+    "name": "Magnemite",
+    "slug": "magnemite"
+  },
+  {
+    "const": "SPECIES_MAKUHITA",
+    "name": "Makuhita",
+    "slug": "makuhita"
+  },
+  {
     "const": "SPECIES_MAKUHITA_REDUX",
     "name": "Makuhita Redux",
     "slug": "makuhita_redux"
   },
   {
+    "const": "SPECIES_MANAPHY",
+    "name": "Manaphy",
+    "slug": "manaphy"
+  },
+  {
+    "const": "SPECIES_MANKEY",
+    "name": "Mankey",
+    "slug": "mankey"
+  },
+  {
+    "const": "SPECIES_MANTYKE",
+    "name": "Mantyke",
+    "slug": "mantyke"
+  },
+  {
+    "const": "SPECIES_MARACTUS",
+    "name": "Maractus",
+    "slug": "maractus"
+  },
+  {
     "const": "SPECIES_MARBEEP",
     "name": "Marbeep",
     "slug": "marbeep"
+  },
+  {
+    "const": "SPECIES_MAREANIE",
+    "name": "Mareanie",
+    "slug": "mareanie"
+  },
+  {
+    "const": "SPECIES_MAREEP",
+    "name": "Mareep",
+    "slug": "mareep"
+  },
+  {
+    "const": "SPECIES_MARSHADOW",
+    "name": "Marshadow",
+    "slug": "marshadow"
+  },
+  {
+    "const": "SPECIES_MASCHIFF",
+    "name": "Maschiff",
+    "slug": "maschiff"
+  },
+  {
+    "const": "SPECIES_MAWILE",
+    "name": "Mawile",
+    "slug": "mawile"
   },
   {
     "const": "SPECIES_MAWILE_REDUX",
@@ -545,9 +1995,29 @@
     "slug": "mawile_redux_b"
   },
   {
+    "const": "SPECIES_MEDITITE",
+    "name": "Meditite",
+    "slug": "meditite"
+  },
+  {
+    "const": "SPECIES_MELOETTA",
+    "name": "Meloetta",
+    "slug": "meloetta"
+  },
+  {
     "const": "SPECIES_MELOETTA_PIROUETTE",
     "name": "Meloetta Pirouette",
     "slug": "meloetta_pirouette"
+  },
+  {
+    "const": "SPECIES_MELTAN",
+    "name": "Meltan",
+    "slug": "meltan"
+  },
+  {
+    "const": "SPECIES_MEOWTH",
+    "name": "Meowth",
+    "slug": "meowth"
   },
   {
     "const": "SPECIES_MEOWTH_PARTNER",
@@ -560,9 +2030,49 @@
     "slug": "merrykarp"
   },
   {
+    "const": "SPECIES_MESPRIT",
+    "name": "Mesprit",
+    "slug": "mesprit"
+  },
+  {
     "const": "SPECIES_MESPRIT_REDUX",
     "name": "Mesprit Redux",
     "slug": "mesprit_redux"
+  },
+  {
+    "const": "SPECIES_MEW",
+    "name": "Mew",
+    "slug": "mew"
+  },
+  {
+    "const": "SPECIES_MEWTWO",
+    "name": "Mewtwo",
+    "slug": "mewtwo"
+  },
+  {
+    "const": "SPECIES_MIENFOO",
+    "name": "Mienfoo",
+    "slug": "mienfoo"
+  },
+  {
+    "const": "SPECIES_MILCERY",
+    "name": "Milcery",
+    "slug": "milcery"
+  },
+  {
+    "const": "SPECIES_MILTANK",
+    "name": "Miltank",
+    "slug": "miltank"
+  },
+  {
+    "const": "SPECIES_MIME_JR",
+    "name": "Mime Jr.",
+    "slug": "mime_jr"
+  },
+  {
+    "const": "SPECIES_MIMIKYU",
+    "name": "Mimikyu",
+    "slug": "mimikyu"
   },
   {
     "const": "SPECIES_MIMIKYU_BUSTED",
@@ -570,14 +2080,54 @@
     "slug": "mimikyu_busted"
   },
   {
+    "const": "SPECIES_MINCCINO",
+    "name": "Minccino",
+    "slug": "minccino"
+  },
+  {
     "const": "SPECIES_MINCCINO_REDUX",
     "name": "Minccino Redux",
     "slug": "minccino_redux"
   },
   {
+    "const": "SPECIES_MINIOR",
+    "name": "Minior",
+    "slug": "minior"
+  },
+  {
+    "const": "SPECIES_MINUN",
+    "name": "Minun",
+    "slug": "minun"
+  },
+  {
+    "const": "SPECIES_MIRAIDON",
+    "name": "Miraidon",
+    "slug": "miraidon"
+  },
+  {
+    "const": "SPECIES_MISDREAVUS",
+    "name": "Misdreavus",
+    "slug": "misdreavus"
+  },
+  {
+    "const": "SPECIES_MOLTRES",
+    "name": "Moltres",
+    "slug": "moltres"
+  },
+  {
     "const": "SPECIES_MOLTRES_EX",
     "name": "Moltres Ex",
     "slug": "moltres_ex"
+  },
+  {
+    "const": "SPECIES_MORELULL",
+    "name": "Morelull",
+    "slug": "morelull"
+  },
+  {
+    "const": "SPECIES_MORPEKO",
+    "name": "Morpeko",
+    "slug": "morpeko"
   },
   {
     "const": "SPECIES_MORPEKO_HANGRY",
@@ -590,14 +2140,114 @@
     "slug": "morpekyll_hangry"
   },
   {
+    "const": "SPECIES_MUDBRAY",
+    "name": "Mudbray",
+    "slug": "mudbray"
+  },
+  {
+    "const": "SPECIES_MUDKIP",
+    "name": "Mudkip",
+    "slug": "mudkip"
+  },
+  {
+    "const": "SPECIES_MUNCHLAX",
+    "name": "Munchlax",
+    "slug": "munchlax"
+  },
+  {
     "const": "SPECIES_MUNCHLAX_REDUX",
     "name": "Munchlax Redux",
     "slug": "munchlax_redux"
   },
   {
+    "const": "SPECIES_MUNKIDORI",
+    "name": "Munkidori",
+    "slug": "munkidori"
+  },
+  {
+    "const": "SPECIES_MUNNA",
+    "name": "Munna",
+    "slug": "munna"
+  },
+  {
+    "const": "SPECIES_MURKROW",
+    "name": "Murkrow",
+    "slug": "murkrow"
+  },
+  {
+    "const": "SPECIES_NACLI",
+    "name": "Nacli",
+    "slug": "nacli"
+  },
+  {
+    "const": "SPECIES_NATU",
+    "name": "Natu",
+    "slug": "natu"
+  },
+  {
+    "const": "SPECIES_NECROZMA",
+    "name": "Necrozma",
+    "slug": "necrozma"
+  },
+  {
+    "const": "SPECIES_NICKIT",
+    "name": "Nickit",
+    "slug": "nickit"
+  },
+  {
+    "const": "SPECIES_NIDORAN_F",
+    "name": "Nidoran♀",
+    "slug": "nidoran_f"
+  },
+  {
+    "const": "SPECIES_NIDORAN_M",
+    "name": "Nidoran♂",
+    "slug": "nidoran_m"
+  },
+  {
+    "const": "SPECIES_NIHILEGO",
+    "name": "Nihilego",
+    "slug": "nihilego"
+  },
+  {
+    "const": "SPECIES_NINCADA",
+    "name": "Nincada",
+    "slug": "nincada"
+  },
+  {
+    "const": "SPECIES_NOIBAT",
+    "name": "Noibat",
+    "slug": "noibat"
+  },
+  {
     "const": "SPECIES_NOIBAT_REDUX",
     "name": "Noibat Redux",
     "slug": "noibat_redux"
+  },
+  {
+    "const": "SPECIES_NOSEPASS",
+    "name": "Nosepass",
+    "slug": "nosepass"
+  },
+  {
+    "const": "SPECIES_NUMEL",
+    "name": "Numel",
+    "slug": "numel"
+  },
+  {
+    "const": "SPECIES_NYMBLE",
+    "name": "Nymble",
+    "slug": "nymble"
+  },
+  {
+    "const": "SPECIES_ODDISH",
+    "name": "Oddish",
+    "slug": "oddish"
+  },
+  {
+    "const": "SPECIES_OGERPON",
+    "name": "Ogerpon",
+    "slug": "ogerpon"
   },
   {
     "const": "SPECIES_OGERPON_CORNERSTONE_MASK",
@@ -615,9 +2265,74 @@
     "slug": "ogerpon_wellspring_mask"
   },
   {
+    "const": "SPECIES_OKIDOGI",
+    "name": "Okidogi",
+    "slug": "okidogi"
+  },
+  {
+    "const": "SPECIES_OMANYTE",
+    "name": "Omanyte",
+    "slug": "omanyte"
+  },
+  {
+    "const": "SPECIES_ONIX",
+    "name": "Onix",
+    "slug": "onix"
+  },
+  {
+    "const": "SPECIES_ORANGURU",
+    "name": "Oranguru",
+    "slug": "oranguru"
+  },
+  {
+    "const": "SPECIES_ORICORIO",
+    "name": "Oricorio",
+    "slug": "oricorio"
+  },
+  {
+    "const": "SPECIES_ORTHWORM",
+    "name": "Orthworm",
+    "slug": "orthworm"
+  },
+  {
+    "const": "SPECIES_OSHAWOTT",
+    "name": "Oshawott",
+    "slug": "oshawott"
+  },
+  {
+    "const": "SPECIES_PACHIRISU",
+    "name": "Pachirisu",
+    "slug": "pachirisu"
+  },
+  {
     "const": "SPECIES_PALAFIN_HERO",
     "name": "Palafin Hero",
     "slug": "palafin_hero"
+  },
+  {
+    "const": "SPECIES_PALDEA_TAUROS",
+    "name": "Paldea Tauros",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_PALDEA_WOOPER",
+    "name": "Paldea Wooper",
+    "slug": null
+  },
+  {
+    "const": "SPECIES_PALKIA",
+    "name": "Palkia",
+    "slug": "palkia"
+  },
+  {
+    "const": "SPECIES_PANCHAM",
+    "name": "Pancham",
+    "slug": "pancham"
+  },
+  {
+    "const": "SPECIES_PANPOUR",
+    "name": "Panpour",
+    "slug": "panpour"
   },
   {
     "const": "SPECIES_PANPOUR_REDUX",
@@ -625,9 +2340,19 @@
     "slug": "panpour_redux"
   },
   {
+    "const": "SPECIES_PANSAGE",
+    "name": "Pansage",
+    "slug": "pansage"
+  },
+  {
     "const": "SPECIES_PANSAGE_REDUX",
     "name": "Pansage Redux",
     "slug": "pansage_redux"
+  },
+  {
+    "const": "SPECIES_PANSEAR",
+    "name": "Pansear",
+    "slug": "pansear"
   },
   {
     "const": "SPECIES_PANSEAR_REDUX",
@@ -635,14 +2360,84 @@
     "slug": "pansear_redux"
   },
   {
+    "const": "SPECIES_PARAS",
+    "name": "Paras",
+    "slug": "paras"
+  },
+  {
+    "const": "SPECIES_PASSIMIAN",
+    "name": "Passimian",
+    "slug": "passimian"
+  },
+  {
+    "const": "SPECIES_PATRAT",
+    "name": "Patrat",
+    "slug": "patrat"
+  },
+  {
+    "const": "SPECIES_PAWMI",
+    "name": "Pawmi",
+    "slug": "pawmi"
+  },
+  {
+    "const": "SPECIES_PAWNIARD",
+    "name": "Pawniard",
+    "slug": "pawniard"
+  },
+  {
     "const": "SPECIES_PAWNIARD_REDUX",
     "name": "Pawniard Redux",
     "slug": "pawniard_redux"
   },
   {
+    "const": "SPECIES_PECHARUNT",
+    "name": "Pecharunt",
+    "slug": "pecharunt"
+  },
+  {
+    "const": "SPECIES_PETILIL",
+    "name": "Petilil",
+    "slug": "petilil"
+  },
+  {
+    "const": "SPECIES_PHANPY",
+    "name": "Phanpy",
+    "slug": "phanpy"
+  },
+  {
+    "const": "SPECIES_PHANTUMP",
+    "name": "Phantump",
+    "slug": "phantump"
+  },
+  {
+    "const": "SPECIES_PHEROMOSA",
+    "name": "Pheromosa",
+    "slug": "pheromosa"
+  },
+  {
+    "const": "SPECIES_PHIONE",
+    "name": "Phione",
+    "slug": "phione"
+  },
+  {
+    "const": "SPECIES_PICHU",
+    "name": "Pichu",
+    "slug": "pichu"
+  },
+  {
     "const": "SPECIES_PICHU_SPIKY_EARED",
     "name": "Pichu Spiky",
     "slug": "pichu_spiky_eared"
+  },
+  {
+    "const": "SPECIES_PIDGEY",
+    "name": "Pidgey",
+    "slug": "pidgey"
+  },
+  {
+    "const": "SPECIES_PIDOVE",
+    "name": "Pidove",
+    "slug": "pidove"
   },
   {
     "const": "SPECIES_PIKACHU_ALOLA_CAP",
@@ -720,9 +2515,44 @@
     "slug": "pikachu_world_cap"
   },
   {
+    "const": "SPECIES_PIKIPEK",
+    "name": "Pikipek",
+    "slug": "pikipek"
+  },
+  {
+    "const": "SPECIES_PINCURCHIN",
+    "name": "Pincurchin",
+    "slug": "pincurchin"
+  },
+  {
+    "const": "SPECIES_PINECO",
+    "name": "Pineco",
+    "slug": "pineco"
+  },
+  {
+    "const": "SPECIES_PINSIR",
+    "name": "Pinsir",
+    "slug": "pinsir"
+  },
+  {
+    "const": "SPECIES_PIPLUP",
+    "name": "Piplup",
+    "slug": "piplup"
+  },
+  {
     "const": "SPECIES_PIPLUP_REDUX",
     "name": "Piplup Redux",
     "slug": "piplup_redux"
+  },
+  {
+    "const": "SPECIES_PLUSLE",
+    "name": "Plusle",
+    "slug": "plusle"
+  },
+  {
+    "const": "SPECIES_POIPOLE",
+    "name": "Poipole",
+    "slug": "poipole"
   },
   {
     "const": "SPECIES_POLARTIC_BLUEMOON",
@@ -730,9 +2560,84 @@
     "slug": "polartic_bluemoon"
   },
   {
+    "const": "SPECIES_POLIWAG",
+    "name": "Poliwag",
+    "slug": "poliwag"
+  },
+  {
+    "const": "SPECIES_POLTCHAGEIST",
+    "name": "Poltchageist",
+    "slug": "poltchageist"
+  },
+  {
+    "const": "SPECIES_PONYTA",
+    "name": "Ponyta",
+    "slug": "ponyta"
+  },
+  {
+    "const": "SPECIES_POOCHYENA",
+    "name": "Poochyena",
+    "slug": "poochyena"
+  },
+  {
+    "const": "SPECIES_POPPLIO",
+    "name": "Popplio",
+    "slug": "popplio"
+  },
+  {
+    "const": "SPECIES_PORYGON",
+    "name": "Porygon",
+    "slug": "porygon"
+  },
+  {
+    "const": "SPECIES_PSYDUCK",
+    "name": "Psyduck",
+    "slug": "psyduck"
+  },
+  {
     "const": "SPECIES_PSYDUCK_REDUX",
     "name": "Psyduck Redux",
     "slug": "psyduck_redux"
+  },
+  {
+    "const": "SPECIES_PUMPKABOO",
+    "name": "Pumpkaboo",
+    "slug": "pumpkaboo"
+  },
+  {
+    "const": "SPECIES_PURRLOIN",
+    "name": "Purrloin",
+    "slug": "purrloin"
+  },
+  {
+    "const": "SPECIES_PYUKUMUKU",
+    "name": "Pyukumuku",
+    "slug": "pyukumuku"
+  },
+  {
+    "const": "SPECIES_QUAXLY",
+    "name": "Quaxly",
+    "slug": "quaxly"
+  },
+  {
+    "const": "SPECIES_QWILFISH",
+    "name": "Qwilfish",
+    "slug": "qwilfish"
+  },
+  {
+    "const": "SPECIES_RAGING_BOLT",
+    "name": "Raging Bolt",
+    "slug": "raging_bolt"
+  },
+  {
+    "const": "SPECIES_RAIKOU",
+    "name": "Raikou",
+    "slug": "raikou"
+  },
+  {
+    "const": "SPECIES_RALTS",
+    "name": "Ralts",
+    "slug": "ralts"
   },
   {
     "const": "SPECIES_RALTS_REDUX",
@@ -740,14 +2645,114 @@
     "slug": "ralts_redux"
   },
   {
+    "const": "SPECIES_RATTATA",
+    "name": "Rattata",
+    "slug": "rattata"
+  },
+  {
     "const": "SPECIES_RATTATA_REDUX",
     "name": "Rattata Redux",
     "slug": "rattata_redux"
   },
   {
+    "const": "SPECIES_RAYQUAZA",
+    "name": "Rayquaza",
+    "slug": "rayquaza"
+  },
+  {
+    "const": "SPECIES_REGICE",
+    "name": "Regice",
+    "slug": "regice"
+  },
+  {
+    "const": "SPECIES_REGIDRAGO",
+    "name": "Regidrago",
+    "slug": "regidrago"
+  },
+  {
+    "const": "SPECIES_REGIELEKI",
+    "name": "Regieleki",
+    "slug": "regieleki"
+  },
+  {
+    "const": "SPECIES_REGIGIGAS",
+    "name": "Regigigas",
+    "slug": "regigigas"
+  },
+  {
+    "const": "SPECIES_REGIROCK",
+    "name": "Regirock",
+    "slug": "regirock"
+  },
+  {
+    "const": "SPECIES_REGISTEEL",
+    "name": "Registeel",
+    "slug": "registeel"
+  },
+  {
+    "const": "SPECIES_RELICANTH",
+    "name": "Relicanth",
+    "slug": "relicanth"
+  },
+  {
+    "const": "SPECIES_RELLOR",
+    "name": "Rellor",
+    "slug": "rellor"
+  },
+  {
+    "const": "SPECIES_REMORAID",
+    "name": "Remoraid",
+    "slug": "remoraid"
+  },
+  {
+    "const": "SPECIES_RESHIRAM",
+    "name": "Reshiram",
+    "slug": "reshiram"
+  },
+  {
+    "const": "SPECIES_RHYHORN",
+    "name": "Rhyhorn",
+    "slug": "rhyhorn"
+  },
+  {
+    "const": "SPECIES_RIOLU",
+    "name": "Riolu",
+    "slug": "riolu"
+  },
+  {
+    "const": "SPECIES_ROARING_MOON",
+    "name": "Roaring Moon",
+    "slug": "roaring_moon"
+  },
+  {
+    "const": "SPECIES_ROCKRUFF",
+    "name": "Rockruff",
+    "slug": "rockruff"
+  },
+  {
     "const": "SPECIES_ROCKRUFF_OWN_TEMPO",
     "name": "Rockruff Own Tempo",
     "slug": "rockruff_own_tempo"
+  },
+  {
+    "const": "SPECIES_ROGGENROLA",
+    "name": "Roggenrola",
+    "slug": "roggenrola"
+  },
+  {
+    "const": "SPECIES_ROLYCOLY",
+    "name": "Rolycoly",
+    "slug": "rolycoly"
+  },
+  {
+    "const": "SPECIES_ROOKIDEE",
+    "name": "Rookidee",
+    "slug": "rookidee"
+  },
+  {
+    "const": "SPECIES_ROTOM",
+    "name": "Rotom",
+    "slug": "rotom"
   },
   {
     "const": "SPECIES_ROTOM_FAN",
@@ -775,9 +2780,54 @@
     "slug": "rotom_wash"
   },
   {
+    "const": "SPECIES_ROWLET",
+    "name": "Rowlet",
+    "slug": "rowlet"
+  },
+  {
+    "const": "SPECIES_RUFFLET",
+    "name": "Rufflet",
+    "slug": "rufflet"
+  },
+  {
+    "const": "SPECIES_SABLEYE",
+    "name": "Sableye",
+    "slug": "sableye"
+  },
+  {
     "const": "SPECIES_SABLEYE_REDUX",
     "name": "Sableye Redux",
     "slug": "sableye_redux"
+  },
+  {
+    "const": "SPECIES_SALANDIT",
+    "name": "Salandit",
+    "slug": "salandit"
+  },
+  {
+    "const": "SPECIES_SANDILE",
+    "name": "Sandile",
+    "slug": "sandile"
+  },
+  {
+    "const": "SPECIES_SANDSHREW",
+    "name": "Sandshrew",
+    "slug": "sandshrew"
+  },
+  {
+    "const": "SPECIES_SANDY_SHOCKS",
+    "name": "Sandy Shocks",
+    "slug": "sandy_shocks"
+  },
+  {
+    "const": "SPECIES_SANDYGAST",
+    "name": "Sandygast",
+    "slug": "sandygast"
+  },
+  {
+    "const": "SPECIES_SAWK",
+    "name": "Sawk",
+    "slug": "sawk"
   },
   {
     "const": "SPECIES_SAWK_REDUX",
@@ -785,9 +2835,44 @@
     "slug": "sawk_redux"
   },
   {
+    "const": "SPECIES_SCATTERBUG",
+    "name": "Scatterbug",
+    "slug": "scatterbug"
+  },
+  {
+    "const": "SPECIES_SCORBUNNY",
+    "name": "Scorbunny",
+    "slug": "scorbunny"
+  },
+  {
+    "const": "SPECIES_SCRAGGY",
+    "name": "Scraggy",
+    "slug": "scraggy"
+  },
+  {
+    "const": "SPECIES_SCREAM_TAIL",
+    "name": "Scream Tail",
+    "slug": "scream_tail"
+  },
+  {
+    "const": "SPECIES_SCYTHER",
+    "name": "Scyther",
+    "slug": "scyther"
+  },
+  {
     "const": "SPECIES_SCYTHER_REDUX",
     "name": "Scyther Redux",
     "slug": "scyther_redux"
+  },
+  {
+    "const": "SPECIES_SEEDOT",
+    "name": "Seedot",
+    "slug": "seedot"
+  },
+  {
+    "const": "SPECIES_SEEL",
+    "name": "Seel",
+    "slug": "seel"
   },
   {
     "const": "SPECIES_SEEL_REDUX",
@@ -795,9 +2880,39 @@
     "slug": "seel_redux"
   },
   {
+    "const": "SPECIES_SENTRET",
+    "name": "Sentret",
+    "slug": "sentret"
+  },
+  {
+    "const": "SPECIES_SEVIPER",
+    "name": "Seviper",
+    "slug": "seviper"
+  },
+  {
+    "const": "SPECIES_SEWADDLE",
+    "name": "Sewaddle",
+    "slug": "sewaddle"
+  },
+  {
+    "const": "SPECIES_SHAYMIN",
+    "name": "Shaymin",
+    "slug": "shaymin"
+  },
+  {
     "const": "SPECIES_SHAYMIN_SKY",
     "name": "Shaymin Sky",
     "slug": "shaymin_sky"
+  },
+  {
+    "const": "SPECIES_SHELLDER",
+    "name": "Shellder",
+    "slug": "shellder"
+  },
+  {
+    "const": "SPECIES_SHELLOS",
+    "name": "Shellos",
+    "slug": "shellos"
   },
   {
     "const": "SPECIES_SHELLOS_EAST_SEA",
@@ -805,9 +2920,59 @@
     "slug": "shellos_east_sea"
   },
   {
+    "const": "SPECIES_SHELMET",
+    "name": "Shelmet",
+    "slug": "shelmet"
+  },
+  {
+    "const": "SPECIES_SHIELDON",
+    "name": "Shieldon",
+    "slug": "shieldon"
+  },
+  {
+    "const": "SPECIES_SHINX",
+    "name": "Shinx",
+    "slug": "shinx"
+  },
+  {
     "const": "SPECIES_SHINX_REDUX",
     "name": "Shinx Redux",
     "slug": "shinx_redux"
+  },
+  {
+    "const": "SPECIES_SHROODLE",
+    "name": "Shroodle",
+    "slug": "shroodle"
+  },
+  {
+    "const": "SPECIES_SHROOMISH",
+    "name": "Shroomish",
+    "slug": "shroomish"
+  },
+  {
+    "const": "SPECIES_SHUCKLE",
+    "name": "Shuckle",
+    "slug": "shuckle"
+  },
+  {
+    "const": "SPECIES_SHUPPET",
+    "name": "Shuppet",
+    "slug": "shuppet"
+  },
+  {
+    "const": "SPECIES_SIGILYPH",
+    "name": "Sigilyph",
+    "slug": "sigilyph"
+  },
+  {
+    "const": "SPECIES_SILICOBRA",
+    "name": "Silicobra",
+    "slug": "silicobra"
+  },
+  {
+    "const": "SPECIES_SINISTEA",
+    "name": "Sinistea",
+    "slug": "sinistea"
   },
   {
     "const": "SPECIES_SINISTEA_ANTIQUE",
@@ -820,9 +2985,49 @@
     "slug": "sinistea_redux"
   },
   {
+    "const": "SPECIES_SIZZLIPEDE",
+    "name": "Sizzlipede",
+    "slug": "sizzlipede"
+  },
+  {
+    "const": "SPECIES_SKARMORY",
+    "name": "Skarmory",
+    "slug": "skarmory"
+  },
+  {
     "const": "SPECIES_SKARMORY_REDUX",
     "name": "Skarmory Redux",
     "slug": "skarmory_redux"
+  },
+  {
+    "const": "SPECIES_SKIDDO",
+    "name": "Skiddo",
+    "slug": "skiddo"
+  },
+  {
+    "const": "SPECIES_SKITTY",
+    "name": "Skitty",
+    "slug": "skitty"
+  },
+  {
+    "const": "SPECIES_SKORUPI",
+    "name": "Skorupi",
+    "slug": "skorupi"
+  },
+  {
+    "const": "SPECIES_SKRELP",
+    "name": "Skrelp",
+    "slug": "skrelp"
+  },
+  {
+    "const": "SPECIES_SKWOVET",
+    "name": "Skwovet",
+    "slug": "skwovet"
+  },
+  {
+    "const": "SPECIES_SLAKOTH",
+    "name": "Slakoth",
+    "slug": "slakoth"
   },
   {
     "const": "SPECIES_SLATE",
@@ -830,9 +3035,59 @@
     "slug": "slate"
   },
   {
+    "const": "SPECIES_SLITHER_WING",
+    "name": "Slither Wing",
+    "slug": "slither_wing"
+  },
+  {
+    "const": "SPECIES_SLOWPOKE",
+    "name": "Slowpoke",
+    "slug": "slowpoke"
+  },
+  {
+    "const": "SPECIES_SLUGMA",
+    "name": "Slugma",
+    "slug": "slugma"
+  },
+  {
     "const": "SPECIES_SLUGMA_REDUX",
     "name": "Slugma Redux",
     "slug": "slugma_redux"
+  },
+  {
+    "const": "SPECIES_SMEARGLE",
+    "name": "Smeargle",
+    "slug": "smeargle"
+  },
+  {
+    "const": "SPECIES_SMOLIV",
+    "name": "Smoliv",
+    "slug": "smoliv"
+  },
+  {
+    "const": "SPECIES_SMOOCHUM",
+    "name": "Smoochum",
+    "slug": "smoochum"
+  },
+  {
+    "const": "SPECIES_SNEASEL",
+    "name": "Sneasel",
+    "slug": "sneasel"
+  },
+  {
+    "const": "SPECIES_SNIVY",
+    "name": "Snivy",
+    "slug": "snivy"
+  },
+  {
+    "const": "SPECIES_SNOM",
+    "name": "Snom",
+    "slug": "snom"
+  },
+  {
+    "const": "SPECIES_SNORUNT",
+    "name": "Snorunt",
+    "slug": "snorunt"
   },
   {
     "const": "SPECIES_SNORUNT_REDUX",
@@ -840,9 +3095,34 @@
     "slug": "snorunt_redux"
   },
   {
+    "const": "SPECIES_SNOVER",
+    "name": "Snover",
+    "slug": "snover"
+  },
+  {
+    "const": "SPECIES_SNUBBULL",
+    "name": "Snubbull",
+    "slug": "snubbull"
+  },
+  {
+    "const": "SPECIES_SOBBLE",
+    "name": "Sobble",
+    "slug": "sobble"
+  },
+  {
+    "const": "SPECIES_SOLOSIS",
+    "name": "Solosis",
+    "slug": "solosis"
+  },
+  {
     "const": "SPECIES_SOLOSIS_REDUX",
     "name": "Solosis Redux",
     "slug": "solosis_redux"
+  },
+  {
+    "const": "SPECIES_SOLROCK",
+    "name": "Solrock",
+    "slug": "solrock"
   },
   {
     "const": "SPECIES_SOLROCK_SYSTEM",
@@ -850,9 +3130,19 @@
     "slug": "solrock_system"
   },
   {
+    "const": "SPECIES_SPEAROW",
+    "name": "Spearow",
+    "slug": "spearow"
+  },
+  {
     "const": "SPECIES_SPEAROW_REDUX",
     "name": "Spearow Redux",
     "slug": "spearow_redux"
+  },
+  {
+    "const": "SPECIES_SPECTRIER",
+    "name": "Spectrier",
+    "slug": "spectrier"
   },
   {
     "const": "SPECIES_SPECTRIER_CLOUD",
@@ -860,9 +3150,49 @@
     "slug": "spectrier_cloud"
   },
   {
+    "const": "SPECIES_SPHEAL",
+    "name": "Spheal",
+    "slug": "spheal"
+  },
+  {
+    "const": "SPECIES_SPINARAK",
+    "name": "Spinarak",
+    "slug": "spinarak"
+  },
+  {
+    "const": "SPECIES_SPINDA",
+    "name": "Spinda",
+    "slug": "spinda"
+  },
+  {
+    "const": "SPECIES_SPIRITOMB",
+    "name": "Spiritomb",
+    "slug": "spiritomb"
+  },
+  {
     "const": "SPECIES_SPIRITOMB_REDUX",
     "name": "Spiritomb Redux",
     "slug": "spiritomb_redux"
+  },
+  {
+    "const": "SPECIES_SPOINK",
+    "name": "Spoink",
+    "slug": "spoink"
+  },
+  {
+    "const": "SPECIES_SPRIGATITO",
+    "name": "Sprigatito",
+    "slug": "sprigatito"
+  },
+  {
+    "const": "SPECIES_SPRITZEE",
+    "name": "Spritzee",
+    "slug": "spritzee"
+  },
+  {
+    "const": "SPECIES_SQUAWKABILLY",
+    "name": "Squawkabilly",
+    "slug": "squawkabilly"
   },
   {
     "const": "SPECIES_SQUAWKABILLY_GREEN_PLUMAGE",
@@ -870,9 +3200,74 @@
     "slug": "squawkabilly_green_plumage"
   },
   {
+    "const": "SPECIES_SQUIRTLE",
+    "name": "Squirtle",
+    "slug": "squirtle"
+  },
+  {
+    "const": "SPECIES_STAKATAKA",
+    "name": "Stakataka",
+    "slug": "stakataka"
+  },
+  {
+    "const": "SPECIES_STANTLER",
+    "name": "Stantler",
+    "slug": "stantler"
+  },
+  {
+    "const": "SPECIES_STARLY",
+    "name": "Starly",
+    "slug": "starly"
+  },
+  {
+    "const": "SPECIES_STARYU",
+    "name": "Staryu",
+    "slug": "staryu"
+  },
+  {
+    "const": "SPECIES_STONJOURNER",
+    "name": "Stonjourner",
+    "slug": "stonjourner"
+  },
+  {
+    "const": "SPECIES_STUFFUL",
+    "name": "Stufful",
+    "slug": "stufful"
+  },
+  {
     "const": "SPECIES_STUFFUL_REDUX",
     "name": "Stufful Redux",
     "slug": "stufful_redux"
+  },
+  {
+    "const": "SPECIES_STUNFISK",
+    "name": "Stunfisk",
+    "slug": "stunfisk"
+  },
+  {
+    "const": "SPECIES_STUNKY",
+    "name": "Stunky",
+    "slug": "stunky"
+  },
+  {
+    "const": "SPECIES_SUICUNE",
+    "name": "Suicune",
+    "slug": "suicune"
+  },
+  {
+    "const": "SPECIES_SUNKERN",
+    "name": "Sunkern",
+    "slug": "sunkern"
+  },
+  {
+    "const": "SPECIES_SURSKIT",
+    "name": "Surskit",
+    "slug": "surskit"
+  },
+  {
+    "const": "SPECIES_SWABLU",
+    "name": "Swablu",
+    "slug": "swablu"
   },
   {
     "const": "SPECIES_SWABLU_REDUX",
@@ -880,9 +3275,104 @@
     "slug": "swablu_redux"
   },
   {
+    "const": "SPECIES_SWINUB",
+    "name": "Swinub",
+    "slug": "swinub"
+  },
+  {
     "const": "SPECIES_SWINUB_REDUX",
     "name": "Swinub Redux",
     "slug": "swinub_redux"
+  },
+  {
+    "const": "SPECIES_SWIRLIX",
+    "name": "Swirlix",
+    "slug": "swirlix"
+  },
+  {
+    "const": "SPECIES_TADBULB",
+    "name": "Tadbulb",
+    "slug": "tadbulb"
+  },
+  {
+    "const": "SPECIES_TAILLOW",
+    "name": "Taillow",
+    "slug": "taillow"
+  },
+  {
+    "const": "SPECIES_TANDEMAUS",
+    "name": "Tandemaus",
+    "slug": "tandemaus"
+  },
+  {
+    "const": "SPECIES_TANGELA",
+    "name": "Tangela",
+    "slug": "tangela"
+  },
+  {
+    "const": "SPECIES_TAPU_BULU",
+    "name": "Tapu Bulu",
+    "slug": "tapu_bulu"
+  },
+  {
+    "const": "SPECIES_TAPU_FINI",
+    "name": "Tapu Fini",
+    "slug": "tapu_fini"
+  },
+  {
+    "const": "SPECIES_TAPU_KOKO",
+    "name": "Tapu Koko",
+    "slug": "tapu_koko"
+  },
+  {
+    "const": "SPECIES_TAPU_LELE",
+    "name": "Tapu Lele",
+    "slug": "tapu_lele"
+  },
+  {
+    "const": "SPECIES_TAROUNTULA",
+    "name": "Tarountula",
+    "slug": "tarountula"
+  },
+  {
+    "const": "SPECIES_TATSUGIRI",
+    "name": "Tatsugiri",
+    "slug": "tatsugiri"
+  },
+  {
+    "const": "SPECIES_TAUROS",
+    "name": "Tauros",
+    "slug": "tauros"
+  },
+  {
+    "const": "SPECIES_TEDDIURSA",
+    "name": "Teddiursa",
+    "slug": "teddiursa"
+  },
+  {
+    "const": "SPECIES_TENTACOOL",
+    "name": "Tentacool",
+    "slug": "tentacool"
+  },
+  {
+    "const": "SPECIES_TEPIG",
+    "name": "Tepig",
+    "slug": "tepig"
+  },
+  {
+    "const": "SPECIES_TERAPAGOS",
+    "name": "Terapagos",
+    "slug": "terapagos"
+  },
+  {
+    "const": "SPECIES_TERRAKION",
+    "name": "Terrakion",
+    "slug": "terrakion"
+  },
+  {
+    "const": "SPECIES_THROH",
+    "name": "Throh",
+    "slug": "throh"
   },
   {
     "const": "SPECIES_THROH_REDUX",
@@ -890,9 +3380,29 @@
     "slug": "throh_redux"
   },
   {
+    "const": "SPECIES_THUNDURUS",
+    "name": "Thundurus",
+    "slug": "thundurus"
+  },
+  {
     "const": "SPECIES_THUNDURUS_THERIAN",
     "name": "Thundurus Therian",
     "slug": "thundurus_therian"
+  },
+  {
+    "const": "SPECIES_TIMBURR",
+    "name": "Timburr",
+    "slug": "timburr"
+  },
+  {
+    "const": "SPECIES_TING_LU",
+    "name": "Ting Lu",
+    "slug": "ting_lu"
+  },
+  {
+    "const": "SPECIES_TINKATINK",
+    "name": "Tinkatink",
+    "slug": "tinkatink"
   },
   {
     "const": "SPECIES_TINKATINK_REDUX",
@@ -900,9 +3410,54 @@
     "slug": "tinkatink_redux"
   },
   {
+    "const": "SPECIES_TIRTOUGA",
+    "name": "Tirtouga",
+    "slug": "tirtouga"
+  },
+  {
+    "const": "SPECIES_TOEDSCOOL",
+    "name": "Toedscool",
+    "slug": "toedscool"
+  },
+  {
+    "const": "SPECIES_TOGEDEMARU",
+    "name": "Togedemaru",
+    "slug": "togedemaru"
+  },
+  {
+    "const": "SPECIES_TOGEPI",
+    "name": "Togepi",
+    "slug": "togepi"
+  },
+  {
+    "const": "SPECIES_TORCHIC",
+    "name": "Torchic",
+    "slug": "torchic"
+  },
+  {
+    "const": "SPECIES_TORKOAL",
+    "name": "Torkoal",
+    "slug": "torkoal"
+  },
+  {
+    "const": "SPECIES_TORNADUS",
+    "name": "Tornadus",
+    "slug": "tornadus"
+  },
+  {
     "const": "SPECIES_TORNADUS_THERIAN",
     "name": "Tornadus Therian",
     "slug": "tornadus_therian"
+  },
+  {
+    "const": "SPECIES_TOTODILE",
+    "name": "Totodile",
+    "slug": "totodile"
+  },
+  {
+    "const": "SPECIES_TOXEL",
+    "name": "Toxel",
+    "slug": "toxel"
   },
   {
     "const": "SPECIES_TOXEL_REDUX",
@@ -910,14 +3465,74 @@
     "slug": "toxel_redux"
   },
   {
+    "const": "SPECIES_TRAPINCH",
+    "name": "Trapinch",
+    "slug": "trapinch"
+  },
+  {
     "const": "SPECIES_TRAPINCH_REDUX",
     "name": "Trapinch Redux",
     "slug": "trapinch_redux"
   },
   {
+    "const": "SPECIES_TREECKO",
+    "name": "Treecko",
+    "slug": "treecko"
+  },
+  {
+    "const": "SPECIES_TROPIUS",
+    "name": "Tropius",
+    "slug": "tropius"
+  },
+  {
+    "const": "SPECIES_TRUBBISH",
+    "name": "Trubbish",
+    "slug": "trubbish"
+  },
+  {
+    "const": "SPECIES_TURTONATOR",
+    "name": "Turtonator",
+    "slug": "turtonator"
+  },
+  {
+    "const": "SPECIES_TURTWIG",
+    "name": "Turtwig",
+    "slug": "turtwig"
+  },
+  {
     "const": "SPECIES_TURTWIG_REDUX",
     "name": "Turtwig Redux",
     "slug": "turtwig_redux"
+  },
+  {
+    "const": "SPECIES_TYMPOLE",
+    "name": "Tympole",
+    "slug": "tympole"
+  },
+  {
+    "const": "SPECIES_TYNAMO",
+    "name": "Tynamo",
+    "slug": "tynamo"
+  },
+  {
+    "const": "SPECIES_TYPE_NULL",
+    "name": "Type: Null",
+    "slug": "type_null"
+  },
+  {
+    "const": "SPECIES_TYROGUE",
+    "name": "Tyrogue",
+    "slug": "tyrogue"
+  },
+  {
+    "const": "SPECIES_TYRUNT",
+    "name": "Tyrunt",
+    "slug": "tyrunt"
+  },
+  {
+    "const": "SPECIES_UNOWN",
+    "name": "Unown",
+    "slug": "unown"
   },
   {
     "const": "SPECIES_UNOWN_REVELATION",
@@ -930,9 +3545,19 @@
     "slug": "ursaluna_bloodmoon"
   },
   {
+    "const": "SPECIES_UXIE",
+    "name": "Uxie",
+    "slug": "uxie"
+  },
+  {
     "const": "SPECIES_UXIE_REDUX",
     "name": "Uxie Redux",
     "slug": "uxie_redux"
+  },
+  {
+    "const": "SPECIES_VANILLITE",
+    "name": "Vanillite",
+    "slug": "vanillite"
   },
   {
     "const": "SPECIES_VANILLITE_REDUX",
@@ -940,9 +3565,89 @@
     "slug": "vanillite_redux"
   },
   {
+    "const": "SPECIES_VAROOM",
+    "name": "Varoom",
+    "slug": "varoom"
+  },
+  {
+    "const": "SPECIES_VELUZA",
+    "name": "Veluza",
+    "slug": "veluza"
+  },
+  {
+    "const": "SPECIES_VENIPEDE",
+    "name": "Venipede",
+    "slug": "venipede"
+  },
+  {
+    "const": "SPECIES_VENONAT",
+    "name": "Venonat",
+    "slug": "venonat"
+  },
+  {
+    "const": "SPECIES_VICTINI",
+    "name": "Victini",
+    "slug": "victini"
+  },
+  {
+    "const": "SPECIES_VIRIZION",
+    "name": "Virizion",
+    "slug": "virizion"
+  },
+  {
+    "const": "SPECIES_VOLBEAT",
+    "name": "Volbeat",
+    "slug": "volbeat"
+  },
+  {
+    "const": "SPECIES_VOLCANION",
+    "name": "Volcanion",
+    "slug": "volcanion"
+  },
+  {
+    "const": "SPECIES_VOLTORB",
+    "name": "Voltorb",
+    "slug": "voltorb"
+  },
+  {
+    "const": "SPECIES_VULLABY",
+    "name": "Vullaby",
+    "slug": "vullaby"
+  },
+  {
+    "const": "SPECIES_VULPIX",
+    "name": "Vulpix",
+    "slug": "vulpix"
+  },
+  {
+    "const": "SPECIES_WAILMER",
+    "name": "Wailmer",
+    "slug": "wailmer"
+  },
+  {
+    "const": "SPECIES_WALKING_WAKE",
+    "name": "Walking Wake",
+    "slug": "walking_wake"
+  },
+  {
+    "const": "SPECIES_WATTREL",
+    "name": "Wattrel",
+    "slug": "wattrel"
+  },
+  {
+    "const": "SPECIES_WEEDLE",
+    "name": "Weedle",
+    "slug": "weedle"
+  },
+  {
     "const": "SPECIES_WEEDLE_REDUX",
     "name": "Weedle Redux",
     "slug": "weedle_redux"
+  },
+  {
+    "const": "SPECIES_WHISMUR",
+    "name": "Whismur",
+    "slug": "whismur"
   },
   {
     "const": "SPECIES_WHISMUR_REDUX",
@@ -953,6 +3658,26 @@
     "const": "SPECIES_WIGGLYTUFF_APEX",
     "name": "Wigglytuff Apex",
     "slug": "wigglytuff_apex"
+  },
+  {
+    "const": "SPECIES_WIGLETT",
+    "name": "Wiglett",
+    "slug": "wiglett"
+  },
+  {
+    "const": "SPECIES_WIMPOD",
+    "name": "Wimpod",
+    "slug": "wimpod"
+  },
+  {
+    "const": "SPECIES_WINGULL",
+    "name": "Wingull",
+    "slug": "wingull"
+  },
+  {
+    "const": "SPECIES_WISHIWASHI",
+    "name": "Wishiwashi",
+    "slug": "wishiwashi"
   },
   {
     "const": "SPECIES_WISHIWASHI_SCHOOL",
@@ -970,9 +3695,44 @@
     "slug": "wispywaspy_hivemind"
   },
   {
+    "const": "SPECIES_WO_CHIEN",
+    "name": "Wo Chien",
+    "slug": "wo_chien"
+  },
+  {
+    "const": "SPECIES_WOOBAT",
+    "name": "Woobat",
+    "slug": "woobat"
+  },
+  {
+    "const": "SPECIES_WOOLOO",
+    "name": "Wooloo",
+    "slug": "wooloo"
+  },
+  {
     "const": "SPECIES_WOOLY_WORM",
     "name": "Wooly Worm",
     "slug": "wooly_worm"
+  },
+  {
+    "const": "SPECIES_WOOPER",
+    "name": "Wooper",
+    "slug": "wooper"
+  },
+  {
+    "const": "SPECIES_WURMPLE",
+    "name": "Wurmple",
+    "slug": "wurmple"
+  },
+  {
+    "const": "SPECIES_WYNAUT",
+    "name": "Wynaut",
+    "slug": "wynaut"
+  },
+  {
+    "const": "SPECIES_XERNEAS",
+    "name": "Xerneas",
+    "slug": "xerneas"
   },
   {
     "const": "SPECIES_XERNEAS_ACTIVE",
@@ -980,13 +3740,98 @@
     "slug": "xerneas_active"
   },
   {
+    "const": "SPECIES_XURKITREE",
+    "name": "Xurkitree",
+    "slug": "xurkitree"
+  },
+  {
+    "const": "SPECIES_YAMASK",
+    "name": "Yamask",
+    "slug": "yamask"
+  },
+  {
+    "const": "SPECIES_YAMPER",
+    "name": "Yamper",
+    "slug": "yamper"
+  },
+  {
+    "const": "SPECIES_YANMA",
+    "name": "Yanma",
+    "slug": "yanma"
+  },
+  {
+    "const": "SPECIES_YUNGOOS",
+    "name": "Yungoos",
+    "slug": "yungoos"
+  },
+  {
+    "const": "SPECIES_YVELTAL",
+    "name": "Yveltal",
+    "slug": "yveltal"
+  },
+  {
+    "const": "SPECIES_ZACIAN",
+    "name": "Zacian",
+    "slug": "zacian"
+  },
+  {
+    "const": "SPECIES_ZAMAZENTA",
+    "name": "Zamazenta",
+    "slug": "zamazenta"
+  },
+  {
+    "const": "SPECIES_ZANGOOSE",
+    "name": "Zangoose",
+    "slug": "zangoose"
+  },
+  {
+    "const": "SPECIES_ZAPDOS",
+    "name": "Zapdos",
+    "slug": "zapdos"
+  },
+  {
     "const": "SPECIES_ZAPDOS_EX",
     "name": "Zapdos Ex",
     "slug": "zapdos_ex"
   },
   {
+    "const": "SPECIES_ZARUDE",
+    "name": "Zarude",
+    "slug": "zarude"
+  },
+  {
     "const": "SPECIES_ZARUDE_DADA",
     "name": "Zarude Dada",
     "slug": "zarude_dada"
+  },
+  {
+    "const": "SPECIES_ZEKROM",
+    "name": "Zekrom",
+    "slug": "zekrom"
+  },
+  {
+    "const": "SPECIES_ZERAORA",
+    "name": "Zeraora",
+    "slug": "zeraora"
+  },
+  {
+    "const": "SPECIES_ZIGZAGOON",
+    "name": "Zigzagoon",
+    "slug": "zigzagoon"
+  },
+  {
+    "const": "SPECIES_ZORUA",
+    "name": "Zorua",
+    "slug": "zorua"
+  },
+  {
+    "const": "SPECIES_ZUBAT",
+    "name": "Zubat",
+    "slug": "zubat"
+  },
+  {
+    "const": "SPECIES_ZYGARDE",
+    "name": "Zygarde",
+    "slug": "zygarde"
   }
 ]

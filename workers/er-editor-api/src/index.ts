@@ -69,6 +69,13 @@ function toBase64(text: string): string {
   return btoa(binary);
 }
 
+/** Decode the base64 content GitHub returns for a file (may contain newlines). */
+function fromBase64(b64: string): string {
+  const binary = atob(b64.replace(/\s/g, ""));
+  const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
 /** Validate the posted egg-move map: speciesConst → 1..4 move-name strings. */
 function validateEggMoves(value: unknown): { ok: true; data: Record<string, string[]> } | { ok: false; error: string } {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -118,18 +125,31 @@ export default {
         return json({ ok: false, error: validated.error }, 400, env);
       }
 
-      // Stable key order keeps diffs clean.
-      const sorted = Object.fromEntries(Object.entries(validated.data).sort(([a], [b]) => a.localeCompare(b)));
-      const content = `${JSON.stringify(sorted, null, 2)}\n`;
-
+      // Read the current file so we MERGE the posted delta into it (the editor
+      // only sends changed species — untouched species must be preserved, and
+      // concurrent editors must not clobber each other).
       const base = `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${EGG_MOVES_PATH}`;
       const getRes = await fetch(`${base}?ref=${encodeURIComponent(env.GITHUB_BRANCH)}`, { headers: ghHeaders(env) });
       let sha: string | undefined;
+      let existing: Record<string, string[]> = {};
       if (getRes.ok) {
-        sha = ((await getRes.json()) as { sha?: string }).sha;
+        const meta = (await getRes.json()) as { sha?: string; content?: string };
+        sha = meta.sha;
+        if (meta.content) {
+          try {
+            existing = JSON.parse(fromBase64(meta.content)) as Record<string, string[]>;
+          } catch {
+            return json({ ok: false, error: "current egg-moves file is not valid JSON" }, 502, env);
+          }
+        }
       } else if (getRes.status !== 404) {
         return json({ ok: false, error: `github read failed: ${getRes.status}` }, 502, env);
       }
+
+      // Overlay the delta, then re-sort for a clean, stable diff.
+      const merged = { ...existing, ...validated.data };
+      const sorted = Object.fromEntries(Object.entries(merged).sort(([a], [b]) => a.localeCompare(b)));
+      const content = `${JSON.stringify(sorted, null, 2)}\n`;
 
       const author = typeof body.author === "string" ? body.author.slice(0, 40).replace(/[^\w .-]/g, "") : "";
       const putRes = await fetch(base, {

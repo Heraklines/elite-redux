@@ -5,24 +5,60 @@
  */
 
 // =============================================================================
-// Elite Redux — hand-audited egg moves for ER-custom species.
+// Elite Redux — egg moves for the FULL roster (vanilla + ER-custom species).
 //
-// The DATA now lives in `er-egg-moves.json` (speciesConst → 4 move NAMES) so the
-// team egg-move editor can read/write it without touching TypeScript. This
-// module loads that JSON and resolves each move name to its `MoveId` enum value
-// (every name is a real MoveId member, vanilla or ER-custom). The export shape
-// is unchanged, so `init-elite-redux-egg-moves.ts` consumes it exactly as before.
+// The DATA lives in `er-egg-moves.json` (speciesConst → move NAMES) so the team
+// egg-move editor can read/write it without touching TypeScript. It holds BOTH
+// the vanilla base species (migrated from `#balance/moves/egg-moves`) and the
+// hand-audited ER customs — `init-elite-redux-egg-moves.ts` applies the whole
+// table over `speciesEggMoves`.
 //
-// Per-species rationale for each kit lives in docs/plans/er-egg-moves-worktable.md.
+// Resolving a move NAME → id covers both pools:
+//   - vanilla moves: the static `MoveId` enum (name → value).
+//   - ER-custom moves: NOT in the static enum (their reverse-map is installed at
+//     runtime, value→name only), so we build name → pokerogue-id straight from
+//     the ER move drafts (`moveNameToEnumKey(draft.name)` → `ER_ID_MAP.moves`).
+// All inputs are static module data, so this resolves correctly at import time.
+//
+// Per-species rationale for the ER kits lives in docs/plans/er-egg-moves-worktable.md.
 // =============================================================================
 
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { MoveId } from "#enums/move-id";
 import eggMovesByName from "./er-egg-moves.json";
 
-/** Reverse lookup: move enum NAME (as stored in the JSON) → MoveId value. */
-const MOVE_BY_NAME = MoveId as unknown as Record<string, MoveId | undefined>;
+/** Mirror of `moveNameToEnumKey` in init-elite-redux-custom-moves.ts (the key style
+ *  the runtime installs for ER custom moves), so our name lookup matches the game. */
+function moveNameToEnumKey(moveName: string): string {
+  return moveName
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
 
-/** ER base species (by speciesConst) → its hand-audited egg moves. */
+/** Move enum NAME (as stored in the JSON) → MoveId value, for vanilla + ER customs. */
+const MOVE_BY_NAME: Record<string, MoveId | undefined> = Object.create(null);
+// Vanilla: name → value direction of the static enum.
+for (const [key, value] of Object.entries(MoveId)) {
+  if (typeof value === "number") {
+    MOVE_BY_NAME[key] = value;
+  }
+}
+// ER customs (and ER-rebalanced vanilla): name → pokerogue id from the drafts.
+// Vanilla wins on a name collision (don't clobber an existing enum entry).
+for (const draft of ER_MOVES) {
+  const pkrgId = ER_ID_MAP.moves[draft.id];
+  if (pkrgId === undefined) {
+    continue;
+  }
+  const key = moveNameToEnumKey(draft.name);
+  if (MOVE_BY_NAME[key] === undefined) {
+    MOVE_BY_NAME[key] = pkrgId as MoveId;
+  }
+}
+
+/** Base species (by speciesConst) → its egg moves (vanilla + ER customs). */
 export const ER_EGG_MOVES: Readonly<Record<string, readonly MoveId[]>> = Object.freeze(
   Object.fromEntries(
     Object.entries(eggMovesByName as Record<string, readonly string[]>).map(([speciesConst, names]) => [

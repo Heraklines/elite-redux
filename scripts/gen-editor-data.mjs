@@ -33,19 +33,37 @@ const nameByConst = {};
   }
 }
 
-// Build species list from the egg-move keys (the editable set).
+const titleCase = c =>
+  c
+    .replace(/^SPECIES_/, "")
+    .toLowerCase()
+    .split("_")
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+
+// Build species list from the egg-move keys (the editable set: vanilla + ER customs).
 const eggMoves = JSON.parse(read("src/data/elite-redux/er-egg-moves.json"));
 const species = Object.keys(eggMoves)
   .map(c => ({
     const: c,
-    name: nameByConst[c] ?? c.replace(/^SPECIES_/, "").replace(/_/g, " "),
+    name: nameByConst[c] ?? titleCase(c),
     slug: slugByConst[c] ?? null,
   }))
   .sort((a, b) => a.name.localeCompare(b.name));
 
-// All MoveId enum member names (skip the numeric reverse-mapping + NONE-likes).
+// Move enum-key style the game installs for ER custom moves (mirror of
+// moveNameToEnumKey in init-elite-redux-custom-moves.ts).
+const moveNameToEnumKey = name =>
+  name
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+// Move options = vanilla MoveId enum names ∪ ER custom move names. Both resolve
+// in-game (see er-egg-moves.ts), so the picker can offer the full move pool.
 const moves = [];
 {
+  // Vanilla: static MoveId enum members (skip numeric reverse-mapping).
   const t = read("src/enums/move-id.ts");
   const body = t.slice(t.indexOf("{") + 1, t.lastIndexOf("}"));
   for (const line of body.split("\n")) {
@@ -55,11 +73,26 @@ const moves = [];
     }
   }
 }
+let erMoveCount = 0;
+{
+  // ER customs: enum-key derived from each draft's display name.
+  const t = read("src/data/elite-redux/er-moves.ts");
+  const re = /"name":\s*"([^"]+)"/g;
+  let m;
+  while ((m = re.exec(t)) !== null) {
+    const key = moveNameToEnumKey(m[1]);
+    if (key && key !== "NONE" && /^[A-Z]/.test(key)) {
+      moves.push(key);
+      erMoveCount++;
+    }
+  }
+}
 const uniqueMoves = [...new Set(moves)].sort();
 
 mkdirSync("editor/data", { recursive: true });
 writeFileSync("editor/data/species.json", `${JSON.stringify(species, null, 2)}\n`);
 writeFileSync("editor/data/moves.json", `${JSON.stringify(uniqueMoves, null, 2)}\n`);
 console.log(
-  `species: ${species.length} (with slug: ${species.filter(s => s.slug).length})  moves: ${uniqueMoves.length}`,
+  `species: ${species.length} (with slug: ${species.filter(s => s.slug).length})  `
+    + `moves: ${uniqueMoves.length} (incl. ${erMoveCount} ER custom names)`,
 );

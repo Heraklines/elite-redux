@@ -101,10 +101,15 @@ function onSlotInput(e) {
 }
 
 function buildPayload() {
-  // Compact each species to its non-empty moves; validate names.
+  // Send ONLY changed species (a delta). The Worker merges them into the live
+  // file, so concurrent editors don't clobber each other's untouched species.
   const out = {};
   const bad = [];
   for (const s of SPECIES) {
+    const changed = JSON.stringify(current[s.const] || []) !== JSON.stringify(baseline[s.const] || []);
+    if (!changed) {
+      continue;
+    }
     const moves = (current[s.const] || []).map(m => (m || "").trim().toUpperCase()).filter(Boolean);
     if (moves.length === 0) {
       bad.push(`${s.name}: needs at least 1 move`);
