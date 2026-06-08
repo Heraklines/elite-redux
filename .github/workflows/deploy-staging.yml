@@ -36,7 +36,9 @@ jobs:
       - name: Stage standalone asset metadata
         run: |
           mkdir -p assets
-          cp deploy/standalone-assets/* assets/
+          cp -v deploy/standalone-assets/* assets/
+          echo "=== assets/ after stage ==="
+          ls -la assets/
 
       - name: Write standalone login env
         run: |
@@ -46,7 +48,14 @@ jobs:
           } > .env.standalone.local
 
       - name: Build standalone bundle
-        run: pnpm build:standalone
+        run: |
+          # Re-assert vendored asset metadata immediately before the build, in
+          # case anything (submodule sync, install hooks) cleared assets/.
+          mkdir -p assets
+          cp -f deploy/standalone-assets/* assets/
+          echo "=== assets/ right before build ==="
+          ls -la assets/
+          pnpm build:standalone
         env:
           NODE_ENV: production
 
