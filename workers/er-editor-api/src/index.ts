@@ -140,7 +140,8 @@ export default {
       } catch {
         return json({ ok: false, error: "invalid JSON body" }, 400, env);
       }
-      if (!env.EDITOR_PASSWORD || body.password !== env.EDITOR_PASSWORD) {
+      // Open mode: if no EDITOR_PASSWORD secret is configured, skip the gate.
+      if (env.EDITOR_PASSWORD && body.password !== env.EDITOR_PASSWORD) {
         return json({ ok: false, error: "unauthorized" }, 401, env);
       }
       const dep = await triggerDeploy(env);
@@ -157,7 +158,8 @@ export default {
       } catch {
         return json({ ok: false, error: "invalid JSON body" }, 400, env);
       }
-      if (!env.EDITOR_PASSWORD || body.password !== env.EDITOR_PASSWORD) {
+      // Open mode: if no EDITOR_PASSWORD secret is configured, skip the gate.
+      if (env.EDITOR_PASSWORD && body.password !== env.EDITOR_PASSWORD) {
         return json({ ok: false, error: "unauthorized" }, 401, env);
       }
       const validated = validateEggMoves(body.eggMoves);
