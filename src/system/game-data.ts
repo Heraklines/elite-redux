@@ -548,6 +548,12 @@ export class GameData {
         loggedInUser.lastSessionSlot = Math.max(loggedInUser.lastSessionSlot, session.slot);
       }
     }
+    // Also seed the shared run-history / ghost-team pool from this device's local
+    // history (#217/#229). Dynamic import avoids rooting the heavy ghost-team /
+    // pokemon import chain into game-data; best-effort, never blocks the import.
+    void import("#data/elite-redux/er-ghost-teams")
+      .then(m => m.uploadLocalRunHistory())
+      .catch(err => console.error("Run-history seed failed:", err));
     return success;
   }
 

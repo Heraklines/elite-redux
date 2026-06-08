@@ -29,6 +29,7 @@
 
 import { loggedInUser } from "#app/account";
 import { globalScene } from "#app/global-scene";
+import { bypassLogin } from "#constants/app-constants";
 import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ghostWavesForCurrentRun, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
 import { TrainerPartyTemplate } from "#data/trainers/trainer-party-template";
@@ -38,6 +39,8 @@ import { TrainerSlot } from "#enums/trainer-slot";
 import type { EnemyPokemon } from "#field/pokemon";
 import type { Trainer } from "#field/trainer";
 import { PokemonMove } from "#moves/pokemon-move";
+import { sessionIdKey } from "#utils/common";
+import { getCookie } from "#utils/cookies";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 export { ghostWavesForCurrentRun, isErGhostWave };
@@ -68,19 +71,73 @@ export interface GhostTeamSnapshot {
   timestamp: number;
   /** Up to 6 serialised members. */
   party: GhostMember[];
+  /** The opponent that ended the run (trainer/rival/ghost name, or wild species). */
+  opponentName?: string | undefined;
+  /** The opponent's serialised party (for "who beat whom" + future rematches). */
+  opponentParty?: GhostMember[] | undefined;
 }
 
 const MAX_PARTY = 6;
-const LOCAL_STORE_CAP = 25;
-const MIN_RECORD_WAVE = 100;
+/** Local backlog of past runs kept per device (seeds the pool on first login). */
+const LOCAL_STORE_CAP = 100;
 const PREFETCH_WAVE = 150;
 
 // -----------------------------------------------------------------------------
 // Env + local storage helpers.
 // -----------------------------------------------------------------------------
 function endpoint(): string {
-  const value = (import.meta.env as Record<string, unknown> | undefined)?.VITE_GHOST_ENDPOINT;
-  return typeof value === "string" ? value : "";
+  return import.meta.env.VITE_GHOST_ENDPOINT ?? "";
+}
+
+/** The cloud save/account Worker base URL (run history lives there, per-account). */
+function serverBase(): string {
+  return import.meta.env.VITE_SERVER_URL ?? "";
+}
+
+/** Authenticated POST of one run to the shared pool. Returns false (never throws)
+ * when offline / guest / unauthenticated, so callers can fall back. */
+async function postRunToServer(snapshot: GhostTeamSnapshot): Promise<boolean> {
+  const base = serverBase();
+  const token = getCookie(sessionIdKey);
+  if (bypassLogin || !base || !token || typeof fetch !== "function") {
+    return false;
+  }
+  try {
+    const res = await fetch(`${base}/savedata/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: token },
+      body: JSON.stringify(snapshot),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Sample winning runs from the shared pool (other players). Empty on any failure. */
+async function sampleRunsFromServer(
+  difficulty: ErDifficulty,
+  count: number,
+  minWave: number,
+): Promise<GhostTeamSnapshot[]> {
+  const base = serverBase();
+  const token = getCookie(sessionIdKey);
+  if (bypassLogin || !base || !token || typeof fetch !== "function") {
+    return [];
+  }
+  try {
+    const res = await fetch(
+      `${base}/savedata/run/sample?difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}`,
+      { method: "GET", headers: { Accept: "application/json", Authorization: token } },
+    );
+    if (!res.ok) {
+      return [];
+    }
+    const data = await res.json();
+    return (Array.isArray(data) ? data : (data?.teams ?? [])).filter(isValidSnapshot) as GhostTeamSnapshot[];
+  } catch {
+    return [];
+  }
 }
 
 function localStoreKey(): string {
@@ -141,6 +198,7 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
   }
   const partyData = party.slice(0, MAX_PARTY).map(serializeMember);
   const waveReached = globalScene?.currentBattle?.waveIndex ?? 0;
+  const { name: opponentName, party: opponentParty } = captureOpponent();
   return {
     id: `${globalScene?.seed ?? "seed"}-${Date.now()}`,
     trainerName: loggedInUser?.username ?? "Trainer",
@@ -149,10 +207,38 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
     isVictory,
     timestamp: Date.now(),
     party: partyData,
+    opponentName,
+    opponentParty,
   };
 }
 
+/** Snapshot the enemy that ended the run: trainer/rival name + their party, or the
+ * wild Pokémon's name. Best-effort and never throws. */
+function captureOpponent(): { name?: string | undefined; party?: GhostMember[] | undefined } {
+  try {
+    const battle = globalScene?.currentBattle;
+    const enemies = battle?.enemyParty ?? [];
+    if (enemies.length === 0) {
+      return {};
+    }
+    const party = enemies.slice(0, MAX_PARTY).map(serializeMember);
+    const trainer = battle?.trainer;
+    const name = trainer
+      ? trainer.getName(TrainerSlot.TRAINER, true)
+      : ((enemies[0] as { species?: { name?: string } })?.species?.name ?? undefined);
+    return { name, party };
+  } catch {
+    // Opponent capture is non-essential; never let it break the game-over flow.
+    return {};
+  }
+}
+
 async function uploadGhostTeam(snapshot: GhostTeamSnapshot): Promise<boolean> {
+  // Preferred: the authenticated shared run-history pool on the cloud Worker.
+  if (await postRunToServer(snapshot)) {
+    return true;
+  }
+  // Fallback: optional standalone ghost endpoint (legacy / guest builds).
   const url = endpoint();
   if (!url || typeof fetch !== "function") {
     return false;
@@ -170,16 +256,56 @@ async function uploadGhostTeam(snapshot: GhostTeamSnapshot): Promise<boolean> {
 }
 
 /**
+ * Upload every locally-stored run-history snapshot to the shared pool. Called on
+ * first-login import (#229) so an existing player's accumulated local history
+ * seeds the cross-player ghost pool. Idempotent server-side (dedup by snapshot id).
+ * Best-effort: never throws, no-op under guest mode. Returns the number attempted.
+ */
+export async function uploadLocalRunHistory(): Promise<number> {
+  if (bypassLogin || typeof localStorage === "undefined") {
+    return 0;
+  }
+  let attempted = 0;
+  try {
+    const seen = new Set<string>();
+    for (const key of Object.keys(localStorage)) {
+      if (!key.startsWith("er-ghost-teams_")) {
+        continue;
+      }
+      let list: unknown;
+      try {
+        list = JSON.parse(localStorage.getItem(key) ?? "[]");
+      } catch {
+        continue;
+      }
+      if (!Array.isArray(list)) {
+        continue;
+      }
+      for (const snap of list) {
+        if (!isValidSnapshot(snap) || seen.has(snap.id)) {
+          continue;
+        }
+        seen.add(snap.id);
+        attempted++;
+        await postRunToServer(snap);
+      }
+    }
+  } catch {
+    // Seeding run history is best-effort; never let it break the import flow.
+  }
+  return attempted;
+}
+
+/**
  * Record the just-finished run as a ghost team: store it locally (so the player
  * always has a self-seeded pool) and upload it to the shared API when one is
  * configured. Only records victories or sufficiently deep runs. Never throws.
  */
 export function recordGhostTeamOnGameOver(isVictory: boolean): void {
   try {
-    const wave = globalScene?.currentBattle?.waveIndex ?? 0;
-    if (!isVictory && wave < MIN_RECORD_WAVE) {
-      return;
-    }
+    // Record EVERY finished run — wins AND losses, at any wave — for the shared
+    // run-history pool (#217 ghost teams + balancing data). captureGhostTeam bails
+    // on an empty party, so a trivial wave-0 state is skipped automatically.
     const snapshot = captureGhostTeam(isVictory);
     if (!snapshot) {
       return;
@@ -208,15 +334,21 @@ function isValidSnapshot(s: unknown): s is GhostTeamSnapshot {
   );
 }
 
-async function fetchGhostTeams(difficulty: ErDifficulty, count: number): Promise<GhostTeamSnapshot[]> {
+async function fetchGhostTeams(difficulty: ErDifficulty, count: number, minWave: number): Promise<GhostTeamSnapshot[]> {
+  // Preferred: the authenticated shared pool (other players' runs that got deep
+  // enough — `minWave` keeps shallow runs out of late ghost waves).
+  const fromServer = await sampleRunsFromServer(difficulty, count, minWave);
+  if (fromServer.length > 0) {
+    return fromServer;
+  }
   const url = endpoint();
   if (url && typeof fetch === "function") {
     try {
       const sep = url.includes("?") ? "&" : "?";
-      const res = await fetch(`${url}${sep}difficulty=${encodeURIComponent(difficulty)}&count=${count}`, {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      });
+      const res = await fetch(
+        `${url}${sep}difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}`,
+        { method: "GET", headers: { Accept: "application/json" } },
+      );
       if (res.ok) {
         const data = await res.json();
         const list = (Array.isArray(data) ? data : (data?.teams ?? [])).filter(isValidSnapshot);
@@ -228,9 +360,9 @@ async function fetchGhostTeams(difficulty: ErDifficulty, count: number): Promise
       // Fall through to the local pool.
     }
   }
-  // Local fallback: the player's own stored teams (prefer the right difficulty),
-  // most-recent first.
-  const local = loadLocalGhostTeams().filter(isValidSnapshot);
+  // Local fallback: the player's own stored teams that reached at least minWave
+  // (prefer the right difficulty), most-recent first.
+  const local = loadLocalGhostTeams().filter(s => isValidSnapshot(s) && s.waveReached >= minWave);
   const matched = local.filter(s => s.difficulty === difficulty);
   return (matched.length > 0 ? matched : local).slice().reverse();
 }
@@ -248,7 +380,10 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
     return;
   }
   prefetchStarted = true;
-  void fetchGhostTeams(getErDifficulty(), waves.length)
+  // Pool floor = the earliest ghost wave; takeGhostForWave then assigns each
+  // fetched team only to waves at/below how far that run actually reached.
+  const minWave = Math.min(...waves);
+  void fetchGhostTeams(getErDifficulty(), waves.length, minWave)
     .then(teams => {
       prefetched = teams;
     })
@@ -270,7 +405,12 @@ export function takeGhostForWave(waveIndex: number): GhostTeamSnapshot | null {
     return existing;
   }
   const pool = prefetched ?? [];
-  const next = pool.find(s => !usedGhostIds.has(s.id));
+  // A run that ended at wave W can only be fielded at waves <= W (its team is
+  // only proven viable up to where it died). Prefer the shallowest still-eligible
+  // team so deeper teams stay available for later ghost waves.
+  const next = pool
+    .filter(s => !usedGhostIds.has(s.id) && s.waveReached >= waveIndex)
+    .sort((a, b) => a.waveReached - b.waveReached)[0];
   if (!next) {
     return null;
   }

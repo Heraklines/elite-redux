@@ -40,3 +40,23 @@ CREATE TABLE IF NOT EXISTS session_saves (
   updated_at INTEGER NOT NULL,
   PRIMARY KEY (user_id, slot)
 );
+
+-- Run history (#217 ghost teams + balancing analytics). One row per finished run
+-- (win or loss), append-only. Winning rows are sampled to build the shared pool of
+-- "ghost trainers" other players face. `id` is client-generated (seed+timestamp)
+-- so re-uploading a player's local history is idempotent (ON CONFLICT DO NOTHING).
+-- `player_team` / `opponent_team` are JSON arrays of serialised party members.
+CREATE TABLE IF NOT EXISTS runs (
+  id            TEXT    PRIMARY KEY,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  username      TEXT,
+  outcome       TEXT,                  -- 'victory' | 'defeat'
+  difficulty    TEXT,                  -- 'ace' | 'elite' | 'hell'
+  mode          TEXT,
+  wave          INTEGER,
+  created_at    INTEGER NOT NULL,
+  player_team   TEXT    NOT NULL,
+  opponent_name TEXT,
+  opponent_team TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_runs_sample ON runs (difficulty, outcome, created_at);

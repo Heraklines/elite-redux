@@ -541,6 +541,124 @@ function handleDailySeed(cors: Record<string, string>): Response {
 }
 
 // #endregion
+// #region run history (ghost-team pool + analytics)
+
+/** Record a finished run (win or loss). Idempotent by client-generated `id`. */
+async function handleRunCreate(
+  request: Request,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const raw = await readSaveBody(request);
+  if (raw === null) {
+    return text("Run data too large.", 413, cors);
+  }
+  let run: {
+    id?: unknown;
+    outcome?: unknown;
+    isVictory?: unknown;
+    difficulty?: unknown;
+    mode?: unknown;
+    wave?: unknown;
+    waveReached?: unknown;
+    timestamp?: unknown;
+    party?: unknown;
+    opponentName?: unknown;
+    opponentParty?: unknown;
+  };
+  try {
+    run = JSON.parse(raw);
+  } catch {
+    return text("Invalid run data.", 400, cors);
+  }
+  const id = typeof run.id === "string" && run.id.length > 0 ? run.id : null;
+  const party = Array.isArray(run.party) ? run.party : null;
+  if (!id || !party) {
+    return text("Run is missing id or party.", 400, cors);
+  }
+  const outcome =
+    run.outcome === "victory" || run.outcome === "defeat" ? run.outcome : run.isVictory ? "victory" : "defeat";
+  const wave = Number.parseInt(String(run.wave ?? run.waveReached ?? ""), 10);
+  const createdAt = Number.parseInt(String(run.timestamp ?? ""), 10);
+  await env.DB.prepare(
+    `INSERT INTO runs (id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+       ON CONFLICT(id) DO NOTHING`,
+  )
+    .bind(
+      id,
+      auth.uid,
+      auth.u,
+      outcome,
+      typeof run.difficulty === "string" ? run.difficulty : null,
+      typeof run.mode === "string" ? run.mode : null,
+      Number.isFinite(wave) ? wave : null,
+      Number.isFinite(createdAt) ? createdAt : Date.now(),
+      JSON.stringify(party),
+      typeof run.opponentName === "string" ? run.opponentName : null,
+      Array.isArray(run.opponentParty) ? JSON.stringify(run.opponentParty) : null,
+    )
+    .run();
+  return text("", 200, cors);
+}
+
+/** Sample winning runs (excluding the caller's own) as ghost-team snapshots. */
+async function handleRunSample(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const difficulty = url.searchParams.get("difficulty") ?? "";
+  const requested = Number.parseInt(url.searchParams.get("count") ?? "", 10);
+  const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 20) : 8;
+  // Only sample runs that reached at least `minWave` — a run that ended at wave W
+  // must never be fielded as a ghost trainer past wave W (its team is only proven
+  // viable up to where it died).
+  const minWaveParsed = Number.parseInt(url.searchParams.get("minWave") ?? "", 10);
+  const minWave = Number.isFinite(minWaveParsed) ? Math.max(minWaveParsed, 0) : 0;
+  const { results } = await env.DB.prepare(
+    `SELECT id, username, outcome, difficulty, wave, created_at, player_team, opponent_name, opponent_team
+       FROM runs
+       WHERE difficulty = ?1 AND user_id != ?2 AND wave >= ?4
+       ORDER BY RANDOM() LIMIT ?3`,
+  )
+    .bind(difficulty, auth.uid, count, minWave)
+    .all<{
+      id: string;
+      username: string | null;
+      outcome: string | null;
+      difficulty: string | null;
+      wave: number | null;
+      created_at: number;
+      player_team: string;
+      opponent_name: string | null;
+      opponent_team: string | null;
+    }>();
+  const teams = (results ?? [])
+    .map(row => {
+      try {
+        return {
+          id: row.id,
+          trainerName: row.username ?? "Trainer",
+          difficulty: row.difficulty ?? difficulty,
+          waveReached: row.wave ?? 0,
+          isVictory: row.outcome === "victory",
+          timestamp: row.created_at,
+          party: JSON.parse(row.player_team),
+          opponentName: row.opponent_name ?? undefined,
+          opponentParty: row.opponent_team ? JSON.parse(row.opponent_team) : undefined,
+        };
+      } catch {
+        return null;
+      }
+    })
+    .filter(t => t !== null);
+  return json({ teams }, 200, cors);
+}
+
+// #endregion
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -613,6 +731,12 @@ export default {
       }
       if (pathname === "/savedata/updateall" && method === "POST") {
         return await handleUpdateAll(request, auth, env, cors);
+      }
+      if (pathname === "/savedata/run" && method === "POST") {
+        return await handleRunCreate(request, auth, env, cors);
+      }
+      if (pathname === "/savedata/run/sample" && method === "GET") {
+        return await handleRunSample(url, auth, env, cors);
       }
 
       return text("Not found.", 404, cors);
