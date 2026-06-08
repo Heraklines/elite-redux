@@ -40,6 +40,7 @@
 // is a regular property).
 // =============================================================================
 
+import { globalScene } from "#app/global-scene";
 import { ChargeAnim } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
 import { ER_FLAG_NAMES_LIST } from "#data/elite-redux/er-flag-mapping";
@@ -699,6 +700,18 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
       break;
     case 1013: // Chiller — 3 snowballs; 10% frostbite handled by chance-status row
       move.attr(MultiHitAttr, MultiHitType.THREE);
+      break;
+    case 832: // Boiling Flame — Fire move that "deals increased damage in rain".
+      // Fire is naturally HALVED in rain (0.5×), so a ×3 power multiplier nets a
+      // 1.5× hit in rain (mirroring Water's rain boost) instead of being weakened.
+      move.attr(MovePowerMultiplierAttr, () => {
+        const w = globalScene.arena.weather;
+        const inRain =
+          !!w
+          && !w.isEffectSuppressed()
+          && (w.weatherType === WeatherType.RAIN || w.weatherType === WeatherType.HEAVY_RAIN);
+        return inRain ? 3 : 1;
+      });
       break;
     // ---- Multi-hit (3, escalating power) ----
     case 826: // Whirling Strikes
