@@ -1,0 +1,16 @@
+# Cloudflare Worker — ISOLATED STAGING for the cloud-save/account API.
+# Separate worker + separate D1 from production; safe to test against without
+# touching real player data. Deploy: wrangler deploy --config wrangler.staging.toml
+name = "er-save-api-staging"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "er-saves-staging"
+database_id = "7dc09f64-6810-4756-8c0f-e44f7d382eed"
+
+[vars]
+ALLOWED_ORIGIN = "*"
+MIN_USERNAME_LENGTH = "3"
+MIN_PASSWORD_LENGTH = "6"
