@@ -30,7 +30,6 @@ enum MenuOptions {
   POKEDEX,
   MANAGE_DATA,
   COMMUNITY,
-  REPORT_BUG,
   SAVE_AND_QUIT,
   LOG_OUT,
 }
@@ -511,6 +510,29 @@ export class MenuUiHandler extends MessageUiHandler {
         keepOpen: true,
       });
     }
+    // ER: Report Bug lives in the Community submenu (not the top-level menu) so
+    // the in-battle pause menu doesn't overflow once Save & Quit + Log Out are
+    // also present under the login build.
+    communityOptions.push({
+      label: i18next.t("menuUiHandler:reportBug"),
+      handler: () => {
+        globalScene.ui.setOverlayMode(UiMode.BUG_REPORT_FORM, {
+          buttonActions: [
+            (description: string) => {
+              globalScene.ui.revertMode().then(() => {
+                submitBugReport(description).then(result => {
+                  const key = result.sent ? "menuUiHandler:reportBugSent" : "menuUiHandler:reportBugSaved";
+                  globalScene.ui.showText(i18next.t(key), null, () => globalScene.ui.showText("", 0), 1500);
+                });
+              });
+            },
+            () => globalScene.ui.revertMode(),
+          ],
+        });
+        return true;
+      },
+      keepOpen: true,
+    });
     communityOptions.push({
       label: i18next.t("menuUiHandler:cancel"),
       handler: () => {
@@ -672,24 +694,6 @@ export class MenuUiHandler extends MessageUiHandler {
           break;
         case MenuOptions.COMMUNITY:
           ui.setOverlayMode(UiMode.MENU_OPTION_SELECT, this.communityConfig);
-          success = true;
-          break;
-        case MenuOptions.REPORT_BUG:
-          ui.setOverlayMode(UiMode.BUG_REPORT_FORM, {
-            buttonActions: [
-              (description: string) => {
-                // Close the form, then submit (clipboard + download + optional
-                // POST) and confirm via a transient message.
-                ui.revertMode().then(() => {
-                  submitBugReport(description).then(result => {
-                    const key = result.sent ? "menuUiHandler:reportBugSent" : "menuUiHandler:reportBugSaved";
-                    ui.showText(i18next.t(key), null, () => ui.showText("", 0), 1500);
-                  });
-                });
-              },
-              () => ui.revertMode(),
-            ],
-          });
           success = true;
           break;
         case MenuOptions.SAVE_AND_QUIT: {

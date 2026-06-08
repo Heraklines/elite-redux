@@ -257,12 +257,21 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       setCategory(move, MoveCategory.PHYSICAL);
     },
   ],
-  // DECORATE: vanilla status (ally Atk/SpAtk +2) → ER Special Fairy damaging.
-  // The ally-boost rider stays via the existing StatStageChange(self/ally) attrs.
+  // DECORATE: vanilla status (ally Atk/SpAtk +2, ally-targeted, no power) → ER
+  // Special Fairy DAMAGING move (80 BP) that also raises the USER's Atk/SpAtk.
+  // The old patch only flipped the category, leaving power = -1, the
+  // `targetsAllyDefault` target, and the ally-targeted StatStageChange — so it
+  // chip-damaged your OWN ally and buffed the wrong side. Aim it at the foe and
+  // redirect the +2 boost to self.
   [
     MoveId.DECORATE,
     move => {
       setCategory(move, MoveCategory.SPECIAL);
+      move.power = 80;
+      move.accuracy = 100;
+      move.moveTarget = MoveTarget.NEAR_OTHER;
+      removeAttrsByName(move, ["StatStageChangeAttr"]);
+      addAttrUnique(move, new StatStageChangeAttr([Stat.ATK, Stat.SPATK], 2, true));
     },
   ],
   // CAPTIVATE: vanilla status (SpAtk -2 opposite-gender) → ER Special Fairy damaging.
@@ -872,6 +881,7 @@ interface MutableMove {
   _type: PokemonType;
   _category: MoveCategory;
   flags: number;
+  power: number;
   accuracy: number;
   chance: number;
   attrs: MoveAttr[];
