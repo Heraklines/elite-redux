@@ -184,7 +184,8 @@ const ERR = "#c0392b";
 // deploy=false → just commit. deploy=true → commit (if any changes) then deploy,
 // or deploy-only when there's nothing to commit.
 async function commit({ deploy }) {
-  const password = $("#password").value;
+  // Trim: pasted passwords / autofill often carry a stray space → 401.
+  const password = $("#password").value.trim();
   if (!password) {
     setStatus("Enter the editor password first.", ERR);
     return;
