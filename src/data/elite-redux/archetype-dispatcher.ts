@@ -5926,11 +5926,13 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // special moves by 35%." Simple damage reduction (all moves, 0.35).
       return ok([new DamageReductionAbAttr({ reduction: 0.35, filter: { kind: "all" } })]);
     case 869:
-      // Logical id 871 is Fire Aspect — "Absorbs fire moves and always
-      // burns with fire." Fire immunity (heal) + auto-burn rider. The auto-
-      // burn-on-defend portion needs PreDefend status-on-immunity, which
-      // doesn't exist as a single primitive. Wire the heal portion only.
-      return ok([new TypeAbsorbHealAbAttr({ type: PokemonType.FIRE, healFraction: 0.25 })]);
+      // Logical id 871 is Fire Aspect — "Absorbs fire moves and always burns
+      // with fire." Fire immunity (heal) + the holder's damaging attacks always
+      // inflict BURN (100%, any damaging move — not just contact).
+      return ok([
+        new TypeAbsorbHealAbAttr({ type: PokemonType.FIRE, healFraction: 0.25 }),
+        new ChanceStatusOnAttackAbAttr({ chance: 100, effects: [StatusEffect.BURN], contactRequired: false }),
+      ]);
     case 911:
       // Musical Notes — "Status moves become sound-based." Injects SOUND_BASED
       // onto the holder's status moves; consumers routed through the user-aware
