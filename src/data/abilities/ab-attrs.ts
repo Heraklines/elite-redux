@@ -973,13 +973,9 @@ export class PostDefendTypeChangeAbAttr extends PostDefendAbAttr {
 export class PreHitResistTypeChangeAbAttr extends AbAttr {
   /** The best single type to resist `moveType`, or `null` if no type improves on the holder's current matchup. */
   private static bestResistType(moveType: PokemonType, pokemon: Pokemon): PokemonType | null {
-    // Effectiveness of the move against the holder's CURRENT typing (product).
-    let currentMultiplier = 1;
-    for (const t of pokemon.getTypes(true, true)) {
-      currentMultiplier *= getTypeDamageMultiplier(moveType, t);
-    }
+    const currentType = pokemon.getTypes(true, true)[0] ?? PokemonType.NORMAL;
     let bestType: PokemonType | null = null;
-    let bestMultiplier = currentMultiplier;
+    let bestMultiplier = getTypeDamageMultiplier(moveType, currentType);
     // Real types are NORMAL(0)…FAIRY(17); skip UNKNOWN(-1) and STELLAR.
     for (let candidate = PokemonType.NORMAL; candidate <= PokemonType.FAIRY; candidate++) {
       const multiplier = getTypeDamageMultiplier(moveType, candidate);
@@ -992,7 +988,12 @@ export class PreHitResistTypeChangeAbAttr extends AbAttr {
   }
 
   override canApply({ pokemon, opponent, move }: AugmentMoveInteractionAbAttrParams): boolean {
-    if (pokemon.isTerastallized || move.category === MoveCategory.STATUS || move.hasAttr("TypelessAttr")) {
+    if (
+      pokemon === opponent
+      || pokemon.isTerastallized
+      || move.category === MoveCategory.STATUS
+      || move.hasAttr("TypelessAttr")
+    ) {
       return false;
     }
     const moveType = opponent.getMoveType(move);

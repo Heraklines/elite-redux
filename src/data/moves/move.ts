@@ -7210,6 +7210,61 @@ function userHasAngelsWrath(user: Pokemon | null | undefined): boolean {
   return !!user?.hasAbility(ErAbilityId.ANGEL_S_WRATH as unknown as AbilityId);
 }
 
+function addAngelsWrathMoveLock(user: Pokemon, target: Pokemon, move: Move, tagType: BattlerTagType): boolean {
+  const lockedMove = target.getMoveset()[0]?.moveId;
+  if (lockedMove === undefined || lockedMove === MoveId.NONE || lockedMove === MoveId.STRUGGLE) {
+    return false;
+  }
+  const history = target.getMoveHistory();
+  const previousLength = history.length;
+  const temporaryMove: TurnMove = {
+    move: lockedMove,
+    targets: [user.getBattlerIndex()],
+    result: MoveResult.SUCCESS,
+    useMode: MoveUseMode.NORMAL,
+  };
+  history.push(temporaryMove);
+  const added = target.addTag(tagType, 0, move.id, user.id);
+  if (added) {
+    const tag = target.getTag(tagType);
+    if (tag) {
+      tag.turnCount = 2;
+    }
+  }
+  history.length = previousLength;
+  return added;
+}
+
+export class AngelsWrathTackleAttr extends MoveEffectAttr {
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    if (!super.apply(user, target, move, args) || !userHasAngelsWrath(user)) {
+      return false;
+    }
+    if (target.getTag(BattlerTagType.ENCORE) || target.getTag(BattlerTagType.DISABLED)) {
+      return false;
+    }
+    const encored = addAngelsWrathMoveLock(user, target, move, BattlerTagType.ENCORE);
+    const disabled = addAngelsWrathMoveLock(user, target, move, BattlerTagType.DISABLED);
+    return encored || disabled;
+  }
+}
+
+export class AngelsWrathPoisonStingStatusAttr extends StatusEffectAttr {
+  constructor() {
+    super(StatusEffect.POISON);
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    if (!userHasAngelsWrath(user)) {
+      return super.apply(user, target, move, args);
+    }
+    if (!this.canApply(user, target, move, args)) {
+      return false;
+    }
+    return target.trySetStatus(StatusEffect.TOXIC, user, undefined, null, false, true);
+  }
+}
+
 /** Bug Bite under Angel's Wrath also drains HP equal to the damage dealt. */
 export class AngelsWrathDrainAttr extends HitHealAttr {
   override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
@@ -7296,6 +7351,36 @@ export class AngelsWrathSteelSuperEffectiveAttr extends MoveTypeChartOverrideAtt
     }
     args[0].value = Math.max(args[0].value, 2);
     return true;
+  }
+}
+
+export class AngelsWrathGroundSuperEffectiveAttr extends MoveTypeChartOverrideAttr {
+  public override apply(
+    user: Pokemon,
+    _target: Pokemon,
+    _move: Move,
+    args: [multiplier: NumberHolder, types: readonly PokemonType[], moveType: PokemonType],
+  ): boolean {
+    if (!userHasAngelsWrath(user) || !args[1].includes(PokemonType.GROUND)) {
+      return false;
+    }
+    args[0].value = Math.max(args[0].value, 2);
+    return true;
+  }
+}
+
+export class AngelsWrathElectrowebAttr extends MoveEffectAttr {
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    if (!super.apply(user, target, move, args) || !userHasAngelsWrath(user)) {
+      return false;
+    }
+    let applied = target.addTag(BattlerTagType.TRAPPED, 1, move.id, user.id);
+    const stages = -6 - target.getStatStage(Stat.SPD);
+    if (stages < 0) {
+      globalScene.phaseManager.unshiftNew("StatStageChangePhase", target.getBattlerIndex(), false, [Stat.SPD], stages);
+      applied = true;
+    }
+    return applied;
   }
 }
 
@@ -9712,7 +9797,9 @@ export function initMoves() {
     new AttackMove(MoveId.HORN_DRILL, PokemonType.NORMAL, MoveCategory.PHYSICAL, 250, 30, 5, -1, 0, 1)
       .attr(OneHitKOAttr)
       .attr(OneHitKOAccuracyAttr),
-    new AttackMove(MoveId.TACKLE, PokemonType.NORMAL, MoveCategory.PHYSICAL, 40, 100, 35, -1, 0, 1),
+    new AttackMove(MoveId.TACKLE, PokemonType.NORMAL, MoveCategory.PHYSICAL, 40, 100, 35, -1, 0, 1).attr(
+      AngelsWrathTackleAttr,
+    ),
     new AttackMove(MoveId.BODY_SLAM, PokemonType.NORMAL, MoveCategory.PHYSICAL, 85, 100, 15, 30, 0, 1)
       .attr(AlwaysHitMinimizeAttr)
       .attr(HitsTagForDoubleDamageAttr, BattlerTagType.MINIMIZED)
@@ -9735,7 +9822,7 @@ export function initMoves() {
       .target(MoveTarget.ALL_NEAR_ENEMIES)
       .reflectable(),
     new AttackMove(MoveId.POISON_STING, PokemonType.POISON, MoveCategory.PHYSICAL, 15, 100, 35, 30, 0, 1)
-      .attr(StatusEffectAttr, StatusEffect.POISON)
+      .attr(AngelsWrathPoisonStingStatusAttr)
       // ER Angel's Wrath: super-effective on Steel (no-op for other users).
       .attr(AngelsWrathSteelSuperEffectiveAttr)
       .makesContact(false),
@@ -11460,7 +11547,9 @@ export function initMoves() {
     new SelfStatusMove(MoveId.WORK_UP, PokemonType.NORMAL, -1, 30, -1, 0, 5) //
       .attr(StatStageChangeAttr, [Stat.ATK, Stat.SPATK], 1, true),
     new AttackMove(MoveId.ELECTROWEB, PokemonType.ELECTRIC, MoveCategory.SPECIAL, 55, 95, 15, 100, 0, 5)
-      .attr(StatStageChangeAttr, [Stat.SPD], -1)
+      .attr(StatStageChangeAttr, [Stat.SPD], -1, false, { condition: user => !userHasAngelsWrath(user) })
+      .attr(AngelsWrathElectrowebAttr)
+      .attr(AngelsWrathGroundSuperEffectiveAttr)
       .target(MoveTarget.ALL_NEAR_ENEMIES),
     new AttackMove(MoveId.WILD_CHARGE, PokemonType.ELECTRIC, MoveCategory.PHYSICAL, 90, 100, 15, -1, 0, 5)
       .attr(RecoilAttr)

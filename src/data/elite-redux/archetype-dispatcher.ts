@@ -2271,8 +2271,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([
         new PreHitResistTypeChangeAbAttr(),
         new PokemonTypeChangeAbAttr(),
-        new ReceivedMoveDamageMultiplierAbAttr((_target, _user, move) => move.category === MoveCategory.PHYSICAL, 0.5),
-        new ReceivedMoveDamageMultiplierAbAttr((_target, _user, move) => move.category === MoveCategory.SPECIAL, 0.5),
+        new ReceivedMoveDamageMultiplierAbAttr(() => true, 0.5),
       ]);
     case 405:
       // Loose Rocks — Stealth Rock deploys when hit by a contact move.
@@ -3490,47 +3489,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Hypnotist (was a 1.5× ACC StatMultiplier approximation — corrected).
       return ok([new SetMoveAccuracyAbAttr([MoveId.SING], 90)]);
     case 439: {
-      // Angel's Wrath — "Drastically alters all the user's moves." FULL:
-      // Tackle Encores+Disables, String Shot sets all hazards, Harden omniboosts,
-      // Iron Defense → stat-dropping King's Shield, Electroweb traps, Bug Bite
-      // heals damage dealt, Poison Sting badly poisons + is SE on Steel. All
-      // enhanced attacks get a large damage boost. The ER ROM also sets the
-      // attacking moves (TACKLE/POISON_STING/ELECTROWEB/BUG_BITE) to moveAcc=100.
-      //
-      // Wired here (attacking-move alterations + boost, via offense primitives):
-      //   - never-miss on the 4 attacking moves (ConditionalAlwaysHit)
-      //   - Tackle → Encore AND Disable the target (two 100% tag procs)
-      //   - Electroweb → Trap the target
-      //   - Poison Sting → badly poison (Toxic)
-      //   - +50% power ("large damage boost") on all 4 enhanced attacks
-      // Deferred (need move-effect-layer hooks that don't exist yet): Bug Bite
-      // heal-on-damage (drain), Poison Sting super-effective-vs-Steel (type
-      // chart), and the STATUS-move overhauls (Harden omniboost, Iron Defense →
-      // King's Shield, String Shot → all hazards) which PostAttack can't reach.
       const enhancedAttacks = [MoveId.TACKLE, MoveId.POISON_STING, MoveId.ELECTROWEB, MoveId.BUG_BITE];
       return ok([
         new ConditionalAlwaysHitAbAttr({ moveIds: enhancedAttacks }),
-        new ChanceBattlerTagOnAttackAbAttr({
-          chance: 100,
-          tags: [BattlerTagType.ENCORE],
-          filter: { moveId: MoveId.TACKLE },
-        }),
-        new ChanceBattlerTagOnAttackAbAttr({
-          chance: 100,
-          tags: [BattlerTagType.DISABLED],
-          filter: { moveId: MoveId.TACKLE },
-        }),
-        new ChanceBattlerTagOnAttackAbAttr({
-          chance: 100,
-          tags: [BattlerTagType.TRAPPED],
-          filter: { moveId: MoveId.ELECTROWEB },
-        }),
-        new ChanceStatusOnAttackAbAttr({
-          chance: 100,
-          effects: [StatusEffect.TOXIC],
-          filter: { moveId: MoveId.POISON_STING },
-        }),
-        new MovePowerBoostAbAttr((_user, _target, move) => enhancedAttacks.includes(move.id), 1.5),
+        new MovePowerBoostAbAttr((_user, _target, move) => move.id === MoveId.TACKLE, 2.5),
+        new MovePowerBoostAbAttr((_user, _target, move) => move.id === MoveId.POISON_STING, 3),
+        new MovePowerBoostAbAttr((_user, _target, move) => move.id === MoveId.ELECTROWEB, 155 / 55),
+        new MovePowerBoostAbAttr((_user, _target, move) => move.id === MoveId.BUG_BITE, 7 / 3),
       ]);
     }
     case 473:

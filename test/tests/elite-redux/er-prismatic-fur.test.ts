@@ -39,12 +39,9 @@ describe("ER Prismatic Fur — dispatch shape", () => {
     const res = dispatchBespoke(PRISMATIC_FUR_ER_ID);
     expect(res).not.toBeNull();
     const names = (res.attrs ?? []).map(a => a.constructor.name);
-    // Order matters: the resist swap must come first so the type change is in
-    // place before the rest of the interaction resolves.
     expect(names[0]).toBe("PreHitResistTypeChangeAbAttr");
-    expect(names).toContain("PokemonTypeChangeAbAttr"); // Protean
-    // Two ReceivedMoveDamageMultiplierAbAttr — Fur Coat (physical) + Ice Scales (special).
-    expect(names.filter(n => n === "ReceivedMoveDamageMultiplierAbAttr")).toHaveLength(2);
+    expect(names).toContain("PokemonTypeChangeAbAttr");
+    expect(names.filter(n => n === "ReceivedMoveDamageMultiplierAbAttr")).toHaveLength(1);
   });
 
   it("the registered ER ability carries the pre-hit resist primitive", () => {

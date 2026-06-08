@@ -4,27 +4,12 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// =============================================================================
-// Angel's Wrath 439 — "Drastically alters the user's moves." Verifies the
-// move alterations ER grants via the ability, AND that they DO NOT trigger for
-// a Pokémon that lacks the ability:
-//   - Poison Sting → badly poisons (Toxic) + super-effective on Steel
-//   - Electroweb    → traps the target
-//   - Tackle        → Encores + Disables the target
-//   - +50% power on the enhanced attacks
-//   - Harden        → omniboost (+1 to every stat)
-//   - Iron Defense  → King's Shield (no +2 Def)
-//   - String Shot   → sets every entry hazard on the foe's side
-//   - Bug Bite      → drains HP equal to the damage dealt
-//
-// Gated behind ER_SCENARIO=1.
-// =============================================================================
-
 import { allMoves } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
@@ -51,11 +36,15 @@ describe.skipIf(!RUN)("ER Angel's Wrath (439)", () => {
   it("Poison Sting badly poisons (Toxic) the target", async () => {
     game.override
       .battleStyle("single")
-      .ability(ER_ID_MAP.abilities[439] as AbilityId) // Angel's Wrath
+      .ability(ER_ID_MAP.abilities[439] as AbilityId)
       .moveset([MoveId.POISON_STING])
-      .enemySpecies(SpeciesId.RATTATA) // Normal — not poison/steel immune
+      .enemySpecies(SpeciesId.SNORLAX)
       .enemyAbility(AbilityId.BALL_FETCH)
-      .enemyMoveset(MoveId.SPLASH);
+      .enemyPassiveAbility(AbilityId.NONE)
+      .enemyMoveset(MoveId.HARDEN)
+      .enemyLevel(100)
+      .startingLevel(100)
+      .criticalHits(false);
     await game.classicMode.startBattle([SpeciesId.PIKACHU]);
 
     const enemy = game.field.getEnemyPokemon();
@@ -65,18 +54,47 @@ describe.skipIf(!RUN)("ER Angel's Wrath (439)", () => {
     expect(enemy.status?.effect).toBe(StatusEffect.TOXIC);
   });
 
-  it("grants a +50% power boost to the enhanced attacks", async () => {
+  it("grants the ER replacement power to the enhanced attacks", async () => {
     game.override
       .ability(ER_ID_MAP.abilities[439] as AbilityId)
-      .moveset([MoveId.TACKLE])
+      .moveset([MoveId.TACKLE, MoveId.POISON_STING, MoveId.ELECTROWEB, MoveId.BUG_BITE])
       .enemySpecies(SpeciesId.RATTATA)
       .enemyMoveset(MoveId.SPLASH);
     await game.classicMode.startBattle([SpeciesId.PIKACHU]);
 
     const user = game.field.getPlayerPokemon();
     const enemy = game.field.getEnemyPokemon();
-    // Tackle base power 40 → ×1.5 = 60 under Angel's Wrath.
-    expect(allMoves[MoveId.TACKLE].calculateBattlePower(user, enemy)).toBe(60);
+    expect(allMoves[MoveId.TACKLE].calculateBattlePower(user, enemy)).toBe(100);
+    expect(allMoves[MoveId.POISON_STING].calculateBattlePower(user, enemy)).toBe(120);
+    expect(allMoves[MoveId.ELECTROWEB].calculateBattlePower(user, enemy)).toBe(155);
+    expect(allMoves[MoveId.BUG_BITE].calculateBattlePower(user, enemy)).toBe(140);
+  });
+
+  it("Tackle encores and disables the target's first move for the ER timer", async () => {
+    game.override
+      .battleStyle("single")
+      .ability(AW())
+      .moveset([MoveId.TACKLE])
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemyPassiveAbility(AbilityId.NONE)
+      .enemyMoveset(MoveId.HARDEN)
+      .enemyLevel(100)
+      .startingLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.PIKACHU]);
+
+    const enemy = game.field.getEnemyPokemon();
+    game.move.use(MoveId.TACKLE);
+    await game.phaseInterceptor.to("MoveEndPhase", false);
+
+    const encore = enemy.getTag(BattlerTagType.ENCORE);
+    const disabled = enemy.getTag(BattlerTagType.DISABLED);
+    expect(encore).toBeDefined();
+    expect(disabled).toBeDefined();
+    expect(encore?.turnCount).toBe(2);
+    expect(disabled?.turnCount).toBe(2);
+    await game.toEndOfTurn();
   });
 
   it("Harden omniboosts (+1 to every stat) for an Angel's Wrath user", async () => {
@@ -184,7 +202,7 @@ describe.skipIf(!RUN)("ER Angel's Wrath (439)", () => {
     game.override
       .ability(AW())
       .moveset([MoveId.POISON_STING])
-      .enemySpecies(SpeciesId.MAGNEMITE) // Electric/Steel — normally immune to Poison
+      .enemySpecies(SpeciesId.MAGNEMITE)
       .enemyAbility(AbilityId.BALL_FETCH)
       .enemyMoveset(MoveId.SPLASH);
     await game.classicMode.startBattle([SpeciesId.PIKACHU]);
@@ -192,7 +210,39 @@ describe.skipIf(!RUN)("ER Angel's Wrath (439)", () => {
     const hpBefore = enemy.hp;
     game.move.use(MoveId.POISON_STING);
     await game.toEndOfTurn();
-    // Steel is normally 0× to Poison; Angel's Wrath makes it deal (super-effective) damage.
+    expect(enemy.hp).toBeLessThan(hpBefore);
+  });
+
+  it("Electroweb traps and bottoms out the target's Speed for an Angel's Wrath user", async () => {
+    game.override
+      .ability(AW())
+      .moveset([MoveId.ELECTROWEB])
+      .enemySpecies(SpeciesId.BLISSEY)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemyMoveset(MoveId.SPLASH)
+      .enemyLevel(100)
+      .startingLevel(100)
+      .criticalHits(false);
+    await game.classicMode.startBattle([SpeciesId.PIKACHU]);
+    const enemy = game.field.getEnemyPokemon();
+    game.move.use(MoveId.ELECTROWEB);
+    await game.toEndOfTurn();
+    expect(enemy.getTag(BattlerTagType.TRAPPED)).toBeDefined();
+    expect(enemy.getStatStage(Stat.SPD)).toBe(-6);
+  });
+
+  it("Electroweb is super-effective on Ground for an Angel's Wrath user", async () => {
+    game.override
+      .ability(AW())
+      .moveset([MoveId.ELECTROWEB])
+      .enemySpecies(SpeciesId.DIGLETT)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemyMoveset(MoveId.SPLASH);
+    await game.classicMode.startBattle([SpeciesId.PIKACHU]);
+    const enemy = game.field.getEnemyPokemon();
+    const hpBefore = enemy.hp;
+    game.move.use(MoveId.ELECTROWEB);
+    await game.toEndOfTurn();
     expect(enemy.hp).toBeLessThan(hpBefore);
   });
 

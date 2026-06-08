@@ -77,23 +77,16 @@ import { WeatherType } from "#enums/weather-type";
 import { describe, expect, it } from "vitest";
 
 describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () => {
-  it("er id 439 (Angel's Wrath) alters its attacking moves: never-miss + per-move riders + power boost", () => {
+  it("er id 439 (Angel's Wrath) alters its attacking moves: never-miss + exact power boosts", () => {
     const res = dispatchArchetype("bespoke", null, 439);
     expect(res.skipReason).toBeNull();
-    // never-miss retained on the 4 enhanced attacks
     expect(res.attrs.some(a => a instanceof ConditionalAlwaysHitAbAttr)).toBe(true);
-    // per-move tag/status riders gated by moveId
     const tagAttrs = res.attrs.filter(
       (a): a is ChanceBattlerTagOnAttackAbAttr => a instanceof ChanceBattlerTagOnAttackAbAttr,
     );
-    const tagFilters = tagAttrs.map(a => a.getFilter());
-    // Tackle → Encore + Disable (two procs), Electroweb → Trap.
-    expect(tagFilters.filter(f => f && "moveId" in f && f.moveId === MoveId.TACKLE)).toHaveLength(2);
-    expect(tagFilters.some(f => f && "moveId" in f && f.moveId === MoveId.ELECTROWEB)).toBe(true);
-    // Poison Sting → badly poison (Toxic), gated by moveId.
-    expect(res.attrs.some(a => a.constructor.name === "ChanceStatusOnAttackAbAttr")).toBe(true);
-    // "large damage boost" on the enhanced attacks.
-    expect(res.attrs.some(a => a.constructor.name === "MovePowerBoostAbAttr")).toBe(true);
+    expect(tagAttrs).toHaveLength(0);
+    expect(res.attrs.some(a => a.constructor.name === "ChanceStatusOnAttackAbAttr")).toBe(false);
+    expect(res.attrs.filter(a => a.constructor.name === "MovePowerBoostAbAttr")).toHaveLength(4);
   });
 
   it("er id 715 (Hover) wires Psychic type-add + Ground-move immunity + FloatAbAttr ungrounding", () => {

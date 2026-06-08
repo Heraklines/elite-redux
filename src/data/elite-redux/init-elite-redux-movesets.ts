@@ -37,8 +37,20 @@ import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { allMoves } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
-import type { MoveId } from "#enums/move-id";
+import { MoveId } from "#enums/move-id";
+import { SpeciesId } from "#enums/species-id";
 import type { LevelMoves } from "#types/pokemon-level-moves";
+
+const CASCOON_PRIMAL_ER_ID = 2157;
+const CASCOON_ANGELS_WRATH_MOVES: LevelMoves = [
+  [1, MoveId.TACKLE],
+  [1, MoveId.POISON_STING],
+  [1, MoveId.STRING_SHOT],
+  [1, MoveId.HARDEN],
+  [1, MoveId.IRON_DEFENSE],
+  [1, MoveId.ELECTROWEB],
+  [1, MoveId.BUG_BITE],
+];
 
 /** Aggregated result of a single `initEliteReduxMovesets()` run. */
 export interface InitEliteReduxMovesetsResult {
@@ -131,5 +143,22 @@ export function initEliteReduxMovesets(): InitEliteReduxMovesetsResult {
     result.movesetEntriesApplied += translated.length;
   }
 
+  installCascoonAngelsWrathMoves(table, SpeciesId.CASCOON);
+  installCascoonAngelsWrathMoves(table, ER_ID_MAP.species[CASCOON_PRIMAL_ER_ID]);
+
   return result;
+}
+
+function installCascoonAngelsWrathMoves(table: Record<number, LevelMoves>, speciesId: number | undefined): void {
+  if (speciesId === undefined) {
+    return;
+  }
+  const moves = table[speciesId] ? [...table[speciesId]] : [];
+  for (const [level, moveId] of CASCOON_ANGELS_WRATH_MOVES) {
+    if (!moves.some(([, existingMove]) => existingMove === moveId)) {
+      moves.push([level, moveId]);
+    }
+  }
+  moves.sort((a, b) => a[0] - b[0]);
+  table[speciesId] = moves;
 }

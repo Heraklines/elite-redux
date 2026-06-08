@@ -2,6 +2,7 @@ import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
 import { initEliteReduxMovesets } from "#data/elite-redux/init-elite-redux-movesets";
+import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import type { LevelMoves } from "#types/pokemon-level-moves";
 import { describe, expect, it } from "vitest";
@@ -124,6 +125,30 @@ describe("initEliteReduxMovesets (B6)", () => {
       // Either the id is in the allowed (mapped) set, or it's a pokerogue
       // vanilla id (< 5000). The id-map's values cover both ranges.
       expect(allowedMoveIds.has(moveId)).toBe(true);
+    }
+  });
+
+  it("gives Cascoon and Primal Cascoon the Angel's Wrath move package", () => {
+    initEliteReduxMovesets();
+    const requiredMoves = [
+      MoveId.TACKLE,
+      MoveId.POISON_STING,
+      MoveId.STRING_SHOT,
+      MoveId.HARDEN,
+      MoveId.IRON_DEFENSE,
+      MoveId.ELECTROWEB,
+      MoveId.BUG_BITE,
+    ];
+    const speciesIds = [SpeciesId.CASCOON, ER_ID_MAP.species[2157]];
+    for (const speciesId of speciesIds) {
+      expect(speciesId).toBeDefined();
+      if (speciesId === undefined) {
+        continue;
+      }
+      const learned = new Set((pokemonSpeciesLevelMoves[speciesId] ?? []).map(([, move]) => move));
+      for (const move of requiredMoves) {
+        expect(learned.has(move), `species ${speciesId} should learn ${MoveId[move]}`).toBe(true);
+      }
     }
   });
 
