@@ -58,6 +58,10 @@ export function minifyPublicJsonFiles(): VitePlugin {
     async generateBundle(options): Promise<void> {
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: good enough
       const minifyJsonFiles = (dir: string, outDir: string): void => {
+        // Ensure the output dir exists: generateBundle runs before vite writes
+        // the bundle, so on a fresh build `dist/` may not exist yet and the
+        // top-level copyFileSync below would throw ENOENT on the destination.
+        fs.mkdirSync(outDir, { recursive: true });
         const files = fs.readdirSync(dir);
 
         for (const file of files) {

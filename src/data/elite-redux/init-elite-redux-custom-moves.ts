@@ -727,8 +727,11 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
       move.attr(HighCritAttr);
       move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.isOfType(PokemonType.DRAGON) ? 2 : 1));
       break;
-    case 796: // Clay Dart — super-effective vs Flying
-      move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.isOfType(PokemonType.FLYING) ? 2 : 1));
+    case 796: // Clay Dart — super-effective vs Flying. Clay Dart is GROUND-type
+      // (ER type 9), which is normally IMMUNE to Flying (0×) — same problem as
+      // Aura Force, so use the immunity-safe type-chart override (forces the
+      // Flying component to 2×) instead of a power multiplier on a 0× hit.
+      move.attr(ErSuperEffectiveVsTypeAttr, PokemonType.FLYING);
       break;
     case 800: // Fumigation Bomb — super-effective vs Bug
       move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.isOfType(PokemonType.BUG) ? 2 : 1));
