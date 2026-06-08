@@ -177,7 +177,10 @@ import { MoveFlagInjectionAbAttr } from "#data/elite-redux/archetypes/move-flag-
 import { MovingFirstTrapFlinchAbAttr } from "#data/elite-redux/archetypes/moving-first-trap-flinch";
 import { ErMultiHeadedAbAttr } from "#data/elite-redux/archetypes/multi-headed";
 import { NullifyFirstNHitsAbAttr } from "#data/elite-redux/archetypes/nullify-first-n-hits";
-import { OffensiveTypeChartOverrideAbAttr } from "#data/elite-redux/archetypes/offensive-type-chart-override";
+import {
+  DefensiveTypeWeaknessNullAbAttr,
+  OffensiveTypeChartOverrideAbAttr,
+} from "#data/elite-redux/archetypes/offensive-type-chart-override";
 import { OnCritStatBoostLowestAbAttr } from "#data/elite-redux/archetypes/on-crit-stat-boost-lowest";
 import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
 import {
@@ -3437,21 +3440,14 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Flawless Precision — "Fatal + Deadly Precision." Same shape as Deadly.
       return ok([new AlwaysHitAbAttr(), new MoveAbilityBypassAbAttr()]);
     case 422:
-      // Gifted Mind — "Nulls Psychic weakness; status moves always hit." A
-      // Psychic-type's weaknesses are Dark/Ghost/Bug; "nulling" them means
-      // those matchups drop from 2x to neutral, i.e. ×0.5 received-damage on
-      // Dark/Ghost/Bug. (The prior wire reduced incoming PSYCHIC-type damage,
-      // which is the wrong type direction — Psychic isn't weak to itself.)
-      // Plus the ER ROM C source (battle_script_commands.c:1936) status-move
-      // always-hit half.
+      // Gifted Mind — "Nulls Psychic weakness; status moves always hit." Null the
+      // weaknesses the holder's PSYCHIC type contributes by dividing that type's
+      // super-effective contribution back out (Dark/Ghost/Bug → neutral, no "super
+      // effective" message). Only the Psychic side is nulled, so a second-type
+      // weakness (e.g. Galar Articuno's Flying weaknesses) still applies. Plus the
+      // ER ROM C source (battle_script_commands.c:1936) status-move always-hit half.
       return ok([
-        ...buildTypeEffectivenessModAttrs({ type: PokemonType.DARK, offensiveMultiplier: 1, defensiveMultiplier: 0.5 }),
-        ...buildTypeEffectivenessModAttrs({
-          type: PokemonType.GHOST,
-          offensiveMultiplier: 1,
-          defensiveMultiplier: 0.5,
-        }),
-        ...buildTypeEffectivenessModAttrs({ type: PokemonType.BUG, offensiveMultiplier: 1, defensiveMultiplier: 0.5 }),
+        new DefensiveTypeWeaknessNullAbAttr(PokemonType.PSYCHIC),
         new ConditionalAlwaysHitAbAttr({ categories: [MoveCategory.STATUS] }),
       ]);
     case 953:

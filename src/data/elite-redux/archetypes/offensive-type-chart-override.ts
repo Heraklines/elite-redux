@@ -58,6 +58,36 @@ export class IgnoreResistancesAbAttr extends AbAttr {
   }
 }
 
+/**
+ * DEFENSIVE: the holder "nulls" the weaknesses contributed by one of its own
+ * types — e.g. Gifted Mind "Nulls Psychic weakness". When an incoming move type
+ * is super-effective against the nulled defender type, divide that contribution
+ * back out so the matchup is no longer super-effective (and shows neutral — no
+ * "super effective" message). Only the nulled type's contribution is removed, so
+ * a second-type weakness (e.g. Galar Articuno's Flying weaknesses) still applies.
+ * Scanned by name in `Pokemon.getAttackTypeEffectiveness` (defender side).
+ */
+export class DefensiveTypeWeaknessNullAbAttr extends AbAttr {
+  constructor(private readonly nulledDefenderType: PokemonType) {
+    super(false);
+  }
+
+  /** Read-only accessor (tests). */
+  public getNulledDefenderType(): PokemonType {
+    return this.nulledDefenderType;
+  }
+
+  public fire(moveType: PokemonType, defenderTypes: readonly PokemonType[], multi: NumberHolder): void {
+    if (!defenderTypes.includes(this.nulledDefenderType)) {
+      return;
+    }
+    const eff = getTypeDamageMultiplier(moveType, this.nulledDefenderType);
+    if (eff > 1) {
+      multi.value /= eff;
+    }
+  }
+}
+
 export class OffensiveTypeChartOverrideAbAttr extends AbAttr {
   private readonly rules: readonly OffensiveTypeChartRule[];
 

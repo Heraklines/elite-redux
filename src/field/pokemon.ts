@@ -3132,6 +3132,22 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
     }
 
+    // ER DEFENSIVE type-weakness nulls (e.g. Gifted Mind "Nulls Psychic weakness"):
+    // this Pokémon's own ability/innates can divide out a super-effective
+    // contribution of one of its types, so the matchup reads neutral (no SE message).
+    {
+      const defAttrs = [...this.getAbility().attrs, ...this.getPassiveAbilities().flatMap(pa => pa?.attrs ?? [])];
+      for (const attr of defAttrs) {
+        if (attr?.constructor?.name === "DefensiveTypeWeaknessNullAbAttr") {
+          (attr as unknown as { fire: (mt: PokemonType, dts: readonly PokemonType[], h: NumberHolder) => void }).fire(
+            moveType,
+            types,
+            multi,
+          );
+        }
+      }
+    }
+
     // Handle strong winds lowering effectiveness of types super effective against pure flying
     if (
       !ignoreStrongWinds
