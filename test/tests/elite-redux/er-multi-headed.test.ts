@@ -50,6 +50,13 @@ describe.skipIf(!RUN)("ER Multi-Headed head count", () => {
     expect(headCountOf(SpeciesId.MAGNEZONE)).toBe(3);
   });
 
+  it("is 3 for ER-custom three-headed mons not in any hand-list (data-driven from F_THREE_HEADED)", () => {
+    // Sandy Shocks is F_THREE_HEADED in the ER dump but was NOT in the old
+    // hardcoded vanilla set, so it used to fall back to the 2-head default.
+    // (Pentadug/Pentawug/Wugtrio/Iron Jugulis/Hydrapple are likewise covered.)
+    expect(headCountOf(SpeciesId.SANDY_SHOCKS)).toBe(3);
+  });
+
   it("the Multi-Headed ability is wired with ErMultiHeadedAbAttr (not 2x AddSecondStrike)", () => {
     const ability = allAbilities[ErAbilityId.MULTI_HEADED];
     expect(ability).toBeDefined();

@@ -31,30 +31,36 @@
 // =============================================================================
 
 import { AddSecondStrikeAbAttr, type AddSecondStrikeAbAttrParams } from "#abilities/ab-attrs";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { ER_SPECIES } from "#data/elite-redux/er-species";
 import { SpeciesFormKey } from "#enums/species-form-key";
-import { SpeciesId } from "#enums/species-id";
 import type { Pokemon } from "#field/pokemon";
 
-/** Base species that are three-headed in ALL forms (per ROM F_THREE_HEADED). */
-const THREE_HEADED: ReadonlySet<SpeciesId> = new Set<SpeciesId>([
-  SpeciesId.DUGTRIO,
-  SpeciesId.MAGNETON,
-  SpeciesId.DODRIO,
-  SpeciesId.EXEGGUTOR,
-  SpeciesId.COMBEE,
-  SpeciesId.MAGNEZONE,
-  SpeciesId.PROBOPASS,
-  SpeciesId.KLANG,
-  SpeciesId.KLINKLANG,
-  SpeciesId.HYDREIGON,
-  SpeciesId.BARBARACLE,
-]);
-
-/**
- * Species that are three-headed ONLY in their Mega form (the ROM flags the
- * SPECIES_*_MEGA records, while the base is two-headed / not headed at all).
- */
-const MEGA_THREE_HEADED: ReadonlySet<SpeciesId> = new Set<SpeciesId>([SpeciesId.MAWILE, SpeciesId.SHUCKLE]);
+// Head count is data-driven from the ER ROM's per-species F_TWO_HEADED /
+// F_THREE_HEADED flags, carried verbatim in the `flags` field of every
+// `ER_SPECIES` dump entry. This covers vanilla 2/3-headed mons AND every ER
+// custom (Pentadug/Pentawug/Wugtrio/Sandy Shocks/Iron Jugulis/Hydrapple/… =
+// three-headed) without a hand-maintained list — so a new headed custom can
+// never silently fall back to the 2-head default again.
+//
+// Megas are split out because a Mega is a FORM of its base pokerogue species
+// (sharing `speciesId`): Mawile/Shuckle gain a 3rd head ONLY as a mega, so a
+// `SPECIES_*_MEGA` dump entry's count is keyed under the mega-only map.
+const BASE_HEAD_COUNT = new Map<number, number>();
+const MEGA_HEAD_COUNT = new Map<number, number>();
+for (const draft of ER_SPECIES) {
+  const flags = (draft as { flags?: string }).flags ?? "";
+  const count = flags.includes("F_THREE_HEADED") ? 3 : flags.includes("F_TWO_HEADED") ? 2 : 0;
+  if (count === 0) {
+    continue;
+  }
+  const pkId = ER_ID_MAP.species[(draft as { id: number }).id];
+  if (pkId === undefined) {
+    continue;
+  }
+  const isMegaEntry = /_MEGA\b/.test((draft as { speciesConst: string }).speciesConst);
+  (isMegaEntry ? MEGA_HEAD_COUNT : BASE_HEAD_COUNT).set(pkId, count);
+}
 
 /** Whether the holder is currently in a Mega form (any mega form key). */
 function isMega(pokemon: Pokemon): boolean {
@@ -65,13 +71,13 @@ function isMega(pokemon: Pokemon): boolean {
 /** Number of heads (= number of strikes) for a Multi-Headed holder. Default 2. */
 export function getErHeadCount(pokemon: Pokemon): number {
   const sid = pokemon.species.speciesId;
-  if (THREE_HEADED.has(sid)) {
-    return 3;
+  if (isMega(pokemon)) {
+    const mega = MEGA_HEAD_COUNT.get(sid);
+    if (mega !== undefined) {
+      return mega;
+    }
   }
-  if (MEGA_THREE_HEADED.has(sid) && isMega(pokemon)) {
-    return 3;
-  }
-  return 2;
+  return BASE_HEAD_COUNT.get(sid) ?? 2;
 }
 
 /**

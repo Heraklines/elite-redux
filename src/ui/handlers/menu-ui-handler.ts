@@ -2,7 +2,7 @@ import { pokerogueApi } from "#api/api";
 import { loggedInUser, updateUserInfo } from "#app/account";
 import { globalScene } from "#app/global-scene";
 import { handleTutorial, Tutorial } from "#app/tutorial";
-import { bypassLogin, isApp, isBeta, isDev } from "#constants/app-constants";
+import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { submitBugReport } from "#data/elite-redux/er-bug-report";
 import { AdminMode, getAdminModeName } from "#enums/admin-mode";
 import { Button } from "#enums/buttons";
@@ -244,22 +244,22 @@ export class MenuUiHandler extends MessageUiHandler {
       });
     };
 
-    // ER: in a backend-less Guest deploy (bypassLogin) there's no account server,
-    // so import is the only way to restore data — surface it just like dev/beta.
-    if (isBeta || isDev || isApp || bypassLogin) {
-      manageDataOptions.push({
-        label: i18next.t("menuUiHandler:importSession"),
-        handler: () => {
-          confirmSlot(
-            i18next.t("menuUiHandler:importSlotSelect"),
-            () => true,
-            slotId => globalScene.gameData.importData(GameDataType.SESSION, slotId),
-          );
-          return true;
-        },
-        keepOpen: true,
-      });
-    }
+    // ER: import is the core save-migration path (guest save → cloud account) and
+    // must be available to ALL players — including the login-required prod build
+    // (where none of isBeta/isDev/isApp/bypassLogin are set). Vanilla hides import
+    // outside beta/dev/app; ER intentionally always surfaces it. (#227)
+    manageDataOptions.push({
+      label: i18next.t("menuUiHandler:importSession"),
+      handler: () => {
+        confirmSlot(
+          i18next.t("menuUiHandler:importSlotSelect"),
+          () => true,
+          slotId => globalScene.gameData.importData(GameDataType.SESSION, slotId),
+        );
+        return true;
+      },
+      keepOpen: true,
+    });
     manageDataOptions.push({
       label: i18next.t("menuUiHandler:exportSession"),
       handler: () => {
@@ -301,17 +301,16 @@ export class MenuUiHandler extends MessageUiHandler {
       },
       keepOpen: true,
     });
-    if (isBeta || isDev || isApp || bypassLogin) {
-      manageDataOptions.push({
-        label: i18next.t("menuUiHandler:importData"),
-        handler: () => {
-          ui.revertMode();
-          globalScene.gameData.importData(GameDataType.SYSTEM);
-          return true;
-        },
-        keepOpen: true,
-      });
-    }
+    // ER: always surface full system-data import (see importSession note above). (#227)
+    manageDataOptions.push({
+      label: i18next.t("menuUiHandler:importData"),
+      handler: () => {
+        ui.revertMode();
+        globalScene.gameData.importData(GameDataType.SYSTEM);
+        return true;
+      },
+      keepOpen: true,
+    });
     manageDataOptions.push(
       {
         label: i18next.t("menuUiHandler:exportData"),

@@ -1461,35 +1461,51 @@ export class GameData {
    * To delete an unfinished run instead, use {@linkcode deleteSession}
    */
   async tryClearSession(slotId: number): Promise<[success: boolean, newClear: boolean]> {
-    const [success] = await updateUserInfo();
-    if (!success) {
-      return [false, false];
-    }
+    const [userOk] = await updateUserInfo();
 
     if (bypassLogin) {
       localStorage.removeItem(getSessionDataLocalStorageKey(slotId));
       return [true, true];
     }
 
-    const sessionData = this.getSessionSaveData();
-    const { trainerId } = this;
-    const jsonResponse = await pokerogueApi.savedata.session.clear(
-      { slot: slotId, trainerId, clientSessionId },
-      sessionData,
-    );
+    let newClear = false;
+    if (userOk) {
+      const sessionData = this.getSessionSaveData();
+      const { trainerId } = this;
+      const jsonResponse = await pokerogueApi.savedata.session.clear(
+        { slot: slotId, trainerId, clientSessionId },
+        sessionData,
+      );
 
-    if (!jsonResponse.error) {
-      localStorage.removeItem(getSessionDataLocalStorageKey(slotId));
-      return [true, !!jsonResponse.success];
+      if (jsonResponse.error) {
+        if (jsonResponse.error.startsWith("session out of date")) {
+          // A newer session exists server-side: queue a reload to reconcile and
+          // KEEP the local copy so the reload has data to load. Do NOT wipe.
+          globalScene.phaseManager.clearPhaseQueue();
+          globalScene.phaseManager.unshiftNew("ReloadSessionPhase");
+          console.error(jsonResponse);
+          return [false, false];
+        }
+        // Any other server failure (offline / Worker error / auth): fall through
+        // and clear the run LOCALLY anyway. A FINISHED run must never remain
+        // continuable — otherwise "Continue" reloads the dead party and the run
+        // immediately game-overs back to the title, forever (the ER prod
+        // login-required regression: clearing used to bail here and leave the
+        // dead session in place). Server-side staleness self-heals on next save.
+        console.error(jsonResponse);
+      } else {
+        newClear = !!jsonResponse.success;
+      }
     }
 
-    if (jsonResponse.error.startsWith("session out of date")) {
-      globalScene.phaseManager.clearPhaseQueue();
-      globalScene.phaseManager.unshiftNew("ReloadSessionPhase");
+    // Always wipe a finished run locally (server reachable or not). Returning
+    // `true` lets PostGameOverPhase proceed cleanly to the title instead of
+    // hard-resetting back into the un-cleared session.
+    localStorage.removeItem(getSessionDataLocalStorageKey(slotId));
+    if (loggedInUser) {
+      loggedInUser.lastSessionSlot = -1;
     }
-
-    console.error(jsonResponse);
-    return [false, false];
+    return [true, newClear];
   }
 
   parseSessionData(dataStr: string): SessionSaveData {

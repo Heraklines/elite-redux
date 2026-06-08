@@ -59,6 +59,24 @@ describe("ER offensive type-chart abilities", () => {
     expect(enemy.getAttackTypeEffectiveness(PokemonType.FIRE, { source: player })).toBe(2);
   });
 
+  test("Molten Down — Water/Rock (Relicanth) stays NEUTRAL (1x), not SE — the dual-type bug", async () => {
+    // Fire vs Water 0.5 × Rock(overridden 2) = 1.0. The old code slammed the whole
+    // matchup to 2x whenever the target merely had Rock, ignoring the Water half.
+    game.override.ability(ErAbilityId.MOLTEN_DOWN as unknown as AbilityId).enemySpecies(SpeciesId.RELICANTH);
+    await game.classicMode.startBattle(SpeciesId.CHARMANDER);
+    const player = game.field.getPlayerPokemon();
+    const enemy = game.field.getEnemyPokemon();
+    expect(enemy.getAttackTypeEffectiveness(PokemonType.FIRE, { source: player })).toBe(1);
+  });
+
+  test("Molten Down — Rock/Ground (Rhyhorn) is SE (2x): Rock overridden, Ground neutral", async () => {
+    game.override.ability(ErAbilityId.MOLTEN_DOWN as unknown as AbilityId).enemySpecies(SpeciesId.RHYHORN);
+    await game.classicMode.startBattle(SpeciesId.CHARMANDER);
+    const player = game.field.getPlayerPokemon();
+    const enemy = game.field.getEnemyPokemon();
+    expect(enemy.getAttackTypeEffectiveness(PokemonType.FIRE, { source: player })).toBe(2);
+  });
+
   test("Phantom Pain — Ghost hits Normal for 1x (immunity pierced)", async () => {
     game.override.ability(ErAbilityId.PHANTOM_PAIN as unknown as AbilityId).enemySpecies(SpeciesId.RATTATA); // pure Normal
     await game.classicMode.startBattle(SpeciesId.GASTLY);

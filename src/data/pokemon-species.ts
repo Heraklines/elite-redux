@@ -556,7 +556,34 @@ export abstract class PokemonSpeciesForm {
     return variantDataIndex;
   }
 
+  /**
+   * Elite Redux: if THIS is a species whose form at `formIndex` carries an ER
+   * sprite/icon redirect (installErFormSpriteRedirect tags the form instance
+   * with `__erFormSpriteRedirect`), return that form so icon resolution can
+   * defer to it. Species-level icon calls — the party/box/Pokédex/starter/
+   * egg-hatch grids all pass an explicit `formIndex` — otherwise build the
+   * vanilla `"<id>-<formKey>"` packed-atlas frame (e.g. `"69-redux"`), which
+   * does not exist for injected redux forms and falls back to the wrong icon
+   * (Bellsprout redux → default, Bounsweet redux → Melmetal). The battle-field
+   * path already defers to the form instance, so it was unaffected.
+   */
+  private getErRedirectedForm(formIndex?: number): PokemonSpeciesForm | undefined {
+    const forms = (this as unknown as { forms?: PokemonSpeciesForm[] }).forms;
+    if (!Array.isArray(forms) || forms.length === 0) {
+      return;
+    }
+    const form = forms[formIndex ?? this.formIndex];
+    if (form && form !== this && (form as unknown as { __erFormSpriteRedirect?: boolean }).__erFormSpriteRedirect) {
+      return form;
+    }
+    return;
+  }
+
   getIconAtlasKey(formIndex?: number, shiny?: boolean, variant?: number): string {
+    const erForm = this.getErRedirectedForm(formIndex);
+    if (erForm) {
+      return erForm.getIconAtlasKey(formIndex, shiny, variant);
+    }
     const variantDataIndex = this.getVariantDataIndex(formIndex);
     const isVariant =
       shiny && variantData[variantDataIndex] && variant !== undefined && variantData[variantDataIndex][variant];
@@ -569,6 +596,10 @@ export abstract class PokemonSpeciesForm {
   }
 
   getIconId(female: boolean, formIndex?: number, shiny?: boolean, variant?: number): string {
+    const erForm = this.getErRedirectedForm(formIndex);
+    if (erForm) {
+      return erForm.getIconId(female, formIndex, shiny, variant);
+    }
     if (formIndex === undefined) {
       formIndex = this.formIndex;
     }
