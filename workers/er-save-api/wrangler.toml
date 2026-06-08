@@ -12,7 +12,7 @@ compatibility_date = "2024-11-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "er-saves"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "b2fae947-6971-45e7-b287-d42648fd0a30"
 
 # Secrets (DO NOT put real values here — set them with `wrangler secret put`):
 #   npx wrangler secret put SESSION_SECRET   # long random string; signs session tokens
