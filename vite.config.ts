@@ -69,6 +69,9 @@ export const sharedConfig: UserConfigFnPromise = async ({ mode }) => {
       (await import("unplugin-inline-enum/vite")).default({ scanDir: "src" }),
       (await import("./plugins/vite/llm-director-log-plugin")).llmDirectorLogPlugin(),
       (await import("./plugins/vite/build-id-plugin")).buildIdPlugin(),
+      // Local-only dev-tools log capture endpoint (POST /__devlog → dev-logs/).
+      // `apply: "serve"` means it self-excludes from all production builds.
+      (await import("./plugins/vite/dev-log-plugin")).devLogPlugin(),
     ];
   }
   return opts;

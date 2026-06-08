@@ -1,5 +1,6 @@
 import { pokerogueApi } from "#api/api";
 import { loggedInUser } from "#app/account";
+import { getDevMenuItems } from "#app/dev-tools/registry";
 import { GameMode, getGameMode } from "#app/game-mode";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
@@ -212,6 +213,16 @@ export class TitlePhase extends Phase {
         keepOpen: true,
       },
     );
+    // Local-only dev tools (gitignored test-scenario harness). On a clean
+    // checkout / production build getDevMenuItems() returns [] so nothing
+    // appears here. The ctx lets a scenario launch a run like "New Game".
+    const startRunWithMode = (gameMode: GameModes) => {
+      this.gameMode = gameMode;
+      globalScene.ui.setMode(UiMode.MESSAGE);
+      globalScene.ui.clearText();
+      this.end();
+    };
+    options.push(...getDevMenuItems({ startRunWithMode }));
     const config: OptionSelectConfig = {
       options,
       noCancel: true,

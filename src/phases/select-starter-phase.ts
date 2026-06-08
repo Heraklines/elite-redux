@@ -1,6 +1,11 @@
+import { consumePendingDevStarters } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { Phase } from "#app/phase";
+
+/** Throwaway save slot used by dev test-scenarios so they don't clobber slot 0. */
+const DEV_SCENARIO_SLOT = 4;
+
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
 import { ChallengeType } from "#enums/challenge-type";
@@ -16,6 +21,16 @@ export class SelectStarterPhase extends Phase {
   public readonly phaseName = "SelectStarterPhase";
   start() {
     super.start();
+
+    // Local-only dev tools: a test scenario may have staged a party so we can
+    // drop straight into the battle, skipping starter-select. consumePending…
+    // returns null in production / on a clean checkout, so this is inert there.
+    const devStarters = consumePendingDevStarters();
+    if (devStarters && devStarters.length > 0) {
+      globalScene.sessionSlotId = DEV_SCENARIO_SLOT;
+      this.initBattle(devStarters);
+      return;
+    }
 
     globalScene.playBgm("menu");
 

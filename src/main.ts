@@ -82,4 +82,7 @@ try {
   // Poll for new deploys so long-open tabs auto-reload onto the latest build
   // (no-op in dev/test/app). Saves live in localStorage, so reloads are safe.
   (await import("#init/init-update-checker")).startUpdateChecker();
+  // Local-only dev tools (test-scenario harness + console-log button). No-op in
+  // production builds and on clean checkouts (gitignored local modules absent).
+  void (await import("#app/dev-tools/registry")).loadDevTools();
 }

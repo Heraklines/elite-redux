@@ -71,3 +71,9 @@ vendor/elite-redux/ghidra-project/
 
 # Cloudflare Worker local dev secrets
 .dev.vars
+
+# Local-only in-game dev tools (test-scenario harness + console-log button).
+# Never pushed; the tracked registry/glob loader no-ops when these are absent.
+src/dev-tools/local/
+# Captured console-log dumps written by the dev-log Vite middleware.
+dev-logs/
