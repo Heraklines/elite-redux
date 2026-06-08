@@ -1,0 +1,24 @@
+# Cloudflare Worker — Elite Redux team data editor backend.
+# Commits the team editor's changes (egg moves, later learnsets/rarity) to the
+# repo branch via the GitHub Contents API. The editor SPA reads data straight
+# from public GitHub raw; only writes hit this Worker.
+#
+# Deploy:
+#   cd workers/er-editor-api
+#   npx wrangler secret put GITHUB_TOKEN      # fine-grained PAT: Contents read+write on the repo
+#   npx wrangler secret put EDITOR_PASSWORD   # shared team password
+#   npx wrangler deploy
+
+name = "er-editor-api"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# Non-secret config. Set the branch the editor should commit to.
+[vars]
+GITHUB_REPO = "Heraklines/elite-redux"
+GITHUB_BRANCH = "feat/elite-redux-port"
+ALLOWED_ORIGIN = "*"
+
+# Secrets (set via `wrangler secret put`, NOT here):
+#   GITHUB_TOKEN     — fine-grained PAT, Contents: read & write, scoped to the repo
+#   EDITOR_PASSWORD  — shared password the editor sends with each save

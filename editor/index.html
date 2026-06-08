@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<!--
+  Elite Redux — team data editor (egg moves).
+  Static SPA: reads game data from public GitHub raw; commits edits via the
+  er-editor-api Worker. Host on Cloudflare Pages. See editor/README.md.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Elite Redux — Egg Move Editor</title>
+    <style>
+      :root {
+        --bg: #16161e; --panel: #1e1e2a; --panel2: #262633; --line: #353548;
+        --text: #e6e6f0; --muted: #9a9ab0; --accent: #b3245c; --ok: #2fae66;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: var(--bg); color: var(--text);
+        font: 14px/1.45 system-ui, sans-serif;
+      }
+      header {
+        position: sticky; top: 0; z-index: 10; background: var(--panel);
+        border-bottom: 1px solid var(--line); padding: 10px 16px;
+        display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+      }
+      header h1 { font-size: 16px; margin: 0 12px 0 0; }
+      input, select, button {
+        background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+        border-radius: 6px; padding: 6px 8px; font: inherit;
+      }
+      #search { flex: 1; min-width: 160px; }
+      button { cursor: pointer; }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      #status { margin-left: auto; color: var(--muted); }
+      #grid {
+        display: grid; gap: 10px; padding: 16px;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      }
+      .card {
+        background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+        padding: 10px; display: flex; gap: 10px; align-items: flex-start;
+      }
+      .card.dirty { border-color: var(--accent); }
+      .card img { width: 64px; height: 64px; image-rendering: pixelated; object-fit: contain; flex: none; background: #0d0d14; border-radius: 6px; }
+      .card .body { flex: 1; min-width: 0; }
+      .card .name { font-weight: 600; margin-bottom: 6px; }
+      .card .name small { color: var(--muted); font-weight: 400; }
+      .slots { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      .slots select { width: 100%; }
+      .empty { color: var(--muted); padding: 40px; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>🥚 ER Egg Move Editor</h1>
+      <input id="search" type="search" placeholder="Search species…" autocomplete="off" />
+      <input id="author" type="text" placeholder="Your name (for the commit)" style="width:170px" />
+      <input id="password" type="password" placeholder="Editor password" style="width:150px" />
+      <button id="save" type="button" class="primary" disabled>Save 0 changes</button>
+      <span id="status">Loading…</span>
+    </header>
+    <div id="grid"></div>
+    <div id="empty" class="empty" hidden>No species match your search.</div>
+    <script src="./app.js"></script>
+  </body>
+</html>
