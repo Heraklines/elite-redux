@@ -358,8 +358,15 @@ export class GameData {
     if (typeof saveDataOrErr === "number" || !saveDataOrErr || saveDataOrErr.length === 0 || saveDataOrErr[0] !== "{") {
       if (saveDataOrErr === 404) {
         // Brand-new account: no cloud save. Flag it so the login flow can offer
-        // a one-time "import your existing local save?" prompt (#229).
+        // a one-time "import your existing local save?" prompt (#229). Suppress
+        // the alarming "could not be found" notice when a local save IS available
+        // to import — otherwise players see a false-alarm error a split second
+        // before the import prompt fires and their data loads fine. Only show the
+        // notice when there's genuinely nothing to import (a true fresh account).
         this.cloudSaveMissing = true;
+        if (!bypassLogin && this.findImportableLocalSaveBundle()) {
+          return true;
+        }
         globalScene.phaseManager.queueMessage(
           "Save data could not be found. If this is a new account, you can safely ignore this message.",
           null,
