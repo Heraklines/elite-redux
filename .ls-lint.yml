@@ -35,5 +35,6 @@ ignore:
    - dist
    - .devcontainer
    - .wrangler
+   - workers
    - "LICENSES"
    - vendor
