@@ -26,9 +26,17 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.ref }}
-          submodules: "recursive"
+          # No submodules: the standalone build needs only a handful of small
+          # asset-metadata files (the big image/audio dirs ship via jsDelivr).
+          # The upstream pokerogue-assets submodule pins a commit that isn't
+          # always fetchable, so we vendor those files in deploy/standalone-assets.
 
       - uses: ./.github/actions/setup-deps
+
+      - name: Stage standalone asset metadata
+        run: |
+          mkdir -p assets
+          cp deploy/standalone-assets/* assets/
 
       - name: Write standalone login env
         run: |
