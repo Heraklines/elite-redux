@@ -44,6 +44,20 @@ export interface OffensiveTypeChartOverrideOptions {
   readonly rules: readonly OffensiveTypeChartRule[];
 }
 
+/**
+ * Registration-free marker: the holder's attacks IGNORE the target's type
+ * RESISTANCES — any sub-neutral multiplier (0 < x < 1) is clamped up to 1×,
+ * while immunities (0×) are preserved. Scanned by name in
+ * `Pokemon.getAttackTypeEffectiveness` (same pattern as OffensiveTypeChart-
+ * OverrideAbAttr). ER Normalize: "Normal-type moves bypass resistances, but not
+ * immunities."
+ */
+export class IgnoreResistancesAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+}
+
 export class OffensiveTypeChartOverrideAbAttr extends AbAttr {
   private readonly rules: readonly OffensiveTypeChartRule[];
 

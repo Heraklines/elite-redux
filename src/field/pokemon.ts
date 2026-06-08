@@ -3119,6 +3119,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
           (attr as unknown as { fire: (mt: PokemonType, h: NumberHolder) => void }).fire(moveType, multi);
         }
       }
+
+      // ER "ignore resistances" (e.g. Normalize): clamp the holder's RESISTED
+      // matchups (sub-neutral but not immune) up to neutral. Immunities (0×) and
+      // weaknesses (>1×) are left intact.
+      if (
+        multi.value > 0
+        && multi.value < 1
+        && sourceAttrs.some(a => a?.constructor?.name === "IgnoreResistancesAbAttr")
+      ) {
+        multi.value = 1;
+      }
     }
 
     // Handle strong winds lowering effectiveness of types super effective against pure flying

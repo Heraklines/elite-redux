@@ -103,6 +103,7 @@ import { DodgeFirstSuperEffectiveAbAttr } from "#data/elite-redux/archetypes/dod
 import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
 import { EntryTailwindClearWeatherAbAttr } from "#data/elite-redux/archetypes/entry-tailwind-clear-weather";
 import { HealStatusOnMoveTypeAbAttr } from "#data/elite-redux/archetypes/heal-status-on-move-type";
+import { IgnoreResistancesAbAttr } from "#data/elite-redux/archetypes/offensive-type-chart-override";
 import { PostAttackChangeTargetTypeAbAttr } from "#data/elite-redux/archetypes/post-attack-change-target-type";
 import { PostDefendChangeAttackerTypeAbAttr } from "#data/elite-redux/archetypes/post-defend-change-attacker-type";
 import { PostDefendSuppressOpponentDamageBoostAbAttr } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
@@ -774,12 +775,15 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // We can only mutate the StatMultiplier — accuracy gating is handled
   // separately in pokerogue and not easily mutable.
   [AbilityId.HUSTLE, ab => mutateStatMultiplier(ab, Stat.ATK, 1.4)],
-  // 96 NORMALIZE: vanilla converts all moves to Normal-type. ER adds 1.1x
-  // boost on Normal-type moves (the post-conversion boost).
+  // 96 NORMALIZE: vanilla converts all moves to Normal-type. ER adds a 1.1x
+  // boost on Normal-type moves AND makes those moves IGNORE the target's
+  // resistances (but not immunities) — the IgnoreResistancesAbAttr marker is
+  // read by Pokemon.getAttackTypeEffectiveness.
   [
     AbilityId.NORMALIZE,
     ab => {
       ab.attrs.push(new MovePowerBoostAbAttr((_user, _t, move) => move?.type === PokemonType.NORMAL, 1.1));
+      ab.attrs.push(new IgnoreResistancesAbAttr());
     },
   ],
   // 113 SCRAPPY: vanilla Normal/Fighting hits Ghost. ER adds ER_FEAR-immune
