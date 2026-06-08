@@ -1132,13 +1132,9 @@ export abstract class Move implements Localizable {
       globalScene.applyModifiers(PokemonMoveAccuracyBoosterModifier, user.isPlayer(), user, moveAccuracy);
     }
 
-    if (globalScene.arena.weather?.weatherType === WeatherType.FOG) {
-      /**
-       *  The 0.9 multiplier is PokeRogue-only implementation, Bulbapedia uses 3/5
-       *  See Fog {@link https://bulbapedia.bulbagarden.net/wiki/Fog}
-       */
-      moveAccuracy.value = Math.floor(moveAccuracy.value * 0.9);
-    }
+    // Elite Redux: fog does NOT reduce accuracy (the vanilla 0.9× penalty is
+    // removed). ER fog instead reduces Ghost-type damage + strips a stat-buff
+    // stage from non-Ghost/Psychic mons (handled in the weather lapse logic).
 
     if (!isOhko && globalScene.arena.getTag(ArenaTagType.GRAVITY)) {
       moveAccuracy.value = Math.floor(moveAccuracy.value * 1.67);

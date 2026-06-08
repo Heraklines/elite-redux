@@ -36,6 +36,7 @@
 // re-running the init is a no-op (same pattern as the ability patcher).
 // =============================================================================
 
+import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import { ER_FLAG_NAMES_LIST } from "#data/elite-redux/er-flag-mapping";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
@@ -78,6 +79,7 @@ import { MultiHitType } from "#enums/multi-hit-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
+import { WeatherType } from "#enums/weather-type";
 
 /** Numeric cutoff: anything ≥ this is an ER custom (registered by B2). */
 const VANILLA_ID_CUTOFF = 5000;
@@ -770,6 +772,20 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     MoveId.GIGATON_HAMMER,
     move => {
       addAttrUnique(move, new MovePowerMultiplierAttr((_u, target) => (target.isOfType(PokemonType.STEEL) ? 2 : 1)));
+    },
+  ],
+  // Ominous Wind — ER "Deals double damage in fog." (keeps its vanilla 60 BP
+  // Ghost-special + 10% all-stats raise.)
+  [
+    MoveId.OMINOUS_WIND,
+    move => {
+      addAttrUnique(
+        move,
+        new MovePowerMultiplierAttr(() => {
+          const w = globalScene.arena.weather;
+          return w?.weatherType === WeatherType.FOG && !w.isEffectSuppressed() ? 2 : 1;
+        }),
+      );
     },
   ],
   // FLOWER_TRICK — ER ABBR "Can't miss. Always crits." (#151 collision zone, so
