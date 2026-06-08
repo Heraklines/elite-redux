@@ -1133,13 +1133,14 @@ class ClearOpponentStatBuffsOnSummonAbAttr extends PostSummonAbAttr {
       if (!opp || opp.isFainted()) {
         continue;
       }
-      // Reset positive stages by emitting a -X stage change matched to the
-      // current positive total. Simpler: just reset the summonData stages.
+      // Clear every POSITIVE stat stage (leave debuffs alone). Use the canonical
+      // accessors — `summonData.statStages` is indexed by `stat - 1`, so writing
+      // `statStages[stat]` (as the old code did) hit the wrong slot and never
+      // actually cleared ATK/etc.
       const stats: BattleStat[] = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD, Stat.ACC, Stat.EVA];
       for (const stat of stats) {
-        const cur = opp.summonData?.statStages?.[stat as number] ?? 0;
-        if (cur > 0) {
-          opp.summonData.statStages[stat as number] = 0;
+        if (opp.getStatStage(stat) > 0) {
+          opp.setStatStage(stat, 0);
         }
       }
       opp.updateInfo();
