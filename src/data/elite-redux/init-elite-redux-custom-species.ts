@@ -84,13 +84,18 @@ function isDegenerateDraft(draft: ErSpeciesDraft): boolean {
  * the broken species const → a slug whose `elite-redux/<slug>/` directory holds
  * the correct, complete sprite set (front/back/icon + all shiny tiers).
  *
- * (Currently empty: the former `SPECIES_INFERNAPE_REDUX → "infernape"` entry was
- * a MISREAD — `infernape_redux/`'s own art IS the correct blue Water/Fighting
- * Redux Infernape; at 64×64 its white boots/blue tail-flame were mistaken for a
- * "creature on a cloud," so it was wrongly pinned to vanilla Infernape. Removed
- * so it uses its own slug. Re-add an entry only for genuinely mis-filed art.)
+ * `SPECIES_INFERNAPE_REDUX → "infernape_redux_mega"`: ER's asset repo misfiled
+ * Infernape Redux's art. Both `infernape_redux/` and `infernape_redux_b/` hold an
+ * unrelated yellow winged bird; the ACTUAL blue Water/Fighting bard (the real
+ * base Redux Infernape) is the only sprite shipped — under the misleading
+ * `infernape_redux_mega/` directory. The folder name says "mega" but the artwork
+ * is the base form, so we point the base species there. (The Mega form species
+ * uses the same slug, so base and mega share this art — ER provided no distinct
+ * mega sprite.)
  */
-const ER_SPRITE_SLUG_OVERRIDES: Readonly<Record<string, string>> = {};
+const ER_SPRITE_SLUG_OVERRIDES: Readonly<Record<string, string>> = {
+  SPECIES_INFERNAPE_REDUX: "infernape_redux_mega",
+};
 
 /**
  * Map ER's numeric type id (decoded by `ER_TYPE_NAMES` in `er-move-tables.ts`)
