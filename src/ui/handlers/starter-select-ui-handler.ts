@@ -1740,7 +1740,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       }
       if (
         Overrides.FREE_CANDY_UPGRADE_OVERRIDE
-        || starterData.candyCount >= getErPassiveSlotCandyCost(starterCost, slot)
+        || starterData.candyCount >= getErPassiveSlotCandyCost(getPassiveCandyCount(starterCost), slot)
       ) {
         return true;
       }
@@ -3662,10 +3662,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     for (let i = start; i < end; i++) {
       const id = ids[i];
       const starterData = globalScene.gameData.starterData[id];
-      const baseCost = speciesStarterCosts[id];
-      if (!starterData || starterData.candyCount <= 0 || baseCost == null) {
+      const starterCost = speciesStarterCosts[id];
+      if (!starterData || starterData.candyCount <= 0 || starterCost == null) {
         continue;
       }
+      // Use the real passive candy base (getPassiveCandyCount), NOT the raw
+      // starter point cost, so the per-slot cost matches the actual unlock menu.
+      const baseCost = getPassiveCandyCount(starterCost);
       const passiveAbilityIds = getPokemonSpecies(id).getPassiveAbilities(0);
       const plan = planMassUnlock(
         starterData.passiveAttr,
