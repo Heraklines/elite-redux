@@ -5,7 +5,7 @@
 #
 # Deploy:
 #   cd workers/er-editor-api
-#   npx wrangler secret put GITHUB_TOKEN      # fine-grained PAT: Contents read+write on the repo
+#   npx wrangler secret put GITHUB_TOKEN      # fine-grained PAT: Contents + Actions, read+write on the repo
 #   npx wrangler secret put EDITOR_PASSWORD   # shared team password
 #   npx wrangler deploy
 
@@ -17,8 +17,10 @@ compatibility_date = "2024-11-01"
 [vars]
 GITHUB_REPO = "Heraklines/elite-redux"
 GITHUB_BRANCH = "feat/elite-redux-port"
+GITHUB_WORKFLOW_FILE = "deploy-staging.yml"
 ALLOWED_ORIGIN = "*"
 
 # Secrets (set via `wrangler secret put`, NOT here):
-#   GITHUB_TOKEN     — fine-grained PAT, Contents: read & write, scoped to the repo
+#   GITHUB_TOKEN     — fine-grained PAT, Contents: read & write + Actions: read & write (deploy
+#                      button fires a workflow_dispatch), scoped to the repo
 #   EDITOR_PASSWORD  — shared password the editor sends with each save

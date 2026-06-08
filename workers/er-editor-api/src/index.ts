@@ -14,13 +14,18 @@
 //
 // Endpoints:
 //   GET  /health        — liveness
-//   POST /egg-moves     — { password, eggMoves: {SPECIES_X: string[]}, author? }
-//                          → commits src/data/elite-redux/er-egg-moves.json
+//   POST /egg-moves     — { password, eggMoves: {SPECIES_X: string[]}, author?, deploy? }
+//                          → merges + commits er-egg-moves.json; if deploy, also
+//                            triggers the staging rebuild+deploy workflow.
+//   POST /deploy        — { password } → triggers the staging deploy workflow only
+//                            (redeploy current branch without an edit).
 //
 // Secrets/vars (wrangler):
-//   GITHUB_TOKEN (secret) — fine-grained PAT with Contents:read+write on the repo
+//   GITHUB_TOKEN (secret) — fine-grained PAT with Contents:read+write AND
+//                           Actions:read+write (workflow dispatch) on the repo
 //   GITHUB_REPO           — "Heraklines/elite-redux"
 //   GITHUB_BRANCH         — e.g. "feat/elite-redux-port"
+//   GITHUB_WORKFLOW_FILE  — deploy workflow filename (default "deploy-staging.yml")
 //   EDITOR_PASSWORD (secret) — shared team password
 //   ALLOWED_ORIGIN        — the editor's origin (or "*")
 // =============================================================================
@@ -29,11 +34,29 @@ interface Env {
   GITHUB_TOKEN: string;
   GITHUB_REPO: string;
   GITHUB_BRANCH: string;
+  GITHUB_WORKFLOW_FILE?: string;
   EDITOR_PASSWORD: string;
   ALLOWED_ORIGIN: string;
 }
 
 const EGG_MOVES_PATH = "src/data/elite-redux/er-egg-moves.json";
+const DEFAULT_WORKFLOW_FILE = "deploy-staging.yml";
+
+/** Fire the staging rebuild+deploy GitHub Action (workflow_dispatch on the branch). */
+async function triggerDeploy(env: Env): Promise<{ ok: true } | { ok: false; error: string }> {
+  const workflow = env.GITHUB_WORKFLOW_FILE || DEFAULT_WORKFLOW_FILE;
+  const url = `https://api.github.com/repos/${env.GITHUB_REPO}/actions/workflows/${workflow}/dispatches`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { ...ghHeaders(env), "Content-Type": "application/json" },
+    body: JSON.stringify({ ref: env.GITHUB_BRANCH }),
+  });
+  // workflow_dispatch returns 204 No Content on success.
+  if (res.status === 204) {
+    return { ok: true };
+  }
+  return { ok: false, error: `deploy dispatch failed: ${res.status} ${await res.text()}` };
+}
 
 function corsHeaders(env: Env): Record<string, string> {
   return {
@@ -110,8 +133,25 @@ export default {
       return json({ ok: true }, 200, env);
     }
 
+    if (url.pathname === "/deploy" && request.method === "POST") {
+      let body: { password?: string };
+      try {
+        body = (await request.json()) as typeof body;
+      } catch {
+        return json({ ok: false, error: "invalid JSON body" }, 400, env);
+      }
+      if (!env.EDITOR_PASSWORD || body.password !== env.EDITOR_PASSWORD) {
+        return json({ ok: false, error: "unauthorized" }, 401, env);
+      }
+      const dep = await triggerDeploy(env);
+      if (!dep.ok) {
+        return json({ ok: false, error: dep.error }, 502, env);
+      }
+      return json({ ok: true, deployed: true }, 200, env);
+    }
+
     if (url.pathname === "/egg-moves" && request.method === "POST") {
-      let body: { password?: string; eggMoves?: unknown; author?: string };
+      let body: { password?: string; eggMoves?: unknown; author?: string; deploy?: boolean };
       try {
         body = (await request.json()) as typeof body;
       } catch {
@@ -166,7 +206,22 @@ export default {
         return json({ ok: false, error: `github commit failed: ${putRes.status} ${await putRes.text()}` }, 502, env);
       }
       const committed = (await putRes.json()) as { commit?: { sha?: string; html_url?: string } };
-      return json({ ok: true, commit: committed.commit?.sha, url: committed.commit?.html_url }, 200, env);
+
+      // Optionally kick off the rebuild+deploy so the edit goes live.
+      let deployed = false;
+      let deployError: string | undefined;
+      if (body.deploy) {
+        const dep = await triggerDeploy(env);
+        deployed = dep.ok;
+        if (!dep.ok) {
+          deployError = dep.error;
+        }
+      }
+      return json(
+        { ok: true, commit: committed.commit?.sha, url: committed.commit?.html_url, deployed, deployError },
+        200,
+        env,
+      );
     }
 
     return json({ ok: false, error: "not found" }, 404, env);

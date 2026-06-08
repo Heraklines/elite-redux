@@ -20,6 +20,7 @@ let baseline = {}; // speciesConst -> [moves] (last-saved snapshot for dirty tra
 const $ = sel => document.querySelector(sel);
 const statusEl = $("#status");
 const saveBtn = $("#save");
+const deployBtn = $("#deploy");
 
 const prettify = name =>
   name
@@ -125,38 +126,77 @@ function buildPayload() {
   return { out, bad };
 }
 
-async function save() {
+const ERR = "#c0392b";
+
+// Commit the dirty species (and optionally trigger a staging rebuild+deploy).
+// deploy=false → just commit. deploy=true → commit (if any changes) then deploy,
+// or deploy-only when there's nothing to commit.
+async function commit({ deploy }) {
   const password = $("#password").value;
   if (!password) {
-    setStatus("Enter the editor password first.", "#c0392b");
+    setStatus("Enter the editor password first.", ERR);
     return;
   }
   const { out, bad } = buildPayload();
   if (bad.length > 0) {
-    setStatus(`Fix ${bad.length} issue(s): ${bad.slice(0, 3).join("; ")}${bad.length > 3 ? "…" : ""}`, "#c0392b");
+    setStatus(`Fix ${bad.length} issue(s): ${bad.slice(0, 3).join("; ")}${bad.length > 3 ? "…" : ""}`, ERR);
+    return;
+  }
+  const hasChanges = Object.keys(out).length > 0;
+  if (!deploy && !hasChanges) {
+    setStatus("No changes to save.");
     return;
   }
   saveBtn.disabled = true;
-  setStatus("Saving → committing to GitHub…");
+  deployBtn.disabled = true;
+
   try {
+    // Deploy-only: nothing changed, just rebuild + ship the current branch.
+    if (deploy && !hasChanges) {
+      setStatus("Triggering staging deploy…");
+      const res = await fetch(`${WORKER_URL}/deploy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setStatus(`Deploy failed: ${data.error || res.status}`, ERR);
+      } else {
+        setStatus("Deploy triggered ✓ — staging rebuilds in a few minutes.", "var(--ok)");
+      }
+      return;
+    }
+
+    setStatus(deploy ? "Saving + deploying…" : "Saving → committing to GitHub…");
     const res = await fetch(`${WORKER_URL}/egg-moves`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password, author: $("#author").value, eggMoves: out }),
+      body: JSON.stringify({ password, author: $("#author").value, eggMoves: out, deploy }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) {
-      setStatus(`Save failed: ${data.error || res.status}`, "#c0392b");
-      refreshSaveButton();
+      setStatus(`Save failed: ${data.error || res.status}`, ERR);
       return;
     }
     baseline = JSON.parse(JSON.stringify(current));
     renderGrid($("#search").value);
-    refreshSaveButton();
-    setStatus(`Saved ✓ commit ${data.commit ? data.commit.slice(0, 7) : ""} — deploy to apply.`, "var(--ok)");
+    const sha = data.commit ? data.commit.slice(0, 7) : "";
+    if (deploy) {
+      setStatus(
+        data.deployed
+          ? `Saved ✓ ${sha} — deploy triggered, live in a few minutes.`
+          : `Saved ✓ ${sha} but deploy failed: ${data.deployError || "unknown"}`,
+        data.deployed ? "var(--ok)" : ERR,
+      );
+    } else {
+      setStatus(`Saved ✓ ${sha} — click "Commit & Deploy" to apply it to staging.`, "var(--ok)");
+    }
   } catch (err) {
-    setStatus(`Save error: ${err}`, "#c0392b");
+    setStatus(`Error: ${err}`, ERR);
+  } finally {
     refreshSaveButton();
+    deployBtn.disabled = false;
   }
 }
 
@@ -194,7 +234,8 @@ async function init() {
 
     $("#grid").addEventListener("input", onSlotInput);
     $("#search").addEventListener("input", e => renderGrid(e.target.value));
-    saveBtn.addEventListener("click", save);
+    saveBtn.addEventListener("click", () => commit({ deploy: false }));
+    deployBtn.addEventListener("click", () => commit({ deploy: true }));
   } catch (err) {
     setStatus(`Failed to load data: ${err}`, "#c0392b");
   }

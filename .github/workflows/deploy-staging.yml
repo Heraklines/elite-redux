@@ -1,0 +1,55 @@
+name: Deploy Staging
+
+# Rebuilds the standalone (login) bundle and deploys it to the
+# elite-redux-staging Cloudflare Pages project. Triggered manually from the
+# Actions tab OR automatically by the team editor's "Commit & Deploy" button
+# (the er-editor-api Worker fires a workflow_dispatch after committing).
+#
+# Required GitHub repo config (Settings → Secrets and variables → Actions):
+#   secrets.CLOUDFLARE_API_TOKEN   — token with Pages:Edit on the account
+#   secrets.CLOUDFLARE_ACCOUNT_ID  — Cloudflare account id
+#   vars.STAGING_SERVER_URL        — save API base, e.g. https://er-save-api-staging.<sub>.workers.dev
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.repository == 'Heraklines/elite-redux'
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+          submodules: "recursive"
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Write standalone login env
+        run: |
+          {
+            echo "VITE_BYPASS_LOGIN=0"
+            echo "VITE_SERVER_URL=${{ vars.STAGING_SERVER_URL }}"
+          } > .env.standalone.local
+
+      - name: Build standalone bundle
+        run: pnpm build:standalone
+        env:
+          NODE_ENV: production
+
+      - name: Assemble dist (Cloudflare config + strip sourcemaps)
+        run: |
+          cp deploy/cloudflare/_redirects deploy/cloudflare/_headers deploy/cloudflare/service-worker.js dist/
+          find dist -name '*.map' -delete
+
+      - name: Deploy to Cloudflare Pages (staging)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name elite-redux-staging --branch staging --commit-dirty=true
