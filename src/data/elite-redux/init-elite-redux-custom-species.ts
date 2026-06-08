@@ -84,18 +84,14 @@ function isDegenerateDraft(draft: ErSpeciesDraft): boolean {
  * the broken species const → a slug whose `elite-redux/<slug>/` directory holds
  * the correct, complete sprite set (front/back/icon + all shiny tiers).
  *
- * `SPECIES_INFERNAPE_REDUX → "infernape_redux_mega"`: ER's asset repo misfiled
- * Infernape Redux's art. Both `infernape_redux/` and `infernape_redux_b/` hold an
- * unrelated yellow winged bird; the ACTUAL blue Water/Fighting bard (the real
- * base Redux Infernape) is the only sprite shipped — under the misleading
- * `infernape_redux_mega/` directory. The folder name says "mega" but the artwork
- * is the base form, so we point the base species there. (The Mega form species
- * uses the same slug, so base and mega share this art — ER provided no distinct
- * mega sprite.)
+ * (Currently empty.) NOTE on Infernape Redux: its BASE sprite is missing from the
+ * asset set. `infernape_redux/` and `infernape_redux_b/` both hold an unrelated
+ * yellow winged bird (misfiled), and the blue bard in `infernape_redux_mega/` is
+ * the MEGA form's art — not the base. There is no correct base sprite to point at
+ * yet, so no override is applied (base falls back to its own `infernape_redux`
+ * slug). Add an override here once the real base art is sourced.
  */
-const ER_SPRITE_SLUG_OVERRIDES: Readonly<Record<string, string>> = {
-  SPECIES_INFERNAPE_REDUX: "infernape_redux_mega",
-};
+const ER_SPRITE_SLUG_OVERRIDES: Readonly<Record<string, string>> = {};
 
 /**
  * Map ER's numeric type id (decoded by `ER_TYPE_NAMES` in `er-move-tables.ts`)
