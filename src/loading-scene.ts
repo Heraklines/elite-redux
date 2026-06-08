@@ -517,8 +517,14 @@ export class LoadingScene extends SceneBase {
 
     this.load
       .once(this.LOAD_EVENTS.START, () => {
-        // videos do not need to be preloaded
-        intro.loadURL("images/intro_dark.mp4", true);
+        // videos do not need to be preloaded.
+        // crossOrigin "anonymous" is REQUIRED in prod: the asset path redirects to
+        // jsDelivr (a different origin), and without it the browser taints the
+        // <video> so WebGL's texImage2D throws an uncaught SecurityError when the
+        // frame is uploaded as a texture — which could freeze the intro for some
+        // first-time users. jsDelivr sends Access-Control-Allow-Origin: *, so the
+        // anonymous request loads cleanly and the texture is never tainted.
+        intro.loadURL("images/intro_dark.mp4", true, "anonymous");
         if (mobile) {
           intro.video?.setAttribute("webkit-playsinline", "webkit-playsinline");
           intro.video?.setAttribute("playsinline", "playsinline");
