@@ -58,6 +58,7 @@ import {
   CritOnlyAttr,
   crashDamageFunc,
   DelayedAttackAttr,
+  ErSuperEffectiveVsTypeAttr,
   FallDownAttr,
   ForceSwitchOutAttr,
   HighCritAttr,
@@ -732,8 +733,11 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
     case 800: // Fumigation Bomb — super-effective vs Bug
       move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.isOfType(PokemonType.BUG) ? 2 : 1));
       break;
-    case 806: // Aura Force — super-effective vs Ghost
-      move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.isOfType(PokemonType.GHOST) ? 2 : 1));
+    case 806: // Aura Force — super-effective vs Ghost (Fighting is normally
+      // immune to Ghost; a power multiplier on a 0× hit stays 0, so use a
+      // type-chart override that substitutes Ghost's contribution with 2× —
+      // this both lets the move HIT Ghosts and makes it super-effective.
+      move.attr(ErSuperEffectiveVsTypeAttr, PokemonType.GHOST);
       break;
     case 933: // Crackle Slam — super-effective vs Steel
       move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.isOfType(PokemonType.STEEL) ? 2 : 1));
