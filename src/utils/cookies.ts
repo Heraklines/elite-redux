@@ -6,7 +6,9 @@ const COOKIE_EXPIRATION_BUFFER = 3600000 * 24 * 30 * 3;
 export function setCookie(cName: string, cValue: string): void {
   const expiration = new Date();
   expiration.setTime(Date.now() + COOKIE_EXPIRATION_BUFFER);
-  document.cookie = `${cName}=${cValue};Secure;SameSite=Strict;Domain=${window.location.hostname};Path=/;Expires=${expiration.toUTCString()}`;
+  const secure = window.location.protocol === "https:" ? ";Secure" : "";
+  const domain = window.location.hostname.includes(".") ? `;Domain=${window.location.hostname}` : "";
+  document.cookie = `${cName}=${cValue}${secure};SameSite=Strict${domain};Path=/;Expires=${expiration.toUTCString()}`;
 }
 
 export function removeCookie(cName: string): void {
@@ -15,7 +17,9 @@ export function removeCookie(cName: string): void {
   }
 
   document.cookie = `${cName}=;Secure;SameSite=Strict;Domain=${window.location.hostname};Path=/;Max-Age=-1`;
+  document.cookie = `${cName}=;SameSite=Strict;Domain=${window.location.hostname};Path=/;Max-Age=-1`;
   document.cookie = `${cName}=;Secure;SameSite=Strict;Path=/;Max-Age=-1`; // legacy cookie without domain, for older cookies to prevent a login loop
+  document.cookie = `${cName}=;SameSite=Strict;Path=/;Max-Age=-1`;
 }
 
 export function getCookie(cName: string): string {

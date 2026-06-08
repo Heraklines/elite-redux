@@ -170,7 +170,7 @@ export class LoginPhase extends Phase {
     if (bypassLogin || !gameData.cloudSaveMissing) {
       return false;
     }
-    const localSave = gameData.findImportableLocalSave();
+    const localSave = gameData.findImportableLocalSaveBundle();
     if (!localSave) {
       return false;
     }
@@ -183,7 +183,7 @@ export class LoginPhase extends Phase {
           () => {
             ui.setMode(UiMode.LOADING, { buttonActions: [] });
             gameData
-              .importSystemSaveString(localSave)
+              .importLocalSaveBundle(localSave)
               .catch(err => console.error("Local save import failed:", err))
               .finally(() => {
                 ui.setMode(UiMode.MESSAGE);

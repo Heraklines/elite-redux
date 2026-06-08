@@ -43,6 +43,7 @@ const donateUrl = "https://github.com/sponsors/pagefaultgames";
 // Elite Redux community + source (AGPL: the source link must be discoverable).
 const erDiscordUrl = "https://discord.gg/g6Gt448sp";
 const erSourceUrl = "https://github.com/Heraklines/elite-redux";
+const isOauthConfigured = (value: string | undefined) => !!value && value !== "placeholder" && value !== "1234567890";
 
 export class MenuUiHandler extends MessageUiHandler {
   private readonly textPadding = 8;
@@ -619,7 +620,7 @@ export class MenuUiHandler extends MessageUiHandler {
             // client ids), so without this guard "Link Discord/Google" would show
             // and open broken `client_id=undefined` URLs.
             const linkOptions: OptionSelectItem[] = [];
-            if (import.meta.env.VITE_DISCORD_CLIENT_ID) {
+            if (isOauthConfigured(import.meta.env.VITE_DISCORD_CLIENT_ID)) {
               linkOptions.push({
                 label:
                   loggedInUser?.discordId === ""
@@ -641,7 +642,7 @@ export class MenuUiHandler extends MessageUiHandler {
                 },
               });
             }
-            if (import.meta.env.VITE_GOOGLE_CLIENT_ID) {
+            if (isOauthConfigured(import.meta.env.VITE_GOOGLE_CLIENT_ID)) {
               linkOptions.push({
                 label:
                   loggedInUser?.googleId === ""
@@ -698,7 +699,7 @@ export class MenuUiHandler extends MessageUiHandler {
             ui.setMode(UiMode.LOADING, {
               buttonActions: [],
               fadeOut: () =>
-                globalScene.gameData.saveAll(true, true, true, true).then(() => {
+                globalScene.gameData.saveAll(true, true, true, true, true).then(() => {
                   globalScene.reset(true);
                 }),
             });

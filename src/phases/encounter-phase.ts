@@ -312,9 +312,8 @@ export class EncounterPhase extends BattlePhase {
           // Set weather and terrain before session gets saved
           this.trySetWeatherIfNewBiome();
           this.trySetTerrainIfNewBiome();
-          // Game syncs to server on waves X1 and X6 (As of 1.2.0)
           globalScene.gameData
-            .saveAll(true, battle.waveIndex % 5 === 1 || (globalScene.lastSavePlayTime ?? 0) >= 300)
+            .saveAll(true, battle.waveIndex % 20 === 1 || (globalScene.lastSavePlayTime ?? 0) >= 1200)
             .then(success => {
               globalScene.disableMenu = false;
               if (!success) {

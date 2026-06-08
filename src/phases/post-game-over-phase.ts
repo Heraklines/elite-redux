@@ -17,7 +17,7 @@ export class PostGameOverPhase extends Phase {
     super.start();
 
     const saveAndReset = () => {
-      globalScene.gameData.saveAll(true, true, true).then(success => {
+      globalScene.gameData.saveAll(true, true, true, false, true).then(success => {
         if (!success) {
           return globalScene.reset(true);
         }

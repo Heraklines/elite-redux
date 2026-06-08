@@ -136,6 +136,31 @@ const systemShortKeys = {
   classicWinCount: "$wc",
 };
 
+const CLOUD_SYNC_MIN_INTERVAL_MS = 20 * 60 * 1000;
+const CLOUD_SYNC_BACKOFF_BASE_MS = 20 * 60 * 1000;
+const CLOUD_SYNC_BACKOFF_MAX_MS = 6 * 60 * 60 * 1000;
+
+interface ImportableLocalSessionSave {
+  slot: number;
+  data: string;
+}
+
+interface ImportableLocalSaveBundle {
+  system: string;
+  sessions: ImportableLocalSessionSave[];
+}
+
+interface ImportableLocalSystemCandidate {
+  key: string;
+  data: string;
+}
+
+interface CloudSyncState {
+  lastSuccessAt?: number;
+  blockedUntil?: number;
+  failureCount?: number;
+}
+
 export class GameData {
   public trainerId: number;
   public secretId: number;
@@ -275,7 +300,7 @@ export class GameData {
     return this.unlocks[unlockable];
   }
 
-  public async saveSystem(): Promise<boolean> {
+  public async saveSystem(forceSync = false): Promise<boolean> {
     globalScene.ui.savingIcon.show();
     // Catch-all for the one-time Legendary-egg gift: a brand-new account never
     // runs initParsedSystem on its first session (no save to parse yet), so the
@@ -295,16 +320,25 @@ export class GameData {
       return true;
     }
 
+    if (!forceSync && !this.shouldAttemptCloudSync()) {
+      globalScene.ui.savingIcon.hide();
+      return true;
+    }
+
     const error = await pokerogueApi.savedata.system.update({ clientSessionId }, systemData);
     globalScene.ui.savingIcon.hide();
     if (error) {
       if (error.startsWith("session out of date")) {
         globalScene.phaseManager.clearPhaseQueue();
         globalScene.phaseManager.unshiftNew("ReloadSessionPhase");
+        console.error(error);
+        return false;
       }
+      this.markCloudSyncFailure();
       console.error(error);
-      return false;
+      return true;
     }
+    this.markCloudSyncSuccess();
     return true;
   }
 
@@ -349,6 +383,80 @@ export class GameData {
       saveDataOrErr,
       cachedSystem ? AES.decrypt(cachedSystem, saveKey).toString(enc.Utf8) : undefined,
     );
+  }
+
+  public findImportableLocalSaveBundle(): ImportableLocalSaveBundle | null {
+    const candidate = this.findImportableLocalSystemCandidate();
+    if (!candidate) {
+      return null;
+    }
+    return {
+      system: candidate.data,
+      sessions: this.findImportableLocalSessionSaves(candidate.key),
+    };
+  }
+
+  private findImportableLocalSystemCandidate(): ImportableLocalSystemCandidate | null {
+    if (typeof localStorage === "undefined") {
+      return null;
+    }
+    const currentKey = `data_${loggedInUser?.username}`;
+    const candidates: string[] = [];
+    for (const key of Object.keys(localStorage)) {
+      if (!key || key.endsWith("_bak") || key === currentKey || (key !== "data" && !key.startsWith("data_"))) {
+        continue;
+      }
+      candidates.push(key);
+    }
+    candidates.sort((a, b) => {
+      const rank = (key: string) => (key === "data_Guest" ? 0 : key === "data" ? 1 : 2);
+      return rank(a) - rank(b);
+    });
+    for (const key of candidates) {
+      const raw = localStorage.getItem(key);
+      const data = raw ? this.decryptImportableLocalSave(raw) : null;
+      if (data) {
+        return { key, data };
+      }
+    }
+    return null;
+  }
+
+  private findImportableLocalSessionSaves(systemKey: string): ImportableLocalSessionSave[] {
+    const userSuffix = systemKey === "data" ? "" : systemKey.slice("data_".length);
+    const sessions: ImportableLocalSessionSave[] = [];
+    for (let slot = 0; slot < 5; slot++) {
+      const base = `sessionData${slot || ""}`;
+      const candidateKeys = userSuffix ? [`${base}_${userSuffix}`] : [base];
+      if (slot === 0) {
+        candidateKeys.push(userSuffix ? `sessionData0_${userSuffix}` : "sessionData0");
+      }
+      for (const key of candidateKeys) {
+        const raw = localStorage.getItem(key);
+        const data = raw ? this.decryptImportableLocalSave(raw) : null;
+        if (!data) {
+          continue;
+        }
+        try {
+          JSON.parse(data);
+          sessions.push({ slot, data });
+          break;
+        } catch {}
+      }
+    }
+    return sessions;
+  }
+
+  private decryptImportableLocalSave(raw: string): string | null {
+    for (const asGuest of [true, false]) {
+      try {
+        const decrypted = decrypt(raw, asGuest);
+        if (decrypted && decrypted[0] === "{") {
+          return decrypted;
+        }
+      } catch {}
+    }
+    return null;
   }
 
   /**
@@ -406,6 +514,81 @@ export class GameData {
     await this.initSystem(rawSystemDataStr);
     this.cloudSaveMissing = false;
     return this.saveSystem();
+  }
+
+  public async importLocalSaveBundle(bundle: ImportableLocalSaveBundle): Promise<boolean> {
+    let success = true;
+    await this.initSystem(bundle.system);
+    this.cloudSaveMissing = false;
+    success = (await this.saveSystem(true)) && success;
+    for (const session of bundle.sessions) {
+      const error = await pokerogueApi.savedata.session.update(
+        {
+          slot: session.slot,
+          trainerId: this.trainerId,
+          secretId: this.secretId,
+          clientSessionId,
+        },
+        session.data,
+      );
+      if (error) {
+        console.error(error);
+        success = false;
+        continue;
+      }
+      localStorage.setItem(getSessionDataLocalStorageKey(session.slot), encrypt(session.data, bypassLogin));
+      if (loggedInUser) {
+        loggedInUser.lastSessionSlot = Math.max(loggedInUser.lastSessionSlot, session.slot);
+      }
+    }
+    return success;
+  }
+
+  private getCloudSyncStateKey(): string {
+    return `cloudSyncState_${loggedInUser?.username}`;
+  }
+
+  private getCloudSyncState(): CloudSyncState {
+    const raw = localStorage.getItem(this.getCloudSyncStateKey());
+    if (!raw) {
+      return {};
+    }
+    try {
+      return JSON.parse(raw) as CloudSyncState;
+    } catch {
+      return {};
+    }
+  }
+
+  private setCloudSyncState(state: CloudSyncState): void {
+    localStorage.setItem(this.getCloudSyncStateKey(), JSON.stringify(state));
+  }
+
+  private shouldAttemptCloudSync(): boolean {
+    const now = Date.now();
+    const state = this.getCloudSyncState();
+    if ((state.blockedUntil ?? 0) > now) {
+      return false;
+    }
+    if (state.lastSuccessAt && now - state.lastSuccessAt < CLOUD_SYNC_MIN_INTERVAL_MS) {
+      return false;
+    }
+    return true;
+  }
+
+  private markCloudSyncSuccess(): void {
+    this.setCloudSyncState({ lastSuccessAt: Date.now(), failureCount: 0 });
+  }
+
+  private markCloudSyncFailure(): void {
+    const state = this.getCloudSyncState();
+    const failureCount = Math.min((state.failureCount ?? 0) + 1, 8);
+    const blockedFor = Math.min(CLOUD_SYNC_BACKOFF_BASE_MS * 2 ** (failureCount - 1), CLOUD_SYNC_BACKOFF_MAX_MS);
+    this.setCloudSyncState({
+      ...state,
+      failureCount,
+      blockedUntil: Date.now() + blockedFor,
+    });
   }
 
   /**
@@ -1385,6 +1568,7 @@ export class GameData {
     sync = false,
     useCachedSession = false,
     useCachedSystem = false,
+    forceSync = false,
   ): Promise<boolean> {
     if (!skipVerification) {
       const [success] = await updateUserInfo();
@@ -1393,7 +1577,9 @@ export class GameData {
       }
     }
 
-    if (sync) {
+    const shouldCloudSync = sync && !bypassLogin && (forceSync || this.shouldAttemptCloudSync());
+
+    if (shouldCloudSync) {
       globalScene.ui.savingIcon.show();
     }
 
@@ -1433,19 +1619,17 @@ export class GameData {
 
     console.debug(`Session data saved to slot ${globalScene.sessionSlotId}!`);
 
-    if (bypassLogin || !sync) {
-      const verified = await this.verify();
+    if (bypassLogin || !shouldCloudSync) {
       globalScene.ui.savingIcon.hide();
-      return verified;
+      return true;
     }
 
     const saveError = await pokerogueApi.savedata.updateAll(request);
-    if (sync) {
-      globalScene.lastSavePlayTime = 0;
-      globalScene.ui.savingIcon.hide();
-    }
+    globalScene.ui.savingIcon.hide();
 
     if (!saveError) {
+      globalScene.lastSavePlayTime = 0;
+      this.markCloudSyncSuccess();
       return true;
     }
 
@@ -1453,9 +1637,12 @@ export class GameData {
     if (saveError.startsWith("session out of date")) {
       globalScene.phaseManager.clearPhaseQueue();
       globalScene.phaseManager.unshiftNew("ReloadSessionPhase");
+      console.error(saveError);
+      return false;
     }
+    this.markCloudSyncFailure();
     console.error(saveError);
-    return false;
+    return true;
   }
 
   public async tryExportData(dataType: GameDataType, slotId = 0): Promise<boolean> {

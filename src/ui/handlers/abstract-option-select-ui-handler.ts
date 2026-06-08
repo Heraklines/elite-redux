@@ -191,6 +191,7 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
     super.show(args);
 
     this.config = args[0] as OptionSelectConfig;
+    this.blockInput = false;
     this.setupOptions();
 
     globalScene.ui.bringToTop(this.optionSelectContainer);
@@ -205,6 +206,9 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
       this.optionSelectTextContainer.setAlpha(0.5);
       this.cursorObj?.setAlpha(0.8);
       globalScene.time.delayedCall(fixedInt(this.config.delay), () => this.unblockInput());
+    } else {
+      this.optionSelectTextContainer.setAlpha(1);
+      this.cursorObj?.setAlpha(1);
     }
 
     if (this.config?.supportHover) {

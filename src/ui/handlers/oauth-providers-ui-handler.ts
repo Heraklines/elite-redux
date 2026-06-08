@@ -68,12 +68,9 @@ export abstract class OAuthProvidersUiHandler extends LoginRegisterInfoContainer
   }
 
   protected processExternalProvider(): void {
-    // Elite Redux: only surface third-party login when an OAuth client id is
-    // actually configured. The ER deploy uses username/password only (no client
-    // ids set), so without this guard the Discord/Google icons would appear and
-    // open broken `client_id=undefined` auth URLs.
-    const hasDiscord = !!import.meta.env.VITE_DISCORD_CLIENT_ID;
-    const hasGoogle = !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const isConfigured = (value: string | undefined) => !!value && value !== "placeholder" && value !== "1234567890";
+    const hasDiscord = isConfigured(import.meta.env.VITE_DISCORD_CLIENT_ID);
+    const hasGoogle = isConfigured(import.meta.env.VITE_GOOGLE_CLIENT_ID);
     if (!hasDiscord && !hasGoogle) {
       this.externalPartyContainer.setVisible(false);
       return;
