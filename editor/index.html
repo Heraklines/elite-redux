@@ -36,19 +36,21 @@
       #status { margin-left: auto; color: var(--muted); }
       #grid {
         display: grid; gap: 10px; padding: 16px;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
       }
       .card {
         background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-        padding: 10px; display: flex; gap: 10px; align-items: flex-start;
+        padding: 10px; display: flex; gap: 10px; align-items: flex-start; overflow: hidden;
       }
       .card.dirty { border-color: var(--accent); }
-      .card img { width: 64px; height: 64px; image-rendering: pixelated; object-fit: contain; flex: none; background: #0d0d14; border-radius: 6px; }
+      .card img { width: 56px; height: 56px; image-rendering: pixelated; object-fit: contain; flex: none; background: #0d0d14; border-radius: 6px; }
       .card .body { flex: 1; min-width: 0; }
-      .card .name { font-weight: 600; margin-bottom: 6px; }
+      .card .name { font-weight: 600; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .card .name small { color: var(--muted); font-weight: 400; }
       .slots { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-      .slots select { width: 100%; }
+      /* Key fix: inputs must shrink to their grid cell instead of keeping the
+         browser's intrinsic ~20-char width (which overflowed the card). */
+      .slots .slot { width: 100%; min-width: 0; padding: 5px 7px; }
       .empty { color: var(--muted); padding: 40px; text-align: center; }
     </style>
   </head>
@@ -58,6 +60,7 @@
       <input id="search" type="search" placeholder="Search species…" autocomplete="off" />
       <input id="author" type="text" placeholder="Your name (for the commit)" style="width:170px" />
       <input id="password" type="password" placeholder="Editor password" style="width:150px" />
+      <button id="undo" type="button" title="Undo the last move change (one step back)" disabled>↶ Undo</button>
       <button id="save" type="button" class="primary" disabled>Save 0 changes</button>
       <button id="deploy" type="button" title="Commit changes (if any) and rebuild + deploy the staging site">
         Commit &amp; Deploy

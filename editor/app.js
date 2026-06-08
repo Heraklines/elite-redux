@@ -17,10 +17,16 @@ const MOVE_SET = new Set();
 const current = {}; // speciesConst -> [moves]
 let baseline = {}; // speciesConst -> [moves] (last-saved snapshot for dirty tracking)
 
+// Per-edit undo: each committed slot change pushes {const, before}. `committed`
+// is the last settled snapshot we diff against to detect a discrete change.
+const undoStack = [];
+let committed = {};
+
 const $ = sel => document.querySelector(sel);
 const statusEl = $("#status");
 const saveBtn = $("#save");
 const deployBtn = $("#deploy");
+const undoBtn = $("#undo");
 
 const prettify = name =>
   name
@@ -48,6 +54,52 @@ function refreshSaveButton() {
   const n = dirtyCount();
   saveBtn.textContent = `Save ${n} change${n === 1 ? "" : "s"}`;
   saveBtn.disabled = n === 0;
+}
+
+function refreshUndoButton() {
+  undoBtn.textContent = undoStack.length > 0 ? `↶ Undo (${undoStack.length})` : "↶ Undo";
+  undoBtn.disabled = undoStack.length === 0;
+}
+
+// Update a single visible card's inputs + dirty state in place (no full re-render).
+function refreshCard(speciesConst) {
+  const card = document.querySelector(`.card[data-card="${CSS.escape(speciesConst)}"]`);
+  if (!card) {
+    return;
+  }
+  const moves = current[speciesConst] || [];
+  card.querySelectorAll(".slot").forEach((inp, i) => {
+    inp.value = moves[i] || "";
+    inp.style.borderColor = inp.value === "" || MOVE_SET.has(inp.value) ? "" : "#c0392b";
+  });
+  const dirty = JSON.stringify(current[speciesConst] || []) !== JSON.stringify(baseline[speciesConst] || []);
+  card.classList.toggle("dirty", dirty);
+}
+
+// Record an undo step when a species' moves settle to a new value (fires on the
+// input's `change` event, i.e. once per completed edit — not per keystroke).
+function pushUndoIfChanged(speciesConst) {
+  const now = JSON.stringify(current[speciesConst] || []);
+  const was = JSON.stringify(committed[speciesConst] || []);
+  if (now !== was) {
+    undoStack.push({ const: speciesConst, before: (committed[speciesConst] || []).slice() });
+    committed[speciesConst] = (current[speciesConst] || []).slice();
+    refreshUndoButton();
+  }
+}
+
+// Step back one change.
+function undo() {
+  const last = undoStack.pop();
+  if (!last) {
+    return;
+  }
+  current[last.const] = last.before.slice();
+  committed[last.const] = last.before.slice();
+  refreshCard(last.const);
+  refreshSaveButton();
+  refreshUndoButton();
+  setStatus(`Reverted ${last.const.replace(/^SPECIES_/, "")} (one step back).`);
 }
 
 function slotsHtml(speciesConst) {
@@ -180,6 +232,9 @@ async function commit({ deploy }) {
       return;
     }
     baseline = JSON.parse(JSON.stringify(current));
+    committed = JSON.parse(JSON.stringify(current));
+    undoStack.length = 0;
+    refreshUndoButton();
     renderGrid($("#search").value);
     const sha = data.commit ? data.commit.slice(0, 7) : "";
     if (deploy) {
@@ -221,6 +276,7 @@ async function init() {
       current[s.const] = arr;
     }
     baseline = JSON.parse(JSON.stringify(current));
+    committed = JSON.parse(JSON.stringify(current));
 
     // One shared datalist for all move inputs (light + searchable).
     const dl = document.createElement("datalist");
@@ -230,12 +286,20 @@ async function init() {
 
     renderGrid("");
     refreshSaveButton();
+    refreshUndoButton();
     setStatus(`${SPECIES.length} species loaded.`);
 
     $("#grid").addEventListener("input", onSlotInput);
+    // `change` fires once per completed edit (blur / pick from list) → one undo step.
+    $("#grid").addEventListener("change", e => {
+      if (e.target.classList.contains("slot")) {
+        pushUndoIfChanged(e.target.dataset.const);
+      }
+    });
     $("#search").addEventListener("input", e => renderGrid(e.target.value));
     saveBtn.addEventListener("click", () => commit({ deploy: false }));
     deployBtn.addEventListener("click", () => commit({ deploy: true }));
+    undoBtn.addEventListener("click", undo);
   } catch (err) {
     setStatus(`Failed to load data: ${err}`, "#c0392b");
   }
