@@ -184,9 +184,12 @@ const ERR = "#c0392b";
 // deploy=false → just commit. deploy=true → commit (if any changes) then deploy,
 // or deploy-only when there's nothing to commit.
 async function commit({ deploy }) {
-  // Password is optional (Worker is in open mode). Trim if present — pasted /
-  // autofilled values often carry a stray space that would 401.
+  // Trim: pasted / autofilled passwords often carry a stray space that would 401.
   const password = ($("#password")?.value || "").trim();
+  if (!password) {
+    setStatus("Enter the editor password first.", ERR);
+    return;
+  }
   const { out, bad } = buildPayload();
   if (bad.length > 0) {
     setStatus(`Fix ${bad.length} issue(s): ${bad.slice(0, 3).join("; ")}${bad.length > 3 ? "…" : ""}`, ERR);
