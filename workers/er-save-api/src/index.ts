@@ -618,13 +618,19 @@ async function handleRunSample(
   // viable up to where it died).
   const minWaveParsed = Number.parseInt(url.searchParams.get("minWave") ?? "", 10);
   const minWave = Number.isFinite(minWaveParsed) ? Math.max(minWaveParsed, 0) : 0;
+  // Pool from EVERYONE, across all difficulties — a ghost can come from any
+  // player's run of any difficulty, as long as it got deep enough (wave >=
+  // minWave) and isn't the caller's own. (`difficulty` is accepted for forward
+  // compat and as a display fallback but no longer restricts the pool.) The wave
+  // floor + re-levelling on spawn keep the opponent appropriately strong
+  // regardless of its origin tier.
   const { results } = await env.DB.prepare(
     `SELECT id, username, outcome, difficulty, wave, created_at, player_team, opponent_name, opponent_team
        FROM runs
-       WHERE difficulty = ?1 AND user_id != ?2 AND wave >= ?4
+       WHERE user_id != ?1 AND wave >= ?2
        ORDER BY RANDOM() LIMIT ?3`,
   )
-    .bind(difficulty, auth.uid, count, minWave)
+    .bind(auth.uid, minWave, count)
     .all<{
       id: string;
       username: string | null;
