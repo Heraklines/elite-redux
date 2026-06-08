@@ -22,6 +22,7 @@
 // =============================================================================
 
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
 import { TrainerType } from "#enums/trainer-type";
 
 /**
@@ -46,9 +47,17 @@ const ER_EXTRA_RIVAL_WAVES: Readonly<Record<string, Readonly<Record<number, Trai
     42: TrainerType.RIVAL_2,
     76: TrainerType.RIVAL_3,
     122: TrainerType.RIVAL_4,
-    158: TrainerType.RIVAL_5,
   },
 };
+
+const ER_CANONICAL_RIVAL_WAVES: ReadonlyArray<readonly [number, TrainerType]> = [
+  [ClassicFixedBossWaves.RIVAL_1, TrainerType.RIVAL],
+  [ClassicFixedBossWaves.RIVAL_2, TrainerType.RIVAL_2],
+  [ClassicFixedBossWaves.RIVAL_3, TrainerType.RIVAL_3],
+  [ClassicFixedBossWaves.RIVAL_4, TrainerType.RIVAL_4],
+  [ClassicFixedBossWaves.RIVAL_5, TrainerType.RIVAL_5],
+  [ClassicFixedBossWaves.RIVAL_6, TrainerType.RIVAL_6],
+];
 
 /** Extra-trainer cadence per difficulty: force a trainer when `wave % N === 0`. */
 const ER_TRAINER_CADENCE: Readonly<Record<string, number>> = {
@@ -67,6 +76,27 @@ export function erExtraRivalTypeForWave(waveIndex: number): TrainerType | null {
     return null;
   }
   return table[waveIndex] ?? null;
+}
+
+export function erRivalWaveSequence(): ReadonlyArray<readonly [number, TrainerType]> {
+  const extra = ER_EXTRA_RIVAL_WAVES[getErDifficulty()];
+  const waves =
+    extra === undefined
+      ? ER_CANONICAL_RIVAL_WAVES
+      : [
+          ...ER_CANONICAL_RIVAL_WAVES,
+          ...Object.entries(extra).map(([wave, trainerType]) => [Number(wave), trainerType] as const),
+        ];
+  return [...waves].sort(([a], [b]) => a - b);
+}
+
+export function erRivalWaveOrdinal(waveIndex: number, trainerType: TrainerType): number | null {
+  const ordinal = erRivalWaveSequence().findIndex(([wave, type]) => wave === waveIndex && type === trainerType);
+  if (ordinal >= 0) {
+    return ordinal;
+  }
+  const fallback = ER_CANONICAL_RIVAL_WAVES.findIndex(([, type]) => type === trainerType);
+  return fallback >= 0 ? fallback : null;
 }
 
 /**

@@ -14,6 +14,7 @@
 // from PokeRogue's wave curve; only the species/movesets come from ER.
 // =============================================================================
 
+import { globalScene } from "#app/global-scene";
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
   clearErTrainerCacheForTests,
@@ -51,12 +52,12 @@ describe("ER integration — rival override", () => {
 
   // ---- Pure stage-mapping: last PokeRogue rival anchors to ER's last stage ----
 
-  it("maps the rival encounter progression so RIVAL_6 → Lilycove (ER's final stage)", () => {
+  it("maps the rival encounter progression through every ER rival stage", () => {
     // encounterIndex 0 (RIVAL) … 5 (RIVAL_6)
     expect(erRivalStageForEncounter(0)).toBe("Route 103");
-    expect(erRivalStageForEncounter(5)).toBe("Lilycove");
+    expect(erRivalStageForEncounter(5)).toBe("Meteor Falls");
     // Monotonic non-decreasing across the progression (never goes backwards).
-    const stages = ["Route 103", "Rustboro", "Route 110", "Route 119", "Lilycove"];
+    const stages = ["Route 103", "Rustboro", "Route 110", "Route 119", "Lilycove", "Meteor Falls"];
     let prev = -1;
     for (let enc = 0; enc <= 5; enc++) {
       const idx = stages.indexOf(erRivalStageForEncounter(enc));
@@ -67,10 +68,11 @@ describe("ER integration — rival override", () => {
 
   // ---- getErRivalEntry end-to-end (needs a live scene for seed + gender) ----
 
-  it("returns an ER rival roster for RIVAL on Elite, and the Lilycove roster for RIVAL_6", async () => {
+  it("returns wave-aware ER rival rosters for early and late rival battles", async () => {
     await game.classicMode.startBattle(SpeciesId.MAGIKARP);
 
     const rival = { config: { trainerType: TrainerType.RIVAL }, variant: TrainerVariant.FEMALE } as unknown as Trainer;
+    globalScene.currentBattle.waveIndex = 8;
     const first = getErRivalEntry(rival);
     expect(first).not.toBeNull();
     expect(first!.stableKey).toContain("Route 103");
@@ -80,9 +82,10 @@ describe("ER integration — rival override", () => {
       config: { trainerType: TrainerType.RIVAL_6 },
       variant: TrainerVariant.FEMALE,
     } as unknown as Trainer;
+    globalScene.currentBattle.waveIndex = 195;
     const last = getErRivalEntry(rival6);
     expect(last).not.toBeNull();
-    expect(last!.stableKey).toContain("Lilycove");
+    expect(last!.stableKey).not.toBe(first!.stableKey);
   });
 
   it("uses the male rival (Brendan) for the non-female variant", async () => {

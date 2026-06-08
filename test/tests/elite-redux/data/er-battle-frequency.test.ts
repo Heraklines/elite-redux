@@ -50,22 +50,22 @@ describe("ER battle frequency", () => {
       expect(erForcesTrainerWave(4)).toBe(true);
       expect(erForcesTrainerWave(6)).toBe(true);
       expect(erForcesTrainerWave(7)).toBe(false);
-      // 16/76/122/158 are extra-rival waves → excluded even though even.
       expect(erForcesTrainerWave(16)).toBe(false);
+      expect(erForcesTrainerWave(158)).toBe(true);
     });
 
-    it("injects the full extra-rival ladder", () => {
+    it("injects four extra rivals", () => {
       setErDifficulty("hell");
       expect(erExtraRivalTypeForWave(16)).toBe(TrainerType.RIVAL);
       expect(erExtraRivalTypeForWave(42)).toBe(TrainerType.RIVAL_2);
       expect(erExtraRivalTypeForWave(76)).toBe(TrainerType.RIVAL_3);
       expect(erExtraRivalTypeForWave(122)).toBe(TrainerType.RIVAL_4);
-      expect(erExtraRivalTypeForWave(158)).toBe(TrainerType.RIVAL_5);
+      expect(erExtraRivalTypeForWave(158)).toBeNull();
     });
 
     it("never lands an injected rival on a boss / x1 / gym / finale wave", () => {
       setErDifficulty("hell");
-      for (const w of [16, 42, 76, 122, 158]) {
+      for (const w of [16, 42, 76, 122]) {
         expect(w % 10, `wave ${w} is a boss wave`).not.toBe(0);
         expect(w % 10, `wave ${w} is an x1 wave`).not.toBe(1);
         expect(w % 30, `wave ${w} is a gym wave`).not.toBe(20);

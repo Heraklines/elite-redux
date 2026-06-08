@@ -23,6 +23,7 @@ import { getErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
+  getErRivalEntry,
   getErTrainerForTrainer,
   pickTierForWave,
   resetErRunTrainerTracking,
@@ -101,7 +102,7 @@ describe("ER complete per-mode run audit (read by hand)", () => {
         trainerName = `type#${battle.trainer.config.trainerType}`;
       }
       boss = !!battle.trainer.config.isBoss;
-      const erEntry = getErTrainerForTrainer(battle.trainer);
+      const erEntry = getErRivalEntry(battle.trainer) ?? getErTrainerForTrainer(battle.trainer);
       if (erEntry) {
         const cls = (erEntry as { trainerClassName?: string }).trainerClassName;
         erKey = `${erEntry.stableKey ?? erEntry.name ?? "?"}${cls ? ` <${cls}>` : ""}`;

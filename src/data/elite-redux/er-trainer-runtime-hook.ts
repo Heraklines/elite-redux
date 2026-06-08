@@ -40,11 +40,12 @@ import {
   type ErPartyMemberRegistered,
   type ErTrainerRegistryEntry,
 } from "#data/elite-redux/init-elite-redux-trainers";
+import { erRivalWaveOrdinal, erRivalWaveSequence } from "#data/elite-redux/er-battle-frequency";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { ER_MEGA_STONE_NAME_BY_ITEM } from "#data/elite-redux/er-mega-stone-item-ids";
 import { erDifficultyToRosterTier, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
-import { type ErRosterTier, findErTrainersForType, selectErRoster } from "#data/elite-redux/er-trainer-overlay";
+import { type ErRosterTier, selectErRoster } from "#data/elite-redux/er-trainer-overlay";
 import { ER_ITEM_CONVERT_CHANCE, resolveErTrainerItem } from "#data/elite-redux/er-trainer-item-map";
 import { SpeciesFormKey } from "#enums/species-form-key";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
@@ -217,6 +218,13 @@ const ER_BOSS_TRAINER_TYPES: ReadonlySet<number> = new Set([200, 300, 350, 352, 
 // path and must NOT be replaced by a gym leader at a rival wave.
 const ER_RIVAL_TRAINER_TYPES: ReadonlySet<number> = new Set([375, 376, 377, 378, 379, 380]);
 
+const ER_RIVAL_KEY_PATTERN =
+  /^(?:May|Brendan) (?:(?:Route 103|Rustboro|Route 110|Route 119|Lilycove) (?:Treecko|Mudkip|Torchic)|(?:Treecko|Mudkip|Torchic) Meteor Falls)$/;
+
+function isErSpecialTrainer(t: ErTrainerRegistryEntry): boolean {
+  return ER_BOSS_TRAINER_TYPES.has(t.trainerType) || ER_RIVAL_KEY_PATTERN.test(t.stableKey);
+}
+
 /** True if the trainer ships a roster for the given difficulty tier. */
 function trainerHasTier(t: ErTrainerRegistryEntry, tier: ErRosterTier): boolean {
   if (tier === "hell") {
@@ -248,7 +256,7 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
     const isBossWave = !isRival && (trainer.config.isBoss || waveIdx % 10 === 0);
     const all = isBossWave
       ? ER_TRAINER_REGISTRY.filter(t => ER_BOSS_TRAINER_TYPES.has(t.trainerType))
-      : findErTrainersForType(trainer.config.trainerType);
+      : ER_TRAINER_REGISTRY.filter(t => !isErSpecialTrainer(t));
     // Prefer trainers that actually ship the chosen difficulty's roster, then
     // those not yet seen this run (a difficulty shouldn't repeat trainers).
     const tierMatched = all.filter(t => trainerHasTier(t, tier));
@@ -261,14 +269,6 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
     // run despite 428 tier-eligible trainers. Falling back to the global unused
     // pool before allowing ANY repeat lets a run field dozens of distinct
     // trainers (variety), only repeating once the entire tier pool is spent.
-    const unusedTierGlobal = ER_TRAINER_REGISTRY.filter(
-      t => trainerHasTier(t, tier) && !USED_ER_TRAINER_KEYS.has(t.stableKey),
-    );
-    // Never repeat a trainer while fresh ones remain (#225). Preference order:
-    //   1. unseen + tier-appropriate, OF THIS TYPE (thematic)
-    //   2. unseen of this type at all (small insane/hell pool → party fallback)
-    //   3. unseen of ANY type at the tier (variety — the big win)
-    //   4. only once EVERY tier-eligible trainer is used do we allow a repeat.
     // Regular (non-boss) waves rotate from the WHOLE tier pool (all types), not
     // the tiny per-type pool. The per-type pools are 1-2 trainers for common
     // early types (Youngster/Lass/…), so the run-seed selection window had
@@ -287,8 +287,8 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
           : tierMatched.length > 0
             ? tierMatched
             : all
-      : unusedTierGlobal.length > 0
-        ? unusedTierGlobal
+      : unusedTier.length > 0
+        ? unusedTier
         : tierMatched.length > 0
           ? tierMatched
           : all;
@@ -328,7 +328,8 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
       const lo = Math.max(0, targetIdx - radius);
       const hi = Math.min(ordered.length - 1, targetIdx + radius);
       const span = hi - lo + 1;
-      const variety = hashErSelectionSeed(`${globalScene.seed}:${wave}:${trainer.config.trainerType}`);
+      const trainerSourceKey = isBossWave ? trainer.config.trainerType : "regular";
+      const variety = hashErSelectionSeed(`${globalScene.seed}:${wave}:${trainerSourceKey}`);
       choice = ordered[lo + (variety % span)];
       USED_ER_TRAINER_KEYS.add(choice.stableKey);
     }
@@ -459,7 +460,7 @@ function buildErEnemyFromMember(
 // =============================================================================
 
 /** ER rival stages, weakest → strongest (used to scale onto PokeRogue's rivals). */
-const ER_RIVAL_STAGES = ["Route 103", "Rustboro", "Route 110", "Route 119", "Lilycove"] as const;
+const ER_RIVAL_STAGES = ["Route 103", "Rustboro", "Route 110", "Route 119", "Lilycove", "Meteor Falls"] as const;
 
 /** The three starter-dependent rival team variants. */
 const ER_RIVAL_STARTERS = ["Treecko", "Mudkip", "Torchic"] as const;
@@ -484,17 +485,9 @@ function rivalEncounterIndex(trainerType: TrainerType): number | null {
   }
 }
 
-/**
- * Scale PokeRogue's 6 rival encounters onto ER's 5 stages so that the FINAL
- * PokeRogue rival (RIVAL_6, the ~Lv 195 endgame fight) always maps to ER's final
- * rival battle (Lilycove), and earlier encounters map proportionally back through
- * the progression. The actual mon levels come from the engine's wave curve — this
- * only chooses which ER stage's species/movesets to use.
- */
 export function erRivalStageForEncounter(encounterIndex: number): (typeof ER_RIVAL_STAGES)[number] {
-  const lastEncounter = 5; // RIVAL_6
   const lastStage = ER_RIVAL_STAGES.length - 1;
-  const idx = Math.round((encounterIndex / lastEncounter) * lastStage);
+  const idx = encounterIndex;
   return ER_RIVAL_STAGES[Math.min(Math.max(idx, 0), lastStage)];
 }
 
@@ -513,6 +506,102 @@ function erRivalStarterVariant(): (typeof ER_RIVAL_STARTERS)[number] {
     hash = (hash * 31 + seed.charCodeAt(i)) | 0;
   }
   return ER_RIVAL_STARTERS[Math.abs(hash) % ER_RIVAL_STARTERS.length];
+}
+
+type ErRivalName = "May" | "Brendan";
+type ErRivalStarter = (typeof ER_RIVAL_STARTERS)[number];
+type ErRivalStage = (typeof ER_RIVAL_STAGES)[number];
+
+function erRivalKey(rivalName: ErRivalName, stage: ErRivalStage, starter: ErRivalStarter): string {
+  return stage === "Meteor Falls" ? `${rivalName} ${starter} Meteor Falls` : `${rivalName} ${stage} ${starter}`;
+}
+
+function erRivalPartySizeForType(trainerType: TrainerType): number {
+  switch (trainerType) {
+    case TrainerType.RIVAL:
+      return 2;
+    case TrainerType.RIVAL_2:
+      return 3;
+    case TrainerType.RIVAL_3:
+      return 4;
+    case TrainerType.RIVAL_4:
+      return 5;
+    case TrainerType.RIVAL_5:
+    case TrainerType.RIVAL_6:
+      return 6;
+    default:
+      return 0;
+  }
+}
+
+function erRivalRosterSignature(roster: readonly ErPartyMemberRegistered[]): string {
+  return roster.map(member => member.speciesId).join("|");
+}
+
+function erRivalCandidates(
+  rivalName: ErRivalName,
+  starter: ErRivalStarter,
+  tier: ErRosterTier,
+): ErTrainerRegistryEntry[] {
+  const rivalNames: ErRivalName[] = [rivalName, rivalName === "May" ? "Brendan" : "May"];
+  const starters = [starter, ...ER_RIVAL_STARTERS.filter(s => s !== starter)];
+  const seen = new Set<string>();
+  const out: ErTrainerRegistryEntry[] = [];
+  for (const candidateStarter of starters) {
+    for (const stage of ER_RIVAL_STAGES) {
+      for (const name of rivalNames) {
+        const entry = ER_TRAINER_BY_KEY.get(erRivalKey(name, stage, candidateStarter));
+        if (!entry) {
+          continue;
+        }
+        const signature = erRivalRosterSignature(selectErRoster(entry, tier));
+        if (seen.has(signature)) {
+          continue;
+        }
+        seen.add(signature);
+        out.push(entry);
+      }
+    }
+  }
+  return out;
+}
+
+function selectErRivalEntry(
+  rivalName: ErRivalName,
+  starter: ErRivalStarter,
+  trainerType: TrainerType,
+  tier: ErRosterTier,
+): ErTrainerRegistryEntry | null {
+  const wave = globalScene.currentBattle?.waveIndex ?? 0;
+  const ordinal = erRivalWaveOrdinal(wave, trainerType) ?? rivalEncounterIndex(trainerType);
+  if (ordinal === null) {
+    return null;
+  }
+  const sequence = erRivalWaveSequence();
+  const currentSequenceIndex = sequence.findIndex(([candidateWave, type]) => candidateWave === wave && type === trainerType);
+  const trainerTypes =
+    currentSequenceIndex >= 0
+      ? sequence.slice(0, currentSequenceIndex + 1).map(([, type]) => type)
+      : [
+          TrainerType.RIVAL,
+          TrainerType.RIVAL_2,
+          TrainerType.RIVAL_3,
+          TrainerType.RIVAL_4,
+          TrainerType.RIVAL_5,
+          TrainerType.RIVAL_6,
+        ].slice(0, ordinal + 1);
+  const candidates = erRivalCandidates(rivalName, starter, tier);
+  const used = new Set<string>();
+  let selected: ErTrainerRegistryEntry | null = null;
+  for (const type of trainerTypes) {
+    const partySize = erRivalPartySizeForType(type);
+    selected = candidates.find(entry => !used.has(entry.stableKey) && selectErRoster(entry, tier).length >= partySize) ?? null;
+    if (selected === null) {
+      break;
+    }
+    used.add(selected.stableKey);
+  }
+  return selected;
 }
 
 /**
@@ -536,10 +625,9 @@ export function getErRivalEntry(trainer: Trainer): ErTrainerRegistryEntry | null
   const isFemaleRival =
     trainer.variant === TrainerVariant.FEMALE
     || (trainer.variant !== TrainerVariant.DOUBLE && globalScene.gameData.gender === PlayerGender.MALE);
-  const rivalName = isFemaleRival ? "May" : "Brendan";
-  const stage = erRivalStageForEncounter(encounterIndex);
+  const rivalName: ErRivalName = isFemaleRival ? "May" : "Brendan";
   const starter = erRivalStarterVariant();
-  return ER_TRAINER_BY_KEY.get(`${rivalName} ${stage} ${starter}`) ?? null;
+  return selectErRivalEntry(rivalName, starter, trainer.config.trainerType, pickTierForWave(trainer));
 }
 
 /**
