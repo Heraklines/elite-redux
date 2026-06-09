@@ -521,9 +521,42 @@ async function handleUpdateAll(
 // #endregion
 // #region misc endpoints
 
+// "Players online" = distinct accounts whose save was written in the last 5
+// minutes (the client autosaves while playing), NOT total registered accounts.
+// Cached for 60s via the Cache API so the underlying COUNT runs at most once per
+// minute regardless of how many clients poll — keeps us well under D1 read quota.
+const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+const TITLE_STATS_CACHE_KEY = "https://er-save-api.internal/__title-stats";
+
 async function handleTitleStats(env: Env, cors: Record<string, string>): Promise<Response> {
-  const row = await env.DB.prepare("SELECT COUNT(*) AS c FROM users").first<{ c: number }>();
-  return json({ playerCount: row?.c ?? 0, battleCount: 0 }, 200, cors);
+  const cache = caches.default;
+  const cacheKey = new Request(TITLE_STATS_CACHE_KEY);
+
+  const hit = await cache.match(cacheKey);
+  if (hit) {
+    return json(JSON.parse(await hit.text()) as unknown, 200, cors);
+  }
+
+  const cutoff = Date.now() - ONLINE_WINDOW_MS;
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS c FROM (
+       SELECT user_id FROM session_saves WHERE updated_at > ?1
+       UNION
+       SELECT user_id FROM system_saves  WHERE updated_at > ?1
+     )`,
+  )
+    .bind(cutoff)
+    .first<{ c: number }>();
+
+  const payload = { playerCount: row?.c ?? 0, battleCount: 0 };
+  // Store under a 60s TTL (Cache API honours Cache-Control max-age).
+  await cache.put(
+    cacheKey,
+    new Response(JSON.stringify(payload), {
+      headers: { "Content-Type": "application/json", "Cache-Control": "max-age=60" },
+    }),
+  );
+  return json(payload, 200, cors);
 }
 
 function handleDailySeed(cors: Record<string, string>): Response {
