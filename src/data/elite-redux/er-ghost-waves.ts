@@ -16,8 +16,11 @@ import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-dif
 // Endgame ghost-wave schedule. Chosen to avoid fixed battles (E4 182/184/186/188,
 // champion 190, RIVAL_6 195), boss waves (% 10 === 0), x1 waves (% 10 === 1) and
 // gym waves (% 30 === 20). Hell reaches a bit earlier (176/178) to fit all 8.
+//
+// ACE = pure vanilla PokeRogue (#345): NO ghost trainers at all — the ghost
+// gauntlet is an Elite/Hell feature.
 const GHOST_WAVES: Readonly<Record<ErDifficulty, readonly number[]>> = {
-  ace: [196],
+  ace: [],
   elite: [192, 196, 199],
   hell: [176, 178, 192, 193, 194, 196, 197, 199],
 };
