@@ -77,6 +77,26 @@ export function consumePendingDevStarters(): Starter[] | null {
   return s;
 }
 
+// --- Pending mid-combat setup (scenario → first TurnInitPhase) ----------------
+// Lets a scenario stage a callback that runs ONCE, after both sides are on the
+// field, so it can apply mid-combat state the pre-battle Overrides can't express
+// (e.g. pre-boosted stat stages). Returns null in production / clean checkout,
+// so the consuming phase is inert there.
+
+let pendingBattleSetup: (() => void) | null = null;
+
+/** Stage a callback to run on the first turn once the battle is set up. */
+export function setPendingDevBattleSetup(setup: () => void): void {
+  pendingBattleSetup = setup;
+}
+
+/** Take (and clear) any staged mid-combat setup. Returns null if none was staged. */
+export function consumePendingDevBattleSetup(): (() => void) | null {
+  const cb = pendingBattleSetup;
+  pendingBattleSetup = null;
+  return cb;
+}
+
 // --- Lazy, env-gated loader --------------------------------------------------
 
 // Lazy glob: returns importers WITHOUT running them. Empty object on a clean

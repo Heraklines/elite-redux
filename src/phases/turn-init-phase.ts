@@ -1,3 +1,4 @@
+import { consumePendingDevBattleSetup } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { BattlerIndex } from "#enums/battler-index";
 import { TurnInitEvent } from "#events/battle-scene";
@@ -13,6 +14,20 @@ export class TurnInitPhase extends FieldPhase {
   public readonly phaseName = "TurnInitPhase";
   start() {
     super.start();
+
+    // Local-only dev tools: a test scenario may stage mid-combat setup (e.g.
+    // pre-boosted stat stages) to apply once both sides are on the field.
+    // consumePendingDevBattleSetup() returns null in production / clean checkout,
+    // so this is inert there.
+    const devBattleSetup = consumePendingDevBattleSetup();
+    if (devBattleSetup) {
+      try {
+        devBattleSetup();
+      } catch (err) {
+        // biome-ignore lint/suspicious/noConsole: dev-only diagnostic
+        console.warn("[dev-tools] battle setup threw:", err);
+      }
+    }
 
     globalScene.getPlayerField().forEach(p => {
       // If this pokemon is in play and evolved into something illegal under the current challenge, force a switch
