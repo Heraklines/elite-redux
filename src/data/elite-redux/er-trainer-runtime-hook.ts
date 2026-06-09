@@ -178,8 +178,14 @@ export function restoreErRunTrainerTracking(keys: readonly string[] | undefined)
  * Wave by which the strongest trainers of a type are reached. Maps a run's wave
  * depth onto a 0..1 fraction used to index the strength-ordered pool, so early
  * waves field the weakest (often-unevolved) teams and late waves the strongest.
+ *
+ * ER (#346): per-difficulty — Elite ramps team strength SLOWER than Hell, so
+ * its top-end teams only show up in the final stretch of a 200-wave run, while
+ * Hell reaches full strength by ~wave 180 as before.
  */
-const ER_WAVE_PROGRESSION_SPAN = 180;
+function erWaveProgressionSpan(): number {
+  return getErDifficulty() === "elite" ? 230 : 180;
+}
 
 /** Cache of a trainer's team base-stat-total per tier (stableKey:tier → BST sum). */
 const TEAM_STRENGTH_CACHE = new Map<string, number>();
@@ -279,6 +285,14 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
     // different cast. The strength-window below keeps the pick wave-appropriate.
     // Boss waves keep their thematic boss-type pool so gym leaders / E4 / the
     // champion stay themselves.
+    // ER (#346): on ELITE, regular waves draw from the FULL unused pool — all
+    // 895 trainers — not just the ~429 that ship an "insane" roster. Trainers
+    // without an insane roster fall back to their (weaker) base party via
+    // selectErRoster, so the strength ordering below naturally schedules them
+    // into the early/mid game. This both uses the whole trainer cast and slows
+    // the felt difficulty ramp. Hell keeps the tier-first preference (its pool
+    // should stay brutal); bosses keep their thematic marquee pool.
+    const eliteFullPool = getErDifficulty() === "elite";
     const pool = isBossWave
       ? unusedTier.length > 0
         ? unusedTier
@@ -287,11 +301,15 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
           : tierMatched.length > 0
             ? tierMatched
             : all
-      : unusedTier.length > 0
-        ? unusedTier
-        : tierMatched.length > 0
-          ? tierMatched
-          : all;
+      : eliteFullPool
+        ? unusedAll.length > 0
+          ? unusedAll
+          : all
+        : unusedTier.length > 0
+          ? unusedTier
+          : tierMatched.length > 0
+            ? tierMatched
+            : all;
     if (pool.length > 0) {
       // Prefer trainers whose roster can field the ENTIRE encounter on its own,
       // so we never mix ER mons with vanilla-generated ones: PokeRogue calls
@@ -312,7 +330,7 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
       // E4 / champion-tier teams naturally show up at the end, not at wave 5.
       const ordered = usablePool.slice().sort((a, b) => teamStrength(a, tier) - teamStrength(b, tier));
       const wave = globalScene.currentBattle?.waveIndex ?? 1;
-      const frac = Math.min(1, Math.max(0, (wave - 1) / ER_WAVE_PROGRESSION_SPAN));
+      const frac = Math.min(1, Math.max(0, (wave - 1) / erWaveProgressionSpan()));
       const targetIdx = Math.round(frac * (ordered.length - 1));
       // Pick from a window around the wave-appropriate strength, varied by the
       // RUN SEED (+ wave + type) via a pure hash — NOT the live RNG (which would
