@@ -475,6 +475,39 @@ export const DEV_SCENARIOS: DevScenario[] = [
     // not combat XP.
     shopItems: [modifierTypes.RARE_CANDY],
   },
+  {
+    // The systematic "Redux X → normal evolved form" repro. Party = the reported
+    // problem lines, each with a Redux form on BOTH ends (so they MUST carry it).
+    // Created at L40 — ABOVE every one's evo level — so each is "overdue" and
+    // evolves on the NEXT level-up. Two ways to trigger it, both provided:
+    //   1) WIN the battle (the Chansey gives lots of XP → level-up), or
+    //   2) take the guaranteed RARER CANDY from the shop (levels the WHOLE party
+    //      +1 at once → every overdue mon evolves together).
+    label: "Redux evos carry form (all)",
+    description:
+      "Redux lines must KEEP their Redux form when they evolve (Drilbur→Excadrill,\n"
+      + "Kadabra→Alakazam, Krabby→Kingler). All are L40 Redux mons, already past their\n"
+      + "evo level.  DO: either WIN the fight (Chansey = big XP → they level up) OR take\n"
+      + "the RARER CANDY in the shop (levels the whole party +1).  EXPECT: each evolves\n"
+      + "into its REDUX evolved form (Redux sprite + typing + learnset), NOT the normal\n"
+      + "one. (If any comes out normal, that line's evolved species is missing its Redux\n"
+      + "form — note which.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.EARTHQUAKE, MoveId.PSYCHIC, MoveId.SURF, MoveId.ICE_BEAM],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 40,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      const redux = (id: SpeciesId): Starter => makeStarter(id, { formIndex: formIndexByKey(id, "redux") });
+      return [redux(SpeciesId.DRILBUR), redux(SpeciesId.KADABRA), redux(SpeciesId.KRABBY)];
+    },
+    // Whole-party level-up → all overdue Redux mons evolve at once.
+    shopItems: [modifierTypes.RARER_CANDY],
+  },
 
   // ===========================================================================
   // EARLIER scenarios (sprites / megas / type-chart / multi-head)
