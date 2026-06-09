@@ -7022,6 +7022,14 @@ export class PlayerPokemon extends Pokemon {
     }
     return new Promise(resolve => {
       this.pauseEvolutions = false;
+      // Capture the PRE-evolution form key BEFORE any mutation below — it is what
+      // sanitizeEvolvedFormIndex() needs to carry the current form (e.g. "redux")
+      // onto the evolved species. The `preEvolution` arg is unreliable: one caller
+      // passes a PokemonSpecies (no `formKey`), so `preEvolution.formKey` is
+      // undefined → "" → the Redux form got dropped to base on evolve (#325:
+      // Kadabra-Redux → normal Alakazam) even though the preview, which reads
+      // this.getFormKey(), showed the correct Redux sprite.
+      const preEvoFormKey = this.getFormKey();
       // Handles Nincada evolving into Ninjask + Shedinja
       this.handleSpecialEvolutions(evolution);
       const isFusion = evolution instanceof FusionSpeciesFormEvolution;
@@ -7053,7 +7061,10 @@ export class PlayerPokemon extends Pokemon {
       // "redux" Krabby at index 1 evolving into Kingler, whose index 1 is
       // "gigantamax"), that carry-over can point at a battle-only form. Reset to
       // the normal base form (the canonical index-0 form key "") in that case.
-      this.sanitizeEvolvedFormIndex(isFusion, (preEvolution as { formKey?: string }).formKey ?? "");
+      // Prefer the form key captured from the live pre-evo Pokémon; fall back to
+      // the (sometimes species-level) preEvolution arg. This is what carries
+      // "redux" (and other regional/custom forms) across the evolution.
+      this.sanitizeEvolvedFormIndex(isFusion, preEvoFormKey || ((preEvolution as { formKey?: string }).formKey ?? ""));
       this.generateName();
       if (isFusion) {
         const abilityCount = this.getFusionSpeciesForm().getAbilityCount();

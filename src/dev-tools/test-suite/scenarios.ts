@@ -395,6 +395,35 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
 
+  {
+    // #325. EXPECT: leveling Kadabra-Redux to 32 evolves it into Alakazam-REDUX
+    // (Redux sprite/typing), NOT the normal Alakazam. Was reverting to base form
+    // on evolve even though the evolution preview showed the Redux sprite.
+    label: "Redux evo keeps form (Kadabra)",
+    description:
+      "#325 Redux line must KEEP its form on evolution.\n"
+      + "You start with a L31 Kadabra-Redux (evolves at 32). DO: win a battle or\n"
+      + "two to hit L32 and let it evolve. EXPECT: it becomes Alakazam-REDUX (Redux\n"
+      + "sprite + typing), NOT the normal Alakazam.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 31,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.PSYCHIC, MoveId.SHADOW_BALL],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 31,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.KADABRA, {
+          formIndex: formIndexByKey(SpeciesId.KADABRA, "redux"),
+          moveset: [MoveId.PSYCHIC, MoveId.SHADOW_BALL],
+        }),
+      ];
+    },
+  },
+
   // ===========================================================================
   // EARLIER scenarios (sprites / megas / type-chart / multi-head)
   // ===========================================================================

@@ -7,18 +7,20 @@ import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 /**
- * Regression: a Redux-form Krabby (formIndex 1 = "redux") that evolves into
- * Kingler via the plain level-up evolution (preFormKey/evoFormKey both null)
- * must NOT carry its form index over onto Kingler's mismatched form layout.
+ * Regression (#325): a Redux-form Pokémon must KEEP its Redux form across a plain
+ * level-up evolution (preFormKey/evoFormKey both null) — e.g. Kadabra-Redux →
+ * Alakazam-Redux, Krabby-Redux → Kingler-Redux — NOT revert to the base form.
  *
- * KRABBY forms : [0:"", 1:"redux"]
- * KINGLER forms: [0:"", 1:"gigantamax", 2:"mega", 3:"redux"]
+ * The real EvolutionPhase calls `evolve(evolution, this.pokemon.species)` — i.e.
+ * it passes a *PokemonSpecies* (which has no `formKey`) as `preEvolution`. The
+ * old code derived the carry key from `preEvolution.formKey` → undefined → "" →
+ * the Redux form was dropped to base (even though the evolution PREVIEW, which
+ * reads `getFormKey()`, showed the correct Redux sprite). The fix captures the
+ * live `getFormKey()` inside `evolve()` before mutating, so the form carries.
  *
- * Before the fix, the carried-over formIndex 1 landed on Kingler's
- * "gigantamax" form — a transient battle-only form that should never be an
- * evolution destination (and whose cross-origin sprite crashed EvolutionPhase).
+ * These tests reproduce the real caller path (passing `.species`, not the form).
  */
-describe("ER - Redux evolution form carryover", () => {
+describe("ER - Redux evolution form carryover (#325)", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
 
@@ -46,28 +48,42 @@ describe("ER - Redux evolution form carryover", () => {
       .startingLevel(60);
   });
 
-  it("Redux Krabby must not evolve into a Gigantamax Kingler form", async () => {
+  it("Kadabra-Redux evolves into Alakazam-REDUX (real species-passing caller)", async () => {
+    await game.classicMode.runToSummon(SpeciesId.KADABRA);
+    const kadabra = game.field.getPlayerPokemon();
+    const reduxIdx = kadabra.species.forms.findIndex(f => f.formKey === "redux");
+    expect(reduxIdx, "Kadabra has a Redux form").toBeGreaterThan(0);
+    kadabra.formIndex = reduxIdx;
+    expect(kadabra.getSpeciesForm().formKey).toBe("redux");
+
+    // Pass `.species` — exactly what EvolutionPhase does (the buggy path).
+    await kadabra.evolve(pokemonEvolutions[SpeciesId.KADABRA][0], kadabra.species);
+
+    expect(kadabra.species.speciesId).toBe(SpeciesId.ALAKAZAM);
+    expect(kadabra.getSpeciesForm().formKey).toBe("redux");
+  });
+
+  it("Redux Krabby keeps Redux (not Gigantamax, not base) into Kingler", async () => {
     await game.classicMode.runToSummon(SpeciesId.KRABBY);
-
     const krabby = game.field.getPlayerPokemon();
-    // Put Krabby into its Redux form (formIndex 1).
-    krabby.formIndex = 1;
-    expect(krabby.getSpeciesForm().formKey).toBe("redux");
+    const reduxIdx = krabby.species.forms.findIndex(f => f.formKey === "redux");
+    expect(reduxIdx, "Krabby has a Redux form").toBeGreaterThan(0);
+    krabby.formIndex = reduxIdx;
 
-    await krabby.evolve(pokemonEvolutions[SpeciesId.KRABBY][0], krabby.getSpeciesForm());
+    await krabby.evolve(pokemonEvolutions[SpeciesId.KRABBY][0], krabby.species);
 
     expect(krabby.species.speciesId).toBe(SpeciesId.KINGLER);
     const evolvedFormKey = krabby.getSpeciesForm().formKey;
     expect(BATTLE_ONLY_FORM_KEYS).not.toContain(evolvedFormKey);
+    expect(evolvedFormKey).toBe("redux");
   });
 
   it("base-form Krabby evolves into base-form Kingler", async () => {
     await game.classicMode.runToSummon(SpeciesId.KRABBY);
-
     const krabby = game.field.getPlayerPokemon();
     krabby.formIndex = 0;
 
-    await krabby.evolve(pokemonEvolutions[SpeciesId.KRABBY][0], krabby.getSpeciesForm());
+    await krabby.evolve(pokemonEvolutions[SpeciesId.KRABBY][0], krabby.species);
 
     expect(krabby.species.speciesId).toBe(SpeciesId.KINGLER);
     expect(krabby.getSpeciesForm().formKey).toBe("");
