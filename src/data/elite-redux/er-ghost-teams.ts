@@ -447,6 +447,12 @@ export function markTrainerAsGhost(trainer: Trainer, snapshot: GhostTeamSnapshot
   if (uploader && uploader !== "Trainer" && uploader !== "guest") {
     trainer.name = uploader.slice(0, 16);
   }
+  // ER (#365): ghost battles get their own theme ("The Piano Before Cynthia").
+  // The track ships in the er-assets repo (audio/bgm/battle_ghost_piano.mp3,
+  // served via the jsDelivr redirect — zero Cloudflare quota); playBgm lazily
+  // loads unknown keys from audio/bgm/<key>.mp3, so shadowing the getter is
+  // the whole wiring.
+  trainer.getBattleBgm = () => "battle_ghost_piano";
 }
 
 /** True if this trainer is an ER ghost battle. */
