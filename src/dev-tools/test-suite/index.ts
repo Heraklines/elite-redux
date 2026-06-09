@@ -69,6 +69,10 @@ function buildReport(comment?: string): string {
 
 async function sendLogs(button: HTMLButtonElement, comment?: string): Promise<void> {
   const report = buildReport(comment);
+  // Mirror a lightweight entry to the shared ledger so the team sees the log
+  // (filed under the active scenario, or "no-scenario") even on the static
+  // staging site that has no local /__devlog dev server.
+  postEvent("LOG", activeScenarioLabel ?? "", comment ?? "");
   const original = button.textContent;
   let ok = false;
   try {
@@ -167,6 +171,73 @@ function addPassed(label: string): void {
   savePassed(arr);
 }
 
+// --- Shared cross-account/browser progress (staging save-API worker) ---------
+// So the QA team doesn't re-run each other's scenarios: Pass/Fail/Send-Logs are
+// mirrored to the save-API worker's /devtest endpoints, and the picker hides
+// scenarios ANYONE has passed. Degrades gracefully to local-only localStorage
+// when the endpoint is unset (local `pnpm start:dev`) or unreachable.
+const SERVER_URL = (import.meta.env as { VITE_SERVER_URL?: string }).VITE_SERVER_URL ?? "";
+const TESTLOG_BASE = SERVER_URL ? `${SERVER_URL.replace(/\/$/, "")}/devtest` : null;
+const TESTER_KEY = "er-dev-tester-name";
+
+/** Scenarios other testers (or this one, on another device) have passed. */
+let remotePassed: string[] = [];
+
+/** A free-text tester label, asked once and cached, so shared logs show who. */
+function getTesterName(): string {
+  try {
+    let name = localStorage.getItem(TESTER_KEY);
+    if (name === null) {
+      name = window.prompt("Tester name for shared test logs (optional):", "") ?? "";
+      localStorage.setItem(TESTER_KEY, name);
+    }
+    return name;
+  } catch {
+    return "";
+  }
+}
+
+/** Pull the shared passed-set so the picker can hide team-passed scenarios. */
+async function fetchRemoteProgress(): Promise<void> {
+  if (!TESTLOG_BASE) {
+    return;
+  }
+  try {
+    const res = await fetch(`${TESTLOG_BASE}/progress`);
+    if (!res.ok) {
+      return;
+    }
+    const body = (await res.json()) as { passed?: unknown };
+    if (Array.isArray(body.passed)) {
+      remotePassed = body.passed.filter((x): x is string => typeof x === "string");
+    }
+  } catch {
+    /* offline / no endpoint — stay local-only */
+  }
+}
+
+/** POST a shared test event (PASS/FAIL/LOG/UNPASS). Best-effort, never throws. */
+function postEvent(kind: "PASS" | "FAIL" | "LOG" | "UNPASS", scenario: string, comment: string): void {
+  if (!TESTLOG_BASE) {
+    return;
+  }
+  try {
+    const body = new URLSearchParams({ kind, scenario, comment, by: getTesterName() });
+    fetch(`${TESTLOG_BASE}/event`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    }).catch(() => {});
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Union of locally- and remotely-passed scenario labels. */
+function combinedPassed(): string[] {
+  return [...new Set([...getPassed(), ...remotePassed])];
+}
+
 /** Record a PASS/FAIL result to the dev server (dev-logs/session.log) + console. */
 function postResult(kind: "PASS" | "FAIL", label: string, comment: string): void {
   const line = `TEST RESULT: ${kind} — ${label}${comment.trim() ? ` — ${comment.trim()}` : ""}`;
@@ -177,6 +248,8 @@ function postResult(kind: "PASS" | "FAIL", label: string, comment: string): void
   } catch {
     /* no dev server; the console line is still captured by Send Logs */
   }
+  // Mirror to the shared (cross-account) ledger on the staging worker.
+  postEvent(kind, label, comment);
 }
 
 /**
@@ -258,8 +331,12 @@ function showScenarioBanner(scenario: (typeof DEV_SCENARIOS)[number]): void {
   const passBtn = makeBannerButton("✓ Pass", "#1f7a3d");
   passBtn.addEventListener("click", () => {
     postResult("PASS", scenario.label, "");
-    // "Passed = remove from list" — and dismiss the banner.
+    // "Passed = remove from list" — and dismiss the banner. Mirror into the
+    // shared cache too so the picker hides it without waiting for a refetch.
     addPassed(scenario.label);
+    if (!remotePassed.includes(scenario.label)) {
+      remotePassed.push(scenario.label);
+    }
     scenarioBanner?.remove();
     scenarioBanner = null;
     activeScenarioLabel = null;
@@ -311,22 +388,26 @@ function launchScenario(ctx: DevMenuCtx, scenario: (typeof DEV_SCENARIOS)[number
  * into the freshly-opened list.
  */
 function openScenarioList(ctx: DevMenuCtx): void {
-  const passed = getPassed();
-  const passedSet = new Set(passed);
+  // Hide scenarios passed by ANYONE on the team (local + shared remote set).
+  const passedSet = new Set(combinedPassed());
   const remaining = DEV_SCENARIOS.filter(s => !passedSet.has(s.label));
+  const localPassed = getPassed();
 
   const options = remaining.map(scenario => ({
     label: scenario.label,
     handler: () => launchScenario(ctx, scenario),
   }));
-  if (passed.length > 0) {
-    // Undo ONLY the most recently passed test (pop the last one) so the whole
-    // passed list isn't dumped back in at once.
-    const last = passed.at(-1) ?? "";
+  if (localPassed.length > 0) {
+    // Undo ONLY the most recently passed test (pop the last LOCAL one) so the
+    // whole passed list isn't dumped back in at once. Also un-pass it on the
+    // shared ledger so it reappears for the team too.
+    const last = localPassed.at(-1) ?? "";
     options.push({
       label: `↺ Undo last pass: ${last}`,
       handler: () => {
-        savePassed(passed.slice(0, -1));
+        savePassed(localPassed.slice(0, -1));
+        remotePassed = remotePassed.filter(l => l !== last);
+        postEvent("UNPASS", last, "");
         openScenarioList(ctx);
         return true;
       },
@@ -356,6 +437,10 @@ function openScenarioList(ctx: DevMenuCtx): void {
 // ---------------------------------------------------------------------------
 
 injectLogButton();
+
+// Pull the team's shared passed-set early so the picker hides already-done
+// scenarios as soon as the player opens the Dev Scenarios menu. Best-effort.
+fetchRemoteProgress().catch(() => {});
 
 registerDevMenu(ctx => ({
   label: "\u{1F6E0} Dev Scenarios",

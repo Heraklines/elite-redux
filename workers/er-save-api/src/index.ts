@@ -698,6 +698,73 @@ async function handleRunSample(
 }
 
 // #endregion
+// #region dev test-suite progress (shared, staging only)
+
+// The in-game dev TEST SUITE (staging build only) posts every Pass / Fail /
+// Send-Logs here so the QA team shares one progress ledger — nobody re-runs a
+// scenario a teammate already passed. These routes are PUBLIC (no account): the
+// suite is staging-only and the data is non-sensitive QA bookkeeping. The table
+// is auto-created on first hit so an already-deployed DB needs no migration.
+let devTestTableReady = false;
+async function ensureDevTestTable(env: Env): Promise<void> {
+  if (devTestTableReady) {
+    return;
+  }
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS devtest_events (
+       id       INTEGER PRIMARY KEY AUTOINCREMENT,
+       kind     TEXT    NOT NULL,
+       scenario TEXT    NOT NULL DEFAULT '',
+       comment  TEXT    NOT NULL DEFAULT '',
+       by       TEXT    NOT NULL DEFAULT '',
+       at       INTEGER NOT NULL
+     )`,
+  ).run();
+  devTestTableReady = true;
+}
+
+const DEVTEST_EVENT_KINDS = new Set(["PASS", "FAIL", "LOG", "UNPASS"]);
+
+async function handleDevTestEvent(request: Request, env: Env, cors: Record<string, string>): Promise<Response> {
+  await ensureDevTestTable(env);
+  const body = await parseFormBody(request);
+  const kind = (body.kind ?? "").toUpperCase();
+  if (!DEVTEST_EVENT_KINDS.has(kind)) {
+    return json({ error: "invalid kind" }, 422, cors);
+  }
+  const scenario = (body.scenario ?? "").slice(0, 200);
+  if ((kind === "PASS" || kind === "FAIL" || kind === "UNPASS") && scenario.length === 0) {
+    return json({ error: "scenario required" }, 422, cors);
+  }
+  const comment = (body.comment ?? "").slice(0, 2000);
+  const by = (body.by ?? "").slice(0, 60);
+  await env.DB.prepare("INSERT INTO devtest_events (kind, scenario, comment, by, at) VALUES (?1, ?2, ?3, ?4, ?5)")
+    .bind(kind, scenario, comment, by, Date.now())
+    .run();
+  return json({ ok: true }, 200, cors);
+}
+
+async function handleDevTestProgress(env: Env, cors: Record<string, string>): Promise<Response> {
+  await ensureDevTestTable(env);
+  // "passed" = scenarios whose most-recent PASS/UNPASS event is a PASS. Resolve
+  // in JS (the dataset is tiny — one QA team) by folding events oldest→newest.
+  const { results: pe } = await env.DB.prepare(
+    "SELECT scenario, kind FROM devtest_events WHERE kind IN ('PASS','UNPASS') ORDER BY at ASC, id ASC",
+  ).all<{ scenario: string; kind: string }>();
+  const latest = new Map<string, string>();
+  for (const row of pe ?? []) {
+    latest.set(row.scenario, row.kind);
+  }
+  const passed = [...latest.entries()].filter(([, k]) => k === "PASS").map(([s]) => s);
+
+  const { results: recent } = await env.DB.prepare(
+    "SELECT kind, scenario, comment, by, at FROM devtest_events ORDER BY at DESC, id DESC LIMIT 50",
+  ).all<{ kind: string; scenario: string; comment: string; by: string; at: number }>();
+
+  return json({ passed, recent: recent ?? [] }, 200, cors);
+}
+
+// #endregion
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -724,6 +791,13 @@ export default {
       }
       if (pathname === "/daily/seed" && method === "GET") {
         return handleDailySeed(cors);
+      }
+      // Shared dev TEST-SUITE progress (staging-only suite; public, non-sensitive).
+      if (pathname === "/devtest/progress" && method === "GET") {
+        return await handleDevTestProgress(env, cors);
+      }
+      if (pathname === "/devtest/event" && method === "POST") {
+        return await handleDevTestEvent(request, env, cors);
       }
       // Logout is harmless without a valid token (tokens are stateless); the
       // client clears its cookie regardless.

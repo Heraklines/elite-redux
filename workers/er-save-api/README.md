@@ -46,6 +46,19 @@ KV is **not** used — its ~1,000 writes/day cap can't host saves. D1 is the rig
 | `POST` | `/savedata/updateall` | ✓ | Upsert system + one session in one batched write. |
 | `GET`  | `/game/titlestats` | – | `{ playerCount, battleCount:0 }`. |
 | `GET`  | `/daily/seed` | – | Per-UTC-day seed string. |
+| `GET`  | `/devtest/progress` | – | Shared dev TEST-SUITE progress: `{ passed:[label…], recent:[event…] }`. |
+| `POST` | `/devtest/event` | – | Append a test event (`kind` = PASS/FAIL/LOG/UNPASS, `scenario`, `comment`, `by` form fields). |
+
+### Shared dev test-suite progress (staging only)
+
+The in-game dev TEST SUITE (built only into the staging bundle, `VITE_DEV_TOOLS=1`)
+mirrors every Pass / Fail / Send-Logs to `/devtest/*` so the QA team shares one
+progress ledger — the scenario picker hides anything **anyone** has passed. The
+backing D1 table `devtest_events` is **auto-created on first hit**, so an
+already-deployed worker just needs a `wrangler deploy` to expose the routes — no
+migration, no new env var (the client uses the existing `VITE_SERVER_URL`). These
+routes are public (no account): the suite is staging-only and the data is
+non-sensitive QA bookkeeping.
 
 ### Security model
 

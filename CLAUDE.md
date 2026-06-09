@@ -59,6 +59,22 @@ drops into the configured battle with a context banner pinned top-left.
 - **Send Logs** (top-right) prompts for an optional comment, then writes a full
   capture. Results/logs land under `dev-logs/` (see below).
 
+### Shared progress across the team (cross-account / cross-browser)
+So one tester's passes are visible to everyone (nobody re-runs a scenario a
+teammate already passed), Pass/Fail/Send-Logs are mirrored to the **save-API
+worker** (`workers/er-save-api`) at public routes `GET /devtest/progress` +
+`POST /devtest/event` (D1 table `devtest_events`, auto-created on first hit). The
+client (`src/dev-tools/test-suite/index.ts`) reads `import.meta.env.VITE_SERVER_URL`
+(already wired into the staging build) and calls `${VITE_SERVER_URL}/devtest/*`.
+The picker hides scenarios passed by ANYONE; "Undo last pass" posts an `UNPASS`.
+It degrades gracefully to local-only `localStorage` when the endpoint is unset
+(local `pnpm start:dev`) or unreachable.
+- **ACTIVATION (one-time, maintainer only — I can't deploy workers):** redeploy
+  the save-API worker so the `/devtest/*` routes go live:
+  `cd workers/er-save-api && npx wrangler deploy`. No new env var or KV/D1
+  migration is needed (the table self-creates; the URL is the existing
+  `VITE_SERVER_URL`). Until then the suite still works, just local-only.
+
 ### dev-logs (local dev server, `plugins/vite/dev-log-plugin.ts`)
 Nothing is overwritten, and captures are AUTO-TRIAGED by scenario:
 - `dev-logs/captures/<scenario-slug>/<timestamp>[__<comment-slug>].log` — one file

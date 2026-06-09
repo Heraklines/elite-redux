@@ -60,3 +60,21 @@ CREATE TABLE IF NOT EXISTS runs (
   opponent_team TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_runs_sample ON runs (difficulty, outcome, created_at);
+
+-- Shared dev TEST-SUITE progress (staging only). So the QA team doesn't re-run
+-- each other's scenarios: every Pass / Fail / Send-Logs from the in-game test
+-- suite is appended here, and the "passed" set is shared across all browsers and
+-- accounts. Append-only event log; the "passed" set is derived as the scenarios
+-- whose most-recent PASS/UNPASS event is a PASS (UNPASS = the "undo last pass"
+-- button). `by` is a free-text tester label (optional). The worker auto-creates
+-- this table on first /devtest hit, so an already-deployed DB needs no migration.
+CREATE TABLE IF NOT EXISTS devtest_events (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind      TEXT    NOT NULL,   -- 'PASS' | 'FAIL' | 'LOG' | 'UNPASS'
+  scenario  TEXT    NOT NULL DEFAULT '',
+  comment   TEXT    NOT NULL DEFAULT '',
+  by        TEXT    NOT NULL DEFAULT '',
+  at        INTEGER NOT NULL    -- epoch ms
+);
+CREATE INDEX IF NOT EXISTS idx_devtest_scenario ON devtest_events (scenario, at);
+CREATE INDEX IF NOT EXISTS idx_devtest_at ON devtest_events (at);
