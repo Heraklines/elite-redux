@@ -172,7 +172,7 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_SHARPEN", { pp: 30 }],
   ["MOVE_CONVERSION", { pp: 30 }],
   ["MOVE_SLASH", { power: 60, accuracy: 100, pp: 10, chance: 20 }], // ER: 60BP/100%/10PP, always-crit + 20% bleed (attrs in move-patches)
-  ["MOVE_TRIPLE_KICK", { power: 25 }],
+  ["MOVE_TRIPLE_KICK", { power: 20 }], // ER dump + Nextdex: 20 BP (the 25 was a stale c-source divergence; ramps per strike)
   ["MOVE_THIEF", { pp: 25 }],
   ["MOVE_MIND_READER", { pp: 5 }],
   ["MOVE_NIGHTMARE", { pp: 15, chance: 0 }],

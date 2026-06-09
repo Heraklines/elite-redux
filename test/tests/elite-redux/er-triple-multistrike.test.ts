@@ -55,10 +55,10 @@ describe("ER Triple Axel / Triple Kick multi-strike ramp (#313)", () => {
     expect(returned).toEqual([20, 40, 60]);
   });
 
-  it("Triple Kick hits 3× with ramping power 25/50/75", async () => {
+  it("Triple Kick hits 3× with ramping power 20/40/60", async () => {
     const kick = allMoves[MoveId.TRIPLE_KICK];
-    // ER c-source correction sets Triple Kick base power to 25.
-    expect(kick.power).toBe(25);
+    // ER dump + Nextdex: Triple Kick base power is 20 (user-report fix).
+    expect(kick.power).toBe(20);
     vi.spyOn(kick, "calculateBattlePower");
 
     game.override.moveset(MoveId.TRIPLE_KICK);
@@ -68,6 +68,6 @@ describe("ER Triple Axel / Triple Kick multi-strike ramp (#313)", () => {
     await game.phaseInterceptor.to("TurnEndPhase");
 
     const returned = (kick.calculateBattlePower as ReturnType<typeof vi.fn>).mock.results.map(r => r.value);
-    expect(returned).toEqual([25, 50, 75]);
+    expect(returned).toEqual([20, 40, 60]);
   });
 });
