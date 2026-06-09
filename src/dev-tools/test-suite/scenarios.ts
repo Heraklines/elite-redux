@@ -653,6 +653,49 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.FORM_CHANGE_ITEM],
   },
   {
+    // #359/#318 verification: these holders' megas were among the 51 that had
+    // NO working stone before the form-change-bridge fix — second megas of
+    // multi-mega species (Venusaur Mega-Y, Gyarados Mega-X, Lucario Mega-X AND
+    // Mega-Z on distinct stones) and regional-form megas (Galarian Slowbro,
+    // Hisuian Arcanine). 6 guaranteed Form-Change Items roll stones for the
+    // party; rerolls re-pick if duplicates show.
+    label: "Store: fixed megas reachable",
+    description:
+      "#359 — 51 megas had no obtainable stone; verify the fix.\n"
+      + "Party: Venusaur, Gyarados, Lucario, Galarian Slowbro, Hisuian Arcanine\n"
+      + "(+ Mega Bracelet). DO: win the opening fight; the shop offers MEGA STONES\n"
+      + "for your party (reroll if dupes). Give each mon its stone, then mega in\n"
+      + "battle.  EXPECT: every offered stone WORKS (sprite/stats change). Lucario\n"
+      + "must offer TWO different stones: Lucarionite (Mega X) + Lucarionite Z\n"
+      + "(Mega Z). Note any stone that does nothing.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 80,
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_MODIFIER_OVERRIDE: [MEGA_BRACELET],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.VENUSAUR),
+        makeStarter(SpeciesId.GYARADOS),
+        makeStarter(SpeciesId.LUCARIO),
+        makeStarter(SpeciesId.GALAR_SLOWBRO),
+        makeStarter(SpeciesId.HISUI_ARCANINE),
+      ];
+    },
+    shopItems: [
+      modifierTypes.FORM_CHANGE_ITEM,
+      modifierTypes.FORM_CHANGE_ITEM,
+      modifierTypes.FORM_CHANGE_ITEM,
+      modifierTypes.FORM_CHANGE_ITEM,
+      modifierTypes.FORM_CHANGE_ITEM,
+      modifierTypes.FORM_CHANGE_ITEM,
+    ],
+  },
+  {
     label: "Redux sprites (party)",
     description:
       "Redux form sprites/icons.\n"
