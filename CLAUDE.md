@@ -15,7 +15,11 @@ This is mandatory, not optional. Do it as part of the fix, in the same batch.
   block. Give it a short `label`, a `description` (the bug #, what to DO, what to
   EXPECT — testers read this), a `setup()` (party + pre-battle `Overrides`), and
   an optional `onBattleStart()` for mid-combat state (pre-boosted stages via
-  `boostPlayer`/`boostEnemy`, etc.).
+  `boostPlayer`/`boostEnemy`, etc.). For a **"start in the store, test a specific
+  item"** scenario, add `shopItems: [modifierTypes.X]` — those reward options are
+  guaranteed in the FIRST shop after the opening battle (e.g.
+  `modifierTypes.RARE_CANDY` to evolve a mon, or `modifierTypes.FORM_CHANGE_ITEM`
+  which, with a single-mon party, resolves to that mon's mega stone).
 - **Also** keep adding the vitest regression test under `test/tests/elite-redux/`
   when the behavior is unit-testable — the two are complementary (CI gate +
   human in-game check).

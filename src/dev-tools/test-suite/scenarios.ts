@@ -23,6 +23,7 @@
 
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
+import { modifierTypes } from "#data/data-lists";
 import { AbilityId } from "#enums/ability-id";
 import { BerryType } from "#enums/berry-type";
 import { ErAbilityId } from "#enums/er-ability-id";
@@ -35,6 +36,7 @@ import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { ModifierOverride } from "#modifiers/modifier-type";
 import type { Variant } from "#sprites/variant";
+import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { Starter, StarterMoveset } from "#types/save-data";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
@@ -47,6 +49,14 @@ export interface DevScenario {
   setup: () => Starter[];
   /** Optional: runs ONCE on the first turn, after both sides are summoned. */
   onBattleStart?: () => void;
+  /**
+   * Optional: guarantee these reward options in the FIRST shop after the opening
+   * battle ("start in the store, test a specific item"). Each is a
+   * `ModifierTypeFunc` from `modifierTypes` (e.g. `modifierTypes.RARE_CANDY`, or
+   * `modifierTypes.FORM_CHANGE_ITEM` which — with a single-mon party — resolves to
+   * that mon's mega stone). Win the opening battle to reach the shop.
+   */
+  shopItems?: ModifierTypeFunc[];
 }
 
 // --- helpers ----------------------------------------------------------------
@@ -439,9 +449,11 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "Redux evo keeps form (Kadabra)",
     description:
       "#325 Redux line must KEEP its form on evolution.\n"
-      + "You start with a L31 Kadabra-Redux (evolves at 32). DO: win a battle or\n"
-      + "two to hit L32 and let it evolve. EXPECT: it becomes Alakazam-REDUX (Redux\n"
-      + "sprite + typing), NOT the normal Alakazam.",
+      + "You start with a L31 Kadabra-Redux (evolves at 32). DO: win the opening\n"
+      + "battle, then take the RARE CANDY from the rewards and use it on Kadabra to\n"
+      + "hit L32 and evolve.  EXPECT: it becomes Alakazam-REDUX (Redux sprite +\n"
+      + "typing + Redux learnset), NOT the normal Alakazam.\n"
+      + "(Rare candy, not combat XP — the dev battle gives little/no XP.)",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -459,6 +471,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
         }),
       ];
     },
+    // Evolve via a guaranteed Rare Candy in the post-battle shop (level 31 → 32),
+    // not combat XP.
+    shopItems: [modifierTypes.RARE_CANDY],
   },
 
   // ===========================================================================
@@ -539,17 +554,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "Mega Venusaur",
+    // In ER, a mega is a permanent form/evo ACTIVATED by giving the mon its mega
+    // stone (not an in-battle toggle). This tests the store path: get the stone
+    // for a specific mon and apply it. Party is JUST Venusaur, so the guaranteed
+    // Form-Change Item the shop offers resolves to Venusaurite.
+    label: "Store: Mega stone (Venusaur)",
     description:
-      "Mega-evolution smoke test.\n"
-      + "You start at L80 with a Mega Bracelet.  DO: in battle, pick Mega Evolve.\n"
-      + "EXPECT: Venusaur megas cleanly (sprite + stat/ability change).",
+      "ER megas = permanent forms unlocked by a MEGA STONE from the shop.\n"
+      + "You have a lone Venusaur + a Mega Bracelet. DO: win the opening battle, then\n"
+      + "in the rewards take the offered MEGA STONE (Venusaurite) and give it to\n"
+      + "Venusaur.  EXPECT: Venusaur takes its Mega form (sprite + stat/ability/typing\n"
+      + "change). Tests 'start in the store, apply a specific item to a specific mon'.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 80,
-        STARTING_WAVE_OVERRIDE: 10,
+        STARTING_WAVE_OVERRIDE: 5,
         STARTING_MODIFIER_OVERRIDE: [MEGA_BRACELET],
+        MOVESET_OVERRIDE: [MoveId.SOLAR_BEAM, MoveId.SLUDGE_BOMB],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
       });
       return [
         makeStarter(SpeciesId.VENUSAUR, {
@@ -557,6 +582,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
         }),
       ];
     },
+    // The shop guarantees a Form-Change Item; with only Venusaur in the party it
+    // can only roll Venusaurite — the "mega stone for a specific mon".
+    shopItems: [modifierTypes.FORM_CHANGE_ITEM],
   },
   {
     label: "Redux sprites (party)",

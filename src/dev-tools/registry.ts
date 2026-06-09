@@ -23,6 +23,7 @@
 // =============================================================================
 
 import type { GameModes } from "#enums/game-modes";
+import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { Starter } from "#types/save-data";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 
@@ -95,6 +96,28 @@ export function consumePendingDevBattleSetup(): (() => void) | null {
   const cb = pendingBattleSetup;
   pendingBattleSetup = null;
   return cb;
+}
+
+// --- Pending shop items (scenario → first SelectModifierPhase) ----------------
+// Lets a "start in the store, test a specific item" scenario guarantee specific
+// reward options in the NEXT reward/shop screen (e.g. a Rare Candy to evolve a
+// mon, or a Form-Change Item that resolves to a single-mon party's mega stone).
+// Each entry is a `ModifierTypeFunc`; the first SelectModifierPhase merges them
+// into its `customModifierSettings.guaranteedModifierTypeFuncs`. Returns null in
+// production / clean checkout, so the consuming phase is inert there.
+
+let pendingDevShop: ModifierTypeFunc[] | null = null;
+
+/** Stage guaranteed reward options for the next reward/shop screen. */
+export function setPendingDevShop(funcs: ModifierTypeFunc[]): void {
+  pendingDevShop = funcs;
+}
+
+/** Take (and clear) any staged shop items. Returns null if none was staged. */
+export function consumePendingDevShop(): ModifierTypeFunc[] | null {
+  const f = pendingDevShop;
+  pendingDevShop = null;
+  return f;
 }
 
 // --- Lazy, env-gated loader --------------------------------------------------

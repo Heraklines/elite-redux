@@ -24,6 +24,7 @@ import {
   type DevMenuCtx,
   registerDevMenu,
   setPendingDevBattleSetup,
+  setPendingDevShop,
   setPendingDevStarters,
 } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
@@ -366,6 +367,11 @@ function launchScenario(ctx: DevMenuCtx, scenario: (typeof DEV_SCENARIOS)[number
     setPendingDevStarters(starters);
     if (scenario.onBattleStart) {
       setPendingDevBattleSetup(scenario.onBattleStart);
+    }
+    if (scenario.shopItems && scenario.shopItems.length > 0) {
+      // Guarantee these reward options in the first shop after the opening battle
+      // ("start in the store, test a specific item").
+      setPendingDevShop(scenario.shopItems);
     }
     activeScenarioLabel = scenario.label;
     showScenarioBanner(scenario);

@@ -1,3 +1,4 @@
+import { consumePendingDevShop } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
@@ -62,6 +63,20 @@ export class SelectModifierPhase extends BattlePhase {
 
     if (!this.isPlayer()) {
       return false;
+    }
+
+    // Dev test-suite "start in the store" scenarios stage guaranteed reward
+    // options (e.g. a Rare Candy, or a Form-Change Item that resolves to a
+    // single-mon party's mega stone). consumePendingDevShop() returns null in
+    // production / clean checkout, so this is inert there. Consumed by the FIRST
+    // reward screen after the scenario's opening battle.
+    const devShop = consumePendingDevShop();
+    if (devShop && devShop.length > 0) {
+      this.customModifierSettings = {
+        ...(this.customModifierSettings ?? {}),
+        guaranteedModifierTypeFuncs: [...(this.customModifierSettings?.guaranteedModifierTypeFuncs ?? []), ...devShop],
+        fillRemaining: true,
+      };
     }
 
     if (!this.rerollCount && !this.isCopy) {
