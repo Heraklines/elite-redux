@@ -116,17 +116,20 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
       .setVisible(false);
 
     // ER Damage Calc view — occupies the same panel area as the move stats,
-    // shown instead of them when cycled to (R / RB).
+    // shown instead of them when cycled to (R / RB). Top-aligned in the panel
+    // (header where the type icon row sits) so the 3-4 short lines fit without
+    // spilling past the panel's bottom edge.
     this.dmgCalcHeader = addTextObject(
       globalScene.scaledCanvas.width - 70,
-      -28,
+      -36,
       "DMG CALC",
       TextStyle.MOVE_INFO_CONTENT,
     )
       .setOrigin(0, 0.5)
       .setVisible(false);
-    this.dmgCalcBody = addTextObject(globalScene.scaledCanvas.width - 70, -21, "", TextStyle.MOVE_INFO_CONTENT, {
-      wordWrap: { width: 320 },
+    this.dmgCalcBody = addTextObject(globalScene.scaledCanvas.width - 70, -30, "", TextStyle.MOVE_INFO_CONTENT, {
+      wordWrap: { width: 340 },
+      lineSpacing: -8,
     })
       .setOrigin(0, 0)
       .setVisible(false);
@@ -392,13 +395,26 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
   }
 
   /**
-   * ER (#356): render the right panel's current page — 0 = the normal move
-   * stats, 1 = the highlighted move's DESCRIPTION (previously unviewable in
-   * battle since the ER panel replaced vanilla's), 2 = the Damage Calc view.
-   * Cycled with R / RB.
+   * ER (#356): render the current panel page, cycled with R / RB:
+   *   0 — the normal move stats in the right panel.
+   *   1 — the highlighted move's DESCRIPTION via the full-width
+   *       {@linkcode MoveInfoOverlay} above the move list (auto-scrolls long
+   *       text); the right panel keeps the stats. The tiny right panel can't
+   *       legibly fit free-form description text, so the overlay does the work.
+   *   2 — the Damage Calc view in the right panel (short, fits top-aligned).
    */
   private applyPanelMode(pokemon: Pokemon, pokemonMove: PokemonMove): void {
     const mode = this.panelMode;
+    // Description page: fade the overlay in; any other page fades it back out
+    // (without fighting the vanilla hold-to-peek info button). If the player
+    // disabled Move Info in settings the overlay never populates — fall back to
+    // a compact in-panel description so the page isn't blank.
+    const overlayUsable = globalScene.enableMoveInfo;
+    const showOverlay = mode === 1 && overlayUsable;
+    if (this.moveInfoOverlay.visible !== showOverlay) {
+      this.moveInfoOverlay.toggleInfo(showOverlay);
+    }
+    const inPanelText = mode === 2 || (mode === 1 && !overlayUsable);
     for (const el of [
       this.typeIcon,
       this.moveCategoryIcon,
@@ -409,16 +425,16 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
       this.accuracyLabel,
       this.accuracyText,
     ]) {
-      el.setVisible(mode === 0);
+      el.setVisible(!inPanelText);
     }
-    this.dmgCalcHeader.setVisible(mode !== 0);
-    this.dmgCalcBody.setVisible(mode !== 0);
-    if (mode === 1) {
-      this.dmgCalcHeader.setText("DESCRIPTION (R)");
-      this.dmgCalcBody.setText(pokemonMove.getMove().effect || "—");
-    } else if (mode === 2) {
+    this.dmgCalcHeader.setVisible(inPanelText);
+    this.dmgCalcBody.setVisible(inPanelText);
+    if (mode === 2) {
       this.dmgCalcHeader.setText("DMG CALC (R)");
       this.dmgCalcBody.setText(this.getDamageCalcText(pokemon, pokemonMove));
+    } else if (mode === 1 && !overlayUsable) {
+      this.dmgCalcHeader.setText("DESCRIPTION (R)");
+      this.dmgCalcBody.setText(pokemonMove.getMove().effect || "—");
     }
   }
 

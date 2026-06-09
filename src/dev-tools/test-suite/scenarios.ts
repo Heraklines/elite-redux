@@ -317,9 +317,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
     description:
       "#356 Move info while choosing moves.\n"
       + "DO: open FIGHT, highlight a move, press R (mobile: on-screen R) repeatedly.\n"
-      + "EXPECT: the right panel cycles STATS -> DESCRIPTION (full move text) ->\n"
-      + "DAMAGE CALC -> back to STATS. Description must show for every move,\n"
-      + "including the 5th rogue-slot move.",
+      + "EXPECT: page 1 = stats panel; page 2 = a WIDE description box above the\n"
+      + "move list (long text auto-scrolls; stats stay in the side panel); page 3 =\n"
+      + "DMG CALC in the side panel, fully inside the panel (no overflow); then back\n"
+      + "to page 1. Works for every move incl. the 5th rogue-slot move.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
