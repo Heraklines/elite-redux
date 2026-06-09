@@ -80,7 +80,8 @@ export interface GhostTeamSnapshot {
 const MAX_PARTY = 6;
 /** Local backlog of past runs kept per device (seeds the pool on first login). */
 const LOCAL_STORE_CAP = 100;
-const PREFETCH_WAVE = 150;
+/** Prefetch this many waves ahead of the run's FIRST ghost wave (#364). */
+const PREFETCH_LEAD_WAVES = 15;
 
 // -----------------------------------------------------------------------------
 // Env + local storage helpers.
@@ -372,11 +373,11 @@ async function fetchGhostTeams(difficulty: ErDifficulty, count: number, minWave:
  * difficulty. Safe to call every wave — it only fires once, around wave 150.
  */
 export function maybePrefetchGhostTeams(waveIndex: number): void {
-  if (prefetchStarted || waveIndex < PREFETCH_WAVE) {
+  if (prefetchStarted) {
     return;
   }
   const waves = ghostWavesForCurrentRun();
-  if (waves.length === 0) {
+  if (waves.length === 0 || waveIndex < Math.min(...waves) - PREFETCH_LEAD_WAVES) {
     return;
   }
   prefetchStarted = true;
@@ -439,6 +440,13 @@ export function markTrainerAsGhost(trainer: Trainer, snapshot: GhostTeamSnapshot
   // Shadow the instance method so getPartyLevels / genParty field exactly the
   // ghost's team size (the shared trainer config is left untouched).
   trainer.getPartyTemplate = () => new TrainerPartyTemplate(size, PartyMemberStrength.STRONGER);
+  // ER (#363): the ghost battles a REAL player's team — show that player's
+  // account name as the trainer's name ("Veteran <username>") instead of a
+  // random NPC name. Skip the anonymous fallbacks so guests keep an NPC name.
+  const uploader = snapshot.trainerName?.trim();
+  if (uploader && uploader !== "Trainer" && uploader !== "guest") {
+    trainer.name = uploader.slice(0, 16);
+  }
 }
 
 /** True if this trainer is an ER ghost battle. */
