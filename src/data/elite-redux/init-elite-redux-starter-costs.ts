@@ -44,6 +44,7 @@ const REMOVE_FROM_GRID_AND_EGGS: readonly RegExp[] = [
   /^Darmanitan Zen/, // Zen Mode (covers "Zen" + "Zen Mode Galarian")
   /^Minior /, // all Minior core/meteor color variants (Shields Down)
   /^Vivillon /, // all cosmetic Vivillon patterns
+  /^Squawkabilly (Green Plumage|Blue|Yellow|White)$/, // cosmetic plumage variants (base stays)
 ];
 
 /**
