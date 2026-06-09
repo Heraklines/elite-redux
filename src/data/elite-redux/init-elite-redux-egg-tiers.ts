@@ -142,14 +142,17 @@ function pickStarterCost(tier: EggTier): number {
 
 function isErFormChangeTarget(draft: (typeof ER_SPECIES)[number], speciesId: number): boolean {
   return (
-    findErFormChangeByTarget(speciesId) !== undefined // HANGRY is Morpeko's in-battle alt-form (the Hunger Switch / Two-Faced // toggle target — SPECIES_MORPEKO_HANGRY / SPECIES_MORPEKYLL_HANGRY in the // ER dump). Like Mega/Primal it is a battle-only form, NOT a base/root mon, // so it must never hatch from eggs or appear in starter selection. ER models // it as a separate custom species with no prevolution, so it would otherwise // leak past the prevolution gate below. BOND / BLUNDER are Darmanitan Redux's // special Battle-Bond forms (SPECIES_DARMANITAN_REDUX_BOND / _BLUNDER) — also // battle-only forms reached via the Bond chain off the base Darmanitan Redux, // never base/root mons, so they must be excluded the same way. AURA is
-    || // Darmanitan Redux's Zen-Mode-style alternate battle form
-    // (SPECIES_DARMANITAN_REDUX_AURA, "Darmanitan Aura") — likewise a
-    // battle-emergent form that must NOT hatch (it was leaking into RARE eggs).
-    /(?:^|_)MEGA(?:_|$)|(?:^|_)PRIMAL(?:_|$)|(?:^|_)HANGRY(?:_|$)|(?:^|_)BOND(?:_|$)|(?:^|_)BLUNDER(?:_|$)|(?:^|_)AURA(?:_|$)/.test(
+    findErFormChangeByTarget(speciesId) !== undefined // HANGRY is Morpeko's in-battle alt-form (the Hunger Switch / Two-Faced // toggle target — SPECIES_MORPEKO_HANGRY / SPECIES_MORPEKYLL_HANGRY in the // ER dump). Like Mega/Primal it is a battle-only form, NOT a base/root mon, // so it must never hatch from eggs or appear in starter selection. ER models // it as a separate custom species with no prevolution, so it would otherwise // leak past the prevolution gate below. BOND / BLUNDER are Darmanitan Redux's // special Battle-Bond forms (SPECIES_DARMANITAN_REDUX_BOND / _BLUNDER) — also // battle-only forms reached via the Bond chain off the base Darmanitan Redux, // never base/root mons, so they must be excluded the same way. AURA is // Darmanitan Redux's Zen-Mode-style alternate battle form // (SPECIES_DARMANITAN_REDUX_AURA, "Darmanitan Aura") — likewise a
+    || // battle-emergent form that must NOT hatch (it was leaking into RARE eggs).
+    /(?:^|_)MEGA(?:_|$)|(?:^|_)PRIMAL(?:_|$)|(?:^|_)HANGRY(?:_|$)|(?:^|_)BOND(?:_|$)|(?:^|_)BLUNDER(?:_|$)|(?:^|_)AURA(?:_|$)|(?:^|_)BLADE(?:_|$)|(?:^|_)SCHOOL(?:_|$)|(?:^|_)ZEN(?:_|$)|(?:^|_)NOICE(?:_|$)|(?:^|_)CROWNED(?:_|$)|(?:^|_)ORIGIN(?:_|$)|(?:^|_)GIGANTAMAX(?:_|$)|(?:^|_)GMAX(?:_|$)|(?:^|_)ETERNAMAX(?:_|$)/.test(
       draft.speciesConst,
+    ) // Display-name battle-form tokens (#352: "Aegislash Blade Redux" hatched —
+    || // Blade is Stance Change's in-battle form, ability-driven, so it is neither
+    // a form-change-registry target nor prevolution-gated). School/Zen/Noice/
+    // Crowned/Origin/Gigantamax are the same class of battle/at-will forms.
+    /\b(Mega|Primal|Hangry|Bond|Blunder|Blade|School|Zen|Noice|Crowned|Origin|Gigantamax|Eternamax)\b/i.test(
+      draft.name ?? "",
     )
-    || /\b(Mega|Primal|Hangry|Bond|Blunder)\b/i.test(draft.name ?? "") // "Darmanitan Aura" by name (the speciesConst suffix _AURA covers the const // path; this catches the display name for robustness).
     || /^Darmanitan Aura$/i.test(draft.name ?? "")
   );
 }
@@ -206,9 +209,34 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
     }
   }
   const formQualifier = /\s+(redux mega|redux b|redux c|redux|primal|mega|hisuian|alolan|galarian|paldean)$/i;
+  /**
+   * Resolve a custom's VANILLA base species id from its display name.
+   * 1) Strip the trailing form qualifier and try an exact vanilla-name match
+   *    ("Infernape Redux" → "infernape").
+   * 2) Fallback (#352): the LONGEST LEADING word-prefix that is a vanilla name.
+   *    Names with a MIDDLE form token used to slip the evolved-base guard
+   *    entirely ("Aegislash Blade Redux" → "aegislash blade" matched nothing →
+   *    hatched a fully-evolved battle form). "aegislash" now resolves.
+   *    Genuinely new ER lines ("Wispywaspy", "Terrow") match no prefix → undefined.
+   */
+  const resolveVanillaBaseId = (draftName: string): number | undefined => {
+    const stripped = draftName.replace(formQualifier, "").trim().toLowerCase();
+    const exact = vanillaByName.get(stripped);
+    if (exact !== undefined) {
+      return exact;
+    }
+    const words = stripped.split(/\s+/);
+    for (let n = words.length; n >= 1; n--) {
+      const prefix = words.slice(0, n).join(" ");
+      const id = vanillaByName.get(prefix);
+      if (id !== undefined) {
+        return id;
+      }
+    }
+    return;
+  };
   const vanillaBaseIsEvolved = (draftName: string): boolean => {
-    const base = draftName.replace(formQualifier, "").trim().toLowerCase();
-    const vanillaId = vanillaByName.get(base);
+    const vanillaId = resolveVanillaBaseId(draftName);
     return vanillaId !== undefined && Object.hasOwn(pokemonPrevolutions, vanillaId as SpeciesId);
   };
   // For an orphaned evolved custom (no prevolution edge points to it), is there
@@ -220,8 +248,7 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
     if (!suffix) {
       return false;
     }
-    const base = draftName.replace(formQualifier, "").trim().toLowerCase();
-    let cur = vanillaByName.get(base);
+    let cur = resolveVanillaBaseId(draftName);
     let guard = 0;
     while (cur !== undefined && Object.hasOwn(pokemonPrevolutions, cur as SpeciesId) && guard++ < 10) {
       cur = pokemonPrevolutions[cur as SpeciesId] as unknown as number;
@@ -236,8 +263,7 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
   // from its base name — used to bump the cost when a non-base form hatches
   // directly because its line has no lower custom.
   const stageDepthOf = (draftName: string): number => {
-    const base = draftName.replace(formQualifier, "").trim().toLowerCase();
-    let cur = vanillaByName.get(base);
+    let cur = resolveVanillaBaseId(draftName);
     let depth = 0;
     while (cur !== undefined && Object.hasOwn(pokemonPrevolutions, cur as SpeciesId) && depth < 5) {
       cur = pokemonPrevolutions[cur as SpeciesId] as unknown as number;
