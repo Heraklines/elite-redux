@@ -124,7 +124,13 @@ export class SelectStarterPhase extends Phase {
     overrideModifiers();
     overrideHeldItems(party[0]);
     Promise.all(loadPokemonAssets).then(() => {
-      SoundFade.fadeOut(globalScene, globalScene.sound.get("menu"), 500, true);
+      // Guard: the menu BGM may not exist (e.g. the AudioContext never started
+      // because the browser blocked autoplay). Fading out a null sound throws,
+      // which would reject this promise and leave the run stuck on a blank field.
+      const menuBgm = globalScene.sound.get("menu");
+      if (menuBgm) {
+        SoundFade.fadeOut(globalScene, menuBgm, 500, true);
+      }
       globalScene.time.delayedCall(500, () => globalScene.playBgm());
       if (globalScene.gameMode.isClassic) {
         globalScene.gameData.gameStats.classicSessionsPlayed++;

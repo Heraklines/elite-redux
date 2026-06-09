@@ -99,9 +99,13 @@ export function consumePendingDevBattleSetup(): (() => void) | null {
 
 // --- Lazy, env-gated loader --------------------------------------------------
 
-// Lazy glob: returns importers WITHOUT running them. Empty object on a clean
-// checkout (no local/ dir) — Vite resolves this at build time with no error.
-const localModules = import.meta.glob("./local/**/index.ts");
+// Lazy glob: returns importers WITHOUT running them.
+//   - `test-suite/`  TRACKED, shipped to the repo. Built into the STAGING bundle
+//                    (which sets VITE_DEV_TOOLS=1) so the test team gets it.
+//                    NEVER activates in production (gate below is false there).
+//   - `local/`       GITIGNORED scratch area for personal experiments; absent on
+//                    CI, so the glob just resolves to nothing there.
+const localModules = import.meta.glob("./{local,test-suite}/**/index.ts");
 
 let loadStarted = false;
 
