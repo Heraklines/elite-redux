@@ -292,6 +292,26 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Fight panel: R cycles 3 pages",
+    description:
+      "#356 Move info while choosing moves.\n"
+      + "DO: open FIGHT, highlight a move, press R (mobile: on-screen R) repeatedly.\n"
+      + "EXPECT: the right panel cycles STATS -> DESCRIPTION (full move text) ->\n"
+      + "DAMAGE CALC -> back to STATS. Description must show for every move,\n"
+      + "including the 5th rogue-slot move.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.GARCHOMP)];
+    },
+  },
+  {
     label: "Dragon Rage = 80 BP",
     description:
       "#336 Dragon Rage info — must DISPLAY power 80 (not 1).\n"

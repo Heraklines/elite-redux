@@ -44,7 +44,11 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
 
   // ER: the right panel can be cycled (R / RB) between the normal move stats and
   // a "Damage Calc" view, which is locked until a Damage Calculator is held.
-  private damageCalcMode = false;
+  /**
+   * ER right-panel page (#356): 0 = move stats, 1 = move DESCRIPTION,
+   * 2 = Damage Calc. Cycled with R / RB (and the on-screen R on mobile).
+   */
+  private panelMode: 0 | 1 | 2 = 0;
   private dmgCalcHeader: Phaser.GameObjects.Text;
   private dmgCalcBody: Phaser.GameObjects.Text;
   private moveInfoOverlay: MoveInfoOverlay;
@@ -211,9 +215,10 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
       this.battleInfo.open();
       return true;
     }
-    // ER: cycle the right panel between move stats and the Damage Calc view.
+    // ER (#356): cycle the right panel through move STATS → DESCRIPTION →
+    // DAMAGE CALC with R / RB (the same on-screen R works on mobile).
     if (button === Button.CYCLE_SHINY) {
-      this.damageCalcMode = !this.damageCalcMode;
+      this.panelMode = ((this.panelMode + 1) % 3) as 0 | 1 | 2;
       this.setMoveInfo(this.getCursor());
       this.getUi().playSelect();
       return true;
@@ -387,11 +392,13 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
   }
 
   /**
-   * ER: show either the normal move stats or the Damage Calc view in the right
-   * panel, depending on {@linkcode damageCalcMode} (toggled with R / RB).
+   * ER (#356): render the right panel's current page — 0 = the normal move
+   * stats, 1 = the highlighted move's DESCRIPTION (previously unviewable in
+   * battle since the ER panel replaced vanilla's), 2 = the Damage Calc view.
+   * Cycled with R / RB.
    */
   private applyPanelMode(pokemon: Pokemon, pokemonMove: PokemonMove): void {
-    const dmg = this.damageCalcMode;
+    const mode = this.panelMode;
     for (const el of [
       this.typeIcon,
       this.moveCategoryIcon,
@@ -402,11 +409,15 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
       this.accuracyLabel,
       this.accuracyText,
     ]) {
-      el.setVisible(!dmg);
+      el.setVisible(mode === 0);
     }
-    this.dmgCalcHeader.setVisible(dmg);
-    this.dmgCalcBody.setVisible(dmg);
-    if (dmg) {
+    this.dmgCalcHeader.setVisible(mode !== 0);
+    this.dmgCalcBody.setVisible(mode !== 0);
+    if (mode === 1) {
+      this.dmgCalcHeader.setText("DESCRIPTION (R)");
+      this.dmgCalcBody.setText(pokemonMove.getMove().effect || "—");
+    } else if (mode === 2) {
+      this.dmgCalcHeader.setText("DMG CALC (R)");
       this.dmgCalcBody.setText(this.getDamageCalcText(pokemon, pokemonMove));
     }
   }
