@@ -98,6 +98,17 @@ export interface InitEliteReduxSpeciesResult {
  * (`SPECIES_VENUSAUR`) + the form's pokerogue key (`mega` → `MEGA`) + the
  * `_REDUX` suffix ER uses for its custom species names.
  */
+/**
+ * Pokerogue form keys whose ER species-const suffix is spelled differently
+ * (#361): pokerogue squashes some multi-word styles into one token while ER
+ * separates them with underscores. Without the alias the per-form ER record
+ * lookup misses and the form silently inherits the BASE form's kit (Pom-Pom
+ * Oricorio showed Baile's Flash Fire innate instead of its own Lightning Rod).
+ */
+const ER_FORM_KEY_SUFFIX_ALIASES: Readonly<Record<string, string>> = {
+  POMPOM: "POM_POM", // Oricorio Pom-Pom style
+};
+
 function deriveErFormSpeciesConst(baseConst: string, formKey: string, hasReduxRegional: boolean): readonly string[] {
   const upperFormKey = formKey.toUpperCase().replace(/-/g, "_");
   const canonical = `${baseConst}_${upperFormKey}`; // e.g. SPECIES_BEEDRILL_MEGA
@@ -118,6 +129,11 @@ function deriveErFormSpeciesConst(baseConst: string, formKey: string, hasReduxRe
   // "Calyrex hasn't innates"). Add the "_RIDER" variants as fallbacks.
   if (upperFormKey === "ICE" || upperFormKey === "SHADOW") {
     candidates.push(`${baseConst}_${upperFormKey}_RIDER`);
+  }
+  // Spelling aliases (#361) — e.g. pokerogue "pompom" vs ER "_POM_POM".
+  const alias = ER_FORM_KEY_SUFFIX_ALIASES[upperFormKey];
+  if (alias) {
+    candidates.push(`${baseConst}_${alias}`);
   }
   return candidates;
 }

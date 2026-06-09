@@ -6,6 +6,7 @@ import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { MoveCategory } from "#enums/move-category";
 import { MoveUseMode } from "#enums/move-use-mode";
+import { MultiHitType } from "#enums/multi-hit-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
@@ -147,16 +148,17 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
       this.dmgCalcBody,
     ]);
 
-    // prepare move overlay
+    // prepare move overlay — sits ABOVE the fight bar with a visible window
+    // (#362: at -getHeight it landed ON the move list, overlapping the move
+    // names with borderless text; the bar is ~48 scaled px tall).
     this.moveInfoOverlay = new MoveInfoOverlay({
       delayVisibility: true,
       onSide: true,
       right: true,
       x: 0,
-      y: -MoveInfoOverlay.getHeight(true),
+      y: -48 - MoveInfoOverlay.getHeight(true),
       width: globalScene.scaledCanvas.width + 4,
       hideEffectBox: true,
-      hideBg: true,
     });
     ui.add(this.moveInfoOverlay);
     // register the overlay to receive toggle events
@@ -464,11 +466,43 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     } catch {
       max = 0;
     }
-    const min = Math.floor(max * 0.85);
+    // ER (#362): the simulation covers ONE hit at the BASE power — scale up
+    // multi-hit moves. Plain multi-strikes multiply by hit count; ramping
+    // 3-strike moves (the Triple Kick effect: 1x/2x/3x base per strike) sum
+    // to hits*(hits+1)/2 times the base hit.
+    const multiHit = move.attrs.find(a => a.constructor.name === "MultiHitAttr") as
+      | { getMultiHitType: () => MultiHitType }
+      | undefined;
+    let hitsMin = 1;
+    let hitsMax = 1;
+    switch (multiHit?.getMultiHitType()) {
+      case MultiHitType.TWO:
+        hitsMin = 2;
+        hitsMax = 2;
+        break;
+      case MultiHitType.TWO_TO_FIVE:
+        hitsMin = 2;
+        hitsMax = 5;
+        break;
+      case MultiHitType.THREE:
+        hitsMin = 3;
+        hitsMax = 3;
+        break;
+      case MultiHitType.TEN:
+        hitsMin = 10;
+        hitsMax = 10;
+        break;
+      default:
+        break; // single-hit (or ONE / BEAT_UP — leave as one hit)
+    }
+    const ramps = move.hasAttr("MultiHitPowerIncrementAttr");
+    const hitScale = (hits: number): number => (ramps ? (hits * (hits + 1)) / 2 : hits);
+    const min = Math.floor(max * 0.85 * hitScale(hitsMin));
+    const totalMax = max * hitScale(hitsMax);
     const hp = Math.max(1, target.hp);
     const minPct = Math.max(0, Math.round((min / hp) * 100));
-    const maxPct = Math.max(0, Math.round((max / hp) * 100));
-    const ko = min >= target.hp ? "\nGuaranteed KO" : max >= target.hp ? "\nPossible KO" : "";
+    const maxPct = Math.max(0, Math.round((totalMax / hp) * 100));
+    const ko = min >= target.hp ? "\nGuaranteed KO" : totalMax >= target.hp ? "\nPossible KO" : "";
     return `${minPct}% – ${maxPct}%\nof foe's HP${ko}`;
   }
 

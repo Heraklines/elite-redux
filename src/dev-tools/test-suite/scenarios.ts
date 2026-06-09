@@ -268,6 +268,30 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Oricorio Pom-Pom innate",
+    description:
+      "#361 Oricorio styles carry their OWN ability kits.\n"
+      + "DO: open Battle Info (C) on the enemy Pom-Pom Oricorio and check its\n"
+      + "abilities; or hit it with Thunderbolt.\n"
+      + "EXPECT: it has LIGHTNING ROD (Electric absorbed/redirected), NOT Baile's\n"
+      + "Flash Fire. Also: R cycles the side panel — page 2 description box sits\n"
+      + "ABOVE the move list (no text overlap, has its own window), page 3 DMG\n"
+      + "CALC counts ALL hits of multi-hit moves (Triple Axel reads ~6x one hit).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.THUNDERBOLT, MoveId.TRIPLE_AXEL, MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.ORICORIO,
+        ENEMY_FORM_OVERRIDES: { [SpeciesId.ORICORIO]: 1 },
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.PIKACHU, { moveset: [MoveId.THUNDERBOLT, MoveId.TRIPLE_AXEL, MoveId.SPLASH] })];
+    },
+  },
+  {
     label: "Hell final rival (Mega Ray)",
     description:
       "#340 Hell final rival battle (wave 195).\n"
