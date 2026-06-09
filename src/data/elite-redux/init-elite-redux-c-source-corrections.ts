@@ -68,7 +68,7 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_VISE_GRIP", { power: 70, accuracy: 100, pp: 30 }],
   ["MOVE_GUILLOTINE", { chance: 0 }],
   ["MOVE_RAZOR_WIND", { power: 90 }],
-  ["MOVE_CUT", { chance: 0 }],
+  ["MOVE_CUT", { power: 60, accuracy: 100, pp: 20, chance: 10 }], // ER: 60BP/100%/20PP, always-crit + 10% bleed (attrs in move-patches)
   ["MOVE_WING_ATTACK", { power: 80 }],
   ["MOVE_WHIRLWIND", { pp: 20 }],
   ["MOVE_BIND", { accuracy: 90 }],
@@ -171,7 +171,7 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_HYPER_FANG", { power: 75 }],
   ["MOVE_SHARPEN", { pp: 30 }],
   ["MOVE_CONVERSION", { pp: 30 }],
-  ["MOVE_SLASH", { power: 70, pp: 20, chance: 0 }],
+  ["MOVE_SLASH", { power: 60, accuracy: 100, pp: 10, chance: 20 }], // ER: 60BP/100%/10PP, always-crit + 20% bleed (attrs in move-patches)
   ["MOVE_TRIPLE_KICK", { power: 25 }],
   ["MOVE_THIEF", { pp: 25 }],
   ["MOVE_MIND_READER", { pp: 5 }],
@@ -185,7 +185,7 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_POWDER_SNOW", { power: 40, pp: 25, chance: 10 }],
   ["MOVE_MACH_PUNCH", { pp: 30 }],
   ["MOVE_FEINT_ATTACK", { power: 60, pp: 20 }],
-  ["MOVE_MUD_SLAP", { power: 20 }],
+  ["MOVE_MUD_SLAP", { power: 25, accuracy: 100, pp: 10 }], // ER: 25BP/100%/10PP 2-5 hits, NO acc drop (attrs in move-patches)
   ["MOVE_OCTAZOOKA", { power: 100 }],
   ["MOVE_FORESIGHT", { pp: 40 }],
   ["MOVE_DETECT", { pp: 5 }],
@@ -207,7 +207,7 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_RAPID_SPIN", { pp: 40, chance: 0 }],
   ["MOVE_IRON_TAIL", { accuracy: 90, pp: 15, chance: 30 }],
   ["MOVE_VITAL_THROW", { power: 70 }],
-  ["MOVE_HIDDEN_POWER", { power: 70 }],
+  ["MOVE_HIDDEN_POWER", { power: 80 }], // ER dump: 80BP (the old 70 was stale)
   ["MOVE_CROSS_CHOP", { power: 100, accuracy: 80, pp: 5 }],
   ["MOVE_TWISTER", { accuracy: 100, chance: 20 }],
   ["MOVE_RAIN_DANCE", { pp: 5 }],
@@ -224,7 +224,7 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_NATURE_POWER", { pp: 20 }],
   ["MOVE_RECYCLE", { pp: 10 }],
   ["MOVE_REFRESH", { pp: 20 }],
-  ["MOVE_SECRET_POWER", { power: 70 }],
+  ["MOVE_SECRET_POWER", { power: 80, pp: 20 }], // ER: 80BP physical Hidden Power (type attr in move-patches)
   ["MOVE_DIVE", { chance: 0 }],
   ["MOVE_ARM_THRUST", { power: 20, pp: 20 }],
   ["MOVE_CAMOUFLAGE", { accuracy: 100, pp: 20 }],

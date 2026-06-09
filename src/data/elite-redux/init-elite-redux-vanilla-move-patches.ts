@@ -51,6 +51,7 @@ import {
   ErSuperEffectiveVsTypeAttr,
   FlinchAttr,
   HealStatusEffectAttr,
+  HiddenPowerTypeAttr,
   HighCritAttr,
   HitHealAttr,
   IgnoreOpponentStatStagesAttr,
@@ -298,6 +299,17 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     move => {
       retypeMove(move, PokemonType.STEEL);
       orFlag(move, MoveFlags.FIELD_BASED);
+      // ER (#353): always crits + 10% bleed (numbers/chance via c-source pass).
+      addAttrUnique(move, new CritOnlyAttr());
+      addAttrUnique(move, new AddBattlerTagAttr(BattlerTagType.ER_BLEED, false, false, 4, 6));
+    },
+  ],
+  [
+    MoveId.SLASH,
+    move => {
+      // ER (#353): 60 BP / 100% / 10 PP (c-source pass), always crits, 20% bleed.
+      addAttrUnique(move, new CritOnlyAttr());
+      addAttrUnique(move, new AddBattlerTagAttr(BattlerTagType.ER_BLEED, false, false, 4, 6));
     },
   ],
   [
@@ -686,7 +698,11 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
   [
     MoveId.MUD_SLAP,
     move => {
-      move.chance = 100;
+      // ER (#354): 25 BP / 100% / 10 PP (c-source pass), hits 2-5 times, and
+      // does NOT drop accuracy — strip the vanilla guaranteed ACC drop.
+      removeAttrsByName(move, ["StatStageChangeAttr"]);
+      addAttrUnique(move, new MultiHitAttr());
+      move.chance = -1;
     },
   ],
   [
@@ -698,7 +714,20 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
   [
     MoveId.SECRET_POWER,
     move => {
-      move.chance = 30;
+      // ER (#355): "Physical Hidden Power" — 80 BP (c-source pass), type varies
+      // with the user; drop the vanilla terrain-dependent secondary entirely.
+      removeAttrsByName(move, ["SecretPowerAttr"]);
+      addAttrUnique(move, new HiddenPowerTypeAttr());
+      move.chance = -1;
+    },
+  ],
+  [
+    MoveId.TECHNO_BLAST,
+    move => {
+      // ER (#355): works like Hidden Power (type varies with the user) at
+      // 120 BP / 5 PP (vanilla numbers already match); drop the Drive-item attr.
+      removeAttrsByName(move, ["TechnoBlastTypeAttr"]);
+      addAttrUnique(move, new HiddenPowerTypeAttr());
     },
   ],
   [
