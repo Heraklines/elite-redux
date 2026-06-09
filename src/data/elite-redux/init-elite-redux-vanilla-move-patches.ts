@@ -230,6 +230,10 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     move => {
       removeAttrsByName(move, ["FixedDamageAttr"]);
       addAttrUnique(move, new SetBasePowerAttr(80));
+      // ER clause: "shock waves that can damage FAIRY mons" — Dragon is normally
+      // 0× into Fairy. Override Fairy's type-chart contribution to 1× (neutral);
+      // a dual-type's other type still combines with its own chart value.
+      addAttrUnique(move, new ErSuperEffectiveVsTypeAttr(PokemonType.FAIRY, 1));
     },
   ],
   // FLASH: vanilla status (accuracy -1) → ER Special Electric damaging, ACC drop.

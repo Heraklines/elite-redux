@@ -54,6 +54,22 @@ describe.skipIf(!RUN)("ER Dragon Rage = normal 80-power Dragon move (not fixed 4
     expect(move.type).toBe(PokemonType.DRAGON);
   });
 
+  it("damages FAIRY neutrally (1×) instead of the vanilla Dragon 0× immunity", () => {
+    // ER clause: "shock waves that can damage Fairy mons". Wired as a
+    // type-chart override forcing Fairy's contribution to 1× (neutral).
+    const move = allMoves[MoveId.DRAGON_RAGE];
+    const attr = move.attrs.find(a => a.constructor.name === "ErSuperEffectiveVsTypeAttr") as
+      | { apply(u: unknown, t: unknown, m: unknown, args: unknown[]): boolean }
+      | undefined;
+    expect(attr, "Dragon Rage must carry the Fairy type-chart override").toBeDefined();
+
+    // Pure Fairy target: multiplier must come out 1 (neutral), not 0 (immune).
+    const multiplier = new NumberHolder(0);
+    const applied = attr?.apply(null, null, move, [multiplier, [PokemonType.FAIRY], PokemonType.DRAGON]);
+    expect(applied).toBe(true);
+    expect(multiplier.value).toBe(1);
+  });
+
   it("DISPLAYS power 80 (the .power scalar matches the real BP)", () => {
     // Bug report: the move-info panel showed "power 1". The c-source correction
     // used to pin the scalar to 1 (a stale ROM dummy), so the displayed BP

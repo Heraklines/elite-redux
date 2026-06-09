@@ -74,8 +74,9 @@ import {
   initPokemonStarters,
   pokemonEvolutions,
   SpeciesEvolution,
-  type SpeciesFormEvolution,
+  SpeciesFormEvolution,
 } from "#balance/pokemon-evolutions";
+import { allSpecies } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES, type ErEvolutionDraft } from "#data/elite-redux/er-species";
 
@@ -121,6 +122,17 @@ export interface InitEliteReduxEvolutionsResult {
    * a positive integer (level evolutions only — defensive).
    */
   edgesDroppedBadLevel: number;
+  /**
+   * Redux-line edges appended onto the VANILLA base species, gated to the
+   * "redux" form (preFormKey "redux") — e.g. Psyduck(redux) → Shyduck.
+   */
+  reduxEdgesAppended: number;
+  /**
+   * Pre-existing all-form edges gated to the BASE form (preFormKey "") because
+   * the redux form got its own dedicated edge — e.g. Psyduck → Golduck becomes
+   * base-form-only so a Redux Psyduck no longer falls down the normal line.
+   */
+  reduxEdgesGated: number;
   /** Non-fatal real errors. */
   errors: string[];
 }
@@ -144,6 +156,8 @@ export function initEliteReduxEvolutions(): InitEliteReduxEvolutionsResult {
     formChangeEdgesSkipped: 0,
     edgesDroppedMissingTarget: 0,
     edgesDroppedBadLevel: 0,
+    reduxEdgesAppended: 0,
+    reduxEdgesGated: 0,
     errors: [],
   };
 
@@ -155,6 +169,10 @@ export function initEliteReduxEvolutions(): InitEliteReduxEvolutionsResult {
     processOneSpecies(draft, table, result);
   }
 
+  // Redux-line pass: make the REDUX form's own evolution line reachable from
+  // the vanilla species (which is how the port models redux — as a FORM).
+  appendReduxFormEvolutions(table, result);
+
   // Rebuild prevolutions + starters tables so post-ER lookups (Dex,
   // breeding, starter eligibility) see the patched edges. Both helpers are
   // idempotent — they clear and re-derive from `pokemonEvolutions`.
@@ -162,6 +180,114 @@ export function initEliteReduxEvolutions(): InitEliteReduxEvolutionsResult {
   initPokemonStarters();
 
   return result;
+}
+
+/**
+ * ER models redux variants as SEPARATE species records with their OWN
+ * evolution lines; the port models redux as a FORM on the vanilla species. The
+ * main merge above lands each `<BASE>_REDUX` record's edges on its own
+ * custom-species id — unreachable from a redux-FORM mon, whose evolutions are
+ * looked up on the VANILLA species id. Two player-visible bugs follow:
+ *
+ *  1. Redux lines whose evolved stage is a STANDALONE custom species (Psyduck
+ *     Redux → Shyduck, Cinccino Redux → Frostuccino, Excadrill Redux →
+ *     Rexcadrill, …15 lines in v2.65) simply could not evolve there.
+ *  2. Worse, the redux mon instead matched the base species' all-form edges and
+ *     evolved down the NORMAL line (Cinccino Redux → Beniccino; Psyduck Redux →
+ *     plain Golduck) — the reported "redux evolves into its normal counterpart".
+ *
+ * Fix, per `<BASE>_REDUX` record with level edges whose base species carries a
+ * "redux" form:
+ *  - For each edge NOT already covered by form-carry (i.e. the target is not
+ *    `<EVOLVED>_REDUX` modeled as a redux form the base already evolves into):
+ *    append `SpeciesFormEvolution(target, "redux", null, level)` on the VANILLA
+ *    base species — only redux-form mons match it (validate() compares
+ *    preFormKey against getFormKey()).
+ *  - Gate the base species' pre-existing all-form (preFormKey null) edges to
+ *    the BASE form (preFormKey "") — EXCEPT form-carry edges, which legitimately
+ *    serve the redux form via the evolve() form-carry heuristic.
+ *
+ * Idempotent: appended edges are detected by (target, preFormKey="redux");
+ * re-gating "" is a no-op.
+ */
+function appendReduxFormEvolutions(
+  table: Record<number, SpeciesFormEvolution[]>,
+  result: InitEliteReduxEvolutionsResult,
+): void {
+  const byConst = new Map(ER_SPECIES.map(d => [d.speciesConst, d]));
+  const speciesById = new Map(allSpecies.map(s => [s.speciesId as number, s]));
+
+  for (const draft of ER_SPECIES) {
+    // Source must be exactly "<BASE>_REDUX" (excludes _REDUX_MEGA, _REDUX_FUZZ,
+    // _REDUX_EVO etc., which are targets/forms, not redux base records).
+    if (!draft.speciesConst.endsWith("_REDUX")) {
+      continue;
+    }
+    const levelEvos = draft.evolutions.filter(e => LEVEL_EVO_KINDS.has(e.kind));
+    if (levelEvos.length === 0) {
+      continue;
+    }
+    const baseDraft = byConst.get(draft.speciesConst.slice(0, -"_REDUX".length));
+    if (!baseDraft) {
+      continue;
+    }
+    const basePkrgId = ER_ID_MAP.species[baseDraft.id];
+    if (basePkrgId === undefined) {
+      continue;
+    }
+    const baseSpecies = speciesById.get(basePkrgId);
+    if (!baseSpecies?.forms.some(f => f.formKey === "redux")) {
+      continue; // redux not modeled as a form here — nothing to bridge
+    }
+
+    const edges = table[basePkrgId] ?? [];
+    const toAppend: { targetId: number; level: number }[] = [];
+    const formCarryTargets = new Set<number>();
+
+    for (const evo of levelEvos) {
+      const resolved = resolveLevelEdge(evo, result);
+      if (resolved === null) {
+        continue;
+      }
+      // Covered by form-carry? Target is "<EVOLVED>_REDUX" modeled as a redux
+      // FORM on the vanilla evolved species, which the base already evolves
+      // into — evolve()'s form-carry keeps the redux form on that path.
+      const targetDraft = ER_SPECIES[evo.into];
+      if (targetDraft?.speciesConst.endsWith("_REDUX")) {
+        const evolvedBase = byConst.get(targetDraft.speciesConst.slice(0, -"_REDUX".length));
+        const evolvedPkrgId = evolvedBase ? ER_ID_MAP.species[evolvedBase.id] : undefined;
+        const evolvedSp = evolvedPkrgId === undefined ? undefined : speciesById.get(evolvedPkrgId);
+        if (
+          evolvedSp?.forms.some(f => f.formKey === "redux")
+          && edges.some(e => (e.speciesId as number) === evolvedPkrgId)
+        ) {
+          formCarryTargets.add(evolvedPkrgId as number);
+          continue;
+        }
+      }
+      // Idempotency: already bridged on a previous init run.
+      if (edges.some(e => (e.speciesId as number) === resolved.targetSpeciesId && e.preFormKey === "redux")) {
+        continue;
+      }
+      toAppend.push({ targetId: resolved.targetSpeciesId, level: resolved.level });
+    }
+
+    if (toAppend.length === 0) {
+      continue;
+    }
+    for (const a of toAppend) {
+      edges.push(new SpeciesFormEvolution(a.targetId, "redux", null, a.level, null, null));
+      result.reduxEdgesAppended++;
+    }
+    for (const e of edges) {
+      if (e.preFormKey === null && !formCarryTargets.has(e.speciesId as number)) {
+        e.preFormKey = "";
+        e.desc = "";
+        result.reduxEdgesGated++;
+      }
+    }
+    table[basePkrgId] = edges;
+  }
 }
 
 /**

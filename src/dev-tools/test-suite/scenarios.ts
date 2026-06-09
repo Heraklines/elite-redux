@@ -476,34 +476,47 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.RARE_CANDY],
   },
   {
-    // The systematic "Redux X → normal evolved form" repro. Party = the reported
-    // problem lines, each with a Redux form on BOTH ends (so they MUST carry it).
-    // Created at L40 — ABOVE every one's evo level — so each is "overdue" and
-    // evolves on the NEXT level-up. Two ways to trigger it, both provided:
-    //   1) WIN the battle (the Chansey gives lots of XP → level-up), or
-    //   2) take the guaranteed RARER CANDY from the shop (levels the WHOLE party
-    //      +1 at once → every overdue mon evolves together).
+    // The systematic "Redux X → normal evolved form" repro — BOTH shapes:
+    //   • form-carry lines (Drilbur→Excadrill-Redux, Kadabra→Alakazam-Redux)
+    //   • the LAST-STAGE / single-evo lines whose Redux evolution is a brand-new
+    //     custom species (Psyduck→SHYDUCK, Cinccino→FROSTUCCINO,
+    //     Excadrill→REXCADRILL) — the ones that wrongly fell down the normal
+    //     line before the redux-edge fix.
+    // Party is L49 (above every evo level; Excadrill→Rexcadrill needs exactly 50,
+    // reached on the next level-up). EXP SHARE ×3 spreads battle XP to the
+    // BENCHED mons too, so winning levels everyone — or take the guaranteed
+    // RARER CANDY from the shop (whole-party +1) for the deterministic path.
     label: "Redux evos carry form (all)",
     description:
-      "Redux lines must KEEP their Redux form when they evolve (Drilbur→Excadrill,\n"
-      + "Kadabra→Alakazam, Krabby→Kingler). All are L40 Redux mons, already past their\n"
-      + "evo level.  DO: either WIN the fight (Chansey = big XP → they level up) OR take\n"
-      + "the RARER CANDY in the shop (levels the whole party +1).  EXPECT: each evolves\n"
-      + "into its REDUX evolved form (Redux sprite + typing + learnset), NOT the normal\n"
-      + "one. (If any comes out normal, that line's evolved species is missing its Redux\n"
-      + "form — note which.)",
+      "Redux lines must evolve WITHIN the Redux line — never into the normal one.\n"
+      + "Party (all Redux, L49): Drilbur→Excadrill-Redux, Kadabra→Alakazam-Redux,\n"
+      + "Psyduck→SHYDUCK, Cinccino→FROSTUCCINO, Excadrill→REXCADRILL (at L50).\n"
+      + "DO: WIN the fight (Chansey + Exp Share = whole party levels) OR take the\n"
+      + "RARER CANDY in the shop (party +1).  EXPECT: every one evolves into its\n"
+      + "REDUX evolution (sprite/typing/learnset) — e.g. Psyduck becomes Shyduck,\n"
+      + "NOT plain Golduck; Cinccino becomes Frostuccino, NOT Beniccino.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
-        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_LEVEL_OVERRIDE: 49,
         STARTING_WAVE_OVERRIDE: 5,
         MOVESET_OVERRIDE: [MoveId.EARTHQUAKE, MoveId.PSYCHIC, MoveId.SURF, MoveId.ICE_BEAM],
+        // Exp Share ×3 → benched party members receive battle XP too, so a win
+        // levels (and evolves) the whole overdue party, per the maintainer.
+        STARTING_MODIFIER_OVERRIDE: [{ name: "EXP_SHARE", count: 3 }],
         ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
-        ENEMY_LEVEL_OVERRIDE: 40,
+        ENEMY_LEVEL_OVERRIDE: 49,
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
       });
       const redux = (id: SpeciesId): Starter => makeStarter(id, { formIndex: formIndexByKey(id, "redux") });
-      return [redux(SpeciesId.DRILBUR), redux(SpeciesId.KADABRA), redux(SpeciesId.KRABBY)];
+      return [
+        redux(SpeciesId.DRILBUR),
+        redux(SpeciesId.KADABRA),
+        redux(SpeciesId.PSYDUCK),
+        redux(SpeciesId.CINCCINO),
+        redux(SpeciesId.EXCADRILL),
+        redux(SpeciesId.KRABBY),
+      ];
     },
     // Whole-party level-up → all overdue Redux mons evolve at once.
     shopItems: [modifierTypes.RARER_CANDY],
