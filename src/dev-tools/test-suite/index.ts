@@ -1,5 +1,8 @@
 /*
- * Elite Redux — LOCAL-ONLY in-game dev tools.  *** GITIGNORED — never pushed ***
+ * Elite Redux — in-game dev TEST SUITE.  *** TRACKED — ships to STAGING only ***
+ *
+ * This IS committed and built into the staging bundle so the test team can use
+ * it; it NEVER activates in production (registry gate is false there).
  *
  * Loaded by src/dev-tools/registry.ts (only under `npm run start:dev` or
  * VITE_DEV_TOOLS=1). Provides:

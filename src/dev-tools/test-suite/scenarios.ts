@@ -1,5 +1,9 @@
 /*
- * Elite Redux — LOCAL-ONLY dev test scenarios.  *** GITIGNORED — never pushed ***
+ * Elite Redux — in-game dev TEST SUITE scenarios.  *** TRACKED — ships to STAGING ***
+ *
+ * This file IS committed and built into the staging bundle (VITE_DEV_TOOLS=1) so
+ * the test team can verify fixes themselves. It NEVER activates in production
+ * (the registry gate is false there). See CLAUDE.md → "STANDING RULE".
  *
  * Each scenario has:
  *   - label       → SHORT name shown in the picker list (keep it tight)
@@ -381,20 +385,6 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
     onBattleStart: () => boostEnemy(allStages(6)),
   },
-  {
-    label: "(note) #330 shop pool",
-    description:
-      "#330 Innate-gated items — NOT a combat check.\n"
-      + "Items that only help a LOCKED innate (e.g. un-unlocked Seed Sower) must not\n"
-      + "appear in the reward/shop pool. Verify in the ITEM SHOP, not in battle.\n"
-      + "(This entry just starts a plain battle; nothing to do here.)",
-    setup: () => {
-      resetDevOverrides();
-      setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 5 });
-      return [makeStarter(SpeciesId.BULBASAUR)];
-    },
-  },
-
   {
     // #325. EXPECT: leveling Kadabra-Redux to 32 evolves it into Alakazam-REDUX
     // (Redux sprite/typing), NOT the normal Alakazam. Was reverting to base form

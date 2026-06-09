@@ -116,6 +116,21 @@ const PILL_BOXES: Box[] = [
   [64, 112, 172, 24],
 ];
 
+// Row layout for the move-list panels (Moves + Damage Calculator). Up to 4 moves
+// use the canonical ROW4 positions; a 5th move (the ER rogue-tier extra slot)
+// compresses all five rows into the same vertical band so the last one isn't cut
+// off the panel.
+const MOVE_ROW5_BOXES: Box[] = [
+  [64, 28, 172, 22],
+  [64, 54, 172, 22],
+  [64, 80, 172, 22],
+  [64, 106, 172, 22],
+  [64, 132, 172, 22],
+];
+function moveRowBoxes(count: number): Box[] {
+  return count <= 4 ? ROW4_BOXES.slice(0, count) : MOVE_ROW5_BOXES.slice(0, count);
+}
+
 export class BattleInfoOverlay {
   private container: Phaser.GameObjects.Container | null = null;
   private pageIndex = 0;
@@ -543,8 +558,8 @@ export class BattleInfoOverlay {
 
   // --- per-Pokémon: MOVES --------------------------------------------------
   private renderMoves(c: Phaser.GameObjects.Container, mon: Pokemon): void {
-    const moves = mon.getMoveset().filter(Boolean).slice(0, 4);
-    ROW4_BOXES.slice(0, moves.length).forEach(([, by], i) => {
+    const moves = mon.getMoveset().filter(Boolean).slice(0, 5);
+    moveRowBoxes(moves.length).forEach(([, by], i) => {
       const mv = moves[i];
       const move = mv.getMove();
       const head = addTextObject(68, by + 3, move.name, TextStyle.SUMMARY, { fontSize: "48px" });
@@ -567,7 +582,7 @@ export class BattleInfoOverlay {
   // primary opposing target (single rolled estimate, % of the target's max HP).
   private renderDamageCalc(c: Phaser.GameObjects.Container, mon: Pokemon): void {
     const target = mon.getOpponents()[0];
-    const moves = mon.getMoveset().filter(Boolean).slice(0, 4);
+    const moves = mon.getMoveset().filter(Boolean).slice(0, 5);
     if (!target) {
       const t = addTextObject(68, ROW4_BOXES[0][1] + 6, "No target on the field.", TextStyle.WINDOW_ALT, {
         fontSize: "44px",
@@ -583,7 +598,7 @@ export class BattleInfoOverlay {
     sub.setOrigin(0, 0);
     c.add(sub);
 
-    ROW4_BOXES.slice(0, Math.max(1, moves.length)).forEach(([, by], i) => {
+    moveRowBoxes(Math.max(1, moves.length)).forEach(([, by], i) => {
       const mv = moves[i];
       if (!mv) {
         return;
