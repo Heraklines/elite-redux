@@ -53,4 +53,13 @@ describe.skipIf(!RUN)("ER Dragon Rage = normal 80-power Dragon move (not fixed 4
     const move = allMoves[MoveId.DRAGON_RAGE];
     expect(move.type).toBe(PokemonType.DRAGON);
   });
+
+  it("DISPLAYS power 80 (the .power scalar matches the real BP)", () => {
+    // Bug report: the move-info panel showed "power 1". The c-source correction
+    // used to pin the scalar to 1 (a stale ROM dummy), so the displayed BP
+    // disagreed with the 80 the move actually hits for. The correction now pins
+    // the scalar to 80 as well.
+    const move = allMoves[MoveId.DRAGON_RAGE];
+    expect(move.power).toBe(80);
+  });
 });

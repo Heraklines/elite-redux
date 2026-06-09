@@ -24,6 +24,7 @@
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { AbilityId } from "#enums/ability-id";
+import { BerryType } from "#enums/berry-type";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { ErMoveId } from "#enums/er-move-id";
 import { MoveId } from "#enums/move-id";
@@ -253,6 +254,52 @@ export const DEV_SCENARIOS: DevScenario[] = [
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
       });
       return [makeStarter(SpeciesId.SNEASEL, { moveset: [MoveId.TRIPLE_AXEL] })];
+    },
+  },
+  {
+    label: "Berry Smash eats a berry",
+    description:
+      "#342 Berry Smash — the user must EAT one of its held berries.\n"
+      + "Snorlax holds a Sitrus AND a Lum berry (two berries). DO: use Berry Smash\n"
+      + "on the enemy.  EXPECT: it deals damage AND the user consumes ONE berry\n"
+      + "(random of the two) — e.g. Sitrus heals it, or a held berry count drops.\n"
+      + "Before the fix it dealt damage but ate nothing.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [erMove(ErMoveId.BERRY_SMASH), MoveId.SPLASH],
+        STARTING_HELD_ITEMS_OVERRIDE: [
+          { name: "BERRY", type: BerryType.SITRUS, count: 1 },
+          { name: "BERRY", type: BerryType.LUM, count: 1 },
+        ],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.SNORLAX, { moveset: [erMove(ErMoveId.BERRY_SMASH), MoveId.SPLASH] })];
+    },
+  },
+  {
+    label: "Dragon Rage = 80 BP",
+    description:
+      "#336 Dragon Rage info — must DISPLAY power 80 (not 1).\n"
+      + "ER's Dragon Rage is a normal 80-BP Dragon move that hits Fairy neutrally.\n"
+      + "DO: open the move detail (fight menu) / Battle Info Moves panel and read\n"
+      + "Dragon Rage's power; then use it on the Clefable.  EXPECT: power shows 80\n"
+      + "(was 1), and it HITS the Fairy for a normal 80-BP chunk.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.DRAGON_RAGE, MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CLEFABLE,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.DRATINI, { moveset: [MoveId.DRAGON_RAGE, MoveId.SPLASH] })];
     },
   },
 

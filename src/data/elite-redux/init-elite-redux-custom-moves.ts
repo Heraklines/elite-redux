@@ -59,6 +59,7 @@ import {
   CritOnlyAttr,
   crashDamageFunc,
   DelayedAttackAttr,
+  EatBerryAttr,
   ErSuperEffectiveVsTypeAttr,
   FallDownAttr,
   ForceSwitchOutAttr,
@@ -883,6 +884,14 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
       // Move.chance (50, from effectChance) gates the bleed proc.
       move.attr(HighCritAttr);
       move.attr(AddBattlerTagAttr, BattlerTagType.ER_BLEED, false, false, 4, 6);
+      break;
+    // ---- Damaging move that also makes the user eat one of its own berries ----
+    case 830: // Berry Smash — "Deals damage. User eats their berry." The classifier
+      // only tagged it HAMMER_BASED (applied via the flag-tagged-move dispatch) and
+      // missed the berry-eat clause, so it never consumed a berry. EatBerryAttr
+      // already picks a RANDOM held berry when the user holds several (the user's
+      // multi-berry case), mirroring Concoction (id 1022) / Stuff Cheeks.
+      move.attr(EatBerryAttr, true);
       break;
   }
 }

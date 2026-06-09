@@ -121,7 +121,13 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_STUN_SPORE", { accuracy: 75, pp: 30 }],
   ["MOVE_PETAL_DANCE", { pp: 10 }],
   ["MOVE_STRING_SHOT", { accuracy: 95, pp: 40 }],
-  ["MOVE_DRAGON_RAGE", { power: 1, pp: 10 }],
+  // Dragon Rage: ER (er-moves.ts id 82) is a regular 80-BP Dragon move — the
+  // vanilla-move-patcher strips FixedDamageAttr and pins 80 BP via SetBasePowerAttr
+  // (an attr, so this c-source scalar pass doesn't touch the actual damage). The
+  // scalar was a stale `1` ROM dummy from the fixed-damage era, so the move-info
+  // panel DISPLAYED "power 1" while the move hit for 80. Pin the scalar to 80 too
+  // so the shown BP matches reality.
+  ["MOVE_DRAGON_RAGE", { power: 80, pp: 10 }],
   // ER data (er-moves.ts id 84) lists Thunder Shock at 80 power; the prior
   // override value of 40 was a stale beta carry-over that under-powered it.
   ["MOVE_THUNDER_SHOCK", { power: 80, pp: 30, chance: 10 }],
