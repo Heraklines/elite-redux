@@ -90,6 +90,7 @@ import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
+import { MoveTarget } from "#enums/move-target";
 import { MultiHitType } from "#enums/multi-hit-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
@@ -567,6 +568,13 @@ function buildCustomMove(
     );
   }
 
+  // ER target table → pokerogue MoveTarget (#366). Every custom move used to
+  // keep the single-target class default, so spread moves (Outburst, the
+  // *-Storm quartet, Mortal Spin…), hazards (Caltrops) and field moves
+  // (Inverse Room) hit/affected ONE mon. Applied BEFORE the archetype/bespoke
+  // wiring so any per-id override there still wins.
+  applyErMoveTarget(move, (draft as { target?: number }).target ?? 0, category);
+
   // Phase D4: wire archetype-classified flags + attrs via the dispatcher. We
   // look up the archetype row by the ER-side id (not the pokerogue id) since
   // the classifier keys on ER's source numbering. The ER-side id is also
@@ -599,12 +607,55 @@ function buildCustomMove(
 }
 
 /**
+ * Map ER's target-table index onto a pokerogue {@linkcode MoveTarget} (#366).
+ * ER targets (er-move-tables ER_TARGET_NAMES):
+ *   0 SELECTED / 5 DEPENDS  → keep the class default (single target);
+ *   1 BOTH                  → all adjacent foes;
+ *   2 USER                  → handled by the self-status split in the builder;
+ *   3 RANDOM                → a random foe;
+ *   4 FOES_AND_ALLY         → every OTHER mon on the field (Self-Destruct
+ *                             spread — user report: Outburst hit one mon);
+ *   6 ALL_BATTLERS          → field effects → both sides; damaging → ALL;
+ *   7 OPPONENTS_FIELD       → the enemy side (entry hazards);
+ *   8 ALLY / 9 USER_OR_ALLY → ally targets.
+ */
+function applyErMoveTarget(move: Move, erTarget: number, category: MoveCategory): void {
+  switch (erTarget) {
+    case 1:
+      move.target(MoveTarget.ALL_NEAR_ENEMIES);
+      break;
+    case 3:
+      move.target(MoveTarget.RANDOM_NEAR_ENEMY);
+      break;
+    case 4:
+      move.target(MoveTarget.ALL_NEAR_OTHERS);
+      break;
+    case 6:
+      move.target(category === MoveCategory.STATUS ? MoveTarget.BOTH_SIDES : MoveTarget.ALL);
+      break;
+    case 7:
+      move.target(MoveTarget.ENEMY_SIDE);
+      break;
+    case 8:
+      move.target(MoveTarget.NEAR_ALLY);
+      break;
+    case 9:
+      move.target(MoveTarget.USER_OR_NEAR_ALLY);
+      break;
+    default:
+      break;
+  }
+}
+
+/**
  * Augment an ER-custom move with secondary effects the archetype classifier
  * missed (audited against each move's in-game description). Keyed by ER move id.
  * Chance-based riders inherit the move's `chance` (set from `effectChance`).
  */
 function applyErMoveBespokeRiders(move: Move, erId: number): void {
   switch (erId) {
+    // (The genie-Storm quartet's ER field riders live in the VANILLA patch
+    // layer — those ER moves map to vanilla MoveIds and never reach here.)
     // ---- High critical-hit ratio ----
     case 772: // Pixie Slash
     case 773: // Seismic Blade

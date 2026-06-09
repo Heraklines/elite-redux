@@ -115,6 +115,7 @@ const O = Overrides as unknown as MutableOverrides;
 const DEV_OVERRIDE_DEFAULTS = {
   STARTING_LEVEL_OVERRIDE: 0,
   STARTING_WAVE_OVERRIDE: null,
+  BATTLE_STYLE_OVERRIDE: null,
   STARTING_BIOME_OVERRIDE: null,
   STARTER_FORM_OVERRIDES: {},
   ABILITY_OVERRIDE: AbilityId.NONE,
@@ -265,6 +266,31 @@ export const DEV_SCENARIOS: DevScenario[] = [
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
       });
       return [makeStarter(SpeciesId.SNEASEL, { moveset: [MoveId.TRIPLE_AXEL] })];
+    },
+  },
+  {
+    label: "Outburst hits the field",
+    description:
+      "#366 Outburst (and 26 other customs) used to hit ONE mon.\n"
+      + "DOUBLE battle. DO: have Gengar use Outburst.\n"
+      + "EXPECT: it damages BOTH enemy mons AND your ally, then Gengar faints.\n"
+      + "Also: Bleakwind Storm hits both foes AND sets Tailwind on your side\n"
+      + "(check the Field panel in Battle Info).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        BATTLE_STYLE_OVERRIDE: "double",
+        MOVESET_OVERRIDE: [erMove(ErMoveId.OUTBURST), MoveId.BLEAKWIND_STORM, MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GENGAR, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH] }),
+      ];
     },
   },
   {

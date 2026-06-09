@@ -43,6 +43,7 @@ import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { type ErPledgeRule, ErPledgeWeatherEffectAttr } from "#data/elite-redux/er-pledge-weather-effect";
 import {
+  AddArenaTagAttr,
   AddBattlerTagAttr,
   CompareWeightPowerAttr,
   ConfuseAttr,
@@ -69,8 +70,11 @@ import {
   SheerColdAccuracyAttr,
   StatStageChangeAttr,
   StatusEffectAttr,
+  TerrainChangeAttr,
+  WeatherChangeAttr,
 } from "#data/moves/move";
 import { FirstMoveCondition } from "#data/moves/move-condition";
+import { TerrainType } from "#data/terrain";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
@@ -453,11 +457,47 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
         "Uses the higher of Atk/SpAtk. In rain it makes a swamp under the foe (quarters Speed); in harsh sunlight it sets a sea of fire under the foe (chips HP each turn).",
       ),
   ],
-  [MoveId.SPRINGTIDE_STORM, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  // ER (#366): the genie-Storm quartet sets a FIELD effect per ER ("Sets
+  // tailwind/rain/sandstorm/fairy terrain") instead of vanilla's chance-based
+  // stat-drop/status secondaries — user report: "Bleakwind Storm says it sets
+  // tailwind but didn't". chance = -1 so the rider fires on every use.
+  [
+    MoveId.SPRINGTIDE_STORM,
+    move => {
+      addAttrUnique(move, new PhotonGeyserCategoryAttr());
+      removeAttrsByName(move, ["StatStageChangeAttr"]);
+      addAttrUnique(move, new TerrainChangeAttr(TerrainType.MISTY));
+      move.chance = -1;
+    },
+  ],
   [MoveId.MYSTICAL_POWER, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
-  [MoveId.BLEAKWIND_STORM, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
-  [MoveId.WILDBOLT_STORM, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
-  [MoveId.SANDSEAR_STORM, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  [
+    MoveId.BLEAKWIND_STORM,
+    move => {
+      addAttrUnique(move, new PhotonGeyserCategoryAttr());
+      removeAttrsByName(move, ["StatStageChangeAttr"]);
+      addAttrUnique(move, new AddArenaTagAttr(ArenaTagType.TAILWIND, 4, false, true));
+      move.chance = -1;
+    },
+  ],
+  [
+    MoveId.WILDBOLT_STORM,
+    move => {
+      addAttrUnique(move, new PhotonGeyserCategoryAttr());
+      removeAttrsByName(move, ["StatusEffectAttr"]);
+      addAttrUnique(move, new WeatherChangeAttr(WeatherType.RAIN));
+      move.chance = -1;
+    },
+  ],
+  [
+    MoveId.SANDSEAR_STORM,
+    move => {
+      addAttrUnique(move, new PhotonGeyserCategoryAttr());
+      removeAttrsByName(move, ["StatusEffectAttr"]);
+      addAttrUnique(move, new WeatherChangeAttr(WeatherType.SANDSTORM));
+      move.chance = -1;
+    },
+  ],
   [MoveId.TACHYON_CUTTER, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
   [MoveId.MALIGNANT_CHAIN, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
   [MoveId.TERA_STARSTORM, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
