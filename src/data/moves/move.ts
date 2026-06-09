@@ -6883,7 +6883,11 @@ export class JawLockAttr extends AddBattlerTagAttr {
 
 export class CurseAttr extends MoveEffectAttr {
   apply(user: Pokemon, target: Pokemon, move: Move, _args: any[]): boolean {
-    if (user.getTypes(true).includes(PokemonType.GHOST)) {
+    // ER Eerie Fog: in fog, ALL Curses act as the Ghost-type Curse (sacrifice HP
+    // to curse the target) regardless of the user's typing.
+    const erFogActive =
+      globalScene.arena.weather?.weatherType === WeatherType.FOG && !globalScene.arena.weather.isEffectSuppressed();
+    if (user.getTypes(true).includes(PokemonType.GHOST) || erFogActive) {
       if (target.getTag(BattlerTagType.CURSED)) {
         globalScene.phaseManager.queueMessage(i18next.t("battle:attackFailed"));
         return false;
@@ -11280,6 +11284,8 @@ export function initMoves() {
       .attr(StatStageChangeAttr, [Stat.SPDEF], -2),
     new AttackMove(MoveId.OMINOUS_WIND, PokemonType.GHOST, MoveCategory.SPECIAL, 60, 100, 5, 10, 0, 4)
       .attr(StatStageChangeAttr, [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD], 1, true)
+      // ER "Eerie Fog" doubles Ominous Wind's power — wired as a
+      // MovePowerMultiplierAttr in init-elite-redux-vanilla-move-patches.ts.
       .windMove(),
     new ChargingAttackMove(MoveId.SHADOW_FORCE, PokemonType.GHOST, MoveCategory.PHYSICAL, 120, 100, 5, -1, 0, 4)
       .chargeText(i18next.t("moveTriggers:vanishedInstantly", { pokemonName: "{USER}" }))

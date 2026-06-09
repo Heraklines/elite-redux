@@ -5,10 +5,24 @@ import { getWeatherDamageMessage, getWeatherLapseMessage } from "#data/weather";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
 import { CommonAnim } from "#enums/move-anims-common";
+import { PokemonType } from "#enums/pokemon-type";
+import type { BattleStat } from "#enums/stat";
+import { Stat } from "#enums/stat";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { CommonAnimPhase } from "#phases/common-anim-phase";
 import { BooleanHolder, toDmgValue } from "#utils/common";
+
+/** Stat stages Eerie Fog decays toward +0 each turn. */
+const ER_FOG_DECAY_STATS: readonly BattleStat[] = [
+  Stat.ATK,
+  Stat.DEF,
+  Stat.SPATK,
+  Stat.SPDEF,
+  Stat.SPD,
+  Stat.ACC,
+  Stat.EVA,
+];
 
 export class WeatherEffectPhase extends CommonAnimPhase {
   public readonly phaseName = "WeatherEffectPhase";
@@ -33,6 +47,26 @@ export class WeatherEffectPhase extends CommonAnimPhase {
     const w = this.weather.weatherType;
     const anim = w === WeatherType.FOG ? CommonAnim.FOG : CommonAnim.SUNNY + (w - 1);
     this.setAnimation(anim);
+
+    // ER Eerie Fog: each turn, every active Pokémon that is NOT Ghost- or
+    // Psychic-type loses one stage off each POSITIVE stat boost (decays to +0).
+    // Debuffs (negative stages) are left alone.
+    if (w === WeatherType.FOG) {
+      this.executeForAll((pokemon: Pokemon) => {
+        if (!pokemon || pokemon.switchOutStatus || pokemon.isFainted()) {
+          return;
+        }
+        if (pokemon.isOfType(PokemonType.GHOST) || pokemon.isOfType(PokemonType.PSYCHIC)) {
+          return;
+        }
+        for (const stat of ER_FOG_DECAY_STATS) {
+          const cur = pokemon.getStatStage(stat);
+          if (cur > 0) {
+            pokemon.setStatStage(stat, cur - 1);
+          }
+        }
+      });
+    }
 
     if (this.weather.isDamaging()) {
       const cancelled = new BooleanHolder(false);

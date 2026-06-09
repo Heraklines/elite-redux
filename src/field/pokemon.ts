@@ -4371,6 +4371,16 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       });
     }
 
+    // ER Eerie Fog: Ghost- and Psychic-type defenders take 20% less move damage.
+    const erFog = globalScene.arena.weather;
+    if (
+      erFog?.weatherType === WeatherType.FOG
+      && !erFog.isEffectSuppressed()
+      && (this.isOfType(PokemonType.GHOST) || this.isOfType(PokemonType.PSYCHIC))
+    ) {
+      arenaAttackTypeMultiplier.value *= 0.8;
+    }
+
     const isTypeImmune = typeMultiplier * arenaAttackTypeMultiplier.value === 0;
 
     if (cancelled.value || isTypeImmune) {
