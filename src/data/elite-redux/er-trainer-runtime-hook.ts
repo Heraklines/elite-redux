@@ -41,6 +41,7 @@ import {
   type ErTrainerRegistryEntry,
 } from "#data/elite-redux/init-elite-redux-trainers";
 import { erRivalWaveOrdinal, erRivalWaveSequence } from "#data/elite-redux/er-battle-frequency";
+import { ER_FACTORY_SETS } from "#data/elite-redux/er-factory-sets";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { ER_MEGA_STONE_NAME_BY_ITEM } from "#data/elite-redux/er-mega-stone-item-ids";
@@ -908,4 +909,144 @@ function forceErMega(enemy: EnemyPokemon, itemId: number): void {
  */
 export function hasErRosterOverride(trainer: Trainer): boolean {
   return getErTrainerForTrainer(trainer) !== null;
+}
+
+// =============================================================================
+// ER Battle-Factory sets (#347) — sporadic competitive teams on Elite/Hell.
+//
+// The maintainer-provided factory_sets dump (1932 Battle-Factory-style sets,
+// species + 4 moves + ability slot) seasons the Elite/Hell trainer pool: a
+// small seeded fraction of REGULAR trainer waves fields a team assembled from
+// wave/BST-appropriate factory sets instead of an ER trainer roster, so the
+// repetitive per-class pools get genuine variety. Ace is untouched (#345).
+// Held items come from PokeRogue's baseline trainer item roll (the dump's item
+// column uses an undecodable newer-ROM id space — see the builder script).
+// =============================================================================
+
+/** % of eligible (Elite/Hell, regular, non-rival) trainer waves that field a factory team. */
+const ER_FACTORY_TEAM_CHANCE_PCT = 15;
+
+interface ErFactorySetResolved {
+  readonly speciesId: number;
+  readonly moves: readonly number[];
+  readonly abilitySlot: 0 | 1 | 2;
+  readonly bst: number;
+}
+
+/** Factory sets with ids resolved through ER_ID_MAP, sorted weakest → strongest. */
+let FACTORY_POOL: ErFactorySetResolved[] | null = null;
+
+/** Exported for unit testing. */
+export function resolvedFactorySets(): readonly ErFactorySetResolved[] {
+  if (FACTORY_POOL !== null) {
+    return FACTORY_POOL;
+  }
+  const out: ErFactorySetResolved[] = [];
+  for (const [erSpecies, erMoves, abilitySlot] of ER_FACTORY_SETS) {
+    const speciesId = ER_ID_MAP.species[erSpecies];
+    if (speciesId === undefined) {
+      continue; // cosmetic/unmapped form — same drop rule as trainer rosters
+    }
+    const bst = getPokemonSpecies(speciesId)?.getBaseStatTotal() ?? 0;
+    if (bst <= 0) {
+      continue;
+    }
+    const moves: number[] = [];
+    for (const m of erMoves) {
+      const mapped = ER_ID_MAP.moves[m];
+      if (mapped !== undefined) {
+        moves.push(mapped);
+      }
+    }
+    out.push({ speciesId, moves, abilitySlot, bst });
+  }
+  out.sort((a, b) => a.bst - b.bst);
+  FACTORY_POOL = out;
+  return out;
+}
+
+let FACTORY_BY_TRAINER: WeakMap<Trainer, ErFactorySetResolved[] | null> = new WeakMap();
+
+/**
+ * The factory team this trainer fields, or `null` (most trainers). Decided once
+ * per Trainer from the RUN SEED + wave (same pure-hash scheme as the ER trainer
+ * pick, so party generation stays reproducible), gated to Elite/Hell regular
+ * waves. Team members are picked from a BST window around the wave-appropriate
+ * strength, distinct species, varied by seed.
+ */
+export function getErFactoryTeamForTrainer(trainer: Trainer): readonly ErFactorySetResolved[] | null {
+  const cached = FACTORY_BY_TRAINER.get(trainer);
+  if (cached !== undefined) {
+    return cached;
+  }
+  let team: ErFactorySetResolved[] | null = null;
+  const difficulty = getErDifficulty();
+  const wave = globalScene.currentBattle?.waveIndex ?? 0;
+  const isRival = ER_RIVAL_TRAINER_TYPES.has(trainer.config.trainerType);
+  const isBossWave = trainer.config.isBoss || wave % 10 === 0;
+  if (difficulty !== "ace" && !isRival && !isBossWave) {
+    const roll = hashErSelectionSeed(`${globalScene.seed}:factory:${wave}`) % 100;
+    const pool = roll < ER_FACTORY_TEAM_CHANCE_PCT ? resolvedFactorySets() : [];
+    if (pool.length > 0) {
+      const size = Math.max(1, trainer.getPartyTemplate?.()?.size ?? 1);
+      const frac = Math.min(1, Math.max(0, (wave - 1) / erWaveProgressionSpan()));
+      const targetIdx = Math.round(frac * (pool.length - 1));
+      const radius = Math.max(size * 8, 60);
+      const lo = Math.max(0, targetIdx - radius);
+      const hi = Math.min(pool.length - 1, targetIdx + radius);
+      const picked: ErFactorySetResolved[] = [];
+      const seenSpecies = new Set<number>();
+      for (let salt = 0; picked.length < size && salt < 200; salt++) {
+        const idx = lo + (hashErSelectionSeed(`${globalScene.seed}:factory:${wave}:${salt}`) % (hi - lo + 1));
+        const cand = pool[idx];
+        if (seenSpecies.has(cand.speciesId)) {
+          continue;
+        }
+        seenSpecies.add(cand.speciesId);
+        picked.push(cand);
+      }
+      if (picked.length > 0) {
+        team = picked;
+      }
+    }
+  }
+  FACTORY_BY_TRAINER.set(trainer, team);
+  return team;
+}
+
+/** True if this trainer fields a factory team (#347). */
+export function hasErFactoryOverride(trainer: Trainer): boolean {
+  return getErFactoryTeamForTrainer(trainer) !== null;
+}
+
+/**
+ * Build the factory-team EnemyPokemon for `index`, or `null` when this trainer
+ * has no factory team / the index is past it. Mirrors the ER roster path:
+ * wave-scaled level, fixed moves/ability, baseline item roll untouched. The
+ * nature is hash-derived per slot for variety (the dump ships no natures).
+ */
+export function applyErFactoryOverride(trainer: Trainer, index: number): EnemyPokemon | null {
+  const team = getErFactoryTeamForTrainer(trainer);
+  if (!team || index >= team.length) {
+    return null;
+  }
+  const set = team[index];
+  const wave = globalScene.currentBattle?.waveIndex ?? 0;
+  const nature = hashErSelectionSeed(`${globalScene.seed}:factory-nature:${wave}:${index}`) % 25;
+  return buildErEnemyFromMember(trainer, index, {
+    speciesId: set.speciesId,
+    level: 50,
+    abilitySlot: set.abilitySlot,
+    ivs: [31, 31, 31, 31, 31, 31],
+    evs: [0, 0, 0, 0, 0, 0],
+    itemId: 0,
+    nature,
+    moves: set.moves,
+    hpType: 0,
+  });
+}
+
+/** Reset the factory caches (tests). */
+export function clearErFactoryCacheForTests(): void {
+  FACTORY_BY_TRAINER = new WeakMap();
 }

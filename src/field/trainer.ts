@@ -3,7 +3,11 @@ import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { signatureSpecies } from "#balance/signature-species";
 import { EntryHazardTag } from "#data/arena-tag";
 import { applyErGhostOverride } from "#data/elite-redux/er-ghost-teams";
-import { applyErRivalOverride, applyErRosterOverride } from "#data/elite-redux/er-trainer-runtime-hook";
+import {
+  applyErFactoryOverride,
+  applyErRivalOverride,
+  applyErRosterOverride,
+} from "#data/elite-redux/er-trainer-runtime-hook";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { PartyMemberStrength } from "#enums/party-member-strength";
@@ -351,6 +355,16 @@ export class Trainer extends Phaser.GameObjects.Container {
         const erRival = applyErRivalOverride(this, index);
         if (erRival !== null) {
           ret = erRival;
+          return;
+        }
+
+        // ER factory hook (#347): a small seeded fraction of Elite/Hell regular
+        // trainer waves fields a Battle-Factory competitive team instead of an
+        // ER roster (pool variety). Before partyMemberFuncs so a factory team
+        // fully replaces the trainer's scripted picks.
+        const erFactory = applyErFactoryOverride(this, index);
+        if (erFactory !== null) {
+          ret = erFactory;
           return;
         }
 
