@@ -63,7 +63,9 @@
 //
 // =============================================================================
 
+import { allSpecies } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { resolveErStoneFormChangeItem } from "#data/elite-redux/er-mega-stones";
 import { ER_SPECIES, type ErEvolutionDraft } from "#data/elite-redux/er-species";
 import { pokemonFormChanges, SpeciesFormChange } from "#data/pokemon-forms";
@@ -342,6 +344,43 @@ function targetFormKey(targetSpeciesConst: string, sourceSpeciesConst: string): 
 const BOSS_ONLY_FORM_TARGETS: ReadonlySet<string> = new Set(["SPECIES_CASCOON_PRIMAL"]);
 
 /**
+ * AUTHORITATIVE (source, target) → injected formKey map, built from
+ * ER_MEGA_FORMS — the same data the form-injection step uses. #359: the bridge
+ * used to GUESS the form key from the target's name suffix, which broke two
+ * ways: (a) for multi-mega species the suffix said "mega" while the injected
+ * form is "mega-y" (the guess then collided with vanilla's "mega" edge and the
+ * real form never got an edge — the #318 "second mega unreachable" class), and
+ * (b) for regional/cap/style megas (alola-mega, galar-mega, hisui-mega,
+ * Pikachu caps, Oricorio styles, …) it registered edges pointing at forms that
+ * don't exist. Keying by the SAME pair the injector used removes the guesswork.
+ */
+let formKeyByPair: Map<string, string> | null = null;
+
+function authoritativeFormKey(sourceConst: string, targetConst: string): string | null {
+  if (formKeyByPair === null) {
+    const constByErId = new Map(ER_SPECIES.map(d => [d.id, d.speciesConst]));
+    formKeyByPair = new Map();
+    for (const e of ER_MEGA_FORMS) {
+      const s = constByErId.get(e.baseErId);
+      const t = constByErId.get(e.targetErId);
+      if (s && t) {
+        formKeyByPair.set(`${s}>${t}`, e.formKey);
+      }
+    }
+  }
+  return formKeyByPair.get(`${sourceConst}>${targetConst}`) ?? null;
+}
+
+/** Lazy species-by-id view for the does-this-form-exist guard. */
+let speciesByIdCache: Map<number, (typeof allSpecies)[number]> | null = null;
+function speciesById(id: number): (typeof allSpecies)[number] | undefined {
+  if (speciesByIdCache === null) {
+    speciesByIdCache = new Map(allSpecies.map(s => [s.speciesId as number, s]));
+  }
+  return speciesByIdCache.get(id);
+}
+
+/**
  * Push a `SpeciesFormChange` into pokerogue's `pokemonFormChanges` table
  * so the source species's dex page surfaces the mega/primal in its
  * Evolutions menu.
@@ -355,8 +394,18 @@ function bridgeEntryToPokerogueFormChanges(entry: ErFormChangeRegistryEntry): vo
   if (BOSS_ONLY_FORM_TARGETS.has(entry.targetSpeciesConst)) {
     return;
   }
-  const formKey = targetFormKey(entry.targetSpeciesConst, entry.sourceSpeciesConst);
+  // Authoritative form key first (same data the injector used); the legacy
+  // suffix derivation only as fallback for pairs ER_MEGA_FORMS doesn't carry.
+  const formKey =
+    authoritativeFormKey(entry.sourceSpeciesConst, entry.targetSpeciesConst)
+    ?? targetFormKey(entry.targetSpeciesConst, entry.sourceSpeciesConst);
   if (formKey === null) {
+    return;
+  }
+  // Never register an edge to a form that does not actually exist on the
+  // source species — such an edge would offer a stone that can't transform.
+  const source = speciesById(entry.sourceSpeciesId);
+  if (!source || !source.forms.some(f => f.formKey === formKey)) {
     return;
   }
   // Use the real mega/primal stone as the trigger (vanilla FormChangeItem where
@@ -373,14 +422,30 @@ function bridgeEntryToPokerogueFormChanges(entry: ErFormChangeRegistryEntry): vo
   if (!pokemonFormChanges[entry.sourceSpeciesId]) {
     pokemonFormChanges[entry.sourceSpeciesId] = [];
   }
-  // Idempotency: skip if same (preFormKey, formKey) pair already exists.
-  const existing = pokemonFormChanges[entry.sourceSpeciesId].some(fc => fc.preFormKey === "" && fc.formKey === formKey);
-  if (!existing) {
-    // pokemonFormChanges entries are typed `readonly SpeciesFormChange[]`,
-    // but the table itself is mutable — pokerogue's own data tables push
-    // into these arrays during init too. Cast through a mutable view.
-    (pokemonFormChanges[entry.sourceSpeciesId] as SpeciesFormChange[]).push(change);
+  // Update-or-push (#359): if a same-(preFormKey, formKey) ITEM edge already
+  // exists — typically a VANILLA edge — and ER's authoritative stone differs,
+  // REPLACE it. Example: ER re-stats Lucario's vanilla "mega" form as Mega Z
+  // (stone LUCARIONITE_Z) and gives Mega X the plain LUCARIONITE; the stale
+  // vanilla mega←LUCARIONITE edge would otherwise collide with Mega X's stone
+  // and leave Mega Z unreachable. Non-item edges (manual/ability triggers) are
+  // left untouched.
+  const list = pokemonFormChanges[entry.sourceSpeciesId] as SpeciesFormChange[];
+  const existingIdx = list.findIndex(
+    fc => fc.preFormKey === "" && fc.formKey === formKey && fc.findTrigger(SpeciesFormChangeItemTrigger),
+  );
+  if (existingIdx >= 0) {
+    const existingTrigger = list[existingIdx].findTrigger(SpeciesFormChangeItemTrigger) as
+      | { item?: FormChangeItem }
+      | undefined;
+    if (stone !== FormChangeItem.NONE && existingTrigger?.item !== stone) {
+      list[existingIdx] = change; // ER stone is authoritative
+    }
+    return;
   }
+  // No ITEM edge for this form yet — push ours. Non-item edges (manual/ability
+  // triggers, e.g. the Eternatus boss transform) may coexist, mirroring
+  // vanilla's manual+item Eternamax pattern.
+  list.push(change);
 }
 
 /**

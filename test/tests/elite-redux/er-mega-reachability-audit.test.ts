@@ -131,17 +131,14 @@ describe.skipIf(!RUN)("ER mega reachability audit (#359)", () => {
         console.log(`${name}: ${list.join(" | ")}`);
       }
     }
-    // KNOWN GAPS (#359/#318 backlog — the form-change bridge does not yet
-    // register item edges for these classes; fix tracked, do not let it GROW):
-    //  - second/third megas of multi-mega vanilla species (mega-y@Venusaur,
-    //    mega@Charizard [Z], mega-x@Gyarados, …) — the #318 "Mega-X stone never
-    //    spawns" class;
-    //  - regional-form megas (alola-mega/galar-mega/hisui-mega) and per-form
-    //    megas (Pikachu caps, Oricorio styles, Tatsugiri, Meowstic-F, …);
-    //  - REDUX megas (mega@Alakazam Redux, …) — need preFormKey "redux" edges;
-    //  - primal@Espeon / Eternatus / Apex primals; missing form: Terapagos.
+    // KNOWN EXCEPTIONS (#359 — fixed; floor must stay here):
+    //  - primal@Terapagos: ER's target is SPECIES_TERAPAGOS_STELLAR, which
+    //    vanilla pokerogue already models natively (Terastal/Stellar forms) —
+    //    injecting a duplicate "primal" form would recreate the #296
+    //    duplicate-form problem, so it is intentionally NOT injected.
+    // Everything else: 0 missing edges / 0 stone collisions (was 51 missing).
     const KNOWN_MISSING_FORM = 1;
-    const KNOWN_MISSING_EDGE = 51;
+    const KNOWN_MISSING_EDGE = 0;
     expect(missingForm.length).toBeLessThanOrEqual(KNOWN_MISSING_FORM);
     expect(missingEdge.length).toBeLessThanOrEqual(KNOWN_MISSING_EDGE);
     expect(noStone).toEqual([]);
