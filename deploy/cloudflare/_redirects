@@ -1,10 +1,23 @@
-/images/*            https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/images/:splat            302
-/audio/*             https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/audio/:splat             302
-/battle-anims/*      https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/battle-anims/:splat       302
-/battle-anims-er/*   https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/battle-anims-er/:splat    302
-/fonts/*             https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/fonts/:splat              302
-/starter-colors.json          https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/starter-colors.json          302
-/exp-sprites.json             https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/exp-sprites.json             302
-/biome-bgm-loop-points.json   https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/biome-bgm-loop-points.json   302
-/logo128.png                  https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/logo128.png                  302
-/logo512.png                  https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/logo512.png                  302
+# Cloudflare Pages redirects → jsDelivr CDN for the big asset dirs (#218, #335).
+#
+# Pinned to an IMMUTABLE er-assets commit (NOT @main). jsDelivr caches a mutable
+# `@main` ref at its edge + in the browser for ~7 days, so when an atlas/icon
+# sheet is updated, players keep the OLD (wrong) cached sprite for days — that's
+# the "Psyduck icon = Mega Charizard X" / "Redux Rattata = Mega Zard X" stale-
+# sprite class. An immutable `@<sha>` ref is served correctly and the URL CHANGES
+# on every asset update, so a bump here is a guaranteed cache-bust for everyone
+# (and `_redirects` itself is served no-cache, so the new URLs propagate at once).
+#
+# 🔁 WHEN er-assets CHANGES: bump the SHA below to the new Heraklines/er-assets
+#    HEAD (`gh api repos/Heraklines/er-assets/commits/main --jq .sha`) and redeploy.
+#    Forgetting to bump = players won't see the new assets (but never a stale mix).
+/images/*            https://cdn.jsdelivr.net/gh/Heraklines/er-assets@f6fc0d7164926da04fd9dd5aa4e1ea2c56fbbc03/images/:splat            302
+/audio/*             https://cdn.jsdelivr.net/gh/Heraklines/er-assets@f6fc0d7164926da04fd9dd5aa4e1ea2c56fbbc03/audio/:splat             302
+/battle-anims/*      https://cdn.jsdelivr.net/gh/Heraklines/er-assets@f6fc0d7164926da04fd9dd5aa4e1ea2c56fbbc03/battle-anims/:splat       302
+/battle-anims-er/*   https://cdn.jsdelivr.net/gh/Heraklines/er-assets@f6fc0d7164926da04fd9dd5aa4e1ea2c56fbbc03/battle-anims-er/:splat    302
+/fonts/*             https://cdn.jsdelivr.net/gh/Heraklines/er-assets@f6fc0d7164926da04fd9dd5aa4e1ea2c56fbbc03/fonts/:splat              302
+/starter-colors.json          https://cdn.jsdelivr.net/gh/Heraklines/er-assets@f6fc0d7164926da04fd9dd5aa4e1ea2c56fbbc03/starter-colors.json          302
+/exp-sprites.json             https://cdn.jsdelivr.net/gh/Heraklines/er-assets@f6fc0d7164926da04fd9dd5aa4e1ea2c56fbbc03/exp-sprites.json             302
+/biome-bgm-loop-points.json   https://cdn.jsdelivr.net/gh/Heraklines/er-assets@f6fc0d7164926da04fd9dd5aa4e1ea2c56fbbc03/biome-bgm-loop-points.json   302
+/logo128.png                  https://cdn.jsdelivr.net/gh/Heraklines/er-assets@f6fc0d7164926da04fd9dd5aa4e1ea2c56fbbc03/logo128.png                  302
+/logo512.png                  https://cdn.jsdelivr.net/gh/Heraklines/er-assets@f6fc0d7164926da04fd9dd5aa4e1ea2c56fbbc03/logo512.png                  302
