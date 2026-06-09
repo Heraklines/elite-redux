@@ -24,6 +24,7 @@
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
+import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { AbilityId } from "#enums/ability-id";
 import { BerryType } from "#enums/berry-type";
 import { ErAbilityId } from "#enums/er-ability-id";
@@ -264,6 +265,25 @@ export const DEV_SCENARIOS: DevScenario[] = [
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
       });
       return [makeStarter(SpeciesId.SNEASEL, { moveset: [MoveId.TRIPLE_AXEL] })];
+    },
+  },
+  {
+    label: "Hell final rival (Mega Ray)",
+    description:
+      "#340 Hell final rival battle (wave 195).\n"
+      + "DO: beat/skip through the rival fight that starts immediately.\n"
+      + "EXPECT: the rival fields a FULLY-EVOLVED late-game team (Vikavolt/\n"
+      + "Swellow/Starmie/Tsareena/Mimikyu/Blaziken-line — never Smeargle, contest\n"
+      + "Pikachus or unevolved mons) and the LAST mon is MEGA RAYQUAZA.\n"
+      + "Before the fix the finale got a leftover early/mid team and no ace.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("hell");
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 95,
+        STARTING_WAVE_OVERRIDE: 195,
+      });
+      return [makeStarter(SpeciesId.GARCHOMP), makeStarter(SpeciesId.METAGROSS), makeStarter(SpeciesId.MILOTIC)];
     },
   },
   {

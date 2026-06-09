@@ -48,6 +48,7 @@ import { erDifficultyToRosterTier, getErDifficulty } from "#data/elite-redux/er-
 import { type ErRosterTier, selectErRoster } from "#data/elite-redux/er-trainer-overlay";
 import { ER_ITEM_CONVERT_CHANCE, resolveErTrainerItem } from "#data/elite-redux/er-trainer-item-map";
 import { SpeciesFormKey } from "#enums/species-form-key";
+import { SpeciesId } from "#enums/species-id";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { Nature } from "#enums/nature";
 import { PlayerGender } from "#enums/player-gender";
@@ -552,38 +553,25 @@ function erRivalPartySizeForType(trainerType: TrainerType): number {
   }
 }
 
-function erRivalRosterSignature(roster: readonly ErPartyMemberRegistered[]): string {
-  return roster.map(member => member.speciesId).join("|");
-}
+/**
+ * ER (#340): the rival stage LADDER, weakest → strongest, used to map an
+ * encounter's position in the run's rival sequence directly onto a stage.
+ * Meteor Falls is deliberately excluded — it's ER's special 3-mon ace trio and
+ * can't field the 6-mon endgame battles; the finale's legendary ace is handled
+ * separately (see {@linkcode applyErRivalOverride}'s Mega Rayquaza slot).
+ */
+const ER_RIVAL_LADDER = ER_RIVAL_STAGES.filter(stage => stage !== "Meteor Falls");
 
-function erRivalCandidates(
-  rivalName: ErRivalName,
-  starter: ErRivalStarter,
-  tier: ErRosterTier,
-): ErTrainerRegistryEntry[] {
-  const rivalNames: ErRivalName[] = [rivalName, rivalName === "May" ? "Brendan" : "May"];
-  const starters = [starter, ...ER_RIVAL_STARTERS.filter(s => s !== starter)];
-  const seen = new Set<string>();
-  const out: ErTrainerRegistryEntry[] = [];
-  for (const candidateStarter of starters) {
-    for (const stage of ER_RIVAL_STAGES) {
-      for (const name of rivalNames) {
-        const entry = ER_TRAINER_BY_KEY.get(erRivalKey(name, stage, candidateStarter));
-        if (!entry) {
-          continue;
-        }
-        const signature = erRivalRosterSignature(selectErRoster(entry, tier));
-        if (seen.has(signature)) {
-          continue;
-        }
-        seen.add(signature);
-        out.push(entry);
-      }
-    }
-  }
-  return out;
-}
-
+/**
+ * Pick the ER rival team for this encounter by PROGRESSION, not by walking a
+ * candidate list (#340): the old walker consumed candidates starter-major, so
+ * on Hell — 10 rival battles for 6 stages — the FINAL battle (wave 195) got a
+ * leftover early/mid-game team: unevolved mons and no ace. Now the encounter's
+ * position in the run's rival sequence maps onto the stage ladder (first
+ * battle → Route 103, final battle → Lilycove), back-to-back battles on the
+ * same stage rotate the May/Brendan + starter variants, and a stage whose
+ * roster is smaller than the required party size bumps up to the next stage.
+ */
 function selectErRivalEntry(
   rivalName: ErRivalName,
   starter: ErRivalStarter,
@@ -591,35 +579,47 @@ function selectErRivalEntry(
   tier: ErRosterTier,
 ): ErTrainerRegistryEntry | null {
   const wave = globalScene.currentBattle?.waveIndex ?? 0;
-  const ordinal = erRivalWaveOrdinal(wave, trainerType) ?? rivalEncounterIndex(trainerType);
-  if (ordinal === null) {
-    return null;
-  }
   const sequence = erRivalWaveSequence();
-  const currentSequenceIndex = sequence.findIndex(([candidateWave, type]) => candidateWave === wave && type === trainerType);
-  const trainerTypes =
-    currentSequenceIndex >= 0
-      ? sequence.slice(0, currentSequenceIndex + 1).map(([, type]) => type)
-      : [
-          TrainerType.RIVAL,
-          TrainerType.RIVAL_2,
-          TrainerType.RIVAL_3,
-          TrainerType.RIVAL_4,
-          TrainerType.RIVAL_5,
-          TrainerType.RIVAL_6,
-        ].slice(0, ordinal + 1);
-  const candidates = erRivalCandidates(rivalName, starter, tier);
-  const used = new Set<string>();
-  let selected: ErTrainerRegistryEntry | null = null;
-  for (const type of trainerTypes) {
-    const partySize = erRivalPartySizeForType(type);
-    selected = candidates.find(entry => !used.has(entry.stableKey) && selectErRoster(entry, tier).length >= partySize) ?? null;
-    if (selected === null) {
-      break;
+  let pos = sequence.findIndex(([candidateWave, type]) => candidateWave === wave && type === trainerType);
+  let len = sequence.length;
+  if (pos < 0) {
+    const ordinal = erRivalWaveOrdinal(wave, trainerType) ?? rivalEncounterIndex(trainerType);
+    if (ordinal === null) {
+      return null;
     }
-    used.add(selected.stableKey);
+    pos = ordinal;
+    len = 6;
   }
-  return selected;
+  const stageFor = (p: number): number =>
+    Math.round((len > 1 ? p / (len - 1) : 1) * (ER_RIVAL_LADDER.length - 1));
+  const stageIdx = stageFor(pos);
+  // How many earlier battles in the sequence landed on the same stage — used
+  // to rotate the name/starter variant so repeats field a different team.
+  let repeat = 0;
+  for (let i = 0; i < pos; i++) {
+    if (stageFor(i) === stageIdx) {
+      repeat++;
+    }
+  }
+  const partySize = erRivalPartySizeForType(trainerType);
+  const names: ErRivalName[] = [rivalName, rivalName === "May" ? "Brendan" : "May"];
+  const starters = [starter, ...ER_RIVAL_STARTERS.filter(s => s !== starter)];
+  for (let s = stageIdx; s < ER_RIVAL_LADDER.length; s++) {
+    const candidates: ErTrainerRegistryEntry[] = [];
+    for (const candidateStarter of starters) {
+      for (const name of names) {
+        const entry = ER_TRAINER_BY_KEY.get(erRivalKey(name, ER_RIVAL_LADDER[s], candidateStarter));
+        if (entry && selectErRoster(entry, tier).length >= partySize) {
+          candidates.push(entry);
+        }
+      }
+    }
+    if (candidates.length > 0) {
+      return candidates[repeat % candidates.length];
+    }
+    repeat = 0; // a bumped-up stage starts its own rotation
+  }
+  return null; // nothing fits → vanilla rival generation
 }
 
 /**
@@ -660,11 +660,49 @@ export function applyErRivalOverride(trainer: Trainer, index: number): EnemyPoke
   if (entry === null) {
     return null;
   }
+  // ER (#340): the FINAL rival battle mirrors vanilla's finale — the last slot
+  // is ALWAYS Mega Rayquaza. The ER rosters top out at the Lilycove team and
+  // never carry the legendary ace themselves, so without this the wave-195
+  // fight lost its signature Mega Rayquaza.
+  if (
+    trainer.config.trainerType === TrainerType.RIVAL_6
+    && index === erRivalPartySizeForType(TrainerType.RIVAL_6) - 1
+  ) {
+    return buildErRivalMegaRayquaza(trainer, index);
+  }
   const roster = selectErRoster(entry, pickTierForWave(trainer));
   if (index >= roster.length) {
     return null;
   }
   return buildErEnemyFromMember(trainer, index, roster[index]);
+}
+
+/** Build the final rival's ace: Mega Rayquaza (#340), vanilla-finale parity. */
+function buildErRivalMegaRayquaza(trainer: Trainer, index: number): EnemyPokemon | null {
+  const enemy = buildErEnemyFromMember(trainer, index, {
+    speciesId: SpeciesId.RAYQUAZA,
+    level: 70,
+    abilitySlot: 0,
+    ivs: [31, 31, 31, 31, 31, 31],
+    evs: [0, 0, 0, 0, 0, 0],
+    itemId: 0,
+    nature: 0,
+    moves: [],
+    hpType: 0,
+  });
+  if (enemy) {
+    const megaIdx = (enemy.species.forms ?? []).findIndex(f => f.formKey === SpeciesFormKey.MEGA);
+    if (megaIdx > 0) {
+      enemy.formIndex = megaIdx;
+      const abilityCount = enemy.getSpeciesForm().getAbilityCount();
+      if (enemy.abilityIndex >= abilityCount) {
+        enemy.abilityIndex = abilityCount - 1;
+      }
+      enemy.calculateStats();
+      enemy.generateName();
+    }
+  }
+  return enemy;
 }
 
 /** True if this trainer is an ER-overridden rival (used to gate the rival hook). */

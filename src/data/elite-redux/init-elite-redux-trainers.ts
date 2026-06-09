@@ -39,6 +39,7 @@
 // =============================================================================
 
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { ER_RIVAL_ROSTER_CORRECTIONS } from "#data/elite-redux/er-rival-roster-corrections";
 import { ER_TRAINER_CLASS_NAMES } from "#data/elite-redux/er-trainer-tables";
 import type { ErPartyMember, ErTrainerDraft } from "#data/elite-redux/er-trainers";
 import { ER_TRAINERS } from "#data/elite-redux/er-trainers";
@@ -250,7 +251,12 @@ function buildRegistryEntry(draft: ErTrainerDraft): {
     return resolved;
   };
 
-  const party = resolveTier(draft.party) ?? [];
+  // ER (#340): the v2.65beta export ships stale/corrupt parties for the late
+  // rival stages (contest-gimmick teams + species ids absent from the id-map,
+  // which silently shrank the rosters). Replace those with the real parties
+  // from the ER decomp — see er-rival-roster-corrections.
+  const correction = ER_RIVAL_ROSTER_CORRECTIONS.get(draft.stableKey);
+  const party = correction ? correction.map(correctedMember) : (resolveTier(draft.party) ?? []);
   const insaneParty = resolveTier(draft.insaneParty);
   const hellParty = resolveTier(draft.hellParty);
 
@@ -279,6 +285,25 @@ function buildRegistryEntry(draft: ErTrainerDraft): {
       hellParty: draft.hellParty === null ? null : hellParty,
     },
     droppedMembers,
+  };
+}
+
+/**
+ * Build a corrected rival party member (#340) from a bare pokerogue species
+ * id: neutral defaults — perfect IVs, no fixed moves (battle layer falls back
+ * to the level-up moveset), no held item.
+ */
+function correctedMember(speciesId: number): ErPartyMemberRegistered {
+  return {
+    speciesId,
+    level: ER_DEFAULT_LEVEL,
+    abilitySlot: 0,
+    ivs: [31, 31, 31, 31, 31, 31] as const,
+    evs: [0, 0, 0, 0, 0, 0] as const,
+    itemId: 0,
+    nature: 0,
+    moves: [],
+    hpType: 0,
   };
 }
 
