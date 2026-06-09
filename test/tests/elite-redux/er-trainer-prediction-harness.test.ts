@@ -137,13 +137,17 @@ describe("ER trainer prediction harness (Hell)", () => {
       .filter(Boolean);
     const uniqueA = new Set(keysA);
     console.log(`[no-repeat] RUN A picked ${keysA.length} trainers, ${uniqueA.size} distinct`);
-    const rivalTeamsA = runA.filter(p => p.source === "rival").map(p => p.team.join("|"));
-    const uniqueRivalTeamsA = new Set(rivalTeamsA);
-    console.log(`[no-repeat] RUN A rival teams ${rivalTeamsA.length} fights, ${uniqueRivalTeamsA.size} distinct teams`);
+    // Rival fights must pick DISTINCT rival entries. (Distinct TEAM species
+    // are no longer guaranteed: the #340 stage-ladder rotates May/Brendan
+    // variants on same-stage repeats, and e.g. both Route 103 duos can share
+    // species while being different trainers.)
+    const rivalKeysA = runA.filter(p => p.source === "rival").map(p => p.stableKey ?? "");
+    const uniqueRivalKeysA = new Set(rivalKeysA);
+    console.log(`[no-repeat] RUN A rivals ${rivalKeysA.length} fights, ${uniqueRivalKeysA.size} distinct entries`);
 
     expect(runA.length).toBeGreaterThan(0);
     expect(uniqueA.size).toBe(keysA.length);
-    expect(uniqueRivalTeamsA.size).toBe(rivalTeamsA.length);
+    expect(uniqueRivalKeysA.size).toBe(rivalKeysA.length);
   });
 
   it("shows the real first two Hell trainer picks across seeds", async () => {

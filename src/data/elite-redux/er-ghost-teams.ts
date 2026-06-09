@@ -428,6 +428,15 @@ export function resetErGhostRunState(): void {
   ghostByWave.clear();
 }
 
+/**
+ * TEST HOOK (#350): inject a ready-made ghost pool so the full-run audit can
+ * exercise the ghost-wave spawn path deterministically (no network/local pool).
+ */
+export function setPrefetchedGhostTeamsForTests(teams: GhostTeamSnapshot[]): void {
+  prefetched = teams;
+  prefetchStarted = true;
+}
+
 // -----------------------------------------------------------------------------
 // Spawn — build a ghost Trainer + its team.
 // -----------------------------------------------------------------------------

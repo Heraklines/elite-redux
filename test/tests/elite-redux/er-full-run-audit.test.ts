@@ -5,39 +5,63 @@
  */
 
 // COMPLETE PER-MODE RUN AUDIT — the canonical "see everything that happens"
-// harness. For Ace / Elite / Hell it walks waves 1..N using the SAME functions
-// the game uses (newBattle → genPartyMember / randomSpecies + the real modifier
-// pipeline incl. the gated forceErMega / revertEarlyMega), and prints, per wave:
-//   - battle type (WILD / TRAINER, + BOSS flag)
-//   - the trainer's NAME (human-readable, with title) and, for Elite/Hell, the
-//     exact ER roster it resolved to (stableKey + tier) so trainer VARIETY is
-//     directly visible and auditable
-//   - every enemy: rendered name (form/mega), level, and active ability
-// Plus a per-run variety summary (distinct trainers, distinct ER rosters,
-// repeats) so "are the trainers actually varied?" is answerable from the dump.
+// harness. For Ace / Elite / Hell it walks waves 1..200 using the SAME
+// functions the game uses (newBattle → genPartyMember / randomSpecies + the
+// real modifier pipeline incl. applyErTrainerHeldItems' forced megas and the
+// early-mega gate), and prints, per wave: battle type, trainer name, resolved
+// ER roster/tier, ghost/factory flags, and every enemy with form + level +
+// ability.
 //
-// Meant to be read by hand. It asserts only basic sanity so it never blocks.
+// ER (#350): it used to "assert only basic sanity so it never blocks" — i.e.
+// it could never CATCH anything ("the harness sometimes misses bugs"). It now
+// enforces the per-mode INVARIANTS the testers keep re-finding by hand:
+//   ACE   — pure vanilla: no ER rosters, no ghosts, no factory teams, no
+//           mega-form enemies before wave 50, vanilla Eternatus finale.
+//   ELITE — ER rosters never repeat in a run; ≥1 factory team appears; no
+//           mega-form enemies before wave 50; the wave-195 rival fields a
+//           6-mon team whose ace is MEGA RAYQUAZA (#340 class); late-game
+//           trainer teams outclass early-game ones (no unevolved-late bug);
+//           ER Cascoon finale.
+//   HELL  — every scheduled ghost wave actually spawns a ghost trainer (pool
+//           stubbed via the test hook) carrying the source player's name
+//           (#363/#364); Mega Rayquaza rival finale; ER Cascoon finale.
+// Fixed seeds keep every assertion deterministic for a given code version.
 
 import { globalScene } from "#app/global-scene";
+import { allBiomes } from "#data/data-lists";
 import { getErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
+import {
+  ghostWavesForCurrentRun,
+  hasErGhostOverride,
+  resetErGhostRunState,
+  setPrefetchedGhostTeamsForTests,
+} from "#data/elite-redux/er-ghost-teams";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
+  clearErFactoryCacheForTests,
   getErRivalEntry,
   getErTrainerForTrainer,
+  hasErFactoryOverride,
   pickTierForWave,
   resetErRunTrainerTracking,
 } from "#data/elite-redux/er-trainer-runtime-hook";
 import { BattleType } from "#enums/battle-type";
+import { BiomeId } from "#enums/biome-id";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
+import { SpeciesId } from "#enums/species-id";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { regenerateModifierPoolThresholds } from "#modifiers/modifier-type";
 import { GameManager } from "#test/framework/game-manager";
+import { randSeedInt, randSeedItem } from "#utils/common";
 import Phaser from "phaser";
 import { beforeAll, describe, expect, it } from "vitest";
 
 interface EnemyRow {
   name: string;
+  speciesId: number;
+  formKey: string;
+  bst: number;
   level: number;
   ability: string;
 }
@@ -48,10 +72,43 @@ interface WaveRow {
   trainerName: string | null;
   erKey: string | null;
   erTier: string | null;
+  ghost: boolean;
+  factory: boolean;
   enemies: EnemyRow[];
 }
 
-describe("ER complete per-mode run audit (read by hand)", () => {
+/** Sturdy 3-mon stub teams for the ghost pool (waveReached 200 ⇒ any wave eligible). */
+const GHOST_STUB_MEMBER = (speciesId: number) => ({
+  speciesId,
+  formIndex: 0,
+  abilityIndex: 0,
+  ivs: [31, 31, 31, 31, 31, 31],
+  nature: 0,
+  level: 80,
+  gender: 0,
+  shiny: false,
+  variant: 0,
+  passive: false,
+  moves: [],
+});
+const makeGhostStubPool = (count: number) =>
+  Array.from({ length: count }, (_, i) => ({
+    id: `audit-ghost-${i}`,
+    trainerName: "AuditGhost",
+    difficulty: "hell" as const,
+    waveReached: 200,
+    isVictory: true,
+    timestamp: i,
+    party: [
+      GHOST_STUB_MEMBER(SpeciesId.GARCHOMP),
+      GHOST_STUB_MEMBER(SpeciesId.METAGROSS),
+      GHOST_STUB_MEMBER(SpeciesId.MILOTIC),
+    ],
+  }));
+
+const MEGA_FORM_RE = /mega|primal|origin/i;
+
+describe("ER complete per-mode run audit (invariant-checked)", () => {
   let phaserGame: Phaser.Game;
 
   beforeAll(() => {
@@ -94,6 +151,8 @@ describe("ER complete per-mode run audit (read by hand)", () => {
     let trainerName: string | null = null;
     let erKey: string | null = null;
     let erTier: string | null = null;
+    let ghost = false;
+    let factory = false;
     let boss = false;
     if (isTrainer && battle.trainer) {
       try {
@@ -102,10 +161,12 @@ describe("ER complete per-mode run audit (read by hand)", () => {
         trainerName = `type#${battle.trainer.config.trainerType}`;
       }
       boss = !!battle.trainer.config.isBoss;
-      const erEntry = getErRivalEntry(battle.trainer) ?? getErTrainerForTrainer(battle.trainer);
+      ghost = hasErGhostOverride(battle.trainer);
+      factory = !ghost && hasErFactoryOverride(battle.trainer);
+      const erEntry = ghost ? null : (getErRivalEntry(battle.trainer) ?? getErTrainerForTrainer(battle.trainer));
       if (erEntry) {
         const cls = (erEntry as { trainerClassName?: string }).trainerClassName;
-        erKey = `${erEntry.stableKey ?? erEntry.name ?? "?"}${cls ? ` <${cls}>` : ""}`;
+        erKey = `${erEntry.stableKey ?? "?"}${cls ? ` <${cls}>` : ""}`;
         erTier = pickTierForWave(battle.trainer);
       }
     }
@@ -119,7 +180,14 @@ describe("ER complete per-mode run audit (read by hand)", () => {
       } catch {
         /* ability lookup can throw for partially-built mons in headless */
       }
-      return { name: mon.getNameToRender({ useIllusion: false }), level: mon.level, ability };
+      return {
+        name: mon.getNameToRender({ useIllusion: false }),
+        speciesId: mon.species.speciesId as number,
+        formKey: mon.species.forms?.[mon.formIndex]?.formKey ?? "",
+        bst: mon.species.getBaseStatTotal(),
+        level: mon.level,
+        ability,
+      };
     });
     return {
       wave: battle.waveIndex,
@@ -128,6 +196,8 @@ describe("ER complete per-mode run audit (read by hand)", () => {
       trainerName,
       erKey,
       erTier,
+      ghost,
+      factory,
       enemies,
     };
   };
@@ -135,6 +205,14 @@ describe("ER complete per-mode run audit (read by hand)", () => {
   const predictRun = async (seed: string, maxWave: number, difficulty: ErDifficulty): Promise<WaveRow[]> => {
     setErDifficulty(difficulty);
     resetErRunTrainerTracking();
+    resetErGhostRunState();
+    clearErFactoryCacheForTests();
+    if (difficulty === "hell") {
+      // Stub the cross-player pool so the ghost spawn path is exercised
+      // deterministically (one team per scheduled ghost wave).
+      setErDifficulty(difficulty);
+      setPrefetchedGhostTeamsForTests(makeGhostStubPool(ghostWavesForCurrentRun().length));
+    }
     // biome-ignore lint/suspicious/noExplicitAny: harness seeding
     (globalScene as any).setSeed(seed);
     // biome-ignore lint/suspicious/noExplicitAny: fresh battle
@@ -149,8 +227,40 @@ describe("ER complete per-mode run audit (read by hand)", () => {
         break;
       }
       out.push(await generateWave());
+      advanceBiomeLikeTheRealGame(globalScene.currentBattle.waveIndex);
     }
     return out;
+  };
+
+  /**
+   * ER (#350): the harness used to sit in the STARTING biome for all 200
+   * waves, so every wild species rolled from the town pool — the wave-200
+   * finale generated a Vileplume instead of Eternatus, and biome-specific
+   * spawn bugs were invisible. Mirror SelectBiomePhase's classic rules: a new
+   * biome every 10 waves via the seeded biome-link walk, switching to END for
+   * the final stretch (next wave + 9 ≥ the final wave).
+   */
+  const advanceBiomeLikeTheRealGame = (justFinishedWave: number): void => {
+    if (justFinishedWave % 10 !== 0 || justFinishedWave >= 200) {
+      return;
+    }
+    const nextWaveIndex = justFinishedWave + 1;
+    if (globalScene.gameMode.isWaveFinal(nextWaveIndex + 9)) {
+      globalScene.newArena(BiomeId.END);
+      return;
+    }
+    const currentBiome = globalScene.arena.biomeId;
+    const { biomeLinks } = allBiomes.get(currentBiome);
+    if (biomeLinks.length > 0) {
+      const candidates: BiomeId[] = biomeLinks
+        .filter(b => !Array.isArray(b) || !randSeedInt(b[1]))
+        .map(b => (Array.isArray(b) ? b[0] : b));
+      globalScene.newArena(
+        candidates.length > 0 ? randSeedItem(candidates) : globalScene.generateRandomBiome(nextWaveIndex),
+      );
+      return;
+    }
+    globalScene.newArena(globalScene.generateRandomBiome(nextWaveIndex));
   };
 
   const dumpMode = async (difficulty: ErDifficulty, seed: string, maxWave: number) => {
@@ -158,49 +268,111 @@ describe("ER complete per-mode run audit (read by hand)", () => {
     console.log(`\n################ ${difficulty.toUpperCase()} | seed=${seed} | waves 1..${maxWave} ################`);
     for (const w of run) {
       if (w.kind === "TRAINER") {
-        const er = w.erKey ? ` {ER: ${w.erKey} / ${w.erTier}}` : " {vanilla}";
+        const er = w.ghost
+          ? " {GHOST}"
+          : w.factory
+            ? " {FACTORY}"
+            : w.erKey
+              ? ` {ER: ${w.erKey} / ${w.erTier}}`
+              : " {vanilla}";
         const bossTag = w.boss ? " *BOSS*" : "";
         console.log(`w${String(w.wave).padStart(3)} [TRAINER]${bossTag} "${w.trainerName}"${er}`);
       } else {
-        const bossTag = w.boss ? " *BOSS*" : "";
-        console.log(`w${String(w.wave).padStart(3)} [WILD]${bossTag}`);
+        console.log(`w${String(w.wave).padStart(3)} [WILD]${w.boss ? " *BOSS*" : ""}`);
       }
       for (const e of w.enemies) {
         console.log(`        - ${e.name}  Lv${e.level}  (${e.ability})`);
       }
     }
-    // Variety summary
     const trainerWaves = run.filter(w => w.kind === "TRAINER");
-    const distinctTrainerNames = new Set(trainerWaves.map(w => w.trainerName));
     const erKeys = trainerWaves.map(w => w.erKey).filter((k): k is string => k != null);
-    const distinctErKeys = new Set(erKeys);
     console.log(
-      `\n--- ${difficulty.toUpperCase()} variety: ${trainerWaves.length} trainer battles, ${distinctTrainerNames.size} distinct trainer names; ER rosters: ${erKeys.length} picks, ${distinctErKeys.size} distinct ---`,
+      `\n--- ${difficulty.toUpperCase()}: ${trainerWaves.length} trainer battles | ER picks ${erKeys.length} (${new Set(erKeys).size} distinct) | factory ${trainerWaves.filter(w => w.factory).length} | ghosts ${trainerWaves.filter(w => w.ghost).length} ---`,
     );
-    // Repeat report: ER rosters used more than once
-    const counts = new Map<string, number>();
-    for (const k of erKeys) {
-      counts.set(k, (counts.get(k) ?? 0) + 1);
-    }
-    const repeats = [...counts.entries()].filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1]);
-    if (repeats.length > 0) {
-      console.log(`    ER rosters reused: ${repeats.map(([k, n]) => `${k}×${n}`).join(", ")}`);
-    }
     return run;
   };
 
-  it("ACE — full 1..200 run", async () => {
+  /** Shared: no mega/primal/origin enemy form before wave 50 (Ace/Elite gate). */
+  const assertNoEarlyMegas = (run: WaveRow[]) => {
+    for (const w of run) {
+      if (w.wave >= 50) {
+        continue;
+      }
+      for (const e of w.enemies) {
+        expect(MEGA_FORM_RE.test(e.formKey), `wave ${w.wave}: early mega ${e.name} (${e.formKey})`).toBe(false);
+      }
+    }
+  };
+
+  /** Shared: the wave-195 rival fields 6 mons and its ace is MEGA Rayquaza (#340). */
+  const assertMegaRayFinale = (run: WaveRow[]) => {
+    const finale = run.find(w => w.wave === 195);
+    expect(finale, "wave-195 rival battle exists").toBeDefined();
+    expect(finale?.kind).toBe("TRAINER");
+    expect(finale?.enemies.length).toBe(6);
+    const ace = finale?.enemies[finale.enemies.length - 1];
+    expect(ace?.speciesId, "finale ace is Rayquaza").toBe(SpeciesId.RAYQUAZA);
+    expect(MEGA_FORM_RE.test(ace?.formKey ?? ""), "finale Rayquaza is MEGA").toBe(true);
+  };
+
+  /** Shared: ER Cascoon finale on Elite/Hell at wave 200. */
+  const assertErFinale = (run: WaveRow[]) => {
+    const finale = run.find(w => w.wave === 200);
+    const expected = getErFinalBossSpecies();
+    expect(finale && expected ? finale.enemies[0]?.speciesId : null).toBe(
+      expected ? (expected.speciesId as number) : null,
+    );
+  };
+
+  it("ACE — full 1..200 run is PURE VANILLA", async () => {
     const run = await dumpMode("ace", "audit-ace", 200);
     expect(run.length).toBeGreaterThan(0);
+    for (const w of run.filter(w => w.kind === "TRAINER")) {
+      expect(w.erKey, `wave ${w.wave}: ER roster leaked into Ace`).toBeNull();
+      expect(w.ghost, `wave ${w.wave}: ghost leaked into Ace`).toBe(false);
+      expect(w.factory, `wave ${w.wave}: factory team leaked into Ace`).toBe(false);
+    }
+    assertNoEarlyMegas(run);
+    const finale = run.find(w => w.wave === 200);
+    expect(finale?.enemies[0]?.speciesId, "Ace finale is vanilla Eternatus").toBe(SpeciesId.ETERNATUS);
   });
 
-  it("ELITE — full 1..200 run", async () => {
+  it("ELITE — full 1..200 run invariants", async () => {
     const run = await dumpMode("elite", "audit-elite", 200);
-    expect(run.length).toBeGreaterThan(0);
+    const trainerWaves = run.filter(w => w.kind === "TRAINER");
+    // ER rosters never repeat within a run.
+    const erKeys = trainerWaves.map(w => w.erKey).filter((k): k is string => k != null);
+    expect(new Set(erKeys).size, "ER roster repeated within the run").toBe(erKeys.length);
+    // Factory teams appear (sporadic ~15% of regular waves — over ~40 eligible
+    // waves the odds of zero are <0.1%; a zero here means the wiring broke).
+    expect(trainerWaves.filter(w => w.factory).length, "no factory team appeared all run").toBeGreaterThan(0);
+    assertNoEarlyMegas(run);
+    assertMegaRayFinale(run);
+    assertErFinale(run);
+    // Late-game trainer teams must outclass early-game ones (the "unevolved
+    // mons late" class): average BST of trainer-wave enemies past wave 150
+    // must exceed the average up to wave 30.
+    const avgBst = (lo: number, hi: number) => {
+      const all = trainerWaves.filter(w => w.wave >= lo && w.wave <= hi).flatMap(w => w.enemies.map(e => e.bst));
+      return all.length > 0 ? all.reduce((s, b) => s + b, 0) / all.length : 0;
+    };
+    const early = avgBst(2, 30);
+    const late = avgBst(150, 199);
+    expect(late, `late avg BST ${late} vs early ${early}`).toBeGreaterThan(early);
   });
 
-  it("HELL — full 1..200 run", async () => {
+  it("HELL — full 1..200 run invariants (ghost waves spawn ghosts)", async () => {
     const run = await dumpMode("hell", "audit-hell", 200);
-    expect(run.length).toBeGreaterThan(0);
+    setErDifficulty("hell");
+    const schedule = ghostWavesForCurrentRun();
+    for (const ghostWave of schedule) {
+      const w = run.find(r => r.wave === ghostWave);
+      expect(w, `ghost wave ${ghostWave} present`).toBeDefined();
+      expect(w?.ghost, `wave ${ghostWave} did not spawn a ghost trainer`).toBe(true);
+      expect(w?.trainerName ?? "", `wave ${ghostWave} ghost shows the source player's name`).toContain("AuditGhost");
+    }
+    assertMegaRayFinale(run);
+    assertErFinale(run);
+    setErDifficulty("ace");
   });
 });
