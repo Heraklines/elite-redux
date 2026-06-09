@@ -481,9 +481,9 @@
   ],
   "SPECIES_CARVANHA": [
     "THUNDER_FANG",
-    "GUNK_SHOT",
+    "POISON_FANG",
     "OBSTRUCT",
-    "SURGING_STRIKES"
+    "FISHIOUS_REND"
   ],
   "SPECIES_CASTFORM": [
     "BOOMBURST",
@@ -1266,10 +1266,10 @@
     "SEED_FLARE"
   ],
   "SPECIES_FLAMIGO": [
-    "THUNDEROUS_KICK",
+    "FLYING_PRESS",
     "TRIPLE_AXEL",
-    "FLOATY_FALL",
-    "AQUA_STEP"
+    "DRAGON_DANCE",
+    "MULTI_ATTACK"
   ],
   "SPECIES_FLETCHLING": [
     "DRILL_RUN",
@@ -2312,7 +2312,7 @@
   "SPECIES_MAKUHITA": [
     "HAMMER_ARM",
     "SLACK_OFF",
-    "HEAT_CRASH",
+    "NO_RETREAT",
     "DOUBLE_IRON_BASH"
   ],
   "SPECIES_MAKUHITA_REDUX": [
@@ -2376,9 +2376,9 @@
     "NO_RETREAT"
   ],
   "SPECIES_MAWILE": [
-    "BULLET_PUNCH",
-    "HORN_LEECH",
-    "EARTHQUAKE",
+    "IRON_FANGS",
+    "FERTILE_FANGS",
+    "TECTONIC_FANGS",
     "MAGICAL_TORQUE"
   ],
   "SPECIES_MAWILE_REDUX": [
@@ -2395,9 +2395,9 @@
   ],
   "SPECIES_MEDITITE": [
     "THUNDEROUS_KICK",
-    "SUCKER_PUNCH",
+    "ASTRAL_HAND",
     "BULLET_PUNCH",
-    "PHOTON_GEYSER"
+    "AXE_KICK"
   ],
   "SPECIES_MELOETTA": [
     "BODY_SLAM",
@@ -2514,10 +2514,10 @@
     "DIAMOND_STORM"
   ],
   "SPECIES_MINUN": [
-    "ICE_BEAM",
-    "BADDY_BAD",
-    "SPARKLY_SWIRL",
-    "TAIL_GLOW"
+    "TRIPLE_AXEL",
+    "RELENTLESS_CLOBBER",
+    "BONK",
+    "VICTORY_DANCE"
   ],
   "SPECIES_MIRAIDON": [
     "FROST_BREATH",
@@ -2574,7 +2574,7 @@
     "SHORE_UP"
   ],
   "SPECIES_MUDKIP": [
-    "SHORE_UP",
+    "BULK_UP",
     "MOUNTAIN_GALE",
     "AQUA_STEP",
     "PRECIPICE_BLADES"
@@ -2653,7 +2653,7 @@
   ],
   "SPECIES_NINCADA": [
     "BULLDOZE",
-    "STICKY_WEB",
+    "INSECT_IMPACT",
     "SHADOW_BONE",
     "SHELL_SMASH"
   ],
@@ -3090,9 +3090,9 @@
     "VOLT_TACKLE"
   ],
   "SPECIES_POOCHYENA": [
-    "KNOCK_OFF",
+    "RIP_AND_TEAR",
     "CLOSE_COMBAT",
-    "DIRE_CLAW",
+    "POISON_FANG",
     "VICTORY_DANCE"
   ],
   "SPECIES_POPPLIO": [
@@ -3165,7 +3165,7 @@
     "PSYBLADE",
     "BITTER_BLADE",
     "NO_RETREAT",
-    "BOOMBURST"
+    "MULTI_ATTACK"
   ],
   "SPECIES_RALTS_REDUX": [
     "CALM_MIND",
@@ -3438,7 +3438,7 @@
     "ICE_SPINNER"
   ],
   "SPECIES_SEEDOT": [
-    "SWORDS_DANCE",
+    "TAILWIND",
     "SACRED_SWORD",
     "KOWTOW_CLEAVE",
     "BITTER_BLADE"
@@ -3537,7 +3537,7 @@
     "ACCELEROCK",
     "TRAILBLAZE",
     "STORM_THROW",
-    "SAPPY_SEED"
+    "ICICLE_SPEAR"
   ],
   "SPECIES_SHUCKLE": [
     "STUFF_CHEEKS",
@@ -3630,9 +3630,9 @@
     "POPULATION_BOMB"
   ],
   "SPECIES_SLAKOTH": [
-    "ENTRAINMENT",
+    "BULK_UP",
     "DRAIN_PUNCH",
-    "PARTING_SHOT",
+    "WICKED_BLOW",
     "CRUSH_GRIP"
   ],
   "SPECIES_SLATE": [
@@ -3915,7 +3915,7 @@
     "POLLEN_PUFF",
     "FIERY_DANCE",
     "BOUNCY_BUBBLE",
-    "AEROBLAST"
+    "HURRICANE"
   ],
   "SPECIES_SWABLU": [
     "ROOST",
@@ -3954,7 +3954,7 @@
     "ELECTRO_SHOT"
   ],
   "SPECIES_TAILLOW": [
-    "BOOMBURST",
+    "HURRICANE",
     "FACADE",
     "HEADLONG_RUSH",
     "NO_RETREAT"
@@ -4117,7 +4117,7 @@
   ],
   "SPECIES_TORCHIC": [
     "THUNDEROUS_KICK",
-    "ZING_ZAP",
+    "WHIRLING_STRIKES",
     "BURNING_BULWARK",
     "PYRO_BALL"
   ],
@@ -4170,10 +4170,10 @@
     "STONE_EDGE"
   ],
   "SPECIES_TREECKO": [
-    "NASTY_PLOT",
-    "CLANGING_SCALES",
-    "SECRET_SWORD",
-    "SEED_FLARE"
+    "SWORDS_DANCE",
+    "SOLAR_BLADE",
+    "SACRED_SWORD",
+    "GLAIVE_RUSH"
   ],
   "SPECIES_TROPIUS": [
     "STUFF_CHEEKS",
@@ -4315,7 +4315,7 @@
   ],
   "SPECIES_VOLBEAT": [
     "BATON_PASS",
-    "STICKY_WEB",
+    "HEAL_PULSE",
     "DECORATE",
     "VICTORY_DANCE"
   ],
@@ -4406,7 +4406,7 @@
   "SPECIES_WINGULL": [
     "THUNDER",
     "FLIP_TURN",
-    "CALM_MIND",
+    "HURRICANE",
     "STEAM_ERUPTION"
   ],
   "SPECIES_WISHIWASHI": [
@@ -4465,7 +4465,7 @@
   ],
   "SPECIES_WURMPLE": [
     "BATON_PASS",
-    "BLEAKWIND_STORM",
+    "SPRINGTIDE_STORM",
     "STORED_POWER",
     "MALIGNANT_CHAIN"
   ],
