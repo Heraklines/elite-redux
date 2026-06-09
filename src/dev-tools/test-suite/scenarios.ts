@@ -267,6 +267,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Fury Cutter/Echoed Voice x3",
+    description:
+      "#360 Fury Cutter + Echoed Voice — Triple Kick's effect.\n"
+      + "Fury Cutter: 20 BP / 90% / 10 PP. Echoed Voice: 20 BP / 90% / 15 PP.\n"
+      + "DO: check both movecards (R cycles the panel), then use each on Blissey.\n"
+      + "EXPECT: each hits 3 TIMES with rising power (20 → 40 → 60), like Triple\n"
+      + "Kick/Axel. Before the fix both were single-hit vanilla repeat-use ramps.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.FURY_CUTTER, MoveId.ECHOED_VOICE, MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.SCYTHER, { moveset: [MoveId.FURY_CUTTER, MoveId.ECHOED_VOICE, MoveId.SPLASH] })];
+    },
+  },
+  {
     label: "Berry Smash eats a berry",
     description:
       "#342 Berry Smash — the user must EAT one of its held berries.\n"

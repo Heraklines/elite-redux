@@ -227,6 +227,11 @@ export class UiInputs {
 
   buttonCycleOption(button: Button): void {
     const whitelist = [
+      // ER (#356): the fight menu's right panel cycles STATS → DESCRIPTION →
+      // DMG CALC on CYCLE_SHINY (R / RB). Without this entry the button was
+      // swallowed here and never reached FightUiHandler.processInput — the
+      // earlier damage-calc toggle was unreachable for the same reason.
+      FightUiHandler,
       StarterSelectUiHandler,
       PokedexUiHandler,
       PokedexPageUiHandler,

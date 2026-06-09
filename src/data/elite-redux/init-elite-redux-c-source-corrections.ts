@@ -194,7 +194,8 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_ROLLOUT", { power: 30, accuracy: 90, pp: 20 }],
   ["MOVE_FALSE_SWIPE", { power: 80, pp: 40, chance: 0 }],
   ["MOVE_MILK_DRINK", { pp: 10 }],
-  ["MOVE_FURY_CUTTER", { power: 40, accuracy: 95, pp: 20 }],
+  // ER (#360): Triple-Kick-style 3-strike ramp — see vanilla-move-patches.
+  ["MOVE_FURY_CUTTER", { power: 20, accuracy: 90, pp: 10 }],
   ["MOVE_RETURN", { power: 95 }],
   ["MOVE_PRESENT", { power: 1, accuracy: 90 }],
   ["MOVE_FRUSTRATION", { power: 95, pp: 20 }],
@@ -318,7 +319,8 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_SYNCHRONOISE", { power: 120 }],
   ["MOVE_COIL", { pp: 20 }],
   ["MOVE_ROUND", { chance: 0 }],
-  ["MOVE_ECHOED_VOICE", { power: 40, accuracy: 100 }],
+  // ER (#360): Triple-Kick-style 3-strike ramp — see vanilla-move-patches.
+  ["MOVE_ECHOED_VOICE", { power: 20, accuracy: 90, pp: 15 }],
   ["MOVE_CHIP_AWAY", { chance: 0 }],
   ["MOVE_QUICK_GUARD", { pp: 15 }],
   ["MOVE_SCALD", { power: 80 }],

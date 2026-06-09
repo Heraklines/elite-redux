@@ -12,6 +12,9 @@
 //  - Hidden Power: 80 BP (was stale 70)
 //  - Secret Power: 80 BP physical Hidden Power (type varies with the user)
 //  - Techno Blast: Hidden Power mechanic at 120 BP / 5 PP (no Drive item)
+// (#360):
+//  - Fury Cutter: 20 BP / 90% / 10 PP, Triple Kick's 3-strike ramp effect
+//  - Echoed Voice: 20 BP / 90% / 15 PP, same effect
 //
 // Gated behind ER_SCENARIO=1.
 // =============================================================================
@@ -74,5 +77,21 @@ describe.skipIf(!RUN)("ER move batch: Slash/Cut/Mud-Slap/HP/Secret Power/Techno 
     expect([m.power, m.pp]).toEqual([120, 5]);
     expect(attrNames(MoveId.TECHNO_BLAST)).toContain("HiddenPowerTypeAttr");
     expect(attrNames(MoveId.TECHNO_BLAST)).not.toContain("TechnoBlastTypeAttr");
+  });
+
+  it("Fury Cutter: 20/90/10, Triple-Kick-style 3-strike ramp (consecutive-use ramp removed)", () => {
+    const m = allMoves[MoveId.FURY_CUTTER];
+    expect([m.power, m.accuracy, m.pp]).toEqual([20, 90, 10]);
+    expect(attrNames(MoveId.FURY_CUTTER)).toContain("MultiHitAttr");
+    expect(attrNames(MoveId.FURY_CUTTER)).toContain("MultiHitPowerIncrementAttr");
+    expect(attrNames(MoveId.FURY_CUTTER)).not.toContain("ConsecutiveUseDoublePowerAttr");
+  });
+
+  it("Echoed Voice: 20/90/15, Triple-Kick-style 3-strike ramp (repeat-use ramp removed)", () => {
+    const m = allMoves[MoveId.ECHOED_VOICE];
+    expect([m.power, m.accuracy, m.pp]).toEqual([20, 90, 15]);
+    expect(attrNames(MoveId.ECHOED_VOICE)).toContain("MultiHitAttr");
+    expect(attrNames(MoveId.ECHOED_VOICE)).toContain("MultiHitPowerIncrementAttr");
+    expect(attrNames(MoveId.ECHOED_VOICE)).not.toContain("ConsecutiveUseMultiBasePowerAttr");
   });
 });

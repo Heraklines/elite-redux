@@ -59,6 +59,7 @@ import {
   type MoveAttr,
   MovePowerMultiplierAttr,
   MultiHitAttr,
+  MultiHitPowerIncrementAttr,
   OneHitKOAccuracyAttr,
   OneHitKOAttr,
   PhotonGeyserCategoryAttr,
@@ -703,6 +704,29 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       removeAttrsByName(move, ["StatStageChangeAttr"]);
       addAttrUnique(move, new MultiHitAttr());
       move.chance = -1;
+    },
+  ],
+  [
+    MoveId.FURY_CUTTER,
+    move => {
+      // ER (#360): 20 BP / 90% / 10 PP (c-source pass) with Triple Kick's
+      // effect — 3 strikes ramping 20/40/60, each checking accuracy. Strip the
+      // vanilla consecutive-use doubling.
+      removeAttrsByName(move, ["ConsecutiveUseDoublePowerAttr"]);
+      addAttrUnique(move, new MultiHitAttr(MultiHitType.THREE));
+      addAttrUnique(move, new MultiHitPowerIncrementAttr(3));
+      orFlag(move, MoveFlags.CHECK_ALL_HITS);
+    },
+  ],
+  [
+    MoveId.ECHOED_VOICE,
+    move => {
+      // ER (#360): 20 BP / 90% / 15 PP (c-source pass) with Triple Kick's
+      // effect, like Fury Cutter above. Strip the vanilla repeat-use ramp.
+      removeAttrsByName(move, ["ConsecutiveUseMultiBasePowerAttr"]);
+      addAttrUnique(move, new MultiHitAttr(MultiHitType.THREE));
+      addAttrUnique(move, new MultiHitPowerIncrementAttr(3));
+      orFlag(move, MoveFlags.CHECK_ALL_HITS);
     },
   ],
   [
