@@ -269,6 +269,36 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Struggle Bug + Antique",
+    description:
+      "#367 Struggle Bug (ER) + Antique innates.\n"
+      + "Your Scyther starts at ~30% HP. DO: use Struggle Bug on the enemy\n"
+      + "Sinistea (ANTIQUE form).\n"
+      + "EXPECT: Struggle Bug shows 80 BP, CRITS EVERY TIME while you're below\n"
+      + "half HP, and does NOT drop SpAtk. Open Battle Info (C) on the enemy:\n"
+      + "the Antique Sinistea must show its INNATES (was: none).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.STRUGGLE_BUG, MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SINISTEA,
+        ENEMY_FORM_OVERRIDES: { [SpeciesId.SINISTEA]: 1 },
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.SCYTHER, { moveset: [MoveId.STRUGGLE_BUG, MoveId.SPLASH] })];
+    },
+    onBattleStart: () => {
+      const p = globalScene.getPlayerPokemon();
+      if (p) {
+        p.hp = Math.max(1, Math.floor(p.getMaxHp() * 0.3));
+        p.updateInfo();
+      }
+    },
+  },
+  {
     label: "Outburst hits the field",
     description:
       "#366 Outburst (and 26 other customs) used to hit ONE mon.\n"

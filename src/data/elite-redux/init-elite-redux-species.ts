@@ -285,11 +285,16 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
         }
         continue;
       }
-      const formPassives: readonly [AbilityId, AbilityId, AbilityId] = [
+      const rawFormPassives: readonly [AbilityId, AbilityId, AbilityId] = [
         mapAbilityId(formDraft.innates[0]),
         mapAbilityId(formDraft.innates[1]),
         mapAbilityId(formDraft.innates[2]),
       ];
+      // ER data hole (#367): some form records ship innates [0,0,0] (e.g.
+      // Sinistea/Polteageist ANTIQUE) — applying them verbatim WIPED the
+      // form's innates (user report: "the special form for Sinistea doesn't
+      // have any innates"). Inherit the base species' ER innates instead.
+      const formPassives = rawFormPassives.every(a => a === AbilityId.NONE) ? passives : rawFormPassives;
       form.setPassives(formPassives);
 
       // Mega forms have their own stat lines and type assignments in ER

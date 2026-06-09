@@ -49,6 +49,7 @@ import {
   ConfuseAttr,
   CritOnlyAttr,
   DefDefAttr,
+  ErCritBelowHalfHpAttr,
   ErSuperEffectiveVsTypeAttr,
   FlinchAttr,
   HealStatusEffectAttr,
@@ -809,7 +810,12 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
   [
     MoveId.STRUGGLE_BUG,
     move => {
-      move.chance = 100;
+      // ER (#367): "A desperate attack that deals critical damage when the
+      // user is below 50% HP" — 80 BP (c-source pass), NO SpAtk drop. The old
+      // patch made vanilla's SpAtk drop a 100% rider, the opposite of ER.
+      removeAttrsByName(move, ["StatStageChangeAttr"]);
+      addAttrUnique(move, new ErCritBelowHalfHpAttr());
+      move.chance = -1;
     },
   ],
   [

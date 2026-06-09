@@ -330,7 +330,8 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_WATER_PLEDGE", { chance: 0 }],
   ["MOVE_FIRE_PLEDGE", { chance: 0 }],
   ["MOVE_GRASS_PLEDGE", { chance: 0 }],
-  ["MOVE_STRUGGLE_BUG", { power: 50, pp: 20 }],
+  // ER (#367): 80 BP desperation attack — crit rider in vanilla-move-patches.
+  ["MOVE_STRUGGLE_BUG", { power: 80, accuracy: 100, pp: 10 }],
   ["MOVE_BULLDOZE", { power: 60 }],
   ["MOVE_WORK_UP", { pp: 30 }],
   ["MOVE_ELECTROWEB", { power: 55 }],

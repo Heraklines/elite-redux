@@ -2009,6 +2009,20 @@ export class CritOnlyAttr extends MoveAttr {
   }
 }
 
+/**
+ * ER (#367): guaranteed critical hit while the USER is below half HP —
+ * Struggle Bug's ER effect ("deals critical damage when the user is below
+ * 50% HP"). No effect at or above half HP.
+ */
+export class ErCritBelowHalfHpAttr extends CritOnlyAttr {
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    if (user.getHpRatio() >= 0.5) {
+      return false;
+    }
+    return super.apply(user, target, move, args);
+  }
+}
+
 export class FixedDamageAttr extends MoveAttr {
   private readonly damage: number;
 
