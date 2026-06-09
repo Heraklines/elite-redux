@@ -466,12 +466,15 @@ async function handleSessionClear(
   if (slot === null) {
     return json({ success: false, error: "Invalid slot." }, 400, cors);
   }
-  // The client sends the final SessionSaveData (as JSON) on clear; persist it to
-  // the slot so the cloud copy reflects the cleared run, then report success.
-  const raw = await readSaveBody(request);
-  if (raw && raw.length > 0) {
-    await upsertSession(env, auth.uid, slot, raw);
-  }
+  // "Clear" = the run is FINISHED (victory or defeat) — DELETE the session row,
+  // matching rogueserver semantics. The previous implementation UPSERTED the
+  // final session instead, so the dead run survived server-side: /account/info
+  // (lastSessionSlot = MAX(slot)) kept pointing at it, the menu offered
+  // "Continue", and loading the all-fainted party instantly game-overed back to
+  // the title in a loop. Run history for ghosts/analytics is captured separately
+  // via POST /savedata/run, so nothing is lost by deleting here.
+  await readSaveBody(request); // drain the request body (final session, unused)
+  await env.DB.prepare("DELETE FROM session_saves WHERE user_id = ? AND slot = ?").bind(auth.uid, slot).run();
   return json({ success: true }, 200, cors);
 }
 
