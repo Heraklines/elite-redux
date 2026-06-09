@@ -2760,6 +2760,50 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   /**
+   * ER meta/pool helper: does this Pokémon have {@linkcode ability} available to it
+   * as its active ability OR as an **unlocked** innate slot?
+   *
+   * Unlike {@linkcode hasAbility} (which, with `canApply: false`, matches a latent
+   * innate regardless of whether the player has unlocked it, and with
+   * `canApply: true` also folds in transient battle state like HP / suppression),
+   * this only reflects what the player permanently has access to: the active
+   * ability plus any candy-unlocked innate slot. It deliberately ignores
+   * field/HP/suppression so it is safe to call out of battle (reward pools, shop).
+   *
+   * Used by ability-gated reward-pool conditions so items that only benefit a
+   * locked innate (e.g. Mystical Rock for an un-unlocked Seed Sower) don't appear.
+   */
+  public hasUnlockedAbility(ability: AbilityId): boolean {
+    if (this.getAbility(true).id === ability) {
+      return true;
+    }
+    const passives = this.getPassiveAbilities();
+    const slotLimit = getEnemyPassiveSlotLimit(this);
+    for (let slot = 0; slot < 3 && slot < slotLimit; slot++) {
+      const pa = passives[slot as 0 | 1 | 2];
+      if (pa?.id !== ability) {
+        continue;
+      }
+      // Form-change-driving innates are species identity, never candy-gated.
+      if (this.abilityDrivesFormChange(pa)) {
+        return true;
+      }
+      // Enemy innates are ungated (their slot count still ramps by level elsewhere).
+      if (!this.isPlayer()) {
+        return true;
+      }
+      // Dev/test passive overrides force all innate slots on (mirrors canApplyAbility).
+      const overridden =
+        Overrides.HAS_PASSIVE_ABILITY_OVERRIDE === true || Overrides.PASSIVE_ABILITY_OVERRIDE !== AbilityId.NONE;
+      const passiveAttr = globalScene.gameData.starterData[this.species.getRootSpeciesId()]?.passiveAttr ?? 0;
+      if (overridden || isSlotActive(passiveAttr, slot as 0 | 1 | 2)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Check whether this pokemon has an ability with the specified attribute in effect, either as a normal or passive ability.
    * Accounts for all the various effects which can disable or modify abilities.
    * @param attrType - The {@linkcode AbAttr | attribute} to check for

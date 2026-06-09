@@ -429,11 +429,11 @@ function initUltraModifierPool() {
                 AbilityId.GUTS,
                 AbilityId.MARVEL_SCALE,
                 AbilityId.MAGIC_GUARD,
-              ].some(a => p.hasAbility(a, false, true));
+              ].some(a => p.hasUnlockedAbility(a));
               const hasSpecificAbility = [AbilityId.TOXIC_BOOST, AbilityId.POISON_HEAL].some(a =>
-                p.hasAbility(a, false, true),
+                p.hasUnlockedAbility(a),
               );
-              const hasOppositeAbility = [AbilityId.FLARE_BOOST].some(a => p.hasAbility(a, false, true));
+              const hasOppositeAbility = [AbilityId.FLARE_BOOST].some(a => p.hasUnlockedAbility(a));
 
               return hasSpecificAbility || (hasGeneralAbility && !hasOppositeAbility) || hasStatusMoves;
             }
@@ -475,10 +475,10 @@ function initUltraModifierPool() {
                 AbilityId.GUTS,
                 AbilityId.MARVEL_SCALE,
                 AbilityId.MAGIC_GUARD,
-              ].some(a => p.hasAbility(a, false, true));
-              const hasSpecificAbility = [AbilityId.FLARE_BOOST].some(a => p.hasAbility(a, false, true));
+              ].some(a => p.hasUnlockedAbility(a));
+              const hasSpecificAbility = [AbilityId.FLARE_BOOST].some(a => p.hasUnlockedAbility(a));
               const hasOppositeAbility = [AbilityId.TOXIC_BOOST, AbilityId.POISON_HEAL].some(a =>
-                p.hasAbility(a, false, true),
+                p.hasUnlockedAbility(a),
               );
 
               return hasSpecificAbility || (hasGeneralAbility && !hasOppositeAbility) || hasStatusMoves;
@@ -521,7 +521,7 @@ function initUltraModifierPool() {
               AbilityId.GRASSY_SURGE,
               AbilityId.SEED_SOWER,
               AbilityId.MISTY_SURGE,
-            ].some(a => p.hasAbility(a, false, true));
+            ].some(a => p.hasUnlockedAbility(a));
 
             const hasMoves = [
               MoveId.SUNNY_DAY,
