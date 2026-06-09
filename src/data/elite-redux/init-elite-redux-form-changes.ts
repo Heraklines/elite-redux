@@ -333,11 +333,28 @@ function targetFormKey(targetSpeciesConst: string, sourceSpeciesConst: string): 
 }
 
 /**
+ * Form-change TARGETS that exist only for boss encounters and must never be
+ * obtainable by players. No player-facing item edge is bridged for these, so
+ * their stones never enter the reward pool. (#351: the Purple Orb was being
+ * offered to a party Cascoon, letting players unlock PRIMAL CASCOON — the
+ * Elite/Hell final boss form.)
+ */
+const BOSS_ONLY_FORM_TARGETS: ReadonlySet<string> = new Set(["SPECIES_CASCOON_PRIMAL"]);
+
+/**
  * Push a `SpeciesFormChange` into pokerogue's `pokemonFormChanges` table
  * so the source species's dex page surfaces the mega/primal in its
  * Evolutions menu.
  */
 function bridgeEntryToPokerogueFormChanges(entry: ErFormChangeRegistryEntry): void {
+  // BOSS-ONLY forms must never get a player-facing ITEM edge: bridging one puts
+  // its stone into the reward pool (a party Cascoon offered the Purple Orb →
+  // players could field PRIMAL CASCOON, the Elite/Hell final boss). The boss's
+  // own transform uses a separate MANUAL-trigger edge (er-final-boss.ts), so
+  // skipping here does not affect the boss fight.
+  if (BOSS_ONLY_FORM_TARGETS.has(entry.targetSpeciesConst)) {
+    return;
+  }
   const formKey = targetFormKey(entry.targetSpeciesConst, entry.sourceSpeciesConst);
   if (formKey === null) {
     return;
