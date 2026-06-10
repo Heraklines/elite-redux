@@ -1184,4 +1184,55 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "Outrage retargets (#372)",
+    description:
+      "#372 Thrash/Outrage in doubles: after the locked move KOs its target, the\n"
+      + "remaining frenzy turns used to FAIL every turn.\n"
+      + "DOUBLE battle vs two frail Rattata. DO: use Outrage on one of them (it\n"
+      + "dies). EXPECT: the NEXT forced Outrage turn automatically hits the OTHER\n"
+      + "Rattata instead of failing.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 70,
+        STARTING_WAVE_OVERRIDE: 5,
+        BATTLE_STYLE_OVERRIDE: "double",
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.RATTATA,
+        ENEMY_LEVEL_OVERRIDE: 15,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.OUTRAGE, MoveId.THRASH, MoveId.EARTHQUAKE, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH, MoveId.PROTECT, MoveId.YAWN, MoveId.REST] }),
+      ];
+    },
+  },
+  {
+    label: "Soul Linker (#376)",
+    description:
+      "#376 Soul Linker: damage links BOTH ways.\n"
+      + "The enemy Snorlax has Soul Linker as its ACTIVE ability.\n"
+      + "DO: hit it with Waterfall.  EXPECT: your Gyarados takes the SAME damage\n"
+      + "back. The harness regression passes; if your in-run case still fails,\n"
+      + "note WHICH mon had Soul Linker (active vs innate slot) and Send Logs.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_ABILITY_OVERRIDE: erAbility(ErAbilityId.SOUL_LINKER),
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.WATERFALL, MoveId.ICE_FANG, MoveId.PROTECT, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
 ];

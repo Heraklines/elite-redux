@@ -52,6 +52,7 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
   private panelMode: 0 | 1 | 2 = 0;
   private dmgCalcHeader: Phaser.GameObjects.Text;
   private dmgCalcBody: Phaser.GameObjects.Text;
+  private panelCycleHint: Phaser.GameObjects.Text;
   private moveInfoOverlay: MoveInfoOverlay;
 
   /** ER: the in-battle "Pokémon Stats" info overlay, also openable from move select (info/STATS key). */
@@ -135,7 +136,14 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
       .setOrigin(0, 0)
       .setVisible(false);
 
+    // ER (#377): tiny ALWAYS-VISIBLE hint at the panel's top-right edge so
+    // players discover that R cycles Stats / Description / Damage Calc.
+    this.panelCycleHint = addTextObject(globalScene.scaledCanvas.width - 12, -36, "R ⇄", TextStyle.MOVE_INFO_CONTENT)
+      .setOrigin(1, 0.5)
+      .setAlpha(0.75);
+
     this.moveInfoContainer.add([
+      this.panelCycleHint,
       this.typeIcon,
       this.moveCategoryIcon,
       this.ppLabel,
@@ -431,6 +439,9 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     }
     this.dmgCalcHeader.setVisible(inPanelText);
     this.dmgCalcBody.setVisible(inPanelText);
+    // The in-panel headers already read "... (R)", so the corner hint only
+    // shows on the default stats page (#377) where nothing else mentions R.
+    this.panelCycleHint.setVisible(!inPanelText);
     if (mode === 2) {
       this.dmgCalcHeader.setText("DMG CALC (R)");
       this.dmgCalcBody.setText(this.getDamageCalcText(pokemon, pokemonMove));

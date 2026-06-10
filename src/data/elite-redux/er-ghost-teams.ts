@@ -32,7 +32,9 @@ import { globalScene } from "#app/global-scene";
 import { bypassLogin } from "#constants/app-constants";
 import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ghostWavesForCurrentRun, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
+import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { TrainerPartyTemplate } from "#data/trainers/trainer-party-template";
+import { EggTier } from "#enums/egg-type";
 import type { Nature } from "#enums/nature";
 import { PartyMemberStrength } from "#enums/party-member-strength";
 import { TrainerSlot } from "#enums/trainer-slot";
@@ -149,10 +151,29 @@ function isBannedGhostMember(member: GhostMember): boolean {
   }
 }
 
+/**
+ * Anti-hack heuristic (#371): a species LINE whose starter hatches only from a
+ * LEGENDARY egg. One on a team is plausible (a lucky egg or a late catch);
+ * two or more is the signature of injected/hacked saves, so such teams are
+ * excluded from the ghost pool entirely.
+ */
+function isLegendaryEggLine(speciesId: number): boolean {
+  try {
+    const root = getPokemonSpecies(speciesId)?.getRootSpeciesId();
+    return root !== undefined && speciesEggTiers[root] === EggTier.LEGENDARY;
+  } catch {
+    return false;
+  }
+}
+
 /** True when every member of the snapshot's party is pool-legal. */
 export function isErGhostTeamLegal(snapshot: GhostTeamSnapshot): boolean {
   try {
-    return snapshot.party.every(m => !isBannedGhostMember(m));
+    if (snapshot.party.some(m => isBannedGhostMember(m))) {
+      return false;
+    }
+    // #371: ban teams fielding 2+ mons from legendary-egg-only lines.
+    return snapshot.party.filter(m => isLegendaryEggLine(m.speciesId)).length < 2;
   } catch {
     return false;
   }
