@@ -24,7 +24,6 @@
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
-import { promoteToErBlackShinyInBattle } from "#data/elite-redux/er-black-shinies";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import { setErDifficulty, setErDifficulty as setErDifficultyForScenario } from "#data/elite-redux/er-run-difficulty";
@@ -137,6 +136,8 @@ const DEV_OVERRIDE_DEFAULTS = {
   ENEMY_ABILITY_OVERRIDE: AbilityId.NONE,
   ENEMY_MOVESET_OVERRIDE: [],
   ENEMY_FORM_OVERRIDES: {},
+  ER_BLACK_SHINY_PLAYER_OVERRIDE: null,
+  ER_BLACK_SHINY_ENEMY_OVERRIDE: null,
 } as const;
 
 /** Reset every dev-managed override so scenarios don't bleed into each other. */
@@ -973,8 +974,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "The wild Gardevoir is a BLACK SHINY (real black smoke-halo sprite; its\n"
       + "ability + 3 innates are UNTOUCHED, it just gains the 5th GIFT slot).\n"
       + "DO: weaken it (False Swipe) and CATCH it (5 Rogue Balls provided).\n"
-      + "EXPECT: after catching, its summary/ability screens show its normal\n"
-      + "abilities plus the Gift row, and the black state SURVIVES save/reload.",
+      + "EXPECT: it spawns BLACK from its FIRST frame (no normal-then-black\n"
+      + "swap - same speed as any shiny). After catching, its summary/ability\n"
+      + "screens show its normal abilities plus the Gift row, and the black\n"
+      + "state SURVIVES save/reload.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -983,6 +986,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
         ENEMY_SPECIES_OVERRIDE: SpeciesId.GARDEVOIR,
         ENEMY_LEVEL_OVERRIDE: 55,
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ER_BLACK_SHINY_ENEMY_OVERRIDE: SpeciesId.GARDEVOIR,
       });
       return [
         makeStarter(SpeciesId.SCIZOR, {
@@ -991,10 +995,6 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
     onBattleStart: () => {
-      const enemy = globalScene.getEnemyPokemon();
-      if (enemy) {
-        promoteToErBlackShinyInBattle(enemy);
-      }
       const balls = globalScene.pokeballCounts;
       balls[3] = Math.max(balls[3] ?? 0, 5); // Rogue Balls
     },
@@ -1008,7 +1008,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "DO: open the summary Abilities page or Battle Info — EXPECT the Gift\n"
       + "row (Gift 1/3, violet italic). PRESS R on that page — EXPECT the gift\n"
       + "cycles 1/3 to 2/3 to 3/3 and the shown ability changes (the new gift\n"
-      + "is live in combat immediately). EXPECT the real black sprite.",
+      + "is live in combat immediately). EXPECT the real black sprite from the\n"
+      + "FIRST frame of the battle (no delayed normal-then-black swap).",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1017,18 +1018,13 @@ export const DEV_SCENARIOS: DevScenario[] = [
         ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
         ENEMY_LEVEL_OVERRIDE: 55,
         ENEMY_MOVESET_OVERRIDE: [MoveId.THUNDER_WAVE],
+        ER_BLACK_SHINY_PLAYER_OVERRIDE: SpeciesId.GARCHOMP,
       });
       return [
         makeStarter(SpeciesId.GARCHOMP, {
           moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.SWORDS_DANCE, MoveId.PROTECT],
         }),
       ];
-    },
-    onBattleStart: () => {
-      const player = globalScene.getPlayerPokemon();
-      if (player) {
-        promoteToErBlackShinyInBattle(player);
-      }
     },
   },
   {
@@ -1050,6 +1046,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
         ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
         ENEMY_LEVEL_OVERRIDE: 10,
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ER_BLACK_SHINY_PLAYER_OVERRIDE: SpeciesId.JIGGLYPUFF,
       });
       return [
         makeStarter(SpeciesId.JIGGLYPUFF, {
@@ -1059,13 +1056,6 @@ export const DEV_SCENARIOS: DevScenario[] = [
           moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.REST, MoveId.PROTECT],
         }),
       ];
-    },
-    onBattleStart: () => {
-      const party = globalScene.getPlayerParty();
-      const puff = party[0];
-      if (puff) {
-        promoteToErBlackShinyInBattle(puff);
-      }
     },
   },
   {
@@ -1300,7 +1290,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "slug atlases. Your Bellsprout-Redux is a BLACK SHINY.\n"
       + "DO: look at its in-battle BACK sprite, then open the summary (FRONT).\n"
       + "EXPECT: REAL black smoke-halo art of the REDUX form on both sides - not\n"
-      + "a flat dark tint, and not the base Bellsprout's art.",
+      + "a flat dark tint, and not the base Bellsprout's art - and it is black\n"
+      + "from the FIRST frame (no delayed swap).",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1309,6 +1300,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
         ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
         ENEMY_LEVEL_OVERRIDE: 10,
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ER_BLACK_SHINY_PLAYER_OVERRIDE: SpeciesId.BELLSPROUT,
       });
       return [
         makeStarter(SpeciesId.BELLSPROUT, {
@@ -1316,12 +1308,6 @@ export const DEV_SCENARIOS: DevScenario[] = [
           moveset: [MoveId.VINE_WHIP, MoveId.RAZOR_LEAF, MoveId.GROWTH, MoveId.SLEEP_POWDER],
         }),
       ];
-    },
-    onBattleStart: () => {
-      const player = globalScene.getPlayerPokemon();
-      if (player) {
-        promoteToErBlackShinyInBattle(player);
-      }
     },
   },
   {

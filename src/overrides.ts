@@ -207,6 +207,14 @@ class DefaultOverrides {
   readonly SHINY_OVERRIDE: boolean | null = null;
   readonly VARIANT_OVERRIDE: Variant | null = null;
   /**
+   * ER (#349, dev suite): force a generated Pokemon of this species to spawn
+   * as a BLACK SHINY. Applied at GENERATION time, so the black atlas is part
+   * of the initial asset load and the mon is black from its first frame
+   * (no mid-battle texture swap). Player-side and enemy-side respectively.
+   */
+  readonly ER_BLACK_SHINY_PLAYER_OVERRIDE: SpeciesId | null = null;
+  readonly ER_BLACK_SHINY_ENEMY_OVERRIDE: SpeciesId | null = null;
+  /**
    * Overrides the IVs of player pokemon. Values must never be outside the range `0` to `31`!
    * - If set to a number between `0` and `31`, set all IVs of all player pokemon to that number.
    * - If set to an array, set the IVs of all player pokemon to that array. Array length must be exactly `6`!

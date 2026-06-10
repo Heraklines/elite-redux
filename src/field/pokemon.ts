@@ -60,6 +60,7 @@ import {
   getErSharedGiftAbilityIdsFor,
   isErBlackShiny,
   maybeUpgradeToErBlackShiny,
+  resetErBlackShinyState,
 } from "#data/elite-redux/er-black-shinies";
 import { erBlackSpritePath, erBlackSpritePathFromBase } from "#data/elite-redux/er-black-sprite-manifest";
 import { applyErResistBerry } from "#data/elite-redux/er-resist-berries";
@@ -1037,7 +1038,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     );
     // ER CUSTOM black shinies (#349): slug-based atlases are keyed by their
     // base path (elite-redux/{slug}/front -> black/elite-redux/{slug}/front).
-    if (isErBlackShiny(this) && formIndex === 0) {
+    // No formIndex gate: Redux FORMS of vanilla species resolve to a slug
+    // path too, and the manifest hit is what decides whether art exists.
+    if (isErBlackShiny(this)) {
       const blackCustom = erBlackSpritePathFromBase(basePath);
       if (blackCustom) {
         return blackCustom;
@@ -1070,7 +1073,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       back,
     );
     // ER CUSTOM black shinies (#349): slug-based scheme, keyed by base path.
-    if (isErBlackShiny(this) && formIndex === 0) {
+    // No formIndex gate (Redux forms resolve to slug paths; manifest decides).
+    if (isErBlackShiny(this)) {
       const blackCustom = erBlackSpritePathFromBase(baseBattlePath);
       if (blackCustom) {
         return blackCustom;
@@ -1113,8 +1117,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       this.getVariant(false),
     );
     // ER Black Shinies (#349): distinct texture key for the t4 atlas
-    // (numeric scheme OR slug-based ER-custom scheme).
-    if (isErBlackShiny(this) && this.formIndex === 0 && this.getSpriteAtlasPath(ignoreOverride).startsWith("black/")) {
+    // (numeric scheme OR slug-based ER-custom scheme). The resolved atlas
+    // path is authoritative - no formIndex gate (Redux forms have slug art).
+    if (isErBlackShiny(this) && this.getSpriteAtlasPath(ignoreOverride).startsWith("black/")) {
       return `${base}-erblack`;
     }
     return base;
@@ -1126,12 +1131,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       back = this.isPlayer();
     }
     // ER Black Shinies (#349): distinct texture key for the t4 atlas
-    // (numeric scheme OR slug-based ER-custom scheme).
-    if (
-      isErBlackShiny(this)
-      && this.formIndex === 0
-      && this.getBattleSpriteAtlasPath(back, ignoreOverride).startsWith("black/")
-    ) {
+    // (numeric scheme OR slug-based ER-custom scheme). The resolved atlas
+    // path is authoritative - no formIndex gate (Redux forms have slug art).
+    if (isErBlackShiny(this) && this.getBattleSpriteAtlasPath(back, ignoreOverride).startsWith("black/")) {
       return `${base}-erblack`;
     }
     return base;
@@ -6975,6 +6977,13 @@ export class PlayerPokemon extends Pokemon {
       this.variant = Overrides.VARIANT_OVERRIDE;
     }
 
+    // ER (#349, dev suite): starters arrive with shiny EXPLICITLY set, which
+    // skips the base constructor's upgrade roll - apply the forced black
+    // override here so the black atlas is part of the initial load.
+    if (!dataSource && Overrides.ER_BLACK_SHINY_PLAYER_OVERRIDE !== null) {
+      maybeUpgradeToErBlackShiny(this);
+    }
+
     if (!dataSource) {
       if (
         globalScene.gameMode.isDaily // Keldeo is excluded due to crashes involving its signature move and the associated form change
@@ -7651,6 +7660,13 @@ export class EnemyPokemon extends Pokemon {
       if (this.shiny) {
         this.variant = Overrides.ENEMY_VARIANT_OVERRIDE ?? this.generateShinyVariant();
       }
+
+      // ER (#349): the base-constructor shiny roll above was DISCARDED by this
+      // re-roll - drop any black state it left, then run the t4 upgrade (1/50
+      // of epic, or the dev-suite forced override) on the FINAL shiny/variant.
+      // Without this, wild enemies could never naturally roll black.
+      resetErBlackShinyState(this);
+      maybeUpgradeToErBlackShiny(this);
 
       this.luck = (this.shiny ? this.variant + 1 : 0) + (this.fusionShiny ? this.fusionVariant + 1 : 0);
 

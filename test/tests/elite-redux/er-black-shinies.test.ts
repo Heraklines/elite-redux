@@ -17,6 +17,7 @@
 // Gated behind ER_SCENARIO=1.
 // =============================================================================
 
+import Overrides from "#app/overrides";
 import {
   applyErBlackShinyKit,
   cycleErGiftAbility,
@@ -31,7 +32,7 @@ import { CustomPokemonData } from "#data/pokemon/pokemon-data";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -221,6 +222,50 @@ describe.skipIf(!RUN)("ER Black Shinies (#349)", () => {
       // pipeline (hasAbility -> canApplyAbility -> gift slot exemptions).
       const gift = getErActiveGiftAbilityId(puff)!;
       expect(lax.hasAbility(gift as never)).toBe(true);
+    });
+  });
+
+  describe("generation-time dev override (dev suite spawn-speed fix)", () => {
+    type MutableErBlackOverrides = {
+      ER_BLACK_SHINY_ENEMY_OVERRIDE: SpeciesId | null;
+      ER_BLACK_SHINY_PLAYER_OVERRIDE: SpeciesId | null;
+    };
+    const O = Overrides as unknown as MutableErBlackOverrides;
+
+    beforeEach(() => {
+      game = new GameManager(phaserGame);
+    });
+
+    afterEach(() => {
+      O.ER_BLACK_SHINY_ENEMY_OVERRIDE = null;
+      O.ER_BLACK_SHINY_PLAYER_OVERRIDE = null;
+    });
+
+    it("forces the enemy black at GENERATION - black atlas resolves before the first frame", async () => {
+      O.ER_BLACK_SHINY_ENEMY_OVERRIDE = SpeciesId.GARDEVOIR;
+      game.override.enemySpecies(SpeciesId.GARDEVOIR);
+      await game.classicMode.startBattle(SpeciesId.SNORLAX);
+
+      const enemy = game.scene.getEnemyPokemon()!;
+      expect(isErBlackShiny(enemy)).toBe(true);
+      expect(enemy.shiny).toBe(true);
+      expect(enemy.variant).toBe(2);
+      // The black atlas IS the initial atlas (no post-summon swap needed).
+      expect(enemy.getSpriteAtlasPath()).toMatch(/^black\//);
+      // Only the targeted species/side is affected.
+      expect(isErBlackShiny(game.scene.getPlayerPokemon()!)).toBe(false);
+    });
+
+    it("forces the player starter black at GENERATION (starters pass shiny explicitly)", async () => {
+      O.ER_BLACK_SHINY_PLAYER_OVERRIDE = SpeciesId.SNORLAX;
+      await game.classicMode.startBattle(SpeciesId.SNORLAX);
+
+      const player = game.scene.getPlayerPokemon()!;
+      expect(isErBlackShiny(player)).toBe(true);
+      expect(player.shiny).toBe(true);
+      expect(player.variant).toBe(2);
+      expect(player.getSpriteAtlasPath()).toMatch(/^black\//);
+      expect(isErBlackShiny(game.scene.getEnemyPokemon()!)).toBe(false);
     });
   });
 });

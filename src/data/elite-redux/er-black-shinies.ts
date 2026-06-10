@@ -26,11 +26,11 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import Overrides from "#app/overrides";
 import {
   ER_BLACK_SHINY_POOL_BORDERLINE,
   ER_BLACK_SHINY_POOL_CORE,
 } from "#data/elite-redux/er-black-shiny-gift-pool";
-import { erBlackSpritePath } from "#data/elite-redux/er-black-sprite-manifest";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import type { Pokemon } from "#field/pokemon";
 import { randSeedInt } from "#utils/common";
@@ -108,6 +108,19 @@ export function applyErBlackShinyKit(pokemon: Pokemon): void {
  */
 export function maybeUpgradeToErBlackShiny(pokemon: Pokemon): boolean {
   try {
+    // Dev-suite override: force the black roll at GENERATION so the black
+    // atlas loads with the initial assets (no delayed mid-battle swap).
+    // Checked BEFORE the already-black early-return so a re-roll that calls
+    // this again still re-pins shiny/variant.
+    const forcedSpecies = pokemon.isPlayer()
+      ? Overrides.ER_BLACK_SHINY_PLAYER_OVERRIDE
+      : Overrides.ER_BLACK_SHINY_ENEMY_OVERRIDE;
+    if (forcedSpecies !== null && pokemon.species.speciesId === forcedSpecies) {
+      pokemon.shiny = true;
+      pokemon.variant = 2;
+      applyErBlackShinyKit(pokemon);
+      return true;
+    }
     if (isErBlackShiny(pokemon)) {
       return true;
     }
@@ -125,6 +138,21 @@ export function maybeUpgradeToErBlackShiny(pokemon: Pokemon): boolean {
   } catch {
     // The shiny pipeline must never break on the upgrade roll.
     return false;
+  }
+}
+
+/**
+ * Drop any black state from a DISCARDED shiny roll. The EnemyPokemon
+ * constructor re-rolls shiny/variant after the base constructor already
+ * rolled (and possibly upgraded) them - without this, the stale kit would
+ * dangle on a mon whose final roll is not an epic shiny at all.
+ */
+export function resetErBlackShinyState(pokemon: Pokemon): void {
+  const data = pokemon.customPokemonData;
+  if (data?.erBlackShiny) {
+    data.erBlackShiny = false;
+    data.erGiftAbilities = [];
+    data.erGiftIndex = 0;
   }
 }
 
@@ -218,9 +246,14 @@ export function applyErBlackShinyInterimTint(pokemon: Pokemon): void {
   if (!isErBlackShiny(pokemon)) {
     return;
   }
-  // The generated t4 atlas is already black — never tint on top of it.
-  if (pokemon.formIndex === 0 && erBlackSpritePath(pokemon.species.speciesId, false)) {
-    return;
+  // The generated t4 atlas is already black — never tint on top of it
+  // (numeric OR slug scheme; the resolved atlas path is authoritative).
+  try {
+    if (pokemon.getSpriteAtlasPath().startsWith("black/")) {
+      return;
+    }
+  } catch {
+    // Headless: no species-form sprite data — fall through to the tint try.
   }
   try {
     pokemon.getSprite()?.setTint(ER_BLACK_SHINY_TINT);
