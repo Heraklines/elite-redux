@@ -4,6 +4,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { FRIENDSHIP_LOSS_FROM_FAINT } from "#balance/starters";
 import { allMoves } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
+import { recordErStreakFaint } from "#data/elite-redux/er-money-streak";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { BattleType } from "#enums/battle-type";
@@ -92,6 +93,8 @@ export class FaintPhase extends PokemonPhase {
     // Track total times pokemon have been KO'd for Last Respects/Supreme Overlord
     if (pokemon.isPlayer()) {
       globalScene.arena.playerFaints += 1;
+      // ER money streak (#348): a faint breaks this mon's faint-free streak.
+      recordErStreakFaint(pokemon);
       globalScene.currentBattle.playerFaintsHistory.push({
         pokemon,
         turn: globalScene.currentBattle.turn,

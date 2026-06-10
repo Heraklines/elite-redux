@@ -20,6 +20,7 @@ import { allAbilities, allMoves, allSpecies } from "#data/data-lists";
 import { Egg, getEggTierForSpecies, MAX_EGG_COUNT } from "#data/egg";
 import { matchesAbilityText } from "#data/elite-redux/er-ability-search";
 import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
+import { resetErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { type ErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { GrowthRate, getGrowthRateColor } from "#data/exp";
@@ -5568,6 +5569,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               setErDifficulty(difficulty);
               resetErRunTrainerTracking();
               resetErGhostRunState();
+              resetErMoneyStreaks();
               globalScene.money = globalScene.gameMode.getStartingMoney();
               const starters = this.starters.slice(0);
               // ER: remember this team so it can be re-selected next run.

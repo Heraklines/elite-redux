@@ -15,6 +15,7 @@ import { EntryHazardTag } from "#data/arena-tag";
 import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed/daily-seed-utils";
 import { allMoves, allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
+import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { getErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ER_CANDY_GAIN_MULTIPLIER, getRunCandyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import { getErUsedTrainerKeys, restoreErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
@@ -1155,6 +1156,8 @@ export class GameData {
       // ER: persist the set of trainers already fought this run, so reloading
       // doesn't wipe the no-repeat tracking and re-field the same trainers.
       erUsedTrainerKeys: getErUsedTrainerKeys(),
+      // ER (#348): persist per-mon faint-free money streaks across save/load.
+      erMoneyStreaks: getErMoneyStreakEntries(),
     } as SessionSaveData;
   }
 
@@ -1268,6 +1271,7 @@ export class GameData {
     // run keeps its no-repeat history (older saves have no keys → fresh pool).
     setErDifficulty(fromSession.erDifficulty ?? "ace");
     restoreErRunTrainerTracking(fromSession.erUsedTrainerKeys);
+    restoreErMoneyStreaks(fromSession.erMoneyStreaks);
 
     globalScene.setSeed(fromSession.seed || globalScene.game.config.seed[0]);
     globalScene.resetSeed();

@@ -32,6 +32,7 @@ import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lis
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
 import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
+import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
 import { chromaKeyErSpriteTexture } from "#data/elite-redux/er-sprite-chroma-key";
 import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
 import type { SpeciesFormChangeTrigger } from "#data/form-change-triggers";
@@ -2940,7 +2941,9 @@ export class BattleScene extends SceneBase {
     const moneyValue =
       Math.pow((waveSetIndex + 1 + (0.75 + (((waveIndex - 1) % 10) + 1) / 10)) * 100, 1 + 0.005 * waveSetIndex)
       * moneyMultiplier;
-    return Math.floor(moneyValue / 10) * 10;
+    // ER money streak (#348): faint-free party streaks add up to +60% money.
+    const erStreakScaled = moneyValue * (1 + erTeamMoneyBonusPercent() / 100);
+    return Math.floor(erStreakScaled / 10) * 10;
   }
 
   addModifier(

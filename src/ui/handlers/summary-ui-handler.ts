@@ -9,6 +9,7 @@ import {
   getErAbilityRomDescription,
   getErCompositeDetailedDescription,
 } from "#data/elite-redux/er-ability-descriptions";
+import { erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
 import { getErMoveDetailPages, type MoveDetailRow } from "#data/elite-redux/er-move-details";
 import { getLevelRelExp, getLevelTotalExp } from "#data/exp";
 import { getGenderColor, getGenderSymbol } from "#data/gender";
@@ -105,6 +106,8 @@ export class SummaryUiHandler extends UiHandler {
   private pokeball: Phaser.GameObjects.Sprite;
   private levelText: Phaser.GameObjects.Text;
   private genderText: Phaser.GameObjects.Text;
+  /** ER (#348): mini money-streak ribbon — this mon's current money bonus. */
+  private erStreakText: Phaser.GameObjects.Text;
   private shinyIcon: Phaser.GameObjects.Image;
   private fusionShinyIcon: Phaser.GameObjects.Image;
   private candyShadow: Phaser.GameObjects.Sprite;
@@ -325,6 +328,13 @@ export class SummaryUiHandler extends UiHandler {
     this.genderText = addTextObject(96, -17, "", TextStyle.SUMMARY);
     this.genderText.setOrigin(0, 1);
     this.summaryContainer.add(this.genderText);
+
+    // ER money streak (#348): small gold ribbon on the name bar — sits in the
+    // dead space after the gender symbol so it never overlaps anything, but is
+    // always visible while the summary is open.
+    this.erStreakText = addTextObject(108, -17, "", TextStyle.SUMMARY_GOLD);
+    this.erStreakText.setOrigin(0, 1);
+    this.summaryContainer.add(this.erStreakText);
 
     this.statusContainer = globalScene.add.container(-106, -16);
 
@@ -583,6 +593,10 @@ export class SummaryUiHandler extends UiHandler {
     this.genderText.setText(getGenderSymbol(this.pokemon.getGender(true)));
     this.genderText.setColor(getGenderColor(this.pokemon.getGender(true)));
     this.genderText.setShadowColor(getGenderColor(this.pokemon.getGender(true), true));
+
+    // ER money streak ribbon (#348): show this mon's current money bonus.
+    const erStreakBonus = erStreakBonusPercent(this.pokemon.id);
+    this.erStreakText.setText(erStreakBonus > 0 ? `₽+${erStreakBonus}%` : "");
 
     switch (this.summaryUiMode) {
       case SummaryUiMode.DEFAULT: {

@@ -1,5 +1,6 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { LapsingPersistentModifier, LapsingPokemonHeldItemModifier } from "#modifiers/modifier";
 import { BattlePhase } from "#phases/battle-phase";
 
@@ -38,6 +39,9 @@ export class BattleEndPhase extends BattlePhase {
       if (globalScene.currentBattle.trainer) {
         globalScene.gameData.gameStats.trainersDefeated++;
       }
+      // ER money streak (#348): a won wave extends every non-fainted party
+      // mon's faint-free streak (+1% money per 3 waves, capped +10%/mon).
+      advanceErMoneyStreaks();
     }
 
     // Endless graceful end

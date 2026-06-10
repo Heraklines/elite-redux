@@ -24,6 +24,7 @@
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
+import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { AbilityId } from "#enums/ability-id";
 import { BerryType } from "#enums/berry-type";
@@ -266,6 +267,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
       });
       return [makeStarter(SpeciesId.SNEASEL, { moveset: [MoveId.TRIPLE_AXEL] })];
+    },
+  },
+  {
+    label: "Money streak ribbon",
+    description:
+      "#348 Money streak — +1% money per mon per 3 faint-free waves (cap 10%).\n"
+      + "This scenario pre-charges your two mons to MAX streak.\n"
+      + "DO: open each mon's SUMMARY.  EXPECT: a small gold ribbon next to the\n"
+      + "gender symbol on the name bar reading P+10%. Win the battle: the money\n"
+      + "reward is ~20% higher than normal. Let a mon faint and win again: its\n"
+      + "ribbon disappears (streak reset), the other keeps its bonus.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.GARCHOMP), makeStarter(SpeciesId.LUCARIO)];
+    },
+    onBattleStart: () => {
+      // Pre-charge the party to max streak so the ribbon + payout are testable.
+      for (let i = 0; i < 30; i++) {
+        advanceErMoneyStreaks();
+      }
     },
   },
   {

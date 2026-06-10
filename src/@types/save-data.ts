@@ -99,6 +99,12 @@ export interface SessionSaveData {
    * compatibility (older saves restore an empty set, i.e. a fresh pool).
    */
   erUsedTrainerKeys?: string[];
+  /**
+   * ER (#348): per-mon faint-free money-streak counters ([pokemonId, waves]),
+   * so a reload keeps each mon's streak. Optional for backwards compatibility
+   * (older saves restore fresh streaks).
+   */
+  erMoneyStreaks?: [number, number][];
 }
 
 export interface Unlocks {
