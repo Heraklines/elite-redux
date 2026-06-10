@@ -19,6 +19,7 @@ import {
 import { allAbilities, allMoves, allSpecies } from "#data/data-lists";
 import { Egg, getEggTierForSpecies, MAX_EGG_COUNT } from "#data/egg";
 import { matchesAbilityText } from "#data/elite-redux/er-ability-search";
+import { ER_BLACK_SHINY_TINT } from "#data/elite-redux/er-black-shinies";
 import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
 import { resetErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { type ErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
@@ -3021,6 +3022,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 originalStarterAttributes.erBlackShiny = true;
                 globalScene.playSound("se/sparkle");
                 this.pokemonShinyIcon.setFrame(getVariantIcon(2)).setTint(0x0a0a0a).setVisible(true);
+                // ER (#349): preview the black look on the big sprite too.
+                this.pokemonSprite.setTint(ER_BLACK_SHINY_TINT);
                 success = true;
               } else {
                 // If shiny, we update the variant
@@ -3028,6 +3031,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 if (starterAttributes.erBlackShiny) {
                   starterAttributes.erBlackShiny = false;
                   originalStarterAttributes.erBlackShiny = false;
+                  this.pokemonSprite.clearTint();
                 }
                 let newVariant = props.variant;
                 do {
@@ -4518,6 +4522,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         this.setTypeIcons(speciesForm.type1, speciesForm.type2);
 
         this.pokemonSprite.clearTint();
+        // ER Black Shinies (#349): PREVIEW the black tier - obsidian-tint the
+        // preview sprite while the black look is selected for this species
+        // (the real black atlas is a battle asset; the tint is the cue here).
+        if (this.starterPreferences[species.speciesId]?.erBlackShiny && props.shiny && props.variant === 2) {
+          this.pokemonSprite.setTint(ER_BLACK_SHINY_TINT);
+        }
         if (this.pokerusSpecies.includes(species)) {
           handleTutorial(Tutorial.POKERUS);
         }

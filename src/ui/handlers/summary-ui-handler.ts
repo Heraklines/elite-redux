@@ -10,7 +10,7 @@ import {
   getErAbilityRomDescription,
   getErCompositeDetailedDescription,
 } from "#data/elite-redux/er-ability-descriptions";
-import { getErActiveGiftAbilityId, isErBlackShiny } from "#data/elite-redux/er-black-shinies";
+import { cycleErGiftAbility, getErActiveGiftAbilityId, isErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
 import { getErMoveDetailPages, type MoveDetailRow } from "#data/elite-redux/er-move-details";
 import { getLevelRelExp, getLevelTotalExp } from "#data/exp";
@@ -719,6 +719,16 @@ export class SummaryUiHandler extends UiHandler {
             success = true;
             break;
         }
+      }
+    } else if (button === Button.CYCLE_SHINY && this.cursor === Page.ABILITIES) {
+      // ER Black Shinies (#349): R cycles the GIFT between its 3 choices for
+      // the player's own black shiny, re-rendering the page in place.
+      if (this.pokemon?.isPlayer() && isErBlackShiny(this.pokemon)) {
+        cycleErGiftAbility(this.pokemon);
+        this.setCursor(this.cursor, true);
+        success = true;
+      } else {
+        error = true;
       }
     } else if (button === Button.ACTION) {
       if (this.cursor === Page.ABILITIES) {
@@ -1747,7 +1757,8 @@ export class SummaryUiHandler extends UiHandler {
         const choices = mon.customPokemonData.erGiftAbilities.length;
         const idx = (mon.customPokemonData.erGiftIndex ?? 0) + 1;
         rows.push({
-          label: `Gift ${idx}/${choices}`,
+          // ER (#349): R cycles the player's own gift between its 3 choices.
+          label: mon.isPlayer() ? `Gift ${idx}/${choices} (R)` : `Gift ${idx}/${choices}`,
           ability: gift,
           gift: true,
         });

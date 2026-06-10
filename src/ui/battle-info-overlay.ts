@@ -19,7 +19,11 @@
 import { globalScene } from "#app/global-scene";
 import { allAbilities } from "#data/data-lists";
 import { getErAbilityDescription } from "#data/elite-redux/er-ability-descriptions";
-import { getErActiveGiftAbilityId, getErSharedGiftAbilityIdsFor } from "#data/elite-redux/er-black-shinies";
+import {
+  cycleErGiftAbility,
+  getErActiveGiftAbilityId,
+  getErSharedGiftAbilityIdsFor,
+} from "#data/elite-redux/er-black-shinies";
 import { erYoungsterFreeInnateSlots } from "#data/elite-redux/er-run-difficulty";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { TerrainType as TerrainTypeEnum } from "#data/terrain";
@@ -214,6 +218,22 @@ export class BattleInfoOverlay {
         const n = this.getPages().length;
         this.pageIndex = (this.pageIndex + 1) % n;
         this.render();
+        return true;
+      }
+      case Btn.CYCLE_SHINY: {
+        // ER Black Shinies (#349): on the Abilities page, R cycles the
+        // inspected PLAYER black shiny's GIFT between its 3 choices.
+        const mon = this.onField()[this.slotIndex];
+        if (
+          this.getPages()[this.pageIndex] === "abilities"
+          && mon?.isPlayer()
+          && getErActiveGiftAbilityId(mon) !== null
+        ) {
+          cycleErGiftAbility(mon);
+          this.render();
+          return true;
+        }
+        this.close();
         return true;
       }
       case Btn.UP:
@@ -573,7 +593,7 @@ export class BattleInfoOverlay {
     for (const giftId of getErSharedGiftAbilityIdsFor(mon)) {
       const label =
         giftId === ownGift
-          ? `Gift ${(mon.customPokemonData?.erGiftIndex ?? 0) + 1}/${mon.customPokemonData?.erGiftAbilities?.length ?? 3}`
+          ? `Gift ${(mon.customPokemonData?.erGiftIndex ?? 0) + 1}/${mon.customPokemonData?.erGiftAbilities?.length ?? 3}${mon.isPlayer() ? " (R)" : ""}`
           : "Gift (Ally)";
       rows.push({ label, abilityId: giftId, locked: false, gift: true });
     }

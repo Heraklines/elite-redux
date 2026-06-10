@@ -1001,11 +1001,12 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "Black shiny: battle kit",
     description:
       "#349 Black Shinies — your OWN black shiny in battle.\n"
-      + "Your Garchomp is a BLACK SHINY: its 3 innates were re-rolled from the\n"
-      + "curated pool and it has the 5th GIFT slot.\n"
-      + "DO: open the ability screen / Battle Info — EXPECT 3 pool innates plus\n"
-      + "the gift ability listed. Fight: the rolled abilities actually work\n"
-      + "(messages/effects trigger). EXPECT the obsidian tint on the sprite.",
+      + "Your Garchomp is a BLACK SHINY: normal ability + innates UNTOUCHED,\n"
+      + "plus the 5th GIFT slot with 3 switchable pool choices.\n"
+      + "DO: open the summary Abilities page or Battle Info — EXPECT the Gift\n"
+      + "row (Gift 1/3, violet italic). PRESS R on that page — EXPECT the gift\n"
+      + "cycles 1/3 to 2/3 to 3/3 and the shown ability changes (the new gift\n"
+      + "is live in combat immediately). EXPECT the real black sprite.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
