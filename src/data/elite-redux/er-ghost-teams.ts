@@ -38,6 +38,8 @@ import { PartyMemberStrength } from "#enums/party-member-strength";
 import { TrainerSlot } from "#enums/trainer-slot";
 import type { EnemyPokemon } from "#field/pokemon";
 import type { Trainer } from "#field/trainer";
+import { ErSpeciesId } from "#enums/er-species-id";
+import { SpeciesId } from "#enums/species-id";
 import { PokemonMove } from "#moves/pokemon-move";
 import { sessionIdKey } from "#utils/common";
 import { getCookie } from "#utils/cookies";
@@ -82,6 +84,79 @@ const MAX_PARTY = 6;
 const LOCAL_STORE_CAP = 100;
 /** Prefetch this many waves ahead of the run's FIRST ghost wave (#364). */
 const PREFETCH_LEAD_WAVES = 15;
+/**
+ * A ghost team fielded at wave W may only come from a run that ended at most
+ * this many waves past W — no endgame teams crushing players at wave 87.
+ */
+export const ER_GHOST_WAVE_WINDOW = 20;
+
+// -----------------------------------------------------------------------------
+// Pool integrity — hacked/impossible teams must never reach other players.
+// -----------------------------------------------------------------------------
+/**
+ * Maintainer ban list: a snapshot containing ANY of these is excluded from the
+ * ghost pool (a player was found injecting impossible teams; cost checks can't
+ * distinguish hacks from legit mid-run catches, so these forms are banned
+ * outright). Standalone ER-custom species ids — covers members recorded as
+ * their own dex entry.
+ */
+const BANNED_GHOST_SPECIES_IDS: ReadonlySet<number> = new Set([
+  ErSpeciesId.ETERNATUS_ETERNAMAX,
+  ErSpeciesId.KARTANA_FALLEN,
+  ErSpeciesId.KECLEONG,
+  ErSpeciesId.VICTINI_PRIMAL,
+  ErSpeciesId.YVELTAL_MEGA,
+  ErSpeciesId.ZACIAN_CROWNED_SWORD,
+  ErSpeciesId.DIALGA_ORIGIN,
+  ErSpeciesId.PALKIA_ORIGIN,
+  ErSpeciesId.CASCOON_PRIMAL,
+  ErSpeciesId.CALYREX_SHADOW_RIDER,
+  ErSpeciesId.DARKRAI_NIGHTMARE,
+]);
+
+/**
+ * The same bans for members recorded as a FORM of a vanilla species (vanilla
+ * battle forms like Eternamax/Crowned/Origin, and ER-injected forms like
+ * Victini Primal / Mega Yveltal). Matched against the member's formKey.
+ */
+const BANNED_GHOST_FORMS: ReadonlyMap<number, RegExp> = new Map([
+  [SpeciesId.ETERNATUS, /eternamax/],
+  [SpeciesId.ZACIAN, /crowned/],
+  [SpeciesId.CALYREX, /shadow/],
+  [SpeciesId.DIALGA, /origin/],
+  [SpeciesId.PALKIA, /origin/],
+  [SpeciesId.YVELTAL, /mega/],
+  [SpeciesId.VICTINI, /primal/],
+  [SpeciesId.DARKRAI, /nightmare/],
+  [SpeciesId.KARTANA, /fallen/],
+  [SpeciesId.CASCOON, /primal/],
+]);
+
+function isBannedGhostMember(member: GhostMember): boolean {
+  if (BANNED_GHOST_SPECIES_IDS.has(member.speciesId)) {
+    return true;
+  }
+  const pattern = BANNED_GHOST_FORMS.get(member.speciesId);
+  if (!pattern) {
+    return false;
+  }
+  try {
+    const formKey = getPokemonSpecies(member.speciesId)?.forms?.[member.formIndex]?.formKey ?? "";
+    return pattern.test(formKey.toLowerCase());
+  } catch {
+    // Species data unavailable — keep the suspicious member out of the pool.
+    return true;
+  }
+}
+
+/** True when every member of the snapshot's party is pool-legal. */
+export function isErGhostTeamLegal(snapshot: GhostTeamSnapshot): boolean {
+  try {
+    return snapshot.party.every(m => !isBannedGhostMember(m));
+  } catch {
+    return false;
+  }
+}
 
 // -----------------------------------------------------------------------------
 // Env + local storage helpers.
@@ -383,10 +458,16 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
   prefetchStarted = true;
   // Pool floor = the earliest ghost wave; takeGhostForWave then assigns each
   // fetched team only to waves at/below how far that run actually reached.
+  // Over-fetch (2x, capped at the worker's 20/request) so the per-wave
+  // eligibility window (>= wave, <= wave + ER_GHOST_WAVE_WINDOW) still finds
+  // matches for the early ghost waves.
   const minWave = Math.min(...waves);
-  void fetchGhostTeams(getErDifficulty(), waves.length, minWave)
+  void fetchGhostTeams(getErDifficulty(), Math.min(20, waves.length * 2), minWave)
     .then(teams => {
-      prefetched = teams;
+      // Single choke point for pool integrity: hacked/banned teams are dropped
+      // here no matter which source (server pool / legacy endpoint / local)
+      // they came from.
+      prefetched = teams.filter(isErGhostTeamLegal);
     })
     .catch(() => {
       prefetched = [];
@@ -407,10 +488,20 @@ export function takeGhostForWave(waveIndex: number): GhostTeamSnapshot | null {
   }
   const pool = prefetched ?? [];
   // A run that ended at wave W can only be fielded at waves <= W (its team is
-  // only proven viable up to where it died). Prefer the shallowest still-eligible
-  // team so deeper teams stay available for later ghost waves.
+  // only proven viable up to where it died) AND at waves >= W - 20
+  // (ER_GHOST_WAVE_WINDOW: an endgame team must not appear at an early ghost
+  // wave where players aren't that strong yet). Prefer the shallowest
+  // still-eligible team so deeper teams stay available for later ghost waves.
+  // The ban filter runs again here as defense-in-depth (covers test-injected
+  // pools and any stale prefetch).
   const next = pool
-    .filter(s => !usedGhostIds.has(s.id) && s.waveReached >= waveIndex)
+    .filter(
+      s =>
+        !usedGhostIds.has(s.id)
+        && s.waveReached >= waveIndex
+        && s.waveReached <= waveIndex + ER_GHOST_WAVE_WINDOW
+        && isErGhostTeamLegal(s),
+    )
     .sort((a, b) => a.waveReached - b.waveReached)[0];
   if (!next) {
     return null;

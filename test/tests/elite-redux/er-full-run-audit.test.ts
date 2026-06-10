@@ -77,7 +77,10 @@ interface WaveRow {
   enemies: EnemyRow[];
 }
 
-/** Sturdy 3-mon stub teams for the ghost pool (waveReached 200 ⇒ any wave eligible). */
+/** Sturdy 3-mon stub teams for the ghost pool — one per ghost wave, each ending
+ * a few waves past its target wave so it sits inside the eligibility window
+ * (waveReached >= W and <= W + ER_GHOST_WAVE_WINDOW; an endgame waveReached:200
+ * team is deliberately NOT eligible at early ghost waves like 63/87). */
 const GHOST_STUB_MEMBER = (speciesId: number) => ({
   speciesId,
   formIndex: 0,
@@ -91,13 +94,13 @@ const GHOST_STUB_MEMBER = (speciesId: number) => ({
   passive: false,
   moves: [],
 });
-const makeGhostStubPool = (count: number) =>
-  Array.from({ length: count }, (_, i) => ({
+const makeGhostStubPool = (waves: readonly number[]) =>
+  waves.map((wave, i) => ({
     id: `audit-ghost-${i}`,
     trainerName: "AuditGhost",
     difficulty: "hell" as const,
-    waveReached: 200,
-    isVictory: true,
+    waveReached: wave + 10,
+    isVictory: false,
     timestamp: i,
     party: [
       GHOST_STUB_MEMBER(SpeciesId.GARCHOMP),
@@ -211,7 +214,7 @@ describe("ER complete per-mode run audit (invariant-checked)", () => {
       // Stub the cross-player pool so the ghost spawn path is exercised
       // deterministically (one team per scheduled ghost wave).
       setErDifficulty(difficulty);
-      setPrefetchedGhostTeamsForTests(makeGhostStubPool(ghostWavesForCurrentRun().length));
+      setPrefetchedGhostTeamsForTests(makeGhostStubPool(ghostWavesForCurrentRun()));
     }
     // biome-ignore lint/suspicious/noExplicitAny: harness seeding
     (globalScene as any).setSeed(seed);
