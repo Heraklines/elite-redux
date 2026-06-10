@@ -916,7 +916,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
       if (enemy) {
         const mod = erResistBerryModifierType(PokemonType.WATER).newModifier(enemy);
         if (mod) {
-          globalScene.addEnemyModifier(mod as PokemonHeldItemModifier, true, true);
+          // ignoreUpdate=false → the enemy item bar refreshes immediately, so
+          // the berry icon is visible from turn 1.
+          void globalScene.addEnemyModifier(mod as PokemonHeldItemModifier, false, true);
         }
       }
     },
@@ -954,7 +956,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
       if (enemy) {
         const mod = erWardStoneModifierType("greater").newModifier(enemy);
         if (mod) {
-          void globalScene.addEnemyModifier(mod as PokemonHeldItemModifier, true, true);
+          // ignoreUpdate=false → the stone (tinted cyan, charge counter) shows
+          // on the enemy item bar from turn 1.
+          void globalScene.addEnemyModifier(mod as PokemonHeldItemModifier, false, true);
         }
       }
     },

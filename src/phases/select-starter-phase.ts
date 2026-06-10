@@ -28,7 +28,10 @@ export class SelectStarterPhase extends Phase {
     const devStarters = consumePendingDevStarters();
     if (devStarters && devStarters.length > 0) {
       globalScene.sessionSlotId = DEV_SCENARIO_SLOT;
-      this.initBattle(devStarters);
+      // Dev scenarios hand-pick movesets for TESTING (e.g. Thunder Wave on a
+      // Blastoise) — skip the starter-legality validation that silently
+      // rejected them and left scenario mons with NO moves.
+      this.initBattle(devStarters, true);
       return;
     }
 
@@ -53,7 +56,7 @@ export class SelectStarterPhase extends Phase {
    * Initialize starters before starting the first battle
    * @param starters - Array of {@linkcode Starter}s with which to start the battle
    */
-  initBattle(starters: Starter[]) {
+  initBattle(starters: Starter[], ignoreMovesetValidation = false) {
     const party = globalScene.getPlayerParty();
     const loadPokemonAssets: Promise<void>[] = [];
     starters.forEach((starter: Starter, i: number) => {
@@ -87,7 +90,7 @@ export class SelectStarterPhase extends Phase {
         starter.nature,
       );
       if (starter.moveset) {
-        starterPokemon.tryPopulateMoveset(starter.moveset);
+        starterPokemon.tryPopulateMoveset(starter.moveset, ignoreMovesetValidation);
       }
       if (starter.passive) {
         starterPokemon.passive = true;
