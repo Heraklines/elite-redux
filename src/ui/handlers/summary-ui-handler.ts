@@ -573,7 +573,8 @@ export class SummaryUiHandler extends UiHandler {
     if (this.shinyIcon.visible) {
       let shinyDescriptor = "";
       if (doubleShiny || bigIconVariant) {
-        shinyDescriptor = " (" + getShinyDescriptor(bigIconVariant);
+        // ER Black Shinies (#349): the t4 tier reads "Black", not "Epic".
+        shinyDescriptor = " (" + (isErBlackShiny(this.pokemon) ? "Black" : getShinyDescriptor(bigIconVariant));
         if (doubleShiny) {
           shinyDescriptor += "/" + getShinyDescriptor(this.pokemon.fusionVariant);
         }

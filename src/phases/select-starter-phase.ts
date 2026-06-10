@@ -2,6 +2,7 @@ import { consumePendingDevStarters } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { Phase } from "#app/phase";
+import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
 
 /** Throwaway save slot used by dev test-scenarios so they don't clobber slot 0. */
 const DEV_SCENARIO_SLOT = 4;
@@ -91,6 +92,15 @@ export class SelectStarterPhase extends Phase {
       );
       if (starter.moveset) {
         starterPokemon.tryPopulateMoveset(starter.moveset, ignoreMovesetValidation);
+      }
+      // ER Black Shinies (#349): a starter chosen at the BLACK tier enters the
+      // run as a full t4 (epic base + gift kit). One per team is implicit:
+      // only one starter can be black since the unlock is per-line and the
+      // roll guard caps player teams at one anyway.
+      if (starter.erBlackShiny) {
+        starterPokemon.shiny = true;
+        starterPokemon.variant = 2;
+        applyErBlackShinyKit(starterPokemon);
       }
       if (starter.passive) {
         starterPokemon.passive = true;

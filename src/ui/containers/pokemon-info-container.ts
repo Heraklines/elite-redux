@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
 import { DexAttr } from "#enums/dex-attr";
@@ -354,11 +355,13 @@ export class PokemonInfoContainer extends Phaser.GameObjects.Container {
 
       this.pokemonShinyIcon.setTexture(`shiny_star${doubleShiny ? "_1" : ""}`);
       this.pokemonShinyIcon.setVisible(pokemon.isShiny());
-      this.pokemonShinyIcon.setTint(getVariantTint(baseVariant));
+      // ER Black Shinies (#349): the t4 sparkle is BLACK, not blue/red/gold.
+      this.pokemonShinyIcon.setTint(isErBlackShiny(pokemon) ? 0x0a0a0a : getVariantTint(baseVariant));
       if (this.pokemonShinyIcon.visible) {
         let shinyDescriptor = "";
         if (doubleShiny || baseVariant) {
-          shinyDescriptor = " (" + getShinyDescriptor(baseVariant);
+          // ER Black Shinies (#349): the t4 tier reads "Black", not "Epic".
+          shinyDescriptor = " (" + (isErBlackShiny(pokemon) ? "Black" : getShinyDescriptor(baseVariant));
           if (doubleShiny) {
             shinyDescriptor += "/" + getShinyDescriptor(pokemon.fusionVariant);
           }

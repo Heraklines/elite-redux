@@ -154,6 +154,8 @@ export interface StarterAttributes {
   favorite?: boolean | undefined;
   nickname?: string | undefined;
   tera?: PokemonType | undefined;
+  /** ER Black Shinies (#349): the t4 black tier is selected for this starter. */
+  erBlackShiny?: boolean | undefined;
 }
 
 export interface DexAttrProps {
@@ -177,6 +179,8 @@ export interface Starter {
   nickname?: string | undefined;
   teraType?: PokemonType | undefined;
   ivs: number[];
+  /** ER Black Shinies (#349): start this mon as a t4 black shiny. */
+  erBlackShiny?: boolean | undefined;
 }
 
 // TODO: What type of number does this store?

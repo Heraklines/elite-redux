@@ -31,7 +31,7 @@ import { getDailyMysteryEncounter } from "#data/daily-seed/daily-run";
 import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
-import { applyErBlackShinyInterimTint, applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
+import { promoteToErBlackShinyInBattle } from "#data/elite-redux/er-black-shinies";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
 import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
@@ -3775,11 +3775,7 @@ export class BattleScene extends SceneBase {
       // vanilla manual form change (Cascoon → Primal / Eternatus → Eternamax)
       // still runs.
       if (isErFinalBossSpecies(pokemon.species.speciesId) && getErDifficulty() === "hell") {
-        pokemon.shiny = true;
-        pokemon.variant = 2;
-        applyErBlackShinyKit(pokemon);
-        applyErBlackShinyInterimTint(pokemon);
-        void pokemon.updateInfo();
+        promoteToErBlackShinyInBattle(pokemon);
       } else {
         this.triggerPokemonFormChange(pokemon, SpeciesFormChangeManualTrigger, false);
       }

@@ -3010,8 +3010,25 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 // Cycle tint based on current sprite tint
                 const tint = getVariantTint(newVariant);
                 this.pokemonShinyIcon.setFrame(getVariantIcon(newVariant)).setTint(tint).setVisible(true);
+              } else if (
+                // ER Black Shinies (#349): after epic (variant 2), the cycle
+                // reaches the BLACK tier when this line has it unlocked.
+                props.variant === 2
+                && !starterAttributes.erBlackShiny
+                && this.getSpeciesData(this.lastSpecies.speciesId).starterDataEntry?.erBlackShiny
+              ) {
+                starterAttributes.erBlackShiny = true;
+                originalStarterAttributes.erBlackShiny = true;
+                globalScene.playSound("se/sparkle");
+                this.pokemonShinyIcon.setFrame(getVariantIcon(2)).setTint(0x0a0a0a).setVisible(true);
+                success = true;
               } else {
                 // If shiny, we update the variant
+                // ER (#349): leaving the BLACK tier resumes the normal cycle.
+                if (starterAttributes.erBlackShiny) {
+                  starterAttributes.erBlackShiny = false;
+                  originalStarterAttributes.erBlackShiny = false;
+                }
                 let newVariant = props.variant;
                 do {
                   newVariant = (newVariant + 1) % 3;
@@ -3370,6 +3387,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       nickname: this.starterPreferences[species.speciesId]?.nickname,
       teraType,
       ivs: dexEntry.ivs,
+      // ER Black Shinies (#349): t4 selected in the shiny cycle (requires the
+      // line's black unlock).
+      erBlackShiny:
+        !!this.starterPreferences[species.speciesId]?.erBlackShiny && !!starterDataEntry?.erBlackShiny && props.shiny,
     };
 
     this.starters.push(starter);

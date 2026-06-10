@@ -827,6 +827,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         globalScene.loadPokemonAtlas(playerBattleKey, this.getBattleSpriteAtlasPath(true, ignoreOverride));
       }
     }
+    // ER Black Shinies (#349): the t4 FRONT atlas lives under its own
+    // `-erblack` key, which the species-form loadAssets above (vanilla keys
+    // only) never queues. Without this an ENEMY black shiny (wild upgrade,
+    // hell finale, dev scenarios) keys to a texture that was never loaded and
+    // renders blank.
+    const erBlackFrontKey = this.getBattleSpriteKey(false, ignoreOverride);
+    if (erBlackFrontKey.endsWith("-erblack") && !globalScene.textures.exists(erBlackFrontKey)) {
+      globalScene.loadPokemonAtlas(erBlackFrontKey, this.getBattleSpriteAtlasPath(false, ignoreOverride));
+    }
     if (this.getFusionSpeciesForm()) {
       const { fusionFormIndex, fusionShiny, fusionVariant } = useIllusion ? illusion! : this;
       loadPromises.push(
@@ -888,8 +897,18 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // "Missing animation: pkmn__<id>". Rebuilding here closes that gap. It is
     // strictly gap-filling: guarded by `textures.exists` (never build frames for
     // an unloaded atlas) AND `!anims.exists` (never clobber an existing anim).
-    const battleSpriteKey = this.getBattleSpriteKey(this.isPlayer(), ignoreOverride);
-    if (globalScene.textures.exists(battleSpriteKey) && !globalScene.anims.exists(battleSpriteKey)) {
+    // ER Black Shinies (#349): also gap-fill the FRONT `-erblack` anim for
+    // PLAYER black shinies (summary screen / catch panel play the front key,
+    // which the back-keyed build below never covers).
+    const animKeys = new Set([this.getBattleSpriteKey(this.isPlayer(), ignoreOverride)]);
+    const erBlackFrontAnimKey = this.getBattleSpriteKey(false, ignoreOverride);
+    if (erBlackFrontAnimKey.endsWith("-erblack")) {
+      animKeys.add(erBlackFrontAnimKey);
+    }
+    for (const battleSpriteKey of animKeys) {
+      if (!globalScene.textures.exists(battleSpriteKey) || globalScene.anims.exists(battleSpriteKey)) {
+        continue;
+      }
       const originalWarn = console.warn;
       // Ignore warnings for missing frames, because there will be a lot
       console.warn = () => {};

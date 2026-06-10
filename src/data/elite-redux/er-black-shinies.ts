@@ -177,6 +177,42 @@ export function getErSharedGiftAbilityIdsFor(pokemon: Pokemon): number[] {
   return ids;
 }
 
+/**
+ * Promote a mon to black shiny MID-BATTLE (dev scenarios + the hell finale's
+ * stage 2). Setting the flags alone is not enough once the mon is already
+ * summoned: the sprite keys change to the `-erblack` black atlas, which was
+ * never loaded at summon time, so the sprite would go blank — and the
+ * nameplate shiny star / sparkle never refresh. This reloads assets under the
+ * new keys, re-plays the anim, re-inits the sparkle and updates the nameplate
+ * (the same recipe breakIllusion uses for its live re-key).
+ */
+export function promoteToErBlackShinyInBattle(pokemon: Pokemon): void {
+  pokemon.shiny = true;
+  pokemon.variant = 2;
+  applyErBlackShinyKit(pokemon);
+  try {
+    void pokemon
+      .loadAssets(false)
+      .then(() => {
+        pokemon.playAnim();
+        applyErBlackShinyInterimTint(pokemon);
+        if (pokemon.isOnField()) {
+          pokemon.initShinySparkle();
+          pokemon.sparkle();
+        }
+        return pokemon.updateInfo(true);
+      })
+      .catch(() => {
+        // Asset reload is best-effort: keep the promotion even if the black
+        // atlas fails to fetch (the base sprite + tint still shows).
+        applyErBlackShinyInterimTint(pokemon);
+        void pokemon.updateInfo(true);
+      });
+  } catch {
+    // Headless contexts have no loader/sprites.
+  }
+}
+
 /** Interim visual: obsidian-tint the battle sprites until real t4 assets land. */
 export function applyErBlackShinyInterimTint(pokemon: Pokemon): void {
   if (!isErBlackShiny(pokemon)) {

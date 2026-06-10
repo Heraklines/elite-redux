@@ -370,7 +370,8 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
 
     let shinyDescriptor = "";
     if (doubleShiny || baseVariant) {
-      shinyDescriptor = " (" + getShinyDescriptor(baseVariant);
+      // ER Black Shinies (#349): the t4 tier reads "Black", not "Epic".
+      shinyDescriptor = " (" + (isErBlackShiny(pokemon) ? "Black" : getShinyDescriptor(baseVariant));
       if (doubleShiny) {
         shinyDescriptor += "/" + getShinyDescriptor(pokemon.fusionVariant);
       }

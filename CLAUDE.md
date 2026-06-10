@@ -100,6 +100,10 @@ Nothing is overwritten, and captures are AUTO-TRIAGED by scenario:
   PASS/FAIL — <scenario> — <comment>`).
 Read these to see what testers verified / where something hung.
 
+## Writing rules (maintainer)
+- NEVER use an em dash in patch notes or any player-facing text. Use a
+  regular hyphen, a comma, or restructure the sentence.
+
 ## Deploy
 - Dev branch / remote: `feat/elite-redux-port` on remote `heraklines`
   (`Heraklines/elite-redux`). Commit + push there.

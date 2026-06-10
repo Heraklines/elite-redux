@@ -24,7 +24,7 @@
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
-import { applyErBlackShinyInterimTint, applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
+import { promoteToErBlackShinyInBattle } from "#data/elite-redux/er-black-shinies";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import { setErDifficulty, setErDifficulty as setErDifficultyForScenario } from "#data/elite-redux/er-run-difficulty";
@@ -991,11 +991,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     onBattleStart: () => {
       const enemy = globalScene.getEnemyPokemon();
       if (enemy) {
-        enemy.shiny = true;
-        enemy.variant = 2;
-        applyErBlackShinyKit(enemy);
-        applyErBlackShinyInterimTint(enemy);
-        void enemy.updateInfo();
+        promoteToErBlackShinyInBattle(enemy);
       }
       const balls = globalScene.pokeballCounts;
       balls[3] = Math.max(balls[3] ?? 0, 5); // Rogue Balls
@@ -1028,11 +1024,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     onBattleStart: () => {
       const player = globalScene.getPlayerPokemon();
       if (player) {
-        player.shiny = true;
-        player.variant = 2;
-        applyErBlackShinyKit(player);
-        applyErBlackShinyInterimTint(player);
-        void player.updateInfo();
+        promoteToErBlackShinyInBattle(player);
       }
     },
   },
@@ -1069,11 +1061,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
       const party = globalScene.getPlayerParty();
       const puff = party[0];
       if (puff) {
-        puff.shiny = true;
-        puff.variant = 2;
-        applyErBlackShinyKit(puff);
-        applyErBlackShinyInterimTint(puff);
-        void puff.updateInfo();
+        promoteToErBlackShinyInBattle(puff);
       }
     },
   },
