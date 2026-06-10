@@ -46,6 +46,7 @@ import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { ER_MEGA_STONE_NAME_BY_ITEM } from "#data/elite-redux/er-mega-stone-item-ids";
 import { maybeAssignErResistBerry } from "#data/elite-redux/er-resist-berries";
+import { maybeAssignErWardStone } from "#data/elite-redux/er-ward-stones";
 import { erDifficultyToRosterTier, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { type ErRosterTier, selectErRoster } from "#data/elite-redux/er-trainer-overlay";
 import { ER_ITEM_CONVERT_CHANCE, resolveErTrainerItem } from "#data/elite-redux/er-trainer-item-map";
@@ -731,6 +732,9 @@ export function applyErTrainerHeldItems(party: readonly EnemyPokemon[]): void {
     // trainer mon may hold ONE berry matching one of its weaknesses. These are
     // trainer-only drops; stealing them is how players obtain them.
     maybeAssignErResistBerry(enemy);
+    // ER (#358): per-mon Ward Stone roll (Hell 100+ / Elite 150+; bosses get
+    // the higher tiers; Primal Cascoon always carries a full Prime stone).
+    maybeAssignErWardStone(enemy);
   }
   for (const enemy of party) {
     const itemId = ER_ITEM_BY_POKEMON.get(enemy);

@@ -58,6 +58,13 @@ import { allAbilities, allMoves } from "#data/data-lists";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
 import { applyErResistBerry } from "#data/elite-redux/er-resist-berries";
 import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
+import {
+  applyErWardStoneBlock,
+  ER_WARD_BLOCKED_TAGS,
+  erWardStoneStatusLabel,
+  erWardStoneTagLabel,
+  findErWardStone,
+} from "#data/elite-redux/er-ward-stones";
 import { getLevelTotalExp } from "#data/exp";
 import {
   SpeciesFormChangeActiveTrigger,
@@ -2926,13 +2933,19 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     /** Holds whether the pokemon is trapped due to an ability */
     const trapped = new BooleanHolder(false);
-    for (const opponent of inSpeedOrder(this.isPlayer() ? ArenaTagSide.ENEMY : ArenaTagSide.PLAYER)) {
-      if (opponent.switchOutStatus === false) {
-        applyAbAttrs(
-          "CheckTrappedAbAttr",
-          { pokemon: opponent, trapped, opponent: this, simulated },
-          trappedAbMessages,
-        );
+    // ER Ward Stones (#358): merely HOLDING a stone makes the bearer immune to
+    // ability-based trapping (Shadow Tag / Arena Trap / Magnet Pull style) —
+    // this one case costs NO charge (maintainer spec). Trapping from moves,
+    // tags or Fairy Lock still applies below.
+    if (!findErWardStone(this)) {
+      for (const opponent of inSpeedOrder(this.isPlayer() ? ArenaTagSide.ENEMY : ArenaTagSide.PLAYER)) {
+        if (opponent.switchOutStatus === false) {
+          applyAbAttrs(
+            "CheckTrappedAbAttr",
+            { pokemon: opponent, trapped, opponent: this, simulated },
+            trappedAbMessages,
+          );
+        }
       }
     }
 
@@ -5019,6 +5032,16 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return false;
     }
 
+    // ER Ward Stones (#358): block external CC tags (flinch / confusion /
+    // infatuation / the ER statuses) before they attach, one charge per block.
+    if (
+      ER_WARD_BLOCKED_TAGS.has(tagType)
+      && sourceId !== this.id
+      && applyErWardStoneBlock(this, erWardStoneTagLabel(tagType))
+    ) {
+      return false;
+    }
+
     const newTag = getBattlerTag(tagType, turnCount, sourceMove!, sourceId!); // TODO: are the bangs correct?
 
     // TODO: Just call canAddTag() here? Can possibly overload it to accept an actual tag instead of just a type
@@ -5887,6 +5910,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return false;
     }
     if (this.isFainted() && effect !== StatusEffect.FAINT) {
+      return false;
+    }
+
+    // ER Ward Stones (#358): a charged stone instantly blocks any EXTERNALLY
+    // inflicted status before it lands (not retroactive like a Lum Berry).
+    // Self-inflicted statuses (Rest, recoil statuses) are exempt.
+    if (
+      effect !== StatusEffect.FAINT
+      && sourcePokemon !== this
+      && applyErWardStoneBlock(this, erWardStoneStatusLabel(effect))
+    ) {
       return false;
     }
 

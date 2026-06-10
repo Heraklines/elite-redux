@@ -1,6 +1,7 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
+import { advanceErWardStoneCharges } from "#data/elite-redux/er-ward-stones";
 import { LapsingPersistentModifier, LapsingPokemonHeldItemModifier } from "#modifiers/modifier";
 import { BattlePhase } from "#phases/battle-phase";
 
@@ -42,6 +43,8 @@ export class BattleEndPhase extends BattlePhase {
       // ER money streak (#348): a won wave extends every non-fainted party
       // mon's faint-free streak (+1% money per 3 waves, capped +10%/mon).
       advanceErMoneyStreaks();
+      // ER Ward Stones (#358): player-held stones charge up over won waves.
+      advanceErWardStoneCharges();
     }
 
     // Endless graceful end

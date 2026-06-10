@@ -111,6 +111,11 @@ export interface SessionSaveData {
    * from the vanilla modifier registry. Optional for backwards compatibility.
    */
   erResistBerries?: [number, number][];
+  /**
+   * ER (#358): the player's Ward Stones ([pokemonId, tierIndex, charges,
+   * waveProgress]) — same side-channel rationale as erResistBerries.
+   */
+  erWardStones?: [number, number, number, number][];
 }
 
 export interface Unlocks {

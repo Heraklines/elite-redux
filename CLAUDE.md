@@ -20,6 +20,10 @@ This is mandatory, not optional. Do it as part of the fix, in the same batch.
   guaranteed in the FIRST shop after the opening battle (e.g.
   `modifierTypes.RARE_CANDY` to evolve a mon, or `modifierTypes.FORM_CHANGE_ITEM`
   which, with a single-mon party, resolves to that mon's mega stone).
+- **ALWAYS give every party mon an explicit `moveset` in `makeStarter`** (4
+  sensible moves incl. whatever the scenario needs). Maintainer rule — starters
+  without one spawn with whatever default moves rolled, which makes scenarios
+  awkward to test. No memberless movesets, ever.
 - **Also** keep adding the vitest regression test under `test/tests/elite-redux/`
   when the behavior is unit-testable — the two are complementary (CI gate +
   human in-game check).

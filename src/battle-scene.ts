@@ -35,6 +35,7 @@ import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#
 import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
 import { chromaKeyErSpriteTexture } from "#data/elite-redux/er-sprite-chroma-key";
 import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
+import { ErWardStoneModifier } from "#data/elite-redux/er-ward-stones";
 import type { SpeciesFormChangeTrigger } from "#data/form-change-triggers";
 import { SpeciesFormChangeManualTrigger, SpeciesFormChangeTimeOfDayTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
@@ -3097,6 +3098,11 @@ export class BattleScene extends SceneBase {
 
     const newItemModifier = itemModifier.clone() as PokemonHeldItemModifier;
     newItemModifier.pokemonId = target.id;
+    // ER Ward Stones (#358): a stone stolen ONTO a player's mon arrives EMPTY
+    // and must recharge over won waves (10 Minor / 15 Greater per the spec).
+    if (newItemModifier instanceof ErWardStoneModifier && target.isPlayer() && source?.isEnemy()) {
+      newItemModifier.drainCharges();
+    }
     const matchingModifier = this.findModifier(
       m => m instanceof PokemonHeldItemModifier && m.matchType(itemModifier) && m.pokemonId === target.id,
       target.isPlayer(),

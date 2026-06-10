@@ -20,6 +20,7 @@ import { getErResistBerryEntries, restoreErResistBerries } from "#data/elite-red
 import { getErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ER_CANDY_GAIN_MULTIPLIER, getRunCandyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import { getErUsedTrainerKeys, restoreErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
+import { getErWardStoneEntries, restoreErWardStones } from "#data/elite-redux/er-ward-stones";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { loadPositionalTag } from "#data/positional-tags/load-positional-tag";
@@ -1162,6 +1163,8 @@ export class GameData {
       // ER (#357): persist the player's stolen resist berries (runtime ER
       // modifier types are dropped by the vanilla modifier registry on load).
       erResistBerries: getErResistBerryEntries(),
+      // ER (#358): persist the player's Ward Stones incl. charge state.
+      erWardStones: getErWardStoneEntries(),
     } as SessionSaveData;
   }
 
@@ -1396,6 +1399,8 @@ export class GameData {
     // modifier type isn't in the vanilla registry, so the loop above dropped
     // them; the session's side-channel field restores them.
     restoreErResistBerries(fromSession.erResistBerries);
+    // ER (#358): same for Ward Stones (incl. charges / recharge progress).
+    restoreErWardStones(fromSession.erWardStones);
 
     for (const enemyModifierData of fromSession.enemyModifiers) {
       const modifier = enemyModifierData.toModifier(Modifier[enemyModifierData.className]);

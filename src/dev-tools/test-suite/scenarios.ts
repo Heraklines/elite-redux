@@ -27,6 +27,7 @@ import { modifierTypes } from "#data/data-lists";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
 import { AbilityId } from "#enums/ability-id";
 import { BerryType } from "#enums/berry-type";
 import { ErAbilityId } from "#enums/er-ability-id";
@@ -290,7 +291,14 @@ export const DEV_SCENARIOS: DevScenario[] = [
         ENEMY_LEVEL_OVERRIDE: 5,
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
       });
-      return [makeStarter(SpeciesId.GARCHOMP), makeStarter(SpeciesId.LUCARIO)];
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.SWORDS_DANCE, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.LUCARIO, {
+          moveset: [MoveId.CLOSE_COMBAT, MoveId.FLASH_CANNON, MoveId.SWORDS_DANCE, MoveId.EXTREME_SPEED],
+        }),
+      ];
     },
     onBattleStart: () => {
       // Pre-charge the party to max streak so the ribbon + payout are testable.
@@ -394,7 +402,17 @@ export const DEV_SCENARIOS: DevScenario[] = [
         STARTING_LEVEL_OVERRIDE: 95,
         STARTING_WAVE_OVERRIDE: 195,
       });
-      return [makeStarter(SpeciesId.GARCHOMP), makeStarter(SpeciesId.METAGROSS), makeStarter(SpeciesId.MILOTIC)];
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.METAGROSS, {
+          moveset: [MoveId.METEOR_MASH, MoveId.ZEN_HEADBUTT, MoveId.BULLET_PUNCH, MoveId.EARTHQUAKE],
+        }),
+        makeStarter(SpeciesId.MILOTIC, {
+          moveset: [MoveId.SURF, MoveId.ICE_BEAM, MoveId.RECOVER, MoveId.PROTECT],
+        }),
+      ];
     },
   },
   {
@@ -461,7 +479,11 @@ export const DEV_SCENARIOS: DevScenario[] = [
         ENEMY_LEVEL_OVERRIDE: 50,
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
       });
-      return [makeStarter(SpeciesId.GARCHOMP)];
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.FIRE_BLAST, MoveId.STONE_EDGE],
+        }),
+      ];
     },
   },
   {
@@ -769,7 +791,12 @@ export const DEV_SCENARIOS: DevScenario[] = [
         STARTING_WAVE_OVERRIDE: 5,
         STARTER_FORM_OVERRIDES: { [SpeciesId.CALYREX]: form },
       });
-      return [makeStarter(SpeciesId.CALYREX, { formIndex: form })];
+      return [
+        makeStarter(SpeciesId.CALYREX, {
+          formIndex: form,
+          moveset: [MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.CALM_MIND, MoveId.PROTECT],
+        }),
+      ];
     },
   },
   {
@@ -832,11 +859,21 @@ export const DEV_SCENARIOS: DevScenario[] = [
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
       });
       return [
-        makeStarter(SpeciesId.VENUSAUR),
-        makeStarter(SpeciesId.GYARADOS),
-        makeStarter(SpeciesId.LUCARIO),
-        makeStarter(SpeciesId.GALAR_SLOWBRO),
-        makeStarter(SpeciesId.HISUI_ARCANINE),
+        makeStarter(SpeciesId.VENUSAUR, {
+          moveset: [MoveId.SLUDGE_BOMB, MoveId.GIGA_DRAIN, MoveId.GROWTH, MoveId.SYNTHESIS],
+        }),
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.WATERFALL, MoveId.CRUNCH, MoveId.DRAGON_DANCE, MoveId.ICE_FANG],
+        }),
+        makeStarter(SpeciesId.LUCARIO, {
+          moveset: [MoveId.CLOSE_COMBAT, MoveId.FLASH_CANNON, MoveId.SWORDS_DANCE, MoveId.EXTREME_SPEED],
+        }),
+        makeStarter(SpeciesId.GALAR_SLOWBRO, {
+          moveset: [MoveId.PSYCHIC, MoveId.SURF, MoveId.CALM_MIND, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.HISUI_ARCANINE, {
+          moveset: [MoveId.FLARE_BLITZ, MoveId.ROCK_SLIDE, MoveId.EXTREME_SPEED, MoveId.CRUNCH],
+        }),
       ];
     },
     shopItems: [
@@ -885,6 +922,44 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Ward Stones (#358)",
+    description:
+      "#358 Ward Stones — charge-based CC blockers (legendary resistance).\n"
+      + "Enemy Snorlax holds a GREATER WARD STONE (2 charges, cyan stone icon).\n"
+      + "DO: 1) Use THUNDER WAVE twice — EXPECT both BLOCKED ('…Ward Stone\n"
+      + "blocked the paralysis!') and the icon's charge number dropping 2->1->0.\n"
+      + "2) A third Thunder Wave lands (stone empty). 3) Confuse Ray while it\n"
+      + "still has charges is also blocked. 4) Restart and THIEF it — EXPECT the\n"
+      + "stolen stone arrives at 0 charges (it refills after 15 won waves).\n"
+      + "Bonus: holding ANY stone makes you immune to Shadow-Tag-style trapping\n"
+      + "at no charge cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.BLASTOISE, {
+          moveset: [MoveId.THUNDER_WAVE, MoveId.CONFUSE_RAY, MoveId.THIEF, MoveId.SURF],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      // Guarantee the stone (real rolls: Hell wave 100+ / Elite 150+).
+      const enemy = globalScene.getEnemyPokemon();
+      if (enemy) {
+        const mod = erWardStoneModifierType("greater").newModifier(enemy);
+        if (mod) {
+          void globalScene.addEnemyModifier(mod as PokemonHeldItemModifier, true, true);
+        }
+      }
+    },
+  },
+  {
     label: "Redux sprites (party)",
     description:
       "Redux form sprites/icons.\n"
@@ -894,8 +969,14 @@ export const DEV_SCENARIOS: DevScenario[] = [
       resetDevOverrides();
       setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 5 });
       return [
-        makeStarter(SpeciesId.BELLSPROUT, { formIndex: formIndexByKey(SpeciesId.BELLSPROUT, "redux") }),
-        makeStarter(SpeciesId.BOUNSWEET, { formIndex: formIndexByKey(SpeciesId.BOUNSWEET, "redux") }),
+        makeStarter(SpeciesId.BELLSPROUT, {
+          formIndex: formIndexByKey(SpeciesId.BELLSPROUT, "redux"),
+          moveset: [MoveId.VINE_WHIP, MoveId.RAZOR_LEAF, MoveId.GROWTH, MoveId.SLEEP_POWDER],
+        }),
+        makeStarter(SpeciesId.BOUNSWEET, {
+          formIndex: formIndexByKey(SpeciesId.BOUNSWEET, "redux"),
+          moveset: [MoveId.MAGICAL_LEAF, MoveId.PLAY_ROUGH, MoveId.SWEET_SCENT, MoveId.PROTECT],
+        }),
       ];
     },
   },
