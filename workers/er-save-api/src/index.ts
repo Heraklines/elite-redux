@@ -292,10 +292,18 @@ async function handleAccountInfo(auth: TokenPayload, env: Env, cors: Record<stri
   if (!user) {
     return text("Account not found.", 404, cors);
   }
-  const slotRow = await env.DB.prepare("SELECT MAX(slot) AS maxSlot FROM session_saves WHERE user_id = ?")
+  // lastSessionSlot = the MOST RECENTLY SAVED slot (rogueserver semantics).
+  // The old MAX(slot) pointed Continue at the highest-numbered slot forever:
+  // a player actively saving into slot 0 with any stale run sitting in slot 4
+  // got slot 4 back on every page load — Continue resumed the OLD run, the
+  // game then autosaved into that old slot, and the player's real run looked
+  // like it "stopped saving".
+  const slotRow = await env.DB.prepare(
+    "SELECT slot FROM session_saves WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1",
+  )
     .bind(auth.uid)
-    .first<{ maxSlot: number | null }>();
-  const lastSessionSlot = slotRow?.maxSlot ?? -1;
+    .first<{ slot: number | null }>();
+  const lastSessionSlot = slotRow?.slot ?? -1;
   return json(
     {
       username: user.username,
