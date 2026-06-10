@@ -64,10 +64,10 @@ export class CustomPokemonData {
   public hitsRecCount: number | null = null;
   /**
    * ER Black Shiny (#349). When `true` this mon is the t4 ultra-rare tier:
-   * its innate slots were re-rolled from the curated pool (stored in
-   * passive/passive2/passive3 above) and it carries a 5th "gift" slot —
-   * `erGiftAbilities` holds the 3 switchable choices, `erGiftIndex` the
-   * active one (shared with on-field allies).
+   * its normal ability + innates are untouched, but it carries the GIFT — a
+   * 5th ability slot. `erGiftAbilities` holds the 3 switchable pool choices,
+   * `erGiftIndex` the active one (shared with on-field allies). The Ability
+   * Randomizer can never touch the gift.
    */
   public erBlackShiny = false;
   public erGiftAbilities: number[] = [];

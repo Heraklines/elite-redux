@@ -7,6 +7,7 @@ import { handleTutorial, Tutorial } from "#app/tutorial";
 import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
+import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { getNatureName } from "#data/nature";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
@@ -165,8 +166,13 @@ export class EncounterPhase extends BattlePhase {
       }
 
       if (battle.isClassicFinalBoss && isErFinalBossSpecies(enemyPokemon.species.speciesId)) {
-        // Elite Redux final boss (Cascoon → Primal): set up phase-1 boss segments
-        // the same way the vanilla Eternatus final boss does.
+        // Elite Redux final boss: set up phase-1 boss segments the same way
+        // the vanilla Eternatus final boss does. On HELL the fight STARTS as
+        // PRIMAL Cascoon (form 1) — stage 2 is its Black Shiny form (#349).
+        if (getErDifficulty() === "hell") {
+          enemyPokemon.formIndex = 1;
+          enemyPokemon.updateScale();
+        }
         enemyPokemon.setBoss();
       } else if (enemyPokemon.species.speciesId === SpeciesId.ETERNATUS) {
         if (battle.isClassicFinalBoss) {

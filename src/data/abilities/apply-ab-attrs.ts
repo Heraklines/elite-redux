@@ -172,12 +172,14 @@ function applyAbAttrsInternal<T extends CallableAbAttrString>(
   // with level so wave-1 encounters don't punch above their weight with all
   // 3 innates active. Player passives stay gated by candy unlock as designed.
   const enemySlotLimit = getEnemyPassiveSlotLimit(params.pokemon);
-  for (let slot = 0; slot < 3; slot++) {
-    if (slot >= enemySlotLimit) {
+  // ER Black Shinies (#349): slots >= 3 are GIFT slots (own + shared ally
+  // gift) — they ignore the enemy level slot limit and candy gates.
+  for (let slot = 0; slot < passiveAbilities.length; slot++) {
+    if (slot < 3 && slot >= enemySlotLimit) {
       continue;
     }
     const slotAbility = passiveAbilities[slot];
-    if (slotAbility === null || seenIds.has(slotAbility.id)) {
+    if (slotAbility == null || seenIds.has(slotAbility.id)) {
       continue;
     }
     seenIds.add(slotAbility.id);
@@ -222,12 +224,13 @@ export function applyPostSummonPassiveAbAttrs(pokemon: AbAttrBaseParams["pokemon
   seenIds.add(pokemon.getAbility().id);
   const passiveAbilities = pokemon.getPassiveAbilities();
   const enemySlotLimit = getEnemyPassiveSlotLimit(pokemon);
-  for (let slot = 0; slot < 3; slot++) {
-    if (slot >= enemySlotLimit) {
+  // ER Black Shinies (#349): GIFT slots (>= 3) ignore the enemy level limit.
+  for (let slot = 0; slot < passiveAbilities.length; slot++) {
+    if (slot < 3 && slot >= enemySlotLimit) {
       continue;
     }
     const slotAbility = passiveAbilities[slot];
-    if (slotAbility === null || seenIds.has(slotAbility.id)) {
+    if (slotAbility == null || seenIds.has(slotAbility.id)) {
       continue;
     }
     seenIds.add(slotAbility.id);

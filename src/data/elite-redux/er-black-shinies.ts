@@ -9,13 +9,12 @@
 //
 // Maintainer spec (June 10):
 //  - Base chance = 1/50 of a RED (epic, variant 2) shiny — hatch 1k-10k eggs.
-//  - A black shiny's 3 INNATE slots are re-rolled from the curated ability
-//    pool (approved June 10: CORE + BORDERLINE), via the same persistent
-//    per-slot overrides the Ability Randomizer uses.
-//  - It also gains a 5th "GIFT" ability slot: 3 pool choices the player can
-//    switch between; the ACTIVE choice is shared with allies on the field
-//    (black shiny Jigglypuff runs Lead Coat → its double-battle partner has
-//    Lead Coat too while both are out).
+//  - Normal ability + the 3 innates stay UNTOUCHED. The black bonus is the
+//    GIFT: a 5th ability slot with 3 choices rolled from the curated pool
+//    (approved June 10: CORE + BORDERLINE) that the player switches between;
+//    the ACTIVE choice is shared with allies on the field (black shiny
+//    Jigglypuff runs Lead Coat → its double-battle partner has Lead Coat too
+//    while both are out). The Ability Randomizer can NEVER touch the gift.
 //  - Max ONE black shiny per player team — your signature Pokémon.
 //  - Visuals: "Ultra Segmented Black Shiny" sprites + smoke halo (see
 //    docs/design/black-shiny-sprite-pipeline.md) — generated assets land in
@@ -31,6 +30,7 @@ import {
   ER_BLACK_SHINY_POOL_BORDERLINE,
   ER_BLACK_SHINY_POOL_CORE,
 } from "#data/elite-redux/er-black-shiny-gift-pool";
+import { erBlackSpritePath } from "#data/elite-redux/er-black-sprite-manifest";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import type { Pokemon } from "#field/pokemon";
 import { randSeedInt } from "#utils/common";
@@ -83,9 +83,9 @@ function drawDistinctFromPool(count: number, exclude: ReadonlySet<number> = new 
 }
 
 /**
- * Turn `pokemon` into a black shiny: re-roll its 3 innate slots from the pool
- * (persistent per-slot overrides) and roll its 3 gift choices (disjoint from
- * the innates). Idempotent.
+ * Turn `pokemon` into a black shiny: roll its GIFT — 3 distinct pool choices
+ * for the 5th ability slot. Normal ability + innates are untouched.
+ * Idempotent.
  */
 export function applyErBlackShinyKit(pokemon: Pokemon): void {
   const data = pokemon.customPokemonData;
@@ -93,13 +93,10 @@ export function applyErBlackShinyKit(pokemon: Pokemon): void {
     return;
   }
   data.erBlackShiny = true;
-  const innates = drawDistinctFromPool(3);
-  // Same persistent slot-override channel the ER Ability Randomizer uses —
-  // battle application + every ability screen already understand it.
-  data.passive = innates[0] ?? -1;
-  data.passive2 = innates[1] ?? -1;
-  data.passive3 = innates[2] ?? -1;
-  data.erGiftAbilities = drawDistinctFromPool(3, new Set(innates));
+  // The mon's normal ability and its 3 innates stay UNTOUCHED (maintainer
+  // correction, June 10). The black bonus is ONLY the GIFT: a 5th ability
+  // slot with 3 random pool choices the player switches between.
+  data.erGiftAbilities = drawDistinctFromPool(3);
   data.erGiftIndex = 0;
 }
 
@@ -183,6 +180,10 @@ export function getErSharedGiftAbilityIdsFor(pokemon: Pokemon): number[] {
 /** Interim visual: obsidian-tint the battle sprites until real t4 assets land. */
 export function applyErBlackShinyInterimTint(pokemon: Pokemon): void {
   if (!isErBlackShiny(pokemon)) {
+    return;
+  }
+  // The generated t4 atlas is already black — never tint on top of it.
+  if (pokemon.formIndex === 0 && erBlackSpritePath(pokemon.species.speciesId, false)) {
     return;
   }
   try {

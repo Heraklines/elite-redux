@@ -56,7 +56,12 @@ import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/dai
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
-import { getErSharedGiftAbilityIdsFor, maybeUpgradeToErBlackShiny } from "#data/elite-redux/er-black-shinies";
+import {
+  getErSharedGiftAbilityIdsFor,
+  isErBlackShiny,
+  maybeUpgradeToErBlackShiny,
+} from "#data/elite-redux/er-black-shinies";
+import { erBlackSpritePath } from "#data/elite-redux/er-black-sprite-manifest";
 import { applyErResistBerry } from "#data/elite-redux/er-resist-berries";
 import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import {
@@ -996,6 +1001,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // vs path `elite-redux/{slug}/front`), so the old id→path string-replace
     // produced a wrong path (`er/{slug}`) and 404'd. The override is authoritative.
     const formIndex = this.summonData.illusion?.formIndex ?? this.formIndex;
+    // ER Black Shinies (#349): use the generated t4 atlas when it exists
+    // (base form only — forms fall back to the interim tint).
+    if (isErBlackShiny(this) && formIndex === 0) {
+      const black = erBlackSpritePath(this.species.speciesId, false);
+      if (black) {
+        return black;
+      }
+    }
     return this.getSpeciesForm(ignoreOverride, true).getSpriteAtlasPath(
       this.getGender(ignoreOverride, true) === Gender.FEMALE,
       formIndex,
@@ -1013,6 +1026,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // instead of the bogus `back/er/{slug}` the id→path replace produced (which
     // 404'd → missing player back sprite → battle softlock).
     const formIndex = this.summonData.illusion?.formIndex ?? this.formIndex;
+    // ER Black Shinies (#349): generated t4 atlas (front or back) when present.
+    if (isErBlackShiny(this) && formIndex === 0) {
+      const black = erBlackSpritePath(this.species.speciesId, !!back);
+      if (black) {
+        return black;
+      }
+    }
     return this.getSpeciesForm(ignoreOverride, true).getSpriteAtlasPath(
       this.getGender(ignoreOverride, true) === Gender.FEMALE,
       formIndex,
@@ -1049,16 +1069,29 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   getSpriteKey(ignoreOverride?: boolean): string {
-    return this.getSpeciesForm(ignoreOverride, false).getSpriteKey(
+    const base = this.getSpeciesForm(ignoreOverride, false).getSpriteKey(
       this.getGender(ignoreOverride) === Gender.FEMALE,
       this.formIndex,
       this.isShiny(false),
       this.getVariant(false),
     );
+    // ER Black Shinies (#349): distinct texture key for the t4 atlas.
+    if (isErBlackShiny(this) && this.formIndex === 0 && erBlackSpritePath(this.species.speciesId, false)) {
+      return `${base}-erblack`;
+    }
+    return base;
   }
 
   getBattleSpriteKey(back?: boolean, ignoreOverride?: boolean): string {
-    return `pkmn__${this.getBattleSpriteId(back, ignoreOverride)}`;
+    const base = `pkmn__${this.getBattleSpriteId(back, ignoreOverride)}`;
+    if (back === undefined) {
+      back = this.isPlayer();
+    }
+    // ER Black Shinies (#349): distinct texture key for the t4 atlas.
+    if (isErBlackShiny(this) && this.formIndex === 0 && erBlackSpritePath(this.species.speciesId, !!back)) {
+      return `${base}-erblack`;
+    }
+    return base;
   }
 
   getFusionSpriteId(ignoreOverride?: boolean): string {
@@ -2395,7 +2428,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    */
   public getAbilitySlots(): { slot: number; ability: Ability }[] {
     const slots: { slot: number; ability: Ability }[] = [{ slot: 0, ability: this.getAbility() }];
-    const passives = this.getPassiveAbilities();
+    // Only the 3 real innate slots are selectable — the ER Black Shiny GIFT
+    // (appended past index 2 by getPassiveAbilities) must NEVER be targetable
+    // by the Ability Randomizer (maintainer rule, #349).
+    const passives = this.getPassiveAbilities().slice(0, 3);
     for (let i = 0; i < passives.length; i++) {
       const ability = passives[i];
       if (ability != null && ability.id !== AbilityId.NONE) {
@@ -2501,12 +2537,16 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     const passives = this.getPassiveAbilities();
     const slotLimit = getEnemyPassiveSlotLimit(this);
-    for (let slot = 0; slot < 3 && slot < slotLimit; slot++) {
-      const pa = passives[slot as 0 | 1 | 2];
+    for (let slot = 0; slot < passives.length; slot++) {
+      // ER Black Shinies (#349): GIFT slots (>= 3) ignore the enemy level limit.
+      if (slot < 3 && slot >= slotLimit) {
+        continue;
+      }
+      const pa = passives[slot];
       if (!pa || seen.has(pa.id)) {
         continue;
       }
-      if (!canApply || this.canApplyAbility(true, slot as 0 | 1 | 2)) {
+      if (!canApply || this.canApplyAbility(true, slot)) {
         abilityAttrs.push(...pa.getAttrs(attrType));
         seen.add(pa.id);
       }
@@ -2585,6 +2625,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns `true` if the Pokemon has a passive
    */
   public hasPassive(): boolean {
+    // ER Black Shinies (#349): the GIFT slot is always active, regardless of
+    // candy unlocks — a black shiny always "has a passive", and so does an
+    // ally currently RECEIVING a shared gift on the field.
+    if (this.customPokemonData?.erBlackShiny || getErSharedGiftAbilityIdsFor(this).length > 0) {
+      return true;
+    }
     // returns override if valid for current case
     // TODO: This can be simplified greatly with minimal effort via ternaries
     if (
@@ -2682,7 +2728,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    *   the requested passive slot is empty (so the dispatcher in
    *   {@linkcode applySingleAbAttrs} short-circuits without falling back to slot 0).
    */
-  public canApplyAbility(passive = false, passiveSlot: 0 | 1 | 2 = 0): boolean {
+  public canApplyAbility(passive = false, passiveSlot = 0): boolean {
     // ER 3-passive: resolve the candidate ability first (before the unlock gates
     // below) so we can special-case form-change-driving innates. We avoid falling
     // back to `this.getAbility()` for an empty passive slot because that would
@@ -2696,19 +2742,23 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // by ER into an innate slot) are species identity and must never be gated
     // behind the candy passive unlock — see {@linkcode abilityDrivesFormChange}.
     const drivesFormChange = passive && this.abilityDrivesFormChange(ability);
-    if (passive && !this.hasPassive() && !drivesFormChange) {
+    // ER Black Shinies (#349): the GIFT slot (>= 3) is exempt from hasPassive
+    // and from candy unlock gates — it is always live (suppression below still
+    // applies, so Neutralizing Gas / ER Frisk affect it like any ability).
+    const isGiftSlot = passive && passiveSlot >= 3;
+    if (passive && !isGiftSlot && !this.hasPassive() && !drivesFormChange) {
       return false;
     }
     // ER 3-passive model: gate each innate slot individually for the player by its
     // candy unlock + enable state. Skipped when a passive override forces passives
     // on (tests/dev) or the slot drives a form change. Enemy slot gating is by
     // level, applied in applyAbAttrsInternal.
-    if (passive && this.isPlayer() && !drivesFormChange) {
+    if (passive && !isGiftSlot && this.isPlayer() && !drivesFormChange) {
       const overridden =
         Overrides.HAS_PASSIVE_ABILITY_OVERRIDE === true || Overrides.PASSIVE_ABILITY_OVERRIDE !== AbilityId.NONE;
       if (!overridden) {
         const passiveAttr = globalScene.gameData.starterData[this.species.getRootSpeciesId()]?.passiveAttr ?? 0;
-        if (!isSlotActive(passiveAttr, passiveSlot)) {
+        if (!isSlotActive(passiveAttr, passiveSlot as 0 | 1 | 2)) {
           return false;
         }
       }
@@ -2772,9 +2822,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
     const passives = this.getPassiveAbilities();
     const slotLimit = getEnemyPassiveSlotLimit(this);
-    for (let slot = 0; slot < 3 && slot < slotLimit; slot++) {
-      const pa = passives[slot as 0 | 1 | 2];
-      if (pa?.id === ability && (!canApply || this.canApplyAbility(true, slot as 0 | 1 | 2))) {
+    for (let slot = 0; slot < passives.length; slot++) {
+      // ER Black Shinies (#349): GIFT slots (>= 3) ignore the enemy slot limit.
+      if (slot < 3 && slot >= slotLimit) {
+        continue;
+      }
+      const pa = passives[slot];
+      if (pa?.id === ability && (!canApply || this.canApplyAbility(true, slot))) {
         return true;
       }
     }
@@ -2845,9 +2899,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
     const passives = this.getPassiveAbilities();
     const slotLimit = getEnemyPassiveSlotLimit(this);
-    for (let slot = 0; slot < 3 && slot < slotLimit; slot++) {
-      const pa = passives[slot as 0 | 1 | 2];
-      if (pa?.hasAttr(attrType) && (!canApply || this.canApplyAbility(true, slot as 0 | 1 | 2))) {
+    for (let slot = 0; slot < passives.length; slot++) {
+      // ER Black Shinies (#349): GIFT slots (>= 3) ignore the enemy slot limit.
+      if (slot < 3 && slot >= slotLimit) {
+        continue;
+      }
+      const pa = passives[slot];
+      if (pa?.hasAttr(attrType) && (!canApply || this.canApplyAbility(true, slot))) {
         return true;
       }
     }

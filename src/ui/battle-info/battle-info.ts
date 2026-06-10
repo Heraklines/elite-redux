@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getTypeRgb } from "#data/type";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -356,7 +357,8 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
     this.shinyIcon
       .setTexture(`shiny_star${doubleShiny ? "_1" : ""}`)
       .setVisible(pokemon.isShiny())
-      .setTint(getVariantTint(baseVariant));
+      // ER Black Shinies (#349): the t4 sparkle is BLACK, not blue/red/gold.
+      .setTint(isErBlackShiny(pokemon) ? 0x0a0a0a : getVariantTint(baseVariant));
 
     this.shinyIcon
       .on("pointerover", () => globalScene.ui.showTooltip("", i18next.t("common:shinyOnHover") + shinyDescriptor))

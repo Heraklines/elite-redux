@@ -54,28 +54,55 @@ describe.skipIf(!RUN)("ER Black Shinies (#349)", () => {
       expect(new Set(ER_BLACK_SHINY_ABILITY_POOL).size).toBe(ER_BLACK_SHINY_ABILITY_POOL.length);
     });
 
-    it("the kit re-rolls 3 innates + 3 disjoint gift choices, all from the pool", () => {
+    it("the kit rolls ONLY the gift (3 distinct pool choices) — innates stay untouched", () => {
       const mon = game.scene.getPlayerPokemon()!;
+      const innatesBefore = mon
+        .getPassiveAbilities()
+        .slice(0, 3)
+        .map(a => a?.id);
+      const overridesBefore = [
+        mon.customPokemonData.passive,
+        mon.customPokemonData.passive2,
+        mon.customPokemonData.passive3,
+      ];
+
       applyErBlackShinyKit(mon);
       expect(isErBlackShiny(mon)).toBe(true);
 
       const data = mon.customPokemonData;
-      const innates = [data.passive, data.passive2, data.passive3] as number[];
-      expect(new Set(innates).size).toBe(3);
-      for (const id of innates) {
-        expect(ER_BLACK_SHINY_ABILITY_POOL).toContain(id);
-      }
+      // Maintainer rule: the normal ability + 3 innates are NOT modified.
+      expect([data.passive, data.passive2, data.passive3]).toEqual(overridesBefore);
+      expect(
+        mon
+          .getPassiveAbilities()
+          .slice(0, 3)
+          .map(a => a?.id),
+      ).toEqual(innatesBefore);
+
+      // The gift: 3 distinct choices, all from the approved pool.
       expect(data.erGiftAbilities).toHaveLength(3);
       expect(new Set(data.erGiftAbilities).size).toBe(3);
       for (const id of data.erGiftAbilities) {
         expect(ER_BLACK_SHINY_ABILITY_POOL).toContain(id);
-        expect(innates).not.toContain(id); // gift choices disjoint from innates
       }
 
       // Idempotent: re-applying must not re-roll.
       const before = [...data.erGiftAbilities];
       applyErBlackShinyKit(mon);
       expect(data.erGiftAbilities).toEqual(before);
+    });
+
+    it("the Ability Randomizer can never target the gift slot", () => {
+      const mon = game.scene.getPlayerPokemon()!;
+      applyErBlackShinyKit(mon);
+      const gift = getErActiveGiftAbilityId(mon)!;
+
+      // The gift IS active (in the passive flow)...
+      expect(mon.getPassiveAbilities().map(a => a?.id)).toContain(gift);
+      // ...but the Randomizer's selectable slots (0-3) never include it.
+      const slots = mon.getAbilitySlots();
+      expect(slots.length).toBeLessThanOrEqual(4);
+      expect(slots.map(s => s.ability.id)).not.toContain(gift);
     });
 
     it("the ACTIVE gift flows through getPassiveAbilities; cycling switches it", () => {
@@ -154,6 +181,46 @@ describe.skipIf(!RUN)("ER Black Shinies (#349)", () => {
       const next = cycleErGiftAbility(puff)!;
       expect(getErSharedGiftAbilityIdsFor(lax)).toContain(next);
       expect(getErSharedGiftAbilityIdsFor(lax)).not.toContain(gift);
+    });
+
+    it("sharing is ONE-WAY: the non-black ally's abilities never flow to the black shiny", () => {
+      const [puff, lax] = game.scene.getPlayerField();
+      applyErBlackShinyKit(puff);
+
+      // The black shiny's extra abilities = exactly its own active gift.
+      expect(getErSharedGiftAbilityIdsFor(puff)).toEqual([getErActiveGiftAbilityId(puff)]);
+
+      // None of the ally's REAL abilities (active or innates) leak onto the
+      // black shiny through the gift channel.
+      const laxIds = [
+        lax.getAbility().id,
+        ...lax
+          .getPassiveAbilities()
+          .slice(0, 3)
+          .map(a => a?.id),
+      ].filter(Boolean);
+      const puffPassiveIds = puff.getPassiveAbilities().map(a => a?.id);
+      const puffOwnBase = [
+        puff.getAbility().id,
+        ...puff
+          .getPassiveAbilities()
+          .slice(0, 3)
+          .map(a => a?.id),
+        getErActiveGiftAbilityId(puff),
+      ];
+      for (const id of puffPassiveIds) {
+        if (id == null) {
+          continue;
+        }
+        if (!puffOwnBase.includes(id)) {
+          expect(laxIds).not.toContain(id);
+        }
+      }
+
+      // And the battle-level check: the ally HAS the gift via the full gating
+      // pipeline (hasAbility -> canApplyAbility -> gift slot exemptions).
+      const gift = getErActiveGiftAbilityId(puff)!;
+      expect(lax.hasAbility(gift as never)).toBe(true);
     });
   });
 });

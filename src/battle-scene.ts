@@ -3743,7 +3743,20 @@ export class BattleScene extends SceneBase {
    * @param pokemon The (enemy) pokemon
    */
   initFinalBossPhaseTwo(pokemon: Pokemon): void {
-    if (!pokemon.isEnemy() || !pokemon.isBoss() || pokemon.formIndex > 0 || pokemon.bossSegmentIndex >= 1) {
+    // ER Black Shinies (#349): the HELL finale STARTS as Primal Cascoon
+    // (formIndex 1), so the formIndex>0 guard must not skip its stage 2 —
+    // which is the BLACK SHINY promotion instead of a form change.
+    const erHellFinale =
+      pokemon.isEnemy()
+      && isErFinalBossSpecies(pokemon.species.speciesId)
+      && getErDifficulty() === "hell"
+      && !pokemon.customPokemonData?.erBlackShiny;
+    if (
+      !pokemon.isEnemy()
+      || !pokemon.isBoss()
+      || (pokemon.formIndex > 0 && !erHellFinale)
+      || pokemon.bossSegmentIndex >= 1
+    ) {
       this.phaseManager.shiftPhase();
       return;
     }
@@ -3757,15 +3770,18 @@ export class BattleScene extends SceneBase {
       this.addEnemyModifier(finalBossMBH, false, true);
       pokemon.generateAndPopulateMoveset(false, 1);
       this.setFieldScale(0.75);
-      this.triggerPokemonFormChange(pokemon, SpeciesFormChangeManualTrigger, false);
-      // ER Black Shinies (#349): on HELL, the finale's second stage is the
-      // BLACK SHINY Primal Cascoon, gift ability active.
+      // ER Black Shinies (#349): on HELL the finale already IS Primal Cascoon
+      // — stage 2 is the BLACK SHINY promotion (no form change). Elsewhere the
+      // vanilla manual form change (Cascoon → Primal / Eternatus → Eternamax)
+      // still runs.
       if (isErFinalBossSpecies(pokemon.species.speciesId) && getErDifficulty() === "hell") {
         pokemon.shiny = true;
         pokemon.variant = 2;
         applyErBlackShinyKit(pokemon);
         applyErBlackShinyInterimTint(pokemon);
         void pokemon.updateInfo();
+      } else {
+        this.triggerPokemonFormChange(pokemon, SpeciesFormChangeManualTrigger, false);
       }
       this.currentBattle.double = true;
       const availablePartyMembers = this.getPlayerParty().filter(p => p.isAllowedInBattle());

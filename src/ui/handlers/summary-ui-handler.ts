@@ -4,11 +4,13 @@ import { globalScene } from "#app/global-scene";
 import { starterColors } from "#app/global-vars/starter-colors";
 import { isSlotEnabled, isSlotUnlocked, type PassiveSlot } from "#app/ui/handlers/starter-select-ui-handler";
 import { getStarterValueFriendshipCap, speciesStarterCosts } from "#balance/starters";
+import { allAbilities } from "#data/data-lists";
 import {
   getErAbilityDescription,
   getErAbilityRomDescription,
   getErCompositeDetailedDescription,
 } from "#data/elite-redux/er-ability-descriptions";
+import { getErActiveGiftAbilityId, isErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
 import { getErMoveDetailPages, type MoveDetailRow } from "#data/elite-redux/er-move-details";
 import { getLevelRelExp, getLevelTotalExp } from "#data/exp";
@@ -566,7 +568,8 @@ export class SummaryUiHandler extends UiHandler {
     this.shinyIcon
       .setTexture(`shiny_star${doubleShiny ? "_1" : ""}`)
       .setVisible(this.pokemon.isShiny(false))
-      .setTint(getVariantTint(bigIconVariant));
+      // ER Black Shinies (#349): the t4 sparkle is BLACK, not blue/red/gold.
+      .setTint(isErBlackShiny(this.pokemon) ? 0x0a0a0a : getVariantTint(bigIconVariant));
     if (this.shinyIcon.visible) {
       let shinyDescriptor = "";
       if (doubleShiny || bigIconVariant) {
@@ -1699,6 +1702,8 @@ export class SummaryUiHandler extends UiHandler {
       ability: Ability;
       /** undefined for the main ability (always active). */
       slot?: PassiveSlot;
+      /** ER Black Shiny gift row — distinct styling, never locked. */
+      gift?: boolean;
     }
     const rows: Row[] = [];
 
@@ -1722,6 +1727,23 @@ export class SummaryUiHandler extends UiHandler {
         ability,
         slot: slot as PassiveSlot,
       });
+    }
+
+    // ER Black Shinies (#349): the GIFT row — the 5th, switchable ability.
+    // Shown ONLY for black shinies (conditional UI per the maintainer spec),
+    // rendered in a distinct bold-italic style and never candy-locked.
+    if (isErBlackShiny(mon)) {
+      const giftId = getErActiveGiftAbilityId(mon);
+      const gift = giftId === null ? null : allAbilities[giftId];
+      if (gift) {
+        const choices = mon.customPokemonData.erGiftAbilities.length;
+        const idx = (mon.customPokemonData.erGiftIndex ?? 0) + 1;
+        rows.push({
+          label: `Gift ${idx}/${choices}`,
+          ability: gift,
+          gift: true,
+        });
+      }
     }
 
     // Fixed even grid (matches the ER ROM's clean N-row separation). Panel is
@@ -1778,6 +1800,12 @@ export class SummaryUiHandler extends UiHandler {
       const nameText = addTextObject(nameX, top + 1, row.ability?.name ?? "", TextStyle.SUMMARY, { fontSize: "64px" });
       nameText.setOrigin(0, 0);
       nameText.setColor(getTextColor(locked ? TextStyle.SUMMARY_GRAY : TextStyle.SUMMARY));
+      if (row.gift) {
+        // ER Black Shinies (#349): the gift renders in a distinct cursive/bold
+        // face so it reads as the special 5th slot.
+        nameText.setFontStyle("bold italic");
+        nameText.setColor("#e8d8ff");
+      }
       container.add(nameText);
 
       if (lockIconKey) {
