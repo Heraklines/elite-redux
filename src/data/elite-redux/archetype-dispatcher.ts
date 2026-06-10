@@ -5028,9 +5028,11 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     case 500:
       // Heaven Asunder — "Spacial Rend always crits. Ups crit level by +1."
-      // The Spacial-Rend-always-crits piece needs a per-move accuracy
-      // override. Wire only the +1 crit-stage bonus.
-      return ok([new CritStageBonusAbAttr({ bonus: 1 })]);
+      // Merciless-style guaranteed crit gated on the move id (#373).
+      return ok([
+        new CritStageBonusAbAttr({ bonus: 1 }),
+        new ConditionalCritAbAttr((_user, _target, move) => move.id === MoveId.SPACIAL_REND),
+      ]);
     // -------------------------------------------------------------------------
     // Round 15 — additional simple compositions
     // -------------------------------------------------------------------------

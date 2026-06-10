@@ -27,8 +27,9 @@ export class TrainerVictoryPhase extends BattlePhase {
     }
 
     // ER: every trainer win grants small (1-egg) egg vouchers, scaled by the
-    // run difficulty — Ace 1, Elite 2, Hell 3.
-    const erVoucherCount = { ace: 1, elite: 2, hell: 3 }[getErDifficulty()];
+    // run difficulty — Ace 1, Elite 2, Hell 3. Youngster (#368) is the
+    // no-stakes trial mode: NO per-trainer vouchers.
+    const erVoucherCount = { youngster: 0, ace: 1, elite: 2, hell: 3 }[getErDifficulty()];
     for (let i = 0; i < erVoucherCount; i++) {
       globalScene.phaseManager.unshiftNew("ModifierRewardPhase", modifierTypes.VOUCHER);
     }

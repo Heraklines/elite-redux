@@ -26,6 +26,7 @@ import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-dif
 // ACE = pure vanilla PokeRogue (#345): NO ghost trainers at all — the ghost
 // gauntlet is an Elite/Hell feature.
 const GHOST_WAVES: Readonly<Record<ErDifficulty, readonly number[]>> = {
+  youngster: [],
   ace: [],
   elite: [87, 137, 163, 192, 196, 199],
   hell: [63, 87, 113, 137, 163, 176, 178, 192, 193, 194, 196, 197, 199],

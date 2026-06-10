@@ -5609,30 +5609,25 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               this.starterSelectCallback = null;
               originalStarterSelectCallback?.(starters);
             };
-            // ER: pick a run difficulty (Ace / Elite / Hell) before launching.
+            // ER: pick a run difficulty (Youngster / Ace / Elite / Hell)
+            // before launching. Hovering a mode shows what it does (#368) in
+            // the message box under the option list.
+            const difficultyOption = (difficulty: ErDifficulty, key: string) => ({
+              label: i18next.t(`starterSelectUiHandler:difficulty${key}`),
+              onHover: () => {
+                ui.showText(i18next.t(`starterSelectUiHandler:difficulty${key}Desc`));
+              },
+              handler: () => {
+                startRun(difficulty);
+                return true;
+              },
+            });
             ui.setOverlayMode(UiMode.OPTION_SELECT, {
               options: [
-                {
-                  label: i18next.t("starterSelectUiHandler:difficultyAce"),
-                  handler: () => {
-                    startRun("ace");
-                    return true;
-                  },
-                },
-                {
-                  label: i18next.t("starterSelectUiHandler:difficultyElite"),
-                  handler: () => {
-                    startRun("elite");
-                    return true;
-                  },
-                },
-                {
-                  label: i18next.t("starterSelectUiHandler:difficultyHell"),
-                  handler: () => {
-                    startRun("hell");
-                    return true;
-                  },
-                },
+                difficultyOption("youngster", "Youngster"),
+                difficultyOption("ace", "Ace"),
+                difficultyOption("elite", "Elite"),
+                difficultyOption("hell", "Hell"),
               ],
             });
           },

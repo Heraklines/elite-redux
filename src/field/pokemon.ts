@@ -63,6 +63,7 @@ import {
 } from "#data/elite-redux/er-black-shinies";
 import { erBlackSpritePath } from "#data/elite-redux/er-black-sprite-manifest";
 import { applyErResistBerry } from "#data/elite-redux/er-resist-berries";
+import { erYoungsterFreeInnateSlots, getErDifficultyShinyMultiplier } from "#data/elite-redux/er-run-difficulty";
 import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import {
   applyErWardStoneBlock,
@@ -2690,7 +2691,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     let basePassive = this.passive;
     if (this.isPlayer()) {
       const passiveAttr = globalScene.gameData.starterData[this.species.getRootSpeciesId()]?.passiveAttr ?? 0;
-      basePassive = hasAnyActiveSlot(passiveAttr);
+      // ER Youngster mode (#368): innates are temp-unlocked by level for the
+      // run, so the player "has a passive" whenever any slot is filled.
+      basePassive =
+        hasAnyActiveSlot(passiveAttr)
+        || (erYoungsterFreeInnateSlots(this.level) > 0 && this.getPassiveAbilities().some(a => a != null));
     } else if (this.isEnemy()) {
       // ER: enemies ALWAYS have their innates active (no candy-unlock gate) — unlike
       // the player, whose innate slots are gated by `passiveAttr` above. This only
@@ -2777,7 +2782,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         Overrides.HAS_PASSIVE_ABILITY_OVERRIDE === true || Overrides.PASSIVE_ABILITY_OVERRIDE !== AbilityId.NONE;
       if (!overridden) {
         const passiveAttr = globalScene.gameData.starterData[this.species.getRootSpeciesId()]?.passiveAttr ?? 0;
-        if (!isSlotActive(passiveAttr, passiveSlot as 0 | 1 | 2)) {
+        // ER Youngster mode (#368): innate slots are TEMP-unlocked by level
+        // for the run (no candy purchase needed; nothing persisted) — the
+        // same 1/15/24 ramp enemies use. Candy unlocks still count too.
+        const youngsterFree = passiveSlot < erYoungsterFreeInnateSlots(this.level);
+        if (!youngsterFree && !isSlotActive(passiveAttr, passiveSlot as 0 | 1 | 2)) {
           return false;
         }
       }
@@ -3721,6 +3730,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         globalScene.applyModifiers(ShinyRateBoosterModifier, true, shinyThreshold);
         // ER: challenge "Favour" raises shiny odds (up to 3x) on a challenge run.
         shinyThreshold.value *= getRunShinyMultiplier();
+        // ER (#368): WILD shiny odds scale with run difficulty (Elite 1.5x,
+        // Hell 2x) and stack with the boosts above (challenge-capped at 6x).
+        if (this.isEnemy() && !this.hasTrainer()) {
+          shinyThreshold.value *= getErDifficultyShinyMultiplier();
+        }
       }
     } else {
       shinyThreshold.value = thresholdOverride;

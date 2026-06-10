@@ -1132,4 +1132,56 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [makeStarter(SpeciesId.PIKACHU, { moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK] })];
     },
   },
+  {
+    label: "Heaven Asunder crit (#373)",
+    description:
+      "#373 Heaven Asunder: Spacial Rend ALWAYS crits (plus the +1 crit level for\n"
+      + "everything else).\n"
+      + "DO: use Spacial Rend several times.  EXPECT: EVERY Spacial Rend is a critical\n"
+      + "hit. Aura Sphere crits only sometimes (that one just gets the +1 level).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.HEAVEN_ASUNDER),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PALKIA, {
+          moveset: [MoveId.SPACIAL_REND, MoveId.AURA_SPHERE, MoveId.SURF, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Youngster innates (#368)",
+    description:
+      "#368 Youngster trial mode: innates unlock FREE by level for the run\n"
+      + "(slot 1 always, slot 2 at Lv 15, slot 3 at Lv 24) - no candies needed.\n"
+      + "DO: open Battle Info -> Abilities (and the summary ability page) on the Lv 30\n"
+      + "Gyarados.  EXPECT: all 3 innates show ACTIVE (Intimidate procs on entry too,\n"
+      + "if not candy-unlocked it would normally be locked).\n"
+      + "(Also #368: NO egg voucher after trainer wins on Youngster; wild shinies are\n"
+      + "1.5x on Elite / 2x on Hell. Mode descriptions show when picking a difficulty\n"
+      + "after team select.)",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficultyForScenario("youngster");
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.RATTATA,
+        ENEMY_LEVEL_OVERRIDE: 20,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.WATERFALL, MoveId.ICE_FANG, MoveId.DRAGON_DANCE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
 ];

@@ -21,7 +21,7 @@
 
 import type { ErRosterTier } from "#data/elite-redux/er-trainer-overlay";
 
-export type ErDifficulty = "ace" | "elite" | "hell";
+export type ErDifficulty = "youngster" | "ace" | "elite" | "hell";
 
 /** Default difficulty when the player hasn't chosen (or after a reload). */
 const DEFAULT_DIFFICULTY: ErDifficulty = "ace";
@@ -53,4 +53,48 @@ export function erDifficultyToRosterTier(difficulty: ErDifficulty = currentDiffi
     default:
       return "party";
   }
+}
+
+/**
+ * "Vanilla" difficulties (#368): Youngster and Ace play PURE PokeRogue —
+ * no ER trainer rosters, no ghost trainers, no ER finale, and the early
+ * high-BST wild gate applies. Elite/Hell layer the full ER experience on top.
+ */
+export function isErVanillaDifficulty(difficulty: ErDifficulty = currentDifficulty): boolean {
+  return difficulty === "ace" || difficulty === "youngster";
+}
+
+/**
+ * Per-mode WILD shiny-rate multiplier (#368): Elite 1.5x, Hell 2x (Youngster
+ * and Ace 1x). Stacks with the Shiny Charm and the challenge "Favour" boost
+ * (up to 3x), so a Hell challenge run tops out at 6x base odds.
+ */
+export function getErDifficultyShinyMultiplier(difficulty: ErDifficulty = currentDifficulty): number {
+  switch (difficulty) {
+    case "hell":
+      return 2;
+    case "elite":
+      return 1.5;
+    default:
+      return 1;
+  }
+}
+
+/**
+ * Youngster trial mode (#368): the player's innate slots are TEMP-unlocked by
+ * LEVEL for the run (no candy purchase, nothing persisted) — the same ramp
+ * enemies use. Returns how many innate slots (0-3) are live at `level`.
+ * Returns 0 for every other difficulty (normal candy gating applies).
+ */
+export function erYoungsterFreeInnateSlots(level: number): number {
+  if (currentDifficulty !== "youngster") {
+    return 0;
+  }
+  if (level >= 24) {
+    return 3;
+  }
+  if (level >= 15) {
+    return 2;
+  }
+  return 1;
 }

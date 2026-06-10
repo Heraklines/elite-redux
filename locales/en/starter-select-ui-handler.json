@@ -1,8 +1,13 @@
 {
   "confirmStartTeam": "Begin with these Pokémon?",
+  "difficultyYoungster": "Youngster",
   "difficultyAce": "Ace",
   "difficultyElite": "Elite",
   "difficultyHell": "Hell",
+  "difficultyYoungsterDesc": "Trial mode. Classic PokeRogue encounters and trainers, and every Pokémon's innate abilities unlock FREE as it levels up (Lv 15 and 24), no candies needed, for this run only. No egg vouchers from trainers.",
+  "difficultyAceDesc": "Classic PokeRogue. Vanilla encounters, trainers and the Eternatus finale. Innates unlock with candies. Each trainer win grants 1 egg voucher.",
+  "difficultyEliteDesc": "The Elite Redux experience. ER trainer teams, ghost battles against real players' teams, the Primal Cascoon finale, more frequent trainers and rivals. Wild shinies appear 1.5x as often. Trainer wins grant 2 egg vouchers.",
+  "difficultyHellDesc": "Maximum danger. The hardest ER rosters with early megas, a near-constant trainer gauntlet, ghost battles, and the Black Shiny Primal Cascoon finale. Wild shinies appear 2x as often. Trainer wins grant 3 egg vouchers.",
   "confirmExit": "Do you want to exit?",
   "invalidParty": "This is not a valid starting party!",
   "gen1": "I",

@@ -8,7 +8,7 @@ import { EntryHazardTag, getArenaTag } from "#data/arena-tag";
 import { biomeBgmLoopPoints } from "#data/biome-bgm-loop-points";
 import { getDailyForcedWaveBiomePoolTier } from "#data/daily-seed/daily-run";
 import { allBiomes } from "#data/data-lists";
-import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { SpeciesFormChangeRevertWeatherFormTrigger, SpeciesFormChangeWeatherTrigger } from "#data/form-change-triggers";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import type { PositionalTag } from "#data/positional-tags/positional-tag";
@@ -638,7 +638,7 @@ export class Arena {
     // and still field whatever their pool dictates.
     const erDifficulty = getErDifficulty();
     if (
-      (erDifficulty === "ace" || erDifficulty === "elite")
+      (isErVanillaDifficulty(erDifficulty) || erDifficulty === "elite")
       && adjustedWave < ER_EARLY_HIGH_BST_WAVE
       && species.baseTotal >= ER_EARLY_HIGH_BST_THRESHOLD
     ) {

@@ -47,7 +47,7 @@ import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { ER_MEGA_STONE_NAME_BY_ITEM } from "#data/elite-redux/er-mega-stone-item-ids";
 import { maybeAssignErResistBerry } from "#data/elite-redux/er-resist-berries";
 import { maybeAssignErWardStone } from "#data/elite-redux/er-ward-stones";
-import { erDifficultyToRosterTier, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { erDifficultyToRosterTier, getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { type ErRosterTier, selectErRoster } from "#data/elite-redux/er-trainer-overlay";
 import { ER_ITEM_CONVERT_CHANCE, resolveErTrainerItem } from "#data/elite-redux/er-trainer-item-map";
 import { SpeciesFormKey } from "#enums/species-form-key";
@@ -252,9 +252,9 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
     return cached;
   }
   let choice: ErTrainerRegistryEntry | null = null;
-  // ACE difficulty = pure vanilla PokeRogue trainers (no ER roster override).
+  // YOUNGSTER / ACE = pure vanilla PokeRogue trainers (no ER roster override).
   // ELITE / HELL pull from the ER pool at the insane / hell tier.
-  if (getErDifficulty() !== "ace") {
+  if (!isErVanillaDifficulty()) {
     const tier = erDifficultyToRosterTier();
     // Boss trainer waves (gym leader / Elite Four / Champion / evil-team leader,
     // or any boss-marked / every-10th wave) pull from ER's marquee trainer pool
@@ -632,7 +632,7 @@ function selectErRivalEntry(
  * otherwise (Finn) → Brendan, matching ER's "rival is your counterpart" framing.
  */
 export function getErRivalEntry(trainer: Trainer): ErTrainerRegistryEntry | null {
-  if (getErDifficulty() === "ace") {
+  if (isErVanillaDifficulty()) {
     return null;
   }
   const encounterIndex = rivalEncounterIndex(trainer.config.trainerType);
@@ -993,7 +993,7 @@ export function getErFactoryTeamForTrainer(trainer: Trainer): readonly ErFactory
   const wave = globalScene.currentBattle?.waveIndex ?? 0;
   const isRival = ER_RIVAL_TRAINER_TYPES.has(trainer.config.trainerType);
   const isBossWave = trainer.config.isBoss || wave % 10 === 0;
-  if (difficulty !== "ace" && !isRival && !isBossWave) {
+  if (!isErVanillaDifficulty(difficulty) && !isRival && !isBossWave) {
     const roll = hashErSelectionSeed(`${globalScene.seed}:factory:${wave}`) % 100;
     const pool = roll < ER_FACTORY_TEAM_CHANCE_PCT ? resolvedFactorySets() : [];
     if (pool.length > 0) {
