@@ -19,6 +19,8 @@
 import { globalScene } from "#app/global-scene";
 import { allAbilities } from "#data/data-lists";
 import { getErAbilityDescription } from "#data/elite-redux/er-ability-descriptions";
+import { getErActiveGiftAbilityId, getErSharedGiftAbilityIdsFor } from "#data/elite-redux/er-black-shinies";
+import { erYoungsterFreeInnateSlots } from "#data/elite-redux/er-run-difficulty";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { TerrainType as TerrainTypeEnum } from "#data/terrain";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -489,7 +491,7 @@ export class BattleInfoOverlay {
 
   // --- per-Pokémon: ABILITIES ----------------------------------------------
   private renderAbilities(c: Phaser.GameObjects.Container, mon: Pokemon): void {
-    const rows: { label: string; abilityId: number; locked: boolean }[] = [];
+    const rows: { label: string; abilityId: number; locked: boolean; gift?: boolean }[] = [];
     const main = mon.getAbility(true);
     if (main) {
       rows.push({ label: "Ability", abilityId: main.id, locked: false });
@@ -504,13 +506,19 @@ export class BattleInfoOverlay {
     const passiveAttr = globalScene.gameData.starterData[rootSpeciesId]?.passiveAttr ?? 0;
     const isEnemy = mon.isEnemy?.() === true;
     const enemyLevelForSlot = [0, 15, 24];
+    // ER Youngster mode (#368): innate slots temp-unlock by level, no candies.
+    const youngsterFree = erYoungsterFreeInnateSlots(mon.level);
 
     // Use the POKEMON-level passive resolver (not the species-level one): it
     // honors per-Pokémon overrides written by the Ability Randomizer
     // (`customPokemonData.passive/passive2/passive3`) and transform overrides,
     // so the panel reflects runtime ability changes rather than static species data.
+    // ER Black Shinies (#349): getPassiveAbilities also appends GIFT slots
+    // (index >= 3) — those are handled separately below, NEVER through the
+    // innate gating (PASSIVE_SLOTS[3] does not exist and threw, closing the
+    // whole overlay for any mon with an active or shared gift).
     const innates = mon.getPassiveAbilities();
-    for (let slot = 0; slot < innates.length; slot++) {
+    for (let slot = 0; slot < Math.min(innates.length, 3); slot++) {
       const ability = innates[slot];
       if (!ability || !ability.id) {
         continue;
@@ -524,6 +532,8 @@ export class BattleInfoOverlay {
           locked = true;
           label = `Innate (Locked Lv${levelReq})`;
         }
+      } else if (slot < youngsterFree) {
+        // live for free this run — fall through unlocked
       } else if (!isSlotUnlocked(passiveAttr, passiveSlot)) {
         locked = true;
         label = "Innate (Locked)";
@@ -534,7 +544,19 @@ export class BattleInfoOverlay {
       rows.push({ label, abilityId: ability.id, locked });
     }
 
-    ROW4_BOXES.slice(0, rows.length).forEach(([, by], i) => {
+    // ER Black Shinies (#349): the GIFT — the black shiny's own active choice
+    // and/or the gift shared by an on-field black ALLY. Always live.
+    const ownGift = getErActiveGiftAbilityId(mon);
+    for (const giftId of getErSharedGiftAbilityIdsFor(mon)) {
+      const label =
+        giftId === ownGift
+          ? `Gift ${(mon.customPokemonData?.erGiftIndex ?? 0) + 1}/${mon.customPokemonData?.erGiftAbilities?.length ?? 3}`
+          : "Gift (Ally)";
+      rows.push({ label, abilityId: giftId, locked: false, gift: true });
+    }
+
+    const boxes = rows.length <= 4 ? ROW4_BOXES : MOVE_ROW5_BOXES;
+    boxes.slice(0, rows.length).forEach(([, by], i) => {
       const r = rows[i];
       const ability = allAbilities[r.abilityId];
       const head = addTextObject(68, by + 1, `${r.label}: ${ability?.name ?? ""}`, TextStyle.SUMMARY, {
@@ -544,6 +566,11 @@ export class BattleInfoOverlay {
       // Gray out locked/disabled innates so it's clear at a glance which are live.
       if (r.locked) {
         head.setColor(getTextColor(TextStyle.SUMMARY_GRAY));
+      }
+      if (r.gift) {
+        // Same styling as the summary screen's gift row.
+        head.setFontStyle("bold italic");
+        head.setColor("#e8d8ff");
       }
       c.add(head);
       const desc = getErAbilityDescription(r.abilityId) ?? ability?.description ?? "";

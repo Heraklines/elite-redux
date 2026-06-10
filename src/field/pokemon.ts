@@ -6415,6 +6415,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   /** Play the shiny sparkle animation and effects, if applicable */
   sparkle(): void {
     if (this.shinySparkle) {
+      // ER Black Shinies (#349): the t4 summon sparkle FX is BLACK, not the
+      // epic-red variant-2 effect.
+      if (isErBlackShiny(this)) {
+        this.shinySparkle.setTintFill(0x111016);
+      } else {
+        this.shinySparkle.clearTint();
+      }
       globalScene.animations.doShinySparkleAnim(this.shinySparkle, this.variant);
     }
   }

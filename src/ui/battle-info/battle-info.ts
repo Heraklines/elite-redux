@@ -676,7 +676,9 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
 
     const doubleShiny = isFusion && pokemon.shiny && pokemon.fusionShiny;
     const baseVariant = doubleShiny ? pokemon.variant : pokemon.getVariant(true);
-    this.shinyIcon.setTint(getVariantTint(baseVariant));
+    // ER Black Shinies (#349): updateInfo re-tints the star every refresh, so
+    // without this check it would paint the t4 BLACK sparkle back to epic red.
+    this.shinyIcon.setTint(isErBlackShiny(pokemon) ? 0x0a0a0a : getVariantTint(baseVariant));
 
     this.fusionShinyIcon.setVisible(doubleShiny).setPosition(this.shinyIcon.x, this.shinyIcon.y);
     if (isFusion) {

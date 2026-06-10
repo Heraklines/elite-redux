@@ -27,7 +27,7 @@ import { StatusEffect } from "#enums/status-effect";
 import { MoveUsedEvent } from "#events/battle-scene";
 import type { Pokemon } from "#field/pokemon";
 import { applyMoveAttrs } from "#moves/apply-attrs";
-import { frenzyMissFunc } from "#moves/move-utils";
+import { frenzyMissFunc, getMoveTargets } from "#moves/move-utils";
 import type { PokemonMove } from "#moves/pokemon-move";
 import type { Move, PreUseInterruptAttr } from "#types/move-types";
 import type { TurnMove } from "#types/turn-move";
@@ -763,8 +763,30 @@ export class MovePhase extends PokemonPhase {
    */
   // TODO: The first part of this check seems already covered in `checkValidity`...
   protected resolveFinalPreMoveCancellationChecks(): boolean {
-    const targets = this.getActiveTargetPokemon();
+    let targets = this.getActiveTargetPokemon();
     const moveQueue = this.pokemon.getMoveQueue();
+
+    // ER (#372): a FRENZY-locked move (Thrash / Outrage / Petal Dance) whose
+    // queued target fainted must RETARGET a remaining valid target (mainline
+    // behavior) instead of failing every leftover frenzy turn. Also re-point
+    // the rest of the queued frenzy turns so they don't re-fail one by one.
+    if (
+      targets.length === 0
+      && this.targets.length === 1
+      && this.pokemon.getTag(BattlerTagType.FRENZY)
+      && this.pokemon.isActive(true)
+    ) {
+      const retargets = getMoveTargets(this.pokemon, this.move.moveId).targets;
+      if (retargets.length > 0) {
+        this.targets[0] = retargets[this.pokemon.randBattleSeedInt(retargets.length)];
+        for (const queued of moveQueue) {
+          if (queued.move === this.move.moveId) {
+            queued.targets = [this.targets[0]];
+          }
+        }
+        targets = this.getActiveTargetPokemon();
+      }
+    }
 
     // A move with no remaining active target fails. This includes hazard moves
     // (`AddArenaTrapTagAttr`, e.g. Sticky Web / Stealth Rock): in normal play an

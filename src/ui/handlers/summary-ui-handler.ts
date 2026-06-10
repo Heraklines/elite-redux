@@ -478,6 +478,13 @@ export class SummaryUiHandler extends UiHandler {
       getTextColor(this.pokemon.isShiny() ? TextStyle.SUMMARY_GOLD : TextStyle.SUMMARY, true),
     );
     const spriteKey = this.pokemon.getSpriteKey(true);
+    // Pin the texture BEFORE attempting the animation: if `play` fails (anim
+    // not built yet), the sprite would otherwise silently keep showing the
+    // PREVIOUS mon's texture (e.g. an ally's black-shiny art on Snorlax's
+    // page). With the texture set, a failed play just means a static frame.
+    if (globalScene.textures.exists(spriteKey)) {
+      this.pokemonSprite.setTexture(spriteKey);
+    }
     try {
       this.pokemonSprite.play(spriteKey);
     } catch (err: unknown) {
