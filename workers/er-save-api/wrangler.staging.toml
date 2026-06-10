@@ -14,3 +14,7 @@ database_id = "7dc09f64-6810-4756-8c0f-e44f7d382eed"
 ALLOWED_ORIGIN = "*"
 MIN_USERNAME_LENGTH = "3"
 MIN_PASSWORD_LENGTH = "6"
+
+# ER (#384): nightly usage-tier aggregation - ONE invocation per day.
+[triggers]
+crons = ["0 4 * * *"]

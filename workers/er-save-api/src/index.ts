@@ -37,6 +37,8 @@ interface Env {
   ALLOWED_ORIGIN?: string;
   MIN_USERNAME_LENGTH?: string;
   MIN_PASSWORD_LENGTH?: string;
+  /** PAT with push access to Heraklines/er-assets (usage-tiers cron). Set via `wrangler secret put`. */
+  ER_ASSETS_TOKEN?: string;
 }
 
 interface UserRow {
@@ -610,6 +612,8 @@ async function handleRunCreate(
     party?: unknown;
     opponentName?: unknown;
     opponentParty?: unknown;
+    starters?: unknown;
+    challenges?: unknown;
   };
   try {
     run = JSON.parse(raw);
@@ -625,9 +629,14 @@ async function handleRunCreate(
     run.outcome === "victory" || run.outcome === "defeat" ? run.outcome : run.isVictory ? "victory" : "defeat";
   const wave = Number.parseInt(String(run.wave ?? run.waveReached ?? ""), 10);
   const createdAt = Number.parseInt(String(run.timestamp ?? ""), 10);
+  // ER (#384): usage-tier inputs ride the SAME single insert - no extra
+  // requests or writes. Lazy one-time column migration below.
+  const starters = Array.isArray(run.starters) ? run.starters.filter(v => typeof v === "number") : null;
+  const challenges = Array.isArray(run.challenges) ? run.challenges : null;
+  await ensureRunStatColumns(env);
   await env.DB.prepare(
-    `INSERT INTO runs (id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+    `INSERT INTO runs (id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, starters, challenges)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
        ON CONFLICT(id) DO NOTHING`,
   )
     .bind(
@@ -642,6 +651,8 @@ async function handleRunCreate(
       JSON.stringify(party),
       typeof run.opponentName === "string" ? run.opponentName : null,
       Array.isArray(run.opponentParty) ? JSON.stringify(run.opponentParty) : null,
+      starters && starters.length > 0 ? JSON.stringify(starters) : null,
+      challenges && challenges.length > 0 ? JSON.stringify(challenges) : null,
     )
     .run();
   return text("", 200, cors);
@@ -777,7 +788,158 @@ async function handleDevTestProgress(env: Env, cors: Record<string, string>): Pr
 
 // #endregion
 
+let runStatColumnsEnsured = false;
+/** One-time per-isolate: add the #384 columns if this DB predates them. */
+async function ensureRunStatColumns(env: Env): Promise<void> {
+  if (runStatColumnsEnsured) {
+    return;
+  }
+  runStatColumnsEnsured = true;
+  for (const col of ["starters TEXT", "challenges TEXT"]) {
+    try {
+      await env.DB.prepare(`ALTER TABLE runs ADD COLUMN ${col}`).run();
+    } catch {
+      // Column already exists.
+    }
+  }
+}
+
+// =============================================================================
+// ER (#384) - nightly usage-tier aggregation (cron). ONE invocation per day:
+// scans the 30-day run window, computes deduped per-player usage + shrunken
+// per-difficulty wave lift per starter LINE, and commits usage-tiers.json to
+// Heraklines/er-assets (served to clients by jsDelivr - zero worker reads).
+// Skips silently when ER_ASSETS_TOKEN is unset.
+// =============================================================================
+const USAGE_TIER_CHALLENGE_ID = 12; // Challenges.USAGE_TIER - excluded from usage stats
+
+async function computeAndPublishUsageTiers(env: Env): Promise<void> {
+  if (!env.ER_ASSETS_TOKEN) {
+    return;
+  }
+  await ensureRunStatColumns(env);
+  const since = Date.now() - 30 * 24 * 3600 * 1000;
+  const { results } = await env.DB.prepare(
+    "SELECT user_id, starters, challenges, difficulty, wave, outcome FROM runs WHERE created_at >= ?1 AND starters IS NOT NULL",
+  )
+    .bind(since)
+    .all<{
+      user_id: string;
+      starters: string;
+      challenges: string | null;
+      difficulty: string | null;
+      wave: number | null;
+      outcome: string;
+    }>();
+
+  const players = new Set<string>();
+  const linePlayers = new Map<number, Set<string>>();
+  const stratWaves = new Map<string, number[]>();
+  const lineWaves = new Map<number, Map<string, number[]>>();
+  for (const row of results ?? []) {
+    let starters: number[];
+    let challenges: [number, number][] = [];
+    try {
+      starters = JSON.parse(row.starters);
+      challenges = row.challenges ? JSON.parse(row.challenges) : [];
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(starters) || starters.length === 0) {
+      continue;
+    }
+    const inUsageTierRun = challenges.some(([cid, value]) => cid === USAGE_TIER_CHALLENGE_ID && value > 0);
+    const diff = row.difficulty ?? "unknown";
+    const wave = row.wave ?? 0;
+    players.add(row.user_id);
+    let sw = stratWaves.get(diff);
+    if (!sw) {
+      sw = [];
+      stratWaves.set(diff, sw);
+    }
+    sw.push(wave);
+    for (const line of new Set(starters)) {
+      // Usage-tier-challenge runs are FORCED picks within a restricted pool;
+      // counting them would feed the tiers back into themselves. Their
+      // PERFORMANCE still counts (cleanest in-tier signal).
+      if (!inUsageTierRun) {
+        let lp = linePlayers.get(line);
+        if (!lp) {
+          lp = new Set();
+          linePlayers.set(line, lp);
+        }
+        lp.add(row.user_id);
+      }
+      let byDiff = lineWaves.get(line);
+      if (!byDiff) {
+        byDiff = new Map();
+        lineWaves.set(line, byDiff);
+      }
+      let lw = byDiff.get(diff);
+      if (!lw) {
+        lw = [];
+        byDiff.set(diff, lw);
+      }
+      lw.push(wave);
+    }
+  }
+  if (players.size === 0) {
+    return; // No starter-tagged runs yet - keep the seed file as-is.
+  }
+
+  const stratMean = new Map<string, number>();
+  for (const [diff, waves] of stratWaves) {
+    stratMean.set(diff, waves.reduce((a, b) => a + b, 0) / waves.length);
+  }
+  const lines: Record<number, { usagePct: number; lift: number; sample: number }> = {};
+  for (const [line, byDiff] of lineWaves) {
+    let liftSum = 0;
+    let n = 0;
+    for (const [diff, waves] of byDiff) {
+      const mu = stratMean.get(diff) ?? 0;
+      // Empirical-Bayes shrinkage: 25 phantom runs at the stratum mean.
+      const shrunk = (waves.reduce((a, b) => a + b, 0) + 25 * mu) / (waves.length + 25);
+      liftSum += (shrunk - mu) * waves.length;
+      n += waves.length;
+    }
+    lines[line] = {
+      usagePct: Math.round((100 * (linePlayers.get(line)?.size ?? 0) * 1000) / players.size) / 1000,
+      lift: n > 0 ? Math.round((liftSum / n) * 100) / 100 : 0,
+      sample: n,
+    };
+  }
+
+  const payload = {
+    generatedAt: new Date().toISOString(),
+    windowDays: 30,
+    players: players.size,
+    runs: results?.length ?? 0,
+    lines,
+  };
+  const body = btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(payload, null, 1))));
+  const gh = (path: string, init?: RequestInit) =>
+    fetch(`https://api.github.com${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${env.ER_ASSETS_TOKEN}`,
+        Accept: "application/vnd.github+json",
+        "User-Agent": "er-usage-tiers-cron",
+        ...(init?.headers ?? {}),
+      },
+    });
+  const current = await gh("/repos/Heraklines/er-assets/contents/usage-tiers.json");
+  const sha = current.ok ? ((await current.json()) as { sha?: string }).sha : undefined;
+  await gh("/repos/Heraklines/er-assets/contents/usage-tiers.json", {
+    method: "PUT",
+    body: JSON.stringify({ message: "usage-tiers: nightly aggregation (#384)", content: body, sha }),
+  });
+}
+
 export default {
+  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(computeAndPublishUsageTiers(env));
+  },
+
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");

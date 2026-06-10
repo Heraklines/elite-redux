@@ -26,3 +26,7 @@ ALLOWED_ORIGIN = "*"
 # Minimum lengths enforced server-side at registration.
 MIN_USERNAME_LENGTH = "3"
 MIN_PASSWORD_LENGTH = "6"
+
+# ER (#384): nightly usage-tier aggregation - ONE invocation per day.
+[triggers]
+crons = ["0 4 * * *"]

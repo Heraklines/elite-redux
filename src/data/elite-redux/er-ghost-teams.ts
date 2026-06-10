@@ -45,6 +45,7 @@ import { SpeciesId } from "#enums/species-id";
 import { PokemonMove } from "#moves/pokemon-move";
 import { sessionIdKey } from "#utils/common";
 import { getCookie } from "#utils/cookies";
+import { loadLastTeam } from "#utils/data";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 export { ghostWavesForCurrentRun, isErGhostWave };
@@ -79,6 +80,10 @@ export interface GhostTeamSnapshot {
   opponentName?: string | undefined;
   /** The opponent's serialised party (for "who beat whom" + future rematches). */
   opponentParty?: GhostMember[] | undefined;
+  /** ER (#384): the run's STARTER lines as ROOT species ids (usage tiers). */
+  starters?: number[] | undefined;
+  /** ER (#384): active challenges at run end, as [id, value] pairs. */
+  challenges?: [number, number][] | undefined;
 }
 
 const MAX_PARTY = 6;
@@ -306,7 +311,44 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
     party: partyData,
     opponentName,
     opponentParty,
+    starters: captureRunStarterLines(),
+    challenges: captureRunChallenges(),
   };
+}
+
+/**
+ * ER (#384): the run's starter LINES as root species ids, for the usage-tier
+ * stats. Source: the last-team store written at run start (the final party
+ * can differ after catches). Best-effort - absent when unavailable.
+ */
+function captureRunStarterLines(): number[] | undefined {
+  try {
+    const team = loadLastTeam();
+    if (!team?.length) {
+      return undefined;
+    }
+    const roots = new Set<number>();
+    for (const starter of team) {
+      const species = getPokemonSpecies(starter.speciesId);
+      const root = species?.getRootSpeciesId?.();
+      if (typeof root === "number") {
+        roots.add(root);
+      }
+    }
+    return roots.size > 0 ? [...roots] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** ER (#384): the run's ACTIVE challenges as [id, value] pairs. */
+function captureRunChallenges(): [number, number][] | undefined {
+  try {
+    const active = (globalScene?.gameMode?.challenges ?? []).filter(c => c.value !== 0).map(c => [c.id, c.value] as [number, number]);
+    return active.length > 0 ? active : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Snapshot the enemy that ended the run: trainer/rival name + their party, or the
