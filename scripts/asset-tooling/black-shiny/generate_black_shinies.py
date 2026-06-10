@@ -244,8 +244,35 @@ def process_atlas(json_path, out_dir):
         atlas = json.load(f)
     png_path = os.path.splitext(json_path)[0] + ".png"
     sheet = np.asarray(Image.open(png_path).convert("RGBA"))
-    tex = atlas["textures"][0]
-    frames = tex["frames"]
+    # TexturePacker multi-texture format ({textures:[{frames:[...]}]}) OR the
+    # older flat hash format ({frames:{name:{...}} | [...], meta:{...}}) - a
+    # large minority of er-assets atlases use the flat one (the full-roster
+    # run's KeyError: 'textures').
+    if "textures" in atlas:
+        tex = atlas["textures"][0]
+        frames = tex["frames"]
+    else:
+        raw = atlas.get("frames", [])
+        if isinstance(raw, dict):
+            frames = []
+            for name, fr in raw.items():
+                fr = dict(fr)
+                fr.setdefault("filename", name)
+                frames.append(fr)
+        else:
+            frames = list(raw)
+        for fr in frames:
+            fr.setdefault("rotated", False)
+            fr.setdefault("trimmed", False)
+            fr.setdefault("sourceSize", {"w": fr["frame"]["w"], "h": fr["frame"]["h"]})
+            fr.setdefault("spriteSourceSize", {"x": 0, "y": 0, "w": fr["frame"]["w"], "h": fr["frame"]["h"]})
+        tex = {
+            "format": "RGBA8888",
+            "scale": atlas.get("meta", {}).get("scale", 1),
+        }
+    if not frames:
+        print(f"SKIP {json_path}: no frames")
+        return
 
     processed = []
     for i, fr in enumerate(frames):
