@@ -20,6 +20,11 @@ This is mandatory, not optional. Do it as part of the fix, in the same batch.
   guaranteed in the FIRST shop after the opening battle (e.g.
   `modifierTypes.RARE_CANDY` to evolve a mon, or `modifierTypes.FORM_CHANGE_ITEM`
   which, with a single-mon party, resolves to that mon's mega stone).
+- **For any LONG or HARD fight scenario, take the player team/movesets
+  DIRECTLY from a WINNING hell-mode run in the ghost pool** (query prod D1:
+  `SELECT player_team FROM runs WHERE outcome='victory' AND difficulty='hell'`
+  via wrangler, read-only) and bake speciesId/formIndex/level/moves verbatim.
+  Maintainer rule — real winning teams, not invented ones.
 - **ALWAYS give every party mon an explicit `moveset` in `makeStarter`** (4
   sensible moves incl. whatever the scenario needs). Maintainer rule — starters
   without one spawn with whatever default moves rolled, which makes scenarios

@@ -1,0 +1,159 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Regression (#349) — ER Black Shinies (t4 ultra-rare tier):
+//  - the kit re-rolls the 3 innate slots from the APPROVED pool and rolls a
+//    3-choice GIFT slot (disjoint from the innates);
+//  - the active gift flows through getPassiveAbilities (combat + UI);
+//  - the gift is SHARED with the on-field ally in doubles, and only there;
+//  - gift cycling switches the active choice;
+//  - max ONE black shiny per player team (second roll never upgrades);
+//  - all state persists through CustomPokemonData round-trips.
+//
+// Gated behind ER_SCENARIO=1.
+// =============================================================================
+
+import {
+  applyErBlackShinyKit,
+  cycleErGiftAbility,
+  ER_BLACK_SHINY_ABILITY_POOL,
+  getErActiveGiftAbilityId,
+  getErSharedGiftAbilityIdsFor,
+  isErBlackShiny,
+  maybeUpgradeToErBlackShiny,
+  playerHasErBlackShiny,
+} from "#data/elite-redux/er-black-shinies";
+import { CustomPokemonData } from "#data/pokemon/pokemon-data";
+import { SpeciesId } from "#enums/species-id";
+import { GameManager } from "#test/framework/game-manager";
+import Phaser from "phaser";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+const RUN = process.env.ER_SCENARIO === "1";
+
+describe.skipIf(!RUN)("ER Black Shinies (#349)", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+
+  describe("singles", () => {
+    beforeEach(async () => {
+      game = new GameManager(phaserGame);
+      await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    });
+
+    it("the approved pool is large and deduped", () => {
+      expect(ER_BLACK_SHINY_ABILITY_POOL.length).toBeGreaterThanOrEqual(120);
+      expect(new Set(ER_BLACK_SHINY_ABILITY_POOL).size).toBe(ER_BLACK_SHINY_ABILITY_POOL.length);
+    });
+
+    it("the kit re-rolls 3 innates + 3 disjoint gift choices, all from the pool", () => {
+      const mon = game.scene.getPlayerPokemon()!;
+      applyErBlackShinyKit(mon);
+      expect(isErBlackShiny(mon)).toBe(true);
+
+      const data = mon.customPokemonData;
+      const innates = [data.passive, data.passive2, data.passive3] as number[];
+      expect(new Set(innates).size).toBe(3);
+      for (const id of innates) {
+        expect(ER_BLACK_SHINY_ABILITY_POOL).toContain(id);
+      }
+      expect(data.erGiftAbilities).toHaveLength(3);
+      expect(new Set(data.erGiftAbilities).size).toBe(3);
+      for (const id of data.erGiftAbilities) {
+        expect(ER_BLACK_SHINY_ABILITY_POOL).toContain(id);
+        expect(innates).not.toContain(id); // gift choices disjoint from innates
+      }
+
+      // Idempotent: re-applying must not re-roll.
+      const before = [...data.erGiftAbilities];
+      applyErBlackShinyKit(mon);
+      expect(data.erGiftAbilities).toEqual(before);
+    });
+
+    it("the ACTIVE gift flows through getPassiveAbilities; cycling switches it", () => {
+      const mon = game.scene.getPlayerPokemon()!;
+      applyErBlackShinyKit(mon);
+
+      const active = getErActiveGiftAbilityId(mon)!;
+      expect(mon.customPokemonData.erGiftAbilities[0]).toBe(active);
+      const passiveIds = mon.getPassiveAbilities().map(a => a?.id);
+      expect(passiveIds).toContain(active);
+
+      const next = cycleErGiftAbility(mon)!;
+      expect(next).toBe(mon.customPokemonData.erGiftAbilities[1]);
+      expect(next).not.toBe(active);
+      expect(mon.getPassiveAbilities().map(a => a?.id)).toContain(next);
+      // Full cycle wraps around.
+      cycleErGiftAbility(mon);
+      expect(cycleErGiftAbility(mon)).toBe(active);
+    });
+
+    it("max ONE black shiny per player team — a second roll never upgrades", () => {
+      const mon = game.scene.getPlayerPokemon()!;
+      applyErBlackShinyKit(mon);
+      expect(playerHasErBlackShiny()).toBe(true);
+
+      const enemy = game.scene.getEnemyPokemon()!;
+      // (enemy upgrades are unaffected by the player cap)
+      enemy.shiny = true;
+      enemy.variant = 2;
+      // For a PLAYER mon the cap short-circuits before any RNG:
+      const second = game.scene.getPlayerParty()[0]; // same party slot is fine for the guard
+      const fresh = Object.create(Object.getPrototypeOf(second)) as typeof second;
+      Object.assign(fresh, second, { customPokemonData: new CustomPokemonData() });
+      fresh.shiny = true;
+      fresh.variant = 2;
+      expect(maybeUpgradeToErBlackShiny(fresh)).toBe(false);
+      expect(isErBlackShiny(fresh)).toBe(false);
+    });
+
+    it("state survives a CustomPokemonData round-trip (save/load channel)", () => {
+      const mon = game.scene.getPlayerPokemon()!;
+      applyErBlackShinyKit(mon);
+      cycleErGiftAbility(mon); // erGiftIndex = 1
+
+      const copy = new CustomPokemonData(mon.customPokemonData);
+      expect(copy.erBlackShiny).toBe(true);
+      expect(copy.erGiftAbilities).toEqual(mon.customPokemonData.erGiftAbilities);
+      expect(copy.erGiftIndex).toBe(1);
+      expect(copy.passive).toBe(mon.customPokemonData.passive);
+      expect(copy.passive2).toBe(mon.customPokemonData.passive2);
+      expect(copy.passive3).toBe(mon.customPokemonData.passive3);
+    });
+  });
+
+  describe("doubles — gift sharing", () => {
+    beforeEach(async () => {
+      game = new GameManager(phaserGame);
+      game.override.battleStyle("double");
+      await game.classicMode.startBattle(SpeciesId.JIGGLYPUFF, SpeciesId.SNORLAX);
+    });
+
+    it("the black shiny's active gift is shared with its on-field ally (and only on field)", () => {
+      const [puff, lax] = game.scene.getPlayerField();
+      applyErBlackShinyKit(puff);
+      const gift = getErActiveGiftAbilityId(puff)!;
+
+      // The NON-black ally receives the gift while both are on the field.
+      expect(getErSharedGiftAbilityIdsFor(lax)).toContain(gift);
+      expect(lax.getPassiveAbilities().map(a => a?.id)).toContain(gift);
+
+      // The black shiny itself has it too, once (no duplicates).
+      const ownIds = puff.getPassiveAbilities().map(a => a?.id);
+      expect(ownIds.filter(id => id === gift)).toHaveLength(1);
+
+      // Cycling the gift updates what the ally sees.
+      const next = cycleErGiftAbility(puff)!;
+      expect(getErSharedGiftAbilityIdsFor(lax)).toContain(next);
+      expect(getErSharedGiftAbilityIdsFor(lax)).not.toContain(gift);
+    });
+  });
+});

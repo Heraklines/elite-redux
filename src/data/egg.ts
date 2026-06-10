@@ -28,6 +28,7 @@ import {
 } from "#balance/rates";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
+import { maybeUpgradeToErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { getErEggWeightDivisor } from "#data/elite-redux/init-elite-redux-egg-tiers";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { EggSourceType } from "#enums/egg-source-types";
@@ -285,6 +286,9 @@ export class Egg {
       ret = globalScene.addPlayerPokemon(pokemonSpecies, 1, abilityIndex, undefined, undefined, false);
       ret.shiny = this._isShiny;
       ret.variant = this._variantTier;
+      // ER Black Shinies (#349): an EPIC egg hatch rolls the 1/50 t4 upgrade
+      // (this is the "hatch 1k-10k eggs" acquisition path).
+      maybeUpgradeToErBlackShiny(ret);
 
       const secondaryIvs = getIvsFromId(randSeedInt(4294967295));
 

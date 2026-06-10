@@ -62,6 +62,16 @@ export class CustomPokemonData {
   /** Deprecated but needed for session save migration */
   // TODO: Remove this once pre-session migration is implemented
   public hitsRecCount: number | null = null;
+  /**
+   * ER Black Shiny (#349). When `true` this mon is the t4 ultra-rare tier:
+   * its innate slots were re-rolled from the curated pool (stored in
+   * passive/passive2/passive3 above) and it carries a 5th "gift" slot —
+   * `erGiftAbilities` holds the 3 switchable choices, `erGiftIndex` the
+   * active one (shared with on-field allies).
+   */
+  public erBlackShiny = false;
+  public erGiftAbilities: number[] = [];
+  public erGiftIndex = 0;
 
   constructor(data?: CustomPokemonData | Partial<CustomPokemonData>) {
     this.spriteScale = data?.spriteScale ?? -1;
@@ -74,6 +84,9 @@ export class CustomPokemonData {
     this.abilityOverridesForm = data?.abilityOverridesForm ?? false;
     this.types = data?.types ?? [];
     this.hitsRecCount = data?.hitsRecCount ?? null;
+    this.erBlackShiny = data?.erBlackShiny ?? false;
+    this.erGiftAbilities = data?.erGiftAbilities ?? [];
+    this.erGiftIndex = data?.erGiftIndex ?? 0;
   }
 }
 

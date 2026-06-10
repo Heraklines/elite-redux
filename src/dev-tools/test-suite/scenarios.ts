@@ -24,9 +24,10 @@
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
+import { applyErBlackShinyInterimTint, applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
-import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { setErDifficulty, setErDifficulty as setErDifficultyForScenario } from "#data/elite-redux/er-run-difficulty";
 import { erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
 import { AbilityId } from "#enums/ability-id";
 import { BerryType } from "#enums/berry-type";
@@ -961,6 +962,147 @@ export const DEV_SCENARIOS: DevScenario[] = [
           void globalScene.addEnemyModifier(mod as PokemonHeldItemModifier, false, true);
         }
       }
+    },
+  },
+  {
+    label: "Black shiny: acquisition",
+    description:
+      "#349 Black Shinies — catching one (acquisition path).\n"
+      + "The wild Gardevoir is a BLACK SHINY (obsidian tint; 3 innates re-rolled\n"
+      + "from the curated pool + a 5th GIFT slot).\n"
+      + "DO: weaken it (False Swipe) and CATCH it (5 Rogue Balls provided).\n"
+      + "EXPECT: after catching, its summary/ability screens show the re-rolled\n"
+      + "pool innates + the gift slot, and the black state SURVIVES save/reload.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.GARDEVOIR,
+        ENEMY_LEVEL_OVERRIDE: 55,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SCIZOR, {
+          moveset: [MoveId.FALSE_SWIPE, MoveId.THUNDER_WAVE, MoveId.BULLET_PUNCH, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const enemy = globalScene.getEnemyPokemon();
+      if (enemy) {
+        enemy.shiny = true;
+        enemy.variant = 2;
+        applyErBlackShinyKit(enemy);
+        applyErBlackShinyInterimTint(enemy);
+        void enemy.updateInfo();
+      }
+      const balls = globalScene.pokeballCounts;
+      balls[3] = Math.max(balls[3] ?? 0, 5); // Rogue Balls
+    },
+  },
+  {
+    label: "Black shiny: battle kit",
+    description:
+      "#349 Black Shinies — your OWN black shiny in battle.\n"
+      + "Your Garchomp is a BLACK SHINY: its 3 innates were re-rolled from the\n"
+      + "curated pool and it has the 5th GIFT slot.\n"
+      + "DO: open the ability screen / Battle Info — EXPECT 3 pool innates plus\n"
+      + "the gift ability listed. Fight: the rolled abilities actually work\n"
+      + "(messages/effects trigger). EXPECT the obsidian tint on the sprite.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 55,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.THUNDER_WAVE],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.SWORDS_DANCE, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const player = globalScene.getPlayerPokemon();
+      if (player) {
+        player.shiny = true;
+        player.variant = 2;
+        applyErBlackShinyKit(player);
+        applyErBlackShinyInterimTint(player);
+        void player.updateInfo();
+      }
+    },
+  },
+  {
+    label: "Black shiny: ally gift share",
+    description:
+      "#349 Black Shinies — the GIFT is shared with allies on the field.\n"
+      + "DOUBLE battle: your Jigglypuff is a BLACK SHINY; its ACTIVE gift\n"
+      + "ability is shared with your Snorlax while both are out.\n"
+      + "DO: open Battle Info → Abilities for SNORLAX (the non-black ally).\n"
+      + "EXPECT: Snorlax's ability list includes the Jigglypuff's active gift\n"
+      + "ability, and its effect works for Snorlax in combat. Switch the\n"
+      + "Jigglypuff out: the gift disappears from Snorlax.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        BATTLE_STYLE_OVERRIDE: "double",
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 10,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.JIGGLYPUFF, {
+          moveset: [MoveId.HYPER_VOICE, MoveId.SING, MoveId.PROTECT, MoveId.WISH],
+        }),
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const party = globalScene.getPlayerParty();
+      const puff = party[0];
+      if (puff) {
+        puff.shiny = true;
+        puff.variant = 2;
+        applyErBlackShinyKit(puff);
+        applyErBlackShinyInterimTint(puff);
+        void puff.updateInfo();
+      }
+    },
+  },
+  {
+    label: "Hell finale: BLACK Cascoon",
+    description:
+      "#349 — the Hell finale's 2nd stage is the BLACK SHINY Primal Cascoon.\n"
+      + "Wave 200 on HELL with a REAL winning hell team (by 'unstressing',\n"
+      + "ghost pool). DO: beat stage 1 (Cascoon).  EXPECT: stage 2 transforms\n"
+      + "into PRIMAL CASCOON in BLACK SHINY form (obsidian tint) carrying its\n"
+      + "gift ability on top of Angel's Wrath. Win for the full finale flow.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficultyForScenario("hell");
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 200,
+        STARTING_WAVE_OVERRIDE: 200,
+      });
+      // Verbatim winning hell team from the prod ghost pool (player
+      // "unstressing", wave 200 victory) — per the maintainer's standing rule.
+      const m = (ids: number[]): MoveId[] => ids.map(id => erMove(id));
+      return [
+        makeStarter(382 as SpeciesId, { formIndex: 1, moveset: m([573, 618, 847, 542]) }),
+        makeStarter(413 as SpeciesId, { formIndex: 2, abilityIndex: 2, moveset: m([456, 552, 455, 483]) }),
+        makeStarter(157 as SpeciesId, { formIndex: 2, moveset: m([414, 552, 908, 284]) }),
+        makeStarter(358 as SpeciesId, { moveset: m([586, 871, 826, 914]) }),
+        makeStarter(263 as SpeciesId, { moveset: m([609, 667, 245, 882]) }),
+        makeStarter(454 as SpeciesId, { moveset: m([827, 823, 837, 813]) }),
+      ];
     },
   },
   {

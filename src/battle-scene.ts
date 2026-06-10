@@ -31,8 +31,11 @@ import { getDailyMysteryEncounter } from "#data/daily-seed/daily-run";
 import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
+import { applyErBlackShinyInterimTint, applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
+import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
 import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
+import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { chromaKeyErSpriteTexture } from "#data/elite-redux/er-sprite-chroma-key";
 import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
 import { ErWardStoneModifier } from "#data/elite-redux/er-ward-stones";
@@ -3755,6 +3758,15 @@ export class BattleScene extends SceneBase {
       pokemon.generateAndPopulateMoveset(false, 1);
       this.setFieldScale(0.75);
       this.triggerPokemonFormChange(pokemon, SpeciesFormChangeManualTrigger, false);
+      // ER Black Shinies (#349): on HELL, the finale's second stage is the
+      // BLACK SHINY Primal Cascoon, gift ability active.
+      if (isErFinalBossSpecies(pokemon.species.speciesId) && getErDifficulty() === "hell") {
+        pokemon.shiny = true;
+        pokemon.variant = 2;
+        applyErBlackShinyKit(pokemon);
+        applyErBlackShinyInterimTint(pokemon);
+        void pokemon.updateInfo();
+      }
       this.currentBattle.double = true;
       const availablePartyMembers = this.getPlayerParty().filter(p => p.isAllowedInBattle());
       if (availablePartyMembers.length > 1) {

@@ -1,0 +1,194 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// ER Black Shinies (#349) — the t4 ultra-rare shiny tier.
+//
+// Maintainer spec (June 10):
+//  - Base chance = 1/50 of a RED (epic, variant 2) shiny — hatch 1k-10k eggs.
+//  - A black shiny's 3 INNATE slots are re-rolled from the curated ability
+//    pool (approved June 10: CORE + BORDERLINE), via the same persistent
+//    per-slot overrides the Ability Randomizer uses.
+//  - It also gains a 5th "GIFT" ability slot: 3 pool choices the player can
+//    switch between; the ACTIVE choice is shared with allies on the field
+//    (black shiny Jigglypuff runs Lead Coat → its double-battle partner has
+//    Lead Coat too while both are out).
+//  - Max ONE black shiny per player team — your signature Pokémon.
+//  - Visuals: "Ultra Segmented Black Shiny" sprites + smoke halo (see
+//    docs/design/black-shiny-sprite-pipeline.md) — generated assets land in
+//    er-assets; until then the battle sprite gets an interim obsidian tint.
+//
+// State lives on CustomPokemonData (erBlackShiny / erGiftAbilities /
+// erGiftIndex + the passive/passive2/passive3 innate overrides), so it
+// persists through PokemonData like every other per-mon customization.
+// =============================================================================
+
+import { globalScene } from "#app/global-scene";
+import {
+  ER_BLACK_SHINY_POOL_BORDERLINE,
+  ER_BLACK_SHINY_POOL_CORE,
+} from "#data/elite-redux/er-black-shiny-gift-pool";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import type { Pokemon } from "#field/pokemon";
+import { randSeedInt } from "#utils/common";
+
+/**
+ * APPROVED pool (maintainer, June 10): core + borderline, deduped — stored as
+ * POKEROGUE ability ids (the curation doc lists ER-native ids; ER customs map
+ * to bridged ids via ER_ID_MAP, which is what allAbilities and the
+ * customPokemonData slot overrides expect).
+ */
+export const ER_BLACK_SHINY_ABILITY_POOL: readonly number[] = [
+  ...new Set(
+    [...ER_BLACK_SHINY_POOL_CORE, ...ER_BLACK_SHINY_POOL_BORDERLINE].map(erId => ER_ID_MAP.abilities[erId] ?? erId),
+  ),
+];
+
+/** A red (epic) shiny upgrades to BLACK with probability 1/50. */
+export const ER_BLACK_SHINY_DENOMINATOR = 50;
+
+/** Interim battle-sprite tint until the generated t4 assets land. */
+export const ER_BLACK_SHINY_TINT = 0x35323d;
+
+/** True when this mon is a Black Shiny. */
+export function isErBlackShiny(pokemon: Pokemon | null | undefined): boolean {
+  return !!pokemon?.customPokemonData?.erBlackShiny;
+}
+
+/** The player team already fields a black shiny (max one per team). */
+export function playerHasErBlackShiny(): boolean {
+  try {
+    return globalScene.getPlayerParty().some(p => isErBlackShiny(p));
+  } catch {
+    return false;
+  }
+}
+
+/** Draw `count` DISTINCT ability ids from the pool (seeded RNG context). */
+function drawDistinctFromPool(count: number, exclude: ReadonlySet<number> = new Set()): number[] {
+  const picked: number[] = [];
+  const taken = new Set(exclude);
+  // Bounded resample: the pool (~130 ids) is far larger than count (3).
+  for (let guard = 0; picked.length < count && guard < 200; guard++) {
+    const id = ER_BLACK_SHINY_ABILITY_POOL[randSeedInt(ER_BLACK_SHINY_ABILITY_POOL.length)];
+    if (!taken.has(id)) {
+      taken.add(id);
+      picked.push(id);
+    }
+  }
+  return picked;
+}
+
+/**
+ * Turn `pokemon` into a black shiny: re-roll its 3 innate slots from the pool
+ * (persistent per-slot overrides) and roll its 3 gift choices (disjoint from
+ * the innates). Idempotent.
+ */
+export function applyErBlackShinyKit(pokemon: Pokemon): void {
+  const data = pokemon.customPokemonData;
+  if (data.erBlackShiny) {
+    return;
+  }
+  data.erBlackShiny = true;
+  const innates = drawDistinctFromPool(3);
+  // Same persistent slot-override channel the ER Ability Randomizer uses —
+  // battle application + every ability screen already understand it.
+  data.passive = innates[0] ?? -1;
+  data.passive2 = innates[1] ?? -1;
+  data.passive3 = innates[2] ?? -1;
+  data.erGiftAbilities = drawDistinctFromPool(3, new Set(innates));
+  data.erGiftIndex = 0;
+}
+
+/**
+ * Roll the black upgrade for a freshly generated shiny. Requires an EPIC
+ * (variant 2) shiny; succeeds 1/50 (seeded). The player team is capped at one
+ * black shiny — a second player-side roll never upgrades. Returns whether the
+ * mon is (now) black.
+ */
+export function maybeUpgradeToErBlackShiny(pokemon: Pokemon): boolean {
+  try {
+    if (isErBlackShiny(pokemon)) {
+      return true;
+    }
+    if (!pokemon.shiny || pokemon.variant !== 2) {
+      return false;
+    }
+    if (pokemon.isPlayer() && playerHasErBlackShiny()) {
+      return false;
+    }
+    if (randSeedInt(ER_BLACK_SHINY_DENOMINATOR) !== 0) {
+      return false;
+    }
+    applyErBlackShinyKit(pokemon);
+    return true;
+  } catch {
+    // The shiny pipeline must never break on the upgrade roll.
+    return false;
+  }
+}
+
+/** The ACTIVE gift ability id of this black shiny, or null. */
+export function getErActiveGiftAbilityId(pokemon: Pokemon): number | null {
+  const data = pokemon.customPokemonData;
+  if (!data?.erBlackShiny || !data.erGiftAbilities?.length) {
+    return null;
+  }
+  const idx = Math.max(0, Math.min(data.erGiftAbilities.length - 1, data.erGiftIndex ?? 0));
+  return data.erGiftAbilities[idx] ?? null;
+}
+
+/** Cycle the gift slot to the next of its 3 choices; returns the new id. */
+export function cycleErGiftAbility(pokemon: Pokemon): number | null {
+  const data = pokemon.customPokemonData;
+  if (!data?.erBlackShiny || !data.erGiftAbilities?.length) {
+    return null;
+  }
+  data.erGiftIndex = ((data.erGiftIndex ?? 0) + 1) % data.erGiftAbilities.length;
+  return getErActiveGiftAbilityId(pokemon);
+}
+
+/**
+ * GIFT SHARING — the extra ability ids active on `pokemon`:
+ *  - its OWN active gift (if it is a black shiny), plus
+ *  - the active gift of any black-shiny ALLY currently on the field with it.
+ * Consumed by Pokemon.getPassiveAbilities, so combat and every
+ * abilities-driven screen pick the gift up automatically.
+ */
+export function getErSharedGiftAbilityIdsFor(pokemon: Pokemon): number[] {
+  const ids: number[] = [];
+  const own = getErActiveGiftAbilityId(pokemon);
+  if (own !== null) {
+    ids.push(own);
+  }
+  try {
+    if (pokemon.isOnField?.()) {
+      const ally = pokemon.getAlly?.();
+      if (ally && ally !== pokemon && ally.isOnField() && isErBlackShiny(ally)) {
+        const gift = getErActiveGiftAbilityId(ally);
+        if (gift !== null && !ids.includes(gift)) {
+          ids.push(gift);
+        }
+      }
+    }
+  } catch {
+    // Ally lookup is best-effort (no scene in some headless contexts).
+  }
+  return ids;
+}
+
+/** Interim visual: obsidian-tint the battle sprites until real t4 assets land. */
+export function applyErBlackShinyInterimTint(pokemon: Pokemon): void {
+  if (!isErBlackShiny(pokemon)) {
+    return;
+  }
+  try {
+    pokemon.getSprite()?.setTint(ER_BLACK_SHINY_TINT);
+    pokemon.getTintSprite?.()?.setTint(ER_BLACK_SHINY_TINT);
+  } catch {
+    // Sprite may not exist yet (headless / pre-summon).
+  }
+}

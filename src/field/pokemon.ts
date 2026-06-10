@@ -56,6 +56,7 @@ import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/dai
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
+import { getErSharedGiftAbilityIdsFor, maybeUpgradeToErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { applyErResistBerry } from "#data/elite-redux/er-resist-berries";
 import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import {
@@ -426,6 +427,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
       if (this.variant === undefined) {
         this.variant = this.shiny ? this.generateShinyVariant() : 0;
+        // ER Black Shinies (#349): an epic (variant 2) roll upgrades to the
+        // t4 BLACK tier with chance 1/50.
+        maybeUpgradeToErBlackShiny(this);
       }
 
       if (nature === undefined) {
@@ -2308,7 +2312,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * Used by {@linkcode applyAbAttrs} to iterate all 3 passive slots when
    * applying ability attributes (ER 3-passive model).
    */
-  public getPassiveAbilities(): readonly [Ability | null, Ability | null, Ability | null] {
+  public getPassiveAbilities(): readonly (Ability | null)[] {
     // Slot 0 must continue to honor overrides / customPokemonData / event
     // boss settings so single-passive behavior is preserved when no
     // 3-passive override is set on the species. We mirror the lookup order
@@ -2366,11 +2370,21 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (transformOverride?.[0] != null) {
       slot0 = transformOverride[0] === AbilityId.NONE ? null : allAbilities[transformOverride[0]];
     }
-    return [
+    const slots: (Ability | null)[] = [
       slot0,
       slot1Id === AbilityId.NONE ? null : allAbilities[slot1Id],
       slot2Id === AbilityId.NONE ? null : allAbilities[slot2Id],
     ];
+    // ER Black Shinies (#349): append the active GIFT abilities — this mon's
+    // own gift plus any on-field black-shiny ally's gift. Flowing them through
+    // the passive list makes combat + every abilities screen pick them up.
+    for (const giftId of getErSharedGiftAbilityIdsFor(this)) {
+      const gift = allAbilities[giftId];
+      if (gift && !slots.some(a => a?.id === gift.id)) {
+        slots.push(gift);
+      }
+    }
+    return slots;
   }
 
   /**
@@ -2531,7 +2545,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @param passives - A triple of passive `Ability`s (or `null` for an empty
    *   slot), e.g. the result of `target.getPassiveAbilities()`.
    */
-  public setTempPassives(passives: readonly [Ability | null, Ability | null, Ability | null]): void {
+  public setTempPassives(passives: readonly (Ability | null)[]): void {
     // Capture the previous resolved passives so we can fire onLose attrs per slot.
     const previous = this.getPassiveAbilities();
     for (let slot = 0; slot < 3; slot++) {
@@ -3681,6 +3695,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (this.shiny) {
       this.variant = this.variant ?? 0;
       this.variant = Math.max(this.generateShinyVariant(), this.variant) as Variant; // Don't set a variant lower than the current one
+      // ER Black Shinies (#349): the re-roll can also hit the 1/50 t4 upgrade.
+      maybeUpgradeToErBlackShiny(this);
       this.luck = this.variant + 1 + (this.fusionShiny ? this.fusionVariant + 1 : 0);
       this.initShinySparkle();
     }
