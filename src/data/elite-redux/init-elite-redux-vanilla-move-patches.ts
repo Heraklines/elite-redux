@@ -1264,6 +1264,7 @@ const ER_ID_SUPER_EFFECTIVE_VS_TYPE: ReadonlyMap<number, PokemonType> = new Map<
   [124, PokemonType.WATER], // Sludge
   [139, PokemonType.FLYING], // Poison Gas
   [329, PokemonType.WATER], // Sheer Cold
+  [362, PokemonType.WATER], // Brine (#374)
   [443, PokemonType.STEEL], // Magnet Bomb
   [859, PokemonType.STEEL], // Gigaton Hammer
 ]);

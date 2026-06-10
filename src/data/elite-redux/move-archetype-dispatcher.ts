@@ -56,6 +56,7 @@ import {
   ClearWeatherAttr,
   ConfuseAttr,
   EatBerryAttr,
+  ErSuperEffectiveVsTypeAttr,
   FlinchAttr,
   ForceSwitchOutAttr,
   HealOnAllyAttr,
@@ -459,16 +460,6 @@ export class RaiseHighestOffenseDefenseStatAttr extends MoveEffectAttr {
 }
 
 /**
- * Custom `VariablePowerAttr`-style helper: boost power by `multiplier` when
- * the target is of the configured `PokemonType`. Composed atop
- * `MovePowerMultiplierAttr` rather than subclassing — the closure captures the
- * target type and multiplier and is invoked on every damage calc.
- */
-function powerBoostVsType(targetType: PokemonType, multiplier: number): MovePowerMultiplierAttr {
-  return new MovePowerMultiplierAttr((_user, target, _move) => (target.isOfType(targetType) ? multiplier : 1));
-}
-
-/**
  * Dispatch a `type-conversion` classifier row. The only mode the classifier
  * emits today is `best-effectiveness` with a candidate types array. The
  * status-chance sibling (if present) wires the same way as flag-tagged-move.
@@ -851,17 +842,15 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // berries. EatBerryAttr(selfTarget=true) matches the Stuff Cheeks shape.
       return ok(0, [new EatBerryAttr(true)]);
     case 1023:
-      // Hacksaw — power 80 steel move that's "stronger vs Steel". Pokerogue
-      // already supports type-conditional power boosts via MovePowerMultiplierAttr.
-      // 1.5x mirrors the magnitude of similar ER super-effective-on-X moves
-      // (e.g. Drainpipe, Bone Crush patterns).
-      return ok(0, [powerBoostVsType(PokemonType.STEEL, 1.5)]);
+      // Hacksaw — "Super effective vs Steel." #374: a power boost cannot fix
+      // the resisted Steel-vs-Steel matchup (and never shows the SE message);
+      // use the type-chart override like Aura Force / Clay Dart.
+      return ok(0, [new ErSuperEffectiveVsTypeAttr(PokemonType.STEEL)]);
     case 1024:
-      // Godspeed — Flying physical move, +2 priority (draft.priority). Its ABBR
-      // ("Super effective vs Steel.") gives it a Steel-targeted boost; "super
-      // effective" maps to ×2 power vs Steel (the convention used by the ER
-      // custom super-effective-vs-type moves, e.g. Excalibur ×2 vs Dragon).
-      return ok(0, [powerBoostVsType(PokemonType.STEEL, 2.0)]);
+      // Godspeed — Flying physical move, +2 priority (draft.priority).
+      // "Super effective vs Steel." #374: Flying is resisted by Steel, so the
+      // x2 power boost still read as not-very-effective — chart override.
+      return ok(0, [new ErSuperEffectiveVsTypeAttr(PokemonType.STEEL)]);
     case 1027:
       // Rain Flush — lowers user's Defense and SpDefense by 1 each
       // (effectChance is 100 on the draft = unconditional).

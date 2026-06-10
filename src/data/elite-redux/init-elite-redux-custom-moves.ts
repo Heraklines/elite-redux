@@ -798,8 +798,10 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
       // Flying component to 2×) instead of a power multiplier on a 0× hit.
       move.attr(ErSuperEffectiveVsTypeAttr, PokemonType.FLYING);
       break;
-    case 800: // Fumigation Bomb — super-effective vs Bug
-      move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.isOfType(PokemonType.BUG) ? 2 : 1));
+    case 800: // Fumigation Bomb — super-effective vs Bug (#374: chart
+      // override, not a silent power multiplier — shows the SE message and
+      // stacks correctly on dual types).
+      move.attr(ErSuperEffectiveVsTypeAttr, PokemonType.BUG);
       break;
     case 806: // Aura Force — super-effective vs Ghost (Fighting is normally
       // immune to Ghost; a power multiplier on a 0× hit stays 0, so use a
@@ -807,11 +809,15 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
       // this both lets the move HIT Ghosts and makes it super-effective.
       move.attr(ErSuperEffectiveVsTypeAttr, PokemonType.GHOST);
       break;
-    case 933: // Crackle Slam — super-effective vs Steel
-      move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.isOfType(PokemonType.STEEL) ? 2 : 1));
+    case 933: // Crackle Slam — super-effective vs Steel (#374: chart override).
+      move.attr(ErSuperEffectiveVsTypeAttr, PokemonType.STEEL);
       break;
-    case 1002: // Tsunami Hammer — super-effective vs Poison + can't be used twice
-      move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.isOfType(PokemonType.POISON) ? 2 : 1));
+    case 1002: // Tsunami Hammer — super-effective vs WATER + can't be used
+      // twice. #374: was wired to the wrong type (Poison, from the stale long
+      // description) AND as a power multiplier — a Water move into a Water
+      // target stayed resisted. The in-game description and the tester report
+      // agree on Water; the chart override makes the matchup truly 2x.
+      move.attr(ErSuperEffectiveVsTypeAttr, PokemonType.WATER);
       move.restriction(consecutiveUseRestriction);
       break;
     // ---- Ignore the target's stat-stage changes (Chip Away-style) ----

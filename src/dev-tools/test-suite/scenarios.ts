@@ -1235,4 +1235,29 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "SE-vs-type moves (#374)",
+    description:
+      "#374 'Super effective vs X' moves now ACTUALLY override the type chart\n"
+      + "(SE message + 2x even into a resist).\n"
+      + "Enemy is EMPOLEON (Water/Steel). DO: use each move.  EXPECT ALL FOUR show\n"
+      + "'It's super effective!': Tsunami Hammer (vs Water - was resisted and on\n"
+      + "the wrong type), Hacksaw + Gigaton Hammer (vs Steel - were resisted),\n"
+      + "Brine (vs Water - was missing entirely).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.EMPOLEON,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.MELMETAL, {
+          moveset: [erMove(1002), erMove(1023), MoveId.GIGATON_HAMMER, MoveId.BRINE],
+        }),
+      ];
+    },
+  },
 ];
