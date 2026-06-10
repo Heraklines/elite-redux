@@ -10,6 +10,7 @@ import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
 import { getLocalizedSpriteKey } from "#utils/common";
+import { loadLastChallenges, saveLastChallenges } from "#utils/data";
 import i18next from "i18next";
 import BBCodeText from "phaser3-rex-plugins/plugins/bbcodetext";
 
@@ -436,6 +437,8 @@ export class GameChallengesUiHandler extends UiHandler {
     } else if (button === Button.SUBMIT || button === Button.ACTION) {
       if (this.hasSelectedChallenge) {
         if (this.startCursor.visible) {
+          // ER (#382): remember this configuration for one-press reuse next run.
+          saveLastChallenges(challenges);
           phaseManager.unshiftNew("SelectStarterPhase");
           phaseManager.getCurrentPhase().end();
         } else {
@@ -446,6 +449,20 @@ export class GameChallengesUiHandler extends UiHandler {
         success = true;
       } else {
         success = false;
+      }
+    } else if (button === Button.CYCLE_SHINY && !this.startCursor.visible) {
+      // ER (#382): R re-applies the LAST-USED challenge configuration instead
+      // of re-inputting every value by hand.
+      const saved = loadLastChallenges();
+      if (saved) {
+        for (const challenge of challenges) {
+          const match = saved.find(sc => sc.id === challenge.id);
+          challenge.value = match?.value ?? 0;
+          challenge.severity = match?.severity ?? 0;
+        }
+        this.hasSelectedChallenge = challenges.some(c => c.value !== 0);
+        this.updateText();
+        success = true;
       }
     } else if (this.cursorObj?.visible && !this.startCursor.visible) {
       switch (button) {

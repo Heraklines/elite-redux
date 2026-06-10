@@ -51,6 +51,7 @@ import { BattleStyle } from "#enums/battle-style";
 import { BattleType } from "#enums/battle-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { BiomeId } from "#enums/biome-id";
+import { Challenges } from "#enums/challenges";
 import { EaseType } from "#enums/ease-type";
 import { ExpGainsSpeed } from "#enums/exp-gains-speed";
 import { ExpNotification } from "#enums/exp-notification";
@@ -1676,6 +1677,13 @@ export class BattleScene extends SceneBase {
       || battleType === BattleType.MYSTERY_ENCOUNTER // MEs are never double battles
     ) {
       return false;
+    }
+
+    // ER (#383): the Doubles Only challenge makes every TRAINER battle a
+    // double battle (before fixed-battle forcing, after the finale/ME edge
+    // cases above - the finale stays single).
+    if (battleType === BattleType.TRAINER && this.gameMode.hasChallenge(Challenges.DOUBLES_ONLY)) {
+      return true;
     }
 
     if (forcedDouble != null) {

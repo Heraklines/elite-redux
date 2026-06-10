@@ -1260,8 +1260,28 @@ export function copyChallenge(source: Challenge | any): Challenge {
       return HardcoreChallenge.loadChallenge(source);
     case Challenges.PASSIVES:
       return PassivesChallenge.loadChallenge(source);
+    case Challenges.DOUBLES_ONLY:
+      return DoublesOnlyChallenge.loadChallenge(source);
   }
   throw new Error("Unknown challenge copied");
+}
+
+/**
+ * ER (#383): Doubles Only - every TRAINER battle is a double battle (wild
+ * battles keep their normal odds). The forcing itself lives in
+ * BattleScene.checkIsDouble, keyed on this challenge being active.
+ */
+export class DoublesOnlyChallenge extends Challenge {
+  constructor() {
+    super(Challenges.DOUBLES_ONLY, 1);
+  }
+
+  static override loadChallenge(source: DoublesOnlyChallenge | any): DoublesOnlyChallenge {
+    const newChallenge = new DoublesOnlyChallenge();
+    newChallenge.value = source.value;
+    newChallenge.severity = source.severity;
+    return newChallenge;
+  }
 }
 
 export const allChallenges: Challenge[] = [];
@@ -1277,5 +1297,6 @@ export function initChallenges() {
     new PassivesChallenge(),
     new InverseBattleChallenge(),
     new FlipStatChallenge(),
+    new DoublesOnlyChallenge(),
   );
 }

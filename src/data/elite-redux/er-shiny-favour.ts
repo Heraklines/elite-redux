@@ -36,6 +36,8 @@ const FAVOUR_BY_CHALLENGE: Partial<Record<Challenges, number>> = {
   // grants NO favour. Deliberately omitted so getChallengeFavour returns 0.
   [Challenges.LOWER_MAX_STARTER_COST]: 3,
   [Challenges.LOWER_STARTER_POINTS]: 3,
+  // ER (#383): every trainer battle doubled.
+  [Challenges.DOUBLES_ONLY]: 3,
 };
 
 /** Favour granted per "step" of the shiny curve. */

@@ -113,5 +113,13 @@
       "0": "Off",
       "1": "On"
     }
+  },
+  "doublesOnly": {
+    "name": "Doubles Only",
+    "desc": "Every Trainer battle is a Double Battle.",
+    "value": {
+      "0": "Off",
+      "1": "On"
+    }
   }
 }

@@ -139,3 +139,41 @@ export function saveLastTeam(starters: Starter[]): void {
   }
   localStorage.setItem(lastTeamKey(), JSON.stringify(starters));
 }
+
+// =============================================================================
+// ER (#382): last-used challenge configuration, per account. Saved when a
+// challenge run actually starts; the challenge screen re-applies it with R.
+// =============================================================================
+
+interface SavedChallenge {
+  id: number;
+  value: number;
+  severity: number;
+}
+
+function lastChallengesKey(): string {
+  return `lastChallenges_${loggedInUser?.username}`;
+}
+
+/** The last challenge configuration the player started a run with, or null. */
+export function loadLastChallenges(): SavedChallenge[] | null {
+  const raw = localStorage.getItem(lastChallengesKey());
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? (parsed as SavedChallenge[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the challenge configuration a run is starting with. */
+export function saveLastChallenges(challenges: readonly { id: number; value: number; severity: number }[]): void {
+  const active = challenges.filter(c => c.value !== 0).map(({ id, value, severity }) => ({ id, value, severity }));
+  if (active.length === 0) {
+    return;
+  }
+  localStorage.setItem(lastChallengesKey(), JSON.stringify(active));
+}
