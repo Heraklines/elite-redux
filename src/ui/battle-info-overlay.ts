@@ -130,8 +130,26 @@ const MOVE_ROW5_BOXES: Box[] = [
   [64, 106, 172, 22],
   [64, 132, 172, 22],
 ];
+// ER (#380): the finale boss runs the FULL 7-move Angel's Wrath kit, so the
+// moves panel needs an extra-compressed band (16px pitch) for 6-8 rows.
+const MOVE_ROW8_BOXES: Box[] = [
+  [64, 26, 172, 14],
+  [64, 42, 172, 14],
+  [64, 58, 172, 14],
+  [64, 74, 172, 14],
+  [64, 90, 172, 14],
+  [64, 106, 172, 14],
+  [64, 122, 172, 14],
+  [64, 138, 172, 14],
+];
 function moveRowBoxes(count: number): Box[] {
-  return count <= 4 ? ROW4_BOXES.slice(0, count) : MOVE_ROW5_BOXES.slice(0, count);
+  if (count <= 4) {
+    return ROW4_BOXES.slice(0, count);
+  }
+  if (count <= 5) {
+    return MOVE_ROW5_BOXES.slice(0, count);
+  }
+  return MOVE_ROW8_BOXES.slice(0, count);
 }
 
 export class BattleInfoOverlay {
@@ -590,19 +608,24 @@ export class BattleInfoOverlay {
 
   // --- per-Pokémon: MOVES --------------------------------------------------
   private renderMoves(c: Phaser.GameObjects.Container, mon: Pokemon): void {
-    const moves = mon.getMoveset().filter(Boolean).slice(0, 5);
+    // ER (#380): up to 8 rows - the finale boss fields the full 7-move
+    // Angel's Wrath kit, rendered in the compressed band.
+    const moves = mon.getMoveset().filter(Boolean).slice(0, 8);
+    const compact = moves.length > 5;
     moveRowBoxes(moves.length).forEach(([, by], i) => {
       const mv = moves[i];
       const move = mv.getMove();
-      const head = addTextObject(68, by + 3, move.name, TextStyle.SUMMARY, { fontSize: "48px" });
+      const head = addTextObject(68, by + (compact ? 1 : 3), move.name, TextStyle.SUMMARY, {
+        fontSize: compact ? "40px" : "48px",
+      });
       head.setOrigin(0, 0);
       c.add(head);
       const meta = addTextObject(
         230,
-        by + 11,
+        by + (compact ? 3 : 11),
         `${i18nType(move.type)}  Pw ${move.power > 0 ? move.power : "—"}  PP ${mv.ppUsed}/${mv.getMovePp()}`,
         TextStyle.WINDOW_ALT,
-        { fontSize: "38px" },
+        { fontSize: compact ? "34px" : "38px" },
       );
       meta.setOrigin(1, 0);
       c.add(meta);
@@ -614,7 +637,7 @@ export class BattleInfoOverlay {
   // primary opposing target (single rolled estimate, % of the target's max HP).
   private renderDamageCalc(c: Phaser.GameObjects.Container, mon: Pokemon): void {
     const target = mon.getOpponents()[0];
-    const moves = mon.getMoveset().filter(Boolean).slice(0, 5);
+    const moves = mon.getMoveset().filter(Boolean).slice(0, 8);
     if (!target) {
       const t = addTextObject(68, ROW4_BOXES[0][1] + 6, "No target on the field.", TextStyle.WINDOW_ALT, {
         fontSize: "44px",

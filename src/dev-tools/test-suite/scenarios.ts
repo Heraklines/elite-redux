@@ -1068,11 +1068,14 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "Hell finale: BLACK Cascoon",
     description:
-      "#349 — the Hell finale STARTS as PRIMAL CASCOON; stage 2 is its BLACK\n"
-      + "SHINY form (real generated black sprite + smoke, black sparkle).\n"
+      "#349/#380 — the Hell finale STARTS as PRIMAL CASCOON; stage 2 is its\n"
+      + "BLACK SHINY form (real generated black sprite + smoke, black sparkle).\n"
       + "Wave 200 on HELL with a REAL winning hell team (by 'unstressing',\n"
       + "ghost pool). DO: break stage 1's boss bars.  EXPECT: stage 2 turns\n"
-      + "BLACK, with a gift ability on top of Angel's Wrath.",
+      + "BLACK, with a gift ability on top of Angel's Wrath. ALSO (#380): open\n"
+      + "Battle Info -> Moves on the boss in BOTH stages - it carries the FULL\n"
+      + "7-move Angel's Wrath kit (compressed list), and the AI actually uses\n"
+      + "the spread (hazards, omniboost, King's Shield, traps...).",
     setup: () => {
       resetDevOverrides();
       setErDifficultyForScenario("hell");

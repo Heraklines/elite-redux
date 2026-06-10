@@ -39,6 +39,7 @@ import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { chromaKeyErSpriteTexture } from "#data/elite-redux/er-sprite-chroma-key";
 import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
 import { ErWardStoneModifier } from "#data/elite-redux/er-ward-stones";
+import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
 import type { SpeciesFormChangeTrigger } from "#data/form-change-triggers";
 import { SpeciesFormChangeManualTrigger, SpeciesFormChangeTimeOfDayTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
@@ -113,6 +114,7 @@ import {
   type ModifierType,
   PokemonHeldItemModifierType,
 } from "#modifiers/modifier-type";
+import { PokemonMove } from "#moves/pokemon-move";
 import { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterSaveData } from "#mystery-encounters/mystery-encounter-save-data";
 import { allMysteryEncounters, mysteryEncountersByBiome } from "#mystery-encounters/mystery-encounters";
@@ -3768,7 +3770,13 @@ export class BattleScene extends SceneBase {
       ) as TurnHeldItemTransferModifier;
       finalBossMBH.setTransferrableFalse();
       this.addEnemyModifier(finalBossMBH, false, true);
-      pokemon.generateAndPopulateMoveset(false, 1);
+      if (isErFinalBossSpecies(pokemon.species.speciesId)) {
+        // ER (#380): the finale boss keeps its FULL Angel's Wrath kit in
+        // stage 2 (fresh PP) - regenerating would shrink it to 4 moves.
+        pokemon.moveset = CASCOON_ANGELS_WRATH_MOVES.map(([, moveId]) => new PokemonMove(moveId));
+      } else {
+        pokemon.generateAndPopulateMoveset(false, 1);
+      }
       this.setFieldScale(0.75);
       // ER Black Shinies (#349): on HELL the finale already IS Primal Cascoon
       // — stage 2 is the BLACK SHINY promotion (no form change). Elsewhere the

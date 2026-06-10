@@ -42,7 +42,11 @@ import { SpeciesId } from "#enums/species-id";
 import type { LevelMoves } from "#types/pokemon-level-moves";
 
 const CASCOON_PRIMAL_ER_ID = 2157;
-const CASCOON_ANGELS_WRATH_MOVES: LevelMoves = [
+/**
+ * The full Angel's Wrath kit (#380): every move the ability transforms. The
+ * FINALE boss carries ALL of them at once (7 move slots, boss-only).
+ */
+export const CASCOON_ANGELS_WRATH_MOVES: LevelMoves = [
   [1, MoveId.TACKLE],
   [1, MoveId.POISON_STING],
   [1, MoveId.STRING_SHOT],

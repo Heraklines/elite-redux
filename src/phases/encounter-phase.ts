@@ -8,6 +8,7 @@ import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims"
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
 import { getNatureName } from "#data/nature";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
@@ -29,6 +30,7 @@ import {
   TurnHeldItemTransferModifier,
 } from "#modifiers/modifier";
 import { regenerateModifierPoolThresholds } from "#modifiers/modifier-type";
+import { PokemonMove } from "#moves/pokemon-move";
 import { getEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
 import { doTrainerExclamation } from "#mystery-encounters/encounter-phase-utils";
 import { getGoldenBugNetSpecies } from "#mystery-encounters/encounter-pokemon-utils";
@@ -174,6 +176,11 @@ export class EncounterPhase extends BattlePhase {
           enemyPokemon.updateScale();
         }
         enemyPokemon.setBoss();
+        // ER (#380): the finale boss runs the FULL Angel's Wrath kit - all 7
+        // transformed moves at once (boss-only extended moveset; the enemy AI
+        // iterates the whole moveset, and the Battle Info moves page has a
+        // compressed layout for >5 rows). Applies to BOTH stages.
+        enemyPokemon.moveset = CASCOON_ANGELS_WRATH_MOVES.map(([, moveId]) => new PokemonMove(moveId));
       } else if (enemyPokemon.species.speciesId === SpeciesId.ETERNATUS) {
         if (battle.isClassicFinalBoss) {
           enemyPokemon.setBoss();
