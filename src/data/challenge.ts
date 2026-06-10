@@ -4,6 +4,7 @@ import type { GameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { defaultStarterSpeciesAndEvolutions } from "#balance/pokemon-evolutions";
 import { type StarterSpeciesId, speciesStarterCosts } from "#balance/starters";
+import { isErLineLegalForUsageTier, preloadErUsageTiers } from "#data/elite-redux/er-usage-tiers";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { AbilityAttr } from "#enums/ability-attr";
 import { BattleType } from "#enums/battle-type";
@@ -1262,6 +1263,8 @@ export function copyChallenge(source: Challenge | any): Challenge {
       return PassivesChallenge.loadChallenge(source);
     case Challenges.DOUBLES_ONLY:
       return DoublesOnlyChallenge.loadChallenge(source);
+    case Challenges.USAGE_TIER:
+      return UsageTierChallenge.loadChallenge(source);
   }
   throw new Error("Unknown challenge copied");
 }
@@ -1284,6 +1287,36 @@ export class DoublesOnlyChallenge extends Challenge {
   }
 }
 
+/**
+ * ER (#384): Usage Tier - restrict starters to a usage tier computed nightly
+ * from real run stats (1=UU, 2=RU, 3=PU, 4=NU; see er-usage-tiers.ts and
+ * docs/design/usage-tiers.md). PU/NU also raise the Favour cap to 5x
+ * (er-shiny-favour.ts).
+ */
+export class UsageTierChallenge extends Challenge {
+  constructor() {
+    super(Challenges.USAGE_TIER, 4);
+    // The screen kicks off the once-per-session tier-data fetch (jsDelivr
+    // CDN, never the save worker).
+    preloadErUsageTiers();
+  }
+
+  applyStarterChoice(species: PokemonSpecies, isValid: BooleanHolder): boolean {
+    if (!isErLineLegalForUsageTier(species.getRootSpeciesId(), this.value)) {
+      isValid.value = false;
+      return true;
+    }
+    return false;
+  }
+
+  static override loadChallenge(source: UsageTierChallenge | any): UsageTierChallenge {
+    const newChallenge = new UsageTierChallenge();
+    newChallenge.value = source.value;
+    newChallenge.severity = source.severity;
+    return newChallenge;
+  }
+}
+
 export const allChallenges: Challenge[] = [];
 
 export function initChallenges() {
@@ -1298,5 +1331,6 @@ export function initChallenges() {
     new InverseBattleChallenge(),
     new FlipStatChallenge(),
     new DoublesOnlyChallenge(),
+    new UsageTierChallenge(),
   );
 }

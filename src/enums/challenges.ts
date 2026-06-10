@@ -11,4 +11,5 @@ export enum Challenges {
   HARDCORE,
   PASSIVES,
   DOUBLES_ONLY,
+  USAGE_TIER,
 }

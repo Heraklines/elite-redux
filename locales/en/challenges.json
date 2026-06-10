@@ -121,5 +121,22 @@
       "0": "Off",
       "1": "On"
     }
+  },
+  "usageTier": {
+    "name": "Usage Tier",
+    "desc": {
+      "0": "Restrict your starters to an underused tier, computed nightly from real player runs. Lower tiers grant more Favour; PU and NU raise the Favour cap to 5x.",
+      "1": "UU: only lines under 2.25% pick rate. No legendary-egg lines. Grants 3 Favour.",
+      "2": "RU: only lines under 1% pick rate. No legendary or epic-egg lines. Grants 8 Favour.",
+      "3": "PU: only lines under 0.5% pick rate, common-egg lines only. Grants 15 Favour and raises the Favour cap to 5x.",
+      "4": "NU: only lines under 0.25% pick rate, common-egg lines only. Grants 20 Favour and raises the Favour cap to 5x."
+    },
+    "value": {
+      "0": "Off",
+      "1": "UU",
+      "2": "RU",
+      "3": "PU",
+      "4": "NU"
+    }
   }
 }

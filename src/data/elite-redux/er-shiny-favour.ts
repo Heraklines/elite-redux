@@ -54,6 +54,9 @@ export const FAVOUR_SHINY_MAX_MULT = 3;
  */
 const LIMITED_SUPPORT_FAVOUR = [0, 6, 8, 10] as const;
 
+/** ER (#384): Usage Tier favour by value: Off / UU / RU / PU / NU. */
+const USAGE_TIER_FAVOUR = [0, 3, 8, 15, 20] as const;
+
 /** Favour a single challenge contributes right now (0 when inactive). */
 export function getChallengeFavour(challenge: Challenge): number {
   if (challenge.value <= 0) {
@@ -61,6 +64,9 @@ export function getChallengeFavour(challenge: Challenge): number {
   }
   if (challenge.id === Challenges.LIMITED_SUPPORT) {
     return LIMITED_SUPPORT_FAVOUR[challenge.value] ?? LIMITED_SUPPORT_FAVOUR[LIMITED_SUPPORT_FAVOUR.length - 1];
+  }
+  if (challenge.id === Challenges.USAGE_TIER) {
+    return USAGE_TIER_FAVOUR[challenge.value] ?? USAGE_TIER_FAVOUR[USAGE_TIER_FAVOUR.length - 1];
   }
   return FAVOUR_BY_CHALLENGE[challenge.id] ?? 0;
 }
@@ -76,14 +82,23 @@ export function getRunShinyFavour(): number {
  * per {@linkcode FAVOUR_PER_STEP} favour, capped at {@linkcode FAVOUR_SHINY_MAX_MULT}.
  * (e.g. 0→×1, 5→×1.5, 10→×2, 15→×2.5, 20+→×3.)
  */
-export function favourToShinyMultiplier(favour: number): number {
+export function favourToShinyMultiplier(favour: number, maxMult: number = FAVOUR_SHINY_MAX_MULT): number {
   const steps = Math.floor(Math.max(0, favour) / FAVOUR_PER_STEP);
-  return Math.min(FAVOUR_SHINY_MAX_MULT, 1 + FAVOUR_SHINY_STEP_BONUS * steps);
+  return Math.min(maxMult, 1 + FAVOUR_SHINY_STEP_BONUS * steps);
+}
+
+/**
+ * ER (#384): the run's favour CAP - normally 3x, raised to 5x while a
+ * bottom usage tier (PU or NU) is active.
+ */
+export function getRunFavourCap(): number {
+  const usageTier = globalScene.gameMode?.challenges?.find(c => c.id === Challenges.USAGE_TIER);
+  return (usageTier?.value ?? 0) >= 3 ? 5 : FAVOUR_SHINY_MAX_MULT;
 }
 
 /** The current run's shiny multiplier from its challenge favour (≥1). */
 export function getRunShinyMultiplier(): number {
-  return favourToShinyMultiplier(getRunShinyFavour());
+  return favourToShinyMultiplier(getRunShinyFavour(), getRunFavourCap());
 }
 
 /**
@@ -99,5 +114,5 @@ export const ER_CANDY_GAIN_MULTIPLIER = 1.35;
  * shininess.
  */
 export function getRunCandyMultiplier(): number {
-  return favourToShinyMultiplier(getRunShinyFavour());
+  return favourToShinyMultiplier(getRunShinyFavour(), getRunFavourCap());
 }
