@@ -1,0 +1,191 @@
+# =============================================================================
+# ER Black Shiny (#349) - FULL ROSTER t4 atlas generation in the cloud.
+#
+# Sharded across runners (public repo = free minutes): every numeric base-form
+# atlas in Heraklines/er-assets images/pokemon/{,back/} is run through
+# scripts/asset-tooling/black-shiny/generate_black_shinies.py (the exact
+# maintainer-approved pipeline). Each shard uploads its outputs as an
+# artifact; a single collect job pushes ONE commit to er-assets (no per-file
+# API PUT races) and prints the commit SHA to pin in
+# deploy/cloudflare/_redirects.
+#
+# Resumable: atlases that already exist under images/pokemon/black/ are
+# skipped, so re-running only generates what's missing.
+#
+# Needs the ER_ASSETS_PUSH_TOKEN repo secret (PAT with push access to
+# Heraklines/er-assets).
+# =============================================================================
+name: Generate Black Shiny Atlases
+
+on:
+  workflow_dispatch:
+    inputs:
+      shards:
+        description: "Number of parallel shards"
+        required: false
+        default: "64"
+      limit:
+        description: "Optional cap on total atlases (smoke test); empty = all"
+        required: false
+        default: ""
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+                 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+                 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+                 30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+                 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+                 50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
+                 60, 61, 62, 63 ]
+    steps:
+      - name: Checkout game repo (generator script)
+        uses: actions/checkout@v4
+
+      - name: Checkout er-assets (source atlases, sparse)
+        uses: actions/checkout@v4
+        with:
+          repository: Heraklines/er-assets
+          path: er-assets
+          sparse-checkout: |
+            images/pokemon/*.json
+            images/pokemon/*.png
+            images/pokemon/back/*.json
+            images/pokemon/back/*.png
+            images/pokemon/black/*.json
+            images/pokemon/black/back/*.json
+          sparse-checkout-cone-mode: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install pillow numpy
+
+      - name: Generate shard
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARDS: ${{ github.event.inputs.shards }}
+          LIMIT: ${{ github.event.inputs.limit }}
+        run: |
+          python - <<'EOF'
+          import os, re, subprocess, sys
+
+          src = "er-assets/images/pokemon"
+          done = "er-assets/images/pokemon/black"
+          shard = int(os.environ["SHARD"])
+          shards = int(os.environ.get("SHARDS") or 64)
+          limit = os.environ.get("LIMIT") or ""
+
+          # Numeric base-form atlases only (forms use the interim tint;
+          # ER customs use a slug path scheme and are a follow-up batch).
+          def numeric_atlases(d):
+              if not os.path.isdir(d):
+                  return []
+              return sorted(
+                  (os.path.join(d, f) for f in os.listdir(d)
+                   if re.fullmatch(r"\d+\.json", f)
+                   and os.path.isfile(os.path.join(d, f[:-5] + ".png"))),
+                  key=lambda p: int(os.path.basename(p)[:-5]),
+              )
+
+          jobs = []
+          for back in (False, True):
+              indir = os.path.join(src, "back") if back else src
+              donedir = os.path.join(done, "back") if back else done
+              for j in numeric_atlases(indir):
+                  marker = os.path.join(donedir, os.path.basename(j))
+                  if not os.path.exists(marker):
+                      jobs.append(j)
+          if limit:
+              jobs = jobs[: int(limit)]
+          mine = [j for i, j in enumerate(jobs) if i % shards == shard]
+          print(f"shard {shard}/{shards}: {len(mine)} of {len(jobs)} atlases")
+          if not mine:
+              open("EMPTY_SHARD", "w").close()
+              sys.exit(0)
+
+          # 4 worker processes per runner (standard runners have 4 vCPU).
+          procs = []
+          for w in range(4):
+              chunk = mine[w::4]
+              if not chunk:
+                  continue
+              procs.append(subprocess.Popen(
+                  [sys.executable,
+                   "scripts/asset-tooling/black-shiny/generate_black_shinies.py",
+                   *chunk, "--out", "black-out"]))
+          rc = 0
+          for p in procs:
+              rc |= p.wait()
+          sys.exit(rc)
+          EOF
+
+      - name: Upload shard output
+        uses: actions/upload-artifact@v4
+        with:
+          name: black-shard-${{ matrix.shard }}
+          path: black-out/
+          if-no-files-found: ignore
+          retention-days: 3
+
+  collect:
+    needs: generate
+    # Commit whatever the shards produced even if some shards failed
+    # (the run is resumable - rerun to fill gaps).
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout er-assets (push target)
+        uses: actions/checkout@v4
+        with:
+          repository: Heraklines/er-assets
+          token: ${{ secrets.ER_ASSETS_PUSH_TOKEN }}
+          path: er-assets
+
+      - name: Download all shard outputs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: black-shard-*
+          merge-multiple: true
+          path: black-out
+
+      - name: Commit to er-assets (single commit)
+        working-directory: er-assets
+        run: |
+          if [ ! -d ../black-out ]; then
+            echo "No outputs - nothing to commit."
+            exit 0
+          fi
+          mkdir -p images/pokemon/black/back
+          cp -r ../black-out/. images/pokemon/black/
+          git add images/pokemon/black
+          if git diff --cached --quiet; then
+            echo "No new atlases - nothing to commit."
+            exit 0
+          fi
+          git config user.name "er-black-shiny-bot"
+          git config user.email "noreply@elite-redux"
+          COUNT=$(git diff --cached --name-only | grep -c '\.json$' || true)
+          git commit -m "black-shiny: full roster t4 atlases (+$COUNT, #349 pipeline)"
+          git push
+          echo "FINAL_COMMIT_SHA $(git rev-parse HEAD)"
+
+      - name: Manifest keys (for er-black-sprite-manifest.ts)
+        working-directory: er-assets
+        run: |
+          ls images/pokemon/black/*.json 2>/dev/null | sed -E 's#.*/([0-9]+)\.json#"\1",#' | sort -t'"' -k2 -n > manifest-keys.txt || true
+          ls images/pokemon/black/back/*.json 2>/dev/null | sed -E 's#.*/([0-9]+)\.json#"back/\1",#' | sort -t'"' -k3 -n >> manifest-keys.txt || true
+          wc -l manifest-keys.txt
+
+      - name: Upload manifest key list
+        uses: actions/upload-artifact@v4
+        with:
+          name: manifest-keys
+          path: er-assets/manifest-keys.txt
