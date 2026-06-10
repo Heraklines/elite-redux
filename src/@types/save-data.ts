@@ -198,6 +198,12 @@ export interface StarterDataEntry {
   passiveAttr: number;
   valueReduction: number;
   classicWinCount: number;
+  /**
+   * ER Black Shinies (#349): set once the player has caught/hatched a BLACK
+   * (t4) shiny of this line — unlocks the black tier in starter select and
+   * the dex filter. Optional for save compatibility.
+   */
+  erBlackShiny?: boolean;
 }
 
 export interface StarterData {

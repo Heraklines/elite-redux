@@ -48,7 +48,8 @@ export class StarterContainer extends Phaser.GameObjects.Container {
     this.add(this.icon);
 
     // shiny icons
-    for (let i = 0; i < 3; i++) {
+    // ER Black Shinies (#349): 4 sparkle slots — the 4th is the BLACK tier.
+    for (let i = 0; i < 4; i++) {
       const shinyIcon = globalScene.add.image(i * -3 + 12, 2, "shiny_star_small");
       shinyIcon.setScale(0.5);
       shinyIcon.setOrigin(0, 0);

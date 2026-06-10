@@ -4145,6 +4145,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           );
         }
       }
+      // ER Black Shinies (#349): 4th sparkle — pure black — once the line's
+      // t4 has been caught/hatched.
+      if (container.shinyIcons[3]) {
+        const hasBlack = !!starterDataEntry?.erBlackShiny;
+        container.shinyIcons[3].setVisible(hasBlack);
+        if (hasBlack) {
+          container.shinyIcons[3].setTint(0x0a0a0a);
+        }
+      }
 
       container.starterPassiveBgs.setVisible(!!starterDataEntry.passiveAttr);
       container.hiddenAbilityIcon.setVisible(!!dexEntry.caughtAttr && !!(starterDataEntry.abilityAttr & 4));

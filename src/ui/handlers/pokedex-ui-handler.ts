@@ -409,7 +409,15 @@ export class PokedexUiHandler extends MessageUiHandler {
     shiny3Sprite.setFrame(getVariantIcon(2));
     shiny3Sprite.setTint(getVariantTint(2));
 
+    // ER Black Shinies (#349): t4 filter sparkle — pure black.
+    const shinyBlackSprite = globalScene.add.sprite(0, 0, "shiny_icons");
+    shinyBlackSprite.setOrigin(0.15, 0.2);
+    shinyBlackSprite.setScale(0.6);
+    shinyBlackSprite.setFrame(getVariantIcon(2));
+    shinyBlackSprite.setTint(0x0a0a0a);
+
     const caughtOptions = [
+      new DropDownOption("SHINYBLACK", new DropDownLabel("", shinyBlackSprite)),
       new DropDownOption("SHINY3", new DropDownLabel("", shiny3Sprite)),
       new DropDownOption("SHINY2", new DropDownLabel("", shiny2Sprite)),
       new DropDownOption("SHINY", new DropDownLabel("", shiny1Sprite)),
@@ -1636,9 +1644,13 @@ export class PokedexUiHandler extends MessageUiHandler {
       const isVariant2Caught = isShinyCaught && !!(caughtAttr & DexAttr.VARIANT_2);
       const isVariant3Caught = isShinyCaught && !!(caughtAttr & DexAttr.VARIANT_3);
       const isUncaught = !isNonShinyCaught && !isVariant1Caught && !isVariant2Caught && !isVariant3Caught;
+      const isBlackCaught = !!starterData?.erBlackShiny;
       const fitsCaught = this.filterBar.getVals(DropDownColumn.CAUGHT).some(caught => {
+        if (caught === "SHINYBLACK") {
+          return isBlackCaught;
+        }
         if (caught === "SHINY3") {
-          return isVariant3Caught;
+          return isVariant3Caught && !isBlackCaught;
         }
         if (caught === "SHINY2") {
           return isVariant2Caught && !isVariant3Caught;
@@ -1981,6 +1993,14 @@ export class PokedexUiHandler extends MessageUiHandler {
           }
 
           const cStarterData = this.gameData.starterData[this.getStarterSpeciesId(speciesId)];
+          // ER Black Shinies (#349): 4th sparkle — pure black — for t4 unlocks.
+          if (container.shinyIcons[3]) {
+            const hasBlack = !!cStarterData?.erBlackShiny;
+            container.shinyIcons[3].setVisible(hasBlack);
+            if (hasBlack) {
+              container.shinyIcons[3].setTint(0x0a0a0a);
+            }
+          }
           container.starterPassiveBgs.setVisible(!!cStarterData?.passiveAttr);
           container.hiddenAbilityIcon.setVisible(
             !!caughtAttr && !!(cStarterData?.abilityAttr ?? 0) && !!(cStarterData.abilityAttr & 4),

@@ -2078,6 +2078,11 @@ export class GameData {
     if (!incrementCount && !globalScene.gameData.dexData[speciesRootForm].caughtAttr) {
       return Promise.resolve(false);
     }
+    // ER Black Shinies (#349): catching/hatching a t4 black shiny unlocks the
+    // black tier for this line (starter select + dex filter).
+    if (pokemon.customPokemonData?.erBlackShiny && this.starterData[speciesRootForm]) {
+      this.starterData[speciesRootForm].erBlackShiny = true;
+    }
     return this.setPokemonSpeciesCaught(pokemon, pokemon.species, incrementCount, fromEgg, showMessage);
   }
 
