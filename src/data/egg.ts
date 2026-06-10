@@ -331,16 +331,20 @@ export class Egg {
   }
 
   public getEggHatchWavesMessage(): string {
+    // ER (#378): always append the CONCRETE remaining wave count - the vague
+    // flavor text alone ("doesn't seem close to hatching") tells the player
+    // nothing actionable.
+    const remaining = i18next.t("egg:hatchWavesRemaining", { count: this.hatchWaves });
     if (this.hatchWaves <= 5) {
-      return i18next.t("egg:hatchWavesMessageSoon");
+      return i18next.t("egg:hatchWavesMessageSoon") + remaining;
     }
     if (this.hatchWaves <= 15) {
-      return i18next.t("egg:hatchWavesMessageClose");
+      return i18next.t("egg:hatchWavesMessageClose") + remaining;
     }
     if (this.hatchWaves <= 50) {
-      return i18next.t("egg:hatchWavesMessageNotClose");
+      return i18next.t("egg:hatchWavesMessageNotClose") + remaining;
     }
-    return i18next.t("egg:hatchWavesMessageLongTime");
+    return i18next.t("egg:hatchWavesMessageLongTime") + remaining;
   }
 
   public getEggTypeDescriptor(): string {

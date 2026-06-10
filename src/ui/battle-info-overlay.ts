@@ -23,6 +23,7 @@ import { getErActiveGiftAbilityId, getErSharedGiftAbilityIdsFor } from "#data/el
 import { erYoungsterFreeInnateSlots } from "#data/elite-redux/er-run-difficulty";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { TerrainType as TerrainTypeEnum } from "#data/terrain";
+import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import type { Button } from "#enums/buttons";
@@ -532,7 +533,11 @@ export class BattleInfoOverlay {
           locked = true;
           label = `Innate (Locked Lv${levelReq})`;
         }
-      } else if (slot < youngsterFree) {
+      } else if (
+        slot < youngsterFree
+        || globalScene.gameMode?.isDaily === true // ER (#381): a TRUANT innate is always live for free (it is a nerf).
+        || ability.id === AbilityId.TRUANT
+      ) {
         // live for free this run — fall through unlocked
       } else if (!isSlotUnlocked(passiveAttr, passiveSlot)) {
         locked = true;

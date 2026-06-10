@@ -4815,8 +4815,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       }
 
       const ability = allAbilities[abilityId];
-      const isUnlocked = isSlotUnlocked(passiveAttr, slotIndex);
-      const isEnabled = isSlotEnabled(passiveAttr, slotIndex);
+      // ER (#381): a TRUANT innate is a NERF - always unlocked and enabled
+      // for free, never behind a candy purchase.
+      const isFreeNerf = abilityId === AbilityId.TRUANT;
+      const isUnlocked = isFreeNerf || isSlotUnlocked(passiveAttr, slotIndex);
+      const isEnabled = isFreeNerf || isSlotEnabled(passiveAttr, slotIndex);
 
       const textStyle = isUnlocked && isEnabled ? TextStyle.SUMMARY_ALT : TextStyle.SUMMARY_GRAY;
       const textAlpha = isUnlocked && isEnabled ? 1 : 0.5;

@@ -1260,4 +1260,31 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "NGas blocks Scare (#375)",
+    description:
+      "#375 Neutralizing Gas suppresses Scare's on-entry Sp. Atk drop.\n"
+      + "The enemy Weezing has Neutralizing Gas; your Gyarados has SCARE.\n"
+      + "DO: just enter the battle, then open Battle Info on the enemy.\n"
+      + "EXPECT: Weezing's Sp. Atk stage is 0 (NOT -1). Regression-locked in the\n"
+      + "harness for both active and innate Scare; if you can still reproduce a\n"
+      + "drop in a real run, Send Logs with the exact mons involved.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.SCARE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.WEEZING,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.NEUTRALIZING_GAS,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.WATERFALL, MoveId.ICE_FANG, MoveId.PROTECT, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
 ];

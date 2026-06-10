@@ -2692,10 +2692,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (this.isPlayer()) {
       const passiveAttr = globalScene.gameData.starterData[this.species.getRootSpeciesId()]?.passiveAttr ?? 0;
       // ER Youngster mode (#368): innates are temp-unlocked by level for the
-      // run, so the player "has a passive" whenever any slot is filled.
+      // run, so the player "has a passive" whenever any slot is filled. ER
+      // (#379): DAILY runs likewise unlock all innates for the run.
       basePassive =
         hasAnyActiveSlot(passiveAttr)
-        || (erYoungsterFreeInnateSlots(this.level) > 0 && this.getPassiveAbilities().some(a => a != null));
+        || ((erYoungsterFreeInnateSlots(this.level) > 0 || gameMode.isDaily)
+          && this.getPassiveAbilities().some(a => a != null)) // ER (#381): a TRUANT innate is always live (it is a nerf).
+        || this.getPassiveAbilities()
+          .slice(0, 3)
+          .some(a => a?.id === AbilityId.TRUANT);
     } else if (this.isEnemy()) {
       // ER: enemies ALWAYS have their innates active (no candy-unlock gate) — unlike
       // the player, whose innate slots are gated by `passiveAttr` above. This only
@@ -2785,8 +2790,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         // ER Youngster mode (#368): innate slots are TEMP-unlocked by level
         // for the run (no candy purchase needed; nothing persisted) — the
         // same 1/15/24 ramp enemies use. Candy unlocks still count too.
-        const youngsterFree = passiveSlot < erYoungsterFreeInnateSlots(this.level);
-        if (!youngsterFree && !isSlotActive(passiveAttr, passiveSlot as 0 | 1 | 2)) {
+        // ER (#379): DAILY runs unlock ALL innates for the run, run-only.
+        // ER (#381): a TRUANT innate is a NERF - it is always active for free
+        // (gating a downside behind a candy purchase makes no sense).
+        const freeInnate =
+          passiveSlot < erYoungsterFreeInnateSlots(this.level)
+          || globalScene.gameMode?.isDaily === true
+          || ability.id === AbilityId.TRUANT;
+        if (!freeInnate && !isSlotActive(passiveAttr, passiveSlot as 0 | 1 | 2)) {
           return false;
         }
       }
