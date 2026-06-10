@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import type { Egg } from "#data/egg";
 import type { EggHatchData } from "#data/egg-hatch-data";
+import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { UiMode } from "#enums/ui-mode";
 import { EggCountChangedEvent } from "#events/egg";
 import type { PlayerPokemon } from "#field/pokemon";
@@ -370,6 +371,13 @@ export class EggHatchPhase extends Phase {
       this.pokemon.cry();
       if (isShiny) {
         globalScene.time.delayedCall(fixedInt(500), () => {
+          // ER Black Shinies (#349): a BLACK hatch - the rarest moment in the
+          // game - plays an obsidian sparkle, not the epic-red effect.
+          if (isErBlackShiny(this.pokemon)) {
+            this.pokemonShinySparkle.setTintFill(0x111016);
+          } else {
+            this.pokemonShinySparkle.clearTint();
+          }
           globalScene.animations.doShinySparkleAnim(this.pokemonShinySparkle, this.pokemon.variant);
         });
       }
