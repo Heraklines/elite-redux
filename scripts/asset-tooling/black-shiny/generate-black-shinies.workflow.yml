@@ -203,7 +203,15 @@ jobs:
           git config user.email "noreply@elite-redux"
           COUNT=$(git diff --cached --name-only | grep -c '\.json$' || true)
           git commit -m "black-shiny: roster t4 atlases (+$COUNT, #349 pipeline)"
-          git push
+          # The branch may have moved while the run was generating (it did
+          # once: a workflow-file push raced the collect commit and the push
+          # was rejected). Rebase-with-retry instead of failing the batch.
+          for attempt in 1 2 3; do
+            if git push; then
+              break
+            fi
+            git pull --rebase
+          done
           echo "FINAL_COMMIT_SHA $(git rev-parse HEAD)"
 
       - name: Manifest keys (for er-black-sprite-manifest.ts)
