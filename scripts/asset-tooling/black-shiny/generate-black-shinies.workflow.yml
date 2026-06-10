@@ -51,8 +51,11 @@ jobs:
             images/pokemon/*.png
             images/pokemon/back/*.json
             images/pokemon/back/*.png
+            images/pokemon/elite-redux/*/*.json
+            images/pokemon/elite-redux/*/*.png
             images/pokemon/black/*.json
             images/pokemon/black/back/*.json
+            images/pokemon/black/elite-redux/*/*.json
           sparse-checkout-cone-mode: false
 
       - name: Checkout game repo (generator script)
@@ -100,6 +103,9 @@ jobs:
                   key=lambda p: int(os.path.basename(p)[:-5]),
               )
 
+          # jobs: (json_path, out_dir). Numeric base forms go to black-out/;
+          # ER CUSTOM slug atlases (elite-redux/{slug}/front|back.json) go to
+          # per-slug out dirs so front/back basenames never collide.
           jobs = []
           for back in (False, True):
               indir = os.path.join(src, "back") if back else src
@@ -107,7 +113,19 @@ jobs:
               for j in numeric_atlases(indir):
                   marker = os.path.join(donedir, os.path.basename(j))
                   if not os.path.exists(marker):
-                      jobs.append(j)
+                      jobs.append((j, "black-out"))
+          er_dir = os.path.join(src, "elite-redux")
+          if os.path.isdir(er_dir):
+              for slug in sorted(os.listdir(er_dir)):
+                  d = os.path.join(er_dir, slug)
+                  if not os.path.isdir(d):
+                      continue
+                  for side in ("front", "back"):
+                      j = os.path.join(d, side + ".json")
+                      png = os.path.join(d, side + ".png")
+                      marker = os.path.join(done, "elite-redux", slug, side + ".json")
+                      if os.path.isfile(j) and os.path.isfile(png) and not os.path.exists(marker):
+                          jobs.append((j, os.path.join("black-out", "elite-redux", slug)))
           if limit:
               jobs = jobs[: int(limit)]
           mine = [j for i, j in enumerate(jobs) if i % shards == shard]
@@ -115,16 +133,22 @@ jobs:
           if not mine:
               sys.exit(0)
 
-          # 4 worker processes per runner (standard runners have 4 vCPU).
+          # 4 worker processes per runner (standard runners have 4 vCPU),
+          # one subprocess per (worker, out_dir) group.
+          from collections import defaultdict
           procs = []
           for w in range(4):
               chunk = mine[w::4]
               if not chunk:
                   continue
-              procs.append(subprocess.Popen(
-                  [sys.executable,
-                   "game/scripts/asset-tooling/black-shiny/generate_black_shinies.py",
-                   *chunk, "--out", "black-out"]))
+              by_out = defaultdict(list)
+              for path, out in chunk:
+                  by_out[out].append(path)
+              for out, paths in by_out.items():
+                  procs.append(subprocess.Popen(
+                      [sys.executable,
+                       "game/scripts/asset-tooling/black-shiny/generate_black_shinies.py",
+                       *paths, "--out", out]))
           rc = 0
           for p in procs:
               rc |= p.wait()
@@ -186,6 +210,7 @@ jobs:
         run: |
           ls images/pokemon/black/*.json 2>/dev/null | sed -E 's#.*/([0-9]+)\.json#"\1",#' > manifest-keys.txt || true
           ls images/pokemon/black/back/*.json 2>/dev/null | sed -E 's#.*/([0-9]+)\.json#"back/\1",#' >> manifest-keys.txt || true
+          ls images/pokemon/black/elite-redux/*/*.json 2>/dev/null | sed -E 's#images/pokemon/black/(elite-redux/[^/]+/(front|back))\.json#"\1",#' >> manifest-keys.txt || true
           wc -l manifest-keys.txt
 
       - name: Upload manifest key list

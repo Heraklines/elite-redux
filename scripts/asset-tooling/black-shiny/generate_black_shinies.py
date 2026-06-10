@@ -13,6 +13,7 @@
 # =============================================================================
 import json
 import os
+import zlib
 import sys
 import random
 import math
@@ -278,7 +279,8 @@ def process_atlas(json_path, out_dir):
     for i, fr in enumerate(frames):
         r = fr["frame"]
         sub = sheet[r["y"]: r["y"] + r["h"], r["x"]: r["x"] + r["w"]]
-        seed = (hash(os.path.basename(json_path)) & 0xFFFF) * 1000 + i
+        seed_key = json_path.replace("\\", "/")
+        seed = (zlib.crc32(seed_key.encode()) & 0xFFFF) * 1000 + i
         processed.append(process_frame(sub, seed))
 
     # Shelf-pack the padded frames into a new sheet.

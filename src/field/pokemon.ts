@@ -61,7 +61,7 @@ import {
   isErBlackShiny,
   maybeUpgradeToErBlackShiny,
 } from "#data/elite-redux/er-black-shinies";
-import { erBlackSpritePath } from "#data/elite-redux/er-black-sprite-manifest";
+import { erBlackSpritePath, erBlackSpritePathFromBase } from "#data/elite-redux/er-black-sprite-manifest";
 import { applyErResistBerry } from "#data/elite-redux/er-resist-berries";
 import { erYoungsterFreeInnateSlots, getErDifficultyShinyMultiplier } from "#data/elite-redux/er-run-difficulty";
 import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
@@ -1029,12 +1029,21 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         return black;
       }
     }
-    return this.getSpeciesForm(ignoreOverride, true).getSpriteAtlasPath(
+    const basePath = this.getSpeciesForm(ignoreOverride, true).getSpriteAtlasPath(
       this.getGender(ignoreOverride, true) === Gender.FEMALE,
       formIndex,
       this.shiny,
       this.variant,
     );
+    // ER CUSTOM black shinies (#349): slug-based atlases are keyed by their
+    // base path (elite-redux/{slug}/front -> black/elite-redux/{slug}/front).
+    if (isErBlackShiny(this) && formIndex === 0) {
+      const blackCustom = erBlackSpritePathFromBase(basePath);
+      if (blackCustom) {
+        return blackCustom;
+      }
+    }
+    return basePath;
   }
 
   getBattleSpriteAtlasPath(back?: boolean, ignoreOverride?: boolean): string {
@@ -1053,13 +1062,21 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         return black;
       }
     }
-    return this.getSpeciesForm(ignoreOverride, true).getSpriteAtlasPath(
+    const baseBattlePath = this.getSpeciesForm(ignoreOverride, true).getSpriteAtlasPath(
       this.getGender(ignoreOverride, true) === Gender.FEMALE,
       formIndex,
       this.shiny,
       this.variant,
       back,
     );
+    // ER CUSTOM black shinies (#349): slug-based scheme, keyed by base path.
+    if (isErBlackShiny(this) && formIndex === 0) {
+      const blackCustom = erBlackSpritePathFromBase(baseBattlePath);
+      if (blackCustom) {
+        return blackCustom;
+      }
+    }
+    return baseBattlePath;
   }
 
   getSpriteId(ignoreOverride?: boolean): string {
@@ -1095,8 +1112,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       this.isShiny(false),
       this.getVariant(false),
     );
-    // ER Black Shinies (#349): distinct texture key for the t4 atlas.
-    if (isErBlackShiny(this) && this.formIndex === 0 && erBlackSpritePath(this.species.speciesId, false)) {
+    // ER Black Shinies (#349): distinct texture key for the t4 atlas
+    // (numeric scheme OR slug-based ER-custom scheme).
+    if (isErBlackShiny(this) && this.formIndex === 0 && this.getSpriteAtlasPath(ignoreOverride).startsWith("black/")) {
       return `${base}-erblack`;
     }
     return base;
@@ -1107,8 +1125,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (back === undefined) {
       back = this.isPlayer();
     }
-    // ER Black Shinies (#349): distinct texture key for the t4 atlas.
-    if (isErBlackShiny(this) && this.formIndex === 0 && erBlackSpritePath(this.species.speciesId, !!back)) {
+    // ER Black Shinies (#349): distinct texture key for the t4 atlas
+    // (numeric scheme OR slug-based ER-custom scheme).
+    if (
+      isErBlackShiny(this)
+      && this.formIndex === 0
+      && this.getBattleSpriteAtlasPath(back, ignoreOverride).startsWith("black/")
+    ) {
       return `${base}-erblack`;
     }
     return base;

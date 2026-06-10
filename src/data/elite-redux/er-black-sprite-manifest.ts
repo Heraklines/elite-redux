@@ -1338,3 +1338,13 @@ export function erBlackSpritePath(speciesId: number, back: boolean): string | nu
   const key = `${back ? "back/" : ""}${speciesId}`;
   return ER_BLACK_SPRITES.has(key) ? `black/${key}` : null;
 }
+
+/**
+ * ER CUSTOM species use a slug-based atlas scheme (`elite-redux/{slug}/front`
+ * instead of a numeric id). Their black atlases live at
+ * `black/elite-redux/{slug}/front|back`, keyed in the manifest by the BASE
+ * atlas path itself. Returns the black path, or null if not generated.
+ */
+export function erBlackSpritePathFromBase(baseAtlasPath: string): string | null {
+  return ER_BLACK_SPRITES.has(baseAtlasPath) ? `black/${baseAtlasPath}` : null;
+}
