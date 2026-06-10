@@ -56,6 +56,7 @@ import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/dai
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
+import { applyErResistBerry } from "#data/elite-redux/er-resist-berries";
 import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import { getLevelTotalExp } from "#data/exp";
 import {
@@ -4672,6 +4673,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!this.isPlayer()) {
       globalScene.applyModifiers(EnemyDamageReducerModifier, false, damage);
     }
+
+    // ER resistance berries (#357): if the DEFENDER holds the berry matching
+    // this hit's type, halve the damage BEFORE it lands and consume the berry
+    // (super-effective hits only; Chilan works on any Normal hit).
+    applyErResistBerry(this, moveType, typeMultiplier, damage, simulated);
 
     // ER recreated Life Orb (held by the attacker): ×1.3 outgoing damage. The
     // matching ~1/10 max-HP recoil is applied in the move-effect phase. Scanned

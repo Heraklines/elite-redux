@@ -25,6 +25,7 @@ import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
+import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { AbilityId } from "#enums/ability-id";
 import { BerryType } from "#enums/berry-type";
@@ -32,10 +33,12 @@ import { ErAbilityId } from "#enums/er-ability-id";
 import { ErMoveId } from "#enums/er-move-id";
 import { MoveId } from "#enums/move-id";
 import { Nature } from "#enums/nature";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
+import type { PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { ModifierOverride } from "#modifiers/modifier-type";
 import type { Variant } from "#sprites/variant";
 import type { ModifierTypeFunc } from "#types/modifier-types";
@@ -844,6 +847,42 @@ export const DEV_SCENARIOS: DevScenario[] = [
       modifierTypes.FORM_CHANGE_ITEM,
       modifierTypes.FORM_CHANGE_ITEM,
     ],
+  },
+  {
+    label: "Resist berries (#357)",
+    description:
+      "#357 Resistance berries — trainer-only held berries that HALVE one\n"
+      + "super-effective hit of their type BEFORE it lands, then are eaten.\n"
+      + "Enemy Charizard holds a PASSHO BERRY (Water).\n"
+      + "DO: 1) Use SURF — EXPECT roughly HALF damage + message '…Passho Berry\n"
+      + "weakened the attack!' and the berry is gone. 2) Surf again — EXPECT full\n"
+      + "damage (one use only). 3) Restart and use THIEF first — EXPECT you STEAL\n"
+      + "the berry; an enemy Water hit on your mon is then halved once instead.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHARIZARD,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SURF],
+      });
+      return [
+        makeStarter(SpeciesId.BLASTOISE, {
+          moveset: [MoveId.SURF, MoveId.THIEF, MoveId.TACKLE, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      // Guarantee the berry (the real trainer roll is 1%/5%/10% per mon).
+      const enemy = globalScene.getEnemyPokemon();
+      if (enemy) {
+        const mod = erResistBerryModifierType(PokemonType.WATER).newModifier(enemy);
+        if (mod) {
+          globalScene.addEnemyModifier(mod as PokemonHeldItemModifier, true, true);
+        }
+      }
+    },
   },
   {
     label: "Redux sprites (party)",

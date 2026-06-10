@@ -329,10 +329,11 @@ export class SummaryUiHandler extends UiHandler {
     this.genderText.setOrigin(0, 1);
     this.summaryContainer.add(this.genderText);
 
-    // ER money streak (#348): small gold ribbon on the name bar — sits in the
-    // dead space after the gender symbol so it never overlaps anything, but is
-    // always visible while the summary is open.
-    this.erStreakText = addTextObject(108, -17, "", TextStyle.SUMMARY_GOLD);
+    // ER money streak (#348): small gold ribbon on the name bar — centered in
+    // the free gap between "Lv." and the gender symbol (the ER summary's left
+    // panel is narrow; anything past the gender symbol gets clipped, which is
+    // why the first placement at x=108 was invisible).
+    this.erStreakText = addTextObject(52, -17, "", TextStyle.SUMMARY_GOLD);
     this.erStreakText.setOrigin(0, 1);
     this.summaryContainer.add(this.erStreakText);
 

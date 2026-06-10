@@ -105,6 +105,12 @@ export interface SessionSaveData {
    * (older saves restore fresh streaks).
    */
   erMoneyStreaks?: [number, number][];
+  /**
+   * ER (#357): the player's resist berries ([pokemonId, resistType]) — kept as
+   * a side-channel because runtime ER modifier types aren't reconstructible
+   * from the vanilla modifier registry. Optional for backwards compatibility.
+   */
+  erResistBerries?: [number, number][];
 }
 
 export interface Unlocks {
