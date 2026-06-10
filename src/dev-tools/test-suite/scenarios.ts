@@ -470,7 +470,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "EXPECT: page 1 = stats panel; page 2 = a WIDE description box above the\n"
       + "move list (long text auto-scrolls; stats stay in the side panel); page 3 =\n"
       + "DMG CALC in the side panel, fully inside the panel (no overflow); then back\n"
-      + "to page 1. Works for every move incl. the 5th rogue-slot move.",
+      + "to page 1. Works for every move incl. the 5th rogue-slot move.\n"
+      + "ALSO (#377): on the stats page a small static 'R ⇄' hint sits at the\n"
+      + "panel edge so the cycling is discoverable.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -967,12 +969,12 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "Black shiny: acquisition",
     description:
-      "#349 Black Shinies — catching one (acquisition path).\n"
-      + "The wild Gardevoir is a BLACK SHINY (obsidian tint; 3 innates re-rolled\n"
-      + "from the curated pool + a 5th GIFT slot).\n"
+      "#349 Black Shinies - catching one (acquisition path).\n"
+      + "The wild Gardevoir is a BLACK SHINY (real black smoke-halo sprite; its\n"
+      + "ability + 3 innates are UNTOUCHED, it just gains the 5th GIFT slot).\n"
       + "DO: weaken it (False Swipe) and CATCH it (5 Rogue Balls provided).\n"
-      + "EXPECT: after catching, its summary/ability screens show the re-rolled\n"
-      + "pool innates + the gift slot, and the black state SURVIVES save/reload.",
+      + "EXPECT: after catching, its summary/ability screens show its normal\n"
+      + "abilities plus the Gift row, and the black state SURVIVES save/reload.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1287,6 +1289,151 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [
         makeStarter(SpeciesId.GYARADOS, {
           moveset: [MoveId.WATERFALL, MoveId.ICE_FANG, MoveId.PROTECT, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Black art: Redux forms",
+    description:
+      "#349 Black art now covers ER CUSTOM (Redux) forms too - 4,053 generated\n"
+      + "slug atlases. Your Bellsprout-Redux is a BLACK SHINY.\n"
+      + "DO: look at its in-battle BACK sprite, then open the summary (FRONT).\n"
+      + "EXPECT: REAL black smoke-halo art of the REDUX form on both sides - not\n"
+      + "a flat dark tint, and not the base Bellsprout's art.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 10,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.BELLSPROUT, {
+          formIndex: formIndexByKey(SpeciesId.BELLSPROUT, "redux"),
+          moveset: [MoveId.VINE_WHIP, MoveId.RAZOR_LEAF, MoveId.GROWTH, MoveId.SLEEP_POWDER],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const player = globalScene.getPlayerPokemon();
+      if (player) {
+        promoteToErBlackShinyInBattle(player);
+      }
+    },
+  },
+  {
+    label: "(note) Egg countdown (#378)",
+    description:
+      "#378 QoL - NOT a battle test, this entry just tracks the check.\n"
+      + "DO: in a normal run, open the EGG LIST from the menu (and hatch one).\n"
+      + "EXPECT: every egg's hatch text ends with the REAL number, e.g.\n"
+      + "'(25 more waves to hatch.)' - no vague wording anywhere.\n"
+      + "Pass/Fail this entry once checked.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 5 });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Daily innates (#379)",
+    description:
+      "#379 - NOT a battle test, this entry just tracks the check.\n"
+      + "DO: start a DAILY run and open Battle Info -> Abilities (or the summary\n"
+      + "ability page) on your mons.\n"
+      + "EXPECT: ALL THREE innate slots are ACTIVE with no candy unlocks, their\n"
+      + "effects work in combat, and after the daily ends your save's real\n"
+      + "unlock state is unchanged (run-only).  Pass/Fail this entry once checked.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 5 });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Truant is free (#381)",
+    description:
+      "#381 - NOT a battle test, this entry just tracks the check.\n"
+      + "DO: in STARTER SELECT, search ability text 'Truant' and inspect a mon\n"
+      + "whose INNATE slot is Truant (Slakoth line is the classic case).\n"
+      + "EXPECT: that slot shows unlocked AND enabled by default at ZERO candy\n"
+      + "cost (it is a nerf, so it is free), and in battle the Truant innate is\n"
+      + "live from turn 1.  Pass/Fail this entry once checked.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 5 });
+      return [
+        makeStarter(SpeciesId.SLAKOTH, {
+          moveset: [MoveId.SLACK_OFF, MoveId.BODY_SLAM, MoveId.SHADOW_CLAW, MoveId.YAWN],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Challenge reuse (#382)",
+    description:
+      "#382 QoL - NOT a battle test, this entry just tracks the check.\n"
+      + "DO: on the CHALLENGE screen, set a few modifiers and start the run.\n"
+      + "Abandon it, go back to the challenge screen and press R.\n"
+      + "EXPECT: your exact last-used modifier configuration is re-applied in\n"
+      + "one keypress, every value restored.  Pass/Fail this entry once checked.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 5 });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Doubles Only (#383)",
+    description:
+      "#383 - NOT a battle test, this entry just tracks the check.\n"
+      + "DO: start a challenge run with DOUBLES ONLY (grants 3 Favour) and play\n"
+      + "past a few trainer waves.\n"
+      + "EXPECT: EVERY trainer battle is a double battle; wild encounters keep\n"
+      + "their normal single/double odds; the finale is unchanged.\n"
+      + "Pass/Fail this entry once checked.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 5 });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Usage tiers (#384)",
+    description:
+      "#384 - NOT a battle test, this entry just tracks the check.\n"
+      + "DO: start a challenge run with the USAGE TIER challenge at each value.\n"
+      + "EXPECT starter select only offers lines BELOW the tier's usage level:\n"
+      + "UU < 2.25% (3 Favour, legendary egg lines banned), RU < 1% (8 Favour,\n"
+      + "epic eggs banned too), PU < 0.5% (15 Favour, rare eggs banned, Favour\n"
+      + "shiny cap rises 3x -> 5x), NU < 0.25% (20 Favour, common eggs only,\n"
+      + "5x cap). Tiers self-update nightly from real player runs.\n"
+      + "Pass/Fail this entry once checked.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 5 });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.PROTECT],
         }),
       ];
     },
