@@ -1430,10 +1430,13 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "(note) Challenge reuse (#382)",
     description:
       "#382 QoL - NOT a battle test, this entry just tracks the check.\n"
-      + "DO: on the CHALLENGE screen, set a few modifiers and start the run.\n"
-      + "Abandon it, go back to the challenge screen and press R.\n"
-      + "EXPECT: your exact last-used modifier configuration is re-applied in\n"
-      + "one keypress, every value restored.  Pass/Fail this entry once checked.",
+      + "DO: on the CHALLENGE screen, set modifiers and start a run. Abandon,\n"
+      + "return to the challenge screen and press ACTION to focus the bottom\n"
+      + "bar (it is reachable even with NOTHING selected when a saved setup\n"
+      + "exists). Press LEFT/RIGHT to switch it to 'Reuse Last Setup', confirm.\n"
+      + "EXPECT: the exact last-used configuration is re-applied, every value\n"
+      + "restored. The R hotkey from the list does the same.\n"
+      + "Pass/Fail this entry once checked.",
     setup: () => {
       resetDevOverrides();
       setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 5 });
