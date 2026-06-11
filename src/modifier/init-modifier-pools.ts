@@ -599,6 +599,8 @@ function initUltraModifierPool() {
     new WeightedModifierType(modifierTypes.ER_LUCKY_HEART, 4),
     new WeightedModifierType(modifierTypes.ER_DEX_NAV, 6),
     new WeightedModifierType(modifierTypes.ER_POWER_HERB, 4),
+    // ER Learner's Shroom (#404): ULTRA per maintainer (2026-06-12).
+    new WeightedModifierType(modifierTypes.ER_LEARNERS_SHROOM, 4),
   ].map(m => {
     m.setTier(ModifierTier.ULTRA);
     return m;
@@ -622,7 +624,6 @@ function initRogueModifierPool() {
     new WeightedModifierType(modifierTypes.ABILITY_RANDOMIZER, 4),
     new WeightedModifierType(modifierTypes.MOVE_SLOT_EXPANDER, 4),
     new WeightedModifierType(modifierTypes.ER_OMNI_GEM, 3),
-    new WeightedModifierType(modifierTypes.ER_LEARNERS_SHROOM, 3),
     // ER: unlocks the Damage Calculator page in the in-battle Info screen (once).
     new WeightedModifierType(modifierTypes.DAMAGE_CALCULATOR, () => (hasDamageCalculator() ? 0 : 4), 4),
     new WeightedModifierType(modifierTypes.FOCUS_BAND, 5),

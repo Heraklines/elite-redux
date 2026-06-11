@@ -31,7 +31,7 @@ import {
   TRAINER_MIN_FRIENDSHIP,
 } from "#balance/starters";
 import { tmSpecies } from "#balance/tm-species-map";
-import { reverseCompatibleTms } from "#balance/tms";
+import { reverseCompatibleTms, speciesTmMoves } from "#balance/tms";
 import type { SuppressAbilitiesTag } from "#data/arena-tag";
 import { NoCritTag, WeakenMoveScreenTag } from "#data/arena-tag";
 import {
@@ -2184,16 +2184,32 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns An array of {@linkcode MoveId}s, as described above.
    */
   /**
-   * ER Learner's Shroom (#404): the species' EGG MOVES this Pokemon does not
-   * already know. Unlike {@linkcode getUnlockedEggMoves} this lists ALL of the
-   * species' egg moves - the Shroom teaches one for the run without requiring
-   * (or granting) the permanent egg-move unlock.
+   * ER Learner's Shroom (#404): every move this Pokemon is capable of
+   * learning through ANY source - TMs, ER tutor moves (merged into
+   * speciesTmMoves), egg moves (no unlock needed) and level-up moves it has
+   * ALREADY reached. The single exception, per the maintainer: level-up moves
+   * it has not learned yet stay gated behind leveling. Known moves excluded.
    */
-  public getErLearnableEggMoves(): MoveId[] {
+  public getErLearnableShroomMoves(): MoveId[] {
+    const formKey = this.getFormKey();
+    const tmMoves = (speciesTmMoves[this.species.speciesId] ?? [])
+      .filter(m => (Array.isArray(m) ? m[0] === formKey : true))
+      .map(m => (Array.isArray(m) ? m[1] : m));
     const rootSpeciesId =
       this.metSpecies in speciesEggMoves ? this.metSpecies : this.getSpeciesForm(true).getRootSpeciesId(true);
     const eggMoves: MoveId[] = speciesEggMoves[rootSpeciesId] ?? [];
-    return eggMoves.filter(m => m && !this.moveset.some(pm => pm?.moveId === m));
+    // Level-up moves up to the CURRENT level only (the "not learned from
+    // level up yet" exception), same source the Memory Mushroom uses.
+    const reachedLevelMoves = this.getLearnableLevelMoves();
+    const seen = new Set<MoveId>();
+    const out: MoveId[] = [];
+    for (const m of [...reachedLevelMoves, ...eggMoves, ...tmMoves]) {
+      if (m && !seen.has(m) && !this.moveset.some(pm => pm?.moveId === m)) {
+        seen.add(m);
+        out.push(m);
+      }
+    }
+    return out;
   }
 
   public getLearnableLevelMoves(): MoveId[] {

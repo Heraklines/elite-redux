@@ -1301,9 +1301,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "the species' next legal one (check the summary). Buying a second\n"
       + "capsule for the same mon shows 'no effect' - it works ONCE per mon.\n"
       + "3) OMNI GEM - held item, see the dedicated Omni Gem scenario.\n"
-      + "4) LEARNER'S SHROOM on Yanmega - pick one of its EGG MOVES from the\n"
-      + "list; it learns it on the spot (no egg-move unlock needed). A mon\n"
-      + "already knowing all its egg moves shows 'no effect'.",
+      + "4) LEARNER'S SHROOM on Yanmega - pick ANY move it can learn (TMs,\n"
+      + "tutors, egg moves, reached level-ups) from the big list; it learns it\n"
+      + "on the spot. Future level-up moves are NOT in the list.",
     setup: () => {
       resetDevOverrides();
       setOverrides({

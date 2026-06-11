@@ -850,9 +850,10 @@ export class ErAbilityCapsuleModifierType extends PokemonModifierType {
 }
 
 /**
- * ER Learner's Shroom (#404, community batch): teaches a Pokemon one of its
- * species' EGG MOVES (run-only; no permanent unlock). Opens the dedicated
- * egg-move party-UI mode. English hardcoded (ER-custom item).
+ * ER Learner's Shroom (#404, community batch): teaches a Pokemon ANY move it
+ * is capable of learning - TMs, ER tutor moves, egg moves (no unlock needed)
+ * and already-reached level-up moves. Future level-up moves stay gated behind
+ * leveling. Opens the dedicated move-picker party-UI mode.
  */
 export class ErLearnersShroomModifierType extends PokemonModifierType {
   constructor() {
@@ -861,7 +862,7 @@ export class ErLearnersShroomModifierType extends PokemonModifierType {
       "learners_shroom",
       (type, args) => new ErLearnersShroomModifier(type, (args[0] as PlayerPokemon).id, args[1] as number),
       (pokemon: PlayerPokemon) => {
-        if (pokemon.getErLearnableEggMoves().length === 0) {
+        if (pokemon.getErLearnableShroomMoves().length === 0) {
           return PartyUiHandler.NoEffectMessage;
         }
         return null;
@@ -874,7 +875,7 @@ export class ErLearnersShroomModifierType extends PokemonModifierType {
   }
 
   getDescription(): string {
-    return "Teaches a Pokémon one of its species' EGG MOVES of your choice, no egg-move unlock needed.";
+    return "Teaches a Pokémon any move it can learn from TMs, tutors or egg moves, your choice. Future level-up moves stay locked.";
   }
 }
 

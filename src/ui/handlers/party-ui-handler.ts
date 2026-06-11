@@ -92,8 +92,9 @@ export enum PartyUiMode {
    */
   REMEMBER_MOVE_MODIFIER,
   /**
-   * ER Learner's Shroom (#404): like REMEMBER_MOVE_MODIFIER, but the move list
-   * is the species' EGG MOVES the mon doesn't know yet.
+   * ER Learner's Shroom (#404): like REMEMBER_MOVE_MODIFIER, but the move
+   * list is EVERYTHING the mon can learn (TMs / tutors / egg moves /
+   * reached level-ups) that it doesn't already know.
    */
   ER_LEARNERS_SHROOM_MODIFIER,
   /**
@@ -779,7 +780,7 @@ export class PartyUiHandler extends MessageUiHandler {
   /** The selectable move list for the current remember-move-like mode. */
   private getRememberableMoves(pokemon: PlayerPokemon): MoveId[] {
     return this.partyUiMode === PartyUiMode.ER_LEARNERS_SHROOM_MODIFIER
-      ? pokemon.getErLearnableEggMoves()
+      ? pokemon.getErLearnableShroomMoves()
       : pokemon.getLearnableLevelMoves();
   }
 
