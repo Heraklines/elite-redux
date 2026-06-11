@@ -908,6 +908,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (erBlackFrontAnimKey.endsWith("-erblack")) {
       animKeys.add(erBlackFrontAnimKey);
     }
+    // ER (#396): also gap-fill the plain FRONT key - the evolution scene, egg
+    // hatch and summary play `getSpriteKey()` (no "back__"), which the keys
+    // above never cover for player mons. A redux shiny whose atlas finalize
+    // was skipped logged "Missing animation: pkmn__er__<form>_shiny3" and the
+    // evolution screen kept showing the PRE-evolution sprite.
+    animKeys.add(this.getSpriteKey(ignoreOverride));
     for (const battleSpriteKey of animKeys) {
       if (!globalScene.textures.exists(battleSpriteKey) || globalScene.anims.exists(battleSpriteKey)) {
         continue;
@@ -4670,6 +4676,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       const strikeIndex = source.turnData.hitCount - source.turnData.hitsLeft; // 0-based
       if (strikeIndex > 0) {
         multiStrikeEnhancementMultiplier.value *= source.turnData.hitCount <= 2 ? 0.25 : strikeIndex === 1 ? 0.2 : 0.15;
+      }
+    }
+
+    // ER Minion Control (#399): "+1 hit per healthy party member" was hitting
+    // up to 6x at FULL power (big community report). Like Parental Bond, every
+    // strike past the first now deals 25% damage (full 6 hits = 200% total),
+    // while the first hit stays at 100%.
+    if (source.hasAbility(ErAbilityId.MINION_CONTROL as unknown as AbilityId)) {
+      const strikeIndex = source.turnData.hitCount - source.turnData.hitsLeft; // 0-based
+      if (strikeIndex > 0) {
+        multiStrikeEnhancementMultiplier.value *= 0.25;
       }
     }
 

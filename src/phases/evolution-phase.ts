@@ -178,6 +178,22 @@ export class EvolutionPhase extends Phase {
    */
   protected configureSprite(pokemon: Pokemon, sprite: Phaser.GameObjects.Sprite, setPipeline = true): typeof sprite {
     const spriteKey = pokemon.getSpriteKey(true);
+    // ER (#396): if the front anim is missing but its atlas IS loaded (redux
+    // shiny whose finalize was skipped), build the frames here - otherwise
+    // `play` warns "Missing animation" and the EVOLVED sprite silently keeps
+    // showing the pre-evolution.
+    if (!globalScene.anims.exists(spriteKey) && globalScene.textures.exists(spriteKey)) {
+      const originalWarn = console.warn;
+      console.warn = () => {};
+      const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
+        zeroPad: 4,
+        suffix: ".png",
+        start: 1,
+        end: 400,
+      });
+      console.warn = originalWarn;
+      globalScene.anims.create({ key: spriteKey, frames: frameNames, frameRate: 10, repeat: -1 });
+    }
     try {
       sprite.play(spriteKey);
     } catch (err: unknown) {

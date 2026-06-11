@@ -672,6 +672,13 @@ export class Trainer extends Phaser.GameObjects.Container {
 
     const sortedPartyMemberScores = this.getSortedPartyMemberMatchupScores(partyMemberScores);
 
+    // ER (#400): with NO benched member left (e.g. the second faint of a
+    // double KO when only one reserve existed), indexing the empty score list
+    // threw mid-phase and hard-froze the battle. Report "nobody" instead.
+    if (sortedPartyMemberScores.length === 0) {
+      return -1;
+    }
+
     const maxScorePartyMemberIndexes = partyMemberScores
       .filter(pms => pms[1] === sortedPartyMemberScores[0][1])
       .map(pms => pms[0]);

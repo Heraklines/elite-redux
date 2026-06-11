@@ -459,11 +459,13 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "Berry Smash eats a berry",
     description:
-      "#342 Berry Smash — the user must EAT one of its held berries.\n"
+      "#342/#398 Berry Smash — the user must EAT one of its held berries.\n"
       + "Snorlax holds a Sitrus AND a Lum berry (two berries). DO: use Berry Smash\n"
-      + "on the enemy.  EXPECT: it deals damage AND the user consumes ONE berry\n"
-      + "(random of the two) — e.g. Sitrus heals it, or a held berry count drops.\n"
-      + "Before the fix it dealt damage but ate nothing.",
+      + "on the enemy.  EXPECT: it deals damage AND the USER consumes ONE berry\n"
+      + "(random of the two) — e.g. Sitrus heals SNORLAX, not Blissey.\n"
+      + "ALSO (#398): the berry's effect must NEVER apply to the TARGET — a\n"
+      + "report had the defender eating the attacker's berry like a reverse\n"
+      + "Pluck. Watch who gets the heal message.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1091,6 +1093,99 @@ export const DEV_SCENARIOS: DevScenario[] = [
     onBattleStart: () => givePlayerCommunityItems([["omniGem", 1]]),
   },
   {
+    label: "Minion Control 25% (#399)",
+    description:
+      "#399 MINION CONTROL (Redux Alakazam line) - '+1 hit per healthy party\n"
+      + "member' was hitting up to 6 TIMES AT FULL POWER. Extra strikes now\n"
+      + "deal 25% each (Parental Bond style), first hit stays 100%.\n"
+      + "Your Alakazam has Minion Control via override + 5 healthy benchmates.\n"
+      + "DO: use PSYCHIC and read the damage numbers per strike (R dmg panel).\n"
+      + "EXPECT: 6 strikes - one big, five small (~quarter of the first).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.MINION_CONTROL),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SOFT_BOILED],
+      });
+      return [
+        makeStarter(SpeciesId.ALAKAZAM, {
+          moveset: [MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.CALM_MIND, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.PROTECT] }),
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.WATERFALL, MoveId.CRUNCH, MoveId.DRAGON_DANCE, MoveId.ICE_FANG],
+        }),
+        makeStarter(SpeciesId.LUCARIO, {
+          moveset: [MoveId.CLOSE_COMBAT, MoveId.FLASH_CANNON, MoveId.SWORDS_DANCE, MoveId.EXTREME_SPEED],
+        }),
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.CALM_MIND, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.ARCANINE, {
+          moveset: [MoveId.FLARE_BLITZ, MoveId.EXTREME_SPEED, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Evo screen sprite (#396)",
+    description:
+      "#396 Evolution screen showed the PRE-evolution sprite for redux shinies\n"
+      + "(reported: shiny Ralts Redux -> Kirlia Redux kept showing Ralts;\n"
+      + "console said 'Missing animation: ..._shiny3'). The front animation is\n"
+      + "now rebuilt on demand.\n"
+      + "DO: your SHINY Ralts Redux is level 19 - win once, level to 20, evolve.\n"
+      + "EXPECT: the evolution cutscene visibly MORPHS into Kirlia Redux and\n"
+      + "the end screen shows KIRLIA REDUX's sprite, not Ralts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 19,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.RATTATA,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.RALTS, {
+          formIndex: formIndexByKey(SpeciesId.RALTS, "redux"),
+          shiny: true,
+          variant: 2,
+          moveset: [MoveId.PSYCHIC, MoveId.CALM_MIND, MoveId.SHADOW_BALL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Justified absorbs Dark (#397)",
+    description:
+      "#397 JUSTIFIED - per the ER dex it boosts Attack INSTEAD OF being hit\n"
+      + "by Dark-type moves (a Sap Sipper style absorb, not hit-then-boost).\n"
+      + "Enemy Weavile spams CRUNCH at your Lucario (ability: Justified).\n"
+      + "EXPECT: Crunch does NO damage at all - Lucario absorbs it and gains\n"
+      + "+1 Attack every time. Before the fix the hit still dealt damage.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: AbilityId.JUSTIFIED,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.WEAVILE,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.CRUNCH],
+      });
+      return [
+        makeStarter(SpeciesId.LUCARIO, {
+          moveset: [MoveId.SPLASH, MoveId.AURA_SPHERE, MoveId.SWORDS_DANCE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "Power Herb (#401)",
     description:
       "#401 POWER HERB - skips the charge turn of two-turn moves. 2 charges,\n"
@@ -1711,6 +1806,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "ALSO (#385): trainers whose pool would send a SINGLE mon now field two\n"
       + "instead - the forced double used to FREEZE on the empty second slot.\n"
       + "Play through early trainer waves and EXPECT no freeze, ever.\n"
+      + "ALSO (#400): KO BOTH enemy mons in the SAME turn (double KO) - this\n"
+      + "used to HARD FREEZE when the trainer had only one reserve left.\n"
+      + "EXPECT the lone replacement to come in (or the battle to end) cleanly.\n"
       + "Pass/Fail this entry once checked.",
     setup: () => {
       resetDevOverrides();

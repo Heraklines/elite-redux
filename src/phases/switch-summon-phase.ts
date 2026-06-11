@@ -120,6 +120,16 @@ export class SwitchSummonPhase extends SummonPhase {
     const switchedInPokemon: Pokemon | undefined = party[this.slotIndex];
     this.lastPokemon = this.getPokemon();
 
+    // ER (#400): this guard used to sit AFTER the resetSummonData call below,
+    // so an unresolvable slot (slotIndex -1: the second replacement of a
+    // double KO with only one reserve, common under Doubles Only) dereferenced
+    // `undefined` inside a delayed call - the phase never ended and the battle
+    // hard-froze. Bail out cleanly before touching the missing Pokemon.
+    if (!switchedInPokemon) {
+      this.end();
+      return;
+    }
+
     // Defensive programming: Overcome the bug where the summon data has somehow not been reset
     // prior to switching in a new Pokemon.
     // Force the switch to occur and load the assets for the new pokemon, ignoring override.
@@ -157,17 +167,14 @@ export class SwitchSummonPhase extends SummonPhase {
       ];
       for (const attr of allAttrs) {
         if (attr && attr.constructor.name === "OnOpponentSwitchOutAbAttr") {
-          (attr as unknown as {
-            fire: (holder: Pokemon, leavingOpponent: Pokemon) => void;
-          }).fire(observer, this.lastPokemon);
+          (
+            attr as unknown as {
+              fire: (holder: Pokemon, leavingOpponent: Pokemon) => void;
+            }
+          ).fire(observer, this.lastPokemon);
         }
       }
     }
-    if (!switchedInPokemon) {
-      this.end();
-      return;
-    }
-
     if (this.switchType === SwitchType.BATON_PASS) {
       // If switching via baton pass, update opposing tags coming from the prior pokemon
       (this.player ? globalScene.getEnemyField() : globalScene.getPlayerField()).forEach((enemyPokemon: Pokemon) =>

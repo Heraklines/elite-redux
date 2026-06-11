@@ -994,7 +994,16 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // 109 UNAWARE: vanilla ignores stat stages. Same.
   // 168 PROTEAN: vanilla converts type per move. Same.
   // 152 MUMMY: vanilla applies Mummy on contact. Same.
-  // 154 JUSTIFIED: vanilla +1 ATK on Dark hit. Same.
+  // 154 JUSTIFIED (#397): ER "Boosts Attack INSTEAD OF being hit by Dark-type
+  // moves" - a Sap-Sipper-style absorb, not vanilla's hit-then-boost. Replace
+  // the PostDefend boost with full Dark immunity + the +1 ATK.
+  [
+    AbilityId.JUSTIFIED,
+    ab => {
+      ab.attrs = ab.attrs.filter(a => a.constructor.name !== "PostDefendStatStageChangeAbAttr");
+      ab.attrs.push(new TypeImmunityStatStageChangeAbAttr(PokemonType.DARK, Stat.ATK, 1));
+    },
+  ],
   // 155 RATTLED: vanilla +1 SPD on Bug/Dark/Ghost hit. Same.
   // 156 MAGIC_BOUNCE: vanilla reflects status. Same.
   // 169 FUR_COAT: vanilla 0.5x Phys. Same.

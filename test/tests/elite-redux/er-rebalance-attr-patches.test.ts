@@ -121,6 +121,14 @@ describe.skipIf(!RUN)("ER rebalance attr patches (audit chunk 7)", () => {
     ).toBe(false);
   });
 
+  it("Justified (#397) NULLIFIES Dark moves (Sap-Sipper-style absorb), not hit-then-boost", () => {
+    const attrs = allAbilities[AbilityId.JUSTIFIED].attrs;
+    // The vanilla PostDefend boost (take the hit, then +1 Atk) must be gone...
+    expect(attrs.some(a => a.constructor.name === "PostDefendStatStageChangeAbAttr")).toBe(false);
+    // ...replaced by full Dark immunity that grants the +1 Atk on absorb.
+    expect(attrs.some(a => a.constructor.name === "TypeImmunityStatStageChangeAbAttr")).toBe(true);
+  });
+
   it("Run Away's stat-lowered rider raises Speed by +2", () => {
     const trigger = allAbilities[AbilityId.RUN_AWAY].attrs.find(
       (a): a is StatTriggerOnStatLoweredAbAttr => a instanceof StatTriggerOnStatLoweredAbAttr,

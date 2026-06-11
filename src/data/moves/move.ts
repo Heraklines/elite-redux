@@ -3511,7 +3511,11 @@ export class EatBerryAttr extends MoveEffectAttr {
     }
 
     // Don't update harvest for berries preserved via Berry pouch (no item dupes lol)
-    this.eatBerry(target, undefined, !preserve.value);
+    // ER (#398): the consumer must be the BERRY OWNER (`pokemon`), not the
+    // move target. With selfTarget=true on a damaging move (Berry Smash), the
+    // user's berry was removed but the TARGET ate its effect. Vanilla never
+    // noticed because its only selfTarget user (Stuff Cheeks) targets itself.
+    this.eatBerry(pokemon, undefined, !preserve.value);
 
     return true;
   }
