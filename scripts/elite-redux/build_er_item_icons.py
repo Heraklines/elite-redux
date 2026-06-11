@@ -28,9 +28,11 @@ JSON_PATH = os.path.join(ITEMS_DIR, "items.json")
 PROTEIN_PATH = os.path.join(ITEMS_DIR, "items", "protein.png")
 FLAME_ORB_PATH = os.path.join(ITEMS_DIR, "items", "flame_orb.png")
 SCANNER_PATH = os.path.join(ITEMS_DIR, "items", "scanner.png")
-ROM_GEM_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "vendor", "elite-redux", "source", "graphics", "items", "icons", "gem.png"
+ROM_ICONS_DIR = os.path.join(
+    os.path.dirname(__file__), "..", "..", "vendor", "elite-redux", "source", "graphics", "items", "icons"
 )
+ROM_GEM_PATH = os.path.join(ROM_ICONS_DIR, "gem.png")
+ROM_POWER_HERB_PATH = os.path.join(ROM_ICONS_DIR, "power_herb.png")
 
 # protein's three red-liquid shades (light / mid / dark) -> recolor targets.
 RED_LIGHT = (246, 164, 164, 255)
@@ -105,9 +107,13 @@ def add_frame(sheet: Image.Image, atlas: dict, name: str, frame_img: Image.Image
     """Place a 32x32 frame in the atlas, appending a new bottom strip if needed."""
     frames = atlas["textures"][0]["frames"]
     w, h = frame_img.size
-    # Reuse an existing same-named frame slot if present (idempotent rebuilds).
+    # Reuse an existing same-named slot ONLY when its dimensions match
+    # (idempotent rebuilds). A mismatched slot (e.g. vanilla's TRIMMED 21x19
+    # `power_herb`) must not be pasted over - the overflow would bleed into
+    # the packed neighbors. Such frames are relocated to a fresh bottom strip
+    # and their atlas entry is repointed there.
     existing = next((f for f in frames if f["filename"] == name), None)
-    if existing is not None:
+    if existing is not None and (existing["frame"]["w"], existing["frame"]["h"]) == (w, h):
         fx, fy = existing["frame"]["x"], existing["frame"]["y"]
         sheet.paste(frame_img, (fx, fy))
         return sheet
@@ -118,16 +124,19 @@ def add_frame(sheet: Image.Image, atlas: dict, name: str, frame_img: Image.Image
     fx, fy = 0, sheet.height
     grown.paste(frame_img, (fx, fy))
     atlas["textures"][0]["size"]["h"] = new_h
-    frames.append(
-        {
-            "filename": name,
-            "rotated": False,
-            "trimmed": False,
-            "sourceSize": {"w": w, "h": h},
-            "spriteSourceSize": {"x": 0, "y": 0, "w": w, "h": h},
-            "frame": {"x": fx, "y": fy, "w": w, "h": h},
-        }
-    )
+    entry = {
+        "filename": name,
+        "rotated": False,
+        "trimmed": False,
+        "sourceSize": {"w": w, "h": h},
+        "spriteSourceSize": {"x": 0, "y": 0, "w": w, "h": h},
+        "frame": {"x": fx, "y": fy, "w": w, "h": h},
+    }
+    if existing is not None:
+        existing.clear()
+        existing.update(entry)
+    else:
+        frames.append(entry)
     return grown
 
 
@@ -146,15 +155,17 @@ def main() -> None:
     sheet = add_frame(sheet, atlas, "move_slot_expander", black)
     sheet = add_frame(sheet, atlas, "ability_randomizer", violet)
     omni_gem = pad_center(whiten(Image.open(ROM_GEM_PATH).convert("RGBA")))
+    power_herb = pad_center(Image.open(ROM_POWER_HERB_PATH).convert("RGBA"))
 
     sheet = add_frame(sheet, atlas, "frostbite_orb", frostbite)
     sheet = add_frame(sheet, atlas, "dex_nav", dex_nav)
     sheet = add_frame(sheet, atlas, "omni_gem", omni_gem)
+    sheet = add_frame(sheet, atlas, "power_herb", power_herb)
 
     sheet.save(PNG_PATH)
     with open(JSON_PATH, "w", encoding="utf-8") as fh:
         json.dump(atlas, fh, indent="\t")
-    print("wrote move_slot_expander + ability_randomizer + frostbite_orb + dex_nav + omni_gem frames; sheet now", sheet.size)
+    print("wrote move_slot_expander + ability_randomizer + frostbite_orb + dex_nav + omni_gem + power_herb frames; sheet now", sheet.size)
 
 
 if __name__ == "__main__":

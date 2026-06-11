@@ -46,7 +46,8 @@ export type ErCommunityItemKind =
   | "spikedKnuckles"
   | "loadedDice"
   | "luckyHeart"
-  | "omniGem";
+  | "omniGem"
+  | "powerHerb";
 
 export interface ErCommunityItemConfig {
   name: string;
@@ -112,10 +113,23 @@ export const ER_COMMUNITY_ITEM_CONFIG: Readonly<Record<ErCommunityItemKind, ErCo
     tint: 0xffffff,
     maxStack: 1,
   },
+  powerHerb: {
+    name: "Power Herb",
+    description:
+      "Skips the charge turn of the holder's two-turn moves. Holds 2 charges and regains one every 10 waves.",
+    // Dedicated atlas frame from the ROM hack's power_herb.png icon.
+    icon: "power_herb",
+    tint: 0xffffff,
+    maxStack: 1,
+  },
 };
 
 /** Omni Gem: total double-damage charges before the gem shatters. */
 export const ER_OMNI_GEM_CHARGES = 2;
+/** Power Herb: maximum stored charge-turn skips. */
+export const ER_POWER_HERB_CHARGES = 2;
+/** Power Herb: won waves needed to regain one charge. */
+export const ER_POWER_HERB_RECHARGE_WAVES = 10;
 
 /** Every community item kind, in display order (used by the type registry). */
 export const ER_COMMUNITY_ITEM_KINDS: readonly ErCommunityItemKind[] = [
@@ -126,6 +140,7 @@ export const ER_COMMUNITY_ITEM_KINDS: readonly ErCommunityItemKind[] = [
   "loadedDice",
   "luckyHeart",
   "omniGem",
+  "powerHerb",
 ];
 
 /** Per-proc chance of the contact/on-hit status items. */
@@ -211,13 +226,13 @@ export function erLuckyHeartChanceBonus(user: Pokemon): number {
  */
 export function erTryApplyOmniGem(source: Pokemon, damage: NumberHolder, simulated: boolean): void {
   const gem = getOmniGem(source);
-  if (!gem || gem.gemCharges <= 0 || damage.value <= 0) {
+  if (!gem || gem.charges <= 0 || damage.value <= 0) {
     return;
   }
   damage.value *= 2;
   if (!simulated) {
-    gem.gemCharges--;
-    if (gem.gemCharges <= 0) {
+    gem.charges--;
+    if (gem.charges <= 0) {
       globalScene.removeModifier(gem, !source.isPlayer());
       globalScene.updateModifiers(source.isPlayer());
       globalScene.phaseManager.queueMessage(
@@ -225,8 +240,60 @@ export function erTryApplyOmniGem(source: Pokemon, damage: NumberHolder, simulat
       );
     } else {
       globalScene.phaseManager.queueMessage(
-        `${source.getNameToRender()}'s Omni Gem doubled the blow! (${gem.gemCharges} charge left)`,
+        `${source.getNameToRender()}'s Omni Gem doubled the blow! (${gem.charges} charge left)`,
       );
     }
+  }
+}
+
+/** The holder's Power Herb modifier, if any. */
+function getPowerHerb(pokemon: Pokemon): ErCommunityItemModifier | undefined {
+  return pokemon
+    .getHeldItems()
+    .find((m): m is ErCommunityItemModifier => m instanceof ErCommunityItemModifier && m.kind === "powerHerb");
+}
+
+/**
+ * Power Herb (#401): called from MoveChargePhase when the holder begins a
+ * two-turn move. Spends one charge to skip the charge turn entirely.
+ * Disabled while the holder's items are locked (ER Frisk).
+ */
+export function erTryConsumePowerHerb(user: Pokemon): boolean {
+  const herb = getPowerHerb(user);
+  if (!herb || herb.charges <= 0 || user.getTag(BattlerTagType.ER_ITEM_DISABLED)) {
+    return false;
+  }
+  herb.charges--;
+  globalScene.phaseManager.queueMessage(
+    `${user.getNameToRender()} became fully charged due to its Power Herb! (${herb.charges} charge${herb.charges === 1 ? "" : "s"} left)`,
+  );
+  return true;
+}
+
+/**
+ * Power Herb recharge (#401): +1 wave of progress per won wave; at
+ * {@linkcode ER_POWER_HERB_RECHARGE_WAVES} the herb regains ONE charge
+ * (capped at {@linkcode ER_POWER_HERB_CHARGES}). Called from BattleEndPhase
+ * next to the Ward Stone recharger.
+ */
+export function erAdvanceCommunityItemCharges(): void {
+  try {
+    for (const mod of globalScene.findModifiers(
+      m => m instanceof ErCommunityItemModifier && (m as ErCommunityItemModifier).kind === "powerHerb",
+      true,
+    )) {
+      const herb = mod as ErCommunityItemModifier;
+      if (herb.charges >= ER_POWER_HERB_CHARGES) {
+        herb.waveProgress = 0;
+        continue;
+      }
+      herb.waveProgress++;
+      if (herb.waveProgress >= ER_POWER_HERB_RECHARGE_WAVES) {
+        herb.charges++;
+        herb.waveProgress = 0;
+      }
+    }
+  } catch {
+    // Recharging must never break the battle-end flow.
   }
 }

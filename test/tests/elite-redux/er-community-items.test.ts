@@ -27,10 +27,12 @@ import {
   ER_COMMUNITY_ITEM_CONFIG,
   ER_COMMUNITY_ITEM_KINDS,
   type ErCommunityItemKind,
+  erAdvanceCommunityItemCharges,
   erApplyCommunityOnHitItems,
   erLoadedDiceMinHitBonus,
   erLuckyHeartChanceBonus,
   erTryApplyOmniGem,
+  erTryConsumePowerHerb,
 } from "#data/elite-redux/er-community-items";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
@@ -56,6 +58,7 @@ const KIND_TO_TYPE_ID: Record<ErCommunityItemKind, string> = {
   loadedDice: "ER_LOADED_DICE",
   luckyHeart: "ER_LUCKY_HEART",
   omniGem: "ER_OMNI_GEM",
+  powerHerb: "ER_POWER_HERB",
 };
 
 function giveItem(holder: Pokemon, kind: ErCommunityItemKind, stacks = 1): ErCommunityItemModifier {
@@ -183,26 +186,26 @@ describe.skipIf(!RUN)("ER community item batch (#387/#392)", () => {
   it("Omni Gem: 2 charges, simulated calcs never consume, shatters (modifier removed) when spent", () => {
     const player = game.scene.getPlayerPokemon()!;
     const gem = giveItem(player, "omniGem");
-    expect(gem.gemCharges).toBe(2);
+    expect(gem.charges).toBe(2);
 
     // Simulated calc: doubled but NOT consumed (AI previews).
     const sim = new NumberHolder(100);
     erTryApplyOmniGem(player, sim, true);
     expect(sim.value).toBe(200);
-    expect(gem.gemCharges).toBe(2);
+    expect(gem.charges).toBe(2);
 
     // First real calc: doubled, one charge spent, gem still held.
     const first = new NumberHolder(100);
     erTryApplyOmniGem(player, first, false);
     expect(first.value).toBe(200);
-    expect(gem.gemCharges).toBe(1);
+    expect(gem.charges).toBe(1);
     expect(player.getHeldItems()).toContain(gem);
 
     // Second real calc: doubled, last charge spent -> the gem SHATTERS.
     const second = new NumberHolder(100);
     erTryApplyOmniGem(player, second, false);
     expect(second.value).toBe(200);
-    expect(gem.gemCharges).toBe(0);
+    expect(gem.charges).toBe(0);
     expect(player.getHeldItems()).not.toContain(gem);
 
     // Gone: no further doubling.
@@ -242,6 +245,36 @@ describe.skipIf(!RUN)("ER community item batch (#387/#392)", () => {
 
     // Single use per Pokemon.
     expect(capsule.apply(player)).toBe(false);
+  });
+
+  it("Power Herb: 2 charge-turn skips, then empty; regains ONE charge after 10 waves", () => {
+    const player = game.scene.getPlayerPokemon()!;
+    const herb = giveItem(player, "powerHerb");
+    expect(herb.charges).toBe(2);
+
+    // Two skips, then the herb is exhausted (but NOT removed - it recharges).
+    expect(erTryConsumePowerHerb(player)).toBe(true);
+    expect(erTryConsumePowerHerb(player)).toBe(true);
+    expect(erTryConsumePowerHerb(player)).toBe(false);
+    expect(player.getHeldItems()).toContain(herb);
+
+    // 9 waves: no refill yet. 10th wave: exactly ONE charge back.
+    for (let i = 0; i < 9; i++) {
+      erAdvanceCommunityItemCharges();
+    }
+    expect(herb.charges).toBe(0);
+    erAdvanceCommunityItemCharges();
+    expect(herb.charges).toBe(1);
+    expect(herb.waveProgress).toBe(0);
+
+    // A full herb accrues no progress.
+    erAdvanceCommunityItemCharges();
+    for (let i = 0; i < 10; i++) {
+      erAdvanceCommunityItemCharges();
+    }
+    expect(herb.charges).toBe(2);
+    erAdvanceCommunityItemCharges();
+    expect(herb.waveProgress).toBe(0);
   });
 
   it("Dex Nav: the current biome offers a non-empty, deduped species pool", () => {

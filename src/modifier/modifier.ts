@@ -2401,17 +2401,29 @@ export class PokemonAddMoveSlotModifier extends ConsumablePokemonModifier {
 export class ErCommunityItemModifier extends PokemonHeldItemModifier {
   public readonly kind: ErCommunityItemKind;
   /**
-   * Omni Gem: remaining double-damage charges. The gem ships with 2; each REAL
-   * (non-simulated) doubled hit spends one, and the gem shatters (the modifier
-   * is removed) when they run out. Persisted via getArgs so a mid-run save
-   * keeps the count. Unused by the other kinds.
+   * Charge counter for the charge-based kinds, persisted via getArgs:
+   * - Omni Gem: remaining double-damage charges (ships with 2; each REAL,
+   *   non-simulated doubled hit spends one; the gem shatters at 0).
+   * - Power Herb: remaining charge-turn skips (ships with 2; regains one
+   *   every 10 waves - see `erAdvanceCommunityItemCharges`).
+   * Unused by the other kinds.
    */
-  public gemCharges: number;
+  public charges: number;
+  /** Power Herb: won waves accrued toward the next charge refill. */
+  public waveProgress: number;
 
-  constructor(type: ModifierType, pokemonId: number, kind: ErCommunityItemKind, gemCharges = 2, stackCount?: number) {
+  constructor(
+    type: ModifierType,
+    pokemonId: number,
+    kind: ErCommunityItemKind,
+    charges = 2,
+    waveProgress = 0,
+    stackCount?: number,
+  ) {
     super(type, pokemonId, stackCount);
     this.kind = kind;
-    this.gemCharges = gemCharges;
+    this.charges = charges;
+    this.waveProgress = waveProgress;
   }
 
   matchType(modifier: Modifier): boolean {
@@ -2419,11 +2431,18 @@ export class ErCommunityItemModifier extends PokemonHeldItemModifier {
   }
 
   clone(): ErCommunityItemModifier {
-    return new ErCommunityItemModifier(this.type, this.pokemonId, this.kind, this.gemCharges, this.stackCount);
+    return new ErCommunityItemModifier(
+      this.type,
+      this.pokemonId,
+      this.kind,
+      this.charges,
+      this.waveProgress,
+      this.stackCount,
+    );
   }
 
   override getArgs(): unknown[] {
-    return [...super.getArgs(), this.kind, this.gemCharges];
+    return [...super.getArgs(), this.kind, this.charges, this.waveProgress];
   }
 
   getMaxHeldItemCount(): number {

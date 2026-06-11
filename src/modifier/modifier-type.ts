@@ -2089,6 +2089,7 @@ const modifierTypeInitObj = Object.freeze({
   ER_LOADED_DICE: () => erCommunityItemModifierType("loadedDice"),
   ER_LUCKY_HEART: () => erCommunityItemModifierType("luckyHeart"),
   ER_OMNI_GEM: () => erCommunityItemModifierType("omniGem"),
+  ER_POWER_HERB: () => erCommunityItemModifierType("powerHerb"),
   ER_ABILITY_CAPSULE: () => new ErAbilityCapsuleModifierType(),
   ER_DEX_NAV: () => new ErDexNavModifierType(),
 

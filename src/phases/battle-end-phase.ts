@@ -1,5 +1,6 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { erAdvanceCommunityItemCharges } from "#data/elite-redux/er-community-items";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { advanceErWardStoneCharges } from "#data/elite-redux/er-ward-stones";
 import { LapsingPersistentModifier, LapsingPokemonHeldItemModifier } from "#modifiers/modifier";
@@ -45,6 +46,7 @@ export class BattleEndPhase extends BattlePhase {
       advanceErMoneyStreaks();
       // ER Ward Stones (#358): player-held stones charge up over won waves.
       advanceErWardStoneCharges();
+      erAdvanceCommunityItemCharges();
     }
 
     // Endless graceful end

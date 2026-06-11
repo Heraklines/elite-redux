@@ -1091,6 +1091,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
     onBattleStart: () => givePlayerCommunityItems([["omniGem", 1]]),
   },
   {
+    label: "Power Herb (#401)",
+    description:
+      "#401 POWER HERB - skips the charge turn of two-turn moves. 2 charges,\n"
+      + "regains one every 10 waves. Venusaur holds one (ROM herb icon).\n"
+      + "DO: use SOLAR BEAM three times (no sun is up).\n"
+      + "EXPECT: uses 1 and 2 FIRE IMMEDIATELY with 'became fully charged due\n"
+      + "to its Power Herb!' (watch the charges-left counter). Use 3 charges\n"
+      + "normally for a turn (herb empty). The herb is NOT consumed - after 10\n"
+      + "more won waves it regains a charge.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SOFT_BOILED],
+      });
+      return [
+        makeStarter(SpeciesId.VENUSAUR, {
+          moveset: [MoveId.SOLAR_BEAM, MoveId.SLUDGE_BOMB, MoveId.GIGA_DRAIN, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onBattleStart: () => givePlayerCommunityItems([["powerHerb", 1]]),
+  },
+  {
     label: "Claws + Copper Rod (#387)",
     description:
       "#387 Contact status items - your Scizor holds RUSTY CLAW + SPIKED\n"

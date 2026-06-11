@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { MoveChargeAnim } from "#data/battle-anims";
+import { erTryConsumePowerHerb } from "#data/elite-redux/er-community-items";
 import type { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveResult } from "#enums/move-result";
@@ -70,6 +71,11 @@ export class MoveChargePhase extends PokemonPhase {
 
     const instantCharge = new BooleanHolder(false);
     applyMoveChargeAttrs("InstantChargeAttr", user, null, move, instantCharge);
+
+    // ER Power Herb (#401): spend one herb charge to skip the charge turn.
+    if (!instantCharge.value && erTryConsumePowerHerb(user)) {
+      instantCharge.value = true;
+    }
 
     // If instantly charging, remove the pending MoveEndPhase and queue a new MovePhase for the "attack" portion of the move.
     // Otherwise, add the attack portion to the user's move queue to execute next turn.

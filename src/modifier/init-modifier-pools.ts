@@ -595,6 +595,7 @@ function initUltraModifierPool() {
     new WeightedModifierType(modifierTypes.ER_LOADED_DICE, 4),
     new WeightedModifierType(modifierTypes.ER_LUCKY_HEART, 4),
     new WeightedModifierType(modifierTypes.ER_DEX_NAV, 6),
+    new WeightedModifierType(modifierTypes.ER_POWER_HERB, 4),
   ].map(m => {
     m.setTier(ModifierTier.ULTRA);
     return m;
