@@ -5653,6 +5653,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               },
             });
             ui.setOverlayMode(UiMode.OPTION_SELECT, {
+              // Without supportHover the option-select handler NEVER invokes
+              // onHover - the mode descriptions were silently dead (#368).
+              supportHover: true,
               options: [
                 difficultyOption("youngster", "Youngster"),
                 difficultyOption("ace", "Ace"),
