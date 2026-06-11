@@ -1043,12 +1043,22 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       this.shiny,
       this.variant,
     );
-    // ER CUSTOM black shinies (#349): slug-based atlases are keyed by their
-    // base path (elite-redux/{slug}/front -> black/elite-redux/{slug}/front).
-    // No formIndex gate: Redux FORMS of vanilla species resolve to a slug
-    // path too, and the manifest hit is what decides whether art exists.
+    // ER CUSTOM black shinies (#349/#393): slug-based atlases are keyed by
+    // their PLAIN base path (elite-redux/{slug}/front ->
+    // black/elite-redux/{slug}/front). No formIndex gate: Redux FORMS of
+    // vanilla species resolve to a slug path too. CRITICAL: black shinies ARE
+    // shiny, so `basePath` is the SHINY path (elite-redux/{slug}/shiny-3) and
+    // never matched the manifest - every Redux black shiny fell back to the
+    // tint placeholder. Look up with shiny=false (black art replaces the
+    // shiny look entirely).
     if (isErBlackShiny(this)) {
-      const blackCustom = erBlackSpritePathFromBase(basePath);
+      const plainPath = this.getSpeciesForm(ignoreOverride, true).getSpriteAtlasPath(
+        this.getGender(ignoreOverride, true) === Gender.FEMALE,
+        formIndex,
+        false,
+        0,
+      );
+      const blackCustom = erBlackSpritePathFromBase(plainPath);
       if (blackCustom) {
         return blackCustom;
       }
@@ -1079,10 +1089,19 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       this.variant,
       back,
     );
-    // ER CUSTOM black shinies (#349): slug-based scheme, keyed by base path.
-    // No formIndex gate (Redux forms resolve to slug paths; manifest decides).
+    // ER CUSTOM black shinies (#349/#393): slug-based scheme, keyed by the
+    // PLAIN base path. As in getSpriteAtlasPath: black shinies are shiny, so
+    // the shiny battle path (elite-redux/{slug}/shiny-back-3) never matched
+    // the front/back manifest keys - resolve with shiny=false instead.
     if (isErBlackShiny(this)) {
-      const blackCustom = erBlackSpritePathFromBase(baseBattlePath);
+      const plainBattlePath = this.getSpeciesForm(ignoreOverride, true).getSpriteAtlasPath(
+        this.getGender(ignoreOverride, true) === Gender.FEMALE,
+        formIndex,
+        false,
+        0,
+        back,
+      );
+      const blackCustom = erBlackSpritePathFromBase(plainBattlePath);
       if (blackCustom) {
         return blackCustom;
       }
@@ -3773,7 +3792,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         globalScene.applyModifiers(ShinyRateBoosterModifier, true, shinyThreshold);
         // ER: challenge "Favour" raises shiny odds (up to 3x) on a challenge run.
         shinyThreshold.value *= getRunShinyMultiplier();
-        // ER (#368): WILD shiny odds scale with run difficulty (Elite 1.5x,
+        // ER (#368/#402): WILD shiny odds scale with run difficulty (Elite 1.75x,
         // Hell 2x) and stack with the boosts above (challenge-capped at 6x).
         if (this.isEnemy() && !this.hasTrainer()) {
           shinyThreshold.value *= getErDifficultyShinyMultiplier();
@@ -4680,13 +4699,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
 
     // ER Minion Control (#399): "+1 hit per healthy party member" was hitting
-    // up to 6x at FULL power (big community report). Like Parental Bond, every
-    // strike past the first now deals 25% damage (full 6 hits = 200% total),
-    // while the first hit stays at 100%.
+    // up to 6x at FULL power (big community report). Per the v2.65.3b ROM long
+    // description: "The first hit deals full damage while each additional hit
+    // deals 10% damage." (full 6 hits = 150% total).
     if (source.hasAbility(ErAbilityId.MINION_CONTROL as unknown as AbilityId)) {
       const strikeIndex = source.turnData.hitCount - source.turnData.hitsLeft; // 0-based
       if (strikeIndex > 0) {
-        multiStrikeEnhancementMultiplier.value *= 0.25;
+        multiStrikeEnhancementMultiplier.value *= 0.1;
       }
     }
 

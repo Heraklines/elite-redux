@@ -15,6 +15,7 @@
 
 import {
   erYoungsterFreeInnateSlots,
+  getErDifficultyCandyMultiplier,
   getErDifficultyShinyMultiplier,
   isErVanillaDifficulty,
   resetErDifficulty,
@@ -34,11 +35,18 @@ describe("ER run difficulty (#368 Youngster mode)", () => {
     expect(isErVanillaDifficulty("hell")).toBe(false);
   });
 
-  it("wild shiny multiplier: 1x / 1x / 1.5x / 2x", () => {
+  it("wild shiny multiplier (#402): 1x / 1x / 1.75x / 2x", () => {
     expect(getErDifficultyShinyMultiplier("youngster")).toBe(1);
     expect(getErDifficultyShinyMultiplier("ace")).toBe(1);
-    expect(getErDifficultyShinyMultiplier("elite")).toBe(1.5);
+    expect(getErDifficultyShinyMultiplier("elite")).toBe(1.75);
     expect(getErDifficultyShinyMultiplier("hell")).toBe(2);
+  });
+
+  it("candy multiplier (#402): 2x / 1.5x / 1x / 1x - low difficulties pay candy, high ones pay shinies", () => {
+    expect(getErDifficultyCandyMultiplier("youngster")).toBe(2);
+    expect(getErDifficultyCandyMultiplier("ace")).toBe(1.5);
+    expect(getErDifficultyCandyMultiplier("elite")).toBe(1);
+    expect(getErDifficultyCandyMultiplier("hell")).toBe(1);
   });
 
   it("Youngster innate slots ramp 1 -> 2 (Lv15) -> 3 (Lv24)", () => {

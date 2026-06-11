@@ -65,15 +65,34 @@ export function isErVanillaDifficulty(difficulty: ErDifficulty = currentDifficul
 }
 
 /**
- * Per-mode WILD shiny-rate multiplier (#368): Elite 1.5x, Hell 2x (Youngster
- * and Ace 1x). Stacks with the Shiny Charm and the challenge "Favour" boost
- * (up to 3x), so a Hell challenge run tops out at 6x base odds.
+ * Per-mode WILD shiny-rate multiplier (#368/#402): Elite 1.75x, Hell 2x
+ * (Youngster and Ace 1x - their perk is candy gain instead). Stacks with the
+ * Shiny Charm and the challenge "Favour" boost (up to 3x).
  */
 export function getErDifficultyShinyMultiplier(difficulty: ErDifficulty = currentDifficulty): number {
   switch (difficulty) {
     case "hell":
       return 2;
     case "elite":
+      // #402: Elite's dedicated perk is SHINIES (the lower difficulties get
+      // the candy bonuses instead) - bumped from 1.5x.
+      return 1.75;
+    default:
+      return 1;
+  }
+}
+
+/**
+ * Per-mode CANDY gain multiplier (#402): the lower difficulties reward
+ * candies, the higher ones reward shinies. Youngster 2x, Ace 1.5x,
+ * Elite/Hell 1x. Run-scoped like the favour bonus (egg hatches excluded by
+ * the caller in addStarterCandy).
+ */
+export function getErDifficultyCandyMultiplier(difficulty: ErDifficulty = currentDifficulty): number {
+  switch (difficulty) {
+    case "youngster":
+      return 2;
+    case "ace":
       return 1.5;
     default:
       return 1;

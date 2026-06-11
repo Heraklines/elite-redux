@@ -1096,11 +1096,11 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "Minion Control 25% (#399)",
     description:
       "#399 MINION CONTROL (Redux Alakazam line) - '+1 hit per healthy party\n"
-      + "member' was hitting up to 6 TIMES AT FULL POWER. Extra strikes now\n"
-      + "deal 25% each (Parental Bond style), first hit stays 100%.\n"
+      + "member' was hitting up to 6 TIMES AT FULL POWER. Per the ROM text,\n"
+      + "extra strikes deal 10% each; the first hit stays 100%.\n"
       + "Your Alakazam has Minion Control via override + 5 healthy benchmates.\n"
       + "DO: use PSYCHIC and read the damage numbers per strike (R dmg panel).\n"
-      + "EXPECT: 6 strikes - one big, five small (~quarter of the first).",
+      + "EXPECT: 6 strikes - one big, five tiny (~10% of the first each).",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1316,6 +1316,36 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
     shopItems: [modifierTypes.ER_DEX_NAV, modifierTypes.ER_ABILITY_CAPSULE, modifierTypes.ER_OMNI_GEM],
+  },
+  {
+    label: "Black shiny: REDUX form (#393)",
+    description:
+      "#393 CRITICAL - Redux-form (and ER-custom) black shinies showed the\n"
+      + "TINTED-HUE PLACEHOLDER instead of the real black art, in the suite AND\n"
+      + "live. Root cause: black shinies are shiny, so the slug atlas lookup\n"
+      + "used the shiny path (elite-redux/{slug}/shiny-3) which is not a\n"
+      + "manifest key.\n"
+      + "Your starter is a BLACK SHINY RALTS REDUX.\n"
+      + "EXPECT: it renders with the REAL black smoke-halo art from its very\n"
+      + "first frame - front (summary) AND back (battle) - no dark-tint-over-\n"
+      + "normal-sprite look. Check the party screen icon too.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.RATTATA,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ER_BLACK_SHINY_PLAYER_OVERRIDE: SpeciesId.RALTS,
+      });
+      return [
+        makeStarter(SpeciesId.RALTS, {
+          formIndex: formIndexByKey(SpeciesId.RALTS, "redux"),
+          moveset: [MoveId.PSYCHIC, MoveId.CALM_MIND, MoveId.SHADOW_BALL, MoveId.PROTECT],
+        }),
+      ];
+    },
   },
   {
     label: "Black shiny: acquisition",

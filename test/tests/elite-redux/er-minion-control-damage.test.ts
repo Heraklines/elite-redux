@@ -7,8 +7,8 @@
 // =============================================================================
 // Regression (#399) - Minion Control (ER 592): "+1 hit per healthy party
 // member" hit up to 6 TIMES AT FULL POWER (big community report; Redux
-// Alakazam). Like Parental Bond, every strike past the first now deals 25%
-// damage (a full 6-hit volley totals ~200%, not 600%).
+// Alakazam). Per the v2.65.3b ROM long description, each additional hit
+// deals 10% damage (a full 6-hit volley totals ~150%, not 600%).
 //
 // Gated behind ER_SCENARIO=1.
 // =============================================================================
@@ -37,7 +37,7 @@ describe.skipIf(!RUN)("ER Minion Control extra strikes deal reduced damage (#399
     await game.classicMode.startBattle(SpeciesId.SNORLAX);
   });
 
-  it("strike 2+ of a Minion Control volley deals ~25% of strike 1", () => {
+  it("strike 2+ of a Minion Control volley deals ~10% of strike 1 (ROM long description)", () => {
     const player = game.scene.getPlayerPokemon()!;
     const enemy = game.scene.getEnemyPokemon()!;
 
@@ -52,7 +52,7 @@ describe.skipIf(!RUN)("ER Minion Control extra strikes deal reduced damage (#399
 
     expect(first).toBeGreaterThan(0);
     expect(later).toBeGreaterThan(0);
-    // 25% nominal; allow the 85-100% random damage roll spread on both sides.
-    expect(later).toBeLessThan(first * 0.35);
+    // 10% nominal; allow the 85-100% random damage roll spread on both sides.
+    expect(later).toBeLessThan(first * 0.15);
   });
 });

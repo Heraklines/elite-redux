@@ -306,6 +306,9 @@ function initGreatModifierPool() {
       },
       4,
     ),
+    // ER Ability Capsule (#387): GREAT tier per maintainer (2026-06-12);
+    // it is a once-per-mon utility, not a Rogue-class power spike.
+    new WeightedModifierType(modifierTypes.ER_ABILITY_CAPSULE, 2),
     new WeightedModifierType(modifierTypes.BASE_STAT_BOOSTER, 3),
     new WeightedModifierType(modifierTypes.TERA_SHARD, (party: Pokemon[]) =>
       party.filter(
@@ -619,7 +622,6 @@ function initRogueModifierPool() {
     new WeightedModifierType(modifierTypes.ABILITY_RANDOMIZER, 4),
     new WeightedModifierType(modifierTypes.MOVE_SLOT_EXPANDER, 4),
     new WeightedModifierType(modifierTypes.ER_OMNI_GEM, 3),
-    new WeightedModifierType(modifierTypes.ER_ABILITY_CAPSULE, 3),
     // ER: unlocks the Damage Calculator page in the in-battle Info screen (once).
     new WeightedModifierType(modifierTypes.DAMAGE_CALCULATOR, () => (hasDamageCalculator() ? 0 : 4), 4),
     new WeightedModifierType(modifierTypes.FOCUS_BAND, 5),

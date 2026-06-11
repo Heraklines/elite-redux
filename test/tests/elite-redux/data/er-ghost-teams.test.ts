@@ -5,8 +5,11 @@
 
 // Unit tests for the ER ghost-team gauntlet scheduling (#217).
 
+import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
+import { markTrainerAsGhost } from "#data/elite-redux/er-ghost-teams";
 import { ghostWavesForCurrentRun, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import type { Trainer } from "#field/trainer";
 import { afterEach, describe, expect, it } from "vitest";
 
 // Endgame fixed-battle waves the ghost gauntlet must avoid.
@@ -37,6 +40,17 @@ describe("ER ghost teams", () => {
         expect(w, `${d} wave ${w} is the finale`).not.toBe(200);
       }
     }
+  });
+
+  it("#403: ghost trainers play the piano theme on BOTH music preferences", () => {
+    // The #365 wiring only shadowed getBattleBgm, which serves the GEN-5
+    // preference - the DEFAULT preference routes through getMixedBattleBgm,
+    // so most players never heard the theme.
+    const trainer = {} as Trainer;
+    const snapshot = { trainerName: "tester", party: [{}] } as unknown as GhostTeamSnapshot;
+    markTrainerAsGhost(trainer, snapshot);
+    expect(trainer.getBattleBgm()).toBe("battle_ghost_piano");
+    expect(trainer.getMixedBattleBgm()).toBe("battle_ghost_piano");
   });
 
   it("isErGhostWave matches the schedule and excludes others", () => {

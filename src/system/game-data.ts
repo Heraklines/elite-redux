@@ -17,7 +17,7 @@ import { allMoves, allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { getErResistBerryEntries, restoreErResistBerries } from "#data/elite-redux/er-resist-berries";
-import { getErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { getErDifficulty, getErDifficultyCandyMultiplier, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ER_CANDY_GAIN_MULTIPLIER, getRunCandyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import { getErUsedTrainerKeys, restoreErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { getErWardStoneEntries, restoreErWardStones } from "#data/elite-redux/er-ward-stones";
@@ -2300,7 +2300,10 @@ export class GameData {
     // would farm triple candy. Egg hatches still keep the always-on flat 35%.
     if (count > 0) {
       const favourMultiplier = fromEgg ? 1 : getRunCandyMultiplier();
-      count = Math.max(1, Math.round(count * ER_CANDY_GAIN_MULTIPLIER * favourMultiplier));
+      // #402: the lower difficulties' dedicated perk is CANDY (Youngster 2x,
+      // Ace 1.5x). Run-scoped like favour, so egg-hatch backlogs are excluded.
+      const difficultyMultiplier = fromEgg ? 1 : getErDifficultyCandyMultiplier();
+      count = Math.max(1, Math.round(count * ER_CANDY_GAIN_MULTIPLIER * favourMultiplier * difficultyMultiplier));
     }
 
     globalScene.candyBar.showStarterSpeciesCandy(speciesId, count);

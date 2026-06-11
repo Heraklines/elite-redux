@@ -256,6 +256,26 @@ describe.skipIf(!RUN)("ER Black Shinies (#349)", () => {
       expect(isErBlackShiny(game.scene.getPlayerPokemon()!)).toBe(false);
     });
 
+    it("#393: a REDUX-FORM black shiny resolves the real black slug atlas, not the tint placeholder", async () => {
+      O.ER_BLACK_SHINY_PLAYER_OVERRIDE = SpeciesId.RALTS;
+      await game.classicMode.startBattle(SpeciesId.RALTS);
+
+      const player = game.scene.getPlayerPokemon()!;
+      expect(isErBlackShiny(player)).toBe(true);
+      // Move it onto its Redux form (slug-based sprite scheme).
+      const reduxIndex = player.species.forms.findIndex(f => f.formKey === "redux");
+      expect(reduxIndex).toBeGreaterThan(-1);
+      player.formIndex = reduxIndex;
+
+      // Black shinies are SHINY, so the naive base path is the shiny slug path
+      // (elite-redux/ralts_redux/shiny-3) which is NOT a manifest key - the
+      // lookup must use the plain front/back path instead. Before the fix this
+      // returned the shiny path and the mon rendered with the tint placeholder.
+      expect(player.getSpriteAtlasPath()).toBe("black/elite-redux/ralts_redux/front");
+      expect(player.getBattleSpriteAtlasPath(true)).toBe("black/elite-redux/ralts_redux/back");
+      expect(player.getSpriteKey()).toMatch(/-erblack$/);
+    });
+
     it("forces the player starter black at GENERATION (starters pass shiny explicitly)", async () => {
       O.ER_BLACK_SHINY_PLAYER_OVERRIDE = SpeciesId.SNORLAX;
       await game.classicMode.startBattle(SpeciesId.SNORLAX);
