@@ -1699,7 +1699,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   ) {
     super.showText(text, delay, callback, callbackDelay, prompt, promptDelay);
 
-    const singleLine = text?.indexOf("\n") === -1;
+    // Multi-line includes WRAPPED text, not just literal newlines - the
+    // difficulty mode descriptions wrap onto a second line that clipped
+    // below the single-line box. Measure with the text object's own wrap.
+    const wrappedLines = text ? this.message.getWrappedText(text).length : 1;
+    const singleLine = text?.indexOf("\n") === -1 && wrappedLines <= 1;
 
     this.starterSelectMessageBox.setSize(318, singleLine ? 28 : 42);
 
