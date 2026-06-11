@@ -283,6 +283,16 @@ class ErCustomAttackMove extends AttackMove {
     const draft = ErCustomAttackMove._draftTexts.get(this.id);
     this.name = draft?.name ?? "Unknown";
     this.effect = bestErMoveDescription(draft);
+    // Community report (Shadow Hammer): some ER descriptions omit the recoil
+    // even though the move mechanically has it. If the move carries a
+    // RecoilAttr and the text never mentions recoil, append the dex wording.
+    const recoil = this.attrs.find(a => a.constructor.name === "RecoilAttr") as unknown as
+      | { damageRatio?: number }
+      | undefined;
+    if (recoil && !/recoil/i.test(this.effect)) {
+      const pct = Math.round((recoil.damageRatio ?? 0.33) * 100);
+      this.effect = `${this.effect.replace(/\s+$/, "")} ${pct}% recoil damage.`;
+    }
   }
 
   /** Stash the draft name/description keyed by pokerogue move id before construction. */

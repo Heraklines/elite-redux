@@ -49,6 +49,13 @@ export class GameChallengesUiHandler extends UiHandler {
   private startBg: Phaser.GameObjects.NineSlice;
   private startCursor: Phaser.GameObjects.NineSlice;
   private startText: Phaser.GameObjects.Text;
+  /**
+   * ER (#382): which action the focused start bar performs - 0 = begin the
+   * run, 1 = re-apply the last-used challenge configuration. Toggled with
+   * LEFT/RIGHT while the start bar is focused (a real selectable option, the
+   * R hotkey alone was too hidden per community feedback).
+   */
+  private startRegionOption: 0 | 1 = 0;
   private hasSelectedChallenge: boolean;
 
   private optionsWidth: number;
@@ -344,6 +351,43 @@ export class GameChallengesUiHandler extends UiHandler {
     this.challengesContainer.update();
   }
 
+  /** ER (#382): start-bar caption for the currently toggled action. */
+  private updateStartRegionText(): void {
+    if (this.startRegionOption === 1) {
+      this.startText
+        .setText("Reuse Last Setup  (L/R: switch)")
+        .setAlpha(1)
+        .setPositionRelative(this.startBg, (this.startBg.width - this.startText.displayWidth) / 2, 4);
+    } else {
+      this.updateText();
+    }
+  }
+
+  /**
+   * ER (#382): re-apply the LAST-USED challenge configuration and return to
+   * the challenge list. Shared by the start-bar option and the R hotkey.
+   */
+  private applyLastChallenges(): boolean {
+    const saved = loadLastChallenges();
+    if (!saved) {
+      return false;
+    }
+    const { challenges } = globalScene.gameMode;
+    for (const challenge of challenges) {
+      const match = saved.find(sc => sc.id === challenge.id);
+      challenge.value = match?.value ?? 0;
+      challenge.severity = match?.severity ?? 0;
+    }
+    this.hasSelectedChallenge = challenges.some(c => c.value !== 0);
+    this.startCursor.setVisible(false);
+    this.startRegionOption = 0;
+    this.cursorObj?.setVisible(true);
+    this.updateChallengeArrowsTint(false);
+    this.initLabels();
+    this.updateText();
+    return true;
+  }
+
   /**
    * ER: refresh the top-left "Favour → shiny" readout from the run's active
    * challenges. Hidden when no challenge is selected (favour 0).
@@ -427,6 +471,8 @@ export class GameChallengesUiHandler extends UiHandler {
         // If the user presses cancel when the start cursor has been activated,
         // the game deactivates the start cursor and allows typical challenge selection behavior
         this.startCursor.setVisible(false);
+        this.startRegionOption = 0;
+        this.updateText();
         this.cursorObj?.setVisible(true);
         this.updateChallengeArrowsTint(this.startCursor.visible);
       } else {
@@ -435,35 +481,41 @@ export class GameChallengesUiHandler extends UiHandler {
       }
       success = true;
     } else if (button === Button.SUBMIT || button === Button.ACTION) {
-      if (this.hasSelectedChallenge) {
-        if (this.startCursor.visible) {
+      if (this.startCursor.visible) {
+        if (this.startRegionOption === 1) {
+          success = this.applyLastChallenges();
+        } else if (this.hasSelectedChallenge) {
           // ER (#382): remember this configuration for one-press reuse next run.
           saveLastChallenges(challenges);
           phaseManager.unshiftNew("SelectStarterPhase");
           phaseManager.getCurrentPhase().end();
+          success = true;
         } else {
-          this.startCursor.setVisible(true);
-          this.cursorObj?.setVisible(false);
-          this.updateChallengeArrowsTint(this.startCursor.visible);
+          success = false;
         }
+      } else if (this.hasSelectedChallenge || loadLastChallenges()) {
+        // The bar is reachable with NOTHING selected when a saved setup
+        // exists - that is exactly the reuse use case.
+        this.startCursor.setVisible(true);
+        this.startRegionOption = this.hasSelectedChallenge ? 0 : 1;
+        this.updateStartRegionText();
+        this.cursorObj?.setVisible(false);
+        this.updateChallengeArrowsTint(this.startCursor.visible);
         success = true;
       } else {
         success = false;
       }
-    } else if (button === Button.CYCLE_SHINY && !this.startCursor.visible) {
-      // ER (#382): R re-applies the LAST-USED challenge configuration instead
-      // of re-inputting every value by hand.
-      const saved = loadLastChallenges();
-      if (saved) {
-        for (const challenge of challenges) {
-          const match = saved.find(sc => sc.id === challenge.id);
-          challenge.value = match?.value ?? 0;
-          challenge.severity = match?.severity ?? 0;
-        }
-        this.hasSelectedChallenge = challenges.some(c => c.value !== 0);
-        this.updateText();
+    } else if (this.startCursor.visible && (button === Button.LEFT || button === Button.RIGHT)) {
+      // ER (#382): LEFT/RIGHT on the focused start bar toggles between
+      // "begin" and "reuse last setup".
+      if (loadLastChallenges()) {
+        this.startRegionOption = this.startRegionOption === 0 ? 1 : 0;
+        this.updateStartRegionText();
         success = true;
       }
+    } else if (button === Button.CYCLE_SHINY && !this.startCursor.visible) {
+      // ER (#382): R hotkey still re-applies the last-used configuration.
+      success = this.applyLastChallenges();
     } else if (this.cursorObj?.visible && !this.startCursor.visible) {
       switch (button) {
         case Button.UP:
