@@ -265,7 +265,10 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_ROOST", { pp: 10 }],
   ["MOVE_MIRACLE_EYE", { pp: 40 }],
   ["MOVE_WAKE_UP_SLAP", { power: 80 }],
-  ["MOVE_BRINE", { power: 65, pp: 15 }],
+  // MANUAL Nextdex pin (community 2026-06-11, do NOT regenerate away): Brine
+  // is 70 BP in ER (its super-effective-vs-Water override is wired
+  // separately, see #374). The old c-source row had the stale 65.
+  ["MOVE_BRINE", { power: 70, pp: 15 }],
   ["MOVE_NATURAL_GIFT", { chance: 0 }],
   ["MOVE_FEINT", { power: 30 }],
   ["MOVE_ACUPRESSURE", { pp: 30 }],

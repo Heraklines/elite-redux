@@ -47,6 +47,9 @@ const SPECS: [MoveId, number, number, number?][] = [
   [MoveId.STEEL_ROLLER, 80, 15],
 ];
 
+/** Power-only pins (pp left to the existing data). */
+const POWER_ONLY: [MoveId, number][] = [[MoveId.BRINE, 70]];
+
 describe.skipIf(!RUN)("ER move spec batch (community report 2026-06-11)", () => {
   it.each(
     SPECS.map(([id, power, pp, chance]) => ({ name: MoveId[id], id, power, pp, chance })),
@@ -57,6 +60,10 @@ describe.skipIf(!RUN)("ER move spec batch (community report 2026-06-11)", () => 
     if (chance !== undefined) {
       expect(move.chance, "chance").toBe(chance);
     }
+  });
+
+  it.each(POWER_ONLY.map(([id, power]) => ({ name: MoveId[id], id, power })))("$name pins power", ({ id, power }) => {
+    expect(allMoves[id].power).toBe(power);
   });
 
   it("NO move anywhere has more than 20 PP (ER global rule)", () => {

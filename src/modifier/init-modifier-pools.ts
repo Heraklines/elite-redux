@@ -8,6 +8,7 @@ import { BerryType } from "#enums/berry-type";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MoveId } from "#enums/move-id";
 import { PokeballType } from "#enums/pokeball";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { StatusEffect } from "#enums/status-effect";
 import { Unlockables } from "#enums/unlockables";
@@ -405,7 +406,9 @@ function initUltraModifierPool() {
       modifierTypes.TOXIC_ORB,
       (party: Pokemon[]) => {
         return party.some(p => {
-          const isHoldingOrb = p.getHeldItems().some(i => i.type.id === "FLAME_ORB" || i.type.id === "TOXIC_ORB");
+          const isHoldingOrb = p
+            .getHeldItems()
+            .some(i => i.type.id === "FLAME_ORB" || i.type.id === "TOXIC_ORB" || i.type.id === "FROSTBITE_ORB");
 
           if (!isHoldingOrb) {
             const moveset = p
@@ -451,7 +454,9 @@ function initUltraModifierPool() {
       modifierTypes.FLAME_ORB,
       (party: Pokemon[]) => {
         return party.some(p => {
-          const isHoldingOrb = p.getHeldItems().some(i => i.type.id === "FLAME_ORB" || i.type.id === "TOXIC_ORB");
+          const isHoldingOrb = p
+            .getHeldItems()
+            .some(i => i.type.id === "FLAME_ORB" || i.type.id === "TOXIC_ORB" || i.type.id === "FROSTBITE_ORB");
 
           if (!isHoldingOrb) {
             const moveset = p
@@ -487,6 +492,23 @@ function initUltraModifierPool() {
           }
 
           return false;
+        })
+          ? 10
+          : 0;
+      },
+      10,
+    ),
+    new WeightedModifierType(
+      modifierTypes.FROSTBITE_ORB,
+      (party: Pokemon[]) => {
+        // ER Frostbite Orb (#387): same shelf as Toxic/Flame Orb. Offer it when
+        // someone could actually use a self-status orb (not already holding one
+        // and not frostbite-immune Ice-type).
+        return party.some(p => {
+          const isHoldingOrb = p
+            .getHeldItems()
+            .some(i => i.type.id === "FLAME_ORB" || i.type.id === "TOXIC_ORB" || i.type.id === "FROSTBITE_ORB");
+          return !isHoldingOrb && !p.isOfType(PokemonType.ICE);
         })
           ? 10
           : 0;
@@ -564,6 +586,15 @@ function initUltraModifierPool() {
     ),
     new WeightedModifierType(modifierTypes.QUICK_CLAW, 3),
     new WeightedModifierType(modifierTypes.WIDE_LENS, 7),
+    // ER community item batch (#387/#392). The 10%-proc status items sit in
+    // King's Rock's power class, Loaded Dice / Lucky Heart in Wide Lens's.
+    new WeightedModifierType(modifierTypes.ER_CHILI_SAMPLE, 4),
+    new WeightedModifierType(modifierTypes.ER_COPPER_ROD, 4),
+    new WeightedModifierType(modifierTypes.ER_RUSTY_CLAW, 4),
+    new WeightedModifierType(modifierTypes.ER_SPIKED_KNUCKLES, 4),
+    new WeightedModifierType(modifierTypes.ER_LOADED_DICE, 4),
+    new WeightedModifierType(modifierTypes.ER_LUCKY_HEART, 4),
+    new WeightedModifierType(modifierTypes.ER_DEX_NAV, 6),
   ].map(m => {
     m.setTier(ModifierTier.ULTRA);
     return m;
@@ -586,6 +617,8 @@ function initRogueModifierPool() {
     // ER custom Rogue-tier consumables.
     new WeightedModifierType(modifierTypes.ABILITY_RANDOMIZER, 4),
     new WeightedModifierType(modifierTypes.MOVE_SLOT_EXPANDER, 4),
+    new WeightedModifierType(modifierTypes.ER_OMNI_GEM, 3),
+    new WeightedModifierType(modifierTypes.ER_ABILITY_CAPSULE, 3),
     // ER: unlocks the Damage Calculator page in the in-battle Info screen (once).
     new WeightedModifierType(modifierTypes.DAMAGE_CALCULATOR, () => (hasDamageCalculator() ? 0 : 4), 4),
     new WeightedModifierType(modifierTypes.FOCUS_BAND, 5),

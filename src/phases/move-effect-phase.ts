@@ -9,6 +9,7 @@ import {
   ConditionalAlwaysHitAbAttr,
   erMoveAlwaysHitsForUserType,
 } from "#data/elite-redux/archetypes/conditional-always-hit";
+import { erApplyCommunityOnHitItems } from "#data/elite-redux/er-community-items";
 import { applyErLifeOrbRecoil, applyErRockyHelmet } from "#data/elite-redux/er-recreated-items";
 import { SpeciesFormChangePostMoveTrigger } from "#data/form-change-triggers";
 import type { TypeDamageMultiplier } from "#data/type";
@@ -863,6 +864,17 @@ export class MoveEffectPhase extends PokemonPhase {
     // Apply Grip Claw's chance to steal an item from the target
     if (this.move.is("AttackMove")) {
       globalScene.applyModifiers(ContactHeldItemTransferChanceModifier, this.player, user, target);
+    }
+
+    // ER community status items (#387): Chili Sample / Rusty Claw / Spiked
+    // Knuckles / Copper Rod proc after a damaging hit, on BOTH sides (the
+    // vanilla status-token path above is enemy-only).
+    if (dealsDamage && this.move.is("AttackMove")) {
+      erApplyCommunityOnHitItems(
+        user,
+        target,
+        this.move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user, target }),
+      );
     }
   }
 

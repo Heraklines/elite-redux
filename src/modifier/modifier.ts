@@ -6,6 +6,7 @@ import { FusionSpeciesFormEvolution, pokemonEvolutions } from "#balance/pokemon-
 import { FRIENDSHIP_GAIN_FROM_RARE_CANDY } from "#balance/starters";
 import { getBerryEffectFunc, getBerryPredicate } from "#data/berry";
 import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
+import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { clearErAilments, hasErAilment } from "#data/elite-redux/er-status-cure";
 import { getLevelTotalExp } from "#data/exp";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
@@ -1689,6 +1690,12 @@ export class TurnStatusEffectModifier extends PokemonHeldItemModifier {
       case "FLAME_ORB":
         this.effect = StatusEffect.BURN;
         break;
+      // ER Frostbite Orb (#387): FREEZE does not exist in ER - trySetStatus
+      // reroutes any freeze attempt into the ER_FROSTBITE battler tag, which is
+      // exactly the behavior this orb wants (Ice-types stay immune).
+      case "FROSTBITE_ORB":
+        this.effect = StatusEffect.FREEZE;
+        break;
     }
   }
 
@@ -2379,6 +2386,108 @@ export class PokemonAddMoveSlotModifier extends ConsumablePokemonModifier {
         LearnMoveType.MEMORY,
       );
     }
+    return true;
+  }
+}
+
+/**
+ * ER community held item (#387). One class covers all seven kinds (Chili
+ * Sample, Copper Rod, Rusty Claw, Spiked Knuckles, Loaded Dice, Lucky Heart,
+ * Omni Gem) - the battle hooks in
+ * {@linkcode module:#data/elite-redux/er-community-items} query the holder's
+ * stacks per kind. Lives in this module (not er-community-items.ts) so the
+ * vanilla save serializer can resolve the class by name on session load.
+ */
+export class ErCommunityItemModifier extends PokemonHeldItemModifier {
+  public readonly kind: ErCommunityItemKind;
+  /**
+   * Omni Gem: remaining double-damage charges. The gem ships with 2; each REAL
+   * (non-simulated) doubled hit spends one, and the gem shatters (the modifier
+   * is removed) when they run out. Persisted via getArgs so a mid-run save
+   * keeps the count. Unused by the other kinds.
+   */
+  public gemCharges: number;
+
+  constructor(type: ModifierType, pokemonId: number, kind: ErCommunityItemKind, gemCharges = 2, stackCount?: number) {
+    super(type, pokemonId, stackCount);
+    this.kind = kind;
+    this.gemCharges = gemCharges;
+  }
+
+  matchType(modifier: Modifier): boolean {
+    return modifier instanceof ErCommunityItemModifier && modifier.kind === this.kind;
+  }
+
+  clone(): ErCommunityItemModifier {
+    return new ErCommunityItemModifier(this.type, this.pokemonId, this.kind, this.gemCharges, this.stackCount);
+  }
+
+  override getArgs(): unknown[] {
+    return [...super.getArgs(), this.kind, this.gemCharges];
+  }
+
+  getMaxHeldItemCount(): number {
+    return ER_COMMUNITY_ITEM_CONFIG[this.kind].maxStack;
+  }
+
+  /** Passive - the er-community-items battle hooks query stacks directly. */
+  override apply(): boolean {
+    return true;
+  }
+
+  /** Reskin: tint the base item frame per config (Ward Stone precedent). */
+  override getIcon(forSummary?: boolean): Phaser.GameObjects.Container {
+    const container = super.getIcon(forSummary);
+    for (const child of container.list) {
+      if (child instanceof Phaser.GameObjects.Sprite && child.texture?.key === "items") {
+        child.setTint(ER_COMMUNITY_ITEM_CONFIG[this.kind].tint);
+      }
+    }
+    return container;
+  }
+}
+
+/**
+ * ER Ability Capsule (#387, community batch): cycles the targeted Pokemon's
+ * ACTIVE ability through the species' legal abilities (ability 1 -> ability 2
+ * -> hidden -> ability 1). Single-use per Pokemon
+ * ({@linkcode CustomPokemonData.erAbilityCapsuleUsed}); the innate slots are
+ * untouched (that is the Ability Randomizer's job).
+ */
+export class ErAbilityCapsuleModifier extends ConsumablePokemonModifier {
+  override apply(playerPokemon: PlayerPokemon): boolean {
+    const custom = playerPokemon.customPokemonData;
+    if (custom.erAbilityCapsuleUsed) {
+      return false;
+    }
+    const form = playerPokemon.getSpeciesForm();
+    const candidates = [form.ability1, form.ability2, form.abilityHidden].filter(
+      (a, i, arr) => a !== AbilityId.NONE && arr.indexOf(a) === i,
+    );
+    if (candidates.length < 2) {
+      return false;
+    }
+    const currentIdx = candidates.indexOf(playerPokemon.getAbility().id);
+    const next = candidates[(currentIdx + 1) % candidates.length];
+    playerPokemon.setAbilityOverrideForSlot(0, next);
+    if (playerPokemon.usesFormDerivedAbilities()) {
+      custom.abilityOverridesForm = true;
+    }
+    custom.erAbilityCapsuleUsed = true;
+    playerPokemon.updateInfo();
+    return true;
+  }
+}
+
+/**
+ * ER Dex Nav (#392, community batch): on pickup, opens a species list of the
+ * current biome's wild encounter pool and lets the player register
+ * ("catch") {@linkcode ErDexNavPhase.PICK_COUNT} of them in the Pokedex, as if
+ * caught at the current wave's level.
+ */
+export class ErDexNavModifier extends ConsumableModifier {
+  override apply(): boolean {
+    globalScene.phaseManager.unshiftNew("ErDexNavPhase");
     return true;
   }
 }

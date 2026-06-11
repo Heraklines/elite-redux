@@ -31,6 +31,7 @@ import {
 } from "#data/battler-tags";
 import { getBerryEffectFunc } from "#data/berry";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { erLoadedDiceMinHitBonus, erLuckyHeartChanceBonus } from "#data/elite-redux/er-community-items";
 import { clearErAilments } from "#data/elite-redux/er-status-cure";
 import { SpeciesFormChangeRevertWeatherFormTrigger } from "#data/form-change-triggers";
 import { getNonVolatileStatusEffects, getStatusEffectHealText, isNonVolatileStatusEffect } from "#data/status-effect";
@@ -1818,6 +1819,13 @@ export class MoveEffectAttr extends MoveAttr {
     if (!selfEffect) {
       applyAbAttrs("IgnoreMoveEffectsAbAttr", { pokemon: target, move, simulated: !showAbility, chance: moveChance });
     }
+
+    // ER Lucky Heart (#387): flat +15 percentage points per stack to POSITIVE
+    // effect chances (guaranteed/-1 chances are left alone). Additive, so it
+    // stacks with Serene Grace's multiplier above.
+    if (moveChance.value > 0 && moveChance.value < 100) {
+      moveChance.value += erLuckyHeartChanceBonus(user);
+    }
     return moveChance.value;
   }
 }
@@ -3082,16 +3090,19 @@ export class MultiHitAttr extends MoveAttr {
         const rand = user.randBattleSeedInt(20);
         const hitValue = new NumberHolder(rand);
         applyAbAttrs("MaxMultiHitAbAttr", { pokemon: user, hits: hitValue });
+        let count: number;
         if (hitValue.value >= 13) {
-          return 2;
+          count = 2;
+        } else if (hitValue.value >= 6) {
+          count = 3;
+        } else if (hitValue.value >= 3) {
+          count = 4;
+        } else {
+          count = 5;
         }
-        if (hitValue.value >= 6) {
-          return 3;
-        }
-        if (hitValue.value >= 3) {
-          return 4;
-        }
-        return 5;
+        // ER Loaded Dice (#387): each stack raises the MINIMUM hit count by 1
+        // (3 stacks = always 5 hits, pseudo Skill Link).
+        return Math.min(Math.max(count, 2 + erLoadedDiceMinHitBonus(user)), 5);
       }
       case MultiHitType.ONE:
         return 1;

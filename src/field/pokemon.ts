@@ -63,6 +63,7 @@ import {
   resetErBlackShinyState,
 } from "#data/elite-redux/er-black-shinies";
 import { erBlackSpritePath, erBlackSpritePathFromBase } from "#data/elite-redux/er-black-sprite-manifest";
+import { erTryApplyOmniGem } from "#data/elite-redux/er-community-items";
 import { applyErResistBerry } from "#data/elite-redux/er-resist-berries";
 import { erYoungsterFreeInnateSlots, getErDifficultyShinyMultiplier } from "#data/elite-redux/er-run-difficulty";
 import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
@@ -4829,6 +4830,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!this.isPlayer()) {
       globalScene.applyModifiers(EnemyDamageReducerModifier, false, damage);
     }
+
+    // ER Omni Gem (#387): once per battle, the attacker's first damaging move
+    // deals double damage. Consumed only on real (non-simulated) calcs.
+    erTryApplyOmniGem(source, damage, simulated);
 
     // ER resistance berries (#357): if the DEFENDER holds the berry matching
     // this hit's type, halve the damage BEFORE it lands and consume the berry

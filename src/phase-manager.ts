@@ -33,6 +33,7 @@ import { EncounterPhase } from "#phases/encounter-phase";
 import { EndCardPhase } from "#phases/end-card-phase";
 import { EndEvolutionPhase } from "#phases/end-evolution-phase";
 import { EnemyCommandPhase } from "#phases/enemy-command-phase";
+import { ErDexNavPhase } from "#phases/er-dex-nav-phase";
 import { EvolutionPhase } from "#phases/evolution-phase";
 import { ExpPhase } from "#phases/exp-phase";
 import { FaintPhase } from "#phases/faint-phase";
@@ -146,6 +147,7 @@ const PHASES = Object.freeze({
   EndCardPhase,
   EndEvolutionPhase,
   EnemyCommandPhase,
+  ErDexNavPhase,
   EvolutionPhase,
   ExpPhase,
   FaintPhase,

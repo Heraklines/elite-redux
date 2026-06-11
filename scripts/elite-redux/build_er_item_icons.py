@@ -5,6 +5,10 @@ produces two recolors:
   - `move_slot_expander`  -> black liquid  (5th move slot consumable)
   - `ability_randomizer`  -> violet liquid (ability randomizer consumable)
 
+Also builds the #387/#392 community item icons:
+  - `frostbite_orb` -> icy-blue recolor of `flame_orb`
+  - `dex_nav`       -> green recolor of `scanner` (the IV Scanner device)
+
 The recolored 32x32 frames are appended to the `items` texture atlas
 (items.png + items.json) so the modifier icons can reference them by frame name
 via `setTexture("items", iconImage)`. Re-running is idempotent: existing frames
@@ -20,6 +24,8 @@ ITEMS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "image
 PNG_PATH = os.path.join(ITEMS_DIR, "items.png")
 JSON_PATH = os.path.join(ITEMS_DIR, "items.json")
 PROTEIN_PATH = os.path.join(ITEMS_DIR, "items", "protein.png")
+FLAME_ORB_PATH = os.path.join(ITEMS_DIR, "items", "flame_orb.png")
+SCANNER_PATH = os.path.join(ITEMS_DIR, "items", "scanner.png")
 
 # protein's three red-liquid shades (light / mid / dark) -> recolor targets.
 RED_LIGHT = (246, 164, 164, 255)
@@ -35,6 +41,25 @@ VIOLET_MAP = {
     RED_LIGHT: (201, 150, 235, 255),
     RED_MID: (140, 80, 190, 255),
     RED_DARK: (90, 45, 130, 255),
+}
+
+
+# flame_orb's warm fire shades -> icy blues (outline/white highlight kept).
+FROSTBITE_MAP = {
+    (248, 56, 56, 255): (72, 144, 248, 255),
+    (248, 136, 96, 255): (128, 192, 248, 255),
+    (248, 136, 136, 255): (152, 204, 248, 255),
+    (248, 200, 104, 255): (192, 228, 252, 255),
+    (248, 248, 104, 255): (224, 244, 255, 255),
+    (240, 192, 184, 255): (216, 232, 248, 255),
+}
+# scanner's blue casing -> Dex Nav green (screen LEDs/accents kept).
+DEX_NAV_MAP = {
+    (156, 180, 238, 255): (132, 216, 148, 255),
+    (82, 106, 164, 255): (62, 150, 86, 255),
+    (41, 65, 115, 255): (30, 104, 52, 255),
+    (197, 222, 255, 255): (188, 240, 198, 255),
+    (238, 238, 255, 255): (238, 255, 240, 255),
 }
 
 
@@ -88,13 +113,18 @@ def main() -> None:
     with open(JSON_PATH, encoding="utf-8") as fh:
         atlas = json.load(fh)
 
+    frostbite = recolor(Image.open(FLAME_ORB_PATH).convert("RGBA"), FROSTBITE_MAP)
+    dex_nav = recolor(Image.open(SCANNER_PATH).convert("RGBA"), DEX_NAV_MAP)
+
     sheet = add_frame(sheet, atlas, "move_slot_expander", black)
     sheet = add_frame(sheet, atlas, "ability_randomizer", violet)
+    sheet = add_frame(sheet, atlas, "frostbite_orb", frostbite)
+    sheet = add_frame(sheet, atlas, "dex_nav", dex_nav)
 
     sheet.save(PNG_PATH)
     with open(JSON_PATH, "w", encoding="utf-8") as fh:
         json.dump(atlas, fh, indent="\t")
-    print("wrote move_slot_expander + ability_randomizer frames; sheet now", sheet.size)
+    print("wrote move_slot_expander + ability_randomizer + frostbite_orb + dex_nav frames; sheet now", sheet.size)
 
 
 if __name__ == "__main__":

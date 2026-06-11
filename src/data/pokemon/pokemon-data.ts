@@ -72,6 +72,12 @@ export class CustomPokemonData {
   public erBlackShiny = false;
   public erGiftAbilities: number[] = [];
   public erGiftIndex = 0;
+  /**
+   * ER Ability Capsule (#387): `true` once the capsule has been used on this
+   * Pokemon (it cycles the ACTIVE ability through the species' legal abilities
+   * and is single-use per Pokemon).
+   */
+  public erAbilityCapsuleUsed = false;
 
   constructor(data?: CustomPokemonData | Partial<CustomPokemonData>) {
     this.spriteScale = data?.spriteScale ?? -1;
@@ -87,6 +93,7 @@ export class CustomPokemonData {
     this.erBlackShiny = data?.erBlackShiny ?? false;
     this.erGiftAbilities = data?.erGiftAbilities ?? [];
     this.erGiftIndex = data?.erGiftIndex ?? 0;
+    this.erAbilityCapsuleUsed = data?.erAbilityCapsuleUsed ?? false;
   }
 }
 

@@ -24,6 +24,7 @@
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
+import type { ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import { setErDifficulty, setErDifficulty as setErDifficultyForScenario } from "#data/elite-redux/er-run-difficulty";
@@ -41,6 +42,7 @@ import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { ModifierOverride } from "#modifiers/modifier-type";
+import { erCommunityItemModifierType } from "#modifiers/modifier-type";
 import type { Variant } from "#sprites/variant";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { Starter, StarterMoveset } from "#types/save-data";
@@ -180,6 +182,22 @@ function boostEnemy(stages: [BattleStat, number][]): void {
 /** Convenience: +n to every offensive/defensive/speed stage (not ACC/EVA). */
 const ALL_MAIN_STATS: BattleStat[] = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD];
 const allStages = (n: number): [BattleStat, number][] => ALL_MAIN_STATS.map(s => [s, n]);
+
+/** #387: hand the active player Pokemon community items (kind, stacks). */
+function givePlayerCommunityItems(items: [ErCommunityItemKind, number][]): void {
+  const player = globalScene.getPlayerPokemon();
+  if (!player) {
+    return;
+  }
+  for (const [kind, stacks] of items) {
+    const mod = erCommunityItemModifierType(kind).newModifier(player) as PokemonHeldItemModifier | null;
+    if (mod) {
+      mod.stackCount = stacks;
+      globalScene.addModifier(mod, true);
+    }
+  }
+  globalScene.updateModifiers(true);
+}
 
 // --- scenarios --------------------------------------------------------------
 
@@ -968,6 +986,214 @@ export const DEV_SCENARIOS: DevScenario[] = [
         }
       }
     },
+  },
+  {
+    label: "Chili Sample (#387)",
+    description:
+      "#387 CHILI SAMPLE - the holder's DAMAGING moves gain a 10% burn chance,\n"
+      + "contact or not. Yanmega holds one (red-tinted charcoal icon).\n"
+      + "DO: spam AIR SLASH / BUG BUZZ (both non-contact) for several turns.\n"
+      + "EXPECT: Chansey gets BURNED now and then (about 1 hit in 10). Soft-\n"
+      + "Boiled does not cure burn, so the status sticks once it lands.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SOFT_BOILED],
+      });
+      return [
+        makeStarter(SpeciesId.YANMEGA, {
+          moveset: [MoveId.AIR_SLASH, MoveId.BUG_BUZZ, MoveId.TACKLE, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onBattleStart: () => givePlayerCommunityItems([["chiliSample", 1]]),
+  },
+  {
+    label: "Loaded Dice (#387)",
+    description:
+      "#387 LOADED DICE - each stack raises the MINIMUM strikes of 2-5-hit\n"
+      + "moves by 1. Yanmega holds the full 3 stacks (gold-tinted lens icon).\n"
+      + "DO: use FURY SWIPES repeatedly.\n"
+      + "EXPECT: it hits 5 TIMES EVERY USE (normally 2-5, weighted low). Pass\n"
+      + "only if you never see fewer than 5 hits across several uses.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SOFT_BOILED],
+      });
+      return [
+        makeStarter(SpeciesId.YANMEGA, {
+          moveset: [MoveId.FURY_SWIPES, MoveId.AIR_SLASH, MoveId.TACKLE, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onBattleStart: () => givePlayerCommunityItems([["loadedDice", 3]]),
+  },
+  {
+    label: "Lucky Heart (#387)",
+    description:
+      "#387 LUCKY HEART - +15% move effect chance per stack (max 2), additive\n"
+      + "with Serene Grace style abilities. Yanmega holds BOTH stacks (pink\n"
+      + "charm icon), so Air Slash's flinch chance is +30 points.\n"
+      + "DO: open with AIR SLASH every turn (you outspeed).\n"
+      + "EXPECT: Snorlax flinches MUCH more often than the move's base chance -\n"
+      + "it should visibly fail to act on most turns it gets hit.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [
+        makeStarter(SpeciesId.YANMEGA, {
+          moveset: [MoveId.AIR_SLASH, MoveId.BUG_BUZZ, MoveId.TACKLE, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onBattleStart: () => givePlayerCommunityItems([["luckyHeart", 2]]),
+  },
+  {
+    label: "Omni Gem (#387)",
+    description:
+      "#387 OMNI GEM - doubles the holder's next damaging move; 2 CHARGES\n"
+      + "total, then the gem SHATTERS and vanishes. Yanmega holds one (pale\n"
+      + "gold gem icon on its item bar).\n"
+      + "DO: attack three times with BUG BUZZ.\n"
+      + "EXPECT: hit 1 - double damage + 'Omni Gem doubled the blow! (1 charge\n"
+      + "left)'. Hit 2 - double damage + '...and shattered!' and the gem icon\n"
+      + "DISAPPEARS from the item bar. Hit 3 - normal damage, no message.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SOFT_BOILED],
+      });
+      return [
+        makeStarter(SpeciesId.YANMEGA, {
+          moveset: [MoveId.BUG_BUZZ, MoveId.AIR_SLASH, MoveId.TACKLE, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onBattleStart: () => givePlayerCommunityItems([["omniGem", 1]]),
+  },
+  {
+    label: "Claws + Copper Rod (#387)",
+    description:
+      "#387 Contact status items - your Scizor holds RUSTY CLAW + SPIKED\n"
+      + "KNUCKLES; the enemy Snorlax holds a COPPER ROD.\n"
+      + "DO: spam BULLET PUNCH (contact) and watch a few turns.\n"
+      + "EXPECT: ~10% per hit the Snorlax gets POISONED (Rusty Claw) or BLEEDS\n"
+      + "(Spiked Knuckles, red badge). The enemy's Copper Rod can PARALYZE YOUR\n"
+      + "Scizor when you make contact (defensive proc). SWIFT (non-contact)\n"
+      + "never procs any of them.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SCIZOR, {
+          moveset: [MoveId.BULLET_PUNCH, MoveId.SWIFT, MoveId.SWORDS_DANCE, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      givePlayerCommunityItems([
+        ["rustyClaw", 1],
+        ["spikedKnuckles", 1],
+      ]);
+      const enemy = globalScene.getEnemyPokemon();
+      if (enemy) {
+        const rod = erCommunityItemModifierType("copperRod").newModifier(enemy);
+        if (rod) {
+          void globalScene.addEnemyModifier(rod as PokemonHeldItemModifier, false, true);
+        }
+      }
+    },
+  },
+  {
+    label: "Frostbite Orb (#387)",
+    description:
+      "#387 FROSTBITE ORB - the Toxic/Flame Orb sibling for ER's Frostbite.\n"
+      + "Your Machamp holds one (icy-blue orb icon).\n"
+      + "DO: end a turn (use Splash).\n"
+      + "EXPECT: at turn end Machamp gets the FROSTBITE badge (1/16 chip per\n"
+      + "turn, weakened special attacks) - fuel for Guts-style abilities. ALSO:\n"
+      + "switch to Glalie (slot 2, also holding one) - it NEVER gets\n"
+      + "frostbitten (Ice-types are immune).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SOFT_BOILED],
+      });
+      return [
+        makeStarter(SpeciesId.MACHAMP, {
+          moveset: [MoveId.SPLASH, MoveId.CLOSE_COMBAT, MoveId.FACADE, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.GLALIE, {
+          moveset: [MoveId.SPLASH, MoveId.ICE_BEAM, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      for (const member of globalScene.getPlayerParty()) {
+        const orb = modifierTypes.FROSTBITE_ORB().newModifier(member) as PokemonHeldItemModifier | null;
+        if (orb) {
+          globalScene.addModifier(orb, true);
+        }
+      }
+      globalScene.updateModifiers(true);
+    },
+  },
+  {
+    label: "Dex Nav + Capsule (#387/#392)",
+    description:
+      "#387/#392 New consumables - win the opening battle; the FIRST shop\n"
+      + "guarantees DEX NAV (green scanner), ABILITY CAPSULE and OMNI GEM.\n"
+      + "DO+EXPECT: 1) DEX NAV - a species list of the CURRENT BIOME opens;\n"
+      + "register 2 Pokemon; both then show as CAUGHT in the Pokedex/starter\n"
+      + "select. 2) ABILITY CAPSULE on Yanmega - its ACTIVE ability switches to\n"
+      + "the species' next legal one (check the summary). Buying a second\n"
+      + "capsule for the same mon shows 'no effect' - it works ONCE per mon.\n"
+      + "3) OMNI GEM - held item, see the dedicated Omni Gem scenario.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.RATTATA,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.YANMEGA, {
+          moveset: [MoveId.AIR_SLASH, MoveId.BUG_BUZZ, MoveId.TACKLE, MoveId.PROTECT],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.ER_DEX_NAV, modifierTypes.ER_ABILITY_CAPSULE, modifierTypes.ER_OMNI_GEM],
   },
   {
     label: "Black shiny: acquisition",

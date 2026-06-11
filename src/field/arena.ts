@@ -619,6 +619,25 @@ export class Arena {
   }
 
   /**
+   * ER Dex Nav (#392): the current biome's wild encounter species, all
+   * non-boss rarity tiers merged and deduped (time-of-day filtered, the same
+   * data {@linkcode randomSpecies} draws from). Used to build the catch list.
+   */
+  public getErDexNavSpeciesPool(): SpeciesId[] {
+    this.updatePoolsForTimeOfDay();
+    const seen = new Set<SpeciesId>();
+    for (const [tier, pool] of Object.entries(this.pokemonPool)) {
+      if (Number(tier) === BiomePoolTier.BOSS) {
+        continue;
+      }
+      for (const entry of pool) {
+        seen.add(entry);
+      }
+    }
+    return [...seen];
+  }
+
+  /**
    * Helper method to determine whether or not to reroll a legend-like species generation attempt
    * based on the estimated BST and wave.
    * @param species - The species being checked

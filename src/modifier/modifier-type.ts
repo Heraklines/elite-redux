@@ -9,12 +9,14 @@ import { tmPoolTiers } from "#balance/tms";
 import { getBerryEffectDescription, getBerryName } from "#data/berry";
 import { getDailyEventSeedLuck } from "#data/daily-seed/daily-run";
 import { allMoves, modifierTypes } from "#data/data-lists";
+import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-stones";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { getPokeballCatchMultiplier, getPokeballName } from "#data/pokeball";
 import { pokemonFormChanges, SpeciesFormChangeCondition } from "#data/pokemon-forms";
 import { getStatusEffectDescriptor } from "#data/status-effect";
+import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { BerryType } from "#enums/berry-type";
 import { ChallengeType } from "#enums/challenge-type";
@@ -53,6 +55,9 @@ import {
   type EnemyPersistentModifier,
   EnemyStatusEffectHealChanceModifier,
   EnemyTurnHealModifier,
+  ErAbilityCapsuleModifier,
+  ErCommunityItemModifier,
+  ErDexNavModifier,
   EvolutionItemModifier,
   EvolutionStatBoosterModifier,
   EvoTrackerModifier,
@@ -789,6 +794,96 @@ export class PokemonAddMoveSlotModifierType extends PokemonModifierType {
 
   getDescription(): string {
     return "Permanently grants a Pokémon a 5th move slot.";
+  }
+}
+
+/**
+ * ER community held items (#387): build the ModifierType for a community item
+ * kind (live name/description from the config; icon = existing atlas frame,
+ * tinted by the modifier's getIcon override).
+ */
+export function erCommunityItemModifierType(kind: ErCommunityItemKind): PokemonHeldItemModifierType {
+  const cfg = ER_COMMUNITY_ITEM_CONFIG[kind];
+  const type = new PokemonHeldItemModifierType(
+    "",
+    cfg.icon,
+    (t, args) => new ErCommunityItemModifier(t, (args[0] as Pokemon).id, kind),
+  );
+  Object.defineProperty(type, "name", { get: () => cfg.name });
+  type.getDescription = () => cfg.description;
+  return type;
+}
+
+/**
+ * ER Ability Capsule (#387, community batch): cycles a Pokémon's ACTIVE
+ * ability through its species' legal abilities (1 -> 2 -> hidden). Single-use
+ * per Pokémon. English hardcoded (ER-custom item, no shared locale entry).
+ */
+export class ErAbilityCapsuleModifierType extends PokemonModifierType {
+  constructor() {
+    super(
+      "",
+      "ability_capsule",
+      (type, args) => new ErAbilityCapsuleModifier(type, (args[0] as PlayerPokemon).id),
+      (pokemon: PlayerPokemon) => {
+        if (pokemon.customPokemonData.erAbilityCapsuleUsed) {
+          return PartyUiHandler.NoEffectMessage;
+        }
+        const form = pokemon.getSpeciesForm();
+        const distinct = new Set([form.ability1, form.ability2, form.abilityHidden].filter(a => a !== AbilityId.NONE));
+        if (distinct.size < 2) {
+          return PartyUiHandler.NoEffectMessage;
+        }
+        return null;
+      },
+    );
+  }
+
+  get name(): string {
+    return "Ability Capsule";
+  }
+
+  getDescription(): string {
+    return "Switches a Pokémon's active ability to its species' next legal ability (1 -> 2 -> hidden). Works once per Pokémon.";
+  }
+}
+
+/**
+ * ER Frostbite Orb (#387, community batch): the Toxic/Flame Orb sibling for
+ * ER's Frostbite status (freeze does not exist in ER). The modifier reuses the
+ * vanilla {@linkcode TurnStatusEffectModifier} plumbing via the FREEZE ->
+ * ER_FROSTBITE reroute in `Pokemon.trySetStatus`.
+ */
+export class ErFrostbiteOrbModifierType extends PokemonHeldItemModifierType {
+  constructor() {
+    super("", "frostbite_orb", (type, args) => new TurnStatusEffectModifier(type, (args[0] as Pokemon).id));
+  }
+
+  get name(): string {
+    return "Frostbite Orb";
+  }
+
+  getDescription(): string {
+    return "Inflicts Frostbite on the holder at the end of each turn. Useful for abilities triggered by status conditions.";
+  }
+}
+
+/**
+ * ER Dex Nav (#392, community batch): a consumable that scans the current
+ * biome and lets the player register 2 of its wild species in the Pokédex as
+ * caught (via {@linkcode ErDexNavPhase}).
+ */
+export class ErDexNavModifierType extends ModifierType {
+  constructor() {
+    super("", "dex_nav", (type, _args) => new ErDexNavModifier(type));
+  }
+
+  get name(): string {
+    return "Dex Nav";
+  }
+
+  getDescription(): string {
+    return "Scans the current biome and registers 2 wild Pokémon of your choice in the Pokédex, as if caught.";
   }
 }
 
@@ -1986,6 +2081,17 @@ const modifierTypeInitObj = Object.freeze({
   ABILITY_RANDOMIZER: () => new PokemonRandomizeAbilityModifierType(),
   MOVE_SLOT_EXPANDER: () => new PokemonAddMoveSlotModifierType(),
 
+  // ER community item batch (#387/#392).
+  ER_CHILI_SAMPLE: () => erCommunityItemModifierType("chiliSample"),
+  ER_COPPER_ROD: () => erCommunityItemModifierType("copperRod"),
+  ER_RUSTY_CLAW: () => erCommunityItemModifierType("rustyClaw"),
+  ER_SPIKED_KNUCKLES: () => erCommunityItemModifierType("spikedKnuckles"),
+  ER_LOADED_DICE: () => erCommunityItemModifierType("loadedDice"),
+  ER_LUCKY_HEART: () => erCommunityItemModifierType("luckyHeart"),
+  ER_OMNI_GEM: () => erCommunityItemModifierType("omniGem"),
+  ER_ABILITY_CAPSULE: () => new ErAbilityCapsuleModifierType(),
+  ER_DEX_NAV: () => new ErDexNavModifierType(),
+
   /*REPEL: () => new DoubleBattleChanceBoosterModifierType('Repel', 5),
   SUPER_REPEL: () => new DoubleBattleChanceBoosterModifierType('Super Repel', 10),
   MAX_REPEL: () => new DoubleBattleChanceBoosterModifierType('Max Repel', 25),*/
@@ -2259,6 +2365,7 @@ const modifierTypeInitObj = Object.freeze({
       "flame_orb",
       (type, args) => new TurnStatusEffectModifier(type, (args[0] as Pokemon).id),
     ),
+  FROSTBITE_ORB: () => new ErFrostbiteOrbModifierType(),
 
   BATON: () =>
     new PokemonHeldItemModifierType(
