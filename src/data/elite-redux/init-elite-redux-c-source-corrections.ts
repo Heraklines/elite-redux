@@ -67,14 +67,17 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_SCRATCH", { pp: 35 }],
   ["MOVE_VISE_GRIP", { power: 70, accuracy: 100, pp: 30 }],
   ["MOVE_GUILLOTINE", { chance: 0 }],
-  ["MOVE_RAZOR_WIND", { power: 90 }],
+  // MANUAL Nextdex pins (do NOT regenerate away) - community report
+  // 2026-06-11: these rows carried stale beta C-source values; the live
+  // Nextdex is the canonical balance source (see MOVE_KARATE_CHOP above).
+  ["MOVE_RAZOR_WIND", { power: 70, accuracy: 100, pp: 10 }],
   ["MOVE_CUT", { power: 60, accuracy: 100, pp: 20, chance: 10 }], // ER: 60BP/100%/20PP, always-crit + 10% bleed (attrs in move-patches)
   ["MOVE_WING_ATTACK", { power: 80 }],
   ["MOVE_WHIRLWIND", { pp: 20 }],
   ["MOVE_BIND", { accuracy: 90 }],
-  ["MOVE_SLAM", { power: 90, pp: 20 }],
-  ["MOVE_VINE_WHIP", { power: 75, pp: 20 }],
-  ["MOVE_DOUBLE_KICK", { power: 30, pp: 30 }],
+  ["MOVE_SLAM", { power: 95, accuracy: 100, pp: 10 }],
+  ["MOVE_VINE_WHIP", { power: 80, pp: 15, chance: 30 }],
+  ["MOVE_DOUBLE_KICK", { power: 45, pp: 20 }],
   ["MOVE_ROLLING_KICK", { power: 60, accuracy: 85 }],
   ["MOVE_HEADBUTT", { power: 70 }],
   ["MOVE_HORN_ATTACK", { power: 80, pp: 25, chance: 0 }],
@@ -83,7 +86,7 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_WRAP", { accuracy: 90 }],
   ["MOVE_TAKE_DOWN", { power: 95, chance: 0 }],
   ["MOVE_THRASH", { power: 120, pp: 10 }],
-  ["MOVE_DOUBLE_EDGE", { power: 120, pp: 15 }],
+  ["MOVE_DOUBLE_EDGE", { power: 130, pp: 10 }],
   ["MOVE_TAIL_WHIP", { pp: 30 }],
   ["MOVE_POISON_STING", { chance: 30 }],
   ["MOVE_LEER", { pp: 30 }],
@@ -97,8 +100,8 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_SING", { accuracy: 55 }],
   ["MOVE_SUPERSONIC", { accuracy: 55 }],
   ["MOVE_SONIC_BOOM", { power: 1, accuracy: 90 }],
-  ["MOVE_ACID", { power: 40, pp: 30, chance: 10 }],
-  ["MOVE_EMBER", { power: 40, pp: 25, chance: 10 }],
+  ["MOVE_ACID", { power: 70, pp: 20, chance: 30 }],
+  ["MOVE_EMBER", { power: 20, pp: 20, chance: 100 }],
   ["MOVE_MIST", { pp: 30 }],
   ["MOVE_WATER_GUN", { pp: 25, chance: 0 }],
   ["MOVE_HYDRO_PUMP", { accuracy: 80, chance: 0 }],
@@ -113,9 +116,9 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_DRILL_PECK", { chance: 0 }],
   ["MOVE_SUBMISSION", { power: 150, accuracy: 80, pp: 15 }],
   ["MOVE_SEISMIC_TOSS", { pp: 20 }],
-  ["MOVE_STRENGTH", { power: 100, pp: 10 }],
+  ["MOVE_STRENGTH", { power: 110, pp: 5, chance: 100 }],
   ["MOVE_ABSORB", { power: 35, pp: 25, chance: 0 }],
-  ["MOVE_MEGA_DRAIN", { power: 60 }],
+  ["MOVE_MEGA_DRAIN", { power: 50, pp: 15 }],
   ["MOVE_RAZOR_LEAF", { pp: 25, chance: 100 }],
   ["MOVE_POISON_POWDER", { pp: 35 }],
   ["MOVE_STUN_SPORE", { accuracy: 75, pp: 30 }],
@@ -166,9 +169,9 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_PSYWAVE", { chance: 30 }],
   ["MOVE_SPLASH", { pp: 40, chance: 0 }],
   ["MOVE_CRABHAMMER", { accuracy: 90, chance: 0 }],
-  ["MOVE_FURY_SWIPES", { power: 20 }],
+  ["MOVE_FURY_SWIPES", { power: 25, accuracy: 100, pp: 15 }],
   ["MOVE_BONEMERANG", { power: 50 }],
-  ["MOVE_HYPER_FANG", { power: 75 }],
+  ["MOVE_HYPER_FANG", { power: 85, pp: 15, chance: 30 }],
   ["MOVE_SHARPEN", { pp: 30 }],
   ["MOVE_CONVERSION", { pp: 30 }],
   ["MOVE_SLASH", { power: 60, accuracy: 100, pp: 10, chance: 20 }], // ER: 60BP/100%/10PP, always-crit + 20% bleed (attrs in move-patches)
@@ -176,7 +179,7 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_THIEF", { pp: 25 }],
   ["MOVE_MIND_READER", { pp: 5 }],
   ["MOVE_NIGHTMARE", { pp: 15, chance: 0 }],
-  ["MOVE_FLAME_WHEEL", { power: 65, pp: 25 }],
+  ["MOVE_FLAME_WHEEL", { power: 40, pp: 10, chance: 0 }],
   ["MOVE_SNORE", { power: 50 }],
   ["MOVE_FLAIL", { power: 1, pp: 15 }],
   ["MOVE_CONVERSION_2", { pp: 30 }],
@@ -191,7 +194,7 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_DETECT", { pp: 5 }],
   ["MOVE_OUTRAGE", { pp: 10 }],
   ["MOVE_ENDURE", { pp: 10 }],
-  ["MOVE_ROLLOUT", { power: 30, accuracy: 90, pp: 20 }],
+  ["MOVE_ROLLOUT", { power: 40, accuracy: 100, pp: 10 }],
   ["MOVE_FALSE_SWIPE", { power: 80, pp: 40, chance: 0 }],
   ["MOVE_MILK_DRINK", { pp: 10 }],
   // ER (#360): Triple-Kick-style 3-strike ramp — see vanilla-move-patches.
@@ -292,9 +295,9 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_AVALANCHE", { power: 60 }],
   ["MOVE_ICE_SHARD", { pp: 30 }],
   ["MOVE_SHADOW_CLAW", { chance: 0 }],
-  ["MOVE_THUNDER_FANG", { power: 70 }],
-  ["MOVE_ICE_FANG", { power: 70 }],
-  ["MOVE_FIRE_FANG", { power: 70 }],
+  ["MOVE_THUNDER_FANG", { power: 80, pp: 15, chance: 10 }],
+  ["MOVE_ICE_FANG", { power: 80, pp: 15, chance: 10 }],
+  ["MOVE_FIRE_FANG", { power: 80, pp: 15, chance: 10 }],
   ["MOVE_SHADOW_SNEAK", { pp: 30 }],
   ["MOVE_MUD_BOMB", { power: 65, pp: 15, chance: 30 }],
   ["MOVE_PSYCHO_CUT", { power: 70, chance: 0 }],
@@ -309,14 +312,14 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_MAGNET_BOMB", { power: 60 }],
   ["MOVE_STONE_EDGE", { accuracy: 85, pp: 5, chance: 0 }],
   ["MOVE_JUDGMENT", { power: 100, pp: 10 }],
-  ["MOVE_WOOD_HAMMER", { pp: 15 }],
+  ["MOVE_WOOD_HAMMER", { pp: 10 }],
   ["MOVE_HEAL_ORDER", { pp: 10 }],
   ["MOVE_DOUBLE_HIT", { power: 35 }],
   ["MOVE_CRUSH_GRIP", { power: 1 }],
   ["MOVE_OMINOUS_WIND", { power: 60 }],
   ["MOVE_SHADOW_FORCE", { chance: 0 }],
   ["MOVE_QUIVER_DANCE", { pp: 20 }],
-  ["MOVE_SYNCHRONOISE", { power: 120 }],
+  ["MOVE_SYNCHRONOISE", { power: 95, pp: 10 }],
   ["MOVE_COIL", { pp: 20 }],
   ["MOVE_ROUND", { chance: 0 }],
   // ER (#360): Triple-Kick-style 3-strike ramp — see vanilla-move-patches.
@@ -343,7 +346,7 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_HURRICANE", { accuracy: 75 }],
   ["MOVE_HEAD_CHARGE", { power: 120, pp: 15 }],
   ["MOVE_RELIC_SONG", { power: 85 }],
-  ["MOVE_SNARL", { power: 55 }],
+  ["MOVE_SNARL", { power: 60, pp: 15, chance: 100 }],
   ["MOVE_ICICLE_CRASH", { chance: 30 }],
   ["MOVE_V_CREATE", { accuracy: 95 }],
   ["MOVE_BELCH", { pp: 10 }],
@@ -392,7 +395,7 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_BRANCH_POKE", { pp: 40 }],
   ["MOVE_METEOR_ASSAULT", { power: 150 }],
   ["MOVE_ETERNABEAM", { power: 160, accuracy: 90 }],
-  ["MOVE_STEEL_ROLLER", { power: 130, pp: 5 }],
+  ["MOVE_STEEL_ROLLER", { power: 80, pp: 15 }],
   ["MOVE_MISTY_EXPLOSION", { power: 100 }],
   ["MOVE_TERRAIN_PULSE", { pp: 10 }],
   ["MOVE_SKITTER_SMACK", { power: 70, accuracy: 90, pp: 10 }],
@@ -673,6 +676,17 @@ export function initEliteReduxCSourceCorrections(): CSourceCorrectionResult {
       target.chance = override.chance;
     }
     result.movesPatched++;
+  }
+
+  // ER GLOBAL RULE (community report 2026-06-11): NO move has more than
+  // 20 PP. The ER data dump has ZERO moves above 20 PP; anything higher in
+  // pokerogue (vanilla baselines and stale c-source rows like Pound 35)
+  // is clamped here, after all numeric passes, so nothing can re-raise it.
+  for (const move of allMoves) {
+    if (move && move.pp > 20) {
+      (move as { pp: number }).pp = 20;
+      result.movesPatched++;
+    }
   }
 
   // Apply flag patches: OR the missing flag bits into each move's flag mask.

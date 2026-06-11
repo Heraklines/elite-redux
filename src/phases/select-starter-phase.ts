@@ -2,7 +2,9 @@ import { consumePendingDevStarters } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { Phase } from "#app/phase";
+import { allMoves } from "#data/data-lists";
 import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
+import { PokemonMove } from "#moves/pokemon-move";
 
 /** Throwaway save slot used by dev test-scenarios so they don't clobber slot 0. */
 const DEV_SCENARIO_SLOT = 4;
@@ -93,6 +95,14 @@ export class SelectStarterPhase extends Phase {
       if (starter.moveset) {
         starterPokemon.tryPopulateMoveset(starter.moveset, ignoreMovesetValidation);
       }
+      // ER (community report 2026-06-11): some lines' EARLY learnset is all
+      // status moves (Krabby Redux opens Kinesis/Showtime/Meditate/...), so a
+      // starter could begin the run with NO damaging move at all. Guarantee
+      // one: swap the last slot for the line's earliest damaging level-up
+      // move (skipped for dev scenarios, whose movesets are intentional).
+      if (!ignoreMovesetValidation) {
+        ensureStarterHasDamagingMove(starterPokemon);
+      }
       // ER Black Shinies (#349): a starter chosen at the BLACK tier enters the
       // run as a full t4 (epic base + gift kit). One per team is implicit:
       // only one starter can be black since the unlock is per-line and the
@@ -160,5 +170,30 @@ export class SelectStarterPhase extends Phase {
       });
       this.end();
     });
+  }
+}
+
+/**
+ * ER: guarantee a freshly created starter has at least ONE damaging move.
+ * Some ER learnsets open with nothing but status moves (Krabby Redux), which
+ * left the run unwinnable from turn 1. Replaces the last moveset slot (or
+ * fills an empty one) with the line's earliest damaging level-up move.
+ */
+function ensureStarterHasDamagingMove(pokemon: ReturnType<typeof globalScene.addPlayerPokemon>): void {
+  const moveset = pokemon.getMoveset();
+  if (moveset.some(m => (m?.getMove()?.power ?? 0) > 0)) {
+    return;
+  }
+  const firstDamaging = pokemon
+    .getLevelMoves(1, true, false, true)
+    .map(lm => lm[1])
+    .find(moveId => (allMoves[moveId]?.power ?? 0) > 0);
+  if (firstDamaging === undefined) {
+    return;
+  }
+  if (moveset.length < 4) {
+    pokemon.moveset.push(new PokemonMove(firstDamaging));
+  } else {
+    pokemon.moveset[3] = new PokemonMove(firstDamaging);
   }
 }

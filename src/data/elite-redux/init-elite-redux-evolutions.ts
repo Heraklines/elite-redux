@@ -79,6 +79,7 @@ import {
 import { allSpecies } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES, type ErEvolutionDraft } from "#data/elite-redux/er-species";
+import { SpeciesId } from "#enums/species-id";
 
 /**
  * ER evolution kind numerics. Mirrors the `evoKindT` table from the v2.65
@@ -172,6 +173,19 @@ export function initEliteReduxEvolutions(): InitEliteReduxEvolutionsResult {
   // Redux-line pass: make the REDUX form's own evolution line reachable from
   // the vanilla species (which is how the port models redux — as a FORM).
   appendReduxFormEvolutions(table, result);
+
+  // ER (community report 2026-06-11): Roaming Gimmighoul never evolved. The
+  // vanilla edge needs 10 Gimmighoul Coin stacks (EVO_TREASURE_TRACKER),
+  // which the roaming form practically never accrues in this port, and ER's
+  // own dump carries no usable Gimmighoul evolution data. Give the ROAMING
+  // form a plain level-50 evolution; the chest form keeps the coin path.
+  {
+    const gimmighoul = table[SpeciesId.GIMMIGHOUL];
+    const idx = gimmighoul?.findIndex(ev => (ev as unknown as { preFormKey?: string }).preFormKey === "roaming") ?? -1;
+    if (gimmighoul && idx >= 0) {
+      gimmighoul[idx] = new SpeciesFormEvolution(SpeciesId.GHOLDENGO, "roaming", "", 50, null, null, [50, 60, 70]);
+    }
+  }
 
   // Rebuild prevolutions + starters tables so post-ER lookups (Dex,
   // breeding, starter eligibility) see the patched edges. Both helpers are

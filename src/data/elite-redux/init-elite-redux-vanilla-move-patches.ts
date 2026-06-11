@@ -47,6 +47,7 @@ import {
   AddBattlerTagAttr,
   CompareWeightPowerAttr,
   ConfuseAttr,
+  ConsecutiveUseDoublePowerAttr,
   CritOnlyAttr,
   DefDefAttr,
   ErCritBelowHalfHpAttr,
@@ -59,6 +60,7 @@ import {
   IgnoreOpponentStatStagesAttr,
   type Move,
   type MoveAttr,
+  type MoveConditionFunc,
   MovePowerMultiplierAttr,
   MultiHitAttr,
   MultiHitPowerIncrementAttr,
@@ -72,6 +74,7 @@ import {
   StatStageChangeAttr,
   StatusEffectAttr,
   TerrainChangeAttr,
+  VariableMoveTypeAttr,
   WeatherChangeAttr,
 } from "#data/moves/move";
 import { FirstMoveCondition } from "#data/moves/move-condition";
@@ -87,6 +90,7 @@ import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
+import type { Pokemon } from "#field/pokemon";
 
 /** Numeric cutoff: anything ≥ this is an ER custom (registered by B2). */
 const VANILLA_ID_CUTOFF = 5000;
@@ -322,6 +326,11 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     MoveId.RAZOR_WIND,
     move => {
       retypeMove(move, PokemonType.FLYING);
+      // ER (community batch 2026-06-11): NO charge turn - hits immediately.
+      // The vanilla instance is a ChargingAttackMove (class-level), so shadow
+      // its type-guard per instance; MovePhase then never enters the charging
+      // branch. SE-vs-Rock rider comes from ER_ID_SUPER_EFFECTIVE_VS_TYPE.
+      Object.defineProperty(move, "isChargingMove", { value: () => false });
     },
   ],
   [
@@ -336,6 +345,9 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     move => {
       retypeMove(move, PokemonType.ROCK);
       orFlag(move, MoveFlags.FIELD_BASED);
+      // ER (community batch): "Lowers the user's defenses" - Close Combat
+      // effect (the numeric pass pins 110 BP / 5 PP / chance 100).
+      addAttrUnique(move, new StatStageChangeAttr([Stat.DEF, Stat.SPDEF], -1, true));
     },
   ],
   [
@@ -467,7 +479,7 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     move => {
       addAttrUnique(move, new PhotonGeyserCategoryAttr());
       removeAttrsByName(move, ["StatStageChangeAttr"]);
-      addAttrUnique(move, new TerrainChangeAttr(TerrainType.MISTY));
+      addAttrUnique(move, new ErTerrainRiderNoFailAttr(TerrainType.MISTY));
       move.chance = -1;
     },
   ],
@@ -486,7 +498,7 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     move => {
       addAttrUnique(move, new PhotonGeyserCategoryAttr());
       removeAttrsByName(move, ["StatusEffectAttr"]);
-      addAttrUnique(move, new WeatherChangeAttr(WeatherType.RAIN));
+      addAttrUnique(move, new ErWeatherRiderNoFailAttr(WeatherType.RAIN));
       move.chance = -1;
     },
   ],
@@ -495,7 +507,7 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     move => {
       addAttrUnique(move, new PhotonGeyserCategoryAttr());
       removeAttrsByName(move, ["StatusEffectAttr"]);
-      addAttrUnique(move, new WeatherChangeAttr(WeatherType.SANDSTORM));
+      addAttrUnique(move, new ErWeatherRiderNoFailAttr(WeatherType.SANDSTORM));
       move.chance = -1;
     },
   ],
@@ -510,6 +522,32 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
   [MoveId.DOUBLE_SLAP, move => addAttrUnique(move, new ConfuseAttr(false))],
   // VINE_WHIP: 30% flinch chance (numeric-patched on top).
   [MoveId.VINE_WHIP, move => addAttrUnique(move, new FlinchAttr())],
+  // MEGA_DRAIN: ER drains 75% of the damage dealt (vanilla 50%).
+  [
+    MoveId.MEGA_DRAIN,
+    move => {
+      removeAttrsByName(move, ["HitHealAttr"]);
+      addAttrUnique(move, new HitHealAttr(0.75));
+    },
+  ],
+  // SYNCHRONOISE: ER - "an odd shock wave that MATCHES the user's second
+  // type" and hits anything (vanilla only damaged targets sharing a type).
+  [
+    MoveId.SYNCHRONOISE,
+    move => {
+      removeAttrsByName(move, ["HitsSameTypeAttr"]);
+      addAttrUnique(move, new ErMatchUserSecondTypeAttr());
+    },
+  ],
+  // STEEL_ROLLER: ER - usable WITHOUT terrain; still clears one when present
+  // (numeric pass pins 80 BP / 15 PP). Drop the vanilla "fails unless terrain
+  // is active" builder condition.
+  [
+    MoveId.STEEL_ROLLER,
+    move => {
+      (move as unknown as { conditions: unknown[] }).conditions.length = 0;
+    },
+  ],
   // PSYBEAM: lowers SpAtk on hit (chance patched separately).
   [MoveId.PSYBEAM, move => addAttrUnique(move, new StatStageChangeAttr([Stat.SPATK], -1, false))],
   // PSYWAVE: ER makes it a normal 40-BP special move (+1 priority, 10% confuse),
@@ -731,10 +769,15 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       }
     },
   ],
+  // FLAME_WHEEL: ER Rollout clone - "rolls into a wheel to strike with
+  // rising intensity". 40 BP ramp, NO burn rider (numeric pass pins
+  // 40 BP / 10 PP / chance 0). Community batch 2026-06-11.
   [
     MoveId.FLAME_WHEEL,
     move => {
-      move.chance = 10;
+      removeAttrsByName(move, ["StatusEffectAttr"]);
+      addAttrUnique(move, new ConsecutiveUseDoublePowerAttr(5, true, true, MoveId.DEFENSE_CURL));
+      move.chance = -1;
     },
   ],
   [
@@ -1031,6 +1074,47 @@ function orFlag(move: MutableMove, flag: MoveFlags): void {
  * same exact constructor is already present (idempotency safeguard for
  * re-runs / overlapping audits).
  */
+// ER (community batch 2026-06-11): field-setting RIDERS on damaging moves
+// must never fail the move. Vanilla TerrainChangeAttr/WeatherChangeAttr
+// attach a "not already active" MoveCondition, which made the genie Storms
+// fail outright when their field was already up (Springtide Storm "always
+// fails" ON misty terrain). These variants always pass the condition and
+// treat an already-active field as a no-op.
+class ErTerrainRiderNoFailAttr extends TerrainChangeAttr {
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    super.apply(user, target, move, args);
+    return true;
+  }
+  override getCondition(): MoveConditionFunc {
+    return () => true;
+  }
+}
+
+class ErWeatherRiderNoFailAttr extends WeatherChangeAttr {
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    super.apply(user, target, move, args);
+    return true;
+  }
+  override getCondition(): MoveConditionFunc {
+    return () => true;
+  }
+}
+
+// ER Synchronoise: the move's TYPE becomes the user's SECOND type (falls back
+// to the first type for monotype users).
+class ErMatchUserSecondTypeAttr extends VariableMoveTypeAttr {
+  override apply(user: Pokemon, _target: Pokemon, _move: Move, args: any[]): boolean {
+    const moveType = args[0] as { value: PokemonType };
+    const types = user.getTypes(true, true);
+    const second = types.at(-1);
+    if (second === undefined) {
+      return false;
+    }
+    moveType.value = second;
+    return true;
+  }
+}
+
 function addAttrUnique(move: MutableMove, attr: MoveAttr): void {
   const ctor = attr.constructor;
   for (const existing of move.attrs) {

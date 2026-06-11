@@ -1344,6 +1344,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Move spec batch (#386)",
+    description:
+      "#386 community move batch. Your Enamorus carries the reworked moves.\n"
+      + "DO: check the fight panel stats, then USE each move twice.\n"
+      + "EXPECT: Razor Wind 70 BP, NO charge turn, super effective vs Rock\n"
+      + "(the foe is Golem). Springtide Storm sets misty terrain on the first\n"
+      + "use and DOES NOT FAIL on the second (it used to). Steel Roller works\n"
+      + "with no terrain and clears one when present. Synchronoise hits the\n"
+      + "Golem (and runs as the user's SECOND type). ALSO: no move anywhere\n"
+      + "shows more than 20 PP now.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.GOLEM,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.ENAMORUS, {
+          moveset: [MoveId.SPRINGTIDE_STORM, MoveId.RAZOR_WIND, MoveId.STEEL_ROLLER, MoveId.SYNCHRONOISE],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Egg countdown (#378)",
     description:
       "#378 QoL - NOT a battle test, this entry just tracks the check.\n"
