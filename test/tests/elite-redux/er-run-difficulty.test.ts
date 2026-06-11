@@ -35,10 +35,10 @@ describe("ER run difficulty (#368 Youngster mode)", () => {
     expect(isErVanillaDifficulty("hell")).toBe(false);
   });
 
-  it("wild shiny multiplier (#402): 1x / 1x / 1.75x / 2x", () => {
+  it("wild shiny multiplier: 1x / 1x / 1.5x / 2x", () => {
     expect(getErDifficultyShinyMultiplier("youngster")).toBe(1);
     expect(getErDifficultyShinyMultiplier("ace")).toBe(1);
-    expect(getErDifficultyShinyMultiplier("elite")).toBe(1.75);
+    expect(getErDifficultyShinyMultiplier("elite")).toBe(1.5);
     expect(getErDifficultyShinyMultiplier("hell")).toBe(2);
   });
 

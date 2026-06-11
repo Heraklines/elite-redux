@@ -2183,6 +2183,19 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * in the starting party of the run and if Fresh Start is not active.
    * @returns An array of {@linkcode MoveId}s, as described above.
    */
+  /**
+   * ER Learner's Shroom (#404): the species' EGG MOVES this Pokemon does not
+   * already know. Unlike {@linkcode getUnlockedEggMoves} this lists ALL of the
+   * species' egg moves - the Shroom teaches one for the run without requiring
+   * (or granting) the permanent egg-move unlock.
+   */
+  public getErLearnableEggMoves(): MoveId[] {
+    const rootSpeciesId =
+      this.metSpecies in speciesEggMoves ? this.metSpecies : this.getSpeciesForm(true).getRootSpeciesId(true);
+    const eggMoves: MoveId[] = speciesEggMoves[rootSpeciesId] ?? [];
+    return eggMoves.filter(m => m && !this.moveset.some(pm => pm?.moveId === m));
+  }
+
   public getLearnableLevelMoves(): MoveId[] {
     let levelMoves = this.getLevelMoves(1, true, false, true).map(lm => lm[1]);
     if (this.metBiome === -1 && !globalScene.gameMode.isFreshStartChallenge() && !globalScene.gameMode.isDaily) {
@@ -3792,7 +3805,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         globalScene.applyModifiers(ShinyRateBoosterModifier, true, shinyThreshold);
         // ER: challenge "Favour" raises shiny odds (up to 3x) on a challenge run.
         shinyThreshold.value *= getRunShinyMultiplier();
-        // ER (#368/#402): WILD shiny odds scale with run difficulty (Elite 1.75x,
+        // ER (#368/#402): WILD shiny odds scale with run difficulty (Elite 1.5x,
         // Hell 2x) and stack with the boosts above (challenge-capped at 6x).
         if (this.isEnemy() && !this.hasTrainer()) {
           shinyThreshold.value *= getErDifficultyShinyMultiplier();

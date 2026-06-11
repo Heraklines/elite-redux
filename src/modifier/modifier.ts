@@ -2559,6 +2559,36 @@ export class TmModifier extends ConsumablePokemonModifier {
   }
 }
 
+/**
+ * ER Learner's Shroom (#404): teaches the chosen Pokemon one of its species'
+ * EGG MOVES for the run - no permanent egg-move unlock required or granted.
+ * `eggMoveIndex` indexes {@linkcode PlayerPokemon.getErLearnableEggMoves}
+ * (the list the ER_LEARNERS_SHROOM party-UI mode displayed).
+ */
+export class ErLearnersShroomModifier extends ConsumablePokemonModifier {
+  public eggMoveIndex: number;
+
+  constructor(type: ModifierType, pokemonId: number, eggMoveIndex: number) {
+    super(type, pokemonId);
+    this.eggMoveIndex = eggMoveIndex;
+  }
+
+  override apply(playerPokemon: PlayerPokemon, cost?: number): boolean {
+    const moveId = playerPokemon.getErLearnableEggMoves()[this.eggMoveIndex];
+    if (moveId == null) {
+      return false;
+    }
+    globalScene.phaseManager.unshiftNew(
+      "LearnMovePhase",
+      globalScene.getPlayerParty().indexOf(playerPokemon),
+      moveId,
+      LearnMoveType.MEMORY,
+      cost,
+    );
+    return true;
+  }
+}
+
 export class RememberMoveModifier extends ConsumablePokemonModifier {
   public levelMoveIndex: number;
 

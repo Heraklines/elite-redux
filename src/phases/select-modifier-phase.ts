@@ -13,6 +13,7 @@ import {
 } from "#modifiers/modifier";
 import type { CustomModifierSettings, ModifierType, ModifierTypeOption } from "#modifiers/modifier-type";
 import {
+  ErLearnersShroomModifierType,
   FusePokemonModifierType,
   getPlayerModifierTypeOptions,
   getPlayerShopModifierTypeOptionsForWave,
@@ -355,6 +356,9 @@ export class SelectModifierPhase extends BattlePhase {
     // chooses which learnable move fills the new 5th slot.
     const isRememberMoveModifier =
       modifierType instanceof RememberMoveModifierType || modifierType instanceof PokemonAddMoveSlotModifierType;
+    // ER Learner's Shroom (#404): same flow as remember-move, but the party UI
+    // lists the species' EGG MOVES instead of learnable level moves.
+    const isErLearnersShroom = modifierType instanceof ErLearnersShroomModifierType;
     const isPpRestoreModifier =
       modifierType instanceof PokemonPpRestoreModifierType || modifierType instanceof PokemonPpUpModifierType;
     const partyUiMode = isMoveModifier
@@ -365,7 +369,9 @@ export class SelectModifierPhase extends BattlePhase {
           ? PartyUiMode.TM_MODIFIER
           : isRememberMoveModifier
             ? PartyUiMode.REMEMBER_MOVE_MODIFIER
-            : PartyUiMode.MODIFIER;
+            : isErLearnersShroom
+              ? PartyUiMode.ER_LEARNERS_SHROOM_MODIFIER
+              : PartyUiMode.MODIFIER;
     const tmMoveId = isTmModifier ? (modifierType as TmModifierType).moveId : undefined;
     globalScene.ui.setModeWithoutClear(
       UiMode.PARTY,
@@ -378,7 +384,7 @@ export class SelectModifierPhase extends BattlePhase {
               ? modifierType.newModifier(party[slotIndex], option - PartyOption.MOVE_1)
               : isAbilityModifier
                 ? modifierType.newModifier(party[slotIndex], option - PartyOption.ABILITY_SLOT_0)
-                : isRememberMoveModifier
+                : isRememberMoveModifier || isErLearnersShroom
                   ? modifierType.newModifier(party[slotIndex], option as number)
                   : modifierType.newModifier(party[slotIndex]);
             this.applyModifier(modifier!, cost, true); // TODO: is the bang correct?

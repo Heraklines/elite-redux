@@ -11,13 +11,13 @@
 # 🔁 WHEN er-assets CHANGES: bump the SHA below to the new Heraklines/er-assets
 #    HEAD (`gh api repos/Heraklines/er-assets/commits/main --jq .sha`) and redeploy.
 #    Forgetting to bump = players won't see the new assets (but never a stale mix).
-/images/*            https://cdn.jsdelivr.net/gh/Heraklines/er-assets@16aa28511de45d476c3d17e341a200e355a3abd3/images/:splat            302
-/audio/*             https://cdn.jsdelivr.net/gh/Heraklines/er-assets@16aa28511de45d476c3d17e341a200e355a3abd3/audio/:splat             302
-/battle-anims/*      https://cdn.jsdelivr.net/gh/Heraklines/er-assets@16aa28511de45d476c3d17e341a200e355a3abd3/battle-anims/:splat       302
-/battle-anims-er/*   https://cdn.jsdelivr.net/gh/Heraklines/er-assets@16aa28511de45d476c3d17e341a200e355a3abd3/battle-anims-er/:splat    302
-/fonts/*             https://cdn.jsdelivr.net/gh/Heraklines/er-assets@16aa28511de45d476c3d17e341a200e355a3abd3/fonts/:splat              302
-/starter-colors.json          https://cdn.jsdelivr.net/gh/Heraklines/er-assets@16aa28511de45d476c3d17e341a200e355a3abd3/starter-colors.json          302
-/exp-sprites.json             https://cdn.jsdelivr.net/gh/Heraklines/er-assets@16aa28511de45d476c3d17e341a200e355a3abd3/exp-sprites.json             302
-/biome-bgm-loop-points.json   https://cdn.jsdelivr.net/gh/Heraklines/er-assets@16aa28511de45d476c3d17e341a200e355a3abd3/biome-bgm-loop-points.json   302
-/logo128.png                  https://cdn.jsdelivr.net/gh/Heraklines/er-assets@16aa28511de45d476c3d17e341a200e355a3abd3/logo128.png                  302
-/logo512.png                  https://cdn.jsdelivr.net/gh/Heraklines/er-assets@16aa28511de45d476c3d17e341a200e355a3abd3/logo512.png                  302
+/images/*            https://cdn.jsdelivr.net/gh/Heraklines/er-assets@b60de487a560cbf31235c4b42cf07f753cca2de5/images/:splat            302
+/audio/*             https://cdn.jsdelivr.net/gh/Heraklines/er-assets@b60de487a560cbf31235c4b42cf07f753cca2de5/audio/:splat             302
+/battle-anims/*      https://cdn.jsdelivr.net/gh/Heraklines/er-assets@b60de487a560cbf31235c4b42cf07f753cca2de5/battle-anims/:splat       302
+/battle-anims-er/*   https://cdn.jsdelivr.net/gh/Heraklines/er-assets@b60de487a560cbf31235c4b42cf07f753cca2de5/battle-anims-er/:splat    302
+/fonts/*             https://cdn.jsdelivr.net/gh/Heraklines/er-assets@b60de487a560cbf31235c4b42cf07f753cca2de5/fonts/:splat              302
+/starter-colors.json          https://cdn.jsdelivr.net/gh/Heraklines/er-assets@b60de487a560cbf31235c4b42cf07f753cca2de5/starter-colors.json          302
+/exp-sprites.json             https://cdn.jsdelivr.net/gh/Heraklines/er-assets@b60de487a560cbf31235c4b42cf07f753cca2de5/exp-sprites.json             302
+/biome-bgm-loop-points.json   https://cdn.jsdelivr.net/gh/Heraklines/er-assets@b60de487a560cbf31235c4b42cf07f753cca2de5/biome-bgm-loop-points.json   302
+/logo128.png                  https://cdn.jsdelivr.net/gh/Heraklines/er-assets@b60de487a560cbf31235c4b42cf07f753cca2de5/logo128.png                  302
+/logo512.png                  https://cdn.jsdelivr.net/gh/Heraklines/er-assets@b60de487a560cbf31235c4b42cf07f753cca2de5/logo512.png                  302

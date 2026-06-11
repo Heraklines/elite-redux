@@ -92,6 +92,11 @@ export enum PartyUiMode {
    */
   REMEMBER_MOVE_MODIFIER,
   /**
+   * ER Learner's Shroom (#404): like REMEMBER_MOVE_MODIFIER, but the move list
+   * is the species' EGG MOVES the mon doesn't know yet.
+   */
+  ER_LEARNERS_SHROOM_MODIFIER,
+  /**
    * Indicates that the party UI is open to transfer items between mons.  This
    * type of selection can be cancelled.
    */
@@ -763,6 +768,21 @@ export class PartyUiHandler extends MessageUiHandler {
     return this.setCursor(this.optionsCursor < this.options.length - 1 ? this.optionsCursor + 1 : 0);
   }
 
+  /** True for the move-picking modifier modes (Memory Mushroom family). */
+  private isRememberMoveLikeMode(): boolean {
+    return (
+      this.partyUiMode === PartyUiMode.REMEMBER_MOVE_MODIFIER
+      || this.partyUiMode === PartyUiMode.ER_LEARNERS_SHROOM_MODIFIER
+    );
+  }
+
+  /** The selectable move list for the current remember-move-like mode. */
+  private getRememberableMoves(pokemon: PlayerPokemon): MoveId[] {
+    return this.partyUiMode === PartyUiMode.ER_LEARNERS_SHROOM_MODIFIER
+      ? pokemon.getErLearnableEggMoves()
+      : pokemon.getLearnableLevelMoves();
+  }
+
   private processRememberMoveModeInput(pokemon: PlayerPokemon) {
     const ui = this.getUi();
     const option = this.options[this.optionsCursor];
@@ -789,7 +809,7 @@ export class PartyUiHandler extends MessageUiHandler {
     // show move description
     const option = this.options[this.optionsCursor];
     const pokemon = globalScene.getPlayerParty()[this.cursor];
-    const move = allMoves[pokemon.getLearnableLevelMoves()[option]];
+    const move = allMoves[this.getRememberableMoves(pokemon)[option]];
     if (move) {
       this.moveInfoOverlay.show(move);
     } else {
@@ -847,7 +867,7 @@ export class PartyUiHandler extends MessageUiHandler {
     }
 
     // options specific to the mode (moves)
-    if (this.partyUiMode === PartyUiMode.REMEMBER_MOVE_MODIFIER) {
+    if (this.isRememberMoveLikeMode()) {
       return this.processRememberMoveModeInput(pokemon);
     }
 
@@ -983,7 +1003,7 @@ export class PartyUiHandler extends MessageUiHandler {
         return this.processModifierTransferModeUpDownInput(button);
       }
 
-      if (this.partyUiMode === PartyUiMode.REMEMBER_MOVE_MODIFIER) {
+      if (this.isRememberMoveLikeMode()) {
         return this.processRememberMoveModeUpDownInput(button);
       }
 
@@ -1418,7 +1438,7 @@ export class PartyUiHandler extends MessageUiHandler {
   }
 
   private updateOptionsWithRememberMoveModifierMode(pokemon): void {
-    const learnableMoves = pokemon.getLearnableLevelMoves();
+    const learnableMoves = this.getRememberableMoves(pokemon);
     for (let m = 0; m < learnableMoves.length; m++) {
       this.options.push(m);
     }
@@ -1513,6 +1533,7 @@ export class PartyUiHandler extends MessageUiHandler {
         this.updateOptionsWithAbilityModifierMode(pokemon);
         break;
       case PartyUiMode.REMEMBER_MOVE_MODIFIER:
+      case PartyUiMode.ER_LEARNERS_SHROOM_MODIFIER:
         this.updateOptionsWithRememberMoveModifierMode(pokemon);
         break;
       case PartyUiMode.MODIFIER_TRANSFER:
@@ -1658,7 +1679,7 @@ export class PartyUiHandler extends MessageUiHandler {
       } else if (option === PartyOption.SCROLL_DOWN) {
         optionName = "↓";
       } else if (
-        (this.partyUiMode !== PartyUiMode.REMEMBER_MOVE_MODIFIER
+        (!this.isRememberMoveLikeMode()
           && (this.partyUiMode !== PartyUiMode.MODIFIER_TRANSFER || this.transferMode)
           && this.partyUiMode !== PartyUiMode.DISCARD)
         || option === PartyOption.CANCEL
@@ -1704,8 +1725,8 @@ export class PartyUiHandler extends MessageUiHandler {
             break;
           }
         }
-      } else if (this.partyUiMode === PartyUiMode.REMEMBER_MOVE_MODIFIER) {
-        const learnableLevelMoves = pokemon.getLearnableLevelMoves();
+      } else if (this.isRememberMoveLikeMode()) {
+        const learnableLevelMoves = this.getRememberableMoves(pokemon);
         const move = learnableLevelMoves[option];
         optionName = allMoves[move].name;
         altText = !pokemon

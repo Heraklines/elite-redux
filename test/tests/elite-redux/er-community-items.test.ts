@@ -277,6 +277,32 @@ describe.skipIf(!RUN)("ER community item batch (#387/#392)", () => {
     expect(herb.waveProgress).toBe(0);
   });
 
+  it("Learner's Shroom (#404): lists unknown EGG MOVES and teaches the chosen one via LearnMovePhase", () => {
+    const player = game.scene.getPlayerPokemon()!;
+    const type = getModifierType(modifierTypes.ER_LEARNERS_SHROOM);
+    expect(type.name).toBe("Learner's Shroom");
+
+    // Snorlax has egg moves; none are known yet, so all are teachable.
+    const eggMoves = player.getErLearnableEggMoves();
+    expect(eggMoves.length).toBeGreaterThan(0);
+
+    // Teaching queues a LearnMovePhase for the chosen egg move.
+    const unshiftSpy = vi.spyOn(globalScene.phaseManager, "unshiftNew").mockImplementation(() => undefined as never);
+    const shroom = type.newModifier(player, 1) as { apply: (p: Pokemon) => boolean };
+    expect(shroom.apply(player)).toBe(true);
+    expect(unshiftSpy).toHaveBeenCalledWith(
+      "LearnMovePhase",
+      expect.any(Number),
+      eggMoves[1],
+      expect.anything(),
+      undefined,
+    );
+
+    // A KNOWN egg move drops out of the list.
+    player.moveset[0]!.moveId = eggMoves[0];
+    expect(player.getErLearnableEggMoves()).not.toContain(eggMoves[0]);
+  });
+
   it("Dex Nav: the current biome offers a non-empty, deduped species pool", () => {
     const pool = game.scene.arena.getErDexNavSpeciesPool();
     expect(pool.length).toBeGreaterThan(0);

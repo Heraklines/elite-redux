@@ -1292,14 +1292,18 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "Dex Nav + Capsule (#387/#392)",
     description:
-      "#387/#392 New consumables - win the opening battle; the FIRST shop\n"
-      + "guarantees DEX NAV (green scanner), ABILITY CAPSULE and OMNI GEM.\n"
+      "#387/#392/#404 New consumables - win the opening battle; the FIRST\n"
+      + "shop guarantees DEX NAV (green scanner), ABILITY CAPSULE, OMNI GEM\n"
+      + "and LEARNER'S SHROOM (teal mushroom).\n"
       + "DO+EXPECT: 1) DEX NAV - a species list of the CURRENT BIOME opens;\n"
       + "register 2 Pokemon; both then show as CAUGHT in the Pokedex/starter\n"
       + "select. 2) ABILITY CAPSULE on Yanmega - its ACTIVE ability switches to\n"
       + "the species' next legal one (check the summary). Buying a second\n"
       + "capsule for the same mon shows 'no effect' - it works ONCE per mon.\n"
-      + "3) OMNI GEM - held item, see the dedicated Omni Gem scenario.",
+      + "3) OMNI GEM - held item, see the dedicated Omni Gem scenario.\n"
+      + "4) LEARNER'S SHROOM on Yanmega - pick one of its EGG MOVES from the\n"
+      + "list; it learns it on the spot (no egg-move unlock needed). A mon\n"
+      + "already knowing all its egg moves shows 'no effect'.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1315,7 +1319,12 @@ export const DEV_SCENARIOS: DevScenario[] = [
         }),
       ];
     },
-    shopItems: [modifierTypes.ER_DEX_NAV, modifierTypes.ER_ABILITY_CAPSULE, modifierTypes.ER_OMNI_GEM],
+    shopItems: [
+      modifierTypes.ER_DEX_NAV,
+      modifierTypes.ER_ABILITY_CAPSULE,
+      modifierTypes.ER_OMNI_GEM,
+      modifierTypes.ER_LEARNERS_SHROOM,
+    ],
   },
   {
     label: "Black shiny: REDUX form (#393)",

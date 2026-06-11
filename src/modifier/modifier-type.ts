@@ -58,6 +58,7 @@ import {
   ErAbilityCapsuleModifier,
   ErCommunityItemModifier,
   ErDexNavModifier,
+  ErLearnersShroomModifier,
   EvolutionItemModifier,
   EvolutionStatBoosterModifier,
   EvoTrackerModifier,
@@ -845,6 +846,35 @@ export class ErAbilityCapsuleModifierType extends PokemonModifierType {
 
   getDescription(): string {
     return "Switches a Pokémon's active ability to its species' next legal ability (1 -> 2 -> hidden). Works once per Pokémon.";
+  }
+}
+
+/**
+ * ER Learner's Shroom (#404, community batch): teaches a Pokemon one of its
+ * species' EGG MOVES (run-only; no permanent unlock). Opens the dedicated
+ * egg-move party-UI mode. English hardcoded (ER-custom item).
+ */
+export class ErLearnersShroomModifierType extends PokemonModifierType {
+  constructor() {
+    super(
+      "",
+      "learners_shroom",
+      (type, args) => new ErLearnersShroomModifier(type, (args[0] as PlayerPokemon).id, args[1] as number),
+      (pokemon: PlayerPokemon) => {
+        if (pokemon.getErLearnableEggMoves().length === 0) {
+          return PartyUiHandler.NoEffectMessage;
+        }
+        return null;
+      },
+    );
+  }
+
+  get name(): string {
+    return "Learner's Shroom";
+  }
+
+  getDescription(): string {
+    return "Teaches a Pokémon one of its species' EGG MOVES of your choice, no egg-move unlock needed.";
   }
 }
 
@@ -2091,6 +2121,7 @@ const modifierTypeInitObj = Object.freeze({
   ER_OMNI_GEM: () => erCommunityItemModifierType("omniGem"),
   ER_POWER_HERB: () => erCommunityItemModifierType("powerHerb"),
   ER_ABILITY_CAPSULE: () => new ErAbilityCapsuleModifierType(),
+  ER_LEARNERS_SHROOM: () => new ErLearnersShroomModifierType(),
   ER_DEX_NAV: () => new ErDexNavModifierType(),
 
   /*REPEL: () => new DoubleBattleChanceBoosterModifierType('Repel', 5),

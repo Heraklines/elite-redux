@@ -33,6 +33,7 @@ ROM_ICONS_DIR = os.path.join(
 )
 ROM_GEM_PATH = os.path.join(ROM_ICONS_DIR, "gem.png")
 ROM_POWER_HERB_PATH = os.path.join(ROM_ICONS_DIR, "power_herb.png")
+BIG_MUSHROOM_PATH = os.path.join(ITEMS_DIR, "items", "big_mushroom.png")
 
 # protein's three red-liquid shades (light / mid / dark) -> recolor targets.
 RED_LIGHT = (246, 164, 164, 255)
@@ -59,6 +60,12 @@ FROSTBITE_MAP = {
     (248, 200, 104, 255): (192, 228, 252, 255),
     (248, 248, 104, 255): (224, 244, 255, 255),
     (240, 192, 184, 255): (216, 232, 248, 255),
+}
+# big_mushroom's red cap -> teal-green Learner's Shroom (#404).
+LEARNERS_SHROOM_MAP = {
+    (255, 115, 90, 255): (90, 200, 160, 255),
+    (255, 164, 131, 255): (140, 228, 192, 255),
+    (213, 57, 32, 255): (40, 150, 110, 255),
 }
 # scanner's blue casing -> Dex Nav green (screen LEDs/accents kept).
 DEX_NAV_MAP = {
@@ -156,16 +163,18 @@ def main() -> None:
     sheet = add_frame(sheet, atlas, "ability_randomizer", violet)
     omni_gem = pad_center(whiten(Image.open(ROM_GEM_PATH).convert("RGBA")))
     power_herb = pad_center(Image.open(ROM_POWER_HERB_PATH).convert("RGBA"))
+    learners_shroom = recolor(Image.open(BIG_MUSHROOM_PATH).convert("RGBA"), LEARNERS_SHROOM_MAP)
 
     sheet = add_frame(sheet, atlas, "frostbite_orb", frostbite)
     sheet = add_frame(sheet, atlas, "dex_nav", dex_nav)
     sheet = add_frame(sheet, atlas, "omni_gem", omni_gem)
     sheet = add_frame(sheet, atlas, "power_herb", power_herb)
+    sheet = add_frame(sheet, atlas, "learners_shroom", learners_shroom)
 
     sheet.save(PNG_PATH)
     with open(JSON_PATH, "w", encoding="utf-8") as fh:
         json.dump(atlas, fh, indent="\t")
-    print("wrote move_slot_expander + ability_randomizer + frostbite_orb + dex_nav + omni_gem + power_herb frames; sheet now", sheet.size)
+    print("wrote move_slot_expander + ability_randomizer + frostbite_orb + dex_nav + omni_gem + power_herb + learners_shroom frames; sheet now", sheet.size)
 
 
 if __name__ == "__main__":
