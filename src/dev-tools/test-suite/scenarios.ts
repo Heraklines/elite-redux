@@ -1425,6 +1425,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "past a few trainer waves.\n"
       + "EXPECT: EVERY trainer battle is a double battle; wild encounters keep\n"
       + "their normal single/double odds; the finale is unchanged.\n"
+      + "ALSO (#385): trainers whose pool would send a SINGLE mon now field two\n"
+      + "instead - the forced double used to FREEZE on the empty second slot.\n"
+      + "Play through early trainer waves and EXPECT no freeze, ever.\n"
       + "Pass/Fail this entry once checked.",
     setup: () => {
       resetDevOverrides();

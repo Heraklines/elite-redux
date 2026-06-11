@@ -10,6 +10,7 @@ import {
 } from "#data/elite-redux/er-trainer-runtime-hook";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { ArenaTagSide } from "#enums/arena-tag-side";
+import { Challenges } from "#enums/challenges";
 import { PartyMemberStrength } from "#enums/party-member-strength";
 import { SpeciesId } from "#enums/species-id";
 import { TeraAIMode } from "#enums/tera-ai-mode";
@@ -285,7 +286,12 @@ export class Trainer extends Phaser.GameObjects.Container {
     const difficultyWaveIndex = globalScene.gameMode.getWaveForDifficulty(waveIndex);
     const baseLevel = 1 + difficultyWaveIndex / 2 + Math.pow(difficultyWaveIndex / 25, 2);
 
-    if (this.isDouble() && partyTemplate.size < 2) {
+    // ER (#383): the Doubles Only challenge forces every trainer battle
+    // double, but only double-VARIANT trainers grew their party to 2 here.
+    // A single-mon trainer in a forced double battle left the second enemy
+    // slot permanently unfillable and the battle froze (community report).
+    const erForcedDouble = globalScene.gameMode?.hasChallenge?.(Challenges.DOUBLES_ONLY) ?? false;
+    if ((this.isDouble() || erForcedDouble) && partyTemplate.size < 2) {
       partyTemplate.size = 2;
     }
 
