@@ -1320,6 +1320,30 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Black Gardevoir (screenshot)",
+    description:
+      "#349 - showcase scenario for screenshots. The wild Gardevoir is a\n"
+      + "BLACK SHINY with real smoke-halo art, black from the first frame,\n"
+      + "standing at normal height. It only uses Splash; take your time\n"
+      + "framing the shot.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.GARDEVOIR,
+        ENEMY_LEVEL_OVERRIDE: 55,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ER_BLACK_SHINY_ENEMY_OVERRIDE: SpeciesId.GARDEVOIR,
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Egg countdown (#378)",
     description:
       "#378 QoL - NOT a battle test, this entry just tracks the check.\n"

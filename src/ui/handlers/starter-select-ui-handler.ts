@@ -1337,7 +1337,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.starterSelectMessageBox = addWindow(1, -1, 318, 28).setOrigin(0, 1);
     this.starterSelectMessageBoxContainer.add(this.starterSelectMessageBox);
 
-    this.message = addTextObject(8, 8, "", TextStyle.WINDOW, { maxLines: 2 }).setOrigin(0);
+    // wordWrap: long texts (e.g. the difficulty mode descriptions) flowed off
+    // the right edge in one unreadable line; the box fits two wrapped lines.
+    this.message = addTextObject(8, 8, "", TextStyle.WINDOW, {
+      maxLines: 2,
+      wordWrap: { width: 1810 },
+    }).setOrigin(0);
     this.starterSelectMessageBoxContainer.add(this.message);
 
     // arrow icon for the message box
