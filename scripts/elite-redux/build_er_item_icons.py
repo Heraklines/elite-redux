@@ -8,6 +8,8 @@ produces two recolors:
 Also builds the #387/#392 community item icons:
   - `frostbite_orb` -> icy-blue recolor of `flame_orb`
   - `dex_nav`       -> green recolor of `scanner` (the IV Scanner device)
+  - `omni_gem`      -> WHITE recolor of the ROM hack's elemental `gem.png`
+                       (vendor icon, 24x24, padded centered into a 32x32 frame)
 
 The recolored 32x32 frames are appended to the `items` texture atlas
 (items.png + items.json) so the modifier icons can reference them by frame name
@@ -26,6 +28,9 @@ JSON_PATH = os.path.join(ITEMS_DIR, "items.json")
 PROTEIN_PATH = os.path.join(ITEMS_DIR, "items", "protein.png")
 FLAME_ORB_PATH = os.path.join(ITEMS_DIR, "items", "flame_orb.png")
 SCANNER_PATH = os.path.join(ITEMS_DIR, "items", "scanner.png")
+ROM_GEM_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "..", "vendor", "elite-redux", "source", "graphics", "items", "icons", "gem.png"
+)
 
 # protein's three red-liquid shades (light / mid / dark) -> recolor targets.
 RED_LIGHT = (246, 164, 164, 255)
@@ -61,6 +66,28 @@ DEX_NAV_MAP = {
     (197, 222, 255, 255): (188, 240, 198, 255),
     (238, 238, 255, 255): (238, 255, 240, 255),
 }
+
+
+def whiten(src: Image.Image) -> Image.Image:
+    """Desaturate to a white/silver gem: each pixel becomes a gray at its
+    brightest channel's level, keeping the dark outline intact."""
+    out = Image.new("RGBA", src.size, (0, 0, 0, 0))
+    src_px = src.load()
+    out_px = out.load()
+    for y in range(src.height):
+        for x in range(src.width):
+            r, g, b, a = src_px[x, y]
+            if a == 0:
+                continue
+            v = max(r, g, b)
+            out_px[x, y] = (v, v, v, a)
+    return out
+
+
+def pad_center(src: Image.Image, size: int = 32) -> Image.Image:
+    out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    out.paste(src, ((size - src.width) // 2, (size - src.height) // 2))
+    return out
 
 
 def recolor(src: Image.Image, mapping: dict) -> Image.Image:
@@ -118,13 +145,16 @@ def main() -> None:
 
     sheet = add_frame(sheet, atlas, "move_slot_expander", black)
     sheet = add_frame(sheet, atlas, "ability_randomizer", violet)
+    omni_gem = pad_center(whiten(Image.open(ROM_GEM_PATH).convert("RGBA")))
+
     sheet = add_frame(sheet, atlas, "frostbite_orb", frostbite)
     sheet = add_frame(sheet, atlas, "dex_nav", dex_nav)
+    sheet = add_frame(sheet, atlas, "omni_gem", omni_gem)
 
     sheet.save(PNG_PATH)
     with open(JSON_PATH, "w", encoding="utf-8") as fh:
         json.dump(atlas, fh, indent="\t")
-    print("wrote move_slot_expander + ability_randomizer + frostbite_orb + dex_nav frames; sheet now", sheet.size)
+    print("wrote move_slot_expander + ability_randomizer + frostbite_orb + dex_nav + omni_gem frames; sheet now", sheet.size)
 
 
 if __name__ == "__main__":

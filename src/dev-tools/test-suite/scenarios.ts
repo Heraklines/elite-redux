@@ -1067,8 +1067,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "Omni Gem (#387)",
     description:
       "#387 OMNI GEM - doubles the holder's next damaging move; 2 CHARGES\n"
-      + "total, then the gem SHATTERS and vanishes. Yanmega holds one (pale\n"
-      + "gold gem icon on its item bar).\n"
+      + "total, then the gem SHATTERS and vanishes. Yanmega holds one (white\n"
+      + "elemental-gem icon on its item bar).\n"
       + "DO: attack three times with BUG BUZZ.\n"
       + "EXPECT: hit 1 - double damage + 'Omni Gem doubled the blow! (1 charge\n"
       + "left)'. Hit 2 - double damage + '...and shattered!' and the gem icon\n"
@@ -1688,6 +1688,29 @@ export const DEV_SCENARIOS: DevScenario[] = [
     setup: () => {
       resetDevOverrides();
       setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 5 });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Early gods gate (#395)",
+    description:
+      "#395 - NOT a battle test, this entry just tracks the check.\n"
+      + "Two holes let 600+ BST 'gods' spawn wild before wave 55 on Youngster/\n"
+      + "Ace/Elite: (1) after 10 failed rerolls the gated mon was KEPT (always\n"
+      + "happened when a biome's boss pool was all high-BST), now a common-pool\n"
+      + "pick replaces it; (2) the level-evolution substitution ran AFTER the\n"
+      + "gate, so a harmless roll could evolve into a 600+ BST final - now the\n"
+      + "evolved form is re-gated and the weaker stage is kept.\n"
+      + "DO: play Youngster/Ace runs to wave ~50 and watch wild + boss spawns.\n"
+      + "EXPECT: no pseudo-legendary finals, box legendaries or ER endgame\n"
+      + "customs in the wild before wave 55. Pass/Fail once satisfied.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 20, STARTING_WAVE_OVERRIDE: 5 });
       return [
         makeStarter(SpeciesId.PIKACHU, {
           moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.PROTECT],

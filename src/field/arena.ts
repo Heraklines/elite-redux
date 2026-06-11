@@ -601,18 +601,53 @@ export class Arena {
       species = getPokemonSpecies(randSeedItem(tierPool));
     }
 
-    const regen = this.checkLegendBST(species, globalScene.gameMode.getWaveForDifficulty(waveIndex, true));
+    const adjustedWave = globalScene.gameMode.getWaveForDifficulty(waveIndex, true);
+    const regen = this.checkLegendBST(species, adjustedWave);
     // Attempt to retry 10 times if generated a LegendLike with an incompatible level
     if (regen && attempt < 10) {
       console.log("Incompatible level: regenerating...");
       return this.randomSpecies(waveIndex, level, ++attempt, luckValue, isBoss);
     }
+    // ER (#395, hole 1): the 10-attempt cap used to KEEP the offender when the
+    // rerolls kept landing on gated species - guaranteed whenever a tier pool
+    // (the BOSS tier especially) consists ONLY of 600+ BST entries. Instead of
+    // surrendering, draw a gate-passing pick from the COMMON pool.
+    if (regen) {
+      const safePool = this.pokemonPool[BiomePoolTier.COMMON].filter(
+        id => !this.checkLegendBST(getPokemonSpecies(id), adjustedWave),
+      );
+      if (safePool.length > 0) {
+        const replacement = getPokemonSpecies(randSeedItem(safePool));
+        console.log(
+          "ER #395: reroll cap hit on",
+          SpeciesId[species.speciesId],
+          "- using",
+          SpeciesId[replacement.speciesId],
+        );
+        species = replacement;
+      }
+    }
 
     // TODO: Clarify what the `isBoss` parameter does
     const newSpeciesId = species.getWildSpeciesForLevel(level, true, isBoss ?? isBossSpecies, globalScene.gameMode);
     if (newSpeciesId !== species.speciesId) {
-      console.log("Replaced", SpeciesId[species.speciesId], "with", SpeciesId[newSpeciesId]);
-      species = getPokemonSpecies(newSpeciesId);
+      // ER (#395, hole 2): this level-based substitution ran AFTER the early
+      // BST gate, so a harmless low-BST roll could evolve straight into an
+      // endgame-tier final stage (ER lines evolve early and many finals sit
+      // well above 600 BST - the "wave 13 god" reports). Re-gate the evolved
+      // species and keep the original (weaker) stage when it trips.
+      const evolved = getPokemonSpecies(newSpeciesId);
+      if (this.checkLegendBST(evolved, adjustedWave)) {
+        console.log(
+          "ER #395: substitution",
+          SpeciesId[newSpeciesId],
+          "trips the early BST gate; keeping",
+          SpeciesId[species.speciesId],
+        );
+      } else {
+        console.log("Replaced", SpeciesId[species.speciesId], "with", SpeciesId[newSpeciesId]);
+        species = evolved;
+      }
     }
 
     return species;

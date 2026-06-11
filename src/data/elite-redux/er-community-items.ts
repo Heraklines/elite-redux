@@ -106,8 +106,10 @@ export const ER_COMMUNITY_ITEM_CONFIG: Readonly<Record<ErCommunityItemKind, ErCo
     name: "Omni Gem",
     description:
       "Doubles the damage of the holder's next damaging move. Holds 2 charges; the gem shatters once both are spent.",
-    icon: "soul_dew",
-    tint: 0xfff2b0,
+    // Dedicated atlas frame: the ROM hack's elemental gem, whitened
+    // (build_er_item_icons.py). 0xffffff tint = no runtime recolor.
+    icon: "omni_gem",
+    tint: 0xffffff,
     maxStack: 1,
   },
 };
