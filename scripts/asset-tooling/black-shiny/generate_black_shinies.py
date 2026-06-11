@@ -307,10 +307,17 @@ def process_atlas(json_path, out_dir):
         nf["frame"] = {"x": px, "y": py, "w": pw, "h": ph}
         nf["rotated"] = False
         nf["trimmed"] = True
-        nf["sourceSize"] = {"w": fr["sourceSize"]["w"] + 2 * PADDING, "h": fr["sourceSize"]["h"] + 2 * PADDING}
+        # Keep the SOURCE BOX at the ORIGINAL sprite geometry and let the halo
+        # overflow it via negative trim offsets. The mon then renders in
+        # exactly the same place as the base sprite under ANY anchor: battle
+        # sprites are bottom-anchored (origin 0.5,1) while summary/starter
+        # sprites are center-anchored. The old scheme grew the box by PADDING
+        # on each side, which preserved center-anchored rendering but floated
+        # bottom-anchored battle sprites 16px high.
+        nf["sourceSize"] = {"w": fr["sourceSize"]["w"], "h": fr["sourceSize"]["h"]}
         nf["spriteSourceSize"] = {
-            "x": fr["spriteSourceSize"]["x"],
-            "y": fr["spriteSourceSize"]["y"],
+            "x": fr["spriteSourceSize"]["x"] - PADDING,
+            "y": fr["spriteSourceSize"]["y"] - PADDING,
             "w": pw,
             "h": ph,
         }
@@ -322,6 +329,10 @@ def process_atlas(json_path, out_dir):
     os.makedirs(out_sub, exist_ok=True)
     Image.fromarray(new_sheet).save(os.path.join(out_sub, base + ".png"), optimize=True)
     out_atlas = {
+        # Anchor scheme marker: 2 = original-size source box + negative trim
+        # offsets (see comment above). fix_black_anchor_metadata.py migrates
+        # un-marked (scheme 1) atlases in place.
+        "erAnchor": 2,
         "textures": [
             {
                 "image": base + ".png",

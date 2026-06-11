@@ -1009,7 +1009,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "row (Gift 1/3, violet italic). PRESS R on that page — EXPECT the gift\n"
       + "cycles 1/3 to 2/3 to 3/3 and the shown ability changes (the new gift\n"
       + "is live in combat immediately). EXPECT the real black sprite from the\n"
-      + "FIRST frame of the battle (no delayed normal-then-black swap).",
+      + "FIRST frame of the battle (no delayed normal-then-black swap), and at\n"
+      + "the SAME HEIGHT as a normal mon (feet on the platform, not floating).\n"
+      + "ALSO open the PARTY screen - EXPECT a BLACK star (not red) and an\n"
+      + "obsidian-tinted party icon.",
     setup: () => {
       resetDevOverrides();
       setOverrides({

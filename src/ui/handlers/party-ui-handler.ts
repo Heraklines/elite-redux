@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { allMoves } from "#data/data-lists";
+import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { Button } from "#enums/buttons";
@@ -2131,7 +2132,8 @@ class PartySlot extends Phaser.GameObjects.Container {
         .image(0, 0, `shiny_star_small${doubleShiny ? "_1" : ""}`)
         .setOrigin(0)
         .setPositionRelative(this.slotName, shinyIconToNameOffset.x, shinyIconToNameOffset.y)
-        .setTint(getVariantTint(largeIconTint));
+        // ER (#349): black shinies show a BLACK star, not the epic red one.
+        .setTint(isErBlackShiny(this.pokemon) ? 0x0a0a0a : getVariantTint(largeIconTint));
       slotInfoContainer.add(shinyStar);
 
       if (doubleShiny) {

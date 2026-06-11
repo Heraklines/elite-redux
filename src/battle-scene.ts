@@ -31,7 +31,7 @@ import { getDailyMysteryEncounter } from "#data/daily-seed/daily-run";
 import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
-import { promoteToErBlackShinyInBattle } from "#data/elite-redux/er-black-shinies";
+import { ER_BLACK_SHINY_TINT, isErBlackShiny, promoteToErBlackShinyInBattle } from "#data/elite-redux/er-black-shinies";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
 import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
@@ -1208,6 +1208,17 @@ export class BattleScene extends SceneBase {
       }
       if (originY !== 0) {
         container.y -= icon.height * originY;
+      }
+    }
+
+    // ER (#349): black shinies have no dedicated icon art - the variant sheet
+    // would show the EPIC (red) palette. Obsidian-tint the icon sprites so
+    // party/box/summary icons match the t4 look.
+    if (isErBlackShiny(pokemon)) {
+      for (const child of container.getAll()) {
+        if (child instanceof Phaser.GameObjects.Sprite) {
+          child.setTint(ER_BLACK_SHINY_TINT);
+        }
       }
     }
 
