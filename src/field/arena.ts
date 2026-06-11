@@ -645,6 +645,15 @@ export class Arena {
       return true;
     }
 
+    // ER (community report 2026-06-11): wild SHEDINJA before wave 55 hard-walls
+    // early teams via Wonder Guard (1 HP is irrelevant when nothing on the team
+    // hits super effectively) and repeatedly ended runs. Its BST (236) sails
+    // under the gate above, so reroll it explicitly - on EVERY difficulty,
+    // Hell included (it is a wall, not a power spike).
+    if (species.speciesId === SpeciesId.SHEDINJA && adjustedWave < ER_EARLY_HIGH_BST_WAVE) {
+      return true;
+    }
+
     if (!isLegendLike) {
       return false;
     }
