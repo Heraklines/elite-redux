@@ -639,8 +639,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       .setScale(0.6)
       .setFrame(getVariantIcon(2))
       .setTint(getVariantTint(2));
+    // ER Black Shinies (#349): t4 filter sparkle — pure black (same as the dex).
+    const shinyBlackSprite = globalScene.add
+      .sprite(0, 0, "shiny_icons")
+      .setOrigin(0.15, 0.2)
+      .setScale(0.6)
+      .setFrame(getVariantIcon(2))
+      .setTint(0x0a0a0a);
 
     const caughtOptions = [
+      new DropDownOption("SHINYBLACK", new DropDownLabel("", shinyBlackSprite)),
       new DropDownOption("SHINY3", new DropDownLabel("", shiny3Sprite)),
       new DropDownOption("SHINY2", new DropDownLabel("", shiny2Sprite)),
       new DropDownOption("SHINY", new DropDownLabel("", shiny1Sprite)),
@@ -3877,9 +3885,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       const isVariant2Caught = isShinyCaught && !!(caughtAttr & DexAttr.VARIANT_2);
       const isVariant3Caught = isShinyCaught && !!(caughtAttr & DexAttr.VARIANT_3);
       const isUncaught = !isNonShinyCaught && !isVariant1Caught && !isVariant2Caught && !isVariant3Caught;
+      // ER (#349): t4 black unlock is starter-data state, not a dex attr.
+      const isBlackCaught = !!starterData?.erBlackShiny;
       const fitsCaught = this.filterBar.getVals(DropDownColumn.CAUGHT).some(caught => {
+        if (caught === "SHINYBLACK") {
+          return isBlackCaught;
+        }
         if (caught === "SHINY3") {
-          return isVariant3Caught;
+          return isVariant3Caught && !isBlackCaught;
         }
         if (caught === "SHINY2") {
           return isVariant2Caught && !isVariant3Caught;
@@ -5628,7 +5641,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             const difficultyOption = (difficulty: ErDifficulty, key: string) => ({
               label: i18next.t(`starterSelectUiHandler:difficulty${key}`),
               onHover: () => {
-                ui.showText(i18next.t(`starterSelectUiHandler:difficulty${key}Desc`));
+                // Show in THIS screen's message box. `ui.showText` would route
+                // through the option-select overlay handler (not a message
+                // handler) into the battle message box, which is not on this
+                // screen - the descriptions were invisible (#368 report).
+                this.showText(i18next.t(`starterSelectUiHandler:difficulty${key}Desc`));
               },
               handler: () => {
                 startRun(difficulty);

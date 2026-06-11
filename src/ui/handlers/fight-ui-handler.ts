@@ -136,11 +136,16 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
       .setOrigin(0, 0)
       .setVisible(false);
 
-    // ER (#377): tiny ALWAYS-VISIBLE hint at the panel's top-right edge so
-    // players discover that R cycles Stats / Description / Damage Calc.
+    // ER (#377): tiny hint at the panel's top-right edge so players discover
+    // that R cycles Stats / Description / Damage Calc. Created HIDDEN like
+    // every other panel element - this container lives on the UI root, so a
+    // visible-at-boot child leaks onto every screen until the first fight
+    // menu close hides it (user report). setMoveInfo/updatePanelMode show it
+    // only while a move is highlighted on the stats page.
     this.panelCycleHint = addTextObject(globalScene.scaledCanvas.width - 12, -36, "R ⇄", TextStyle.MOVE_INFO_CONTENT)
       .setOrigin(1, 0.5)
-      .setAlpha(0.75);
+      .setAlpha(0.75)
+      .setVisible(false);
 
     this.moveInfoContainer.add([
       this.panelCycleHint,

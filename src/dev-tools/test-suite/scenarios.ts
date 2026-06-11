@@ -473,7 +473,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "DMG CALC in the side panel, fully inside the panel (no overflow); then back\n"
       + "to page 1. Works for every move incl. the 5th rogue-slot move.\n"
       + "ALSO (#377): on the stats page a small static 'R ⇄' hint sits at the\n"
-      + "panel edge so the cycling is discoverable.",
+      + "panel edge so the cycling is discoverable. The hint must appear ONLY\n"
+      + "there - NOT on the title screen, starter select, command menu or any\n"
+      + "other screen (it used to leak everywhere until the first fight).",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -977,7 +979,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "EXPECT: it spawns BLACK from its FIRST frame (no normal-then-black\n"
       + "swap - same speed as any shiny). After catching, its summary/ability\n"
       + "screens show its normal abilities plus the Gift row, and the black\n"
-      + "state SURVIVES save/reload.",
+      + "state SURVIVES save/reload. ALSO: in starter select, the caught\n"
+      + "filter dropdown has a BLACK sparkle option that shows only your\n"
+      + "black-unlocked starters.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1160,6 +1164,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
     description:
       "#368 Youngster trial mode: innates unlock FREE by level for the run\n"
       + "(slot 1 always, slot 2 at Lv 15, slot 3 at Lv 24) - no candies needed.\n"
+      + "ALSO: on the difficulty picker after team select, HIGHLIGHTING each\n"
+      + "mode shows its description in the message box under the list.\n"
       + "DO: open Battle Info -> Abilities (and the summary ability page) on the Lv 30\n"
       + "Gyarados.  EXPECT: all 3 innates show ACTIVE (Intimidate procs on entry too,\n"
       + "if not candy-unlocked it would normally be locked).\n"
