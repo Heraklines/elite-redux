@@ -1,0 +1,61 @@
+name: Deploy Production
+
+# Rebuilds the standalone (login) bundle and deploys it to the elite-redux
+# PRODUCTION Cloudflare Pages project. Mirror of deploy-staging.yml with two
+# differences: VITE_DEV_TOOLS is NEVER set (the dev test suite must not exist
+# in prod - see CLAUDE.md), and the save API points at the PROD worker.
+#
+# Manual dispatch ONLY, and only after the maintainer explicitly approves a
+# production release.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.repository == 'Heraklines/elite-redux'
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+          # No submodules: standalone asset metadata is vendored (see staging).
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Stage standalone asset metadata
+        run: |
+          mkdir -p assets
+          cp -v deploy/standalone-assets/* assets/
+
+      - name: Write standalone login env (PROD - no dev tools)
+        run: |
+          {
+            echo "VITE_BYPASS_LOGIN=0"
+            echo "VITE_SERVER_URL=https://er-save-api.heraklines.workers.dev"
+          } > .env.standalone.local
+
+      - name: Build standalone bundle
+        run: |
+          mkdir -p assets
+          cp -f deploy/standalone-assets/* assets/
+          pnpm build:standalone
+        env:
+          NODE_ENV: production
+
+      - name: Assemble dist (Cloudflare config + strip sourcemaps)
+        run: |
+          cp deploy/cloudflare/_redirects deploy/cloudflare/_headers deploy/cloudflare/service-worker.js dist/
+          find dist -name '*.map' -delete
+
+      - name: Deploy to Cloudflare Pages (PRODUCTION)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name elite-redux --branch main --commit-dirty=true
