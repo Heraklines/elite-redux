@@ -51,6 +51,24 @@ jobs:
             echo "VITE_DEV_TOOLS=1"
           } > .env.standalone.local
 
+      # ER (#431): resolve the CURRENT er-assets HEAD so this deploy's
+      # _redirects pin can never be stale. The pin used to be bumped by hand;
+      # a forgotten bump = players kept old art/audio (or 404'd brand-new
+      # assets) for days - the single biggest source of "stale cache" reports.
+      # Best-effort: on API failure the committed pin is used (never blocks a
+      # deploy, worst case is the old manual-bump behavior).
+      - name: Resolve er-assets HEAD for the jsDelivr pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA=$(gh api repos/Heraklines/er-assets/commits/main --jq .sha || true)
+          if echo "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "ER_ASSETS_SHA=$SHA" >> "$GITHUB_ENV"
+            echo "er-assets pin for this deploy: $SHA"
+          else
+            echo "WARNING: could not resolve er-assets HEAD - keeping the committed pin."
+          fi
+
       - name: Build standalone bundle
         run: |
           # Re-assert vendored asset metadata immediately before the build, in
@@ -59,14 +77,20 @@ jobs:
           cp -f deploy/standalone-assets/* assets/
           echo "=== assets/ right before build ==="
           ls -la assets/
+          # build:standalone now also assembles dist (Cloudflare config copy,
+          # sourcemap strip, empty manifest.json, ER_ASSETS_SHA re-pin) via
+          # scripts/assemble-cloudflare-dist.mjs - same path production uses.
           pnpm build:standalone
         env:
           NODE_ENV: production
 
-      - name: Assemble dist (Cloudflare config + strip sourcemaps)
+      - name: Verify assembled dist
         run: |
-          cp deploy/cloudflare/_redirects deploy/cloudflare/_headers deploy/cloudflare/service-worker.js dist/
-          find dist -name '*.map' -delete
+          for f in _redirects _headers service-worker.js manifest.json version.json; do
+            test -f "dist/$f" || { echo "MISSING dist/$f"; exit 1; }
+          done
+          echo "=== er-assets pins in dist/_redirects ==="
+          grep -o 'er-assets@[0-9a-f]*' dist/_redirects | sort -u
 
       - name: Deploy to Cloudflare Pages (staging)
         uses: cloudflare/wrangler-action@v3

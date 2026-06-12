@@ -53,8 +53,13 @@ function captureStateHeader(): string {
         ?.getEnemyParty?.()
         ?.map(p => `${p?.species?.name ?? "?"}(L${p?.level ?? "?"})`)
         .join(", ") ?? "";
+    // ER (#431): the build id makes stale-bundle reports identifiable at
+    // triage - if a logged build differs from the latest deploy, the report
+    // is from old code, not a live bug.
+    const build = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "?";
     return [
       `url:      ${location.href}`,
+      `build:    ${build}`,
       `mode:     ${s?.gameMode?.modeId ?? "?"}  wave:${s?.currentBattle?.waveIndex ?? "?"}`,
       `seed:     ${s?.seed ?? "?"}`,
       `party:    ${party}`,

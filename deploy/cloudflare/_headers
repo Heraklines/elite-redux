@@ -27,3 +27,17 @@
 
 /service-worker.js
   Cache-Control: no-cache
+
+# Vite build output is content-hashed (the filename changes whenever the content
+# does), so it is safe and FAST to cache it forever - a new deploy's (no-cache)
+# index.html simply points at new hashed filenames. Without this rule the bundle
+# fell back to heuristic browser caching: harmless but wasteful, and the one
+# layer here that was left to chance.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The update-checker sidecar must NEVER be served from any cache - it is how
+# open tabs learn that a new build shipped. (The poller also sends no-store,
+# this makes the server side explicit.)
+/version.json
+  Cache-Control: no-store

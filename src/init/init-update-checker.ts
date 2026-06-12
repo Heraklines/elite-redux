@@ -171,6 +171,12 @@ export function startUpdateChecker(): void {
   void isBeta;
   started = true;
 
+  // ER (#431): announce the running build in the console so every captured
+  // log (incl. the in-game Send Logs ring buffer) carries the build id -
+  // stale-bundle reports become identifiable at a glance.
+  // biome-ignore lint/suspicious/noConsole: intentional diagnostic breadcrumb
+  console.log(`[ER] build ${runningBuildId() ?? "unknown"}`);
+
   window.setInterval(() => void checkOnce(), POLL_INTERVAL_MS);
   // Also check the moment the player returns to the tab — that's both the most
   // likely time a new build shipped while they were away and the least
