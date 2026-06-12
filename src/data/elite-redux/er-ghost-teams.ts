@@ -516,16 +516,36 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
     return;
   }
   // ER (#422): Ghost Trainers challenge - ghosts can appear from wave 1, so
-  // prefetch a full batch immediately (floor 1, max fetch).
+  // prefetch a full batch immediately (floor 1). The pool endpoint filters by
+  // DIFFICULTY, and a difficulty with few stored runs (Ace!) starved the
+  // challenge into constant normal-trainer fallbacks - so under the challenge
+  // we top up from the OTHER difficulties' pools too (current first, then the
+  // deepest pools), de-duped by id.
   if (isErGhostChallengeActive()) {
     prefetchStarted = true;
-    void fetchGhostTeams(getErDifficulty(), 20, 1)
-      .then(teams => {
-        prefetched = teams.filter(isErGhostTeamLegal);
-      })
-      .catch(() => {
-        prefetched = [];
-      });
+    void (async () => {
+      const collected: GhostTeamSnapshot[] = [];
+      const order: ErDifficulty[] = [getErDifficulty(), "hell", "elite", "ace", "youngster"];
+      const tried = new Set<string>();
+      for (const diff of order) {
+        if (tried.has(diff)) {
+          continue;
+        }
+        tried.add(diff);
+        try {
+          collected.push(...(await fetchGhostTeams(diff, 20, 1)));
+        } catch {
+          // Per-difficulty fetch is best-effort.
+        }
+        if (collected.length >= 30) {
+          break;
+        }
+      }
+      const byId = new Map(collected.filter(isErGhostTeamLegal).map(t => [t.id, t] as const));
+      prefetched = [...byId.values()];
+    })().catch(() => {
+      prefetched = [];
+    });
     return;
   }
   const waves = ghostWavesForCurrentRun();
