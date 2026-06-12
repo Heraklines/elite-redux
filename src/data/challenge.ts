@@ -4,6 +4,8 @@ import type { GameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { defaultStarterSpeciesAndEvolutions } from "#balance/pokemon-evolutions";
 import { type StarterSpeciesId, speciesStarterCosts } from "#balance/starters";
+import { ER_COLOR_HEX, erSpeciesMatchesColor } from "#data/elite-redux/er-monocolor";
+import { ER_COLOR_NAMES } from "#data/elite-redux/er-species-colors";
 import { isErLineLegalForUsageTier, preloadErUsageTiers } from "#data/elite-redux/er-usage-tiers";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { AbilityAttr } from "#enums/ability-attr";
@@ -1293,6 +1295,8 @@ export function copyChallenge(source: Challenge | any): Challenge {
       return DoublesOnlyChallenge.loadChallenge(source);
     case Challenges.USAGE_TIER:
       return UsageTierChallenge.loadChallenge(source);
+    case Challenges.MONO_COLOR:
+      return MonoColorChallenge.loadChallenge(source);
   }
   throw new Error("Unknown challenge copied");
 }
@@ -1345,6 +1349,64 @@ export class UsageTierChallenge extends Challenge {
   }
 }
 
+/**
+ * ER (#388): Mono Color - the whole team must share one of the ten official
+ * dex colors (the ROM's own per-species color table, er-species-colors.ts).
+ * Mirrors Mono Type's semantics: starters must match the chosen color, and a
+ * Pokemon whose CURRENT species color no longer matches (an evolution that
+ * changes color) becomes unusable in battle - plan the team around it. Value
+ * 1-10 indexes {@linkcode ER_COLOR_NAMES}. Grants 5 Favour (er-shiny-favour).
+ */
+export class MonoColorChallenge extends Challenge {
+  constructor() {
+    super(Challenges.MONO_COLOR, 10);
+  }
+
+  override applyStarterChoice(species: PokemonSpecies, isValid: BooleanHolder): boolean {
+    if (!erSpeciesMatchesColor(species.speciesId, this.value - 1)) {
+      isValid.value = false;
+      return true;
+    }
+    return false;
+  }
+
+  applyPokemonInBattle(pokemon: Pokemon, valid: BooleanHolder): boolean {
+    if (!pokemon.isPlayer()) {
+      return false;
+    }
+    const matches =
+      erSpeciesMatchesColor(pokemon.species.speciesId, this.value - 1)
+      || (pokemon.isFusion()
+        && pokemon.fusionSpecies != null
+        && erSpeciesMatchesColor(pokemon.fusionSpecies.speciesId, this.value - 1));
+    if (!matches) {
+      valid.value = false;
+      return true;
+    }
+    return false;
+  }
+
+  override getDifficulty(): number {
+    return this.value > 0 ? 1 : 0;
+  }
+
+  getDescription(overrideValue: number = this.value): string {
+    const colorName = ER_COLOR_NAMES[overrideValue - 1];
+    const desc = i18next.t([`challenges:monoColor.desc.${overrideValue}`, "challenges:monoColor.desc.0"]);
+    if (overrideValue === 0 || !colorName) {
+      return desc;
+    }
+    return `[color=${ER_COLOR_HEX[colorName]}]${desc}[/color]`;
+  }
+
+  static override loadChallenge(source: MonoColorChallenge | any): MonoColorChallenge {
+    const newChallenge = new MonoColorChallenge();
+    newChallenge.value = source.value;
+    newChallenge.severity = source.severity;
+    return newChallenge;
+  }
+}
+
 export const allChallenges: Challenge[] = [];
 
 export function initChallenges() {
@@ -1355,6 +1417,7 @@ export function initChallenges() {
     new LimitedSupportChallenge(),
     new SingleGenerationChallenge(),
     new SingleTypeChallenge(),
+    new MonoColorChallenge(),
     new PassivesChallenge(),
     new InverseBattleChallenge(),
     new FlipStatChallenge(),

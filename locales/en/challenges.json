@@ -123,6 +123,35 @@
       "1": "On"
     }
   },
+  "monoColor": {
+    "name": "Mono Color",
+    "desc": {
+      "0": "You can only use Pokemon of the chosen dex color (Elite Redux dex data). Grants 5 Favour.",
+      "1": "You can only use Red Pokemon. Evolutions that change color make a Pokemon unusable, plan your team! Grants 5 Favour.",
+      "2": "You can only use Green Pokemon. Evolutions that change color make a Pokemon unusable, plan your team! Grants 5 Favour.",
+      "3": "You can only use Blue Pokemon. Evolutions that change color make a Pokemon unusable, plan your team! Grants 5 Favour.",
+      "4": "You can only use White Pokemon. Evolutions that change color make a Pokemon unusable, plan your team! Grants 5 Favour.",
+      "5": "You can only use Brown Pokemon. Evolutions that change color make a Pokemon unusable, plan your team! Grants 5 Favour.",
+      "6": "You can only use Yellow Pokemon. Evolutions that change color make a Pokemon unusable, plan your team! Grants 5 Favour.",
+      "7": "You can only use Purple Pokemon. Evolutions that change color make a Pokemon unusable, plan your team! Grants 5 Favour.",
+      "8": "You can only use Pink Pokemon. Evolutions that change color make a Pokemon unusable, plan your team! Grants 5 Favour.",
+      "9": "You can only use Gray Pokemon. Evolutions that change color make a Pokemon unusable, plan your team! Grants 5 Favour.",
+      "10": "You can only use Black Pokemon. Evolutions that change color make a Pokemon unusable, plan your team! Grants 5 Favour."
+    },
+    "value": {
+      "0": "Off",
+      "1": "Red",
+      "2": "Green",
+      "3": "Blue",
+      "4": "White",
+      "5": "Brown",
+      "6": "Yellow",
+      "7": "Purple",
+      "8": "Pink",
+      "9": "Gray",
+      "10": "Black"
+    }
+  },
   "usageTier": {
     "name": "Usage Tier",
     "desc": {

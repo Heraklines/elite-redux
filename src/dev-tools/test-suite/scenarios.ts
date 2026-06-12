@@ -1871,6 +1871,24 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Mono Color challenge (#388)",
+    description:
+      "#388 - new challenge: MONO COLOR (5 Favour). Open Challenges and\n"
+      + "pick a dex color (Red, Green, Blue, White, Brown, Yellow, Purple,\n"
+      + "Pink, Gray, Black - the ROM's own color table). EXPECT: starter\n"
+      + "select only allows Pokemon of that color, and a team member whose\n"
+      + "evolution changes color becomes unusable in battle (like Mono\n"
+      + "Type). Favour display should show +5.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Faster game speed (#416)",
     description:
       "#416 - two new speed tiers above Turbo: HYPER (7x) and LUDICROUS\n"

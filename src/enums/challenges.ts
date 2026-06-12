@@ -12,4 +12,5 @@ export enum Challenges {
   PASSIVES,
   DOUBLES_ONLY,
   USAGE_TIER,
+  MONO_COLOR,
 }

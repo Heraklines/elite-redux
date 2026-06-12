@@ -38,6 +38,8 @@ const FAVOUR_BY_CHALLENGE: Partial<Record<Challenges, number>> = {
   [Challenges.LOWER_STARTER_POINTS]: 3,
   // ER (#383): every trainer battle doubled.
   [Challenges.DOUBLES_ONLY]: 3,
+  // ER (#388): whole team locked to one dex color.
+  [Challenges.MONO_COLOR]: 5,
 };
 
 /** Favour granted per "step" of the shiny curve. */
