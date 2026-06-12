@@ -32,6 +32,7 @@ import { globalScene } from "#app/global-scene";
 import { bypassLogin } from "#constants/app-constants";
 import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ghostWavesForCurrentRun, isErGhostChallengeActive, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
+import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { TrainerPartyTemplate } from "#data/trainers/trainer-party-template";
 import { EggTier } from "#enums/egg-type";
@@ -572,22 +573,29 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
   // still-eligible team so deeper teams stay available for later ghost waves.
   // The ban filter runs again here as defense-in-depth (covers test-injected
   // pools and any stale prefetch).
-  // ER (#422): the Ghost Trainers challenge needs a ghost EVERY trainer wave,
-  // including wave 4 - but pool teams mostly ended deep (150+), so the
-  // strict eligibility window found nothing early and the run fell back to
-  // normal trainers. With the challenge active: take ANY unused legal team
-  // (members are re-levelled to the wave's enemy levels on build, and the
-  // party is sized to the snapshot, so depth doesn't matter), and once the
-  // pool is exhausted RECYCLE used teams instead of going dry.
+  // ER (#422): the Ghost Trainers challenge needs ghosts on every trainer
+  // wave, but the 20-wave fairness window stays PRIMARY (maintainer: never
+  // field full endgame teams early). Only when a window comes up empty does
+  // the search widen step by step (30/40/60 waves past the current wave) -
+  // and a team taken from BEYOND the 20-wave window has its members DEVOLVED
+  // on build (see applyErGhostOverride) so the player is not swept. If even
+  // the widest window is empty, the wave falls back to a normal trainer.
+  // Pool exhaustion recycles used teams (within the same windows) before
+  // giving up. Scheduled ghost waves on normal runs keep the strict window.
   const challengeMode = isErGhostChallengeActive();
   const legal = pool.filter(s => isErGhostTeamLegal(s));
-  const eligible = challengeMode
-    ? legal
-    : legal.filter(s => s.waveReached >= waveIndex && s.waveReached <= waveIndex + ER_GHOST_WAVE_WINDOW);
-  const unused = eligible.filter(s => !usedGhostIds.has(s.id));
-  const next = (unused.length > 0 ? unused : challengeMode ? eligible : []).sort(
-    (a, b) => a.waveReached - b.waveReached,
-  )[0];
+  const windows = challengeMode ? [ER_GHOST_WAVE_WINDOW, 30, 40, 60] : [ER_GHOST_WAVE_WINDOW];
+  let next: GhostTeamSnapshot | undefined;
+  for (const window of windows) {
+    const eligible = legal.filter(s => s.waveReached >= waveIndex && s.waveReached <= waveIndex + window);
+    const unused = eligible.filter(s => !usedGhostIds.has(s.id));
+    next = (unused.length > 0 ? unused : challengeMode ? eligible : []).sort(
+      (a, b) => a.waveReached - b.waveReached,
+    )[0];
+    if (next) {
+      break;
+    }
+  }
   if (!next) {
     return null;
   }
@@ -662,15 +670,33 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
   }
   try {
     const member = snapshot.party[index];
-    const species = getPokemonSpecies(member.speciesId);
+    let species = getPokemonSpecies(member.speciesId);
     if (!species) {
       return null;
     }
     const battle = globalScene.currentBattle;
+    // ER (#422): a team fielded from BEYOND the 20-wave fairness window
+    // (challenge widening) gets its members devolved - one stage for up to 20
+    // waves of overshoot, two stages past that - so a deep team's fully
+    // evolved mons don't sweep an early-game player. Single-stagers stay.
+    const overshoot = Math.max(0, snapshot.waveReached - ((battle?.waveIndex ?? snapshot.waveReached) + ER_GHOST_WAVE_WINDOW));
+    let devolved = false;
+    if (overshoot > 0) {
+      const stages = overshoot > 20 ? 2 : 1;
+      for (let i = 0; i < stages; i++) {
+        const prevId = pokemonPrevolutions[species.speciesId as SpeciesId];
+        const prev = prevId !== undefined ? getPokemonSpecies(prevId) : undefined;
+        if (!prev) {
+          break;
+        }
+        species = prev;
+        devolved = true;
+      }
+    }
     const level = battle?.enemyLevels?.[index] ?? member.level;
     const trainerSlot = !trainer.isDouble() || !(index % 2) ? TrainerSlot.TRAINER : TrainerSlot.TRAINER_PARTNER;
     const enemy = globalScene.addEnemyPokemon(species, level, trainerSlot);
-    if (member.formIndex >= 0) {
+    if (member.formIndex >= 0 && !devolved && member.formIndex < (species.forms?.length ?? 0)) {
       enemy.formIndex = member.formIndex;
     }
     enemy.abilityIndex = member.abilityIndex;
@@ -682,10 +708,13 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
     enemy.shiny = member.shiny;
     enemy.variant = member.variant;
     enemy.passive = member.passive;
-    if (member.moves.length > 0) {
+    if (member.moves.length > 0 && !devolved) {
       const moves = member.moves.map(id => new PokemonMove(id));
       enemy.moveset = moves;
       enemy.summonData.moveset = moves;
+    } else if (devolved) {
+      // A devolved stage rolls its own level-appropriate moveset.
+      enemy.generateAndPopulateMoveset();
     }
     enemy.generateName();
     return enemy;
