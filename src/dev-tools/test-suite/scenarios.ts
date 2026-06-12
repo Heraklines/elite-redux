@@ -1871,7 +1871,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "(note) Save and Quit cloud push (#389)",
+    label: "(note) Cloud push warn (#389)",
     description:
       "#389 - Save and Quit force-pushes the FULL save (system + session)\n"
       + "to the cloud, bypassing the sync throttle. NEW: if that push fails\n"
@@ -1890,7 +1890,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "(note) Elite curve + ghost challenge + sprite heal (#419/#422/#421)",
+    label: "(note) Curve/ghost/sprite (#419+)",
     description:
       "#419 - ELITE trainer mons now respect a per-wave BST ceiling (420 at\n"
       + "w1-20 up to 600 at w81-100, +40 on boss waves; legends banned before\n"
@@ -1912,7 +1912,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "(note) Berry/Ward rates + reuse hint (#420/#382)",
+    label: "(note) Berry/Ward rates (#420)",
     description:
       "#420 - resist berry rolls doubled (Ace 5% / Elite 10% / Hell 20%)\n"
       + "and Ward Stone rolls doubled on Elite/Hell (boss Prime 20%/Greater\n"
@@ -1967,7 +1967,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "(note) No wild redux forms on Ace (#421)",
+    label: "(note) No Ace redux wilds (#421)",
     description:
       "#421 - wild spawns had a 1-in-8 chance to roll their REDUX form on\n"
       + "EVERY difficulty, so pure-vanilla Ace/Youngster met ER customs in\n"
@@ -1985,7 +1985,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "(note) No mega transforms/trades (#414)",
+    label: "(note) No mega transforms (#414)",
     description:
       "#414 - a wave-13 Weird Dream on Ace turned a party mon into a\n"
       + "permanent MEGA URSHIFU (the standalone ER mega species records\n"
