@@ -2314,8 +2314,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         this.originalStarterPreferences[this.lastSpecies.speciesId] = {};
       }
       // Bangs are safe here due to the above check
-      const starterAttributes = this.starterPreferences[this.lastSpecies.speciesId]!;
-      const originalStarterAttributes = this.originalStarterPreferences[this.lastSpecies.speciesId]!;
+      // ER hotfix (#438): these were non-null-asserted, but a species the
+      // player never configured has NO preferences entry - the first quick
+      // cycle press (shiny/form/gender/ability/nature) then wrote a property
+      // on undefined and crashed to a black screen. Create the entries.
+      const starterAttributes = (this.starterPreferences[this.lastSpecies.speciesId] ??= {});
+      const originalStarterAttributes = (this.originalStarterPreferences[this.lastSpecies.speciesId] ??= {});
 
       // this gets the correct pokemon cursor depending on whether you're in the starter screen or the party icons
       if (this.starterIconsCursorObj.visible) {
