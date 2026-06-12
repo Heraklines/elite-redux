@@ -1926,6 +1926,24 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) No wild redux forms on Ace (#421)",
+    description:
+      "#421 - wild spawns had a 1-in-8 chance to roll their REDUX form on\n"
+      + "EVERY difficulty, so pure-vanilla Ace/Youngster met ER customs in\n"
+      + "the wild. Now Elite/Hell only. CHECK: play early Ace waves - wild\n"
+      + "mons must always be their normal vanilla form (Battle Info shows\n"
+      + "vanilla abilities, not ER innates). On Elite/Hell redux forms still\n"
+      + "appear in the wild.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) No mega transforms/trades (#414)",
     description:
       "#414 - a wave-13 Weird Dream on Ace turned a party mon into a\n"

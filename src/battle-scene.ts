@@ -35,7 +35,7 @@ import { ER_BLACK_SHINY_TINT, isErBlackShiny, promoteToErBlackShinyInBattle } fr
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
 import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
-import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { chromaKeyErSpriteTexture } from "#data/elite-redux/er-sprite-chroma-key";
 import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
 import { ErWardStoneModifier } from "#data/elite-redux/er-ward-stones";
@@ -2053,11 +2053,14 @@ export class BattleScene extends SceneBase {
 
     // ER: give wild/enemy spawns a chance at their "Redux" form. Un-special-cased
     // species always returned the base form (index 0), so Redux forms essentially
-    // never appeared in the wild — this makes them slightly more common in all
-    // modes. Excludes the player side (ignoreArena) and egg hatches (eggs hand out
-    // base-form customs by design). 1-in-REDUX_FORM_SPAWN_ODDS per eligible spawn.
+    // never appeared in the wild — this makes them slightly more common. Excludes
+    // the player side (ignoreArena) and egg hatches (eggs hand out base-form
+    // customs by design). 1-in-REDUX_FORM_SPAWN_ODDS per eligible spawn.
+    // ER (#421): ELITE/HELL ONLY. Redux forms are full ER customs (custom
+    // abilities/innates, kits, types, sometimes stats) - Ace/Youngster are
+    // pure vanilla (#345) and must never roll them.
     const REDUX_FORM_SPAWN_ODDS = 8;
-    if (!isEggPhase && !ignoreArena) {
+    if (!isEggPhase && !ignoreArena && !isErVanillaDifficulty()) {
       const reduxFormIndex = species.forms.findIndex(f => f.formKey === "redux");
       if (reduxFormIndex > 0 && !randSeedInt(REDUX_FORM_SPAWN_ODDS)) {
         return reduxFormIndex;
