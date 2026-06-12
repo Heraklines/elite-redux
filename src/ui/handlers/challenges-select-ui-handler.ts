@@ -103,8 +103,11 @@ export class GameChallengesUiHandler extends UiHandler {
     this.lastSetupBtnText = addTextObject(0, 0, "Last Setup", TextStyle.SETTINGS_LABEL)
       .setName("text-last-setup-btn")
       .setOrigin(0, 0.5)
-      .setScale(0.85)
       .setVisible(false);
+    // addTextObject bakes the style's render scale in - MULTIPLY, never
+    // setScale absolutely (an absolute value renders the native font size,
+    // i.e. giant text across the whole header).
+    this.lastSetupBtnText.setScale(this.lastSetupBtnText.scaleX * 0.85, this.lastSetupBtnText.scaleY * 0.85);
     this.lastSetupBtnBg = addWindow(0, 0, this.lastSetupBtnText.displayWidth + 12, 18)
       .setName("window-last-setup-btn")
       .setOrigin(0, 0.5)
@@ -119,9 +122,10 @@ export class GameChallengesUiHandler extends UiHandler {
     this.favourText = addTextObject(0, 0, "", TextStyle.SETTINGS_LABEL)
       .setName("text-challenge-favour")
       .setOrigin(1, 0.5)
-      // ER (#382): compact so the header fits the title + Last Setup button.
-      .setScale(0.75)
       .setVisible(false);
+    // ER (#382): compact so the header fits the title + Last Setup button
+    // (multiplied - addTextObject bakes the style's render scale in).
+    this.favourText.setScale(this.favourText.scaleX * 0.75, this.favourText.scaleY * 0.75);
     this.favourText.setPositionRelative(headerBg, headerBg.width - 6, headerBg.height / 2);
     this.favourIcon = globalScene.add
       .sprite(0, 0, "shiny_star")
