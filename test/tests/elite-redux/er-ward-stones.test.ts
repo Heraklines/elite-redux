@@ -170,7 +170,7 @@ describe.skipIf(!RUN)("ER Ward Stones (#358)", () => {
     expect(greater.charges).toBe(2); // both at once
   });
 
-  it("trainer assignment respects the Hell 100+ / Elite 150+ gate (and never Ace)", () => {
+  it("trainer assignment respects the Hell 100+ / Elite 150+ / Ace 150+ gate (#420)", () => {
     const enemy = game.scene.getEnemyPokemon()! as EnemyPokemon;
     vi.spyOn(enemy, "randBattleSeedInt").mockReturnValue(0); // every roll passes
     const battle = game.scene.currentBattle as unknown as { trainer: object | null; waveIndex: number };
@@ -191,12 +191,19 @@ describe.skipIf(!RUN)("ER Ward Stones (#358)", () => {
     expect(stone).toBeDefined();
     expect(stone!.charges).toBe(ER_WARD_STONE_CONFIG[stone!.tier].maxCharges);
 
-    // Ace never gets one.
+    // ER (#420): Ace joins at wave 150+ with a flat 5% roll (Minor on regular
+    // trainer mons) - below the gate still nothing.
     globalScene.removeModifier(stone! as PokemonHeldItemModifier, true);
     setErDifficulty("ace");
-    battle.waveIndex = 190;
+    battle.waveIndex = 149;
     maybeAssignErWardStone(enemy);
     expect(findErWardStone(enemy)).toBeUndefined();
+    battle.waveIndex = 190;
+    maybeAssignErWardStone(enemy);
+    const aceStone = findErWardStone(enemy);
+    expect(aceStone).toBeDefined();
+    expect(aceStone!.tier).toBe("minor");
+    globalScene.removeModifier(aceStone! as PokemonHeldItemModifier, true);
 
     battle.trainer = prevTrainer;
     battle.waveIndex = prevWave;

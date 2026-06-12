@@ -22,7 +22,7 @@
 //   - PRIME  Ward Stone: 3 charges; BOSS-ONLY and NOT stealable. Guaranteed
 //     (with all 3 charges) on the Primal Cascoon finale.
 //
-// Spawn gate: Hell from wave 100, Elite from wave 150, never in Ace. Enemy
+// Spawn gate: Hell wave 100+, Elite/Ace wave 150+ (#420). Enemy
 // stones always spawn FULL. Minor/Greater are stealable like any held item,
 // but a stone stolen onto a player's mon arrives EMPTY and must charge up
 // (see BattleScene.tryTransferHeldItemModifier). Player stones (incl. their
@@ -87,8 +87,11 @@ export const ER_WARD_STONE_CONFIG: Readonly<Record<ErWardStoneTier, WardStoneCon
 
 const TIER_ORDER: readonly ErWardStoneTier[] = ["minor", "greater", "prime"];
 
-/** Spawn gate per difficulty: earliest wave Ward Stones may appear (never in Ace). */
-const SPAWN_FROM_WAVE: Readonly<Record<string, number>> = { hell: 100, elite: 150 };
+/**
+ * Spawn gate per difficulty: earliest wave Ward Stones may appear.
+ * ER (#420): Ace joins at wave 150 with a flat 5% roll (see below).
+ */
+const SPAWN_FROM_WAVE: Readonly<Record<string, number>> = { hell: 100, elite: 150, ace: 150 };
 
 /**
  * CC battler tags a Ward Stone blocks: vanilla volatile CC (flinch, confusion,
@@ -324,9 +327,10 @@ function isPrimalCascoonFinale(enemy: EnemyPokemon): boolean {
 
 /**
  * Per-mon Ward Stone roll, called from applyErTrainerHeldItems for trainer
- * parties AND from the boss path. Gate: Hell wave 100+ / Elite wave 150+;
- * never Ace. Rolls (seeded): boss mons — Prime 10% / Greater 25%; regular
- * trainer mons — Greater 5% / Minor 20%. Primal Cascoon always gets a full
+ * parties AND from the boss path. Gate: Hell wave 100+ / Elite wave 150+ /
+ * Ace wave 150+ (#420). Rolls (seeded): Elite/Hell boss mons — Prime 20% /
+ * Greater 30%; regular trainer mons — Greater 10% / Minor 40%. Ace: flat 5%
+ * (boss Greater / regular Minor). Primal Cascoon always gets a full
  * Prime stone. Enemy stones spawn FULL. Never throws.
  */
 export function maybeAssignErWardStone(enemy: EnemyPokemon): void {
@@ -348,17 +352,26 @@ export function maybeAssignErWardStone(enemy: EnemyPokemon): void {
       return; // regular wild mons never hold one
     }
     const roll = enemy.randBattleSeedInt(100);
+    // ER (#420): Ace gets a flat 5% roll (boss -> Greater, regular -> Minor);
+    // Elite/Hell rolls are DOUBLED (boss Prime 20/Greater +30, regular
+    // Greater 10/Minor +40 - was 10/25 and 5/20).
+    if (getErDifficulty() === "ace") {
+      if (roll < 5) {
+        addWardStone(enemy, isBoss ? "greater" : "minor");
+      }
+      return;
+    }
     if (isBoss) {
-      if (roll < 10) {
+      if (roll < 20) {
         addWardStone(enemy, "prime");
-      } else if (roll < 35) {
+      } else if (roll < 50) {
         addWardStone(enemy, "greater");
       }
       return;
     }
-    if (roll < 5) {
+    if (roll < 10) {
       addWardStone(enemy, "greater");
-    } else if (roll < 25) {
+    } else if (roll < 50) {
       addWardStone(enemy, "minor");
     }
   } catch {

@@ -1890,6 +1890,25 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Berry/Ward rates + reuse hint (#420/#382)",
+    description:
+      "#420 - resist berry rolls doubled (Ace 5% / Elite 10% / Hell 20%)\n"
+      + "and Ward Stone rolls doubled on Elite/Hell (boss Prime 20%/Greater\n"
+      + "30%, regular Greater 10%/Minor 40%); Ace now gets a flat 5% Ward\n"
+      + "Stone roll from wave 150. CHECK: steal from trainer mons past the\n"
+      + "gates, drops should feel about twice as common.\n"
+      + "#382 - the challenge screen Start bar now SHOWS the (L/R: last\n"
+      + "setup) hint whenever a previous setup exists.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Mono Color challenge (#388)",
     description:
       "#388 - new challenge: MONO COLOR (5 Favour). Open Challenges and\n"

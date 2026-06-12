@@ -343,8 +343,16 @@ export class GameChallengesUiHandler extends UiHandler {
       i18nKey = "challenges:noneSelected";
       alphaValue = 0.5;
     }
+    // ER (#382 discoverability): the "reuse last setup" action was invisible -
+    // it only appeared after pressing LEFT/RIGHT on the focused start bar, so
+    // nobody found it. Surface the hint on the start bar itself whenever a
+    // saved configuration exists.
+    let startCaption = i18next.t(i18nKey);
+    if (loadLastChallenges() && this.startRegionOption === 0) {
+      startCaption = `${startCaption}  (L/R: last setup)`;
+    }
     this.startText
-      .setText(i18next.t(i18nKey))
+      .setText(startCaption)
       .setAlpha(alphaValue)
       .setPositionRelative(this.startBg, (this.startBg.width - this.startText.displayWidth) / 2, 4);
 

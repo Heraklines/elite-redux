@@ -54,9 +54,10 @@ export const ER_RESIST_BERRY_BY_TYPE: ReadonlyMap<PokemonType, { name: string; i
 
 /** Per-mon roll chance (%) that a trainer mon holds a resist berry. */
 export const ER_RESIST_BERRY_CHANCE_PCT: Readonly<Record<string, number>> = {
-  ace: 1,
-  elite: 5,
-  hell: 10,
+  // ER (#420): doubled on Elite/Hell, Ace raised to 5 (was 1/5/10).
+  ace: 5,
+  elite: 10,
+  hell: 20,
 };
 
 /**
