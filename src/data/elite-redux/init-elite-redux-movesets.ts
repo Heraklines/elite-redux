@@ -33,8 +33,8 @@
 // type reports `speciesPatched` per run, not "deltas".
 // =============================================================================
 
-import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
-import { allMoves } from "#data/data-lists";
+import { pokemonFormLevelMoves, pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
+import { allMoves, allSpecies } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
 import { MoveId } from "#enums/move-id";
@@ -150,6 +150,14 @@ export function initEliteReduxMovesets(): InitEliteReduxMovesetsResult {
   installCascoonAngelsWrathMoves(table, SpeciesId.CASCOON);
   installCascoonAngelsWrathMoves(table, ER_ID_MAP.species[CASCOON_PRIMAL_ER_ID]);
 
+  // #411: in-run redux mons are VANILLA species wearing the "redux" FORM, so
+  // they read the vanilla species' level-moves table - a redux-form Beedrill
+  // kept regular Beedrill's learnset and never learned its kit (Icicle Spear
+  // etc.). Mirror each "<X> Redux" custom's level moves onto the vanilla
+  // species' redux FORM via pokemonFormLevelMoves[vanillaId][reduxFormIndex],
+  // which PokemonSpeciesForm.getLevelMoves prefers over the species table.
+  installReduxFormLevelMoves(table);
+
   return result;
 }
 
@@ -165,4 +173,36 @@ function installCascoonAngelsWrathMoves(table: Record<number, LevelMoves>, speci
   }
   moves.sort((a, b) => a[0] - b[0]);
   table[speciesId] = moves;
+}
+
+/**
+ * Mirror every "<X> Redux" custom species' level-up moves onto the matching
+ * vanilla species' REDUX form (#411). Idempotent - plain assignment.
+ */
+function installReduxFormLevelMoves(table: Record<number, LevelMoves>): void {
+  const customByName = new Map<string, number>();
+  for (const sp of allSpecies) {
+    if (sp.speciesId >= 10000) {
+      customByName.set(sp.name.toLowerCase(), sp.speciesId);
+    }
+  }
+  const formTable = pokemonFormLevelMoves as Record<number, Record<number, LevelMoves>>;
+  for (const sp of allSpecies) {
+    if (sp.speciesId >= 10000 || sp.forms?.length === 0) {
+      continue;
+    }
+    const reduxFormIndex = sp.forms.findIndex(f => f.formKey === "redux");
+    if (reduxFormIndex < 0) {
+      continue;
+    }
+    const counterpartId = customByName.get(`${sp.name.toLowerCase()} redux`);
+    if (counterpartId === undefined) {
+      continue;
+    }
+    const moves = table[counterpartId];
+    if (moves?.length === 0) {
+      continue;
+    }
+    formTable[sp.speciesId] = { ...formTable[sp.speciesId], [reduxFormIndex]: moves };
+  }
 }

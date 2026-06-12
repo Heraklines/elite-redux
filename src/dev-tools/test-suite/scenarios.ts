@@ -1829,6 +1829,25 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Weedle Redux line (#411)",
+    description:
+      "#411 - NOT a battle test, this entry tracks the check.\n"
+      + "DO: get a Weedle Redux (RDX tab / Redux Up gacha) and level it: 7\n"
+      + "then 10. EXPECT: Weedle Redux -> Kakuna Redux -> Beedrill Redux (no\n"
+      + "plain Beedrill). The Beedrill Redux learns ITS kit on level-up (Icicle\n"
+      + "Spear etc.), not vanilla Beedrill moves. Same for the redux FORM\n"
+      + "version caught in runs. Pass/Fail once checked.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 5 });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Egg countdown (#378)",
     description:
       "#378 QoL - NOT a battle test, this entry just tracks the check.\n"
