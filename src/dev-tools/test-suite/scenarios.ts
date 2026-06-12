@@ -142,8 +142,13 @@ const DEV_OVERRIDE_DEFAULTS = {
   ER_BLACK_SHINY_ENEMY_OVERRIDE: null,
 } as const;
 
-/** Reset every dev-managed override so scenarios don't bleed into each other. */
-function resetDevOverrides(): void {
+/**
+ * Reset every dev-managed override so scenarios don't bleed into each other.
+ * Also called from index.ts whenever the player is back at the TITLE screen:
+ * without that, a scenario's overrides (pinned enemy species/level, starting
+ * wave, movesets) leaked into the next NORMAL run started from the title.
+ */
+export function resetDevOverrides(): void {
   Object.assign(O, structuredClone(DEV_OVERRIDE_DEFAULTS));
 }
 

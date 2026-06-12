@@ -21,6 +21,9 @@
  */
 
 import {
+  consumePendingDevBattleSetup,
+  consumePendingDevShop,
+  consumePendingDevStarters,
   type DevMenuCtx,
   registerDevMenu,
   setPendingDevBattleSetup,
@@ -31,7 +34,7 @@ import { globalScene } from "#app/global-scene";
 import { GameModes } from "#enums/game-modes";
 import { UiMode } from "#enums/ui-mode";
 import { formatConsoleSnapshot } from "#utils/console-ring-buffer";
-import { DEV_SCENARIOS } from "./scenarios";
+import { DEV_SCENARIOS, resetDevOverrides } from "./scenarios";
 
 // ---------------------------------------------------------------------------
 // 1. Floating "Send Logs" button
@@ -448,20 +451,35 @@ injectLogButton();
 // scenarios as soon as the player opens the Dev Scenarios menu. Best-effort.
 fetchRemoteProgress().catch(() => {});
 
-registerDevMenu(ctx => ({
-  label: "\u{1F6E0} Dev Scenarios",
-  handler: () => {
-    // No keepOpen — mirror the New Game item: return true to close the title
-    // menu, and the deferred showText callback opens the scenario list.
-    // REFRESH the shared passed-set first (one tiny GET per menu open) so a
-    // teammate's passes hide scenarios WITHOUT requiring a page reload; offline
-    // or fetch failure just opens with the cached/local state.
-    fetchRemoteProgress()
-      .catch(() => {})
-      .finally(() => openScenarioList(ctx));
-    return true;
-  },
-}));
+registerDevMenu(ctx => {
+  // This factory runs every time the TITLE menu is built - i.e. whenever the
+  // player is back at the title screen, the previous scenario (if any) is over.
+  // Scrub ALL scenario state here so a NORMAL run started from the title is
+  // clean: without this, the last scenario's Overrides (pinned enemy species/
+  // level, starting wave, movesets) leaked into real runs, which looked like
+  // "new game dropped me into the old scenario save at Lv50".
+  resetDevOverrides();
+  consumePendingDevStarters();
+  consumePendingDevBattleSetup();
+  consumePendingDevShop();
+  scenarioBanner?.remove();
+  scenarioBanner = null;
+  activeScenarioLabel = null;
+  return {
+    label: "\u{1F6E0} Dev Scenarios",
+    handler: () => {
+      // No keepOpen — mirror the New Game item: return true to close the title
+      // menu, and the deferred showText callback opens the scenario list.
+      // REFRESH the shared passed-set first (one tiny GET per menu open) so a
+      // teammate's passes hide scenarios WITHOUT requiring a page reload; offline
+      // or fetch failure just opens with the cached/local state.
+      fetchRemoteProgress()
+        .catch(() => {})
+        .finally(() => openScenarioList(ctx));
+      return true;
+    },
+  };
+});
 
 // biome-ignore lint/suspicious/noConsole: dev-only status line
 console.log(`[dev-tools] loaded — ${DEV_SCENARIOS.length} scenarios + Send Logs button`);
