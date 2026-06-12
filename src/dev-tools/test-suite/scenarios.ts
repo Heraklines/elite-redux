@@ -1841,6 +1841,24 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) No mega transforms/trades (#414)",
+    description:
+      "#414 - a wave-13 Weird Dream on Ace turned a party mon into a\n"
+      + "permanent MEGA URSHIFU (the standalone ER mega species records\n"
+      + "leaked into the transform and GTS trade pools). Not battle-testable\n"
+      + "here - check by replaying Weird Dream / GTS encounters: results\n"
+      + "must never be a Mega/Primal/battle-form species, and on Ace or\n"
+      + "Youngster never an ER custom at all.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Egg declutter + RDX (#407)",
     description:
       "#407/#408/#409 - NOT a battle test, this entry tracks the checks.\n"

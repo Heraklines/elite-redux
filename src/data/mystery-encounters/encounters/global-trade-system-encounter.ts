@@ -1,6 +1,7 @@
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { allSpecies } from "#data/data-lists";
+import { isErGenericPoolBanned } from "#data/elite-redux/er-generic-pool-bans";
 import { Gender, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
 import { getPokeballAtlasKey, getPokeballTintColor } from "#data/pokeball";
@@ -524,7 +525,16 @@ function generateTradeOption(alreadyUsedSpecies: PokemonSpecies[], originalBst?:
       const isLegendaryOrMythical = s.legendary || s.subLegendary || s.mythical;
       const speciesBst = s.getBaseStatTotal();
       const bstInRange = speciesBst >= bstMin && speciesBst <= bstCap;
-      return !isLegendaryOrMythical && bstInRange && !EXCLUDED_TRADE_SPECIES.includes(s.speciesId);
+      // ER (#414): same hole as Weird Dream - standalone mega/battle-form
+      // CUSTOM records (legendary=false) passed the vanilla legendary check, so
+      // a GTS trade could hand the player a permanent mega. Battle-form customs
+      // are banned always; ALL customs on Youngster/Ace (#345).
+      return (
+        !isLegendaryOrMythical
+        && bstInRange
+        && !EXCLUDED_TRADE_SPECIES.includes(s.speciesId)
+        && !isErGenericPoolBanned(s.speciesId, s.name)
+      );
     });
 
     // There must be at least 20 species available before it will choose one

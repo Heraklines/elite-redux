@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { allSpecies, modifierTypes } from "#data/data-lists";
+import { isErGenericPoolBanned } from "#data/elite-redux/er-generic-pool-bans";
 import { getLevelTotalExp } from "#data/exp";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
@@ -648,7 +649,17 @@ function getTransformedSpecies(
           || speciesBst < NON_LEGENDARY_BST_THRESHOLD
           || speciesBst > SUPER_LEGENDARY_BST_THRESHOLD)
         && (!hasPokemonBstHigherThan600 || speciesBst <= SUPER_LEGENDARY_BST_THRESHOLD);
-      return bstInRange && validBst && !EXCLUDED_TRANSFORMATION_SPECIES.includes(s.speciesId);
+      // ER (#414): the vanilla exclusion list bans legendaries BY SpeciesId,
+      // but ER's standalone mega/battle-form CUSTOM records (id >= 10000,
+      // legendary=false, e.g. "Urshifu Mega" BST 660) sailed through - a
+      // wave-13 Weird Dream turned a party mon into a permanent Mega. Battle
+      // form customs are banned always; ALL customs on Youngster/Ace (#345).
+      return (
+        bstInRange
+        && validBst
+        && !EXCLUDED_TRANSFORMATION_SPECIES.includes(s.speciesId)
+        && !isErGenericPoolBanned(s.speciesId, s.name)
+      );
     });
 
     // There must be at least 20 species available before it will choose one
