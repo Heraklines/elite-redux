@@ -522,15 +522,6 @@
     "cost": 2
   },
   {
-    "const": "SPECIES_BURMY_ETERNA",
-    "name": "Burmy Eterna",
-    "slug": "burmy_eterna",
-    "id": 10042,
-    "dex": 412,
-    "eggTier": 3,
-    "cost": 11
-  },
-  {
     "const": "SPECIES_BUZZWOLE",
     "name": "Buzzwole",
     "slug": "buzzwole",
@@ -556,15 +547,6 @@
     "dex": 898,
     "eggTier": 3,
     "cost": 8
-  },
-  {
-    "const": "SPECIES_CALYREX_CLOUD_RIDER",
-    "name": "Calyrex Cloud Rider",
-    "slug": "calyrex_cloud_rider",
-    "id": 10772,
-    "dex": 898,
-    "eggTier": 3,
-    "cost": 9
   },
   {
     "const": "SPECIES_CAPSAKID",
