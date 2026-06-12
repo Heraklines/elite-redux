@@ -258,10 +258,14 @@ export class UiInputs {
     if (currentSetting === -1) {
       currentSetting = 1;
     }
+    // ER (#416): derive the caps from the option list instead of hardcoding
+    // 2..5 so the new Hyper (7x) / Ludicrous (10x) tiers are hotkey-reachable.
+    const minSpeed = Number(settingOptions[0].value);
+    const maxSpeed = Number(settingOptions.at(-1)?.value);
     let direction: number;
-    if (up && globalScene.gameSpeed < 5) {
+    if (up && globalScene.gameSpeed < maxSpeed) {
       direction = 1;
-    } else if (!up && globalScene.gameSpeed > 2) {
+    } else if (!up && globalScene.gameSpeed > minSpeed) {
       direction = -1;
     } else {
       return;

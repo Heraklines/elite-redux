@@ -220,6 +220,18 @@ export const Setting: Setting[] = [
         value: "5",
         label: i18next.t("settings:gameSpeedTurbo"),
       },
+      // ER (#416): faster tiers for grinding. Tween/timer durations divide by
+      // gameSpeed (see initGameSpeed) - audio playback rate and music are
+      // untouched (playSound never scales rate; only SoundFade durations
+      // shorten, which is intended).
+      {
+        value: "7",
+        label: i18next.t("settings:gameSpeedHyper"),
+      },
+      {
+        value: "10",
+        label: i18next.t("settings:gameSpeedLudicrous"),
+      },
     ],
     default: 1,
     type: SettingType.GENERAL,

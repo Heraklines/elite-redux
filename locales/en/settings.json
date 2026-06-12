@@ -12,6 +12,8 @@
   "gameSpeedNormal": "Normal",
   "gameSpeedFast": "Fast",
   "gameSpeedTurbo": "Turbo",
+  "gameSpeedHyper": "Hyper (7x)",
+  "gameSpeedLudicrous": "Ludicrous (10x)",
   "hpBarSpeed": "HP Bar Speed",
   "expGainsSpeed": "EXP Gains Speed",
   "expPartyDisplay": "Show EXP Party",

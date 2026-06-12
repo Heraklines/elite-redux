@@ -1871,6 +1871,24 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Faster game speed (#416)",
+    description:
+      "#416 - two new speed tiers above Turbo: HYPER (7x) and LUDICROUS\n"
+      + "(10x). Check in Settings > General > Game Speed, or cycle with the\n"
+      + "speed-change hotkeys (plus/minus) mid-battle - the hotkeys now reach\n"
+      + "the new tiers too. EXPECT: animations and text run much faster but\n"
+      + "the MUSIC and sound pitch stay completely normal, and battles still\n"
+      + "resolve cleanly at 10x (no skipped or stuck phases).",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) No mega transforms/trades (#414)",
     description:
       "#414 - a wave-13 Weird Dream on Ace turned a party mon into a\n"
