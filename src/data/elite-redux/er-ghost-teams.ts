@@ -551,7 +551,18 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
         // ALL (up to 5 sequential) fetches finished, so the first trainer
         // waves raced several network round-trips against an empty pool.
         const byId = new Map(collected.filter(isErGhostTeamLegal).map(t => [t.id, t] as const));
-        prefetched = [...byId.values()];
+        // Cap teams per UPLOADER (3): one prolific early-dying tester can
+        // otherwise own most of the sampled pool and appear every wave.
+        const perUploader = new Map<string, number>();
+        prefetched = [...byId.values()].filter(t => {
+          const k = t.trainerName ?? "";
+          const n = perUploader.get(k) ?? 0;
+          if (n >= 3) {
+            return false;
+          }
+          perUploader.set(k, n + 1);
+          return true;
+        });
         if (collected.length >= 30) {
           break;
         }
@@ -596,6 +607,32 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
     .catch(() => {
       prefetched = [];
     });
+}
+
+/** The uploader of the most recently fielded ghost - the picker avoids
+ * fielding the same player twice in a row when alternatives exist (#422). */
+let lastGhostUploader: string | null = null;
+
+/**
+ * Seeded-random pick among candidate snapshots, preferring an uploader other
+ * than the previous ghost's. Deterministic per (run seed, wave) so reloading
+ * the same wave fields the same ghost - but DIFFERENT waves and different
+ * runs spread across the pool. Replaces the old shallowest-first sort, which
+ * deterministically handed every early wave to whichever single player owned
+ * the shallow end of the sample ("why is it always Arctic Flame?").
+ */
+function pickGhost(candidates: GhostTeamSnapshot[], waveIndex: number): GhostTeamSnapshot | undefined {
+  if (candidates.length === 0) {
+    return undefined;
+  }
+  const fresh = candidates.filter(s => (s.trainerName ?? "") !== lastGhostUploader);
+  const pool = fresh.length > 0 ? fresh : candidates;
+  const key = `${globalScene.seed}:ghostpick:${waveIndex}`;
+  let h = 0;
+  for (let i = 0; i < key.length; i++) {
+    h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  }
+  return pool[h % pool.length];
 }
 
 /**
@@ -648,9 +685,7 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
   for (const window of windows) {
     const eligible = legal.filter(s => s.waveReached >= waveIndex && s.waveReached <= waveIndex + window);
     const unused = eligible.filter(s => !usedGhostIds.has(s.id));
-    next = (unused.length > 0 ? unused : challengeMode ? eligible : []).sort(
-      (a, b) => a.waveReached - b.waveReached,
-    )[0];
+    next = pickGhost(unused.length > 0 ? unused : challengeMode ? eligible : [], waveIndex);
     if (next) {
       break;
     }
@@ -664,7 +699,8 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
   if (!next && challengeMode) {
     const anyDeeper = legal.filter(s => s.waveReached >= waveIndex);
     const unused = anyDeeper.filter(s => !usedGhostIds.has(s.id));
-    next = (unused.length > 0 ? unused : anyDeeper).sort((a, b) => a.waveReached - b.waveReached)[0];
+    const closest = (unused.length > 0 ? unused : anyDeeper).sort((a, b) => a.waveReached - b.waveReached).slice(0, 3);
+    next = pickGhost(closest, waveIndex);
   }
   if (!next) {
     if (challengeMode) {
@@ -680,6 +716,7 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
     console.log(`[er-ghost] wave ${waveIndex}: ghost '${next.trainerName}' (run ended at ${next.waveReached})`);
   }
   usedGhostIds.add(next.id);
+  lastGhostUploader = next.trainerName ?? "";
   ghostByWave.set(waveIndex, next);
   return next;
 }
@@ -690,6 +727,7 @@ export function resetErGhostRunState(): void {
   prefetchStarted = false;
   usedGhostIds.clear();
   ghostByWave.clear();
+  lastGhostUploader = null;
 }
 
 /**

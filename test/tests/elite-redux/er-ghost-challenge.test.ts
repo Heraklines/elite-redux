@@ -135,8 +135,24 @@ describe.skipIf(!RUN)("ER Ghost Trainers challenge (#422)", () => {
     const deeper = { ...SNAPSHOT, id: "er-test-deeper", waveReached: 200 };
     setPrefetchedGhostTeamsForTests([deeper, deep]);
     activate(true);
-    expect(takeGhostForWave(5, true)?.id).toBe("er-test-deep");
+    // The pick is seeded-random among the closest deeper teams (#422 variety
+    // pass - the old always-shallowest sort fielded the same uploader every
+    // wave), so either of the two qualifies.
+    expect(["er-test-deep", "er-test-deeper"]).toContain(takeGhostForWave(5, true)?.id);
     // Scheduled ghost waves on NORMAL runs keep the strict 20-wave window -
     // no last resort there (covered by the challenge-off case above).
+  });
+
+  it("consecutive waves prefer DIFFERENT uploaders (no more 'always Arctic Flame')", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    const a = { ...SNAPSHOT, id: "er-test-a", trainerName: "PlayerA", waveReached: 25 };
+    const b = { ...SNAPSHOT, id: "er-test-b", trainerName: "PlayerB", waveReached: 26 };
+    setPrefetchedGhostTeamsForTests([a, b]);
+    activate(true);
+    const first = takeGhostForWave(14, true);
+    const second = takeGhostForWave(15, true);
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(first?.trainerName).not.toBe(second?.trainerName);
   });
 });
