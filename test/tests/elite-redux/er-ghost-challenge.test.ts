@@ -15,6 +15,7 @@
 import { allChallenges, GhostTrainersChallenge } from "#data/challenge";
 import {
   type GhostTeamSnapshot,
+  hasErGhostOverride,
   setPrefetchedGhostTeamsForTests,
   takeGhostForWave,
 } from "#data/elite-redux/er-ghost-teams";
@@ -141,6 +142,23 @@ describe.skipIf(!RUN)("ER Ghost Trainers challenge (#422)", () => {
     expect(["er-test-deep", "er-test-deeper"]).toContain(takeGhostForWave(5, true)?.id);
     // Scheduled ghost waves on NORMAL runs keep the strict 20-wave window -
     // no last resort there (covered by the challenge-off case above).
+  });
+
+  it("wave 5 (the FIXED Youngster/Lass battle) fields a ghost too (#436)", async () => {
+    // Wave 5 is ClassicFixedBossWaves.TOWN_YOUNGSTER - a fixed battle that
+    // bypasses handleNonFixedBattle's ghost hook entirely, which is why the
+    // 5th trainer was ALWAYS a plain Youngster/Lass in the challenge. The
+    // challenge must be armed BEFORE newBattle builds the wave.
+    game.override.startingWave(5);
+    setPrefetchedGhostTeamsForTests([SNAPSHOT]);
+    game.challengeMode.addChallenge(Challenges.GHOST_TRAINERS, 1, 1);
+    await game.challengeMode.startBattle(SpeciesId.SNORLAX);
+
+    const trainer = game.scene.currentBattle.trainer;
+    expect(trainer).not.toBeNull();
+    expect(hasErGhostOverride(trainer!)).toBe(true);
+    // Story fixed battles stay scripted - only the generic wave-5 filler is
+    // ghosted (rival/evil-team/E4/champion checks live in handleFixedBattle).
   });
 
   it("consecutive waves prefer DIFFERENT uploaders (no more 'always Arctic Flame')", async () => {

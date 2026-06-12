@@ -33,6 +33,7 @@ import { classicFinalBossDialogue } from "#data/dialogue";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
 import { ER_BLACK_SHINY_TINT, isErBlackShiny, promoteToErBlackShinyInBattle } from "#data/elite-redux/er-black-shinies";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
+import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
 import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
 import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
@@ -55,6 +56,7 @@ import { Challenges } from "#enums/challenges";
 import { EaseType } from "#enums/ease-type";
 import { ExpGainsSpeed } from "#enums/exp-gains-speed";
 import { ExpNotification } from "#enums/exp-notification";
+import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
 import { FormChangeItem } from "#enums/form-change-item";
 import { GameModes } from "#enums/game-modes";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
@@ -1566,6 +1568,23 @@ export class BattleScene extends SceneBase {
    */
   private handleFixedBattle(resolved: NewBattleInitialProps): void {
     const { waveIndex } = resolved;
+    // ER Ghost Trainers challenge (#422): the wave-5 fixed Youngster/Lass is
+    // generic filler, not a story battle - in the challenge it must field a
+    // ghost like every other trainer wave (it bypassed handleNonFixedBattle's
+    // ghost hook, which is why wave 5 was ALWAYS a plain Youngster/Lass).
+    // Story fixed battles (rival, evil teams, E4, champion) stay scripted.
+    // takeGhostForWave is a no-op when the challenge is off (wave 5 is not a
+    // scheduled ghost-gauntlet wave), so normal runs are untouched.
+    if (waveIndex === ClassicFixedBossWaves.TOWN_YOUNGSTER) {
+      const ghost = takeGhostForWave(waveIndex, true);
+      if (ghost !== null) {
+        resolved.battleType = BattleType.TRAINER;
+        const ghostTrainer = this.createGhostTrainer(ghost);
+        this.field.add(ghostTrainer);
+        resolved.trainer = ghostTrainer;
+        return;
+      }
+    }
     // Bang is justified as this code is only called when `isFixedBattle` is true
     const battleConfig = this.gameMode.getFixedBattle(waveIndex)!;
     resolved.double = battleConfig.double;
@@ -1649,37 +1668,7 @@ export class BattleScene extends SceneBase {
       && Overrides.BATTLE_TYPE_OVERRIDE == null
     ) {
       resolved.battleType = BattleType.TRAINER;
-      // Ghosts used to be hardcoded VETERAN - vary the class for flavor. The
-      // pick hashes the snapshot id so the SAME ghost always appears as the
-      // SAME class everywhere. The party itself is fully overridden by the
-      // snapshot, so the class is purely cosmetic (sprite/dialogue/music cue).
-      const ghostClasses = [
-        TrainerType.VETERAN,
-        TrainerType.ACE_TRAINER,
-        TrainerType.BLACK_BELT,
-        TrainerType.PSYCHIC,
-        TrainerType.HIKER,
-        TrainerType.SCIENTIST,
-        TrainerType.SWIMMER,
-        TrainerType.RANGER,
-        TrainerType.HEX_MANIAC,
-        TrainerType.ROUGHNECK,
-        TrainerType.BEAUTY,
-        TrainerType.BACKPACKER,
-        TrainerType.CYCLIST,
-        TrainerType.MUSICIAN,
-        TrainerType.BIKER,
-      ];
-      let idHash = 0;
-      for (let i = 0; i < ghost.id.length; i++) {
-        idHash = (idHash * 31 + ghost.id.charCodeAt(i)) >>> 0;
-      }
-      const ghostType = ghostClasses[idHash % ghostClasses.length];
-      const ghostTrainer = new Trainer(
-        ghostType,
-        trainerConfigs[ghostType].hasGenders && randSeedInt(2) ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT,
-      );
-      markTrainerAsGhost(ghostTrainer, ghost);
+      const ghostTrainer = this.createGhostTrainer(ghost);
       this.field.add(ghostTrainer);
       resolved.trainer = ghostTrainer;
       return;
@@ -1703,6 +1692,44 @@ export class BattleScene extends SceneBase {
     const trainer = this.generateNewBattleTrainer(waveIndex);
     this.field.add(trainer);
     resolved.trainer = trainer;
+  }
+
+  /**
+   * Build the cosmetic trainer shell for a ghost team (#422/#424). Ghosts used
+   * to be hardcoded VETERAN - vary the class for flavor. The pick hashes the
+   * snapshot id so the SAME ghost always appears as the SAME class everywhere.
+   * The party itself is fully overridden by the snapshot, so the class is
+   * purely cosmetic (sprite/dialogue/music cue).
+   */
+  private createGhostTrainer(ghost: GhostTeamSnapshot): Trainer {
+    const ghostClasses = [
+      TrainerType.VETERAN,
+      TrainerType.ACE_TRAINER,
+      TrainerType.BLACK_BELT,
+      TrainerType.PSYCHIC,
+      TrainerType.HIKER,
+      TrainerType.SCIENTIST,
+      TrainerType.SWIMMER,
+      TrainerType.RANGER,
+      TrainerType.HEX_MANIAC,
+      TrainerType.ROUGHNECK,
+      TrainerType.BEAUTY,
+      TrainerType.BACKPACKER,
+      TrainerType.CYCLIST,
+      TrainerType.MUSICIAN,
+      TrainerType.BIKER,
+    ];
+    let idHash = 0;
+    for (let i = 0; i < ghost.id.length; i++) {
+      idHash = (idHash * 31 + ghost.id.charCodeAt(i)) >>> 0;
+    }
+    const ghostType = ghostClasses[idHash % ghostClasses.length];
+    const ghostTrainer = new Trainer(
+      ghostType,
+      trainerConfigs[ghostType].hasGenders && randSeedInt(2) ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT,
+    );
+    markTrainerAsGhost(ghostTrainer, ghost);
+    return ghostTrainer;
   }
 
   /**

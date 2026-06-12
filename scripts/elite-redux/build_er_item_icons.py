@@ -10,6 +10,10 @@ Also builds the #387/#392 community item icons:
   - `dex_nav`       -> green recolor of `scanner` (the IV Scanner device)
   - `omni_gem`      -> WHITE recolor of the ROM hack's elemental `gem.png`
                        (vendor icon, 24x24, padded centered into a 32x32 frame)
+  - `copper_rod`    -> drawn from scratch (#437): a diagonal copper rod with
+                       yellow sparks. The old icon was a copper-tinted
+                       quick_claw, which read as "a claw", not "a conductive
+                       rod that paralyzes on contact".
 
 The recolored 32x32 frames are appended to the `items` texture atlas
 (items.png + items.json) so the modifier icons can reference them by frame name
@@ -110,6 +114,65 @@ def recolor(src: Image.Image, mapping: dict) -> Image.Image:
     return out
 
 
+def draw_copper_rod(size: int = 24) -> Image.Image:
+    """Copper Rod (#437): a diagonal copper rod (pointed tip) with yellow
+    sparks - "conductive rod = 10% paralysis on contact, both ways"."""
+    out_c = (58, 32, 16, 255)  # outline
+    cu_l = (244, 178, 120, 255)  # light copper (top edge highlight)
+    cu_m = (205, 117, 56, 255)  # mid copper
+    cu_d = (140, 71, 32, 255)  # dark copper (bottom shade)
+    sp_l = (255, 247, 130, 255)  # spark core
+    sp_d = (248, 184, 32, 255)  # spark arms
+
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    px = img.load()
+
+    # Rod body: 3px-thick diagonal from bottom-left (4,20) to (18,6).
+    for t in range(15):
+        x, y = 4 + t, 20 - t
+        px[x, y - 1] = cu_l
+        px[x, y] = cu_m
+        px[x, y + 1] = cu_d
+    # Pointed tip + slightly wider butt end.
+    px[18, 5] = cu_l
+    px[19, 4] = cu_m
+    px[3, 20] = cu_m
+    px[3, 21] = cu_d
+    px[4, 21] = cu_d
+
+    # Outline around every rod pixel.
+    rod_px = [(x, y) for x in range(size) for y in range(size) if px[x, y][3] != 0]
+    for x, y in rod_px:
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < size and 0 <= ny < size and px[nx, ny][3] == 0:
+                    px[nx, ny] = out_c
+
+    # Big 4-point spark off the tip + a tiny one along the shaft.
+    cx, cy = 20, 3
+    for x, y, c in [
+        (cx, cy, sp_l),
+        (cx - 1, cy, sp_d),
+        (cx + 1, cy, sp_d),
+        (cx, cy - 1, sp_d),
+        (cx, cy + 1, sp_d),
+        (cx - 2, cy, sp_d),
+        (cx + 2, cy, sp_d),
+        (cx, cy - 2, sp_d),
+        (cx, cy + 2, sp_d),
+    ]:
+        if 0 <= x < size and 0 <= y < size:
+            px[x, y] = c
+    for x, y in [(6, 13), (8, 13), (7, 12), (7, 14)]:
+        if px[x, y][3] == 0:
+            px[x, y] = sp_d
+    if px[7, 13][3] == 0:
+        px[7, 13] = sp_l
+
+    return img
+
+
 def add_frame(sheet: Image.Image, atlas: dict, name: str, frame_img: Image.Image) -> Image.Image:
     """Place a 32x32 frame in the atlas, appending a new bottom strip if needed."""
     frames = atlas["textures"][0]["frames"]
@@ -165,16 +228,23 @@ def main() -> None:
     power_herb = pad_center(Image.open(ROM_POWER_HERB_PATH).convert("RGBA"))
     learners_shroom = recolor(Image.open(BIG_MUSHROOM_PATH).convert("RGBA"), LEARNERS_SHROOM_MAP)
 
+    copper_rod = pad_center(draw_copper_rod())
+
     sheet = add_frame(sheet, atlas, "frostbite_orb", frostbite)
     sheet = add_frame(sheet, atlas, "dex_nav", dex_nav)
     sheet = add_frame(sheet, atlas, "omni_gem", omni_gem)
     sheet = add_frame(sheet, atlas, "power_herb", power_herb)
     sheet = add_frame(sheet, atlas, "learners_shroom", learners_shroom)
+    sheet = add_frame(sheet, atlas, "copper_rod", copper_rod)
 
     sheet.save(PNG_PATH)
     with open(JSON_PATH, "w", encoding="utf-8") as fh:
         json.dump(atlas, fh, indent="\t")
-    print("wrote move_slot_expander + ability_randomizer + frostbite_orb + dex_nav + omni_gem + power_herb + learners_shroom frames; sheet now", sheet.size)
+    print(
+        "wrote move_slot_expander + ability_randomizer + frostbite_orb + dex_nav + omni_gem"
+        + " + power_herb + learners_shroom + copper_rod frames; sheet now",
+        sheet.size,
+    )
 
 
 if __name__ == "__main__":

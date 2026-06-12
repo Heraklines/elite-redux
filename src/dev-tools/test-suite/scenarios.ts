@@ -1253,7 +1253,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "EXPECT: ~10% per hit the Snorlax gets POISONED (Rusty Claw) or BLEEDS\n"
       + "(Spiked Knuckles, red badge). The enemy's Copper Rod can PARALYZE YOUR\n"
       + "Scizor when you make contact (defensive proc). SWIFT (non-contact)\n"
-      + "never procs any of them.",
+      + "never procs any of them. ALSO (#437): the Copper Rod icon over the\n"
+      + "enemy is now a copper rod with sparks, not a copper-tinted Quick Claw.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -2031,6 +2032,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "teams field basic/mid-stage mons, no wave-20 Kyogre. Hell unchanged.\n"
       + "#422 - new challenge GHOST TRAINERS (7 Favour): every trainer wave\n"
       + "is a ghost team when the pool has one, else a normal trainer.\n"
+      + "#436 - wave 5 (the fixed Youngster/Lass battle) is now ALSO a ghost\n"
+      + "in the challenge. CHECK: start a Ghost Trainers run, the wave-5\n"
+      + "trainer is a ghost (player name + ghost music), not a Youngster.\n"
       + "#421 - wrong-sprite self-heal: if a Pokemon atlas key is requested\n"
       + "with a different path than it loaded with, the texture reloads and\n"
       + "a [er-atlas] warning is logged - if you SEE a wrong sprite (mega art\n"
