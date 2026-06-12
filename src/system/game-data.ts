@@ -177,6 +177,14 @@ export class GameData {
    */
   public cloudSaveMissing = false;
 
+  /**
+   * ER (#389): set by {@linkcode saveAll} when the most recent attempted cloud
+   * push FAILED (non-fatal - the save still landed in localStorage and the
+   * sync retries later). Save and Quit reads this to warn the player that the
+   * save is local-only right now.
+   */
+  public lastCloudSyncFailed = false;
+
   public gender: PlayerGender;
 
   public dexData: DexData;
@@ -1639,6 +1647,11 @@ export class GameData {
 
     const shouldCloudSync = sync && !bypassLogin && (forceSync || this.shouldAttemptCloudSync());
 
+    // ER (#389): reset the cloud-push failure signal for this save attempt -
+    // Save and Quit reads it to warn the player when their force-push to the
+    // cloud did NOT go through (the save is local-only until the next retry).
+    this.lastCloudSyncFailed = false;
+
     if (shouldCloudSync) {
       globalScene.ui.savingIcon.show();
     }
@@ -1701,6 +1714,7 @@ export class GameData {
       return false;
     }
     this.markCloudSyncFailure();
+    this.lastCloudSyncFailed = true;
     console.error(saveError);
     return true;
   }

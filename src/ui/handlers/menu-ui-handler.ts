@@ -698,13 +698,28 @@ export class MenuUiHandler extends MessageUiHandler {
           break;
         case MenuOptions.SAVE_AND_QUIT: {
           success = true;
+          // ER (#389): the save runs BEFORE switching to the loading screen so
+          // a failed cloud push can be surfaced - the full save (system +
+          // session) is force-pushed (forceSync bypasses the sync throttle and
+          // backoff), and if the push fails the player is told the save is
+          // local-only right now instead of silently quitting.
           const doSaveQuit = () => {
-            ui.setMode(UiMode.LOADING, {
-              buttonActions: [],
-              fadeOut: () =>
-                globalScene.gameData.saveAll(true, true, true, true, true).then(() => {
-                  globalScene.reset(true);
-                }),
+            const finishQuit = () => {
+              ui.setMode(UiMode.LOADING, {
+                buttonActions: [],
+                fadeOut: () => globalScene.reset(true),
+              });
+            };
+            globalScene.gameData.saveAll(true, true, true, true, true).then(() => {
+              if (!this.active) {
+                finishQuit();
+                return;
+              }
+              if (globalScene.gameData.lastCloudSyncFailed) {
+                ui.showText(i18next.t("menuUiHandler:cloudSyncFailedWarning"), null, () => finishQuit(), null, true);
+              } else {
+                finishQuit();
+              }
             });
           };
           if (globalScene.currentBattle.turn > 1) {

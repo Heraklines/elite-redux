@@ -38,5 +38,6 @@
   "cancel": "Cancel",
   "donate": "Donate",
   "losingProgressionWarning": "You will lose any progress since the beginning of the battle. Proceed?",
+  "cloudSyncFailedWarning": "Your game saved on this device, but the cloud sync did not go through. It will retry automatically next time you play - avoid clearing your browser data until then.",
   "noEggs": "You are not hatching\nany Eggs at the moment!"
 }

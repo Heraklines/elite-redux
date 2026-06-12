@@ -1871,6 +1871,25 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Save and Quit cloud push (#389)",
+    description:
+      "#389 - Save and Quit force-pushes the FULL save (system + session)\n"
+      + "to the cloud, bypassing the sync throttle. NEW: if that push fails\n"
+      + "(server down, offline), a warning appears BEFORE quitting telling\n"
+      + "you the save is on this device only. CHECK: while logged in, use\n"
+      + "Save and Quit normally (no warning, run reappears on another\n"
+      + "browser); then disconnect your network and Save and Quit again -\n"
+      + "the local-only warning must appear.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Mono Color challenge (#388)",
     description:
       "#388 - new challenge: MONO COLOR (5 Favour). Open Challenges and\n"
