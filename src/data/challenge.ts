@@ -1297,6 +1297,8 @@ export function copyChallenge(source: Challenge | any): Challenge {
       return UsageTierChallenge.loadChallenge(source);
     case Challenges.MONO_COLOR:
       return MonoColorChallenge.loadChallenge(source);
+    case Challenges.GHOST_TRAINERS:
+      return GhostTrainersChallenge.loadChallenge(source);
   }
   throw new Error("Unknown challenge copied");
 }
@@ -1407,6 +1409,26 @@ export class MonoColorChallenge extends Challenge {
   }
 }
 
+/**
+ * ER (#422): Ghost Trainers - every trainer battle fields a GHOST team (a real
+ * winning player team from the cross-player pool, #217). The behavior lives in
+ * the ghost-wave machinery (er-ghost-waves isErGhostChallengeActive +
+ * BattleScene.handleNonFixedBattle); this class only carries the toggle.
+ * Falls back to a normal trainer when no ghost team fits the wave. 7 Favour.
+ */
+export class GhostTrainersChallenge extends Challenge {
+  constructor() {
+    super(Challenges.GHOST_TRAINERS, 1);
+  }
+
+  static override loadChallenge(source: GhostTrainersChallenge | any): GhostTrainersChallenge {
+    const newChallenge = new GhostTrainersChallenge();
+    newChallenge.value = source.value;
+    newChallenge.severity = source.severity;
+    return newChallenge;
+  }
+}
+
 export const allChallenges: Challenge[] = [];
 
 export function initChallenges() {
@@ -1422,6 +1444,7 @@ export function initChallenges() {
     new InverseBattleChallenge(),
     new FlipStatChallenge(),
     new DoublesOnlyChallenge(),
+    new GhostTrainersChallenge(),
     new UsageTierChallenge(),
   );
 }

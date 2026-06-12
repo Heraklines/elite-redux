@@ -40,6 +40,8 @@ const FAVOUR_BY_CHALLENGE: Partial<Record<Challenges, number>> = {
   [Challenges.DOUBLES_ONLY]: 3,
   // ER (#388): whole team locked to one dex color.
   [Challenges.MONO_COLOR]: 5,
+  // ER (#422): every trainer battle is a ghost team.
+  [Challenges.GHOST_TRAINERS]: 7,
 };
 
 /** Favour granted per "step" of the shiny curve. */

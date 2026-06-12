@@ -1890,6 +1890,28 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Elite curve + ghost challenge + sprite heal (#419/#422/#421)",
+    description:
+      "#419 - ELITE trainer mons now respect a per-wave BST ceiling (420 at\n"
+      + "w1-20 up to 600 at w81-100, +40 on boss waves; legends banned before\n"
+      + "w80). Violators devolve a stage or swap. CHECK: early Elite trainer\n"
+      + "teams field basic/mid-stage mons, no wave-20 Kyogre. Hell unchanged.\n"
+      + "#422 - new challenge GHOST TRAINERS (7 Favour): every trainer wave\n"
+      + "is a ghost team when the pool has one, else a normal trainer.\n"
+      + "#421 - wrong-sprite self-heal: if a Pokemon atlas key is requested\n"
+      + "with a different path than it loaded with, the texture reloads and\n"
+      + "a [er-atlas] warning is logged - if you SEE a wrong sprite (mega art\n"
+      + "on a base mon), press Send Logs so we capture the culprit trace.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Berry/Ward rates + reuse hint (#420/#382)",
     description:
       "#420 - resist berry rolls doubled (Ace 5% / Elite 10% / Hell 20%)\n"

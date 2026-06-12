@@ -31,7 +31,7 @@ import { loggedInUser } from "#app/account";
 import { globalScene } from "#app/global-scene";
 import { bypassLogin } from "#constants/app-constants";
 import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
-import { ghostWavesForCurrentRun, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
+import { ghostWavesForCurrentRun, isErGhostChallengeActive, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { TrainerPartyTemplate } from "#data/trainers/trainer-party-template";
 import { EggTier } from "#enums/egg-type";
@@ -514,6 +514,19 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
   if (prefetchStarted) {
     return;
   }
+  // ER (#422): Ghost Trainers challenge - ghosts can appear from wave 1, so
+  // prefetch a full batch immediately (floor 1, max fetch).
+  if (isErGhostChallengeActive()) {
+    prefetchStarted = true;
+    void fetchGhostTeams(getErDifficulty(), 20, 1)
+      .then(teams => {
+        prefetched = teams.filter(isErGhostTeamLegal);
+      })
+      .catch(() => {
+        prefetched = [];
+      });
+    return;
+  }
   const waves = ghostWavesForCurrentRun();
   if (waves.length === 0 || waveIndex < Math.min(...waves) - PREFETCH_LEAD_WAVES) {
     return;
@@ -541,8 +554,10 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
  * The ghost team to field on `waveIndex`, or `null` if none is available yet.
  * Stable within a run: the same wave always yields the same ghost.
  */
-export function takeGhostForWave(waveIndex: number): GhostTeamSnapshot | null {
-  if (!isErGhostWave(waveIndex)) {
+export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostTeamSnapshot | null {
+  // ER (#422): with the Ghost Trainers challenge active, EVERY trainer wave
+  // is a ghost wave (the caller says whether this wave fields a trainer).
+  if (!isErGhostWave(waveIndex) && !(trainerWave && isErGhostChallengeActive())) {
     return null;
   }
   const existing = ghostByWave.get(waveIndex);

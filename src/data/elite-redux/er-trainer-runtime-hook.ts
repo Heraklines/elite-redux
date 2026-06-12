@@ -73,10 +73,12 @@ function hashErSelectionSeed(s: string): number {
   return h >>> 0;
 }
 import { TrainerVariant } from "#enums/trainer-variant";
+import type { PokemonSpecies } from "#data/pokemon-species";
 import type { EnemyPokemon } from "#field/pokemon";
 import type { Trainer } from "#field/trainer";
 import { PokemonMove } from "#moves/pokemon-move";
 import { randSeedShuffle } from "#utils/common";
+import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 /**
@@ -728,7 +730,10 @@ export function applyErTrainerHeldItems(party: readonly EnemyPokemon[]): void {
   // which would otherwise show a mega at wave < 50. Hell is exempt.
   for (const enemy of party) {
     revertEarlyMega(enemy);
-    // ER (#357): per-mon resist-berry roll (1% Ace / 5% Elite / 10% Hell) — a
+    // ER (#419): ELITE early-game BST curve - devolve/swap trainer mons that
+    // violate the wave ceiling (Kyogre at wave 20 lvl 11 etc.). Hell exempt.
+    enforceErEliteBstCurve(enemy);
+    // ER (#357): per-mon resist-berry roll (5% Ace / 10% Elite / 20% Hell) — a
     // trainer mon may hold ONE berry matching one of its weaknesses. These are
     // trainer-only drops; stealing them is how players obtain them.
     maybeAssignErResistBerry(enemy);
@@ -793,6 +798,108 @@ function megaSpeciesToBase(): Map<number, number> {
   }
   ER_MEGA_SPECIES_TO_BASE = map;
   return map;
+}
+
+/**
+ * ER (#419): per-wave TRAINER BST ceilings for ELITE, derived from the wild
+ * curve in docs/er-bst-curve-report.md. Boss waves (every 10th / boss-marked)
+ * get +{@linkcode ER_ELITE_BST_BOSS_HEADROOM} so gym leaders stay bossy
+ * without fielding box legendaries at wave 20. No cap past wave 100.
+ * Legend-likes (legendary/sub-legendary/mythical) are banned before wave
+ * {@linkcode ER_ELITE_LEGEND_FROM_WAVE} regardless of BST.
+ */
+const ER_ELITE_BST_CAPS: readonly (readonly [number, number])[] = [
+  [20, 420],
+  [40, 480],
+  [60, 540],
+  [80, 580],
+  [100, 600],
+];
+const ER_ELITE_BST_BOSS_HEADROOM = 40;
+const ER_ELITE_LEGEND_FROM_WAVE = 80;
+
+function erEliteBstCapFor(wave: number, isBossWave: boolean): number | null {
+  for (const [maxWave, cap] of ER_ELITE_BST_CAPS) {
+    if (wave <= maxWave) {
+      return cap + (isBossWave ? ER_ELITE_BST_BOSS_HEADROOM : 0);
+    }
+  }
+  return null;
+}
+
+/**
+ * ER (#419): slow the ELITE early/mid-game trainer ramp. When a trainer mon
+ * violates the wave's BST ceiling (or is a legend-like before wave 80):
+ *   1. DEVOLVE it stage by stage until it fits;
+ *   2. if no prevolution fits (legendaries, heavy single-stagers), SWAP it for
+ *      a wave-appropriate factory-pool species under the cap (seeded pick).
+ * Hell is exempt (early spikes are its identity); Ace never fields ER teams.
+ */
+export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
+  try {
+    if (getErDifficulty() !== "elite") {
+      return;
+    }
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
+    const isBossWave = wave % 10 === 0 || (globalScene.currentBattle?.trainer?.config.isBoss ?? false);
+    const cap = erEliteBstCapFor(wave, isBossWave);
+    if (cap === null) {
+      return;
+    }
+    const legendBanned = wave < ER_ELITE_LEGEND_FROM_WAVE;
+    const violates = (sp: PokemonSpecies): boolean =>
+      sp.getBaseStatTotal() > cap || (legendBanned && (sp.legendary || sp.subLegendary || sp.mythical));
+    if (!violates(enemy.species)) {
+      return;
+    }
+    // 1. Devolve stage by stage while it still violates.
+    let current = enemy.species;
+    for (let g = 0; g < 3; g++) {
+      const prevId = pokemonPrevolutions[current.speciesId];
+      if (prevId === undefined) {
+        break;
+      }
+      const prev = getPokemonSpecies(prevId);
+      if (!prev) {
+        break;
+      }
+      current = prev;
+      if (!violates(current)) {
+        break;
+      }
+    }
+    // 2. Still violating (legendary / heavy single-stager): swap for a
+    //    wave-appropriate factory-pool pick under the cap, closest to it.
+    if (violates(current)) {
+      const pool = resolvedFactorySets().filter(s => {
+        const sp = getPokemonSpecies(s.speciesId);
+        return sp && !violates(sp);
+      });
+      if (pool.length === 0) {
+        return; // nothing safe to swap to - leave it rather than break generation
+      }
+      const windowStart = Math.max(0, pool.length - 40);
+      const idx = windowStart + (hashErSelectionSeed(`${globalScene.seed}:bstcap:${wave}:${enemy.id}`) % (pool.length - windowStart));
+      current = getPokemonSpecies(pool[idx].speciesId);
+    }
+    if (current === enemy.species) {
+      return;
+    }
+    console.log(
+      `ER #419: elite BST cap (${cap} @ w${wave}) - replacing ${enemy.species.name} (${enemy.species.getBaseStatTotal()}) with ${current.name} (${current.getBaseStatTotal()})`,
+    );
+    enemy.species = current;
+    enemy.formIndex = 0;
+    const abilityCount = enemy.getSpeciesForm().getAbilityCount();
+    if (enemy.abilityIndex >= abilityCount) {
+      enemy.abilityIndex = abilityCount - 1;
+    }
+    enemy.generateAndPopulateMoveset();
+    enemy.calculateStats();
+    enemy.generateName();
+  } catch {
+    // Curve enforcement must never break enemy generation.
+  }
 }
 
 /**

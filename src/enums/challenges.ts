@@ -13,4 +13,5 @@ export enum Challenges {
   DOUBLES_ONLY,
   USAGE_TIER,
   MONO_COLOR,
+  GHOST_TRAINERS,
 }

@@ -41,6 +41,10 @@ export class GameChallengesUiHandler extends UiHandler {
 
   // ER: "Favour" → shiny + candy readout shown in the header's empty space.
   private favourIcon: Phaser.GameObjects.Sprite;
+  // ER (#382): header "Last Setup" button (UP from the top row focuses it).
+  private lastSetupBtnBg: Phaser.GameObjects.NineSlice;
+  private lastSetupBtnText: Phaser.GameObjects.Text;
+  private onHeaderButton = false;
   private favourCandyIcon: Phaser.GameObjects.Sprite;
   private favourText: Phaser.GameObjects.Text;
 
@@ -93,6 +97,21 @@ export class GameChallengesUiHandler extends UiHandler {
       .setOrigin(0)
       .setPositionRelative(headerBg, 8, 4);
 
+    // ER (#382): "Last Setup" button right of the title. Reachable with UP
+    // from the top challenge row; ACTION re-applies the saved configuration.
+    // Hidden until a saved setup exists.
+    this.lastSetupBtnText = addTextObject(0, 0, "Last Setup", TextStyle.SETTINGS_LABEL)
+      .setName("text-last-setup-btn")
+      .setOrigin(0, 0.5)
+      .setScale(0.85)
+      .setVisible(false);
+    this.lastSetupBtnBg = addWindow(0, 0, this.lastSetupBtnText.displayWidth + 12, 18)
+      .setName("window-last-setup-btn")
+      .setOrigin(0, 0.5)
+      .setVisible(false);
+    this.lastSetupBtnBg.setPositionRelative(headerBg, headerText.x + headerText.displayWidth + 10, headerBg.height / 2);
+    this.lastSetupBtnText.setPosition(this.lastSetupBtnBg.x + 6, this.lastSetupBtnBg.y);
+
     // ER: Favour → shiny-odds readout, RIGHT-aligned in the header so it sits
     // clear of the (long) title. Compact font; the shiny-star icon sits just
     // left of the text. The icon's x is recomputed in updateFavourDisplay since
@@ -100,6 +119,8 @@ export class GameChallengesUiHandler extends UiHandler {
     this.favourText = addTextObject(0, 0, "", TextStyle.SETTINGS_LABEL)
       .setName("text-challenge-favour")
       .setOrigin(1, 0.5)
+      // ER (#382): compact so the header fits the title + Last Setup button.
+      .setScale(0.75)
       .setVisible(false);
     this.favourText.setPositionRelative(headerBg, headerBg.width - 6, headerBg.height / 2);
     this.favourIcon = globalScene.add
@@ -207,6 +228,8 @@ export class GameChallengesUiHandler extends UiHandler {
     this.challengesContainer.add([
       headerBg,
       headerText,
+      this.lastSetupBtnBg,
+      this.lastSetupBtnText,
       this.favourCandyIcon,
       this.favourIcon,
       this.favourText,
@@ -343,20 +366,35 @@ export class GameChallengesUiHandler extends UiHandler {
       i18nKey = "challenges:noneSelected";
       alphaValue = 0.5;
     }
-    // ER (#382 discoverability): the "reuse last setup" action was invisible -
-    // it only appeared after pressing LEFT/RIGHT on the focused start bar, so
-    // nobody found it. Surface the hint on the start bar itself whenever a
-    // saved configuration exists.
-    let startCaption = i18next.t(i18nKey);
-    if (loadLastChallenges() && this.startRegionOption === 0) {
-      startCaption = `${startCaption}  (L/R: last setup)`;
-    }
+    this.updateLastSetupButton();
     this.startText
-      .setText(startCaption)
+      .setText(i18next.t(i18nKey))
       .setAlpha(alphaValue)
       .setPositionRelative(this.startBg, (this.startBg.width - this.startText.displayWidth) / 2, 4);
 
     this.challengesContainer.update();
+  }
+
+  /** ER (#382): show/highlight the header Last Setup button. */
+  private updateLastSetupButton(): void {
+    if (!this.lastSetupBtnBg) {
+      return;
+    }
+    const available = !!loadLastChallenges();
+    if (!available) {
+      this.onHeaderButton = false;
+    }
+    this.lastSetupBtnBg.setVisible(available);
+    this.lastSetupBtnText.setVisible(available);
+    this.lastSetupBtnText.setAlpha(this.onHeaderButton ? 1 : 0.6);
+    this.lastSetupBtnBg.setAlpha(this.onHeaderButton ? 1 : 0.6);
+  }
+
+  /** ER (#382): move focus between the header button and the challenge list. */
+  private setHeaderFocus(focused: boolean): void {
+    this.onHeaderButton = focused;
+    this.cursorObj?.setVisible(!focused);
+    this.updateLastSetupButton();
   }
 
   /** ER (#382): start-bar caption for the currently toggled action. */
@@ -389,6 +427,7 @@ export class GameChallengesUiHandler extends UiHandler {
     this.hasSelectedChallenge = challenges.some(c => c.value !== 0);
     this.startCursor.setVisible(false);
     this.startRegionOption = 0;
+    this.onHeaderButton = false;
     this.cursorObj?.setVisible(true);
     this.updateChallengeArrowsTint(false);
     this.initLabels();
@@ -475,7 +514,10 @@ export class GameChallengesUiHandler extends UiHandler {
     let success = false;
 
     if (button === Button.CANCEL) {
-      if (this.startCursor.visible) {
+      if (this.onHeaderButton) {
+        this.setHeaderFocus(false);
+        success = true;
+      } else if (this.startCursor.visible) {
         // If the user presses cancel when the start cursor has been activated,
         // the game deactivates the start cursor and allows typical challenge selection behavior
         this.startCursor.setVisible(false);
@@ -489,7 +531,10 @@ export class GameChallengesUiHandler extends UiHandler {
       }
       success = true;
     } else if (button === Button.SUBMIT || button === Button.ACTION) {
-      if (this.startCursor.visible) {
+      if (this.onHeaderButton) {
+        success = this.applyLastChallenges();
+        this.setHeaderFocus(false);
+      } else if (this.startCursor.visible) {
         if (this.startRegionOption === 1) {
           success = this.applyLastChallenges();
         } else if (this.hasSelectedChallenge) {
@@ -513,6 +558,13 @@ export class GameChallengesUiHandler extends UiHandler {
       } else {
         success = false;
       }
+    } else if (this.onHeaderButton) {
+      // ER (#382): DOWN (or UP, wrap-style) leaves the header button back to
+      // the challenge list's top row. LEFT/RIGHT do nothing up here.
+      if (button === Button.DOWN || button === Button.UP) {
+        this.setHeaderFocus(false);
+        success = true;
+      }
     } else if (this.startCursor.visible && (button === Button.LEFT || button === Button.RIGHT)) {
       // ER (#382): LEFT/RIGHT on the focused start bar toggles between
       // "begin" and "reuse last setup".
@@ -528,6 +580,13 @@ export class GameChallengesUiHandler extends UiHandler {
       switch (button) {
         case Button.UP:
           if (this.cursor === 0) {
+            if (this.scrollCursor === 0 && loadLastChallenges()) {
+              // ER (#382): UP from the very top focuses the header's
+              // Last Setup button (when a saved configuration exists).
+              this.setHeaderFocus(true);
+              success = true;
+              break;
+            }
             if (this.scrollCursor === 0) {
               // When at the top of the menu and pressing UP, move to the bottommost item.
               if (challenges.length > MAX_ROWS_TO_DISPLAY) {

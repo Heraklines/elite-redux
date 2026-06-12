@@ -208,6 +208,8 @@ export class BattleScene extends SceneBase {
   public seVolume = 1;
   public uiVolume = 1;
   public gameSpeed = 1;
+  /** ER (#421): atlas path each pokemon-atlas key was loaded with (poison detection). */
+  private readonly erAtlasPathByKey = new Map<string, string>();
   public damageNumbersMode = 0;
   public reroll = false;
   public shopCursorTarget: number = ShopCursorTarget.REWARDS;
@@ -417,6 +419,23 @@ export class BattleScene extends SceneBase {
     if (variant) {
       atlasPath = atlasPath.replace("variant/", "");
     }
+    // ER (#421, sprite-swap class - "base Venusaur rendered the MEGA atlas"):
+    // every pokemon atlas load funnels through here, so remember which PATH
+    // each KEY was bound to. If a later load asks for the SAME key with a
+    // DIFFERENT path, the in-memory texture is poisoned (a race bound the
+    // wrong pair earlier, or the caller computed a mismatched key/path) -
+    // evict it and reload with the requested pair, and log loudly so a
+    // tester's Send Logs capture identifies the culprit call.
+    const previousPath = this.erAtlasPathByKey.get(key);
+    if (previousPath !== undefined && previousPath !== atlasPath && this.textures.exists(key)) {
+      console.warn(
+        `[er-atlas] key ${key} was bound to "${previousPath}" but is now requested as "${atlasPath}" - evicting and reloading`,
+        new Error("rebind trace").stack,
+      );
+      this.textures.remove(key);
+      this.anims.remove(key);
+    }
+    this.erAtlasPathByKey.set(key, atlasPath);
     this.load.atlas(
       key,
       `images/pokemon/${variant ? "variant/" : ""}${experimental ? "exp/" : ""}${atlasPath}.png`,
@@ -1019,6 +1038,26 @@ export class BattleScene extends SceneBase {
     }
 
     const pokemon = new EnemyPokemon(species, level, trainerSlot, boss, shinyLock, dataSource, forRival);
+    // ER (#421): WILD enemies must NEVER spawn at a battle-only form. A live
+    // Ace report fielded a true Mega Venusaur in the wild (nameplates no
+    // longer show the Mega prefix, so it read as "Venusaur") - whatever path
+    // produces the bad formIndex, this is the chokepoint every enemy passes.
+    // Trainer mons are exempt (champion configs legally pin megas); loaded
+    // save data is exempt (round-trips whatever was already legal).
+    // (TrainerSlot.NONE === 0; numeric compare keeps the type-only import)
+    if ((trainerSlot as number) === 0 && !dataSource && pokemon.formIndex > 0) {
+      const formKey = species.forms?.[pokemon.formIndex]?.formKey ?? "";
+      if (/mega|primal|eternamax|gigantamax|gmax/i.test(formKey)) {
+        console.warn(`ER #421: wild ${species.name} spawned at battle-only form "${formKey}" - resetting to base`);
+        pokemon.formIndex = 0;
+        const abilityCount = pokemon.getSpeciesForm().getAbilityCount();
+        if (pokemon.abilityIndex >= abilityCount) {
+          pokemon.abilityIndex = abilityCount - 1;
+        }
+        pokemon.calculateStats();
+        pokemon.generateName();
+      }
+    }
     if (Overrides.ENEMY_FUSION_OVERRIDE) {
       pokemon.generateFusionSpecies();
     }
@@ -1602,7 +1641,7 @@ export class BattleScene extends SceneBase {
     // cross-player ghost team as a "Veteran" trainer. Only when a ghost is
     // actually available (fetch resolved / local pool non-empty); otherwise the
     // wave proceeds normally. Done before the ME check for the same reason as rivals.
-    const ghost = takeGhostForWave(waveIndex);
+    const ghost = takeGhostForWave(waveIndex, resolved.battleType === BattleType.TRAINER);
     if (
       ghost !== null
       && this.gameMode.hasTrainers

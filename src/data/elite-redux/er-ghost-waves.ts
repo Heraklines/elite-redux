@@ -11,7 +11,9 @@
 // heavy battle/pokemon modules) so this can be imported/tested in isolation.
 // =============================================================================
 
+import { globalScene } from "#app/global-scene";
 import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { Challenges } from "#enums/challenges";
 
 // Ghost-wave schedule. Chosen to avoid fixed battles (rivals 8/16/25/42/55/76/
 // 95/122/145/195, E4 182/184/186/188, champion 190), boss waves (% 10 === 0),
@@ -40,4 +42,17 @@ export function ghostWavesForCurrentRun(): readonly number[] {
 /** Whether `waveIndex` is a ghost-trainer wave for the current difficulty. */
 export function isErGhostWave(waveIndex: number): boolean {
   return ghostWavesForCurrentRun().includes(waveIndex);
+}
+
+/**
+ * ER (#422): the Ghost Trainers challenge - EVERY trainer battle fields a
+ * ghost team. An explicit player opt-in, so it applies on any difficulty
+ * (the per-difficulty schedule above still drives normal runs).
+ */
+export function isErGhostChallengeActive(): boolean {
+  try {
+    return (globalScene.gameMode?.challenges ?? []).some(c => c.id === Challenges.GHOST_TRAINERS && c.value > 0);
+  } catch {
+    return false;
+  }
 }
