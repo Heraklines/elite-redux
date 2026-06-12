@@ -27,6 +27,11 @@ const fixGameSpeed: SettingsSaveMigrator = {
         globalScene.gameSpeed = 5;
       }
       data[SettingKeys.Game_Speed] = newValue;
+      // ER (#430): stamp the version BEFORE persisting. Without this the
+      // migration re-ran on EVERY game load (settings only get a gameVersion
+      // stamp when the player changes a setting), re-clamping whatever speed
+      // the player had just picked - "my settings keep getting overwritten".
+      data["gameVersion"] = "1.11.19";
       localStorage.setItem("settings", JSON.stringify(data));
     }
   },

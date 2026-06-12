@@ -1053,6 +1053,19 @@ export class GameData {
 
     applySettingsVersionMigration(settings);
 
+    // ER (#430): the speed-option rework (#416) shrank Game_Speed to 6 options,
+    // but the version-gated migrator never runs for players whose settings were
+    // stamped with this build's version BEFORE the rework (the fork's package
+    // version does not change every staging deploy). An out-of-range index from
+    // the old 8-option list would silently break the setting - remap it here,
+    // idempotently (in-range indexes are never touched). Old 6 = 4x -> new 2,
+    // old 7 = 5x -> new 3.
+    const speedIndex = settings[SettingKeys.Game_Speed];
+    if (typeof speedIndex === "number" && speedIndex > 5) {
+      settings[SettingKeys.Game_Speed] = speedIndex <= 6 ? 2 : 3;
+      localStorage.setItem("settings", JSON.stringify(settings));
+    }
+
     for (const setting of Object.keys(settings)) {
       setSetting(setting, settings[setting]);
     }
