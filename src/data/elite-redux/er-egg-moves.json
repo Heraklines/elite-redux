@@ -193,21 +193,21 @@
   ],
   "SPECIES_BAGON": [
     "HEADLONG_RUSH",
-    "FIRE_LASH",
-    "DRAGON_DANCE",
+    "FLARE_BLITZ",
+    "HONE_CLAWS",
     "DRAGON_DARTS"
   ],
   "SPECIES_BALTOY": [
     "RECOVER",
     "GLARE",
-    "RUINATION",
-    "MYSTICAL_POWER"
+    "SCATTER_BLAST",
+    "RUINATION"
   ],
   "SPECIES_BARBOACH": [
     "DRAGON_DANCE",
     "ZING_ZAP",
     "ICE_SPINNER",
-    "SURGING_STRIKES"
+    "DEATHROLL"
   ],
   "SPECIES_BASCULIN": [
     "LAST_RESPECTS",
@@ -440,8 +440,8 @@
   "SPECIES_CACNEA": [
     "EARTH_POWER",
     "CEASELESS_EDGE",
-    "NIGHT_DAZE",
-    "IVY_CUDGEL"
+    "LEECH_BLADE",
+    "WICKED_BLOW"
   ],
   "SPECIES_CALYREX": [
     "SAPPY_SEED",
@@ -492,9 +492,9 @@
     "FISHIOUS_REND"
   ],
   "SPECIES_CASTFORM": [
-    "BOOMBURST",
+    "REVELATION_DANCE",
     "HYDRO_STEAM",
-    "ERUPTION",
+    "BOILING_FLAME",
     "QUIVER_DANCE"
   ],
   "SPECIES_CASTFORM_FOGGY": [
@@ -1988,7 +1988,7 @@
   "SPECIES_JIRACHI": [
     "TACHYON_CUTTER",
     "TRIPLE_ARROWS",
-    "ROCK_SLIDE",
+    "DIAMOND_STORM",
     "SHELL_SMASH"
   ],
   "SPECIES_JOLTIK": [
@@ -2030,8 +2030,8 @@
   "SPECIES_KECLEON": [
     "ZIPPY_ZAP",
     "COIL",
-    "EXTREME_SPEED",
-    "MULTI_ATTACK"
+    "PHANTOM_GLOVE",
+    "EXTREME_SPEED"
   ],
   "SPECIES_KECLEONG": [
     "CALM_MIND",
@@ -2126,8 +2126,8 @@
   "SPECIES_KYOGRE": [
     "RECOVER",
     "HURRICANE",
-    "FREEZY_FROST",
-    "WILDBOLT_STORM"
+    "COSMIC_POWER",
+    "ELECTRO_SHOT"
   ],
   "SPECIES_KYUREM": [
     "DRAGON_DARTS",
@@ -2190,13 +2190,13 @@
     "SOLAR_BEAM"
   ],
   "SPECIES_LATIAS": [
-    "CORE_ENFORCER",
+    "SPACIAL_REND",
     "FUSION_FLARE",
     "SPARKLY_SWIRL",
     "MYSTICAL_POWER"
   ],
   "SPECIES_LATIOS": [
-    "CORE_ENFORCER",
+    "CLANGING_SCALES",
     "BLUE_FLARE",
     "NASTY_PLOT",
     "TACHYON_CUTTER"
@@ -2217,10 +2217,10 @@
     "POWER_UP_PUNCH",
     "ICE_PUNCH",
     "FIRE_PUNCH",
-    "NOXIOUS_TORQUE"
+    "WICKED_BLOW"
   ],
   "SPECIES_LICKITUNG": [
-    "CRUSH_GRIP",
+    "POWER_TRIP",
     "FIRE_LASH",
     "SLACK_OFF",
     "MAGICAL_TORQUE"
@@ -2229,7 +2229,7 @@
     "POWER_GEM",
     "SCALD",
     "STRENGTH_SAP",
-    "SAPPY_SEED"
+    "SOIL_DRAIN"
   ],
   "SPECIES_LILLIPUP": [
     "CLOSE_COMBAT",
@@ -2916,7 +2916,7 @@
     "FLOWER_TRICK"
   ],
   "SPECIES_PHANPY": [
-    "STONE_AXE",
+    "STONE_EDGE",
     "SWORDS_DANCE",
     "MOUNTAIN_GALE",
     "COLLISION_COURSE"
@@ -3225,7 +3225,7 @@
     "V_CREATE",
     "NASTY_PLOT",
     "CORE_ENFORCER",
-    "DRAGON_DARTS"
+    "OBLIVION_WING"
   ],
   "SPECIES_REGICE": [
     "EARTH_POWER",
@@ -3267,7 +3267,7 @@
     "DRAGON_DANCE",
     "SHORE_UP",
     "WAVE_CRASH",
-    "DIAMOND_STORM"
+    "SEISMIC_SLAM"
   ],
   "SPECIES_RELLOR": [
     "HEAL_BLOCK",
@@ -3504,7 +3504,7 @@
     "EXTREME_SPEED"
   ],
   "SPECIES_SEVIPER": [
-    "ICE_BEAM",
+    "FROST_BRAND",
     "BITTER_BLADE",
     "SUCKER_PUNCH",
     "NO_RETREAT"
@@ -3590,7 +3590,7 @@
   "SPECIES_SHUPPET": [
     "STORM_THROW",
     "TIDY_UP",
-    "PARTING_SHOT",
+    "ENDURE",
     "SPECTRAL_THIEF"
   ],
   "SPECIES_SIGILYPH": [
@@ -3836,7 +3836,7 @@
   "SPECIES_SPINDA": [
     "SUPERPOWER",
     "SLACK_OFF",
-    "FLEUR_CANNON",
+    "DIRE_CLAW",
     "V_CREATE"
   ],
   "SPECIES_SPIRITOMB": [
@@ -3963,7 +3963,7 @@
     "ROOST",
     "TAKE_HEART",
     "AEROBLAST",
-    "BOOMBURST"
+    "RELIC_SONG"
   ],
   "SPECIES_SWABLU_REDUX": [
     "CALM_MIND",
@@ -4200,10 +4200,10 @@
     "FOCUS_BLAST"
   ],
   "SPECIES_TRAPINCH": [
-    "FIRE_LASH",
+    "BUG_BUZZ",
     "DRAGON_DARTS",
     "THOUSAND_ARROWS",
-    "DRAGON_ENERGY"
+    "TORCH_SONG"
   ],
   "SPECIES_TRAPINCH_REDUX": [
     "SWORDS_DANCE",
@@ -4221,7 +4221,7 @@
     "STUFF_CHEEKS",
     "EARTH_POWER",
     "APPLE_ACID",
-    "SAPPY_SEED"
+    "FICKLE_BEAM"
   ],
   "SPECIES_TRUBBISH": [
     "COIL",
@@ -4507,7 +4507,7 @@
   ],
   "SPECIES_WOOPER": [
     "SIZZLY_SLIDE",
-    "RECOVER",
+    "EARTH_POWER",
     "BOUNCY_BUBBLE",
     "SURGING_STRIKES"
   ],
@@ -4519,7 +4519,7 @@
   ],
   "SPECIES_WYNAUT": [
     "RECOVER",
-    "SHED_TAIL",
+    "PERISH_SONG",
     "TAUNT",
     "COMEUPPANCE"
   ],
