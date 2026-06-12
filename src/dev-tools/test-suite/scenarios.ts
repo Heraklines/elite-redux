@@ -1978,6 +1978,32 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Ogerpon Cornerstone audit (#391)",
+    description:
+      "#391 - Cornerstone Ogerpon full check (old report: dead Rockhard\n"
+      + "Will innate + Ivy Cudgel not type-shifting; both verified fixed).\n"
+      + "DO: open Ivy Cudgel's move info - EXPECT it reads ROCK type on\n"
+      + "this form (Water/Fire on the other masks). Open the abilities\n"
+      + "panel - EXPECT Rockhard Will listed as an innate. Use Power Gem\n"
+      + "or Ivy Cudgel and sanity-check the Rock boost feels ~1.2x.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTER_FORM_OVERRIDES: { [SpeciesId.OGERPON]: 3 },
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.OGERPON, {
+          moveset: [MoveId.IVY_CUDGEL, MoveId.POWER_GEM, MoveId.LEAFAGE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Cloud push warn (#389)",
     description:
       "#389 - Save and Quit force-pushes the FULL save (system + session)\n"
