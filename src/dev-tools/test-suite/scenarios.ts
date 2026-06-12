@@ -1926,6 +1926,32 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Infatuation: ER stat cut (#427)",
+    description:
+      "#427 - ER infatuation replaces vanilla's 50% immobilize: the\n"
+      + "infatuated mon ALWAYS acts but its Atk AND Sp.Atk are HALVED.\n"
+      + "Your male Snorlax vs female Lopunny (Cute Charm).\n"
+      + "DO: poke it with Tackle until Cute Charm infatuates you, note\n"
+      + "Tackle's damage before vs after (about half), and confirm you\n"
+      + "are NEVER 'immobilized by love' across many turns.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.LOPUNNY,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.CUTE_CHARM,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.TACKLE, MoveId.HYPER_VOICE, MoveId.SPLASH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Cloud push warn (#389)",
     description:
       "#389 - Save and Quit force-pushes the FULL save (system + session)\n"

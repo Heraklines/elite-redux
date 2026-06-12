@@ -1780,6 +1780,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         if (this.getTag(BattlerTagType.SLOW_START)) {
           ret >>= 1;
         }
+        // ER (#427): infatuation cuts Attack and Sp. Atk in HALF - the ER ROM
+        // replaces vanilla's 50% immobilize chance with this stat cut (see
+        // InfatuatedTag.lapse, where the immobilize roll was removed).
+        if (this.getTag(BattlerTagType.INFATUATED)) {
+          ret /= 2;
+        }
         break;
       case Stat.DEF:
         if (this.isOfType(PokemonType.ICE) && globalScene.arena.weather?.weatherType === WeatherType.SNOW) {
@@ -1787,6 +1793,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         }
         break;
       case Stat.SPATK:
+        // ER (#427): see the Stat.ATK case - infatuation halves both.
+        if (this.getTag(BattlerTagType.INFATUATED)) {
+          ret /= 2;
+        }
         break;
       case Stat.SPDEF:
         if (this.isOfType(PokemonType.ROCK) && globalScene.arena.weather?.weatherType === WeatherType.SANDSTORM) {

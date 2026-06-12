@@ -1025,18 +1025,10 @@ export class InfatuatedTag extends SerializableBattlerTag {
     );
     phaseManager.unshiftNew("CommonAnimPhase", pokemon.getBattlerIndex(), undefined, CommonAnim.ATTRACT);
 
-    // 50% chance to disrupt the target's action
-    if (pokemon.randBattleSeedInt(2)) {
-      phaseManager.queueMessage(
-        i18next.t("battlerTags:infatuatedLapseImmobilize", {
-          pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
-        }),
-      );
-      const currentPhase = phaseManager.getCurrentPhase();
-      if (currentPhase.is("MovePhase")) {
-        currentPhase.cancel();
-      }
-    }
+    // ER (#427): NO immobilize roll. In Elite Redux infatuation never stops
+    // the Pokemon from acting - instead it cuts the holder's Attack and
+    // Sp. Atk in HALF for as long as it lasts (applied in
+    // Pokemon.getEffectiveStat). The flavor message + animation stay.
 
     return true;
   }
