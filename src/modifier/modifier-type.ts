@@ -2900,7 +2900,8 @@ export function getPlayerShopModifierTypeOptionsForWave(waveIndex: number, baseC
     // the dev-tools gate - local dev + staging builds (VITE_DEV_TOOLS=1) only.
     // Prod builds never set the flag, so a prod release CANNOT ship the
     // market by accident. Remove this gate only on explicit release approval.
-    const marketEnabled = import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === "1";
+    const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+    const marketEnabled = !!env?.DEV || env?.VITE_DEV_TOOLS === "1";
     if (marketEnabled && waveIndex < 200 && globalScene.currentBattle != null) {
       const stock = rollErBiomeShopStock(globalScene.arena.biomeId, waveIndex);
       const options: ModifierTypeOption[] = [];
