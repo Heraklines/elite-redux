@@ -1,18 +1,20 @@
 <!DOCTYPE html>
 <!--
-  Elite Redux — team data editor (egg moves).
+  Elite Redux — team balancing editor.
   Static SPA: reads game data from public GitHub raw; commits edits via the
   er-editor-api Worker. Host on Cloudflare Pages. See editor/README.md.
+  Tabs: Egg Moves | Species (egg tier + starter cost) | Items | Trainers.
 -->
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Elite Redux — Egg Move Editor</title>
+    <title>Elite Redux — Balancing Editor</title>
     <style>
       :root {
         --bg: #16161e; --panel: #1e1e2a; --panel2: #262633; --line: #353548;
         --text: #e6e6f0; --muted: #9a9ab0; --accent: #b3245c; --ok: #2fae66;
+        --warn: #d8aa3a;
       }
       * { box-sizing: border-box; }
       body {
@@ -34,10 +36,21 @@
       button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
       button:disabled { opacity: 0.5; cursor: default; }
       #status { margin-left: auto; color: var(--muted); }
+      nav.tabs {
+        display: flex; gap: 4px; padding: 8px 16px 0; background: var(--panel);
+        border-bottom: 1px solid var(--line);
+      }
+      nav.tabs button {
+        border-radius: 8px 8px 0 0; border-bottom: none; padding: 7px 14px;
+        background: var(--panel2); color: var(--muted);
+      }
+      nav.tabs button.active { background: var(--bg); color: var(--text); font-weight: 600; }
+      nav.tabs button .dot { color: var(--accent); margin-left: 4px; }
       #grid {
         display: grid; gap: 10px; padding: 16px;
         grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
       }
+      #grid.wide { grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); }
       .card {
         background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
         padding: 10px; display: flex; gap: 10px; align-items: flex-start; overflow: hidden;
@@ -47,28 +60,65 @@
       .card .body { flex: 1; min-width: 0; }
       .card .name { font-weight: 600; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .card .name small { color: var(--muted); font-weight: 400; }
+      .badges { display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: 1px; }
+      .badge {
+        font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 10px;
+        background: var(--panel2); border: 1px solid var(--line); color: var(--muted);
+      }
+      .badge.tier-OU { color: #ff7f7f; border-color: #ff7f7f; }
+      .badge.tier-UU { color: #ffb360; border-color: #ffb360; }
+      .badge.tier-RU { color: #ffe08a; border-color: #ffe08a; }
+      .badge.tier-PU { color: #9fd89f; border-color: #9fd89f; }
+      .badge.tier-NU { color: #9ab8e8; border-color: #9ab8e8; }
       .slots { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-      /* Key fix: inputs must shrink to their grid cell instead of keeping the
-         browser's intrinsic ~20-char width (which overflowed the card). */
       .slots .slot { width: 100%; min-width: 0; padding: 5px 7px; }
+      .fields { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      .fields label { color: var(--muted); font-size: 12px; display: flex; gap: 5px; align-items: center; }
+      .fields input[type="number"] { width: 74px; }
       .empty { color: var(--muted); padding: 40px; text-align: center; }
+      .section {
+        background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+        padding: 14px; margin: 16px; max-width: 980px;
+      }
+      .section h2 { font-size: 15px; margin: 0 0 10px; }
+      .section p.hint { color: var(--muted); font-size: 12px; margin: 4px 0 10px; }
+      .knob-row { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; padding: 6px 0; }
+      .knob-row .diff { font-weight: 600; width: 60px; text-transform: capitalize; }
+      .factory-list { display: grid; gap: 4px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); margin: 16px; }
+      .factory-item {
+        display: flex; gap: 8px; align-items: center; background: var(--panel);
+        border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px;
+      }
+      .factory-item.dirty { border-color: var(--accent); }
+      .factory-item small { color: var(--muted); margin-left: auto; }
+      .dyn { color: var(--warn); font-size: 11px; }
     </style>
   </head>
   <body>
     <header>
-      <h1>🥚 ER Egg Move Editor</h1>
-      <input id="search" type="search" placeholder="Search species…" autocomplete="off" />
+      <h1>⚖️ ER Balancing Editor</h1>
+      <input id="search" type="search" placeholder="Search…" autocomplete="off" />
+      <select id="sort" title="Sort the species list">
+        <option value="name">Sort: Name</option>
+        <option value="dex">Sort: Dex No.</option>
+        <option value="usage">Sort: Usage Tier</option>
+      </select>
       <input id="author" type="text" placeholder="Your name (for the commit)" style="width:170px" />
       <input id="password" type="password" placeholder="Editor password" style="width:150px" autocomplete="off" autocapitalize="off" spellcheck="false" />
-      <button id="undo" type="button" title="Undo the last move change (one step back)" disabled>↶ Undo</button>
+      <button id="undo" type="button" title="Undo the last egg-move change (one step back)" disabled>↶ Undo</button>
       <button id="save" type="button" class="primary" disabled>Save 0 changes</button>
       <button id="deploy" type="button" title="Commit changes (if any) and rebuild + deploy the staging site">
         Commit &amp; Deploy
       </button>
       <span id="status">Loading…</span>
     </header>
-    <div id="grid"></div>
-    <div id="empty" class="empty" hidden>No species match your search.</div>
+    <nav class="tabs">
+      <button type="button" data-tab="eggmoves" class="active">🥚 Egg Moves</button>
+      <button type="button" data-tab="species">📊 Species</button>
+      <button type="button" data-tab="items">🎒 Items</button>
+      <button type="button" data-tab="trainers">🤺 Trainers</button>
+    </nav>
+    <main id="content"></main>
     <script src="./app.js"></script>
   </body>
 </html>

@@ -1,24 +1,53 @@
 /*
- * Elite Redux — egg-move editor SPA.
- * Reads live data from public GitHub raw; commits edits via the er-editor-api Worker.
+ * Elite Redux — team balancing editor SPA.
+ * Reads live data from public GitHub raw; commits edits via the er-editor-api
+ * Worker (delta-only saves, merge-committed server-side so concurrent editors
+ * don't clobber each other). Tabs: Egg Moves | Species | Items | Trainers.
  */
 
 // ---- Config (edit if URLs change) ------------------------------------------
 const WORKER_URL = "https://er-editor-api.heraklines.workers.dev"; // er-editor-api Worker
 const REPO = "Heraklines/elite-redux";
 const BRANCH = "feat/elite-redux-port";
-const EGG_MOVES_RAW = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/src/data/elite-redux/er-egg-moves.json`;
+const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/src/data/elite-redux`;
 const SPRITE_BASE = "https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/images/pokemon/elite-redux";
+const USAGE_TIERS_URL = "https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/usage-tiers.json";
+
+const EGG_TIER_NAMES = ["Common", "Rare", "Epic", "Legendary"];
+const ITEM_TIERS = ["COMMON", "GREAT", "ULTRA", "ROGUE", "MASTER"];
+// ER community held items (the only ones with an editable stack cap) → base cap.
+const ER_MAX_STACK_BASE = {
+  ER_CHILI_SAMPLE: 1,
+  ER_COPPER_ROD: 1,
+  ER_RUSTY_CLAW: 1,
+  ER_SPIKED_KNUCKLES: 1,
+  ER_LOADED_DICE: 3,
+  ER_LUCKY_HEART: 2,
+  ER_OMNI_GEM: 1,
+  ER_POWER_HERB: 1,
+};
 
 // ---- State -----------------------------------------------------------------
-let SPECIES = []; // [{const, name, slug}]
-let MOVES = []; // ["MOVE_NAME", ...]
+let SPECIES = []; // [{const, name, slug, id, dex, eggTier, cost}]
+let MOVES = [];
 const MOVE_SET = new Set();
-const current = {}; // speciesConst -> [moves]
-let baseline = {}; // speciesConst -> [moves] (last-saved snapshot for dirty tracking)
+let ITEMS = []; // [{key, tier, weight, maxWeight}]
+let TRAINER_DEFAULTS = { elite: {}, hell: {} };
+let FACTORY_SPECIES = []; // [{const, name, sets}]
 
-// Per-edit undo: each committed slot change pushes {const, before}. `committed`
-// is the last settled snapshot we diff against to detect a discrete change.
+// Per-domain current/baseline (baseline = last saved; dirty = current != baseline).
+const egg = { current: {}, baseline: {} }; // const → [moves]
+const sp = { current: {}, baseline: {} }; // const → {eggTier, cost}
+const item = { current: {}, baseline: {} }; // key → {tier, weight, maxStack} ("" = no override)
+const tr = { current: null, baseline: null }; // {freq: {elite:{...}, hell:{...}}, excluded: [...]}
+
+// Usage tiers (fetched at runtime; graceful "unranked" fallback when missing).
+const usage = { loaded: false, lines: {} };
+
+let activeTab = "eggmoves";
+
+// Per-edit undo for EGG MOVES (the free-text inputs): each committed slot
+// change pushes {const, before}. `committed` is the last settled snapshot.
 const undoStack = [];
 let committed = {};
 
@@ -27,6 +56,7 @@ const statusEl = $("#status");
 const saveBtn = $("#save");
 const deployBtn = $("#deploy");
 const undoBtn = $("#undo");
+const ERR = "#c0392b";
 
 const prettify = name =>
   name
@@ -35,137 +65,398 @@ const prettify = name =>
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+
 function setStatus(msg, color) {
   statusEl.textContent = msg;
   statusEl.style.color = color || "var(--muted)";
 }
 
-function dirtyCount() {
-  let n = 0;
+// ---- Usage tiers -------------------------------------------------------------
+// Band thresholds mirror src/data/elite-redux/er-usage-tiers.ts: a line is OU
+// when its usage fails the UU gate (>= 2.25%), and so on down. The species'
+// EGG tier also gates the floor (Legendary lines can never drop below OU etc.),
+// matching the in-game challenge legality.
+const BANDS = ["OU", "UU", "RU", "PU", "NU"];
+
+function usageBandIndex(pct) {
+  if (pct >= 2.25) {
+    return 0; // OU
+  }
+  if (pct >= 1) {
+    return 1; // UU
+  }
+  if (pct >= 0.5) {
+    return 2; // RU
+  }
+  if (pct >= 0.25) {
+    return 3; // PU
+  }
+  return 4; // NU
+}
+
+function eggBandIndex(eggTier) {
+  // LEGENDARY → OU floor, EPIC → UU, RARE → RU, COMMON/none → no floor.
+  if (eggTier === 3) {
+    return 0;
+  }
+  if (eggTier === 2) {
+    return 1;
+  }
+  if (eggTier === 1) {
+    return 2;
+  }
+  return 4;
+}
+
+/** Effective tier badge for a species, or null when usage data is unavailable. */
+function usageTierOf(s) {
+  if (!usage.loaded) {
+    return null;
+  }
+  const pct = usage.lines[s.id]?.usagePct ?? 0;
+  const effective = Math.min(usageBandIndex(pct), eggBandIndex(currentEggTierOf(s)));
+  return BANDS[effective];
+}
+
+function usagePctOf(s) {
+  return usage.lines[s.id]?.usagePct ?? 0;
+}
+
+function currentEggTierOf(s) {
+  const cur = sp.current[s.const];
+  return cur && cur.eggTier !== null && cur.eggTier !== "" ? Number(cur.eggTier) : s.eggTier;
+}
+
+function tierBadge(s) {
+  const tier = usageTierOf(s);
+  return tier === null
+    ? '<span class="badge">unranked</span>'
+    : `<span class="badge tier-${tier}" title="usage ${usagePctOf(s).toFixed(2)}%">${tier}</span>`;
+}
+
+// ---- Dirty tracking ----------------------------------------------------------
+const jsonEq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+function dirtyCounts() {
+  let eggN = 0;
+  let spN = 0;
+  let itemN = 0;
+  let trN = 0;
   for (const s of SPECIES) {
-    if (JSON.stringify(current[s.const] || []) !== JSON.stringify(baseline[s.const] || [])) {
-      n++;
+    if (!jsonEq(egg.current[s.const] || [], egg.baseline[s.const] || [])) {
+      eggN++;
+    }
+    if (!jsonEq(sp.current[s.const], sp.baseline[s.const])) {
+      spN++;
     }
   }
-  return n;
+  for (const it of ITEMS) {
+    if (!jsonEq(item.current[it.key], item.baseline[it.key])) {
+      itemN++;
+    }
+  }
+  if (tr.current && !jsonEq(tr.current.freq, tr.baseline.freq)) {
+    trN++;
+  }
+  if (tr.current && !jsonEq(tr.current.excluded, tr.baseline.excluded)) {
+    trN++;
+  }
+  return { eggN, spN, itemN, trN, total: eggN + spN + itemN + trN };
 }
 
-function refreshSaveButton() {
-  const n = dirtyCount();
-  saveBtn.textContent = `Save ${n} change${n === 1 ? "" : "s"}`;
-  saveBtn.disabled = n === 0;
-}
-
-function refreshUndoButton() {
+function refreshChrome() {
+  const { eggN, spN, itemN, trN, total } = dirtyCounts();
+  saveBtn.textContent = `Save ${total} change${total === 1 ? "" : "s"}`;
+  saveBtn.disabled = total === 0;
+  const dots = { eggmoves: eggN, species: spN, items: itemN, trainers: trN };
+  document.querySelectorAll("nav.tabs button").forEach(b => {
+    const n = dots[b.dataset.tab];
+    const label = b.textContent.replace(/\s*●$/, "");
+    b.innerHTML = n > 0 ? `${esc(label)}<span class="dot">●</span>` : esc(label);
+  });
   undoBtn.textContent = undoStack.length > 0 ? `↶ Undo (${undoStack.length})` : "↶ Undo";
-  undoBtn.disabled = undoStack.length === 0;
+  undoBtn.disabled = undoStack.length === 0 || activeTab !== "eggmoves";
 }
 
-// Update a single visible card's inputs + dirty state in place (no full re-render).
-function refreshCard(speciesConst) {
+// ---- Sorting / filtering -----------------------------------------------------
+function sortedSpecies() {
+  const mode = $("#sort").value;
+  const list = [...SPECIES];
+  if (mode === "dex") {
+    list.sort((a, b) => (a.dex ?? 99999) - (b.dex ?? 99999) || a.name.localeCompare(b.name));
+  } else if (mode === "usage") {
+    list.sort((a, b) => {
+      const ta = usageTierOf(a);
+      const tb = usageTierOf(b);
+      if (ta === null || tb === null) {
+        return a.name.localeCompare(b.name);
+      }
+      return BANDS.indexOf(ta) - BANDS.indexOf(tb) || usagePctOf(b) - usagePctOf(a) || a.name.localeCompare(b.name);
+    });
+  } else {
+    list.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  const f = ($("#search").value || "").trim().toLowerCase();
+  return f ? list.filter(s => s.name.toLowerCase().includes(f) || s.const.toLowerCase().includes(f)) : list;
+}
+
+// ---- Egg Moves tab -----------------------------------------------------------
+function slotsHtml(speciesConst) {
+  const moves = egg.current[speciesConst] || [];
+  let html = "";
+  for (let i = 0; i < 4; i++) {
+    const val = moves[i] || "";
+    html += `<input class="slot" list="moves-list" data-const="${speciesConst}" data-slot="${i}" value="${esc(val)}" placeholder="—" spellcheck="false" />`;
+  }
+  return html;
+}
+
+function renderEggMoves(root) {
+  const visible = sortedSpecies();
+  root.innerHTML = `<div id="grid">${visible
+    .map(s => {
+      const sprite = s.slug ? `${SPRITE_BASE}/${s.slug}/front.png` : "";
+      const dirty = !jsonEq(egg.current[s.const] || [], egg.baseline[s.const] || []);
+      return `<div class="card${dirty ? " dirty" : ""}" data-card="${s.const}">
+        <img src="${sprite}" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />
+        <div class="body">
+          <div class="name">${esc(s.name)} <small>#${s.dex ?? "—"}</small><span class="badges">${tierBadge(s)}</span></div>
+          <div class="slots">${slotsHtml(s.const)}</div>
+        </div>
+      </div>`;
+    })
+    .join("")}</div>${visible.length === 0 ? '<div class="empty">No species match your search.</div>' : ""}`;
+}
+
+function refreshEggCard(speciesConst) {
   const card = document.querySelector(`.card[data-card="${CSS.escape(speciesConst)}"]`);
   if (!card) {
     return;
   }
-  const moves = current[speciesConst] || [];
+  const moves = egg.current[speciesConst] || [];
   card.querySelectorAll(".slot").forEach((inp, i) => {
     inp.value = moves[i] || "";
-    inp.style.borderColor = inp.value === "" || MOVE_SET.has(inp.value) ? "" : "#c0392b";
+    inp.style.borderColor = inp.value === "" || MOVE_SET.has(inp.value) ? "" : ERR;
   });
-  const dirty = JSON.stringify(current[speciesConst] || []) !== JSON.stringify(baseline[speciesConst] || []);
-  card.classList.toggle("dirty", dirty);
+  card.classList.toggle("dirty", !jsonEq(egg.current[speciesConst] || [], egg.baseline[speciesConst] || []));
 }
 
-// Record an undo step when a species' moves settle to a new value (fires on the
-// input's `change` event, i.e. once per completed edit — not per keystroke).
 function pushUndoIfChanged(speciesConst) {
-  const now = JSON.stringify(current[speciesConst] || []);
+  const now = JSON.stringify(egg.current[speciesConst] || []);
   const was = JSON.stringify(committed[speciesConst] || []);
   if (now !== was) {
     undoStack.push({ const: speciesConst, before: (committed[speciesConst] || []).slice() });
-    committed[speciesConst] = (current[speciesConst] || []).slice();
-    refreshUndoButton();
+    committed[speciesConst] = (egg.current[speciesConst] || []).slice();
+    refreshChrome();
   }
 }
 
-// Step back one change.
 function undo() {
   const last = undoStack.pop();
   if (!last) {
     return;
   }
-  current[last.const] = last.before.slice();
+  egg.current[last.const] = last.before.slice();
   committed[last.const] = last.before.slice();
-  refreshCard(last.const);
-  refreshSaveButton();
-  refreshUndoButton();
+  refreshEggCard(last.const);
+  refreshChrome();
   setStatus(`Reverted ${last.const.replace(/^SPECIES_/, "")} (one step back).`);
 }
 
-function slotsHtml(speciesConst) {
-  const moves = current[speciesConst] || [];
-  let html = "";
-  for (let i = 0; i < 4; i++) {
-    const val = moves[i] || "";
-    html += `<input class="slot" list="moves-list" data-const="${speciesConst}" data-slot="${i}" value="${val}" placeholder="—" spellcheck="false" />`;
-  }
-  return html;
-}
-
-function renderGrid(filter) {
-  const grid = $("#grid");
-  const f = (filter || "").trim().toLowerCase();
-  const visible = SPECIES.filter(s => !f || s.name.toLowerCase().includes(f) || s.const.toLowerCase().includes(f));
-  $("#empty").hidden = visible.length > 0;
-  grid.innerHTML = visible
+// ---- Species tab (egg tier + starter cost) ------------------------------------
+function renderSpecies(root) {
+  const visible = sortedSpecies();
+  root.innerHTML = `<div id="grid">${visible
     .map(s => {
+      const cur = sp.current[s.const];
       const sprite = s.slug ? `${SPRITE_BASE}/${s.slug}/front.png` : "";
-      const dirty = JSON.stringify(current[s.const] || []) !== JSON.stringify(baseline[s.const] || []);
+      const dirty = !jsonEq(cur, sp.baseline[s.const]);
+      const tierSelect =
+        s.eggTier === null
+          ? '<span class="dyn" title="This species is not in the egg pool (battle-only or banned), so it has no egg rarity.">not in egg pool</span>'
+          : `<select class="sp-tier" data-const="${s.const}">${EGG_TIER_NAMES.map(
+              (n, i) => `<option value="${i}"${Number(cur.eggTier) === i ? " selected" : ""}>${n}</option>`,
+            ).join("")}</select>`;
       return `<div class="card${dirty ? " dirty" : ""}" data-card="${s.const}">
         <img src="${sprite}" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />
         <div class="body">
-          <div class="name">${s.name} <small>${s.const}</small></div>
-          <div class="slots">${slotsHtml(s.const)}</div>
+          <div class="name">${esc(s.name)} <small>#${s.dex ?? "—"}</small><span class="badges">${tierBadge(s)}</span></div>
+          <div class="fields">
+            <label>Egg tier ${tierSelect}</label>
+            <label>Cost <input type="number" class="sp-cost" data-const="${s.const}" min="1" max="50" step="1" value="${esc(cur.cost)}" /></label>
+          </div>
         </div>
       </div>`;
     })
-    .join("");
+    .join("")}</div>${visible.length === 0 ? '<div class="empty">No species match your search.</div>' : ""}`;
 }
 
-function onSlotInput(e) {
+// ---- Items tab -----------------------------------------------------------------
+function renderItems(root) {
+  const f = ($("#search").value || "").trim().toLowerCase();
+  const visible = ITEMS.filter(it => !f || it.key.toLowerCase().includes(f));
+  root.innerHTML = `<div id="grid" class="wide">${visible
+    .map(it => {
+      const cur = item.current[it.key];
+      const dirty = !jsonEq(cur, item.baseline[it.key]);
+      const dynamic = it.weight === null;
+      const stackable = Object.hasOwn(ER_MAX_STACK_BASE, it.key);
+      return `<div class="card${dirty ? " dirty" : ""}" data-card="${it.key}">
+        <div class="body">
+          <div class="name">${prettify(it.key)} <small>${it.key}</small>${dynamic ? ' <span class="dyn" title="This item’s weight is computed dynamically (party-dependent). Entering a number replaces it with a constant; clearing the box restores the dynamic weight.">dynamic weight</span>' : ""}</div>
+          <div class="fields">
+            <label>Tier <select class="it-tier" data-key="${it.key}">${ITEM_TIERS.map(
+              t => `<option value="${t}"${cur.tier === t ? " selected" : ""}>${t}</option>`,
+            ).join("")}</select></label>
+            <label>Weight <input type="number" class="it-weight" data-key="${it.key}" min="0" max="1000" step="1" value="${esc(cur.weight)}" placeholder="${dynamic ? "dyn" : ""}" /></label>
+            ${stackable ? `<label>Max stack <input type="number" class="it-stack" data-key="${it.key}" min="1" max="99" step="1" value="${esc(cur.maxStack)}" /></label>` : ""}
+          </div>
+        </div>
+      </div>`;
+    })
+    .join("")}</div>${visible.length === 0 ? '<div class="empty">No items match your search.</div>' : ""}`;
+}
+
+// ---- Trainers tab ---------------------------------------------------------------
+function renderTrainers(root) {
+  const f = ($("#search").value || "").trim().toLowerCase();
+  const cur = tr.current;
+  const knobRow = diff => {
+    const d = TRAINER_DEFAULTS[diff] || {};
+    const k = cur.freq[diff];
+    return `<div class="knob-row">
+      <span class="diff">${diff}</span>
+      <label>Trainer every Nth wave
+        <input type="number" class="tr-knob" data-diff="${diff}" data-knob="trainerCadence" min="1" max="50" step="1"
+          value="${esc(k.trainerCadence)}" placeholder="${d.trainerCadence ?? ""}" title="Force a regular trainer battle every Nth eligible wave. Empty = default (${d.trainerCadence})." />
+      </label>
+      <label>Factory team %
+        <input type="number" class="tr-knob" data-diff="${diff}" data-knob="factoryTeamPct" min="0" max="100" step="1"
+          value="${esc(k.factoryTeamPct)}" placeholder="${d.factoryTeamPct ?? ""}" title="% of eligible trainer waves that field a Battle-Factory team. Empty = default (${d.factoryTeamPct})." />
+      </label>
+    </div>`;
+  };
+  const excluded = new Set(cur.excluded);
+  const visible = FACTORY_SPECIES.filter(
+    s => !f || s.name.toLowerCase().includes(f) || s.const.toLowerCase().includes(f),
+  );
+  root.innerHTML = `
+    <div class="section">
+      <h2>Battle frequency</h2>
+      <p class="hint">Per-difficulty knobs. Leave a box empty to keep the game default (shown greyed). Ace stays pure PokeRogue and has no knobs.</p>
+      ${knobRow("elite")}
+      ${knobRow("hell")}
+    </div>
+    <div class="section" style="margin-bottom:0">
+      <h2>Battle Factory set membership</h2>
+      <p class="hint">Unticked species have ALL their factory sets removed from the Elite/Hell factory-team pool. (${cur.excluded.length} currently excluded)</p>
+    </div>
+    <div class="factory-list">${visible
+      .map(s => {
+        const dirty = excluded.has(s.const) !== tr.baseline.excluded.includes(s.const);
+        return `<label class="factory-item${dirty ? " dirty" : ""}">
+          <input type="checkbox" class="tr-fac" data-const="${s.const}"${excluded.has(s.const) ? "" : " checked"} />
+          ${esc(s.name)} <small>${s.sets} set${s.sets === 1 ? "" : "s"}</small>
+        </label>`;
+      })
+      .join("")}</div>${visible.length === 0 ? '<div class="empty">No species match your search.</div>' : ""}`;
+}
+
+// ---- Render dispatch --------------------------------------------------------------
+function render() {
+  const root = $("#content");
+  if (activeTab === "eggmoves") {
+    renderEggMoves(root);
+  } else if (activeTab === "species") {
+    renderSpecies(root);
+  } else if (activeTab === "items") {
+    renderItems(root);
+  } else {
+    renderTrainers(root);
+  }
+  refreshChrome();
+}
+
+// ---- Input handlers -----------------------------------------------------------------
+function onInput(e) {
   const el = e.target;
-  if (!el.classList.contains("slot")) {
+  if (el.classList.contains("slot")) {
+    const speciesConst = el.dataset.const;
+    const value = el.value.trim().toUpperCase();
+    el.value = value;
+    const arr = (egg.current[speciesConst] || []).slice();
+    arr[Number(el.dataset.slot)] = value;
+    egg.current[speciesConst] = arr;
+    el.style.borderColor = value === "" || MOVE_SET.has(value) ? "" : ERR;
+    el.closest(".card").classList.toggle("dirty", !jsonEq(egg.current[speciesConst], egg.baseline[speciesConst] || []));
+  } else if (el.classList.contains("sp-tier") || el.classList.contains("sp-cost")) {
+    const c = el.dataset.const;
+    const cur = { ...sp.current[c] };
+    if (el.classList.contains("sp-tier")) {
+      cur.eggTier = Number(el.value);
+    } else {
+      cur.cost = el.value === "" ? "" : Number(el.value);
+      const bad = cur.cost === "" || !(cur.cost >= 1 && cur.cost <= 50);
+      el.style.borderColor = bad ? ERR : "";
+    }
+    sp.current[c] = cur;
+    el.closest(".card").classList.toggle("dirty", !jsonEq(sp.current[c], sp.baseline[c]));
+  } else if (
+    el.classList.contains("it-tier")
+    || el.classList.contains("it-weight")
+    || el.classList.contains("it-stack")
+  ) {
+    const k = el.dataset.key;
+    const cur = { ...item.current[k] };
+    if (el.classList.contains("it-tier")) {
+      cur.tier = el.value;
+    } else if (el.classList.contains("it-weight")) {
+      cur.weight = el.value === "" ? "" : Number(el.value);
+      el.style.borderColor = cur.weight === "" || (cur.weight >= 0 && cur.weight <= 1000) ? "" : ERR;
+    } else {
+      cur.maxStack = el.value === "" ? "" : Number(el.value);
+      el.style.borderColor =
+        cur.maxStack === "" || (Number.isInteger(cur.maxStack) && cur.maxStack >= 1 && cur.maxStack <= 99) ? "" : ERR;
+    }
+    item.current[k] = cur;
+    el.closest(".card").classList.toggle("dirty", !jsonEq(item.current[k], item.baseline[k]));
+  } else if (el.classList.contains("tr-knob")) {
+    const v = el.value === "" ? "" : Number(el.value);
+    tr.current.freq[el.dataset.diff][el.dataset.knob] = v;
+    const max = el.dataset.knob === "trainerCadence" ? 50 : 100;
+    const min = el.dataset.knob === "trainerCadence" ? 1 : 0;
+    el.style.borderColor = v === "" || (v >= min && v <= max) ? "" : ERR;
+  } else if (el.classList.contains("tr-fac")) {
+    const c = el.dataset.const;
+    const set = new Set(tr.current.excluded);
+    if (el.checked) {
+      set.delete(c);
+    } else {
+      set.add(c);
+    }
+    tr.current.excluded = [...set].sort();
+    el.closest(".factory-item").classList.toggle("dirty", el.checked === tr.baseline.excluded.includes(c));
+  } else {
     return;
   }
-  const speciesConst = el.dataset.const;
-  const slot = Number(el.dataset.slot);
-  const value = el.value.trim().toUpperCase();
-  el.value = value;
-  const arr = (current[speciesConst] || []).slice();
-  arr[slot] = value;
-  current[speciesConst] = arr;
-  // Visual validity hint.
-  el.style.borderColor = value === "" || MOVE_SET.has(value) ? "" : "#c0392b";
-  // Update card dirty state + save count.
-  const card = el.closest(".card");
-  const dirty = JSON.stringify(current[speciesConst]) !== JSON.stringify(baseline[speciesConst] || []);
-  card.classList.toggle("dirty", dirty);
-  refreshSaveButton();
+  refreshChrome();
 }
 
-function buildPayload() {
-  // Send ONLY changed species (a delta). The Worker merges them into the live
-  // file, so concurrent editors don't clobber each other's untouched species.
-  const out = {};
+// ---- Delta building -----------------------------------------------------------------
+function buildDeltas() {
   const bad = [];
+  const deltas = {}; // file → delta object
+
+  // Egg moves: only changed species, 1-4 valid move names.
+  const eggDelta = {};
   for (const s of SPECIES) {
-    const changed = JSON.stringify(current[s.const] || []) !== JSON.stringify(baseline[s.const] || []);
-    if (!changed) {
+    if (jsonEq(egg.current[s.const] || [], egg.baseline[s.const] || [])) {
       continue;
     }
-    const moves = (current[s.const] || []).map(m => (m || "").trim().toUpperCase()).filter(Boolean);
+    const moves = (egg.current[s.const] || []).map(m => (m || "").trim().toUpperCase()).filter(Boolean);
     if (moves.length === 0) {
-      bad.push(`${s.name}: needs at least 1 move`);
+      bad.push(`${s.name}: needs at least 1 egg move`);
       continue;
     }
     for (const m of moves) {
@@ -173,16 +464,125 @@ function buildPayload() {
         bad.push(`${s.name}: unknown move "${m}"`);
       }
     }
-    out[s.const] = moves;
+    eggDelta[s.const] = moves;
   }
-  return { out, bad };
+  if (Object.keys(eggDelta).length > 0) {
+    deltas["egg-moves"] = eggDelta;
+  }
+
+  // Species tuning: changed fields only.
+  const spDelta = {};
+  for (const s of SPECIES) {
+    const cur = sp.current[s.const];
+    const base = sp.baseline[s.const];
+    if (jsonEq(cur, base)) {
+      continue;
+    }
+    const entry = {};
+    if (cur.eggTier !== base.eggTier && s.eggTier !== null) {
+      entry.eggTier = Number(cur.eggTier);
+    }
+    if (cur.cost !== base.cost) {
+      if (!(typeof cur.cost === "number" && cur.cost >= 1 && cur.cost <= 50)) {
+        bad.push(`${s.name}: cost must be 1-50`);
+        continue;
+      }
+      entry.cost = cur.cost;
+    }
+    if (Object.keys(entry).length > 0) {
+      spDelta[s.const] = entry;
+    }
+  }
+  if (Object.keys(spDelta).length > 0) {
+    deltas["species-tuning"] = spDelta;
+  }
+
+  // Item tuning: changed fields; clearing an override sends null (delete).
+  const itemDelta = {};
+  for (const it of ITEMS) {
+    const cur = item.current[it.key];
+    const base = item.baseline[it.key];
+    if (jsonEq(cur, base)) {
+      continue;
+    }
+    const entry = {};
+    if (cur.tier !== base.tier) {
+      entry.tier = cur.tier;
+    }
+    if (cur.weight !== base.weight) {
+      if (cur.weight === "") {
+        if (it.weight === null) {
+          entry.weight = null; // back to the dynamic weight
+        } else {
+          bad.push(`${prettify(it.key)}: weight must be 0-1000`);
+          continue;
+        }
+      } else if (typeof cur.weight === "number" && cur.weight >= 0 && cur.weight <= 1000) {
+        entry.weight = cur.weight;
+      } else {
+        bad.push(`${prettify(it.key)}: weight must be 0-1000`);
+        continue;
+      }
+    }
+    if (cur.maxStack !== base.maxStack && cur.maxStack !== undefined) {
+      if (Number.isInteger(cur.maxStack) && cur.maxStack >= 1 && cur.maxStack <= 99) {
+        entry.maxStack = cur.maxStack;
+      } else {
+        bad.push(`${prettify(it.key)}: max stack must be 1-99`);
+        continue;
+      }
+    }
+    if (Object.keys(entry).length > 0) {
+      itemDelta[it.key] = entry;
+    }
+  }
+  if (Object.keys(itemDelta).length > 0) {
+    deltas["item-tuning"] = itemDelta;
+  }
+
+  // Trainer tuning: changed knobs ("" clears the override → null) + exclusions.
+  if (tr.current) {
+    const trDelta = {};
+    const freq = {};
+    for (const diff of ["elite", "hell"]) {
+      const knobs = {};
+      for (const knob of ["trainerCadence", "factoryTeamPct"]) {
+        const cur = tr.current.freq[diff][knob];
+        const base = tr.baseline.freq[diff][knob];
+        if (cur === base) {
+          continue;
+        }
+        if (cur === "") {
+          knobs[knob] = null;
+        } else {
+          const max = knob === "trainerCadence" ? 50 : 100;
+          const min = knob === "trainerCadence" ? 1 : 0;
+          if (typeof cur === "number" && cur >= min && cur <= max) {
+            knobs[knob] = cur;
+          } else {
+            bad.push(`${diff} ${knob}: must be ${min}-${max}`);
+          }
+        }
+      }
+      if (Object.keys(knobs).length > 0) {
+        freq[diff] = knobs;
+      }
+    }
+    if (Object.keys(freq).length > 0) {
+      trDelta.frequency = freq;
+    }
+    if (!jsonEq(tr.current.excluded, tr.baseline.excluded)) {
+      trDelta.sets = { factoryExcludeSpecies: tr.current.excluded };
+    }
+    if (Object.keys(trDelta).length > 0) {
+      deltas["trainer-tuning"] = trDelta;
+    }
+  }
+
+  return { deltas, bad };
 }
 
-const ERR = "#c0392b";
-
-// Commit the dirty species (and optionally trigger a staging rebuild+deploy).
-// deploy=false → just commit. deploy=true → commit (if any changes) then deploy,
-// or deploy-only when there's nothing to commit.
+// ---- Save / deploy --------------------------------------------------------------------
 async function commit({ deploy }) {
   // Trim: pasted / autofilled passwords often carry a stray space that would 401.
   const password = ($("#password")?.value || "").trim();
@@ -190,13 +590,13 @@ async function commit({ deploy }) {
     setStatus("Enter the editor password first.", ERR);
     return;
   }
-  const { out, bad } = buildPayload();
+  const { deltas, bad } = buildDeltas();
   if (bad.length > 0) {
     setStatus(`Fix ${bad.length} issue(s): ${bad.slice(0, 3).join("; ")}${bad.length > 3 ? "…" : ""}`, ERR);
     return;
   }
-  const hasChanges = Object.keys(out).length > 0;
-  if (!deploy && !hasChanges) {
+  const files = Object.keys(deltas);
+  if (!deploy && files.length === 0) {
     setStatus("No changes to save.");
     return;
   }
@@ -205,7 +605,7 @@ async function commit({ deploy }) {
 
   try {
     // Deploy-only: nothing changed, just rebuild + ship the current branch.
-    if (deploy && !hasChanges) {
+    if (deploy && files.length === 0) {
       setStatus("Triggering staging deploy…");
       const res = await fetch(`${WORKER_URL}/deploy`, {
         method: "POST",
@@ -213,71 +613,139 @@ async function commit({ deploy }) {
         body: JSON.stringify({ password }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
-        setStatus(`Deploy failed: ${data.error || res.status}`, ERR);
-      } else {
-        setStatus("Deploy triggered ✓ — staging rebuilds in a few minutes.", "var(--ok)");
-      }
+      setStatus(
+        !res.ok || !data.ok
+          ? `Deploy failed: ${data.error || res.status}`
+          : "Deploy triggered ✓ — staging rebuilds in a few minutes.",
+        !res.ok || !data.ok ? ERR : "var(--ok)",
+      );
       return;
     }
 
-    setStatus(deploy ? "Saving + deploying…" : "Saving → committing to GitHub…");
-    const res = await fetch(`${WORKER_URL}/egg-moves`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password, author: $("#author").value, eggMoves: out, deploy }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) {
-      setStatus(`Save failed: ${data.error || res.status}`, ERR);
-      return;
+    const author = $("#author").value;
+    let lastSha = "";
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      // Only the LAST save triggers the (single) deploy.
+      const wantDeploy = deploy && i === files.length - 1;
+      setStatus(`Saving ${file} (${i + 1}/${files.length})…`);
+      const res = await fetch(`${WORKER_URL}/save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, file, delta: deltas[file], author, deploy: wantDeploy }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setStatus(`Save of ${file} failed: ${data.error || res.status} (earlier files saved fine)`, ERR);
+        return;
+      }
+      lastSha = data.commit ? data.commit.slice(0, 7) : "";
+      if (wantDeploy && !data.deployed) {
+        setStatus(`Saved ✓ ${lastSha} but deploy failed: ${data.deployError || "unknown"}`, ERR);
+        return;
+      }
+      markSaved(file);
     }
-    baseline = JSON.parse(JSON.stringify(current));
-    committed = JSON.parse(JSON.stringify(current));
-    undoStack.length = 0;
-    refreshUndoButton();
-    renderGrid($("#search").value);
-    const sha = data.commit ? data.commit.slice(0, 7) : "";
-    if (deploy) {
-      setStatus(
-        data.deployed
-          ? `Saved ✓ ${sha} — deploy triggered, live in a few minutes.`
-          : `Saved ✓ ${sha} but deploy failed: ${data.deployError || "unknown"}`,
-        data.deployed ? "var(--ok)" : ERR,
-      );
-    } else {
-      setStatus(`Saved ✓ ${sha} — click "Commit & Deploy" to apply it to staging.`, "var(--ok)");
-    }
+    render();
+    setStatus(
+      deploy
+        ? `Saved ✓ ${lastSha} — deploy triggered, live in a few minutes.`
+        : `Saved ✓ ${lastSha} — click "Commit & Deploy" to apply it to staging.`,
+      "var(--ok)",
+    );
   } catch (err) {
     setStatus(`Error: ${err}`, ERR);
   } finally {
-    refreshSaveButton();
+    refreshChrome();
     deployBtn.disabled = false;
   }
 }
 
+function markSaved(file) {
+  if (file === "egg-moves") {
+    egg.baseline = JSON.parse(JSON.stringify(egg.current));
+    committed = JSON.parse(JSON.stringify(egg.current));
+    undoStack.length = 0;
+  } else if (file === "species-tuning") {
+    sp.baseline = JSON.parse(JSON.stringify(sp.current));
+  } else if (file === "item-tuning") {
+    item.baseline = JSON.parse(JSON.stringify(item.current));
+  } else if (file === "trainer-tuning") {
+    tr.baseline = JSON.parse(JSON.stringify(tr.current));
+  }
+}
+
+// ---- Init ------------------------------------------------------------------------------
+const fetchJson = (url, fallback) =>
+  fetch(url)
+    .then(r => (r.ok ? r.json() : fallback))
+    .catch(() => fallback);
+
 async function init() {
   try {
-    const [species, moves, egg] = await Promise.all([
+    const bust = `?t=${Date.now()}`;
+    const [species, moves, items, trainers, eggLive, spLive, itemLive, trLive] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
-      // Resilient: if the JSON isn't on the branch yet (first deploy), start empty.
-      fetch(`${EGG_MOVES_RAW}?t=${Date.now()}`)
-        .then(r => (r.ok ? r.json() : {}))
-        .catch(() => ({})),
+      fetchJson("./data/items.json", []),
+      fetchJson("./data/trainers.json", { frequencyDefaults: { elite: {}, hell: {} }, factorySpecies: [] }),
+      // Live override files (resilient: missing on the branch → start empty).
+      fetchJson(`${RAW_BASE}/er-egg-moves.json${bust}`, {}),
+      fetchJson(`${RAW_BASE}/er-species-tuning.json${bust}`, {}),
+      fetchJson(`${RAW_BASE}/er-item-tuning.json${bust}`, {}),
+      fetchJson(`${RAW_BASE}/er-trainer-tuning.json${bust}`, {}),
     ]);
     SPECIES = species;
     MOVES = moves;
+    ITEMS = items;
+    TRAINER_DEFAULTS = trainers.frequencyDefaults;
+    FACTORY_SPECIES = trainers.factorySpecies;
     for (const m of MOVES) {
       MOVE_SET.add(m);
     }
-    // Seed current state from the live egg-moves (pad to 4 slots for editing).
+
+    // Seed egg moves from the live file (pad to 4 slots for editing).
     for (const s of SPECIES) {
-      const arr = (egg[s.const] || []).slice(0, 4);
-      current[s.const] = arr;
+      egg.current[s.const] = (eggLive[s.const] || []).slice(0, 4);
     }
-    baseline = JSON.parse(JSON.stringify(current));
-    committed = JSON.parse(JSON.stringify(current));
+    egg.baseline = JSON.parse(JSON.stringify(egg.current));
+    committed = JSON.parse(JSON.stringify(egg.current));
+
+    // Seed species tuning: snapshot values overlaid with any live override.
+    for (const s of SPECIES) {
+      const o = spLive[s.const] || {};
+      sp.current[s.const] = {
+        eggTier: s.eggTier === null ? null : typeof o.eggTier === "number" ? o.eggTier : s.eggTier,
+        cost: typeof o.cost === "number" ? o.cost : s.cost,
+      };
+    }
+    sp.baseline = JSON.parse(JSON.stringify(sp.current));
+
+    // Seed item tuning the same way ("" = no weight override on a dynamic item).
+    for (const it of ITEMS) {
+      const o = itemLive[it.key] || {};
+      item.current[it.key] = {
+        tier: typeof o.tier === "string" ? o.tier : it.tier,
+        weight: typeof o.weight === "number" ? o.weight : (it.weight ?? ""),
+        ...(Object.hasOwn(ER_MAX_STACK_BASE, it.key)
+          ? { maxStack: typeof o.maxStack === "number" ? o.maxStack : ER_MAX_STACK_BASE[it.key] }
+          : {}),
+      };
+    }
+    item.baseline = JSON.parse(JSON.stringify(item.current));
+
+    // Seed trainer tuning ("" = no override, default applies).
+    const freqOf = diff => ({
+      trainerCadence:
+        typeof trLive.frequency?.[diff]?.trainerCadence === "number" ? trLive.frequency[diff].trainerCadence : "",
+      factoryTeamPct:
+        typeof trLive.frequency?.[diff]?.factoryTeamPct === "number" ? trLive.frequency[diff].factoryTeamPct : "",
+    });
+    tr.current = {
+      freq: { elite: freqOf("elite"), hell: freqOf("hell") },
+      excluded: [...(trLive.sets?.factoryExcludeSpecies || [])].sort(),
+    };
+    tr.baseline = JSON.parse(JSON.stringify(tr.current));
 
     // One shared datalist for all move inputs (light + searchable).
     const dl = document.createElement("datalist");
@@ -285,24 +753,42 @@ async function init() {
     dl.innerHTML = MOVES.map(m => `<option value="${m}">${prettify(m)}</option>`).join("");
     document.body.appendChild(dl);
 
-    renderGrid("");
-    refreshSaveButton();
-    refreshUndoButton();
-    setStatus(`${SPECIES.length} species loaded.`);
+    render();
+    setStatus(`${SPECIES.length} species, ${ITEMS.length} items loaded.`);
 
-    $("#grid").addEventListener("input", onSlotInput);
+    // Usage tiers: same nightly CDN JSON the game uses; "unranked" fallback.
+    fetchJson(USAGE_TIERS_URL, null).then(data => {
+      if (data && typeof data === "object" && data.lines) {
+        usage.lines = data.lines;
+        usage.loaded = true;
+        if (activeTab === "eggmoves" || activeTab === "species") {
+          render();
+        }
+      }
+    });
+
+    const content = $("#content");
+    content.addEventListener("input", onInput);
     // `change` fires once per completed edit (blur / pick from list) → one undo step.
-    $("#grid").addEventListener("change", e => {
+    content.addEventListener("change", e => {
       if (e.target.classList.contains("slot")) {
         pushUndoIfChanged(e.target.dataset.const);
       }
     });
-    $("#search").addEventListener("input", e => renderGrid(e.target.value));
+    $("#search").addEventListener("input", render);
+    $("#sort").addEventListener("change", render);
+    document.querySelectorAll("nav.tabs button").forEach(b =>
+      b.addEventListener("click", () => {
+        activeTab = b.dataset.tab;
+        document.querySelectorAll("nav.tabs button").forEach(x => x.classList.toggle("active", x === b));
+        render();
+      }),
+    );
     saveBtn.addEventListener("click", () => commit({ deploy: false }));
     deployBtn.addEventListener("click", () => commit({ deploy: true }));
     undoBtn.addEventListener("click", undo);
   } catch (err) {
-    setStatus(`Failed to load data: ${err}`, "#c0392b");
+    setStatus(`Failed to load data: ${err}`, ERR);
   }
 }
 

@@ -73,21 +73,33 @@ describe("tools — dump editor SPA data", () => {
       }
     }
     const formQualifier = /\s+(redux mega|redux b|redux c|redux|primal|mega|hisuian|alolan|galarian|paldean)$/i;
+    // Vanilla regional-form ids encode the dex as id % 1000 (Alolan 2xxx,
+    // Galarian 4xxx, Hisuian 6xxx, Paldean 8xxx); plain ids ARE the dex.
+    const vanillaDex = (id: number): number => (id >= 2000 ? id % 1000 : id);
     const resolveDex = (id: number, name: string): number | null => {
       if (id < VANILLA_ID_CUTOFF) {
-        return id;
+        return vanillaDex(id);
       }
       const stripped = name.replace(formQualifier, "").trim().toLowerCase();
       const exact = vanillaIdByName.get(stripped);
       if (exact !== undefined) {
-        return exact;
+        return vanillaDex(exact);
       }
       const words = stripped.split(/\s+/);
       for (let n = words.length; n >= 1; n--) {
         const prefix = words.slice(0, n).join(" ");
         const found = vanillaIdByName.get(prefix);
         if (found !== undefined) {
-          return found;
+          return vanillaDex(found);
+        }
+      }
+      // Fusions like "Ash-Greninja" / "Clemont-Chesnaught": the vanilla base
+      // is the LAST hyphen-separated token.
+      const lastToken = stripped.split(/[\s-]+/).pop();
+      if (lastToken !== undefined) {
+        const found = vanillaIdByName.get(lastToken);
+        if (found !== undefined) {
+          return vanillaDex(found);
         }
       }
       return null;
