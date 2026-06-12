@@ -186,13 +186,126 @@ this is mostly content, not engine.
 Everything data-driven where possible (er-biome-economy.ts +
 er-biome-rules.ts) so the editor site can manage it later.
 
-## 6. Open questions for the maintainer
-1. Shop frequency: every 10 waves REPLACES the current x0 reward shop, or
-   appears in ADDITION (after rewards)? Doc assumes addition.
-2. Abyss with no shop - too mean or great dread?
-3. Space economy direction: buy-low or sell-high there?
-4. Ace/Youngster: do biome battle rules apply (they are ER flavor - the
-   "pure vanilla" promise (#345) says NO; shops/prices yes)? Doc assumes
-   rules Elite/Hell only, shops everywhere.
-5. Biome lengths (P3) change run pacing globally - want that this patch or
-   the one after?
+## 6. Decisions LOCKED (maintainer, 0.0.4.x planning)
+1. Biome shop appears IN ADDITION to the x0 reward shop.
+2. Biome battle rules apply on ALL difficulties incl. Ace/Youngster.
+   (Supersedes the #345 reading: "pure vanilla" still governs SPAWNS and
+   item pools there, but biome rules are universal world flavor.)
+3. Abyss: NO shop - a Devilish Deal instead (Part II below).
+4. Space economy: buy tech cheap there, sell Comet Shards in Metropolis.
+5. Biome lengths: this patch, P3.
+
+---
+---
+
+# PART II - The interaction grammar ("not every biome speaks the same language")
+
+Maintainer brief v2: biomes must differ not only in WHAT they throw at you
+but in HOW YOU ENGAGE them. Colosseum lets you stay or walk away. Caves let
+you push deeper at mounting risk. The Abyss makes offers. Curses exist.
+
+## 7. The Crossroads (one engine primitive powers everything)
+
+A choice screen (styled like the ME option dialog, full art panel) that a
+biome can raise at defined beats - typically after the x0 boss, next to the
+shop. Every option is one of six VERBS; each biome flavors at most ONE verb.
+This keeps engine work tiny (one phase + one data table) while every biome
+plays differently.
+
+### The six verbs
+
+1. GAUNTLET (stay or walk) - "Another challenger waits. Fight on?"
+   - Loop: extra trainer fight -> reward tier escalates (T1 GREAT -> T2
+     ULTRA -> T3 ROGUE -> T4 the jackpot: voucher/candy pile) -> Crossroads
+     again. FORFEIT at any Crossroads: keep everything banked, biome ends,
+     run continues. Lose the fight: run over, like any loss - that is the
+     tension. No heals between rounds (Ward/berries matter).
+   - Biomes: DOJO (the Colosseum). ISLAND gets a 1-round variant
+     (exhibition match vs a Veteran for an exotic import).
+
+2. DELVE (push your luck) - "A passage descends..."
+   - Loop: optional extra wave(s) beyond the biome's normal length. Each
+     delve depth adds +1 loot roll AND a stacking hazard (depth 1: enemies
+     +2 levels; depth 2: +1 curse offered as floor trap (below); depth 3:
+     boss-bar guardian with 2-3 held items - the hoard). Leave at any
+     Crossroads with everything. Faint-outs are real: the run can end down
+     there.
+   - Biomes: CAVE, SEABED, RUINS, JUNGLE, ICE_CAVE. (WASTELAND is a
+     permanent depth-3: every wave is a guardian.)
+
+3. DEAL (the bargain) - "A figure in the dark clears its throat."
+   - The Abyss special; FAIRY_CAVE gets the benevolent mirror (small gift
+     for a small vow). Menu of 2-3 offers, each = COST + PAYOFF, both
+     drawn from weighted pools, both stated up front. Walk away freely.
+   - COST pool (all implementable on existing save fields):
+     - Sacrifice: release a chosen party member (scales payoff by its BST).
+     - Tithe: all candies of one species you own.
+     - Drain: a chosen mon loses 20% of its levels.
+     - Seal: a party slot is LOCKED for the rest of the run (5-mon cap;
+       reuses the Doubles/slot machinery; the dramatic one).
+     - Curse: the devil applies a permanent stat curse (below) to a mon
+       of YOUR choice - which is secretly a build tool (Trick Room teams
+       happily take -Spd).
+     - Embargo: your next 2 biome shops are shuttered.
+   - PAYOFF pool: ROGUE item of choice from 3, +2 run Luck, legendary egg,
+     revive-all + full heal, money x3 of current, a 5th-move-slot item,
+     black-shiny reroll on one mon (1/10).
+   - HARD RULE: never touch permanent account data negatively except
+     candies (which are an account currency the player consciously
+     spends); everything else is run-scoped. Saves stay safe.
+
+4. FORAGE (free roll with a catch) - "Berries glint in the grass."
+   - One free pick from a biome-flavored minipool; 20% the pick is
+     "guarded" (a wild double-battle ambush before you get it).
+   - Biomes: FOREST, MEADOW, BEACH, GRASS, SNOWY_FOREST, LAKE (spring:
+     full team heal instead of an item).
+
+5. TOLL (pay or fight) - "The bridge keeper names a price."
+   - Pay 10% money: pass quietly (skip next wave entirely). Refuse: fight
+     a trainer with +1 reward tier. Either is fine; it is a mood choice.
+   - Biomes: MOUNTAIN, CONSTRUCTION_SITE, SLUM (the pickpocket event folds
+     into this), BADLANDS.
+6. EXPERIMENT (the lab special) - one free Ability-Randomizer-style
+   reroll offer with a stated 10% chance of rolling Truant/Slow Start
+   (removable later, as normal). LABORATORY, POWER_PLANT.
+
+TOWN/PLAINS/METROPOLIS/TEMPLE/etc. raise no Crossroads - pacing breathers.
+TEMPLE keeps its totem fight as a scripted beat instead.
+
+## 8. Curses (the anti-vitamins)
+
+New item class `ER Curse`, the negative mirror of vitamins - a PERMANENT
+(run-scoped) -10% to one stat of one mon, displayed as a dark badge on the
+summary. Sources: Deal costs, Delve floor traps (depth 2+, always with a
+sidestep: lose the loot roll instead), and the Slum shop's "used goods"
+fine print. NEVER random unavoidable - always the consequence of a choice.
+The twist that makes them DESIGN and not just punishment: curses have
+corner-case upside (Gyro Ball / Trick Room love -Spd; a -Atk curse on a
+special attacker is free Deal currency), so veterans learn to eat them
+deliberately. Cleansing: one shrine event in TEMPLE/FAIRY_CAVE removes a
+curse, once per run.
+
+## 9. How a biome composes its language (full stack per biome)
+Each biome = passive RULE (Part I §3) + ECONOMY column (§2) + one VERB
+(§7) + optional EVENT (§4). Example readings:
+- DOJO: rule "every wave a trainer" + gauntlet verb + battle-goods shop =
+  the Colosseum run-within-a-run.
+- CAVE: darkness rule + delve verb + Hiker trail post = the dungeon crawl.
+- ABYSS: dark rule + NO shop + Deal verb = the dread floor.
+- SWAMP: attrition rule + no verb (the biome itself is the negotiation) +
+  bog trader who sells the antidotes to its own swamp.
+- SLUM: cheap-but-used economy + toll verb + pickpocket event = the den.
+
+## 10. Engine inventory for Part II (all small, listed for estimation)
+- CrossroadsPhase + er-biome-crossroads.ts data table (verb per biome,
+  option text, payload refs). One UI handler, ME-dialog styled.
+- Gauntlet loop: repeat-trainer-wave flag + banked-reward ledger +
+  forfeit-to-transition. Reuses generateNewBattleTrainer.
+- Delve loop: extra-wave counter on Battle, loot-roll multiplier, depth
+  modifiers (level bump exists; guardian = boss flag + held items exist).
+- Deal: cost executors (release/candy spend/level set/slot lock/curse/
+  shop-skip flag) + payoff executors (mostly existing reward plumbing).
+- Curse: one PokemonHeldItemModifier subclass with negative stat hook
+  (SLOW_START-style multiplier site already exists) + badge icon.
+- Slot seal: party-size cap field checked in switch/summon + party UI.
+- All of it behind run-scoped fields only; serialized additively (save-safe).
