@@ -1638,8 +1638,8 @@ export class BattleScene extends SceneBase {
     }
 
     // ER ghost gauntlet (#217): on designated endgame waves, field a stored
-    // cross-player ghost team as a "Veteran" trainer. Only when a ghost is
-    // actually available (fetch resolved / local pool non-empty); otherwise the
+    // cross-player ghost team as a trainer. Only when a ghost is actually
+    // available (fetch resolved / local pool non-empty); otherwise the
     // wave proceeds normally. Done before the ME check for the same reason as rivals.
     const ghost = takeGhostForWave(waveIndex, resolved.battleType === BattleType.TRAINER);
     if (
@@ -1649,9 +1649,35 @@ export class BattleScene extends SceneBase {
       && Overrides.BATTLE_TYPE_OVERRIDE == null
     ) {
       resolved.battleType = BattleType.TRAINER;
-      const ghostTrainer = new Trainer(
+      // Ghosts used to be hardcoded VETERAN - vary the class for flavor. The
+      // pick hashes the snapshot id so the SAME ghost always appears as the
+      // SAME class everywhere. The party itself is fully overridden by the
+      // snapshot, so the class is purely cosmetic (sprite/dialogue/music cue).
+      const ghostClasses = [
         TrainerType.VETERAN,
-        randSeedInt(2) ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT,
+        TrainerType.ACE_TRAINER,
+        TrainerType.BLACK_BELT,
+        TrainerType.PSYCHIC,
+        TrainerType.HIKER,
+        TrainerType.SCIENTIST,
+        TrainerType.SWIMMER,
+        TrainerType.RANGER,
+        TrainerType.HEX_MANIAC,
+        TrainerType.ROUGHNECK,
+        TrainerType.BEAUTY,
+        TrainerType.BACKPACKER,
+        TrainerType.CYCLIST,
+        TrainerType.MUSICIAN,
+        TrainerType.BIKER,
+      ];
+      let idHash = 0;
+      for (let i = 0; i < ghost.id.length; i++) {
+        idHash = (idHash * 31 + ghost.id.charCodeAt(i)) >>> 0;
+      }
+      const ghostType = ghostClasses[idHash % ghostClasses.length];
+      const ghostTrainer = new Trainer(
+        ghostType,
+        trainerConfigs[ghostType].hasGenders && randSeedInt(2) ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT,
       );
       markTrainerAsGhost(ghostTrainer, ghost);
       this.field.add(ghostTrainer);
