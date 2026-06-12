@@ -154,7 +154,7 @@
   },
   "ghostTrainers": {
     "name": "Ghost Trainers",
-    "desc": "Every Trainer battle is fought against a GHOST team - a real team from another player's winning run, scaled to your wave. Grants 7 Favour.",
+    "desc": "Every Trainer battle is fought against a GHOST team - a real team from another player's run (wins and losses both feed the pool), matched to your current wave. Grants 7 Favour.",
     "value": {
       "0": "Off",
       "1": "On"

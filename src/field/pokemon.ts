@@ -64,8 +64,13 @@ import {
 } from "#data/elite-redux/er-black-shinies";
 import { erBlackSpritePath, erBlackSpritePathFromBase } from "#data/elite-redux/er-black-sprite-manifest";
 import { erTryApplyOmniGem } from "#data/elite-redux/er-community-items";
+import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { applyErResistBerry } from "#data/elite-redux/er-resist-berries";
-import { erYoungsterFreeInnateSlots, getErDifficultyShinyMultiplier } from "#data/elite-redux/er-run-difficulty";
+import {
+  erYoungsterFreeInnateSlots,
+  getErDifficulty,
+  getErDifficultyShinyMultiplier,
+} from "#data/elite-redux/er-run-difficulty";
 import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import {
   applyErWardStoneBlock,
@@ -8251,7 +8256,21 @@ export class EnemyPokemon extends Pokemon {
       );
     }
 
-    if (globalScene.currentBattle.isClassicFinalBoss && this.formIndex === 0 && this.bossSegmentIndex < 1) {
+    // ER (#423): the HELL finale STARTS as Primal Cascoon (formIndex 1), so
+    // the vanilla `formIndex === 0` stage-one check missed it - the last
+    // shield-breaking hit carried through and the boss died straight into the
+    // victory screen instead of reaching its black shiny stage 2. Stage one on
+    // Hell = ER finale species that has NOT been black-promoted yet.
+    const erHellFinaleStageOne =
+      this.formIndex > 0
+      && isErFinalBossSpecies(this.species.speciesId)
+      && !this.customPokemonData?.erBlackShiny
+      && getErDifficulty() === "hell";
+    if (
+      globalScene.currentBattle.isClassicFinalBoss
+      && (this.formIndex === 0 || erHellFinaleStageOne)
+      && this.bossSegmentIndex < 1
+    ) {
       damage = Math.min(damage, this.hp - 1);
     }
 

@@ -3845,6 +3845,28 @@ export class BattleScene extends SceneBase {
       // still runs.
       if (isErFinalBossSpecies(pokemon.species.speciesId) && getErDifficulty() === "hell") {
         promoteToErBlackShinyInBattle(pokemon);
+        // ER (#423): the vanilla stage-2 path gets healed/re-shielded by
+        // QuietFormChangePhase.end's final-boss block - the Hell promotion
+        // path skipped a form change and therefore NEVER got it, so stage 2
+        // started on the last sliver of HP and died to the next hit ("revealed
+        // his true form, health dropped to 0, victory screen"). Mirror it.
+        this.playBgm();
+        this.phaseManager.unshiftNew(
+          "PokemonHealPhase",
+          pokemon.getBattlerIndex(),
+          pokemon.getMaxHp(),
+          null,
+          false,
+          false,
+          false,
+          true,
+        );
+        pokemon.findAndRemoveTags(() => true);
+        pokemon.bossSegments = 5;
+        pokemon.bossSegmentIndex = 4;
+        pokemon.initBattleInfo();
+        pokemon.cry();
+        this.phaseManager.cancelMove(p => p.pokemon === pokemon);
       } else {
         this.triggerPokemonFormChange(pokemon, SpeciesFormChangeManualTrigger, false);
       }
