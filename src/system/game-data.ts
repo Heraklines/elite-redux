@@ -17,6 +17,7 @@ import { allMoves, allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
+import { getErReduxCounterpartId, migrateErReduxDexHijack } from "#data/elite-redux/er-redux-dex-redirect";
 import { getErResistBerryEntries, restoreErResistBerries } from "#data/elite-redux/er-resist-berries";
 import { getErDifficulty, getErDifficultyCandyMultiplier, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ER_CANDY_GAIN_MULTIPLIER, getRunCandyMultiplier } from "#data/elite-redux/er-shiny-favour";
@@ -733,6 +734,11 @@ export class GameData {
     // (e.g. a red-shiny Unown letter unlocks red shiny on vanilla Unown).
     // Purely additive and exception-guarded - it can never break a save load.
     migrateErRemovedFormUnlocks(this);
+
+    // ER (#410): move already-hijacked redux-form unlocks off the vanilla
+    // species' dex entries onto their RDX counterparts (gen slot reverts to
+    // vanilla; shiny/candies land on the RDX entry). Additive + idempotent.
+    migrateErReduxDexHijack(this);
   }
 
   public async initSystem(systemDataStr: string, cachedSystemDataStr?: string): Promise<boolean> {
@@ -2079,9 +2085,16 @@ export class GameData {
     fromEgg = false,
     showMessage = true,
   ): Promise<boolean> {
+    // ER (#410): a vanilla mon wearing the REDUX form registers its RDX custom
+    // species (the entry eggs hatch and the RDX tab lists) instead of stamping
+    // the vanilla species' slot - the reported "Spearow Redux replaced gen 1
+    // Spearow's location" hijack. The run mon itself is untouched.
+    const reduxCounterpartId = getErReduxCounterpartId(pokemon.species.speciesId, pokemon.getFormKey());
+    const dexSpecies = reduxCounterpartId === undefined ? pokemon.species : getPokemonSpecies(reduxCounterpartId);
+
     // If incrementCount === false (not a catch scenario), only update the pokemon's dex data if the Pokemon has already been marked as caught in dex
     // Prevents form changes, nature changes, etc. from unintentionally updating the dex data of a "rental" pokemon
-    const speciesRootForm = pokemon.species.getRootSpeciesId();
+    const speciesRootForm = dexSpecies.getRootSpeciesId();
     if (!incrementCount && !globalScene.gameData.dexData[speciesRootForm].caughtAttr) {
       return Promise.resolve(false);
     }
@@ -2090,7 +2103,16 @@ export class GameData {
     if (pokemon.customPokemonData?.erBlackShiny && this.starterData[speciesRootForm]) {
       this.starterData[speciesRootForm].erBlackShiny = true;
     }
-    return this.setPokemonSpeciesCaught(pokemon, pokemon.species, incrementCount, fromEgg, showMessage);
+    return this.setPokemonSpeciesCaught(
+      pokemon,
+      dexSpecies,
+      incrementCount,
+      fromEgg,
+      showMessage,
+      // The redux formIndex bit means nothing on the single-form counterpart:
+      // register its DEFAULT form alongside the mon's gender/shiny/variant bits.
+      reduxCounterpartId === undefined ? undefined : (pokemon.getDexAttr() & 127n) | DexAttr.DEFAULT_FORM,
+    );
   }
 
   /**
@@ -2109,13 +2131,17 @@ export class GameData {
     incrementCount = true,
     fromEgg = false,
     showMessage = true,
+    // ER (#410): redux-form catches register their RDX counterpart species,
+    // whose dex bits differ from the mon's own (the redux formIndex bit does
+    // not exist there) - the caller passes the corrected attr.
+    dexAttrOverride?: bigint,
   ): Promise<boolean> {
     const dexEntry = this.dexData[species.speciesId];
     const caughtAttr = dexEntry.caughtAttr;
     const formIndex = pokemon.formIndex;
 
     // This makes sure that we do not try to unlock data which cannot be unlocked
-    const dexAttr = pokemon.getDexAttr() & species.getFullUnlocksData();
+    const dexAttr = (dexAttrOverride ?? pokemon.getDexAttr()) & species.getFullUnlocksData();
 
     // Mark as caught
     dexEntry.caughtAttr |= dexAttr;
@@ -2214,6 +2240,7 @@ export class GameData {
         incrementCount,
         fromEgg,
         showMessage,
+        dexAttrOverride,
       );
     };
 

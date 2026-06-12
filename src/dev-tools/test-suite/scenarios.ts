@@ -1809,6 +1809,26 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Redux slot un-hijack (#410)",
+    description:
+      "#410 - NOT a battle test, this entry tracks the check.\n"
+      + "DO: catch a Redux-form mon (e.g. Spearow Redux) in a run, then open\n"
+      + "starter select. EXPECT: the catch shows up on the RDX tab entry,\n"
+      + "NOT on the vanilla gen slot (gen 1 Spearow stays uncaught unless you\n"
+      + "really caught a normal one). If your save was already hijacked, one\n"
+      + "reload moves the unlock (shiny tiers + candies) to the RDX entry and\n"
+      + "frees the vanilla slot. Pass/Fail once checked.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 5 });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Egg countdown (#378)",
     description:
       "#378 QoL - NOT a battle test, this entry just tracks the check.\n"
