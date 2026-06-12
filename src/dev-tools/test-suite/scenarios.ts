@@ -1435,7 +1435,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "FIRST frame of the battle (no delayed normal-then-black swap), and at\n"
       + "the SAME HEIGHT as a normal mon (feet on the platform, not floating).\n"
       + "ALSO open the PARTY screen - EXPECT a BLACK star (not red) and an\n"
-      + "obsidian-tinted party icon.",
+      + "obsidian-tinted party icon.\n"
+      + "ALSO (#432): black shinies grant LUCK 5 - win and check the shop's\n"
+      + "luck readout / reroll discount reflects 5 (normal shiny max is 3).",
     setup: () => {
       resetDevOverrides();
       setOverrides({
