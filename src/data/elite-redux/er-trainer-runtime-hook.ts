@@ -42,6 +42,7 @@ import {
 } from "#data/elite-redux/init-elite-redux-trainers";
 import { erRivalWaveOrdinal, erRivalWaveSequence } from "#data/elite-redux/er-battle-frequency";
 import { ER_FACTORY_SETS } from "#data/elite-redux/er-factory-sets";
+import { erFactoryExcludedDraftIds, erTunedFactoryTeamPct } from "#data/elite-redux/er-trainer-tuning";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { ER_MEGA_STONE_NAME_BY_ITEM } from "#data/elite-redux/er-mega-stone-item-ids";
@@ -1052,13 +1053,22 @@ interface ErFactorySetResolved {
 /** Factory sets with ids resolved through ER_ID_MAP, sorted weakest → strongest. */
 let FACTORY_POOL: ErFactorySetResolved[] | null = null;
 
+/** Test hook: drop the memoized factory pool (e.g. after changing the tuning table). */
+export function resetErFactoryPoolForTesting(): void {
+  FACTORY_POOL = null;
+}
+
 /** Exported for unit testing. */
 export function resolvedFactorySets(): readonly ErFactorySetResolved[] {
   if (FACTORY_POOL !== null) {
     return FACTORY_POOL;
   }
   const out: ErFactorySetResolved[] = [];
+  const excluded = erFactoryExcludedDraftIds();
   for (const [erSpecies, erMoves, abilitySlot] of ER_FACTORY_SETS) {
+    if (excluded.has(erSpecies)) {
+      continue; // editor-managed set-membership exclusion (er-trainer-tuning.json)
+    }
     const speciesId = ER_ID_MAP.species[erSpecies];
     if (speciesId === undefined) {
       continue; // cosmetic/unmapped form — same drop rule as trainer rosters
@@ -1101,8 +1111,10 @@ export function getErFactoryTeamForTrainer(trainer: Trainer): readonly ErFactory
   const isRival = ER_RIVAL_TRAINER_TYPES.has(trainer.config.trainerType);
   const isBossWave = trainer.config.isBoss || wave % 10 === 0;
   if (!isErVanillaDifficulty(difficulty) && !isRival && !isBossWave) {
+    // Editor-managed per-difficulty override first (er-trainer-tuning.json).
+    const chancePct = erTunedFactoryTeamPct(difficulty) ?? ER_FACTORY_TEAM_CHANCE_PCT;
     const roll = hashErSelectionSeed(`${globalScene.seed}:factory:${wave}`) % 100;
-    const pool = roll < ER_FACTORY_TEAM_CHANCE_PCT ? resolvedFactorySets() : [];
+    const pool = roll < chancePct ? resolvedFactorySets() : [];
     if (pool.length > 0) {
       const size = Math.max(1, trainer.getPartyTemplate?.()?.size ?? 1);
       const frac = Math.min(1, Math.max(0, (wave - 1) / erWaveProgressionSpan()));

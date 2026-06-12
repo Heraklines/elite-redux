@@ -21,8 +21,10 @@ import { initEliteReduxEggTiers } from "#data/elite-redux/init-elite-redux-egg-t
 import { initEliteReduxErCustomFormChanges } from "#data/elite-redux/init-elite-redux-er-custom-form-changes";
 import { initEliteReduxEvolutions } from "#data/elite-redux/init-elite-redux-evolutions";
 import { initEliteReduxFormChanges } from "#data/elite-redux/init-elite-redux-form-changes";
+import { initEliteReduxItemTuning } from "#data/elite-redux/init-elite-redux-item-tuning";
 import { initEliteReduxMovesets } from "#data/elite-redux/init-elite-redux-movesets";
 import { initEliteReduxSpecies, injectAllErMegaForms } from "#data/elite-redux/init-elite-redux-species";
+import { initEliteReduxSpeciesTuning } from "#data/elite-redux/init-elite-redux-species-tuning";
 import { initEliteReduxStarterCosts } from "#data/elite-redux/init-elite-redux-starter-costs";
 import { initEliteReduxTmMoves } from "#data/elite-redux/init-elite-redux-tm-moves";
 import { initEliteReduxTrainers } from "#data/elite-redux/init-elite-redux-trainers";
@@ -253,6 +255,21 @@ export function initializeGame() {
   const costResult = initEliteReduxStarterCosts();
   console.info(
     `[er-starter-costs] re-costed ${costResult.recosted} ER customs (${costResult.legendaryTiered} → Legendary eggs); removed ${costResult.removed} ability/item-emergent forms from grid + egg pool`,
+  );
+
+  // Elite Redux: editor-managed per-species tuning (egg tier + starter cost)
+  // from er-species-tuning.json. Must run LAST in the tier/cost chain so a
+  // committed editor edit is the final word.
+  const speciesTuningResult = initEliteReduxSpeciesTuning();
+  console.info(
+    `[er-species-tuning] applied ${speciesTuningResult.eggTiersApplied} egg-tier + ${speciesTuningResult.costsApplied} cost overrides (skipped ${speciesTuningResult.skippedAbsent} absent + ${speciesTuningResult.skippedUnmapped} unmapped)`,
+  );
+
+  // Elite Redux: editor-managed item tuning (reward-pool tier/weight + params)
+  // from er-item-tuning.json, applied over the pools initModifierPools() built.
+  const itemTuningResult = initEliteReduxItemTuning();
+  console.info(
+    `[er-item-tuning] moved ${itemTuningResult.tiersMoved} tiers, applied ${itemTuningResult.weightsApplied} weights + ${itemTuningResult.maxStacksApplied} stack caps (skipped ${itemTuningResult.skipped})`,
   );
 
   // Elite Redux: inject hand-audited egg moves for ER-custom base species into

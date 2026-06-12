@@ -22,6 +22,7 @@
 // =============================================================================
 
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { erTunedTrainerCadence } from "#data/elite-redux/er-trainer-tuning";
 import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
 import { TrainerType } from "#enums/trainer-type";
 
@@ -113,7 +114,8 @@ export function erRivalWaveOrdinal(waveIndex: number, trainerType: TrainerType):
  */
 export function erForcesTrainerWave(waveIndex: number): boolean {
   const difficulty = getErDifficulty();
-  const cadence = ER_TRAINER_CADENCE[difficulty];
+  // Editor-managed override first (er-trainer-tuning.json), then the default.
+  const cadence = erTunedTrainerCadence(difficulty) ?? ER_TRAINER_CADENCE[difficulty];
   if (cadence === undefined) {
     return false;
   }
