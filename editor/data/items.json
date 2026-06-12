@@ -1,0 +1,614 @@
+[
+  {
+    "key": "POKEBALL",
+    "tier": "COMMON",
+    "weight": null,
+    "maxWeight": 6
+  },
+  {
+    "key": "RARE_CANDY",
+    "tier": "COMMON",
+    "weight": 2,
+    "maxWeight": 2
+  },
+  {
+    "key": "POTION",
+    "tier": "COMMON",
+    "weight": null,
+    "maxWeight": 9
+  },
+  {
+    "key": "SUPER_POTION",
+    "tier": "COMMON",
+    "weight": null,
+    "maxWeight": 3
+  },
+  {
+    "key": "ETHER",
+    "tier": "COMMON",
+    "weight": null,
+    "maxWeight": 9
+  },
+  {
+    "key": "MAX_ETHER",
+    "tier": "COMMON",
+    "weight": null,
+    "maxWeight": 3
+  },
+  {
+    "key": "LURE",
+    "tier": "COMMON",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "TEMP_STAT_STAGE_BOOSTER",
+    "tier": "COMMON",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "BERRY",
+    "tier": "COMMON",
+    "weight": 2,
+    "maxWeight": 2
+  },
+  {
+    "key": "TM_COMMON",
+    "tier": "COMMON",
+    "weight": 2,
+    "maxWeight": 2
+  },
+  {
+    "key": "GREAT_BALL",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 6
+  },
+  {
+    "key": "PP_UP",
+    "tier": "GREAT",
+    "weight": 2,
+    "maxWeight": 2
+  },
+  {
+    "key": "FULL_HEAL",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 18
+  },
+  {
+    "key": "REVIVE",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 27
+  },
+  {
+    "key": "MAX_REVIVE",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 9
+  },
+  {
+    "key": "SACRED_ASH",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 1
+  },
+  {
+    "key": "HYPER_POTION",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 9
+  },
+  {
+    "key": "MAX_POTION",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 3
+  },
+  {
+    "key": "FULL_RESTORE",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 3
+  },
+  {
+    "key": "ELIXIR",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 9
+  },
+  {
+    "key": "MAX_ELIXIR",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 3
+  },
+  {
+    "key": "DIRE_HIT",
+    "tier": "GREAT",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "SUPER_LURE",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "NUGGET",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "SPECIES_STAT_BOOSTER",
+    "tier": "GREAT",
+    "weight": 2,
+    "maxWeight": 2
+  },
+  {
+    "key": "EVOLUTION_ITEM",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 8
+  },
+  {
+    "key": "MAP",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 2
+  },
+  {
+    "key": "SOOTHE_BELL",
+    "tier": "GREAT",
+    "weight": 2,
+    "maxWeight": 2
+  },
+  {
+    "key": "TM_GREAT",
+    "tier": "GREAT",
+    "weight": 3,
+    "maxWeight": 3
+  },
+  {
+    "key": "MEMORY_MUSHROOM",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 4
+  },
+  {
+    "key": "ER_ABILITY_CAPSULE",
+    "tier": "GREAT",
+    "weight": 2,
+    "maxWeight": 2
+  },
+  {
+    "key": "BASE_STAT_BOOSTER",
+    "tier": "GREAT",
+    "weight": 3,
+    "maxWeight": 3
+  },
+  {
+    "key": "TERA_SHARD",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "DNA_SPLICERS",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 4
+  },
+  {
+    "key": "VOUCHER",
+    "tier": "GREAT",
+    "weight": null,
+    "maxWeight": 1
+  },
+  {
+    "key": "ULTRA_BALL",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 15
+  },
+  {
+    "key": "MAX_LURE",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "BIG_NUGGET",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "PP_MAX",
+    "tier": "ULTRA",
+    "weight": 3,
+    "maxWeight": 3
+  },
+  {
+    "key": "MINT",
+    "tier": "ULTRA",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "SPEED_ORDER",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 4
+  },
+  {
+    "key": "RARE_EVOLUTION_ITEM",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 32
+  },
+  {
+    "key": "FORM_CHANGE_ITEM",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 24
+  },
+  {
+    "key": "AMULET_COIN",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "EVIOLITE",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "RARE_SPECIES_STAT_BOOSTER",
+    "tier": "ULTRA",
+    "weight": 12,
+    "maxWeight": 12
+  },
+  {
+    "key": "LEEK",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 12
+  },
+  {
+    "key": "TOXIC_ORB",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 10
+  },
+  {
+    "key": "FLAME_ORB",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 10
+  },
+  {
+    "key": "FROSTBITE_ORB",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 10
+  },
+  {
+    "key": "MYSTICAL_ROCK",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 10
+  },
+  {
+    "key": "REVIVER_SEED",
+    "tier": "ULTRA",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "CANDY_JAR",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "ATTACK_TYPE_BOOSTER",
+    "tier": "ULTRA",
+    "weight": 9,
+    "maxWeight": 9
+  },
+  {
+    "key": "TM_ULTRA",
+    "tier": "ULTRA",
+    "weight": 11,
+    "maxWeight": 11
+  },
+  {
+    "key": "RARER_CANDY",
+    "tier": "ULTRA",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "GOLDEN_PUNCH",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "IV_SCANNER",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "EXP_CHARM",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "EXP_SHARE",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "TERA_ORB",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 4
+  },
+  {
+    "key": "QUICK_CLAW",
+    "tier": "ULTRA",
+    "weight": 3,
+    "maxWeight": 3
+  },
+  {
+    "key": "WIDE_LENS",
+    "tier": "ULTRA",
+    "weight": 7,
+    "maxWeight": 7
+  },
+  {
+    "key": "ER_CHILI_SAMPLE",
+    "tier": "ULTRA",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "ER_COPPER_ROD",
+    "tier": "ULTRA",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "ER_RUSTY_CLAW",
+    "tier": "ULTRA",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "ER_SPIKED_KNUCKLES",
+    "tier": "ULTRA",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "ER_LOADED_DICE",
+    "tier": "ULTRA",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "ER_LUCKY_HEART",
+    "tier": "ULTRA",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "ER_DEX_NAV",
+    "tier": "ULTRA",
+    "weight": 6,
+    "maxWeight": 6
+  },
+  {
+    "key": "ER_POWER_HERB",
+    "tier": "ULTRA",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "ER_LEARNERS_SHROOM",
+    "tier": "ULTRA",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "ROGUE_BALL",
+    "tier": "ROGUE",
+    "weight": null,
+    "maxWeight": 16
+  },
+  {
+    "key": "RELIC_GOLD",
+    "tier": "ROGUE",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "LEFTOVERS",
+    "tier": "ROGUE",
+    "weight": 3,
+    "maxWeight": 3
+  },
+  {
+    "key": "SHELL_BELL",
+    "tier": "ROGUE",
+    "weight": 3,
+    "maxWeight": 3
+  },
+  {
+    "key": "BERRY_POUCH",
+    "tier": "ROGUE",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "GRIP_CLAW",
+    "tier": "ROGUE",
+    "weight": 5,
+    "maxWeight": 5
+  },
+  {
+    "key": "SCOPE_LENS",
+    "tier": "ROGUE",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "BATON",
+    "tier": "ROGUE",
+    "weight": 2,
+    "maxWeight": 2
+  },
+  {
+    "key": "SOUL_DEW",
+    "tier": "ROGUE",
+    "weight": 7,
+    "maxWeight": 7
+  },
+  {
+    "key": "CATCHING_CHARM",
+    "tier": "ROGUE",
+    "weight": null,
+    "maxWeight": 4
+  },
+  {
+    "key": "ABILITY_CHARM",
+    "tier": "ROGUE",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "ABILITY_RANDOMIZER",
+    "tier": "ROGUE",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "MOVE_SLOT_EXPANDER",
+    "tier": "ROGUE",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "ER_OMNI_GEM",
+    "tier": "ROGUE",
+    "weight": 3,
+    "maxWeight": 3
+  },
+  {
+    "key": "DAMAGE_CALCULATOR",
+    "tier": "ROGUE",
+    "weight": null,
+    "maxWeight": 4
+  },
+  {
+    "key": "FOCUS_BAND",
+    "tier": "ROGUE",
+    "weight": 5,
+    "maxWeight": 5
+  },
+  {
+    "key": "KINGS_ROCK",
+    "tier": "ROGUE",
+    "weight": 3,
+    "maxWeight": 3
+  },
+  {
+    "key": "LOCK_CAPSULE",
+    "tier": "ROGUE",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "SUPER_EXP_CHARM",
+    "tier": "ROGUE",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "RARE_FORM_CHANGE_ITEM",
+    "tier": "ROGUE",
+    "weight": null,
+    "maxWeight": 24
+  },
+  {
+    "key": "MEGA_BRACELET",
+    "tier": "ROGUE",
+    "weight": null,
+    "maxWeight": 36
+  },
+  {
+    "key": "DYNAMAX_BAND",
+    "tier": "ROGUE",
+    "weight": null,
+    "maxWeight": 36
+  },
+  {
+    "key": "VOUCHER_PLUS",
+    "tier": "ROGUE",
+    "weight": null,
+    "maxWeight": 3
+  },
+  {
+    "key": "MASTER_BALL",
+    "tier": "MASTER",
+    "weight": null,
+    "maxWeight": 24
+  },
+  {
+    "key": "SHINY_CHARM",
+    "tier": "MASTER",
+    "weight": 14,
+    "maxWeight": 14
+  },
+  {
+    "key": "HEALING_CHARM",
+    "tier": "MASTER",
+    "weight": 18,
+    "maxWeight": 18
+  },
+  {
+    "key": "MULTI_LENS",
+    "tier": "MASTER",
+    "weight": 18,
+    "maxWeight": 18
+  },
+  {
+    "key": "VOUCHER_PREMIUM",
+    "tier": "MASTER",
+    "weight": null,
+    "maxWeight": 5
+  },
+  {
+    "key": "DNA_SPLICERS",
+    "tier": "MASTER",
+    "weight": null,
+    "maxWeight": 24
+  },
+  {
+    "key": "MINI_BLACK_HOLE",
+    "tier": "MASTER",
+    "weight": null,
+    "maxWeight": 1
+  }
+]

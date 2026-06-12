@@ -63,8 +63,9 @@ const ER_CANONICAL_RIVAL_WAVES: ReadonlyArray<readonly [number, TrainerType]> = 
 /** Extra-trainer cadence per difficulty: force a trainer when `wave % N === 0`. */
 // ER (#346): Elite eased from every-3rd to every-4th eligible wave — testers
 // found the trainer density slightly too high. Hell stays a near-continuous
-// gauntlet.
-const ER_TRAINER_CADENCE: Readonly<Record<string, number>> = {
+// gauntlet. Exported as the DEFAULT the editor tooling shows next to any
+// er-trainer-tuning.json override.
+export const ER_TRAINER_CADENCE: Readonly<Record<string, number>> = {
   elite: 4,
   hell: 2,
 };

@@ -898,6 +898,12 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
     enemy.generateAndPopulateMoveset();
     enemy.calculateStats();
     enemy.generateName();
+    // ER (#434): the species changed AFTER EncounterPhase already loaded the
+    // enemy's sprite assets - without an explicit reload the battle keeps the
+    // OLD species' texture bound (live report: Iron Voca's sprite under a
+    // 'Swadloon' nameplate). Fire-and-forget is fine: the trainer intro
+    // dialogue + slide-in leave ample frames for the fetch before summon.
+    void enemy.loadAssets(false);
   } catch {
     // Curve enforcement must never break enemy generation.
   }
@@ -929,6 +935,9 @@ function revertEarlyMega(enemy: EnemyPokemon): void {
       }
       enemy.calculateStats();
       enemy.generateName();
+      // ER (#434): see enforceErEliteBstCurve - rebind the sprite to the
+      // base species after the late swap.
+      void enemy.loadAssets(false);
       return;
     }
   }
@@ -939,6 +948,8 @@ function revertEarlyMega(enemy: EnemyPokemon): void {
     enemy.formIndex = 0;
     enemy.calculateStats();
     enemy.generateName();
+    // ER (#434): the form changed after asset load - rebind to the base form.
+    void enemy.loadAssets(false);
   }
 }
 
@@ -1040,8 +1051,9 @@ export function hasErRosterOverride(trainer: Trainer): boolean {
 // column uses an undecodable newer-ROM id space — see the builder script).
 // =============================================================================
 
-/** % of eligible (Elite/Hell, regular, non-rival) trainer waves that field a factory team. */
-const ER_FACTORY_TEAM_CHANCE_PCT = 15;
+/** % of eligible (Elite/Hell, regular, non-rival) trainer waves that field a factory team.
+ * Exported as the DEFAULT the editor tooling shows next to any er-trainer-tuning.json override. */
+export const ER_FACTORY_TEAM_CHANCE_PCT = 15;
 
 interface ErFactorySetResolved {
   readonly speciesId: number;

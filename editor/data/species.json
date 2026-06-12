@@ -2,3836 +2,6193 @@
   {
     "const": "SPECIES_ABRA",
     "name": "Abra",
-    "slug": "abra"
+    "slug": "abra",
+    "id": 63,
+    "dex": 63,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_ABRA_REDUX",
     "name": "Abra Redux",
-    "slug": "abra_redux"
+    "slug": "abra_redux",
+    "id": 10694,
+    "dex": 63,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_ABSOL",
     "name": "Absol",
-    "slug": "absol"
-  },
-  {
-    "const": "SPECIES_AEGISLASH_BLADE",
-    "name": "Aegislash Blade",
-    "slug": "aegislash_blade"
-  },
-  {
-    "const": "SPECIES_AEGISLASH_BLADE_REDUX",
-    "name": "Aegislash Blade Redux",
-    "slug": "aegislash_blade_redux"
+    "slug": "absol",
+    "id": 359,
+    "dex": 359,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_AERODACTYL",
     "name": "Aerodactyl",
-    "slug": "aerodactyl"
+    "slug": "aerodactyl",
+    "id": 142,
+    "dex": 142,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_AIPOM",
     "name": "Aipom",
-    "slug": "aipom"
-  },
-  {
-    "const": "SPECIES_ALOLA_DIGLETT",
-    "name": "Alola Diglett",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_ALOLA_GEODUDE",
-    "name": "Alola Geodude",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_ALOLA_GRIMER",
-    "name": "Alola Grimer",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_ALOLA_MEOWTH",
-    "name": "Alola Meowth",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_ALOLA_RATTATA",
-    "name": "Alola Rattata",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_ALOLA_SANDSHREW",
-    "name": "Alola Sandshrew",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_ALOLA_VULPIX",
-    "name": "Alola Vulpix",
-    "slug": null
+    "slug": "aipom",
+    "id": 190,
+    "dex": 190,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_ALOMOMOLA",
     "name": "Alomomola",
-    "slug": "alomomola"
+    "slug": "alomomola",
+    "id": 594,
+    "dex": 594,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_AMAURA",
     "name": "Amaura",
-    "slug": "amaura"
+    "slug": "amaura",
+    "id": 698,
+    "dex": 698,
+    "eggTier": 1,
+    "cost": 2
   },
   {
     "const": "SPECIES_ANORITH",
     "name": "Anorith",
-    "slug": "anorith"
+    "slug": "anorith",
+    "id": 347,
+    "dex": 347,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_APPLIN",
     "name": "Applin",
-    "slug": "applin"
+    "slug": "applin",
+    "id": 840,
+    "dex": 840,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_ARCEUS",
     "name": "Arceus",
-    "slug": "arceus"
+    "slug": "arceus",
+    "id": 493,
+    "dex": 493,
+    "eggTier": 3,
+    "cost": 9
   },
   {
     "const": "SPECIES_ARCHEN",
     "name": "Archen",
-    "slug": "archen"
+    "slug": "archen",
+    "id": 566,
+    "dex": 566,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_ARCTOVISH",
     "name": "Arctovish",
-    "slug": "arctovish"
+    "slug": "arctovish",
+    "id": 883,
+    "dex": 883,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_ARCTOZOLT",
     "name": "Arctozolt",
-    "slug": "arctozolt"
+    "slug": "arctozolt",
+    "id": 881,
+    "dex": 881,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_ARON",
     "name": "Aron",
-    "slug": "aron"
+    "slug": "aron",
+    "id": 304,
+    "dex": 304,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_ARON_REDUX",
     "name": "Aron Redux",
-    "slug": "aron_redux"
+    "slug": "aron_redux",
+    "id": 10839,
+    "dex": 304,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_ARROKUDA",
     "name": "Arrokuda",
-    "slug": "arrokuda"
+    "slug": "arrokuda",
+    "id": 846,
+    "dex": 846,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_ARTICUNO",
     "name": "Articuno",
-    "slug": "articuno"
+    "slug": "articuno",
+    "id": 144,
+    "dex": 144,
+    "eggTier": 2,
+    "cost": 5
+  },
+  {
+    "const": "SPECIES_GALAR_ARTICUNO",
+    "name": "Articuno",
+    "slug": null,
+    "id": 4144,
+    "dex": 4144,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_ARTICUNO_EX",
     "name": "Articuno Ex",
-    "slug": "articuno_ex"
+    "slug": "articuno_ex",
+    "id": 10621,
+    "dex": 4144,
+    "eggTier": 3,
+    "cost": 9
   },
   {
     "const": "SPECIES_GRENINJA_ASH",
     "name": "Ash-Greninja",
-    "slug": "greninja_ash"
+    "slug": "greninja_ash",
+    "id": 10280,
+    "dex": null,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_AUDINO",
     "name": "Audino",
-    "slug": "audino"
+    "slug": "audino",
+    "id": 531,
+    "dex": 531,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_AXEW",
     "name": "Axew",
-    "slug": "axew"
+    "slug": "axew",
+    "id": 610,
+    "dex": 610,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_AZELF",
     "name": "Azelf",
-    "slug": "azelf"
+    "slug": "azelf",
+    "id": 482,
+    "dex": 482,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_AZELF_REDUX",
     "name": "Azelf Redux",
-    "slug": "azelf_redux"
+    "slug": "azelf_redux",
+    "id": 10712,
+    "dex": 482,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_AZURILL",
     "name": "Azurill",
-    "slug": "azurill"
+    "slug": "azurill",
+    "id": 298,
+    "dex": 298,
+    "eggTier": 0,
+    "cost": 4
   },
   {
     "const": "SPECIES_BAGON",
     "name": "Bagon",
-    "slug": "bagon"
+    "slug": "bagon",
+    "id": 371,
+    "dex": 371,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_BALTOY",
     "name": "Baltoy",
-    "slug": "baltoy"
+    "slug": "baltoy",
+    "id": 343,
+    "dex": 343,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_BARBOACH",
     "name": "Barboach",
-    "slug": "barboach"
+    "slug": "barboach",
+    "id": 339,
+    "dex": 339,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_BASCULIN",
     "name": "Basculin",
-    "slug": "basculin"
-  },
-  {
-    "const": "SPECIES_BASCULIN_BLUE_STRIPED",
-    "name": "Basculin Blue",
-    "slug": "basculin_blue_striped"
-  },
-  {
-    "const": "SPECIES_BASCULIN_WHITESTRIPED",
-    "name": "Basculin White",
-    "slug": "basculin_whitestriped"
+    "slug": "basculin",
+    "id": 550,
+    "dex": 550,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_BELDUM",
     "name": "Beldum",
-    "slug": "beldum"
+    "slug": "beldum",
+    "id": 374,
+    "dex": 374,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_BELLSPROUT",
     "name": "Bellsprout",
-    "slug": "bellsprout"
+    "slug": "bellsprout",
+    "id": 69,
+    "dex": 69,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_BELLSPROUT_REDUX",
     "name": "Bellsprout Redux",
-    "slug": "bellsprout_redux"
+    "slug": "bellsprout_redux",
+    "id": 10667,
+    "dex": 69,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_BERGMITE",
     "name": "Bergmite",
-    "slug": "bergmite"
+    "slug": "bergmite",
+    "id": 712,
+    "dex": 712,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_BEWEAR_ANGRY",
     "name": "Bewear Angry",
-    "slug": "bewear_angry"
+    "slug": "bewear_angry",
+    "id": 10766,
+    "dex": 760,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_BIDOOF",
     "name": "Bidoof",
-    "slug": "bidoof"
+    "slug": "bidoof",
+    "id": 399,
+    "dex": 399,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_BINACLE",
     "name": "Binacle",
-    "slug": "binacle"
+    "slug": "binacle",
+    "id": 688,
+    "dex": 688,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_BLACEPHALON",
     "name": "Blacephalon",
-    "slug": "blacephalon"
+    "slug": "blacephalon",
+    "id": 806,
+    "dex": 806,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_BLIPBUG",
     "name": "Blipbug",
-    "slug": "blipbug"
+    "slug": "blipbug",
+    "id": 824,
+    "dex": 824,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_BLITZLE",
     "name": "Blitzle",
-    "slug": "blitzle"
+    "slug": "blitzle",
+    "id": 522,
+    "dex": 522,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_BLIZZARD_MAW",
     "name": "Blizzard Maw",
-    "slug": "blizzard_maw"
+    "slug": "blizzard_maw",
+    "id": 10022,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 6
   },
   {
     "const": "SPECIES_BLOCLI",
     "name": "Blocli",
-    "slug": "blocli"
-  },
-  {
-    "const": "SPECIES_BLOODMOON_URSALUNA",
-    "name": "Bloodmoon Ursaluna",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_DARMANITAN_REDUX_BLUNDER",
-    "name": "Blunder-Darmanitan",
-    "slug": "darmanitan_redux_blunder"
+    "slug": "blocli",
+    "id": 10083,
+    "dex": null,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_BOMBIRDIER",
     "name": "Bombirdier",
-    "slug": "bombirdier"
+    "slug": "bombirdier",
+    "id": 962,
+    "dex": 962,
+    "eggTier": 0,
+    "cost": 4
   },
   {
     "const": "SPECIES_BONSLY",
     "name": "Bonsly",
-    "slug": "bonsly"
+    "slug": "bonsly",
+    "id": 438,
+    "dex": 438,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_BOUFFALANT",
     "name": "Bouffalant",
-    "slug": "bouffalant"
+    "slug": "bouffalant",
+    "id": 626,
+    "dex": 626,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_BOUNSWEET",
     "name": "Bounsweet",
-    "slug": "bounsweet"
+    "slug": "bounsweet",
+    "id": 761,
+    "dex": 761,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_BOUNSWEET_REDUX",
     "name": "Bounsweet Redux",
-    "slug": "bounsweet_redux"
+    "slug": "bounsweet_redux",
+    "id": 10788,
+    "dex": 761,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_BRAMBLIN",
     "name": "Bramblin",
-    "slug": "bramblin"
+    "slug": "bramblin",
+    "id": 946,
+    "dex": 946,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_BRONZOR",
     "name": "Bronzor",
-    "slug": "bronzor"
+    "slug": "bronzor",
+    "id": 436,
+    "dex": 436,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_BRUTE_BONNET",
     "name": "Brute Bonnet",
-    "slug": "brute_bonnet"
+    "slug": "brute_bonnet",
+    "id": 986,
+    "dex": 986,
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_BRUXISH",
     "name": "Bruxish",
-    "slug": "bruxish"
+    "slug": "bruxish",
+    "id": 779,
+    "dex": 779,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_BUBBLEO",
     "name": "Bubbleo",
-    "slug": "bubbleo"
+    "slug": "bubbleo",
+    "id": 10038,
+    "dex": null,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_BUDEW",
     "name": "Budew",
-    "slug": "budew"
+    "slug": "budew",
+    "id": 406,
+    "dex": 406,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_BUIZEL",
     "name": "Buizel",
-    "slug": "buizel"
+    "slug": "buizel",
+    "id": 418,
+    "dex": 418,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_BUIZEL_REDUX",
     "name": "Buizel Redux",
-    "slug": "buizel_redux"
+    "slug": "buizel_redux",
+    "id": 10710,
+    "dex": 418,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_BULBASAUR",
     "name": "Bulbasaur",
-    "slug": "bulbasaur"
+    "slug": "bulbasaur",
+    "id": 1,
+    "dex": 1,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_BUNEARY",
     "name": "Buneary",
-    "slug": "buneary"
+    "slug": "buneary",
+    "id": 427,
+    "dex": 427,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_BUNNELBY",
     "name": "Bunnelby",
-    "slug": "bunnelby"
+    "slug": "bunnelby",
+    "id": 659,
+    "dex": 659,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_BURMY",
     "name": "Burmy",
-    "slug": "burmy"
+    "slug": "burmy",
+    "id": 412,
+    "dex": 412,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_BURMY_ETERNA",
     "name": "Burmy Eterna",
-    "slug": "burmy_eterna"
-  },
-  {
-    "const": "SPECIES_BURMY_SANDY_CLOAK",
-    "name": "Burmy Sandy",
-    "slug": "burmy_sandy_cloak"
-  },
-  {
-    "const": "SPECIES_BURMY_TRASH_CLOAK",
-    "name": "Burmy Trash",
-    "slug": "burmy_trash_cloak"
+    "slug": "burmy_eterna",
+    "id": 10042,
+    "dex": 412,
+    "eggTier": 3,
+    "cost": 11
   },
   {
     "const": "SPECIES_BUZZWOLE",
     "name": "Buzzwole",
-    "slug": "buzzwole"
+    "slug": "buzzwole",
+    "id": 794,
+    "dex": 794,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_CACNEA",
     "name": "Cacnea",
-    "slug": "cacnea"
+    "slug": "cacnea",
+    "id": 331,
+    "dex": 331,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_CALYREX",
     "name": "Calyrex",
-    "slug": "calyrex"
+    "slug": "calyrex",
+    "id": 898,
+    "dex": 898,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_CALYREX_CLOUD_RIDER",
     "name": "Calyrex Cloud Rider",
-    "slug": "calyrex_cloud_rider"
-  },
-  {
-    "const": "SPECIES_CALYREX_ICE_RIDER",
-    "name": "Calyrex Ice Rider",
-    "slug": "calyrex_ice_rider"
-  },
-  {
-    "const": "SPECIES_CALYREX_SHADOW_RIDER",
-    "name": "Calyrex Shadow Rider",
-    "slug": "calyrex_shadow_rider"
+    "slug": "calyrex_cloud_rider",
+    "id": 10772,
+    "dex": 898,
+    "eggTier": 3,
+    "cost": 9
   },
   {
     "const": "SPECIES_CAPSAKID",
     "name": "Capsakid",
-    "slug": "capsakid"
+    "slug": "capsakid",
+    "id": 951,
+    "dex": 951,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CARBINK",
     "name": "Carbink",
-    "slug": "carbink"
+    "slug": "carbink",
+    "id": 703,
+    "dex": 703,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_CARNIVINE",
     "name": "Carnivine",
-    "slug": "carnivine"
+    "slug": "carnivine",
+    "id": 455,
+    "dex": 455,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_CARVANHA",
     "name": "Carvanha",
-    "slug": "carvanha"
+    "slug": "carvanha",
+    "id": 318,
+    "dex": 318,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CASTFORM",
     "name": "Castform",
-    "slug": "castform"
-  },
-  {
-    "const": "SPECIES_CASTFORM_FOGGY",
-    "name": "Castform Foggy",
-    "slug": "castform_foggy"
-  },
-  {
-    "const": "SPECIES_CASTFORM_RAINY",
-    "name": "Castform Rainy",
-    "slug": "castform_rainy"
-  },
-  {
-    "const": "SPECIES_CASTFORM_SANDY",
-    "name": "Castform Sandy",
-    "slug": "castform_sandy"
-  },
-  {
-    "const": "SPECIES_CASTFORM_SNOWY",
-    "name": "Castform Snowy",
-    "slug": "castform_snowy"
-  },
-  {
-    "const": "SPECIES_CASTFORM_SUNNY",
-    "name": "Castform Sunny",
-    "slug": "castform_sunny"
+    "slug": "castform",
+    "id": 351,
+    "dex": 351,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_CATERPIE",
     "name": "Caterpie",
-    "slug": "caterpie"
+    "slug": "caterpie",
+    "id": 10,
+    "dex": 10,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_CELEBI",
     "name": "Celebi",
-    "slug": "celebi"
+    "slug": "celebi",
+    "id": 251,
+    "dex": 251,
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_CELESTEELA",
     "name": "Celesteela",
-    "slug": "celesteela"
+    "slug": "celesteela",
+    "id": 797,
+    "dex": 797,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_CETODDLE",
     "name": "Cetoddle",
-    "slug": "cetoddle"
+    "slug": "cetoddle",
+    "id": 974,
+    "dex": 974,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CETODDLE_REDUX",
     "name": "Cetoddle Redux",
-    "slug": "cetoddle_redux"
+    "slug": "cetoddle_redux",
+    "id": 10628,
+    "dex": 974,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CHARCADET",
     "name": "Charcadet",
-    "slug": "charcadet"
+    "slug": "charcadet",
+    "id": 935,
+    "dex": 935,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_CHARMANDER",
     "name": "Charmander",
-    "slug": "charmander"
+    "slug": "charmander",
+    "id": 4,
+    "dex": 4,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CHATOT",
     "name": "Chatot",
-    "slug": "chatot"
-  },
-  {
-    "const": "SPECIES_CHERRIM_SUNSHINE",
-    "name": "Cherrim Sunshine",
-    "slug": "cherrim_sunshine"
+    "slug": "chatot",
+    "id": 441,
+    "dex": 441,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_CHERUBI",
     "name": "Cherubi",
-    "slug": "cherubi"
-  },
-  {
-    "const": "SPECIES_CHESNAUGHT_BATTLE_BOND",
-    "name": "Chesnaught Battle Bond",
-    "slug": "chesnaught_battle_bond"
+    "slug": "cherubi",
+    "id": 420,
+    "dex": 420,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_CHESPIN",
     "name": "Chespin",
-    "slug": "chespin"
+    "slug": "chespin",
+    "id": 650,
+    "dex": 650,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CHEWTLE",
     "name": "Chewtle",
-    "slug": "chewtle"
+    "slug": "chewtle",
+    "id": 833,
+    "dex": 833,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CHI_YU",
-    "name": "Chi Yu",
-    "slug": "chi_yu"
+    "name": "Chi-Yu",
+    "slug": "chi_yu",
+    "id": 1004,
+    "dex": 1004,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_CHIEN_PAO",
-    "name": "Chien Pao",
-    "slug": "chien_pao"
+    "name": "Chien-Pao",
+    "slug": "chien_pao",
+    "id": 1002,
+    "dex": 1002,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_CHIKORITA",
     "name": "Chikorita",
-    "slug": "chikorita"
+    "slug": "chikorita",
+    "id": 152,
+    "dex": 152,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_CHIMCHAR",
     "name": "Chimchar",
-    "slug": "chimchar"
+    "slug": "chimchar",
+    "id": 390,
+    "dex": 390,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CHIMCHAR_REDUX",
     "name": "Chimchar Redux",
-    "slug": "chimchar_redux"
+    "slug": "chimchar_redux",
+    "id": 10782,
+    "dex": 390,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CHINCHOU",
     "name": "Chinchou",
-    "slug": "chinchou"
+    "slug": "chinchou",
+    "id": 170,
+    "dex": 170,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_CHINGLING",
     "name": "Chingling",
-    "slug": "chingling"
+    "slug": "chingling",
+    "id": 433,
+    "dex": 433,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_CLAMPERL",
     "name": "Clamperl",
-    "slug": "clamperl"
+    "slug": "clamperl",
+    "id": 366,
+    "dex": 366,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CLAUNCHER",
     "name": "Clauncher",
-    "slug": "clauncher"
+    "slug": "clauncher",
+    "id": 692,
+    "dex": 692,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CLEFFA",
     "name": "Cleffa",
-    "slug": "cleffa"
+    "slug": "cleffa",
+    "id": 173,
+    "dex": 173,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_CLEFFA_REDUX",
     "name": "Cleffa Redux",
-    "slug": "cleffa_redux"
+    "slug": "cleffa_redux",
+    "id": 10799,
+    "dex": 173,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CHESNAUGHT_CLEMONT",
     "name": "Clemont-Chesnaught",
-    "slug": "chesnaught_clemont"
+    "slug": "chesnaught_clemont",
+    "id": 10452,
+    "dex": null,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_CLOBBOPUS",
     "name": "Clobbopus",
-    "slug": "clobbopus"
+    "slug": "clobbopus",
+    "id": 852,
+    "dex": 852,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_COBALION",
     "name": "Cobalion",
-    "slug": "cobalion"
+    "slug": "cobalion",
+    "id": 638,
+    "dex": 638,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_COMBEE",
     "name": "Combee",
-    "slug": "combee"
+    "slug": "combee",
+    "id": 415,
+    "dex": 415,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_COMFEY",
     "name": "Comfey",
-    "slug": "comfey"
+    "slug": "comfey",
+    "id": 764,
+    "dex": 764,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_CORM",
     "name": "Corm",
-    "slug": "corm"
+    "slug": "corm",
+    "id": 10019,
+    "dex": null,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_HARVESTING_TYRANT",
     "name": "Corn Tyrant",
-    "slug": "harvesting_tyrant"
+    "slug": "harvesting_tyrant",
+    "id": 10088,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 6
   },
   {
     "const": "SPECIES_CORPHISH",
     "name": "Corphish",
-    "slug": "corphish"
+    "slug": "corphish",
+    "id": 341,
+    "dex": 341,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CORSOLA",
     "name": "Corsola",
-    "slug": "corsola"
+    "slug": "corsola",
+    "id": 222,
+    "dex": 222,
+    "eggTier": 0,
+    "cost": 2
+  },
+  {
+    "const": "SPECIES_GALAR_CORSOLA",
+    "name": "Corsola",
+    "slug": null,
+    "id": 4222,
+    "dex": 4222,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_COSMOG",
     "name": "Cosmog",
-    "slug": "cosmog"
+    "slug": "cosmog",
+    "id": 789,
+    "dex": 789,
+    "eggTier": 3,
+    "cost": 7
   },
   {
     "const": "SPECIES_COTTONEE",
     "name": "Cottonee",
-    "slug": "cottonee"
+    "slug": "cottonee",
+    "id": 546,
+    "dex": 546,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CRABRAWLER",
     "name": "Crabrawler",
-    "slug": "crabrawler"
+    "slug": "crabrawler",
+    "id": 739,
+    "dex": 739,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CRABRAWLER_REDUX",
     "name": "Crabrawler Redux",
-    "slug": "crabrawler_redux"
+    "slug": "crabrawler_redux",
+    "id": 10797,
+    "dex": 739,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_JAGGED_CHUNGULIS",
     "name": "Crag Hopper",
-    "slug": "jagged_chungulis"
+    "slug": "jagged_chungulis",
+    "id": 10060,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 6
   },
   {
     "const": "SPECIES_CRAMORANT",
     "name": "Cramorant",
-    "slug": "cramorant"
-  },
-  {
-    "const": "SPECIES_CRAMORANT_GORGING",
-    "name": "Cramorant Gorging",
-    "slug": "cramorant_gorging"
-  },
-  {
-    "const": "SPECIES_CRAMORANT_GULPING",
-    "name": "Cramorant Gulping",
-    "slug": "cramorant_gulping"
+    "slug": "cramorant",
+    "id": 845,
+    "dex": 845,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CRANIDOS",
     "name": "Cranidos",
-    "slug": "cranidos"
+    "slug": "cranidos",
+    "id": 408,
+    "dex": 408,
+    "eggTier": 1,
+    "cost": 2
   },
   {
     "const": "SPECIES_CRESSELIA",
     "name": "Cresselia",
-    "slug": "cresselia"
+    "slug": "cresselia",
+    "id": 488,
+    "dex": 488,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_CROAGUNK",
     "name": "Croagunk",
-    "slug": "croagunk"
+    "slug": "croagunk",
+    "id": 453,
+    "dex": 453,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_CRYOGONAL",
     "name": "Cryogonal",
-    "slug": "cryogonal"
+    "slug": "cryogonal",
+    "id": 615,
+    "dex": 615,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_CUBCHOO",
     "name": "Cubchoo",
-    "slug": "cubchoo"
+    "slug": "cubchoo",
+    "id": 613,
+    "dex": 613,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_CUBONE",
     "name": "Cubone",
-    "slug": "cubone"
+    "slug": "cubone",
+    "id": 104,
+    "dex": 104,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CUFANT",
     "name": "Cufant",
-    "slug": "cufant"
+    "slug": "cufant",
+    "id": 878,
+    "dex": 878,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CUTIEFLY",
     "name": "Cutiefly",
-    "slug": "cutiefly"
+    "slug": "cutiefly",
+    "id": 742,
+    "dex": 742,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_CYCLIZAR",
     "name": "Cyclizar",
-    "slug": "cyclizar"
+    "slug": "cyclizar",
+    "id": 967,
+    "dex": 967,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_CYNDAQUIL",
     "name": "Cyndaquil",
-    "slug": "cyndaquil"
+    "slug": "cyndaquil",
+    "id": 155,
+    "dex": 155,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_DARKRAI",
     "name": "Darkrai",
-    "slug": "darkrai"
+    "slug": "darkrai",
+    "id": 491,
+    "dex": 491,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_DARKRAI_NIGHTMARE",
     "name": "Darkrai Nightmare",
-    "slug": "darkrai_nightmare"
-  },
-  {
-    "const": "SPECIES_DARMANITAN_REDUX_AURA",
-    "name": "Darmanitan Aura",
-    "slug": "darmanitan_redux_aura"
-  },
-  {
-    "const": "SPECIES_DARMANITAN_REDUX_BOND",
-    "name": "Darmanitan Redux Bond",
-    "slug": "darmanitan_redux_bond"
-  },
-  {
-    "const": "SPECIES_DARMANITAN_ZEN_MODE",
-    "name": "Darmanitan Zen",
-    "slug": "darmanitan_zen_mode"
-  },
-  {
-    "const": "SPECIES_DARMANITAN_ZEN_MODE_GALARIAN",
-    "name": "Darmanitan Zen Mode Galarian",
-    "slug": "darmanitan_zen_mode_galarian"
+    "slug": "darkrai_nightmare",
+    "id": 10769,
+    "dex": 491,
+    "eggTier": 3,
+    "cost": 10
   },
   {
     "const": "SPECIES_DARUMAKA",
     "name": "Darumaka",
-    "slug": "darumaka"
+    "slug": "darumaka",
+    "id": 554,
+    "dex": 554,
+    "eggTier": 1,
+    "cost": 4
+  },
+  {
+    "const": "SPECIES_GALAR_DARUMAKA",
+    "name": "Darumaka",
+    "slug": null,
+    "id": 4554,
+    "dex": 4554,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_DARUMAKA_REDUX",
     "name": "Darumaka Redux",
-    "slug": "darumaka_redux"
+    "slug": "darumaka_redux",
+    "id": 10810,
+    "dex": 4554,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_DEDENNE",
     "name": "Dedenne",
-    "slug": "dedenne"
+    "slug": "dedenne",
+    "id": 702,
+    "dex": 702,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_DEERLING",
     "name": "Deerling",
-    "slug": "deerling"
-  },
-  {
-    "const": "SPECIES_DEERLING_AUTUMN",
-    "name": "Deerling Autumn",
-    "slug": "deerling_autumn"
-  },
-  {
-    "const": "SPECIES_DEERLING_SUMMER",
-    "name": "Deerling Summer",
-    "slug": "deerling_summer"
-  },
-  {
-    "const": "SPECIES_DEERLING_WINTER",
-    "name": "Deerling Winter",
-    "slug": "deerling_winter"
+    "slug": "deerling",
+    "id": 585,
+    "dex": 585,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_DEINO",
     "name": "Deino",
-    "slug": "deino"
+    "slug": "deino",
+    "id": 633,
+    "dex": 633,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_DEINO_REDUX",
     "name": "Deino Redux",
-    "slug": "deino_redux"
+    "slug": "deino_redux",
+    "id": 10730,
+    "dex": 633,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_DELIBIRD",
     "name": "Delibird",
-    "slug": "delibird"
+    "slug": "delibird",
+    "id": 225,
+    "dex": 225,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_DEOXYS",
     "name": "Deoxys",
-    "slug": "deoxys"
-  },
-  {
-    "const": "SPECIES_DEOXYS_ATTACK",
-    "name": "Deoxys Attack",
-    "slug": "deoxys_attack"
-  },
-  {
-    "const": "SPECIES_DEOXYS_DEFENSE",
-    "name": "Deoxys Defense",
-    "slug": "deoxys_defense"
-  },
-  {
-    "const": "SPECIES_DEOXYS_SPEED",
-    "name": "Deoxys Speed",
-    "slug": "deoxys_speed"
+    "slug": "deoxys",
+    "id": 386,
+    "dex": 386,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_DEWPIDER",
     "name": "Dewpider",
-    "slug": "dewpider"
+    "slug": "dewpider",
+    "id": 751,
+    "dex": 751,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_DEWPIDER_REDUX",
     "name": "Dewpider Redux",
-    "slug": "dewpider_redux"
+    "slug": "dewpider_redux",
+    "id": 10819,
+    "dex": 751,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_DHELMISE",
     "name": "Dhelmise",
-    "slug": "dhelmise"
+    "slug": "dhelmise",
+    "id": 781,
+    "dex": 781,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_DIALGA",
     "name": "Dialga",
-    "slug": "dialga"
+    "slug": "dialga",
+    "id": 483,
+    "dex": 483,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_DIANCIE",
     "name": "Diancie",
-    "slug": "diancie"
+    "slug": "diancie",
+    "id": 719,
+    "dex": 719,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_DIGLETT",
     "name": "Diglett",
-    "slug": "diglett"
+    "slug": "diglett",
+    "id": 50,
+    "dex": 50,
+    "eggTier": 0,
+    "cost": 2
+  },
+  {
+    "const": "SPECIES_ALOLA_DIGLETT",
+    "name": "Diglett",
+    "slug": null,
+    "id": 2050,
+    "dex": 2050,
+    "eggTier": 1,
+    "cost": 2
   },
   {
     "const": "SPECIES_DITTO",
     "name": "Ditto",
-    "slug": "ditto"
+    "slug": "ditto",
+    "id": 132,
+    "dex": 132,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_DODUO",
     "name": "Doduo",
-    "slug": "doduo"
+    "slug": "doduo",
+    "id": 84,
+    "dex": 84,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_DODUO_REDUX",
     "name": "Doduo Redux",
-    "slug": "doduo_redux"
+    "slug": "doduo_redux",
+    "id": 10739,
+    "dex": 84,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_DONDOZO",
     "name": "Dondozo",
-    "slug": "dondozo"
+    "slug": "dondozo",
+    "id": 977,
+    "dex": 977,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_DRACOVISH",
     "name": "Dracovish",
-    "slug": "dracovish"
+    "slug": "dracovish",
+    "id": 882,
+    "dex": 882,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_DRACOZOLT",
     "name": "Dracozolt",
-    "slug": "dracozolt"
+    "slug": "dracozolt",
+    "id": 880,
+    "dex": 880,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_DRAGONITE_DELIVERY",
     "name": "Dragonite Delivery",
-    "slug": "dragonite_delivery"
+    "slug": "dragonite_delivery",
+    "id": 10752,
+    "dex": 149,
+    "eggTier": 3,
+    "cost": 9
   },
   {
     "const": "SPECIES_DRAMPA",
     "name": "Drampa",
-    "slug": "drampa"
+    "slug": "drampa",
+    "id": 780,
+    "dex": 780,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_DRATINI",
     "name": "Dratini",
-    "slug": "dratini"
+    "slug": "dratini",
+    "id": 147,
+    "dex": 147,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_DREEPY",
     "name": "Dreepy",
-    "slug": "dreepy"
+    "slug": "dreepy",
+    "id": 885,
+    "dex": 885,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_DRIFLOON",
     "name": "Drifloon",
-    "slug": "drifloon"
+    "slug": "drifloon",
+    "id": 425,
+    "dex": 425,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_DRILBUR",
     "name": "Drilbur",
-    "slug": "drilbur"
+    "slug": "drilbur",
+    "id": 529,
+    "dex": 529,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_DRILBUR_REDUX",
     "name": "Drilbur Redux",
-    "slug": "drilbur_redux"
+    "slug": "drilbur_redux",
+    "id": 10656,
+    "dex": 529,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_DROWZEE",
     "name": "Drowzee",
-    "slug": "drowzee"
+    "slug": "drowzee",
+    "id": 96,
+    "dex": 96,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_DRUDDIGON",
     "name": "Druddigon",
-    "slug": "druddigon"
+    "slug": "druddigon",
+    "id": 621,
+    "dex": 621,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_DUCKLETT",
     "name": "Ducklett",
-    "slug": "ducklett"
+    "slug": "ducklett",
+    "id": 580,
+    "dex": 580,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_DUNSPARCE",
     "name": "Dunsparce",
-    "slug": "dunsparce"
+    "slug": "dunsparce",
+    "id": 206,
+    "dex": 206,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_DURALUDON",
     "name": "Duraludon",
-    "slug": "duraludon"
+    "slug": "duraludon",
+    "id": 884,
+    "dex": 884,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_DURANT",
     "name": "Durant",
-    "slug": "durant"
+    "slug": "durant",
+    "id": 632,
+    "dex": 632,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_DUSKULL",
     "name": "Duskull",
-    "slug": "duskull"
+    "slug": "duskull",
+    "id": 355,
+    "dex": 355,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_DWEBBLE",
     "name": "Dwebble",
-    "slug": "dwebble"
+    "slug": "dwebble",
+    "id": 557,
+    "dex": 557,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_EEVEE",
     "name": "Eevee",
-    "slug": "eevee"
-  },
-  {
-    "const": "SPECIES_EEVEE_PARTNER",
-    "name": "Eevee Partner",
-    "slug": "eevee_partner"
+    "slug": "eevee",
+    "id": 133,
+    "dex": 133,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_EISCUE",
     "name": "Eiscue",
-    "slug": "eiscue"
-  },
-  {
-    "const": "SPECIES_EISCUE_NOICE_FACE",
-    "name": "Eiscue Noice Face",
-    "slug": "eiscue_noice_face"
+    "slug": "eiscue",
+    "id": 875,
+    "dex": 875,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_EKANS",
     "name": "Ekans",
-    "slug": "ekans"
+    "slug": "ekans",
+    "id": 23,
+    "dex": 23,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_ELECTRIKE",
     "name": "Electrike",
-    "slug": "electrike"
+    "slug": "electrike",
+    "id": 309,
+    "dex": 309,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_ELEKID",
     "name": "Elekid",
-    "slug": "elekid"
+    "slug": "elekid",
+    "id": 239,
+    "dex": 239,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_ELGYEM",
     "name": "Elgyem",
-    "slug": "elgyem"
+    "slug": "elgyem",
+    "id": 605,
+    "dex": 605,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_EMOLGA",
     "name": "Emolga",
-    "slug": "emolga"
+    "slug": "emolga",
+    "id": 587,
+    "dex": 587,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_ENAMORUS",
     "name": "Enamorus",
-    "slug": "enamorus"
-  },
-  {
-    "const": "SPECIES_ENAMORUS_THERIAN",
-    "name": "Enamorus Therian",
-    "slug": "enamorus_therian"
+    "slug": "enamorus",
+    "id": 905,
+    "dex": 905,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_ENTEI",
     "name": "Entei",
-    "slug": "entei"
+    "slug": "entei",
+    "id": 244,
+    "dex": 244,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_ESPURR",
     "name": "Espurr",
-    "slug": "espurr"
-  },
-  {
-    "const": "SPECIES_ETERNAL_FLOETTE",
-    "name": "Eternal Floette",
-    "slug": null
+    "slug": "espurr",
+    "id": 677,
+    "dex": 677,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_ETERNATUS",
     "name": "Eternatus",
-    "slug": "eternatus"
+    "slug": "eternatus",
+    "id": 890,
+    "dex": 890,
+    "eggTier": 3,
+    "cost": 10
   },
   {
     "const": "SPECIES_EXEGGCUTE",
     "name": "Exeggcute",
-    "slug": "exeggcute"
+    "slug": "exeggcute",
+    "id": 102,
+    "dex": 102,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_EXEGGCUTE_REDUX",
     "name": "Exeggcute Redux",
-    "slug": "exeggcute_redux"
+    "slug": "exeggcute_redux",
+    "id": 10681,
+    "dex": 102,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_FALINKS",
     "name": "Falinks",
-    "slug": "falinks"
+    "slug": "falinks",
+    "id": 870,
+    "dex": 870,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_FARFETCHD",
-    "name": "Farfetch'd",
-    "slug": "farfetchd"
+    "name": "Farfetch’d",
+    "slug": "farfetchd",
+    "id": 83,
+    "dex": 83,
+    "eggTier": 1,
+    "cost": 2
+  },
+  {
+    "const": "SPECIES_GALAR_FARFETCHD",
+    "name": "Farfetch’d",
+    "slug": null,
+    "id": 4083,
+    "dex": 4083,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_FEEBAS",
     "name": "Feebas",
-    "slug": "feebas"
+    "slug": "feebas",
+    "id": 349,
+    "dex": 349,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_FENNEKIN",
     "name": "Fennekin",
-    "slug": "fennekin"
+    "slug": "fennekin",
+    "id": 653,
+    "dex": 653,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_FERROSEED",
     "name": "Ferroseed",
-    "slug": "ferroseed"
+    "slug": "ferroseed",
+    "id": 597,
+    "dex": 597,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_FEZANDIPITI",
     "name": "Fezandipiti",
-    "slug": "fezandipiti"
+    "slug": "fezandipiti",
+    "id": 1016,
+    "dex": 1016,
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_FIDOUGH",
     "name": "Fidough",
-    "slug": "fidough"
+    "slug": "fidough",
+    "id": 926,
+    "dex": 926,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_FINIZEN",
     "name": "Finizen",
-    "slug": "finizen"
+    "slug": "finizen",
+    "id": 963,
+    "dex": 963,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_FINNEON",
     "name": "Finneon",
-    "slug": "finneon"
+    "slug": "finneon",
+    "id": 456,
+    "dex": 456,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_FLABEBE",
     "name": "Flabébé",
-    "slug": "flabebe"
+    "slug": "flabebe",
+    "id": 669,
+    "dex": 669,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_FLAMIGO",
     "name": "Flamigo",
-    "slug": "flamigo"
+    "slug": "flamigo",
+    "id": 973,
+    "dex": 973,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_FLETCHLING",
     "name": "Fletchling",
-    "slug": "fletchling"
+    "slug": "fletchling",
+    "id": 661,
+    "dex": 661,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_FLITTLE",
     "name": "Flittle",
-    "slug": "flittle"
+    "slug": "flittle",
+    "id": 955,
+    "dex": 955,
+    "eggTier": 0,
+    "cost": 3
   },
   {
-    "const": "SPECIES_FLOETTE_ETERNAL_FLOWER",
-    "name": "Floette Eternal Flower",
-    "slug": "floette_eternal_flower"
+    "const": "SPECIES_ETERNAL_FLOETTE",
+    "name": "Floette",
+    "slug": null,
+    "id": 2670,
+    "dex": 2670,
+    "eggTier": 2,
+    "cost": 4
   },
   {
     "const": "SPECIES_FLUTTER_MANE",
     "name": "Flutter Mane",
-    "slug": "flutter_mane"
+    "slug": "flutter_mane",
+    "id": 987,
+    "dex": 987,
+    "eggTier": 2,
+    "cost": 7
+  },
+  {
+    "const": "SPECIES_FLYGON_REDUX_B",
+    "name": "Flygon Redux B",
+    "slug": "flygon_redux_b",
+    "id": 10759,
+    "dex": 330,
+    "eggTier": 2,
+    "cost": 4
   },
   {
     "const": "SPECIES_FOGGING",
     "name": "Fogging",
-    "slug": "fogging"
+    "slug": "fogging",
+    "id": 10847,
+    "dex": null,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_FOMANTIS",
     "name": "Fomantis",
-    "slug": "fomantis"
+    "slug": "fomantis",
+    "id": 753,
+    "dex": 753,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_FOONGUS",
     "name": "Foongus",
-    "slug": "foongus"
+    "slug": "foongus",
+    "id": 590,
+    "dex": 590,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_FRIGIBAX",
     "name": "Frigibax",
-    "slug": "frigibax"
+    "slug": "frigibax",
+    "id": 996,
+    "dex": 996,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_FRILLISH",
     "name": "Frillish",
-    "slug": "frillish"
+    "slug": "frillish",
+    "id": 592,
+    "dex": 592,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_FROAKIE",
     "name": "Froakie",
-    "slug": "froakie"
+    "slug": "froakie",
+    "id": 656,
+    "dex": 656,
+    "eggTier": 0,
+    "cost": 4
   },
   {
     "const": "SPECIES_FUECOCO",
     "name": "Fuecoco",
-    "slug": "fuecoco"
+    "slug": "fuecoco",
+    "id": 909,
+    "dex": 909,
+    "eggTier": 0,
+    "cost": 4
   },
   {
     "const": "SPECIES_FURFROU",
     "name": "Furfrou",
-    "slug": "furfrou"
-  },
-  {
-    "const": "SPECIES_GALAR_ARTICUNO",
-    "name": "Galar Articuno",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_GALAR_CORSOLA",
-    "name": "Galar Corsola",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_GALAR_DARUMAKA",
-    "name": "Galar Darumaka",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_GALAR_FARFETCHD",
-    "name": "Galar Farfetchd",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_GALAR_MEOWTH",
-    "name": "Galar Meowth",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_GALAR_MOLTRES",
-    "name": "Galar Moltres",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_GALAR_PONYTA",
-    "name": "Galar Ponyta",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_GALAR_SLOWPOKE",
-    "name": "Galar Slowpoke",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_GALAR_STUNFISK",
-    "name": "Galar Stunfisk",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_GALAR_YAMASK",
-    "name": "Galar Yamask",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_GALAR_ZAPDOS",
-    "name": "Galar Zapdos",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_GALAR_ZIGZAGOON",
-    "name": "Galar Zigzagoon",
-    "slug": null
+    "slug": "furfrou",
+    "id": 676,
+    "dex": 676,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_GASTLY",
     "name": "Gastly",
-    "slug": "gastly"
+    "slug": "gastly",
+    "id": 92,
+    "dex": 92,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_GENESECT",
     "name": "Genesect",
-    "slug": "genesect"
+    "slug": "genesect",
+    "id": 649,
+    "dex": 649,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_GEODUDE",
     "name": "Geodude",
-    "slug": "geodude"
+    "slug": "geodude",
+    "id": 74,
+    "dex": 74,
+    "eggTier": 0,
+    "cost": 3
+  },
+  {
+    "const": "SPECIES_ALOLA_GEODUDE",
+    "name": "Geodude",
+    "slug": null,
+    "id": 2074,
+    "dex": 2074,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_GIBLE",
     "name": "Gible",
-    "slug": "gible"
+    "slug": "gible",
+    "id": 443,
+    "dex": 443,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_GIBLE_REDUX",
     "name": "Gible Redux",
-    "slug": "gible_redux"
+    "slug": "gible_redux",
+    "id": 10727,
+    "dex": 443,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_GIMMIGHOUL",
     "name": "Gimmighoul",
-    "slug": "gimmighoul"
-  },
-  {
-    "const": "SPECIES_GIMMIGHOUL_ROAMING",
-    "name": "Gimmighoul Roaming",
-    "slug": "gimmighoul_roaming"
+    "slug": "gimmighoul",
+    "id": 999,
+    "dex": 999,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_GIRAFARIG",
     "name": "Girafarig",
-    "slug": "girafarig"
+    "slug": "girafarig",
+    "id": 203,
+    "dex": 203,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_GIRATINA",
     "name": "Giratina",
-    "slug": "giratina"
+    "slug": "giratina",
+    "id": 487,
+    "dex": 487,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_GLAMEOW",
     "name": "Glameow",
-    "slug": "glameow"
+    "slug": "glameow",
+    "id": 431,
+    "dex": 431,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_GLASTRIER",
     "name": "Glastrier",
-    "slug": "glastrier"
+    "slug": "glastrier",
+    "id": 896,
+    "dex": 896,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_GLIGAR",
     "name": "Gligar",
-    "slug": "gligar"
+    "slug": "gligar",
+    "id": 207,
+    "dex": 207,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_GLIGAR_REDUX",
     "name": "Gligar Redux",
-    "slug": "gligar_redux"
+    "slug": "gligar_redux",
+    "id": 10802,
+    "dex": 207,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_GLIMMET",
     "name": "Glimmet",
-    "slug": "glimmet"
+    "slug": "glimmet",
+    "id": 969,
+    "dex": 969,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_GOLDEEN",
     "name": "Goldeen",
-    "slug": "goldeen"
+    "slug": "goldeen",
+    "id": 118,
+    "dex": 118,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_GOLETT",
     "name": "Golett",
-    "slug": "golett"
+    "slug": "golett",
+    "id": 622,
+    "dex": 622,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_GOOMY",
     "name": "Goomy",
-    "slug": "goomy"
+    "slug": "goomy",
+    "id": 704,
+    "dex": 704,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_GOSSIFLEUR",
     "name": "Gossifleur",
-    "slug": "gossifleur"
+    "slug": "gossifleur",
+    "id": 829,
+    "dex": 829,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_GOTHITA",
     "name": "Gothita",
-    "slug": "gothita"
+    "slug": "gothita",
+    "id": 574,
+    "dex": 574,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_GOUGING_FIRE",
     "name": "Gouging Fire",
-    "slug": "gouging_fire"
+    "slug": "gouging_fire",
+    "id": 1020,
+    "dex": 1020,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_GREAT_TUSK",
     "name": "Great Tusk",
-    "slug": "great_tusk"
+    "slug": "great_tusk",
+    "id": 984,
+    "dex": 984,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_GREAVARD",
     "name": "Greavard",
-    "slug": "greavard"
-  },
-  {
-    "const": "SPECIES_GRENINJA_BATTLE_BOND",
-    "name": "Greninja Battle Bond",
-    "slug": "greninja_battle_bond"
+    "slug": "greavard",
+    "id": 971,
+    "dex": 971,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_GRIMER",
     "name": "Grimer",
-    "slug": "grimer"
+    "slug": "grimer",
+    "id": 88,
+    "dex": 88,
+    "eggTier": 0,
+    "cost": 2
+  },
+  {
+    "const": "SPECIES_ALOLA_GRIMER",
+    "name": "Grimer",
+    "slug": null,
+    "id": 2088,
+    "dex": 2088,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_GROOKEY",
     "name": "Grookey",
-    "slug": "grookey"
+    "slug": "grookey",
+    "id": 810,
+    "dex": 810,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_GROTOM",
     "name": "Grotom",
-    "slug": "grotom"
+    "slug": "grotom",
+    "id": 10069,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_GROTOM_DRUM",
     "name": "Grotom Drum",
-    "slug": "grotom_drum"
+    "slug": "grotom_drum",
+    "id": 10634,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_GROTOM_FILL",
     "name": "Grotom Fill",
-    "slug": "grotom_fill"
+    "slug": "grotom_fill",
+    "id": 10636,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_GROTOM_GLASS",
     "name": "Grotom Glass",
-    "slug": "grotom_glass"
+    "slug": "grotom_glass",
+    "id": 10632,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_GROTOM_KICK",
     "name": "Grotom Kick",
-    "slug": "grotom_kick"
+    "slug": "grotom_kick",
+    "id": 10635,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_GROTOM_ROLL",
     "name": "Grotom Roll",
-    "slug": "grotom_roll"
+    "slug": "grotom_roll",
+    "id": 10633,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_GROUDON",
     "name": "Groudon",
-    "slug": "groudon"
+    "slug": "groudon",
+    "id": 383,
+    "dex": 383,
+    "eggTier": 3,
+    "cost": 9
   },
   {
     "const": "SPECIES_GROWLITHE",
     "name": "Growlithe",
-    "slug": "growlithe"
+    "slug": "growlithe",
+    "id": 58,
+    "dex": 58,
+    "eggTier": 1,
+    "cost": 4
+  },
+  {
+    "const": "SPECIES_HISUI_GROWLITHE",
+    "name": "Growlithe",
+    "slug": null,
+    "id": 6058,
+    "dex": 6058,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_GROWLITHE_REDUX",
     "name": "Growlithe Redux",
-    "slug": "growlithe_redux"
+    "slug": "growlithe_redux",
+    "id": 10722,
+    "dex": 6058,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_GRUBBIN",
     "name": "Grubbin",
-    "slug": "grubbin"
+    "slug": "grubbin",
+    "id": 736,
+    "dex": 736,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_GULPIN",
     "name": "Gulpin",
-    "slug": "gulpin"
+    "slug": "gulpin",
+    "id": 316,
+    "dex": 316,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_GUZZLORD",
     "name": "Guzzlord",
-    "slug": "guzzlord"
+    "slug": "guzzlord",
+    "id": 799,
+    "dex": 799,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_HAPPINY",
     "name": "Happiny",
-    "slug": "happiny"
+    "slug": "happiny",
+    "id": 440,
+    "dex": 440,
+    "eggTier": 1,
+    "cost": 2
   },
   {
     "const": "SPECIES_HAPPINY_REDUX",
     "name": "Happiny Redux",
-    "slug": "happiny_redux"
+    "slug": "happiny_redux",
+    "id": 10814,
+    "dex": 440,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_HATENNA",
     "name": "Hatenna",
-    "slug": "hatenna"
+    "slug": "hatenna",
+    "id": 856,
+    "dex": 856,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_HAWLUCHA",
     "name": "Hawlucha",
-    "slug": "hawlucha"
+    "slug": "hawlucha",
+    "id": 701,
+    "dex": 701,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_HEATMOR",
     "name": "Heatmor",
-    "slug": "heatmor"
+    "slug": "heatmor",
+    "id": 631,
+    "dex": 631,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_HEATRAN",
     "name": "Heatran",
-    "slug": "heatran"
+    "slug": "heatran",
+    "id": 485,
+    "dex": 485,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_HELIOPTILE",
     "name": "Helioptile",
-    "slug": "helioptile"
+    "slug": "helioptile",
+    "id": 694,
+    "dex": 694,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_HERACREUS",
     "name": "Heracreus",
-    "slug": "heracreus"
+    "slug": "heracreus",
+    "id": 10068,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_HERACROSS",
     "name": "Heracross",
-    "slug": "heracross"
+    "slug": "heracross",
+    "id": 214,
+    "dex": 214,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_HIPPOPOTAS",
     "name": "Hippopotas",
-    "slug": "hippopotas"
+    "slug": "hippopotas",
+    "id": 449,
+    "dex": 449,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_HIPPOPOTATO",
     "name": "Hippopotato",
-    "slug": "hippopotato"
-  },
-  {
-    "const": "SPECIES_HISUI_GROWLITHE",
-    "name": "Hisui Growlithe",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_HISUI_QWILFISH",
-    "name": "Hisui Qwilfish",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_HISUI_SNEASEL",
-    "name": "Hisui Sneasel",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_HISUI_VOLTORB",
-    "name": "Hisui Voltorb",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_HISUI_ZORUA",
-    "name": "Hisui Zorua",
-    "slug": null
+    "slug": "hippopotato",
+    "id": 10086,
+    "dex": null,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_HO_OH",
     "name": "Ho-Oh",
-    "slug": "ho_oh"
+    "slug": "ho_oh",
+    "id": 250,
+    "dex": 250,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_HONEDGE",
     "name": "Honedge",
-    "slug": "honedge"
+    "slug": "honedge",
+    "id": 679,
+    "dex": 679,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_HONEDGE_REDUX",
     "name": "Honedge Redux",
-    "slug": "honedge_redux"
+    "slug": "honedge_redux",
+    "id": 10690,
+    "dex": 679,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_HOOPA",
     "name": "Hoopa",
-    "slug": "hoopa"
-  },
-  {
-    "const": "SPECIES_HOOPA_UNBOUND",
-    "name": "Hoopa Unbound",
-    "slug": "hoopa_unbound"
+    "slug": "hoopa",
+    "id": 720,
+    "dex": 720,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_HOOTHOOT",
     "name": "Hoothoot",
-    "slug": "hoothoot"
+    "slug": "hoothoot",
+    "id": 163,
+    "dex": 163,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_HOPPIP",
     "name": "Hoppip",
-    "slug": "hoppip"
+    "slug": "hoppip",
+    "id": 187,
+    "dex": 187,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_HORSEA",
     "name": "Horsea",
-    "slug": "horsea"
+    "slug": "horsea",
+    "id": 116,
+    "dex": 116,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_HOUNDOUR",
     "name": "Houndour",
-    "slug": "houndour"
+    "slug": "houndour",
+    "id": 228,
+    "dex": 228,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_HOUNDOUR_REDUX",
     "name": "Houndour Redux",
-    "slug": "houndour_redux"
+    "slug": "houndour_redux",
+    "id": 10737,
+    "dex": 228,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_IGGLYBUFF",
     "name": "Igglybuff",
-    "slug": "igglybuff"
+    "slug": "igglybuff",
+    "id": 174,
+    "dex": 174,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_ILLUMISE",
     "name": "Illumise",
-    "slug": "illumise"
+    "slug": "illumise",
+    "id": 314,
+    "dex": 314,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_IMPIDIMP",
     "name": "Impidimp",
-    "slug": "impidimp"
+    "slug": "impidimp",
+    "id": 859,
+    "dex": 859,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_INDEEDEE",
     "name": "Indeedee",
-    "slug": "indeedee"
-  },
-  {
-    "const": "SPECIES_INDEEDEE_FEMALE",
-    "name": "Indeedee Female",
-    "slug": "indeedee_female"
+    "slug": "indeedee",
+    "id": 876,
+    "dex": 876,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_INKAY",
     "name": "Inkay",
-    "slug": "inkay"
+    "slug": "inkay",
+    "id": 686,
+    "dex": 686,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_IRON_BOULDER",
     "name": "Iron Boulder",
-    "slug": "iron_boulder"
+    "slug": "iron_boulder",
+    "id": 1022,
+    "dex": 1022,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_IRON_BUNDLE",
     "name": "Iron Bundle",
-    "slug": "iron_bundle"
+    "slug": "iron_bundle",
+    "id": 991,
+    "dex": 991,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_IRON_CARAPACE",
     "name": "Iron Carapace",
-    "slug": "iron_carapace"
+    "slug": "iron_carapace",
+    "id": 10024,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 6
   },
   {
     "const": "SPECIES_IRON_CROWN",
     "name": "Iron Crown",
-    "slug": "iron_crown"
+    "slug": "iron_crown",
+    "id": 1023,
+    "dex": 1023,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_IRON_EXO",
     "name": "Iron Exo",
-    "slug": "iron_exo"
+    "slug": "iron_exo",
+    "id": 10747,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 6
   },
   {
     "const": "SPECIES_IRON_HANDS",
     "name": "Iron Hands",
-    "slug": "iron_hands"
+    "slug": "iron_hands",
+    "id": 992,
+    "dex": 992,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_LEDIAN_PARADOX",
     "name": "Iron Heart",
-    "slug": "ledian_paradox"
+    "slug": "ledian_paradox",
+    "id": 10755,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 6
   },
   {
     "const": "SPECIES_IRON_JUGULIS",
     "name": "Iron Jugulis",
-    "slug": "iron_jugulis"
+    "slug": "iron_jugulis",
+    "id": 993,
+    "dex": 993,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_IRON_LEAVES",
     "name": "Iron Leaves",
-    "slug": "iron_leaves"
+    "slug": "iron_leaves",
+    "id": 1010,
+    "dex": 1010,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_IRON_MOTH",
     "name": "Iron Moth",
-    "slug": "iron_moth"
+    "slug": "iron_moth",
+    "id": 994,
+    "dex": 994,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_IRON_PALETTE",
     "name": "Iron Palette",
-    "slug": "iron_palette"
+    "slug": "iron_palette",
+    "id": 10063,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 6
   },
   {
     "const": "SPECIES_IRON_SABER",
     "name": "Iron Saber",
-    "slug": "iron_saber"
+    "slug": "iron_saber",
+    "id": 10090,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 6
   },
   {
     "const": "SPECIES_IRON_SCYTHE",
     "name": "Iron Scythe",
-    "slug": "iron_scythe"
+    "slug": "iron_scythe",
+    "id": 10066,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 6
   },
   {
     "const": "SPECIES_IRON_SPIRALS",
     "name": "Iron Spirals",
-    "slug": "iron_spirals"
+    "slug": "iron_spirals",
+    "id": 10089,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 6
   },
   {
     "const": "SPECIES_IRON_THORNS",
     "name": "Iron Thorns",
-    "slug": "iron_thorns"
+    "slug": "iron_thorns",
+    "id": 995,
+    "dex": 995,
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_IRON_TREADS",
     "name": "Iron Treads",
-    "slug": "iron_treads"
+    "slug": "iron_treads",
+    "id": 990,
+    "dex": 990,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_IRON_VALIANT",
     "name": "Iron Valiant",
-    "slug": "iron_valiant"
+    "slug": "iron_valiant",
+    "id": 1006,
+    "dex": 1006,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_IRON_VOCA",
     "name": "Iron Voca",
-    "slug": "iron_voca"
+    "slug": "iron_voca",
+    "id": 10047,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 6
   },
   {
     "const": "SPECIES_JANGMO_O",
     "name": "Jangmo-o",
-    "slug": "jangmo_o"
+    "slug": "jangmo_o",
+    "id": 782,
+    "dex": 782,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_JIRACHI",
     "name": "Jirachi",
-    "slug": "jirachi"
+    "slug": "jirachi",
+    "id": 385,
+    "dex": 385,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_JOLTIK",
     "name": "Joltik",
-    "slug": "joltik"
+    "slug": "joltik",
+    "id": 595,
+    "dex": 595,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_KABUTO",
     "name": "Kabuto",
-    "slug": "kabuto"
+    "slug": "kabuto",
+    "id": 140,
+    "dex": 140,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_KANGASKHAN",
     "name": "Kangaskhan",
-    "slug": "kangaskhan"
+    "slug": "kangaskhan",
+    "id": 115,
+    "dex": 115,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_KARRABLAST",
     "name": "Karrablast",
-    "slug": "karrablast"
+    "slug": "karrablast",
+    "id": 588,
+    "dex": 588,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_KARTANA",
     "name": "Kartana",
-    "slug": "kartana"
+    "slug": "kartana",
+    "id": 798,
+    "dex": 798,
+    "eggTier": 2,
+    "cost": 8
   },
   {
     "const": "SPECIES_KARTANA_FALLEN",
     "name": "Kartana Fallen",
-    "slug": "kartana_fallen"
+    "slug": "kartana_fallen",
+    "id": 10777,
+    "dex": 798,
+    "eggTier": 3,
+    "cost": 11
   },
   {
     "const": "SPECIES_KECLEON",
     "name": "Kecleon",
-    "slug": "kecleon"
+    "slug": "kecleon",
+    "id": 352,
+    "dex": 352,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_KECLEONG",
     "name": "Kecleong",
-    "slug": "kecleong"
+    "slug": "kecleong",
+    "id": 10684,
+    "dex": null,
+    "eggTier": 3,
+    "cost": 12
   },
   {
     "const": "SPECIES_KELDEO",
     "name": "Keldeo",
-    "slug": "keldeo"
-  },
-  {
-    "const": "SPECIES_KELDEO_RESOLUTE",
-    "name": "Keldeo Resolute",
-    "slug": "keldeo_resolute"
+    "slug": "keldeo",
+    "id": 647,
+    "dex": 647,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_KIPMODO",
     "name": "Kipmodo",
-    "slug": "kipmodo"
+    "slug": "kipmodo",
+    "id": 10612,
+    "dex": null,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_KLAWF",
     "name": "Klawf",
-    "slug": "klawf"
+    "slug": "klawf",
+    "id": 950,
+    "dex": 950,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_KLEFKI",
     "name": "Klefki",
-    "slug": "klefki"
+    "slug": "klefki",
+    "id": 707,
+    "dex": 707,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_KLEFKI_REDUX",
     "name": "Klefki Redux",
-    "slug": "klefki_redux"
+    "slug": "klefki_redux",
+    "id": 10666,
+    "dex": 707,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_KLINK",
     "name": "Klink",
-    "slug": "klink"
+    "slug": "klink",
+    "id": 599,
+    "dex": 599,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_KOFFING",
     "name": "Koffing",
-    "slug": "koffing"
+    "slug": "koffing",
+    "id": 109,
+    "dex": 109,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_KOMALA",
     "name": "Komala",
-    "slug": "komala"
+    "slug": "komala",
+    "id": 775,
+    "dex": 775,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_KORAIDON",
     "name": "Koraidon",
-    "slug": "koraidon"
+    "slug": "koraidon",
+    "id": 1007,
+    "dex": 1007,
+    "eggTier": 3,
+    "cost": 9
   },
   {
     "const": "SPECIES_KRABBY",
     "name": "Krabby",
-    "slug": "krabby"
+    "slug": "krabby",
+    "id": 98,
+    "dex": 98,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_KRABBY_REDUX",
     "name": "Krabby Redux",
-    "slug": "krabby_redux"
+    "slug": "krabby_redux",
+    "id": 10832,
+    "dex": 98,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_KRICKETOT",
     "name": "Kricketot",
-    "slug": "kricketot"
+    "slug": "kricketot",
+    "id": 401,
+    "dex": 401,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_KUBFU",
     "name": "Kubfu",
-    "slug": "kubfu"
+    "slug": "kubfu",
+    "id": 891,
+    "dex": 891,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_KYOGRE",
     "name": "Kyogre",
-    "slug": "kyogre"
+    "slug": "kyogre",
+    "id": 382,
+    "dex": 382,
+    "eggTier": 3,
+    "cost": 9
   },
   {
     "const": "SPECIES_KYUREM",
     "name": "Kyurem",
-    "slug": "kyurem"
-  },
-  {
-    "const": "SPECIES_KYUREM_BLACK",
-    "name": "Kyurem Black",
-    "slug": "kyurem_black"
-  },
-  {
-    "const": "SPECIES_KYUREM_WHITE",
-    "name": "Kyurem White",
-    "slug": "kyurem_white"
+    "slug": "kyurem",
+    "id": 646,
+    "dex": 646,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_LANDORUS",
     "name": "Landorus",
-    "slug": "landorus"
-  },
-  {
-    "const": "SPECIES_LANDORUS_THERIAN",
-    "name": "Landorus Therian",
-    "slug": "landorus_therian"
+    "slug": "landorus",
+    "id": 645,
+    "dex": 645,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_LAPRAS",
     "name": "Lapras",
-    "slug": "lapras"
+    "slug": "lapras",
+    "id": 131,
+    "dex": 131,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_LARVESTA",
     "name": "Larvesta",
-    "slug": "larvesta"
+    "slug": "larvesta",
+    "id": 636,
+    "dex": 636,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_LARVESTA_REDUX",
     "name": "Larvesta Redux",
-    "slug": "larvesta_redux"
+    "slug": "larvesta_redux",
+    "id": 10664,
+    "dex": 636,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_LARVITAR",
     "name": "Larvitar",
-    "slug": "larvitar"
+    "slug": "larvitar",
+    "id": 246,
+    "dex": 246,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_LARVITAR_REDUX",
     "name": "Larvitar Redux",
-    "slug": "larvitar_redux"
+    "slug": "larvitar_redux",
+    "id": 10742,
+    "dex": 246,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_LATIAS",
     "name": "Latias",
-    "slug": "latias"
+    "slug": "latias",
+    "id": 380,
+    "dex": 380,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_LATIOS",
     "name": "Latios",
-    "slug": "latios"
+    "slug": "latios",
+    "id": 381,
+    "dex": 381,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_LECHONK",
     "name": "Lechonk",
-    "slug": "lechonk"
+    "slug": "lechonk",
+    "id": 915,
+    "dex": 915,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_LEDYBA",
     "name": "Ledyba",
-    "slug": "ledyba"
+    "slug": "ledyba",
+    "id": 165,
+    "dex": 165,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_LICKITUNG",
     "name": "Lickitung",
-    "slug": "lickitung"
+    "slug": "lickitung",
+    "id": 108,
+    "dex": 108,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_LILEEP",
     "name": "Lileep",
-    "slug": "lileep"
+    "slug": "lileep",
+    "id": 345,
+    "dex": 345,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_LILLIPUP",
     "name": "Lillipup",
-    "slug": "lillipup"
+    "slug": "lillipup",
+    "id": 506,
+    "dex": 506,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_LITLEO",
     "name": "Litleo",
-    "slug": "litleo"
+    "slug": "litleo",
+    "id": 667,
+    "dex": 667,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_LITTEN",
     "name": "Litten",
-    "slug": "litten"
+    "slug": "litten",
+    "id": 725,
+    "dex": 725,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_LITWICK",
     "name": "Litwick",
-    "slug": "litwick"
+    "slug": "litwick",
+    "id": 607,
+    "dex": 607,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_LITWICK_REDUX",
     "name": "Litwick Redux",
-    "slug": "litwick_redux"
+    "slug": "litwick_redux",
+    "id": 10652,
+    "dex": 607,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_LOTAD",
     "name": "Lotad",
-    "slug": "lotad"
+    "slug": "lotad",
+    "id": 270,
+    "dex": 270,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_LUGIA",
     "name": "Lugia",
-    "slug": "lugia"
+    "slug": "lugia",
+    "id": 249,
+    "dex": 249,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_LUMBERING_SLOTH",
     "name": "Lumber Sloth",
-    "slug": "lumbering_sloth"
+    "slug": "lumbering_sloth",
+    "id": 10023,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 6
   },
   {
     "const": "SPECIES_LUMBERING_SLOTH_ENGULFED",
     "name": "Lumbering Sloth Engulfed",
-    "slug": "lumbering_sloth_engulfed"
+    "slug": "lumbering_sloth_engulfed",
+    "id": 10439,
+    "dex": null,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_LUNATONE",
     "name": "Lunatone",
-    "slug": "lunatone"
+    "slug": "lunatone",
+    "id": 337,
+    "dex": 337,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_LUVDISC",
     "name": "Luvdisc",
-    "slug": "luvdisc"
+    "slug": "luvdisc",
+    "id": 370,
+    "dex": 370,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_MACHOP",
     "name": "Machop",
-    "slug": "machop"
+    "slug": "machop",
+    "id": 66,
+    "dex": 66,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MACHOP_REDUX",
     "name": "Machop Redux",
-    "slug": "machop_redux"
+    "slug": "machop_redux",
+    "id": 10715,
+    "dex": 66,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MAGBY",
     "name": "Magby",
-    "slug": "magby"
+    "slug": "magby",
+    "id": 240,
+    "dex": 240,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MAGEARNA",
     "name": "Magearna",
-    "slug": "magearna"
-  },
-  {
-    "const": "SPECIES_MAGEARNA_ORIGINAL_COLOR",
-    "name": "Magearna Original",
-    "slug": "magearna_original_color"
+    "slug": "magearna",
+    "id": 801,
+    "dex": 801,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_MAGIKARP",
     "name": "Magikarp",
-    "slug": "magikarp"
+    "slug": "magikarp",
+    "id": 129,
+    "dex": 129,
+    "eggTier": 0,
+    "cost": 4
   },
   {
     "const": "SPECIES_MAGNEMITE",
     "name": "Magnemite",
-    "slug": "magnemite"
+    "slug": "magnemite",
+    "id": 81,
+    "dex": 81,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_MAKUHITA",
     "name": "Makuhita",
-    "slug": "makuhita"
+    "slug": "makuhita",
+    "id": 296,
+    "dex": 296,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MAKUHITA_REDUX",
     "name": "Makuhita Redux",
-    "slug": "makuhita_redux"
+    "slug": "makuhita_redux",
+    "id": 10843,
+    "dex": 296,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MANAPHY",
     "name": "Manaphy",
-    "slug": "manaphy"
+    "slug": "manaphy",
+    "id": 490,
+    "dex": 490,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_MANKEY",
     "name": "Mankey",
-    "slug": "mankey"
+    "slug": "mankey",
+    "id": 56,
+    "dex": 56,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_MANTYKE",
     "name": "Mantyke",
-    "slug": "mantyke"
+    "slug": "mantyke",
+    "id": 458,
+    "dex": 458,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_MARACTUS",
     "name": "Maractus",
-    "slug": "maractus"
+    "slug": "maractus",
+    "id": 556,
+    "dex": 556,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_MARBEEP",
     "name": "Marbeep",
-    "slug": "marbeep"
+    "slug": "marbeep",
+    "id": 10029,
+    "dex": null,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_MAREANIE",
     "name": "Mareanie",
-    "slug": "mareanie"
+    "slug": "mareanie",
+    "id": 747,
+    "dex": 747,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_MAREEP",
     "name": "Mareep",
-    "slug": "mareep"
+    "slug": "mareep",
+    "id": 179,
+    "dex": 179,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_MARSHADOW",
     "name": "Marshadow",
-    "slug": "marshadow"
+    "slug": "marshadow",
+    "id": 802,
+    "dex": 802,
+    "eggTier": 2,
+    "cost": 8
   },
   {
     "const": "SPECIES_MASCHIFF",
     "name": "Maschiff",
-    "slug": "maschiff"
+    "slug": "maschiff",
+    "id": 942,
+    "dex": 942,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MAWILE",
     "name": "Mawile",
-    "slug": "mawile"
+    "slug": "mawile",
+    "id": 303,
+    "dex": 303,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_MAWILE_REDUX",
     "name": "Mawile Redux",
-    "slug": "mawile_redux"
+    "slug": "mawile_redux",
+    "id": 10735,
+    "dex": 303,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MAWILE_REDUX_B",
     "name": "Mawile Redux B",
-    "slug": "mawile_redux_b"
+    "slug": "mawile_redux_b",
+    "id": 10773,
+    "dex": 303,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_MEDITITE",
     "name": "Meditite",
-    "slug": "meditite"
+    "slug": "meditite",
+    "id": 307,
+    "dex": 307,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MELOETTA",
     "name": "Meloetta",
-    "slug": "meloetta"
-  },
-  {
-    "const": "SPECIES_MELOETTA_PIROUETTE",
-    "name": "Meloetta Pirouette",
-    "slug": "meloetta_pirouette"
+    "slug": "meloetta",
+    "id": 648,
+    "dex": 648,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_MELTAN",
     "name": "Meltan",
-    "slug": "meltan"
+    "slug": "meltan",
+    "id": 808,
+    "dex": 808,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_MEOWTH",
     "name": "Meowth",
-    "slug": "meowth"
+    "slug": "meowth",
+    "id": 52,
+    "dex": 52,
+    "eggTier": 0,
+    "cost": 3
   },
   {
-    "const": "SPECIES_MEOWTH_PARTNER",
-    "name": "Meowth Partner",
-    "slug": "meowth_partner"
+    "const": "SPECIES_ALOLA_MEOWTH",
+    "name": "Meowth",
+    "slug": null,
+    "id": 2052,
+    "dex": 2052,
+    "eggTier": 1,
+    "cost": 3
+  },
+  {
+    "const": "SPECIES_GALAR_MEOWTH",
+    "name": "Meowth",
+    "slug": null,
+    "id": 4052,
+    "dex": 4052,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_MERRYKARP",
     "name": "Merrykarp",
-    "slug": "merrykarp"
+    "slug": "merrykarp",
+    "id": 10856,
+    "dex": null,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_MESPRIT",
     "name": "Mesprit",
-    "slug": "mesprit"
+    "slug": "mesprit",
+    "id": 481,
+    "dex": 481,
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_MESPRIT_REDUX",
     "name": "Mesprit Redux",
-    "slug": "mesprit_redux"
+    "slug": "mesprit_redux",
+    "id": 10713,
+    "dex": 481,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_MEW",
     "name": "Mew",
-    "slug": "mew"
+    "slug": "mew",
+    "id": 151,
+    "dex": 151,
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_MEWTWO",
     "name": "Mewtwo",
-    "slug": "mewtwo"
+    "slug": "mewtwo",
+    "id": 150,
+    "dex": 150,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_MIENFOO",
     "name": "Mienfoo",
-    "slug": "mienfoo"
+    "slug": "mienfoo",
+    "id": 619,
+    "dex": 619,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MILCERY",
     "name": "Milcery",
-    "slug": "milcery"
+    "slug": "milcery",
+    "id": 868,
+    "dex": 868,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MILTANK",
     "name": "Miltank",
-    "slug": "miltank"
+    "slug": "miltank",
+    "id": 241,
+    "dex": 241,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_MIME_JR",
     "name": "Mime Jr.",
-    "slug": "mime_jr"
+    "slug": "mime_jr",
+    "id": 439,
+    "dex": 439,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_MIMIKYU",
     "name": "Mimikyu",
-    "slug": "mimikyu"
+    "slug": "mimikyu",
+    "id": 778,
+    "dex": 778,
+    "eggTier": 1,
+    "cost": 4
   },
   {
-    "const": "SPECIES_MIMIKYU_BUSTED",
-    "name": "Mimikyu Busted",
-    "slug": "mimikyu_busted"
+    "const": "SPECIES_MIMIKYU_APEX",
+    "name": "Mimikyu Apex",
+    "slug": "mimikyu_apex",
+    "id": 10821,
+    "dex": 778,
+    "eggTier": 1,
+    "cost": 6
   },
   {
     "const": "SPECIES_MINCCINO",
     "name": "Minccino",
-    "slug": "minccino"
+    "slug": "minccino",
+    "id": 572,
+    "dex": 572,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MINCCINO_REDUX",
     "name": "Minccino Redux",
-    "slug": "minccino_redux"
+    "slug": "minccino_redux",
+    "id": 10623,
+    "dex": 572,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MINIOR",
     "name": "Minior",
-    "slug": "minior"
+    "slug": "minior",
+    "id": 774,
+    "dex": 774,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_MINUN",
     "name": "Minun",
-    "slug": "minun"
+    "slug": "minun",
+    "id": 312,
+    "dex": 312,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_MIRAIDON",
     "name": "Miraidon",
-    "slug": "miraidon"
+    "slug": "miraidon",
+    "id": 1008,
+    "dex": 1008,
+    "eggTier": 3,
+    "cost": 9
   },
   {
     "const": "SPECIES_MISDREAVUS",
     "name": "Misdreavus",
-    "slug": "misdreavus"
+    "slug": "misdreavus",
+    "id": 200,
+    "dex": 200,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MOLTRES",
     "name": "Moltres",
-    "slug": "moltres"
+    "slug": "moltres",
+    "id": 146,
+    "dex": 146,
+    "eggTier": 2,
+    "cost": 6
+  },
+  {
+    "const": "SPECIES_GALAR_MOLTRES",
+    "name": "Moltres",
+    "slug": null,
+    "id": 4146,
+    "dex": 4146,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_MOLTRES_EX",
     "name": "Moltres Ex",
-    "slug": "moltres_ex"
+    "slug": "moltres_ex",
+    "id": 10622,
+    "dex": 4146,
+    "eggTier": 3,
+    "cost": 9
   },
   {
     "const": "SPECIES_MORELULL",
     "name": "Morelull",
-    "slug": "morelull"
+    "slug": "morelull",
+    "id": 755,
+    "dex": 755,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_MORPEKO",
     "name": "Morpeko",
-    "slug": "morpeko"
-  },
-  {
-    "const": "SPECIES_MORPEKO_HANGRY",
-    "name": "Morpeko Hangry",
-    "slug": "morpeko_hangry"
-  },
-  {
-    "const": "SPECIES_MORPEKYLL_HANGRY",
-    "name": "Morpekyll Hangry",
-    "slug": "morpekyll_hangry"
+    "slug": "morpeko",
+    "id": 877,
+    "dex": 877,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MUDBRAY",
     "name": "Mudbray",
-    "slug": "mudbray"
+    "slug": "mudbray",
+    "id": 749,
+    "dex": 749,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MUDKIP",
     "name": "Mudkip",
-    "slug": "mudkip"
+    "slug": "mudkip",
+    "id": 258,
+    "dex": 258,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MUNCHLAX",
     "name": "Munchlax",
-    "slug": "munchlax"
+    "slug": "munchlax",
+    "id": 446,
+    "dex": 446,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_MUNCHLAX_REDUX",
     "name": "Munchlax Redux",
-    "slug": "munchlax_redux"
+    "slug": "munchlax_redux",
+    "id": 10858,
+    "dex": 446,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_MUNKIDORI",
     "name": "Munkidori",
-    "slug": "munkidori"
+    "slug": "munkidori",
+    "id": 1015,
+    "dex": 1015,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_MUNNA",
     "name": "Munna",
-    "slug": "munna"
+    "slug": "munna",
+    "id": 517,
+    "dex": 517,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_MURKROW",
     "name": "Murkrow",
-    "slug": "murkrow"
+    "slug": "murkrow",
+    "id": 198,
+    "dex": 198,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_NACLI",
     "name": "Nacli",
-    "slug": "nacli"
+    "slug": "nacli",
+    "id": 932,
+    "dex": 932,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_NATU",
     "name": "Natu",
-    "slug": "natu"
+    "slug": "natu",
+    "id": 177,
+    "dex": 177,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_NECROZMA",
     "name": "Necrozma",
-    "slug": "necrozma"
+    "slug": "necrozma",
+    "id": 800,
+    "dex": 800,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_NICKIT",
     "name": "Nickit",
-    "slug": "nickit"
+    "slug": "nickit",
+    "id": 827,
+    "dex": 827,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_NIDORAN_F",
     "name": "Nidoran♀",
-    "slug": "nidoran_f"
+    "slug": "nidoran_f",
+    "id": 29,
+    "dex": 29,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_NIDORAN_M",
     "name": "Nidoran♂",
-    "slug": "nidoran_m"
+    "slug": "nidoran_m",
+    "id": 32,
+    "dex": 32,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_NIHILEGO",
     "name": "Nihilego",
-    "slug": "nihilego"
+    "slug": "nihilego",
+    "id": 793,
+    "dex": 793,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_NINCADA",
     "name": "Nincada",
-    "slug": "nincada"
+    "slug": "nincada",
+    "id": 290,
+    "dex": 290,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_NOIBAT",
     "name": "Noibat",
-    "slug": "noibat"
+    "slug": "noibat",
+    "id": 714,
+    "dex": 714,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_NOIBAT_REDUX",
     "name": "Noibat Redux",
-    "slug": "noibat_redux"
+    "slug": "noibat_redux",
+    "id": 10686,
+    "dex": 714,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_NOSEPASS",
     "name": "Nosepass",
-    "slug": "nosepass"
+    "slug": "nosepass",
+    "id": 299,
+    "dex": 299,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_NUMEL",
     "name": "Numel",
-    "slug": "numel"
+    "slug": "numel",
+    "id": 322,
+    "dex": 322,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_NYMBLE",
     "name": "Nymble",
-    "slug": "nymble"
+    "slug": "nymble",
+    "id": 919,
+    "dex": 919,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_ODDISH",
     "name": "Oddish",
-    "slug": "oddish"
+    "slug": "oddish",
+    "id": 43,
+    "dex": 43,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_OGERPON",
     "name": "Ogerpon",
-    "slug": "ogerpon"
-  },
-  {
-    "const": "SPECIES_OGERPON_CORNERSTONE_MASK",
-    "name": "Ogerpon Cornerstone",
-    "slug": "ogerpon_cornerstone_mask"
-  },
-  {
-    "const": "SPECIES_OGERPON_HEARTHFLAME_MASK",
-    "name": "Ogerpon Hearthflame",
-    "slug": "ogerpon_hearthflame_mask"
-  },
-  {
-    "const": "SPECIES_OGERPON_WELLSPRING_MASK",
-    "name": "Ogerpon Wellspring Mask",
-    "slug": "ogerpon_wellspring_mask"
+    "slug": "ogerpon",
+    "id": 1017,
+    "dex": 1017,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_OKIDOGI",
     "name": "Okidogi",
-    "slug": "okidogi"
+    "slug": "okidogi",
+    "id": 1014,
+    "dex": 1014,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_OMANYTE",
     "name": "Omanyte",
-    "slug": "omanyte"
+    "slug": "omanyte",
+    "id": 138,
+    "dex": 138,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_ONIX",
     "name": "Onix",
-    "slug": "onix"
+    "slug": "onix",
+    "id": 95,
+    "dex": 95,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_ORANGURU",
     "name": "Oranguru",
-    "slug": "oranguru"
+    "slug": "oranguru",
+    "id": 765,
+    "dex": 765,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_ORICORIO",
     "name": "Oricorio",
-    "slug": "oricorio"
+    "slug": "oricorio",
+    "id": 741,
+    "dex": 741,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_ORTHWORM",
     "name": "Orthworm",
-    "slug": "orthworm"
+    "slug": "orthworm",
+    "id": 968,
+    "dex": 968,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_OSHAWOTT",
     "name": "Oshawott",
-    "slug": "oshawott"
+    "slug": "oshawott",
+    "id": 501,
+    "dex": 501,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_PACHIRISU",
     "name": "Pachirisu",
-    "slug": "pachirisu"
-  },
-  {
-    "const": "SPECIES_PALAFIN_HERO",
-    "name": "Palafin Hero",
-    "slug": "palafin_hero"
-  },
-  {
-    "const": "SPECIES_PALDEA_TAUROS",
-    "name": "Paldea Tauros",
-    "slug": null
-  },
-  {
-    "const": "SPECIES_PALDEA_WOOPER",
-    "name": "Paldea Wooper",
-    "slug": null
+    "slug": "pachirisu",
+    "id": 417,
+    "dex": 417,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_PALKIA",
     "name": "Palkia",
-    "slug": "palkia"
+    "slug": "palkia",
+    "id": 484,
+    "dex": 484,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_PANCHAM",
     "name": "Pancham",
-    "slug": "pancham"
+    "slug": "pancham",
+    "id": 674,
+    "dex": 674,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_PANPOUR",
     "name": "Panpour",
-    "slug": "panpour"
+    "slug": "panpour",
+    "id": 515,
+    "dex": 515,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_PANPOUR_REDUX",
     "name": "Panpour Redux",
-    "slug": "panpour_redux"
+    "slug": "panpour_redux",
+    "id": 10702,
+    "dex": 515,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_PANSAGE",
     "name": "Pansage",
-    "slug": "pansage"
+    "slug": "pansage",
+    "id": 511,
+    "dex": 511,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_PANSAGE_REDUX",
     "name": "Pansage Redux",
-    "slug": "pansage_redux"
+    "slug": "pansage_redux",
+    "id": 10704,
+    "dex": 511,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_PANSEAR",
     "name": "Pansear",
-    "slug": "pansear"
+    "slug": "pansear",
+    "id": 513,
+    "dex": 513,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_PANSEAR_REDUX",
     "name": "Pansear Redux",
-    "slug": "pansear_redux"
+    "slug": "pansear_redux",
+    "id": 10706,
+    "dex": 513,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_PARAS",
     "name": "Paras",
-    "slug": "paras"
+    "slug": "paras",
+    "id": 46,
+    "dex": 46,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_PASSIMIAN",
     "name": "Passimian",
-    "slug": "passimian"
+    "slug": "passimian",
+    "id": 766,
+    "dex": 766,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_PATRAT",
     "name": "Patrat",
-    "slug": "patrat"
+    "slug": "patrat",
+    "id": 504,
+    "dex": 504,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_PAWMI",
     "name": "Pawmi",
-    "slug": "pawmi"
+    "slug": "pawmi",
+    "id": 921,
+    "dex": 921,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_PAWNIARD",
     "name": "Pawniard",
-    "slug": "pawniard"
+    "slug": "pawniard",
+    "id": 624,
+    "dex": 624,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_PAWNIARD_REDUX",
     "name": "Pawniard Redux",
-    "slug": "pawniard_redux"
+    "slug": "pawniard_redux",
+    "id": 10733,
+    "dex": 624,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_PECHARUNT",
     "name": "Pecharunt",
-    "slug": "pecharunt"
+    "slug": "pecharunt",
+    "id": 1025,
+    "dex": 1025,
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_PETILIL",
     "name": "Petilil",
-    "slug": "petilil"
+    "slug": "petilil",
+    "id": 548,
+    "dex": 548,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_PHANPY",
     "name": "Phanpy",
-    "slug": "phanpy"
+    "slug": "phanpy",
+    "id": 231,
+    "dex": 231,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_PHANTUMP",
     "name": "Phantump",
-    "slug": "phantump"
+    "slug": "phantump",
+    "id": 708,
+    "dex": 708,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_PHEROMOSA",
     "name": "Pheromosa",
-    "slug": "pheromosa"
+    "slug": "pheromosa",
+    "id": 795,
+    "dex": 795,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_PHIONE",
     "name": "Phione",
-    "slug": "phione"
+    "slug": "phione",
+    "id": 489,
+    "dex": 489,
+    "eggTier": 2,
+    "cost": 4
   },
   {
     "const": "SPECIES_PICHU",
     "name": "Pichu",
-    "slug": "pichu"
-  },
-  {
-    "const": "SPECIES_PICHU_SPIKY_EARED",
-    "name": "Pichu Spiky",
-    "slug": "pichu_spiky_eared"
+    "slug": "pichu",
+    "id": 172,
+    "dex": 172,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_PIDGEY",
     "name": "Pidgey",
-    "slug": "pidgey"
+    "slug": "pidgey",
+    "id": 16,
+    "dex": 16,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_PIDOVE",
     "name": "Pidove",
-    "slug": "pidove"
+    "slug": "pidove",
+    "id": 519,
+    "dex": 519,
+    "eggTier": 0,
+    "cost": 1
   },
   {
-    "const": "SPECIES_PIKACHU_ALOLA_CAP",
-    "name": "Pikachu Alola",
-    "slug": "pikachu_alola_cap"
-  },
-  {
-    "const": "SPECIES_PIKACHU_BELLE",
-    "name": "Pikachu Belle",
-    "slug": "pikachu_belle"
-  },
-  {
-    "const": "SPECIES_PIKACHU_COSPLAY",
-    "name": "Pikachu Cosplay",
-    "slug": "pikachu_cosplay"
-  },
-  {
-    "const": "SPECIES_PIKACHU_HOENN_CAP",
-    "name": "Pikachu Hoenn",
-    "slug": "pikachu_hoenn_cap"
-  },
-  {
-    "const": "SPECIES_PIKACHU_KALOS_CAP",
-    "name": "Pikachu Kalos",
-    "slug": "pikachu_kalos_cap"
-  },
-  {
-    "const": "SPECIES_PIKACHU_ORIGINAL_CAP",
-    "name": "Pikachu Kanto",
-    "slug": "pikachu_original_cap"
-  },
-  {
-    "const": "SPECIES_PIKACHU_LIBRE",
-    "name": "Pikachu Libre",
-    "slug": "pikachu_libre"
-  },
-  {
-    "const": "SPECIES_PIKACHU_PARTNER",
-    "name": "Pikachu Partner",
-    "slug": "pikachu_partner"
-  },
-  {
-    "const": "SPECIES_PIKACHU_PARTNER_CAP",
-    "name": "Pikachu Partner Cap",
-    "slug": "pikachu_partner_cap"
-  },
-  {
-    "const": "SPECIES_PIKACHU_PH_D",
-    "name": "Pikachu Ph D",
-    "slug": "pikachu_ph_d"
-  },
-  {
-    "const": "SPECIES_PIKACHU_POP_STAR",
-    "name": "Pikachu Pop Star",
-    "slug": "pikachu_pop_star"
-  },
-  {
-    "const": "SPECIES_PIKACHU_ROCK_STAR",
-    "name": "Pikachu Rock Star",
-    "slug": "pikachu_rock_star"
-  },
-  {
-    "const": "SPECIES_PIKACHU_SINNOH_CAP",
-    "name": "Pikachu Sinnoh",
-    "slug": "pikachu_sinnoh_cap"
-  },
-  {
-    "const": "SPECIES_PIKACHU_UNOVA_CAP",
-    "name": "Pikachu Unova",
-    "slug": "pikachu_unova_cap"
-  },
-  {
-    "const": "SPECIES_PIKACHU_WORLD_CAP",
-    "name": "Pikachu World",
-    "slug": "pikachu_world_cap"
+    "const": "SPECIES_PIKACHU",
+    "name": "Pikachu",
+    "slug": "pikachu",
+    "id": 25,
+    "dex": 25,
+    "eggTier": null,
+    "cost": 4
   },
   {
     "const": "SPECIES_PIKIPEK",
     "name": "Pikipek",
-    "slug": "pikipek"
+    "slug": "pikipek",
+    "id": 731,
+    "dex": 731,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_PINCURCHIN",
     "name": "Pincurchin",
-    "slug": "pincurchin"
+    "slug": "pincurchin",
+    "id": 871,
+    "dex": 871,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_PINECO",
     "name": "Pineco",
-    "slug": "pineco"
+    "slug": "pineco",
+    "id": 204,
+    "dex": 204,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_PINSIR",
     "name": "Pinsir",
-    "slug": "pinsir"
+    "slug": "pinsir",
+    "id": 127,
+    "dex": 127,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_PIPLUP",
     "name": "Piplup",
-    "slug": "piplup"
+    "slug": "piplup",
+    "id": 393,
+    "dex": 393,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_PIPLUP_REDUX",
     "name": "Piplup Redux",
-    "slug": "piplup_redux"
+    "slug": "piplup_redux",
+    "id": 10785,
+    "dex": 393,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_PLUSLE",
     "name": "Plusle",
-    "slug": "plusle"
+    "slug": "plusle",
+    "id": 311,
+    "dex": 311,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_POIPOLE",
     "name": "Poipole",
-    "slug": "poipole"
+    "slug": "poipole",
+    "id": 803,
+    "dex": 803,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_POLARTIC_BLUEMOON",
     "name": "Polartic Bluemoon",
-    "slug": "polartic_bluemoon"
+    "slug": "polartic_bluemoon",
+    "id": 10438,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 6
   },
   {
     "const": "SPECIES_POLIWAG",
     "name": "Poliwag",
-    "slug": "poliwag"
+    "slug": "poliwag",
+    "id": 60,
+    "dex": 60,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_POLTCHAGEIST",
     "name": "Poltchageist",
-    "slug": "poltchageist"
+    "slug": "poltchageist",
+    "id": 1012,
+    "dex": 1012,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_PONYTA",
     "name": "Ponyta",
-    "slug": "ponyta"
+    "slug": "ponyta",
+    "id": 77,
+    "dex": 77,
+    "eggTier": 0,
+    "cost": 2
+  },
+  {
+    "const": "SPECIES_GALAR_PONYTA",
+    "name": "Ponyta",
+    "slug": null,
+    "id": 4077,
+    "dex": 4077,
+    "eggTier": 1,
+    "cost": 2
   },
   {
     "const": "SPECIES_POOCHYENA",
     "name": "Poochyena",
-    "slug": "poochyena"
+    "slug": "poochyena",
+    "id": 261,
+    "dex": 261,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_POPPLIO",
     "name": "Popplio",
-    "slug": "popplio"
+    "slug": "popplio",
+    "id": 728,
+    "dex": 728,
+    "eggTier": 0,
+    "cost": 4
   },
   {
     "const": "SPECIES_PORYGON",
     "name": "Porygon",
-    "slug": "porygon"
+    "slug": "porygon",
+    "id": 137,
+    "dex": 137,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_PSYDUCK",
     "name": "Psyduck",
-    "slug": "psyduck"
+    "slug": "psyduck",
+    "id": 54,
+    "dex": 54,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_PSYDUCK_REDUX",
     "name": "Psyduck Redux",
-    "slug": "psyduck_redux"
+    "slug": "psyduck_redux",
+    "id": 10804,
+    "dex": 54,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_PUMPKABOO",
     "name": "Pumpkaboo",
-    "slug": "pumpkaboo"
+    "slug": "pumpkaboo",
+    "id": 710,
+    "dex": 710,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_PURRLOIN",
     "name": "Purrloin",
-    "slug": "purrloin"
+    "slug": "purrloin",
+    "id": 509,
+    "dex": 509,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_PYUKUMUKU",
     "name": "Pyukumuku",
-    "slug": "pyukumuku"
+    "slug": "pyukumuku",
+    "id": 771,
+    "dex": 771,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_QUAXLY",
     "name": "Quaxly",
-    "slug": "quaxly"
+    "slug": "quaxly",
+    "id": 912,
+    "dex": 912,
+    "eggTier": 0,
+    "cost": 4
   },
   {
     "const": "SPECIES_QWILFISH",
     "name": "Qwilfish",
-    "slug": "qwilfish"
+    "slug": "qwilfish",
+    "id": 211,
+    "dex": 211,
+    "eggTier": 0,
+    "cost": 3
+  },
+  {
+    "const": "SPECIES_HISUI_QWILFISH",
+    "name": "Qwilfish",
+    "slug": null,
+    "id": 6211,
+    "dex": 6211,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_RAGING_BOLT",
     "name": "Raging Bolt",
-    "slug": "raging_bolt"
+    "slug": "raging_bolt",
+    "id": 1021,
+    "dex": 1021,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_RAIKOU",
     "name": "Raikou",
-    "slug": "raikou"
+    "slug": "raikou",
+    "id": 243,
+    "dex": 243,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_RALTS",
     "name": "Ralts",
-    "slug": "ralts"
+    "slug": "ralts",
+    "id": 280,
+    "dex": 280,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_RALTS_REDUX",
     "name": "Ralts Redux",
-    "slug": "ralts_redux"
+    "slug": "ralts_redux",
+    "id": 10850,
+    "dex": 280,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_RATTATA",
     "name": "Rattata",
-    "slug": "rattata"
+    "slug": "rattata",
+    "id": 19,
+    "dex": 19,
+    "eggTier": 0,
+    "cost": 1
+  },
+  {
+    "const": "SPECIES_ALOLA_RATTATA",
+    "name": "Rattata",
+    "slug": null,
+    "id": 2019,
+    "dex": 2019,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_RATTATA_REDUX",
     "name": "Rattata Redux",
-    "slug": "rattata_redux"
+    "slug": "rattata_redux",
+    "id": 10646,
+    "dex": 2019,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_RAYQUAZA",
     "name": "Rayquaza",
-    "slug": "rayquaza"
+    "slug": "rayquaza",
+    "id": 384,
+    "dex": 384,
+    "eggTier": 3,
+    "cost": 9
   },
   {
     "const": "SPECIES_REGICE",
     "name": "Regice",
-    "slug": "regice"
+    "slug": "regice",
+    "id": 378,
+    "dex": 378,
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_REGIDRAGO",
     "name": "Regidrago",
-    "slug": "regidrago"
+    "slug": "regidrago",
+    "id": 895,
+    "dex": 895,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_REGIELEKI",
     "name": "Regieleki",
-    "slug": "regieleki"
+    "slug": "regieleki",
+    "id": 894,
+    "dex": 894,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_REGIGIGAS",
     "name": "Regigigas",
-    "slug": "regigigas"
+    "slug": "regigigas",
+    "id": 486,
+    "dex": 486,
+    "eggTier": 3,
+    "cost": 7
   },
   {
     "const": "SPECIES_REGIROCK",
     "name": "Regirock",
-    "slug": "regirock"
+    "slug": "regirock",
+    "id": 377,
+    "dex": 377,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_REGISTEEL",
     "name": "Registeel",
-    "slug": "registeel"
+    "slug": "registeel",
+    "id": 379,
+    "dex": 379,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_RELICANTH",
     "name": "Relicanth",
-    "slug": "relicanth"
+    "slug": "relicanth",
+    "id": 369,
+    "dex": 369,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_RELLOR",
     "name": "Rellor",
-    "slug": "rellor"
+    "slug": "rellor",
+    "id": 953,
+    "dex": 953,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_REMORAID",
     "name": "Remoraid",
-    "slug": "remoraid"
+    "slug": "remoraid",
+    "id": 223,
+    "dex": 223,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_RESHIRAM",
     "name": "Reshiram",
-    "slug": "reshiram"
+    "slug": "reshiram",
+    "id": 643,
+    "dex": 643,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_RHYHORN",
     "name": "Rhyhorn",
-    "slug": "rhyhorn"
+    "slug": "rhyhorn",
+    "id": 111,
+    "dex": 111,
+    "eggTier": 1,
+    "cost": 4
+  },
+  {
+    "const": "SPECIES_RIBOMBEE_REDUX",
+    "name": "Ribombee Redux",
+    "slug": "ribombee_redux",
+    "id": 10761,
+    "dex": 743,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_RIOLU",
     "name": "Riolu",
-    "slug": "riolu"
+    "slug": "riolu",
+    "id": 447,
+    "dex": 447,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_ROARING_MOON",
     "name": "Roaring Moon",
-    "slug": "roaring_moon"
+    "slug": "roaring_moon",
+    "id": 1005,
+    "dex": 1005,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_ROCKRUFF",
     "name": "Rockruff",
-    "slug": "rockruff"
-  },
-  {
-    "const": "SPECIES_ROCKRUFF_OWN_TEMPO",
-    "name": "Rockruff Own Tempo",
-    "slug": "rockruff_own_tempo"
+    "slug": "rockruff",
+    "id": 744,
+    "dex": 744,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_ROGGENROLA",
     "name": "Roggenrola",
-    "slug": "roggenrola"
+    "slug": "roggenrola",
+    "id": 524,
+    "dex": 524,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_ROLYCOLY",
     "name": "Rolycoly",
-    "slug": "rolycoly"
+    "slug": "rolycoly",
+    "id": 837,
+    "dex": 837,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_ROOKIDEE",
     "name": "Rookidee",
-    "slug": "rookidee"
+    "slug": "rookidee",
+    "id": 821,
+    "dex": 821,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_ROTOM",
     "name": "Rotom",
-    "slug": "rotom"
-  },
-  {
-    "const": "SPECIES_ROTOM_FAN",
-    "name": "Rotom Fan",
-    "slug": "rotom_fan"
-  },
-  {
-    "const": "SPECIES_ROTOM_FROST",
-    "name": "Rotom Frost",
-    "slug": "rotom_frost"
-  },
-  {
-    "const": "SPECIES_ROTOM_HEAT",
-    "name": "Rotom Heat",
-    "slug": "rotom_heat"
-  },
-  {
-    "const": "SPECIES_ROTOM_MOW",
-    "name": "Rotom Mow",
-    "slug": "rotom_mow"
-  },
-  {
-    "const": "SPECIES_ROTOM_WASH",
-    "name": "Rotom Wash",
-    "slug": "rotom_wash"
+    "slug": "rotom",
+    "id": 479,
+    "dex": 479,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_ROWLET",
     "name": "Rowlet",
-    "slug": "rowlet"
+    "slug": "rowlet",
+    "id": 722,
+    "dex": 722,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_RUFFLET",
     "name": "Rufflet",
-    "slug": "rufflet"
+    "slug": "rufflet",
+    "id": 627,
+    "dex": 627,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SABLEYE",
     "name": "Sableye",
-    "slug": "sableye"
+    "slug": "sableye",
+    "id": 302,
+    "dex": 302,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SABLEYE_REDUX",
     "name": "Sableye Redux",
-    "slug": "sableye_redux"
+    "slug": "sableye_redux",
+    "id": 10736,
+    "dex": 302,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SALANDIT",
     "name": "Salandit",
-    "slug": "salandit"
+    "slug": "salandit",
+    "id": 757,
+    "dex": 757,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SANDILE",
     "name": "Sandile",
-    "slug": "sandile"
+    "slug": "sandile",
+    "id": 551,
+    "dex": 551,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_SANDSHREW",
     "name": "Sandshrew",
-    "slug": "sandshrew"
+    "slug": "sandshrew",
+    "id": 27,
+    "dex": 27,
+    "eggTier": 0,
+    "cost": 2
+  },
+  {
+    "const": "SPECIES_ALOLA_SANDSHREW",
+    "name": "Sandshrew",
+    "slug": null,
+    "id": 2027,
+    "dex": 2027,
+    "eggTier": 1,
+    "cost": 2
   },
   {
     "const": "SPECIES_SANDY_SHOCKS",
     "name": "Sandy Shocks",
-    "slug": "sandy_shocks"
+    "slug": "sandy_shocks",
+    "id": 989,
+    "dex": 989,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_SANDYGAST",
     "name": "Sandygast",
-    "slug": "sandygast"
+    "slug": "sandygast",
+    "id": 769,
+    "dex": 769,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SAWK",
     "name": "Sawk",
-    "slug": "sawk"
+    "slug": "sawk",
+    "id": 539,
+    "dex": 539,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_SAWK_REDUX",
     "name": "Sawk Redux",
-    "slug": "sawk_redux"
+    "slug": "sawk_redux",
+    "id": 10670,
+    "dex": 539,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SCATTERBUG",
     "name": "Scatterbug",
-    "slug": "scatterbug"
+    "slug": "scatterbug",
+    "id": 664,
+    "dex": 664,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SCORBUNNY",
     "name": "Scorbunny",
-    "slug": "scorbunny"
+    "slug": "scorbunny",
+    "id": 813,
+    "dex": 813,
+    "eggTier": 0,
+    "cost": 4
   },
   {
     "const": "SPECIES_SCRAGGY",
     "name": "Scraggy",
-    "slug": "scraggy"
+    "slug": "scraggy",
+    "id": 559,
+    "dex": 559,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SCREAM_TAIL",
     "name": "Scream Tail",
-    "slug": "scream_tail"
+    "slug": "scream_tail",
+    "id": 985,
+    "dex": 985,
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_SCYTHER",
     "name": "Scyther",
-    "slug": "scyther"
+    "slug": "scyther",
+    "id": 123,
+    "dex": 123,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_SCYTHER_REDUX",
     "name": "Scyther Redux",
-    "slug": "scyther_redux"
+    "slug": "scyther_redux",
+    "id": 10827,
+    "dex": 123,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_SEEDOT",
     "name": "Seedot",
-    "slug": "seedot"
+    "slug": "seedot",
+    "id": 273,
+    "dex": 273,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SEEL",
     "name": "Seel",
-    "slug": "seel"
+    "slug": "seel",
+    "id": 86,
+    "dex": 86,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_SEEL_REDUX",
     "name": "Seel Redux",
-    "slug": "seel_redux"
+    "slug": "seel_redux",
+    "id": 10805,
+    "dex": 86,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SENTRET",
     "name": "Sentret",
-    "slug": "sentret"
+    "slug": "sentret",
+    "id": 161,
+    "dex": 161,
+    "eggTier": 0,
+    "cost": 1
+  },
+  {
+    "const": "SPECIES_DELPHOX_SERENA",
+    "name": "Serena-Delphox",
+    "slug": "delphox_serena",
+    "id": 10454,
+    "dex": null,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_SEVIPER",
     "name": "Seviper",
-    "slug": "seviper"
+    "slug": "seviper",
+    "id": 336,
+    "dex": 336,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_SEWADDLE",
     "name": "Sewaddle",
-    "slug": "sewaddle"
+    "slug": "sewaddle",
+    "id": 540,
+    "dex": 540,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SHAYMIN",
     "name": "Shaymin",
-    "slug": "shaymin"
-  },
-  {
-    "const": "SPECIES_SHAYMIN_SKY",
-    "name": "Shaymin Sky",
-    "slug": "shaymin_sky"
+    "slug": "shaymin",
+    "id": 492,
+    "dex": 492,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_SHELLDER",
     "name": "Shellder",
-    "slug": "shellder"
+    "slug": "shellder",
+    "id": 90,
+    "dex": 90,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_SHELLOS",
     "name": "Shellos",
-    "slug": "shellos"
-  },
-  {
-    "const": "SPECIES_SHELLOS_EAST_SEA",
-    "name": "Shellos East",
-    "slug": "shellos_east_sea"
+    "slug": "shellos",
+    "id": 422,
+    "dex": 422,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SHELMET",
     "name": "Shelmet",
-    "slug": "shelmet"
+    "slug": "shelmet",
+    "id": 616,
+    "dex": 616,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SHIELDON",
     "name": "Shieldon",
-    "slug": "shieldon"
+    "slug": "shieldon",
+    "id": 410,
+    "dex": 410,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_SHINX",
     "name": "Shinx",
-    "slug": "shinx"
+    "slug": "shinx",
+    "id": 403,
+    "dex": 403,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SHINX_REDUX",
     "name": "Shinx Redux",
-    "slug": "shinx_redux"
+    "slug": "shinx_redux",
+    "id": 10835,
+    "dex": 403,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SHROODLE",
     "name": "Shroodle",
-    "slug": "shroodle"
+    "slug": "shroodle",
+    "id": 944,
+    "dex": 944,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SHROOMISH",
     "name": "Shroomish",
-    "slug": "shroomish"
+    "slug": "shroomish",
+    "id": 285,
+    "dex": 285,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SHUCKLE",
     "name": "Shuckle",
-    "slug": "shuckle"
+    "slug": "shuckle",
+    "id": 213,
+    "dex": 213,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SHUPPET",
     "name": "Shuppet",
-    "slug": "shuppet"
+    "slug": "shuppet",
+    "id": 353,
+    "dex": 353,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SIGILYPH",
     "name": "Sigilyph",
-    "slug": "sigilyph"
+    "slug": "sigilyph",
+    "id": 561,
+    "dex": 561,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_SILICOBRA",
     "name": "Silicobra",
-    "slug": "silicobra"
+    "slug": "silicobra",
+    "id": 843,
+    "dex": 843,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SINISTEA",
     "name": "Sinistea",
-    "slug": "sinistea"
-  },
-  {
-    "const": "SPECIES_SINISTEA_ANTIQUE",
-    "name": "Sinistea Antique",
-    "slug": "sinistea_antique"
+    "slug": "sinistea",
+    "id": 854,
+    "dex": 854,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SINISTEA_REDUX",
     "name": "Sinistea Redux",
-    "slug": "sinistea_redux"
+    "slug": "sinistea_redux",
+    "id": 10626,
+    "dex": 854,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SIZZLIPEDE",
     "name": "Sizzlipede",
-    "slug": "sizzlipede"
+    "slug": "sizzlipede",
+    "id": 850,
+    "dex": 850,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SKARMORY",
     "name": "Skarmory",
-    "slug": "skarmory"
+    "slug": "skarmory",
+    "id": 227,
+    "dex": 227,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_SKARMORY_REDUX",
     "name": "Skarmory Redux",
-    "slug": "skarmory_redux"
+    "slug": "skarmory_redux",
+    "id": 10721,
+    "dex": 227,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_SKIDDO",
     "name": "Skiddo",
-    "slug": "skiddo"
+    "slug": "skiddo",
+    "id": 672,
+    "dex": 672,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SKITTY",
     "name": "Skitty",
-    "slug": "skitty"
+    "slug": "skitty",
+    "id": 300,
+    "dex": 300,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_SKORUPI",
     "name": "Skorupi",
-    "slug": "skorupi"
+    "slug": "skorupi",
+    "id": 451,
+    "dex": 451,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SKRELP",
     "name": "Skrelp",
-    "slug": "skrelp"
+    "slug": "skrelp",
+    "id": 690,
+    "dex": 690,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SKWOVET",
     "name": "Skwovet",
-    "slug": "skwovet"
+    "slug": "skwovet",
+    "id": 819,
+    "dex": 819,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SLAKOTH",
     "name": "Slakoth",
-    "slug": "slakoth"
-  },
-  {
-    "const": "SPECIES_SLATE",
-    "name": "Slate",
-    "slug": "slate"
+    "slug": "slakoth",
+    "id": 287,
+    "dex": 287,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_SLITHER_WING",
     "name": "Slither Wing",
-    "slug": "slither_wing"
+    "slug": "slither_wing",
+    "id": 988,
+    "dex": 988,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_SLOWPOKE",
     "name": "Slowpoke",
-    "slug": "slowpoke"
+    "slug": "slowpoke",
+    "id": 79,
+    "dex": 79,
+    "eggTier": 0,
+    "cost": 3
+  },
+  {
+    "const": "SPECIES_GALAR_SLOWPOKE",
+    "name": "Slowpoke",
+    "slug": null,
+    "id": 4079,
+    "dex": 4079,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_SLUGMA",
     "name": "Slugma",
-    "slug": "slugma"
+    "slug": "slugma",
+    "id": 218,
+    "dex": 218,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SLUGMA_REDUX",
     "name": "Slugma Redux",
-    "slug": "slugma_redux"
+    "slug": "slugma_redux",
+    "id": 10708,
+    "dex": 218,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SMEARGLE",
     "name": "Smeargle",
-    "slug": "smeargle"
+    "slug": "smeargle",
+    "id": 235,
+    "dex": 235,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_SMOLIV",
     "name": "Smoliv",
-    "slug": "smoliv"
+    "slug": "smoliv",
+    "id": 928,
+    "dex": 928,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SMOOCHUM",
     "name": "Smoochum",
-    "slug": "smoochum"
+    "slug": "smoochum",
+    "id": 238,
+    "dex": 238,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SNEASEL",
     "name": "Sneasel",
-    "slug": "sneasel"
+    "slug": "sneasel",
+    "id": 215,
+    "dex": 215,
+    "eggTier": 1,
+    "cost": 4
+  },
+  {
+    "const": "SPECIES_HISUI_SNEASEL",
+    "name": "Sneasel",
+    "slug": null,
+    "id": 6215,
+    "dex": 6215,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_SNIVY",
     "name": "Snivy",
-    "slug": "snivy"
+    "slug": "snivy",
+    "id": 495,
+    "dex": 495,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SNOM",
     "name": "Snom",
-    "slug": "snom"
+    "slug": "snom",
+    "id": 872,
+    "dex": 872,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SNORUNT",
     "name": "Snorunt",
-    "slug": "snorunt"
+    "slug": "snorunt",
+    "id": 361,
+    "dex": 361,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SNORUNT_REDUX",
     "name": "Snorunt Redux",
-    "slug": "snorunt_redux"
+    "slug": "snorunt_redux",
+    "id": 10807,
+    "dex": 361,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SNOVER",
     "name": "Snover",
-    "slug": "snover"
+    "slug": "snover",
+    "id": 459,
+    "dex": 459,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SNUBBULL",
     "name": "Snubbull",
-    "slug": "snubbull"
+    "slug": "snubbull",
+    "id": 209,
+    "dex": 209,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SOBBLE",
     "name": "Sobble",
-    "slug": "sobble"
+    "slug": "sobble",
+    "id": 816,
+    "dex": 816,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SOLOSIS",
     "name": "Solosis",
-    "slug": "solosis"
+    "slug": "solosis",
+    "id": 577,
+    "dex": 577,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SOLOSIS_REDUX",
     "name": "Solosis Redux",
-    "slug": "solosis_redux"
+    "slug": "solosis_redux",
+    "id": 10718,
+    "dex": 577,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SOLROCK",
     "name": "Solrock",
-    "slug": "solrock"
+    "slug": "solrock",
+    "id": 338,
+    "dex": 338,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SOLROCK_SYSTEM",
     "name": "Solrock System",
-    "slug": "solrock_system"
+    "slug": "solrock_system",
+    "id": 10770,
+    "dex": 338,
+    "eggTier": 3,
+    "cost": 9
   },
   {
     "const": "SPECIES_SPEAROW",
     "name": "Spearow",
-    "slug": "spearow"
+    "slug": "spearow",
+    "id": 21,
+    "dex": 21,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_SPEAROW_REDUX",
     "name": "Spearow Redux",
-    "slug": "spearow_redux"
+    "slug": "spearow_redux",
+    "id": 10877,
+    "dex": 21,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SPECTRIER",
     "name": "Spectrier",
-    "slug": "spectrier"
+    "slug": "spectrier",
+    "id": 897,
+    "dex": 897,
+    "eggTier": 2,
+    "cost": 8
   },
   {
     "const": "SPECIES_SPECTRIER_CLOUD",
     "name": "Spectrier Cloud",
-    "slug": "spectrier_cloud"
+    "slug": "spectrier_cloud",
+    "id": 10771,
+    "dex": 897,
+    "eggTier": 1,
+    "cost": 6
   },
   {
     "const": "SPECIES_SPHEAL",
     "name": "Spheal",
-    "slug": "spheal"
+    "slug": "spheal",
+    "id": 363,
+    "dex": 363,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SPINARAK",
     "name": "Spinarak",
-    "slug": "spinarak"
+    "slug": "spinarak",
+    "id": 167,
+    "dex": 167,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_SPINDA",
     "name": "Spinda",
-    "slug": "spinda"
+    "slug": "spinda",
+    "id": 327,
+    "dex": 327,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_SPIRITOMB",
     "name": "Spiritomb",
-    "slug": "spiritomb"
+    "slug": "spiritomb",
+    "id": 442,
+    "dex": 442,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_SPIRITOMB_REDUX",
     "name": "Spiritomb Redux",
-    "slug": "spiritomb_redux"
+    "slug": "spiritomb_redux",
+    "id": 10817,
+    "dex": 442,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_SPOINK",
     "name": "Spoink",
-    "slug": "spoink"
+    "slug": "spoink",
+    "id": 325,
+    "dex": 325,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SPRIGATITO",
     "name": "Sprigatito",
-    "slug": "sprigatito"
+    "slug": "sprigatito",
+    "id": 906,
+    "dex": 906,
+    "eggTier": 0,
+    "cost": 4
   },
   {
     "const": "SPECIES_SPRITZEE",
     "name": "Spritzee",
-    "slug": "spritzee"
+    "slug": "spritzee",
+    "id": 682,
+    "dex": 682,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SQUAWKABILLY",
     "name": "Squawkabilly",
-    "slug": "squawkabilly"
-  },
-  {
-    "const": "SPECIES_SQUAWKABILLY_GREEN_PLUMAGE",
-    "name": "Squawkabilly Green Plumage",
-    "slug": "squawkabilly_green_plumage"
+    "slug": "squawkabilly",
+    "id": 931,
+    "dex": 931,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SQUIRTLE",
     "name": "Squirtle",
-    "slug": "squirtle"
+    "slug": "squirtle",
+    "id": 7,
+    "dex": 7,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_STAKATAKA",
     "name": "Stakataka",
-    "slug": "stakataka"
+    "slug": "stakataka",
+    "id": 805,
+    "dex": 805,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_STANTLER",
     "name": "Stantler",
-    "slug": "stantler"
+    "slug": "stantler",
+    "id": 234,
+    "dex": 234,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_STARLY",
     "name": "Starly",
-    "slug": "starly"
+    "slug": "starly",
+    "id": 396,
+    "dex": 396,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_STARYU",
     "name": "Staryu",
-    "slug": "staryu"
+    "slug": "staryu",
+    "id": 120,
+    "dex": 120,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_STONJOURNER",
     "name": "Stonjourner",
-    "slug": "stonjourner"
+    "slug": "stonjourner",
+    "id": 874,
+    "dex": 874,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_STUFFUL",
     "name": "Stufful",
-    "slug": "stufful"
+    "slug": "stufful",
+    "id": 759,
+    "dex": 759,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_STUFFUL_REDUX",
     "name": "Stufful Redux",
-    "slug": "stufful_redux"
+    "slug": "stufful_redux",
+    "id": 10700,
+    "dex": 759,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_STUNFISK",
     "name": "Stunfisk",
-    "slug": "stunfisk"
+    "slug": "stunfisk",
+    "id": 618,
+    "dex": 618,
+    "eggTier": 0,
+    "cost": 3
+  },
+  {
+    "const": "SPECIES_GALAR_STUNFISK",
+    "name": "Stunfisk",
+    "slug": null,
+    "id": 4618,
+    "dex": 4618,
+    "eggTier": 1,
+    "cost": 2
   },
   {
     "const": "SPECIES_STUNKY",
     "name": "Stunky",
-    "slug": "stunky"
+    "slug": "stunky",
+    "id": 434,
+    "dex": 434,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SUICUNE",
     "name": "Suicune",
-    "slug": "suicune"
+    "slug": "suicune",
+    "id": 245,
+    "dex": 245,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_SUNKERN",
     "name": "Sunkern",
-    "slug": "sunkern"
+    "slug": "sunkern",
+    "id": 191,
+    "dex": 191,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_SURSKIT",
     "name": "Surskit",
-    "slug": "surskit"
+    "slug": "surskit",
+    "id": 283,
+    "dex": 283,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SWABLU",
     "name": "Swablu",
-    "slug": "swablu"
+    "slug": "swablu",
+    "id": 333,
+    "dex": 333,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_SWABLU_REDUX",
     "name": "Swablu Redux",
-    "slug": "swablu_redux"
+    "slug": "swablu_redux",
+    "id": 10677,
+    "dex": 333,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SWINUB",
     "name": "Swinub",
-    "slug": "swinub"
+    "slug": "swinub",
+    "id": 220,
+    "dex": 220,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SWINUB_REDUX",
     "name": "Swinub Redux",
-    "slug": "swinub_redux"
+    "slug": "swinub_redux",
+    "id": 10659,
+    "dex": 220,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_SWIRLIX",
     "name": "Swirlix",
-    "slug": "swirlix"
+    "slug": "swirlix",
+    "id": 684,
+    "dex": 684,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TADBULB",
     "name": "Tadbulb",
-    "slug": "tadbulb"
+    "slug": "tadbulb",
+    "id": 938,
+    "dex": 938,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TAILLOW",
     "name": "Taillow",
-    "slug": "taillow"
+    "slug": "taillow",
+    "id": 276,
+    "dex": 276,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TANDEMAUS",
     "name": "Tandemaus",
-    "slug": "tandemaus"
+    "slug": "tandemaus",
+    "id": 924,
+    "dex": 924,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_TANGELA",
     "name": "Tangela",
-    "slug": "tangela"
+    "slug": "tangela",
+    "id": 114,
+    "dex": 114,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TAPU_BULU",
     "name": "Tapu Bulu",
-    "slug": "tapu_bulu"
+    "slug": "tapu_bulu",
+    "id": 787,
+    "dex": 787,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_TAPU_FINI",
     "name": "Tapu Fini",
-    "slug": "tapu_fini"
+    "slug": "tapu_fini",
+    "id": 788,
+    "dex": 788,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_TAPU_KOKO",
     "name": "Tapu Koko",
-    "slug": "tapu_koko"
+    "slug": "tapu_koko",
+    "id": 785,
+    "dex": 785,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_TAPU_LELE",
     "name": "Tapu Lele",
-    "slug": "tapu_lele"
+    "slug": "tapu_lele",
+    "id": 786,
+    "dex": 786,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_TAROUNTULA",
     "name": "Tarountula",
-    "slug": "tarountula"
+    "slug": "tarountula",
+    "id": 917,
+    "dex": 917,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_TATSUGIRI",
     "name": "Tatsugiri",
-    "slug": "tatsugiri"
+    "slug": "tatsugiri",
+    "id": 978,
+    "dex": 978,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_TAUROS",
     "name": "Tauros",
-    "slug": "tauros"
+    "slug": "tauros",
+    "id": 128,
+    "dex": 128,
+    "eggTier": 1,
+    "cost": 4
+  },
+  {
+    "const": "SPECIES_PALDEA_TAUROS",
+    "name": "Tauros",
+    "slug": null,
+    "id": 8128,
+    "dex": 8128,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_TEDDIURSA",
     "name": "Teddiursa",
-    "slug": "teddiursa"
+    "slug": "teddiursa",
+    "id": 216,
+    "dex": 216,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_TENTACOOL",
     "name": "Tentacool",
-    "slug": "tentacool"
+    "slug": "tentacool",
+    "id": 72,
+    "dex": 72,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TEPIG",
     "name": "Tepig",
-    "slug": "tepig"
+    "slug": "tepig",
+    "id": 498,
+    "dex": 498,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TERAPAGOS",
     "name": "Terapagos",
-    "slug": "terapagos"
+    "slug": "terapagos",
+    "id": 1024,
+    "dex": 1024,
+    "eggTier": 3,
+    "cost": 9
   },
   {
     "const": "SPECIES_TERRAKION",
     "name": "Terrakion",
-    "slug": "terrakion"
+    "slug": "terrakion",
+    "id": 639,
+    "dex": 639,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_THROH",
     "name": "Throh",
-    "slug": "throh"
+    "slug": "throh",
+    "id": 538,
+    "dex": 538,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_THROH_REDUX",
     "name": "Throh Redux",
-    "slug": "throh_redux"
+    "slug": "throh_redux",
+    "id": 10671,
+    "dex": 538,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_THUNDURUS",
     "name": "Thundurus",
-    "slug": "thundurus"
-  },
-  {
-    "const": "SPECIES_THUNDURUS_THERIAN",
-    "name": "Thundurus Therian",
-    "slug": "thundurus_therian"
+    "slug": "thundurus",
+    "id": 642,
+    "dex": 642,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_TIMBURR",
     "name": "Timburr",
-    "slug": "timburr"
+    "slug": "timburr",
+    "id": 532,
+    "dex": 532,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_TING_LU",
-    "name": "Ting Lu",
-    "slug": "ting_lu"
+    "name": "Ting-Lu",
+    "slug": "ting_lu",
+    "id": 1003,
+    "dex": 1003,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_TINKATINK",
     "name": "Tinkatink",
-    "slug": "tinkatink"
+    "slug": "tinkatink",
+    "id": 957,
+    "dex": 957,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_TINKATINK_REDUX",
     "name": "Tinkatink Redux",
-    "slug": "tinkatink_redux"
+    "slug": "tinkatink_redux",
+    "id": 10823,
+    "dex": 957,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TIRTOUGA",
     "name": "Tirtouga",
-    "slug": "tirtouga"
+    "slug": "tirtouga",
+    "id": 564,
+    "dex": 564,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_TOEDSCOOL",
     "name": "Toedscool",
-    "slug": "toedscool"
+    "slug": "toedscool",
+    "id": 948,
+    "dex": 948,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TOGEDEMARU",
     "name": "Togedemaru",
-    "slug": "togedemaru"
+    "slug": "togedemaru",
+    "id": 777,
+    "dex": 777,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TOGEPI",
     "name": "Togepi",
-    "slug": "togepi"
+    "slug": "togepi",
+    "id": 175,
+    "dex": 175,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TORCHIC",
     "name": "Torchic",
-    "slug": "torchic"
+    "slug": "torchic",
+    "id": 255,
+    "dex": 255,
+    "eggTier": 0,
+    "cost": 4
   },
   {
     "const": "SPECIES_TORKOAL",
     "name": "Torkoal",
-    "slug": "torkoal"
+    "slug": "torkoal",
+    "id": 324,
+    "dex": 324,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TORNADUS",
     "name": "Tornadus",
-    "slug": "tornadus"
-  },
-  {
-    "const": "SPECIES_TORNADUS_THERIAN",
-    "name": "Tornadus Therian",
-    "slug": "tornadus_therian"
+    "slug": "tornadus",
+    "id": 641,
+    "dex": 641,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_TOTODILE",
     "name": "Totodile",
-    "slug": "totodile"
+    "slug": "totodile",
+    "id": 158,
+    "dex": 158,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TOXEL",
     "name": "Toxel",
-    "slug": "toxel"
+    "slug": "toxel",
+    "id": 848,
+    "dex": 848,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TOXEL_REDUX",
     "name": "Toxel Redux",
-    "slug": "toxel_redux"
+    "slug": "toxel_redux",
+    "id": 10791,
+    "dex": 848,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TRAPINCH",
     "name": "Trapinch",
-    "slug": "trapinch"
+    "slug": "trapinch",
+    "id": 328,
+    "dex": 328,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TRAPINCH_REDUX",
     "name": "Trapinch Redux",
-    "slug": "trapinch_redux"
+    "slug": "trapinch_redux",
+    "id": 10794,
+    "dex": 328,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TREECKO",
     "name": "Treecko",
-    "slug": "treecko"
+    "slug": "treecko",
+    "id": 252,
+    "dex": 252,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TROPIUS",
     "name": "Tropius",
-    "slug": "tropius"
+    "slug": "tropius",
+    "id": 357,
+    "dex": 357,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TRUBBISH",
     "name": "Trubbish",
-    "slug": "trubbish"
+    "slug": "trubbish",
+    "id": 568,
+    "dex": 568,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_TURTONATOR",
     "name": "Turtonator",
-    "slug": "turtonator"
+    "slug": "turtonator",
+    "id": 776,
+    "dex": 776,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_TURTWIG",
     "name": "Turtwig",
-    "slug": "turtwig"
+    "slug": "turtwig",
+    "id": 387,
+    "dex": 387,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TURTWIG_REDUX",
     "name": "Turtwig Redux",
-    "slug": "turtwig_redux"
+    "slug": "turtwig_redux",
+    "id": 10779,
+    "dex": 387,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TYMPOLE",
     "name": "Tympole",
-    "slug": "tympole"
+    "slug": "tympole",
+    "id": 535,
+    "dex": 535,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TYNAMO",
     "name": "Tynamo",
-    "slug": "tynamo"
+    "slug": "tynamo",
+    "id": 602,
+    "dex": 602,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_TYPE_NULL",
     "name": "Type: Null",
-    "slug": "type_null"
+    "slug": "type_null",
+    "id": 772,
+    "dex": 772,
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_TYROGUE",
     "name": "Tyrogue",
-    "slug": "tyrogue"
+    "slug": "tyrogue",
+    "id": 236,
+    "dex": 236,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_TYRUNT",
     "name": "Tyrunt",
-    "slug": "tyrunt"
+    "slug": "tyrunt",
+    "id": 696,
+    "dex": 696,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_UNOWN",
     "name": "Unown",
-    "slug": "unown"
+    "slug": "unown",
+    "id": 201,
+    "dex": 201,
+    "eggTier": 0,
+    "cost": 1
   },
   {
-    "const": "SPECIES_UNOWN_REVELATION",
-    "name": "Unown Revelation",
-    "slug": "unown_revelation"
-  },
-  {
-    "const": "SPECIES_URSALUNA_BLOODMOON",
-    "name": "Ursaluna Bloodmoon",
-    "slug": "ursaluna_bloodmoon"
+    "const": "SPECIES_BLOODMOON_URSALUNA",
+    "name": "Ursaluna",
+    "slug": null,
+    "id": 8901,
+    "dex": 8901,
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_UXIE",
     "name": "Uxie",
-    "slug": "uxie"
+    "slug": "uxie",
+    "id": 480,
+    "dex": 480,
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_UXIE_REDUX",
     "name": "Uxie Redux",
-    "slug": "uxie_redux"
+    "slug": "uxie_redux",
+    "id": 10714,
+    "dex": 480,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_VANILLITE",
     "name": "Vanillite",
-    "slug": "vanillite"
+    "slug": "vanillite",
+    "id": 582,
+    "dex": 582,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_VANILLITE_REDUX",
     "name": "Vanillite Redux",
-    "slug": "vanillite_redux"
+    "slug": "vanillite_redux",
+    "id": 10648,
+    "dex": 582,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_VAROOM",
     "name": "Varoom",
-    "slug": "varoom"
+    "slug": "varoom",
+    "id": 965,
+    "dex": 965,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_VELUZA",
     "name": "Veluza",
-    "slug": "veluza"
+    "slug": "veluza",
+    "id": 976,
+    "dex": 976,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_VENIPEDE",
     "name": "Venipede",
-    "slug": "venipede"
+    "slug": "venipede",
+    "id": 543,
+    "dex": 543,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_VENONAT",
     "name": "Venonat",
-    "slug": "venonat"
+    "slug": "venonat",
+    "id": 48,
+    "dex": 48,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_VICTINI",
     "name": "Victini",
-    "slug": "victini"
+    "slug": "victini",
+    "id": 494,
+    "dex": 494,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_VIRIZION",
     "name": "Virizion",
-    "slug": "virizion"
+    "slug": "virizion",
+    "id": 640,
+    "dex": 640,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_VOLBEAT",
     "name": "Volbeat",
-    "slug": "volbeat"
+    "slug": "volbeat",
+    "id": 313,
+    "dex": 313,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_VOLCANION",
     "name": "Volcanion",
-    "slug": "volcanion"
+    "slug": "volcanion",
+    "id": 721,
+    "dex": 721,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_VOLTORB",
     "name": "Voltorb",
-    "slug": "voltorb"
+    "slug": "voltorb",
+    "id": 100,
+    "dex": 100,
+    "eggTier": 0,
+    "cost": 2
+  },
+  {
+    "const": "SPECIES_HISUI_VOLTORB",
+    "name": "Voltorb",
+    "slug": null,
+    "id": 6100,
+    "dex": 6100,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_VULLABY",
     "name": "Vullaby",
-    "slug": "vullaby"
+    "slug": "vullaby",
+    "id": 629,
+    "dex": 629,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_VULPIX",
     "name": "Vulpix",
-    "slug": "vulpix"
+    "slug": "vulpix",
+    "id": 37,
+    "dex": 37,
+    "eggTier": 0,
+    "cost": 3
+  },
+  {
+    "const": "SPECIES_ALOLA_VULPIX",
+    "name": "Vulpix",
+    "slug": null,
+    "id": 2037,
+    "dex": 2037,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_WAILMER",
     "name": "Wailmer",
-    "slug": "wailmer"
+    "slug": "wailmer",
+    "id": 320,
+    "dex": 320,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_WALKING_WAKE",
     "name": "Walking Wake",
-    "slug": "walking_wake"
+    "slug": "walking_wake",
+    "id": 1009,
+    "dex": 1009,
+    "eggTier": 2,
+    "cost": 7
   },
   {
     "const": "SPECIES_WATTREL",
     "name": "Wattrel",
-    "slug": "wattrel"
+    "slug": "wattrel",
+    "id": 940,
+    "dex": 940,
+    "eggTier": 0,
+    "cost": 3
+  },
+  {
+    "const": "SPECIES_WEAVILE_REDUX",
+    "name": "Weavile Redux",
+    "slug": "weavile_redux",
+    "id": 10763,
+    "dex": 461,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_WEEDLE",
     "name": "Weedle",
-    "slug": "weedle"
+    "slug": "weedle",
+    "id": 13,
+    "dex": 13,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_WEEDLE_REDUX",
     "name": "Weedle Redux",
-    "slug": "weedle_redux"
+    "slug": "weedle_redux",
+    "id": 10697,
+    "dex": 13,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_WHISMUR",
     "name": "Whismur",
-    "slug": "whismur"
+    "slug": "whismur",
+    "id": 293,
+    "dex": 293,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_WHISMUR_REDUX",
     "name": "Whismur Redux",
-    "slug": "whismur_redux"
+    "slug": "whismur_redux",
+    "id": 10724,
+    "dex": 293,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_WIGGLYTUFF_APEX",
     "name": "Wigglytuff Apex",
-    "slug": "wigglytuff_apex"
+    "slug": "wigglytuff_apex",
+    "id": 10775,
+    "dex": 40,
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_WIGLETT",
     "name": "Wiglett",
-    "slug": "wiglett"
+    "slug": "wiglett",
+    "id": 960,
+    "dex": 960,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_WIMPOD",
     "name": "Wimpod",
-    "slug": "wimpod"
+    "slug": "wimpod",
+    "id": 767,
+    "dex": 767,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_WINGULL",
     "name": "Wingull",
-    "slug": "wingull"
+    "slug": "wingull",
+    "id": 278,
+    "dex": 278,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_WISHIWASHI",
     "name": "Wishiwashi",
-    "slug": "wishiwashi"
-  },
-  {
-    "const": "SPECIES_WISHIWASHI_SCHOOL",
-    "name": "Wishiwashi School",
-    "slug": "wishiwashi_school"
+    "slug": "wishiwashi",
+    "id": 746,
+    "dex": 746,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_WISPYWASPY",
     "name": "Wispywaspy",
-    "slug": "wispywaspy"
-  },
-  {
-    "const": "SPECIES_WISPYWASPY_HIVEMIND",
-    "name": "Wispywaspy Hivemind",
-    "slug": "wispywaspy_hivemind"
+    "slug": "wispywaspy",
+    "id": 10065,
+    "dex": null,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_WO_CHIEN",
-    "name": "Wo Chien",
-    "slug": "wo_chien"
+    "name": "Wo-Chien",
+    "slug": "wo_chien",
+    "id": 1001,
+    "dex": 1001,
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_WOOBAT",
     "name": "Woobat",
-    "slug": "woobat"
+    "slug": "woobat",
+    "id": 527,
+    "dex": 527,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_WOOLOO",
     "name": "Wooloo",
-    "slug": "wooloo"
+    "slug": "wooloo",
+    "id": 831,
+    "dex": 831,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_WOOLY_WORM",
     "name": "Wooly Worm",
-    "slug": "wooly_worm"
+    "slug": "wooly_worm",
+    "id": 10067,
+    "dex": null,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_WOOPER",
     "name": "Wooper",
-    "slug": "wooper"
+    "slug": "wooper",
+    "id": 194,
+    "dex": 194,
+    "eggTier": 0,
+    "cost": 2
+  },
+  {
+    "const": "SPECIES_PALDEA_WOOPER",
+    "name": "Wooper",
+    "slug": null,
+    "id": 8194,
+    "dex": 8194,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_WURMPLE",
     "name": "Wurmple",
-    "slug": "wurmple"
+    "slug": "wurmple",
+    "id": 265,
+    "dex": 265,
+    "eggTier": 0,
+    "cost": 1
   },
   {
     "const": "SPECIES_WYNAUT",
     "name": "Wynaut",
-    "slug": "wynaut"
+    "slug": "wynaut",
+    "id": 360,
+    "dex": 360,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_XERNEAS",
     "name": "Xerneas",
-    "slug": "xerneas"
-  },
-  {
-    "const": "SPECIES_XERNEAS_ACTIVE",
-    "name": "Xerneas Active",
-    "slug": "xerneas_active"
+    "slug": "xerneas",
+    "id": 716,
+    "dex": 716,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_XURKITREE",
     "name": "Xurkitree",
-    "slug": "xurkitree"
+    "slug": "xurkitree",
+    "id": 796,
+    "dex": 796,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_YAMASK",
     "name": "Yamask",
-    "slug": "yamask"
+    "slug": "yamask",
+    "id": 562,
+    "dex": 562,
+    "eggTier": 0,
+    "cost": 3
+  },
+  {
+    "const": "SPECIES_GALAR_YAMASK",
+    "name": "Yamask",
+    "slug": null,
+    "id": 4562,
+    "dex": 4562,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_YAMPER",
     "name": "Yamper",
-    "slug": "yamper"
+    "slug": "yamper",
+    "id": 835,
+    "dex": 835,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_YANMA",
     "name": "Yanma",
-    "slug": "yanma"
+    "slug": "yanma",
+    "id": 193,
+    "dex": 193,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_YUNGOOS",
     "name": "Yungoos",
-    "slug": "yungoos"
+    "slug": "yungoos",
+    "id": 734,
+    "dex": 734,
+    "eggTier": 0,
+    "cost": 2
   },
   {
     "const": "SPECIES_YVELTAL",
     "name": "Yveltal",
-    "slug": "yveltal"
+    "slug": "yveltal",
+    "id": 717,
+    "dex": 717,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_ZACIAN",
     "name": "Zacian",
-    "slug": "zacian"
+    "slug": "zacian",
+    "id": 888,
+    "dex": 888,
+    "eggTier": 3,
+    "cost": 9
   },
   {
     "const": "SPECIES_ZAMAZENTA",
     "name": "Zamazenta",
-    "slug": "zamazenta"
+    "slug": "zamazenta",
+    "id": 889,
+    "dex": 889,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_ZANGOOSE",
     "name": "Zangoose",
-    "slug": "zangoose"
+    "slug": "zangoose",
+    "id": 335,
+    "dex": 335,
+    "eggTier": 1,
+    "cost": 4
   },
   {
     "const": "SPECIES_ZAPDOS",
     "name": "Zapdos",
-    "slug": "zapdos"
+    "slug": "zapdos",
+    "id": 145,
+    "dex": 145,
+    "eggTier": 2,
+    "cost": 6
+  },
+  {
+    "const": "SPECIES_GALAR_ZAPDOS",
+    "name": "Zapdos",
+    "slug": null,
+    "id": 4145,
+    "dex": 4145,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_ZAPDOS_EX",
     "name": "Zapdos Ex",
-    "slug": "zapdos_ex"
+    "slug": "zapdos_ex",
+    "id": 10620,
+    "dex": 4145,
+    "eggTier": 3,
+    "cost": 9
   },
   {
     "const": "SPECIES_ZARUDE",
     "name": "Zarude",
-    "slug": "zarude"
-  },
-  {
-    "const": "SPECIES_ZARUDE_DADA",
-    "name": "Zarude Dada",
-    "slug": "zarude_dada"
+    "slug": "zarude",
+    "id": 893,
+    "dex": 893,
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_ZEKROM",
     "name": "Zekrom",
-    "slug": "zekrom"
+    "slug": "zekrom",
+    "id": 644,
+    "dex": 644,
+    "eggTier": 3,
+    "cost": 8
   },
   {
     "const": "SPECIES_ZERAORA",
     "name": "Zeraora",
-    "slug": "zeraora"
+    "slug": "zeraora",
+    "id": 807,
+    "dex": 807,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_ZIGZAGOON",
     "name": "Zigzagoon",
-    "slug": "zigzagoon"
+    "slug": "zigzagoon",
+    "id": 263,
+    "dex": 263,
+    "eggTier": 0,
+    "cost": 2
+  },
+  {
+    "const": "SPECIES_GALAR_ZIGZAGOON",
+    "name": "Zigzagoon",
+    "slug": null,
+    "id": 4263,
+    "dex": 4263,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_ZORUA",
     "name": "Zorua",
-    "slug": "zorua"
+    "slug": "zorua",
+    "id": 570,
+    "dex": 570,
+    "eggTier": 0,
+    "cost": 3
+  },
+  {
+    "const": "SPECIES_HISUI_ZORUA",
+    "name": "Zorua",
+    "slug": null,
+    "id": 6570,
+    "dex": 6570,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_ZUBAT",
     "name": "Zubat",
-    "slug": "zubat"
+    "slug": "zubat",
+    "id": 41,
+    "dex": 41,
+    "eggTier": 0,
+    "cost": 3
   },
   {
     "const": "SPECIES_ZYGARDE",
     "name": "Zygarde",
-    "slug": "zygarde"
+    "slug": "zygarde",
+    "id": 718,
+    "dex": 718,
+    "eggTier": 3,
+    "cost": 8
   }
 ]

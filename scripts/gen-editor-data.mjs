@@ -1,55 +1,18 @@
-// Generate the static data the team editor SPA needs, parsed from the game
-// source (no TS import / build step):
-//   editor/data/species.json — [{ const, name, slug }] for every egg-move species
-//   editor/data/moves.json    — sorted list of all MoveId enum names
-// Run: node scripts/gen-editor-data.mjs   (re-run when species/moves change)
+// Generate the static MOVE data the team editor SPA needs, parsed from the
+// game source (no TS import / build step):
+//   editor/data/moves.json — sorted list of all MoveId enum names + ER customs
+//
+// NOTE: editor/data/species.json (plus items.json / trainers.json) is NOT
+// generated here anymore. The old approach built the species list from the
+// er-egg-moves.json keys, so any starter-selectable species WITHOUT an
+// egg-move entry silently never appeared in the editor. The roster now comes
+// from the LIVE runtime tables via the dump tool:
+//   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/tools/dump-editor-data.test.ts
+//
+// Run: node scripts/gen-editor-data.mjs   (re-run when moves change)
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 const read = p => readFileSync(p, "utf8");
-
-// speciesConst -> sprite slug (for the icon)
-const slugByConst = {};
-{
-  const t = read("src/data/elite-redux/er-sprite-manifest.ts");
-  const re = /"speciesConst":\s*"(SPECIES_[A-Z0-9_]+)"[\s\S]*?"slug":\s*"([^"]+)"/g;
-  let m;
-  while ((m = re.exec(t)) !== null) {
-    if (!(m[1] in slugByConst)) {
-      slugByConst[m[1]] = m[2];
-    }
-  }
-}
-
-// speciesConst -> display name
-const nameByConst = {};
-{
-  const t = read("src/data/elite-redux/er-species.ts");
-  const re = /"speciesConst":\s*"(SPECIES_[A-Z0-9_]+)",\s*\n\s*"name":\s*"([^"]+)"/g;
-  let m;
-  while ((m = re.exec(t)) !== null) {
-    if (!(m[1] in nameByConst)) {
-      nameByConst[m[1]] = m[2];
-    }
-  }
-}
-
-const titleCase = c =>
-  c
-    .replace(/^SPECIES_/, "")
-    .toLowerCase()
-    .split("_")
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-
-// Build species list from the egg-move keys (the editable set: vanilla + ER customs).
-const eggMoves = JSON.parse(read("src/data/elite-redux/er-egg-moves.json"));
-const species = Object.keys(eggMoves)
-  .map(c => ({
-    const: c,
-    name: nameByConst[c] ?? titleCase(c),
-    slug: slugByConst[c] ?? null,
-  }))
-  .sort((a, b) => a.name.localeCompare(b.name));
 
 // Move enum-key style the game installs for ER custom moves (mirror of
 // moveNameToEnumKey in init-elite-redux-custom-moves.ts).
@@ -90,9 +53,6 @@ let erMoveCount = 0;
 const uniqueMoves = [...new Set(moves)].sort();
 
 mkdirSync("editor/data", { recursive: true });
-writeFileSync("editor/data/species.json", `${JSON.stringify(species, null, 2)}\n`);
 writeFileSync("editor/data/moves.json", `${JSON.stringify(uniqueMoves, null, 2)}\n`);
-console.log(
-  `species: ${species.length} (with slug: ${species.filter(s => s.slug).length})  `
-    + `moves: ${uniqueMoves.length} (incl. ${erMoveCount} ER custom names)`,
-);
+console.log(`moves: ${uniqueMoves.length} (incl. ${erMoveCount} ER custom names)`);
+console.log("species/items/trainers: run the dump tool (see header) — they come from the live runtime tables.");

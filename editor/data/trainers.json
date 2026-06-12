@@ -1,0 +1,2874 @@
+{
+  "frequencyDefaults": {
+    "elite": {
+      "trainerCadence": 4,
+      "factoryTeamPct": 15
+    },
+    "hell": {
+      "trainerCadence": 2,
+      "factoryTeamPct": 15
+    }
+  },
+  "factorySpecies": [
+    {
+      "const": "SPECIES_ABOMASNOW",
+      "name": "Abomasnow",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ABSOL",
+      "name": "Absol",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_ACCELGOR",
+      "name": "Accelgor",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_AEGISLASH",
+      "name": "Aegislash",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_AERODACTYL",
+      "name": "Aerodactyl",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_AGGRON",
+      "name": "Aggron",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_ALAKAZAM",
+      "name": "Alakazam",
+      "sets": 8
+    },
+    {
+      "const": "SPECIES_ALCREMIE",
+      "name": "Alcremie",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_ALOMOMOLA",
+      "name": "Alomomola",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ALTARIA",
+      "name": "Altaria",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_AMBIPOM",
+      "name": "Ambipom",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_AMOONGUSS",
+      "name": "Amoonguss",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_AMPHAROS",
+      "name": "Ampharos",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_AMPHYBUZZ",
+      "name": "Amphybuzz",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_ANNIHILAPE",
+      "name": "Annihilape",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_ARACHTRES",
+      "name": "Arachtres",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ARASHINNE",
+      "name": "Arashinne",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ARBOK",
+      "name": "Arbok",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_ARBOLIVA",
+      "name": "Arboliva",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ARCANINE",
+      "name": "Arcanine",
+      "sets": 9
+    },
+    {
+      "const": "SPECIES_ARCHALUDON",
+      "name": "Archaludon",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ARCHEOPS",
+      "name": "Archeops",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ARCTOVISH",
+      "name": "Arctovish",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_ARCTOZOLT",
+      "name": "Arctozolt",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ARMALDO",
+      "name": "Armaldo",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ARMAROUGE",
+      "name": "Armarouge",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ARTICUNO",
+      "name": "Articuno",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_AUDINO",
+      "name": "Audino",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_AURORUS",
+      "name": "Aurorus",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_AVALUGG",
+      "name": "Avalugg",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_AZELF",
+      "name": "Azelf",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_AZUMARILL",
+      "name": "Azumarill",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BANETTE",
+      "name": "Banette",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_BARBARACLE",
+      "name": "Barbaracle",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_BARRASKEWDA",
+      "name": "Barraskewda",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_BASTIODON",
+      "name": "Bastiodon",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BAXCALIBUR",
+      "name": "Baxcalibur",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_BEAUTIFLY",
+      "name": "Beautifly",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BEEDRILL",
+      "name": "Beedrill",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_BEEFENDER",
+      "name": "Beefender",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BEHEEYEM",
+      "name": "Beheeyem",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BELLIBOLT",
+      "name": "Bellibolt",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BELLOSSOM",
+      "name": "Bellossom",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BEWARDEN",
+      "name": "Bewarden",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_BIBAREL",
+      "name": "Bibarel",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BLACEPHALON",
+      "name": "Blacephalon",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BLASTOISE",
+      "name": "Blastoise",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_BLAZIKEN",
+      "name": "Blaziken",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BLISSEY",
+      "name": "Blissey",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_BLIZZARD_MAW",
+      "name": "Blizzard Maw",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_BLOCLI",
+      "name": "Blocli",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BOLTUND",
+      "name": "Boltund",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BOMBIRDIER",
+      "name": "Bombirdier",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BOUFFALANT",
+      "name": "Bouffalant",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BRAMBLEGHAST",
+      "name": "Brambleghast",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BRAVIARY",
+      "name": "Braviary",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_BRELOOM",
+      "name": "Breloom",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_BRONTONANA",
+      "name": "Brontonana",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_BRONZONG",
+      "name": "Bronzong",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_BRUTE_BONNET",
+      "name": "Brute Bonnet",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BRUXISH",
+      "name": "Bruxish",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BUTTERFREE",
+      "name": "Butterfree",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_BUZZWOLE",
+      "name": "Buzzwole",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CALYREX",
+      "name": "Calyrex",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CAMERUPT",
+      "name": "Camerupt",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_CARBINK",
+      "name": "Carbink",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CARBONIX",
+      "name": "Carbonix",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CARNIVINE",
+      "name": "Carnivine",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_CARRACOSTA",
+      "name": "Carracosta",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CASTFORM",
+      "name": "Castform",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CELEBI",
+      "name": "Celebi",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CELESTEELA",
+      "name": "Celesteela",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CENTISKORCH",
+      "name": "Centiskorch",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_CERULEDGE",
+      "name": "Ceruledge",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CETITAN",
+      "name": "Cetitan",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CHANDELURE",
+      "name": "Chandelure",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_CHARIZARD",
+      "name": "Charizard",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_CHARJABUG",
+      "name": "Charjabug",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_CHERRIM",
+      "name": "Cherrim",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CHERRIM_SUNSHINE",
+      "name": "Cherrim Sunshine",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_CHESNAUGHT",
+      "name": "Chesnaught",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CHESNAUGHT_MEGA",
+      "name": "Chesnaught Mega",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_CHI_YU",
+      "name": "Chi-Yu",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CHIEN_PAO",
+      "name": "Chien-Pao",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_CHIMECHO",
+      "name": "Chimecho",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CINDERACE",
+      "name": "Cinderace",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_CLAMPERL",
+      "name": "Clamperl",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_CLAWITZER",
+      "name": "Clawitzer",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CLAYDOL",
+      "name": "Claydol",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CLEFABLE",
+      "name": "Clefable",
+      "sets": 8
+    },
+    {
+      "const": "SPECIES_CLODSIRE",
+      "name": "Clodsire",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_CLOYSTER",
+      "name": "Cloyster",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_COALOSSAL",
+      "name": "Coalossal",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_COBALION",
+      "name": "Cobalion",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_COFAGRIGUS",
+      "name": "Cofagrigus",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_COMFEY",
+      "name": "Comfey",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CONKELDURR",
+      "name": "Conkeldurr",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_COPPERAJAH",
+      "name": "Copperajah",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CORMOTH",
+      "name": "Cormoth",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_HARVESTING_TYRANT",
+      "name": "Corn Tyrant",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CORVIKNIGHT",
+      "name": "Corviknight",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_COSMOEM",
+      "name": "Cosmoem",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_CRADILY",
+      "name": "Cradily",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CRAMORANT",
+      "name": "Cramorant",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_CRESSELIA",
+      "name": "Cresselia",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CROBAT",
+      "name": "Crobat",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CRUSTLE",
+      "name": "Crustle",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CRYOGONAL",
+      "name": "Cryogonal",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CURSOLA",
+      "name": "Cursola",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_CYCLIZAR",
+      "name": "Cyclizar",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DACHSBUN",
+      "name": "Dachsbun",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DARKRAI",
+      "name": "Darkrai",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DARMANITAN",
+      "name": "Darmanitan",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_DECIDUEYE",
+      "name": "Decidueye",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_DEDELIBIRD",
+      "name": "Dedelibird",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DELCATTY",
+      "name": "Delcatty",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DELPHOX",
+      "name": "Delphox",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DEOXYS",
+      "name": "Deoxys",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_DEWGONG",
+      "name": "Dewgong",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_DIALGA",
+      "name": "Dialga",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_DIANCIE",
+      "name": "Diancie",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_DIGGERSBY",
+      "name": "Diggersby",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DODRIO",
+      "name": "Dodrio",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_DONDOZO",
+      "name": "Dondozo",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DONPHAN",
+      "name": "Donphan",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DOUBLADE",
+      "name": "Doublade",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_DRACOVISH",
+      "name": "Dracovish",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DRACOZOLT",
+      "name": "Dracozolt",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DRAGALGE",
+      "name": "Dragalge",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_DRAGAPULT",
+      "name": "Dragapult",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DRAGONITE",
+      "name": "Dragonite",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_DRAMPA",
+      "name": "Drampa",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_DRAPION",
+      "name": "Drapion",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_DREDNAW",
+      "name": "Drednaw",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DREDWOOD",
+      "name": "Dredwood",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DRIFBLIM",
+      "name": "Drifblim",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DRUDDIGON",
+      "name": "Druddigon",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DUBWOOL",
+      "name": "Dubwool",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DUELUMBER",
+      "name": "Duelumber",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DUNSPARCE",
+      "name": "Dunsparce",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_DURANT",
+      "name": "Durant",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DUSCLOPS",
+      "name": "Dusclops",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_DUSKNOIR",
+      "name": "Dusknoir",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_DUSTOX",
+      "name": "Dustox",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_EELEKTROSS",
+      "name": "Eelektross",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_EISCUE",
+      "name": "Eiscue",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_ELDEGOSS",
+      "name": "Eldegoss",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ELECTIVIRE",
+      "name": "Electivire",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_ELECTRODE",
+      "name": "Electrode",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_EMBOAR",
+      "name": "Emboar",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_EMOLGA",
+      "name": "Emolga",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_EMPOLEON",
+      "name": "Empoleon",
+      "sets": 7
+    },
+    {
+      "const": "SPECIES_ENAMORUS",
+      "name": "Enamorus",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_ENTEI",
+      "name": "Entei",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ESCARGINITE",
+      "name": "Escarginite",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ESCAVALIER",
+      "name": "Escavalier",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ESPATHRA",
+      "name": "Espathra",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_ETERNATUS",
+      "name": "Eternatus",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_EXCADRILL",
+      "name": "Excadrill",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_EXEGGUTOR",
+      "name": "Exeggutor",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_EXPLOUD",
+      "name": "Exploud",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_FALINKS",
+      "name": "Falinks",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_FARIGIRAF",
+      "name": "Farigiraf",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_FERALIGATR",
+      "name": "Feraligatr",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_FERROTHORN",
+      "name": "Ferrothorn",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_FEZANDIPITI",
+      "name": "Fezandipiti",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_FLAIRGRANCE",
+      "name": "Flairgrance",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_FLAMIGO",
+      "name": "Flamigo",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_FLOETTE_BLUE_FLOWER",
+      "name": "Floette Blue",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_FLOETTE_WHITE_FLOWER",
+      "name": "Floette White",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_FLORGES",
+      "name": "Florges",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_FLUTTER_MANE",
+      "name": "Flutter Mane",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_FLYGON",
+      "name": "Flygon",
+      "sets": 7
+    },
+    {
+      "const": "SPECIES_FORRETRESS",
+      "name": "Forretress",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_FROSLASS",
+      "name": "Froslass",
+      "sets": 9
+    },
+    {
+      "const": "SPECIES_FROSTULA",
+      "name": "Frostula",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_FUJIFLAP",
+      "name": "Fujiflap",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_FURFROU",
+      "name": "Furfrou",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_FURRET",
+      "name": "Furret",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GALLADE",
+      "name": "Gallade",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GALVANTULA",
+      "name": "Galvantula",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GARBODOR",
+      "name": "Garbodor",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GARCHOMP",
+      "name": "Garchomp",
+      "sets": 7
+    },
+    {
+      "const": "SPECIES_GARDEVOIR",
+      "name": "Gardevoir",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_GARGABLOX",
+      "name": "Gargablox",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GARGANACL",
+      "name": "Garganacl",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GASTRODON",
+      "name": "Gastrodon",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GENESECT",
+      "name": "Genesect",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_GENGAR",
+      "name": "Gengar",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_GHOLDENGO",
+      "name": "Gholdengo",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GIGALITH",
+      "name": "Gigalith",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GIMMIGHOUL",
+      "name": "Gimmighoul",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_GIRATINA",
+      "name": "Giratina",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GLALIE",
+      "name": "Glalie",
+      "sets": 8
+    },
+    {
+      "const": "SPECIES_GLASTRIER",
+      "name": "Glastrier",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GLIMMORA",
+      "name": "Glimmora",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_GLISCOR",
+      "name": "Gliscor",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GLOOM",
+      "name": "Gloom",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GOGOAT",
+      "name": "Gogoat",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GOLEM",
+      "name": "Golem",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_GOLISOPOD",
+      "name": "Golisopod",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_GOLURK",
+      "name": "Golurk",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GOODRA",
+      "name": "Goodra",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GOOSCHASE",
+      "name": "Gooschase",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GOREBYSS",
+      "name": "Gorebyss",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GOTHITELLE",
+      "name": "Gothitelle",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_GOUGING_FIRE",
+      "name": "Gouging Fire",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GRAFAIAI",
+      "name": "Grafaiai",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GRANBULL",
+      "name": "Granbull",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GRANITUN",
+      "name": "Granitun",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GRAPPLOCT",
+      "name": "Grapploct",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GREAT_TUSK",
+      "name": "Great Tusk",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_GREEDENT",
+      "name": "Greedent",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_GRENINJA",
+      "name": "Greninja",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GRIMMSNARL",
+      "name": "Grimmsnarl",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_GROUDON",
+      "name": "Groudon",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_GRUMPIG",
+      "name": "Grumpig",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_GUZZLORD",
+      "name": "Guzzlord",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_GYARADEATH",
+      "name": "Gyaradeath",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_GYARADOS",
+      "name": "Gyarados",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_HARIYAMA",
+      "name": "Hariyama",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_HATTERENE",
+      "name": "Hatterene",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_HAWLUCHA",
+      "name": "Hawlucha",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_HAXORUS",
+      "name": "Haxorus",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_HEATMOR",
+      "name": "Heatmor",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_HEATRAN",
+      "name": "Heatran",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_HELIOLISK",
+      "name": "Heliolisk",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_HELIOSUNNY",
+      "name": "Heliomodo",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_HERACROSS",
+      "name": "Heracross",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_HIPPOPOTATO",
+      "name": "Hippopotato",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_HIPPOTATON",
+      "name": "Hippotaton",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_HIPPOWDON",
+      "name": "Hippowdon",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_HITMONCHAN",
+      "name": "Hitmonchan",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_HITMONLEE",
+      "name": "Hitmonlee",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_HITMONTOP",
+      "name": "Hitmontop",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_HONCHKROW",
+      "name": "Honchkrow",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_HOOPA",
+      "name": "Hoopa",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_HOUNDOOM",
+      "name": "Houndoom",
+      "sets": 7
+    },
+    {
+      "const": "SPECIES_HOUNDSTONE",
+      "name": "Houndstone",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_HUNTAIL",
+      "name": "Huntail",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_HYDREIGON",
+      "name": "Hydreigon",
+      "sets": 7
+    },
+    {
+      "const": "SPECIES_HYDROAR",
+      "name": "Hydroar",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_HYPNO",
+      "name": "Hypno",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ILLUMISE",
+      "name": "Illumise",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_INCINEROAR",
+      "name": "Incineroar",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_INFERNAPE",
+      "name": "Infernape",
+      "sets": 7
+    },
+    {
+      "const": "SPECIES_INTELEON",
+      "name": "Inteleon",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_IRON_BOULDER",
+      "name": "Iron Boulder",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_IRON_BUNDLE",
+      "name": "Iron Bundle",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_IRON_CARAPACE",
+      "name": "Iron Carapace",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_IRON_CROWN",
+      "name": "Iron Crown",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_IRON_HANDS",
+      "name": "Iron Hands",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_IRON_LEAVES",
+      "name": "Iron Leaves",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_IRON_MOTH",
+      "name": "Iron Moth",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_IRON_THORNS",
+      "name": "Iron Thorns",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_IRON_TREADS",
+      "name": "Iron Treads",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_IRON_VALIANT",
+      "name": "Iron Valiant",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_JELLICENT",
+      "name": "Jellicent",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_JIRACHI",
+      "name": "Jirachi",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_JUMPLUFF",
+      "name": "Jumpluff",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_JYNX",
+      "name": "Jynx",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_KABUTOPS",
+      "name": "Kabutops",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_KADABRA",
+      "name": "Kadabra",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_KAIOSEA",
+      "name": "Kaiosea",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_KANGASKHAN",
+      "name": "Kangaskhan",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_KARTANA",
+      "name": "Kartana",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_KECLEON",
+      "name": "Kecleon",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_KELDEO",
+      "name": "Keldeo",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_KILOWATTREL",
+      "name": "Kilowattrel",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_KINGAMBIT",
+      "name": "Kingambit",
+      "sets": 7
+    },
+    {
+      "const": "SPECIES_KINGDRA",
+      "name": "Kingdra",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_KINGLER",
+      "name": "Kingler",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_KLAWF",
+      "name": "Klawf",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_KLEAVOR",
+      "name": "Kleavor",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_KLEFKI",
+      "name": "Klefki",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_KLINKLANG",
+      "name": "Klinklang",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_KOMALA",
+      "name": "Komala",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_KORAIDON",
+      "name": "Koraidon",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_KRICKETUNE",
+      "name": "Kricketune",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_KROOKODILE",
+      "name": "Krookodile",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_KYOGRE",
+      "name": "Kyogre",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_KYUREM",
+      "name": "Kyurem",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_LANDORUS",
+      "name": "Landorus",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_LANTURN",
+      "name": "Lanturn",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_LAPRAS",
+      "name": "Lapras",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_LATIAS",
+      "name": "Latias",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_LATIOS",
+      "name": "Latios",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_LEAVANNY",
+      "name": "Leavanny",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_LEDIAN",
+      "name": "Ledian",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_LEPASTRY",
+      "name": "Lepastry",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_LICKILICKY",
+      "name": "Lickilicky",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_LIEPARD",
+      "name": "Liepard",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_LILLIGANT",
+      "name": "Lilligant",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_LOKIX",
+      "name": "Lokix",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_LOPUNNY",
+      "name": "Lopunny",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_LUCARIO",
+      "name": "Lucario",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_LUMINOSITEON",
+      "name": "Lucineon",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_LUDICOLO",
+      "name": "Ludicolo",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_LUGIA",
+      "name": "Lugia",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_LUNALA",
+      "name": "Lunala",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_LUNATONE",
+      "name": "Lunatone",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_LURANTIS",
+      "name": "Lurantis",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_LUVDISC",
+      "name": "Luvdisc",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_LUXRAY",
+      "name": "Luxray",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_LYCANROC",
+      "name": "Lycanroc",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_MABOSSTIFF",
+      "name": "Mabosstiff",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MACHAMP",
+      "name": "Machamp",
+      "sets": 8
+    },
+    {
+      "const": "SPECIES_MAGEARNA",
+      "name": "Magearna",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MAGMORTAR",
+      "name": "Magmortar",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MAGMENOUS",
+      "name": "Magnemous",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_MAGNEZONE",
+      "name": "Magnezone",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MALAMAR",
+      "name": "Malamar",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MALAMAR_MEGA",
+      "name": "Malamar Mega",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MAMOSWINE",
+      "name": "Mamoswine",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MANAPHY",
+      "name": "Manaphy",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MANDIBUZZ",
+      "name": "Mandibuzz",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_MANECTRIC",
+      "name": "Manectric",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_MANTINE",
+      "name": "Mantine",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MAROWAK",
+      "name": "Marowak",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_MARSHADOW",
+      "name": "Marshadow",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MASQUERAIN",
+      "name": "Masquerain",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MAUSHOLD",
+      "name": "Maushold",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_MAWILE",
+      "name": "Mawile",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_MEDICHAM",
+      "name": "Medicham",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_MEGANIUM",
+      "name": "Meganium",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_MELMETAL",
+      "name": "Melmetal",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_MELOETTA",
+      "name": "Meloetta",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_MEOWSCARADA",
+      "name": "Meowscarada",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_MESPRIT",
+      "name": "Mesprit",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_METAGROSS",
+      "name": "Metagross",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_MEW",
+      "name": "Mew",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_MEWTWO",
+      "name": "Mewtwo",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_MIENSHAO",
+      "name": "Mienshao",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_MILOTIC",
+      "name": "Milotic",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_MILTANK",
+      "name": "Miltank",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MIMIKYU",
+      "name": "Mimikyu",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MINIOR",
+      "name": "Minior",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MINIOR_METEOR_VIOLET",
+      "name": "Minior Violet",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MINUN",
+      "name": "Minun",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MIRAIDON",
+      "name": "Miraidon",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MISMAGIUS",
+      "name": "Mismagius",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MOLTRES",
+      "name": "Moltres",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_MOTHIM",
+      "name": "Mothim",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MUDSDALE",
+      "name": "Mudsdale",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MUK",
+      "name": "Muk",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_MUNKIDORI",
+      "name": "Munkidori",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_MUSHARNA",
+      "name": "Musharna",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_NAGANADEL",
+      "name": "Naganadel",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_NECROZMA",
+      "name": "Necrozma",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_NIDOKING",
+      "name": "Nidoking",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_NIDOQUEEN",
+      "name": "Nidoqueen",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_NIHILEGO",
+      "name": "Nihilego",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_NINETALES",
+      "name": "Ninetales",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_NINJASK",
+      "name": "Ninjask",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_NOIVERN",
+      "name": "Noivern",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_OBSTAGOON",
+      "name": "Obstagoon",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_OCTILLERY",
+      "name": "Octillery",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_OKIDOGI",
+      "name": "Okidogi",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_OMASTAR",
+      "name": "Omastar",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_ONIX",
+      "name": "Onix",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ORANGURU",
+      "name": "Oranguru",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ORBEETLE",
+      "name": "Orbeetle",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_ORICORIO",
+      "name": "Oricorio",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_ORTHWORM",
+      "name": "Orthworm",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_OVERQWIL",
+      "name": "Overqwil",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PACHIRISU",
+      "name": "Pachirisu",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PALAFIN",
+      "name": "Palafin",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PALKIA",
+      "name": "Palkia",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_PANGORO",
+      "name": "Pangoro",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PARASECT",
+      "name": "Parasect",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PASSIMIAN",
+      "name": "Passimian",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PAWMOT",
+      "name": "Pawmot",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PECHARUNT",
+      "name": "Pecharunt",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PELIPPER",
+      "name": "Pelipper",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PERRSERKER",
+      "name": "Perrserker",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PERSIAN",
+      "name": "Persian",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_PHANFERNAL",
+      "name": "Phanfernal",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_PHANTOWL",
+      "name": "Phantowl",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PHEROMOSA",
+      "name": "Pheromosa",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PHIONE",
+      "name": "Phione",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PIDGEOT",
+      "name": "Pidgeot",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_PILOSWINE",
+      "name": "Piloswine",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_PINCURCHIN",
+      "name": "Pincurchin",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PINSIR",
+      "name": "Pinsir",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_PLUSLE",
+      "name": "Plusle",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_POLARTIC",
+      "name": "Polartic",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_POLITOED",
+      "name": "Politoed",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_POLIWRATH",
+      "name": "Poliwrath",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_POLTEAGEIST",
+      "name": "Polteageist",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_POPCORM",
+      "name": "Popcorm",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PRIMARINA",
+      "name": "Primarina",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PRIMEAPE",
+      "name": "Primeape",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_PROBOPASS",
+      "name": "Probopass",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PURUGLY",
+      "name": "Purugly",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PYROAR",
+      "name": "Pyroar",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_PYUKUMUKU",
+      "name": "Pyukumuku",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_QUAGSIRE",
+      "name": "Quagsire",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_QUAQUAVAL",
+      "name": "Quaquaval",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_RABSCA",
+      "name": "Rabsca",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_RAGING_BOLT",
+      "name": "Raging Bolt",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_RAICHU",
+      "name": "Raichu",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_RAIKOU",
+      "name": "Raikou",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_RAMPARDOS",
+      "name": "Rampardos",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_RAPIDASH",
+      "name": "Rapidash",
+      "sets": 7
+    },
+    {
+      "const": "SPECIES_RATICATE",
+      "name": "Raticate",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_RAYQUAZA",
+      "name": "Rayquaza",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_REGIDRAGO",
+      "name": "Regidrago",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_REGIELEKI",
+      "name": "Regieleki",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_REGIGIGAS",
+      "name": "Regigigas",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_REGIROCK",
+      "name": "Regirock",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_RELICANTH",
+      "name": "Relicanth",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_RESHIRAM",
+      "name": "Reshiram",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_REUNICLUS",
+      "name": "Reuniclus",
+      "sets": 7
+    },
+    {
+      "const": "SPECIES_REVAVROOM",
+      "name": "Revavroom",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_RHYDON",
+      "name": "Rhydon",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_RHYPERIOR",
+      "name": "Rhyperior",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_RIBOMBEE",
+      "name": "Ribombee",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_RILLABOOM",
+      "name": "Rillaboom",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_ROARING_MOON",
+      "name": "Roaring Moon",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ROSERADE",
+      "name": "Roserade",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ROTOM",
+      "name": "Rotom",
+      "sets": 16
+    },
+    {
+      "const": "SPECIES_RUNERIGUS",
+      "name": "Runerigus",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_SABLEYE",
+      "name": "Sableye",
+      "sets": 8
+    },
+    {
+      "const": "SPECIES_SAGARACAS",
+      "name": "Sagaracas",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SALAMENCE",
+      "name": "Salamence",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_SALAZARUS",
+      "name": "Salazarus",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SALAZZLE",
+      "name": "Salazzle",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SAMUROTT",
+      "name": "Samurott",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SANDACONDA",
+      "name": "Sandaconda",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_SANDSLASH",
+      "name": "Sandslash",
+      "sets": 8
+    },
+    {
+      "const": "SPECIES_SANDY_SHOCKS",
+      "name": "Sandy Shocks",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SAWK",
+      "name": "Sawk",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SAWSBUCK",
+      "name": "Sawsbuck",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SCEPTILE",
+      "name": "Sceptile",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_SCIZOR",
+      "name": "Scizor",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SCOLIPEDE",
+      "name": "Scolipede",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_SCOVILLAIN",
+      "name": "Scovillain",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_SCRAFSTER",
+      "name": "Scrafster",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SCRAFTY",
+      "name": "Scrafty",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_SCREAM_TAIL",
+      "name": "Scream Tail",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_SCYTHER",
+      "name": "Scyther",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SEISMITOAD",
+      "name": "Seismitoad",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SERPERIOR",
+      "name": "Serperior",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_SEVIPER",
+      "name": "Seviper",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SHARPEDO",
+      "name": "Sharpedo",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_SHAYMIN",
+      "name": "Shaymin",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_SHEDINJA",
+      "name": "Shedinja",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SHIFTRY",
+      "name": "Shiftry",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SHIINOTIC",
+      "name": "Shiinotic",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_SHUCKLE",
+      "name": "Shuckle",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SIGILYPH",
+      "name": "Sigilyph",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SIMIPOUR",
+      "name": "Simipour",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_SIMISAGE",
+      "name": "Simisage",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_SIMISEAR",
+      "name": "Simisear",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_SINISTCHA",
+      "name": "Sinistcha",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_SIRFETCHD",
+      "name": "Sirfetch’d",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SKARMORY",
+      "name": "Skarmory",
+      "sets": 9
+    },
+    {
+      "const": "SPECIES_SKELEDIRGE",
+      "name": "Skeledirge",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_SKULBERUS",
+      "name": "Skulberus",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SKUNTANK",
+      "name": "Skuntank",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_SLAKING",
+      "name": "Slaking",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_SLOWBRO",
+      "name": "Slowbro",
+      "sets": 8
+    },
+    {
+      "const": "SPECIES_SLOWKING",
+      "name": "Slowking",
+      "sets": 7
+    },
+    {
+      "const": "SPECIES_SLYDUCK",
+      "name": "Slyduck",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_SMEARGLE",
+      "name": "Smeargle",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_SNEASLER",
+      "name": "Sneasler",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SNOM",
+      "name": "Snom",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_SNORLAX",
+      "name": "Snorlax",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SOLGALEO",
+      "name": "Solgaleo",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SOLROCK",
+      "name": "Solrock",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SOPRANICE",
+      "name": "Sopranice",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SPECTRIER",
+      "name": "Spectrier",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SPIDOPS",
+      "name": "Spidops",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SPIRITOMB",
+      "name": "Spiritomb",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_SQUAWKABILLY",
+      "name": "Squawkabilly",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_STAKATAKA",
+      "name": "Stakataka",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_STANTLER",
+      "name": "Stantler",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_STARAPTOR",
+      "name": "Staraptor",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_STARMIE",
+      "name": "Starmie",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_STEELIX",
+      "name": "Steelix",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_STONJOURNER",
+      "name": "Stonjourner",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_STOUTLAND",
+      "name": "Stoutland",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_STUNFISK",
+      "name": "Stunfisk",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_STUNKY",
+      "name": "Stunky",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_SUICUNE",
+      "name": "Suicune",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SUNFLORA",
+      "name": "Sunflora",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SWADLOON",
+      "name": "Swadloon",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SWALOT",
+      "name": "Swalot",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SWAMPERT",
+      "name": "Swampert",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_SWANNA",
+      "name": "Swanna",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SWELLOW",
+      "name": "Swellow",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_SWOOBAT",
+      "name": "Swoobat",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_TALONFLAME",
+      "name": "Talonflame",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_TANGROWTH",
+      "name": "Tangrowth",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_TAPU_BULU",
+      "name": "Tapu Bulu",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_TAPU_FINI",
+      "name": "Tapu Fini",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_TAPU_KOKO",
+      "name": "Tapu Koko",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_TAPU_LELE",
+      "name": "Tapu Lele",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_TATSUGIRI",
+      "name": "Tatsugiri",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_TAUROS",
+      "name": "Tauros",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_TERAPAGOS",
+      "name": "Terapagos",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_TERRAKION",
+      "name": "Terrakion",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_THIEVUL",
+      "name": "Thievul",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_THROH",
+      "name": "Throh",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_THUNDURUS",
+      "name": "Thundurus",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_TING_LU",
+      "name": "Ting-Lu",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_TINKATON",
+      "name": "Tinkaton",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_TOEDSCRUEL",
+      "name": "Toedscruel",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_TOGEDEMARU",
+      "name": "Togedemaru",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_TOGEKISS",
+      "name": "Togekiss",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_TOGETIC",
+      "name": "Togetic",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_TORKOAL",
+      "name": "Torkoal",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_TORNADUS",
+      "name": "Tornadus",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_TORTEMPLE",
+      "name": "Tortemple",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_TORTERRA",
+      "name": "Torterra",
+      "sets": 8
+    },
+    {
+      "const": "SPECIES_TOUCANNON",
+      "name": "Toucannon",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_TOXAPEX",
+      "name": "Toxapex",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_TOXICROAK",
+      "name": "Toxicroak",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_TSAREENA",
+      "name": "Tsareena",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_TURTONATOR",
+      "name": "Turtonator",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_TYRANITAR",
+      "name": "Tyranitar",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_TYRANTRUM",
+      "name": "Tyrantrum",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_UNFEZANT",
+      "name": "Unfezant",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_URSALUNA",
+      "name": "Ursaluna",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_URSARING",
+      "name": "Ursaring",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_UXIE",
+      "name": "Uxie",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_VANILLUXE",
+      "name": "Vanilluxe",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_VELOZEL",
+      "name": "Velozel",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_VELUZA",
+      "name": "Veluza",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_VENOMOTH",
+      "name": "Venomoth",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_VENUSAUR",
+      "name": "Venusaur",
+      "sets": 5
+    },
+    {
+      "const": "SPECIES_VESPIQUEN",
+      "name": "Vespiquen",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_VICTINI",
+      "name": "Victini",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_VICTREEBEL",
+      "name": "Victreebel",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_VIKAVOLT",
+      "name": "Vikavolt",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_VILEPLUME",
+      "name": "Vileplume",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_VIRIZION",
+      "name": "Virizion",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_VIVILLON",
+      "name": "Vivillon",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_VOLBEAT",
+      "name": "Volbeat",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_VOLCANION",
+      "name": "Volcanion",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_WAILORD",
+      "name": "Wailord",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_WALKING_WAKE",
+      "name": "Walking Wake",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_WALREIN",
+      "name": "Walrein",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_WEAVILE",
+      "name": "Weavile",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_WEEZING",
+      "name": "Weezing",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_WHIMSICOTT",
+      "name": "Whimsicott",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_WHISCASH",
+      "name": "Whiscash",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_WIGGLYTUFF",
+      "name": "Wigglytuff",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_WISHIWASHI",
+      "name": "Wishiwashi",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_WISPYWASPY",
+      "name": "Wispywaspy",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_WO_CHIEN",
+      "name": "Wo-Chien",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_WOBBUFFET",
+      "name": "Wobbuffet",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_WOOLY_WORM",
+      "name": "Wooly Worm",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_WORMADAM",
+      "name": "Wormadam",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_WUGTRIO",
+      "name": "Wugtrio",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_WYNAUT",
+      "name": "Wynaut",
+      "sets": 1
+    },
+    {
+      "const": "SPECIES_WYRDEER",
+      "name": "Wyrdeer",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_XATU",
+      "name": "Xatu",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_XERNEAS",
+      "name": "Xerneas",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_XURKITREE",
+      "name": "Xurkitree",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_YANMEGA",
+      "name": "Yanmega",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_YVELTAL",
+      "name": "Yveltal",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_ZACIAN",
+      "name": "Zacian",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_ZAMAZENTA",
+      "name": "Zamazenta",
+      "sets": 4
+    },
+    {
+      "const": "SPECIES_ZANGOOSE",
+      "name": "Zangoose",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_ZAPDOS",
+      "name": "Zapdos",
+      "sets": 6
+    },
+    {
+      "const": "SPECIES_ZARUDE",
+      "name": "Zarude",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_ZEBSTRIKA",
+      "name": "Zebstrika",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ZEKROM",
+      "name": "Zekrom",
+      "sets": 2
+    },
+    {
+      "const": "SPECIES_ZERAORA",
+      "name": "Zeraora",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ZOROARK",
+      "name": "Zoroark",
+      "sets": 3
+    },
+    {
+      "const": "SPECIES_ZYGARDE",
+      "name": "Zygarde",
+      "sets": 3
+    }
+  ]
+}
