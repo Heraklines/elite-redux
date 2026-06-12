@@ -1848,6 +1848,26 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) RDX egg moves (#417)",
+    description:
+      "#417 - NOT a battle test, this entry tracks the check.\n"
+      + "DO: in starter select, open the egg-move panel on RDX customs -\n"
+      + "especially Flygon Redux B, Mimikyu Apex, Ribombee Redux,\n"
+      + "Serena-Delphox and Weavile Redux. EXPECT: all four egg-move slots\n"
+      + "show real, kit-appropriate moves (Mimikyu Apex rare = Dragon\n"
+      + "Ascent; Ribombee Redux rare = Tail Glow) - no empty/??? slots on\n"
+      + "any hatchable RDX mon. Pass/Fail once checked.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 5 });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Egg countdown (#378)",
     description:
       "#378 QoL - NOT a battle test, this entry just tracks the check.\n"
