@@ -98,9 +98,21 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {
-    const { pokemon, opponent, simulated } = params;
+    const { pokemon, simulated } = params;
+    let { opponent } = params;
     if (simulated || !opponent) {
       return;
+    }
+    // #413: STATUS dances (Quiver/Victory Dance) target the USER, so the
+    // hook's `opponent` is the dancer itself - the scripted follow-up
+    // (Two Step's Revelation Dance, Blade Dance's Leaf Blade, ...) then
+    // SELF-HIT. Aim the follow-up at a real opponent instead.
+    if (opponent === pokemon || opponent.isPlayer() === pokemon.isPlayer()) {
+      const foes = pokemon.getOpponents().filter(o => !o.isFainted());
+      if (foes.length === 0) {
+        return;
+      }
+      opponent = foes[0];
     }
     // MovePhase is a *dynamic* phase: a plain `unshiftNew("MovePhase", ...)` is
     // routed into the speed-sorted MovePhasePriorityQueue (placed after the next

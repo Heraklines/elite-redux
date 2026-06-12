@@ -3172,7 +3172,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Soothing Aroma — "Cures party status on entry."
       // Pokerogue's heal-bell uses HealStatusEffectAttr — wire as a scripted
       // Heal Bell call from PostSummon.
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.HEAL_BELL })]);
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.HEAL_BELL, targetsSelf: true })]);
     case 603:
       // Flourish — "Boosts Grass moves by 50% in grassy terrain."
       // No direct primitive — wire via MovePowerBoostAbAttr with a closure that
@@ -3336,7 +3336,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Composite: FOG weather + Mist arena tag (Mist blocks stat drops).
       return ok([
         new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.FOG, turns: 8 }),
-        new PostSummonScriptedMoveAbAttr({ moveId: MoveId.MIST }),
+        new PostSummonScriptedMoveAbAttr({ moveId: MoveId.MIST, targetsSelf: true }),
       ]);
     case 477:
       // Generator — "Charges up once on entry or when electric terrain is active."
@@ -3656,14 +3656,16 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 496:
       // Wishmaker — "Uses Wish on switch-in. Three uses per battle."
       // The 3-use cap is harder to model; ship the wire and accept that
-      // it activates every switch-in. Partial wire.
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.WISH })]);
+      // it activates every switch-in. Partial wire. targetsSelf (#412): Wish
+      // is a USER-target move - without it the Wish landed on the OPPONENT's
+      // slot and healed them (live Dragonite Y report).
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.WISH, targetsSelf: true })]);
     case 541:
       // Web Spinner — "Uses String Shot on switch-in."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.STRING_SHOT })]);
     case 670:
       // Draco Morale — "Uses Dragon Cheer on switch-in."
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.DRAGON_CHEER })]);
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.DRAGON_CHEER, targetsSelf: true })]);
     case 710:
       // Dream Whimsy — "Uses Yawn on switch-in."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.YAWN })]);
@@ -3675,10 +3677,10 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.DEFOG })]);
     case 878:
       // Frosty Presence — "Uses Mist on entry."
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.MIST })]);
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.MIST, targetsSelf: true })]);
     case 293:
       // Let's Roll — "Casts Defense Curl on entry."
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.DEFENSE_CURL })]);
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.DEFENSE_CURL, targetsSelf: true })]);
     case 320:
       // Air Blower — "Casts a 3-turn Tailwind on entry." Tailwind is a self-side
       // buff, so `targetsSelf` makes it fire even when Air Blower's holder is sent
@@ -3731,7 +3733,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TEETER_DANCE })]);
     case 947:
       // I Am Steve — "Uses No Retreat on entry."
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.NO_RETREAT })]);
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.NO_RETREAT, targetsSelf: true })]);
     case 949:
       // Foamy Web — "Casts an unremovable Sticky Web on entry. Lasts 5 turns."
       // Lays the dedicated FOAMY_WEB entry hazard on the FOE's side: it behaves
@@ -3742,7 +3744,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([new EntryEffectAbAttr({ kind: "set-hazard", hazard: ArenaTagType.FOAMY_WEB, side: "foe" })]);
     case 1006:
       // Electro Booster — "Uses Magnet Rise on entry."
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.MAGNET_RISE })]);
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.MAGNET_RISE, targetsSelf: true })]);
     case 517:
       // Two Step — "Triggers 50BP Revelation Dance after using a Dance move."
       return ok([

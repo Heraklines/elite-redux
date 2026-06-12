@@ -1785,6 +1785,62 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Wishmaker heals SELF (#412)",
+    description:
+      "#412 WISHMAKER - the on-entry Wish used to land on the OPPONENT and\n"
+      + "heal THEM. Your Dragonite (Wishmaker) enters hurt vs a Chansey.\n"
+      + "DO: stall a turn (Protect) and watch the end of the NEXT turn.\n"
+      + "EXPECT: the Wish heal lands on YOUR Dragonite (big HP jump), never\n"
+      + "on the enemy.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: ErAbilityId.WISHMAKER as unknown as AbilityId,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.DRAGONITE, {
+          moveset: [MoveId.PROTECT, MoveId.DRAGON_CLAW, MoveId.ROOST, MoveId.SPLASH],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const p = globalScene.getPlayerPokemon();
+      if (p) {
+        p.hp = Math.floor(p.getMaxHp() / 4);
+      }
+    },
+  },
+  {
+    label: "Two Step dance rider (#413)",
+    description:
+      "#413 TWO STEP - the Revelation Dance follow-up after a dance move\n"
+      + "used to SELF-HIT the dancer when the dance was a self-buff.\n"
+      + "DO: use QUIVER DANCE with your Oricorio (Two Step).\n"
+      + "EXPECT: the 50 BP Revelation Dance fires INTO the enemy Snorlax -\n"
+      + "your dancer never damages itself. Same for Victory Dance.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: ErAbilityId.TWO_STEP as unknown as AbilityId,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.ORICORIO, {
+          moveset: [MoveId.QUIVER_DANCE, MoveId.REVELATION_DANCE, MoveId.AIR_SLASH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Egg declutter + RDX (#407)",
     description:
       "#407/#408/#409 - NOT a battle test, this entry tracks the checks.\n"
