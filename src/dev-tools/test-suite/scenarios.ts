@@ -1188,13 +1188,14 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "Power Herb (#401)",
     description:
-      "#401 POWER HERB - skips the charge turn of two-turn moves. 2 charges,\n"
-      + "regains one every 10 waves. Venusaur holds one (ROM herb icon).\n"
+      "#401/#406 POWER HERB - skips the charge turn of two-turn moves. 2\n"
+      + "charges, regains one every 10 waves. Venusaur holds one (ROM icon).\n"
       + "DO: use SOLAR BEAM three times (no sun is up).\n"
-      + "EXPECT: uses 1 and 2 FIRE IMMEDIATELY with 'became fully charged due\n"
-      + "to its Power Herb!' (watch the charges-left counter). Use 3 charges\n"
-      + "normally for a turn (herb empty). The herb is NOT consumed - after 10\n"
-      + "more won waves it regains a charge.",
+      + "EXPECT: the herb icon shows a GREEN charge number (#406). Uses 1 and\n"
+      + "2 FIRE IMMEDIATELY with 'became fully charged due to its Power Herb!'\n"
+      + "and the number counts 2 -> 1 -> 0 (red at 0). Use 3 charges normally\n"
+      + "for a turn (herb empty). The herb is NOT consumed - after 10 more won\n"
+      + "waves the counter ticks back up.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1211,6 +1212,32 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
     onBattleStart: () => givePlayerCommunityItems([["powerHerb", 1]]),
+  },
+  {
+    label: "Aftermath vs multihit (#405)",
+    description:
+      "#405 AFTERMATH vs MULTI-HIT - enemy Koffing has Aftermath as an innate\n"
+      + "(on KO it uses a 100 BP Explosion as its dying act).\n"
+      + "DO: use ICICLE SPEAR (2-5 strikes) to KO it.\n"
+      + "EXPECT: Aftermath triggers ONCE on the lethal strike - the volley\n"
+      + "STOPS there (no extra strikes), Koffing immediately explodes and\n"
+      + "faints. Before the fix every leftover strike re-triggered Aftermath\n"
+      + "and Koffing kept sitting at 1 HP with the popup spamming.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.KOFFING,
+        ENEMY_LEVEL_OVERRIDE: 15,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [
+        makeStarter(SpeciesId.DEWGONG, {
+          moveset: [MoveId.ICICLE_SPEAR, MoveId.SWIFT, MoveId.PROTECT, MoveId.REST],
+        }),
+      ];
+    },
   },
   {
     label: "Claws + Copper Rod (#387)",

@@ -2462,6 +2462,16 @@ export class ErCommunityItemModifier extends PokemonHeldItemModifier {
         child.setTint(ER_COMMUNITY_ITEM_CONFIG[this.kind].tint);
       }
     }
+    if (!forSummary && (this.kind === "omniGem" || this.kind === "powerHerb")) {
+      // Remaining charges, drawn like a stack count (green = charged, red =
+      // empty) - the Ward Stone precedent. Both charge kinds are maxStack 1,
+      // so this never collides with a stack-count text.
+      const chargeText = globalScene.add.bitmapText(10, 15, "item-count", `${this.charges}`, 11);
+      chargeText.letterSpacing = -0.5;
+      chargeText.setOrigin(0, 0);
+      chargeText.setTint(this.charges > 0 ? 0x90f8a0 : 0xf89890);
+      container.add(chargeText);
+    }
     return container;
   }
 }

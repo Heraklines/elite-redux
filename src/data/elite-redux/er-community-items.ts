@@ -239,6 +239,8 @@ export function erTryApplyOmniGem(source: Pokemon, damage: NumberHolder, simulat
         `${source.getNameToRender()}'s Omni Gem doubled the blow... and shattered!`,
       );
     } else {
+      // Refresh the held-item icon so the on-icon charge counter updates live.
+      globalScene.updateModifiers(source.isPlayer());
       globalScene.phaseManager.queueMessage(
         `${source.getNameToRender()}'s Omni Gem doubled the blow! (${gem.charges} charge left)`,
       );
@@ -264,6 +266,8 @@ export function erTryConsumePowerHerb(user: Pokemon): boolean {
     return false;
   }
   herb.charges--;
+  // Refresh the held-item icon so the on-icon charge counter updates live.
+  globalScene.updateModifiers(user.isPlayer());
   globalScene.phaseManager.queueMessage(
     `${user.getNameToRender()} became fully charged due to its Power Herb! (${herb.charges} charge${herb.charges === 1 ? "" : "s"} left)`,
   );
@@ -291,6 +295,8 @@ export function erAdvanceCommunityItemCharges(): void {
       if (herb.waveProgress >= ER_POWER_HERB_RECHARGE_WAVES) {
         herb.charges++;
         herb.waveProgress = 0;
+        // Refresh the held-item icon so the on-icon charge counter updates.
+        globalScene.updateModifiers(true);
       }
     }
   } catch {

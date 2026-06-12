@@ -237,7 +237,7 @@ export class PostFaintDetonateAbAttr extends PreDefendFullHpEndureAbAttr {
   public override apply(params: PreDefendModifyDamageAbAttrParams): void {
     // super.apply adds the STURDY tag so the damage pipeline clamps this lethal
     // hit to leave the holder at 1 HP (pokemon.ts:4478).
-    const { pokemon, simulated, damage } = params;
+    const { pokemon, opponent, simulated, damage } = params;
 
     // Subsequent lethal sub-hits of a multi-hit move (after the arming hit
     // already clamped the holder to 1 HP): survive them so the holder is still
@@ -259,6 +259,18 @@ export class PostFaintDetonateAbAttr extends PreDefendFullHpEndureAbAttr {
       return;
     }
     ARMED_TURN.set(pokemon, currentArmingKey());
+    // ER ROM parity: the KO hit ENDS a multi-hit volley - in the ROM the target
+    // faints on that strike and the remaining strikes never happen, THEN the
+    // blast fires. Without this, every leftover sub-hit re-triggered the endure
+    // (the reported "Koffing lived on 1 HP repeatedly, Aftermath popping every
+    // hit"). Truncate the attacker's volley to the strikes already executed so
+    // this strike is its last; the per-sub-hit clamp above remains only as a
+    // safety net (e.g. the OTHER attacker in doubles hitting the armed holder).
+    const attackerTurnData = opponent?.turnData;
+    if (attackerTurnData && attackerTurnData.hitsLeft > 1) {
+      attackerTurnData.hitCount = attackerTurnData.hitCount - attackerTurnData.hitsLeft + 1;
+      attackerTurnData.hitsLeft = 1;
+    }
     const category =
       pokemon.getEffectiveStat(Stat.SPATK) > pokemon.getEffectiveStat(Stat.ATK)
         ? MoveCategory.SPECIAL
