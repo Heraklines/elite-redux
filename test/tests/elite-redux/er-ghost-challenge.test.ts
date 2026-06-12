@@ -109,12 +109,20 @@ describe.skipIf(!RUN)("ER Ghost Trainers challenge (#422)", () => {
     expect(isErGhostChallengeActive()).toBe(false);
     expect(takeGhostForWave(15, true)).toBeNull();
 
-    // ON: the same trainer wave now takes the ghost (eligible: reached 30,
-    // within the 20-wave window of 15). Non-trainer waves stay untouched.
+    // ON: the same trainer wave now takes the ghost. The eligibility window
+    // is dropped in challenge mode (a deep team works at wave 4 - members
+    // re-level to the wave), and exhausted pools RECYCLE instead of going
+    // dry. Non-trainer waves stay untouched.
     activate(true);
     expect(isErGhostChallengeActive()).toBe(true);
     expect(takeGhostForWave(16, false)).toBeNull();
     const ghost = takeGhostForWave(15, true);
     expect(ghost?.id).toBe(SNAPSHOT.id);
+    // Wave 4: far below the team's depth - still fielded under the challenge.
+    const early = takeGhostForWave(4, true);
+    expect(early?.id).toBe(SNAPSHOT.id);
+    // Pool exhausted (single team, already used) - a later wave recycles it.
+    const recycled = takeGhostForWave(35, true);
+    expect(recycled?.id).toBe(SNAPSHOT.id);
   });
 });

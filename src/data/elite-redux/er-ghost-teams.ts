@@ -572,15 +572,22 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
   // still-eligible team so deeper teams stay available for later ghost waves.
   // The ban filter runs again here as defense-in-depth (covers test-injected
   // pools and any stale prefetch).
-  const next = pool
-    .filter(
-      s =>
-        !usedGhostIds.has(s.id)
-        && s.waveReached >= waveIndex
-        && s.waveReached <= waveIndex + ER_GHOST_WAVE_WINDOW
-        && isErGhostTeamLegal(s),
-    )
-    .sort((a, b) => a.waveReached - b.waveReached)[0];
+  // ER (#422): the Ghost Trainers challenge needs a ghost EVERY trainer wave,
+  // including wave 4 - but pool teams mostly ended deep (150+), so the
+  // strict eligibility window found nothing early and the run fell back to
+  // normal trainers. With the challenge active: take ANY unused legal team
+  // (members are re-levelled to the wave's enemy levels on build, and the
+  // party is sized to the snapshot, so depth doesn't matter), and once the
+  // pool is exhausted RECYCLE used teams instead of going dry.
+  const challengeMode = isErGhostChallengeActive();
+  const legal = pool.filter(s => isErGhostTeamLegal(s));
+  const eligible = challengeMode
+    ? legal
+    : legal.filter(s => s.waveReached >= waveIndex && s.waveReached <= waveIndex + ER_GHOST_WAVE_WINDOW);
+  const unused = eligible.filter(s => !usedGhostIds.has(s.id));
+  const next = (unused.length > 0 ? unused : challengeMode ? eligible : []).sort(
+    (a, b) => a.waveReached - b.waveReached,
+  )[0];
   if (!next) {
     return null;
   }
