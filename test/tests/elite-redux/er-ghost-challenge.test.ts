@@ -120,8 +120,23 @@ describe.skipIf(!RUN)("ER Ghost Trainers challenge (#422)", () => {
     // 30-window - fielded (and devolved on build). Recycles when exhausted.
     const early = takeGhostForWave(4, true);
     expect(early?.id).toBe(SNAPSHOT.id);
-    // A wave where even the widest 60-window misses (30 < 90) - normal
-    // trainer fallback, NEVER an endgame mismatch.
+    // A wave where the pool has NO team that got at least that far (30 < 90) -
+    // normal trainer fallback, NEVER a team past where its run actually ended.
     expect(takeGhostForWave(90, true)).toBeNull();
+  });
+
+  it("with the challenge ON, a wave misses every window but a DEEPER team exists - last resort takes the closest one", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    // Pool holds only deep runs (the real pool is dominated by them): wave 5
+    // misses even the widest 60-window (120 > 65), but the challenge promises
+    // a ghost on every trainer wave - the closest deeper team is fielded (and
+    // applyErGhostOverride devolves + re-levels it on build).
+    const deep = { ...SNAPSHOT, id: "er-test-deep", waveReached: 120 };
+    const deeper = { ...SNAPSHOT, id: "er-test-deeper", waveReached: 200 };
+    setPrefetchedGhostTeamsForTests([deeper, deep]);
+    activate(true);
+    expect(takeGhostForWave(5, true)?.id).toBe("er-test-deep");
+    // Scheduled ghost waves on NORMAL runs keep the strict 20-wave window -
+    // no last resort there (covered by the challenge-off case above).
   });
 });

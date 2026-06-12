@@ -616,6 +616,17 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
       break;
     }
   }
+  // ER (#422): challenge last resort - the pool is dominated by DEEP runs
+  // (victories end at 200), so early waves can miss even the widest window
+  // and the player kept meeting normal trainers in ghost mode. Take the
+  // CLOSEST deeper team instead; applyErGhostOverride devolves its members
+  // by overshoot (up to base form past 60 waves) and re-levels them to the
+  // wave, so an endgame roster arrives as its early-game self.
+  if (!next && challengeMode) {
+    const anyDeeper = legal.filter(s => s.waveReached >= waveIndex);
+    const unused = anyDeeper.filter(s => !usedGhostIds.has(s.id));
+    next = (unused.length > 0 ? unused : anyDeeper).sort((a, b) => a.waveReached - b.waveReached)[0];
+  }
   if (!next) {
     return null;
   }
@@ -696,13 +707,14 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
     }
     const battle = globalScene.currentBattle;
     // ER (#422): a team fielded from BEYOND the 20-wave fairness window
-    // (challenge widening) gets its members devolved - one stage for up to 20
-    // waves of overshoot, two stages past that - so a deep team's fully
-    // evolved mons don't sweep an early-game player. Single-stagers stay.
+    // (challenge widening / last resort) gets its members devolved - one stage
+    // for up to 20 waves of overshoot, two past that, all the way to the BASE
+    // form past 60 - so a deep team's fully evolved mons don't sweep an
+    // early-game player. Single-stagers stay.
     const overshoot = Math.max(0, snapshot.waveReached - ((battle?.waveIndex ?? snapshot.waveReached) + ER_GHOST_WAVE_WINDOW));
     let devolved = false;
     if (overshoot > 0) {
-      const stages = overshoot > 20 ? 2 : 1;
+      const stages = overshoot > 60 ? 3 : overshoot > 20 ? 2 : 1;
       for (let i = 0; i < stages; i++) {
         const prevId = pokemonPrevolutions[species.speciesId as SpeciesId];
         const prev = prevId !== undefined ? getPokemonSpecies(prevId) : undefined;
