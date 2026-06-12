@@ -606,10 +606,22 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
   // ER (#422): with the Ghost Trainers challenge active, EVERY trainer wave
   // is a ghost wave (the caller says whether this wave fields a trainer).
   if (!isErGhostWave(waveIndex) && !(trainerWave && isErGhostChallengeActive())) {
+    if (trainerWave && ghostByWave.size > 0) {
+      // Tripwire for the live "silent wave miss" reports: a ghost was already
+      // fielded THIS RUN (so it must be a challenge run), yet the challenge
+      // read came back false for this trainer wave. Should be impossible -
+      // if this ever prints, the gameMode/challenge state mutated mid-run.
+      // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
+      console.warn(
+        `[er-ghost] wave ${waveIndex}: trainer wave SKIPPED - challenge read false (ghosts already taken: ${ghostByWave.size})`,
+      );
+    }
     return null;
   }
   const existing = ghostByWave.get(waveIndex);
   if (existing) {
+    // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
+    console.log(`[er-ghost] wave ${waveIndex}: reusing cached ghost '${existing.trainerName}'`);
     return existing;
   }
   const pool = prefetched ?? [];
