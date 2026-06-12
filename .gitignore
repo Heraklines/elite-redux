@@ -77,3 +77,4 @@ vendor/elite-redux/ghidra-project/
 src/dev-tools/local/
 # Captured console-log dumps written by the dev-log Vite middleware.
 dev-logs/
+docs/plans/er-biome-overhaul-design.md
