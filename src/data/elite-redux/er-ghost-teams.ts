@@ -226,6 +226,8 @@ async function sampleRunsFromServer(
   const base = serverBase();
   const token = getCookie(sessionIdKey);
   if (bypassLogin || !base || !token || typeof fetch !== "function") {
+    // biome-ignore lint/suspicious/noConsole: live diagnostic (#422) - reveals WHY the shared pool was skipped
+    console.warn(`[er-ghost] server sample skipped (bypassLogin=${bypassLogin}, base=${!!base}, token=${!!token})`);
     return [];
   }
   try {
@@ -234,11 +236,15 @@ async function sampleRunsFromServer(
       { method: "GET", headers: { Accept: "application/json", Authorization: token } },
     );
     if (!res.ok) {
+      // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
+      console.warn(`[er-ghost] server sample HTTP ${res.status}`);
       return [];
     }
     const data = await res.json();
     return (Array.isArray(data) ? data : (data?.teams ?? [])).filter(isValidSnapshot) as GhostTeamSnapshot[];
-  } catch {
+  } catch (err) {
+    // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
+    console.warn("[er-ghost] server sample fetch failed:", err);
     return [];
   }
 }
@@ -533,18 +539,39 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
         }
         tried.add(diff);
         try {
-          collected.push(...(await fetchGhostTeams(diff, 20, 1)));
-        } catch {
-          // Per-difficulty fetch is best-effort.
+          const batch = await fetchGhostTeams(diff, 20, 1);
+          collected.push(...batch);
+          // biome-ignore lint/suspicious/noConsole: live diagnostic (#422) - lands in Send Logs captures
+          console.log(`[er-ghost] challenge prefetch: +${batch.length} from '${diff}' pool`);
+        } catch (err) {
+          // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
+          console.warn(`[er-ghost] challenge prefetch '${diff}' failed:`, err);
         }
+        // Publish INCREMENTALLY: the old code assigned the pool only after
+        // ALL (up to 5 sequential) fetches finished, so the first trainer
+        // waves raced several network round-trips against an empty pool.
+        const byId = new Map(collected.filter(isErGhostTeamLegal).map(t => [t.id, t] as const));
+        prefetched = [...byId.values()];
         if (collected.length >= 30) {
           break;
         }
       }
-      const byId = new Map(collected.filter(isErGhostTeamLegal).map(t => [t.id, t] as const));
-      prefetched = [...byId.values()];
-    })().catch(() => {
-      prefetched = [];
+      // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
+      console.log(`[er-ghost] challenge pool ready: ${prefetched?.length ?? 0} team(s) of ${collected.length} fetched`);
+      if (!prefetched || prefetched.length === 0) {
+        // EVERY source came back empty (auth token not ready at wave 1, a
+        // network blip, ...). The old code left the pool empty for the WHOLE
+        // run - every trainer stayed a normal trainer. Allow a retry on a
+        // later wave instead.
+        // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
+        console.warn("[er-ghost] challenge pool EMPTY after prefetch - retrying next wave");
+        prefetchStarted = false;
+      }
+    })().catch(err => {
+      // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
+      console.warn("[er-ghost] challenge prefetch crashed - retrying next wave:", err);
+      prefetched = prefetched ?? [];
+      prefetchStarted = false;
     });
     return;
   }
@@ -628,7 +655,17 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
     next = (unused.length > 0 ? unused : anyDeeper).sort((a, b) => a.waveReached - b.waveReached)[0];
   }
   if (!next) {
+    if (challengeMode) {
+      // biome-ignore lint/suspicious/noConsole: live diagnostic (#422) - the smoking gun for "normal trainer in ghost mode"
+      console.warn(
+        `[er-ghost] wave ${waveIndex}: NO ghost - pool=${pool.length} legal=${legal.length} deeper=${legal.filter(s => s.waveReached >= waveIndex).length} prefetch=${prefetched === null ? "PENDING" : "done"}`,
+      );
+    }
     return null;
+  }
+  if (challengeMode) {
+    // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
+    console.log(`[er-ghost] wave ${waveIndex}: ghost '${next.trainerName}' (run ended at ${next.waveReached})`);
   }
   usedGhostIds.add(next.id);
   ghostByWave.set(waveIndex, next);
