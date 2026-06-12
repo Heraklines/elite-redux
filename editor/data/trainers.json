@@ -13,2861 +13,3433 @@
     {
       "const": "SPECIES_ABOMASNOW",
       "name": "Abomasnow",
+      "slug": "abomasnow",
       "sets": 3
     },
     {
       "const": "SPECIES_ABSOL",
       "name": "Absol",
+      "slug": "absol",
       "sets": 4
     },
     {
       "const": "SPECIES_ACCELGOR",
       "name": "Accelgor",
+      "slug": "accelgor",
       "sets": 3
     },
     {
       "const": "SPECIES_AEGISLASH",
       "name": "Aegislash",
+      "slug": "aegislash",
       "sets": 6
     },
     {
       "const": "SPECIES_AERODACTYL",
       "name": "Aerodactyl",
+      "slug": "aerodactyl",
       "sets": 3
     },
     {
       "const": "SPECIES_AGGRON",
       "name": "Aggron",
+      "slug": "aggron",
       "sets": 4
     },
     {
       "const": "SPECIES_ALAKAZAM",
       "name": "Alakazam",
+      "slug": "alakazam",
       "sets": 8
     },
     {
       "const": "SPECIES_ALCREMIE",
       "name": "Alcremie",
+      "slug": "alcremie",
       "sets": 4
     },
     {
       "const": "SPECIES_ALOMOMOLA",
       "name": "Alomomola",
+      "slug": "alomomola",
       "sets": 3
     },
     {
       "const": "SPECIES_ALTARIA",
       "name": "Altaria",
+      "slug": "altaria",
       "sets": 4
     },
     {
       "const": "SPECIES_AMBIPOM",
       "name": "Ambipom",
+      "slug": "ambipom",
       "sets": 3
     },
     {
       "const": "SPECIES_AMOONGUSS",
       "name": "Amoonguss",
+      "slug": "amoonguss",
       "sets": 1
     },
     {
       "const": "SPECIES_AMPHAROS",
       "name": "Ampharos",
+      "slug": "ampharos",
       "sets": 2
     },
     {
       "const": "SPECIES_AMPHYBUZZ",
       "name": "Amphybuzz",
+      "slug": "amphybuzz",
       "sets": 4
     },
     {
       "const": "SPECIES_ANNIHILAPE",
       "name": "Annihilape",
+      "slug": "annihilape",
       "sets": 2
     },
     {
       "const": "SPECIES_ARACHTRES",
       "name": "Arachtres",
+      "slug": "arachtres",
       "sets": 3
     },
     {
       "const": "SPECIES_ARASHINNE",
       "name": "Arashinne",
+      "slug": "arashinne",
       "sets": 3
     },
     {
       "const": "SPECIES_ARBOK",
       "name": "Arbok",
+      "slug": "arbok",
       "sets": 5
     },
     {
       "const": "SPECIES_ARBOLIVA",
       "name": "Arboliva",
+      "slug": "arboliva",
       "sets": 3
     },
     {
       "const": "SPECIES_ARCANINE",
       "name": "Arcanine",
+      "slug": "arcanine",
       "sets": 9
     },
     {
       "const": "SPECIES_ARCHALUDON",
       "name": "Archaludon",
+      "slug": "archaludon",
       "sets": 3
     },
     {
       "const": "SPECIES_ARCHEOPS",
       "name": "Archeops",
+      "slug": "archeops",
       "sets": 3
     },
     {
       "const": "SPECIES_ARCTOVISH",
       "name": "Arctovish",
+      "slug": "arctovish",
       "sets": 2
     },
     {
       "const": "SPECIES_ARCTOZOLT",
       "name": "Arctozolt",
+      "slug": "arctozolt",
       "sets": 3
     },
     {
       "const": "SPECIES_ARMALDO",
       "name": "Armaldo",
+      "slug": "armaldo",
       "sets": 3
     },
     {
       "const": "SPECIES_ARMAROUGE",
       "name": "Armarouge",
+      "slug": "armarouge",
       "sets": 3
     },
     {
       "const": "SPECIES_ARTICUNO",
       "name": "Articuno",
+      "slug": "articuno",
       "sets": 6
     },
     {
       "const": "SPECIES_AUDINO",
       "name": "Audino",
+      "slug": "audino",
       "sets": 4
     },
     {
       "const": "SPECIES_AURORUS",
       "name": "Aurorus",
+      "slug": "aurorus",
       "sets": 3
     },
     {
       "const": "SPECIES_AVALUGG",
       "name": "Avalugg",
+      "slug": "avalugg",
       "sets": 3
     },
     {
       "const": "SPECIES_AZELF",
       "name": "Azelf",
+      "slug": "azelf",
       "sets": 6
     },
     {
       "const": "SPECIES_AZUMARILL",
       "name": "Azumarill",
+      "slug": "azumarill",
       "sets": 3
     },
     {
       "const": "SPECIES_BANETTE",
       "name": "Banette",
+      "slug": "banette",
       "sets": 4
     },
     {
       "const": "SPECIES_BARBARACLE",
       "name": "Barbaracle",
+      "slug": "barbaracle",
       "sets": 1
     },
     {
       "const": "SPECIES_BARRASKEWDA",
       "name": "Barraskewda",
+      "slug": "barraskewda",
       "sets": 2
     },
     {
       "const": "SPECIES_BASTIODON",
       "name": "Bastiodon",
+      "slug": "bastiodon",
       "sets": 3
     },
     {
       "const": "SPECIES_BAXCALIBUR",
       "name": "Baxcalibur",
+      "slug": "baxcalibur",
       "sets": 2
     },
     {
       "const": "SPECIES_BEAUTIFLY",
       "name": "Beautifly",
+      "slug": "beautifly",
       "sets": 3
     },
     {
       "const": "SPECIES_BEEDRILL",
       "name": "Beedrill",
+      "slug": "beedrill",
       "sets": 6
     },
     {
       "const": "SPECIES_BEEFENDER",
       "name": "Beefender",
+      "slug": "beefender",
       "sets": 3
     },
     {
       "const": "SPECIES_BEHEEYEM",
       "name": "Beheeyem",
+      "slug": "beheeyem",
       "sets": 3
     },
     {
       "const": "SPECIES_BELLIBOLT",
       "name": "Bellibolt",
+      "slug": "bellibolt",
       "sets": 3
     },
     {
       "const": "SPECIES_BELLOSSOM",
       "name": "Bellossom",
+      "slug": "bellossom",
       "sets": 3
     },
     {
       "const": "SPECIES_BEWARDEN",
       "name": "Bewarden",
+      "slug": "bewarden",
       "sets": 1
     },
     {
       "const": "SPECIES_BIBAREL",
       "name": "Bibarel",
+      "slug": "bibarel",
       "sets": 3
     },
     {
       "const": "SPECIES_BLACEPHALON",
       "name": "Blacephalon",
+      "slug": "blacephalon",
       "sets": 3
     },
     {
       "const": "SPECIES_BLASTOISE",
       "name": "Blastoise",
+      "slug": "blastoise",
       "sets": 5
     },
     {
       "const": "SPECIES_BLAZIKEN",
       "name": "Blaziken",
+      "slug": "blaziken",
       "sets": 3
     },
     {
       "const": "SPECIES_BLISSEY",
       "name": "Blissey",
+      "slug": "blissey",
       "sets": 6
     },
     {
       "const": "SPECIES_BLIZZARD_MAW",
       "name": "Blizzard Maw",
+      "slug": "blizzard_maw",
       "sets": 1
     },
     {
       "const": "SPECIES_BLOCLI",
       "name": "Blocli",
+      "slug": "blocli",
       "sets": 3
     },
     {
       "const": "SPECIES_BOLTUND",
       "name": "Boltund",
+      "slug": "boltund",
       "sets": 3
     },
     {
       "const": "SPECIES_BOMBIRDIER",
       "name": "Bombirdier",
+      "slug": "bombirdier",
       "sets": 3
     },
     {
       "const": "SPECIES_BOUFFALANT",
       "name": "Bouffalant",
+      "slug": "bouffalant",
       "sets": 3
     },
     {
       "const": "SPECIES_BRAMBLEGHAST",
       "name": "Brambleghast",
+      "slug": "brambleghast",
       "sets": 3
     },
     {
       "const": "SPECIES_BRAVIARY",
       "name": "Braviary",
+      "slug": "braviary",
       "sets": 1
     },
     {
       "const": "SPECIES_BRELOOM",
       "name": "Breloom",
+      "slug": "breloom",
       "sets": 4
     },
     {
       "const": "SPECIES_BRONTONANA",
       "name": "Brontonana",
+      "slug": "brontonana",
       "sets": 2
     },
     {
       "const": "SPECIES_BRONZONG",
       "name": "Bronzong",
+      "slug": "bronzong",
       "sets": 2
     },
     {
       "const": "SPECIES_BRUTE_BONNET",
       "name": "Brute Bonnet",
+      "slug": "brute_bonnet",
       "sets": 3
     },
     {
       "const": "SPECIES_BRUXISH",
       "name": "Bruxish",
+      "slug": "bruxish",
       "sets": 3
     },
     {
       "const": "SPECIES_BUTTERFREE",
       "name": "Butterfree",
+      "slug": "butterfree",
       "sets": 3
     },
     {
       "const": "SPECIES_BUZZWOLE",
       "name": "Buzzwole",
+      "slug": "buzzwole",
       "sets": 3
     },
     {
       "const": "SPECIES_CALYREX",
       "name": "Calyrex",
+      "slug": "calyrex",
       "sets": 3
     },
     {
       "const": "SPECIES_CAMERUPT",
       "name": "Camerupt",
+      "slug": "camerupt",
       "sets": 4
     },
     {
       "const": "SPECIES_CARBINK",
       "name": "Carbink",
+      "slug": "carbink",
       "sets": 3
     },
     {
       "const": "SPECIES_CARBONIX",
       "name": "Carbonix",
+      "slug": "carbonix",
       "sets": 3
     },
     {
       "const": "SPECIES_CARNIVINE",
       "name": "Carnivine",
+      "slug": "carnivine",
       "sets": 2
     },
     {
       "const": "SPECIES_CARRACOSTA",
       "name": "Carracosta",
+      "slug": "carracosta",
       "sets": 3
     },
     {
       "const": "SPECIES_CASTFORM",
       "name": "Castform",
+      "slug": "castform",
       "sets": 3
     },
     {
       "const": "SPECIES_CELEBI",
       "name": "Celebi",
+      "slug": "celebi",
       "sets": 3
     },
     {
       "const": "SPECIES_CELESTEELA",
       "name": "Celesteela",
+      "slug": "celesteela",
       "sets": 3
     },
     {
       "const": "SPECIES_CENTISKORCH",
       "name": "Centiskorch",
+      "slug": "centiskorch",
       "sets": 4
     },
     {
       "const": "SPECIES_CERULEDGE",
       "name": "Ceruledge",
+      "slug": "ceruledge",
       "sets": 3
     },
     {
       "const": "SPECIES_CETITAN",
       "name": "Cetitan",
+      "slug": "cetitan",
       "sets": 3
     },
     {
       "const": "SPECIES_CHANDELURE",
       "name": "Chandelure",
+      "slug": "chandelure",
       "sets": 5
     },
     {
       "const": "SPECIES_CHARIZARD",
       "name": "Charizard",
+      "slug": "charizard",
       "sets": 5
     },
     {
       "const": "SPECIES_CHARJABUG",
       "name": "Charjabug",
+      "slug": "charjabug",
       "sets": 1
     },
     {
       "const": "SPECIES_CHERRIM",
       "name": "Cherrim",
+      "slug": "cherrim",
       "sets": 3
     },
     {
       "const": "SPECIES_CHERRIM_SUNSHINE",
       "name": "Cherrim Sunshine",
+      "slug": "cherrim_sunshine",
       "sets": 4
     },
     {
       "const": "SPECIES_CHESNAUGHT",
       "name": "Chesnaught",
+      "slug": "chesnaught",
       "sets": 3
     },
     {
       "const": "SPECIES_CHESNAUGHT_MEGA",
       "name": "Chesnaught Mega",
+      "slug": "chesnaught_mega",
       "sets": 1
     },
     {
       "const": "SPECIES_CHI_YU",
       "name": "Chi-Yu",
+      "slug": "chi_yu",
       "sets": 3
     },
     {
       "const": "SPECIES_CHIEN_PAO",
       "name": "Chien-Pao",
+      "slug": "chien_pao",
       "sets": 4
     },
     {
       "const": "SPECIES_CHIMECHO",
       "name": "Chimecho",
+      "slug": "chimecho",
       "sets": 3
     },
     {
       "const": "SPECIES_CINDERACE",
       "name": "Cinderace",
+      "slug": "cinderace",
       "sets": 4
     },
     {
       "const": "SPECIES_CLAMPERL",
       "name": "Clamperl",
+      "slug": "clamperl",
       "sets": 1
     },
     {
       "const": "SPECIES_CLAWITZER",
       "name": "Clawitzer",
+      "slug": "clawitzer",
       "sets": 3
     },
     {
       "const": "SPECIES_CLAYDOL",
       "name": "Claydol",
+      "slug": "claydol",
       "sets": 3
     },
     {
       "const": "SPECIES_CLEFABLE",
       "name": "Clefable",
+      "slug": "clefable",
       "sets": 8
     },
     {
       "const": "SPECIES_CLODSIRE",
       "name": "Clodsire",
+      "slug": "clodsire",
       "sets": 4
     },
     {
       "const": "SPECIES_CLOYSTER",
       "name": "Cloyster",
+      "slug": "cloyster",
       "sets": 4
     },
     {
       "const": "SPECIES_COALOSSAL",
       "name": "Coalossal",
+      "slug": "coalossal",
       "sets": 4
     },
     {
       "const": "SPECIES_COBALION",
       "name": "Cobalion",
+      "slug": "cobalion",
       "sets": 2
     },
     {
       "const": "SPECIES_COFAGRIGUS",
       "name": "Cofagrigus",
+      "slug": "cofagrigus",
       "sets": 3
     },
     {
       "const": "SPECIES_COMFEY",
       "name": "Comfey",
+      "slug": "comfey",
       "sets": 3
     },
     {
       "const": "SPECIES_CONKELDURR",
       "name": "Conkeldurr",
+      "slug": "conkeldurr",
       "sets": 3
     },
     {
       "const": "SPECIES_COPPERAJAH",
       "name": "Copperajah",
+      "slug": "copperajah",
       "sets": 3
     },
     {
       "const": "SPECIES_CORMOTH",
       "name": "Cormoth",
+      "slug": "cormoth",
       "sets": 4
     },
     {
       "const": "SPECIES_HARVESTING_TYRANT",
       "name": "Corn Tyrant",
+      "slug": "harvesting_tyrant",
       "sets": 3
     },
     {
       "const": "SPECIES_CORVIKNIGHT",
       "name": "Corviknight",
+      "slug": "corviknight",
       "sets": 4
     },
     {
       "const": "SPECIES_COSMOEM",
       "name": "Cosmoem",
+      "slug": "cosmoem",
       "sets": 1
     },
     {
       "const": "SPECIES_CRADILY",
       "name": "Cradily",
+      "slug": "cradily",
       "sets": 3
     },
     {
       "const": "SPECIES_CRAMORANT",
       "name": "Cramorant",
+      "slug": "cramorant",
       "sets": 4
     },
     {
       "const": "SPECIES_CRESSELIA",
       "name": "Cresselia",
+      "slug": "cresselia",
       "sets": 3
     },
     {
       "const": "SPECIES_CROBAT",
       "name": "Crobat",
+      "slug": "crobat",
       "sets": 3
     },
     {
       "const": "SPECIES_CRUSTLE",
       "name": "Crustle",
+      "slug": "crustle",
       "sets": 3
     },
     {
       "const": "SPECIES_CRYOGONAL",
       "name": "Cryogonal",
+      "slug": "cryogonal",
       "sets": 3
     },
     {
       "const": "SPECIES_CURSOLA",
       "name": "Cursola",
+      "slug": "cursola",
       "sets": 3
     },
     {
       "const": "SPECIES_CYCLIZAR",
       "name": "Cyclizar",
+      "slug": "cyclizar",
       "sets": 3
     },
     {
       "const": "SPECIES_DACHSBUN",
       "name": "Dachsbun",
+      "slug": "dachsbun",
       "sets": 3
     },
     {
       "const": "SPECIES_DARKRAI",
       "name": "Darkrai",
+      "slug": "darkrai",
       "sets": 3
     },
     {
       "const": "SPECIES_DARMANITAN",
       "name": "Darmanitan",
+      "slug": "darmanitan",
       "sets": 6
     },
     {
       "const": "SPECIES_DECIDUEYE",
       "name": "Decidueye",
+      "slug": "decidueye",
       "sets": 6
     },
     {
       "const": "SPECIES_DEDELIBIRD",
       "name": "Dedelibird",
+      "slug": "dedelibird",
       "sets": 3
     },
     {
       "const": "SPECIES_DELCATTY",
       "name": "Delcatty",
+      "slug": "delcatty",
       "sets": 3
     },
     {
       "const": "SPECIES_DELPHOX",
       "name": "Delphox",
+      "slug": "delphox",
       "sets": 3
     },
     {
       "const": "SPECIES_DEOXYS",
       "name": "Deoxys",
+      "slug": "deoxys",
       "sets": 4
     },
     {
       "const": "SPECIES_DEWGONG",
       "name": "Dewgong",
+      "slug": "dewgong",
       "sets": 5
     },
     {
       "const": "SPECIES_DIALGA",
       "name": "Dialga",
+      "slug": "dialga",
       "sets": 4
     },
     {
       "const": "SPECIES_DIANCIE",
       "name": "Diancie",
+      "slug": "diancie",
       "sets": 4
     },
     {
       "const": "SPECIES_DIGGERSBY",
       "name": "Diggersby",
+      "slug": "diggersby",
       "sets": 3
     },
     {
       "const": "SPECIES_DODRIO",
       "name": "Dodrio",
+      "slug": "dodrio",
       "sets": 6
     },
     {
       "const": "SPECIES_DONDOZO",
       "name": "Dondozo",
+      "slug": "dondozo",
       "sets": 3
     },
     {
       "const": "SPECIES_DONPHAN",
       "name": "Donphan",
+      "slug": "donphan",
       "sets": 3
     },
     {
       "const": "SPECIES_DOUBLADE",
       "name": "Doublade",
+      "slug": "doublade",
       "sets": 2
     },
     {
       "const": "SPECIES_DRACOVISH",
       "name": "Dracovish",
+      "slug": "dracovish",
       "sets": 3
     },
     {
       "const": "SPECIES_DRACOZOLT",
       "name": "Dracozolt",
+      "slug": "dracozolt",
       "sets": 3
     },
     {
       "const": "SPECIES_DRAGALGE",
       "name": "Dragalge",
+      "slug": "dragalge",
       "sets": 4
     },
     {
       "const": "SPECIES_DRAGAPULT",
       "name": "Dragapult",
+      "slug": "dragapult",
       "sets": 3
     },
     {
       "const": "SPECIES_DRAGONITE",
       "name": "Dragonite",
+      "slug": "dragonite",
       "sets": 4
     },
     {
       "const": "SPECIES_DRAMPA",
       "name": "Drampa",
+      "slug": "drampa",
       "sets": 4
     },
     {
       "const": "SPECIES_DRAPION",
       "name": "Drapion",
+      "slug": "drapion",
       "sets": 2
     },
     {
       "const": "SPECIES_DREDNAW",
       "name": "Drednaw",
+      "slug": "drednaw",
       "sets": 3
     },
     {
       "const": "SPECIES_DREDWOOD",
       "name": "Dredwood",
+      "slug": "dredwood",
       "sets": 3
     },
     {
       "const": "SPECIES_DRIFBLIM",
       "name": "Drifblim",
+      "slug": "drifblim",
       "sets": 3
     },
     {
       "const": "SPECIES_DRUDDIGON",
       "name": "Druddigon",
+      "slug": "druddigon",
       "sets": 3
     },
     {
       "const": "SPECIES_DUBWOOL",
       "name": "Dubwool",
+      "slug": "dubwool",
       "sets": 3
     },
     {
       "const": "SPECIES_DUELUMBER",
       "name": "Duelumber",
+      "slug": "duelumber",
       "sets": 3
     },
     {
       "const": "SPECIES_DUNSPARCE",
       "name": "Dunsparce",
+      "slug": "dunsparce",
       "sets": 1
     },
     {
       "const": "SPECIES_DURANT",
       "name": "Durant",
+      "slug": "durant",
       "sets": 3
     },
     {
       "const": "SPECIES_DUSCLOPS",
       "name": "Dusclops",
+      "slug": "dusclops",
       "sets": 2
     },
     {
       "const": "SPECIES_DUSKNOIR",
       "name": "Dusknoir",
+      "slug": "dusknoir",
       "sets": 3
     },
     {
       "const": "SPECIES_DUSTOX",
       "name": "Dustox",
+      "slug": "dustox",
       "sets": 2
     },
     {
       "const": "SPECIES_EELEKTROSS",
       "name": "Eelektross",
+      "slug": "eelektross",
       "sets": 4
     },
     {
       "const": "SPECIES_EISCUE",
       "name": "Eiscue",
+      "slug": "eiscue",
       "sets": 4
     },
     {
       "const": "SPECIES_ELDEGOSS",
       "name": "Eldegoss",
+      "slug": "eldegoss",
       "sets": 3
     },
     {
       "const": "SPECIES_ELECTIVIRE",
       "name": "Electivire",
+      "slug": "electivire",
       "sets": 2
     },
     {
       "const": "SPECIES_ELECTRODE",
       "name": "Electrode",
+      "slug": "electrode",
       "sets": 6
     },
     {
       "const": "SPECIES_EMBOAR",
       "name": "Emboar",
+      "slug": "emboar",
       "sets": 3
     },
     {
       "const": "SPECIES_EMOLGA",
       "name": "Emolga",
+      "slug": "emolga",
       "sets": 3
     },
     {
       "const": "SPECIES_EMPOLEON",
       "name": "Empoleon",
+      "slug": "empoleon",
       "sets": 7
     },
     {
       "const": "SPECIES_ENAMORUS",
       "name": "Enamorus",
+      "slug": "enamorus",
       "sets": 6
     },
     {
       "const": "SPECIES_ENTEI",
       "name": "Entei",
+      "slug": "entei",
       "sets": 3
     },
     {
       "const": "SPECIES_ESCARGINITE",
       "name": "Escarginite",
+      "slug": "escarginite",
       "sets": 3
     },
     {
       "const": "SPECIES_ESCAVALIER",
       "name": "Escavalier",
+      "slug": "escavalier",
       "sets": 3
     },
     {
       "const": "SPECIES_ESPATHRA",
       "name": "Espathra",
+      "slug": "espathra",
       "sets": 2
     },
     {
       "const": "SPECIES_ETERNATUS",
       "name": "Eternatus",
+      "slug": "eternatus",
       "sets": 4
     },
     {
       "const": "SPECIES_EXCADRILL",
       "name": "Excadrill",
+      "slug": "excadrill",
       "sets": 4
     },
     {
       "const": "SPECIES_EXEGGUTOR",
       "name": "Exeggutor",
+      "slug": "exeggutor",
       "sets": 6
     },
     {
       "const": "SPECIES_EXPLOUD",
       "name": "Exploud",
+      "slug": "exploud",
       "sets": 6
     },
     {
       "const": "SPECIES_FALINKS",
       "name": "Falinks",
+      "slug": "falinks",
       "sets": 3
     },
     {
       "const": "SPECIES_FARIGIRAF",
       "name": "Farigiraf",
+      "slug": "farigiraf",
       "sets": 2
     },
     {
       "const": "SPECIES_FERALIGATR",
       "name": "Feraligatr",
+      "slug": "feraligatr",
       "sets": 4
     },
     {
       "const": "SPECIES_FERROTHORN",
       "name": "Ferrothorn",
+      "slug": "ferrothorn",
       "sets": 4
     },
     {
       "const": "SPECIES_FEZANDIPITI",
       "name": "Fezandipiti",
+      "slug": "fezandipiti",
       "sets": 3
     },
     {
       "const": "SPECIES_FLAIRGRANCE",
       "name": "Flairgrance",
+      "slug": "flairgrance",
       "sets": 3
     },
     {
       "const": "SPECIES_FLAMIGO",
       "name": "Flamigo",
+      "slug": "flamigo",
       "sets": 3
     },
     {
       "const": "SPECIES_FLOETTE_BLUE_FLOWER",
       "name": "Floette Blue",
+      "slug": "floette_blue_flower",
       "sets": 3
     },
     {
       "const": "SPECIES_FLOETTE_WHITE_FLOWER",
       "name": "Floette White",
+      "slug": "floette_white_flower",
       "sets": 1
     },
     {
       "const": "SPECIES_FLORGES",
       "name": "Florges",
+      "slug": "florges",
       "sets": 3
     },
     {
       "const": "SPECIES_FLUTTER_MANE",
       "name": "Flutter Mane",
+      "slug": "flutter_mane",
       "sets": 3
     },
     {
       "const": "SPECIES_FLYGON",
       "name": "Flygon",
+      "slug": "flygon",
       "sets": 7
     },
     {
       "const": "SPECIES_FORRETRESS",
       "name": "Forretress",
+      "slug": "forretress",
       "sets": 3
     },
     {
       "const": "SPECIES_FROSLASS",
       "name": "Froslass",
+      "slug": "froslass",
       "sets": 9
     },
     {
       "const": "SPECIES_FROSTULA",
       "name": "Frostula",
+      "slug": "frostula",
       "sets": 4
     },
     {
       "const": "SPECIES_FUJIFLAP",
       "name": "Fujiflap",
+      "slug": "fujiflap",
       "sets": 3
     },
     {
       "const": "SPECIES_FURFROU",
       "name": "Furfrou",
+      "slug": "furfrou",
       "sets": 3
     },
     {
       "const": "SPECIES_FURRET",
       "name": "Furret",
+      "slug": "furret",
       "sets": 3
     },
     {
       "const": "SPECIES_GALLADE",
       "name": "Gallade",
+      "slug": "gallade",
       "sets": 3
     },
     {
       "const": "SPECIES_GALVANTULA",
       "name": "Galvantula",
+      "slug": "galvantula",
       "sets": 3
     },
     {
       "const": "SPECIES_GARBODOR",
       "name": "Garbodor",
+      "slug": "garbodor",
       "sets": 3
     },
     {
       "const": "SPECIES_GARCHOMP",
       "name": "Garchomp",
+      "slug": "garchomp",
       "sets": 7
     },
     {
       "const": "SPECIES_GARDEVOIR",
       "name": "Gardevoir",
+      "slug": "gardevoir",
       "sets": 4
     },
     {
       "const": "SPECIES_GARGABLOX",
       "name": "Gargablox",
+      "slug": "gargablox",
       "sets": 3
     },
     {
       "const": "SPECIES_GARGANACL",
       "name": "Garganacl",
+      "slug": "garganacl",
       "sets": 3
     },
     {
       "const": "SPECIES_GASTRODON",
       "name": "Gastrodon",
+      "slug": "gastrodon",
       "sets": 3
     },
     {
       "const": "SPECIES_GENESECT",
       "name": "Genesect",
+      "slug": "genesect",
       "sets": 2
     },
     {
       "const": "SPECIES_GENGAR",
       "name": "Gengar",
+      "slug": "gengar",
       "sets": 5
     },
     {
       "const": "SPECIES_GHOLDENGO",
       "name": "Gholdengo",
+      "slug": "gholdengo",
       "sets": 3
     },
     {
       "const": "SPECIES_GIGALITH",
       "name": "Gigalith",
+      "slug": "gigalith",
       "sets": 3
     },
     {
       "const": "SPECIES_GIMMIGHOUL",
       "name": "Gimmighoul",
+      "slug": "gimmighoul",
       "sets": 1
     },
     {
       "const": "SPECIES_GIRATINA",
       "name": "Giratina",
+      "slug": "giratina",
       "sets": 3
     },
     {
       "const": "SPECIES_GLALIE",
       "name": "Glalie",
+      "slug": "glalie",
       "sets": 8
     },
     {
       "const": "SPECIES_GLASTRIER",
       "name": "Glastrier",
+      "slug": "glastrier",
       "sets": 3
     },
     {
       "const": "SPECIES_GLIMMORA",
       "name": "Glimmora",
+      "slug": "glimmora",
       "sets": 4
     },
     {
       "const": "SPECIES_GLISCOR",
       "name": "Gliscor",
+      "slug": "gliscor",
       "sets": 3
     },
     {
       "const": "SPECIES_GLOOM",
       "name": "Gloom",
+      "slug": "gloom",
       "sets": 3
     },
     {
       "const": "SPECIES_GOGOAT",
       "name": "Gogoat",
+      "slug": "gogoat",
       "sets": 3
     },
     {
       "const": "SPECIES_GOLEM",
       "name": "Golem",
+      "slug": "golem",
       "sets": 6
     },
     {
       "const": "SPECIES_GOLISOPOD",
       "name": "Golisopod",
+      "slug": "golisopod",
       "sets": 4
     },
     {
       "const": "SPECIES_GOLURK",
       "name": "Golurk",
+      "slug": "golurk",
       "sets": 3
     },
     {
       "const": "SPECIES_GOODRA",
       "name": "Goodra",
+      "slug": "goodra",
       "sets": 3
     },
     {
       "const": "SPECIES_GOOSCHASE",
       "name": "Gooschase",
+      "slug": "gooschase",
       "sets": 3
     },
     {
       "const": "SPECIES_GOREBYSS",
       "name": "Gorebyss",
+      "slug": "gorebyss",
       "sets": 3
     },
     {
       "const": "SPECIES_GOTHITELLE",
       "name": "Gothitelle",
+      "slug": "gothitelle",
       "sets": 4
     },
     {
       "const": "SPECIES_GOUGING_FIRE",
       "name": "Gouging Fire",
+      "slug": "gouging_fire",
       "sets": 3
     },
     {
       "const": "SPECIES_GRAFAIAI",
       "name": "Grafaiai",
+      "slug": "grafaiai",
       "sets": 3
     },
     {
       "const": "SPECIES_GRANBULL",
       "name": "Granbull",
+      "slug": "granbull",
       "sets": 3
     },
     {
       "const": "SPECIES_GRANITUN",
       "name": "Granitun",
+      "slug": "granitun",
       "sets": 3
     },
     {
       "const": "SPECIES_GRAPPLOCT",
       "name": "Grapploct",
+      "slug": "grapploct",
       "sets": 3
     },
     {
       "const": "SPECIES_GREAT_TUSK",
       "name": "Great Tusk",
+      "slug": "great_tusk",
       "sets": 2
     },
     {
       "const": "SPECIES_GREEDENT",
       "name": "Greedent",
+      "slug": "greedent",
       "sets": 4
     },
     {
       "const": "SPECIES_GRENINJA",
       "name": "Greninja",
+      "slug": "greninja",
       "sets": 3
     },
     {
       "const": "SPECIES_GRIMMSNARL",
       "name": "Grimmsnarl",
+      "slug": "grimmsnarl",
       "sets": 4
     },
     {
       "const": "SPECIES_GROUDON",
       "name": "Groudon",
+      "slug": "groudon",
       "sets": 4
     },
     {
       "const": "SPECIES_GRUMPIG",
       "name": "Grumpig",
+      "slug": "grumpig",
       "sets": 1
     },
     {
       "const": "SPECIES_GUZZLORD",
       "name": "Guzzlord",
+      "slug": "guzzlord",
       "sets": 3
     },
     {
       "const": "SPECIES_GYARADEATH",
       "name": "Gyaradeath",
+      "slug": "gyaradeath",
       "sets": 5
     },
     {
       "const": "SPECIES_GYARADOS",
       "name": "Gyarados",
+      "slug": "gyarados",
       "sets": 5
     },
     {
       "const": "SPECIES_HARIYAMA",
       "name": "Hariyama",
+      "slug": "hariyama",
       "sets": 4
     },
     {
       "const": "SPECIES_HATTERENE",
       "name": "Hatterene",
+      "slug": "hatterene",
       "sets": 4
     },
     {
       "const": "SPECIES_HAWLUCHA",
       "name": "Hawlucha",
+      "slug": "hawlucha",
       "sets": 3
     },
     {
       "const": "SPECIES_HAXORUS",
       "name": "Haxorus",
+      "slug": "haxorus",
       "sets": 3
     },
     {
       "const": "SPECIES_HEATMOR",
       "name": "Heatmor",
+      "slug": "heatmor",
       "sets": 3
     },
     {
       "const": "SPECIES_HEATRAN",
       "name": "Heatran",
+      "slug": "heatran",
       "sets": 3
     },
     {
       "const": "SPECIES_HELIOLISK",
       "name": "Heliolisk",
+      "slug": "heliolisk",
       "sets": 2
     },
     {
       "const": "SPECIES_HELIOSUNNY",
       "name": "Heliomodo",
+      "slug": "heliosunny",
       "sets": 3
     },
     {
       "const": "SPECIES_HERACROSS",
       "name": "Heracross",
+      "slug": "heracross",
       "sets": 3
     },
     {
       "const": "SPECIES_HIPPOPOTATO",
       "name": "Hippopotato",
+      "slug": "hippopotato",
       "sets": 3
     },
     {
       "const": "SPECIES_HIPPOTATON",
       "name": "Hippotaton",
+      "slug": "hippotaton",
       "sets": 2
     },
     {
       "const": "SPECIES_HIPPOWDON",
       "name": "Hippowdon",
+      "slug": "hippowdon",
       "sets": 3
     },
     {
       "const": "SPECIES_HITMONCHAN",
       "name": "Hitmonchan",
+      "slug": "hitmonchan",
       "sets": 4
     },
     {
       "const": "SPECIES_HITMONLEE",
       "name": "Hitmonlee",
+      "slug": "hitmonlee",
       "sets": 4
     },
     {
       "const": "SPECIES_HITMONTOP",
       "name": "Hitmontop",
+      "slug": "hitmontop",
       "sets": 4
     },
     {
       "const": "SPECIES_HONCHKROW",
       "name": "Honchkrow",
+      "slug": "honchkrow",
       "sets": 3
     },
     {
       "const": "SPECIES_HOOPA",
       "name": "Hoopa",
+      "slug": "hoopa",
       "sets": 6
     },
     {
       "const": "SPECIES_HOUNDOOM",
       "name": "Houndoom",
+      "slug": "houndoom",
       "sets": 7
     },
     {
       "const": "SPECIES_HOUNDSTONE",
       "name": "Houndstone",
+      "slug": "houndstone",
       "sets": 2
     },
     {
       "const": "SPECIES_HUNTAIL",
       "name": "Huntail",
+      "slug": "huntail",
       "sets": 3
     },
     {
       "const": "SPECIES_HYDREIGON",
       "name": "Hydreigon",
+      "slug": "hydreigon",
       "sets": 7
     },
     {
       "const": "SPECIES_HYDROAR",
       "name": "Hydroar",
+      "slug": "hydroar",
       "sets": 2
     },
     {
       "const": "SPECIES_HYPNO",
       "name": "Hypno",
+      "slug": "hypno",
       "sets": 3
     },
     {
       "const": "SPECIES_ILLUMISE",
       "name": "Illumise",
+      "slug": "illumise",
       "sets": 3
     },
     {
       "const": "SPECIES_INCINEROAR",
       "name": "Incineroar",
+      "slug": "incineroar",
       "sets": 2
     },
     {
       "const": "SPECIES_INFERNAPE",
       "name": "Infernape",
+      "slug": "infernape",
       "sets": 7
     },
     {
       "const": "SPECIES_INTELEON",
       "name": "Inteleon",
+      "slug": "inteleon",
       "sets": 4
     },
     {
       "const": "SPECIES_IRON_BOULDER",
       "name": "Iron Boulder",
+      "slug": "iron_boulder",
       "sets": 3
     },
     {
       "const": "SPECIES_IRON_BUNDLE",
       "name": "Iron Bundle",
+      "slug": "iron_bundle",
       "sets": 2
     },
     {
       "const": "SPECIES_IRON_CARAPACE",
       "name": "Iron Carapace",
+      "slug": "iron_carapace",
       "sets": 3
     },
     {
       "const": "SPECIES_IRON_CROWN",
       "name": "Iron Crown",
+      "slug": "iron_crown",
       "sets": 2
     },
     {
       "const": "SPECIES_IRON_HANDS",
       "name": "Iron Hands",
+      "slug": "iron_hands",
       "sets": 3
     },
     {
       "const": "SPECIES_IRON_LEAVES",
       "name": "Iron Leaves",
+      "slug": "iron_leaves",
       "sets": 3
     },
     {
       "const": "SPECIES_IRON_MOTH",
       "name": "Iron Moth",
+      "slug": "iron_moth",
       "sets": 3
     },
     {
       "const": "SPECIES_IRON_THORNS",
       "name": "Iron Thorns",
+      "slug": "iron_thorns",
       "sets": 2
     },
     {
       "const": "SPECIES_IRON_TREADS",
       "name": "Iron Treads",
+      "slug": "iron_treads",
       "sets": 3
     },
     {
       "const": "SPECIES_IRON_VALIANT",
       "name": "Iron Valiant",
+      "slug": "iron_valiant",
       "sets": 3
     },
     {
       "const": "SPECIES_JELLICENT",
       "name": "Jellicent",
+      "slug": "jellicent",
       "sets": 3
     },
     {
       "const": "SPECIES_JIRACHI",
       "name": "Jirachi",
+      "slug": "jirachi",
       "sets": 3
     },
     {
       "const": "SPECIES_JUMPLUFF",
       "name": "Jumpluff",
+      "slug": "jumpluff",
       "sets": 3
     },
     {
       "const": "SPECIES_JYNX",
       "name": "Jynx",
+      "slug": "jynx",
       "sets": 1
     },
     {
       "const": "SPECIES_KABUTOPS",
       "name": "Kabutops",
+      "slug": "kabutops",
       "sets": 3
     },
     {
       "const": "SPECIES_KADABRA",
       "name": "Kadabra",
+      "slug": "kadabra",
       "sets": 1
     },
     {
       "const": "SPECIES_KAIOSEA",
       "name": "Kaiosea",
+      "slug": "kaiosea",
       "sets": 3
     },
     {
       "const": "SPECIES_KANGASKHAN",
       "name": "Kangaskhan",
+      "slug": "kangaskhan",
       "sets": 4
     },
     {
       "const": "SPECIES_KARTANA",
       "name": "Kartana",
+      "slug": "kartana",
       "sets": 3
     },
     {
       "const": "SPECIES_KECLEON",
       "name": "Kecleon",
+      "slug": "kecleon",
       "sets": 3
     },
     {
       "const": "SPECIES_KELDEO",
       "name": "Keldeo",
+      "slug": "keldeo",
       "sets": 3
     },
     {
       "const": "SPECIES_KILOWATTREL",
       "name": "Kilowattrel",
+      "slug": "kilowattrel",
       "sets": 2
     },
     {
       "const": "SPECIES_KINGAMBIT",
       "name": "Kingambit",
+      "slug": "kingambit",
       "sets": 7
     },
     {
       "const": "SPECIES_KINGDRA",
       "name": "Kingdra",
+      "slug": "kingdra",
       "sets": 3
     },
     {
       "const": "SPECIES_KINGLER",
       "name": "Kingler",
+      "slug": "kingler",
       "sets": 3
     },
     {
       "const": "SPECIES_KLAWF",
       "name": "Klawf",
+      "slug": "klawf",
       "sets": 3
     },
     {
       "const": "SPECIES_KLEAVOR",
       "name": "Kleavor",
+      "slug": "kleavor",
       "sets": 3
     },
     {
       "const": "SPECIES_KLEFKI",
       "name": "Klefki",
+      "slug": "klefki",
       "sets": 3
     },
     {
       "const": "SPECIES_KLINKLANG",
       "name": "Klinklang",
+      "slug": "klinklang",
       "sets": 3
     },
     {
       "const": "SPECIES_KOMALA",
       "name": "Komala",
+      "slug": "komala",
       "sets": 3
     },
     {
       "const": "SPECIES_KORAIDON",
       "name": "Koraidon",
+      "slug": "koraidon",
       "sets": 2
     },
     {
       "const": "SPECIES_KRICKETUNE",
       "name": "Kricketune",
+      "slug": "kricketune",
       "sets": 3
     },
     {
       "const": "SPECIES_KROOKODILE",
       "name": "Krookodile",
+      "slug": "krookodile",
       "sets": 3
     },
     {
       "const": "SPECIES_KYOGRE",
       "name": "Kyogre",
+      "slug": "kyogre",
       "sets": 4
     },
     {
       "const": "SPECIES_KYUREM",
       "name": "Kyurem",
+      "slug": "kyurem",
       "sets": 3
     },
     {
       "const": "SPECIES_LANDORUS",
       "name": "Landorus",
+      "slug": "landorus",
       "sets": 6
     },
     {
       "const": "SPECIES_LANTURN",
       "name": "Lanturn",
+      "slug": "lanturn",
       "sets": 3
     },
     {
       "const": "SPECIES_LAPRAS",
       "name": "Lapras",
+      "slug": "lapras",
       "sets": 5
     },
     {
       "const": "SPECIES_LATIAS",
       "name": "Latias",
+      "slug": "latias",
       "sets": 4
     },
     {
       "const": "SPECIES_LATIOS",
       "name": "Latios",
+      "slug": "latios",
       "sets": 4
     },
     {
       "const": "SPECIES_LEAVANNY",
       "name": "Leavanny",
+      "slug": "leavanny",
       "sets": 3
     },
     {
       "const": "SPECIES_LEDIAN",
       "name": "Ledian",
+      "slug": "ledian",
       "sets": 3
     },
     {
       "const": "SPECIES_LEPASTRY",
       "name": "Lepastry",
+      "slug": "lepastry",
       "sets": 3
     },
     {
       "const": "SPECIES_LICKILICKY",
       "name": "Lickilicky",
+      "slug": "lickilicky",
       "sets": 3
     },
     {
       "const": "SPECIES_LIEPARD",
       "name": "Liepard",
+      "slug": "liepard",
       "sets": 3
     },
     {
       "const": "SPECIES_LILLIGANT",
       "name": "Lilligant",
+      "slug": "lilligant",
       "sets": 3
     },
     {
       "const": "SPECIES_LOKIX",
       "name": "Lokix",
+      "slug": "lokix",
       "sets": 3
     },
     {
       "const": "SPECIES_LOPUNNY",
       "name": "Lopunny",
+      "slug": "lopunny",
       "sets": 4
     },
     {
       "const": "SPECIES_LUCARIO",
       "name": "Lucario",
+      "slug": "lucario",
       "sets": 3
     },
     {
       "const": "SPECIES_LUMINOSITEON",
       "name": "Lucineon",
+      "slug": "luminositeon",
       "sets": 2
     },
     {
       "const": "SPECIES_LUDICOLO",
       "name": "Ludicolo",
+      "slug": "ludicolo",
       "sets": 3
     },
     {
       "const": "SPECIES_LUGIA",
       "name": "Lugia",
+      "slug": "lugia",
       "sets": 3
     },
     {
       "const": "SPECIES_LUNALA",
       "name": "Lunala",
+      "slug": "lunala",
       "sets": 3
     },
     {
       "const": "SPECIES_LUNATONE",
       "name": "Lunatone",
+      "slug": "lunatone",
       "sets": 4
     },
     {
       "const": "SPECIES_LURANTIS",
       "name": "Lurantis",
+      "slug": "lurantis",
       "sets": 2
     },
     {
       "const": "SPECIES_LUVDISC",
       "name": "Luvdisc",
+      "slug": "luvdisc",
       "sets": 3
     },
     {
       "const": "SPECIES_LUXRAY",
       "name": "Luxray",
+      "slug": "luxray",
       "sets": 2
     },
     {
       "const": "SPECIES_LYCANROC",
       "name": "Lycanroc",
+      "slug": "lycanroc",
       "sets": 2
     },
     {
       "const": "SPECIES_MABOSSTIFF",
       "name": "Mabosstiff",
+      "slug": "mabosstiff",
       "sets": 3
     },
     {
       "const": "SPECIES_MACHAMP",
       "name": "Machamp",
+      "slug": "machamp",
       "sets": 8
     },
     {
       "const": "SPECIES_MAGEARNA",
       "name": "Magearna",
+      "slug": "magearna",
       "sets": 3
     },
     {
       "const": "SPECIES_MAGMORTAR",
       "name": "Magmortar",
+      "slug": "magmortar",
       "sets": 3
     },
     {
       "const": "SPECIES_MAGMENOUS",
       "name": "Magnemous",
+      "slug": "magmenous",
       "sets": 1
     },
     {
       "const": "SPECIES_MAGNEZONE",
       "name": "Magnezone",
+      "slug": "magnezone",
       "sets": 3
     },
     {
       "const": "SPECIES_MALAMAR",
       "name": "Malamar",
+      "slug": "malamar",
       "sets": 3
     },
     {
       "const": "SPECIES_MALAMAR_MEGA",
       "name": "Malamar Mega",
+      "slug": "malamar_mega",
       "sets": 3
     },
     {
       "const": "SPECIES_MAMOSWINE",
       "name": "Mamoswine",
+      "slug": "mamoswine",
       "sets": 3
     },
     {
       "const": "SPECIES_MANAPHY",
       "name": "Manaphy",
+      "slug": "manaphy",
       "sets": 3
     },
     {
       "const": "SPECIES_MANDIBUZZ",
       "name": "Mandibuzz",
+      "slug": "mandibuzz",
       "sets": 2
     },
     {
       "const": "SPECIES_MANECTRIC",
       "name": "Manectric",
+      "slug": "manectric",
       "sets": 4
     },
     {
       "const": "SPECIES_MANTINE",
       "name": "Mantine",
+      "slug": "mantine",
       "sets": 3
     },
     {
       "const": "SPECIES_MAROWAK",
       "name": "Marowak",
+      "slug": "marowak",
       "sets": 6
     },
     {
       "const": "SPECIES_MARSHADOW",
       "name": "Marshadow",
+      "slug": "marshadow",
       "sets": 3
     },
     {
       "const": "SPECIES_MASQUERAIN",
       "name": "Masquerain",
+      "slug": "masquerain",
       "sets": 3
     },
     {
       "const": "SPECIES_MAUSHOLD",
       "name": "Maushold",
+      "slug": "maushold",
       "sets": 4
     },
     {
       "const": "SPECIES_MAWILE",
       "name": "Mawile",
+      "slug": "mawile",
       "sets": 5
     },
     {
       "const": "SPECIES_MEDICHAM",
       "name": "Medicham",
+      "slug": "medicham",
       "sets": 4
     },
     {
       "const": "SPECIES_MEGANIUM",
       "name": "Meganium",
+      "slug": "meganium",
       "sets": 4
     },
     {
       "const": "SPECIES_MELMETAL",
       "name": "Melmetal",
+      "slug": "melmetal",
       "sets": 4
     },
     {
       "const": "SPECIES_MELOETTA",
       "name": "Meloetta",
+      "slug": "meloetta",
       "sets": 6
     },
     {
       "const": "SPECIES_MEOWSCARADA",
       "name": "Meowscarada",
+      "slug": "meowscarada",
       "sets": 4
     },
     {
       "const": "SPECIES_MESPRIT",
       "name": "Mesprit",
+      "slug": "mesprit",
       "sets": 5
     },
     {
       "const": "SPECIES_METAGROSS",
       "name": "Metagross",
+      "slug": "metagross",
       "sets": 4
     },
     {
       "const": "SPECIES_MEW",
       "name": "Mew",
+      "slug": "mew",
       "sets": 1
     },
     {
       "const": "SPECIES_MEWTWO",
       "name": "Mewtwo",
+      "slug": "mewtwo",
       "sets": 4
     },
     {
       "const": "SPECIES_MIENSHAO",
       "name": "Mienshao",
+      "slug": "mienshao",
       "sets": 4
     },
     {
       "const": "SPECIES_MILOTIC",
       "name": "Milotic",
+      "slug": "milotic",
       "sets": 4
     },
     {
       "const": "SPECIES_MILTANK",
       "name": "Miltank",
+      "slug": "miltank",
       "sets": 3
     },
     {
       "const": "SPECIES_MIMIKYU",
       "name": "Mimikyu",
+      "slug": "mimikyu",
       "sets": 3
     },
     {
       "const": "SPECIES_MINIOR",
       "name": "Minior",
+      "slug": "minior",
       "sets": 3
     },
     {
       "const": "SPECIES_MINIOR_METEOR_VIOLET",
       "name": "Minior Violet",
+      "slug": "minior_meteor_violet",
       "sets": 3
     },
     {
       "const": "SPECIES_MINUN",
       "name": "Minun",
+      "slug": "minun",
       "sets": 3
     },
     {
       "const": "SPECIES_MIRAIDON",
       "name": "Miraidon",
+      "slug": "miraidon",
       "sets": 3
     },
     {
       "const": "SPECIES_MISMAGIUS",
       "name": "Mismagius",
+      "slug": "mismagius",
       "sets": 3
     },
     {
       "const": "SPECIES_MOLTRES",
       "name": "Moltres",
+      "slug": "moltres",
       "sets": 6
     },
     {
       "const": "SPECIES_MOTHIM",
       "name": "Mothim",
+      "slug": "mothim",
       "sets": 3
     },
     {
       "const": "SPECIES_MUDSDALE",
       "name": "Mudsdale",
+      "slug": "mudsdale",
       "sets": 3
     },
     {
       "const": "SPECIES_MUK",
       "name": "Muk",
+      "slug": "muk",
       "sets": 6
     },
     {
       "const": "SPECIES_MUNKIDORI",
       "name": "Munkidori",
+      "slug": "munkidori",
       "sets": 3
     },
     {
       "const": "SPECIES_MUSHARNA",
       "name": "Musharna",
+      "slug": "musharna",
       "sets": 3
     },
     {
       "const": "SPECIES_NAGANADEL",
       "name": "Naganadel",
+      "slug": "naganadel",
       "sets": 3
     },
     {
       "const": "SPECIES_NECROZMA",
       "name": "Necrozma",
+      "slug": "necrozma",
       "sets": 3
     },
     {
       "const": "SPECIES_NIDOKING",
       "name": "Nidoking",
+      "slug": "nidoking",
       "sets": 4
     },
     {
       "const": "SPECIES_NIDOQUEEN",
       "name": "Nidoqueen",
+      "slug": "nidoqueen",
       "sets": 4
     },
     {
       "const": "SPECIES_NIHILEGO",
       "name": "Nihilego",
+      "slug": "nihilego",
       "sets": 2
     },
     {
       "const": "SPECIES_NINETALES",
       "name": "Ninetales",
+      "slug": "ninetales",
       "sets": 5
     },
     {
       "const": "SPECIES_NINJASK",
       "name": "Ninjask",
+      "slug": "ninjask",
       "sets": 3
     },
     {
       "const": "SPECIES_NOIVERN",
       "name": "Noivern",
+      "slug": "noivern",
       "sets": 5
     },
     {
       "const": "SPECIES_OBSTAGOON",
       "name": "Obstagoon",
+      "slug": "obstagoon",
       "sets": 3
     },
     {
       "const": "SPECIES_OCTILLERY",
       "name": "Octillery",
+      "slug": "octillery",
       "sets": 3
     },
     {
       "const": "SPECIES_OKIDOGI",
       "name": "Okidogi",
+      "slug": "okidogi",
       "sets": 3
     },
     {
       "const": "SPECIES_OMASTAR",
       "name": "Omastar",
+      "slug": "omastar",
       "sets": 4
     },
     {
       "const": "SPECIES_ONIX",
       "name": "Onix",
+      "slug": "onix",
       "sets": 3
     },
     {
       "const": "SPECIES_ORANGURU",
       "name": "Oranguru",
+      "slug": "oranguru",
       "sets": 3
     },
     {
       "const": "SPECIES_ORBEETLE",
       "name": "Orbeetle",
+      "slug": "orbeetle",
       "sets": 4
     },
     {
       "const": "SPECIES_ORICORIO",
       "name": "Oricorio",
+      "slug": "oricorio",
       "sets": 6
     },
     {
       "const": "SPECIES_ORTHWORM",
       "name": "Orthworm",
+      "slug": "orthworm",
       "sets": 3
     },
     {
       "const": "SPECIES_OVERQWIL",
       "name": "Overqwil",
+      "slug": "overqwil",
       "sets": 3
     },
     {
       "const": "SPECIES_PACHIRISU",
       "name": "Pachirisu",
+      "slug": "pachirisu",
       "sets": 3
     },
     {
       "const": "SPECIES_PALAFIN",
       "name": "Palafin",
+      "slug": "palafin",
       "sets": 3
     },
     {
       "const": "SPECIES_PALKIA",
       "name": "Palkia",
+      "slug": "palkia",
       "sets": 4
     },
     {
       "const": "SPECIES_PANGORO",
       "name": "Pangoro",
+      "slug": "pangoro",
       "sets": 3
     },
     {
       "const": "SPECIES_PARASECT",
       "name": "Parasect",
+      "slug": "parasect",
       "sets": 3
     },
     {
       "const": "SPECIES_PASSIMIAN",
       "name": "Passimian",
+      "slug": "passimian",
       "sets": 3
     },
     {
       "const": "SPECIES_PAWMOT",
       "name": "Pawmot",
+      "slug": "pawmot",
       "sets": 3
     },
     {
       "const": "SPECIES_PECHARUNT",
       "name": "Pecharunt",
+      "slug": "pecharunt",
       "sets": 3
     },
     {
       "const": "SPECIES_PELIPPER",
       "name": "Pelipper",
+      "slug": "pelipper",
       "sets": 3
     },
     {
       "const": "SPECIES_PERRSERKER",
       "name": "Perrserker",
+      "slug": "perrserker",
       "sets": 3
     },
     {
       "const": "SPECIES_PERSIAN",
       "name": "Persian",
+      "slug": "persian",
       "sets": 5
     },
     {
       "const": "SPECIES_PHANFERNAL",
       "name": "Phanfernal",
+      "slug": "phanfernal",
       "sets": 1
     },
     {
       "const": "SPECIES_PHANTOWL",
       "name": "Phantowl",
+      "slug": "phantowl",
       "sets": 3
     },
     {
       "const": "SPECIES_PHEROMOSA",
       "name": "Pheromosa",
+      "slug": "pheromosa",
       "sets": 3
     },
     {
       "const": "SPECIES_PHIONE",
       "name": "Phione",
+      "slug": "phione",
       "sets": 3
     },
     {
       "const": "SPECIES_PIDGEOT",
       "name": "Pidgeot",
+      "slug": "pidgeot",
       "sets": 5
     },
     {
       "const": "SPECIES_PILOSWINE",
       "name": "Piloswine",
+      "slug": "piloswine",
       "sets": 1
     },
     {
       "const": "SPECIES_PINCURCHIN",
       "name": "Pincurchin",
+      "slug": "pincurchin",
       "sets": 3
     },
     {
       "const": "SPECIES_PINSIR",
       "name": "Pinsir",
+      "slug": "pinsir",
       "sets": 4
     },
     {
       "const": "SPECIES_PLUSLE",
       "name": "Plusle",
+      "slug": "plusle",
       "sets": 3
     },
     {
       "const": "SPECIES_POLARTIC",
       "name": "Polartic",
+      "slug": "polartic",
       "sets": 2
     },
     {
       "const": "SPECIES_POLITOED",
       "name": "Politoed",
+      "slug": "politoed",
       "sets": 3
     },
     {
       "const": "SPECIES_POLIWRATH",
       "name": "Poliwrath",
+      "slug": "poliwrath",
       "sets": 2
     },
     {
       "const": "SPECIES_POLTEAGEIST",
       "name": "Polteageist",
+      "slug": "polteageist",
       "sets": 3
     },
     {
       "const": "SPECIES_POPCORM",
       "name": "Popcorm",
+      "slug": "popcorm",
       "sets": 3
     },
     {
       "const": "SPECIES_PRIMARINA",
       "name": "Primarina",
+      "slug": "primarina",
       "sets": 3
     },
     {
       "const": "SPECIES_PRIMEAPE",
       "name": "Primeape",
+      "slug": "primeape",
       "sets": 2
     },
     {
       "const": "SPECIES_PROBOPASS",
       "name": "Probopass",
+      "slug": "probopass",
       "sets": 3
     },
     {
       "const": "SPECIES_PURUGLY",
       "name": "Purugly",
+      "slug": "purugly",
       "sets": 3
     },
     {
       "const": "SPECIES_PYROAR",
       "name": "Pyroar",
+      "slug": "pyroar",
       "sets": 3
     },
     {
       "const": "SPECIES_PYUKUMUKU",
       "name": "Pyukumuku",
+      "slug": "pyukumuku",
       "sets": 2
     },
     {
       "const": "SPECIES_QUAGSIRE",
       "name": "Quagsire",
+      "slug": "quagsire",
       "sets": 4
     },
     {
       "const": "SPECIES_QUAQUAVAL",
       "name": "Quaquaval",
+      "slug": "quaquaval",
       "sets": 4
     },
     {
       "const": "SPECIES_RABSCA",
       "name": "Rabsca",
+      "slug": "rabsca",
       "sets": 3
     },
     {
       "const": "SPECIES_RAGING_BOLT",
       "name": "Raging Bolt",
+      "slug": "raging_bolt",
       "sets": 3
     },
     {
       "const": "SPECIES_RAICHU",
       "name": "Raichu",
+      "slug": "raichu",
       "sets": 6
     },
     {
       "const": "SPECIES_RAIKOU",
       "name": "Raikou",
+      "slug": "raikou",
       "sets": 3
     },
     {
       "const": "SPECIES_RAMPARDOS",
       "name": "Rampardos",
+      "slug": "rampardos",
       "sets": 3
     },
     {
       "const": "SPECIES_RAPIDASH",
       "name": "Rapidash",
+      "slug": "rapidash",
       "sets": 7
     },
     {
       "const": "SPECIES_RATICATE",
       "name": "Raticate",
+      "slug": "raticate",
       "sets": 2
     },
     {
       "const": "SPECIES_RAYQUAZA",
       "name": "Rayquaza",
+      "slug": "rayquaza",
       "sets": 4
     },
     {
       "const": "SPECIES_REGIDRAGO",
       "name": "Regidrago",
+      "slug": "regidrago",
       "sets": 3
     },
     {
       "const": "SPECIES_REGIELEKI",
       "name": "Regieleki",
+      "slug": "regieleki",
       "sets": 3
     },
     {
       "const": "SPECIES_REGIGIGAS",
       "name": "Regigigas",
+      "slug": "regigigas",
       "sets": 3
     },
     {
       "const": "SPECIES_REGIROCK",
       "name": "Regirock",
+      "slug": "regirock",
       "sets": 3
     },
     {
       "const": "SPECIES_RELICANTH",
       "name": "Relicanth",
+      "slug": "relicanth",
       "sets": 4
     },
     {
       "const": "SPECIES_RESHIRAM",
       "name": "Reshiram",
+      "slug": "reshiram",
       "sets": 3
     },
     {
       "const": "SPECIES_REUNICLUS",
       "name": "Reuniclus",
+      "slug": "reuniclus",
       "sets": 7
     },
     {
       "const": "SPECIES_REVAVROOM",
       "name": "Revavroom",
+      "slug": "revavroom",
       "sets": 2
     },
     {
       "const": "SPECIES_RHYDON",
       "name": "Rhydon",
+      "slug": "rhydon",
       "sets": 1
     },
     {
       "const": "SPECIES_RHYPERIOR",
       "name": "Rhyperior",
+      "slug": "rhyperior",
       "sets": 3
     },
     {
       "const": "SPECIES_RIBOMBEE",
       "name": "Ribombee",
+      "slug": "ribombee",
       "sets": 4
     },
     {
       "const": "SPECIES_RILLABOOM",
       "name": "Rillaboom",
+      "slug": "rillaboom",
       "sets": 4
     },
     {
       "const": "SPECIES_ROARING_MOON",
       "name": "Roaring Moon",
+      "slug": "roaring_moon",
       "sets": 3
     },
     {
       "const": "SPECIES_ROSERADE",
       "name": "Roserade",
+      "slug": "roserade",
       "sets": 3
     },
     {
       "const": "SPECIES_ROTOM",
       "name": "Rotom",
+      "slug": "rotom",
       "sets": 16
     },
     {
       "const": "SPECIES_RUNERIGUS",
       "name": "Runerigus",
+      "slug": "runerigus",
       "sets": 2
     },
     {
       "const": "SPECIES_SABLEYE",
       "name": "Sableye",
+      "slug": "sableye",
       "sets": 8
     },
     {
       "const": "SPECIES_SAGARACAS",
       "name": "Sagaracas",
+      "slug": "sagaracas",
       "sets": 3
     },
     {
       "const": "SPECIES_SALAMENCE",
       "name": "Salamence",
+      "slug": "salamence",
       "sets": 1
     },
     {
       "const": "SPECIES_SALAZARUS",
       "name": "Salazarus",
+      "slug": "salazarus",
       "sets": 3
     },
     {
       "const": "SPECIES_SALAZZLE",
       "name": "Salazzle",
+      "slug": "salazzle",
       "sets": 3
     },
     {
       "const": "SPECIES_SAMUROTT",
       "name": "Samurott",
+      "slug": "samurott",
       "sets": 3
     },
     {
       "const": "SPECIES_SANDACONDA",
       "name": "Sandaconda",
+      "slug": "sandaconda",
       "sets": 4
     },
     {
       "const": "SPECIES_SANDSLASH",
       "name": "Sandslash",
+      "slug": "sandslash",
       "sets": 8
     },
     {
       "const": "SPECIES_SANDY_SHOCKS",
       "name": "Sandy Shocks",
+      "slug": "sandy_shocks",
       "sets": 3
     },
     {
       "const": "SPECIES_SAWK",
       "name": "Sawk",
+      "slug": "sawk",
       "sets": 3
     },
     {
       "const": "SPECIES_SAWSBUCK",
       "name": "Sawsbuck",
+      "slug": "sawsbuck",
       "sets": 3
     },
     {
       "const": "SPECIES_SCEPTILE",
       "name": "Sceptile",
+      "slug": "sceptile",
       "sets": 4
     },
     {
       "const": "SPECIES_SCIZOR",
       "name": "Scizor",
+      "slug": "scizor",
       "sets": 3
     },
     {
       "const": "SPECIES_SCOLIPEDE",
       "name": "Scolipede",
+      "slug": "scolipede",
       "sets": 4
     },
     {
       "const": "SPECIES_SCOVILLAIN",
       "name": "Scovillain",
+      "slug": "scovillain",
       "sets": 4
     },
     {
       "const": "SPECIES_SCRAFSTER",
       "name": "Scrafster",
+      "slug": "scrafster",
       "sets": 3
     },
     {
       "const": "SPECIES_SCRAFTY",
       "name": "Scrafty",
+      "slug": "scrafty",
       "sets": 2
     },
     {
       "const": "SPECIES_SCREAM_TAIL",
       "name": "Scream Tail",
+      "slug": "scream_tail",
       "sets": 2
     },
     {
       "const": "SPECIES_SCYTHER",
       "name": "Scyther",
+      "slug": "scyther",
       "sets": 3
     },
     {
       "const": "SPECIES_SEISMITOAD",
       "name": "Seismitoad",
+      "slug": "seismitoad",
       "sets": 3
     },
     {
       "const": "SPECIES_SERPERIOR",
       "name": "Serperior",
+      "slug": "serperior",
       "sets": 2
     },
     {
       "const": "SPECIES_SEVIPER",
       "name": "Seviper",
+      "slug": "seviper",
       "sets": 3
     },
     {
       "const": "SPECIES_SHARPEDO",
       "name": "Sharpedo",
+      "slug": "sharpedo",
       "sets": 1
     },
     {
       "const": "SPECIES_SHAYMIN",
       "name": "Shaymin",
+      "slug": "shaymin",
       "sets": 6
     },
     {
       "const": "SPECIES_SHEDINJA",
       "name": "Shedinja",
+      "slug": "shedinja",
       "sets": 3
     },
     {
       "const": "SPECIES_SHIFTRY",
       "name": "Shiftry",
+      "slug": "shiftry",
       "sets": 3
     },
     {
       "const": "SPECIES_SHIINOTIC",
       "name": "Shiinotic",
+      "slug": "shiinotic",
       "sets": 2
     },
     {
       "const": "SPECIES_SHUCKLE",
       "name": "Shuckle",
+      "slug": "shuckle",
       "sets": 3
     },
     {
       "const": "SPECIES_SIGILYPH",
       "name": "Sigilyph",
+      "slug": "sigilyph",
       "sets": 3
     },
     {
       "const": "SPECIES_SIMIPOUR",
       "name": "Simipour",
+      "slug": "simipour",
       "sets": 6
     },
     {
       "const": "SPECIES_SIMISAGE",
       "name": "Simisage",
+      "slug": "simisage",
       "sets": 6
     },
     {
       "const": "SPECIES_SIMISEAR",
       "name": "Simisear",
+      "slug": "simisear",
       "sets": 5
     },
     {
       "const": "SPECIES_SINISTCHA",
       "name": "Sinistcha",
+      "slug": "sinistcha",
       "sets": 2
     },
     {
       "const": "SPECIES_SIRFETCHD",
       "name": "Sirfetch’d",
+      "slug": "sirfetchd",
       "sets": 3
     },
     {
       "const": "SPECIES_SKARMORY",
       "name": "Skarmory",
+      "slug": "skarmory",
       "sets": 9
     },
     {
       "const": "SPECIES_SKELEDIRGE",
       "name": "Skeledirge",
+      "slug": "skeledirge",
       "sets": 4
     },
     {
       "const": "SPECIES_SKULBERUS",
       "name": "Skulberus",
+      "slug": "skulberus",
       "sets": 3
     },
     {
       "const": "SPECIES_SKUNTANK",
       "name": "Skuntank",
+      "slug": "skuntank",
       "sets": 2
     },
     {
       "const": "SPECIES_SLAKING",
       "name": "Slaking",
+      "slug": "slaking",
       "sets": 4
     },
     {
       "const": "SPECIES_SLOWBRO",
       "name": "Slowbro",
+      "slug": "slowbro",
       "sets": 8
     },
     {
       "const": "SPECIES_SLOWKING",
       "name": "Slowking",
+      "slug": "slowking",
       "sets": 7
     },
     {
       "const": "SPECIES_SLYDUCK",
       "name": "Slyduck",
+      "slug": "slyduck",
       "sets": 1
     },
     {
       "const": "SPECIES_SMEARGLE",
       "name": "Smeargle",
+      "slug": "smeargle",
       "sets": 4
     },
     {
       "const": "SPECIES_SNEASLER",
       "name": "Sneasler",
+      "slug": "sneasler",
       "sets": 3
     },
     {
       "const": "SPECIES_SNOM",
       "name": "Snom",
+      "slug": "snom",
       "sets": 1
     },
     {
       "const": "SPECIES_SNORLAX",
       "name": "Snorlax",
+      "slug": "snorlax",
       "sets": 3
     },
     {
       "const": "SPECIES_SOLGALEO",
       "name": "Solgaleo",
+      "slug": "solgaleo",
       "sets": 3
     },
     {
       "const": "SPECIES_SOLROCK",
       "name": "Solrock",
+      "slug": "solrock",
       "sets": 3
     },
     {
       "const": "SPECIES_SOPRANICE",
       "name": "Sopranice",
+      "slug": "sopranice",
       "sets": 3
     },
     {
       "const": "SPECIES_SPECTRIER",
       "name": "Spectrier",
+      "slug": "spectrier",
       "sets": 3
     },
     {
       "const": "SPECIES_SPIDOPS",
       "name": "Spidops",
+      "slug": "spidops",
       "sets": 3
     },
     {
       "const": "SPECIES_SPIRITOMB",
       "name": "Spiritomb",
+      "slug": "spiritomb",
       "sets": 6
     },
     {
       "const": "SPECIES_SQUAWKABILLY",
       "name": "Squawkabilly",
+      "slug": "squawkabilly",
       "sets": 3
     },
     {
       "const": "SPECIES_STAKATAKA",
       "name": "Stakataka",
+      "slug": "stakataka",
       "sets": 3
     },
     {
       "const": "SPECIES_STANTLER",
       "name": "Stantler",
+      "slug": "stantler",
       "sets": 1
     },
     {
       "const": "SPECIES_STARAPTOR",
       "name": "Staraptor",
+      "slug": "staraptor",
       "sets": 3
     },
     {
       "const": "SPECIES_STARMIE",
       "name": "Starmie",
+      "slug": "starmie",
       "sets": 4
     },
     {
       "const": "SPECIES_STEELIX",
       "name": "Steelix",
+      "slug": "steelix",
       "sets": 4
     },
     {
       "const": "SPECIES_STONJOURNER",
       "name": "Stonjourner",
+      "slug": "stonjourner",
       "sets": 3
     },
     {
       "const": "SPECIES_STOUTLAND",
       "name": "Stoutland",
+      "slug": "stoutland",
       "sets": 3
     },
     {
       "const": "SPECIES_STUNFISK",
       "name": "Stunfisk",
+      "slug": "stunfisk",
       "sets": 6
     },
     {
       "const": "SPECIES_STUNKY",
       "name": "Stunky",
+      "slug": "stunky",
       "sets": 2
     },
     {
       "const": "SPECIES_SUICUNE",
       "name": "Suicune",
+      "slug": "suicune",
       "sets": 3
     },
     {
       "const": "SPECIES_SUNFLORA",
       "name": "Sunflora",
+      "slug": "sunflora",
       "sets": 3
     },
     {
       "const": "SPECIES_SWADLOON",
       "name": "Swadloon",
+      "slug": "swadloon",
       "sets": 3
     },
     {
       "const": "SPECIES_SWALOT",
       "name": "Swalot",
+      "slug": "swalot",
       "sets": 3
     },
     {
       "const": "SPECIES_SWAMPERT",
       "name": "Swampert",
+      "slug": "swampert",
       "sets": 4
     },
     {
       "const": "SPECIES_SWANNA",
       "name": "Swanna",
+      "slug": "swanna",
       "sets": 3
     },
     {
       "const": "SPECIES_SWELLOW",
       "name": "Swellow",
+      "slug": "swellow",
       "sets": 3
     },
     {
       "const": "SPECIES_SWOOBAT",
       "name": "Swoobat",
+      "slug": "swoobat",
       "sets": 2
     },
     {
       "const": "SPECIES_TALONFLAME",
       "name": "Talonflame",
+      "slug": "talonflame",
       "sets": 2
     },
     {
       "const": "SPECIES_TANGROWTH",
       "name": "Tangrowth",
+      "slug": "tangrowth",
       "sets": 3
     },
     {
       "const": "SPECIES_TAPU_BULU",
       "name": "Tapu Bulu",
+      "slug": "tapu_bulu",
       "sets": 3
     },
     {
       "const": "SPECIES_TAPU_FINI",
       "name": "Tapu Fini",
+      "slug": "tapu_fini",
       "sets": 3
     },
     {
       "const": "SPECIES_TAPU_KOKO",
       "name": "Tapu Koko",
+      "slug": "tapu_koko",
       "sets": 2
     },
     {
       "const": "SPECIES_TAPU_LELE",
       "name": "Tapu Lele",
+      "slug": "tapu_lele",
       "sets": 3
     },
     {
       "const": "SPECIES_TATSUGIRI",
       "name": "Tatsugiri",
+      "slug": "tatsugiri",
       "sets": 4
     },
     {
       "const": "SPECIES_TAUROS",
       "name": "Tauros",
+      "slug": "tauros",
       "sets": 3
     },
     {
       "const": "SPECIES_TERAPAGOS",
       "name": "Terapagos",
+      "slug": "terapagos",
       "sets": 4
     },
     {
       "const": "SPECIES_TERRAKION",
       "name": "Terrakion",
+      "slug": "terrakion",
       "sets": 3
     },
     {
       "const": "SPECIES_THIEVUL",
       "name": "Thievul",
+      "slug": "thievul",
       "sets": 2
     },
     {
       "const": "SPECIES_THROH",
       "name": "Throh",
+      "slug": "throh",
       "sets": 3
     },
     {
       "const": "SPECIES_THUNDURUS",
       "name": "Thundurus",
+      "slug": "thundurus",
       "sets": 5
     },
     {
       "const": "SPECIES_TING_LU",
       "name": "Ting-Lu",
+      "slug": "ting_lu",
       "sets": 3
     },
     {
       "const": "SPECIES_TINKATON",
       "name": "Tinkaton",
+      "slug": "tinkaton",
       "sets": 5
     },
     {
       "const": "SPECIES_TOEDSCRUEL",
       "name": "Toedscruel",
+      "slug": "toedscruel",
       "sets": 2
     },
     {
       "const": "SPECIES_TOGEDEMARU",
       "name": "Togedemaru",
+      "slug": "togedemaru",
       "sets": 3
     },
     {
       "const": "SPECIES_TOGEKISS",
       "name": "Togekiss",
+      "slug": "togekiss",
       "sets": 3
     },
     {
       "const": "SPECIES_TOGETIC",
       "name": "Togetic",
+      "slug": "togetic",
       "sets": 2
     },
     {
       "const": "SPECIES_TORKOAL",
       "name": "Torkoal",
+      "slug": "torkoal",
       "sets": 2
     },
     {
       "const": "SPECIES_TORNADUS",
       "name": "Tornadus",
+      "slug": "tornadus",
       "sets": 6
     },
     {
       "const": "SPECIES_TORTEMPLE",
       "name": "Tortemple",
+      "slug": "tortemple",
       "sets": 1
     },
     {
       "const": "SPECIES_TORTERRA",
       "name": "Torterra",
+      "slug": "torterra",
       "sets": 8
     },
     {
       "const": "SPECIES_TOUCANNON",
       "name": "Toucannon",
+      "slug": "toucannon",
       "sets": 2
     },
     {
       "const": "SPECIES_TOXAPEX",
       "name": "Toxapex",
+      "slug": "toxapex",
       "sets": 3
     },
     {
       "const": "SPECIES_TOXICROAK",
       "name": "Toxicroak",
+      "slug": "toxicroak",
       "sets": 3
     },
     {
       "const": "SPECIES_TSAREENA",
       "name": "Tsareena",
+      "slug": "tsareena",
       "sets": 6
     },
     {
       "const": "SPECIES_TURTONATOR",
       "name": "Turtonator",
+      "slug": "turtonator",
       "sets": 2
     },
     {
       "const": "SPECIES_TYRANITAR",
       "name": "Tyranitar",
+      "slug": "tyranitar",
       "sets": 6
     },
     {
       "const": "SPECIES_TYRANTRUM",
       "name": "Tyrantrum",
+      "slug": "tyrantrum",
       "sets": 3
     },
     {
       "const": "SPECIES_UNFEZANT",
       "name": "Unfezant",
+      "slug": "unfezant",
       "sets": 3
     },
     {
       "const": "SPECIES_URSALUNA",
       "name": "Ursaluna",
+      "slug": "ursaluna",
       "sets": 3
     },
     {
       "const": "SPECIES_URSARING",
       "name": "Ursaring",
+      "slug": "ursaring",
       "sets": 2
     },
     {
       "const": "SPECIES_UXIE",
       "name": "Uxie",
+      "slug": "uxie",
       "sets": 6
     },
     {
       "const": "SPECIES_VANILLUXE",
       "name": "Vanilluxe",
+      "slug": "vanilluxe",
       "sets": 3
     },
     {
       "const": "SPECIES_VELOZEL",
       "name": "Velozel",
+      "slug": "velozel",
       "sets": 3
     },
     {
       "const": "SPECIES_VELUZA",
       "name": "Veluza",
+      "slug": "veluza",
       "sets": 1
     },
     {
       "const": "SPECIES_VENOMOTH",
       "name": "Venomoth",
+      "slug": "venomoth",
       "sets": 2
     },
     {
       "const": "SPECIES_VENUSAUR",
       "name": "Venusaur",
+      "slug": "venusaur",
       "sets": 5
     },
     {
       "const": "SPECIES_VESPIQUEN",
       "name": "Vespiquen",
+      "slug": "vespiquen",
       "sets": 3
     },
     {
       "const": "SPECIES_VICTINI",
       "name": "Victini",
+      "slug": "victini",
       "sets": 3
     },
     {
       "const": "SPECIES_VICTREEBEL",
       "name": "Victreebel",
+      "slug": "victreebel",
       "sets": 4
     },
     {
       "const": "SPECIES_VIKAVOLT",
       "name": "Vikavolt",
+      "slug": "vikavolt",
       "sets": 3
     },
     {
       "const": "SPECIES_VILEPLUME",
       "name": "Vileplume",
+      "slug": "vileplume",
       "sets": 2
     },
     {
       "const": "SPECIES_VIRIZION",
       "name": "Virizion",
+      "slug": "virizion",
       "sets": 3
     },
     {
       "const": "SPECIES_VIVILLON",
       "name": "Vivillon",
+      "slug": "vivillon",
       "sets": 3
     },
     {
       "const": "SPECIES_VOLBEAT",
       "name": "Volbeat",
+      "slug": "volbeat",
       "sets": 3
     },
     {
       "const": "SPECIES_VOLCANION",
       "name": "Volcanion",
+      "slug": "volcanion",
       "sets": 3
     },
     {
       "const": "SPECIES_WAILORD",
       "name": "Wailord",
+      "slug": "wailord",
       "sets": 2
     },
     {
       "const": "SPECIES_WALKING_WAKE",
       "name": "Walking Wake",
+      "slug": "walking_wake",
       "sets": 3
     },
     {
       "const": "SPECIES_WALREIN",
       "name": "Walrein",
+      "slug": "walrein",
       "sets": 3
     },
     {
       "const": "SPECIES_WEAVILE",
       "name": "Weavile",
+      "slug": "weavile",
       "sets": 3
     },
     {
       "const": "SPECIES_WEEZING",
       "name": "Weezing",
+      "slug": "weezing",
       "sets": 6
     },
     {
       "const": "SPECIES_WHIMSICOTT",
       "name": "Whimsicott",
+      "slug": "whimsicott",
       "sets": 3
     },
     {
       "const": "SPECIES_WHISCASH",
       "name": "Whiscash",
+      "slug": "whiscash",
       "sets": 3
     },
     {
       "const": "SPECIES_WIGGLYTUFF",
       "name": "Wigglytuff",
+      "slug": "wigglytuff",
       "sets": 4
     },
     {
       "const": "SPECIES_WISHIWASHI",
       "name": "Wishiwashi",
+      "slug": "wishiwashi",
       "sets": 2
     },
     {
       "const": "SPECIES_WISPYWASPY",
       "name": "Wispywaspy",
+      "slug": "wispywaspy",
       "sets": 3
     },
     {
       "const": "SPECIES_WO_CHIEN",
       "name": "Wo-Chien",
+      "slug": "wo_chien",
       "sets": 2
     },
     {
       "const": "SPECIES_WOBBUFFET",
       "name": "Wobbuffet",
+      "slug": "wobbuffet",
       "sets": 3
     },
     {
       "const": "SPECIES_WOOLY_WORM",
       "name": "Wooly Worm",
+      "slug": "wooly_worm",
       "sets": 3
     },
     {
       "const": "SPECIES_WORMADAM",
       "name": "Wormadam",
+      "slug": "wormadam",
       "sets": 6
     },
     {
       "const": "SPECIES_WUGTRIO",
       "name": "Wugtrio",
+      "slug": "wugtrio",
       "sets": 1
     },
     {
       "const": "SPECIES_WYNAUT",
       "name": "Wynaut",
+      "slug": "wynaut",
       "sets": 1
     },
     {
       "const": "SPECIES_WYRDEER",
       "name": "Wyrdeer",
+      "slug": "wyrdeer",
       "sets": 3
     },
     {
       "const": "SPECIES_XATU",
       "name": "Xatu",
+      "slug": "xatu",
       "sets": 3
     },
     {
       "const": "SPECIES_XERNEAS",
       "name": "Xerneas",
+      "slug": "xerneas",
       "sets": 3
     },
     {
       "const": "SPECIES_XURKITREE",
       "name": "Xurkitree",
+      "slug": "xurkitree",
       "sets": 3
     },
     {
       "const": "SPECIES_YANMEGA",
       "name": "Yanmega",
+      "slug": "yanmega",
       "sets": 3
     },
     {
       "const": "SPECIES_YVELTAL",
       "name": "Yveltal",
+      "slug": "yveltal",
       "sets": 4
     },
     {
       "const": "SPECIES_ZACIAN",
       "name": "Zacian",
+      "slug": "zacian",
       "sets": 4
     },
     {
       "const": "SPECIES_ZAMAZENTA",
       "name": "Zamazenta",
+      "slug": "zamazenta",
       "sets": 4
     },
     {
       "const": "SPECIES_ZANGOOSE",
       "name": "Zangoose",
+      "slug": "zangoose",
       "sets": 2
     },
     {
       "const": "SPECIES_ZAPDOS",
       "name": "Zapdos",
+      "slug": "zapdos",
       "sets": 6
     },
     {
       "const": "SPECIES_ZARUDE",
       "name": "Zarude",
+      "slug": "zarude",
       "sets": 2
     },
     {
       "const": "SPECIES_ZEBSTRIKA",
       "name": "Zebstrika",
+      "slug": "zebstrika",
       "sets": 3
     },
     {
       "const": "SPECIES_ZEKROM",
       "name": "Zekrom",
+      "slug": "zekrom",
       "sets": 2
     },
     {
       "const": "SPECIES_ZERAORA",
       "name": "Zeraora",
+      "slug": "zeraora",
       "sets": 3
     },
     {
       "const": "SPECIES_ZOROARK",
       "name": "Zoroark",
+      "slug": "zoroark",
       "sets": 3
     },
     {
       "const": "SPECIES_ZYGARDE",
       "name": "Zygarde",
+      "slug": "zygarde",
       "sets": 3
     }
   ]

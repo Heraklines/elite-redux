@@ -319,48 +319,75 @@ function renderItems(root) {
 }
 
 // ---- Trainers tab ---------------------------------------------------------------
+let factoryFilter = "all"; // all | excluded
+
+// One knob cell: the input always shows the EFFECTIVE value (default prefilled).
+// Typing a different number creates an override ("overridden" badge + a reset
+// button); typing the default back (or clicking reset) removes the override.
+function knobCell(diff, knob, help) {
+  const cur = tr.current.freq[diff];
+  const def = TRAINER_DEFAULTS[diff]?.[knob];
+  const overridden = cur[knob] !== "";
+  const shown = overridden ? cur[knob] : def;
+  const min = knob === "trainerCadence" ? 1 : 0;
+  const max = knob === "trainerCadence" ? 50 : 100;
+  return `<td><div class="knob-cell">
+    <input type="number" class="tr-knob" data-diff="${diff}" data-knob="${knob}" min="${min}" max="${max}" step="1"
+      value="${esc(shown)}" title="${help} Default: ${def}." />
+    ${
+      overridden
+        ? `<span class="badge override">overridden</span><button type="button" class="tr-reset" data-diff="${diff}" data-knob="${knob}" title="Back to the default (${def})">↺ ${def}</button>`
+        : '<span class="badge" title="Using the game default">default</span>'
+    }
+  </div></td>`;
+}
+
 function renderTrainers(root) {
   const f = ($("#search").value || "").trim().toLowerCase();
   const cur = tr.current;
-  const knobRow = diff => {
-    const d = TRAINER_DEFAULTS[diff] || {};
-    const k = cur.freq[diff];
-    return `<div class="knob-row">
-      <span class="diff">${diff}</span>
-      <label>Trainer every Nth wave
-        <input type="number" class="tr-knob" data-diff="${diff}" data-knob="trainerCadence" min="1" max="50" step="1"
-          value="${esc(k.trainerCadence)}" placeholder="${d.trainerCadence ?? ""}" title="Force a regular trainer battle every Nth eligible wave. Empty = default (${d.trainerCadence})." />
-      </label>
-      <label>Factory team %
-        <input type="number" class="tr-knob" data-diff="${diff}" data-knob="factoryTeamPct" min="0" max="100" step="1"
-          value="${esc(k.factoryTeamPct)}" placeholder="${d.factoryTeamPct ?? ""}" title="% of eligible trainer waves that field a Battle-Factory team. Empty = default (${d.factoryTeamPct})." />
-      </label>
-    </div>`;
-  };
   const excluded = new Set(cur.excluded);
-  const visible = FACTORY_SPECIES.filter(
+  let visible = FACTORY_SPECIES.filter(
     s => !f || s.name.toLowerCase().includes(f) || s.const.toLowerCase().includes(f),
   );
+  if (factoryFilter === "excluded") {
+    visible = visible.filter(s => excluded.has(s.const));
+  }
   root.innerHTML = `
     <div class="section">
-      <h2>Battle frequency</h2>
-      <p class="hint">Per-difficulty knobs. Leave a box empty to keep the game default (shown greyed). Ace stays pure PokeRogue and has no knobs.</p>
-      ${knobRow("elite")}
-      ${knobRow("hell")}
+      <h2>Battle frequency <small style="font-weight:400;color:var(--muted)">(Elite and Hell only)</small></h2>
+      <p class="hint">The number in each box is what the game uses. Type a new number to change it; the ↺ button puts it back to the default. Ace and Youngster always play normal PokeRogue pacing.</p>
+      <table class="knob-table">
+        <thead><tr>
+          <th></th>
+          <th>Trainer battle every … waves <span class="qm" title="Forces a regular trainer battle every Nth eligible wave. LOWER number = MORE trainer fights. Boss, rival and scripted waves are never affected.">?</span></th>
+          <th>Battle Factory team chance % <span class="qm" title="Chance that an eligible trainer wave fields a competitive Battle Factory team instead of its normal roster.">?</span></th>
+        </tr></thead>
+        <tbody>
+          <tr><th>Elite</th>${knobCell("elite", "trainerCadence", "Forces a trainer battle every Nth eligible wave on Elite. Lower = more fights.")}${knobCell("elite", "factoryTeamPct", "Chance an eligible Elite trainer wave uses a Battle Factory team.")}</tr>
+          <tr><th>Hell</th>${knobCell("hell", "trainerCadence", "Forces a trainer battle every Nth eligible wave on Hell. Lower = more fights.")}${knobCell("hell", "factoryTeamPct", "Chance an eligible Hell trainer wave uses a Battle Factory team.")}</tr>
+        </tbody>
+      </table>
     </div>
     <div class="section" style="margin-bottom:0">
-      <h2>Battle Factory set membership</h2>
-      <p class="hint">Unticked species have ALL their factory sets removed from the Elite/Hell factory-team pool. (${cur.excluded.length} currently excluded)</p>
+      <h2>Battle Factory species</h2>
+      <p class="hint">Click a card to toggle it. <b style="color:var(--ok)">✓ IN POOL</b> = its sets can appear on factory teams. <b style="color:#e0556a">✗ EXCLUDED</b> = all its sets are removed from the pool. Use the search box above to find a species.</p>
+      <div class="chips">
+        <button type="button" class="chip${factoryFilter === "all" ? " on" : ""}" data-facfilter="all">All (${FACTORY_SPECIES.length})</button>
+        <button type="button" class="chip${factoryFilter === "excluded" ? " on" : ""}" data-facfilter="excluded">Excluded (${cur.excluded.length})</button>
+      </div>
     </div>
     <div class="factory-list">${visible
       .map(s => {
-        const dirty = excluded.has(s.const) !== tr.baseline.excluded.includes(s.const);
-        return `<label class="factory-item${dirty ? " dirty" : ""}">
-          <input type="checkbox" class="tr-fac" data-const="${s.const}"${excluded.has(s.const) ? "" : " checked"} />
-          ${esc(s.name)} <small>${s.sets} set${s.sets === 1 ? "" : "s"}</small>
-        </label>`;
+        const out = excluded.has(s.const);
+        const dirty = out !== tr.baseline.excluded.includes(s.const);
+        const sprite = s.slug ? `${SPRITE_BASE}/${s.slug}/front.png` : "";
+        return `<button type="button" class="factory-item${dirty ? " dirty" : ""}${out ? " out" : ""}" data-facconst="${s.const}" title="Click to ${out ? "put back into" : "remove from"} the factory pool">
+          <img src="${sprite}" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />
+          <span class="fname">${esc(s.name)}<small>${s.sets} set${s.sets === 1 ? "" : "s"}</small></span>
+          <span class="state">${out ? "✗ EXCLUDED" : "✓ IN POOL"}</span>
+        </button>`;
       })
-      .join("")}</div>${visible.length === 0 ? '<div class="empty">No species match your search.</div>' : ""}`;
+      .join("")}</div>${visible.length === 0 ? '<div class="empty">No species match your search/filter.</div>' : ""}`;
 }
 
 // ---- Render dispatch --------------------------------------------------------------
@@ -422,25 +449,45 @@ function onInput(e) {
     item.current[k] = cur;
     el.closest(".card").classList.toggle("dirty", !jsonEq(item.current[k], item.baseline[k]));
   } else if (el.classList.contains("tr-knob")) {
+    // The box shows the EFFECTIVE value; typing the default back removes the override.
+    const def = TRAINER_DEFAULTS[el.dataset.diff]?.[el.dataset.knob];
     const v = el.value === "" ? "" : Number(el.value);
-    tr.current.freq[el.dataset.diff][el.dataset.knob] = v;
+    tr.current.freq[el.dataset.diff][el.dataset.knob] = v === def ? "" : v;
     const max = el.dataset.knob === "trainerCadence" ? 50 : 100;
     const min = el.dataset.knob === "trainerCadence" ? 1 : 0;
     el.style.borderColor = v === "" || (v >= min && v <= max) ? "" : ERR;
-  } else if (el.classList.contains("tr-fac")) {
-    const c = el.dataset.const;
+  } else {
+    return;
+  }
+  refreshChrome();
+}
+
+// Click targets on the Trainers tab (toggle cards, knob resets, filter chips).
+function onClick(e) {
+  const fac = e.target.closest(".factory-item");
+  if (fac) {
+    const c = fac.dataset.facconst;
     const set = new Set(tr.current.excluded);
-    if (el.checked) {
+    if (set.has(c)) {
       set.delete(c);
     } else {
       set.add(c);
     }
     tr.current.excluded = [...set].sort();
-    el.closest(".factory-item").classList.toggle("dirty", el.checked === tr.baseline.excluded.includes(c));
-  } else {
+    render();
     return;
   }
-  refreshChrome();
+  const reset = e.target.closest(".tr-reset");
+  if (reset) {
+    tr.current.freq[reset.dataset.diff][reset.dataset.knob] = "";
+    render();
+    return;
+  }
+  const chip = e.target.closest(".chip");
+  if (chip) {
+    factoryFilter = chip.dataset.facfilter;
+    render();
+  }
 }
 
 // ---- Delta building -----------------------------------------------------------------
@@ -769,10 +816,14 @@ async function init() {
 
     const content = $("#content");
     content.addEventListener("input", onInput);
-    // `change` fires once per completed edit (blur / pick from list) → one undo step.
+    content.addEventListener("click", onClick);
+    // `change` fires once per completed edit (blur / pick from list) → one undo step,
+    // and on the Trainers tab it refreshes the default/overridden badges.
     content.addEventListener("change", e => {
       if (e.target.classList.contains("slot")) {
         pushUndoIfChanged(e.target.dataset.const);
+      } else if (e.target.classList.contains("tr-knob")) {
+        render();
       }
     });
     $("#search").addEventListener("input", render);

@@ -164,7 +164,7 @@ describe("tools — dump editor SPA data", () => {
       setCountByDraftId.set(draftId, (setCountByDraftId.get(draftId) ?? 0) + 1);
     }
     const draftById = new Map(ER_SPECIES.map(d => [d.id, d]));
-    const factorySpecies: { const: string; name: string; sets: number }[] = [];
+    const factorySpecies: { const: string; name: string; slug: string | null; sets: number }[] = [];
     for (const [draftId, sets] of setCountByDraftId) {
       const draft = draftById.get(draftId);
       const pkrgId = ER_ID_MAP.species[draftId];
@@ -174,6 +174,7 @@ describe("tools — dump editor SPA data", () => {
       factorySpecies.push({
         const: draft.speciesConst,
         name: getPokemonSpecies(pkrgId)?.name ?? draft.name,
+        slug: slugByConst.get(draft.speciesConst) ?? null,
         sets,
       });
     }
