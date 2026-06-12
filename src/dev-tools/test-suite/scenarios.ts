@@ -1253,8 +1253,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "EXPECT: ~10% per hit the Snorlax gets POISONED (Rusty Claw) or BLEEDS\n"
       + "(Spiked Knuckles, red badge). The enemy's Copper Rod can PARALYZE YOUR\n"
       + "Scizor when you make contact (defensive proc). SWIFT (non-contact)\n"
-      + "never procs any of them. ALSO (#437): the Copper Rod icon over the\n"
-      + "enemy is now a copper rod with sparks, not a copper-tinted Quick Claw.",
+      + "never procs any of them. ALSO (#437): win and check the SHOP - the\n"
+      + "guaranteed Copper Rod offer must show the COPPER-tinted claw icon\n"
+      + "(it used to render untinted, like a plain Quick Claw).",
+    shopItems: [modifierTypes.ER_COPPER_ROD],
     setup: () => {
       resetDevOverrides();
       setOverrides({

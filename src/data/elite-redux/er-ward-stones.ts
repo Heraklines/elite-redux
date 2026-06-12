@@ -213,6 +213,10 @@ export function erWardStoneModifierType(tier: ErWardStoneTier): PokemonHeldItemM
   // ER items live outside the i18n catalogue — pin the live strings (same
   // pattern as the resist berries / recreated items).
   Object.defineProperty(mt, "name", { get: () => cfg.name, configurable: true });
+  // Carry the tier reskin on the type so the SHOP shows the recolored stone
+  // too (#437) - without it all three tiers rendered as plain Absolite there.
+  mt.iconTint = cfg.tint;
+  mt.iconAlpha = cfg.alpha;
   mt.getDescription = () =>
     `Instantly blocks status, flinches and confusion before they land — 1 charge per block. `
     + (tier === "greater"

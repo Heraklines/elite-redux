@@ -806,6 +806,17 @@ class ModifierOption extends Phaser.GameObjects.Container {
 
     const getItem = () => {
       const item = globalScene.add.sprite(0, 0, "items", this.modifierTypeOption.type?.iconImage);
+      // ER reskinned items (#437): Ward Stones / community items carry their
+      // recolor on the ModifierType - without applying it here the shop
+      // offered a Copper Rod that looked like a plain Quick Claw.
+      const iconTint = this.modifierTypeOption.type?.iconTint;
+      if (iconTint != null) {
+        item.setTint(iconTint);
+      }
+      const iconAlpha = this.modifierTypeOption.type?.iconAlpha;
+      if (iconAlpha != null) {
+        item.setAlpha(iconAlpha);
+      }
       return item;
     };
 

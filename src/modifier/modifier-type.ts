@@ -146,6 +146,14 @@ export class ModifierType {
   public id: string;
   public localeKey: string;
   public iconImage: string;
+  /**
+   * ER reskinned items (#437): runtime tint/alpha for the icon frame, applied
+   * wherever the TYPE's icon is drawn with no modifier instance around (the
+   * reward shop). Held-item icons re-apply the same recolor in the modifier's
+   * getIcon override (Ward Stone / community item pattern).
+   */
+  public iconTint?: number;
+  public iconAlpha?: number;
   public group: string;
   public soundName: string;
   public tier: ModifierTier;
@@ -812,6 +820,9 @@ export function erCommunityItemModifierType(kind: ErCommunityItemKind): PokemonH
   );
   Object.defineProperty(type, "name", { get: () => cfg.name });
   type.getDescription = () => cfg.description;
+  // Carry the reskin tint on the type so the SHOP shows the recolored icon
+  // too (#437) - without it a Copper Rod offer rendered as a plain Quick Claw.
+  type.iconTint = cfg.tint;
   return type;
 }
 

@@ -34,6 +34,7 @@ import {
   erTryApplyOmniGem,
   erTryConsumePowerHerb,
 } from "#data/elite-redux/er-community-items";
+import { ER_WARD_STONE_CONFIG, erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -103,6 +104,21 @@ describe.skipIf(!RUN)("ER community item batch (#387/#392)", () => {
     expect(getModifierType(modifierTypes.FROSTBITE_ORB).name).toBe("Frostbite Orb");
     expect(getModifierType(modifierTypes.ER_ABILITY_CAPSULE).name).toBe("Ability Capsule");
     expect(getModifierType(modifierTypes.ER_DEX_NAV).name).toBe("Dex Nav");
+  });
+
+  it("reskin tint rides on the ModifierType so the SHOP shows the recolor (#437)", () => {
+    // The recolor used to live only on the held-item modifier's getIcon, so
+    // shop offers rendered the untinted base frame (a Copper Rod looking like
+    // a plain Quick Claw). The type itself must carry the tint now.
+    for (const kind of ER_COMMUNITY_ITEM_KINDS) {
+      const type = getModifierType(modifierTypes[KIND_TO_TYPE_ID[kind]]);
+      expect(type.iconTint, kind).toBe(ER_COMMUNITY_ITEM_CONFIG[kind].tint);
+    }
+    for (const tier of ["minor", "greater", "prime"] as const) {
+      const mt = erWardStoneModifierType(tier);
+      expect(mt.iconTint, tier).toBe(ER_WARD_STONE_CONFIG[tier].tint);
+      expect(mt.iconAlpha, tier).toBe(ER_WARD_STONE_CONFIG[tier].alpha);
+    }
   });
 
   it("Chili Sample: burns on a NON-contact damaging hit when the roll lands; never without the roll", () => {

@@ -70,11 +70,8 @@ export const ER_COMMUNITY_ITEM_CONFIG: Readonly<Record<ErCommunityItemKind, ErCo
     name: "Copper Rod",
     description:
       "10% chance to paralyze on contact, both ways: striking with a contact move, or being struck by one.",
-    // Dedicated atlas frame (#437): a copper rod with electric sparks, drawn
-    // by build_er_item_icons.py. The old copper-tinted quick_claw read as "a
-    // claw", not a conductive rod. 0xffffff tint = no runtime recolor.
-    icon: "copper_rod",
-    tint: 0xffffff,
+    icon: "quick_claw",
+    tint: 0xd98850,
     maxStack: 1,
   },
   rustyClaw: {
