@@ -91,6 +91,7 @@ import {
 } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
+import { getPokemonNameWithAffix } from "#app/messages";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { ChanceStatusOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
@@ -134,6 +135,8 @@ import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
+import { BerryModifier } from "#modifiers/modifier";
+import i18next from "i18next";
 
 /**
  * Numeric cutoff for "vanilla pokerogue" ids — anything ≥ this is an ER
@@ -1016,6 +1019,17 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
       ab.attrs.push(new TypeImmunityStatStageChangeAbAttr(PokemonType.DARK, Stat.ATK, 1));
     },
   ],
+  // 223 POWER_OF_ALCHEMY (#429): vanilla copies a fainted ally's ability; ER
+  // REDEFINES it as item transmutation ("transmutes berries on entry..."). The
+  // patcher pin also fixes the description (it showed the ER ROM text while
+  // the EFFECT was still the vanilla copy - effect and text now agree).
+  [
+    AbilityId.POWER_OF_ALCHEMY,
+    ab => {
+      ab.attrs = ab.attrs.filter(a => a.constructor.name !== "CopyFaintedAllyAbilityAbAttr");
+      ab.attrs.push(new ErTransmuteOpposingBerriesAbAttr());
+    },
+  ],
   // 155 RATTLED: vanilla +1 SPD on Bug/Dark/Ghost hit. Same.
   // 156 MAGIC_BOUNCE: vanilla reflects status. Same.
   // 169 FUR_COAT: vanilla 0.5x Phys. Same.
@@ -1141,6 +1155,56 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
  * MAJOR rider for PRESSURE — clear all positive stat stages on opponents
  * when this ability's holder is summoned (entry effect).
  */
+// ER Power of Alchemy (#429): the ER ability is "Upon entry, transmutes all
+// opposing Berries into Black Sludge. When any Pokemon loses an item during
+// battle, it gets replaced by Black Sludge. If Black Sludge is removed, it
+// gets replaced by Big Nugget." pokerogue has no held Black Sludge or Big
+// Nugget items, so we port the part that matters in a roguelite: ON ENTRY the
+// holder destroys every Berry held by opposing Pokemon (to almost any holder
+// a Black Sludge is a dead item anyway). The two lose-an-item clauses have no
+// pokerogue equivalent and are deliberately skipped.
+class ErTransmuteOpposingBerriesAbAttr extends PostSummonAbAttr {
+  constructor() {
+    super(true);
+  }
+
+  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+    return pokemon.getOpponents().length > 0;
+  }
+
+  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
+    if (simulated) {
+      return;
+    }
+    for (const opp of pokemon.getOpponents()) {
+      if (!opp || opp.isFainted()) {
+        continue;
+      }
+      const berries = globalScene.findModifiers(
+        m => m instanceof BerryModifier && m.pokemonId === opp.id,
+        opp.isPlayer(),
+      ) as BerryModifier[];
+      if (berries.length === 0) {
+        continue;
+      }
+      for (const berry of berries) {
+        // Drain the whole stack - the ER text transmutes ALL berries.
+        let guard = 99;
+        while (berry.stackCount > 0 && guard-- > 0) {
+          opp.loseHeldItem(berry);
+        }
+      }
+      globalScene.updateModifiers(opp.isPlayer());
+      globalScene.phaseManager.queueMessage(
+        i18next.t("abilityTriggers:erTransmutedBerries", {
+          pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+          targetName: getPokemonNameWithAffix(opp),
+        }),
+      );
+    }
+  }
+}
+
 class ClearOpponentStatBuffsOnSummonAbAttr extends PostSummonAbAttr {
   constructor() {
     super(true);

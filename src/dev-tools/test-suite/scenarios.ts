@@ -1952,6 +1952,32 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Power of Alchemy: transmute (#429)",
+    description:
+      "#429 - ER Power of Alchemy transmutes opposing Berries on entry\n"
+      + "(it had vanilla's copy-fainted-ally effect with the ER text).\n"
+      + "Your Alolan Muk (Power of Alchemy) vs Snorlax holding berries.\n"
+      + "DO: just enter the battle. EXPECT a 'transmuted ... Berries away'\n"
+      + "message and the Snorlax has NO berries left (it never heals via\n"
+      + "Sitrus). ALSO check the ability description reads the ER text.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ABILITY_OVERRIDE: AbilityId.POWER_OF_ALCHEMY,
+      });
+      return [
+        makeStarter(SpeciesId.ALOLA_MUK, {
+          moveset: [MoveId.TACKLE, MoveId.SLUDGE_BOMB, MoveId.SPLASH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Cloud push warn (#389)",
     description:
       "#389 - Save and Quit force-pushes the FULL save (system + session)\n"
