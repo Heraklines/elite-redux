@@ -303,6 +303,16 @@ describe.skipIf(!RUN)("ER community item batch (#387/#392)", () => {
       undefined,
     );
 
+    // STRICTLY species-scoped (maintainer): the list is Snorlax's OWN
+    // TM/tutor/egg data - a move outside its learnset (Judgment is
+    // Arceus-only) must never appear.
+    expect(eggMoves).not.toContain(MoveId.JUDGMENT);
+
+    // STRICTLY species-scoped: the pool is Snorlax's OWN TM/tutor/egg
+    // data - a move outside its learnset (Judgment is Arceus-only) must
+    // never appear.
+    expect(eggMoves).not.toContain(MoveId.JUDGMENT);
+
     // A move once KNOWN drops out of the list.
     player.moveset[0]!.moveId = eggMoves[0];
     expect(player.getErLearnableShroomMoves()).not.toContain(eggMoves[0]);
