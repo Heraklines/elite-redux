@@ -4,6 +4,7 @@ import { handleTutorial, Tutorial } from "#app/tutorial";
 import type { IEggOptions } from "#data/egg";
 import { Egg, getLegendaryGachaSpeciesForTimestamp, MAX_EGG_COUNT } from "#data/egg";
 import { Button } from "#enums/buttons";
+import { EggSourceType } from "#enums/egg-source-types";
 import { EggTier } from "#enums/egg-type";
 import { GachaType } from "#enums/gacha-types";
 import { TextStyle } from "#enums/text-style";
@@ -175,6 +176,13 @@ export class EggGachaUiHandler extends MessageUiHandler {
         }
 
         gachaUpLabel.setText(i18next.t("egg:shinyUpGacha")).setX(0).setOrigin(0.5, 0);
+        break;
+      case GachaType.REDUX:
+        // Elite Redux (#409): the Redux Up machine - boosted ER-custom odds.
+        gachaUpLabel
+          .setText(i18next.t("egg:reduxUpGacha", { defaultValue: "Redux Up!" }))
+          .setX(0)
+          .setOrigin(0.5, 0);
         break;
     }
 
@@ -537,7 +545,10 @@ export class EggGachaUiHandler extends MessageUiHandler {
     for (let i = 1; i <= pullCount; i++) {
       const eggOptions: IEggOptions = {
         pulled: true,
-        sourceType: this.gachaCursor,
+        // SAVE SAFETY: the gacha cursor is NOT an EggSourceType - cursor 3
+        // (Redux Up) would collide with SAME_SPECIES_EGG. Map it explicitly.
+        sourceType:
+          this.gachaCursor === GachaType.REDUX ? EggSourceType.GACHA_REDUX : (this.gachaCursor as EggSourceType),
       };
 
       // Before creating the last egg, check if the guaranteed egg tier was already generated

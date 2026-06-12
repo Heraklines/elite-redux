@@ -21,6 +21,8 @@ function gachaSourceTypeFor(gachaType: GachaType): EggSourceType {
       return EggSourceType.GACHA_LEGENDARY;
     case GachaType.SHINY:
       return EggSourceType.GACHA_SHINY;
+    case GachaType.REDUX:
+      return EggSourceType.GACHA_REDUX;
   }
   return EggSourceType.GACHA_LEGENDARY;
 }

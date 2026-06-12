@@ -30,7 +30,7 @@ const ROW_COUNT = 9;
 const TARGET_STEPS: number[] = [10, 25, 50, 100, 250, 500, 1000, MAX_EGG_COUNT];
 
 /** Order of gacha machines on the machine row. */
-const MACHINE_STEPS: GachaType[] = [GachaType.MOVE, GachaType.LEGENDARY, GachaType.SHINY];
+const MACHINE_STEPS: GachaType[] = [GachaType.MOVE, GachaType.LEGENDARY, GachaType.SHINY, GachaType.REDUX];
 
 /** Voucher rows in display order. */
 const VOUCHER_ROWS: { row: Row; voucher: VoucherType; labelKey: string }[] = [
@@ -236,6 +236,10 @@ export class AutoEggRestockUiHandler extends MessageUiHandler {
         label.setText(String(this.working.targetCount));
         return;
       case Row.MACHINE: {
+        if (this.working.gachaType === GachaType.REDUX) {
+          label.setText(i18next.t("egg:gachaTypeRedux", { defaultValue: "Redux Rate Up" }));
+          return;
+        }
         const key =
           this.working.gachaType === GachaType.MOVE
             ? "egg:gachaTypeMove"

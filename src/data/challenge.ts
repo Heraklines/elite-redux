@@ -447,19 +447,35 @@ export abstract class Challenge {
 }
 
 /** Implements a mono generation challenge. */
+/**
+ * Mono-gen pseudo-generation for the "RDX" tab (#408): value 10 gates the run
+ * to Elite Redux customs (speciesId >= 10000), which nominally carry
+ * generation 9. Mirrors the RDX gen tab in starter select and the Pokedex.
+ */
+const ER_RDX_CHALLENGE_GEN = 10;
+
+/** The generation the mono-gen challenge sees: ER customs count as RDX (10). */
+function erChallengeGeneration(species: PokemonSpecies): number {
+  return species.speciesId >= 10000 ? ER_RDX_CHALLENGE_GEN : species.generation;
+}
+
 export class SingleGenerationChallenge extends Challenge {
   public override get ribbonAwarded(): RibbonFlag {
     // NOTE: This logic will not work for the eventual mono gen 10 ribbon,
     // as its flag will not be in sequence with the other mono gen ribbons.
-    return this.value ? ((RibbonData.MONO_GEN_1 << (BigInt(this.value) - 1n)) as RibbonFlag) : 0n;
+    // The ER RDX pseudo-gen (10) therefore awards NO ribbon (its shifted flag
+    // would collide with the next ribbon in the table).
+    return this.value >= 1 && this.value <= 9
+      ? ((RibbonData.MONO_GEN_1 << (BigInt(this.value) - 1n)) as RibbonFlag)
+      : 0n;
   }
 
   constructor() {
-    super(Challenges.SINGLE_GENERATION, 9);
+    super(Challenges.SINGLE_GENERATION, ER_RDX_CHALLENGE_GEN);
   }
 
   applyStarterChoice(species: PokemonSpecies, isValid: BooleanHolder): boolean {
-    if (species.generation !== this.value) {
+    if (erChallengeGeneration(species) !== this.value) {
       isValid.value = false;
       return true;
     }
@@ -481,8 +497,10 @@ export class SingleGenerationChallenge extends Challenge {
   }
 
   applyPokemonInBattle(pokemon: Pokemon, valid: BooleanHolder): boolean {
-    const baseGeneration = getPokemonSpecies(pokemon.species.speciesId).generation;
-    const fusionGeneration = pokemon.isFusion() ? getPokemonSpecies(pokemon.fusionSpecies!.speciesId).generation : 0;
+    const baseGeneration = erChallengeGeneration(getPokemonSpecies(pokemon.species.speciesId));
+    const fusionGeneration = pokemon.isFusion()
+      ? erChallengeGeneration(getPokemonSpecies(pokemon.fusionSpecies!.speciesId))
+      : 0;
     if (
       pokemon.isPlayer()
       && (baseGeneration !== this.value || (pokemon.isFusion() && fusionGeneration !== this.value))
@@ -494,6 +512,13 @@ export class SingleGenerationChallenge extends Challenge {
   }
 
   applyFixedBattle(waveIndex: number, battleConfig: FixedBattleConfig): boolean {
+    // RDX (#408): the ER-custom pseudo-gen has no canonical evil team / Elite
+    // Four, and every per-gen lookup below indexes 9-entry tables with
+    // `value - 1` (index 9 would be undefined). Keep the default classic
+    // fixed battles instead.
+    if (this.value === ER_RDX_CHALLENGE_GEN) {
+      return false;
+    }
     let trainerTypes: (TrainerType | TrainerType[])[] = [];
     const evilTeamWaves: number[] = [
       ClassicFixedBossWaves.EVIL_GRUNT_1,
@@ -729,6 +754,9 @@ export class SingleGenerationChallenge extends Challenge {
     if (overrideValue === 0) {
       return i18next.t("settings:off");
     }
+    if (overrideValue === ER_RDX_CHALLENGE_GEN) {
+      return i18next.t("starterSelectUiHandler:genRedux", { defaultValue: "RDX" });
+    }
     return i18next.t(`starterSelectUiHandler:gen${overrideValue}`);
   }
 
@@ -737,7 +765,7 @@ export class SingleGenerationChallenge extends Challenge {
       return i18next.t("challenges:singleGeneration.descDefault");
     }
     return i18next.t("challenges:singleGeneration.desc", {
-      gen: i18next.t(`challenges:singleGeneration.gen.${overrideValue}`),
+      gen: i18next.t(`challenges:singleGeneration.gen.${overrideValue}`, { defaultValue: "Redux (ER customs)" }),
     });
   }
 

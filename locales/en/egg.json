@@ -49,5 +49,7 @@
   "flushEggsEntry": "Discard Eggs...",
   "flushEggsNone": "You don’t have any Eggs to discard.",
   "flushEggsConfirm": "Discard ALL {{count}} of your Eggs?\nThis cannot be undone!",
-  "flushEggsDone": "Discarded {{count}} Eggs."
+  "flushEggsDone": "Discarded {{count}} Eggs.",
+  "reduxUpGacha": "Redux Up!",
+  "gachaTypeRedux": "Redux Rate Up"
 }

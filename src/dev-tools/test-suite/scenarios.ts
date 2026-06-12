@@ -1785,6 +1785,30 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Egg declutter + RDX (#407)",
+    description:
+      "#407/#408/#409 - NOT a battle test, this entry tracks the checks.\n"
+      + "DO: (1) hatch a bunch of eggs - NO Unown letters, Arceus types,\n"
+      + "Pikachu caps, Furfrou trims, Therians, Castform weather forms etc\n"
+      + "may hatch anymore (the vanilla mon covers those forms). (2) If you\n"
+      + "owned a removed form SHINY, its shine (incl. red/black) now shows\n"
+      + "on the VANILLA base in starter select, candies carried over. (3)\n"
+      + "The RDX gen tab (starter select + Pokedex) lists EVERY ER custom\n"
+      + "incl. convergents like Wispywaspy and the Iron series. (4) The\n"
+      + "mono-gen challenge offers RDX. (5) Egg gacha: a 4th teal REDUX UP\n"
+      + "machine pulls mostly ER customs; auto-restock offers it too.\n"
+      + "Pass/Fail this entry once checked.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 5 });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Egg countdown (#378)",
     description:
       "#378 QoL - NOT a battle test, this entry just tracks the check.\n"

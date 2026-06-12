@@ -46,13 +46,16 @@ describe.skipIf(!RUN)("ER custom starter cost re-tier + form removals", () => {
     expect(costOf("Burmy Eterna")).toBe(11);
     expect(costOf("Kartana Fallen")).toBe(11);
     expect(costOf("Darkrai Nightmare")).toBe(10);
-    expect(costOf("Zygarde Complete")).toBe(9);
-    expect(costOf("Zarude Dada")).toBe(7);
+    // Zygarde Complete (battle form) and Zarude Dada (vanilla cosmetic) were
+    // removed from the grid entirely by the #407 declutter ban list.
+    expect(costOf("Zygarde Complete")).toBeUndefined();
+    expect(costOf("Zarude Dada")).toBeUndefined();
   });
 
-  it("every Arceus type plate costs 9", () => {
+  it("the imported Arceus type plates are out of the grid (#407 - vanilla plates cover them)", () => {
     for (const t of ["Fire", "Water", "Dragon", "Fairy", "Steel"]) {
-      expect(costOf(`Arceus ${t}`)).toBe(9);
+      expect(costOf(`Arceus ${t}`)).toBeUndefined();
+      expect(inEggPool(`Arceus ${t}`)).toBe(false);
     }
   });
 
@@ -96,10 +99,10 @@ describe.skipIf(!RUN)("ER custom starter cost re-tier + form removals", () => {
     };
     expect(tierOf("Kecleong")).toBe(EggTier.LEGENDARY); // 12
     expect(tierOf("Burmy Eterna")).toBe(EggTier.LEGENDARY); // 11
-    expect(tierOf("Arceus Fire")).toBe(EggTier.LEGENDARY); // 9
     expect(tierOf("Ash-Greninja")).toBe(EggTier.LEGENDARY); // 8
-    // Below the cost-8 floor → NOT forced to Legendary.
-    expect(tierOf("Zarude Dada")).not.toBe(EggTier.LEGENDARY); // 7
+    // Arceus Fire / Zarude Dada are gone from the pool entirely (#407 bans).
+    expect(tierOf("Arceus Fire")).toBeUndefined();
+    expect(tierOf("Zarude Dada")).toBeUndefined();
   });
 
   it("does NOT touch vanilla starter costs (Kecleon stays vanilla)", () => {

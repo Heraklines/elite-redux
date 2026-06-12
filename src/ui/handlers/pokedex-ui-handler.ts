@@ -198,6 +198,12 @@ const valueReductionMax = 2;
 // Position of UI elements
 const filterBarHeight = 17;
 const speciesContainerX = 143;
+/**
+ * Gen-filter sentinel for the "RDX" tab (#407): real generations are 1-9; this
+ * pseudo-value groups every Elite Redux custom (speciesId >= 10000) into its
+ * own tab. Mirrors REDUX_GEN_FILTER_VALUE in starter-select-ui-handler.
+ */
+const ER_RDX_GEN_FILTER_VALUE = 10;
 
 /**
  * Calculates the starter position for a Pokemon of a given UI index
@@ -358,6 +364,12 @@ export class PokedexUiHandler extends MessageUiHandler {
       new DropDownOption(7, new DropDownLabel(i18next.t("pokedexUiHandler:gen7"))),
       new DropDownOption(8, new DropDownLabel(i18next.t("pokedexUiHandler:gen8"))),
       new DropDownOption(9, new DropDownLabel(i18next.t("pokedexUiHandler:gen9"))),
+      // Elite Redux (#407): the "RDX" tab collects every ER custom (id >= 10000)
+      // instead of lumping them under their nominal Gen 9.
+      new DropDownOption(
+        ER_RDX_GEN_FILTER_VALUE,
+        new DropDownLabel(i18next.t("starterSelectUiHandler:genRedux", { defaultValue: "RDX" })),
+      ),
     ];
     const genDropDown: DropDown = new DropDown(0, 0, genOptions, this.updateStarters, DropDownType.HYBRID);
     this.filterBar.addFilter(DropDownColumn.GEN, i18next.t("filterBar:genFilter"), genDropDown);
@@ -1596,8 +1608,11 @@ export class PokedexUiHandler extends MessageUiHandler {
         }
       }
 
-      // Gen filter
-      const fitsGen = this.filterBar.getVals(DropDownColumn.GEN).includes(species.generation);
+      // Gen filter. ER customs live under the dedicated "RDX" tab (#407)
+      // instead of their nominal Gen 9 column.
+      const genVals = this.filterBar.getVals(DropDownColumn.GEN);
+      const fitsGen =
+        species.speciesId >= 10000 ? genVals.includes(ER_RDX_GEN_FILTER_VALUE) : genVals.includes(species.generation);
 
       // Type filter
       const fitsType = this.filterBar

@@ -42,6 +42,14 @@ import i18next from "i18next";
 
 export const EGG_SEED = 1073741824;
 
+/**
+ * ER Redux Up gacha (#409): per-species weight multiplier applied to ER customs
+ * (speciesId >= 10000) when rolling species for an egg pulled from the Redux Up
+ * machine. With ~100+ customs spread across the tiers this makes the large
+ * majority of Redux Up pulls hatch ER content while vanilla stays possible.
+ */
+export const ER_REDUX_GACHA_WEIGHT_MULTIPLIER = 10;
+
 /** Maximum number of unhatched eggs the player can hold at once. */
 export const MAX_EGG_COUNT = 10_000;
 
@@ -365,6 +373,8 @@ export class Egg {
         return this.eggDescriptor ?? i18next.t("egg:gachaTypeShiny");
       case EggSourceType.GACHA_MOVE:
         return this.eggDescriptor ?? i18next.t("egg:gachaTypeMove");
+      case EggSourceType.GACHA_REDUX:
+        return this.eggDescriptor ?? i18next.t("egg:gachaTypeRedux", { defaultValue: "Redux Rate Up" });
       case EggSourceType.EVENT:
         return this.eggDescriptor ?? i18next.t("egg:eventType");
       default:
@@ -530,6 +540,11 @@ export class Egg {
       // this they'd collectively appear N× and swamp the pool. Divide each
       // form's weight by its family size so the whole family totals ≈ one mon.
       weight = Math.max(1, Math.floor(weight / getErEggWeightDivisor(speciesId)));
+      // ER Redux Up gacha (#409): eggs pulled from the 4th machine heavily
+      // favor ER customs (id >= 10000) within the rolled tier.
+      if (this._sourceType === EggSourceType.GACHA_REDUX && speciesId >= 10000) {
+        weight *= ER_REDUX_GACHA_WEIGHT_MULTIPLIER;
+      }
       speciesWeights[idx] = totalWeight + weight;
       totalWeight += weight;
     }

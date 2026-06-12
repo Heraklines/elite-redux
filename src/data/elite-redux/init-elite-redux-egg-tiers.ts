@@ -29,6 +29,7 @@ import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
 import { allSpecies } from "#data/data-lists";
+import { applyErEggPoolBans } from "#data/elite-redux/er-egg-pool-bans";
 import { findErFormChangeByTarget } from "#data/elite-redux/er-form-change-overlay";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
@@ -142,15 +143,15 @@ function pickStarterCost(tier: EggTier): number {
 
 function isErFormChangeTarget(draft: (typeof ER_SPECIES)[number], speciesId: number): boolean {
   return (
-    findErFormChangeByTarget(speciesId) !== undefined // HANGRY is Morpeko's in-battle alt-form (the Hunger Switch / Two-Faced // toggle target — SPECIES_MORPEKO_HANGRY / SPECIES_MORPEKYLL_HANGRY in the // ER dump). Like Mega/Primal it is a battle-only form, NOT a base/root mon, // so it must never hatch from eggs or appear in starter selection. ER models // it as a separate custom species with no prevolution, so it would otherwise // leak past the prevolution gate below. BOND / BLUNDER are Darmanitan Redux's // special Battle-Bond forms (SPECIES_DARMANITAN_REDUX_BOND / _BLUNDER) — also // battle-only forms reached via the Bond chain off the base Darmanitan Redux, // never base/root mons, so they must be excluded the same way. AURA is // Darmanitan Redux's Zen-Mode-style alternate battle form // (SPECIES_DARMANITAN_REDUX_AURA, "Darmanitan Aura") — likewise a
-    || // battle-emergent form that must NOT hatch (it was leaking into RARE eggs).
-    /(?:^|_)MEGA(?:_|$)|(?:^|_)PRIMAL(?:_|$)|(?:^|_)HANGRY(?:_|$)|(?:^|_)BOND(?:_|$)|(?:^|_)BLUNDER(?:_|$)|(?:^|_)AURA(?:_|$)|(?:^|_)BLADE(?:_|$)|(?:^|_)SCHOOL(?:_|$)|(?:^|_)ZEN(?:_|$)|(?:^|_)NOICE(?:_|$)|(?:^|_)CROWNED(?:_|$)|(?:^|_)ORIGIN(?:_|$)|(?:^|_)GIGANTAMAX(?:_|$)|(?:^|_)GMAX(?:_|$)|(?:^|_)ETERNAMAX(?:_|$)/.test(
+    findErFormChangeByTarget(speciesId) !== undefined // HANGRY is Morpeko's in-battle alt-form (the Hunger Switch / Two-Faced // toggle target — SPECIES_MORPEKO_HANGRY / SPECIES_MORPEKYLL_HANGRY in the // ER dump). Like Mega/Primal it is a battle-only form, NOT a base/root mon, // so it must never hatch from eggs or appear in starter selection. ER models // it as a separate custom species with no prevolution, so it would otherwise // leak past the prevolution gate below. BOND / BLUNDER are Darmanitan Redux's // special Battle-Bond forms (SPECIES_DARMANITAN_REDUX_BOND / _BLUNDER) — also // battle-only forms reached via the Bond chain off the base Darmanitan Redux, // never base/root mons, so they must be excluded the same way. AURA is // Darmanitan Redux's Zen-Mode-style alternate battle form // (SPECIES_DARMANITAN_REDUX_AURA, "Darmanitan Aura") — likewise a // battle-emergent form that must NOT hatch (it was leaking into RARE eggs).
+    || /(?:^|_)MEGA(?:_|$)|(?:^|_)PRIMAL(?:_|$)|(?:^|_)HANGRY(?:_|$)|(?:^|_)BOND(?:_|$)|(?:^|_)BLUNDER(?:_|$)|(?:^|_)AURA(?:_|$)|(?:^|_)BLADE(?:_|$)|(?:^|_)SCHOOL(?:_|$)|(?:^|_)ZEN(?:_|$)|(?:^|_)NOICE(?:_|$)|(?:^|_)CROWNED(?:_|$)|(?:^|_)ORIGIN(?:_|$)|(?:^|_)GIGANTAMAX(?:_|$)|(?:^|_)GMAX(?:_|$)|(?:^|_)ETERNAMAX(?:_|$)/.test(
       draft.speciesConst,
-    ) // Display-name battle-form tokens (#352: "Aegislash Blade Redux" hatched —
-    || // Blade is Stance Change's in-battle form, ability-driven, so it is neither
-    // a form-change-registry target nor prevolution-gated). School/Zen/Noice/
-    // Crowned/Origin/Gigantamax are the same class of battle/at-will forms.
-    /\b(Mega|Primal|Hangry|Bond|Blunder|Blade|School|Zen|Noice|Crowned|Origin|Gigantamax|Eternamax)\b/i.test(
+    ) // Display-name battle-form tokens (#352: "Aegislash Blade Redux" hatched — // Blade is Stance Change's in-battle form, ability-driven, so it is neither // a form-change-registry target nor prevolution-gated). School/Zen/Noice/
+    || // Crowned/Origin/Gigantamax are the same class of battle/at-will forms.
+    // ... Busted (Mimikyu's broken Disguise), Gulping/Gorging (Cramorant's
+    // Gulp Missile payloads) and Sunshine (Cherrim's Flower Gift form) are the
+    // same battle-only class (#407) - verified unambiguous across ER_SPECIES.
+    /\b(Mega|Primal|Hangry|Bond|Blunder|Blade|School|Zen|Noice|Crowned|Origin|Gigantamax|Eternamax|Busted|Gulping|Gorging|Sunshine)\b/i.test(
       draft.name ?? "",
     )
     || /^Darmanitan Aura$/i.test(draft.name ?? "")
@@ -329,6 +330,11 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
     }
   }
 
+  // Declutter ban list (#407): drop the imported alternate-form duplicates
+  // (Unown letters, Arceus plates, Pikachu caps, ...) and battle-only forms
+  // from BOTH the egg pool and starter select. See er-egg-pool-bans.ts.
+  applyErEggPoolBans();
+
   return result;
 }
 
@@ -361,7 +367,16 @@ function buildErEggWeightDivisors(): Map<number, number> {
       vanillaNames.add(sp.name.toLowerCase());
     }
   }
+  // ER-custom multi-form families with NO vanilla name prefix (the vanilla
+  // loop below can't group them). Grotom + its 5 appliance variants (#407)
+  // would otherwise each roll at FULL weight - 6x one mon's appearance rate.
+  const ER_FAMILY_PREFIXES = ["grotom"];
   const familyKey = (name: string): string => {
+    const lower = name.toLowerCase();
+    const erFam = ER_FAMILY_PREFIXES.find(p => lower === p || lower.startsWith(`${p} `));
+    if (erFam) {
+      return erFam;
+    }
     const words = name.split(/\s+/);
     for (let n = words.length; n >= 1; n--) {
       const prefix = words.slice(0, n).join(" ").toLowerCase();
@@ -369,7 +384,7 @@ function buildErEggWeightDivisors(): Map<number, number> {
         return prefix;
       }
     }
-    return name.toLowerCase();
+    return lower;
   };
   const idFamily = new Map<number, string>();
   const familyCount = new Map<string, number>();

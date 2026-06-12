@@ -25,12 +25,14 @@ describe("ER Tornadus Therian + Typhlosion custom are EPIC egg-tier", () => {
     void new GameManager(phaserGame);
   });
 
-  it("Tornadus Therian resolves to EPIC", () => {
+  it("Tornadus Therian is OUT of the egg pool (#407 - vanilla Reveal Glass covers it)", () => {
+    // Superseded by the egg-pool declutter: the imported Therian duplicate is
+    // banned (the vanilla Tornadus changes form via the Reveal Glass), but the
+    // species stays registered so existing saves keep resolving it.
     const tiers = speciesEggTiers as Record<number, EggTier | undefined>;
     const sp = allSpecies.find(s => s.name === "Tornadus Therian");
-    expect(sp, "Tornadus Therian should be registered").toBeDefined();
-    expect(tiers[sp!.speciesId], "Tornadus Therian must be in the egg pool").toBeDefined();
-    expect(tiers[sp!.speciesId]).toBe(EggTier.EPIC);
+    expect(sp, "Tornadus Therian should stay registered").toBeDefined();
+    expect(tiers[sp!.speciesId], "Tornadus Therian must NOT be in the egg pool").toBeUndefined();
   });
 
   it("the Typhlosion custom (Lumbering Sloth Engulfed) resolves to EPIC", () => {

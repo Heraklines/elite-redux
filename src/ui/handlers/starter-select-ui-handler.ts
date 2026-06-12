@@ -255,14 +255,16 @@ const randomSelectionWindowHeight = 20;
 const REDUX_GEN_FILTER_VALUE = 10;
 
 /**
- * True for an Elite Redux new-evolution "Redux" custom species — an ER custom
- * (speciesId ≥ 10000) whose name contains "Redux" (e.g. "Minccino Redux",
- * "Sinistea Redux"). These are the entries the Redux tab collects. Imported
- * alternate forms (extra Arceus types and the like) and wholly-new customs
- * (e.g. Phantowl) are not "Redux"-named, so they keep their assigned generation.
+ * True for ANY Elite Redux custom species (speciesId ≥ 10000) — the entries the
+ * "RDX" generation tab collects. This used to match only "Redux"-NAMED customs,
+ * which dumped the convergent/wholly-new customs (Wispywaspy, the Iron paradox
+ * series, Heracreus, ...) into the Gen 9 column (#407 maintainer report). After
+ * the egg-pool declutter the imported vanilla-form duplicates are gone from the
+ * grid entirely, so everything left with a custom id is genuine ER content and
+ * belongs under RDX.
  */
 function isReduxFormSpecies(species: PokemonSpecies): boolean {
-  return species.speciesId >= 10000 && /redux/i.test(species.name);
+  return species.speciesId >= 10000;
 }
 
 /**

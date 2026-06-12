@@ -15,6 +15,7 @@ import { EntryHazardTag } from "#data/arena-tag";
 import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed/daily-seed-utils";
 import { allMoves, allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
+import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { getErResistBerryEntries, restoreErResistBerries } from "#data/elite-redux/er-resist-berries";
 import { getErDifficulty, getErDifficultyCandyMultiplier, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
@@ -726,6 +727,12 @@ export class GameData {
     this.dexData = Object.assign(this.dexData, systemData.dexData);
     this.consolidateDexData(this.dexData);
     this.defaultDexData = null;
+
+    // ER egg-pool declutter (#407): compress shiny/dex/candy progress from the
+    // removed duplicate forms onto their vanilla base so nothing is lost
+    // (e.g. a red-shiny Unown letter unlocks red shiny on vanilla Unown).
+    // Purely additive and exception-guarded - it can never break a save load.
+    migrateErRemovedFormUnlocks(this);
   }
 
   public async initSystem(systemDataStr: string, cachedSystemDataStr?: string): Promise<boolean> {
