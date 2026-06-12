@@ -2026,6 +2026,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Biome Market preview (#440)",
+    description:
+      "#440 BIOME MARKET - every 10th wave the boss reward screen now has a\n"
+      + "MARKET below the rewards (boss waves had no shop before). Stock and\n"
+      + "prices depend on the BIOME: staples + the biome's signature items +\n"
+      + "discounted-category picks + a wildcard. DO: win this wave-10 fight,\n"
+      + "then scroll DOWN past the rewards. EXPECT: ~9 priced items themed to\n"
+      + "the biome; prices scale with wave income (staple under one wave's\n"
+      + "money, held items about three). Buy something - money deducts, item\n"
+      + "applies. The Abyss biome has NO market by design.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 10,
+        STARTING_MONEY_OVERRIDE: 20000,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 20,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.SWORDS_DANCE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Curve/ghost/sprite (#419+)",
     description:
       "#419 - ELITE trainer mons now respect a per-wave BST ceiling (420 at\n"

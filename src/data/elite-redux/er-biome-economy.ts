@@ -23,9 +23,12 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
-import { modifierTypes } from "#data/data-lists";
+// Type-only: this module feeds modifier-type.ts (the shop hook), so a value
+// import of the built modifierTypes table here would be a require cycle.
+import type { modifierTypes } from "#data/data-lists";
 import { BiomeId } from "#enums/biome-id";
 import type { ModifierTypeFunc } from "#types/modifier-types";
+import { randSeedInt } from "#utils/common";
 
 /** Stock categories - each biome discounts some and marks up others. */
 export type ErShopCategory =
@@ -153,6 +156,80 @@ export const ER_SHOP_CATEGORY_POOL: Record<ErShopCategory, (keyof typeof modifie
   CANDY: ["RARE_CANDY", "RARER_CANDY"],
   MINT: ["MINT"],
 };
+
+/** Slot tier for pricing, per category (staples cheap, held items dear). */
+const CATEGORY_TIER: Record<ErShopCategory, keyof typeof ER_SHOP_TIER_FACTOR> = {
+  HEAL: "staple",
+  BALLS: "staple",
+  BATTLE: "staple",
+  BERRY: "staple",
+  TM: "great",
+  HELD: "ultra",
+  EVO: "great",
+  CANDY: "great",
+  MINT: "great",
+};
+
+export interface ErBiomeShopStockEntry {
+  key: keyof typeof modifierTypes;
+  cost: number;
+}
+
+/**
+ * Roll the biome market stock for an x0 wave: 3 staples (wave-bracketed heal,
+ * status heal, ball), the biome's signature items, picks from its discounted
+ * categories, and wildcards (the Desert caravan rolls extra HELD exotics).
+ * Deterministic per wave: runs under the wave seed so the reward phase and the
+ * UI handler see the SAME stock.
+ */
+export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiomeShopStockEntry[] {
+  const eco = ER_BIOME_ECONOMY[biome];
+  if (!eco || eco.noShop) {
+    return [];
+  }
+  const stock: ErBiomeShopStockEntry[] = [];
+  const seen = new Set<string>();
+  const priceOf = (key: keyof typeof modifierTypes, category: ErShopCategory): number =>
+    erBiomeShopPrice(CATEGORY_TIER[category], erBiomeCategoryPriceMod(biome, category));
+  const add = (key: keyof typeof modifierTypes, category: ErShopCategory) => {
+    if (!seen.has(key) && stock.length < 9) {
+      seen.add(key);
+      stock.push({ key, cost: priceOf(key, category) });
+    }
+  };
+
+  globalScene.executeWithSeedOffset(
+    () => {
+      // Staples: bracketed by depth like the vanilla shop's unlock curve.
+      const bracket = Math.min(Math.floor(waveIndex / 40), 2);
+      add((["POTION", "HYPER_POTION", "MAX_POTION"] as const)[bracket], "HEAL");
+      add("FULL_HEAL", "HEAL");
+      add((["POKEBALL", "GREAT_BALL", "ULTRA_BALL"] as const)[bracket], "BALLS");
+      // Signatures: the biome's identity items, always in stock.
+      for (const key of eco.signature) {
+        if (!seen.has(key) && stock.length < 9) {
+          seen.add(key);
+          stock.push({ key, cost: erBiomeShopPrice("ultra", eco.priceMod) });
+        }
+      }
+      // Discounted-category picks: the reason this biome's market is GOOD.
+      for (const category of eco.cheap) {
+        const pool = ER_SHOP_CATEGORY_POOL[category];
+        add(pool[randSeedInt(pool.length)], category);
+      }
+      // Wildcards: one held-item roll everywhere; the Desert caravan rolls two
+      // more (exotics are its whole deal).
+      const heldPool = ER_SHOP_CATEGORY_POOL.HELD;
+      const wildcards = biome === BiomeId.DESERT ? 3 : 1;
+      for (let i = 0; i < wildcards; i++) {
+        add(heldPool[randSeedInt(heldPool.length)], "HELD");
+      }
+    },
+    waveIndex,
+    "er-biome-shop",
+  );
+  return stock;
+}
 
 export interface ErBiomeShopSlot {
   typeFunc: ModifierTypeFunc;

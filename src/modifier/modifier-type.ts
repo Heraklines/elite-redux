@@ -9,6 +9,7 @@ import { tmPoolTiers } from "#balance/tms";
 import { getBerryEffectDescription, getBerryName } from "#data/berry";
 import { getDailyEventSeedLuck } from "#data/daily-seed/daily-run";
 import { allMoves, modifierTypes } from "#data/data-lists";
+import { rollErBiomeShopStock } from "#data/elite-redux/er-biome-economy";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-stones";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
@@ -2891,6 +2892,32 @@ export function overridePlayerModifierTypeOptions(options: ModifierTypeOption[],
 
 export function getPlayerShopModifierTypeOptionsForWave(waveIndex: number, baseCost: number): ModifierTypeOption[] {
   if (!(waveIndex % 10)) {
+    // ER Biome Market (#440): boss waves never had a shop - that empty space
+    // is now the biome market. Stock + prices come from the per-biome economy
+    // table (in ADDITION to the boss rewards above it). The finale is exempt;
+    // the Abyss has no market by design.
+    if (waveIndex < 200 && globalScene.currentBattle != null) {
+      const stock = rollErBiomeShopStock(globalScene.arena.biomeId, waveIndex);
+      const options: ModifierTypeOption[] = [];
+      for (const entry of stock) {
+        let mt: ModifierType | null = modifierTypeInitObj[entry.key]();
+        if (mt instanceof ModifierTypeGenerator) {
+          // Generator entries (BERRY/TM/MINT/...) resolve against the party,
+          // under the same wave seed the stock roll used.
+          globalScene.executeWithSeedOffset(
+            () => {
+              mt = (mt as ModifierTypeGenerator).generateType(globalScene.getPlayerParty()) ?? null;
+            },
+            waveIndex,
+            "er-biome-shop-gen",
+          );
+        }
+        if (mt != null) {
+          options.push(new ModifierTypeOption(mt, 0, entry.cost));
+        }
+      }
+      return options;
+    }
     return [];
   }
 
