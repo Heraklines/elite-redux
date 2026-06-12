@@ -1841,6 +1841,36 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Flash hits BOTH foes (#415)",
+    description:
+      "#415 FLASH - it is multi-target in ER but hit only ONE foe here.\n"
+      + "Doubles vs two Snorlax. DO: use FLASH.\n"
+      + "EXPECT: BOTH enemies take damage from the single Flash (60 BP\n"
+      + "Electric, 50% chance to drop Atk on each).\n"
+      + "ALSO CHECK: open High Jump Kick's move info - the description\n"
+      + "must now mention its Striker boost (same for punch/bite/slice\n"
+      + "moves and their Iron Fist / Strong Jaw / Keen Edge notes).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        BATTLE_STYLE_OVERRIDE: "double",
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.FLASH, MoveId.THUNDERBOLT, MoveId.HIGH_JUMP_KICK, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.RAICHU, {
+          moveset: [MoveId.FLASH, MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) No mega transforms/trades (#414)",
     description:
       "#414 - a wave-13 Weird Dream on Ace turned a party mon into a\n"

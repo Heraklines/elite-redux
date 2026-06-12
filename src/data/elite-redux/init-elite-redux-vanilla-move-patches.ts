@@ -1232,6 +1232,41 @@ export function initEliteReduxVanillaMovePatches(): VanillaMovePatchResult {
   }
 
   // ---------------------------------------------------------------------------
+  // Systemic ability-boost-note pass (#415): ER's authored move text tags every
+  // move boosted by an ER ability with a trailing "<Ability> boost." sentence
+  // (Striker for kicks, Keen Edge for slices, Iron Fist for punches, Strong Jaw
+  // for bites, Mighty Horn, Mega Launcher - 85 vanilla moves). Only moves with
+  // a MOVE_PATCHERS row got their ER description pinned, so unpatched moves
+  // (High Jump Kick - live report) still read the vanilla text with no boost
+  // note. APPEND the note(s) to the live description instead of replacing it,
+  // keeping pokerogue's richer text for mechanically-unchanged moves.
+  const BOOST_NOTE_RE = /[A-Z][A-Za-z' ]*? boost\./g;
+  for (const draft of ER_MOVES) {
+    const pokerogueId = ER_ID_MAP.moves[draft.id];
+    if (pokerogueId === undefined || pokerogueId >= VANILLA_ID_CUTOFF || draft.archetype !== "vanilla") {
+      continue;
+    }
+    const move = moveById.get(pokerogueId);
+    if (!move) {
+      continue;
+    }
+    const notes = ((draft.longDescription || "").match(BOOST_NOTE_RE) ?? []).map(n => n.trim());
+    if (notes.length === 0) {
+      continue;
+    }
+    const mutable = move as unknown as { descriptionOverride?: string; effect: string };
+    const current = String(mutable.descriptionOverride ?? mutable.effect ?? "");
+    const missing = notes.filter(n => !current.toLowerCase().includes(n.toLowerCase()));
+    if (missing.length === 0) {
+      continue;
+    }
+    const appended = `${current.trim()} ${missing.join(" ")}`.trim();
+    mutable.descriptionOverride = appended;
+    mutable.effect = appended;
+    result.moveDeltas++;
+  }
+
+  // ---------------------------------------------------------------------------
   // Systemic crit pass — ER encodes "High Crit Rate" and "Always Crits" as ROM
   // flag bits (indices into ER_FLAG_NAMES_LIST), but pokerogue models them as
   // MoveAttrs (HighCritAttr / CritOnlyAttr), so the numeric rebalance loop never

@@ -128,6 +128,7 @@ import { HitResult } from "#enums/hit-result";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
+import { MoveTarget } from "#enums/move-target";
 import { PokemonType } from "#enums/pokemon-type";
 import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
@@ -140,6 +141,17 @@ import type { Pokemon } from "#field/pokemon";
  * `init-elite-redux-custom-{moves,abilities}.ts`.
  */
 const VANILLA_ID_CUTOFF = 5000;
+
+/**
+ * Per-move target overrides for vanilla moves whose ER dump `target` field is
+ * STALE vs the actual ROM behavior (#415). Flash is "natively multi-target" in
+ * ER (live report; its ER description reads "a blast of light" hitting the
+ * field) but the dump ships target 0 (SELECTED), so the data-driven spread
+ * pass below can't catch it.
+ */
+const ER_VANILLA_TARGET_OVERRIDES: ReadonlyMap<number, MoveTarget> = new Map([
+  [MoveId.FLASH as number, MoveTarget.ALL_NEAR_ENEMIES],
+]);
 
 /** Aggregated result of a single `initEliteReduxVanillaRebalance()` run. */
 export interface VanillaRebalanceResult {
@@ -1283,6 +1295,21 @@ export function initEliteReduxVanillaRebalance(): VanillaRebalanceResult {
     // ER uses 0 (or absent). Only patch when ER specifies a positive value.
     if (draft.effectChance > 0 && target.chance !== draft.effectChance) {
       target.chance = draft.effectChance;
+      result.moveFieldWrites++;
+      movedirty = true;
+    }
+
+    // target (#415): per-move target overrides only. A data-driven sweep of
+    // ER's foe-spread target classes flagged 19 vanilla moves whose targeting
+    // disagrees (Avalanche/Round/Ominous Wind/Photon Geyser/Tera Starstorm...)
+    // but blanket-applying them broke target-coordination mechanics in the
+    // vanilla suites (Round's follow-up chain, Tera Starstorm's form-variable
+    // targeting), so each needs individual verification before widening - the
+    // overrides map is where verified ones go. Flash is the live report: it is
+    // multi-target in the ROM but the dump ships target 0 (stale field).
+    const desiredTarget = ER_VANILLA_TARGET_OVERRIDES.get(pokerogueId) ?? null;
+    if (desiredTarget !== null && move.moveTarget !== desiredTarget) {
+      move.target(desiredTarget);
       result.moveFieldWrites++;
       movedirty = true;
     }
