@@ -2066,7 +2066,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns The luck value of this Pokemon.
    */
   getLuck(): number {
-    return this.luck + (this.isFusion() ? this.fusionLuck : 0);
+    const base = this.luck + (this.isFusion() ? this.fusionLuck : 0);
+    // ER (#432): a Black Shiny is the rarest shiny tier and grants a flat
+    // Luck 5 (a regular shiny caps at 3). DERIVED here, never stored - the
+    // save keeps its ordinary variant/luck fields untouched, so this is
+    // additive and fully save-safe.
+    return this.customPokemonData?.erBlackShiny ? Math.max(base, 5) : base;
   }
 
   /**

@@ -4403,7 +4403,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         }
         const colorScheme = starterColors[species.speciesId];
 
-        const luck = globalScene.gameData.getDexAttrLuck(this.speciesStarterDexEntry.caughtAttr);
+        // ER (#432): a selected Black Shiny reads its flat Luck 5 (the dex-attr
+        // path only knows the regular 1-3 variant tiers). Display-only here;
+        // the in-run value comes from Pokemon.getLuck()'s matching override.
+        const luck = starterAttributes?.erBlackShiny
+          ? 5
+          : globalScene.gameData.getDexAttrLuck(this.speciesStarterDexEntry.caughtAttr);
         this.pokemonLuckText
           .setVisible(!!luck)
           .setText(luck.toString())
