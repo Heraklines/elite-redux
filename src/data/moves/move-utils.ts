@@ -64,11 +64,7 @@ function userGrantsSpreadTargeting(user: Pokemon, move: Move): boolean {
   if (move.hasAttr("MultiHitAttr") || !user.hasAbilityWithAttr("SpreadTargetByFlagAbAttr")) {
     return false;
   }
-  const attrs = [
-    ...user.getAbility().getAttrs("SpreadTargetByFlagAbAttr"),
-    ...user.getPassiveAbilities().flatMap(pa => pa?.getAttrs("SpreadTargetByFlagAbAttr") ?? []),
-  ];
-  return attrs.some(a => move.hasFlag(a.flag));
+  return user.getAbilityAttrs("SpreadTargetByFlagAbAttr").some(a => move.hasFlag(a.flag));
 }
 
 export function getMoveTargets(user: Pokemon, move: MoveId, replaceTarget?: MoveTarget): MoveTargetSet {

@@ -1876,6 +1876,54 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Locked innate must stay OFF (#425)",
+    description:
+      "#425 - a LOCKED Overwhelm innate let Dragon moves hit Fairies.\n"
+      + "Zekrom (Overwhelm NOT unlocked) vs Clefable.\n"
+      + "DO: use Dragon Claw on Clefable.\n"
+      + "EXPECT: 'It doesn't affect...' - NO damage. Fairy stays immune\n"
+      + "to Dragon until Overwhelm is actually unlocked and enabled.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 20,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CLEFABLE,
+        ENEMY_LEVEL_OVERRIDE: 20,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.ZEKROM, {
+          moveset: [MoveId.DRAGON_CLAW, MoveId.THUNDERBOLT, MoveId.SPLASH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Wildbolt Storm: no miss in rain (#426)",
+    description:
+      "#426 report said Wildbolt Storm always misses in rain - it\n"
+      + "verifies CORRECT here, so please confirm in-game.\n"
+      + "DO: use Wildbolt Storm repeatedly (it sets rain itself).\n"
+      + "EXPECT: once rain is up it NEVER misses (90% accuracy without\n"
+      + "rain). If you ever see a miss IN RAIN, press Fail + Send Logs.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.ZEKROM, {
+          moveset: [MoveId.WILDBOLT_STORM, MoveId.THUNDERBOLT, MoveId.SPLASH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Cloud push warn (#389)",
     description:
       "#389 - Save and Quit force-pushes the FULL save (system + session)\n"

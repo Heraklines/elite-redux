@@ -161,11 +161,7 @@ export class SwitchSummonPhase extends SummonPhase {
       if (!observer || observer.isFainted()) {
         continue;
       }
-      const allAttrs = [
-        ...observer.getAbility().attrs,
-        ...observer.getPassiveAbilities().flatMap(pa => pa?.attrs ?? []),
-      ];
-      for (const attr of allAttrs) {
+      for (const attr of observer.getAllActiveAbilityAttrs()) {
         if (attr && attr.constructor.name === "OnOpponentSwitchOutAbAttr") {
           (
             attr as unknown as {

@@ -953,10 +953,7 @@ export abstract class Move implements Localizable {
         // bypass protection). The holder carries IgnoreProtectByFlagAbAttr(flag);
         // bypass applies when this move has that flag.
         if (user.hasAbilityWithAttr("IgnoreProtectByFlagAbAttr")) {
-          const byFlag = [
-            ...user.getAbility().getAttrs("IgnoreProtectByFlagAbAttr"),
-            ...user.getPassiveAbilities().flatMap(pa => pa?.getAttrs("IgnoreProtectByFlagAbAttr") ?? []),
-          ];
+          const byFlag = user.getAbilityAttrs("IgnoreProtectByFlagAbAttr");
           if (byFlag.some(a => this.hasFlag(a.flag))) {
             return true;
           }
@@ -970,7 +967,7 @@ export abstract class Move implements Localizable {
         // moves). Scanned by name (registration-free). Consumers that route
         // their flag check through `doesFlagEffectApply` (the user-aware path)
         // therefore respect the injected flag.
-        const injectAttrs = [...user.getAbility().attrs, ...user.getPassiveAbilities().flatMap(pa => pa?.attrs ?? [])];
+        const injectAttrs = user.getAllActiveAbilityAttrs();
         for (const attr of injectAttrs) {
           if (
             attr?.constructor?.name === "MoveFlagInjectionAbAttr"
@@ -2308,7 +2305,7 @@ export class RecoilAttr extends MoveEffectAttr {
     // RecoilDamageMultiplierAbAttr constructor by name (no central
     // registry edit required).
     const recoilMult = new NumberHolder(1);
-    const userAttrs = [...user.getAbility().attrs, ...user.getPassiveAbilities().flatMap(pa => pa?.attrs ?? [])];
+    const userAttrs = user.getAllActiveAbilityAttrs();
     for (const attr of userAttrs) {
       if (attr && attr.constructor.name === "RecoilDamageMultiplierAbAttr") {
         (attr as unknown as { fire: (mult: NumberHolder) => void }).fire(recoilMult);

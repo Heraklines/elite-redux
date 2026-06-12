@@ -28,7 +28,7 @@
 
 import { AbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
-import { Stat, type EffectiveStat } from "#enums/stat";
+import type { EffectiveStat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
 import type { NumberHolder } from "#utils/common";
 
@@ -85,11 +85,7 @@ export class PersistentFieldAuraAbAttr extends AbAttr {
   public static applyAuras(subject: Pokemon, stat: EffectiveStat, value: NumberHolder): void {
     const field = globalScene.getField().filter(p => p && !p.isFainted());
     for (const holder of field) {
-      const allAttrs = [
-        ...holder.getAbility().attrs,
-        ...holder.getPassiveAbilities().flatMap(pa => pa?.attrs ?? []),
-      ];
-      for (const attr of allAttrs) {
+      for (const attr of holder.getAllActiveAbilityAttrs()) {
         if (!attr || attr.constructor.name !== "PersistentFieldAuraAbAttr") {
           continue;
         }

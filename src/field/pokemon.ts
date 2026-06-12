@@ -1658,8 +1658,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // crit-stage bonus. Scanned by name (registration-free); max, not sum.
     let fieldCritBonus = 0;
     for (const p of globalScene.getField(true)) {
-      const attrs = [...p.getAbility().attrs, ...p.getPassiveAbilities().flatMap(pa => pa?.attrs ?? [])];
-      for (const attr of attrs) {
+      for (const attr of p.getAllActiveAbilityAttrs()) {
         if (attr?.constructor?.name === "FieldCritBoostAbAttr") {
           fieldCritBonus = Math.max(fieldCritBonus, (attr as unknown as { bonus: number }).bonus);
         }
@@ -1668,8 +1667,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     critStage.value += fieldCritBonus;
 
     // ER Pretentious: the attacker's accumulated KO crit-stacks. Scanned by name.
-    const sourceAttrs = [...source.getAbility().attrs, ...source.getPassiveAbilities().flatMap(pa => pa?.attrs ?? [])];
-    for (const attr of sourceAttrs) {
+    for (const attr of source.getAllActiveAbilityAttrs()) {
       if (attr?.constructor?.name === "CritStackOnKoAbAttr") {
         critStage.value += (attr as unknown as { currentStacks: (p: Pokemon) => number }).currentStacks(source);
       }
@@ -2661,6 +2659,44 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   /**
+   * ER (#425): EVERY ability attr currently applicable on this Pokémon — the
+   * active ability plus each ELIGIBLE innate slot, with the same gating as
+   * {@linkcode getAbilityAttrs} / applyAbAttrsInternal (enemy level slot-limit,
+   * per-slot {@linkcode canApplyAbility} — which enforces the player's candy
+   * unlocks — and ability-id dedup).
+   *
+   * The "registration-free" name-scan sites (OffensiveTypeChartOverrideAbAttr
+   * and friends) used to read `getAbility().attrs` + `getPassiveAbilities()`
+   * RAW, which leaked LOCKED innates into battle — a locked Overwhelm let
+   * Dragon moves hit Fairies. All such sites must route through this.
+   */
+  public getAllActiveAbilityAttrs(): readonly AbAttrMap[AbAttrString][] {
+    const out: AbAttrMap[AbAttrString][] = [];
+    const active = this.getAbility();
+    const seen = new Set<number>([active.id]);
+    if (this.canApplyAbility()) {
+      out.push(...active.attrs);
+    }
+    const passives = this.getPassiveAbilities();
+    const slotLimit = getEnemyPassiveSlotLimit(this);
+    for (let slot = 0; slot < passives.length; slot++) {
+      // ER Black Shinies (#349): GIFT slots (>= 3) ignore the enemy level limit.
+      if (slot < 3 && slot >= slotLimit) {
+        continue;
+      }
+      const pa = passives[slot];
+      if (!pa || seen.has(pa.id)) {
+        continue;
+      }
+      if (this.canApplyAbility(true, slot)) {
+        out.push(...pa.attrs);
+        seen.add(pa.id);
+      }
+    }
+    return out;
+  }
+
+  /**
    * Set this Pokémon's temporary ability, activating it if it normally activates on summon
    *
    * Also clears primal weather if it is from the ability being changed
@@ -3351,10 +3387,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // Molten Down). Scanned by name (same registration-free pattern as
     // RecoilDamageMultiplierAbAttr) so no central AbAttr-map edit is needed.
     if (source) {
-      const sourceAttrs = [
-        ...source.getAbility().attrs,
-        ...source.getPassiveAbilities().flatMap(pa => pa?.attrs ?? []),
-      ];
+      const sourceAttrs = source.getAllActiveAbilityAttrs();
       for (const attr of sourceAttrs) {
         if (attr?.constructor?.name === "OffensiveTypeChartOverrideAbAttr") {
           (attr as unknown as { fire: (mt: PokemonType, dts: PokemonType[], h: NumberHolder) => void }).fire(
@@ -3390,7 +3423,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // this Pokémon's own ability/innates can divide out a super-effective
     // contribution of one of its types, so the matchup reads neutral (no SE message).
     {
-      const defAttrs = [...this.getAbility().attrs, ...this.getPassiveAbilities().flatMap(pa => pa?.attrs ?? [])];
+      const defAttrs = this.getAllActiveAbilityAttrs();
       for (const attr of defAttrs) {
         if (attr?.constructor?.name === "DefensiveTypeWeaknessNullAbAttr") {
           (attr as unknown as { fire: (mt: PokemonType, dts: readonly PokemonType[], h: NumberHolder) => void }).fire(
@@ -4425,7 +4458,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // Momentum: use Speed on contact). Scanned by name — registration-free,
     // same pattern as OffensiveTypeChartOverrideAbAttr.
     if (!ignoreSourceAbility) {
-      const subAttrs = [...source.getAbility().attrs, ...source.getPassiveAbilities().flatMap(pa => pa?.attrs ?? [])];
+      const subAttrs = source.getAllActiveAbilityAttrs();
       for (const attr of subAttrs) {
         if (attr?.constructor?.name === "AttackStatSubstituteAbAttr") {
           const sub = (

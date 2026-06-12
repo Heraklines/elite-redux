@@ -1670,7 +1670,7 @@ export class AddMoveFlagAbAttr extends AbAttr {
     if (!user || user.summonData?.abilitySuppressed) {
       return false;
     }
-    const attrs = [...user.getAbility().attrs, ...user.getPassiveAbilities().flatMap(pa => pa?.attrs ?? [])];
+    const attrs = user.getAllActiveAbilityAttrs();
     for (const attr of attrs) {
       if (attr?.constructor?.name !== "AddMoveFlagAbAttr") {
         continue;
