@@ -114,6 +114,19 @@
       .factory-item.out img { filter: grayscale(1); }
       .factory-item.dirty { border-color: var(--accent); }
       .dyn { color: var(--warn); font-size: 11px; }
+      .knob-row2 {
+        display: flex; gap: 10px; align-items: center; padding: 7px 0;
+        border-bottom: 1px solid var(--line); flex-wrap: wrap;
+      }
+      .knob-row2:last-child { border-bottom: none; }
+      .knob-row2 .klabel { width: 290px; min-width: 200px; }
+      .knob-row2 .klabel small { display: block; color: var(--muted); font-size: 11px; }
+      .knob-row2 input[type="text"] { width: 320px; font-family: ui-monospace, monospace; font-size: 13px; }
+      .knob-row2.dirty { background: rgba(179, 36, 92, 0.07); }
+      .knob-row2 .warn-badge { color: var(--warn); font-size: 11px; font-weight: 700; }
+      .map-rows { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 280px; }
+      .map-rows .map-row { display: flex; gap: 8px; align-items: center; }
+      .map-rows .map-row .mkey { width: 140px; color: var(--muted); font-size: 12px; }
     </style>
   </head>
   <body>
@@ -139,6 +152,7 @@
       <button type="button" data-tab="species">📊 Species</button>
       <button type="button" data-tab="items">🎒 Items</button>
       <button type="button" data-tab="trainers">🤺 Trainers</button>
+      <button type="button" data-tab="game">🎛 Game</button>
     </nav>
     <main id="content"></main>
     <script src="./app.js"></script>

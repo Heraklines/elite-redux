@@ -228,6 +228,56 @@ function validateTrainerTuningDelta(delta: unknown): ValidationResult {
   return { ok: true };
 }
 
+/**
+ * Balance-tuning delta: dotted knob key → number | number[] | [number,number][]
+ * | { name: number } | null. Shape-only validation — the GAME's loader
+ * (er-balance-tuning.ts) revalidates every value against the knob registry and
+ * falls back to the default for anything out of range, so a bad value can
+ * never break a build.
+ */
+function validateBalanceTuningDelta(delta: unknown): ValidationResult {
+  if (!isPlainObject(delta)) {
+    return { ok: false, error: "delta must be an object" };
+  }
+  const okNumber = (v: unknown): boolean => isFiniteNumber(v) && Math.abs(v) <= 1e9;
+  for (const [key, value] of Object.entries(delta)) {
+    if (!/^[a-z][a-zA-Z0-9.]{0,80}$/.test(key)) {
+      return { ok: false, error: `bad knob key: ${key}` };
+    }
+    if (value === null || okNumber(value)) {
+      continue;
+    }
+    if (Array.isArray(value)) {
+      if (value.length > 64) {
+        return { ok: false, error: `${key}: list too long` };
+      }
+      const allNumbers = value.every(okNumber);
+      const allPairs = value.every(p => Array.isArray(p) && p.length === 2 && p.every(okNumber));
+      if (!allNumbers && !allPairs) {
+        return { ok: false, error: `${key}: must be a list of numbers or [a, b] pairs` };
+      }
+      continue;
+    }
+    if (isPlainObject(value)) {
+      const entries = Object.entries(value);
+      if (entries.length > 64) {
+        return { ok: false, error: `${key}: too many map keys` };
+      }
+      for (const [mapKey, mapValue] of entries) {
+        if (!/^[A-Za-z0-9_]{1,40}$/.test(mapKey)) {
+          return { ok: false, error: `${key}: bad map key "${mapKey}"` };
+        }
+        if (mapValue !== null && !okNumber(mapValue)) {
+          return { ok: false, error: `${key}.${mapKey}: must be a number or null` };
+        }
+      }
+      continue;
+    }
+    return { ok: false, error: `${key}: unsupported value type` };
+  }
+  return { ok: true };
+}
+
 /** The ONLY repo paths this Worker will ever write. */
 const EDITABLE_FILES: Record<string, EditableFile> = {
   "egg-moves": {
@@ -249,6 +299,11 @@ const EDITABLE_FILES: Record<string, EditableFile> = {
     path: "src/data/elite-redux/er-trainer-tuning.json",
     label: "trainer tuning",
     validate: validateTrainerTuningDelta,
+  },
+  "balance-tuning": {
+    path: "src/data/elite-redux/er-balance-tuning.json",
+    label: "balance tuning",
+    validate: validateBalanceTuningDelta,
   },
 };
 

@@ -20,6 +20,7 @@
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
 import { allSpecies } from "#data/data-lists";
+import { ER_BALANCE_KNOBS } from "#data/elite-redux/er-balance-knobs";
 import { ER_TRAINER_CADENCE } from "#data/elite-redux/er-battle-frequency";
 import { ER_FACTORY_SETS } from "#data/elite-redux/er-factory-sets";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
@@ -190,6 +191,8 @@ describe("tools — dump editor SPA data", () => {
     writeFileSync("editor/data/species.json", `${JSON.stringify(species, null, 2)}\n`, "utf8");
     writeFileSync("editor/data/items.json", `${JSON.stringify(items, null, 2)}\n`, "utf8");
     writeFileSync("editor/data/trainers.json", `${JSON.stringify(trainers, null, 2)}\n`, "utf8");
+    // The Game tab renders straight from the knob registry (single source of truth).
+    writeFileSync("editor/data/balance-knobs.json", `${JSON.stringify(ER_BALANCE_KNOBS, null, 2)}\n`, "utf8");
 
     // Sanity: the roster covers every starter-cost entry that is a real species,
     // includes vanilla + ER customs, and lost nobody to a missing const key.

@@ -34,12 +34,16 @@ const MOVE_SET = new Set();
 let ITEMS = []; // [{key, tier, weight, maxWeight}]
 let TRAINER_DEFAULTS = { elite: {}, hell: {} };
 let FACTORY_SPECIES = []; // [{const, name, sets}]
+let KNOBS = []; // balance-knob registry rows (editor/data/balance-knobs.json)
 
 // Per-domain current/baseline (baseline = last saved; dirty = current != baseline).
 const egg = { current: {}, baseline: {} }; // const → [moves]
 const sp = { current: {}, baseline: {} }; // const → {eggTier, cost}
 const item = { current: {}, baseline: {} }; // key → {tier, weight, maxStack} ("" = no override)
 const tr = { current: null, baseline: null }; // {freq: {elite:{...}, hell:{...}}, excluded: [...]}
+// Balance knobs: key → override value in JSON form (absent = no override).
+// Maps store ONLY the overridden entries ({entryKey: number}).
+const bal = { current: {}, baseline: {} };
 
 // Usage tiers (fetched at runtime; graceful "unranked" fallback when missing).
 const usage = { loaded: false, lines: {} };
@@ -162,14 +166,20 @@ function dirtyCounts() {
   if (tr.current && !jsonEq(tr.current.excluded, tr.baseline.excluded)) {
     trN++;
   }
-  return { eggN, spN, itemN, trN, total: eggN + spN + itemN + trN };
+  let balN = 0;
+  for (const knob of KNOBS) {
+    if (!jsonEq(bal.current[knob.key], bal.baseline[knob.key])) {
+      balN++;
+    }
+  }
+  return { eggN, spN, itemN, trN, balN, total: eggN + spN + itemN + trN + balN };
 }
 
 function refreshChrome() {
-  const { eggN, spN, itemN, trN, total } = dirtyCounts();
+  const { eggN, spN, itemN, trN, balN, total } = dirtyCounts();
   saveBtn.textContent = `Save ${total} change${total === 1 ? "" : "s"}`;
   saveBtn.disabled = total === 0;
-  const dots = { eggmoves: eggN, species: spN, items: itemN, trainers: trN };
+  const dots = { eggmoves: eggN, species: spN, items: itemN, trainers: trN, game: balN };
   document.querySelectorAll("nav.tabs button").forEach(b => {
     const n = dots[b.dataset.tab];
     const label = b.textContent.replace(/\s*●$/, "");
@@ -390,6 +400,160 @@ function renderTrainers(root) {
       .join("")}</div>${visible.length === 0 ? '<div class="empty">No species match your search/filter.</div>' : ""}`;
 }
 
+// ---- Game tab (balance knobs) -----------------------------------------------
+// Each knob row shows the EFFECTIVE value (override or default) with the same
+// default/overridden badge + reset treatment as the Trainers tab. Arrays are
+// comma-separated, pair ladders are "a:b, a:b", maps get one sub-row per entry.
+
+const fmtArr = a => a.join(", ");
+const fmtPairs = p => p.map(x => `${x[0]}:${x[1]}`).join(", ");
+
+function parseKnobText(knob, text) {
+  const t = (text || "").trim();
+  if (t === "") {
+    return { error: "empty" };
+  }
+  const nums = v => (/^-?\d+(\.\d+)?$/.test(v) ? Number(v) : Number.NaN);
+  if (knob.kind === "pairs") {
+    const pairs = t.split(",").map(part => part.split(":").map(s => nums(s.trim())));
+    if (pairs.some(p => p.length !== 2 || p.some(Number.isNaN))) {
+      return { error: "use a:b pairs separated by commas" };
+    }
+    return { value: pairs };
+  }
+  const arr = t.split(",").map(s => nums(s.trim()));
+  if (arr.some(Number.isNaN)) {
+    return { error: "use numbers separated by commas" };
+  }
+  return { value: arr };
+}
+
+function knobValueError(knob, value) {
+  const okNum = v =>
+    typeof v === "number"
+    && Number.isFinite(v)
+    && v >= knob.min
+    && v <= knob.max
+    && (!knob.integer || Number.isInteger(v));
+  const ordered = (vals, ordering) => {
+    for (let i = 1; i < vals.length; i++) {
+      if (ordering === "asc" ? vals[i] < vals[i - 1] : vals[i] > vals[i - 1]) {
+        return false;
+      }
+    }
+    return true;
+  };
+  const range = `${knob.min}-${knob.max}${knob.integer ? " (whole numbers)" : ""}`;
+  if (knob.kind === "scalar") {
+    return okNum(value) ? null : `must be ${range}`;
+  }
+  if (knob.kind === "array") {
+    if (!Array.isArray(value) || (knob.length > 0 && value.length !== knob.length)) {
+      return `needs exactly ${knob.length} values`;
+    }
+    if (!value.every(okNum)) {
+      return `every value must be ${range}`;
+    }
+    if (knob.ordering && !ordered(value, knob.ordering)) {
+      return knob.ordering === "asc" ? "values must not decrease" : "values must decrease";
+    }
+    return null;
+  }
+  if (knob.kind === "pairs") {
+    if (!Array.isArray(value) || value.length === 0 || (knob.length > 0 && value.length > knob.length)) {
+      return `needs 1-${knob.length} pairs`;
+    }
+    if (!value.every(p => Array.isArray(p) && p.length === 2 && p.every(okNum))) {
+      return `every number must be ${range}`;
+    }
+    if (
+      !ordered(
+        value.map(p => p[0]),
+        "asc",
+      )
+      || !ordered(
+        value.map(p => p[1]),
+        "asc",
+      )
+    ) {
+      return "both columns must increase";
+    }
+    return null;
+  }
+  return null;
+}
+
+/** Effective value of a map entry (override or registry default). */
+function mapEntryValue(knob, entryKey) {
+  const o = bal.current[knob.key];
+  return o && typeof o[entryKey] === "number" ? o[entryKey] : knob.default[entryKey];
+}
+
+function knobRowHtml(knob) {
+  const cur = bal.current[knob.key];
+  const overridden = cur !== undefined && (knob.kind !== "map" || Object.keys(cur).length > 0);
+  const dirty = !jsonEq(bal.current[knob.key], bal.baseline[knob.key]);
+  const badge = overridden
+    ? `<span class="badge override">overridden</span><button type="button" class="bal-reset" data-balkey="${knob.key}" title="Back to the default">↺ default</button>`
+    : '<span class="badge" title="Using the game default">default</span>';
+  const warn = knob.advanced
+    ? '<span class="warn-badge" title="Advanced knob - a careless value here reshapes whole runs. The game ignores out-of-range values, but double-check what you type.">⚠ advanced</span>'
+    : "";
+  let control = "";
+  if (knob.kind === "scalar") {
+    const shown = overridden ? cur : knob.default;
+    control = `<input type="number" class="bal-num" data-balkey="${knob.key}" min="${knob.min}" max="${knob.max}" step="${knob.integer ? 1 : "any"}" value="${esc(shown)}" title="${esc(knob.help)} Default: ${knob.default}." />`;
+  } else if (knob.kind === "array" || knob.kind === "pairs") {
+    const fmt = knob.kind === "pairs" ? fmtPairs : fmtArr;
+    const shown = overridden ? fmt(cur) : fmt(knob.default);
+    control = `<input type="text" class="bal-text" data-balkey="${knob.key}" value="${esc(shown)}" spellcheck="false" title="${esc(knob.help)} Default: ${fmt(knob.default)}." />`;
+  } else {
+    control = `<div class="map-rows">${Object.keys(knob.default)
+      .map(entryKey => {
+        const entryOverridden = cur && typeof cur[entryKey] === "number";
+        return `<div class="map-row"><span class="mkey">${esc(entryKey)}</span>
+          <input type="number" class="bal-map" data-balkey="${knob.key}" data-entry="${esc(entryKey)}" min="${knob.min}" max="${knob.max}" step="${knob.integer ? 1 : "any"}" value="${esc(mapEntryValue(knob, entryKey))}" title="${esc(knob.help)} Default: ${knob.default[entryKey]}." />
+          ${entryOverridden ? `<button type="button" class="bal-map-reset" data-balkey="${knob.key}" data-entry="${esc(entryKey)}" title="Back to the default (${knob.default[entryKey]})">↺ ${knob.default[entryKey]}</button>` : ""}</div>`;
+      })
+      .join("")}</div>`;
+  }
+  return `<div class="knob-row2${dirty ? " dirty" : ""}">
+    <span class="klabel">${esc(knob.label)} ${warn}<small>${esc(knob.help)}</small></span>
+    ${control}
+    <span class="knob-cell">${badge}</span>
+  </div>`;
+}
+
+function renderGame(root) {
+  const f = ($("#search").value || "").trim().toLowerCase();
+  const groups = [];
+  for (const knob of KNOBS) {
+    if (
+      f
+      && !knob.label.toLowerCase().includes(f)
+      && !knob.key.toLowerCase().includes(f)
+      && !knob.group.toLowerCase().includes(f)
+    ) {
+      continue;
+    }
+    let g = groups.find(x => x.name === knob.group);
+    if (!g) {
+      g = { name: knob.group, rows: [] };
+      groups.push(g);
+    }
+    g.rows.push(knobRowHtml(knob));
+  }
+  root.innerHTML = `${groups
+    .map(
+      g => `<div class="section">
+      <h2>${esc(g.name)}</h2>
+      ${g.rows.join("")}
+    </div>`,
+    )
+    .join("")}${groups.length === 0 ? '<div class="empty">No knobs match your search.</div>' : ""}
+    <p class="hint" style="margin:0 16px 16px;color:var(--muted);font-size:12px">Every value here is validated twice: the editor refuses obviously bad input, and the game itself ignores any out-of-range override and keeps its default - a bad save cannot break a build.</p>`;
+}
+
 // ---- Render dispatch --------------------------------------------------------------
 function render() {
   const root = $("#content");
@@ -399,8 +563,10 @@ function render() {
     renderSpecies(root);
   } else if (activeTab === "items") {
     renderItems(root);
-  } else {
+  } else if (activeTab === "trainers") {
     renderTrainers(root);
+  } else {
+    renderGame(root);
   }
   refreshChrome();
 }
@@ -456,6 +622,60 @@ function onInput(e) {
     const max = el.dataset.knob === "trainerCadence" ? 50 : 100;
     const min = el.dataset.knob === "trainerCadence" ? 1 : 0;
     el.style.borderColor = v === "" || (v >= min && v <= max) ? "" : ERR;
+  } else if (
+    el.classList.contains("bal-num")
+    || el.classList.contains("bal-text")
+    || el.classList.contains("bal-map")
+  ) {
+    const knob = KNOBS.find(k => k.key === el.dataset.balkey);
+    if (!knob) {
+      return;
+    }
+    if (el.classList.contains("bal-num")) {
+      const v = el.value === "" ? Number.NaN : Number(el.value);
+      if (v === knob.default) {
+        delete bal.current[knob.key];
+        el.style.borderColor = "";
+      } else {
+        bal.current[knob.key] = v;
+        el.style.borderColor = knobValueError(knob, v) ? ERR : "";
+      }
+    } else if (el.classList.contains("bal-map")) {
+      const entry = el.dataset.entry;
+      const v = el.value === "" ? Number.NaN : Number(el.value);
+      const cur = { ...(bal.current[knob.key] || {}) };
+      if (v === knob.default[entry]) {
+        delete cur[entry];
+      } else {
+        cur[entry] = v;
+      }
+      if (Object.keys(cur).length === 0) {
+        delete bal.current[knob.key];
+      } else {
+        bal.current[knob.key] = cur;
+      }
+      const bad = !(
+        typeof v === "number"
+        && Number.isFinite(v)
+        && v >= knob.min
+        && v <= knob.max
+        && (!knob.integer || Number.isInteger(v))
+      );
+      el.style.borderColor = v === knob.default[entry] || !bad ? "" : ERR;
+    } else {
+      const parsed = parseKnobText(knob, el.value);
+      if (parsed.error) {
+        bal.current[knob.key] = { __invalid: el.value };
+        el.style.borderColor = ERR;
+      } else if (jsonEq(parsed.value, knob.default)) {
+        delete bal.current[knob.key];
+        el.style.borderColor = "";
+      } else {
+        bal.current[knob.key] = parsed.value;
+        el.style.borderColor = knobValueError(knob, parsed.value) ? ERR : "";
+      }
+    }
+    el.closest(".knob-row2")?.classList.toggle("dirty", !jsonEq(bal.current[knob.key], bal.baseline[knob.key]));
   } else {
     return;
   }
@@ -486,6 +706,24 @@ function onClick(e) {
   const chip = e.target.closest(".chip");
   if (chip) {
     factoryFilter = chip.dataset.facfilter;
+    render();
+    return;
+  }
+  const balReset = e.target.closest(".bal-reset");
+  if (balReset) {
+    delete bal.current[balReset.dataset.balkey];
+    render();
+    return;
+  }
+  const balMapReset = e.target.closest(".bal-map-reset");
+  if (balMapReset) {
+    const cur = { ...(bal.current[balMapReset.dataset.balkey] || {}) };
+    delete cur[balMapReset.dataset.entry];
+    if (Object.keys(cur).length === 0) {
+      delete bal.current[balMapReset.dataset.balkey];
+    } else {
+      bal.current[balMapReset.dataset.balkey] = cur;
+    }
     render();
   }
 }
@@ -626,6 +864,58 @@ function buildDeltas() {
     }
   }
 
+  // Balance knobs: changed keys only; a removed override sends null (delete).
+  const balDelta = {};
+  for (const knob of KNOBS) {
+    const cur = bal.current[knob.key];
+    const base = bal.baseline[knob.key];
+    if (jsonEq(cur, base)) {
+      continue;
+    }
+    if (cur === undefined) {
+      balDelta[knob.key] = null;
+      continue;
+    }
+    if (cur && cur.__invalid !== undefined) {
+      bad.push(`${knob.label}: could not read the value`);
+      continue;
+    }
+    if (knob.kind === "map") {
+      const err = Object.values(cur).some(
+        v =>
+          !(
+            typeof v === "number"
+            && Number.isFinite(v)
+            && v >= knob.min
+            && v <= knob.max
+            && (!knob.integer || Number.isInteger(v))
+          ),
+      );
+      if (err) {
+        bad.push(`${knob.label}: every value must be ${knob.min}-${knob.max}`);
+        continue;
+      }
+      // Per-entry delta: overridden entries + null for entries the baseline had.
+      const entryDelta = { ...cur };
+      for (const entryKey of Object.keys(base || {})) {
+        if (entryDelta[entryKey] === undefined) {
+          entryDelta[entryKey] = null;
+        }
+      }
+      balDelta[knob.key] = entryDelta;
+      continue;
+    }
+    const err = knobValueError(knob, cur);
+    if (err) {
+      bad.push(`${knob.label}: ${err}`);
+      continue;
+    }
+    balDelta[knob.key] = cur;
+  }
+  if (Object.keys(balDelta).length > 0) {
+    deltas["balance-tuning"] = balDelta;
+  }
+
   return { deltas, bad };
 }
 
@@ -719,6 +1009,8 @@ function markSaved(file) {
     item.baseline = JSON.parse(JSON.stringify(item.current));
   } else if (file === "trainer-tuning") {
     tr.baseline = JSON.parse(JSON.stringify(tr.current));
+  } else if (file === "balance-tuning") {
+    bal.baseline = JSON.parse(JSON.stringify(bal.current));
   }
 }
 
@@ -731,22 +1023,34 @@ const fetchJson = (url, fallback) =>
 async function init() {
   try {
     const bust = `?t=${Date.now()}`;
-    const [species, moves, items, trainers, eggLive, spLive, itemLive, trLive] = await Promise.all([
+    const [species, moves, items, trainers, knobs, eggLive, spLive, itemLive, trLive, balLive] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
       fetchJson("./data/items.json", []),
       fetchJson("./data/trainers.json", { frequencyDefaults: { elite: {}, hell: {} }, factorySpecies: [] }),
+      fetchJson("./data/balance-knobs.json", []),
       // Live override files (resilient: missing on the branch → start empty).
       fetchJson(`${RAW_BASE}/er-egg-moves.json${bust}`, {}),
       fetchJson(`${RAW_BASE}/er-species-tuning.json${bust}`, {}),
       fetchJson(`${RAW_BASE}/er-item-tuning.json${bust}`, {}),
       fetchJson(`${RAW_BASE}/er-trainer-tuning.json${bust}`, {}),
+      fetchJson(`${RAW_BASE}/er-balance-tuning.json${bust}`, {}),
     ]);
     SPECIES = species;
     MOVES = moves;
     ITEMS = items;
     TRAINER_DEFAULTS = trainers.frequencyDefaults;
     FACTORY_SPECIES = trainers.factorySpecies;
+    KNOBS = knobs;
+
+    // Seed balance-knob overrides from the live tuning file (only keys that
+    // are still in the registry; map overrides keep just their own entries).
+    for (const knob of KNOBS) {
+      if (balLive[knob.key] !== undefined && balLive[knob.key] !== null) {
+        bal.current[knob.key] = balLive[knob.key];
+      }
+    }
+    bal.baseline = JSON.parse(JSON.stringify(bal.current));
     for (const m of MOVES) {
       MOVE_SET.add(m);
     }
@@ -822,7 +1126,12 @@ async function init() {
     content.addEventListener("change", e => {
       if (e.target.classList.contains("slot")) {
         pushUndoIfChanged(e.target.dataset.const);
-      } else if (e.target.classList.contains("tr-knob")) {
+      } else if (
+        e.target.classList.contains("tr-knob")
+        || e.target.classList.contains("bal-num")
+        || e.target.classList.contains("bal-text")
+        || e.target.classList.contains("bal-map")
+      ) {
         render();
       }
     });
