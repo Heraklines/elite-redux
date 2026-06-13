@@ -54,13 +54,22 @@ export class LoadingScene extends SceneBase {
       .loadImage("er_binfo_field_tile", "elite-redux/battle-info", "field-forest.png")
       .loadImage("er_binfo_stat_up", "elite-redux/battle-info", "stat_up_arrow.png")
       .loadImage("er_binfo_stat_down", "elite-redux/battle-info", "stat_down_arrow.png")
-      .loadImage("er_binfo_check", "elite-redux/battle-info", "check.png")
-      // ER Biome Market (#440): BW-ROM shop backdrop + shopkeeper sprites for
-      // the bespoke per-biome market screen (staging-only feature for now).
-      .loadImage("er_biome_shop_bg", "biome-shop", "backdrop.png");
-    for (let i = 0; i < 16; i++) {
-      const idx = i.toString().padStart(2, "0");
-      this.loadImage(`er_biome_shop_keeper_${idx}`, "biome-shop", `keeper_${idx}.png`);
+      .loadImage("er_binfo_check", "elite-redux/battle-info", "check.png");
+    // ER Biome Market (#440): the shopkeeper is a real PokeRogue trainer-class
+    // sprite (mapped per biome in BiomeShopUiHandler). Preload the curated set
+    // so the market can show one without an on-the-fly atlas load. The backdrop
+    // is the game's own default_bg panel (already loaded), not a ROM image.
+    for (const keeper of [
+      "baker",
+      "fisherman",
+      "hiker",
+      "backpacker_m",
+      "parasol_lady",
+      "maid",
+      "beauty",
+      "aroma_lady",
+    ]) {
+      this.loadAtlas(keeper, "trainer");
     }
     this.loadAtlas("bg", "ui")
       .loadAtlas("prompt", "ui")

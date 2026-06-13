@@ -209,11 +209,17 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
 
   globalScene.executeWithSeedOffset(
     () => {
-      // 1. STAPLES: the four ball tiers, always in stock, always affordable.
-      // (The spec's "heals/balls" staples drop the heals per maintainer rule.)
-      for (const key of ER_SHOP_CATEGORY_POOL.BALLS) {
-        add(key, "BALLS");
-      }
+      // 1. STAPLES: the four ball tiers, always in stock. Prices ESCALATE by
+      // ball rarity (Poke < Great < Ultra < Rogue) so they don't all read the
+      // same - the plain add() would flat-price every ball at the staple tier.
+      const ballMult = [1, 2, 4, 9];
+      ER_SHOP_CATEGORY_POOL.BALLS.forEach((key, idx) => {
+        if (!seen.has(key) && stock.length < TARGET_SLOTS) {
+          seen.add(key);
+          const base = priceOf(key, "BALLS");
+          stock.push({ key, cost: Math.max(10, Math.floor((base * (ballMult[idx] ?? 1)) / 10) * 10) });
+        }
+      });
       // 2. SIGNATURES: the biome's identity items, always stocked, ultra-priced.
       for (const key of eco.signature) {
         if (!seen.has(key) && stock.length < TARGET_SLOTS) {

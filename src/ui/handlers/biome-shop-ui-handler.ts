@@ -7,12 +7,14 @@
 // =============================================================================
 // ER Biome Market (#440) - the bespoke every-10-waves shop UI.
 //
-// A FULL-SCREEN, distinct-from-the-wave-shop screen (design doc §1):
-//   - full-screen BW market backdrop
-//   - a per-biome shopkeeper sprite on the left third
-//   - a "<BIOME> MARKET" banner + greeting up top, money top-right
-//   - a 4x4 GRID (16 slots) of item icons + prices with a starter-grid-style
-//     cursor. The whole screen is stock - no "one row of heals + reward row".
+// Full-screen, distinct-from-the-wave-shop screen (design doc §1):
+//   - clean default_bg panel + a framed grid window (the ROM backdrop rip was
+//     a garbage placeholder, so we use the game's own UI art)
+//   - a real PokeRogue trainer-class sprite as the per-biome shopkeeper (left)
+//   - a "<BIOME> MARKET" banner + the focused item's name + money up top
+//   - a 4x4 GRID (16 slots): each cell is an item icon + price (compact, no
+//     per-cell name, so labels never collide); the focused item's full name is
+//     shown once in the header.
 //
 // All purchase / party-target / money plumbing is REUSED from
 // SelectModifierPhase (BiomeShopPhase subclasses it); this handler is pure
@@ -21,14 +23,14 @@
 
 import { globalScene } from "#app/global-scene";
 import { ER_BIOME_SHOP_SLOTS } from "#data/elite-redux/er-biome-economy";
-import type { BiomeId } from "#enums/biome-id";
+import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import type { ModifierTypeOption } from "#modifiers/modifier-type";
-import { ModifierOption } from "#ui/modifier-select-ui-handler";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
+import { addWindow } from "#ui/ui-theme";
 import { formatMoney, getBiomeName } from "#utils/common";
 
 /** Buy a slot (index) or leave the shop (index < 0). */
@@ -36,24 +38,64 @@ export type BiomeShopSelectCallback = (index: number) => boolean;
 
 const GRID_COLS = 4;
 
+// Layout in the 320x180 logical screen (container sits at the screen top-left,
+// matching the egg-gacha convention: child (0,0) == screen top-left).
+const COL_STEP = 52;
+const ROW_STEP = 29;
+const GRID_X = 124; // centre of the first column
+const GRID_Y = 60; // centre of the first row
+const KEEPER_X = 46;
+
+/** Per-biome shopkeeper, cast from the preloaded trainer-class sprites. */
+const KEEPER_BY_BIOME: Partial<Record<BiomeId, string>> = {
+  [BiomeId.SEA]: "fisherman",
+  [BiomeId.BEACH]: "fisherman",
+  [BiomeId.LAKE]: "fisherman",
+  [BiomeId.SEABED]: "fisherman",
+  [BiomeId.ISLAND]: "fisherman",
+  [BiomeId.SWAMP]: "fisherman",
+  [BiomeId.MOUNTAIN]: "hiker",
+  [BiomeId.CAVE]: "hiker",
+  [BiomeId.BADLANDS]: "hiker",
+  [BiomeId.VOLCANO]: "hiker",
+  [BiomeId.DESERT]: "backpacker_m",
+  [BiomeId.WASTELAND]: "backpacker_m",
+  [BiomeId.CONSTRUCTION_SITE]: "backpacker_m",
+  [BiomeId.POWER_PLANT]: "backpacker_m",
+  [BiomeId.FACTORY]: "backpacker_m",
+  [BiomeId.LABORATORY]: "backpacker_m",
+  [BiomeId.SPACE]: "backpacker_m",
+  [BiomeId.ICE_CAVE]: "parasol_lady",
+  [BiomeId.SNOWY_FOREST]: "parasol_lady",
+  [BiomeId.FOREST]: "aroma_lady",
+  [BiomeId.JUNGLE]: "aroma_lady",
+  [BiomeId.TALL_GRASS]: "aroma_lady",
+  [BiomeId.GRASS]: "aroma_lady",
+  [BiomeId.MEADOW]: "aroma_lady",
+  [BiomeId.GRAVEYARD]: "maid",
+  [BiomeId.RUINS]: "maid",
+  [BiomeId.TEMPLE]: "maid",
+  [BiomeId.FAIRY_CAVE]: "maid",
+  [BiomeId.METROPOLIS]: "beauty",
+  [BiomeId.SLUM]: "beauty",
+  [BiomeId.DOJO]: "hiker",
+};
+
 export class BiomeShopUiHandler extends UiHandler {
   private shopContainer: Phaser.GameObjects.Container;
-  private bg: Phaser.GameObjects.Image;
-  private keeper: Phaser.GameObjects.Image;
+  private bg: Phaser.GameObjects.NineSlice;
+  private gridWindow: Phaser.GameObjects.NineSlice;
+  private keeper: Phaser.GameObjects.Sprite;
   private bannerText: Phaser.GameObjects.Text;
-  private greetingText: Phaser.GameObjects.Text;
+  private itemNameText: Phaser.GameObjects.Text;
   private moneyText: Phaser.GameObjects.Text;
+  private leaveText: Phaser.GameObjects.Text;
   private cursorObj: Phaser.GameObjects.Rectangle;
 
-  private cells: ModifierOption[] = [];
+  /** One {icon, price} pair per stocked slot. */
+  private cells: { icon: Phaser.GameObjects.Sprite; price: Phaser.GameObjects.Text }[] = [];
   private options: ModifierTypeOption[] = [];
   private onSelect: BiomeShopSelectCallback | null = null;
-
-  // Grid geometry, in the 320x180 logical screen (right two-thirds).
-  private readonly colStep = 52;
-  private readonly rowStep = 33;
-  private readonly gridX = 128;
-  private readonly gridY = 54;
 
   constructor() {
     super(UiMode.BIOME_SHOP);
@@ -61,113 +103,138 @@ export class BiomeShopUiHandler extends UiHandler {
 
   setup(): void {
     const ui = this.getUi();
-    const screenW = globalScene.scaledCanvas.width;
-    const screenH = globalScene.scaledCanvas.height;
+    const w = globalScene.scaledCanvas.width;
+    const h = globalScene.scaledCanvas.height;
 
-    // Container origin sits at the top-left of the visible screen (matches the
-    // egg-gacha screen convention: child (0,0) == screen top-left).
-    this.shopContainer = globalScene.add.container(0, -screenH);
+    this.shopContainer = globalScene.add.container(0, -h);
     this.shopContainer.setVisible(false);
     ui.add(this.shopContainer);
 
-    this.bg = globalScene.add.image(0, 0, "er_biome_shop_bg").setOrigin(0, 0);
-    this.bg.setDisplaySize(screenW, screenH);
+    // Backdrop: the game's own dark panel (clean, intentional), tinted per biome
+    // in show(). Far better than the placeholder ROM rip.
+    this.bg = globalScene.add.nineslice(0, 0, "default_bg", undefined, w, h, 0, 0, 16, 0).setOrigin(0);
     this.shopContainer.add(this.bg);
 
-    this.keeper = globalScene.add.image(46, screenH - 26, "er_biome_shop_keeper_00").setOrigin(0.5, 1);
+    // Framed shelf window for the item grid (right two thirds).
+    this.gridWindow = addWindow(96, 20, w - 98, 156);
+    this.shopContainer.add(this.gridWindow);
+
+    this.keeper = globalScene.add.sprite(KEEPER_X, h - 8, "baker");
+    this.keeper.setOrigin(0.5, 1);
     this.shopContainer.add(this.keeper);
 
-    this.bannerText = addTextObject(214, 6, "", TextStyle.WINDOW, { fontSize: "96px" });
+    this.bannerText = addTextObject(208, 4, "", TextStyle.WINDOW, { fontSize: "84px" });
     this.bannerText.setOrigin(0.5, 0);
     this.shopContainer.add(this.bannerText);
 
-    this.greetingText = addTextObject(214, 26, "", TextStyle.PARTY, { fontSize: "48px" });
-    this.greetingText.setOrigin(0.5, 0);
-    this.shopContainer.add(this.greetingText);
+    this.itemNameText = addTextObject(208, 24, "", TextStyle.PARTY, { fontSize: "54px" });
+    this.itemNameText.setOrigin(0.5, 0);
+    this.shopContainer.add(this.itemNameText);
 
-    this.moneyText = addTextObject(screenW - 4, 6, "", TextStyle.MONEY);
+    this.moneyText = addTextObject(w - 4, 4, "", TextStyle.MONEY);
     this.moneyText.setOrigin(1, 0);
     this.shopContainer.add(this.moneyText);
 
-    this.cursorObj = globalScene.add.rectangle(0, 0, 46, 40, 0xffffff, 0);
-    this.cursorObj.setStrokeStyle(1.5, 0xffe070);
+    this.leaveText = addTextObject(w - 4, h - 6, "B: Leave", TextStyle.PARTY, { fontSize: "42px" });
+    this.leaveText.setOrigin(1, 1);
+    this.shopContainer.add(this.leaveText);
+
+    this.cursorObj = globalScene.add.rectangle(0, 0, 44, 26, 0xffffff, 0);
+    this.cursorObj.setStrokeStyle(1, 0xf8d030);
     this.cursorObj.setOrigin(0.5);
     this.cursorObj.setVisible(false);
     this.shopContainer.add(this.cursorObj);
   }
 
   show(args: any[]): boolean {
-    // Full (re)build when handed fresh data: [options, biome, callback].
     if (args.length >= 3 && Array.isArray(args[0]) && typeof args[2] === "function") {
       this.options = args[0] as ModifierTypeOption[];
       const biome = args[1] as BiomeId;
       this.onSelect = args[2] as BiomeShopSelectCallback;
 
       this.bannerText.setText(`${getBiomeName(biome)} Market`.toUpperCase());
-      this.greetingText.setText("Take a look at my wares!");
+      this.bg.setTint(biomeTint(biome));
       this.setKeeper(biome);
       this.buildGrid();
       this.cursor = 0;
       this.moveCursorTo(0);
-      this.refreshMoneyAndAffordability();
+      this.refresh();
 
       this.shopContainer.setVisible(true);
       this.active = true;
       return true;
     }
 
-    // Re-shown after a party-target purchase: just refresh money + dims.
+    // Re-shown after a party-target purchase: refresh money + affordability.
     this.shopContainer.setVisible(true);
     this.active = true;
-    this.refreshMoneyAndAffordability();
+    this.refresh();
     return true;
   }
 
-  /** Cast the per-biome shopkeeper from the 16 BW sprites (deterministic). */
   private setKeeper(biome: BiomeId): void {
-    const idx = (((biome as number) % 16) + 16) % 16;
-    const key = `er_biome_shop_keeper_${idx.toString().padStart(2, "0")}`;
+    const key = KEEPER_BY_BIOME[biome] ?? "baker";
     if (globalScene.textures.exists(key)) {
-      this.keeper.setTexture(key);
+      this.keeper.setTexture(key).setFrame(0);
+      this.keeper.setVisible(true);
+      const sh = this.keeper.height || 1;
+      const maxH = 120;
+      this.keeper.setScale(sh > maxH ? maxH / sh : 1);
+    } else {
+      this.keeper.setVisible(false);
     }
-    this.keeper.setVisible(globalScene.textures.exists(this.keeper.texture.key));
-    // Keep the keeper within the left third (cap display height).
-    const h = this.keeper.height || 1;
-    const maxH = 96;
-    this.keeper.setScale(h > maxH ? maxH / h : 1);
   }
 
   private buildGrid(): void {
     for (const cell of this.cells) {
-      cell.destroy();
+      cell.icon.destroy();
+      cell.price.destroy();
     }
     this.cells = [];
     for (let i = 0; i < this.options.length && i < ER_BIOME_SHOP_SLOTS; i++) {
       const col = i % GRID_COLS;
       const row = Math.floor(i / GRID_COLS);
-      const cell = new ModifierOption(
-        this.gridX + col * this.colStep,
-        this.gridY + row * this.rowStep,
-        this.options[i],
+      const x = GRID_X + col * COL_STEP;
+      const y = GRID_Y + row * ROW_STEP;
+      const type = this.options[i].type;
+
+      const icon = globalScene.add.sprite(x, y - 3, "items", type?.iconImage).setScale(0.75);
+      if (type?.iconTint != null) {
+        icon.setTint(type.iconTint);
+      }
+      if (type?.iconAlpha != null) {
+        icon.setAlpha(type.iconAlpha);
+      }
+      this.shopContainer.add(icon);
+
+      const price = addTextObject(
+        x,
+        y + 9,
+        formatMoney(globalScene.moneyFormat, this.options[i].cost),
+        TextStyle.MONEY,
+        {
+          fontSize: "38px",
+        },
       );
-      cell.setScale(0.5);
-      globalScene.add.existing(cell);
-      cell.revealInstant();
-      this.shopContainer.add(cell);
-      this.cells.push(cell);
+      price.setOrigin(0.5, 0);
+      this.shopContainer.add(price);
+
+      this.cells.push({ icon, price });
     }
   }
 
   private moveCursorTo(index: number): void {
     if (this.cells.length === 0) {
       this.cursorObj.setVisible(false);
+      this.itemNameText.setText("");
       return;
     }
     const i = Math.max(0, Math.min(index, this.cells.length - 1));
     const col = i % GRID_COLS;
     const row = Math.floor(i / GRID_COLS);
-    this.cursorObj.setPosition(this.gridX + col * this.colStep, this.gridY + row * this.rowStep + 6);
+    this.cursorObj.setPosition(GRID_X + col * COL_STEP, GRID_Y + row * ROW_STEP + 1);
     this.cursorObj.setVisible(true);
+    this.itemNameText.setText(this.options[i]?.type?.name ?? "");
   }
 
   override setCursor(cursor: number): boolean {
@@ -176,66 +243,62 @@ export class BiomeShopUiHandler extends UiHandler {
     return changed;
   }
 
-  /** Refresh the money readout and dim slots the player cannot afford. */
-  private refreshMoneyAndAffordability(): void {
+  /** Refresh the money readout + dim unaffordable slots. */
+  private refresh(): void {
     this.moneyText.setText(formatMoney(globalScene.moneyFormat, globalScene.money));
     for (let i = 0; i < this.cells.length; i++) {
-      const cost = this.options[i]?.cost ?? 0;
-      this.cells[i].setAlpha(globalScene.money >= cost ? 1 : 0.45);
+      const affordable = globalScene.money >= (this.options[i]?.cost ?? 0);
+      this.cells[i].icon.setAlpha(affordable ? 1 : 0.4);
+      this.cells[i].price.setAlpha(affordable ? 1 : 0.4);
     }
   }
 
   /** Called by SelectModifierPhase.applyModifier after a purchase. */
   updateCostText(): void {
-    this.refreshMoneyAndAffordability();
+    this.refresh();
   }
 
   processInput(button: Button): boolean {
-    let success = false;
     const count = this.cells.length;
+    let moved = false;
 
     switch (button) {
       case Button.ACTION:
         if (count > 0 && this.cursor < count && this.onSelect) {
           this.onSelect(this.cursor);
-          success = true;
         }
-        break;
+        return true;
       case Button.CANCEL:
         if (this.onSelect) {
           this.onSelect(-1);
-          success = true;
         }
-        break;
+        return true;
       case Button.UP:
         if (this.cursor - GRID_COLS >= 0) {
-          success = this.setCursor(this.cursor - GRID_COLS);
+          moved = this.setCursor(this.cursor - GRID_COLS);
         }
         break;
       case Button.DOWN:
         if (this.cursor + GRID_COLS < count) {
-          success = this.setCursor(this.cursor + GRID_COLS);
+          moved = this.setCursor(this.cursor + GRID_COLS);
         }
         break;
       case Button.LEFT:
         if (this.cursor % GRID_COLS > 0) {
-          success = this.setCursor(this.cursor - 1);
+          moved = this.setCursor(this.cursor - 1);
         }
         break;
       case Button.RIGHT:
         if (this.cursor % GRID_COLS < GRID_COLS - 1 && this.cursor + 1 < count) {
-          success = this.setCursor(this.cursor + 1);
+          moved = this.setCursor(this.cursor + 1);
         }
         break;
     }
 
-    if (
-      success
-      && (button === Button.UP || button === Button.DOWN || button === Button.LEFT || button === Button.RIGHT)
-    ) {
+    if (moved) {
       globalScene.playSound("se/select");
     }
-    return success;
+    return moved;
   }
 
   clear(): void {
@@ -243,10 +306,38 @@ export class BiomeShopUiHandler extends UiHandler {
     this.shopContainer.setVisible(false);
     this.cursorObj.setVisible(false);
     for (const cell of this.cells) {
-      cell.destroy();
+      cell.icon.destroy();
+      cell.price.destroy();
     }
     this.cells = [];
     this.options = [];
     this.onSelect = null;
+  }
+}
+
+/** A subtle per-biome tint for the default_bg panel (kept light so text reads). */
+function biomeTint(biome: BiomeId): number {
+  switch (biome) {
+    case BiomeId.VOLCANO:
+    case BiomeId.BADLANDS:
+      return 0xffd6c0;
+    case BiomeId.SEA:
+    case BiomeId.SEABED:
+    case BiomeId.LAKE:
+    case BiomeId.BEACH:
+    case BiomeId.ICE_CAVE:
+      return 0xc8e0ff;
+    case BiomeId.FOREST:
+    case BiomeId.JUNGLE:
+    case BiomeId.GRASS:
+    case BiomeId.TALL_GRASS:
+    case BiomeId.MEADOW:
+      return 0xd2f0c0;
+    case BiomeId.GRAVEYARD:
+    case BiomeId.RUINS:
+    case BiomeId.TEMPLE:
+      return 0xd8c8f0;
+    default:
+      return 0xffffff;
   }
 }
