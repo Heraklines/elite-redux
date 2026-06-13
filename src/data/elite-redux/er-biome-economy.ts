@@ -75,26 +75,26 @@ export interface ErBiomeEconomy {
  * Editor-friendly: plain data, no logic.
  */
 export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
-  [BiomeId.TOWN]: { cheap: ["HEAL", "BALLS"], dear: ["TM", "HELD"], signature: ["BERRY"], priceMod: 1 },
+  [BiomeId.TOWN]: { cheap: ["HEAL", "BALLS"], dear: ["TM", "HELD"], signature: ["BERRY", "LURE"], priceMod: 1 },
   [BiomeId.PLAINS]: { cheap: ["HEAL", "BALLS"], dear: ["HELD"], signature: ["BERRY", "LURE"], priceMod: 1 },
-  [BiomeId.GRASS]: { cheap: ["BERRY"], dear: ["EVO"], signature: ["BERRY"], priceMod: 1 },
-  [BiomeId.TALL_GRASS]: { cheap: ["BERRY", "BALLS"], dear: ["TM"], signature: ["MAX_LURE"], priceMod: 1 },
+  [BiomeId.GRASS]: { cheap: ["BERRY"], dear: ["EVO"], signature: ["BERRY", "LEEK"], priceMod: 1 },
+  [BiomeId.TALL_GRASS]: { cheap: ["BERRY", "BALLS"], dear: ["TM"], signature: ["MAX_LURE", "BERRY"], priceMod: 1 },
   [BiomeId.METROPOLIS]: {
     cheap: ["TM", "EVO"],
     dear: ["BERRY"],
-    signature: ["AMULET_COIN"],
+    signature: ["AMULET_COIN", "RELIC_GOLD"],
     priceMod: 1,
     buysDear: "HELD",
   },
-  [BiomeId.FOREST]: { cheap: ["BERRY"], dear: ["BATTLE"], signature: ["LEEK"], priceMod: 1 },
-  [BiomeId.SEA]: { cheap: ["BALLS"], dear: ["EVO"], signature: ["SHELL_BELL"], priceMod: 1 },
-  [BiomeId.SWAMP]: { cheap: ["HEAL"], dear: ["TM"], signature: ["TOXIC_ORB"], priceMod: 1.1 },
-  [BiomeId.BEACH]: { cheap: ["BERRY", "HEAL"], dear: ["TM"], signature: ["SOOTHE_BELL"], priceMod: 0.9 },
-  [BiomeId.LAKE]: { cheap: ["HEAL"], dear: ["HELD"], signature: ["SHELL_BELL"], priceMod: 0.9 },
+  [BiomeId.FOREST]: { cheap: ["BERRY"], dear: ["BATTLE"], signature: ["LEEK", "SOOTHE_BELL"], priceMod: 1 },
+  [BiomeId.SEA]: { cheap: ["BALLS"], dear: ["EVO"], signature: ["SHELL_BELL", "SOUL_DEW"], priceMod: 1 },
+  [BiomeId.SWAMP]: { cheap: ["HEAL"], dear: ["TM"], signature: ["TOXIC_ORB", "QUICK_CLAW"], priceMod: 1.1 },
+  [BiomeId.BEACH]: { cheap: ["BERRY", "HEAL"], dear: ["TM"], signature: ["SOOTHE_BELL", "SHELL_BELL"], priceMod: 0.9 },
+  [BiomeId.LAKE]: { cheap: ["HEAL"], dear: ["HELD"], signature: ["SHELL_BELL", "SOUL_DEW"], priceMod: 0.9 },
   [BiomeId.SEABED]: { cheap: [], dear: ["HEAL"], signature: ["SOUL_DEW", "EVIOLITE"], priceMod: 1.2 },
-  [BiomeId.MOUNTAIN]: { cheap: ["BATTLE"], dear: ["HEAL"], signature: ["KINGS_ROCK"], priceMod: 1.1 },
-  [BiomeId.BADLANDS]: { cheap: ["BATTLE"], dear: ["BERRY"], signature: ["QUICK_CLAW"], priceMod: 1.1 },
-  [BiomeId.CAVE]: { cheap: ["BALLS"], dear: ["HEAL"], signature: ["EVOLUTION_ITEM"], priceMod: 1 },
+  [BiomeId.MOUNTAIN]: { cheap: ["BATTLE"], dear: ["HEAL"], signature: ["KINGS_ROCK", "QUICK_CLAW"], priceMod: 1.1 },
+  [BiomeId.BADLANDS]: { cheap: ["BATTLE"], dear: ["BERRY"], signature: ["QUICK_CLAW", "KINGS_ROCK"], priceMod: 1.1 },
+  [BiomeId.CAVE]: { cheap: ["BALLS"], dear: ["HEAL"], signature: ["EVOLUTION_ITEM", "EVIOLITE"], priceMod: 1 },
   [BiomeId.DESERT]: {
     // The caravan: everything pricey, but it stocks exotics (extra ULTRA
     // wildcard rolls; see stock builder).
@@ -103,32 +103,37 @@ export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
     signature: ["GRIP_CLAW", "BATON"],
     priceMod: 1.3,
   },
-  [BiomeId.ICE_CAVE]: { cheap: ["EVO"], dear: ["HEAL"], signature: ["FROSTBITE_ORB"], priceMod: 1.2 },
-  [BiomeId.MEADOW]: { cheap: ["MINT", "BERRY"], dear: ["BATTLE"], signature: ["SOOTHE_BELL"], priceMod: 0.9 },
-  [BiomeId.POWER_PLANT]: { cheap: ["TM"], dear: ["BERRY"], signature: ["MULTI_LENS"], priceMod: 1 },
-  [BiomeId.VOLCANO]: { cheap: ["EVO"], dear: ["HEAL"], signature: ["FLAME_ORB"], priceMod: 1.1 },
-  [BiomeId.GRAVEYARD]: { cheap: ["EVO"], dear: ["BALLS"], signature: ["REVIVER_SEED"], priceMod: 1 },
+  [BiomeId.ICE_CAVE]: { cheap: ["EVO"], dear: ["HEAL"], signature: ["FROSTBITE_ORB", "EVIOLITE"], priceMod: 1.2 },
+  [BiomeId.MEADOW]: { cheap: ["MINT", "BERRY"], dear: ["BATTLE"], signature: ["SOOTHE_BELL", "BERRY"], priceMod: 0.9 },
+  [BiomeId.POWER_PLANT]: { cheap: ["TM"], dear: ["BERRY"], signature: ["MULTI_LENS", "WIDE_LENS"], priceMod: 1 },
+  [BiomeId.VOLCANO]: { cheap: ["EVO"], dear: ["HEAL"], signature: ["FLAME_ORB", "ER_CHILI_SAMPLE"], priceMod: 1.1 },
+  [BiomeId.GRAVEYARD]: { cheap: ["EVO"], dear: ["BALLS"], signature: ["REVIVER_SEED", "ER_RUSTY_CLAW"], priceMod: 1 },
   [BiomeId.DOJO]: { cheap: ["BATTLE"], dear: ["TM"], signature: ["FOCUS_BAND", "KINGS_ROCK"], priceMod: 1 },
-  [BiomeId.FACTORY]: { cheap: ["HELD"], dear: ["BERRY"], signature: ["WHITE_HERB"], priceMod: 1 },
-  [BiomeId.RUINS]: { cheap: [], dear: ["HEAL"], signature: ["RELIC_GOLD"], priceMod: 1.1 },
-  [BiomeId.WASTELAND]: { cheap: ["HEAL"], dear: ["BALLS"], signature: ["DNA_SPLICERS"], priceMod: 1.2 },
+  [BiomeId.FACTORY]: { cheap: ["HELD"], dear: ["BERRY"], signature: ["WHITE_HERB", "ER_LOADED_DICE"], priceMod: 1 },
+  [BiomeId.RUINS]: { cheap: [], dear: ["HEAL"], signature: ["RELIC_GOLD", "REVIVER_SEED"], priceMod: 1.1 },
+  [BiomeId.WASTELAND]: { cheap: ["HEAL"], dear: ["BALLS"], signature: ["DNA_SPLICERS", "REVIVER_SEED"], priceMod: 1.2 },
   [BiomeId.ABYSS]: { cheap: [], dear: [], signature: [], priceMod: 1, noShop: true },
-  [BiomeId.SPACE]: { cheap: ["HELD"], dear: ["HEAL", "BERRY"], signature: ["MINI_BLACK_HOLE"], priceMod: 1.2 },
-  [BiomeId.CONSTRUCTION_SITE]: { cheap: ["BATTLE"], dear: ["MINT"], signature: ["GOLDEN_PUNCH"], priceMod: 1 },
-  [BiomeId.JUNGLE]: { cheap: ["BERRY", "CANDY"], dear: ["HEAL"], signature: ["LUCKY_EGG"], priceMod: 1.1 },
-  [BiomeId.FAIRY_CAVE]: { cheap: ["MINT"], dear: ["BATTLE"], signature: ["ER_LUCKY_HEART"], priceMod: 1 },
-  [BiomeId.TEMPLE]: { cheap: [], dear: [], signature: ["LEFTOVERS"], priceMod: 1 },
+  [BiomeId.SPACE]: { cheap: ["HELD"], dear: ["HEAL", "BERRY"], signature: ["MINI_BLACK_HOLE", "MULTI_LENS"], priceMod: 1.2 },
+  [BiomeId.CONSTRUCTION_SITE]: {
+    cheap: ["BATTLE"],
+    dear: ["MINT"],
+    signature: ["GOLDEN_PUNCH", "FOCUS_BAND"],
+    priceMod: 1,
+  },
+  [BiomeId.JUNGLE]: { cheap: ["BERRY", "CANDY"], dear: ["HEAL"], signature: ["LUCKY_EGG", "BERRY"], priceMod: 1.1 },
+  [BiomeId.FAIRY_CAVE]: { cheap: ["MINT"], dear: ["BATTLE"], signature: ["ER_LUCKY_HEART", "SOOTHE_BELL"], priceMod: 1 },
+  [BiomeId.TEMPLE]: { cheap: [], dear: [], signature: ["LEFTOVERS", "RELIC_GOLD"], priceMod: 1 },
   [BiomeId.SLUM]: {
     // The den: everything is 25% off, no markups. (The "used goods" twist
     // ships with the curse system, not in P1.)
     cheap: [],
     dear: [],
-    signature: ["WIDE_LENS"],
+    signature: ["WIDE_LENS", "ER_LOADED_DICE"],
     priceMod: 0.75,
     buysDear: "EVO",
   },
-  [BiomeId.SNOWY_FOREST]: { cheap: ["BERRY"], dear: ["HEAL"], signature: ["REVIVER_SEED"], priceMod: 1.1 },
-  [BiomeId.ISLAND]: { cheap: [], dear: [], signature: ["ER_DEX_NAV"], priceMod: 1.15 },
+  [BiomeId.SNOWY_FOREST]: { cheap: ["BERRY"], dear: ["HEAL"], signature: ["REVIVER_SEED", "FROSTBITE_ORB"], priceMod: 1.1 },
+  [BiomeId.ISLAND]: { cheap: [], dear: [], signature: ["ER_DEX_NAV", "SHELL_BELL"], priceMod: 1.15 },
   [BiomeId.LABORATORY]: {
     cheap: ["CANDY"],
     dear: ["BALLS"],
@@ -243,18 +248,32 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
           pool.splice(idx, 1);
         }
       }
-      // 4. WILDCARDS / FILL: top up to 16 from the broad non-heal pool, drawn
-      // randomly so each shop varies. HELD (community exotics) is weighted
-      // heaviest; the Desert caravan leans even harder into HELD exotics.
-      const wildcardCats: ErShopCategory[] = ["HELD", "EVO", "TM", "BATTLE", "BERRY", "CANDY", "MINT"];
+      // 4. WILDCARDS / FILL: top up to 16, BIOME-FLAVORED. The bag is weighted
+      // toward THIS biome's discounted categories (its identity), so every
+      // market fills differently - a Power Plant tops up with TMs, a Dojo with
+      // X-items, a Laboratory with candies, while the Desert / Slum / Ruins (no
+      // cheap categories) lean into HELD exotics. HELD is a universal
+      // medium-weight wildcard everywhere; HEAL is never included.
       const bag: { key: keyof typeof modifierTypes; cat: ErShopCategory }[] = [];
-      for (const cat of wildcardCats) {
-        const weight = cat === "HELD" && biome === BiomeId.DESERT ? 2 : 1;
+      const pushCat = (cat: ErShopCategory, weight: number) => {
+        if (cat === "HEAL") {
+          return;
+        }
         for (let w = 0; w < weight; w++) {
           for (const key of ER_SHOP_CATEGORY_POOL[cat]) {
             bag.push({ key, cat });
           }
         }
+      };
+      // Biome's own cheap categories lead the wildcard bag (heavy weight)...
+      for (const cat of eco.cheap) {
+        pushCat(cat, 3);
+      }
+      // ...then the universal exotic pool (heavier for the Desert caravan)...
+      pushCat("HELD", biome === BiomeId.DESERT ? 4 : 2);
+      // ...then a light sprinkle of the rest for variety.
+      for (const cat of ["EVO", "TM", "BATTLE", "BERRY", "CANDY", "MINT"] as ErShopCategory[]) {
+        pushCat(cat, 1);
       }
       let guard = 0;
       while (stock.length < TARGET_SLOTS && bag.length > 0 && guard++ < 500) {
