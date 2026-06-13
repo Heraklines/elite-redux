@@ -25,6 +25,7 @@
 // =============================================================================
 
 import { speciesEggTiers } from "#balance/species-egg-tiers";
+import { erBalanceArr } from "#data/elite-redux/er-balance-tuning";
 import { EggTier } from "#enums/egg-type";
 
 /** Challenge value → human name (0 = Off). */
@@ -103,6 +104,8 @@ export function isErLineLegalForUsageTier(rootSpeciesId: number, tierValue: numb
   if (eggTier > MAX_EGG_TIER[value]) {
     return false;
   }
-  // Usage gate (from the nightly data; 0 when unknown).
-  return getErLineUsagePct(rootSpeciesId) < USAGE_GATE_PCT[value];
+  // Usage gate (from the nightly data; 0 when unknown). The gate percentages
+  // are editor-tunable (er.usageTiers.gates: [UU, RU, PU, NU]).
+  const gate = value >= 1 ? erBalanceArr("er.usageTiers.gates")[value - 1] : Number.POSITIVE_INFINITY;
+  return getErLineUsagePct(rootSpeciesId) < (gate ?? USAGE_GATE_PCT[value]);
 }

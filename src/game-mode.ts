@@ -12,6 +12,7 @@ import {
 } from "#data/daily-seed/daily-run";
 import { parseDailySeed } from "#data/daily-seed/daily-seed-utils";
 import { allSpecies } from "#data/data-lists";
+import { erBalanceMap, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { erForcesTrainerWave } from "#data/elite-redux/er-battle-frequency";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { BiomeId } from "#enums/biome-id";
@@ -174,7 +175,8 @@ export class GameMode implements GameModeConfig {
         }
       }
       default:
-        return 1000;
+        // Editor-tunable (vanilla.money.starting).
+        return erBalanceNum("vanilla.money.starting");
     }
   }
 
@@ -426,15 +428,17 @@ export class GameMode implements GameModeConfig {
   }
 
   getEnemyModifierChance(isBoss: boolean): number {
+    // Editor-tunable 1-in-X odds (vanilla.enemy.modifierChance).
+    const chances = erBalanceMap("vanilla.enemy.modifierChance");
     switch (this.modeId) {
       case GameModes.CLASSIC:
       case GameModes.CHALLENGE:
       case GameModes.DAILY:
       case GameModes.LLM_DIRECTOR:
-        return isBoss ? 6 : 18;
+        return isBoss ? chances.classicBoss : chances.classicNonBoss;
       case GameModes.ENDLESS:
       case GameModes.SPLICED_ENDLESS:
-        return isBoss ? 4 : 12;
+        return isBoss ? chances.endlessBoss : chances.endlessNonBoss;
     }
   }
 

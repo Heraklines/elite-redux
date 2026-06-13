@@ -22,12 +22,13 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import type { Pokemon } from "#field/pokemon";
 
-/** Per-mon streak bonus cap (%): 10 → a 6-mon team caps at 60%. */
-const PER_MON_CAP_PCT = 10;
-/** Faint-free waves required per +1%. */
-const WAVES_PER_PERCENT = 3;
+/** Per-mon streak bonus cap (%): 10 → a 6-mon team caps at 60%. Editor-tunable. */
+const PER_MON_CAP_PCT = () => erBalanceNum("er.money.streakCapPct");
+/** Faint-free waves required per +1%. Editor-tunable. */
+const WAVES_PER_PERCENT = () => erBalanceNum("er.money.streakWavesPerPct");
 
 /** pokemonId → consecutive faint-free waves. */
 let STREAKS = new Map<number, number>();
@@ -72,7 +73,7 @@ export function erStreakWaves(pokemonId: number): number {
 
 /** This mon's current money bonus in percent (0–10). */
 export function erStreakBonusPercent(pokemonId: number): number {
-  return Math.min(PER_MON_CAP_PCT, Math.floor(erStreakWaves(pokemonId) / WAVES_PER_PERCENT));
+  return Math.min(PER_MON_CAP_PCT(), Math.floor(erStreakWaves(pokemonId) / WAVES_PER_PERCENT()));
 }
 
 /** The whole party's current money bonus in percent (0–60). */

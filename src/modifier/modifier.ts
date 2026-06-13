@@ -3,9 +3,9 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { FusionSpeciesFormEvolution, pokemonEvolutions } from "#balance/pokemon-evolutions";
-import { FRIENDSHIP_GAIN_FROM_RARE_CANDY } from "#balance/starters";
 import { getBerryEffectFunc, getBerryPredicate } from "#data/berry";
 import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
+import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { clearErAilments, hasErAilment } from "#data/elite-redux/er-status-cure";
 import { getLevelTotalExp } from "#data/exp";
@@ -2536,7 +2536,7 @@ export class PokemonLevelIncrementModifier extends ConsumablePokemonModifier {
       playerPokemon.exp = getLevelTotalExp(playerPokemon.level, playerPokemon.species.growthRate);
     }
 
-    playerPokemon.addFriendship(FRIENDSHIP_GAIN_FROM_RARE_CANDY, true);
+    playerPokemon.addFriendship(erBalanceNum("vanilla.friendship.gainRareCandy"), true);
 
     globalScene.phaseManager.unshiftNew(
       "LevelUpPhase",

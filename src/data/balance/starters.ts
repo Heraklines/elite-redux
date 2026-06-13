@@ -1,4 +1,5 @@
 import { IS_TEST } from "#constants/app-constants";
+import { erBalanceArr, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { SpeciesId } from "#enums/species-id";
 
 export const POKERUS_STARTER_COUNT = 5;
@@ -24,27 +25,11 @@ export const TRAINER_MAX_FRIENDSHIP_WAVE = 145;
  * @returns aforementioned threshold
  */
 export function getStarterValueFriendshipCap(starterCost: number): number {
-  switch (starterCost) {
-    case 1:
-      return 25;
-    case 2:
-      return 50;
-    case 3:
-      return 75;
-    case 4:
-      return 100;
-    case 5:
-      return 150;
-    case 6:
-      return 200;
-    case 7:
-      return 300;
-    case 8:
-    case 9:
-      return 450;
-    default:
-      return 600;
-  }
+  // Editor-tunable per starter cost 1-10 (vanilla.friendship.capByCost);
+  // costs above 10 use the cost-10 cap.
+  const caps = erBalanceArr("vanilla.friendship.capByCost");
+  const index = Math.min(Math.max(Math.floor(starterCost), 1), caps.length) - 1;
+  return caps[index];
 }
 
 export const speciesStarterCosts = {
@@ -669,7 +654,8 @@ const allStarterCandyCosts: readonly StarterCandyCosts[] = [
  * @returns the candy cost for passive unlock
  */
 export function getPassiveCandyCount(starterCost: number): number {
-  return allStarterCandyCosts[starterCost - 1].passive;
+  // Editor-tunable per starter cost 1-12 (vanilla.candy.passiveUnlock).
+  return erBalanceArr("vanilla.candy.passiveUnlock")[starterCost - 1] ?? allStarterCandyCosts[starterCost - 1].passive;
 }
 
 /**
@@ -684,7 +670,7 @@ export function getPassiveCandyCount(starterCost: number): number {
  * @param slot - 0-based passive slot index
  */
 export function getErPassiveSlotCandyCost(baseCost: number, slot: number): number {
-  return Math.ceil(baseCost / 2) + slot * 10;
+  return Math.ceil(baseCost / 2) + slot * erBalanceNum("er.candy.passiveSlotStep");
 }
 
 /**
@@ -693,6 +679,12 @@ export function getErPassiveSlotCandyCost(baseCost: number, slot: number): numbe
  * @returns respective candy cost for the two cost reductions as an array 2 numbers
  */
 export function getValueReductionCandyCounts(starterCost: number): readonly [number, number] {
+  // Editor-tunable per starter cost 1-12 (vanilla.candy.costReduction1/2).
+  const r1 = erBalanceArr("vanilla.candy.costReduction1")[starterCost - 1];
+  const r2 = erBalanceArr("vanilla.candy.costReduction2")[starterCost - 1];
+  if (r1 !== undefined && r2 !== undefined) {
+    return [r1, r2];
+  }
   return allStarterCandyCosts[starterCost - 1].costReduction;
 }
 
@@ -707,6 +699,11 @@ export function getSameSpeciesEggCandyCounts(starterCost: number, hatchCount: nu
   let eggCostIndex = 0;
   while (hatchCount >= starterCandyCosts.eggCostReductionThresholds[eggCostIndex]) {
     eggCostIndex++;
+  }
+  if (eggCostIndex === 0) {
+    // The first-egg cost is editor-tunable (vanilla.candy.eggCostBase); the
+    // hatch-count discount steps keep their shipped table values.
+    return erBalanceArr("vanilla.candy.eggCostBase")[starterCost - 1] ?? starterCandyCosts.eggCosts[0];
   }
   return starterCandyCosts.eggCosts[eggCostIndex];
 }

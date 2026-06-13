@@ -31,6 +31,7 @@ import {
   ER_BLACK_SHINY_POOL_BORDERLINE,
   ER_BLACK_SHINY_POOL_CORE,
 } from "#data/elite-redux/er-black-shiny-gift-pool";
+import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import type { Pokemon } from "#field/pokemon";
 import { randSeedInt } from "#utils/common";
@@ -130,7 +131,7 @@ export function maybeUpgradeToErBlackShiny(pokemon: Pokemon): boolean {
     if (pokemon.isPlayer() && playerHasErBlackShiny()) {
       return false;
     }
-    if (randSeedInt(ER_BLACK_SHINY_DENOMINATOR) !== 0) {
+    if (randSeedInt(erBalanceNum("er.shiny.blackShinyDenominator")) !== 0) {
       return false;
     }
     applyErBlackShinyKit(pokemon);

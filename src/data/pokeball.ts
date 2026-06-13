@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { erBalanceMap, erBalancePairs } from "#data/elite-redux/er-balance-tuning";
 import { PokeballType } from "#enums/pokeball";
 import { NumberHolder } from "#utils/common";
 import i18next from "i18next";
@@ -48,19 +49,21 @@ export function getPokeballName(type: PokeballType): string {
 }
 
 export function getPokeballCatchMultiplier(type: PokeballType): number {
+  // Editor-tunable per ball (vanilla.catch.ballMult); Master Ball always catches.
+  const mult = erBalanceMap("vanilla.catch.ballMult");
   switch (type) {
     case PokeballType.POKEBALL:
-      return 1;
+      return mult.pokeball;
     case PokeballType.GREAT_BALL:
-      return 1.5;
+      return mult.greatBall;
     case PokeballType.ULTRA_BALL:
-      return 2;
+      return mult.ultraBall;
     case PokeballType.ROGUE_BALL:
-      return 3;
+      return mult.rogueBall;
     case PokeballType.MASTER_BALL:
       return -1;
     case PokeballType.LUXURY_BALL:
-      return 1;
+      return mult.luxuryBall;
   }
 }
 
@@ -94,18 +97,18 @@ export function getCriticalCaptureChance(modifiedCatchRate: number): number {
   const dexCount = globalScene.gameData.getSpeciesCount(d => !!d.caughtAttr);
   const catchingCharmMultiplier = new NumberHolder(1);
   globalScene.findModifier(m => m.is("CriticalCatchChanceBoosterModifier"))?.apply(catchingCharmMultiplier);
-  const dexMultiplier =
-    globalScene.gameMode.isDaily || dexCount > 800
-      ? 2.5
-      : dexCount > 600
-        ? 2
-        : dexCount > 400
-          ? 1.5
-          : dexCount > 200
-            ? 1
-            : dexCount > 100
-              ? 0.5
-              : 0;
+  // Editor-tunable breakpoints (vanilla.catch.critDexMultipliers): [count, mult]
+  // pairs, highest matching count wins; Daily always uses the top multiplier.
+  const breakpoints = erBalancePairs("vanilla.catch.critDexMultipliers");
+  let dexMultiplier = 0;
+  for (const [count, multiplier] of breakpoints) {
+    if (dexCount > count) {
+      dexMultiplier = multiplier;
+    }
+  }
+  if (globalScene.gameMode.isDaily) {
+    dexMultiplier = breakpoints.at(-1)?.[1] ?? 0;
+  }
   return Math.floor((catchingCharmMultiplier.value * dexMultiplier * Math.min(255, modifiedCatchRate)) / 6);
 }
 

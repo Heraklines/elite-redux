@@ -1,5 +1,6 @@
 import type { GameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
+import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
@@ -128,8 +129,12 @@ export class Battle {
 
   public getLevelForWave(): number {
     const levelWaveIndex = this.gameMode.getWaveForDifficulty(this.waveIndex);
-    const baseLevel = 1 + levelWaveIndex / 2 + Math.pow(levelWaveIndex / 25, 2);
-    const bossMultiplier = 1.2;
+    // Editor-tunable curve (vanilla.level.waveSlope / quadDivisor / bossMult).
+    const baseLevel =
+      1
+      + levelWaveIndex / erBalanceNum("vanilla.level.waveSlope")
+      + Math.pow(levelWaveIndex / erBalanceNum("vanilla.level.quadDivisor"), 2);
+    const bossMultiplier = erBalanceNum("vanilla.level.bossMult");
 
     if (this.gameMode.isBoss(this.waveIndex)) {
       const ret = Math.floor(baseLevel * bossMultiplier);

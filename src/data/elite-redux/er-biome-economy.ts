@@ -23,6 +23,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { erBalanceMap, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 // Type-only: this module feeds modifier-type.ts (the shop hook), so a value
 // import of the built modifierTypes table here would be a require cycle.
 import type { modifierTypes } from "#data/data-lists";
@@ -209,7 +210,10 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
       for (const key of eco.signature) {
         if (!seen.has(key) && stock.length < 9) {
           seen.add(key);
-          stock.push({ key, cost: erBiomeShopPrice("ultra", eco.priceMod) });
+          stock.push({
+            key,
+            cost: erBiomeShopPrice("ultra", erBalanceMap("er.shop.biomePriceMod")[BiomeId[biome]] ?? eco.priceMod),
+          });
         }
       }
       // Discounted-category picks: the reason this biome's market is GOOD.
@@ -244,11 +248,13 @@ export function erBiomeCategoryPriceMod(biome: BiomeId, category: ErShopCategory
   if (!eco) {
     return 1;
   }
-  let mod = eco.priceMod;
+  // Editor-managed per-biome modifier (keyed by the BiomeId NAME) first, then
+  // the shipped table; discount/markup multipliers are editor-tunable too.
+  let mod = erBalanceMap("er.shop.biomePriceMod")[BiomeId[biome]] ?? eco.priceMod;
   if (eco.cheap.includes(category)) {
-    mod *= 0.7;
+    mod *= erBalanceNum("er.shop.cheapMult");
   } else if (eco.dear.includes(category)) {
-    mod *= 1.4;
+    mod *= erBalanceNum("er.shop.dearMult");
   }
   return mod;
 }
@@ -265,6 +271,7 @@ export function erBiomeHasShop(biome: BiomeId): boolean {
  */
 export function erBiomeShopPrice(tier: keyof typeof ER_SHOP_TIER_FACTOR, categoryMod: number): number {
   const waveUnit = globalScene.getWaveMoneyAmount(1);
+  const tierFactor = erBalanceMap("er.shop.tierFactor")[tier] ?? ER_SHOP_TIER_FACTOR[tier];
   // Round to a clean 10 like all money values.
-  return Math.max(10, Math.floor((waveUnit * ER_SHOP_TIER_FACTOR[tier] * categoryMod) / 10) * 10);
+  return Math.max(10, Math.floor((waveUnit * tierFactor * categoryMod) / 10) * 10);
 }

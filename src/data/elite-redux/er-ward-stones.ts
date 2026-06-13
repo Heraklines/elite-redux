@@ -34,6 +34,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { erBalanceMap, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { StatusEffect } from "#enums/status-effect";
@@ -87,11 +88,22 @@ export const ER_WARD_STONE_CONFIG: Readonly<Record<ErWardStoneTier, WardStoneCon
 
 const TIER_ORDER: readonly ErWardStoneTier[] = ["minor", "greater", "prime"];
 
+// Editor-managed charge/recharge overrides (er-balance-tuning.json), applied
+// over the shipped config ONCE at module load — the tuning JSON is static per
+// build, and patching the config here wires every consumer (the modifier's
+// stack cap, recharge loop AND the item descriptions) in one place.
+for (const tier of TIER_ORDER) {
+  const cfg = ER_WARD_STONE_CONFIG[tier] as { maxCharges: number; rechargeWaves: number };
+  cfg.maxCharges = erBalanceMap("er.items.wardStoneCharges")[tier] ?? cfg.maxCharges;
+  cfg.rechargeWaves = erBalanceMap("er.items.wardStoneRechargeWaves")[tier] ?? cfg.rechargeWaves;
+}
+
 /**
  * Spawn gate per difficulty: earliest wave Ward Stones may appear.
  * ER (#420): Ace joins at wave 150 with a flat 5% roll (see below).
+ * Editor-tunable (er.items.wardStoneFromWave).
  */
-const SPAWN_FROM_WAVE: Readonly<Record<string, number>> = { hell: 100, elite: 150, ace: 150 };
+const SPAWN_FROM_WAVE = (): Readonly<Record<string, number>> => erBalanceMap("er.items.wardStoneFromWave");
 
 /**
  * CC battler tags a Ward Stone blocks: vanilla volatile CC (flinch, confusion,
@@ -346,7 +358,7 @@ export function maybeAssignErWardStone(enemy: EnemyPokemon): void {
       addWardStone(enemy, "prime");
       return;
     }
-    const fromWave = SPAWN_FROM_WAVE[getErDifficulty()];
+    const fromWave = SPAWN_FROM_WAVE()[getErDifficulty()];
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
     if (fromWave === undefined || wave < fromWave) {
       return;
@@ -358,24 +370,25 @@ export function maybeAssignErWardStone(enemy: EnemyPokemon): void {
     const roll = enemy.randBattleSeedInt(100);
     // ER (#420): Ace gets a flat 5% roll (boss -> Greater, regular -> Minor);
     // Elite/Hell rolls are DOUBLED (boss Prime 20/Greater +30, regular
-    // Greater 10/Minor +40 - was 10/25 and 5/20).
+    // Greater 10/Minor +40 - was 10/25 and 5/20). All five thresholds are
+    // editor-tunable (er.items.wardStone*Pct).
     if (getErDifficulty() === "ace") {
-      if (roll < 5) {
+      if (roll < erBalanceNum("er.items.wardStoneAcePct")) {
         addWardStone(enemy, isBoss ? "greater" : "minor");
       }
       return;
     }
     if (isBoss) {
-      if (roll < 20) {
+      if (roll < erBalanceNum("er.items.wardStoneBossPrimePct")) {
         addWardStone(enemy, "prime");
-      } else if (roll < 50) {
+      } else if (roll < erBalanceNum("er.items.wardStoneBossGreaterPct")) {
         addWardStone(enemy, "greater");
       }
       return;
     }
-    if (roll < 10) {
+    if (roll < erBalanceNum("er.items.wardStoneRegularGreaterPct")) {
       addWardStone(enemy, "greater");
-    } else if (roll < 50) {
+    } else if (roll < erBalanceNum("er.items.wardStoneRegularMinorPct")) {
       addWardStone(enemy, "minor");
     }
   } catch {

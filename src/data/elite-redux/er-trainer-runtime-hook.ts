@@ -42,6 +42,7 @@ import {
 } from "#data/elite-redux/init-elite-redux-trainers";
 import { erRivalWaveOrdinal, erRivalWaveSequence } from "#data/elite-redux/er-battle-frequency";
 import { ER_FACTORY_SETS } from "#data/elite-redux/er-factory-sets";
+import { erBalanceMap, erBalanceNum, erBalancePairs } from "#data/elite-redux/er-balance-tuning";
 import { erFactoryExcludedDraftIds, erTunedFactoryTeamPct } from "#data/elite-redux/er-trainer-tuning";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
@@ -50,7 +51,7 @@ import { maybeAssignErResistBerry } from "#data/elite-redux/er-resist-berries";
 import { maybeAssignErWardStone } from "#data/elite-redux/er-ward-stones";
 import { erDifficultyToRosterTier, getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { type ErRosterTier, selectErRoster } from "#data/elite-redux/er-trainer-overlay";
-import { ER_ITEM_CONVERT_CHANCE, resolveErTrainerItem } from "#data/elite-redux/er-trainer-item-map";
+import { resolveErTrainerItem } from "#data/elite-redux/er-trainer-item-map";
 import { SpeciesFormKey } from "#enums/species-form-key";
 import { SpeciesId } from "#enums/species-id";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
@@ -191,7 +192,8 @@ export function restoreErRunTrainerTracking(keys: readonly string[] | undefined)
  * Hell reaches full strength by ~wave 180 as before.
  */
 function erWaveProgressionSpan(): number {
-  return getErDifficulty() === "elite" ? 230 : 180;
+  const span = erBalanceMap("er.trainer.waveProgressionSpan");
+  return getErDifficulty() === "elite" ? span.elite : span.hell;
 }
 
 /** Cache of a trainer's team base-stat-total per tier (stableKey:tier → BST sum). */
@@ -718,7 +720,7 @@ export function hasErRivalOverride(trainer: Trainer): boolean {
 
 /**
  * After PokeRogue rolls its baseline trainer held items, apply the soft ER
- * conversion: with {@linkcode ER_ITEM_CONVERT_CHANCE} probability, if the ER
+ * conversion: with `er.items.convertChance` probability, if the ER
  * roster member held a translatable competitive item, give the mapped
  * PokeRogue held item. Balls / berries / consumables / unmapped items are left
  * to the baseline roll. (Recreated ER-only items and mega-stone force-evolves
@@ -761,7 +763,7 @@ export function applyErTrainerHeldItems(party: readonly EnemyPokemon[]): void {
     }
     // Soft conversion: only sometimes override the baseline roll with the
     // ER-faithful item.
-    if (enemy.randBattleSeedInt(100) >= ER_ITEM_CONVERT_CHANCE * 100) {
+    if (enemy.randBattleSeedInt(100) >= erBalanceNum("er.items.convertChance") * 100) {
       continue;
     }
     const modifier = res.make().newModifier(enemy) as PokemonHeldItemModifier | null;
@@ -776,7 +778,7 @@ export function applyErTrainerHeldItems(party: readonly EnemyPokemon[]): void {
  * an end-game power spike and shouldn't show up early in those modes. **Hell is
  * intentionally exempt** — early megas are part of its difficulty.
  */
-const ER_MEGA_MIN_WAVE_NON_HELL = 50;
+const ER_MEGA_MIN_WAVE_NON_HELL = () => erBalanceNum("er.trainer.megaMinWaveNonHell");
 
 /**
  * Lazily-built map: pokerogue species id of a DIRECT mega species → its base
@@ -809,20 +811,17 @@ function megaSpeciesToBase(): Map<number, number> {
  * Legend-likes (legendary/sub-legendary/mythical) are banned before wave
  * {@linkcode ER_ELITE_LEGEND_FROM_WAVE} regardless of BST.
  */
-const ER_ELITE_BST_CAPS: readonly (readonly [number, number])[] = [
-  [20, 420],
-  [40, 480],
-  [60, 540],
-  [80, 580],
-  [100, 600],
-];
-const ER_ELITE_BST_BOSS_HEADROOM = 40;
-const ER_ELITE_LEGEND_FROM_WAVE = 80;
+// Ladder/headroom/legend-gate values live in the balance-knob registry
+// (er-balance-knobs.ts: er.elite.bstCaps / bstBossHeadroom / legendFromWave) so
+// the team editor can tune them; the shipped defaults match #419.
+const ER_ELITE_LEGEND_FROM_WAVE = () => erBalanceNum("er.elite.legendFromWave");
 
 function erEliteBstCapFor(wave: number, isBossWave: boolean): number | null {
-  for (const [maxWave, cap] of ER_ELITE_BST_CAPS) {
+  // Editor-managed ladder first (er-balance-tuning.json), validated to be
+  // ascending in both columns — invalid overrides fall back to the default.
+  for (const [maxWave, cap] of erBalancePairs("er.elite.bstCaps")) {
     if (wave <= maxWave) {
-      return cap + (isBossWave ? ER_ELITE_BST_BOSS_HEADROOM : 0);
+      return cap + (isBossWave ? erBalanceNum("er.elite.bstBossHeadroom") : 0);
     }
   }
   return null;
@@ -847,7 +846,7 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
     if (cap === null) {
       return;
     }
-    const legendBanned = wave < ER_ELITE_LEGEND_FROM_WAVE;
+    const legendBanned = wave < ER_ELITE_LEGEND_FROM_WAVE();
     const violates = (sp: PokemonSpecies): boolean =>
       sp.getBaseStatTotal() > cap || (legendBanned && (sp.legendary || sp.subLegendary || sp.mythical));
     if (!violates(enemy.species)) {
@@ -919,7 +918,7 @@ function revertEarlyMega(enemy: EnemyPokemon): void {
   if (getErDifficulty() === "hell") {
     return;
   }
-  if ((globalScene.currentBattle?.waveIndex ?? 0) >= ER_MEGA_MIN_WAVE_NON_HELL) {
+  if ((globalScene.currentBattle?.waveIndex ?? 0) >= ER_MEGA_MIN_WAVE_NON_HELL()) {
     return;
   }
   // (a) The species itself is a mega → swap to the base species.
@@ -1012,7 +1011,7 @@ function pickErMegaFormIndex(enemy: EnemyPokemon, itemId: number): number {
 function forceErMega(enemy: EnemyPokemon, itemId: number): void {
   if (getErDifficulty() !== "hell") {
     const waveIndex = globalScene.currentBattle?.waveIndex ?? 0;
-    if (waveIndex < ER_MEGA_MIN_WAVE_NON_HELL) {
+    if (waveIndex < ER_MEGA_MIN_WAVE_NON_HELL()) {
       return;
     }
   }

@@ -7,11 +7,7 @@ import {
   EGG_PITY_EPIC_THRESHOLD,
   EGG_PITY_LEGENDARY_THRESHOLD,
   EGG_PITY_RARE_THRESHOLD,
-  GACHA_DEFAULT_COMMON_EGG_THRESHOLD,
-  GACHA_DEFAULT_EPIC_EGG_THRESHOLD,
-  GACHA_DEFAULT_RARE_EGG_THRESHOLD,
   GACHA_DEFAULT_SHINY_RATE,
-  GACHA_EGG_HA_RATE,
   GACHA_LEGENDARY_UP_THRESHOLD_OFFSET,
   GACHA_SHINY_UP_SHINY_RATE,
   HATCH_WAVES_COMMON_EGG,
@@ -19,15 +15,14 @@ import {
   HATCH_WAVES_LEGENDARY_EGG,
   HATCH_WAVES_MANAPHY_EGG,
   HATCH_WAVES_RARE_EGG,
-  MANAPHY_EGG_MANAPHY_RATE,
   RARE_EGGMOVE_RATES,
-  SAME_SPECIES_EGG_HA_RATE,
   SAME_SPECIES_EGG_SHINY_RATE,
   SHINY_EPIC_CHANCE,
   SHINY_VARIANT_CHANCE,
 } from "#balance/rates";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
+import { erBalanceArr, erBalanceMap, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { maybeUpgradeToErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { getErEggWeightDivisor } from "#data/elite-redux/init-elite-redux-egg-tiers";
 import type { PokemonSpecies } from "#data/pokemon-species";
@@ -267,7 +262,7 @@ export class Egg {
       // Special condition to have Phione eggs also have a chance of generating Manaphy
       if (this._species === SpeciesId.PHIONE && this._sourceType === EggSourceType.SAME_SPECIES_EGG) {
         pokemonSpecies = getPokemonSpecies(
-          randSeedInt(MANAPHY_EGG_MANAPHY_RATE) ? SpeciesId.PHIONE : SpeciesId.MANAPHY,
+          randSeedInt(erBalanceNum("vanilla.eggs.manaphyRate")) ? SpeciesId.PHIONE : SpeciesId.MANAPHY,
         );
       }
       // ER safety net: eggs must always hatch a BASE form. Stale eggs created
@@ -283,9 +278,11 @@ export class Egg {
       // Sets the hidden ability if a hidden ability exists and
       // the override is set or the egg hits the chance
       let abilityIndex: number | undefined;
+      // Editor-tunable HA odds (vanilla.eggs.haRate).
+      const haRates = erBalanceMap("vanilla.eggs.haRate");
       const sameSpeciesEggHACheck =
-        this._sourceType === EggSourceType.SAME_SPECIES_EGG && !randSeedInt(SAME_SPECIES_EGG_HA_RATE);
-      const gachaEggHACheck = !(this._sourceType === EggSourceType.SAME_SPECIES_EGG) && !randSeedInt(GACHA_EGG_HA_RATE);
+        this._sourceType === EggSourceType.SAME_SPECIES_EGG && !randSeedInt(haRates.sameSpecies);
+      const gachaEggHACheck = !(this._sourceType === EggSourceType.SAME_SPECIES_EGG) && !randSeedInt(haRates.gacha);
       if (pokemonSpecies.abilityHidden && (this._overrideHiddenAbility || sameSpeciesEggHACheck || gachaEggHACheck)) {
         abilityIndex = 2;
       }
@@ -400,40 +397,46 @@ export class Egg {
   private rollEggMoveIndex() {
     const tierNum = this.isManaphyEgg() ? 2 : this.tier;
     let baseChance: number;
+    // Editor-tunable (vanilla.eggs.rareEggMoveRates / boostedRareEggMoveRates).
     if (this._sourceType === EggSourceType.SAME_SPECIES_EGG || this._sourceType === EggSourceType.GACHA_MOVE) {
-      baseChance = BOOSTED_RARE_EGGMOVE_RATES[tierNum];
+      baseChance = erBalanceArr("vanilla.eggs.boostedRareEggMoveRates")[tierNum] ?? BOOSTED_RARE_EGGMOVE_RATES[tierNum];
     } else {
-      baseChance = RARE_EGGMOVE_RATES[tierNum];
+      baseChance = erBalanceArr("vanilla.eggs.rareEggMoveRates")[tierNum] ?? RARE_EGGMOVE_RATES[tierNum];
     }
 
     return randSeedInt(baseChance) ? randSeedInt(3) : 3;
   }
 
   private getEggTierDefaultHatchWaves(eggTier?: EggTier): number {
+    // Editor-tunable (vanilla.eggs.hatchWaves).
+    const hatchWaves = erBalanceMap("vanilla.eggs.hatchWaves");
     if (this._species === SpeciesId.PHIONE || this._species === SpeciesId.MANAPHY) {
-      return HATCH_WAVES_MANAPHY_EGG;
+      return hatchWaves.manaphy ?? HATCH_WAVES_MANAPHY_EGG;
     }
 
     switch (eggTier ?? this._tier) {
       case EggTier.COMMON:
-        return HATCH_WAVES_COMMON_EGG;
+        return hatchWaves.common ?? HATCH_WAVES_COMMON_EGG;
       case EggTier.RARE:
-        return HATCH_WAVES_RARE_EGG;
+        return hatchWaves.rare ?? HATCH_WAVES_RARE_EGG;
       case EggTier.EPIC:
-        return HATCH_WAVES_EPIC_EGG;
+        return hatchWaves.epic ?? HATCH_WAVES_EPIC_EGG;
     }
-    return HATCH_WAVES_LEGENDARY_EGG;
+    return hatchWaves.legendary ?? HATCH_WAVES_LEGENDARY_EGG;
   }
 
   private rollEggTier(): EggTier {
     const tierValueOffset =
       this._sourceType === EggSourceType.GACHA_LEGENDARY ? GACHA_LEGENDARY_UP_THRESHOLD_OFFSET : 0;
+    // Editor-tunable thresholds [common, rare, epic] (vanilla.eggs.gachaThresholds),
+    // validated to be descending so the tier logic can never invert.
+    const [commonThreshold, rareThreshold, epicThreshold] = erBalanceArr("vanilla.eggs.gachaThresholds");
     const tierValue = randInt(256);
-    return tierValue >= GACHA_DEFAULT_COMMON_EGG_THRESHOLD + tierValueOffset
+    return tierValue >= commonThreshold + tierValueOffset
       ? EggTier.COMMON
-      : tierValue >= GACHA_DEFAULT_RARE_EGG_THRESHOLD + tierValueOffset
+      : tierValue >= rareThreshold + tierValueOffset
         ? EggTier.RARE
-        : tierValue >= GACHA_DEFAULT_EPIC_EGG_THRESHOLD + tierValueOffset
+        : tierValue >= epicThreshold + tierValueOffset
           ? EggTier.EPIC
           : EggTier.LEGENDARY;
   }
@@ -453,7 +456,7 @@ export class Egg {
        * when Utils.randSeedInt(8) = 1, and by making the generatePlayerPokemon() species
        * check pass when Utils.randSeedInt(8) = 0, we can tell them apart during tests.
        */
-      const rand = randSeedInt(MANAPHY_EGG_MANAPHY_RATE) !== 1;
+      const rand = randSeedInt(erBalanceNum("vanilla.eggs.manaphyRate")) !== 1;
       return rand ? SpeciesId.PHIONE : SpeciesId.MANAPHY;
     }
     if (this.tier === EggTier.LEGENDARY && this._sourceType === EggSourceType.GACHA_LEGENDARY && !randSeedInt(2)) {
@@ -577,13 +580,15 @@ export class Egg {
    * @returns `true` if the egg is shiny
    */
   private rollShiny(): boolean {
-    let shinyChance = GACHA_DEFAULT_SHINY_RATE;
+    // Editor-tunable per-source odds (vanilla.eggs.shinyRate).
+    const shinyRates = erBalanceMap("vanilla.eggs.shinyRate");
+    let shinyChance = shinyRates.gachaDefault ?? GACHA_DEFAULT_SHINY_RATE;
     switch (this._sourceType) {
       case EggSourceType.GACHA_SHINY:
-        shinyChance = GACHA_SHINY_UP_SHINY_RATE;
+        shinyChance = shinyRates.gachaShinyUp ?? GACHA_SHINY_UP_SHINY_RATE;
         break;
       case EggSourceType.SAME_SPECIES_EGG:
-        shinyChance = SAME_SPECIES_EGG_SHINY_RATE;
+        shinyChance = shinyRates.sameSpecies ?? SAME_SPECIES_EGG_SHINY_RATE;
         break;
       default:
         break;
@@ -617,14 +622,22 @@ export class Egg {
     globalScene.gameData.eggPity[EggTier.EPIC] += 1;
     globalScene.gameData.eggPity[EggTier.LEGENDARY] += 1 + tierValueOffset;
     // These numbers are roughly the 80% mark. That is, 80% of the time you'll get an egg before this gets triggered.
+    // Editor-tunable pity thresholds (vanilla.eggs.pity).
+    const pity = erBalanceMap("vanilla.eggs.pity");
     if (
-      globalScene.gameData.eggPity[EggTier.LEGENDARY] >= EGG_PITY_LEGENDARY_THRESHOLD
+      globalScene.gameData.eggPity[EggTier.LEGENDARY] >= (pity.legendary ?? EGG_PITY_LEGENDARY_THRESHOLD)
       && this._tier === EggTier.COMMON
     ) {
       this._tier = EggTier.LEGENDARY;
-    } else if (globalScene.gameData.eggPity[EggTier.EPIC] >= EGG_PITY_EPIC_THRESHOLD && this._tier === EggTier.COMMON) {
+    } else if (
+      globalScene.gameData.eggPity[EggTier.EPIC] >= (pity.epic ?? EGG_PITY_EPIC_THRESHOLD)
+      && this._tier === EggTier.COMMON
+    ) {
       this._tier = EggTier.EPIC;
-    } else if (globalScene.gameData.eggPity[EggTier.RARE] >= EGG_PITY_RARE_THRESHOLD && this._tier === EggTier.COMMON) {
+    } else if (
+      globalScene.gameData.eggPity[EggTier.RARE] >= (pity.rare ?? EGG_PITY_RARE_THRESHOLD)
+      && this._tier === EggTier.COMMON
+    ) {
       this._tier = EggTier.RARE;
     }
     globalScene.gameData.eggPity[this._tier] = 0;

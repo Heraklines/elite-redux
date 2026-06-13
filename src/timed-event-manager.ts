@@ -1,6 +1,6 @@
 import { SHINY_CATCH_RATE_MULTIPLIER } from "#balance/rates";
-import { CLASSIC_CANDY_FRIENDSHIP_MULTIPLIER } from "#balance/starters";
 import { allSpecies } from "#data/data-lists";
+import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import type { PokemonSpeciesFilter } from "#data/pokemon-species";
 import type { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
@@ -105,7 +105,9 @@ export class TimedEventManager {
    * @returns The classic friendship multiplier of the active {@linkcode TimedEvent}, or the default {@linkcode CLASSIC_CANDY_FRIENDSHIP_MULTIPLIER}
    */
   getClassicFriendshipMultiplier(): number {
-    return this.activeEvent()?.classicFriendshipMultiplier ?? CLASSIC_CANDY_FRIENDSHIP_MULTIPLIER;
+    // Event override first, then the editor-tunable default
+    // (vanilla.friendship.candyMultClassic).
+    return this.activeEvent()?.classicFriendshipMultiplier ?? erBalanceNum("vanilla.friendship.candyMultClassic");
   }
 
   /**

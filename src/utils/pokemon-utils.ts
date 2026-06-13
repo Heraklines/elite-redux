@@ -1,7 +1,8 @@
 import { MAX_TERAS_PER_ARENA } from "#app/constants";
 import { globalScene } from "#app/global-scene";
-import { POKERUS_STARTER_COUNT, speciesStarterCosts } from "#balance/starters";
+import { speciesStarterCosts } from "#balance/starters";
 import { allSpecies } from "#data/data-lists";
+import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import type { PokemonSpecies, PokemonSpeciesForm } from "#data/pokemon-species";
 import { BattlerIndex } from "#enums/battler-index";
 import { SpeciesId } from "#enums/species-id";
@@ -46,7 +47,7 @@ export function getPokerusStarters(): PokemonSpecies[] {
   date.setUTCHours(0, 0, 0, 0);
   globalScene.executeWithSeedOffset(
     () => {
-      while (pokerusStarters.length < POKERUS_STARTER_COUNT) {
+      while (pokerusStarters.length < erBalanceNum("vanilla.pokerusCount")) {
         const randomSpeciesId = Number.parseInt(randSeedItem(Object.keys(speciesStarterCosts)), 10);
         const species = getPokemonSpecies(randomSpeciesId);
         if (!pokerusStarters.includes(species)) {

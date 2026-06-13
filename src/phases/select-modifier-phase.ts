@@ -1,6 +1,7 @@
 import { consumePendingDevShop } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
+import { erBalanceArr, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import type { ModifierTier } from "#enums/modifier-tier";
 import { UiMode } from "#enums/ui-mode";
@@ -450,13 +451,14 @@ export class SelectModifierPhase extends BattlePhase {
     if (Overrides.WAIVE_ROLL_FEE_OVERRIDE) {
       return baseValue;
     }
+    // Editor-tunable (vanilla.shop.rerollTierValues / rerollBase).
     if (lockRarities) {
-      const tierValues = [50, 125, 300, 750, 2000];
+      const tierValues = erBalanceArr("vanilla.shop.rerollTierValues");
       for (const opt of this.typeOptions) {
-        baseValue += tierValues[opt.type.tier ?? 0];
+        baseValue += tierValues[opt.type.tier ?? 0] ?? tierValues.at(-1) ?? 0;
       }
     } else {
-      baseValue = 250;
+      baseValue = erBalanceNum("vanilla.shop.rerollBase");
     }
 
     let multiplier = 1;

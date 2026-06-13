@@ -23,6 +23,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { erBalanceMap } from "#data/elite-redux/er-balance-tuning";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { getTypeDamageMultiplier } from "#data/type";
 import { PokemonType } from "#enums/pokemon-type";
@@ -195,7 +196,7 @@ export function maybeAssignErResistBerry(enemy: EnemyPokemon): void {
     if (!globalScene.currentBattle?.trainer) {
       return; // trainer-only drops — wild mons never hold one
     }
-    const chance = ER_RESIST_BERRY_CHANCE_PCT[getErDifficulty()] ?? 0;
+    const chance = erBalanceMap("er.items.resistBerryPct")[getErDifficulty()] ?? 0;
     if (chance <= 0 || enemy.randBattleSeedInt(100) >= chance) {
       return;
     }

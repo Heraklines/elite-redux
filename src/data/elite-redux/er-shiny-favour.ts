@@ -19,6 +19,7 @@
 
 import { globalScene } from "#app/global-scene";
 import type { Challenge } from "#data/challenge";
+import { erBalanceArr, erBalanceMap, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { Challenges } from "#enums/challenges";
 
 /** Favour granted by each challenge while it is active (value > 0). */
@@ -67,12 +68,19 @@ export function getChallengeFavour(challenge: Challenge): number {
     return 0;
   }
   if (challenge.id === Challenges.LIMITED_SUPPORT) {
-    return LIMITED_SUPPORT_FAVOUR[challenge.value] ?? LIMITED_SUPPORT_FAVOUR[LIMITED_SUPPORT_FAVOUR.length - 1];
+    const tiers = erBalanceArr("er.favour.limitedSupport");
+    return tiers[challenge.value] ?? tiers[tiers.length - 1];
   }
   if (challenge.id === Challenges.USAGE_TIER) {
-    return USAGE_TIER_FAVOUR[challenge.value] ?? USAGE_TIER_FAVOUR[USAGE_TIER_FAVOUR.length - 1];
+    const tiers = erBalanceArr("er.favour.usageTier");
+    return tiers[challenge.value] ?? tiers[tiers.length - 1];
   }
-  return FAVOUR_BY_CHALLENGE[challenge.id] ?? 0;
+  // Editor-managed override first (keyed by the Challenges enum NAME), then the
+  // hardcoded table (which also decides WHICH challenges grant favour at all).
+  if (FAVOUR_BY_CHALLENGE[challenge.id] === undefined) {
+    return 0;
+  }
+  return erBalanceMap("er.favour.byChallenge")[Challenges[challenge.id]] ?? FAVOUR_BY_CHALLENGE[challenge.id] ?? 0;
 }
 
 /** Total favour from all active challenges on the current run. */
@@ -86,9 +94,9 @@ export function getRunShinyFavour(): number {
  * per {@linkcode FAVOUR_PER_STEP} favour, capped at {@linkcode FAVOUR_SHINY_MAX_MULT}.
  * (e.g. 0→×1, 5→×1.5, 10→×2, 15→×2.5, 20+→×3.)
  */
-export function favourToShinyMultiplier(favour: number, maxMult: number = FAVOUR_SHINY_MAX_MULT): number {
-  const steps = Math.floor(Math.max(0, favour) / FAVOUR_PER_STEP);
-  return Math.min(maxMult, 1 + FAVOUR_SHINY_STEP_BONUS * steps);
+export function favourToShinyMultiplier(favour: number, maxMult?: number): number {
+  const steps = Math.floor(Math.max(0, favour) / erBalanceNum("er.favour.perStep"));
+  return Math.min(maxMult ?? erBalanceNum("er.favour.maxMult"), 1 + erBalanceNum("er.favour.stepBonus") * steps);
 }
 
 /**
@@ -97,7 +105,7 @@ export function favourToShinyMultiplier(favour: number, maxMult: number = FAVOUR
  */
 export function getRunFavourCap(): number {
   const usageTier = globalScene.gameMode?.challenges?.find(c => c.id === Challenges.USAGE_TIER);
-  return (usageTier?.value ?? 0) >= 3 ? 5 : FAVOUR_SHINY_MAX_MULT;
+  return (usageTier?.value ?? 0) >= 3 ? erBalanceNum("er.favour.lowTierMaxMult") : erBalanceNum("er.favour.maxMult");
 }
 
 /** The current run's shiny multiplier from its challenge favour (≥1). */
@@ -108,8 +116,10 @@ export function getRunShinyMultiplier(): number {
 /**
  * Flat, always-on Elite Redux buff to candy gains (applies in or out of a run,
  * on top of any favour multiplier). ~35% more candy across the board.
+ * Evaluated once at module load — the tuning JSON is static per build, and the
+ * consumer (game-data.ts addStarterCandy) imports this as a plain const.
  */
-export const ER_CANDY_GAIN_MULTIPLIER = 1.35;
+export const ER_CANDY_GAIN_MULTIPLIER = erBalanceNum("er.candy.globalMult");
 
 /**
  * The current run's candy-gain multiplier from its challenge favour. Uses the

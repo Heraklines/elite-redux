@@ -19,6 +19,7 @@
 // re-exported from the trainer-overlay so callers map difficulty → tier here.
 // =============================================================================
 
+import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import type { ErRosterTier } from "#data/elite-redux/er-trainer-overlay";
 
 export type ErDifficulty = "youngster" | "ace" | "elite" | "hell";
@@ -72,9 +73,9 @@ export function isErVanillaDifficulty(difficulty: ErDifficulty = currentDifficul
 export function getErDifficultyShinyMultiplier(difficulty: ErDifficulty = currentDifficulty): number {
   switch (difficulty) {
     case "hell":
-      return 2;
+      return erBalanceNum("er.shiny.multHell");
     case "elite":
-      return 1.5;
+      return erBalanceNum("er.shiny.multElite");
     default:
       return 1;
   }
@@ -89,9 +90,9 @@ export function getErDifficultyShinyMultiplier(difficulty: ErDifficulty = curren
 export function getErDifficultyCandyMultiplier(difficulty: ErDifficulty = currentDifficulty): number {
   switch (difficulty) {
     case "youngster":
-      return 2;
+      return erBalanceNum("er.candy.multYoungster");
     case "ace":
-      return 1.5;
+      return erBalanceNum("er.candy.multAce");
     default:
       return 1;
   }

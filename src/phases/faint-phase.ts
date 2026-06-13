@@ -1,9 +1,9 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
-import { FRIENDSHIP_LOSS_FROM_FAINT } from "#balance/starters";
 import { allMoves } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
+import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { recordErStreakFaint } from "#data/elite-redux/er-money-streak";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -198,7 +198,7 @@ export class FaintPhase extends PokemonPhase {
 
     pokemon.faintCry(() => {
       if (pokemon.isPlayer()) {
-        pokemon.addFriendship(-FRIENDSHIP_LOSS_FROM_FAINT);
+        pokemon.addFriendship(-erBalanceNum("vanilla.friendship.lossFaint"));
       }
       pokemon.hideInfo();
       globalScene.playSound("se/faint");

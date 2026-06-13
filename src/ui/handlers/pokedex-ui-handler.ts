@@ -8,12 +8,12 @@ import {
   getSameSpeciesEggCandyCounts,
   getStarterValueFriendshipCap,
   getValueReductionCandyCounts,
-  POKERUS_STARTER_COUNT,
   speciesStarterCosts,
 } from "#balance/starters";
 import { speciesTmMoves } from "#balance/tms";
 import { allAbilities, allMoves, allSpecies, catchableSpecies } from "#data/data-lists";
 import { matchesAbilityText } from "#data/elite-redux/er-ability-search";
+import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import type { PokemonForm, PokemonSpecies } from "#data/pokemon-species";
 import { normalForm } from "#data/pokemon-species";
 import { AbilityAttr } from "#enums/ability-attr";
@@ -579,7 +579,8 @@ export class PokedexUiHandler extends MessageUiHandler {
     starterBoxContainer.add(this.starterSelectScrollBar);
 
     this.pokerusCursorObjs = [];
-    for (let i = 0; i < POKERUS_STARTER_COUNT; i++) {
+    // One cursor per Pokerus starter (editor-tunable: vanilla.pokerusCount).
+    for (let i = 0; i < erBalanceNum("vanilla.pokerusCount"); i++) {
       const cursorObj = globalScene.add.image(0, 0, "select_cursor_pokerus");
       cursorObj.setVisible(false);
       cursorObj.setOrigin(0, 0);
