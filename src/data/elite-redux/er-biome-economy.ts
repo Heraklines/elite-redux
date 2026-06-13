@@ -201,12 +201,11 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
 
   globalScene.executeWithSeedOffset(
     () => {
-      // Staples: bracketed by depth like the vanilla shop's unlock curve.
-      const bracket = Math.min(Math.floor(waveIndex / 40), 2);
-      add((["POTION", "HYPER_POTION", "MAX_POTION"] as const)[bracket], "HEAL");
-      add("FULL_HEAL", "HEAL");
-      add((["POKEBALL", "GREAT_BALL", "ULTRA_BALL"] as const)[bracket], "BALLS");
-      // Signatures: the biome's identity items, always in stock.
+      // #440 feedback: the market must read as a BIOME market, not the vanilla
+      // potion shop. So lead with the biome's IDENTITY items (signatures), then
+      // the discounted-category picks + held wildcards that make the place worth
+      // visiting, and keep healing to a SINGLE affordable staple at the END.
+      // Signatures: the biome's identity items, always in stock - FIRST.
       for (const key of eco.signature) {
         if (!seen.has(key) && stock.length < 9) {
           seen.add(key);
@@ -228,6 +227,11 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
       for (let i = 0; i < wildcards; i++) {
         add(heldPool[randSeedInt(heldPool.length)], "HELD");
       }
+      // A SINGLE depth-bracketed healing staple at the END - heal access
+      // without the vanilla-shop look. (Extra heals / balls appear only if the
+      // biome lists those categories as cheap above.)
+      const bracket = Math.min(Math.floor(waveIndex / 40), 2);
+      add((["POTION", "HYPER_POTION", "MAX_POTION"] as const)[bracket], "HEAL");
     },
     waveIndex,
     "er-biome-shop",
