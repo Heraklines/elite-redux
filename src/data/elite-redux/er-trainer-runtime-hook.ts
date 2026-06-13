@@ -838,7 +838,20 @@ function erEliteBstCapFor(wave: number, isBossWave: boolean): number | null {
  */
 export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
   try {
-    if (getErDifficulty() !== "elite") {
+    // ER (#441): THE universal power gate. This used to be Elite-only and
+    // trainer-only; it now runs for EVERY difficulty except Hell (whose early
+    // spikes are intentional) and is invoked from the EnemyPokemon
+    // CONSTRUCTOR, so every spawn path - wild, trainer, mystery encounter,
+    // scripted - passes through one chokepoint. Species of any origin
+    // (vanilla or ER custom) are allowed as long as their BST fits the
+    // wave's ceiling; violators devolve or swap. Note the FAIL-CLOSED shape:
+    // an unknown/future difficulty value is gated, not exempted.
+    if (getErDifficulty() === "hell") {
+      return;
+    }
+    // Daily runs are shared-seed curated content (set bosses incl. wave-50
+    // legendaries) - gating them would silently rewrite everyone's daily.
+    if (globalScene.gameMode?.isDaily) {
       return;
     }
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
