@@ -19,6 +19,7 @@ import { AttemptCapturePhase } from "#phases/attempt-capture-phase";
 import { AttemptRunPhase } from "#phases/attempt-run-phase";
 import { BattleEndPhase } from "#phases/battle-end-phase";
 import { BerryPhase } from "#phases/berry-phase";
+import { BiomeShopPhase } from "#phases/biome-shop-phase";
 import { CheckInterludePhase } from "#phases/check-interlude-phase";
 import { CheckStatusEffectPhase } from "#phases/check-status-effect-phase";
 import { CheckSwitchPhase } from "#phases/check-switch-phase";
@@ -133,6 +134,7 @@ const PHASES = Object.freeze({
   AttemptRunPhase,
   BattleEndPhase,
   BerryPhase,
+  BiomeShopPhase,
   CheckInterludePhase,
   CheckStatusEffectPhase,
   CheckSwitchPhase,

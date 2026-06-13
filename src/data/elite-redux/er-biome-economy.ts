@@ -43,6 +43,9 @@ export type ErShopCategory =
   | "CANDY"
   | "MINT";
 
+/** The biome market is a 4x4 grid: 16 stock slots (spec #440 §1). */
+export const ER_BIOME_SHOP_SLOTS = 16;
+
 /** Price factor per shop slot tier, in "waves of income" units. */
 export const ER_SHOP_TIER_FACTOR = {
   staple: 0.35,
@@ -192,8 +195,13 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
   const seen = new Set<string>();
   const priceOf = (key: keyof typeof modifierTypes, category: ErShopCategory): number =>
     erBiomeShopPrice(CATEGORY_TIER[category], erBiomeCategoryPriceMod(biome, category));
+  // Spec (#440 §1): the market is a 4x4 GRID of 16 slots, not a single row.
+  // 4 ball staples + biome signatures + biome-skewed (discounted) picks +
+  // rarity wildcards, padded to 16. NEVER healing (maintainer rule: the biome
+  // market is a distinct shop, healing stays the normal-wave shop's job).
+  const TARGET_SLOTS = ER_BIOME_SHOP_SLOTS;
   const add = (key: keyof typeof modifierTypes, category: ErShopCategory) => {
-    if (!seen.has(key) && stock.length < 9) {
+    if (!seen.has(key) && stock.length < TARGET_SLOTS) {
       seen.add(key);
       stock.push({ key, cost: priceOf(key, category) });
     }
@@ -201,13 +209,14 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
 
   globalScene.executeWithSeedOffset(
     () => {
-      // #440 feedback: the market must read as a BIOME market, not the vanilla
-      // potion shop. So lead with the biome's IDENTITY items (signatures), then
-      // the discounted-category picks + held wildcards that make the place worth
-      // visiting, and keep healing to a SINGLE affordable staple at the END.
-      // Signatures: the biome's identity items, always in stock - FIRST.
+      // 1. STAPLES: the four ball tiers, always in stock, always affordable.
+      // (The spec's "heals/balls" staples drop the heals per maintainer rule.)
+      for (const key of ER_SHOP_CATEGORY_POOL.BALLS) {
+        add(key, "BALLS");
+      }
+      // 2. SIGNATURES: the biome's identity items, always stocked, ultra-priced.
       for (const key of eco.signature) {
-        if (!seen.has(key) && stock.length < 9) {
+        if (!seen.has(key) && stock.length < TARGET_SLOTS) {
           seen.add(key);
           stock.push({
             key,
@@ -215,23 +224,38 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
           });
         }
       }
-      // Discounted-category picks: the reason this biome's market is GOOD.
-      // #440 feedback: NO healing items in the biome market - it's a distinct
-      // shop, not the vanilla potion store. Skip the HEAL category entirely
-      // (healing access stays the vanilla shop's job on non-boss waves).
+      // 3. BIOME-SKEWED: up to two distinct picks from each discounted category
+      // (the reason this biome's market is worth a look). HEAL is excluded.
       for (const category of eco.cheap) {
         if (category === "HEAL") {
           continue;
         }
-        const pool = ER_SHOP_CATEGORY_POOL[category];
-        add(pool[randSeedInt(pool.length)], category);
+        const pool = ER_SHOP_CATEGORY_POOL[category].filter(k => !seen.has(k));
+        for (let i = 0; i < 2 && pool.length > 0 && stock.length < TARGET_SLOTS; i++) {
+          const idx = randSeedInt(pool.length);
+          add(pool[idx], category);
+          pool.splice(idx, 1);
+        }
       }
-      // Wildcards: one held-item roll everywhere; the Desert caravan rolls two
-      // more (exotics are its whole deal).
-      const heldPool = ER_SHOP_CATEGORY_POOL.HELD;
-      const wildcards = biome === BiomeId.DESERT ? 3 : 1;
-      for (let i = 0; i < wildcards; i++) {
-        add(heldPool[randSeedInt(heldPool.length)], "HELD");
+      // 4. WILDCARDS / FILL: top up to 16 from the broad non-heal pool, drawn
+      // randomly so each shop varies. HELD (community exotics) is weighted
+      // heaviest; the Desert caravan leans even harder into HELD exotics.
+      const wildcardCats: ErShopCategory[] = ["HELD", "EVO", "TM", "BATTLE", "BERRY", "CANDY", "MINT"];
+      const bag: { key: keyof typeof modifierTypes; cat: ErShopCategory }[] = [];
+      for (const cat of wildcardCats) {
+        const weight = cat === "HELD" && biome === BiomeId.DESERT ? 2 : 1;
+        for (let w = 0; w < weight; w++) {
+          for (const key of ER_SHOP_CATEGORY_POOL[cat]) {
+            bag.push({ key, cat });
+          }
+        }
+      }
+      let guard = 0;
+      while (stock.length < TARGET_SLOTS && bag.length > 0 && guard++ < 500) {
+        const idx = randSeedInt(bag.length);
+        const { key, cat } = bag[idx];
+        bag.splice(idx, 1);
+        add(key, cat);
       }
     },
     waveIndex,

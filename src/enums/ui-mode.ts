@@ -50,4 +50,6 @@ export enum UiMode {
   CHANGE_PASSWORD_FORM,
   LLM_DIRECTOR_THEME_PICKER,
   BUG_REPORT_FORM,
+  /** ER #440: the bespoke every-10-waves biome market (full-screen grid shop). */
+  BIOME_SHOP,
 }

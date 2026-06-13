@@ -123,11 +123,10 @@ export class VictoryPhase extends PokemonPhase {
 
         // ER #440: Biome Market on x0 boss waves. Vanilla skips
         // SelectModifierPhase entirely on x0 waves (the `if (currentWaveIndex %
-        // 10)` above is false), so the biome-stock shop row never opened. Push a
-        // REWARD-LESS SelectModifierPhase here (fillRemaining:false -> 0 free
-        // options) so only the paid biome shop row is shown - that row is built
-        // by getPlayerShopModifierTypeOptionsForWave, which returns the biome
-        // stock for x0 waves. It runs AFTER the x0 reward popups and BEFORE the
+        // 10)` above is false), so no shop ever opened. Push the bespoke
+        // BiomeShopPhase here - a full-screen 4x4 biome market (see
+        // BiomeShopUiHandler) built from getPlayerShopModifierTypeOptionsForWave's
+        // 16-slot biome stock. It runs AFTER the x0 reward popups and BEFORE the
         // biome change, so prices reflect the biome just cleared. Gated to
         // local/staging builds with the SAME flag as the shop-stock hook, so
         // prod x0 waves are unchanged; daily runs (shared seed) are skipped.
@@ -135,7 +134,7 @@ export class VictoryPhase extends PokemonPhase {
           const env = import.meta.env as unknown as Record<string, unknown> | undefined;
           const biomeShopEnabled = !!env?.DEV || env?.VITE_DEV_TOOLS === "1";
           if (!(currentWaveIndex % 10) && !gameMode.isDaily && biomeShopEnabled) {
-            globalScene.phaseManager.pushNew("SelectModifierPhase", 0, undefined, { fillRemaining: false });
+            globalScene.phaseManager.pushNew("BiomeShopPhase");
           }
         }
 

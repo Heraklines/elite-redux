@@ -183,8 +183,18 @@ export class SelectModifierPhase extends BattlePhase {
     return this.applyChosenModifier(modifierType, cost, modifierSelectCallback);
   }
 
+  /**
+   * The UiMode the shop returns to after the party-target menu closes.
+   * BiomeShopPhase (#440) overrides this to UiMode.BIOME_SHOP so the bespoke
+   * grid re-appears after assigning a held item / TM, instead of the vanilla
+   * reward screen.
+   */
+  protected getModifierSelectMode(): UiMode {
+    return UiMode.MODIFIER_SELECT;
+  }
+
   // Apply a chosen modifier: do an effect or open the party menu
-  private applyChosenModifier(
+  protected applyChosenModifier(
     modifierType: ModifierType,
     cost: number,
     modifierSelectCallback: ModifierSelectCallback,
@@ -284,7 +294,7 @@ export class SelectModifierPhase extends BattlePhase {
    * @param cost - The cost of the modifier if it was purchased, or -1 if selected as the modifier reward
    * @param playSound - Whether the 'obtain modifier' sound should be played when adding the modifier.
    */
-  private applyModifier(modifier: Modifier, cost = -1, playSound = false): void {
+  protected applyModifier(modifier: Modifier, cost = -1, playSound = false): void {
     const result = globalScene.addModifier(modifier, false, playSound, undefined, undefined, cost);
     // Queue a copy of this phase when applying a TM or Memory Mushroom.
     // If the player selects either of these, then escapes out of consuming them,
@@ -313,7 +323,7 @@ export class SelectModifierPhase extends BattlePhase {
   }
 
   // Opens the party menu specifically for fusions
-  private openFusionMenu(
+  protected openFusionMenu(
     modifierType: PokemonModifierType,
     cost: number,
     modifierSelectCallback: ModifierSelectCallback,
@@ -330,7 +340,7 @@ export class SelectModifierPhase extends BattlePhase {
           && spliceSlotIndex < 6
           && fromSlotIndex !== spliceSlotIndex
         ) {
-          globalScene.ui.setMode(UiMode.MODIFIER_SELECT, this.isPlayer()).then(() => {
+          globalScene.ui.setMode(this.getModifierSelectMode(), this.isPlayer()).then(() => {
             const modifier = modifierType.newModifier(party[fromSlotIndex], party[spliceSlotIndex])!; //TODO: is the bang correct?
             this.applyModifier(modifier, cost, true);
           });
@@ -343,7 +353,7 @@ export class SelectModifierPhase extends BattlePhase {
   }
 
   // Opens the party menu to apply one of various modifiers
-  private openModifierMenu(
+  protected openModifierMenu(
     modifierType: PokemonModifierType,
     cost: number,
     modifierSelectCallback: ModifierSelectCallback,
@@ -380,7 +390,7 @@ export class SelectModifierPhase extends BattlePhase {
       -1,
       (slotIndex: number, option: PartyOption) => {
         if (slotIndex < 6) {
-          globalScene.ui.setMode(UiMode.MODIFIER_SELECT, this.isPlayer()).then(() => {
+          globalScene.ui.setMode(this.getModifierSelectMode(), this.isPlayer()).then(() => {
             const modifier = isMoveModifier
               ? modifierType.newModifier(party[slotIndex], option - PartyOption.MOVE_1)
               : isAbilityModifier
@@ -428,7 +438,7 @@ export class SelectModifierPhase extends BattlePhase {
 
   // Function that resets the reward selection screen,
   // e.g. after pressing cancel in the party ui or while learning a move
-  private resetModifierSelect(modifierSelectCallback: ModifierSelectCallback) {
+  protected resetModifierSelect(modifierSelectCallback: ModifierSelectCallback) {
     globalScene.ui.setMode(
       UiMode.MODIFIER_SELECT,
       this.isPlayer(),
