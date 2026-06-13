@@ -22,9 +22,9 @@
 // =============================================================================
 
 import { PostAttackAbAttr } from "#abilities/ab-attrs";
-import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
+import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 
 const TRAPPING_MOVES = new Set<MoveId>([
   MoveId.BIND,
@@ -77,10 +77,14 @@ export class TrapDurationModifierAbAttr extends PostAttackAbAttr {
     opponent.removeTag(BattlerTagType.THUNDER_CAGE);
     opponent.removeTag(BattlerTagType.SNAP_TRAP);
     opponent.addTag(BattlerTagType.WRAP, this.opts.turns, undefined, pokemon.id);
-    // Damage fraction will be applied by the trap tag's tick; pokerogue's
-    // WRAP tag damage = 1/8, but our re-added tag's class controls it. The
-    // additional 1/6 vs 1/8 differential is folded into the move's text
-    // representation — the user gets the longer-trap effect which is the
-    // dominant gameplay impact.
+    // #454: actually apply the boosted per-turn damage. The WRAP tag's lapse
+    // normally deals maxHp/8; set the denominator override so Grappler's trap
+    // deals maxHp/6 (damageFraction 1/6 -> denominator 6) as the dex states.
+    const tag = opponent.getTag(BattlerTagType.WRAP);
+    if (tag && this.opts.damageFraction > 0) {
+      (tag as { damageDenominatorOverride?: number }).damageDenominatorOverride = Math.round(
+        1 / this.opts.damageFraction,
+      );
+    }
   }
 }

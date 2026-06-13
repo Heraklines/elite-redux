@@ -2079,6 +2079,43 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Wishiwashi Schooling form (#451)",
+    description:
+      "#451 - Schooling is a HP-gated FORM change (not an evolution): with the\n"
+      + "Schooling ability and level >= 20, Wishiwashi is in School (big) form\n"
+      + "above 1/4 HP and reverts to Solo form at or below 1/4 HP. CHECK: this\n"
+      + "Wishiwashi (Lv30) starts in School form; chip it below 1/4 HP and it\n"
+      + "should shrink back to Solo, then return to School when healed above 1/4.\n"
+      + "If it stays stuck in School form, report it (Send Logs).",
+    setup: () => {
+      resetDevOverrides();
+      O.STARTING_LEVEL_OVERRIDE = 30;
+      O.ABILITY_OVERRIDE = AbilityId.SCHOOLING;
+      return [
+        makeStarter(SpeciesId.WISHIWASHI, {
+          moveset: [MoveId.WATER_GUN, MoveId.TAKE_DOWN, MoveId.PROTECT, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Grappler trap 1/6 HP (#454)",
+    description:
+      "#454 - Grappler (ER 523) trapping moves now deal 1/6 max HP per turn\n"
+      + "(was 1/8) and last 6 turns. CHECK: this Snorlax has Grappler + Wrap;\n"
+      + "use Wrap on the foe and watch the end-of-turn chip - it should take\n"
+      + "~16.7% of the foe's max HP each turn, not ~12.5%.",
+    setup: () => {
+      resetDevOverrides();
+      O.ABILITY_OVERRIDE = erAbility(523); // Grappler
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.WRAP, MoveId.BODY_SLAM, MoveId.PROTECT, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
     label: "Restraining Order force-out (#452)",
     description:
       "#452 - Restraining Order (Gooschase sig, ER ability 690) + Chuckster\n"

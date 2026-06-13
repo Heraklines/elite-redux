@@ -1592,6 +1592,12 @@ export abstract class DamagingTrapTag extends TrappedTag {
   public declare readonly tagType: TrappingBattlerTagType;
   /** The animation to play during the damage sequence */
   #commonAnim: CommonAnim;
+  /**
+   * ER (#454): per-turn trap damage is normally maxHp/8. ER's Grappler ability
+   * (523) raises it to maxHp/6 by setting this override on the tag it installs.
+   * Undefined = vanilla 1/8.
+   */
+  public damageDenominatorOverride?: number;
 
   constructor(
     tagType: BattlerTagType,
@@ -1626,7 +1632,8 @@ export abstract class DamagingTrapTag extends TrappedTag {
       applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon, cancelled });
 
       if (!cancelled.value) {
-        pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() / 8), { result: HitResult.INDIRECT });
+        const denom = this.damageDenominatorOverride ?? 8;
+        pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() / denom), { result: HitResult.INDIRECT });
       }
     }
 
