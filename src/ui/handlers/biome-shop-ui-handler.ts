@@ -63,7 +63,7 @@ const DEFAULT_KEEPER = "clerk_m";
  * stall, a firebreather the volcano forge, a hex maniac the graveyard curio
  * shop, etc.). Every distinct sprite used here is preloaded in loading-scene.
  */
-const KEEPER_BY_BIOME: Partial<Record<BiomeId, string>> = {
+export const KEEPER_BY_BIOME: Partial<Record<BiomeId, string>> = {
   // Towns & open country - general-store clerks / florists.
   [BiomeId.TOWN]: "clerk_m",
   [BiomeId.PLAINS]: "clerk_f",
@@ -141,7 +141,7 @@ export const ER_BIOME_SHOP_KEEPERS = [
  * a Kecleon, the classic PMD dungeon shopkeeper. Takes priority over the trainer
  * map in setKeeper.
  */
-const POKEMON_KEEPER_BY_BIOME: Partial<Record<BiomeId, SpeciesId>> = {
+export const POKEMON_KEEPER_BY_BIOME: Partial<Record<BiomeId, SpeciesId>> = {
   [BiomeId.SPACE]: SpeciesId.CLEFAIRY,
   [BiomeId.CAVE]: SpeciesId.KECLEON,
 };
@@ -151,7 +151,7 @@ const POKEMON_KEEPER_BY_BIOME: Partial<Record<BiomeId, SpeciesId>> = {
  * caravan, a graveyard the local shaman, a slum a black market, a volcano a
  * forge, etc. Shown in the banner as "<BIOME> <TYPE>". Default "Market".
  */
-const SHOP_TYPE_BY_BIOME: Partial<Record<BiomeId, string>> = {
+export const SHOP_TYPE_BY_BIOME: Partial<Record<BiomeId, string>> = {
   [BiomeId.DESERT]: "Caravan",
   [BiomeId.WASTELAND]: "Scavenger",
   [BiomeId.SLUM]: "Black Market",
@@ -413,6 +413,9 @@ export class BiomeShopUiHandler extends UiHandler {
     const type = this.options[i]?.type;
     this.itemNameText.setText(type?.name ?? "");
     this.descText.setText(type?.getDescription() ?? "");
+    // The hovered item must pop in full colour against the dark backdrop, so
+    // re-style every cell whenever the cursor moves.
+    this.restyleCells();
   }
 
   override setCursor(cursor: number): boolean {
@@ -421,18 +424,38 @@ export class BiomeShopUiHandler extends UiHandler {
     return changed;
   }
 
-  /** Refresh the money readout + dim unaffordable slots. */
+  /** Refresh the money readout + per-cell visuals. */
   private refresh(): void {
     this.moneyText.setText(money(globalScene.money));
+    this.restyleCells();
+  }
+
+  /**
+   * Per-slot visuals. A slot is "lit" (full colour, no tint) when it is either
+   * the HOVERED slot - so you can always read what the cursor is on, even an
+   * item you can't afford yet - or an affordable, in-stock slot. Non-hovered
+   * slots that are unaffordable or sold out dim so they read as "not buyable
+   * now" instead of vanishing into the dark backdrop.
+   */
+  private restyleCells(): void {
     for (let i = 0; i < this.cells.length; i++) {
+      const cell = this.cells[i];
       const remaining = this.qtys[i] ?? 0;
       const affordable = globalScene.money >= (this.options[i]?.cost ?? 0);
       const buyable = affordable && remaining > 0;
-      const dim = buyable ? 1 : 0.35;
-      this.cells[i].icon.setAlpha(dim);
-      this.cells[i].price.setAlpha(dim);
-      this.cells[i].qty.setText(remaining > 0 ? `x${remaining}` : "SOLD");
-      this.cells[i].qty.setAlpha(remaining > 0 ? 0.85 : 0.55);
+      const lit = i === this.cursor || buyable;
+      cell.icon.setAlpha(lit ? 1 : 0.35);
+      // Full colour on a lit slot: drop any greying tint the modifier type
+      // carries for its "unusable" state elsewhere in the UI.
+      const tint = this.options[i]?.type?.iconTint;
+      if (lit || tint == null) {
+        cell.icon.clearTint();
+      } else {
+        cell.icon.setTint(tint);
+      }
+      cell.price.setAlpha(lit ? 1 : 0.4);
+      cell.qty.setText(remaining > 0 ? `x${remaining}` : "SOLD");
+      cell.qty.setAlpha(remaining > 0 && lit ? 1 : 0.55);
     }
   }
 

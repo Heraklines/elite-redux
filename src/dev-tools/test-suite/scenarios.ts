@@ -24,6 +24,7 @@
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
+import { ER_BIOME_ECONOMY, erBiomeHasShop } from "#data/elite-redux/er-biome-economy";
 import type { ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
@@ -31,6 +32,7 @@ import { setErDifficulty, setErDifficulty as setErDifficultyForScenario } from "
 import { erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
 import { AbilityId } from "#enums/ability-id";
 import { BerryType } from "#enums/berry-type";
+import type { BiomeId } from "#enums/biome-id";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { ErMoveId } from "#enums/er-move-id";
 import { MoveId } from "#enums/move-id";
@@ -46,6 +48,8 @@ import { erCommunityItemModifierType } from "#modifiers/modifier-type";
 import type { Variant } from "#sprites/variant";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { Starter, StarterMoveset } from "#types/save-data";
+import { KEEPER_BY_BIOME, POKEMON_KEEPER_BY_BIOME, SHOP_TYPE_BY_BIOME } from "#ui/biome-shop-ui-handler";
+import { getBiomeName } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 export interface DevScenario {
@@ -206,7 +210,63 @@ function givePlayerCommunityItems(items: [ErCommunityItemKind, number][]): void 
 
 // --- scenarios --------------------------------------------------------------
 
+// --- #440 biome shop previews: one scenario per biome that runs a shop ------
+// Each drops you at a wave-10 boss IN the chosen biome with a lvl-100 sweeper vs
+// a lvl-5 Magikarp - win the (~2 turn) fight and THAT biome's shop opens, so the
+// team can eyeball every market: its shop-type name, keeper sprite, signature
+// stock, per-biome discounts, rarity-tier P prices and per-item stock counts.
+const BIOME_SHOP_SWEEPER: MoveId[] = [MoveId.THUNDERBOLT, MoveId.ICE_BEAM, MoveId.SHADOW_BALL, MoveId.FLAMETHROWER];
+
+/** Human label for a biome's shopkeeper (Pokemon name, or trainer-class key). */
+function biomeKeeperLabel(biome: BiomeId): string {
+  const pkmn = POKEMON_KEEPER_BY_BIOME[biome];
+  if (pkmn != null) {
+    return `${getPokemonSpecies(pkmn).getName()} (Pokemon keeper)`;
+  }
+  return (KEEPER_BY_BIOME[biome] ?? "clerk_m").replace(/_/g, " ");
+}
+
+function biomeShopScenario(biome: BiomeId): DevScenario {
+  const eco = ER_BIOME_ECONOMY[biome]!;
+  const name = getBiomeName(biome);
+  const shop = SHOP_TYPE_BY_BIOME[biome] ?? "Market";
+  return {
+    label: `Shop: ${name} ${shop}`,
+    description:
+      `#440 biome market preview - ${name.toUpperCase()} ${shop.toUpperCase()}.\n`
+      + "DO: win the wave-10 boss (lvl100 Mewtwo vs lvl5 Magikarp, ~2 turns) to\n"
+      + "open THIS biome's shop, then assess it.\n"
+      + `KEEPER: ${biomeKeeperLabel(biome)}.   global price x${eco.priceMod}.\n`
+      + `SIGNATURES (always stocked): ${eco.signature.join(", ") || "(none)"}.\n`
+      + `CHEAPER here: ${eco.cheap.join(", ") || "-"}.   PRICIER: ${eco.dear.join(", ") || "-"}.\n`
+      + "EXPECT: banner shows the shop name above, biome scenery behind a dark\n"
+      + "overlay, P prices BY RARITY TIER (balls escalate, Focus Band > Quick\n"
+      + "Claw), per-item stock (xN, SOLD at 0), the hovered item in FULL colour,\n"
+      + "item descriptions on select, NO healing items. Buy repeatedly; B leaves.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 10,
+        STARTING_BIOME_OVERRIDE: biome,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        MOVESET_OVERRIDE: BIOME_SHOP_SWEEPER,
+      });
+      return [makeStarter(SpeciesId.MEWTWO, { moveset: BIOME_SHOP_SWEEPER })];
+    },
+  };
+}
+
+/** One preview per biome that runs a shop (the Abyss is noShop, so excluded). */
+const BIOME_SHOP_PREVIEW_SCENARIOS: DevScenario[] = Object.keys(ER_BIOME_ECONOMY)
+  .map(k => Number(k) as BiomeId)
+  .filter(b => erBiomeHasShop(b))
+  .map(biomeShopScenario);
+
 export const DEV_SCENARIOS: DevScenario[] = [
+  ...BIOME_SHOP_PREVIEW_SCENARIOS,
   // ===========================================================================
   // FIXES — this session
   // ===========================================================================
