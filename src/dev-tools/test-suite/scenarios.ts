@@ -2028,14 +2028,15 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "Biome Market preview (#440)",
     description:
-      "#440 BIOME MARKET - every 10th wave the boss reward screen now has a\n"
-      + "MARKET below the rewards (boss waves had no shop before). Stock and\n"
-      + "prices depend on the BIOME: staples + the biome's signature items +\n"
-      + "discounted-category picks + a wildcard. DO: win this wave-10 fight,\n"
-      + "then scroll DOWN past the rewards. EXPECT: ~9 priced items themed to\n"
-      + "the biome; prices scale with wave income (staple under one wave's\n"
-      + "money, held items about three). Buy something - money deducts, item\n"
-      + "applies. The Abyss biome has NO market by design.",
+      "#440 BIOME MARKET - x0 boss waves now OPEN A SHOP SCREEN (they had none\n"
+      + "before - vanilla skips the item screen on boss waves entirely). After\n"
+      + "the wave-10 boss + reward popups, a shop appears with NO free reward\n"
+      + "row, just the priced MARKET row themed to the biome: staples + the\n"
+      + "biome's signature items + discounted-category picks + a wildcard. DO:\n"
+      + "win this wave-10 fight and wait through the reward popups. EXPECT: the\n"
+      + "shop opens with ~9 priced biome items (staple under one wave's money,\n"
+      + "held items ~3x); buy something - money deducts, item applies; then the\n"
+      + "biome-select appears. The Abyss biome has NO market by design.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
