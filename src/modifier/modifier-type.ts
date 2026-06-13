@@ -9,7 +9,7 @@ import { tmPoolTiers } from "#balance/tms";
 import { getBerryEffectDescription, getBerryName } from "#data/berry";
 import { getDailyEventSeedLuck } from "#data/daily-seed/daily-run";
 import { allMoves, modifierTypes } from "#data/data-lists";
-import { erBiomeTierPrice, rollErBiomeShopStock } from "#data/elite-redux/er-biome-economy";
+import { erBiomeShopResolveTier, erBiomeTierPrice, rollErBiomeShopStock } from "#data/elite-redux/er-biome-economy";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-stones";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
@@ -2919,11 +2919,19 @@ export function getPlayerShopModifierTypeOptionsForWave(waveIndex: number, baseC
           );
         }
         if (mt != null) {
-          // Price by the item's actual RARITY tier (a Rogue-tier held item costs
-          // far more than a Great-tier one) x the biome discount - not a flat
-          // per-category rate. Falls back to the category price if untiered.
-          const tier = mt.getOrInferTier();
-          const cost = tier == null ? entry.cost : erBiomeTierPrice(tier, globalScene.arena.biomeId, entry.category);
+          // CRITICAL: set the id first. getOrInferTier reverse-looks-up the
+          // item in the reward pools BY id; without it every item returns a
+          // null tier and collapses to one flat price + one stock count.
+          mt.withIdFromFunc(modifierTypeInitObj[entry.key]);
+          // Price by the item's actual RARITY tier (a Rogue-tier Focus Band
+          // costs far more than an Ultra-tier Quick Claw, balls escalate Poke <
+          // Great < Ultra < Rogue) x the biome discount - not a flat per-category
+          // rate. Explicit map covers staples (balls) that aren't pooled.
+          const tier = erBiomeShopResolveTier(entry.key, mt.getOrInferTier(), entry.category);
+          // Cache the resolved tier on the type so the phase's stock calc
+          // (o.type.getOrInferTier()) reads the SAME tier the price used.
+          mt.setTier(tier);
+          const cost = erBiomeTierPrice(tier, globalScene.arena.biomeId, entry.category);
           options.push(new ModifierTypeOption(mt, 0, cost));
         }
       }

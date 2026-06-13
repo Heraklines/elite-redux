@@ -227,6 +227,51 @@ export function erBiomeStockCount(tier: ModifierTier): number {
 }
 
 /**
+ * Explicit rarity tier for staples that are NOT in the random reward pool (the
+ * balls and the X-item staples), so getOrInferTier's reverse pool lookup can't
+ * find them and would otherwise collapse them all to one tier/price. Keyed by
+ * the modifierTypes key. Pooled items (held items, TMs, candies) infer their
+ * tier from the pool and don't need an entry here.
+ */
+export const ER_SHOP_EXPLICIT_ITEM_TIER: Partial<Record<keyof typeof modifierTypes, ModifierTier>> = {
+  POKEBALL: ModifierTier.COMMON,
+  GREAT_BALL: ModifierTier.GREAT,
+  ULTRA_BALL: ModifierTier.ULTRA,
+  ROGUE_BALL: ModifierTier.ROGUE,
+  MASTER_BALL: ModifierTier.MASTER,
+  DIRE_HIT: ModifierTier.COMMON,
+  TEMP_STAT_STAGE_BOOSTER: ModifierTier.COMMON,
+};
+
+/** Last-resort tier per category when an item is neither explicitly mapped nor
+ * resolvable from a reward pool. */
+export const ER_SHOP_CATEGORY_DEFAULT_TIER: Record<ErShopCategory, ModifierTier> = {
+  HEAL: ModifierTier.COMMON,
+  BALLS: ModifierTier.COMMON,
+  BATTLE: ModifierTier.COMMON,
+  BERRY: ModifierTier.COMMON,
+  TM: ModifierTier.GREAT,
+  HELD: ModifierTier.ULTRA,
+  EVO: ModifierTier.GREAT,
+  CANDY: ModifierTier.GREAT,
+  MINT: ModifierTier.GREAT,
+};
+
+/**
+ * Resolve the rarity tier that drives BOTH price and stock for a shop slot:
+ *   explicit staple map  ->  the item's reward-pool tier  ->  category default.
+ * `inferred` is the caller's `mt.getOrInferTier()` (passed in to avoid a value
+ * import of the modifier table here, which would be a require cycle).
+ */
+export function erBiomeShopResolveTier(
+  key: keyof typeof modifierTypes,
+  inferred: ModifierTier | null,
+  category: ErShopCategory,
+): ModifierTier {
+  return ER_SHOP_EXPLICIT_ITEM_TIER[key] ?? inferred ?? ER_SHOP_CATEGORY_DEFAULT_TIER[category];
+}
+
+/**
  * Roll the biome market stock for an x0 wave: 3 staples (wave-bracketed heal,
  * status heal, ball), the biome's signature items, picks from its discounted
  * categories, and wildcards (the Desert caravan rolls extra HELD exotics).
