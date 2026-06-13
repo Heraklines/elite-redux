@@ -10260,14 +10260,13 @@ export function initMoves() {
       .condition(failIfGhostTypeCondition)
       .attr(AddBattlerTagAttr, BattlerTagType.TRAPPED, false, true, 1)
       .reflectable(),
-    new StatusMove(MoveId.MIND_READER, PokemonType.NORMAL, -1, 5, -1, 0, 2)
-      .attr(AddBattlerTagAttr, BattlerTagType.IGNORE_ACCURACY, true, false, 2)
-      .attr(MessageAttr, (user, target) =>
-        i18next.t("moveTriggers:tookAimAtTarget", {
-          pokemonName: getPokemonNameWithAffix(user),
-          targetName: getPokemonNameWithAffix(target),
-        }),
-      ),
+    // Elite Redux: Mind Reader is a King's Shield-style protect (priority +4)
+    // that dodges all attacks and, on contact, lowers the attacker's Sp. Def by
+    // 1 stage. May fail if used in succession. (Type retyped to Psychic and PP
+    // set to 5 by the ER vanilla-move patches; priority is set here.)
+    new SelfStatusMove(MoveId.MIND_READER, PokemonType.PSYCHIC, -1, 5, -1, 4, 2)
+      .attr(ProtectAttr, BattlerTagType.MIND_READER)
+      .condition(failIfLastCondition, 3),
     new StatusMove(MoveId.NIGHTMARE, PokemonType.GHOST, 100, 15, -1, 0, 2)
       .attr(AddBattlerTagAttr, BattlerTagType.NIGHTMARE)
       .condition(targetSleptOrComatoseCondition),

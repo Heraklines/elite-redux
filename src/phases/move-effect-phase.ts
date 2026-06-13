@@ -486,7 +486,7 @@ export class MoveEffectPhase extends PokemonPhase {
    * Accuracy and semi-invulnerability can be bypassed by:
    * - An ability like {@linkcode AbilityId.NO_GUARD | No Guard}
    * - A poison type using {@linkcode MoveId.TOXIC | Toxic}
-   * - A move like {@linkcode MoveId.LOCK_ON | Lock-On} or {@linkcode MoveId.MIND_READER | Mind Reader}.
+   * - A move like {@linkcode MoveId.LOCK_ON | Lock-On}.
    * - A field-targeted move like spikes
    *
    * Does *not* check against effects {@linkcode MoveId.GLAIVE_RUSH | Glaive Rush} status (which
@@ -515,12 +515,14 @@ export class MoveEffectPhase extends PokemonPhase {
     if (erMoveAlwaysHitsForUserType(this.move, user)) {
       return true;
     }
-    // TODO: Fix lock on / mind reader check to belong to the battler tag - this is really ugly
+    // TODO: Fix lock on check to belong to the battler tag - this is really ugly
+    // NOTE: Mind Reader is an Elite Redux protect move (no longer a lock-on),
+    // so only Lock-On still grants the IGNORE_ACCURACY bypass here.
     if (
       user.getTag(BattlerTagType.IGNORE_ACCURACY)
       && user
         .getLastXMoves(-1)
-        .find(m => m.move === MoveId.LOCK_ON || m.move === MoveId.MIND_READER)
+        .find(m => m.move === MoveId.LOCK_ON)
         ?.targets?.includes(target.getBattlerIndex())
     ) {
       return true;

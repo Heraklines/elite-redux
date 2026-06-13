@@ -4001,6 +4001,8 @@ export function getBattlerTag(
       return new ContactStatStageChangeProtectedTag(sourceMove, tagType, Stat.DEF, -2);
     case BattlerTagType.SILK_TRAP:
       return new ContactStatStageChangeProtectedTag(sourceMove, tagType, Stat.SPD, -1);
+    case BattlerTagType.MIND_READER:
+      return new ContactStatStageChangeProtectedTag(sourceMove, tagType, Stat.SPDEF, -1);
     case BattlerTagType.BANEFUL_BUNKER:
       return new ContactSetStatusProtectedTag(sourceMove, tagType, StatusEffect.POISON);
     case BattlerTagType.BURNING_BULWARK:
@@ -4201,6 +4203,7 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.KINGS_SHIELD]: ContactStatStageChangeProtectedTag;
   [BattlerTagType.OBSTRUCT]: ContactStatStageChangeProtectedTag;
   [BattlerTagType.SILK_TRAP]: ContactStatStageChangeProtectedTag;
+  [BattlerTagType.MIND_READER]: ContactStatStageChangeProtectedTag;
   [BattlerTagType.BANEFUL_BUNKER]: ContactSetStatusProtectedTag;
   [BattlerTagType.BURNING_BULWARK]: ContactSetStatusProtectedTag;
   [BattlerTagType.ENDURING]: EnduringTag;

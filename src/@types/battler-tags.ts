@@ -60,7 +60,8 @@ export type ContactSetStatusProtectedTagType = BattlerTagType.BANEFUL_BUNKER | B
 export type ContactStatStageChangeProtectedTagType =
   | BattlerTagType.KINGS_SHIELD
   | BattlerTagType.SILK_TRAP
-  | BattlerTagType.OBSTRUCT;
+  | BattlerTagType.OBSTRUCT
+  | BattlerTagType.MIND_READER;
 
 /** Subset of {@linkcode BattlerTagType}s that provide the Endure effect */
 export type EndureTagType = BattlerTagType.ENDURE_TOKEN | BattlerTagType.ENDURING;

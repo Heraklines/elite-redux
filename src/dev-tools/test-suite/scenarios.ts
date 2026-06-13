@@ -2660,4 +2660,29 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "Mind Reader = SpDef protect",
+    description:
+      "ER 2.65 dex - Mind Reader is no longer a lock-on. It is now a King's\n"
+      + "Shield-style PROTECT (priority +4, Psychic, Status, self): it dodges ALL\n"
+      + "attacks and, on CONTACT, drops the ATTACKER's Special Defense by 1 stage.\n"
+      + "May fail if used in succession.\n"
+      + "DO: your Alakazam uses Mind Reader; the enemy Rattata uses Tackle (a\n"
+      + "CONTACT move) into it.\n"
+      + "EXPECT: Tackle is BLOCKED (Alakazam takes 0 damage / 'protected itself')\n"
+      + "AND the enemy Rattata's Sp. Def falls by 1 stage. (Use Battle Info / the\n"
+      + "stat arrows to confirm the -1 SpDef on the enemy.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.MIND_READER, MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.RATTATA,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [makeStarter(SpeciesId.ALAKAZAM, { moveset: [MoveId.MIND_READER, MoveId.SPLASH] })];
+    },
+  },
 ];
