@@ -55,7 +55,14 @@ export class LoadingScene extends SceneBase {
       .loadImage("er_binfo_stat_up", "elite-redux/battle-info", "stat_up_arrow.png")
       .loadImage("er_binfo_stat_down", "elite-redux/battle-info", "stat_down_arrow.png")
       .loadImage("er_binfo_check", "elite-redux/battle-info", "check.png")
-      .loadAtlas("bg", "ui")
+      // ER Biome Market (#440): BW-ROM shop backdrop + shopkeeper sprites for
+      // the bespoke per-biome market screen (staging-only feature for now).
+      .loadImage("er_biome_shop_bg", "biome-shop", "backdrop.png");
+    for (let i = 0; i < 16; i++) {
+      const idx = i.toString().padStart(2, "0");
+      this.loadImage(`er_biome_shop_keeper_${idx}`, "biome-shop", `keeper_${idx}.png`);
+    }
+    this.loadAtlas("bg", "ui")
       .loadAtlas("prompt", "ui")
       .loadImage("candy", "ui")
       .loadImage("candy_overlay", "ui")
