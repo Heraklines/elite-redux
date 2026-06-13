@@ -2079,6 +2079,26 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Restraining Order force-out (#452)",
+    description:
+      "#452 - Restraining Order (Gooschase sig, ER ability 690) + Chuckster\n"
+      + "(864) now force the ATTACKER out when the holder is hit, once per\n"
+      + "switch-in - NOT the holder (the old wire acted like Wimp Out). CHECK:\n"
+      + "this Snorlax has Restraining Order; vs a TRAINER (has back-up mons),\n"
+      + "let the foe hit you - the ATTACKER should be dragged out, you stay in.\n"
+      + "It fires only once per send-out.",
+    setup: () => {
+      resetDevOverrides();
+      O.ABILITY_OVERRIDE = erAbility(690); // Restraining Order
+      O.STARTING_WAVE_OVERRIDE = 5; // a trainer battle (foe has switch targets)
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Ability Capsule + evo (#445)",
     description:
       "#445 - Ability Capsule no longer leaves a wasted active ability that\n"

@@ -182,6 +182,14 @@ export class PokemonSummonData {
    */
   public chuckusterReductionUsed = false;
 
+  /**
+   * Whether this Pokémon's ER attacker-out signature (Restraining Order 690 /
+   * Chuckster 864) has already forced an attacker out this ENTRY. As part of
+   * `summonData` it resets each send-out, matching the dex's "once each
+   * switch-in".
+   */
+  public forceAttackerOutUsed = false;
+
   // Overrides for transform and company.
   // TODO: Move these into a separate class & add rage fist hit count
   public speciesForm: PokemonSpeciesForm | null = null;

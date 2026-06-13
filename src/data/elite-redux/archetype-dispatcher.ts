@@ -91,7 +91,6 @@ import {
   PokemonTypeChangeAbAttr,
   PostAttackApplyBattlerTagAbAttr,
   PostAttackApplyStatusEffectAbAttr,
-  PostDamageForceSwitchAbAttr,
   PostDancingMoveAbAttr,
   PostDefendAbilitySwapAbAttr,
   PostDefendContactDamageAbAttr,
@@ -205,6 +204,7 @@ import {
   PostAttackSetHazardByMoveTypeAbAttr,
   PostAttackSetTerrainByMoveTypeAbAttr,
 } from "#data/elite-redux/archetypes/post-attack-set-field-by-type";
+import { PostDamageForceAttackerOutAbAttr } from "#data/elite-redux/archetypes/post-damage-force-attacker-out";
 import { PostDefendChangeAttackerTypeAbAttr } from "#data/elite-redux/archetypes/post-defend-change-attacker-type";
 import { PostDefendHpGatedSelfTagAbAttr } from "#data/elite-redux/archetypes/post-defend-hp-gated-self-tag";
 import { PostDefendSuppressOpponentDamageBoostAbAttr } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
@@ -5702,16 +5702,19 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return SKIP_BESPOKE;
     case 690:
       // Restraining Order — "Forces the attacker out when hit, once each
-      // switch-in." Vanilla PostDamageForceSwitch is HP-threshold based,
-      // not on-hit. Approximation: wire PostDamageForceSwitch with hpRatio=1
-      // (fires on any damage). Once-per-switch gate deferred.
-      return ok([new PostDamageForceSwitchAbAttr(1.0)]);
+      // switch-in." Must force the ATTACKER out, not the holder. The prior wire
+      // used PostDamageForceSwitch (vanilla Wimp Out), which switches the HOLDER
+      // out - the live "acts like Wimp Out" bug on Gooschase. Now uses the
+      // attacker-out primitive with its built-in once-per-switch-in gate.
+      return ok([new PostDamageForceAttackerOutAbAttr()]);
     case 864:
       // Chuckster — "Once per entry when receiving a contact move, gain 50%
       // damage reduction and force out the attacker." The once-per-entry contact
       // 50% reduction (was missing) + the force-switch. The reduction carries its
       // own once-per-entry charge (summonData) consumed on the first contact hit.
-      return ok([new OncePerEntryContactDamageReductionAbAttr(0.5), new PostDamageForceSwitchAbAttr(1.0)]);
+      // The force-out targets the ATTACKER (not the holder) - same fix as
+      // Restraining Order (690); the prior PostDamageForceSwitch wire was Wimp Out.
+      return ok([new OncePerEntryContactDamageReductionAbAttr(0.5), new PostDamageForceAttackerOutAbAttr()]);
     // -------------------------------------------------------------------------
     // Round 29 — PostDefendMoveDisable / PerishBody-style wires
     // -------------------------------------------------------------------------
