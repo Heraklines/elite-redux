@@ -2079,14 +2079,15 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "(note) Keen Edge slicing flag (#449)",
+    label: "(note) Ability-boost move flags (#449/#453)",
     description:
-      "#449 - Dire Claw and many ER custom blades (Excalibur, Diamond Blade,\n"
-      + "Leech Blade, etc.) now correctly count as Keen Edge / slicing moves, per\n"
-      + "the ER 2.65 dex 'Keen Edge boost' text. CHECK: with Sweeping Edge (or\n"
-      + "Sharpness / Keen Edge), Dire Claw should never miss + get the 1.5x blade\n"
-      + "boost; previously these abilities skipped it. Kicking moves are a\n"
-      + "SEPARATE ability (Roundhouse), unaffected by this change.",
+      "#449/#453 - move flags now derive from the ER 2.65 dex 'X boost' text\n"
+      + "(authoritative), fixing moves that shipped with no flags. Affects ALL\n"
+      + "ability-boost families: Keen Edge (slicing, e.g. Dire Claw), Mega\n"
+      + "Launcher (pulse), Iron Fist (punch), Strong Jaw (bite), Mighty Horn,\n"
+      + "Striker (kick), Archer (arrow). CHECK: Dire Claw + Sweeping Edge/\n"
+      + "Sharpness never-miss + 1.5x; a Mega Launcher / Iron Fist / Strong Jaw\n"
+      + "mon now boosts the right moves. Kicks use Roundhouse, not Sweeping Edge.",
     setup: () => {
       resetDevOverrides();
       return [

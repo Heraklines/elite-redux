@@ -3,6 +3,24 @@
 Elite Redux (ER) is a PokeRogue fork (TypeScript + Phaser + Vite). This file is
 auto-loaded every session — read it and follow it.
 
+## 🔴 AUTHORITATIVE SOURCE — the ER 2.65 Pokédex
+
+**The in-game Pokédex from Elite Redux version 2.65 is the SINGLE SOURCE OF
+TRUTH for every move, ability, stat, type, and effect.** When anything in this
+port disagrees with the 2.65 dex, the dex wins and the port is the bug. This
+overrides the parsed C-source flag arrays, the vanilla PokeRogue values, and any
+prior assumption.
+
+- The dex data lives in the repo: `src/data/elite-redux/er-moves.ts`
+  (`longDescription`, `description`, `flags`, power/accuracy/pp/type/category),
+  `er-abilities.ts`, and `er-ability-rom-descriptions.ts` /
+  `er-ability-descriptions.ts`. The human-readable **description text** is
+  authoritative even when the parsed `flags` array disagrees (e.g. a move whose
+  long description says "Keen Edge boost" IS a slicing move even if its `flags`
+  array is empty — see #449).
+- When a tester reports a divergence, confirm it against the 2.65 dex text
+  FIRST, then fix the port to match. Do not guess from vanilla behavior.
+
 ## 🔴 STANDING RULE — every bug fix gets an in-game test scenario
 
 **Whenever you fix a bug (or change behavior) that is observable in-game, you

@@ -630,23 +630,34 @@ export function initEliteReduxCSourceCorrections(): CSourceCorrectionResult {
     }
   }
 
-  // ER 2.65 Pokedex authority (#449): the dex marks every slicing move with a
-  // "Keen Edge boost" line in its long description, but several of them (Dire
-  // Claw plus numerous ER customs like Excalibur / Diamond Blade / Leech Blade)
-  // ship with an empty `flags: [0]` array in er-moves.ts, so the flag-coverage
-  // pass above never tags them SLICING_MOVE. Without that flag the Keen Edge
-  // abilities silently skip them: Sweeping Edge (never-miss + spread), Sharpness
-  // / Keen Edge (1.5x), Pinnacle Blade (protect-break). The in-game dex text is
-  // the source of truth, so trust it: any move whose ER long description calls
-  // out a Keen Edge boost IS a slicing move. Idempotent OR - moves already
-  // flagged (in move.ts via .slicingMove() or above) are no-ops, and moves with
-  // other flags (e.g. Solar Blade's WEATHER_BASED) keep them.
+  // ER 2.65 Pokedex authority (#449/#453): the dex tags every ability-boosted
+  // move class with an "<X> boost" line in its long description (Keen Edge,
+  // Mega Launcher, Iron Fist, Strong Jaw, Mighty Horn, Striker, Archer). Many
+  // moves - Dire Claw plus numerous ER customs - ship with an empty
+  // `flags: [0]` array in er-moves.ts, so the flag-coverage pass above never
+  // tags them and the matching abilities silently skip them (Sweeping Edge /
+  // Sharpness on slicers, Mega Launcher 1.5x on pulses, Iron Fist on punches,
+  // Strong Jaw on bites, Roundhouse / Striker on kicks, etc.). The in-game dex
+  // text is the source of truth, so derive the flag straight from it. Idempotent
+  // OR - moves already flagged (move.ts or the pass above) are no-ops, and other
+  // flags (e.g. Solar Blade's WEATHER_BASED) are preserved.
   {
     const movesMap = ER_ID_MAP.moves as Record<number, number>;
-    let keenEdgeFlagged = 0;
+    // dex phrase (lowercase) -> the MoveFlags bit it grants. Mirrors the ER
+    // ability-boost flag families (er-flag-mapping.ts classifier names).
+    const BOOST_PHRASE_FLAGS: readonly [string, MoveFlags][] = [
+      ["keen edge boost", MoveFlags.SLICING_MOVE],
+      ["mega launcher boost", MoveFlags.PULSE_MOVE],
+      ["iron fist boost", MoveFlags.PUNCHING_MOVE],
+      ["strong jaw boost", MoveFlags.BITING_MOVE],
+      ["mighty horn boost", MoveFlags.HORN_BASED],
+      ["striker boost", MoveFlags.KICKING_MOVE],
+      ["archer boost", MoveFlags.ARROW_BASED],
+    ];
+    let boostFlagged = 0;
     for (const drf of ER_MOVES) {
       const text = (drf as { longDescription?: string }).longDescription?.toLowerCase() ?? "";
-      if (!text.includes("keen edge boost")) {
+      if (!text.includes("boost")) {
         continue;
       }
       const pkrgId = movesMap[drf.id];
@@ -658,13 +669,15 @@ export function initEliteReduxCSourceCorrections(): CSourceCorrectionResult {
         continue;
       }
       const target = move as unknown as { flags: number };
-      if ((target.flags & MoveFlags.SLICING_MOVE) === 0) {
-        target.flags |= MoveFlags.SLICING_MOVE;
-        keenEdgeFlagged++;
+      for (const [phrase, flag] of BOOST_PHRASE_FLAGS) {
+        if (text.includes(phrase) && (target.flags & flag) === 0) {
+          target.flags |= flag;
+          boostFlagged++;
+        }
       }
     }
-    if (keenEdgeFlagged > 0) {
-      console.info(`[er-csrc] tagged ${keenEdgeFlagged} Keen Edge moves SLICING_MOVE (dex authority)`);
+    if (boostFlagged > 0) {
+      console.info(`[er-csrc] tagged ${boostFlagged} ability-boost move flags from dex text (authority)`);
     }
   }
 
