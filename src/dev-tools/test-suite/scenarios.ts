@@ -2613,4 +2613,51 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "Cross Chop: 2 hits + high crit",
+    description:
+      "Community report - Cross Chop should be TWO 40BP hits with a high crit\n"
+      + "ratio (ER 2.65 dex), not the vanilla single 100BP hit.\n"
+      + "DO: select Cross Chop against the Snorlax (tanky, survives a turn).\n"
+      + "EXPECT: the move strikes TWICE in one turn (two damage numbers), each\n"
+      + "hit ~40BP, and crits often (high critical-hit ratio). 100% acc, 15 PP.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.MACHAMP, {
+          moveset: [MoveId.CROSS_CHOP, MoveId.PROTECT, MoveId.BULK_UP, MoveId.DETECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Clobbopus evolves at lv24 (no Taunt)",
+    description:
+      "Community report - Clobbopus would not evolve by level because it kept a\n"
+      + "vanilla 'knows Taunt' gate. ER 2.65 dex = plain level-24 evolution.\n"
+      + "DO: this Clobbopus starts at level 23 and does NOT know Taunt. Win a\n"
+      + "battle so it reaches level 24.\n"
+      + "EXPECT: it evolves into Grapploct on hitting level 24 with no Taunt\n"
+      + "requirement. (note) Pure data fix - if it evolves, pass.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 23,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.CLOBBOPUS, {
+          moveset: [MoveId.BRUTAL_SWING, MoveId.DETECT, MoveId.ROCK_SMASH, MoveId.BIND],
+        }),
+      ];
+    },
+  },
 ];

@@ -212,7 +212,10 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_IRON_TAIL", { accuracy: 90, pp: 15, chance: 30 }],
   ["MOVE_VITAL_THROW", { power: 70 }],
   ["MOVE_HIDDEN_POWER", { power: 80 }], // ER dump: 80BP (the old 70 was stale)
-  ["MOVE_CROSS_CHOP", { power: 100, accuracy: 80, pp: 5 }],
+  // Cross Chop: the 2.65 dex (authoritative) is 40BP / 100% / 15PP, "double
+  // chops" (2 hits) + high crit - NOT the vanilla 100/80/5. The old C-source
+  // pin here was wrong; let the dump's 40/100/15 stand. The 2-hit attr lives in
+  // move.ts (multi-hit is not a stat).
   ["MOVE_TWISTER", { accuracy: 100, chance: 20 }],
   ["MOVE_RAIN_DANCE", { pp: 5 }],
   ["MOVE_SUNNY_DAY", { pp: 5 }],

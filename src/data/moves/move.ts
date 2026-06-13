@@ -10523,6 +10523,9 @@ export function initMoves() {
     new AttackMove(MoveId.HIDDEN_POWER, PokemonType.NORMAL, MoveCategory.SPECIAL, 60, 100, 15, -1, 0, 2) //
       .attr(HiddenPowerTypeAttr),
     new AttackMove(MoveId.CROSS_CHOP, PokemonType.FIGHTING, MoveCategory.PHYSICAL, 100, 80, 5, -1, 0, 2) //
+      // ER 2.65 dex: "double chops" - two hits at 40BP each (stats set by the ER
+      // dump to 40/100/15) with a high critical-hit ratio.
+      .attr(MultiHitAttr, MultiHitType.TWO)
       .attr(HighCritAttr),
     new AttackMove(MoveId.TWISTER, PokemonType.DRAGON, MoveCategory.SPECIAL, 40, 100, 20, 20, 0, 2)
       .attr(HitsTagForDoubleDamageAttr, BattlerTagType.FLYING)

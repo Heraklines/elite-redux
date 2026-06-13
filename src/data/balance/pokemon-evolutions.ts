@@ -159,7 +159,6 @@ export class SpeciesEvolutionCondition {
   }
 
   public conditionsFulfilled(pokemon: Pokemon, forFusion = false): boolean {
-    console.log(this.data);
     return this.data.every(cond => {
       switch (cond.key) {
         case EvoCondKey.FRIENDSHIP:
@@ -1658,7 +1657,10 @@ export const pokemonEvolutions: PokemonEvolutions = {
     new SpeciesEvolution(SpeciesId.APPLETUN, 1, EvolutionItem.SWEET_APPLE, null, [24, 24, 28])
   ],
   [SpeciesId.CLOBBOPUS]: [
-    new SpeciesEvolution(SpeciesId.GRAPPLOCT, 35, null, {key: EvoCondKey.MOVE, move: MoveId.TAUNT}/*Once Taunt is implemented, change evo level to 1 and delay to LONG*/)
+    // ER 2.65 dex: plain level-24 evolution, NO "knows Taunt" gate. The vanilla
+    // Taunt condition would otherwise be preserved by the ER evolution merge and
+    // block Clobbopus from ever evolving by level.
+    new SpeciesEvolution(SpeciesId.GRAPPLOCT, 24, null, null)
   ],
   [SpeciesId.SINISTEA]: [
     new SpeciesFormEvolution(SpeciesId.POLTEAGEIST, "phony", "phony", 1, EvolutionItem.CRACKED_POT, null, [30, 35, 40]),
