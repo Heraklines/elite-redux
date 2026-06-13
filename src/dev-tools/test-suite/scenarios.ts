@@ -2079,6 +2079,25 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Evo cancel freeze (#444)",
+    description:
+      "#444 - cancelling an evolution no longer freezes the game. The UI was\n"
+      + "left stuck in the evolution scene when the player declined; it now\n"
+      + "hands control back like a normal completed/failed evolution.\n"
+      + "CHECK: bring an Eevee to a level where it can evolve (its branched-\n"
+      + "evolution PICK list appears post-battle), choose Cancel - you should\n"
+      + "return to the field/party normally, not a black screen. Same for\n"
+      + "pressing B to stop any single-path evolution mid-animation.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.EEVEE, {
+          moveset: [MoveId.QUICK_ATTACK, MoveId.BITE, MoveId.SWIFT, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Unown egg hatch (#442)",
     description:
       "#442 - Unown REVELATION (the battle-only school form) no longer\n"

@@ -268,6 +268,11 @@ export class EvolutionPhase extends Phase {
     await this.setMode();
 
     if (!this.validate()) {
+      // setMode() above put the UI in EVOLUTION_SCENE; only EndEvolutionPhase
+      // transitions back to MESSAGE. Bailing straight to end() here would leave
+      // the UI stuck in the evolution scene (frozen black screen), so restore
+      // it the same way the success/failed paths do.
+      globalScene.phaseManager.unshiftNew("EndEvolutionPhase");
       return this.end();
     }
 
@@ -278,6 +283,11 @@ export class EvolutionPhase extends Phase {
     if (this.evolutionChoices.length > 1) {
       const chosen = await this.promptEvolutionChoice();
       if (!chosen) {
+        // Same as the validate()-fail bail above: we are in EVOLUTION_SCENE
+        // mode, so we must route through EndEvolutionPhase to hand the UI back
+        // to MESSAGE. Cancelling Eevee (its branched evolutions trigger this
+        // prompt) otherwise froze the game.
+        globalScene.phaseManager.unshiftNew("EndEvolutionPhase");
         return this.end();
       }
       this.evolution = chosen;
