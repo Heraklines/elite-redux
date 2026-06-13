@@ -7416,6 +7416,25 @@ export class PlayerPokemon extends Pokemon {
           this.abilityIndex = 0;
         }
       }
+      // ER (#445): the Ability Capsule writes a persistent ACTIVE-ability
+      // override (customPokemonData.ability). If evolution introduces that exact
+      // ability as an INNATE of the evolved form, the override would duplicate
+      // an innate - wasting the active slot (reported: a capsule'd Earthbound
+      // Dugtrio evolving into a form that already has Earthbound as an innate).
+      // Drop the redundant override so the active ability re-derives to the
+      // form's normal ability (the mon keeps the innate AND gains a distinct
+      // active), and re-arm the single-use capsule so the player can re-pick on
+      // the new form. Only the active-ability override is touched; innate-slot
+      // overrides (the Ability Randomizer) are independent and left alone.
+      const capsuleAbilityId = this.customPokemonData.ability;
+      if (capsuleAbilityId != null && capsuleAbilityId !== -1) {
+        const evolvedInnates = this.getPassiveAbilities();
+        if (evolvedInnates.some(a => a?.id === capsuleAbilityId)) {
+          this.customPokemonData.ability = -1;
+          this.customPokemonData.abilityOverridesForm = false;
+          this.customPokemonData.erAbilityCapsuleUsed = false;
+        }
+      }
       this.compatibleTms.splice(0, this.compatibleTms.length);
       this.generateCompatibleTms();
       const updateAndResolve = () => {

@@ -2079,6 +2079,25 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Ability Capsule + evo (#445)",
+    description:
+      "#445 - Ability Capsule no longer leaves a wasted active ability that\n"
+      + "duplicates an innate after evolution. If the capsule-set active ability\n"
+      + "becomes an innate on the evolved form, it is dropped (active re-derives\n"
+      + "to a distinct ability, innate kept) and the capsule re-arms so you can\n"
+      + "re-pick. CHECK: capsule a pre-evo to an ability its evolved form has as\n"
+      + "an INNATE, evolve - the active should change (not double the innate) and\n"
+      + "the capsule should be usable again on the evolved mon.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Ability-boost move flags (#449/#453)",
     description:
       "#449/#453 - move flags now derive from the ER 2.65 dex 'X boost' text\n"
