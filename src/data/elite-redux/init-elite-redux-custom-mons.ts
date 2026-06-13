@@ -51,7 +51,8 @@ export interface ErCustomMonEntry {
   id: number;
   name: string;
   slug: string;
-  types: readonly [string, string | null];
+  /** [primary, secondary|null] — kept loose: the JSON is editor-written. */
+  types: readonly (string | null)[];
   baseStats: readonly number[];
   abilities?: readonly string[];
   innates?: readonly string[];

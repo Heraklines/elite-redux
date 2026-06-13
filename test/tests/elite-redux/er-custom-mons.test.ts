@@ -1,8 +1,8 @@
-/*
+﻿/*
  * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
  * SPDX-License-Identifier: AGPL-3.0-only
  */
-// Editor-created custom mons (er-custom-mons.json → live species + balance
+// Editor-created custom mons (er-custom-mons.json -> live species + balance
 // tables). Tests inject mon tables directly (applyErCustomMons) and assert
 // registration, table writes, validation skips and idempotency.
 // Run: ER_SCENARIO=1 npx vitest run test/tests/elite-redux/er-custom-mons.test.ts
@@ -14,8 +14,14 @@ import { allSpecies } from "#data/data-lists";
 import { applyErCustomMons } from "#data/elite-redux/init-elite-redux-custom-mons";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
+import type { SpeciesId } from "#enums/species-id";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { describe, expect, it } from "vitest";
+
+// Editor mons live OUTSIDE the static SpeciesId enum (runtime-extended ids).
+const TEST_ID = 60042 as SpeciesId;
+const BAD_STATS_ID = 60043 as SpeciesId;
+const BAD_TYPE_ID = 60044 as SpeciesId;
 
 const TEST_MON = {
   SPECIES_EDITOR_TESTCAT: {
@@ -42,7 +48,7 @@ describe("ER editor custom mons (er-custom-mons.json loader)", () => {
     const result = applyErCustomMons(TEST_MON);
     expect(result.registered).toBe(1);
 
-    const species = getPokemonSpecies(60042);
+    const species = getPokemonSpecies(TEST_ID);
     expect(species).toBeDefined();
     expect(species?.name).toBe("Testcat");
     expect(species?.type1).toBe(PokemonType.FIRE);
@@ -66,7 +72,7 @@ describe("ER editor custom mons (er-custom-mons.json loader)", () => {
     const again = applyErCustomMons(TEST_MON);
     expect(again.registered).toBe(0);
     expect(again.alreadyPresent).toBe(1);
-    expect(allSpecies.filter(s => s.speciesId === 60042)).toHaveLength(1);
+    expect(allSpecies.filter(s => s.speciesId === TEST_ID)).toHaveLength(1);
   });
 
   it("skips invalid entries (bad id band, bad stats, unknown type) without registering", () => {
@@ -87,8 +93,8 @@ describe("ER editor custom mons (er-custom-mons.json loader)", () => {
     });
     expect(result.registered).toBe(0);
     expect(result.skippedInvalid).toBe(3);
-    expect(getPokemonSpecies(60043)).toBeUndefined();
-    expect(getPokemonSpecies(60044)).toBeUndefined();
+    expect(getPokemonSpecies(BAD_STATS_ID)).toBeUndefined();
+    expect(getPokemonSpecies(BAD_TYPE_ID)).toBeUndefined();
   });
 
   it("a mon with no resolvable level-up moves still gets a fallback move", () => {
