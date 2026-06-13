@@ -64,8 +64,8 @@ const DEFAULT_KEEPER = "clerk_m";
  * shop, etc.). Every distinct sprite used here is preloaded in loading-scene.
  */
 export const KEEPER_BY_BIOME: Partial<Record<BiomeId, string>> = {
-  // Towns & open country - general-store clerks / florists.
-  [BiomeId.TOWN]: "clerk_m",
+  // Towns & open country - a homey baker stall / general-store clerks / florists.
+  [BiomeId.TOWN]: "baker",
   [BiomeId.PLAINS]: "clerk_f",
   [BiomeId.METROPOLIS]: "clerk_m_2",
   [BiomeId.GRASS]: "aroma_lady",
@@ -109,6 +109,7 @@ export const KEEPER_BY_BIOME: Partial<Record<BiomeId, string>> = {
 
 /** The distinct shopkeeper sprites used above (preloaded in loading-scene). */
 export const ER_BIOME_SHOP_KEEPERS = [
+  "baker",
   "clerk_m",
   "clerk_f",
   "clerk_m_2",
