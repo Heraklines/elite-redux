@@ -12,6 +12,7 @@ import { AwaitableUiHandler } from "#ui/awaitable-ui-handler";
 import { BallUiHandler } from "#ui/ball-ui-handler";
 import { BattleMessageUiHandler } from "#ui/battle-message-ui-handler";
 import type { BgmBar } from "#ui/bgm-bar";
+import { BiomeShopUiHandler } from "#ui/biome-shop-ui-handler";
 import { BugReportFormUiHandler } from "#ui/bug-report-form-ui-handler";
 import { GameChallengesUiHandler } from "#ui/challenges-select-ui-handler";
 import { ChangePasswordFormUiHandler } from "#ui/change-password-form-ui-handler";
@@ -188,6 +189,7 @@ export class UI extends Phaser.GameObjects.Container {
       new ChangePasswordFormUiHandler(),
       new LlmDirectorThemePickerUiHandler(),
       new BugReportFormUiHandler(),
+      new BiomeShopUiHandler(),
     ];
   }
 
