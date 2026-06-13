@@ -7,6 +7,7 @@ import { BiomeId } from "#enums/biome-id";
 import { GachaType } from "#enums/gacha-types";
 import { getBiomeHasProps } from "#field/arena";
 import { CacheBustedLoaderPlugin } from "#plugins/cache-busted-loader-plugin";
+import { ER_BIOME_SHOP_KEEPERS } from "#ui/biome-shop-ui-handler";
 import { getWindowVariantSuffix, WindowVariant } from "#ui/ui-theme";
 import { hasAllLocalizedSprites, localPing } from "#utils/common";
 import { enumValueToKey, getEnumValues } from "#utils/enums";
@@ -56,19 +57,11 @@ export class LoadingScene extends SceneBase {
       .loadImage("er_binfo_stat_down", "elite-redux/battle-info", "stat_down_arrow.png")
       .loadImage("er_binfo_check", "elite-redux/battle-info", "check.png");
     // ER Biome Market (#440): the shopkeeper is a real PokeRogue trainer-class
-    // sprite (mapped per biome in BiomeShopUiHandler). Preload the curated set
-    // so the market can show one without an on-the-fly atlas load. The backdrop
-    // is the game's own default_bg panel (already loaded), not a ROM image.
-    for (const keeper of [
-      "baker",
-      "fisherman",
-      "hiker",
-      "backpacker_m",
-      "parasol_lady",
-      "maid",
-      "beauty",
-      "aroma_lady",
-    ]) {
+    // sprite cast per biome (clerk for towns, fisherman for the sea, firebreather
+    // for the volcano, hex maniac for the graveyard, etc. - see KEEPER_BY_BIOME).
+    // Preload the curated set so the market shows one without an on-the-fly
+    // atlas load. The backdrop is the live biome scenery (already loaded).
+    for (const keeper of ER_BIOME_SHOP_KEEPERS) {
       this.loadAtlas(keeper, "trainer");
     }
     this.loadAtlas("bg", "ui")

@@ -25,6 +25,7 @@ import { globalScene } from "#app/global-scene";
 import { ER_BIOME_SHOP_SLOTS } from "#data/elite-redux/er-biome-economy";
 import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
+import { PlayerGender } from "#enums/player-gender";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import { getBiomeKey } from "#field/arena";
@@ -52,40 +53,85 @@ const GRID_X = 124; // centre of the first column
 const GRID_Y = 50; // centre of the first row
 const KEEPER_X = 46;
 
-/** Per-biome shopkeeper, cast from the preloaded trainer-class sprites. */
+const DEFAULT_KEEPER = "clerk_m";
+
+/**
+ * Per-biome shopkeeper, cast from real PokeRogue trainer-class sprites to fit
+ * each biome's flavor (a clerk runs the town mart, a fisherman the dockside
+ * stall, a firebreather the volcano forge, a hex maniac the graveyard curio
+ * shop, etc.). Every distinct sprite used here is preloaded in loading-scene.
+ */
 const KEEPER_BY_BIOME: Partial<Record<BiomeId, string>> = {
+  // Towns & open country - general-store clerks / florists.
+  [BiomeId.TOWN]: "clerk_m",
+  [BiomeId.PLAINS]: "clerk_f",
+  [BiomeId.METROPOLIS]: "clerk_m_2",
+  [BiomeId.GRASS]: "aroma_lady",
+  [BiomeId.TALL_GRASS]: "ranger_m",
+  [BiomeId.MEADOW]: "aroma_lady",
+  // Water - dockside stalls.
   [BiomeId.SEA]: "fisherman",
-  [BiomeId.BEACH]: "fisherman",
+  [BiomeId.BEACH]: "sailor",
   [BiomeId.LAKE]: "fisherman",
-  [BiomeId.SEABED]: "fisherman",
-  [BiomeId.ISLAND]: "fisherman",
+  [BiomeId.SEABED]: "scuba_diver_m",
+  [BiomeId.ISLAND]: "sailor",
   [BiomeId.SWAMP]: "fisherman",
+  // Rugged terrain - trail posts / caravans.
   [BiomeId.MOUNTAIN]: "hiker",
   [BiomeId.CAVE]: "hiker",
-  [BiomeId.BADLANDS]: "hiker",
-  [BiomeId.VOLCANO]: "hiker",
+  [BiomeId.BADLANDS]: "worker_m",
   [BiomeId.DESERT]: "backpacker_m",
-  [BiomeId.WASTELAND]: "backpacker_m",
-  [BiomeId.CONSTRUCTION_SITE]: "backpacker_m",
-  [BiomeId.POWER_PLANT]: "backpacker_m",
-  [BiomeId.FACTORY]: "backpacker_m",
-  [BiomeId.LABORATORY]: "backpacker_m",
-  [BiomeId.SPACE]: "backpacker_m",
+  [BiomeId.WASTELAND]: "veteran_m",
+  // Cold.
   [BiomeId.ICE_CAVE]: "parasol_lady",
-  [BiomeId.SNOWY_FOREST]: "parasol_lady",
-  [BiomeId.FOREST]: "aroma_lady",
-  [BiomeId.JUNGLE]: "aroma_lady",
-  [BiomeId.TALL_GRASS]: "aroma_lady",
-  [BiomeId.GRASS]: "aroma_lady",
-  [BiomeId.MEADOW]: "aroma_lady",
-  [BiomeId.GRAVEYARD]: "maid",
-  [BiomeId.RUINS]: "maid",
-  [BiomeId.TEMPLE]: "maid",
-  [BiomeId.FAIRY_CAVE]: "maid",
-  [BiomeId.METROPOLIS]: "beauty",
-  [BiomeId.SLUM]: "beauty",
-  [BiomeId.DOJO]: "hiker",
+  [BiomeId.SNOWY_FOREST]: "snow_worker_m",
+  // Woods.
+  [BiomeId.FOREST]: "ranger_f",
+  [BiomeId.JUNGLE]: "ranger_m",
+  // Industrial / tech - workers & scientists.
+  [BiomeId.POWER_PLANT]: "scientist_m",
+  [BiomeId.FACTORY]: "worker_f",
+  [BiomeId.LABORATORY]: "scientist_f",
+  [BiomeId.CONSTRUCTION_SITE]: "worker_m",
+  [BiomeId.SPACE]: "scientist_m",
+  // Heat & training.
+  [BiomeId.VOLCANO]: "firebreather",
+  [BiomeId.DOJO]: "black_belt_m",
+  // Eerie - curio shops.
+  [BiomeId.GRAVEYARD]: "hex_maniac",
+  [BiomeId.RUINS]: "ruin_maniac",
+  [BiomeId.TEMPLE]: "hex_maniac",
+  [BiomeId.FAIRY_CAVE]: "fairy_tale_girl",
+  [BiomeId.SLUM]: "roughneck",
 };
+
+/** The distinct shopkeeper sprites used above (preloaded in loading-scene). */
+export const ER_BIOME_SHOP_KEEPERS = [
+  "clerk_m",
+  "clerk_f",
+  "clerk_m_2",
+  "aroma_lady",
+  "ranger_m",
+  "ranger_f",
+  "fisherman",
+  "sailor",
+  "scuba_diver_m",
+  "hiker",
+  "worker_m",
+  "worker_f",
+  "backpacker_m",
+  "veteran_m",
+  "parasol_lady",
+  "snow_worker_m",
+  "scientist_m",
+  "scientist_f",
+  "firebreather",
+  "black_belt_m",
+  "hex_maniac",
+  "ruin_maniac",
+  "fairy_tale_girl",
+  "roughneck",
+];
 
 export class BiomeShopUiHandler extends UiHandler {
   private shopContainer: Phaser.GameObjects.Container;
@@ -93,6 +139,7 @@ export class BiomeShopUiHandler extends UiHandler {
   private bgOverlay: Phaser.GameObjects.Rectangle;
   private gridWindow: Phaser.GameObjects.NineSlice;
   private keeper: Phaser.GameObjects.Sprite;
+  private playerBack: Phaser.GameObjects.Sprite;
   private bannerText: Phaser.GameObjects.Text;
   private itemNameText: Phaser.GameObjects.Text;
   private descText: Phaser.GameObjects.Text;
@@ -132,9 +179,16 @@ export class BiomeShopUiHandler extends UiHandler {
     this.gridWindow = addWindow(96, 20, w - 98, 150);
     this.shopContainer.add(this.gridWindow);
 
-    this.keeper = globalScene.add.sprite(KEEPER_X, h - 8, "baker");
+    // Shopkeeper (behind the counter, upper-left) + the player's BACK sprite in
+    // the foreground (lower-left), facing the keeper - a proper shop scene.
+    this.keeper = globalScene.add.sprite(KEEPER_X - 6, h - 22, "clerk_m");
     this.keeper.setOrigin(0.5, 1);
     this.shopContainer.add(this.keeper);
+
+    this.playerBack = globalScene.add.sprite(KEEPER_X + 30, h + 6, "trainer_m_back");
+    this.playerBack.setOrigin(0.5, 1);
+    this.playerBack.setScale(0.7);
+    this.shopContainer.add(this.playerBack);
 
     this.bannerText = addTextObject(208, 4, "", TextStyle.WINDOW, { fontSize: "84px" });
     this.bannerText.setOrigin(0.5, 0);
@@ -177,6 +231,7 @@ export class BiomeShopUiHandler extends UiHandler {
       this.bannerText.setText(`${getBiomeName(biome)} Market`.toUpperCase());
       this.setBackground(biome);
       this.setKeeper(biome);
+      this.setPlayer();
       this.buildGrid();
       this.cursor = 0;
       this.moveCursorTo(0);
@@ -204,8 +259,19 @@ export class BiomeShopUiHandler extends UiHandler {
     this.bg.setDisplaySize(w, h);
   }
 
+  /** Show the player's BACK sprite (gender-matched) in the shop foreground. */
+  private setPlayer(): void {
+    const key = globalScene.gameData.gender === PlayerGender.FEMALE ? "trainer_f_back" : "trainer_m_back";
+    if (globalScene.textures.exists(key)) {
+      this.playerBack.setTexture(key).setFrame(0);
+      this.playerBack.setVisible(true);
+    } else {
+      this.playerBack.setVisible(false);
+    }
+  }
+
   private setKeeper(biome: BiomeId): void {
-    const key = KEEPER_BY_BIOME[biome] ?? "baker";
+    const key = KEEPER_BY_BIOME[biome] ?? DEFAULT_KEEPER;
     if (globalScene.textures.exists(key)) {
       this.keeper.setTexture(key).setFrame(0);
       this.keeper.setVisible(true);
