@@ -1947,7 +1947,13 @@ export class BattleScene extends SceneBase {
     const obtainable: number[] = [];
     for (let i = 0; i < species.forms.length; i++) {
       const key = species.forms[i]?.formKey ?? "";
-      if (!/(?:^|-)(mega|primal|gmax|gigantamax|eternamax|ultra)(?:-|$)/i.test(key)) {
+      // isUnobtainable covers ER-injected battle-only forms whose keys the
+      // regex can't know about (e.g. Unown "revelation", which otherwise
+      // hatched from eggs as a resting form).
+      if (
+        !species.forms[i]?.isUnobtainable
+        && !/(?:^|-)(mega|primal|gmax|gigantamax|eternamax|ultra)(?:-|$)/i.test(key)
+      ) {
         obtainable.push(i);
       }
     }

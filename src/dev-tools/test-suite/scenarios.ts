@@ -2079,6 +2079,24 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Unown egg hatch (#442)",
+    description:
+      "#442 - Unown REVELATION (the battle-only school form) no longer\n"
+      + "hatches from eggs or appears as a wild Unown's resting form. The\n"
+      + "form is only reachable in battle via the Revelation ability.\n"
+      + "CHECK: hatch Unown eggs / catch wild Unown - always a letter form\n"
+      + "(A-Z, ! or ?), never the big multi-Unown school sprite. Already-\n"
+      + "hatched Revelation Unown from before the fix are unaffected.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Berry/Ward rates (#420)",
     description:
       "#420 - resist berry rolls doubled (Ace 5% / Elite 10% / Hell 20%)\n"
