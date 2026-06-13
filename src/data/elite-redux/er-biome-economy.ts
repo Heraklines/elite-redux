@@ -28,6 +28,7 @@ import { erBalanceMap, erBalanceNum } from "#data/elite-redux/er-balance-tuning"
 // import of the built modifierTypes table here would be a require cycle.
 import type { modifierTypes } from "#data/data-lists";
 import { BiomeId } from "#enums/biome-id";
+import { ModifierTier } from "#enums/modifier-tier";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import { randSeedInt } from "#utils/common";
 
@@ -181,7 +182,48 @@ const CATEGORY_TIER: Record<ErShopCategory, keyof typeof ER_SHOP_TIER_FACTOR> = 
 
 export interface ErBiomeShopStockEntry {
   key: keyof typeof modifierTypes;
+  /** Category-based fallback price (the real price is recomputed by item tier
+   * in getPlayerShopModifierTypeOptionsForWave once the type is resolved). */
   cost: number;
+  /** The shop category this slot was drawn from (drives the biome discount). */
+  category: ErShopCategory;
+}
+
+/**
+ * Price multiplier per item RARITY tier, in wave-income units. Pricing is by
+ * the item's actual tier (a Rogue-tier Focus Band costs far more than a
+ * Great-tier Quick Claw) rather than a flat per-category rate. The biome
+ * discount/markup (erBiomeCategoryPriceMod) multiplies on top.
+ */
+export const ER_SHOP_ITEM_TIER_FACTOR: Record<ModifierTier, number> = {
+  [ModifierTier.COMMON]: 0.25,
+  [ModifierTier.GREAT]: 0.7,
+  [ModifierTier.ULTRA]: 1.8,
+  [ModifierTier.ROGUE]: 4,
+  [ModifierTier.MASTER]: 8,
+  [ModifierTier.LUXURY]: 6,
+};
+
+/** How many of an item the market stocks, by rarity (rarer = scarcer). */
+export const ER_SHOP_STOCK_BY_TIER: Record<ModifierTier, number> = {
+  [ModifierTier.COMMON]: 5,
+  [ModifierTier.GREAT]: 3,
+  [ModifierTier.ULTRA]: 2,
+  [ModifierTier.ROGUE]: 1,
+  [ModifierTier.MASTER]: 1,
+  [ModifierTier.LUXURY]: 1,
+};
+
+/** Final price for a resolved item, by its rarity tier x the biome discount. */
+export function erBiomeTierPrice(tier: ModifierTier, biome: BiomeId, category: ErShopCategory): number {
+  const waveUnit = globalScene.getWaveMoneyAmount(1);
+  const tierFactor = ER_SHOP_ITEM_TIER_FACTOR[tier] ?? ER_SHOP_ITEM_TIER_FACTOR[ModifierTier.GREAT];
+  return Math.max(10, Math.floor((waveUnit * tierFactor * erBiomeCategoryPriceMod(biome, category)) / 10) * 10);
+}
+
+/** Stock count for a resolved item, by its rarity tier. */
+export function erBiomeStockCount(tier: ModifierTier): number {
+  return ER_SHOP_STOCK_BY_TIER[tier] ?? ER_SHOP_STOCK_BY_TIER[ModifierTier.GREAT];
 }
 
 /**
@@ -208,23 +250,18 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
   const add = (key: keyof typeof modifierTypes, category: ErShopCategory) => {
     if (!seen.has(key) && stock.length < TARGET_SLOTS) {
       seen.add(key);
-      stock.push({ key, cost: priceOf(key, category) });
+      stock.push({ key, cost: priceOf(key, category), category });
     }
   };
 
   globalScene.executeWithSeedOffset(
     () => {
-      // 1. STAPLES: the four ball tiers, always in stock. Prices ESCALATE by
-      // ball rarity (Poke < Great < Ultra < Rogue) so they don't all read the
-      // same - the plain add() would flat-price every ball at the staple tier.
-      const ballMult = [1, 2, 4, 9];
-      ER_SHOP_CATEGORY_POOL.BALLS.forEach((key, idx) => {
-        if (!seen.has(key) && stock.length < TARGET_SLOTS) {
-          seen.add(key);
-          const base = priceOf(key, "BALLS");
-          stock.push({ key, cost: Math.max(10, Math.floor((base * (ballMult[idx] ?? 1)) / 10) * 10) });
-        }
-      });
+      // 1. STAPLES: the four ball tiers, always in stock. The real price is set
+      // by each ball's rarity tier in the shop hook (Poke < Great < Ultra <
+      // Rogue), so they no longer all read the same.
+      for (const key of ER_SHOP_CATEGORY_POOL.BALLS) {
+        add(key, "BALLS");
+      }
       // 2. SIGNATURES: the biome's identity items, always stocked, ultra-priced.
       for (const key of eco.signature) {
         if (!seen.has(key) && stock.length < TARGET_SLOTS) {
@@ -232,6 +269,9 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
           stock.push({
             key,
             cost: erBiomeShopPrice("ultra", erBalanceMap("er.shop.biomePriceMod")[BiomeId[biome]] ?? eco.priceMod),
+            // Signatures are flavor items (mostly held) - tag HELD so the biome
+            // discount still applies; the real price comes from the item tier.
+            category: "HELD",
           });
         }
       }

@@ -22,7 +22,10 @@
 
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
+import { erBiomeStockCount } from "#data/elite-redux/er-biome-economy";
+import { ModifierTier } from "#enums/modifier-tier";
 import { UiMode } from "#enums/ui-mode";
+import type { Modifier } from "#modifiers/modifier";
 import { HealShopCostModifier } from "#modifiers/modifier";
 import type { ModifierTypeOption } from "#modifiers/modifier-type";
 import { getPlayerShopModifierTypeOptionsForWave } from "#modifiers/modifier-type";
@@ -32,6 +35,10 @@ import { NumberHolder } from "#utils/common";
 
 export class BiomeShopPhase extends SelectModifierPhase {
   private shopOptions: ModifierTypeOption[] = [];
+  /** Remaining stock per slot (rarer items stock fewer; see erBiomeStockCount). */
+  private qtys: number[] = [];
+  /** Slot index awaiting a purchase result, so applyModifier can decrement it. */
+  private pendingIndex = -1;
 
   /** The biome market re-appears (not the vanilla reward screen) after the
    * party-target menu closes on a held-item / TM purchase. */
@@ -57,14 +64,20 @@ export class BiomeShopPhase extends SelectModifierPhase {
       this.end();
       return;
     }
+    // Stock count per slot by the item's rarity tier (rarer = scarcer).
+    this.qtys = this.shopOptions.map(o => erBiomeStockCount(o.type.getOrInferTier() ?? ModifierTier.GREAT));
 
     this.openBiomeShop();
     return;
   }
 
   private openBiomeShop(): void {
-    globalScene.ui.setMode(UiMode.BIOME_SHOP, this.shopOptions, globalScene.arena.biomeId, (index: number) =>
-      this.onSelect(index),
+    globalScene.ui.setMode(
+      UiMode.BIOME_SHOP,
+      this.shopOptions,
+      globalScene.arena.biomeId,
+      (index: number) => this.onSelect(index),
+      this.qtys,
     );
   }
 
@@ -79,6 +92,11 @@ export class BiomeShopPhase extends SelectModifierPhase {
     if (!option) {
       return false;
     }
+    if ((this.qtys[index] ?? 0) <= 0) {
+      // Sold out - rarer items stock fewer copies.
+      globalScene.ui.playError();
+      return false;
+    }
     const cost = option.cost;
     if (globalScene.money < cost && !Overrides.WAIVE_ROLL_FEE_OVERRIDE) {
       globalScene.ui.playError();
@@ -87,8 +105,25 @@ export class BiomeShopPhase extends SelectModifierPhase {
     // Reuse the proven purchase plumbing: non-targeted items apply directly;
     // held items / TMs / candies open the party menu, then return to the
     // BIOME_SHOP mode (via getModifierSelectMode) and the shop stays open.
+    // Remember the slot so applyModifier can decrement its stock on success.
+    this.pendingIndex = index;
     const noop: ModifierSelectCallback = () => false;
     return this.applyChosenModifier(option.type, cost, noop);
+  }
+
+  /**
+   * After a confirmed purchase (cost !== -1), decrement that slot's stock and
+   * refresh the grid. The party-CANCEL path goes through resetModifierSelect
+   * (no applyModifier), so cancelling never consumes stock.
+   */
+  protected override applyModifier(modifier: Modifier, cost = -1, playSound = false): void {
+    super.applyModifier(modifier, cost, playSound);
+    if (cost !== -1 && this.pendingIndex >= 0 && this.pendingIndex < this.qtys.length) {
+      this.qtys[this.pendingIndex] = Math.max(0, this.qtys[this.pendingIndex] - 1);
+      const handler = globalScene.ui.getHandler() as { setStock?: (index: number, remaining: number) => void };
+      handler.setStock?.(this.pendingIndex, this.qtys[this.pendingIndex]);
+      this.pendingIndex = -1;
+    }
   }
 
   /** Re-show the market after the party-target menu is cancelled. */

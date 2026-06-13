@@ -9,7 +9,7 @@ import { tmPoolTiers } from "#balance/tms";
 import { getBerryEffectDescription, getBerryName } from "#data/berry";
 import { getDailyEventSeedLuck } from "#data/daily-seed/daily-run";
 import { allMoves, modifierTypes } from "#data/data-lists";
-import { rollErBiomeShopStock } from "#data/elite-redux/er-biome-economy";
+import { erBiomeTierPrice, rollErBiomeShopStock } from "#data/elite-redux/er-biome-economy";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-stones";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
@@ -2919,7 +2919,12 @@ export function getPlayerShopModifierTypeOptionsForWave(waveIndex: number, baseC
           );
         }
         if (mt != null) {
-          options.push(new ModifierTypeOption(mt, 0, entry.cost));
+          // Price by the item's actual RARITY tier (a Rogue-tier held item costs
+          // far more than a Great-tier one) x the biome discount - not a flat
+          // per-category rate. Falls back to the category price if untiered.
+          const tier = mt.getOrInferTier();
+          const cost = tier == null ? entry.cost : erBiomeTierPrice(tier, globalScene.arena.biomeId, entry.category);
+          options.push(new ModifierTypeOption(mt, 0, cost));
         }
       }
       return options;

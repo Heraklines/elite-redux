@@ -26,6 +26,7 @@ import { ER_BIOME_SHOP_SLOTS } from "#data/elite-redux/er-biome-economy";
 import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { PlayerGender } from "#enums/player-gender";
+import { SpeciesId } from "#enums/species-id";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import { getBiomeKey } from "#field/arena";
@@ -34,6 +35,7 @@ import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
 import { formatMoney, getBiomeName } from "#utils/common";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 /** Prefix an amount with the in-game money symbol. */
 function money(amount: number): string {
@@ -133,6 +135,51 @@ export const ER_BIOME_SHOP_KEEPERS = [
   "roughneck",
 ];
 
+/**
+ * Some biomes use a POKEMON as the shopkeeper instead of a trainer (rendered
+ * from the dex-icon atlas). Space gets a Clefairy (cosmic companion); Cave gets
+ * a Kecleon, the classic PMD dungeon shopkeeper. Takes priority over the trainer
+ * map in setKeeper.
+ */
+const POKEMON_KEEPER_BY_BIOME: Partial<Record<BiomeId, SpeciesId>> = {
+  [BiomeId.SPACE]: SpeciesId.CLEFAIRY,
+  [BiomeId.CAVE]: SpeciesId.KECLEON,
+};
+
+/**
+ * The shop's TYPE word per biome - it isn't always a "Market". A desert is a
+ * caravan, a graveyard the local shaman, a slum a black market, a volcano a
+ * forge, etc. Shown in the banner as "<BIOME> <TYPE>". Default "Market".
+ */
+const SHOP_TYPE_BY_BIOME: Partial<Record<BiomeId, string>> = {
+  [BiomeId.DESERT]: "Caravan",
+  [BiomeId.WASTELAND]: "Scavenger",
+  [BiomeId.SLUM]: "Black Market",
+  [BiomeId.METROPOLIS]: "Department",
+  [BiomeId.SEA]: "Dock Stall",
+  [BiomeId.BEACH]: "Dock Stall",
+  [BiomeId.SEABED]: "Diver's Hold",
+  [BiomeId.ISLAND]: "Dock Stall",
+  [BiomeId.MOUNTAIN]: "Trail Post",
+  [BiomeId.CAVE]: "Trail Post",
+  [BiomeId.BADLANDS]: "Trail Post",
+  [BiomeId.VOLCANO]: "Forge",
+  [BiomeId.DOJO]: "Training Goods",
+  [BiomeId.ICE_CAVE]: "Warm Stand",
+  [BiomeId.SNOWY_FOREST]: "Warm Stand",
+  [BiomeId.POWER_PLANT]: "Tech Counter",
+  [BiomeId.FACTORY]: "Tech Counter",
+  [BiomeId.LABORATORY]: "Tech Counter",
+  [BiomeId.SPACE]: "Observatory Kiosk",
+  [BiomeId.GRAVEYARD]: "Shaman",
+  [BiomeId.TEMPLE]: "Shrine",
+  [BiomeId.RUINS]: "Relic Stall",
+  [BiomeId.FAIRY_CAVE]: "Sweets Shop",
+  [BiomeId.FOREST]: "Field Supplies",
+  [BiomeId.JUNGLE]: "Field Supplies",
+  [BiomeId.SWAMP]: "Bog Trader",
+};
+
 export class BiomeShopUiHandler extends UiHandler {
   private shopContainer: Phaser.GameObjects.Container;
   private bg: Phaser.GameObjects.Image;
@@ -147,10 +194,23 @@ export class BiomeShopUiHandler extends UiHandler {
   private leaveText: Phaser.GameObjects.Text;
   private cursorObj: Phaser.GameObjects.Rectangle;
 
-  /** One {icon, price} pair per stocked slot. */
-  private cells: { icon: Phaser.GameObjects.Sprite; price: Phaser.GameObjects.Text }[] = [];
+  /** One {icon, price, qty} trio per stocked slot. */
+  private cells: { icon: Phaser.GameObjects.Sprite; price: Phaser.GameObjects.Text; qty: Phaser.GameObjects.Text }[] =
+    [];
   private options: ModifierTypeOption[] = [];
+  private qtys: number[] = [];
   private onSelect: BiomeShopSelectCallback | null = null;
+
+  /** Remaining stock of the slot at `index` (clamped >= 0). */
+  getStock(index: number): number {
+    return this.qtys[index] ?? 0;
+  }
+
+  /** Set remaining stock of a slot (called by the phase after a purchase). */
+  setStock(index: number, remaining: number): void {
+    this.qtys[index] = Math.max(0, remaining);
+    this.refresh();
+  }
 
   constructor() {
     super(UiMode.BIOME_SHOP);
@@ -227,8 +287,10 @@ export class BiomeShopUiHandler extends UiHandler {
       this.options = args[0] as ModifierTypeOption[];
       const biome = args[1] as BiomeId;
       this.onSelect = args[2] as BiomeShopSelectCallback;
+      this.qtys = (args[3] as number[]) ?? this.options.map(() => 1);
 
-      this.bannerText.setText(`${getBiomeName(biome)} Market`.toUpperCase());
+      const shopType = SHOP_TYPE_BY_BIOME[biome] ?? "Market";
+      this.bannerText.setText(`${getBiomeName(biome)} ${shopType}`.toUpperCase());
       this.setBackground(biome);
       this.setKeeper(biome);
       this.setPlayer();
@@ -271,6 +333,21 @@ export class BiomeShopUiHandler extends UiHandler {
   }
 
   private setKeeper(biome: BiomeId): void {
+    // Pokemon keeper (Clefairy in Space, Kecleon in caves) - rendered from the
+    // dex-icon atlas, which is always loaded. Takes priority over trainers.
+    const pkmn = POKEMON_KEEPER_BY_BIOME[biome];
+    if (pkmn != null) {
+      const species = getPokemonSpecies(pkmn);
+      const atlas = species.getIconAtlasKey(0, false, 0);
+      const frame = species.getIconId(false, 0, false, 0);
+      if (globalScene.textures.exists(atlas)) {
+        this.keeper.setTexture(atlas, frame);
+        this.keeper.setVisible(true);
+        this.keeper.setScale(2.6); // dex icons are ~40px - scale up to keeper size
+        return;
+      }
+    }
+
     const key = KEEPER_BY_BIOME[biome] ?? DEFAULT_KEEPER;
     if (globalScene.textures.exists(key)) {
       this.keeper.setTexture(key).setFrame(0);
@@ -287,6 +364,7 @@ export class BiomeShopUiHandler extends UiHandler {
     for (const cell of this.cells) {
       cell.icon.destroy();
       cell.price.destroy();
+      cell.qty.destroy();
     }
     this.cells = [];
     for (let i = 0; i < this.options.length && i < ER_BIOME_SHOP_SLOTS; i++) {
@@ -311,7 +389,12 @@ export class BiomeShopUiHandler extends UiHandler {
       price.setOrigin(0.5, 0);
       this.shopContainer.add(price);
 
-      this.cells.push({ icon, price });
+      // Remaining stock, top-right of the cell (rarer items stock fewer).
+      const qty = addTextObject(x + 20, y - 13, "", TextStyle.PARTY, { fontSize: "38px" });
+      qty.setOrigin(1, 0);
+      this.shopContainer.add(qty);
+
+      this.cells.push({ icon, price, qty });
     }
   }
 
@@ -342,9 +425,14 @@ export class BiomeShopUiHandler extends UiHandler {
   private refresh(): void {
     this.moneyText.setText(money(globalScene.money));
     for (let i = 0; i < this.cells.length; i++) {
+      const remaining = this.qtys[i] ?? 0;
       const affordable = globalScene.money >= (this.options[i]?.cost ?? 0);
-      this.cells[i].icon.setAlpha(affordable ? 1 : 0.4);
-      this.cells[i].price.setAlpha(affordable ? 1 : 0.4);
+      const buyable = affordable && remaining > 0;
+      const dim = buyable ? 1 : 0.35;
+      this.cells[i].icon.setAlpha(dim);
+      this.cells[i].price.setAlpha(dim);
+      this.cells[i].qty.setText(remaining > 0 ? `x${remaining}` : "SOLD");
+      this.cells[i].qty.setAlpha(remaining > 0 ? 0.85 : 0.55);
     }
   }
 
@@ -403,9 +491,11 @@ export class BiomeShopUiHandler extends UiHandler {
     for (const cell of this.cells) {
       cell.icon.destroy();
       cell.price.destroy();
+      cell.qty.destroy();
     }
     this.cells = [];
     this.options = [];
+    this.qtys = [];
     this.onSelect = null;
   }
 }
