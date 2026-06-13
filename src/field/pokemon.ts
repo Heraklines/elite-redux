@@ -72,6 +72,7 @@ import {
   getErDifficultyShinyMultiplier,
 } from "#data/elite-redux/er-run-difficulty";
 import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
+import { enforceErEliteBstCurve } from "#data/elite-redux/er-trainer-runtime-hook";
 import {
   applyErWardStoneBlock,
   ER_WARD_BLOCKED_TAGS,
@@ -7768,6 +7769,14 @@ export class EnemyPokemon extends Pokemon {
     }
 
     if (!dataSource) {
+      // ER (#441): universal power gate at THE chokepoint every enemy passes
+      // through (wild, trainer, mystery encounter, scripted - several ME
+      // paths construct EnemyPokemon directly and bypassed every per-pipeline
+      // gate, which is how a level-9 Moltres Ex reached wave 15 on
+      // Youngster). Over-ceiling species devolve or swap BEFORE the moveset
+      // is generated, so the final mon's kit matches its final species.
+      // Saved battles (dataSource) are restored untouched.
+      enforceErEliteBstCurve(this);
       this.generateAndPopulateMoveset(forRival);
       if (shinyLock || Overrides.ENEMY_SHINY_OVERRIDE === false) {
         this.shiny = false;

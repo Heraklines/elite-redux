@@ -43,7 +43,12 @@ import {
 import { erRivalWaveOrdinal, erRivalWaveSequence } from "#data/elite-redux/er-battle-frequency";
 import { ER_FACTORY_SETS } from "#data/elite-redux/er-factory-sets";
 import { erBalanceMap, erBalanceNum, erBalancePairs } from "#data/elite-redux/er-balance-tuning";
-import { erFactoryExcludedDraftIds, erTunedFactoryTeamPct } from "#data/elite-redux/er-trainer-tuning";
+import {
+  erFactoryExcludedDraftIds,
+  erFactoryOverriddenDraftIds,
+  erFactorySetOverrideEntries,
+  erTunedFactoryTeamPct,
+} from "#data/elite-redux/er-trainer-tuning";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { ER_MEGA_STONE_NAME_BY_ITEM } from "#data/elite-redux/er-mega-stone-item-ids";
@@ -837,7 +842,20 @@ function erEliteBstCapFor(wave: number, isBossWave: boolean): number | null {
  */
 export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
   try {
-    if (getErDifficulty() !== "elite") {
+    // ER (#441): THE universal power gate. This used to be Elite-only and
+    // trainer-only; it now runs for EVERY difficulty except Hell (whose early
+    // spikes are intentional) and is invoked from the EnemyPokemon
+    // CONSTRUCTOR, so every spawn path - wild, trainer, mystery encounter,
+    // scripted - passes through one chokepoint. Species of any origin
+    // (vanilla or ER custom) are allowed as long as their BST fits the
+    // wave's ceiling; violators devolve or swap. Note the FAIL-CLOSED shape:
+    // an unknown/future difficulty value is gated, not exempted.
+    if (getErDifficulty() === "hell") {
+      return;
+    }
+    // Daily runs are shared-seed curated content (set bosses incl. wave-50
+    // legendaries) - gating them would silently rewrite everyone's daily.
+    if (globalScene.gameMode?.isDaily) {
       return;
     }
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
@@ -1076,9 +1094,13 @@ export function resolvedFactorySets(): readonly ErFactorySetResolved[] {
   }
   const out: ErFactorySetResolved[] = [];
   const excluded = erFactoryExcludedDraftIds();
+  const overridden = erFactoryOverriddenDraftIds();
   for (const [erSpecies, erMoves, abilitySlot] of ER_FACTORY_SETS) {
     if (excluded.has(erSpecies)) {
       continue; // editor-managed set-membership exclusion (er-trainer-tuning.json)
+    }
+    if (overridden.has(erSpecies)) {
+      continue; // editor-managed set REPLACEMENT — the override entries below win
     }
     const speciesId = ER_ID_MAP.species[erSpecies];
     if (speciesId === undefined) {
@@ -1096,6 +1118,18 @@ export function resolvedFactorySets(): readonly ErFactorySetResolved[] {
       }
     }
     out.push({ speciesId, moves, abilitySlot, bst });
+  }
+  // Editor-managed replacement sets (er-trainer-tuning.json sets.factorySetOverrides);
+  // also how the team gives factory sets to species with none shipped.
+  for (const entry of erFactorySetOverrideEntries()) {
+    if (entry.speciesId === undefined || entry.moves.length === 0) {
+      continue;
+    }
+    const bst = getPokemonSpecies(entry.speciesId)?.getBaseStatTotal() ?? 0;
+    if (bst <= 0) {
+      continue;
+    }
+    out.push({ speciesId: entry.speciesId, moves: entry.moves, abilitySlot: entry.abilitySlot, bst });
   }
   out.sort((a, b) => a.bst - b.bst);
   FACTORY_POOL = out;

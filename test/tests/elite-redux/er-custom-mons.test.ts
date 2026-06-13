@@ -1,0 +1,108 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+// Editor-created custom mons (er-custom-mons.json → live species + balance
+// tables). Tests inject mon tables directly (applyErCustomMons) and assert
+// registration, table writes, validation skips and idempotency.
+// Run: ER_SCENARIO=1 npx vitest run test/tests/elite-redux/er-custom-mons.test.ts
+import { speciesEggMoves } from "#balance/moves/egg-moves";
+import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
+import { speciesEggTiers } from "#balance/species-egg-tiers";
+import { speciesStarterCosts } from "#balance/starters";
+import { allSpecies } from "#data/data-lists";
+import { applyErCustomMons } from "#data/elite-redux/init-elite-redux-custom-mons";
+import { MoveId } from "#enums/move-id";
+import { PokemonType } from "#enums/pokemon-type";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
+import { describe, expect, it } from "vitest";
+
+const TEST_MON = {
+  SPECIES_EDITOR_TESTCAT: {
+    id: 60042,
+    name: "Testcat",
+    slug: "editor-testcat",
+    types: ["FIRE", "FLYING"] as [string, string | null],
+    baseStats: [70, 95, 60, 80, 60, 105],
+    abilities: ["Blaze", "", ""],
+    innates: ["Intimidate"],
+    catchRate: 90,
+    eggTier: 2,
+    cost: 5,
+    levelUpMoves: [
+      { level: 1, move: "SCRATCH" },
+      { level: 7, move: "EMBER" },
+    ],
+    eggMoves: ["FLARE_BLITZ"],
+  },
+};
+
+describe("ER editor custom mons (er-custom-mons.json loader)", () => {
+  it("registers a valid mon as a live species with all balance tables wired", () => {
+    const result = applyErCustomMons(TEST_MON);
+    expect(result.registered).toBe(1);
+
+    const species = getPokemonSpecies(60042);
+    expect(species).toBeDefined();
+    expect(species?.name).toBe("Testcat");
+    expect(species?.type1).toBe(PokemonType.FIRE);
+    expect(species?.type2).toBe(PokemonType.FLYING);
+    expect(species?.baseTotal).toBe(70 + 95 + 60 + 80 + 60 + 105);
+    expect(species?.catchRate).toBe(90);
+    // Ability resolved by display name; empty slots are NONE-padded.
+    expect(species?.ability1).toBeGreaterThan(0);
+
+    expect((speciesEggTiers as Record<number, number>)[60042]).toBe(2);
+    expect((speciesStarterCosts as Record<number, number>)[60042]).toBe(5);
+    expect((pokemonSpeciesLevelMoves as Record<number, [number, number][]>)[60042]).toEqual([
+      [1, MoveId.SCRATCH],
+      [7, MoveId.EMBER],
+    ]);
+    expect((speciesEggMoves as Record<number, number[]>)[60042]).toEqual([MoveId.FLARE_BLITZ]);
+  });
+
+  it("is idempotent: a second apply reports already-present, no duplicate species", () => {
+    applyErCustomMons(TEST_MON);
+    const again = applyErCustomMons(TEST_MON);
+    expect(again.registered).toBe(0);
+    expect(again.alreadyPresent).toBe(1);
+    expect(allSpecies.filter(s => s.speciesId === 60042)).toHaveLength(1);
+  });
+
+  it("skips invalid entries (bad id band, bad stats, unknown type) without registering", () => {
+    const result = applyErCustomMons({
+      SPECIES_EDITOR_BAD_ID: { ...TEST_MON.SPECIES_EDITOR_TESTCAT, id: 10000, slug: "bad-id" },
+      SPECIES_EDITOR_BAD_STATS: {
+        ...TEST_MON.SPECIES_EDITOR_TESTCAT,
+        id: 60043,
+        slug: "bad-stats",
+        baseStats: [0, 95, 60, 80, 60, 105],
+      },
+      SPECIES_EDITOR_BAD_TYPE: {
+        ...TEST_MON.SPECIES_EDITOR_TESTCAT,
+        id: 60044,
+        slug: "bad-type",
+        types: ["NOT_A_TYPE", null] as [string, string | null],
+      },
+    });
+    expect(result.registered).toBe(0);
+    expect(result.skippedInvalid).toBe(3);
+    expect(getPokemonSpecies(60043)).toBeUndefined();
+    expect(getPokemonSpecies(60044)).toBeUndefined();
+  });
+
+  it("a mon with no resolvable level-up moves still gets a fallback move", () => {
+    const result = applyErCustomMons({
+      SPECIES_EDITOR_MOVELESS: {
+        id: 60045,
+        name: "Moveless",
+        slug: "editor-moveless",
+        types: ["NORMAL", null] as [string, string | null],
+        baseStats: [50, 50, 50, 50, 50, 50],
+        levelUpMoves: [{ level: 1, move: "NOT_A_REAL_MOVE" }],
+      },
+    });
+    expect(result.registered).toBe(1);
+    expect((pokemonSpeciesLevelMoves as Record<number, [number, number][]>)[60045]).toEqual([[1, MoveId.TACKLE]]);
+  });
+});
