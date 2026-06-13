@@ -15,7 +15,14 @@
 //       "elite": { "trainerCadence": 4, "factoryTeamPct": 15 },
 //       "hell":  { "trainerCadence": 2, "factoryTeamPct": 25 }
 //     },
-//     "sets": { "factoryExcludeSpecies": ["SPECIES_SLAKING"] }
+//     "sets": {
+//       "factoryExcludeSpecies": ["SPECIES_SLAKING"],
+//       "factorySetOverrides": {
+//         "SPECIES_GARCHOMP": [
+//           { "moves": ["EARTHQUAKE", "DRAGON_CLAW", "SWORDS_DANCE", "FIRE_FANG"], "abilitySlot": 1 }
+//         ]
+//       }
+//     }
 //   }
 //
 // Overrides are ADDITIVE: an absent difficulty / absent field keeps the
@@ -27,10 +34,34 @@
 //   - `factoryExcludeSpecies` — speciesConsts whose factory sets are removed
 //                          from the pool (set membership, mapped BY KEY through
 //                          the ER draft ids the sets are stored under).
+//   - `factorySetOverrides`  — a species key present here REPLACES that
+//                          species' shipped Battle-Factory sets wholesale with
+//                          the listed sets (move NAMES resolve over the same
+//                          vanilla + ER pool as egg moves; an empty list means
+//                          "no sets"). Absent species keep their shipped sets.
 // =============================================================================
 
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
+import { MoveId } from "#enums/move-id";
+import { SpeciesId } from "#enums/species-id";
 import trainerTuningJson from "./er-trainer-tuning.json";
+
+export interface ErFactorySetOverride {
+  /** Move enum NAMES (vanilla MoveId keys or ER-custom enum-keyed names). */
+  moves: readonly string[];
+  abilitySlot: 0 | 1 | 2;
+}
+
+/** A factory-set override resolved to live pokerogue ids. */
+export interface ErFactorySetOverrideResolved {
+  speciesConst: string;
+  /** Live pokerogue species id (undefined when the const doesn't resolve). */
+  speciesId: number | undefined;
+  moves: readonly number[];
+  abilitySlot: 0 | 1 | 2;
+}
 
 export interface ErTrainerFrequencyTuning {
   /** Force a regular trainer battle when `wave % N === 0`. */
@@ -43,16 +74,111 @@ export interface ErTrainerTuning {
   frequency?: Record<string, ErTrainerFrequencyTuning>;
   sets?: {
     factoryExcludeSpecies?: readonly string[];
+    factorySetOverrides?: Record<string, readonly ErFactorySetOverride[]>;
   };
 }
 
 let activeTuning: ErTrainerTuning = trainerTuningJson as ErTrainerTuning;
 let excludedDraftIdsCache: ReadonlySet<number> | null = null;
+let setOverridesCache: readonly ErFactorySetOverrideResolved[] | null = null;
+let overriddenDraftIdsCache: ReadonlySet<number> | null = null;
 
 /** Test hook: replace (or with `undefined` restore) the active tuning table. */
 export function setErTrainerTuningForTesting(tuning?: ErTrainerTuning): void {
   activeTuning = tuning ?? (trainerTuningJson as ErTrainerTuning);
   excludedDraftIdsCache = null;
+  setOverridesCache = null;
+  overriddenDraftIdsCache = null;
+}
+
+/** Move enum NAME → pokerogue MoveId, vanilla + ER customs (mirror of er-egg-moves.ts). */
+let moveByNameCache: Map<string, number> | null = null;
+function moveByName(): Map<string, number> {
+  if (moveByNameCache !== null) {
+    return moveByNameCache;
+  }
+  const map = new Map<string, number>();
+  for (const [key, value] of Object.entries(MoveId)) {
+    if (typeof value === "number") {
+      map.set(key, value);
+    }
+  }
+  for (const draft of ER_MOVES) {
+    const pkrgId = ER_ID_MAP.moves[draft.id];
+    if (pkrgId === undefined) {
+      continue;
+    }
+    const key = draft.name
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    if (!map.has(key)) {
+      map.set(key, pkrgId);
+    }
+  }
+  moveByNameCache = map;
+  return map;
+}
+
+function draftIdByConst(): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const draft of ER_SPECIES) {
+    map.set(draft.speciesConst, draft.id);
+  }
+  return map;
+}
+
+/**
+ * The editor-managed factory-set replacements, resolved to live pokerogue ids
+ * (unresolvable move names are dropped; a species const that resolves to no
+ * live species gets `speciesId: undefined` and is skipped by the consumer).
+ */
+export function erFactorySetOverrideEntries(): readonly ErFactorySetOverrideResolved[] {
+  if (setOverridesCache !== null) {
+    return setOverridesCache;
+  }
+  const out: ErFactorySetOverrideResolved[] = [];
+  const overrides = activeTuning.sets?.factorySetOverrides ?? {};
+  if (Object.keys(overrides).length > 0) {
+    const drafts = draftIdByConst();
+    const moves = moveByName();
+    const speciesIdByName = SpeciesId as unknown as Record<string, number | undefined>;
+    for (const [speciesConst, sets] of Object.entries(overrides)) {
+      const draftId = drafts.get(speciesConst);
+      const speciesId =
+        draftId === undefined ? speciesIdByName[speciesConst.replace(/^SPECIES_/, "")] : ER_ID_MAP.species[draftId];
+      for (const set of sets ?? []) {
+        out.push({
+          speciesConst,
+          speciesId: typeof speciesId === "number" ? speciesId : undefined,
+          moves: (set.moves ?? []).map(name => moves.get(name)).filter((id): id is number => id !== undefined),
+          abilitySlot: set.abilitySlot === 1 || set.abilitySlot === 2 ? set.abilitySlot : 0,
+        });
+      }
+    }
+  }
+  setOverridesCache = out;
+  return out;
+}
+
+/** ER draft ids whose shipped factory sets are REPLACED by an override entry. */
+export function erFactoryOverriddenDraftIds(): ReadonlySet<number> {
+  if (overriddenDraftIdsCache !== null) {
+    return overriddenDraftIdsCache;
+  }
+  const set = new Set<number>();
+  const overrides = activeTuning.sets?.factorySetOverrides ?? {};
+  if (Object.keys(overrides).length > 0) {
+    const drafts = draftIdByConst();
+    for (const speciesConst of Object.keys(overrides)) {
+      const draftId = drafts.get(speciesConst);
+      if (draftId !== undefined) {
+        set.add(draftId);
+      }
+    }
+  }
+  overriddenDraftIdsCache = set;
+  return set;
 }
 
 /** Editor-tuned trainer cadence for a difficulty, or `undefined` (use default). */

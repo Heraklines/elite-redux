@@ -411,6 +411,70 @@ export function getErSpriteSlug(speciesId: number): string | undefined {
   return ErCustomSpecies.getSpriteSlug(speciesId);
 }
 
+/** A fully-resolved editor-created mon (see init-elite-redux-custom-mons.ts). */
+export interface ErEditorMonSpec {
+  speciesId: number;
+  name: string;
+  /** er-assets sprite directory slug (images/pokemon/elite-redux/<slug>/). */
+  slug: string;
+  type1: PokemonType;
+  type2: PokemonType | null;
+  baseStats: readonly [number, number, number, number, number, number];
+  abilities: readonly [number, number, number];
+  innates: readonly [number, number, number];
+  catchRate: number;
+}
+
+/**
+ * Register an EDITOR-CREATED custom mon (er-custom-mons.json) as a live
+ * species, reusing the exact ErCustomSpecies plumbing the ER dump customs get
+ * (slug-based sprites/icons, sprite-only asset loading, crash-safe cry/name).
+ * Returns false when the id is already registered (idempotent re-init).
+ */
+export function registerErEditorMon(spec: ErEditorMonSpec): boolean {
+  if (allSpecies.some(s => s.speciesId === spec.speciesId)) {
+    return false;
+  }
+  ErCustomSpecies.registerDraftName(spec.speciesId, spec.name);
+  const baseTotal = spec.baseStats.reduce((sum, n) => sum + n, 0);
+  const species = new ErCustomSpecies(
+    spec.speciesId,
+    9,
+    false,
+    false,
+    false,
+    "??? Pokémon",
+    spec.type1,
+    spec.type2,
+    1.0,
+    30.0,
+    spec.abilities[0],
+    spec.abilities[1],
+    spec.abilities[2],
+    baseTotal,
+    spec.baseStats[0],
+    spec.baseStats[1],
+    spec.baseStats[2],
+    spec.baseStats[3],
+    spec.baseStats[4],
+    spec.baseStats[5],
+    spec.catchRate,
+    50,
+    100,
+    GrowthRate.MEDIUM_FAST,
+    50,
+    false,
+    false,
+  );
+  species.setPassives([spec.innates[0], spec.innates[1], spec.innates[2]]);
+  ErCustomSpecies.registerSpriteSlug(spec.speciesId, spec.slug);
+  if (!starterColors[spec.speciesId]) {
+    starterColors[spec.speciesId] = ["ffffff", "ffffff"];
+  }
+  (allSpecies as PokemonSpecies[]).push(species);
+  return true;
+}
+
 /**
  * Construct `PokemonSpecies` instances for the ER-custom species and push
  * them onto `allSpecies`. Idempotent: a re-run skips species that are

@@ -14,6 +14,7 @@ import {
   initEliteReduxCustomAbilities,
   refreshEliteReduxComposites,
 } from "#data/elite-redux/init-elite-redux-custom-abilities";
+import { initEliteReduxCustomMons } from "#data/elite-redux/init-elite-redux-custom-mons";
 import { initEliteReduxCustomMoves } from "#data/elite-redux/init-elite-redux-custom-moves";
 import { initEliteReduxCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
 import { initEliteReduxEggMoves } from "#data/elite-redux/init-elite-redux-egg-moves";
@@ -278,6 +279,16 @@ export function initializeGame() {
   console.info(
     `[er-egg-moves] applied egg-move table: ${eggMoveResult.added} new + ${eggMoveResult.alreadyPresent} overridden species (skipped ${eggMoveResult.skippedUnmapped} unmapped)`,
   );
+
+  // Elite Redux: editor-created custom mons (er-custom-mons.json). Runs after
+  // the egg-move pass so every balance table it writes exists; invalid entries
+  // are skipped, never fatal.
+  const customMonResult = initEliteReduxCustomMons();
+  if (customMonResult.registered + customMonResult.skippedInvalid + customMonResult.alreadyPresent > 0) {
+    console.info(
+      `[er-custom-mons] registered ${customMonResult.registered} editor mons (skipped ${customMonResult.skippedInvalid} invalid + ${customMonResult.alreadyPresent} already present)`,
+    );
+  }
 
   // Elite Redux: extend TM-learnable pool with each species's tutor moves.
   // Must run AFTER move/species init so id lookups resolve.

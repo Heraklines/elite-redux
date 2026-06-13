@@ -51,6 +51,50 @@ describe("ER trainer tuning (er-trainer-tuning.json loader)", () => {
     expect(erTunedFactoryTeamPct("hell")).toBeUndefined();
   });
 
+  it("replaces a species' factory sets with the override sets", () => {
+    // Pick a shipped factory species with an unambiguous pokerogue id.
+    const draftIds = [...new Set(ER_FACTORY_SETS.map(([id]) => id))];
+    const erDraftId = draftIds.find(
+      id =>
+        ER_ID_MAP.species[id] !== undefined
+        && !draftIds.some(other => other !== id && ER_ID_MAP.species[other] === ER_ID_MAP.species[id]),
+    );
+    const speciesConst = ER_SPECIES.find(d => d.id === erDraftId)?.speciesConst as string;
+    const pkrgId = ER_ID_MAP.species[erDraftId as number];
+
+    setErTrainerTuningForTesting({
+      sets: {
+        factorySetOverrides: {
+          [speciesConst]: [{ moves: ["TACKLE", "GROWL"], abilitySlot: 2 }],
+        },
+      },
+    });
+    resetErFactoryPoolForTesting();
+    const pool = resolvedFactorySets().filter(s => s.speciesId === pkrgId);
+    expect(pool).toHaveLength(1);
+    expect(pool[0].moves).toHaveLength(2);
+    expect(pool[0].abilitySlot).toBe(2);
+  });
+
+  it("an override can give factory sets to a species with none shipped", () => {
+    const setDraftIds = new Set(ER_FACTORY_SETS.map(([id]) => id));
+    const fresh = ER_SPECIES.find(d => {
+      const pkrgId = ER_ID_MAP.species[d.id];
+      return !setDraftIds.has(d.id) && pkrgId !== undefined && pkrgId < 10000;
+    });
+    expect(fresh).toBeDefined();
+    const pkrgId = ER_ID_MAP.species[fresh?.id as number];
+
+    resetErFactoryPoolForTesting();
+    expect(resolvedFactorySets().some(s => s.speciesId === pkrgId)).toBe(false);
+
+    setErTrainerTuningForTesting({
+      sets: { factorySetOverrides: { [fresh?.speciesConst as string]: [{ moves: ["TACKLE"], abilitySlot: 0 }] } },
+    });
+    resetErFactoryPoolForTesting();
+    expect(resolvedFactorySets().some(s => s.speciesId === pkrgId)).toBe(true);
+  });
+
   it("removes excluded species' factory sets from the resolved pool", () => {
     // Pick a factory-set species that resolves to a live pokerogue species and
     // whose pokerogue id is not shared by any OTHER draft id in the set list
