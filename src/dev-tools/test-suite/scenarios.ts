@@ -2079,6 +2079,25 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Ability screen crash (#443)",
+    description:
+      "#443 - the Pokemon Info / summary ABILITIES screen no longer hard-\n"
+      + "crashes or renders garbled for edge-case mons (reported on a freshly-\n"
+      + "evolved Gholdengo and on Bloodmoon Ursaluna). The render is now\n"
+      + "guarded: a bad row is skipped and logged instead of killing the page.\n"
+      + "CHECK: evolve a Gimmighoul to Gholdengo and open its abilities; open\n"
+      + "Bloodmoon Ursaluna's abilities - both should display, not crash. If a\n"
+      + "row is missing, press Send Logs so the underlying cause is captured.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Evo cancel freeze (#444)",
     description:
       "#444 - cancelling an evolution no longer freezes the game. The UI was\n"

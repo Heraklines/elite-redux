@@ -530,6 +530,19 @@ export class BattleInfoOverlay {
 
   // --- per-Pokémon: ABILITIES ----------------------------------------------
   private renderAbilities(c: Phaser.GameObjects.Container, mon: Pokemon): void {
+    try {
+      this.renderAbilitiesInner(c, mon);
+    } catch (err) {
+      // #443: certain mons (reported on a freshly-evolved Gholdengo and on
+      // Bloodmoon Ursaluna) could throw while resolving their ability/innate
+      // data here, hard-crashing the whole Pokémon Info overlay. A blank-ish
+      // ability panel is far better than a dead game, and the logged error
+      // keeps the real culprit diagnosable from a Send Logs capture.
+      console.error("[battle-info] renderAbilities failed for", mon?.species?.name, err);
+    }
+  }
+
+  private renderAbilitiesInner(c: Phaser.GameObjects.Container, mon: Pokemon): void {
     const rows: { label: string; abilityId: number; locked: boolean; gift?: boolean }[] = [];
     const main = mon.getAbility(true);
     if (main) {

@@ -1698,6 +1698,23 @@ export class SummaryUiHandler extends UiHandler {
    * slot 3 @ Lv24) — shown as a level lock when inspecting an enemy.
    */
   private populateAbilitiesPage(pageContainer: Phaser.GameObjects.Container, pageBg: Phaser.GameObjects.Sprite): void {
+    // #443: harden against any throw while resolving/laying out a mon's
+    // ability + innate rows (reported as a hard crash on a freshly-evolved
+    // Gholdengo and a garbled screen on Bloodmoon Ursaluna). Keep the partial
+    // page rather than crashing the summary UI; log the culprit for a real fix.
+    this.abilitiesRows = [];
+    this.abilitiesRowCount = 0;
+    try {
+      this.populateAbilitiesPageInner(pageContainer, pageBg);
+    } catch (err) {
+      console.error("[summary] populateAbilitiesPage failed for", this.pokemon?.species?.name, err);
+    }
+  }
+
+  private populateAbilitiesPageInner(
+    pageContainer: Phaser.GameObjects.Container,
+    pageBg: Phaser.GameObjects.Sprite,
+  ): void {
     const container = globalScene.add.container(0, -pageBg.height);
     pageContainer.add(container);
 
