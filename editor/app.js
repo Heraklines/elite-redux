@@ -44,6 +44,12 @@ const tr = { current: null, baseline: null }; // {freq: {elite:{...}, hell:{...}
 // Balance knobs: key → override value in JSON form (absent = no override).
 // Maps store ONLY the overridden entries ({entryKey: number}).
 const bal = { current: {}, baseline: {} };
+// Factory SET overrides: const → [{moves: [names], abilitySlot}] (absent = shipped sets).
+const trSets = { current: {}, baseline: {} };
+const expandedFactory = new Set(); // species consts with an open set panel
+// Add-a-Mon: live er-custom-mons.json + ability name list for autocomplete.
+let MONS_LIVE = {};
+let ABILITY_NAMES = [];
 
 // Usage tiers (fetched at runtime; graceful "unranked" fallback when missing).
 const usage = { loaded: false, lines: {} };
@@ -165,6 +171,11 @@ function dirtyCounts() {
   }
   if (tr.current && !jsonEq(tr.current.excluded, tr.baseline.excluded)) {
     trN++;
+  }
+  for (const s of FACTORY_SPECIES) {
+    if (!jsonEq(trSets.current[s.const], trSets.baseline[s.const])) {
+      trN++;
+    }
   }
   let balN = 0;
   for (const knob of KNOBS) {
@@ -391,13 +402,73 @@ function renderTrainers(root) {
         const out = excluded.has(s.const);
         const dirty = out !== tr.baseline.excluded.includes(s.const);
         const sprite = s.slug ? `${SPRITE_BASE}/${s.slug}/front.png` : "";
-        return `<button type="button" class="factory-item${dirty ? " dirty" : ""}${out ? " out" : ""}" data-facconst="${s.const}" title="Click to ${out ? "put back into" : "remove from"} the factory pool">
+        const sets = effectiveSets(s);
+        const edited = trSets.current[s.const] !== undefined;
+        const setsDirty = !jsonEq(trSets.current[s.const], trSets.baseline[s.const]);
+        const open = expandedFactory.has(s.const);
+        return `<div class="factory-wrap">
+        <div class="factory-item${dirty || setsDirty ? " dirty" : ""}${out ? " out" : ""}" data-facopen="${s.const}" role="button" title="Click to view/edit this species' sets" style="${open ? "border-radius:8px 8px 0 0;" : ""}">
           <img src="${sprite}" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />
-          <span class="fname">${esc(s.name)}<small>${s.sets} set${s.sets === 1 ? "" : "s"}</small></span>
-          <span class="state">${out ? "✗ EXCLUDED" : "✓ IN POOL"}</span>
-        </button>`;
+          <span class="fname">${esc(s.name)}<small>${sets.length} set${sets.length === 1 ? "" : "s"}${edited ? " (edited)" : ""} ${open ? "▴" : "▾"}</small></span>
+          <button type="button" class="toggle${out ? " out-b" : " in"}" data-facconst="${s.const}" title="Click to ${out ? "put back into" : "remove from"} the factory pool">${out ? "✗ EXCLUDED" : "✓ IN POOL"}</button>
+        </div>
+        ${open ? setPanelHtml(s, sets, edited) : ""}
+        </div>`;
       })
       .join("")}</div>${visible.length === 0 ? '<div class="empty">No species match your search/filter.</div>' : ""}`;
+}
+
+// ---- Factory SET editor -------------------------------------------------------
+/** The sets currently shown for a species: the override if present, else shipped. */
+function effectiveSets(s) {
+  return trSets.current[s.const] ?? s.setsDetail ?? [];
+}
+
+function setPanelHtml(s, sets, edited) {
+  const rows = sets
+    .map(
+      (set, i) => `<div class="set-row" data-setconst="${s.const}" data-setidx="${i}">
+        ${[0, 1, 2, 3]
+          .map(slot => {
+            const val = set.moves[slot] || "";
+            const bad = val !== "" && !MOVE_SET.has(val);
+            return `<input class="set-move" list="moves-list" data-setconst="${s.const}" data-setidx="${i}" data-slot="${slot}" value="${esc(val)}" placeholder="—" spellcheck="false" style="${bad ? `border-color:${ERR}` : ""}" />`;
+          })
+          .join("")}
+        <select class="set-slot" data-setconst="${s.const}" data-setidx="${i}" title="Which of the species' abilities this set uses">
+          ${[0, 1, 2].map(a => `<option value="${a}"${set.abilitySlot === a ? " selected" : ""}>Ability ${a + 1}</option>`).join("")}
+        </select>
+        <button type="button" class="set-del" data-setconst="${s.const}" data-setidx="${i}" title="Remove this set">✕</button>
+      </div>`,
+    )
+    .join("");
+  return `<div class="set-panel">
+    ${rows || '<span class="dyn">No sets - this species cannot appear on factory teams.</span>'}
+    <div class="set-actions">
+      <button type="button" class="set-add" data-setconst="${s.const}">+ add set</button>
+      ${edited ? `<span class="badge edited">edited</span><button type="button" class="set-reset" data-setconst="${s.const}" title="Back to the shipped sets">↺ shipped sets</button>` : '<span class="badge" title="These are the shipped Battle Factory sets">shipped</span>'}
+    </div>
+  </div>`;
+}
+
+/** Clone the shipped sets into the override slot the first time a species is edited. */
+function ensureSetOverride(speciesConst) {
+  if (trSets.current[speciesConst] === undefined) {
+    const shipped = FACTORY_SPECIES.find(s => s.const === speciesConst)?.setsDetail ?? [];
+    trSets.current[speciesConst] = JSON.parse(JSON.stringify(shipped)).map(set => ({
+      moves: [...set.moves],
+      abilitySlot: set.abilitySlot,
+    }));
+  }
+  return trSets.current[speciesConst];
+}
+
+/** An override identical to the shipped sets is no override at all. */
+function normalizeSetOverride(speciesConst) {
+  const shipped = FACTORY_SPECIES.find(s => s.const === speciesConst)?.setsDetail ?? [];
+  if (jsonEq(trSets.current[speciesConst], shipped) && trSets.baseline[speciesConst] === undefined) {
+    delete trSets.current[speciesConst];
+  }
 }
 
 // ---- Game tab (balance knobs) -----------------------------------------------
@@ -554,6 +625,373 @@ function renderGame(root) {
     <p class="hint" style="margin:0 16px 16px;color:var(--muted);font-size:12px">Every value here is validated twice: the editor refuses obviously bad input, and the game itself ignores any out-of-range override and keeps its default - a bad save cannot break a build.</p>`;
 }
 
+// ---- Add a Mon tab -------------------------------------------------------------
+// Form + sprite studio. Sprites: upload front/back (and optionally a tier-1
+// shiny); tier-2/tier-3 shinies are GENERATED by hue-rotating tier 1 by +120°
+// and +240° (the same scheme the ER pipeline uses). Saving uploads the sprite
+// files + single-frame atlas JSONs to er-assets in one commit, then commits
+// the mon's entry to er-custom-mons.json.
+
+const MON_TYPES = [
+  "NORMAL",
+  "FIGHTING",
+  "FLYING",
+  "POISON",
+  "GROUND",
+  "ROCK",
+  "BUG",
+  "GHOST",
+  "STEEL",
+  "FIRE",
+  "WATER",
+  "GRASS",
+  "ELECTRIC",
+  "PSYCHIC",
+  "ICE",
+  "DRAGON",
+  "DARK",
+  "FAIRY",
+];
+const STAT_LABELS = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"];
+// Uploaded source images (Image objects) + whether anything new needs uploading.
+const monSprites = { front: null, back: null, shinyFront: null, shinyBack: null };
+let monSpritesDirty = false;
+
+function monNextId() {
+  let max = 60000;
+  for (const m of Object.values(MONS_LIVE)) {
+    if (Number.isInteger(m.id) && m.id > max) {
+      max = m.id;
+    }
+  }
+  return max + 1;
+}
+
+const slugify = name =>
+  `editor-${(name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")}`;
+const constify = name =>
+  `SPECIES_EDITOR_${(name || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")}`;
+
+function renderAddMon(root) {
+  const monCards = Object.entries(MONS_LIVE)
+    .map(
+      ([c, m]) => `<button type="button" class="mon-edit" data-monconst="${c}">
+        <img src="${SPRITE_BASE}/${esc(m.slug)}/front.png" style="width:40px;height:40px;image-rendering:pixelated" onerror="this.style.visibility='hidden'" />
+        ${esc(m.name)} <small style="color:var(--muted)">#${m.id}</small>
+      </button>`,
+    )
+    .join("");
+  const typeOptions = sel =>
+    `<option value=""${sel === "" ? " selected" : ""}>—</option>${MON_TYPES.map(t => `<option value="${t}"${sel === t ? " selected" : ""}>${t[0] + t.slice(1).toLowerCase()}</option>`).join("")}`;
+  root.innerHTML = `
+    <div class="section">
+      <h2>Existing custom mons</h2>
+      <p class="hint">Click one to load it into the form below (saving updates it). New mons get the next free id automatically.</p>
+      <div class="mon-list">${monCards || '<span class="dyn">none yet</span>'}</div>
+    </div>
+    <div class="section">
+      <h2>Mon editor</h2>
+      <div class="mon-form">
+        <fieldset><legend>Identity</legend>
+          <label>Name <input type="text" id="mon-name" maxlength="30" style="width:160px" /></label>
+          <label>Id <input type="number" id="mon-id" readonly style="width:80px;opacity:.6" value="${monNextId()}" /></label>
+          <label>Sprite folder <input type="text" id="mon-slug" style="width:170px" spellcheck="false" /></label>
+          <br /><label>Type 1 <select id="mon-type1">${typeOptions("NORMAL")}</select></label>
+          <label>Type 2 <select id="mon-type2">${typeOptions("")}</select></label>
+          <label>Catch rate <input type="number" id="mon-catch" min="1" max="255" value="45" /></label>
+        </fieldset>
+        <fieldset><legend>Base stats</legend>
+          ${STAT_LABELS.map((s, i) => `<label>${s} <input type="number" class="mon-stat" data-stat="${i}" min="1" max="255" value="50" /></label>`).join("")}
+          <span class="dyn" id="mon-bst"></span>
+        </fieldset>
+        <fieldset><legend>Abilities (up to 3 active + 3 innate, by name)</legend>
+          ${[1, 2, 3].map(i => `<label>Active ${i} <input type="text" class="mon-ab" id="mon-ab${i}" list="abilities-list" style="width:150px" /></label>`).join("")}
+          <br />${[1, 2, 3].map(i => `<label>Innate ${i} <input type="text" class="mon-ab" id="mon-in${i}" list="abilities-list" style="width:150px" /></label>`).join("")}
+        </fieldset>
+        <fieldset><legend>Starter & eggs</legend>
+          <label>Egg tier <select id="mon-eggtier">${EGG_TIER_NAMES.map((n, i) => `<option value="${i}">${n}</option>`).join("")}</select></label>
+          <label>Cost <input type="number" id="mon-cost" min="1" max="50" value="3" /></label>
+          <br />${[1, 2, 3, 4].map(i => `<label>Egg move ${i} <input type="text" class="mon-egg" list="moves-list" style="width:150px" spellcheck="false" /></label>`).join("")}
+        </fieldset>
+        <fieldset class="full"><legend>Level-up moves (one per line: "level: MOVE_NAME")</legend>
+          <textarea id="mon-levelmoves" rows="5" style="width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;font-family:ui-monospace,monospace;font-size:13px" spellcheck="false">1: TACKLE</textarea>
+        </fieldset>
+        <fieldset class="full"><legend>Sprites & shiny studio</legend>
+          <p class="hint">Upload the normal front + back (64×64 ish PNG with transparency). Optionally upload a tier-1 shiny; otherwise it is generated with the hue slider. Tier 2/3 shinies are always generated (tier 1 hue +120° / +240°). The icon uses the front sprite.</p>
+          <label>Front <input type="file" id="mon-file-front" accept="image/png" /></label>
+          <label>Back <input type="file" id="mon-file-back" accept="image/png" /></label>
+          <label>Shiny front (optional) <input type="file" id="mon-file-shinyf" accept="image/png" /></label>
+          <label>Shiny back (optional) <input type="file" id="mon-file-shinyb" accept="image/png" /></label>
+          <label>Shiny hue <input type="range" id="mon-hue" min="0" max="359" value="120" style="width:130px" /><span id="mon-hue-val">120°</span></label>
+          <div class="sprite-slots" id="mon-previews"></div>
+        </fieldset>
+        <div class="full" style="display:flex;gap:10px;align-items:center">
+          <button type="button" id="mon-save" class="primary">💾 Save mon (commits sprites + data)</button>
+          <button type="button" id="mon-clear">New blank mon</button>
+          <span class="dyn" id="mon-status"></span>
+        </div>
+      </div>
+    </div>`;
+  drawMonPreviews();
+  refreshMonBst();
+}
+
+function refreshMonBst() {
+  const el = $("#mon-bst");
+  if (el) {
+    const total = [...document.querySelectorAll(".mon-stat")].reduce((sum, i) => sum + (Number(i.value) || 0), 0);
+    el.textContent = `BST ${total}`;
+  }
+}
+
+/** The 8 battle sprites this mon ships, as {name, draw(ctx, img source)} rules. */
+function monSpriteFiles() {
+  const hue = Number($("#mon-hue")?.value ?? 120);
+  const t1f = monSprites.shinyFront ? { src: "shinyFront", hue: 0 } : { src: "front", hue };
+  const t1b = monSprites.shinyBack ? { src: "shinyBack", hue: 0 } : { src: "back", hue };
+  return [
+    { name: "front", src: "front", hue: 0 },
+    { name: "back", src: "back", hue: 0 },
+    { name: "shiny", ...t1f },
+    { name: "shiny-back", ...t1b },
+    { name: "shiny-2", src: t1f.src, hue: t1f.hue + 120 },
+    { name: "shiny-back-2", src: t1b.src, hue: t1b.hue + 120 },
+    { name: "shiny-3", src: t1f.src, hue: t1f.hue + 240 },
+    { name: "shiny-back-3", src: t1b.src, hue: t1b.hue + 240 },
+    { name: "icon", src: "front", hue: 0 },
+  ];
+}
+
+function drawSprite(canvas, img, hue) {
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.filter = hue % 360 === 0 ? "none" : `hue-rotate(${hue % 360}deg)`;
+  ctx.drawImage(img, 0, 0);
+}
+
+function drawMonPreviews() {
+  const wrap = $("#mon-previews");
+  if (!wrap) {
+    return;
+  }
+  wrap.innerHTML = monSpriteFiles()
+    .map(f => `<span class="sprite-slot"><canvas data-spritefile="${f.name}"></canvas>${f.name}.png</span>`)
+    .join("");
+  for (const f of monSpriteFiles()) {
+    const img = monSprites[f.src];
+    const canvas = wrap.querySelector(`canvas[data-spritefile="${f.name}"]`);
+    if (img && canvas) {
+      drawSprite(canvas, img, f.hue);
+    }
+  }
+}
+
+function monAtlasJson(name, w, h) {
+  return JSON.stringify({
+    textures: [
+      {
+        image: `${name}.png`,
+        format: "RGBA8888",
+        size: { w, h },
+        scale: 1,
+        frames: [
+          {
+            filename: "0001.png",
+            rotated: false,
+            trimmed: false,
+            sourceSize: { w, h },
+            spriteSourceSize: { x: 0, y: 0, w, h },
+            frame: { x: 0, y: 0, w, h },
+          },
+        ],
+      },
+    ],
+    meta: { app: "er-editor", version: "1.0" },
+  });
+}
+
+function loadMonIntoForm(speciesConst) {
+  const m = MONS_LIVE[speciesConst];
+  if (!m) {
+    return;
+  }
+  $("#mon-name").value = m.name;
+  $("#mon-id").value = m.id;
+  $("#mon-slug").value = m.slug;
+  $("#mon-type1").value = m.types?.[0] ?? "NORMAL";
+  $("#mon-type2").value = m.types?.[1] ?? "";
+  $("#mon-catch").value = m.catchRate ?? 45;
+  document.querySelectorAll(".mon-stat").forEach((inp, i) => {
+    inp.value = m.baseStats?.[i] ?? 50;
+  });
+  [1, 2, 3].forEach(i => {
+    $(`#mon-ab${i}`).value = m.abilities?.[i - 1] ?? "";
+    $(`#mon-in${i}`).value = m.innates?.[i - 1] ?? "";
+  });
+  $("#mon-eggtier").value = m.eggTier ?? 0;
+  $("#mon-cost").value = m.cost ?? 3;
+  document.querySelectorAll(".mon-egg").forEach((inp, i) => {
+    inp.value = m.eggMoves?.[i] ?? "";
+  });
+  $("#mon-levelmoves").value = (m.levelUpMoves ?? []).map(lm => `${lm.level}: ${lm.move}`).join("\n") || "1: TACKLE";
+  // Pull the existing sprites into the studio so previews show (jsDelivr sends CORS).
+  monSpritesDirty = false;
+  for (const [key, file] of [
+    ["front", "front"],
+    ["back", "back"],
+    ["shinyFront", "shiny"],
+    ["shinyBack", "shiny-back"],
+  ]) {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      monSprites[key] = img;
+      drawMonPreviews();
+    };
+    img.src = `${SPRITE_BASE}/${m.slug}/${file}.png`;
+  }
+  refreshMonBst();
+  $("#mon-status").textContent = `Editing ${m.name} - saving updates it in place.`;
+}
+
+function monSetStatus(msg, color) {
+  const el = $("#mon-status");
+  if (el) {
+    el.textContent = msg;
+    el.style.color = color || "var(--muted)";
+  }
+}
+
+async function saveMon() {
+  const password = ($("#password")?.value || "").trim();
+  if (!password) {
+    monSetStatus("Enter the editor password (top right) first.", ERR);
+    return;
+  }
+  const name = ($("#mon-name").value || "").trim();
+  if (!name) {
+    monSetStatus("Give the mon a name.", ERR);
+    return;
+  }
+  const speciesConst = constify(name);
+  const isUpdate = MONS_LIVE[speciesConst] !== undefined;
+  const slug = ($("#mon-slug").value || "").trim() || slugify(name);
+  if (!/^[a-z0-9-]{2,40}$/.test(slug)) {
+    monSetStatus("Sprite folder must be lowercase letters, digits and hyphens.", ERR);
+    return;
+  }
+  if (!isUpdate && (!monSprites.front || !monSprites.back)) {
+    monSetStatus("Upload a front AND a back sprite first.", ERR);
+    return;
+  }
+  const stats = [...document.querySelectorAll(".mon-stat")].map(i => Number(i.value));
+  if (stats.some(v => !Number.isInteger(v) || v < 1 || v > 255)) {
+    monSetStatus("Every base stat must be a whole number 1-255.", ERR);
+    return;
+  }
+  const levelMoves = [];
+  for (const line of $("#mon-levelmoves").value.split("\n")) {
+    const m = line.trim().match(/^(\d+)\s*[:-]\s*([A-Za-z0-9_ ]+)$/);
+    if (!m) {
+      if (line.trim() !== "") {
+        monSetStatus(`Could not read level-up move line: "${line.trim()}" (use "7: EMBER")`, ERR);
+        return;
+      }
+      continue;
+    }
+    const move = m[2].trim().toUpperCase().replace(/\s+/g, "_");
+    if (!MOVE_SET.has(move)) {
+      monSetStatus(`Unknown move "${move}" in level-up moves.`, ERR);
+      return;
+    }
+    levelMoves.push({ level: Number(m[1]), move });
+  }
+  const eggMoves = [...document.querySelectorAll(".mon-egg")].map(i => i.value.trim().toUpperCase()).filter(Boolean);
+  for (const m of eggMoves) {
+    if (!MOVE_SET.has(m)) {
+      monSetStatus(`Unknown egg move "${m}".`, ERR);
+      return;
+    }
+  }
+
+  const entry = {
+    id: isUpdate ? MONS_LIVE[speciesConst].id : Number($("#mon-id").value) || monNextId(),
+    name,
+    slug,
+    types: [$("#mon-type1").value || "NORMAL", $("#mon-type2").value || null],
+    baseStats: stats,
+    abilities: [1, 2, 3].map(i => $(`#mon-ab${i}`).value.trim()),
+    innates: [1, 2, 3].map(i => $(`#mon-in${i}`).value.trim()),
+    catchRate: Number($("#mon-catch").value) || 45,
+    eggTier: Number($("#mon-eggtier").value) || 0,
+    cost: Number($("#mon-cost").value) || 3,
+    levelUpMoves: levelMoves,
+    eggMoves,
+  };
+
+  try {
+    // 1) Sprites (only when new files are in the studio).
+    if (monSpritesDirty || !isUpdate) {
+      monSetStatus("Rendering + uploading sprites…");
+      const files = [];
+      for (const f of monSpriteFiles()) {
+        const img = monSprites[f.src];
+        if (!img) {
+          continue;
+        }
+        const canvas = document.createElement("canvas");
+        drawSprite(canvas, img, f.hue);
+        files.push({ name: `${f.name}.png`, contentBase64: canvas.toDataURL("image/png").split(",")[1] });
+        files.push({
+          name: `${f.name}.json`,
+          contentBase64: btoa(monAtlasJson(f.name, canvas.width, canvas.height)),
+        });
+      }
+      const upRes = await fetch(`${WORKER_URL}/upload-assets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, slug, files, author: $("#author").value }),
+      });
+      const upData = await upRes.json().catch(() => ({}));
+      if (!upRes.ok || !upData.ok) {
+        monSetStatus(`Sprite upload failed: ${upData.error || upRes.status}`, ERR);
+        return;
+      }
+    }
+    // 2) The mon entry itself.
+    monSetStatus("Saving mon data…");
+    const res = await fetch(`${WORKER_URL}/save`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        password,
+        file: "custom-mons",
+        delta: { [speciesConst]: entry },
+        author: $("#author").value,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      monSetStatus(`Save failed: ${data.error || res.status}`, ERR);
+      return;
+    }
+    MONS_LIVE[speciesConst] = entry;
+    monSpritesDirty = false;
+    monSetStatus(`Saved ✓ ${name} (#${entry.id}). It joins the game on the next deploy.`, "var(--ok)");
+    setStatus(`Custom mon ${name} saved ✓ - use "Commit & Deploy" when you want it live on staging.`, "var(--ok)");
+  } catch (err) {
+    monSetStatus(`Error: ${err}`, ERR);
+  }
+}
+
 // ---- Render dispatch --------------------------------------------------------------
 function render() {
   const root = $("#content");
@@ -565,6 +1003,8 @@ function render() {
     renderItems(root);
   } else if (activeTab === "trainers") {
     renderTrainers(root);
+  } else if (activeTab === "addmon") {
+    renderAddMon(root);
   } else {
     renderGame(root);
   }
@@ -614,6 +1054,38 @@ function onInput(e) {
     }
     item.current[k] = cur;
     el.closest(".card").classList.toggle("dirty", !jsonEq(item.current[k], item.baseline[k]));
+  } else if (el.id === "mon-name") {
+    const slugEl = $("#mon-slug");
+    if (slugEl && (slugEl.value === "" || slugEl.value === slugify(el.dataset.prev || ""))) {
+      slugEl.value = slugify(el.value);
+    }
+    el.dataset.prev = el.value;
+    return; // no global dirty tracking - the mon form has its own save button
+  } else if (el.classList.contains("mon-stat")) {
+    refreshMonBst();
+    return;
+  } else if (el.id === "mon-hue") {
+    const hueLabel = $("#mon-hue-val");
+    if (hueLabel) {
+      hueLabel.textContent = `${el.value}°`;
+    }
+    monSpritesDirty = true;
+    drawMonPreviews();
+    return;
+  } else if (el.classList.contains("set-move") || el.classList.contains("set-slot")) {
+    const sets = ensureSetOverride(el.dataset.setconst);
+    const set = sets[Number(el.dataset.setidx)];
+    if (!set) {
+      return;
+    }
+    if (el.classList.contains("set-move")) {
+      const value = el.value.trim().toUpperCase();
+      el.value = value;
+      set.moves[Number(el.dataset.slot)] = value;
+      el.style.borderColor = value === "" || MOVE_SET.has(value) ? "" : ERR;
+    } else {
+      set.abilitySlot = Number(el.value);
+    }
   } else if (el.classList.contains("tr-knob")) {
     // The box shows the EFFECTIVE value; typing the default back removes the override.
     const def = TRAINER_DEFAULTS[el.dataset.diff]?.[el.dataset.knob];
@@ -684,9 +1156,9 @@ function onInput(e) {
 
 // Click targets on the Trainers tab (toggle cards, knob resets, filter chips).
 function onClick(e) {
-  const fac = e.target.closest(".factory-item");
-  if (fac) {
-    const c = fac.dataset.facconst;
+  const facToggle = e.target.closest(".toggle[data-facconst]");
+  if (facToggle) {
+    const c = facToggle.dataset.facconst;
     const set = new Set(tr.current.excluded);
     if (set.has(c)) {
       set.delete(c);
@@ -694,6 +1166,36 @@ function onClick(e) {
       set.add(c);
     }
     tr.current.excluded = [...set].sort();
+    render();
+    return;
+  }
+  const setDel = e.target.closest(".set-del");
+  if (setDel) {
+    ensureSetOverride(setDel.dataset.setconst).splice(Number(setDel.dataset.setidx), 1);
+    normalizeSetOverride(setDel.dataset.setconst);
+    render();
+    return;
+  }
+  const setAdd = e.target.closest(".set-add");
+  if (setAdd) {
+    ensureSetOverride(setAdd.dataset.setconst).push({ moves: ["", "", "", ""], abilitySlot: 0 });
+    render();
+    return;
+  }
+  const setReset = e.target.closest(".set-reset");
+  if (setReset) {
+    delete trSets.current[setReset.dataset.setconst];
+    render();
+    return;
+  }
+  const facOpen = e.target.closest("[data-facopen]");
+  if (facOpen) {
+    const c = facOpen.dataset.facopen;
+    if (expandedFactory.has(c)) {
+      expandedFactory.delete(c);
+    } else {
+      expandedFactory.add(c);
+    }
     render();
     return;
   }
@@ -725,7 +1227,41 @@ function onClick(e) {
       bal.current[balMapReset.dataset.balkey] = cur;
     }
     render();
+    return;
   }
+  // Add-a-Mon buttons.
+  const monEdit = e.target.closest(".mon-edit");
+  if (monEdit) {
+    loadMonIntoForm(monEdit.dataset.monconst);
+    return;
+  }
+  if (e.target.closest("#mon-save")) {
+    saveMon();
+    return;
+  }
+  if (e.target.closest("#mon-clear")) {
+    monSprites.front = null;
+    monSprites.back = null;
+    monSprites.shinyFront = null;
+    monSprites.shinyBack = null;
+    monSpritesDirty = false;
+    render();
+  }
+}
+
+/** Read an uploaded PNG into an Image for the sprite studio. */
+function readMonSpriteFile(input, key) {
+  const file = input.files?.[0];
+  if (!file) {
+    return;
+  }
+  const img = new Image();
+  img.onload = () => {
+    monSprites[key] = img;
+    monSpritesDirty = true;
+    drawMonPreviews();
+  };
+  img.src = URL.createObjectURL(file);
 }
 
 // ---- Delta building -----------------------------------------------------------------
@@ -858,6 +1394,42 @@ function buildDeltas() {
     }
     if (!jsonEq(tr.current.excluded, tr.baseline.excluded)) {
       trDelta.sets = { factoryExcludeSpecies: tr.current.excluded };
+    }
+    // Factory set overrides: changed species only; reverting to shipped sends null.
+    const setOverrides = {};
+    const allSetConsts = new Set([...Object.keys(trSets.current), ...Object.keys(trSets.baseline)]);
+    for (const c of allSetConsts) {
+      const cur = trSets.current[c];
+      if (jsonEq(cur, trSets.baseline[c])) {
+        continue;
+      }
+      if (cur === undefined) {
+        setOverrides[c] = null;
+        continue;
+      }
+      const cleaned = [];
+      let setBad = false;
+      for (const set of cur) {
+        const moves = set.moves.map(m => (m || "").trim().toUpperCase()).filter(Boolean);
+        if (moves.length === 0) {
+          bad.push(`${c.replace(/^SPECIES_/, "")}: a factory set needs at least 1 move`);
+          setBad = true;
+          break;
+        }
+        for (const m of moves) {
+          if (!MOVE_SET.has(m)) {
+            bad.push(`${c.replace(/^SPECIES_/, "")}: unknown move "${m}"`);
+            setBad = true;
+          }
+        }
+        cleaned.push({ moves, abilitySlot: set.abilitySlot });
+      }
+      if (!setBad) {
+        setOverrides[c] = cleaned;
+      }
+    }
+    if (Object.keys(setOverrides).length > 0) {
+      trDelta.sets = { ...(trDelta.sets || {}), factorySetOverrides: setOverrides };
     }
     if (Object.keys(trDelta).length > 0) {
       deltas["trainer-tuning"] = trDelta;
@@ -1009,6 +1581,7 @@ function markSaved(file) {
     item.baseline = JSON.parse(JSON.stringify(item.current));
   } else if (file === "trainer-tuning") {
     tr.baseline = JSON.parse(JSON.stringify(tr.current));
+    trSets.baseline = JSON.parse(JSON.stringify(trSets.current));
   } else if (file === "balance-tuning") {
     bal.baseline = JSON.parse(JSON.stringify(bal.current));
   }
@@ -1023,25 +1596,30 @@ const fetchJson = (url, fallback) =>
 async function init() {
   try {
     const bust = `?t=${Date.now()}`;
-    const [species, moves, items, trainers, knobs, eggLive, spLive, itemLive, trLive, balLive] = await Promise.all([
-      fetch("./data/species.json").then(r => r.json()),
-      fetch("./data/moves.json").then(r => r.json()),
-      fetchJson("./data/items.json", []),
-      fetchJson("./data/trainers.json", { frequencyDefaults: { elite: {}, hell: {} }, factorySpecies: [] }),
-      fetchJson("./data/balance-knobs.json", []),
-      // Live override files (resilient: missing on the branch → start empty).
-      fetchJson(`${RAW_BASE}/er-egg-moves.json${bust}`, {}),
-      fetchJson(`${RAW_BASE}/er-species-tuning.json${bust}`, {}),
-      fetchJson(`${RAW_BASE}/er-item-tuning.json${bust}`, {}),
-      fetchJson(`${RAW_BASE}/er-trainer-tuning.json${bust}`, {}),
-      fetchJson(`${RAW_BASE}/er-balance-tuning.json${bust}`, {}),
-    ]);
+    const [species, moves, items, trainers, knobs, abilities, eggLive, spLive, itemLive, trLive, balLive, monsLive] =
+      await Promise.all([
+        fetch("./data/species.json").then(r => r.json()),
+        fetch("./data/moves.json").then(r => r.json()),
+        fetchJson("./data/items.json", []),
+        fetchJson("./data/trainers.json", { frequencyDefaults: { elite: {}, hell: {} }, factorySpecies: [] }),
+        fetchJson("./data/balance-knobs.json", []),
+        fetchJson("./data/abilities.json", []),
+        // Live override files (resilient: missing on the branch → start empty).
+        fetchJson(`${RAW_BASE}/er-egg-moves.json${bust}`, {}),
+        fetchJson(`${RAW_BASE}/er-species-tuning.json${bust}`, {}),
+        fetchJson(`${RAW_BASE}/er-item-tuning.json${bust}`, {}),
+        fetchJson(`${RAW_BASE}/er-trainer-tuning.json${bust}`, {}),
+        fetchJson(`${RAW_BASE}/er-balance-tuning.json${bust}`, {}),
+        fetchJson(`${RAW_BASE}/er-custom-mons.json${bust}`, {}),
+      ]);
     SPECIES = species;
     MOVES = moves;
     ITEMS = items;
     TRAINER_DEFAULTS = trainers.frequencyDefaults;
     FACTORY_SPECIES = trainers.factorySpecies;
     KNOBS = knobs;
+    ABILITY_NAMES = abilities;
+    MONS_LIVE = monsLive;
 
     // Seed balance-knob overrides from the live tuning file (only keys that
     // are still in the registry; map overrides keep just their own entries).
@@ -1097,12 +1675,27 @@ async function init() {
       excluded: [...(trLive.sets?.factoryExcludeSpecies || [])].sort(),
     };
     tr.baseline = JSON.parse(JSON.stringify(tr.current));
+    // Live factory-set overrides (only entries whose species we can show).
+    for (const [c, sets] of Object.entries(trLive.sets?.factorySetOverrides || {})) {
+      if (Array.isArray(sets)) {
+        trSets.current[c] = sets.map(set => ({
+          moves: [...(set.moves || []), "", "", "", ""].slice(0, 4),
+          abilitySlot: set.abilitySlot ?? 0,
+        }));
+      }
+    }
+    trSets.baseline = JSON.parse(JSON.stringify(trSets.current));
 
     // One shared datalist for all move inputs (light + searchable).
     const dl = document.createElement("datalist");
     dl.id = "moves-list";
     dl.innerHTML = MOVES.map(m => `<option value="${m}">${prettify(m)}</option>`).join("");
     document.body.appendChild(dl);
+    // Ability names for the Add-a-Mon autocomplete.
+    const adl = document.createElement("datalist");
+    adl.id = "abilities-list";
+    adl.innerHTML = ABILITY_NAMES.map(a => `<option value="${esc(a)}"></option>`).join("");
+    document.body.appendChild(adl);
 
     render();
     setStatus(`${SPECIES.length} species, ${ITEMS.length} items loaded.`);
@@ -1126,6 +1719,17 @@ async function init() {
     content.addEventListener("change", e => {
       if (e.target.classList.contains("slot")) {
         pushUndoIfChanged(e.target.dataset.const);
+      } else if (e.target.id === "mon-file-front") {
+        readMonSpriteFile(e.target, "front");
+      } else if (e.target.id === "mon-file-back") {
+        readMonSpriteFile(e.target, "back");
+      } else if (e.target.id === "mon-file-shinyf") {
+        readMonSpriteFile(e.target, "shinyFront");
+      } else if (e.target.id === "mon-file-shinyb") {
+        readMonSpriteFile(e.target, "shinyBack");
+      } else if (e.target.classList.contains("set-move") || e.target.classList.contains("set-slot")) {
+        normalizeSetOverride(e.target.dataset.setconst);
+        render();
       } else if (
         e.target.classList.contains("tr-knob")
         || e.target.classList.contains("bal-num")

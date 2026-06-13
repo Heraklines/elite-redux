@@ -19,16 +19,18 @@
 //   editor/data/trainers.json — frequency-knob defaults + factory species list
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
-import { allSpecies } from "#data/data-lists";
+import { allAbilities, allSpecies } from "#data/data-lists";
 import { ER_BALANCE_KNOBS } from "#data/elite-redux/er-balance-knobs";
 import { ER_TRAINER_CADENCE } from "#data/elite-redux/er-battle-frequency";
 import { ER_FACTORY_SETS } from "#data/elite-redux/er-factory-sets";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
 import { ER_SPRITE_MANIFEST } from "#data/elite-redux/er-sprite-manifest";
 import { ER_FACTORY_TEAM_CHANCE_PCT } from "#data/elite-redux/er-trainer-runtime-hook";
 import type { EggTier } from "#enums/egg-type";
 import { ModifierTier } from "#enums/modifier-tier";
+import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { modifierPool } from "#modifiers/modifier-pools";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -160,13 +162,48 @@ describe("tools — dump editor SPA data", () => {
     }
 
     // ---- trainers.json ------------------------------------------------------
-    const setCountByDraftId = new Map<number, number>();
-    for (const [draftId] of ER_FACTORY_SETS) {
-      setCountByDraftId.set(draftId, (setCountByDraftId.get(draftId) ?? 0) + 1);
+    // pokerogue move id → enum-style NAME (the key space the editor validates
+    // against): vanilla from the MoveId enum, ER customs from the move drafts.
+    const moveNameById = new Map<number, string>();
+    for (const [name, value] of Object.entries(MoveId)) {
+      if (typeof value === "number") {
+        moveNameById.set(value, name);
+      }
+    }
+    for (const draft of ER_MOVES) {
+      const pkrgId = ER_ID_MAP.moves[draft.id];
+      if (pkrgId === undefined || moveNameById.has(pkrgId)) {
+        continue;
+      }
+      const key = draft.name
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+      if (key) {
+        moveNameById.set(pkrgId, key);
+      }
+    }
+
+    const setsByDraftId = new Map<number, { moves: string[]; abilitySlot: number }[]>();
+    for (const [draftId, erMoves, abilitySlot] of ER_FACTORY_SETS) {
+      const moves = erMoves
+        .map(m => ER_ID_MAP.moves[m])
+        .filter((id): id is number => id !== undefined)
+        .map(id => moveNameById.get(id))
+        .filter((n): n is string => n !== undefined);
+      const list = setsByDraftId.get(draftId) ?? [];
+      list.push({ moves, abilitySlot });
+      setsByDraftId.set(draftId, list);
     }
     const draftById = new Map(ER_SPECIES.map(d => [d.id, d]));
-    const factorySpecies: { const: string; name: string; slug: string | null; sets: number }[] = [];
-    for (const [draftId, sets] of setCountByDraftId) {
+    const factorySpecies: {
+      const: string;
+      name: string;
+      slug: string | null;
+      sets: number;
+      setsDetail: { moves: string[]; abilitySlot: number }[];
+    }[] = [];
+    for (const [draftId, setsDetail] of setsByDraftId) {
       const draft = draftById.get(draftId);
       const pkrgId = ER_ID_MAP.species[draftId];
       if (!draft || pkrgId === undefined || !getPokemonSpecies(pkrgId)) {
@@ -176,7 +213,8 @@ describe("tools — dump editor SPA data", () => {
         const: draft.speciesConst,
         name: getPokemonSpecies(pkrgId)?.name ?? draft.name,
         slug: slugByConst.get(draft.speciesConst) ?? null,
-        sets,
+        sets: setsDetail.length,
+        setsDetail,
       });
     }
     factorySpecies.sort((a, b) => a.name.localeCompare(b.name));
@@ -193,6 +231,12 @@ describe("tools — dump editor SPA data", () => {
     writeFileSync("editor/data/trainers.json", `${JSON.stringify(trainers, null, 2)}\n`, "utf8");
     // The Game tab renders straight from the knob registry (single source of truth).
     writeFileSync("editor/data/balance-knobs.json", `${JSON.stringify(ER_BALANCE_KNOBS, null, 2)}\n`, "utf8");
+
+    // Ability display names (vanilla + ER customs) for the Add-a-Mon autocomplete.
+    const abilityNames = [
+      ...new Set(allAbilities.filter(a => a && a.id > 0 && a.name && !a.name.startsWith("???")).map(a => a.name)),
+    ].sort();
+    writeFileSync("editor/data/abilities.json", `${JSON.stringify(abilityNames, null, 2)}\n`, "utf8");
 
     // Sanity: the roster covers every starter-cost entry that is a real species,
     // includes vanilla + ER customs, and lost nobody to a missing const key.

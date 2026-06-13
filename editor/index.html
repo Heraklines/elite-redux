@@ -127,6 +127,33 @@
       .map-rows { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 280px; }
       .map-rows .map-row { display: flex; gap: 8px; align-items: center; }
       .map-rows .map-row .mkey { width: 140px; color: var(--muted); font-size: 12px; }
+      /* Factory set editor */
+      .factory-wrap { display: flex; flex-direction: column; gap: 0; }
+      .factory-item .toggle { margin-left: auto; flex: none; font-size: 11px; font-weight: 700; }
+      .factory-item .toggle.in { color: var(--ok); border-color: var(--ok); }
+      .factory-item .toggle.out-b { color: #e0556a; border-color: #e0556a; }
+      .set-panel {
+        background: var(--panel2); border: 1px solid var(--line); border-top: none;
+        border-radius: 0 0 8px 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px;
+      }
+      .set-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+      .set-row input.set-move { width: 150px; padding: 4px 6px; font-size: 12px; }
+      .set-row select.set-slot { padding: 4px 6px; font-size: 12px; }
+      .set-row button { padding: 3px 8px; font-size: 12px; }
+      .set-actions { display: flex; gap: 8px; align-items: center; }
+      .badge.edited { color: var(--warn); border-color: var(--warn); }
+      /* Add a Mon */
+      .mon-form { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; max-width: 1100px; }
+      .mon-form .full { grid-column: 1 / -1; }
+      .mon-form fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+      .mon-form legend { color: var(--muted); font-size: 12px; padding: 0 6px; }
+      .mon-form label { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; margin: 4px 10px 4px 0; }
+      .mon-form input[type="number"] { width: 70px; }
+      .sprite-slots { display: flex; gap: 12px; flex-wrap: wrap; }
+      .sprite-slot { display: flex; flex-direction: column; gap: 4px; align-items: center; font-size: 11px; color: var(--muted); }
+      .sprite-slot canvas { width: 96px; height: 96px; image-rendering: pixelated; background: #0d0d14; border: 1px solid var(--line); border-radius: 6px; }
+      .mon-list { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); margin-top: 8px; }
+      .mon-list button { display: flex; gap: 8px; align-items: center; text-align: left; }
     </style>
   </head>
   <body>
@@ -153,6 +180,7 @@
       <button type="button" data-tab="items">🎒 Items</button>
       <button type="button" data-tab="trainers">🤺 Trainers</button>
       <button type="button" data-tab="game">🎛 Game</button>
+      <button type="button" data-tab="addmon">➕ Add a Mon</button>
     </nav>
     <main id="content"></main>
     <script src="./app.js"></script>

@@ -9,7 +9,9 @@ deploy. Four tabs:
 | 🥚 Egg Moves | 4 egg moves per species | `src/data/elite-redux/er-egg-moves.json` |
 | 📊 Species | egg rarity tier + starter cost | `src/data/elite-redux/er-species-tuning.json` |
 | 🎒 Items | reward-pool tier, weight, ER item stack caps | `src/data/elite-redux/er-item-tuning.json` |
-| 🤺 Trainers | Elite/Hell battle-frequency knobs + factory set membership | `src/data/elite-redux/er-trainer-tuning.json` |
+| 🤺 Trainers | Elite/Hell frequency knobs + factory set membership AND the sets themselves (click a species card to view/edit its 4-move sets) | `src/data/elite-redux/er-trainer-tuning.json` |
+| 🎛 Game | 62 validated balance knobs (shiny/candy/eggs/money/curves...) | `src/data/elite-redux/er-balance-tuning.json` |
+| ➕ Add a Mon | whole new species: stats, types, abilities, moves, cost - plus a sprite studio that generates tier-2/3 shinies by hue rotation from an uploaded front/back | `src/data/elite-redux/er-custom-mons.json` + sprites committed to `Heraklines/er-assets` |
 
 How it fits together:
 
@@ -62,10 +64,17 @@ affects NEW species/items, not current values.
 
 ### 1. Create a GitHub token (the only secret you must make)
 
-A **fine-grained PAT** on `Heraklines/elite-redux` with:
+A **fine-grained PAT** covering BOTH `Heraklines/elite-redux` AND
+`Heraklines/er-assets` with:
 
-- **Contents: Read & write** (to commit the JSON)
-- **Actions: Read & write** (so the deploy button can fire the workflow)
+- **Contents: Read & write** (to commit the JSON, and the Add-a-Mon sprites
+  into er-assets)
+- **Actions: Read & write** on elite-redux (so the deploy button can fire the
+  workflow)
+
+If the PAT only covers elite-redux, everything works EXCEPT Add-a-Mon's sprite
+upload (it fails with "assets repo read failed: 404" until the token is
+extended).
 
 ### 2. Add the deploy workflow's repo config
 

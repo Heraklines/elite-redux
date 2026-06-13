@@ -46,6 +46,11 @@ interface Env {
   GITHUB_WORKFLOW_FILE?: string;
   EDITOR_PASSWORD: string;
   ALLOWED_ORIGIN: string;
+  /** Sprite asset repo for /upload-assets (default "Heraklines/er-assets").
+   * The GITHUB_TOKEN PAT must ALSO have Contents read+write on this repo. */
+  ASSETS_REPO?: string;
+  /** Branch of ASSETS_REPO to commit sprites to (default "main"). */
+  ASSETS_BRANCH?: string;
 }
 
 const DEFAULT_WORKFLOW_FILE = "deploy-staging.yml";
@@ -210,15 +215,56 @@ function validateTrainerTuningDelta(delta: unknown): ValidationResult {
       if (!isPlainObject(value)) {
         return { ok: false, error: "sets: must be an object or null" };
       }
-      for (const [field, listValue] of Object.entries(value)) {
-        if (field !== "factoryExcludeSpecies") {
+      for (const [field, fieldValue] of Object.entries(value)) {
+        if (field === "factoryExcludeSpecies") {
+          if (fieldValue === null) {
+            continue;
+          }
+          if (!Array.isArray(fieldValue) || fieldValue.some(s => typeof s !== "string" || !SPECIES_CONST_RE.test(s))) {
+            return { ok: false, error: "sets.factoryExcludeSpecies: must be a list of SPECIES_* consts or null" };
+          }
+        } else if (field === "factorySetOverrides") {
+          if (fieldValue === null) {
+            continue;
+          }
+          if (!isPlainObject(fieldValue)) {
+            return { ok: false, error: "sets.factorySetOverrides: must be an object or null" };
+          }
+          for (const [speciesKey, sets] of Object.entries(fieldValue)) {
+            if (!SPECIES_CONST_RE.test(speciesKey)) {
+              return { ok: false, error: `factorySetOverrides: bad species key ${speciesKey}` };
+            }
+            if (sets === null) {
+              continue; // back to the shipped sets
+            }
+            if (!Array.isArray(sets) || sets.length > 10) {
+              return { ok: false, error: `${speciesKey}: must be a list of up to 10 sets or null` };
+            }
+            for (const set of sets) {
+              if (!isPlainObject(set)) {
+                return { ok: false, error: `${speciesKey}: each set must be an object` };
+              }
+              const moves = (set as { moves?: unknown }).moves;
+              const abilitySlot = (set as { abilitySlot?: unknown }).abilitySlot;
+              if (
+                !Array.isArray(moves)
+                || moves.length === 0
+                || moves.length > 4
+                || moves.some(m => typeof m !== "string" || !/^[A-Z0-9_]+$/.test(m))
+              ) {
+                return { ok: false, error: `${speciesKey}: each set needs 1-4 move names` };
+              }
+              if (abilitySlot !== 0 && abilitySlot !== 1 && abilitySlot !== 2) {
+                return { ok: false, error: `${speciesKey}: abilitySlot must be 0, 1 or 2` };
+              }
+              const extras = Object.keys(set).filter(k => k !== "moves" && k !== "abilitySlot");
+              if (extras.length > 0) {
+                return { ok: false, error: `${speciesKey}: unknown set field "${extras[0]}"` };
+              }
+            }
+          }
+        } else {
           return { ok: false, error: `sets: unknown field "${field}"` };
-        }
-        if (listValue === null) {
-          continue;
-        }
-        if (!Array.isArray(listValue) || listValue.some(s => typeof s !== "string" || !SPECIES_CONST_RE.test(s))) {
-          return { ok: false, error: "sets.factoryExcludeSpecies: must be a list of SPECIES_* consts or null" };
         }
       }
     } else {
@@ -305,7 +351,99 @@ const EDITABLE_FILES: Record<string, EditableFile> = {
     label: "balance tuning",
     validate: validateBalanceTuningDelta,
   },
+  "custom-mons": {
+    path: "src/data/elite-redux/er-custom-mons.json",
+    label: "custom mons",
+    validate: validateCustomMonsDelta,
+  },
 };
+
+/** speciesConst → editor-created mon entry (null deletes the mon). */
+function validateCustomMonsDelta(delta: unknown): ValidationResult {
+  if (!isPlainObject(delta)) {
+    return { ok: false, error: "delta must be an object" };
+  }
+  const isName = (v: unknown): boolean => typeof v === "string" && /^[A-Z0-9_]{1,60}$/.test(v);
+  for (const [key, mon] of Object.entries(delta)) {
+    if (!SPECIES_CONST_RE.test(key)) {
+      return { ok: false, error: `bad species key: ${key}` };
+    }
+    if (mon === null) {
+      continue;
+    }
+    if (!isPlainObject(mon)) {
+      return { ok: false, error: `${key}: must be an object or null` };
+    }
+    const m = mon as Record<string, unknown>;
+    if (!Number.isInteger(m.id) || (m.id as number) < 60000 || (m.id as number) > 69999) {
+      return { ok: false, error: `${key}: id must be 60000-69999` };
+    }
+    if (typeof m.name !== "string" || m.name.trim().length === 0 || m.name.length > 30) {
+      return { ok: false, error: `${key}: name must be 1-30 chars` };
+    }
+    if (typeof m.slug !== "string" || !/^[a-z0-9-]{2,40}$/.test(m.slug)) {
+      return { ok: false, error: `${key}: slug must be lowercase letters/digits/hyphens` };
+    }
+    if (
+      !Array.isArray(m.baseStats)
+      || m.baseStats.length !== 6
+      || m.baseStats.some(v => !Number.isInteger(v) || (v as number) < 1 || (v as number) > 255)
+    ) {
+      return { ok: false, error: `${key}: baseStats must be 6 integers 1-255` };
+    }
+    if (!Array.isArray(m.types) || m.types.length !== 2 || !isName(m.types[0])) {
+      return { ok: false, error: `${key}: types must be [PRIMARY, SECONDARY|null]` };
+    }
+    if (m.types[1] !== null && !isName(m.types[1])) {
+      return { ok: false, error: `${key}: secondary type must be a type name or null` };
+    }
+    for (const field of ["abilities", "innates"]) {
+      if (m[field] !== undefined) {
+        const list = m[field];
+        if (!Array.isArray(list) || list.length > 3 || list.some(v => typeof v !== "string" || v.length > 40)) {
+          return { ok: false, error: `${key}: ${field} must be up to 3 ability names` };
+        }
+      }
+    }
+    if (
+      m.catchRate !== undefined
+      && !(Number.isInteger(m.catchRate) && (m.catchRate as number) >= 1 && (m.catchRate as number) <= 255)
+    ) {
+      return { ok: false, error: `${key}: catchRate must be 1-255` };
+    }
+    if (
+      m.eggTier !== undefined
+      && !(Number.isInteger(m.eggTier) && (m.eggTier as number) >= 0 && (m.eggTier as number) <= 3)
+    ) {
+      return { ok: false, error: `${key}: eggTier must be 0-3` };
+    }
+    if (m.cost !== undefined && !(Number.isInteger(m.cost) && (m.cost as number) >= 1 && (m.cost as number) <= 50)) {
+      return { ok: false, error: `${key}: cost must be 1-50` };
+    }
+    if (
+      m.levelUpMoves !== undefined
+      && (!Array.isArray(m.levelUpMoves)
+        || m.levelUpMoves.length > 40
+        || m.levelUpMoves.some(
+          lm =>
+            !isPlainObject(lm)
+            || !Number.isInteger((lm as { level?: unknown }).level)
+            || ((lm as { level: number }).level as number) < 1
+            || ((lm as { level: number }).level as number) > 100
+            || !isName((lm as { move?: unknown }).move),
+        ))
+    ) {
+      return { ok: false, error: `${key}: levelUpMoves must be up to 40 {level 1-100, move NAME} rows` };
+    }
+    if (
+      m.eggMoves !== undefined
+      && (!Array.isArray(m.eggMoves) || m.eggMoves.length > 4 || m.eggMoves.some(v => !isName(v)))
+    ) {
+      return { ok: false, error: `${key}: eggMoves must be up to 4 move names` };
+    }
+  }
+  return { ok: true };
+}
 
 /**
  * Deep-merge `delta` into `base` (both plain objects):
@@ -485,6 +623,121 @@ async function handleSave(body: SaveBody, env: Env): Promise<Response> {
   );
 }
 
+const ASSET_FILE_RE = /^(front|back|shiny|shiny-back|shiny-2|shiny-back-2|shiny-3|shiny-back-3|icon)\.(png|json)$/;
+
+interface UploadAssetsBody {
+  password?: string;
+  slug?: string;
+  files?: { name?: string; contentBase64?: string }[];
+  author?: string;
+}
+
+/**
+ * Commit a custom mon's sprite files to the ASSETS repo
+ * (images/pokemon/elite-redux/<slug>/...) as ONE commit via the Git Data API.
+ * Only the fixed sprite filenames are accepted. Requires the PAT to cover the
+ * assets repo (Contents read+write) — without it GitHub answers 404.
+ */
+async function handleUploadAssets(body: UploadAssetsBody, env: Env): Promise<Response> {
+  if (env.EDITOR_PASSWORD && body.password !== env.EDITOR_PASSWORD) {
+    return json({ ok: false, error: "unauthorized" }, 401, env);
+  }
+  const slug = body.slug ?? "";
+  if (!/^[a-z0-9-]{2,40}$/.test(slug)) {
+    return json({ ok: false, error: "bad slug" }, 400, env);
+  }
+  const files = body.files ?? [];
+  if (!Array.isArray(files) || files.length === 0 || files.length > 24) {
+    return json({ ok: false, error: "1-24 files required" }, 400, env);
+  }
+  for (const file of files) {
+    if (typeof file.name !== "string" || !ASSET_FILE_RE.test(file.name)) {
+      return json({ ok: false, error: `bad file name: ${String(file.name)}` }, 400, env);
+    }
+    if (
+      typeof file.contentBase64 !== "string"
+      || file.contentBase64.length === 0
+      || file.contentBase64.length > 2_000_000
+    ) {
+      return json({ ok: false, error: `${file.name}: content missing or over ~1.5MB` }, 400, env);
+    }
+  }
+
+  const repo = env.ASSETS_REPO || "Heraklines/er-assets";
+  const branch = env.ASSETS_BRANCH || "main";
+  const api = `https://api.github.com/repos/${repo}`;
+  const headers = { ...ghHeaders(env), "Content-Type": "application/json" };
+
+  // Current branch head + its tree.
+  const refRes = await fetch(`${api}/git/ref/heads/${branch}`, { headers: ghHeaders(env) });
+  if (!refRes.ok) {
+    return json(
+      { ok: false, error: `assets repo read failed: ${refRes.status} (does the PAT cover ${repo}?)` },
+      502,
+      env,
+    );
+  }
+  const ref = (await refRes.json()) as { object: { sha: string } };
+  const headSha = ref.object.sha;
+  const commitRes = await fetch(`${api}/git/commits/${headSha}`, { headers: ghHeaders(env) });
+  if (!commitRes.ok) {
+    return json({ ok: false, error: `assets commit read failed: ${commitRes.status}` }, 502, env);
+  }
+  const headCommit = (await commitRes.json()) as { tree: { sha: string } };
+
+  // One blob per file, then one tree, one commit, one ref update.
+  const treeEntries: { path: string; mode: string; type: string; sha: string }[] = [];
+  for (const file of files) {
+    const blobRes = await fetch(`${api}/git/blobs`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ content: file.contentBase64, encoding: "base64" }),
+    });
+    if (!blobRes.ok) {
+      return json({ ok: false, error: `blob create failed for ${file.name}: ${blobRes.status}` }, 502, env);
+    }
+    const blob = (await blobRes.json()) as { sha: string };
+    treeEntries.push({
+      path: `images/pokemon/elite-redux/${slug}/${file.name}`,
+      mode: "100644",
+      type: "blob",
+      sha: blob.sha,
+    });
+  }
+  const treeRes = await fetch(`${api}/git/trees`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ base_tree: headCommit.tree.sha, tree: treeEntries }),
+  });
+  if (!treeRes.ok) {
+    return json({ ok: false, error: `tree create failed: ${treeRes.status}` }, 502, env);
+  }
+  const tree = (await treeRes.json()) as { sha: string };
+  const author = typeof body.author === "string" ? body.author.slice(0, 40).replace(/[^\w .-]/g, "") : "";
+  const newCommitRes = await fetch(`${api}/git/commits`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      message: `editor: sprites for ${slug}${author ? ` (by ${author})` : ""}`,
+      tree: tree.sha,
+      parents: [headSha],
+    }),
+  });
+  if (!newCommitRes.ok) {
+    return json({ ok: false, error: `commit create failed: ${newCommitRes.status}` }, 502, env);
+  }
+  const newCommit = (await newCommitRes.json()) as { sha: string };
+  const updateRes = await fetch(`${api}/git/refs/heads/${branch}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ sha: newCommit.sha, force: false }),
+  });
+  if (!updateRes.ok) {
+    return json({ ok: false, error: `ref update failed: ${updateRes.status}` }, 502, env);
+  }
+  return json({ ok: true, commit: newCommit.sha, files: files.length }, 200, env);
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -522,6 +775,16 @@ export default {
         return json({ ok: false, error: "invalid JSON body" }, 400, env);
       }
       return handleSave(body, env);
+    }
+
+    if (url.pathname === "/upload-assets" && request.method === "POST") {
+      let body: UploadAssetsBody;
+      try {
+        body = (await request.json()) as UploadAssetsBody;
+      } catch {
+        return json({ ok: false, error: "invalid JSON body" }, 400, env);
+      }
+      return handleUploadAssets(body, env);
     }
 
     // Back-compat: the original egg-move route ({ eggMoves } instead of

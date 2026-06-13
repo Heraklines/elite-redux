@@ -19,8 +19,12 @@ GITHUB_REPO = "Heraklines/elite-redux"
 GITHUB_BRANCH = "feat/elite-redux-port"
 GITHUB_WORKFLOW_FILE = "deploy-staging.yml"
 ALLOWED_ORIGIN = "*"
+# Sprite repo for the Add-a-Mon upload route (/upload-assets).
+ASSETS_REPO = "Heraklines/er-assets"
+ASSETS_BRANCH = "main"
 
 # Secrets (set via `wrangler secret put`, NOT here):
 #   GITHUB_TOKEN     — fine-grained PAT, Contents: read & write + Actions: read & write (deploy
-#                      button fires a workflow_dispatch), scoped to the repo
+#                      button fires a workflow_dispatch). Must cover BOTH
+#                      GITHUB_REPO and ASSETS_REPO (sprite uploads land there).
 #   EDITOR_PASSWORD  — shared password the editor sends with each save
