@@ -3,6 +3,7 @@ import Overrides from "#app/overrides";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import { allMoves } from "#data/data-lists";
 import { getPokeballAtlasKey } from "#data/pokeball";
+import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import type { PokeballType } from "#enums/pokeball";
 import { ShopCursorTarget } from "#enums/shop-cursor-target";
@@ -15,7 +16,7 @@ import type { ModifierSelectCallback } from "#phases/select-modifier-phase";
 import { AwaitableUiHandler } from "#ui/awaitable-ui-handler";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { addTextObject, getModifierTierTextTint, getTextColor, getTextStyleOptions } from "#ui/text";
-import { formatMoney, NumberHolder } from "#utils/common";
+import { formatMoney, getBiomeName, NumberHolder } from "#utils/common";
 import i18next from "i18next";
 import Phaser from "phaser";
 
@@ -52,6 +53,14 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
 
   private cursorObj: Phaser.GameObjects.Image | null;
 
+  // ER #440: bespoke Biome Market decoration (full-screen BW backdrop +
+  // per-biome shopkeeper sprite + biome-name banner). Created once at the BACK
+  // of the modifier container and toggled per-show, so the reward-less biome
+  // shop looks like a distinct market instead of the vanilla potion store.
+  private erShopBg: Phaser.GameObjects.Image | null = null;
+  private erShopKeeper: Phaser.GameObjects.Image | null = null;
+  private erShopBanner: Phaser.GameObjects.Container | null = null;
+
   constructor() {
     super(UiMode.CONFIRM);
 
@@ -64,6 +73,29 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
 
     this.modifierContainer = globalScene.add.container(0, 0);
     ui.add(this.modifierContainer);
+
+    // ER #440: build the Biome Market decoration ONCE, at the back of the
+    // modifier container (added before any options, so the shop rows always
+    // render on top). All three start hidden and are toggled in show().
+    // Coordinate space matches the egg-gacha screen: the visible 320x180 area
+    // spans local y in [-scaledCanvas.height, 0] (top-left at 0,-height).
+    {
+      const screenW = globalScene.scaledCanvas.width;
+      const screenH = globalScene.scaledCanvas.height;
+      this.erShopBg = globalScene.add.image(0, -screenH, "er_biome_shop_bg").setOrigin(0, 0).setVisible(false);
+      this.erShopBg.setDisplaySize(screenW, screenH);
+      this.modifierContainer.add(this.erShopBg);
+
+      this.erShopKeeper = globalScene.add.image(40, -8, "er_biome_shop_keeper_00").setOrigin(0.5, 1).setVisible(false);
+      this.modifierContainer.add(this.erShopKeeper);
+
+      this.erShopBanner = globalScene.add.container(screenW / 2, -screenH + 5).setVisible(false);
+      const bannerText = addTextObject(0, 0, "", TextStyle.WINDOW, { fontSize: "80px" });
+      bannerText.setOrigin(0.5, 0);
+      bannerText.setName("er-shop-banner-text");
+      this.erShopBanner.add(bannerText);
+      this.modifierContainer.add(this.erShopBanner);
+    }
 
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
@@ -215,6 +247,26 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
       : [];
     const optionsYOffset =
       shopTypeOptions.length > SHOP_OPTIONS_ROW_LIMIT ? -SINGLE_SHOP_ROW_YOFFSET : -DOUBLE_SHOP_ROW_YOFFSET;
+
+    // ER #440: detect the reward-less Biome Market and skin it. victory-phase.ts
+    // pushes a SelectModifierPhase on x0 boss waves with 0 free reward options
+    // (typeOptions empty) but a populated biome shop row. That exact shape is
+    // the market - decorate it as a distinct BW shop so it never looks like the
+    // vanilla potion store. Gated identically (staging/local only); the normal
+    // x10 reward shop has free reward options and so is never matched.
+    {
+      const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+      const biomeShopEnabled = !!env?.DEV || env?.VITE_DEV_TOOLS === "1";
+      const isErBiomeShop =
+        biomeShopEnabled
+        && this.player
+        && typeOptions.length === 0
+        && shopTypeOptions.length > 0
+        && globalScene.currentBattle != null
+        && globalScene.currentBattle.waveIndex % 10 === 0
+        && !globalScene.gameMode.isDaily;
+      this.applyErBiomeShopDecor(isErBiomeShop);
+    }
 
     for (let m = 0; m < typeOptions.length; m++) {
       const sliceWidth = globalScene.scaledCanvas.width / (typeOptions.length + 2);
@@ -695,8 +747,46 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     this.lockRarityButtonText.setShadowColor(getTextColor(textStyle, true));
   }
 
+  /**
+   * ER #440: toggle + refresh the Biome Market decoration (full-screen BW
+   * backdrop, per-biome shopkeeper sprite, biome-name banner). Keeps the three
+   * decoration objects at the BACK of the modifier container so the freshly
+   * built shop options always render on top. No-op until setup() has created
+   * them. Safe to call every show() (hidden for the normal shop).
+   */
+  private applyErBiomeShopDecor(active: boolean): void {
+    if (!this.erShopBg || !this.erShopKeeper || !this.erShopBanner) {
+      return;
+    }
+    this.erShopBg.setVisible(active);
+    this.erShopKeeper.setVisible(active);
+    this.erShopBanner.setVisible(active);
+    if (!active) {
+      return;
+    }
+    const biome = globalScene.arena?.biomeId ?? BiomeId.PLAINS;
+    // Deterministic keeper from the 16 BW shopkeeper sprites, one per biome.
+    const keeperIdx = ((biome % 16) + 16) % 16;
+    const keeperKey = `er_biome_shop_keeper_${keeperIdx.toString().padStart(2, "0")}`;
+    if (globalScene.textures.exists(keeperKey)) {
+      this.erShopKeeper.setTexture(keeperKey);
+    }
+    const bannerText = this.erShopBanner.getByName("er-shop-banner-text") as Phaser.GameObjects.Text | null;
+    if (bannerText) {
+      bannerText.setText(`${getBiomeName(biome)} Market`.toUpperCase());
+    }
+    // Re-seat the decoration behind the newly added shop options.
+    this.modifierContainer.sendToBack(this.erShopBanner);
+    this.modifierContainer.sendToBack(this.erShopKeeper);
+    this.modifierContainer.sendToBack(this.erShopBg);
+  }
+
   clear() {
     super.clear();
+
+    // ER #440: hide the Biome Market decoration when leaving the shop so it
+    // never bleeds into the next (non-biome) shop screen.
+    this.applyErBiomeShopDecor(false);
 
     this.moveInfoOverlay.clear();
     this.moveInfoOverlayActive = false;

@@ -2028,15 +2028,18 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "Biome Market preview (#440)",
     description:
-      "#440 BIOME MARKET - x0 boss waves now OPEN A SHOP SCREEN (they had none\n"
-      + "before - vanilla skips the item screen on boss waves entirely). After\n"
-      + "the wave-10 boss + reward popups, a shop appears with NO free reward\n"
-      + "row, just the priced MARKET row themed to the biome: staples + the\n"
-      + "biome's signature items + discounted-category picks + a wildcard. DO:\n"
-      + "win this wave-10 fight and wait through the reward popups. EXPECT: the\n"
-      + "shop opens with ~9 priced biome items (staple under one wave's money,\n"
-      + "held items ~3x); buy something - money deducts, item applies; then the\n"
-      + "biome-select appears. The Abyss biome has NO market by design.",
+      "#440 BIOME MARKET - x0 boss waves now OPEN A BESPOKE SHOP SCREEN (they\n"
+      + "had none before - vanilla skips the item screen on boss waves). After\n"
+      + "the wave-10 boss + reward popups, the MARKET opens: a full-screen BW\n"
+      + "backdrop with a biome shopkeeper on the LEFT and a '<BIOME> MARKET'\n"
+      + "banner up top - clearly NOT the vanilla potion shop. The priced row is\n"
+      + "the biome's signature items + discounted-category picks + a wildcard.\n"
+      + "NO healing items appear (healing stays the normal-wave shop's job).\n"
+      + "DO: win this wave-10 fight, wait through the reward popups. EXPECT:\n"
+      + "the market opens with the BW art; buy items REPEATEDLY - each buy\n"
+      + "deducts money + applies the item and the shop STAYS OPEN (buy as much\n"
+      + "as you can afford). Press B to LEAVE and continue to biome-select.\n"
+      + "The Abyss biome has NO market by design.",
     setup: () => {
       resetDevOverrides();
       setOverrides({

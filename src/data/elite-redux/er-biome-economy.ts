@@ -216,7 +216,13 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
         }
       }
       // Discounted-category picks: the reason this biome's market is GOOD.
+      // #440 feedback: NO healing items in the biome market - it's a distinct
+      // shop, not the vanilla potion store. Skip the HEAL category entirely
+      // (healing access stays the vanilla shop's job on non-boss waves).
       for (const category of eco.cheap) {
+        if (category === "HEAL") {
+          continue;
+        }
         const pool = ER_SHOP_CATEGORY_POOL[category];
         add(pool[randSeedInt(pool.length)], category);
       }
@@ -227,11 +233,6 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
       for (let i = 0; i < wildcards; i++) {
         add(heldPool[randSeedInt(heldPool.length)], "HELD");
       }
-      // A SINGLE depth-bracketed healing staple at the END - heal access
-      // without the vanilla-shop look. (Extra heals / balls appear only if the
-      // biome lists those categories as cheap above.)
-      const bracket = Math.min(Math.floor(waveIndex / 40), 2);
-      add((["POTION", "HYPER_POTION", "MAX_POTION"] as const)[bracket], "HEAL");
     },
     waveIndex,
     "er-biome-shop",
