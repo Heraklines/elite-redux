@@ -27,11 +27,17 @@ import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
+import { getBiomeKey } from "#field/arena";
 import type { ModifierTypeOption } from "#modifiers/modifier-type";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
 import { formatMoney, getBiomeName } from "#utils/common";
+
+/** Prefix an amount with the in-game money symbol. */
+function money(amount: number): string {
+  return `₽${formatMoney(globalScene.moneyFormat, amount)}`;
+}
 
 /** Buy a slot (index) or leave the shop (index < 0). */
 export type BiomeShopSelectCallback = (index: number) => boolean;
@@ -41,9 +47,9 @@ const GRID_COLS = 4;
 // Layout in the 320x180 logical screen (container sits at the screen top-left,
 // matching the egg-gacha convention: child (0,0) == screen top-left).
 const COL_STEP = 52;
-const ROW_STEP = 29;
+const ROW_STEP = 26;
 const GRID_X = 124; // centre of the first column
-const GRID_Y = 60; // centre of the first row
+const GRID_Y = 50; // centre of the first row
 const KEEPER_X = 46;
 
 /** Per-biome shopkeeper, cast from the preloaded trainer-class sprites. */
@@ -83,11 +89,13 @@ const KEEPER_BY_BIOME: Partial<Record<BiomeId, string>> = {
 
 export class BiomeShopUiHandler extends UiHandler {
   private shopContainer: Phaser.GameObjects.Container;
-  private bg: Phaser.GameObjects.NineSlice;
+  private bg: Phaser.GameObjects.Image;
+  private bgOverlay: Phaser.GameObjects.Rectangle;
   private gridWindow: Phaser.GameObjects.NineSlice;
   private keeper: Phaser.GameObjects.Sprite;
   private bannerText: Phaser.GameObjects.Text;
   private itemNameText: Phaser.GameObjects.Text;
+  private descText: Phaser.GameObjects.Text;
   private moneyText: Phaser.GameObjects.Text;
   private leaveText: Phaser.GameObjects.Text;
   private cursorObj: Phaser.GameObjects.Rectangle;
@@ -110,13 +118,18 @@ export class BiomeShopUiHandler extends UiHandler {
     this.shopContainer.setVisible(false);
     ui.add(this.shopContainer);
 
-    // Backdrop: the game's own dark panel (clean, intentional), tinted per biome
-    // in show(). Far better than the placeholder ROM rip.
-    this.bg = globalScene.add.nineslice(0, 0, "default_bg", undefined, w, h, 0, 0, 16, 0).setOrigin(0);
+    // Backdrop: the ACTUAL biome scenery (the bg already loaded for this wave's
+    // arena), set per-biome in show(). A dark overlay keeps text/panel readable.
+    // Falls back to the game's default_bg panel if a biome bg is missing.
+    this.bg = globalScene.add.image(0, 0, "default_bg").setOrigin(0);
+    this.bg.setDisplaySize(w, h);
     this.shopContainer.add(this.bg);
 
+    this.bgOverlay = globalScene.add.rectangle(0, 0, w, h, 0x10101c, 0.4).setOrigin(0);
+    this.shopContainer.add(this.bgOverlay);
+
     // Framed shelf window for the item grid (right two thirds).
-    this.gridWindow = addWindow(96, 20, w - 98, 156);
+    this.gridWindow = addWindow(96, 20, w - 98, 150);
     this.shopContainer.add(this.gridWindow);
 
     this.keeper = globalScene.add.sprite(KEEPER_X, h - 8, "baker");
@@ -127,9 +140,18 @@ export class BiomeShopUiHandler extends UiHandler {
     this.bannerText.setOrigin(0.5, 0);
     this.shopContainer.add(this.bannerText);
 
-    this.itemNameText = addTextObject(208, 24, "", TextStyle.PARTY, { fontSize: "54px" });
+    this.itemNameText = addTextObject(208, 22, "", TextStyle.PARTY, { fontSize: "54px" });
     this.itemNameText.setOrigin(0.5, 0);
     this.shopContainer.add(this.itemNameText);
+
+    // Focused item's description, wrapped, just under the grid.
+    this.descText = addTextObject(208, 150, "", TextStyle.PARTY, {
+      fontSize: "40px",
+      align: "center",
+      wordWrap: { width: (w - 110) * 6 },
+    });
+    this.descText.setOrigin(0.5, 0);
+    this.shopContainer.add(this.descText);
 
     this.moneyText = addTextObject(w - 4, 4, "", TextStyle.MONEY);
     this.moneyText.setOrigin(1, 0);
@@ -153,7 +175,7 @@ export class BiomeShopUiHandler extends UiHandler {
       this.onSelect = args[2] as BiomeShopSelectCallback;
 
       this.bannerText.setText(`${getBiomeName(biome)} Market`.toUpperCase());
-      this.bg.setTint(biomeTint(biome));
+      this.setBackground(biome);
       this.setKeeper(biome);
       this.buildGrid();
       this.cursor = 0;
@@ -170,6 +192,16 @@ export class BiomeShopUiHandler extends UiHandler {
     this.active = true;
     this.refresh();
     return true;
+  }
+
+  /** Use the live biome scenery as the backdrop; fall back to default_bg. */
+  private setBackground(biome: BiomeId): void {
+    const w = globalScene.scaledCanvas.width;
+    const h = globalScene.scaledCanvas.height;
+    const biomeKey = `${getBiomeKey(biome)}_bg`;
+    const key = globalScene.textures.exists(biomeKey) ? biomeKey : "default_bg";
+    this.bg.setTexture(key);
+    this.bg.setDisplaySize(w, h);
   }
 
   private setKeeper(biome: BiomeId): void {
@@ -207,15 +239,9 @@ export class BiomeShopUiHandler extends UiHandler {
       }
       this.shopContainer.add(icon);
 
-      const price = addTextObject(
-        x,
-        y + 9,
-        formatMoney(globalScene.moneyFormat, this.options[i].cost),
-        TextStyle.MONEY,
-        {
-          fontSize: "38px",
-        },
-      );
+      const price = addTextObject(x, y + 9, money(this.options[i].cost), TextStyle.MONEY, {
+        fontSize: "38px",
+      });
       price.setOrigin(0.5, 0);
       this.shopContainer.add(price);
 
@@ -227,6 +253,7 @@ export class BiomeShopUiHandler extends UiHandler {
     if (this.cells.length === 0) {
       this.cursorObj.setVisible(false);
       this.itemNameText.setText("");
+      this.descText.setText("");
       return;
     }
     const i = Math.max(0, Math.min(index, this.cells.length - 1));
@@ -234,7 +261,9 @@ export class BiomeShopUiHandler extends UiHandler {
     const row = Math.floor(i / GRID_COLS);
     this.cursorObj.setPosition(GRID_X + col * COL_STEP, GRID_Y + row * ROW_STEP + 1);
     this.cursorObj.setVisible(true);
-    this.itemNameText.setText(this.options[i]?.type?.name ?? "");
+    const type = this.options[i]?.type;
+    this.itemNameText.setText(type?.name ?? "");
+    this.descText.setText(type?.getDescription() ?? "");
   }
 
   override setCursor(cursor: number): boolean {
@@ -245,7 +274,7 @@ export class BiomeShopUiHandler extends UiHandler {
 
   /** Refresh the money readout + dim unaffordable slots. */
   private refresh(): void {
-    this.moneyText.setText(formatMoney(globalScene.moneyFormat, globalScene.money));
+    this.moneyText.setText(money(globalScene.money));
     for (let i = 0; i < this.cells.length; i++) {
       const affordable = globalScene.money >= (this.options[i]?.cost ?? 0);
       this.cells[i].icon.setAlpha(affordable ? 1 : 0.4);
@@ -312,32 +341,5 @@ export class BiomeShopUiHandler extends UiHandler {
     this.cells = [];
     this.options = [];
     this.onSelect = null;
-  }
-}
-
-/** A subtle per-biome tint for the default_bg panel (kept light so text reads). */
-function biomeTint(biome: BiomeId): number {
-  switch (biome) {
-    case BiomeId.VOLCANO:
-    case BiomeId.BADLANDS:
-      return 0xffd6c0;
-    case BiomeId.SEA:
-    case BiomeId.SEABED:
-    case BiomeId.LAKE:
-    case BiomeId.BEACH:
-    case BiomeId.ICE_CAVE:
-      return 0xc8e0ff;
-    case BiomeId.FOREST:
-    case BiomeId.JUNGLE:
-    case BiomeId.GRASS:
-    case BiomeId.TALL_GRASS:
-    case BiomeId.MEADOW:
-      return 0xd2f0c0;
-    case BiomeId.GRAVEYARD:
-    case BiomeId.RUINS:
-    case BiomeId.TEMPLE:
-      return 0xd8c8f0;
-    default:
-      return 0xffffff;
   }
 }
