@@ -2239,7 +2239,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (Array.isArray(this.usedTMs) && this.usedTMs.length > 0) {
       levelMoves = this.usedTMs.filter(m => !levelMoves.includes(m)).concat(levelMoves);
     }
-    levelMoves = levelMoves.filter(lm => !this.moveset.some(m => m.moveId === lm));
+    // Dedupe by moveId AND drop already-known moves. A move can sit in BOTH the
+    // (ER-expanded) level-up learnset and the egg-move pool - e.g. Drifloon's
+    // Psycho Shift - which otherwise lists it twice on the move-swap screen.
+    const seen = new Set<MoveId>();
+    levelMoves = levelMoves.filter(lm => {
+      if (!lm || seen.has(lm) || this.moveset.some(m => m?.moveId === lm)) {
+        return false;
+      }
+      seen.add(lm);
+      return true;
+    });
     return levelMoves;
   }
 

@@ -2705,4 +2705,31 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [makeStarter(SpeciesId.ALAKAZAM, { moveset: [MoveId.MIND_READER, MoveId.SPLASH] })];
     },
   },
+  {
+    label: "Drifloon move list: no duplicates",
+    description:
+      "Community report - the move-swap list showed Psycho Shift TWICE (and a\n"
+      + "long list). Drifloon has Psycho Shift in BOTH its ER level-up learnset\n"
+      + "and its egg moves; the swap list was not de-duplicated.\n"
+      + "DO: win the opening battle, take the Move Slot Expander from the shop, use\n"
+      + "it on Drifloon, and open the move-to-learn list.\n"
+      + "EXPECT: every move appears exactly ONCE (Psycho Shift listed a single\n"
+      + "time). The list being long is fine - that is Drifloon's full ER movepool;\n"
+      + "the bug was the duplicate. (note) Pure UI/data fix.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.DRIFLOON, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.CALM_MIND, MoveId.GUST, MoveId.THUNDERBOLT],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.MOVE_SLOT_EXPANDER],
+  },
 ];
