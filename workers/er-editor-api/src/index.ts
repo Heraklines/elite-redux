@@ -623,6 +623,89 @@ async function handleSave(body: SaveBody, env: Env): Promise<Response> {
   );
 }
 
+// --- Remote dev-log sink (staging test suite → the repo's dev-logs branch) ----
+// The in-game Send Logs button posts the FULL capture here from wherever the
+// tester is playing; each log is committed as a file on the `dev-logs` branch
+// (NEVER the code branch - no CI, no noise). The maintainer syncs them locally
+// with scripts/pull-dev-logs.mjs. Unauthenticated by design (testers have no
+// password) but size-capped and path-fixed, so the worst case is log spam on
+// an orphan QA branch.
+
+const DEVLOG_BRANCH = "dev-logs";
+const DEVLOG_MAX_BYTES = 300_000;
+
+interface DevLogBody {
+  by?: string;
+  scenario?: string;
+  comment?: string;
+  report?: string;
+}
+
+const devlogSlug = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40) || "no-scenario";
+
+/** Ensure the dev-logs branch exists (create from the code branch head once). */
+async function ensureDevLogBranch(env: Env): Promise<string | null> {
+  const api = `https://api.github.com/repos/${env.GITHUB_REPO}`;
+  const refRes = await fetch(`${api}/git/ref/heads/${DEVLOG_BRANCH}`, { headers: ghHeaders(env) });
+  if (refRes.ok) {
+    return null; // exists
+  }
+  const baseRes = await fetch(`${api}/git/ref/heads/${env.GITHUB_BRANCH}`, { headers: ghHeaders(env) });
+  if (!baseRes.ok) {
+    return `base branch read failed: ${baseRes.status}`;
+  }
+  const base = (await baseRes.json()) as { object: { sha: string } };
+  const createRes = await fetch(`${api}/git/refs`, {
+    method: "POST",
+    headers: { ...ghHeaders(env), "Content-Type": "application/json" },
+    body: JSON.stringify({ ref: `refs/heads/${DEVLOG_BRANCH}`, sha: base.object.sha }),
+  });
+  // 422 = lost a creation race - that's fine, the branch exists now.
+  if (!createRes.ok && createRes.status !== 422) {
+    return `branch create failed: ${createRes.status}`;
+  }
+  return null;
+}
+
+/** Commit one Send Logs capture onto the dev-logs branch. */
+async function handleDevLog(body: DevLogBody, env: Env): Promise<Response> {
+  const report = typeof body.report === "string" ? body.report : "";
+  if (report.trim().length === 0) {
+    return json({ ok: false, error: "empty report" }, 400, env);
+  }
+  if (report.length > DEVLOG_MAX_BYTES) {
+    return json({ ok: false, error: "report too large" }, 413, env);
+  }
+  const branchError = await ensureDevLogBranch(env);
+  if (branchError !== null) {
+    return json({ ok: false, error: branchError }, 502, env);
+  }
+  const by = devlogSlug(typeof body.by === "string" && body.by ? body.by : "anon");
+  const scenario = devlogSlug(typeof body.scenario === "string" && body.scenario ? body.scenario : "no-scenario");
+  const now = new Date();
+  const day = now.toISOString().slice(0, 10);
+  const stamp = now.toISOString().replace(/[:.]/g, "-");
+  const path = `remote/${day}/${stamp}__${scenario}__${by}.log`;
+  const putRes = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/contents/${path}`, {
+    method: "PUT",
+    headers: { ...ghHeaders(env), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message: `devlog: ${scenario} (by ${by})`,
+      content: toBase64(report),
+      branch: DEVLOG_BRANCH,
+    }),
+  });
+  if (!putRes.ok) {
+    return json({ ok: false, error: `log commit failed: ${putRes.status}` }, 502, env);
+  }
+  return json({ ok: true, path }, 200, env);
+}
+
 const ASSET_FILE_RE = /^(front|back|shiny|shiny-back|shiny-2|shiny-back-2|shiny-3|shiny-back-3|icon)\.(png|json)$/;
 
 interface UploadAssetsBody {
@@ -785,6 +868,16 @@ export default {
         return json({ ok: false, error: "invalid JSON body" }, 400, env);
       }
       return handleUploadAssets(body, env);
+    }
+
+    if (url.pathname === "/devlog" && request.method === "POST") {
+      let body: DevLogBody;
+      try {
+        body = (await request.json()) as DevLogBody;
+      } catch {
+        return json({ ok: false, error: "invalid JSON body" }, 400, env);
+      }
+      return handleDevLog(body, env);
     }
 
     // Back-compat: the original egg-move route ({ eggMoves } instead of

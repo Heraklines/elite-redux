@@ -337,23 +337,25 @@ export class BiomeShopUiHandler extends UiHandler {
   }
 
   private setKeeper(biome: BiomeId): void {
-    // Pokemon keeper (Clefairy in Space, Kecleon in caves) - rendered from the
-    // dex-icon atlas, which is always loaded. Takes priority over trainers.
+    // Pokemon keeper (Clefairy in Space, Kecleon in caves). Show the always-
+    // loaded dex icon immediately (no blank frame), then upgrade to the full
+    // battle sprite once its atlas loads. Takes priority over trainers.
     const pkmn = POKEMON_KEEPER_BY_BIOME[biome];
     if (pkmn != null) {
       const species = getPokemonSpecies(pkmn);
       const atlas = species.getIconAtlasKey(0, false, 0);
       const frame = species.getIconId(false, 0, false, 0);
       if (globalScene.textures.exists(atlas)) {
-        this.keeper.setTexture(atlas, frame);
-        this.keeper.setVisible(true);
-        this.keeper.setScale(2.6); // dex icons are ~40px - scale up to keeper size
-        return;
+        this.keeper.stop();
+        this.keeper.setTexture(atlas, frame).setVisible(true).setScale(2.6);
       }
+      this.loadKeeperPokemonSprite(species);
+      return;
     }
 
     const key = KEEPER_BY_BIOME[biome] ?? DEFAULT_KEEPER;
     if (globalScene.textures.exists(key)) {
+      this.keeper.stop(); // drop any Pokemon-keeper animation from a prior biome
       this.keeper.setTexture(key).setFrame(0);
       this.keeper.setVisible(true);
       const sh = this.keeper.height || 1;
@@ -362,6 +364,34 @@ export class BiomeShopUiHandler extends UiHandler {
     } else {
       this.keeper.setVisible(false);
     }
+  }
+
+  /**
+   * Upgrade a Pokemon keeper from its dex icon to the FULL battle sprite once
+   * its atlas loads (sprites are only loaded on demand, never preloaded for the
+   * shop). Async: the icon stands in until this lands. No-ops if the shop has
+   * since closed or the atlas failed.
+   */
+  private loadKeeperPokemonSprite(species: ReturnType<typeof getPokemonSpecies>): void {
+    const spriteKey = species.getSpriteKey(false, 0, false, 0);
+    species
+      // female=false, form 0, non-shiny, variant 0, startLoad, front, spriteOnly
+      .loadAssets(false, 0, false, 0, true, false, true)
+      .then(() => {
+        if (!this.active || !globalScene.textures.exists(spriteKey)) {
+          return;
+        }
+        this.keeper.setTexture(spriteKey).setVisible(true);
+        if (globalScene.anims.exists(spriteKey)) {
+          this.keeper.play(spriteKey);
+        }
+        // Fit the full sprite (~96px) into the keeper slot.
+        this.keeper.setScale(1);
+        const sh = this.keeper.height || 1;
+        const maxH = 116;
+        this.keeper.setScale(sh > maxH ? maxH / sh : 1);
+      })
+      .catch(() => {});
   }
 
   private buildGrid(): void {

@@ -22,6 +22,7 @@
 
 import {
   consumePendingDevBattleSetup,
+  consumePendingDevEnemyParty,
   consumePendingDevShop,
   consumePendingDevStarters,
   type DevMenuCtx,
@@ -34,7 +35,14 @@ import { globalScene } from "#app/global-scene";
 import { GameModes } from "#enums/game-modes";
 import { UiMode } from "#enums/ui-mode";
 import { formatConsoleSnapshot } from "#utils/console-ring-buffer";
-import { DEV_SCENARIOS, resetDevOverrides } from "./scenarios";
+import { openScenarioBuilder } from "./builder";
+import { DEV_SCENARIOS, type DevScenario, resetDevOverrides } from "./scenarios";
+
+/** er-editor-api Worker — the remote log sink (commits logs to the dev-logs branch). */
+const REMOTE_LOG_URL = "https://er-editor-api.heraklines.workers.dev/devlog";
+
+/** Share code of the active BUILDER scenario (embedded in Send Logs captures). */
+let activeShareCode: string | null = null;
 
 // ---------------------------------------------------------------------------
 // 1. Floating "Send Logs" button
@@ -73,7 +81,33 @@ function captureStateHeader(): string {
 function buildReport(comment?: string): string {
   const commentBlock = comment?.trim() ? `----- COMMENT -----\n${comment.trim()}\n\n` : "";
   const scenarioBlock = activeScenarioLabel ? `scenario: ${activeScenarioLabel}\n` : "";
-  return `${scenarioBlock}${captureStateHeader()}\n\n${commentBlock}----- CONSOLE -----\n${formatConsoleSnapshot()}\n`;
+  // Builder scenarios carry their share code so EVERY log is replayable:
+  // paste the code into the Scenario Builder to rebuild the exact situation.
+  const shareBlock = activeShareCode ? `share-code: ${activeShareCode}\n` : "";
+  return `${scenarioBlock}${shareBlock}${captureStateHeader()}\n\n${commentBlock}----- CONSOLE -----\n${formatConsoleSnapshot()}\n`;
+}
+
+/**
+ * Ship the FULL report to the remote log sink (er-editor-api → the repo's
+ * `dev-logs` branch), so logs reach the maintainer's PC no matter where the
+ * tester is playing. `scripts/pull-dev-logs.mjs` syncs them down locally.
+ */
+async function sendRemoteLog(report: string, comment: string): Promise<boolean> {
+  try {
+    const res = await fetch(REMOTE_LOG_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        by: getTesterName(),
+        scenario: activeScenarioLabel ?? "",
+        comment,
+        report,
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 async function sendLogs(button: HTMLButtonElement, comment?: string): Promise<void> {
@@ -83,20 +117,22 @@ async function sendLogs(button: HTMLButtonElement, comment?: string): Promise<vo
   // staging site that has no local /__devlog dev server.
   postEvent("LOG", activeScenarioLabel ?? "", comment ?? "");
   const original = button.textContent;
-  let ok = false;
+  let localOk = false;
   try {
     const res = await fetch("/__devlog", { method: "POST", body: report });
-    ok = res.ok;
+    localOk = res.ok;
   } catch {
-    ok = false;
+    localOk = false;
   }
+  // The remote sink works from ANYWHERE (staging, a tester's laptop, a phone).
+  const remoteOk = await sendRemoteLog(report, comment ?? "");
   // Always also copy to clipboard + download as an offline fallback.
   try {
     await navigator.clipboard?.writeText(report);
   } catch {
     /* clipboard may be blocked; ignore */
   }
-  if (!ok) {
+  if (!localOk && !remoteOk) {
     try {
       const blob = new Blob([report], { type: "text/plain" });
       const a = document.createElement("a");
@@ -108,7 +144,11 @@ async function sendLogs(button: HTMLButtonElement, comment?: string): Promise<vo
       /* download may fail in some contexts; ignore */
     }
   }
-  button.textContent = ok ? "Sent ✓ (dev-logs/latest.log)" : "Copied ✓ (no dev server)";
+  button.textContent = remoteOk
+    ? "Sent ✓ (remote + local)"
+    : localOk
+      ? "Sent ✓ (dev-logs/latest.log)"
+      : "Copied ✓ (offline fallback)";
   setTimeout(() => {
     button.textContent = original;
   }, 1800);
@@ -369,7 +409,7 @@ function showScenarioBanner(scenario: (typeof DEV_SCENARIOS)[number]): void {
 }
 
 /** Launch the chosen scenario (party + overrides + optional mid-combat + banner). */
-function launchScenario(ctx: DevMenuCtx, scenario: (typeof DEV_SCENARIOS)[number]): boolean {
+function launchScenario(ctx: DevMenuCtx, scenario: DevScenario): boolean {
   try {
     const starters = scenario.setup();
     setPendingDevStarters(starters);
@@ -407,10 +447,29 @@ function openScenarioList(ctx: DevMenuCtx): void {
   const remaining = DEV_SCENARIOS.filter(s => !passedSet.has(s.label));
   const localPassed = getPassed();
 
-  const options = remaining.map(scenario => ({
-    label: scenario.label,
-    handler: () => launchScenario(ctx, scenario),
-  }));
+  const options = [
+    {
+      // The scenario BUILDER: compose any situation (party/enemy/run/items/
+      // stages) in a form, launch it, and share it as a copy-paste code.
+      label: "🧪 Scenario Builder",
+      handler: () => {
+        openScenarioBuilder({
+          launch: scenario => launchScenario(ctx, scenario),
+          setShareCode: code => {
+            activeShareCode = code;
+          },
+        });
+        return true;
+      },
+    },
+    ...remaining.map(scenario => ({
+      label: scenario.label,
+      handler: () => {
+        activeShareCode = null; // hand-written scenario: no share code
+        return launchScenario(ctx, scenario);
+      },
+    })),
+  ];
   if (localPassed.length > 0) {
     // Undo ONLY the most recently passed test (pop the last LOCAL one) so the
     // whole passed list isn't dumped back in at once. Also un-pass it on the
@@ -467,9 +526,11 @@ registerDevMenu(ctx => {
   consumePendingDevStarters();
   consumePendingDevBattleSetup();
   consumePendingDevShop();
+  consumePendingDevEnemyParty();
   scenarioBanner?.remove();
   scenarioBanner = null;
   activeScenarioLabel = null;
+  activeShareCode = null;
   return {
     label: "\u{1F6E0} Dev Scenarios",
     handler: () => {
