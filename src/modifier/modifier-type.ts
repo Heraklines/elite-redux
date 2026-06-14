@@ -2936,9 +2936,9 @@ export function getPlayerShopModifierTypeOptionsForWave(waveIndex: number, baseC
     return [];
   }
 
-  // ER tuning: HP / revive / status-cure items cost 20% less across the board.
+  // ER tuning: HP / revive / status-cure items cost 30% less across the board.
   // PP items (Ether/Elixir) and Memory Mushroom keep their vanilla prices.
-  const heal = (factor: number): number => baseCost * factor * 0.8;
+  const heal = (factor: number): number => baseCost * factor * 0.7;
   const options = [
     [
       new ModifierTypeOption(modifierTypeInitObj.POTION(), 0, heal(0.2)),
