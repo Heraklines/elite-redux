@@ -2732,4 +2732,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
     shopItems: [modifierTypes.MOVE_SLOT_EXPANDER],
   },
+  {
+    label: "Pichu line: candy + passives pool to root",
+    description:
+      "Community report - evolving a Pichu showed Pikachu/Raichu passives\n"
+      + "'Locked' and candy split across stages (Pichu 26 / Pikachu 0 / Raichu 98).\n"
+      + "Cause: candy + passive unlocks keyed by different species ids across the\n"
+      + "line (Pichu AND Pikachu are both starters). Now everything pools to the\n"
+      + "line root, and a one-time load migration merges historic scatter.\n"
+      + "DO: this Pichu starts at lv24; win the opening battle so it evolves to\n"
+      + "Pikachu, take the Rare Candy from the shop to push it toward Raichu, and\n"
+      + "open Pokemon Info > Abilities at each stage.\n"
+      + "EXPECT: the candy count is the SAME pooled total at every stage, and any\n"
+      + "passive you unlocked stays Unlocked through both evolutions. (note) Save-\n"
+      + "data fix - existing saves consolidate on load with no candy lost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 24,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PICHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.NUZZLE, MoveId.QUICK_ATTACK, MoveId.PROTECT],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.RARE_CANDY],
+  },
 ];

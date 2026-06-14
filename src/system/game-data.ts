@@ -682,6 +682,10 @@ export class GameData {
       }
     }
 
+    // Merge any historic candy/passive scatter across evolution stages into the
+    // line root (e.g. a save with Pichu 26 / Pikachu 0 / Raichu 98). Idempotent.
+    this.consolidateStarterDataToRoots();
+
     if (systemData.gameStats) {
       this.gameStats = systemData.gameStats;
     }
@@ -2043,7 +2047,45 @@ export class GameData {
   }
 
   public getStarterDataEntry(speciesId: number): StarterDataEntry {
-    return (this.starterData[speciesId] ??= this.createStarterDataEntry(speciesId));
+    // Normalize to the evolution line's ROOT so candy + passive/ability unlocks
+    // pool under ONE key and survive evolution. Without this, any line with a
+    // baby pre-evo (Pichu->Pikachu->Raichu, Cleffa->Clefairy, ...) scattered
+    // candy and unlocks across stages - the in-battle Abilities page reads the
+    // root and showed everything "Locked - unlock with candy" even after paying.
+    // Falls back to the raw id for synthetic/custom species not in the table.
+    const rootId = getPokemonSpecies(speciesId)?.getRootSpeciesId() ?? speciesId;
+    return (this.starterData[rootId] ??= this.createStarterDataEntry(rootId));
+  }
+
+  /**
+   * One-time consolidation: fold any starterData entry that belongs to a
+   * NON-root member of an evolution line into the line's root, then delete the
+   * stray. Undoes historic candy/passive scatter (e.g. a save with Pichu 26 /
+   * Pikachu 0 / Raichu 98 and a passive paid on Pikachu) so nothing is lost and
+   * the in-battle Abilities page reads correctly. Idempotent - once merged the
+   * strays are gone, so re-running is a no-op.
+   */
+  private consolidateStarterDataToRoots(): void {
+    for (const key of Object.keys(this.starterData)) {
+      const speciesId = Number.parseInt(key) as SpeciesId;
+      const species = getPokemonSpecies(speciesId);
+      if (!species) {
+        continue;
+      }
+      const rootId = species.getRootSpeciesId();
+      if (rootId === speciesId) {
+        continue;
+      }
+      const src = this.starterData[speciesId];
+      const dst = (this.starterData[rootId] ??= this.createStarterDataEntry(rootId));
+      dst.candyCount = (dst.candyCount ?? 0) + (src.candyCount ?? 0);
+      dst.passiveAttr |= src.passiveAttr ?? 0;
+      dst.abilityAttr |= src.abilityAttr ?? 0;
+      dst.valueReduction = Math.max(dst.valueReduction ?? 0, src.valueReduction ?? 0);
+      dst.classicWinCount = Math.max(dst.classicWinCount ?? 0, src.classicWinCount ?? 0);
+      dst.friendship = Math.max(dst.friendship ?? 0, src.friendship ?? 0);
+      delete this.starterData[speciesId];
+    }
   }
 
   private applyLocalAllStartersDebug(): void {
