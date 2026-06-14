@@ -30,6 +30,8 @@ export enum MysteryEncounterType {
   UNCOMMON_BREED,
   GLOBAL_TRADE_SYSTEM,
   THE_EXPERT_POKEMON_BREEDER,
+  /** ER #439: the Colosseum press-your-luck trainer gauntlet. */
+  COLOSSEUM,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

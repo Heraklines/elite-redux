@@ -36,6 +36,7 @@ import { BiomeId } from "#enums/biome-id";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { ErMoveId } from "#enums/er-move-id";
 import { MoveId } from "#enums/move-id";
+import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { Nature } from "#enums/nature";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
@@ -145,6 +146,10 @@ const DEV_OVERRIDE_DEFAULTS = {
   ENEMY_FORM_OVERRIDES: {},
   ER_BLACK_SHINY_PLAYER_OVERRIDE: null,
   ER_BLACK_SHINY_ENEMY_OVERRIDE: null,
+  // ER Colosseum (#439): scrub the ME overrides so a scenario that forces an
+  // encounter doesn't leak into the next run/scenario.
+  MYSTERY_ENCOUNTER_OVERRIDE: null,
+  MYSTERY_ENCOUNTER_RATE_OVERRIDE: null,
 } as const;
 
 /**
@@ -297,6 +302,40 @@ const BIOME_SHOP_PREVIEW_SCENARIOS: DevScenario[] = [
 
 export const DEV_SCENARIOS: DevScenario[] = [
   ...BIOME_SHOP_PREVIEW_SCENARIOS,
+  // ===========================================================================
+  // FEATURES — this session
+  // ===========================================================================
+  {
+    label: "Colosseum gauntlet (#439)",
+    description:
+      "#439 Colosseum - press-your-luck trainer gauntlet (SKELETON).\n"
+      + "DO: on wave 12 the Colosseum encounter spawns. Pick 'Enter the Colosseum',\n"
+      + "win the battle, then on the screen choose CONTINUE or CASH OUT.\n"
+      + "EXPECT: a full-screen arena UI showing the D-C-B-A-S-EX tier ladder with the\n"
+      + "banked tier highlighted. CONTINUE -> a harder battle, tier ramps up. CASH OUT\n"
+      + "-> money + a reward-shop item of that tier (EX also gives a shiny egg + 50\n"
+      + "candies). Survivors are healed to half HP between rounds (status NOT cured).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 80,
+        STARTING_WAVE_OVERRIDE: 12,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.COLOSSEUM,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.CALM_MIND],
+        }),
+        makeStarter(SpeciesId.METAGROSS, {
+          moveset: [MoveId.METEOR_MASH, MoveId.ZEN_HEADBUTT, MoveId.BULLET_PUNCH, MoveId.EARTHQUAKE],
+        }),
+      ];
+    },
+  },
   // ===========================================================================
   // FIXES — this session
   // ===========================================================================

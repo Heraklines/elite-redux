@@ -16,6 +16,7 @@ import { BiomeShopUiHandler } from "#ui/biome-shop-ui-handler";
 import { BugReportFormUiHandler } from "#ui/bug-report-form-ui-handler";
 import { GameChallengesUiHandler } from "#ui/challenges-select-ui-handler";
 import { ChangePasswordFormUiHandler } from "#ui/change-password-form-ui-handler";
+import { ColosseumUiHandler } from "#ui/colosseum-ui-handler";
 import { CommandUiHandler } from "#ui/command-ui-handler";
 import { ConfirmUiHandler } from "#ui/confirm-ui-handler";
 import { EggGachaUiHandler } from "#ui/egg-gacha-ui-handler";
@@ -190,6 +191,7 @@ export class UI extends Phaser.GameObjects.Container {
       new LlmDirectorThemePickerUiHandler(),
       new BugReportFormUiHandler(),
       new BiomeShopUiHandler(),
+      new ColosseumUiHandler(),
     ];
   }
 

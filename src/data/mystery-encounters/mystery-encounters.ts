@@ -6,6 +6,7 @@ import { AnOfferYouCantRefuseEncounter } from "#mystery-encounters/an-offer-you-
 import { BerriesAboundEncounter } from "#mystery-encounters/berries-abound-encounter";
 import { BugTypeSuperfanEncounter } from "#mystery-encounters/bug-type-superfan-encounter";
 import { ClowningAroundEncounter } from "#mystery-encounters/clowning-around-encounter";
+import { ColosseumEncounter } from "#mystery-encounters/colosseum-encounter";
 import { DancingLessonsEncounter } from "#mystery-encounters/dancing-lessons-encounter";
 import { DarkDealEncounter } from "#mystery-encounters/dark-deal-encounter";
 import { DelibirdyEncounter } from "#mystery-encounters/delibirdy-encounter";
@@ -153,6 +154,7 @@ const humanTransitableBiomeEncounters: MysteryEncounterType[] = [
   // MysteryEncounterType.AN_OFFER_YOU_CANT_REFUSE, Disabled
   MysteryEncounterType.THE_WINSTRATE_CHALLENGE,
   MysteryEncounterType.THE_EXPERT_POKEMON_BREEDER,
+  MysteryEncounterType.COLOSSEUM,
 ];
 
 const civilizationBiomeEncounters: MysteryEncounterType[] = [
@@ -257,6 +259,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.UNCOMMON_BREED] = UncommonBreedEncounter;
   allMysteryEncounters[MysteryEncounterType.GLOBAL_TRADE_SYSTEM] = GlobalTradeSystemEncounter;
   allMysteryEncounters[MysteryEncounterType.THE_EXPERT_POKEMON_BREEDER] = TheExpertPokemonBreederEncounter;
+  allMysteryEncounters[MysteryEncounterType.COLOSSEUM] = ColosseumEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

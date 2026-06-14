@@ -55,7 +55,10 @@ export class LoadingScene extends SceneBase {
       .loadImage("er_binfo_field_tile", "elite-redux/battle-info", "field-forest.png")
       .loadImage("er_binfo_stat_up", "elite-redux/battle-info", "stat_up_arrow.png")
       .loadImage("er_binfo_stat_down", "elite-redux/battle-info", "stat_down_arrow.png")
-      .loadImage("er_binfo_check", "elite-redux/battle-info", "check.png");
+      .loadImage("er_binfo_check", "elite-redux/battle-info", "check.png")
+      // ER Colosseum (#439): full-screen tournament-arena backdrop (BW2-derived
+      // stone-pillar hall) for the press-your-luck gauntlet UI.
+      .loadImage("er_colosseum_bg", "elite-redux/colosseum", "colosseum_bg.png");
     // ER Biome Market (#440): the shopkeeper is a real PokeRogue trainer-class
     // sprite cast per biome (clerk for towns, fisherman for the sea, firebreather
     // for the volcano, hex maniac for the graveyard, etc. - see KEEPER_BY_BIOME).

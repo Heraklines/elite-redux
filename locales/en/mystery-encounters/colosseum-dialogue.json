@@ -1,0 +1,21 @@
+{
+  "intro": "A grand arena rises before you, its stone pillars worn by countless battles.",
+  "speaker": "Colosseum Master",
+  "introDialogue": "Welcome, challenger, to the Colosseum!$Win battle after battle and the rewards keep climbing. Stop whenever you like to claim your prize, but push too far and you walk away with nothing. How far will you go?",
+  "title": "The Colosseum",
+  "description": "A rising gauntlet of trainers. After every win, CONTINUE to chase a higher reward tier (D up to EX) or CASH OUT to bank what you have. Survivors are patched up between rounds, but lose a battle and the prize is gone.",
+  "query": "Do you accept the challenge?",
+  "option": {
+    "1": {
+      "label": "Enter the Colosseum",
+      "tooltip": "(-) Back-to-back trainer battles\n(+) Rewards ramp from D to EX",
+      "selected": "Then let the gauntlet begin!"
+    },
+    "2": {
+      "label": "Leave",
+      "tooltip": "(-) No reward",
+      "selected": "You step away from the arena."
+    }
+  },
+  "reward": "Colosseum cleared at the {{tier}} tier! You pocket ₽{{money}} and claim your prize."
+}

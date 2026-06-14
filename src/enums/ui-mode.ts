@@ -52,4 +52,6 @@ export enum UiMode {
   BUG_REPORT_FORM,
   /** ER #440: the bespoke every-10-waves biome market (full-screen grid shop). */
   BIOME_SHOP,
+  /** ER #439: the Colosseum press-your-luck gauntlet choice screen. */
+  COLOSSEUM,
 }
