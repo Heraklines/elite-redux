@@ -226,14 +226,16 @@ export class BiomeShopUiHandler extends UiHandler {
     this.shopContainer.setVisible(false);
     ui.add(this.shopContainer);
 
-    // Backdrop: the ACTUAL biome scenery (the bg already loaded for this wave's
-    // arena), set per-biome in show(). A dark overlay keeps text/panel readable.
+    // Backdrop: the ACTUAL biome scenery, exactly as it looks during play (the
+    // bg already loaded for this wave's arena), set per-biome in show(). Only a
+    // very light dimming so it reads as the live biome, not a darkened panel -
+    // the grid window already darkens the item area for readability.
     // Falls back to the game's default_bg panel if a biome bg is missing.
     this.bg = globalScene.add.image(0, 0, "default_bg").setOrigin(0);
     this.bg.setDisplaySize(w, h);
     this.shopContainer.add(this.bg);
 
-    this.bgOverlay = globalScene.add.rectangle(0, 0, w, h, 0x10101c, 0.4).setOrigin(0);
+    this.bgOverlay = globalScene.add.rectangle(0, 0, w, h, 0x10101c, 0.12).setOrigin(0);
     this.shopContainer.add(this.bgOverlay);
 
     // Framed shelf window for the item grid (right two thirds).
