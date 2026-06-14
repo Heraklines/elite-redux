@@ -24,7 +24,6 @@
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
-import { ER_BIOME_ECONOMY, erBiomeHasShop } from "#data/elite-redux/er-biome-economy";
 import type { ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
@@ -49,8 +48,6 @@ import { erCommunityItemModifierType } from "#modifiers/modifier-type";
 import type { Variant } from "#sprites/variant";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { Starter, StarterMoveset } from "#types/save-data";
-import { KEEPER_BY_BIOME, POKEMON_KEEPER_BY_BIOME, SHOP_TYPE_BY_BIOME } from "#ui/biome-shop-ui-handler";
-import { getBiomeName } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 export interface DevScenario {
@@ -216,92 +213,7 @@ function givePlayerCommunityItems(items: [ErCommunityItemKind, number][]): void 
 
 // --- scenarios --------------------------------------------------------------
 
-// --- #440 biome shop previews: one scenario per biome that runs a shop ------
-// Each drops you at a wave-10 boss IN the chosen biome with a lvl-100 sweeper vs
-// a lvl-5 Magikarp - win the (~2 turn) fight and THAT biome's shop opens, so the
-// team can eyeball every market: its shop-type name, keeper sprite, signature
-// stock, per-biome discounts, rarity-tier P prices and per-item stock counts.
-const BIOME_SHOP_SWEEPER: MoveId[] = [MoveId.THUNDERBOLT, MoveId.ICE_BEAM, MoveId.SHADOW_BALL, MoveId.FLAMETHROWER];
-
-/** Human label for a biome's shopkeeper (Pokemon name, or trainer-class key). */
-function biomeKeeperLabel(biome: BiomeId): string {
-  const pkmn = POKEMON_KEEPER_BY_BIOME[biome];
-  if (pkmn != null) {
-    return `${getPokemonSpecies(pkmn).getName()} (Pokemon keeper)`;
-  }
-  return (KEEPER_BY_BIOME[biome] ?? "clerk_m").replace(/_/g, " ");
-}
-
-// Fat wallet so a tester can buy every tier (and watch stock deplete to SOLD,
-// then watch slots dim as the wallet runs dry at deep waves) - the point is to
-// REFINE prices/stock, not to grind money.
-const BIOME_SHOP_WALLET = 250000;
-
-function biomeShopScenario(biome: BiomeId, wave = 10): DevScenario {
-  const eco = ER_BIOME_ECONOMY[biome]!;
-  const name = getBiomeName(biome);
-  const shop = SHOP_TYPE_BY_BIOME[biome] ?? "Market";
-  const depth = wave === 10 ? "" : ` @w${wave}`;
-  return {
-    label: `Shop${depth}: ${name} ${shop}`,
-    description:
-      `#440 biome market preview - ${name.toUpperCase()} ${shop.toUpperCase()} (wave ${wave}).\n`
-      + `DO: win the wave-${wave} boss (lvl100 Mewtwo vs lvl5 Magikarp, ~2 turns)\n`
-      + "to open THIS biome's shop. You start with a FAT WALLET so you can buy\n"
-      + "every tier and judge prices + stock directly.\n"
-      + `KEEPER: ${biomeKeeperLabel(biome)}.   global price x${eco.priceMod}.\n`
-      + `SIGNATURES (always stocked): ${eco.signature.join(", ") || "(none)"}.\n`
-      + `CHEAPER here: ${eco.cheap.join(", ") || "-"}.   PRICIER: ${eco.dear.join(", ") || "-"}.\n`
-      + "EXPECT: banner shows the shop name, biome scenery behind a dark overlay,\n"
-      + "P prices BY RARITY TIER (balls escalate, Focus Band > Quick Claw, and the\n"
-      + "whole curve scales UP at deeper waves), per-item stock (xN -> SOLD once you\n"
-      + "buy a slot out), the hovered item in FULL colour, item descriptions on\n"
-      + "select, NO healing items.\n"
-      + "NEW high-value stock (only where a biome features it): Mega Bracelet\n"
-      + "(Metropolis/Dojo), Ability Randomizer / Move Slot Expander / Omni Gem\n"
-      + "(Lab/Space/Ruins), vitamins (Dojo/Construction/Metropolis), Ethers + PP Ups\n"
-      + "(Power Plant/Forest/Lake/Snowy Forest) - buy + apply each to a party mon.\n"
-      + "The LEAVE hint bottom-right now shows YOUR Cancel binding, not a hardcoded\n"
-      + "B - rebind Cancel in Options (or use a gamepad) and confirm the glyph\n"
-      + "follows. Buy repeatedly to refine; the Cancel button leaves.\n"
-      + "MONEY: after buying a HELD item (Focus Band, a claw, Lucky Heart, a lens)\n"
-      + "and assigning it to a mon, your money MUST drop by the listed price - the\n"
-      + "held-item purchase used to apply the item for free.",
-    setup: () => {
-      resetDevOverrides();
-      setOverrides({
-        STARTING_WAVE_OVERRIDE: wave,
-        STARTING_BIOME_OVERRIDE: biome,
-        STARTING_LEVEL_OVERRIDE: 100,
-        STARTING_MONEY_OVERRIDE: BIOME_SHOP_WALLET,
-        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
-        ENEMY_LEVEL_OVERRIDE: 5,
-        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
-        MOVESET_OVERRIDE: BIOME_SHOP_SWEEPER,
-      });
-      return [makeStarter(SpeciesId.MEWTWO, { moveset: BIOME_SHOP_SWEEPER })];
-    },
-  };
-}
-
-const BIOME_SHOP_PREVIEW_SCENARIOS: DevScenario[] = [
-  // One preview per biome that runs a shop, at wave 10 (the Abyss is noShop).
-  ...Object.keys(ER_BIOME_ECONOMY)
-    .map(k => Number(k) as BiomeId)
-    .filter(b => erBiomeHasShop(b))
-    .map(b => biomeShopScenario(b)),
-  // Price-scaling spot-checks at depth: a pricey caravan, a discount den, and a
-  // neutral mart at mid/late waves, so you can see the rarity-tier curve grow
-  // (a Rogue item at wave 10 vs wave 100 vs wave 190).
-  biomeShopScenario(BiomeId.DESERT, 50),
-  biomeShopScenario(BiomeId.DESERT, 100),
-  biomeShopScenario(BiomeId.SLUM, 100),
-  biomeShopScenario(BiomeId.TOWN, 150),
-  biomeShopScenario(BiomeId.CAVE, 190),
-];
-
 export const DEV_SCENARIOS: DevScenario[] = [
-  ...BIOME_SHOP_PREVIEW_SCENARIOS,
   // ===========================================================================
   // FEATURES — this session
   // ===========================================================================

@@ -220,6 +220,10 @@ async function colosseumBetweenBattles(): Promise<void> {
   }
 
   const choice = await openColosseumChoice(wins);
+  // Pop the Colosseum overlay back to the underlying mode BEFORE the next battle
+  // / reward flow runs - otherwise the next trainer's intro dialogue can't take
+  // the screen and the run appears frozen.
+  await globalScene.ui.revertMode();
   if (choice === COLOSSEUM_CONTINUE) {
     await startNextColosseumBattle(wins + 1);
   } else {
@@ -236,7 +240,9 @@ function openColosseumChoice(wins: number): Promise<number> {
       tierLabel: TIER_LADDER[wins - 1],
       nextTierLabel: TIER_LADDER[Math.min(wins, MAX_ROUNDS - 1)],
     };
-    globalScene.ui.setMode(UiMode.COLOSSEUM, data, (choice: number) => {
+    // Overlay (not setMode) so the underlying battle/message mode survives
+    // underneath and reverting restores it cleanly for the next fight.
+    globalScene.ui.setOverlayMode(UiMode.COLOSSEUM, data, (choice: number) => {
       resolve(choice === COLOSSEUM_CASH_OUT ? COLOSSEUM_CASH_OUT : COLOSSEUM_CONTINUE);
     });
   });
