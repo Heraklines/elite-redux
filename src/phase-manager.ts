@@ -23,6 +23,7 @@ import { BiomeShopPhase } from "#phases/biome-shop-phase";
 import { CheckInterludePhase } from "#phases/check-interlude-phase";
 import { CheckStatusEffectPhase } from "#phases/check-status-effect-phase";
 import { CheckSwitchPhase } from "#phases/check-switch-phase";
+import { ColosseumChoicePhase } from "#phases/colosseum-choice-phase";
 import { CommandPhase } from "#phases/command-phase";
 import { CommonAnimPhase } from "#phases/common-anim-phase";
 import { DamageAnimPhase } from "#phases/damage-anim-phase";
@@ -135,6 +136,7 @@ const PHASES = Object.freeze({
   BattleEndPhase,
   BerryPhase,
   BiomeShopPhase,
+  ColosseumChoicePhase,
   CheckInterludePhase,
   CheckStatusEffectPhase,
   CheckSwitchPhase,
