@@ -196,12 +196,12 @@ export interface ErBiomeShopStockEntry {
  * discount/markup (erBiomeCategoryPriceMod) multiplies on top.
  */
 export const ER_SHOP_ITEM_TIER_FACTOR: Record<ModifierTier, number> = {
-  [ModifierTier.COMMON]: 0.25,
-  [ModifierTier.GREAT]: 0.7,
-  [ModifierTier.ULTRA]: 1.8,
-  [ModifierTier.ROGUE]: 4,
-  [ModifierTier.MASTER]: 8,
-  [ModifierTier.LUXURY]: 6,
+  [ModifierTier.COMMON]: 0.35,
+  [ModifierTier.GREAT]: 1.0,
+  [ModifierTier.ULTRA]: 2.6,
+  [ModifierTier.ROGUE]: 6,
+  [ModifierTier.MASTER]: 12,
+  [ModifierTier.LUXURY]: 9,
 };
 
 /** How many of an item the market stocks, by rarity (rarer = scarcer). */
@@ -288,9 +288,10 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
   const priceOf = (key: keyof typeof modifierTypes, category: ErShopCategory): number =>
     erBiomeShopPrice(CATEGORY_TIER[category], erBiomeCategoryPriceMod(biome, category));
   // Spec (#440 §1): the market is a 4x4 GRID of 16 slots, not a single row.
-  // 4 ball staples + biome signatures + biome-skewed (discounted) picks +
-  // rarity wildcards, padded to 16. NEVER healing (maintainer rule: the biome
-  // market is a distinct shop, healing stays the normal-wave shop's job).
+  // Biome signatures + biome-skewed (discounted) picks + weighted wildcards
+  // (balls/berries are wildcards now, NOT guaranteed staples - they used to
+  // appear in every shop), padded to 16. NEVER healing (maintainer rule: the
+  // biome market is a distinct shop, healing stays the normal-wave shop's job).
   const TARGET_SLOTS = ER_BIOME_SHOP_SLOTS;
   const add = (key: keyof typeof modifierTypes, category: ErShopCategory) => {
     if (!seen.has(key) && stock.length < TARGET_SLOTS) {
@@ -301,13 +302,7 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
 
   globalScene.executeWithSeedOffset(
     () => {
-      // 1. STAPLES: the four ball tiers, always in stock. The real price is set
-      // by each ball's rarity tier in the shop hook (Poke < Great < Ultra <
-      // Rogue), so they no longer all read the same.
-      for (const key of ER_SHOP_CATEGORY_POOL.BALLS) {
-        add(key, "BALLS");
-      }
-      // 2. SIGNATURES: the biome's identity items, always stocked, ultra-priced.
+      // 1. SIGNATURES: the biome's identity items, always stocked, ultra-priced.
       for (const key of eco.signature) {
         if (!seen.has(key) && stock.length < TARGET_SLOTS) {
           seen.add(key);
@@ -356,8 +351,13 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
       }
       // ...then the universal exotic pool (heavier for the Desert caravan)...
       pushCat("HELD", biome === BiomeId.DESERT ? 4 : 2);
-      // ...then a light sprinkle of the rest for variety.
-      for (const cat of ["EVO", "TM", "BATTLE", "BERRY", "CANDY", "MINT"] as ErShopCategory[]) {
+      // Balls are a LIGHT wildcard now (not a guaranteed 4-ball staple), so a
+      // shop usually carries a ball or two but not always all four.
+      pushCat("BALLS", 2);
+      // ...then a light sprinkle of the rest for variety. BERRY is intentionally
+      // NOT a universal wildcard (it showed up in every shop / always Sitrus);
+      // berries now only appear where a biome features them (cheap/signature).
+      for (const cat of ["EVO", "TM", "BATTLE", "CANDY", "MINT"] as ErShopCategory[]) {
         pushCat(cat, 1);
       }
       let guard = 0;

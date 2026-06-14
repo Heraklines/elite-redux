@@ -27,7 +27,7 @@ import { ModifierTier } from "#enums/modifier-tier";
 import { UiMode } from "#enums/ui-mode";
 import type { Modifier } from "#modifiers/modifier";
 import { HealShopCostModifier } from "#modifiers/modifier";
-import type { ModifierTypeOption } from "#modifiers/modifier-type";
+import type { ModifierTypeOption, PokemonModifierType } from "#modifiers/modifier-type";
 import { getPlayerShopModifierTypeOptionsForWave } from "#modifiers/modifier-type";
 import type { ModifierSelectCallback } from "#phases/select-modifier-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
@@ -129,5 +129,31 @@ export class BiomeShopPhase extends SelectModifierPhase {
   /** Re-show the market after the party-target menu is cancelled. */
   protected override resetModifierSelect(_modifierSelectCallback: ModifierSelectCallback): void {
     this.openBiomeShop();
+  }
+
+  /**
+   * Held items / TMs / candies open a party target-picker. The base does this
+   * with setModeWithoutClear (no clear()), so our opaque full-screen shop would
+   * stay drawn ON TOP of the picker and read as a freeze. Hide the shop first;
+   * the handler's show() / openBiomeShop() re-reveals it when the shop regains
+   * focus (after a buy or a cancel).
+   */
+  protected override openModifierMenu(
+    modifierType: PokemonModifierType,
+    cost: number,
+    cb: ModifierSelectCallback,
+  ): void {
+    this.hideShopForOverlay();
+    super.openModifierMenu(modifierType, cost, cb);
+  }
+
+  protected override openFusionMenu(modifierType: PokemonModifierType, cost: number, cb: ModifierSelectCallback): void {
+    this.hideShopForOverlay();
+    super.openFusionMenu(modifierType, cost, cb);
+  }
+
+  private hideShopForOverlay(): void {
+    const handler = globalScene.ui.getHandler() as { hideForOverlay?: () => void };
+    handler.hideForOverlay?.();
   }
 }

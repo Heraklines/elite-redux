@@ -305,9 +305,12 @@ export class BiomeShopUiHandler extends UiHandler {
       return true;
     }
 
-    // Re-shown after a party-target purchase: refresh money + affordability.
+    // Re-shown after a party-target purchase (the shop was hidden via
+    // hideForOverlay while the party menu was up): restore the cursor + refresh
+    // money/affordability/stock.
     this.shopContainer.setVisible(true);
     this.active = true;
+    this.moveCursorTo(this.cursor);
     this.refresh();
     return true;
   }
@@ -503,9 +506,21 @@ export class BiomeShopUiHandler extends UiHandler {
     }
 
     if (moved) {
-      globalScene.playSound("se/select");
+      globalScene.ui.playSelect();
     }
     return moved;
+  }
+
+  /**
+   * Hide the full-screen shop WITHOUT tearing it down, so a menu overlaid via
+   * setModeWithoutClear (the party target-picker the buy flow opens for a held
+   * item) renders ON TOP instead of behind this opaque overlay - which read as
+   * a freeze. Restored by show() / openBiomeShop() when the shop regains focus.
+   */
+  hideForOverlay(): void {
+    this.shopContainer.setVisible(false);
+    this.cursorObj.setVisible(false);
+    this.active = false;
   }
 
   clear(): void {
