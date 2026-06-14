@@ -25,12 +25,14 @@ import { globalScene } from "#app/global-scene";
 import { ER_BIOME_SHOP_SLOTS } from "#data/elite-redux/er-biome-economy";
 import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
+import { Device } from "#enums/devices";
 import { PlayerGender } from "#enums/player-gender";
 import { SpeciesId } from "#enums/species-id";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import { getBiomeKey } from "#field/arena";
 import type { ModifierTypeOption } from "#modifiers/modifier-type";
+import { SettingKeyboard } from "#system/settings-keyboard";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
@@ -193,6 +195,7 @@ export class BiomeShopUiHandler extends UiHandler {
   private descText: Phaser.GameObjects.Text;
   private moneyText: Phaser.GameObjects.Text;
   private leaveText: Phaser.GameObjects.Text;
+  private leaveIcon: Phaser.GameObjects.Sprite;
   private cursorObj: Phaser.GameObjects.Rectangle;
 
   /** One {icon, price, qty} trio per stocked slot. */
@@ -274,9 +277,17 @@ export class BiomeShopUiHandler extends UiHandler {
     this.moneyText.setOrigin(1, 0);
     this.shopContainer.add(this.moneyText);
 
-    this.leaveText = addTextObject(w - 4, h - 6, "B: Leave", TextStyle.PARTY, { fontSize: "42px" });
-    this.leaveText.setOrigin(1, 1);
+    // "<button>: Leave" hint. The button glyph is resolved to the player's
+    // actual Cancel binding (keyboard key or gamepad face button) in
+    // updateLeaveHint(), refreshed each show() so a rebind / device swap shows
+    // the right key instead of a hardcoded "B".
+    this.leaveText = addTextObject(w - 4, h - 6, "Leave", TextStyle.PARTY, { fontSize: "42px" });
+    this.leaveText.setOrigin(0, 1);
     this.shopContainer.add(this.leaveText);
+
+    this.leaveIcon = globalScene.add.sprite(0, h - 6, "keyboard", "X.png");
+    this.leaveIcon.setOrigin(1, 1).setScale(0.6);
+    this.shopContainer.add(this.leaveIcon);
 
     this.cursorObj = globalScene.add.rectangle(0, 0, 44, 26, 0xffffff, 0);
     this.cursorObj.setStrokeStyle(1, 0xf8d030);
@@ -301,6 +312,7 @@ export class BiomeShopUiHandler extends UiHandler {
       this.cursor = 0;
       this.moveCursorTo(0);
       this.refresh();
+      this.updateLeaveHint();
 
       this.shopContainer.setVisible(true);
       this.active = true;
@@ -314,7 +326,37 @@ export class BiomeShopUiHandler extends UiHandler {
     this.active = true;
     this.moveCursorTo(this.cursor);
     this.refresh();
+    this.updateLeaveHint();
     return true;
+  }
+
+  /**
+   * Resolve the "Leave" hint glyph to the player's CURRENT Cancel binding
+   * (last-used device + remaps), mirroring CommandUiHandler.updateInfoHint, and
+   * right-align the [glyph] Leave pair to the bottom-right corner. Falls back to
+   * the keyboard atlas for touch (no separate touch glyph for Cancel).
+   */
+  private updateLeaveHint(): void {
+    let gamepadType: string;
+    if (globalScene.inputMethod === "gamepad") {
+      const device = globalScene.inputController.selectedDevice[Device.GAMEPAD];
+      gamepadType = device == null ? "keyboard" : globalScene.inputController.getConfig(device).padType;
+    } else {
+      gamepadType = globalScene.inputMethod;
+    }
+    let iconPath: string | undefined;
+    if (gamepadType === "touch") {
+      gamepadType = "keyboard";
+      iconPath = "X.png";
+    } else {
+      iconPath = globalScene.inputController?.getIconForLatestInputRecorded(SettingKeyboard.BUTTON_CANCEL);
+    }
+    if (gamepadType && iconPath) {
+      this.leaveIcon.setTexture(gamepadType, iconPath).setVisible(true);
+    }
+    const textX = globalScene.scaledCanvas.width - 4 - this.leaveText.displayWidth;
+    this.leaveText.setX(textX);
+    this.leaveIcon.setX(textX - 2);
   }
 
   /** Use the live biome scenery as the backdrop; fall back to default_bg. */

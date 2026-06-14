@@ -251,7 +251,14 @@ function biomeShopScenario(biome: BiomeId, wave = 10): DevScenario {
       + "P prices BY RARITY TIER (balls escalate, Focus Band > Quick Claw, and the\n"
       + "whole curve scales UP at deeper waves), per-item stock (xN -> SOLD once you\n"
       + "buy a slot out), the hovered item in FULL colour, item descriptions on\n"
-      + "select, NO healing items. Buy repeatedly to refine; B leaves.",
+      + "select, NO healing items.\n"
+      + "NEW high-value stock (only where a biome features it): Mega Bracelet\n"
+      + "(Metropolis/Dojo), Ability Randomizer / Move Slot Expander / Omni Gem\n"
+      + "(Lab/Space/Ruins), vitamins (Dojo/Construction/Metropolis), Ethers + PP Ups\n"
+      + "(Power Plant/Forest/Lake/Snowy Forest) - buy + apply each to a party mon.\n"
+      + "The LEAVE hint bottom-right now shows YOUR Cancel binding, not a hardcoded\n"
+      + "B - rebind Cancel in Options (or use a gamepad) and confirm the glyph\n"
+      + "follows. Buy repeatedly to refine; the Cancel button leaves.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
