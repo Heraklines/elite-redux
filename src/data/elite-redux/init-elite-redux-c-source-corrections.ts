@@ -372,7 +372,9 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_HOLD_BACK", { power: 40, pp: 40, chance: 0 }],
   ["MOVE_LANDS_WRATH", { power: 90 }],
   ["MOVE_SHORE_UP", { pp: 10 }],
-  ["MOVE_FIRST_IMPRESSION", { power: 90, chance: 0 }],
+  // First Impression shares the Fake Out effect (effect 139): a guaranteed
+  // flinch (dex effectChance 100). chance: 0 here made FlinchAttr never fire.
+  ["MOVE_FIRST_IMPRESSION", { power: 90, chance: 100 }],
   ["MOVE_SPIRIT_SHACKLE", { power: 90 }],
   ["MOVE_STRENGTH_SAP", { pp: 10 }],
   ["MOVE_LEAFAGE", { pp: 40 }],

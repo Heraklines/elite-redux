@@ -583,6 +583,29 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "First Impression flinches",
+    description:
+      "First Impression - in ER it shares the Fake Out effect (#623, effect\n"
+      + "139): a GUARANTEED flinch, usable only on the first turn. Report: it\n"
+      + "wasn't flinching (vanilla First Impression never did).\n"
+      + "DO: turn 1, use First Impression on the slow Snorlax.\n"
+      + "EXPECT: Golisopod moves first (+3 priority), and Snorlax FLINCHES -\n"
+      + "it cannot use Tackle this turn ('flinched and couldn't move'). Turn 2,\n"
+      + "First Impression FAILS (first-turn only), confirming the gate still works.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.FIRST_IMPRESSION, MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [makeStarter(SpeciesId.GOLISOPOD, { moveset: [MoveId.FIRST_IMPRESSION, MoveId.SPLASH] })];
+    },
+  },
+  {
     label: "Berry Smash eats a berry",
     description:
       "#342/#398 Berry Smash — the user must EAT one of its held berries.\n"

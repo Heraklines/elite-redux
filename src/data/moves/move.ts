@@ -11993,6 +11993,11 @@ export function initMoves() {
       .attr(SandHealAttr)
       .triageMove(),
     new AttackMove(MoveId.FIRST_IMPRESSION, PokemonType.BUG, MoveCategory.PHYSICAL, 90, 100, 10, -1, 2, 7) //
+      // ER (#623): First Impression shares the Fake Out effect (effect 139) -
+      // a guaranteed flinch, usable only on the first turn. Vanilla never
+      // flinched, hence the report. The c-source correction sets chance 100 so
+      // FlinchAttr always lands.
+      .attr(FlinchAttr)
       .condition(new FirstMoveCondition(), 3),
     new SelfStatusMove(MoveId.BANEFUL_BUNKER, PokemonType.POISON, -1, 10, -1, 4, 7) //
       .attr(ProtectAttr, BattlerTagType.BANEFUL_BUNKER)
