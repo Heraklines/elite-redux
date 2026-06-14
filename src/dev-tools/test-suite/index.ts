@@ -458,6 +458,9 @@ function openScenarioList(ctx: DevMenuCtx): void {
           setShareCode: code => {
             activeShareCode = code;
           },
+          // Closing the form re-opens this picker so the game keeps a live UI
+          // mode (otherwise: modeless softlock).
+          closeMenu: () => openScenarioList(ctx),
         });
         return true;
       },

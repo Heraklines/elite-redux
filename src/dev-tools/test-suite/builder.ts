@@ -37,6 +37,13 @@ export interface BuilderDeps {
   launch: (scenario: DevScenario) => boolean;
   /** Record the active share code so Send Logs embeds it. */
   setShareCode: (code: string | null) => void;
+  /**
+   * Restore the Phaser dev-scenario picker. The picker's OPTION_SELECT is
+   * cleared while this DOM form is open (so it doesn't fight the form for
+   * keyboard input), which leaves the game with no active UI mode. Closing the
+   * form WITHOUT launching must re-open the picker, or the game softlocks.
+   */
+  closeMenu: () => void;
 }
 
 const SAVED_KEY = "er-dev-saved-scenarios";
@@ -684,6 +691,10 @@ export function openScenarioBuilder(deps: BuilderDeps): void {
     panel.remove();
     if (deps.launch(scenario)) {
       postLaunch();
+    } else {
+      // Launch failed (e.g. setup threw) - restore the picker instead of
+      // leaving the player in a modeless limbo.
+      deps.closeMenu();
     }
   });
   const copyBtn = styledButton("📋 Copy share code", "#2a4d6e");
@@ -736,7 +747,10 @@ export function openScenarioBuilder(deps: BuilderDeps): void {
     setStatus(`Saved "${name}" locally.`, true);
   });
   const closeBtn = styledButton("Close", "#5c2430");
-  closeBtn.addEventListener("click", () => panel.remove());
+  closeBtn.addEventListener("click", () => {
+    panel.remove();
+    deps.closeMenu();
+  });
   actions.append(launchBtn, copyBtn, pasteBtn, saveBtn, closeBtn);
   panel.append(actions);
 
