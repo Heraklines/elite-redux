@@ -258,7 +258,10 @@ function biomeShopScenario(biome: BiomeId, wave = 10): DevScenario {
       + "(Power Plant/Forest/Lake/Snowy Forest) - buy + apply each to a party mon.\n"
       + "The LEAVE hint bottom-right now shows YOUR Cancel binding, not a hardcoded\n"
       + "B - rebind Cancel in Options (or use a gamepad) and confirm the glyph\n"
-      + "follows. Buy repeatedly to refine; the Cancel button leaves.",
+      + "follows. Buy repeatedly to refine; the Cancel button leaves.\n"
+      + "MONEY: after buying a HELD item (Focus Band, a claw, Lucky Heart, a lens)\n"
+      + "and assigning it to a mon, your money MUST drop by the listed price - the\n"
+      + "held-item purchase used to apply the item for free.",
     setup: () => {
       resetDevOverrides();
       setOverrides({

@@ -3092,6 +3092,12 @@ export class BattleScene extends SceneBase {
     const modifiersToRemove: PersistentModifier[] = [];
     if (modifier instanceof PersistentModifier) {
       if ((modifier as PersistentModifier).add(this.modifiers, !!virtual)) {
+        // The modifier was added: report success so purchase flows that gate on
+        // the return value (e.g. SelectModifierPhase.applyModifier deducting the
+        // cost) charge for it. Previously `success` stayed false for a normal
+        // held item, so the ER biome market - the first place held items are
+        // BOUGHT rather than handed out free - never took the player's money.
+        success = true;
         if (modifier instanceof PokemonFormChangeItemModifier) {
           const pokemon = this.getPokemonById(modifier.pokemonId);
           if (pokemon) {
