@@ -1,0 +1,269 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqd6qf1m-fw3y
+mode:     4  wave:12
+seed:     tmAwbozmtCaFR9mOj3lMsbtb
+party:    Kartana Fallen(L13 66hp f0), Beedrill(L12 40hp f0)
+enemy:    Ludicolo(L13), Wugtrio(L13), Dragalge(L13), Vaporeon(L13)
+
+----- CONSOLE -----
+[03:15:40.377] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} (enemy)
+[03:15:40.456] DEBUG: Session data saved to slot 2!
+[03:15:40.456] LOG: Wave Seed: ~wKlyw~MkP\CwYt=vW}l~l 10
+[03:15:40.668] WARN: cry/46 not found
+[03:15:40.885] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[03:15:40.885] LOG: %cStart Phase InitEncounterPhase color:green;
+[03:15:40.886] LOG: %cStart Phase PostSummonPhase color:green;
+[03:15:40.886] LOG: Ran PSP for: Paras
+[03:15:40.887] LOG: %cStart Phase PostSummonPhase color:green;
+[03:15:40.887] LOG: %cStart Phase PostSummonPhase color:green;
+[03:15:40.888] LOG: %cStart Phase TurnInitPhase color:green;
+[03:15:40.888] LOG: %cStart Phase CommandPhase color:green;
+[03:15:42.993] LOG: Move: TRIPLE_AXEL Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Kartana Fallen
+[03:15:42.997] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:15:43.000] LOG: Battle Seed: R7n7SEYZ3DTzJOJ4
+[03:15:43.001] WARN: BattlerTag ER_BLEED is missing a score!
+[03:15:43.003] WARN: BattlerTag ER_BLEED is missing a score!
+[03:15:43.004] LOG: Move Pool: ["Mega Drain","Sleep Powder","Slash","Skitter Smack"]
+[03:15:43.004] LOG: Move Scores: [3.328125,10,8,21]
+[03:15:43.004] LOG: Sorted Move Pool: ["Skitter Smack","Sleep Powder","Slash","Mega Drain"]
+[03:15:43.004] LOG: Chosen Move: Skitter Smack
+[03:15:43.005] LOG: %cStart Phase TurnStartPhase color:green;
+[03:15:43.006] LOG: %cStart Phase MovePhase color:green;
+[03:15:43.006] LOG: %cUser: Kartana Fallen
+Move: TRIPLE_AXEL
+Use Mode: NORMAL color:orchid
+[03:15:43.007] LOG: %cStart Phase MessagePhase color:green;
+[03:15:43.114] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:15:43.117] LOG: crit stage: +0
+[03:15:43.118] LOG: Move: Triple Axel | Base damage: 11.025454545454545 | Power: 20 | Source attack: 73 | Target defense: 22
+[03:15:43.119] LOG: Move: Triple Axel | Attack damage: 20
+[03:15:43.120] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:15:43.153] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:15:43.154] LOG: %cStart Phase MessagePhase color:green;
+[03:15:43.367] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:15:43.369] LOG: crit stage: +0
+[03:15:43.370] LOG: Move: Triple Axel | Base damage: 20.05090909090909 | Power: 40 | Source attack: 73 | Target defense: 22
+[03:15:43.370] LOG: Move: Triple Axel | Attack damage: 36
+[03:15:43.372] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:15:43.402] LOG: %cStart Phase MessagePhase color:green;
+[03:15:43.617] LOG: %cStart Phase MessagePhase color:green;
+[03:15:43.815] LOG: %cStart Phase FaintPhase color:green;
+[03:15:43.817] WARN: cry/46 not found
+[03:15:43.883] LOG: %cStart Phase MessagePhase color:green;
+[03:15:43.959] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:15:44.119] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:15:44.121] LOG: %cStart Phase MessagePhase color:green;
+[03:15:44.349] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:15:44.385] LOG: %cStart Phase VictoryPhase color:green;
+[03:15:44.386] LOG: %cStart Phase MoveEndPhase color:green;
+[03:15:44.386] LOG: %cStart Phase MovePhase color:green;
+[03:15:44.386] LOG: %cStart Phase MoveEndPhase color:green;
+[03:15:44.386] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:15:44.387] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:15:44.387] LOG: %cStart Phase TurnEndPhase color:green;
+[03:15:44.387] LOG: %cStart Phase BattleEndPhase color:green;
+[03:15:44.387] LOG: Battle Score: 105 (1 Turns x1)
+[03:15:44.387] LOG: Total Score: 2120
+[03:15:44.398] LOG: %cStart Phase EggLapsePhase color:green;
+[03:15:44.398] LOG: %cStart Phase ModifierRewardPhase color:green;
+[03:15:44.606] LOG: %cStart Phase ModifierRewardPhase color:green;
+[03:15:45.058] LOG: %cStart Phase SelectModifierPhase color:green;
+[03:16:17.862] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'select') @ https://elite-redux-staging.pages.dev/assets/biome-shop-ui-handler-CyFvcty0.js:5:26819
+[03:16:18.508] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'deselect') @ https://elite-redux-staging.pages.dev/assets/biome-shop-ui-handler-CyFvcty0.js:5:26671
+[03:16:18.508] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'deselect') @ https://elite-redux-staging.pages.dev/assets/biome-shop-ui-handler-CyFvcty0.js:5:26671
+[03:16:18.782] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'deselect') @ https://elite-redux-staging.pages.dev/assets/biome-shop-ui-handler-CyFvcty0.js:5:26671
+[03:16:18.783] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'deselect') @ https://elite-redux-staging.pages.dev/assets/biome-shop-ui-handler-CyFvcty0.js:5:26671
+[03:16:22.091] LOG: %cStart Phase SelectBiomePhase color:green;
+[03:16:22.091] LOG: Wave Seed: ~wKlyw~MkP\CwYt=vW}l~l 10
+[03:16:22.092] LOG: %cStart Phase PartyHealPhase color:green;
+[03:16:24.564] LOG: %cStart Phase ResetStatusPhase color:green;
+[03:16:24.565] LOG: %cStart Phase ResetStatusPhase color:green;
+[03:16:24.567] LOG: %cStart Phase SwitchBiomePhase color:green;
+[03:16:24.995] LOG: %cStart Phase NewBattlePhase color:green;
+[03:16:24.995] LOG: Wave Seed: xLmzxNlQ]DxZu>wX~mm 11
+[03:16:24.996] LOG: Applied Lure 
+[03:16:24.998] LOG: %cStart Phase ReturnPhase color:green;
+[03:16:25.110] LOG: %cStart Phase ShowTrainerPhase color:green;
+[03:16:25.210] LOG: %cStart Phase NewBiomeEncounterPhase color:green;
+[03:16:25.216] LOG: Starting species pool tier: COMMON
+[03:16:25.244] LOG: Pokemon: Wild Meowth | Species ID: 52 | Level: 12 | Nature: Hasty (+Spd/-Def)
+[03:16:25.244] LOG: Stats (IVs): HP: 35 (30), Atk: 17 (14), Def: 14 (29), Spatk: 16 (16), Spdef: 15 (4), Spd: 33 (31)
+[03:16:25.244] LOG: Ability: Limber | Passive Ability: Perfectionist 
+[03:16:25.245] LOG: Moveset: ["Scratch","Growl","Snarl","Pay Day"]
+[03:16:25.245] LOG: Starting species pool tier: COMMON
+[03:16:25.262] LOG: Pokemon: Wild Poochyena | Species ID: 261 | Level: 12 | Nature: Impish (+Def/-SpAtk)
+[03:16:25.262] LOG: Stats (IVs): HP: 30 (0), Atk: 27 (24), Def: 17 (17), Spatk: 13 (24), Spdef: 17 (0), Spd: 27 (31)
+[03:16:25.262] LOG: Ability: Intimidate | Passive Ability: Nocturnal 
+[03:16:25.262] LOG: Moveset: ["Hyper Fang","Roar","Howl","Odor Sleuth"]
+[03:16:26.294] DEBUG: Session data saved to slot 2!
+[03:16:26.296] LOG: Wave Seed: xLmzxNlQ]DxZu>wX~mm 11
+[03:16:26.763] LOG: %cStart Phase LevelCapPhase color:green;
+[03:16:27.452] LOG: %cStart Phase SummonPhase color:green;
+[03:16:27.628] WARN: cry/10777 not found
+[03:16:27.728] LOG: %cStart Phase InitEncounterPhase color:green;
+[03:16:27.731] LOG: %cStart Phase PostSummonPhase color:green;
+[03:16:27.731] LOG: Ran PSP for: Kartana Fallen
+[03:16:27.733] LOG: %cStart Phase PostSummonPhase color:green;
+[03:16:27.735] LOG: %cStart Phase PostSummonPhase color:green;
+[03:16:27.735] LOG: %cStart Phase PostSummonPhase color:green;
+[03:16:27.735] LOG: Ran PSP for: Meowth
+[03:16:27.737] LOG: %cStart Phase PostSummonPhase color:green;
+[03:16:27.737] LOG: %cStart Phase PostSummonPhase color:green;
+[03:16:27.737] LOG: %cStart Phase PostSummonPhase color:green;
+[03:16:27.738] LOG: Ran PSP for: Poochyena
+[03:16:27.738] LOG: %cStart Phase PostSummonPhase color:green;
+[03:16:27.739] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:16:27.899] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:16:27.901] LOG: %cStart Phase MessagePhase color:green;
+[03:16:28.129] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:16:28.164] LOG: %cStart Phase PostSummonPhase color:green;
+[03:16:28.164] LOG: %cStart Phase TurnInitPhase color:green;
+[03:16:28.164] LOG: %cStart Phase CommandPhase color:green;
+[03:16:39.157] LOG: Move: LEAF_BLADE Move targets: {"targets":[2,3],"multiple":false} 
+Player Pokemon: Kartana Fallen
+[03:16:39.160] LOG: %cStart Phase SelectTargetPhase color:green;
+[03:16:39.390] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:16:39.398] LOG: Battle Seed: SdTAjSRa5IauEZbJ
+[03:16:39.402] LOG: Move Pool: ["Scratch","Growl","Snarl","Pay Day"]
+[03:16:39.402] LOG: Move Scores: [5.625,2,14,8.625]
+[03:16:39.402] LOG: Sorted Move Pool: ["Snarl","Pay Day","Scratch","Growl"]
+[03:16:39.402] LOG: Chosen Move: Snarl
+[03:16:39.403] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:16:39.406] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[03:16:39.406] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[03:16:39.407] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[03:16:39.407] LOG: Move Pool: ["Hyper Fang","Roar","Howl","Odor Sleuth"]
+[03:16:39.407] LOG: Move Scores: [9,-20,2,0]
+[03:16:39.407] LOG: Sorted Move Pool: ["Hyper Fang","Howl","Odor Sleuth","Roar"]
+[03:16:39.407] LOG: Chosen Move: Hyper Fang
+[03:16:39.407] LOG: %cStart Phase TurnStartPhase color:green;
+[03:16:39.412] LOG: %cStart Phase MovePhase color:green;
+[03:16:39.412] LOG: %cUser: Kartana Fallen
+Move: LEAF_BLADE
+Use Mode: NORMAL color:orchid
+[03:16:39.416] LOG: %cStart Phase MessagePhase color:green;
+[03:16:39.514] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:16:39.516] LOG: crit stage: +1
+[03:16:39.518] LOG: Move: Leaf Blade | Base damage: 44.84 | Power: 90 | Source attack: 49 | Target defense: 14
+[03:16:39.518] LOG: Move: Leaf Blade | Attack damage: 88
+[03:16:39.519] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:16:39.551] LOG: %cStart Phase MessagePhase color:green;
+[03:16:39.749] LOG: %cStart Phase FaintPhase color:green;
+[03:16:39.816] LOG: %cStart Phase MessagePhase color:green;
+[03:16:40.229] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:16:40.400] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:16:40.401] LOG: %cStart Phase MessagePhase color:green;
+[03:16:40.631] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:16:40.666] LOG: %cStart Phase VictoryPhase color:green;
+[03:16:40.667] LOG: %cStart Phase ExpPhase color:green;
+[03:16:40.667] LOG: Applied Super EXP. Charm 
+[03:16:40.667] LOG: Applied EXP. Charm 
+[03:16:40.833] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[03:16:40.833] LOG: Applied Super EXP. Charm 
+[03:16:40.833] LOG: Applied EXP. Charm 
+[03:16:40.834] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[03:16:40.834] LOG: %cStart Phase MoveEndPhase color:green;
+[03:16:40.835] LOG: %cStart Phase MovePhase color:green;
+[03:16:40.835] LOG: %cStart Phase MoveEndPhase color:green;
+[03:16:40.835] LOG: %cStart Phase MovePhase color:green;
+[03:16:40.836] LOG: %cUser: Poochyena
+Move: HYPER_FANG
+Use Mode: NORMAL color:orchid
+[03:16:40.839] LOG: %cStart Phase MessagePhase color:green;
+[03:16:40.966] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:16:40.968] LOG: crit stage: +0
+[03:16:40.969] LOG: Move: Hyper Fang | Base damage: 10.003076923076923 | Power: 85 | Source attack: 27 | Target defense: 39
+[03:16:40.970] LOG: Move: Hyper Fang | Attack damage: 5
+[03:16:40.970] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:16:41.001] LOG: %cStart Phase MessagePhase color:green;
+[03:16:41.218] LOG: %cStart Phase MoveEndPhase color:green;
+[03:16:41.218] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:16:41.218] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:16:41.218] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:16:41.218] LOG: %cStart Phase BerryPhase color:green;
+[03:16:41.220] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:16:41.221] LOG: %cStart Phase TurnEndPhase color:green;
+[03:16:41.222] LOG: %cStart Phase TurnInitPhase color:green;
+[03:16:41.222] LOG: %cStart Phase CommandPhase color:green;
+[03:16:42.984] LOG: Move: SACRED_SWORD Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Kartana Fallen
+[03:16:42.987] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:16:42.991] LOG: Battle Seed: SdTAjSRa5IauEZbJ
+[03:16:42.991] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[03:16:42.992] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[03:16:42.992] LOG: Move Pool: ["Hyper Fang","Roar","Howl","Odor Sleuth"]
+[03:16:42.992] LOG: Move Scores: [9,-20,2,0]
+[03:16:42.992] LOG: Sorted Move Pool: ["Hyper Fang","Howl","Odor Sleuth","Roar"]
+[03:16:42.993] LOG: Chosen Move: Hyper Fang
+[03:16:42.993] LOG: %cStart Phase TurnStartPhase color:green;
+[03:16:42.994] LOG: %cStart Phase MovePhase color:green;
+[03:16:42.994] LOG: %cUser: Kartana Fallen
+Move: SACRED_SWORD
+Use Mode: NORMAL color:orchid
+[03:16:42.996] LOG: %cStart Phase MessagePhase color:green;
+[03:16:43.099] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:16:43.100] LOG: crit stage: +0
+[03:16:43.102] LOG: Move: Sacred Sword | Base damage: 37.28 | Power: 90 | Source attack: 49 | Target defense: 17
+[03:16:43.102] LOG: Move: Sacred Sword | Attack damage: 73
+[03:16:43.103] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:16:43.134] LOG: %cStart Phase MessagePhase color:green;
+[03:16:43.349] LOG: %cStart Phase FaintPhase color:green;
+[03:16:43.418] LOG: %cStart Phase MessagePhase color:green;
+[03:16:43.491] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:16:43.669] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:16:43.670] LOG: %cStart Phase MessagePhase color:green;
+[03:16:43.900] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:16:43.935] LOG: %cStart Phase VictoryPhase color:green;
+[03:16:43.936] LOG: %cStart Phase ExpPhase color:green;
+[03:16:43.936] LOG: Applied Super EXP. Charm 
+[03:16:43.936] LOG: Applied EXP. Charm 
+[03:16:44.251] LOG: %cStart Phase LevelUpPhase color:green;
+[03:16:44.253] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[03:16:44.253] LOG: Applied Super EXP. Charm 
+[03:16:44.253] LOG: Applied EXP. Charm 
+[03:16:44.253] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[03:16:44.254] LOG: %cStart Phase MoveEndPhase color:green;
+[03:16:44.254] LOG: %cStart Phase MovePhase color:green;
+[03:16:44.254] LOG: %cStart Phase MoveEndPhase color:green;
+[03:16:44.254] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:16:44.254] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:16:44.254] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:16:44.254] LOG: %cStart Phase BerryPhase color:green;
+[03:16:44.255] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:16:44.255] LOG: %cStart Phase TurnEndPhase color:green;
+[03:16:44.255] LOG: %cStart Phase BattleEndPhase color:green;
+[03:16:44.255] LOG: Battle Score: 76 (2 Turns x0.84)
+[03:16:44.255] LOG: Total Score: 2196
+[03:16:44.271] LOG: %cStart Phase EggLapsePhase color:green;
+[03:16:44.271] LOG: %cStart Phase SelectModifierPhase color:green;
+[03:16:44.271] LOG: Wave Seed: xLmzxNlQ]DxZu>wX~mm 11
+[03:16:44.274] LOG: 8 5 [2,3,4,5,6]
+[03:16:44.274] LOG: {"id":"BERRY","localeKey":"","iconImage":"apicot_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":6} 
+[03:16:44.275] LOG: 9 5 [2,3,4,5,6]
+[03:16:44.275] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_normal","group":"tm","soundName":"se/restore","tier":0,"moveId":164} 
+[03:16:44.275] LOG: 0 0 [2,3,4,5,6]
+[03:16:44.275] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[03:17:05.956] LOG: %cStart Phase NewBattlePhase color:green;
+[03:17:05.956] LOG: Wave Seed: yMn{yOmR^Ey[v?xYnn 12
+[03:17:05.956] LOG: Starting trainer pool tier: COMMON
+[03:17:05.957] LOG: Applied Lure 
+[03:17:05.959] LOG: %cStart Phase ReturnPhase color:green;
+[03:17:06.073] LOG: %cStart Phase ShowTrainerPhase color:green;
+[03:17:06.188] LOG: %cStart Phase NextEncounterPhase color:green;
+[03:17:06.219] LOG: Pokemon: Foe Ludicolo | Species ID: 272 | Level: 13 | Nature: Modest (+SpAtk/-Atk)
+[03:17:06.220] LOG: Stats (IVs): HP: 46 (31), Atk: 24 (31), Def: 26 (31), Spatk: 31 (31), Spdef: 33 (31), Spd: 26 (31)
+[03:17:06.220] LOG: Ability: Swift Swim | Passive Ability: Seaweed 
+[03:17:06.220] LOG: Moveset: ["Giga Drain","Leech Seed","Ice Beam","Scald"]
+[03:17:06.239] LOG: Pokemon: Foe Wugtrio | Species ID: 961 | Level: 13 | Nature: Jolly (+Spd/-SpAtk)
+[03:17:06.239] LOG: Stats (IVs): HP: 32 (31), Atk: 31 (31), Def: 18 (31), Spatk: 18 (31), Spdef: 26 (31), Spd: 37 (31)
+[03:17:06.239] LOG: Ability: Accelerate | Passive Ability: Gooey 
+[03:17:06.239] LOG: Moveset: ["Aqua Jet","Dive","Fake Out","Knock Off"]
+[03:17:06.250] LOG: Pokemon: Foe Dragalge | Species ID: 691 | Level: 13 | Nature: Modest (+SpAtk/-Atk)
+[03:17:06.251] LOG: Stats (IVs): HP: 45 (31), Atk: 32 (31), Def: 36 (31), Spatk: 28 (31), Spdef: 39 (31), Spd: 17 (31)
+[03:17:06.251] LOG: Ability: Pressure | Passive Ability: Aquatic 
+[03:17:06.251] LOG: Moveset: ["Acid","Muddy Water","Twister","Brine"]
+[03:17:06.269] LOG: Pokemon: Foe Vaporeon | Species ID: 134 | Level: 13 | Nature: Modest (+SpAtk/-Atk)
+[03:17:06.269] LOG: Stats (IVs): HP: 56 (31), Atk: 28 (31), Def: 19 (31), Spatk: 37 (31), Spdef: 33 (31), Spd: 24 (31)
+[03:17:06.269] LOG: Ability: Drizzle | Passive Ability: Water Veil 
+[03:17:06.270] LOG: Moveset: ["Volt Switch","Hydro Pump","Giga Drain","Calm Mind"]
