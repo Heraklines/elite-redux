@@ -32,7 +32,7 @@ import { setErDifficulty, setErDifficulty as setErDifficultyForScenario } from "
 import { erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
 import { AbilityId } from "#enums/ability-id";
 import { BerryType } from "#enums/berry-type";
-import type { BiomeId } from "#enums/biome-id";
+import { BiomeId } from "#enums/biome-id";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { ErMoveId } from "#enums/er-move-id";
 import { MoveId } from "#enums/move-id";
@@ -126,6 +126,7 @@ const O = Overrides as unknown as MutableOverrides;
 const DEV_OVERRIDE_DEFAULTS = {
   STARTING_LEVEL_OVERRIDE: 0,
   STARTING_WAVE_OVERRIDE: null,
+  STARTING_MONEY_OVERRIDE: 0,
   BATTLE_STYLE_OVERRIDE: null,
   STARTING_BIOME_OVERRIDE: null,
   STARTER_FORM_OVERRIDES: {},
@@ -226,29 +227,38 @@ function biomeKeeperLabel(biome: BiomeId): string {
   return (KEEPER_BY_BIOME[biome] ?? "clerk_m").replace(/_/g, " ");
 }
 
-function biomeShopScenario(biome: BiomeId): DevScenario {
+// Fat wallet so a tester can buy every tier (and watch stock deplete to SOLD,
+// then watch slots dim as the wallet runs dry at deep waves) - the point is to
+// REFINE prices/stock, not to grind money.
+const BIOME_SHOP_WALLET = 250000;
+
+function biomeShopScenario(biome: BiomeId, wave = 10): DevScenario {
   const eco = ER_BIOME_ECONOMY[biome]!;
   const name = getBiomeName(biome);
   const shop = SHOP_TYPE_BY_BIOME[biome] ?? "Market";
+  const depth = wave === 10 ? "" : ` @w${wave}`;
   return {
-    label: `Shop: ${name} ${shop}`,
+    label: `Shop${depth}: ${name} ${shop}`,
     description:
-      `#440 biome market preview - ${name.toUpperCase()} ${shop.toUpperCase()}.\n`
-      + "DO: win the wave-10 boss (lvl100 Mewtwo vs lvl5 Magikarp, ~2 turns) to\n"
-      + "open THIS biome's shop, then assess it.\n"
+      `#440 biome market preview - ${name.toUpperCase()} ${shop.toUpperCase()} (wave ${wave}).\n`
+      + `DO: win the wave-${wave} boss (lvl100 Mewtwo vs lvl5 Magikarp, ~2 turns)\n`
+      + "to open THIS biome's shop. You start with a FAT WALLET so you can buy\n"
+      + "every tier and judge prices + stock directly.\n"
       + `KEEPER: ${biomeKeeperLabel(biome)}.   global price x${eco.priceMod}.\n`
       + `SIGNATURES (always stocked): ${eco.signature.join(", ") || "(none)"}.\n`
       + `CHEAPER here: ${eco.cheap.join(", ") || "-"}.   PRICIER: ${eco.dear.join(", ") || "-"}.\n`
-      + "EXPECT: banner shows the shop name above, biome scenery behind a dark\n"
-      + "overlay, P prices BY RARITY TIER (balls escalate, Focus Band > Quick\n"
-      + "Claw), per-item stock (xN, SOLD at 0), the hovered item in FULL colour,\n"
-      + "item descriptions on select, NO healing items. Buy repeatedly; B leaves.",
+      + "EXPECT: banner shows the shop name, biome scenery behind a dark overlay,\n"
+      + "P prices BY RARITY TIER (balls escalate, Focus Band > Quick Claw, and the\n"
+      + "whole curve scales UP at deeper waves), per-item stock (xN -> SOLD once you\n"
+      + "buy a slot out), the hovered item in FULL colour, item descriptions on\n"
+      + "select, NO healing items. Buy repeatedly to refine; B leaves.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
-        STARTING_WAVE_OVERRIDE: 10,
+        STARTING_WAVE_OVERRIDE: wave,
         STARTING_BIOME_OVERRIDE: biome,
         STARTING_LEVEL_OVERRIDE: 100,
+        STARTING_MONEY_OVERRIDE: BIOME_SHOP_WALLET,
         ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
         ENEMY_LEVEL_OVERRIDE: 5,
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
@@ -259,11 +269,21 @@ function biomeShopScenario(biome: BiomeId): DevScenario {
   };
 }
 
-/** One preview per biome that runs a shop (the Abyss is noShop, so excluded). */
-const BIOME_SHOP_PREVIEW_SCENARIOS: DevScenario[] = Object.keys(ER_BIOME_ECONOMY)
-  .map(k => Number(k) as BiomeId)
-  .filter(b => erBiomeHasShop(b))
-  .map(biomeShopScenario);
+const BIOME_SHOP_PREVIEW_SCENARIOS: DevScenario[] = [
+  // One preview per biome that runs a shop, at wave 10 (the Abyss is noShop).
+  ...Object.keys(ER_BIOME_ECONOMY)
+    .map(k => Number(k) as BiomeId)
+    .filter(b => erBiomeHasShop(b))
+    .map(b => biomeShopScenario(b)),
+  // Price-scaling spot-checks at depth: a pricey caravan, a discount den, and a
+  // neutral mart at mid/late waves, so you can see the rarity-tier curve grow
+  // (a Rogue item at wave 10 vs wave 100 vs wave 190).
+  biomeShopScenario(BiomeId.DESERT, 50),
+  biomeShopScenario(BiomeId.DESERT, 100),
+  biomeShopScenario(BiomeId.SLUM, 100),
+  biomeShopScenario(BiomeId.TOWN, 150),
+  biomeShopScenario(BiomeId.CAVE, 190),
+];
 
 export const DEV_SCENARIOS: DevScenario[] = [
   ...BIOME_SHOP_PREVIEW_SCENARIOS,
