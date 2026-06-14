@@ -2224,8 +2224,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "DO: win this wave-10 fight, wait through the reward popups. EXPECT:\n"
       + "the market opens with the BW art; buy items REPEATEDLY - each buy\n"
       + "deducts money + applies the item and the shop STAYS OPEN (buy as much\n"
-      + "as you can afford). Press B to LEAVE and continue to biome-select.\n"
-      + "The Abyss biome has NO market by design.",
+      + "as you can afford). Press B/Cancel to LEAVE: a Yes/No confirm now asks\n"
+      + "'Are you sure you want to leave the market?' (so a stray Cancel does\n"
+      + "not skip the shop). Pick No to return to the market; pick Yes to\n"
+      + "continue to biome-select. The Abyss biome has NO market by design.",
     setup: () => {
       resetDevOverrides();
       setOverrides({

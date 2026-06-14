@@ -84,6 +84,7 @@
   "turnEndHpRestore": "{{pokemonName}}’s HP was restored.",
   "hpIsFull": "{{pokemonName}}’s\nHP is full!",
   "skipItemQuestion": "Are you sure you want to skip taking an item?",
+  "leaveShopQuestion": "Are you sure you want to leave the market?",
   "itemStackFull": "The stack for {{fullItemName}} is full.\nYou will receive {{itemName}} instead.",
   "eggHatching": "Oh?",
   "eggSkipPrompt": "{{eggsToHatch}} Eggs are ready to hatch.\nSkip to Egg summary?",

@@ -32,6 +32,7 @@ import { getPlayerShopModifierTypeOptionsForWave } from "#modifiers/modifier-typ
 import type { ModifierSelectCallback } from "#phases/select-modifier-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { NumberHolder } from "#utils/common";
+import i18next from "i18next";
 
 export class BiomeShopPhase extends SelectModifierPhase {
   private shopOptions: ModifierTypeOption[] = [];
@@ -84,8 +85,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
   /** Buy slot `index`, or leave the shop when `index < 0`. */
   private onSelect(index: number): boolean {
     if (index < 0) {
-      globalScene.ui.clearText();
-      globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
+      this.confirmLeave();
       return true;
     }
     const option = this.shopOptions[index];
@@ -109,6 +109,36 @@ export class BiomeShopPhase extends SelectModifierPhase {
     this.pendingIndex = index;
     const noop: ModifierSelectCallback = () => false;
     return this.applyChosenModifier(option.type, cost, noop);
+  }
+
+  /**
+   * Cancel out of the market asks for confirmation first (mirrors the reward
+   * screen's "skip taking an item" Yes/No). Players run at high speed and spam
+   * the Cancel button to skip dialogue, so a bare B-to-leave was getting them
+   * out of the shop by accident; the confirm prompt protects against that.
+   */
+  private confirmLeave(): void {
+    // The market backdrop is opaque and full-screen, so leaving it drawn would
+    // cover the question text + the Yes/No box. Hide it for the prompt (the same
+    // trick the held-item party overlay uses); "No" re-opens it.
+    this.hideShopForOverlay();
+    globalScene.ui.showText(i18next.t("battle:leaveShopQuestion"), null, () => {
+      globalScene.ui.setOverlayMode(
+        UiMode.CONFIRM,
+        () => {
+          // YES: pop the confirm, drop the prompt, hand off to the next phase.
+          globalScene.ui.revertMode();
+          globalScene.ui.clearText();
+          globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
+        },
+        () => {
+          // NO: drop the prompt and re-show the market (setMode out of CONFIRM
+          // rebuilds + re-reveals the hidden shop).
+          globalScene.ui.clearText();
+          this.openBiomeShop();
+        },
+      );
+    });
   }
 
   /**
