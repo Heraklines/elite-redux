@@ -7,10 +7,12 @@
 // =============================================================================
 // ER Colosseum (#439) - the press-your-luck gauntlet standings board.
 //
-// Styled after the BW2 Pokemon World Tournament entry/bracket screen: a clean
-// dark tournament board (NOT a battle photo), a framed two-column roster of all
-// 15 entrants (cleared / next-up / upcoming), a gold champion crown over the
-// final challenger, the current reward GRADE, and CONTINUE / CASH OUT buttons.
+// Styled after the BW2 Pokemon World Tournament entry screen: a deep-navy
+// tournament board (NOT a battle photo) crowned by the AUTHENTIC PWT crest
+// (crown + shield + laurel wreath + star, ripped from the BW2 ROM and recoloured
+// gold), a "WORLD TOURNAMENT" wordmark, a framed two-column roster of all 15
+// entrants (cleared / next-up / upcoming), a gold champion crown over the final
+// challenger, the current reward GRADE, and CONTINUE / CASH OUT buttons.
 // Pure presentation + a 2-way callback; ColosseumChoicePhase owns the logic.
 // =============================================================================
 
@@ -47,18 +49,20 @@ export type ColosseumChoiceCallback = (choice: number) => void;
 const GOLD = 0xf8d030; // cleared / banked / champion
 const NEXT = 0x48c8f8; // the next challenger (CONTINUE target)
 const TODO = 0x9098b0; // not yet faced
-const BOARD = 0x0a1020; // tournament board base
-const PANEL = 0x141d33; // column panels
+const BOARD = 0x0b1838; // deep-navy tournament board base (BW2 PWT)
+const BOARD_TOP = 0x16284f; // lighter navy top band
+const PANEL = 0x122146; // column panels
 
 export class ColosseumUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
   private board: Phaser.GameObjects.Rectangle;
+  private boardTop: Phaser.GameObjects.Rectangle;
   private frame: Phaser.GameObjects.NineSlice;
   private leftPanel: Phaser.GameObjects.Rectangle;
   private rightPanel: Phaser.GameObjects.Rectangle;
   private crown: Phaser.GameObjects.Graphics;
-  private titleText: Phaser.GameObjects.Text;
-  private subtitleText: Phaser.GameObjects.Text;
+  private crest: Phaser.GameObjects.Image;
+  private wordmark: Phaser.GameObjects.Text;
   private statusText: Phaser.GameObjects.Text;
   private gradeWindow: Phaser.GameObjects.NineSlice;
   private gradeLabel: Phaser.GameObjects.Text;
@@ -83,23 +87,32 @@ export class ColosseumUiHandler extends UiHandler {
     this.container.setVisible(false);
     ui.add(this.container);
 
-    // Clean dark tournament board (no battle photo) + a framed border.
+    // Deep-navy tournament board (no battle photo) with a lighter top band +
+    // a framed border, the BW2 PWT look.
     this.board = globalScene.add.rectangle(0, 0, w, h, BOARD, 1).setOrigin(0);
     this.container.add(this.board);
+    this.boardTop = globalScene.add.rectangle(0, 0, w, 44, BOARD_TOP, 1).setOrigin(0);
+    this.container.add(this.boardTop);
     this.frame = addWindow(2, 2, w - 4, h - 4);
     this.container.add(this.frame);
 
-    this.titleText = addTextObject(w / 2, 5, "COLOSSEUM", TextStyle.WINDOW, { fontSize: "84px" });
-    this.titleText.setOrigin(0.5, 0);
-    this.container.add(this.titleText);
+    // The authentic gold PWT crest is the hero of the board, centred at the top.
+    // Guard against a first-load CDN miss so we never show the missing-texture box.
+    if (globalScene.textures.exists("er_pwt_crest")) {
+      this.crest = globalScene.add.image(w / 2, 3, "er_pwt_crest");
+      this.crest.setOrigin(0.5, 0);
+      this.crest.setScale(26 / 123); // ripped crest is 112x123; render ~26px tall
+      this.container.add(this.crest);
+    }
 
-    this.subtitleText = addTextObject(w / 2, 22, "WORLD TOURNAMENT", TextStyle.PARTY, { fontSize: "38px" });
-    this.subtitleText.setOrigin(0.5, 0);
-    this.subtitleText.setTint(0xc0c8e0);
-    this.container.add(this.subtitleText);
+    this.wordmark = addTextObject(w / 2, 30, "POKEMON WORLD TOURNAMENT", TextStyle.WINDOW, { fontSize: "36px" });
+    this.wordmark.setOrigin(0.5, 0);
+    this.wordmark.setTint(GOLD);
+    this.container.add(this.wordmark);
 
-    this.statusText = addTextObject(w / 2, 33, "", TextStyle.PARTY, { fontSize: "42px" });
+    this.statusText = addTextObject(w / 2, 39, "", TextStyle.PARTY, { fontSize: "38px" });
     this.statusText.setOrigin(0.5, 0);
+    this.statusText.setTint(0xc0c8e0);
     this.container.add(this.statusText);
 
     // Grade badge, top-left, framed + gold.
@@ -193,8 +206,8 @@ export class ColosseumUiHandler extends UiHandler {
     const n = data.challengers.length;
     const perCol = Math.ceil(n / 2);
     const colX = [14, w / 2 + 12];
-    const rowY0 = 52;
-    const rowH = 13;
+    const rowY0 = 51;
+    const rowH = 12;
 
     let championPos: { x: number; y: number } | null = null;
 

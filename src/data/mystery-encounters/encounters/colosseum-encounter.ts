@@ -165,7 +165,16 @@ function showColosseumVs(round: number): Promise<void> {
     const c = globalScene.add.container(0, 0);
     c.add(globalScene.add.rectangle(0, 0, w, h, 0x0a0e18, 1).setOrigin(0));
 
-    const top = addTextObject(w / 2, 18, `CHALLENGER ${round} / ${MAX_ROUNDS}`, TextStyle.WINDOW, { fontSize: "50px" });
+    // Authentic gold PWT crest as the splash watermark (guarded against CDN miss).
+    if (globalScene.textures.exists("er_pwt_crest")) {
+      const crest = globalScene.add.image(w / 2, 6, "er_pwt_crest");
+      crest.setOrigin(0.5, 0);
+      crest.setScale(30 / 123);
+      crest.setAlpha(0.9);
+      c.add(crest);
+    }
+
+    const top = addTextObject(w / 2, 40, `CHALLENGER ${round} / ${MAX_ROUNDS}`, TextStyle.WINDOW, { fontSize: "50px" });
     top.setOrigin(0.5, 0);
     top.setTint(0xf8d030);
     c.add(top);

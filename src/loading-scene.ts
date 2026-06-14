@@ -58,7 +58,11 @@ export class LoadingScene extends SceneBase {
       .loadImage("er_binfo_check", "elite-redux/battle-info", "check.png")
       // ER Colosseum (#439): full-screen tournament-arena backdrop (BW2-derived
       // stone-pillar hall) for the press-your-luck gauntlet UI.
-      .loadImage("er_colosseum_bg", "elite-redux/colosseum", "colosseum_bg.png");
+      .loadImage("er_colosseum_bg", "elite-redux/colosseum", "colosseum_bg.png")
+      // The authentic BW2 Pokemon World Tournament crest (crown + shield +
+      // laurel wreath + star), ripped from the BW2 ROM and recoloured gold; the
+      // centrepiece of the Colosseum standings board + VS splash.
+      .loadImage("er_pwt_crest", "elite-redux/colosseum", "pwt_crest.png");
     // ER Biome Market (#440): the shopkeeper is a real PokeRogue trainer-class
     // sprite cast per biome (clerk for towns, fisherman for the sea, firebreather
     // for the volcano, hex maniac for the graveyard, etc. - see KEEPER_BY_BIOME).
