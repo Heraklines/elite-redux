@@ -31,6 +31,7 @@ import { getDailyMysteryEncounter } from "#data/daily-seed/daily-run";
 import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
+import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ER_BLACK_SHINY_TINT, isErBlackShiny, promoteToErBlackShinyInBattle } from "#data/elite-redux/er-black-shinies";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
@@ -1796,7 +1797,14 @@ export class BattleScene extends SceneBase {
     // Standard wild battle chance
     // TODO: Rework the calcs here - this is weird
     if (battleType === BattleType.WILD) {
-      return randSeedInt(this.getDoubleBattleChance(waveIndex)) === 0;
+      // ER biome identity (#439 §3): Grass/Tall Grass double the WILD double-battle
+      // odds. getDoubleBattleChance returns a 1-in-N rarity, so we shrink N.
+      let doubleChance = this.getDoubleBattleChance(waveIndex);
+      const mult = getErBiomeRule(this.arena.biomeId)?.doubleBattleMult;
+      if (mult && mult > 1) {
+        doubleChance = Math.max(1, Math.round(doubleChance / mult));
+      }
+      return randSeedInt(doubleChance) === 0;
     }
     return trainer?.variant === TrainerVariant.DOUBLE;
   }

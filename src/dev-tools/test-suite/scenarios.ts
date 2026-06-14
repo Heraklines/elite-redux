@@ -769,6 +769,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Biome: Jungle wild +2 levels",
+    description:
+      "#439 §3 encounter shape. JUNGLE overgrowth: WILD mons spawn +2 levels above\n"
+      + "the normal wave level. DO: start (a wild battle), open the enemy's summary\n"
+      + "and read its level - it should be ~2 higher than a same-wave wild elsewhere.\n"
+      + "Trainer mons are unaffected (their levels come from the party template).\n"
+      + "Builder check GRASS/TALL_GRASS: those DOUBLE the wild double-battle rate -\n"
+      + "re-enter several wild waves and you'll see doubles roughly twice as often.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 20,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.JUNGLE,
+        MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.GARCHOMP, { moveset: [MoveId.SPLASH, MoveId.EARTHQUAKE] })];
+    },
+  },
+  {
     label: "Berry Smash eats a berry",
     description:
       "#342/#398 Berry Smash — the user must EAT one of its held berries.\n"

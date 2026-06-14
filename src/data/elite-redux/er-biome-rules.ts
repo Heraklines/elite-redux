@@ -81,6 +81,12 @@ export interface ErBiomeRule {
   fairyBlessing?: boolean;
   /** % chance a consumed berry is preserved instead (Beach Harvest-like, 0-100). */
   berrySaveChance?: number;
+
+  // --- Encounter shape (generation-layer, not the in-battle field) ---
+  /** Multiplier on the WILD double-battle probability (Grass/Tall Grass = 2x). */
+  doubleBattleMult?: number;
+  /** Flat level bonus for WILD spawns (Jungle overgrowth = +2). */
+  wildLevelBonus?: number;
 }
 
 /**
@@ -97,9 +103,11 @@ const ER_BIOME_RULES: Partial<Record<BiomeId, ErBiomeRule>> = {
   [BiomeId.GRAVEYARD]: { weather: WeatherType.FOG },
 
   // GROUP A - forced ambient terrain (vanilla never sets terrain)
-  [BiomeId.GRASS]: { terrain: TerrainType.GRASSY },
-  [BiomeId.TALL_GRASS]: { terrain: TerrainType.GRASSY },
-  [BiomeId.JUNGLE]: { terrain: TerrainType.GRASSY },
+  // Grass fields: grassy terrain + doubled WILD double-battle odds.
+  [BiomeId.GRASS]: { terrain: TerrainType.GRASSY, doubleBattleMult: 2 },
+  [BiomeId.TALL_GRASS]: { terrain: TerrainType.GRASSY, doubleBattleMult: 2 },
+  // Jungle overgrowth: grassy terrain + wild mons spawn +2 levels.
+  [BiomeId.JUNGLE]: { terrain: TerrainType.GRASSY, wildLevelBonus: 2 },
   [BiomeId.POWER_PLANT]: { terrain: TerrainType.ELECTRIC },
 
   // Composite biomes (multiple groups) ----------------------------------------

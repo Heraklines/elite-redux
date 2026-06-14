@@ -1,6 +1,7 @@
 import type { GameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
+import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { applyErHellEnemyLevelScaling } from "#data/elite-redux/er-run-difficulty";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattleType } from "#enums/battle-type";
@@ -125,6 +126,14 @@ export class Battle {
     // ER HELL ONLY: rescale every enemy toward the player's highest party level,
     // eased in by wave (top-2 < w20, top-1 < w40, top after). No-op off Hell.
     this.enemyLevels = applyErHellEnemyLevelScaling(this.enemyLevels, this.waveIndex);
+    // ER biome identity (#439 §3): Jungle overgrowth - WILD mons spawn a few
+    // levels higher. Wild-only; trainer levels are set by their party template.
+    if (battleType === BattleType.WILD && this.enemyLevels) {
+      const wildLevelBonus = getErBiomeRule(globalScene.arena.biomeId)?.wildLevelBonus;
+      if (wildLevelBonus) {
+        this.enemyLevels = this.enemyLevels.map(level => level + wildLevelBonus);
+      }
+    }
   }
 
   public get isClassicFinalBoss(): boolean {

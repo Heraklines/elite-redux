@@ -66,4 +66,13 @@ describe.skipIf(!RUN)("ER biome battle identity - ambient weather/terrain (#439 
     expect(getErBiomeRule(BiomeId.FAIRY_CAVE)?.fairyBlessing).toBe(true);
     expect(getErBiomeRule(BiomeId.BEACH)?.berrySaveChance).toBe(25);
   });
+
+  it("encounter shape: double-battle odds + wild level bonus", () => {
+    expect(getErBiomeRule(BiomeId.GRASS)?.doubleBattleMult).toBe(2);
+    expect(getErBiomeRule(BiomeId.TALL_GRASS)?.doubleBattleMult).toBe(2);
+    expect(getErBiomeRule(BiomeId.JUNGLE)?.wildLevelBonus).toBe(2);
+    // These don't bleed into unrelated biomes.
+    expect(getErBiomeRule(BiomeId.PLAINS)?.doubleBattleMult).toBeUndefined();
+    expect(getErBiomeRule(BiomeId.GRASS)?.wildLevelBonus).toBeUndefined();
+  });
 });
