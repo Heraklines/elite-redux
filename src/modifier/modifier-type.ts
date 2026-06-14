@@ -2936,31 +2936,34 @@ export function getPlayerShopModifierTypeOptionsForWave(waveIndex: number, baseC
     return [];
   }
 
+  // ER tuning: HP / revive / status-cure items cost 20% less across the board.
+  // PP items (Ether/Elixir) and Memory Mushroom keep their vanilla prices.
+  const heal = (factor: number): number => baseCost * factor * 0.8;
   const options = [
     [
-      new ModifierTypeOption(modifierTypeInitObj.POTION(), 0, baseCost * 0.2),
+      new ModifierTypeOption(modifierTypeInitObj.POTION(), 0, heal(0.2)),
       new ModifierTypeOption(modifierTypeInitObj.ETHER(), 0, baseCost * 0.4),
-      new ModifierTypeOption(modifierTypeInitObj.REVIVE(), 0, baseCost * 2),
+      new ModifierTypeOption(modifierTypeInitObj.REVIVE(), 0, heal(2)),
     ],
     [
-      new ModifierTypeOption(modifierTypeInitObj.SUPER_POTION(), 0, baseCost * 0.45),
-      new ModifierTypeOption(modifierTypeInitObj.FULL_HEAL(), 0, baseCost),
+      new ModifierTypeOption(modifierTypeInitObj.SUPER_POTION(), 0, heal(0.45)),
+      new ModifierTypeOption(modifierTypeInitObj.FULL_HEAL(), 0, heal(1)),
     ],
     [
       new ModifierTypeOption(modifierTypeInitObj.ELIXIR(), 0, baseCost),
       new ModifierTypeOption(modifierTypeInitObj.MAX_ETHER(), 0, baseCost),
     ],
     [
-      new ModifierTypeOption(modifierTypeInitObj.HYPER_POTION(), 0, baseCost * 0.8),
-      new ModifierTypeOption(modifierTypeInitObj.MAX_REVIVE(), 0, baseCost * 2.75),
+      new ModifierTypeOption(modifierTypeInitObj.HYPER_POTION(), 0, heal(0.8)),
+      new ModifierTypeOption(modifierTypeInitObj.MAX_REVIVE(), 0, heal(2.75)),
       new ModifierTypeOption(modifierTypeInitObj.MEMORY_MUSHROOM(), 0, baseCost * 4),
     ],
     [
-      new ModifierTypeOption(modifierTypeInitObj.MAX_POTION(), 0, baseCost * 1.5),
+      new ModifierTypeOption(modifierTypeInitObj.MAX_POTION(), 0, heal(1.5)),
       new ModifierTypeOption(modifierTypeInitObj.MAX_ELIXIR(), 0, baseCost * 2.5),
     ],
-    [new ModifierTypeOption(modifierTypeInitObj.FULL_RESTORE(), 0, baseCost * 2.25)],
-    [new ModifierTypeOption(modifierTypeInitObj.SACRED_ASH(), 0, baseCost * 10)],
+    [new ModifierTypeOption(modifierTypeInitObj.FULL_RESTORE(), 0, heal(2.25))],
+    [new ModifierTypeOption(modifierTypeInitObj.SACRED_ASH(), 0, heal(10))],
   ];
 
   return options
