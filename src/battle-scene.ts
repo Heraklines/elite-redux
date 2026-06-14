@@ -2165,7 +2165,10 @@ export class BattleScene extends SceneBase {
     // ER (#421): ELITE/HELL ONLY. Redux forms are full ER customs (custom
     // abilities/innates, kits, types, sometimes stats) - Ace/Youngster are
     // pure vanilla (#345) and must never roll them.
-    const REDUX_FORM_SPAWN_ODDS = 8;
+    // ER biome identity (#439 §3): the ISLAND is "exotic imports" - it sharply
+    // boosts the Redux-form spawn rate (1-in-3 vs the usual 1-in-8). Still
+    // Elite/Hell only, never on Ace/Youngster.
+    const REDUX_FORM_SPAWN_ODDS = getErBiomeRule(this.arena.biomeId)?.reduxFormBoost ? 3 : 8;
     if (!isEggPhase && !ignoreArena && !isErVanillaDifficulty()) {
       const reduxFormIndex = species.forms.findIndex(f => f.formKey === "redux");
       if (reduxFormIndex > 0 && !randSeedInt(REDUX_FORM_SPAWN_ODDS)) {

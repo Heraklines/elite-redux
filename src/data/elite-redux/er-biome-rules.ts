@@ -87,6 +87,15 @@ export interface ErBiomeRule {
   doubleBattleMult?: number;
   /** Flat level bonus for WILD spawns (Jungle overgrowth = +2). */
   wildLevelBonus?: number;
+  /** % chance a WILD foe gets a free turn-1 action unless your lead outspeeds it
+   *  (Forest/Snowy Forest ambush, 0-100). */
+  ambushChance?: number;
+  /** Island "exotic imports": sharply boost the wild Redux-form spawn rate
+   *  (Elite/Hell only - never breaks Ace/Youngster pure-vanilla). */
+  reduxFormBoost?: boolean;
+  /** Island: bias the wild species roll toward REGIONAL variants in the pool
+   *  (Alolan/Galarian/Hisuian/Paldean). */
+  regionalBoost?: boolean;
 }
 
 /**
@@ -99,7 +108,8 @@ const ER_BIOME_RULES: Partial<Record<BiomeId, ErBiomeRule>> = {
   // GROUP A - forced ambient weather
   [BiomeId.BADLANDS]: { weather: WeatherType.SANDSTORM },
   [BiomeId.DESERT]: { weather: WeatherType.SANDSTORM },
-  [BiomeId.SNOWY_FOREST]: { weather: WeatherType.SNOW },
+  // Snowy Forest: snow ambient + Forest's ambush.
+  [BiomeId.SNOWY_FOREST]: { weather: WeatherType.SNOW, ambushChance: 20 },
   [BiomeId.GRAVEYARD]: { weather: WeatherType.FOG },
 
   // GROUP A - forced ambient terrain (vanilla never sets terrain)
@@ -123,6 +133,8 @@ const ER_BIOME_RULES: Partial<Record<BiomeId, ErBiomeRule>> = {
   [BiomeId.VOLCANO]: { typeBoost: { type: PokemonType.FIRE, mult: 1.2 }, entryStatus: { kind: "burn", chance: 10 } },
   // Cave: darkness - all accuracy -10% unless a Flash/Illuminate ability is on field.
   [BiomeId.CAVE]: { darkness: true },
+  // Forest: ambush - a wild foe may snatch a free turn-1 move unless you outspeed.
+  [BiomeId.FOREST]: { ambushChance: 20 },
   // Sea: non-swimmers lose 1 Spd on entry (rain frequency stays the vanilla pool).
   [BiomeId.SEA]: { swimmerSpdDrop: true },
   // Swamp: attrition - grounded non-Poison/Steel mons take 1/16 bog chip each turn.
@@ -133,6 +145,8 @@ const ER_BIOME_RULES: Partial<Record<BiomeId, ErBiomeRule>> = {
   [BiomeId.ABYSS]: { darkCritBoost: true },
   // Fairy Cave: blessed - infatuation immunity + faster status recovery.
   [BiomeId.FAIRY_CAVE]: { fairyBlessing: true },
+  // Island: exotic imports - boosts regional variants + Redux forms in the wild.
+  [BiomeId.ISLAND]: { regionalBoost: true, reduxFormBoost: true },
 };
 
 /** The full battle-identity rule for a biome, or undefined (vanilla behavior). */

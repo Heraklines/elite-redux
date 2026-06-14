@@ -602,6 +602,23 @@ export class Arena {
       species = getPokemonSpecies(randSeedItem(tierPool));
     }
 
+    // ER biome identity (#439 §3): the ISLAND favors regional variants. When the
+    // roll lands on a non-regional and the pool HAS regional entries, ~50% of the
+    // time re-draw from those (Alolan/Galarian/etc). Elite/Hell only - the
+    // Ace/Youngster pure-vanilla roll is untouched.
+    if (
+      tierPool.length > 0
+      && getErBiomeRule(this.biomeId)?.regionalBoost
+      && !isErVanillaDifficulty()
+      && !species.isRegional()
+      && randSeedInt(2) === 0
+    ) {
+      const regionalPool = tierPool.filter(id => getPokemonSpecies(id).isRegional());
+      if (regionalPool.length > 0) {
+        species = getPokemonSpecies(randSeedItem(regionalPool));
+      }
+    }
+
     const adjustedWave = globalScene.gameMode.getWaveForDifficulty(waveIndex, true);
     const regen = this.checkLegendBST(species, adjustedWave);
     // Attempt to retry 10 times if generated a LegendLike with an incompatible level

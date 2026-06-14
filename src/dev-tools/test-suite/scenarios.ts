@@ -790,6 +790,49 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Biome: Forest ambush (free turn)",
+    description:
+      "#439 §3 encounter shape. FOREST/SNOWY FOREST: ~20% of WILD encounters, the\n"
+      + "foe gets a FREE turn-1 move before you act - UNLESS your lead outspeeds it.\n"
+      + "This lead is a slow Munchlax (the fast wild Electrode outspeeds it), so the\n"
+      + "ambush can fire. DO: start a few wild Forest waves. EXPECT: ~1 in 5, the\n"
+      + "Electrode attacks ONCE for free before your first command. Swap the lead to\n"
+      + "something faster than the foe and the ambush should never trigger.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_BIOME_OVERRIDE: BiomeId.FOREST,
+        MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.ELECTRODE,
+        ENEMY_LEVEL_OVERRIDE: 30,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [makeStarter(SpeciesId.MUNCHLAX, { moveset: [MoveId.SPLASH, MoveId.BODY_SLAM] })];
+    },
+  },
+  {
+    label: "Biome: Island exotic spawns",
+    description:
+      "#439 §3 encounter shape. ISLAND (Elite/Hell only): wild spawns are biased\n"
+      + "toward REGIONAL variants (Alolan/Galarian/etc) AND ER REDUX forms - 'exotic\n"
+      + "imports'. DO: on Elite/Hell, walk several wild Island waves and check the\n"
+      + "foes. EXPECT: noticeably more regionals + Redux-form mons than a normal\n"
+      + "biome. On ACE/YOUNGSTER it stays PURE vanilla (no Redux, normal pool) -\n"
+      + "switch difficulty to confirm the gate.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("hell");
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_BIOME_OVERRIDE: BiomeId.ISLAND,
+        MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.GARCHOMP, { moveset: [MoveId.SPLASH, MoveId.EARTHQUAKE] })];
+    },
+  },
+  {
     label: "Berry Smash eats a berry",
     description:
       "#342/#398 Berry Smash — the user must EAT one of its held berries.\n"

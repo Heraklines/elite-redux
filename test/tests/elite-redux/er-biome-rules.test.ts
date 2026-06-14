@@ -75,4 +75,13 @@ describe.skipIf(!RUN)("ER biome battle identity - ambient weather/terrain (#439 
     expect(getErBiomeRule(BiomeId.PLAINS)?.doubleBattleMult).toBeUndefined();
     expect(getErBiomeRule(BiomeId.GRASS)?.wildLevelBonus).toBeUndefined();
   });
+
+  it("encounter shape: Forest ambush + Island exotic boosts", () => {
+    expect(getErBiomeRule(BiomeId.FOREST)?.ambushChance).toBe(20);
+    expect(getErBiomeRule(BiomeId.SNOWY_FOREST)?.ambushChance).toBe(20);
+    expect(getErBiomeRule(BiomeId.ISLAND)?.regionalBoost).toBe(true);
+    expect(getErBiomeRule(BiomeId.ISLAND)?.reduxFormBoost).toBe(true);
+    // Snowy Forest keeps its snow ambient alongside the ambush.
+    expect(erBiomeForcedWeather(BiomeId.SNOWY_FOREST)).toBe(WeatherType.SNOW);
+  });
 });

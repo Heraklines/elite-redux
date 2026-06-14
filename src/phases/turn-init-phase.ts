@@ -1,8 +1,14 @@
 import { consumePendingDevBattleSetup } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
+import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
+import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
+import { MoveUseMode } from "#enums/move-use-mode";
+import { Stat } from "#enums/stat";
 import { TurnInitEvent } from "#events/battle-scene";
-import type { PlayerPokemon } from "#field/pokemon";
+import type { EnemyPokemon, PlayerPokemon } from "#field/pokemon";
+import { PokemonMove } from "#moves/pokemon-move";
 import {
   handleMysteryEncounterBattleStartEffects,
   handleMysteryEncounterTurnStartEffects,
@@ -89,6 +95,50 @@ export class TurnInitPhase extends FieldPhase {
 
     globalScene.phaseManager.pushNew("TurnStartPhase");
 
+    this.applyErForestAmbush();
+
     this.end();
+  }
+
+  /**
+   * ER biome identity (#439 §3): Forest / Snowy Forest ambush. On turn 1 of a
+   * WILD encounter, a % chance the foe snatches a FREE move before you act -
+   * unless your lead outspeeds it (you reacted in time). Reuses the Instruct
+   * pattern (unshift a FIRST-timing MovePhase) and the enemy's own AI to pick a
+   * sensible move + target.
+   */
+  private applyErForestAmbush(): void {
+    const battle = globalScene.currentBattle;
+    if (battle.turn !== 1 || battle.battleType !== BattleType.WILD) {
+      return;
+    }
+    const chance = getErBiomeRule(globalScene.arena.biomeId)?.ambushChance;
+    if (!chance) {
+      return;
+    }
+    const enemy = globalScene.getEnemyField(true)[0] as EnemyPokemon | undefined;
+    const player = globalScene.getPlayerPokemon();
+    if (!enemy?.isActive(true) || !player?.isActive(true)) {
+      return;
+    }
+    // Reacted in time: a lead that is at least as fast prevents the ambush.
+    if (player.getEffectiveStat(Stat.SPD, enemy) >= enemy.getEffectiveStat(Stat.SPD, player)) {
+      return;
+    }
+    if (globalScene.randBattleSeedInt(100) >= chance) {
+      return;
+    }
+    const turnMove = enemy.getNextMove();
+    if (!turnMove?.move) {
+      return;
+    }
+    globalScene.phaseManager.unshiftNew(
+      "MovePhase",
+      enemy,
+      turnMove.targets,
+      new PokemonMove(turnMove.move),
+      MoveUseMode.NORMAL,
+      MovePhaseTimingModifier.FIRST,
+    );
   }
 }
