@@ -2894,15 +2894,11 @@ export function getPlayerShopModifierTypeOptionsForWave(waveIndex: number, baseC
   if (!(waveIndex % 10)) {
     // ER Biome Market (#440): boss waves never had a shop - that empty space
     // is now the biome market. Stock + prices come from the per-biome economy
-    // table (in ADDITION to the boss rewards above it). The finale is exempt;
-    // the Abyss has no market by design.
-    // STAGING-ONLY while in development (maintainer): the gate below matches
-    // the dev-tools gate - local dev + staging builds (VITE_DEV_TOOLS=1) only.
-    // Prod builds never set the flag, so a prod release CANNOT ship the
-    // market by accident. Remove this gate only on explicit release approval.
-    const env = import.meta.env as unknown as Record<string, unknown> | undefined;
-    const marketEnabled = !!env?.DEV || env?.VITE_DEV_TOOLS === "1";
-    if (marketEnabled && waveIndex < 200 && globalScene.currentBattle != null) {
+    // table (in ADDITION to the boss rewards above it). The finale (wave 200) is
+    // exempt; the Abyss has no market by design.
+    // Shipped to production (release approval): the market runs on every x0 wave
+    // in all builds. (The dev TEST SUITE remains staging-only via its own gate.)
+    if (waveIndex < 200 && globalScene.currentBattle != null) {
       const stock = rollErBiomeShopStock(globalScene.arena.biomeId, waveIndex);
       const options: ModifierTypeOption[] = [];
       for (const entry of stock) {

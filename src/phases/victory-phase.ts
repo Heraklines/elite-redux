@@ -127,15 +127,11 @@ export class VictoryPhase extends PokemonPhase {
         // BiomeShopPhase here - a full-screen 4x4 biome market (see
         // BiomeShopUiHandler) built from getPlayerShopModifierTypeOptionsForWave's
         // 16-slot biome stock. It runs AFTER the x0 reward popups and BEFORE the
-        // biome change, so prices reflect the biome just cleared. Gated to
-        // local/staging builds with the SAME flag as the shop-stock hook, so
-        // prod x0 waves are unchanged; daily runs (shared seed) are skipped.
-        {
-          const env = import.meta.env as unknown as Record<string, unknown> | undefined;
-          const biomeShopEnabled = !!env?.DEV || env?.VITE_DEV_TOOLS === "1";
-          if (!(currentWaveIndex % 10) && !gameMode.isDaily && biomeShopEnabled) {
-            globalScene.phaseManager.pushNew("BiomeShopPhase");
-          }
+        // biome change, so prices reflect the biome just cleared. Shipped to
+        // production (release approval): runs on every x0 wave; daily runs
+        // (shared seed) are still skipped.
+        if (!(currentWaveIndex % 10) && !gameMode.isDaily) {
+          globalScene.phaseManager.pushNew("BiomeShopPhase");
         }
 
         if (gameMode.hasRandomBiomes || globalScene.isNewBiome()) {
