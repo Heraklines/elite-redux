@@ -48,11 +48,13 @@ export function resetErDifficulty(): void {
 /**
  * HELL-ONLY enemy level scaling, eased in so the early game is survivable. Every
  * enemy mon spawns relative to the TOP of the player's party (the single highest
- * level among the player's current Pokemon), with a wave-based handicap:
- *   - waves  1-19: top level - 2
+ * level among the player's current Pokemon), with a wave-based handicap that
+ * eases off as the run goes:
+ *   - waves  1-9 : top level - 3
+ *   - waves 10-19: top level - 2
  *   - waves 20-39: top level - 1
  *   - waves 40+  : top level   (full parity)
- * So a lv10 best mon faces lv8 enemies early, ramping to lv10 by wave 40.
+ * So a lv10 best mon faces lv7 enemies at the very start, ramping to lv10 by w40.
  * Benching a low-level mon still can't soften a wave (it's keyed off the MAX).
  *
  * STRICTLY gated to `currentDifficulty === "hell"`: Youngster / Ace / Elite keep
@@ -77,7 +79,7 @@ export function applyErHellEnemyLevelScaling(
   if (topLevel <= 0) {
     return enemyLevels;
   }
-  const handicap = waveIndex < 20 ? 2 : waveIndex < 40 ? 1 : 0;
+  const handicap = waveIndex < 10 ? 3 : waveIndex < 20 ? 2 : waveIndex < 40 ? 1 : 0;
   const target = Math.max(1, topLevel - handicap);
   return enemyLevels.map(() => target);
 }
