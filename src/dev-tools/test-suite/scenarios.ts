@@ -308,13 +308,15 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "Colosseum gauntlet (#439)",
     description:
-      "#439 Colosseum - press-your-luck trainer gauntlet (SKELETON).\n"
+      "#439 Colosseum - 15-trainer press-your-luck gauntlet (SKELETON).\n"
       + "DO: on wave 12 the Colosseum encounter spawns. Pick 'Enter the Colosseum',\n"
       + "win the battle, then on the screen choose CONTINUE or CASH OUT.\n"
-      + "EXPECT: a full-screen arena UI showing the D-C-B-A-S-EX tier ladder with the\n"
-      + "banked tier highlighted. CONTINUE -> a harder battle, tier ramps up. CASH OUT\n"
-      + "-> money + a reward-shop item of that tier (EX also gives a shiny egg + 50\n"
-      + "candies). Survivors are healed to half HP between rounds (status NOT cured).",
+      + "EXPECT: a 15-round ladder of rising trainers (rookies -> gym leaders ->\n"
+      + "Champion), each with their OWN sprite + team. The arena UI shows the reward\n"
+      + "GRADE (D, D+, C ... SS, SSS, SSS+, EX) + a 15-segment progress bar. CONTINUE\n"
+      + "-> a harder challenger, grade climbs. CASH OUT -> money + a full reward shop\n"
+      + "locked to that grade's rarity (commons low, MASTER-tier at the top).\n"
+      + "Survivors are healed to half HP between rounds (status NOT cured).",
     setup: () => {
       resetDevOverrides();
       setOverrides({

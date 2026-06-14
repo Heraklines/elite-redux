@@ -7,17 +7,20 @@
 // =============================================================================
 // ER Colosseum (#439) - a press-your-luck trainer gauntlet mystery encounter.
 //
-// You enter a dojo/arena and fight a rising ladder of trainers back-to-back.
-// After EACH win you choose: CONTINUE (risk it for a higher reward tier) or
-// CASH OUT (bank the current tier's reward and leave). The reward tier ramps
-// D -> C -> B -> A -> S -> EX; clearing all six auto-awards the EX tier. Between
-// rounds your survivors are patched up to half HP (statuses are NOT cured).
+// You enter a dojo/arena and fight a 15-trainer ladder of rising threat (rookies
+// -> trained classes -> ace/veteran -> gym leaders -> dragon master -> Champion),
+// each TrainerType bringing its OWN sprite + curated team. After EACH win you
+// choose: CONTINUE (risk it for a higher reward GRADE) or CASH OUT (bank the
+// current grade and leave). The grade ramps one rung per round across
+// D, D+, C ... SS, SSS, SSS+, EX; clearing all 15 auto-awards EX. Survivors are
+// patched up to half HP between rounds (statuses are NOT cured); lose a battle
+// and the prize is gone.
 //
-// SKELETON (#439): the LOOP + the tier UI + reward GRANTING all work end-to-end.
-// The exact reward CONTENTS per tier are placeholders to be workshopped - right
-// now each tier grants a wave-scaled money payout plus one reward-shop item of
-// the mapped engine tier, and EX additionally drops a guaranteed-shiny egg and a
-// 50-candy bag for the lead. Built on the Winstrate Challenge consecutive-battle
+// SKELETON (#439): the LOOP + the grade UI + reward GRANTING all work end-to-end.
+// Cash-out pays wave-scaled money and opens an ESCALATING GUARANTEED-RARITY shop:
+// every slot is locked to the banked grade's engine rarity (a full shop of
+// commons low, ramping to a full shop of MASTER-tier items by S..EX) with the
+// slot count growing too. Built on the Winstrate Challenge consecutive-battle
 // pattern (doContinueEncounter), with the choice surfaced through the bespoke
 // ColosseumUiHandler.
 // =============================================================================
@@ -25,9 +28,7 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
-import type { IEggOptions } from "#data/egg";
 import { BattlerTagType } from "#enums/battler-tag-type";
-import { EggSourceType } from "#enums/egg-source-types";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
@@ -50,47 +51,76 @@ import i18next from "i18next";
 /** The i18n namespace for the encounter. */
 const namespace = "mysteryEncounters/colosseum";
 
-/** Number of rounds / tiers in the gauntlet. */
-const MAX_ROUNDS = 6;
-
-/** Display tier ladder, lowest first. The banked tier after N wins is LADDER[N-1]. */
-const TIER_LADDER = ["D", "C", "B", "A", "S", "EX"];
+/** Number of rounds in the gauntlet (one trainer + one tier rung per round). */
+const MAX_ROUNDS = 15;
 
 /**
- * Each display tier maps to an engine ModifierTier for the item roll. EX reuses
- * MASTER for its item and stacks bonus rewards on top (see endColosseum).
+ * Display tier ladder, lowest first - one rung per round, with "+" gradations and
+ * SS/SSS prestige steps near the top. The banked tier after N wins is LADDER[N-1].
+ */
+const TIER_LADDER = ["D", "D+", "C", "C+", "B", "B+", "A", "A+", "S", "S+", "SS", "SS+", "SSS", "SSS+", "EX"];
+
+/**
+ * Each display rung maps to an engine ModifierTier for the reward SHOP. The
+ * engine only has COMMON..MASTER, so rarity ramps COMMON -> MASTER over the first
+ * nine rungs and then SATURATES at MASTER; the SS/SSS/EX rungs keep escalating
+ * the shop SIZE instead (see colosseumShopSize).
  */
 const TIER_TO_MODIFIER: ModifierTier[] = [
   ModifierTier.COMMON, // D
+  ModifierTier.COMMON, // D+
   ModifierTier.GREAT, // C
+  ModifierTier.GREAT, // C+
   ModifierTier.ULTRA, // B
+  ModifierTier.ULTRA, // B+
   ModifierTier.ROGUE, // A
+  ModifierTier.ROGUE, // A+
   ModifierTier.MASTER, // S
+  ModifierTier.MASTER, // S+
+  ModifierTier.MASTER, // SS
+  ModifierTier.MASTER, // SS+
+  ModifierTier.MASTER, // SSS
+  ModifierTier.MASTER, // SSS+
   ModifierTier.MASTER, // EX
 ];
 
 /**
- * The trainer fought in each round (1-indexed). A rising-difficulty ladder of
- * vanilla trainer classes; later rounds also scale levels up via
- * levelAdditiveModifier. SKELETON rosters - the curated ghost/gym-leader ladder
- * from the design doc is a follow-up.
+ * The trainer fought each round (1-indexed), in rising threat: rookies -> trained
+ * classes -> ace/veteran -> gym leaders -> a dragon master -> the Champion. Each
+ * TrainerType supplies its own battle sprite AND its curated team, so the roster
+ * escalates in both look and difficulty. (Curated ghost-team rungs are a follow-up.)
  */
 const TRAINER_LADDER: TrainerType[] = [
-  TrainerType.YOUNGSTER,
-  TrainerType.ACE_TRAINER,
-  TrainerType.ACE_TRAINER,
-  TrainerType.VETERAN,
-  TrainerType.VETERAN,
-  TrainerType.VETERAN,
+  TrainerType.YOUNGSTER, // 1
+  TrainerType.BUG_CATCHER, // 2
+  TrainerType.SCHOOL_KID, // 3
+  TrainerType.CYCLIST, // 4
+  TrainerType.HIKER, // 5
+  TrainerType.BLACK_BELT, // 6
+  TrainerType.RANGER, // 7
+  TrainerType.ACE_TRAINER, // 8
+  TrainerType.VETERAN, // 9
+  TrainerType.NORMAN, // 10 - gym leader
+  TrainerType.GIOVANNI, // 11 - gym leader
+  TrainerType.SABRINA, // 12 - gym leader
+  TrainerType.CLAIR, // 13 - gym leader
+  TrainerType.LANCE, // 14 - dragon master
+  TrainerType.CYNTHIA, // 15 - the Champion (final challenger)
 ];
+
+/** Cash-out reward-shop size for a display-tier index (0..14): 3 -> 8 slots. */
+function colosseumShopSize(tierIndex: number): number {
+  return Math.min(3 + Math.floor(tierIndex / 2), 8);
+}
 
 /** Build the enemy config for a given round (1..MAX_ROUNDS). */
 function getColosseumRoundConfig(round: number): EnemyPartyConfig {
   const idx = Math.min(round, MAX_ROUNDS) - 1;
   return {
     trainerType: TRAINER_LADDER[idx],
-    // Levels climb with the round so the ladder gets meaningfully harder.
-    levelAdditiveModifier: 2 + round,
+    // A modest per-round level bump on top of the wave-appropriate base level;
+    // the real difficulty ramp is the team QUALITY (gym leaders -> Champion).
+    levelAdditiveModifier: 1 + round * 0.5,
   };
 }
 
@@ -200,7 +230,12 @@ async function colosseumBetweenBattles(): Promise<void> {
 /** Show the press-your-luck screen; resolves with the player's choice. */
 function openColosseumChoice(wins: number): Promise<number> {
   return new Promise(resolve => {
-    const data: ColosseumViewData = { wins, maxRounds: MAX_ROUNDS, ladder: TIER_LADDER };
+    const data: ColosseumViewData = {
+      round: wins,
+      totalRounds: MAX_ROUNDS,
+      tierLabel: TIER_LADDER[wins - 1],
+      nextTierLabel: TIER_LADDER[Math.min(wins, MAX_ROUNDS - 1)],
+    };
     globalScene.ui.setMode(UiMode.COLOSSEUM, data, (choice: number) => {
       resolve(choice === COLOSSEUM_CASH_OUT ? COLOSSEUM_CASH_OUT : COLOSSEUM_CONTINUE);
     });
@@ -250,7 +285,10 @@ function halfHealSurvivors(): void {
 
 /**
  * End the gauntlet: clear the continue hook, pay out the money for the reached
- * tier, queue the tiered item reward (+ EX bonuses), and leave the encounter.
+ * tier, and open an ESCALATING GUARANTEED-RARITY reward shop - every slot is
+ * locked to the banked tier's engine rarity (D = a full shop of commons, ramping
+ * to a full shop of MASTER-tier items by S/SS/SSS/EX), with the slot count also
+ * growing the deeper you went. Then leave the encounter.
  */
 async function endColosseum(reachedRound: number): Promise<void> {
   const encounter = globalScene.currentBattle.mysteryEncounter!;
@@ -258,6 +296,8 @@ async function endColosseum(reachedRound: number): Promise<void> {
 
   const tierIdx = Math.min(reachedRound, MAX_ROUNDS) - 1;
   const tierLabel = TIER_LADDER[tierIdx];
+  const shopTier = TIER_TO_MODIFIER[tierIdx];
+  const shopSize = colosseumShopSize(tierIdx);
 
   // Money reward scales with how deep you went.
   const money = globalScene.getWaveMoneyAmount(1 + reachedRound);
@@ -265,22 +305,10 @@ async function endColosseum(reachedRound: number): Promise<void> {
 
   await showEncounterText(i18next.t(`${namespace}:reward`, { tier: tierLabel, money }));
 
-  const tiers: ModifierTier[] = [TIER_TO_MODIFIER[tierIdx]];
-  const eggRewards: IEggOptions[] = [];
-  if (reachedRound >= MAX_ROUNDS) {
-    // EX bonuses: a second top-tier item, a guaranteed-shiny egg, and 50 candies
-    // for the lead. (Placeholder "crazy" rewards - to be workshopped.)
-    tiers.push(ModifierTier.MASTER);
-    eggRewards.push({ isShiny: true, hatchWaves: 10, sourceType: EggSourceType.EVENT });
-    const lead = globalScene.getPlayerParty()[0];
-    if (lead) {
-      globalScene.gameData.addStarterCandy(lead.species.getRootSpeciesId(), 50, true);
-    }
-  }
-
-  setEncounterRewards(
-    { guaranteedModifierTiers: tiers, fillRemaining: false },
-    eggRewards.length > 0 ? eggRewards : undefined,
-  );
+  // A full shop where EVERY slot is guaranteed at the banked tier's rarity.
+  setEncounterRewards({
+    guaranteedModifierTiers: new Array(shopSize).fill(shopTier),
+    fillRemaining: false,
+  });
   leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
 }

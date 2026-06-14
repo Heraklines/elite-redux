@@ -8,11 +8,11 @@
 // ER Colosseum (#439) - the press-your-luck gauntlet choice screen.
 //
 // Shown BETWEEN gauntlet battles by the Colosseum mystery encounter. Full-screen
-// tournament-arena backdrop (BW2-derived stone hall) + a D->C->B->A->S->EX reward
-// tier ladder (cleared tiers lit, the current banked tier highlighted, future
-// tiers dim) + two buttons: CONTINUE (risk it for the next tier) or CASH OUT
-// (bank the current tier's reward and leave). Pure presentation + a 2-way
-// callback; the encounter owns all battle/reward logic. Staging-gated upstream.
+// tournament-arena backdrop (BW2-derived stone hall) + the current reward GRADE
+// (D, D+, C ... SS, SSS, SSS+, EX), a 15-segment progress bar, and two buttons:
+// CONTINUE (risk it for the next grade) or CASH OUT (bank the current grade's
+// reward shop and leave). Pure presentation + a 2-way callback; the encounter
+// owns all battle/reward logic. Staging-gated upstream.
 //
 // Modeled on BiomeShopUiHandler (#440) for the container/asset conventions.
 // =============================================================================
@@ -25,27 +25,30 @@ import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
 
-/** Player chose to fight on for a higher tier. */
+/** Player chose to fight on for a higher grade. */
 export const COLOSSEUM_CONTINUE = 0;
-/** Player chose to bank the current tier's reward and leave. */
+/** Player chose to bank the current grade's reward and leave. */
 export const COLOSSEUM_CASH_OUT = 1;
 
 /** Data the encounter passes in to render the current state of the run. */
 export interface ColosseumViewData {
-  /** Battles won so far (1..maxRounds). The banked tier is ladder[wins - 1]. */
-  wins: number;
-  /** Total number of tiers / rounds in the gauntlet. */
-  maxRounds: number;
-  /** Display tier labels, lowest first, e.g. ["D","C","B","A","S","EX"]. */
-  ladder: string[];
+  /** Rounds won so far (1..totalRounds). */
+  round: number;
+  /** Total rounds in the gauntlet. */
+  totalRounds: number;
+  /** Display grade banked at the current round (e.g. "SS"). */
+  tierLabel: string;
+  /** Display grade you'd reach by winning the next round. */
+  nextTierLabel: string;
 }
 
 /** continue (0) / cash out (1). */
 export type ColosseumChoiceCallback = (choice: number) => void;
 
-const LADDER_GOLD = 0xf8d030; // a cleared/banked tier
-const LADDER_NOW = 0x40c0f8; // the current banked tier (highlighted)
-const LADDER_DIM = 0x70708c; // a not-yet-earned tier
+const GRADE_GOLD = 0xf8d030; // banked / cleared
+const SEG_DONE = 0xf8d030;
+const SEG_NOW = 0x40c0f8;
+const SEG_TODO = 0x40445c;
 
 export class ColosseumUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
@@ -53,13 +56,13 @@ export class ColosseumUiHandler extends UiHandler {
   private bgOverlay: Phaser.GameObjects.Rectangle;
   private titleText: Phaser.GameObjects.Text;
   private subtitleText: Phaser.GameObjects.Text;
+  private tierText: Phaser.GameObjects.Text;
   private rewardText: Phaser.GameObjects.Text;
-  private ladderCells: { box: Phaser.GameObjects.NineSlice; label: Phaser.GameObjects.Text }[] = [];
+  private progressSegs: Phaser.GameObjects.Rectangle[] = [];
   private buttons: { window: Phaser.GameObjects.NineSlice; label: Phaser.GameObjects.Text }[] = [];
   private cursorObj: Phaser.GameObjects.Rectangle;
 
   private onChoice: ColosseumChoiceCallback | null = null;
-  private data: ColosseumViewData | null = null;
   /** Guards against a double input firing the callback twice. */
   private resolved = false;
 
@@ -76,39 +79,47 @@ export class ColosseumUiHandler extends UiHandler {
     this.container.setVisible(false);
     ui.add(this.container);
 
-    // Arena backdrop (BW2 stone hall) + a fairly heavy dim so the ladder/buttons
-    // read clearly and the backdrop's baked sprites recede. Falls back to the
+    // Arena backdrop (BW2 stone hall) + a fairly heavy dim. Falls back to the
     // game's default_bg panel if the custom art isn't present.
     const bgKey = globalScene.textures.exists("er_colosseum_bg") ? "er_colosseum_bg" : "default_bg";
     this.bg = globalScene.add.image(0, 0, bgKey).setOrigin(0);
     this.bg.setDisplaySize(w, h);
     this.container.add(this.bg);
 
-    this.bgOverlay = globalScene.add.rectangle(0, 0, w, h, 0x080a14, 0.5).setOrigin(0);
+    this.bgOverlay = globalScene.add.rectangle(0, 0, w, h, 0x080a14, 0.55).setOrigin(0);
     this.container.add(this.bgOverlay);
 
     this.titleText = addTextObject(w / 2, 8, "COLOSSEUM", TextStyle.WINDOW, { fontSize: "96px" });
     this.titleText.setOrigin(0.5, 0);
     this.container.add(this.titleText);
 
-    this.subtitleText = addTextObject(w / 2, 30, "", TextStyle.PARTY, { fontSize: "54px" });
+    this.subtitleText = addTextObject(w / 2, 30, "", TextStyle.PARTY, { fontSize: "50px" });
     this.subtitleText.setOrigin(0.5, 0);
     this.container.add(this.subtitleText);
 
-    // Tier ladder built once (cells positioned in layoutLadder() from the data).
-    this.ladderCells = [];
+    // Big banked-grade readout.
+    this.tierText = addTextObject(w / 2, 46, "", TextStyle.WINDOW, { fontSize: "160px" });
+    this.tierText.setOrigin(0.5, 0);
+    this.tierText.setTint(GRADE_GOLD);
+    this.container.add(this.tierText);
 
-    this.rewardText = addTextObject(w / 2, 96, "", TextStyle.MONEY, { fontSize: "54px" });
+    // Progress segments are (re)built per show in layoutProgress().
+    this.progressSegs = [];
+
+    this.rewardText = addTextObject(w / 2, 100, "Cash out claims a full reward shop of this grade.", TextStyle.PARTY, {
+      fontSize: "42px",
+      align: "center",
+    });
     this.rewardText.setOrigin(0.5, 0);
     this.container.add(this.rewardText);
 
     // Two buttons, side by side near the bottom.
-    const btnW = 120;
-    const btnH = 22;
+    const btnW = 124;
+    const btnH = 24;
     const gap = 8;
     const totalW = btnW * 2 + gap;
     const startX = (w - totalW) / 2;
-    const btnY = h - 40;
+    const btnY = h - 42;
     const captions = ["CONTINUE", "CASH OUT"];
     this.buttons = [];
     for (let i = 0; i < 2; i++) {
@@ -125,7 +136,7 @@ export class ColosseumUiHandler extends UiHandler {
     }
 
     this.cursorObj = globalScene.add.rectangle(0, 0, btnW + 4, btnH + 4, 0xffffff, 0);
-    this.cursorObj.setStrokeStyle(2, LADDER_GOLD);
+    this.cursorObj.setStrokeStyle(2, GRADE_GOLD);
     this.cursorObj.setOrigin(0.5);
     this.cursorObj.setVisible(false);
     this.container.add(this.cursorObj);
@@ -135,20 +146,16 @@ export class ColosseumUiHandler extends UiHandler {
     if (!(args.length >= 2 && typeof args[1] === "function")) {
       return false;
     }
-    this.data = args[0] as ColosseumViewData;
+    const data = args[0] as ColosseumViewData;
     this.onChoice = args[1] as ColosseumChoiceCallback;
     this.resolved = false;
 
-    const { wins, maxRounds, ladder } = this.data;
-    const banked = ladder[Math.min(wins, maxRounds) - 1] ?? ladder[0];
-    const nextTier = ladder[Math.min(wins, maxRounds - 1)] ?? banked;
+    this.subtitleText.setText(`Round ${data.round} of ${data.totalRounds} cleared!`);
+    this.tierText.setText(data.tierLabel);
+    this.buttons[0].label.setText(`CONTINUE\n(risk for ${data.nextTierLabel})`);
+    this.buttons[1].label.setText(`CASH OUT\n(claim ${data.tierLabel})`);
 
-    this.subtitleText.setText(`Round ${wins} cleared!`);
-    this.rewardText.setText(`Banked reward tier:  ${banked}`);
-    this.buttons[0].label.setText(`CONTINUE\n(risk for ${nextTier})`);
-    this.buttons[1].label.setText(`CASH OUT\n(claim ${banked})`);
-
-    this.layoutLadder();
+    this.layoutProgress(data.round, data.totalRounds);
 
     // Default the cursor to CONTINUE (the exciting choice).
     this.cursor = COLOSSEUM_CONTINUE;
@@ -159,42 +166,26 @@ export class ColosseumUiHandler extends UiHandler {
     return true;
   }
 
-  /** Build/refresh the D..EX tier chips, coloured by progress. */
-  private layoutLadder(): void {
-    for (const cell of this.ladderCells) {
-      cell.box.destroy();
-      cell.label.destroy();
+  /** Build the N-segment progress bar: cleared rounds lit, the latest one cyan. */
+  private layoutProgress(round: number, total: number): void {
+    for (const seg of this.progressSegs) {
+      seg.destroy();
     }
-    this.ladderCells = [];
-    if (!this.data) {
-      return;
-    }
-    const { wins, maxRounds, ladder } = this.data;
+    this.progressSegs = [];
     const w = globalScene.scaledCanvas.width;
-    const cellW = 30;
-    const cellH = 26;
-    const gap = 4;
-    const totalW = ladder.length * cellW + (ladder.length - 1) * gap;
-    const startX = (w - totalW) / 2;
-    const y = 52;
-    for (let i = 0; i < ladder.length; i++) {
-      const cx = startX + i * (cellW + gap);
-      const box = addWindow(cx, y, cellW, cellH);
-      // i is 0-based; banked tier index is wins-1.
-      const earned = i < wins;
-      const isCurrent = i === Math.min(wins, maxRounds) - 1;
-      const tint = isCurrent ? LADDER_NOW : earned ? LADDER_GOLD : LADDER_DIM;
-      box.setAlpha(earned || isCurrent ? 1 : 0.5);
-      this.container.add(box);
-      const label = addTextObject(cx + cellW / 2, y + cellH / 2, ladder[i], TextStyle.WINDOW, {
-        fontSize: "70px",
-        align: "center",
-      });
-      label.setOrigin(0.5, 0.5);
-      label.setTint(tint);
-      label.setAlpha(earned || isCurrent ? 1 : 0.6);
-      this.container.add(label);
-      this.ladderCells.push({ box, label });
+    const avail = w - 32;
+    const gap = 2;
+    const segW = (avail - (total - 1) * gap) / total;
+    const segH = 8;
+    const y = 88;
+    const startX = 16;
+    for (let i = 0; i < total; i++) {
+      const done = i < round;
+      const isLatest = i === round - 1;
+      const color = isLatest ? SEG_NOW : done ? SEG_DONE : SEG_TODO;
+      const seg = globalScene.add.rectangle(startX + i * (segW + gap), y, segW, segH, color, 1).setOrigin(0, 0.5);
+      this.container.add(seg);
+      this.progressSegs.push(seg);
     }
   }
 
@@ -257,12 +248,10 @@ export class ColosseumUiHandler extends UiHandler {
     super.clear();
     this.container.setVisible(false);
     this.cursorObj.setVisible(false);
-    for (const cell of this.ladderCells) {
-      cell.box.destroy();
-      cell.label.destroy();
+    for (const seg of this.progressSegs) {
+      seg.destroy();
     }
-    this.ladderCells = [];
+    this.progressSegs = [];
     this.onChoice = null;
-    this.data = null;
   }
 }
