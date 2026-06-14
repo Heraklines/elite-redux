@@ -12,6 +12,7 @@ import { getLevelTotalExp } from "#data/exp";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { MAX_PER_TYPE_POKEBALLS } from "#data/pokeball";
 import { getStatusEffectHealText } from "#data/status-effect";
+import { AbilityAttr } from "#enums/ability-attr";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { BerryType } from "#enums/berry-type";
@@ -2503,6 +2504,21 @@ export class ErAbilityCapsuleModifier extends ConsumablePokemonModifier {
       custom.abilityOverridesForm = true;
     }
     custom.erAbilityCapsuleUsed = true;
+    // Register the newly-selected ability in the dex so starter select offers
+    // it on future runs. The capsule cycles the species' OWN legal abilities,
+    // so `next` maps cleanly onto one of the three abilityAttr bits (unlike the
+    // Randomizer, whose arbitrary roll cannot be represented and so is excluded).
+    const unlockBit =
+      next === form.ability1
+        ? AbilityAttr.ABILITY_1
+        : next === form.ability2
+          ? AbilityAttr.ABILITY_2
+          : next === form.abilityHidden
+            ? AbilityAttr.ABILITY_HIDDEN
+            : 0;
+    if (unlockBit) {
+      globalScene.gameData.getStarterDataEntry(playerPokemon.species.speciesId).abilityAttr |= unlockBit;
+    }
     playerPokemon.updateInfo();
     return true;
   }

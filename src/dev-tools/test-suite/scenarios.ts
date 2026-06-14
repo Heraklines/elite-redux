@@ -1415,6 +1415,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "select. 2) ABILITY CAPSULE on Yanmega - its ACTIVE ability switches to\n"
       + "the species' next legal one (check the summary). Buying a second\n"
       + "capsule for the same mon shows 'no effect' - it works ONCE per mon.\n"
+      + "Then EXIT to title -> starter select -> Yanmega: the ability the\n"
+      + "capsule switched it to is now UNLOCKED (selectable), not greyed.\n"
       + "3) OMNI GEM - held item, see the dedicated Omni Gem scenario.\n"
       + "4) LEARNER'S SHROOM on Yanmega - pick ANY move it can learn (TMs,\n"
       + "tutors, egg moves, reached level-ups) from the big list; it learns it\n"
