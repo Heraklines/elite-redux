@@ -31,6 +31,7 @@ import {
 } from "#data/battler-tags";
 import { getBerryEffectFunc } from "#data/berry";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erLoadedDiceMinHitBonus, erLuckyHeartChanceBonus } from "#data/elite-redux/er-community-items";
 import { clearErAilments } from "#data/elite-redux/er-status-cure";
 import { SpeciesFormChangeRevertWeatherFormTrigger } from "#data/form-change-triggers";
@@ -1136,6 +1137,28 @@ export abstract class Move implements Localizable {
 
     if (!isOhko && globalScene.arena.getTag(ArenaTagType.GRAVITY)) {
       moveAccuracy.value = Math.floor(moveAccuracy.value * 1.67);
+    }
+
+    // ER biome identity (#439 §3 Group B): biome-wide accuracy modifiers.
+    // Mountain wind (-5% all), Cave darkness (-10% all unless a Flash/Illuminate
+    // ability is on the field), Space zero-g (-10% to GROUNDED attackers only).
+    if (!isOhko) {
+      const biomeRule = getErBiomeRule(globalScene.arena.biomeId);
+      if (biomeRule) {
+        let biomeAcc = 1;
+        if (biomeRule.accuracyMult != null) {
+          biomeAcc *= biomeRule.accuracyMult;
+        }
+        if (biomeRule.darkness && !globalScene.getField(true).some(p => p?.hasAbility(AbilityId.ILLUMINATE))) {
+          biomeAcc *= 0.9;
+        }
+        if (biomeRule.groundedAccuracyMult != null && user.isGrounded()) {
+          biomeAcc *= biomeRule.groundedAccuracyMult;
+        }
+        if (biomeAcc !== 1) {
+          moveAccuracy.value = Math.floor(moveAccuracy.value * biomeAcc);
+        }
+      }
     }
 
     return moveAccuracy.value;

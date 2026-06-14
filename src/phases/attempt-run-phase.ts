@@ -1,6 +1,7 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
+import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
@@ -76,6 +77,12 @@ export class AttemptRunPhase extends FieldPhase {
     //   Check for override, guaranteeing or forbidding random flee attempts as applicable.
     if (Overrides.RUN_SUCCESS_OVERRIDE !== null) {
       return Overrides.RUN_SUCCESS_OVERRIDE ? 100 : 0;
+    }
+
+    // ER biome identity (#439 §3 Group F): Plains "open fields" - fleeing always
+    // succeeds (switching is likewise unhindered in the open).
+    if (getErBiomeRule(globalScene.arena.biomeId)?.runNeverFails) {
+      return 100;
     }
 
     const enemyField = globalScene.getEnemyField();

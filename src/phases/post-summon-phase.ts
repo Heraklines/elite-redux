@@ -2,9 +2,15 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { EntryHazardTag } from "#data/arena-tag";
 import { MysteryEncounterPostSummonTag } from "#data/battler-tags";
+import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import { AbilityId } from "#enums/ability-id";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { PokemonType } from "#enums/pokemon-type";
+import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
+import type { Pokemon } from "#field/pokemon";
+import { AttackTypeBoosterModifier } from "#modifiers/modifier";
 import { PokemonPhase } from "#phases/pokemon-phase";
 
 export class PostSummonPhase extends PokemonPhase {
@@ -34,7 +40,51 @@ export class PostSummonPhase extends PokemonPhase {
       applyAbAttrs("CommanderAbAttr", { pokemon: p });
     }
 
+    this.applyErBiomeSwitchIn(pokemon);
+
     this.end();
+  }
+
+  /**
+   * ER biome identity (#439 §3 Groups C/D): on switch-in, some biomes drop Spd
+   * (Sea non-swimmers, Space grounded) or risk an entry status (Volcano burn,
+   * Ice Cave frostbite). Universal world flavor - applies to BOTH sides.
+   */
+  private applyErBiomeSwitchIn(pokemon: Pokemon): void {
+    const rule = getErBiomeRule(globalScene.arena.biomeId);
+    if (!rule) {
+      return;
+    }
+
+    // Group C - entry Spd drop. "Swimmers" = Water/Flying type or Levitate.
+    const isSwimmer =
+      pokemon.isOfType(PokemonType.WATER)
+      || pokemon.isOfType(PokemonType.FLYING)
+      || pokemon.hasAbility(AbilityId.LEVITATE);
+    if ((rule.swimmerSpdDrop && !isSwimmer) || (rule.groundedSpdDrop && pokemon.isGrounded())) {
+      globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [Stat.SPD], -1);
+    }
+
+    // Group D - entry status risk: grounded, not the immune type, no warm item
+    // (a Fire-type-boosting held item like Charcoal wards off both).
+    if (rule.entryStatus && pokemon.isGrounded()) {
+      const { kind, chance } = rule.entryStatus;
+      const immuneType = kind === "burn" ? PokemonType.FIRE : PokemonType.ICE;
+      const holdsWarmItem = pokemon
+        .getHeldItems()
+        .some(m => m instanceof AttackTypeBoosterModifier && m.moveType === PokemonType.FIRE);
+      if (!pokemon.isOfType(immuneType) && !holdsWarmItem && globalScene.randBattleSeedInt(100) < chance) {
+        // burn -> BURN; frostbite -> FREEZE (ER reroutes FREEZE to the frostbite tag).
+        pokemon.trySetStatus(
+          kind === "burn" ? StatusEffect.BURN : StatusEffect.FREEZE,
+          undefined,
+          undefined,
+          null,
+          undefined,
+          false,
+        );
+      }
+    }
   }
 
   public getPriority() {

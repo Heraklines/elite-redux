@@ -10,9 +10,10 @@
 // terrain at all - these rules make the signature field GUARANTEED. ER_SCENARIO=1.
 // =============================================================================
 
-import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
+import { erBiomeForcedTerrain, erBiomeForcedWeather, getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { TerrainType } from "#data/terrain";
 import { BiomeId } from "#enums/biome-id";
+import { PokemonType } from "#enums/pokemon-type";
 import { WeatherType } from "#enums/weather-type";
 import { describe, expect, it } from "vitest";
 
@@ -44,5 +45,25 @@ describe.skipIf(!RUN)("ER biome battle identity - ambient weather/terrain (#439 
     // A weather biome doesn't also force terrain, and vice-versa.
     expect(erBiomeForcedTerrain(BiomeId.DESERT)).toBeUndefined();
     expect(erBiomeForcedWeather(BiomeId.POWER_PLANT)).toBeUndefined();
+  });
+
+  it("Group B: type-damage + accuracy field modifiers", () => {
+    expect(getErBiomeRule(BiomeId.MOUNTAIN)?.typeBoost).toEqual({ type: PokemonType.FLYING, mult: 1.2 });
+    expect(getErBiomeRule(BiomeId.MOUNTAIN)?.accuracyMult).toBe(0.95);
+    expect(getErBiomeRule(BiomeId.VOLCANO)?.typeBoost).toEqual({ type: PokemonType.FIRE, mult: 1.2 });
+    expect(getErBiomeRule(BiomeId.CAVE)?.darkness).toBe(true);
+    expect(getErBiomeRule(BiomeId.SPACE)?.groundedAccuracyMult).toBe(0.9);
+  });
+
+  it("Groups C/D/E/F: switch-in, status, chip, and flags", () => {
+    expect(getErBiomeRule(BiomeId.SEA)?.swimmerSpdDrop).toBe(true);
+    expect(getErBiomeRule(BiomeId.SPACE)?.groundedSpdDrop).toBe(true);
+    expect(getErBiomeRule(BiomeId.VOLCANO)?.entryStatus).toEqual({ kind: "burn", chance: 10 });
+    expect(getErBiomeRule(BiomeId.ICE_CAVE)?.entryStatus).toEqual({ kind: "frostbite", chance: 10 });
+    expect(getErBiomeRule(BiomeId.SWAMP)?.bogChip).toBe(true);
+    expect(getErBiomeRule(BiomeId.PLAINS)?.runNeverFails).toBe(true);
+    expect(getErBiomeRule(BiomeId.ABYSS)?.darkCritBoost).toBe(true);
+    expect(getErBiomeRule(BiomeId.FAIRY_CAVE)?.fairyBlessing).toBe(true);
+    expect(getErBiomeRule(BiomeId.BEACH)?.berrySaveChance).toBe(25);
   });
 });

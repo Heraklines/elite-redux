@@ -56,6 +56,7 @@ import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/dai
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
+import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import {
   getErSharedGiftAbilityIdsFor,
   isErBlackShiny,
@@ -1672,6 +1673,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       if (attr?.constructor?.name === "CritStackOnKoAbAttr") {
         critStage.value += (attr as unknown as { currentStacks: (p: Pokemon) => number }).currentStacks(source);
       }
+    }
+
+    // ER biome identity (#439 §3 Group F): the Abyss sharpens Dark-type attackers
+    // - a +1 crit stage while fighting on the dread floor.
+    if (getErBiomeRule(globalScene.arena.biomeId)?.darkCritBoost && source.isOfType(PokemonType.DARK)) {
+      critStage.value += 1;
     }
 
     console.log(`crit stage: +${critStage.value}`);
@@ -6289,6 +6296,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         break;
       case StatusEffect.SLEEP: {
         this.setFrameRate(3);
+
+        // ER Fairy Cave blessing (#439 §3 Group F): status conditions wear off a
+        // turn faster - sleep lasts one fewer turn (min 1).
+        if (getErBiomeRule(globalScene.arena.biomeId)?.fairyBlessing) {
+          sleepTurnsRemaining = Math.max(1, sleepTurnsRemaining - 1);
+        }
 
         // If the user is semi-invulnerable when put asleep (such as due to Yawm),
         // remove their invulnerability and cancel the upcoming move from the queue

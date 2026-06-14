@@ -6,6 +6,7 @@ import { FusionSpeciesFormEvolution, pokemonEvolutions } from "#balance/pokemon-
 import { getBerryEffectFunc, getBerryPredicate } from "#data/berry";
 import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
+import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { clearErAilments, hasErAilment } from "#data/elite-redux/er-status-cure";
 import { getLevelTotalExp } from "#data/exp";
@@ -1857,6 +1858,12 @@ export class BerryModifier extends PokemonHeldItemModifier {
   override apply(pokemon: Pokemon): boolean {
     const preserve = new BooleanHolder(false);
     globalScene.applyModifiers(PreserveBerryModifier, pokemon.isPlayer(), pokemon, preserve);
+    // ER biome identity (#439 §3 Group F): the Beach (Harvest-like) gives a flat
+    // chance for a berry to NOT be consumed - a free, field-wide Berry Pouch.
+    const berrySaveChance = getErBiomeRule(globalScene.arena.biomeId)?.berrySaveChance;
+    if (berrySaveChance != null && globalScene.randBattleSeedInt(100) < berrySaveChance) {
+      preserve.value = true;
+    }
     this.consumed = !preserve.value;
 
     // munch the berry and trigger unburden-like effects

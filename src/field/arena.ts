@@ -8,6 +8,7 @@ import { EntryHazardTag, getArenaTag } from "#data/arena-tag";
 import { biomeBgmLoopPoints } from "#data/biome-bgm-loop-points";
 import { getDailyForcedWaveBiomePoolTier } from "#data/daily-seed/daily-run";
 import { allBiomes } from "#data/data-lists";
+import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { SpeciesFormChangeRevertWeatherFormTrigger, SpeciesFormChangeWeatherTrigger } from "#data/form-change-triggers";
 import type { PokemonSpecies } from "#data/pokemon-species";
@@ -1081,7 +1082,15 @@ export class Arena {
       terrainMultiplier = this.terrain.getAttackTypeMultiplier(attackType);
     }
 
-    return weatherMultiplier * terrainMultiplier;
+    // ER biome identity (#439 §3 Group B): a biome can boost one move type for
+    // both sides (Mountain Flying +20%, Volcano Fire +20%).
+    let biomeMultiplier = 1;
+    const biomeBoost = getErBiomeRule(this.biomeId)?.typeBoost;
+    if (biomeBoost && biomeBoost.type === attackType) {
+      biomeMultiplier = biomeBoost.mult;
+    }
+
+    return weatherMultiplier * terrainMultiplier * biomeMultiplier;
   }
 }
 

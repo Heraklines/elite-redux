@@ -55,6 +55,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { CommonBattleAnim, MoveChargeAnim } from "#data/battle-anims";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { SpeciesFormChangeAbilityTrigger } from "#data/form-change-triggers";
 import { getStatusEffectHealText } from "#data/status-effect";
 import { TerrainType } from "#data/terrain";
@@ -973,6 +974,11 @@ export class InfatuatedTag extends SerializableBattlerTag {
   }
 
   canAdd(pokemon: Pokemon): boolean {
+    // ER Fairy Cave blessing (#439 §3 Group F): fielded mons can't be infatuated.
+    if (getErBiomeRule(globalScene.arena.biomeId)?.fairyBlessing) {
+      return false;
+    }
+
     const source = this.getSourcePokemon();
     if (!source) {
       console.warn(`Failed to get source Pokemon for InfatuatedTag canAdd; id: ${this.sourceId}`);

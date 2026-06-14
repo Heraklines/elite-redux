@@ -1,9 +1,11 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { TerrainType } from "#data/terrain";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { HitResult } from "#enums/hit-result";
+import { PokemonType } from "#enums/pokemon-type";
 import { WeatherType } from "#enums/weather-type";
 import { TurnEndEvent } from "#events/battle-scene";
 import type { Pokemon } from "#field/pokemon";
@@ -61,6 +63,27 @@ export class TurnEndPhase extends FieldPhase {
           if (!cancelled.value) {
             // ER custom terrain — English-only (shared locales submodule).
             globalScene.phaseManager.queueMessage(`${getPokemonNameWithAffix(pokemon)} is hurt by the toxic terrain!`);
+            pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() / 16), {
+              result: HitResult.INDIRECT,
+              ignoreSegments: true,
+            });
+          }
+        }
+
+        // ER biome identity (#439 §3 Group E): Swamp attrition - grounded
+        // non-Poison/Steel mons take 1/16 max HP each turn end from the bog
+        // (Magic-Guard-class abilities exempt them, like other indirect damage).
+        if (
+          getErBiomeRule(globalScene.arena.biomeId)?.bogChip
+          && pokemon.isGrounded()
+          && !pokemon.isOfType(PokemonType.POISON)
+          && !pokemon.isOfType(PokemonType.STEEL)
+        ) {
+          const cancelled = new BooleanHolder(false);
+          applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon, cancelled });
+          if (!cancelled.value) {
+            // ER custom biome rule - English-only (shared locales submodule).
+            globalScene.phaseManager.queueMessage(`${getPokemonNameWithAffix(pokemon)} is sapped by the bog!`);
             pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() / 16), {
               result: HitResult.INDIRECT,
               ignoreSegments: true,

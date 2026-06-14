@@ -647,6 +647,128 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Biome: Sea non-swimmer -1 Spd",
+    description:
+      "#439 §3 Group C. SEA saps non-swimmers (no Water/Flying type, no Levitate)\n"
+      + "of 1 Speed stage WHEN THEY ENTER. DO: just start the battle.\n"
+      + "EXPECT: turn 0, 'SNORLAX's Speed fell!' (Snorlax is a non-swimmer). A\n"
+      + "Water/Flying mon or a Levitate mon would be exempt. Builder check SPACE\n"
+      + "(STARTING_BIOME_OVERRIDE) too: there ALL grounded mons get -1 Spd on entry\n"
+      + "AND -10% accuracy, with Psychic Terrain up.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_BIOME_OVERRIDE: BiomeId.SEA,
+        MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH, MoveId.BODY_SLAM] })];
+    },
+  },
+  {
+    label: "Biome: Swamp bog chip",
+    description:
+      "#439 §3 Group E. SWAMP attrition: grounded non-Poison/Steel mons lose 1/16\n"
+      + "max HP at the END of every turn (Magic Guard exempts). DO: use Splash and\n"
+      + "watch the turn end. EXPECT: 'SNORLAX is sapped by the bog!' and ~6% HP lost\n"
+      + "each turn. A Poison, Steel, or Flying/Levitate (ungrounded) mon takes NO\n"
+      + "chip - swap the starter to test the immunity.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_BIOME_OVERRIDE: BiomeId.SWAMP,
+        MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH, MoveId.BODY_SLAM] })];
+    },
+  },
+  {
+    label: "Biome: Plains free run",
+    description:
+      "#439 §3 Group F. PLAINS open fields: fleeing ALWAYS succeeds. DO: pick Run\n"
+      + "(Flee) on turn 1, repeatedly if you like. EXPECT: you escape every time,\n"
+      + "even against a faster wild mon (vanilla flee can fail on a speed deficit).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 5,
+        STARTING_BIOME_OVERRIDE: BiomeId.PLAINS,
+        MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.NINJASK, // very fast - vanilla flee would often fail
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.SLOWPOKE, { moveset: [MoveId.SPLASH, MoveId.TACKLE] })];
+    },
+  },
+  {
+    label: "Biome: Fairy Cave - no infatuation",
+    description:
+      "#439 §3 Group F. FAIRY CAVE blessing: your fielded mons CANNOT be infatuated,\n"
+      + "and sleep wears off a turn faster. DO: let the enemy use Attract (it leads\n"
+      + "with it). EXPECT: Attract FAILS - no '...fell in love!' / infatuation; your\n"
+      + "mon acts freely every turn. (Outside Fairy Cave the same Attract would\n"
+      + "infatuate.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_BIOME_OVERRIDE: BiomeId.FAIRY_CAVE,
+        MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.GARDEVOIR,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.ATTRACT],
+      });
+      return [makeStarter(SpeciesId.GALLADE, { moveset: [MoveId.SPLASH, MoveId.PSYCHO_CUT] })];
+    },
+  },
+  {
+    label: "Biome: Mountain Flying+20%/-acc",
+    description:
+      "#439 §3 Group B. MOUNTAIN wind: Flying-type moves deal +20% (both sides) and\n"
+      + "ALL moves take -5% accuracy. DO: open the move panel (R cycles to the Damage\n"
+      + "Calc) and compare Air Slash here vs in a neutral biome - it should read ~20%\n"
+      + "higher. EXPECT also slightly more misses across the board. Builder check\n"
+      + "VOLCANO: Fire moves +20% AND a ~10% burn risk on grounded non-Fire entry;\n"
+      + "CAVE: -10% accuracy unless a Flash/Illuminate ability is on the field.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_BIOME_OVERRIDE: BiomeId.MOUNTAIN,
+        MOVESET_OVERRIDE: [MoveId.AIR_SLASH, MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.STARAPTOR, { moveset: [MoveId.AIR_SLASH, MoveId.SPLASH] })];
+    },
+  },
+  {
+    label: "Biome: Abyss Dark +1 crit",
+    description:
+      "#439 §3 Group F. ABYSS: Dark-type attackers get +1 crit stage. DO: spam a\n"
+      + "Dark move (Night Slash) and watch the crit rate - it should crit far more\n"
+      + "often than the base 1/24 (one stage = ~1/8). Non-Dark moves are unaffected.\n"
+      + "Statistical - take several swings to see it.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_BIOME_OVERRIDE: BiomeId.ABYSS,
+        MOVESET_OVERRIDE: [MoveId.NIGHT_SLASH, MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.WEAVILE, { moveset: [MoveId.NIGHT_SLASH, MoveId.SPLASH] })];
+    },
+  },
+  {
     label: "Berry Smash eats a berry",
     description:
       "#342/#398 Berry Smash — the user must EAT one of its held berries.\n"
