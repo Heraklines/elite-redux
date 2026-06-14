@@ -606,6 +606,47 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Biome identity: Power Plant terrain",
+    description:
+      "#439 §3 biome battle identity (GROUP A). Power Plant has Electric Terrain\n"
+      + "ALWAYS on (vanilla biomes never set terrain). DO: start the battle.\n"
+      + "EXPECT: Electric Terrain is active from turn 1 (the field glows; grounded\n"
+      + "mons can't be put to sleep; Electric moves are boosted). It persists for\n"
+      + "the whole biome, not 5 turns. Use the builder to also check GRASS/JUNGLE\n"
+      + "(Grassy Terrain) and SPACE (Psychic Terrain).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_BIOME_OVERRIDE: BiomeId.POWER_PLANT,
+        MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.PIKACHU, { moveset: [MoveId.SPLASH, MoveId.THUNDERBOLT] })];
+    },
+  },
+  {
+    label: "Biome identity: Desert sandstorm",
+    description:
+      "#439 §3 biome battle identity (GROUP A). Desert/Badlands have sandstorm as\n"
+      + "a BASELINE (guaranteed on entry, not just a likely pool roll). DO: start.\n"
+      + "EXPECT: a sandstorm is whipping from turn 1 and stays up the whole biome.\n"
+      + "Builder check the other baselines too: ICE_CAVE/SNOWY_FOREST = snow,\n"
+      + "GRAVEYARD = fog, BEACH = harsh-less sun.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_BIOME_OVERRIDE: BiomeId.DESERT,
+        MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SANDILE,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.GARCHOMP, { moveset: [MoveId.SPLASH, MoveId.EARTHQUAKE] })];
+    },
+  },
+  {
     label: "Berry Smash eats a berry",
     description:
       "#342/#398 Berry Smash — the user must EAT one of its held berries.\n"

@@ -7,6 +7,7 @@ import Overrides from "#app/overrides";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims";
 import { getCharVariantFromDialogue } from "#data/dialogue";
+import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
@@ -734,6 +735,15 @@ export class EncounterPhase extends BattlePhase {
    * wave in the same biome).
    */
   protected trySetWeatherIfNewBiome(): void {
+    // ER biome identity (#439 §3): some biomes FORCE a baseline weather instead
+    // of rolling the vanilla pool (e.g. Desert/Badlands sandstorm, Ice Cave snow,
+    // Graveyard fog). No `user` -> permanent (turnsLeft 0), so it persists across
+    // the biome's waves like any ambient biome weather.
+    const forced = erBiomeForcedWeather(globalScene.arena.biomeId);
+    if (forced != null) {
+      globalScene.arena.trySetWeather(forced);
+      return;
+    }
     globalScene.arena.setBiomeWeather();
   }
 
@@ -746,6 +756,14 @@ export class EncounterPhase extends BattlePhase {
    * wave in the same biome).
    */
   protected trySetTerrainIfNewBiome(): void {
+    // ER biome identity (#439 §3): vanilla terrainPools are all empty, so biome
+    // terrain only exists via this override (Power Plant electric, Grass/Jungle
+    // grassy, Space psychic). turnsOverride 0 -> permanent, persists across waves.
+    const forced = erBiomeForcedTerrain(globalScene.arena.biomeId);
+    if (forced != null) {
+      globalScene.arena.trySetTerrain(forced, false, undefined, 0);
+      return;
+    }
     globalScene.arena.setBiomeTerrain();
   }
 }
