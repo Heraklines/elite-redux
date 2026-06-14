@@ -1446,6 +1446,69 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Frostbite Orb vs Magma Armor",
+    description:
+      "Frostbite Orb must NOT proc frostbite on a MAGMA ARMOR holder (Magma Armor\n"
+      + "grants freeze immunity, and ER frostbite is the freeze analog). Reported on\n"
+      + "a Heatran with Magma Armor.\n"
+      + "Your SLUGMA has Magma Armor and holds a Frostbite Orb; the Machamp also\n"
+      + "holds one but has no immunity.\n"
+      + "EXPECT: Slugma NEVER gains the FROST badge at turn end (orb blocked by\n"
+      + "Magma Armor), while the Machamp DOES get frostbitten by its orb.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SOFT_BOILED],
+      });
+      return [
+        makeStarter(SpeciesId.SLUGMA, {
+          abilityIndex: 0, // Magma Armor
+          moveset: [MoveId.SPLASH, MoveId.LAVA_PLUME, MoveId.FLAMETHROWER, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.MACHAMP, {
+          moveset: [MoveId.SPLASH, MoveId.CLOSE_COMBAT, MoveId.FACADE, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      for (const member of globalScene.getPlayerParty()) {
+        const orb = modifierTypes.FROSTBITE_ORB().newModifier(member) as PokemonHeldItemModifier | null;
+        if (orb) {
+          globalScene.addModifier(orb, true);
+        }
+      }
+      globalScene.updateModifiers(true);
+    },
+  },
+  {
+    label: "(note) Redux dex crash + move-loop",
+    description:
+      "DATA / FLOW fixes - verify outside a forced battle:\n"
+      + "1) POKEDEX CRASH: open the Pokedex and view Redux / ER-custom / mid-stage\n"
+      + "forms (Monferno Redux, Flaaffy Redux 'Fluffbee', etc.). The ABILITIES,\n"
+      + "EVOLUTION, and EGG-MOVE screens must open WITHOUT crashing (was 'show()\n"
+      + "crashed: ...eggMoves / abilityAttr of undefined' for basically every Redux\n"
+      + "mon). Root: starterId resolved to an id with no starterData entry.\n"
+      + "2) INFINITE MOVE-LEARN LOOP: a mon hitting a 4-move learnset tier (Latios\n"
+      + "lv37: Confusion / Dragon Rage / Power Swap / Guard Swap) no longer re-offers\n"
+      + "the same moves forever (was a run-blocker). Root: a leaked MOVESET_OVERRIDE\n"
+      + "made the 'already knows it' check read the override view, not the real\n"
+      + "moveset; the dedup now reads the real moveset.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1 });
+      return [
+        makeStarter(SpeciesId.LATIOS, {
+          moveset: [MoveId.PSYCHIC, MoveId.DRAGON_PULSE, MoveId.CALM_MIND, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "Dex Nav + Capsule (#387/#392)",
     description:
       "#387/#392/#404 New consumables - win the opening battle; the FIRST\n"

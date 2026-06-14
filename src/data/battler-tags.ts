@@ -3837,7 +3837,16 @@ export class ErFrostbiteTag extends SerializableBattlerTag {
     // Ice types are immune to frostbite (Gen 9 mainline behavior) — EXCEPT a
     // target afflicted by ER Ice Statue, which is Ice-type but explicitly loses
     // that immunity.
-    return !pokemon.isOfType(PokemonType.ICE) || pokemon.getTag(BattlerTagType.ER_ICE_STATUE) != null;
+    if (pokemon.isOfType(PokemonType.ICE) && pokemon.getTag(BattlerTagType.ER_ICE_STATUE) == null) {
+      return false;
+    }
+    // ER frostbite is the freeze analog, so abilities granting FREEZE immunity
+    // (e.g. Magma Armor) must block it too. The FREEZE->frostbite reroute in
+    // trySetStatus skips canSetStatus's StatusEffectImmunityAbAttr check, so we
+    // consult it HERE - covering every frostbite source, incl. the Frostbite Orb.
+    const cancelled = new BooleanHolder(false);
+    applyAbAttrs("StatusEffectImmunityAbAttr", { pokemon, effect: StatusEffect.FREEZE, cancelled, simulated: false });
+    return !cancelled.value;
   }
 
   override lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {

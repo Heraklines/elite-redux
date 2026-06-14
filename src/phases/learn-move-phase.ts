@@ -38,7 +38,12 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
 
     const pokemon = this.getPokemon();
     const move = allMoves[this.moveId];
-    const currentMoveset = pokemon.getMoveset();
+    // Use the REAL moveset (ignoreOverride=true), not the MOVESET_OVERRIDE view:
+    // a stale dev/scenario override makes getMoveset() return moves the mon
+    // doesn't actually have, so the "already knows it" check below never matched
+    // the just-learned level-up move -> LevelUpPhase re-queued it forever (the
+    // run-blocking infinite move-learn loop, e.g. Latios past lv 37).
+    const currentMoveset = pokemon.getMoveset(true);
 
     // The game first checks if the Pokemon already has the move and ends the phase if it does.
     const hasMoveAlready = currentMoveset.some(m => m.moveId === move.id) && this.moveId !== MoveId.SKETCH;

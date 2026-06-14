@@ -915,7 +915,11 @@ export class PokedexPageUiHandler extends MessageUiHandler {
     this.eggMoves = speciesEggMoves[this.starterId] ?? [];
     this.hasEggMoves = Array.from(
       { length: 4 },
-      (_, em) => (globalScene.gameData.starterData[this.starterId].eggMoves & (1 << em)) !== 0,
+      (_, em) =>
+        ((globalScene.gameData.starterData[this.starterId] ?? globalScene.gameData.getStarterDataEntry(this.starterId))
+          .eggMoves
+          & (1 << em))
+        !== 0,
     );
 
     this.tmMoves =
@@ -924,7 +928,8 @@ export class PokedexPageUiHandler extends MessageUiHandler {
         .map(m => (Array.isArray(m) ? m[1] : m))
         .sort((a, b) => (allMoves[a].name > allMoves[b].name ? 1 : -1)) ?? [];
 
-    const starterData = globalScene.gameData.starterData[this.starterId];
+    const starterData =
+      globalScene.gameData.starterData[this.starterId] ?? globalScene.gameData.getStarterDataEntry(this.starterId);
     const abilityAttr = starterData.abilityAttr;
 
     const hasAbility1 = abilityAttr & AbilityAttr.ABILITY_1;
@@ -1301,7 +1306,8 @@ export class PokedexPageUiHandler extends MessageUiHandler {
         success = true;
       }
     } else {
-      const starterData = globalScene.gameData.starterData[this.starterId];
+      const starterData =
+        globalScene.gameData.starterData[this.starterId] ?? globalScene.gameData.getStarterDataEntry(this.starterId);
       // prepare persistent starter data to store changes
       const starterAttributes = this.starterAttributes;
 
@@ -1569,7 +1575,10 @@ export class PokedexPageUiHandler extends MessageUiHandler {
                 // [passive1, NONE, NONE] from `getPassiveAbilities()` — we skip
                 // NONE slots so vanilla collapses cleanly to a single passive row.
                 const passiveAbilityIds = this.species.getPassiveAbilities(this.formIndex);
-                const passiveAttrForDisplay = globalScene.gameData.starterData[this.starterId].passiveAttr;
+                const passiveAttrForDisplay = (
+                  globalScene.gameData.starterData[this.starterId]
+                  ?? globalScene.gameData.getStarterDataEntry(this.starterId)
+                ).passiveAttr;
                 const hasAnyPassive = passiveAbilityIds.some(a => a !== AbilityId.NONE);
                 if (hasAnyPassive) {
                   options.push({
@@ -2548,7 +2557,9 @@ export class PokedexPageUiHandler extends MessageUiHandler {
   }
 
   private getFriendship(): { currentFriendship: number; friendshipCap: number } {
-    let currentFriendship = globalScene.gameData.starterData[this.starterId].friendship;
+    let currentFriendship = (
+      globalScene.gameData.starterData[this.starterId] ?? globalScene.gameData.getStarterDataEntry(this.starterId)
+    ).friendship;
     if (!currentFriendship || currentFriendship === undefined) {
       currentFriendship = 0;
     }
@@ -2563,7 +2574,8 @@ export class PokedexPageUiHandler extends MessageUiHandler {
    * @returns Whether the user has enough candies and all value reductions have not been unlocked already
    */
   private isValueReductionAvailable(): boolean {
-    const starterData = globalScene.gameData.starterData[this.starterId];
+    const starterData =
+      globalScene.gameData.starterData[this.starterId] ?? globalScene.gameData.getStarterDataEntry(this.starterId);
 
     return (
       starterData.candyCount
@@ -2577,7 +2589,8 @@ export class PokedexPageUiHandler extends MessageUiHandler {
    * @returns Whether the user has enough candies
    */
   private isSameSpeciesEggAvailable(): boolean {
-    const starterData = globalScene.gameData.starterData[this.starterId];
+    const starterData =
+      globalScene.gameData.starterData[this.starterId] ?? globalScene.gameData.getStarterDataEntry(this.starterId);
     const hatchCount = globalScene.gameData.dexData[this.starterId].hatchedCount;
 
     return starterData.candyCount >= getSameSpeciesEggCandyCounts(speciesStarterCosts[this.starterId], hatchCount);
@@ -2922,11 +2935,16 @@ export class PokedexPageUiHandler extends MessageUiHandler {
         this.pokemonCandyIcon.setTint(argbFromRgba(rgbHexToRgba(colorScheme[0])));
         this.pokemonCandyOverlayIcon.setTint(argbFromRgba(rgbHexToRgba(colorScheme[1])));
         this.pokemonCandyCountText.setText(
-          `×${species.speciesId === SpeciesId.PIKACHU ? 0 : globalScene.gameData.starterData[this.starterId].candyCount}`,
+          `×${species.speciesId === SpeciesId.PIKACHU ? 0 : (globalScene.gameData.starterData[this.starterId] ?? globalScene.gameData.getStarterDataEntry(this.starterId)).candyCount}`,
         );
         updateCandyCountTextStyle(
           this.pokemonCandyCountText,
-          species.speciesId === SpeciesId.PIKACHU ? 0 : globalScene.gameData.starterData[this.starterId].candyCount,
+          species.speciesId === SpeciesId.PIKACHU
+            ? 0
+            : (
+                globalScene.gameData.starterData[this.starterId]
+                ?? globalScene.gameData.getStarterDataEntry(this.starterId)
+              ).candyCount,
         );
         this.pokemonCandyContainer.setVisible(true);
 
