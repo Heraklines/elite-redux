@@ -68,8 +68,9 @@ describe.skipIf(!RUN)("ER Biome Market (#440)", () => {
     for (const slot of a) {
       expect(HEAL_KEYS.has(slot.key)).toBe(false);
     }
-    // The shop hook resolves the stock into purchasable options.
-    const options = getPlayerShopModifierTypeOptionsForWave(10, 0);
+    // The shop hook resolves the stock into purchasable options - but ONLY when
+    // asked for the biome shop (the dedicated BiomeShopPhase passes forBiomeShop).
+    const options = getPlayerShopModifierTypeOptionsForWave(10, 0, /* forBiomeShop */ true);
     expect(options.length).toBeGreaterThanOrEqual(4);
     for (const opt of options) {
       expect(opt.cost).toBeGreaterThan(0);
@@ -79,16 +80,16 @@ describe.skipIf(!RUN)("ER Biome Market (#440)", () => {
     expect(getPlayerShopModifierTypeOptionsForWave(11, 1000).length).toBeGreaterThan(0);
   });
 
-  it("END TO END: winning a wave-10 boss shows the market rows in the reward UI", async () => {
-    game.override.startingWave(10).startingLevel(80).moveset(MoveId.BODY_SLAM);
+  it("does NOT leak biome stock into the vanilla x0 shop row (unlimited-buy exploit)", async () => {
+    // Reported exploit: after the market, the vanilla reward screen's shop row
+    // showed the SAME biome items - and that row has no per-slot stock cap, so
+    // they could be re-bought endlessly. The vanilla callers omit forBiomeShop,
+    // so on a boss (x0) wave they must get an EMPTY shop row (vanilla skips the
+    // shop entirely on boss waves; only the BiomeShopPhase shows the market).
     await game.classicMode.startBattle(SpeciesId.SNORLAX);
-    game.move.select(MoveId.BODY_SLAM);
-    await game.doKillOpponents();
-    await game.phaseInterceptor.to("SelectModifierPhase");
-    game.scene.ui.getHandler().processInput; // ensure handler resolved
-    const handler =
-      game.scene.ui.getHandler() as import("#ui/handlers/modifier-select-ui-handler").ModifierSelectUiHandler;
-    expect(handler.shopOptionsRows.flat().length).toBeGreaterThanOrEqual(4);
+    expect(getPlayerShopModifierTypeOptionsForWave(10, 1000)).toEqual([]);
+    // The dedicated biome-shop path still has stock on the same wave.
+    expect(getPlayerShopModifierTypeOptionsForWave(10, 1000, true).length).toBeGreaterThanOrEqual(4);
   });
 
   it("the Abyss has no market; every other biome has an economy entry", async () => {

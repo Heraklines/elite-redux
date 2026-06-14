@@ -2250,7 +2250,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "as you can afford). Press B/Cancel to LEAVE: a Yes/No confirm now asks\n"
       + "'Are you sure you want to leave the market?' (so a stray Cancel does\n"
       + "not skip the shop). Pick No to return to the market; pick Yes to\n"
-      + "continue to biome-select. The Abyss biome has NO market by design.",
+      + "continue to biome-select. The Abyss biome has NO market by design.\n"
+      + "REGRESSION: the normal reward/shop screen must NOT list the market's\n"
+      + "items - they used to leak into the vanilla shop row and be re-bought\n"
+      + "unlimited times. Now only the dedicated market shows them.",
     setup: () => {
       resetDevOverrides();
       setOverrides({

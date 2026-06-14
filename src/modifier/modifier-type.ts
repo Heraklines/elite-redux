@@ -2890,7 +2890,11 @@ export function overridePlayerModifierTypeOptions(options: ModifierTypeOption[],
   }
 }
 
-export function getPlayerShopModifierTypeOptionsForWave(waveIndex: number, baseCost: number): ModifierTypeOption[] {
+export function getPlayerShopModifierTypeOptionsForWave(
+  waveIndex: number,
+  baseCost: number,
+  forBiomeShop = false,
+): ModifierTypeOption[] {
   if (!(waveIndex % 10)) {
     // ER Biome Market (#440): boss waves never had a shop - that empty space
     // is now the biome market. Stock + prices come from the per-biome economy
@@ -2898,7 +2902,13 @@ export function getPlayerShopModifierTypeOptionsForWave(waveIndex: number, baseC
     // exempt; the Abyss has no market by design.
     // Shipped to production (release approval): the market runs on every x0 wave
     // in all builds. (The dev TEST SUITE remains staging-only via its own gate.)
-    if (waveIndex < 200 && globalScene.currentBattle != null) {
+    //
+    // ONLY the BiomeShopPhase (forBiomeShop) gets this stock. The vanilla reward
+    // screen's shop row also calls this on x0 waves; if it received the biome
+    // stock it would render it in its UNCAPPED row (no per-slot qty), letting
+    // players re-buy market items unlimited times for free-ish. Boss waves have
+    // no vanilla shop row (return [] below), so only the dedicated phase shows it.
+    if (forBiomeShop && waveIndex < 200 && globalScene.currentBattle != null) {
       const stock = rollErBiomeShopStock(globalScene.arena.biomeId, waveIndex);
       const options: ModifierTypeOption[] = [];
       for (const entry of stock) {

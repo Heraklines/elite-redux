@@ -60,7 +60,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
     globalScene.applyModifier(HealShopCostModifier, true, baseCost);
     // Same hook the reward screen used: on x0 waves this returns the 16-slot
     // biome market stock (see getPlayerShopModifierTypeOptionsForWave).
-    this.shopOptions = getPlayerShopModifierTypeOptionsForWave(waveIndex, baseCost.value);
+    this.shopOptions = getPlayerShopModifierTypeOptionsForWave(waveIndex, baseCost.value, /* forBiomeShop */ true);
     if (this.shopOptions.length === 0) {
       this.end();
       return;
