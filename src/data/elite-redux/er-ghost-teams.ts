@@ -85,6 +85,13 @@ export interface GhostTeamSnapshot {
   starters?: number[] | undefined;
   /** ER (#384): active challenges at run end, as [id, value] pairs. */
   challenges?: [number, number][] | undefined;
+  /** ER (Colosseum): true when a GHOST trainer dealt the run-ending defeat -
+   * the deadliest-ghost leaderboard counts these. Only set on a loss. */
+  killedByGhost?: boolean | undefined;
+  /** Source player's name for the killer ghost (when killedByGhost). */
+  ghostSourceName?: string | undefined;
+  /** The killer ghost's source winning-run id (joins back to its exact team). */
+  ghostSourceRunId?: string | undefined;
 }
 
 const MAX_PARTY = 6;
@@ -308,6 +315,11 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
   const partyData = party.slice(0, MAX_PARTY).map(serializeMember);
   const waveReached = globalScene?.currentBattle?.waveIndex ?? 0;
   const { name: opponentName, party: opponentParty } = captureOpponent();
+  // ER (Colosseum): if THIS defeat was dealt by a fielded ghost, record who it
+  // was (and which winning run it came from) so the deadliest-ghost board is
+  // exact - the rendered opponent name alone is ambiguous (NPC/wild collisions).
+  const killerTrainer = globalScene?.currentBattle?.trainer;
+  const killerGhost = !isVictory && killerTrainer ? GHOST_BY_TRAINER.get(killerTrainer) : undefined;
   return {
     id: `${globalScene?.seed ?? "seed"}-${Date.now()}`,
     trainerName: loggedInUser?.username ?? "Trainer",
@@ -320,6 +332,9 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
     opponentParty,
     starters: captureRunStarterLines(),
     challenges: captureRunChallenges(),
+    killedByGhost: killerGhost != null || undefined,
+    ghostSourceName: killerGhost?.trainerName,
+    ghostSourceRunId: killerGhost?.id,
   };
 }
 

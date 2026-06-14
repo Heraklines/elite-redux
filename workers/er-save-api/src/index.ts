@@ -614,6 +614,9 @@ async function handleRunCreate(
     opponentParty?: unknown;
     starters?: unknown;
     challenges?: unknown;
+    killedByGhost?: unknown;
+    ghostSourceName?: unknown;
+    ghostSourceRunId?: unknown;
   };
   try {
     run = JSON.parse(raw);
@@ -635,8 +638,8 @@ async function handleRunCreate(
   const challenges = Array.isArray(run.challenges) ? run.challenges : null;
   await ensureRunStatColumns(env);
   await env.DB.prepare(
-    `INSERT INTO runs (id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, starters, challenges)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+    `INSERT INTO runs (id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, starters, challenges, killed_by_ghost, ghost_source_name, ghost_source_run_id)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
        ON CONFLICT(id) DO NOTHING`,
   )
     .bind(
@@ -653,6 +656,9 @@ async function handleRunCreate(
       Array.isArray(run.opponentParty) ? JSON.stringify(run.opponentParty) : null,
       starters && starters.length > 0 ? JSON.stringify(starters) : null,
       challenges && challenges.length > 0 ? JSON.stringify(challenges) : null,
+      run.killedByGhost === true ? 1 : null,
+      typeof run.ghostSourceName === "string" ? run.ghostSourceName : null,
+      typeof run.ghostSourceRunId === "string" ? run.ghostSourceRunId : null,
     )
     .run();
   return text("", 200, cors);
@@ -795,7 +801,16 @@ async function ensureRunStatColumns(env: Env): Promise<void> {
     return;
   }
   runStatColumnsEnsured = true;
-  for (const col of ["starters TEXT", "challenges TEXT"]) {
+  for (const col of [
+    "starters TEXT",
+    "challenges TEXT",
+    // ER (Colosseum): the killer ghost on a run-ending defeat. Additive +
+    // nullable - old clients simply send null. No new request/write (rides the
+    // existing run-create INSERT).
+    "killed_by_ghost INTEGER",
+    "ghost_source_name TEXT",
+    "ghost_source_run_id TEXT",
+  ]) {
     try {
       await env.DB.prepare(`ALTER TABLE runs ADD COLUMN ${col}`).run();
     } catch {

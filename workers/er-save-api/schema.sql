@@ -57,7 +57,17 @@ CREATE TABLE IF NOT EXISTS runs (
   created_at    INTEGER NOT NULL,
   player_team   TEXT    NOT NULL,
   opponent_name TEXT,
-  opponent_team TEXT
+  opponent_team TEXT,
+  -- Added post-launch via lazy ALTER (ensureRunStatColumns); listed here so a
+  -- fresh DB matches. starters/challenges: usage-tier inputs (#384).
+  starters            TEXT,
+  challenges          TEXT,
+  -- ER (Colosseum): the run-ending ghost. killed_by_ghost=1 when a fielded
+  -- ghost trainer dealt the final defeat; ghost_source_run_id joins back to
+  -- that winning run's team. Powers the deadliest-ghost leaderboard.
+  killed_by_ghost     INTEGER,
+  ghost_source_name   TEXT,
+  ghost_source_run_id TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_runs_sample ON runs (difficulty, outcome, created_at);
 
