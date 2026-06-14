@@ -821,10 +821,12 @@ function megaSpeciesToBase(): Map<number, number> {
 // the team editor can tune them; the shipped defaults match #419.
 const ER_ELITE_LEGEND_FROM_WAVE = () => erBalanceNum("er.elite.legendFromWave");
 
-function erEliteBstCapFor(wave: number, isBossWave: boolean): number | null {
-  // Editor-managed ladder first (er-balance-tuning.json), validated to be
-  // ascending in both columns — invalid overrides fall back to the default.
-  for (const [maxWave, cap] of erBalancePairs("er.elite.bstCaps")) {
+function erEliteBstCapFor(wave: number, isBossWave: boolean, isHell: boolean): number | null {
+  // Hell runs a steeper ladder than Elite (er.hell.bstCaps); Ace/Youngster and
+  // Elite share the Elite ladder. Both are editor-managed (er-balance-tuning.json),
+  // validated ascending in both columns — invalid overrides fall back to default.
+  const ladderKey = isHell ? "er.hell.bstCaps" : "er.elite.bstCaps";
+  for (const [maxWave, cap] of erBalancePairs(ladderKey)) {
     if (wave <= maxWave) {
       return cap + (isBossWave ? erBalanceNum("er.elite.bstBossHeadroom") : 0);
     }
@@ -838,21 +840,22 @@ function erEliteBstCapFor(wave: number, isBossWave: boolean): number | null {
  *   1. DEVOLVE it stage by stage until it fits;
  *   2. if no prevolution fits (legendaries, heavy single-stagers), SWAP it for
  *      a wave-appropriate factory-pool species under the cap (seeded pick).
- * Hell is exempt (early spikes are its identity); Ace never fields ER teams.
+ * Runs for every difficulty: Ace/Youngster/Elite share the Elite ladder, Hell
+ * uses its own steeper {@linkcode er.hell.bstCaps} ladder (and keeps its early
+ * legendaries - no pre-wave legend ban).
  */
 export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
   try {
     // ER (#441): THE universal power gate. This used to be Elite-only and
-    // trainer-only; it now runs for EVERY difficulty except Hell (whose early
-    // spikes are intentional) and is invoked from the EnemyPokemon
-    // CONSTRUCTOR, so every spawn path - wild, trainer, mystery encounter,
-    // scripted - passes through one chokepoint. Species of any origin
-    // (vanilla or ER custom) are allowed as long as their BST fits the
-    // wave's ceiling; violators devolve or swap. Note the FAIL-CLOSED shape:
-    // an unknown/future difficulty value is gated, not exempted.
-    if (getErDifficulty() === "hell") {
-      return;
-    }
+    // trainer-only; it now runs for EVERY difficulty, invoked from the
+    // EnemyPokemon CONSTRUCTOR, so every spawn path - wild, trainer, mystery
+    // encounter, scripted - passes through one chokepoint. Species of any origin
+    // (vanilla or ER custom) are allowed as long as their BST fits the wave's
+    // ceiling; violators devolve or swap. Hell uses its OWN steeper ladder
+    // (er.hell.bstCaps) so early Hell is survivable but still harder than Elite;
+    // it keeps its early legendaries (no pre-wave legend ban). Fail-closed: an
+    // unknown/future difficulty value falls through to the Elite ladder, gated.
+    const isHell = getErDifficulty() === "hell";
     // Daily runs are shared-seed curated content (set bosses incl. wave-50
     // legendaries) - gating them would silently rewrite everyone's daily.
     if (globalScene.gameMode?.isDaily) {
@@ -860,11 +863,13 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
     }
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
     const isBossWave = wave % 10 === 0 || (globalScene.currentBattle?.trainer?.config.isBoss ?? false);
-    const cap = erEliteBstCapFor(wave, isBossWave);
+    const cap = erEliteBstCapFor(wave, isBossWave, isHell);
     if (cap === null) {
       return;
     }
-    const legendBanned = wave < ER_ELITE_LEGEND_FROM_WAVE();
+    // Hell keeps its early legendary spikes (BST cap still trims most of them);
+    // only the vanilla-facing ladders ban legend-likes before the legend wave.
+    const legendBanned = !isHell && wave < ER_ELITE_LEGEND_FROM_WAVE();
     const violates = (sp: PokemonSpecies): boolean =>
       sp.getBaseStatTotal() > cap || (legendBanned && (sp.legendary || sp.subLegendary || sp.mythical));
     if (!violates(enemy.species)) {
