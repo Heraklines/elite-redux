@@ -1,5 +1,6 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { PLAYER_PARTY_MAX_SIZE, WEIGHT_INCREMENT_ON_SPAWN_MISS } from "#app/constants";
+import { consumePendingDevEnemyParty, type DevEnemyMonSpec } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
@@ -21,7 +22,7 @@ import { SpeciesId } from "#enums/species-id";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { UiMode } from "#enums/ui-mode";
 import { EncounterPhaseEvent } from "#events/battle-scene";
-import type { Pokemon } from "#field/pokemon";
+import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import {
   BoostBugSpawnModifier,
   IvScannerModifier,
@@ -37,7 +38,44 @@ import { getGoldenBugNetSpecies } from "#mystery-encounters/encounter-pokemon-ut
 import { BattlePhase } from "#phases/battle-phase";
 import { achvs } from "#system/achv";
 import { randSeedInt, randSeedItem } from "#utils/common";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
+
+/**
+ * Dev scenario builder (staging only): construct one staged enemy mon for slot
+ * `e`. Mirrors the LLM director's wild-encounter override construction. Returns
+ * null when the spec's species doesn't resolve (falls through to normal gen).
+ */
+function buildDevEnemy(spec: DevEnemyMonSpec, fallbackLevel: number, trainerBattle: boolean): EnemyPokemon | null {
+  const species = getPokemonSpecies(spec.speciesId);
+  if (!species) {
+    return null;
+  }
+  const level = Math.max(1, Math.floor(spec.level ?? fallbackLevel));
+  const enemy = globalScene.addEnemyPokemon(
+    species,
+    level,
+    trainerBattle ? TrainerSlot.TRAINER : TrainerSlot.NONE,
+    !!spec.isBoss,
+  );
+  if (spec.formIndex) {
+    enemy.formIndex = spec.formIndex;
+    enemy.calculateStats();
+    enemy.generateName();
+  }
+  if (spec.moveIds && spec.moveIds.length > 0) {
+    const moves = spec.moveIds.slice(0, 4).map(id => new PokemonMove(id));
+    enemy.moveset = moves;
+    enemy.summonData.moveset = moves.slice();
+  }
+  if (spec.abilitySlot !== undefined) {
+    enemy.abilityIndex = Math.max(0, Math.min(2, spec.abilitySlot));
+  }
+  if (spec.shiny) {
+    enemy.shiny = true;
+  }
+  return enemy;
+}
 
 export class EncounterPhase extends BattlePhase {
   // Union type is necessary as this is subclassed, and typescript will otherwise complain
@@ -102,6 +140,10 @@ export class EncounterPhase extends BattlePhase {
 
     let totalBst = 0;
 
+    // Dev scenario builder (staging only): a fully custom enemy party staged
+    // for this wave. Consumed ONCE; null in production builds.
+    const devEnemyParty = this.loaded ? null : consumePendingDevEnemyParty();
+
     battle.enemyLevels?.every((level, e) => {
       if (battle.isBattleMysteryEncounter()) {
         // Skip enemy loading for MEs, those are loaded elsewhere
@@ -112,6 +154,12 @@ export class EncounterPhase extends BattlePhase {
       // wild encounters (a specific Pelipper, a feral Houndoom). When
       // that's the case, skip the standard generation so the LLM's
       // choices stick.
+      if (devEnemyParty?.[e] && !this.loaded && !battle.enemyParty[e]) {
+        const devEnemy = buildDevEnemy(devEnemyParty[e], level, battle.battleType === BattleType.TRAINER);
+        if (devEnemy) {
+          battle.enemyParty[e] = devEnemy;
+        }
+      }
       if (!this.loaded && !battle.enemyParty[e]) {
         if (battle.battleType === BattleType.TRAINER) {
           battle.enemyParty[e] = battle.trainer?.genPartyMember(e)!; // TODO:: is the bang correct here?

@@ -120,6 +120,38 @@ export function consumePendingDevShop(): ModifierTypeFunc[] | null {
   return f;
 }
 
+// --- Pending custom ENEMY party (scenario builder → EncounterPhase) -----------
+// Lets the scenario builder specify the enemy side slot-by-slot (species, level,
+// moves, ability slot, form, boss) - something the uniform ENEMY_*_OVERRIDEs
+// cannot express. EncounterPhase consumes it once when generating the wave's
+// enemies and constructs each staged mon instead of rolling one. Returns null
+// in production / clean checkout, so the consuming phase is inert there.
+
+export interface DevEnemyMonSpec {
+  speciesId: number;
+  level?: number;
+  moveIds?: number[];
+  /** 0 = ability1, 1 = ability2, 2 = hidden. */
+  abilitySlot?: number;
+  formIndex?: number;
+  isBoss?: boolean;
+  shiny?: boolean;
+}
+
+let pendingDevEnemyParty: DevEnemyMonSpec[] | null = null;
+
+/** Stage a custom enemy party for the next wave's encounter generation. */
+export function setPendingDevEnemyParty(party: DevEnemyMonSpec[]): void {
+  pendingDevEnemyParty = party;
+}
+
+/** Take (and clear) any staged enemy party. Returns null if none was staged. */
+export function consumePendingDevEnemyParty(): DevEnemyMonSpec[] | null {
+  const p = pendingDevEnemyParty;
+  pendingDevEnemyParty = null;
+  return p;
+}
+
 // --- Lazy, env-gated loader --------------------------------------------------
 
 // Lazy glob: returns importers WITHOUT running them.
