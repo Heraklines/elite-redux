@@ -1,6 +1,7 @@
 import type { GameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
+import { applyErHellEnemyLevelScaling } from "#data/elite-redux/er-run-difficulty";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
@@ -121,6 +122,9 @@ export class Battle {
         ? trainer?.getPartyLevels(this.waveIndex)
         : // TODO: Remove array.fill.map
           new Array(double ? 2 : 1).fill(null).map(() => this.getLevelForWave());
+    // ER HELL ONLY: rescale every enemy to the player's highest party level
+    // (no-op on Youngster / Ace / Elite).
+    this.enemyLevels = applyErHellEnemyLevelScaling(this.enemyLevels);
   }
 
   public get isClassicFinalBoss(): boolean {

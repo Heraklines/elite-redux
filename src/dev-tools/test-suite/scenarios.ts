@@ -531,6 +531,37 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Hell: enemy = your top level",
+    description:
+      "ER HELL-ONLY level scaling. On HELL, every enemy spawns at the HIGHEST\n"
+      + "level in YOUR party (a lv10 mon on a lv5 team => the whole enemy team is\n"
+      + "lv10), so benching a low mon can't soften a wave. Your party here is all\n"
+      + "LEVEL 50 at wave 5.\n"
+      + "EXPECT: the wild enemy spawns at LEVEL 50 (your top level), NOT the usual\n"
+      + "~level 5 wave-scaled mon. Level ONE mon higher (a rare candy) and confirm\n"
+      + "the NEXT wave's enemies rise to that new top level.\n"
+      + "OTHER MODES UNAFFECTED: the same setup on Ace/Elite/Youngster keeps the\n"
+      + "normal low wave-scaled enemy level.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("hell");
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.SPLASH],
+        }),
+        makeStarter(SpeciesId.BULBASAUR, {
+          moveset: [MoveId.GIGA_DRAIN, MoveId.SLUDGE_BOMB, MoveId.SYNTHESIS, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "Fury Cutter/Echoed Voice x3",
     description:
       "#360 Fury Cutter + Echoed Voice — Triple Kick's effect.\n"

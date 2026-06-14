@@ -19,6 +19,7 @@
 // re-exported from the trainer-overlay so callers map difficulty → tier here.
 // =============================================================================
 
+import { globalScene } from "#app/global-scene";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import type { ErRosterTier } from "#data/elite-redux/er-trainer-overlay";
 
@@ -42,6 +43,35 @@ export function setErDifficulty(difficulty: ErDifficulty): void {
 /** Reset to the default (e.g. when returning to the title / starting fresh). */
 export function resetErDifficulty(): void {
   currentDifficulty = DEFAULT_DIFFICULTY;
+}
+
+/**
+ * HELL-ONLY enemy level scaling. On Hell, every enemy mon spawns at the TOP of
+ * the player's party - the single highest level among the player's current
+ * Pokemon - so the whole enemy team matches your best mon (e.g. a lv10 Pikachu
+ * on a lv5 team => the entire enemy team is lv10). Benching a low-level mon can
+ * no longer soften a wave.
+ *
+ * STRICTLY gated to `currentDifficulty === "hell"`: Youngster / Ace / Elite keep
+ * the vanilla wave-scaled levels untouched. Returns the input unchanged off-Hell,
+ * when there are no enemy levels, or when the party isn't populated yet (so a
+ * mid-load construction can't zero out the levels).
+ */
+export function applyErHellEnemyLevelScaling(enemyLevels: number[] | undefined): number[] | undefined {
+  if (currentDifficulty !== "hell" || !enemyLevels?.length) {
+    return enemyLevels;
+  }
+  const party = globalScene.getPlayerParty();
+  let topLevel = 0;
+  for (const member of party) {
+    if (member.level > topLevel) {
+      topLevel = member.level;
+    }
+  }
+  if (topLevel <= 0) {
+    return enemyLevels;
+  }
+  return enemyLevels.map(() => topLevel);
 }
 
 /** Map the chosen difficulty to the ER trainer roster tier it should use. */
