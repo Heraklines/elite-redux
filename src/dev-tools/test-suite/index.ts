@@ -492,7 +492,13 @@ function openScenarioList(ctx: DevMenuCtx): void {
   options.push({
     label: "Cancel",
     handler: () => {
-      // Back to a fresh title screen (mirrors the New Game submenu's cancel).
+      // The scenario list is opened with `setOverlayMode`, which pushes the
+      // previous mode onto the UI mode CHAIN. `toTitleScreen()` alone rebuilds
+      // the title but never unwinds that chain, so the stale overlay handler
+      // keeps eating input -> "can't move / locked when going back". Reset the
+      // chain first; the fresh TitlePhase then transitions cleanly from the
+      // (cleared) OPTION_SELECT mode to TITLE.
+      globalScene.ui.resetModeChain();
       globalScene.phaseManager.toTitleScreen();
       return true;
     },
