@@ -458,14 +458,9 @@ function openScenarioList(ctx: DevMenuCtx): void {
           setShareCode: code => {
             activeShareCode = code;
           },
-          // Closing the form pops the overlay back to the live title menu
-          // (revertMode resets `overlayActive` + restores a real UI mode).
-          // Re-opening the list directly can't work: setOverlayMode no-ops when
-          // the mode is already OPTION_SELECT, so we'd be left modeless. From
-          // the title the tester just re-enters Dev Scenarios -> Builder.
-          closeMenu: () => {
-            globalScene.ui.revertMode();
-          },
+          // Closing the form re-opens this picker so the game keeps a live UI
+          // mode (otherwise: modeless softlock).
+          closeMenu: () => openScenarioList(ctx),
         });
         return true;
       },
@@ -497,15 +492,14 @@ function openScenarioList(ctx: DevMenuCtx): void {
   options.push({
     label: "Cancel",
     handler: () => {
-      // The list is an OVERLAY (setOverlayMode) sitting over the still-alive
-      // TITLE menu (the Dev Scenarios item uses keepOpen so the title is NOT
-      // torn down). `revertMode()` fades the overlay out - resetting the UI's
-      // `overlayActive` flag, which otherwise makes `ui.processInput` swallow
-      // EVERY input ("can't move / locked when going back") - and pops back to
-      // the live title menu. toTitleScreen() can't work here: TitlePhase is
-      // still the running phase and never ends, so a freshly-queued TitlePhase
-      // would never start.
-      globalScene.ui.revertMode();
+      // The scenario list is opened with `setOverlayMode`, which pushes the
+      // previous mode onto the UI mode CHAIN. `toTitleScreen()` alone rebuilds
+      // the title but never unwinds that chain, so the stale overlay handler
+      // keeps eating input -> "can't move / locked when going back". Reset the
+      // chain first; the fresh TitlePhase then transitions cleanly from the
+      // (cleared) OPTION_SELECT mode to TITLE.
+      globalScene.ui.resetModeChain();
+      globalScene.phaseManager.toTitleScreen();
       return true;
     },
   });
@@ -548,13 +542,9 @@ registerDevMenu(ctx => {
   activeShareCode = null;
   return {
     label: "\u{1F6E0} Dev Scenarios",
-    // keepOpen: the scenario list opens as an OVERLAY over this title menu, and
-    // the back-out path (Cancel / builder close) uses `revertMode()` to pop
-    // back to it. That only works if the title menu is STILL ALIVE underneath -
-    // so it must NOT be torn down (the default return-true behaviour clears it,
-    // which left the player on a dead, input-swallowing screen).
-    keepOpen: true,
     handler: () => {
+      // No keepOpen — mirror the New Game item: return true to close the title
+      // menu, and the deferred showText callback opens the scenario list.
       // REFRESH the shared passed-set first (one tiny GET per menu open) so a
       // teammate's passes hide scenarios WITHOUT requiring a page reload; offline
       // or fetch failure just opens with the cached/local state.
