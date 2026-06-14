@@ -5204,6 +5204,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             }
           }
         }
+        // A move can be BOTH an early level-up move AND an egg move (e.g.
+        // Drifloon's Psycho Shift is a level-1 ER move and an egg move), which
+        // would list it twice in the starter move picker. Dedupe by moveId.
+        this.speciesStarterMoves = [...new Set(this.speciesStarterMoves)];
 
         const speciesMoveData = starterDataEntry.moveset;
         const moveData: StarterMoveset | null = speciesMoveData
