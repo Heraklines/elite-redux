@@ -533,13 +533,13 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "Hell: enemy = your top level",
     description:
-      "ER HELL-ONLY level scaling. On HELL, every enemy spawns at the HIGHEST\n"
-      + "level in YOUR party (a lv10 mon on a lv5 team => the whole enemy team is\n"
-      + "lv10), so benching a low mon can't soften a wave. Your party here is all\n"
-      + "LEVEL 50 at wave 5.\n"
-      + "EXPECT: the wild enemy spawns at LEVEL 50 (your top level), NOT the usual\n"
-      + "~level 5 wave-scaled mon. Level ONE mon higher (a rare candy) and confirm\n"
-      + "the NEXT wave's enemies rise to that new top level.\n"
+      "ER HELL-ONLY level scaling, eased in by wave. Enemies spawn relative to the\n"
+      + "HIGHEST level in YOUR party (benching a low mon can't soften a wave):\n"
+      + "  waves 1-19: top - 2,  waves 20-39: top - 1,  wave 40+: top (parity).\n"
+      + "Your party here is all LEVEL 50 at wave 5.\n"
+      + "EXPECT: the wild enemy spawns at LEVEL 48 (top 50 minus 2 at this wave),\n"
+      + "NOT the usual ~level 5 wave-scaled mon. Past wave 20 it would be 49, and\n"
+      + "from wave 40 it matches your top level exactly.\n"
       + "OTHER MODES UNAFFECTED: the same setup on Ace/Elite/Youngster keeps the\n"
       + "normal low wave-scaled enemy level.",
     setup: () => {

@@ -122,9 +122,9 @@ export class Battle {
         ? trainer?.getPartyLevels(this.waveIndex)
         : // TODO: Remove array.fill.map
           new Array(double ? 2 : 1).fill(null).map(() => this.getLevelForWave());
-    // ER HELL ONLY: rescale every enemy to the player's highest party level
-    // (no-op on Youngster / Ace / Elite).
-    this.enemyLevels = applyErHellEnemyLevelScaling(this.enemyLevels);
+    // ER HELL ONLY: rescale every enemy toward the player's highest party level,
+    // eased in by wave (top-2 < w20, top-1 < w40, top after). No-op off Hell.
+    this.enemyLevels = applyErHellEnemyLevelScaling(this.enemyLevels, this.waveIndex);
   }
 
   public get isClassicFinalBoss(): boolean {
