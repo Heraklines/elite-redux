@@ -5,13 +5,13 @@
  */
 
 // =============================================================================
-// ER Colosseum (#439) - the press-your-luck gauntlet choice screen.
+// ER Colosseum (#439) - the press-your-luck gauntlet standings board.
 //
-// Shown BETWEEN gauntlet battles by ColosseumChoicePhase. A BW2 PWT-style
-// standings board: a full 15-challenger bracket (cleared / next-up / upcoming),
-// the current reward GRADE, and two buttons - CONTINUE (risk it for the next
-// grade) or CASH OUT (bank the current grade's reward shop and leave). Pure
-// presentation + a 2-way callback; the phase owns all battle/reward logic.
+// Styled after the BW2 Pokemon World Tournament entry/bracket screen: a clean
+// dark tournament board (NOT a battle photo), a framed two-column roster of all
+// 15 entrants (cleared / next-up / upcoming), a gold champion crown over the
+// final challenger, the current reward GRADE, and CONTINUE / CASH OUT buttons.
+// Pure presentation + a 2-way callback; ColosseumChoicePhase owns the logic.
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
@@ -44,23 +44,30 @@ export interface ColosseumViewData {
 /** continue (0) / cash out (1). */
 export type ColosseumChoiceCallback = (choice: number) => void;
 
-const GRADE_GOLD = 0xf8d030; // cleared / banked
-const COLOR_NEXT = 0x40c0f8; // the next challenger (CONTINUE target)
-const COLOR_TODO = 0x9098b0; // not yet faced
+const GOLD = 0xf8d030; // cleared / banked / champion
+const NEXT = 0x48c8f8; // the next challenger (CONTINUE target)
+const TODO = 0x9098b0; // not yet faced
+const BOARD = 0x0a1020; // tournament board base
+const PANEL = 0x141d33; // column panels
 
 export class ColosseumUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
-  private bg: Phaser.GameObjects.Image;
-  private bgOverlay: Phaser.GameObjects.Rectangle;
+  private board: Phaser.GameObjects.Rectangle;
+  private frame: Phaser.GameObjects.NineSlice;
+  private leftPanel: Phaser.GameObjects.Rectangle;
+  private rightPanel: Phaser.GameObjects.Rectangle;
+  private crown: Phaser.GameObjects.Graphics;
   private titleText: Phaser.GameObjects.Text;
+  private subtitleText: Phaser.GameObjects.Text;
   private statusText: Phaser.GameObjects.Text;
+  private gradeWindow: Phaser.GameObjects.NineSlice;
+  private gradeLabel: Phaser.GameObjects.Text;
   private gradeText: Phaser.GameObjects.Text;
-  private bracketRows: Phaser.GameObjects.Text[] = [];
+  private rosterRows: Phaser.GameObjects.Text[] = [];
   private buttons: { window: Phaser.GameObjects.NineSlice; label: Phaser.GameObjects.Text }[] = [];
   private cursorObj: Phaser.GameObjects.Rectangle;
 
   private onChoice: ColosseumChoiceCallback | null = null;
-  /** Guards against a double input firing the callback twice. */
   private resolved = false;
 
   constructor() {
@@ -76,35 +83,55 @@ export class ColosseumUiHandler extends UiHandler {
     this.container.setVisible(false);
     ui.add(this.container);
 
-    // Arena backdrop (BW2 stone hall) + a dim so the board reads clearly. Falls
-    // back to the game's default_bg panel if the custom art isn't present.
-    const bgKey = globalScene.textures.exists("er_colosseum_bg") ? "er_colosseum_bg" : "default_bg";
-    this.bg = globalScene.add.image(0, 0, bgKey).setOrigin(0);
-    this.bg.setDisplaySize(w, h);
-    this.container.add(this.bg);
+    // Clean dark tournament board (no battle photo) + a framed border.
+    this.board = globalScene.add.rectangle(0, 0, w, h, BOARD, 1).setOrigin(0);
+    this.container.add(this.board);
+    this.frame = addWindow(2, 2, w - 4, h - 4);
+    this.container.add(this.frame);
 
-    this.bgOverlay = globalScene.add.rectangle(0, 0, w, h, 0x080a14, 0.5).setOrigin(0);
-    this.container.add(this.bgOverlay);
-
-    this.titleText = addTextObject(w / 2, 6, "COLOSSEUM", TextStyle.WINDOW, { fontSize: "84px" });
+    this.titleText = addTextObject(w / 2, 5, "COLOSSEUM", TextStyle.WINDOW, { fontSize: "84px" });
     this.titleText.setOrigin(0.5, 0);
     this.container.add(this.titleText);
 
-    this.statusText = addTextObject(w / 2, 24, "", TextStyle.PARTY, { fontSize: "44px" });
+    this.subtitleText = addTextObject(w / 2, 22, "WORLD TOURNAMENT", TextStyle.PARTY, { fontSize: "38px" });
+    this.subtitleText.setOrigin(0.5, 0);
+    this.subtitleText.setTint(0xc0c8e0);
+    this.container.add(this.subtitleText);
+
+    this.statusText = addTextObject(w / 2, 33, "", TextStyle.PARTY, { fontSize: "42px" });
     this.statusText.setOrigin(0.5, 0);
     this.container.add(this.statusText);
 
-    // Banked grade, big + gold, top-right.
-    this.gradeText = addTextObject(w - 8, 6, "", TextStyle.WINDOW, { fontSize: "90px" });
-    this.gradeText.setOrigin(1, 0);
-    this.gradeText.setTint(GRADE_GOLD);
+    // Grade badge, top-left, framed + gold.
+    this.gradeWindow = addWindow(6, 6, 42, 26);
+    this.container.add(this.gradeWindow);
+    this.gradeLabel = addTextObject(27, 9, "GRADE", TextStyle.PARTY, { fontSize: "32px" });
+    this.gradeLabel.setOrigin(0.5, 0);
+    this.container.add(this.gradeLabel);
+    this.gradeText = addTextObject(27, 16, "", TextStyle.WINDOW, { fontSize: "60px" });
+    this.gradeText.setOrigin(0.5, 0);
+    this.gradeText.setTint(GOLD);
     this.container.add(this.gradeText);
 
-    // The 15-challenger bracket is (re)built per show in layoutBracket().
-    this.bracketRows = [];
+    // Two roster column panels.
+    const panelY = 48;
+    const panelH = h - panelY - 38;
+    const panelW = w / 2 - 14;
+    this.leftPanel = globalScene.add.rectangle(8, panelY, panelW, panelH, PANEL, 0.85).setOrigin(0);
+    this.leftPanel.setStrokeStyle(1, 0x39456a);
+    this.container.add(this.leftPanel);
+    this.rightPanel = globalScene.add.rectangle(w / 2 + 6, panelY, panelW, panelH, PANEL, 0.85).setOrigin(0);
+    this.rightPanel.setStrokeStyle(1, 0x39456a);
+    this.container.add(this.rightPanel);
+
+    // Champion crown, drawn centred above the board (re-pointed per show()).
+    this.crown = globalScene.add.graphics();
+    this.container.add(this.crown);
+
+    this.rosterRows = [];
 
     // Two buttons near the bottom.
-    const btnW = 124;
+    const btnW = 122;
     const btnH = 22;
     const gap = 8;
     const totalW = btnW * 2 + gap;
@@ -126,7 +153,7 @@ export class ColosseumUiHandler extends UiHandler {
     }
 
     this.cursorObj = globalScene.add.rectangle(0, 0, btnW + 4, btnH + 4, 0xffffff, 0);
-    this.cursorObj.setStrokeStyle(2, GRADE_GOLD);
+    this.cursorObj.setStrokeStyle(2, GOLD);
     this.cursorObj.setOrigin(0.5);
     this.cursorObj.setVisible(false);
     this.container.add(this.cursorObj);
@@ -145,9 +172,8 @@ export class ColosseumUiHandler extends UiHandler {
     this.buttons[0].label.setText(`CONTINUE\n(risk for ${data.nextTierLabel})`);
     this.buttons[1].label.setText(`CASH OUT\n(claim ${data.tierLabel})`);
 
-    this.layoutBracket(data);
+    this.layoutRoster(data);
 
-    // Default the cursor to CONTINUE (the exciting choice).
     this.cursor = COLOSSEUM_CONTINUE;
     this.moveCursorTo(this.cursor);
 
@@ -156,37 +182,64 @@ export class ColosseumUiHandler extends UiHandler {
     return true;
   }
 
-  /** Build the 15-challenger bracket in two columns: cleared / next / upcoming. */
-  private layoutBracket(data: ColosseumViewData): void {
-    for (const row of this.bracketRows) {
+  /** Draw the two-column entrant roster + the champion crown. */
+  private layoutRoster(data: ColosseumViewData): void {
+    for (const row of this.rosterRows) {
       row.destroy();
     }
-    this.bracketRows = [];
+    this.rosterRows = [];
 
     const w = globalScene.scaledCanvas.width;
-    const colX = [10, w / 2 + 4];
-    const rowY0 = 42;
+    const n = data.challengers.length;
+    const perCol = Math.ceil(n / 2);
+    const colX = [14, w / 2 + 12];
+    const rowY0 = 52;
     const rowH = 13;
-    const perCol = Math.ceil(data.challengers.length / 2);
 
-    for (let i = 0; i < data.challengers.length; i++) {
+    let championPos: { x: number; y: number } | null = null;
+
+    for (let i = 0; i < n; i++) {
       const col = i < perCol ? 0 : 1;
       const row = i < perCol ? i : i - perCol;
       const x = colX[col];
       const y = rowY0 + row * rowH;
 
       const cleared = i < data.round;
-      const isNext = i === data.round; // the CONTINUE target
-      // Cleared rows get a check; the next challenger a chevron; rest a dot.
+      const isNext = i === data.round;
+      const isChampion = i === n - 1;
       const marker = cleared ? "*" : isNext ? ">" : "-";
       const label = `${marker} ${i + 1}. ${data.challengers[i]}`;
       const t = addTextObject(x, y, label, TextStyle.WINDOW, { fontSize: "42px" });
       t.setOrigin(0, 0);
-      t.setTint(cleared ? GRADE_GOLD : isNext ? COLOR_NEXT : COLOR_TODO);
-      t.setAlpha(cleared || isNext ? 1 : 0.75);
+      t.setTint(isChampion && !cleared ? GOLD : cleared ? GOLD : isNext ? NEXT : TODO);
+      t.setAlpha(cleared || isNext || isChampion ? 1 : 0.7);
       this.container.add(t);
-      this.bracketRows.push(t);
+      this.rosterRows.push(t);
+
+      if (isChampion) {
+        championPos = { x, y };
+      }
     }
+
+    // Crown above the champion's row (the final challenger).
+    this.crown.clear();
+    if (championPos) {
+      this.drawCrown(championPos.x - 2, championPos.y - 11);
+    }
+  }
+
+  /** A small gold crown drawn from primitives (no glyph/asset risk). */
+  private drawCrown(x: number, y: number): void {
+    const g = this.crown;
+    g.fillStyle(GOLD, 1);
+    // base band
+    g.fillRect(x, y + 6, 16, 3);
+    // three spikes
+    g.fillTriangle(x, y + 6, x + 4, y + 6, x + 2, y);
+    g.fillTriangle(x + 6, y + 6, x + 10, y + 6, x + 8, y - 2);
+    g.fillTriangle(x + 12, y + 6, x + 16, y + 6, x + 14, y);
+    g.fillStyle(0xfff0a0, 1);
+    g.fillRect(x + 1, y + 7, 14, 1);
   }
 
   private moveCursorTo(index: number): void {
@@ -211,7 +264,6 @@ export class ColosseumUiHandler extends UiHandler {
         this.choose(this.cursor === COLOSSEUM_CASH_OUT ? COLOSSEUM_CASH_OUT : COLOSSEUM_CONTINUE);
         return true;
       case Button.CANCEL:
-        // Cancel = the SAFE default: bank what you have rather than risk it.
         this.choose(COLOSSEUM_CASH_OUT);
         return true;
       case Button.LEFT:
@@ -248,10 +300,11 @@ export class ColosseumUiHandler extends UiHandler {
     super.clear();
     this.container.setVisible(false);
     this.cursorObj.setVisible(false);
-    for (const row of this.bracketRows) {
+    this.crown.clear();
+    for (const row of this.rosterRows) {
       row.destroy();
     }
-    this.bracketRows = [];
+    this.rosterRows = [];
     this.onChoice = null;
   }
 }

@@ -34,6 +34,7 @@ import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { TextStyle } from "#enums/text-style";
 import { TrainerType } from "#enums/trainer-type";
 import { getBiomeKey } from "#field/arena";
 import { showEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
@@ -46,6 +47,7 @@ import {
 } from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
+import { addTextObject } from "#ui/text";
 import i18next from "i18next";
 
 /** The i18n namespace for the encounter. */
@@ -151,6 +153,51 @@ function applyColosseumArena(): void {
   globalScene.arenaNextEnemy.setBiome(biome);
 }
 
+/**
+ * BW2 PWT-style "VS" splash shown before each gauntlet battle: "CHALLENGER N /
+ * 15", a big VS, and the upcoming foe's name. A self-contained overlay that fades
+ * in, holds ~1.3s, fades out, and resolves - no UiMode/phase ordering to fight.
+ */
+function showColosseumVs(round: number): Promise<void> {
+  return new Promise(resolve => {
+    const w = globalScene.scaledCanvas.width;
+    const h = globalScene.scaledCanvas.height;
+    const c = globalScene.add.container(0, 0);
+    c.add(globalScene.add.rectangle(0, 0, w, h, 0x0a0e18, 1).setOrigin(0));
+
+    const top = addTextObject(w / 2, 18, `CHALLENGER ${round} / ${MAX_ROUNDS}`, TextStyle.WINDOW, { fontSize: "50px" });
+    top.setOrigin(0.5, 0);
+    top.setTint(0xf8d030);
+    c.add(top);
+
+    const vs = addTextObject(w / 2, h / 2 - 28, "VS", TextStyle.WINDOW, { fontSize: "96px" });
+    vs.setOrigin(0.5, 0.5);
+    vs.setTint(0xf85040);
+    c.add(vs);
+
+    const foe = addTextObject(w / 2, h / 2 + 26, CHALLENGER_NAMES[round - 1] ?? "", TextStyle.WINDOW, {
+      fontSize: "64px",
+    });
+    foe.setOrigin(0.5, 0);
+    c.add(foe);
+
+    globalScene.ui.add(c);
+    c.setAlpha(0);
+    globalScene.tweens.add({ targets: c, alpha: 1, duration: 220 });
+    globalScene.time.delayedCall(1300, () => {
+      globalScene.tweens.add({
+        targets: c,
+        alpha: 0,
+        duration: 220,
+        onComplete: () => {
+          c.destroy(true);
+          resolve();
+        },
+      });
+    });
+  });
+}
+
 /** Build the enemy config for a given round (1..MAX_ROUNDS). */
 function getColosseumRoundConfig(round: number): EnemyPartyConfig {
   const idx = Math.min(round, MAX_ROUNDS) - 1;
@@ -233,6 +280,7 @@ export const ColosseumEncounter: MysteryEncounter = MysteryEncounterBuilder.with
       };
       await transitionMysteryEncounterIntroVisuals(true, false);
       applyColosseumArena();
+      await showColosseumVs(1);
       await initBattleWithEnemyConfig(getColosseumRoundConfig(1));
     },
   )
@@ -260,6 +308,7 @@ export const ColosseumEncounter: MysteryEncounter = MysteryEncounterBuilder.with
  * ColosseumChoicePhase when the player picks CONTINUE.
  */
 export async function startNextColosseumBattle(round: number): Promise<void> {
+  await showColosseumVs(round);
   const playerField = globalScene.getPlayerField();
   for (const pokemon of playerField) {
     pokemon.lapseTag(BattlerTagType.COMMANDED);
