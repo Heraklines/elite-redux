@@ -106,6 +106,28 @@ const TRAINER_LADDER: TrainerType[] = [
   TrainerType.CYNTHIA, // 15 - the Champion (final challenger)
 ];
 
+/**
+ * Human-readable challenger labels, parallel to TRAINER_LADDER, for the
+ * tournament-bracket display on the between-rounds screen.
+ */
+export const CHALLENGER_NAMES = [
+  "Youngster",
+  "Bug Catcher",
+  "School Kid",
+  "Cyclist",
+  "Hiker",
+  "Black Belt",
+  "Ranger",
+  "Ace Trainer",
+  "Veteran",
+  "Norman",
+  "Giovanni",
+  "Sabrina",
+  "Clair",
+  "Lance",
+  "Cynthia",
+];
+
 /** Cash-out reward-shop size for a display-tier index (0..14): 3 -> 8 slots. */
 function colosseumShopSize(tierIndex: number): number {
   return Math.min(3 + Math.floor(tierIndex / 2), 8);

@@ -7,14 +7,11 @@
 // =============================================================================
 // ER Colosseum (#439) - the press-your-luck gauntlet choice screen.
 //
-// Shown BETWEEN gauntlet battles by the Colosseum mystery encounter. Full-screen
-// tournament-arena backdrop (BW2-derived stone hall) + the current reward GRADE
-// (D, D+, C ... SS, SSS, SSS+, EX), a 15-segment progress bar, and two buttons:
-// CONTINUE (risk it for the next grade) or CASH OUT (bank the current grade's
-// reward shop and leave). Pure presentation + a 2-way callback; the encounter
-// owns all battle/reward logic. Staging-gated upstream.
-//
-// Modeled on BiomeShopUiHandler (#440) for the container/asset conventions.
+// Shown BETWEEN gauntlet battles by ColosseumChoicePhase. A BW2 PWT-style
+// standings board: a full 15-challenger bracket (cleared / next-up / upcoming),
+// the current reward GRADE, and two buttons - CONTINUE (risk it for the next
+// grade) or CASH OUT (bank the current grade's reward shop and leave). Pure
+// presentation + a 2-way callback; the phase owns all battle/reward logic.
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
@@ -40,25 +37,25 @@ export interface ColosseumViewData {
   tierLabel: string;
   /** Display grade you'd reach by winning the next round. */
   nextTierLabel: string;
+  /** Human labels for every challenger in the ladder (length === totalRounds). */
+  challengers: string[];
 }
 
 /** continue (0) / cash out (1). */
 export type ColosseumChoiceCallback = (choice: number) => void;
 
-const GRADE_GOLD = 0xf8d030; // banked / cleared
-const SEG_DONE = 0xf8d030;
-const SEG_NOW = 0x40c0f8;
-const SEG_TODO = 0x40445c;
+const GRADE_GOLD = 0xf8d030; // cleared / banked
+const COLOR_NEXT = 0x40c0f8; // the next challenger (CONTINUE target)
+const COLOR_TODO = 0x9098b0; // not yet faced
 
 export class ColosseumUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
   private bg: Phaser.GameObjects.Image;
   private bgOverlay: Phaser.GameObjects.Rectangle;
   private titleText: Phaser.GameObjects.Text;
-  private subtitleText: Phaser.GameObjects.Text;
-  private tierText: Phaser.GameObjects.Text;
-  private rewardText: Phaser.GameObjects.Text;
-  private progressSegs: Phaser.GameObjects.Rectangle[] = [];
+  private statusText: Phaser.GameObjects.Text;
+  private gradeText: Phaser.GameObjects.Text;
+  private bracketRows: Phaser.GameObjects.Text[] = [];
   private buttons: { window: Phaser.GameObjects.NineSlice; label: Phaser.GameObjects.Text }[] = [];
   private cursorObj: Phaser.GameObjects.Rectangle;
 
@@ -79,47 +76,40 @@ export class ColosseumUiHandler extends UiHandler {
     this.container.setVisible(false);
     ui.add(this.container);
 
-    // Arena backdrop (BW2 stone hall) + a fairly heavy dim. Falls back to the
-    // game's default_bg panel if the custom art isn't present.
+    // Arena backdrop (BW2 stone hall) + a dim so the board reads clearly. Falls
+    // back to the game's default_bg panel if the custom art isn't present.
     const bgKey = globalScene.textures.exists("er_colosseum_bg") ? "er_colosseum_bg" : "default_bg";
     this.bg = globalScene.add.image(0, 0, bgKey).setOrigin(0);
     this.bg.setDisplaySize(w, h);
     this.container.add(this.bg);
 
-    this.bgOverlay = globalScene.add.rectangle(0, 0, w, h, 0x080a14, 0.55).setOrigin(0);
+    this.bgOverlay = globalScene.add.rectangle(0, 0, w, h, 0x080a14, 0.5).setOrigin(0);
     this.container.add(this.bgOverlay);
 
-    this.titleText = addTextObject(w / 2, 8, "COLOSSEUM", TextStyle.WINDOW, { fontSize: "96px" });
+    this.titleText = addTextObject(w / 2, 6, "COLOSSEUM", TextStyle.WINDOW, { fontSize: "84px" });
     this.titleText.setOrigin(0.5, 0);
     this.container.add(this.titleText);
 
-    this.subtitleText = addTextObject(w / 2, 30, "", TextStyle.PARTY, { fontSize: "50px" });
-    this.subtitleText.setOrigin(0.5, 0);
-    this.container.add(this.subtitleText);
+    this.statusText = addTextObject(w / 2, 24, "", TextStyle.PARTY, { fontSize: "44px" });
+    this.statusText.setOrigin(0.5, 0);
+    this.container.add(this.statusText);
 
-    // Big banked-grade readout.
-    this.tierText = addTextObject(w / 2, 46, "", TextStyle.WINDOW, { fontSize: "160px" });
-    this.tierText.setOrigin(0.5, 0);
-    this.tierText.setTint(GRADE_GOLD);
-    this.container.add(this.tierText);
+    // Banked grade, big + gold, top-right.
+    this.gradeText = addTextObject(w - 8, 6, "", TextStyle.WINDOW, { fontSize: "90px" });
+    this.gradeText.setOrigin(1, 0);
+    this.gradeText.setTint(GRADE_GOLD);
+    this.container.add(this.gradeText);
 
-    // Progress segments are (re)built per show in layoutProgress().
-    this.progressSegs = [];
+    // The 15-challenger bracket is (re)built per show in layoutBracket().
+    this.bracketRows = [];
 
-    this.rewardText = addTextObject(w / 2, 100, "Cash out claims a full reward shop of this grade.", TextStyle.PARTY, {
-      fontSize: "42px",
-      align: "center",
-    });
-    this.rewardText.setOrigin(0.5, 0);
-    this.container.add(this.rewardText);
-
-    // Two buttons, side by side near the bottom.
+    // Two buttons near the bottom.
     const btnW = 124;
-    const btnH = 24;
+    const btnH = 22;
     const gap = 8;
     const totalW = btnW * 2 + gap;
     const startX = (w - totalW) / 2;
-    const btnY = h - 42;
+    const btnY = h - 30;
     const captions = ["CONTINUE", "CASH OUT"];
     this.buttons = [];
     for (let i = 0; i < 2; i++) {
@@ -127,7 +117,7 @@ export class ColosseumUiHandler extends UiHandler {
       const window = addWindow(bx, btnY, btnW, btnH);
       this.container.add(window);
       const label = addTextObject(bx + btnW / 2, btnY + btnH / 2, captions[i], TextStyle.WINDOW, {
-        fontSize: "60px",
+        fontSize: "54px",
         align: "center",
       });
       label.setOrigin(0.5, 0.5);
@@ -150,12 +140,12 @@ export class ColosseumUiHandler extends UiHandler {
     this.onChoice = args[1] as ColosseumChoiceCallback;
     this.resolved = false;
 
-    this.subtitleText.setText(`Round ${data.round} of ${data.totalRounds} cleared!`);
-    this.tierText.setText(data.tierLabel);
+    this.statusText.setText(`Round ${data.round} of ${data.totalRounds} cleared`);
+    this.gradeText.setText(data.tierLabel);
     this.buttons[0].label.setText(`CONTINUE\n(risk for ${data.nextTierLabel})`);
     this.buttons[1].label.setText(`CASH OUT\n(claim ${data.tierLabel})`);
 
-    this.layoutProgress(data.round, data.totalRounds);
+    this.layoutBracket(data);
 
     // Default the cursor to CONTINUE (the exciting choice).
     this.cursor = COLOSSEUM_CONTINUE;
@@ -166,26 +156,36 @@ export class ColosseumUiHandler extends UiHandler {
     return true;
   }
 
-  /** Build the N-segment progress bar: cleared rounds lit, the latest one cyan. */
-  private layoutProgress(round: number, total: number): void {
-    for (const seg of this.progressSegs) {
-      seg.destroy();
+  /** Build the 15-challenger bracket in two columns: cleared / next / upcoming. */
+  private layoutBracket(data: ColosseumViewData): void {
+    for (const row of this.bracketRows) {
+      row.destroy();
     }
-    this.progressSegs = [];
+    this.bracketRows = [];
+
     const w = globalScene.scaledCanvas.width;
-    const avail = w - 32;
-    const gap = 2;
-    const segW = (avail - (total - 1) * gap) / total;
-    const segH = 8;
-    const y = 88;
-    const startX = 16;
-    for (let i = 0; i < total; i++) {
-      const done = i < round;
-      const isLatest = i === round - 1;
-      const color = isLatest ? SEG_NOW : done ? SEG_DONE : SEG_TODO;
-      const seg = globalScene.add.rectangle(startX + i * (segW + gap), y, segW, segH, color, 1).setOrigin(0, 0.5);
-      this.container.add(seg);
-      this.progressSegs.push(seg);
+    const colX = [10, w / 2 + 4];
+    const rowY0 = 42;
+    const rowH = 13;
+    const perCol = Math.ceil(data.challengers.length / 2);
+
+    for (let i = 0; i < data.challengers.length; i++) {
+      const col = i < perCol ? 0 : 1;
+      const row = i < perCol ? i : i - perCol;
+      const x = colX[col];
+      const y = rowY0 + row * rowH;
+
+      const cleared = i < data.round;
+      const isNext = i === data.round; // the CONTINUE target
+      // Cleared rows get a check; the next challenger a chevron; rest a dot.
+      const marker = cleared ? "*" : isNext ? ">" : "-";
+      const label = `${marker} ${i + 1}. ${data.challengers[i]}`;
+      const t = addTextObject(x, y, label, TextStyle.WINDOW, { fontSize: "42px" });
+      t.setOrigin(0, 0);
+      t.setTint(cleared ? GRADE_GOLD : isNext ? COLOR_NEXT : COLOR_TODO);
+      t.setAlpha(cleared || isNext ? 1 : 0.75);
+      this.container.add(t);
+      this.bracketRows.push(t);
     }
   }
 
@@ -248,10 +248,10 @@ export class ColosseumUiHandler extends UiHandler {
     super.clear();
     this.container.setVisible(false);
     this.cursorObj.setVisible(false);
-    for (const seg of this.progressSegs) {
-      seg.destroy();
+    for (const row of this.bracketRows) {
+      row.destroy();
     }
-    this.progressSegs = [];
+    this.bracketRows = [];
     this.onChoice = null;
   }
 }

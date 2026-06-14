@@ -21,6 +21,7 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { UiMode } from "#enums/ui-mode";
 import {
+  CHALLENGER_NAMES,
   endColosseum,
   MAX_ROUNDS,
   startNextColosseumBattle,
@@ -48,6 +49,7 @@ export class ColosseumChoicePhase extends Phase {
       totalRounds: MAX_ROUNDS,
       tierLabel: TIER_LADDER[this.wins - 1],
       nextTierLabel: TIER_LADDER[Math.min(this.wins, MAX_ROUNDS - 1)],
+      challengers: CHALLENGER_NAMES,
     };
     globalScene.ui.setMode(UiMode.COLOSSEUM, data, (choice: number) => this.onChoice(choice));
   }
