@@ -29,11 +29,13 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { BiomeId } from "#enums/biome-id";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { TrainerType } from "#enums/trainer-type";
+import { getBiomeKey } from "#field/arena";
 import { showEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
 import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
@@ -133,6 +135,22 @@ function colosseumShopSize(tierIndex: number): number {
   return Math.min(3 + Math.floor(tierIndex / 2), 8);
 }
 
+/**
+ * Make every gauntlet battle take place in the DOJO arena - a real, correctly
+ * aligned PokeRogue battle background + bases, so the fights read as a tournament
+ * venue instead of the random biome you spawned in. Pure visual swap (all biome
+ * arena assets are preloaded), using the same primitives as Teleporting Hijinks.
+ * (BW2's own PWT floor is a 3D model and its 2D battle fields don't map to
+ * PokeRogue's layout, so the dojo arena is the clean fit - see #439.)
+ */
+function applyColosseumArena(): void {
+  const biome = BiomeId.DOJO;
+  globalScene.arenaBg.setTexture(`${getBiomeKey(biome)}_bg`);
+  globalScene.arenaPlayer.setBiome(biome);
+  globalScene.arenaEnemy.setBiome(biome);
+  globalScene.arenaNextEnemy.setBiome(biome);
+}
+
 /** Build the enemy config for a given round (1..MAX_ROUNDS). */
 function getColosseumRoundConfig(round: number): EnemyPartyConfig {
   const idx = Math.min(round, MAX_ROUNDS) - 1;
@@ -214,6 +232,7 @@ export const ColosseumEncounter: MysteryEncounter = MysteryEncounterBuilder.with
         }
       };
       await transitionMysteryEncounterIntroVisuals(true, false);
+      applyColosseumArena();
       await initBattleWithEnemyConfig(getColosseumRoundConfig(1));
     },
   )
@@ -255,6 +274,7 @@ export async function startNextColosseumBattle(round: number): Promise<void> {
   }
 
   globalScene.phaseManager.unshiftNew("ShowTrainerPhase");
+  applyColosseumArena();
   await initBattleWithEnemyConfig(getColosseumRoundConfig(round));
 }
 
