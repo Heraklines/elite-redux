@@ -45,7 +45,10 @@ const GOLD = 0xf8d030;
 const INK = 0xe8ecf8;
 
 export class ErQuizUiHandler extends UiHandler {
+  /** Full-screen root (origin matches every other handler: (0, -canvasHeight)). */
   private container: Phaser.GameObjects.Container;
+  /** Centred card sub-container; all card elements use local 0..PANEL coords. */
+  private card: Phaser.GameObjects.Container;
   private panel: Phaser.GameObjects.NineSlice;
   private headerText: Phaser.GameObjects.Text;
   private promptText: Phaser.GameObjects.Text;
@@ -74,29 +77,34 @@ export class ErQuizUiHandler extends UiHandler {
     const px = (w - PANEL_W) / 2;
     const py = (h - PANEL_H) / 2;
 
-    this.container = globalScene.add.container(px, py);
+    // Full-screen root. The UI parent is offset by +canvasHeight, so every
+    // handler anchors its full-screen container at (0, -h) to land at (0, 0).
+    this.container = globalScene.add.container(0, -h);
     this.container.setVisible(false);
     ui.add(this.container);
 
-    // Full-screen dim behind the card so the quiz reads as a clear modal popup
-    // over whatever scene is behind it (positioned to cover the canvas).
-    const dim = globalScene.add.rectangle(-px, -py, w, h, 0x000000, 0.6).setOrigin(0, 0);
+    // Full-screen dim so the quiz reads as a clear modal popup over the scene.
+    const dim = globalScene.add.rectangle(0, 0, w, h, 0x000000, 0.6).setOrigin(0, 0);
     this.container.add(dim);
 
+    // Centred card. All elements below use local card coords (0..PANEL_W/H).
+    this.card = globalScene.add.container(px, py);
+    this.container.add(this.card);
+
     this.panel = addWindow(0, 0, PANEL_W, PANEL_H);
-    this.container.add(this.panel);
+    this.card.add(this.panel);
 
     this.headerText = addTextObject(PANEL_W / 2, 6, "", TextStyle.WINDOW, { fontSize: "44px", align: "center" });
     this.headerText.setOrigin(0.5, 0);
     this.headerText.setTint(GOLD);
-    this.container.add(this.headerText);
+    this.card.add(this.headerText);
 
     // The dex blurb (hidden in silhouette mode). Wrapped to the panel width.
     this.promptText = addTextObject(8, 20, "", TextStyle.WINDOW, { fontSize: "36px" });
     this.promptText.setOrigin(0, 0);
     this.promptText.setTint(INK);
     this.promptText.setWordWrapWidth((PANEL_W - 16) * 6, false);
-    this.container.add(this.promptText);
+    this.card.add(this.promptText);
 
     // Four answer buttons.
     this.optionButtons = [];
@@ -104,13 +112,13 @@ export class ErQuizUiHandler extends UiHandler {
     for (let i = 0; i < 4; i++) {
       const by = ErQuizUiHandler.OPT_Y0 + i * (ErQuizUiHandler.OPT_H + ErQuizUiHandler.OPT_GAP);
       const window = addWindow(8, by, btnW, ErQuizUiHandler.OPT_H);
-      this.container.add(window);
+      this.card.add(window);
       const label = addTextObject(8 + btnW / 2, by + ErQuizUiHandler.OPT_H / 2, "", TextStyle.WINDOW, {
         fontSize: "50px",
         align: "center",
       });
       label.setOrigin(0.5, 0.5);
-      this.container.add(label);
+      this.card.add(label);
       this.optionButtons.push({ window, label });
     }
 
@@ -118,7 +126,7 @@ export class ErQuizUiHandler extends UiHandler {
     this.cursorObj.setStrokeStyle(2, GOLD);
     this.cursorObj.setOrigin(0.5);
     this.cursorObj.setVisible(false);
-    this.container.add(this.cursorObj);
+    this.card.add(this.cursorObj);
   }
 
   show(args: any[]): boolean {
@@ -140,7 +148,7 @@ export class ErQuizUiHandler extends UiHandler {
       sil.setOrigin(0.5, 0.5);
       sil.setScale(Math.min(1, 40 / fh));
       sil.setTintFill(0x101018);
-      this.container.add(sil);
+      this.card.add(sil);
       this.transient.push(sil);
     } else {
       this.promptText.setVisible(true);
