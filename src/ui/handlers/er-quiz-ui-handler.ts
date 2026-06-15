@@ -28,8 +28,10 @@ import { addWindow } from "#ui/ui-theme";
 export interface ErQuizView {
   /** Small caption above the figure/blurb (e.g. "Who's that Pokémon?"). */
   header: string;
-  /** Menu-icon atlas key + frame, rendered as a black silhouette (silhouette
-   * mode). Icons are preloaded at boot, so they never race the loader. */
+  /** Loaded battle-sprite atlas key, rendered as a black silhouette (preferred). */
+  spriteKey?: string | undefined;
+  /** Menu-icon atlas key + frame, used as a silhouette fallback when the battle
+   * sprite atlas is unavailable (icons are preloaded at boot). */
   iconAtlas?: string | undefined;
   iconFrame?: string | undefined;
   /** Wrapped blurb shown instead of a silhouette (dex mode). */
@@ -141,8 +143,19 @@ export class ErQuizUiHandler extends UiHandler {
 
     this.headerText.setText(data.header ?? "");
 
-    // Silhouette (menu icon, tinted flat black) OR blurb.
-    if (data.iconAtlas && globalScene.textures.exists(data.iconAtlas)) {
+    // Silhouette (tinted flat black) OR blurb. Prefer the full battle sprite;
+    // fall back to the menu icon (which can be larger-scaled, but reliable).
+    if (data.spriteKey && globalScene.textures.exists(data.spriteKey)) {
+      this.promptText.setVisible(false);
+      const sil = globalScene.add.sprite(PANEL_W / 2, 42, data.spriteKey);
+      sil.setFrame(0);
+      const fh = sil.height || 64;
+      sil.setOrigin(0.5, 0.5);
+      sil.setScale(Math.min(1, 50 / fh));
+      sil.setTintFill(0x101018);
+      this.card.add(sil);
+      this.transient.push(sil);
+    } else if (data.iconAtlas && globalScene.textures.exists(data.iconAtlas)) {
       this.promptText.setVisible(false);
       const sil = globalScene.add.sprite(PANEL_W / 2, 40, data.iconAtlas, data.iconFrame);
       const fh = sil.height || 64;

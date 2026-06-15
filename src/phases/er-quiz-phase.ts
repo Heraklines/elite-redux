@@ -23,6 +23,7 @@ import { erQuizOptionName } from "#data/elite-redux/er-quiz";
 import { UiMode } from "#enums/ui-mode";
 import type { ErQuizView } from "#ui/er-quiz-ui-handler";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
+import Phaser from "phaser";
 
 export interface ErQuizResult {
   /** Questions answered correctly. */
@@ -67,15 +68,40 @@ export class ErQuizPhase extends Phase {
 
   start(): void {
     super.start();
-    void this.ask();
+    void this.run();
   }
 
   /**
-   * Present the current question. The silhouette uses the species' menu ICON
-   * (atlas + frame), which is preloaded at boot (pokemon_icons_*), so there is
-   * no per-question atlas load - the earlier battle-sprite approach raced the
-   * shared Phaser loader and left silhouettes blank.
+   * Preload every silhouette's full battle-sprite atlas, THEN run the round.
+   * Queue all atlases first and start the shared loader ONCE, awaiting its
+   * COMPLETE (the proven encounter-phase / trainer-config pattern). The earlier
+   * per-question loadAssets(startLoad) started the loader mid-queue and raced,
+   * dropping later atlases - so silhouettes rendered blank.
    */
+  private async run(): Promise<void> {
+    const keys = this.questions
+      .filter(q => q.kind === "silhouette")
+      .map(q => {
+        const species = getPokemonSpecies(q.answerId);
+        const key = species.getSpriteKey(false);
+        if (!globalScene.textures.exists(key)) {
+          globalScene.loadPokemonAtlas(key, species.getSpriteAtlasPath(false));
+        }
+        return key;
+      });
+
+    if (keys.some(k => !globalScene.textures.exists(k))) {
+      await new Promise<void>(resolve => {
+        globalScene.load.once(Phaser.Loader.Events.COMPLETE, () => resolve());
+        if (!globalScene.load.isLoading()) {
+          globalScene.load.start();
+        }
+      });
+    }
+    void this.ask();
+  }
+
+  /** Present the current question (its silhouette sprite is already loaded). */
   private async ask(): Promise<void> {
     if (this.index >= this.questions.length) {
       this.finish();
@@ -83,14 +109,22 @@ export class ErQuizPhase extends Phase {
     }
     const q = this.questions[this.index];
 
+    // Prefer the full battle sprite (preloaded above); fall back to the always-
+    // present menu icon if its atlas somehow missed, so it is never blank.
+    let spriteKey: string | undefined;
     let iconAtlas: string | undefined;
     let iconFrame: string | undefined;
     if (q.kind === "silhouette") {
       const species = getPokemonSpecies(q.answerId);
-      const atlas = species.getIconAtlasKey();
-      if (globalScene.textures.exists(atlas)) {
-        iconAtlas = atlas;
-        iconFrame = species.getIconId(false);
+      const key = species.getSpriteKey(false);
+      if (globalScene.textures.exists(key)) {
+        spriteKey = key;
+      } else {
+        const atlas = species.getIconAtlasKey();
+        if (globalScene.textures.exists(atlas)) {
+          iconAtlas = atlas;
+          iconFrame = species.getIconId(false);
+        }
       }
     }
 
@@ -99,6 +133,7 @@ export class ErQuizPhase extends Phase {
         q.kind === "silhouette"
           ? `Who's that Pokémon?  (${this.index + 1}/${this.questions.length})`
           : `Whose entry is this?  (${this.index + 1}/${this.questions.length})`,
+      spriteKey,
       iconAtlas,
       iconFrame,
       prompt: q.kind === "dex" ? q.prompt : undefined,
