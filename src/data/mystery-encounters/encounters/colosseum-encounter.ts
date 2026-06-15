@@ -179,12 +179,20 @@ function showColosseumVs(round: number): Promise<void> {
     top.setTint(0xf8d030);
     c.add(top);
 
-    const vs = addTextObject(w / 2, h / 2 - 28, "VS", TextStyle.WINDOW, { fontSize: "96px" });
+    const vs = addTextObject(w / 2, h / 2 - 46, "VS", TextStyle.WINDOW, { fontSize: "96px" });
     vs.setOrigin(0.5, 0.5);
     vs.setTint(0xf85040);
     c.add(vs);
 
-    const foe = addTextObject(w / 2, h / 2 + 26, CHALLENGER_NAMES[round - 1] ?? "", TextStyle.WINDOW, {
+    // The upcoming challenger's class portrait (cropped head), large + centred.
+    if (globalScene.textures.exists("er_pwt_portraits")) {
+      const face = globalScene.add.sprite(w / 2, h / 2 + 6, "er_pwt_portraits", round - 1);
+      face.setOrigin(0.5, 0.5);
+      face.setScale(40 / 32);
+      c.add(face);
+    }
+
+    const foe = addTextObject(w / 2, h / 2 + 34, CHALLENGER_NAMES[round - 1] ?? "", TextStyle.WINDOW, {
       fontSize: "64px",
     });
     foe.setOrigin(0.5, 0);

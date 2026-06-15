@@ -60,7 +60,8 @@ export class ColosseumUiHandler extends UiHandler {
   private frame: Phaser.GameObjects.NineSlice;
   private leftPanel: Phaser.GameObjects.Rectangle;
   private rightPanel: Phaser.GameObjects.Rectangle;
-  private crown: Phaser.GameObjects.Graphics;
+  private trophy: Phaser.GameObjects.Image | null = null;
+  private portraits: Phaser.GameObjects.Sprite[] = [];
   private crest: Phaser.GameObjects.Image;
   private wordmark: Phaser.GameObjects.Text;
   private statusText: Phaser.GameObjects.Text;
@@ -105,6 +106,16 @@ export class ColosseumUiHandler extends UiHandler {
       this.container.add(this.crest);
     }
 
+    // Gold PWT trophy emblem, parked off-screen until layoutRoster() places it
+    // beside the Champion. Guarded against a first-load CDN miss.
+    if (globalScene.textures.exists("er_pwt_trophy")) {
+      this.trophy = globalScene.add.image(0, 0, "er_pwt_trophy");
+      this.trophy.setOrigin(0, 0);
+      this.trophy.setScale(12 / 62); // ripped trophy is 76x62; render ~12px tall
+      this.trophy.setVisible(false);
+      this.container.add(this.trophy);
+    }
+
     this.wordmark = addTextObject(w / 2, 30, "POKEMON WORLD TOURNAMENT", TextStyle.WINDOW, { fontSize: "36px" });
     this.wordmark.setOrigin(0.5, 0);
     this.wordmark.setTint(GOLD);
@@ -127,21 +138,18 @@ export class ColosseumUiHandler extends UiHandler {
     this.container.add(this.gradeText);
 
     // Two roster column panels.
-    const panelY = 48;
-    const panelH = h - panelY - 38;
+    const panelY = 46;
+    const panelH = h - panelY - 36;
     const panelW = w / 2 - 14;
-    this.leftPanel = globalScene.add.rectangle(8, panelY, panelW, panelH, PANEL, 0.85).setOrigin(0);
+    this.leftPanel = globalScene.add.rectangle(8, panelY, panelW, panelH, PANEL, 0.92).setOrigin(0);
     this.leftPanel.setStrokeStyle(1, 0x39456a);
     this.container.add(this.leftPanel);
-    this.rightPanel = globalScene.add.rectangle(w / 2 + 6, panelY, panelW, panelH, PANEL, 0.85).setOrigin(0);
+    this.rightPanel = globalScene.add.rectangle(w / 2 + 6, panelY, panelW, panelH, PANEL, 0.92).setOrigin(0);
     this.rightPanel.setStrokeStyle(1, 0x39456a);
     this.container.add(this.rightPanel);
 
-    // Champion crown, drawn centred above the board (re-pointed per show()).
-    this.crown = globalScene.add.graphics();
-    this.container.add(this.crown);
-
     this.rosterRows = [];
+    this.portraits = [];
 
     // Two buttons near the bottom.
     const btnW = 122;
@@ -195,21 +203,29 @@ export class ColosseumUiHandler extends UiHandler {
     return true;
   }
 
-  /** Draw the two-column entrant roster + the champion crown. */
+  /**
+   * Draw the two-column entrant roster: a cropped trainer-class head portrait +
+   * name per row (cleared = gold/full colour, next-up = cyan, upcoming = dim),
+   * with the gold PWT trophy beside the final challenger (the Champion).
+   */
   private layoutRoster(data: ColosseumViewData): void {
     for (const row of this.rosterRows) {
       row.destroy();
     }
+    for (const p of this.portraits) {
+      p.destroy();
+    }
     this.rosterRows = [];
+    this.portraits = [];
 
     const w = globalScene.scaledCanvas.width;
     const n = data.challengers.length;
     const perCol = Math.ceil(n / 2);
-    const colX = [14, w / 2 + 12];
-    const rowY0 = 51;
+    const colX = [12, w / 2 + 10];
+    const rowY0 = 48;
     const rowH = 12;
-
-    let championPos: { x: number; y: number } | null = null;
+    const PORTRAIT = 11; // on-screen px (texture cells are 32x32)
+    const havePortraits = globalScene.textures.exists("er_pwt_portraits");
 
     for (let i = 0; i < n; i++) {
       const col = i < perCol ? 0 : 1;
@@ -220,39 +236,34 @@ export class ColosseumUiHandler extends UiHandler {
       const cleared = i < data.round;
       const isNext = i === data.round;
       const isChampion = i === n - 1;
-      const marker = cleared ? "*" : isNext ? ">" : "-";
-      const label = `${marker} ${i + 1}. ${data.challengers[i]}`;
-      const t = addTextObject(x, y, label, TextStyle.WINDOW, { fontSize: "42px" });
+
+      if (havePortraits) {
+        const p = globalScene.add.sprite(x, y, "er_pwt_portraits", i);
+        p.setOrigin(0, 0);
+        p.setScale(PORTRAIT / 32);
+        // Upcoming foes are dimmed; the ones you have cleared / face next pop.
+        if (!cleared && !isNext && !isChampion) {
+          p.setAlpha(0.45);
+        }
+        this.container.add(p);
+        this.portraits.push(p);
+      }
+
+      const label = `${i + 1}. ${data.challengers[i]}`;
+      const t = addTextObject(x + (havePortraits ? 13 : 0), y + 2, label, TextStyle.WINDOW, { fontSize: "36px" });
       t.setOrigin(0, 0);
-      t.setTint(isChampion && !cleared ? GOLD : cleared ? GOLD : isNext ? NEXT : TODO);
+      t.setTint(cleared || isChampion ? GOLD : isNext ? NEXT : TODO);
       t.setAlpha(cleared || isNext || isChampion ? 1 : 0.7);
       this.container.add(t);
       this.rosterRows.push(t);
 
-      if (isChampion) {
-        championPos = { x, y };
+      // Gold PWT trophy beside the Champion (final challenger), tucked against
+      // the right panel's inner edge.
+      if (isChampion && this.trophy) {
+        this.trophy.setVisible(true);
+        this.trophy.setPosition(w - 26, y - 1);
       }
     }
-
-    // Crown above the champion's row (the final challenger).
-    this.crown.clear();
-    if (championPos) {
-      this.drawCrown(championPos.x - 2, championPos.y - 11);
-    }
-  }
-
-  /** A small gold crown drawn from primitives (no glyph/asset risk). */
-  private drawCrown(x: number, y: number): void {
-    const g = this.crown;
-    g.fillStyle(GOLD, 1);
-    // base band
-    g.fillRect(x, y + 6, 16, 3);
-    // three spikes
-    g.fillTriangle(x, y + 6, x + 4, y + 6, x + 2, y);
-    g.fillTriangle(x + 6, y + 6, x + 10, y + 6, x + 8, y - 2);
-    g.fillTriangle(x + 12, y + 6, x + 16, y + 6, x + 14, y);
-    g.fillStyle(0xfff0a0, 1);
-    g.fillRect(x + 1, y + 7, 14, 1);
   }
 
   private moveCursorTo(index: number): void {
@@ -313,11 +324,15 @@ export class ColosseumUiHandler extends UiHandler {
     super.clear();
     this.container.setVisible(false);
     this.cursorObj.setVisible(false);
-    this.crown.clear();
+    this.trophy?.setVisible(false);
     for (const row of this.rosterRows) {
       row.destroy();
     }
+    for (const p of this.portraits) {
+      p.destroy();
+    }
     this.rosterRows = [];
+    this.portraits = [];
     this.onChoice = null;
   }
 }

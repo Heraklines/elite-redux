@@ -62,7 +62,12 @@ export class LoadingScene extends SceneBase {
       // The authentic BW2 Pokemon World Tournament crest (crown + shield +
       // laurel wreath + star), ripped from the BW2 ROM and recoloured gold; the
       // centrepiece of the Colosseum standings board + VS splash.
-      .loadImage("er_pwt_crest", "elite-redux/colosseum", "pwt_crest.png");
+      .loadImage("er_pwt_crest", "elite-redux/colosseum", "pwt_crest.png")
+      // BW2 PWT champion trophy emblem (gold) - marks the final challenger.
+      .loadImage("er_pwt_trophy", "elite-redux/colosseum", "pwt_trophy.png")
+      // 15 cropped trainer-class head portraits (32x32 grid), one per challenger
+      // in the Colosseum ladder, for the standings-board roster rows.
+      .loadSpritesheet("er_pwt_portraits", "elite-redux/colosseum", 32, "pwt_portraits.png");
     // ER Biome Market (#440): the shopkeeper is a real PokeRogue trainer-class
     // sprite cast per biome (clerk for towns, fisherman for the sea, firebreather
     // for the volcano, hex maniac for the graveyard, etc. - see KEEPER_BY_BIOME).
