@@ -71,7 +71,10 @@ export const TownGuessingBoothEncounter: MysteryEncounter = MysteryEncounterBuil
       })
       .withOptionPhase(async () => {
         // Pay the entry fee, clear the intro art, then run the silhouette round.
-        const fee = globalScene.getWaveMoneyAmount(0.5);
+        // The fee tracks a Super Potion's shop price at this wave: shop heal items
+        // cost getWaveMoneyAmount(1) * factor * 0.7 (the ER heal discount), and a
+        // Super Potion's factor is 0.45 (see getPlayerShopModifierTypeOptionsForWave).
+        const fee = Math.floor((globalScene.getWaveMoneyAmount(1) * 0.45 * 0.7) / 10) * 10;
         updatePlayerMoney(-fee, true, false);
         await transitionMysteryEncounterIntroVisuals(true, false);
 

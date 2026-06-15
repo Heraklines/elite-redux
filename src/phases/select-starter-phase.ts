@@ -31,6 +31,11 @@ export class SelectStarterPhase extends Phase {
     const devStarters = consumePendingDevStarters();
     if (devStarters && devStarters.length > 0) {
       globalScene.sessionSlotId = DEV_SCENARIO_SLOT;
+      // The normal starter-select confirm path sets starting money; the dev
+      // path skips that screen, so set it here too. Otherwise money stays at the
+      // 0 default and STARTING_MONEY_OVERRIDE (and the 1000 classic default) are
+      // both ignored - e.g. the Guessing Booth scenario showed P0 (#439).
+      globalScene.money = globalScene.gameMode.getStartingMoney();
       // Dev scenarios hand-pick movesets for TESTING (e.g. Thunder Wave on a
       // Blastoise) — skip the starter-legality validation that silently
       // rejected them and left scenario mons with NO moves.

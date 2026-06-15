@@ -82,7 +82,10 @@ export class ErQuizPhase extends Phase {
     if (q.kind === "silhouette") {
       try {
         const species = getPokemonSpecies(q.answerId);
-        await species.loadAssets(false);
+        // startLoad=true: this is a standalone load (no starter-select queue is
+        // running the Phaser loader for us), so the quiz must kick the loader
+        // itself or the atlas never lands and the silhouette stays blank.
+        await species.loadAssets(false, undefined, false, undefined, true);
         spriteKey = species.getSpriteKey(false);
       } catch {
         spriteKey = undefined;
