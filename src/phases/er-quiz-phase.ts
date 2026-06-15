@@ -67,10 +67,30 @@ export class ErQuizPhase extends Phase {
 
   start(): void {
     super.start();
+    void this.run();
+  }
+
+  /**
+   * Preload EVERY silhouette species up front (the Colosseum pattern), then run
+   * the round. Loading per-question raced the shared Phaser loader: the first
+   * silhouette landed (loader idle at phase start) but later ones opened before
+   * their atlas finished and rendered blank. Batch-loading once, while the loader
+   * is idle, guarantees each question renders from a cached texture.
+   */
+  private async run(): Promise<void> {
+    await Promise.all(
+      this.questions
+        .filter(q => q.kind === "silhouette")
+        .map(q =>
+          getPokemonSpecies(q.answerId)
+            .loadAssets(false, undefined, false, undefined, true)
+            .catch(() => undefined),
+        ),
+    );
     void this.ask();
   }
 
-  /** Present the current question (preloading the silhouette sprite first). */
+  /** Present the current question (its silhouette sprite is already loaded). */
   private async ask(): Promise<void> {
     if (this.index >= this.questions.length) {
       this.finish();
@@ -80,16 +100,8 @@ export class ErQuizPhase extends Phase {
 
     let spriteKey: string | undefined;
     if (q.kind === "silhouette") {
-      try {
-        const species = getPokemonSpecies(q.answerId);
-        // startLoad=true: this is a standalone load (no starter-select queue is
-        // running the Phaser loader for us), so the quiz must kick the loader
-        // itself or the atlas never lands and the silhouette stays blank.
-        await species.loadAssets(false, undefined, false, undefined, true);
-        spriteKey = species.getSpriteKey(false);
-      } catch {
-        spriteKey = undefined;
-      }
+      const key = getPokemonSpecies(q.answerId).getSpriteKey(false);
+      spriteKey = globalScene.textures.exists(key) ? key : undefined;
     }
 
     const view: ErQuizView = {
