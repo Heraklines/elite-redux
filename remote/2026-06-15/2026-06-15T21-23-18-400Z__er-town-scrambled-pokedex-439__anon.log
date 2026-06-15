@@ -1,0 +1,78 @@
+scenario: ER Town: Scrambled Pokedex (#439)
+url:      https://elite-redux-staging.pages.dev/
+build:    mqfppo39-98ii
+mode:     0  wave:12
+seed:     lCJinREMEB5MwEgiaKqZU3tE
+party:    Snorlax(L30 145hp f0), Pidgey(L30 73hp f0)
+enemy:    
+
+----- CONSOLE -----
+[21:18:42.155] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[21:18:42.416] WARN: [er-b1c] 1 mega-form injection issues: ["ER mega target 1850 has no primary type"]
+[21:18:42.555] LOG: [ER] build mqfppo39-98ii
+[21:18:43.252] LOG: [dev-tools] loaded — 119 scenarios + Send Logs button
+[21:20:38.186] DEBUG: Destroying loading scene
+[21:20:38.186] DEBUG: Destroyed loading scene
+[21:20:38.241] LOG: Seed: sbm2RTfw8RkzHCipau1SgiCE
+[21:20:38.241] LOG: Wave Seed: sbm2RTfw8RkzHCipau1SgiCE 0
+[21:20:40.618] LOG: %cStart Phase LoginPhase color:green;
+[21:20:41.709] LOG: Client Session: LBh1dL7CCfSouxMsxqglQf1Fn7NRQ8BL
+[21:20:42.533] DEBUG: Using cached system data
+[21:20:42.662] LOG: %cStart Phase TitlePhase color:green;
+[21:20:42.662] LOG: Getting Session Slot id: %d 0
+[21:20:42.676] LOG: use seasonal splash messages true
+[21:20:42.676] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[21:21:06.752] LOG: %cStart Phase SelectStarterPhase color:green;
+[21:21:10.154] LOG: Wave Seed: tcn3SUgx9Sl{IDjqbv2ThjDF 1
+[21:21:10.156] LOG: %cStart Phase EncounterPhase color:green;
+[21:21:10.159] LOG: Starting species pool tier: UNCOMMON
+[21:21:10.175] LOG: Pokemon: Wild Magikarp | Species ID: 129 | Level: 5 | Nature: Docile (-)
+[21:21:10.176] LOG: Stats (IVs): HP: 17 (15), Atk: 7 (22), Def: 11 (11), Spatk: 6 (8), Spdef: 8 (23), Spd: 13 (1)
+[21:21:10.176] LOG: Ability: Guilt Trip | Passive Ability: Multiscale 
+[21:21:10.176] LOG: Moveset: ["Splash"]
+[21:21:15.210] DEBUG: Session data saved to slot 4!
+[21:21:17.383] LOG: Wave Seed: tcn3SUgx9Sl{IDjqbv2ThjDF 1
+[21:21:17.802] LOG: %cStart Phase SummonPhase color:green;
+[21:21:18.086] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[21:21:18.087] LOG: %cStart Phase InitEncounterPhase color:green;
+[21:21:18.088] LOG: %cStart Phase PostSummonPhase color:green;
+[21:21:18.088] LOG: Ran PSP for: Snorlax
+[21:21:18.089] LOG: %cStart Phase PostSummonPhase color:green;
+[21:21:18.089] LOG: %cStart Phase MovePhase color:green;
+[21:21:18.089] LOG: %cUser: Snorlax
+Move: DEFENSE_CURL
+Use Mode: INDIRECT color:orchid
+[21:21:18.090] LOG: %cStart Phase MessagePhase color:green;
+[21:21:18.204] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:21:18.212] LOG: %cStart Phase StatStageChangePhase color:green;
+[21:21:18.394] LOG: %cStart Phase MessagePhase color:green;
+[21:21:18.600] LOG: %cStart Phase MoveEndPhase color:green;
+[21:21:18.601] LOG: %cStart Phase PostSummonPhase color:green;
+[21:21:18.601] LOG: %cStart Phase PostSummonPhase color:green;
+[21:21:18.601] LOG: Ran PSP for: Magikarp
+[21:21:18.601] LOG: %cStart Phase PostSummonPhase color:green;
+[21:21:18.601] LOG: %cStart Phase PostSummonPhase color:green;
+[21:21:18.601] LOG: %cStart Phase TurnInitPhase color:green;
+[21:21:18.602] LOG: %cStart Phase ErQuizPhase color:green;
+[21:21:20.199] LOG: %cStart Phase MessagePhase color:green;
+[21:21:20.433] LOG: %cStart Phase CommandPhase color:green;
+[21:21:50.339] DEBUG: Session data saved to slot 4!
+[21:21:52.348] DEBUG: Session data saved to slot 4!
+[21:21:55.485] LOG: Seed: 83x8ZvwATqJLPfvcYNEO96Wk
+[21:21:55.485] LOG: Wave Seed: 83x8ZvwATqJLPfvcYNEO96Wk 0
+[21:21:55.635] WARN: AnimationManager key already exists: prompt
+[21:21:55.635] WARN: AnimationManager key already exists: tera_sparkle
+[21:21:55.635] LOG: Seed: lCJinREMEB5MwEgiaKqZU3tE
+[21:21:55.635] LOG: Wave Seed: lCJinREMEB5MwEgiaKqZU3tE 0
+[21:21:58.746] LOG: %cStart Phase LoginPhase color:green;
+[21:21:58.878] LOG: Client Session: LBh1dL7CCfSouxMsxqglQf1Fn7NRQ8BL
+[21:21:59.740] LOG: %cStart Phase TitlePhase color:green;
+[21:21:59.741] LOG: Getting Session Slot id: %d 4
+[21:21:59.908] LOG: use seasonal splash messages true
+[21:21:59.908] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[21:22:15.281] LOG: %cStart Phase SelectStarterPhase color:green;
+[21:22:16.692] LOG: Wave Seed: xOVuz^QYQNAYQsumW}fa?Q 12
+[21:22:16.693] LOG: %cStart Phase EncounterPhase color:green;
+[21:22:17.968] DEBUG: Session data saved to slot 4!
+[21:22:17.969] LOG: Wave Seed: xOVuz^QYQNAYQsumW}fa?Q 12
+[21:22:18.170] ERROR: No texture found for 'professor_oak'!
