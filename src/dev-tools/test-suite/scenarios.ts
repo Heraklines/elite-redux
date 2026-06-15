@@ -316,12 +316,13 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "ER Town: Scrambled Pokedex (#439)",
     description:
-      "#439 - Professor's Scrambled Pokedex (rides the Quiz engine). Professor Oak\n"
-      + "(if the sprite is uploaded) shows four jumbled dex entries.\n"
+      "#439 - Professor's Scrambled Pokedex (rides the Quiz engine). The Professor\n"
+      + "shows four jumbled dex entries.\n"
       + "DO: on wave 12, choose 'Help the Professor'. A card shows a Pokedex blurb +\n"
       + "4 names; answer all 4 (no stop-on-wrong).\n"
-      + "EXPECT: 4/4 -> the Damage Calculator unlock in the reward shop; 2-3 -> a Rare\n"
-      + "Candy; <2 -> a heal. Verify the answer's name is NOT shown in its own blurb\n"
+      + "EXPECT: 4/4 -> +5 research Candy for EACH team member (notification) + choose\n"
+      + "1 of 3 ROGUE-tier rewards; 3 -> choose 1 of 3 ULTRA; 2 -> GREAT; 1 -> COMMON;\n"
+      + "0 -> a heal. Verify the answer's name is NOT shown in its own blurb\n"
       + "(redacted to '[this Pokemon]').",
     setup: () => {
       resetDevOverrides();

@@ -7,14 +7,15 @@
 // =============================================================================
 // ER #439 - Professor's Scrambled Pokedex. The Professor shows four jumbled
 // Pokedex entries; name each from four choices (the dex-entry quiz on the shared
-// ErQuiz engine). Match ALL FOUR -> unlock the Damage Calculator (a genuine,
-// thematic tool, not a pool pull). A couple right -> a Rare Candy token.
+// ErQuiz engine). The reward scales with the tally: all four right -> a CHOICE of
+// Rogue-tier items PLUS research candy for the whole team; otherwise pick one
+// reward from a tier that scales (Ultra / Great / Common).
 // =============================================================================
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
-import { modifierTypes } from "#data/data-lists";
 import { buildErQuizRound } from "#data/elite-redux/er-quiz";
+import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
@@ -30,8 +31,51 @@ import type { ErQuizResult } from "#phases/er-quiz-phase";
 
 const namespace = "mysteryEncounters/scrambledPokedex";
 
-/** Number of dex entries the Professor asks about (all must be right for the calc). */
+/** Number of dex entries the Professor asks about. */
 const POKEDEX_QUESTION_COUNT = 4;
+/** How many reward options to offer at the earned tier (player picks one). */
+const REWARD_CHOICES = 3;
+/** Research candy granted to EACH team member's species on a perfect round. */
+const PERFECT_CANDY_PER_MON = 5;
+
+/**
+ * Hand out the Professor's reward for `correct` dex entries, then leave. A
+ * perfect round grants the whole team research candy and a Rogue-tier pick;
+ * otherwise the player chooses one reward from a tier that scales with the
+ * tally. Naming none leaves with a heal.
+ */
+function grantPokedexReward(correct: number): void {
+  if (correct >= POKEDEX_QUESTION_COUNT) {
+    for (const mon of globalScene.getPlayerParty()) {
+      globalScene.gameData.addStarterCandy(mon.species.getRootSpeciesId(), PERFECT_CANDY_PER_MON);
+    }
+    globalScene.phaseManager.queueMessage(
+      `The Professor shares ${PERFECT_CANDY_PER_MON} research Candy for each of your Pokémon!`,
+      null,
+      true,
+    );
+    setEncounterRewards({
+      guaranteedModifierTiers: new Array(REWARD_CHOICES).fill(ModifierTier.ROGUE),
+      fillRemaining: false,
+    });
+    leaveEncounterWithoutBattle(false);
+    return;
+  }
+  const tier =
+    correct === 3
+      ? ModifierTier.ULTRA
+      : correct === 2
+        ? ModifierTier.GREAT
+        : correct === 1
+          ? ModifierTier.COMMON
+          : null;
+  if (tier === null) {
+    leaveEncounterWithoutBattle(true);
+    return;
+  }
+  setEncounterRewards({ guaranteedModifierTiers: new Array(REWARD_CHOICES).fill(tier), fillRemaining: false });
+  leaveEncounterWithoutBattle(false);
+}
 
 export const ScrambledPokedexEncounter: MysteryEncounter = MysteryEncounterBuilder.withEncounterType(
   MysteryEncounterType.ER_SCRAMBLED_POKEDEX,
@@ -64,22 +108,7 @@ export const ScrambledPokedexEncounter: MysteryEncounter = MysteryEncounterBuild
         globalScene.phaseManager.unshiftNew("ErQuizPhase", {
           questions,
           stopOnWrong: false,
-          onComplete: (result: ErQuizResult) => {
-            if (result.correct >= POKEDEX_QUESTION_COUNT) {
-              // Perfect - unlock the Damage Calculator tool.
-              setEncounterRewards({
-                guaranteedModifierTypeFuncs: [modifierTypes.DAMAGE_CALCULATOR],
-                fillRemaining: false,
-              });
-              leaveEncounterWithoutBattle(false);
-            } else if (result.correct >= 2) {
-              // Partial - a small token of thanks.
-              setEncounterRewards({ guaranteedModifierTypeFuncs: [modifierTypes.RARE_CANDY], fillRemaining: false });
-              leaveEncounterWithoutBattle(false);
-            } else {
-              leaveEncounterWithoutBattle(true);
-            }
-          },
+          onComplete: (result: ErQuizResult) => grantPokedexReward(result.correct),
         });
         return true;
       })
