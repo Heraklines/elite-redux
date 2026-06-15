@@ -40,18 +40,27 @@ export interface ErQuizQuestion {
 }
 
 /**
- * The species the quiz can ask about: those with shipped dex flavor text. Built
- * once. Filtered to ids that resolve to a real species (defensive).
+ * The species the quiz can ask about: those with shipped dex flavor text,
+ * filtered to ids that resolve to a real species. Computed LAZILY and memoized -
+ * this module is imported during early init (encounters/scenarios) BEFORE the
+ * species data is registered, so building the pool at module-load time would
+ * filter everything out (getPokemonSpecies not ready) and yield an empty quiz.
  */
-const QUIZ_SPECIES_IDS: readonly number[] = Object.keys(ER_DEX_FLAVOR)
-  .map(Number)
-  .filter(id => {
-    try {
-      return !!getPokemonSpecies(id);
-    } catch {
-      return false;
-    }
-  });
+let cachedQuizSpeciesIds: number[] | null = null;
+function quizSpeciesIds(): number[] {
+  if (cachedQuizSpeciesIds === null) {
+    cachedQuizSpeciesIds = Object.keys(ER_DEX_FLAVOR)
+      .map(Number)
+      .filter(id => {
+        try {
+          return !!getPokemonSpecies(id);
+        } catch {
+          return false;
+        }
+      });
+  }
+  return cachedQuizSpeciesIds;
+}
 
 /** Dex flavor text for a species, or undefined if none shipped. */
 export function getErDexFlavor(speciesId: number): string | undefined {
@@ -60,7 +69,7 @@ export function getErDexFlavor(speciesId: number): string | undefined {
 
 /** Build one quiz question of the given kind (4 options, run-seeded). */
 export function buildErQuizQuestion(kind: ErQuizKind): ErQuizQuestion {
-  const pool = QUIZ_SPECIES_IDS;
+  const pool = quizSpeciesIds();
   const answerId = pool[randSeedInt(pool.length)];
 
   const distractors = new Set<number>();

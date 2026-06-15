@@ -35,10 +35,12 @@ export type ErRelicKind = "fieldMedic" | "warmIncubator";
 export interface ErRelicConfig {
   name: string;
   description: string;
-  /** Existing items-atlas frame, reskinned via tint. */
+  /** Items-atlas frame used as the summary/fallback icon (tinted). */
   icon: string;
   tint: number;
   maxStack: number;
+  /** Standalone er-assets texture key (PokeAPI sprite) for the bar icon. */
+  texture: string;
 }
 
 export const ER_RELIC_CONFIG: Readonly<Record<ErRelicKind, ErRelicConfig>> = {
@@ -48,6 +50,7 @@ export const ER_RELIC_CONFIG: Readonly<Record<ErRelicKind, ErRelicConfig>> = {
     icon: "healing_charm",
     tint: 0x88f0b0,
     maxStack: 1,
+    texture: "er_field_medic",
   },
   warmIncubator: {
     name: "Warm Incubator",
@@ -55,6 +58,7 @@ export const ER_RELIC_CONFIG: Readonly<Record<ErRelicKind, ErRelicConfig>> = {
     icon: "charcoal",
     tint: 0xffb060,
     maxStack: 1,
+    texture: "er_warm_incubator",
   },
 };
 

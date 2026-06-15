@@ -40,9 +40,10 @@ export const ScrambledPokedexEncounter: MysteryEncounter = MysteryEncounterBuild
   .withSceneWaveRangeRequirement(...CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES)
   .withAutoHideIntroVisuals(false)
   .withIntroSpriteConfigs([
-    // NOTE: "professor_oak" must match the uploaded er-assets mystery-encounters
-    // sprite key; swap this one string if the asset is named differently.
-    { spriteKey: "professor_oak", fileRoot: "mystery-encounters", hasShadow: true, x: 0, y: 6, yShadow: 6 },
+    // Lab-coat researcher already served from the CDN (reads as the Professor).
+    // Swap to a dedicated Oak/Juniper sprite once one is uploaded to er-assets
+    // (images/mystery-encounters/<key>.png + .json).
+    { spriteKey: "dark_deal_scientist", fileRoot: "mystery-encounters", hasShadow: true, x: 0, y: 6, yShadow: 6 },
   ])
   .withIntroDialogue([{ speaker: `${namespace}:speaker`, text: `${namespace}:introDialogue` }])
   .setLocalizationKey(`${namespace}`)

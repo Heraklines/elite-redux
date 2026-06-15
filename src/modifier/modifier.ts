@@ -2520,12 +2520,29 @@ export class ErRelicModifier extends PersistentModifier {
     return ER_RELIC_CONFIG[this.kind].maxStack;
   }
 
-  /** Reskin: tint the base item frame per config (community-item precedent). */
+  /**
+   * Icon: prefer the standalone er-assets sprite (a fitting PokeAPI item image);
+   * fall back to the tinted items-atlas frame if that texture isn't loaded (e.g.
+   * a clean checkout without the CDN assets, or the summary path).
+   */
   override getIcon(forSummary?: boolean): Phaser.GameObjects.Container {
+    const cfg = ER_RELIC_CONFIG[this.kind];
+    if (cfg.texture && globalScene.textures.exists(cfg.texture)) {
+      const container = globalScene.add.container(0, 0);
+      const item = globalScene.add.sprite(0, 12, cfg.texture);
+      item.setOrigin(0, 0.5);
+      item.setScale(28 / (item.width || 28));
+      container.add(item);
+      const stackText = this.getIconStackText();
+      if (stackText) {
+        container.add(stackText);
+      }
+      return container;
+    }
     const container = super.getIcon(forSummary);
     for (const child of container.list) {
       if (child instanceof Phaser.GameObjects.Sprite && child.texture?.key === "items") {
-        child.setTint(ER_RELIC_CONFIG[this.kind].tint);
+        child.setTint(cfg.tint);
       }
     }
     return container;
