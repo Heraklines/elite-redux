@@ -1,0 +1,20 @@
+{
+  "intro": "An elderly researcher in a lab coat waves you over, a stack of jumbled notes in hand.",
+  "speaker": "Professor Oak",
+  "introDialogue": "Ah, perfect timing! My Pokédex entries got all jumbled up and I can't tell which is which.$If you can match these four descriptions to the right Pokémon, I'll reward you with something rather special. Will you help an old professor out?",
+  "title": "The Scrambled Pokédex",
+  "description": "Professor Oak shows you four Pokédex entries and asks you to name each one from four choices. Match all four correctly to earn the Damage Calculator. A couple right earns a small token; help is its own reward either way.",
+  "query": "Will you help?",
+  "option": {
+    "1": {
+      "label": "Help the Professor",
+      "tooltip": "(+) Name 4 dex entries\n(+) All 4 right -> unlock the Damage Calculator",
+      "selected": "The Professor beams and lays out the first entry."
+    },
+    "2": {
+      "label": "Not now",
+      "tooltip": "(-) No reward",
+      "selected": "You wish the Professor luck and move on."
+    }
+  }
+}

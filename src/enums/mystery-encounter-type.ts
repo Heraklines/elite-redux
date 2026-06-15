@@ -32,6 +32,10 @@ export enum MysteryEncounterType {
   THE_EXPERT_POKEMON_BREEDER,
   /** ER #439: the Colosseum press-your-luck trainer gauntlet. */
   COLOSSEUM,
+  /** ER #439: Town Guessing Booth - silhouette press-your-luck quiz. */
+  ER_GUESSING_BOOTH,
+  /** ER #439: Professor's Scrambled Pokedex - dex-entry quiz -> Damage Calculator. */
+  ER_SCRAMBLED_POKEDEX,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

@@ -54,4 +54,6 @@ export enum UiMode {
   BIOME_SHOP,
   /** ER #439: the Colosseum press-your-luck gauntlet choice screen. */
   COLOSSEUM,
+  /** ER #439: the compact Quiz/Minigame panel (silhouette / dex multiple-choice). */
+  ER_QUIZ,
 }

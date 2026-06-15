@@ -1,0 +1,20 @@
+{
+  "intro": "A colorful stall stands in the square, a hand-painted sign reading 'WHO'S THAT POKEMON?'",
+  "speaker": "Booth Operator",
+  "introDialogue": "Step right up! Name the mystery Pokémon from its shadow alone!$Each one you call right bumps up your prize - but miss even once and you walk away with nothing. Care to test your eye?",
+  "title": "The Guessing Booth",
+  "description": "A festival silhouette game. Pay a small fee, then name each shadowed Pokémon from four choices. Every correct call raises your prize (up to an Ultra Ball), but one wrong answer ends the game empty-handed. Press your luck!",
+  "query": "Will you play?",
+  "option": {
+    "1": {
+      "label": "Play (pay the fee)",
+      "tooltip": "(-) A small fee\n(+) Name silhouettes for a rising prize, capped at an Ultra Ball",
+      "selected": "You hand over the fee. The operator grins and pulls the first card..."
+    },
+    "2": {
+      "label": "Walk on by",
+      "tooltip": "(-) No prize",
+      "selected": "You leave the booth behind."
+    }
+  }
+}

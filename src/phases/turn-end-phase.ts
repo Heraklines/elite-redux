@@ -2,6 +2,7 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import { erApplyFieldMedic } from "#data/elite-redux/er-relics";
 import { TerrainType } from "#data/terrain";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { HitResult } from "#enums/hit-result";
@@ -38,6 +39,10 @@ export class TurnEndPhase extends FieldPhase {
         pokemon.lapseTags(BattlerTagLapseType.TURN_END);
 
         globalScene.applyModifiers(TurnHealModifier, pokemon.isPlayer(), pokemon);
+
+        // ER relic (#439): Field Medic - every 3 turns the active player mons
+        // recover 1/12 max HP (no-op unless the relic is held).
+        erApplyFieldMedic(pokemon);
 
         if (globalScene.arena.terrain?.terrainType === TerrainType.GRASSY && pokemon.isGrounded()) {
           globalScene.phaseManager.unshiftNew(

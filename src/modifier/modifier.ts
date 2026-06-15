@@ -8,6 +8,7 @@ import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
+import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
 import { clearErAilments, hasErAilment } from "#data/elite-redux/er-status-cure";
 import { getLevelTotalExp } from "#data/exp";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
@@ -2479,6 +2480,53 @@ export class ErCommunityItemModifier extends PokemonHeldItemModifier {
       chargeText.setOrigin(0, 0);
       chargeText.setTint(this.charges > 0 ? 0x90f8a0 : 0xf89890);
       container.add(chargeText);
+    }
+    return container;
+  }
+}
+
+/**
+ * ER Relic (#439 biome overhaul): a PERMANENT, run-scoped, TEAM-WIDE buff item.
+ * Not attached to a Pokemon (no pokemonId) - it renders as a relic icon in the
+ * modifier bar and its effect is driven by external hooks in #data/elite-redux/
+ * er-relics (TurnEndPhase for Field Medic, EggLapsePhase for Warm Incubator).
+ * `apply()` is passive; the hooks query the held relic directly.
+ */
+export class ErRelicModifier extends PersistentModifier {
+  public readonly kind: ErRelicKind;
+
+  constructor(type: ModifierType, kind: ErRelicKind, stackCount?: number) {
+    super(type, stackCount);
+    this.kind = kind;
+  }
+
+  match(modifier: Modifier): boolean {
+    return modifier instanceof ErRelicModifier && modifier.kind === this.kind;
+  }
+
+  clone(): ErRelicModifier {
+    return new ErRelicModifier(this.type, this.kind, this.stackCount);
+  }
+
+  override getArgs(): any[] {
+    return [this.kind];
+  }
+
+  override apply(): boolean {
+    return true;
+  }
+
+  getMaxStackCount(): number {
+    return ER_RELIC_CONFIG[this.kind].maxStack;
+  }
+
+  /** Reskin: tint the base item frame per config (community-item precedent). */
+  override getIcon(forSummary?: boolean): Phaser.GameObjects.Container {
+    const container = super.getIcon(forSummary);
+    for (const child of container.list) {
+      if (child instanceof Phaser.GameObjects.Sprite && child.texture?.key === "items") {
+        child.setTint(ER_RELIC_CONFIG[this.kind].tint);
+      }
     }
     return container;
   }

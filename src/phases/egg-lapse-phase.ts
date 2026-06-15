@@ -3,6 +3,7 @@ import Overrides from "#app/overrides";
 import { Phase } from "#app/phase";
 import { EGG_SEED, Egg, MAX_EGG_COUNT } from "#data/egg";
 import { EggHatchData } from "#data/egg-hatch-data";
+import { erWarmIncubatorBonus } from "#data/elite-redux/er-relics";
 import { EggSourceType } from "#enums/egg-source-types";
 import { GachaType } from "#enums/gacha-types";
 import { UiMode } from "#enums/ui-mode";
@@ -47,8 +48,15 @@ export class EggLapsePhase extends Phase {
 
   start() {
     super.start();
+    // ER relic (#439): Warm Incubator gives every egg extra hatch-wave progress
+    // this wave, on top of the normal -1 (0 when the relic isn't held).
+    const warmBonus = erWarmIncubatorBonus();
     const allReadyEggs: Egg[] = globalScene.gameData.eggs.filter((egg: Egg) => {
-      return Overrides.EGG_IMMEDIATE_HATCH_OVERRIDE ? true : --egg.hatchWaves < 1;
+      if (Overrides.EGG_IMMEDIATE_HATCH_OVERRIDE) {
+        return true;
+      }
+      egg.hatchWaves -= 1 + warmBonus;
+      return egg.hatchWaves < 1;
     });
     // Cap this batch; the rest stay queued (already past their hatch wave) and
     // drain on later lapses. This is what "unclogs the pipe" 1000 at a time.

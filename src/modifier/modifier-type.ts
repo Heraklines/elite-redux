@@ -12,6 +12,7 @@ import { allMoves, modifierTypes } from "#data/data-lists";
 import { erBiomeShopResolveTier, erBiomeTierPrice, rollErBiomeShopStock } from "#data/elite-redux/er-biome-economy";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-stones";
+import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { getPokeballCatchMultiplier, getPokeballName } from "#data/pokeball";
@@ -60,6 +61,7 @@ import {
   ErCommunityItemModifier,
   ErDexNavModifier,
   ErLearnersShroomModifier,
+  ErRelicModifier,
   EvolutionItemModifier,
   EvolutionStatBoosterModifier,
   EvoTrackerModifier,
@@ -823,6 +825,20 @@ export function erCommunityItemModifierType(kind: ErCommunityItemKind): PokemonH
   type.getDescription = () => cfg.description;
   // Carry the reskin tint on the type so the SHOP shows the recolored icon
   // too (#437) - without it a Copper Rod offer rendered as a plain Quick Claw.
+  type.iconTint = cfg.tint;
+  return type;
+}
+
+/**
+ * ER relic (#439): build the ModifierType for a relic kind (live name/
+ * description from the config; icon = an existing atlas frame, tinted via the
+ * modifier's getIcon override and the type's iconTint so the shop matches).
+ */
+export function erRelicModifierType(kind: ErRelicKind): ModifierType {
+  const cfg = ER_RELIC_CONFIG[kind];
+  const type = new ModifierType("", cfg.icon, (t, _args) => new ErRelicModifier(t, kind));
+  Object.defineProperty(type, "name", { get: () => cfg.name });
+  type.getDescription = () => cfg.description;
   type.iconTint = cfg.tint;
   return type;
 }
@@ -2136,6 +2152,10 @@ const modifierTypeInitObj = Object.freeze({
   ER_ABILITY_CAPSULE: () => new ErAbilityCapsuleModifierType(),
   ER_LEARNERS_SHROOM: () => new ErLearnersShroomModifierType(),
   ER_DEX_NAV: () => new ErDexNavModifierType(),
+
+  // ER relics (#439 biome overhaul) - permanent team-wide buff items.
+  ER_RELIC_FIELD_MEDIC: () => erRelicModifierType("fieldMedic"),
+  ER_RELIC_WARM_INCUBATOR: () => erRelicModifierType("warmIncubator"),
 
   /*REPEL: () => new DoubleBattleChanceBoosterModifierType('Repel', 5),
   SUPER_REPEL: () => new DoubleBattleChanceBoosterModifierType('Super Repel', 10),

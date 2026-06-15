@@ -37,6 +37,7 @@ import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { TrainerPartyTemplate } from "#data/trainers/trainer-party-template";
 import { EggTier } from "#enums/egg-type";
 import type { Nature } from "#enums/nature";
+import { PokemonHeldItemModifier } from "#modifiers/modifier";
 import { PartyMemberStrength } from "#enums/party-member-strength";
 import { TrainerSlot } from "#enums/trainer-slot";
 import type { EnemyPokemon } from "#field/pokemon";
@@ -64,6 +65,11 @@ interface GhostMember {
   variant: number;
   passive: boolean;
   moves: number[];
+  /** ER (Graveyard ME): the items this member was holding, as
+   * [modifierTypeId, stackCount] pairs. Omitted when none / for legacy
+   * snapshots captured before item recording (those fall back to a random
+   * Ultra-tier item or berry when a memento is granted). */
+  heldItems?: [string, number][] | undefined;
 }
 
 export interface GhostTeamSnapshot {
@@ -345,11 +351,12 @@ function saveLocalGhostTeam(snapshot: GhostTeamSnapshot): void {
 // -----------------------------------------------------------------------------
 // Capture + record.
 // -----------------------------------------------------------------------------
-function serializeMember(p: any): GhostMember {
+function serializeMember(p: any, isPlayer = true): GhostMember {
   const ivs: number[] = Array.isArray(p?.ivs) ? p.ivs.slice(0, 6) : [];
   const moves: number[] = Array.isArray(p?.moveset)
     ? p.moveset.filter(Boolean).map((m: any) => m.moveId ?? m.move ?? 0)
     : [];
+  const heldItems = serializeHeldItems(p, isPlayer);
   return {
     speciesId: p?.species?.speciesId ?? 0,
     formIndex: p?.formIndex ?? 0,
@@ -362,7 +369,25 @@ function serializeMember(p: any): GhostMember {
     variant: p?.variant ?? 0,
     passive: !!p?.passive,
     moves,
+    ...(heldItems.length > 0 ? { heldItems } : {}),
   };
+}
+
+/** Serialise a member's held items as [modifierTypeId, stackCount] pairs, or [] when
+ * none. Best-effort and never throws - item data is non-essential to the snapshot. */
+function serializeHeldItems(p: any, isPlayer: boolean): [string, number][] {
+  try {
+    const id = p?.id;
+    if (id == null) {
+      return [];
+    }
+    return globalScene
+      .findModifiers(m => m instanceof PokemonHeldItemModifier && m.pokemonId === id, isPlayer)
+      .map(m => [(m as PokemonHeldItemModifier).type.id, (m as PokemonHeldItemModifier).getStackCount()] as [string, number])
+      .filter(([typeId]) => !!typeId);
+  } catch {
+    return [];
+  }
 }
 
 /** Snapshot the current player party into a ghost team, or `null` if empty. */
@@ -371,7 +396,7 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
   if (party.length === 0) {
     return null;
   }
-  const partyData = party.slice(0, MAX_PARTY).map(serializeMember);
+  const partyData = party.slice(0, MAX_PARTY).map(m => serializeMember(m));
   const waveReached = globalScene?.currentBattle?.waveIndex ?? 0;
   const { name: opponentName, party: opponentParty } = captureOpponent();
   // ER (Colosseum): if THIS defeat was dealt by a fielded ghost, record who it
@@ -441,7 +466,7 @@ function captureOpponent(): { name?: string | undefined; party?: GhostMember[] |
     if (enemies.length === 0) {
       return {};
     }
-    const party = enemies.slice(0, MAX_PARTY).map(serializeMember);
+    const party = enemies.slice(0, MAX_PARTY).map(e => serializeMember(e, false));
     const trainer = battle?.trainer;
     const name = trainer
       ? trainer.getName(TrainerSlot.TRAINER, true)

@@ -22,6 +22,7 @@ import { MysteriousChestEncounter } from "#mystery-encounters/mysterious-chest-e
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { PartTimerEncounter } from "#mystery-encounters/part-timer-encounter";
 import { SafariZoneEncounter } from "#mystery-encounters/safari-zone-encounter";
+import { ScrambledPokedexEncounter } from "#mystery-encounters/scrambled-pokedex-encounter";
 import { ShadyVitaminDealerEncounter } from "#mystery-encounters/shady-vitamin-dealer-encounter";
 import { SlumberingSnorlaxEncounter } from "#mystery-encounters/slumbering-snorlax-encounter";
 import { TeleportingHijinksEncounter } from "#mystery-encounters/teleporting-hijinks-encounter";
@@ -29,6 +30,7 @@ import { TheExpertPokemonBreederEncounter } from "#mystery-encounters/the-expert
 import { ThePokemonSalesmanEncounter } from "#mystery-encounters/the-pokemon-salesman-encounter";
 import { TheStrongStuffEncounter } from "#mystery-encounters/the-strong-stuff-encounter";
 import { TheWinstrateChallengeEncounter } from "#mystery-encounters/the-winstrate-challenge-encounter";
+import { TownGuessingBoothEncounter } from "#mystery-encounters/town-guessing-booth-encounter";
 import { TrainingSessionEncounter } from "#mystery-encounters/training-session-encounter";
 import { TrashToTreasureEncounter } from "#mystery-encounters/trash-to-treasure-encounter";
 import { UncommonBreedEncounter } from "#mystery-encounters/uncommon-breed-encounter";
@@ -192,7 +194,7 @@ const anyBiomeEncounters: MysteryEncounterType[] = [
  * that biome groups do not cover
  */
 export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>([
-  [BiomeId.TOWN, []],
+  [BiomeId.TOWN, [MysteryEncounterType.ER_GUESSING_BOOTH, MysteryEncounterType.ER_SCRAMBLED_POKEDEX]],
   [BiomeId.PLAINS, [MysteryEncounterType.SLUMBERING_SNORLAX]],
   [BiomeId.GRASS, [MysteryEncounterType.SLUMBERING_SNORLAX, MysteryEncounterType.ABSOLUTE_AVARICE]],
   [BiomeId.TALL_GRASS, [MysteryEncounterType.SLUMBERING_SNORLAX, MysteryEncounterType.ABSOLUTE_AVARICE]],
@@ -261,6 +263,8 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.GLOBAL_TRADE_SYSTEM] = GlobalTradeSystemEncounter;
   allMysteryEncounters[MysteryEncounterType.THE_EXPERT_POKEMON_BREEDER] = TheExpertPokemonBreederEncounter;
   allMysteryEncounters[MysteryEncounterType.COLOSSEUM] = ColosseumEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_GUESSING_BOOTH] = TownGuessingBoothEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_SCRAMBLED_POKEDEX] = ScrambledPokedexEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

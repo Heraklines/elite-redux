@@ -26,6 +26,7 @@ import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
 import type { ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
+import { buildErQuizRound } from "#data/elite-redux/er-quiz";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import { setErDifficulty, setErDifficulty as setErDifficultyForScenario } from "#data/elite-redux/er-run-difficulty";
 import { erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
@@ -232,6 +233,118 @@ export const DEV_SCENARIOS: DevScenario[] = [
   // ===========================================================================
   // FEATURES — this session
   // ===========================================================================
+  {
+    label: "ER Relic: Field Medic (#439)",
+    description:
+      "#439 biome overhaul - Relic/Formation buff-item system, first relic.\n"
+      + "DO: you start holding the FIELD MEDIC relic (a tinted charm in the item bar)\n"
+      + "and your Snorlax begins at ~40% HP. Use SPLASH each turn and just watch.\n"
+      + "EXPECT: every 3rd turn-end, 'Snorlax was tended by the Field Medic!' and it\n"
+      + "heals ~1/12 of max HP. (Warm Incubator note: the other first relic speeds\n"
+      + "egg hatching - with it held, each egg's 'waves to hatch' in the Egg list\n"
+      + "drops by 2 per wave instead of 1. Hard to show in one battle; verify via the\n"
+      + "egg list across waves.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_FIELD_MEDIC" }],
+      });
+      return [makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH] })];
+    },
+    onBattleStart: () => {
+      const p = globalScene.getPlayerPokemon();
+      if (p) {
+        p.hp = Math.max(1, Math.floor(p.getMaxHp() * 0.4));
+        p.updateInfo();
+      }
+    },
+  },
+  {
+    label: "ER Quiz engine: silhouette (#439)",
+    description:
+      "#439 biome overhaul - the Quiz/Minigame engine (compact panel, not full-\n"
+      + "screen). On turn 1 a 5-question 'Who's that Pokémon?' silhouette round opens.\n"
+      + "DO: each question shows a small card with a BLACK silhouette + 4 name choices;\n"
+      + "UP/DOWN to pick, ACTION to answer (CANCEL forfeits). It's press-your-luck:\n"
+      + "stops at your first wrong answer.\n"
+      + "EXPECT: correct -> 'Correct! It's X!'; wrong -> 'Wrong... it was X.' and the\n"
+      + "round ends. A final message reports your score. (Engine test harness; the\n"
+      + "real Town Guessing Booth / Professor events ride this same engine.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH] })];
+    },
+    onBattleStart: () => {
+      const questions = buildErQuizRound("silhouette", 5);
+      globalScene.phaseManager.unshiftNew("ErQuizPhase", {
+        questions,
+        stopOnWrong: true,
+        onComplete: (result: { correct: number; answered: number; perfect: boolean }) => {
+          globalScene.phaseManager.queueMessage(
+            `Quiz over - ${result.correct}/${result.answered} correct${result.perfect ? " (perfect!)" : ""}.`,
+          );
+        },
+      });
+    },
+  },
+  {
+    label: "ER Town: Guessing Booth (#439)",
+    description:
+      "#439 - Town Guessing Booth mystery encounter (rides the Quiz engine).\n"
+      + "DO: on wave 12 the booth spawns. Choose 'Play (pay the fee)'. A small card\n"
+      + "shows a black SILHOUETTE + 4 names; UP/DOWN + ACTION to answer.\n"
+      + "EXPECT: press-your-luck - each correct silhouette raises the prize (Poke ->\n"
+      + "Great -> Ultra Ball), one wrong answer ends it. The reward shop opens at the\n"
+      + "earned tier; 0 correct = a heal. 'Walk on by' just leaves.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_MONEY_OVERRIDE: 50000,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_GUESSING_BOOTH,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "ER Town: Scrambled Pokedex (#439)",
+    description:
+      "#439 - Professor's Scrambled Pokedex (rides the Quiz engine). Professor Oak\n"
+      + "(if the sprite is uploaded) shows four jumbled dex entries.\n"
+      + "DO: on wave 12, choose 'Help the Professor'. A card shows a Pokedex blurb +\n"
+      + "4 names; answer all 4 (no stop-on-wrong).\n"
+      + "EXPECT: 4/4 -> the Damage Calculator unlock in the reward shop; 2-3 -> a Rare\n"
+      + "Candy; <2 -> a heal. Verify the answer's name is NOT shown in its own blurb\n"
+      + "(redacted to '[this Pokemon]').",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_SCRAMBLED_POKEDEX,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
   {
     label: "World Tournament - ACE (vanilla) (#439)",
     description:
