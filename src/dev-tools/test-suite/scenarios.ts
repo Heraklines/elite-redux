@@ -233,7 +233,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
   // FEATURES — this session
   // ===========================================================================
   {
-    label: "Colosseum gauntlet - ACE (vanilla) (#439)",
+    label: "World Tournament - ACE (vanilla) (#439)",
     description:
       "#439 Colosseum - dynamic 15-round press-your-luck gauntlet, ACE mode.\n"
       + "DO: on wave 12 the Colosseum spawns. Enter, win, then CONTINUE / CASH OUT.\n"
@@ -257,7 +257,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "Colosseum gauntlet - ELITE (#439)",
+    label: "World Tournament - ELITE (#439)",
     description:
       "#439 Colosseum - dynamic gauntlet, ELITE mode (full ER).\n"
       + "DO: enter on wave 12, fight through, watch the escalation.\n"
@@ -279,7 +279,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "Colosseum gauntlet - HELL (#439)",
+    label: "World Tournament - HELL (#439)",
     description:
       "#439 Colosseum - dynamic gauntlet, HELL mode (hardest pools).\n"
       + "DO: enter on wave 12, push as deep as you can.\n"

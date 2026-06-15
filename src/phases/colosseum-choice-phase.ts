@@ -91,13 +91,18 @@ export class ColosseumChoicePhase extends Phase {
     }
     this.resolving = true;
 
+    // Hand the UI back to MESSAGE FIRST. endColosseum/startNextColosseumBattle
+    // run dialogue + reward flow (showEncounterText, leaveEncounterWithoutBattle)
+    // that need a normal mode; running them while still in UiMode.COLOSSEUM
+    // stalled the cash-out (#439).
+    await globalScene.ui.setMode(UiMode.MESSAGE);
+
     if (choice === COLOSSEUM_CONTINUE) {
       await startNextColosseumBattle(this.wins + 1);
     } else {
       await endColosseum(this.wins);
     }
 
-    // Hand the UI back to a known mode before the next phase runs, then end.
-    globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
+    this.end();
   }
 }

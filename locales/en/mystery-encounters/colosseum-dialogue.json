@@ -1,15 +1,15 @@
 {
   "intro": "A grand arena rises before you, its stone pillars worn by countless battles.",
-  "speaker": "Colosseum Master",
-  "introDialogue": "Welcome, challenger, to the Colosseum!$Fifteen opponents await, from rookies to the Champion herself. Win battle after battle and your reward grade keeps climbing. Stop whenever you like to claim your prize, but push too far and you walk away with nothing. How far will you go?",
-  "title": "The Colosseum",
-  "description": "A 15-trainer gauntlet of rising threat, from rookies to gym leaders to the Champion. After every win, CONTINUE to chase a higher reward grade (D up to EX) or CASH OUT to open a full reward shop locked to that grade. Survivors are patched up between rounds, but lose a battle and the prize is gone.",
+  "speaker": "Tournament Master",
+  "introDialogue": "Welcome, challenger, to the World Tournament!$Fifteen opponents await, from rookies to a Champion. Win battle after battle and your reward grade keeps climbing. Stop whenever you like to claim your prize, but push too far and you walk away with nothing. How far will you go?",
+  "title": "World Tournament",
+  "description": "A 15-round tournament of rising threat, from rookies to gym leaders, ghost challengers, and a Champion. After every win, CONTINUE to chase a higher reward grade (D up to EX) or CASH OUT to open a full reward shop locked to that grade. Survivors are patched up between rounds, but lose a battle and the prize is gone.",
   "query": "Do you accept the challenge?",
   "option": {
     "1": {
-      "label": "Enter the Colosseum",
+      "label": "Enter the Tournament",
       "tooltip": "(-) 15 back-to-back trainer battles\n(+) Reward grade ramps from D to EX",
-      "selected": "Then let the gauntlet begin!"
+      "selected": "Then let the tournament begin!"
     },
     "2": {
       "label": "Leave",
@@ -17,5 +17,5 @@
       "selected": "You step away from the arena."
     }
   },
-  "reward": "Colosseum cleared at the {{tier}} grade! You pocket ₽{{money}}, and a full reward shop of that grade opens."
+  "reward": "Tournament cleared at the {{tier}} grade! You pocket ₽{{money}}, and a full reward shop of that grade opens."
 }
