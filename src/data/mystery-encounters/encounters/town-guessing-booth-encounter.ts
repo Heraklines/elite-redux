@@ -6,10 +6,10 @@
 
 // =============================================================================
 // ER #439 - Town Guessing Booth. A festival silhouette quiz (the "Who's that
-// Pokemon?" booth). Pay a small fee, then a press-your-luck round of silhouette
-// questions on the compact ErQuiz UI: every correct call raises the prize tier
-// (capped at an Ultra Ball for early Town), one wrong answer ends it. Rides the
-// shared Quiz/Minigame engine (ErQuizPhase).
+// Pokemon?" booth). Pay a small fee, then a 4-question press-your-luck round of
+// silhouettes on the compact ErQuiz UI: every correct call raises the prize tier
+// (4/4 = the Damage Calculator unlock; 3/2/1 = a CHOICE from Ultra/Great/Common),
+// one wrong answer ends it. Rides the shared Quiz/Minigame engine (ErQuizPhase).
 // =============================================================================
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
