@@ -7,15 +7,14 @@
 // =============================================================================
 // ER Colosseum (#439) - the press-your-luck gauntlet standings board.
 //
-// BW2 Pokemon World Tournament entry screen: a deep-navy board crowned by the
-// authentic gold PWT crest + "WORLD TOURNAMENT" wordmark, a framed two-column
-// roster of all 15 entrants, the reward GRADE, and CONTINUE / CASH OUT.
-//
-// The gauntlet is rolled per-mode and SECRET: only the challengers you've cleared
-// (and the one you face next) are revealed - a cropped trainer-class head + name
-// (ghosts show the source player's account name). Upcoming entrants are dark
-// silhouettes tagged only with their tier (Ghost / Boss / Gym / Champion). A gold
-// PWT trophy marks the final challenger. Pure presentation + a 2-way callback.
+// BW2 Pokemon World Tournament entry screen: a deep-navy board framed entirely in
+// the ripped/derived BW2 PWT navy+gold 9-slice chrome (NOT PokeRogue's default
+// window theme), crowned by the authentic gold PWT crest + "WORLD TOURNAMENT"
+// wordmark. A framed two-column roster of all 15 entrants - the ones you've
+// cleared (and the one you face next) reveal a cropped trainer-class head + name
+// (ghosts show the source player's account name); everyone ahead is a dark
+// SILHOUETTE of the real challenger tagged only with their tier. A gold PWT
+// trophy marks the Champion. Pure presentation + a 2-way callback.
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
@@ -62,40 +61,57 @@ export type ColosseumChoiceCallback = (choice: number) => void;
 
 const GOLD = 0xf8d030; // cleared / banked / champion
 const NEXT = 0x48c8f8; // the next challenger (CONTINUE target)
-const TODO = 0x9098b0; // not yet faced
-const BOARD = 0x0b1838; // deep-navy tournament board base (BW2 PWT)
-const BOARD_TOP = 0x16284f; // lighter navy top band
-const PANEL = 0x122146; // column panels
-const SILHOUETTE = 0x05070e; // unrevealed portrait box
+const TODO = 0x8a93b4; // not yet faced (tier tag)
+const BOARD = 0x0b1838; // deep-navy board base
 
 /**
- * A cropped trainer-class head from a loaded "trainer" atlas, scaled to a target
- * on-screen height. Returns null if the atlas isn't loaded (caller shows a
- * silhouette instead). Shared by the standings board + the VS splash.
+ * A BW2 PWT navy/gold 9-slice panel (or raised button). Falls back to the engine
+ * window if the CDN chrome hasn't loaded. Origin top-left.
  */
-export function colosseumHeadSprite(spriteKey: string, displayH: number): Phaser.GameObjects.Sprite | null {
+function pwtPanel(x: number, y: number, w: number, h: number, button = false): Phaser.GameObjects.NineSlice {
+  const key = button ? "er_pwt_button" : "er_pwt_panel";
+  if (globalScene.textures.exists(key)) {
+    const n = globalScene.add.nineslice(x, y, key, undefined, w, h, 4, 4, 4, 4);
+    n.setOrigin(0, 0);
+    return n;
+  }
+  return addWindow(x, y, w, h);
+}
+
+/**
+ * A trainer-class figure from a loaded "trainer" atlas, scaled to a target
+ * on-screen height, origin top-CENTRE (caller sets the centre x). We render the
+ * WHOLE standing pose (no crop): in-engine setCrop on trimmed atlas frames was
+ * unreliable and mis-clipped. `silhouette` renders it as a flat dark shadow (for
+ * not-yet-faced challengers). Returns null if the atlas isn't loaded. Shared by
+ * the standings board + the VS splash.
+ */
+export function colosseumHeadSprite(
+  spriteKey: string,
+  displayH: number,
+  opts: { silhouette?: boolean } = {},
+): Phaser.GameObjects.Sprite | null {
   if (!spriteKey || !globalScene.textures.exists(spriteKey)) {
     return null;
   }
   const s = globalScene.add.sprite(0, 0, spriteKey);
   s.setFrame(0);
   const fh = s.height || 64;
-  const fw = s.width || 64;
-  // Show the top slice of the standing pose (head + shoulders) and scale it up.
-  const frac = 0.52;
-  s.setOrigin(0, 0);
-  s.setCrop(0, 0, fw, Math.round(fh * frac));
-  s.setScale(displayH / (fh * frac));
+  s.setOrigin(0.5, 0);
+  s.setScale(displayH / fh);
+  if (opts.silhouette) {
+    s.setTintFill(0x070c1a);
+    s.setAlpha(0.9);
+  }
   return s;
 }
 
 export class ColosseumUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
   private board: Phaser.GameObjects.Rectangle;
-  private boardTop: Phaser.GameObjects.Rectangle;
   private frame: Phaser.GameObjects.NineSlice;
-  private leftPanel: Phaser.GameObjects.Rectangle;
-  private rightPanel: Phaser.GameObjects.Rectangle;
+  private leftPanel: Phaser.GameObjects.NineSlice;
+  private rightPanel: Phaser.GameObjects.NineSlice;
   private trophy: Phaser.GameObjects.Image | null = null;
   private crest: Phaser.GameObjects.Image;
   private wordmark: Phaser.GameObjects.Text;
@@ -123,19 +139,17 @@ export class ColosseumUiHandler extends UiHandler {
     this.container.setVisible(false);
     ui.add(this.container);
 
-    // Deep-navy tournament board with a lighter top band + a framed border.
+    // Deep-navy board, framed entirely in BW2 PWT navy/gold chrome.
     this.board = globalScene.add.rectangle(0, 0, w, h, BOARD, 1).setOrigin(0);
     this.container.add(this.board);
-    this.boardTop = globalScene.add.rectangle(0, 0, w, 44, BOARD_TOP, 1).setOrigin(0);
-    this.container.add(this.boardTop);
-    this.frame = addWindow(2, 2, w - 4, h - 4);
+    this.frame = pwtPanel(0, 0, w, h);
     this.container.add(this.frame);
 
-    // The authentic gold PWT crest is the hero of the board, centred at the top.
+    // Authentic gold PWT crest, centred at the top.
     if (globalScene.textures.exists("er_pwt_crest")) {
-      this.crest = globalScene.add.image(w / 2, 3, "er_pwt_crest");
+      this.crest = globalScene.add.image(w / 2, 2, "er_pwt_crest");
       this.crest.setOrigin(0.5, 0);
-      this.crest.setScale(26 / 123);
+      this.crest.setScale(22 / 123);
       this.container.add(this.crest);
     }
 
@@ -143,60 +157,59 @@ export class ColosseumUiHandler extends UiHandler {
     if (globalScene.textures.exists("er_pwt_trophy")) {
       this.trophy = globalScene.add.image(0, 0, "er_pwt_trophy");
       this.trophy.setOrigin(0, 0);
-      this.trophy.setScale(12 / 62);
+      this.trophy.setScale(11 / 62);
       this.trophy.setVisible(false);
       this.container.add(this.trophy);
     }
 
-    this.wordmark = addTextObject(w / 2, 30, "POKEMON WORLD TOURNAMENT", TextStyle.WINDOW, { fontSize: "36px" });
+    this.wordmark = addTextObject(w / 2, 25, "POKEMON WORLD TOURNAMENT", TextStyle.WINDOW, { fontSize: "34px" });
     this.wordmark.setOrigin(0.5, 0);
     this.wordmark.setTint(GOLD);
     this.container.add(this.wordmark);
 
-    this.statusText = addTextObject(w / 2, 39, "", TextStyle.PARTY, { fontSize: "38px" });
+    this.statusText = addTextObject(w / 2, 33, "", TextStyle.PARTY, { fontSize: "26px" });
     this.statusText.setOrigin(0.5, 0);
     this.statusText.setTint(0xc0c8e0);
     this.container.add(this.statusText);
 
-    // Grade badge, top-left, framed + gold.
-    this.gradeWindow = addWindow(6, 6, 42, 26);
+    // Grade badge, top-left.
+    this.gradeWindow = pwtPanel(6, 5, 44, 26);
     this.container.add(this.gradeWindow);
-    this.gradeLabel = addTextObject(27, 9, "GRADE", TextStyle.PARTY, { fontSize: "32px" });
+    this.gradeLabel = addTextObject(28, 7, "GRADE", TextStyle.PARTY, { fontSize: "28px" });
     this.gradeLabel.setOrigin(0.5, 0);
+    this.gradeLabel.setTint(0xc0c8e0);
     this.container.add(this.gradeLabel);
-    this.gradeText = addTextObject(27, 16, "", TextStyle.WINDOW, { fontSize: "60px" });
+    this.gradeText = addTextObject(28, 14, "", TextStyle.WINDOW, { fontSize: "56px" });
     this.gradeText.setOrigin(0.5, 0);
     this.gradeText.setTint(GOLD);
     this.container.add(this.gradeText);
 
     // Two roster column panels.
-    const panelY = 46;
-    const panelH = h - panelY - 36;
-    const panelW = w / 2 - 14;
-    this.leftPanel = globalScene.add.rectangle(8, panelY, panelW, panelH, PANEL, 0.92).setOrigin(0);
-    this.leftPanel.setStrokeStyle(1, 0x39456a);
+    const panelY = 44;
+    const panelH = h - panelY - 33;
+    const panelW = w / 2 - 12;
+    this.leftPanel = pwtPanel(7, panelY, panelW, panelH);
     this.container.add(this.leftPanel);
-    this.rightPanel = globalScene.add.rectangle(w / 2 + 6, panelY, panelW, panelH, PANEL, 0.92).setOrigin(0);
-    this.rightPanel.setStrokeStyle(1, 0x39456a);
+    this.rightPanel = pwtPanel(w / 2 + 5, panelY, panelW, panelH);
     this.container.add(this.rightPanel);
 
     this.rosterRows = [];
 
     // Two buttons near the bottom.
-    const btnW = 122;
-    const btnH = 22;
+    const btnW = 126;
+    const btnH = 24;
     const gap = 8;
     const totalW = btnW * 2 + gap;
     const startX = (w - totalW) / 2;
-    const btnY = h - 30;
+    const btnY = h - 29;
     const captions = ["CONTINUE", "CASH OUT"];
     this.buttons = [];
     for (let i = 0; i < 2; i++) {
       const bx = startX + i * (btnW + gap);
-      const window = addWindow(bx, btnY, btnW, btnH);
+      const window = pwtPanel(bx, btnY, btnW, btnH, true);
       this.container.add(window);
       const label = addTextObject(bx + btnW / 2, btnY + btnH / 2, captions[i], TextStyle.WINDOW, {
-        fontSize: "54px",
+        fontSize: "52px",
         align: "center",
       });
       label.setOrigin(0.5, 0.5);
@@ -235,9 +248,9 @@ export class ColosseumUiHandler extends UiHandler {
   }
 
   /**
-   * Draw the two-column entrant roster. Revealed entries (cleared + next) show a
-   * cropped portrait + name; secret upcoming ones show a silhouette + tier tag.
-   * The gold trophy marks the final challenger (the Champion).
+   * Draw the two-column entrant roster. Revealed entries show a cropped portrait
+   * + name; secret upcoming ones show a dark silhouette of the real challenger +
+   * its tier tag. The gold trophy marks the final challenger (the Champion).
    */
   private layoutRoster(data: ColosseumViewData): void {
     for (const row of this.rosterRows) {
@@ -249,8 +262,9 @@ export class ColosseumUiHandler extends UiHandler {
     const n = data.challengers.length;
     const perCol = Math.ceil(n / 2);
     const colX = [12, w / 2 + 10];
-    const rowY0 = 48;
+    const rowY0 = 47;
     const rowH = 12;
+    const SLOT = 14; // portrait gutter width
     const PORTRAIT = 11;
 
     for (let i = 0; i < n; i++) {
@@ -263,40 +277,30 @@ export class ColosseumUiHandler extends UiHandler {
       const cleared = i < data.round;
       const isNext = i === data.round;
       const isChampion = i === n - 1;
-      const revealed = entry.revealed;
 
-      // Portrait (revealed) or silhouette (secret).
-      const head = revealed ? colosseumHeadSprite(entry.spriteKey, PORTRAIT) : null;
+      const head = colosseumHeadSprite(entry.spriteKey, PORTRAIT, { silhouette: !entry.revealed });
       if (head) {
-        head.setPosition(x, y);
-        if (!cleared && !isNext) {
-          head.setAlpha(0.85);
-        }
+        head.setPosition(x + SLOT / 2, y);
         this.container.add(head);
         this.rosterRows.push(head);
-      } else {
-        const sil = globalScene.add.rectangle(x, y, PORTRAIT, PORTRAIT, SILHOUETTE, 0.9).setOrigin(0, 0);
-        sil.setStrokeStyle(1, 0x2a3656);
+      } else if (!entry.revealed) {
+        // No atlas yet - a plain dark placeholder silhouette box.
+        const sil = globalScene.add.rectangle(x + 1, y, PORTRAIT, PORTRAIT, 0x070c1a, 0.85).setOrigin(0, 0);
         this.container.add(sil);
         this.rosterRows.push(sil);
-        const q = addTextObject(x + PORTRAIT / 2, y + 1, "?", TextStyle.WINDOW, { fontSize: "36px" });
-        q.setOrigin(0.5, 0);
-        q.setTint(TODO);
-        this.container.add(q);
-        this.rosterRows.push(q);
       }
 
-      const labelTxt = revealed ? entry.name : entry.tier;
-      const t = addTextObject(x + 13, y + 2, `${i + 1}. ${labelTxt}`, TextStyle.WINDOW, { fontSize: "36px" });
+      const labelTxt = entry.revealed ? entry.name : entry.tier;
+      const t = addTextObject(x + SLOT + 2, y + 2, `${i + 1}. ${labelTxt}`, TextStyle.WINDOW, { fontSize: "34px" });
       t.setOrigin(0, 0);
       t.setTint(cleared || isChampion ? GOLD : isNext ? NEXT : TODO);
-      t.setAlpha(cleared || isNext || isChampion ? 1 : 0.7);
+      t.setAlpha(cleared || isNext || isChampion ? 1 : 0.75);
       this.container.add(t);
       this.rosterRows.push(t);
 
       if (isChampion && this.trophy) {
         this.trophy.setVisible(true);
-        this.trophy.setPosition(w - 26, y - 1);
+        this.trophy.setPosition(w - 24, y - 1);
       }
     }
   }

@@ -149,14 +149,14 @@ function showColosseumVs(round: number, challenger: ColosseumChallenger): Promis
     vs.setTint(0xf85040);
     c.add(vs);
 
-    // The upcoming challenger's class portrait (cropped head), large + centred.
-    const face = colosseumHeadSprite(challenger.spriteKey, 44);
+    // The upcoming challenger's class figure, large + centred (origin top-centre).
+    const face = colosseumHeadSprite(challenger.spriteKey, 54);
     if (face) {
-      face.setPosition(w / 2 - face.displayWidth / 2, h / 2 - 16);
+      face.setPosition(w / 2, h / 2 - 26);
       c.add(face);
     }
 
-    const foe = addTextObject(w / 2, h / 2 + 34, challenger.name, TextStyle.WINDOW, { fontSize: "64px" });
+    const foe = addTextObject(w / 2, h / 2 + 36, challenger.name, TextStyle.WINDOW, { fontSize: "64px" });
     foe.setOrigin(0.5, 0);
     c.add(foe);
 

@@ -61,15 +61,11 @@ export class ColosseumChoicePhase extends Phase {
   private async open(): Promise<void> {
     const gauntlet = (globalScene.currentBattle.mysteryEncounter?.misc?.gauntlet as ColosseumChallenger[]) ?? [];
 
-    // Reveal cleared (index < wins) + the next-up challenger (index === wins).
-    const revealedTypes = new Set<number>();
-    for (let i = 0; i < gauntlet.length; i++) {
-      if (i <= this.wins) {
-        revealedTypes.add(gauntlet[i].trainerType);
-      }
-    }
+    // Load every challenger's class atlas: revealed ones render in colour, the
+    // rest as dark silhouettes (so the board shows shadowy figures ahead).
+    const types = new Set<number>(gauntlet.map(g => g.trainerType));
     await Promise.all(
-      [...revealedTypes].map(t => trainerConfigs[t]?.loadAssets(TrainerVariant.DEFAULT).catch(() => undefined)),
+      [...types].map(t => trainerConfigs[t]?.loadAssets(TrainerVariant.DEFAULT).catch(() => undefined)),
     );
 
     const challengers: ColosseumChallengerView[] = gauntlet.map((ch, i) => ({

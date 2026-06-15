@@ -66,7 +66,11 @@ export class LoadingScene extends SceneBase {
       // BW2 PWT champion trophy emblem (gold) - marks the final challenger.
       // (Roster + VS-splash portraits are the live trainer-class sprites, loaded
       // on demand per challenger - the Colosseum gauntlet is rolled dynamically.)
-      .loadImage("er_pwt_trophy", "elite-redux/colosseum", "pwt_trophy.png");
+      .loadImage("er_pwt_trophy", "elite-redux/colosseum", "pwt_trophy.png")
+      // BW2 PWT navy/gold 9-slice chrome (panel + raised button) for the whole
+      // Colosseum board, replacing PokeRogue's default red window theme.
+      .loadImage("er_pwt_panel", "elite-redux/colosseum", "pwt_panel.png")
+      .loadImage("er_pwt_button", "elite-redux/colosseum", "pwt_button.png");
     // ER Biome Market (#440): the shopkeeper is a real PokeRogue trainer-class
     // sprite cast per biome (clerk for towns, fisherman for the sea, firebreather
     // for the volcano, hex maniac for the graveyard, etc. - see KEEPER_BY_BIOME).
