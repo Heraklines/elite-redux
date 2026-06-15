@@ -22,6 +22,7 @@
 // nothing → every function here is a harmless no-op and no menu items appear.
 // =============================================================================
 
+import Overrides from "#app/overrides";
 import type { GameModes } from "#enums/game-modes";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { Starter } from "#types/save-data";
@@ -76,6 +77,39 @@ export function consumePendingDevStarters(): Starter[] | null {
   const s = pendingStarters;
   pendingStarters = null;
   return s;
+}
+
+// --- One-shot mystery-encounter override (scenario → first ME) ----------------
+// A scenario that forces a Mystery Encounter (via MYSTERY_ENCOUNTER_OVERRIDE +
+// MYSTERY_ENCOUNTER_RATE_OVERRIDE=256) would otherwise re-force the SAME
+// encounter on EVERY subsequent wave - the rate override bypasses the normal
+// "no ME within 3 waves" rule. Arming this makes the override fire exactly ONCE:
+// MysteryEncounterPhase consumes it after the encounter is committed, clearing
+// the overrides so the rest of the run plays normally. Inert in production.
+
+let clearMeOverrideAfterFirst = false;
+
+/** Arm the one-shot: clear the forced-ME overrides after the next encounter. */
+export function setClearMeOverrideAfterFirst(): void {
+  clearMeOverrideAfterFirst = true;
+}
+
+/**
+ * If armed, clear the forced-ME overrides so a scenario's forced encounter fires
+ * only once (not every wave). Called from MysteryEncounterPhase once the
+ * encounter is committed. No-op when not armed (production / normal runs).
+ */
+export function consumeClearMeOverrideAfterFirst(): void {
+  if (!clearMeOverrideAfterFirst) {
+    return;
+  }
+  clearMeOverrideAfterFirst = false;
+  const O = Overrides as unknown as {
+    MYSTERY_ENCOUNTER_OVERRIDE: unknown;
+    MYSTERY_ENCOUNTER_RATE_OVERRIDE: unknown;
+  };
+  O.MYSTERY_ENCOUNTER_OVERRIDE = null;
+  O.MYSTERY_ENCOUNTER_RATE_OVERRIDE = null;
 }
 
 // --- Pending mid-combat setup (scenario → first TurnInitPhase) ----------------

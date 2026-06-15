@@ -21,6 +21,7 @@
  * boostPlayer()/boostEnemy(). resetDevOverrides() runs first so each starts clean.
  */
 
+import { setClearMeOverrideAfterFirst } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
@@ -161,6 +162,12 @@ export function resetDevOverrides(): void {
 
 function setOverrides(partial: Partial<MutableOverrides>): void {
   Object.assign(O, partial);
+  // When a scenario FORCES a mystery encounter, arm the one-shot clear so it
+  // fires once instead of re-spawning every wave (the rate override otherwise
+  // bypasses the "no ME within 3 waves" rule and loops forever).
+  if (partial.MYSTERY_ENCOUNTER_OVERRIDE != null) {
+    setClearMeOverrideAfterFirst();
+  }
 }
 
 const MEGA_BRACELET: ModifierOverride = { name: "MEGA_BRACELET" };

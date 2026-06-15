@@ -1,3 +1,4 @@
+import { consumeClearMeOverrideAfterFirst } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { getCharVariantFromDialogue } from "#data/dialogue";
@@ -59,6 +60,9 @@ export class MysteryEncounterPhase extends Phase {
       globalScene.mysteryEncounterSaveData.encounteredEvents.push(
         new SeenEncounterData(encounter.encounterType, encounter.encounterTier, globalScene.currentBattle.waveIndex),
       );
+      // Dev-tools: a scenario that FORCED this encounter clears its ME overrides
+      // here so it fires once instead of re-spawning every wave. No-op in prod.
+      consumeClearMeOverrideAfterFirst();
     }
 
     // Initiates encounter dialogue window and option select
