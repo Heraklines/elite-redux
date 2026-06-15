@@ -154,7 +154,8 @@ const humanTransitableBiomeEncounters: MysteryEncounterType[] = [
   // MysteryEncounterType.AN_OFFER_YOU_CANT_REFUSE, Disabled
   MysteryEncounterType.THE_WINSTRATE_CHALLENGE,
   MysteryEncounterType.THE_EXPERT_POKEMON_BREEDER,
-  MysteryEncounterType.COLOSSEUM,
+  // World Tournament (#439) is NOT a generic human-transitable encounter - it is
+  // gated to DOJO + METROPOLIS only (see mysteryEncountersByBiome below).
 ];
 
 const civilizationBiomeEncounters: MysteryEncounterType[] = [
@@ -195,7 +196,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.PLAINS, [MysteryEncounterType.SLUMBERING_SNORLAX]],
   [BiomeId.GRASS, [MysteryEncounterType.SLUMBERING_SNORLAX, MysteryEncounterType.ABSOLUTE_AVARICE]],
   [BiomeId.TALL_GRASS, [MysteryEncounterType.SLUMBERING_SNORLAX, MysteryEncounterType.ABSOLUTE_AVARICE]],
-  [BiomeId.METROPOLIS, []],
+  [BiomeId.METROPOLIS, [MysteryEncounterType.COLOSSEUM]],
   [BiomeId.FOREST, [MysteryEncounterType.SAFARI_ZONE, MysteryEncounterType.ABSOLUTE_AVARICE]],
   [BiomeId.SEA, [MysteryEncounterType.LOST_AT_SEA]],
   [BiomeId.SWAMP, [MysteryEncounterType.SAFARI_ZONE]],
@@ -211,7 +212,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.POWER_PLANT, []],
   [BiomeId.VOLCANO, [MysteryEncounterType.FIERY_FALLOUT, MysteryEncounterType.DANCING_LESSONS]],
   [BiomeId.GRAVEYARD, []],
-  [BiomeId.DOJO, []],
+  [BiomeId.DOJO, [MysteryEncounterType.COLOSSEUM]],
   [BiomeId.FACTORY, []],
   [BiomeId.RUINS, []],
   [BiomeId.WASTELAND, [MysteryEncounterType.DANCING_LESSONS]],

@@ -258,6 +258,20 @@ export class GameMode implements GameModeConfig {
           }
         }
       }
+      // ER (#439): the DOJO biome is trainer-DENSE - its "hall of fighters"
+      // identity. Every eligible non-boss / non-fixed wave is a trainer battle
+      // (on all difficulties; the trainers themselves still come from the normal
+      // per-difficulty pool, so Ace/Youngster stay vanilla-sourced). The World
+      // Tournament gauntlet is a SEPARATE special event (gated to Dojo+Metropolis),
+      // not this passive density.
+      if (
+        arena?.biomeId === BiomeId.DOJO
+        && allowTrainerBattle
+        && waveIndex % 30 !== (offsetGym ? 0 : 20)
+        && !this.isFixedBattle(waveIndex)
+      ) {
+        return true;
+      }
       // ER Elite/Hell: force a trainer on the difficulty cadence (in addition to
       // — not instead of — the normal biome trainer roll). Ace is untouched.
       //
