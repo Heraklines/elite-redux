@@ -26,7 +26,6 @@ import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
 import type { ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
-import { buildErQuizRound } from "#data/elite-redux/er-quiz";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import { setErDifficulty, setErDifficulty as setErDifficultyForScenario } from "#data/elite-redux/er-run-difficulty";
 import { erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
@@ -280,40 +279,6 @@ export const DEV_SCENARIOS: DevScenario[] = [
         p.hp = Math.max(1, Math.floor(p.getMaxHp() * 0.4));
         p.updateInfo();
       }
-    },
-  },
-  {
-    label: "ER Quiz engine: silhouette (#439)",
-    description:
-      "#439 biome overhaul - the Quiz/Minigame engine (compact panel, not full-\n"
-      + "screen). On turn 1 a 5-question 'Who's that Pokémon?' silhouette round opens.\n"
-      + "DO: each question shows a small card with a BLACK silhouette + 4 name choices;\n"
-      + "UP/DOWN to pick, ACTION to answer (CANCEL forfeits). It's press-your-luck:\n"
-      + "stops at your first wrong answer.\n"
-      + "EXPECT: correct -> 'Correct! It's X!'; wrong -> 'Wrong... it was X.' and the\n"
-      + "round ends. A final message reports your score. (Engine test harness; the\n"
-      + "real Town Guessing Booth / Professor events ride this same engine.)",
-    setup: () => {
-      resetDevOverrides();
-      setOverrides({
-        STARTING_LEVEL_OVERRIDE: 50,
-        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
-        ENEMY_LEVEL_OVERRIDE: 5,
-        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
-      });
-      return [makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH] })];
-    },
-    onBattleStart: () => {
-      const questions = buildErQuizRound("silhouette", 5);
-      globalScene.phaseManager.unshiftNew("ErQuizPhase", {
-        questions,
-        stopOnWrong: true,
-        onComplete: (result: { correct: number; answered: number; perfect: boolean }) => {
-          globalScene.phaseManager.queueMessage(
-            `Quiz over - ${result.correct}/${result.answered} correct${result.perfect ? " (perfect!)" : ""}.`,
-          );
-        },
-      });
     },
   },
   {

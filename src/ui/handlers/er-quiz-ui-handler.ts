@@ -78,6 +78,11 @@ export class ErQuizUiHandler extends UiHandler {
     this.container.setVisible(false);
     ui.add(this.container);
 
+    // Full-screen dim behind the card so the quiz reads as a clear modal popup
+    // over whatever scene is behind it (positioned to cover the canvas).
+    const dim = globalScene.add.rectangle(-px, -py, w, h, 0x000000, 0.6).setOrigin(0, 0);
+    this.container.add(dim);
+
     this.panel = addWindow(0, 0, PANEL_W, PANEL_H);
     this.container.add(this.panel);
 
@@ -160,6 +165,7 @@ export class ErQuizUiHandler extends UiHandler {
     this.cursor = 0;
     this.moveCursorTo(0);
     this.container.setVisible(true);
+    this.container.parentContainer?.bringToTop(this.container);
     this.active = true;
     return true;
   }
