@@ -256,6 +256,38 @@ async function sampleRunsFromServer(
   }
 }
 
+/**
+ * Fetch the "deadliest" ghost team(s) - the ones whose ghost trainers ended the
+ * most other players' runs - from the shared pool, ranked by kill count. Pass
+ * "any" to rank across all difficulties. Returns [] on any failure (offline /
+ * guest / sparse pool) so callers fall back to a strong waveReached ghost.
+ * Used for the ER Colosseum's climactic final challenger (#439).
+ */
+export async function fetchDeadliestGhosts(
+  difficulty: ErDifficulty | "any",
+  count = 1,
+  minWave = 0,
+): Promise<GhostTeamSnapshot[]> {
+  const base = serverBase();
+  const token = getCookie(sessionIdKey);
+  if (bypassLogin || !base || !token || typeof fetch !== "function") {
+    return [];
+  }
+  try {
+    const res = await fetch(
+      `${base}/savedata/run/deadliest?difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}`,
+      { method: "GET", headers: { Accept: "application/json", Authorization: token } },
+    );
+    if (!res.ok) {
+      return [];
+    }
+    const data = await res.json();
+    return (Array.isArray(data) ? data : (data?.teams ?? [])).filter(isValidSnapshot) as GhostTeamSnapshot[];
+  } catch {
+    return [];
+  }
+}
+
 function localStoreKey(): string {
   return `er-ghost-teams_${loggedInUser?.username ?? "guest"}`;
 }

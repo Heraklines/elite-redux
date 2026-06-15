@@ -725,6 +725,79 @@ async function handleRunSample(
   return json({ teams }, 200, cors);
 }
 
+/**
+ * The "deadliest" ghost team(s): the source runs whose ghost trainers dealt the
+ * killing blow to the most OTHER players' runs. Aggregates the kill columns
+ * (killed_by_ghost / ghost_source_run_id) written on every losing run, joins
+ * back to the source run, and returns its team as a ghost-team snapshot with a
+ * `kills` count. Used for the ER Colosseum's climactic final ghost. Optional
+ * `difficulty` filters by the SOURCE run's difficulty; `count` (default 1) and
+ * `minWave` mirror /sample.
+ */
+async function handleRunDeadliest(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const difficulty = url.searchParams.get("difficulty") ?? "";
+  const requested = Number.parseInt(url.searchParams.get("count") ?? "", 10);
+  const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 10) : 1;
+  const minWaveParsed = Number.parseInt(url.searchParams.get("minWave") ?? "", 10);
+  const minWave = Number.isFinite(minWaveParsed) ? Math.max(minWaveParsed, 0) : 0;
+
+  // Rank source runs by how many losing runs name them as the killer ghost.
+  // Join the kill rows (k) to the source run (r) to fetch its team; exclude the
+  // caller's own runs and honour the wave floor + optional difficulty filter.
+  const filterDifficulty = difficulty && difficulty !== "any";
+  const { results } = await env.DB.prepare(
+    `SELECT r.id, r.username, r.outcome, r.difficulty, r.wave, r.created_at, r.player_team,
+            r.opponent_name, r.opponent_team, COUNT(*) AS kills
+       FROM runs k
+       JOIN runs r ON r.id = k.ghost_source_run_id
+       WHERE k.killed_by_ghost = 1 AND k.ghost_source_run_id IS NOT NULL
+         AND r.user_id != ?1 AND r.wave >= ?2
+         ${filterDifficulty ? "AND r.difficulty = ?4" : ""}
+       GROUP BY k.ghost_source_run_id
+       ORDER BY kills DESC
+       LIMIT ?3`,
+  )
+    .bind(...(filterDifficulty ? [auth.uid, minWave, count, difficulty] : [auth.uid, minWave, count]))
+    .all<{
+      id: string;
+      username: string | null;
+      outcome: string | null;
+      difficulty: string | null;
+      wave: number | null;
+      created_at: number;
+      player_team: string;
+      opponent_name: string | null;
+      opponent_team: string | null;
+      kills: number;
+    }>();
+  const teams = (results ?? [])
+    .map(row => {
+      try {
+        return {
+          id: row.id,
+          trainerName: row.username ?? "Trainer",
+          difficulty: row.difficulty ?? difficulty,
+          waveReached: row.wave ?? 0,
+          isVictory: row.outcome === "victory",
+          timestamp: row.created_at,
+          kills: row.kills ?? 0,
+          party: JSON.parse(row.player_team),
+          opponentName: row.opponent_name ?? undefined,
+          opponentParty: row.opponent_team ? JSON.parse(row.opponent_team) : undefined,
+        };
+      } catch {
+        return null;
+      }
+    })
+    .filter(t => t !== null);
+  return json({ teams }, 200, cors);
+}
+
 // #endregion
 // #region dev test-suite progress (shared, staging only)
 
@@ -1038,6 +1111,9 @@ export default {
       }
       if (pathname === "/savedata/run/sample" && method === "GET") {
         return await handleRunSample(url, auth, env, cors);
+      }
+      if (pathname === "/savedata/run/deadliest" && method === "GET") {
+        return await handleRunDeadliest(url, auth, env, cors);
       }
 
       return text("Not found.", 404, cors);
