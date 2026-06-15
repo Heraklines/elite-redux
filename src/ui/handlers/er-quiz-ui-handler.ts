@@ -28,8 +28,10 @@ import { addWindow } from "#ui/ui-theme";
 export interface ErQuizView {
   /** Small caption above the figure/blurb (e.g. "Who's that Pokémon?"). */
   header: string;
-  /** Loaded sprite atlas key to render as a black silhouette (silhouette mode). */
-  spriteKey?: string | undefined;
+  /** Menu-icon atlas key + frame, rendered as a black silhouette (silhouette
+   * mode). Icons are preloaded at boot, so they never race the loader. */
+  iconAtlas?: string | undefined;
+  iconFrame?: string | undefined;
   /** Wrapped blurb shown instead of a silhouette (dex mode). */
   prompt?: string | undefined;
   /** Exactly four answer labels. */
@@ -139,14 +141,13 @@ export class ErQuizUiHandler extends UiHandler {
 
     this.headerText.setText(data.header ?? "");
 
-    // Silhouette OR blurb.
-    if (data.spriteKey && globalScene.textures.exists(data.spriteKey)) {
+    // Silhouette (menu icon, tinted flat black) OR blurb.
+    if (data.iconAtlas && globalScene.textures.exists(data.iconAtlas)) {
       this.promptText.setVisible(false);
-      const sil = globalScene.add.sprite(PANEL_W / 2, 42, data.spriteKey);
-      sil.setFrame(0);
+      const sil = globalScene.add.sprite(PANEL_W / 2, 40, data.iconAtlas, data.iconFrame);
       const fh = sil.height || 64;
       sil.setOrigin(0.5, 0.5);
-      sil.setScale(Math.min(1, 40 / fh));
+      sil.setScale(Math.min(1.6, 56 / fh));
       sil.setTintFill(0x101018);
       this.card.add(sil);
       this.transient.push(sil);

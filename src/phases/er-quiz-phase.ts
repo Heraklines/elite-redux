@@ -67,30 +67,15 @@ export class ErQuizPhase extends Phase {
 
   start(): void {
     super.start();
-    void this.run();
-  }
-
-  /**
-   * Preload EVERY silhouette species up front (the Colosseum pattern), then run
-   * the round. Loading per-question raced the shared Phaser loader: the first
-   * silhouette landed (loader idle at phase start) but later ones opened before
-   * their atlas finished and rendered blank. Batch-loading once, while the loader
-   * is idle, guarantees each question renders from a cached texture.
-   */
-  private async run(): Promise<void> {
-    await Promise.all(
-      this.questions
-        .filter(q => q.kind === "silhouette")
-        .map(q =>
-          getPokemonSpecies(q.answerId)
-            .loadAssets(false, undefined, false, undefined, true)
-            .catch(() => undefined),
-        ),
-    );
     void this.ask();
   }
 
-  /** Present the current question (its silhouette sprite is already loaded). */
+  /**
+   * Present the current question. The silhouette uses the species' menu ICON
+   * (atlas + frame), which is preloaded at boot (pokemon_icons_*), so there is
+   * no per-question atlas load - the earlier battle-sprite approach raced the
+   * shared Phaser loader and left silhouettes blank.
+   */
   private async ask(): Promise<void> {
     if (this.index >= this.questions.length) {
       this.finish();
@@ -98,10 +83,15 @@ export class ErQuizPhase extends Phase {
     }
     const q = this.questions[this.index];
 
-    let spriteKey: string | undefined;
+    let iconAtlas: string | undefined;
+    let iconFrame: string | undefined;
     if (q.kind === "silhouette") {
-      const key = getPokemonSpecies(q.answerId).getSpriteKey(false);
-      spriteKey = globalScene.textures.exists(key) ? key : undefined;
+      const species = getPokemonSpecies(q.answerId);
+      const atlas = species.getIconAtlasKey();
+      if (globalScene.textures.exists(atlas)) {
+        iconAtlas = atlas;
+        iconFrame = species.getIconId(false);
+      }
     }
 
     const view: ErQuizView = {
@@ -109,7 +99,8 @@ export class ErQuizPhase extends Phase {
         q.kind === "silhouette"
           ? `Who's that Pokémon?  (${this.index + 1}/${this.questions.length})`
           : `Whose entry is this?  (${this.index + 1}/${this.questions.length})`,
-      spriteKey,
+      iconAtlas,
+      iconFrame,
       prompt: q.kind === "dex" ? q.prompt : undefined,
       options: q.options.map(erQuizOptionName),
     };
