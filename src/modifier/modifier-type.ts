@@ -2156,6 +2156,8 @@ const modifierTypeInitObj = Object.freeze({
   // ER relics (#439 biome overhaul) - permanent team-wide buff items.
   ER_RELIC_FIELD_MEDIC: () => erRelicModifierType("fieldMedic"),
   ER_RELIC_WARM_INCUBATOR: () => erRelicModifierType("warmIncubator"),
+  ER_RELIC_COIN_PURSE: () => erRelicModifierType("coinPurse"),
+  ER_RELIC_MYSTERY_CHARM: () => erRelicModifierType("mysteryCharm"),
 
   /*REPEL: () => new DoubleBattleChanceBoosterModifierType('Repel', 5),
   SUPER_REPEL: () => new DoubleBattleChanceBoosterModifierType('Super Repel', 10),

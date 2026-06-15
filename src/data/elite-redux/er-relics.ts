@@ -30,7 +30,7 @@ import type { Pokemon } from "#field/pokemon";
 import { ErRelicModifier } from "#modifiers/modifier";
 import { toDmgValue } from "#utils/common";
 
-export type ErRelicKind = "fieldMedic" | "warmIncubator";
+export type ErRelicKind = "fieldMedic" | "warmIncubator" | "coinPurse" | "mysteryCharm";
 
 export interface ErRelicConfig {
   name: string;
@@ -39,8 +39,9 @@ export interface ErRelicConfig {
   icon: string;
   tint: number;
   maxStack: number;
-  /** Standalone er-assets texture key (PokeAPI sprite) for the bar icon. */
-  texture: string;
+  /** Standalone er-assets texture key (PokeAPI sprite) for the bar icon; omit to
+   * use the tinted items-atlas frame above. */
+  texture?: string;
 }
 
 export const ER_RELIC_CONFIG: Readonly<Record<ErRelicKind, ErRelicConfig>> = {
@@ -60,6 +61,20 @@ export const ER_RELIC_CONFIG: Readonly<Record<ErRelicKind, ErRelicConfig>> = {
     maxStack: 1,
     texture: "er_warm_incubator",
   },
+  coinPurse: {
+    name: "Coin Purse",
+    description: "You earn 20% more money from all sources.",
+    icon: "amulet_coin",
+    tint: 0xf8d030,
+    maxStack: 1,
+  },
+  mysteryCharm: {
+    name: "Mystery Charm",
+    description: "Mystery encounters appear more often while you hold this charm.",
+    icon: "healing_charm",
+    tint: 0xc080f8,
+    maxStack: 1,
+  },
 };
 
 /** Every relic kind, in display order (used by the type registry). */
@@ -70,6 +85,10 @@ const FIELD_MEDIC_TURN_CADENCE = 3;
 const FIELD_MEDIC_HEAL_DENOM = 12;
 /** Warm Incubator: extra hatch-wave progress per wave, per stack. */
 const WARM_INCUBATOR_WAVES_PER_STACK = 1;
+/** Coin Purse: percent money bonus per stack. */
+const COIN_PURSE_PERCENT_PER_STACK = 20;
+/** Mystery Charm: added ME spawn weight (out of 256) per stack. */
+const MYSTERY_CHARM_WEIGHT_PER_STACK = 40;
 
 /** Total stacks of the given relic the player currently holds (team-wide). */
 export function getErRelicStacks(kind: ErRelicKind): number {
@@ -118,4 +137,14 @@ export function erApplyFieldMedic(pokemon: Pokemon): void {
  */
 export function erWarmIncubatorBonus(): number {
   return getErRelicStacks("warmIncubator") * WARM_INCUBATOR_WAVES_PER_STACK;
+}
+
+/** Coin Purse (relic): percent money bonus applied to every money gain. */
+export function erCoinPurseBonusPercent(): number {
+  return getErRelicStacks("coinPurse") * COIN_PURSE_PERCENT_PER_STACK;
+}
+
+/** Mystery Charm (relic): added Mystery-Encounter spawn weight (out of 256). */
+export function erMysteryCharmWeightBonus(): number {
+  return getErRelicStacks("mysteryCharm") * MYSTERY_CHARM_WEIGHT_PER_STACK;
 }

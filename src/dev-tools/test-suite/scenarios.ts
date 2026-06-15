@@ -234,6 +234,25 @@ export const DEV_SCENARIOS: DevScenario[] = [
   // FEATURES — this session
   // ===========================================================================
   {
+    label: "ER Relics: Coin Purse + Mystery Charm (#439)",
+    description:
+      "#439 relics batch. You start holding COIN PURSE (gold amulet) + MYSTERY CHARM\n"
+      + "(purple charm) - both visible in the item bar.\n"
+      + "EXPECT: Coin Purse = +20% money from all sources (KO the Magikarp and watch the\n"
+      + "money reward); Mystery Charm = mystery encounters spawn more often (raises the\n"
+      + "natural ME weight - relic + description confirm it).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_COIN_PURSE" }, { name: "ER_RELIC_MYSTERY_CHARM" }],
+      });
+      return [makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE] })];
+    },
+  },
+  {
     label: "ER Relic: Field Medic (#439)",
     description:
       "#439 biome overhaul - Relic/Formation buff-item system, first relic.\n"

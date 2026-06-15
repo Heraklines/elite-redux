@@ -37,6 +37,7 @@ import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
 import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
+import { erCoinPurseBonusPercent, erMysteryCharmWeightBonus } from "#data/elite-redux/er-relics";
 import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { chromaKeyErSpriteTexture } from "#data/elite-redux/er-sprite-chroma-key";
 import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
@@ -3066,6 +3067,13 @@ export class BattleScene extends SceneBase {
   }
 
   addMoney(amount: number): void {
+    // ER relic (#439): Coin Purse boosts every money gain (not losses).
+    if (amount > 0) {
+      const purse = erCoinPurseBonusPercent();
+      if (purse > 0) {
+        amount = Math.floor(amount * (1 + purse / 100));
+      }
+    }
     this.money = Math.min(this.money + amount, Number.MAX_SAFE_INTEGER);
     this.updateMoneyText();
     this.animateMoneyChanged(true);
@@ -4122,7 +4130,8 @@ export class BattleScene extends SceneBase {
       sessionEncounterRate
       + Math.min(currentRunDiffFromAvg * ANTI_VARIANCE_WEIGHT_MODIFIER, MYSTERY_ENCOUNTER_SPAWN_MAX_WEIGHT / 2);
 
-    const successRate = Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE ?? favoredEncounterRate;
+    // ER relic (#439): the Mystery Charm raises the natural ME spawn weight.
+    const successRate = Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE ?? favoredEncounterRate + erMysteryCharmWeightBonus();
 
     let roll = 0;
     // Always rolls the check on the same offset to ensure no RNG changes from reloading session
