@@ -7,27 +7,23 @@
 // =============================================================================
 // ER Colosseum (#439) - a press-your-luck trainer gauntlet mystery encounter.
 //
-// You enter a dojo/arena and fight a 15-trainer ladder of rising threat (rookies
-// -> trained classes -> ace/veteran -> gym leaders -> dragon master -> Champion),
-// each TrainerType bringing its OWN sprite + curated team. After EACH win you
-// choose: CONTINUE (risk it for a higher reward GRADE) or CASH OUT (bank the
-// current grade and leave). The grade ramps one rung per round across
-// D, D+, C ... SS, SSS, SSS+, EX; clearing all 15 auto-awards EX. Survivors are
-// patched up to half HP between rounds (statuses are NOT cured); lose a battle
-// and the prize is gone.
-//
-// SKELETON (#439): the LOOP + the grade UI + reward GRANTING all work end-to-end.
-// Cash-out pays wave-scaled money and opens an ESCALATING GUARANTEED-RARITY shop:
-// every slot is locked to the banked grade's engine rarity (a full shop of
-// commons low, ramping to a full shop of MASTER-tier items by S..EX) with the
-// slot count growing too. Built on the Winstrate Challenge consecutive-battle
-// pattern (doContinueEncounter), with the choice surfaced through the bespoke
-// ColosseumUiHandler.
+// You enter a dojo/arena and fight a 15-round gauntlet ROLLED from the active
+// run's own difficulty pools (see colosseum-gauntlet.ts): normal trainers ->
+// real player GHOST teams -> boss trainers -> gym leaders -> strong/deadliest
+// ghosts -> a Champion. After EACH win you choose CONTINUE (risk it for a higher
+// reward GRADE) or CASH OUT (bank the current grade and leave). The grade ramps
+// one rung per round across D..EX; clearing all 15 auto-awards EX. Survivors are
+// patched to half HP between rounds (statuses are NOT cured); lose and the prize
+// is gone. Injected teams fight at FULL power (BST cap bypassed) re-levelled to
+// your strongest party member. Built on the Winstrate consecutive-battle pattern
+// (doContinueEncounter); the choice surfaces through the bespoke ColosseumUiHandler.
 // =============================================================================
 
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
+import { setErColosseumBattleActive } from "#data/elite-redux/er-trainer-runtime-hook";
+import { trainerConfigs } from "#data/trainers/trainer-config";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { BiomeId } from "#enums/biome-id";
 import { ModifierTier } from "#enums/modifier-tier";
@@ -35,10 +31,15 @@ import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { TextStyle } from "#enums/text-style";
-import { TrainerType } from "#enums/trainer-type";
+import { TrainerVariant } from "#enums/trainer-variant";
 import { getBiomeKey } from "#field/arena";
+import {
+  buildColosseumGauntlet,
+  type ColosseumChallenger,
+  colosseumRoundConfig,
+  MAX_ROUNDS,
+} from "#mystery-encounters/colosseum-gauntlet";
 import { showEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
-import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
   initBattleWithEnemyConfig,
   leaveEncounterWithoutBattle,
@@ -47,14 +48,14 @@ import {
 } from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
+import { colosseumHeadSprite } from "#ui/colosseum-ui-handler";
 import { addTextObject } from "#ui/text";
 import i18next from "i18next";
 
 /** The i18n namespace for the encounter. */
 const namespace = "mysteryEncounters/colosseum";
 
-/** Number of rounds in the gauntlet (one trainer + one tier rung per round). */
-export const MAX_ROUNDS = 15;
+export { MAX_ROUNDS };
 
 /**
  * Display tier ladder, lowest first - one rung per round, with "+" gradations and
@@ -86,64 +87,20 @@ const TIER_TO_MODIFIER: ModifierTier[] = [
   ModifierTier.MASTER, // EX
 ];
 
-/**
- * The trainer fought each round (1-indexed), in rising threat: rookies -> trained
- * classes -> ace/veteran -> gym leaders -> a dragon master -> the Champion. Each
- * TrainerType supplies its own battle sprite AND its curated team, so the roster
- * escalates in both look and difficulty. (Curated ghost-team rungs are a follow-up.)
- */
-const TRAINER_LADDER: TrainerType[] = [
-  TrainerType.YOUNGSTER, // 1
-  TrainerType.BUG_CATCHER, // 2
-  TrainerType.SCHOOL_KID, // 3
-  TrainerType.CYCLIST, // 4
-  TrainerType.HIKER, // 5
-  TrainerType.BLACK_BELT, // 6
-  TrainerType.RANGER, // 7
-  TrainerType.ACE_TRAINER, // 8
-  TrainerType.VETERAN, // 9
-  TrainerType.NORMAN, // 10 - gym leader
-  TrainerType.GIOVANNI, // 11 - gym leader
-  TrainerType.SABRINA, // 12 - gym leader
-  TrainerType.CLAIR, // 13 - gym leader
-  TrainerType.LANCE, // 14 - dragon master
-  TrainerType.CYNTHIA, // 15 - the Champion (final challenger)
-];
-
-/**
- * Human-readable challenger labels, parallel to TRAINER_LADDER, for the
- * tournament-bracket display on the between-rounds screen.
- */
-export const CHALLENGER_NAMES = [
-  "Youngster",
-  "Bug Catcher",
-  "School Kid",
-  "Cyclist",
-  "Hiker",
-  "Black Belt",
-  "Ranger",
-  "Ace Trainer",
-  "Veteran",
-  "Norman",
-  "Giovanni",
-  "Sabrina",
-  "Clair",
-  "Lance",
-  "Cynthia",
-];
-
 /** Cash-out reward-shop size for a display-tier index (0..14): 3 -> 8 slots. */
 function colosseumShopSize(tierIndex: number): number {
   return Math.min(3 + Math.floor(tierIndex / 2), 8);
 }
 
+/** The rolled gauntlet for the current encounter (stored on encounter.misc). */
+function getGauntlet(): ColosseumChallenger[] {
+  return (globalScene.currentBattle.mysteryEncounter?.misc?.gauntlet as ColosseumChallenger[]) ?? [];
+}
+
 /**
  * Make every gauntlet battle take place in the DOJO arena - a real, correctly
  * aligned PokeRogue battle background + bases, so the fights read as a tournament
- * venue instead of the random biome you spawned in. Pure visual swap (all biome
- * arena assets are preloaded), using the same primitives as Teleporting Hijinks.
- * (BW2's own PWT floor is a 3D model and its 2D battle fields don't map to
- * PokeRogue's layout, so the dojo arena is the clean fit - see #439.)
+ * venue. Pure visual swap (all biome arena assets are preloaded).
  */
 function applyColosseumArena(): void {
   const biome = BiomeId.DOJO;
@@ -153,19 +110,27 @@ function applyColosseumArena(): void {
   globalScene.arenaNextEnemy.setBiome(biome);
 }
 
+/** Load a challenger's trainer-class atlas so its portrait/sprite can render. */
+async function ensureTrainerSprite(challenger: ColosseumChallenger): Promise<void> {
+  try {
+    await trainerConfigs[challenger.trainerType]?.loadAssets(TrainerVariant.DEFAULT);
+  } catch {
+    /* portrait falls back to a silhouette if the atlas can't load */
+  }
+}
+
 /**
- * BW2 PWT-style "VS" splash shown before each gauntlet battle: "CHALLENGER N /
- * 15", a big VS, and the upcoming foe's name. A self-contained overlay that fades
- * in, holds ~1.3s, fades out, and resolves - no UiMode/phase ordering to fight.
+ * BW2 PWT-style "VS" splash before each battle: the gold crest, "CHALLENGER N /
+ * 15", a big VS, and the upcoming foe's class portrait + name. Self-contained
+ * overlay that fades in, holds ~1.3s, fades out, and resolves.
  */
-function showColosseumVs(round: number): Promise<void> {
+function showColosseumVs(round: number, challenger: ColosseumChallenger): Promise<void> {
   return new Promise(resolve => {
     const w = globalScene.scaledCanvas.width;
     const h = globalScene.scaledCanvas.height;
     const c = globalScene.add.container(0, 0);
     c.add(globalScene.add.rectangle(0, 0, w, h, 0x0a0e18, 1).setOrigin(0));
 
-    // Authentic gold PWT crest as the splash watermark (guarded against CDN miss).
     if (globalScene.textures.exists("er_pwt_crest")) {
       const crest = globalScene.add.image(w / 2, 6, "er_pwt_crest");
       crest.setOrigin(0.5, 0);
@@ -185,16 +150,13 @@ function showColosseumVs(round: number): Promise<void> {
     c.add(vs);
 
     // The upcoming challenger's class portrait (cropped head), large + centred.
-    if (globalScene.textures.exists("er_pwt_portraits")) {
-      const face = globalScene.add.sprite(w / 2, h / 2 + 6, "er_pwt_portraits", round - 1);
-      face.setOrigin(0.5, 0.5);
-      face.setScale(40 / 32);
+    const face = colosseumHeadSprite(challenger.spriteKey, 44);
+    if (face) {
+      face.setPosition(w / 2 - face.displayWidth / 2, h / 2 - 16);
       c.add(face);
     }
 
-    const foe = addTextObject(w / 2, h / 2 + 34, CHALLENGER_NAMES[round - 1] ?? "", TextStyle.WINDOW, {
-      fontSize: "64px",
-    });
+    const foe = addTextObject(w / 2, h / 2 + 34, challenger.name, TextStyle.WINDOW, { fontSize: "64px" });
     foe.setOrigin(0.5, 0);
     c.add(foe);
 
@@ -215,15 +177,25 @@ function showColosseumVs(round: number): Promise<void> {
   });
 }
 
-/** Build the enemy config for a given round (1..MAX_ROUNDS). */
-function getColosseumRoundConfig(round: number): EnemyPartyConfig {
-  const idx = Math.min(round, MAX_ROUNDS) - 1;
-  return {
-    trainerType: TRAINER_LADDER[idx],
-    // A modest per-round level bump on top of the wave-appropriate base level;
-    // the real difficulty ramp is the team QUALITY (gym leaders -> Champion).
-    levelAdditiveModifier: 1 + round * 0.5,
-  };
+/**
+ * Start one gauntlet battle: preload the challenger's sprite, show the VS splash,
+ * then init the battle with the BST cap bypassed (so curated boss/gym/champion/
+ * ghost teams fight at full power). The bypass flag is set ONLY around enemy
+ * construction (which happens synchronously inside initBattleWithEnemyConfig).
+ */
+async function startColosseumBattle(round: number): Promise<void> {
+  const challenger = getGauntlet()[round - 1];
+  if (!challenger) {
+    return;
+  }
+  await ensureTrainerSprite(challenger);
+  await showColosseumVs(round, challenger);
+  setErColosseumBattleActive(true);
+  try {
+    await initBattleWithEnemyConfig(colosseumRoundConfig(challenger));
+  } finally {
+    setErColosseumBattleActive(false);
+  }
 }
 
 export const ColosseumEncounter: MysteryEncounter = MysteryEncounterBuilder.withEncounterType(
@@ -254,7 +226,7 @@ export const ColosseumEncounter: MysteryEncounter = MysteryEncounterBuilder.with
   .withAutoHideIntroVisuals(false)
   .withOnInit(() => {
     const encounter = globalScene.currentBattle.mysteryEncounter!;
-    encounter.misc = { wins: 0 };
+    encounter.misc = { wins: 0, gauntlet: [] };
     return true;
   })
   .setLocalizationKey(`${namespace}`)
@@ -273,18 +245,15 @@ export const ColosseumEncounter: MysteryEncounter = MysteryEncounterBuilder.with
       ],
     },
     async () => {
-      // Enter the gauntlet. The Winstrate pattern: doContinueEncounter fires
-      // after every won battle (in MysteryEncounterRewardsPhase) so the encounter
-      // never ends until we explicitly clear the hook.
+      // Enter the gauntlet. Roll the per-mode lineup, then use the Winstrate
+      // pattern: doContinueEncounter fires after every won battle so the encounter
+      // never ends until we clear the hook. The CONTINUE / CASH OUT choice MUST be
+      // a real phase (not a setMode opened from inside this callback) - doing UI
+      // transitions from within the awaited rewards-phase callback raced the fade
+      // system and softlocked the next trainer's intro dialogue (#439).
       const encounter = globalScene.currentBattle.mysteryEncounter!;
-      encounter.misc = { wins: 0 };
-      // After EACH won battle, MysteryEncounterRewardsPhase calls this. We tally
-      // the win, patch up survivors, then EITHER auto-end (cleared all 15) OR
-      // hand the CONTINUE / CASH OUT choice to a dedicated ColosseumChoicePhase.
-      // The choice MUST be a real phase (not a setMode/setOverlayMode opened from
-      // inside this callback): doing UI transitions from within the awaited
-      // rewards-phase callback raced the fade system and softlocked the next
-      // trainer's intro dialogue (#439, diagnosed via Oracle).
+      const gauntlet = await buildColosseumGauntlet();
+      encounter.misc = { wins: 0, gauntlet };
       encounter.doContinueEncounter = async () => {
         const enc = globalScene.currentBattle.mysteryEncounter!;
         enc.misc.wins += 1;
@@ -297,8 +266,7 @@ export const ColosseumEncounter: MysteryEncounter = MysteryEncounterBuilder.with
       };
       await transitionMysteryEncounterIntroVisuals(true, false);
       applyColosseumArena();
-      await showColosseumVs(1);
-      await initBattleWithEnemyConfig(getColosseumRoundConfig(1));
+      await startColosseumBattle(1);
     },
   )
   .withSimpleOption(
@@ -325,7 +293,6 @@ export const ColosseumEncounter: MysteryEncounter = MysteryEncounterBuilder.with
  * ColosseumChoicePhase when the player picks CONTINUE.
  */
 export async function startNextColosseumBattle(round: number): Promise<void> {
-  await showColosseumVs(round);
   const playerField = globalScene.getPlayerField();
   for (const pokemon of playerField) {
     pokemon.lapseTag(BattlerTagType.COMMANDED);
@@ -334,20 +301,18 @@ export async function startNextColosseumBattle(round: number): Promise<void> {
 
   globalScene.arena.resetArenaEffects();
   for (const pokemon of globalScene.getPlayerParty()) {
-    // Each round is a fresh fight - clear per-battle activation state.
     pokemon.resetBattleAndWaveData();
     applyAbAttrs("PostBattleInitAbAttr", { pokemon });
   }
 
   globalScene.phaseManager.unshiftNew("ShowTrainerPhase");
   applyColosseumArena();
-  await initBattleWithEnemyConfig(getColosseumRoundConfig(round));
+  await startColosseumBattle(round);
 }
 
 /**
  * Heal each STILL-STANDING party member up to at least half HP (no status cure).
- * Fainted members stay down - that's the gauntlet's risk. (Reviving fainted mons
- * to half is a design-doc follow-up.)
+ * Fainted members stay down - that's the gauntlet's risk.
  */
 function halfHealSurvivors(): void {
   for (const pokemon of globalScene.getPlayerParty()) {
@@ -364,27 +329,26 @@ function halfHealSurvivors(): void {
 
 /**
  * End the gauntlet: clear the continue hook, pay out the money for the reached
- * tier, and open an ESCALATING GUARANTEED-RARITY reward shop - every slot is
- * locked to the banked tier's engine rarity (D = a full shop of commons, ramping
- * to a full shop of MASTER-tier items by S/SS/SSS/EX), with the slot count also
+ * tier, and open an ESCALATING GUARANTEED-RARITY reward shop - every slot locked
+ * to the banked tier's engine rarity (D = a full shop of commons, ramping to a
+ * full shop of MASTER-tier items by S/SS/SSS/EX), with the slot count also
  * growing the deeper you went. Then leave the encounter.
  */
 export async function endColosseum(reachedRound: number): Promise<void> {
   const encounter = globalScene.currentBattle.mysteryEncounter!;
   encounter.doContinueEncounter = undefined;
+  setErColosseumBattleActive(false);
 
   const tierIdx = Math.min(reachedRound, MAX_ROUNDS) - 1;
   const tierLabel = TIER_LADDER[tierIdx];
   const shopTier = TIER_TO_MODIFIER[tierIdx];
   const shopSize = colosseumShopSize(tierIdx);
 
-  // Money reward scales with how deep you went.
   const money = globalScene.getWaveMoneyAmount(1 + reachedRound);
   globalScene.addMoney(money);
 
   await showEncounterText(i18next.t(`${namespace}:reward`, { tier: tierLabel, money }));
 
-  // A full shop where EVERY slot is guaranteed at the banked tier's rarity.
   setEncounterRewards({
     guaranteedModifierTiers: new Array(shopSize).fill(shopTier),
     fillRemaining: false,

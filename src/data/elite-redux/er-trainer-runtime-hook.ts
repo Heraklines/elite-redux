@@ -844,6 +844,19 @@ function erEliteBstCapFor(wave: number, isBossWave: boolean, isHell: boolean): n
  * uses its own steeper {@linkcode er.hell.bstCaps} ladder (and keeps its early
  * legendaries - no pre-wave legend ban).
  */
+/**
+ * While true, the universal BST power gate is bypassed - used by the ER Colosseum
+ * gauntlet (#439) so its curated boss / gym / champion / ghost teams fight at
+ * full strength instead of being devolved to the wave ceiling. Set true only
+ * around Colosseum battle construction, cleared immediately after.
+ */
+let erColosseumBattleActive = false;
+
+/** Toggle the BST-cap bypass for ER Colosseum gauntlet battles (#439). */
+export function setErColosseumBattleActive(active: boolean): void {
+  erColosseumBattleActive = active;
+}
+
 export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
   try {
     // ER (#441): THE universal power gate. This used to be Elite-only and
@@ -858,7 +871,10 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
     const isHell = getErDifficulty() === "hell";
     // Daily runs are shared-seed curated content (set bosses incl. wave-50
     // legendaries) - gating them would silently rewrite everyone's daily.
-    if (globalScene.gameMode?.isDaily) {
+    // The ER Colosseum gauntlet (#439) is likewise curated content (real boss /
+    // gym / champion / ghost teams meant to fight at FULL power), so its battles
+    // bypass the BST cap while the flag is set.
+    if (globalScene.gameMode?.isDaily || erColosseumBattleActive) {
       return;
     }
     const wave = globalScene.currentBattle?.waveIndex ?? 0;

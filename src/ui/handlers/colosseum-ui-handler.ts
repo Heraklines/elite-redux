@@ -7,13 +7,15 @@
 // =============================================================================
 // ER Colosseum (#439) - the press-your-luck gauntlet standings board.
 //
-// Styled after the BW2 Pokemon World Tournament entry screen: a deep-navy
-// tournament board (NOT a battle photo) crowned by the AUTHENTIC PWT crest
-// (crown + shield + laurel wreath + star, ripped from the BW2 ROM and recoloured
-// gold), a "WORLD TOURNAMENT" wordmark, a framed two-column roster of all 15
-// entrants (cleared / next-up / upcoming), a gold champion crown over the final
-// challenger, the current reward GRADE, and CONTINUE / CASH OUT buttons.
-// Pure presentation + a 2-way callback; ColosseumChoicePhase owns the logic.
+// BW2 Pokemon World Tournament entry screen: a deep-navy board crowned by the
+// authentic gold PWT crest + "WORLD TOURNAMENT" wordmark, a framed two-column
+// roster of all 15 entrants, the reward GRADE, and CONTINUE / CASH OUT.
+//
+// The gauntlet is rolled per-mode and SECRET: only the challengers you've cleared
+// (and the one you face next) are revealed - a cropped trainer-class head + name
+// (ghosts show the source player's account name). Upcoming entrants are dark
+// silhouettes tagged only with their tier (Ghost / Boss / Gym / Champion). A gold
+// PWT trophy marks the final challenger. Pure presentation + a 2-way callback.
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
@@ -29,6 +31,18 @@ export const COLOSSEUM_CONTINUE = 0;
 /** Player chose to bank the current grade's reward and leave. */
 export const COLOSSEUM_CASH_OUT = 1;
 
+/** One row of the standings board. */
+export interface ColosseumChallengerView {
+  /** Display name (player name for ghosts); only meaningful when revealed. */
+  name: string;
+  /** Trainer-class atlas key for the portrait (loaded on demand by the phase). */
+  spriteKey: string;
+  /** Tier tag shown for unrevealed rows: "Normal" | "Ghost" | "Boss" | "Gym" | "Champion". */
+  tier: string;
+  /** Cleared or next-up -> portrait + name shown; else a silhouette + tier tag. */
+  revealed: boolean;
+}
+
 /** Data the encounter passes in to render the current state of the run. */
 export interface ColosseumViewData {
   /** Rounds won so far (1..totalRounds). */
@@ -39,8 +53,8 @@ export interface ColosseumViewData {
   tierLabel: string;
   /** Display grade you'd reach by winning the next round. */
   nextTierLabel: string;
-  /** Human labels for every challenger in the ladder (length === totalRounds). */
-  challengers: string[];
+  /** The full roster (length === totalRounds), revealed/secret per entry. */
+  challengers: ColosseumChallengerView[];
 }
 
 /** continue (0) / cash out (1). */
@@ -52,6 +66,28 @@ const TODO = 0x9098b0; // not yet faced
 const BOARD = 0x0b1838; // deep-navy tournament board base (BW2 PWT)
 const BOARD_TOP = 0x16284f; // lighter navy top band
 const PANEL = 0x122146; // column panels
+const SILHOUETTE = 0x05070e; // unrevealed portrait box
+
+/**
+ * A cropped trainer-class head from a loaded "trainer" atlas, scaled to a target
+ * on-screen height. Returns null if the atlas isn't loaded (caller shows a
+ * silhouette instead). Shared by the standings board + the VS splash.
+ */
+export function colosseumHeadSprite(spriteKey: string, displayH: number): Phaser.GameObjects.Sprite | null {
+  if (!spriteKey || !globalScene.textures.exists(spriteKey)) {
+    return null;
+  }
+  const s = globalScene.add.sprite(0, 0, spriteKey);
+  s.setFrame(0);
+  const fh = s.height || 64;
+  const fw = s.width || 64;
+  // Show the top slice of the standing pose (head + shoulders) and scale it up.
+  const frac = 0.52;
+  s.setOrigin(0, 0);
+  s.setCrop(0, 0, fw, Math.round(fh * frac));
+  s.setScale(displayH / (fh * frac));
+  return s;
+}
 
 export class ColosseumUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
@@ -61,14 +97,13 @@ export class ColosseumUiHandler extends UiHandler {
   private leftPanel: Phaser.GameObjects.Rectangle;
   private rightPanel: Phaser.GameObjects.Rectangle;
   private trophy: Phaser.GameObjects.Image | null = null;
-  private portraits: Phaser.GameObjects.Sprite[] = [];
   private crest: Phaser.GameObjects.Image;
   private wordmark: Phaser.GameObjects.Text;
   private statusText: Phaser.GameObjects.Text;
   private gradeWindow: Phaser.GameObjects.NineSlice;
   private gradeLabel: Phaser.GameObjects.Text;
   private gradeText: Phaser.GameObjects.Text;
-  private rosterRows: Phaser.GameObjects.Text[] = [];
+  private rosterRows: Phaser.GameObjects.GameObject[] = [];
   private buttons: { window: Phaser.GameObjects.NineSlice; label: Phaser.GameObjects.Text }[] = [];
   private cursorObj: Phaser.GameObjects.Rectangle;
 
@@ -88,8 +123,7 @@ export class ColosseumUiHandler extends UiHandler {
     this.container.setVisible(false);
     ui.add(this.container);
 
-    // Deep-navy tournament board (no battle photo) with a lighter top band +
-    // a framed border, the BW2 PWT look.
+    // Deep-navy tournament board with a lighter top band + a framed border.
     this.board = globalScene.add.rectangle(0, 0, w, h, BOARD, 1).setOrigin(0);
     this.container.add(this.board);
     this.boardTop = globalScene.add.rectangle(0, 0, w, 44, BOARD_TOP, 1).setOrigin(0);
@@ -98,20 +132,18 @@ export class ColosseumUiHandler extends UiHandler {
     this.container.add(this.frame);
 
     // The authentic gold PWT crest is the hero of the board, centred at the top.
-    // Guard against a first-load CDN miss so we never show the missing-texture box.
     if (globalScene.textures.exists("er_pwt_crest")) {
       this.crest = globalScene.add.image(w / 2, 3, "er_pwt_crest");
       this.crest.setOrigin(0.5, 0);
-      this.crest.setScale(26 / 123); // ripped crest is 112x123; render ~26px tall
+      this.crest.setScale(26 / 123);
       this.container.add(this.crest);
     }
 
-    // Gold PWT trophy emblem, parked off-screen until layoutRoster() places it
-    // beside the Champion. Guarded against a first-load CDN miss.
+    // Gold PWT trophy emblem, parked off-screen until layoutRoster() places it.
     if (globalScene.textures.exists("er_pwt_trophy")) {
       this.trophy = globalScene.add.image(0, 0, "er_pwt_trophy");
       this.trophy.setOrigin(0, 0);
-      this.trophy.setScale(12 / 62); // ripped trophy is 76x62; render ~12px tall
+      this.trophy.setScale(12 / 62);
       this.trophy.setVisible(false);
       this.container.add(this.trophy);
     }
@@ -149,7 +181,6 @@ export class ColosseumUiHandler extends UiHandler {
     this.container.add(this.rightPanel);
 
     this.rosterRows = [];
-    this.portraits = [];
 
     // Two buttons near the bottom.
     const btnW = 122;
@@ -204,19 +235,15 @@ export class ColosseumUiHandler extends UiHandler {
   }
 
   /**
-   * Draw the two-column entrant roster: a cropped trainer-class head portrait +
-   * name per row (cleared = gold/full colour, next-up = cyan, upcoming = dim),
-   * with the gold PWT trophy beside the final challenger (the Champion).
+   * Draw the two-column entrant roster. Revealed entries (cleared + next) show a
+   * cropped portrait + name; secret upcoming ones show a silhouette + tier tag.
+   * The gold trophy marks the final challenger (the Champion).
    */
   private layoutRoster(data: ColosseumViewData): void {
     for (const row of this.rosterRows) {
       row.destroy();
     }
-    for (const p of this.portraits) {
-      p.destroy();
-    }
     this.rosterRows = [];
-    this.portraits = [];
 
     const w = globalScene.scaledCanvas.width;
     const n = data.challengers.length;
@@ -224,8 +251,7 @@ export class ColosseumUiHandler extends UiHandler {
     const colX = [12, w / 2 + 10];
     const rowY0 = 48;
     const rowH = 12;
-    const PORTRAIT = 11; // on-screen px (texture cells are 32x32)
-    const havePortraits = globalScene.textures.exists("er_pwt_portraits");
+    const PORTRAIT = 11;
 
     for (let i = 0; i < n; i++) {
       const col = i < perCol ? 0 : 1;
@@ -233,32 +259,41 @@ export class ColosseumUiHandler extends UiHandler {
       const x = colX[col];
       const y = rowY0 + row * rowH;
 
+      const entry = data.challengers[i];
       const cleared = i < data.round;
       const isNext = i === data.round;
       const isChampion = i === n - 1;
+      const revealed = entry.revealed;
 
-      if (havePortraits) {
-        const p = globalScene.add.sprite(x, y, "er_pwt_portraits", i);
-        p.setOrigin(0, 0);
-        p.setScale(PORTRAIT / 32);
-        // Upcoming foes are dimmed; the ones you have cleared / face next pop.
-        if (!cleared && !isNext && !isChampion) {
-          p.setAlpha(0.45);
+      // Portrait (revealed) or silhouette (secret).
+      const head = revealed ? colosseumHeadSprite(entry.spriteKey, PORTRAIT) : null;
+      if (head) {
+        head.setPosition(x, y);
+        if (!cleared && !isNext) {
+          head.setAlpha(0.85);
         }
-        this.container.add(p);
-        this.portraits.push(p);
+        this.container.add(head);
+        this.rosterRows.push(head);
+      } else {
+        const sil = globalScene.add.rectangle(x, y, PORTRAIT, PORTRAIT, SILHOUETTE, 0.9).setOrigin(0, 0);
+        sil.setStrokeStyle(1, 0x2a3656);
+        this.container.add(sil);
+        this.rosterRows.push(sil);
+        const q = addTextObject(x + PORTRAIT / 2, y + 1, "?", TextStyle.WINDOW, { fontSize: "36px" });
+        q.setOrigin(0.5, 0);
+        q.setTint(TODO);
+        this.container.add(q);
+        this.rosterRows.push(q);
       }
 
-      const label = `${i + 1}. ${data.challengers[i]}`;
-      const t = addTextObject(x + (havePortraits ? 13 : 0), y + 2, label, TextStyle.WINDOW, { fontSize: "36px" });
+      const labelTxt = revealed ? entry.name : entry.tier;
+      const t = addTextObject(x + 13, y + 2, `${i + 1}. ${labelTxt}`, TextStyle.WINDOW, { fontSize: "36px" });
       t.setOrigin(0, 0);
       t.setTint(cleared || isChampion ? GOLD : isNext ? NEXT : TODO);
       t.setAlpha(cleared || isNext || isChampion ? 1 : 0.7);
       this.container.add(t);
       this.rosterRows.push(t);
 
-      // Gold PWT trophy beside the Champion (final challenger), tucked against
-      // the right panel's inner edge.
       if (isChampion && this.trophy) {
         this.trophy.setVisible(true);
         this.trophy.setPosition(w - 26, y - 1);
@@ -328,11 +363,7 @@ export class ColosseumUiHandler extends UiHandler {
     for (const row of this.rosterRows) {
       row.destroy();
     }
-    for (const p of this.portraits) {
-      p.destroy();
-    }
     this.rosterRows = [];
-    this.portraits = [];
     this.onChoice = null;
   }
 }

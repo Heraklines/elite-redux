@@ -165,6 +165,21 @@ function setOverrides(partial: Partial<MutableOverrides>): void {
 
 const MEGA_BRACELET: ModifierOverride = { name: "MEGA_BRACELET" };
 
+/** Shared strong trio for the ER Colosseum gauntlet scenarios (#439). */
+function colosseumTestParty(): Starter[] {
+  return [
+    makeStarter(SpeciesId.GARCHOMP, {
+      moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+    }),
+    makeStarter(SpeciesId.GARDEVOIR, {
+      moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.CALM_MIND],
+    }),
+    makeStarter(SpeciesId.METAGROSS, {
+      moveset: [MoveId.METEOR_MASH, MoveId.ZEN_HEADBUTT, MoveId.BULLET_PUNCH, MoveId.EARTHQUAKE],
+    }),
+  ];
+}
+
 // --- mid-combat helpers (use inside onBattleStart) --------------------------
 
 /** Set absolute stat stages on the active player Pokémon (e.g. [[Stat.ATK, 4]]). */
@@ -218,36 +233,69 @@ export const DEV_SCENARIOS: DevScenario[] = [
   // FEATURES — this session
   // ===========================================================================
   {
-    label: "Colosseum gauntlet (#439)",
+    label: "Colosseum gauntlet - ACE (vanilla) (#439)",
     description:
-      "#439 Colosseum - 15-trainer press-your-luck gauntlet (SKELETON).\n"
-      + "DO: on wave 12 the Colosseum encounter spawns. Pick 'Enter the Colosseum',\n"
-      + "win the battle, then on the screen choose CONTINUE or CASH OUT.\n"
-      + "EXPECT: a 15-round ladder of rising trainers (rookies -> gym leaders ->\n"
-      + "Champion), each with their OWN sprite + team. The arena UI shows the reward\n"
-      + "GRADE (D, D+, C ... SS, SSS, SSS+, EX) + a 15-segment progress bar. CONTINUE\n"
-      + "-> a harder challenger, grade climbs. CASH OUT -> money + a full reward shop\n"
-      + "locked to that grade's rarity (commons low, MASTER-tier at the top).\n"
-      + "Survivors are healed to half HP between rounds (status NOT cured).",
+      "#439 Colosseum - dynamic 15-round press-your-luck gauntlet, ACE mode.\n"
+      + "DO: on wave 12 the Colosseum spawns. Enter, win, then CONTINUE / CASH OUT.\n"
+      + "EXPECT (Ace = PURE VANILLA): challengers are rolled from VANILLA pools -\n"
+      + "rounds 1-4 normal trainers, 5-8 GHOSTS (real player teams, shown by the\n"
+      + "uploader's name; may be sparse so some fall back to gym trainers), 9-10\n"
+      + "bosses (Elite Four), 11-12 gym leaders, 13-14 strong ghosts, 15 a Champion.\n"
+      + "The standings board reveals only cleared + next challengers (portrait +\n"
+      + "name); upcoming ones are SILHOUETTES tagged Ghost/Boss/Gym/Champion. NO ER\n"
+      + "custom mons (pure vanilla). Grade D..EX; CASH OUT = money + grade-locked shop.",
     setup: () => {
       resetDevOverrides();
+      setErDifficulty("ace");
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 80,
         STARTING_WAVE_OVERRIDE: 12,
         MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
         MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.COLOSSEUM,
       });
-      return [
-        makeStarter(SpeciesId.GARCHOMP, {
-          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
-        }),
-        makeStarter(SpeciesId.GARDEVOIR, {
-          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.CALM_MIND],
-        }),
-        makeStarter(SpeciesId.METAGROSS, {
-          moveset: [MoveId.METEOR_MASH, MoveId.ZEN_HEADBUTT, MoveId.BULLET_PUNCH, MoveId.EARTHQUAKE],
-        }),
-      ];
+      return colosseumTestParty();
+    },
+  },
+  {
+    label: "Colosseum gauntlet - ELITE (#439)",
+    description:
+      "#439 Colosseum - dynamic gauntlet, ELITE mode (full ER).\n"
+      + "DO: enter on wave 12, fight through, watch the escalation.\n"
+      + "EXPECT: normal/boss/gym/champion rounds field REAL ER 'insane'-tier teams\n"
+      + "(not weak vanilla mons), ghosts are real Elite player teams (uploader names),\n"
+      + "round 14 is the 'deadliest' ghost when the kill-pool has one. Teams fight at\n"
+      + "FULL power (BST cap bypassed) re-levelled to your strongest mon. Silhouette\n"
+      + "board reveals only cleared + next. Champion (round 15) = a Champion sprite.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("elite");
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 110,
+        STARTING_WAVE_OVERRIDE: 12,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.COLOSSEUM,
+      });
+      return colosseumTestParty();
+    },
+  },
+  {
+    label: "Colosseum gauntlet - HELL (#439)",
+    description:
+      "#439 Colosseum - dynamic gauntlet, HELL mode (hardest pools).\n"
+      + "DO: enter on wave 12, push as deep as you can.\n"
+      + "EXPECT: ER 'hell'-tier rosters + Hell ghosts, brutal boss/gym/champion teams\n"
+      + "at full power re-levelled to your strongest mon; round 14 the deadliest ghost.\n"
+      + "Mystery silhouette board; grade climbs D..EX; CASH OUT banks the grade shop.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("hell");
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 130,
+        STARTING_WAVE_OVERRIDE: 12,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.COLOSSEUM,
+      });
+      return colosseumTestParty();
     },
   },
   // ===========================================================================

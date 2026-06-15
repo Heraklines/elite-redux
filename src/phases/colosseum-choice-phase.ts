@@ -7,27 +7,37 @@
 // =============================================================================
 // ER Colosseum (#439) - the between-rounds press-your-luck choice phase.
 //
-// A DEDICATED phase that owns the full-screen Colosseum choice UI (UiMode.
-// COLOSSEUM), modeled on BiomeShopPhase. The Colosseum mystery encounter
-// unshifts this after each won battle (instead of opening the UI from inside its
-// doContinueEncounter callback - doing that raced the UI fade system and
-// softlocked the next trainer's intro dialogue, #439). This phase IS the UI: it
-// opens the mode on start, and on the player's choice it either starts the next
-// gauntlet battle (CONTINUE) or runs the cash-out reward flow (CASH OUT), then
-// hands the UI back to MESSAGE and ends.
+// A DEDICATED phase that owns the full-screen Colosseum standings UI (UiMode.
+// COLOSSEUM), modeled on BiomeShopPhase. The Colosseum mystery encounter unshifts
+// this after each won battle (instead of opening the UI from inside its
+// doContinueEncounter callback - that raced the UI fade system and softlocked the
+// next trainer's intro dialogue, #439). It builds the standings view from the
+// rolled gauntlet (revealing only cleared + next challengers), preloads their
+// trainer-class portraits, opens the mode, and on the player's choice either
+// starts the next battle (CONTINUE) or runs the cash-out flow (CASH OUT).
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { trainerConfigs } from "#data/trainers/trainer-config";
+import { TrainerVariant } from "#enums/trainer-variant";
 import { UiMode } from "#enums/ui-mode";
 import {
-  CHALLENGER_NAMES,
   endColosseum,
   MAX_ROUNDS,
   startNextColosseumBattle,
   TIER_LADDER,
 } from "#mystery-encounters/colosseum-encounter";
-import { COLOSSEUM_CONTINUE, type ColosseumViewData } from "#ui/colosseum-ui-handler";
+import type { ColosseumChallenger } from "#mystery-encounters/colosseum-gauntlet";
+import { COLOSSEUM_CONTINUE, type ColosseumChallengerView, type ColosseumViewData } from "#ui/colosseum-ui-handler";
+
+const TIER_TAG: Record<ColosseumChallenger["tier"], string> = {
+  normal: "Normal",
+  ghost: "Ghost",
+  boss: "Boss",
+  gym: "Gym",
+  champion: "Champion",
+};
 
 export class ColosseumChoicePhase extends Phase {
   public readonly phaseName = "ColosseumChoicePhase";
@@ -44,12 +54,37 @@ export class ColosseumChoicePhase extends Phase {
 
   start(): void {
     super.start();
+    void this.open();
+  }
+
+  /** Preload the revealed challengers' portraits, then open the standings board. */
+  private async open(): Promise<void> {
+    const gauntlet = (globalScene.currentBattle.mysteryEncounter?.misc?.gauntlet as ColosseumChallenger[]) ?? [];
+
+    // Reveal cleared (index < wins) + the next-up challenger (index === wins).
+    const revealedTypes = new Set<number>();
+    for (let i = 0; i < gauntlet.length; i++) {
+      if (i <= this.wins) {
+        revealedTypes.add(gauntlet[i].trainerType);
+      }
+    }
+    await Promise.all(
+      [...revealedTypes].map(t => trainerConfigs[t]?.loadAssets(TrainerVariant.DEFAULT).catch(() => undefined)),
+    );
+
+    const challengers: ColosseumChallengerView[] = gauntlet.map((ch, i) => ({
+      name: ch.name,
+      spriteKey: ch.spriteKey,
+      tier: TIER_TAG[ch.tier],
+      revealed: i <= this.wins,
+    }));
+
     const data: ColosseumViewData = {
       round: this.wins,
       totalRounds: MAX_ROUNDS,
       tierLabel: TIER_LADDER[this.wins - 1],
       nextTierLabel: TIER_LADDER[Math.min(this.wins, MAX_ROUNDS - 1)],
-      challengers: CHALLENGER_NAMES,
+      challengers,
     };
     globalScene.ui.setMode(UiMode.COLOSSEUM, data, (choice: number) => this.onChoice(choice));
   }
@@ -66,8 +101,7 @@ export class ColosseumChoicePhase extends Phase {
       await endColosseum(this.wins);
     }
 
-    // Hand the UI back to a known mode before the next phase runs, then end -
-    // exactly like the encounter phases do on exit.
+    // Hand the UI back to a known mode before the next phase runs, then end.
     globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
   }
 }

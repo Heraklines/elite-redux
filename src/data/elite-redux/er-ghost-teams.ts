@@ -288,6 +288,33 @@ export async function fetchDeadliestGhosts(
   }
 }
 
+/**
+ * Sample legal ghost-team snapshots from the shared pool (server first, local
+ * fallback), de-duplicated. Not wave-gated like takeGhostForWave - for callers
+ * (e.g. the Colosseum gauntlet, #439) that want a batch of ghosts on demand and
+ * will filter / re-level them themselves. Empty on any failure.
+ */
+export async function sampleGhostSnapshots(
+  difficulty: ErDifficulty,
+  count = 8,
+  minWave = 0,
+): Promise<GhostTeamSnapshot[]> {
+  let pool = await sampleRunsFromServer(difficulty, count, minWave);
+  if (pool.length < count) {
+    const local = loadLocalGhostTeams().filter(s => !minWave || s.waveReached >= minWave);
+    pool = [...pool, ...local];
+  }
+  const seen = new Set<string>();
+  const out: GhostTeamSnapshot[] = [];
+  for (const s of pool) {
+    if (s && !seen.has(s.id) && isErGhostTeamLegal(s)) {
+      seen.add(s.id);
+      out.push(s);
+    }
+  }
+  return out;
+}
+
 function localStoreKey(): string {
   return `er-ghost-teams_${loggedInUser?.username ?? "guest"}`;
 }
