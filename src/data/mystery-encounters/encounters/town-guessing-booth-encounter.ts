@@ -16,6 +16,7 @@ import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import { buildErQuizRound } from "#data/elite-redux/er-quiz";
+import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
@@ -29,22 +30,34 @@ import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
 import type { ErQuizResult } from "#phases/er-quiz-phase";
-import type { ModifierTypeFunc } from "#types/modifier-types";
 
 const namespace = "mysteryEncounters/townGuessingBooth";
 
-/** Prize for naming `correct` silhouettes (early-Town cap = Ultra Ball). */
-function boothReward(correct: number): ModifierTypeFunc | undefined {
-  if (correct >= 5) {
-    return modifierTypes.ULTRA_BALL;
+/** A 4-question press-your-luck silhouette round. */
+const BOOTH_QUESTIONS = 4;
+/** How many reward options to offer at the chosen tier (player picks one). */
+const TIER_CHOICES = 3;
+
+/**
+ * Hand out the booth prize for `correct` consecutive silhouettes, then leave.
+ * A perfect round (all {@linkcode BOOTH_QUESTIONS}) earns the Professor-grade
+ * Damage Calculator unlock; otherwise the player CHOOSES one reward from a tier
+ * that scales with the streak. A cold 0 leaves with a heal (never a dead stop).
+ */
+function grantBoothReward(correct: number): void {
+  if (correct >= BOOTH_QUESTIONS) {
+    setEncounterRewards({ guaranteedModifierTypeFuncs: [modifierTypes.DAMAGE_CALCULATOR], fillRemaining: false });
+    leaveEncounterWithoutBattle(false);
+    return;
   }
-  if (correct >= 3) {
-    return modifierTypes.GREAT_BALL;
+  const tier =
+    correct >= 3 ? ModifierTier.ULTRA : correct === 2 ? ModifierTier.GREAT : correct === 1 ? ModifierTier.COMMON : null;
+  if (tier === null) {
+    leaveEncounterWithoutBattle(true);
+    return;
   }
-  if (correct >= 1) {
-    return modifierTypes.POKEBALL;
-  }
-  return;
+  setEncounterRewards({ guaranteedModifierTiers: new Array(TIER_CHOICES).fill(tier), fillRemaining: false });
+  leaveEncounterWithoutBattle(false);
 }
 
 export const TownGuessingBoothEncounter: MysteryEncounter = MysteryEncounterBuilder.withEncounterType(
@@ -78,20 +91,11 @@ export const TownGuessingBoothEncounter: MysteryEncounter = MysteryEncounterBuil
         updatePlayerMoney(-fee, true, false);
         await transitionMysteryEncounterIntroVisuals(true, false);
 
-        const questions = buildErQuizRound("silhouette", 5);
+        const questions = buildErQuizRound("silhouette", BOOTH_QUESTIONS);
         globalScene.phaseManager.unshiftNew("ErQuizPhase", {
           questions,
           stopOnWrong: true,
-          onComplete: (result: ErQuizResult) => {
-            const reward = boothReward(result.correct);
-            if (reward) {
-              setEncounterRewards({ guaranteedModifierTypeFuncs: [reward], fillRemaining: false });
-              leaveEncounterWithoutBattle(false);
-            } else {
-              // No prize - leave with a heal so a cold streak isn't a dead stop.
-              leaveEncounterWithoutBattle(true);
-            }
-          },
+          onComplete: (result: ErQuizResult) => grantBoothReward(result.correct),
         });
         return true;
       })

@@ -286,10 +286,11 @@ export const DEV_SCENARIOS: DevScenario[] = [
     description:
       "#439 - Town Guessing Booth mystery encounter (rides the Quiz engine).\n"
       + "DO: on wave 12 the booth spawns. Choose 'Play (pay the fee)'. A small card\n"
-      + "shows a black SILHOUETTE + 4 names; UP/DOWN + ACTION to answer.\n"
-      + "EXPECT: press-your-luck - each correct silhouette raises the prize (Poke ->\n"
-      + "Great -> Ultra Ball), one wrong answer ends it. The reward shop opens at the\n"
-      + "earned tier; 0 correct = a heal. 'Walk on by' just leaves.",
+      + "shows a black battle-sprite SILHOUETTE + 4 names; UP/DOWN + ACTION to answer.\n"
+      + "EXPECT: 4-question press-your-luck (one wrong answer ends it). Reward scales\n"
+      + "with consecutive correct: 4/4 -> Damage Calculator unlock; 3 -> choose 1 of 3\n"
+      + "ULTRA-tier rewards; 2 -> choose 1 of 3 GREAT-tier; 1 -> choose 1 of 3 COMMON;\n"
+      + "0 -> a heal. 'Walk on by' just leaves.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
