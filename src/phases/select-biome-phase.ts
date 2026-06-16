@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { allBiomes } from "#data/data-lists";
+import { consumeMapTravelTarget } from "#data/elite-redux/er-map-nodes";
 import { BiomeId } from "#enums/biome-id";
 import { ChallengeType } from "#enums/challenge-type";
 import { UiMode } from "#enums/ui-mode";
@@ -29,6 +30,16 @@ export class SelectBiomePhase extends BattlePhase {
       || (gameMode.hasShortBiomes && !(nextWaveIndex % 50))
     ) {
       this.setNextBiomeAndEnd(BiomeId.END);
+      return;
+    }
+
+    // ER (#486): a travel event (The Storm / Ultra Wormhole / Echo Chamber) may
+    // have set a destination from a revealed map node. Honor it for this single
+    // transition, ahead of the normal biome links - but never over the run finale
+    // (handled above, which returns before we consume the target).
+    const travelTarget = consumeMapTravelTarget();
+    if (travelTarget != null) {
+      this.setNextBiomeAndEnd(travelTarget);
       return;
     }
 
