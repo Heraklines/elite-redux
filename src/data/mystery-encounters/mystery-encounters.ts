@@ -36,6 +36,7 @@ import { TrainingSessionEncounter } from "#mystery-encounters/training-session-e
 import { TrashToTreasureEncounter } from "#mystery-encounters/trash-to-treasure-encounter";
 import { UncommonBreedEncounter } from "#mystery-encounters/uncommon-breed-encounter";
 import { WeirdDreamEncounter } from "#mystery-encounters/weird-dream-encounter";
+import { WoodlandForagerEncounter } from "#mystery-encounters/woodland-forager-encounter";
 import { getBiomeName } from "#utils/common";
 
 export const EXTREME_ENCOUNTER_BIOMES = [
@@ -200,7 +201,10 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.GRASS, [MysteryEncounterType.SLUMBERING_SNORLAX, MysteryEncounterType.ABSOLUTE_AVARICE]],
   [BiomeId.TALL_GRASS, [MysteryEncounterType.SLUMBERING_SNORLAX, MysteryEncounterType.ABSOLUTE_AVARICE]],
   [BiomeId.METROPOLIS, [MysteryEncounterType.COLOSSEUM]],
-  [BiomeId.FOREST, [MysteryEncounterType.SAFARI_ZONE, MysteryEncounterType.ABSOLUTE_AVARICE]],
+  [
+    BiomeId.FOREST,
+    [MysteryEncounterType.SAFARI_ZONE, MysteryEncounterType.ABSOLUTE_AVARICE, MysteryEncounterType.ER_WOODLAND_FORAGER],
+  ],
   [BiomeId.SEA, [MysteryEncounterType.LOST_AT_SEA]],
   [BiomeId.SWAMP, [MysteryEncounterType.SAFARI_ZONE]],
   [BiomeId.BEACH, []],
@@ -267,6 +271,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_GUESSING_BOOTH] = TownGuessingBoothEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_SCRAMBLED_POKEDEX] = ScrambledPokedexEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_GRAVES_OF_THE_FALLEN] = GravesOfTheFallenEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_WOODLAND_FORAGER] = WoodlandForagerEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

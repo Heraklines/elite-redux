@@ -39,6 +39,9 @@ export enum MysteryEncounterType {
   /** ER #439: Graves of the Fallen - a Graveyard grave of a real ghost-pool team;
    * pay respects for a memento, or disturb it for a level-scaled ghost battle. */
   ER_GRAVES_OF_THE_FALLEN,
+  /** ER #439: Woodland Forager - a Forest press-your-luck forage loop; bank the
+   * haul or push for more, risking a territorial Bug-swarm interrupt fight. */
+  ER_WOODLAND_FORAGER,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

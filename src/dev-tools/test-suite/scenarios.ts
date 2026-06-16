@@ -518,6 +518,35 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Forest: Woodland Forager (#439)",
+    description:
+      "#439 Forest press-your-luck FORAGE loop (Phase A3 substrate + first event).\n"
+      + "Forces ER_WOODLAND_FORAGER in the FOREST biome.\n"
+      + "DO: pick 'Forage the grove', then 'Forage on' to grow the haul (common -> rare\n"
+      + "berries, a Rogue ingredient deep in) while the BUST chance climbs each round;\n"
+      + "or 'Pack up and leave' to bank what you have.\n"
+      + "EXPECT: banking keeps the gathered berries (+ a Rogue-tier pick on a jackpot).\n"
+      + "Pushing into a bust scatters HALF the haul and spawns a level-scaled 2-mon Bug\n"
+      + "swarm; win keeps the rest. Round-0 leave = nothing, no cost. Never softlocks.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_BIOME_OVERRIDE: BiomeId.FOREST,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_WOODLAND_FORAGER,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.FIRE_FANG],
+        }),
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+      ];
+    },
+  },
+  {
     label: "World Tournament - ACE (vanilla) (#439)",
     description:
       "#439 Colosseum - dynamic 15-round press-your-luck gauntlet, ACE mode.\n"

@@ -1,0 +1,32 @@
+{
+  "intro": "The trail opens into a sun-dappled grove. Berry bushes crowd every clearing, heavy and ripe, and the air hums with the drone of something territorial deeper in the trees.",
+  "title": "Woodland Forager",
+  "description": "A berry-rich grove, ripe for the picking. Forage round by round for a growing haul, common berries giving way to rarer finds, but every push you make raises the chance a territorial swarm interrupts and forces a fight. Pack up early to keep the safe haul, or press your luck for more.",
+  "query": "Will you forage here?",
+  "option": {
+    "1": {
+      "label": "Forage the grove",
+      "tooltip": "(+) Gather a haul round by round\n(?) Each push raises the chance a swarm attacks",
+      "selected": "You step into the grove and start filling your pack..."
+    },
+    "2": {
+      "label": "Move on",
+      "tooltip": "(-) No haul",
+      "selected": "You leave the grove untouched and move on."
+    }
+  },
+  "foragePrompt": "Your pack holds {{berryCount}} berries{{ingredientNote}}. The droning is getting closer. Forage on, or pack up and leave?",
+  "forage": {
+    "push": {
+      "label": "Forage on",
+      "tooltip": "(+) Add to your haul, rarer finds the deeper you go\n(?) Higher chance the swarm interrupts"
+    },
+    "bank": {
+      "label": "Pack up and leave",
+      "tooltip": "(+) Keep everything you have gathered"
+    }
+  },
+  "foundBerry": "You tuck a fresh berry into your pack.",
+  "foundIngredient": "Tucked beneath the roots, you find a rare foraging ingredient!",
+  "swarmInterrupts": "The droning erupts into a roar! A territorial swarm bursts from the trees, scattering {{scattered}} of your berries as you scramble to defend yourself!"
+}
