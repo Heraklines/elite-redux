@@ -147,16 +147,16 @@ export class ErQuizUiHandler extends UiHandler {
     this.headerText.setText(data.header ?? "");
 
     // Footprint takes precedence: the player reads the actual track shape.
-    // Footprint sprites are small, single-colour (near-black) shapes on a
-    // transparent field, which would vanish on the dark card - so tint them a
-    // light "snow" ink for contrast, and blow them up to a readable size.
+    // The decomp footprints are 1-bit, no-alpha tiles - a black print on an
+    // OPAQUE white square - so they're shown AS-IS (a black track on a white
+    // "snow" tile). Do NOT tint: setTintFill would repaint every pixel and erase
+    // the print into a solid block. Just scale the 16px tile up to a readable size.
     if (data.footprintKey && globalScene.textures.exists(data.footprintKey)) {
       this.promptText.setVisible(false);
       const fp = globalScene.add.sprite(PANEL_W / 2, 42, data.footprintKey);
       const fh = fp.height || 16;
       fp.setOrigin(0.5, 0.5);
       fp.setScale(Math.max(1, Math.min(4, 44 / fh)));
-      fp.setTintFill(INK);
       this.card.add(fp);
       this.transient.push(fp);
     } else if (data.spriteKey && globalScene.textures.exists(data.spriteKey)) {
