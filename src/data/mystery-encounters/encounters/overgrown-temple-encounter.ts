@@ -32,13 +32,19 @@
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
-import { modifierTypes } from "#data/data-lists";
+import {
+  emptyMineralHaul,
+  type MineralLootHaul,
+  mineralHaulHasItems,
+  openMineralHaul,
+  rollMegaStone,
+  rollMineralFind,
+} from "#data/elite-redux/er-mineral-loot";
 import {
   type PressYourLuckConfig,
   resumePressYourLuck,
   startPressYourLuck,
 } from "#data/elite-redux/er-press-your-luck";
-import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
@@ -49,15 +55,13 @@ import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils
 import {
   initBattleWithEnemyConfig,
   leaveEncounterWithoutBattle,
-  setEncounterRewards,
   transitionMysteryEncounterIntroVisuals,
   updatePlayerMoney,
 } from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
-import type { ModifierTypeFunc } from "#types/modifier-types";
-import { randSeedInt, randSeedItem } from "#utils/common";
+import { randSeedItem } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 const namespace = "mysteryEncounters/overgrownTemple";
@@ -78,17 +82,12 @@ const WAKE_MAX = 0.8;
 
 /** Chamber (0-indexed step count) at and beyond which finds become antiquities. */
 const ANTIQUITY_CHAMBER = 2;
-/** Chamber at/after which each survived step has a small shot at the relic. */
-const RELIC_CHAMBER = 3;
-/** Chance per qualifying step to turn up the relic. */
-const RELIC_CHANCE = 0.2;
 /** Levels added to the guardian per prior wake (deeper = deadlier). */
 const GUARDIAN_LEVEL_PER_INTERRUPT = 6;
 /** After this many wakes the guardian becomes a BOSS. */
 const GUARDIAN_BOSS_AFTER_INTERRUPTS = 3;
-
-/** The relic's evo-item half (an early evolution-item source). */
-const RELIC_EVO_FUNC: ModifierTypeFunc = modifierTypes.RARE_EVOLUTION_ITEM;
+/** Percent chance per deep chamber to turn up a party-line mega stone (once/session). */
+const MEGA_STONE_CHANCE = 4;
 
 /** Thematic wild Grass/Rock guardians for the temple-wakes fight. */
 const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.CRADILY, SpeciesId.SUDOWOODO, SpeciesId.TORTERRA, SpeciesId.TANGROWTH];
@@ -97,14 +96,15 @@ const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.CRADILY, SpeciesId.SUDOWOODO, S
 interface DelveHaul {
   /** How many finds have been made (each pays its money at once). */
   finds: number;
-  /** Whether the relic has been found (an evolution-stone / Rogue shop pick). */
-  relic: boolean;
+  /** The item haul (themed plates/TMs/evo items + a rare party-line mega stone),
+   * cashed in as a reward shop on bank; lost if a party wipe ends the run first. */
+  loot: MineralLootHaul;
   /** How many temple-wakes have been survived (drives guardian escalation). */
   interrupts: number;
 }
 
 function defaultHaul(): DelveHaul {
-  return { finds: 0, relic: false, interrupts: 0 };
+  return { finds: 0, loot: emptyMineralHaul(), interrupts: 0 };
 }
 
 function getHaul(encounter: MysteryEncounter): DelveHaul {
@@ -131,39 +131,25 @@ async function delveChamber(encounter: MysteryEncounter, chamber: number): Promi
   updatePlayerMoney(chamber >= ANTIQUITY_CHAMBER ? ANTIQUITY_VALUE : TRIBUTE_VALUE, true, false);
   haul.finds += 1;
 
-  // Deep chambers can also turn up the relic (only once).
-  if (!haul.relic && chamber >= RELIC_CHAMBER && randSeedInt(10000) < Math.round(RELIC_CHANCE * 10000)) {
-    haul.relic = true;
-    setHaulTokens(encounter);
-    queueEncounterMessage(`${namespace}:foundRelic`);
-    return;
-  }
-
+  // Each chamber can also turn up an ITEM for the bank haul (deeper = better tier),
+  // and a deep chamber has a rare shot at a party-line mega stone.
+  const gotMega = rollMegaStone(haul.loot, chamber, MEGA_STONE_CHANCE);
+  const gotItem = rollMineralFind(haul.loot, chamber, "relic");
   setHaulTokens(encounter);
-  queueEncounterMessage(`${namespace}:foundTribute`);
+  if (gotMega) {
+    queueEncounterMessage(`${namespace}:foundMegaStone`);
+  } else if (gotItem) {
+    queueEncounterMessage(`${namespace}:foundRelic`);
+  } else {
+    queueEncounterMessage(`${namespace}:foundTribute`);
+  }
 }
 
 /** Refresh the {{findCount}} / {{relicNote}} dialogue tokens from the live haul. */
 function setHaulTokens(encounter: MysteryEncounter): void {
   const haul = getHaul(encounter);
   encounter.setDialogueToken("findCount", String(haul.finds));
-  encounter.setDialogueToken("relicNote", haul.relic ? " and an ancient relic" : "");
-}
-
-/**
- * Open the relic shop pick if the relic was found (a Rogue-tier item or an
- * evolution stone). Money is paid per chamber, so only the relic needs the reward
- * phase; no relic = no shop opened.
- */
-function awardRelic(relic: boolean): void {
-  if (relic) {
-    // Half the time an evolution stone, half the time a Rogue-tier pick.
-    if (randSeedInt(2) === 0) {
-      setEncounterRewards({ guaranteedModifierTypeFuncs: [RELIC_EVO_FUNC], fillRemaining: false });
-    } else {
-      setEncounterRewards({ guaranteedModifierTiers: [ModifierTier.ROGUE], fillRemaining: false });
-    }
-  }
+  encounter.setDialogueToken("relicNote", mineralHaulHasItems(haul.loot) ? " and a trove of relics" : "");
 }
 
 /** Enemy level for the guardian: the player's strongest mon, floored at the wave level. */
@@ -211,10 +197,14 @@ function delveConfig(encounter: MysteryEncounter): PressYourLuckConfig {
         leaveEncounterWithoutBattle(true);
         return;
       }
-      // Money was paid per chamber; only the relic shop is left.
-      awardRelic(haul.relic);
+      // Money was paid per chamber; cash in the item haul as a reward shop (if any).
+      const hasShop = openMineralHaul(haul.loot);
       await transitionMysteryEncounterIntroVisuals(true, true);
-      leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
+      if (hasShop) {
+        leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
+      } else {
+        leaveEncounterWithoutBattle(true);
+      }
     },
     onBust: async () => {
       const haul = getHaul(encounter);

@@ -34,13 +34,19 @@
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
-import { modifierTypes } from "#data/data-lists";
+import {
+  emptyMineralHaul,
+  type MineralLootHaul,
+  mineralHaulHasItems,
+  openMineralHaul,
+  rollMegaStone,
+  rollMineralFind,
+} from "#data/elite-redux/er-mineral-loot";
 import {
   type PressYourLuckConfig,
   resumePressYourLuck,
   startPressYourLuck,
 } from "#data/elite-redux/er-press-your-luck";
-import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
@@ -51,15 +57,13 @@ import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils
 import {
   initBattleWithEnemyConfig,
   leaveEncounterWithoutBattle,
-  setEncounterRewards,
   transitionMysteryEncounterIntroVisuals,
   updatePlayerMoney,
 } from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
-import type { ModifierTypeFunc } from "#types/modifier-types";
-import { randSeedInt, randSeedItem } from "#utils/common";
+import { randSeedItem } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 const namespace = "mysteryEncounters/glitteringVein";
@@ -80,18 +84,12 @@ const BUST_MAX = 0.8;
 
 /** Round (0-indexed strike count) at and beyond which the seam turns to fine gems. */
 const GEM_ROUND = 2;
-/** Round at/after which each surviving strike has a small shot at the jackpot. */
-const JACKPOT_ROUND = 3;
-/** Chance per qualifying strike to turn up the jackpot. */
-const JACKPOT_CHANCE = 0.2;
 /** Levels added to the guardian per prior cave-in (deeper = deadlier). */
 const GUARDIAN_LEVEL_PER_INTERRUPT = 6;
 /** After this many cave-ins the guardian becomes a BOSS. */
 const GUARDIAN_BOSS_AFTER_INTERRUPTS = 3;
-
-/** The two jackpot prizes (one is rolled when the jackpot hits): a Rogue-tier pick
- * or an evolution stone (an early evo-item source, mirroring the mega-stone idea). */
-const JACKPOT_EVO_FUNC: ModifierTypeFunc = modifierTypes.RARE_EVOLUTION_ITEM;
+/** Percent chance per deep strike to turn up a party-line mega stone (once/session). */
+const MEGA_STONE_CHANCE = 4;
 
 /** Thematic wild Rock/Ground guardians for the cave-in fight. */
 const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.ONIX, SpeciesId.GRAVELER, SpeciesId.RHYDON, SpeciesId.GIGALITH];
@@ -100,14 +98,15 @@ const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.ONIX, SpeciesId.GRAVELER, Speci
 interface MineHaul {
   /** How many ore/gem strikes have landed (each pays its money at once). */
   finds: number;
-  /** Whether the jackpot has been struck (an evolution-stone / Rogue shop pick). */
-  jackpot: boolean;
+  /** The item haul (themed gems/stones/vitamins/TMs + a rare party-line mega stone),
+   * cashed in as a reward shop on bank; lost if a party wipe ends the run first. */
+  loot: MineralLootHaul;
   /** How many cave-ins have been survived (drives guardian escalation). */
   interrupts: number;
 }
 
 function defaultHaul(): MineHaul {
-  return { finds: 0, jackpot: false, interrupts: 0 };
+  return { finds: 0, loot: emptyMineralHaul(), interrupts: 0 };
 }
 
 function getHaul(encounter: MysteryEncounter): MineHaul {
@@ -134,39 +133,28 @@ async function mineRound(encounter: MysteryEncounter, round: number): Promise<vo
   updatePlayerMoney(round >= GEM_ROUND ? GEM_VALUE : ORE_VALUE, true, false);
   haul.finds += 1;
 
-  // Deep strikes can also turn up the jackpot (only once).
-  if (!haul.jackpot && round >= JACKPOT_ROUND && randSeedInt(10000) < Math.round(JACKPOT_CHANCE * 10000)) {
-    haul.jackpot = true;
-    setHaulTokens(encounter);
-    queueEncounterMessage(`${namespace}:foundJackpot`);
-    return;
-  }
-
+  // Each strike can also turn up an ITEM for the bank haul (deeper = better tier),
+  // and a deep strike has a rare shot at a party-line mega stone.
+  const gotMega = rollMegaStone(haul.loot, round, MEGA_STONE_CHANCE);
+  const gotItem = rollMineralFind(haul.loot, round, "mineral");
   setHaulTokens(encounter);
-  queueEncounterMessage(`${namespace}:foundOre`);
+  if (gotMega) {
+    queueEncounterMessage(`${namespace}:foundMegaStone`);
+  } else if (gotItem) {
+    queueEncounterMessage(`${namespace}:foundTreasure`);
+  } else {
+    queueEncounterMessage(`${namespace}:foundOre`);
+  }
 }
 
 /** Refresh the {{oreCount}} / {{jackpotNote}} dialogue tokens from the live haul. */
 function setHaulTokens(encounter: MysteryEncounter): void {
   const haul = getHaul(encounter);
   encounter.setDialogueToken("oreCount", String(haul.finds));
-  encounter.setDialogueToken("jackpotNote", haul.jackpot ? " and a glittering treasure" : "");
-}
-
-/**
- * Open the jackpot shop pick if the jackpot was struck (a Rogue-tier item or an
- * evolution stone). Money is paid per strike, so only the jackpot needs the
- * reward phase; no jackpot = no shop opened.
- */
-function awardJackpot(jackpot: boolean): void {
-  if (jackpot) {
-    // Half the time an evolution stone, half the time a Rogue-tier pick.
-    if (randSeedInt(2) === 0) {
-      setEncounterRewards({ guaranteedModifierTypeFuncs: [JACKPOT_EVO_FUNC], fillRemaining: false });
-    } else {
-      setEncounterRewards({ guaranteedModifierTiers: [ModifierTier.ROGUE], fillRemaining: false });
-    }
-  }
+  encounter.setDialogueToken(
+    "jackpotNote",
+    mineralHaulHasItems(haul.loot) ? " and a glittering hoard of treasure" : "",
+  );
 }
 
 /** Enemy level for the guardian: the player's strongest mon, floored at the wave level. */
@@ -214,10 +202,14 @@ function mineConfig(encounter: MysteryEncounter): PressYourLuckConfig {
         leaveEncounterWithoutBattle(true);
         return;
       }
-      // Money was paid per strike; only the jackpot shop is left.
-      awardJackpot(haul.jackpot);
+      // Money was paid per strike; cash in the item haul as a reward shop (if any).
+      const hasShop = openMineralHaul(haul.loot);
       await transitionMysteryEncounterIntroVisuals(true, true);
-      leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
+      if (hasShop) {
+        leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
+      } else {
+        leaveEncounterWithoutBattle(true);
+      }
     },
     onBust: async () => {
       const haul = getHaul(encounter);
