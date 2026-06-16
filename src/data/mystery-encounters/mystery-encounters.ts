@@ -34,6 +34,7 @@ import { GravesOfTheFallenEncounter } from "#mystery-encounters/graves-of-the-fa
 import { HotSpringEncounter } from "#mystery-encounters/hot-spring-encounter";
 import { ImportBazaarEncounter } from "#mystery-encounters/import-bazaar-encounter";
 import { InformantEncounter } from "#mystery-encounters/informant-encounter";
+import { IntoTheCalderaEncounter } from "#mystery-encounters/into-the-caldera-encounter";
 import { LakeSpiritEncounter } from "#mystery-encounters/lake-spirit-encounter";
 import { LostAtSeaEncounter } from "#mystery-encounters/lost-at-sea-encounter";
 import { LostWandererEncounter } from "#mystery-encounters/lost-wanderer-encounter";
@@ -292,7 +293,14 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.ICE_CAVE, [MysteryEncounterType.ER_FROZEN_SHAPES]],
   [BiomeId.MEADOW, [MysteryEncounterType.ER_PICNIC]],
   [BiomeId.POWER_PLANT, [MysteryEncounterType.ER_OVERCHARGE_CORE]],
-  [BiomeId.VOLCANO, [MysteryEncounterType.FIERY_FALLOUT, MysteryEncounterType.DANCING_LESSONS]],
+  [
+    BiomeId.VOLCANO,
+    [
+      MysteryEncounterType.FIERY_FALLOUT,
+      MysteryEncounterType.DANCING_LESSONS,
+      MysteryEncounterType.ER_INTO_THE_CALDERA,
+    ],
+  ],
   [BiomeId.GRAVEYARD, [MysteryEncounterType.ER_GRAVES_OF_THE_FALLEN]],
   [BiomeId.DOJO, [MysteryEncounterType.COLOSSEUM]],
   [BiomeId.FACTORY, [MysteryEncounterType.ER_SALVAGE_YARD]],
@@ -398,6 +406,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_FORTUNE_TELLER] = FortuneTellerEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_THE_MIRAGE] = TheMirageEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_CLEANSING_FONT] = CleansingFontEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_INTO_THE_CALDERA] = IntoTheCalderaEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

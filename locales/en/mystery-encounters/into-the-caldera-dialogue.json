@@ -1,0 +1,32 @@
+{
+  "intro": "The ground splits open onto a glowing lava tube, heat hammering up from the dark. Molten veins of ore glitter far below, where something vast turns in its sleep.",
+  "title": "Into the Caldera",
+  "description": "A lava tube plunges into the heart of the volcano. Descend it for a growing money haul and, deep down, a chance at the Molten Core relic - but each descent scorches your non-Fire Pokemon, and every level risks waking a Fire guardian. Rise early to keep the safe haul, or dive deeper for more.",
+  "query": "How deep will you descend?",
+  "option": {
+    "1": {
+      "label": "Descend the tube",
+      "tooltip": "(+) Gather wealth level by level; deep dives can yield Molten Core\n(?) Each descent scorches non-Fire mons and risks an eruption",
+      "selected": "You pick your way down into the searing dark..."
+    },
+    "2": {
+      "label": "Stay at the rim",
+      "tooltip": "(-) No haul",
+      "selected": "You back away from the heat and move on."
+    }
+  },
+  "divePrompt": "You have gathered {{diveCount}} finds. The rock glows hotter the deeper you go. Descend further, or rise back to the rim with your haul?",
+  "dive": {
+    "push": {
+      "label": "Descend deeper",
+      "tooltip": "(+) Richer ore and a shot at the Molten Core\n(?) More heat, higher chance of an eruption"
+    },
+    "bank": {
+      "label": "Rise to the rim",
+      "tooltip": "(+) Keep everything you have gathered"
+    }
+  },
+  "foundMagma": "You chip glowing ore from the tube wall and pocket the money it fetches.",
+  "foundNothing": "This stretch is bare scorched rock. You find nothing of worth.",
+  "erupts": "The tube ROARS! A Fire guardian bursts from the magma - the money you have gathered is safe. Drive it off and you can keep descending!"
+}

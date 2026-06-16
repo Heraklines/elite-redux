@@ -158,6 +158,9 @@ export enum MysteryEncounterType {
   /** ER #515: The Cleansing Font - a Temple shrine; drink to lift a curse, or (no
    * curse) the clean water fully restores the party. */
   ER_CLEANSING_FONT,
+  /** ER #512: Into the Caldera - a Volcano press-your-luck delve; descend for money
+   * (heat-chipping non-Fire mons) past Fire guardians; deep banks can yield Molten Core. */
+  ER_INTO_THE_CALDERA,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

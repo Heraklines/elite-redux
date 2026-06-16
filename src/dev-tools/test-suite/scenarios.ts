@@ -580,6 +580,35 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Volcano: Into the Caldera (#512)",
+    description:
+      "#512 - Into the Caldera (Volcano press-your-luck delve). Forces\n"
+      + "ER_INTO_THE_CALDERA in VOLCANO.\n"
+      + "DO: 'Descend the tube', then 'Descend deeper' a few times; 'Rise to the rim'\n"
+      + "to bank.\n"
+      + "EXPECT: each descent pays money + scorches your NON-Fire mons ~1/16 max HP\n"
+      + "(the Magcargo lead is Fire, so it is spared; the Pidgey takes heat, never\n"
+      + "below 1 HP). Pushing raises the eruption chance -> a Fire guardian fight\n"
+      + "(BST climbs, boss after 3); win and the dive resumes, money kept. A DEEP\n"
+      + "bank can offer the Molten Core relic / Greater Golden Ball + high-tier picks.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.VOLCANO,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_INTO_THE_CALDERA,
+      });
+      return [
+        makeStarter(SpeciesId.MAGCARGO, {
+          moveset: [MoveId.LAVA_PLUME, MoveId.ROCK_SLIDE, MoveId.RECOVER, MoveId.SPLASH],
+        }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
     label: "ER Graveyard: Graves of the Fallen (#439)",
     description:
       "#439 Graveyard ME (rides the ghost-team substrate). Forces\n"
