@@ -1,0 +1,19 @@
+{
+  "intro": "A sealed glass bottle bobs in on the tide, a curl of paper visible inside.",
+  "title": "Message in a Bottle",
+  "description": "A weathered bottle holds a torn scrap of a treasure map and a hand-drawn chart of the surrounding waters. Open it to claim the fragment and mark the nearby routes, or leave it to drift.",
+  "query": "Open the bottle?",
+  "option": {
+    "1": {
+      "label": "Open the bottle",
+      "tooltip": "(+) Gain a Treasure-Map Fragment\n(+) Chart the onward routes onto your World Map",
+      "selected": "You uncork the bottle and unfold the brittle paper..."
+    },
+    "2": {
+      "label": "Leave it",
+      "tooltip": "(-) Leave the bottle on the tide",
+      "selected": "You let the bottle drift back out to sea."
+    }
+  },
+  "opened": "A Treasure-Map Fragment, and a chart of nearby places! They are added to your World Map. (Press M to view.)"
+}

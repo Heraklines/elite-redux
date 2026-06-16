@@ -32,6 +32,7 @@ import { HotSpringEncounter } from "#mystery-encounters/hot-spring-encounter";
 import { ImportBazaarEncounter } from "#mystery-encounters/import-bazaar-encounter";
 import { LakeSpiritEncounter } from "#mystery-encounters/lake-spirit-encounter";
 import { LostAtSeaEncounter } from "#mystery-encounters/lost-at-sea-encounter";
+import { MessageInABottleEncounter } from "#mystery-encounters/message-in-a-bottle-encounter";
 import { MushroomCircleEncounter } from "#mystery-encounters/mushroom-circle-encounter";
 import { MysteriousChallengersEncounter } from "#mystery-encounters/mysterious-challengers-encounter";
 import { MysteriousChestEncounter } from "#mystery-encounters/mysterious-chest-encounter";
@@ -62,6 +63,7 @@ import { TrashToTreasureEncounter } from "#mystery-encounters/trash-to-treasure-
 import { UncommonBreedEncounter } from "#mystery-encounters/uncommon-breed-encounter";
 import { WeirdDreamEncounter } from "#mystery-encounters/weird-dream-encounter";
 import { WoodlandForagerEncounter } from "#mystery-encounters/woodland-forager-encounter";
+import { XMarksTheSpotEncounter } from "#mystery-encounters/x-marks-the-spot-encounter";
 import { getBiomeName } from "#utils/common";
 
 export const EXTREME_ENCOUNTER_BIOMES = [
@@ -252,9 +254,16 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
     BiomeId.FOREST,
     [MysteryEncounterType.SAFARI_ZONE, MysteryEncounterType.ABSOLUTE_AVARICE, MysteryEncounterType.ER_WOODLAND_FORAGER],
   ],
-  [BiomeId.SEA, [MysteryEncounterType.LOST_AT_SEA, MysteryEncounterType.ER_EXOTIC_TRADER]],
+  [
+    BiomeId.SEA,
+    [
+      MysteryEncounterType.LOST_AT_SEA,
+      MysteryEncounterType.ER_EXOTIC_TRADER,
+      MysteryEncounterType.ER_MESSAGE_IN_A_BOTTLE,
+    ],
+  ],
   [BiomeId.SWAMP, [MysteryEncounterType.SAFARI_ZONE]],
-  [BiomeId.BEACH, [MysteryEncounterType.ER_TIDE_POOLS]],
+  [BiomeId.BEACH, [MysteryEncounterType.ER_TIDE_POOLS, MysteryEncounterType.ER_X_MARKS_THE_SPOT]],
   [BiomeId.LAKE, [MysteryEncounterType.ER_LAKE_SPIRIT, MysteryEncounterType.ER_STILL_WATERS]],
   [BiomeId.SEABED, [MysteryEncounterType.ER_ABYSSAL_VENT]],
   [BiomeId.MOUNTAIN, [MysteryEncounterType.ER_HOT_SPRING]],
@@ -344,6 +353,8 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_RUSTLING_GRASS] = RustlingGrassEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_DRAGONS_HOARD] = DragonsHoardEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_STILL_WATERS] = StillWatersEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_MESSAGE_IN_A_BOTTLE] = MessageInABottleEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_X_MARKS_THE_SPOT] = XMarksTheSpotEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

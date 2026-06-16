@@ -1,0 +1,26 @@
+{
+  "intro": "A weathered X is gouged deep into the wet sand, half-buried by the tide.",
+  "title": "X Marks the Spot",
+  "description": "Someone marked this spot long ago. With three Treasure-Map Fragments to piece the chart together, you could dig up whatever was buried here. Short of that, you might still scratch up a stray fragment.",
+  "query": "What will you do?",
+  "option": {
+    "1": {
+      "label": "Dig at the X",
+      "tooltip": "(+) With 3 Treasure-Map Fragments: dig up a buried cache of rewards\n(-) Spends the 3 fragments",
+      "selected": "You drive your shovel into the sand at the heart of the X..."
+    },
+    "2": {
+      "label": "Scratch around",
+      "tooltip": "(+) Turn up a single Treasure-Map Fragment",
+      "selected": "You sift through the loose sand around the marking..."
+    },
+    "3": {
+      "label": "Walk the shoreline",
+      "tooltip": "(-) Leave the spot undisturbed",
+      "selected": "You leave the X behind and walk on down the beach."
+    }
+  },
+  "dug": "The shovel strikes wood - a buried cache! You haul the treasure up onto the sand.",
+  "notEnough": "The chart is incomplete. You need three Treasure-Map Fragments to dig here.",
+  "scratched": "Half-buried in the sand: another Treasure-Map Fragment!"
+}

@@ -151,6 +151,8 @@ const DEV_OVERRIDE_DEFAULTS = {
   // encounter doesn't leak into the next run/scenario.
   MYSTERY_ENCOUNTER_OVERRIDE: null,
   MYSTERY_ENCOUNTER_RATE_OVERRIDE: null,
+  // ER #486: clear the Treasure-Map fragment seed so it never leaks between runs.
+  ER_TREASURE_FRAGMENTS_OVERRIDE: 0,
 } as const;
 
 /**
@@ -4170,6 +4172,52 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ]);
       addTreasureFragments(2);
       openErMapOverlay();
+    },
+  },
+  {
+    label: "ER #486: Message in a Bottle",
+    description:
+      "Phase D map event - a Sea bottle that grants a Treasure-Map fragment and\n"
+      + "charts nearby routes. Starts you with 2 fragments seeded.\n"
+      + "DO: on wave 12 (SEA) the bottle spawns. Choose 'Open the bottle'. Then press\n"
+      + "M to open the World Map.\n"
+      + "EXPECT: a message confirming a fragment + chart; the World Map now shows\n"
+      + "'Treasure-Map Fragments: 3 / 3' and lists the onward routes as [Route] nodes.\n"
+      + "(note) With 3 fragments, the Beach 'X Marks the Spot' dig now pays out.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.SEA,
+        ER_TREASURE_FRAGMENTS_OVERRIDE: 2,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_MESSAGE_IN_A_BOTTLE,
+      });
+      return [makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] })];
+    },
+  },
+  {
+    label: "ER #486: X Marks the Spot (dig)",
+    description:
+      "Phase D map payout - the Beach buried-cache event. Starts you with 3\n"
+      + "Treasure-Map fragments seeded (press M before choosing to confirm 3 / 3).\n"
+      + "DO: on wave 12 (BEACH) choose 'Dig at the X'.\n"
+      + "EXPECT: a 'buried cache' message, then a reward selection of solid items\n"
+      + "(Rogue / Ultra / Great tier). After taking the reward, press M: the fragment\n"
+      + "count is back to 0 / 3 (the three were spent). 'Scratch around' instead would\n"
+      + "add one fragment; 'Walk the shoreline' just leaves.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.BEACH,
+        ER_TREASURE_FRAGMENTS_OVERRIDE: 3,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_X_MARKS_THE_SPOT,
+      });
+      return [makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] })];
     },
   },
 ];

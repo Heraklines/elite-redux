@@ -117,6 +117,12 @@ export enum MysteryEncounterType {
   /** ER #439: Still Waters - a Lake mirror-match; a still lake reflects your team,
    * and the reflection steps out to fight (a clone of your current squad). */
   ER_STILL_WATERS,
+  /** ER #486: Message in a Bottle - a Sea/Beach event; a bottle washes up holding
+   * a Treasure-Map fragment and charts a nearby location onto the World Map. */
+  ER_MESSAGE_IN_A_BOTTLE,
+  /** ER #486: X Marks the Spot - a Beach event; with 3 Treasure-Map fragments in
+   * hand, dig up the buried cache for a guaranteed reward. */
+  ER_X_MARKS_THE_SPOT,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

@@ -215,6 +215,13 @@ class DefaultOverrides {
   readonly ER_BLACK_SHINY_PLAYER_OVERRIDE: SpeciesId | null = null;
   readonly ER_BLACK_SHINY_ENEMY_OVERRIDE: SpeciesId | null = null;
   /**
+   * ER (#486): seed the run with this many Treasure-Map fragments at run start
+   * (applied AFTER the per-run map reset, so it actually sticks). Dev/testing
+   * only - lets a scenario pre-stock fragments to test the "X Marks the Spot"
+   * payout without playing a whole run. `0` disables the override.
+   */
+  readonly ER_TREASURE_FRAGMENTS_OVERRIDE: number = 0;
+  /**
    * Overrides the IVs of player pokemon. Values must never be outside the range `0` to `31`!
    * - If set to a number between `0` and `31`, set all IVs of all player pokemon to that number.
    * - If set to an array, set the IVs of all player pokemon to that array. Array length must be exactly `6`!

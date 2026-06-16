@@ -148,6 +148,9 @@ export class ErMapUiHandler extends UiHandler {
     this.hintText.setOrigin(0.5, 0);
     this.hintText.setTint(DIM);
     this.card.add(this.hintText);
+
+    // Wire the global "M" opens-the-map hotkey (registered once).
+    installErMapHotkey();
   }
 
   show(args: any[]): boolean {
@@ -261,4 +264,35 @@ export class ErMapUiHandler extends UiHandler {
 /** Open the World Map overlay over the current screen. Optional close callback. */
 export function openErMapOverlay(onClose?: ErMapCloseCallback): void {
   globalScene.ui.setOverlayMode(UiMode.ER_MAP, onClose);
+}
+
+let mapHotkeyInstalled = false;
+
+/**
+ * Install the global "M" hotkey that opens the World Map during a run. Registered
+ * once (idempotent). Deliberately conservative: it only fires from the in-battle
+ * COMMAND screen (the "standing in the field" moment), never while typing in a
+ * text field, never outside a run, and never when an overlay is already open - so
+ * it can't stomp menus, forms, or the map itself.
+ */
+export function installErMapHotkey(): void {
+  if (mapHotkeyInstalled || typeof window === "undefined") {
+    return;
+  }
+  mapHotkeyInstalled = true;
+  window.addEventListener("keydown", (ev: KeyboardEvent) => {
+    if (ev.key !== "m" && ev.key !== "M") {
+      return;
+    }
+    // Ignore the key while a text field has focus (rename/search/password forms).
+    const tag = (ev.target as HTMLElement | null)?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA") {
+      return;
+    }
+    if (!globalScene?.currentBattle || globalScene.ui?.getMode() !== UiMode.COMMAND) {
+      return;
+    }
+    ev.preventDefault();
+    openErMapOverlay();
+  });
 }

@@ -21,7 +21,7 @@ import { Egg, getEggTierForSpecies, MAX_EGG_COUNT } from "#data/egg";
 import { matchesAbilityText } from "#data/elite-redux/er-ability-search";
 import { ER_BLACK_SHINY_TINT } from "#data/elite-redux/er-black-shinies";
 import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
-import { resetErMapNodes } from "#data/elite-redux/er-map-nodes";
+import { addTreasureFragments, resetErMapNodes } from "#data/elite-redux/er-map-nodes";
 import { resetErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { type ErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
@@ -5651,6 +5651,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               resetErRunTrainerTracking();
               resetErGhostRunState();
               resetErMapNodes();
+              // ER (#486): dev/testing seed - pre-stock Treasure-Map fragments
+              // AFTER the reset so a scenario can test the X-Marks-the-Spot payout.
+              if (Overrides.ER_TREASURE_FRAGMENTS_OVERRIDE > 0) {
+                addTreasureFragments(Overrides.ER_TREASURE_FRAGMENTS_OVERRIDE);
+              }
               resetErMoneyStreaks();
               globalScene.money = globalScene.gameMode.getStartingMoney();
               const starters = this.starters.slice(0);
