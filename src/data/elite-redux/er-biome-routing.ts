@@ -1,0 +1,160 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// ER #486 - World Map routing (Part III s11). Turns the fixed "pick from the
+// biome's hardcoded links" transition into a BRANCHING NODE GRAPH:
+//
+//   - The current biome's normal links are the BASE nodes.
+//   - On top of those, OTHER biomes can appear as unexpected adjacent nodes,
+//     each at a ~50% roll (capped), so "not every run has the same topography".
+//   - The biome you JUST came from is the ONLY exclusion - everything else is fair.
+//   - How many of the rolled nodes are actually REVEALED is gated by your Map
+//     Upgrade tier (the stacked, renamed old "Map" item). Base Map shows a
+//     subset; each upgrade reveals more.
+//
+// This module is the pure routing/data layer. SelectBiomePhase consumes
+// rollErNextBiomeNodes() to build the player's choice. It deliberately does NOT
+// touch wave counts or the run finale - biome BOUNDARIES still fall where the
+// engine already puts them; only the DESTINATION choice is reworked. Variable
+// biome length + the every-5 Crossroads are a separate, later slice.
+//
+// Run-scoped state (the previous biome) is serialized additively via game-data.
+// =============================================================================
+
+import { globalScene } from "#app/global-scene";
+import { allBiomes } from "#data/data-lists";
+import { BiomeId } from "#enums/biome-id";
+import { MapModifier } from "#modifiers/modifier";
+import { randSeedInt } from "#utils/common";
+
+/** Percent chance each candidate "unexpected" biome appears as an extra node. */
+const EXTRA_NODE_CHANCE = 50;
+/** Hard cap on how many extra (non-link) nodes a single transition can roll. */
+const MAX_EXTRA_NODES = 3;
+/** Visible nodes at Map Upgrade tier 0 (base Map). Each upgrade reveals +1. */
+const BASE_VISIBLE_NODES = 2;
+
+/**
+ * Whether the branching node graph drives biome transitions this run. Gated to
+ * classic, non-daily, non-random-biome runs - and, for now, to dev/staging
+ * builds (the same gate as the dev test suite) so it ships to the testing site
+ * for verification before it ever reaches a production run. Flip the dev gate
+ * once it is play-verified.
+ */
+export function erBiomeRoutingActive(): boolean {
+  const env = import.meta.env as unknown as { DEV?: boolean; VITE_DEV_TOOLS?: string };
+  const devBuild = !!env.DEV || env.VITE_DEV_TOOLS === "1";
+  const gm = globalScene?.gameMode;
+  return devBuild && !!gm && gm.isClassic && !gm.isDaily && !gm.hasRandomBiomes;
+}
+
+/** The biome the player travelled FROM into the current one (the only exclusion). */
+let prevBiome: BiomeId | null = null;
+
+/**
+ * Record a biome entry. Called from newArena on every biome change (and run
+ * start). `from` is the biome being left (null at run start).
+ */
+export function erRecordBiomeEntry(from: BiomeId | null): void {
+  prevBiome = from;
+}
+
+/** The biome the player just came from (excluded from the next node options). */
+export function getErPrevBiome(): BiomeId | null {
+  return prevBiome;
+}
+
+/** Clear routing state at the start of a new run (module state outlives a run). */
+export function resetErRouting(): void {
+  prevBiome = null;
+}
+
+/** Serialized previous-biome for the run save (additive; undefined when unset). */
+export function getErRoutingState(): number | undefined {
+  return prevBiome == null ? undefined : prevBiome;
+}
+
+/** Restore previous-biome from a loaded run save. */
+export function restoreErRouting(value: number | undefined): void {
+  prevBiome = value == null ? null : (value as BiomeId);
+}
+
+/** Total Map Upgrade tier = summed stacks of the (renamed) Map item held. */
+export function erMapUpgradeTier(): number {
+  return globalScene
+    .findModifiers(m => m instanceof MapModifier)
+    .reduce((sum, m) => sum + m.getStackCount(), 0);
+}
+
+/** Biomes that are never valid travel destinations on the graph. */
+const NON_TRAVEL_BIOMES: ReadonlySet<BiomeId> = new Set([BiomeId.TOWN, BiomeId.END]);
+
+/** Resolve the current biome's hardcoded links to concrete biome ids. */
+function baseLinks(current: BiomeId): BiomeId[] {
+  const links = allBiomes.get(current)?.biomeLinks ?? [];
+  return links
+    .filter(b => !Array.isArray(b) || !randSeedInt(b[1]))
+    .map(b => (Array.isArray(b) ? b[0] : b) as BiomeId);
+}
+
+/** A node on the routing graph: a destination biome + whether the player can see it. */
+export interface ErRouteNode {
+  biome: BiomeId;
+  /** True if revealed (selectable); false = hidden silhouette (needs more Map Upgrade). */
+  revealed: boolean;
+}
+
+/**
+ * Roll the branching next-biome node set for a transition out of `current`,
+ * having arrived from `prev`. Returns the nodes in display order with their
+ * reveal state already resolved against the player's Map Upgrade tier.
+ *
+ * Determinism: relies on the seeded RNG (randSeedInt), so a given transition is
+ * stable across save/reload like every other ER roll.
+ */
+export function rollErNextBiomeNodes(current: BiomeId, prev: BiomeId | null): ErRouteNode[] {
+  // Base = the biome's real links, minus the biome we just came from.
+  const chosen: BiomeId[] = [];
+  const seen = new Set<BiomeId>([current]);
+  if (prev != null) {
+    seen.add(prev);
+  }
+  for (const b of baseLinks(current)) {
+    if (!seen.has(b) && !NON_TRAVEL_BIOMES.has(b)) {
+      seen.add(b);
+      chosen.push(b);
+    }
+  }
+
+  // Extras: any OTHER real biome can show up unexpectedly, each at ~50%, capped.
+  let extras = 0;
+  for (const b of allBiomes.keys()) {
+    if (extras >= MAX_EXTRA_NODES) {
+      break;
+    }
+    if (seen.has(b) || NON_TRAVEL_BIOMES.has(b)) {
+      continue;
+    }
+    if (randSeedInt(100) < EXTRA_NODE_CHANCE) {
+      seen.add(b);
+      chosen.push(b);
+      extras++;
+    }
+  }
+
+  // Always offer at least one destination (fall back to a random link if the
+  // rolls somehow stripped everything but the excluded previous biome).
+  if (chosen.length === 0) {
+    const fallback = baseLinks(current).find(b => !NON_TRAVEL_BIOMES.has(b)) ?? BiomeId.PLAINS;
+    chosen.push(fallback);
+  }
+
+  // Visibility: base Map reveals BASE_VISIBLE_NODES; each Map Upgrade tier +1.
+  // The first node is always revealed so the player can never be soft-locked.
+  const visibleCount = Math.max(1, BASE_VISIBLE_NODES + erMapUpgradeTier());
+  return chosen.map((biome, i) => ({ biome, revealed: i < visibleCount }));
+}

@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { erRecordBiomeEntry } from "#data/elite-redux/er-biome-routing";
 import type { BiomeId } from "#enums/biome-id";
 import { getBiomeKey } from "#field/arena";
 import { BattlePhase } from "#phases/battle-phase";
@@ -19,6 +20,11 @@ export class SwitchBiomePhase extends BattlePhase {
     if (this.nextBiome === undefined) {
       return this.end();
     }
+
+    // ER (#486): record the biome we're leaving as the "previous" biome, so the
+    // World Map routing graph can exclude it from the NEXT transition's options.
+    // Only fires on real transitions (not run start / save load).
+    erRecordBiomeEntry(globalScene.arena?.biomeId ?? null);
 
     // Before switching biomes, make sure to set the last encounter for other phases that need it too.
     globalScene.lastEnemyTrainer = globalScene.currentBattle?.trainer ?? null;

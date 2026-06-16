@@ -19,6 +19,7 @@
 //   - TREASURE-MAP fragments: collect a threshold to unlock a guaranteed reward node
 // =============================================================================
 
+import { getErPrevBiome, resetErRouting, restoreErRouting } from "#data/elite-redux/er-biome-routing";
 import type { BiomeId } from "#enums/biome-id";
 
 /** What a revealed node represents. */
@@ -46,6 +47,7 @@ export function resetErMapNodes(): void {
   revealedNodes = [];
   travelTarget = null;
   fragmentCount = 0;
+  resetErRouting();
 }
 
 /**
@@ -123,6 +125,8 @@ export interface ErMapSaveData {
   nodes: ErMapNode[];
   travelTarget: BiomeId | null;
   fragments: number;
+  /** ER (#486) routing: the biome the player last came from (next-node exclusion). */
+  prevBiome?: number | null;
 }
 
 /** Snapshot the current map state for the session save (#486 increment 2). */
@@ -131,6 +135,7 @@ export function getErMapSaveData(): ErMapSaveData {
     nodes: revealedNodes.map(node => ({ ...node })),
     travelTarget,
     fragments: fragmentCount,
+    prevBiome: getErPrevBiome(),
   };
 }
 
@@ -158,4 +163,5 @@ export function restoreErMapState(data: ErMapSaveData | undefined | null): void 
   if (typeof data.fragments === "number" && data.fragments > 0) {
     fragmentCount = Math.floor(data.fragments);
   }
+  restoreErRouting(typeof data.prevBiome === "number" ? data.prevBiome : undefined);
 }

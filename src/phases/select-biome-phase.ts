@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { allBiomes } from "#data/data-lists";
+import { erBiomeRoutingActive, getErPrevBiome, rollErNextBiomeNodes } from "#data/elite-redux/er-biome-routing";
 import { consumeMapTravelTarget } from "#data/elite-redux/er-map-nodes";
 import { BiomeId } from "#enums/biome-id";
 import { ChallengeType } from "#enums/challenge-type";
@@ -40,6 +41,31 @@ export class SelectBiomePhase extends BattlePhase {
     const travelTarget = consumeMapTravelTarget();
     if (travelTarget != null) {
       this.setNextBiomeAndEnd(travelTarget);
+      return;
+    }
+
+    // ER (#486): the branching World Map graph. Build the next-biome node set
+    // (base links + 50%-rolled unexpected adjacents, minus the biome we came
+    // from, with reveal gated by Map Upgrade tier) and let the player choose.
+    if (erBiomeRoutingActive()) {
+      const nodes = rollErNextBiomeNodes(currentBiome, getErPrevBiome());
+      const revealed = nodes.filter(n => n.revealed);
+      if (revealed.length > 1) {
+        const items = revealed.map(
+          n =>
+            ({
+              label: getBiomeName(n.biome),
+              handler: () => {
+                globalScene.ui.setMode(UiMode.MESSAGE);
+                this.setNextBiomeAndEnd(n.biome);
+                return true;
+              },
+            }) satisfies OptionSelectItem as OptionSelectItem,
+        );
+        globalScene.ui.setMode(UiMode.OPTION_SELECT, { options: items, delay: 1000 });
+      } else {
+        this.setNextBiomeAndEnd(revealed[0].biome);
+      }
       return;
     }
 
