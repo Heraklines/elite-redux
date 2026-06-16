@@ -1448,6 +1448,13 @@ export class BattleScene extends SceneBase {
     if (erBiomeRoutingActive()) {
       const erEnd = erIsBiomeEnd(currentBattle.waveIndex);
       if (erEnd !== null) {
+        // Don't end the biome right before a SCRIPTED fixed battle (rival / evil
+        // boss / fixed wave-5): a biome-select prompt landing in front of a
+        // scripted fighter is awkward. Defer the end one wave so the fight happens
+        // first, in its intended biome.
+        if (erEnd && this.gameMode.isFixedBattle(currentBattle.waveIndex + 1)) {
+          return false;
+        }
         return erEnd;
       }
     }

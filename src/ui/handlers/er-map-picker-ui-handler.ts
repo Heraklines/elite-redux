@@ -41,6 +41,12 @@ const INK = 0xe8ecf8;
 const DIM = 0x90a0c0;
 const LINE = 0x6878a0;
 const LINE_SEL = 0xf8d030;
+// Source colours for REVEALED nodes (hidden "???" nodes always render dim):
+//   base -> GOLD/INK (the defaults above), upgrade -> green, event -> blue.
+const NODE_UPGRADE = 0x78c850;
+const NODE_UPGRADE_LBL = 0xbfe9a0;
+const NODE_EVENT = 0x6890f0;
+const NODE_EVENT_LBL = 0xa9c7f8;
 
 /** Vertical span the destination column is laid out within. */
 const NODE_COL_X = PANEL_W - 78;
@@ -56,6 +62,9 @@ export class ErMapPickerUiHandler extends UiHandler {
   private originText: Phaser.GameObjects.Text;
   private originDot: Phaser.GameObjects.Arc;
   private hintText: Phaser.GameObjects.Text;
+  /** Colour-key labels, shown only when an upgrade / event node is on the board. */
+  private legendUpgrade: Phaser.GameObjects.Text;
+  private legendEvent: Phaser.GameObjects.Text;
   /** Base route lines (drawn once per node set). */
   private graphics: Phaser.GameObjects.Graphics;
   /** The single highlighted (selected) route line, redrawn on cursor move. */
@@ -138,6 +147,19 @@ export class ErMapPickerUiHandler extends UiHandler {
     this.hintText.setOrigin(0.5, 0);
     this.hintText.setTint(DIM);
     this.card.add(this.hintText);
+
+    // Colour key (only shown when an upgrade / event route is on the board).
+    this.legendUpgrade = addTextObject(56, PANEL_H - 26, "Map Upgrade", TextStyle.WINDOW, { fontSize: "34px" });
+    this.legendUpgrade.setOrigin(0, 0);
+    this.legendUpgrade.setTint(NODE_UPGRADE);
+    this.legendUpgrade.setVisible(false);
+    this.card.add(this.legendUpgrade);
+
+    this.legendEvent = addTextObject(150, PANEL_H - 26, "Event route", TextStyle.WINDOW, { fontSize: "34px" });
+    this.legendEvent.setOrigin(0, 0);
+    this.legendEvent.setTint(NODE_EVENT);
+    this.legendEvent.setVisible(false);
+    this.card.add(this.legendEvent);
   }
 
   show(args: any[]): boolean {
@@ -157,6 +179,10 @@ export class ErMapPickerUiHandler extends UiHandler {
     this.selectable = this.nodes.map((n, i) => (n.revealed ? i : -1)).filter(i => i >= 0);
 
     this.layoutNodes();
+
+    // Colour-key legend: show each entry only when such a revealed node exists.
+    this.legendUpgrade.setVisible(this.nodes.some(n => n.revealed && (n.source ?? "base") === "upgrade"));
+    this.legendEvent.setVisible(this.nodes.some(n => n.revealed && (n.source ?? "base") === "event"));
 
     // Start the cursor on the first selectable node.
     this.cursor = 0;
@@ -196,15 +222,40 @@ export class ErMapPickerUiHandler extends UiHandler {
     }
   }
 
-  /** Draw a single node's base route line, dot and label. */
+  /** Draw a single node's base route line, dot and label. Revealed nodes are
+   * coloured by SOURCE (base gold / upgrade green / event blue); hidden nodes stay
+   * dim "???" regardless of source (the maintainer confirmed the dim look is right). */
   private drawNode(node: ErRouteNode, y: number): void {
-    this.graphics.lineStyle(1, LINE, node.revealed ? 0.9 : 0.4);
+    const source = node.source ?? "base";
+    const dotColor = node.revealed
+      ? source === "upgrade"
+        ? NODE_UPGRADE
+        : source === "event"
+          ? NODE_EVENT
+          : GOLD
+      : DIM;
+    const labelColor = node.revealed
+      ? source === "upgrade"
+        ? NODE_UPGRADE_LBL
+        : source === "event"
+          ? NODE_EVENT_LBL
+          : INK
+      : DIM;
+    const lineColor = node.revealed
+      ? source === "upgrade"
+        ? NODE_UPGRADE
+        : source === "event"
+          ? NODE_EVENT
+          : LINE
+      : LINE;
+
+    this.graphics.lineStyle(1, lineColor, node.revealed ? 0.9 : 0.4);
     this.graphics.beginPath();
     this.graphics.moveTo(ORIGIN_X + 4, ErMapPickerUiHandler.ORIGIN_Y);
     this.graphics.lineTo(NODE_COL_X - 6, y);
     this.graphics.strokePath();
 
-    const dot = globalScene.add.circle(NODE_COL_X, y, 4, node.revealed ? GOLD : DIM);
+    const dot = globalScene.add.circle(NODE_COL_X, y, 4, dotColor);
     dot.setAlpha(node.revealed ? 1 : 0.6);
     this.card.add(dot);
     this.nodeDots.push(dot);
@@ -219,7 +270,7 @@ export class ErMapPickerUiHandler extends UiHandler {
       },
     );
     label.setOrigin(0, 0);
-    label.setTint(node.revealed ? INK : DIM);
+    label.setTint(labelColor);
     label.setAlpha(node.revealed ? 1 : 0.6);
     this.card.add(label);
     this.nodeTexts.push(label);

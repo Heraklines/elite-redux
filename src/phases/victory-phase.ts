@@ -158,7 +158,11 @@ export class VictoryPhase extends PokemonPhase {
 
         if (gameMode.hasRandomBiomes || biomeEnding) {
           globalScene.phaseManager.pushNew("SelectBiomePhase");
-        } else if (erRouting && erShouldRaiseCrossroads(currentWaveIndex)) {
+        } else if (
+          erRouting
+          && erShouldRaiseCrossroads(currentWaveIndex)
+          && !gameMode.isFixedBattle(currentWaveIndex + 1)
+        ) {
           // ER (#486): not a biome end, but a 5-wave Crossroads tick - raise the
           // "Stay / Move on" choice AFTER the reward and BEFORE the next battle.
           globalScene.phaseManager.pushNew("ErCrossroadsPhase");

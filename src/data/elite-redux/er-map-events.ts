@@ -13,6 +13,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { allBiomes } from "#data/data-lists";
+import { addErEventRevealedNode } from "#data/elite-redux/er-biome-routing";
 import { type ErMapNode, revealMapNodes, setMapTravelTarget } from "#data/elite-redux/er-map-nodes";
 import type { BiomeId } from "#enums/biome-id";
 import { getBiomeName, randSeedItem } from "#utils/common";
@@ -37,9 +38,12 @@ export function chartOnwardRoutes(extra: ErMapNode[] = []): number {
   return revealMapNodes([...routes, ...extra]);
 }
 
-/** Reveal a single landmark node onto the map. */
+/** Reveal a single landmark node onto the map. Also surfaces it as a selectable
+ * BLUE event route in the next biome picker (so an event-revealed place is an
+ * actual onward choice, colour-coded by its source). */
 export function revealLandmark(biome: BiomeId, label: string): void {
   revealMapNodes([{ biome, label, kind: "landmark" }]);
+  addErEventRevealedNode(biome);
 }
 
 /**

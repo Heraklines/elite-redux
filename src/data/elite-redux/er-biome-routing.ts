@@ -61,6 +61,8 @@ let prevBiome: BiomeId | null = null;
  */
 export function erRecordBiomeEntry(from: BiomeId | null): void {
   prevBiome = from;
+  // Event-revealed routes are per-biome: clear them as we enter the new biome.
+  eventRevealedBiomes = [];
 }
 
 /** The biome the player just came from (excluded from the next node options). */
@@ -86,10 +88,32 @@ export function getErPendingNodes(): ErRouteNode[] {
   return pendingNodes;
 }
 
+/**
+ * Biomes a mystery event has revealed as onward routes for the CURRENT biome's
+ * exit (rendered blue + selectable in the route picker). Reset on every biome
+ * entry - an event reveal is only good for the next hop.
+ */
+let eventRevealedBiomes: BiomeId[] = [];
+
+/**
+ * Mark `biome` as a mystery-event-revealed onward route: it renders blue and
+ * selectable in the next route picker. De-duped; also lights up the already-built
+ * pending node set so a reveal mid-biome shows up immediately.
+ */
+export function addErEventRevealedNode(biome: BiomeId): void {
+  if (!eventRevealedBiomes.includes(biome)) {
+    eventRevealedBiomes.push(biome);
+  }
+  if (pendingNodes.length > 0 && !pendingNodes.some(n => n.biome === biome)) {
+    pendingNodes.push({ biome, revealed: true, source: "event" });
+  }
+}
+
 /** Clear routing state at the start of a new run (module state outlives a run). */
 export function resetErRouting(): void {
   prevBiome = null;
   pendingNodes = [];
+  eventRevealedBiomes = [];
 }
 
 /** Serialized previous-biome for the run save (additive; undefined when unset). */
@@ -120,11 +144,22 @@ function baseLinks(current: BiomeId): BiomeId[] {
     .map(b => (Array.isArray(b) ? b[0] : b) as BiomeId);
 }
 
+/**
+ * Why a REVEALED node is on the graph - drives the map picker's node colour:
+ *   base    = your normal routes (shown by the base Map)  -> default gold
+ *   upgrade = an extra route a Map Upgrade tier revealed  -> green
+ *   event   = a route a mystery event surfaced            -> blue
+ * Hidden ("???") nodes have no meaningful source - they always render dim.
+ */
+export type ErNodeSource = "base" | "upgrade" | "event";
+
 /** A node on the routing graph: a destination biome + whether the player can see it. */
 export interface ErRouteNode {
   biome: BiomeId;
   /** True if revealed (selectable); false = hidden silhouette (needs more Map Upgrade). */
   revealed: boolean;
+  /** Why this node is shown (drives its colour); defaults to "base" when absent. */
+  source?: ErNodeSource;
 }
 
 /**
@@ -172,10 +207,24 @@ export function rollErNextBiomeNodes(current: BiomeId, prev: BiomeId | null): Er
     chosen.push(fallback);
   }
 
-  // Visibility: base Map reveals BASE_VISIBLE_NODES; each Map Upgrade tier +1.
-  // The first node is always revealed so the player can never be soft-locked.
+  // Visibility: base Map reveals BASE_VISIBLE_NODES; each Map Upgrade tier +1. The
+  // first node is always revealed so the player can never be soft-locked. A node
+  // revealed only because of the upgrade band is tagged "upgrade" (green); the
+  // base-visible ones are "base" (gold). Hidden ones render dim "???".
   const visibleCount = Math.max(1, BASE_VISIBLE_NODES + erMapUpgradeTier());
-  return chosen.map((biome, i) => ({ biome, revealed: i < visibleCount }));
+  const nodes: ErRouteNode[] = chosen.map((biome, i) => ({
+    biome,
+    revealed: i < visibleCount,
+    source: i < BASE_VISIBLE_NODES ? "base" : "upgrade",
+  }));
+  // Merge any mystery-event-revealed routes for this biome (always shown, blue),
+  // de-duped against the rolled set.
+  for (const biome of eventRevealedBiomes) {
+    if (!nodes.some(n => n.biome === biome)) {
+      nodes.push({ biome, revealed: true, source: "event" });
+    }
+  }
+  return nodes;
 }
 
 // --- Interaction grammar (#502) -------------------------------------------
