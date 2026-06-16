@@ -1,0 +1,20 @@
+{
+  "intro": "A lab technician waves you over to a humming apparatus. \"Care to be a test subject? It usually works. Usually. Either way you keep whatever it spits out... if it spits anything out.\"",
+  "title": "The Experiment",
+  "description": "A lab technician offers to run an experiment on the house. It usually pays out a high-tier reward, but there is a small chance it backfires - the reward is lost and you cover the cleanup. Decline to walk away clean.",
+  "query": "Will you run the experiment?",
+  "option": {
+    "1": {
+      "label": "Run the experiment",
+      "tooltip": "(+) Usually a high-tier reward\n(?) Small chance it backfires and costs you",
+      "selected": "You step onto the platform and the technician throws the switch..."
+    },
+    "2": {
+      "label": "Decline",
+      "tooltip": "(-) No experiment, no risk",
+      "selected": "You decide not to be a guinea pig today and move on."
+    }
+  },
+  "success": "The apparatus hums and produces a perfectly good result - the reward is yours!",
+  "backfire": "The apparatus shorts out in a shower of sparks! The result is ruined and you cover the cleanup bill."
+}

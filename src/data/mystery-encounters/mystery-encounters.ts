@@ -4,6 +4,7 @@ import { ATrainersTestEncounter } from "#mystery-encounters/a-trainers-test-enco
 import { AbsoluteAvariceEncounter } from "#mystery-encounters/absolute-avarice-encounter";
 import { AbyssalVentEncounter } from "#mystery-encounters/abyssal-vent-encounter";
 import { AnOfferYouCantRefuseEncounter } from "#mystery-encounters/an-offer-you-cant-refuse-encounter";
+import { AuroraEncounter } from "#mystery-encounters/aurora-encounter";
 import { BerriesAboundEncounter } from "#mystery-encounters/berries-abound-encounter";
 import { BlackMarketEncounter } from "#mystery-encounters/black-market-encounter";
 import { BugTypeSuperfanEncounter } from "#mystery-encounters/bug-type-superfan-encounter";
@@ -14,10 +15,12 @@ import { DarkDealEncounter } from "#mystery-encounters/dark-deal-encounter";
 import { DelibirdyEncounter } from "#mystery-encounters/delibirdy-encounter";
 import { DepartmentStoreSaleEncounter } from "#mystery-encounters/department-store-sale-encounter";
 import { ExoticTraderEncounter } from "#mystery-encounters/exotic-trader-encounter";
+import { ExperimentEncounter } from "#mystery-encounters/experiment-encounter";
 import { FairysBoonEncounter } from "#mystery-encounters/fairys-boon-encounter";
 import { FieldTripEncounter } from "#mystery-encounters/field-trip-encounter";
 import { FieryFalloutEncounter } from "#mystery-encounters/fiery-fallout-encounter";
 import { FightOrFlightEncounter } from "#mystery-encounters/fight-or-flight-encounter";
+import { ForemansJobEncounter } from "#mystery-encounters/foremans-job-encounter";
 import { FrozenShapesEncounter } from "#mystery-encounters/frozen-shapes-encounter";
 import { FunAndGamesEncounter } from "#mystery-encounters/fun-and-games-encounter";
 import { GlitteringVeinEncounter } from "#mystery-encounters/glittering-vein-encounter";
@@ -257,14 +260,14 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.WASTELAND, [MysteryEncounterType.DANCING_LESSONS]],
   [BiomeId.ABYSS, [MysteryEncounterType.DANCING_LESSONS]],
   [BiomeId.SPACE, [MysteryEncounterType.THE_EXPERT_POKEMON_BREEDER]],
-  [BiomeId.CONSTRUCTION_SITE, []],
+  [BiomeId.CONSTRUCTION_SITE, [MysteryEncounterType.ER_FOREMANS_JOB]],
   [BiomeId.JUNGLE, [MysteryEncounterType.SAFARI_ZONE, MysteryEncounterType.ER_OVERGROWN_TEMPLE]],
   [BiomeId.FAIRY_CAVE, [MysteryEncounterType.ER_FAIRYS_BOON]],
   [BiomeId.TEMPLE, [MysteryEncounterType.ER_TOTEM_TRIAL]],
   [BiomeId.SLUM, [MysteryEncounterType.ER_BLACK_MARKET]],
-  [BiomeId.SNOWY_FOREST, []],
+  [BiomeId.SNOWY_FOREST, [MysteryEncounterType.ER_AURORA]],
   [BiomeId.ISLAND, [MysteryEncounterType.ER_IMPORT_BAZAAR]],
-  [BiomeId.LABORATORY, []],
+  [BiomeId.LABORATORY, [MysteryEncounterType.ER_EXPERIMENT]],
 ]);
 
 export function initMysteryEncounters() {
@@ -322,6 +325,9 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_OVERCHARGE_CORE] = OverchargeCoreEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_FROZEN_SHAPES] = FrozenShapesEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_SALVAGE_YARD] = SalvageYardEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_FOREMANS_JOB] = ForemansJobEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_AURORA] = AuroraEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_EXPERIMENT] = ExperimentEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

@@ -93,6 +93,15 @@ export enum MysteryEncounterType {
   /** ER #439: Frozen Shapes - an Ice Cave silhouette puzzle; name the shapes
    * trapped in the ice for a reward scaled to your reads. */
   ER_FROZEN_SHAPES,
+  /** ER #439: The Foreman's Job - a Construction Site guardian-boss trial; clear
+   * the rampaging construction golem for a high-tier reward + a Relic. */
+  ER_FOREMANS_JOB,
+  /** ER #439: The Aurora - a Snowy Forest blessing; stand under the rare lights
+   * for a fleeting high-tier reward. */
+  ER_AURORA,
+  /** ER #439: The Experiment - a Laboratory gamble; run the experiment for a
+   * high-tier reward, with a small chance it backfires. */
+  ER_EXPERIMENT,
   /** ER #439: The Salvage Yard - a Factory market of reclaimed parts; browse a
    * curated held-item selection. */
   ER_SALVAGE_YARD,

@@ -1,0 +1,18 @@
+{
+  "intro": "Curtains of green and violet light ripple across the night sky above the snowy pines. A rare aurora, and a feeling of quiet fortune settles over your team beneath it.",
+  "title": "The Aurora",
+  "description": "A rare aurora shimmers overhead. Stand beneath the lights to bathe your team in a fleeting blessing - a guaranteed high-tier reward. Or walk on and let the lights fade.",
+  "query": "Will you stand under the aurora?",
+  "option": {
+    "1": {
+      "label": "Stand under the lights",
+      "tooltip": "(+) A guaranteed high-tier reward",
+      "selected": "You stand still beneath the shifting colours, and the lights seem to answer..."
+    },
+    "2": {
+      "label": "Walk on",
+      "tooltip": "(-) No blessing",
+      "selected": "You watch the aurora a moment longer, then press on through the snow."
+    }
+  }
+}

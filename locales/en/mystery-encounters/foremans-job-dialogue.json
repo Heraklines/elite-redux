@@ -1,0 +1,18 @@
+{
+  "intro": "A construction golem has gone haywire on the site, smashing scaffolding and scattering workers. The foreman flags you down and offers good pay to shut it down.",
+  "title": "The Foreman's Job",
+  "description": "A rampaging construction golem is tearing up the site. Take the foreman's job and bring it down - a powerful multi-bar boss, several levels above your strongest Pokemon - for a guaranteed high-tier reward and a Relic. Or clock out and leave.",
+  "query": "Will you take the job?",
+  "option": {
+    "1": {
+      "label": "Take the job",
+      "tooltip": "(+) Win for a guaranteed high-tier reward + a Relic\n(?) A tough multi-bar boss, above your level",
+      "selected": "You roll up your sleeves as the golem turns its attention to you!"
+    },
+    "2": {
+      "label": "Clock out",
+      "tooltip": "(-) No fight, no reward",
+      "selected": "You leave the foreman to find someone else for the job."
+    }
+  }
+}

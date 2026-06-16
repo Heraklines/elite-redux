@@ -996,6 +996,84 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Foreman's Job (#439)",
+    description:
+      "#439 Construction Site boss TRIAL. Forces ER_FOREMANS_JOB in the\n"
+      + "CONSTRUCTION_SITE biome.\n"
+      + "DO: 'Take the job' or 'Clock out'.\n"
+      + "EXPECT: Take = a BOSS battle vs a construction golem (Conkeldurr / Bronzong /\n"
+      + "Coalossal), 2-3 bars and >= 5 levels above your strongest mon. WIN for 2 Rogue\n"
+      + "picks + a Relic. Clock out = nothing, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.CONSTRUCTION_SITE,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_FOREMANS_JOB,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.STONE_EDGE, MoveId.DRAGON_CLAW, MoveId.IRON_HEAD],
+        }),
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER The Aurora (#439)",
+    description:
+      "#439 Snowy Forest blessing. Forces ER_AURORA in the SNOWY_FOREST biome.\n"
+      + "DO: 'Stand under the lights' or 'Walk on'.\n"
+      + "EXPECT: Stand opens a no-battle reward of 3 guaranteed Ultra picks. Walk on =\n"
+      + "nothing, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.SNOWY_FOREST,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_AURORA,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.YAWN] }),
+        makeStarter(SpeciesId.PIDGEY, {
+          moveset: [MoveId.TACKLE, MoveId.GUST, MoveId.QUICK_ATTACK, MoveId.SAND_ATTACK],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER The Experiment (#439)",
+    description:
+      "#439 Laboratory GAMBLE. Forces ER_EXPERIMENT in the LABORATORY biome (money).\n"
+      + "DO: 'Run the experiment' or 'Decline'.\n"
+      + "EXPECT: ~80% success = a no-battle reward of 3 Ultra picks; ~20% backfire = no\n"
+      + "reward + a wave-scaled cleanup fee deducted, with a backfire message. Decline =\n"
+      + "nothing, no cost. (Outcome is RNG; re-roll the scenario to see both.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_MONEY_OVERRIDE: 50000,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.LABORATORY,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_EXPERIMENT,
+      });
+      return [
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.YAWN] }),
+      ];
+    },
+  },
+  {
     label: "ER Mushroom Circle (#439)",
     description:
       "#439 Grass one-shot GAMBLE. Forces ER_MUSHROOM_CIRCLE (wave-only override,\n"
