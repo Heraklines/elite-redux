@@ -102,11 +102,15 @@ function quizSpeciesIds(): number[] {
  * 1..1025, so option labels stay clean). Memoized for the same early-init reason
  * as {@linkcode quizSpeciesIds}.
  */
+/** Footprint sprites are canon only through Gen 5 (#649, Genesect); Gen 6+ never
+ * had them, and the decomp only auto-generated placeholder prints for those. Cap
+ * the pool here so every answer and distractor is a real Gen 1-5 footprint. */
+const LAST_FOOTPRINT_DEX_ID = 649;
 let cachedFootprintSpeciesIds: number[] | null = null;
 function footprintSpeciesIds(): number[] {
   if (cachedFootprintSpeciesIds === null) {
     cachedFootprintSpeciesIds = [...ER_FOOTPRINT_IDS].filter(id => {
-      if (id > 1025) {
+      if (id > LAST_FOOTPRINT_DEX_ID) {
         return false;
       }
       try {

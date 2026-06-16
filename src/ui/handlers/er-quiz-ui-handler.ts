@@ -153,10 +153,10 @@ export class ErQuizUiHandler extends UiHandler {
     // the print into a solid block. Just scale the 16px tile up to a readable size.
     if (data.footprintKey && globalScene.textures.exists(data.footprintKey)) {
       this.promptText.setVisible(false);
-      const fp = globalScene.add.sprite(PANEL_W / 2, 42, data.footprintKey);
+      const fp = globalScene.add.sprite(PANEL_W / 2, 36, data.footprintKey);
       const fh = fp.height || 16;
       fp.setOrigin(0.5, 0.5);
-      fp.setScale(Math.max(1, Math.min(4, 44 / fh)));
+      fp.setScale(Math.max(1, Math.min(4, 34 / fh)));
       this.card.add(fp);
       this.transient.push(fp);
     } else if (data.spriteKey && globalScene.textures.exists(data.spriteKey)) {
