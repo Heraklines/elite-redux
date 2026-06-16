@@ -869,6 +869,56 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Import Bazaar (#439)",
+    description:
+      "#439 Island MARKET. Forces ER_IMPORT_BAZAAR in the ISLAND biome.\n"
+      + "DO: 'Browse the imports' or 'Move on'.\n"
+      + "EXPECT: Browse opens a no-battle reward of curated held-item imports (Wide Lens,\n"
+      + "Scope Lens, Leftovers, Shell Bell, Quick Claw, King's Rock) - pick one. Move on\n"
+      + "= nothing, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.ISLAND,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_IMPORT_BAZAAR,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.YAWN] }),
+        makeStarter(SpeciesId.PIDGEY, {
+          moveset: [MoveId.TACKLE, MoveId.GUST, MoveId.QUICK_ATTACK, MoveId.SAND_ATTACK],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER Sealed Door (#439)",
+    description:
+      "#439 Ruins glyph puzzle (reuses the ErQuiz silhouette engine). Forces\n"
+      + "ER_SEALED_DOOR in the RUINS biome.\n"
+      + "DO: 'Read the glyphs' (3 silhouette questions) or 'Leave it sealed'.\n"
+      + "EXPECT: the vault tier scales with correct answers - 3/3 = 3 Rogue picks; 2 = 3\n"
+      + "Ultra; 1 = 3 Great; 0 = leave with a heal. Leave it sealed = nothing, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.RUINS,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_SEALED_DOOR,
+      });
+      return [
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.YAWN] }),
+      ];
+    },
+  },
+  {
     label: "ER Mushroom Circle (#439)",
     description:
       "#439 Grass one-shot GAMBLE. Forces ER_MUSHROOM_CIRCLE (wave-only override,\n"

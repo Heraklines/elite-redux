@@ -1,0 +1,18 @@
+{
+  "intro": "A massive stone door blocks the passage ahead, its surface carved with rows of shadowed Pokemon glyphs. A mechanism waits to be solved by anyone who can read them.",
+  "title": "The Sealed Door",
+  "description": "An ancient vault door sealed with a glyph puzzle. Read the shadowed Pokemon carved into it to work the mechanism - the better you read the glyphs, the richer the vault behind it. Or leave the door sealed.",
+  "query": "Will you read the glyphs?",
+  "option": {
+    "1": {
+      "label": "Read the glyphs",
+      "tooltip": "(+) The vault's reward scales with how many glyphs you read right",
+      "selected": "You study the carvings and begin matching each shadow to its Pokemon..."
+    },
+    "2": {
+      "label": "Leave it sealed",
+      "tooltip": "(-) No reward, no cost",
+      "selected": "You leave the vault to its silence and move on."
+    }
+  }
+}

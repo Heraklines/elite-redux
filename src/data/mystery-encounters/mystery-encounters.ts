@@ -23,6 +23,7 @@ import { GlitteringVeinEncounter } from "#mystery-encounters/glittering-vein-enc
 import { GlobalTradeSystemEncounter } from "#mystery-encounters/global-trade-system-encounter";
 import { GravesOfTheFallenEncounter } from "#mystery-encounters/graves-of-the-fallen-encounter";
 import { HotSpringEncounter } from "#mystery-encounters/hot-spring-encounter";
+import { ImportBazaarEncounter } from "#mystery-encounters/import-bazaar-encounter";
 import { LakeSpiritEncounter } from "#mystery-encounters/lake-spirit-encounter";
 import { LostAtSeaEncounter } from "#mystery-encounters/lost-at-sea-encounter";
 import { MushroomCircleEncounter } from "#mystery-encounters/mushroom-circle-encounter";
@@ -34,6 +35,7 @@ import { PartTimerEncounter } from "#mystery-encounters/part-timer-encounter";
 import { PicnicEncounter } from "#mystery-encounters/picnic-encounter";
 import { SafariZoneEncounter } from "#mystery-encounters/safari-zone-encounter";
 import { ScrambledPokedexEncounter } from "#mystery-encounters/scrambled-pokedex-encounter";
+import { SealedDoorEncounter } from "#mystery-encounters/sealed-door-encounter";
 import { ShadyVitaminDealerEncounter } from "#mystery-encounters/shady-vitamin-dealer-encounter";
 import { SlumberingSnorlaxEncounter } from "#mystery-encounters/slumbering-snorlax-encounter";
 import { TeleportingHijinksEncounter } from "#mystery-encounters/teleporting-hijinks-encounter";
@@ -248,7 +250,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.GRAVEYARD, [MysteryEncounterType.ER_GRAVES_OF_THE_FALLEN]],
   [BiomeId.DOJO, [MysteryEncounterType.COLOSSEUM]],
   [BiomeId.FACTORY, []],
-  [BiomeId.RUINS, []],
+  [BiomeId.RUINS, [MysteryEncounterType.ER_SEALED_DOOR]],
   [BiomeId.WASTELAND, [MysteryEncounterType.DANCING_LESSONS]],
   [BiomeId.ABYSS, [MysteryEncounterType.DANCING_LESSONS]],
   [BiomeId.SPACE, [MysteryEncounterType.THE_EXPERT_POKEMON_BREEDER]],
@@ -258,7 +260,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.TEMPLE, [MysteryEncounterType.ER_TOTEM_TRIAL]],
   [BiomeId.SLUM, [MysteryEncounterType.ER_BLACK_MARKET]],
   [BiomeId.SNOWY_FOREST, []],
-  [BiomeId.ISLAND, []],
+  [BiomeId.ISLAND, [MysteryEncounterType.ER_IMPORT_BAZAAR]],
   [BiomeId.LABORATORY, []],
 ]);
 
@@ -312,6 +314,8 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_TOTEM_TRIAL] = TotemTrialEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_BLACK_MARKET] = BlackMarketEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_LAKE_SPIRIT] = LakeSpiritEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_IMPORT_BAZAAR] = ImportBazaarEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_SEALED_DOOR] = SealedDoorEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

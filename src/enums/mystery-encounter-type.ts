@@ -81,6 +81,12 @@ export enum MysteryEncounterType {
   /** ER #439: The Lake Spirit - a Lake knowledge trial; answer a guardian's
    * Pokedex riddles for Candy + a blessing scaled to how many you get right. */
   ER_LAKE_SPIRIT,
+  /** ER #439: The Import Bazaar - an Island market of goods exclusive to other
+   * biomes; browse a curated selection of useful held-item imports. */
+  ER_IMPORT_BAZAAR,
+  /** ER #439: The Sealed Door - a Ruins glyph puzzle; read the silhouettes to open
+   * the vault for a high-tier reward. */
+  ER_SEALED_DOOR,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

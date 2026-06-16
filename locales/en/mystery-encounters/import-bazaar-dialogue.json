@@ -1,0 +1,18 @@
+{
+  "intro": "The island market is a riot of colour and noise. Stalls overflow with goods carried in from a dozen distant regions, things you would never see anywhere else.",
+  "title": "The Import Bazaar",
+  "description": "A bustling island bazaar trading in goods from far-off biomes. Browse the imports and take your pick of a curated held-item selection, or move along.",
+  "query": "Will you browse the imports?",
+  "option": {
+    "1": {
+      "label": "Browse the imports",
+      "tooltip": "(+) Pick one from a curated held-item selection",
+      "selected": "You weave through the stalls and look over the imported wares..."
+    },
+    "2": {
+      "label": "Move on",
+      "tooltip": "(-) No goods, no cost",
+      "selected": "You take in the bustle for a moment, then move along."
+    }
+  }
+}
