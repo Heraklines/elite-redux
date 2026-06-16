@@ -14,11 +14,11 @@
 //     (GhostMember.heldItems = [modifierTypeId, count] pairs). Legacy graves with
 //     no item data, or items that no longer resolve, fall back to a random
 //     Ultra-tier item or berry. Leaves without battle, never softlocks.
-//   DISTURB (risk): the fallen team's ghost RISES and fights you (a level-scaled
-//     wild battle rebuilt from the GhostMember[] snapshot; unresolvable species are
-//     filtered so it never crashes). Win -> reward is 2 of their held items (or 2
-//     Ultra-tier fallbacks). [A named ghost-TRAINER presentation is tracked as a
-//     follow-up - it needs the ghost-wave trainer path, not initBattleWithEnemyConfig.]
+//   DISTURB (risk): the fallen team's ghost RISES as a named ghost TRAINER (the
+//     source player's account name + ghost BGM, a cosmetic spooky trainer class)
+//     fielding the snapshot's actual team, level-scaled to the wave. Unresolvable
+//     species are filtered so it never crashes. Win -> reward is 2 of their held
+//     items (or 2 Ultra-tier fallbacks).
 //   WALK AWAY: leave with no cost.
 //
 // The chosen grave (a GhostTeamSnapshot) is fetched in onInit and stashed on
@@ -30,9 +30,16 @@
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
-import { type GhostMember, type GhostTeamSnapshot, sampleGhostSnapshots } from "#data/elite-redux/er-ghost-teams";
+import {
+  type GhostMember,
+  type GhostTeamSnapshot,
+  markTrainerAsGhost,
+  sampleGhostSnapshots,
+} from "#data/elite-redux/er-ghost-teams";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import type { Gender } from "#data/gender";
+import { trainerConfigs } from "#data/trainers/trainer-config";
+import { TrainerPartyTemplate } from "#data/trainers/trainer-party-template";
 import { ModifierTier } from "#enums/modifier-tier";
 import type { MoveId } from "#enums/move-id";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
@@ -40,6 +47,8 @@ import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import type { Nature } from "#enums/nature";
+import { PartyMemberStrength } from "#enums/party-member-strength";
+import { TrainerType } from "#enums/trainer-type";
 import type { EnemyPartyConfig, EnemyPokemonConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
   initBattleWithEnemyConfig,
@@ -173,12 +182,35 @@ function graveTargetLevel(): number {
 }
 
 /**
- * Build the wild-style enemy party config for the risen ghost team. Members whose
- * species id does NOT resolve (legacy/cross-version data: an ER-custom id this
- * build does not register) are filtered out so initBattleWithEnemyConfig never
- * tries to spawn an undefined-species enemy (which crashed battle-info init). If
- * the whole team filters out, fall back to a single resolvable mon so the fight
- * still builds.
+ * Spooky-but-strong trainer classes a risen grave can present as. Purely
+ * cosmetic - the party is fully the fallen team and the name is overridden to
+ * the source player's account - but varying the class keeps it from always
+ * looking identical. Picked deterministically from the grave id (same grave =
+ * same class everywhere), mirroring BattleScene.createGhostTrainer.
+ */
+const GRAVE_TRAINER_CLASSES = [
+  TrainerType.HEX_MANIAC,
+  TrainerType.PSYCHIC,
+  TrainerType.VETERAN,
+  TrainerType.ACE_TRAINER,
+];
+
+function graveTrainerType(grave: GhostTeamSnapshot): TrainerType {
+  let hash = 0;
+  for (let i = 0; i < grave.id.length; i++) {
+    hash = (hash * 31 + grave.id.charCodeAt(i)) >>> 0;
+  }
+  return GRAVE_TRAINER_CLASSES[hash % GRAVE_TRAINER_CLASSES.length];
+}
+
+/**
+ * Build the enemy party config for the risen ghost team as a TRAINER battle (a
+ * real named ghost trainer, not a wild fight). Members whose species id does NOT
+ * resolve (legacy/cross-version data) are filtered out so the battle never tries
+ * to spawn an undefined-species enemy; if the whole team filters out, fall back
+ * to a single resolvable mon. The trainer's party template is sized to the team
+ * so initBattleWithEnemyConfig fields exactly these mons (no random filler), and
+ * the option phase then marks the trainer as a ghost (player name + ghost BGM).
  */
 function buildGraveBattle(grave: GhostTeamSnapshot): EnemyPartyConfig {
   const level = graveTargetLevel();
@@ -189,7 +221,12 @@ function buildGraveBattle(grave: GhostTeamSnapshot): EnemyPartyConfig {
   if (pokemonConfigs.length === 0) {
     pokemonConfigs.push({ species: getPokemonSpecies(94 /* Gengar */), isBoss: false, level });
   }
-  return { pokemonConfigs };
+  // Clone the cosmetic class config and pin its party size to the grave team so
+  // every slot is overridden by pokemonConfigs (the fallen mons), with no filler.
+  const trainerConfig = trainerConfigs[graveTrainerType(grave)]
+    .clone()
+    .setPartyTemplates(new TrainerPartyTemplate(pokemonConfigs.length, PartyMemberStrength.STRONGER));
+  return { trainerConfig, pokemonConfigs };
 }
 
 /**
@@ -321,13 +358,20 @@ export const GravesOfTheFallenEncounter: MysteryEncounter = MysteryEncounterBuil
         selected: [{ text: `${namespace}:option.2.selected` }],
       })
       .withOptionPhase(async () => {
-        // DISTURB (risk): the fallen team's ghost rises and fights (a level-scaled
-        // wild battle from the snapshot). The reward shop (2 of their held items,
-        // Ultra-tier fallbacks) opens after the win.
+        // DISTURB (risk): the fallen team's ghost RISES as a named ghost TRAINER
+        // (the source player's account name + ghost BGM), fielding the snapshot's
+        // actual team. The reward (2 of their held items, Ultra-tier fallbacks)
+        // opens after the win.
         const grave = getMisc()?.grave ?? syntheticLegacyGrave();
         setDisturbRewards(grave);
         await transitionMysteryEncounterIntroVisuals(true, false);
         await initBattleWithEnemyConfig(buildGraveBattle(grave));
+        // The trainer + its party are now built (party = the grave's mons via
+        // pokemonConfigs); flag it as a ghost so it shows the fallen player's
+        // name and plays the ghost theme, like the gauntlet/ghost-wave trainers.
+        if (globalScene.currentBattle.trainer) {
+          markTrainerAsGhost(globalScene.currentBattle.trainer, grave);
+        }
         return true;
       })
       .build(),
