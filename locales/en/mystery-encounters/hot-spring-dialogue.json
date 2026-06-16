@@ -1,18 +1,18 @@
 {
-  "intro": "Steam drifts up from a natural spring tucked into the mountainside. An old keeper tends the pools and waves you over with a knowing smile.",
+  "intro": "Steam drifts up from a natural spring tucked into the mountainside. Pokemon lounging in the warm water raise their heads and watch you approach.",
   "title": "The Hot Spring",
-  "description": "A warm mountain spring where a weary team can soak and recover. Pay the keeper's modest fee to fully restore your whole party, or move on and keep your coin.",
-  "query": "Will you take a soak?",
+  "description": "The Pokemon here have claimed this spring as their own. They will not take coin - but they might let your team soak in exchange for a few Berries as tribute.",
+  "query": "Offer some Berries for a soak?",
   "option": {
     "1": {
-      "label": "Soak ({{money, money}})",
-      "tooltip": "(+) Fully restore the whole party (HP, status, PP, revive)\n(-) Costs a modest fee",
-      "selected": "You pay the keeper and ease your team into the warm water..."
+      "label": "Offer Berries (3)",
+      "tooltip": "(+) Fully restore the whole party (HP, status, PP, revive)\n(-) Costs 3 Berries from your team",
+      "selected": "You set out a handful of Berries. The guardians nod, and let your team slip into the warm water..."
     },
     "2": {
       "label": "Move on",
       "tooltip": "(-) No rest, no cost",
-      "selected": "You nod to the keeper and continue up the trail."
+      "selected": "You bow to the spring's keepers and continue up the trail."
     }
   },
   "soaked": "The warm spring works wonders - your whole party is fully restored!"

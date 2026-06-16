@@ -692,19 +692,22 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "ER Hot Spring (#439)",
     description:
-      "#439 Mountain REST. Forces ER_HOT_SPRING in the MOUNTAIN biome (with money).\n"
-      + "DO: 'Soak' (costs a wave-scaled fee) or 'Move on' for free.\n"
-      + "EXPECT: Soak deducts the fee and fully restores the WHOLE party (HP, status,\n"
-      + "PP, fainted revived) via PartyHealPhase, with a 'fully restored' message. The\n"
-      + "soak option greys out if you cannot afford it. (Party spawns at full HP here,\n"
-      + "so the heal is a no-op visually - verify it does not error and money is spent.)",
+      "#439 Mountain REST, redesigned: guardian Pokemon (a Slowking sprite) watch the\n"
+      + "spring and accept BERRIES as tribute, not money. Party seeded with 5 Sitrus\n"
+      + "Berries so the toll is affordable.\n"
+      + "DO: 'Offer Berries (3)' or 'Move on' for free.\n"
+      + "EXPECT: the intro shows a Slowking guardian (not a chest); Offer spends 3\n"
+      + "berries (check held items: 5 -> 2) and fully restores the WHOLE party via\n"
+      + "PartyHealPhase with a 'fully restored' message. The Offer option greys out if\n"
+      + "the party holds fewer than 3 berries. (Party spawns at full HP, so the heal is\n"
+      + "a no-op visually - verify no error and the berries are spent.)",
     setup: () => {
       resetDevOverrides();
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 40,
-        STARTING_MONEY_OVERRIDE: 50000,
         STARTING_WAVE_OVERRIDE: 12,
         STARTING_BIOME_OVERRIDE: BiomeId.MOUNTAIN,
+        STARTING_HELD_ITEMS_OVERRIDE: [{ name: "BERRY", type: BerryType.SITRUS, count: 5 }],
         MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
         MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_HOT_SPRING,
       });
