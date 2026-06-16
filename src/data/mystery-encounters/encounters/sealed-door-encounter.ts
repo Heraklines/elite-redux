@@ -5,11 +5,12 @@
  */
 
 // =============================================================================
-// ER #439 - The Sealed Door. A RUINS-biome glyph puzzle (design PART XVI s65 /
-// PART IX s64). A vault door is carved with shadowed Pokemon glyphs; read them
-// (the silhouette quiz on the shared ErQuiz engine) to work the mechanism. The
-// better you read the glyphs, the richer the vault: a perfect round cracks it for
-// a guaranteed Rogue-tier haul, a partial read still opens it a crack.
+// ER #439 / #506 - The Sealed Door (the Unown Cipher). A RUINS-biome decoding
+// puzzle (reconciliation Ruins, transcript line 124175). The vault door is carved
+// with words spelled out in UNOWN letters; decode each word (pick it from the
+// choices, on the shared ErQuiz engine's "cipher" kind) to work the mechanism. The
+// more words you read, the richer the vault: a perfect round cracks it for a
+// guaranteed Rogue-tier haul, a partial read still opens it a crack.
 // =============================================================================
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
@@ -32,7 +33,8 @@ import type { ErQuizResult } from "#phases/er-quiz-phase";
 
 const namespace = "mysteryEncounters/sealedDoor";
 
-/** Number of glyphs carved on the door. */
+/** Number of Unown words carved on the door (the vault tier keys off how many
+ * the player decodes). */
 const GLYPH_COUNT = 3;
 /** How many reward options to offer at the earned tier (player picks one). */
 const REWARD_CHOICES = 3;
@@ -84,8 +86,9 @@ export const SealedDoorEncounter: MysteryEncounter = MysteryEncounterBuilder.wit
       })
       .withOptionPhase(async () => {
         await transitionMysteryEncounterIntroVisuals(true, false);
-        // Read ALL glyphs (no stop-on-wrong) - the vault tier keys off the tally.
-        const questions = buildErQuizRound("silhouette", GLYPH_COUNT);
+        // Decode ALL cipher words (no stop-on-wrong) - the vault tier keys off the
+        // tally. Each word is spelled in Unown letters, picked from 4 choices.
+        const questions = buildErQuizRound("cipher", GLYPH_COUNT, 4);
         globalScene.phaseManager.unshiftNew("ErQuizPhase", {
           questions,
           stopOnWrong: false,

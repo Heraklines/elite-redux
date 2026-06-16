@@ -911,13 +911,16 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "ER Sealed Door (#439)",
+    label: "ER Sealed Door / Unown Cipher (#506)",
     description:
-      "#439 Ruins glyph puzzle (reuses the ErQuiz silhouette engine). Forces\n"
+      "#506 Ruins UNOWN CIPHER (no longer the silhouette game). Forces\n"
       + "ER_SEALED_DOOR in the RUINS biome.\n"
-      + "DO: 'Read the glyphs' (3 silhouette questions) or 'Leave it sealed'.\n"
-      + "EXPECT: the vault tier scales with correct answers - 3/3 = 3 Rogue picks; 2 = 3\n"
-      + "Ultra; 1 = 3 Great; 0 = leave with a heal. Leave it sealed = nothing, no cost.",
+      + "DO: 'Read the glyphs' or 'Leave it sealed'. EXPECT: each of 3 questions shows\n"
+      + "a WORD spelled out in a row of UNOWN letter glyphs; pick the matching word\n"
+      + "from the 4 choices (NOT a Pokemon silhouette). The vault tier scales with\n"
+      + "correct decodes - 3/3 = 3 Rogue picks; 2 = 3 Ultra; 1 = 3 Great; 0 = leave\n"
+      + "with a heal. Leave it sealed = nothing, no cost. CHECK the Unown glyphs render\n"
+      + "(a row of distinct letter icons, not blank).",
     setup: () => {
       resetDevOverrides();
       setOverrides({

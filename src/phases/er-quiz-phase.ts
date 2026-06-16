@@ -20,6 +20,7 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import type { ErQuizQuestion } from "#data/elite-redux/er-quiz";
 import { erQuizOptionName, getErFootprintAsset } from "#data/elite-redux/er-quiz";
+import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import type { ErQuizView } from "#ui/er-quiz-ui-handler";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -142,6 +143,29 @@ export class ErQuizPhase extends Phase {
     }
     const q = this.questions[this.index];
 
+    // CIPHER (Unown): render the answer word as a row of Unown letter icons and
+    // offer the word choices. Unown forms A-Z = formIndex 0-25; the menu-icon
+    // atlas is boot-loaded, so no extra asset load is needed.
+    if (q.kind === "cipher") {
+      const word = q.cipherWord ?? "";
+      const unown = getPokemonSpecies(SpeciesId.UNOWN);
+      const glyphIcons: { atlas: string; frame: string }[] = [];
+      for (const ch of word) {
+        const formIndex = ch.charCodeAt(0) - 65; // 'A' -> 0 ... 'Z' -> 25
+        if (formIndex < 0 || formIndex > 25) {
+          continue;
+        }
+        glyphIcons.push({ atlas: unown.getIconAtlasKey(formIndex), frame: unown.getIconId(false, formIndex) });
+      }
+      const cipherView: ErQuizView = {
+        header: `What do the glyphs spell?  (${this.index + 1}/${this.questions.length})`,
+        glyphIcons,
+        options: q.cipherOptions ?? [],
+      };
+      globalScene.ui.setMode(UiMode.ER_QUIZ, cipherView, (choice: number) => void this.onAnswer(choice));
+      return;
+    }
+
     // figure assets: footprint image (preferred for footprint questions),
     // else the full battle sprite as a black silhouette, else the always-present
     // menu icon - so the figure is never blank.
@@ -195,7 +219,8 @@ export class ErQuizPhase extends Phase {
     await globalScene.ui.setMode(UiMode.MESSAGE);
 
     const q = this.questions[this.index];
-    const answerName = erQuizOptionName(q.answerId);
+    const isCipher = q.kind === "cipher";
+    const answerName = isCipher ? (q.cipherWord ?? "") : erQuizOptionName(q.answerId);
 
     if (choice < 0) {
       this.forfeited = true;
@@ -204,7 +229,7 @@ export class ErQuizPhase extends Phase {
     }
 
     this.answered++;
-    const correctIndex = q.options.indexOf(q.answerId);
+    const correctIndex = isCipher ? (q.cipherOptions ?? []).indexOf(q.cipherWord ?? "") : q.options.indexOf(q.answerId);
     const isCorrect = choice === correctIndex;
     if (isCorrect) {
       this.correct++;

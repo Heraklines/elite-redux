@@ -28,6 +28,9 @@ import { addWindow } from "#ui/ui-theme";
 export interface ErQuizView {
   /** Small caption above the figure/blurb (e.g. "Who's that Pokémon?"). */
   header: string;
+  /** A row of Unown letter icons (the Unown Cipher) - {atlas, frame} per letter,
+   * rendered left-to-right as a centered row. Highest precedence when present. */
+  glyphIcons?: { atlas: string; frame: string }[] | undefined;
   /** Loaded footprint image key, rendered as-is and scaled up (footprint quiz).
    * Takes precedence over the silhouette/icon when present. */
   footprintKey?: string | undefined;
@@ -146,12 +149,30 @@ export class ErQuizUiHandler extends UiHandler {
 
     this.headerText.setText(data.header ?? "");
 
-    // Footprint takes precedence: the player reads the actual track shape.
-    // The decomp footprints are 1-bit, no-alpha tiles - a black print on an
-    // OPAQUE white square - so they're shown AS-IS (a black track on a white
-    // "snow" tile). Do NOT tint: setTintFill would repaint every pixel and erase
-    // the print into a solid block. Just scale the 16px tile up to a readable size.
-    if (data.footprintKey && globalScene.textures.exists(data.footprintKey)) {
+    // Unown Cipher: a centered row of Unown letter icons spelling the answer word.
+    // Highest precedence; rendered as-is (the Unown forms ARE the letters).
+    if (data.glyphIcons && data.glyphIcons.length > 0) {
+      this.promptText.setVisible(false);
+      const n = data.glyphIcons.length;
+      const span = Math.min(24, Math.floor((PANEL_W - 20) / n));
+      const startX = PANEL_W / 2 - ((n - 1) * span) / 2;
+      data.glyphIcons.forEach((g, i) => {
+        if (!globalScene.textures.exists(g.atlas)) {
+          return;
+        }
+        const glyph = globalScene.add.sprite(startX + i * span, 34, g.atlas, g.frame);
+        glyph.setOrigin(0.5, 0.5);
+        const gw = glyph.width || 32;
+        glyph.setScale(Math.max(0.5, Math.min(1, span / gw)));
+        this.card.add(glyph);
+        this.transient.push(glyph);
+      });
+    } else if (data.footprintKey && globalScene.textures.exists(data.footprintKey)) {
+      // Footprint takes precedence over the silhouette/icon: the player reads the
+      // actual track shape. The decomp footprints are 1-bit, no-alpha tiles - a
+      // black print on an OPAQUE white square - so they're shown AS-IS (a black
+      // track on a white "snow" tile). Do NOT tint: setTintFill would repaint
+      // every pixel and erase the print. Just scale the 16px tile up.
       this.promptText.setVisible(false);
       const fp = globalScene.add.sprite(PANEL_W / 2, 31, data.footprintKey);
       const fh = fp.height || 16;
