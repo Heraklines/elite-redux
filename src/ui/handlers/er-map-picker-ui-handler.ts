@@ -83,7 +83,11 @@ export class ErMapPickerUiHandler extends UiHandler {
     const px = (w - PANEL_W) / 2;
     const py = (h - PANEL_H) / 2;
 
-    this.container = globalScene.add.container(0, 0);
+    // Full-screen root. The UI parent is offset by +canvasHeight, so EVERY
+    // full-screen handler anchors its container at (0, -h) to land at (0, 0).
+    // (This was (0, 0) and rendered one screen-height off - the invisible/"black"
+    // map picker that still took input and shuffled the biome blind. #486 fix.)
+    this.container = globalScene.add.container(0, -h);
     this.container.setVisible(false);
     ui.add(this.container);
 
