@@ -28,6 +28,9 @@ import { addWindow } from "#ui/ui-theme";
 export interface ErQuizView {
   /** Small caption above the figure/blurb (e.g. "Who's that Pokémon?"). */
   header: string;
+  /** Loaded footprint image key, rendered as-is and scaled up (footprint quiz).
+   * Takes precedence over the silhouette/icon when present. */
+  footprintKey?: string | undefined;
   /** Loaded battle-sprite atlas key, rendered as a black silhouette (preferred). */
   spriteKey?: string | undefined;
   /** Menu-icon atlas key + frame, used as a silhouette fallback when the battle
@@ -143,9 +146,18 @@ export class ErQuizUiHandler extends UiHandler {
 
     this.headerText.setText(data.header ?? "");
 
-    // Silhouette (tinted flat black) OR blurb. Prefer the full battle sprite;
-    // fall back to the menu icon (which can be larger-scaled, but reliable).
-    if (data.spriteKey && globalScene.textures.exists(data.spriteKey)) {
+    // Footprint (shown as-is, scaled up) takes precedence: the player reads the
+    // actual track shape, so it must NOT be silhouetted. Footprint sprites are
+    // small flat line art, so blow them up to a readable size.
+    if (data.footprintKey && globalScene.textures.exists(data.footprintKey)) {
+      this.promptText.setVisible(false);
+      const fp = globalScene.add.sprite(PANEL_W / 2, 42, data.footprintKey);
+      const fh = fp.height || 16;
+      fp.setOrigin(0.5, 0.5);
+      fp.setScale(Math.max(1, Math.min(4, 44 / fh)));
+      this.card.add(fp);
+      this.transient.push(fp);
+    } else if (data.spriteKey && globalScene.textures.exists(data.spriteKey)) {
       this.promptText.setVisible(false);
       const sil = globalScene.add.sprite(PANEL_W / 2, 42, data.spriteKey);
       sil.setFrame(0);

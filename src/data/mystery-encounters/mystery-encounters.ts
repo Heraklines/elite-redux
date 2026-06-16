@@ -64,6 +64,7 @@ import { TidePoolsEncounter } from "#mystery-encounters/tide-pools-encounter";
 import { TotemTrialEncounter } from "#mystery-encounters/totem-trial-encounter";
 import { TownGuessingBoothEncounter } from "#mystery-encounters/town-guessing-booth-encounter";
 import { TownRaffleEncounter } from "#mystery-encounters/town-raffle-encounter";
+import { TracksInTheSnowEncounter } from "#mystery-encounters/tracks-in-the-snow-encounter";
 import { TrainingSessionEncounter } from "#mystery-encounters/training-session-encounter";
 import { TrashToTreasureEncounter } from "#mystery-encounters/trash-to-treasure-encounter";
 import { UltraWormholeEncounter } from "#mystery-encounters/ultra-wormhole-encounter";
@@ -308,7 +309,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.FAIRY_CAVE, [MysteryEncounterType.ER_FAIRYS_BOON]],
   [BiomeId.TEMPLE, [MysteryEncounterType.ER_TOTEM_TRIAL]],
   [BiomeId.SLUM, [MysteryEncounterType.ER_BLACK_MARKET, MysteryEncounterType.ER_INFORMANT]],
-  [BiomeId.SNOWY_FOREST, [MysteryEncounterType.ER_AURORA]],
+  [BiomeId.SNOWY_FOREST, [MysteryEncounterType.ER_AURORA, MysteryEncounterType.ER_TRACKS_IN_THE_SNOW]],
   [BiomeId.ISLAND, [MysteryEncounterType.ER_IMPORT_BAZAAR]],
   [BiomeId.LABORATORY, [MysteryEncounterType.ER_EXPERIMENT]],
 ]);
@@ -370,6 +371,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_SALVAGE_YARD] = SalvageYardEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_FOREMANS_JOB] = ForemansJobEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_AURORA] = AuroraEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_TRACKS_IN_THE_SNOW] = TracksInTheSnowEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_EXPERIMENT] = ExperimentEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_GENTLE_GIANT] = GentleGiantEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_RUSTLING_GRASS] = RustlingGrassEncounter;

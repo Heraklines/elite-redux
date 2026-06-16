@@ -19,7 +19,7 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import type { ErQuizQuestion } from "#data/elite-redux/er-quiz";
-import { erQuizOptionName } from "#data/elite-redux/er-quiz";
+import { erQuizOptionName, getErFootprintAsset } from "#data/elite-redux/er-quiz";
 import { UiMode } from "#enums/ui-mode";
 import type { ErQuizView } from "#ui/er-quiz-ui-handler";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -72,25 +72,43 @@ export class ErQuizPhase extends Phase {
   }
 
   /**
-   * Preload every silhouette's full battle-sprite atlas, THEN run the round.
-   * Queue all atlases first and start the shared loader ONCE, awaiting its
-   * COMPLETE (the proven encounter-phase / trainer-config pattern). The earlier
-   * per-question loadAssets(startLoad) started the loader mid-queue and raced,
-   * dropping later atlases - so silhouettes rendered blank.
+   * Preload every sprite-based question's assets, THEN run the round. Queue all
+   * of them first and start the shared loader ONCE, awaiting its COMPLETE (the
+   * proven encounter-phase / trainer-config pattern). A per-question
+   * loadAssets(startLoad) would start the loader mid-queue and race, dropping
+   * later assets - so figures rendered blank.
+   *
+   * silhouette -> the full battle-sprite atlas. footprint -> the footprint PNG
+   * AND (as a fallback) the silhouette atlas, since not every species ships
+   * footprint art - the UI shows the footprint when present, else a silhouette.
    */
   private async run(): Promise<void> {
-    const keys = this.questions
-      .filter(q => q.kind === "silhouette")
-      .map(q => {
-        const species = getPokemonSpecies(q.answerId);
-        const key = species.getSpriteKey(false);
-        if (!globalScene.textures.exists(key)) {
-          globalScene.loadPokemonAtlas(key, species.getSpriteAtlasPath(false));
-        }
-        return key;
-      });
+    let queuedAnything = false;
+    const queueSilhouette = (speciesId: number): void => {
+      const species = getPokemonSpecies(speciesId);
+      const key = species.getSpriteKey(false);
+      if (!globalScene.textures.exists(key)) {
+        globalScene.loadPokemonAtlas(key, species.getSpriteAtlasPath(false));
+        queuedAnything = true;
+      }
+    };
 
-    if (keys.some(k => !globalScene.textures.exists(k))) {
+    for (const q of this.questions) {
+      if (q.kind === "silhouette") {
+        queueSilhouette(q.answerId);
+      } else if (q.kind === "footprint") {
+        const fp = getErFootprintAsset(q.answerId);
+        if (fp && !globalScene.textures.exists(fp.key)) {
+          // A missing footprint file 404s harmlessly; ask() falls back to the
+          // silhouette we also queue below.
+          globalScene.load.image(fp.key, fp.url);
+          queuedAnything = true;
+        }
+        queueSilhouette(q.answerId);
+      }
+    }
+
+    if (queuedAnything) {
       await new Promise<void>(resolve => {
         globalScene.load.once(Phaser.Loader.Events.COMPLETE, () => resolve());
         if (!globalScene.load.isLoading()) {
@@ -101,7 +119,7 @@ export class ErQuizPhase extends Phase {
     void this.ask();
   }
 
-  /** Present the current question (its silhouette sprite is already loaded). */
+  /** Present the current question (its figure assets are already loaded). */
   private async ask(): Promise<void> {
     if (this.index >= this.questions.length) {
       this.finish();
@@ -109,12 +127,21 @@ export class ErQuizPhase extends Phase {
     }
     const q = this.questions[this.index];
 
-    // Prefer the full battle sprite (preloaded above); fall back to the always-
-    // present menu icon if its atlas somehow missed, so it is never blank.
+    // figure assets: footprint image (preferred for footprint questions),
+    // else the full battle sprite as a black silhouette, else the always-present
+    // menu icon - so the figure is never blank.
+    let footprintKey: string | undefined;
     let spriteKey: string | undefined;
     let iconAtlas: string | undefined;
     let iconFrame: string | undefined;
-    if (q.kind === "silhouette") {
+
+    if (q.kind === "footprint") {
+      const fp = getErFootprintAsset(q.answerId);
+      if (fp && globalScene.textures.exists(fp.key)) {
+        footprintKey = fp.key;
+      }
+    }
+    if (!footprintKey && (q.kind === "silhouette" || q.kind === "footprint")) {
       const species = getPokemonSpecies(q.answerId);
       const key = species.getSpriteKey(false);
       if (globalScene.textures.exists(key)) {
@@ -128,11 +155,16 @@ export class ErQuizPhase extends Phase {
       }
     }
 
-    const view: ErQuizView = {
-      header:
-        q.kind === "silhouette"
+    const header =
+      q.kind === "footprint"
+        ? `Whose tracks are these?  (${this.index + 1}/${this.questions.length})`
+        : q.kind === "silhouette"
           ? `Who's that Pokémon?  (${this.index + 1}/${this.questions.length})`
-          : `Whose entry is this?  (${this.index + 1}/${this.questions.length})`,
+          : `Whose entry is this?  (${this.index + 1}/${this.questions.length})`;
+
+    const view: ErQuizView = {
+      header,
+      footprintKey,
       spriteKey,
       iconAtlas,
       iconFrame,

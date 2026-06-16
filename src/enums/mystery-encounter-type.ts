@@ -144,6 +144,10 @@ export enum MysteryEncounterType {
   /** ER #486: Sunken Vessel - a Seabed event; scout the wreck to chart the onward
    * routes and salvage a Treasure-Map fragment. */
   ER_SUNKEN_VESSEL,
+  /** ER #498: Tracks in the Snow - a Snowy Forest footprint hunt; read the fresh
+   * tracks and name who made them. Right -> you corner it for a richer cache;
+   * wrong -> you still chase it down, for a lesser find. (SCOUT, no hard fail.) */
+  ER_TRACKS_IN_THE_SNOW,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

@@ -1055,6 +1055,31 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Tracks in the Snow (#498)",
+    description:
+      "#498 Snowy Forest footprint hunt. Forces ER_TRACKS_IN_THE_SNOW in SNOWY_FOREST.\n"
+      + "DO: 'Read the tracks' -> a FOOTPRINT sprite shows; pick who made it from 3\n"
+      + "names. (Species with no footprint art fall back to a black silhouette.)\n"
+      + "EXPECT: Right = a no-battle reward of 3 Ultra picks; wrong = 2 Great picks\n"
+      + "(never empty). 'Leave the trail' = nothing, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.SNOWY_FOREST,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_TRACKS_IN_THE_SNOW,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.YAWN] }),
+        makeStarter(SpeciesId.PIDGEY, {
+          moveset: [MoveId.TACKLE, MoveId.GUST, MoveId.QUICK_ATTACK, MoveId.SAND_ATTACK],
+        }),
+      ];
+    },
+  },
+  {
     label: "ER The Experiment (#439)",
     description:
       "#439 Laboratory GAMBLE. Forces ER_EXPERIMENT in the LABORATORY biome (money).\n"

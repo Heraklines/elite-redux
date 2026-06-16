@@ -1,0 +1,18 @@
+{
+  "intro": "Fresh tracks cut a clean line across the new snow, still crisp at the edges. Whatever made them is not far ahead.",
+  "title": "Tracks in the Snow",
+  "description": "Fresh snow holds tracks no summer forest could. Read the prints and name who made them: get it right and you corner it for a richer cache, get it wrong and you still run it down for a smaller find. Or leave the trail be.",
+  "query": "Will you follow the tracks?",
+  "option": {
+    "1": {
+      "label": "Read the tracks",
+      "tooltip": "(+) Name the maker. Right = a richer cache, wrong = a lesser find (never nothing)",
+      "selected": "You crouch over the prints, reading their size and spacing, and set off down the trail..."
+    },
+    "2": {
+      "label": "Leave the trail",
+      "tooltip": "(-) No reward, no cost",
+      "selected": "You leave the tracks to the snow and move on."
+    }
+  }
+}
