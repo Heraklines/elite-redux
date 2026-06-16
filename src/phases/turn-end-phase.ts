@@ -40,10 +40,6 @@ export class TurnEndPhase extends FieldPhase {
 
         globalScene.applyModifiers(TurnHealModifier, pokemon.isPlayer(), pokemon);
 
-        // ER relic (#439): Field Medic - every 3 turns the active player mons
-        // recover 1/12 max HP (no-op unless the relic is held).
-        erApplyFieldMedic(pokemon);
-
         if (globalScene.arena.terrain?.terrainType === TerrainType.GRASSY && pokemon.isGrounded()) {
           globalScene.phaseManager.unshiftNew(
             "PokemonHealPhase",
@@ -113,6 +109,11 @@ export class TurnEndPhase extends FieldPhase {
 
     if (!this.upcomingInterlude) {
       this.executeForAll(handlePokemon);
+
+      // ER relic (#439): Field Medic - once per turn, every 3 turns, the benched
+      // player mons in party slots 2 and 3 recover 1/12 max HP (no-op unless the
+      // relic is held). Runs once here, NOT per active mon, to avoid double-heal.
+      erApplyFieldMedic();
 
       globalScene.arena.lapseTags();
     }

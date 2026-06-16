@@ -1,5 +1,6 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { erWeathervaneBlocksWeatherDamage } from "#data/elite-redux/er-relics";
 import type { Weather } from "#data/weather";
 import { getWeatherDamageMessage, getWeatherLapseMessage } from "#data/weather";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -100,7 +101,8 @@ export class WeatherEffectPhase extends CommonAnimPhase {
           const immune =
             !pokemon
             || pokemon.getTypes(true, true).filter(t => this.weather?.isTypeDamageImmune(t)).length > 0
-            || pokemon.switchOutStatus;
+            || pokemon.switchOutStatus // ER relic (#439): Weathervane - player mons ignore residual // sandstorm/hail chip damage while the relic is held.
+            || (pokemon.isPlayer() && erWeathervaneBlocksWeatherDamage());
           if (!immune) {
             inflictDamage(pokemon);
           }

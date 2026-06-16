@@ -2,6 +2,8 @@ import { consumePendingDevShop } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { erBalanceArr, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
+import { erScrapMagnetExtraRewards } from "#data/elite-redux/er-relics";
+import { BattleType } from "#enums/battle-type";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import type { ModifierTier } from "#enums/modifier-tier";
 import { UiMode } from "#enums/ui-mode";
@@ -418,6 +420,12 @@ export class SelectModifierPhase extends BattlePhase {
     const modifierCountHolder = new NumberHolder(3);
     globalScene.applyModifiers(ExtraModifierModifier, true, modifierCountHolder);
     globalScene.applyModifiers(TempExtraModifierModifier, true, modifierCountHolder);
+
+    // ER relic (#439): Scrap Magnet - trainer battles have a 25% chance to drop one
+    // extra reward option. The roll is cached per wave so rerolls/copies are stable.
+    if (globalScene.currentBattle?.battleType === BattleType.TRAINER) {
+      modifierCountHolder.value += erScrapMagnetExtraRewards();
+    }
 
     // If custom modifiers are specified, overrides default item count
     if (this.customModifierSettings) {

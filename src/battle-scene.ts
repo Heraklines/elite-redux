@@ -37,7 +37,11 @@ import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
 import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
-import { erCoinPurseBonusPercent, erMysteryCharmWeightBonus } from "#data/elite-redux/er-relics";
+import {
+  erCoinPurseBonusPercent,
+  erMysteryCharmWeightBonus,
+  resetErRelicBiomeState,
+} from "#data/elite-redux/er-relics";
 import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { chromaKeyErSpriteTexture } from "#data/elite-redux/er-sprite-chroma-key";
 import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
@@ -1895,6 +1899,10 @@ export class BattleScene extends SceneBase {
 
   newArena(biome: BiomeId, playerFaints = 0): Arena {
     this.arena = new Arena(biome, playerFaints);
+    // ER relics (#439): clear the per-biome relic flags (Morale Banner faint-free,
+    // Second Wind / Anchor once-per-biome charges, Scrap Magnet wave-roll cache)
+    // on every biome entry.
+    resetErRelicBiomeState();
     this.eventTarget.dispatchEvent(new NewArenaEvent());
 
     this.arenaBg.pipelineData = {

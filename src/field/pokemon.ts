@@ -66,6 +66,7 @@ import {
 import { erBlackSpritePath, erBlackSpritePathFromBase } from "#data/elite-redux/er-black-sprite-manifest";
 import { erTryApplyOmniGem } from "#data/elite-redux/er-community-items";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
+import { erMoraleBannerMultiplier, erTrySecondWind, erTwinLinkMultiplier } from "#data/elite-redux/er-relics";
 import { applyErResistBerry } from "#data/elite-redux/er-resist-berries";
 import {
   erYoungsterFreeInnateSlots,
@@ -4924,6 +4925,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         ? 0.5
         : 1;
 
+    /**
+     * ER relics (#439): team-wide damage buffs that apply only to PLAYER
+     * attackers. Morale Banner = +15% while the team is faint-free this biome;
+     * Twin Link = +15% for moves of the type shared by party slots 2 and 3. Both
+     * return 1 when their relic isn't held or the condition isn't met.
+     */
+    const erRelicMultiplier = source.isPlayer() ? erMoraleBannerMultiplier() * erTwinLinkMultiplier(moveType) : 1;
+
     damage.value = toDmgValue(
       baseDamage
         * targetMultiplier
@@ -4939,7 +4948,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         * fearMultiplier
         * screenMultiplier.value
         * hitsTagMultiplier.value
-        * mistyTerrainMultiplier,
+        * mistyTerrainMultiplier
+        * erRelicMultiplier,
     );
 
     // ER Overrule 815: on a CRITICAL hit, the holder's attacks deal double damage
@@ -5112,6 +5122,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
       if (!surviveDamage.value) {
         globalScene.applyModifiers(SurviveDamageModifier, this.isPlayer(), this, surviveDamage);
+      }
+      // ER relic (#439): Second Wind - once per biome, the first player mon that
+      // would faint survives at 1 HP (like a one-shot Focus Sash). Checked last so
+      // it only consumes its charge when nothing else already saved the mon.
+      if (!surviveDamage.value && erTrySecondWind(this)) {
+        surviveDamage.value = true;
       }
       if (surviveDamage.value) {
         damage = this.hp - 1;

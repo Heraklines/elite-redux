@@ -2158,6 +2158,12 @@ const modifierTypeInitObj = Object.freeze({
   ER_RELIC_WARM_INCUBATOR: () => erRelicModifierType("warmIncubator"),
   ER_RELIC_COIN_PURSE: () => erRelicModifierType("coinPurse"),
   ER_RELIC_MYSTERY_CHARM: () => erRelicModifierType("mysteryCharm"),
+  ER_RELIC_MORALE_BANNER: () => erRelicModifierType("moraleBanner"),
+  ER_RELIC_SECOND_WIND: () => erRelicModifierType("secondWind"),
+  ER_RELIC_TWIN_LINK: () => erRelicModifierType("twinLink"),
+  ER_RELIC_ANCHOR: () => erRelicModifierType("anchor"),
+  ER_RELIC_SCRAP_MAGNET: () => erRelicModifierType("scrapMagnet"),
+  ER_RELIC_WEATHERVANE: () => erRelicModifierType("weathervane"),
 
   /*REPEL: () => new DoubleBattleChanceBoosterModifierType('Repel', 5),
   SUPER_REPEL: () => new DoubleBattleChanceBoosterModifierType('Super Repel', 10),

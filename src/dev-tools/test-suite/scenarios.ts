@@ -259,16 +259,13 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "ER Relic: Field Medic (#439)",
+    label: "ER Relic: Field Medic (reserves) (#439)",
     description:
-      "#439 biome overhaul - Relic/Formation buff-item system, first relic.\n"
-      + "DO: you start holding the FIELD MEDIC relic (a tinted charm in the item bar)\n"
-      + "and your Snorlax begins at ~40% HP. Use SPLASH each turn and just watch.\n"
-      + "EXPECT: every 3rd turn-end, 'Snorlax was tended by the Field Medic!' and it\n"
-      + "heals ~1/12 of max HP. (Warm Incubator note: the other first relic speeds\n"
-      + "egg hatching - with it held, each egg's 'waves to hatch' in the Egg list\n"
-      + "drops by 2 per wave instead of 1. Hard to show in one battle; verify via the\n"
-      + "egg list across waves.)",
+      "#439 - Field Medic heals the BENCHED reserves (slots 2 and 3), NOT the active\n"
+      + "mon. You hold FIELD MEDIC; slots 2-3 (Pidgey, Rattata) start at ~40% HP, the\n"
+      + "active Snorlax is full. Use SPLASH each turn and watch.\n"
+      + "EXPECT: every 3rd turn-end, ONLY the slot-2 and slot-3 reserves heal ~1/12 of\n"
+      + "max HP (a message names them). The active Snorlax is NEVER healed by it.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -278,12 +275,106 @@ export const DEV_SCENARIOS: DevScenario[] = [
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
         STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_FIELD_MEDIC" }],
       });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.RATTATA, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+    onBattleStart: () => {
+      const party = globalScene.getPlayerParty();
+      for (const i of [1, 2]) {
+        const p = party[i];
+        if (p) {
+          p.hp = Math.max(1, Math.floor(p.getMaxHp() * 0.4));
+          p.updateInfo();
+        }
+      }
+    },
+  },
+  {
+    label: "ER Relic: Weathervane (#439)",
+    description:
+      "#439 relic - Weathervane: your team ignores hostile ambient-weather chip\n"
+      + "damage. A SANDSTORM is active and you hold WEATHERVANE. Use SPLASH and watch\n"
+      + "end-of-turn weather damage.\n"
+      + "EXPECT: your Normal-type Snorlax takes NO sandstorm residual; the enemy\n"
+      + "Magikarp DOES chip each turn (it has no relic).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 30,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        WEATHER_OVERRIDE: WeatherType.SANDSTORM,
+        STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_WEATHERVANE" }],
+      });
       return [makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH] })];
+    },
+  },
+  {
+    label: "ER Relics: Morale Banner + Twin Link + Scrap Magnet (#439)",
+    description:
+      "#439 relics. You hold MORALE BANNER (+15% team dmg while no mon has fainted\n"
+      + "this biome), TWIN LINK (+15% to the type SHARED by party slots 2 and 3 -\n"
+      + "here both WATER, so Water moves get it), and SCRAP MAGNET.\n"
+      + "DO: hit the Magikarp with Snorlax's WATER PULSE (gets BOTH damage boosts);\n"
+      + "note the number. Let a mon faint in a later wave -> Morale Banner BREAKS for\n"
+      + "the rest of the biome (Water Pulse dmg drops by Morale's 15%; Twin Link stays).\n"
+      + "SCRAP MAGNET (note): on a TRAINER win, ~25% chance of one EXTRA reward option.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 30,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        STARTING_MODIFIER_OVERRIDE: [
+          { name: "ER_RELIC_MORALE_BANNER" },
+          { name: "ER_RELIC_TWIN_LINK" },
+          { name: "ER_RELIC_SCRAP_MAGNET" },
+        ],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.WATER_PULSE, MoveId.TACKLE] }),
+        makeStarter(SpeciesId.SQUIRTLE, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.PSYDUCK, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "ER Relics: Second Wind + Anchor (#439)",
+    description:
+      "#439 relics (survival). You hold SECOND WIND (once per biome, the first mon\n"
+      + "that would faint survives at 1 HP) and ANCHOR (your slot-6 mon full-heals\n"
+      + "once when it becomes your last mon standing).\n"
+      + "DO: your active Snorlax starts at ~15% HP vs a strong Magikarp using TACKLE.\n"
+      + "EXPECT: the hit that would KO it instead leaves it at 1 HP (Second Wind),\n"
+      + "ONCE this biome. (Anchor: harder to stage - faint everyone but the slot-6\n"
+      + "mon and it full-heals once as the last standing.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+        STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_SECOND_WIND" }, { name: "ER_RELIC_ANCHOR" }],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.RATTATA, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.CATERPIE, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.WEEDLE, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.MAGIKARP, { moveset: [MoveId.SPLASH] }),
+      ];
     },
     onBattleStart: () => {
       const p = globalScene.getPlayerPokemon();
       if (p) {
-        p.hp = Math.max(1, Math.floor(p.getMaxHp() * 0.4));
+        p.hp = Math.max(1, Math.floor(p.getMaxHp() * 0.15));
         p.updateInfo();
       }
     },

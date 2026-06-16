@@ -5,6 +5,7 @@ import { allMoves } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { recordErStreakFaint } from "#data/elite-redux/er-money-streak";
+import { erRelicRecordPlayerFaint, erTryAnchorLastStand } from "#data/elite-redux/er-relics";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { BattleType } from "#enums/battle-type";
@@ -95,6 +96,12 @@ export class FaintPhase extends PokemonPhase {
       globalScene.arena.playerFaints += 1;
       // ER money streak (#348): a faint breaks this mon's faint-free streak.
       recordErStreakFaint(pokemon);
+      // ER relics (#439): a player faint breaks Morale Banner's faint-free bonus
+      // for the rest of this biome.
+      erRelicRecordPlayerFaint();
+      // ER relics (#439): Anchor - if the slot 6 mon is now the last one standing,
+      // fully heal it once per biome (last stand). No-op unless the relic is held.
+      erTryAnchorLastStand();
       globalScene.currentBattle.playerFaintsHistory.push({
         pokemon,
         turn: globalScene.currentBattle.turn,
