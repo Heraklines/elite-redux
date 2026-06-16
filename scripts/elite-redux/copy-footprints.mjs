@@ -1,17 +1,22 @@
 // SPDX-FileCopyrightText: 2024-2026 Pagefault Games
 // SPDX-License-Identifier: AGPL-3.0-only
 //
-// ER #498 - bundle Pokemon FOOTPRINT sprites for the "Tracks in the Snow" quiz.
+// ER #498 - extract Pokemon FOOTPRINT sprites for the "Tracks in the Snow" quiz.
 //
 // Footprint art exists only for the decomp roster (Gen 1-5 canon + whatever the
-// pokeemerald-expansion base shipped); it was NEVER pulled into the er-assets CDN
-// (which only has front/back/icon/shiny), and the deployed site redirects ALL of
-// /images/* to that CDN - so footprints can't live under /images/. Instead we copy
-// the decomp PNGs into public/footprints/<speciesId>.png (a path no redirect rule
-// touches, served straight from the build) and emit the id list the quiz pool uses.
+// pokeemerald-expansion base shipped). It was NEVER pulled into the er-assets CDN
+// (which only had front/back/icon/shiny). This script extracts the decomp PNGs into
+// footprints-out/<speciesId>.png (gitignored staging) and emits the id list the quiz
+// pool uses. The PNGs are then hosted on er-assets at images/footprints/<id>.png so
+// they serve via the existing /images/* -> jsDelivr redirect (off-Cloudflare, no
+// bandwidth-quota cost), exactly like every other sprite - NOT bundled into the app.
 //
-// Run: node scripts/elite-redux/copy-footprints.mjs   (re-run if the manifest or the
-// decomp graphics change). Source of truth for slug<->id is the sprite manifest.
+// Workflow to (re)publish:
+//   1. node scripts/elite-redux/copy-footprints.mjs   (re-run if manifest/decomp change)
+//   2. copy footprints-out/* into a Heraklines/er-assets checkout at images/footprints/
+//   3. commit + push er-assets, then bump the SHA pin in deploy/cloudflare/_redirects
+//      to the new er-assets HEAD and redeploy.
+// Source of truth for slug<->id is the sprite manifest.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -19,7 +24,7 @@ import path from "node:path";
 const ROOT = path.resolve(import.meta.dirname, "../..");
 const MANIFEST = path.join(ROOT, "src/data/elite-redux/er-sprite-manifest.ts");
 const DECOMP = path.join(ROOT, "vendor/elite-redux/source/graphics/pokemon");
-const OUT_DIR = path.join(ROOT, "public/footprints");
+const OUT_DIR = path.join(ROOT, "footprints-out");
 const ID_LIST = path.join(ROOT, "src/data/elite-redux/er-footprint-species.json");
 
 const manifest = fs.readFileSync(MANIFEST, "utf8");

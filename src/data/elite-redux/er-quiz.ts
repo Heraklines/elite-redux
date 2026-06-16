@@ -61,15 +61,16 @@ export interface ErFootprintAsset {
 
 /**
  * The footprint texture key + runtime URL for a species, or undefined if no
- * footprint sprite is bundled for it. The URL is a plain `footprints/<id>.png`
- * (public/ static path) - deliberately NOT under `/images/`, which the deploy
- * redirects wholesale to the er-assets CDN (where footprints don't exist).
+ * footprint sprite is bundled for it. The URL is `images/footprints/<id>.png`,
+ * which the deploy redirects to the er-assets CDN (jsDelivr) like every other
+ * sprite - so footprints are served off-Cloudflare (no bandwidth-quota cost),
+ * NOT bundled into the app. (Requires the er-assets pin to include them.)
  */
 export function getErFootprintAsset(speciesId: number): ErFootprintAsset | undefined {
   if (!ER_FOOTPRINT_IDS.has(speciesId)) {
     return undefined;
   }
-  return { key: `er_footprint__${speciesId}`, url: `footprints/${speciesId}.png` };
+  return { key: `er_footprint__${speciesId}`, url: `images/footprints/${speciesId}.png` };
 }
 
 /**

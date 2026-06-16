@@ -82,3 +82,6 @@ docs/plans/er-events-design-recovered.md
 
 docs/plans/er-events-ideation-transcript.md
 docs/plans/er-events-reconciliation.md
+
+# ER #498: footprint extraction staging (published to er-assets CDN, not bundled)
+footprints-out/
