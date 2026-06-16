@@ -1,0 +1,113 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// ER #439 / #486 - Phase D Map system, increment 1: the run-scoped MAP-NODE data
+// substrate. This is the pure data layer every map-aware event talks to - it has
+// NO UI and NO save dependency (kept deliberately side-effect-free so it is unit
+// testable and cannot break the run flow). Later increments add the overlay UI
+// (UiMode.ER_MAP), session persistence, and the events that drive it (Observatory,
+// Echo Chamber, Informant, Storm, Ultra Wormhole, Treasure-Map fragments).
+//
+// State is module-level and reset per run via resetErMapNodes() (wired next to the
+// other ER per-run resets at run start). Three concerns:
+//   - revealed NODES: upcoming biome / landmark options a SCOUT-style event surfaced
+//   - a TRAVEL target: a node a travel event lets the player jump to next
+//   - TREASURE-MAP fragments: collect a threshold to unlock a guaranteed reward node
+// =============================================================================
+
+import type { BiomeId } from "#enums/biome-id";
+
+/** What a revealed node represents. */
+export type ErMapNodeKind = "biome" | "treasure" | "landmark";
+
+/** A single revealed point on the run's map. */
+export interface ErMapNode {
+  /** The biome this node leads to / sits in. */
+  biome: BiomeId;
+  /** Short player-facing label (English-only; ER custom strings are English). */
+  label: string;
+  /** What kind of node this is. */
+  kind: ErMapNodeKind;
+}
+
+/** Collect this many Treasure-Map fragments to unlock a guaranteed reward node. */
+export const TREASURE_FRAGMENTS_FOR_REWARD = 3;
+
+let revealedNodes: ErMapNode[] = [];
+let travelTarget: BiomeId | null = null;
+let fragmentCount = 0;
+
+/** Clear all map state. Called once at run start (alongside the other ER resets). */
+export function resetErMapNodes(): void {
+  revealedNodes = [];
+  travelTarget = null;
+  fragmentCount = 0;
+}
+
+/**
+ * Reveal one or more map nodes (a SCOUT-style event surfacing upcoming options).
+ * De-duplicates by biome+label so re-revealing is idempotent. Returns how many
+ * NEW nodes were added.
+ */
+export function revealMapNodes(nodes: ErMapNode[]): number {
+  let added = 0;
+  for (const node of nodes) {
+    if (!revealedNodes.some(existing => existing.biome === node.biome && existing.label === node.label)) {
+      revealedNodes.push({ ...node });
+      added += 1;
+    }
+  }
+  return added;
+}
+
+/** The nodes revealed so far this run (read-only snapshot for the overlay UI). */
+export function getRevealedMapNodes(): readonly ErMapNode[] {
+  return revealedNodes;
+}
+
+/** True if anything has been revealed (drives whether the overlay has content). */
+export function hasRevealedMapNodes(): boolean {
+  return revealedNodes.length > 0;
+}
+
+/**
+ * Mark a biome as the player's chosen travel target (a Storm / Wormhole / Echo
+ * Chamber travel reward). The run flow consumes it at the next biome-choice.
+ */
+export function setMapTravelTarget(biome: BiomeId): void {
+  travelTarget = biome;
+}
+
+/** Take and clear the pending travel target, if any. */
+export function consumeMapTravelTarget(): BiomeId | null {
+  const target = travelTarget;
+  travelTarget = null;
+  return target;
+}
+
+/** Add (or, with a negative n, spend) Treasure-Map fragments. Clamped at 0. Returns the new total. */
+export function addTreasureFragments(n: number): number {
+  fragmentCount = Math.max(0, fragmentCount + n);
+  return fragmentCount;
+}
+
+/** How many Treasure-Map fragments the player currently holds. */
+export function getTreasureFragments(): number {
+  return fragmentCount;
+}
+
+/**
+ * If the player has enough fragments for a reward, spend a set and return true
+ * (the Beach "X Marks the Spot" payout). Otherwise return false and spend nothing.
+ */
+export function consumeTreasureFragmentsForReward(): boolean {
+  if (fragmentCount >= TREASURE_FRAGMENTS_FOR_REWARD) {
+    fragmentCount -= TREASURE_FRAGMENTS_FOR_REWARD;
+    return true;
+  }
+  return false;
+}
