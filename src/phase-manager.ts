@@ -20,6 +20,7 @@ import { AttemptRunPhase } from "#phases/attempt-run-phase";
 import { BattleEndPhase } from "#phases/battle-end-phase";
 import { BerryPhase } from "#phases/berry-phase";
 import { BiomeShopPhase } from "#phases/biome-shop-phase";
+import { BlackMarketShopPhase } from "#phases/black-market-shop-phase";
 import { CheckInterludePhase } from "#phases/check-interlude-phase";
 import { CheckStatusEffectPhase } from "#phases/check-status-effect-phase";
 import { CheckSwitchPhase } from "#phases/check-switch-phase";
@@ -138,6 +139,7 @@ const PHASES = Object.freeze({
   BattleEndPhase,
   BerryPhase,
   BiomeShopPhase,
+  BlackMarketShopPhase,
   ColosseumChoicePhase,
   ExoticShopPhase,
   ErQuizPhase,

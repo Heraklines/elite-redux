@@ -10,19 +10,20 @@
 // free mixed-tier selection (mostly solid, with a shot at something better than
 // you'd expect off a back alley). Walk away to keep the alley at your back.
 //
-// First pass = a guaranteed mixed-tier selection (the "cheap goods" payoff). The
-// design's optional curse-lite downside on shady stock is a later refinement.
+// Real bargain SHOP screen (BlackMarketShopPhase): cheap, mixed-tier "used"
+// goods at back-alley prices, launched via the encounter's doEncounterRewards
+// hook (no softlock). The design's optional curse-lite downside on the cheapest
+// stock is a later refinement; this is the cheap-goods core. NOT a reward screen.
 // =============================================================================
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
-import { ModifierTier } from "#enums/modifier-tier";
+import { globalScene } from "#app/global-scene";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import {
   leaveEncounterWithoutBattle,
-  setEncounterRewards,
   transitionMysteryEncounterIntroVisuals,
 } from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
@@ -30,9 +31,6 @@ import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
 
 const namespace = "mysteryEncounters/blackMarket";
-
-/** The mixed-tier "used goods" selection the dealer lays out. */
-const STALL_TIERS: ModifierTier[] = [ModifierTier.GREAT, ModifierTier.GREAT, ModifierTier.ULTRA];
 
 export const BlackMarketEncounter: MysteryEncounter = MysteryEncounterBuilder.withEncounterType(
   MysteryEncounterType.ER_BLACK_MARKET,
@@ -59,7 +57,13 @@ export const BlackMarketEncounter: MysteryEncounter = MysteryEncounterBuilder.wi
         selected: [{ text: `${namespace}:option.1.selected` }],
       })
       .withOptionPhase(async () => {
-        setEncounterRewards({ guaranteedModifierTiers: STALL_TIERS, fillRemaining: false });
+        // Open the real bargain SHOP screen (BlackMarketShopPhase: cheap, mixed-
+        // tier used goods). Launched via the doEncounterRewards hook so it runs
+        // as a real phase before the post-encounter continuation. Not a reward screen.
+        globalScene.currentBattle.mysteryEncounter!.doEncounterRewards = () => {
+          globalScene.phaseManager.unshiftNew("BlackMarketShopPhase");
+          return true;
+        };
         await transitionMysteryEncounterIntroVisuals(true, true);
         leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
         return true;

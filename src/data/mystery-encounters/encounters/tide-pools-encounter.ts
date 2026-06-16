@@ -99,13 +99,9 @@ const MEGA_STONE_CHANCE = 3;
 // the standout SHELL BELL. Deliberately humble and money-first: this is a beach,
 // not a treasure vault.
 
-/** Common washed-up gear (the bread-and-butter item find). */
-const BEACH_FIND_FUNCS: ModifierTypeFunc[] = [
-  modifierTypes.LEFTOVERS,
-  modifierTypes.WIDE_LENS,
-  modifierTypes.QUICK_CLAW,
-  modifierTypes.SCOPE_LENS,
-];
+// Common washed-up gear by KEY (resolved lazily - modifierTypes is empty until
+// initModifierTypes() runs, so module-load func capture would freeze undefined).
+const BEACH_FIND_KEYS = ["LEFTOVERS", "WIDE_LENS", "QUICK_CLAW", "SCOPE_LENS"] as const;
 
 /** Of the combs that DO wash up gear, this % are the rare Shell Bell instead. */
 const SHELL_BELL_SHARE = 14;
@@ -136,7 +132,12 @@ function rollBeachFind(haul: MineralLootHaul, d: number): boolean {
   if (randSeedInt(100) >= beachFindChance(d)) {
     return false;
   }
-  haul.funcs.push(randSeedInt(100) < SHELL_BELL_SHARE ? modifierTypes.SHELL_BELL : randSeedItem(BEACH_FIND_FUNCS));
+  const registry = modifierTypes as Record<string, ModifierTypeFunc | undefined>;
+  const func = randSeedInt(100) < SHELL_BELL_SHARE ? registry.SHELL_BELL : registry[randSeedItem([...BEACH_FIND_KEYS])];
+  if (!func) {
+    return false;
+  }
+  haul.funcs.push(func);
   return true;
 }
 

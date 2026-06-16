@@ -24,27 +24,29 @@ import type { ModifierTypeOption } from "#modifiers/modifier-type";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 
 /**
- * The premium goods, each with a PRICE WEIGHT (multiplied by the wave money unit
- * to set the steep shop price). No heals. Rough ordering: balls + utility +
- * charms, priciest = the run-defining charms and Master Ball.
+ * The premium goods by modifier-type KEY, each with a PRICE WEIGHT (multiplied by
+ * the wave money unit to set the steep shop price). No heals. Keys (not direct
+ * func refs) so the modifierTypes registry is read LAZILY at call time - it is an
+ * empty object until initModifierTypes() runs, so capturing func refs at module
+ * load would freeze in `undefined` and empty the shop.
  */
-const EXOTIC_GOODS: { func: ModifierTypeFunc | undefined; weight: number }[] = [
-  { func: modifierTypes.MASTER_BALL, weight: 28 },
-  { func: modifierTypes.ROGUE_BALL, weight: 9 },
-  { func: modifierTypes.ULTRA_BALL, weight: 4 },
-  { func: modifierTypes.SHELL_BELL, weight: 12 },
-  { func: modifierTypes.LEFTOVERS, weight: 10 },
-  { func: modifierTypes.FOCUS_BAND, weight: 12 },
-  { func: modifierTypes.KINGS_ROCK, weight: 9 },
-  { func: modifierTypes.GRIP_CLAW, weight: 9 },
-  { func: modifierTypes.WIDE_LENS, weight: 8 },
-  { func: modifierTypes.SCOPE_LENS, weight: 9 },
-  { func: modifierTypes.MULTI_LENS, weight: 16 },
-  { func: modifierTypes.AMULET_COIN, weight: 13 },
-  { func: modifierTypes.GOLDEN_EXP_CHARM, weight: 20 },
-  { func: modifierTypes.ABILITY_CHARM, weight: 18 },
-  { func: modifierTypes.SHINY_CHARM, weight: 24 },
-  { func: modifierTypes.IV_SCANNER, weight: 8 },
+const EXOTIC_GOODS: { key: string; weight: number }[] = [
+  { key: "MASTER_BALL", weight: 28 },
+  { key: "ROGUE_BALL", weight: 9 },
+  { key: "ULTRA_BALL", weight: 4 },
+  { key: "SHELL_BELL", weight: 12 },
+  { key: "LEFTOVERS", weight: 10 },
+  { key: "FOCUS_BAND", weight: 12 },
+  { key: "KINGS_ROCK", weight: 9 },
+  { key: "GRIP_CLAW", weight: 9 },
+  { key: "WIDE_LENS", weight: 8 },
+  { key: "SCOPE_LENS", weight: 9 },
+  { key: "MULTI_LENS", weight: 16 },
+  { key: "AMULET_COIN", weight: 13 },
+  { key: "GOLDEN_EXP_CHARM", weight: 20 },
+  { key: "ABILITY_CHARM", weight: 18 },
+  { key: "SHINY_CHARM", weight: 24 },
+  { key: "IV_SCANNER", weight: 8 },
 ];
 
 /** Floor so even the "cheapest" exotic good still reads as premium. */
@@ -57,12 +59,14 @@ const MIN_PRICE_WEIGHT = 6;
  */
 export function buildExoticShopStock(): ModifierTypeOption[] {
   const unit = globalScene.getWaveMoneyAmount(1);
+  const registry = modifierTypes as Record<string, ModifierTypeFunc | undefined>;
   const out: ModifierTypeOption[] = [];
   for (const good of EXOTIC_GOODS) {
-    if (!good.func) {
+    const func = registry[good.key];
+    if (!func) {
       continue;
     }
-    const option = generateModifierTypeOption(good.func);
+    const option = generateModifierTypeOption(func);
     if (!option) {
       continue;
     }
