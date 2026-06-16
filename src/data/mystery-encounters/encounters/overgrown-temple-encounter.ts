@@ -33,6 +33,7 @@
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { guardianForDepth } from "#data/elite-redux/er-delve-guardians";
+import { applyErGuardianTokens } from "#data/elite-redux/er-fight-tokens";
 import {
   emptyMineralHaul,
   type MineralLootHaul,
@@ -56,6 +57,7 @@ import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
+import { StatusEffect } from "#enums/status-effect";
 import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
@@ -265,6 +267,9 @@ function delveConfig(encounter: MysteryEncounter): PressYourLuckConfig {
       };
       await transitionMysteryEncounterIntroVisuals(true, false);
       await initBattleWithEnemyConfig(buildGuardianBattle(haul.interrupts));
+      // Depth-scaled challenge tokens for this delve fight only (Poison-themed for
+      // the overgrown jungle); cleared after the battle by doPostBattleCleanup.
+      applyErGuardianTokens(haul.interrupts - 1, { statusType: StatusEffect.POISON });
     },
   };
 }

@@ -14,6 +14,7 @@
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
+import { applyErGuardianTokens } from "#data/elite-redux/er-fight-tokens";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
@@ -85,6 +86,8 @@ export const DragonsHoardEncounter: MysteryEncounter = MysteryEncounterBuilder.w
       const encounter = globalScene.currentBattle.mysteryEncounter!;
       setEncounterRewards({ guaranteedModifierTiers: HOARD_TIERS, fillRemaining: false });
       await initBattleWithEnemyConfig(encounter.enemyPartyConfigs[0]);
+      // Master-tier hoard boss: deep challenge tokens; cleared after the battle.
+      applyErGuardianTokens(4);
     },
   )
   .withSimpleOption(

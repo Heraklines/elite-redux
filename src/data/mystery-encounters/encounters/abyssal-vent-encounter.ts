@@ -29,6 +29,7 @@
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { guardianForDepth } from "#data/elite-redux/er-delve-guardians";
+import { applyErGuardianTokens } from "#data/elite-redux/er-fight-tokens";
 import {
   emptyMineralHaul,
   type MineralLootHaul,
@@ -243,6 +244,9 @@ function diveConfig(encounter: MysteryEncounter): PressYourLuckConfig {
       };
       await transitionMysteryEncounterIntroVisuals(true, false);
       await initBattleWithEnemyConfig(buildGuardianBattle(haul.interrupts));
+      // Depth-scaled challenge tokens for this dive fight only; cleared after the
+      // battle by doPostBattleCleanup.
+      applyErGuardianTokens(haul.interrupts - 1);
     },
   };
 }

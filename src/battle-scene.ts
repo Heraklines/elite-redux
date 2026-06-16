@@ -36,6 +36,7 @@ import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erIsBiomeEnd, erRollBiomeLength } from "#data/elite-redux/er-biome-structure";
 import { ER_BLACK_SHINY_TINT, isErBlackShiny, promoteToErBlackShinyInBattle } from "#data/elite-redux/er-black-shinies";
+import { clearErFightTokens } from "#data/elite-redux/er-fight-tokens";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
@@ -1853,6 +1854,10 @@ export class BattleScene extends SceneBase {
 
   // TODO: Split this up and move it to a "post battle phase"
   private doPostBattleCleanup(lastBattle: Battle, maxExpLevel: number): void {
+    // ER: a guardian fight's temporary challenge tokens (er-fight-tokens) MUST NOT
+    // outlive that fight - strip them the moment any battle ends so they can never
+    // leak into a normal wave. No-op outside the World Map gate.
+    clearErFightTokens();
     const isNewBiome = this.isNewBiome(lastBattle);
     /** Whether to reset and recall pokemon */
     const resetArenaState =
@@ -1918,6 +1923,8 @@ export class BattleScene extends SceneBase {
     // Second Wind / Anchor once-per-biome charges, Scrap Magnet wave-roll cache)
     // on every biome entry.
     resetErRelicBiomeState();
+    // ER: belt-and-braces - never carry guardian challenge tokens across a biome.
+    clearErFightTokens();
 
     // ER (#486): roll the FIRST biome's variable length here, at the genuine run
     // start (no battle exists yet). Biome-to-biome TRANSITIONS roll in

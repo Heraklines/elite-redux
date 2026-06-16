@@ -18,11 +18,13 @@
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
+import { applyErGuardianTokens } from "#data/elite-redux/er-fight-tokens";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
+import { StatusEffect } from "#enums/status-effect";
 import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
   initBattleWithEnemyConfig,
@@ -102,6 +104,9 @@ export const OverchargeCoreEncounter: MysteryEncounter = MysteryEncounterBuilder
         });
         await transitionMysteryEncounterIntroVisuals(true, false);
         await initBattleWithEnemyConfig(buildGuardianBattle());
+        // Boss-tier challenge tokens (Paralysis-themed for the electric core);
+        // cleared after the battle by doPostBattleCleanup.
+        applyErGuardianTokens(3, { statusType: StatusEffect.PARALYSIS });
         return true;
       })
       .build(),

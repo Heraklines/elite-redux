@@ -35,6 +35,7 @@
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { guardianForDepth } from "#data/elite-redux/er-delve-guardians";
+import { applyErGuardianTokens } from "#data/elite-redux/er-fight-tokens";
 import {
   emptyMineralHaul,
   type MineralLootHaul,
@@ -259,6 +260,9 @@ function mineConfig(encounter: MysteryEncounter): PressYourLuckConfig {
       };
       await transitionMysteryEncounterIntroVisuals(true, false);
       await initBattleWithEnemyConfig(buildGuardianBattle(haul.interrupts));
+      // Depth-scaled challenge tokens for this cave-in fight only (cleared after
+      // the battle by doPostBattleCleanup). First cave-in (interrupts 1) = depth 0.
+      applyErGuardianTokens(haul.interrupts - 1);
     },
   };
 }

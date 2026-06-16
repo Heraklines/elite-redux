@@ -20,6 +20,7 @@
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
+import { applyErGuardianTokens } from "#data/elite-redux/er-fight-tokens";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MoveId } from "#enums/move-id";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
@@ -114,6 +115,8 @@ export const TotemTrialEncounter: MysteryEncounter = MysteryEncounterBuilder.wit
         });
         await transitionMysteryEncounterIntroVisuals(true, false);
         await initBattleWithEnemyConfig(buildTotemBattle());
+        // Boss-tier challenge tokens for the totem trial; cleared after the battle.
+        applyErGuardianTokens(3);
         return true;
       })
       .build(),

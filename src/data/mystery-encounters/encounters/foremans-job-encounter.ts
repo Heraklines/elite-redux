@@ -15,6 +15,7 @@
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
+import { applyErGuardianTokens } from "#data/elite-redux/er-fight-tokens";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
@@ -99,6 +100,8 @@ export const ForemansJobEncounter: MysteryEncounter = MysteryEncounterBuilder.wi
         });
         await transitionMysteryEncounterIntroVisuals(true, false);
         await initBattleWithEnemyConfig(buildGuardianBattle());
+        // Boss-tier challenge tokens; cleared after the battle by doPostBattleCleanup.
+        applyErGuardianTokens(3);
         return true;
       })
       .build(),
