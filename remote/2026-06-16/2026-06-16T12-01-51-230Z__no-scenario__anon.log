@@ -1,0 +1,297 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqgl4kop-6sqp
+mode:     0  wave:2
+seed:     zrM3COid6NlVq9TAuQlRItNe
+party:    Weedle(L50 0hp f0), Magikarp(L50 0hp f0), Pidgey(L50 0hp f0), Rattata(L50 0hp f0), Caterpie(L50 0hp f0), Snorlax(L50 235hp f0)
+enemy:    Magikarp(L80)
+
+----- COMMENT -----
+Sending log to say both items, Anchor and Second wind worked perfectly
+
+----- CONSOLE -----
+[12:01:12.564] LOG: %cStart Phase PositionalTagPhase color:green;
+[12:01:12.564] LOG: %cStart Phase BerryPhase color:green;
+[12:01:12.565] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[12:01:12.565] LOG: %cStart Phase TurnEndPhase color:green;
+[12:01:12.565] LOG: %cStart Phase TurnInitPhase color:green;
+[12:01:12.565] LOG: %cStart Phase CommandPhase color:green;
+[12:01:12.833] LOG: Move: SPLASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Caterpie
+[12:01:12.834] LOG: %cStart Phase EnemyCommandPhase color:green;
+[12:01:12.834] LOG: Battle Seed: dKlbbGdye2kTCAGe
+[12:01:12.834] LOG: %cStart Phase TurnStartPhase color:green;
+[12:01:12.835] LOG: %cStart Phase MovePhase color:green;
+[12:01:12.835] LOG: %cUser: Magikarp
+Move: TACKLE
+Use Mode: NORMAL color:orchid
+[12:01:12.835] LOG: %cStart Phase MessagePhase color:green;
+[12:01:12.946] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:01:13.013] LOG: crit stage: +0
+[12:01:13.013] LOG: Move: Tackle | Base damage: 25.243636363636366 | Power: 40 | Source attack: 47 | Target defense: 55
+[12:01:13.014] LOG: Move: Tackle | Attack damage: 37
+[12:01:13.014] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:01:13.026] LOG: %cStart Phase MessagePhase color:green;
+[12:01:13.213] LOG: %cStart Phase MoveEndPhase color:green;
+[12:01:13.213] LOG: %cStart Phase MovePhase color:green;
+[12:01:13.213] LOG: %cUser: Caterpie
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[12:01:13.214] LOG: %cStart Phase MessagePhase color:green;
+[12:01:13.316] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:01:13.534] LOG: crit stage: +0
+[12:01:13.535] LOG: Move: Splash | Base damage: 9.857142857142858 | Power: 40 | Source attack: 50 | Target defense: 112
+[12:01:13.535] LOG: Move: Splash | Attack damage: 4
+[12:01:13.535] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:01:13.547] LOG: %cStart Phase MessagePhase color:green;
+[12:01:13.752] LOG: %cStart Phase MoveEndPhase color:green;
+[12:01:13.752] LOG: %cStart Phase CheckInterludePhase color:green;
+[12:01:13.752] LOG: %cStart Phase WeatherEffectPhase color:green;
+[12:01:13.752] LOG: %cStart Phase PositionalTagPhase color:green;
+[12:01:13.752] LOG: %cStart Phase BerryPhase color:green;
+[12:01:13.752] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[12:01:13.753] LOG: %cStart Phase TurnEndPhase color:green;
+[12:01:13.753] LOG: %cStart Phase TurnInitPhase color:green;
+[12:01:13.753] LOG: %cStart Phase CommandPhase color:green;
+[12:01:14.081] LOG: Move: SPLASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Caterpie
+[12:01:14.082] LOG: %cStart Phase EnemyCommandPhase color:green;
+[12:01:14.083] LOG: Battle Seed: dKlbbGdye2kTCAGe
+[12:01:14.083] LOG: %cStart Phase TurnStartPhase color:green;
+[12:01:14.083] LOG: %cStart Phase MovePhase color:green;
+[12:01:14.083] LOG: %cUser: Magikarp
+Move: TACKLE
+Use Mode: NORMAL color:orchid
+[12:01:14.084] LOG: %cStart Phase MessagePhase color:green;
+[12:01:14.194] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:01:14.261] LOG: crit stage: +0
+[12:01:14.262] LOG: Move: Tackle | Base damage: 25.243636363636366 | Power: 40 | Source attack: 47 | Target defense: 55
+[12:01:14.262] LOG: Move: Tackle | Attack damage: 23
+[12:01:14.262] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:01:14.274] LOG: %cStart Phase MoveEndPhase color:green;
+[12:01:14.274] LOG: %cStart Phase MovePhase color:green;
+[12:01:14.274] LOG: %cUser: Caterpie
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[12:01:14.275] LOG: %cStart Phase MessagePhase color:green;
+[12:01:14.377] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:01:14.595] LOG: crit stage: +0
+[12:01:14.595] LOG: Move: Splash | Base damage: 9.857142857142858 | Power: 40 | Source attack: 50 | Target defense: 112
+[12:01:14.596] LOG: Move: Splash | Attack damage: 4
+[12:01:14.596] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:01:14.608] LOG: %cStart Phase MessagePhase color:green;
+[12:01:14.813] LOG: %cStart Phase MoveEndPhase color:green;
+[12:01:14.813] LOG: %cStart Phase CheckInterludePhase color:green;
+[12:01:14.813] LOG: %cStart Phase WeatherEffectPhase color:green;
+[12:01:14.813] LOG: %cStart Phase PositionalTagPhase color:green;
+[12:01:14.813] LOG: %cStart Phase BerryPhase color:green;
+[12:01:14.814] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[12:01:14.814] LOG: %cStart Phase TurnEndPhase color:green;
+[12:01:14.814] LOG: %cStart Phase TurnInitPhase color:green;
+[12:01:14.814] LOG: %cStart Phase CommandPhase color:green;
+[12:01:15.081] LOG: Move: SPLASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Caterpie
+[12:01:15.082] LOG: %cStart Phase EnemyCommandPhase color:green;
+[12:01:15.082] LOG: Battle Seed: dKlbbGdye2kTCAGe
+[12:01:15.082] LOG: %cStart Phase TurnStartPhase color:green;
+[12:01:15.082] LOG: %cStart Phase MovePhase color:green;
+[12:01:15.082] LOG: %cUser: Magikarp
+Move: TACKLE
+Use Mode: NORMAL color:orchid
+[12:01:15.083] LOG: %cStart Phase MessagePhase color:green;
+[12:01:15.196] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:01:15.262] LOG: crit stage: +0
+[12:01:15.263] LOG: Move: Tackle | Base damage: 25.243636363636366 | Power: 40 | Source attack: 47 | Target defense: 55
+[12:01:15.263] LOG: Move: Tackle | Attack damage: 24
+[12:01:15.263] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:01:15.275] LOG: %cStart Phase FaintPhase color:green;
+[12:01:15.335] LOG: %cStart Phase MessagePhase color:green;
+[12:01:15.581] LOG: %cStart Phase MoveEndPhase color:green;
+[12:01:15.581] LOG: %cStart Phase MovePhase color:green;
+[12:01:15.581] LOG: %cStart Phase MoveEndPhase color:green;
+[12:01:15.581] LOG: %cStart Phase CheckInterludePhase color:green;
+[12:01:15.581] LOG: %cStart Phase WeatherEffectPhase color:green;
+[12:01:15.581] LOG: %cStart Phase PositionalTagPhase color:green;
+[12:01:15.581] LOG: %cStart Phase BerryPhase color:green;
+[12:01:15.581] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[12:01:15.581] LOG: %cStart Phase TurnEndPhase color:green;
+[12:01:15.581] LOG: %cStart Phase SwitchPhase color:green;
+[12:01:17.321] LOG: %cStart Phase SwitchSummonPhase color:green;
+[12:01:17.528] LOG: %cStart Phase PostSummonPhase color:green;
+[12:01:17.528] LOG: Ran PSP for: Weedle
+[12:01:17.529] LOG: %cStart Phase PostSummonPhase color:green;
+[12:01:17.529] LOG: %cStart Phase TurnInitPhase color:green;
+[12:01:17.529] LOG: %cStart Phase CommandPhase color:green;
+[12:01:18.020] LOG: Move: SPLASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Weedle
+[12:01:18.021] LOG: %cStart Phase EnemyCommandPhase color:green;
+[12:01:18.021] LOG: Battle Seed: dKlbbGdye2kTCAGe
+[12:01:18.021] LOG: %cStart Phase TurnStartPhase color:green;
+[12:01:18.022] LOG: %cStart Phase MovePhase color:green;
+[12:01:18.022] LOG: %cUser: Magikarp
+Move: TACKLE
+Use Mode: NORMAL color:orchid
+[12:01:18.022] LOG: %cStart Phase MessagePhase color:green;
+[12:01:18.133] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:01:18.201] LOG: crit stage: +0
+[12:01:18.202] LOG: Move: Tackle | Base damage: 27.568 | Power: 40 | Source attack: 47 | Target defense: 50
+[12:01:18.202] LOG: Move: Tackle | Attack damage: 27
+[12:01:18.202] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:01:18.214] LOG: %cStart Phase MoveEndPhase color:green;
+[12:01:18.214] LOG: %cStart Phase MovePhase color:green;
+[12:01:18.214] LOG: %cUser: Weedle
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[12:01:18.215] LOG: %cStart Phase MessagePhase color:green;
+[12:01:18.315] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:01:18.535] LOG: crit stage: +0
+[12:01:18.535] LOG: Move: Splash | Base damage: 10.642857142857144 | Power: 40 | Source attack: 55 | Target defense: 112
+[12:01:18.535] LOG: Move: Splash | Attack damage: 4
+[12:01:18.535] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:01:18.547] LOG: %cStart Phase MessagePhase color:green;
+[12:01:18.752] LOG: %cStart Phase MoveEndPhase color:green;
+[12:01:18.752] LOG: %cStart Phase CheckInterludePhase color:green;
+[12:01:18.752] LOG: %cStart Phase WeatherEffectPhase color:green;
+[12:01:18.752] LOG: %cStart Phase PositionalTagPhase color:green;
+[12:01:18.752] LOG: %cStart Phase BerryPhase color:green;
+[12:01:18.753] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[12:01:18.753] LOG: %cStart Phase TurnEndPhase color:green;
+[12:01:18.753] LOG: %cStart Phase TurnInitPhase color:green;
+[12:01:18.753] LOG: %cStart Phase CommandPhase color:green;
+[12:01:19.020] LOG: Move: SPLASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Weedle
+[12:01:19.020] LOG: %cStart Phase EnemyCommandPhase color:green;
+[12:01:19.021] LOG: Battle Seed: dKlbbGdye2kTCAGe
+[12:01:19.021] LOG: %cStart Phase TurnStartPhase color:green;
+[12:01:19.021] LOG: %cStart Phase MovePhase color:green;
+[12:01:19.021] LOG: %cUser: Magikarp
+Move: TACKLE
+Use Mode: NORMAL color:orchid
+[12:01:19.022] LOG: %cStart Phase MessagePhase color:green;
+[12:01:19.134] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:01:19.201] LOG: crit stage: +0
+[12:01:19.202] LOG: Move: Tackle | Base damage: 27.568 | Power: 40 | Source attack: 47 | Target defense: 50
+[12:01:19.202] LOG: Move: Tackle | Attack damage: 27
+[12:01:19.202] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:01:19.214] LOG: %cStart Phase MoveEndPhase color:green;
+[12:01:19.214] LOG: %cStart Phase MovePhase color:green;
+[12:01:19.214] LOG: %cUser: Weedle
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[12:01:19.215] LOG: %cStart Phase MessagePhase color:green;
+[12:01:19.315] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:01:19.540] LOG: crit stage: +0
+[12:01:19.541] LOG: Move: Splash | Base damage: 10.642857142857144 | Power: 40 | Source attack: 55 | Target defense: 112
+[12:01:19.541] LOG: Move: Splash | Attack damage: 5
+[12:01:19.541] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:01:19.554] LOG: %cStart Phase MessagePhase color:green;
+[12:01:19.758] LOG: %cStart Phase MoveEndPhase color:green;
+[12:01:19.758] LOG: %cStart Phase CheckInterludePhase color:green;
+[12:01:19.758] LOG: %cStart Phase WeatherEffectPhase color:green;
+[12:01:19.758] LOG: %cStart Phase PositionalTagPhase color:green;
+[12:01:19.758] LOG: %cStart Phase BerryPhase color:green;
+[12:01:19.759] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[12:01:19.759] LOG: %cStart Phase TurnEndPhase color:green;
+[12:01:19.759] LOG: %cStart Phase TurnInitPhase color:green;
+[12:01:19.759] LOG: %cStart Phase CommandPhase color:green;
+[12:01:20.020] LOG: Move: SPLASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Weedle
+[12:01:20.021] LOG: %cStart Phase EnemyCommandPhase color:green;
+[12:01:20.022] LOG: Battle Seed: dKlbbGdye2kTCAGe
+[12:01:20.022] LOG: %cStart Phase TurnStartPhase color:green;
+[12:01:20.022] LOG: %cStart Phase MovePhase color:green;
+[12:01:20.022] LOG: %cUser: Magikarp
+Move: TACKLE
+Use Mode: NORMAL color:orchid
+[12:01:20.022] LOG: %cStart Phase MessagePhase color:green;
+[12:01:20.134] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:01:20.201] LOG: crit stage: +0
+[12:01:20.202] LOG: Move: Tackle | Base damage: 27.568 | Power: 40 | Source attack: 47 | Target defense: 50
+[12:01:20.202] LOG: Move: Tackle | Attack damage: 25
+[12:01:20.202] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:01:20.214] LOG: %cStart Phase MoveEndPhase color:green;
+[12:01:20.214] LOG: %cStart Phase MovePhase color:green;
+[12:01:20.214] LOG: %cUser: Weedle
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[12:01:20.215] LOG: %cStart Phase MessagePhase color:green;
+[12:01:20.315] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:01:20.535] LOG: crit stage: +0
+[12:01:20.535] LOG: Move: Splash | Base damage: 10.642857142857144 | Power: 40 | Source attack: 55 | Target defense: 112
+[12:01:20.535] LOG: Move: Splash | Attack damage: 5
+[12:01:20.535] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:01:20.547] LOG: %cStart Phase MessagePhase color:green;
+[12:01:20.752] LOG: %cStart Phase MoveEndPhase color:green;
+[12:01:20.752] LOG: %cStart Phase CheckInterludePhase color:green;
+[12:01:20.752] LOG: %cStart Phase WeatherEffectPhase color:green;
+[12:01:20.752] LOG: %cStart Phase PositionalTagPhase color:green;
+[12:01:20.752] LOG: %cStart Phase BerryPhase color:green;
+[12:01:20.753] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[12:01:20.753] LOG: %cStart Phase TurnEndPhase color:green;
+[12:01:20.753] LOG: %cStart Phase TurnInitPhase color:green;
+[12:01:20.753] LOG: %cStart Phase CommandPhase color:green;
+[12:01:21.021] LOG: Move: SPLASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Weedle
+[12:01:21.022] LOG: %cStart Phase EnemyCommandPhase color:green;
+[12:01:21.022] LOG: Battle Seed: dKlbbGdye2kTCAGe
+[12:01:21.022] LOG: %cStart Phase TurnStartPhase color:green;
+[12:01:21.022] LOG: %cStart Phase MovePhase color:green;
+[12:01:21.022] LOG: %cUser: Magikarp
+Move: TACKLE
+Use Mode: NORMAL color:orchid
+[12:01:21.023] LOG: %cStart Phase MessagePhase color:green;
+[12:01:21.134] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:01:21.202] LOG: crit stage: +0
+[12:01:21.202] LOG: Move: Tackle | Base damage: 27.568 | Power: 40 | Source attack: 47 | Target defense: 50
+[12:01:21.202] LOG: Move: Tackle | Attack damage: 26
+[12:01:21.202] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:01:21.213] LOG: %cStart Phase MoveEndPhase color:green;
+[12:01:21.214] LOG: %cStart Phase MovePhase color:green;
+[12:01:21.214] LOG: %cUser: Weedle
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[12:01:21.214] LOG: %cStart Phase MessagePhase color:green;
+[12:01:21.316] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:01:21.534] LOG: crit stage: +0
+[12:01:21.535] LOG: Move: Splash | Base damage: 10.642857142857144 | Power: 40 | Source attack: 55 | Target defense: 112
+[12:01:21.535] LOG: Move: Splash | Attack damage: 4
+[12:01:21.535] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:01:21.547] LOG: %cStart Phase MessagePhase color:green;
+[12:01:21.752] LOG: %cStart Phase MoveEndPhase color:green;
+[12:01:21.752] LOG: %cStart Phase CheckInterludePhase color:green;
+[12:01:21.752] LOG: %cStart Phase WeatherEffectPhase color:green;
+[12:01:21.752] LOG: %cStart Phase PositionalTagPhase color:green;
+[12:01:21.752] LOG: %cStart Phase BerryPhase color:green;
+[12:01:21.752] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[12:01:21.752] LOG: %cStart Phase TurnEndPhase color:green;
+[12:01:21.753] LOG: %cStart Phase TurnInitPhase color:green;
+[12:01:21.753] LOG: %cStart Phase CommandPhase color:green;
+[12:01:22.020] LOG: Move: SPLASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Weedle
+[12:01:22.021] LOG: %cStart Phase EnemyCommandPhase color:green;
+[12:01:22.021] LOG: Battle Seed: dKlbbGdye2kTCAGe
+[12:01:22.022] LOG: %cStart Phase TurnStartPhase color:green;
+[12:01:22.022] LOG: %cStart Phase MovePhase color:green;
+[12:01:22.022] LOG: %cUser: Magikarp
+Move: TACKLE
+Use Mode: NORMAL color:orchid
+[12:01:22.022] LOG: %cStart Phase MessagePhase color:green;
+[12:01:22.134] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:01:22.201] LOG: crit stage: +0
+[12:01:22.201] LOG: Move: Tackle | Base damage: 27.568 | Power: 40 | Source attack: 47 | Target defense: 50
+[12:01:22.201] LOG: Move: Tackle | Attack damage: 25
+[12:01:22.201] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:01:22.214] LOG: %cStart Phase FaintPhase color:green;
+[12:01:22.274] LOG: %cStart Phase ResetStatusPhase color:green;
+[12:01:22.274] LOG: %cStart Phase MessagePhase color:green;
+[12:01:22.552] LOG: %cStart Phase MessagePhase color:green;
+[12:01:23.164] LOG: %cStart Phase MoveEndPhase color:green;
+[12:01:23.165] LOG: %cStart Phase MovePhase color:green;
+[12:01:23.165] LOG: %cStart Phase MoveEndPhase color:green;
+[12:01:23.165] LOG: %cStart Phase CheckInterludePhase color:green;
+[12:01:23.165] LOG: %cStart Phase WeatherEffectPhase color:green;
+[12:01:23.165] LOG: %cStart Phase PositionalTagPhase color:green;
+[12:01:23.165] LOG: %cStart Phase BerryPhase color:green;
+[12:01:23.165] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[12:01:23.165] LOG: %cStart Phase TurnEndPhase color:green;
+[12:01:23.165] LOG: %cStart Phase SwitchPhase color:green;
+[12:01:26.506] LOG: [dev-tools] TEST RESULT: PASS — ER Relics: Second Wind + Anchor (#439)
