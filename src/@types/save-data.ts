@@ -1,5 +1,6 @@
 import type { PokeballCounts } from "#app/battle-scene";
 import type { Tutorial } from "#app/tutorial";
+import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import type { BattleType } from "#enums/battle-type";
 import type { GameModes } from "#enums/game-modes";
@@ -116,6 +117,13 @@ export interface SessionSaveData {
    * waveProgress]) — same side-channel rationale as erResistBerries.
    */
   erWardStones?: [number, number, number, number][];
+  /**
+   * ER (#486): the run's Map state - revealed nodes, a pending travel target, and
+   * Treasure-Map fragment count. Run-scoped module state that a reload would
+   * otherwise wipe. Optional for backwards compatibility (older saves restore a
+   * fresh, empty map).
+   */
+  erMapState?: ErMapSaveData;
 }
 
 export interface Unlocks {

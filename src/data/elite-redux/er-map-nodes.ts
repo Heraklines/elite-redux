@@ -111,3 +111,51 @@ export function consumeTreasureFragmentsForReward(): boolean {
   }
   return false;
 }
+
+// --- Session persistence ----------------------------------------------------
+// The whole substrate is plain JSON-safe data (biome is a numeric enum, label a
+// string, kind a string literal), so the save payload is just a snapshot of the
+// three pieces of state. Restoring is defensive: a legacy save with no field, or
+// a malformed one, leaves a clean (reset) map rather than throwing on load.
+
+/** A serializable snapshot of the run's map state for the session save. */
+export interface ErMapSaveData {
+  nodes: ErMapNode[];
+  travelTarget: BiomeId | null;
+  fragments: number;
+}
+
+/** Snapshot the current map state for the session save (#486 increment 2). */
+export function getErMapSaveData(): ErMapSaveData {
+  return {
+    nodes: revealedNodes.map(node => ({ ...node })),
+    travelTarget,
+    fragments: fragmentCount,
+  };
+}
+
+/**
+ * Restore map state from a session save. Tolerant of undefined (older saves) and
+ * of partially-malformed payloads - anything unusable is dropped, never thrown.
+ * Always resets first so a reload can't accumulate stale state.
+ */
+export function restoreErMapState(data: ErMapSaveData | undefined | null): void {
+  resetErMapNodes();
+  if (!data) {
+    return;
+  }
+  if (Array.isArray(data.nodes)) {
+    revealMapNodes(
+      data.nodes.filter(
+        (node): node is ErMapNode =>
+          node != null && typeof node.label === "string" && typeof node.biome === "number",
+      ),
+    );
+  }
+  if (typeof data.travelTarget === "number") {
+    travelTarget = data.travelTarget;
+  }
+  if (typeof data.fragments === "number" && data.fragments > 0) {
+    fragmentCount = Math.floor(data.fragments);
+  }
+}

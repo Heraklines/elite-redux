@@ -2,10 +2,12 @@ import {
   addTreasureFragments,
   consumeMapTravelTarget,
   consumeTreasureFragmentsForReward,
+  getErMapSaveData,
   getRevealedMapNodes,
   getTreasureFragments,
   hasRevealedMapNodes,
   resetErMapNodes,
+  restoreErMapState,
   revealMapNodes,
   setMapTravelTarget,
   TREASURE_FRAGMENTS_FOR_REWARD,
@@ -77,5 +79,49 @@ describe("ER #486 - Phase D map-node substrate", () => {
     expect(getRevealedMapNodes()).toHaveLength(0);
     expect(getTreasureFragments()).toBe(0);
     expect(consumeMapTravelTarget()).toBeNull();
+  });
+
+  it("round-trips through the session save snapshot (#486 increment 2)", () => {
+    revealMapNodes([
+      { biome: BiomeId.SEA, label: "Distant Isle", kind: "biome" },
+      { biome: BiomeId.SPACE, label: "The Observatory", kind: "landmark" },
+    ]);
+    setMapTravelTarget(BiomeId.SEA);
+    addTreasureFragments(2);
+
+    const saved = getErMapSaveData();
+    // Snapshot must be a plain detached copy, not a live reference.
+    expect(saved.nodes).toHaveLength(2);
+    expect(saved.travelTarget).toBe(BiomeId.SEA);
+    expect(saved.fragments).toBe(2);
+
+    // A fresh run wipes everything...
+    resetErMapNodes();
+    expect(hasRevealedMapNodes()).toBe(false);
+
+    // ...and loading the save brings it all back.
+    restoreErMapState(saved);
+    expect(getRevealedMapNodes()).toHaveLength(2);
+    expect(getTreasureFragments()).toBe(2);
+    // Travel target survives the round-trip (consume returns it once).
+    expect(consumeMapTravelTarget()).toBe(BiomeId.SEA);
+  });
+
+  it("restore tolerates undefined and malformed payloads", () => {
+    revealMapNodes([{ biome: BiomeId.CAVE, label: "Deep Cave", kind: "biome" }]);
+    // Undefined (a legacy save) restores a clean, empty map.
+    restoreErMapState(undefined);
+    expect(hasRevealedMapNodes()).toBe(false);
+    expect(getTreasureFragments()).toBe(0);
+
+    // A malformed payload drops unusable entries instead of throwing.
+    restoreErMapState({
+      // biome-ignore lint/suspicious/noExplicitAny: deliberately malformed test payload
+      nodes: [{ biome: BiomeId.LAKE, label: "Quiet Lake", kind: "biome" }, null as any, { label: "x" } as any],
+      travelTarget: null,
+      fragments: -3,
+    });
+    expect(getRevealedMapNodes()).toHaveLength(1);
+    expect(getTreasureFragments()).toBe(0);
   });
 });

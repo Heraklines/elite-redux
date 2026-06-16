@@ -16,6 +16,7 @@ import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed/da
 import { allMoves, allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
+import { getErMapSaveData, restoreErMapState } from "#data/elite-redux/er-map-nodes";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { getErReduxCounterpartId, migrateErReduxDexHijack } from "#data/elite-redux/er-redux-dex-redirect";
 import { getErResistBerryEntries, restoreErResistBerries } from "#data/elite-redux/er-resist-berries";
@@ -1203,6 +1204,9 @@ export class GameData {
       erResistBerries: getErResistBerryEntries(),
       // ER (#358): persist the player's Ward Stones incl. charge state.
       erWardStones: getErWardStoneEntries(),
+      // ER (#486): persist the run's Map state (revealed nodes / travel target /
+      // Treasure-Map fragments) - run-scoped module state a reload would wipe.
+      erMapState: getErMapSaveData(),
     } as SessionSaveData;
   }
 
@@ -1317,6 +1321,9 @@ export class GameData {
     setErDifficulty(fromSession.erDifficulty ?? "ace");
     restoreErRunTrainerTracking(fromSession.erUsedTrainerKeys);
     restoreErMoneyStreaks(fromSession.erMoneyStreaks);
+    // ER (#486): restore the run's Map state (revealed nodes / travel target /
+    // fragments). Tolerant of older saves with no field (clean, empty map).
+    restoreErMapState(fromSession.erMapState);
 
     globalScene.setSeed(fromSession.seed || globalScene.game.config.seed[0]);
     globalScene.resetSeed();
