@@ -28,6 +28,7 @@
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
+import { guardianForDepth } from "#data/elite-redux/er-delve-guardians";
 import {
   emptyMineralHaul,
   type MineralLootHaul,
@@ -47,7 +48,7 @@ import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
-import { SpeciesId } from "#enums/species-id";
+import { PokemonType } from "#enums/pokemon-type";
 import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
@@ -60,7 +61,6 @@ import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
 import { randSeedInt } from "#utils/common";
-import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 const namespace = "mysteryEncounters/abyssalVent";
 
@@ -89,12 +89,8 @@ const BOSS_LEVELS_ABOVE = 5;
 /** Percent chance per deep descent to turn up a party-line mega stone (once/session). */
 const MEGA_STONE_CHANCE = 4;
 
-/**
- * Thematic wild deep-sea guardians, ordered weakest -> strongest. Deeper stirs
- * pull from further down the list (escalating BST beyond the wave cap); the boss
- * is the last, toughest entry.
- */
-const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.LANTURN, SpeciesId.RELICANTH, SpeciesId.TOXAPEX, SpeciesId.DHELMISE];
+/** The Vent's guardians are WATER-typed (deep-sea); the shared picker climbs BST. */
+const VENT_GUARDIAN_TYPES = [PokemonType.WATER];
 
 /** What the Vent accumulates on `encounter.misc.dive`. */
 interface DiveHaul {
@@ -189,9 +185,8 @@ function guardianLevel(): number {
  */
 function buildGuardianBattle(interrupts: number): EnemyPartyConfig {
   const isBoss = interrupts >= GUARDIAN_BOSS_AFTER_INTERRUPTS;
-  const speciesIdx = Math.min(interrupts, GUARDIAN_SPECIES.length - 1);
-  const toughestIdx = GUARDIAN_SPECIES.length - 1;
-  const species = getPokemonSpecies(GUARDIAN_SPECIES[isBoss ? toughestIdx : speciesIdx]);
+  // A Water guardian whose BST climbs with depth (shared picker), boss at the top.
+  const species = guardianForDepth(VENT_GUARDIAN_TYPES, interrupts, isBoss);
   let level = guardianLevel() + interrupts * GUARDIAN_LEVEL_PER_INTERRUPT;
   if (isBoss) {
     level = Math.max(level, guardianLevel() + BOSS_LEVELS_ABOVE);

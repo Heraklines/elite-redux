@@ -32,6 +32,7 @@
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
+import { guardianForDepth } from "#data/elite-redux/er-delve-guardians";
 import {
   emptyMineralHaul,
   type MineralLootHaul,
@@ -52,7 +53,8 @@ import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
-import { SpeciesId } from "#enums/species-id";
+import { PokemonType } from "#enums/pokemon-type";
+import type { SpeciesId } from "#enums/species-id";
 import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
@@ -94,11 +96,8 @@ const BOSS_LEVELS_ABOVE = 5;
 /** Percent chance per deep chamber to turn up a party-line mega stone (once/session). */
 const MEGA_STONE_CHANCE = 4;
 
-/**
- * Thematic wild Grass/Rock guardians, ordered weakest -> strongest. Deeper wakes
- * pull from further down the list (escalating BST beyond the wave cap).
- */
-const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.SUDOWOODO, SpeciesId.CRADILY, SpeciesId.TORTERRA, SpeciesId.TANGROWTH];
+/** The Temple's guardians are GRASS/BUG-typed (jungle ruin); shared picker climbs BST. */
+const TEMPLE_GUARDIAN_TYPES = [PokemonType.GRASS, PokemonType.BUG];
 
 /**
  * The temple's awakened guardian and chain BOSS: Burmy Eterna, the Redux
@@ -208,18 +207,17 @@ function buildGuardianBattle(interrupts: number): EnemyPartyConfig {
       guardianLevel() + BOSS_LEVELS_ABOVE,
     );
     // Guard against the ER custom not being registered (the unresolved-species
-    // class of crash, cf. Graves): fall back to the toughest normal guardian.
-    const toughestIdx = GUARDIAN_SPECIES.length - 1;
-    const bossSpecies = getPokemonSpecies(TEMPLE_BOSS_SPECIES) ?? getPokemonSpecies(GUARDIAN_SPECIES[toughestIdx]);
+    // class of crash, cf. Graves): fall back to a top-BST themed guardian.
+    const bossSpecies =
+      getPokemonSpecies(TEMPLE_BOSS_SPECIES) ?? guardianForDepth(TEMPLE_GUARDIAN_TYPES, interrupts, true);
     return {
       pokemonConfigs: [{ species: bossSpecies, isBoss: true, bossSegments: 2 + randSeedInt(2), level }],
     };
   }
-  // Deeper wakes escalate the species (ascending BST), clamped to the list.
-  const speciesIdx = Math.min(interrupts, GUARDIAN_SPECIES.length - 1);
+  // A Grass/Bug guardian whose BST climbs with depth (shared picker).
   const level = guardianLevel() + interrupts * GUARDIAN_LEVEL_PER_INTERRUPT;
   return {
-    pokemonConfigs: [{ species: getPokemonSpecies(GUARDIAN_SPECIES[speciesIdx]), isBoss: false, level }],
+    pokemonConfigs: [{ species: guardianForDepth(TEMPLE_GUARDIAN_TYPES, interrupts, false), isBoss: false, level }],
   };
 }
 
