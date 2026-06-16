@@ -1,0 +1,273 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqh3a9vj-8pui
+mode:     0  wave:44
+seed:     JeHbaH2NtHJzdzln3HJpvY0t
+party:    Lanturn(L37 150hp f1), Breezing(L35 139hp f0), Typhlosion(L37 127hp f0), Rotom(L36 93hp f2), Pyukumuku(L37 136hp f0), Zweilous(L37 111hp f0)
+enemy:    Gargablox(L37), Popcorm(L37), Cormoth(L37), Malamar(L37)
+
+----- CONSOLE -----
+[20:26:52.617] LOG: Moveset: ["Astonish","Shadow Sneak","Shocking Edge","Feint Attack"]
+[20:26:55.804] LOG: Wave Seed: uss]ysu¥¥^su¡[ 43
+[20:26:56.243] LOG: %cStart Phase SummonPhase color:green;
+[20:26:56.419] LOG: Applied Iron 
+[20:26:56.568] LOG: %cStart Phase ShinySparklePhase color:green;
+[20:26:56.700] LOG: %cStart Phase CheckSwitchPhase color:green;
+[20:27:00.223] LOG: %cStart Phase SwitchPhase color:green;
+[20:27:03.826] LOG: %cStart Phase SwitchSummonPhase color:green;
+[20:27:04.011] LOG: Applied Iron 
+[20:27:04.037] WARN: cry/171-mega not found
+[20:27:04.184] LOG: %cStart Phase PostSummonPhase color:green;
+[20:27:04.184] LOG: Ran PSP for: Mega Lanturn
+[20:27:04.184] LOG: %cStart Phase PostSummonPhase color:green;
+[20:27:04.184] LOG: %cStart Phase PostSummonPhase color:green;
+[20:27:04.184] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:27:04.184] LOG: %cStart Phase PostSummonPhase color:green;
+[20:27:04.184] LOG: Ran PSP for: Mimikyu
+[20:27:04.184] LOG: %cStart Phase PostSummonPhase color:green;
+[20:27:04.185] LOG: %cStart Phase PostSummonPhase color:green;
+[20:27:04.185] LOG: %cStart Phase TurnInitPhase color:green;
+[20:27:04.185] LOG: %cStart Phase CommandPhase color:green;
+[20:27:07.228] LOG: Move: BOUNCY_BUBBLE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega Lanturn
+[20:27:07.229] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:27:07.234] LOG: Battle Seed: TjJoWzoiCIDDopYl
+[20:27:07.236] LOG: Move Pool: ["Astonish","Shadow Sneak","Shocking Edge","Feint Attack"]
+[20:27:07.236] LOG: Move Scores: [19.5,12,16,12]
+[20:27:07.236] LOG: Sorted Move Pool: ["Astonish","Shocking Edge","Shadow Sneak","Feint Attack"]
+[20:27:07.236] LOG: Chosen Move: Shocking Edge
+[20:27:07.236] LOG: %cStart Phase TurnStartPhase color:green;
+[20:27:07.237] LOG: %cStart Phase MovePhase color:green;
+[20:27:07.237] LOG: %cUser: Mimikyu
+Move: SHOCKING_EDGE
+Use Mode: NORMAL color:orchid
+[20:27:07.239] LOG: %cStart Phase MessagePhase color:green;
+[20:27:07.382] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:27:07.383] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:27:07.559] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:27:07.606] LOG: %cStart Phase MessagePhase color:green;
+[20:27:07.867] LOG: %cStart Phase MoveEndPhase color:green;
+[20:27:07.867] LOG: %cStart Phase MovePhase color:green;
+[20:27:07.867] LOG: %cUser: Mega Lanturn
+Move: BOUNCY_BUBBLE
+Use Mode: NORMAL color:orchid
+[20:27:07.868] LOG: %cStart Phase MessagePhase color:green;
+[20:27:08.017] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:27:08.946] LOG: Applied Dire Hit 
+[20:27:08.946] LOG: crit stage: +1
+[20:27:08.946] LOG: Move: Bouncy Bubble | Base damage: 25.218604651162792 | Power: 60 | Source attack: 104 | Target defense: 86
+[20:27:08.947] LOG: Move: Bouncy Bubble | Attack damage: 0
+[20:27:08.947] LOG: %cStart Phase MessagePhase color:green;
+[20:27:09.198] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:27:09.200] LOG: %cStart Phase QuietFormChangePhase color:green;
+[20:27:10.983] LOG: %cStart Phase PokemonHealPhase color:green;
+[20:27:10.983] LOG: %cStart Phase MessagePhase color:green;
+[20:27:11.252] LOG: %cStart Phase MoveEndPhase color:green;
+[20:27:11.252] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:27:11.252] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:27:11.851] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:27:11.851] LOG: %cStart Phase BerryPhase color:green;
+[20:27:11.852] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:27:11.852] LOG: %cStart Phase TurnEndPhase color:green;
+[20:27:11.853] LOG: %cStart Phase TurnInitPhase color:green;
+[20:27:11.853] LOG: %cStart Phase CommandPhase color:green;
+[20:27:12.728] LOG: Move: BOUNCY_BUBBLE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega Lanturn
+[20:27:12.728] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:27:12.731] LOG: Battle Seed: TjJoWzoiCIDDopYl
+[20:27:12.732] LOG: Move Pool: ["Astonish","Shadow Sneak","Shocking Edge","Feint Attack"]
+[20:27:12.732] LOG: Move Scores: [-20,12,-20,12]
+[20:27:12.732] LOG: Sorted Move Pool: ["Shadow Sneak","Feint Attack","Astonish","Shocking Edge"]
+[20:27:12.732] LOG: Chosen Move: Shadow Sneak
+[20:27:12.732] LOG: %cStart Phase TurnStartPhase color:green;
+[20:27:12.733] LOG: %cStart Phase MovePhase color:green;
+[20:27:12.733] LOG: %cUser: Mimikyu
+Move: SHADOW_SNEAK
+Use Mode: NORMAL color:orchid
+[20:27:12.733] LOG: %cStart Phase MessagePhase color:green;
+[20:27:12.826] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:27:13.817] LOG: crit stage: +0
+[20:27:13.817] LOG: Move: Shadow Sneak | Base damage: 13.267764705882353 | Power: 40 | Source attack: 73 | Target defense: 85
+[20:27:13.817] LOG: Move: Shadow Sneak | Attack damage: 19
+[20:27:13.817] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:27:13.865] LOG: %cStart Phase MoveEndPhase color:green;
+[20:27:13.865] LOG: %cStart Phase MovePhase color:green;
+[20:27:13.865] LOG: %cUser: Mega Lanturn
+Move: BOUNCY_BUBBLE
+Use Mode: NORMAL color:orchid
+[20:27:13.866] LOG: %cStart Phase MessagePhase color:green;
+[20:27:14.028] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:27:14.915] LOG: Applied Dire Hit 
+[20:27:14.915] LOG: crit stage: +1
+[20:27:14.915] LOG: Move: Bouncy Bubble | Base damage: 25.218604651162792 | Power: 60 | Source attack: 104 | Target defense: 86
+[20:27:14.915] LOG: Move: Bouncy Bubble | Attack damage: 53
+[20:27:14.916] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:27:14.962] LOG: %cStart Phase PokemonHealPhase color:green;
+[20:27:14.962] LOG: %cStart Phase MessagePhase color:green;
+[20:27:15.231] LOG: %cStart Phase MoveEndPhase color:green;
+[20:27:15.231] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:27:15.231] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:27:15.822] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:27:15.822] LOG: %cStart Phase BerryPhase color:green;
+[20:27:15.823] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:27:15.823] LOG: %cStart Phase TurnEndPhase color:green;
+[20:27:15.824] LOG: %cStart Phase TurnInitPhase color:green;
+[20:27:15.824] LOG: %cStart Phase CommandPhase color:green;
+[20:27:16.172] LOG: Move: BOUNCY_BUBBLE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega Lanturn
+[20:27:16.173] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:27:16.175] LOG: Battle Seed: TjJoWzoiCIDDopYl
+[20:27:16.177] LOG: Move Pool: ["Astonish","Shadow Sneak","Shocking Edge","Feint Attack"]
+[20:27:16.177] LOG: Move Scores: [-20,12,-20,12]
+[20:27:16.177] LOG: Sorted Move Pool: ["Shadow Sneak","Feint Attack","Astonish","Shocking Edge"]
+[20:27:16.177] LOG: Chosen Move: Shadow Sneak
+[20:27:16.177] LOG: %cStart Phase TurnStartPhase color:green;
+[20:27:16.178] LOG: %cStart Phase MovePhase color:green;
+[20:27:16.178] LOG: %cUser: Mimikyu
+Move: SHADOW_SNEAK
+Use Mode: NORMAL color:orchid
+[20:27:16.179] LOG: %cStart Phase MessagePhase color:green;
+[20:27:16.317] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:27:17.290] LOG: crit stage: +0
+[20:27:17.290] LOG: Move: Shadow Sneak | Base damage: 13.267764705882353 | Power: 40 | Source attack: 73 | Target defense: 85
+[20:27:17.290] LOG: Move: Shadow Sneak | Attack damage: 19
+[20:27:17.290] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:27:17.335] LOG: %cStart Phase MoveEndPhase color:green;
+[20:27:17.335] LOG: %cStart Phase MovePhase color:green;
+[20:27:17.335] LOG: %cUser: Mega Lanturn
+Move: BOUNCY_BUBBLE
+Use Mode: NORMAL color:orchid
+[20:27:17.336] LOG: %cStart Phase MessagePhase color:green;
+[20:27:17.495] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:27:18.391] LOG: Applied Dire Hit 
+[20:27:18.391] LOG: crit stage: +1
+[20:27:18.391] LOG: Move: Bouncy Bubble | Base damage: 25.218604651162792 | Power: 60 | Source attack: 104 | Target defense: 86
+[20:27:18.391] LOG: Move: Bouncy Bubble | Attack damage: 49
+[20:27:18.392] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:27:18.446] LOG: %cStart Phase PokemonHealPhase color:green;
+[20:27:18.446] LOG: %cStart Phase MessagePhase color:green;
+[20:27:18.712] LOG: %cStart Phase FaintPhase color:green;
+[20:27:18.783] LOG: %cStart Phase MessagePhase color:green;
+[20:27:19.335] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:27:19.563] LOG: %cStart Phase QuietFormChangePhase color:green;
+[20:27:19.563] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:27:19.609] LOG: %cStart Phase VictoryPhase color:green;
+[20:27:19.611] LOG: %cStart Phase ExpPhase color:green;
+[20:27:19.611] LOG: Applied Super EXP. Charm 
+[20:27:19.611] LOG: Applied EXP. Charm 
+[20:27:21.457] LOG: %cStart Phase LevelUpPhase color:green;
+[20:27:21.458] LOG: %cStart Phase LearnMovePhase color:green;
+[20:27:23.393] WARN: cry/171-mega not found
+[20:27:24.367] LOG: %cStart Phase LearnMovePhase color:green;
+[20:27:25.891] WARN: cry/171-mega not found
+[20:27:28.062] LOG: %cStart Phase LearnMovePhase color:green;
+[20:27:29.617] LOG: %cStart Phase LearnMovePhase color:green;
+[20:27:30.899] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:27:30.899] LOG: Applied Super EXP. Charm 
+[20:27:30.899] LOG: Applied EXP. Charm 
+[20:27:30.900] LOG: %cStart Phase LevelUpPhase color:green;
+[20:27:30.901] LOG: %cStart Phase EvolutionPhase color:green;
+[20:27:31.176] WARN: cry/10847 not found
+[20:27:32.911] ERROR: [uncaught] Uncaught SecurityError: Failed to execute 'texImage2D' on 'WebGLRenderingContext': The video element contains cross-origin data, and may not be loaded. @ https://elite-redux-staging.pages.dev/assets/phaser-CoS_K63z.js:63:2433
+[20:27:35.371] WARN: cry/10848 not found
+[20:27:40.096] LOG: %cStart Phase EndEvolutionPhase color:green;
+[20:27:40.170] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:27:40.171] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:27:40.171] LOG: Applied Super EXP. Charm 
+[20:27:40.171] LOG: Applied EXP. Charm 
+[20:27:40.171] LOG: %cStart Phase LevelUpPhase color:green;
+[20:27:40.172] LOG: %cStart Phase LearnMovePhase color:green;
+[20:27:42.488] LOG: %cStart Phase LearnMovePhase color:green;
+[20:27:43.951] LOG: %cStart Phase EvolutionPhase color:green;
+[20:27:46.181] ERROR: [uncaught] Uncaught SecurityError: Failed to execute 'texImage2D' on 'WebGLRenderingContext': The video element contains cross-origin data, and may not be loaded. @ https://elite-redux-staging.pages.dev/assets/phaser-CoS_K63z.js:63:2433
+[20:27:54.047] LOG: %cStart Phase EndEvolutionPhase color:green;
+[20:27:54.121] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:27:54.121] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:27:54.121] LOG: Applied Super EXP. Charm 
+[20:27:54.121] LOG: Applied EXP. Charm 
+[20:27:54.121] LOG: %cStart Phase LevelUpPhase color:green;
+[20:27:54.122] LOG: %cStart Phase LearnMovePhase color:green;
+[20:27:56.177] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:27:56.177] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:27:56.177] LOG: Applied Super EXP. Charm 
+[20:27:56.177] LOG: Applied EXP. Charm 
+[20:27:56.177] LOG: %cStart Phase LevelUpPhase color:green;
+[20:27:56.178] LOG: Applied Iron 
+[20:27:56.178] LOG: %cStart Phase LearnMovePhase color:green;
+[20:27:57.890] LOG: %cStart Phase LearnMovePhase color:green;
+[20:28:02.428] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:28:02.429] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:28:02.429] LOG: Applied Super EXP. Charm 
+[20:28:02.429] LOG: Applied EXP. Charm 
+[20:28:02.430] LOG: %cStart Phase LevelUpPhase color:green;
+[20:28:02.430] LOG: %cStart Phase LearnMovePhase color:green;
+[20:28:05.627] LOG: %cStart Phase LearnMovePhase color:green;
+[20:28:07.441] LOG: %cStart Phase LearnMovePhase color:green;
+[20:28:09.206] LOG: %cStart Phase LearnMovePhase color:green;
+[20:28:31.909] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:28:31.909] LOG: %cStart Phase MoveEndPhase color:green;
+[20:28:31.909] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:28:31.909] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:28:32.509] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:28:32.509] LOG: %cStart Phase BerryPhase color:green;
+[20:28:32.509] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:28:32.509] LOG: %cStart Phase TurnEndPhase color:green;
+[20:28:32.510] LOG: %cStart Phase BattleEndPhase color:green;
+[20:28:32.510] LOG: Battle Score: 108 (3 Turns x0.69)
+[20:28:32.510] LOG: Total Score: 5232
+[20:28:32.512] LOG: Applied Iron 
+[20:28:32.514] LOG: %cStart Phase EggLapsePhase color:green;
+[20:28:32.514] LOG: %cStart Phase SelectModifierPhase color:green;
+[20:28:32.514] LOG: Wave Seed: uss]ysu¥¥^su¡[ 43
+[20:28:32.517] LOG: 6 0 [9,11,12,13,25]
+[20:28:32.517] LOG: ULTRA 2
+[20:28:32.517] LOG: 31 5 [9,11,12,13,25]
+[20:28:32.517] LOG: {"id":"ER_SPIKED_KNUCKLES","localeKey":"","iconImage":"quick_claw","iconTint":12107976,"soundName":"se/restore","tier":2} 
+[20:28:32.517] LOG: 0 0 [2,3,4,5,6,7,8,9,10,23]
+[20:28:32.517] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[20:28:32.517] LOG: 34 5 [9,11,12,13,25]
+[20:28:32.517] LOG: {"id":"ER_DEX_NAV","localeKey":"","iconImage":"dex_nav","soundName":"se/restore","tier":2} 
+[20:28:32.517] LOG: 19 4 [9,11,12,13,25]
+[20:28:32.517] LOG: {"id":"TM_ULTRA","localeKey":"","iconImage":"tm_ice","group":"tm","soundName":"se/restore","tier":2,"moveId":54} 
+[20:28:41.904] LOG: Applied Iron 
+[20:28:41.909] LOG: %cStart Phase SelectBiomePhase color:green;
+[20:28:41.909] LOG: Wave Seed: uss]ysu¥¥^su¡[ 43
+[20:28:54.444] LOG: %cStart Phase PartyHealPhase color:green;
+[20:28:56.933] LOG: %cStart Phase ResetStatusPhase color:green;
+[20:28:56.934] LOG: %cStart Phase ResetStatusPhase color:green;
+[20:28:56.934] LOG: %cStart Phase ResetStatusPhase color:green;
+[20:28:56.934] LOG: %cStart Phase ResetStatusPhase color:green;
+[20:28:56.934] LOG: %cStart Phase ResetStatusPhase color:green;
+[20:28:56.934] LOG: %cStart Phase ResetStatusPhase color:green;
+[20:28:56.934] LOG: %cStart Phase SwitchBiomePhase color:green;
+[20:28:57.404] LOG: %cStart Phase NewBattlePhase color:green;
+[20:28:57.404] LOG: Wave Seed: vtt^z tv¦¦_tv¢\  44
+[20:28:57.405] LOG: Starting trainer pool tier: RARE
+[20:28:57.405] LOG: Downgraded trainer rarity tier from RARE to UNCOMMON
+[20:28:57.407] LOG: %cStart Phase ReturnPhase color:green;
+[20:28:57.500] LOG: %cStart Phase ShowTrainerPhase color:green;
+[20:28:57.605] LOG: %cStart Phase NextEncounterPhase color:green;
+[20:28:57.614] LOG: Pokemon: Foe Gargablox | Species ID: 10085 | Level: 37 | Nature: Rash (+SpAtk/-SpDef)
+[20:28:57.614] LOG: Stats (IVs): HP: 119 (31), Atk: 57 (31), Def: 102 (31), Spatk: 70 (31), Spdef: 86 (31), Spd: 30 (31)
+[20:28:57.614] LOG: Ability: Immunity | Passive Ability: Strong Foundation 
+[20:28:57.614] LOG: Moveset: ["Grassy Terrain","Grassy Glide","Grass Knot","Hidden Power"]
+[20:28:57.618] LOG: Pokemon: Foe Popcorm | Species ID: 10021 | Level: 37 | Nature: Hardy (-)
+[20:28:57.618] LOG: Stats (IVs): HP: 123 (31), Atk: 96 (31), Def: 72 (31), Spatk: 46 (31), Spdef: 78 (31), Spd: 66 (31)
+[20:28:57.618] LOG: Ability: Unburden | Passive Ability: Aerodynamics 
+[20:28:57.618] LOG: Moveset: ["Sunny Day","Seed Bomb","Flare Blitz","Fluttering Leaf"]
+[20:28:57.621] LOG: Pokemon: Foe Cormoth | Species ID: 10020 | Level: 37 | Nature: Relaxed (+Def/-Spd)
+[20:28:57.621] LOG: Stats (IVs): HP: 127 (31), Atk: 50 (31), Def: 89 (31), Spatk: 72 (31), Spdef: 93 (31), Spd: 47 (31)
+[20:28:57.621] LOG: Ability: Grass Pelt | Passive Ability: Self Sufficient 
+[20:28:57.621] LOG: Moveset: ["Leech Seed","Protect","Seed Flare","Sleep Powder"]
+[20:28:57.624] LOG: Pokemon: Foe Malamar | Species ID: 687 | Level: 37 | Nature: Jolly (+Spd/-SpAtk)
+[20:28:57.624] LOG: Stats (IVs): HP: 111 (31), Atk: 70 (31), Def: 74 (31), Spatk: 74 (31), Spdef: 76 (31), Spd: 68 (31)
+[20:28:57.624] LOG: Ability: Keen Edge | Passive Ability: Hypnotist 
+[20:28:57.624] LOG: Moveset: ["Strength","Hypnosis","Stored Power","Foul Play"]
+[20:29:05.079] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"calcium","soundName":"se/restore","tier":0,"stat":3,"key":"calcium"} (enemy)
+[20:29:05.079] LOG: Battle Seed: oGwh7a6dlsOt80y7
+[20:29:05.080] LOG: Applied Calcium (enemy)
+[20:29:05.081] LOG: Generated AI funcs
+[20:29:05.105] DEBUG: Session data saved to slot 0!
+[20:29:05.106] LOG: Wave Seed: vtt^z tv¦¦_tv¢\  44
+[20:29:05.315] LOG: Ace Trainer Mariah
+[20:29:05.315] LOG: Dialogue dialogue:aceTrainer.encounter.1 skipped
+[20:29:05.363] LOG: Ace Trainer Mariah
