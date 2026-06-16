@@ -23,6 +23,7 @@ import { EggGachaUiHandler } from "#ui/egg-gacha-ui-handler";
 import { EggHatchSceneUiHandler } from "#ui/egg-hatch-scene-ui-handler";
 import { EggListUiHandler } from "#ui/egg-list-ui-handler";
 import { EggSummaryUiHandler } from "#ui/egg-summary-ui-handler";
+import { ErMapUiHandler } from "#ui/er-map-ui-handler";
 import { ErQuizUiHandler } from "#ui/er-quiz-ui-handler";
 import { EvolutionSceneUiHandler } from "#ui/evolution-scene-ui-handler";
 import { FightUiHandler } from "#ui/fight-ui-handler";
@@ -194,6 +195,7 @@ export class UI extends Phaser.GameObjects.Container {
       new BiomeShopUiHandler(),
       new ColosseumUiHandler(),
       new ErQuizUiHandler(),
+      new ErMapUiHandler(),
     ];
   }
 

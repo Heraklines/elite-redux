@@ -56,4 +56,6 @@ export enum UiMode {
   COLOSSEUM,
   /** ER #439: the compact Quiz/Minigame panel (silhouette / dex multiple-choice). */
   ER_QUIZ,
+  /** ER #486: the run's World Map overlay (revealed nodes + Treasure-Map fragments). */
+  ER_MAP,
 }

@@ -27,6 +27,7 @@ import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
 import type { ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
+import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import { setErDifficulty, setErDifficulty as setErDifficultyForScenario } from "#data/elite-redux/er-run-difficulty";
@@ -50,6 +51,7 @@ import { erCommunityItemModifierType } from "#modifiers/modifier-type";
 import type { Variant } from "#sprites/variant";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { Starter, StarterMoveset } from "#types/save-data";
+import { openErMapOverlay } from "#ui/er-map-ui-handler";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 export interface DevScenario {
@@ -4127,5 +4129,47 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
     shopItems: [modifierTypes.RARE_CANDY],
+  },
+  {
+    label: "ER #486: World Map overlay",
+    description:
+      "Phase D Map system, increment 3 - the read-only World Map overlay.\n"
+      + "DO: start this scenario. On the first turn it reveals a handful of sample\n"
+      + "map nodes + 2 Treasure-Map fragments, then opens the World Map overlay\n"
+      + "automatically. Scroll the list with Up/Down; press B (or the action\n"
+      + "button) to close it and return to the battle.\n"
+      + "EXPECT: a centred 'World Map' card listing the revealed nodes (label, biome\n"
+      + "name, and a [Route]/[Landmark]/[Treasure] tag), a 'Treasure-Map Fragments:\n"
+      + "2 / 3' line, the cursor highlighting the selected row and scrolling when\n"
+      + "the list runs past 6 entries, and a clean close back to combat. (note) UI-\n"
+      + "only; revealed nodes also persist across save/load (see er-map-nodes test).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.PROTECT, MoveId.IRON_TAIL],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      // Seed a clean, recognisable map state, then pop the overlay.
+      resetErMapNodes();
+      revealMapNodes([
+        { biome: BiomeId.SEA, label: "Distant Isle", kind: "biome" },
+        { biome: BiomeId.SPACE, label: "The Observatory", kind: "landmark" },
+        { biome: BiomeId.BEACH, label: "Buried Cache", kind: "treasure" },
+        { biome: BiomeId.LAKE, label: "Quiet Lake", kind: "biome" },
+        { biome: BiomeId.CAVE, label: "Echoing Cavern", kind: "landmark" },
+        { biome: BiomeId.JUNGLE, label: "Overgrown Temple", kind: "landmark" },
+        { biome: BiomeId.VOLCANO, label: "Smoking Crater", kind: "biome" },
+      ]);
+      addTreasureFragments(2);
+      openErMapOverlay();
+    },
   },
 ];
