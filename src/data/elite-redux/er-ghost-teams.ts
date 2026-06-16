@@ -53,7 +53,7 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 export { ghostWavesForCurrentRun, isErGhostWave };
 
 /** A serialised party member — lightweight, JSON-safe, no class instances. */
-interface GhostMember {
+export interface GhostMember {
   speciesId: number;
   formIndex: number;
   abilityIndex: number;

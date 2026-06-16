@@ -16,6 +16,7 @@ import { FieryFalloutEncounter } from "#mystery-encounters/fiery-fallout-encount
 import { FightOrFlightEncounter } from "#mystery-encounters/fight-or-flight-encounter";
 import { FunAndGamesEncounter } from "#mystery-encounters/fun-and-games-encounter";
 import { GlobalTradeSystemEncounter } from "#mystery-encounters/global-trade-system-encounter";
+import { GravesOfTheFallenEncounter } from "#mystery-encounters/graves-of-the-fallen-encounter";
 import { LostAtSeaEncounter } from "#mystery-encounters/lost-at-sea-encounter";
 import { MysteriousChallengersEncounter } from "#mystery-encounters/mysterious-challengers-encounter";
 import { MysteriousChestEncounter } from "#mystery-encounters/mysterious-chest-encounter";
@@ -213,7 +214,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.MEADOW, []],
   [BiomeId.POWER_PLANT, []],
   [BiomeId.VOLCANO, [MysteryEncounterType.FIERY_FALLOUT, MysteryEncounterType.DANCING_LESSONS]],
-  [BiomeId.GRAVEYARD, []],
+  [BiomeId.GRAVEYARD, [MysteryEncounterType.ER_GRAVES_OF_THE_FALLEN]],
   [BiomeId.DOJO, [MysteryEncounterType.COLOSSEUM]],
   [BiomeId.FACTORY, []],
   [BiomeId.RUINS, []],
@@ -265,6 +266,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.COLOSSEUM] = ColosseumEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_GUESSING_BOOTH] = TownGuessingBoothEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_SCRAMBLED_POKEDEX] = ScrambledPokedexEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_GRAVES_OF_THE_FALLEN] = GravesOfTheFallenEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

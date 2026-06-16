@@ -36,6 +36,9 @@ export enum MysteryEncounterType {
   ER_GUESSING_BOOTH,
   /** ER #439: Professor's Scrambled Pokedex - dex-entry quiz -> Damage Calculator. */
   ER_SCRAMBLED_POKEDEX,
+  /** ER #439: Graves of the Fallen - a Graveyard grave of a real ghost-pool team;
+   * pay respects for a memento, or disturb it for a level-scaled ghost battle. */
+  ER_GRAVES_OF_THE_FALLEN,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

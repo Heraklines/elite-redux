@@ -1,0 +1,25 @@
+{
+  "intro": "Rows of weathered headstones line the graveyard. Each marks a trainer who fell on a long, hard road.",
+  "speaker": "Graveside Keeper",
+  "introDialogue": "These are the fallen, every one of them a real challenger who came before you.$You may pay your respects and take a memento, or disturb the grave and face what still lingers. Choose carefully.",
+  "title": "Graves of the Fallen",
+  "description": "One headstone stands out: {{trainerName}}, {{difficulty}} difficulty, fell at wave {{waveReached}}, beaten by {{opponentName}}. You can pay your respects for a memento, or disturb the grave and fight the team that rests here.",
+  "query": "What will you do?",
+  "option": {
+    "1": {
+      "label": "Pay respects",
+      "tooltip": "(+) Receive a memento from the fallen team's loadout\n(+) Leave in peace, no battle",
+      "selected": "You bow your head at the grave. A memento of the fallen team is left in your care."
+    },
+    "2": {
+      "label": "Disturb the grave",
+      "tooltip": "(-) The fallen team's ghost rises and fights you\n(+) Win to claim two of their held items",
+      "selected": "The earth stirs. The fallen team rises to defend its rest!"
+    },
+    "3": {
+      "label": "Walk away",
+      "tooltip": "(-) No reward",
+      "selected": "You leave the graves undisturbed."
+    }
+  }
+}
