@@ -51,7 +51,8 @@ export type ErRelicKind =
   | "quartermaster"
   | "lookout"
   | "moltenCore"
-  | "capacitor";
+  | "capacitor"
+  | "pharaohAnkh";
 
 export interface ErRelicConfig {
   name: string;
@@ -129,6 +130,13 @@ export const ER_RELIC_CONFIG: Readonly<Record<ErRelicKind, ErRelicConfig>> = {
     description: "Stored reactor charge. Your team's Electric-type moves deal 20% more damage.",
     icon: "magnet",
     tint: 0x70d0f8,
+    maxStack: 1,
+  },
+  pharaohAnkh: {
+    name: "Pharaoh's Ankh",
+    description: "Once per battle, when any of your Pokémon would faint, it instead clings to life at 1 HP.",
+    icon: "reviver_seed",
+    tint: 0xf8d040,
     maxStack: 1,
   },
   anchor: {
@@ -443,6 +451,30 @@ export function erTrySecondWind(pokemon: Pokemon): boolean {
   SECOND_WIND_USED = true;
   // ER custom relic - English-only (shared locales submodule).
   globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()} held on with its Second Wind!`);
+  return true;
+}
+
+/** The wave on which Pharaoh's Ankh last saved a Pokémon (re-arms each new battle). */
+let PHARAOH_ANKH_USED_WAVE = -1;
+
+/**
+ * Pharaoh's Ankh (relic): once per BATTLE, when ANY player Pokémon would faint it
+ * instead clings to life at 1 HP. Re-arms automatically on the next wave (no biome
+ * reset needed - keyed on the wave index, which also self-heals across new runs).
+ * Called from {@linkcode Pokemon.damage} after Second Wind.
+ */
+export function erTryPharaohAnkh(pokemon: Pokemon): boolean {
+  if (!pokemon.isPlayer() || pokemon.hp < 1 || !hasErRelic("pharaohAnkh")) {
+    return false;
+  }
+  const wave = globalScene.currentBattle?.waveIndex ?? 0;
+  if (PHARAOH_ANKH_USED_WAVE === wave) {
+    return false;
+  }
+  PHARAOH_ANKH_USED_WAVE = wave;
+  globalScene.phaseManager.queueMessage(
+    `${pokemon.getNameToRender()} was pulled back from the brink by the Pharaoh's Ankh!`,
+  );
   return true;
 }
 

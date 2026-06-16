@@ -70,6 +70,7 @@ import {
   erCapacitorElectricMultiplier,
   erMoltenCoreFireMultiplier,
   erMoraleBannerMultiplier,
+  erTryPharaohAnkh,
   erTrySecondWind,
   erTwinLinkMultiplier,
 } from "#data/elite-redux/er-relics";
@@ -5138,6 +5139,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       // would faint survives at 1 HP (like a one-shot Focus Sash). Checked last so
       // it only consumes its charge when nothing else already saved the mon.
       if (!surviveDamage.value && erTrySecondWind(this)) {
+        surviveDamage.value = true;
+      }
+      // ER relic (#439): Pharaoh's Ankh - once per battle, ANY player mon that
+      // would faint clings to life at 1 HP (re-arms each battle).
+      if (!surviveDamage.value && erTryPharaohAnkh(this)) {
         surviveDamage.value = true;
       }
       if (surviveDamage.value) {
