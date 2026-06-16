@@ -47,6 +47,7 @@ import { ScrambledPokedexEncounter } from "#mystery-encounters/scrambled-pokedex
 import { SealedDoorEncounter } from "#mystery-encounters/sealed-door-encounter";
 import { ShadyVitaminDealerEncounter } from "#mystery-encounters/shady-vitamin-dealer-encounter";
 import { SlumberingSnorlaxEncounter } from "#mystery-encounters/slumbering-snorlax-encounter";
+import { StillWatersEncounter } from "#mystery-encounters/still-waters-encounter";
 import { TeleportingHijinksEncounter } from "#mystery-encounters/teleporting-hijinks-encounter";
 import { TheExpertPokemonBreederEncounter } from "#mystery-encounters/the-expert-pokemon-breeder-encounter";
 import { ThePokemonSalesmanEncounter } from "#mystery-encounters/the-pokemon-salesman-encounter";
@@ -254,7 +255,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.SEA, [MysteryEncounterType.LOST_AT_SEA, MysteryEncounterType.ER_EXOTIC_TRADER]],
   [BiomeId.SWAMP, [MysteryEncounterType.SAFARI_ZONE]],
   [BiomeId.BEACH, [MysteryEncounterType.ER_TIDE_POOLS]],
-  [BiomeId.LAKE, [MysteryEncounterType.ER_LAKE_SPIRIT]],
+  [BiomeId.LAKE, [MysteryEncounterType.ER_LAKE_SPIRIT, MysteryEncounterType.ER_STILL_WATERS]],
   [BiomeId.SEABED, [MysteryEncounterType.ER_ABYSSAL_VENT]],
   [BiomeId.MOUNTAIN, [MysteryEncounterType.ER_HOT_SPRING]],
   [BiomeId.BADLANDS, [MysteryEncounterType.DANCING_LESSONS]],
@@ -342,6 +343,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_GENTLE_GIANT] = GentleGiantEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_RUSTLING_GRASS] = RustlingGrassEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_DRAGONS_HOARD] = DragonsHoardEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_STILL_WATERS] = StillWatersEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

@@ -114,6 +114,9 @@ export enum MysteryEncounterType {
   /** ER #439: The Dragon's Hoard - a Wasteland catch event; a hoarder dragon
    * guarding a pile of held items - beat it for the hoard, or catch the dragon. */
   ER_DRAGONS_HOARD,
+  /** ER #439: Still Waters - a Lake mirror-match; a still lake reflects your team,
+   * and the reflection steps out to fight (a clone of your current squad). */
+  ER_STILL_WATERS,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

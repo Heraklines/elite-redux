@@ -1,0 +1,18 @@
+{
+  "intro": "The lake is utterly still, a perfect mirror of the sky. As you lean over the water, your team's reflection looks back - and then, impossibly, it steps out to meet you.",
+  "title": "Still Waters",
+  "description": "A mirror-still lake reflects your team, and the reflection comes alive - a clone of your current squad, with the same builds and levels. Beat yourself for a Rogue-tier reward, or step away from the water.",
+  "query": "Will you face your reflection?",
+  "option": {
+    "1": {
+      "label": "Face your reflection",
+      "tooltip": "(+) Beat a mirror of your team for a Rogue-tier reward\n(?) It fights with your own builds",
+      "selected": "Your reflection sets its feet, wearing your team's faces - the mirror match begins!"
+    },
+    "2": {
+      "label": "Step away",
+      "tooltip": "(-) No battle, no reward",
+      "selected": "You step back from the water, and the reflection sinks away."
+    }
+  }
+}
