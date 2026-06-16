@@ -2153,6 +2153,20 @@ const modifierTypeInitObj = Object.freeze({
   ER_LEARNERS_SHROOM: () => new ErLearnersShroomModifierType(),
   ER_DEX_NAV: () => new ErDexNavModifierType(),
 
+  // ER reward ball: Greater Golden Ball. Like the vanilla Golden Poke Ball (which
+  // grants +1 item option at the end of every battle via ExtraModifierModifier),
+  // but +2. Seeds the ExtraModifierModifier at stack 2; it shares/merges with the
+  // existing extra-option pool, which caps at 3 stacks (so at most +3 options
+  // total). Event-only reward - not added to any random pool.
+  ER_GREATER_GOLDEN_BALL: () =>
+    new ModifierType(
+      "modifierType:ModifierType.ER_GREATER_GOLDEN_BALL",
+      "pb_gold",
+      (type, _args) => new ExtraModifierModifier(type, 2),
+      undefined,
+      "se/pb_bounce_1",
+    ),
+
   // ER relics (#439 biome overhaul) - permanent team-wide buff items.
   ER_RELIC_FIELD_MEDIC: () => erRelicModifierType("fieldMedic"),
   ER_RELIC_WARM_INCUBATOR: () => erRelicModifierType("warmIncubator"),
