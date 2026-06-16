@@ -1,0 +1,36 @@
+{
+  "intro": "A hydrothermal trench yawns open in the seabed, its vents glowing faintly in the crushing dark. Mineral shards encrust every ledge, but something vast shifts in the black water below.",
+  "title": "The Abyssal Vent",
+  "description": "A mineral-rich trench in the deep seabed. Descend it level by level for a growing haul, loose shards giving way to real mineral wealth and, deep in, a rare curio, but every level down risks waking a deep-sea guardian. Rise early to keep the safe haul, or dive deeper for more.",
+  "query": "How deep will you dive?",
+  "option": {
+    "1": {
+      "label": "Dive the trench",
+      "tooltip": "(+) Gather wealth level by level\n(?) Each descent raises the chance of an ambush",
+      "selected": "You vent your buoyancy and sink into the glowing dark..."
+    },
+    "2": {
+      "label": "Stay shallow",
+      "tooltip": "(-) No haul",
+      "selected": "You leave the trench to the deep and move on."
+    }
+  },
+  "divePrompt": "You have recovered {{diveCount}} finds{{treasureNote}}. The water grows colder and blacker the deeper you go. Dive on, or rise back up with your haul?",
+  "dive": {
+    "push": {
+      "label": "Dive deeper",
+      "tooltip": "(+) Richer wealth deeper down\n(?) Higher chance something wakes"
+    },
+    "bank": {
+      "label": "Rise up",
+      "tooltip": "(+) Keep everything you have recovered"
+    }
+  },
+  "foundShards": "You pry loose a cluster of shards and pocket the money they fetch.",
+  "foundNothing": "This ledge is bare rock, scoured clean by the current. You find nothing of worth.",
+  "foundNugget": "Fused to a glowing vent, a fat metallic Nugget breaks free - worth a small fortune!",
+  "foundCurio": "Encrusted on the trench wall, you work loose a valuable curio and stow it away.",
+  "foundKingsRock": "Set into a vent chimney sits a heavy, crowned stone - a King's Rock! A genuinely rare find.",
+  "foundMegaStone": "Deep in the trench, a stone pulses with a strange inner light - a Mega Stone! You stow it carefully.",
+  "trenchStirs": "The dark water erupts! A deep-sea guardian heaves up from the trench floor - the money you have recovered is safely in your bag. Drive it off and you can keep diving!"
+}

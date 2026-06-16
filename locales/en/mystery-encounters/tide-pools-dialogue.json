@@ -1,0 +1,36 @@
+{
+  "intro": "The tide has pulled far out, leaving a maze of rocky pools glinting in the sun. Shells, glassy stones, and stranded curios litter the basins, but something large stirs in the deeper water beyond.",
+  "title": "Tide Pools",
+  "description": "A low-tide shoreline of rich rock pools. Comb them round by round for a growing haul, loose shells giving way to finer pickings and, deep in, a real curio, but every reach raises the chance a territorial Water mon sweeps in on the turning tide. Pack up early to keep the safe haul, or press your luck for more.",
+  "query": "Will you comb the pools?",
+  "option": {
+    "1": {
+      "label": "Comb the pools",
+      "tooltip": "(+) Gather a haul pool by pool\n(?) Each reach raises the chance of an ambush",
+      "selected": "You crouch at the water's edge and start sifting through the rocks..."
+    },
+    "2": {
+      "label": "Move on",
+      "tooltip": "(-) No haul",
+      "selected": "You leave the pools to the tide and move on."
+    }
+  },
+  "combPrompt": "You have gathered {{combCount}} finds{{treasureNote}}. The water beyond is getting choppy. Keep combing, or pack up and leave?",
+  "comb": {
+    "push": {
+      "label": "Keep combing",
+      "tooltip": "(+) Add to your haul, finer finds the deeper you reach\n(?) Higher chance the tide turns on you"
+    },
+    "bank": {
+      "label": "Pack up and leave",
+      "tooltip": "(+) Keep everything you have gathered"
+    }
+  },
+  "foundShells": "You scoop up a handful of shells and pocket the money they fetch.",
+  "foundNothing": "Your hand comes up with nothing but cold seawater. This reach turns up empty.",
+  "foundPearl": "Wedged in a crevice, a lustrous Pearl comes loose - worth a small fortune!",
+  "foundCurio": "Glinting under the water, you work loose a valuable curio and tuck it away for later.",
+  "foundKingsRock": "Rolled smooth by the surf sits a heavy, crowned stone - a King's Rock! A genuinely rare find.",
+  "foundMegaStone": "Half-buried in the wet sand, a stone pulses with a strange inner light - a Mega Stone! You stow it carefully.",
+  "tideTurns": "The tide turns in a rush of foam! A territorial Water Pokemon surges out of the deep - the money you have earned is safely in your bag. Drive it off and you can keep combing!"
+}

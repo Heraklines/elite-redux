@@ -2,6 +2,7 @@ import { BiomeId } from "#enums/biome-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { ATrainersTestEncounter } from "#mystery-encounters/a-trainers-test-encounter";
 import { AbsoluteAvariceEncounter } from "#mystery-encounters/absolute-avarice-encounter";
+import { AbyssalVentEncounter } from "#mystery-encounters/abyssal-vent-encounter";
 import { AnOfferYouCantRefuseEncounter } from "#mystery-encounters/an-offer-you-cant-refuse-encounter";
 import { BerriesAboundEncounter } from "#mystery-encounters/berries-abound-encounter";
 import { BugTypeSuperfanEncounter } from "#mystery-encounters/bug-type-superfan-encounter";
@@ -34,6 +35,7 @@ import { TheExpertPokemonBreederEncounter } from "#mystery-encounters/the-expert
 import { ThePokemonSalesmanEncounter } from "#mystery-encounters/the-pokemon-salesman-encounter";
 import { TheStrongStuffEncounter } from "#mystery-encounters/the-strong-stuff-encounter";
 import { TheWinstrateChallengeEncounter } from "#mystery-encounters/the-winstrate-challenge-encounter";
+import { TidePoolsEncounter } from "#mystery-encounters/tide-pools-encounter";
 import { TownGuessingBoothEncounter } from "#mystery-encounters/town-guessing-booth-encounter";
 import { TownRaffleEncounter } from "#mystery-encounters/town-raffle-encounter";
 import { TrainingSessionEncounter } from "#mystery-encounters/training-session-encounter";
@@ -225,9 +227,9 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   ],
   [BiomeId.SEA, [MysteryEncounterType.LOST_AT_SEA]],
   [BiomeId.SWAMP, [MysteryEncounterType.SAFARI_ZONE]],
-  [BiomeId.BEACH, []],
+  [BiomeId.BEACH, [MysteryEncounterType.ER_TIDE_POOLS]],
   [BiomeId.LAKE, []],
-  [BiomeId.SEABED, []],
+  [BiomeId.SEABED, [MysteryEncounterType.ER_ABYSSAL_VENT]],
   [BiomeId.MOUNTAIN, []],
   [BiomeId.BADLANDS, [MysteryEncounterType.DANCING_LESSONS]],
   [BiomeId.CAVE, [MysteryEncounterType.THE_STRONG_STUFF, MysteryEncounterType.ER_GLITTERING_VEIN]],
@@ -294,6 +296,8 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_MUSHROOM_CIRCLE] = MushroomCircleEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_TOWN_RAFFLE] = TownRaffleEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_OVERGROWN_TEMPLE] = OvergrownTempleEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_TIDE_POOLS] = TidePoolsEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_ABYSSAL_VENT] = AbyssalVentEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

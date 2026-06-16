@@ -54,6 +54,12 @@ export enum MysteryEncounterType {
   /** ER #439: The Overgrown Temple - a Jungle press-your-luck delve; bank the haul
    * or press deeper for richer treasure, risking a trap / Grass-Rock guardian. */
   ER_OVERGROWN_TEMPLE,
+  /** ER #439: Tide Pools - a Beach press-your-luck comb; bank the haul or keep
+   * combing for more, risking a territorial Water guardian sweeping in. */
+  ER_TIDE_POOLS,
+  /** ER #439: The Abyssal Vent - a Seabed press-your-luck delve; bank the haul or
+   * dive deeper for richer treasure, risking a deep-sea guardian. */
+  ER_ABYSSAL_VENT,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

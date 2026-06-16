@@ -622,6 +622,70 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Tide Pools (#439)",
+    description:
+      "#439 Beach press-your-luck COMB (reuses the press-luck substrate). Forces\n"
+      + "ER_TIDE_POOLS in the BEACH biome.\n"
+      + "DO: 'Comb the pools', then keep combing or pack up. Each comb rolls money:\n"
+      + "usually jittered, sometimes a PEARL (big), sometimes NOTHING (dud). Item finds\n"
+      + "are HELD only: Eviolite / Mystical Rock (uncommon, deep), a King's Rock (rare),\n"
+      + "or a party-line Mega Stone. BUST chance climbs.\n"
+      + "EXPECT: money paid per comb and kept on a bust. pack up = item shop if any.\n"
+      + "A bust spawns an escalating wild Water mon (Corsola->Gyarados); after 3 it is\n"
+      + "the chain BOSS (2-3 bars, >= 5 levels over your strongest). Win and combing\n"
+      + "RESUMES. Round-0 leave = nothing. Never softlocks.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 45,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.BEACH,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_TIDE_POOLS,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.STONE_EDGE, MoveId.DRAGON_CLAW, MoveId.IRON_HEAD],
+        }),
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER Abyssal Vent (#439)",
+    description:
+      "#439 Seabed press-your-luck DELVE (reuses the press-luck substrate). Forces\n"
+      + "ER_ABYSSAL_VENT in the SEABED biome.\n"
+      + "DO: 'Dive the trench', then dive deeper or rise up. Each descent rolls money:\n"
+      + "usually jittered, sometimes a NUGGET (big), sometimes NOTHING (dud). Item finds\n"
+      + "are HELD only: Eviolite / Mystical Rock (uncommon, deep), a King's Rock (rare),\n"
+      + "or a party-line Mega Stone. STIR chance climbs each level.\n"
+      + "EXPECT: money paid per descent and kept on a stir. rise = item shop if any.\n"
+      + "A stir spawns an escalating wild deep-sea mon (Lanturn->Dhelmise); after 3 it\n"
+      + "is the chain BOSS (2-3 bars, >= 5 levels over your strongest). Win and diving\n"
+      + "RESUMES. Level-0 rise = nothing. Never softlocks.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 45,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.SEABED,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_ABYSSAL_VENT,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.STONE_EDGE, MoveId.DRAGON_CLAW, MoveId.IRON_HEAD],
+        }),
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+      ];
+    },
+  },
+  {
     label: "ER Mushroom Circle (#439)",
     description:
       "#439 Grass one-shot GAMBLE. Forces ER_MUSHROOM_CIRCLE (wave-only override,\n"
