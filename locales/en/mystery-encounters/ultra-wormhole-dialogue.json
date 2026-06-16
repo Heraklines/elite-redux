@@ -1,0 +1,20 @@
+{
+  "intro": "A jagged rift shimmers in the void, its edges crackling with unfamiliar light.",
+  "title": "Ultra Wormhole",
+  "description": "The rift hums with pulling force. Step through and it will fling your team onward to somewhere new. Or leave it well alone.",
+  "query": "Step through the rift?",
+  "option": {
+    "1": {
+      "label": "Step through",
+      "tooltip": "(~) Forces your next destination to a random nearby place",
+      "selected": "You step into the shimmering rift, and the world folds away..."
+    },
+    "2": {
+      "label": "Back away",
+      "tooltip": "(-) Leave the rift alone",
+      "selected": "You back away from the rift and let it crackle on alone."
+    }
+  },
+  "flung": "The wormhole flings you onward! Your next destination has changed.",
+  "closed": "The rift seals shut before it can take you anywhere."
+}

@@ -1,0 +1,20 @@
+{
+  "intro": "The sky blackens in moments and a howling squall churns the water white.",
+  "title": "The Storm",
+  "description": "A sudden tempest bears down. Brave it and the wind will sweep your team off-course to somewhere new. Or turn back and ride it out where you are.",
+  "query": "Will you brave the storm?",
+  "option": {
+    "1": {
+      "label": "Brave the storm",
+      "tooltip": "(~) Forces your next destination to a random nearby place",
+      "selected": "You press on into the gale, and the wind takes you where it will..."
+    },
+    "2": {
+      "label": "Turn back",
+      "tooltip": "(-) Ride out the storm, no change of course",
+      "selected": "You retreat from the squall and wait for it to pass."
+    }
+  },
+  "swept": "The storm sweeps you off-course! Your next destination has changed.",
+  "calm": "The wind dies down before it can carry you anywhere."
+}

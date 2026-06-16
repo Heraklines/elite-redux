@@ -1,0 +1,19 @@
+{
+  "intro": "The cavern opens into a vast vaulted space. Every footstep returns a dozen times over.",
+  "title": "Echo Chamber",
+  "description": "Call out into the dark and the returning echoes trace the shape of the tunnels ahead. Listen carefully to map the onward routes, or move on quietly.",
+  "query": "Listen to the echoes?",
+  "option": {
+    "1": {
+      "label": "Listen to the echoes",
+      "tooltip": "(+) Reveal the onward routes onto your World Map",
+      "selected": "You call out, and the cavern answers - the echoes sketch the passages ahead..."
+    },
+    "2": {
+      "label": "Move on quietly",
+      "tooltip": "(-) Leave without listening",
+      "selected": "You pick your way onward through the dark."
+    }
+  },
+  "charted": "The tunnels ahead are mapped onto your World Map. (Press M to view.)"
+}

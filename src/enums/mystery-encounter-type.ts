@@ -123,6 +123,21 @@ export enum MysteryEncounterType {
   /** ER #486: X Marks the Spot - a Beach event; with 3 Treasure-Map fragments in
    * hand, dig up the buried cache for a guaranteed reward. */
   ER_X_MARKS_THE_SPOT,
+  /** ER #486: The Observatory - a Space event; chart the heavens to reveal the
+   * onward routes and a distant landmark onto the World Map. */
+  ER_OBSERVATORY,
+  /** ER #486: Echo Chamber - a Cave event; the cavern's echoes map the tunnels
+   * ahead (reveal onward routes). */
+  ER_ECHO_CHAMBER,
+  /** ER #486: The Informant - a Slum event; pay for a tip-off that charts the
+   * onward routes (and sometimes a fragment). */
+  ER_INFORMANT,
+  /** ER #486: The Storm - a Sea event; a squall sweeps the party off-course to a
+   * random onward biome (sets a travel target). */
+  ER_THE_STORM,
+  /** ER #486: Ultra Wormhole - a Space event; step through to be flung to a random
+   * onward biome (sets a travel target). */
+  ER_ULTRA_WORMHOLE,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

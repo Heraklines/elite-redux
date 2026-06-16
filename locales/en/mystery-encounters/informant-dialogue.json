@@ -1,0 +1,19 @@
+{
+  "intro": "A hooded figure leans against a back-alley wall and beckons you closer with one finger.",
+  "title": "The Informant",
+  "description": "The informant sells directions to those who can pay. The tip charts the routes ahead onto your World Map and comes with a Treasure-Map Fragment. Or keep your coin and walk on.",
+  "query": "Buy a tip-off?",
+  "option": {
+    "1": {
+      "label": "Buy the tip ({{money, money}})",
+      "tooltip": "(+) Reveal the onward routes onto your World Map\n(+) Gain a Treasure-Map Fragment\n(-) Costs a fee",
+      "selected": "You pass over the coin, and the figure murmurs directions in your ear..."
+    },
+    "2": {
+      "label": "Walk on",
+      "tooltip": "(-) Keep your coin",
+      "selected": "You shake your head and keep walking."
+    }
+  },
+  "tipped": "The routes ahead are charted onto your World Map, and you pocket a Treasure-Map Fragment. (Press M to view.)"
+}

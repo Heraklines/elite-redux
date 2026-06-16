@@ -15,6 +15,7 @@ import { DarkDealEncounter } from "#mystery-encounters/dark-deal-encounter";
 import { DelibirdyEncounter } from "#mystery-encounters/delibirdy-encounter";
 import { DepartmentStoreSaleEncounter } from "#mystery-encounters/department-store-sale-encounter";
 import { DragonsHoardEncounter } from "#mystery-encounters/dragons-hoard-encounter";
+import { EchoChamberEncounter } from "#mystery-encounters/echo-chamber-encounter";
 import { ExoticTraderEncounter } from "#mystery-encounters/exotic-trader-encounter";
 import { ExperimentEncounter } from "#mystery-encounters/experiment-encounter";
 import { FairysBoonEncounter } from "#mystery-encounters/fairys-boon-encounter";
@@ -30,6 +31,7 @@ import { GlobalTradeSystemEncounter } from "#mystery-encounters/global-trade-sys
 import { GravesOfTheFallenEncounter } from "#mystery-encounters/graves-of-the-fallen-encounter";
 import { HotSpringEncounter } from "#mystery-encounters/hot-spring-encounter";
 import { ImportBazaarEncounter } from "#mystery-encounters/import-bazaar-encounter";
+import { InformantEncounter } from "#mystery-encounters/informant-encounter";
 import { LakeSpiritEncounter } from "#mystery-encounters/lake-spirit-encounter";
 import { LostAtSeaEncounter } from "#mystery-encounters/lost-at-sea-encounter";
 import { MessageInABottleEncounter } from "#mystery-encounters/message-in-a-bottle-encounter";
@@ -37,6 +39,7 @@ import { MushroomCircleEncounter } from "#mystery-encounters/mushroom-circle-enc
 import { MysteriousChallengersEncounter } from "#mystery-encounters/mysterious-challengers-encounter";
 import { MysteriousChestEncounter } from "#mystery-encounters/mysterious-chest-encounter";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
+import { ObservatoryEncounter } from "#mystery-encounters/observatory-encounter";
 import { OverchargeCoreEncounter } from "#mystery-encounters/overcharge-core-encounter";
 import { OvergrownTempleEncounter } from "#mystery-encounters/overgrown-temple-encounter";
 import { PartTimerEncounter } from "#mystery-encounters/part-timer-encounter";
@@ -52,6 +55,7 @@ import { StillWatersEncounter } from "#mystery-encounters/still-waters-encounter
 import { TeleportingHijinksEncounter } from "#mystery-encounters/teleporting-hijinks-encounter";
 import { TheExpertPokemonBreederEncounter } from "#mystery-encounters/the-expert-pokemon-breeder-encounter";
 import { ThePokemonSalesmanEncounter } from "#mystery-encounters/the-pokemon-salesman-encounter";
+import { TheStormEncounter } from "#mystery-encounters/the-storm-encounter";
 import { TheStrongStuffEncounter } from "#mystery-encounters/the-strong-stuff-encounter";
 import { TheWinstrateChallengeEncounter } from "#mystery-encounters/the-winstrate-challenge-encounter";
 import { TidePoolsEncounter } from "#mystery-encounters/tide-pools-encounter";
@@ -60,6 +64,7 @@ import { TownGuessingBoothEncounter } from "#mystery-encounters/town-guessing-bo
 import { TownRaffleEncounter } from "#mystery-encounters/town-raffle-encounter";
 import { TrainingSessionEncounter } from "#mystery-encounters/training-session-encounter";
 import { TrashToTreasureEncounter } from "#mystery-encounters/trash-to-treasure-encounter";
+import { UltraWormholeEncounter } from "#mystery-encounters/ultra-wormhole-encounter";
 import { UncommonBreedEncounter } from "#mystery-encounters/uncommon-breed-encounter";
 import { WeirdDreamEncounter } from "#mystery-encounters/weird-dream-encounter";
 import { WoodlandForagerEncounter } from "#mystery-encounters/woodland-forager-encounter";
@@ -260,6 +265,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
       MysteryEncounterType.LOST_AT_SEA,
       MysteryEncounterType.ER_EXOTIC_TRADER,
       MysteryEncounterType.ER_MESSAGE_IN_A_BOTTLE,
+      MysteryEncounterType.ER_THE_STORM,
     ],
   ],
   [BiomeId.SWAMP, [MysteryEncounterType.SAFARI_ZONE]],
@@ -268,7 +274,14 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.SEABED, [MysteryEncounterType.ER_ABYSSAL_VENT]],
   [BiomeId.MOUNTAIN, [MysteryEncounterType.ER_HOT_SPRING]],
   [BiomeId.BADLANDS, [MysteryEncounterType.DANCING_LESSONS]],
-  [BiomeId.CAVE, [MysteryEncounterType.THE_STRONG_STUFF, MysteryEncounterType.ER_GLITTERING_VEIN]],
+  [
+    BiomeId.CAVE,
+    [
+      MysteryEncounterType.THE_STRONG_STUFF,
+      MysteryEncounterType.ER_GLITTERING_VEIN,
+      MysteryEncounterType.ER_ECHO_CHAMBER,
+    ],
+  ],
   [BiomeId.DESERT, [MysteryEncounterType.DANCING_LESSONS]],
   [BiomeId.ICE_CAVE, [MysteryEncounterType.ER_FROZEN_SHAPES]],
   [BiomeId.MEADOW, [MysteryEncounterType.ER_PICNIC]],
@@ -280,12 +293,19 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.RUINS, [MysteryEncounterType.ER_SEALED_DOOR]],
   [BiomeId.WASTELAND, [MysteryEncounterType.DANCING_LESSONS, MysteryEncounterType.ER_DRAGONS_HOARD]],
   [BiomeId.ABYSS, [MysteryEncounterType.DANCING_LESSONS]],
-  [BiomeId.SPACE, [MysteryEncounterType.THE_EXPERT_POKEMON_BREEDER]],
+  [
+    BiomeId.SPACE,
+    [
+      MysteryEncounterType.THE_EXPERT_POKEMON_BREEDER,
+      MysteryEncounterType.ER_OBSERVATORY,
+      MysteryEncounterType.ER_ULTRA_WORMHOLE,
+    ],
+  ],
   [BiomeId.CONSTRUCTION_SITE, [MysteryEncounterType.ER_FOREMANS_JOB]],
   [BiomeId.JUNGLE, [MysteryEncounterType.SAFARI_ZONE, MysteryEncounterType.ER_OVERGROWN_TEMPLE]],
   [BiomeId.FAIRY_CAVE, [MysteryEncounterType.ER_FAIRYS_BOON]],
   [BiomeId.TEMPLE, [MysteryEncounterType.ER_TOTEM_TRIAL]],
-  [BiomeId.SLUM, [MysteryEncounterType.ER_BLACK_MARKET]],
+  [BiomeId.SLUM, [MysteryEncounterType.ER_BLACK_MARKET, MysteryEncounterType.ER_INFORMANT]],
   [BiomeId.SNOWY_FOREST, [MysteryEncounterType.ER_AURORA]],
   [BiomeId.ISLAND, [MysteryEncounterType.ER_IMPORT_BAZAAR]],
   [BiomeId.LABORATORY, [MysteryEncounterType.ER_EXPERIMENT]],
@@ -355,6 +375,11 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_STILL_WATERS] = StillWatersEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_MESSAGE_IN_A_BOTTLE] = MessageInABottleEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_X_MARKS_THE_SPOT] = XMarksTheSpotEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_OBSERVATORY] = ObservatoryEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_ECHO_CHAMBER] = EchoChamberEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_INFORMANT] = InformantEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_THE_STORM] = TheStormEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_ULTRA_WORMHOLE] = UltraWormholeEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

@@ -1,0 +1,19 @@
+{
+  "intro": "A field of silent dishes and great lenses still turns slowly toward the stars.",
+  "title": "The Observatory",
+  "description": "The old instruments are dusty but functional. Chart the heavens to map the routes ahead onto your World Map, or leave them be.",
+  "query": "Chart the heavens?",
+  "option": {
+    "1": {
+      "label": "Chart the heavens",
+      "tooltip": "(+) Reveal the onward routes onto your World Map",
+      "selected": "You align the lenses and trace the constellations against the dark..."
+    },
+    "2": {
+      "label": "Leave the instruments",
+      "tooltip": "(-) Move on without charting",
+      "selected": "You leave the silent dishes to their vigil."
+    }
+  },
+  "charted": "The routes ahead are charted onto your World Map. (Press M to view.)"
+}

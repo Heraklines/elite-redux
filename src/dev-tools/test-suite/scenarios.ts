@@ -4220,4 +4220,102 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] })];
     },
   },
+  {
+    label: "ER #486: The Observatory (reveal)",
+    description:
+      "Phase D reveal event (Space). DO: on wave 12 choose 'Chart the heavens',\n"
+      + "then press M.\n"
+      + "EXPECT: the World Map lists the onward routes as [Route] nodes plus 'The\n"
+      + "Observatory' as a [Landmark]. 'Leave' just exits.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.SPACE,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_OBSERVATORY,
+      });
+      return [makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] })];
+    },
+  },
+  {
+    label: "ER #486: Echo Chamber (reveal)",
+    description:
+      "Phase D reveal event (Cave). DO: on wave 12 choose 'Listen to the echoes',\n"
+      + "then press M.\n"
+      + "EXPECT: the World Map lists the onward routes as [Route] nodes. 'Move on'\n"
+      + "just exits.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.CAVE,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_ECHO_CHAMBER,
+      });
+      return [makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] })];
+    },
+  },
+  {
+    label: "ER #486: The Informant (reveal + fragment)",
+    description:
+      "Phase D reveal event (Slum), money-gated. Starts with 50000 money.\n"
+      + "DO: on wave 12 choose 'Buy the tip' (greyed if you cannot afford it), then\n"
+      + "press M.\n"
+      + "EXPECT: money drops by the fee; the World Map shows the onward [Route] nodes\n"
+      + "and the fragment count went up by 1. 'Walk on' just exits.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.SLUM,
+        STARTING_MONEY_OVERRIDE: 50000,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_INFORMANT,
+      });
+      return [makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] })];
+    },
+  },
+  {
+    label: "ER #486: The Storm (travel)",
+    description:
+      "Phase D travel event (Sea). DO: on wave 12 choose 'Brave the storm'.\n"
+      + "EXPECT: a 'swept off-course' message. The travel target is set - at the NEXT\n"
+      + "biome transition (wave 20) the run jumps to that destination instead of the\n"
+      + "normal choice. 'Turn back' sets no travel. (note) the jump is verified at the\n"
+      + "biome boundary, so play on to wave 20 to confirm the destination.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.SEA,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_THE_STORM,
+      });
+      return [makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] })];
+    },
+  },
+  {
+    label: "ER #486: Ultra Wormhole (travel)",
+    description:
+      "Phase D travel event (Space). DO: on wave 12 choose 'Step through'.\n"
+      + "EXPECT: a 'flung onward' message. Like The Storm, the next biome transition\n"
+      + "(wave 20) is forced to the chosen destination. 'Back away' sets no travel.\n"
+      + "(note) verify the jump at the wave-20 biome boundary.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.SPACE,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_ULTRA_WORMHOLE,
+      });
+      return [makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] })];
+    },
+  },
 ];
