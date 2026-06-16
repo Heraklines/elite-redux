@@ -503,6 +503,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER City: Fortune Teller (#500)",
+    description:
+      "#500 - The Fortune Teller (Metropolis / Slum settlement seer). Forces\n"
+      + "ER_FORTUNE_TELLER. She PREVIEWS the next mystery encounter and, if you let\n"
+      + "her, forces it to actually spawn.\n"
+      + "DO: on wave 12, read the description + 'Hear the prophecy' tooltip. Note the\n"
+      + "named encounter + biome she foresees, then choose 'Hear the prophecy'.\n"
+      + "EXPECT: her line names that SAME encounter + biome (no raw ER_ enum text,\n"
+      + "no missing-locale keys). It charts that biome onto the World Map (blue node).\n"
+      + "Then keep playing to the NEXT mystery wave: the foreseen encounter should be\n"
+      + "the one that appears (the prophecy comes true), and only once. 'Decline'\n"
+      + "leaves with no queue. (note) The forced-spawn is verifiable only by playing\n"
+      + "on to the next ME wave.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_FORTUNE_TELLER,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
     label: "ER Graveyard: Graves of the Fallen (#439)",
     description:
       "#439 Graveyard ME (rides the ghost-team substrate). Forces\n"

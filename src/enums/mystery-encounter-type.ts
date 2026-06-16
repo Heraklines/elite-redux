@@ -148,6 +148,10 @@ export enum MysteryEncounterType {
    * tracks and name who made them. Right -> you corner it for a richer cache;
    * wrong -> you still chase it down, for a lesser find. (SCOUT, no hard fail.) */
   ER_TRACKS_IN_THE_SNOW,
+  /** ER #500: The Fortune Teller - a settlement seer who foretells the next
+   * mystery encounter waiting on the road ahead (preview), and bends fate so it
+   * comes to pass (queues that encounter for your next ME wave). */
+  ER_FORTUNE_TELLER,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

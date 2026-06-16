@@ -4247,19 +4247,21 @@ export class BattleScene extends SceneBase {
       encounter = allMysteryEncounters[getDailyMysteryEncounter(this.currentBattle.waveIndex)!];
     }
 
-    // Check for queued encounters first
-    // TODO: the inner `while` loop will never run, should this code be deleted or fixed?
+    // Check for queued encounters first. A queued encounter (e.g. one the ER
+    // Fortune Teller foretold) spawns by its spawnPercent and is CONSUMED so it
+    // fires exactly once. (The original `&& encounter` guard meant this loop never
+    // ran - a queued encounter could never spawn; fixed to `&& !encounter`.)
     const queuedEncounters = this.mysteryEncounterSaveData?.queuedEncounters ?? [];
     if (!encounter && queuedEncounters.length > 0) {
       let i = 0;
-      while (i < queuedEncounters.length && encounter) {
+      while (i < queuedEncounters.length && !encounter) {
         const candidate = queuedEncounters[i];
-        const forcedChance = candidate.spawnPercent;
-        if (randSeedInt(100) < forcedChance) {
+        if (randSeedInt(100) < candidate.spawnPercent) {
           encounter = allMysteryEncounters[candidate.type];
+          queuedEncounters.splice(i, 1); // consume it so it never re-fires
+        } else {
+          i++;
         }
-
-        i++;
       }
     }
 

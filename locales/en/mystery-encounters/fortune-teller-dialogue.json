@@ -1,0 +1,20 @@
+{
+  "intro": "A draped tent stands at the roadside, lanterns swaying. Inside, a glass orb glows over a worn star-chart.",
+  "speaker": "Fortune Teller",
+  "introDialogue": "Come, traveler. The road ahead is not as blind as you fear... let me read what waits for you.",
+  "title": "The Fortune Teller",
+  "description": "A roadside seer offers to read the path ahead. She senses {{eventName}} stirring in {{biomeName}}. Hear the prophecy and she will bend fate so it finds you, and mark the place on your map. Or keep your fortune unread and move on.",
+  "query": "Will you hear the prophecy?",
+  "option": {
+    "1": {
+      "label": "Hear the prophecy",
+      "tooltip": "(+) Foretells the next mystery encounter and forces it to appear\n(+) Charts the foreseen biome onto your World Map",
+      "selected": "Her eyes cloud over. \"{{eventName}}... in {{biomeName}}. It is written now. Fate will carry you there.\""
+    },
+    "2": {
+      "label": "Decline the reading",
+      "tooltip": "(-) Leave with your fortune unread",
+      "selected": "\"Some prefer to meet the road blind. Go well, then.\""
+    }
+  }
+}

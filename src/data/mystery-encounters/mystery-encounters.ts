@@ -23,6 +23,7 @@ import { FieldTripEncounter } from "#mystery-encounters/field-trip-encounter";
 import { FieryFalloutEncounter } from "#mystery-encounters/fiery-fallout-encounter";
 import { FightOrFlightEncounter } from "#mystery-encounters/fight-or-flight-encounter";
 import { ForemansJobEncounter } from "#mystery-encounters/foremans-job-encounter";
+import { FortuneTellerEncounter, registerFortuneTellerLookups } from "#mystery-encounters/fortune-teller-encounter";
 import { FrozenShapesEncounter } from "#mystery-encounters/frozen-shapes-encounter";
 import { FunAndGamesEncounter } from "#mystery-encounters/fun-and-games-encounter";
 import { GentleGiantEncounter } from "#mystery-encounters/gentle-giant-encounter";
@@ -257,7 +258,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
       MysteryEncounterType.ER_RUSTLING_GRASS,
     ],
   ],
-  [BiomeId.METROPOLIS, [MysteryEncounterType.COLOSSEUM]],
+  [BiomeId.METROPOLIS, [MysteryEncounterType.COLOSSEUM, MysteryEncounterType.ER_FORTUNE_TELLER]],
   [
     BiomeId.FOREST,
     [MysteryEncounterType.SAFARI_ZONE, MysteryEncounterType.ABSOLUTE_AVARICE, MysteryEncounterType.ER_WOODLAND_FORAGER],
@@ -309,7 +310,10 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.FAIRY_CAVE, [MysteryEncounterType.ER_FAIRYS_BOON]],
   // #503: the Totem Trial belongs to ISLAND (transcript line 124231), not Temple.
   // Temple's signature is the Innate Shrine (not yet built); leave it without an ER ME.
-  [BiomeId.SLUM, [MysteryEncounterType.ER_BLACK_MARKET, MysteryEncounterType.ER_INFORMANT]],
+  [
+    BiomeId.SLUM,
+    [MysteryEncounterType.ER_BLACK_MARKET, MysteryEncounterType.ER_INFORMANT, MysteryEncounterType.ER_FORTUNE_TELLER],
+  ],
   [BiomeId.SNOWY_FOREST, [MysteryEncounterType.ER_AURORA, MysteryEncounterType.ER_TRACKS_IN_THE_SNOW]],
   [BiomeId.ISLAND, [MysteryEncounterType.ER_IMPORT_BAZAAR, MysteryEncounterType.ER_TOTEM_TRIAL]],
   [BiomeId.LABORATORY, [MysteryEncounterType.ER_EXPERIMENT]],
@@ -387,6 +391,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_ULTRA_WORMHOLE] = UltraWormholeEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_LOST_WANDERER] = LostWandererEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_SUNKEN_VESSEL] = SunkenVesselEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_FORTUNE_TELLER] = FortuneTellerEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {
@@ -441,4 +446,9 @@ export function initMysteryEncounters() {
   });
 
   //console.debug("All Mystery Encounters by Biome:\n" + encounterBiomeTableLog);
+
+  // Give the Fortune Teller (#500) read access to the fully-built ME pools so it
+  // can foretell a real encounter. Injected here to avoid an import cycle (this
+  // module imports the encounter; the encounter must not import back).
+  registerFortuneTellerLookups(mysteryEncountersByBiome, allMysteryEncounters);
 }
