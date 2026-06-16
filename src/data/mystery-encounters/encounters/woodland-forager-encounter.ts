@@ -97,11 +97,17 @@ const JACKPOT_ROUND = 3;
 const JACKPOT_CHANCE = 0.2;
 /** Levels added to the swarm per prior interrupt (design s44: deeper = deadlier). */
 const SWARM_LEVEL_PER_INTERRUPT = 6;
-/** After this many interrupts the swarm's lead becomes a BOSS (top-tier threat). */
+/** After this many interrupts the swarm's lead becomes the chain BOSS (top-tier threat). */
 const SWARM_BOSS_AFTER_INTERRUPTS = 3;
+/** The boss lead is at least this many levels above the player's strongest mon. */
+const BOSS_LEVELS_ABOVE = 5;
 
-/** Thematic wild Bug guardians for the interrupt fight (a 2-mon swarm). */
-const SWARM_SPECIES: SpeciesId[] = [SpeciesId.BEEDRILL, SpeciesId.ARIADOS, SpeciesId.SCOLIPEDE, SpeciesId.VESPIQUEN];
+/**
+ * Thematic wild Bug guardians for the interrupt fight (a 2-mon swarm), ordered
+ * weakest -> strongest. Deeper interrupts pull the lead from further down the
+ * list (escalating BST beyond the wave cap); the boss lead is the toughest entry.
+ */
+const SWARM_SPECIES: SpeciesId[] = [SpeciesId.BEEDRILL, SpeciesId.ARIADOS, SpeciesId.VESPIQUEN, SpeciesId.SCOLIPEDE];
 
 /** What the Forager accumulates on `encounter.misc.forage`. */
 interface ForageHaul {
@@ -205,15 +211,22 @@ function swarmLevel(): number {
 }
 
 /**
- * Build the level-scaled 2-mon wild Bug swarm for the interrupt fight. Each prior
- * interrupt (`interrupts`) raises the swarm's level, and past
- * {@linkcode SWARM_BOSS_AFTER_INTERRUPTS} the lead is promoted to a BOSS - so the
- * deeper a session runs, the deadlier the guardians get (design PART XII s44).
+ * Build the 2-mon wild Bug swarm for the interrupt fight. Each prior interrupt
+ * pulls a tougher lead from {@linkcode SWARM_SPECIES} and raises the swarm's level
+ * (BST + level climb beyond the wave cap). Past
+ * {@linkcode SWARM_BOSS_AFTER_INTERRUPTS} the lead becomes the chain BOSS: 2-3
+ * health bars and at least {@linkcode BOSS_LEVELS_ABOVE} levels over the player's
+ * strongest mon (design PART XII s44).
  */
 function buildSwarmBattle(interrupts: number): EnemyPartyConfig {
-  const level = swarmLevel() + interrupts * SWARM_LEVEL_PER_INTERRUPT;
   const leadIsBoss = interrupts >= SWARM_BOSS_AFTER_INTERRUPTS;
-  const first = randSeedItem(SWARM_SPECIES);
+  let level = swarmLevel() + interrupts * SWARM_LEVEL_PER_INTERRUPT;
+  if (leadIsBoss) {
+    level = Math.max(level, swarmLevel() + BOSS_LEVELS_ABOVE);
+  }
+  // Deeper interrupts escalate the lead (ascending BST); the boss uses the toughest.
+  const leadIdx = leadIsBoss ? SWARM_SPECIES.length - 1 : Math.min(interrupts, SWARM_SPECIES.length - 1);
+  const first = SWARM_SPECIES[leadIdx];
   let second = randSeedItem(SWARM_SPECIES);
   if (second === first) {
     second = SWARM_SPECIES[(SWARM_SPECIES.indexOf(first) + 1) % SWARM_SPECIES.length];
@@ -221,7 +234,9 @@ function buildSwarmBattle(interrupts: number): EnemyPartyConfig {
   return {
     doubleBattle: true,
     pokemonConfigs: [
-      { species: getPokemonSpecies(first), isBoss: leadIsBoss, level },
+      leadIsBoss
+        ? { species: getPokemonSpecies(first), isBoss: true, bossSegments: 2 + randSeedInt(2), level }
+        : { species: getPokemonSpecies(first), isBoss: false, level },
       { species: getPokemonSpecies(second), isBoss: false, level },
     ],
   };

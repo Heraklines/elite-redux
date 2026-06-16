@@ -27,7 +27,10 @@
     }
   },
   "foundOre": "You pry loose another chunk of ore and pocket the money it fetches.",
+  "foundNothing": "Your pick bites into nothing but dead rock. This strike turns up empty.",
+  "foundNugget": "Your pick strikes something solid - a fat Nugget rolls free, worth a small fortune!",
   "foundTreasure": "Glinting in the rock, you work loose a valuable find and tuck it away for later.",
+  "foundKingsRock": "Lodged deep in the seam sits a heavy, crowned stone - a King's Rock! A genuinely rare find.",
   "foundMegaStone": "Deep in the seam, a stone pulses with a strange inner light - a Mega Stone! You stow it carefully.",
   "foundJackpot": "Wedged deep in the seam, a glittering treasure comes free in your hand!",
   "caveInAmbush": "The rumbling becomes a roar! A territorial guardian heaves out of the wall - the money you have earned is safely in your bag. Drive it off and you can keep mining!"

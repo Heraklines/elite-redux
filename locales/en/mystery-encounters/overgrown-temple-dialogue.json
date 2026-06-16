@@ -27,7 +27,10 @@
     }
   },
   "foundTribute": "You pry loose more tribute and pocket the money it fetches.",
+  "foundNothing": "This chamber was picked clean long ago. You find nothing of worth here.",
+  "foundNugget": "Tucked behind a fallen idol, a fat golden Nugget gleams - worth a small fortune!",
   "foundRelic": "Half-buried in the roots, an ancient relic glints in the dark - you stow it away.",
+  "foundKingsRock": "Atop a weathered pedestal rests a heavy, crowned stone - a King's Rock! A genuinely rare find.",
   "foundMegaStone": "Set into a crumbling altar, a stone pulses with ancient power - a Mega Stone! You carefully pry it free.",
   "templeWakes": "A trap springs and the temple shudders awake! The money you have recovered is safely in your bag. Beat its guardian and you can keep delving!"
 }

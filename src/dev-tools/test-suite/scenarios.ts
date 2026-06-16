@@ -531,11 +531,12 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "berries, a Rogue ingredient deep in) while the BUST chance climbs; or 'Pack\n"
       + "up and leave' to stop.\n"
       + "EXPECT: each forage hands a berry to your party RIGHT AWAY (check held items).\n"
-      + "Pushing into an interrupt spawns a level-scaled 2-mon Bug swarm - WIN and\n"
-      + "foraging RESUMES (it does NOT end). Each interrupt makes the next swarm\n"
-      + "tougher (more levels; boss lead after 3). Berries already held are never\n"
-      + "lost. Pack up = leave with everything (+ Rogue pick on a jackpot). Round-0\n"
-      + "leave = nothing. A party wipe ends the run; never softlocks.",
+      + "Pushing into an interrupt spawns an escalating 2-mon Bug swarm - WIN and\n"
+      + "foraging RESUMES (it does NOT end). Each interrupt pulls a tougher lead and\n"
+      + "more levels; after 3 the lead is the chain BOSS (2-3 health bars, >= 5 levels\n"
+      + "over your strongest mon). Berries already held are never lost. Pack up = leave\n"
+      + "with everything (+ Rogue pick on a jackpot). Round-0 leave = nothing. A party\n"
+      + "wipe ends the run; never softlocks.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -560,11 +561,14 @@ export const DEV_SCENARIOS: DevScenario[] = [
     description:
       "#439 Cave press-your-luck MINING (reuses the press-luck substrate). Forces\n"
       + "ER_GLITTERING_VEIN in the CAVE biome.\n"
-      + "DO: 'Work the vein', then keep digging or pack up. Each round pays ore/gem\n"
-      + "money; deep digs can hit a Rogue / evolution-stone jackpot. BUST chance climbs.\n"
-      + "EXPECT: bank = money (+ jackpot shop if deep). A bust scatters HALF the money\n"
-      + "and spawns a level-scaled wild Rock/Ground mon (Onix/Graveler/Rhydon/Gigalith);\n"
-      + "win keeps the rest + jackpot. Round-0 leave = nothing. Never softlocks.",
+      + "DO: 'Work the vein', then keep digging or pack up. Each round rolls money:\n"
+      + "usually a jittered payout, sometimes a NUGGET (big), sometimes NOTHING (dud).\n"
+      + "Item finds are HELD only: Eviolite / Mystical Rock (uncommon, deep), a King's\n"
+      + "Rock (rare, ~mega-rare), or a party-line Mega Stone. BUST chance climbs.\n"
+      + "EXPECT: money is paid per strike and kept on a bust (nothing scatters). bank =\n"
+      + "item shop if any found. A bust spawns an escalating wild Rock/Ground mon\n"
+      + "(Onix->Gigalith); after 3 it is the chain BOSS (2-3 bars, >= 5 levels over your\n"
+      + "strongest). Win and mining RESUMES. Round-0 leave = nothing. Never softlocks.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -589,13 +593,15 @@ export const DEV_SCENARIOS: DevScenario[] = [
     description:
       "#439 Jungle press-your-luck DELVE (reuses the press-luck substrate). Forces\n"
       + "ER_OVERGROWN_TEMPLE in the JUNGLE biome.\n"
-      + "DO: 'Delve into the temple', then press deeper or climb out. Each chamber pays\n"
-      + "tribute/antiquity money; deep chambers can hit a Rogue / evolution-stone relic.\n"
-      + "WAKE chance climbs each step.\n"
-      + "EXPECT: climb out = money (+ relic shop if deep). A trap scatters HALF the\n"
-      + "money and spawns a level-scaled wild Grass/Rock guardian (Cradily/Sudowoodo/\n"
-      + "Torterra/Tangrowth); win keeps the rest + relic. Chamber-0 leave = nothing.\n"
-      + "Never softlocks.",
+      + "DO: 'Delve into the temple', then press deeper or climb out. Each chamber rolls\n"
+      + "money: usually jittered, sometimes a NUGGET (big), sometimes NOTHING (dud). Item\n"
+      + "finds are HELD only: Eviolite / Mystical Rock (uncommon, deep), a King's Rock\n"
+      + "(rare, ~mega-rare), or a party-line Mega Stone. WAKE chance climbs each step.\n"
+      + "EXPECT: money is paid per chamber and kept on a wake (nothing scatters). climb\n"
+      + "out = item shop if any found. A wake spawns an escalating wild Grass/Rock\n"
+      + "guardian (Sudowoodo->Tangrowth); after 3 it is the chain BOSS - BURMY ETERNA\n"
+      + "('Eternaburm', 2-3 bars, >= 5 levels over your strongest). Win and delving\n"
+      + "RESUMES. Chamber-0 leave = nothing. Never softlocks.",
     setup: () => {
       resetDevOverrides();
       setOverrides({

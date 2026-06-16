@@ -7,19 +7,26 @@
 // =============================================================================
 // ER #439 - shared "mineral / treasure" loot for the mining + delving press-your-
 // luck events (Glittering Vein, Overgrown Temple). Money is paid per find by the
-// host; THIS module builds the ITEM HAUL that the player cashes in as a reward
-// shop when they finally bank (and loses if a party wipe ends the run first).
+// host using rollMineralMoney(); THIS module also builds the ITEM HAUL that the
+// player cashes in as a reward shop when they finally bank (and loses if a party
+// wipe ends the run first).
 //
-// The pool is HELD ITEMS only - and only the ones that read as something you'd
-// dig out of stone: rocks (King's Rock, Mystical Rock), gem-lenses (Scope/Wide/
-// Multi Lens), orbs (Toxic/Flame Orb), ore (Eviolite), buried treasure (Amulet
-// Coin), a claw, and the odd black hole. Type-boost gems / plates
-// (ATTACK_TYPE_BOOSTER) are deliberately VERY RARE (deep ROGUE roll only). NO
-// evolution stones, vitamins, or TMs - none of which make sense underground.
-// A RARE deep find turns up a MEGA STONE matching one of the player's lines -
-// even a pre-evolution (a Charmeleon can still unearth Charizardite X). The haul
-// accumulates on the host's `encounter.misc`, so it survives the continue-after-
-// fight resume and only pays out (or is lost) when the loop ends.
+// The item pool is deliberately TINY and reads as something you'd dig out of
+// stone:
+//   - EVIOLITE and MYSTICAL ROCK are the regular item finds (an uncommon bonus
+//     on a deeper strike).
+//   - KING'S ROCK is a RARE find, about as rare as the mega stone (a deep, low-%
+//     roll of its own).
+//   - A RARE deep find still turns up a MEGA STONE matching one of the player's
+//     lines, even a pre-evolution (a Charmeleon can unearth Charizardite X).
+// Everything else (lenses, orbs, plates, claws, vitamins, evo stones, TMs) is
+// gone - none of it reads as buried treasure.
+//
+// Money itself varies per strike: most strikes pay a jittered amount, a small
+// chance turns up nothing (a dud), and a small chance strikes a NUGGET (a big
+// payout). The haul accumulates on the host's `encounter.misc`, so it survives
+// the continue-after-fight resume and only pays out (or is lost) when the loop
+// ends.
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
@@ -28,7 +35,6 @@ import { modifierTypes } from "#data/data-lists";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import type { FormChangeItem } from "#enums/form-change-item";
-import { ModifierTier } from "#enums/modifier-tier";
 import { SpeciesFormKey } from "#enums/species-form-key";
 import type { SpeciesId } from "#enums/species-id";
 import {
@@ -39,15 +45,13 @@ import type { CustomModifierSettings, ModifierTypeOption } from "#modifiers/modi
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import { randSeedInt, randSeedItem } from "#utils/common";
 
-/** The two themed flavours: mining (stones/gems/vitamins) vs ruin relics (plates/TMs/evo). */
+/** The two themed flavours: mining a cave seam vs prying relics from a ruin. */
 export type MineralFlavor = "mineral" | "relic";
 
 /** The accumulating item haul, stashed on the host encounter's `misc`. */
 export interface MineralLootHaul {
-  /** Themed generator funcs (each draws one item of its kind at the shop). */
+  /** Themed generator funcs (each draws one found item at the shop). */
   funcs: ModifierTypeFunc[];
-  /** Generic tier draws (used for ROGUE-tier "relics" with no themed pool). */
-  tiers: ModifierTier[];
   /** Pre-genned options (the mega stone the player turned up). */
   options: ModifierTypeOption[];
   /** Guard so at most one mega stone is found per session. */
@@ -55,100 +59,89 @@ export interface MineralLootHaul {
 }
 
 export function emptyMineralHaul(): MineralLootHaul {
-  return { funcs: [], tiers: [], options: [], megaFound: false };
+  return { funcs: [], options: [], megaFound: false };
+}
+
+// --- Money ----------------------------------------------------------------- //
+
+/** % chance a strike turns up nothing (a dud). */
+const DUD_CHANCE = 12;
+/** % chance a strike turns up a nugget (a big payout). */
+const NUGGET_CHANCE = 8;
+/** A nugget pays roughly this multiple of the strike's base value. */
+const NUGGET_MULT = 5;
+
+/** The outcome of a single money strike. */
+export interface MoneyRoll {
+  /** Money to pay for this strike (0 on a dud). */
+  amount: number;
+  /** What kind of strike it was, for the flavour message. */
+  kind: "dud" | "ore" | "nugget";
 }
 
 /**
- * Held-item func pools per flavour, keyed by each item's REAL player-pool tier
- * (init-modifier-pools.ts) so a "find" matches the item's actual rarity. These
- * held items only ever live at ULTRA / ROGUE / MASTER in the real pool - there are
- * no COMMON/GREAT held battle items - so shallow finds stay money-only and the
- * items are a rarer deep bonus drawn at their true tier.
+ * Roll the money for one strike worth `base`. Most strikes pay `base` jittered
+ * +/-25%; a small chance turns up NOTHING (a dud), and a small chance strikes a
+ * NUGGET worth ~{@linkcode NUGGET_MULT}x base. The find is treated like a
+ * great-tier reward, so a dud is a real (if uncommon) outcome.
  */
-const POOLS: Record<MineralFlavor, Partial<Record<ModifierTier, ModifierTypeFunc[]>>> = {
-  // Mining a cave seam: gem-lenses, orbs, ore, rocks, a claw.
-  mineral: {
-    [ModifierTier.ULTRA]: [
-      modifierTypes.WIDE_LENS,
-      modifierTypes.TOXIC_ORB,
-      modifierTypes.FLAME_ORB,
-      modifierTypes.EVIOLITE,
-      modifierTypes.AMULET_COIN,
-      modifierTypes.MYSTICAL_ROCK,
-      modifierTypes.ATTACK_TYPE_BOOSTER,
-    ],
-    [ModifierTier.ROGUE]: [modifierTypes.KINGS_ROCK, modifierTypes.SCOPE_LENS, modifierTypes.GRIP_CLAW],
-    [ModifierTier.MASTER]: [modifierTypes.MULTI_LENS, modifierTypes.MINI_BLACK_HOLE],
-  },
-  // Pried from a ruin: same minerals plus a sacred dewdrop (Soul Dew).
-  relic: {
-    [ModifierTier.ULTRA]: [
-      modifierTypes.WIDE_LENS,
-      modifierTypes.TOXIC_ORB,
-      modifierTypes.FLAME_ORB,
-      modifierTypes.EVIOLITE,
-      modifierTypes.AMULET_COIN,
-      modifierTypes.MYSTICAL_ROCK,
-      modifierTypes.ATTACK_TYPE_BOOSTER,
-    ],
-    [ModifierTier.ROGUE]: [
-      modifierTypes.KINGS_ROCK,
-      modifierTypes.SCOPE_LENS,
-      modifierTypes.SOUL_DEW,
-      modifierTypes.GRIP_CLAW,
-    ],
-    [ModifierTier.MASTER]: [modifierTypes.MULTI_LENS, modifierTypes.MINI_BLACK_HOLE],
-  },
-};
+export function rollMineralMoney(base: number): MoneyRoll {
+  const r = randSeedInt(100);
+  if (r < DUD_CHANCE) {
+    return { amount: 0, kind: "dud" };
+  }
+  if (r < DUD_CHANCE + NUGGET_CHANCE) {
+    // 85%-115% of the full nugget value.
+    return { amount: Math.round(base * NUGGET_MULT * (0.85 + randSeedInt(31) / 100)), kind: "nugget" };
+  }
+  // Normal ore: 75%-125% of base.
+  return { amount: Math.round(base * (0.75 + randSeedInt(51) / 100)), kind: "ore" };
+}
+
+// --- Items ----------------------------------------------------------------- //
+
+/** The regular item finds (an uncommon bonus on a deeper strike). */
+const ITEM_POOL: ModifierTypeFunc[] = [modifierTypes.EVIOLITE, modifierTypes.MYSTICAL_ROCK];
+
+/** Percent chance per deep strike to turn up a KING'S ROCK (about mega-stone rare). */
+const KINGS_ROCK_CHANCE = 4;
 
 /**
- * Pick the item tier for a find at depth `d` (0-indexed). null = money-only this
- * find (the common case). The held items only exist at ULTRA / ROGUE / MASTER, so
- * those are the only tiers ever returned, and deeper finds upgrade the odds.
+ * Percent chance that a strike at depth `d` (0-indexed) also turns up one of the
+ * regular items (Eviolite / Mystical Rock). Shallow strikes are money-only; the
+ * chance climbs as the dig deepens but stays an uncommon bonus.
  */
-function rollFindTier(d: number): ModifierTier | null {
-  const r = randSeedInt(100);
+function itemFindChance(d: number): number {
   if (d <= 1) {
-    // Shallow: almost always just money, a slim ULTRA chance.
-    return r < 15 ? ModifierTier.ULTRA : null;
+    return 0;
   }
   if (d <= 3) {
-    if (r < 8) {
-      return ModifierTier.ROGUE;
-    }
-    if (r < 40) {
-      return ModifierTier.ULTRA;
-    }
-    return null;
+    return 14;
   }
-  // Deep: a real MASTER shot, better ROGUE/ULTRA odds.
-  if (r < 6) {
-    return ModifierTier.MASTER;
-  }
-  if (r < 24) {
-    return ModifierTier.ROGUE;
-  }
-  if (r < 60) {
-    return ModifierTier.ULTRA;
-  }
-  return null;
+  return 22;
 }
 
 /**
- * Add one find's ITEM reward (if any) to the haul. Returns true if an item was
- * added (money-only finds return false). `d` is depth (0-indexed).
+ * Add one strike's regular ITEM reward (if any) to the haul. Returns true if an
+ * item was added. `d` is depth (0-indexed).
  */
-export function rollMineralFind(haul: MineralLootHaul, d: number, flavor: MineralFlavor): boolean {
-  const tier = rollFindTier(d);
-  if (tier == null) {
+export function rollMineralFind(haul: MineralLootHaul, d: number, _flavor: MineralFlavor): boolean {
+  if (randSeedInt(100) >= itemFindChance(d)) {
     return false;
   }
-  const pool = POOLS[flavor][tier];
-  if (pool && pool.length > 0) {
-    haul.funcs.push(randSeedItem(pool));
-  } else {
-    haul.tiers.push(tier); // ROGUE (or any unmapped tier) -> a generic tier draw
+  haul.funcs.push(randSeedItem(ITEM_POOL));
+  return true;
+}
+
+/**
+ * RARE deep roll for a KING'S ROCK - about as rare as the mega stone. Returns
+ * true if one was added. `d` is depth (0-indexed).
+ */
+export function rollKingsRock(haul: MineralLootHaul, d: number): boolean {
+  if (d < 3 || randSeedInt(100) >= KINGS_ROCK_CHANCE) {
+    return false;
   }
+  haul.funcs.push(modifierTypes.KINGS_ROCK);
   return true;
 }
 
@@ -211,7 +204,7 @@ export function rollMegaStone(haul: MineralLootHaul, d: number, chancePct: numbe
 
 /** True if the haul holds any item reward (drives the prompt's "treasure" hint). */
 export function mineralHaulHasItems(haul: MineralLootHaul): boolean {
-  return haul.funcs.length > 0 || haul.tiers.length > 0 || haul.options.length > 0;
+  return haul.funcs.length > 0 || haul.options.length > 0;
 }
 
 /**
@@ -229,9 +222,6 @@ export function openMineralHaul(haul: MineralLootHaul): boolean {
   }
   if (haul.funcs.length > 0) {
     settings.guaranteedModifierTypeFuncs = haul.funcs;
-  }
-  if (haul.tiers.length > 0) {
-    settings.guaranteedModifierTiers = haul.tiers;
   }
   setEncounterRewards(settings);
   return true;

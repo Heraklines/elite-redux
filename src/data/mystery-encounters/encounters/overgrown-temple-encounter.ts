@@ -37,14 +37,17 @@ import {
   type MineralLootHaul,
   mineralHaulHasItems,
   openMineralHaul,
+  rollKingsRock,
   rollMegaStone,
   rollMineralFind,
+  rollMineralMoney,
 } from "#data/elite-redux/er-mineral-loot";
 import {
   type PressYourLuckConfig,
   resumePressYourLuck,
   startPressYourLuck,
 } from "#data/elite-redux/er-press-your-luck";
+import { ErSpeciesId } from "#enums/er-species-id";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
@@ -61,7 +64,7 @@ import {
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
-import { randSeedItem } from "#utils/common";
+import { randSeedInt } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 const namespace = "mysteryEncounters/overgrownTemple";
@@ -84,13 +87,25 @@ const WAKE_MAX = 0.8;
 const ANTIQUITY_CHAMBER = 2;
 /** Levels added to the guardian per prior wake (deeper = deadlier). */
 const GUARDIAN_LEVEL_PER_INTERRUPT = 6;
-/** After this many wakes the guardian becomes a BOSS. */
+/** After this many wakes the temple's guardian becomes the chain's BOSS. */
 const GUARDIAN_BOSS_AFTER_INTERRUPTS = 3;
+/** A boss guardian is at least this many levels above the player's strongest mon. */
+const BOSS_LEVELS_ABOVE = 5;
 /** Percent chance per deep chamber to turn up a party-line mega stone (once/session). */
 const MEGA_STONE_CHANCE = 4;
 
-/** Thematic wild Grass/Rock guardians for the temple-wakes fight. */
-const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.CRADILY, SpeciesId.SUDOWOODO, SpeciesId.TORTERRA, SpeciesId.TANGROWTH];
+/**
+ * Thematic wild Grass/Rock guardians, ordered weakest -> strongest. Deeper wakes
+ * pull from further down the list (escalating BST beyond the wave cap).
+ */
+const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.SUDOWOODO, SpeciesId.CRADILY, SpeciesId.TORTERRA, SpeciesId.TANGROWTH];
+
+/**
+ * The temple's awakened guardian and chain BOSS: Burmy Eterna, the Redux
+ * Eterna-cloak cocoon ("Eternaburm"). A jungle-ruin god-bug, fitting as the
+ * deepest threat of the delve.
+ */
+const TEMPLE_BOSS_SPECIES = ErSpeciesId.BURMY_ETERNA as unknown as SpeciesId;
 
 /** What the Temple accumulates on `encounter.misc.delve`. */
 interface DelveHaul {
@@ -126,24 +141,36 @@ function wakeChance(chamber: number): number {
 /** Grow the haul for a survived step entering `chamber`, and refresh the prompt token. */
 async function delveChamber(encounter: MysteryEncounter, chamber: number): Promise<void> {
   const haul = getHaul(encounter);
-  // Pay the chamber's value RIGHT AWAY (visible +money each step, and a temple-
-  // wakes fight never costs what was already recovered).
-  globalScene.playSound("item_fanfare");
-  updatePlayerMoney(chamber >= ANTIQUITY_CHAMBER ? ANTIQUITY_VALUE : TRIBUTE_VALUE, true, false);
   haul.finds += 1;
 
-  // Each chamber can also turn up an ITEM for the bank haul (deeper = better tier),
-  // and a deep chamber has a rare shot at a party-line mega stone.
-  const gotMega = rollMegaStone(haul.loot, chamber, MEGA_STONE_CHANCE);
-  const gotItem = rollMineralFind(haul.loot, chamber, "relic");
-  setHaulTokens(encounter);
-  if (gotMega) {
-    queueEncounterMessage(`${namespace}:foundMegaStone`);
-  } else if (gotItem) {
-    queueEncounterMessage(`${namespace}:foundRelic`);
-  } else {
-    queueEncounterMessage(`${namespace}:foundTribute`);
+  // Roll this chamber's money: usually a jittered payout, sometimes nothing (a
+  // dud), sometimes a big NUGGET. Pay it RIGHT AWAY (a temple-wakes fight never
+  // costs what was already recovered).
+  const money = rollMineralMoney(chamber >= ANTIQUITY_CHAMBER ? ANTIQUITY_VALUE : TRIBUTE_VALUE);
+  if (money.amount > 0) {
+    globalScene.playSound("item_fanfare");
+    updatePlayerMoney(money.amount, true, false);
   }
+
+  // An empty chamber turns up nothing. Otherwise a chamber can also turn up an
+  // ITEM for the bank haul (deeper digs have better odds): a rare King's Rock, an
+  // uncommon Eviolite / Mystical Rock, or, deep in, a party-line mega stone.
+  let messageKey: string;
+  if (money.kind === "dud") {
+    messageKey = `${namespace}:foundNothing`;
+  } else if (rollMegaStone(haul.loot, chamber, MEGA_STONE_CHANCE)) {
+    messageKey = `${namespace}:foundMegaStone`;
+  } else if (rollKingsRock(haul.loot, chamber)) {
+    messageKey = `${namespace}:foundKingsRock`;
+  } else if (rollMineralFind(haul.loot, chamber, "relic")) {
+    messageKey = `${namespace}:foundRelic`;
+  } else if (money.kind === "nugget") {
+    messageKey = `${namespace}:foundNugget`;
+  } else {
+    messageKey = `${namespace}:foundTribute`;
+  }
+  setHaulTokens(encounter);
+  queueEncounterMessage(messageKey);
 }
 
 /** Refresh the {{findCount}} / {{relicNote}} dialogue tokens from the live haul. */
@@ -166,17 +193,33 @@ function guardianLevel(): number {
 }
 
 /**
- * Build the level-scaled wild Grass/Rock guardian for the temple-wakes fight. Each
- * prior wake raises its level, and past {@linkcode GUARDIAN_BOSS_AFTER_INTERRUPTS}
- * it becomes a BOSS - so the deeper a delve session runs, the deadlier it gets.
+ * Build the wild guardian for the temple-wakes fight. Each prior wake pulls a
+ * tougher species and raises its level (BST + level climb beyond the wave cap).
+ * Past {@linkcode GUARDIAN_BOSS_AFTER_INTERRUPTS} the temple fully wakes: the
+ * guardian becomes the chain BOSS - Burmy Eterna ({@linkcode TEMPLE_BOSS_SPECIES})
+ * with 2-3 health bars and at least {@linkcode BOSS_LEVELS_ABOVE} levels over the
+ * player's strongest mon.
  */
 function buildGuardianBattle(interrupts: number): EnemyPartyConfig {
+  const isBoss = interrupts >= GUARDIAN_BOSS_AFTER_INTERRUPTS;
+  if (isBoss) {
+    const level = Math.max(
+      guardianLevel() + interrupts * GUARDIAN_LEVEL_PER_INTERRUPT,
+      guardianLevel() + BOSS_LEVELS_ABOVE,
+    );
+    // Guard against the ER custom not being registered (the unresolved-species
+    // class of crash, cf. Graves): fall back to the toughest normal guardian.
+    const toughestIdx = GUARDIAN_SPECIES.length - 1;
+    const bossSpecies = getPokemonSpecies(TEMPLE_BOSS_SPECIES) ?? getPokemonSpecies(GUARDIAN_SPECIES[toughestIdx]);
+    return {
+      pokemonConfigs: [{ species: bossSpecies, isBoss: true, bossSegments: 2 + randSeedInt(2), level }],
+    };
+  }
+  // Deeper wakes escalate the species (ascending BST), clamped to the list.
+  const speciesIdx = Math.min(interrupts, GUARDIAN_SPECIES.length - 1);
   const level = guardianLevel() + interrupts * GUARDIAN_LEVEL_PER_INTERRUPT;
-  const species = randSeedItem(GUARDIAN_SPECIES);
   return {
-    pokemonConfigs: [
-      { species: getPokemonSpecies(species), isBoss: interrupts >= GUARDIAN_BOSS_AFTER_INTERRUPTS, level },
-    ],
+    pokemonConfigs: [{ species: getPokemonSpecies(GUARDIAN_SPECIES[speciesIdx]), isBoss: false, level }],
   };
 }
 

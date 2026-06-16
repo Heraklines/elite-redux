@@ -39,8 +39,10 @@ import {
   type MineralLootHaul,
   mineralHaulHasItems,
   openMineralHaul,
+  rollKingsRock,
   rollMegaStone,
   rollMineralFind,
+  rollMineralMoney,
 } from "#data/elite-redux/er-mineral-loot";
 import {
   type PressYourLuckConfig,
@@ -63,7 +65,7 @@ import {
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
-import { randSeedItem } from "#utils/common";
+import { randSeedInt } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 const namespace = "mysteryEncounters/glitteringVein";
@@ -86,12 +88,18 @@ const BUST_MAX = 0.8;
 const GEM_ROUND = 2;
 /** Levels added to the guardian per prior cave-in (deeper = deadlier). */
 const GUARDIAN_LEVEL_PER_INTERRUPT = 6;
-/** After this many cave-ins the guardian becomes a BOSS. */
+/** After this many cave-ins the guardian becomes the chain's BOSS. */
 const GUARDIAN_BOSS_AFTER_INTERRUPTS = 3;
+/** A boss guardian is at least this many levels above the player's strongest mon. */
+const BOSS_LEVELS_ABOVE = 5;
 /** Percent chance per deep strike to turn up a party-line mega stone (once/session). */
 const MEGA_STONE_CHANCE = 4;
 
-/** Thematic wild Rock/Ground guardians for the cave-in fight. */
+/**
+ * Thematic wild Rock/Ground guardians, ordered weakest -> strongest. Deeper
+ * cave-ins pull from further down the list (escalating BST beyond the wave cap);
+ * the boss is the last, toughest entry.
+ */
 const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.ONIX, SpeciesId.GRAVELER, SpeciesId.RHYDON, SpeciesId.GIGALITH];
 
 /** What the Vein accumulates on `encounter.misc.mine`. */
@@ -128,24 +136,36 @@ function bustChance(round: number): number {
 /** Grow the haul for a survived strike entering `round`, and refresh the prompt token. */
 async function mineRound(encounter: MysteryEncounter, round: number): Promise<void> {
   const haul = getHaul(encounter);
-  // Pay the strike's value RIGHT AWAY (visible +money each round, and a cave-in
-  // fight never costs what was already chipped out).
-  globalScene.playSound("item_fanfare");
-  updatePlayerMoney(round >= GEM_ROUND ? GEM_VALUE : ORE_VALUE, true, false);
   haul.finds += 1;
 
-  // Each strike can also turn up an ITEM for the bank haul (deeper = better tier),
-  // and a deep strike has a rare shot at a party-line mega stone.
-  const gotMega = rollMegaStone(haul.loot, round, MEGA_STONE_CHANCE);
-  const gotItem = rollMineralFind(haul.loot, round, "mineral");
-  setHaulTokens(encounter);
-  if (gotMega) {
-    queueEncounterMessage(`${namespace}:foundMegaStone`);
-  } else if (gotItem) {
-    queueEncounterMessage(`${namespace}:foundTreasure`);
-  } else {
-    queueEncounterMessage(`${namespace}:foundOre`);
+  // Roll this strike's money: usually a jittered payout, sometimes nothing (a
+  // dud), sometimes a big NUGGET. Pay it RIGHT AWAY (a cave-in fight never costs
+  // what was already chipped out).
+  const money = rollMineralMoney(round >= GEM_ROUND ? GEM_VALUE : ORE_VALUE);
+  if (money.amount > 0) {
+    globalScene.playSound("item_fanfare");
+    updatePlayerMoney(money.amount, true, false);
   }
+
+  // A dud strike turns up nothing at all. Otherwise a strike can also turn up an
+  // ITEM for the bank haul (deeper digs have better odds): a rare King's Rock, an
+  // uncommon Eviolite / Mystical Rock, or, deep in, a party-line mega stone.
+  let messageKey: string;
+  if (money.kind === "dud") {
+    messageKey = `${namespace}:foundNothing`;
+  } else if (rollMegaStone(haul.loot, round, MEGA_STONE_CHANCE)) {
+    messageKey = `${namespace}:foundMegaStone`;
+  } else if (rollKingsRock(haul.loot, round)) {
+    messageKey = `${namespace}:foundKingsRock`;
+  } else if (rollMineralFind(haul.loot, round, "mineral")) {
+    messageKey = `${namespace}:foundTreasure`;
+  } else if (money.kind === "nugget") {
+    messageKey = `${namespace}:foundNugget`;
+  } else {
+    messageKey = `${namespace}:foundOre`;
+  }
+  setHaulTokens(encounter);
+  queueEncounterMessage(messageKey);
 }
 
 /** Refresh the {{oreCount}} / {{jackpotNote}} dialogue tokens from the live haul. */
@@ -171,16 +191,25 @@ function guardianLevel(): number {
 }
 
 /**
- * Build the level-scaled wild Rock/Ground guardian for the cave-in fight. Each
- * prior cave-in raises its level, and past {@linkcode GUARDIAN_BOSS_AFTER_INTERRUPTS}
- * it becomes a BOSS - so the deeper a dig session runs, the deadlier it gets.
+ * Build the wild Rock/Ground guardian for the cave-in fight. Each prior cave-in
+ * pulls a tougher species from {@linkcode GUARDIAN_SPECIES} and raises its level
+ * (BST + level climb beyond the wave cap). Past
+ * {@linkcode GUARDIAN_BOSS_AFTER_INTERRUPTS} it becomes the chain's BOSS: 2-3
+ * health bars and at least {@linkcode BOSS_LEVELS_ABOVE} levels over the player's
+ * strongest mon.
  */
 function buildGuardianBattle(interrupts: number): EnemyPartyConfig {
-  const level = guardianLevel() + interrupts * GUARDIAN_LEVEL_PER_INTERRUPT;
-  const species = randSeedItem(GUARDIAN_SPECIES);
+  const isBoss = interrupts >= GUARDIAN_BOSS_AFTER_INTERRUPTS;
+  // Deeper cave-ins escalate the species (ascending BST), clamped to the list.
+  const speciesIdx = Math.min(interrupts, GUARDIAN_SPECIES.length - 1);
+  const species = getPokemonSpecies(GUARDIAN_SPECIES[isBoss ? GUARDIAN_SPECIES.length - 1 : speciesIdx]);
+  let level = guardianLevel() + interrupts * GUARDIAN_LEVEL_PER_INTERRUPT;
+  if (isBoss) {
+    level = Math.max(level, guardianLevel() + BOSS_LEVELS_ABOVE);
+  }
   return {
     pokemonConfigs: [
-      { species: getPokemonSpecies(species), isBoss: interrupts >= GUARDIAN_BOSS_AFTER_INTERRUPTS, level },
+      isBoss ? { species, isBoss: true, bossSegments: 2 + randSeedInt(2), level } : { species, isBoss: false, level },
     ],
   };
 }
