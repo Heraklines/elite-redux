@@ -78,3 +78,4 @@ src/dev-tools/local/
 # Captured console-log dumps written by the dev-log Vite middleware.
 dev-logs/
 docs/plans/er-biome-overhaul-design.md
+docs/plans/er-events-design-recovered.md
