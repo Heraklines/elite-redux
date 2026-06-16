@@ -49,7 +49,9 @@ export type ErRelicKind =
   | "bondedCharm"
   | "collectorsAlbum"
   | "quartermaster"
-  | "lookout";
+  | "lookout"
+  | "moltenCore"
+  | "capacitor";
 
 export interface ErRelicConfig {
   name: string;
@@ -113,6 +115,20 @@ export const ER_RELIC_CONFIG: Readonly<Record<ErRelicKind, ErRelicConfig>> = {
     description: "If your party slots 2 and 3 share a type, your team's moves of that type deal 15% more damage.",
     icon: "soul_dew",
     tint: 0x80c0f8,
+    maxStack: 1,
+  },
+  moltenCore: {
+    name: "Molten Core",
+    description: "The Caldera's heart. Your team's Fire-type moves deal 20% more damage.",
+    icon: "charcoal",
+    tint: 0xf85020,
+    maxStack: 1,
+  },
+  capacitor: {
+    name: "Capacitor",
+    description: "Stored reactor charge. Your team's Electric-type moves deal 20% more damage.",
+    icon: "magnet",
+    tint: 0x70d0f8,
     maxStack: 1,
   },
   anchor: {
@@ -395,6 +411,22 @@ export function erTwinLinkMultiplier(moveType: PokemonType): number {
     return 1;
   }
   return 1 + TWIN_LINK_PERCENT / 100;
+}
+
+/**
+ * Molten Core (relic): the Caldera's heart. Team-wide +20% damage on FIRE-type
+ * moves while held. Queried from {@linkcode Pokemon.getAttackDamage}.
+ */
+export function erMoltenCoreFireMultiplier(moveType: PokemonType): number {
+  return moveType === PokemonType.FIRE && hasErRelic("moltenCore") ? 1.2 : 1;
+}
+
+/**
+ * Capacitor (relic): stored reactor charge. Team-wide +20% damage on ELECTRIC-type
+ * moves while held. Queried from {@linkcode Pokemon.getAttackDamage}.
+ */
+export function erCapacitorElectricMultiplier(moveType: PokemonType): number {
+  return moveType === PokemonType.ELECTRIC && hasErRelic("capacitor") ? 1.2 : 1;
 }
 
 /**

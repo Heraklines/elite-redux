@@ -66,7 +66,13 @@ import {
 import { erBlackSpritePath, erBlackSpritePathFromBase } from "#data/elite-redux/er-black-sprite-manifest";
 import { erTryApplyOmniGem } from "#data/elite-redux/er-community-items";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
-import { erMoraleBannerMultiplier, erTrySecondWind, erTwinLinkMultiplier } from "#data/elite-redux/er-relics";
+import {
+  erCapacitorElectricMultiplier,
+  erMoltenCoreFireMultiplier,
+  erMoraleBannerMultiplier,
+  erTrySecondWind,
+  erTwinLinkMultiplier,
+} from "#data/elite-redux/er-relics";
 import { applyErResistBerry } from "#data/elite-redux/er-resist-berries";
 import {
   erYoungsterFreeInnateSlots,
@@ -4931,7 +4937,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
      * Twin Link = +15% for moves of the type shared by party slots 2 and 3. Both
      * return 1 when their relic isn't held or the condition isn't met.
      */
-    const erRelicMultiplier = source.isPlayer() ? erMoraleBannerMultiplier() * erTwinLinkMultiplier(moveType) : 1;
+    const erRelicMultiplier = source.isPlayer()
+      ? erMoraleBannerMultiplier()
+        * erTwinLinkMultiplier(moveType)
+        * erMoltenCoreFireMultiplier(moveType)
+        * erCapacitorElectricMultiplier(moveType)
+      : 1;
 
     damage.value = toDmgValue(
       baseDamage
