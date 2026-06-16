@@ -156,7 +156,9 @@ export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
 
 /** Category -> the modifierTypes generators that can fill its slots. */
 export const ER_SHOP_CATEGORY_POOL: Record<ErShopCategory, (keyof typeof modifierTypes)[]> = {
-  HEAL: ["POTION", "SUPER_POTION", "HYPER_POTION", "MAX_POTION", "FULL_HEAL", "FULL_RESTORE", "REVIVE", "MAX_REVIVE"],
+  // ER: Full Heal / Full Restore dropped from biome shops - they land at the end
+  // of a biome where full healing is redundant. Potions + revives stay.
+  HEAL: ["POTION", "SUPER_POTION", "HYPER_POTION", "MAX_POTION", "REVIVE", "MAX_REVIVE"],
   BALLS: ["POKEBALL", "GREAT_BALL", "ULTRA_BALL", "ROGUE_BALL"],
   BATTLE: ["TEMP_STAT_STAGE_BOOSTER", "DIRE_HIT"],
   BERRY: ["BERRY"],
@@ -176,7 +178,9 @@ export const ER_SHOP_CATEGORY_POOL: Record<ErShopCategory, (keyof typeof modifie
   EVO: ["EVOLUTION_ITEM", "RARE_EVOLUTION_ITEM", "FORM_CHANGE_ITEM"],
   CANDY: ["RARE_CANDY", "RARER_CANDY"],
   MINT: ["MINT"],
-  PP: ["ETHER", "MAX_ETHER", "ELIXIR", "MAX_ELIXIR", "PP_UP", "PP_MAX"],
+  // ER: PP-restore items (Ether/Elixir family) dropped from biome shops as
+  // redundant end-of-biome filler. Only the permanent PP upgrades remain.
+  PP: ["PP_UP", "PP_MAX"],
   VITAMIN: ["BASE_STAT_BOOSTER"],
   ARCANE: ["ABILITY_RANDOMIZER", "MOVE_SLOT_EXPANDER", "ER_OMNI_GEM"],
   KEYSTONE: ["MEGA_BRACELET"],
