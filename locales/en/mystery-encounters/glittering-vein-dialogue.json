@@ -26,7 +26,7 @@
       "tooltip": "(+) Keep everything you have dug out"
     }
   },
-  "foundOre": "You pry loose another chunk and tuck it away.",
+  "foundOre": "You pry loose another chunk of ore and pocket the money it fetches.",
   "foundJackpot": "Wedged deep in the seam, a glittering treasure comes free in your hand!",
-  "caveInAmbush": "The rumbling becomes a roar! Rock splits and a territorial guardian heaves out of the wall, burying {{scattered}} of your finds in the rubble as you scramble to defend yourself!"
+  "caveInAmbush": "The rumbling becomes a roar! A territorial guardian heaves out of the wall - the money you have earned is safely in your bag. Drive it off and you can keep mining!"
 }

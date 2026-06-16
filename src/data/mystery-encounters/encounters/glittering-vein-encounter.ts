@@ -35,7 +35,11 @@
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
-import { type PressYourLuckConfig, startPressYourLuck } from "#data/elite-redux/er-press-your-luck";
+import {
+  type PressYourLuckConfig,
+  resumePressYourLuck,
+  startPressYourLuck,
+} from "#data/elite-redux/er-press-your-luck";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
@@ -80,8 +84,10 @@ const GEM_ROUND = 2;
 const JACKPOT_ROUND = 3;
 /** Chance per qualifying strike to turn up the jackpot. */
 const JACKPOT_CHANCE = 0.2;
-/** Fraction of the gathered money the cave-in scatters when it interrupts. */
-const BUST_HAUL_LOSS = 0.5;
+/** Levels added to the guardian per prior cave-in (deeper = deadlier). */
+const GUARDIAN_LEVEL_PER_INTERRUPT = 6;
+/** After this many cave-ins the guardian becomes a BOSS. */
+const GUARDIAN_BOSS_AFTER_INTERRUPTS = 3;
 
 /** The two jackpot prizes (one is rolled when the jackpot hits): a Rogue-tier pick
  * or an evolution stone (an early evo-item source, mirroring the mega-stone idea). */
@@ -92,12 +98,16 @@ const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.ONIX, SpeciesId.GRAVELER, Speci
 
 /** What the Vein accumulates on `encounter.misc.mine`. */
 interface MineHaul {
-  /** Money chipped out so far (paid to the player on bank/win). */
-  money: number;
-  /** How many ore/gem strikes have landed (drives the {{oreCount}} token). */
+  /** How many ore/gem strikes have landed (each pays its money at once). */
   finds: number;
   /** Whether the jackpot has been struck (an evolution-stone / Rogue shop pick). */
   jackpot: boolean;
+  /** How many cave-ins have been survived (drives guardian escalation). */
+  interrupts: number;
+}
+
+function defaultHaul(): MineHaul {
+  return { finds: 0, jackpot: false, interrupts: 0 };
 }
 
 function getHaul(encounter: MysteryEncounter): MineHaul {
@@ -105,7 +115,7 @@ function getHaul(encounter: MysteryEncounter): MineHaul {
     encounter.misc = {};
   }
   if (!encounter.misc.mine) {
-    encounter.misc.mine = { money: 0, finds: 0, jackpot: false } satisfies MineHaul;
+    encounter.misc.mine = defaultHaul();
   }
   return encounter.misc.mine as MineHaul;
 }
@@ -118,7 +128,10 @@ function bustChance(round: number): number {
 /** Grow the haul for a survived strike entering `round`, and refresh the prompt token. */
 async function mineRound(encounter: MysteryEncounter, round: number): Promise<void> {
   const haul = getHaul(encounter);
-  haul.money += round >= GEM_ROUND ? GEM_VALUE : ORE_VALUE;
+  // Pay the strike's value RIGHT AWAY (visible +money each round, and a cave-in
+  // fight never costs what was already chipped out).
+  globalScene.playSound("item_fanfare");
+  updatePlayerMoney(round >= GEM_ROUND ? GEM_VALUE : ORE_VALUE, true, false);
   haul.finds += 1;
 
   // Deep strikes can also turn up the jackpot (only once).
@@ -141,16 +154,11 @@ function setHaulTokens(encounter: MysteryEncounter): void {
 }
 
 /**
- * Hand the player the kept haul. The gathered money is paid out directly; the
- * jackpot, if struck, is offered as a single post-resolution shop pick (a Rogue-
- * tier item or an evolution stone). With no money and no jackpot, nothing is
- * granted (no empty shop is opened).
+ * Open the jackpot shop pick if the jackpot was struck (a Rogue-tier item or an
+ * evolution stone). Money is paid per strike, so only the jackpot needs the
+ * reward phase; no jackpot = no shop opened.
  */
-function awardHaul(money: number, jackpot: boolean): void {
-  if (money > 0) {
-    globalScene.playSound("item_fanfare");
-    updatePlayerMoney(money, true, false);
-  }
+function awardJackpot(jackpot: boolean): void {
   if (jackpot) {
     // Half the time an evolution stone, half the time a Rogue-tier pick.
     if (randSeedInt(2) === 0) {
@@ -173,12 +181,18 @@ function guardianLevel(): number {
   return Math.max(1, top, Math.round(waveLvl));
 }
 
-/** Build the level-scaled wild Rock/Ground guardian for the cave-in fight. */
-function buildGuardianBattle(): EnemyPartyConfig {
-  const level = guardianLevel();
+/**
+ * Build the level-scaled wild Rock/Ground guardian for the cave-in fight. Each
+ * prior cave-in raises its level, and past {@linkcode GUARDIAN_BOSS_AFTER_INTERRUPTS}
+ * it becomes a BOSS - so the deeper a dig session runs, the deadlier it gets.
+ */
+function buildGuardianBattle(interrupts: number): EnemyPartyConfig {
+  const level = guardianLevel() + interrupts * GUARDIAN_LEVEL_PER_INTERRUPT;
   const species = randSeedItem(GUARDIAN_SPECIES);
   return {
-    pokemonConfigs: [{ species: getPokemonSpecies(species), isBoss: false, level }],
+    pokemonConfigs: [
+      { species: getPokemonSpecies(species), isBoss: interrupts >= GUARDIAN_BOSS_AFTER_INTERRUPTS, level },
+    ],
   };
 }
 
@@ -194,28 +208,30 @@ function mineConfig(encounter: MysteryEncounter): PressYourLuckConfig {
     onPush: round => mineRound(encounter, round),
     onBank: async roundsCompleted => {
       const haul = getHaul(encounter);
-      if (roundsCompleted === 0) {
+      if (roundsCompleted === 0 && haul.finds === 0) {
         // Walked away before digging anything - no haul, no cost.
         await transitionMysteryEncounterIntroVisuals(true, true);
         leaveEncounterWithoutBattle(true);
         return;
       }
-      awardHaul(haul.money, haul.jackpot);
+      // Money was paid per strike; only the jackpot shop is left.
+      awardJackpot(haul.jackpot);
       await transitionMysteryEncounterIntroVisuals(true, true);
       leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
     },
     onBust: async () => {
       const haul = getHaul(encounter);
-      // The cave-in buries part of the haul up front; the rest rides on the win.
-      const kept = Math.floor(haul.money * (1 - BUST_HAUL_LOSS));
-      const scatteredFinds = Math.ceil(haul.finds * BUST_HAUL_LOSS);
-      encounter.setDialogueToken("scattered", String(scatteredFinds));
+      // The cave-in is NOT terminal: the money you have is already paid, so nothing
+      // is lost. WIN the fight and mining RESUMES (each cave-in makes the next
+      // guardian tougher). A full party wipe ends the run as any battle would.
+      haul.interrupts += 1;
       queueEncounterMessage(`${namespace}:caveInAmbush`);
-      // Pay the reduced haul now (jackpot shop opens after the win - Graves combat-
-      // branch pattern); a full party wipe ends the run.
-      awardHaul(kept, haul.jackpot);
+      encounter.doContinueEncounter = async () => {
+        encounter.doContinueEncounter = undefined;
+        await resumePressYourLuck(mineConfig(encounter));
+      };
       await transitionMysteryEncounterIntroVisuals(true, false);
-      await initBattleWithEnemyConfig(buildGuardianBattle());
+      await initBattleWithEnemyConfig(buildGuardianBattle(haul.interrupts));
     },
   };
 }
@@ -236,7 +252,7 @@ export const GlitteringVeinEncounter: MysteryEncounter = MysteryEncounterBuilder
   .withOnInit(() => {
     const encounter = globalScene.currentBattle.mysteryEncounter!;
     // Reset the haul + prompt tokens so a re-rolled/forced encounter starts clean.
-    encounter.misc = { mine: { money: 0, finds: 0, jackpot: false } satisfies MineHaul };
+    encounter.misc = { mine: defaultHaul() };
     setHaulTokens(encounter);
     return true;
   })

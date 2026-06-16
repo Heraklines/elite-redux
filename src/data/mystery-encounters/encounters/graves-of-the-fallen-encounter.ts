@@ -14,10 +14,11 @@
 //     (GhostMember.heldItems = [modifierTypeId, count] pairs). Legacy graves with
 //     no item data, or items that no longer resolve, fall back to a random
 //     Ultra-tier item or berry. Leaves without battle, never softlocks.
-//   DISTURB (risk): the fallen challenger RISES as a GHOST TRAINER and fights you
-//     - a ghost-class trainer that shows the dead player's name and plays the
-//     ghost battle theme, fielding the GhostMember[] snapshot (level-scaled to the
-//     wave). Win -> reward is 2 of their held items (or 2 Ultra-tier fallbacks).
+//   DISTURB (risk): the fallen team's ghost RISES and fights you (a level-scaled
+//     wild battle rebuilt from the GhostMember[] snapshot; unresolvable species are
+//     filtered so it never crashes). Win -> reward is 2 of their held items (or 2
+//     Ultra-tier fallbacks). [A named ghost-TRAINER presentation is tracked as a
+//     follow-up - it needs the ghost-wave trainer path, not initBattleWithEnemyConfig.]
 //   WALK AWAY: leave with no cost.
 //
 // The chosen grave (a GhostTeamSnapshot) is fetched in onInit and stashed on
@@ -29,12 +30,7 @@
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
-import {
-  type GhostMember,
-  type GhostTeamSnapshot,
-  markTrainerAsGhost,
-  sampleGhostSnapshots,
-} from "#data/elite-redux/er-ghost-teams";
+import { type GhostMember, type GhostTeamSnapshot, sampleGhostSnapshots } from "#data/elite-redux/er-ghost-teams";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import type { Gender } from "#data/gender";
 import { ModifierTier } from "#enums/modifier-tier";
@@ -44,7 +40,6 @@ import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import type { Nature } from "#enums/nature";
-import { TrainerType } from "#enums/trainer-type";
 import type { EnemyPartyConfig, EnemyPokemonConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
   initBattleWithEnemyConfig,
@@ -57,7 +52,6 @@ import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
 import type { Variant } from "#sprites/variant";
 import type { ModifierTypeFunc } from "#types/modifier-types";
-import { randSeedItem } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 const namespace = "mysteryEncounters/gravesOfTheFallen";
@@ -66,14 +60,6 @@ const namespace = "mysteryEncounters/gravesOfTheFallen";
 const DISTURB_REWARD_ITEMS = 2;
 /** Tier used for every fallback / legacy-grave reward (a 1-of choice). */
 const FALLBACK_TIER = ModifierTier.ULTRA;
-/** Trainer classes a risen grave can wear (mirrors the ghost-wave/Colosseum set). */
-const GHOST_TRAINER_CLASSES: TrainerType[] = [
-  TrainerType.VETERAN,
-  TrainerType.ACE_TRAINER,
-  TrainerType.BLACK_BELT,
-  TrainerType.PSYCHIC,
-  TrainerType.HEX_MANIAC,
-];
 
 /** What is stashed on encounter.misc once a grave is resolved. */
 interface GravesMisc {
@@ -187,17 +173,23 @@ function graveTargetLevel(): number {
 }
 
 /**
- * Build the enemy party config for the risen ghost. This is a TRAINER battle (a
- * ghost-class trainer wearing one of {@linkcode GHOST_TRAINER_CLASSES}), not a
- * wild swarm - the fallen challenger themselves rises to fight. `trainerType`
- * makes it a trainer battle; `pokemonConfigs` overrides the team with the grave's
- * exact snapshot. The trainer's name + ghost BGM are stamped by
- * {@linkcode markTrainerAsGhost} once the battle is initialised.
+ * Build the wild-style enemy party config for the risen ghost team. Members whose
+ * species id does NOT resolve (legacy/cross-version data: an ER-custom id this
+ * build does not register) are filtered out so initBattleWithEnemyConfig never
+ * tries to spawn an undefined-species enemy (which crashed battle-info init). If
+ * the whole team filters out, fall back to a single resolvable mon so the fight
+ * still builds.
  */
 function buildGraveBattle(grave: GhostTeamSnapshot): EnemyPartyConfig {
   const level = graveTargetLevel();
-  const pokemonConfigs = grave.party.slice(0, 6).map(m => toEnemyConfig(m, level));
-  return { trainerType: randSeedItem(GHOST_TRAINER_CLASSES), pokemonConfigs };
+  const pokemonConfigs = grave.party
+    .slice(0, 6)
+    .filter(m => !!getPokemonSpecies(m.speciesId))
+    .map(m => toEnemyConfig(m, level));
+  if (pokemonConfigs.length === 0) {
+    pokemonConfigs.push({ species: getPokemonSpecies(94 /* Gengar */), isBoss: false, level });
+  }
+  return { pokemonConfigs };
 }
 
 /**
@@ -329,20 +321,13 @@ export const GravesOfTheFallenEncounter: MysteryEncounter = MysteryEncounterBuil
         selected: [{ text: `${namespace}:option.2.selected` }],
       })
       .withOptionPhase(async () => {
-        // DISTURB (risk): the fallen challenger RISES as a ghost trainer and
-        // fights. The reward shop (2 of their held items, Ultra-tier fallbacks)
-        // opens after the win.
+        // DISTURB (risk): the fallen team's ghost rises and fights (a level-scaled
+        // wild battle from the snapshot). The reward shop (2 of their held items,
+        // Ultra-tier fallbacks) opens after the win.
         const grave = getMisc()?.grave ?? syntheticLegacyGrave();
         setDisturbRewards(grave);
         await transitionMysteryEncounterIntroVisuals(true, false);
         await initBattleWithEnemyConfig(buildGraveBattle(grave));
-        // Stamp the freshly-built trainer with the fallen player's name + ghost
-        // theme (the team itself comes from pokemonConfigs above). Runs before the
-        // battle phase executes, so the intro shows the ghost's name.
-        const trainer = globalScene.currentBattle.trainer;
-        if (trainer) {
-          markTrainerAsGhost(trainer, grave);
-        }
         return true;
       })
       .build(),

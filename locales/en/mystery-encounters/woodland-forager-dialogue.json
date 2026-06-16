@@ -28,5 +28,5 @@
   },
   "foundBerry": "You tuck a fresh berry into your pack.",
   "foundIngredient": "Tucked beneath the roots, you find a rare foraging ingredient!",
-  "swarmInterrupts": "The droning erupts into a roar! A territorial swarm bursts from the trees, scattering {{scattered}} of your berries as you scramble to defend yourself!"
+  "swarmInterrupts": "The droning erupts into a roar! A territorial swarm bursts from the trees - the berries you have gathered are safely stowed. Drive the swarm off and you can keep foraging!"
 }

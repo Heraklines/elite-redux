@@ -26,7 +26,7 @@
       "tooltip": "(+) Keep everything you have found"
     }
   },
-  "foundTribute": "You pry loose more tribute and press on.",
+  "foundTribute": "You pry loose more tribute and pocket the money it fetches.",
   "foundRelic": "Half-buried in the roots, an ancient relic glints in the dark!",
-  "templeWakes": "A trap springs and the temple shudders awake! {{scattered}} of your finds scatter as its guardian lunges from the stone!"
+  "templeWakes": "A trap springs and the temple shudders awake! The money you have recovered is safely in your bag. Beat its guardian and you can keep delving!"
 }

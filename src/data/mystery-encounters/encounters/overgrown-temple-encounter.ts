@@ -33,7 +33,11 @@
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
-import { type PressYourLuckConfig, startPressYourLuck } from "#data/elite-redux/er-press-your-luck";
+import {
+  type PressYourLuckConfig,
+  resumePressYourLuck,
+  startPressYourLuck,
+} from "#data/elite-redux/er-press-your-luck";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
@@ -78,8 +82,10 @@ const ANTIQUITY_CHAMBER = 2;
 const RELIC_CHAMBER = 3;
 /** Chance per qualifying step to turn up the relic. */
 const RELIC_CHANCE = 0.2;
-/** Fraction of the gathered money the trap scatters when the temple wakes. */
-const WAKE_HAUL_LOSS = 0.5;
+/** Levels added to the guardian per prior wake (deeper = deadlier). */
+const GUARDIAN_LEVEL_PER_INTERRUPT = 6;
+/** After this many wakes the guardian becomes a BOSS. */
+const GUARDIAN_BOSS_AFTER_INTERRUPTS = 3;
 
 /** The relic's evo-item half (an early evolution-item source). */
 const RELIC_EVO_FUNC: ModifierTypeFunc = modifierTypes.RARE_EVOLUTION_ITEM;
@@ -89,12 +95,16 @@ const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.CRADILY, SpeciesId.SUDOWOODO, S
 
 /** What the Temple accumulates on `encounter.misc.delve`. */
 interface DelveHaul {
-  /** Money found so far (paid to the player on leave/win). */
-  money: number;
-  /** How many finds have been made (drives the {{findCount}} token). */
+  /** How many finds have been made (each pays its money at once). */
   finds: number;
   /** Whether the relic has been found (an evolution-stone / Rogue shop pick). */
   relic: boolean;
+  /** How many temple-wakes have been survived (drives guardian escalation). */
+  interrupts: number;
+}
+
+function defaultHaul(): DelveHaul {
+  return { finds: 0, relic: false, interrupts: 0 };
 }
 
 function getHaul(encounter: MysteryEncounter): DelveHaul {
@@ -102,7 +112,7 @@ function getHaul(encounter: MysteryEncounter): DelveHaul {
     encounter.misc = {};
   }
   if (!encounter.misc.delve) {
-    encounter.misc.delve = { money: 0, finds: 0, relic: false } satisfies DelveHaul;
+    encounter.misc.delve = defaultHaul();
   }
   return encounter.misc.delve as DelveHaul;
 }
@@ -115,7 +125,10 @@ function wakeChance(chamber: number): number {
 /** Grow the haul for a survived step entering `chamber`, and refresh the prompt token. */
 async function delveChamber(encounter: MysteryEncounter, chamber: number): Promise<void> {
   const haul = getHaul(encounter);
-  haul.money += chamber >= ANTIQUITY_CHAMBER ? ANTIQUITY_VALUE : TRIBUTE_VALUE;
+  // Pay the chamber's value RIGHT AWAY (visible +money each step, and a temple-
+  // wakes fight never costs what was already recovered).
+  globalScene.playSound("item_fanfare");
+  updatePlayerMoney(chamber >= ANTIQUITY_CHAMBER ? ANTIQUITY_VALUE : TRIBUTE_VALUE, true, false);
   haul.finds += 1;
 
   // Deep chambers can also turn up the relic (only once).
@@ -138,15 +151,11 @@ function setHaulTokens(encounter: MysteryEncounter): void {
 }
 
 /**
- * Hand the player the kept haul. The gathered money is paid out directly; the
- * relic, if found, is offered as a single post-resolution shop pick (a Rogue-tier
- * item or an evolution stone). With no money and no relic, nothing is granted.
+ * Open the relic shop pick if the relic was found (a Rogue-tier item or an
+ * evolution stone). Money is paid per chamber, so only the relic needs the reward
+ * phase; no relic = no shop opened.
  */
-function awardHaul(money: number, relic: boolean): void {
-  if (money > 0) {
-    globalScene.playSound("item_fanfare");
-    updatePlayerMoney(money, true, false);
-  }
+function awardRelic(relic: boolean): void {
   if (relic) {
     // Half the time an evolution stone, half the time a Rogue-tier pick.
     if (randSeedInt(2) === 0) {
@@ -169,12 +178,18 @@ function guardianLevel(): number {
   return Math.max(1, top, Math.round(waveLvl));
 }
 
-/** Build the level-scaled wild Grass/Rock guardian for the temple-wakes fight. */
-function buildGuardianBattle(): EnemyPartyConfig {
-  const level = guardianLevel();
+/**
+ * Build the level-scaled wild Grass/Rock guardian for the temple-wakes fight. Each
+ * prior wake raises its level, and past {@linkcode GUARDIAN_BOSS_AFTER_INTERRUPTS}
+ * it becomes a BOSS - so the deeper a delve session runs, the deadlier it gets.
+ */
+function buildGuardianBattle(interrupts: number): EnemyPartyConfig {
+  const level = guardianLevel() + interrupts * GUARDIAN_LEVEL_PER_INTERRUPT;
   const species = randSeedItem(GUARDIAN_SPECIES);
   return {
-    pokemonConfigs: [{ species: getPokemonSpecies(species), isBoss: false, level }],
+    pokemonConfigs: [
+      { species: getPokemonSpecies(species), isBoss: interrupts >= GUARDIAN_BOSS_AFTER_INTERRUPTS, level },
+    ],
   };
 }
 
@@ -190,28 +205,30 @@ function delveConfig(encounter: MysteryEncounter): PressYourLuckConfig {
     onPush: chamber => delveChamber(encounter, chamber),
     onBank: async chambersCompleted => {
       const haul = getHaul(encounter);
-      if (chambersCompleted === 0) {
+      if (chambersCompleted === 0 && haul.finds === 0) {
         // Turned back before entering - no haul, no cost.
         await transitionMysteryEncounterIntroVisuals(true, true);
         leaveEncounterWithoutBattle(true);
         return;
       }
-      awardHaul(haul.money, haul.relic);
+      // Money was paid per chamber; only the relic shop is left.
+      awardRelic(haul.relic);
       await transitionMysteryEncounterIntroVisuals(true, true);
       leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
     },
     onBust: async () => {
       const haul = getHaul(encounter);
-      // The trap buries part of the haul up front; the rest rides on the win.
-      const kept = Math.floor(haul.money * (1 - WAKE_HAUL_LOSS));
-      const scatteredFinds = Math.ceil(haul.finds * WAKE_HAUL_LOSS);
-      encounter.setDialogueToken("scattered", String(scatteredFinds));
+      // The temple-wakes fight is NOT terminal: the money you have is already paid,
+      // so nothing is lost. WIN and delving RESUMES (each wake makes the next
+      // guardian tougher). A full party wipe ends the run as any battle would.
+      haul.interrupts += 1;
       queueEncounterMessage(`${namespace}:templeWakes`);
-      // Pay the reduced haul now (relic shop opens after the win); a full party
-      // wipe ends the run.
-      awardHaul(kept, haul.relic);
+      encounter.doContinueEncounter = async () => {
+        encounter.doContinueEncounter = undefined;
+        await resumePressYourLuck(delveConfig(encounter));
+      };
       await transitionMysteryEncounterIntroVisuals(true, false);
-      await initBattleWithEnemyConfig(buildGuardianBattle());
+      await initBattleWithEnemyConfig(buildGuardianBattle(haul.interrupts));
     },
   };
 }
@@ -232,7 +249,7 @@ export const OvergrownTempleEncounter: MysteryEncounter = MysteryEncounterBuilde
   .withOnInit(() => {
     const encounter = globalScene.currentBattle.mysteryEncounter!;
     // Reset the haul + prompt tokens so a re-rolled/forced encounter starts clean.
-    encounter.misc = { delve: { money: 0, finds: 0, relic: false } satisfies DelveHaul };
+    encounter.misc = { delve: defaultHaul() };
     setHaulTokens(encounter);
     return true;
   })

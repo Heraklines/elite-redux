@@ -618,7 +618,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "ER Mushroom Circle (#439)",
     description:
-      "#439 Grass one-shot GAMBLE. Forces ER_MUSHROOM_CIRCLE in the GRASS biome.\n"
+      "#439 Grass one-shot GAMBLE. Forces ER_MUSHROOM_CIRCLE (wave-only override,\n"
+      + "matching the proven Booth scenario - the forced type does not depend on the\n"
+      + "backdrop biome).\n"
       + "DO: 'Taste a mushroom' (a single 50/50 roll, no loop, no battle) or 'Leave the\n"
       + "ring be' for nothing.\n"
       + "EXPECT: WINDFALL = +3 Candy to each party member's species (check candy on the\n"
@@ -630,7 +632,6 @@ export const DEV_SCENARIOS: DevScenario[] = [
         STARTING_LEVEL_OVERRIDE: 40,
         STARTING_MONEY_OVERRIDE: 20000,
         STARTING_WAVE_OVERRIDE: 12,
-        STARTING_BIOME_OVERRIDE: BiomeId.GRASS,
         MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
         MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_MUSHROOM_CIRCLE,
       });
