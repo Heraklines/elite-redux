@@ -1,0 +1,19 @@
+{
+  "intro": "A weary traveler sits at the roadside, turning a crumpled map this way and that.",
+  "title": "The Lost Wanderer",
+  "description": "The wanderer has no idea which way to go. Point them the right way and they will gladly share what they have - their marked-up map and a spare scrap of an old treasure chart.",
+  "query": "Help the wanderer?",
+  "option": {
+    "1": {
+      "label": "Point the way",
+      "tooltip": "(+) Reveal the onward routes onto your World Map\n(+) Gain a Treasure-Map Fragment",
+      "selected": "You set the traveler straight, and they press their notes into your hands in thanks..."
+    },
+    "2": {
+      "label": "Leave them be",
+      "tooltip": "(-) Walk on without helping",
+      "selected": "You leave the wanderer to puzzle over the map alone."
+    }
+  },
+  "helped": "The wanderer's map charts the routes ahead, and you pocket a Treasure-Map Fragment. (Press M to view.)"
+}

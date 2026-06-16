@@ -1,0 +1,19 @@
+{
+  "intro": "The broken hull of an old ship rests on the seabed, its cargo strewn across the silt.",
+  "title": "The Sunken Vessel",
+  "description": "Charts and crates spill from the wreck. Scout the navigator's quarters to map the routes ahead and salvage a scrap of an old treasure chart, or drift on past.",
+  "query": "Scout the wreck?",
+  "option": {
+    "1": {
+      "label": "Scout the wreck",
+      "tooltip": "(+) Reveal the onward routes onto your World Map\n(+) Salvage a Treasure-Map Fragment",
+      "selected": "You slip into the flooded hull and sift through the navigator's scattered charts..."
+    },
+    "2": {
+      "label": "Drift on",
+      "tooltip": "(-) Leave the wreck undisturbed",
+      "selected": "You leave the wreck to the silt and the current."
+    }
+  },
+  "scouted": "The wreck's charts map the routes ahead, and you salvage a Treasure-Map Fragment. (Press M to view.)"
+}

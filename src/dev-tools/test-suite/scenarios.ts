@@ -4318,4 +4318,42 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] })];
     },
   },
+  {
+    label: "ER #486: Lost Wanderer (reveal + fragment)",
+    description:
+      "Phase D reveal event (Plains). DO: on wave 12 choose 'Point the way', then\n"
+      + "press M.\n"
+      + "EXPECT: the World Map shows the onward [Route] nodes and the fragment count\n"
+      + "went up by 1. 'Leave them be' just exits.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.PLAINS,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_LOST_WANDERER,
+      });
+      return [makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] })];
+    },
+  },
+  {
+    label: "ER #486: Sunken Vessel (reveal + fragment)",
+    description:
+      "Phase D reveal event (Seabed). DO: on wave 12 choose 'Scout the wreck', then\n"
+      + "press M.\n"
+      + "EXPECT: the World Map shows the onward [Route] nodes and the fragment count\n"
+      + "went up by 1. 'Drift on' just exits.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.SEABED,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_SUNKEN_VESSEL,
+      });
+      return [makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] })];
+    },
+  },
 ];

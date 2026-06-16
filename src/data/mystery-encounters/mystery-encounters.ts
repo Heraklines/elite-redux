@@ -34,6 +34,7 @@ import { ImportBazaarEncounter } from "#mystery-encounters/import-bazaar-encount
 import { InformantEncounter } from "#mystery-encounters/informant-encounter";
 import { LakeSpiritEncounter } from "#mystery-encounters/lake-spirit-encounter";
 import { LostAtSeaEncounter } from "#mystery-encounters/lost-at-sea-encounter";
+import { LostWandererEncounter } from "#mystery-encounters/lost-wanderer-encounter";
 import { MessageInABottleEncounter } from "#mystery-encounters/message-in-a-bottle-encounter";
 import { MushroomCircleEncounter } from "#mystery-encounters/mushroom-circle-encounter";
 import { MysteriousChallengersEncounter } from "#mystery-encounters/mysterious-challengers-encounter";
@@ -52,6 +53,7 @@ import { SealedDoorEncounter } from "#mystery-encounters/sealed-door-encounter";
 import { ShadyVitaminDealerEncounter } from "#mystery-encounters/shady-vitamin-dealer-encounter";
 import { SlumberingSnorlaxEncounter } from "#mystery-encounters/slumbering-snorlax-encounter";
 import { StillWatersEncounter } from "#mystery-encounters/still-waters-encounter";
+import { SunkenVesselEncounter } from "#mystery-encounters/sunken-vessel-encounter";
 import { TeleportingHijinksEncounter } from "#mystery-encounters/teleporting-hijinks-encounter";
 import { TheExpertPokemonBreederEncounter } from "#mystery-encounters/the-expert-pokemon-breeder-encounter";
 import { ThePokemonSalesmanEncounter } from "#mystery-encounters/the-pokemon-salesman-encounter";
@@ -236,7 +238,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
       MysteryEncounterType.ER_TOWN_RAFFLE,
     ],
   ],
-  [BiomeId.PLAINS, [MysteryEncounterType.SLUMBERING_SNORLAX]],
+  [BiomeId.PLAINS, [MysteryEncounterType.SLUMBERING_SNORLAX, MysteryEncounterType.ER_LOST_WANDERER]],
   [
     BiomeId.GRASS,
     [
@@ -271,7 +273,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.SWAMP, [MysteryEncounterType.SAFARI_ZONE]],
   [BiomeId.BEACH, [MysteryEncounterType.ER_TIDE_POOLS, MysteryEncounterType.ER_X_MARKS_THE_SPOT]],
   [BiomeId.LAKE, [MysteryEncounterType.ER_LAKE_SPIRIT, MysteryEncounterType.ER_STILL_WATERS]],
-  [BiomeId.SEABED, [MysteryEncounterType.ER_ABYSSAL_VENT]],
+  [BiomeId.SEABED, [MysteryEncounterType.ER_ABYSSAL_VENT, MysteryEncounterType.ER_SUNKEN_VESSEL]],
   [BiomeId.MOUNTAIN, [MysteryEncounterType.ER_HOT_SPRING]],
   [BiomeId.BADLANDS, [MysteryEncounterType.DANCING_LESSONS]],
   [
@@ -380,6 +382,8 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_INFORMANT] = InformantEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_THE_STORM] = TheStormEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_ULTRA_WORMHOLE] = UltraWormholeEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_LOST_WANDERER] = LostWandererEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_SUNKEN_VESSEL] = SunkenVesselEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

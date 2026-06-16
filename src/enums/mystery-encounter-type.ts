@@ -138,6 +138,12 @@ export enum MysteryEncounterType {
   /** ER #486: Ultra Wormhole - a Space event; step through to be flung to a random
    * onward biome (sets a travel target). */
   ER_ULTRA_WORMHOLE,
+  /** ER #486: Lost Wanderer - a Plains event; help a lost traveler and they share
+   * their map (reveal onward routes) and a Treasure-Map fragment. */
+  ER_LOST_WANDERER,
+  /** ER #486: Sunken Vessel - a Seabed event; scout the wreck to chart the onward
+   * routes and salvage a Treasure-Map fragment. */
+  ER_SUNKEN_VESSEL,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */
