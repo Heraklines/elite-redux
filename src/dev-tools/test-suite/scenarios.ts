@@ -3526,7 +3526,13 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "continue to biome-select. The Abyss biome has NO market by design.\n"
       + "REGRESSION: the normal reward/shop screen must NOT list the market's\n"
       + "items - they used to leak into the vanilla shop row and be re-bought\n"
-      + "unlimited times. Now only the dedicated market shows them.",
+      + "unlimited times. Now only the dedicated market shows them.\n"
+      + "#504: the market fires every 10 GLOBAL waves even INSIDE a long biome\n"
+      + "(not only at the biome boundary), and it NEVER shows healing items no\n"
+      + "matter which wave it opens on (the old bug fell through to the vanilla\n"
+      + "potion row when it fired off a non-x0 boundary wave). You ALSO get a\n"
+      + "full party HEAL on every 10th wave (mid-biome x0 waves heal here; biome-\n"
+      + "change waves still heal on transition).",
     setup: () => {
       resetDevOverrides();
       setOverrides({

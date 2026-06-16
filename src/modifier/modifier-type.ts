@@ -2939,20 +2939,15 @@ export function getPlayerShopModifierTypeOptionsForWave(
   baseCost: number,
   forBiomeShop = false,
 ): ModifierTypeOption[] {
-  if (!(waveIndex % 10)) {
-    // ER Biome Market (#440): boss waves never had a shop - that empty space
-    // is now the biome market. Stock + prices come from the per-biome economy
-    // table (in ADDITION to the boss rewards above it). The finale (wave 200) is
-    // exempt; the Abyss has no market by design.
-    // Shipped to production (release approval): the market runs on every x0 wave
-    // in all builds. (The dev TEST SUITE remains staging-only via its own gate.)
-    //
-    // ONLY the BiomeShopPhase (forBiomeShop) gets this stock. The vanilla reward
-    // screen's shop row also calls this on x0 waves; if it received the biome
-    // stock it would render it in its UNCAPPED row (no per-slot qty), letting
-    // players re-buy market items unlimited times for free-ish. Boss waves have
-    // no vanilla shop row (return [] below), so only the dedicated phase shows it.
-    if (forBiomeShop && waveIndex < 200 && globalScene.currentBattle != null) {
+  // ER Biome Market (#440 / #504): the dedicated BiomeShopPhase ALWAYS shows the
+  // per-biome stock (rollErBiomeShopStock excludes heals by design) and NEVER the
+  // vanilla healing row. DECOUPLED from the %10 gate: with variable biome length
+  // (#504) the market can fire on a non-x0 wave, and the old "x0 only" gate made
+  // it fall through to the vanilla heal row - the "biome shop is only healing
+  // items" bug. The finale (wave 200) + the Abyss (no economy) yield an empty
+  // stock. The vanilla reward row never receives this stock (forBiomeShop=false).
+  if (forBiomeShop) {
+    if (waveIndex < 200 && globalScene.currentBattle != null) {
       const stock = rollErBiomeShopStock(globalScene.arena.biomeId, waveIndex);
       const options: ModifierTypeOption[] = [];
       for (const entry of stock) {
@@ -2987,6 +2982,13 @@ export function getPlayerShopModifierTypeOptionsForWave(
       }
       return options;
     }
+    return [];
+  }
+
+  if (!(waveIndex % 10)) {
+    // Boss (x0) waves have no vanilla reward shop row - their shop is the biome
+    // market (above, via the dedicated phase). Returning [] keeps the vanilla
+    // reward screen from rendering uncapped, re-buyable market stock.
     return [];
   }
 

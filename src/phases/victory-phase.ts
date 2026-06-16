@@ -145,6 +145,17 @@ export class VictoryPhase extends PokemonPhase {
           globalScene.phaseManager.pushNew("BiomeShopPhase");
         }
 
+        // ER (#504): every 10 GLOBAL waves the player also gets a full rest, the
+        // same cadence as the biome shop. Vanilla healed on the biome change
+        // (SelectBiomePhase, which lined up with every 10 waves); with variable
+        // biome length a x0 wave is often MID-biome, so heal here on those mid-biome
+        // x0 waves. Biome-change waves (biomeEnding) still heal via SelectBiomePhase,
+        // so the !biomeEnding guard avoids a double heal. ER routing only (in vanilla
+        // a x0 wave is always the biome change, so nothing changes there).
+        if (erRouting && fireBiomeShop && !biomeEnding) {
+          globalScene.phaseManager.pushNew("PartyHealPhase", false);
+        }
+
         if (gameMode.hasRandomBiomes || biomeEnding) {
           globalScene.phaseManager.pushNew("SelectBiomePhase");
         } else if (erRouting && erShouldRaiseCrossroads(currentWaveIndex)) {
