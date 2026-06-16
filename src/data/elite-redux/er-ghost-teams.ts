@@ -348,6 +348,46 @@ function saveLocalGhostTeam(snapshot: GhostTeamSnapshot): void {
   }
 }
 
+/**
+ * DEV-ONLY: plant one realistic, NAMED ghost grave into local storage so the
+ * Graves of the Fallen test scenario always has a real epitaph (name / difficulty
+ * / wave / killer) and real held-item mementos to show - even when the
+ * cross-player pool is empty on the test environment (which otherwise falls back
+ * to the anonymous synthetic legacy grave). Idempotent via a fixed id, so
+ * re-running the scenario never stacks duplicates. Only the dev test suite calls
+ * this; no production path references it.
+ */
+export function seedDevGhostGrave(): void {
+  const member = (speciesId: number, level: number, heldItems: [string, number][] = []): GhostMember => ({
+    speciesId,
+    formIndex: 0,
+    abilityIndex: 0,
+    ivs: [31, 31, 31, 31, 31, 31],
+    nature: 0,
+    level,
+    gender: -1,
+    shiny: false,
+    variant: 0,
+    passive: true,
+    moves: [],
+    heldItems,
+  });
+  saveLocalGhostTeam({
+    id: "dev-grave-fixed",
+    trainerName: "Veteran Lance",
+    difficulty: "hell",
+    waveReached: 147,
+    isVictory: false,
+    timestamp: 0,
+    party: [
+      member(445 /* Garchomp */, 95, [["LEFTOVERS", 1]]),
+      member(248 /* Tyranitar */, 95, [["WIDE_LENS", 1]]),
+      member(149 /* Dragonite */, 95, [["WIDE_LENS", 1]]),
+    ],
+    opponentName: "Champion Cynthia",
+  });
+}
+
 // -----------------------------------------------------------------------------
 // Capture + record.
 // -----------------------------------------------------------------------------

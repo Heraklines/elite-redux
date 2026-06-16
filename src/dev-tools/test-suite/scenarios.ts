@@ -26,6 +26,7 @@ import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
 import type { ErCommunityItemKind } from "#data/elite-redux/er-community-items";
+import { seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import { setErDifficulty, setErDifficulty as setErDifficultyForScenario } from "#data/elite-redux/er-run-difficulty";
@@ -492,15 +493,18 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "ER Graveyard: Graves of the Fallen (#439)",
     description:
       "#439 Graveyard ME (rides the ghost-team substrate). Forces\n"
-      + "ER_GRAVES_OF_THE_FALLEN in the GRAVEYARD biome.\n"
-      + "EXPECT: an epitaph for a fallen challenger (name / difficulty / fell at wave N\n"
-      + "/ beaten by X). PAY RESPECTS -> a memento (their held item, or an Ultra-tier\n"
-      + "fallback) and leave. DISTURB -> their ghost team rises and fights; win -> 2 of\n"
-      + "their held items. WALK AWAY -> no cost. On a fresh/offline account a legacy\n"
-      + "grave (Gengar/Chandelure/Dusclops, Ultra-tier memento) appears and NEVER\n"
-      + "softlocks.",
+      + "ER_GRAVES_OF_THE_FALLEN in the GRAVEYARD biome. This scenario PLANTS a real\n"
+      + "named grave (Veteran Lance, hell, fell at wave 147, beaten by Champion\n"
+      + "Cynthia) so the epitaph + mementos always render even on an empty pool.\n"
+      + "EXPECT: the epitaph shows that NAME / difficulty / wave / killer. PAY\n"
+      + "RESPECTS -> a memento (their held item: Leftovers/Wide Lens) and leave.\n"
+      + "DISTURB -> they rise as a NAMED GHOST TRAINER (Lance's team, ghost theme);\n"
+      + "win -> 2 of their held items. WALK AWAY -> no cost. Never softlocks.",
     setup: () => {
       resetDevOverrides();
+      // Plant a real named grave so the epitaph (name/wave/mode/killer) and the
+      // held-item mementos render regardless of the live ghost pool's contents.
+      seedDevGhostGrave();
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 40,
         STARTING_WAVE_OVERRIDE: 12,
