@@ -10,8 +10,12 @@
 // host; THIS module builds the ITEM HAUL that the player cashes in as a reward
 // shop when they finally bank (and loses if a party wipe ends the run first).
 //
-// Each find rolls (depth-weighted) a themed item: evolution stones, type-boost
-// "gems / plates", vitamins, and TMs, with deeper finds favouring higher tiers.
+// The pool is HELD ITEMS only - and only the ones that read as something you'd
+// dig out of stone: rocks (King's Rock, Mystical Rock), gem-lenses (Scope/Wide/
+// Multi Lens), orbs (Toxic/Flame Orb), ore (Eviolite), buried treasure (Amulet
+// Coin), a claw, and the odd black hole. Type-boost gems / plates
+// (ATTACK_TYPE_BOOSTER) are deliberately VERY RARE (deep ROGUE roll only). NO
+// evolution stones, vitamins, or TMs - none of which make sense underground.
 // A RARE deep find turns up a MEGA STONE matching one of the player's lines -
 // even a pre-evolution (a Charmeleon can still unearth Charizardite X). The haul
 // accumulates on the host's `encounter.misc`, so it survives the continue-after-
@@ -54,61 +58,80 @@ export function emptyMineralHaul(): MineralLootHaul {
   return { funcs: [], tiers: [], options: [], megaFound: false };
 }
 
-/** Themed func pools per flavour and tier (COMMON/GREAT/ULTRA; ROGUE uses a tier draw). */
+/**
+ * Held-item func pools per flavour, keyed by each item's REAL player-pool tier
+ * (init-modifier-pools.ts) so a "find" matches the item's actual rarity. These
+ * held items only ever live at ULTRA / ROGUE / MASTER in the real pool - there are
+ * no COMMON/GREAT held battle items - so shallow finds stay money-only and the
+ * items are a rarer deep bonus drawn at their true tier.
+ */
 const POOLS: Record<MineralFlavor, Partial<Record<ModifierTier, ModifierTypeFunc[]>>> = {
+  // Mining a cave seam: gem-lenses, orbs, ore, rocks, a claw.
   mineral: {
-    [ModifierTier.COMMON]: [
-      modifierTypes.EVOLUTION_ITEM,
+    [ModifierTier.ULTRA]: [
+      modifierTypes.WIDE_LENS,
+      modifierTypes.TOXIC_ORB,
+      modifierTypes.FLAME_ORB,
+      modifierTypes.EVIOLITE,
+      modifierTypes.AMULET_COIN,
+      modifierTypes.MYSTICAL_ROCK,
       modifierTypes.ATTACK_TYPE_BOOSTER,
-      modifierTypes.BASE_STAT_BOOSTER,
     ],
-    [ModifierTier.GREAT]: [
-      modifierTypes.RARE_EVOLUTION_ITEM,
-      modifierTypes.ATTACK_TYPE_BOOSTER,
-      modifierTypes.TM_GREAT,
-    ],
-    [ModifierTier.ULTRA]: [modifierTypes.RARE_EVOLUTION_ITEM, modifierTypes.TM_ULTRA],
+    [ModifierTier.ROGUE]: [modifierTypes.KINGS_ROCK, modifierTypes.SCOPE_LENS, modifierTypes.GRIP_CLAW],
+    [ModifierTier.MASTER]: [modifierTypes.MULTI_LENS, modifierTypes.MINI_BLACK_HOLE],
   },
+  // Pried from a ruin: same minerals plus a sacred dewdrop (Soul Dew).
   relic: {
-    [ModifierTier.COMMON]: [
+    [ModifierTier.ULTRA]: [
+      modifierTypes.WIDE_LENS,
+      modifierTypes.TOXIC_ORB,
+      modifierTypes.FLAME_ORB,
+      modifierTypes.EVIOLITE,
+      modifierTypes.AMULET_COIN,
+      modifierTypes.MYSTICAL_ROCK,
       modifierTypes.ATTACK_TYPE_BOOSTER,
-      modifierTypes.TM_COMMON,
-      modifierTypes.BASE_STAT_BOOSTER,
     ],
-    [ModifierTier.GREAT]: [modifierTypes.TM_GREAT, modifierTypes.EVOLUTION_ITEM, modifierTypes.ATTACK_TYPE_BOOSTER],
-    [ModifierTier.ULTRA]: [modifierTypes.TM_ULTRA, modifierTypes.RARE_EVOLUTION_ITEM],
+    [ModifierTier.ROGUE]: [
+      modifierTypes.KINGS_ROCK,
+      modifierTypes.SCOPE_LENS,
+      modifierTypes.SOUL_DEW,
+      modifierTypes.GRIP_CLAW,
+    ],
+    [ModifierTier.MASTER]: [modifierTypes.MULTI_LENS, modifierTypes.MINI_BLACK_HOLE],
   },
 };
 
-/** Pick the item tier for a find at depth `d` (0-indexed). null = money-only this find. */
+/**
+ * Pick the item tier for a find at depth `d` (0-indexed). null = money-only this
+ * find (the common case). The held items only exist at ULTRA / ROGUE / MASTER, so
+ * those are the only tiers ever returned, and deeper finds upgrade the odds.
+ */
 function rollFindTier(d: number): ModifierTier | null {
   const r = randSeedInt(100);
   if (d <= 1) {
-    return r < 40 ? ModifierTier.COMMON : null;
+    // Shallow: almost always just money, a slim ULTRA chance.
+    return r < 15 ? ModifierTier.ULTRA : null;
   }
   if (d <= 3) {
-    if (r < 25) {
+    if (r < 8) {
+      return ModifierTier.ROGUE;
+    }
+    if (r < 40) {
       return ModifierTier.ULTRA;
-    }
-    if (r < 60) {
-      return ModifierTier.GREAT;
-    }
-    if (r < 85) {
-      return ModifierTier.COMMON;
     }
     return null;
   }
-  // Deep finds: best odds, a real ROGUE chance.
-  if (r < 12) {
+  // Deep: a real MASTER shot, better ROGUE/ULTRA odds.
+  if (r < 6) {
+    return ModifierTier.MASTER;
+  }
+  if (r < 24) {
     return ModifierTier.ROGUE;
   }
-  if (r < 45) {
+  if (r < 60) {
     return ModifierTier.ULTRA;
   }
-  if (r < 80) {
-    return ModifierTier.GREAT;
-  }
-  return ModifierTier.COMMON;
+  return null;
 }
 
 /**

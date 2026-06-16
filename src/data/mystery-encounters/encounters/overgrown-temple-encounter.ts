@@ -96,8 +96,9 @@ const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.CRADILY, SpeciesId.SUDOWOODO, S
 interface DelveHaul {
   /** How many finds have been made (each pays its money at once). */
   finds: number;
-  /** The item haul (themed plates/TMs/evo items + a rare party-line mega stone),
-   * cashed in as a reward shop on bank; lost if a party wipe ends the run first. */
+  /** The item haul (ruin-found HELD items - relic stones, lenses, a sacred gem -
+   * plus a rare party-line mega stone), cashed in as a reward shop on bank; lost
+   * if a party wipe ends the run first. */
   loot: MineralLootHaul;
   /** How many temple-wakes have been survived (drives guardian escalation). */
   interrupts: number;

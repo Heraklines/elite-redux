@@ -98,8 +98,9 @@ const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.ONIX, SpeciesId.GRAVELER, Speci
 interface MineHaul {
   /** How many ore/gem strikes have landed (each pays its money at once). */
   finds: number;
-  /** The item haul (themed gems/stones/vitamins/TMs + a rare party-line mega stone),
-   * cashed in as a reward shop on bank; lost if a party wipe ends the run first. */
+  /** The item haul (cave-found HELD items - rocks, gem-lenses, orbs, ore - plus a
+   * rare party-line mega stone), cashed in as a reward shop on bank; lost if a
+   * party wipe ends the run first. */
   loot: MineralLootHaul;
   /** How many cave-ins have been survived (drives guardian escalation). */
   interrupts: number;
