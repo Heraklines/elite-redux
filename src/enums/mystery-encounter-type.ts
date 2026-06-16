@@ -105,6 +105,15 @@ export enum MysteryEncounterType {
   /** ER #439: The Salvage Yard - a Factory market of reclaimed parts; browse a
    * curated held-item selection. */
   ER_SALVAGE_YARD,
+  /** ER #439: The Gentle Giant - a Grass-biome catch event; a docile Grass titan
+   * you can battle (and catch) or leave in peace. */
+  ER_GENTLE_GIANT,
+  /** ER #439: Rustling Grass - a Tall Grass catch event; a rare hidden mon bursts
+   * out - battle and catch it, or let it flee. */
+  ER_RUSTLING_GRASS,
+  /** ER #439: The Dragon's Hoard - a Wasteland catch event; a hoarder dragon
+   * guarding a pile of held items - beat it for the hoard, or catch the dragon. */
+  ER_DRAGONS_HOARD,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

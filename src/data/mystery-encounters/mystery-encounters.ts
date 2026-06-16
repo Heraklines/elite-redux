@@ -14,6 +14,7 @@ import { DancingLessonsEncounter } from "#mystery-encounters/dancing-lessons-enc
 import { DarkDealEncounter } from "#mystery-encounters/dark-deal-encounter";
 import { DelibirdyEncounter } from "#mystery-encounters/delibirdy-encounter";
 import { DepartmentStoreSaleEncounter } from "#mystery-encounters/department-store-sale-encounter";
+import { DragonsHoardEncounter } from "#mystery-encounters/dragons-hoard-encounter";
 import { ExoticTraderEncounter } from "#mystery-encounters/exotic-trader-encounter";
 import { ExperimentEncounter } from "#mystery-encounters/experiment-encounter";
 import { FairysBoonEncounter } from "#mystery-encounters/fairys-boon-encounter";
@@ -23,6 +24,7 @@ import { FightOrFlightEncounter } from "#mystery-encounters/fight-or-flight-enco
 import { ForemansJobEncounter } from "#mystery-encounters/foremans-job-encounter";
 import { FrozenShapesEncounter } from "#mystery-encounters/frozen-shapes-encounter";
 import { FunAndGamesEncounter } from "#mystery-encounters/fun-and-games-encounter";
+import { GentleGiantEncounter } from "#mystery-encounters/gentle-giant-encounter";
 import { GlitteringVeinEncounter } from "#mystery-encounters/glittering-vein-encounter";
 import { GlobalTradeSystemEncounter } from "#mystery-encounters/global-trade-system-encounter";
 import { GravesOfTheFallenEncounter } from "#mystery-encounters/graves-of-the-fallen-encounter";
@@ -38,6 +40,7 @@ import { OverchargeCoreEncounter } from "#mystery-encounters/overcharge-core-enc
 import { OvergrownTempleEncounter } from "#mystery-encounters/overgrown-temple-encounter";
 import { PartTimerEncounter } from "#mystery-encounters/part-timer-encounter";
 import { PicnicEncounter } from "#mystery-encounters/picnic-encounter";
+import { RustlingGrassEncounter } from "#mystery-encounters/rustling-grass-encounter";
 import { SafariZoneEncounter } from "#mystery-encounters/safari-zone-encounter";
 import { SalvageYardEncounter } from "#mystery-encounters/salvage-yard-encounter";
 import { ScrambledPokedexEncounter } from "#mystery-encounters/scrambled-pokedex-encounter";
@@ -232,9 +235,17 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
       MysteryEncounterType.SLUMBERING_SNORLAX,
       MysteryEncounterType.ABSOLUTE_AVARICE,
       MysteryEncounterType.ER_MUSHROOM_CIRCLE,
+      MysteryEncounterType.ER_GENTLE_GIANT,
     ],
   ],
-  [BiomeId.TALL_GRASS, [MysteryEncounterType.SLUMBERING_SNORLAX, MysteryEncounterType.ABSOLUTE_AVARICE]],
+  [
+    BiomeId.TALL_GRASS,
+    [
+      MysteryEncounterType.SLUMBERING_SNORLAX,
+      MysteryEncounterType.ABSOLUTE_AVARICE,
+      MysteryEncounterType.ER_RUSTLING_GRASS,
+    ],
+  ],
   [BiomeId.METROPOLIS, [MysteryEncounterType.COLOSSEUM]],
   [
     BiomeId.FOREST,
@@ -257,7 +268,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.DOJO, [MysteryEncounterType.COLOSSEUM]],
   [BiomeId.FACTORY, [MysteryEncounterType.ER_SALVAGE_YARD]],
   [BiomeId.RUINS, [MysteryEncounterType.ER_SEALED_DOOR]],
-  [BiomeId.WASTELAND, [MysteryEncounterType.DANCING_LESSONS]],
+  [BiomeId.WASTELAND, [MysteryEncounterType.DANCING_LESSONS, MysteryEncounterType.ER_DRAGONS_HOARD]],
   [BiomeId.ABYSS, [MysteryEncounterType.DANCING_LESSONS]],
   [BiomeId.SPACE, [MysteryEncounterType.THE_EXPERT_POKEMON_BREEDER]],
   [BiomeId.CONSTRUCTION_SITE, [MysteryEncounterType.ER_FOREMANS_JOB]],
@@ -328,6 +339,9 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_FOREMANS_JOB] = ForemansJobEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_AURORA] = AuroraEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_EXPERIMENT] = ExperimentEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_GENTLE_GIANT] = GentleGiantEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_RUSTLING_GRASS] = RustlingGrassEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_DRAGONS_HOARD] = DragonsHoardEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

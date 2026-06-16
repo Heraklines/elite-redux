@@ -1,0 +1,18 @@
+{
+  "intro": "Atop a glittering mound of salvaged treasure, a powerful dragon coils and watches you with hungry, territorial eyes. The hoard beneath it is enormous.",
+  "title": "The Dragon's Hoard",
+  "description": "A territorial dragon guards a glittering hoard. Challenge it - win to claim the hoard, or throw a Ball to catch the dragon itself - or back away and leave it be.",
+  "query": "Will you challenge the dragon?",
+  "option": {
+    "1": {
+      "label": "Challenge it",
+      "tooltip": "(+) Win for the hoard (high-tier reward), or catch the dragon\n(?) A powerful boss",
+      "selected": "The dragon rears up off its hoard with a deafening roar - the fight is on!"
+    },
+    "2": {
+      "label": "Back away",
+      "tooltip": "(-) No battle, no cost",
+      "selected": "You back away slowly and leave the dragon to its treasure."
+    }
+  }
+}

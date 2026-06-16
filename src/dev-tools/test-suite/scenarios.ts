@@ -1074,6 +1074,88 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Gentle Giant (#439)",
+    description:
+      "#439 Grass CATCH event. Forces ER_GENTLE_GIANT in the GRASS biome.\n"
+      + "DO: 'Approach it' or 'Leave it be'.\n"
+      + "EXPECT: Approach = a wild-boss battle vs a docile Grass titan (Torterra /\n"
+      + "Tangrowth / Gogoat / Tsareena), asleep + multi-bar. Weaken it, then the Ball\n"
+      + "command CATCHES it (catch is allowed; flee is not). Leave = nothing, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 45,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.GRASS,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_GENTLE_GIANT,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.STONE_EDGE, MoveId.DRAGON_CLAW, MoveId.IRON_HEAD],
+        }),
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER Rustling Grass (#439)",
+    description:
+      "#439 Tall Grass CATCH event. Forces ER_RUSTLING_GRASS in the TALL_GRASS biome.\n"
+      + "DO: 'Flush it out' or 'Leave it hidden'.\n"
+      + "EXPECT: Flush = a wild-boss battle vs a rare hidden mon (Ditto / Chansey /\n"
+      + "Kangaskhan / Bouffalant). Weaken it, then the Ball command CATCHES it. Leave =\n"
+      + "nothing, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 45,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.TALL_GRASS,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_RUSTLING_GRASS,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.STONE_EDGE, MoveId.DRAGON_CLAW, MoveId.IRON_HEAD],
+        }),
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER Dragon's Hoard (#439)",
+    description:
+      "#439 Wasteland CATCH + loot event. Forces ER_DRAGONS_HOARD in the WASTELAND\n"
+      + "biome.\n"
+      + "DO: 'Challenge it' or 'Back away'.\n"
+      + "EXPECT: Challenge = a wild-boss battle vs a strong dragon (Hydreigon /\n"
+      + "Dragonite / Salamence / Garchomp). WIN to collect the hoard (2 Rogue + 1 Ultra\n"
+      + "picks), or throw a Ball to CATCH the dragon instead. Back away = nothing.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.WASTELAND,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_DRAGONS_HOARD,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.STONE_EDGE, MoveId.DRAGON_CLAW, MoveId.IRON_HEAD],
+        }),
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+      ];
+    },
+  },
+  {
     label: "ER Mushroom Circle (#439)",
     description:
       "#439 Grass one-shot GAMBLE. Forces ER_MUSHROOM_CIRCLE (wave-only override,\n"

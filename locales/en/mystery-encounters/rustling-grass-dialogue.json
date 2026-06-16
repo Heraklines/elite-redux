@@ -1,0 +1,18 @@
+{
+  "intro": "The tall grass ahead shakes violently - something rare and skittish is hiding in there, and it has not noticed you yet.",
+  "title": "Rustling Grass",
+  "description": "Something rare is rustling in the tall grass. Flush it out for a battle - weaken it and you can throw a Ball to catch it - or leave it hidden.",
+  "query": "Will you flush it out?",
+  "option": {
+    "1": {
+      "label": "Flush it out",
+      "tooltip": "(+) Battle the hidden Pokemon - weaken it, then catch it with a Ball",
+      "selected": "You rush the grass and a startled Pokemon bursts out to fight!"
+    },
+    "2": {
+      "label": "Leave it hidden",
+      "tooltip": "(-) No battle, no cost",
+      "selected": "You step around the grass and leave whatever it is in peace."
+    }
+  }
+}

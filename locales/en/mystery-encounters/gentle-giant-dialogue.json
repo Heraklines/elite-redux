@@ -1,0 +1,18 @@
+{
+  "intro": "In a sunlit clearing, an enormous Grass-type dozes among the flowers. It is calm, unbothered, and far larger than any you have seen of its kind.",
+  "title": "The Gentle Giant",
+  "description": "A huge, docile Grass Pokemon naps in a clearing. Approach to battle it - weaken it and you can throw a Ball to add it to your team - or leave it to its rest.",
+  "query": "Will you approach the giant?",
+  "option": {
+    "1": {
+      "label": "Approach it",
+      "tooltip": "(+) Battle the giant - weaken it, then catch it with a Ball",
+      "selected": "You step into the clearing, and the great Pokemon stirs awake to face you..."
+    },
+    "2": {
+      "label": "Leave it be",
+      "tooltip": "(-) No battle, no cost",
+      "selected": "You back out of the clearing and leave the gentle giant to its nap."
+    }
+  }
+}
