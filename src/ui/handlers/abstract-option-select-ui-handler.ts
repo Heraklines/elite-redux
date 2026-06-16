@@ -138,7 +138,13 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
       globalScene.scaledCanvas.width - 1 - (this.config?.xOffset || 0),
       -48 + (this.config?.yOffset || 0),
     );
-    this.optionSelectBg.width = Math.max(this.optionSelectText.displayWidth + 24, this.getWindowWidth());
+    // Cap the auto-grown width at the canvas so a very long option label can't
+    // push the right-anchored window off the left edge of the screen. For normal
+    // (short) menus the cap is a no-op; it only bounds pathologically wide ones.
+    this.optionSelectBg.width = Math.min(
+      Math.max(this.optionSelectText.displayWidth + 24, this.getWindowWidth()),
+      globalScene.scaledCanvas.width - 2,
+    );
     this.optionSelectBg.height = this.getWindowHeight();
     this.optionSelectTextContainer.setPosition(
       this.optionSelectBg.x - this.optionSelectBg.width + 12 + 24 * this.scale,

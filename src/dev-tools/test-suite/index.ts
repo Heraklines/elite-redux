@@ -434,8 +434,8 @@ function launchScenario(ctx: DevMenuCtx, scenario: DevScenario): boolean {
 }
 
 /** Max characters shown for a picker option label (keeps the auto-sized
- * OPTION_SELECT window from growing wider than the screen). */
-const MAX_PICKER_LABEL = 38;
+ * OPTION_SELECT window comfortably within the screen width). */
+const MAX_PICKER_LABEL = 30;
 
 /** Truncate a long scenario label so the picker window stays on-screen. */
 function clampLabel(label: string): string {
