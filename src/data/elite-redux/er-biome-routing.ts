@@ -68,9 +68,28 @@ export function getErPrevBiome(): BiomeId | null {
   return prevBiome;
 }
 
+/**
+ * The next-biome node set rolled when the CURRENT biome was entered. Stored so
+ * (a) the map overlay can show the player's onward routes mid-biome, and (b) the
+ * eventual transition (SelectBiomePhase) reuses the SAME set the overlay showed,
+ * instead of re-rolling to a different one.
+ */
+let pendingNodes: ErRouteNode[] = [];
+
+/** Stash the rolled next-biome nodes for the current biome. */
+export function setErPendingNodes(nodes: ErRouteNode[]): void {
+  pendingNodes = nodes;
+}
+
+/** The stored next-biome nodes (empty if none rolled yet this biome). */
+export function getErPendingNodes(): ErRouteNode[] {
+  return pendingNodes;
+}
+
 /** Clear routing state at the start of a new run (module state outlives a run). */
 export function resetErRouting(): void {
   prevBiome = null;
+  pendingNodes = [];
 }
 
 /** Serialized previous-biome for the run save (additive; undefined when unset). */

@@ -1,8 +1,16 @@
 import { globalScene } from "#app/global-scene";
-import { erRecordBiomeEntry } from "#data/elite-redux/er-biome-routing";
+import {
+  erBiomeRoutingActive,
+  erRecordBiomeEntry,
+  getErPrevBiome,
+  rollErNextBiomeNodes,
+  setErPendingNodes,
+} from "#data/elite-redux/er-biome-routing";
+import { clearErBiomeNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import type { BiomeId } from "#enums/biome-id";
 import { getBiomeKey } from "#field/arena";
 import { BattlePhase } from "#phases/battle-phase";
+import { getBiomeName } from "#utils/common";
 
 export class SwitchBiomePhase extends BattlePhase {
   public readonly phaseName = "SwitchBiomePhase";
@@ -25,6 +33,21 @@ export class SwitchBiomePhase extends BattlePhase {
     // World Map routing graph can exclude it from the NEXT transition's options.
     // Only fires on real transitions (not run start / save load).
     erRecordBiomeEntry(globalScene.arena?.biomeId ?? null);
+
+    // Roll the NEW biome's onward routes now and stash them, so (a) the map
+    // overlay shows the player's routes while in this biome and (b) the leave
+    // transition reuses the same set instead of re-rolling. Reveal only the
+    // visible (Map-Upgrade-gated) nodes; clear the prior biome's stale routes.
+    if (erBiomeRoutingActive()) {
+      const nodes = rollErNextBiomeNodes(this.nextBiome, getErPrevBiome());
+      setErPendingNodes(nodes);
+      clearErBiomeNodes();
+      revealMapNodes(
+        nodes
+          .filter(n => n.revealed)
+          .map(n => ({ biome: n.biome, label: getBiomeName(n.biome), kind: "biome" as const })),
+      );
+    }
 
     // Before switching biomes, make sure to set the last encounter for other phases that need it too.
     globalScene.lastEnemyTrainer = globalScene.currentBattle?.trainer ?? null;

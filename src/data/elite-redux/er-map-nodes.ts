@@ -50,6 +50,13 @@ export function resetErMapNodes(): void {
   resetErRouting();
 }
 
+/** Drop all revealed "biome" route nodes (keep treasure/landmark). Used when a
+ * new biome is entered so the overlay shows the CURRENT onward routes, not stale
+ * ones from the biome you just left. */
+export function clearErBiomeNodes(): void {
+  revealedNodes = revealedNodes.filter(n => n.kind !== "biome");
+}
+
 /**
  * Reveal one or more map nodes (a SCOUT-style event surfacing upcoming options).
  * De-duplicates by biome+label so re-revealing is idempotent. Returns how many
