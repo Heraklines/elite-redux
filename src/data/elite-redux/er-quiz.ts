@@ -24,12 +24,20 @@
 // the run RNG so they're deterministic within a seed.
 // =============================================================================
 
-import { ER_SPRITE_MANIFEST } from "#data/elite-redux/er-sprite-manifest";
 import { randSeedInt, randSeedShuffle } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import erDexFlavorRaw from "./er-dex-flavor.json";
+import erFootprintIdsRaw from "./er-footprint-species.json";
 
 const ER_DEX_FLAVOR = erDexFlavorRaw as Record<string, string>;
+
+/**
+ * National-dex ids that ship a bundled footprint sprite (public/footprints/<id>.png,
+ * extracted from the decomp by scripts/elite-redux/copy-footprints.mjs). Footprint
+ * art only exists for the Gen 1-5-era roster, so this list IS the footprint-quiz
+ * candidate pool - a species without one can never be asked or offered.
+ */
+const ER_FOOTPRINT_IDS = new Set<number>(erFootprintIdsRaw as number[]);
 
 export type ErQuizKind = "silhouette" | "dex" | "footprint";
 
@@ -52,37 +60,16 @@ export interface ErFootprintAsset {
 }
 
 /**
- * speciesId -> footprint runtime URL, built from the sprite manifest. The
- * manifest stores build-time paths (`assets/images/...`); the served path drops
- * the leading `assets/` to `images/pokemon/elite-redux/<slug>/footprint.png` -
- * the SAME raw `images/...` form `loadPokemonAtlas` uses for every ER pokemon
- * sprite (NOT run through getCachedUrl, matching that proven loader). Memoized.
- */
-let cachedFootprintUrls: Map<number, string> | null = null;
-function footprintUrls(): Map<number, string> {
-  if (cachedFootprintUrls === null) {
-    cachedFootprintUrls = new Map();
-    for (const entry of ER_SPRITE_MANIFEST) {
-      if (entry.paths.footprint) {
-        cachedFootprintUrls.set(entry.speciesId, entry.paths.footprint.replace(/^assets\//, ""));
-      }
-    }
-  }
-  return cachedFootprintUrls;
-}
-
-/**
- * The footprint texture key + runtime URL for a species, or undefined if the
- * manifest lists no footprint path for it. (The file may still 404 at load time
- * for a species with no shipped footprint art - callers fall back to a
- * silhouette in that case.)
+ * The footprint texture key + runtime URL for a species, or undefined if no
+ * footprint sprite is bundled for it. The URL is a plain `footprints/<id>.png`
+ * (public/ static path) - deliberately NOT under `/images/`, which the deploy
+ * redirects wholesale to the er-assets CDN (where footprints don't exist).
  */
 export function getErFootprintAsset(speciesId: number): ErFootprintAsset | undefined {
-  const rel = footprintUrls().get(speciesId);
-  if (!rel) {
+  if (!ER_FOOTPRINT_IDS.has(speciesId)) {
     return undefined;
   }
-  return { key: `er_footprint__${speciesId}`, url: rel };
+  return { key: `er_footprint__${speciesId}`, url: `footprints/${speciesId}.png` };
 }
 
 /**
@@ -109,15 +96,15 @@ function quizSpeciesIds(): number[] {
 }
 
 /**
- * The species a FOOTPRINT question can ask about: those that ship a footprint
- * path in the sprite manifest AND resolve to a real, vanilla-named species
- * (national dex 1..1025, so option labels stay clean). Memoized for the same
- * early-init reason as {@linkcode quizSpeciesIds}.
+ * The species a FOOTPRINT question can ask about: those that ship a bundled
+ * footprint sprite AND resolve to a real, vanilla-named species (national dex
+ * 1..1025, so option labels stay clean). Memoized for the same early-init reason
+ * as {@linkcode quizSpeciesIds}.
  */
 let cachedFootprintSpeciesIds: number[] | null = null;
 function footprintSpeciesIds(): number[] {
   if (cachedFootprintSpeciesIds === null) {
-    cachedFootprintSpeciesIds = [...footprintUrls().keys()].filter(id => {
+    cachedFootprintSpeciesIds = [...ER_FOOTPRINT_IDS].filter(id => {
       if (id > 1025) {
         return false;
       }
