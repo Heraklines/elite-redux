@@ -1,0 +1,19 @@
+{
+  "intro": "Steam drifts up from a natural spring tucked into the mountainside. An old keeper tends the pools and waves you over with a knowing smile.",
+  "title": "The Hot Spring",
+  "description": "A warm mountain spring where a weary team can soak and recover. Pay the keeper's modest fee to fully restore your whole party, or move on and keep your coin.",
+  "query": "Will you take a soak?",
+  "option": {
+    "1": {
+      "label": "Soak ({{money, money}})",
+      "tooltip": "(+) Fully restore the whole party (HP, status, PP, revive)\n(-) Costs a modest fee",
+      "selected": "You pay the keeper and ease your team into the warm water..."
+    },
+    "2": {
+      "label": "Move on",
+      "tooltip": "(-) No rest, no cost",
+      "selected": "You nod to the keeper and continue up the trail."
+    }
+  },
+  "soaked": "The warm spring works wonders - your whole party is fully restored!"
+}

@@ -60,6 +60,18 @@ export enum MysteryEncounterType {
   /** ER #439: The Abyssal Vent - a Seabed press-your-luck delve; bank the haul or
    * dive deeper for richer treasure, risking a deep-sea guardian. */
   ER_ABYSSAL_VENT,
+  /** ER #439: The Hot Spring - a Mountain rest; pay a small fee to soak and fully
+   * restore the whole party (HP, status, PP, fainted revived). */
+  ER_HOT_SPRING,
+  /** ER #439: The Fairy's Boon - a Fairy Cave benevolent gift; accept a blessing
+   * to receive a random Formation/buff Relic. */
+  ER_FAIRYS_BOON,
+  /** ER #439: The Picnic - a Meadow social rest; lay out a spread for Candy and
+   * affection across the whole party. */
+  ER_PICNIC,
+  /** ER #439: The Exotic Trader - a Sea premium market; pay a fee to browse a
+   * top-shelf, high-tier reward selection. */
+  ER_EXOTIC_TRADER,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

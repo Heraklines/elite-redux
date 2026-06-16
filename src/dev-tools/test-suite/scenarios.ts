@@ -686,6 +686,111 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Hot Spring (#439)",
+    description:
+      "#439 Mountain REST. Forces ER_HOT_SPRING in the MOUNTAIN biome (with money).\n"
+      + "DO: 'Soak' (costs a wave-scaled fee) or 'Move on' for free.\n"
+      + "EXPECT: Soak deducts the fee and fully restores the WHOLE party (HP, status,\n"
+      + "PP, fainted revived) via PartyHealPhase, with a 'fully restored' message. The\n"
+      + "soak option greys out if you cannot afford it. (Party spawns at full HP here,\n"
+      + "so the heal is a no-op visually - verify it does not error and money is spent.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_MONEY_OVERRIDE: 50000,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.MOUNTAIN,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_HOT_SPRING,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.YAWN] }),
+        makeStarter(SpeciesId.PIDGEOT, { moveset: [MoveId.AIR_SLASH, MoveId.HURRICANE, MoveId.ROOST, MoveId.U_TURN] }),
+      ];
+    },
+  },
+  {
+    label: "ER Fairy's Boon (#439)",
+    description:
+      "#439 Fairy Cave RELIC gift. Forces ER_FAIRYS_BOON in the FAIRY_CAVE biome.\n"
+      + "DO: 'Accept the blessing' or 'Decline politely'.\n"
+      + "EXPECT: Accept opens a no-battle reward with ONE guaranteed Formation/buff\n"
+      + "Relic (Morale Banner / Second Wind / Mystery Charm / Weathervane) - take it and\n"
+      + "check it lands in your held items + the buff panel. Decline = nothing, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.FAIRY_CAVE,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_FAIRYS_BOON,
+      });
+      return [
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+        makeStarter(SpeciesId.SYLVEON, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYSHOCK, MoveId.SHADOW_BALL, MoveId.WISH],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER The Picnic (#439)",
+    description:
+      "#439 Meadow social REST. Forces ER_PICNIC in the MEADOW biome.\n"
+      + "DO: 'Lay out a spread' or 'Move on'.\n"
+      + "EXPECT: the spread grants +5 Candy to EACH party member's species (check candy\n"
+      + "on the starter screen) and adds affection to the whole party, with a message.\n"
+      + "Move on = nothing, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.MEADOW,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_PICNIC,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.YAWN] }),
+        makeStarter(SpeciesId.PIDGEY, {
+          moveset: [MoveId.TACKLE, MoveId.GUST, MoveId.QUICK_ATTACK, MoveId.SAND_ATTACK],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER Exotic Trader (#439)",
+    description:
+      "#439 Sea premium MARKET. Forces ER_EXOTIC_TRADER in the SEA biome (with money).\n"
+      + "DO: 'Board and browse' (steep wave-scaled fee) or 'Sail on' for free.\n"
+      + "EXPECT: Board deducts the fee and opens a no-battle reward of 3 GUARANTEED\n"
+      + "high-tier picks (1 Rogue + 2 Ultra). The board option greys out if you cannot\n"
+      + "afford it. Sail on = nothing, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 45,
+        STARTING_MONEY_OVERRIDE: 200000,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.SEA,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_EXOTIC_TRADER,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.STONE_EDGE, MoveId.DRAGON_CLAW, MoveId.IRON_HEAD],
+        }),
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+      ];
+    },
+  },
+  {
     label: "ER Mushroom Circle (#439)",
     description:
       "#439 Grass one-shot GAMBLE. Forces ER_MUSHROOM_CIRCLE (wave-only override,\n"

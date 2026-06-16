@@ -1,0 +1,19 @@
+{
+  "intro": "Sunlight spills over a wide, flower-strewn meadow. It is the perfect spot to stop, lay out a spread, and let your whole team rest and eat together.",
+  "title": "The Picnic",
+  "description": "A cozy meadow clearing made for a shared meal. Lay out a spread and your whole party gains Candy and affection, or simply move along.",
+  "query": "Will you set out a picnic?",
+  "option": {
+    "1": {
+      "label": "Lay out a spread",
+      "tooltip": "(+) Candy for each party member's species\n(+) Affection across the whole party",
+      "selected": "You unpack a generous spread and your team gathers round to share it..."
+    },
+    "2": {
+      "label": "Move on",
+      "tooltip": "(-) No picnic",
+      "selected": "You take in the meadow for a moment, then move along."
+    }
+  },
+  "shared": "Your whole team shares the meal - everyone gains Candy and grows a little closer!"
+}

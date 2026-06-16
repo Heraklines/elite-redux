@@ -1,0 +1,18 @@
+{
+  "intro": "A lantern-strung merchant ship drifts alongside, its deck heaped with crates from a hundred distant ports. A sharp-eyed trader leans over the rail and beckons.",
+  "title": "The Exotic Trader",
+  "description": "A floating market of top-shelf goods, every piece rare and dear. Pay the steep boarding fee to browse a guaranteed high-tier selection, or sail on with your coin.",
+  "query": "Will you board the ship?",
+  "option": {
+    "1": {
+      "label": "Board and browse ({{money, money}})",
+      "tooltip": "(+) A guaranteed high-tier selection (1 Rogue, 2 Ultra)\n(-) A steep boarding fee",
+      "selected": "You hand over the fee and step aboard to inspect the wares..."
+    },
+    "2": {
+      "label": "Sail on",
+      "tooltip": "(-) No trade, no cost",
+      "selected": "You wave the trader off and let the ship drift away."
+    }
+  }
+}

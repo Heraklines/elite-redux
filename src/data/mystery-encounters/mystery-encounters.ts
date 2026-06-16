@@ -12,6 +12,8 @@ import { DancingLessonsEncounter } from "#mystery-encounters/dancing-lessons-enc
 import { DarkDealEncounter } from "#mystery-encounters/dark-deal-encounter";
 import { DelibirdyEncounter } from "#mystery-encounters/delibirdy-encounter";
 import { DepartmentStoreSaleEncounter } from "#mystery-encounters/department-store-sale-encounter";
+import { ExoticTraderEncounter } from "#mystery-encounters/exotic-trader-encounter";
+import { FairysBoonEncounter } from "#mystery-encounters/fairys-boon-encounter";
 import { FieldTripEncounter } from "#mystery-encounters/field-trip-encounter";
 import { FieryFalloutEncounter } from "#mystery-encounters/fiery-fallout-encounter";
 import { FightOrFlightEncounter } from "#mystery-encounters/fight-or-flight-encounter";
@@ -19,6 +21,7 @@ import { FunAndGamesEncounter } from "#mystery-encounters/fun-and-games-encounte
 import { GlitteringVeinEncounter } from "#mystery-encounters/glittering-vein-encounter";
 import { GlobalTradeSystemEncounter } from "#mystery-encounters/global-trade-system-encounter";
 import { GravesOfTheFallenEncounter } from "#mystery-encounters/graves-of-the-fallen-encounter";
+import { HotSpringEncounter } from "#mystery-encounters/hot-spring-encounter";
 import { LostAtSeaEncounter } from "#mystery-encounters/lost-at-sea-encounter";
 import { MushroomCircleEncounter } from "#mystery-encounters/mushroom-circle-encounter";
 import { MysteriousChallengersEncounter } from "#mystery-encounters/mysterious-challengers-encounter";
@@ -26,6 +29,7 @@ import { MysteriousChestEncounter } from "#mystery-encounters/mysterious-chest-e
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { OvergrownTempleEncounter } from "#mystery-encounters/overgrown-temple-encounter";
 import { PartTimerEncounter } from "#mystery-encounters/part-timer-encounter";
+import { PicnicEncounter } from "#mystery-encounters/picnic-encounter";
 import { SafariZoneEncounter } from "#mystery-encounters/safari-zone-encounter";
 import { ScrambledPokedexEncounter } from "#mystery-encounters/scrambled-pokedex-encounter";
 import { ShadyVitaminDealerEncounter } from "#mystery-encounters/shady-vitamin-dealer-encounter";
@@ -225,17 +229,17 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
     BiomeId.FOREST,
     [MysteryEncounterType.SAFARI_ZONE, MysteryEncounterType.ABSOLUTE_AVARICE, MysteryEncounterType.ER_WOODLAND_FORAGER],
   ],
-  [BiomeId.SEA, [MysteryEncounterType.LOST_AT_SEA]],
+  [BiomeId.SEA, [MysteryEncounterType.LOST_AT_SEA, MysteryEncounterType.ER_EXOTIC_TRADER]],
   [BiomeId.SWAMP, [MysteryEncounterType.SAFARI_ZONE]],
   [BiomeId.BEACH, [MysteryEncounterType.ER_TIDE_POOLS]],
   [BiomeId.LAKE, []],
   [BiomeId.SEABED, [MysteryEncounterType.ER_ABYSSAL_VENT]],
-  [BiomeId.MOUNTAIN, []],
+  [BiomeId.MOUNTAIN, [MysteryEncounterType.ER_HOT_SPRING]],
   [BiomeId.BADLANDS, [MysteryEncounterType.DANCING_LESSONS]],
   [BiomeId.CAVE, [MysteryEncounterType.THE_STRONG_STUFF, MysteryEncounterType.ER_GLITTERING_VEIN]],
   [BiomeId.DESERT, [MysteryEncounterType.DANCING_LESSONS]],
   [BiomeId.ICE_CAVE, []],
-  [BiomeId.MEADOW, []],
+  [BiomeId.MEADOW, [MysteryEncounterType.ER_PICNIC]],
   [BiomeId.POWER_PLANT, []],
   [BiomeId.VOLCANO, [MysteryEncounterType.FIERY_FALLOUT, MysteryEncounterType.DANCING_LESSONS]],
   [BiomeId.GRAVEYARD, [MysteryEncounterType.ER_GRAVES_OF_THE_FALLEN]],
@@ -247,7 +251,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.SPACE, [MysteryEncounterType.THE_EXPERT_POKEMON_BREEDER]],
   [BiomeId.CONSTRUCTION_SITE, []],
   [BiomeId.JUNGLE, [MysteryEncounterType.SAFARI_ZONE, MysteryEncounterType.ER_OVERGROWN_TEMPLE]],
-  [BiomeId.FAIRY_CAVE, []],
+  [BiomeId.FAIRY_CAVE, [MysteryEncounterType.ER_FAIRYS_BOON]],
   [BiomeId.TEMPLE, []],
   [BiomeId.SLUM, []],
   [BiomeId.SNOWY_FOREST, []],
@@ -298,6 +302,10 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_OVERGROWN_TEMPLE] = OvergrownTempleEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_TIDE_POOLS] = TidePoolsEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_ABYSSAL_VENT] = AbyssalVentEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_HOT_SPRING] = HotSpringEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_FAIRYS_BOON] = FairysBoonEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_PICNIC] = PicnicEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_EXOTIC_TRADER] = ExoticTraderEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {
