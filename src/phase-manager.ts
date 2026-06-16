@@ -36,6 +36,7 @@ import { EncounterPhase } from "#phases/encounter-phase";
 import { EndCardPhase } from "#phases/end-card-phase";
 import { EndEvolutionPhase } from "#phases/end-evolution-phase";
 import { EnemyCommandPhase } from "#phases/enemy-command-phase";
+import { ErCrossroadsPhase } from "#phases/er-crossroads-phase";
 import { ErDexNavPhase } from "#phases/er-dex-nav-phase";
 import { ErQuizPhase } from "#phases/er-quiz-phase";
 import { EvolutionPhase } from "#phases/evolution-phase";
@@ -142,6 +143,7 @@ const PHASES = Object.freeze({
   BlackMarketShopPhase,
   ColosseumChoicePhase,
   ExoticShopPhase,
+  ErCrossroadsPhase,
   ErQuizPhase,
   CheckInterludePhase,
   CheckStatusEffectPhase,

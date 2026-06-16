@@ -6,6 +6,7 @@ import {
   rollErNextBiomeNodes,
   setErPendingNodes,
 } from "#data/elite-redux/er-biome-routing";
+import { erRollBiomeLength } from "#data/elite-redux/er-biome-structure";
 import { clearErBiomeNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import type { BiomeId } from "#enums/biome-id";
 import { getBiomeKey } from "#field/arena";
@@ -47,6 +48,10 @@ export class SwitchBiomePhase extends BattlePhase {
           .filter(n => n.revealed)
           .map(n => ({ biome: n.biome, label: getBiomeName(n.biome), kind: "biome" as const })),
       );
+
+      // ER (#486): roll THIS biome's variable length + record its start wave. The
+      // new biome's first battle is the wave AFTER the boundary we just cleared.
+      erRollBiomeLength(this.nextBiome, (globalScene.currentBattle?.waveIndex ?? 0) + 1);
     }
 
     // Before switching biomes, make sure to set the last encounter for other phases that need it too.

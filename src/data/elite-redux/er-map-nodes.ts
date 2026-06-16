@@ -20,6 +20,12 @@
 // =============================================================================
 
 import { getErPrevBiome, resetErRouting, restoreErRouting } from "#data/elite-redux/er-biome-routing";
+import {
+  getErBiomeLength,
+  getErBiomeStartWave,
+  resetErBiomeStructure,
+  restoreErBiomeStructure,
+} from "#data/elite-redux/er-biome-structure";
 import type { BiomeId } from "#enums/biome-id";
 
 /** What a revealed node represents. */
@@ -48,6 +54,7 @@ export function resetErMapNodes(): void {
   travelTarget = null;
   fragmentCount = 0;
   resetErRouting();
+  resetErBiomeStructure();
 }
 
 /** Drop all revealed "biome" route nodes (keep treasure/landmark). Used when a
@@ -134,6 +141,10 @@ export interface ErMapSaveData {
   fragments: number;
   /** ER (#486) routing: the biome the player last came from (next-node exclusion). */
   prevBiome?: number | null;
+  /** ER (#486) structure: the current biome's rolled length in waves (null = vanilla cadence). */
+  biomeLength?: number | null;
+  /** ER (#486) structure: the wave the current biome was entered on. */
+  biomeStartWave?: number;
 }
 
 /** Snapshot the current map state for the session save (#486 increment 2). */
@@ -143,6 +154,8 @@ export function getErMapSaveData(): ErMapSaveData {
     travelTarget,
     fragments: fragmentCount,
     prevBiome: getErPrevBiome(),
+    biomeLength: getErBiomeLength(),
+    biomeStartWave: getErBiomeStartWave(),
   };
 }
 
@@ -171,4 +184,8 @@ export function restoreErMapState(data: ErMapSaveData | undefined | null): void 
     fragmentCount = Math.floor(data.fragments);
   }
   restoreErRouting(typeof data.prevBiome === "number" ? data.prevBiome : undefined);
+  restoreErBiomeStructure(
+    typeof data.biomeLength === "number" ? data.biomeLength : null,
+    typeof data.biomeStartWave === "number" ? data.biomeStartWave : null,
+  );
 }

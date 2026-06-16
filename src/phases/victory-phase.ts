@@ -1,6 +1,8 @@
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
+import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
+import { erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
 import { BattleType } from "#enums/battle-type";
 import type { BattlerIndex } from "#enums/battler-index";
 import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
@@ -130,12 +132,25 @@ export class VictoryPhase extends PokemonPhase {
         // biome change, so prices reflect the biome just cleared. Shipped to
         // production (release approval): runs on every x0 wave; daily runs
         // (shared seed) are still skipped.
-        if (!(currentWaveIndex % 10) && !gameMode.isDaily) {
+        // ER (#486): under the World Map gate the biome ends on its rolled length
+        // (or the Crossroads "Move on" choice), not on %10. Fire the biome market
+        // at the biome BOUNDARY (isNewBiome) so the shop still bookends each biome.
+        // Vanilla / non-gated runs keep the every-x0 market.
+        const erRouting = erBiomeRoutingActive();
+        const biomeEnding = globalScene.isNewBiome();
+        const fireBiomeShop = erRouting
+          ? biomeEnding && !gameMode.isDaily
+          : !(currentWaveIndex % 10) && !gameMode.isDaily;
+        if (fireBiomeShop) {
           globalScene.phaseManager.pushNew("BiomeShopPhase");
         }
 
-        if (gameMode.hasRandomBiomes || globalScene.isNewBiome()) {
+        if (gameMode.hasRandomBiomes || biomeEnding) {
           globalScene.phaseManager.pushNew("SelectBiomePhase");
+        } else if (erRouting && erShouldRaiseCrossroads(currentWaveIndex)) {
+          // ER (#486): not a biome end, but a 5-wave Crossroads tick - raise the
+          // "Stay / Move on" choice AFTER the reward and BEFORE the next battle.
+          globalScene.phaseManager.pushNew("ErCrossroadsPhase");
         }
 
         globalScene.phaseManager.pushNew("NewBattlePhase");

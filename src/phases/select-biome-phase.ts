@@ -59,18 +59,13 @@ export class SelectBiomePhase extends BattlePhase {
       const nodes = pending.length > 0 ? pending : rollErNextBiomeNodes(currentBiome, getErPrevBiome());
       const revealed = nodes.filter(n => n.revealed);
       if (revealed.length > 1) {
-        const items = revealed.map(
-          n =>
-            ({
-              label: getBiomeName(n.biome),
-              handler: () => {
-                globalScene.ui.setMode(UiMode.MESSAGE);
-                this.setNextBiomeAndEnd(n.biome);
-                return true;
-              },
-            }) satisfies OptionSelectItem as OptionSelectItem,
-        );
-        globalScene.ui.setMode(UiMode.OPTION_SELECT, { options: items, delay: 1000 });
+        // Present the choice as the branching World Map node picker (#486), using
+        // the already-rolled nodes (hidden ones render as gated silhouettes).
+        globalScene.ui.setMode(UiMode.ER_MAP_PICKER, {
+          nodes,
+          origin: currentBiome,
+          onSelect: (biome: BiomeId) => this.setNextBiomeAndEnd(biome),
+        });
       } else {
         this.setNextBiomeAndEnd(revealed[0].biome);
       }
@@ -137,7 +132,12 @@ export class SelectBiomePhase extends BattlePhase {
     const currentWaveIndex = globalScene.currentBattle.waveIndex;
     const nextWaveIndex = currentWaveIndex + 1;
 
-    if (nextWaveIndex % 10 === 1) {
+    // ER (#486): with variable biome length the biome start is no longer at
+    // %10+1. But SelectBiomePhase only runs at a REAL biome transition (it is
+    // pushed when isNewBiome() is true), so under the gate the heal/interest
+    // always fires here - exactly once per biome start. Vanilla keeps the %10
+    // check for daily / endless / random which share this phase.
+    if (erBiomeRoutingActive() || nextWaveIndex % 10 === 1) {
       globalScene.applyModifiers(MoneyInterestModifier, true);
       const healStatus = new BooleanHolder(true);
       applyChallenges(ChallengeType.PARTY_HEAL, healStatus);

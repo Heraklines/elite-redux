@@ -4402,4 +4402,46 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] })];
     },
   },
+  {
+    label: "(note) ER #486: World Map core (length / crossroads / picker)",
+    description:
+      "#486 World Map CORE (dev/staging only, classic non-daily). Three new pieces\n"
+      + "to verify across a real run with this strong team:\n"
+      + "1) VARIABLE BIOME LENGTH - biomes are no longer a fixed 10 waves. Each biome\n"
+      + "   rolls a length in its band (Town/Plains short 5-10, Cave/Seabed/Ruins/\n"
+      + "   Jungle/Ice Cave/Wasteland/Abyss long 18-30, everything else 10-18; all\n"
+      + "   snapped to a multiple of 5). Two runs of the same biome should differ.\n"
+      + "2) CROSSROADS - every 5 waves spent in a biome (after the reward, not on the\n"
+      + "   biome's final wave), a 'Stay / Move on' prompt appears. STAY keeps going;\n"
+      + "   MOVE ON ends the biome now and opens the map picker.\n"
+      + "3) VISUAL MAP PICKER - leaving a biome (forced end OR Move on) shows a\n"
+      + "   BRANCHING map screen (origin node on the left, destination biomes\n"
+      + "   branching right with route lines; gated nodes show as '???'), NOT the old\n"
+      + "   plain text list. Up/Down picks a revealed route, A travels.\n"
+      + "CHECK: play several biomes. Lengths vary; the biome SHOP + heal/interest\n"
+      + "still bookend each biome (no double or missing shop); the J overlay still\n"
+      + "shows onward routes. FINALE SAFETY (most important): from wave ~170 on,\n"
+      + "biomes revert to the vanilla 10-wave cadence and the END biome must enter\n"
+      + "at wave 191 with the wave-200 finale exactly as vanilla. Save+reload\n"
+      + "mid-biome must keep the SAME boundary (no skipped/repeated transition). If\n"
+      + "anything desyncs near the finale, press Send Logs.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 100,
+        STARTING_BIOME_OVERRIDE: BiomeId.PLAINS,
+      });
+      return [
+        makeStarter(SpeciesId.MEWTWO, {
+          moveset: [MoveId.PSYSTRIKE, MoveId.ICE_BEAM, MoveId.AURA_SPHERE, MoveId.RECOVER],
+        }),
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.GHOLDENGO, {
+          moveset: [MoveId.MAKE_IT_RAIN, MoveId.SHADOW_BALL, MoveId.NASTY_PLOT, MoveId.RECOVER],
+        }),
+      ];
+    },
+  },
 ];

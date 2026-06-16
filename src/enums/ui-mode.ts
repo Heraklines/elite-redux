@@ -58,4 +58,6 @@ export enum UiMode {
   ER_QUIZ,
   /** ER #486: the run's World Map overlay (revealed nodes + Treasure-Map fragments). */
   ER_MAP,
+  /** ER #486: the branching World Map node PICKER shown when leaving a biome. */
+  ER_MAP_PICKER,
 }

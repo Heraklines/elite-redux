@@ -31,7 +31,9 @@ import { getDailyMysteryEncounter } from "#data/daily-seed/daily-run";
 import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
+import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import { erIsBiomeEnd, erRollBiomeLength } from "#data/elite-redux/er-biome-structure";
 import { ER_BLACK_SHINY_TINT, isErBlackShiny, promoteToErBlackShinyInBattle } from "#data/elite-redux/er-black-shinies";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
@@ -1435,6 +1437,18 @@ export class BattleScene extends SceneBase {
   }
 
   isNewBiome(currentBattle = this.currentBattle) {
+    // ER (#486): variable biome length. Under the World Map gate, a biome ENDS
+    // when its per-run rolled length is reached (or the Crossroads "Move on"
+    // flag is set), not on the fixed %10 cadence. erIsBiomeEnd returns null when
+    // variable length is NOT in effect (no rolled length, or we are in the
+    // finale-safety zone) - in which case we fall through to vanilla %10 so the
+    // wave-200 END biome / finale align exactly.
+    if (erBiomeRoutingActive()) {
+      const erEnd = erIsBiomeEnd(currentBattle.waveIndex);
+      if (erEnd !== null) {
+        return erEnd;
+      }
+    }
     const isWaveIndexMultipleOfTen = !(currentBattle.waveIndex % 10);
     const isEndlessOrDaily = this.gameMode.hasShortBiomes || this.gameMode.isDaily;
     const isEndlessFifthWave = this.gameMode.hasShortBiomes && currentBattle.waveIndex % 5 === 0;
@@ -1903,6 +1917,14 @@ export class BattleScene extends SceneBase {
     // Second Wind / Anchor once-per-biome charges, Scrap Magnet wave-roll cache)
     // on every biome entry.
     resetErRelicBiomeState();
+
+    // ER (#486): roll the FIRST biome's variable length here, at the genuine run
+    // start (no battle exists yet). Biome-to-biome TRANSITIONS roll in
+    // SwitchBiomePhase with the correct next start wave, so this is gated to the
+    // run-start case (currentBattle null) to avoid a double roll on switches.
+    if (erBiomeRoutingActive() && !this.currentBattle) {
+      erRollBiomeLength(biome, 1);
+    }
     this.eventTarget.dispatchEvent(new NewArenaEvent());
 
     this.arenaBg.pipelineData = {
