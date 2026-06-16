@@ -29,6 +29,7 @@
 import { globalScene } from "#app/global-scene";
 import { PokemonType } from "#enums/pokemon-type";
 import type { SpeciesId } from "#enums/species-id";
+import type { BattleStat } from "#enums/stat";
 import { BATTLE_STATS } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
 import { ErRelicModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
@@ -468,36 +469,51 @@ export function erWeathervaneBlocksWeatherDamage(): boolean {
   return hasErRelic("weathervane");
 }
 
+/** A captured set of positive stat stages, carried across a Bonded Charm switch. */
+export type ErBondedCharmSnapshot = [BattleStat, number][];
+
 /**
- * Bonded Charm (relic): "soft baton pass". Called from SwitchSummonPhase on a
- * PLAYER, VOLUNTARY switch (Command.POKEMON) only - NOT on faint replacement,
- * U-turn/forced switch, or the opening lead. Copies the OUTGOING lead's POSITIVE
- * stat stages onto the INCOMING mon (negative/zero stages are skipped, so the
- * fresh switch-in never inherits a debuff). No-op when the relic isn't held.
- *
- * Called AFTER the incoming mon's `fieldSetup(true)` (which re-runs
- * `resetSummonData`, zeroing its stages) and BEFORE the outgoing mon's
- * `resetSummonData()` (which fires later in SwitchSummonPhase.onEnd), so the
- * carried stages survive and the source stages are still readable here.
+ * Bonded Charm (relic) - STEP 1 of the "soft baton pass". Snapshot the OUTGOING
+ * lead's POSITIVE stat stages. MUST be called from SwitchSummonPhase BEFORE the
+ * outgoing mon's `leaveField()` runs - leaveField(clearEffects=true) calls
+ * `resetSummonData()`, which zeroes the stages, so reading them after that point
+ * always returns 0 (this was the bug: the stages were read post-leaveField and
+ * nothing ever carried). Returns [] when the relic isn't held or the outgoing
+ * mon isn't the player's, so the caller can apply unconditionally.
  */
-export function erBondedCharmCarryStages(outgoing: Pokemon, incoming: Pokemon): void {
-  if (!hasErRelic("bondedCharm") || !incoming.isPlayer()) {
-    return;
+export function erBondedCharmSnapshot(outgoing: Pokemon): ErBondedCharmSnapshot {
+  if (!hasErRelic("bondedCharm") || !outgoing.isPlayer()) {
+    return [];
   }
-  let carried = false;
+  const snapshot: ErBondedCharmSnapshot = [];
   for (const stat of BATTLE_STATS) {
     const stage = outgoing.getStatStage(stat);
     if (stage > 0) {
-      incoming.setStatStage(stat, stage);
-      carried = true;
+      snapshot.push([stat, stage]);
     }
   }
-  if (carried) {
-    // ER custom relic - English-only (shared locales submodule).
-    globalScene.phaseManager.queueMessage(
-      `${incoming.getNameToRender()} inherited the lead's momentum through the Bonded Charm!`,
-    );
+  return snapshot;
+}
+
+/**
+ * Bonded Charm (relic) - STEP 2 of the "soft baton pass". Apply a snapshot taken
+ * by {@linkcode erBondedCharmSnapshot} onto the INCOMING mon. MUST be called
+ * AFTER the incoming mon's `fieldSetup(true)` (which re-runs `resetSummonData`,
+ * zeroing its stages) so the carried stages survive. Gated to a PLAYER, VOLUNTARY
+ * switch (Command.POKEMON) by the caller - NOT faint replacement, U-turn/forced
+ * switch, or the opening lead. No-op for an empty snapshot.
+ */
+export function erBondedCharmApply(incoming: Pokemon, snapshot: ErBondedCharmSnapshot): void {
+  if (snapshot.length === 0 || !incoming.isPlayer()) {
+    return;
   }
+  for (const [stat, stage] of snapshot) {
+    incoming.setStatStage(stat, stage);
+  }
+  // ER custom relic - English-only (shared locales submodule).
+  globalScene.phaseManager.queueMessage(
+    `${incoming.getNameToRender()} inherited the lead's momentum through the Bonded Charm!`,
+  );
 }
 
 /** waveIndex on which Quartermaster last fired its copy (guards against re-firing). */

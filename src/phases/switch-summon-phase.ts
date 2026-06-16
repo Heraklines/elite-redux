@@ -3,7 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { SubstituteTag } from "#data/battler-tags";
 import { allMoves } from "#data/data-lists";
-import { erBondedCharmCarryStages } from "#data/elite-redux/er-relics";
+import { type ErBondedCharmSnapshot, erBondedCharmApply, erBondedCharmSnapshot } from "#data/elite-redux/er-relics";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { getPokeballTintColor } from "#data/pokeball";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -145,6 +145,20 @@ export class SwitchSummonPhase extends SummonPhase {
     // (instead of happening at end of turn from an empty slot).
     // That being said, this blemish becomes completely irrelevant
     // once #6611 burns the entire system to the ground.
+    // ER relic (#439): Bonded Charm - "soft baton pass". Snapshot the outgoing
+    // lead's POSITIVE stat stages NOW, BEFORE leaveField() below runs
+    // resetSummonData() and zeroes them (reading them after that point - as the
+    // first version of this hook did - always returned 0, so nothing carried).
+    // Gated to a player VOLUNTARY switch (the menu "Switch" command) so faint
+    // replacements, U-turn/forced switches, baton pass, and the opening lead are
+    // all excluded. Applied to the incoming mon after its fieldSetup(true) below.
+    const bondedCharmStages: ErBondedCharmSnapshot =
+      this.player
+      && this.switchType === SwitchType.SWITCH
+      && globalScene.currentBattle.turnCommands[this.fieldIndex]?.command === Command.POKEMON
+        ? erBondedCharmSnapshot(this.lastPokemon)
+        : [];
+
     if (this.lastPokemon.isOnField()) {
       this.lastPokemon.leaveField(this.switchType === SwitchType.SWITCH);
     }
@@ -224,20 +238,12 @@ export class SwitchSummonPhase extends SummonPhase {
       } else {
         switchedInPokemon.fieldSetup(true);
       }
-      // ER relic (#439): Bonded Charm - "soft baton pass". On a player VOLUNTARY
-      // switch (the menu "Switch" command, SwitchType.SWITCH), the incoming mon
-      // keeps the outgoing lead's POSITIVE stat boosts. Gated to the player's own
-      // chosen switch so faint replacements, U-turn/forced switches, baton pass,
-      // and the opening lead are excluded. Applied AFTER fieldSetup(true) (which
-      // re-runs resetSummonData) so the carried stages survive, and BEFORE the
-      // outgoing's onEnd resetSummonData so the source stages are still intact.
-      if (
-        this.player
-        && this.switchType === SwitchType.SWITCH
-        && globalScene.currentBattle.turnCommands[this.fieldIndex]?.command === Command.POKEMON
-      ) {
-        erBondedCharmCarryStages(this.lastPokemon, switchedInPokemon);
-      }
+      // ER relic (#439): Bonded Charm - apply the snapshot captured above, before
+      // the outgoing mon's leaveField() zeroed its stages. Runs AFTER
+      // fieldSetup(true) (which re-runs resetSummonData) so the carried stages
+      // survive. No-op for an empty snapshot (relic absent / not a voluntary
+      // player switch).
+      erBondedCharmApply(switchedInPokemon, bondedCharmStages);
       this.summon();
     };
 

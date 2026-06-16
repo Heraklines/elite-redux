@@ -503,6 +503,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
       resetDevOverrides();
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 12,
         STARTING_BIOME_OVERRIDE: BiomeId.GRAVEYARD,
         MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
         MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_GRAVES_OF_THE_FALLEN,
@@ -532,6 +533,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
       resetDevOverrides();
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 12,
         STARTING_BIOME_OVERRIDE: BiomeId.FOREST,
         MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
         MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_WOODLAND_FORAGER,
@@ -560,6 +562,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
       resetDevOverrides();
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 45,
+        STARTING_WAVE_OVERRIDE: 12,
         STARTING_BIOME_OVERRIDE: BiomeId.CAVE,
         MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
         MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_GLITTERING_VEIN,
@@ -588,6 +591,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 40,
         STARTING_MONEY_OVERRIDE: 20000,
+        STARTING_WAVE_OVERRIDE: 12,
         STARTING_BIOME_OVERRIDE: BiomeId.GRASS,
         MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
         MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_MUSHROOM_CIRCLE,
@@ -613,6 +617,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 30,
         STARTING_MONEY_OVERRIDE: 50000,
+        STARTING_WAVE_OVERRIDE: 12,
         STARTING_BIOME_OVERRIDE: BiomeId.TOWN,
         MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
         MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_TOWN_RAFFLE,
