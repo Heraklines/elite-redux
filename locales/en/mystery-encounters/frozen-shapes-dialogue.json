@@ -1,0 +1,18 @@
+{
+  "intro": "A wall of crystal-clear ice rises ahead, and within it you can make out the frozen shadows of Pokemon, perfectly preserved. A cache glints somewhere behind the shapes.",
+  "title": "Frozen Shapes",
+  "description": "Pokemon shapes are frozen in a clear wall of ice, a cache locked behind them. Name the shapes to chip out the right find - the more you read correctly, the richer the cache. Or leave the ice be.",
+  "query": "Will you read the shapes?",
+  "option": {
+    "1": {
+      "label": "Read the shapes",
+      "tooltip": "(+) The cache scales with how many shapes you name right",
+      "selected": "You peer into the ice and start matching each frozen shadow to its Pokemon..."
+    },
+    "2": {
+      "label": "Leave the ice",
+      "tooltip": "(-) No reward, no cost",
+      "selected": "You leave the frozen wall undisturbed and move on."
+    }
+  }
+}

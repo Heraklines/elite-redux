@@ -18,6 +18,7 @@ import { FairysBoonEncounter } from "#mystery-encounters/fairys-boon-encounter";
 import { FieldTripEncounter } from "#mystery-encounters/field-trip-encounter";
 import { FieryFalloutEncounter } from "#mystery-encounters/fiery-fallout-encounter";
 import { FightOrFlightEncounter } from "#mystery-encounters/fight-or-flight-encounter";
+import { FrozenShapesEncounter } from "#mystery-encounters/frozen-shapes-encounter";
 import { FunAndGamesEncounter } from "#mystery-encounters/fun-and-games-encounter";
 import { GlitteringVeinEncounter } from "#mystery-encounters/glittering-vein-encounter";
 import { GlobalTradeSystemEncounter } from "#mystery-encounters/global-trade-system-encounter";
@@ -30,10 +31,12 @@ import { MushroomCircleEncounter } from "#mystery-encounters/mushroom-circle-enc
 import { MysteriousChallengersEncounter } from "#mystery-encounters/mysterious-challengers-encounter";
 import { MysteriousChestEncounter } from "#mystery-encounters/mysterious-chest-encounter";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
+import { OverchargeCoreEncounter } from "#mystery-encounters/overcharge-core-encounter";
 import { OvergrownTempleEncounter } from "#mystery-encounters/overgrown-temple-encounter";
 import { PartTimerEncounter } from "#mystery-encounters/part-timer-encounter";
 import { PicnicEncounter } from "#mystery-encounters/picnic-encounter";
 import { SafariZoneEncounter } from "#mystery-encounters/safari-zone-encounter";
+import { SalvageYardEncounter } from "#mystery-encounters/salvage-yard-encounter";
 import { ScrambledPokedexEncounter } from "#mystery-encounters/scrambled-pokedex-encounter";
 import { SealedDoorEncounter } from "#mystery-encounters/sealed-door-encounter";
 import { ShadyVitaminDealerEncounter } from "#mystery-encounters/shady-vitamin-dealer-encounter";
@@ -243,13 +246,13 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.BADLANDS, [MysteryEncounterType.DANCING_LESSONS]],
   [BiomeId.CAVE, [MysteryEncounterType.THE_STRONG_STUFF, MysteryEncounterType.ER_GLITTERING_VEIN]],
   [BiomeId.DESERT, [MysteryEncounterType.DANCING_LESSONS]],
-  [BiomeId.ICE_CAVE, []],
+  [BiomeId.ICE_CAVE, [MysteryEncounterType.ER_FROZEN_SHAPES]],
   [BiomeId.MEADOW, [MysteryEncounterType.ER_PICNIC]],
-  [BiomeId.POWER_PLANT, []],
+  [BiomeId.POWER_PLANT, [MysteryEncounterType.ER_OVERCHARGE_CORE]],
   [BiomeId.VOLCANO, [MysteryEncounterType.FIERY_FALLOUT, MysteryEncounterType.DANCING_LESSONS]],
   [BiomeId.GRAVEYARD, [MysteryEncounterType.ER_GRAVES_OF_THE_FALLEN]],
   [BiomeId.DOJO, [MysteryEncounterType.COLOSSEUM]],
-  [BiomeId.FACTORY, []],
+  [BiomeId.FACTORY, [MysteryEncounterType.ER_SALVAGE_YARD]],
   [BiomeId.RUINS, [MysteryEncounterType.ER_SEALED_DOOR]],
   [BiomeId.WASTELAND, [MysteryEncounterType.DANCING_LESSONS]],
   [BiomeId.ABYSS, [MysteryEncounterType.DANCING_LESSONS]],
@@ -316,6 +319,9 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_LAKE_SPIRIT] = LakeSpiritEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_IMPORT_BAZAAR] = ImportBazaarEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_SEALED_DOOR] = SealedDoorEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_OVERCHARGE_CORE] = OverchargeCoreEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_FROZEN_SHAPES] = FrozenShapesEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_SALVAGE_YARD] = SalvageYardEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

@@ -87,6 +87,15 @@ export enum MysteryEncounterType {
   /** ER #439: The Sealed Door - a Ruins glyph puzzle; read the silhouettes to open
    * the vault for a high-tier reward. */
   ER_SEALED_DOOR,
+  /** ER #439: Overcharge the Core - a Power Plant guardian-boss trial; best the
+   * overcharged Electric guardian for a high-tier reward + a Relic. */
+  ER_OVERCHARGE_CORE,
+  /** ER #439: Frozen Shapes - an Ice Cave silhouette puzzle; name the shapes
+   * trapped in the ice for a reward scaled to your reads. */
+  ER_FROZEN_SHAPES,
+  /** ER #439: The Salvage Yard - a Factory market of reclaimed parts; browse a
+   * curated held-item selection. */
+  ER_SALVAGE_YARD,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

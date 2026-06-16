@@ -1,0 +1,18 @@
+{
+  "intro": "Alarms blare across the plant floor. The reactor core has overloaded, and the crackling energy has woken something that now guards it, sparking with raw current.",
+  "title": "Overcharge the Core",
+  "description": "The power plant's core has overcharged and its Electric guardian surges to life. Best it in battle - a powerful multi-bar boss, several levels above your strongest Pokemon - for a guaranteed high-tier reward and a Relic. Or pull the breaker and leave.",
+  "query": "Will you face the guardian?",
+  "option": {
+    "1": {
+      "label": "Face the guardian",
+      "tooltip": "(+) Win for a guaranteed high-tier reward + a Relic\n(?) A tough multi-bar boss, above your level",
+      "selected": "Sparks arc across the floor as the overcharged guardian rounds on you!"
+    },
+    "2": {
+      "label": "Pull the breaker",
+      "tooltip": "(-) No fight, no reward",
+      "selected": "You throw the breaker, and the guardian sputters back into dormancy."
+    }
+  }
+}

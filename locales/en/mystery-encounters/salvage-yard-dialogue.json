@@ -1,0 +1,18 @@
+{
+  "intro": "The factory's salvage yard is heaped with reclaimed parts, worn gears, and gear that still has plenty of life left in it. A worker waves you toward the usable pile.",
+  "title": "The Salvage Yard",
+  "description": "A factory salvage yard piled with reclaimed parts and gear. Pick through the usable salvage for a curated held-item selection, or leave the scrap be.",
+  "query": "Will you pick through the salvage?",
+  "option": {
+    "1": {
+      "label": "Pick through the salvage",
+      "tooltip": "(+) Pick one from a curated held-item selection",
+      "selected": "You sort through the reclaimed parts and find some gear worth keeping..."
+    },
+    "2": {
+      "label": "Leave it be",
+      "tooltip": "(-) No goods, no cost",
+      "selected": "You leave the scrap to rust and move on."
+    }
+  }
+}

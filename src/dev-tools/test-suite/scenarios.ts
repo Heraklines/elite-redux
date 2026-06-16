@@ -919,6 +919,83 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Overcharge the Core (#439)",
+    description:
+      "#439 Power Plant boss TRIAL. Forces ER_OVERCHARGE_CORE in the POWER_PLANT biome.\n"
+      + "DO: 'Face the guardian' or 'Pull the breaker'.\n"
+      + "EXPECT: Face = a BOSS battle vs an overcharged Electric guardian (Electrode /\n"
+      + "Magnezone / Rotom), 2-3 bars and >= 5 levels above your strongest mon. WIN for 2\n"
+      + "Rogue picks + a Relic. Pull the breaker = nothing, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.POWER_PLANT,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_OVERCHARGE_CORE,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.STONE_EDGE, MoveId.DRAGON_CLAW, MoveId.IRON_HEAD],
+        }),
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER Frozen Shapes (#439)",
+    description:
+      "#439 Ice Cave silhouette puzzle (reuses the ErQuiz engine). Forces\n"
+      + "ER_FROZEN_SHAPES in the ICE_CAVE biome.\n"
+      + "DO: 'Read the shapes' (3 silhouette questions) or 'Leave the ice'.\n"
+      + "EXPECT: the cache tier scales with correct answers - 3/3 = 3 Rogue picks; 2 = 3\n"
+      + "Ultra; 1 = 3 Great; 0 = leave with a heal. Leave = nothing, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.ICE_CAVE,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_FROZEN_SHAPES,
+      });
+      return [
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.YAWN] }),
+      ];
+    },
+  },
+  {
+    label: "ER Salvage Yard (#439)",
+    description:
+      "#439 Factory MARKET. Forces ER_SALVAGE_YARD in the FACTORY biome.\n"
+      + "DO: 'Pick through the salvage' or 'Leave it be'.\n"
+      + "EXPECT: Pick opens a no-battle reward of curated reclaimed parts (Quick Claw,\n"
+      + "Grip Claw, Wide Lens, Scope Lens, King's Rock, Leftovers) - pick one. Leave =\n"
+      + "nothing, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.FACTORY,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_SALVAGE_YARD,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.YAWN] }),
+        makeStarter(SpeciesId.PIDGEY, {
+          moveset: [MoveId.TACKLE, MoveId.GUST, MoveId.QUICK_ATTACK, MoveId.SAND_ATTACK],
+        }),
+      ];
+    },
+  },
+  {
     label: "ER Mushroom Circle (#439)",
     description:
       "#439 Grass one-shot GAMBLE. Forces ER_MUSHROOM_CIRCLE (wave-only override,\n"
