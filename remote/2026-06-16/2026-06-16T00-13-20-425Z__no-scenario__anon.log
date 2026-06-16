@@ -1,0 +1,282 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqfvr4mx-a6q1
+mode:     0  wave:86
+seed:     Ss2QrOr7LQiWCGTB9V7B6tR9
+party:    Torrentula(L70 104hp f0), Dragonite Delivery(L70 193hp f0), Scizor Redux(L66 182hp f0), Slowbro(L66 217hp f0), Torrentula(L66 200hp f0)
+enemy:    Muk(L56), Muk(L57)
+
+----- COMMENT -----
+Game froze for no reason
+
+----- CONSOLE -----
+[00:12:38.112] LOG: Move Pool: ["Seismic Slam","Body Slam","Mountain Chunk","Fissure"]
+[00:12:38.112] LOG: Move Scores: [-20,20,-20,-20]
+[00:12:38.112] LOG: Sorted Move Pool: ["Body Slam","Seismic Slam","Mountain Chunk","Fissure"]
+[00:12:38.112] LOG: Chosen Move: Body Slam
+[00:12:38.112] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:12:38.132] LOG: Move Pool: ["Anchor Shot","Swagger","Spin Out","Drain Punch"]
+[00:12:38.132] LOG: Move Scores: [28.5,1,12.75,7]
+[00:12:38.132] LOG: Sorted Move Pool: ["Anchor Shot","Spin Out","Drain Punch","Swagger"]
+[00:12:38.132] LOG: Chosen Move: Spin Out
+[00:12:38.132] LOG: %cStart Phase TurnStartPhase color:green;
+[00:12:38.144] LOG: %cStart Phase MovePhase color:green;
+[00:12:38.144] LOG: %cUser: Dragonite Delivery
+Move: DUAL_WINGBEAT
+Use Mode: NORMAL color:orchid
+[00:12:38.153] LOG: %cStart Phase MessagePhase color:green;
+[00:12:38.256] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:12:38.267] LOG: crit stage: +0
+[00:12:38.271] LOG: Move: Dual Wingbeat | Base damage: 29.433531914893614 | Power: 45 | Source attack: 242 | Target defense: 235
+[00:12:38.273] LOG: Move: Dual Wingbeat | Attack damage: 35
+[00:12:38.275] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:12:38.306] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:12:38.307] LOG: crit stage: +0
+[00:12:38.310] LOG: Move: Dual Wingbeat | Base damage: 29.433531914893614 | Power: 45 | Source attack: 242 | Target defense: 235
+[00:12:38.310] LOG: Move: Dual Wingbeat | Attack damage: 32
+[00:12:38.311] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:12:38.337] LOG: %cStart Phase MessagePhase color:green;
+[00:12:38.535] LOG: %cStart Phase MoveEndPhase color:green;
+[00:12:38.539] LOG: %cStart Phase MovePhase color:green;
+[00:12:38.540] LOG: %cUser: Torrentula
+Move: AQUA_STEP
+Use Mode: NORMAL color:orchid
+[00:12:38.556] LOG: %cStart Phase MessagePhase color:green;
+[00:12:38.669] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:12:38.673] LOG: crit stage: +0
+[00:12:38.677] LOG: Move: Aqua Step | Base damage: 70.52085106382978 | Power: 160 | Source attack: 170 | Target defense: 235
+[00:12:38.679] LOG: Move: Aqua Step | Attack damage: 164
+[00:12:38.680] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:12:38.705] LOG: %cStart Phase MessagePhase color:green;
+[00:12:38.918] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:12:38.927] LOG: %cStart Phase MessagePhase color:green;
+[00:12:39.135] LOG: %cStart Phase FaintPhase color:green;
+[00:12:39.227] LOG: %cStart Phase MessagePhase color:green;
+[00:12:39.778] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:12:39.937] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:12:39.944] LOG: %cStart Phase MessagePhase color:green;
+[00:12:40.185] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:12:40.222] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:12:40.389] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:12:40.393] LOG: %cStart Phase MessagePhase color:green;
+[00:12:40.620] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:12:40.627] LOG: %cStart Phase MessagePhase color:green;
+[00:12:40.853] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:12:40.889] LOG: %cStart Phase VictoryPhase color:green;
+[00:12:40.893] LOG: Applied Soothe Bell 
+[00:12:40.895] LOG: %cStart Phase ExpPhase color:green;
+[00:12:40.895] LOG: Applied Super EXP. Charm 
+[00:12:40.895] LOG: Applied EXP. Charm 
+[00:12:41.889] LOG: %cStart Phase LevelUpPhase color:green;
+[00:12:41.892] LOG: %cStart Phase ExpPhase color:green;
+[00:12:41.892] LOG: Applied Super EXP. Charm 
+[00:12:41.893] LOG: Applied EXP. Charm 
+[00:12:42.421] LOG: %cStart Phase LevelUpPhase color:green;
+[00:12:42.422] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:12:42.423] LOG: Applied Super EXP. Charm 
+[00:12:42.423] LOG: Applied EXP. Charm 
+[00:12:42.425] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:12:42.425] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:12:42.425] LOG: Applied Super EXP. Charm 
+[00:12:42.426] LOG: Applied EXP. Charm 
+[00:12:42.427] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:12:42.428] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:12:42.428] LOG: Applied Super EXP. Charm 
+[00:12:42.428] LOG: Applied EXP. Charm 
+[00:12:42.429] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:12:42.429] LOG: %cStart Phase MoveEndPhase color:green;
+[00:12:42.431] LOG: %cStart Phase MovePhase color:green;
+[00:12:42.431] LOG: %cStart Phase MoveEndPhase color:green;
+[00:12:42.431] LOG: %cStart Phase MovePhase color:green;
+[00:12:42.431] LOG: %cUser: Perrserker
+Move: SPIN_OUT
+Use Mode: NORMAL color:orchid
+[00:12:42.440] LOG: %cStart Phase MessagePhase color:green;
+[00:12:42.553] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:12:42.557] LOG: crit stage: +0
+[00:12:42.559] LOG: Move: Spin Out | Base damage: 84.69263312883437 | Power: 202.8 | Source attack: 134 | Target defense: 163
+[00:12:42.560] LOG: Move: Spin Out | Attack damage: 56
+[00:12:42.562] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:12:42.590] LOG: %cStart Phase MessagePhase color:green;
+[00:12:42.802] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:12:42.808] LOG: %cStart Phase MessagePhase color:green;
+[00:12:43.053] LOG: %cStart Phase MoveEndPhase color:green;
+[00:12:43.053] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:12:43.054] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:12:43.054] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:12:43.055] LOG: %cStart Phase BerryPhase color:green;
+[00:12:43.058] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:12:43.061] LOG: %cStart Phase TurnEndPhase color:green;
+[00:12:43.069] LOG: %cStart Phase TurnInitPhase color:green;
+[00:12:43.070] LOG: %cStart Phase CommandPhase color:green;
+[00:12:44.178] LOG: Move: AQUA_STEP Move targets: {"targets":[3,1],"multiple":false} 
+Player Pokemon: Torrentula
+[00:12:44.181] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:12:44.400] LOG: %cStart Phase CommandPhase color:green;
+[00:12:44.892] LOG: Move: DUAL_WINGBEAT Move targets: {"targets":[3,0],"multiple":false} 
+Player Pokemon: Dragonite Delivery
+[00:12:44.895] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:12:45.579] LOG: %cStart Phase CommandPhase color:green;
+[00:12:46.365] LOG: Move: THUNDER_PUNCH Move targets: {"targets":[3,0],"multiple":false} 
+Player Pokemon: Dragonite Delivery
+[00:12:46.369] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:12:46.583] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:12:46.607] LOG: Battle Seed: 61vdzfOrAjQRehak
+[00:12:46.616] LOG: Move Pool: ["Anchor Shot","Swagger","Spin Out","Drain Punch"]
+[00:12:46.616] LOG: Move Scores: [13.5,-1,27,7]
+[00:12:46.616] LOG: Sorted Move Pool: ["Spin Out","Anchor Shot","Drain Punch","Swagger"]
+[00:12:46.616] LOG: Chosen Move: Spin Out
+[00:12:46.616] LOG: %cStart Phase TurnStartPhase color:green;
+[00:12:46.625] LOG: %cStart Phase MovePhase color:green;
+[00:12:46.625] LOG: %cUser: Dragonite Delivery
+Move: THUNDER_PUNCH
+Use Mode: NORMAL color:orchid
+[00:12:46.630] LOG: %cStart Phase MessagePhase color:green;
+[00:12:46.738] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:12:46.741] LOG: crit stage: +0
+[00:12:46.744] LOG: Move: Thunder Punch | Base damage: 146.8684210526316 | Power: 75 | Source attack: 367 | Target defense: 114
+[00:12:46.745] LOG: Move: Thunder Punch | Attack damage: 55
+[00:12:46.746] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:12:46.775] LOG: %cStart Phase MoveEndPhase color:green;
+[00:12:46.776] LOG: %cStart Phase MovePhase color:green;
+[00:12:46.777] LOG: %cUser: Torrentula
+Move: AQUA_STEP
+Use Mode: NORMAL color:orchid
+[00:12:46.782] LOG: %cStart Phase MessagePhase color:green;
+[00:12:46.888] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:12:46.891] LOG: crit stage: +0
+[00:12:46.893] LOG: Move: Aqua Step | Base damage: 146.8421052631579 | Power: 160 | Source attack: 172 | Target defense: 114
+[00:12:46.894] LOG: Move: Aqua Step | Attack damage: 85
+[00:12:46.895] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:12:46.923] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:12:46.925] LOG: %cStart Phase MessagePhase color:green;
+[00:12:47.138] LOG: %cStart Phase MoveEndPhase color:green;
+[00:12:47.139] LOG: %cStart Phase MovePhase color:green;
+[00:12:47.139] LOG: %cUser: Perrserker
+Move: SPIN_OUT
+Use Mode: NORMAL color:orchid
+[00:12:47.148] LOG: %cStart Phase MessagePhase color:green;
+[00:12:47.272] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:12:47.275] LOG: crit stage: +0
+[00:12:47.277] LOG: Move: Spin Out | Base damage: 78.58465454545455 | Power: 202.8 | Source attack: 134 | Target defense: 176
+[00:12:47.278] LOG: Move: Spin Out | Attack damage: 55
+[00:12:47.279] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:12:47.307] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:12:47.309] LOG: %cStart Phase MessagePhase color:green;
+[00:12:47.554] LOG: %cStart Phase MoveEndPhase color:green;
+[00:12:47.555] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:12:47.555] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:12:47.555] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:12:47.555] LOG: %cStart Phase BerryPhase color:green;
+[00:12:47.558] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:12:47.561] LOG: %cStart Phase TurnEndPhase color:green;
+[00:12:47.566] LOG: Applied Leftovers 
+[00:12:47.567] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:12:47.574] LOG: %cStart Phase MessagePhase color:green;
+[00:12:47.854] LOG: %cStart Phase TurnInitPhase color:green;
+[00:12:47.854] LOG: %cStart Phase CommandPhase color:green;
+[00:12:48.080] LOG: Move: AQUA_STEP Move targets: {"targets":[3,1],"multiple":false} 
+Player Pokemon: Torrentula
+[00:12:48.083] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:12:48.560] LOG: %cStart Phase CommandPhase color:green;
+[00:12:48.914] LOG: Move: THUNDER_PUNCH Move targets: {"targets":[3,0],"multiple":false} 
+Player Pokemon: Dragonite Delivery
+[00:12:48.917] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:12:49.097] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:12:49.114] LOG: Battle Seed: 61vdzfOrAjQRehak
+[00:12:49.121] LOG: Move Pool: ["Anchor Shot","Swagger","Spin Out","Drain Punch"]
+[00:12:49.121] LOG: Move Scores: [13.5,-1,33,11]
+[00:12:49.121] LOG: Sorted Move Pool: ["Spin Out","Anchor Shot","Drain Punch","Swagger"]
+[00:12:49.122] LOG: Chosen Move: Anchor Shot
+[00:12:49.122] LOG: %cStart Phase TurnStartPhase color:green;
+[00:12:49.128] LOG: %cStart Phase MovePhase color:green;
+[00:12:49.128] LOG: %cUser: Dragonite Delivery
+Move: THUNDER_PUNCH
+Use Mode: NORMAL color:orchid
+[00:12:49.134] LOG: %cStart Phase MessagePhase color:green;
+[00:12:49.255] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:12:49.257] LOG: crit stage: +0
+[00:12:49.260] LOG: Move: Thunder Punch | Base damage: 146.8684210526316 | Power: 75 | Source attack: 367 | Target defense: 114
+[00:12:49.261] LOG: Move: Thunder Punch | Attack damage: 54
+[00:12:49.262] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:12:49.293] LOG: %cStart Phase FaintPhase color:green;
+[00:12:49.357] LOG: %cStart Phase MessagePhase color:green;
+[00:12:49.698] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:12:49.859] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:12:49.861] LOG: %cStart Phase MessagePhase color:green;
+[00:12:50.104] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:12:50.108] LOG: %cStart Phase MessagePhase color:green;
+[00:12:50.338] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:12:50.373] LOG: %cStart Phase VictoryPhase color:green;
+[00:12:50.373] LOG: Applied Soothe Bell 
+[00:12:50.375] LOG: %cStart Phase ExpPhase color:green;
+[00:12:50.375] LOG: Applied Super EXP. Charm 
+[00:12:50.375] LOG: Applied EXP. Charm 
+[00:12:50.524] LOG: %cStart Phase ExpPhase color:green;
+[00:12:50.525] LOG: Applied Super EXP. Charm 
+[00:12:50.525] LOG: Applied EXP. Charm 
+[00:12:50.722] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:12:50.722] LOG: Applied Super EXP. Charm 
+[00:12:50.723] LOG: Applied EXP. Charm 
+[00:12:50.723] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:12:50.723] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:12:50.724] LOG: Applied Super EXP. Charm 
+[00:12:50.724] LOG: Applied EXP. Charm 
+[00:12:50.724] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:12:50.725] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:12:50.725] LOG: Applied Super EXP. Charm 
+[00:12:50.725] LOG: Applied EXP. Charm 
+[00:12:50.725] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:12:50.726] LOG: %cStart Phase MoveEndPhase color:green;
+[00:12:50.727] LOG: %cStart Phase MovePhase color:green;
+[00:12:50.727] LOG: %cUser: Torrentula
+Move: AQUA_STEP
+Use Mode: NORMAL color:orchid
+[00:12:50.728] LOG: %cStart Phase MessagePhase color:green;
+[00:12:50.855] LOG: %cStart Phase MessagePhase color:green;
+[00:12:51.056] LOG: %cStart Phase MoveEndPhase color:green;
+[00:12:51.056] LOG: %cStart Phase MovePhase color:green;
+[00:12:51.057] LOG: %cStart Phase MoveEndPhase color:green;
+[00:12:51.057] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:12:51.057] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:12:51.057] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:12:51.057] LOG: %cStart Phase BerryPhase color:green;
+[00:12:51.059] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:12:51.059] LOG: %cStart Phase TurnEndPhase color:green;
+[00:12:51.063] LOG: Applied Leftovers 
+[00:12:51.064] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:12:51.070] LOG: %cStart Phase MessagePhase color:green;
+[00:12:51.355] LOG: %cStart Phase BattleEndPhase color:green;
+[00:12:51.356] LOG: Battle Score: 174 (3 Turns x0.69)
+[00:12:51.356] LOG: Total Score: 11708
+[00:12:51.395] LOG: %cStart Phase EggLapsePhase color:green;
+[00:12:51.397] LOG: %cStart Phase SelectModifierPhase color:green;
+[00:12:51.398] LOG: Wave Seed: ¨È¦Ç¤Ç¡¦¾¬©«É§ 85
+[00:12:51.413] LOG: Applied Golden Poké Ball 
+[00:12:51.414] LOG: 7 0 []
+[00:12:51.414] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_attack","soundName":"se/restore","tier":0,"stat":1,"nameKey":"x_attack","quantityKey":"percentage"} 
+[00:12:51.414] LOG: 0 0 []
+[00:12:51.414] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:12:51.415] LOG: 0 0 []
+[00:12:51.415] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:12:51.415] LOG: 2 0 []
+[00:12:51.415] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[00:12:51.415] LOG: 13 6 [2,3,4,5,8,12,16,23]
+[00:12:51.415] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[00:12:51.794] LOG: %cStart Phase NewBattlePhase color:green;
+[00:12:51.795] LOG: Wave Seed: ©É§È¥È¢§¿­ª¬Ê¨ 86
+[00:12:51.796] LOG: Applied Max Lure 
+[00:12:51.796] LOG: Applied Super Lure 
+[00:12:51.797] LOG: %cStart Phase NextEncounterPhase color:green;
+[00:12:51.801] LOG: Starting species pool tier: COMMON
+[00:12:51.801] LOG: Replaced GRIMER with MUK
+[00:12:51.829] LOG: Pokemon: Wild Muk | Species ID: 89 | Level: 56 | Nature: Bashful (-)
+[00:12:51.829] LOG: Stats (IVs): HP: 192 (16), Atk: 162 (31), Def: 101 (22), Spatk: 90 (22), Spdef: 130 (24), Spd: 63 (5)
+[00:12:51.830] LOG: Ability: Poison Touch | Passive Ability: Liquified 
+[00:12:51.830] LOG: Moveset: ["Fumigation Bomb","Pain Split","Karma","Imprison"]
+[00:12:51.830] LOG: Starting species pool tier: COMMON
+[00:12:51.830] LOG: Replaced GRIMER with MUK
+[00:12:51.852] LOG: Pokemon: Wild Muk | Species ID: 89 | Level: 57 | Nature: Timid (+Spd/-Atk)
+[00:12:51.852] LOG: Stats (IVs): HP: 198 (21), Atk: 136 (9), Def: 91 (1), Spatk: 89 (18), Spdef: 119 (0), Spd: 86 (29)
+[00:12:51.852] LOG: Ability: Regenerator | Passive Ability: Liquified 
+[00:12:51.852] LOG: Moveset: ["Fumigation Bomb","Explosion","Imprison","Quash"]
+[00:12:51.967] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'sys') @ https://elite-redux-staging.pages.dev/assets/phaser-CoS_K63z.js:8:28332
