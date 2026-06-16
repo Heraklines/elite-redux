@@ -11,9 +11,10 @@
 // ability, form, moves) - and you must beat yourself. Win for a Rogue-tier reward.
 //
 // Built on initBattleWithEnemyConfig: the enemy party is mirrored from
-// globalScene.getPlayerParty() at the moment you accept. Held items are NOT copied
-// (the reflection fights with the same builds, not your bag); a fuller "uses your
-// own items" mirror is a later refinement.
+// globalScene.getPlayerParty() at the moment you accept, INCLUDING your held items
+// (cloned onto the reflection per the design - so a smart player can exploit the
+// mirror). Mystery-encounter battles are exempt from the #419 BST cap, so the
+// clone keeps your real (possibly over-cap) team.
 // =============================================================================
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
@@ -22,6 +23,7 @@ import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import type { PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { EnemyPartyConfig, EnemyPokemonConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
   initBattleWithEnemyConfig,
@@ -32,6 +34,7 @@ import {
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
+import type { HeldModifierConfig } from "#types/held-modifier-config";
 
 const namespace = "mysteryEncounters/stillWaters";
 
@@ -39,6 +42,15 @@ const namespace = "mysteryEncounters/stillWaters";
 function buildMirrorBattle(): EnemyPartyConfig {
   const configs: EnemyPokemonConfig[] = globalScene.getPlayerParty().map(mon => {
     const moveSet = mon.moveset.filter(m => m != null).map(m => m.moveId);
+    // The reflection fights with YOUR OWN held items (design intent). CLONE each
+    // held item - generateEnemyModifiers re-points the modifier's pokemonId to the
+    // clone, so passing the live instance would strip it off the player's mon.
+    // Non-transferable so the player can't Thief their own mirrored gear back.
+    const modifierConfigs: HeldModifierConfig[] = mon.getHeldItems().map(item => ({
+      modifier: item.clone() as PokemonHeldItemModifier,
+      stackCount: item.getStackCount(),
+      isTransferable: false,
+    }));
     return {
       species: mon.species,
       isBoss: false,
@@ -50,6 +62,7 @@ function buildMirrorBattle(): EnemyPartyConfig {
       shiny: mon.shiny,
       variant: mon.variant,
       moveSet,
+      modifierConfigs,
     };
   });
   return { pokemonConfigs: configs, disableSwitch: false };
