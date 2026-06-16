@@ -531,6 +531,55 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Desert: The Mirage (#511)",
+    description:
+      "#511 - The Mirage (Desert read-the-tell). Forces ER_THE_MIRAGE. A mon with an\n"
+      + "acuity ability (Frisk, Compound Eyes, Keen Eye, Anticipation, Forewarn) sees\n"
+      + "through the haze to a hidden cache.\n"
+      + "DO: on wave 12 read the description - it should NAME your sharp-eyed mon (this\n"
+      + "party has Vespiquen w/ no acuity by default, so swap in one or rely on the\n"
+      + "blind path). Choose 'Search the mirage'.\n"
+      + "EXPECT: with an acuity mon -> an Ultra + Great reward pick; without one -> a\n"
+      + "single Great pick. No raw enum text / missing locale keys.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_THE_MIRAGE,
+        ABILITY_OVERRIDE: AbilityId.COMPOUND_EYES,
+      });
+      return [
+        makeStarter(SpeciesId.BUTTERFREE, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "ER Temple: Cleansing Font (#515)",
+    description:
+      "#515 - The Cleansing Font (Temple shrine). Forces ER_CLEANSING_FONT.\n"
+      + "DO: on wave 12, with a hurt party (the lead is pre-damaged), choose 'Drink\n"
+      + "from the font'.\n"
+      + "EXPECT: the whole party is fully restored (HP + status) via PartyHealPhase,\n"
+      + "and the 'restored' line shows (curses are not a built mechanic yet, so it\n"
+      + "always takes the restore branch). 'Leave it untouched' just moves on.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_CLEANSING_FONT,
+      });
+      return [
+        makeStarter(SpeciesId.LUMINEON, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
     label: "ER Graveyard: Graves of the Fallen (#439)",
     description:
       "#439 Graveyard ME (rides the ghost-team substrate). Forces\n"

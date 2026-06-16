@@ -8,6 +8,7 @@ import { AuroraEncounter } from "#mystery-encounters/aurora-encounter";
 import { BerriesAboundEncounter } from "#mystery-encounters/berries-abound-encounter";
 import { BlackMarketEncounter } from "#mystery-encounters/black-market-encounter";
 import { BugTypeSuperfanEncounter } from "#mystery-encounters/bug-type-superfan-encounter";
+import { CleansingFontEncounter } from "#mystery-encounters/cleansing-font-encounter";
 import { ClowningAroundEncounter } from "#mystery-encounters/clowning-around-encounter";
 import { ColosseumEncounter } from "#mystery-encounters/colosseum-encounter";
 import { DancingLessonsEncounter } from "#mystery-encounters/dancing-lessons-encounter";
@@ -57,6 +58,7 @@ import { StillWatersEncounter } from "#mystery-encounters/still-waters-encounter
 import { SunkenVesselEncounter } from "#mystery-encounters/sunken-vessel-encounter";
 import { TeleportingHijinksEncounter } from "#mystery-encounters/teleporting-hijinks-encounter";
 import { TheExpertPokemonBreederEncounter } from "#mystery-encounters/the-expert-pokemon-breeder-encounter";
+import { TheMirageEncounter } from "#mystery-encounters/the-mirage-encounter";
 import { ThePokemonSalesmanEncounter } from "#mystery-encounters/the-pokemon-salesman-encounter";
 import { TheStormEncounter } from "#mystery-encounters/the-storm-encounter";
 import { TheStrongStuffEncounter } from "#mystery-encounters/the-strong-stuff-encounter";
@@ -286,7 +288,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
       MysteryEncounterType.ER_ECHO_CHAMBER,
     ],
   ],
-  [BiomeId.DESERT, [MysteryEncounterType.DANCING_LESSONS]],
+  [BiomeId.DESERT, [MysteryEncounterType.DANCING_LESSONS, MysteryEncounterType.ER_THE_MIRAGE]],
   [BiomeId.ICE_CAVE, [MysteryEncounterType.ER_FROZEN_SHAPES]],
   [BiomeId.MEADOW, [MysteryEncounterType.ER_PICNIC]],
   [BiomeId.POWER_PLANT, [MysteryEncounterType.ER_OVERCHARGE_CORE]],
@@ -309,7 +311,9 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.JUNGLE, [MysteryEncounterType.SAFARI_ZONE, MysteryEncounterType.ER_OVERGROWN_TEMPLE]],
   [BiomeId.FAIRY_CAVE, [MysteryEncounterType.ER_FAIRYS_BOON]],
   // #503: the Totem Trial belongs to ISLAND (transcript line 124231), not Temple.
-  // Temple's signature is the Innate Shrine (not yet built); leave it without an ER ME.
+  // Temple's SIGNATURE is the Innate Shrine (#514, not yet built); the Cleansing
+  // Font (#515) is its second event.
+  [BiomeId.TEMPLE, [MysteryEncounterType.ER_CLEANSING_FONT]],
   [
     BiomeId.SLUM,
     [MysteryEncounterType.ER_BLACK_MARKET, MysteryEncounterType.ER_INFORMANT, MysteryEncounterType.ER_FORTUNE_TELLER],
@@ -392,6 +396,8 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_LOST_WANDERER] = LostWandererEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_SUNKEN_VESSEL] = SunkenVesselEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_FORTUNE_TELLER] = FortuneTellerEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_THE_MIRAGE] = TheMirageEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_CLEANSING_FONT] = CleansingFontEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

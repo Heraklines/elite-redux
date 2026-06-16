@@ -1,0 +1,20 @@
+{
+  "intro": "The dunes shimmer ahead, and a cool blue oasis wavers into view between them, fringed with impossible palms.",
+  "title": "The Mirage",
+  "description": "A shimmering oasis beckons across the sand. {{tell}}",
+  "query": "Do you approach the oasis?",
+  "option": {
+    "1": {
+      "label": "Search the mirage",
+      "tooltip": "(+) With a sharp-eyed Pokemon: dig up a real cache (Ultra + Great)\n(?) Without one: only a single Great find",
+      "selected": "You walk into the shimmering haze where the water should be..."
+    },
+    "2": {
+      "label": "Move on",
+      "tooltip": "(-) Leave the mirage behind",
+      "selected": "You know better than to chase water in the desert, and press on."
+    }
+  },
+  "resultSeer": "Guided by your Pokemon's senses, you brush away the sand and uncover a cache the mirage was hiding!",
+  "resultBlind": "The oasis melts into empty air, but your digging turns up one thing worth keeping."
+}

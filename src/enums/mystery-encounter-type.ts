@@ -152,6 +152,12 @@ export enum MysteryEncounterType {
    * mystery encounter waiting on the road ahead (preview), and bends fate so it
    * comes to pass (queues that encounter for your next ME wave). */
   ER_FORTUNE_TELLER,
+  /** ER #511: The Mirage - a Desert read-the-tell event; an acuity ability sees
+   * through the heat-haze to a hidden cache (better find), else a single find. */
+  ER_THE_MIRAGE,
+  /** ER #515: The Cleansing Font - a Temple shrine; drink to lift a curse, or (no
+   * curse) the clean water fully restores the party. */
+  ER_CLEANSING_FONT,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

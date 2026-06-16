@@ -1,0 +1,20 @@
+{
+  "intro": "Deep in the temple, a stone font brims with water so clear it seems to glow. The air here feels strangely light.",
+  "title": "The Cleansing Font",
+  "description": "An ancient font of clean water sits untouched in the temple. Drink from it: if a curse weighs on your team it will be lifted, and otherwise the pure water restores your whole party.",
+  "query": "Will you drink from the font?",
+  "option": {
+    "1": {
+      "label": "Drink from the font",
+      "tooltip": "(+) Lifts a curse, or fully restores the party if uncursed",
+      "selected": "You cup the clear water and let your team drink their fill."
+    },
+    "2": {
+      "label": "Leave it untouched",
+      "tooltip": "(-) Move on without drinking",
+      "selected": "You leave the font undisturbed and move deeper into the temple."
+    }
+  },
+  "cleansed": "The water washes a lingering curse clean away.",
+  "restored": "The pure water soothes every ache and weariness. Your party is fully restored."
+}
