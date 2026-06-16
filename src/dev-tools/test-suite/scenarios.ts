@@ -151,6 +151,10 @@ const DEV_OVERRIDE_DEFAULTS = {
   // encounter doesn't leak into the next run/scenario.
   MYSTERY_ENCOUNTER_OVERRIDE: null,
   MYSTERY_ENCOUNTER_RATE_OVERRIDE: null,
+  // ER: a forced ME only replaces a WILD wave (a trainer wave skips it). ME
+  // scenarios set this true so the wave is guaranteed wild; reset here so it
+  // never leaks into a normal run (which would have NO trainers).
+  DISABLE_STANDARD_TRAINERS_OVERRIDE: false,
   // ER #486: clear the Treasure-Map fragment seed so it never leaks between runs.
   ER_TREASURE_FRAGMENTS_OVERRIDE: 0,
 } as const;
@@ -172,6 +176,11 @@ function setOverrides(partial: Partial<MutableOverrides>): void {
   // bypasses the "no ME within 3 waves" rule and loops forever).
   if (partial.MYSTERY_ENCOUNTER_OVERRIDE != null) {
     setClearMeOverrideAfterFirst();
+    // A forced ME only replaces a WILD wave - if the starting wave happens to
+    // roll a trainer (isWaveTrainer is seeded per run), the override is skipped
+    // and you get a normal battle instead. Guarantee a wild wave so the ME
+    // triggers on EVERY launch, not just the lucky seeds.
+    O.DISABLE_STANDARD_TRAINERS_OVERRIDE = true;
   }
 }
 
