@@ -1,6 +1,8 @@
 import type { GameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
+import { erNotorietyOverLevel } from "#data/elite-redux/er-biome-notoriety";
+import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { applyErHellEnemyLevelScaling } from "#data/elite-redux/er-run-difficulty";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -132,6 +134,17 @@ export class Battle {
       const wildLevelBonus = getErBiomeRule(globalScene.arena.biomeId)?.wildLevelBonus;
       if (wildLevelBonus) {
         this.enemyLevels = this.enemyLevels.map(level => level + wildLevelBonus);
+      }
+    }
+    // ER (#504): biome NOTORIETY lets enemies/trainers exceed the normal level cap
+    // the longer the player over-stays a biome (additive, to a fixed ceiling). The
+    // GLOBAL level cap getLevelForWave() is untouched - this only adds an over-cap
+    // bump LOCAL to the over-stayed biome, so leaving it resumes the global curve
+    // exactly. Gated to the World Map run; no-op in the finale-safety zone.
+    if (this.enemyLevels && erBiomeRoutingActive()) {
+      const overLevel = erNotorietyOverLevel(this.waveIndex);
+      if (overLevel > 0) {
+        this.enemyLevels = this.enemyLevels.map(level => level + overLevel);
       }
     }
   }

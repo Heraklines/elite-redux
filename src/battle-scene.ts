@@ -31,6 +31,7 @@ import { getDailyMysteryEncounter } from "#data/daily-seed/daily-run";
 import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
+import { erNotorietyBossChancePct, erNotorietyItemRateMult } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erIsBiomeEnd, erRollBiomeLength } from "#data/elite-redux/er-biome-structure";
@@ -2254,9 +2255,16 @@ export class BattleScene extends SceneBase {
     if (forceBoss || (species && (species.subLegendary || species.legendary || species.mythical))) {
       isBoss = true;
     } else {
+      // ER (#504): biome NOTORIETY ramps the wild-boss RATE the longer the player
+      // over-stays a biome (every ~3 waves -> ~2 -> every wave). Additive to the
+      // vanilla every-10 cadence and LOCAL to the biome (overstay is a pure
+      // function of the per-biome start wave, which resets on biome entry), so the
+      // global curve resumes exactly after leaving. Gated to the World Map run.
+      const notorietyBossPct = erBiomeRoutingActive() ? erNotorietyBossChancePct(waveIndex) : 0;
       this.executeWithSeedOffset(() => {
         isBoss =
           waveIndex % 10 === 0
+          || (notorietyBossPct > 0 && randSeedInt(100) < notorietyBossPct)
           || (this.gameMode.hasRandomBosses
             && randSeedInt(100) < Math.min(Math.max(Math.ceil((waveIndex - 250) / 50), 0) * 2, 30));
       }, waveIndex << 2);
@@ -3413,6 +3421,16 @@ export class BattleScene extends SceneBase {
       let chances = Math.ceil(difficultyWaveIndex / 10);
       if (isFinalBoss) {
         chances = Math.ceil(chances * 2.5);
+      }
+      // ER (#504): biome NOTORIETY raises the enemy HELD-ITEM rate the longer the
+      // player over-stays a biome - more roll chances per mon (additive, capped).
+      // Gated to the World Map run and LOCAL to the biome (overstay resets on biome
+      // entry), so leaving resumes the normal held-item rate exactly.
+      if (erBiomeRoutingActive()) {
+        const notoMult = erNotorietyItemRateMult(this.currentBattle.waveIndex);
+        if (notoMult > 1) {
+          chances = Math.ceil(chances * notoMult);
+        }
       }
 
       const party = this.getEnemyParty();

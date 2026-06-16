@@ -43,6 +43,8 @@ import {
 import { erRivalWaveOrdinal, erRivalWaveSequence } from "#data/elite-redux/er-battle-frequency";
 import { ER_FACTORY_SETS } from "#data/elite-redux/er-factory-sets";
 import { erBalanceMap, erBalanceNum, erBalancePairs } from "#data/elite-redux/er-balance-tuning";
+import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
+import { erNotorietyBstBonus } from "#data/elite-redux/er-biome-notoriety";
 import {
   erFactoryExcludedDraftIds,
   erFactoryOverriddenDraftIds,
@@ -889,10 +891,15 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
     }
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
     const isBossWave = wave % 10 === 0 || (globalScene.currentBattle?.trainer?.config.isBoss ?? false);
-    const cap = erEliteBstCapFor(wave, isBossWave, isHell);
-    if (cap === null) {
+    const baseCap = erEliteBstCapFor(wave, isBossWave, isHell);
+    if (baseCap === null) {
       return;
     }
+    // ER (#504): biome NOTORIETY raises the BST ceiling LOCALLY by up to +100 the
+    // longer the player over-stays a biome. Purely additive and gated to the World
+    // Map run - leaving the biome drops overstay to 0 and the cap snaps back to
+    // baseCap, so the global curve resumes exactly. No persistent state touched.
+    const cap = baseCap + (erBiomeRoutingActive() ? erNotorietyBstBonus(wave) : 0);
     // Hell keeps its early legendary spikes (BST cap still trims most of them);
     // only the vanilla-facing ladders ban legend-likes before the legend wave.
     const legendBanned = !isHell && wave < ER_ELITE_LEGEND_FROM_WAVE();

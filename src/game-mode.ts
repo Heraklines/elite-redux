@@ -14,6 +14,8 @@ import { parseDailySeed } from "#data/daily-seed/daily-seed-utils";
 import { allSpecies } from "#data/data-lists";
 import { erBalanceMap, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { erForcesTrainerWave } from "#data/elite-redux/er-battle-frequency";
+import { erNotorietyTrainerChancePct } from "#data/elite-redux/er-biome-notoriety";
+import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { BiomeId } from "#enums/biome-id";
 import { ChallengeType } from "#enums/challenge-type";
@@ -291,6 +293,18 @@ export class GameMode implements GameModeConfig {
       // supply their own (scripted) trainer and take precedence downstream.
       if (erForcesTrainerWave(waveIndex) && waveIndex % 30 !== (offsetGym ? 0 : 20) && !this.isFixedBattle(waveIndex)) {
         return true;
+      }
+      // ER (#504): biome NOTORIETY forces more TRAINER battles the longer the
+      // player over-stays a biome (climbing to near-certain at full notoriety).
+      // Additive to the normal trainer roll and LOCAL to the biome (overstay is a
+      // pure function of the per-biome start wave, which resets on entry), so the
+      // global curve resumes exactly after leaving. Skips the exact gym/fixed wave
+      // (those supply their own scripted trainer). Gated to the World Map run.
+      if (erBiomeRoutingActive() && waveIndex % 30 !== (offsetGym ? 0 : 20) && !this.isFixedBattle(waveIndex)) {
+        const notorietyTrainerPct = erNotorietyTrainerChancePct(waveIndex);
+        if (notorietyTrainerPct > 0 && randSeedInt(100) < notorietyTrainerPct) {
+          return true;
+        }
       }
       return Boolean(allowTrainerBattle && trainerChance && !randSeedInt(trainerChance));
     }

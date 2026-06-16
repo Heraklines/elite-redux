@@ -1,8 +1,9 @@
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
+import { erHasNotoriety } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
-import { erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
+import { erClaimNotorietyWarning, erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
 import { BattleType } from "#enums/battle-type";
 import type { BattlerIndex } from "#enums/battler-index";
 import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
@@ -132,15 +133,14 @@ export class VictoryPhase extends PokemonPhase {
         // biome change, so prices reflect the biome just cleared. Shipped to
         // production (release approval): runs on every x0 wave; daily runs
         // (shared seed) are still skipped.
-        // ER (#486): under the World Map gate the biome ends on its rolled length
-        // (or the Crossroads "Move on" choice), not on %10. Fire the biome market
-        // at the biome BOUNDARY (isNewBiome) so the shop still bookends each biome.
-        // Vanilla / non-gated runs keep the every-x0 market.
+        // ER (#504): the shop cadence stays on the every-10 GLOBAL-wave tick
+        // (waveIndex % 10) for ALL runs, including the World Map gate. #486 had
+        // moved it to the biome BOUNDARY (isNewBiome); that is reverted here so the
+        // market always fires every 10 global waves regardless of variable biome
+        // length / notoriety. Daily runs (shared seed) are still skipped.
         const erRouting = erBiomeRoutingActive();
         const biomeEnding = globalScene.isNewBiome();
-        const fireBiomeShop = erRouting
-          ? biomeEnding && !gameMode.isDaily
-          : !(currentWaveIndex % 10) && !gameMode.isDaily;
+        const fireBiomeShop = !(currentWaveIndex % 10) && !gameMode.isDaily;
         if (fireBiomeShop) {
           globalScene.phaseManager.pushNew("BiomeShopPhase");
         }
@@ -151,6 +151,19 @@ export class VictoryPhase extends PokemonPhase {
           // ER (#486): not a biome end, but a 5-wave Crossroads tick - raise the
           // "Stay / Move on" choice AFTER the reward and BEFORE the next battle.
           globalScene.phaseManager.pushNew("ErCrossroadsPhase");
+        }
+
+        // ER (#504): the FIRST time the player crosses into notoriety in this biome
+        // (the next wave is past the 10-wave free window and the biome is NOT
+        // ending), warn ONCE that lingering grows the place increasingly hostile.
+        // erClaimNotorietyWarning() latches per biome (resets on biome entry).
+        if (erRouting && !biomeEnding && erHasNotoriety(currentWaveIndex + 1) && erClaimNotorietyWarning()) {
+          globalScene.phaseManager.pushNew(
+            "MessagePhase",
+            "Word of your lingering has spread, and you are gaining notoriety here. The longer you stay, the more hostile this place will grow.",
+            null,
+            true,
+          );
         }
 
         globalScene.phaseManager.pushNew("NewBattlePhase");

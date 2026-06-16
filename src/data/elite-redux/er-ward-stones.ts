@@ -35,6 +35,8 @@
 
 import { globalScene } from "#app/global-scene";
 import { erBalanceMap, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
+import { erNotorietyItemRateMult } from "#data/elite-redux/er-biome-notoriety";
+import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { StatusEffect } from "#enums/status-effect";
@@ -368,27 +370,33 @@ export function maybeAssignErWardStone(enemy: EnemyPokemon): void {
       return; // regular wild mons never hold one
     }
     const roll = enemy.randBattleSeedInt(100);
+    // ER (#504): biome NOTORIETY scales the ward-stone drop rate up the longer the
+    // player over-stays a biome (widening every threshold, additive + capped).
+    // Gated to the World Map run and LOCAL to the biome, so leaving resumes the
+    // normal rate exactly.
+    const notoMult = erBiomeRoutingActive() ? erNotorietyItemRateMult(wave) : 1;
+    const pct = (key: string): number => erBalanceNum(key) * notoMult;
     // ER (#420): Ace gets a flat 5% roll (boss -> Greater, regular -> Minor);
     // Elite/Hell rolls are DOUBLED (boss Prime 20/Greater +30, regular
     // Greater 10/Minor +40 - was 10/25 and 5/20). All five thresholds are
     // editor-tunable (er.items.wardStone*Pct).
     if (getErDifficulty() === "ace") {
-      if (roll < erBalanceNum("er.items.wardStoneAcePct")) {
+      if (roll < pct("er.items.wardStoneAcePct")) {
         addWardStone(enemy, isBoss ? "greater" : "minor");
       }
       return;
     }
     if (isBoss) {
-      if (roll < erBalanceNum("er.items.wardStoneBossPrimePct")) {
+      if (roll < pct("er.items.wardStoneBossPrimePct")) {
         addWardStone(enemy, "prime");
-      } else if (roll < erBalanceNum("er.items.wardStoneBossGreaterPct")) {
+      } else if (roll < pct("er.items.wardStoneBossGreaterPct")) {
         addWardStone(enemy, "greater");
       }
       return;
     }
-    if (roll < erBalanceNum("er.items.wardStoneRegularGreaterPct")) {
+    if (roll < pct("er.items.wardStoneRegularGreaterPct")) {
       addWardStone(enemy, "greater");
-    } else if (roll < erBalanceNum("er.items.wardStoneRegularMinorPct")) {
+    } else if (roll < pct("er.items.wardStoneRegularMinorPct")) {
       addWardStone(enemy, "minor");
     }
   } catch {

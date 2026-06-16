@@ -5,54 +5,47 @@
  */
 
 // =============================================================================
-// ER #486 - World Map core, VARIABLE BIOME LENGTH + the every-5 Crossroads flag.
+// ER #486 / #504 - World Map core, VARIABLE BIOME LENGTH + the every-5 Crossroads
+// flag + biome NOTORIETY (overstay escalation).
 //
 // Vanilla biomes are a fixed 10 waves: isNewBiome() fires on waveIndex % 10 === 0.
 // This module replaces that (behind erBiomeRoutingActive()) with a PER-RUN ROLLED
-// length per biome instance, so two runs of the same biome can differ. Lengths are
-// drawn from a per-biome band (SHORT / MED / LONG) and snapped to a multiple of 5,
-// so:
-//   - every biome still ENDS on a wave that is a multiple of 5 (the Crossroads
-//     cadence and the boss/level cadence line up cleanly), and
-//   - the every-5-waves Crossroads ("Stay / Move on") has a clean tick.
+// length per biome instance, so two runs of the same biome can differ.
 //
-// FINALE SAFETY (critical): variable length is INACTIVE in the late game. Past
-// `finalWave - LATE_GAME_MARGIN` everything reverts to the vanilla %10 cadence, and
-// a biome is only given a rolled length if its WORST-CASE end (band max) still
-// lands strictly before that zone. This guarantees the classic wave-200 END biome
-// enters at 191 and the finale triggers at 200 exactly as vanilla - the variable
-// path never reaches the late waves at all.
+// #504 reworks the lengths: a single rolled range [BIOME_LENGTH_MIN,
+// BIOME_LENGTH_MAX] = [7, 25] waves, re-rolled on EVERY biome entry, with a mild
+// bias toward the longer end (most rolls > 10). The roll is a HARD CAP: when
+// waves-spent-in-biome reaches it the biome ENDS even if the player kept choosing
+// "Stay" at the Crossroads. Leaving early via the 5-wave Crossroads still works.
+//
+// NOTORIETY (#504): the first 10 waves in a biome follow the GLOBAL difficulty
+// curve unchanged. PAST 10 in-biome waves the place grows hostile - "overstay" =
+// max(0, wavesSinceEnteredBiome - NOTORIETY_FREE_WAVES). Notoriety is a PURE
+// function of the current biome's wave position (it reads the per-biome start wave,
+// which resets on every biome entry), so it is local + additive and never shifts
+// the persistent/global curve. After leaving an over-stayed biome the global curve
+// resumes exactly: wave N enemies match a fresh run at wave N.
+//
+// FINALE SAFETY (critical): variable length AND notoriety are INACTIVE in the late
+// game. Past `finalWave - LATE_GAME_MARGIN` everything reverts to the vanilla %10
+// cadence, and a biome is only given a rolled length if its WORST-CASE end (range
+// max) still lands strictly before that zone. This guarantees the classic wave-200
+// END biome enters at 191 and the finale triggers at 200 exactly as vanilla - the
+// variable path never reaches the late waves at all.
 //
 // State is module-level, reset per run (alongside the other ER resets) and folded
 // additively into the erMapState save blob so a reload restores the same boundary.
 // =============================================================================
 
-import { BiomeId } from "#enums/biome-id";
+import type { BiomeId } from "#enums/biome-id";
 import { randSeedIntRange } from "#utils/common";
 
-/** Per-biome length band. Picked by biome id; MED is the default. */
-type LengthBand = "short" | "med" | "long";
+/** Minimum rolled biome length in waves (#504). */
+const BIOME_LENGTH_MIN = 7;
+/** Maximum rolled biome length in waves and the hard cap (#504). */
+const BIOME_LENGTH_MAX = 25;
 
-/** Inclusive [min, max] wave-count band per category (spec #486). */
-const BANDS: Record<LengthBand, readonly [number, number]> = {
-  short: [5, 10],
-  med: [10, 18],
-  long: [18, 30],
-};
-
-/** Breather / overworld biomes get the SHORT band. */
-const SHORT_BIOMES: ReadonlySet<BiomeId> = new Set([BiomeId.TOWN, BiomeId.PLAINS]);
-
-/** Delve / dungeon biomes get the LONG band. */
-const LONG_BIOMES: ReadonlySet<BiomeId> = new Set([
-  BiomeId.CAVE,
-  BiomeId.SEABED,
-  BiomeId.RUINS,
-  BiomeId.JUNGLE,
-  BiomeId.ICE_CAVE,
-  BiomeId.WASTELAND,
-  BiomeId.ABYSS,
-]);
+// --- Run-scoped state -------------------------------------------------------
 
 /**
  * How many waves before the run finale variable length switches off entirely.
@@ -61,26 +54,11 @@ const LONG_BIOMES: ReadonlySet<BiomeId> = new Set([
  */
 const LATE_GAME_MARGIN = 30;
 
-/** The largest length any band can roll (used for the worst-case finale clamp). */
-const MAX_BAND_LENGTH = BANDS.long[1];
+/** The largest length a biome can roll (used for the worst-case finale clamp). */
+const MAX_BAND_LENGTH = BIOME_LENGTH_MAX;
 
-function bandFor(biome: BiomeId): LengthBand {
-  if (SHORT_BIOMES.has(biome)) {
-    return "short";
-  }
-  if (LONG_BIOMES.has(biome)) {
-    return "long";
-  }
-  return "med";
-}
-
-/** Round to the nearest multiple of 5, clamped into [min, max] and never below 5. */
-function snapToFive(value: number, min: number, max: number): number {
-  const snapped = Math.round(value / 5) * 5;
-  return Math.max(5, Math.min(max, Math.max(min, snapped)));
-}
-
-// --- Run-scoped state -------------------------------------------------------
+/** First N in-biome waves run the GLOBAL curve untouched; past it = notoriety (#504). */
+const NOTORIETY_FREE_WAVES = 10;
 
 /** The rolled length (in waves) of the CURRENT biome instance, or null if vanilla. */
 let currentLength: number | null = null;
@@ -88,12 +66,15 @@ let currentLength: number | null = null;
 let currentStartWave = 1;
 /** Set by the Crossroads "Move on" choice: force the next wave to end the biome. */
 let leaveBiomeNow = false;
+/** #504: true once the one-time "gaining notoriety" warning fired this biome. */
+let notorietyWarningShown = false;
 
 /** Clear all structure state at run start (module state outlives a run). */
 export function resetErBiomeStructure(): void {
   currentLength = null;
   currentStartWave = 1;
   leaveBiomeNow = false;
+  notorietyWarningShown = false;
 }
 
 /** The classic mode final wave (isWaveFinal pins wave 200). */
@@ -115,12 +96,19 @@ export function erInLateGameZone(waveIndex: number): boolean {
 
 /**
  * Record a biome entry and roll its length. `startWave` is the wave the biome's
- * first battle sits on. If the biome's worst-case end (start + band-max - 1) would
- * reach the finale-safety zone, we DO NOT assign a rolled length - the biome falls
- * back to the vanilla %10 cadence so it can never straddle into the late game.
+ * first battle sits on. The length is a single rolled value in [BIOME_LENGTH_MIN,
+ * BIOME_LENGTH_MAX] with a mild bias toward the longer end (so most rolls clear 10
+ * and start to attract notoriety). The roll is the biome's HARD CAP. If the biome's
+ * worst-case end (start + max - 1) would reach the finale-safety zone, we DO NOT
+ * assign a rolled length - the biome falls back to the vanilla %10 cadence so it
+ * can never straddle into the late game.
+ *
+ * The `biome` arg is retained for API/signature stability (callers pass it) even
+ * though #504 dropped the per-biome bands - lengths are now uniform-ish per entry.
  */
-export function erRollBiomeLength(biome: BiomeId, startWave: number): void {
+export function erRollBiomeLength(_biome: BiomeId, startWave: number): void {
   leaveBiomeNow = false;
+  notorietyWarningShown = false;
   currentStartWave = startWave;
 
   // Finale safety: never roll a variable length once we're at/inside the late
@@ -130,9 +118,12 @@ export function erRollBiomeLength(biome: BiomeId, startWave: number): void {
     return;
   }
 
-  const [min, max] = BANDS[bandFor(biome)];
-  const raw = randSeedIntRange(min, max);
-  currentLength = snapToFive(raw, min, max);
+  // Mild bias toward the longer end: take the higher of two rolls so the median
+  // sits above 10 (most biomes will tip into notoriety territory) while short
+  // biomes (down to 7) still happen. No snap-to-5 - the cap is exact (#504).
+  const a = randSeedIntRange(BIOME_LENGTH_MIN, BIOME_LENGTH_MAX);
+  const b = randSeedIntRange(BIOME_LENGTH_MIN, BIOME_LENGTH_MAX);
+  currentLength = Math.max(a, b);
 }
 
 /** Restore a biome's rolled length + start wave from a loaded save (defensive). */
@@ -140,6 +131,23 @@ export function restoreErBiomeStructure(length: number | null | undefined, start
   currentLength = typeof length === "number" && length > 0 ? Math.floor(length) : null;
   currentStartWave = typeof startWave === "number" && startWave > 0 ? Math.floor(startWave) : 1;
   leaveBiomeNow = false;
+  // A reload mid-biome may already be past the warning point; suppress a
+  // duplicate pop by treating the warning as already shown when over the window.
+  notorietyWarningShown = false;
+}
+
+/**
+ * #504: claim the one-time notoriety warning for THIS biome. Returns true exactly
+ * once per biome instance (the first call after the warning is due), false after.
+ * Resets on every biome entry (erRollBiomeLength) so each over-stayed biome warns
+ * once. Pure aside from the latch; callers gate on erBiomeRoutingActive().
+ */
+export function erClaimNotorietyWarning(): boolean {
+  if (notorietyWarningShown) {
+    return false;
+  }
+  notorietyWarningShown = true;
+  return true;
 }
 
 /** The current biome's rolled length, or null if it is on the vanilla cadence. */

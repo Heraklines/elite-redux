@@ -30,22 +30,22 @@ describe("ER #486 - variable biome length / structure", () => {
     expect(erIsBiomeEnd(10)).toBeNull(); // null = fall back to vanilla %10
   });
 
-  it("rolls a length within the biome's band, snapped to a multiple of 5", () => {
-    erRollBiomeLength(BiomeId.PLAINS, 1); // SHORT band 5-10
+  it("rolls a length in the single [7, 25] range, re-rolled per entry (#504)", () => {
+    erRollBiomeLength(BiomeId.PLAINS, 1);
     const len = getErBiomeLength();
     expect(len).not.toBeNull();
-    expect(len! % 5).toBe(0);
-    expect(len!).toBeGreaterThanOrEqual(5);
-    expect(len!).toBeLessThanOrEqual(10);
+    expect(len!).toBeGreaterThanOrEqual(7);
+    expect(len!).toBeLessThanOrEqual(25);
     expect(getErBiomeStartWave()).toBe(1);
   });
 
-  it("LONG biomes roll into the long band (snapped to 5)", () => {
-    erRollBiomeLength(BiomeId.CAVE, 1); // LONG band 18-30 -> snaps to {20,25,30}
-    const len = getErBiomeLength()!;
-    expect(len % 5).toBe(0);
-    expect(len).toBeGreaterThanOrEqual(20);
-    expect(len).toBeLessThanOrEqual(30);
+  it("all biomes roll the same [7, 25] range (#504 dropped per-biome bands)", () => {
+    for (const biome of [BiomeId.PLAINS, BiomeId.CAVE, BiomeId.GRASS, BiomeId.TOWN]) {
+      erRollBiomeLength(biome, 1);
+      const len = getErBiomeLength()!;
+      expect(len).toBeGreaterThanOrEqual(7);
+      expect(len).toBeLessThanOrEqual(25);
+    }
   });
 
   it("computes waves spent in the biome", () => {
@@ -64,8 +64,8 @@ describe("ER #486 - variable biome length / structure", () => {
 
   it("Crossroads ticks every 5 waves spent, but not on the ending wave", () => {
     erRollBiomeLength(BiomeId.GRASS, 1);
-    // With a length that is a multiple of 5, the final wave is also a %5 tick;
-    // erShouldRaiseCrossroads must NOT offer "stay" there.
+    // erShouldRaiseCrossroads offers "stay" on each %5 tick strictly before the
+    // rolled length (the ending wave is never a crossroads).
     const len = getErBiomeLength()!;
     for (let w = 1; w < 1 + len - 1; w++) {
       const spent = w; // startWave 1 -> spent == waveIndex
@@ -93,14 +93,14 @@ describe("ER #486 - variable biome length / structure", () => {
   });
 
   it("does NOT roll a variable length for a biome that could straddle into the late zone", () => {
-    // A biome entered at 145 with a max-band length (30) would reach 174 (>=170):
-    // it must fall back to the vanilla cadence (null length).
-    erRollBiomeLength(BiomeId.CAVE, 145);
+    // A biome entered at 150 with a max length (25) would reach 174 (>=170): it
+    // must fall back to the vanilla cadence (null length).
+    erRollBiomeLength(BiomeId.CAVE, 150);
     expect(getErBiomeLength()).toBeNull();
   });
 
   it("a biome safely below the late zone still rolls a length", () => {
-    erRollBiomeLength(BiomeId.PLAINS, 100); // worst case 100+10-1 = 109 < 170
+    erRollBiomeLength(BiomeId.PLAINS, 100); // worst case 100+25-1 = 124 < 170
     expect(getErBiomeLength()).not.toBeNull();
   });
 

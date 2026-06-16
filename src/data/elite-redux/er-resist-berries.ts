@@ -24,6 +24,8 @@
 
 import { globalScene } from "#app/global-scene";
 import { erBalanceMap } from "#data/elite-redux/er-balance-tuning";
+import { erNotorietyItemRateMult } from "#data/elite-redux/er-biome-notoriety";
+import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { getTypeDamageMultiplier } from "#data/type";
 import { PokemonType } from "#enums/pokemon-type";
@@ -196,7 +198,12 @@ export function maybeAssignErResistBerry(enemy: EnemyPokemon): void {
     if (!globalScene.currentBattle?.trainer) {
       return; // trainer-only drops — wild mons never hold one
     }
-    const chance = erBalanceMap("er.items.resistBerryPct")[getErDifficulty()] ?? 0;
+    const baseChance = erBalanceMap("er.items.resistBerryPct")[getErDifficulty()] ?? 0;
+    // ER (#504): biome NOTORIETY scales the held-item drop rate up the longer the
+    // player over-stays a biome (additive, capped). Gated to the World Map run and
+    // LOCAL to the biome, so leaving resumes the normal rate exactly.
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
+    const chance = erBiomeRoutingActive() ? baseChance * erNotorietyItemRateMult(wave) : baseChance;
     if (chance <= 0 || enemy.randBattleSeedInt(100) >= chance) {
       return;
     }

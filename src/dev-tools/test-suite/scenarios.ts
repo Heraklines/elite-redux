@@ -4442,9 +4442,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
       "#486 World Map CORE (dev/staging only, classic non-daily). Three new pieces\n"
       + "to verify across a real run with this strong team:\n"
       + "1) VARIABLE BIOME LENGTH - biomes are no longer a fixed 10 waves. Each biome\n"
-      + "   rolls a length in its band (Town/Plains short 5-10, Cave/Seabed/Ruins/\n"
-      + "   Jungle/Ice Cave/Wasteland/Abyss long 18-30, everything else 10-18; all\n"
-      + "   snapped to a multiple of 5). Two runs of the same biome should differ.\n"
+      + "   rolls a length in [7, 25] waves (#504; biased long, most rolls clear 10),\n"
+      + "   re-rolled on every biome entry. The roll is a HARD cap. Two runs of the\n"
+      + "   same biome should differ.\n"
       + "2) CROSSROADS - every 5 waves spent in a biome (after the reward, not on the\n"
       + "   biome's final wave), a 'Stay / Move on' prompt appears. STAY keeps going;\n"
       + "   MOVE ON ends the biome now and opens the map picker.\n"
@@ -4464,6 +4464,49 @@ export const DEV_SCENARIOS: DevScenario[] = [
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 100,
         STARTING_BIOME_OVERRIDE: BiomeId.PLAINS,
+      });
+      return [
+        makeStarter(SpeciesId.MEWTWO, {
+          moveset: [MoveId.PSYSTRIKE, MoveId.ICE_BEAM, MoveId.AURA_SPHERE, MoveId.RECOVER],
+        }),
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.GHOLDENGO, {
+          moveset: [MoveId.MAKE_IT_RAIN, MoveId.SHADOW_BALL, MoveId.NASTY_PLOT, MoveId.RECOVER],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER #504: Biome Notoriety (overstay)",
+    description:
+      "#504 biome NOTORIETY / overstay escalation (dev/staging only, classic\n"
+      + "non-daily). This run STARTS deep inside a biome (wave 18 = 8 waves OVER the\n"
+      + "10-wave free window) so notoriety is ALREADY in effect on the opening\n"
+      + "battle. The first 10 in-biome waves run the GLOBAL curve unchanged; past 10\n"
+      + "the place turns hostile, escalating with each extra wave (LOCAL to this\n"
+      + "biome only).\n"
+      + "DO: fight on in this biome (choose the Stay verb at each Crossroads). Watch\n"
+      + "the next several waves.\n"
+      + "EXPECT: a one-time 'you are gaining notoriety' warning the first time you\n"
+      + "pass 10 waves in a biome (already shown if you keep staying here). Bosses\n"
+      + "and trainers come far more often (roughly every 2-3 waves, climbing toward\n"
+      + "EVERY wave by ~wave 20 in-biome). Enemy BST climbs above the normal cap (up\n"
+      + "to +100 by ~wave 20 in-biome, then holds), enemy LEVELS run over the normal\n"
+      + "cap, and enemies hold more resist berries / ward stones / held items. The\n"
+      + "biome still HARD-ENDS at its rolled cap (max 25 waves) even if you keep\n"
+      + "staying. CRITICAL: when you LEAVE this biome (Move on, or the cap ends it),\n"
+      + "notoriety RESETS - the very next biome drops back to the NORMAL global curve\n"
+      + "(no inflated BST/level/boss-rate carried over). If overstay inflation leaks\n"
+      + "into the next biome, that is the bug - press Send Logs.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("elite");
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 18,
+        STARTING_BIOME_OVERRIDE: BiomeId.CAVE,
       });
       return [
         makeStarter(SpeciesId.MEWTWO, {
