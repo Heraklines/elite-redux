@@ -19,6 +19,7 @@ import { addTreasureFragments, type ErMapNode, revealMapNodes } from "#data/elit
 import type { BiomeId } from "#enums/biome-id";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { SpeciesId } from "#enums/species-id";
 import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import {
   leaveEncounterWithoutBattle,
@@ -46,9 +47,8 @@ export const MessageInABottleEncounter: MysteryEncounter = MysteryEncounterBuild
   .withSceneWaveRangeRequirement(...CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES)
   .withAutoHideIntroVisuals(false)
   .withIntroSpriteConfigs([
-    // Placeholder art (reuses an already-served key). Swap to a dedicated bottle
-    // sprite once one is uploaded to er-assets.
-    { spriteKey: "mysterious_chest_blue", fileRoot: "mystery-encounters", hasShadow: false, x: 0, y: 6, yShadow: 6 },
+    // A seabird perched by the washed-up bottle (Wingull).
+    { species: SpeciesId.WINGULL, spriteKey: "", fileRoot: "", hasShadow: true, repeat: true, y: 5 },
   ])
   .withIntroDialogue([{ text: `${namespace}:intro` }])
   .setLocalizationKey(`${namespace}`)

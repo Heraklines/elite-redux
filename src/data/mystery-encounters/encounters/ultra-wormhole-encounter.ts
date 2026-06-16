@@ -15,6 +15,7 @@ import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { setRandomTravelTarget } from "#data/elite-redux/er-map-events";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { SpeciesId } from "#enums/species-id";
 import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import {
   leaveEncounterWithoutBattle,
@@ -32,7 +33,8 @@ export const UltraWormholeEncounter: MysteryEncounter = MysteryEncounterBuilder.
   .withSceneWaveRangeRequirement(...CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES)
   .withAutoHideIntroVisuals(false)
   .withIntroSpriteConfigs([
-    { spriteKey: "mysterious_chest_blue", fileRoot: "mystery-encounters", hasShadow: false, x: 0, y: 6, yShadow: 6 },
+    // A nebula-being that drifts through the rift (Cosmog, the Ultra Wormhole mon).
+    { species: SpeciesId.COSMOG, spriteKey: "", fileRoot: "", hasShadow: true, repeat: true, y: 5 },
   ])
   .withIntroDialogue([{ text: `${namespace}:intro` }])
   .setLocalizationKey(`${namespace}`)

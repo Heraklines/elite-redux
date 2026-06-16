@@ -260,7 +260,8 @@ export const TidePoolsEncounter: MysteryEncounter = MysteryEncounterBuilder.with
     // Reuses the already-served chest key (reads as a wave-washed cache among the
     // rocks). Swap to a dedicated tide-pool sprite once one is uploaded to
     // er-assets (images/mystery-encounters/<key>.png + .json).
-    { spriteKey: "mysterious_chest_blue", fileRoot: "mystery-encounters", hasShadow: false, x: 0, y: 6, yShadow: 6 },
+    // A reef-dweller stranded in the low-tide pools (Corsola).
+    { species: SpeciesId.CORSOLA, spriteKey: "", fileRoot: "", hasShadow: true, repeat: true, y: 5 },
   ])
   .withIntroDialogue([{ text: `${namespace}:intro` }])
   .withOnInit(() => {

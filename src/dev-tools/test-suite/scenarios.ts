@@ -3669,6 +3669,28 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Event intro sprites (#490)",
+    description:
+      "#490 - ER mystery events no longer all reuse the blue chest sprite for\n"
+      + "their intro art. Each now shows a thematic Pokemon: e.g. Fairy's Boon =\n"
+      + "Clefable, Still Waters = Milotic, Glittering Vein = Carbink, Abyssal\n"
+      + "Vent = Lanturn, Overgrown Temple = Cradily, Tide Pools = Corsola, Lake\n"
+      + "Spirit = Uxie, Observatory = Lunatone, Echo Chamber = Noibat, Informant\n"
+      + "= Nickit, The Storm = Pelipper, Ultra Wormhole = Cosmog, Sunken Vessel\n"
+      + "= Dhelmise, X Marks the Spot = Gimmighoul, Aurora = Cryogonal, etc.\n"
+      + "CHECK: trigger these ER events (delve/map/blessing events) - the intro\n"
+      + "should be the themed mon, not the generic chest. (The Exotic Trader and\n"
+      + "Black Market keep theirs until their shop rework lands.)",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Unown egg hatch (#442)",
     description:
       "#442 - Unown REVELATION (the battle-only school form) no longer\n"

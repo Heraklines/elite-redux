@@ -79,7 +79,8 @@ export const OverchargeCoreEncounter: MysteryEncounter = MysteryEncounterBuilder
   .withSceneWaveRangeRequirement(...CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES)
   .withAutoHideIntroVisuals(false)
   .withIntroSpriteConfigs([
-    { spriteKey: "mysterious_chest_blue", fileRoot: "mystery-encounters", hasShadow: false, x: 0, y: 6, yShadow: 6 },
+    // The plant's possessed Electric guardian surging from the core (Rotom).
+    { species: SpeciesId.ROTOM, spriteKey: "", fileRoot: "", hasShadow: true, repeat: true, y: 5 },
   ])
   .withIntroDialogue([{ text: `${namespace}:intro` }])
   .setLocalizationKey(`${namespace}`)

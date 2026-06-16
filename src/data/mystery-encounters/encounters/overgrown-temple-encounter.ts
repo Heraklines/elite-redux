@@ -54,7 +54,7 @@ import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { PokemonType } from "#enums/pokemon-type";
-import type { SpeciesId } from "#enums/species-id";
+import { SpeciesId } from "#enums/species-id";
 import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
@@ -275,7 +275,8 @@ export const OvergrownTempleEncounter: MysteryEncounter = MysteryEncounterBuilde
     // Reuses the already-served chest key from Mysterious Chest (reads as a tribute
     // cache in the temple). Swap to a dedicated ruin/idol sprite once one is
     // uploaded to er-assets (images/mystery-encounters/<key>.png + .json).
-    { spriteKey: "mysterious_chest_blue", fileRoot: "mystery-encounters", hasShadow: false, x: 0, y: 6, yShadow: 6 },
+    // An ancient living-fossil sentinel of the ruin (Cradily).
+    { species: SpeciesId.CRADILY, spriteKey: "", fileRoot: "", hasShadow: true, repeat: true, y: 5 },
   ])
   .withIntroDialogue([{ text: `${namespace}:intro` }])
   .withOnInit(() => {

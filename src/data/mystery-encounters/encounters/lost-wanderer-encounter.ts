@@ -17,6 +17,7 @@ import { chartOnwardRoutes } from "#data/elite-redux/er-map-events";
 import { addTreasureFragments } from "#data/elite-redux/er-map-nodes";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { SpeciesId } from "#enums/species-id";
 import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import {
   leaveEncounterWithoutBattle,
@@ -34,7 +35,8 @@ export const LostWandererEncounter: MysteryEncounter = MysteryEncounterBuilder.w
   .withSceneWaveRangeRequirement(...CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES)
   .withAutoHideIntroVisuals(false)
   .withIntroSpriteConfigs([
-    { spriteKey: "mysterious_chest_blue", fileRoot: "mystery-encounters", hasShadow: false, x: 0, y: 6, yShadow: 6 },
+    // A roaming plains forager keeping the wanderer company (Zigzagoon).
+    { species: SpeciesId.ZIGZAGOON, spriteKey: "", fileRoot: "", hasShadow: true, repeat: true, y: 5 },
   ])
   .withIntroDialogue([{ text: `${namespace}:intro` }])
   .setLocalizationKey(`${namespace}`)

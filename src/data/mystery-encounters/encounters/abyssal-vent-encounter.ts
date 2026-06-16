@@ -49,6 +49,7 @@ import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { PokemonType } from "#enums/pokemon-type";
+import { SpeciesId } from "#enums/species-id";
 import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
@@ -252,7 +253,8 @@ export const AbyssalVentEncounter: MysteryEncounter = MysteryEncounterBuilder.wi
     // Reuses the already-served chest key (reads as a mineral-encrusted cache on
     // the trench floor). Swap to a dedicated vent sprite once one is uploaded to
     // er-assets (images/mystery-encounters/<key>.png + .json).
-    { spriteKey: "mysterious_chest_blue", fileRoot: "mystery-encounters", hasShadow: false, x: 0, y: 6, yShadow: 6 },
+    // An anglerfish lighting the trench dark (Lanturn).
+    { species: SpeciesId.LANTURN, spriteKey: "", fileRoot: "", hasShadow: true, repeat: true, y: 5 },
   ])
   .withIntroDialogue([{ text: `${namespace}:intro` }])
   .withOnInit(() => {

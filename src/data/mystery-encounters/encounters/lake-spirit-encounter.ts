@@ -21,6 +21,7 @@ import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { SpeciesId } from "#enums/species-id";
 import {
   leaveEncounterWithoutBattle,
   setEncounterRewards,
@@ -90,7 +91,8 @@ export const LakeSpiritEncounter: MysteryEncounter = MysteryEncounterBuilder.wit
   .withIntroSpriteConfigs([
     // Placeholder art (reuses an already-served key). Swap to a dedicated lake
     // spirit sprite once one is uploaded to er-assets.
-    { spriteKey: "mysterious_chest_blue", fileRoot: "mystery-encounters", hasShadow: false, x: 0, y: 6, yShadow: 6 },
+    // The Being of Knowledge rising from the lake to test you (Uxie).
+    { species: SpeciesId.UXIE, spriteKey: "", fileRoot: "", hasShadow: true, repeat: true, y: 5 },
   ])
   .withIntroDialogue([{ text: `${namespace}:intro` }])
   .setLocalizationKey(`${namespace}`)

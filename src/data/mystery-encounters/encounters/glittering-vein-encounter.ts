@@ -55,6 +55,7 @@ import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { PokemonType } from "#enums/pokemon-type";
+import { SpeciesId } from "#enums/species-id";
 import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
@@ -268,7 +269,8 @@ export const GlitteringVeinEncounter: MysteryEncounter = MysteryEncounterBuilder
     // Reuses the already-served chest key from Mysterious Chest (reads as a buried
     // treasure cache in the cave wall). Swap to a dedicated vein/ore sprite once one
     // is uploaded to er-assets (images/mystery-encounters/<key>.png + .json).
-    { spriteKey: "mysterious_chest_blue", fileRoot: "mystery-encounters", hasShadow: false, x: 0, y: 6, yShadow: 6 },
+    // A living gemstone embedded in the seam (Carbink).
+    { species: SpeciesId.CARBINK, spriteKey: "", fileRoot: "", hasShadow: true, repeat: true, y: 5 },
   ])
   .withIntroDialogue([{ text: `${namespace}:intro` }])
   .withOnInit(() => {
