@@ -2,7 +2,7 @@ import { consumePendingDevStarters } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { Phase } from "#app/phase";
-import { allMoves } from "#data/data-lists";
+import { allMoves, modifierTypes } from "#data/data-lists";
 import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
 import { PokemonMove } from "#moves/pokemon-move";
 
@@ -166,6 +166,11 @@ export class SelectStarterPhase extends Phase {
         globalScene.gameData.gameStats.endlessSessionsPlayed++;
       }
       globalScene.newBattle();
+      // ER #439: the biome Map is a DEFAULT item on every run, all difficulties -
+      // players can always choose their next biome from the start (daily runs
+      // already grant it in TitlePhase; this covers classic/endless/challenge +
+      // the ER difficulty modes + dev scenarios, which all route through here).
+      globalScene.addModifier(modifierTypes.MAP().withIdFromFunc(modifierTypes.MAP).newModifier(), true);
       globalScene.arena.init();
       globalScene.sessionPlayTime = 0;
       globalScene.lastSavePlayTime = 0;
