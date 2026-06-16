@@ -1018,11 +1018,15 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "ER Overcharge the Core (#439)",
     description:
-      "#439 Power Plant boss TRIAL. Forces ER_OVERCHARGE_CORE in the POWER_PLANT biome.\n"
-      + "DO: 'Face the guardian' or 'Pull the breaker'.\n"
-      + "EXPECT: Face = a BOSS battle vs an overcharged Electric guardian (Electrode /\n"
-      + "Magnezone / Rotom), 2-3 bars and >= 5 levels above your strongest mon. WIN for 2\n"
-      + "Rogue picks + a Relic. Pull the breaker = nothing, no cost.",
+      "#439 Power Plant PERMANENT STAT SURGE (reworked from the old boss fight).\n"
+      + "Forces ER_OVERCHARGE_CORE in POWER_PLANT.\n"
+      + "DO: 'Channel the core' -> pick a Pokemon. A press-your-luck loop opens: each\n"
+      + "'Surge again' permanently raises that mon's Sp. Atk OR Speed (a vitamin, fixed\n"
+      + "stat for the session); 'Stabilize' to keep them.\n"
+      + "EXPECT: each surge bumps the stat for good (check Summary stats climb); pushing\n"
+      + "raises the short-circuit chance - on a short-circuit the WHOLE session's surges\n"
+      + "vanish and the mon is chipped (HP drops, never below 1). 'Pull the breaker' =\n"
+      + "nothing, no cost. NO boss battle should appear.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
