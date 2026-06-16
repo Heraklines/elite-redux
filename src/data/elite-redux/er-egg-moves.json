@@ -114,10 +114,10 @@
     "JUDGMENT"
   ],
   "SPECIES_ARCHEN": [
-    "ROOST",
-    "EARTHQUAKE",
-    "FLOATY_FALL",
-    "MIGHTY_CLEAVE"
+    "WOOD_HAMMER",
+    "SEISMIC_SLAM",
+    "HEAD_CHARGE",
+    "VOLT_TACKLE"
   ],
   "SPECIES_ARCTOVISH": [
     "ICE_FANG",
@@ -164,7 +164,7 @@
   "SPECIES_AUDINO": [
     "TAKE_HEART",
     "MOONBLAST",
-    "WISH",
+    "BATON_PASS",
     "MATCHA_GOTCHA"
   ],
   "SPECIES_AXEW": [
@@ -211,7 +211,7 @@
   ],
   "SPECIES_BASCULIN": [
     "LAST_RESPECTS",
-    "CLOSE_COMBAT",
+    "SUBMISSION",
     "SPLISHY_SPLASH",
     "NO_RETREAT"
   ],
@@ -537,7 +537,7 @@
     "QUIVER_DANCE",
     "MATCHA_GOTCHA",
     "SOIL_DRAIN",
-    "SPRINGTIDE_STORM"
+    "DAZZLING_GLEAM"
   ],
   "SPECIES_CELESTEELA": [
     "RECOVER",
@@ -1062,10 +1062,10 @@
     "OBLIVION_WING"
   ],
   "SPECIES_DRILBUR": [
-    "METEOR_MASH",
-    "ICE_SPINNER",
+    "HORN_DRILL",
+    "ICICLE_IMPALE",
     "SHIFT_GEAR",
-    "THOUSAND_ARROWS"
+    "DRILL_RUN"
   ],
   "SPECIES_DRILBUR_REDUX": [
     "SWORDS_DANCE",
@@ -1117,7 +1117,7 @@
   ],
   "SPECIES_DWEBBLE": [
     "CRABHAMMER",
-    "STONE_AXE",
+    "ICE_HAMMER",
     "LEECH_LIFE",
     "MIGHTY_CLEAVE"
   ],
@@ -2233,7 +2233,7 @@
   ],
   "SPECIES_LILLIPUP": [
     "CLOSE_COMBAT",
-    "BODY_SLAM",
+    "SWORDS_DANCE",
     "HIGH_HORSEPOWER",
     "LAST_RESPECTS"
   ],
@@ -2790,8 +2790,8 @@
     "SHORE_UP"
   ],
   "SPECIES_OSHAWOTT": [
-    "FREEZE_DRY",
-    "SHELL_SIDE_ARM",
+    "FROST_BRAND",
+    "CROSS_POISON",
     "SACRED_SWORD",
     "SHELL_SMASH"
   ],
@@ -2832,10 +2832,10 @@
     "WICKED_BLOW"
   ],
   "SPECIES_PANPOUR": [
-    "NASTY_PLOT",
+    "WATER_SPOUT",
     "ENERGY_BALL",
     "EARTH_POWER",
-    "WATER_SPOUT"
+    "QUIVER_DANCE"
   ],
   "SPECIES_PANPOUR_REDUX": [
     "AURA_SPHERE",
@@ -2857,9 +2857,9 @@
   ],
   "SPECIES_PANSEAR": [
     "NASTY_PLOT",
-    "HYDRO_STEAM",
+    "WILL_O_WISP",
     "EARTH_POWER",
-    "ERUPTION"
+    "HYDRO_STEAM"
   ],
   "SPECIES_PANSEAR_REDUX": [
     "SWORDS_DANCE",
@@ -2880,10 +2880,10 @@
     "VICTORY_DANCE"
   ],
   "SPECIES_PATRAT": [
-    "FAKE_OUT",
-    "INSTRUCT",
-    "DYNAMIC_PUNCH",
-    "EXTREME_SPEED"
+    "STORM_THROW",
+    "SLASH",
+    "FROST_BREATH",
+    "INSTRUCT"
   ],
   "SPECIES_PAWMI": [
     "DRAIN_PUNCH",
@@ -2958,7 +2958,7 @@
     "BOOMBURST"
   ],
   "SPECIES_PIDOVE": [
-    "SLASH",
+    "DRILL_RUN",
     "TIDY_UP",
     "FLOATY_FALL",
     "TRIPLE_ARROWS"
@@ -3162,7 +3162,7 @@
     "SAPPY_SEED"
   ],
   "SPECIES_PURRLOIN": [
-    "ENCORE",
+    "DIRE_CLAW",
     "OBSTRUCT",
     "PARTING_SHOT",
     "WICKED_BLOW"
@@ -3408,10 +3408,10 @@
     "ERUPTION"
   ],
   "SPECIES_SANDILE": [
-    "DIRE_CLAW",
+    "POISON_FANG",
     "SUCKER_PUNCH",
-    "FIRE_LASH",
-    "HEADLONG_RUSH"
+    "FIRE_FANG",
+    "TECTONIC_FANGS"
   ],
   "SPECIES_SANDSHREW": [
     "HIGH_HORSEPOWER",
@@ -3432,9 +3432,9 @@
     "SALT_CURE"
   ],
   "SPECIES_SAWK": [
-    "DRAIN_PUNCH",
+    "POWER_UP_PUNCH",
     "SUCKER_PUNCH",
-    "METEOR_MASH",
+    "ICE_PUNCH",
     "VICTORY_DANCE"
   ],
   "SPECIES_SAWK_REDUX": [
@@ -3595,7 +3595,7 @@
   ],
   "SPECIES_SIGILYPH": [
     "MOONBLAST",
-    "PSYCHO_SHIFT",
+    "NASTY_PLOT",
     "ESPER_WING",
     "OBLIVION_WING"
   ],
@@ -3734,7 +3734,7 @@
   "SPECIES_SNIVY": [
     "BURNING_JEALOUSY",
     "LEECH_LIFE",
-    "SUPERPOWER",
+    "SPIN_OUT",
     "DRACO_METEOR"
   ],
   "SPECIES_SNOM": [
@@ -4111,7 +4111,7 @@
   ],
   "SPECIES_TIMBURR": [
     "MACH_PUNCH",
-    "DRAIN_PUNCH",
+    "DARKEST_LARIAT",
     "ICE_HAMMER",
     "DOUBLE_IRON_BASH"
   ],
@@ -4226,7 +4226,7 @@
   "SPECIES_TRUBBISH": [
     "COIL",
     "RECOVER",
-    "DIRE_CLAW",
+    "VENOM_DRENCH",
     "GIGATON_HAMMER"
   ],
   "SPECIES_TURTONATOR": [
@@ -4248,7 +4248,7 @@
     "KNOCK_OFF"
   ],
   "SPECIES_TYMPOLE": [
-    "JET_PUNCH",
+    "HYPER_VOICE",
     "HIGH_HORSEPOWER",
     "BULK_UP",
     "SURGING_STRIKES"
@@ -4334,7 +4334,7 @@
   "SPECIES_VENIPEDE": [
     "BANEFUL_BUNKER",
     "LEECH_LIFE",
-    "NOXIOUS_TORQUE",
+    "SWORDS_DANCE",
     "POWER_TRIP"
   ],
   "SPECIES_VENONAT": [
@@ -4344,9 +4344,9 @@
     "STORED_POWER"
   ],
   "SPECIES_VICTINI": [
-    "BLUE_FLARE",
-    "BOLT_STRIKE",
-    "LUSTER_PURGE",
+    "ARMOR_CANNON",
+    "VOLT_TACKLE",
+    "BLUE_MOON",
     "VICTORY_DANCE"
   ],
   "SPECIES_VIRIZION": [
@@ -4488,8 +4488,8 @@
     "STRENGTH_SAP"
   ],
   "SPECIES_WOOBAT": [
-    "ESPER_WING",
-    "STORED_POWER",
+    "ECHOED_VOICE",
+    "CALM_MIND",
     "MYSTICAL_FIRE",
     "OBLIVION_WING"
   ],
@@ -4545,7 +4545,7 @@
     "STRENGTH_SAP",
     "GLARE",
     "AURA_SPHERE",
-    "ASTRAL_BARRAGE"
+    "INFERNAL_PARADE"
   ],
   "SPECIES_YAMPER": [
     "ICE_FANG",
