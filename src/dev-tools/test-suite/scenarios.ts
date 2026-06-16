@@ -807,20 +807,21 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "ER Totem Trial (#439)",
+    label: "ER Totem Trial (#503)",
     description:
-      "#439 Temple guardian-boss TRIAL. Forces ER_TOTEM_TRIAL in the TEMPLE biome.\n"
-      + "DO: 'Face the totem' or 'Leave it at rest'.\n"
-      + "EXPECT: Face = a BOSS battle vs a multi-bar guardian (Golurk / Regirock /\n"
-      + "Runerigus), 2-3 health bars and >= 5 levels above your strongest mon. WIN and\n"
-      + "the reward fires: 2 guaranteed ROGUE picks + a blessing Relic. Leave = nothing,\n"
-      + "no cost. A wipe ends the run (never softlocks).",
+      "#503 ISLAND Trial (moved off Temple). Forces ER_TOTEM_TRIAL in the ISLAND\n"
+      + "biome. DO: 'Face the totem' or 'Leave it at rest'.\n"
+      + "EXPECT: Face = a DOUBLE battle - a multi-bar totem boss (Golurk / Regirock /\n"
+      + "Runerigus) that SUMMONS an ally (Sableye / Bronzong / Carbink), the totem\n"
+      + ">= 5 levels above your strongest mon. WIN and the reward fires: a guaranteed\n"
+      + "POWER GEM (its TM) + one ROGUE pick (no relic - that was Temple's Innate\n"
+      + "Shrine). Leave = nothing, no cost. A wipe ends the run (never softlocks).",
     setup: () => {
       resetDevOverrides();
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 60,
         STARTING_WAVE_OVERRIDE: 12,
-        STARTING_BIOME_OVERRIDE: BiomeId.TEMPLE,
+        STARTING_BIOME_OVERRIDE: BiomeId.ISLAND,
         MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
         MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_TOTEM_TRIAL,
       });

@@ -307,10 +307,11 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.CONSTRUCTION_SITE, [MysteryEncounterType.ER_FOREMANS_JOB]],
   [BiomeId.JUNGLE, [MysteryEncounterType.SAFARI_ZONE, MysteryEncounterType.ER_OVERGROWN_TEMPLE]],
   [BiomeId.FAIRY_CAVE, [MysteryEncounterType.ER_FAIRYS_BOON]],
-  [BiomeId.TEMPLE, [MysteryEncounterType.ER_TOTEM_TRIAL]],
+  // #503: the Totem Trial belongs to ISLAND (transcript line 124231), not Temple.
+  // Temple's signature is the Innate Shrine (not yet built); leave it without an ER ME.
   [BiomeId.SLUM, [MysteryEncounterType.ER_BLACK_MARKET, MysteryEncounterType.ER_INFORMANT]],
   [BiomeId.SNOWY_FOREST, [MysteryEncounterType.ER_AURORA, MysteryEncounterType.ER_TRACKS_IN_THE_SNOW]],
-  [BiomeId.ISLAND, [MysteryEncounterType.ER_IMPORT_BAZAAR]],
+  [BiomeId.ISLAND, [MysteryEncounterType.ER_IMPORT_BAZAAR, MysteryEncounterType.ER_TOTEM_TRIAL]],
   [BiomeId.LABORATORY, [MysteryEncounterType.ER_EXPERIMENT]],
 ]);
 
