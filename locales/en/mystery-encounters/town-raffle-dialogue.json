@@ -1,0 +1,23 @@
+{
+  "intro": "A festive raffle stand stands at the edge of the square, its drum of tickets spinning lazily. A hand-painted board lists the prizes, with one rare relic crowning the top.",
+  "speaker": "Raffle Host",
+  "introDialogue": "Care to try your luck? One ticket, one draw, and everyone walks away with something!$The grand prize is a genuine Formation Relic, but even the smallest ticket pays out. What do you say?",
+  "title": "Town Raffle",
+  "description": "A town raffle. Pay a small entry fee and draw a single ticket. Every ticket pays out something, from a couple of Poke Balls up to a Great or Ultra tier item, and a lucky few draw the grand prize: a rare Formation Relic. Or you can decline and keep your money.",
+  "query": "Will you buy a ticket?",
+  "option": {
+    "1": {
+      "label": "Buy a ticket (pay the fee)",
+      "tooltip": "(-) A small fee\n(+) Always wins something, with a small chance at a Formation Relic",
+      "selected": "You hand over the fee and draw a ticket from the spinning drum..."
+    },
+    "2": {
+      "label": "Decline",
+      "tooltip": "(-) No prize",
+      "selected": "You wave the host off and move along."
+    }
+  },
+  "jackpot": "A bell rings out and the host throws up their hands! You have drawn the grand prize, a genuine Formation Relic!",
+  "midPrize": "The host checks your ticket and nods, impressed. A fine prize is yours to pick!",
+  "consolation": "Not the big one, but the host smiles and hands you a small consolation prize. Everyone wins something here!"
+}

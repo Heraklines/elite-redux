@@ -1,0 +1,20 @@
+{
+  "intro": "A perfect ring of pale mushrooms grows in the grass, each cap faintly luminous. The old stories say a fairy circle either blesses those who taste it or plays a little trick on them.",
+  "title": "The Mushroom Circle",
+  "description": "A ring of glowing mushrooms in the meadow. Tasting one is a gamble, an even chance at a sweet windfall for your team or a small mischievous trick. Or you can simply step around the ring and leave it be.",
+  "query": "Will you taste a mushroom?",
+  "option": {
+    "1": {
+      "label": "Taste a mushroom",
+      "tooltip": "(?) An even chance: a boon for your team, or a minor trick",
+      "selected": "You pick the ripest cap from the ring and take a bite..."
+    },
+    "2": {
+      "label": "Leave the ring be",
+      "tooltip": "(-) Nothing ventured, nothing gained",
+      "selected": "You step around the ring and walk on."
+    }
+  },
+  "windfallCandy": "A warm, sweet rush spreads through you and your whole team! Everyone feels a little stronger. (+{{candyAmount}} Candy each)",
+  "curseMoney": "The cap turns bitter on your tongue. A prankish little spirit cackles and lifts {{moneyLost}} from your bag before vanishing into the grass!"
+}

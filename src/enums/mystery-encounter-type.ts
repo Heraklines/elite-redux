@@ -42,6 +42,15 @@ export enum MysteryEncounterType {
   /** ER #439: Woodland Forager - a Forest press-your-luck forage loop; bank the
    * haul or push for more, risking a territorial Bug-swarm interrupt fight. */
   ER_WOODLAND_FORAGER,
+  /** ER #439: Glittering Vein - a Cave press-your-luck mining loop; bank the haul
+   * or keep digging for more, risking a cave-in / Rock-Ground ambush fight. */
+  ER_GLITTERING_VEIN,
+  /** ER #439: The Mushroom Circle - a Grass one-shot gamble; taste a fairy-ring
+   * mushroom for a candy windfall or a curse-lite money nip. */
+  ER_MUSHROOM_CIRCLE,
+  /** ER #439: Town Raffle - a Town relic gamble; pay a fee and draw a ticket for a
+   * tiered prize, with a small chance at a rare Formation Relic. */
+  ER_TOWN_RAFFLE,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

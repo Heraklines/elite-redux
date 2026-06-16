@@ -547,6 +547,83 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Glittering Vein (#439)",
+    description:
+      "#439 Cave press-your-luck MINING (reuses the press-luck substrate). Forces\n"
+      + "ER_GLITTERING_VEIN in the CAVE biome.\n"
+      + "DO: 'Work the vein', then keep digging or pack up. Each round pays ore/gem\n"
+      + "money; deep digs can hit a Rogue / evolution-stone jackpot. BUST chance climbs.\n"
+      + "EXPECT: bank = money (+ jackpot shop if deep). A bust scatters HALF the money\n"
+      + "and spawns a level-scaled wild Rock/Ground mon (Onix/Graveler/Rhydon/Gigalith);\n"
+      + "win keeps the rest + jackpot. Round-0 leave = nothing. Never softlocks.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 45,
+        STARTING_BIOME_OVERRIDE: BiomeId.CAVE,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_GLITTERING_VEIN,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.WATERFALL, MoveId.DRAGON_CLAW, MoveId.IRON_HEAD],
+        }),
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER Mushroom Circle (#439)",
+    description:
+      "#439 Grass one-shot GAMBLE. Forces ER_MUSHROOM_CIRCLE in the GRASS biome.\n"
+      + "DO: 'Taste a mushroom' (a single 50/50 roll, no loop, no battle) or 'Leave the\n"
+      + "ring be' for nothing.\n"
+      + "EXPECT: WINDFALL = +3 Candy to each party member's species (check candy on the\n"
+      + "starter screen) with a notification; or CURSE-LITE = a small money nip. Leave\n"
+      + "= no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_MONEY_OVERRIDE: 20000,
+        STARTING_BIOME_OVERRIDE: BiomeId.GRASS,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_MUSHROOM_CIRCLE,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE] }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "ER Town Raffle (#439)",
+    description:
+      "#439 Town RELIC gamble. Forces ER_TOWN_RAFFLE in the TOWN biome (you start\n"
+      + "with money for the fee).\n"
+      + "DO: 'Buy a ticket' (a small fee, Super-Potion sized) for a seeded draw, or\n"
+      + "'Decline' for no cost.\n"
+      + "EXPECT: a tiered reward shop - JACKPOT (~10%) = a Formation relic (Quartermaster\n"
+      + "/ Lookout / Anchor / Twin Link); MID = pick 1 of 3 Great/Ultra; CONSOLATION = 2\n"
+      + "Poke Balls. Always pays something. Buy repeatedly to see the jackpot.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_MONEY_OVERRIDE: 50000,
+        STARTING_BIOME_OVERRIDE: BiomeId.TOWN,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_TOWN_RAFFLE,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE] }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
     label: "World Tournament - ACE (vanilla) (#439)",
     description:
       "#439 Colosseum - dynamic 15-round press-your-luck gauntlet, ACE mode.\n"

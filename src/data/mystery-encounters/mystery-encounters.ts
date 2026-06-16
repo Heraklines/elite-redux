@@ -15,9 +15,11 @@ import { FieldTripEncounter } from "#mystery-encounters/field-trip-encounter";
 import { FieryFalloutEncounter } from "#mystery-encounters/fiery-fallout-encounter";
 import { FightOrFlightEncounter } from "#mystery-encounters/fight-or-flight-encounter";
 import { FunAndGamesEncounter } from "#mystery-encounters/fun-and-games-encounter";
+import { GlitteringVeinEncounter } from "#mystery-encounters/glittering-vein-encounter";
 import { GlobalTradeSystemEncounter } from "#mystery-encounters/global-trade-system-encounter";
 import { GravesOfTheFallenEncounter } from "#mystery-encounters/graves-of-the-fallen-encounter";
 import { LostAtSeaEncounter } from "#mystery-encounters/lost-at-sea-encounter";
+import { MushroomCircleEncounter } from "#mystery-encounters/mushroom-circle-encounter";
 import { MysteriousChallengersEncounter } from "#mystery-encounters/mysterious-challengers-encounter";
 import { MysteriousChestEncounter } from "#mystery-encounters/mysterious-chest-encounter";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
@@ -32,6 +34,7 @@ import { ThePokemonSalesmanEncounter } from "#mystery-encounters/the-pokemon-sal
 import { TheStrongStuffEncounter } from "#mystery-encounters/the-strong-stuff-encounter";
 import { TheWinstrateChallengeEncounter } from "#mystery-encounters/the-winstrate-challenge-encounter";
 import { TownGuessingBoothEncounter } from "#mystery-encounters/town-guessing-booth-encounter";
+import { TownRaffleEncounter } from "#mystery-encounters/town-raffle-encounter";
 import { TrainingSessionEncounter } from "#mystery-encounters/training-session-encounter";
 import { TrashToTreasureEncounter } from "#mystery-encounters/trash-to-treasure-encounter";
 import { UncommonBreedEncounter } from "#mystery-encounters/uncommon-breed-encounter";
@@ -196,9 +199,23 @@ const anyBiomeEncounters: MysteryEncounterType[] = [
  * that biome groups do not cover
  */
 export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>([
-  [BiomeId.TOWN, [MysteryEncounterType.ER_GUESSING_BOOTH, MysteryEncounterType.ER_SCRAMBLED_POKEDEX]],
+  [
+    BiomeId.TOWN,
+    [
+      MysteryEncounterType.ER_GUESSING_BOOTH,
+      MysteryEncounterType.ER_SCRAMBLED_POKEDEX,
+      MysteryEncounterType.ER_TOWN_RAFFLE,
+    ],
+  ],
   [BiomeId.PLAINS, [MysteryEncounterType.SLUMBERING_SNORLAX]],
-  [BiomeId.GRASS, [MysteryEncounterType.SLUMBERING_SNORLAX, MysteryEncounterType.ABSOLUTE_AVARICE]],
+  [
+    BiomeId.GRASS,
+    [
+      MysteryEncounterType.SLUMBERING_SNORLAX,
+      MysteryEncounterType.ABSOLUTE_AVARICE,
+      MysteryEncounterType.ER_MUSHROOM_CIRCLE,
+    ],
+  ],
   [BiomeId.TALL_GRASS, [MysteryEncounterType.SLUMBERING_SNORLAX, MysteryEncounterType.ABSOLUTE_AVARICE]],
   [BiomeId.METROPOLIS, [MysteryEncounterType.COLOSSEUM]],
   [
@@ -212,7 +229,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.SEABED, []],
   [BiomeId.MOUNTAIN, []],
   [BiomeId.BADLANDS, [MysteryEncounterType.DANCING_LESSONS]],
-  [BiomeId.CAVE, [MysteryEncounterType.THE_STRONG_STUFF]],
+  [BiomeId.CAVE, [MysteryEncounterType.THE_STRONG_STUFF, MysteryEncounterType.ER_GLITTERING_VEIN]],
   [BiomeId.DESERT, [MysteryEncounterType.DANCING_LESSONS]],
   [BiomeId.ICE_CAVE, []],
   [BiomeId.MEADOW, []],
@@ -272,6 +289,9 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_SCRAMBLED_POKEDEX] = ScrambledPokedexEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_GRAVES_OF_THE_FALLEN] = GravesOfTheFallenEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_WOODLAND_FORAGER] = WoodlandForagerEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_GLITTERING_VEIN] = GlitteringVeinEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_MUSHROOM_CIRCLE] = MushroomCircleEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_TOWN_RAFFLE] = TownRaffleEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {
