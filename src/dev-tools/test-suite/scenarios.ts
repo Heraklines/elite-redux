@@ -791,6 +791,84 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Totem Trial (#439)",
+    description:
+      "#439 Temple guardian-boss TRIAL. Forces ER_TOTEM_TRIAL in the TEMPLE biome.\n"
+      + "DO: 'Face the totem' or 'Leave it at rest'.\n"
+      + "EXPECT: Face = a BOSS battle vs a multi-bar guardian (Golurk / Regirock /\n"
+      + "Runerigus), 2-3 health bars and >= 5 levels above your strongest mon. WIN and\n"
+      + "the reward fires: 2 guaranteed ROGUE picks + a blessing Relic. Leave = nothing,\n"
+      + "no cost. A wipe ends the run (never softlocks).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.TEMPLE,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_TOTEM_TRIAL,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.STONE_EDGE, MoveId.DRAGON_CLAW, MoveId.IRON_HEAD],
+        }),
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER Black Market (#439)",
+    description:
+      "#439 Slum bargain MARKET. Forces ER_BLACK_MARKET in the SLUM biome.\n"
+      + "DO: 'Browse the stalls' or 'Walk away'.\n"
+      + "EXPECT: Browse opens a no-battle reward of 3 mixed-tier picks (2 Great + 1\n"
+      + "Ultra). Walk away = nothing, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.SLUM,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_BLACK_MARKET,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.YAWN] }),
+        makeStarter(SpeciesId.PIDGEY, {
+          moveset: [MoveId.TACKLE, MoveId.GUST, MoveId.QUICK_ATTACK, MoveId.SAND_ATTACK],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER Lake Spirit (#439)",
+    description:
+      "#439 Lake knowledge TRIAL (reuses the ErQuiz dex engine). Forces ER_LAKE_SPIRIT\n"
+      + "in the LAKE biome.\n"
+      + "DO: 'Take the test' (3 Pokedex riddles) or 'Decline'.\n"
+      + "EXPECT: the blessing scales with correct answers - 3/3 = +5 Candy each + a\n"
+      + "blessing Relic + 2 Ultra picks; 2 = 3 Ultra picks; 1 = 3 Great picks; 0 = leave\n"
+      + "with a heal. Decline = nothing, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.LAKE,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_LAKE_SPIRIT,
+      });
+      return [
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.YAWN] }),
+      ];
+    },
+  },
+  {
     label: "ER Mushroom Circle (#439)",
     description:
       "#439 Grass one-shot GAMBLE. Forces ER_MUSHROOM_CIRCLE (wave-only override,\n"

@@ -5,6 +5,7 @@ import { AbsoluteAvariceEncounter } from "#mystery-encounters/absolute-avarice-e
 import { AbyssalVentEncounter } from "#mystery-encounters/abyssal-vent-encounter";
 import { AnOfferYouCantRefuseEncounter } from "#mystery-encounters/an-offer-you-cant-refuse-encounter";
 import { BerriesAboundEncounter } from "#mystery-encounters/berries-abound-encounter";
+import { BlackMarketEncounter } from "#mystery-encounters/black-market-encounter";
 import { BugTypeSuperfanEncounter } from "#mystery-encounters/bug-type-superfan-encounter";
 import { ClowningAroundEncounter } from "#mystery-encounters/clowning-around-encounter";
 import { ColosseumEncounter } from "#mystery-encounters/colosseum-encounter";
@@ -22,6 +23,7 @@ import { GlitteringVeinEncounter } from "#mystery-encounters/glittering-vein-enc
 import { GlobalTradeSystemEncounter } from "#mystery-encounters/global-trade-system-encounter";
 import { GravesOfTheFallenEncounter } from "#mystery-encounters/graves-of-the-fallen-encounter";
 import { HotSpringEncounter } from "#mystery-encounters/hot-spring-encounter";
+import { LakeSpiritEncounter } from "#mystery-encounters/lake-spirit-encounter";
 import { LostAtSeaEncounter } from "#mystery-encounters/lost-at-sea-encounter";
 import { MushroomCircleEncounter } from "#mystery-encounters/mushroom-circle-encounter";
 import { MysteriousChallengersEncounter } from "#mystery-encounters/mysterious-challengers-encounter";
@@ -40,6 +42,7 @@ import { ThePokemonSalesmanEncounter } from "#mystery-encounters/the-pokemon-sal
 import { TheStrongStuffEncounter } from "#mystery-encounters/the-strong-stuff-encounter";
 import { TheWinstrateChallengeEncounter } from "#mystery-encounters/the-winstrate-challenge-encounter";
 import { TidePoolsEncounter } from "#mystery-encounters/tide-pools-encounter";
+import { TotemTrialEncounter } from "#mystery-encounters/totem-trial-encounter";
 import { TownGuessingBoothEncounter } from "#mystery-encounters/town-guessing-booth-encounter";
 import { TownRaffleEncounter } from "#mystery-encounters/town-raffle-encounter";
 import { TrainingSessionEncounter } from "#mystery-encounters/training-session-encounter";
@@ -232,7 +235,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.SEA, [MysteryEncounterType.LOST_AT_SEA, MysteryEncounterType.ER_EXOTIC_TRADER]],
   [BiomeId.SWAMP, [MysteryEncounterType.SAFARI_ZONE]],
   [BiomeId.BEACH, [MysteryEncounterType.ER_TIDE_POOLS]],
-  [BiomeId.LAKE, []],
+  [BiomeId.LAKE, [MysteryEncounterType.ER_LAKE_SPIRIT]],
   [BiomeId.SEABED, [MysteryEncounterType.ER_ABYSSAL_VENT]],
   [BiomeId.MOUNTAIN, [MysteryEncounterType.ER_HOT_SPRING]],
   [BiomeId.BADLANDS, [MysteryEncounterType.DANCING_LESSONS]],
@@ -252,8 +255,8 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.CONSTRUCTION_SITE, []],
   [BiomeId.JUNGLE, [MysteryEncounterType.SAFARI_ZONE, MysteryEncounterType.ER_OVERGROWN_TEMPLE]],
   [BiomeId.FAIRY_CAVE, [MysteryEncounterType.ER_FAIRYS_BOON]],
-  [BiomeId.TEMPLE, []],
-  [BiomeId.SLUM, []],
+  [BiomeId.TEMPLE, [MysteryEncounterType.ER_TOTEM_TRIAL]],
+  [BiomeId.SLUM, [MysteryEncounterType.ER_BLACK_MARKET]],
   [BiomeId.SNOWY_FOREST, []],
   [BiomeId.ISLAND, []],
   [BiomeId.LABORATORY, []],
@@ -306,6 +309,9 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_FAIRYS_BOON] = FairysBoonEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_PICNIC] = PicnicEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_EXOTIC_TRADER] = ExoticTraderEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_TOTEM_TRIAL] = TotemTrialEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_BLACK_MARKET] = BlackMarketEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_LAKE_SPIRIT] = LakeSpiritEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

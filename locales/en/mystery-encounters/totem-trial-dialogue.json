@@ -1,0 +1,18 @@
+{
+  "intro": "Deep in the temple, a great stone totem stands wreathed in a faint, watchful aura. As you approach, its carved eyes flare to life and the ground begins to tremble.",
+  "title": "The Totem Trial",
+  "description": "An aura-wreathed guardian totem awakens to test those who enter. Best it in battle - it is a powerful multi-bar boss, several levels above your strongest Pokemon - to claim a high-tier reward and a blessing Relic. Or leave it at rest.",
+  "query": "Will you face the totem?",
+  "option": {
+    "1": {
+      "label": "Face the totem",
+      "tooltip": "(+) Win for a guaranteed high-tier reward + a Relic\n(?) A tough multi-bar boss, above your level",
+      "selected": "You square up as the totem heaves itself upright and the trial begins!"
+    },
+    "2": {
+      "label": "Leave it at rest",
+      "tooltip": "(-) No fight, no reward",
+      "selected": "You lower your eyes and step back, leaving the guardian undisturbed."
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "intro": "Down a narrow alley, a hooded dealer has set out a row of stalls heaped with secondhand goods. He gives you a crooked grin and gestures at the wares.",
+  "title": "The Black Market",
+  "description": "A back-alley dealer fencing cheap, secondhand goods. Browse the stalls for a free mixed-tier selection, or walk away and keep the alley at your back.",
+  "query": "Will you browse the stalls?",
+  "option": {
+    "1": {
+      "label": "Browse the stalls",
+      "tooltip": "(+) A free mixed-tier selection of used goods",
+      "selected": "You pick through the dealer's stalls and take your pick of the wares..."
+    },
+    "2": {
+      "label": "Walk away",
+      "tooltip": "(-) No goods, no cost",
+      "selected": "You decide the alley is no place to linger and move on."
+    }
+  }
+}

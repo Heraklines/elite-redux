@@ -72,6 +72,15 @@ export enum MysteryEncounterType {
   /** ER #439: The Exotic Trader - a Sea premium market; pay a fee to browse a
    * top-shelf, high-tier reward selection. */
   ER_EXOTIC_TRADER,
+  /** ER #439: The Totem Trial - a Temple guardian-boss trial; beat the aura totem
+   * (multi-bar boss) for a guaranteed high-tier reward + a Relic. */
+  ER_TOTEM_TRIAL,
+  /** ER #439: The Black Market - a Slum bargain market; browse cheap "used" goods
+   * for a mixed-tier reward selection. */
+  ER_BLACK_MARKET,
+  /** ER #439: The Lake Spirit - a Lake knowledge trial; answer a guardian's
+   * Pokedex riddles for Candy + a blessing scaled to how many you get right. */
+  ER_LAKE_SPIRIT,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

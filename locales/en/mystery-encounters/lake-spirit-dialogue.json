@@ -1,0 +1,18 @@
+{
+  "intro": "The lake is mirror-still. As you near the water, a luminous guardian rises from the surface and regards you with ancient, knowing eyes. It will share its blessing - if you can answer its riddles.",
+  "title": "The Lake Spirit",
+  "description": "A luminous lake guardian offers a blessing, earned by knowledge. Answer its Pokedex riddles and the blessing scales with how many you get right; a perfect round grants Candy, a Relic, and a high-tier reward. Decline to leave the water undisturbed.",
+  "query": "Will you take the spirit's test?",
+  "option": {
+    "1": {
+      "label": "Take the test",
+      "tooltip": "(+) The blessing scales with how many riddles you answer right",
+      "selected": "The spirit's voice echoes across the water, and the first riddle forms in your mind..."
+    },
+    "2": {
+      "label": "Decline",
+      "tooltip": "(-) No test, no blessing",
+      "selected": "You bow to the guardian and leave the still water behind."
+    }
+  }
+}
