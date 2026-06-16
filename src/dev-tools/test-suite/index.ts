@@ -433,6 +433,15 @@ function launchScenario(ctx: DevMenuCtx, scenario: DevScenario): boolean {
   return true;
 }
 
+/** Max characters shown for a picker option label (keeps the auto-sized
+ * OPTION_SELECT window from growing wider than the screen). */
+const MAX_PICKER_LABEL = 38;
+
+/** Truncate a long scenario label so the picker window stays on-screen. */
+function clampLabel(label: string): string {
+  return label.length > MAX_PICKER_LABEL ? `${label.slice(0, MAX_PICKER_LABEL - 1)}…` : label;
+}
+
 /**
  * The scenario picker — a SINGLE option-select (no nested overlay; nesting one
  * over another and then starting a run tangled the mode stack and froze the
@@ -466,7 +475,9 @@ function openScenarioList(ctx: DevMenuCtx): void {
       },
     },
     ...remaining.map(scenario => ({
-      label: scenario.label,
+      // Clamp the displayed label: the OPTION_SELECT window auto-sizes to its
+      // WIDEST option, so one long label blew the picker off the screen edges.
+      label: clampLabel(scenario.label),
       handler: () => {
         activeShareCode = null; // hand-written scenario: no share code
         return launchScenario(ctx, scenario);

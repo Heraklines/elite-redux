@@ -314,7 +314,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "ER Relics: Morale Banner + Twin Link + Scrap Magnet (#439)",
+    label: "ER Relics: Banner/Link/Magnet (#439)",
     description:
       "#439 relics. You hold MORALE BANNER (+15% team dmg while no mon has fainted\n"
       + "this biome), TWIN LINK (+15% to the type SHARED by party slots 2 and 3 -\n"
@@ -426,6 +426,35 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [
         makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH] }),
         makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "ER Graveyard: Graves of the Fallen (#439)",
+    description:
+      "#439 Graveyard ME (rides the ghost-team substrate). Forces\n"
+      + "ER_GRAVES_OF_THE_FALLEN in the GRAVEYARD biome.\n"
+      + "EXPECT: an epitaph for a fallen challenger (name / difficulty / fell at wave N\n"
+      + "/ beaten by X). PAY RESPECTS -> a memento (their held item, or an Ultra-tier\n"
+      + "fallback) and leave. DISTURB -> their ghost team rises and fights; win -> 2 of\n"
+      + "their held items. WALK AWAY -> no cost. On a fresh/offline account a legacy\n"
+      + "grave (Gengar/Chandelure/Dusclops, Ultra-tier memento) appears and NEVER\n"
+      + "softlocks.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_BIOME_OVERRIDE: BiomeId.GRAVEYARD,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_GRAVES_OF_THE_FALLEN,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.CRUNCH],
+        }),
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
       ];
     },
   },
