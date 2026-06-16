@@ -177,3 +177,46 @@ export function rollErNextBiomeNodes(current: BiomeId, prev: BiomeId | null): Er
   const visibleCount = Math.max(1, BASE_VISIBLE_NODES + erMapUpgradeTier());
   return chosen.map((biome, i) => ({ biome, revealed: i < visibleCount }));
 }
+
+// --- Interaction grammar (#502) -------------------------------------------
+// The biome's "keep exploring here" VERB, surfaced as the STAY action label on
+// the every-5-wave Crossroads panel (maintainer ruling: lock the grammar verbs
+// to the Crossroads + matching biome ME options). Grouped by biome character;
+// anything unmapped falls back to a neutral "Press on".
+const BIOME_CROSSROADS_VERB = new Map<BiomeId, string>([
+  // DELVE - go deeper underground / underwater.
+  [BiomeId.CAVE, "Delve deeper"],
+  [BiomeId.ICE_CAVE, "Delve deeper"],
+  [BiomeId.FAIRY_CAVE, "Delve deeper"],
+  [BiomeId.SEABED, "Delve deeper"],
+  [BiomeId.ABYSS, "Delve deeper"],
+  [BiomeId.RUINS, "Delve deeper"],
+  // FORAGE - push through living growth.
+  [BiomeId.FOREST, "Forage on"],
+  [BiomeId.JUNGLE, "Forage on"],
+  [BiomeId.GRASS, "Forage on"],
+  [BiomeId.TALL_GRASS, "Forage on"],
+  [BiomeId.MEADOW, "Forage on"],
+  // SCOUT - read the open ground ahead.
+  [BiomeId.PLAINS, "Scout ahead"],
+  [BiomeId.MOUNTAIN, "Scout ahead"],
+  [BiomeId.BADLANDS, "Scout ahead"],
+  [BiomeId.DESERT, "Scout ahead"],
+  [BiomeId.WASTELAND, "Scout ahead"],
+  [BiomeId.SNOWY_FOREST, "Scout ahead"],
+  // MARKET - settlements you browse.
+  [BiomeId.TOWN, "Browse on"],
+  [BiomeId.METROPOLIS, "Browse on"],
+  [BiomeId.SLUM, "Browse on"],
+  [BiomeId.ISLAND, "Browse on"],
+  // Waterline - wade along the shore/shallows.
+  [BiomeId.SEA, "Wade on"],
+  [BiomeId.LAKE, "Wade on"],
+  [BiomeId.BEACH, "Wade on"],
+  [BiomeId.SWAMP, "Wade on"],
+]);
+
+/** The Crossroads "stay and keep exploring" action label for a biome. */
+export function erBiomeCrossroadsVerb(biomeId: BiomeId): string {
+  return BIOME_CROSSROADS_VERB.get(biomeId) ?? "Press on";
+}

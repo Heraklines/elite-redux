@@ -25,6 +25,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { erBiomeCrossroadsVerb } from "#data/elite-redux/er-biome-routing";
 import { setErLeaveBiomeNow } from "#data/elite-redux/er-biome-structure";
 import { UiMode } from "#enums/ui-mode";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
@@ -42,7 +43,10 @@ export class ErCrossroadsPhase extends Phase {
     const biomeName = getBiomeName(globalScene.arena.biomeId);
     const options: OptionSelectItem[] = [
       {
-        label: "Stay",
+        // #502: the "keep exploring this biome" action carries the biome's
+        // interaction-grammar verb (Delve deeper / Forage on / Scout ahead /
+        // Browse on / Wade on), surfacing the grammar on the Crossroads panel.
+        label: erBiomeCrossroadsVerb(globalScene.arena.biomeId),
         handler: () => {
           this.resolve(false);
           return true;
