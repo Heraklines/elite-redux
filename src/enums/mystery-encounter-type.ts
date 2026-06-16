@@ -51,6 +51,9 @@ export enum MysteryEncounterType {
   /** ER #439: Town Raffle - a Town relic gamble; pay a fee and draw a ticket for a
    * tiered prize, with a small chance at a rare Formation Relic. */
   ER_TOWN_RAFFLE,
+  /** ER #439: The Overgrown Temple - a Jungle press-your-luck delve; bank the haul
+   * or press deeper for richer treasure, risking a trap / Grass-Rock guardian. */
+  ER_OVERGROWN_TEMPLE,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

@@ -585,6 +585,37 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Overgrown Temple (#439)",
+    description:
+      "#439 Jungle press-your-luck DELVE (reuses the press-luck substrate). Forces\n"
+      + "ER_OVERGROWN_TEMPLE in the JUNGLE biome.\n"
+      + "DO: 'Delve into the temple', then press deeper or climb out. Each chamber pays\n"
+      + "tribute/antiquity money; deep chambers can hit a Rogue / evolution-stone relic.\n"
+      + "WAKE chance climbs each step.\n"
+      + "EXPECT: climb out = money (+ relic shop if deep). A trap scatters HALF the\n"
+      + "money and spawns a level-scaled wild Grass/Rock guardian (Cradily/Sudowoodo/\n"
+      + "Torterra/Tangrowth); win keeps the rest + relic. Chamber-0 leave = nothing.\n"
+      + "Never softlocks.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 45,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.JUNGLE,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_OVERGROWN_TEMPLE,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.FIRE_FANG, MoveId.DRAGON_CLAW, MoveId.IRON_HEAD],
+        }),
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+      ];
+    },
+  },
+  {
     label: "ER Mushroom Circle (#439)",
     description:
       "#439 Grass one-shot GAMBLE. Forces ER_MUSHROOM_CIRCLE in the GRASS biome.\n"

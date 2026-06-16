@@ -1,0 +1,32 @@
+{
+  "intro": "Vines and roots have swallowed an ancient stone temple. Beyond the broken archway, dark passages lead down into chambers no one has walked in centuries.",
+  "title": "The Overgrown Temple",
+  "description": "A ruin reclaimed by the jungle. Each chamber you delve holds older, richer treasure, loose tribute giving way to real antiquities and, deep in, an ancient relic, but every step deeper risks a trap or waking the temple's guardian. Climb out early to keep the safe haul, or press deeper for more.",
+  "query": "How deep will you delve?",
+  "option": {
+    "1": {
+      "label": "Delve into the temple",
+      "tooltip": "(+) Gather treasure chamber by chamber\n(?) Each step raises the chance of a trap",
+      "selected": "You step through the archway and descend into the dark..."
+    },
+    "2": {
+      "label": "Leave it be",
+      "tooltip": "(-) No haul",
+      "selected": "You leave the temple to the jungle and move on."
+    }
+  },
+  "delvePrompt": "You have recovered {{findCount}} finds{{relicNote}}. The air grows colder the deeper you go. Press on, or climb back out with your haul?",
+  "delve": {
+    "push": {
+      "label": "Press deeper",
+      "tooltip": "(+) Richer treasure deeper in\n(?) Higher chance the temple wakes"
+    },
+    "bank": {
+      "label": "Climb out",
+      "tooltip": "(+) Keep everything you have found"
+    }
+  },
+  "foundTribute": "You pry loose more tribute and press on.",
+  "foundRelic": "Half-buried in the roots, an ancient relic glints in the dark!",
+  "templeWakes": "A trap springs and the temple shudders awake! {{scattered}} of your finds scatter as its guardian lunges from the stone!"
+}

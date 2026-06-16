@@ -23,6 +23,7 @@ import { MushroomCircleEncounter } from "#mystery-encounters/mushroom-circle-enc
 import { MysteriousChallengersEncounter } from "#mystery-encounters/mysterious-challengers-encounter";
 import { MysteriousChestEncounter } from "#mystery-encounters/mysterious-chest-encounter";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
+import { OvergrownTempleEncounter } from "#mystery-encounters/overgrown-temple-encounter";
 import { PartTimerEncounter } from "#mystery-encounters/part-timer-encounter";
 import { SafariZoneEncounter } from "#mystery-encounters/safari-zone-encounter";
 import { ScrambledPokedexEncounter } from "#mystery-encounters/scrambled-pokedex-encounter";
@@ -243,7 +244,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.ABYSS, [MysteryEncounterType.DANCING_LESSONS]],
   [BiomeId.SPACE, [MysteryEncounterType.THE_EXPERT_POKEMON_BREEDER]],
   [BiomeId.CONSTRUCTION_SITE, []],
-  [BiomeId.JUNGLE, [MysteryEncounterType.SAFARI_ZONE]],
+  [BiomeId.JUNGLE, [MysteryEncounterType.SAFARI_ZONE, MysteryEncounterType.ER_OVERGROWN_TEMPLE]],
   [BiomeId.FAIRY_CAVE, []],
   [BiomeId.TEMPLE, []],
   [BiomeId.SLUM, []],
@@ -292,6 +293,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_GLITTERING_VEIN] = GlitteringVeinEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_MUSHROOM_CIRCLE] = MushroomCircleEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_TOWN_RAFFLE] = TownRaffleEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_OVERGROWN_TEMPLE] = OvergrownTempleEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {
