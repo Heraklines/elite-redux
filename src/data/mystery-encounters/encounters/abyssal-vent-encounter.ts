@@ -34,6 +34,7 @@ import {
   type MineralLootHaul,
   mineralHaulHasItems,
   openMineralHaul,
+  rollDelveWardOrBerry,
   rollKingsRock,
   rollMegaStone,
   rollMineralFind,
@@ -147,6 +148,9 @@ async function diveLevel(encounter: MysteryEncounter, level: number): Promise<vo
     messageKey = `${namespace}:foundMegaStone`;
   } else if (rollKingsRock(haul.loot, level)) {
     messageKey = `${namespace}:foundKingsRock`;
+  } else if (rollDelveWardOrBerry(haul.loot, level)) {
+    // Ward Stone / resist berry dug from the deep vent (find chance climbs with depth).
+    messageKey = `${namespace}:foundCurio`;
   } else if (rollMineralFind(haul.loot, level, "relic")) {
     messageKey = `${namespace}:foundCurio`;
   } else if (money.kind === "nugget") {

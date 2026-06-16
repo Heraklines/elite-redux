@@ -38,6 +38,7 @@ import {
   type MineralLootHaul,
   mineralHaulHasItems,
   openMineralHaul,
+  rollDelveWardOrBerry,
   rollKingsRock,
   rollMegaStone,
   rollMineralFind,
@@ -161,6 +162,9 @@ async function delveChamber(encounter: MysteryEncounter, chamber: number): Promi
     messageKey = `${namespace}:foundMegaStone`;
   } else if (rollKingsRock(haul.loot, chamber)) {
     messageKey = `${namespace}:foundKingsRock`;
+  } else if (rollDelveWardOrBerry(haul.loot, chamber)) {
+    // Ward Stone / resist berry pried from the deeper chambers (find chance climbs with depth).
+    messageKey = `${namespace}:foundRelic`;
   } else if (rollMineralFind(haul.loot, chamber, "relic")) {
     messageKey = `${namespace}:foundRelic`;
   } else if (money.kind === "nugget") {

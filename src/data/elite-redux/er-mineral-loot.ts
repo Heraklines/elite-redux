@@ -32,6 +32,8 @@
 import { globalScene } from "#app/global-scene";
 import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { modifierTypes } from "#data/data-lists";
+import { ER_RESIST_BERRY_BY_TYPE, erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
+import { type ErWardStoneTier, erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import type { FormChangeItem } from "#enums/form-change-item";
@@ -41,7 +43,7 @@ import {
   generateModifierTypeOption,
   setEncounterRewards,
 } from "#mystery-encounters/encounter-phase-utils";
-import type { CustomModifierSettings, ModifierTypeOption } from "#modifiers/modifier-type";
+import { type CustomModifierSettings, ModifierTypeOption } from "#modifiers/modifier-type";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import { randSeedInt, randSeedItem } from "#utils/common";
 
@@ -149,6 +151,109 @@ export function rollKingsRock(haul: MineralLootHaul, d: number): boolean {
   }
   haul.funcs.push(modifierTypes.KINGS_ROCK);
   return true;
+}
+
+// --- Delve special finds: Ward Stones + resist berries -------------------- //
+//
+// #491 - the deeper a delve goes, the more likely it turns up a defensive curio.
+// These are the same Ward Stones / resist berries enemies and trainers drop, but
+// here the player can DIG them out, with a find chance that climbs DRASTICALLY
+// with depth (shallow strikes never turn them up; a deep dive very often does).
+// Each found item is banked as a guaranteed reward OPTION (like the mega stone),
+// so it shows up in the cash-in shop when the player finally banks.
+
+/**
+ * Percent chance a strike at depth `d` (0-indexed) turns up a WARD STONE. Zero in
+ * the shallows, then ramps hard the deeper the delve goes.
+ */
+function wardStoneFindChance(d: number): number {
+  if (d <= 1) {
+    return 0;
+  }
+  if (d === 2) {
+    return 15;
+  }
+  if (d === 3) {
+    return 30;
+  }
+  if (d === 4) {
+    return 45;
+  }
+  return 60;
+}
+
+/** Ward Stone tier by depth: deeper digs turn up the stronger stones. */
+function wardStoneTierForDepth(d: number): ErWardStoneTier {
+  if (d <= 2) {
+    return "minor";
+  }
+  if (d <= 4) {
+    return "greater";
+  }
+  return "prime";
+}
+
+/**
+ * Percent chance a strike at depth `d` (0-indexed) turns up a RESIST BERRY. Resist
+ * berries are commoner than Ward Stones, so the ramp starts a level earlier and
+ * climbs higher. Zero on the very first strike.
+ */
+function resistBerryFindChance(d: number): number {
+  if (d <= 0) {
+    return 0;
+  }
+  if (d === 1) {
+    return 12;
+  }
+  if (d === 2) {
+    return 24;
+  }
+  if (d === 3) {
+    return 38;
+  }
+  if (d === 4) {
+    return 52;
+  }
+  return 68;
+}
+
+/**
+ * Roll for a WARD STONE find at depth `d` (0-indexed). Adds a tier-scaled stone to
+ * the haul's options on a hit. Returns true if one was added.
+ */
+export function rollWardStone(haul: MineralLootHaul, d: number): boolean {
+  if (randSeedInt(100) >= wardStoneFindChance(d)) {
+    return false;
+  }
+  const type = erWardStoneModifierType(wardStoneTierForDepth(d));
+  haul.options.push(new ModifierTypeOption(type, 0));
+  return true;
+}
+
+/**
+ * Roll for a RESIST BERRY find at depth `d` (0-indexed). Adds a random-type resist
+ * berry to the haul's options on a hit. Returns true if one was added.
+ */
+export function rollResistBerry(haul: MineralLootHaul, d: number): boolean {
+  if (randSeedInt(100) >= resistBerryFindChance(d)) {
+    return false;
+  }
+  const resistType = randSeedItem([...ER_RESIST_BERRY_BY_TYPE.keys()]);
+  const type = erResistBerryModifierType(resistType);
+  haul.options.push(new ModifierTypeOption(type, 0));
+  return true;
+}
+
+/**
+ * Combined delve "defensive curio" roll: rolls a Ward Stone first, then a resist
+ * berry (independent rolls, so a deep strike can turn up both). Returns true if
+ * EITHER was added - the host reuses its normal item-find message on a hit. `d`
+ * is depth (0-indexed).
+ */
+export function rollDelveWardOrBerry(haul: MineralLootHaul, d: number): boolean {
+  const ward = rollWardStone(haul, d);
+  const berry = rollResistBerry(haul, d);
+  return ward || berry;
 }
 
 /** A species' full FORWARD evolution line (itself + every species it can evolve into). */

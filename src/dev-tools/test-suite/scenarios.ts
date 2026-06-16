@@ -3709,6 +3709,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Delve ward/berry finds (#491)",
+    description:
+      "#491 - the delve press-your-luck events (Abyssal Vent, Glittering Vein,\n"
+      + "Overgrown Temple) now turn up WARD STONES and RESIST BERRIES, with a\n"
+      + "find chance that climbs DRASTICALLY the deeper you push. Shallow strikes\n"
+      + "never yield them; deep strikes very often do (Ward Stone ~0/0/15/30/45/\n"
+      + "60% by depth, tier Minor->Greater->Prime; resist berry ~0/12/24/38/52/\n"
+      + "68%). Found items bank into the cash-in shop on RISE/PACK UP.\n"
+      + "CHECK: dive these events deep (push 4+ levels) and bank - the reward\n"
+      + "shop should include Ward Stones / resist berries far more often than a\n"
+      + "shallow dive. They are lost on a party wipe like the rest of the haul.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Berry/Ward rates (#420)",
     description:
       "#420 - resist berry rolls doubled (Ace 5% / Elite 10% / Hell 20%)\n"
