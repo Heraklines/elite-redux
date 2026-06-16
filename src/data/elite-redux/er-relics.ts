@@ -27,9 +27,11 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
-import type { PokemonType } from "#enums/pokemon-type";
+import { PokemonType } from "#enums/pokemon-type";
+import type { SpeciesId } from "#enums/species-id";
+import { BATTLE_STATS } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
-import { ErRelicModifier } from "#modifiers/modifier";
+import { ErRelicModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import { toDmgValue } from "#utils/common";
 
 export type ErRelicKind =
@@ -42,7 +44,11 @@ export type ErRelicKind =
   | "twinLink"
   | "anchor"
   | "scrapMagnet"
-  | "weathervane";
+  | "weathervane"
+  | "bondedCharm"
+  | "collectorsAlbum"
+  | "quartermaster"
+  | "lookout";
 
 export interface ErRelicConfig {
   name: string;
@@ -129,6 +135,34 @@ export const ER_RELIC_CONFIG: Readonly<Record<ErRelicKind, ErRelicConfig>> = {
     tint: 0xc0d8f0,
     maxStack: 1,
   },
+  bondedCharm: {
+    name: "Bonded Charm",
+    description: "When you switch a Pokémon out, the one coming in keeps the lead's positive stat boosts.",
+    icon: "binding_band",
+    tint: 0xf8a8d8,
+    maxStack: 1,
+  },
+  collectorsAlbum: {
+    name: "Collector's Album",
+    description: "Every 3rd new species you catch this run grants a small batch of candy for that species.",
+    icon: "relic_gold",
+    tint: 0xf8d860,
+    maxStack: 1,
+  },
+  quartermaster: {
+    name: "Quartermaster",
+    description: "Every 10 waves, your slot 5 Pokémon copies one held item from slot 4 or slot 6.",
+    icon: "berry_pouch",
+    tint: 0xc0a070,
+    maxStack: 1,
+  },
+  lookout: {
+    name: "Lookout",
+    description: "Before each battle, scout the lead enemy and report its types.",
+    icon: "scope_lens",
+    tint: 0x90d0c0,
+    maxStack: 1,
+  },
 };
 
 /** Every relic kind, in display order (used by the type registry). */
@@ -149,6 +183,12 @@ const MORALE_BANNER_PERCENT = 15;
 const TWIN_LINK_PERCENT = 15;
 /** Scrap Magnet: chance (out of 100) of an extra trainer-battle reward option. */
 const SCRAP_MAGNET_CHANCE_PCT = 25;
+/** Collector's Album: grant the candy trickle on every Nth unique species caught. */
+const COLLECTORS_ALBUM_CADENCE = 3;
+/** Collector's Album: candy units granted on each cadence hit. */
+const COLLECTORS_ALBUM_CANDY = 3;
+/** Quartermaster: copy one held item to slot 5 every N waves. */
+const QUARTERMASTER_WAVE_CADENCE = 10;
 
 /** Total stacks of the given relic the player currently holds (team-wide). */
 export function getErRelicStacks(kind: ErRelicKind): number {
@@ -221,6 +261,50 @@ export function erCoinPurseBonusPercent(): number {
 /** Mystery Charm (relic): added Mystery-Encounter spawn weight (out of 256). */
 export function erMysteryCharmWeightBonus(): number {
   return getErRelicStacks("mysteryCharm") * MYSTERY_CHARM_WEIGHT_PER_STACK;
+}
+
+// =============================================================================
+// Per-RUN transient relic state (NOT saved, NOT reset per biome - lives for the
+// whole run). Collector's Album counts the DISTINCT root species the player has
+// caught this run; a mid-run reload re-zeroes it (player-friendly: it can only
+// give MORE candy, never softlock), matching the per-biome flags' "not in the
+// save schema" stance.
+// =============================================================================
+
+/** Root species ids the player has caught this run (Collector's Album). */
+const COLLECTORS_ALBUM_SEEN: Set<SpeciesId> = new Set();
+
+/**
+ * Collector's Album (relic): record a freshly-caught Pokémon. When the catch is
+ * a NEW root species this run AND that pushes the unique-species count to a
+ * multiple of {@linkcode COLLECTORS_ALBUM_CADENCE}, grant a small batch of candy
+ * for that species' starter line. No-op when the relic isn't held, the species
+ * was already caught this run, or the candy store is already capped.
+ *
+ * Called from AttemptCapturePhase's catch-success path with the caught mon's
+ * root species id. Always records the species (so the run-unique count stays
+ * accurate even when the relic is later acquired), but only grants while held.
+ */
+export function erCollectorsAlbumRecordCatch(rootSpeciesId: SpeciesId): void {
+  if (COLLECTORS_ALBUM_SEEN.has(rootSpeciesId)) {
+    return;
+  }
+  COLLECTORS_ALBUM_SEEN.add(rootSpeciesId);
+  if (!hasErRelic("collectorsAlbum")) {
+    return;
+  }
+  if (COLLECTORS_ALBUM_SEEN.size % COLLECTORS_ALBUM_CADENCE !== 0) {
+    return;
+  }
+  // addStarterCandy clamps at MAX_STARTER_CANDY_COUNT and returns false when the
+  // store is already full; only announce when candy was actually granted.
+  const granted = globalScene.gameData.addStarterCandy(rootSpeciesId, COLLECTORS_ALBUM_CANDY);
+  if (granted) {
+    // ER custom relic - English-only (shared locales submodule).
+    globalScene.phaseManager.queueMessage(
+      `The Collector's Album rewarded you with candy for filling in ${COLLECTORS_ALBUM_SEEN.size} species!`,
+    );
+  }
 }
 
 // =============================================================================
@@ -382,4 +466,145 @@ export function erScrapMagnetExtraRewards(): number {
  */
 export function erWeathervaneBlocksWeatherDamage(): boolean {
   return hasErRelic("weathervane");
+}
+
+/**
+ * Bonded Charm (relic): "soft baton pass". Called from SwitchSummonPhase on a
+ * PLAYER, VOLUNTARY switch (Command.POKEMON) only - NOT on faint replacement,
+ * U-turn/forced switch, or the opening lead. Copies the OUTGOING lead's POSITIVE
+ * stat stages onto the INCOMING mon (negative/zero stages are skipped, so the
+ * fresh switch-in never inherits a debuff). No-op when the relic isn't held.
+ *
+ * Called AFTER the incoming mon's `fieldSetup(true)` (which re-runs
+ * `resetSummonData`, zeroing its stages) and BEFORE the outgoing mon's
+ * `resetSummonData()` (which fires later in SwitchSummonPhase.onEnd), so the
+ * carried stages survive and the source stages are still readable here.
+ */
+export function erBondedCharmCarryStages(outgoing: Pokemon, incoming: Pokemon): void {
+  if (!hasErRelic("bondedCharm") || !incoming.isPlayer()) {
+    return;
+  }
+  let carried = false;
+  for (const stat of BATTLE_STATS) {
+    const stage = outgoing.getStatStage(stat);
+    if (stage > 0) {
+      incoming.setStatStage(stat, stage);
+      carried = true;
+    }
+  }
+  if (carried) {
+    // ER custom relic - English-only (shared locales submodule).
+    globalScene.phaseManager.queueMessage(
+      `${incoming.getNameToRender()} inherited the lead's momentum through the Bonded Charm!`,
+    );
+  }
+}
+
+/** waveIndex on which Quartermaster last fired its copy (guards against re-firing). */
+let QUARTERMASTER_LAST_WAVE = -1;
+
+/**
+ * Quartermaster (relic): every {@linkcode QUARTERMASTER_WAVE_CADENCE} waves, the
+ * slot 5 player mon (party index 4) copies ONE transferable held item from slot
+ * 4 (index 3) or slot 6 (index 5). A brand-new modifier instance (stack count 1)
+ * is added to slot 5 via the normal modifier path, so save round-trips for free.
+ *
+ * Runaway-stacking guards: at most ONE item is copied per trigger; the slot 5
+ * mon's existing stack of that item must be BELOW its per-mon cap (else we skip
+ * that candidate and try the next), and the trigger fires at most once per wave.
+ * No-op when the relic isn't held, slot 5 is missing/fainted, or no eligible
+ * source item exists. Called from EncounterPhase once the party is loaded.
+ */
+export function erQuartermasterTick(): void {
+  if (!hasErRelic("quartermaster")) {
+    return;
+  }
+  const wave = globalScene.currentBattle?.waveIndex ?? -1;
+  if (wave < 1 || wave % QUARTERMASTER_WAVE_CADENCE !== 0 || wave === QUARTERMASTER_LAST_WAVE) {
+    return;
+  }
+  const party = globalScene.getPlayerParty();
+  const recipient = party[4];
+  if (!recipient || recipient.isFainted()) {
+    return;
+  }
+  // Candidate source mons: slot 4 (index 3) and slot 6 (index 5), in order.
+  for (const sourceIndex of [3, 5]) {
+    const source = party[sourceIndex];
+    if (!source) {
+      continue;
+    }
+    const heldItems = globalScene.findModifiers(
+      m =>
+        m instanceof PokemonHeldItemModifier && (m as PokemonHeldItemModifier).pokemonId === source.id && m.isTransferable,
+      true,
+    ) as PokemonHeldItemModifier[];
+    for (const item of heldItems) {
+      const clone = item.clone() as PokemonHeldItemModifier;
+      clone.pokemonId = recipient.id;
+      clone.stackCount = 1;
+      // Respect the recipient's per-mon stack cap for this item: skip if it's
+      // already maxed, so the copy never tips into the "stack full" fallback.
+      const existing = globalScene.findModifier(
+        m =>
+          m instanceof PokemonHeldItemModifier
+          && (m as PokemonHeldItemModifier).matchType(item)
+          && (m as PokemonHeldItemModifier).pokemonId === recipient.id,
+        true,
+      ) as PokemonHeldItemModifier | undefined;
+      const cap = clone.getMaxStackCount();
+      if (cap < 1 || (existing && existing.getStackCount() >= cap)) {
+        continue;
+      }
+      if (globalScene.addModifier(clone, false, false)) {
+        QUARTERMASTER_LAST_WAVE = wave;
+        // ER custom relic - English-only (shared locales submodule). Deferred so
+        // the note plays after the encounter setup instead of mid-sequence.
+        globalScene.phaseManager.queueMessage(
+          `The Quartermaster issued ${recipient.getNameToRender()} a copy of ${item.type.name}!`,
+          null,
+          true,
+          null,
+          true,
+        );
+        return;
+      }
+    }
+  }
+}
+
+/** Convert a {@linkcode PokemonType} enum value to a display label (e.g. "Fire"). */
+function erTypeLabel(type: PokemonType): string {
+  const raw = PokemonType[type];
+  if (!raw) {
+    return "Unknown";
+  }
+  return raw.charAt(0) + raw.slice(1).toLowerCase();
+}
+
+/**
+ * Lookout (relic): queue a short "scout report" naming the lead enemy and its
+ * types before the battle begins (message-only, no new UI). No-op when the relic
+ * isn't held or there is no enemy on the field. Called from EncounterPhase after
+ * the enemy party is built. Previews the lead foe of the battle you are about to
+ * enter (the next fight from the player's standpoint).
+ */
+export function erLookoutPreviewEnemy(): void {
+  if (!hasErRelic("lookout")) {
+    return;
+  }
+  const lead = globalScene.getEnemyParty()?.[0];
+  if (!lead) {
+    return;
+  }
+  const types = lead.getTypes(false, false, true).map(erTypeLabel).join(" / ");
+  // ER custom relic - English-only (shared locales submodule). Deferred so the
+  // scout report plays after the encounter setup instead of mid-sequence.
+  globalScene.phaseManager.queueMessage(
+    `Lookout report: ${lead.getNameToRender()} ahead, a ${types} type!`,
+    null,
+    true,
+    null,
+    true,
+  );
 }

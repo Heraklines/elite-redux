@@ -3,6 +3,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { IS_TEST, isBeta, isDev } from "#constants/app-constants";
 import { SubstituteTag } from "#data/battler-tags";
+import { erCollectorsAlbumRecordCatch } from "#data/elite-redux/er-relics";
 import { Gender } from "#data/gender";
 import {
   doPokeballBounceAnim,
@@ -241,6 +242,11 @@ export class AttemptCapturePhase extends PokemonPhase {
 
   catch() {
     const pokemon = this.getPokemon() as EnemyPokemon;
+
+    // ER relic (#439): Collector's Album - record this catch against the run's
+    // unique-species tally and, on every Nth new species, grant a candy trickle
+    // for that species line (no-op unless the relic is held).
+    erCollectorsAlbumRecordCatch(pokemon.species.getRootSpeciesId(true));
 
     const speciesForm = pokemon.fusionSpecies ? pokemon.getFusionSpeciesForm() : pokemon.getSpeciesForm();
 

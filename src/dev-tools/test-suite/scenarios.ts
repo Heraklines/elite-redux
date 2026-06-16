@@ -380,6 +380,65 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Relic: Bonded Charm (#439)",
+    description:
+      "#439 relic - Bonded Charm (soft baton pass): a VOLUNTARY switch carries the\n"
+      + "outgoing mon's POSITIVE stat boosts to the incoming mon.\n"
+      + "DO: your lead Snorlax starts at +2 to all stats. SWITCH to Pidgey on turn 1\n"
+      + "(open the party menu, pick Pidgey).\n"
+      + "EXPECT: Pidgey enters KEEPING the +2 boosts. A faint replacement or a forced\n"
+      + "switch would NOT carry them (and negatives never carry).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_BONDED_CHARM" }],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+    onBattleStart: () => boostPlayer(allStages(2)),
+  },
+  {
+    label: "ER Relics: Lookout/Quartermaster/Collector (#439)",
+    description:
+      "#439 formation relics. You hold LOOKOUT, QUARTERMASTER, and COLLECTOR'S ALBUM.\n"
+      + "LOOKOUT (observe now): before the fight, a scout line names the lead enemy\n"
+      + "(Gengar) and its TYPES.\n"
+      + "QUARTERMASTER (note): every 10th wave, the slot-5 mon copies one transferable\n"
+      + "held item from slot 4 or 6 - give slot 4/6 an item (e.g. Leftovers) in a shop,\n"
+      + "then reach a wave divisible by 10.\n"
+      + "COLLECTOR'S ALBUM (note): every 3rd NEW species you CATCH grants +3 candy to\n"
+      + "that species - catch 3 different wild mons and watch the 3rd.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.GENGAR,
+        ENEMY_LEVEL_OVERRIDE: 30,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        STARTING_MODIFIER_OVERRIDE: [
+          { name: "ER_RELIC_LOOKOUT" },
+          { name: "ER_RELIC_QUARTERMASTER" },
+          { name: "ER_RELIC_COLLECTORS_ALBUM" },
+        ],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE] }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.RATTATA, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.SPEAROW, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.EKANS, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.SANDSHREW, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
     label: "ER Town: Guessing Booth (#439)",
     description:
       "#439 - Town Guessing Booth mystery encounter (rides the Quiz engine).\n"

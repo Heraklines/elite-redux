@@ -2164,6 +2164,10 @@ const modifierTypeInitObj = Object.freeze({
   ER_RELIC_ANCHOR: () => erRelicModifierType("anchor"),
   ER_RELIC_SCRAP_MAGNET: () => erRelicModifierType("scrapMagnet"),
   ER_RELIC_WEATHERVANE: () => erRelicModifierType("weathervane"),
+  ER_RELIC_BONDED_CHARM: () => erRelicModifierType("bondedCharm"),
+  ER_RELIC_COLLECTORS_ALBUM: () => erRelicModifierType("collectorsAlbum"),
+  ER_RELIC_QUARTERMASTER: () => erRelicModifierType("quartermaster"),
+  ER_RELIC_LOOKOUT: () => erRelicModifierType("lookout"),
 
   /*REPEL: () => new DoubleBattleChanceBoosterModifierType('Repel', 5),
   SUPER_REPEL: () => new DoubleBattleChanceBoosterModifierType('Super Repel', 10),

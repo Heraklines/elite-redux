@@ -9,6 +9,7 @@ import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims"
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
+import { erLookoutPreviewEnemy, erQuartermasterTick } from "#data/elite-redux/er-relics";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
 import { getNatureName } from "#data/nature";
@@ -364,6 +365,17 @@ export class EncounterPhase extends BattlePhase {
 
       if (battle.battleType === BattleType.TRAINER && globalScene.currentBattle.trainer) {
         globalScene.currentBattle.trainer.genAI(globalScene.getEnemyParty());
+      }
+
+      if (!battle.isBattleMysteryEncounter()) {
+        // ER relics (#439): Lookout - queue a scout report of the lead enemy's
+        // types before the fight (message-only, no-op unless the relic is held).
+        erLookoutPreviewEnemy();
+        // Quartermaster - on every 10th wave (skipped on a mid-wave reload so it
+        // can't re-copy), the slot 5 mon copies one held item from slot 4 or 6.
+        if (!this.loaded) {
+          erQuartermasterTick();
+        }
       }
 
       globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
