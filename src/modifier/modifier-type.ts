@@ -2986,11 +2986,12 @@ export function getPlayerShopModifierTypeOptionsForWave(
       new ModifierTypeOption(modifierTypeInitObj.POTION(), 0, heal(0.2)),
       new ModifierTypeOption(modifierTypeInitObj.ETHER(), 0, baseCost * 0.4),
       new ModifierTypeOption(modifierTypeInitObj.REVIVE(), 0, heal(2)),
+      // ER: Full Heal sits in the FIRST shop row so it is buyable from wave 1 -
+      // early poison/burn is too punishing without an affordable status cure. It
+      // is also 20% cheaper than its prior price (heal(1) -> heal(0.8)).
+      new ModifierTypeOption(modifierTypeInitObj.FULL_HEAL(), 0, heal(0.8)),
     ],
-    [
-      new ModifierTypeOption(modifierTypeInitObj.SUPER_POTION(), 0, heal(0.45)),
-      new ModifierTypeOption(modifierTypeInitObj.FULL_HEAL(), 0, heal(1)),
-    ],
+    [new ModifierTypeOption(modifierTypeInitObj.SUPER_POTION(), 0, heal(0.45))],
     [
       new ModifierTypeOption(modifierTypeInitObj.ELIXIR(), 0, baseCost),
       new ModifierTypeOption(modifierTypeInitObj.MAX_ETHER(), 0, baseCost),

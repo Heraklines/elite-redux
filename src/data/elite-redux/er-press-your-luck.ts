@@ -135,6 +135,22 @@ export async function startPressYourLuck(config: PressYourLuckConfig): Promise<v
   await promptRound(config);
 }
 
+/**
+ * RESUME a press-your-luck loop that was paused mid-run - specifically, a loop
+ * whose `onBust` started a battle instead of ending the encounter. Call this from
+ * the host's `encounter.doContinueEncounter` (which fires after the ME battle is
+ * won) to re-arm the looping contract and re-prompt at the CURRENT round (the
+ * round counter is NOT reset, so the escalating bust chance carries over). The
+ * host is responsible for any per-interrupt escalation it wants to apply before
+ * calling this. Used by the Woodland Forager, whose swarm interrupt is a fight
+ * you survive and then keep foraging, rather than a terminal bust.
+ */
+export async function resumePressYourLuck(config: PressYourLuckConfig): Promise<void> {
+  const encounter = globalScene.currentBattle.mysteryEncounter!;
+  encounter.continuousEncounter = true;
+  await promptRound(config);
+}
+
 /** Show the round prompt, then queue the bank/push option select. */
 async function promptRound(config: PressYourLuckConfig): Promise<void> {
   await showEncounterText(config.promptKey);

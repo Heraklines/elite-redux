@@ -523,12 +523,15 @@ export const DEV_SCENARIOS: DevScenario[] = [
     description:
       "#439 Forest press-your-luck FORAGE loop (Phase A3 substrate + first event).\n"
       + "Forces ER_WOODLAND_FORAGER in the FOREST biome.\n"
-      + "DO: pick 'Forage the grove', then 'Forage on' to grow the haul (common -> rare\n"
-      + "berries, a Rogue ingredient deep in) while the BUST chance climbs each round;\n"
-      + "or 'Pack up and leave' to bank what you have.\n"
-      + "EXPECT: banking keeps the gathered berries (+ a Rogue-tier pick on a jackpot).\n"
-      + "Pushing into a bust scatters HALF the haul and spawns a level-scaled 2-mon Bug\n"
-      + "swarm; win keeps the rest. Round-0 leave = nothing, no cost. Never softlocks.",
+      + "DO: pick 'Forage the grove', then 'Forage on' repeatedly (common -> rare\n"
+      + "berries, a Rogue ingredient deep in) while the BUST chance climbs; or 'Pack\n"
+      + "up and leave' to stop.\n"
+      + "EXPECT: each forage hands a berry to your party RIGHT AWAY (check held items).\n"
+      + "Pushing into an interrupt spawns a level-scaled 2-mon Bug swarm - WIN and\n"
+      + "foraging RESUMES (it does NOT end). Each interrupt makes the next swarm\n"
+      + "tougher (more levels; boss lead after 3). Berries already held are never\n"
+      + "lost. Pack up = leave with everything (+ Rogue pick on a jackpot). Round-0\n"
+      + "leave = nothing. A party wipe ends the run; never softlocks.",
     setup: () => {
       resetDevOverrides();
       setOverrides({

@@ -11,20 +11,22 @@
 // leaves with the safe haul, or FORAGES ON for more - but every push raises the
 // chance a territorial wild Bug swarm interrupts and forces a fight.
 //
-//   Round haul: early rounds drop common berries; later rounds drop rarer berries
-//     and, deep in, a small chance at a single Rogue-tier "ingredient" item (the
-//     jackpot). Each surviving push grows the haul - berries are handed over as
-//     held items when the haul is kept, plus the Rogue ingredient as a shop pick.
-//   PACK UP (bank): keep everything gathered so far, leave in peace. Banking at
-//     round 0 = nothing, no cost.
-//   FORAGE ON (push) + survive: the haul grows, prompt again.
+//   Round haul: each surviving forage drops a berry, handed to the party as a held
+//     item IMMEDIATELY (so a push that ends in a fight never costs you what you
+//     already gathered). Early rounds drop common berries; later rounds drop rarer
+//     ones and, deep in, a small chance at a single Rogue-tier "ingredient" (the
+//     jackpot, offered as a shop pick when you finally pack up).
+//   PACK UP (bank): stop foraging and leave with everything already held (plus the
+//     jackpot shop, if you found the ingredient). Banking at round 0 = nothing.
+//   FORAGE ON (push) + survive: one more berry, prompt again.
 //   FORAGE ON (push) + the swarm INTERRUPTS: the grove's guardians (a level-scaled
-//     wild Bug pair built via initBattleWithEnemyConfig) attack. The interrupt
-//     itself scatters PART of the haul (a fraction of the gathered berries are
-//     lost up front); the kept berries are granted immediately and any jackpot is
-//     set as the reward shop, which opens after the win (exactly like the Graves
-//     combat branch). A full party wipe ends the run as any battle would - the
-//     branch never softlocks a forced encounter.
+//     wild Bug pair via initBattleWithEnemyConfig) attack. This is NOT a terminal
+//     bust - WIN the fight and foraging RESUMES where it left off (design PART XII
+//     s44 escalation: each interrupt makes the NEXT swarm tougher, so the deeper
+//     you forage the deadlier the guardians get). The berries you already hold are
+//     never lost. A full party wipe ends the run as any battle would - the branch
+//     never softlocks the forced encounter; the player just keeps banking berries
+//     until the swarm finally outscales them or they choose to pack up.
 //
 // Tuning lives in the constants below. The jackpot is a Rogue-tier item pick for
 // now; the design's "Forager's Pack relic" can replace it later (note in report).
@@ -33,7 +35,11 @@
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
-import { type PressYourLuckConfig, startPressYourLuck } from "#data/elite-redux/er-press-your-luck";
+import {
+  type PressYourLuckConfig,
+  resumePressYourLuck,
+  startPressYourLuck,
+} from "#data/elite-redux/er-press-your-luck";
 import { BerryType } from "#enums/berry-type";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
@@ -89,18 +95,26 @@ const RARE_ROUND = 2;
 const JACKPOT_ROUND = 3;
 /** Chance per qualifying push to gather the Rogue-tier "ingredient" jackpot. */
 const JACKPOT_CHANCE = 0.2;
-/** Fraction of the gathered berries the swarm scatters when it interrupts. */
-const BUST_HAUL_LOSS = 0.5;
+/** Levels added to the swarm per prior interrupt (design s44: deeper = deadlier). */
+const SWARM_LEVEL_PER_INTERRUPT = 6;
+/** After this many interrupts the swarm's lead becomes a BOSS (top-tier threat). */
+const SWARM_BOSS_AFTER_INTERRUPTS = 3;
 
 /** Thematic wild Bug guardians for the interrupt fight (a 2-mon swarm). */
 const SWARM_SPECIES: SpeciesId[] = [SpeciesId.BEEDRILL, SpeciesId.ARIADOS, SpeciesId.SCOLIPEDE, SpeciesId.VESPIQUEN];
 
 /** What the Forager accumulates on `encounter.misc.forage`. */
 interface ForageHaul {
-  /** Berries gathered so far, in pick order (granted to the party on bank/win). */
-  berries: BerryType[];
+  /** How many berries have been gathered (each is granted to the party at once). */
+  finds: number;
   /** Whether the Rogue-tier ingredient jackpot has been gathered. */
   jackpot: boolean;
+  /** How many swarm interrupts have been survived (drives swarm escalation). */
+  interrupts: number;
+}
+
+function defaultHaul(): ForageHaul {
+  return { finds: 0, jackpot: false, interrupts: 0 };
 }
 
 function getHaul(encounter: MysteryEncounter): ForageHaul {
@@ -108,7 +122,7 @@ function getHaul(encounter: MysteryEncounter): ForageHaul {
     encounter.misc = {};
   }
   if (!encounter.misc.forage) {
-    encounter.misc.forage = { berries: [], jackpot: false } satisfies ForageHaul;
+    encounter.misc.forage = defaultHaul();
   }
   return encounter.misc.forage as ForageHaul;
 }
@@ -118,11 +132,36 @@ function bustChance(round: number): number {
   return Math.min(BUST_BASE + round * BUST_PER_ROUND, BUST_MAX);
 }
 
-/** Grow the haul for a survived push entering `round`, and refresh the prompt token. */
+/**
+ * Grant ONE berry of the given type to the first party member that has room for
+ * it (a new held-item stack or a non-maxed existing one). Returns silently if no
+ * mon can hold it - a full party of maxed stacks just forgoes the extra.
+ */
+function grantOneBerry(berryType: BerryType): void {
+  const berry = generateModifierType(modifierTypes.BERRY, [berryType]) as BerryModifierType;
+  for (const pokemon of globalScene.getPlayerParty()) {
+    const held = globalScene.findModifier(
+      m => m instanceof BerryModifier && m.pokemonId === pokemon.id && (m as BerryModifier).berryType === berryType,
+      true,
+    ) as BerryModifier | undefined;
+    if (!held || held.getStackCount() < held.getMaxStackCount()) {
+      applyModifierTypeToPlayerPokemon(pokemon, berry);
+      return;
+    }
+  }
+}
+
+/**
+ * Resolve a survived push entering `round`: gather one berry, hand it to the party
+ * RIGHT AWAY as a held item (so an interrupt fight never costs it), and refresh
+ * the prompt token. A deep push also has a one-time shot at the Rogue ingredient.
+ */
 async function gatherRound(encounter: MysteryEncounter, round: number): Promise<void> {
   const haul = getHaul(encounter);
   const pool = round >= RARE_ROUND ? RARE_BERRIES : COMMON_BERRIES;
-  haul.berries.push(randSeedItem(pool));
+  globalScene.playSound("item_fanfare");
+  grantOneBerry(randSeedItem(pool));
+  haul.finds += 1;
 
   // Deep pushes can also turn up the Rogue-tier ingredient (only once).
   if (!haul.jackpot && round >= JACKPOT_ROUND && randSeedInt(10000) < Math.round(JACKPOT_CHANCE * 10000)) {
@@ -139,42 +178,15 @@ async function gatherRound(encounter: MysteryEncounter, round: number): Promise<
 /** Refresh the {{berryCount}} / {{ingredientNote}} dialogue tokens from the live haul. */
 function setHaulTokens(encounter: MysteryEncounter): void {
   const haul = getHaul(encounter);
-  encounter.setDialogueToken("berryCount", String(haul.berries.length));
+  encounter.setDialogueToken("berryCount", String(haul.finds));
   encounter.setDialogueToken("ingredientNote", haul.jackpot ? " and a rare ingredient" : "");
 }
 
 /**
- * Grant the gathered berries to the party as held items (the reward-phase
- * callback), one per gathered berry, spread across mons that have room.
+ * Open the Rogue-tier "ingredient" shop pick if the jackpot was gathered. Berries
+ * are already held (granted per round), so only the jackpot needs the reward phase.
  */
-function grantBerries(berries: BerryType[]): void {
-  const party = globalScene.getPlayerParty();
-  for (const berryType of berries) {
-    const berry = generateModifierType(modifierTypes.BERRY, [berryType]) as BerryModifierType;
-    for (const pokemon of party) {
-      const held = globalScene.findModifier(
-        m => m instanceof BerryModifier && m.pokemonId === pokemon.id && (m as BerryModifier).berryType === berryType,
-        true,
-      ) as BerryModifier | undefined;
-      if (!held || held.getStackCount() < held.getMaxStackCount()) {
-        applyModifierTypeToPlayerPokemon(pokemon, berry);
-        break;
-      }
-    }
-  }
-}
-
-/**
- * Hand the player the kept haul. The gathered berries are granted directly as
- * held items (they ride into and through any following battle); the Rogue-tier
- * jackpot, if gathered, is offered as a single post-resolution shop pick. With no
- * berries and no jackpot, nothing is granted (no empty shop is opened).
- */
-function awardHaul(berries: BerryType[], jackpot: boolean): void {
-  if (berries.length > 0) {
-    globalScene.playSound("item_fanfare");
-    grantBerries(berries);
-  }
+function awardJackpot(jackpot: boolean): void {
   if (jackpot) {
     setEncounterRewards({ guaranteedModifierTiers: [ModifierTier.ROGUE], fillRemaining: false });
   }
@@ -192,9 +204,15 @@ function swarmLevel(): number {
   return Math.max(1, top, Math.round(waveLvl));
 }
 
-/** Build the level-scaled 2-mon wild Bug swarm for the interrupt fight. */
-function buildSwarmBattle(): EnemyPartyConfig {
-  const level = swarmLevel();
+/**
+ * Build the level-scaled 2-mon wild Bug swarm for the interrupt fight. Each prior
+ * interrupt (`interrupts`) raises the swarm's level, and past
+ * {@linkcode SWARM_BOSS_AFTER_INTERRUPTS} the lead is promoted to a BOSS - so the
+ * deeper a session runs, the deadlier the guardians get (design PART XII s44).
+ */
+function buildSwarmBattle(interrupts: number): EnemyPartyConfig {
+  const level = swarmLevel() + interrupts * SWARM_LEVEL_PER_INTERRUPT;
+  const leadIsBoss = interrupts >= SWARM_BOSS_AFTER_INTERRUPTS;
   const first = randSeedItem(SWARM_SPECIES);
   let second = randSeedItem(SWARM_SPECIES);
   if (second === first) {
@@ -203,7 +221,7 @@ function buildSwarmBattle(): EnemyPartyConfig {
   return {
     doubleBattle: true,
     pokemonConfigs: [
-      { species: getPokemonSpecies(first), isBoss: false, level },
+      { species: getPokemonSpecies(first), isBoss: leadIsBoss, level },
       { species: getPokemonSpecies(second), isBoss: false, level },
     ],
   };
@@ -221,28 +239,32 @@ function forageConfig(encounter: MysteryEncounter): PressYourLuckConfig {
     onPush: round => gatherRound(encounter, round),
     onBank: async roundsCompleted => {
       const haul = getHaul(encounter);
-      if (roundsCompleted === 0) {
+      if (roundsCompleted === 0 && haul.finds === 0) {
         // Walked away before gathering anything - no haul, no cost.
         await transitionMysteryEncounterIntroVisuals(true, true);
         leaveEncounterWithoutBattle(true);
         return;
       }
-      awardHaul(haul.berries, haul.jackpot);
+      // Berries are already held (granted per round); only the jackpot shop is left.
+      awardJackpot(haul.jackpot);
       await transitionMysteryEncounterIntroVisuals(true, true);
       leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
     },
     onBust: async () => {
       const haul = getHaul(encounter);
-      // The swarm scatters part of the haul up front; the rest rides on the win.
-      const kept = Math.floor(haul.berries.length * (1 - BUST_HAUL_LOSS));
-      const keptBerries = haul.berries.slice(0, kept);
-      encounter.setDialogueToken("scattered", String(haul.berries.length - kept));
+      // The swarm interrupts - but this is NOT terminal. Berries are already held,
+      // so nothing is lost. WIN the fight and foraging RESUMES (design s44): the
+      // post-battle MysteryEncounterRewardsPhase fires doContinueEncounter, which
+      // re-prompts the loop with an escalated swarm. A party wipe ends the run as
+      // any battle would. The interrupt count drives the next swarm's difficulty.
+      haul.interrupts += 1;
       queueEncounterMessage(`${namespace}:swarmInterrupts`);
-      // Hand over the reduced haul (berries granted now, jackpot shop opens after
-      // the win - Graves combat-branch pattern); a full party wipe ends the run.
-      awardHaul(keptBerries, haul.jackpot);
+      encounter.doContinueEncounter = async () => {
+        encounter.doContinueEncounter = undefined;
+        await resumePressYourLuck(forageConfig(encounter));
+      };
       await transitionMysteryEncounterIntroVisuals(true, false);
-      await initBattleWithEnemyConfig(buildSwarmBattle());
+      await initBattleWithEnemyConfig(buildSwarmBattle(haul.interrupts));
     },
   };
 }
@@ -263,7 +285,7 @@ export const WoodlandForagerEncounter: MysteryEncounter = MysteryEncounterBuilde
   .withOnInit(() => {
     const encounter = globalScene.currentBattle.mysteryEncounter!;
     // Reset the haul + prompt tokens so a re-rolled/forced encounter starts clean.
-    encounter.misc = { forage: { berries: [], jackpot: false } satisfies ForageHaul };
+    encounter.misc = { forage: defaultHaul() };
     setHaulTokens(encounter);
     return true;
   })
