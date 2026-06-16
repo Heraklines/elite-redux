@@ -83,6 +83,14 @@ export class ErQuizPhase extends Phase {
    * footprint art - the UI shows the footprint when present, else a silhouette.
    */
   private async run(): Promise<void> {
+    // A prior phase / the encounter intro transition may still be loading; adding
+    // files to an in-flight loader can drop them (the COMPLETE we await fires for
+    // the OTHER batch). Wait for the loader to be idle, THEN queue our own batch
+    // and start it once - the pattern that reliably lands every asset.
+    if (globalScene.load.isLoading()) {
+      await new Promise<void>(resolve => globalScene.load.once(Phaser.Loader.Events.COMPLETE, () => resolve()));
+    }
+
     let queuedAnything = false;
     const queueSilhouette = (speciesId: number): void => {
       const species = getPokemonSpecies(speciesId);
@@ -99,22 +107,29 @@ export class ErQuizPhase extends Phase {
       } else if (q.kind === "footprint") {
         const fp = getErFootprintAsset(q.answerId);
         if (fp && !globalScene.textures.exists(fp.key)) {
-          // A missing footprint file 404s harmlessly; ask() falls back to the
-          // silhouette we also queue below.
           globalScene.load.image(fp.key, fp.url);
           queuedAnything = true;
         }
+        // Always queue the silhouette too: it is the fallback when a species
+        // ships no footprint art (a missing file 404s harmlessly).
         queueSilhouette(q.answerId);
       }
     }
 
     if (queuedAnything) {
+      // Surface any failed file (e.g. a missing footprint) into a Send-Logs
+      // capture so we can see exactly which URL didn't load.
+      const onErr = (file: { key?: string; src?: string }): void => {
+        console.warn(`[er-quiz] asset load failed: key=${file?.key} src=${file?.src}`);
+      };
+      globalScene.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onErr);
       await new Promise<void>(resolve => {
         globalScene.load.once(Phaser.Loader.Events.COMPLETE, () => resolve());
         if (!globalScene.load.isLoading()) {
           globalScene.load.start();
         }
       });
+      globalScene.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onErr);
     }
     void this.ask();
   }

@@ -26,7 +26,6 @@
 
 import { ER_SPRITE_MANIFEST } from "#data/elite-redux/er-sprite-manifest";
 import { randSeedInt, randSeedShuffle } from "#utils/common";
-import { getCachedUrl } from "#utils/fetch-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import erDexFlavorRaw from "./er-dex-flavor.json";
 
@@ -55,8 +54,9 @@ export interface ErFootprintAsset {
 /**
  * speciesId -> footprint runtime URL, built from the sprite manifest. The
  * manifest stores build-time paths (`assets/images/...`); the served path drops
- * the leading `assets/` (matching how ER pokemon atlases load from
- * `images/pokemon/elite-redux/<slug>/`). Memoized.
+ * the leading `assets/` to `images/pokemon/elite-redux/<slug>/footprint.png` -
+ * the SAME raw `images/...` form `loadPokemonAtlas` uses for every ER pokemon
+ * sprite (NOT run through getCachedUrl, matching that proven loader). Memoized.
  */
 let cachedFootprintUrls: Map<number, string> | null = null;
 function footprintUrls(): Map<number, string> {
@@ -72,9 +72,9 @@ function footprintUrls(): Map<number, string> {
 }
 
 /**
- * The footprint texture key + cache-busted URL for a species, or undefined if
- * the manifest lists no footprint path for it. (The file may still 404 at load
- * time for a species with no shipped footprint art - callers fall back to a
+ * The footprint texture key + runtime URL for a species, or undefined if the
+ * manifest lists no footprint path for it. (The file may still 404 at load time
+ * for a species with no shipped footprint art - callers fall back to a
  * silhouette in that case.)
  */
 export function getErFootprintAsset(speciesId: number): ErFootprintAsset | undefined {
@@ -82,7 +82,7 @@ export function getErFootprintAsset(speciesId: number): ErFootprintAsset | undef
   if (!rel) {
     return undefined;
   }
-  return { key: `er_footprint__${speciesId}`, url: getCachedUrl(rel) };
+  return { key: `er_footprint__${speciesId}`, url: rel };
 }
 
 /**
