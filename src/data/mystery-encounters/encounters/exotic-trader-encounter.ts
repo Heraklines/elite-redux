@@ -18,14 +18,12 @@
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
-import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import {
   leaveEncounterWithoutBattle,
-  setEncounterRewards,
   transitionMysteryEncounterIntroVisuals,
   updatePlayerMoney,
 } from "#mystery-encounters/encounter-phase-utils";
@@ -38,9 +36,6 @@ const namespace = "mysteryEncounters/exoticTrader";
 
 /** Wave-scaled boarding fee multiplier (steep - this is premium stock). */
 const BOARDING_FEE_MULTIPLIER = 2.5;
-
-/** The guaranteed high-tier selection the trader lays out. */
-const PREMIUM_TIERS: ModifierTier[] = [ModifierTier.ROGUE, ModifierTier.ULTRA, ModifierTier.ULTRA];
 
 /** The wave-scaled boarding fee. */
 function boardingFee(): number {
@@ -73,9 +68,16 @@ export const ExoticTraderEncounter: MysteryEncounter = MysteryEncounterBuilder.w
         selected: [{ text: `${namespace}:option.1.selected` }],
       })
       .withOptionPhase(async () => {
-        // Pay the boarding fee, then lay out the premium high-tier selection.
+        // Pay the boarding fee, then open the real premium SHOP screen
+        // (ExoticShopPhase: every good Ultra->Master tier, steep prices, no heals).
+        // Launched via the doEncounterRewards hook so it runs as a real phase
+        // BEFORE the post-encounter continuation - a full browse-and-buy market,
+        // not a reward screen.
         updatePlayerMoney(-boardingFee(), true, false);
-        setEncounterRewards({ guaranteedModifierTiers: PREMIUM_TIERS, fillRemaining: false });
+        globalScene.currentBattle.mysteryEncounter!.doEncounterRewards = () => {
+          globalScene.phaseManager.unshiftNew("ExoticShopPhase");
+          return true;
+        };
         await transitionMysteryEncounterIntroVisuals(true, true);
         leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
         return true;

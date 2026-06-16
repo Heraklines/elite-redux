@@ -35,9 +35,11 @@ import { NumberHolder } from "#utils/common";
 import i18next from "i18next";
 
 export class BiomeShopPhase extends SelectModifierPhase {
-  private shopOptions: ModifierTypeOption[] = [];
+  /** The shop stock. `protected` so event-specific shops (e.g. ExoticShopPhase)
+   * can override buildStock() to supply their own curated goods. */
+  protected shopOptions: ModifierTypeOption[] = [];
   /** Remaining stock per slot (rarer items stock fewer; see erBiomeStockCount). */
-  private qtys: number[] = [];
+  protected qtys: number[] = [];
   /** Slot index awaiting a purchase result, so applyModifier can decrement it. */
   private pendingIndex = -1;
 
@@ -55,21 +57,29 @@ export class BiomeShopPhase extends SelectModifierPhase {
       return false;
     }
 
+    this.buildStock();
+    if (this.shopOptions.length === 0) {
+      this.end();
+      return;
+    }
+    this.openBiomeShop();
+    return;
+  }
+
+  /**
+   * Populate this.shopOptions + this.qtys. Default = the every-10-wave biome
+   * market (the 16-slot biome stock). Event-specific shops override this to
+   * supply their own curated goods (see ExoticShopPhase).
+   */
+  protected buildStock(): void {
     const waveIndex = globalScene.currentBattle.waveIndex;
     const baseCost = new NumberHolder(globalScene.getWaveMoneyAmount(1));
     globalScene.applyModifier(HealShopCostModifier, true, baseCost);
     // Same hook the reward screen used: on x0 waves this returns the 16-slot
     // biome market stock (see getPlayerShopModifierTypeOptionsForWave).
     this.shopOptions = getPlayerShopModifierTypeOptionsForWave(waveIndex, baseCost.value, /* forBiomeShop */ true);
-    if (this.shopOptions.length === 0) {
-      this.end();
-      return;
-    }
     // Stock count per slot by the item's rarity tier (rarer = scarcer).
     this.qtys = this.shopOptions.map(o => erBiomeStockCount(o.type.getOrInferTier() ?? ModifierTier.GREAT));
-
-    this.openBiomeShop();
-    return;
   }
 
   private openBiomeShop(): void {

@@ -38,6 +38,7 @@ import { EnemyCommandPhase } from "#phases/enemy-command-phase";
 import { ErDexNavPhase } from "#phases/er-dex-nav-phase";
 import { ErQuizPhase } from "#phases/er-quiz-phase";
 import { EvolutionPhase } from "#phases/evolution-phase";
+import { ExoticShopPhase } from "#phases/exotic-shop-phase";
 import { ExpPhase } from "#phases/exp-phase";
 import { FaintPhase } from "#phases/faint-phase";
 import { FormChangePhase } from "#phases/form-change-phase";
@@ -138,6 +139,7 @@ const PHASES = Object.freeze({
   BerryPhase,
   BiomeShopPhase,
   ColosseumChoicePhase,
+  ExoticShopPhase,
   ErQuizPhase,
   CheckInterludePhase,
   CheckStatusEffectPhase,
