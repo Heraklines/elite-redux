@@ -874,7 +874,17 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
     // The ER Colosseum gauntlet (#439) is likewise curated content (real boss /
     // gym / champion / ghost teams meant to fight at FULL power), so its battles
     // bypass the BST cap while the flag is set.
-    if (globalScene.gameMode?.isDaily || erColosseumBattleActive) {
+    //
+    // MYSTERY-ENCOUNTER battles set their enemies intentionally (#439 biome
+    // events): the Still Waters mirror clones the player's own party (which can
+    // legitimately exceed the cap), the delve guardians (#494) are MEANT to climb
+    // past the wave cap with depth, and catch-bosses are hand-built. Never let the
+    // wave-ladder cap rewrite an encounter's chosen species.
+    if (
+      globalScene.gameMode?.isDaily ||
+      erColosseumBattleActive ||
+      (globalScene.currentBattle?.isBattleMysteryEncounter?.() ?? false)
+    ) {
       return;
     }
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
