@@ -31,14 +31,13 @@
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
+import { modifierTypes } from "#data/data-lists";
 import {
   emptyMineralHaul,
   type MineralLootHaul,
   mineralHaulHasItems,
   openMineralHaul,
-  rollKingsRock,
   rollMegaStone,
-  rollMineralFind,
   rollMineralMoney,
 } from "#data/elite-redux/er-mineral-loot";
 import {
@@ -62,7 +61,8 @@ import {
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
-import { randSeedInt } from "#utils/common";
+import type { ModifierTypeFunc } from "#types/modifier-types";
+import { randSeedInt, randSeedItem } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 const namespace = "mysteryEncounters/tidePools";
@@ -90,7 +90,55 @@ const GUARDIAN_BOSS_AFTER_INTERRUPTS = 3;
 /** A boss guardian is at least this many levels above the player's strongest mon. */
 const BOSS_LEVELS_ABOVE = 5;
 /** Percent chance per deep comb to turn up a party-line mega stone (once/session). */
-const MEGA_STONE_CHANCE = 4;
+const MEGA_STONE_CHANCE = 3;
+
+// --- Beach find pool (Tide Pools' OWN items, not the shared mineral pool) --- //
+//
+// A tide pool is mostly MONEY (shells/pearls, paid per comb). On top of that a
+// comb can wash up a piece of gear - common, sea-worn held items - and, rarely,
+// the standout SHELL BELL. Deliberately humble and money-first: this is a beach,
+// not a treasure vault.
+
+/** Common washed-up gear (the bread-and-butter item find). */
+const BEACH_FIND_FUNCS: ModifierTypeFunc[] = [
+  modifierTypes.LEFTOVERS,
+  modifierTypes.WIDE_LENS,
+  modifierTypes.QUICK_CLAW,
+  modifierTypes.SCOPE_LENS,
+];
+
+/** Of the combs that DO wash up gear, this % are the rare Shell Bell instead. */
+const SHELL_BELL_SHARE = 14;
+
+/**
+ * Percent chance a comb at depth `d` (0-indexed) washes up a held item at all.
+ * Intentionally lower than the mineral delves - the beach pays in money first,
+ * an item is the uncommon bonus on a deeper reach.
+ */
+function beachFindChance(d: number): number {
+  if (d <= 1) {
+    return 0;
+  }
+  if (d === 2) {
+    return 14;
+  }
+  if (d === 3) {
+    return 20;
+  }
+  return 26;
+}
+
+/**
+ * Roll for a washed-up item find at comb depth `d`. Mostly common sea-worn gear;
+ * rarely the standout Shell Bell. Adds the find to the haul's funcs on a hit.
+ */
+function rollBeachFind(haul: MineralLootHaul, d: number): boolean {
+  if (randSeedInt(100) >= beachFindChance(d)) {
+    return false;
+  }
+  haul.funcs.push(randSeedInt(100) < SHELL_BELL_SHARE ? modifierTypes.SHELL_BELL : randSeedItem(BEACH_FIND_FUNCS));
+  return true;
+}
 
 /**
  * Thematic wild Water guardians, ordered weakest -> strongest. Deeper interrupts
@@ -143,17 +191,15 @@ async function combRound(encounter: MysteryEncounter, round: number): Promise<vo
     updatePlayerMoney(money.amount, true, false);
   }
 
-  // An empty comb turns up nothing. Otherwise a comb can also turn up an ITEM for
-  // the bank haul (deeper pools have better odds): a rare King's Rock, an uncommon
-  // curio (Eviolite / Mystical Rock), or, deep in, a party-line mega stone.
+  // An empty comb turns up nothing. Otherwise the beach pays in MONEY first; a
+  // deeper comb can also wash up a held item for the bank haul (common sea-worn
+  // gear, rarely a Shell Bell), or - deep in, very rarely - a party-line mega stone.
   let messageKey: string;
   if (money.kind === "dud") {
     messageKey = `${namespace}:foundNothing`;
   } else if (rollMegaStone(haul.loot, round, MEGA_STONE_CHANCE)) {
     messageKey = `${namespace}:foundMegaStone`;
-  } else if (rollKingsRock(haul.loot, round)) {
-    messageKey = `${namespace}:foundKingsRock`;
-  } else if (rollMineralFind(haul.loot, round, "mineral")) {
+  } else if (rollBeachFind(haul.loot, round)) {
     messageKey = `${namespace}:foundCurio`;
   } else if (money.kind === "nugget") {
     messageKey = `${namespace}:foundPearl`;

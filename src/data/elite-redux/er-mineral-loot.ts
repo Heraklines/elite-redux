@@ -111,22 +111,30 @@ function itemPool(): ModifierTypeFunc[] {
   return [modifierTypes.EVIOLITE, modifierTypes.MYSTICAL_ROCK];
 }
 
-/** Percent chance per deep strike to turn up a KING'S ROCK (about mega-stone rare). */
-const KINGS_ROCK_CHANCE = 4;
+/** Percent chance per deep strike to turn up a KING'S ROCK (an uncommon deep find). */
+const KINGS_ROCK_CHANCE = 7;
 
 /**
  * Percent chance that a strike at depth `d` (0-indexed) also turns up one of the
- * regular items (Eviolite / Mystical Rock). Shallow strikes are money-only; the
- * chance climbs as the dig deepens but stays an uncommon bonus.
+ * regular items (Eviolite / Mystical Rock). Only the very first strike is money-
+ * only; from the second strike on a curio is a real, climbing possibility - the
+ * old gate (nothing before depth 2, then 14%) was so stingy that, against the
+ * fast-climbing bust curve, most runs busted out before ever seeing an item.
  */
 function itemFindChance(d: number): number {
-  if (d <= 1) {
+  if (d <= 0) {
     return 0;
   }
-  if (d <= 3) {
-    return 14;
+  if (d === 1) {
+    return 22;
   }
-  return 22;
+  if (d === 2) {
+    return 34;
+  }
+  if (d === 3) {
+    return 44;
+  }
+  return 55;
 }
 
 /**
