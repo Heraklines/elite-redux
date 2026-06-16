@@ -149,7 +149,7 @@ export class ErMapUiHandler extends UiHandler {
     this.hintText.setTint(DIM);
     this.card.add(this.hintText);
 
-    // Wire the global "M" opens-the-map hotkey (registered once).
+    // Wire the global "J" opens-the-map hotkey (registered once).
     installErMapHotkey();
   }
 
@@ -269,11 +269,15 @@ export function openErMapOverlay(onClose?: ErMapCloseCallback): void {
 let mapHotkeyInstalled = false;
 
 /**
- * Install the global "M" hotkey that opens the World Map during a run. Registered
+ * Install the global "J" hotkey that opens the World Map during a run. Registered
  * once (idempotent). Deliberately conservative: it only fires from the in-battle
  * COMMAND screen (the "standing in the field" moment), never while typing in a
  * text field, never outside a run, and never when an overlay is already open - so
  * it can't stomp menus, forms, or the map itself.
+ *
+ * NOTE: "J" is an UNASSIGNED key in the keyboard config (cfg-keyboard-qwerty maps
+ * it to -1), so it can't collide with a real binding. "M" was wrong - it's bound
+ * to ALT_BUTTON_MENU (opens the pause menu / settings).
  */
 export function installErMapHotkey(): void {
   if (mapHotkeyInstalled || typeof window === "undefined") {
@@ -281,7 +285,7 @@ export function installErMapHotkey(): void {
   }
   mapHotkeyInstalled = true;
   window.addEventListener("keydown", (ev: KeyboardEvent) => {
-    if (ev.key !== "m" && ev.key !== "M") {
+    if (ev.key !== "j" && ev.key !== "J") {
       return;
     }
     // Ignore the key while a text field has focus (rename/search/password forms).

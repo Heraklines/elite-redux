@@ -4201,10 +4201,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "ER #486: X Marks the Spot (dig)",
     description:
       "Phase D map payout - the Beach buried-cache event. Starts you with 3\n"
-      + "Treasure-Map fragments seeded (press M before choosing to confirm 3 / 3).\n"
+      + "Treasure-Map fragments seeded (press J before choosing to confirm 3 / 3).\n"
       + "DO: on wave 12 (BEACH) choose 'Dig at the X'.\n"
       + "EXPECT: a 'buried cache' message, then a reward selection of solid items\n"
-      + "(Rogue / Ultra / Great tier). After taking the reward, press M: the fragment\n"
+      + "(Rogue / Ultra / Great tier). After taking the reward, press J: the fragment\n"
       + "count is back to 0 / 3 (the three were spent). 'Scratch around' instead would\n"
       + "add one fragment; 'Walk the shoreline' just leaves.",
     setup: () => {
@@ -4224,7 +4224,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "ER #486: The Observatory (reveal)",
     description:
       "Phase D reveal event (Space). DO: on wave 12 choose 'Chart the heavens',\n"
-      + "then press M.\n"
+      + "then press J.\n"
       + "EXPECT: the World Map lists the onward routes as [Route] nodes plus 'The\n"
       + "Observatory' as a [Landmark]. 'Leave' just exits.",
     setup: () => {
@@ -4243,7 +4243,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "ER #486: Echo Chamber (reveal)",
     description:
       "Phase D reveal event (Cave). DO: on wave 12 choose 'Listen to the echoes',\n"
-      + "then press M.\n"
+      + "then press J.\n"
       + "EXPECT: the World Map lists the onward routes as [Route] nodes. 'Move on'\n"
       + "just exits.",
     setup: () => {
@@ -4263,7 +4263,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     description:
       "Phase D reveal event (Slum), money-gated. Starts with 50000 money.\n"
       + "DO: on wave 12 choose 'Buy the tip' (greyed if you cannot afford it), then\n"
-      + "press M.\n"
+      + "press J.\n"
       + "EXPECT: money drops by the fee; the World Map shows the onward [Route] nodes\n"
       + "and the fragment count went up by 1. 'Walk on' just exits.",
     setup: () => {
@@ -4322,7 +4322,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "ER #486: Lost Wanderer (reveal + fragment)",
     description:
       "Phase D reveal event (Plains). DO: on wave 12 choose 'Point the way', then\n"
-      + "press M.\n"
+      + "press J.\n"
       + "EXPECT: the World Map shows the onward [Route] nodes and the fragment count\n"
       + "went up by 1. 'Leave them be' just exits.",
     setup: () => {
@@ -4341,7 +4341,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "ER #486: Sunken Vessel (reveal + fragment)",
     description:
       "Phase D reveal event (Seabed). DO: on wave 12 choose 'Scout the wreck', then\n"
-      + "press M.\n"
+      + "press J.\n"
       + "EXPECT: the World Map shows the onward [Route] nodes and the fragment count\n"
       + "went up by 1. 'Drift on' just exits.",
     setup: () => {

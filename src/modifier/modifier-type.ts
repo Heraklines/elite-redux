@@ -2814,16 +2814,28 @@ export function getPlayerModifierTypeOptions(
       && customModifierSettings.guaranteedModifierTypeFuncs.length > 0
     ) {
       customModifierSettings.guaranteedModifierTypeFuncs!.forEach((mod, _i) => {
-        const modifierId = Object.keys(modifierTypeInitObj).find(k => modifierTypeInitObj[k] === mod) as string;
-        let guaranteedMod: ModifierType = modifierTypeInitObj[modifierId]?.();
+        // ER: resolve guaranteed reward funcs against the FULL modifier registry
+        // (`modifierTypes`), not just the vanilla `modifierTypeInitObj`. ER-custom
+        // funcs (Relics, ER items) live in `modifierTypes` only, so the vanilla
+        // reverse-lookup returned undefined and `undefined.withIdFromFunc(...)`
+        // crashed the whole reward screen (Fairy's Boon, Abyssal Vent, etc.).
+        // `modifierTypes` is a superset of `modifierTypeInitObj`, so this also
+        // covers every vanilla func. Guard each step so an unresolved/undefined
+        // entry is skipped instead of crashing.
+        const modifierId = Object.keys(modifierTypes).find(k => modifierTypes[k] === mod);
+        const builder = modifierId ? modifierTypes[modifierId] : mod;
+        const guaranteedMod: ModifierType | undefined = builder?.();
+        if (!guaranteedMod) {
+          return;
+        }
 
-        // Populates item id and tier
-        guaranteedMod = guaranteedMod
-          .withIdFromFunc(modifierTypeInitObj[modifierId])
-          .withTierFromPool(ModifierPoolType.PLAYER, party);
+        // Populates item id (used for tier/price reverse-lookup) and tier.
+        if (modifierId) {
+          guaranteedMod.id = modifierId;
+        }
+        const tieredMod = guaranteedMod.withTierFromPool(ModifierPoolType.PLAYER, party);
 
-        const modType =
-          guaranteedMod instanceof ModifierTypeGenerator ? guaranteedMod.generateType(party) : guaranteedMod;
+        const modType = tieredMod instanceof ModifierTypeGenerator ? tieredMod.generateType(party) : tieredMod;
         if (modType) {
           const option = new ModifierTypeOption(modType, 0);
           options.push(option);

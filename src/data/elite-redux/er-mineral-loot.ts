@@ -100,8 +100,14 @@ export function rollMineralMoney(base: number): MoneyRoll {
 
 // --- Items ----------------------------------------------------------------- //
 
-/** The regular item finds (an uncommon bonus on a deeper strike). */
-const ITEM_POOL: ModifierTypeFunc[] = [modifierTypes.EVIOLITE, modifierTypes.MYSTICAL_ROCK];
+/**
+ * The regular item finds (an uncommon bonus on a deeper strike). Built lazily at
+ * call time: `modifierTypes` is an empty object until initModifierTypes() runs, so
+ * capturing these at module-eval time could freeze in `undefined` references.
+ */
+function itemPool(): ModifierTypeFunc[] {
+  return [modifierTypes.EVIOLITE, modifierTypes.MYSTICAL_ROCK];
+}
 
 /** Percent chance per deep strike to turn up a KING'S ROCK (about mega-stone rare). */
 const KINGS_ROCK_CHANCE = 4;
@@ -129,7 +135,7 @@ export function rollMineralFind(haul: MineralLootHaul, d: number, _flavor: Miner
   if (randSeedInt(100) >= itemFindChance(d)) {
     return false;
   }
-  haul.funcs.push(randSeedItem(ITEM_POOL));
+  haul.funcs.push(randSeedItem(itemPool()));
   return true;
 }
 
