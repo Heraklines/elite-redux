@@ -580,6 +580,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Fairy Cave: Wishing Crystal (#521)",
+    description:
+      "#521 - The Wishing Crystal (Fairy Cave blessing). Forces ER_WISHING_CRYSTAL\n"
+      + "in FAIRY_CAVE.\n"
+      + "DO: read the description - it names the rolled tier (mostly Great, rarely\n"
+      + "Ultra/Rogue). Pick a blessing: power, fortune, or protection.\n"
+      + "EXPECT: a reward screen of picks at the ROLLED tier (1 for Great, 2 Ultra, 3\n"
+      + "Rogue); on an Ultra+ roll the matching relic is included (power=Morale Banner,\n"
+      + "fortune=Coin Purse, protection=Field Medic). No battle.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.FAIRY_CAVE,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_WISHING_CRYSTAL,
+      });
+      return [
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.SPLASH],
+        }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
     label: "ER Badlands: High Noon (#516)",
     description:
       "#516 - High Noon (Badlands single-strike duel). Forces ER_HIGH_NOON in\n"

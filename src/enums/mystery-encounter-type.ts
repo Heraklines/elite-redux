@@ -174,6 +174,9 @@ export enum MysteryEncounterType {
   /** ER #516: High Noon - a Badlands single-strike duel; ante money and pick your
    * fastest mon to out-draw the outlaw for the pot, or lose your ante. */
   ER_HIGH_NOON,
+  /** ER #521: The Wishing Crystal - a Fairy Cave blessing; the crystal rolls a tier,
+   * then you choose a category (power/fortune/protection) for tier-scaled gifts. */
+  ER_WISHING_CRYSTAL,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

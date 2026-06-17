@@ -1,0 +1,23 @@
+{
+  "intro": "Deep in the glittering cave, a single crystal floats in a shaft of light, humming a note you feel more than hear. It is listening for a wish.",
+  "title": "The Wishing Crystal",
+  "description": "A wish-crystal thrums with gathered luck. As you reach for it, the light settles into a {{tierName}}-tier glow - that is the strength of the blessing it will grant. Now choose what to wish for: power, fortune, or protection.",
+  "query": "What do you wish for?",
+  "option": {
+    "1": {
+      "label": "Wish for power",
+      "tooltip": "(+) Offensive gifts scaled to the rolled tier (+ a Morale Banner on a high roll)",
+      "selected": "The crystal flares red-gold, and strength pours into your team."
+    },
+    "2": {
+      "label": "Wish for fortune",
+      "tooltip": "(+) Lucky gifts scaled to the rolled tier (+ a Coin Purse on a high roll)",
+      "selected": "The crystal shimmers gold, and fortune turns your way."
+    },
+    "3": {
+      "label": "Wish for protection",
+      "tooltip": "(+) Protective gifts scaled to the rolled tier (+ a Field Medic on a high roll)",
+      "selected": "The crystal glows a steady blue, and a warm ward settles over your team."
+    }
+  }
+}

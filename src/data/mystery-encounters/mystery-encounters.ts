@@ -78,6 +78,7 @@ import { TrashToTreasureEncounter } from "#mystery-encounters/trash-to-treasure-
 import { UltraWormholeEncounter } from "#mystery-encounters/ultra-wormhole-encounter";
 import { UncommonBreedEncounter } from "#mystery-encounters/uncommon-breed-encounter";
 import { WeirdDreamEncounter } from "#mystery-encounters/weird-dream-encounter";
+import { WishingCrystalEncounter } from "#mystery-encounters/wishing-crystal-encounter";
 import { WoodlandForagerEncounter } from "#mystery-encounters/woodland-forager-encounter";
 import { XMarksTheSpotEncounter } from "#mystery-encounters/x-marks-the-spot-encounter";
 import { getBiomeName } from "#utils/common";
@@ -324,7 +325,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   ],
   [BiomeId.CONSTRUCTION_SITE, [MysteryEncounterType.ER_FOREMANS_JOB]],
   [BiomeId.JUNGLE, [MysteryEncounterType.SAFARI_ZONE, MysteryEncounterType.ER_OVERGROWN_TEMPLE]],
-  [BiomeId.FAIRY_CAVE, [MysteryEncounterType.ER_FAIRYS_BOON]],
+  [BiomeId.FAIRY_CAVE, [MysteryEncounterType.ER_FAIRYS_BOON, MysteryEncounterType.ER_WISHING_CRYSTAL]],
   // #503: the Totem Trial belongs to ISLAND (transcript line 124231), not Temple.
   // Temple's SIGNATURE is the Innate Shrine (#514, not yet built); the Cleansing
   // Font (#515) is its second event.
@@ -418,6 +419,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_REACTOR_MELTDOWN] = ReactorMeltdownEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_MOUNTAIN_SAGE] = MountainSageEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_HIGH_NOON] = HighNoonEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_WISHING_CRYSTAL] = WishingCrystalEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {
