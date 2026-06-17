@@ -6,21 +6,23 @@
 
 // =============================================================================
 // ER #525 - The Fabricator. A FACTORY crafting event, the rework of the old
-// Salvage Yard (transcript line 124214). The reclamation works turn your spare
-// gear into something better - feed it as many held items as you like and the
-// machine values the haul (rarity x quantity), then pays out by total value:
+// Salvage Yard (transcript line 124214). Feed it as many held items as you like
+// and the works value the haul (rarity x quantity), then pay out by total value.
 //
-//   THE SMELTER: melt the fed haul into ITEMS. The more (and finer) you pour, the
-//     higher the rarity - and a big haul yields more than one. Always items, never
-//     a relic.
-//   THE FABRICATOR: forge the fed haul into a production RELIC (Scrap Magnet /
-//     Quartermaster / Collector's Album) - BUT only if the haul is valuable enough.
-//     A cheap haul just gets stamped into a normal item instead (no free relic).
+// Scrap value per item (x its stack): COMMON 3 / GREAT 6 / ULTRA 12 / ROGUE 24 /
+// MASTER 48. So ONE item of a tier is worth exactly that tier's output threshold:
+//   value >= 48 -> MASTER item     value >= 24 -> ROGUE item
+//   value >= 12 -> ULTRA item      else        -> GREAT item
+//   value >= 100 -> a production RELIC (about two Master items' worth, plus a bit)
+//
+//   THE SMELTER: melts the haul into 1-3 ITEMS at that tier (more for bigger hauls),
+//     or a RELIC once the haul is worth >= 100.
+//   THE FABRICATOR: forges the haul into a RELIC at value >= 100; below that it
+//     stamps out a single item at the value's tier (no free relics).
 //   WALK AWAY: salvage nothing.
 //
-// Feeding loops: pick an item, then pick another, until you choose "Done". Value
-// is summed across everything fed (whole stacks), so it scales smoothly with how
-// much and how rare your contribution is.
+// Feeding loops: pick an item, then pick another, until you choose "Stop feeding"
+// (up to 6). Whole stacks are fed; value sums across everything.
 // =============================================================================
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
@@ -58,19 +60,22 @@ const FABRICATOR_RELICS: ModifierTypeFunc[] = [
 /** Most items a single visit can feed (keeps the picker loop bounded). */
 const MAX_FEED = 6;
 
-/** A fed item is worth this much "scrap value" per stack, weighted by rarity. */
+/** Haul value needed to forge a RELIC (about two Master-tier items' worth, plus a bit). */
+const RELIC_VALUE_THRESHOLD = 100;
+
+/** Scrap value of one item of a given tier (multiplied by its stack count). */
 function tierScrapValue(tier: ModifierTier): number {
   switch (tier) {
     case ModifierTier.MASTER:
-      return 16;
+      return 48;
     case ModifierTier.ROGUE:
-      return 8;
+      return 24;
     case ModifierTier.ULTRA:
-      return 4;
+      return 12;
     case ModifierTier.GREAT:
-      return 2;
+      return 6;
     default:
-      return 1; // COMMON / unknown
+      return 3; // COMMON / unknown
   }
 }
 
@@ -96,23 +101,30 @@ function haulValue(fed: PokemonHeldItemModifier[]): number {
   return fed.reduce((sum, m) => sum + tierScrapValue(itemTier(m)) * m.stackCount, 0);
 }
 
-/** The rarest tier among the fed items (GREAT floor - the works never spits out trash). */
-function bestFedTier(fed: PokemonHeldItemModifier[]): ModifierTier {
-  return fed.reduce<ModifierTier>((best, m) => Math.max(best, itemTier(m)) as ModifierTier, ModifierTier.GREAT);
+/** Output ITEM tier for a given haul value (relic is handled separately at >= 100). */
+function outputTier(value: number): ModifierTier {
+  if (value >= 48) {
+    return ModifierTier.MASTER;
+  }
+  if (value >= 24) {
+    return ModifierTier.ROGUE;
+  }
+  if (value >= 12) {
+    return ModifierTier.ULTRA;
+  }
+  return ModifierTier.GREAT; // floor: even a tiny haul never outputs trash
 }
 
-/** Clamp a tier into the [GREAT, ROGUE] normal-item output band. */
-function clampItemTier(tier: number): ModifierTier {
-  return Math.max(ModifierTier.GREAT, Math.min(tier, ModifierTier.ROGUE)) as ModifierTier;
+/** Grant one random production relic as the encounter reward. */
+function rewardRelic(): void {
+  queueEncounterMessage(`${namespace}:fabricated`);
+  setEncounterRewards({ guaranteedModifierTypeFuncs: [randSeedItem(FABRICATOR_RELICS)], fillRemaining: false });
 }
-
-/** Haul value needed before the Fabricator will forge a RELIC (else a plain item). */
-const RELIC_VALUE_THRESHOLD = 16;
 
 /**
  * The held-item picker (preOptionPhase): feed AS MANY items as you like. Each round
  * you pick a mon then one of its (not-yet-fed) transferable items, or choose
- * "Done". Whole stacks are fed; chosen items accumulate in misc.fed.
+ * "Stop feeding". Whole stacks are fed; chosen items accumulate in misc.fed.
  */
 async function feedPicker(): Promise<boolean> {
   const encounter = globalScene.currentBattle.mysteryEncounter!;
@@ -132,7 +144,7 @@ async function feedPicker(): Promise<boolean> {
           return true;
         },
       }));
-      // A "stop feeding" entry so the player can finish with what they have.
+      // A plain "stop feeding" entry so the player can finish with what they have.
       opts.push({
         label: "Stop feeding",
         handler: () => {
@@ -148,7 +160,7 @@ async function feedPicker(): Promise<boolean> {
         : (getEncounterText(`${namespace}:invalidSelection`) ?? null);
 
     const proceeded = await selectPokemonForOption(onPokemonSelected, undefined, selectableFilter);
-    // Cancelled the party select, or chose "Done" -> stop looping.
+    // Cancelled the party select, or chose "Stop feeding" -> stop looping.
     if (!proceeded || !pickedThisRound) {
       feeding = false;
     }
@@ -167,7 +179,7 @@ async function consumeFed(fed: PokemonHeldItemModifier[]): Promise<void> {
   await globalScene.updateModifiers(true);
 }
 
-/** Smelt: melt the haul into ITEMS - tier and count scale with total value. */
+/** Smelt: melt the haul into ITEMS (count + tier scale with value), or a RELIC at >= 100. */
 async function smelt(): Promise<void> {
   const fed = getFed();
   if (fed.length === 0) {
@@ -175,20 +187,22 @@ async function smelt(): Promise<void> {
     return;
   }
   const value = haulValue(fed);
-  // Output starts at the rarest item fed, then a big haul bumps it up a tier or two.
-  const bump = value >= 32 ? 2 : value >= 12 ? 1 : 0;
-  const tier = clampItemTier(bestFedTier(fed) + bump);
-  const count = Math.min(3, 1 + Math.floor(value / 16));
   await consumeFed(fed);
-  queueEncounterMessage(`${namespace}:smelted`);
-  setEncounterRewards({
-    guaranteedModifierTiers: Array.from({ length: count }, () => tier),
-    fillRemaining: false,
-  });
+  if (value >= RELIC_VALUE_THRESHOLD) {
+    rewardRelic();
+  } else {
+    const tier = outputTier(value);
+    const count = Math.min(3, 1 + Math.floor(value / 48));
+    queueEncounterMessage(`${namespace}:smelted`);
+    setEncounterRewards({
+      guaranteedModifierTiers: Array.from({ length: count }, () => tier),
+      fillRemaining: false,
+    });
+  }
   leaveEncounterWithoutBattle(false);
 }
 
-/** Fabricate: a valuable haul forges a RELIC; a cheap haul just gets a plain item. */
+/** Fabricate: forge a RELIC at value >= 100; below that, a single item at the value's tier. */
 async function fabricate(): Promise<void> {
   const fed = getFed();
   if (fed.length === 0) {
@@ -198,13 +212,11 @@ async function fabricate(): Promise<void> {
   const value = haulValue(fed);
   await consumeFed(fed);
   if (value >= RELIC_VALUE_THRESHOLD) {
-    queueEncounterMessage(`${namespace}:fabricated`);
-    setEncounterRewards({ guaranteedModifierTypeFuncs: [randSeedItem(FABRICATOR_RELICS)], fillRemaining: false });
+    rewardRelic();
   } else {
-    // Not enough scrap for a relic - the assembler stamps out a normal item that
-    // reflects the rarest thing fed (so a Rogue item still yields a Rogue item).
+    // Not enough scrap for a relic - the assembler stamps out a normal item by value.
     queueEncounterMessage(`${namespace}:smelted`);
-    setEncounterRewards({ guaranteedModifierTiers: [clampItemTier(bestFedTier(fed))], fillRemaining: false });
+    setEncounterRewards({ guaranteedModifierTiers: [outputTier(value)], fillRemaining: false });
   }
   leaveEncounterWithoutBattle(false);
 }
