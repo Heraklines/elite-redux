@@ -34,7 +34,6 @@ import {
   emptyMineralHaul,
   type MineralLootHaul,
   mineralHaulHasItems,
-  openMineralHaul,
   rollDelveWardOrBerry,
   rollKingsRock,
   rollMegaStone,
@@ -46,17 +45,20 @@ import {
   resumePressYourLuck,
   startPressYourLuck,
 } from "#data/elite-redux/er-press-your-luck";
+import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
+import type { CustomModifierSettings } from "#modifiers/modifier-type";
 import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
   initBattleWithEnemyConfig,
   leaveEncounterWithoutBattle,
+  setEncounterRewards,
   transitionMysteryEncounterIntroVisuals,
   updatePlayerMoney,
 } from "#mystery-encounters/encounter-phase-utils";
@@ -76,10 +78,16 @@ const WEALTH_VALUE = 240;
 
 /** Base stir chance for the very first descent, in [0, 1]. */
 const STIR_BASE = 0.12;
-/** Added to the stir chance per level (level 0 = STIR_BASE). */
-const STIR_PER_LEVEL = 0.13;
+/** Added to the stir chance per level. The Vent is much more DANGEROUS than the
+ * surface delves, so it ramps faster than the others. */
+const STIR_PER_LEVEL = 0.18;
 /** The stir chance never exceeds this, so a deep dive is risky but not hopeless. */
-const STIR_MAX = 0.8;
+const STIR_MAX = 0.85;
+
+/** Fraction of max HP the crushing pressure/cold chips off each non-Water mon per descent. */
+const VENT_CHIP = 1 / 16;
+/** The dive turns up at most this many held items (rare bonus; the depth reward is the draw). */
+const MAX_VENT_ITEMS = 2;
 
 /** Level (0-indexed descent count) at and beyond which finds become mineral wealth. */
 const WEALTH_LEVEL = 2;
@@ -87,8 +95,8 @@ const WEALTH_LEVEL = 2;
 const GUARDIAN_LEVEL_PER_INTERRUPT = 6;
 /** After this many stirs the trench's guardian becomes the chain's BOSS. */
 const GUARDIAN_BOSS_AFTER_INTERRUPTS = 3;
-/** A boss guardian is at least this many levels above the player's strongest mon. */
-const BOSS_LEVELS_ABOVE = 5;
+/** A boss guardian is at least this many levels above the player's strongest mon (the abyss is deadly). */
+const BOSS_LEVELS_ABOVE = 8;
 /** Percent chance per deep descent to turn up a party-line mega stone (once/session). */
 const MEGA_STONE_CHANCE = 4;
 
@@ -125,6 +133,44 @@ function stirChance(level: number): number {
   return Math.min(STIR_BASE + level * STIR_PER_LEVEL, STIR_MAX);
 }
 
+/** Crush every non-Water, non-fainted party member for the pressure chip (floored at 1 HP). Returns how many were hit. */
+function applyVentChip(): number {
+  let strained = 0;
+  for (const mon of globalScene.getPlayerParty()) {
+    if (mon.isFainted() || mon.getTypes(false, false, true).includes(PokemonType.WATER)) {
+      continue;
+    }
+    const chip = Math.max(1, Math.floor(mon.getMaxHp() * VENT_CHIP));
+    mon.hp = Math.max(1, mon.hp - chip);
+    mon.updateInfo();
+    strained++;
+  }
+  return strained;
+}
+
+/** How many held items the dive has turned up so far (funcs + pre-genned options). */
+function ventItemCount(haul: DiveHaul): number {
+  return haul.loot.funcs.length + haul.loot.options.length;
+}
+
+/**
+ * The guaranteed reward TIER for surfacing after `deepest` descents - it ramps
+ * with depth (the deeper you push the abyss, the better the prize): 2 -> Great,
+ * 4 -> Ultra, 8 -> Rogue, 16+ -> Master (the cap).
+ */
+function rewardTierForDepth(deepest: number): ModifierTier {
+  if (deepest >= 16) {
+    return ModifierTier.MASTER;
+  }
+  if (deepest >= 8) {
+    return ModifierTier.ROGUE;
+  }
+  if (deepest >= 4) {
+    return ModifierTier.ULTRA;
+  }
+  return ModifierTier.GREAT;
+}
+
 /** Grow the haul for a survived descent entering `level`, and refresh the prompt token. */
 async function diveLevel(encounter: MysteryEncounter, level: number): Promise<void> {
   const haul = getHaul(encounter);
@@ -139,20 +185,21 @@ async function diveLevel(encounter: MysteryEncounter, level: number): Promise<vo
     updatePlayerMoney(money.amount, true, false);
   }
 
-  // An empty vent turns up nothing. Otherwise a descent can also turn up an ITEM
-  // for the bank haul (deeper vents have better odds): a rare King's Rock, an
-  // uncommon curio (Eviolite / Mystical Rock), or, deep in, a party-line mega stone.
+  // The Vent pays in MONEY first. ITEMS are a RARE bonus: only attempt a find on
+  // ~18% of descents, and the dive turns up AT MOST MAX_VENT_ITEMS in total - the
+  // real draw is the depth-scaled reward on surfacing.
+  const mayFindItem = ventItemCount(haul) < MAX_VENT_ITEMS && randSeedInt(100) < 18;
   let messageKey: string;
   if (money.kind === "dud") {
     messageKey = `${namespace}:foundNothing`;
-  } else if (rollMegaStone(haul.loot, level, MEGA_STONE_CHANCE)) {
+  } else if (mayFindItem && rollMegaStone(haul.loot, level, MEGA_STONE_CHANCE)) {
     messageKey = `${namespace}:foundMegaStone`;
-  } else if (rollKingsRock(haul.loot, level)) {
+  } else if (mayFindItem && rollKingsRock(haul.loot, level)) {
     messageKey = `${namespace}:foundKingsRock`;
-  } else if (rollDelveWardOrBerry(haul.loot, level)) {
-    // Ward Stone / resist berry dug from the deep vent (find chance climbs with depth).
+  } else if (mayFindItem && rollDelveWardOrBerry(haul.loot, level)) {
+    // Ward Stone / resist berry dug from the deep vent.
     messageKey = `${namespace}:foundCurio`;
-  } else if (rollMineralFind(haul.loot, level, "relic")) {
+  } else if (mayFindItem && rollMineralFind(haul.loot, level, "relic")) {
     messageKey = `${namespace}:foundCurio`;
   } else if (money.kind === "nugget") {
     messageKey = `${namespace}:foundNugget`;
@@ -161,6 +208,11 @@ async function diveLevel(encounter: MysteryEncounter, level: number): Promise<vo
   }
   setHaulTokens(encounter);
   queueEncounterMessage(messageKey);
+
+  // The abyss crushes non-Water mons each descent - make the toll clear.
+  if (applyVentChip() > 0) {
+    queueEncounterMessage(`${namespace}:strained`);
+  }
 }
 
 /** Refresh the {{diveCount}} / {{treasureNote}} dialogue tokens from the live haul. */
@@ -199,7 +251,7 @@ function buildGuardianBattle(interrupts: number): EnemyPartyConfig {
   }
   return {
     pokemonConfigs: [
-      isBoss ? { species, isBoss: true, bossSegments: 2 + randSeedInt(2), level } : { species, isBoss: false, level },
+      isBoss ? { species, isBoss: true, bossSegments: 3 + randSeedInt(2), level } : { species, isBoss: false, level },
     ],
   };
 }
@@ -222,14 +274,22 @@ function diveConfig(encounter: MysteryEncounter): PressYourLuckConfig {
         leaveEncounterWithoutBattle(true);
         return;
       }
-      // Money was paid per descent; cash in the item haul as a reward shop (if any).
-      const hasShop = openMineralHaul(haul.loot);
-      await transitionMysteryEncounterIntroVisuals(true, true);
-      if (hasShop) {
-        leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
-      } else {
-        leaveEncounterWithoutBattle(true);
+      // Money was paid per descent. On surfacing, the depth itself is the prize: a
+      // guaranteed reward whose rarity RAMPS with how deep you pushed (Great ->
+      // Ultra -> Rogue -> Master), plus any rare curios the dive turned up.
+      const settings: CustomModifierSettings = {
+        fillRemaining: false,
+        guaranteedModifierTiers: [rewardTierForDepth(levelsCompleted)],
+      };
+      if (haul.loot.options.length > 0) {
+        settings.guaranteedModifierTypeOptions = haul.loot.options;
       }
+      if (haul.loot.funcs.length > 0) {
+        settings.guaranteedModifierTypeFuncs = haul.loot.funcs;
+      }
+      setEncounterRewards(settings);
+      await transitionMysteryEncounterIntroVisuals(true, true);
+      leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
     },
     onBust: async () => {
       const haul = getHaul(encounter);

@@ -32,6 +32,7 @@
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
+import { guardianForDepth } from "#data/elite-redux/er-delve-guardians";
 import {
   emptyMineralHaul,
   type MineralLootHaul,
@@ -49,6 +50,7 @@ import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils";
@@ -63,7 +65,6 @@ import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import { randSeedInt, randSeedItem } from "#utils/common";
-import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 const namespace = "mysteryEncounters/tidePools";
 
@@ -146,12 +147,8 @@ function rollBeachFind(haul: MineralLootHaul, d: number): boolean {
   return true;
 }
 
-/**
- * Thematic wild Water guardians, ordered weakest -> strongest. Deeper interrupts
- * pull from further down the list (escalating BST beyond the wave cap); the boss
- * is the last, toughest entry.
- */
-const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.CORSOLA, SpeciesId.CRAWDAUNT, SpeciesId.KINGLER, SpeciesId.GYARADOS];
+/** The tide-turn guardians are WATER-typed; the shared picker climbs BST with depth. */
+const TIDE_GUARDIAN_TYPES = [PokemonType.WATER];
 
 /** What Tide Pools accumulates on `encounter.misc.comb`. */
 interface CombHaul {
@@ -244,9 +241,8 @@ function guardianLevel(): number {
  */
 function buildGuardianBattle(interrupts: number): EnemyPartyConfig {
   const isBoss = interrupts >= GUARDIAN_BOSS_AFTER_INTERRUPTS;
-  const speciesIdx = Math.min(interrupts, GUARDIAN_SPECIES.length - 1);
-  const toughestIdx = GUARDIAN_SPECIES.length - 1;
-  const species = getPokemonSpecies(GUARDIAN_SPECIES[isBoss ? toughestIdx : speciesIdx]);
+  // A varied Water guardian whose BST climbs with depth (shared picker), boss at top.
+  const species = guardianForDepth(TIDE_GUARDIAN_TYPES, interrupts, isBoss);
   let level = guardianLevel() + interrupts * GUARDIAN_LEVEL_PER_INTERRUPT;
   if (isBoss) {
     level = Math.max(level, guardianLevel() + BOSS_LEVELS_ABOVE);

@@ -1,7 +1,7 @@
 {
   "intro": "A hydrothermal trench yawns open in the seabed, its vents glowing faintly in the crushing dark. Mineral shards encrust every ledge, but something vast shifts in the black water below.",
   "title": "The Abyssal Vent",
-  "description": "A mineral-rich trench in the deep seabed. Descend it level by level for a growing haul, loose shards giving way to real mineral wealth and, deep in, a rare curio, but every level down risks waking a deep-sea guardian. Rise early to keep the safe haul, or dive deeper for more.",
+  "description": "A crushing trench in the deep seabed - and a deadly one. Each descent pays money but strains your non-Water Pokemon, and the danger climbs FAST as a deep-sea guardian stirs. But the deeper you push before surfacing, the better the prize you bring up. Rise early and safe, or risk the abyss for far more.",
   "query": "How deep will you dive?",
   "option": {
     "1": {
@@ -32,5 +32,6 @@
   "foundCurio": "Encrusted on the trench wall, you work loose a valuable curio and stow it away.",
   "foundKingsRock": "Set into a vent chimney sits a heavy, crowned stone - a King's Rock! A genuinely rare find.",
   "foundMegaStone": "Deep in the trench, a stone pulses with a strange inner light - a Mega Stone! You stow it carefully.",
-  "trenchStirs": "The dark water erupts! A deep-sea guardian heaves up from the trench floor - the money you have recovered is safely in your bag. Drive it off and you can keep diving!"
+  "trenchStirs": "The dark water erupts! A deep-sea guardian heaves up from the trench floor - the money you have recovered is safely in your bag. Drive it off and you can keep diving!",
+  "strained": "The crushing pressure and cold batter your non-Water Pokemon - they take damage the deeper you push!"
 }

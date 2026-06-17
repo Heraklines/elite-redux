@@ -29,5 +29,6 @@
   "foundMagma": "You pry a rich seam from the tube wall - a hefty sum of gold!",
   "foundNothing": "This stretch is bare scorched rock. You find nothing of worth.",
   "foundItem": "Half-buried in the slag, you turn up a {{itemName}}! You hand it to {{itemPokemon}}.",
+  "scorched": "The searing heat sears your non-Fire Pokemon - they're taking damage the deeper you go!",
   "erupts": "The tube ROARS! A Fire guardian bursts from the magma - the money you have gathered is safe. Drive it off and you can keep descending!"
 }

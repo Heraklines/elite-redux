@@ -152,8 +152,9 @@ function eruptChance(level: number): number {
   return Math.min(ERUPT_BASE + level * ERUPT_PER_LEVEL, ERUPT_MAX);
 }
 
-/** Scorch every non-Fire, non-fainted party member for the heat chip (floored at 1 HP). */
-function applyHeatChip(): void {
+/** Scorch every non-Fire, non-fainted party member for the heat chip (floored at 1 HP). Returns how many were scorched. */
+function applyHeatChip(): number {
+  let scorched = 0;
   for (const mon of globalScene.getPlayerParty()) {
     if (mon.isFainted() || mon.getTypes(false, false, true).includes(PokemonType.FIRE)) {
       continue;
@@ -161,7 +162,9 @@ function applyHeatChip(): void {
     const chip = Math.max(1, Math.floor(mon.getMaxHp() * HEAT_CHIP));
     mon.hp = Math.max(1, mon.hp - chip);
     mon.updateInfo();
+    scorched++;
   }
+  return scorched;
 }
 
 /** Enemy level for the guardian: the player's strongest mon, floored at the wave level. */
@@ -244,10 +247,14 @@ function diveConfig(): PressYourLuckConfig {
         }
       }
       const foundItem = maybeFindCalderaItem(level);
-      applyHeatChip();
+      const scorched = applyHeatChip();
       globalScene.currentBattle.mysteryEncounter!.setDialogueToken("diveCount", String(haul.finds));
       if (!foundItem) {
         queueEncounterMessage(paid ? `${namespace}:foundMagma` : `${namespace}:foundNothing`);
+      }
+      // Make it clear the descent is hurting the team (non-Fire mons take the heat).
+      if (scorched > 0) {
+        queueEncounterMessage(`${namespace}:scorched`);
       }
     },
     onBank: async levelsCompleted => {
