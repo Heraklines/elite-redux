@@ -12,10 +12,13 @@ export const SESSION_ID_COOKIE_NAME: string = "pokerogue_sessionId";
 /** Max value for an integer attribute in {@linkcode SystemSaveData} */
 export const MAX_INT_ATTR_VALUE = 0x80000000;
 
-/** The min and max waves for mystery encounters to spawn in classic mode */
-export const CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES: [number, number] = [10, 180] as const;
+/** The min and max waves for mystery encounters to spawn in classic mode.
+ * ER: lowered the floor 10 -> 1 (no early-game grace period; MEs spawn from the
+ * start - though wave 1 itself is still skipped by the `waveIndex % 10 !== 1`
+ * rule in isMysteryEncounterValidForWave, so the first MEs land from wave 2). */
+export const CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES: [number, number] = [1, 180] as const;
 /** The min and max waves for mystery encounters to spawn in challenge mode */
-export const CHALLENGE_MODE_MYSTERY_ENCOUNTER_WAVES: [number, number] = [10, 180] as const;
+export const CHALLENGE_MODE_MYSTERY_ENCOUNTER_WAVES: [number, number] = [1, 180] as const;
 
 /** The raw percentage power boost for type boost items*/
 export const TYPE_BOOST_ITEM_BOOST_PERCENT = 20;
@@ -83,10 +86,11 @@ export const WEIGHT_INCREMENT_ON_SPAWN_MISS = 5;
  */
 // ER: the anti-variance mechanic steers each run's TOTAL ME count toward this
 // target, spread across the ME-legal wave span (CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES
-// = [10, 180] -> 170 waves), so the expected gap between MEs is ~ 170 / target.
-// Raised 12 -> 15 to bring the average cadence to ~170/15 = 11.3 waves (was ~14.2),
-// landing in the desired "an ME every 10-15 waves" band.
-export const AVERAGE_ENCOUNTERS_PER_RUN_TARGET = 15;
+// = [1, 180] -> 179 waves), so the expected gap between MEs is ~ 179 / target.
+// Raised 12 -> 16 to bring the average cadence to ~179/16 = 11.2 waves (was ~14.2),
+// landing in the desired "an ME every 10-15 waves" band across the no-grace-period
+// window.
+export const AVERAGE_ENCOUNTERS_PER_RUN_TARGET = 16;
 
 /**
  * Will increase/decrease the chance of spawning a ME based on the current run's total MEs encountered vs AVERAGE_ENCOUNTERS_PER_RUN_TARGET

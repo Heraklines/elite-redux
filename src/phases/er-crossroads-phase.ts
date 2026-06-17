@@ -25,7 +25,6 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import { erBiomeCrossroadsVerb } from "#data/elite-redux/er-biome-routing";
 import { setErLeaveBiomeNow } from "#data/elite-redux/er-biome-structure";
 import { UiMode } from "#enums/ui-mode";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
@@ -43,17 +42,15 @@ export class ErCrossroadsPhase extends Phase {
     const biomeName = getBiomeName(globalScene.arena.biomeId);
     const options: OptionSelectItem[] = [
       {
-        // #502: the "keep exploring this biome" action carries the biome's
-        // interaction-grammar verb (Delve deeper / Forage on / Scout ahead /
-        // Browse on / Wade on), surfacing the grammar on the Crossroads panel.
-        label: erBiomeCrossroadsVerb(globalScene.arena.biomeId),
+        // Plain "Stay" (keep exploring this biome) - clearer than the biome verb.
+        label: "Stay",
         handler: () => {
           this.resolve(false);
           return true;
         },
       },
       {
-        label: "Move on",
+        label: "Leave",
         handler: () => {
           this.resolve(true);
           return true;
@@ -61,7 +58,7 @@ export class ErCrossroadsPhase extends Phase {
       },
     ];
 
-    globalScene.ui.showText(`You reach a crossroads in ${biomeName}. Press on, or move to a new area?`, null, () => {
+    globalScene.ui.showText(`You reach a crossroads in ${biomeName}. Stay, or leave for a new area?`, null, () => {
       globalScene.ui.setMode(UiMode.OPTION_SELECT, { options, delay: 500 });
     });
   }

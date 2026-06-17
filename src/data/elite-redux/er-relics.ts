@@ -92,8 +92,9 @@ export const ER_RELIC_CONFIG: Readonly<Record<ErRelicKind, ErRelicConfig>> = {
   },
   mysteryCharm: {
     name: "Mystery Charm",
-    description: "Mystery encounters appear more often while you hold this charm.",
-    icon: "healing_charm",
+    description: "Mystery encounters appear far more often while you hold this charm (about one every 5 waves).",
+    // A purple-tinted Ability Charm (the hidden-ability charm), recolored for MEs.
+    icon: "ability_charm",
     tint: 0xc080f8,
     maxStack: 1,
   },
@@ -200,8 +201,13 @@ const FIELD_MEDIC_HEAL_DENOM = 12;
 const WARM_INCUBATOR_WAVES_PER_STACK = 1;
 /** Coin Purse: percent money bonus per stack. */
 const COIN_PURSE_PERCENT_PER_STACK = 20;
-/** Mystery Charm: added ME spawn weight (out of 256) per stack. */
-const MYSTERY_CHARM_WEIGHT_PER_STACK = 40;
+/** Mystery Charm: added to the anti-variance ME RUN TARGET per stack. A flat
+ * spawn-weight bonus would be fought by the anti-variance mechanic (which pulls
+ * the run back toward its target count), so instead the charm raises the target
+ * itself: +20 takes the run target 16 -> 36 over the 179-wave ME span, i.e. an ME
+ * ~every 5 waves (vs ~11 without). Because it lifts the whole target, every tier
+ * - including the rare ULTRA/ROGUE events - scales up commensurately. */
+const MYSTERY_CHARM_TARGET_PER_STACK = 20;
 /** Morale Banner: percent damage bonus while the team is faint-free this biome. */
 const MORALE_BANNER_PERCENT = 15;
 /** Twin Link: percent damage bonus for moves of the slot 2/3 shared type. */
@@ -283,9 +289,10 @@ export function erCoinPurseBonusPercent(): number {
   return getErRelicStacks("coinPurse") * COIN_PURSE_PERCENT_PER_STACK;
 }
 
-/** Mystery Charm (relic): added Mystery-Encounter spawn weight (out of 256). */
-export function erMysteryCharmWeightBonus(): number {
-  return getErRelicStacks("mysteryCharm") * MYSTERY_CHARM_WEIGHT_PER_STACK;
+/** Mystery Charm (relic): bonus added to the anti-variance Mystery-Encounter run
+ * target (raises the per-run ME count to ~every 5 waves at 1 stack). */
+export function erMysteryCharmTargetBonus(): number {
+  return getErRelicStacks("mysteryCharm") * MYSTERY_CHARM_TARGET_PER_STACK;
 }
 
 // =============================================================================

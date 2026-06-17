@@ -43,7 +43,7 @@ import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#
 import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
 import {
   erCoinPurseBonusPercent,
-  erMysteryCharmWeightBonus,
+  erMysteryCharmTargetBonus,
   resetErRelicBiomeState,
 } from "#data/elite-redux/er-relics";
 import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
@@ -4223,16 +4223,20 @@ export class BattleScene extends SceneBase {
     // If total number of encounters is lower than expected for the run, slightly favor a new encounter spawn (reverse as well)
     // Reduces occurrence of runs with total encounters significantly different from AVERAGE_ENCOUNTERS_PER_RUN_TARGET
     // Favored rate changes can never exceed 50%. So if base rate is 15/256 and favored rate would add 200/256, result will be (15 + 128)/256
+    // ER relic (#439): the Mystery Charm raises the anti-variance RUN TARGET (not a
+    // flat per-wave weight, which the anti-variance would just cancel out), so the
+    // whole run targets more MEs - ~every 5 waves at 1 charm - and every tier scales
+    // up commensurately.
+    const effectiveTarget = AVERAGE_ENCOUNTERS_PER_RUN_TARGET + erMysteryCharmTargetBonus();
     const expectedEncountersByFloor =
-      (AVERAGE_ENCOUNTERS_PER_RUN_TARGET / (highestMysteryEncounterWave - lowestMysteryEncounterWave))
+      (effectiveTarget / (highestMysteryEncounterWave - lowestMysteryEncounterWave))
       * (waveIndex - lowestMysteryEncounterWave);
     const currentRunDiffFromAvg = expectedEncountersByFloor - encounteredEvents.length;
     const favoredEncounterRate =
       sessionEncounterRate
       + Math.min(currentRunDiffFromAvg * ANTI_VARIANCE_WEIGHT_MODIFIER, MYSTERY_ENCOUNTER_SPAWN_MAX_WEIGHT / 2);
 
-    // ER relic (#439): the Mystery Charm raises the natural ME spawn weight.
-    const successRate = Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE ?? favoredEncounterRate + erMysteryCharmWeightBonus();
+    const successRate = Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE ?? favoredEncounterRate;
 
     let roll = 0;
     // Always rolls the check on the same offset to ensure no RNG changes from reloading session
