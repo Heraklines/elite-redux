@@ -100,7 +100,7 @@ function attune(pokemon: Pokemon): void {
 export const InnateShrineEncounter: MysteryEncounter = MysteryEncounterBuilder.withEncounterType(
   MysteryEncounterType.ER_INNATE_SHRINE,
 )
-  .withEncounterTier(MysteryEncounterTier.GREAT)
+  .withEncounterTier(MysteryEncounterTier.ULTRA)
   .withSceneWaveRangeRequirement(...CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES)
   .withAutoHideIntroVisuals(false)
   .withIntroSpriteConfigs([

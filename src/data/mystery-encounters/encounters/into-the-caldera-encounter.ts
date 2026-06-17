@@ -215,7 +215,7 @@ function diveConfig(): PressYourLuckConfig {
 export const IntoTheCalderaEncounter: MysteryEncounter = MysteryEncounterBuilder.withEncounterType(
   MysteryEncounterType.ER_INTO_THE_CALDERA,
 )
-  .withEncounterTier(MysteryEncounterTier.GREAT)
+  .withEncounterTier(MysteryEncounterTier.ULTRA)
   .withSceneWaveRangeRequirement(...CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES)
   .withAutoHideIntroVisuals(false)
   .withIntroSpriteConfigs([

@@ -87,7 +87,7 @@ function blessingOption(blessing: Blessing, n: number) {
 export const WishingCrystalEncounter: MysteryEncounter = MysteryEncounterBuilder.withEncounterType(
   MysteryEncounterType.ER_WISHING_CRYSTAL,
 )
-  .withEncounterTier(MysteryEncounterTier.GREAT)
+  .withEncounterTier(MysteryEncounterTier.ULTRA)
   .withSceneWaveRangeRequirement(...CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES)
   .withAutoHideIntroVisuals(false)
   .withIntroSpriteConfigs([

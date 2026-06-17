@@ -238,7 +238,7 @@ function buildAvengeBattle(grave: GhostTeamSnapshot, killers: GhostMember[]): En
 export const UnfinishedBusinessEncounter: MysteryEncounter = MysteryEncounterBuilder.withEncounterType(
   MysteryEncounterType.ER_UNFINISHED_BUSINESS,
 )
-  .withEncounterTier(MysteryEncounterTier.GREAT)
+  .withEncounterTier(MysteryEncounterTier.ULTRA)
   .withSceneWaveRangeRequirement(...CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES)
   .withAutoHideIntroVisuals(false)
   .withIntroSpriteConfigs([

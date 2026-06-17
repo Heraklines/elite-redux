@@ -117,7 +117,7 @@ async function battleForStar(claim: RegionalForm): Promise<void> {
 export const RegionalEmissaryEncounter: MysteryEncounter = MysteryEncounterBuilder.withEncounterType(
   MysteryEncounterType.ER_REGIONAL_EMISSARY,
 )
-  .withEncounterTier(MysteryEncounterTier.GREAT)
+  .withEncounterTier(MysteryEncounterTier.ULTRA)
   .withSceneWaveRangeRequirement(...CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES)
   .withAutoHideIntroVisuals(false)
   .withIntroSpriteConfigs([

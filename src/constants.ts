@@ -58,7 +58,10 @@ export const saveKey = "x0i2O7WRiANTqPmZ"; // Temporary; secure encryption is no
 /**
  * Spawn chance: (BASE_MYSTERY_ENCOUNTER_SPAWN_WEIGHT + WIGHT_INCREMENT_ON_SPAWN_MISS * <number of missed spawns>) / MYSTERY_ENCOUNTER_SPAWN_MAX_WEIGHT
  */
-export const BASE_MYSTERY_ENCOUNTER_SPAWN_WEIGHT = 3;
+// ER: raised 3 -> 5 to lift the on-pace floor rate so the cadence between MEs is
+// smoother (fewer long dry spells). The run MEAN is still governed by the
+// anti-variance target below.
+export const BASE_MYSTERY_ENCOUNTER_SPAWN_WEIGHT = 5;
 
 /**
  * The divisor for determining ME spawns, defines the "maximum" weight required for a spawn
@@ -70,13 +73,20 @@ export const MYSTERY_ENCOUNTER_SPAWN_MAX_WEIGHT = 256;
  * When an ME spawn roll fails, WEIGHT_INCREMENT_ON_SPAWN_MISS is added to future rolls for ME spawn checks.
  * These values are cleared whenever the next ME spawns, and spawn weight returns to BASE_MYSTERY_ENCOUNTER_SPAWN_WEIGHT
  */
-export const WEIGHT_INCREMENT_ON_SPAWN_MISS = 3;
+// ER: raised 3 -> 5 so a dry spell ramps back up faster (each missed floor adds
+// more weight), keeping the gap between MEs closer to the ~11-12 wave target.
+export const WEIGHT_INCREMENT_ON_SPAWN_MISS = 5;
 
 /**
  * Specifies the target average for total ME spawns in a single Classic run.
  * Used by anti-variance mechanic to check whether a run is above or below the target on a given wave.
  */
-export const AVERAGE_ENCOUNTERS_PER_RUN_TARGET = 12;
+// ER: the anti-variance mechanic steers each run's TOTAL ME count toward this
+// target, spread across the ME-legal wave span (CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES
+// = [10, 180] -> 170 waves), so the expected gap between MEs is ~ 170 / target.
+// Raised 12 -> 15 to bring the average cadence to ~170/15 = 11.3 waves (was ~14.2),
+// landing in the desired "an ME every 10-15 waves" band.
+export const AVERAGE_ENCOUNTERS_PER_RUN_TARGET = 15;
 
 /**
  * Will increase/decrease the chance of spawning a ME based on the current run's total MEs encountered vs AVERAGE_ENCOUNTERS_PER_RUN_TARGET
