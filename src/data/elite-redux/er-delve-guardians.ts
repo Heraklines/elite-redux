@@ -17,6 +17,7 @@
 // =============================================================================
 
 import { allSpecies } from "#data/data-lists";
+import { isErGenericPoolBanned } from "#data/elite-redux/er-generic-pool-bans";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import type { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
@@ -34,20 +35,18 @@ const BST_WINDOW = 25;
 /** Hard floor so weak NFEs never appear as guardians. */
 const BST_FLOOR = 300;
 
-/** First pokerogue id reserved for ER custom species (mega/primal/Redux/etc.). */
-const ER_CUSTOM_ID_CUTOFF = 10000;
-
 /** Is this species a usable guardian of one of the allowed types? */
 function eligible(sp: PokemonSpecies, types: PokemonType[]): boolean {
   if (sp.legendary || sp.subLegendary || sp.mythical) {
     return false;
   }
-  // #492: guardians are spawned DYNAMICALLY at bust-time via initBattleWithEnemyConfig.
-  // ER custom species (id >= 10000) carry sprite redirects / dex records that aren't
-  // guaranteed to be resolved for a mid-encounter wild spawn, which crashed the enemy
-  // info render (drawImage of a null frame). Vanilla species cover every biome type, so
-  // restrict the guardian pool to them - real, fully-loadable mons only.
-  if (sp.speciesId >= ER_CUSTOM_ID_CUTOFF) {
+  // ER guardians SHOULD be ER custom species (Redux / paradox / etc.) - that is the
+  // point. We only drop battle-ONLY form records (raw Mega / Primal / Origin entries):
+  // you fight a wild Scovillain, not a standalone "Scovillain Mega". This also keeps
+  // Youngster/Ace pure-vanilla (isErGenericPoolBanned bans all customs there). The #492
+  // render crash was a separate bug (unguarded dex/starter lookups for not-in-dex
+  // enemies), fixed in enemy-battle-info - NOT a reason to exclude customs.
+  if (isErGenericPoolBanned(sp.speciesId, sp.name)) {
     return false;
   }
   const bst = sp.getBaseStatTotal();

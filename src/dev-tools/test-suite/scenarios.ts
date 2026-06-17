@@ -1315,9 +1315,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "A stir spawns an escalating wild deep-sea mon (Lanturn->Dhelmise); after 3 it\n"
       + "is the chain BOSS (2-3 bars, >= 5 levels over your strongest). Win and diving\n"
       + "RESUMES. Level-0 rise = nothing. Never softlocks.\n"
-      + "#492 REGRESSION: keep diving until the trench STIRS - the guardian must spawn\n"
-      + "and its enemy HP/info bar must render with NO crash (was drawImage-of-null when\n"
-      + "an ER-custom species got picked as the guardian; the pool is now vanilla-only).",
+      + "#492 REGRESSION: keep diving until the trench STIRS - the guardian (often an\n"
+      + "ER custom) must spawn and its enemy HP/info bar must render with NO crash. The\n"
+      + "crash was unguarded dex/starter lookups in enemy-battle-info for not-in-dex\n"
+      + "enemies; ER custom guardians are intended and now render fine.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
