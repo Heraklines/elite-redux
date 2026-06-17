@@ -78,7 +78,22 @@ let pdSelected = null; // selected species const
 const palSort = "name"; // move-palette sort: name | type | power
 let palQuery = ""; // move-palette search text (preserved across re-renders)
 let newMoveLevel = 1; // level assigned to moves added to a learnset
-const ABIL_SLOTS = ["ability1", "ability2", "hidden"]; // ability slot keys
+// Ability/innate slots: 3 ability slots + 3 ER "innate" (passive) slots.
+const EMPTY_ABIL = { ability1: 0, ability2: 0, hidden: 0, innates: [0, 0, 0] };
+/** Read one slot's ability id from an abilities entry (scalar field or innate index). */
+function getAbilSlot(cur, slot) {
+  return slot.startsWith("innate") ? (cur.innates || [])[Number(slot.slice(6))] || 0 : cur[slot] || 0;
+}
+/** Write one slot's ability id into an abilities entry (returns a new entry). */
+function setAbilSlot(cur, slot, id) {
+  const next = { ...cur, innates: (cur.innates || [0, 0, 0]).slice() };
+  if (slot.startsWith("innate")) {
+    next.innates[Number(slot.slice(6))] = id;
+  } else {
+    next[slot] = id;
+  }
+  return next;
+}
 const POKEDEX_TABS = new Set(["learnsets", "tms", "abilities"]);
 
 const $ = sel => document.querySelector(sel);
@@ -1189,32 +1204,47 @@ function renderTMs(root) {
   filterPalette();
 }
 
-const ABIL_SLOT_LABEL = { ability1: "Ability 1", ability2: "Ability 2", hidden: "Hidden Ability" };
+const ABIL_SLOT_LABEL = {
+  ability1: "Ability 1",
+  ability2: "Ability 2",
+  hidden: "Hidden Ability",
+  innate0: "Innate 1",
+  innate1: "Innate 2",
+  innate2: "Innate 3",
+};
+
+function abilSlotHtml(cur, slot) {
+  const a = abilById.get(getAbilSlot(cur, slot));
+  const isInnate = slot.startsWith("innate");
+  return `<div class="abil-slot${slot === "hidden" || isInnate ? " hidden-slot" : ""}">
+    <label>${ABIL_SLOT_LABEL[slot]}</label>
+    <div class="combo">
+      <input class="abil-input" data-slot="${slot}" placeholder="Search name or description…" autocomplete="off" value="${esc(a ? a.name : "")}" />
+      <div class="abil-drop" data-slot="${slot}"></div>
+    </div>
+    <div class="abil-cur">
+      <div class="acur-name">${a ? esc(a.name) : "<span style='color:var(--muted)'>none</span>"}</div>
+      <div class="acur-desc">${a ? esc(a.description) : ""}</div>
+    </div>
+  </div>`;
+}
 
 function renderAbilities(root) {
   root.innerHTML = `<div class="pd"><aside class="pd-list">${pdListHtml()}</aside><section class="pd-main" id="pd-main"></section></div>`;
   const main = $("#pd-main");
   if (!pdSelected) {
-    main.innerHTML = '<div class="empty">Select a species from the list to edit its three ability slots.</div>';
+    main.innerHTML = '<div class="empty">Select a species from the list to edit its ability + innate slots.</div>';
     return;
   }
   const s = spByConst.get(pdSelected);
-  const cur = abil.current[pdSelected] || { ability1: 0, ability2: 0, hidden: 0 };
-  const slotsHtml = ABIL_SLOTS.map(slot => {
-    const a = abilById.get(cur[slot]);
-    return `<div class="abil-slot${slot === "hidden" ? " hidden-slot" : ""}">
-      <label>${ABIL_SLOT_LABEL[slot]}</label>
-      <div class="combo">
-        <input class="abil-input" data-slot="${slot}" placeholder="Search name or description…" autocomplete="off" value="${esc(a ? a.name : "")}" />
-        <div class="abil-drop" data-slot="${slot}"></div>
-      </div>
-      <div class="abil-cur">
-        <div class="acur-name">${a ? esc(a.name) : "<span style='color:var(--muted)'>none</span>"}</div>
-        <div class="acur-desc">${a ? esc(a.description) : ""}</div>
-      </div>
-    </div>`;
-  }).join("");
-  main.innerHTML = `${pdHeadHtml(s)}<div class="abil-slots">${slotsHtml}</div>`;
+  const cur = abil.current[pdSelected] || EMPTY_ABIL;
+  const abilities = ["ability1", "ability2", "hidden"].map(slot => abilSlotHtml(cur, slot)).join("");
+  const innates = ["innate0", "innate1", "innate2"].map(slot => abilSlotHtml(cur, slot)).join("");
+  main.innerHTML = `${pdHeadHtml(s)}
+    <div class="abil-group-title">Abilities</div>
+    <div class="abil-slots">${abilities}</div>
+    <div class="abil-group-title">Innates (ER passives)</div>
+    <div class="abil-slots">${innates}</div>`;
 }
 
 /** Fill an ability slot's dropdown with up to 60 matches (name OR description). */
@@ -1482,9 +1512,11 @@ function onPokedexClick(e) {
   }
   const opt = e.target.closest(".abil-opt");
   if (opt) {
-    const cur = { ...(abil.current[pdSelected] || { ability1: 0, ability2: 0, hidden: 0 }) };
-    cur[opt.dataset.slot] = Number(opt.dataset.abilid);
-    abil.current[pdSelected] = cur;
+    abil.current[pdSelected] = setAbilSlot(
+      abil.current[pdSelected] || EMPTY_ABIL,
+      opt.dataset.slot,
+      Number(opt.dataset.abilid),
+    );
     closeAbilDrops();
     render();
     return true;
@@ -1899,12 +1931,15 @@ function buildDeltas() {
       continue;
     }
     const cur = abil.current[s.const] || {};
+    const innates = (cur.innates || [0, 0, 0]).map(id => Number(id) || 0);
     const entry = {
       ability1: Number(cur.ability1) || 0,
       ability2: Number(cur.ability2) || 0,
       hidden: Number(cur.hidden) || 0,
+      innates: [innates[0] || 0, innates[1] || 0, innates[2] || 0],
     };
-    if (Object.values(entry).every(id => id === 0 || abilById.has(id))) {
+    const allIds = [entry.ability1, entry.ability2, entry.hidden, ...entry.innates];
+    if (allIds.every(id => id === 0 || abilById.has(id))) {
       abDelta[s.const] = entry;
     } else {
       bad.push(`${s.name}: unknown ability id`);
@@ -2118,12 +2153,15 @@ async function init() {
       learn.current[s.const] = Array.isArray(lsLive[s.const]) ? lsLive[s.const].map(([lvl, mv]) => [lvl, mv]) : base;
       const tmBase = (tmData[s.id] || []).slice();
       tms.current[s.const] = Array.isArray(tmLive[s.const]) ? tmLive[s.const].slice() : tmBase;
-      const abBase = abData[s.id] || { ability1: 0, ability2: 0, hidden: 0 };
-      const o = abLive[s.const];
-      abil.current[s.const] =
-        o && typeof o === "object"
-          ? { ability1: o.ability1 ?? 0, ability2: o.ability2 ?? 0, hidden: o.hidden ?? 0 }
-          : { ability1: abBase.ability1, ability2: abBase.ability2, hidden: abBase.hidden };
+      const abBase = abData[s.id] || EMPTY_ABIL;
+      const o = abLive[s.const] && typeof abLive[s.const] === "object" ? abLive[s.const] : abBase;
+      const oi = Array.isArray(o.innates) ? o.innates : abBase.innates || [0, 0, 0];
+      abil.current[s.const] = {
+        ability1: o.ability1 ?? 0,
+        ability2: o.ability2 ?? 0,
+        hidden: o.hidden ?? 0,
+        innates: [oi[0] || 0, oi[1] || 0, oi[2] || 0],
+      };
     }
     learn.baseline = JSON.parse(JSON.stringify(learn.current));
     tms.baseline = JSON.parse(JSON.stringify(tms.current));

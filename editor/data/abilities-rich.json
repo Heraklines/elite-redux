@@ -35,7 +35,7 @@
     "name": "Sand Veil",
     "description": "Boosts the Pokémon’s evasiveness by 25% in a sandstorm. The Pokémon takes no damage from sandstorms if it would otherwise."
   },
-  { "id": 9, "name": "static.name", "description": "30% chance to paralyze on contact, 10% on non-contact." },
+  { "id": 9, "name": "Static", "description": "30% chance to paralyze on contact, 10% on non-contact." },
   {
     "id": 10,
     "name": "Volt Absorb",
