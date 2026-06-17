@@ -8282,6 +8282,27 @@ export class EnemyPokemon extends Pokemon {
                   });
                   best = Math.max(best, damageToScore(damage, target.getMaxHp(), target.hp, move.accuracy));
                 }
+                // Slice 4 (doubles): a spread move that also hits our own ally is
+                // penalized by the damage it would deal them - so the AI won't
+                // Earthquake its non-immune partner (and never KOs its own ally).
+                const ally = this.getAlly();
+                const hitsAlly =
+                  move.moveTarget === MoveTarget.ALL_NEAR_OTHERS
+                  || move.moveTarget === MoveTarget.ALL_OTHERS
+                  || move.moveTarget === MoveTarget.ALL;
+                if (best > 0 && hitsAlly && ally && !ally.isFainted()) {
+                  const { damage: allyDamage } = ally.getAttackDamage({
+                    source: this,
+                    move,
+                    ignoreAbility: false,
+                    ignoreSourceAbility: false,
+                    ignoreAllyAbility: false,
+                    ignoreSourceAllyAbility: false,
+                    isCritical: false,
+                    simulated: true,
+                  });
+                  best -= damageToScore(allyDamage, ally.getMaxHp(), ally.hp, 100);
+                }
                 moveScores[moveIndex] = best;
                 return;
               }

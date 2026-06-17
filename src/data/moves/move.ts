@@ -10092,9 +10092,13 @@ export function initMoves() {
     new SelfStatusMove(MoveId.MINIMIZE, PokemonType.NORMAL, -1, 10, -1, 0, 1)
       .attr(AddBattlerTagAttr, BattlerTagType.MINIMIZED, true, false)
       .attr(StatStageChangeAttr, [Stat.EVA], 2, true),
-    new StatusMove(MoveId.SMOKESCREEN, PokemonType.NORMAL, 100, 20, -1, 0, 1)
-      .attr(StatStageChangeAttr, [Stat.ACC], -1)
-      .reflectable(),
+    // Elite Redux (#394): Smokescreen no longer lowers the target's accuracy - it
+    // "obscures the user's party in smoke for 5 turns, increasing evasiveness by
+    // 25%." Sets the ER_SMOKESCREEN side field; the +25% evasion is applied in
+    // Pokemon.getAccuracyMultiplier for any mon on the smoked side.
+    new StatusMove(MoveId.SMOKESCREEN, PokemonType.NORMAL, -1, 20, -1, 0, 1)
+      .attr(AddArenaTagAttr, ArenaTagType.ER_SMOKESCREEN, 5, true)
+      .target(MoveTarget.USER_SIDE),
     new StatusMove(MoveId.CONFUSE_RAY, PokemonType.GHOST, 100, 10, -1, 0, 1) //
       .attr(ConfuseAttr)
       .reflectable(),

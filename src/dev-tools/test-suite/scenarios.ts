@@ -4521,6 +4521,31 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Smokescreen smoke field (#394)",
+    description:
+      "#394 - ER Smokescreen no longer lowers the target's accuracy. Instead it\n"
+      + "'obscures the user's party in smoke for 5 turns, increasing evasiveness by\n"
+      + "25%.' Use Smokescreen turn 1.\n"
+      + "EXPECT: 'Smoke billowed across the field...' message; for the next 5 turns the\n"
+      + "ENEMY's moves miss noticeably more often (your whole side has +25% evasion,\n"
+      + "i.e. incoming accuracy x0.8). Switching in your other mon keeps the buff (it's\n"
+      + "side-wide). After 5 turns 'The smoke cleared away.' and accuracy is normal.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+      });
+      return [
+        makeStarter(SpeciesId.KOFFING, {
+          moveset: [MoveId.SMOKESCREEN, MoveId.SLUDGE_BOMB, MoveId.PROTECT, MoveId.PAIN_SPLIT],
+        }),
+        makeStarter(SpeciesId.PIDGEOT, {
+          moveset: [MoveId.AIR_SLASH, MoveId.ROOST, MoveId.PROTECT, MoveId.HURRICANE],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) No custom evo on vanilla (#479)",
     description:
       "#479 - on the PURE-VANILLA difficulties (Youngster / Ace) a wild vanilla\n"

@@ -15,6 +15,8 @@ export enum ArenaTagType {
   SPIKES = "SPIKES",
   TOXIC_SPIKES = "TOXIC_SPIKES",
   MIST = "MIST",
+  /** Elite Redux (#394): ER Smokescreen - obscures the user's party in smoke, +25% evasiveness for 5 turns. */
+  ER_SMOKESCREEN = "ER_SMOKESCREEN",
   STEALTH_ROCK = "STEALTH_ROCK",
   STICKY_WEB = "STICKY_WEB",
   TRICK_ROOM = "TRICK_ROOM",

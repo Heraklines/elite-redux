@@ -343,6 +343,42 @@ export class MistTag extends SerializableArenaTag {
 }
 
 /**
+ * Elite Redux (#394): ER Smokescreen. A side-scoped field set by the ER version of
+ * Smokescreen - "Obscures the user's party in smoke for 5 turns, increasing
+ * evasiveness by 25%." The +25% evasiveness is applied in
+ * {@linkcode Pokemon.getAccuracyMultiplier} (the target's evasion multiplier is
+ * boosted x1.25 while its side holds this tag); this tag just marks the side and
+ * shows the smoke messages. Messages are hardcoded (no locale entry needed).
+ */
+export class ErSmokescreenTag extends SerializableArenaTag {
+  readonly tagType = ArenaTagType.ER_SMOKESCREEN;
+  constructor(turnCount: number, side: ArenaTagSide) {
+    super(turnCount, MoveId.SMOKESCREEN, undefined, side);
+  }
+
+  // No locale key (ER-custom field): messages are queued directly in onAdd/onRemove.
+  protected override get onAddMessageKey(): string {
+    return "";
+  }
+
+  protected override get onRemoveMessageKey(): string {
+    return "";
+  }
+
+  override onAdd(quiet = false): void {
+    if (!quiet) {
+      globalScene.phaseManager.queueMessage("Smoke billowed across the field, obscuring the team!");
+    }
+  }
+
+  override onRemove(quiet = false): void {
+    if (!quiet) {
+      globalScene.phaseManager.queueMessage("The smoke cleared away.");
+    }
+  }
+}
+
+/**
  * Reduces the damage of specific move categories in the arena.
  */
 export abstract class WeakenMoveScreenTag extends SerializableArenaTag {
@@ -1833,6 +1869,8 @@ export function getArenaTag(
   switch (tagType) {
     case ArenaTagType.MIST:
       return new MistTag(turnCount, side);
+    case ArenaTagType.ER_SMOKESCREEN:
+      return new ErSmokescreenTag(turnCount, side);
     case ArenaTagType.QUICK_GUARD:
       return new QuickGuardTag(sourceId, side);
     case ArenaTagType.WIDE_GUARD:
@@ -1919,6 +1957,7 @@ export type ArenaTagTypeMap = {
   [ArenaTagType.ION_DELUGE]: IonDelugeTag;
   [ArenaTagType.SPIKES]: SpikesTag;
   [ArenaTagType.MIST]: MistTag;
+  [ArenaTagType.ER_SMOKESCREEN]: ErSmokescreenTag;
   [ArenaTagType.QUICK_GUARD]: QuickGuardTag;
   [ArenaTagType.WIDE_GUARD]: WideGuardTag;
   [ArenaTagType.MAT_BLOCK]: MatBlockTag;
