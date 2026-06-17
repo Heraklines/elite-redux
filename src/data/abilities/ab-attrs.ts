@@ -3062,6 +3062,28 @@ export class PostSummonWeatherSuppressedFormChangeAbAttr extends PostSummonAbAtt
 }
 
 /**
+ * Elite Redux (#450): Cloud Nine "clears all weather upon switch-in" per the ER
+ * 2.65 dex (a stronger effect than vanilla, which only nullifies weather while on
+ * field). Clearing routes through {@linkcode Arena.trySetWeather}, whose immutable
+ * guard explicitly allows {@linkcode WeatherType.NONE} through — so this clears
+ * even Primal weather, matching the dex ("including Primal weathers"). Weather can
+ * still be re-set afterwards; the holder's separate {@linkcode SuppressWeatherEffectAbAttr}
+ * then nullifies its effects while it remains on the field.
+ */
+export class PostSummonClearWeatherAbAttr extends PostSummonAbAttr {
+  override canApply(_params: AbAttrBaseParams): boolean {
+    const weather = globalScene.arena.weather;
+    return !!weather && weather.weatherType !== WeatherType.NONE;
+  }
+
+  override apply({ simulated }: AbAttrBaseParams): void {
+    if (!simulated) {
+      globalScene.arena.trySetWeather(WeatherType.NONE);
+    }
+  }
+}
+
+/**
  * Triggers weather-based form change when summoned into an active weather.
  * Used by Forecast and Flower Gift.
  */
@@ -6723,6 +6745,7 @@ export const AbilityAttrs = Object.freeze({
   PostSummonAddBattlerTagAbAttr,
   PostSummonAllyHealAbAttr,
   PostSummonClearAllyStatStagesAbAttr,
+  PostSummonClearWeatherAbAttr,
   PostSummonCopyAbilityAbAttr,
   PostSummonCopyAllyStatsAbAttr,
   PostSummonFormChangeAbAttr,

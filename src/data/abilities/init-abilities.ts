@@ -114,6 +114,7 @@ import {
   PostSummonAddBattlerTagAbAttr,
   PostSummonAllyHealAbAttr,
   PostSummonClearAllyStatStagesAbAttr,
+  PostSummonClearWeatherAbAttr,
   PostSummonCopyAbilityAbAttr,
   PostSummonCopyAllyStatsAbAttr,
   PostSummonFormChangeAbAttr,
@@ -326,7 +327,12 @@ export function initAbilities() {
       .build(),
     new AbBuilder(AbilityId.CLOUD_NINE, 3) //
       .attr(SuppressWeatherEffectAbAttr, true)
-      .attr(PostSummonUnnamedMessageAbAttr, i18next.t("abilityTriggers:weatherEffectDisappeared"))
+      // ER (#450): Cloud Nine also CLEARS all active weather on switch-in (the dex
+      // text, stronger than vanilla's effect-only suppression). The clear emits its
+      // own weather-cleared message, so it replaces the generic "weather effect
+      // disappeared" line. SuppressWeatherEffectAbAttr above still nullifies any
+      // weather re-set while Cloud Nine remains on the field.
+      .attr(PostSummonClearWeatherAbAttr)
       .attr(PostSummonWeatherSuppressedFormChangeAbAttr)
       .attr(PostFaintUnsuppressedWeatherFormChangeAbAttr)
       .bypassFaint()

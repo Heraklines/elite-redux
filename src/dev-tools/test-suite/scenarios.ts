@@ -4385,6 +4385,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Cloud Nine clears weather (#450)",
+    description:
+      "#450 - per the 2.65 dex, ER Cloud Nine CLEARS all weather on switch-in (not\n"
+      + "just nullifies its effects like vanilla). Both player mons have Cloud Nine\n"
+      + "forced; the enemy has Drizzle (sets Rain on entry).\n"
+      + "EXPECT: the Rain weather indicator is CLEARED entirely (gone, not just 'no\n"
+      + "effect'). Switch your other Cloud Nine mon in - if Rain was re-set it is\n"
+      + "cleared again on entry. Any weather set while a Cloud Nine mon is out also\n"
+      + "gives NO damage boost / ability triggers (suppressed).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        ABILITY_OVERRIDE: AbilityId.CLOUD_NINE,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.DRIZZLE,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.PELIPPER,
+      });
+      return [
+        makeStarter(SpeciesId.GOLDUCK, {
+          moveset: [MoveId.SURF, MoveId.ICE_BEAM, MoveId.CALM_MIND, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.LICKILICKY, {
+          moveset: [MoveId.BODY_SLAM, MoveId.PROTECT, MoveId.REST, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) No custom evo on vanilla (#479)",
     description:
       "#479 - on the PURE-VANILLA difficulties (Youngster / Ace) a wild vanilla\n"
