@@ -1,0 +1,281 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqi6w5p0-2w6
+mode:     0  wave:62
+seed:     JeHbaH2NtHJzdzln3HJpvY0t
+party:    Breezing(L49 130hp f0), Pyukumuku(L49 153hp f0), Rotom(L49 0hp f2), Typhlosion(L49 165hp f2), Zweilous(L49 144hp f0), Lanturn(L49 196hp f1)
+enemy:    Squawkabilly Yellow(L74), Wormadam(L74), Blizzard Maw(L74)
+
+----- COMMENT -----
+Wastelands biome change to plains- fought leader- evil team fight massively over level.
+
+----- CONSOLE -----
+[14:59:01.387] WARN: AnimationManager key already exists: tera_sparkle
+[14:59:01.387] LOG: Seed: 31Z7wjmyzn80UypipMjqsBdY
+[14:59:01.387] LOG: Wave Seed: 31Z7wjmyzn80UypipMjqsBdY 0
+[14:59:01.806] LOG: %cStart Phase LoginPhase color:green;
+[14:59:02.112] LOG: Client Session: Rmq8F5UFlQHUFQFTGGbMvx8IXOTvHfEf
+[14:59:02.673] LOG: %cStart Phase TitlePhase color:green;
+[14:59:02.673] LOG: Getting Session Slot id: %d 0
+[14:59:02.893] LOG: use seasonal splash messages true
+[14:59:02.893] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[14:59:12.620] LOG: Getting Session Slot id: %d 0
+[14:59:12.624] LOG: Getting Session Slot id: %d 1
+[14:59:12.625] LOG: Getting Session Slot id: %d 2
+[14:59:12.625] LOG: Getting Session Slot id: %d 3
+[14:59:12.625] LOG: Getting Session Slot id: %d 4
+[14:59:12.626] LOG: Getting Session Slot id: %d 0
+[14:59:12.794] ERROR: Invalid save data JSON detected! Session not found.
+[14:59:12.805] ERROR: Invalid save data JSON detected! Session not found.
+[14:59:12.815] ERROR: Invalid save data JSON detected! Session not found.
+[14:59:14.478] LOG: Getting Session Slot id: %d 0
+[14:59:14.481] LOG: Wave Seed: JeHbaH2NtHJzdzln3HJpvY0t 0
+[14:59:14.481] LOG: Seed: JeHbaH2NtHJzdzln3HJpvY0t
+[14:59:14.491] LOG: Wave Seed: £ p²¸¢¸ª¬q®´n² 62
+[14:59:14.498] LOG: Applied Iron 
+[14:59:14.498] LOG: Applied Iron 
+[14:59:14.499] LOG: Applied Iron 
+[14:59:14.500] LOG: Applied Iron (enemy)
+[14:59:14.500] LOG: Applied Iron (enemy)
+[14:59:14.568] LOG: %cStart Phase EncounterPhase color:green;
+[14:59:14.569] LOG: Pokemon: Foe Squawkabilly Yellow | Species ID: 10429 | Level: 74 | Nature: Adamant (+Atk/-SpAtk)
+[14:59:14.569] LOG: Stats (IVs): HP: 240 (31), Atk: 104 (31), Def: 190 (31), Spatk: 126 (31), Spdef: 161 (31), Spd: 153 (31)
+[14:59:14.569] LOG: Ability: Friend Guard | Passive Ability: Airborne 
+[14:59:14.569] LOG: Moveset: ["Headlong Rush","Collision Course","Fire Punch","Endure"]
+[14:59:14.569] LOG: Pokemon: Foe Wormadam | Species ID: 413 | Level: 74 | Nature: Timid (+Spd/-Atk)
+[14:59:14.569] LOG: Stats (IVs): HP: 195 (31), Atk: 103 (31), Def: 153 (31), Spatk: 144 (31), Spdef: 183 (31), Spd: 90 (31)
+[14:59:14.569] LOG: Ability: Anticipation | Passive Ability: Adaptability 
+[14:59:14.569] LOG: Moveset: ["Web Shot","Quiver Dance","Giga Drain","Soil Drain"]
+[14:59:14.569] LOG: Pokemon: Foe Blizzard Maw | Species ID: 10022 | Level: 74 | Nature: Adamant (+Atk/-SpAtk)
+[14:59:14.569] LOG: Stats (IVs): HP: 277 (31), Atk: 247 (31), Def: 192 (31), Spatk: 121 (31), Spdef: 180 (31), Spd: 124 (31)
+[14:59:14.569] LOG: Ability: Growing Tooth | Passive Ability: Protosynthesis 
+[14:59:14.569] LOG: Moveset: ["Rip and Tear","Ice Fang","Ice Shard","Jaw Lock"]
+[14:59:14.627] LOG: Generated AI funcs
+[14:59:14.627] LOG: Applied Iron (enemy)
+[14:59:14.627] LOG: Applied Iron (enemy)
+[14:59:14.627] LOG: Wave Seed: £ p²¸¢¸ª¬q®´n² 62
+[14:59:14.827] LOG: Localized grunt name: Plasma Grunts
+[14:59:14.828] LOG: Dialogue dialogue:plasmaGrunt.encounter.3 skipped
+[14:59:14.869] LOG: Localized grunt name: Plasma Grunts
+[14:59:50.469] LOG: %cStart Phase SummonPhase color:green;
+[14:59:50.469] LOG: Localized grunt name: Plasma Grunt
+[14:59:50.656] LOG: Applied Iron (enemy)
+[14:59:50.656] LOG: Applied Iron (enemy)
+[14:59:50.683] WARN: cry/10429 not found
+[14:59:50.790] LOG: %cStart Phase SummonPhase color:green;
+[14:59:50.791] LOG: Localized grunt name: Plasma Grunt
+[14:59:50.958] LOG: Applied Iron (enemy)
+[14:59:50.959] LOG: Applied Iron (enemy)
+[14:59:51.098] LOG: %cStart Phase SummonPhase color:green;
+[14:59:51.268] LOG: Applied Iron 
+[14:59:51.402] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:59:51.516] LOG: %cStart Phase SummonPhase color:green;
+[14:59:51.689] LOG: Applied Iron 
+[14:59:51.821] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:59:51.933] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:59:51.935] LOG: %cStart Phase PostSummonPhase color:green;
+[14:59:51.935] LOG: Ran PSP for: Squawkabilly Yellow
+[14:59:51.936] LOG: %cStart Phase PostSummonPhase color:green;
+[14:59:51.937] LOG: %cStart Phase PostSummonPhase color:green;
+[14:59:51.937] LOG: %cStart Phase PostSummonPhase color:green;
+[14:59:51.937] LOG: Ran PSP for: Rotom
+[14:59:51.938] LOG: %cStart Phase PostSummonPhase color:green;
+[14:59:51.938] LOG: %cStart Phase PostSummonPhase color:green;
+[14:59:51.938] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:59:52.110] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:59:52.154] LOG: %cStart Phase PostSummonPhase color:green;
+[14:59:52.154] LOG: Ran PSP for: Wormadam
+[14:59:52.155] LOG: %cStart Phase PostSummonPhase color:green;
+[14:59:52.155] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:59:52.323] LOG: %cStart Phase MessagePhase color:green;
+[14:59:52.552] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:59:52.582] LOG: %cStart Phase PostSummonPhase color:green;
+[14:59:52.583] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:59:52.765] LOG: %cStart Phase MessagePhase color:green;
+[14:59:53.010] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:59:53.040] LOG: %cStart Phase PostSummonPhase color:green;
+[14:59:53.040] LOG: Ran PSP for: Pyukumuku
+[14:59:53.040] LOG: %cStart Phase PostSummonPhase color:green;
+[14:59:53.040] LOG: %cStart Phase PostSummonPhase color:green;
+[14:59:53.041] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:59:53.225] LOG: %cStart Phase MessagePhase color:green;
+[14:59:53.471] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:59:53.501] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:59:53.682] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:59:53.725] LOG: %cStart Phase TurnInitPhase color:green;
+[14:59:53.725] LOG: %cStart Phase CommandPhase color:green;
+[14:59:57.018] LOG: Move: INFERNAL_PARADE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Rotom
+[14:59:57.019] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:59:58.215] LOG: %cStart Phase CommandPhase color:green;
+[14:59:59.334] LOG: Move: BANEFUL_BUNKER Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Pyukumuku
+[14:59:59.335] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:59:59.339] LOG: Applied Soft Sand (enemy)
+[14:59:59.345] LOG: Battle Seed: iyicxuLi1BevT39U
+[14:59:59.348] WARN: BattlerTag ENDURING is missing a score!
+[14:59:59.349] WARN: BattlerTag ENDURING is missing a score!
+[14:59:59.350] LOG: Applied Soft Sand (enemy)
+[14:59:59.352] LOG: Move Pool: ["Headlong Rush","Collision Course","Fire Punch","Endure"]
+[14:59:59.352] LOG: Move Scores: [16.101694915254235,11.440677966101696,10.97560975609756,-20]
+[14:59:59.352] LOG: Sorted Move Pool: ["Headlong Rush","Collision Course","Fire Punch","Endure"]
+[14:59:59.352] LOG: Chosen Move: Headlong Rush
+[14:59:59.352] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:59:59.357] LOG: Move Pool: ["Giga Drain"]
+[14:59:59.357] LOG: Move Scores: [1137.8048780487804]
+[14:59:59.357] LOG: Sorted Move Pool: ["Giga Drain"]
+[14:59:59.357] LOG: Chosen Move: Giga Drain
+[14:59:59.357] LOG: %cStart Phase TurnStartPhase color:green;
+[14:59:59.360] LOG: %cStart Phase MovePhase color:green;
+[14:59:59.360] LOG: %cUser: Pyukumuku
+Move: BANEFUL_BUNKER
+Use Mode: NORMAL color:orchid
+[14:59:59.362] LOG: %cStart Phase MessagePhase color:green;
+[14:59:59.455] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:00:00.011] LOG: %cStart Phase MessagePhase color:green;
+[15:00:00.238] LOG: %cStart Phase MoveEndPhase color:green;
+[15:00:00.239] LOG: %cStart Phase MovePhase color:green;
+[15:00:00.239] LOG: %cUser: Squawkabilly Yellow
+Move: HEADLONG_RUSH
+Use Mode: NORMAL color:orchid
+[15:00:00.242] LOG: %cStart Phase MessagePhase color:green;
+[15:00:00.405] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:00:00.406] LOG: %cStart Phase MessagePhase color:green;
+[15:00:00.638] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[15:00:00.955] LOG: %cStart Phase MessagePhase color:green;
+[15:00:01.214] LOG: %cStart Phase MoveEndPhase color:green;
+[15:00:01.215] LOG: %cStart Phase MovePhase color:green;
+[15:00:01.215] LOG: %cUser: Rotom
+Move: INFERNAL_PARADE
+Use Mode: NORMAL color:orchid
+[15:00:01.216] LOG: %cStart Phase MessagePhase color:green;
+[15:00:01.346] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:00:01.346] LOG: %cStart Phase MessagePhase color:green;
+[15:00:01.596] LOG: %cStart Phase MoveEndPhase color:green;
+[15:00:01.597] LOG: %cStart Phase MovePhase color:green;
+[15:00:01.597] LOG: %cUser: Wormadam
+Move: GIGA_DRAIN
+Use Mode: NORMAL color:orchid
+[15:00:01.599] LOG: %cStart Phase MessagePhase color:green;
+[15:00:01.729] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:00:02.610] LOG: crit stage: +0
+[15:00:02.610] LOG: Move: Giga Drain | Base damage: 56.6048 | Power: 75 | Source attack: 144 | Target defense: 125
+[15:00:02.611] LOG: Move: Giga Drain | Attack damage: 199
+[15:00:02.611] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:00:02.640] LOG: %cStart Phase MessagePhase color:green;
+[15:00:02.856] LOG: %cStart Phase PokemonHealPhase color:green;
+[15:00:02.856] LOG: %cStart Phase MessagePhase color:green;
+[15:00:03.086] LOG: %cStart Phase FaintPhase color:green;
+[15:00:03.144] LOG: %cStart Phase MessagePhase color:green;
+[15:00:04.098] LOG: %cStart Phase MoveEndPhase color:green;
+[15:00:04.099] LOG: %cStart Phase CheckInterludePhase color:green;
+[15:00:04.099] LOG: %cStart Phase WeatherEffectPhase color:green;
+[15:00:04.099] LOG: %cStart Phase PositionalTagPhase color:green;
+[15:00:04.099] LOG: %cStart Phase BerryPhase color:green;
+[15:00:04.099] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[15:00:04.100] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[15:00:04.422] LOG: %cStart Phase MessagePhase color:green;
+[15:00:04.677] LOG: %cStart Phase TurnEndPhase color:green;
+[15:00:04.678] LOG: %cStart Phase SwitchPhase color:green;
+[15:00:08.748] LOG: %cStart Phase SwitchSummonPhase color:green;
+[15:00:08.836] LOG: Applied Iron 
+[15:00:08.867] WARN: cry/10848 not found
+[15:00:08.969] LOG: %cStart Phase ShinySparklePhase color:green;
+[15:00:09.067] LOG: %cStart Phase PostSummonPhase color:green;
+[15:00:09.067] LOG: Ran PSP for: Breezing
+[15:00:09.067] LOG: %cStart Phase PostSummonPhase color:green;
+[15:00:09.067] LOG: %cStart Phase PostSummonPhase color:green;
+[15:00:09.070] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:00:09.238] LOG: %cStart Phase CommonAnimPhase color:green;
+[15:00:09.751] LOG: %cStart Phase MessagePhase color:green;
+[15:00:09.965] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:00:09.995] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:00:10.163] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:00:10.205] LOG: %cStart Phase TurnInitPhase color:green;
+[15:00:10.205] LOG: %cStart Phase CommandPhase color:green;
+[15:00:12.381] LOG: Move: ICE_BEAM Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Breezing
+[15:00:12.382] LOG: %cStart Phase SelectTargetPhase color:green;
+[15:00:13.842] LOG: %cStart Phase CommandPhase color:green;
+[15:00:15.448] LOG: Move: SALT_CURE Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Pyukumuku
+[15:00:15.449] LOG: %cStart Phase SelectTargetPhase color:green;
+[15:00:15.905] LOG: %cStart Phase EnemyCommandPhase color:green;
+[15:00:15.906] LOG: Applied Soft Sand (enemy)
+[15:00:15.909] LOG: Battle Seed: iyicxuLi1BevT39U
+[15:00:15.910] WARN: BattlerTag ENDURING is missing a score!
+[15:00:15.911] WARN: BattlerTag ENDURING is missing a score!
+[15:00:15.912] LOG: Move Pool: ["Headlong Rush","Collision Course","Fire Punch","Endure"]
+[15:00:15.912] LOG: Move Scores: [-20,11.440677966101696,2.1186440677966103,-20]
+[15:00:15.912] LOG: Sorted Move Pool: ["Collision Course","Fire Punch","Headlong Rush","Endure"]
+[15:00:15.912] LOG: Chosen Move: Collision Course
+[15:00:15.912] LOG: %cStart Phase EnemyCommandPhase color:green;
+[15:00:15.919] LOG: Move Pool: ["Web Shot","Quiver Dance","Giga Drain","Soil Drain"]
+[15:00:15.919] LOG: Move Scores: [17.372881355932204,20,25.523560209424087,13.983050847457628]
+[15:00:15.919] LOG: Sorted Move Pool: ["Giga Drain","Quiver Dance","Web Shot","Soil Drain"]
+[15:00:15.919] LOG: Chosen Move: Giga Drain
+[15:00:15.919] LOG: %cStart Phase TurnStartPhase color:green;
+[15:00:15.921] LOG: %cStart Phase MovePhase color:green;
+[15:00:15.921] LOG: %cUser: Squawkabilly Yellow
+Move: COLLISION_COURSE
+Use Mode: NORMAL color:orchid
+[15:00:15.924] LOG: %cStart Phase MessagePhase color:green;
+[15:00:16.094] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:00:16.164] WARN: cry/10429 not found
+[15:00:17.024] LOG: crit stage: +0
+[15:00:17.024] LOG: Move: Collision Course | Base damage: 27.377606177606175 | Power: 100 | Source attack: 104 | Target defense: 259
+[15:00:17.025] LOG: Move: Collision Course | Attack damage: 24
+[15:00:17.025] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:00:17.054] LOG: %cStart Phase MoveEndPhase color:green;
+[15:00:17.055] LOG: %cStart Phase MovePhase color:green;
+[15:00:17.055] LOG: %cUser: Breezing
+Move: ICE_BEAM
+Use Mode: NORMAL color:orchid
+[15:00:17.058] LOG: %cStart Phase MessagePhase color:green;
+[15:00:17.182] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:00:17.667] LOG: Applied Dire Hit 
+[15:00:17.667] LOG: crit stage: +1
+[15:00:17.668] LOG: Move: Ice Beam | Base damage: 29.288447204968946 | Power: 90 | Source attack: 113 | Target defense: 161
+[15:00:17.668] LOG: Move: Ice Beam | Attack damage: 52
+[15:00:17.668] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:00:17.698] LOG: %cStart Phase MessagePhase color:green;
+[15:00:17.920] LOG: %cStart Phase MoveEndPhase color:green;
+[15:00:17.921] LOG: %cStart Phase MovePhase color:green;
+[15:00:17.921] LOG: %cUser: Wormadam
+Move: GIGA_DRAIN
+Use Mode: NORMAL color:orchid
+[15:00:17.923] LOG: %cStart Phase MessagePhase color:green;
+[15:00:18.066] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:00:18.938] LOG: crit stage: +0
+[15:00:18.938] LOG: Move: Giga Drain | Base damage: 65.2 | Power: 75 | Source attack: 144 | Target defense: 108
+[15:00:18.939] LOG: Move: Giga Drain | Attack damage: 61
+[15:00:18.939] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:00:18.968] LOG: %cStart Phase PokemonHealPhase color:green;
+[15:00:18.968] LOG: %cStart Phase MessagePhase color:green;
+[15:00:19.207] LOG: %cStart Phase MoveEndPhase color:green;
+[15:00:19.207] LOG: %cStart Phase MovePhase color:green;
+[15:00:19.207] LOG: %cUser: Pyukumuku
+Move: SALT_CURE
+Use Mode: NORMAL color:orchid
+[15:00:19.209] LOG: %cStart Phase MessagePhase color:green;
+[15:00:19.336] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:00:19.719] LOG: Applied Dire Hit 
+[15:00:19.719] LOG: crit stage: +1
+[15:00:19.720] LOG: Move: Salt Cure | Base damage: 9.093894736842106 | Power: 40 | Source attack: 78 | Target defense: 190
+[15:00:19.720] LOG: Move: Salt Cure | Attack damage: 16
+[15:00:19.720] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:00:19.749] LOG: %cStart Phase MessagePhase color:green;
+[15:00:19.961] LOG: %cStart Phase MessagePhase color:green;
+[15:00:20.232] LOG: %cStart Phase MoveEndPhase color:green;
+[15:00:20.232] LOG: %cStart Phase CheckInterludePhase color:green;
+[15:00:20.232] LOG: %cStart Phase WeatherEffectPhase color:green;
+[15:00:20.813] LOG: %cStart Phase PositionalTagPhase color:green;
+[15:00:20.813] LOG: %cStart Phase BerryPhase color:green;
+[15:00:20.814] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[15:00:20.815] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[15:00:21.127] LOG: %cStart Phase MessagePhase color:green;
+[15:00:21.383] LOG: %cStart Phase TurnEndPhase color:green;
+[15:00:21.385] LOG: %cStart Phase CommonAnimPhase color:green;
+[15:00:21.569] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:00:21.571] LOG: %cStart Phase MessagePhase color:green;
+[15:00:21.843] LOG: %cStart Phase TurnInitPhase color:green;
+[15:00:21.843] LOG: %cStart Phase CommandPhase color:green;
