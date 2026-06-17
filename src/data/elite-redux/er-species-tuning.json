@@ -1,1 +1,10 @@
-{}
+{
+  "SPECIES_SCYTHER": {
+    "cost": 4,
+    "eggTier": 0
+  },
+  "SPECIES_SCYTHER_REDUX": {
+    "cost": 4,
+    "eggTier": 0
+  }
+}
