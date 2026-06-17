@@ -2,6 +2,12 @@
   "SPECIES_GALAR_STUNFISK": {
     "eggTier": 0
   },
+  "SPECIES_KARTANA": {
+    "cost": 7
+  },
+  "SPECIES_KARTANA_FALLEN": {
+    "cost": 12
+  },
   "SPECIES_SCYTHER": {
     "cost": 4,
     "eggTier": 0
