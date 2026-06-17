@@ -1,0 +1,18 @@
+{
+  "intro": "A lone headstone leans in the fog, fresher than the rest. The challenger beneath it almost made it - their fight was simply never finished.",
+  "title": "Unfinished Business",
+  "description": "The epitaph reads: \"{{trainerName}}, a {{difficulty}}-mode challenger. Fell at wave {{waveReached}} to {{opponentName}}.\" The grave is restless. You could take up their cause and face the very team that ended their run - win, and the grateful spirit will pass on the prize they were reaching for. Or you could leave their fight unfinished.",
+  "query": "Do you settle the score?",
+  "option": {
+    "1": {
+      "label": "Finish their fight",
+      "tooltip": "(-) Battle the exact team that ended their run. (+) Win to claim a random relic.",
+      "selected": "You take up the fallen challenger's cause. The team that beat them rises from the fog to meet you."
+    },
+    "2": {
+      "label": "Walk on",
+      "tooltip": "(-) Leave their fight unfinished. No cost.",
+      "selected": "Some scores are not yours to settle. You leave the grave to its rest."
+    }
+  }
+}

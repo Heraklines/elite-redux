@@ -181,6 +181,11 @@ export enum MysteryEncounterType {
    * frozen in clear ice. Thaw it (with Fire) to wake & catch it (careless thaw
    * wakes it hostile), or chip out the preserved held item by hand (no fight). */
   ER_FROZEN_IN_TIME,
+  /** ER #517: Unfinished Business - a Graveyard score-settling event; the grave of
+   * a challenger who almost made it. Finish their fight against the exact team that
+   * ended their run (the stored opponentParty, as a spectral trainer) for a random
+   * relic, or walk on. */
+  ER_UNFINISHED_BUSINESS,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

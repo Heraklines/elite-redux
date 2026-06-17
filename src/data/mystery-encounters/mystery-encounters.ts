@@ -78,6 +78,7 @@ import { TrainingSessionEncounter } from "#mystery-encounters/training-session-e
 import { TrashToTreasureEncounter } from "#mystery-encounters/trash-to-treasure-encounter";
 import { UltraWormholeEncounter } from "#mystery-encounters/ultra-wormhole-encounter";
 import { UncommonBreedEncounter } from "#mystery-encounters/uncommon-breed-encounter";
+import { UnfinishedBusinessEncounter } from "#mystery-encounters/unfinished-business-encounter";
 import { WeirdDreamEncounter } from "#mystery-encounters/weird-dream-encounter";
 import { WishingCrystalEncounter } from "#mystery-encounters/wishing-crystal-encounter";
 import { WoodlandForagerEncounter } from "#mystery-encounters/woodland-forager-encounter";
@@ -310,7 +311,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
       MysteryEncounterType.ER_INTO_THE_CALDERA,
     ],
   ],
-  [BiomeId.GRAVEYARD, [MysteryEncounterType.ER_GRAVES_OF_THE_FALLEN]],
+  [BiomeId.GRAVEYARD, [MysteryEncounterType.ER_GRAVES_OF_THE_FALLEN, MysteryEncounterType.ER_UNFINISHED_BUSINESS]],
   [BiomeId.DOJO, [MysteryEncounterType.COLOSSEUM]],
   [BiomeId.FACTORY, [MysteryEncounterType.ER_SALVAGE_YARD]],
   [BiomeId.RUINS, [MysteryEncounterType.ER_SEALED_DOOR]],
@@ -422,6 +423,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_HIGH_NOON] = HighNoonEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_WISHING_CRYSTAL] = WishingCrystalEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_FROZEN_IN_TIME] = FrozenInTimeEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_UNFINISHED_BUSINESS] = UnfinishedBusinessEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

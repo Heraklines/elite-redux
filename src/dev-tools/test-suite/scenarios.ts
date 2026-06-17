@@ -661,6 +661,37 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Graveyard: Unfinished Business (#517)",
+    description:
+      "#517 - Unfinished Business (Graveyard score-settling). Forces\n"
+      + "ER_UNFINISHED_BUSINESS in GRAVEYARD. With an empty ghost pool it uses the\n"
+      + "synthetic legacy grave: killer team = Garchomp / Spiritomb / Milotic.\n"
+      + "DO: read the epitaph (challenger name / difficulty / wave / killer), then\n"
+      + "'Finish their fight' to battle the killer team, or 'Walk on'.\n"
+      + "EXPECT: finish -> a spectral TRAINER (named after the killer) fielding the\n"
+      + "exact killer team, level-scaled; win -> a reward screen with one random\n"
+      + "relic. Walk on -> no battle, no cost. (Online, the grave/killer are real\n"
+      + "ghost-pool data instead of the legacy trio.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.GRAVEYARD,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_UNFINISHED_BUSINESS,
+      });
+      return [
+        makeStarter(SpeciesId.TYRANITAR, {
+          moveset: [MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.ICE_BEAM, MoveId.DRAGON_DANCE],
+        }),
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT],
+        }),
+      ];
+    },
+  },
+  {
     label: "ER Badlands: High Noon (#516)",
     description:
       "#516 - High Noon (Badlands single-strike duel). Forces ER_HIGH_NOON in\n"
