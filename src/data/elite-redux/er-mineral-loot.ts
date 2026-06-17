@@ -66,8 +66,8 @@ export function emptyMineralHaul(): MineralLootHaul {
 
 // --- Money ----------------------------------------------------------------- //
 
-/** % chance a strike turns up nothing (a dud). */
-const DUD_CHANCE = 12;
+/** % chance a strike turns up nothing (a dud). Kept low so a dive rarely feels empty. */
+const DUD_CHANCE = 6;
 /** % chance a strike turns up a nugget (a big payout). */
 const NUGGET_CHANCE = 8;
 /** A nugget pays roughly this multiple of the strike's base value. */
@@ -122,17 +122,19 @@ const KINGS_ROCK_CHANCE = 7;
  * fast-climbing bust curve, most runs busted out before ever seeing an item.
  */
 function itemFindChance(d: number): number {
+  // Probabilistic from the FIRST strike (d=0) - no hard-zero gate, so a find can
+  // genuinely happen right away rather than feeling pre-scripted.
   if (d <= 0) {
-    return 0;
+    return 14;
   }
   if (d === 1) {
-    return 22;
+    return 24;
   }
   if (d === 2) {
-    return 34;
+    return 36;
   }
   if (d === 3) {
-    return 44;
+    return 46;
   }
   return 55;
 }

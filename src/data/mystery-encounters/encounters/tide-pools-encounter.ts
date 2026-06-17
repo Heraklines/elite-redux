@@ -112,16 +112,21 @@ const SHELL_BELL_SHARE = 14;
  * an item is the uncommon bonus on a deeper reach.
  */
 function beachFindChance(d: number): number {
-  if (d <= 1) {
-    return 0;
+  // Probabilistic from the first comb (no hard-zero gate); the beach is still
+  // money-first, so these stay lower than the mineral delves.
+  if (d <= 0) {
+    return 8;
+  }
+  if (d === 1) {
+    return 12;
   }
   if (d === 2) {
-    return 14;
+    return 18;
   }
   if (d === 3) {
-    return 20;
+    return 24;
   }
-  return 26;
+  return 30;
 }
 
 /**
