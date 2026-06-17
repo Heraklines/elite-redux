@@ -88,7 +88,9 @@ function feedPicker(): Promise<boolean> {
         label: modifier.type.name,
         handler: () => {
           encounter.setDialogueToken("chosenItem", modifier.type.name);
-          getMisc().chosenModifier = modifier;
+          // Assign a fresh misc object - encounter.misc resets to null, so
+          // mutating getMisc() in place would throw and the click would no-op.
+          encounter.misc = { chosenModifier: modifier };
           return true;
         },
       };

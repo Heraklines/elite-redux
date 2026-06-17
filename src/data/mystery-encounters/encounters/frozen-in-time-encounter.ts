@@ -56,15 +56,35 @@ const namespace = "mysteryEncounters/frozenInTime";
  */
 const FROZEN_SPECIES: SpeciesId[] = [SpeciesId.ARCTOZOLT, SpeciesId.ARCTOVISH, SpeciesId.AURORUS, SpeciesId.AMAURA];
 
-/** The signature preserved loot: a Never-Melt Ice. */
+/** The signature preserved loot: a Never-Melt Ice ("Evermelt Ice"). */
 const ICE_BOOSTER: ModifierTypeFunc = () => generateModifierType(modifierTypes.ATTACK_TYPE_BOOSTER, [PokemonType.ICE])!;
 
-/** Sometimes the frozen mon was clutching a (perfectly preserved) healing item. */
-const PRESERVED_HEAL_ITEMS: ModifierTypeFunc[] = [
-  modifierTypes.FULL_RESTORE,
-  modifierTypes.MAX_REVIVE,
-  modifierTypes.SACRED_ASH,
+/**
+ * The chip-out reward pool (#518): ONE thematic, ice-cavern-appropriate item.
+ * Heavily weighted toward the signature Never-Melt Ice, with a chance at a
+ * Mystical Rock (the weather rock - fitting for an ICE_CAVE's hail/snow) and a
+ * rarer perfectly-preserved healing item the frozen mon died clutching.
+ */
+const CHIP_POOL: { func: ModifierTypeFunc; weight: number }[] = [
+  { func: ICE_BOOSTER, weight: 50 }, // Never-Melt Ice ("Evermelt Ice")
+  { func: modifierTypes.MYSTICAL_ROCK, weight: 30 }, // the "weather rock"
+  { func: modifierTypes.FULL_RESTORE, weight: 8 },
+  { func: modifierTypes.MAX_REVIVE, weight: 8 },
+  { func: modifierTypes.SACRED_ASH, weight: 4 },
 ];
+
+/** Roll ONE reward func from the weighted chip-out pool. */
+function rollChipReward(): ModifierTypeFunc {
+  const total = CHIP_POOL.reduce((sum, e) => sum + e.weight, 0);
+  let roll = randSeedInt(total);
+  for (const entry of CHIP_POOL) {
+    roll -= entry.weight;
+    if (roll < 0) {
+      return entry.func;
+    }
+  }
+  return ICE_BOOSTER;
+}
 
 interface FrozenState {
   speciesId: SpeciesId;
@@ -148,10 +168,9 @@ export const FrozenInTimeEncounter: MysteryEncounter = MysteryEncounterBuilder.w
       selected: [{ text: `${namespace}:option.2.selected` }],
     },
     async () => {
-      // Chip out the preserved held item by hand: a Never-Melt Ice (the signature),
-      // or sometimes a perfectly preserved healing item. No fight.
-      const itemFunc: ModifierTypeFunc = randSeedInt(100) < 60 ? ICE_BOOSTER : randSeedItem(PRESERVED_HEAL_ITEMS);
-      setEncounterRewards({ guaranteedModifierTypeFuncs: [itemFunc], fillRemaining: false });
+      // Chip out the preserved held item by hand: ONE thematic reward (Never-Melt
+      // Ice, the weather rock, or a preserved healing item). No fight.
+      setEncounterRewards({ guaranteedModifierTypeFuncs: [rollChipReward()], fillRemaining: false });
       await transitionMysteryEncounterIntroVisuals(true, true);
       leaveEncounterWithoutBattle(false);
       return true;
