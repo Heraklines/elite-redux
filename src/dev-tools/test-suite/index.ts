@@ -236,6 +236,21 @@ function nextUnpassedScenario(after: DevScenario | null): DevScenario | null {
   return null;
 }
 
+/**
+ * Open the scenario picker cleanly after a teardown. The rebuilt title is showing
+ * its OWN option-select (Continue / New Game / ... / Dev Scenarios) via
+ * setMode(UiMode.TITLE). Opening the list as an overlay ON TOP of that leaves both
+ * menus stacked on screen forever (the reported overlap). So switch the active
+ * mode to MESSAGE first - which dismisses the title menu - exactly like the real
+ * "Dev Scenarios" item does (its handler returns true to close the title select)
+ * before deferring to openScenarioList.
+ */
+function openPickerClean(ctx: DevMenuCtx): void {
+  Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE))
+    .then(() => openScenarioList(ctx))
+    .catch(() => {});
+}
+
 // Passed scenarios are remembered in localStorage (ordered, most-recent LAST) so
 // they DROP OUT of the picker list and survive reloads. "Undo last pass" in the
 // menu pops only the most recent one (so you don't re-flood the whole list).
@@ -474,14 +489,14 @@ function showScenarioBanner(scenario: (typeof DEV_SCENARIOS)[number]): void {
         activeShareCode = null;
         launchScenario(ctx, nxt);
       } else {
-        openScenarioList(ctx); // all passed -> let the tester reset/pick
+        openPickerClean(ctx); // all passed -> let the tester reset/pick
       }
     }),
   );
 
   const pickBtn = makeBannerButton("☰ Pick", "#444");
   pickBtn.title = "Open the scenario picker to choose any scenario";
-  pickBtn.addEventListener("click", () => teardownThen(ctx => openScenarioList(ctx)));
+  pickBtn.addEventListener("click", () => teardownThen(ctx => openPickerClean(ctx)));
 
   navRow.append(resetBtn, nextBtn, pickBtn);
   body.appendChild(navRow);
