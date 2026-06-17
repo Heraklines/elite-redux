@@ -39,7 +39,6 @@ import {
   initBattleWithEnemyConfig,
   leaveEncounterWithoutBattle,
   setEncounterRewards,
-  transitionMysteryEncounterIntroVisuals,
 } from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
@@ -107,7 +106,11 @@ export const FrozenInTimeEncounter: MysteryEncounter = MysteryEncounterBuilder.w
   .withCatchAllowed(true)
   .withHideWildIntroMessage(true)
   .withFleeAllowed(false)
-  .withAutoHideIntroVisuals(false)
+  // Default auto-hide (true): the framework's MysteryEncounterOptionSelectedPhase
+  // hides the intro sprite before the chosen option's handler runs. (#518 fix: a
+  // manual `await transitionMysteryEncounterIntroVisuals` on the no-battle chip
+  // option could leave the sprite up AND skip the reward if its tween never
+  // resolved - letting the framework own the transition is robust for both options.)
   .withIntroSpriteConfigs([
     // A vast shape suspended in clear ice (Aurorus), frosted over with a pale tint.
     {
@@ -169,9 +172,9 @@ export const FrozenInTimeEncounter: MysteryEncounter = MysteryEncounterBuilder.w
     },
     async () => {
       // Chip out the preserved held item by hand: ONE thematic reward (Never-Melt
-      // Ice, the weather rock, or a preserved healing item). No fight.
+      // Ice, the weather rock, or a preserved healing item). No fight. The intro
+      // sprite is auto-hidden by the option-select phase (see autoHide note above).
       setEncounterRewards({ guaranteedModifierTypeFuncs: [rollChipReward()], fillRemaining: false });
-      await transitionMysteryEncounterIntroVisuals(true, true);
       leaveEncounterWithoutBattle(false);
       return true;
     },
