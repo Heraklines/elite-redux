@@ -8,6 +8,7 @@ import { AuroraEncounter } from "#mystery-encounters/aurora-encounter";
 import { BerriesAboundEncounter } from "#mystery-encounters/berries-abound-encounter";
 import { BlackMarketEncounter } from "#mystery-encounters/black-market-encounter";
 import { BugTypeSuperfanEncounter } from "#mystery-encounters/bug-type-superfan-encounter";
+import { BuriedCityEncounter } from "#mystery-encounters/buried-city-encounter";
 import { CleansingFontEncounter } from "#mystery-encounters/cleansing-font-encounter";
 import { ClowningAroundEncounter } from "#mystery-encounters/clowning-around-encounter";
 import { ColosseumEncounter } from "#mystery-encounters/colosseum-encounter";
@@ -289,7 +290,10 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
       MysteryEncounterType.ER_ECHO_CHAMBER,
     ],
   ],
-  [BiomeId.DESERT, [MysteryEncounterType.DANCING_LESSONS, MysteryEncounterType.ER_THE_MIRAGE]],
+  [
+    BiomeId.DESERT,
+    [MysteryEncounterType.DANCING_LESSONS, MysteryEncounterType.ER_THE_MIRAGE, MysteryEncounterType.ER_BURIED_CITY],
+  ],
   [BiomeId.ICE_CAVE, [MysteryEncounterType.ER_FROZEN_SHAPES]],
   [BiomeId.MEADOW, [MysteryEncounterType.ER_PICNIC]],
   [BiomeId.POWER_PLANT, [MysteryEncounterType.ER_OVERCHARGE_CORE]],
@@ -407,6 +411,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_THE_MIRAGE] = TheMirageEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_CLEANSING_FONT] = CleansingFontEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_INTO_THE_CALDERA] = IntoTheCalderaEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_BURIED_CITY] = BuriedCityEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

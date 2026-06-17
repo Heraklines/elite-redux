@@ -1,0 +1,33 @@
+{
+  "intro": "Wind peels back the dunes to reveal stone rooftops half-swallowed by sand - a whole city buried here, and something old still keeping watch over it.",
+  "title": "The Buried City",
+  "description": "An ancient city lies entombed beneath the sand, its treasures with it. Dig down level by level for a growing haul, but every level risks waking its Ground guardians, and deep below the warden Runerigus stirs. Best the warden and you may claim the Pharaoh's Ankh. Rise early to keep the safe haul, or dig deeper for more.",
+  "query": "How deep will you dig?",
+  "option": {
+    "1": {
+      "label": "Dig into the city",
+      "tooltip": "(+) Gather wealth level by level; beat the warden for the Pharaoh's Ankh\n(?) Each dig risks waking a guardian",
+      "selected": "You lower yourself into the buried streets..."
+    },
+    "2": {
+      "label": "Leave it buried",
+      "tooltip": "(-) No haul",
+      "selected": "Some things are better left to the sand. You move on."
+    }
+  },
+  "digPrompt": "You have recovered {{diveCount}} finds. The passages grow older and darker the deeper you go. Dig on, or rise back up with your haul?",
+  "dig": {
+    "push": {
+      "label": "Dig deeper",
+      "tooltip": "(+) Richer relics deeper down; the warden waits below\n(?) Higher chance something wakes"
+    },
+    "bank": {
+      "label": "Climb out",
+      "tooltip": "(+) Keep everything you have recovered"
+    }
+  },
+  "foundRelics": "You unearth a cache of old coins and trinkets and pocket what they fetch.",
+  "foundNothing": "This chamber was picked clean long ago. You find nothing of worth.",
+  "sandStirs": "The sand erupts! A buried guardian drags itself up - the money you have recovered is safe. Drive it off and you can keep digging!",
+  "wardenRises": "The ground splits and the warden RUNERIGUS rises, its glyphs blazing! Best it and the Pharaoh's Ankh is yours."
+}

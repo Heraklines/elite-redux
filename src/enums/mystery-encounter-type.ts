@@ -161,6 +161,10 @@ export enum MysteryEncounterType {
   /** ER #512: Into the Caldera - a Volcano press-your-luck delve; descend for money
    * (heat-chipping non-Fire mons) past Fire guardians; deep banks can yield Molten Core. */
   ER_INTO_THE_CALDERA,
+  /** ER #510: The Buried City - a Desert press-your-luck delve; dig for money past
+   * Ground guardians; the warden Runerigus rises deep, and besting it earns the
+   * Pharaoh's Ankh. */
+  ER_BURIED_CITY,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

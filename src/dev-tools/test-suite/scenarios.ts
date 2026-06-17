@@ -580,6 +580,35 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Desert: The Buried City (#510)",
+    description:
+      "#510 - The Buried City (Desert press-your-luck delve). Forces ER_BURIED_CITY\n"
+      + "in DESERT.\n"
+      + "DO: 'Dig into the city', then 'Dig deeper' past guardian stirs until the warden\n"
+      + "RUNERIGUS rises (after 3 stirs), beat it, then 'Climb out'.\n"
+      + "EXPECT: money per dig; stirs = Ground guardians (BST climbs); the 4th stir is\n"
+      + "Runerigus (3-4 bars, +5 levels). Banking AFTER beating Runerigus grants the\n"
+      + "Pharaoh's Ankh relic + Ultra picks; banking WITHOUT beating it = NO Ankh.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.DESERT,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_BURIED_CITY,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.CRUNCH, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  {
     label: "ER Volcano: Into the Caldera (#512)",
     description:
       "#512 - Into the Caldera (Volcano press-your-luck delve). Forces\n"
