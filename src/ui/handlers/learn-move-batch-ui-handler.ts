@@ -18,6 +18,7 @@ type PanelState = "pickNew" | "pickSlot" | "confirmCancel";
 const PANEL_X = 6;
 const PANEL_Y = 22;
 const PANEL_W = 180;
+const PANEL_H = 96;
 const COL_GAP = 92;
 const ROW_H = 14;
 const ROW_TOP = 30;
@@ -61,11 +62,18 @@ export class LearnMoveBatchUiHandler extends UiHandler {
 
   setup(): void {
     const ui = this.getUi();
-    this.container = globalScene.add.container(0, 0);
+    // The UI container's origin is BOTTOM-left (positive y = DOWN / off-screen),
+    // so a visible panel must shift UP by ~canvas height (see ErQuizUiHandler at
+    // (0, -height)). Position the container so the window lands CENTERED on screen;
+    // children keep their positive PANEL_X/PANEL_Y offsets.
+    const sc = globalScene.scaledCanvas;
+    const winX = Math.floor((sc.width - PANEL_W) / 2);
+    const winY = Math.floor((sc.height - PANEL_H) / 2) - sc.height;
+    this.container = globalScene.add.container(winX - PANEL_X, winY - PANEL_Y);
     this.container.setVisible(false);
     ui.add(this.container);
 
-    this.container.add(addWindow(PANEL_X, PANEL_Y, PANEL_W, 96));
+    this.container.add(addWindow(PANEL_X, PANEL_Y, PANEL_W, PANEL_H));
     this.titleText = addTextObject(PANEL_X + 6, PANEL_Y + 4, "", TextStyle.WINDOW);
     this.learnableHeader = addTextObject(PANEL_X + 6, ROW_TOP - 12, "Learnable", TextStyle.WINDOW_ALT);
     this.currentHeader = addTextObject(PANEL_X + 6 + COL_GAP, ROW_TOP - 12, "Current", TextStyle.WINDOW_ALT);
