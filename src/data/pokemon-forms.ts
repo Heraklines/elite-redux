@@ -420,8 +420,18 @@ export const pokemonFormChanges: PokemonFormChanges = {
     new SpeciesFormChange(SpeciesId.PALAFIN, "hero", "zero", new SpeciesFormChangeAbilityTrigger(), true)
   ],
   [SpeciesId.AEGISLASH]: [
-    new SpeciesFormChange(SpeciesId.AEGISLASH, "blade", "shield", new SpeciesFormChangePreMoveTrigger(MoveId.KINGS_SHIELD), true, new SpeciesFormChangeCondition(p => p.hasAbility(AbilityId.STANCE_CHANGE))),
-    new SpeciesFormChange(SpeciesId.AEGISLASH, "shield", "blade", new SpeciesFormChangePreMoveTrigger(m => allMoves[m].category !== MoveCategory.STATUS), true, new SpeciesFormChangeCondition(p => p.hasAbility(AbilityId.STANCE_CHANGE))),
+    // Elite Redux (#480) — Stance Change. ER's Aegislash swaps between two Redux
+    // forms by the CATEGORY of the move it is about to use (2.65 dex: "Redux forms
+    // swap between physical/special based on move type"), resolved before the move
+    // executes. The "blade" form is the AXE (physical, sprite aegislash_blade_redux)
+    // and the "shield"/resting form is the BOW (special, sprite aegislash_redux):
+    // a physical move brings out the axe, a special move (or King's Shield, or
+    // switching out) returns it to the bow. Status moves leave the form unchanged.
+    // Gated on STANCE_CHANGE, which ER relocates into an innate slot — Pokemon's
+    // abilityDrivesFormChange exempts it from the innate unlock gate so the swap is
+    // never locked out (the actual cause of the "stuck" report).
+    new SpeciesFormChange(SpeciesId.AEGISLASH, "shield", "blade", new SpeciesFormChangePreMoveTrigger(m => allMoves[m].category === MoveCategory.PHYSICAL), true, new SpeciesFormChangeCondition(p => p.hasAbility(AbilityId.STANCE_CHANGE))),
+    new SpeciesFormChange(SpeciesId.AEGISLASH, "blade", "shield", new SpeciesFormChangePreMoveTrigger(m => allMoves[m].category === MoveCategory.SPECIAL || m === MoveId.KINGS_SHIELD), true, new SpeciesFormChangeCondition(p => p.hasAbility(AbilityId.STANCE_CHANGE))),
     new SpeciesFormChange(SpeciesId.AEGISLASH, "blade", "shield", new SpeciesFormChangeActiveTrigger(false), true)
   ],
   [SpeciesId.XERNEAS]: [

@@ -4362,6 +4362,29 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Aegislash stance swap (#480)",
+    description:
+      "#480 - Redux Aegislash's Stance Change is an INNATE (not the active ability),\n"
+      + "which was being candy/level gated, so the form never switched ('stuck'). It\n"
+      + "is now treated as a form-change driver, so the swap is never locked out, and\n"
+      + "it swaps by MOVE CATEGORY per the 2.65 dex: physical -> Axe ('blade' form),\n"
+      + "special / King's Shield / switch-out -> Bow ('shield' form).\n"
+      + "Aegislash here is a FRESH starter (Stance Change innate NOT unlocked).\n"
+      + "EXPECT: starts as Bow (shield). Iron Head (physical) -> switches to Axe (blade)\n"
+      + "sprite. Shadow Ball (special) -> back to Bow. King's Shield -> Bow. Every time.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+      });
+      return [
+        makeStarter(SpeciesId.AEGISLASH, {
+          moveset: [MoveId.IRON_HEAD, MoveId.SHADOW_BALL, MoveId.KINGS_SHIELD, MoveId.SACRED_SWORD],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) No custom evo on vanilla (#479)",
     description:
       "#479 - on the PURE-VANILLA difficulties (Youngster / Ace) a wild vanilla\n"

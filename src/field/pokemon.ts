@@ -2902,7 +2902,19 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   ] as const satisfies readonly AbAttrString[];
 
   private abilityDrivesFormChange(ability: Ability | null | undefined): boolean {
-    return !!ability && Pokemon.FORM_CHANGE_DRIVER_ATTRS.some(attr => ability.hasAttr(attr));
+    if (!ability) {
+      return false;
+    }
+    // ER relocates Stance Change into an INNATE slot (Aegislash #480). Unlike the
+    // weather/turn form abilities above, Stance Change is a gate-only MARKER with
+    // no form-change AbAttr — the actual swap lives in the form-change table keyed
+    // on `hasAbility(STANCE_CHANGE)`. Treat it as a driver so its innate slot is
+    // never candy/level gated; otherwise Aegislash stays stuck in one form until
+    // the slot unlocks (the cause of the "stance change stuck" report).
+    if (ability.id === AbilityId.STANCE_CHANGE) {
+      return true;
+    }
+    return Pokemon.FORM_CHANGE_DRIVER_ATTRS.some(attr => ability.hasAttr(attr));
   }
 
   /**
@@ -3025,11 +3037,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     const passives = this.getPassiveAbilities();
     const slotLimit = getEnemyPassiveSlotLimit(this);
     for (let slot = 0; slot < passives.length; slot++) {
+      const pa = passives[slot];
+      // Form-change drivers are species identity, never gated by the enemy slot
+      // limit or candy unlock — match them regardless of slot position (#480:
+      // Stance Change sits in innate slot 2, past a low-level enemy's slot limit).
+      if (pa?.id === ability && this.abilityDrivesFormChange(pa) && (!canApply || this.canApplyAbility(true, slot))) {
+        return true;
+      }
       // ER Black Shinies (#349): GIFT slots (>= 3) ignore the enemy slot limit.
       if (slot < 3 && slot >= slotLimit) {
         continue;
       }
-      const pa = passives[slot];
       if (pa?.id === ability && (!canApply || this.canApplyAbility(true, slot))) {
         return true;
       }
