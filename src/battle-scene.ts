@@ -212,6 +212,11 @@ export class BattleScene extends SceneBase {
   public gameSpeed = 1;
   /** ER (#421): atlas path each pokemon-atlas key was loaded with (poison detection). */
   private readonly erAtlasPathByKey = new Map<string, string>();
+  // ER: resolved png/json URLs per atlas key + a one-shot retry guard, for the
+  // poisoned-cache cache-bust retry (see installErAtlasRetry / loadPokemonAtlas).
+  private readonly erAtlasUrlsByKey = new Map<string, { png: string; json: string }>();
+  private readonly erAtlasRetried = new Set<string>();
+  private erAtlasRetryInstalled = false;
   public damageNumbersMode = 0;
   public reroll = false;
   public shopCursorTarget: number = ShopCursorTarget.REWARDS;
@@ -438,17 +443,51 @@ export class BattleScene extends SceneBase {
       this.anims.remove(key);
     }
     this.erAtlasPathByKey.set(key, atlasPath);
-    this.load.atlas(
-      key,
-      `images/pokemon/${variant ? "variant/" : ""}${experimental ? "exp/" : ""}${atlasPath}.png`,
-      `images/pokemon/${variant ? "variant/" : ""}${experimental ? "exp/" : ""}${atlasPath}.json`,
-    );
+    const atlasUrlBase = `images/pokemon/${variant ? "variant/" : ""}${experimental ? "exp/" : ""}${atlasPath}`;
+    // ER: remember the resolved URLs so installErAtlasRetry can re-issue the whole
+    // atlas with a cache-buster if this load errors (poisoned-cache bypass).
+    this.erAtlasUrlsByKey.set(key, { png: `${atlasUrlBase}.png`, json: `${atlasUrlBase}.json` });
+    this.installErAtlasRetry();
+    this.load.atlas(key, `${atlasUrlBase}.png`, `${atlasUrlBase}.json`);
     // ER: a few ER-custom sprites shipped without alpha (flat opaque background),
     // so they render inside a coloured box. Key the background out once the atlas
     // texture finishes loading. No-ops for keys/sprites that don't need it.
     if (key.includes("er__")) {
       this.load.once(`filecomplete-atlas-${key}`, () => chromaKeyErSpriteTexture(this, key));
     }
+  }
+
+  /**
+   * ER: one-time guard against a POISONED BROWSER CACHE for pokemon atlases. A
+   * transient CDN failure gets cached under jsDelivr's 7-day TTL, after which the
+   * browser keeps failing the CORS check on cache HITS even though the server
+   * serves the file fine - the mon renders the substitute placeholder and the
+   * game can crash on faint. Phaser's own retry re-requests the SAME (poisoned)
+   * URL, so it can never recover. On a load error we re-issue the WHOLE atlas
+   * ONCE with a unique cache-buster, which forces a fresh URL that bypasses the
+   * poisoned entry; the server serves it correctly. Capped at one retry per key
+   * (and skipped once the texture exists) so it can never loop or wedge loads.
+   */
+  private installErAtlasRetry(): void {
+    if (this.erAtlasRetryInstalled) {
+      return;
+    }
+    this.erAtlasRetryInstalled = true;
+    this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, (file: Phaser.Loader.File) => {
+      const key = file.key;
+      const urls = this.erAtlasUrlsByKey.get(key);
+      if (!urls || this.erAtlasRetried.has(key) || this.textures.exists(key)) {
+        return;
+      }
+      this.erAtlasRetried.add(key);
+      const cb = `cb=${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+      const bust = (u: string) => `${u}${u.includes("?") ? "&" : "?"}${cb}`;
+      console.warn(`[er-atlas] load error for ${key}; retrying once with cache-buster (poisoned-cache bypass)`);
+      this.load.atlas(key, bust(urls.png), bust(urls.json));
+      if (!this.load.isLoading()) {
+        this.load.start();
+      }
+    });
   }
 
   /**
