@@ -3,6 +3,9 @@
     "cost": 2,
     "eggTier": 1
   },
+  "SPECIES_FEEBAS": {
+    "cost": 3
+  },
   "SPECIES_GALAR_STUNFISK": {
     "eggTier": 0
   },
