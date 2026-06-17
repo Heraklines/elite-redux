@@ -13,6 +13,7 @@
  * so getLevelMoves()/ability slots/tmSpecies reflect ER 2.65, not vanilla.
  */
 
+import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { tmSpecies } from "#balance/tm-species-map";
 import { allAbilities, allMoves, allSpecies } from "#data/data-lists";
 import { AbilityId } from "#enums/ability-id";
@@ -90,7 +91,32 @@ describe.skipIf(!RUN)("gen editor pokedex data", () => {
       .filter(a => a.id !== 0)
       .map(a => ({ id: a.id, name: abilName(a), description: a.description }));
 
+    // Evolution graph (for the editor's "jump to evolutions" navigator): per
+    // species, the ids it evolves TO and the ids it evolves FROM (derived by
+    // inverting the forward map). Reflects ER's custom evolutions (post-init).
+    const evoTo: Record<number, number[]> = {};
+    const evoFrom: Record<number, number[]> = {};
+    for (const [idStr, evos] of Object.entries(pokemonEvolutions)) {
+      const id = Number(idStr);
+      for (const evo of evos as Array<{ speciesId?: number }>) {
+        const target = evo.speciesId;
+        if (!target) {
+          continue;
+        }
+        (evoTo[id] ??= []).push(target);
+        (evoFrom[target] ??= []).push(id);
+      }
+    }
+    const evolutions: Record<number, { to: number[]; from: number[] }> = {};
+    for (const id of new Set([...Object.keys(evoTo), ...Object.keys(evoFrom)].map(Number))) {
+      evolutions[id] = {
+        to: [...new Set(evoTo[id] ?? [])],
+        from: [...new Set(evoFrom[id] ?? [])],
+      };
+    }
+
     mkdirSync("editor/data", { recursive: true });
+    writeJson("editor/data/evolutions.json", evolutions);
     writeJson("editor/data/learnsets.json", learnsets);
     writeJson("editor/data/tm-learnsets.json", tmLearnsets);
     writeJson("editor/data/species-abilities.json", speciesAbilities);

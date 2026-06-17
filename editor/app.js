@@ -66,6 +66,10 @@ let committed = {};
 // which is SPECIES[i].id). Move/ability metadata powers the palettes + search.
 let MOVES_RICH = []; // [{id, name, type, category, power, accuracy, pp}]
 let ABILS_RICH = []; // [{id, name, description}]
+// The Pokedex Editor's species universe = ALL registered species (evolutions +
+// forms too), NOT just the starter pool in SPECIES, so any evolution is editable.
+let POKEDEX_SPECIES = []; // [{const, name, slug, id, dex}]
+let EVOS = {}; // speciesId → { to: number[], from: number[] }
 const moveById = new Map(); // moveId → rich move
 const abilById = new Map(); // abilityId → rich ability
 // Edit state keyed by species CONST (joined to data via SPECIES[i].id), so the
@@ -198,6 +202,9 @@ function dirtyCounts() {
     if (!jsonEq(sp.current[s.const], sp.baseline[s.const])) {
       spN++;
     }
+  }
+  // Learnsets / TMs / abilities span the FULL Pokedex universe (evolutions too).
+  for (const s of POKEDEX_SPECIES) {
     if (!jsonEq(learn.current[s.const], learn.baseline[s.const])) {
       lsN++;
     }
@@ -1050,8 +1057,21 @@ async function saveMon() {
 
 // ---- Render dispatch --------------------------------------------------------------
 // ---- Pokedex Editor (Learnsets / TMs / Abilities) --------------------------
-// const → species object, filled in init() (avoids O(n²) lookups in render).
+// const/id → species object, filled in init() (avoids O(n²) lookups in render).
 const spByConst = new Map();
+const spById = new Map();
+
+/** The Pokedex tabs' species list: ALL species, filtered by the header search, sorted. */
+function pokedexList() {
+  const f = ($("#search").value || "").trim().toLowerCase();
+  const list = f
+    ? POKEDEX_SPECIES.filter(s => s.name.toLowerCase().includes(f) || s.const.toLowerCase().includes(f))
+    : POKEDEX_SPECIES;
+  const byDex = $("#sort").value === "dex";
+  return [...list].sort((a, b) =>
+    byDex ? (a.dex ?? 99999) - (b.dex ?? 99999) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name),
+  );
+}
 
 const powStr = m => (m && m.power > 1 ? String(m.power) : "—");
 const moveLabel = m => (m ? `${esc(m.name)} <small>${esc(m.type)} · ${esc(m.category)} · ${powStr(m)}</small>` : "—");
@@ -1069,7 +1089,7 @@ function pdDirty(c, tab) {
 
 /** Left species list (shared by all three pokedex tabs). */
 function pdListHtml() {
-  return sortedSpecies()
+  return pokedexList()
     .map(s => {
       const sprite = s.slug ? `${SPRITE_BASE}/${s.slug}/front.png` : "";
       const dirty = pdDirty(s.const, activeTab);
@@ -1122,6 +1142,62 @@ function filterPalette() {
   });
 }
 
+/** One clickable evolution-relative chip (jumps to edit that species in the same tab). */
+function evoChipHtml(id) {
+  const rel = spById.get(id);
+  if (!rel) {
+    return "";
+  }
+  const sprite = rel.slug ? `${SPRITE_BASE}/${rel.slug}/front.png` : "";
+  const dirty = pdDirty(rel.const, activeTab);
+  return `<button type="button" class="evo-chip${dirty ? " dirty" : ""}" data-pdpick="${rel.const}" title="Edit ${esc(rel.name)}">
+    <img src="${sprite}" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />${esc(rel.name)}${dirty ? " ●" : ""}
+  </button>`;
+}
+
+/** Collect the WHOLE evolutionary line around a species: all ancestors + all descendants. */
+function collectEvoLine(id) {
+  const ancestors = [];
+  const seen = new Set([id]);
+  let cur = id;
+  for (let guard = 0; guard < 20; guard++) {
+    const prevo = (EVOS[cur]?.from || []).find(p => !seen.has(p));
+    if (prevo === undefined) {
+      break;
+    }
+    ancestors.unshift(prevo);
+    seen.add(prevo);
+    cur = prevo;
+  }
+  const descendants = [];
+  const queue = [...(EVOS[id]?.to || [])];
+  while (queue.length > 0 && descendants.length < 30) {
+    const n = queue.shift();
+    if (seen.has(n)) {
+      continue;
+    }
+    seen.add(n);
+    descendants.push(n);
+    queue.push(...(EVOS[n]?.to || []));
+  }
+  return { ancestors, descendants };
+}
+
+/** The evolution chain row: the full line (pre-evos → THIS → all evolutions), all clickable. */
+function evoChainHtml(s) {
+  const { ancestors, descendants } = collectEvoLine(s.id);
+  if (ancestors.length === 0 && descendants.length === 0) {
+    return "";
+  }
+  const arrow = '<span class="evo-arrow">→</span>';
+  const from = ancestors.map(evoChipHtml).filter(Boolean).join(arrow);
+  const to = descendants.map(evoChipHtml).filter(Boolean).join(" ");
+  const here = `<span class="evo-here">${esc(s.name)}</span>`;
+  return `<div class="evo-chain">
+    ${from ? `${from}${arrow}` : ""}${here}${to ? `${arrow}${to}` : ""}
+  </div>`;
+}
+
 function pdHeadHtml(s) {
   const sprite = s.slug ? `${SPRITE_BASE}/${s.slug}/front.png` : "";
   const dirty = pdDirty(s.const, activeTab);
@@ -1132,7 +1208,8 @@ function pdHeadHtml(s) {
     </div>
     ${dirty ? '<span class="badge edited">modified</span>' : ""}
     <button type="button" class="pd-revert" data-pdrevert="${s.const}"${dirty ? "" : " disabled"}>↺ Revert</button>
-  </div>`;
+  </div>
+  ${evoChainHtml(s)}`;
 }
 
 function renderLearnsets(root) {
@@ -1883,7 +1960,7 @@ function buildDeltas() {
   // Learnsets: changed species → full [[level, moveId], ...] (replaces the
   // level-up learnset). A species reverted to baseline is simply not emitted.
   const lsDelta = {};
-  for (const s of SPECIES) {
+  for (const s of POKEDEX_SPECIES) {
     if (jsonEq(learn.current[s.const], learn.baseline[s.const])) {
       continue;
     }
@@ -1908,7 +1985,7 @@ function buildDeltas() {
 
   // TM learnsets: changed species → full [moveId, ...] (replaces TM compatibility).
   const tmDelta = {};
-  for (const s of SPECIES) {
+  for (const s of POKEDEX_SPECIES) {
     if (jsonEq(tms.current[s.const], tms.baseline[s.const])) {
       continue;
     }
@@ -1926,7 +2003,7 @@ function buildDeltas() {
   // Abilities: changed species → {ability1, ability2, hidden} (0 = none). Each
   // non-zero id must resolve to a known ability.
   const abDelta = {};
-  for (const s of SPECIES) {
+  for (const s of POKEDEX_SPECIES) {
     if (jsonEq(abil.current[s.const], abil.baseline[s.const])) {
       continue;
     }
@@ -2084,6 +2161,8 @@ async function init() {
       lsLive,
       tmLive,
       abLive,
+      allSpeciesData,
+      evosData,
     ] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
@@ -2108,6 +2187,9 @@ async function init() {
       fetchJson(`${RAW_BASE}/er-learnsets.json${bust}`, {}),
       fetchJson(`${RAW_BASE}/er-tm-learnsets.json${bust}`, {}),
       fetchJson(`${RAW_BASE}/er-species-abilities.json${bust}`, {}),
+      // Pokedex editor: the FULL species universe (evolutions/forms) + evo graph.
+      fetchJson("./data/all-species.json", []),
+      fetchJson("./data/evolutions.json", {}),
     ]);
     SPECIES = species;
     MOVES = moves;
@@ -2141,14 +2223,19 @@ async function init() {
     // edit state from the baseline data, overlaid with any live override.
     MOVES_RICH = movesRich;
     ABILS_RICH = abilsRich.map(a => ({ ...a, hay: `${a.name} ${a.description}`.toLowerCase() }));
+    // Pokedex universe = ALL species (evolutions/forms); fall back to the starter
+    // list if the fuller dump isn't present yet. EVOS powers the chain navigator.
+    POKEDEX_SPECIES = Array.isArray(allSpeciesData) && allSpeciesData.length > 0 ? allSpeciesData : SPECIES;
+    EVOS = evosData && typeof evosData === "object" ? evosData : {};
     for (const m of MOVES_RICH) {
       moveById.set(m.id, m);
     }
     for (const a of ABILS_RICH) {
       abilById.set(a.id, a);
     }
-    for (const s of SPECIES) {
+    for (const s of POKEDEX_SPECIES) {
       spByConst.set(s.const, s);
+      spById.set(s.id, s);
       const base = (lsData[s.id] || []).map(([lvl, mv]) => [lvl, mv]);
       learn.current[s.const] = Array.isArray(lsLive[s.const]) ? lsLive[s.const].map(([lvl, mv]) => [lvl, mv]) : base;
       const tmBase = (tmData[s.id] || []).slice();

@@ -141,6 +141,27 @@ describe("tools — dump editor SPA data", () => {
     }
     species.sort((a, b) => a.name.localeCompare(b.name));
 
+    // ---- all-species.json ---------------------------------------------------
+    // EVERY registered species (not just starters), so the Pokedex Editor can
+    // select + edit the learnset/TM/abilities of evolutions and forms too. Other
+    // tabs keep the starter-only species.json above.
+    const allSpeciesIndex: { const: string; name: string; slug: string | null; id: number; dex: number | null }[] = [];
+    for (const sp of allSpecies) {
+      const id = sp.speciesId;
+      const speciesConst = constById.get(id);
+      if (speciesConst === undefined) {
+        continue; // no stable key to edit it by
+      }
+      allSpeciesIndex.push({
+        const: speciesConst,
+        name: sp.name,
+        slug: slugByConst.get(speciesConst) ?? null,
+        id,
+        dex: resolveDex(id, sp.name),
+      });
+    }
+    allSpeciesIndex.sort((a, b) => a.name.localeCompare(b.name));
+
     // ---- items.json ---------------------------------------------------------
     const tierNames: ReadonlyArray<readonly [ModifierTier, string]> = [
       [ModifierTier.COMMON, "COMMON"],
@@ -227,6 +248,7 @@ describe("tools — dump editor SPA data", () => {
     };
 
     writeFileSync("editor/data/species.json", `${JSON.stringify(species, null, 2)}\n`, "utf8");
+    writeFileSync("editor/data/all-species.json", `${JSON.stringify(allSpeciesIndex, null, 2)}\n`, "utf8");
     writeFileSync("editor/data/items.json", `${JSON.stringify(items, null, 2)}\n`, "utf8");
     writeFileSync("editor/data/trainers.json", `${JSON.stringify(trainers, null, 2)}\n`, "utf8");
     // The Game tab renders straight from the knob registry (single source of truth).

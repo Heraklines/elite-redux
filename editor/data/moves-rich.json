@@ -194,7 +194,7 @@
   { "id": 105, "name": "Recover", "type": "NORMAL", "category": "STATUS", "power": -1, "accuracy": -1, "pp": 10 },
   { "id": 106, "name": "Harden", "type": "NORMAL", "category": "STATUS", "power": -1, "accuracy": -1, "pp": 20 },
   { "id": 107, "name": "Minimize", "type": "NORMAL", "category": "STATUS", "power": -1, "accuracy": -1, "pp": 1 },
-  { "id": 108, "name": "Smokescreen", "type": "NORMAL", "category": "STATUS", "power": -1, "accuracy": 100, "pp": 20 },
+  { "id": 108, "name": "Smokescreen", "type": "NORMAL", "category": "STATUS", "power": -1, "accuracy": -1, "pp": 20 },
   { "id": 109, "name": "Confuse Ray", "type": "GHOST", "category": "STATUS", "power": -1, "accuracy": 100, "pp": 5 },
   { "id": 110, "name": "Withdraw", "type": "WATER", "category": "STATUS", "power": -1, "accuracy": -1, "pp": 20 },
   { "id": 111, "name": "Defense Curl", "type": "NORMAL", "category": "STATUS", "power": -1, "accuracy": -1, "pp": 20 },

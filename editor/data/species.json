@@ -590,8 +590,8 @@
     "slug": "castform",
     "id": 351,
     "dex": 351,
-    "eggTier": 0,
-    "cost": 1
+    "eggTier": 1,
+    "cost": 2
   },
   {
     "const": "SPECIES_CATERPIE",
@@ -1527,7 +1527,7 @@
     "id": 349,
     "dex": 349,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_FENNEKIN",
@@ -2508,7 +2508,7 @@
     "id": 798,
     "dex": 798,
     "eggTier": 2,
-    "cost": 8
+    "cost": 7
   },
   {
     "const": "SPECIES_KARTANA_FALLEN",
@@ -2517,7 +2517,7 @@
     "id": 10777,
     "dex": 798,
     "eggTier": 3,
-    "cost": 11
+    "cost": 12
   },
   {
     "const": "SPECIES_KECLEON",
@@ -4406,8 +4406,8 @@
     "slug": "scyther",
     "id": 123,
     "dex": 123,
-    "eggTier": 1,
-    "cost": 5
+    "eggTier": 0,
+    "cost": 4
   },
   {
     "const": "SPECIES_SCYTHER_REDUX",
@@ -4415,8 +4415,8 @@
     "slug": "scyther_redux",
     "id": 10827,
     "dex": 123,
-    "eggTier": 1,
-    "cost": 3
+    "eggTier": 0,
+    "cost": 4
   },
   {
     "const": "SPECIES_SEEDOT",
@@ -5090,7 +5090,7 @@
     "slug": null,
     "id": 4618,
     "dex": 618,
-    "eggTier": 1,
+    "eggTier": 0,
     "cost": 2
   },
   {
@@ -5721,7 +5721,7 @@
     "id": 721,
     "dex": 721,
     "eggTier": 2,
-    "cost": 7
+    "cost": 6
   },
   {
     "const": "SPECIES_VOLTORB",
@@ -6063,7 +6063,7 @@
     "id": 335,
     "dex": 335,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_ZAPDOS",

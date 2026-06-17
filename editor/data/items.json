@@ -570,6 +570,12 @@
     "maxWeight": 3
   },
   {
+    "key": "MULTI_LENS",
+    "tier": "ROGUE",
+    "weight": 18,
+    "maxWeight": 18
+  },
+  {
     "key": "MASTER_BALL",
     "tier": "MASTER",
     "weight": null,
@@ -583,12 +589,6 @@
   },
   {
     "key": "HEALING_CHARM",
-    "tier": "MASTER",
-    "weight": 18,
-    "maxWeight": 18
-  },
-  {
-    "key": "MULTI_LENS",
     "tier": "MASTER",
     "weight": 18,
     "maxWeight": 18
