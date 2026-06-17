@@ -5174,4 +5174,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "(note) Pokedex Editor overrides",
+    description:
+      "Editor feature - the er-editor 'Learnsets / TMs / Abilities' tabs now\n"
+      + "write per-species overrides (er-learnsets.json / er-tm-learnsets.json /\n"
+      + "er-species-abilities.json) that the game applies LAST at init, on top of\n"
+      + "every other pass. The loader is FAIL-SAFE: bad ids are dropped, unmapped\n"
+      + "species skipped, and it can only no-op on error (never crashes a run).\n"
+      + "With NO override committed, the dex is unchanged.\n"
+      + "CHECK (after committing an edit in the editor + a staging redeploy): the\n"
+      + "edited species shows the new level-up learnset (catch/hatch it and check\n"
+      + "its moves), the new TM-learnable moves (starter-select / TM rewards), and\n"
+      + "the new ability slots (summary ABILITIES screen). Console logs an\n"
+      + "[er-pokedex-overrides] summary line. If anything is off, press Send Logs.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.VOLT_SWITCH, MoveId.GRASS_KNOT, MoveId.NUZZLE],
+        }),
+      ];
+    },
+  },
 ];

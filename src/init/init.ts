@@ -24,6 +24,7 @@ import { initEliteReduxEvolutions } from "#data/elite-redux/init-elite-redux-evo
 import { initEliteReduxFormChanges } from "#data/elite-redux/init-elite-redux-form-changes";
 import { initEliteReduxItemTuning } from "#data/elite-redux/init-elite-redux-item-tuning";
 import { initEliteReduxMovesets } from "#data/elite-redux/init-elite-redux-movesets";
+import { initEliteReduxPokedexOverrides } from "#data/elite-redux/init-elite-redux-pokedex-overrides";
 import { initEliteReduxSpecies, injectAllErMegaForms } from "#data/elite-redux/init-elite-redux-species";
 import { initEliteReduxSpeciesTuning } from "#data/elite-redux/init-elite-redux-species-tuning";
 import { initEliteReduxStarterCosts } from "#data/elite-redux/init-elite-redux-starter-costs";
@@ -296,4 +297,18 @@ export function initializeGame() {
   console.info(
     `[er-tm] added ${tmResult.pairsAdded} (species, move) pairs to TM-learnable pool (${tmResult.movesAddedToPool} new moves added to drop pool; skipped ${tmResult.pairsSkippedDup} duplicates + ${tmResult.pairsSkippedUnmapped} unmapped)`,
   );
+
+  // Elite Redux: editor-managed Pokedex overrides (learnsets / TM sets / ability
+  // slots) from er-learnsets.json + er-tm-learnsets.json + er-species-abilities.json.
+  // Runs LAST so a committed editor edit is the final word over every prior pass;
+  // fail-safe (revalidates every id, can only no-op on a bad entry).
+  const pokedexResult = initEliteReduxPokedexOverrides();
+  if (
+    pokedexResult.learnsetsApplied + pokedexResult.tmSetsApplied + pokedexResult.abilitiesApplied > 0
+    || pokedexResult.errors.length > 0
+  ) {
+    console.info(
+      `[er-pokedex-overrides] applied ${pokedexResult.learnsetsApplied} learnsets + ${pokedexResult.tmSetsApplied} TM sets + ${pokedexResult.abilitiesApplied} ability sets (dropped ${pokedexResult.idsDropped} ids, skipped ${pokedexResult.skippedUnmapped} unmapped${pokedexResult.errors.length > 0 ? `, ${pokedexResult.errors.length} errors` : ""})`,
+    );
+  }
 }
