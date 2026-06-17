@@ -168,6 +168,9 @@ export enum MysteryEncounterType {
   /** ER #519: Reactor Meltdown - a Power Plant gauge-read; shut down the hottest of
    * three units for the Capacitor relic, or misjudge it for a party-chipping blowout. */
   ER_REACTOR_MELTDOWN,
+  /** ER #522: The Mountain Sage - a Mountain training event; choose a training boon
+   * (vitamins + Rare Candy) or a Learner's Shroom (moveset workshop). */
+  ER_MOUNTAIN_SAGE,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

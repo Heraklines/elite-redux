@@ -580,6 +580,31 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Mountain: The Mountain Sage (#522)",
+    description:
+      "#522 - The Mountain Sage (Mountain training event). Forces ER_MOUNTAIN_SAGE\n"
+      + "in MOUNTAIN.\n"
+      + "DO: on wave 12 choose 'Train the body', 'Train the technique', or bow out.\n"
+      + "EXPECT: body -> a reward screen with 2 vitamins + a Rare Candy; technique ->\n"
+      + "a Learner's Shroom (teach any move); bow -> move on, no reward. No battle.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.MOUNTAIN,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_MOUNTAIN_SAGE,
+      });
+      return [
+        makeStarter(SpeciesId.MEDICHAM, {
+          moveset: [MoveId.HIGH_JUMP_KICK, MoveId.ZEN_HEADBUTT, MoveId.ICE_PUNCH, MoveId.BULK_UP],
+        }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
     label: "ER Power Plant: Reactor Meltdown (#519)",
     description:
       "#519 - Reactor Meltdown (Power Plant gauge-read). Forces ER_REACTOR_MELTDOWN\n"

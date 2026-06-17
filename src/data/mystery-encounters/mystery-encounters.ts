@@ -40,6 +40,7 @@ import { LakeSpiritEncounter } from "#mystery-encounters/lake-spirit-encounter";
 import { LostAtSeaEncounter } from "#mystery-encounters/lost-at-sea-encounter";
 import { LostWandererEncounter } from "#mystery-encounters/lost-wanderer-encounter";
 import { MessageInABottleEncounter } from "#mystery-encounters/message-in-a-bottle-encounter";
+import { MountainSageEncounter } from "#mystery-encounters/mountain-sage-encounter";
 import { MushroomCircleEncounter } from "#mystery-encounters/mushroom-circle-encounter";
 import { MysteriousChallengersEncounter } from "#mystery-encounters/mysterious-challengers-encounter";
 import { MysteriousChestEncounter } from "#mystery-encounters/mysterious-chest-encounter";
@@ -281,7 +282,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.BEACH, [MysteryEncounterType.ER_TIDE_POOLS, MysteryEncounterType.ER_X_MARKS_THE_SPOT]],
   [BiomeId.LAKE, [MysteryEncounterType.ER_LAKE_SPIRIT, MysteryEncounterType.ER_STILL_WATERS]],
   [BiomeId.SEABED, [MysteryEncounterType.ER_ABYSSAL_VENT, MysteryEncounterType.ER_SUNKEN_VESSEL]],
-  [BiomeId.MOUNTAIN, [MysteryEncounterType.ER_HOT_SPRING]],
+  [BiomeId.MOUNTAIN, [MysteryEncounterType.ER_HOT_SPRING, MysteryEncounterType.ER_MOUNTAIN_SAGE]],
   [BiomeId.BADLANDS, [MysteryEncounterType.DANCING_LESSONS]],
   [
     BiomeId.CAVE,
@@ -414,6 +415,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_INTO_THE_CALDERA] = IntoTheCalderaEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_BURIED_CITY] = BuriedCityEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_REACTOR_MELTDOWN] = ReactorMeltdownEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_MOUNTAIN_SAGE] = MountainSageEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

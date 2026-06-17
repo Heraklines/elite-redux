@@ -1,0 +1,25 @@
+{
+  "intro": "Near the summit, on a ledge swept by cold wind, an old figure sits in perfect stillness, eyes closed, breathing slow.",
+  "speaker": "Mountain Sage",
+  "introDialogue": "You climbed all this way. Good. Strength is not only in battle, traveler. Tell me - will you train your body, or your technique?",
+  "title": "The Mountain Sage",
+  "description": "A disciplined recluse offers to train those who reach the summit. Choose your lesson: train the BODY for a growing-strength boon (vitamins and a Rare Candy), or train the TECHNIQUE for a Learner's Shroom to rebuild a Pokemon's moveset. Or bow and move on.",
+  "query": "What will the Sage teach you?",
+  "option": {
+    "1": {
+      "label": "Train the body",
+      "tooltip": "(+) Vitamins to grow stats + a Rare Candy",
+      "selected": "The Sage drills you through grueling forms until your team is stronger for it."
+    },
+    "2": {
+      "label": "Train the technique",
+      "tooltip": "(+) A Learner's Shroom - teach a Pokemon any move it can learn",
+      "selected": "The Sage shares an old secret, and presses a Learner's Shroom into your hand."
+    },
+    "3": {
+      "label": "Bow and move on",
+      "tooltip": "(-) Decline the training",
+      "selected": "You bow to the Sage and continue your climb."
+    }
+  }
+}
