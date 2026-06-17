@@ -1,9 +1,9 @@
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
-import { erHasNotoriety } from "#data/elite-redux/er-biome-notoriety";
+import { erBiomeOverstay } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
-import { erClaimNotorietyWarning, erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
+import { erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
 import { BattleType } from "#enums/battle-type";
 import type { BattlerIndex } from "#enums/battler-index";
 import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
@@ -168,11 +168,12 @@ export class VictoryPhase extends PokemonPhase {
           globalScene.phaseManager.pushNew("ErCrossroadsPhase");
         }
 
-        // ER (#504): the FIRST time the player crosses into notoriety in this biome
-        // (the next wave is past the 10-wave free window and the biome is NOT
-        // ending), warn ONCE that lingering grows the place increasingly hostile.
-        // erClaimNotorietyWarning() latches per biome (resets on biome entry).
-        if (erRouting && !biomeEnding && erHasNotoriety(currentWaveIndex + 1) && erClaimNotorietyWarning()) {
+        // ER (#504): warn ONCE, exactly on the wave the player crosses into
+        // notoriety (the next wave is the FIRST past the 10-wave free window) and
+        // the biome is NOT ending. Gated on the overstay TRANSITION (== 1) rather
+        // than a module-state latch, so a mid-biome save/state restore can't make
+        // it re-fire every wave (the old erClaimNotorietyWarning latch bug).
+        if (erRouting && !biomeEnding && erBiomeOverstay(currentWaveIndex + 1) === 1) {
           globalScene.phaseManager.pushNew(
             "MessagePhase",
             "Word of your lingering has spread, and you are gaining notoriety here. The longer you stay, the more hostile this place will grow.",

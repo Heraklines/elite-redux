@@ -66,15 +66,12 @@ let currentLength: number | null = null;
 let currentStartWave = 1;
 /** Set by the Crossroads "Move on" choice: force the next wave to end the biome. */
 let leaveBiomeNow = false;
-/** #504: true once the one-time "gaining notoriety" warning fired this biome. */
-let notorietyWarningShown = false;
 
 /** Clear all structure state at run start (module state outlives a run). */
 export function resetErBiomeStructure(): void {
   currentLength = null;
   currentStartWave = 1;
   leaveBiomeNow = false;
-  notorietyWarningShown = false;
 }
 
 /** The classic mode final wave (isWaveFinal pins wave 200). */
@@ -108,7 +105,6 @@ export function erInLateGameZone(waveIndex: number): boolean {
  */
 export function erRollBiomeLength(_biome: BiomeId, startWave: number): void {
   leaveBiomeNow = false;
-  notorietyWarningShown = false;
   currentStartWave = startWave;
 
   // Finale safety: never roll a variable length once we're at/inside the late
@@ -131,23 +127,6 @@ export function restoreErBiomeStructure(length: number | null | undefined, start
   currentLength = typeof length === "number" && length > 0 ? Math.floor(length) : null;
   currentStartWave = typeof startWave === "number" && startWave > 0 ? Math.floor(startWave) : 1;
   leaveBiomeNow = false;
-  // A reload mid-biome may already be past the warning point; suppress a
-  // duplicate pop by treating the warning as already shown when over the window.
-  notorietyWarningShown = false;
-}
-
-/**
- * #504: claim the one-time notoriety warning for THIS biome. Returns true exactly
- * once per biome instance (the first call after the warning is due), false after.
- * Resets on every biome entry (erRollBiomeLength) so each over-stayed biome warns
- * once. Pure aside from the latch; callers gate on erBiomeRoutingActive().
- */
-export function erClaimNotorietyWarning(): boolean {
-  if (notorietyWarningShown) {
-    return false;
-  }
-  notorietyWarningShown = true;
-  return true;
 }
 
 /** The current biome's rolled length, or null if it is on the vanilla cadence. */
