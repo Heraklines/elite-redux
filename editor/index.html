@@ -154,6 +154,71 @@
       .sprite-slot canvas { width: 96px; height: 96px; image-rendering: pixelated; background: #0d0d14; border: 1px solid var(--line); border-radius: 6px; }
       .mon-list { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); margin-top: 8px; }
       .mon-list button { display: flex; gap: 8px; align-items: center; text-align: left; }
+      /* ---- Pokedex Editor (Learnsets / TMs / Abilities) ---- */
+      .pd { display: grid; grid-template-columns: 280px 1fr; gap: 0; height: calc(100vh - 132px); }
+      .pd-list { overflow-y: auto; border-right: 1px solid var(--line); padding: 8px; display: flex; flex-direction: column; gap: 3px; }
+      .pd-sp {
+        display: flex; gap: 8px; align-items: center; text-align: left; padding: 5px 8px;
+        background: transparent; border: 1px solid transparent; border-radius: 7px; color: var(--text); width: 100%;
+      }
+      .pd-sp:hover { background: var(--panel2); }
+      .pd-sp.sel { background: var(--panel2); border-color: var(--accent); }
+      .pd-sp img { width: 30px; height: 30px; image-rendering: pixelated; object-fit: contain; flex: none; background: #0d0d14; border-radius: 5px; }
+      .pd-sp .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .pd-sp .nm small { color: var(--muted); }
+      .pd-sp .pd-dot { color: var(--accent); flex: none; }
+      .pd-main { overflow-y: auto; padding: 14px 18px; }
+      .pd-head { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+      .pd-head img { width: 56px; height: 56px; image-rendering: pixelated; object-fit: contain; background: #0d0d14; border-radius: 7px; flex: none; }
+      .pd-title { font-size: 17px; font-weight: 700; }
+      .pd-title small { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+      .pd-revert { margin-left: auto; padding: 5px 11px; }
+      .pd-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+      .pd-col-head { display: flex; gap: 8px; align-items: center; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; flex-wrap: wrap; }
+      .pd-col-head input, .pd-col-head select { font-size: 12px; padding: 4px 6px; }
+      .pd-col-head input[type="search"] { flex: 1; min-width: 90px; }
+      .pd-col-head input[type="number"] { width: 56px; }
+      .pal { display: flex; flex-direction: column; gap: 3px; max-height: calc(100vh - 280px); overflow-y: auto; padding-right: 4px; }
+      .pal-move {
+        display: flex; flex-direction: column; gap: 1px; text-align: left; padding: 5px 8px; cursor: grab;
+        background: var(--panel); border: 1px solid var(--line); border-radius: 6px; color: var(--text);
+      }
+      .pal-move:hover { border-color: var(--accent); }
+      .pal-move .mname { font-weight: 600; font-size: 13px; }
+      .pal-move .mmeta { color: var(--muted); font-size: 11px; }
+      .pal-move .tcol { font-weight: 700; }
+      .ls-list, .tm-list {
+        display: flex; flex-direction: column; gap: 4px; min-height: 120px; padding: 8px;
+        border: 1px dashed var(--line); border-radius: 8px; background: var(--panel);
+      }
+      .ls-list.drag, .tm-list.drag { border-color: var(--accent); background: rgba(179,36,92,0.06); }
+      .ls-row, .tm-row { display: flex; gap: 8px; align-items: center; }
+      .ls-row .ls-level { width: 58px; text-align: center; }
+      .ls-row .ls-lv1 { color: var(--warn); font-weight: 700; font-size: 11px; }
+      .ls-move, .tm-move { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .ls-move small, .tm-move small { color: var(--muted); }
+      .ls-del, .tm-del { padding: 2px 8px; font-size: 12px; color: #e0556a; border-color: #e0556a; }
+      .pd-empty { color: var(--muted); padding: 6px 2px; font-size: 12px; }
+      /* Abilities */
+      .abil-slots { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); max-width: 980px; }
+      .abil-slot { background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 12px; }
+      .abil-slot.hidden-slot { border-style: dashed; }
+      .abil-slot > label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 7px; }
+      .combo { position: relative; }
+      .abil-input { width: 100%; }
+      .abil-drop {
+        position: absolute; z-index: 20; left: 0; right: 0; top: 100%; margin-top: 3px; max-height: 280px; overflow-y: auto;
+        background: var(--panel2); border: 1px solid var(--accent); border-radius: 8px; display: none;
+      }
+      .abil-drop.open { display: block; }
+      .abil-opt { display: block; width: 100%; text-align: left; padding: 6px 9px; background: transparent; border: none; border-bottom: 1px solid var(--line); color: var(--text); border-radius: 0; }
+      .abil-opt:hover { background: var(--accent); color: #fff; }
+      .abil-opt .aname { font-weight: 600; display: block; }
+      .abil-opt .adesc { color: var(--muted); font-size: 11px; display: block; }
+      .abil-opt:hover .adesc { color: #ffd9e5; }
+      .abil-cur { margin-top: 8px; }
+      .abil-cur .acur-name { font-weight: 700; }
+      .abil-cur .acur-desc { color: var(--muted); font-size: 12px; margin-top: 2px; }
     </style>
   </head>
   <body>
@@ -177,6 +242,9 @@
     <nav class="tabs">
       <button type="button" data-tab="eggmoves" class="active">🥚 Egg Moves</button>
       <button type="button" data-tab="species">📊 Species</button>
+      <button type="button" data-tab="learnsets">📚 Learnsets</button>
+      <button type="button" data-tab="tms">💿 TMs</button>
+      <button type="button" data-tab="abilities">✨ Abilities</button>
       <button type="button" data-tab="items">🎒 Items</button>
       <button type="button" data-tab="trainers">🤺 Trainers</button>
       <button type="button" data-tab="game">🎛 Game</button>

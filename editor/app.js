@@ -61,6 +61,26 @@ let activeTab = "eggmoves";
 const undoStack = [];
 let committed = {};
 
+// ---- Pokedex Editor (Learnsets / TMs / Abilities) --------------------------
+// Rich catalogs (loaded from editor/data/*.json; keyed by numeric speciesId,
+// which is SPECIES[i].id). Move/ability metadata powers the palettes + search.
+let MOVES_RICH = []; // [{id, name, type, category, power, accuracy, pp}]
+let ABILS_RICH = []; // [{id, name, description}]
+const moveById = new Map(); // moveId → rich move
+const abilById = new Map(); // abilityId → rich ability
+// Edit state keyed by species CONST (joined to data via SPECIES[i].id), so the
+// committed override JSON is human-readable and consistent with the other tabs.
+const learn = { current: {}, baseline: {} }; // const → [[level, moveId], ...]
+const tms = { current: {}, baseline: {} }; // const → [moveId, ...]
+const abil = { current: {}, baseline: {} }; // const → {ability1, ability2, hidden}
+// Shared UI state across the three Pokedex tabs.
+let pdSelected = null; // selected species const
+const palSort = "name"; // move-palette sort: name | type | power
+let palQuery = ""; // move-palette search text (preserved across re-renders)
+let newMoveLevel = 1; // level assigned to moves added to a learnset
+const ABIL_SLOTS = ["ability1", "ability2", "hidden"]; // ability slot keys
+const POKEDEX_TABS = new Set(["learnsets", "tms", "abilities"]);
+
 const $ = sel => document.querySelector(sel);
 const statusEl = $("#status");
 const saveBtn = $("#save");
@@ -153,12 +173,24 @@ function dirtyCounts() {
   let spN = 0;
   let itemN = 0;
   let trN = 0;
+  let lsN = 0;
+  let tmN = 0;
+  let abN = 0;
   for (const s of SPECIES) {
     if (!jsonEq(egg.current[s.const] || [], egg.baseline[s.const] || [])) {
       eggN++;
     }
     if (!jsonEq(sp.current[s.const], sp.baseline[s.const])) {
       spN++;
+    }
+    if (!jsonEq(learn.current[s.const], learn.baseline[s.const])) {
+      lsN++;
+    }
+    if (!jsonEq(tms.current[s.const], tms.baseline[s.const])) {
+      tmN++;
+    }
+    if (!jsonEq(abil.current[s.const], abil.baseline[s.const])) {
+      abN++;
     }
   }
   for (const it of ITEMS) {
@@ -183,14 +215,23 @@ function dirtyCounts() {
       balN++;
     }
   }
-  return { eggN, spN, itemN, trN, balN, total: eggN + spN + itemN + trN + balN };
+  return { eggN, spN, itemN, trN, balN, lsN, tmN, abN, total: eggN + spN + itemN + trN + balN + lsN + tmN + abN };
 }
 
 function refreshChrome() {
-  const { eggN, spN, itemN, trN, balN, total } = dirtyCounts();
+  const { eggN, spN, itemN, trN, balN, lsN, tmN, abN, total } = dirtyCounts();
   saveBtn.textContent = `Save ${total} change${total === 1 ? "" : "s"}`;
   saveBtn.disabled = total === 0;
-  const dots = { eggmoves: eggN, species: spN, items: itemN, trainers: trN, game: balN };
+  const dots = {
+    eggmoves: eggN,
+    species: spN,
+    items: itemN,
+    trainers: trN,
+    game: balN,
+    learnsets: lsN,
+    tms: tmN,
+    abilities: abN,
+  };
   document.querySelectorAll("nav.tabs button").forEach(b => {
     const n = dots[b.dataset.tab];
     const label = b.textContent.replace(/\s*●$/, "");
@@ -993,12 +1034,223 @@ async function saveMon() {
 }
 
 // ---- Render dispatch --------------------------------------------------------------
+// ---- Pokedex Editor (Learnsets / TMs / Abilities) --------------------------
+// const → species object, filled in init() (avoids O(n²) lookups in render).
+const spByConst = new Map();
+
+const powStr = m => (m && m.power > 1 ? String(m.power) : "—");
+const moveLabel = m => (m ? `${esc(m.name)} <small>${esc(m.type)} · ${esc(m.category)} · ${powStr(m)}</small>` : "—");
+
+/** Is the selected species modified in the given pokedex domain? */
+function pdDirty(c, tab) {
+  if (tab === "learnsets") {
+    return !jsonEq(learn.current[c], learn.baseline[c]);
+  }
+  if (tab === "tms") {
+    return !jsonEq(tms.current[c], tms.baseline[c]);
+  }
+  return !jsonEq(abil.current[c], abil.baseline[c]);
+}
+
+/** Left species list (shared by all three pokedex tabs). */
+function pdListHtml() {
+  return sortedSpecies()
+    .map(s => {
+      const sprite = s.slug ? `${SPRITE_BASE}/${s.slug}/front.png` : "";
+      const dirty = pdDirty(s.const, activeTab);
+      return `<button type="button" class="pd-sp${s.const === pdSelected ? " sel" : ""}" data-pdpick="${s.const}">
+        <img src="${sprite}" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />
+        <span class="nm">${esc(s.name)} <small>#${s.dex ?? "—"}</small></span>
+        ${dirty ? '<span class="pd-dot">●</span>' : ""}
+      </button>`;
+    })
+    .join("");
+}
+
+/** The full move palette (all moves, current sort). Filtered live by filterPalette(). */
+function paletteHtml() {
+  const list = [...MOVES_RICH];
+  if (palSort === "type") {
+    list.sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name));
+  } else if (palSort === "power") {
+    list.sort((a, b) => (b.power || 0) - (a.power || 0) || a.name.localeCompare(b.name));
+  } else {
+    list.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  return list
+    .map(
+      m => `<button type="button" class="pal-move" draggable="true" data-moveid="${m.id}"
+        data-hay="${esc(`${m.name} ${m.type} ${m.category}`.toLowerCase())}">
+        <span class="mname">${esc(m.name)}</span>
+        <span class="mmeta"><span class="tcol">${esc(m.type)}</span> · ${esc(m.category)} · Pwr ${powStr(m)} · Acc ${
+          m.accuracy > 0 ? m.accuracy : "—"
+        } · PP ${m.pp}</span>
+      </button>`,
+    )
+    .join("");
+}
+
+const paletteControlsHtml = withLevel => `
+  <input id="pal-search" type="search" placeholder="Filter moves…" autocomplete="off" value="${esc(palQuery)}" />
+  <select id="pal-sort" title="Sort the move palette">
+    <option value="name"${palSort === "name" ? " selected" : ""}>Name</option>
+    <option value="type"${palSort === "type" ? " selected" : ""}>Type</option>
+    <option value="power"${palSort === "power" ? " selected" : ""}>Power</option>
+  </select>
+  ${withLevel ? `<label style="text-transform:none">Add at Lv <input id="pd-newlevel" type="number" min="1" max="100" value="${newMoveLevel}" /></label>` : ""}`;
+
+/** Hide palette entries that don't match the current query (no re-render → keeps focus). */
+function filterPalette() {
+  const q = palQuery.trim().toLowerCase();
+  document.querySelectorAll("#pal .pal-move").forEach(el => {
+    el.hidden = q !== "" && !el.dataset.hay.includes(q);
+  });
+}
+
+function pdHeadHtml(s) {
+  const sprite = s.slug ? `${SPRITE_BASE}/${s.slug}/front.png` : "";
+  const dirty = pdDirty(s.const, activeTab);
+  return `<div class="pd-head">
+    <img src="${sprite}" alt="" onerror="this.style.visibility='hidden'" />
+    <div>
+      <div class="pd-title">${esc(s.name)} <small>#${s.dex ?? "—"} · ${esc(s.const)}</small></div>
+    </div>
+    ${dirty ? '<span class="badge edited">modified</span>' : ""}
+    <button type="button" class="pd-revert" data-pdrevert="${s.const}"${dirty ? "" : " disabled"}>↺ Revert</button>
+  </div>`;
+}
+
+function renderLearnsets(root) {
+  root.innerHTML = `<div class="pd"><aside class="pd-list">${pdListHtml()}</aside><section class="pd-main" id="pd-main"></section></div>`;
+  const main = $("#pd-main");
+  if (!pdSelected) {
+    main.innerHTML = '<div class="empty">Select a species from the list to edit its level-up learnset.</div>';
+    return;
+  }
+  const s = spByConst.get(pdSelected);
+  const rows = (learn.current[pdSelected] || [])
+    .map(([lvl, mv], idx) => ({ lvl, mv, idx }))
+    .sort((a, b) => a.lvl - b.lvl || a.idx - b.idx);
+  const rowsHtml = rows
+    .map(
+      r => `<div class="ls-row" data-idx="${r.idx}">
+        <input class="ls-level" type="number" min="1" max="100" value="${r.lvl}" data-idx="${r.idx}" />
+        <span class="ls-move">${r.lvl === 1 ? '<span class="ls-lv1">START</span> ' : ""}${moveLabel(moveById.get(r.mv))}</span>
+        <button type="button" class="ls-del" data-idx="${r.idx}" title="Remove">✕</button>
+      </div>`,
+    )
+    .join("");
+  main.innerHTML = `${pdHeadHtml(s)}
+    <div class="pd-cols">
+      <div class="pd-col">
+        <div class="pd-col-head">Learnable ${paletteControlsHtml(true)}</div>
+        <div class="pal" id="pal">${paletteHtml()}</div>
+      </div>
+      <div class="pd-col">
+        <div class="pd-col-head">Current learnset (${rows.length})</div>
+        <div class="ls-list" data-drop="learn">${rowsHtml || '<div class="pd-empty">No level-up moves. Click or drag a move from the left to add one.</div>'}</div>
+      </div>
+    </div>`;
+  filterPalette();
+}
+
+function renderTMs(root) {
+  root.innerHTML = `<div class="pd"><aside class="pd-list">${pdListHtml()}</aside><section class="pd-main" id="pd-main"></section></div>`;
+  const main = $("#pd-main");
+  if (!pdSelected) {
+    main.innerHTML = '<div class="empty">Select a species from the list to edit which TM/move it can learn.</div>';
+    return;
+  }
+  const s = spByConst.get(pdSelected);
+  const ids = (tms.current[pdSelected] || []).slice().sort((a, b) => {
+    const ma = moveById.get(a);
+    const mb = moveById.get(b);
+    return (ma?.name || "").localeCompare(mb?.name || "");
+  });
+  const listHtml = ids
+    .map(
+      id => `<div class="tm-row" data-moveid="${id}">
+        <span class="tm-move">${moveLabel(moveById.get(id))}</span>
+        <button type="button" class="tm-del" data-moveid="${id}" title="Remove">✕</button>
+      </div>`,
+    )
+    .join("");
+  main.innerHTML = `${pdHeadHtml(s)}
+    <div class="pd-cols">
+      <div class="pd-col">
+        <div class="pd-col-head">All moves ${paletteControlsHtml(false)}</div>
+        <div class="pal" id="pal">${paletteHtml()}</div>
+      </div>
+      <div class="pd-col">
+        <div class="pd-col-head">TM-learnable (${ids.length})</div>
+        <div class="tm-list" data-drop="tm">${listHtml || '<div class="pd-empty">No TM moves. Click or drag a move from the left to add one.</div>'}</div>
+      </div>
+    </div>`;
+  filterPalette();
+}
+
+const ABIL_SLOT_LABEL = { ability1: "Ability 1", ability2: "Ability 2", hidden: "Hidden Ability" };
+
+function renderAbilities(root) {
+  root.innerHTML = `<div class="pd"><aside class="pd-list">${pdListHtml()}</aside><section class="pd-main" id="pd-main"></section></div>`;
+  const main = $("#pd-main");
+  if (!pdSelected) {
+    main.innerHTML = '<div class="empty">Select a species from the list to edit its three ability slots.</div>';
+    return;
+  }
+  const s = spByConst.get(pdSelected);
+  const cur = abil.current[pdSelected] || { ability1: 0, ability2: 0, hidden: 0 };
+  const slotsHtml = ABIL_SLOTS.map(slot => {
+    const a = abilById.get(cur[slot]);
+    return `<div class="abil-slot${slot === "hidden" ? " hidden-slot" : ""}">
+      <label>${ABIL_SLOT_LABEL[slot]}</label>
+      <div class="combo">
+        <input class="abil-input" data-slot="${slot}" placeholder="Search name or description…" autocomplete="off" value="${esc(a ? a.name : "")}" />
+        <div class="abil-drop" data-slot="${slot}"></div>
+      </div>
+      <div class="abil-cur">
+        <div class="acur-name">${a ? esc(a.name) : "<span style='color:var(--muted)'>none</span>"}</div>
+        <div class="acur-desc">${a ? esc(a.description) : ""}</div>
+      </div>
+    </div>`;
+  }).join("");
+  main.innerHTML = `${pdHeadHtml(s)}<div class="abil-slots">${slotsHtml}</div>`;
+}
+
+/** Fill an ability slot's dropdown with up to 60 matches (name OR description). */
+function openAbilDrop(slot, query) {
+  const drop = document.querySelector(`.abil-drop[data-slot="${slot}"]`);
+  if (!drop) {
+    return;
+  }
+  const q = query.trim().toLowerCase();
+  const matches = (q === "" ? ABILS_RICH : ABILS_RICH.filter(a => a.hay.includes(q))).slice(0, 60);
+  drop.innerHTML = matches
+    .map(
+      a => `<button type="button" class="abil-opt" data-slot="${slot}" data-abilid="${a.id}">
+        <span class="aname">${esc(a.name)}</span><span class="adesc">${esc(a.description)}</span>
+      </button>`,
+    )
+    .join("");
+  drop.classList.add("open");
+}
+
+function closeAbilDrops() {
+  document.querySelectorAll(".abil-drop.open").forEach(d => d.classList.remove("open"));
+}
+
 function render() {
   const root = $("#content");
   if (activeTab === "eggmoves") {
     renderEggMoves(root);
   } else if (activeTab === "species") {
     renderSpecies(root);
+  } else if (activeTab === "learnsets") {
+    renderLearnsets(root);
+  } else if (activeTab === "tms") {
+    renderTMs(root);
+  } else if (activeTab === "abilities") {
+    renderAbilities(root);
   } else if (activeTab === "items") {
     renderItems(root);
   } else if (activeTab === "trainers") {
@@ -1011,9 +1263,46 @@ function render() {
   refreshChrome();
 }
 
+// Live-input targets for the Pokedex tabs. These deliberately do NOT re-render
+// (which would steal focus): they mutate state + tweak the DOM in place.
+function onPokedexInput(el) {
+  if (el.id === "pal-search") {
+    palQuery = el.value;
+    filterPalette();
+    return true;
+  }
+  if (el.id === "pd-newlevel") {
+    const v = Number(el.value);
+    newMoveLevel = Number.isInteger(v) && v >= 1 && v <= 100 ? v : newMoveLevel;
+    return true;
+  }
+  if (el.classList.contains("ls-level")) {
+    const arr = (learn.current[pdSelected] || []).slice();
+    const idx = Number(el.dataset.idx);
+    const v = Number(el.value);
+    if (arr[idx] && Number.isInteger(v) && v >= 1 && v <= 100) {
+      arr[idx] = [v, arr[idx][1]];
+      learn.current[pdSelected] = arr;
+      el.style.borderColor = "";
+    } else {
+      el.style.borderColor = ERR;
+    }
+    refreshChrome();
+    return true;
+  }
+  if (el.classList.contains("abil-input")) {
+    openAbilDrop(el.dataset.slot, el.value);
+    return true;
+  }
+  return false;
+}
+
 // ---- Input handlers -----------------------------------------------------------------
 function onInput(e) {
   const el = e.target;
+  if (POKEDEX_TABS.has(activeTab) && onPokedexInput(el)) {
+    return;
+  }
   if (el.classList.contains("slot")) {
     const speciesConst = el.dataset.const;
     const value = el.value.trim().toUpperCase();
@@ -1154,8 +1443,79 @@ function onInput(e) {
   refreshChrome();
 }
 
+// Add a move id to the selected species' learnset / TM list (shared by click + drop).
+function pdAddMove(moveId) {
+  if (!pdSelected || !moveById.has(moveId)) {
+    return;
+  }
+  if (activeTab === "learnsets") {
+    const arr = (learn.current[pdSelected] || []).slice();
+    if (!arr.some(([lvl, mv]) => lvl === newMoveLevel && mv === moveId)) {
+      arr.push([newMoveLevel, moveId]);
+      learn.current[pdSelected] = arr;
+    }
+  } else if (activeTab === "tms") {
+    const arr = (tms.current[pdSelected] || []).slice();
+    if (!arr.includes(moveId)) {
+      arr.push(moveId);
+      tms.current[pdSelected] = arr;
+    }
+  }
+  render();
+}
+
+// Click targets for the Pokedex tabs (species pick, palette add, row delete, revert, ability pick).
+function onPokedexClick(e) {
+  const pick = e.target.closest("[data-pdpick]");
+  if (pick) {
+    pdSelected = pick.dataset.pdpick;
+    render();
+    return true;
+  }
+  const revert = e.target.closest("[data-pdrevert]");
+  if (revert) {
+    const c = revert.dataset.pdrevert;
+    const store = activeTab === "learnsets" ? learn : activeTab === "tms" ? tms : abil;
+    store.current[c] = JSON.parse(JSON.stringify(store.baseline[c]));
+    render();
+    return true;
+  }
+  const opt = e.target.closest(".abil-opt");
+  if (opt) {
+    const cur = { ...(abil.current[pdSelected] || { ability1: 0, ability2: 0, hidden: 0 }) };
+    cur[opt.dataset.slot] = Number(opt.dataset.abilid);
+    abil.current[pdSelected] = cur;
+    closeAbilDrops();
+    render();
+    return true;
+  }
+  const lsDel = e.target.closest(".ls-del");
+  if (lsDel) {
+    const arr = (learn.current[pdSelected] || []).slice();
+    arr.splice(Number(lsDel.dataset.idx), 1);
+    learn.current[pdSelected] = arr;
+    render();
+    return true;
+  }
+  const tmDel = e.target.closest(".tm-del");
+  if (tmDel) {
+    tms.current[pdSelected] = (tms.current[pdSelected] || []).filter(id => id !== Number(tmDel.dataset.moveid));
+    render();
+    return true;
+  }
+  const pal = e.target.closest(".pal-move");
+  if (pal) {
+    pdAddMove(Number(pal.dataset.moveid));
+    return true;
+  }
+  return false;
+}
+
 // Click targets on the Trainers tab (toggle cards, knob resets, filter chips).
 function onClick(e) {
+  if (POKEDEX_TABS.has(activeTab) && onPokedexClick(e)) {
+    return;
+  }
   const facToggle = e.target.closest(".toggle[data-facconst]");
   if (facToggle) {
     const c = facToggle.dataset.facconst;
@@ -1488,6 +1848,72 @@ function buildDeltas() {
     deltas["balance-tuning"] = balDelta;
   }
 
+  // Learnsets: changed species → full [[level, moveId], ...] (replaces the
+  // level-up learnset). A species reverted to baseline is simply not emitted.
+  const lsDelta = {};
+  for (const s of SPECIES) {
+    if (jsonEq(learn.current[s.const], learn.baseline[s.const])) {
+      continue;
+    }
+    const pairs = (learn.current[s.const] || []).map(([lvl, mv]) => [Number(lvl), Number(mv)]);
+    let ok = true;
+    for (const [lvl, mv] of pairs) {
+      if (!(Number.isInteger(lvl) && lvl >= 1 && lvl <= 100)) {
+        bad.push(`${s.name}: learnset level must be 1-100`);
+        ok = false;
+      } else if (!moveById.has(mv)) {
+        bad.push(`${s.name}: unknown learnset move id ${mv}`);
+        ok = false;
+      }
+    }
+    if (ok) {
+      lsDelta[s.const] = pairs.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    }
+  }
+  if (Object.keys(lsDelta).length > 0) {
+    deltas.learnsets = lsDelta;
+  }
+
+  // TM learnsets: changed species → full [moveId, ...] (replaces TM compatibility).
+  const tmDelta = {};
+  for (const s of SPECIES) {
+    if (jsonEq(tms.current[s.const], tms.baseline[s.const])) {
+      continue;
+    }
+    const ids = [...new Set((tms.current[s.const] || []).map(Number))];
+    if (ids.every(id => moveById.has(id))) {
+      tmDelta[s.const] = ids.sort((a, b) => a - b);
+    } else {
+      bad.push(`${s.name}: unknown TM move id`);
+    }
+  }
+  if (Object.keys(tmDelta).length > 0) {
+    deltas["tm-learnsets"] = tmDelta;
+  }
+
+  // Abilities: changed species → {ability1, ability2, hidden} (0 = none). Each
+  // non-zero id must resolve to a known ability.
+  const abDelta = {};
+  for (const s of SPECIES) {
+    if (jsonEq(abil.current[s.const], abil.baseline[s.const])) {
+      continue;
+    }
+    const cur = abil.current[s.const] || {};
+    const entry = {
+      ability1: Number(cur.ability1) || 0,
+      ability2: Number(cur.ability2) || 0,
+      hidden: Number(cur.hidden) || 0,
+    };
+    if (Object.values(entry).every(id => id === 0 || abilById.has(id))) {
+      abDelta[s.const] = entry;
+    } else {
+      bad.push(`${s.name}: unknown ability id`);
+    }
+  }
+  if (Object.keys(abDelta).length > 0) {
+    deltas["species-abilities"] = abDelta;
+  }
+
   return { deltas, bad };
 }
 
@@ -1584,6 +2010,12 @@ function markSaved(file) {
     trSets.baseline = JSON.parse(JSON.stringify(trSets.current));
   } else if (file === "balance-tuning") {
     bal.baseline = JSON.parse(JSON.stringify(bal.current));
+  } else if (file === "learnsets") {
+    learn.baseline = JSON.parse(JSON.stringify(learn.current));
+  } else if (file === "tm-learnsets") {
+    tms.baseline = JSON.parse(JSON.stringify(tms.current));
+  } else if (file === "species-abilities") {
+    abil.baseline = JSON.parse(JSON.stringify(abil.current));
   }
 }
 
@@ -1596,22 +2028,52 @@ const fetchJson = (url, fallback) =>
 async function init() {
   try {
     const bust = `?t=${Date.now()}`;
-    const [species, moves, items, trainers, knobs, abilities, eggLive, spLive, itemLive, trLive, balLive, monsLive] =
-      await Promise.all([
-        fetch("./data/species.json").then(r => r.json()),
-        fetch("./data/moves.json").then(r => r.json()),
-        fetchJson("./data/items.json", []),
-        fetchJson("./data/trainers.json", { frequencyDefaults: { elite: {}, hell: {} }, factorySpecies: [] }),
-        fetchJson("./data/balance-knobs.json", []),
-        fetchJson("./data/abilities.json", []),
-        // Live override files (resilient: missing on the branch → start empty).
-        fetchJson(`${RAW_BASE}/er-egg-moves.json${bust}`, {}),
-        fetchJson(`${RAW_BASE}/er-species-tuning.json${bust}`, {}),
-        fetchJson(`${RAW_BASE}/er-item-tuning.json${bust}`, {}),
-        fetchJson(`${RAW_BASE}/er-trainer-tuning.json${bust}`, {}),
-        fetchJson(`${RAW_BASE}/er-balance-tuning.json${bust}`, {}),
-        fetchJson(`${RAW_BASE}/er-custom-mons.json${bust}`, {}),
-      ]);
+    const [
+      species,
+      moves,
+      items,
+      trainers,
+      knobs,
+      abilities,
+      eggLive,
+      spLive,
+      itemLive,
+      trLive,
+      balLive,
+      monsLive,
+      movesRich,
+      abilsRich,
+      lsData,
+      tmData,
+      abData,
+      lsLive,
+      tmLive,
+      abLive,
+    ] = await Promise.all([
+      fetch("./data/species.json").then(r => r.json()),
+      fetch("./data/moves.json").then(r => r.json()),
+      fetchJson("./data/items.json", []),
+      fetchJson("./data/trainers.json", { frequencyDefaults: { elite: {}, hell: {} }, factorySpecies: [] }),
+      fetchJson("./data/balance-knobs.json", []),
+      fetchJson("./data/abilities.json", []),
+      // Live override files (resilient: missing on the branch → start empty).
+      fetchJson(`${RAW_BASE}/er-egg-moves.json${bust}`, {}),
+      fetchJson(`${RAW_BASE}/er-species-tuning.json${bust}`, {}),
+      fetchJson(`${RAW_BASE}/er-item-tuning.json${bust}`, {}),
+      fetchJson(`${RAW_BASE}/er-trainer-tuning.json${bust}`, {}),
+      fetchJson(`${RAW_BASE}/er-balance-tuning.json${bust}`, {}),
+      fetchJson(`${RAW_BASE}/er-custom-mons.json${bust}`, {}),
+      // Pokedex editor: rich catalogs + per-species baseline data (keyed by speciesId).
+      fetchJson("./data/moves-rich.json", []),
+      fetchJson("./data/abilities-rich.json", []),
+      fetchJson("./data/learnsets.json", {}),
+      fetchJson("./data/tm-learnsets.json", {}),
+      fetchJson("./data/species-abilities.json", {}),
+      // Live Pokedex override files (resilient: missing → start from baseline).
+      fetchJson(`${RAW_BASE}/er-learnsets.json${bust}`, {}),
+      fetchJson(`${RAW_BASE}/er-tm-learnsets.json${bust}`, {}),
+      fetchJson(`${RAW_BASE}/er-species-abilities.json${bust}`, {}),
+    ]);
     SPECIES = species;
     MOVES = moves;
     ITEMS = items;
@@ -1639,6 +2101,33 @@ async function init() {
     }
     egg.baseline = JSON.parse(JSON.stringify(egg.current));
     committed = JSON.parse(JSON.stringify(egg.current));
+
+    // Pokedex editor: build rich catalogs + lookups, then seed learn/tm/ability
+    // edit state from the baseline data, overlaid with any live override.
+    MOVES_RICH = movesRich;
+    ABILS_RICH = abilsRich.map(a => ({ ...a, hay: `${a.name} ${a.description}`.toLowerCase() }));
+    for (const m of MOVES_RICH) {
+      moveById.set(m.id, m);
+    }
+    for (const a of ABILS_RICH) {
+      abilById.set(a.id, a);
+    }
+    for (const s of SPECIES) {
+      spByConst.set(s.const, s);
+      const base = (lsData[s.id] || []).map(([lvl, mv]) => [lvl, mv]);
+      learn.current[s.const] = Array.isArray(lsLive[s.const]) ? lsLive[s.const].map(([lvl, mv]) => [lvl, mv]) : base;
+      const tmBase = (tmData[s.id] || []).slice();
+      tms.current[s.const] = Array.isArray(tmLive[s.const]) ? tmLive[s.const].slice() : tmBase;
+      const abBase = abData[s.id] || { ability1: 0, ability2: 0, hidden: 0 };
+      const o = abLive[s.const];
+      abil.current[s.const] =
+        o && typeof o === "object"
+          ? { ability1: o.ability1 ?? 0, ability2: o.ability2 ?? 0, hidden: o.hidden ?? 0 }
+          : { ability1: abBase.ability1, ability2: abBase.ability2, hidden: abBase.hidden };
+    }
+    learn.baseline = JSON.parse(JSON.stringify(learn.current));
+    tms.baseline = JSON.parse(JSON.stringify(tms.current));
+    abil.baseline = JSON.parse(JSON.stringify(abil.current));
 
     // Seed species tuning: snapshot values overlaid with any live override.
     for (const s of SPECIES) {
@@ -1735,8 +2224,54 @@ async function init() {
         || e.target.classList.contains("bal-num")
         || e.target.classList.contains("bal-text")
         || e.target.classList.contains("bal-map")
+        || e.target.classList.contains("ls-level")
       ) {
+        // .ls-level: re-render to re-sort rows by their new level (on blur/commit).
         render();
+      }
+    });
+
+    // ---- Pokedex tabs: ability combobox open/close + move drag-and-drop -----
+    content.addEventListener("focusin", e => {
+      if (e.target.classList && e.target.classList.contains("abil-input")) {
+        openAbilDrop(e.target.dataset.slot, e.target.value);
+      }
+    });
+    content.addEventListener("focusout", e => {
+      // Delay so a click on an option registers before the dropdown closes.
+      if (e.target.classList && e.target.classList.contains("abil-input")) {
+        setTimeout(closeAbilDrops, 150);
+      }
+    });
+    let dragMoveId = null;
+    content.addEventListener("dragstart", e => {
+      const pal = e.target.closest?.(".pal-move");
+      if (pal) {
+        dragMoveId = Number(pal.dataset.moveid);
+        e.dataTransfer.effectAllowed = "copy";
+      }
+    });
+    content.addEventListener("dragover", e => {
+      const zone = e.target.closest?.("[data-drop]");
+      if (zone && dragMoveId !== null) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        zone.classList.add("drag");
+      }
+    });
+    content.addEventListener("dragleave", e => {
+      const zone = e.target.closest?.("[data-drop]");
+      if (zone) {
+        zone.classList.remove("drag");
+      }
+    });
+    content.addEventListener("drop", e => {
+      const zone = e.target.closest?.("[data-drop]");
+      if (zone && dragMoveId !== null) {
+        e.preventDefault();
+        zone.classList.remove("drag");
+        pdAddMove(dragMoveId);
+        dragMoveId = null;
       }
     });
     $("#search").addEventListener("input", render);
