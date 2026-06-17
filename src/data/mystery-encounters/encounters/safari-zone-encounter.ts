@@ -2,6 +2,7 @@ import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { NON_LEGEND_PARADOX_POKEMON } from "#balance/special-species-groups";
+import { isErGenericPoolBanned } from "#data/elite-redux/er-generic-pool-bans";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { BattlerIndex } from "#enums/battler-index";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
@@ -578,7 +579,14 @@ async function doEndTurn(cursorIndex: number) {
  * @returns A function to get a random species that has at most 5 starter cost and is not Mythical, Paradox, etc.
  */
 export function getSafariSpeciesSpawn(): PokemonSpecies {
-  return getPokemonSpecies(
-    getRandomSpeciesByStarterCost([0, 5], NON_LEGEND_PARADOX_POKEMON, undefined, false, false, false),
-  );
+  // ER (#345): the shared starter-cost roller draws from speciesStarterCosts,
+  // into which ER injects custom species (and battle-only form records). Reject
+  // those - battle forms always, and ALL ER customs on pure-vanilla Youngster/Ace
+  // - by re-rolling until a legal species comes up (the vanilla pool dominates, so
+  // this resolves in a couple of tries).
+  let id = getRandomSpeciesByStarterCost([0, 5], NON_LEGEND_PARADOX_POKEMON, undefined, false, false, false);
+  for (let i = 0; i < 25 && isErGenericPoolBanned(id, getPokemonSpecies(id).name); i++) {
+    id = getRandomSpeciesByStarterCost([0, 5], NON_LEGEND_PARADOX_POKEMON, undefined, false, false, false);
+  }
+  return getPokemonSpecies(id);
 }
