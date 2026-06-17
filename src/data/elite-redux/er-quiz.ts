@@ -24,7 +24,7 @@
 // the run RNG so they're deterministic within a seed.
 // =============================================================================
 
-import { randSeedInt, randSeedShuffle } from "#utils/common";
+import { randSeedInt, randSeedItem, randSeedShuffle } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import erDexFlavorRaw from "./er-dex-flavor.json";
 import erFootprintIdsRaw from "./er-footprint-species.json";
@@ -64,16 +64,30 @@ export interface ErQuizQuestion {
 }
 
 /**
- * The Unown Cipher word bank: short A-Z-only words (4-6 letters) that read as
- * ancient-ruins inscriptions. Every letter maps to an Unown form (A=0..Z=25), so
- * the word renders cleanly as a row of Unown glyph icons.
+ * The Unown Cipher word bank: A-Z-only words (4-7 letters) that read as ancient-
+ * ruins inscriptions. Every letter maps to an Unown form (A=0..Z=25), so the word
+ * renders cleanly as a row of Unown glyph icons. Grouped loosely by length so a
+ * question can draw SAME-LENGTH distractors (otherwise the odd-length-out option
+ * gives the answer away). Kept large for variety so a run rarely repeats.
  */
 const ER_CIPHER_WORDS: readonly string[] = [
-  "POWER", "RELIC", "VAULT", "RUINS", "GLYPH", "RUNE", "OMEN", "CURSE", "TOMB",
-  "CRYPT", "SHRINE", "TEMPLE", "SPIRIT", "LEGEND", "MYSTIC", "ORACLE", "SEALED",
-  "GHOST", "DRAGON", "EMBER", "FROST", "STORM", "TITAN", "MAGMA", "STONE", "GOLD",
-  "KING", "QUEEN", "BEAST", "VENOM", "FLAME", "LIGHT", "VOID", "ABYSS", "SAGE",
-  "WING", "FANG", "RITE", "OATH", "DUSK",
+  // 4 letters
+  "RUNE", "OMEN", "TOMB", "GOLD", "KING", "VOID", "SAGE", "WING", "FANG", "RITE",
+  "OATH", "DUSK", "SOUL", "WARD", "TOME", "IDOL", "SEAL", "PACT", "BANE", "DOOM",
+  "GATE", "HALL", "MASK", "JADE", "ONYX", "RUST", "DUST", "MOSS", "VINE", "TIDE",
+  "GALE", "WISP", "HUSK", "MAZE", "VEIL", "HORN", "CLAW", "ROAR", "HOWL", "ICON",
+  // 5 letters
+  "POWER", "RELIC", "VAULT", "RUINS", "GLYPH", "CURSE", "CRYPT", "GHOST", "EMBER",
+  "FROST", "STORM", "TITAN", "MAGMA", "STONE", "QUEEN", "BEAST", "VENOM", "FLAME",
+  "LIGHT", "ABYSS", "CHARM", "GRAVE", "CROWN", "THORN", "BLOOD", "SLATE", "AMBER",
+  "CORAL", "PEARL", "TOTEM", "VIGIL", "HAVEN", "WRATH", "SCALE", "TALON", "ASHEN",
+  "RUNES", "OMENS", "IDOLS",
+  // 6 letters
+  "SHRINE", "TEMPLE", "SPIRIT", "LEGEND", "MYSTIC", "ORACLE", "SEALED", "DRAGON",
+  "WRAITH", "CIPHER", "SECRET", "SACRED", "HOLLOW", "MARROW", "CAVERN", "TUNDRA",
+  "GEYSER", "BASALT", "WARDEN", "SCROLL", "RELICS", "CRYPTS", "TITANS", "EMBERS",
+  // 7 letters
+  "OBELISK", "PHANTOM", "TEMPEST", "ANCIENT", "CRYSTAL", "SERPENT", "WARLOCK", "SCEPTER",
 ];
 
 /** A loaded-asset descriptor for a species' footprint sprite. */
@@ -168,16 +182,14 @@ export function getErDexFlavor(speciesId: number): string | undefined {
  * `optionCount-1` distractor words, all shuffled. answerId is unused (-1).
  */
 function buildErCipherQuestion(optionCount: number): ErQuizQuestion {
-  const answer = ER_CIPHER_WORDS[randSeedInt(ER_CIPHER_WORDS.length)];
+  const answer = randSeedItem(ER_CIPHER_WORDS);
   const distractorTarget = Math.max(1, Math.min(3, optionCount - 1));
-  const distractors = new Set<string>();
-  let guard = 0;
-  while (distractors.size < distractorTarget && guard++ < 100) {
-    const d = ER_CIPHER_WORDS[randSeedInt(ER_CIPHER_WORDS.length)];
-    if (d !== answer) {
-      distractors.add(d);
-    }
-  }
+  // Distractors MUST be the same length as the answer - otherwise the odd-one-out
+  // length gives the answer away without reading the glyphs at all. Fall back to
+  // any other word only if a length somehow lacks enough peers.
+  const sameLength = ER_CIPHER_WORDS.filter(w => w.length === answer.length && w !== answer);
+  const pool = sameLength.length >= distractorTarget ? sameLength : ER_CIPHER_WORDS.filter(w => w !== answer);
+  const distractors = randSeedShuffle([...pool]).slice(0, distractorTarget);
   const cipherOptions = randSeedShuffle([answer, ...distractors]);
   return { kind: "cipher", answerId: -1, options: [], prompt: "", cipherWord: answer, cipherOptions };
 }

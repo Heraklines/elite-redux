@@ -29,5 +29,6 @@
   },
   "surged": "Current floods in - the surge holds, and the stat is locked in for good!",
   "stabilized": "You ease off the leads. The channelled power settles in, permanent.",
-  "shortCircuit": "The core SHORT-CIRCUITS! The surge collapses, this session's gains are lost, and your Pokemon is jolted."
+  "shortCircuit": "The core SHORT-CIRCUITS! The surge collapses, this session's gains are lost, and the backlash jolts your Pokemon hard.",
+  "shortCircuitFaint": "The core SHORT-CIRCUITS violently! All that stacked current discharges at once - the surge is lost and your Pokemon is knocked out cold!"
 }

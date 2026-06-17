@@ -30,6 +30,7 @@ import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
+import { StatusEffect } from "#enums/status-effect";
 import type { PlayerPokemon, Pokemon } from "#field/pokemon";
 import { BaseStatBoosterModifierType } from "#modifiers/modifier-type";
 import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
@@ -53,14 +54,15 @@ const STAT_LABEL: Record<number, string> = {
   [Stat.SPD]: "Speed",
 };
 
+// Short-circuit chance climbs FAST: ~25% on the first surge, ~45% on the second,
+// ~65% on the third, capping at 85% - so each surge is a real gamble (success
+// ~75% / 55% / 35% / ...). Tuned per the maintainer's "decreases quickly" call.
 /** Base short-circuit chance for the very first surge, in [0, 1]. */
-const SHORT_CIRCUIT_BASE = 0.1;
-/** Added to the short-circuit chance per surge already taken. */
-const SHORT_CIRCUIT_PER_LEVEL = 0.16;
+const SHORT_CIRCUIT_BASE = 0.25;
+/** Added to the short-circuit chance per surge already held. */
+const SHORT_CIRCUIT_PER_LEVEL = 0.2;
 /** The short-circuit chance never exceeds this (risky, but never hopeless). */
-const SHORT_CIRCUIT_MAX = 0.75;
-/** Fraction of max HP chipped off the channelled Pokemon on a short-circuit. */
-const SHORT_CIRCUIT_CHIP = 1 / 8;
+const SHORT_CIRCUIT_MAX = 0.85;
 
 /** Per-session surge state stashed on encounter.misc. */
 interface SurgeState {
@@ -106,18 +108,27 @@ function surgeConfig(): PressYourLuckConfig {
     },
     onBust: async () => {
       const surge = getSurge();
-      // Short-circuit: the whole session's surge is lost, and the mon is chipped.
+      // Short-circuit: the whole session's surge is lost. The backlash SCALES with
+      // how many surges were riding on it - the more you greedily stacked, the
+      // worse the jolt. 0 held -> 20%, 1 -> 40%, 2 -> 80%, 3+ -> the mon FAINTS.
+      const held = surge.granted.length;
       for (const mod of surge.granted) {
         if (mod) {
           globalScene.removeModifier(mod);
         }
       }
       surge.granted = [];
-      const chip = Math.max(1, Math.floor(surge.pokemon.getMaxHp() * SHORT_CIRCUIT_CHIP));
-      surge.pokemon.hp = Math.max(1, surge.pokemon.hp - chip);
+      const mon = surge.pokemon;
       globalScene.playSound("se/error");
-      surge.pokemon.updateInfo();
-      queueEncounterMessage(`${namespace}:shortCircuit`);
+      if (held >= 3) {
+        mon.hp = 0;
+        mon.doSetStatus(StatusEffect.FAINT);
+      } else {
+        const fraction = held >= 2 ? 0.8 : held >= 1 ? 0.4 : 0.2;
+        mon.hp = Math.max(1, mon.hp - Math.floor(mon.getMaxHp() * fraction));
+      }
+      mon.updateInfo();
+      queueEncounterMessage(held >= 3 ? `${namespace}:shortCircuitFaint` : `${namespace}:shortCircuit`);
       await transitionMysteryEncounterIntroVisuals(true, true);
       leaveEncounterWithoutBattle(true);
     },
@@ -153,6 +164,10 @@ export const OverchargeCoreEncounter: MysteryEncounter = MysteryEncounterBuilder
           const stat = randSeedItem([...SURGE_STATS]);
           encounter.misc = { pokemon, stat, granted: [] } satisfies SurgeState;
           encounter.setDialogueToken("statName", STAT_LABEL[stat]);
+          // Seed the surge counter so the FIRST prompt reads "0 surge(s) held"
+          // instead of the literal {{surges}} token (it is otherwise only set
+          // after a surge lands).
+          encounter.setDialogueToken("surges", "0");
         };
         const selectableFilter = (pokemon: Pokemon) =>
           isPokemonValidForEncounterOptionSelection(pokemon, `${namespace}:invalidSelection`);
