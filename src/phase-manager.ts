@@ -49,6 +49,7 @@ import { GameOverPhase } from "#phases/game-over-phase";
 import { HideAbilityPhase } from "#phases/hide-ability-phase";
 import { HidePartyExpBarPhase } from "#phases/hide-party-exp-bar-phase";
 import { InitEncounterPhase } from "#phases/init-encounter-phase";
+import { LearnMoveBatchPhase } from "#phases/learn-move-batch-phase";
 import { LearnMovePhase } from "#phases/learn-move-phase";
 import { LevelCapPhase } from "#phases/level-cap-phase";
 import { LevelUpPhase } from "#phases/level-up-phase";
@@ -169,6 +170,7 @@ const PHASES = Object.freeze({
   HideAbilityPhase,
   HidePartyExpBarPhase,
   InitEncounterPhase,
+  LearnMoveBatchPhase,
   LearnMovePhase,
   LLMDirectorBeatPhase,
   LLMDirectorBiblePhase,

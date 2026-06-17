@@ -60,4 +60,6 @@ export enum UiMode {
   ER_MAP,
   /** ER #486: the branching World Map node PICKER shown when leaving a biome. */
   ER_MAP_PICKER,
+  /** ER QoL: the level-up Move Learn panel (LEARNABLE | CURRENT, silent thin-down). */
+  LEARN_MOVE_BATCH,
 }
