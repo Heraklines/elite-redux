@@ -557,11 +557,12 @@ export function initAbilities() {
       .unreplaceable()
       .attr(NoFusionAbilityAbAttr)
       .attr(PostSummonFormChangeByWeatherAbAttr)
+      // ER (#450): FOG removed from the revert-to-Normal list - Forecast now maps
+      // Fog to the Ghost-type Foggy form (see the CASTFORM form-change table).
       .attr(PostWeatherChangeFormChangeAbAttr, AbilityId.FORECAST, [
         WeatherType.NONE,
         WeatherType.SANDSTORM,
         WeatherType.STRONG_WINDS,
-        WeatherType.FOG,
       ])
       .build(),
     new AbBuilder(AbilityId.STICKY_HOLD, 3) //

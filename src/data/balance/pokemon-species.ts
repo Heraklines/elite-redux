@@ -529,7 +529,11 @@ export function initSpecies() {
       new PokemonForm("Normal Form", "", PokemonType.NORMAL, null, 0.3, 0.8, AbilityId.FORECAST, AbilityId.NONE, AbilityId.NONE, 420, 70, 70, 70, 70, 70, 70, 45, 70, 147, false, null, true),
       new PokemonForm("Sunny Form", "sunny", PokemonType.FIRE, null, 0.3, 0.8, AbilityId.FORECAST, AbilityId.NONE, AbilityId.NONE, 420, 70, 70, 70, 70, 70, 70, 45, 70, 147),
       new PokemonForm("Rainy Form", "rainy", PokemonType.WATER, null, 0.3, 0.8, AbilityId.FORECAST, AbilityId.NONE, AbilityId.NONE, 420, 70, 70, 70, 70, 70, 70, 45, 70, 147),
-      new PokemonForm("Snowy Form", "snowy", PokemonType.ICE, null, 0.3, 0.8, AbilityId.FORECAST, AbilityId.NONE, AbilityId.NONE, 420, 70, 70, 70, 70, 70, 70, 45, 70, 147)
+      new PokemonForm("Snowy Form", "snowy", PokemonType.ICE, null, 0.3, 0.8, AbilityId.FORECAST, AbilityId.NONE, AbilityId.NONE, 420, 70, 70, 70, 70, 70, 70, 45, 70, 147),
+      // Elite Redux (#450): Foggy Form (Ghost) - Forecast's response to ER's Fog
+      // weather. Battle-only weather form like the others; ER art (castform_foggy)
+      // is wired via installErFormSpriteRedirect in init-elite-redux-species.
+      new PokemonForm("Foggy Form", "foggy", PokemonType.GHOST, null, 0.3, 0.8, AbilityId.FORECAST, AbilityId.NONE, AbilityId.NONE, 420, 70, 70, 70, 70, 70, 70, 45, 70, 147)
     ),
     new PokemonSpecies(SpeciesId.KECLEON, 3, false, false, false, "Color Swap Pokémon", PokemonType.NORMAL, null, 1, 22, AbilityId.COLOR_CHANGE, AbilityId.NONE, AbilityId.PROTEAN, 440, 60, 90, 70, 60, 120, 40, 200, 70, 154, GrowthRate.MEDIUM_SLOW, 50, false),
     new PokemonSpecies(SpeciesId.SHUPPET, 3, false, false, false, "Puppet Pokémon", PokemonType.GHOST, null, 0.6, 2.3, AbilityId.INSOMNIA, AbilityId.FRISK, AbilityId.CURSED_BODY, 295, 44, 75, 35, 63, 33, 45, 225, 35, 59, GrowthRate.FAST, 50, false),

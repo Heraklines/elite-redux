@@ -4412,6 +4412,28 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Castform Foggy form (#450)",
+    description:
+      "#450 - ER added Fog as a real weather and a matching Foggy (Ghost-type)\n"
+      + "Castform form. Forecast Castform is forced; the battle starts in Fog.\n"
+      + "EXPECT: Castform takes its FOGGY form (Ghost type, the castform_foggy ER\n"
+      + "sprite - not Normal form, not a placeholder). Use Sunny Day -> Sunny (Fire)\n"
+      + "form; Rain Dance -> Rainy (Water); back to fog (e.g. via a fog setter or\n"
+      + "switch) -> Foggy again. Reverts to Normal when weather clears / on switch-out.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        WEATHER_OVERRIDE: WeatherType.FOG,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+      });
+      return [
+        makeStarter(SpeciesId.CASTFORM, {
+          moveset: [MoveId.WEATHER_BALL, MoveId.SUNNY_DAY, MoveId.RAIN_DANCE, MoveId.SHADOW_BALL],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) No custom evo on vanilla (#479)",
     description:
       "#479 - on the PURE-VANILLA difficulties (Youngster / Ace) a wild vanilla\n"

@@ -249,21 +249,38 @@ export const pokemonFormChanges: PokemonFormChanges = {
     new SpeciesFormChange(SpeciesId.ALTARIA, "", SpeciesFormKey.MEGA, new SpeciesFormChangeItemTrigger(FormChangeItem.ALTARIANITE))
   ],
   [SpeciesId.CASTFORM]: [
+    // Sun -> Sunny (Fire)
     new SpeciesFormChange(SpeciesId.CASTFORM, "", "sunny", new SpeciesFormChangeWeatherTrigger(AbilityId.FORECAST, [ WeatherType.SUNNY, WeatherType.HARSH_SUN ]), true),
     new SpeciesFormChange(SpeciesId.CASTFORM, "rainy", "sunny", new SpeciesFormChangeWeatherTrigger(AbilityId.FORECAST, [ WeatherType.SUNNY, WeatherType.HARSH_SUN ]), true),
     new SpeciesFormChange(SpeciesId.CASTFORM, "snowy", "sunny", new SpeciesFormChangeWeatherTrigger(AbilityId.FORECAST, [ WeatherType.SUNNY, WeatherType.HARSH_SUN ]), true),
+    new SpeciesFormChange(SpeciesId.CASTFORM, "foggy", "sunny", new SpeciesFormChangeWeatherTrigger(AbilityId.FORECAST, [ WeatherType.SUNNY, WeatherType.HARSH_SUN ]), true),
+    // Rain -> Rainy (Water)
     new SpeciesFormChange(SpeciesId.CASTFORM, "", "rainy", new SpeciesFormChangeWeatherTrigger(AbilityId.FORECAST, [ WeatherType.RAIN, WeatherType.HEAVY_RAIN ]), true),
     new SpeciesFormChange(SpeciesId.CASTFORM, "sunny", "rainy", new SpeciesFormChangeWeatherTrigger(AbilityId.FORECAST, [ WeatherType.RAIN, WeatherType.HEAVY_RAIN ]), true),
     new SpeciesFormChange(SpeciesId.CASTFORM, "snowy", "rainy", new SpeciesFormChangeWeatherTrigger(AbilityId.FORECAST, [ WeatherType.RAIN, WeatherType.HEAVY_RAIN ]), true),
+    new SpeciesFormChange(SpeciesId.CASTFORM, "foggy", "rainy", new SpeciesFormChangeWeatherTrigger(AbilityId.FORECAST, [ WeatherType.RAIN, WeatherType.HEAVY_RAIN ]), true),
+    // Hail/Snow -> Snowy (Ice)
     new SpeciesFormChange(SpeciesId.CASTFORM, "", "snowy", new SpeciesFormChangeWeatherTrigger(AbilityId.FORECAST, [ WeatherType.HAIL, WeatherType.SNOW ]), true),
     new SpeciesFormChange(SpeciesId.CASTFORM, "sunny", "snowy", new SpeciesFormChangeWeatherTrigger(AbilityId.FORECAST, [ WeatherType.HAIL, WeatherType.SNOW ]), true),
     new SpeciesFormChange(SpeciesId.CASTFORM, "rainy", "snowy", new SpeciesFormChangeWeatherTrigger(AbilityId.FORECAST, [ WeatherType.HAIL, WeatherType.SNOW ]), true),
-    new SpeciesFormChange(SpeciesId.CASTFORM, "sunny", "", new SpeciesFormChangeRevertWeatherFormTrigger(AbilityId.FORECAST, [ WeatherType.NONE, WeatherType.SANDSTORM, WeatherType.STRONG_WINDS, WeatherType.FOG ]), true),
-    new SpeciesFormChange(SpeciesId.CASTFORM, "rainy", "", new SpeciesFormChangeRevertWeatherFormTrigger(AbilityId.FORECAST, [ WeatherType.NONE, WeatherType.SANDSTORM, WeatherType.STRONG_WINDS, WeatherType.FOG ]), true),
-    new SpeciesFormChange(SpeciesId.CASTFORM, "snowy", "", new SpeciesFormChangeRevertWeatherFormTrigger(AbilityId.FORECAST, [ WeatherType.NONE, WeatherType.SANDSTORM, WeatherType.STRONG_WINDS, WeatherType.FOG ]), true),
+    new SpeciesFormChange(SpeciesId.CASTFORM, "foggy", "snowy", new SpeciesFormChangeWeatherTrigger(AbilityId.FORECAST, [ WeatherType.HAIL, WeatherType.SNOW ]), true),
+    // Elite Redux (#450): Fog -> Foggy (Ghost). ER added Fog as a real weather, so
+    // Forecast Castform now gets a matching Foggy form (Ghost-type, ER art) instead
+    // of reverting to Normal in fog.
+    new SpeciesFormChange(SpeciesId.CASTFORM, "", "foggy", new SpeciesFormChangeWeatherTrigger(AbilityId.FORECAST, [ WeatherType.FOG ]), true),
+    new SpeciesFormChange(SpeciesId.CASTFORM, "sunny", "foggy", new SpeciesFormChangeWeatherTrigger(AbilityId.FORECAST, [ WeatherType.FOG ]), true),
+    new SpeciesFormChange(SpeciesId.CASTFORM, "rainy", "foggy", new SpeciesFormChangeWeatherTrigger(AbilityId.FORECAST, [ WeatherType.FOG ]), true),
+    new SpeciesFormChange(SpeciesId.CASTFORM, "snowy", "foggy", new SpeciesFormChangeWeatherTrigger(AbilityId.FORECAST, [ WeatherType.FOG ]), true),
+    // Revert to Normal on no/neutral weather (FOG removed - it now maps to Foggy).
+    new SpeciesFormChange(SpeciesId.CASTFORM, "sunny", "", new SpeciesFormChangeRevertWeatherFormTrigger(AbilityId.FORECAST, [ WeatherType.NONE, WeatherType.SANDSTORM, WeatherType.STRONG_WINDS ]), true),
+    new SpeciesFormChange(SpeciesId.CASTFORM, "rainy", "", new SpeciesFormChangeRevertWeatherFormTrigger(AbilityId.FORECAST, [ WeatherType.NONE, WeatherType.SANDSTORM, WeatherType.STRONG_WINDS ]), true),
+    new SpeciesFormChange(SpeciesId.CASTFORM, "snowy", "", new SpeciesFormChangeRevertWeatherFormTrigger(AbilityId.FORECAST, [ WeatherType.NONE, WeatherType.SANDSTORM, WeatherType.STRONG_WINDS ]), true),
+    new SpeciesFormChange(SpeciesId.CASTFORM, "foggy", "", new SpeciesFormChangeRevertWeatherFormTrigger(AbilityId.FORECAST, [ WeatherType.NONE, WeatherType.SANDSTORM, WeatherType.STRONG_WINDS ]), true),
+    // Switch-out / inactive revert to Normal.
     new SpeciesFormChange(SpeciesId.CASTFORM, "sunny", "", new SpeciesFormChangeActiveTrigger(), true),
     new SpeciesFormChange(SpeciesId.CASTFORM, "rainy", "", new SpeciesFormChangeActiveTrigger(), true),
-    new SpeciesFormChange(SpeciesId.CASTFORM, "snowy", "", new SpeciesFormChangeActiveTrigger(), true)
+    new SpeciesFormChange(SpeciesId.CASTFORM, "snowy", "", new SpeciesFormChangeActiveTrigger(), true),
+    new SpeciesFormChange(SpeciesId.CASTFORM, "foggy", "", new SpeciesFormChangeActiveTrigger(), true)
   ],
   [SpeciesId.BANETTE]: [
     new SpeciesFormChange(SpeciesId.BANETTE, "", SpeciesFormKey.MEGA, new SpeciesFormChangeItemTrigger(FormChangeItem.BANETTITE))

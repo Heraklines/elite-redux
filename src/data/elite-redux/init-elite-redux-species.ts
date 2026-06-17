@@ -167,6 +167,15 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
     byId.set(species.speciesId, species);
   }
 
+  // Elite Redux (#450): Castform's Foggy form (Forecast's response to ER Fog
+  // weather) uses ER custom art at the `castform_foggy` slug - there is no vanilla
+  // `castform-foggy` sprite. Redirect just that form's sprite/icon to the ER slug,
+  // mirroring how injected ER-art forms are handled elsewhere in this module.
+  const foggyCastform = byId.get(SpeciesId.CASTFORM)?.forms.find(f => f.formKey === "foggy");
+  if (foggyCastform) {
+    installErFormSpriteRedirect(foggyCastform, "castform_foggy");
+  }
+
   // Build a O(1) ER speciesConst → draft lookup for the form-mapping pass.
   // (ER ships mega/primal forms as separate species records keyed by name.)
   const erDraftByConst = new Map<string, (typeof ER_SPECIES)[number]>();
