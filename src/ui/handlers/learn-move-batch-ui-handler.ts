@@ -9,7 +9,6 @@ import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
-import i18next from "i18next";
 
 /** Panel sub-state. Kept INTERNAL (no UiMode switches) so the panel can never
  * desync the mode stack - the softlock class this avoids. */
@@ -21,7 +20,7 @@ const PANEL_W = 180;
 const PANEL_H = 96;
 const COL_GAP = 92;
 const ROW_H = 14;
-const ROW_TOP = 30;
+const ROW_TOP = 44;
 
 /**
  * ER QoL Move Learn panel (see {@linkcode LearnMoveBatchPhase}). One screen on
@@ -35,7 +34,6 @@ const ROW_TOP = 30;
  */
 export class LearnMoveBatchUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
-  private titleText: Phaser.GameObjects.Text;
   private learnableHeader: Phaser.GameObjects.Text;
   private currentHeader: Phaser.GameObjects.Text;
   private learnableTexts: Phaser.GameObjects.Text[] = [];
@@ -74,14 +72,13 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     ui.add(this.container);
 
     this.container.add(addWindow(PANEL_X, PANEL_Y, PANEL_W, PANEL_H));
-    this.titleText = addTextObject(PANEL_X + 6, PANEL_Y + 4, "", TextStyle.WINDOW);
     this.learnableHeader = addTextObject(PANEL_X + 6, ROW_TOP - 12, "Learnable", TextStyle.WINDOW_ALT);
     this.currentHeader = addTextObject(PANEL_X + 6 + COL_GAP, ROW_TOP - 12, "Current", TextStyle.WINDOW_ALT);
     this.cancelText = addTextObject(PANEL_X + 6, ROW_TOP + ROW_H * 5, "Cancel", TextStyle.WINDOW);
-    this.promptText = addTextObject(PANEL_X + 6, PANEL_Y + 4, "", TextStyle.WINDOW)
+    this.promptText = addTextObject(PANEL_X + 6, PANEL_Y + 6, "", TextStyle.WINDOW)
       .setVisible(false)
       .setWordWrapWidth(PANEL_W - 16);
-    this.container.add([this.titleText, this.learnableHeader, this.currentHeader, this.cancelText, this.promptText]);
+    this.container.add([this.learnableHeader, this.currentHeader, this.cancelText, this.promptText]);
 
     this.cursorObj = globalScene.add.image(0, 0, "cursor");
     this.container.add(this.cursorObj);
@@ -89,7 +86,7 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     // Reuse the shared move-info overlay (the combat move-select panel) for the
     // highlighted move; sits along the bottom like the fight UI's.
     this.moveInfoOverlay = new MoveInfoOverlay({
-      delayVisibility: true,
+      delayVisibility: false,
       onSide: true,
       right: true,
       x: 0,
@@ -110,14 +107,9 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       this.confirmCursor = 0;
       this.pendingMoveId = null;
       this.learnedAny = false;
-      this.titleText.setText(
-        i18next.t("battle:learnMovePrompt", { pokemonName: this.deps.pokemon.getNameToRender() })
-          || `${this.deps.pokemon.getNameToRender()} can learn new moves!`,
-      );
       this.container.setVisible(true);
       this.active = true;
       this.render();
-      console.log(`[lmb] panel shown OK (${this.deps.learnableIds.length} moves)`);
     } catch (e) {
       // NEVER softlock the level-up: log the real cause + fall back to the
       // per-move learn flow on the next tick (deferred so we are not re-entrant
@@ -142,13 +134,13 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     }
     const confirming = this.state === "confirmCancel";
     this.promptText.setVisible(confirming);
-    for (const t of [this.titleText, this.learnableHeader, this.currentHeader, this.cancelText]) {
+    for (const t of [this.learnableHeader, this.currentHeader, this.cancelText]) {
       t.setVisible(!confirming);
     }
 
     if (confirming) {
       this.promptText.setText(
-        `${i18next.t("battle:learnMoveStopTeaching", { moveName: "" }) || "Don't learn any new move?"}\n   ${this.confirmCursor === 0 ? "> " : "  "}No     ${this.confirmCursor === 1 ? "> " : "  "}Yes`,
+        `Don't learn any new move?\n   ${this.confirmCursor === 0 ? "> " : "  "}No     ${this.confirmCursor === 1 ? "> " : "  "}Yes`,
       );
       this.cursorObj?.setVisible(false);
       this.moveInfoOverlay.clear();

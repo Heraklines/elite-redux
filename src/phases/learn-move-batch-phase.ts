@@ -117,7 +117,6 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       },
     };
 
-    console.log(`[lmb] opening panel: ${learnable.length} learnable move(s) -> setMode(LEARN_MOVE_BATCH)`);
     try {
       globalScene.ui.setMode(UiMode.LEARN_MOVE_BATCH, deps);
     } catch (e) {
