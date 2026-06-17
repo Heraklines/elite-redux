@@ -580,6 +580,32 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Power Plant: Reactor Meltdown (#519)",
+    description:
+      "#519 - Reactor Meltdown (Power Plant gauge-read). Forces ER_REACTOR_MELTDOWN\n"
+      + "in POWER_PLANT.\n"
+      + "DO: read the three unit gauges in the option tooltips and 'Shut down' the unit\n"
+      + "with the HIGHEST reading.\n"
+      + "EXPECT: correct (hottest) unit -> the core stabilises, reward = Capacitor relic\n"
+      + "+ an Ultra pick. WRONG unit -> a blowout chips the whole party ~1/8 max HP\n"
+      + "(never below 1) + a single Great pick. (This is the OTHER power-plant event,\n"
+      + "distinct from Overcharge the Core's stat surge.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.POWER_PLANT,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_REACTOR_MELTDOWN,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.SPLASH] }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
     label: "ER Desert: The Buried City (#510)",
     description:
       "#510 - The Buried City (Desert press-your-luck delve). Forces ER_BURIED_CITY\n"

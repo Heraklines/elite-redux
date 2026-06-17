@@ -49,6 +49,7 @@ import { OverchargeCoreEncounter } from "#mystery-encounters/overcharge-core-enc
 import { OvergrownTempleEncounter } from "#mystery-encounters/overgrown-temple-encounter";
 import { PartTimerEncounter } from "#mystery-encounters/part-timer-encounter";
 import { PicnicEncounter } from "#mystery-encounters/picnic-encounter";
+import { ReactorMeltdownEncounter } from "#mystery-encounters/reactor-meltdown-encounter";
 import { RustlingGrassEncounter } from "#mystery-encounters/rustling-grass-encounter";
 import { SafariZoneEncounter } from "#mystery-encounters/safari-zone-encounter";
 import { SalvageYardEncounter } from "#mystery-encounters/salvage-yard-encounter";
@@ -296,7 +297,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   ],
   [BiomeId.ICE_CAVE, [MysteryEncounterType.ER_FROZEN_SHAPES]],
   [BiomeId.MEADOW, [MysteryEncounterType.ER_PICNIC]],
-  [BiomeId.POWER_PLANT, [MysteryEncounterType.ER_OVERCHARGE_CORE]],
+  [BiomeId.POWER_PLANT, [MysteryEncounterType.ER_OVERCHARGE_CORE, MysteryEncounterType.ER_REACTOR_MELTDOWN]],
   [
     BiomeId.VOLCANO,
     [
@@ -412,6 +413,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_CLEANSING_FONT] = CleansingFontEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_INTO_THE_CALDERA] = IntoTheCalderaEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_BURIED_CITY] = BuriedCityEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_REACTOR_MELTDOWN] = ReactorMeltdownEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

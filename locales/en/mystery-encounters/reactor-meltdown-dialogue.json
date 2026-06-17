@@ -1,0 +1,25 @@
+{
+  "intro": "Klaxons scream across the plant floor. The core is going critical, and three coolant units flash wildly different readings. There is only time to shut ONE down.",
+  "title": "Reactor Meltdown",
+  "description": "The reactor is moments from blowing. Three coolant units are spiking - the shutdown order has to go to the one running HOTTEST. Read the gauges and call it: get it right and the stored charge crystallises into a Capacitor relic, get it wrong and the partial blowout will scorch your whole team.",
+  "query": "Which unit do you shut down?",
+  "option": {
+    "1": {
+      "label": "Shut down Unit 1",
+      "tooltip": "Unit 1 gauge: {{reading1}}",
+      "selected": "You slam the cutoff on Unit 1..."
+    },
+    "2": {
+      "label": "Shut down Unit 2",
+      "tooltip": "Unit 2 gauge: {{reading2}}",
+      "selected": "You slam the cutoff on Unit 2..."
+    },
+    "3": {
+      "label": "Shut down Unit 3",
+      "tooltip": "Unit 3 gauge: {{reading3}}",
+      "selected": "You slam the cutoff on Unit 3..."
+    }
+  },
+  "stabilized": "The right unit! The core sighs back to safe levels, and the bled-off charge hardens into a Capacitor.",
+  "blowout": "Wrong unit - the core lurches and a wave of heat washes over your team before the failsafes catch it. You grab what loose charge you can on the way out."
+}

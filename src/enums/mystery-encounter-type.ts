@@ -165,6 +165,9 @@ export enum MysteryEncounterType {
    * Ground guardians; the warden Runerigus rises deep, and besting it earns the
    * Pharaoh's Ankh. */
   ER_BURIED_CITY,
+  /** ER #519: Reactor Meltdown - a Power Plant gauge-read; shut down the hottest of
+   * three units for the Capacitor relic, or misjudge it for a party-chipping blowout. */
+  ER_REACTOR_MELTDOWN,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */
