@@ -169,8 +169,8 @@
   ],
   "SPECIES_AXEW": [
     "STONE_AXE",
-    "DIRE_CLAW",
-    "RAGING_FURY",
+    "CROSS_POISON",
+    "PSYCHO_CUT",
     "BITTER_BLADE"
   ],
   "SPECIES_AZELF": [
@@ -792,9 +792,9 @@
     "ORIGIN_PULSE"
   ],
   "SPECIES_CUBCHOO": [
-    "MOUNTAIN_GALE",
+    "FACADE",
     "AQUA_STEP",
-    "ICE_SHARD",
+    "SUCKER_PUNCH",
     "COLLISION_COURSE"
   ],
   "SPECIES_CUBONE": [
@@ -889,8 +889,8 @@
   ],
   "SPECIES_DEERLING": [
     "TIDY_UP",
-    "HEADBUTT",
-    "AXE_KICK",
+    "POPPING_MAYHEM",
+    "BEATDOWN",
     "FLOWER_TRICK"
   ],
   "SPECIES_DEERLING_AUTUMN": [
@@ -1080,8 +1080,8 @@
     "DARK_VOID"
   ],
   "SPECIES_DRUDDIGON": [
-    "FIRE_LASH",
-    "MORNING_SUN",
+    "EGG_BOMB",
+    "BEHEMOTH_BASH",
     "DRAGON_DARTS",
     "CLANGOROUS_SOUL"
   ],
@@ -1104,9 +1104,9 @@
     "CORE_ENFORCER"
   ],
   "SPECIES_DURANT": [
-    "HIGH_HORSEPOWER",
+    "TECTONIC_FANGS",
     "FIRST_IMPRESSION",
-    "U_TURN",
+    "LEECH_LIFE",
     "BEHEMOTH_BASH"
   ],
   "SPECIES_DUSKULL": [
@@ -1256,8 +1256,8 @@
   "SPECIES_FERROSEED": [
     "SYNTHESIS",
     "CEASELESS_EDGE",
-    "SPIKY_SHIELD",
-    "SAPPY_SEED"
+    "SAPPY_SEED",
+    "FOLLOW_ME"
   ],
   "SPECIES_FEZANDIPITI": [
     "BARB_BARRAGE",
@@ -1452,7 +1452,7 @@
     "DARK_VOID"
   ],
   "SPECIES_GENESECT": [
-    "EXTREME_SPEED",
+    "SNIPE_SHOT",
     "SHIFT_GEAR",
     "BEHEMOTH_BASH",
     "TACHYON_CUTTER"
@@ -1554,7 +1554,7 @@
     "SPORE"
   ],
   "SPECIES_GOTHITA": [
-    "RECOVER",
+    "VEXING_VOID",
     "MOONBLAST",
     "AURA_SPHERE",
     "LUMINA_CRASH"
@@ -1705,9 +1705,9 @@
   ],
   "SPECIES_HEATMOR": [
     "EARTH_POWER",
-    "OVERHEAT",
+    "FLASH_CANNON",
     "SUPERCELL_SLAM",
-    "V_CREATE"
+    "BITTER_BLADE"
   ],
   "SPECIES_HEATRAN": [
     "MATCHA_GOTCHA",
@@ -2041,8 +2041,8 @@
   ],
   "SPECIES_KELDEO": [
     "BOUNCY_BUBBLE",
-    "THUNDERBOLT",
-    "ICE_BEAM",
+    "SHOCKING_EDGE",
+    "FROST_BRAND",
     "STEAM_ERUPTION"
   ],
   "SPECIES_KELDEO_RESOLUTE": [
@@ -2148,7 +2148,7 @@
     "NASTY_PLOT"
   ],
   "SPECIES_LANDORUS": [
-    "STONE_AXE",
+    "PEBBLE_SHOWER",
     "FLOATY_FALL",
     "ROOST",
     "THOUSAND_WAVES"
@@ -2892,7 +2892,7 @@
     "PLASMA_FISTS"
   ],
   "SPECIES_PAWNIARD": [
-    "SUCKER_PUNCH",
+    "TRIPLE_ARROWS",
     "SPIRIT_BREAK",
     "LAST_RESPECTS",
     "BITTER_BLADE"
@@ -3283,9 +3283,9 @@
   ],
   "SPECIES_RESHIRAM": [
     "ENERGY_BALL",
-    "TAKE_HEART",
+    "ERUPTION",
     "FICKLE_BEAM",
-    "ERUPTION"
+    "TAIL_GLOW"
   ],
   "SPECIES_RHYHORN": [
     "SHORE_UP",
@@ -3546,8 +3546,8 @@
     "HAZE"
   ],
   "SPECIES_SHELMET": [
-    "POWER_GEM",
-    "NASTY_PLOT",
+    "TRIPLE_AXEL",
+    "TOXIC_NEEDLES",
     "EARTH_POWER",
     "STEAM_ERUPTION"
   ],
@@ -3775,7 +3775,7 @@
   ],
   "SPECIES_SOLOSIS": [
     "MIST_BALL",
-    "SPEED_SWAP",
+    "BADDY_BAD",
     "FLAMETHROWER",
     "LIGHT_OF_RUIN"
   ],
@@ -4081,7 +4081,7 @@
   ],
   "SPECIES_TERRAKION": [
     "MIGHTY_CLEAVE",
-    "HEADLONG_RUSH",
+    "SEISMIC_BLADE",
     "KNOCK_OFF",
     "VICTORY_DANCE"
   ],
@@ -4098,7 +4098,7 @@
     "ICICLE_SPEAR"
   ],
   "SPECIES_THUNDURUS": [
-    "SANDSEAR_STORM",
+    "WILDBOLT_STORM",
     "HURRICANE",
     "FROST_BREATH",
     "ELECTRO_SHOT"
@@ -4350,7 +4350,7 @@
     "VICTORY_DANCE"
   ],
   "SPECIES_VIRIZION": [
-    "SAPPY_SEED",
+    "SMART_STRIKE",
     "PSYBLADE",
     "STONE_AXE",
     "VICTORY_DANCE"
@@ -4616,8 +4616,8 @@
   "SPECIES_ZEKROM": [
     "TRIPLE_AXEL",
     "THUNDEROUS_KICK",
-    "DRAGON_HAMMER",
-    "DRAGON_ENERGY"
+    "PIKA_PAPOW",
+    "CORE_ENFORCER"
   ],
   "SPECIES_ZERAORA": [
     "ICE_PUNCH",
