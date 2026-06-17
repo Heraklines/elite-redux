@@ -49,18 +49,23 @@ import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import type { Nature } from "#enums/nature";
 import { PartyMemberStrength } from "#enums/party-member-strength";
 import { TrainerType } from "#enums/trainer-type";
+import type { PokemonHeldItemModifierType } from "#modifiers/modifier-type";
+import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import type { EnemyPartyConfig, EnemyPokemonConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
+  generateModifierType,
   initBattleWithEnemyConfig,
   leaveEncounterWithoutBattle,
   setEncounterRewards,
   transitionMysteryEncounterIntroVisuals,
 } from "#mystery-encounters/encounter-phase-utils";
+import { applyModifierTypeToPlayerPokemon } from "#mystery-encounters/encounter-pokemon-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
 import type { Variant } from "#sprites/variant";
 import type { ModifierTypeFunc } from "#types/modifier-types";
+import { randSeedShuffle } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 const namespace = "mysteryEncounters/gravesOfTheFallen";
@@ -265,32 +270,84 @@ function payRespects(grave: GhostTeamSnapshot): void {
   leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
 }
 
+/** Solid, definitely-resolving held items used to top up a DISTURB payout. */
+const FALLBACK_HELD_FUNCS: ModifierTypeFunc[] = [
+  modifierTypes.LEFTOVERS,
+  modifierTypes.WIDE_LENS,
+  modifierTypes.SCOPE_LENS,
+  modifierTypes.FOCUS_BAND,
+  modifierTypes.QUICK_CLAW,
+  modifierTypes.KINGS_ROCK,
+];
+
 /**
- * Set up the DISTURB-win reward: up to {@linkcode DISTURB_REWARD_ITEMS} of the
- * fallen team's held items, topped up with Ultra-tier fallbacks so the player
- * always gets exactly that many picks (legacy graves pay out all fallbacks).
- * Called BEFORE initBattleWithEnemyConfig; the shop opens after the win.
+ * The {@linkcode DISTURB_REWARD_ITEMS} held-item types a DISTURB win hands over:
+ * the fallen team's own held items first, topped up with random solid held items.
+ * De-duplicated by name.
  */
-function setDisturbRewards(grave: GhostTeamSnapshot): void {
-  const funcs = resolvableHeldItemFuncs(grave);
-  // Deduplicate while preserving order, then take up to the payout count.
-  const seen = new Set<ModifierTypeFunc>();
-  const guaranteedModifierTypeFuncs: ModifierTypeFunc[] = [];
-  for (const fn of funcs) {
-    if (!seen.has(fn)) {
-      seen.add(fn);
-      guaranteedModifierTypeFuncs.push(fn);
+function disturbMementoTypes(grave: GhostTeamSnapshot): PokemonHeldItemModifierType[] {
+  const out: PokemonHeldItemModifierType[] = [];
+  const seen = new Set<string>();
+  const tryAdd = (fn: ModifierTypeFunc): void => {
+    if (out.length >= DISTURB_REWARD_ITEMS) {
+      return;
     }
-    if (guaranteedModifierTypeFuncs.length >= DISTURB_REWARD_ITEMS) {
-      break;
+    const type = generateModifierType(fn) as PokemonHeldItemModifierType | null;
+    if (type && !seen.has(type.name)) {
+      seen.add(type.name);
+      out.push(type);
+    }
+  };
+  for (const fn of resolvableHeldItemFuncs(grave)) {
+    tryAdd(fn);
+  }
+  for (const fn of randSeedShuffle([...FALLBACK_HELD_FUNCS])) {
+    tryAdd(fn);
+  }
+  return out;
+}
+
+/**
+ * Grant the DISTURB win reward DIRECTLY: hand the player TWO held items (the
+ * fallen team's mementos, topped with solid fallbacks) straight onto the lead, and
+ * announce them - no 1-of-N reward screen. Wired as setEncounterRewards' pre-
+ * rewards callback so it fires after the win with NO shop opened.
+ */
+function grantDisturbMementos(grave: GhostTeamSnapshot): void {
+  const types = disturbMementoTypes(grave);
+  const lead = globalScene.getPlayerParty()[0];
+  for (const type of types) {
+    if (lead) {
+      applyModifierTypeToPlayerPokemon(lead, type);
     }
   }
-  const fallbackCount = DISTURB_REWARD_ITEMS - guaranteedModifierTypeFuncs.length;
-  setEncounterRewards({
-    guaranteedModifierTypeFuncs,
-    guaranteedModifierTiers: new Array(fallbackCount).fill(FALLBACK_TIER),
-    fillRemaining: false,
-  });
+  const encounter = globalScene.currentBattle.mysteryEncounter!;
+  encounter.setDialogueToken("item1", types[0]?.name ?? "a relic");
+  encounter.setDialogueToken("item2", types[1]?.name ?? "a relic");
+  queueEncounterMessage(`${namespace}:disturbReward`);
+}
+
+/**
+ * Resolve the grave to a REAL fallen challenger: if the onInit prefetch hasn't
+ * landed (we are still on the synthetic legacy grave), AWAIT a live ghost sample
+ * now so DISTURB really fights a real player's team. Falls back to the synthetic
+ * grave only if the pool is genuinely empty.
+ */
+async function resolveGrave(): Promise<GhostTeamSnapshot> {
+  let grave = getMisc()?.grave ?? syntheticLegacyGrave();
+  if (grave.id.startsWith("legacy-grave")) {
+    try {
+      const snaps = await sampleGhostSnapshots(getErDifficulty(), 6, 0);
+      const real = snaps.find(s => s.party.length > 0);
+      if (real) {
+        applyGrave(globalScene.currentBattle.mysteryEncounter!, real);
+        grave = real;
+      }
+    } catch {
+      /* keep the synthetic legacy grave - never throw into the encounter flow */
+    }
+  }
+  return grave;
 }
 
 export const GravesOfTheFallenEncounter: MysteryEncounter = MysteryEncounterBuilder.withEncounterType(
@@ -343,7 +400,7 @@ export const GravesOfTheFallenEncounter: MysteryEncounter = MysteryEncounterBuil
       })
       .withOptionPhase(async () => {
         // PAY RESPECTS (safe): a memento, then leave in peace.
-        const grave = getMisc()?.grave ?? syntheticLegacyGrave();
+        const grave = await resolveGrave();
         await transitionMysteryEncounterIntroVisuals(true, false);
         payRespects(grave);
         return true;
@@ -360,10 +417,10 @@ export const GravesOfTheFallenEncounter: MysteryEncounter = MysteryEncounterBuil
       .withOptionPhase(async () => {
         // DISTURB (risk): the fallen team's ghost RISES as a named ghost TRAINER
         // (the source player's account name + ghost BGM), fielding the snapshot's
-        // actual team. The reward (2 of their held items, Ultra-tier fallbacks)
-        // opens after the win.
-        const grave = getMisc()?.grave ?? syntheticLegacyGrave();
-        setDisturbRewards(grave);
+        // actual team. Win -> TWO held items are handed over directly (the fallen
+        // team's mementos, topped with solid fallbacks), no 1-of-N reward screen.
+        const grave = await resolveGrave();
+        setEncounterRewards(undefined, undefined, () => grantDisturbMementos(grave));
         await transitionMysteryEncounterIntroVisuals(true, false);
         await initBattleWithEnemyConfig(buildGraveBattle(grave));
         // The trainer + its party are now built (party = the grave's mons via

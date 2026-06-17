@@ -1,15 +1,15 @@
 {
   "intro": "Heat shimmers off the cracked flats. A lone figure stands in your path, hand hovering, and the only sound is the wind.",
   "speaker": "Outlaw",
-  "introDialogue": "You and me, stranger. One draw. We both put up {{ante}}, and the fastest hand walks away with the lot. My draw clocks {{outlawSpeed}} Speed - bring something quicker. Pick your partner... if you've got the nerve.",
+  "introDialogue": "You and me, stranger. One draw, half of all you're carrying on the line - {{ante}} apiece. Fastest hand takes the lot. My draw's quicker than it looks... pick your partner, if you've got the nerve.",
   "title": "High Noon",
-  "description": "An outlaw calls you out for a single-strike duel. You each ante {{ante}}. Its draw clocks {{outlawSpeed}} Speed. Pick ONE Pokemon: if that mon's Speed is at least {{outlawSpeed}} it strikes first and you take the whole pot - otherwise your ante is gone. Only the mon you pick is compared. Or walk away.",
+  "description": "An outlaw calls you out for a single-strike duel - and the stake is HALF your money ({{ante}}). Pick ONE Pokemon; only its Speed is put to the test against his draw, and his is no slouch. Out-draw him and you walk with the pot. Lose and the stake is gone. Or walk away.",
   "query": "Will you take the duel?",
   "invalidSelection": "That Pokemon is in no shape to draw.",
   "option": {
     "1": {
       "label": "Take the duel",
-      "tooltip": "(+) Pick your FASTEST mon to win 2x your ante\n(?) Too slow and you lose your ante",
+      "tooltip": "(?) Stake half your money. Send your quickest draw - his is faster than he lets on.",
       "selected": "You step into the flats and square off..."
     },
     "2": {

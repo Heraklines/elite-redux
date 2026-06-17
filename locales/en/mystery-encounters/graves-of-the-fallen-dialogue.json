@@ -21,5 +21,6 @@
       "tooltip": "(-) No reward",
       "selected": "You leave the graves undisturbed."
     }
-  }
+  },
+  "disturbReward": "The laid-to-rest spirits relinquish their treasures: you collect {{item1}} and {{item2}}!"
 }

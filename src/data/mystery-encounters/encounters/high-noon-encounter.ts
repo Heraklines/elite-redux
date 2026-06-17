@@ -69,10 +69,11 @@ export const HighNoonEncounter: MysteryEncounter = MysteryEncounterBuilder.withE
     const encounter = globalScene.currentBattle.mysteryEncounter!;
     const level = Math.max(1, Math.round(globalScene.currentBattle?.getLevelForWave?.() ?? 1));
     const outlawSpeed = Math.floor(((2 * OUTLAW_BASE_SPD + 20) * level) / 100) + 5;
-    const ante = Math.max(10, Math.floor((globalScene.getWaveMoneyAmount(1) * 0.5) / 10) * 10);
+    // High stakes: you ante HALF your money (so winning ~1.5x's it, losing halves
+    // it). The outlaw's draw speed is hidden - the player has to KNOW their fastest.
+    const ante = Math.max(10, Math.floor(globalScene.money * 0.5));
     encounter.misc = { outlawSpeed, ante } satisfies DuelState;
     encounter.setDialogueToken("ante", String(ante));
-    encounter.setDialogueToken("outlawSpeed", String(outlawSpeed));
     return true;
   })
   .setLocalizationKey(`${namespace}`)
@@ -99,10 +100,11 @@ export const HighNoonEncounter: MysteryEncounter = MysteryEncounterBuilder.withE
         const encounter = globalScene.currentBattle.mysteryEncounter!;
         const { outlawSpeed, ante, duelist } = encounter.misc as DuelState & { duelist: PlayerPokemon };
         await transitionMysteryEncounterIntroVisuals(true, true);
-        // Both ante; the faster mon strikes first.
+        // Both ante; the faster mon strikes first. You stake half your money; win
+        // and you take the outlaw's matching stake too (net +ante -> ~1.5x money).
         updatePlayerMoney(-ante, true, false);
         if (duelist.getStat(Stat.SPD) >= outlawSpeed) {
-          updatePlayerMoney(ante * 3, true, false); // net +2x ante
+          updatePlayerMoney(ante * 2, true, false); // net +ante (your stake back + the pot)
           queueEncounterMessage(`${namespace}:win`);
         } else {
           queueEncounterMessage(`${namespace}:lose`);

@@ -32,6 +32,10 @@ import {
   resumePressYourLuck,
   startPressYourLuck,
 } from "#data/elite-redux/er-press-your-luck";
+import { ER_RESIST_BERRY_BY_TYPE, erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
+import { erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
+import type { PokemonSpecies } from "#data/pokemon-species";
+import { getTypeDamageMultiplier } from "#data/type";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
@@ -50,6 +54,7 @@ import {
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
+import type { HeldModifierConfig } from "#types/held-modifier-config";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import { randSeedInt } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -72,10 +77,16 @@ const STIR_MAX = 0.8;
 
 /** Levels added to the guardian per prior stir (deeper = deadlier). */
 const GUARDIAN_LEVEL_PER_INTERRUPT = 6;
-/** After this many stirs the warden Runerigus rises as the boss. */
-const GUARDIAN_BOSS_AFTER_INTERRUPTS = 3;
-/** Runerigus is at least this many levels above the player's strongest mon. */
-const BOSS_LEVELS_ABOVE = 5;
+/**
+ * Chance (on a stir) that the warden RUNERIGUS itself rises instead of a lesser
+ * guardian. There is no fixed dig count - it is a probability that climbs the
+ * deeper you push, so the warden can rise early (rarely) or late.
+ */
+const BOSS_RISE_BASE = 0.1;
+const BOSS_RISE_PER_INTERRUPT = 0.18;
+const BOSS_RISE_MAX = 0.85;
+/** The warden is at least this many levels above the player's strongest mon (a real wall). */
+const BOSS_LEVELS_ABOVE = 10;
 /** Non-boss guardians are GROUND-typed; the shared picker climbs BST with depth. */
 const CITY_GUARDIAN_TYPES = [PokemonType.GROUND];
 
@@ -84,18 +95,41 @@ interface DigHaul {
   interrupts: number;
   /** True once Runerigus (the boss) has been beaten this dive (gates the Ankh). */
   beatBoss: boolean;
+  /** Whether the stir currently being resolved summoned the warden (the boss). */
+  lastWasBoss: boolean;
 }
 
 function getHaul(): DigHaul {
   const encounter = globalScene.currentBattle.mysteryEncounter!;
   if (!encounter.misc?.dig) {
-    encounter.misc = { dig: { finds: 0, interrupts: 0, beatBoss: false } satisfies DigHaul };
+    encounter.misc = { dig: { finds: 0, interrupts: 0, beatBoss: false, lastWasBoss: false } satisfies DigHaul };
   }
   return encounter.misc.dig as DigHaul;
 }
 
 function stirChance(level: number): number {
   return Math.min(STIR_BASE + level * STIR_PER_LEVEL, STIR_MAX);
+}
+
+/** Chance (0-1) this stir is the warden rising - climbs with each stir survived. */
+function bossRiseChance(interrupts: number): number {
+  return Math.min(BOSS_RISE_BASE + Math.max(0, interrupts - 1) * BOSS_RISE_PER_INTERRUPT, BOSS_RISE_MAX);
+}
+
+/** Resist berries for each type the warden is WEAK to (covers its soft spots). */
+function bossWeaknessBerries(species: PokemonSpecies): HeldModifierConfig[] {
+  const defTypes = [species.type1, species.type2].filter((t): t is PokemonType => t != null);
+  const out: HeldModifierConfig[] = [];
+  for (const atk of ER_RESIST_BERRY_BY_TYPE.keys()) {
+    let mult = 1;
+    for (const def of defTypes) {
+      mult *= getTypeDamageMultiplier(atk, def);
+    }
+    if (mult >= 2) {
+      out.push({ modifier: erResistBerryModifierType(atk), isTransferable: false });
+    }
+  }
+  return out;
 }
 
 function guardianLevel(): number {
@@ -109,17 +143,23 @@ function guardianLevel(): number {
   return Math.max(1, top, Math.round(waveLvl));
 }
 
-/** Build the stir fight: a Ground guardian, or - deep - the warden Runerigus boss (3-4 bars). */
-function buildGuardianBattle(interrupts: number): EnemyPartyConfig {
-  const isBoss = interrupts >= GUARDIAN_BOSS_AFTER_INTERRUPTS;
+/** Build the stir fight: a Ground guardian, or the warden Runerigus boss (3-4 bars). */
+function buildGuardianBattle(interrupts: number, isBoss: boolean): EnemyPartyConfig {
   if (isBoss) {
+    const wardenSpecies = getPokemonSpecies(SpeciesId.RUNERIGUS);
     const level = Math.max(
       guardianLevel() + interrupts * GUARDIAN_LEVEL_PER_INTERRUPT,
       guardianLevel() + BOSS_LEVELS_ABOVE,
     );
+    // The warden is a real wall: 3-4 bars, a maxed PRIME Ward Stone (CC-immune),
+    // and a resist berry for each of its weaknesses.
+    const modifierConfigs: HeldModifierConfig[] = [
+      { modifier: erWardStoneModifierType("prime"), isTransferable: false },
+      ...bossWeaknessBerries(wardenSpecies),
+    ];
     return {
       pokemonConfigs: [
-        { species: getPokemonSpecies(SpeciesId.RUNERIGUS), isBoss: true, bossSegments: 3 + randSeedInt(2), level },
+        { species: wardenSpecies, isBoss: true, bossSegments: 3 + randSeedInt(2), level, modifierConfigs },
       ],
     };
   }
@@ -178,19 +218,21 @@ function diveConfig(): PressYourLuckConfig {
     onBust: async () => {
       const haul = getHaul();
       haul.interrupts += 1;
-      const isBoss = haul.interrupts >= GUARDIAN_BOSS_AFTER_INTERRUPTS;
+      // The warden rises on a depth-scaling CHANCE (no fixed dig count).
+      const isBoss = randSeedInt(100) < Math.round(bossRiseChance(haul.interrupts) * 100);
+      haul.lastWasBoss = isBoss;
       queueEncounterMessage(isBoss ? `${namespace}:wardenRises` : `${namespace}:sandStirs`);
       const encounter = globalScene.currentBattle.mysteryEncounter!;
       encounter.doContinueEncounter = async () => {
         encounter.doContinueEncounter = undefined;
-        // Surviving a boss-tier stir means Runerigus was beaten -> the Ankh is earned.
-        if (isBoss) {
+        // Surviving the warden means Runerigus was beaten -> the Ankh is earned.
+        if (getHaul().lastWasBoss) {
           getHaul().beatBoss = true;
         }
         await resumePressYourLuck(diveConfig());
       };
       await transitionMysteryEncounterIntroVisuals(true, false);
-      await initBattleWithEnemyConfig(buildGuardianBattle(haul.interrupts));
+      await initBattleWithEnemyConfig(buildGuardianBattle(haul.interrupts, isBoss));
       applyErGuardianTokens(haul.interrupts - 1);
     },
   };
@@ -209,7 +251,7 @@ export const BuriedCityEncounter: MysteryEncounter = MysteryEncounterBuilder.wit
   .withIntroDialogue([{ text: `${namespace}:intro` }])
   .withOnInit(() => {
     const encounter = globalScene.currentBattle.mysteryEncounter!;
-    encounter.misc = { dig: { finds: 0, interrupts: 0, beatBoss: false } satisfies DigHaul };
+    encounter.misc = { dig: { finds: 0, interrupts: 0, beatBoss: false, lastWasBoss: false } satisfies DigHaul };
     encounter.setDialogueToken("diveCount", "0");
     return true;
   })

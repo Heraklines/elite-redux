@@ -1078,12 +1078,12 @@ export const DEV_SCENARIOS: DevScenario[] = [
     description:
       "#516 - High Noon (Badlands single-strike duel). Forces ER_HIGH_NOON in\n"
       + "BADLANDS.\n"
-      + "DO: 'Take the duel' and pick a Pokemon. The outlaw draws at a FIXED, wave-scaled\n"
-      + "speed (shown in the dialogue), compared ONLY against the mon you pick - not the\n"
-      + "team average.\n"
-      + "EXPECT: both ante (money drops by the ante); pick the fast Ninjask -> its Speed\n"
-      + "beats the outlaw's draw, you win back 2x the ante (net gain); pick the slow\n"
-      + "Munchlax -> it is out-drawn, you lose the ante. No battle. 'Walk away' = no cost.",
+      + "DO: 'Take the duel' and pick a Pokemon. The stake is now HALF your money, and the\n"
+      + "outlaw's draw speed is HIDDEN (no number shown - the duel is hint-only).\n"
+      + "EXPECT: half your money is staked (money drops by ~50%); pick the fast Ninjask ->\n"
+      + "it out-draws the outlaw and you end with ~1.5x your money (stake back + the pot);\n"
+      + "pick the slow Munchlax -> out-drawn, you keep only the other half. No battle.\n"
+      + "'Walk away' = no cost.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1129,14 +1129,16 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "ER Power Plant: Reactor Meltdown (#519)",
     description:
-      "#519 - Reactor Meltdown (Power Plant gauge-read). Forces ER_REACTOR_MELTDOWN\n"
-      + "in POWER_PLANT.\n"
-      + "DO: read the three unit gauges in the option tooltips and 'Shut down' the unit\n"
-      + "with the HIGHEST reading.\n"
-      + "EXPECT: correct (hottest) unit -> the core stabilises, reward = Capacitor relic\n"
-      + "+ an Ultra pick. WRONG unit -> a blowout chips the whole party ~1/8 max HP\n"
-      + "(never below 1) + a single Great pick. (This is the OTHER power-plant event,\n"
-      + "distinct from Overcharge the Core's stat surge.)",
+      "#519 - Reactor Meltdown (Power Plant pick-the-right-mon). Forces\n"
+      + "ER_REACTOR_MELTDOWN in POWER_PLANT. REWORKED: instead of reading gauges, you\n"
+      + "now pick the right POKEMON for the job. Each run rolls one crucial stat + 3\n"
+      + "candidate species whose value in it is close (within 5, never equal, all < 100).\n"
+      + "DO: read the hazard line in the description (it HINTS the stat - force a door =\n"
+      + "Atk, sprint to the button = Spd, etc.) and send the candidate with the highest\n"
+      + "value in that stat. Re-run to confirm the stat + the 3 mons VARY.\n"
+      + "EXPECT: correct (highest in the stat) -> core stabilises -> Capacitor relic\n"
+      + "(it shows in the reward screen now). WRONG -> the blowout BURNS your whole party,\n"
+      + "no reward. (Distinct from Overcharge the Core's stat surge.)",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1157,11 +1159,14 @@ export const DEV_SCENARIOS: DevScenario[] = [
     description:
       "#510 - The Buried City (Desert press-your-luck delve). Forces ER_BURIED_CITY\n"
       + "in DESERT.\n"
-      + "DO: 'Dig into the city', then 'Dig deeper' past guardian stirs until the warden\n"
-      + "RUNERIGUS rises (after 3 stirs), beat it, then 'Climb out'.\n"
-      + "EXPECT: money per dig; stirs = Ground guardians (BST climbs); the 4th stir is\n"
-      + "Runerigus (3-4 bars, +5 levels). Banking AFTER beating Runerigus grants the\n"
-      + "Pharaoh's Ankh relic + Ultra picks; banking WITHOUT beating it = NO Ankh.",
+      + "DO: 'Dig into the city', then 'Dig deeper' past guardian stirs; keep pushing\n"
+      + "until the warden RUNERIGUS rises, beat it, then 'Climb out'.\n"
+      + "EXPECT: money/nuggets per dig; stirs = Ground guardians (BST climbs). The warden\n"
+      + "no longer rises at a FIXED count - it is a CHANCE that climbs the deeper you go,\n"
+      + "so it can come early or late. When it does it is much stronger: +10 levels over\n"
+      + "your best, 3-4 bars, a maxed PRIME Ward Stone + a resist berry per weakness.\n"
+      + "Banking AFTER beating Runerigus grants the Pharaoh's Ankh relic (shows now) +\n"
+      + "Ultra picks; banking WITHOUT beating it = NO Ankh.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1188,11 +1193,13 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "ER_INTO_THE_CALDERA in VOLCANO.\n"
       + "DO: 'Descend the tube', then 'Descend deeper' a few times; 'Rise to the rim'\n"
       + "to bank.\n"
-      + "EXPECT: each descent pays money + scorches your NON-Fire mons ~1/16 max HP\n"
-      + "(the Magcargo lead is Fire, so it is spared; the Pidgey takes heat, never\n"
-      + "below 1 HP). Pushing raises the eruption chance -> a Fire guardian fight\n"
-      + "(BST climbs, boss after 3); win and the dive resumes, money kept. A DEEP\n"
-      + "bank can offer the Molten Core relic / Greater Golden Ball + high-tier picks.",
+      + "EXPECT: a paying descent (~65%) now nets a BIG sum - at least ~10% of your\n"
+      + "current money - plus a climbing chance to FIND a held item handed straight to\n"
+      + "the lead (Flame Orb / Quick Claw / King's Rock) with a notification. Each\n"
+      + "descent still scorches NON-Fire mons ~1/16 max HP (Magcargo lead spared; Pidgey\n"
+      + "takes heat, never below 1). Pushing raises the eruption chance -> a Fire guardian\n"
+      + "(BST climbs, boss 3-4 bars). A DEEP bank can offer Molten Core / Greater Golden\n"
+      + "Ball / a party-line Mega Stone + high-tier picks.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1218,9 +1225,11 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "named grave (Veteran Lance, hell, fell at wave 147, beaten by Champion\n"
       + "Cynthia) so the epitaph + mementos always render even on an empty pool.\n"
       + "EXPECT: the epitaph shows that NAME / difficulty / wave / killer. PAY\n"
-      + "RESPECTS -> a memento (their held item: Leftovers/Wide Lens) and leave.\n"
-      + "DISTURB -> they rise as a NAMED GHOST TRAINER (Lance's team, ghost theme);\n"
-      + "win -> 2 of their held items. WALK AWAY -> no cost. Never softlocks.",
+      + "RESPECTS -> a memento (their held item) and leave. DISTURB -> they rise as a\n"
+      + "NAMED GHOST TRAINER (Lance's team, ghost theme); win -> TWO held items are\n"
+      + "handed over DIRECTLY (a notification, NO 1-of-N reward screen). Online, the\n"
+      + "option AWAITS a live ghost sample, so it uses a REAL fallen player's team when\n"
+      + "the pool has one. WALK AWAY -> no cost. Never softlocks.",
     setup: () => {
       resetDevOverrides();
       // Plant a real named grave so the epitaph (name/wave/mode/killer) and the

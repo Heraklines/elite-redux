@@ -27,7 +27,7 @@ import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import { guardianForDepth } from "#data/elite-redux/er-delve-guardians";
 import { applyErGuardianTokens } from "#data/elite-redux/er-fight-tokens";
-import { rollMineralMoney } from "#data/elite-redux/er-mineral-loot";
+import { emptyMineralHaul, rollMegaStone } from "#data/elite-redux/er-mineral-loot";
 import {
   type PressYourLuckConfig,
   resumePressYourLuck,
@@ -39,20 +39,23 @@ import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
+import type { PokemonHeldItemModifierType } from "#modifiers/modifier-type";
 import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
+  generateModifierType,
   initBattleWithEnemyConfig,
   leaveEncounterWithoutBattle,
   setEncounterRewards,
   transitionMysteryEncounterIntroVisuals,
   updatePlayerMoney,
 } from "#mystery-encounters/encounter-phase-utils";
+import { applyModifierTypeToPlayerPokemon } from "#mystery-encounters/encounter-pokemon-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
 import type { ModifierTypeFunc } from "#types/modifier-types";
-import { randSeedInt } from "#utils/common";
+import { randSeedInt, randSeedItem } from "#utils/common";
 
 const namespace = "mysteryEncounters/intoTheCaldera";
 
@@ -86,6 +89,50 @@ const CALDERA_GUARDIAN_TYPES = [PokemonType.FIRE];
 const MOLTEN_CORE_CHANCE = 25;
 /** Percent chance, on a DEEP bank, the haul includes a Greater Golden Ball. */
 const GREATER_BALL_CHANCE = 20;
+/** Percent chance, on a DEEP bank, the haul also turns up a party-line Mega Stone. */
+const MEGA_STONE_CHANCE = 22;
+
+/** Percent chance a descent pays its big haul (otherwise just embers - little/nothing). */
+const PAYOUT_CHANCE = 65;
+/** A paying descent is worth at least this fraction of the player's current money. */
+const PAYOUT_MONEY_FRACTION = 0.1;
+
+/** Thematic held items the lava tube can turn up (given straight to a party mon). */
+const CALDERA_ITEM_FUNCS: ModifierTypeFunc[] = [
+  modifierTypes.FLAME_ORB,
+  modifierTypes.QUICK_CLAW,
+  modifierTypes.KINGS_ROCK,
+];
+
+/** Percent chance a descent at `level` (0-indexed) also turns up a held item. */
+function itemFindChance(level: number): number {
+  return Math.min(25 + level * 12, 70);
+}
+
+/**
+ * Give a found held item to the lead (or the next party member if the lead can't
+ * take it), and announce it. Returns true if an item was found + handed over.
+ */
+function maybeFindCalderaItem(level: number): boolean {
+  if (randSeedInt(100) >= itemFindChance(level)) {
+    return false;
+  }
+  const itemType = generateModifierType(randSeedItem(CALDERA_ITEM_FUNCS)) as PokemonHeldItemModifierType | null;
+  if (!itemType) {
+    return false;
+  }
+  const party = globalScene.getPlayerParty().filter(p => !p.isFainted());
+  const target = party[0] ?? globalScene.getPlayerParty()[0];
+  if (!target) {
+    return false;
+  }
+  applyModifierTypeToPlayerPokemon(target, itemType);
+  const encounter = globalScene.currentBattle.mysteryEncounter!;
+  encounter.setDialogueToken("itemName", itemType.name);
+  encounter.setDialogueToken("itemPokemon", target.getNameToRender());
+  queueEncounterMessage(`${namespace}:foundItem`);
+  return true;
+}
 
 interface DiveHaul {
   finds: number;
@@ -139,7 +186,7 @@ function buildGuardianBattle(interrupts: number): EnemyPartyConfig {
   }
   return {
     pokemonConfigs: [
-      isBoss ? { species, isBoss: true, bossSegments: 2 + randSeedInt(2), level } : { species, isBoss: false, level },
+      isBoss ? { species, isBoss: true, bossSegments: 3 + randSeedInt(2), level } : { species, isBoss: false, level },
     ],
   };
 }
@@ -148,6 +195,8 @@ function buildGuardianBattle(interrupts: number): EnemyPartyConfig {
 function bankCalderaRewards(deepestLevel: number): void {
   const deep = deepestLevel >= DEEP_LEVEL;
   const funcs: ModifierTypeFunc[] = [];
+  // A deep dive can also turn up a Mega Stone matching one of the party's lines.
+  const haul = emptyMineralHaul();
   if (deep) {
     if (randSeedInt(100) < MOLTEN_CORE_CHANCE) {
       funcs.push(modifierTypes.ER_RELIC_MOLTEN_CORE);
@@ -155,11 +204,13 @@ function bankCalderaRewards(deepestLevel: number): void {
     if (randSeedInt(100) < GREATER_BALL_CHANCE) {
       funcs.push(modifierTypes.ER_GREATER_GOLDEN_BALL);
     }
+    rollMegaStone(haul, deepestLevel, MEGA_STONE_CHANCE);
   }
   const picks = Math.min(1 + Math.floor(deepestLevel / 2), 3);
   const tiers = new Array(picks).fill(deep ? ModifierTier.ULTRA : ModifierTier.GREAT);
   setEncounterRewards({
     ...(funcs.length > 0 ? { guaranteedModifierTypeFuncs: funcs } : {}),
+    ...(haul.options.length > 0 ? { guaranteedModifierTypeOptions: haul.options } : {}),
     guaranteedModifierTiers: tiers,
     fillRemaining: false,
   });
@@ -177,14 +228,27 @@ function diveConfig(): PressYourLuckConfig {
     onPush: async level => {
       const haul = getHaul();
       haul.finds += 1;
-      const money = rollMineralMoney(level >= DEEP_LEVEL ? MAGMA_VALUE : EMBER_VALUE);
-      if (money.amount > 0) {
-        globalScene.playSound("item_fanfare");
-        updatePlayerMoney(money.amount, true, false);
+      // A paying descent (~65%) is worth at least ~10% of the player's current
+      // money (jittered) - the deep heat is dangerous, so the gold has to match.
+      let paid = false;
+      if (randSeedInt(100) < PAYOUT_CHANCE) {
+        const base = Math.max(
+          level >= DEEP_LEVEL ? MAGMA_VALUE : EMBER_VALUE,
+          Math.floor(globalScene.money * PAYOUT_MONEY_FRACTION),
+        );
+        const amount = Math.round(base * (0.85 + randSeedInt(31) / 100)); // 85-115%
+        if (amount > 0) {
+          globalScene.playSound("item_fanfare");
+          updatePlayerMoney(amount, true, false);
+          paid = true;
+        }
       }
+      const foundItem = maybeFindCalderaItem(level);
       applyHeatChip();
       globalScene.currentBattle.mysteryEncounter!.setDialogueToken("diveCount", String(haul.finds));
-      queueEncounterMessage(money.kind === "dud" ? `${namespace}:foundNothing` : `${namespace}:foundMagma`);
+      if (!foundItem) {
+        queueEncounterMessage(paid ? `${namespace}:foundMagma` : `${namespace}:foundNothing`);
+      }
     },
     onBank: async levelsCompleted => {
       const haul = getHaul();
