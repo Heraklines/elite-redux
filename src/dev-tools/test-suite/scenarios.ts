@@ -640,14 +640,13 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "ER Temple: Cleansing Font (#515)",
     description:
       "#515 - The Cleansing Font (Temple shrine). Forces ER_CLEANSING_FONT.\n"
-      + "Your party starts BURNED (STATUS_OVERRIDE) and the lead is knocked to ~1/3 HP\n"
-      + "in the opening battle, so there is a real ailment + HP to restore.\n"
-      + "DO: win the opening battle (you'll still be burned + hurt), then on wave 12\n"
-      + "choose 'Drink from the font'.\n"
-      + "EXPECT: the whole party is fully restored - HP back to full AND the BURN is\n"
-      + "cured (check the status pip is gone) via PartyHealPhase, with the 'restored'\n"
-      + "line. (Curses are not a built mechanic yet, so it always takes the restore\n"
-      + "branch.) 'Leave it untouched' just moves on with the burn still active.",
+      + "Your party starts BURNED (STATUS_OVERRIDE), the lead is knocked to ~1/3 HP, AND\n"
+      + "the lead carries a Bog Witch CURSE (its Attack sapped 10% - check its summary).\n"
+      + "DO: win the opening battle, then on wave 12 choose 'Drink from the font'.\n"
+      + "EXPECT: because the party is cursed, the font LIFTS the curse (the 'cleansed'\n"
+      + "line; the lead's Attack returns to normal on its summary) AND PartyHealPhase\n"
+      + "fully restores HP + cures the burn. With no curse it would show 'restored'\n"
+      + "instead. 'Leave it untouched' just moves on, still cursed + burned.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -666,6 +665,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
       const lead = globalScene.getPlayerPokemon();
       if (lead) {
         lead.hp = Math.max(1, Math.floor(lead.getMaxHp() / 3));
+        // Seed a Bog Witch curse (Attack sapped 10%) so the font's cure branch is
+        // testable: Stat.ATK = 1.
+        lead.customPokemonData.erCursedStat = 1;
+        lead.calculateStats();
         lead.updateInfo();
       }
     },
@@ -944,13 +947,14 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "ER Slum: The Fight Club (#524)",
     description:
       "#524 - The Fight Club (Slum bet/brawl). Forces ER_FIGHT_CLUB in SLUM.\n"
-      + "DO: 'Step into the ring' (small ante) or 'Up the ante' (big ante) to brawl a\n"
-      + "dirty fighter, or 'Back out'.\n"
-      + "EXPECT: ante is deducted from your money up front; the fighter OUTNUMBERS you\n"
-      + "(2 mons small / 3 big), TRAPS you in (no switching), some SWAGGER in with an\n"
-      + "announced all-stats power-up, and they pull dirty tricks (Fake Out, Sand\n"
-      + "Attack, Toxic, Knock Off, Quick Claw/Focus Band/King's Rock). Win -> the loot\n"
-      + "payout (Ultra+Great small / Rogue+Ultra+Great big). Back out = no cost.",
+      + "DO: 'Step into the ring' (small ante) or 'Up the ante' (big ante) to brawl, or\n"
+      + "'Back out'. Run it a few times to confirm the fighters VARY each run.\n"
+      + "EXPECT: ante deducted up front; the crew is sampled fresh from a brawler pool\n"
+      + "(2 mons small / 3 big) so it differs run to run, TRAPS you in (no switching),\n"
+      + "and the lead SWAGGERS in with a clear message that the HANDLER injected it with\n"
+      + "a black-market serum (announced all-stats power-up). They pull dirty tricks\n"
+      + "(Fake Out, Sand Attack, Toxic, Knock Off, Quick Claw/Focus Band/King's Rock).\n"
+      + "Win -> the loot payout. Back out = no cost.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -976,12 +980,15 @@ export const DEV_SCENARIOS: DevScenario[] = [
     description:
       "#508 - The Bog Witch's Bargain (Swamp DEAL). Forces ER_BOG_WITCH in SWAMP.\n"
       + "The witch wants an offering at or above a HIDDEN rarity (Great/Ultra/Rogue),\n"
-      + "which she never names.\n"
-      + "DO: 'Leave an offering', pick a held item. The party here carries items of\n"
-      + "different tiers (Leftovers/Eviolite vs a Soul Dew-tier) to test both outcomes.\n"
-      + "EXPECT: offer >= her hidden bar -> she purges all party status + a Weathervane\n"
-      + "relic reward; offer below it -> a bog-rot curse chips the whole party ~1/6 HP\n"
-      + "(never below 1). The offered item is consumed either way. 'Refuse' = no cost.",
+      + "which she never names. (Tier is now inferred reliably, so a cheap item really\n"
+      + "reads as cheap.)\n"
+      + "DO: 'Leave an offering', pick a held item. Party carries a cheap item\n"
+      + "(Leftovers) and a Rogue-tier item (Soul Dew) to test both outcomes.\n"
+      + "EXPECT: offer >= her hidden bar -> purges all party status + a Weathervane RELIC\n"
+      + "that NOW SHOWS in the reward screen (Master Ball). Offer below it -> a permanent\n"
+      + "CURSE: one random party mon has one stat sapped 10% (message names the mon +\n"
+      + "stat), visible on its summary, lasting until lifted at a Cleansing Font. The\n"
+      + "offered item is consumed either way. 'Refuse' = no cost.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1012,9 +1019,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "DO: 'Haul it out' and pick a rescuer. A Flying/Levitate/light/strong-Attack mon\n"
       + "succeeds; a heavy weakling flounders. (Party: Crobat = Flying rescuer that\n"
       + "always works; Munchlax = heavy weakling that flounders.) Or 'Leave it'.\n"
-      + "EXPECT: good rescuer -> a Rogue-tier reward + the sinker's status cleared; bad\n"
-      + "rescuer -> the sinking mon takes ~1/4 HP mire damage + loses a held item. Leave\n"
-      + "-> the bog takes one of the sinker's held items (or chips it), no reward.",
+      + "EXPECT: good rescuer -> the sinker's status cleared + a dredged cache reward,\n"
+      + "now 60% ULTRA-tier / 40% ROGUE-tier rarity (re-run to see it vary); bad rescuer\n"
+      + "-> the sinking mon takes ~1/4 HP mire damage + loses a held item. Leave -> the\n"
+      + "bog takes one of the sinker's held items (or chips it), no reward.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1042,9 +1050,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "DO: read the epitaph (challenger name / difficulty / wave / killer), then\n"
       + "'Finish their fight' to battle the killer team, or 'Walk on'.\n"
       + "EXPECT: finish -> a spectral TRAINER (named after the killer) fielding the\n"
-      + "exact killer team, level-scaled; win -> a reward screen with one random\n"
-      + "relic. Walk on -> no battle, no cost. (Online, the grave/killer are real\n"
-      + "ghost-pool data instead of the legacy trio.)",
+      + "exact killer team, level-scaled; win -> a reward screen with one random RELIC\n"
+      + "that NOW SHOWS (Master Ball). Walk on -> no battle, no cost. Online, the option\n"
+      + "AWAITS a live ghost sample, so you fight the real team that ended a real\n"
+      + "player's run (only falls back to the legacy trio if the pool is truly empty).",
     setup: () => {
       resetDevOverrides();
       setOverrides({

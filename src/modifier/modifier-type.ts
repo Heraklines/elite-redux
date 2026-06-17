@@ -840,6 +840,12 @@ export function erRelicModifierType(kind: ErRelicKind): ModifierType {
   Object.defineProperty(type, "name", { get: () => cfg.name });
   type.getDescription = () => cfg.description;
   type.iconTint = cfg.tint;
+  // Relics are not in any modifier pool, so their tier would otherwise stay
+  // undefined - which makes the reward screen build its pokeball sprite from a
+  // NaN frame and render blank (the relic looked "missing" in the reward UI).
+  // Pin them to MASTER so they show with a Master Ball, the top-tier prize they
+  // are. (withTierFromPool keeps this, since no pool entry overrides it.)
+  type.setTier(ModifierTier.MASTER);
   return type;
 }
 

@@ -280,7 +280,26 @@ export const UnfinishedBusinessEncounter: MysteryEncounter = MysteryEncounterBui
       })
       .withOptionPhase(async () => {
         // FINISH THEIR FIGHT: face the exact killer team. Win -> a random relic.
-        const grave = getMisc()?.grave ?? syntheticLegacyGrave();
+        const encounter = globalScene.currentBattle.mysteryEncounter!;
+        let grave = getMisc()?.grave ?? syntheticLegacyGrave();
+        // The onInit prefetch may not have resolved (or returned no killer team)
+        // before the player committed. If we are still on the synthetic legacy
+        // grave (or one without a real killer team), AWAIT a live ghost sample now
+        // so we genuinely fight the team that ended a real player's run.
+        const isSynthetic = grave.id.startsWith("legacy-business");
+        if (isSynthetic || resolvableKillers(grave).length === 0) {
+          try {
+            const snaps = await sampleGhostSnapshots(getErDifficulty(), 8, 0);
+            const withKiller = snaps.filter(s => (s.opponentParty?.length ?? 0) > 0);
+            const real = withKiller.find(s => (s.opponentParty?.length ?? 0) >= 2) ?? withKiller[0];
+            if (real) {
+              applyGrave(encounter, real);
+              grave = real;
+            }
+          } catch {
+            /* keep the synthetic grave - never throw into the encounter flow */
+          }
+        }
         const killers = resolvableKillers(grave);
         const relic = randSeedItem(AVENGE_RELIC_FUNCS);
         setEncounterRewards({ guaranteedModifierTypeFuncs: [relic], fillRemaining: false });

@@ -46,7 +46,7 @@ import {
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
-import { randSeedItem } from "#utils/common";
+import { randSeedInt, randSeedItem } from "#utils/common";
 
 const namespace = "mysteryEncounters/sinkingMire";
 
@@ -163,7 +163,10 @@ export const SinkingMireEncounter: MysteryEncounter = MysteryEncounterBuilder.wi
             sinking.updateInfo();
           }
           queueEncounterMessage(`${namespace}:rescued`);
-          setEncounterRewards({ guaranteedModifierTiers: [ModifierTier.ROGUE], fillRemaining: false });
+          // The dredged-up cache is usually a fine find (Ultra-tier rarity), and
+          // sometimes a real treasure (Rogue-tier): 60% Ultra / 40% Rogue.
+          const cacheTier = randSeedInt(100) < 60 ? ModifierTier.ULTRA : ModifierTier.ROGUE;
+          setEncounterRewards({ guaranteedModifierTiers: [cacheTier], fillRemaining: false });
           leaveEncounterWithoutBattle(false);
         } else {
           // The rescue flounders: the sinking mon takes mire damage and loses an item.

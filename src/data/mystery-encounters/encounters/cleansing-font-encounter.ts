@@ -10,10 +10,9 @@
 //   - If the party carries a CURSE, the font lifts one curse.
 //   - Otherwise the clean water simply restores the whole party (HP + status).
 //
-// NOTE: ER run-state CURSES are not yet a built mechanic (they arrive with the
-// Bog Witch / Black-Market / Abyss bargaining systems). Until then partyHasCurse()
-// is always false, so the font always takes its specified "no curse -> restore"
-// fallback. The curse-lift branch is wired and ready for when curses land.
+// ER curses are stored per-Pokemon as customPokemonData.erCursedStat (the Bog
+// Witch's "anti-vitamin" hex, #508). If the party carries one, the font lifts a
+// single curse; otherwise the clean water just restores the whole party.
 // =============================================================================
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
@@ -31,13 +30,9 @@ import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 
 const namespace = "mysteryEncounters/cleansingFont";
 
-/**
- * Whether the party currently carries an ER curse. Curses are not yet a built run
- * mechanic, so this is always false today - the font then takes its "restore the
- * party" fallback. Wire this to the curse state when ER curses are implemented.
- */
-function partyHasCurse(): boolean {
-  return false;
+/** A party Pokemon carrying the Bog Witch's anti-vitamin curse, or undefined. */
+function findCursedPartyMember() {
+  return globalScene.getPlayerParty().find(p => p.customPokemonData.erCursedStat >= 0);
 }
 
 export const CleansingFontEncounter: MysteryEncounter = MysteryEncounterBuilder.withEncounterType(
@@ -63,8 +58,11 @@ export const CleansingFontEncounter: MysteryEncounter = MysteryEncounterBuilder.
     },
     async () => {
       // Cursed party -> lift one curse; otherwise the clean water restores everyone.
-      if (partyHasCurse()) {
-        // TODO: lift one curse once ER curses are a run mechanic.
+      const cursed = findCursedPartyMember();
+      if (cursed) {
+        cursed.customPokemonData.erCursedStat = -1;
+        cursed.calculateStats();
+        cursed.updateInfo();
         queueEncounterMessage(`${namespace}:cleansed`);
       } else {
         queueEncounterMessage(`${namespace}:restored`);

@@ -32,6 +32,7 @@ import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { Stat } from "#enums/stat";
 import type { PlayerPokemon, Pokemon } from "#field/pokemon";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
 import { getEncounterText, queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
@@ -45,12 +46,21 @@ import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
-import { randSeedInt } from "#utils/common";
+import { randSeedInt, randSeedItem } from "#utils/common";
 
 const namespace = "mysteryEncounters/bogWitch";
 
-/** Fraction of max HP the bog-rot curse chips from each party mon (never below 1). */
-const BOG_CURSE_CHIP = 1 / 6;
+/** The combat stats the bog's curse can rot (never HP). */
+const CURSABLE_STATS = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD] as const;
+
+/** Short display labels for the cursed stat (for the curse message). */
+const STAT_LABEL: Record<(typeof CURSABLE_STATS)[number], string> = {
+  [Stat.ATK]: "Attack",
+  [Stat.DEF]: "Defense",
+  [Stat.SPATK]: "Sp. Atk",
+  [Stat.SPDEF]: "Sp. Def",
+  [Stat.SPD]: "Speed",
+};
 
 interface BogMisc {
   /** The hidden minimum rarity the witch will accept (she never tells you). */
@@ -126,7 +136,9 @@ export const BogWitchEncounter: MysteryEncounter = MysteryEncounterBuilder.withE
           leaveEncounterWithoutBattle(true);
           return true;
         }
-        const offeredTier = chosenModifier.type.tier ?? ModifierTier.COMMON;
+        // Resolve the real rarity: held items often have an unset .type.tier
+        // (reads COMMON), which would make her reject almost everything. Infer it.
+        const offeredTier = chosenModifier.type.getOrInferTier() ?? ModifierTier.COMMON;
         // Consume the offering (the price) - one stack of it.
         if (chosenModifier.stackCount > 1) {
           chosenModifier.stackCount--;
@@ -151,13 +163,20 @@ export const BogWitchEncounter: MysteryEncounter = MysteryEncounterBuilder.withE
           });
           leaveEncounterWithoutBattle(false);
         } else {
-          // Lowballed her: cursed. The bog rots your party's health.
-          for (const p of globalScene.getPlayerParty()) {
-            if (!p.isFainted()) {
-              const chip = Math.max(1, Math.floor(p.getMaxHp() * BOG_CURSE_CHIP));
-              p.hp = Math.max(1, p.hp - chip);
-              p.updateInfo();
-            }
+          // Lowballed her: cursed. The mire lays a lasting hex on one of your
+          // Pokemon - a permanent "anti-vitamin" that saps one of its stats by
+          // 10% until it is lifted at a Cleansing Font. Picks a random (non-
+          // fainted) mon and a random combat stat.
+          const party = globalScene.getPlayerParty().filter(p => !p.isFainted());
+          const victim = party.length > 0 ? randSeedItem(party) : globalScene.getPlayerParty()[0];
+          const stat = randSeedItem([...CURSABLE_STATS]);
+          if (victim) {
+            victim.customPokemonData.erCursedStat = stat;
+            victim.calculateStats();
+            victim.updateInfo();
+            const encounter = globalScene.currentBattle.mysteryEncounter!;
+            encounter.setDialogueToken("cursedName", victim.getNameToRender());
+            encounter.setDialogueToken("cursedStat", STAT_LABEL[stat]);
           }
           globalScene.playSound("se/error");
           queueEncounterMessage(`${namespace}:cursed`);

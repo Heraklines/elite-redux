@@ -1,17 +1,17 @@
 {
   "intro": "Down a reeking alley, a ring of onlookers roars around a makeshift pit. Money changes hands. A bouncer jerks a thumb at you: in or out?",
   "title": "The Fight Club",
-  "description": "No rules down here. Ante your money and brawl the house fighters - who cheat shamelessly: they outnumber you, trap you in the ring, swagger in juiced up, and pull every dirty trick in the book. Beat the cheaters down and the pot is yours. The bouncer eyes your wallet: a small ante ({{smallAnte}}), or up the ante ({{bigAnte}}) for the real fight?",
+  "description": "No rules down here. Ante your money and brawl the house fighters - they outnumber you, trap you in the ring, and the handler cheats any way he can. Win and the pot is yours; lose and your ante is gone.",
   "query": "Do you step into the ring?",
   "option": {
     "1": {
       "label": "Step into the ring",
-      "tooltip": "(-) Ante {{smallAnte}}. (?) Brawl a 2-mon dirty tag team. (+) Win for an Ultra+Great payout.",
+      "tooltip": "(-) Ante {{smallAnte}}. (?) A smaller, dirty crew. (+) Win the pot.",
       "selected": "You toss your ante on the table and step into the pit."
     },
     "2": {
       "label": "Up the ante",
-      "tooltip": "(-) Ante {{bigAnte}}. (?) Brawl a 3-mon dirty gang, even nastier. (+) Win for a Rogue+Ultra+Great haul.",
+      "tooltip": "(-) Ante {{bigAnte}}. (?) A bigger, nastier crew. (+) Win the bigger pot.",
       "selected": "You slam down the big money. The crowd howls as a whole gang cracks its knuckles."
     },
     "3": {
@@ -20,6 +20,6 @@
       "selected": "You back out of the alley. Not your kind of fight."
     }
   },
-  "dirtyWarning": "No referee, no mercy. These fighters play every angle - watch for the dirty tricks!",
-  "dirtyEntry": "{{pokemonName}} swaggers into the ring, juiced up and itching to fight dirty!"
+  "dirtyWarning": "No referee, no mercy. The handler grins - his fighters won't play fair.",
+  "dirtyEntry": "The handler jabs {{pokemonName}} with a syringe of black-market serum - it swells with stolen power!"
 }

@@ -60,6 +60,7 @@ import {
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import type { ModifierTypeFunc } from "#types/modifier-types";
+import { randSeedInt } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
 
@@ -70,6 +71,67 @@ const SMALL_ANTE_MULT = 1.5;
 const BIG_ANTE_MULT = 4;
 
 const ALL_STATS = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD] as const;
+
+/**
+ * The back-alley brawler roster: thuggish, hard-hitting VANILLA species (so the
+ * Fight Club stays vanilla-safe in every difficulty mode). Fighters are sampled
+ * fresh from this pool each run, so the crew is varied and never the same set
+ * twice. Their movesets are forced (see the dirty kits below), so type/legality
+ * does not matter - any of them can throw the same dirty tricks.
+ */
+const BRAWLER_POOL: SpeciesId[] = [
+  SpeciesId.SCRAFTY,
+  SpeciesId.OBSTAGOON,
+  SpeciesId.INCINEROAR,
+  SpeciesId.MACHAMP,
+  SpeciesId.CONKELDURR,
+  SpeciesId.HARIYAMA,
+  SpeciesId.PANGORO,
+  SpeciesId.MIENSHAO,
+  SpeciesId.TOXICROAK,
+  SpeciesId.BEWEAR,
+  SpeciesId.PRIMEAPE,
+  SpeciesId.HITMONLEE,
+  SpeciesId.HITMONCHAN,
+  SpeciesId.HITMONTOP,
+  SpeciesId.GURDURR,
+  SpeciesId.GRIMMSNARL,
+  SpeciesId.WEAVILE,
+  SpeciesId.ABSOL,
+  SpeciesId.MIGHTYENA,
+  SpeciesId.KROOKODILE,
+  SpeciesId.ZANGOOSE,
+  SpeciesId.URSARING,
+  SpeciesId.GRANBULL,
+];
+
+/**
+ * Forced "dirty fighter" movesets - every fighter throws cheap shots regardless
+ * of its species (the moveSet is forced, so legality is irrelevant). One generic
+ * kit per crew slot.
+ */
+const DIRTY_KITS: MoveId[][] = [
+  [MoveId.FAKE_OUT, MoveId.SAND_ATTACK, MoveId.KNOCK_OFF, MoveId.BODY_SLAM],
+  [MoveId.FAKE_OUT, MoveId.TOXIC, MoveId.SWAGGER, MoveId.FACADE],
+  [MoveId.FAKE_OUT, MoveId.SAND_ATTACK, MoveId.SWAGGER, MoveId.BODY_SLAM],
+];
+
+/** Rigged gear sets, one per crew slot (cheat items that never miss / cheat death). */
+const RIGGED_GEAR: ModifierTypeFunc[][] = [
+  [modifierTypes.QUICK_CLAW, modifierTypes.FOCUS_BAND],
+  [modifierTypes.KINGS_ROCK, modifierTypes.LEFTOVERS],
+  [modifierTypes.QUICK_CLAW, modifierTypes.WIDE_LENS],
+];
+
+/** Pick `n` distinct entries from `pool` using the seeded RNG (for run variety). */
+function pickDistinct<T>(pool: readonly T[], n: number): T[] {
+  const copy = [...pool];
+  const out: T[] = [];
+  while (out.length < n && copy.length > 0) {
+    out.push(copy.splice(randSeedInt(copy.length), 1)[0]);
+  }
+  return out;
+}
 
 interface DirtyOpts {
   moves: MoveId[];
@@ -126,32 +188,25 @@ function dirtyMon(species: SpeciesId, level: number, opts: DirtyOpts): EnemyPoke
   return cfg;
 }
 
-/** The dirty fighter's crew. Two mons for the small bet, a third (nastier) for the big bet. */
+/**
+ * The dirty fighter's crew, sampled fresh from the brawler pool each run (varied,
+ * never the same set twice). Two mons for the small bet, a third (nastier) for the
+ * big bet. Every fighter gets a forced dirty kit + rigged gear; the lead (and the
+ * big-bet enforcer) also swaggers in juiced up.
+ */
 function buildFight(big: boolean): EnemyPartyConfig {
   const level = fightLevel();
-  const pokemonConfigs: EnemyPokemonConfig[] = [
-    dirtyMon(SpeciesId.SCRAFTY, level, {
-      moves: [MoveId.FAKE_OUT, MoveId.SAND_ATTACK, MoveId.CRUNCH, MoveId.DRAIN_PUNCH],
-      items: [modifierTypes.QUICK_CLAW, modifierTypes.FOCUS_BAND],
-      swagger: true,
+  const count = big ? 3 : 2;
+  const species = pickDistinct(BRAWLER_POOL, count);
+  const pokemonConfigs: EnemyPokemonConfig[] = species.map((sp, i) =>
+    dirtyMon(sp, level, {
+      moves: DIRTY_KITS[i % DIRTY_KITS.length],
+      items: RIGGED_GEAR[i % RIGGED_GEAR.length],
+      // The lead and the big-bet enforcer get the illegal entry juicing.
+      swagger: i === 0 || (big && i === 2),
       boss: big,
     }),
-    dirtyMon(SpeciesId.OBSTAGOON, level, {
-      moves: [MoveId.TOXIC, MoveId.KNOCK_OFF, MoveId.FACADE, MoveId.SAND_ATTACK],
-      items: [modifierTypes.KINGS_ROCK, modifierTypes.LEFTOVERS],
-      boss: big,
-    }),
-  ];
-  if (big) {
-    pokemonConfigs.push(
-      dirtyMon(SpeciesId.INCINEROAR, level, {
-        moves: [MoveId.FAKE_OUT, MoveId.DARKEST_LARIAT, MoveId.FLARE_BLITZ, MoveId.SWAGGER],
-        items: [modifierTypes.QUICK_CLAW, modifierTypes.WIDE_LENS],
-        swagger: true,
-        boss: true,
-      }),
-    );
-  }
+  );
   const trainerConfig = trainerConfigs[TrainerType.ROUGHNECK]
     .clone()
     .setPartyTemplates(new TrainerPartyTemplate(pokemonConfigs.length, PartyMemberStrength.STRONGER));

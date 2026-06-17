@@ -1923,6 +1923,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // Vitamins
     globalScene.applyModifiers(BaseStatModifier, this.isPlayer(), this, baseStats);
 
+    // ER Bog Witch curse (#508): a permanent "anti-vitamin" - one base stat is
+    // cut 10% until the curse is lifted at the Cleansing Font. -1 = uncursed.
+    const cursedStat = this.customPokemonData.erCursedStat;
+    if (cursedStat >= 0 && cursedStat < baseStats.length) {
+      baseStats[cursedStat] = Math.max(1, Math.floor(baseStats[cursedStat] * 0.9));
+    }
+
     return baseStats;
   }
 

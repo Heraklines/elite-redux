@@ -3,12 +3,12 @@
   "speaker": "Bog Witch",
   "introDialogue": "The swamp takes its due from all who pass... but I can lift its rot from you. Leave me an appropriate offering, and we have a bargain. Skimp, and the mire will remember you.",
   "title": "The Bog Witch's Bargain",
-  "description": "She will cleanse your team and ward you against the bog - for the right offering. But she names no price, only that it be \"appropriate.\" Read how greedy she is: offer too little and the mire will curse you instead.",
+  "description": "She names no price, only that the offering be \"appropriate.\" Read her mood and decide what she is worth - the mire has a long memory for those who disappoint it.",
   "query": "Do you make an offering?",
   "option": {
     "1": {
       "label": "Leave an offering",
-      "tooltip": "(?) Offer a held item. If it is valuable enough she blesses you; too cheap and you are cursed. The item is gone either way.",
+      "tooltip": "(?) Offer one held item. Judge for yourself what will satisfy her - she will not say.",
       "selectPrompt": "Offer which held item?",
       "selected": "You lay your offering in the witch's withered hands."
     },
@@ -20,5 +20,5 @@
   },
   "invalidSelection": "That Pokemon has nothing to offer.",
   "blessed": "The witch cackles, pleased. The rot lifts from your team, and she presses a warding charm into your hand.",
-  "cursed": "The witch sneers at your stinginess. The mire churns, and a creeping rot saps your whole team!"
+  "cursed": "The witch sneers at your stinginess and spits a hex into the mud. A lasting curse settles over {{cursedName}} - its {{cursedStat}} is sapped until the hex is cleansed."
 }

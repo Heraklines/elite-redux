@@ -6,7 +6,7 @@
   "option": {
     "1": {
       "label": "Haul it out",
-      "tooltip": "(?) Pick a rescuer. A Flying/Levitate/light or strong-Attack mon succeeds (a Rogue reward); a heavy weakling flounders (mire damage + a lost item).",
+      "tooltip": "(?) Pick a rescuer. One that can stay atop the muck or muscle the sinker free will manage it - and may dredge up what the mire swallowed. The wrong choice flounders.",
       "selectPrompt": "Send which Pokemon to the rescue?",
       "selected": "You send your chosen Pokemon out across the treacherous mud."
     },

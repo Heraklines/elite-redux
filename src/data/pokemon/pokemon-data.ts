@@ -85,6 +85,13 @@ export class CustomPokemonData {
    * permanent account unlock. Checked in {@linkcode Pokemon.canApplyAbility}.
    */
   public erInnateShrineUnlocked = false;
+  /**
+   * ER Bog Witch curse (#508): a permanent "anti-vitamin" curse. Holds the
+   * {@linkcode Stat} index (0=HP..5=SPD) of the base stat permanently lowered by
+   * 10%, or `-1` for "uncursed". Applied in {@linkcode Pokemon.calculateBaseStats}
+   * and lifted at the Cleansing Font (#515). Run-scoped (serialized).
+   */
+  public erCursedStat = -1;
 
   constructor(data?: CustomPokemonData | Partial<CustomPokemonData>) {
     this.spriteScale = data?.spriteScale ?? -1;
@@ -102,6 +109,7 @@ export class CustomPokemonData {
     this.erGiftIndex = data?.erGiftIndex ?? 0;
     this.erAbilityCapsuleUsed = data?.erAbilityCapsuleUsed ?? false;
     this.erInnateShrineUnlocked = data?.erInnateShrineUnlocked ?? false;
+    this.erCursedStat = data?.erCursedStat ?? -1;
   }
 }
 
