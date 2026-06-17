@@ -191,6 +191,51 @@ function injectLogButton(): void {
 /** The scenario currently loaded into the battle (for the banner + Pass/Fail). */
 let activeScenarioLabel: string | null = null;
 
+// --- Fast scenario iteration (dev-only Reset / Next / Pick) -------------------
+// Testers re-run a scenario (to try different ME choices) or hop to another one
+// constantly. Walking Title -> Dev Scenarios -> pick every time is far too slow,
+// so the banner has Reset / Next / Pick buttons. They all use the SAME safe
+// path: tear the run down to the title with the canonical globalScene.reset(true)
+// (exactly what the pause menu's "Return to Title" does, so no mode-stack
+// garbage), then run a staged action once the rebuilt title menu hands us a
+// fresh launch ctx (see the dev-menu factory at the bottom).
+
+/** A one-shot action to run with the fresh title ctx after a teardown. */
+let pendingTitleAction: ((ctx: DevMenuCtx) => void) | null = null;
+
+/**
+ * Tear the current run down to the title (canonical reset, no page reload) and,
+ * once the rebuilt title menu hands us a fresh launch ctx, run `action`. Used by
+ * the dev banner's Reset / Next / Pick buttons. Dev-only.
+ */
+function teardownThen(action: (ctx: DevMenuCtx) => void): void {
+  pendingTitleAction = action;
+  scenarioBanner?.remove();
+  scenarioBanner = null;
+  try {
+    // clearScene=true: fade out, free the UI, and re-boot into the title. The
+    // dev-menu factory runs on the rebuilt title and fires pendingTitleAction.
+    globalScene.reset(true);
+  } catch (err) {
+    // biome-ignore lint/suspicious/noConsole: dev-only diagnostic
+    console.error("[dev-tools] scenario teardown failed:", err);
+    pendingTitleAction = null;
+  }
+}
+
+/** The next not-yet-passed scenario after `after` (wraps; null if none remain). */
+function nextUnpassedScenario(after: DevScenario | null): DevScenario | null {
+  const passed = new Set(combinedPassed());
+  const start = after ? DEV_SCENARIOS.findIndex(s => s.label === after.label) : -1;
+  for (let step = 1; step <= DEV_SCENARIOS.length; step++) {
+    const cand = DEV_SCENARIOS[(start + step) % DEV_SCENARIOS.length];
+    if (cand && cand.label !== after?.label && !passed.has(cand.label)) {
+      return cand;
+    }
+  }
+  return null;
+}
+
 // Passed scenarios are remembered in localStorage (ordered, most-recent LAST) so
 // they DROP OUT of the picker list and survive reloads. "Undo last pass" in the
 // menu pops only the most recent one (so you don't re-flood the whole list).
@@ -403,6 +448,44 @@ function showScenarioBanner(scenario: (typeof DEV_SCENARIOS)[number]): void {
 
   row.append(passBtn, failBtn, hideBtn);
   body.appendChild(row);
+
+  // Second row: fast scenario iteration (dev-only). All three tear the run down
+  // to the title and immediately do the next thing - no manual menu walking.
+  // The share code is captured now so a Reset keeps the log replayable.
+  const shareCode = activeShareCode;
+  const navRow = document.createElement("div");
+  Object.assign(navRow.style, { display: "flex", gap: "5px", marginTop: "5px" } satisfies Partial<CSSStyleDeclaration>);
+
+  const resetBtn = makeBannerButton("↻ Reset", "#2b6cb0");
+  resetBtn.title = "Re-run THIS scenario from the start";
+  resetBtn.addEventListener("click", () =>
+    teardownThen(ctx => {
+      launchScenario(ctx, scenario);
+      activeShareCode = shareCode; // launchScenario doesn't touch it; keep logs replayable
+    }),
+  );
+
+  const nextBtn = makeBannerButton("⏭ Next", "#6b46c1");
+  nextBtn.title = "Jump to the next not-yet-passed scenario";
+  nextBtn.addEventListener("click", () =>
+    teardownThen(ctx => {
+      const nxt = nextUnpassedScenario(scenario);
+      if (nxt) {
+        activeShareCode = null;
+        launchScenario(ctx, nxt);
+      } else {
+        openScenarioList(ctx); // all passed -> let the tester reset/pick
+      }
+    }),
+  );
+
+  const pickBtn = makeBannerButton("☰ Pick", "#444");
+  pickBtn.title = "Open the scenario picker to choose any scenario";
+  pickBtn.addEventListener("click", () => teardownThen(ctx => openScenarioList(ctx)));
+
+  navRow.append(resetBtn, nextBtn, pickBtn);
+  body.appendChild(navRow);
+
   scenarioBanner.appendChild(body);
   setCollapsed(false);
   document.body.appendChild(scenarioBanner);
@@ -551,6 +634,22 @@ registerDevMenu(ctx => {
   scenarioBanner = null;
   activeScenarioLabel = null;
   activeShareCode = null;
+  // Fast-iteration handoff: if the banner's Reset / Next / Pick button tore the
+  // run down (teardownThen), run the staged action now that we have a FRESH
+  // title launch ctx. Deferred so the title menu is fully built first; this is
+  // the same ctx the user would get by manually opening Dev Scenarios.
+  if (pendingTitleAction) {
+    const action = pendingTitleAction;
+    pendingTitleAction = null;
+    setTimeout(() => {
+      try {
+        action(ctx);
+      } catch (err) {
+        // biome-ignore lint/suspicious/noConsole: dev-only diagnostic
+        console.error("[dev-tools] staged scenario relaunch failed:", err);
+      }
+    }, 0);
+  }
   return {
     label: "\u{1F6E0} Dev Scenarios",
     handler: () => {
