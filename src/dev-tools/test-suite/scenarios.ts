@@ -661,6 +661,74 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Factory: The Fabricator (#525)",
+    description:
+      "#525 - The Fabricator (Factory crafting, rework of Salvage Yard). Forces\n"
+      + "ER_FABRICATOR in FACTORY. Party carries a 5-stack of Sitrus + Leftovers + Soul\n"
+      + "Dew to feed.\n"
+      + "DO: 'Use the Smelter' (melt a whole stack -> higher-rarity item, more/finer =\n"
+      + "better) or 'Use the Fabricator' (one item -> a production relic), then pick the\n"
+      + "item, or 'Walk away'.\n"
+      + "EXPECT: smelt -> a reward one-to-three tiers above the fed item (feeding the\n"
+      + "5-stack Sitrus pushes it toward Rogue); the whole stack is consumed. Fabricate\n"
+      + "-> a Scrap Magnet / Quartermaster / Collector's Album relic (one item consumed).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.FACTORY,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_FABRICATOR,
+        STARTING_HELD_ITEMS_OVERRIDE: [
+          { name: "BERRY", type: BerryType.SITRUS, count: 5 },
+          { name: "LEFTOVERS" },
+          { name: "SOUL_DEW" },
+        ],
+      });
+      return [
+        makeStarter(SpeciesId.METAGROSS, {
+          moveset: [MoveId.METEOR_MASH, MoveId.EARTHQUAKE, MoveId.ZEN_HEADBUTT, MoveId.BULLET_PUNCH],
+        }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "ER Volcano: The Great Forge (#513)",
+    description:
+      "#513 - The Great Forge (Volcano crafting). Forces ER_GREAT_FORGE in VOLCANO.\n"
+      + "Party carries held items of different rarities (Leftovers/Soul Dew/Sitrus) to\n"
+      + "feed.\n"
+      + "DO: 'Temper gently' (+1 tier, low crack) or 'Stoke white-hot' (+2 tiers, high\n"
+      + "crack), then pick a held item to feed, or 'Leave the forge'.\n"
+      + "EXPECT: success -> a reward screen one/two rarity tiers above the fed item\n"
+      + "(a Master-tier feed -> a relic); crack -> the item is consumed and you get a\n"
+      + "little slag money, no item. The fed item is consumed either way. Crack chance\n"
+      + "rises with heat AND the fed item's rarity.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.VOLCANO,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_GREAT_FORGE,
+        STARTING_HELD_ITEMS_OVERRIDE: [
+          { name: "LEFTOVERS" },
+          { name: "SOUL_DEW" },
+          { name: "BERRY", type: BerryType.SITRUS },
+        ],
+      });
+      return [
+        makeStarter(SpeciesId.TYPHLOSION, {
+          moveset: [MoveId.ERUPTION, MoveId.FLAMETHROWER, MoveId.FOCUS_BLAST, MoveId.SOLAR_BEAM],
+        }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
     label: "ER Ruins: The Dormant Guardian (#520)",
     description:
       "#520 - The Dormant Guardian (Ruins Braille puzzle -> boss). Forces\n"

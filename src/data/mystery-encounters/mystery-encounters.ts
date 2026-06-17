@@ -22,6 +22,7 @@ import { DragonsHoardEncounter } from "#mystery-encounters/dragons-hoard-encount
 import { EchoChamberEncounter } from "#mystery-encounters/echo-chamber-encounter";
 import { ExoticTraderEncounter } from "#mystery-encounters/exotic-trader-encounter";
 import { ExperimentEncounter } from "#mystery-encounters/experiment-encounter";
+import { FabricatorEncounter } from "#mystery-encounters/fabricator-encounter";
 import { FairysBoonEncounter } from "#mystery-encounters/fairys-boon-encounter";
 import { FieldTripEncounter } from "#mystery-encounters/field-trip-encounter";
 import { FieryFalloutEncounter } from "#mystery-encounters/fiery-fallout-encounter";
@@ -36,6 +37,7 @@ import { GentleGiantEncounter } from "#mystery-encounters/gentle-giant-encounter
 import { GlitteringVeinEncounter } from "#mystery-encounters/glittering-vein-encounter";
 import { GlobalTradeSystemEncounter } from "#mystery-encounters/global-trade-system-encounter";
 import { GravesOfTheFallenEncounter } from "#mystery-encounters/graves-of-the-fallen-encounter";
+import { GreatForgeEncounter } from "#mystery-encounters/great-forge-encounter";
 import { HighNoonEncounter } from "#mystery-encounters/high-noon-encounter";
 import { HotSpringEncounter } from "#mystery-encounters/hot-spring-encounter";
 import { ImportBazaarEncounter } from "#mystery-encounters/import-bazaar-encounter";
@@ -318,11 +320,13 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
       MysteryEncounterType.FIERY_FALLOUT,
       MysteryEncounterType.DANCING_LESSONS,
       MysteryEncounterType.ER_INTO_THE_CALDERA,
+      MysteryEncounterType.ER_GREAT_FORGE,
     ],
   ],
   [BiomeId.GRAVEYARD, [MysteryEncounterType.ER_GRAVES_OF_THE_FALLEN, MysteryEncounterType.ER_UNFINISHED_BUSINESS]],
   [BiomeId.DOJO, [MysteryEncounterType.COLOSSEUM]],
-  [BiomeId.FACTORY, [MysteryEncounterType.ER_SALVAGE_YARD]],
+  // #525: Salvage Yard reworked into the Fabricator (smelt/fabricate crafting).
+  [BiomeId.FACTORY, [MysteryEncounterType.ER_FABRICATOR]],
   [BiomeId.RUINS, [MysteryEncounterType.ER_SEALED_DOOR, MysteryEncounterType.ER_DORMANT_GUARDIAN]],
   [
     BiomeId.WASTELAND,
@@ -452,6 +456,8 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_FIGHT_CLUB] = FightClubEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_REGIONAL_EMISSARY] = RegionalEmissaryEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_DORMANT_GUARDIAN] = DormantGuardianEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_GREAT_FORGE] = GreatForgeEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_FABRICATOR] = FabricatorEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

@@ -1,0 +1,28 @@
+{
+  "intro": "The reclamation works clank and hiss, conveyor belts feeding a great furnace and a stamping assembler. The foreman waves you over: bring it scrap, and it makes something useful.",
+  "title": "The Fabricator",
+  "description": "Two machines hum here. The SMELTER melts down a held item - pour in a whole stack and the more (and finer) you feed it, the higher the rarity of the bar you get back. The FABRICATOR stamps one item into a production relic. Or you can salvage nothing and move on.",
+  "query": "Which machine do you use?",
+  "option": {
+    "1": {
+      "label": "Use the Smelter",
+      "tooltip": "(+) Melt down a held item's whole stack into a higher-rarity item (the more you pour, the better).",
+      "selectPrompt": "Smelt down which held item?",
+      "selected": "You tip the items into the crucible and watch them melt."
+    },
+    "2": {
+      "label": "Use the Fabricator",
+      "tooltip": "(+) Stamp one held item into a random production relic (Scrap Magnet / Quartermaster / Collector's Album).",
+      "selectPrompt": "Feed which held item?",
+      "selected": "You drop the item onto the assembler line."
+    },
+    "3": {
+      "label": "Walk away",
+      "tooltip": "(-) Salvage nothing. No cost.",
+      "selected": "Nothing here you need. You move on."
+    }
+  },
+  "invalidSelection": "That Pokemon has no item to feed the works.",
+  "smelted": "The crucible pours out a gleaming new bar - reforged into something far more useful!",
+  "fabricated": "The assembler stamps, hisses, and spits out a finished relic!"
+}

@@ -1,0 +1,28 @@
+{
+  "intro": "A vast forge built into the volcano's flank roars with molten light. An old smith's tools lie ready - the lava here can temper an item into something far finer, if it does not crack first.",
+  "title": "The Great Forge",
+  "description": "Feed one of your held items into the lava and stoke the heat to temper it into something better. The hotter you push, the bigger the upgrade - but the finer the metal, the more likely it cracks. A truly masterwork item can be forged into a relic. If it cracks, only the slag is left.",
+  "query": "How do you work the forge?",
+  "option": {
+    "1": {
+      "label": "Temper gently",
+      "tooltip": "(+) A modest upgrade (+1 rarity). (-) Low crack risk (rises with the item's rarity).",
+      "selectPrompt": "Temper which held item?",
+      "selected": "You lay the item in the coals and work it slow and steady."
+    },
+    "2": {
+      "label": "Stoke white-hot",
+      "tooltip": "(+) A big upgrade (+2 rarity). (-) High crack risk (rises with the item's rarity).",
+      "selectPrompt": "Forge which held item?",
+      "selected": "You crank the bellows and plunge the item into the white-hot core."
+    },
+    "3": {
+      "label": "Leave the forge",
+      "tooltip": "(-) Feed nothing. No cost.",
+      "selected": "You leave the forge to its fire."
+    }
+  },
+  "invalidSelection": "That Pokemon has no item to forge.",
+  "tempered": "The metal sings as it cools - the forge has tempered it into something finer!",
+  "cracked": "A sharp crack rings out - the item shatters in the heat. Only a lump of slag is left to sell."
+}

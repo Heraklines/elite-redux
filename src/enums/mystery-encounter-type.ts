@@ -210,6 +210,14 @@ export enum MysteryEncounterType {
    * to attune (relic, no fight), or botch it and fight the woken 5-6 bar
    * omni-boosted construct for the relic the hard way. */
   ER_DORMANT_GUARDIAN,
+  /** ER #513: The Great Forge - a Volcano crafting event; feed a held item and
+   * stoke the lava to temper it into a higher-tier item (Master -> relic), with a
+   * crack chance that climbs with heat and the fed item's rarity. */
+  ER_GREAT_FORGE,
+  /** ER #525: The Fabricator - a Factory crafting event (rework of Salvage Yard);
+   * SMELT a held-item stack into a higher-rarity item (value-weighted), or
+   * FABRICATE one item into a production relic. */
+  ER_FABRICATOR,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */
