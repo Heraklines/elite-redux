@@ -63,17 +63,13 @@ export class LevelUpPhase extends PlayerPartyMemberPokemonPhase {
     if (this.lastLevel < 100) {
       // this feels like an unnecessary optimization
       const levelMoves = this.getPokemon().getLevelMoves(this.lastLevel + 1);
-      if (levelMoves.length > 0) {
-        // ER QoL: ONE interactive Move Learn panel for the whole level-up instead
-        // of the per-move text barrage. The panel filters out already-known/dupe
-        // moves and skips itself when nothing new is offerable. TMs, the egg/Memory
-        // tutor, the relearner and evolution moves still use LearnMovePhase.
-        globalScene.phaseManager.unshiftNew(
-          "LearnMoveBatchPhase",
-          this.partyMemberIndex,
-          levelMoves.map(lm => lm[1]),
-        );
+      for (const lm of levelMoves) {
+        globalScene.phaseManager.unshiftNew("LearnMovePhase", this.partyMemberIndex, lm[1]);
       }
+      // ER QoL: the level-up Move Learn panel (LearnMoveBatchPhase) is temporarily
+      // un-routed - its handler.show() threw and softlocked the level-up. The phase
+      // + UiMode.LEARN_MOVE_BATCH + handler stay registered (dormant) while the
+      // panel bug is fixed; this restores the known-good per-move flow above.
     }
     if (!this.pokemon.pauseEvolutions) {
       const evolutions = this.pokemon.getValidEvolutions();
