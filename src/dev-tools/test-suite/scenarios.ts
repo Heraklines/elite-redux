@@ -4434,6 +4434,93 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Raging Storm in rain (#452)",
+    description:
+      "#452 - Primal Kyogre's Raging Storm: 'Ups highest attacking stat by 1.5x in\n"
+      + "rain.' Kyogre (SpAtk >> Atk) has Raging Storm forced; battle starts in Rain.\n"
+      + "EXPECT: its SP. ATK is multiplied 1.5x while it's raining (special moves hit\n"
+      + "~50% harder); in clear weather, no boost. Picks whichever attack stat is\n"
+      + "higher, so it boosts SP. ATK here (not Attack).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.RAGING_STORM),
+        WEATHER_OVERRIDE: WeatherType.RAIN,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+      });
+      return [
+        makeStarter(SpeciesId.KYOGRE, {
+          moveset: [MoveId.ORIGIN_PULSE, MoveId.ICE_BEAM, MoveId.THUNDER, MoveId.CALM_MIND],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER Roar of Time rework (#452)",
+    description:
+      "#452 - Roar of Time is reworked per the 2.65 dex: 90 BP, 100 acc, 10 PP,\n"
+      + "priority -6 (MOVES LAST), forces the target to switch, and NO recharge\n"
+      + "(was vanilla 150 BP + recharge turn). Temporal Rupture is forced, so it ALSO\n"
+      + "sets the target's ability to Slow Start on hit.\n"
+      + "EXPECT: Dialga acts again next turn (no recharge), Roar of Time goes last,\n"
+      + "and the target's ability becomes Slow Start. Best vs a multi-mon trainer to\n"
+      + "see the forced switch.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.TEMPORAL_RUPTURE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+      });
+      return [
+        makeStarter(SpeciesId.DIALGA, {
+          moveset: [MoveId.ROAR_OF_TIME, MoveId.FLASH_CANNON, MoveId.DRACO_METEOR, MoveId.CALM_MIND],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER Inverse Kecleon (#452)",
+    description:
+      "#452 - Kecleon's Inversion: 'Sets up Inverse Room on entry, lasts 3 turns.'\n"
+      + "Inversion is forced on Kecleon.\n"
+      + "EXPECT: on entry, Inverse Room is set (type chart inverted) for 3 turns -\n"
+      + "normally-resisted/immune hits become super-effective and vice versa. Confirm\n"
+      + "via a move that is normally weak/immune now landing super-effective.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.INVERSION),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+      });
+      return [
+        makeStarter(SpeciesId.KECLEON, {
+          moveset: [MoveId.SHADOW_SNEAK, MoveId.POWER_UP_PUNCH, MoveId.SUCKER_PUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER Restraining Order / Gooschase (#452)",
+    description:
+      "#452 - Restraining Order (Gooschase line): 'Forces the ATTACKER out when hit,\n"
+      + "once each switch-in' - NOT Wimp Out (which switches the holder out). Forced\n"
+      + "on the player; the enemy is a multi-mon trainer that attacks.\n"
+      + "EXPECT: when the holder is hit by a move, the ATTACKER (not the holder) is\n"
+      + "forced to switch out, once per the holder's switch-in.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.RESTRAINING_ORDER),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT, MoveId.CRUNCH],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) No custom evo on vanilla (#479)",
     description:
       "#479 - on the PURE-VANILLA difficulties (Youngster / Ace) a wild vanilla\n"

@@ -11314,8 +11314,14 @@ export function initMoves() {
       .recklessMove(),
     new AttackMove(MoveId.DOUBLE_HIT, PokemonType.NORMAL, MoveCategory.PHYSICAL, 35, 90, 10, -1, 0, 4) //
       .attr(MultiHitAttr, MultiHitType.TWO),
-    new AttackMove(MoveId.ROAR_OF_TIME, PokemonType.DRAGON, MoveCategory.SPECIAL, 150, 90, 5, -1, 0, 4) //
-      .attr(RechargeAttr),
+    // Elite Redux (#452): Roar of Time is reworked per the 2.65 dex - "A blast
+    // which distorts even time. Forces the target to switch. Moves last." 90 BP /
+    // 100 acc / 10 PP, priority -6, force-switch, and NO recharge (was vanilla
+    // 150/90/5 + RechargeAttr). The Temporal Rupture ability further modifies it
+    // (100 BP, +0 priority, sets Slow Start, no switch) via the dispatcher.
+    new AttackMove(MoveId.ROAR_OF_TIME, PokemonType.DRAGON, MoveCategory.SPECIAL, 90, 100, 10, -1, -6, 4) //
+      .attr(ForceSwitchOutAttr, false, SwitchType.FORCE_SWITCH)
+      .hidesTarget(),
     new AttackMove(MoveId.SPACIAL_REND, PokemonType.DRAGON, MoveCategory.SPECIAL, 100, 95, 5, -1, 0, 4) //
       .attr(HighCritAttr),
     new SelfStatusMove(MoveId.LUNAR_DANCE, PokemonType.PSYCHIC, -1, 10, -1, 0, 4)
