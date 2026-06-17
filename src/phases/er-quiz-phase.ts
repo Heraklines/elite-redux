@@ -166,6 +166,18 @@ export class ErQuizPhase extends Phase {
       return;
     }
 
+    // BRAILLE (Dormant Guardian seal): render the answer word as raised Braille
+    // dot-cells in the text prompt (no sprites) and offer the word choices.
+    if (q.kind === "braille") {
+      const brailleView: ErQuizView = {
+        header: `Read the raised glyphs.  (${this.index + 1}/${this.questions.length})`,
+        prompt: q.prompt,
+        options: q.cipherOptions ?? [],
+      };
+      globalScene.ui.setMode(UiMode.ER_QUIZ, brailleView, (choice: number) => void this.onAnswer(choice));
+      return;
+    }
+
     // figure assets: footprint image (preferred for footprint questions),
     // else the full battle sprite as a black silhouette, else the always-present
     // menu icon - so the figure is never blank.
@@ -219,7 +231,7 @@ export class ErQuizPhase extends Phase {
     await globalScene.ui.setMode(UiMode.MESSAGE);
 
     const q = this.questions[this.index];
-    const isCipher = q.kind === "cipher";
+    const isCipher = q.kind === "cipher" || q.kind === "braille";
     const answerName = isCipher ? (q.cipherWord ?? "") : erQuizOptionName(q.answerId);
 
     if (choice < 0) {

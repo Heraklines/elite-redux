@@ -17,6 +17,7 @@ import { DancingLessonsEncounter } from "#mystery-encounters/dancing-lessons-enc
 import { DarkDealEncounter } from "#mystery-encounters/dark-deal-encounter";
 import { DelibirdyEncounter } from "#mystery-encounters/delibirdy-encounter";
 import { DepartmentStoreSaleEncounter } from "#mystery-encounters/department-store-sale-encounter";
+import { DormantGuardianEncounter } from "#mystery-encounters/dormant-guardian-encounter";
 import { DragonsHoardEncounter } from "#mystery-encounters/dragons-hoard-encounter";
 import { EchoChamberEncounter } from "#mystery-encounters/echo-chamber-encounter";
 import { ExoticTraderEncounter } from "#mystery-encounters/exotic-trader-encounter";
@@ -322,7 +323,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.GRAVEYARD, [MysteryEncounterType.ER_GRAVES_OF_THE_FALLEN, MysteryEncounterType.ER_UNFINISHED_BUSINESS]],
   [BiomeId.DOJO, [MysteryEncounterType.COLOSSEUM]],
   [BiomeId.FACTORY, [MysteryEncounterType.ER_SALVAGE_YARD]],
-  [BiomeId.RUINS, [MysteryEncounterType.ER_SEALED_DOOR]],
+  [BiomeId.RUINS, [MysteryEncounterType.ER_SEALED_DOOR, MysteryEncounterType.ER_DORMANT_GUARDIAN]],
   [
     BiomeId.WASTELAND,
     [
@@ -450,6 +451,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_SCAVENGERS_PACT] = ScavengersPactEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_FIGHT_CLUB] = FightClubEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_REGIONAL_EMISSARY] = RegionalEmissaryEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_DORMANT_GUARDIAN] = DormantGuardianEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

@@ -43,7 +43,11 @@ const ER_FOOTPRINT_IDS = new Set<number>(erFootprintIdsRaw as number[]);
 //                   in Unown letters (Unown forms A-Z); the player decodes it and
 //                   picks the matching word from the choices. Answer + options are
 //                   WORDS (not species), and the figure is a row of Unown icons.
-export type ErQuizKind = "silhouette" | "dex" | "footprint" | "cipher";
+//   - "braille":    the Dormant Guardian seal (Ruins). The same short word bank as
+//                   "cipher", but spelled in raised Unicode BRAILLE dot-cells in
+//                   the text prompt (no glyph sprites); the player reads it and
+//                   picks the matching word. Answer + options are WORDS.
+export type ErQuizKind = "silhouette" | "dex" | "footprint" | "cipher" | "braille";
 
 export interface ErQuizQuestion {
   kind: ErQuizKind;
@@ -178,9 +182,34 @@ function buildErCipherQuestion(optionCount: number): ErQuizQuestion {
   return { kind: "cipher", answerId: -1, options: [], prompt: "", cipherWord: answer, cipherOptions };
 }
 
+/** Standard Braille letter cells A-Z (Unicode U+2801..), index 0='A'..25='Z'. */
+const BRAILLE_CELLS = "⠁⠃⠉⠙⠑⠋⠛⠓⠊⠚⠅⠇⠍⠝⠕⠏⠟⠗⠎⠞⠥⠧⠺⠭⠽⠵";
+
+/** Spell a word in spaced Unicode Braille cells (unknown chars -> a blank cell). */
+function brailleEncode(word: string): string {
+  return [...word]
+    .map(ch => {
+      const i = ch.toUpperCase().charCodeAt(0) - 65;
+      return i >= 0 && i < 26 ? BRAILLE_CELLS[i] : "⠿";
+    })
+    .join(" ");
+}
+
+/**
+ * Build one Braille seal question: the same word bank as the Unown Cipher, but the
+ * answer word is rendered as raised Braille dot-cells in the prompt (no sprites).
+ */
+function buildErBrailleQuestion(optionCount: number): ErQuizQuestion {
+  const q = buildErCipherQuestion(optionCount);
+  return { ...q, kind: "braille", prompt: brailleEncode(q.cipherWord ?? "") };
+}
+
 export function buildErQuizQuestion(kind: ErQuizKind, optionCount = 4): ErQuizQuestion {
   if (kind === "cipher") {
     return buildErCipherQuestion(optionCount);
+  }
+  if (kind === "braille") {
+    return buildErBrailleQuestion(optionCount);
   }
   const pool = quizPool(kind);
   const answerId = pool[randSeedInt(pool.length)];
@@ -214,7 +243,7 @@ export function buildErQuizRound(kind: ErQuizKind, count: number, optionCount = 
   let guard = 0;
   while (out.length < count && guard++ < count * 50) {
     const q = buildErQuizQuestion(kind, optionCount);
-    const key = q.kind === "cipher" ? (q.cipherWord ?? "") : String(q.answerId);
+    const key = q.kind === "cipher" || q.kind === "braille" ? (q.cipherWord ?? "") : String(q.answerId);
     if (usedAnswers.has(key)) {
       continue;
     }

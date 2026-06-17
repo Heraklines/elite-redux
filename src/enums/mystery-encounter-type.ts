@@ -206,6 +206,10 @@ export enum MysteryEncounterType {
    * Bazaar); beat a trainer fielding regional variants and keep one of their
    * stars (it joins your party). */
   ER_REGIONAL_EMISSARY,
+  /** ER #520: The Dormant Guardian - a Ruins puzzle->boss; read the Braille seal
+   * to attune (relic, no fight), or botch it and fight the woken 5-6 bar
+   * omni-boosted construct for the relic the hard way. */
+  ER_DORMANT_GUARDIAN,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

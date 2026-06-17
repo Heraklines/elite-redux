@@ -1,0 +1,20 @@
+{
+  "intro": "Deep in the ruins, a colossal construct sits motionless behind a wall of raised glyphs. It has slept here, sealed, for an age - and something valuable rests in its grip.",
+  "title": "The Dormant Guardian",
+  "description": "The seal is a row of raised dots - an ancient Braille. Read it correctly and the wards will recognize you, letting you attune to the guardian and claim what it protects. Misread it, and the construct will wake in a fury. Or you could leave the seal untouched.",
+  "query": "Do you work the seal?",
+  "option": {
+    "1": {
+      "label": "Read the seal",
+      "tooltip": "(?) Decode the Braille glyphs. Right -> attune and claim the relic (no fight). Wrong -> the guardian wakes enraged (a tough boss).",
+      "selected": "You trace the raised glyphs and speak the word they spell..."
+    },
+    "2": {
+      "label": "Leave it sealed",
+      "tooltip": "(-) Leave the guardian to its sleep. No reward, no risk.",
+      "selected": "Some things are best left undisturbed. You move on."
+    }
+  },
+  "attuned": "The wards glow and go still - you read it true. The guardian's grip relaxes, and the relic it protected is yours.",
+  "enraged": "The glyphs flare red - wrong word! The ancient construct shudders awake, and turns on you in a fury!"
+}

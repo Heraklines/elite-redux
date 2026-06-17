@@ -661,6 +661,36 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Ruins: The Dormant Guardian (#520)",
+    description:
+      "#520 - The Dormant Guardian (Ruins Braille puzzle -> boss). Forces\n"
+      + "ER_DORMANT_GUARDIAN in RUINS.\n"
+      + "DO: 'Read the seal' and decode the BRAILLE word (raised dot-cells shown as the\n"
+      + "prompt, pick the matching word), or 'Leave it sealed'.\n"
+      + "EXPECT: correct -> attune, a reward screen with a relic + a Rogue pick, no\n"
+      + "fight. Wrong -> the construct (Golurk/Regirock/Registeel/Golem) wakes as a 5-6\n"
+      + "bar omni-boosted boss (+5 levels, all stats +1 on entry); win for the same\n"
+      + "relic + Rogue reward. Leave -> no battle, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.RUINS,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_DORMANT_GUARDIAN,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.LUCARIO, {
+          moveset: [MoveId.CLOSE_COMBAT, MoveId.METEOR_MASH, MoveId.AURA_SPHERE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  {
     label: "ER Island: The Regional Emissary (#526)",
     description:
       "#526 - The Regional Emissary (Island exhibition, rework of Import Bazaar).\n"
