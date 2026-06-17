@@ -1963,7 +1963,7 @@ export class BattleScene extends SceneBase {
     }
   }
 
-  newArena(biome: BiomeId, playerFaints = 0): Arena {
+  newArena(biome: BiomeId, playerFaints = 0, restoring = false): Arena {
     this.arena = new Arena(biome, playerFaints);
     // ER relics (#439): clear the per-biome relic flags (Morale Banner faint-free,
     // Second Wind / Anchor once-per-biome charges, Scrap Magnet wave-roll cache)
@@ -1976,7 +1976,14 @@ export class BattleScene extends SceneBase {
     // start (no battle exists yet). Biome-to-biome TRANSITIONS roll in
     // SwitchBiomePhase with the correct next start wave, so this is gated to the
     // run-start case (currentBattle null) to avoid a double roll on switches.
-    if (erBiomeRoutingActive() && !this.currentBattle) {
+    //
+    // ER (#504 fix): a SAVE LOAD also reaches here with currentBattle still null
+    // (game-data.ts calls newArena BEFORE newBattle). The biome structure was
+    // already restored from the save by then, so re-rolling here would clobber the
+    // restored start wave back to 1 - making wavesSinceEnteredBiome huge and the
+    // biome NOTORIETY over-level pin to its max forever (enemies +25 levels for the
+    // rest of the run). The `restoring` flag suppresses the roll on the load path.
+    if (erBiomeRoutingActive() && !this.currentBattle && !restoring) {
       erRollBiomeLength(biome, 1);
     }
     this.eventTarget.dispatchEvent(new NewArenaEvent());

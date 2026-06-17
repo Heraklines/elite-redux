@@ -5579,4 +5579,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "(note) Notoriety resets on biome switch (#504)",
+    description:
+      "#504 - NOT a single-battle test, this entry tracks the manual check.\n"
+      + "Biome NOTORIETY raises enemy levels above the global cap the LONGER you\n"
+      + "over-stay one biome; LEAVING the biome must drop that bonus to ZERO so\n"
+      + "the next biome follows the normal global curve again.\n"
+      + "BUG (reported): after switching biomes everything was suddenly ~+25\n"
+      + "levels above the player (e.g. Plains wave 62, your team ~lv49 but the\n"
+      + "wild mons lv74) and it never came back down. Root cause: a SAVE LOAD\n"
+      + "re-rolled the biome start wave back to 1 (newArena ran before the battle\n"
+      + "was restored), so wavesSinceEntered was huge and notoriety pinned to MAX.\n"
+      + "DO: play a run with the World Map biome routing, OVER-STAY a biome a few\n"
+      + "waves (watch enemy levels climb above your cap), then SWITCH to a new\n"
+      + "biome. Also try SAVE & QUIT then CONTINUE mid-biome.\n"
+      + "EXPECT: right after a biome switch (and after any reload) enemy levels\n"
+      + "snap back to the normal global curve (roughly your own level), not a\n"
+      + "permanent +25. Notoriety only climbs again if you LINGER in the new\n"
+      + "biome.  Pass/Fail this entry once checked.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 5 });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
 ];

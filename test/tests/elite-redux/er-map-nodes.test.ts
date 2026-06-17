@@ -1,3 +1,4 @@
+import { erRollBiomeLength, getErBiomeStartWave, resetErBiomeStructure } from "#data/elite-redux/er-biome-structure";
 import {
   addTreasureFragments,
   consumeMapTravelTarget,
@@ -123,5 +124,44 @@ describe("ER #486 - Phase D map-node substrate", () => {
     });
     expect(getRevealedMapNodes()).toHaveLength(1);
     expect(getTreasureFragments()).toBe(0);
+  });
+
+  // ER (#504 fix): biome NOTORIETY over-level is a pure function of the biome
+  // start wave. On a SAVE LOAD, restoreErMapState restores that start wave - and
+  // game-data calls newArena(..., restoring=true) so the run-start re-roll does NOT
+  // clobber it back to 1. The bug was: clobbered start wave -> wavesSinceEntered
+  // huge -> notoriety pinned to MAX (+25 enemy levels) for the rest of the run.
+  describe("ER #504 - biome start wave survives a save load", () => {
+    beforeEach(() => {
+      resetErBiomeStructure();
+    });
+
+    it("round-trips the biome start wave through the save snapshot", () => {
+      // Enter PLAINS on wave 61 (e.g. just switched from an over-stayed biome).
+      Phaser.Math.RND = new Phaser.Math.RandomDataGenerator(["er-504-restore"]);
+      erRollBiomeLength(BiomeId.PLAINS, 61);
+      expect(getErBiomeStartWave()).toBe(61);
+
+      const saved = getErMapSaveData();
+      expect(saved.biomeStartWave).toBe(61);
+
+      // A reload wipes module state to defaults...
+      resetErBiomeStructure();
+      expect(getErBiomeStartWave()).toBe(1);
+
+      // ...and restoring brings the real start wave back (NOT 1). With the start
+      // wave at 61, wavesSinceEntered(62) == 2 -> zero overstay -> no notoriety.
+      restoreErMapState(saved, 62);
+      expect(getErBiomeStartWave()).toBe(61);
+    });
+
+    it("anchors a save MISSING biomeStartWave to the current wave, not wave 1", () => {
+      // Older staging saves predate the biomeStartWave field. Defaulting to 1
+      // would make every loaded run instantly max-notoriety; instead anchor to
+      // the current wave (zero overstay), which self-heals on the next switch.
+      // biomeStartWave intentionally ABSENT (older save predating the field).
+      restoreErMapState({ nodes: [], travelTarget: null, fragments: 0, biomeLength: null }, 62);
+      expect(getErBiomeStartWave()).toBe(62);
+    });
   });
 });

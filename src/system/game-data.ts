@@ -1323,7 +1323,7 @@ export class GameData {
     restoreErMoneyStreaks(fromSession.erMoneyStreaks);
     // ER (#486): restore the run's Map state (revealed nodes / travel target /
     // fragments). Tolerant of older saves with no field (clean, empty map).
-    restoreErMapState(fromSession.erMapState);
+    restoreErMapState(fromSession.erMapState, fromSession.waveIndex);
 
     globalScene.setSeed(fromSession.seed || globalScene.game.config.seed[0]);
     globalScene.resetSeed();
@@ -1366,7 +1366,12 @@ export class GameData {
 
     globalScene.mysteryEncounterSaveData = new MysteryEncounterSaveData(fromSession.mysteryEncounterSaveData);
 
-    globalScene.newArena(fromSession.arena.biome, fromSession.playerFaints);
+    // ER (#504 fix): pass `restoring=true` so newArena does NOT re-roll the biome
+    // length / reset the start wave to 1. The biome structure (length + start wave)
+    // was already restored from the save by restoreErMapState() above; re-rolling
+    // here would clobber the start wave to 1 and pin biome notoriety to its max for
+    // the rest of the run (enemies stuck +25 levels above the global curve).
+    globalScene.newArena(fromSession.arena.biome, fromSession.playerFaints, true);
 
     const battle = globalScene.newBattle(fromSession);
     const { battleType } = battle;

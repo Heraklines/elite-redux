@@ -164,7 +164,7 @@ export function getErMapSaveData(): ErMapSaveData {
  * of partially-malformed payloads - anything unusable is dropped, never thrown.
  * Always resets first so a reload can't accumulate stale state.
  */
-export function restoreErMapState(data: ErMapSaveData | undefined | null): void {
+export function restoreErMapState(data: ErMapSaveData | undefined | null, currentWaveIndex = 1): void {
   resetErMapNodes();
   if (!data) {
     return;
@@ -186,6 +186,10 @@ export function restoreErMapState(data: ErMapSaveData | undefined | null): void 
   restoreErRouting(typeof data.prevBiome === "number" ? data.prevBiome : undefined);
   restoreErBiomeStructure(
     typeof data.biomeLength === "number" ? data.biomeLength : null,
-    typeof data.biomeStartWave === "number" ? data.biomeStartWave : null,
+    // ER (#504 fix): a save lacking biomeStartWave (older staging save) must NOT
+    // fall back to wave 1 - that anchor makes wavesSinceEnteredBiome enormous and
+    // pins biome notoriety to its max. Anchor to the CURRENT wave instead (zero
+    // overstay), which self-heals on the next biome transition.
+    typeof data.biomeStartWave === "number" ? data.biomeStartWave : currentWaveIndex,
   );
 }
