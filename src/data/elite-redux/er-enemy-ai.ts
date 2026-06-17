@@ -52,6 +52,16 @@ export const ER_DAMAGE_SCORE_SCALE = 75;
 /** Added (accuracy-weighted) when a move would secure a KO this turn - dominates non-KO moves. */
 export const ER_KO_BONUS = 1000;
 
+/**
+ * Whether the smarter switching logic is on (Elite/Hell). Used at switch sites
+ * that don't have an enemy handle (the forced/faint replacement resolver), where
+ * the gate is the run difficulty - those paths only run in trainer battles.
+ */
+export function isErSmartSwitching(): boolean {
+  const difficulty = getErDifficulty();
+  return difficulty === "elite" || difficulty === "hell";
+}
+
 /** Resolve the AI profile for a given enemy. Active only for Elite/Hell trainers & bosses. */
 export function getErAiProfile(pokemon: ErAiPokemon): ErAiProfile {
   const difficulty = getErDifficulty();

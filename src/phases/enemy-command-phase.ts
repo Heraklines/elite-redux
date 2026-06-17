@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { getErAiProfile } from "#data/elite-redux/er-enemy-ai";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -59,17 +60,23 @@ export class EnemyCommandPhase extends FieldPhase {
       const opponents = enemyPokemon.getOpponents();
 
       if (!enemyPokemon.isTrapped()) {
-        const partyMemberScores = trainer.getPartyMemberMatchupScores(enemyPokemon.trainerSlot, true);
+        // ER smarter AI (Elite/Hell): use the best-move matchup metric for both
+        // the bench and the active mon, and a tuned (lower) switch threshold so
+        // the AI swaps to a real counter more readily. Inactive -> vanilla.
+        const erAi = getErAiProfile(enemyPokemon);
+        const partyMemberScores = trainer.getPartyMemberMatchupScores(enemyPokemon.trainerSlot, true, erAi.active);
 
         if (partyMemberScores.length > 0) {
-          const matchupScores = opponents.map(opp => enemyPokemon.getMatchupScore(opp));
+          const matchupScores = opponents.map(opp => enemyPokemon.getMatchupScore(opp, erAi.active));
           const matchupScore = matchupScores.reduce((total, score) => (total += score), 0) / matchupScores.length;
 
           const sortedPartyMemberScores = trainer.getSortedPartyMemberMatchupScores(partyMemberScores);
 
           const switchMultiplier = 1 - (battle.enemySwitchCounter ? Math.pow(0.1, 1 / battle.enemySwitchCounter) : 0);
 
-          if (sortedPartyMemberScores[0][1] * switchMultiplier >= matchupScore * (trainer.config.isBoss ? 2 : 3)) {
+          const switchThreshold = erAi.active ? erAi.switchThreshold : trainer.config.isBoss ? 2 : 3;
+
+          if (sortedPartyMemberScores[0][1] * switchMultiplier >= matchupScore * switchThreshold) {
             const index = trainer.getNextSummonIndex(enemyPokemon.trainerSlot, partyMemberScores);
 
             battle.turnCommands[this.fieldIndex + BattlerIndex.ENEMY] = {

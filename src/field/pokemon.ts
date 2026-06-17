@@ -3565,7 +3565,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @param opponent - The Pokemon to compare this Pokémon against
    * @returns A score value based on how favorable this Pokémon is when fighting the given Pokémon
    */
-  getMatchupScore(opponent: Pokemon): number {
+  getMatchupScore(opponent: Pokemon, useBestMove = false): number {
     const enemyTypes = opponent.getTypes(true, false, false, true);
     /** Is this Pokemon faster than the opponent? */
     const outspeed =
@@ -3617,15 +3617,22 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         thisScore *= 1.5;
       }
 
-      atkScore += thisScore;
+      // ER smarter AI (`useBestMove`): take the BEST damaging move's effectiveness
+      // rather than the average - if this mon switches in, it uses its strongest
+      // move, so a single 4x option shouldn't be diluted by weak coverage. The
+      // default (vanilla) path still averages.
+      if (useBestMove) {
+        atkScore = Math.max(atkScore, thisScore);
+      } else {
+        atkScore += thisScore;
+      }
       moveAtkScoreLength++;
     }
-    // Get average attack score of all damaging moves (|| 1 prevents division by zero))
-    // TODO: Averaging the attack score is excessively simplistic, and doesn't reflect the AI's move selection logic
-    // e.g. if the mon has one 4x effective move and three 0.5x effective moves, this score would be ~1.375
-    // which does not seem fair, given that if the AI were to switch, in all likelihood it would use the 4x move.
-    // We could consider a weighted average...
-    atkScore /= moveAtkScoreLength || 1;
+    // Vanilla: average the attack score (|| 1 prevents division by zero). ER's
+    // `useBestMove` already holds the max, so skip the averaging there.
+    if (!useBestMove) {
+      atkScore /= moveAtkScoreLength || 1;
+    }
     /**
      * Based on this Pokemon's HP ratio compared to that of the opponent.
      * This ratio is multiplied by 1.5 if this Pokemon outspeeds the opponent;

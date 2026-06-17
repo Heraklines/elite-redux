@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { signatureSpecies } from "#balance/signature-species";
 import { EntryHazardTag } from "#data/arena-tag";
+import { isErSmartSwitching } from "#data/elite-redux/er-enemy-ai";
 import { applyErGhostOverride } from "#data/elite-redux/er-ghost-teams";
 import {
   applyErFactoryOverride,
@@ -616,7 +617,11 @@ export class Trainer extends Phaser.GameObjects.Container {
     return currentSpecies.includes(baseSpecies) || staticSpecies.includes(baseSpecies);
   }
 
-  getPartyMemberMatchupScores(trainerSlot: TrainerSlot = TrainerSlot.NONE, forSwitch = false): [number, number][] {
+  getPartyMemberMatchupScores(
+    trainerSlot: TrainerSlot = TrainerSlot.NONE,
+    forSwitch = false,
+    useBestMove = false,
+  ): [number, number][] {
     if (trainerSlot && !this.isDouble()) {
       trainerSlot = TrainerSlot.NONE;
     }
@@ -632,7 +637,7 @@ export class Trainer extends Phaser.GameObjects.Container {
 
       if (playerField.length > 0) {
         for (const playerPokemon of playerField) {
-          score += p.getMatchupScore(playerPokemon);
+          score += p.getMatchupScore(playerPokemon, useBestMove);
           if (playerPokemon.species.legendary) {
             score /= 2;
           }
@@ -664,7 +669,14 @@ export class Trainer extends Phaser.GameObjects.Container {
 
   getNextSummonIndex(
     trainerSlot: TrainerSlot = TrainerSlot.NONE,
-    partyMemberScores: [number, number][] = this.getPartyMemberMatchupScores(trainerSlot),
+    // ER (Slice 2): forced/faint replacements (callers that don't pass scores)
+    // become hazard-aware (forSwitch) AND best-move-aware on Elite/Hell, so the
+    // AI stops sending a hazard-weak mon into its own Rocks after a KO.
+    partyMemberScores: [number, number][] = this.getPartyMemberMatchupScores(
+      trainerSlot,
+      isErSmartSwitching(),
+      isErSmartSwitching(),
+    ),
   ): number {
     if (trainerSlot && !this.isDouble()) {
       trainerSlot = TrainerSlot.NONE;

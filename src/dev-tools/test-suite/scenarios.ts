@@ -5451,4 +5451,28 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "(note) Hell AI: smarter switching (Slice 2)",
+    description:
+      "Slice 2 of the smarter Elite/Hell AI - switching. On Elite/Hell, trainer\n"
+      + "switch decisions now use a BEST-MOVE matchup (the strongest damaging move\n"
+      + "vs you, not the diluted average of all moves), a LOWER switch threshold\n"
+      + "(Hell 1.5 / Elite 2.0 vs vanilla 2/3) so they swap to a real counter more\n"
+      + "readily, and forced/faint replacements are now HAZARD-AWARE (the AI no\n"
+      + "longer sends a Stealth-Rock-weak mon into its own hazards after a KO).\n"
+      + "DO: play a Hell TRAINER fight (set Rocks/Spikes on the enemy side if you\n"
+      + "can). EXPECT the AI to pivot to type counters and to avoid bringing a\n"
+      + "4x-hazard-weak mon in after a faint. Switch to Ace to confirm the old\n"
+      + "behavior. Press Send Logs if a switch looks wrong.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("hell");
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 11 });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.STEALTH_ROCK, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE],
+        }),
+      ];
+    },
+  },
 ];
