@@ -65,19 +65,20 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     // (0, -height)). Position the container so the window lands CENTERED on screen;
     // children keep their positive PANEL_X/PANEL_Y offsets.
     const sc = globalScene.scaledCanvas;
+    const overlayH = MoveInfoOverlay.getHeight(true);
     const winX = Math.floor((sc.width - PANEL_W) / 2);
-    const winY = Math.floor((sc.height - PANEL_H) / 2) - sc.height;
+    // Centre the panel in the space ABOVE the bottom move-info strip so it never
+    // overlaps the description/stats box.
+    const winY = Math.floor((sc.height - overlayH - PANEL_H) / 2) - sc.height;
     this.container = globalScene.add.container(winX - PANEL_X, winY - PANEL_Y);
     this.container.setVisible(false);
     ui.add(this.container);
 
     this.container.add(addWindow(PANEL_X, PANEL_Y, PANEL_W, PANEL_H));
-    this.learnableHeader = addTextObject(PANEL_X + 6, ROW_TOP - 12, "Learnable", TextStyle.WINDOW_ALT);
-    this.currentHeader = addTextObject(PANEL_X + 6 + COL_GAP, ROW_TOP - 12, "Current", TextStyle.WINDOW_ALT);
+    this.learnableHeader = addTextObject(PANEL_X + 6, ROW_TOP - 18, "Learnable", TextStyle.WINDOW_ALT);
+    this.currentHeader = addTextObject(PANEL_X + 6 + COL_GAP, ROW_TOP - 18, "Current", TextStyle.WINDOW_ALT);
     this.cancelText = addTextObject(PANEL_X + 6, ROW_TOP + ROW_H * 5, "Cancel", TextStyle.WINDOW);
-    this.promptText = addTextObject(PANEL_X + 6, PANEL_Y + 6, "", TextStyle.WINDOW)
-      .setVisible(false)
-      .setWordWrapWidth(PANEL_W - 16);
+    this.promptText = addTextObject(PANEL_X + 8, PANEL_Y + 8, "", TextStyle.WINDOW).setVisible(false);
     this.container.add([this.learnableHeader, this.currentHeader, this.cancelText, this.promptText]);
 
     this.cursorObj = globalScene.add.image(0, 0, "cursor").setOrigin(0, 0.5);
@@ -91,7 +92,7 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       right: true,
       x: 0,
       y: -MoveInfoOverlay.getHeight(true),
-      width: globalScene.scaledCanvas.width + 4,
+      width: globalScene.scaledCanvas.width - 8,
       hideEffectBox: false,
     });
     ui.add(this.moveInfoOverlay);
@@ -144,8 +145,10 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       for (const t of [...this.learnableTexts, ...this.currentTexts]) {
         t.setVisible(false);
       }
+      // Fixed 3-line layout (NO word-wrap - the wrap units differ from pixels and
+      // overflowed). Short lines so they fit the window at the panel font size.
       this.promptText.setText(
-        `Don't learn any new move?\n   ${this.confirmCursor === 0 ? "> " : "  "}No     ${this.confirmCursor === 1 ? "> " : "  "}Yes`,
+        `Skip learning\nany new moves?\n  ${this.confirmCursor === 0 ? "> " : "   "}No    ${this.confirmCursor === 1 ? "> " : "   "}Yes`,
       );
       this.cursorObj?.setVisible(false);
       this.moveInfoOverlay.clear();
