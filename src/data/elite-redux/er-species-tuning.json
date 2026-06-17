@@ -1,6 +1,7 @@
 {
   "SPECIES_CASTFORM": {
-    "cost": 2
+    "cost": 2,
+    "eggTier": 1
   },
   "SPECIES_GALAR_STUNFISK": {
     "eggTier": 0
