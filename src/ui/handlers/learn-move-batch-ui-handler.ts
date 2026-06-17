@@ -80,7 +80,7 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       .setWordWrapWidth(PANEL_W - 16);
     this.container.add([this.learnableHeader, this.currentHeader, this.cancelText, this.promptText]);
 
-    this.cursorObj = globalScene.add.image(0, 0, "cursor");
+    this.cursorObj = globalScene.add.image(0, 0, "cursor").setOrigin(0, 0.5);
     this.container.add(this.cursorObj);
 
     // Reuse the shared move-info overlay (the combat move-select panel) for the
@@ -92,7 +92,7 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       x: 0,
       y: -MoveInfoOverlay.getHeight(true),
       width: globalScene.scaledCanvas.width + 4,
-      hideEffectBox: true,
+      hideEffectBox: false,
     });
     ui.add(this.moveInfoOverlay);
   }
@@ -139,6 +139,11 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     }
 
     if (confirming) {
+      // Hide the move lists + cursor so only the confirm prompt shows (otherwise
+      // the Learnable/Current rows bleed through behind the question).
+      for (const t of [...this.learnableTexts, ...this.currentTexts]) {
+        t.setVisible(false);
+      }
       this.promptText.setText(
         `Don't learn any new move?\n   ${this.confirmCursor === 0 ? "> " : "  "}No     ${this.confirmCursor === 1 ? "> " : "  "}Yes`,
       );
@@ -181,12 +186,10 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       return;
     }
     this.cursorObj.setVisible(true);
-    if (this.state === "pickSlot") {
-      this.cursorObj.setPosition(PANEL_X + 6 + COL_GAP, ROW_TOP + this.slotCursor * ROW_H + 4);
-    } else {
-      // pickNew - the row after the moves is the Cancel button.
-      this.cursorObj.setPosition(PANEL_X + 6, ROW_TOP + this.newCursor * ROW_H + 4);
-    }
+    // Origin is (0, 0.5): x = arrow's left edge (just left of the column text at
+    // PANEL_X + 12), y = vertical centre of the row.
+    const cy = ROW_TOP + (this.state === "pickSlot" ? this.slotCursor : this.newCursor) * ROW_H + Math.floor(ROW_H / 2);
+    this.cursorObj.setPosition(PANEL_X + 4 + (this.state === "pickSlot" ? COL_GAP : 0), cy);
   }
 
   /** Show the highlighted move's info (learnable move, or the slot's current move). */
