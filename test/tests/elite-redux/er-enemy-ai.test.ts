@@ -1,4 +1,10 @@
-import { chooseMoveIndex, damageToScore, ER_KO_BONUS, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
+import {
+  chooseMoveIndex,
+  damageToScore,
+  ER_KO_BONUS,
+  getErAiProfile,
+  strategicMoveScore,
+} from "#data/elite-redux/er-enemy-ai";
 import { getErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -95,6 +101,43 @@ describe("er-enemy-ai (Elite/Hell smarter AI - Slice 1)", () => {
 
     it("treats never-miss moves (accuracy <= 0) as 100% accurate", () => {
       expect(damageToScore(30, 100, 100, -1)).toBe(damageToScore(30, 100, 100, 100));
+    });
+  });
+
+  describe("strategicMoveScore (Slice 3: setup + hazard valuation)", () => {
+    const base = (over: Partial<Parameters<typeof strategicMoveScore>[1]>) => ({
+      isSetup: false,
+      isHazard: false,
+      userHpRatio: 1,
+      opponentBenchCount: 3,
+      hazardAlreadyUp: false,
+      ...over,
+    });
+
+    it("refuses to set up while frail (about to be KO'd)", () => {
+      expect(strategicMoveScore(15, base({ isSetup: true, userHpRatio: 0.3 }))).toBeLessThan(0);
+    });
+
+    it("makes setup competitive when the user is healthy", () => {
+      const healthy = strategicMoveScore(4, base({ isSetup: true, userHpRatio: 1 }));
+      expect(healthy).toBeGreaterThan(15); // boosted above a weak attack
+    });
+
+    it("values hazards when there's a bench to punish and none are up", () => {
+      const score = strategicMoveScore(2, base({ isHazard: true, opponentBenchCount: 4, hazardAlreadyUp: false }));
+      expect(score).toBeGreaterThan(20);
+    });
+
+    it("does not re-set a hazard that is already up", () => {
+      expect(strategicMoveScore(2, base({ isHazard: true, hazardAlreadyUp: true }))).toBeLessThan(0);
+    });
+
+    it("does not value hazards against a lone opponent (no bench left)", () => {
+      expect(strategicMoveScore(2, base({ isHazard: true, opponentBenchCount: 1 }))).toBeLessThan(0);
+    });
+
+    it("leaves a normal (non-setup, non-hazard) move's score untouched", () => {
+      expect(strategicMoveScore(7, base({}))).toBe(7);
     });
   });
 });

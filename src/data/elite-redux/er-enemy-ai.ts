@@ -24,6 +24,15 @@
 
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { MoveId } from "#enums/move-id";
+
+/** Entry-hazard moves the strategic scorer recognizes (set vs a big bench). */
+export const ER_HAZARD_MOVE_IDS: ReadonlySet<number> = new Set<number>([
+  MoveId.STEALTH_ROCK,
+  MoveId.SPIKES,
+  MoveId.TOXIC_SPIKES,
+  MoveId.STICKY_WEB,
+]);
 
 /** The enemy a profile is resolved for (structural - avoids importing Pokemon). */
 interface ErAiPokemon {
@@ -96,6 +105,49 @@ export function damageToScore(damage: number, maxHp: number, hp: number, accurac
     score += ER_KO_BONUS * accFactor;
   }
   return score;
+}
+
+/** Context for scoring a strategic (non-attack) move. */
+export interface StrategicMoveContext {
+  /** A self-targeting stat-boost ("setup") move. */
+  isSetup: boolean;
+  /** An entry-hazard move (Rocks/Spikes/etc.). */
+  isHazard: boolean;
+  /** The user's current HP fraction (0..1). */
+  userHpRatio: number;
+  /** How many opposing Pokemon are still unfainted (incl. the active one). */
+  opponentBenchCount: number;
+  /** Whether an entry hazard is already on the opponent's side. */
+  hazardAlreadyUp: boolean;
+}
+
+/**
+ * Adjust the score of a SETUP or HAZARD move (Elite/Hell). Pure (unit-tested).
+ * Conservative by design - it fixes known AI blunders rather than chasing
+ * aggressive setup:
+ *   - setup: refuse to boost while frail (about to be KO'd); when healthy, make
+ *     it competitive with a mediocre attack so a safe sweeper sets up turn 1;
+ *   - hazard: worth it only when there's still a bench to punish AND nothing is
+ *     up yet; otherwise near-worthless (don't waste a turn re-setting hazards).
+ * Non-setup/non-hazard moves keep their incoming (vanilla) score.
+ */
+export function strategicMoveScore(baseScore: number, ctx: StrategicMoveContext): number {
+  if (ctx.isHazard) {
+    if (ctx.hazardAlreadyUp || ctx.opponentBenchCount <= 1) {
+      return -10;
+    }
+    // Scales with how many switch-ins will eat the hazard (~22 at 2 reserves,
+    // ~34 at 4) - competitive with a mid-strength attack early.
+    return 10 + (ctx.opponentBenchCount - 1) * 12;
+  }
+  if (ctx.isSetup) {
+    if (ctx.userHpRatio < 0.45) {
+      return -20; // don't set up while frail / about to faint
+    }
+    const healthyBonus = ctx.userHpRatio > 0.7 ? 8 : 0;
+    return Math.max(baseScore, 12) + healthyBonus;
+  }
+  return baseScore;
 }
 
 /**

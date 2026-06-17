@@ -33,7 +33,7 @@ import {
 import { tmSpecies } from "#balance/tm-species-map";
 import { reverseCompatibleTms, speciesTmMoves } from "#balance/tms";
 import type { SuppressAbilitiesTag } from "#data/arena-tag";
-import { NoCritTag, WeakenMoveScreenTag } from "#data/arena-tag";
+import { EntryHazardTag, NoCritTag, WeakenMoveScreenTag } from "#data/arena-tag";
 import {
   AutotomizedTag,
   BattlerTag,
@@ -65,7 +65,13 @@ import {
 } from "#data/elite-redux/er-black-shinies";
 import { erBlackSpritePath, erBlackSpritePathFromBase } from "#data/elite-redux/er-black-sprite-manifest";
 import { erTryApplyOmniGem } from "#data/elite-redux/er-community-items";
-import { chooseMoveIndex, damageToScore, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
+import {
+  chooseMoveIndex,
+  damageToScore,
+  ER_HAZARD_MOVE_IDS,
+  getErAiProfile,
+  strategicMoveScore,
+} from "#data/elite-redux/er-enemy-ai";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import {
   erCapacitorElectricMultiplier,
@@ -4455,6 +4461,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       move: sourceMove,
     });
 
+    // Elite Redux (#394): ER Smokescreen blankets the target's whole side in smoke,
+    // granting +25% evasiveness for 5 turns. Boost the target's evasion multiplier
+    // while its side holds the tag (the final return is accuracy / evasion).
+    const smokeSide = target.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
+    if (globalScene.arena.getTagOnSide(ArenaTagType.ER_SMOKESCREEN, smokeSide)) {
+      evasionMultiplier.value *= 1.25;
+    }
+
     const ally = this.getAlly();
     if (ally != null) {
       const ignore =
@@ -8231,34 +8245,59 @@ export class EnemyPokemon extends Pokemon {
           // vanilla benefit score (refined in a later slice); a move the vanilla
           // pass flagged unusable (<= -20) is left alone.
           if (erAi.active) {
+            // Strategic (Slice 3) context, computed once: how many opposing mons
+            // are left to punish, and whether a hazard is already on their side.
+            const opponentSide = this.isPlayer() ? ArenaTagSide.ENEMY : ArenaTagSide.PLAYER;
+            const opponentParty = this.isPlayer() ? globalScene.getEnemyParty() : globalScene.getPlayerParty();
+            const opponentBenchCount = opponentParty.filter(p => !p.isFainted()).length;
+            const hazardAlreadyUp =
+              globalScene.arena.findTagsOnSide(t => t instanceof EntryHazardTag, opponentSide).length > 0;
+
             movePool.forEach((pokemonMove, moveIndex) => {
               const move = pokemonMove.getMove();
-              if (!move.is("AttackMove") || moveScores[moveIndex] <= -20) {
+              if (moveScores[moveIndex] <= -20) {
                 return;
               }
-              let best = 0;
-              for (const mt of moveTargets[move.id]) {
-                if (mt === BattlerIndex.ATTACKER) {
-                  continue;
+              if (move.is("AttackMove")) {
+                // Slice 1: re-score attacks by real simulated damage.
+                let best = 0;
+                for (const mt of moveTargets[move.id]) {
+                  if (mt === BattlerIndex.ATTACKER) {
+                    continue;
+                  }
+                  const target = globalScene.getField()[mt];
+                  if (!target || target.isPlayer() === this.isPlayer()) {
+                    continue;
+                  }
+                  const isCritical = move.hasAttr("CritOnlyAttr") || !!this.getTag(BattlerTagType.ALWAYS_CRIT);
+                  const { damage } = target.getAttackDamage({
+                    source: this,
+                    move,
+                    ignoreAbility: !target.waveData.abilityRevealed,
+                    ignoreSourceAbility: false,
+                    ignoreAllyAbility: !target.getAlly()?.waveData.abilityRevealed,
+                    ignoreSourceAllyAbility: false,
+                    isCritical,
+                    simulated: true,
+                  });
+                  best = Math.max(best, damageToScore(damage, target.getMaxHp(), target.hp, move.accuracy));
                 }
-                const target = globalScene.getField()[mt];
-                if (!target || target.isPlayer() === this.isPlayer()) {
-                  continue;
-                }
-                const isCritical = move.hasAttr("CritOnlyAttr") || !!this.getTag(BattlerTagType.ALWAYS_CRIT);
-                const { damage } = target.getAttackDamage({
-                  source: this,
-                  move,
-                  ignoreAbility: !target.waveData.abilityRevealed,
-                  ignoreSourceAbility: false,
-                  ignoreAllyAbility: !target.getAlly()?.waveData.abilityRevealed,
-                  ignoreSourceAllyAbility: false,
-                  isCritical,
-                  simulated: true,
-                });
-                best = Math.max(best, damageToScore(damage, target.getMaxHp(), target.hp, move.accuracy));
+                moveScores[moveIndex] = best;
+                return;
               }
-              moveScores[moveIndex] = best;
+              // Slice 3: setup (self stat-boost) + hazard valuation. Other
+              // non-attack moves keep their vanilla benefit score.
+              const isHazard = ER_HAZARD_MOVE_IDS.has(move.id);
+              const isSetup = move.moveTarget === MoveTarget.USER && move.hasAttr("StatStageChangeAttr");
+              if (isHazard || isSetup) {
+                moveScores[moveIndex] = strategicMoveScore(moveScores[moveIndex], {
+                  isSetup,
+                  isHazard,
+                  userHpRatio: this.getHpRatio(),
+                  opponentBenchCount,
+                  hazardAlreadyUp,
+                });
+              }
             });
           }
 

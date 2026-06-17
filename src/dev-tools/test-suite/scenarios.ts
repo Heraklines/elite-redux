@@ -5475,4 +5475,31 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "(note) Hell AI: setup + hazards (Slice 3)",
+    description:
+      "Slice 3 of the smarter Elite/Hell AI - field & strategy. On Elite/Hell the\n"
+      + "AI now: (1) refuses to use a SETUP move (Swords Dance, etc.) while frail\n"
+      + "(<45% HP / about to be KO'd) and is willing to set up when healthy; (2)\n"
+      + "values ENTRY HAZARDS (Rocks/Spikes) when you still have a bench to punish\n"
+      + "and none are up yet - and won't waste a turn re-setting one that's already\n"
+      + "down or when you're on your last mon.\n"
+      + "DO: bring a FULL party vs a Hell boss/trainer that has a hazard or setup\n"
+      + "move. EXPECT it to lay hazards early (full bench) but not re-lay them, and\n"
+      + "to set up only when it's healthy, not at low HP. Send Logs if it sets up\n"
+      + "while nearly fainted or re-lays a hazard.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("hell");
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 11 });
+      return [
+        makeStarter(SpeciesId.DRAGONITE, {
+          moveset: [MoveId.DRAGON_DANCE, MoveId.EARTHQUAKE, MoveId.STEALTH_ROCK, MoveId.EXTREME_SPEED],
+        }),
+        makeStarter(SpeciesId.METAGROSS, {
+          moveset: [MoveId.METEOR_MASH, MoveId.EARTHQUAKE, MoveId.BULLET_PUNCH, MoveId.ICE_PUNCH],
+        }),
+      ];
+    },
+  },
 ];
