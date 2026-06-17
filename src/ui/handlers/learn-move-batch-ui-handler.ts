@@ -109,6 +109,7 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       this.container.setVisible(true);
       this.active = true;
       this.render();
+      console.log(`[lmb] panel shown OK (${this.deps.learnableIds.length} moves)`);
     } catch (e) {
       // NEVER softlock the level-up: log the real cause + fall back to the
       // per-move learn flow on the next tick (deferred so we are not re-entrant
