@@ -593,23 +593,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "ER Temple: Cleansing Font (#515)",
     description:
       "#515 - The Cleansing Font (Temple shrine). Forces ER_CLEANSING_FONT.\n"
-      + "DO: on wave 12, with a hurt party (the lead is pre-damaged), choose 'Drink\n"
-      + "from the font'.\n"
-      + "EXPECT: the whole party is fully restored (HP + status) via PartyHealPhase,\n"
-      + "and the 'restored' line shows (curses are not a built mechanic yet, so it\n"
-      + "always takes the restore branch). 'Leave it untouched' just moves on.",
+      + "Your party starts BURNED (STATUS_OVERRIDE) and the lead is knocked to ~1/3 HP\n"
+      + "in the opening battle, so there is a real ailment + HP to restore.\n"
+      + "DO: win the opening battle (you'll still be burned + hurt), then on wave 12\n"
+      + "choose 'Drink from the font'.\n"
+      + "EXPECT: the whole party is fully restored - HP back to full AND the BURN is\n"
+      + "cured (check the status pip is gone) via PartyHealPhase, with the 'restored'\n"
+      + "line. (Curses are not a built mechanic yet, so it always takes the restore\n"
+      + "branch.) 'Leave it untouched' just moves on with the burn still active.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 30,
         STARTING_WAVE_OVERRIDE: 12,
+        STATUS_OVERRIDE: StatusEffect.BURN,
         MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
         MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_CLEANSING_FONT,
       });
       return [
-        makeStarter(SpeciesId.LUMINEON, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.LUMINEON, { moveset: [MoveId.SURF, MoveId.ICE_BEAM, MoveId.PROTECT, MoveId.U_TURN] }),
         makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
       ];
+    },
+    onBattleStart: () => {
+      const lead = globalScene.getPlayerPokemon();
+      if (lead) {
+        lead.hp = Math.max(1, Math.floor(lead.getMaxHp() / 3));
+        lead.updateInfo();
+      }
     },
   },
   {
