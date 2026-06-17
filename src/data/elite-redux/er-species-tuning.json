@@ -12,5 +12,8 @@
   },
   "SPECIES_VOLCANION": {
     "cost": 6
+  },
+  "SPECIES_ZANGOOSE": {
+    "cost": 3
   }
 }
