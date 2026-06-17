@@ -65,6 +65,7 @@ import {
 } from "#data/elite-redux/er-black-shinies";
 import { erBlackSpritePath, erBlackSpritePathFromBase } from "#data/elite-redux/er-black-sprite-manifest";
 import { erTryApplyOmniGem } from "#data/elite-redux/er-community-items";
+import { chooseMoveIndex, damageToScore, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import {
   erCapacitorElectricMultiplier,
@@ -8135,6 +8136,11 @@ export class EnemyPokemon extends Pokemon {
             movePool = koMoves;
           }
 
+          // ER (Elite/Hell trainers & bosses): a smarter, near-optimal profile.
+          // Inactive (false) for Youngster/Ace and wild -> the vanilla path below
+          // runs unchanged. See er-enemy-ai.ts / the AI design doc.
+          const erAi = getErAiProfile(this);
+
           /**
            * Move selection is based on the move's calculated "benefit score" against the
            * best possible target(s) (as determined by {@linkcode getNextTargets}).
@@ -8212,6 +8218,43 @@ export class EnemyPokemon extends Pokemon {
             moveScores[moveIndex] = moveScore;
           });
 
+          // ER smarter AI: re-score ATTACK moves by REAL simulated damage (vs the
+          // target's actual bulk), accuracy-weighted, with a KO bonus - replacing
+          // the vanilla power/effectiveness proxy. Non-attack moves keep their
+          // vanilla benefit score (refined in a later slice); a move the vanilla
+          // pass flagged unusable (<= -20) is left alone.
+          if (erAi.active) {
+            movePool.forEach((pokemonMove, moveIndex) => {
+              const move = pokemonMove.getMove();
+              if (!move.is("AttackMove") || moveScores[moveIndex] <= -20) {
+                return;
+              }
+              let best = 0;
+              for (const mt of moveTargets[move.id]) {
+                if (mt === BattlerIndex.ATTACKER) {
+                  continue;
+                }
+                const target = globalScene.getField()[mt];
+                if (!target || target.isPlayer() === this.isPlayer()) {
+                  continue;
+                }
+                const isCritical = move.hasAttr("CritOnlyAttr") || !!this.getTag(BattlerTagType.ALWAYS_CRIT);
+                const { damage } = target.getAttackDamage({
+                  source: this,
+                  move,
+                  ignoreAbility: !target.waveData.abilityRevealed,
+                  ignoreSourceAbility: false,
+                  ignoreAllyAbility: !target.getAlly()?.waveData.abilityRevealed,
+                  ignoreSourceAllyAbility: false,
+                  isCritical,
+                  simulated: true,
+                });
+                best = Math.max(best, damageToScore(damage, target.getMaxHp(), target.hp, move.accuracy));
+              }
+              moveScores[moveIndex] = best;
+            });
+          }
+
           // Sort the move pool in decreasing order of move score
           const sortedMovePool = movePool.slice(0);
           sortedMovePool.sort((a, b) => {
@@ -8220,7 +8263,12 @@ export class EnemyPokemon extends Pokemon {
             return scoreA < scoreB ? 1 : scoreA > scoreB ? -1 : 0;
           });
           let chosenMoveIndex = 0;
-          if (this.aiType === AiType.SMART_RANDOM) {
+          if (erAi.active) {
+            // ER determinism dial: Hell (sharpness 1) always takes the best move;
+            // Elite slides to a worse one only rarely. Scores aligned to sortedMovePool.
+            const sortedScores = sortedMovePool.map(m => moveScores[movePool.indexOf(m)]);
+            chosenMoveIndex = chooseMoveIndex(sortedScores, erAi.sharpness, n => globalScene.randBattleSeedInt(n));
+          } else if (this.aiType === AiType.SMART_RANDOM) {
             // Has a 5/8 chance to select the best move, and a 3/8 chance to advance to the next best move (and repeat this roll)
             while (chosenMoveIndex < sortedMovePool.length - 1 && globalScene.randBattleSeedInt(8) >= 5) {
               chosenMoveIndex++;

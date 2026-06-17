@@ -5422,4 +5422,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "Hell AI: smarter move pick (Slice 1)",
+    description:
+      "Slice 1 of the smarter Elite/Hell AI. On HELL, trainer/boss enemies now\n"
+      + "score moves by REAL simulated damage vs your mon's actual bulk (accuracy-\n"
+      + "weighted, with a big bonus for a guaranteed KO) instead of the old power x\n"
+      + "type-effectiveness proxy, and they NEVER deliberately throw - they always\n"
+      + "use their best-scored move (sharpness 1 on Hell).\n"
+      + "DO: fight this Hell boss Tyranitar a few turns, then press Send Logs. The\n"
+      + "console prints 'Move Pool', 'Move Scores' and 'Chosen Move' each enemy\n"
+      + "turn; the CHOSEN move should always be the TOP score, and a guaranteed-KO\n"
+      + "move should dominate (huge score). On Ace/Youngster and vs wild mons the\n"
+      + "old behavior is unchanged - switch difficulty to confirm.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("hell");
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.TYRANITAR,
+        ENEMY_HEALTH_SEGMENTS_OVERRIDE: 2, // force a boss so the AI profile is active
+        ENEMY_MOVESET_OVERRIDE: [MoveId.CRUNCH, MoveId.STONE_EDGE, MoveId.EARTHQUAKE, MoveId.LOW_KICK],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.EARTHQUAKE, MoveId.CRUNCH, MoveId.REST],
+        }),
+      ];
+    },
+  },
 ];

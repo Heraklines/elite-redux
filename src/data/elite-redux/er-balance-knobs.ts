@@ -830,6 +830,47 @@ export const ER_BALANCE_KNOBS: readonly ErBalanceKnob[] = [
     integer: true,
     advanced: true,
   },
+  // ---- Battle AI (Elite/Hell smarter AI) ------------------------------------
+  {
+    key: "er.ai.sharpnessHell",
+    group: "Battle AI",
+    label: "Hell AI sharpness",
+    help: "How optimally Hell trainers/bosses play. 1 = always the best evaluated move (no misplays); lower = more random.",
+    kind: "scalar",
+    default: 1,
+    min: 0,
+    max: 1,
+  },
+  {
+    key: "er.ai.sharpnessElite",
+    group: "Battle AI",
+    label: "Elite AI sharpness",
+    help: "How optimally Elite trainers/bosses play. 1 = always the best move; 0.5 ~ vanilla; lower = more random.",
+    kind: "scalar",
+    default: 0.85,
+    min: 0,
+    max: 1,
+  },
+  {
+    key: "er.ai.switchThresholdHell",
+    group: "Battle AI",
+    label: "Hell switch threshold",
+    help: "How much better a benched mon's matchup must be before a Hell trainer switches to it. LOWER = switches to counters more readily. (Used by the switching AI.)",
+    kind: "scalar",
+    default: 1.5,
+    min: 1,
+    max: 5,
+  },
+  {
+    key: "er.ai.switchThresholdElite",
+    group: "Battle AI",
+    label: "Elite switch threshold",
+    help: "How much better a benched mon's matchup must be before an Elite trainer switches to it. LOWER = switches more readily.",
+    kind: "scalar",
+    default: 2,
+    min: 1,
+    max: 5,
+  },
 ];
 
 /** Registry lookup by key (built once). */
