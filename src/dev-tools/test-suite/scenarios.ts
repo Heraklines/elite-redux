@@ -302,7 +302,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
         ENEMY_LEVEL_OVERRIDE: 5,
         STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_COIN_PURSE" }, { name: "ER_RELIC_MYSTERY_CHARM" }],
       });
-      return [makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE] })];
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST] }),
+      ];
     },
   },
   {
@@ -310,7 +312,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
     description:
       "#439 - Field Medic heals the BENCHED reserves (slots 2 and 3), NOT the active\n"
       + "mon. You hold FIELD MEDIC; slots 2-3 (Pidgey, Rattata) start at ~40% HP, the\n"
-      + "active Snorlax is full. Use SPLASH each turn and watch.\n"
+      + "active Snorlax is full.\n"
+      + "DO: stall with PROTECT/REST for ~6 turns to watch two heal procs, then BODY\n"
+      + "SLAM the Magikarp to end the battle (the enemy just Splashes, so take your time).\n"
       + "EXPECT: every 3rd turn-end, ONLY the slot-2 and slot-3 reserves heal ~1/12 of\n"
       + "max HP (a message names them). The active Snorlax is NEVER healed by it.",
     setup: () => {
@@ -323,9 +327,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
         STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_FIELD_MEDIC" }],
       });
       return [
-        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH] }),
-        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
-        makeStarter(SpeciesId.RATTATA, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.PROTECT, MoveId.REST, MoveId.SPLASH] }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.GUST, MoveId.QUICK_ATTACK] }),
+        makeStarter(SpeciesId.RATTATA, { moveset: [MoveId.TACKLE, MoveId.QUICK_ATTACK] }),
       ];
     },
     onBattleStart: () => {
@@ -346,7 +350,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "damage. A SANDSTORM is active and you hold WEATHERVANE. Use SPLASH and watch\n"
       + "end-of-turn weather damage.\n"
       + "EXPECT: your Normal-type Snorlax takes NO sandstorm residual; the enemy\n"
-      + "Magikarp DOES chip each turn (it has no relic).",
+      + "Magikarp DOES chip each turn (it has no relic). Stall a few turns to confirm,\n"
+      + "then Body Slam to finish.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -357,7 +362,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
         WEATHER_OVERRIDE: WeatherType.SANDSTORM,
         STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_WEATHERVANE" }],
       });
-      return [makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH] })];
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.PROTECT, MoveId.REST, MoveId.SPLASH] }),
+      ];
     },
   },
   {
@@ -410,12 +417,12 @@ export const DEV_SCENARIOS: DevScenario[] = [
         STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_SECOND_WIND" }, { name: "ER_RELIC_ANCHOR" }],
       });
       return [
-        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.SPLASH] }),
-        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
-        makeStarter(SpeciesId.RATTATA, { moveset: [MoveId.SPLASH] }),
-        makeStarter(SpeciesId.CATERPIE, { moveset: [MoveId.SPLASH] }),
-        makeStarter(SpeciesId.WEEDLE, { moveset: [MoveId.SPLASH] }),
-        makeStarter(SpeciesId.MAGIKARP, { moveset: [MoveId.SPLASH] }),
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.PROTECT, MoveId.REST, MoveId.SPLASH] }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.GUST, MoveId.QUICK_ATTACK] }),
+        makeStarter(SpeciesId.RATTATA, { moveset: [MoveId.TACKLE, MoveId.QUICK_ATTACK] }),
+        makeStarter(SpeciesId.CATERPIE, { moveset: [MoveId.TACKLE, MoveId.BUG_BITE] }),
+        makeStarter(SpeciesId.WEEDLE, { moveset: [MoveId.POISON_STING, MoveId.BUG_BITE] }),
+        makeStarter(SpeciesId.MAGIKARP, { moveset: [MoveId.TACKLE, MoveId.SPLASH] }),
       ];
     },
     onBattleStart: () => {
@@ -5557,7 +5564,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
       setErDifficulty("hell");
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 60,
-        BATTLE_TYPE_OVERRIDE: "double",
+        BATTLE_STYLE_OVERRIDE: "double", // forces a double battle (BATTLE_TYPE is wild/trainer/ME, not the style)
         ENEMY_SPECIES_OVERRIDE: SpeciesId.TYRANITAR,
         ENEMY_HEALTH_SEGMENTS_OVERRIDE: 1,
         ENEMY_MOVESET_OVERRIDE: [MoveId.EARTHQUAKE, MoveId.CRUNCH, MoveId.STONE_EDGE, MoveId.ICE_PUNCH],
