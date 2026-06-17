@@ -4318,6 +4318,28 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Wind Rider higher atk (#496)",
+    description:
+      "#496 - ER Wind Rider raises whichever ATTACKING stat is higher (Atk vs\n"
+      + "SpAtk), not always physical Attack. Player Gardevoir (SpAtk >> Atk) has\n"
+      + "Wind Rider forced; the enemy spams Gust (a wind move).\n"
+      + "EXPECT: Gust is absorbed (no damage) and Gardevoir's SP. ATK rises +1 each\n"
+      + "time (NOT its Attack). Also applies to the Tailwind-on-entry boost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        ABILITY_OVERRIDE: AbilityId.WIND_RIDER,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.GUST],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.PIDGEOT,
+      });
+      return [
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.CALM_MIND, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) No custom evo on vanilla (#479)",
     description:
       "#479 - on the PURE-VANILLA difficulties (Youngster / Ace) a wild vanilla\n"

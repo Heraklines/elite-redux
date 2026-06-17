@@ -667,10 +667,18 @@ export class WonderSkinAbAttr extends PreDefendAbAttr {
 }
 
 export class MoveImmunityStatStageChangeAbAttr extends MoveImmunityAbAttr {
-  private readonly stat: BattleStat;
+  /**
+   * The stat to raise, or a resolver evaluated at apply-time. ER uses the resolver
+   * form for Wind Rider, which boosts whichever attacking stat is higher (#496).
+   */
+  private readonly stat: BattleStat | ((pokemon: Pokemon) => BattleStat);
   private readonly stages: number;
 
-  constructor(immuneCondition: PreDefendAbAttrCondition, stat: BattleStat, stages: number) {
+  constructor(
+    immuneCondition: PreDefendAbAttrCondition,
+    stat: BattleStat | ((pokemon: Pokemon) => BattleStat),
+    stages: number,
+  ) {
     super(immuneCondition);
     this.stat = stat;
     this.stages = stages;
@@ -684,12 +692,13 @@ export class MoveImmunityStatStageChangeAbAttr extends MoveImmunityAbAttr {
 
   override apply(params: MoveImmunityAbAttrParams): void {
     super.apply(params);
+    const stat = typeof this.stat === "function" ? this.stat(params.pokemon) : this.stat;
     // TODO: We probably should not unshift the phase if this is simulated
     globalScene.phaseManager.unshiftNew(
       "StatStageChangePhase",
       params.pokemon.getBattlerIndex(),
       true,
-      [this.stat],
+      [stat],
       this.stages,
     );
   }
@@ -5821,21 +5830,46 @@ export class MoneyAbAttr extends PostBattleAbAttr {
 export class PostSummonStatStageChangeOnArenaAbAttr extends PostSummonStatStageChangeAbAttr {
   /** The type of arena tag that conditions the stat change. */
   private readonly arenaTagType: ArenaTagType;
+  /**
+   * Optional apply-time resolver for the stat to raise. ER Wind Rider (#496) uses
+   * this to raise whichever attacking stat is higher instead of always Attack.
+   */
+  private readonly statResolver: ((pokemon: Pokemon) => BattleStat) | undefined;
 
   /**
    * Creates an instance of PostSummonStatStageChangeOnArenaAbAttr.
    * Initializes the stat change to increase Attack by 1 stage if the specified arena tag is present.
    *
    * @param tagType - The type of arena tag to check for.
+   * @param statResolver - Optional resolver returning the stat to raise (defaults to Attack).
    */
-  constructor(tagType: ArenaTagType) {
+  constructor(tagType: ArenaTagType, statResolver?: (pokemon: Pokemon) => BattleStat) {
     super([Stat.ATK], 1, true, false);
     this.arenaTagType = tagType;
+    this.statResolver = statResolver;
   }
 
   override canApply(params: AbAttrBaseParams): boolean {
     const side = params.pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
     return (globalScene.arena.getTagOnSide(this.arenaTagType, side) ?? false) && super.canApply(params);
+  }
+
+  override apply(params: AbAttrBaseParams): void {
+    if (this.statResolver) {
+      // ER (#496): raise the resolved (higher) attacking stat, self-targeted.
+      if (params.simulated) {
+        return;
+      }
+      globalScene.phaseManager.unshiftNew(
+        "StatStageChangePhase",
+        params.pokemon.getBattlerIndex(),
+        true,
+        [this.statResolver(params.pokemon)],
+        1,
+      );
+      return;
+    }
+    super.apply(params);
   }
 }
 

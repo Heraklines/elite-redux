@@ -225,6 +225,14 @@ import i18next from "i18next";
  *   applies (e.g. the Pokémon has no Battle Bond form change, or it is already
  *   in the transformed form).
  */
+/**
+ * ER (#496): the higher of a Pokemon's two ATTACKING stats (Atk vs SpAtk), used by
+ * Wind Rider so its boost benefits special attackers too. Uses unmodified base
+ * stats (no stat-stage scaling) so the comparison reflects the mon's build.
+ */
+const erHigherAttackStat = (pokemon: Pokemon): Stat.ATK | Stat.SPATK =>
+  pokemon.getStat(Stat.SPATK, false) > pokemon.getStat(Stat.ATK, false) ? Stat.SPATK : Stat.ATK;
+
 function getBattleBondTargetFormIndex(pokemon: Pokemon): number | null {
   const formChanges = pokemonFormChanges[pokemon.species.speciesId];
   if (!formChanges) {
@@ -1930,14 +1938,16 @@ export function initAbilities() {
       .ignorable()
       .build(),
     new AbBuilder(AbilityId.WIND_RIDER, 9) //
+      // ER (#496): Wind Rider raises whichever ATTACKING stat is higher (Atk vs
+      // SpAtk), not always physical Attack - so it benefits special attackers too.
       .attr(
         MoveImmunityStatStageChangeAbAttr,
         (pokemon, attacker, move) =>
           pokemon !== attacker && move.hasFlag(MoveFlags.WIND_MOVE) && move.category !== MoveCategory.STATUS,
-        Stat.ATK,
+        erHigherAttackStat,
         1,
       )
-      .attr(PostSummonStatStageChangeOnArenaAbAttr, ArenaTagType.TAILWIND)
+      .attr(PostSummonStatStageChangeOnArenaAbAttr, ArenaTagType.TAILWIND, erHigherAttackStat)
       .ignorable()
       .build(),
     new AbBuilder(AbilityId.GUARD_DOG, 9) //
