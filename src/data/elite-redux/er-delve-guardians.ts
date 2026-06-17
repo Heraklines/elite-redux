@@ -34,9 +34,20 @@ const BST_WINDOW = 25;
 /** Hard floor so weak NFEs never appear as guardians. */
 const BST_FLOOR = 300;
 
+/** First pokerogue id reserved for ER custom species (mega/primal/Redux/etc.). */
+const ER_CUSTOM_ID_CUTOFF = 10000;
+
 /** Is this species a usable guardian of one of the allowed types? */
 function eligible(sp: PokemonSpecies, types: PokemonType[]): boolean {
   if (sp.legendary || sp.subLegendary || sp.mythical) {
+    return false;
+  }
+  // #492: guardians are spawned DYNAMICALLY at bust-time via initBattleWithEnemyConfig.
+  // ER custom species (id >= 10000) carry sprite redirects / dex records that aren't
+  // guaranteed to be resolved for a mid-encounter wild spawn, which crashed the enemy
+  // info render (drawImage of a null frame). Vanilla species cover every biome type, so
+  // restrict the guardian pool to them - real, fully-loadable mons only.
+  if (sp.speciesId >= ER_CUSTOM_ID_CUTOFF) {
     return false;
   }
   const bst = sp.getBaseStatTotal();

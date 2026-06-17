@@ -126,10 +126,12 @@ export class EnemyBattleInfo extends BattleInfo {
       this.championRibbon.setVisible(true);
     }
 
-    // Check if Player owns all genders and forms of the Pokemon
-    const missingDexAttrs = (dexEntry.caughtAttr & opponentPokemonDexAttr) < opponentPokemonDexAttr;
+    // Check if Player owns all genders and forms of the Pokemon.
+    // ER: an enemy without a dex/starter record (e.g. a dynamically-spawned wild
+    // that isn't in dexData) must not crash the info render - guard both lookups.
+    const missingDexAttrs = ((dexEntry?.caughtAttr ?? 0) & opponentPokemonDexAttr) < opponentPokemonDexAttr;
 
-    const ownedAbilityAttrs = globalScene.gameData.starterData[pokemon.species.getRootSpeciesId()].abilityAttr;
+    const ownedAbilityAttrs = globalScene.gameData.starterData[pokemon.species.getRootSpeciesId()]?.abilityAttr ?? 0;
 
     // Check if the player owns ability for the root form
     const playerOwnsThisAbility = pokemon.checkIfPlayerHasAbilityOfStarter(ownedAbilityAttrs);

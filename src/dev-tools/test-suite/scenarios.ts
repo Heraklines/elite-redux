@@ -1314,7 +1314,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "EXPECT: money paid per descent and kept on a stir. rise = item shop if any.\n"
       + "A stir spawns an escalating wild deep-sea mon (Lanturn->Dhelmise); after 3 it\n"
       + "is the chain BOSS (2-3 bars, >= 5 levels over your strongest). Win and diving\n"
-      + "RESUMES. Level-0 rise = nothing. Never softlocks.",
+      + "RESUMES. Level-0 rise = nothing. Never softlocks.\n"
+      + "#492 REGRESSION: keep diving until the trench STIRS - the guardian must spawn\n"
+      + "and its enemy HP/info bar must render with NO crash (was drawImage-of-null when\n"
+      + "an ER-custom species got picked as the guardian; the pool is now vanilla-only).",
     setup: () => {
       resetDevOverrides();
       setOverrides({
