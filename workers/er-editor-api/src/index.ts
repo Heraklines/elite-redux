@@ -324,6 +324,86 @@ function validateBalanceTuningDelta(delta: unknown): ValidationResult {
   return { ok: true };
 }
 
+/** A valid in-game move/ability id (positive int; ER ids range into the 5000s). */
+function okId(v: unknown): boolean {
+  return Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 99999;
+}
+
+/** speciesConst → [[level 1-100, moveId], ...] (replaces the level-up learnset; null deletes). */
+function validateLearnsetsDelta(delta: unknown): ValidationResult {
+  if (!isPlainObject(delta)) {
+    return { ok: false, error: "delta must be an object" };
+  }
+  for (const [key, value] of Object.entries(delta)) {
+    if (!SPECIES_CONST_RE.test(key)) {
+      return { ok: false, error: `bad species key: ${key}` };
+    }
+    if (value === null) {
+      continue; // revert to the shipped learnset
+    }
+    if (!Array.isArray(value) || value.length > 120) {
+      return { ok: false, error: `${key}: must be a list of up to 120 [level, moveId] pairs or null` };
+    }
+    for (const pair of value) {
+      if (
+        !Array.isArray(pair)
+        || pair.length !== 2
+        || !(Number.isInteger(pair[0]) && (pair[0] as number) >= 1 && (pair[0] as number) <= 100)
+        || !okId(pair[1])
+      ) {
+        return { ok: false, error: `${key}: each entry must be [level 1-100, moveId]` };
+      }
+    }
+  }
+  return { ok: true };
+}
+
+/** speciesConst → [moveId, ...] (replaces TM compatibility; null deletes). */
+function validateTmLearnsetsDelta(delta: unknown): ValidationResult {
+  if (!isPlainObject(delta)) {
+    return { ok: false, error: "delta must be an object" };
+  }
+  for (const [key, value] of Object.entries(delta)) {
+    if (!SPECIES_CONST_RE.test(key)) {
+      return { ok: false, error: `bad species key: ${key}` };
+    }
+    if (value === null) {
+      continue;
+    }
+    if (!Array.isArray(value) || value.length > 400 || !value.every(okId)) {
+      return { ok: false, error: `${key}: must be a list of up to 400 move ids or null` };
+    }
+  }
+  return { ok: true };
+}
+
+/** speciesConst → { ability1, ability2, hidden } (each an id, or 0 for none; null deletes). */
+function validateSpeciesAbilitiesDelta(delta: unknown): ValidationResult {
+  if (!isPlainObject(delta)) {
+    return { ok: false, error: "delta must be an object" };
+  }
+  for (const [key, entry] of Object.entries(delta)) {
+    if (!SPECIES_CONST_RE.test(key)) {
+      return { ok: false, error: `bad species key: ${key}` };
+    }
+    if (entry === null) {
+      continue;
+    }
+    if (!isPlainObject(entry)) {
+      return { ok: false, error: `${key}: must be an object or null` };
+    }
+    for (const [field, value] of Object.entries(entry)) {
+      if (field !== "ability1" && field !== "ability2" && field !== "hidden") {
+        return { ok: false, error: `${key}: unknown field "${field}"` };
+      }
+      if (value !== 0 && !okId(value)) {
+        return { ok: false, error: `${key}.${field}: must be an ability id or 0` };
+      }
+    }
+  }
+  return { ok: true };
+}
+
 /** The ONLY repo paths this Worker will ever write. */
 const EDITABLE_FILES: Record<string, EditableFile> = {
   "egg-moves": {
@@ -355,6 +435,21 @@ const EDITABLE_FILES: Record<string, EditableFile> = {
     path: "src/data/elite-redux/er-custom-mons.json",
     label: "custom mons",
     validate: validateCustomMonsDelta,
+  },
+  learnsets: {
+    path: "src/data/elite-redux/er-learnsets.json",
+    label: "learnsets",
+    validate: validateLearnsetsDelta,
+  },
+  "tm-learnsets": {
+    path: "src/data/elite-redux/er-tm-learnsets.json",
+    label: "TM learnsets",
+    validate: validateTmLearnsetsDelta,
+  },
+  "species-abilities": {
+    path: "src/data/elite-redux/er-species-abilities.json",
+    label: "species abilities",
+    validate: validateSpeciesAbilitiesDelta,
   },
 };
 
