@@ -172,6 +172,7 @@ export class ErQuizPhase extends Phase {
       const brailleView: ErQuizView = {
         header: `Read the raised glyphs.  (${this.index + 1}/${this.questions.length})`,
         prompt: q.prompt,
+        largePrompt: true,
         options: q.cipherOptions ?? [],
       };
       globalScene.ui.setMode(UiMode.ER_QUIZ, brailleView, (choice: number) => void this.onAnswer(choice));

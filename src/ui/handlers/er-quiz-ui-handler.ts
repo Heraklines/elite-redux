@@ -42,6 +42,9 @@ export interface ErQuizView {
   iconFrame?: string | undefined;
   /** Wrapped blurb shown instead of a silhouette (dex mode). */
   prompt?: string | undefined;
+  /** Render the prompt large and centered (Braille seal) instead of the small,
+   * left-aligned, wrapped dex blurb - so the raised glyphs are easy to read. */
+  largePrompt?: boolean | undefined;
   /** Exactly four answer labels. */
   options: string[];
 }
@@ -202,6 +205,23 @@ export class ErQuizUiHandler extends UiHandler {
     } else {
       this.promptText.setVisible(true);
       this.promptText.setText(data.prompt ?? "");
+      if (data.largePrompt) {
+        // Braille seal: a short word of spaced dot-cells. Render it big and
+        // centered in the figure area so it is easy to read (the default 36px
+        // dex blurb is the smallest text on the card).
+        this.promptText.setFontSize("64px");
+        this.promptText.setOrigin(0.5, 0);
+        this.promptText.setPosition(PANEL_W / 2, 22);
+        this.promptText.setAlign("center");
+        this.promptText.setWordWrapWidth((PANEL_W - 8) * 6, false);
+      } else {
+        // Dex blurb: small, left-aligned, wrapped (the setup default).
+        this.promptText.setFontSize("36px");
+        this.promptText.setOrigin(0, 0);
+        this.promptText.setPosition(8, 20);
+        this.promptText.setAlign("left");
+        this.promptText.setWordWrapWidth((PANEL_W - 16) * 6, false);
+      }
     }
 
     const opts = data.options ?? [];
