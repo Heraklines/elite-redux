@@ -177,6 +177,10 @@ export enum MysteryEncounterType {
   /** ER #521: The Wishing Crystal - a Fairy Cave blessing; the crystal rolls a tier,
    * then you choose a category (power/fortune/protection) for tier-scaled gifts. */
   ER_WISHING_CRYSTAL,
+  /** ER #518: Frozen in Time - an Ice Cave preservation event; an ancient mon is
+   * frozen in clear ice. Thaw it (with Fire) to wake & catch it (careless thaw
+   * wakes it hostile), or chip out the preserved held item by hand (no fight). */
+  ER_FROZEN_IN_TIME,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

@@ -1,0 +1,20 @@
+{
+  "intro": "A wall of ancient, perfectly clear ice rises before you. Something huge is frozen solid inside it - a shape that has not moved in ages.",
+  "title": "Frozen in Time",
+  "description": "The ice has kept its prisoner flawless: an ancient Pokemon, and clutched against it, an item still bright after all these years. {{thawTell}} You could thaw it free to wake and catch it, or carefully chip out the preserved item it holds and leave the rest to its long sleep.",
+  "query": "What do you do?",
+  "option": {
+    "1": {
+      "label": "Thaw it free",
+      "tooltip": "(+) Wake the ancient Pokemon and catch it. A gentle thaw wakes it calm; a careless one wakes it hostile (fight first).",
+      "selected": "You work to melt the ice around the frozen shape."
+    },
+    "2": {
+      "label": "Chip out the item",
+      "tooltip": "(+) Carefully free the perfectly preserved held item. No fight.",
+      "selected": "You chip patiently at the ice and work the preserved item loose."
+    }
+  },
+  "thawGentle": "Your Fire-blood melts the ice gently. The ancient Pokemon stirs, blinks, and wakes drowsy and unafraid.",
+  "thawHard": "With no flame to ease the thaw, you crack the ice the hard way. The ancient Pokemon wakes with a furious roar!"
+}

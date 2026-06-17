@@ -26,6 +26,7 @@ import { FieryFalloutEncounter } from "#mystery-encounters/fiery-fallout-encount
 import { FightOrFlightEncounter } from "#mystery-encounters/fight-or-flight-encounter";
 import { ForemansJobEncounter } from "#mystery-encounters/foremans-job-encounter";
 import { FortuneTellerEncounter, registerFortuneTellerLookups } from "#mystery-encounters/fortune-teller-encounter";
+import { FrozenInTimeEncounter } from "#mystery-encounters/frozen-in-time-encounter";
 import { FrozenShapesEncounter } from "#mystery-encounters/frozen-shapes-encounter";
 import { FunAndGamesEncounter } from "#mystery-encounters/fun-and-games-encounter";
 import { GentleGiantEncounter } from "#mystery-encounters/gentle-giant-encounter";
@@ -298,7 +299,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
     BiomeId.DESERT,
     [MysteryEncounterType.DANCING_LESSONS, MysteryEncounterType.ER_THE_MIRAGE, MysteryEncounterType.ER_BURIED_CITY],
   ],
-  [BiomeId.ICE_CAVE, [MysteryEncounterType.ER_FROZEN_SHAPES]],
+  [BiomeId.ICE_CAVE, [MysteryEncounterType.ER_FROZEN_SHAPES, MysteryEncounterType.ER_FROZEN_IN_TIME]],
   [BiomeId.MEADOW, [MysteryEncounterType.ER_PICNIC]],
   [BiomeId.POWER_PLANT, [MysteryEncounterType.ER_OVERCHARGE_CORE, MysteryEncounterType.ER_REACTOR_MELTDOWN]],
   [
@@ -420,6 +421,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_MOUNTAIN_SAGE] = MountainSageEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_HIGH_NOON] = HighNoonEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_WISHING_CRYSTAL] = WishingCrystalEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_FROZEN_IN_TIME] = FrozenInTimeEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

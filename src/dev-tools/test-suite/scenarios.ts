@@ -607,15 +607,70 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Ice Cave: Frozen in Time - with Fire (#518)",
+    description:
+      "#518 - Frozen in Time (Ice Cave preservation). Forces ER_FROZEN_IN_TIME in\n"
+      + "ICE_CAVE. Party HAS a Fire source (Arcanine) -> the gentle-thaw branch.\n"
+      + "DO: 'Thaw it free' -> the ancient mon wakes DROWSY and DOCILE (asleep), an\n"
+      + "easy catch (throw a Ball). OR 'Chip out the item' for the preserved loot.\n"
+      + "EXPECT: thaw -> a catchable wild battle vs a frozen ancient mon (Arctozolt/\n"
+      + "Arctovish/Aurorus/Amaura), already asleep. Chip -> a reward (usually a\n"
+      + "Never-Melt Ice, sometimes a heal item), no fight.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.ICE_CAVE,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_FROZEN_IN_TIME,
+      });
+      return [
+        makeStarter(SpeciesId.ARCANINE, {
+          moveset: [MoveId.FLAMETHROWER, MoveId.EXTREME_SPEED, MoveId.CRUNCH, MoveId.WILL_O_WISP],
+        }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "ER Ice Cave: Frozen in Time - no Fire (#518)",
+    description:
+      "#518 - Frozen in Time (Ice Cave preservation). Forces ER_FROZEN_IN_TIME in\n"
+      + "ICE_CAVE. Party has NO Fire source -> the careless-thaw branch.\n"
+      + "DO: 'Thaw it free' -> with no flame you crack the ice the hard way and the\n"
+      + "ancient mon wakes HOSTILE.\n"
+      + "EXPECT: thaw -> a boss-tier wild battle vs the frozen ancient mon (still\n"
+      + "catchable once weakened, +levels). Chip out the item = same no-fight reward as\n"
+      + "the with-Fire scenario.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.ICE_CAVE,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_FROZEN_IN_TIME,
+      });
+      return [
+        makeStarter(SpeciesId.LAPRAS, {
+          moveset: [MoveId.SURF, MoveId.ICE_BEAM, MoveId.THUNDERBOLT, MoveId.BODY_SLAM],
+        }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
     label: "ER Badlands: High Noon (#516)",
     description:
       "#516 - High Noon (Badlands single-strike duel). Forces ER_HIGH_NOON in\n"
       + "BADLANDS.\n"
-      + "DO: 'Take the duel' and pick a Pokemon. The outlaw draws at the party's AVERAGE\n"
-      + "speed, so the FAST mon wins and the SLOW one loses.\n"
-      + "EXPECT: both ante (money drops by the ante); pick the fast Ninjask -> you win\n"
-      + "back 2x the ante (net gain); pick the slow Munchlax -> you lose the ante. No\n"
-      + "battle. 'Walk away' = no cost.",
+      + "DO: 'Take the duel' and pick a Pokemon. The outlaw draws at a FIXED, wave-scaled\n"
+      + "speed (shown in the dialogue), compared ONLY against the mon you pick - not the\n"
+      + "team average.\n"
+      + "EXPECT: both ante (money drops by the ante); pick the fast Ninjask -> its Speed\n"
+      + "beats the outlaw's draw, you win back 2x the ante (net gain); pick the slow\n"
+      + "Munchlax -> it is out-drawn, you lose the ante. No battle. 'Walk away' = no cost.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
