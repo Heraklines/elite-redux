@@ -202,6 +202,10 @@ export enum MysteryEncounterType {
    * fighter who outnumbers you and pulls every dirty trick. Win the bet for a big
    * payout, or back out. */
   ER_FIGHT_CLUB,
+  /** ER #526: The Regional Emissary - an Island exhibition (rework of Import
+   * Bazaar); beat a trainer fielding regional variants and keep one of their
+   * stars (it joins your party). */
+  ER_REGIONAL_EMISSARY,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

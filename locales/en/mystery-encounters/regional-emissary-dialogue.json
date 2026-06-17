@@ -1,0 +1,23 @@
+{
+  "intro": "On the island docks, a sharply dressed trainer is showing off a team of Pokemon you have never seen quite like this. They beckon you over for an exhibition.",
+  "title": "The Regional Emissary",
+  "description": "The emissary travels the regions and battles with their rare local variants. Win the exhibition, they say, and you may keep one of their stars for yourself. Which one will you play for: the Alolan Ninetales, or the Hisuian Zoroark? Or wave the whole thing off.",
+  "query": "Which star do you battle for?",
+  "option": {
+    "1": {
+      "label": "Battle for Alolan Ninetales",
+      "tooltip": "(-) Battle the full exhibition team. (+) Win and the Alolan Ninetales joins your party.",
+      "selected": "You point to the Alolan Ninetales. The emissary grins and sends out the team."
+    },
+    "2": {
+      "label": "Battle for Hisuian Zoroark",
+      "tooltip": "(-) Battle the full exhibition team. (+) Win and the Hisuian Zoroark joins your party.",
+      "selected": "You point to the Hisuian Zoroark. The emissary grins and sends out the team."
+    },
+    "3": {
+      "label": "Decline",
+      "tooltip": "(-) Wave the exhibition off. No fight, no cost.",
+      "selected": "You wave the exhibition off and continue on your way."
+    }
+  }
+}

@@ -55,6 +55,7 @@ import { OvergrownTempleEncounter } from "#mystery-encounters/overgrown-temple-e
 import { PartTimerEncounter } from "#mystery-encounters/part-timer-encounter";
 import { PicnicEncounter } from "#mystery-encounters/picnic-encounter";
 import { ReactorMeltdownEncounter } from "#mystery-encounters/reactor-meltdown-encounter";
+import { RegionalEmissaryEncounter } from "#mystery-encounters/regional-emissary-encounter";
 import { RustlingGrassEncounter } from "#mystery-encounters/rustling-grass-encounter";
 import { SafariZoneEncounter } from "#mystery-encounters/safari-zone-encounter";
 import { SalvageYardEncounter } from "#mystery-encounters/salvage-yard-encounter";
@@ -356,7 +357,8 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
     ],
   ],
   [BiomeId.SNOWY_FOREST, [MysteryEncounterType.ER_AURORA, MysteryEncounterType.ER_TRACKS_IN_THE_SNOW]],
-  [BiomeId.ISLAND, [MysteryEncounterType.ER_IMPORT_BAZAAR, MysteryEncounterType.ER_TOTEM_TRIAL]],
+  // #526: Import Bazaar reworked into the Regional Emissary (regional-form home).
+  [BiomeId.ISLAND, [MysteryEncounterType.ER_REGIONAL_EMISSARY, MysteryEncounterType.ER_TOTEM_TRIAL]],
   [BiomeId.LABORATORY, [MysteryEncounterType.ER_EXPERIMENT]],
 ]);
 
@@ -447,6 +449,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_SINKING_MIRE] = SinkingMireEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_SCAVENGERS_PACT] = ScavengersPactEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_FIGHT_CLUB] = FightClubEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_REGIONAL_EMISSARY] = RegionalEmissaryEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

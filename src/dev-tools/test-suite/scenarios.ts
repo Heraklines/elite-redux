@@ -661,6 +661,35 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Island: The Regional Emissary (#526)",
+    description:
+      "#526 - The Regional Emissary (Island exhibition, rework of Import Bazaar).\n"
+      + "Forces ER_REGIONAL_EMISSARY in ISLAND.\n"
+      + "DO: 'Battle for Alolan Ninetales' or 'Battle for Hisuian Zoroark' to fight the\n"
+      + "regional exhibition team (Alolan Ninetales / Galarian Weezing / Hisuian\n"
+      + "Zoroark), or 'Decline'.\n"
+      + "EXPECT: a trainer battle vs the regional team; on WIN the star you chose joins\n"
+      + "your party (a catch/obtain message). Decline -> no battle, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.ISLAND,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_REGIONAL_EMISSARY,
+      });
+      return [
+        makeStarter(SpeciesId.METAGROSS, {
+          moveset: [MoveId.METEOR_MASH, MoveId.EARTHQUAKE, MoveId.ZEN_HEADBUTT, MoveId.BULLET_PUNCH],
+        }),
+        makeStarter(SpeciesId.SALAMENCE, {
+          moveset: [MoveId.DRAGON_CLAW, MoveId.EARTHQUAKE, MoveId.FIRE_FANG, MoveId.DRAGON_DANCE],
+        }),
+      ];
+    },
+  },
+  {
     label: "ER Wasteland: The Scavenger's Pact (#523)",
     description:
       "#523 - The Scavenger's Pact (Wasteland character test). Forces\n"
