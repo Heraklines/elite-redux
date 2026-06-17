@@ -251,6 +251,39 @@ function givePlayerCommunityItems(items: [ErCommunityItemKind, number][]): void 
 
 export const DEV_SCENARIOS: DevScenario[] = [
   // ===========================================================================
+  // QoL — level-up Move Learn panel
+  // ===========================================================================
+  {
+    label: "QoL: level-up Move Learn panel (mass evolve to 17)",
+    description:
+      "ER QoL - the level-up Move Learn panel (LEARNABLE | CURRENT) replaces the\n"
+      + "per-move text barrage. A 6-mon team of starters at LEVEL 16 (all evolve at 16).\n"
+      + "KO the Magikarp, then in the FIRST shop take RARER CANDY - it levels the WHOLE\n"
+      + "team +1, so everyone hits 17 at once.\n"
+      + "EXPECT: for each mon that learns a move at 17 the panel opens - pick a move\n"
+      + "(free slot learns silently; a full set asks which CURRENT move to overwrite),\n"
+      + "the list thins down, the highlighted move's type/BP/PP/desc show, and Cancel\n"
+      + "asks to confirm. Then all six EVOLVE. No softlock, no text barrage.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 16,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+      });
+      const base = (a: MoveId, b: MoveId): MoveId[] => [a, b, MoveId.TACKLE, MoveId.GROWL];
+      return [
+        makeStarter(SpeciesId.BULBASAUR, { moveset: base(MoveId.VINE_WHIP, MoveId.ABSORB) }),
+        makeStarter(SpeciesId.CHARMANDER, { moveset: base(MoveId.EMBER, MoveId.SCRATCH) }),
+        makeStarter(SpeciesId.SQUIRTLE, { moveset: base(MoveId.WATER_GUN, MoveId.BUBBLE) }),
+        makeStarter(SpeciesId.TREECKO, { moveset: base(MoveId.ABSORB, MoveId.SCRATCH) }),
+        makeStarter(SpeciesId.MUDKIP, { moveset: base(MoveId.WATER_GUN, MoveId.MUD_SLAP) }),
+        makeStarter(SpeciesId.TORCHIC, { moveset: base(MoveId.EMBER, MoveId.PECK) }),
+      ];
+    },
+    shopItems: [modifierTypes.RARER_CANDY, modifierTypes.RARER_CANDY],
+  },
+  // ===========================================================================
   // FEATURES — this session
   // ===========================================================================
   {
