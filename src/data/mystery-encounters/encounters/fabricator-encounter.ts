@@ -82,20 +82,28 @@ function getFed(): PokemonHeldItemModifier[] {
   return (globalScene.currentBattle.mysteryEncounter!.misc as FabMisc | null)?.fed ?? [];
 }
 
-/** Total scrap value of the fed haul = sum of rarity-weight x stack over each item. */
-function haulValue(fed: PokemonHeldItemModifier[]): number {
-  return fed.reduce((sum, m) => sum + tierScrapValue(m.type.tier ?? ModifierTier.COMMON) * m.stackCount, 0);
+/**
+ * A held item's rarity tier. Items already sitting on a mon usually have an UNSET
+ * `.type.tier`, so we infer it from the modifier pool by id - otherwise a Soul Dew
+ * or a Rogue-tier item would read as COMMON and the output would be junk.
+ */
+function itemTier(m: PokemonHeldItemModifier): ModifierTier {
+  return m.type.getOrInferTier() ?? ModifierTier.COMMON;
 }
 
-/** Output item tier for a given haul value (the "what rarity comes out" formula). */
-function tierForValue(value: number): ModifierTier {
-  if (value >= 24) {
-    return ModifierTier.ROGUE;
-  }
-  if (value >= 12) {
-    return ModifierTier.ULTRA;
-  }
-  return ModifierTier.GREAT; // floor: even a tiny haul smelts to a GREAT item
+/** Total scrap value of the fed haul = sum of rarity-weight x stack over each item. */
+function haulValue(fed: PokemonHeldItemModifier[]): number {
+  return fed.reduce((sum, m) => sum + tierScrapValue(itemTier(m)) * m.stackCount, 0);
+}
+
+/** The rarest tier among the fed items (GREAT floor - the works never spits out trash). */
+function bestFedTier(fed: PokemonHeldItemModifier[]): ModifierTier {
+  return fed.reduce<ModifierTier>((best, m) => Math.max(best, itemTier(m)) as ModifierTier, ModifierTier.GREAT);
+}
+
+/** Clamp a tier into the [GREAT, ROGUE] normal-item output band. */
+function clampItemTier(tier: number): ModifierTier {
+  return Math.max(ModifierTier.GREAT, Math.min(tier, ModifierTier.ROGUE)) as ModifierTier;
 }
 
 /** Haul value needed before the Fabricator will forge a RELIC (else a plain item). */
@@ -126,7 +134,7 @@ async function feedPicker(): Promise<boolean> {
       }));
       // A "stop feeding" entry so the player can finish with what they have.
       opts.push({
-        label: getEncounterText(`${namespace}:doneFeeding`) ?? "Done feeding",
+        label: "Stop feeding",
         handler: () => {
           feeding = false;
           return true;
@@ -167,8 +175,10 @@ async function smelt(): Promise<void> {
     return;
   }
   const value = haulValue(fed);
-  const tier = tierForValue(value);
-  const count = Math.min(3, 1 + Math.floor(value / 12));
+  // Output starts at the rarest item fed, then a big haul bumps it up a tier or two.
+  const bump = value >= 32 ? 2 : value >= 12 ? 1 : 0;
+  const tier = clampItemTier(bestFedTier(fed) + bump);
+  const count = Math.min(3, 1 + Math.floor(value / 16));
   await consumeFed(fed);
   queueEncounterMessage(`${namespace}:smelted`);
   setEncounterRewards({
@@ -191,9 +201,10 @@ async function fabricate(): Promise<void> {
     queueEncounterMessage(`${namespace}:fabricated`);
     setEncounterRewards({ guaranteedModifierTypeFuncs: [randSeedItem(FABRICATOR_RELICS)], fillRemaining: false });
   } else {
-    // Not enough scrap for a relic - the assembler stamps out a normal item.
+    // Not enough scrap for a relic - the assembler stamps out a normal item that
+    // reflects the rarest thing fed (so a Rogue item still yields a Rogue item).
     queueEncounterMessage(`${namespace}:smelted`);
-    setEncounterRewards({ guaranteedModifierTiers: [tierForValue(value)], fillRemaining: false });
+    setEncounterRewards({ guaranteedModifierTiers: [clampItemTier(bestFedTier(fed))], fillRemaining: false });
   }
   leaveEncounterWithoutBattle(false);
 }
