@@ -24,6 +24,7 @@ import { ExperimentEncounter } from "#mystery-encounters/experiment-encounter";
 import { FairysBoonEncounter } from "#mystery-encounters/fairys-boon-encounter";
 import { FieldTripEncounter } from "#mystery-encounters/field-trip-encounter";
 import { FieryFalloutEncounter } from "#mystery-encounters/fiery-fallout-encounter";
+import { FightClubEncounter } from "#mystery-encounters/fight-club-encounter";
 import { FightOrFlightEncounter } from "#mystery-encounters/fight-or-flight-encounter";
 import { ForemansJobEncounter } from "#mystery-encounters/foremans-job-encounter";
 import { FortuneTellerEncounter, registerFortuneTellerLookups } from "#mystery-encounters/fortune-teller-encounter";
@@ -57,6 +58,7 @@ import { ReactorMeltdownEncounter } from "#mystery-encounters/reactor-meltdown-e
 import { RustlingGrassEncounter } from "#mystery-encounters/rustling-grass-encounter";
 import { SafariZoneEncounter } from "#mystery-encounters/safari-zone-encounter";
 import { SalvageYardEncounter } from "#mystery-encounters/salvage-yard-encounter";
+import { ScavengersPactEncounter } from "#mystery-encounters/scavengers-pact-encounter";
 import { ScrambledPokedexEncounter } from "#mystery-encounters/scrambled-pokedex-encounter";
 import { SealedDoorEncounter } from "#mystery-encounters/sealed-door-encounter";
 import { ShadyVitaminDealerEncounter } from "#mystery-encounters/shady-vitamin-dealer-encounter";
@@ -320,7 +322,14 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.DOJO, [MysteryEncounterType.COLOSSEUM]],
   [BiomeId.FACTORY, [MysteryEncounterType.ER_SALVAGE_YARD]],
   [BiomeId.RUINS, [MysteryEncounterType.ER_SEALED_DOOR]],
-  [BiomeId.WASTELAND, [MysteryEncounterType.DANCING_LESSONS, MysteryEncounterType.ER_DRAGONS_HOARD]],
+  [
+    BiomeId.WASTELAND,
+    [
+      MysteryEncounterType.DANCING_LESSONS,
+      MysteryEncounterType.ER_DRAGONS_HOARD,
+      MysteryEncounterType.ER_SCAVENGERS_PACT,
+    ],
+  ],
   [BiomeId.ABYSS, [MysteryEncounterType.DANCING_LESSONS]],
   [
     BiomeId.SPACE,
@@ -339,7 +348,12 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.TEMPLE, [MysteryEncounterType.ER_CLEANSING_FONT]],
   [
     BiomeId.SLUM,
-    [MysteryEncounterType.ER_BLACK_MARKET, MysteryEncounterType.ER_INFORMANT, MysteryEncounterType.ER_FORTUNE_TELLER],
+    [
+      MysteryEncounterType.ER_BLACK_MARKET,
+      MysteryEncounterType.ER_INFORMANT,
+      MysteryEncounterType.ER_FORTUNE_TELLER,
+      MysteryEncounterType.ER_FIGHT_CLUB,
+    ],
   ],
   [BiomeId.SNOWY_FOREST, [MysteryEncounterType.ER_AURORA, MysteryEncounterType.ER_TRACKS_IN_THE_SNOW]],
   [BiomeId.ISLAND, [MysteryEncounterType.ER_IMPORT_BAZAAR, MysteryEncounterType.ER_TOTEM_TRIAL]],
@@ -431,6 +445,8 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_UNFINISHED_BUSINESS] = UnfinishedBusinessEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_BOG_WITCH] = BogWitchEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_SINKING_MIRE] = SinkingMireEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_SCAVENGERS_PACT] = ScavengersPactEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_FIGHT_CLUB] = FightClubEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

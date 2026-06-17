@@ -1,0 +1,23 @@
+{
+  "intro": "Out in the dust, you and another scavenger reach for the same glinting find at the same moment. You both freeze.",
+  "title": "The Scavenger's Pact",
+  "description": "A big find, and two of you eyeing it. The other scavenger meets your gaze, hand near their Poke Balls. You can shake on a fair split and both walk away richer, or take it all - betray the pact and fight them for the whole haul.",
+  "query": "How do you settle it?",
+  "option": {
+    "1": {
+      "label": "Split it fairly",
+      "tooltip": "(+) Shake on a fair share. No fight. A moderate cut of the find.",
+      "selected": "You nod, and split the find down the middle. No trouble, no blood."
+    },
+    "2": {
+      "label": "Take it all",
+      "tooltip": "(-) Betray the pact and fight them. (+) Win to claim the whole haul.",
+      "selected": "You go for it all. The other scavenger snarls and sends out their pack!"
+    },
+    "3": {
+      "label": "Walk away",
+      "tooltip": "(-) Leave the find to the other scavenger. No cost.",
+      "selected": "Not worth the fight. You leave them to it and move on."
+    }
+  }
+}

@@ -661,6 +661,66 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Wasteland: The Scavenger's Pact (#523)",
+    description:
+      "#523 - The Scavenger's Pact (Wasteland character test). Forces\n"
+      + "ER_SCAVENGERS_PACT in WASTELAND.\n"
+      + "DO: 'Split it fairly' (no fight), 'Take it all' (betray + fight the rival\n"
+      + "scavenger), or 'Walk away'.\n"
+      + "EXPECT: split -> a reward screen (Ultra+Great), no battle; betray -> a trainer\n"
+      + "fight vs a ROUGHNECK scavenger fielding Krookodile/Mightyena/Flygon, win for\n"
+      + "Rogue+Ultra; walk away -> no battle, no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 55,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.WASTELAND,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_SCAVENGERS_PACT,
+      });
+      return [
+        makeStarter(SpeciesId.DRAGONITE, {
+          moveset: [MoveId.DRAGON_CLAW, MoveId.EARTHQUAKE, MoveId.FIRE_PUNCH, MoveId.DRAGON_DANCE],
+        }),
+        makeStarter(SpeciesId.SLOWBRO, {
+          moveset: [MoveId.SURF, MoveId.ICE_BEAM, MoveId.PSYCHIC, MoveId.SLACK_OFF],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER Slum: The Fight Club (#524)",
+    description:
+      "#524 - The Fight Club (Slum bet/brawl). Forces ER_FIGHT_CLUB in SLUM.\n"
+      + "DO: 'Step into the ring' (small ante) or 'Up the ante' (big ante) to brawl a\n"
+      + "dirty fighter, or 'Back out'.\n"
+      + "EXPECT: ante is deducted from your money up front; the fighter OUTNUMBERS you\n"
+      + "(2 mons small / 3 big), TRAPS you in (no switching), some SWAGGER in with an\n"
+      + "announced all-stats power-up, and they pull dirty tricks (Fake Out, Sand\n"
+      + "Attack, Toxic, Knock Off, Quick Claw/Focus Band/King's Rock). Win -> the loot\n"
+      + "payout (Ultra+Great small / Rogue+Ultra+Great big). Back out = no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 45,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.SLUM,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_FIGHT_CLUB,
+        STARTING_MONEY_OVERRIDE: 50000,
+      });
+      return [
+        makeStarter(SpeciesId.LUCARIO, {
+          moveset: [MoveId.CLOSE_COMBAT, MoveId.METEOR_MASH, MoveId.EXTREME_SPEED, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  {
     label: "ER Swamp: The Bog Witch's Bargain (#508)",
     description:
       "#508 - The Bog Witch's Bargain (Swamp DEAL). Forces ER_BOG_WITCH in SWAMP.\n"

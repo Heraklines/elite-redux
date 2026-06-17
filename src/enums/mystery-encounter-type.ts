@@ -194,6 +194,14 @@ export enum MysteryEncounterType {
    * under. Haul it out with a Flying/Levitate/light/strong rescuer for a Rogue
    * cache, or leave it and pay the bog a held-item toll. */
   ER_SINKING_MIRE,
+  /** ER #523: The Scavenger's Pact - a Wasteland character test; split a big find
+   * fairly (safe, smaller) or betray the other scavenger and fight them for the
+   * lot (bigger), or walk away. */
+  ER_SCAVENGERS_PACT,
+  /** ER #524: The Fight Club - a Slum bet/brawl; ante money and brawl a no-rules
+   * fighter who outnumbers you and pulls every dirty trick. Win the bet for a big
+   * payout, or back out. */
+  ER_FIGHT_CLUB,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */
