@@ -37,6 +37,9 @@ export interface ErQuizResult {
   perfect: boolean;
   /** True if the player forfeited (cancelled) instead of answering. */
   forfeited: boolean;
+  /** "item" rounds only: modifierTypes keys of the items correctly identified
+   * (in ask order). Lets an encounter grant the exact parts the player named. */
+  correctItemIds: string[];
 }
 
 export interface ErQuizSessionConfig {
@@ -59,6 +62,8 @@ export class ErQuizPhase extends Phase {
   private correct = 0;
   private answered = 0;
   private forfeited = false;
+  /** modifierTypes keys of the "item"-kind questions answered correctly. */
+  private readonly correctItemIds: string[] = [];
 
   constructor(config: ErQuizSessionConfig) {
     super();
@@ -179,6 +184,20 @@ export class ErQuizPhase extends Phase {
       return;
     }
 
+    // ITEM (Salvage Yard): render the held item's icon as a black silhouette
+    // (the boot-loaded "items" atlas is always present, so no asset load) and
+    // offer the item-name choices.
+    if (q.kind === "item") {
+      const itemView: ErQuizView = {
+        header: `What part is this?  (${this.index + 1}/${this.questions.length})`,
+        iconAtlas: "items",
+        iconFrame: q.itemIconFrame,
+        options: q.itemOptions ?? [],
+      };
+      globalScene.ui.setMode(UiMode.ER_QUIZ, itemView, (choice: number) => void this.onAnswer(choice));
+      return;
+    }
+
     // figure assets: footprint image (preferred for footprint questions),
     // else the full battle sprite as a black silhouette, else the always-present
     // menu icon - so the figure is never blank.
@@ -233,7 +252,8 @@ export class ErQuizPhase extends Phase {
 
     const q = this.questions[this.index];
     const isCipher = q.kind === "cipher" || q.kind === "braille";
-    const answerName = isCipher ? (q.cipherWord ?? "") : erQuizOptionName(q.answerId);
+    const isItem = q.kind === "item";
+    const answerName = isItem ? (q.itemName ?? "") : isCipher ? (q.cipherWord ?? "") : erQuizOptionName(q.answerId);
 
     if (choice < 0) {
       this.forfeited = true;
@@ -242,10 +262,17 @@ export class ErQuizPhase extends Phase {
     }
 
     this.answered++;
-    const correctIndex = isCipher ? (q.cipherOptions ?? []).indexOf(q.cipherWord ?? "") : q.options.indexOf(q.answerId);
+    const correctIndex = isItem
+      ? (q.itemOptions ?? []).indexOf(q.itemName ?? "")
+      : isCipher
+        ? (q.cipherOptions ?? []).indexOf(q.cipherWord ?? "")
+        : q.options.indexOf(q.answerId);
     const isCorrect = choice === correctIndex;
     if (isCorrect) {
       this.correct++;
+      if (isItem && q.itemId) {
+        this.correctItemIds.push(q.itemId);
+      }
     }
 
     const msg = isCorrect ? `Correct! It's ${answerName}!` : `Wrong... it was ${answerName}.`;
@@ -268,6 +295,7 @@ export class ErQuizPhase extends Phase {
       total: this.questions.length,
       perfect: this.answered > 0 && this.correct === this.answered && !this.forfeited,
       forfeited: this.forfeited,
+      correctItemIds: this.correctItemIds,
     };
     this.onComplete(result);
     this.end();

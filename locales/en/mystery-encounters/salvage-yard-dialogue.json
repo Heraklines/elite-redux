@@ -1,18 +1,19 @@
 {
-  "intro": "The factory's salvage yard is heaped with reclaimed parts, worn gears, and gear that still has plenty of life left in it. A worker waves you toward the usable pile.",
+  "intro": "The factory's salvage yard is heaped with rusted, worn-down parts - shapes you can barely make out under the grime. A scrapper grins and waves you toward the heap: pull out what you can name, the rest is junk.",
   "title": "The Salvage Yard",
-  "description": "A factory salvage yard piled with reclaimed parts and gear. Pick through the usable salvage for a curated held-item selection, or leave the scrap be.",
-  "query": "Will you pick through the salvage?",
+  "description": "A scrap heap of corroded parts, each just a worn silhouette. Identify a part correctly and you reclaim it - guess wrong and it crumbles to rust. The more you can name, the more you keep.",
+  "query": "Will you dig through the scrap?",
   "option": {
     "1": {
-      "label": "Pick through the salvage",
-      "tooltip": "(+) Pick one from a curated held-item selection",
-      "selected": "You sort through the reclaimed parts and find some gear worth keeping..."
+      "label": "Sort the scrap heap",
+      "tooltip": "(+) Name each part from its silhouette\n(+) Keep one held item per part you identify correctly",
+      "selected": "You crouch by the heap and start matching shapes to parts..."
     },
     "2": {
       "label": "Leave it be",
       "tooltip": "(-) No goods, no cost",
       "selected": "You leave the scrap to rust and move on."
     }
-  }
+  },
+  "reclaimed": "You pried {{count}} usable part(s) from the heap: {{parts}}. The rest crumbled to rust."
 }

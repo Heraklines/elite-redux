@@ -24,6 +24,7 @@
 // the run RNG so they're deterministic within a seed.
 // =============================================================================
 
+import { modifierTypes } from "#data/data-lists";
 import { randSeedInt, randSeedItem, randSeedShuffle } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import erDexFlavorRaw from "./er-dex-flavor.json";
@@ -47,7 +48,13 @@ const ER_FOOTPRINT_IDS = new Set<number>(erFootprintIdsRaw as number[]);
 //                   "cipher", but spelled in raised Unicode BRAILLE dot-cells in
 //                   the text prompt (no glyph sprites); the player reads it and
 //                   picks the matching word. Answer + options are WORDS.
-export type ErQuizKind = "silhouette" | "dex" | "footprint" | "cipher" | "braille";
+//   - "item":       the Salvage Yard scrap heap (Factory). A held ITEM is shown as
+//                   a black silhouette (its icon from the boot-loaded "items"
+//                   atlas, tinted by the UI); the player names the part from the
+//                   choices. Answer + options are ITEM names; each question carries
+//                   the item's modifierTypes key so the encounter can grant the
+//                   parts the player correctly identifies.
+export type ErQuizKind = "silhouette" | "dex" | "footprint" | "cipher" | "braille" | "item";
 
 export interface ErQuizQuestion {
   kind: ErQuizKind;
@@ -61,6 +68,14 @@ export interface ErQuizQuestion {
   cipherWord?: string;
   /** "cipher" only: the shuffled word options (answer + distractors) = the labels. */
   cipherOptions?: string[];
+  /** "item" only: the correct item's icon frame in the boot-loaded "items" atlas. */
+  itemIconFrame?: string;
+  /** "item" only: the correct item's localized display name (the answer label). */
+  itemName?: string;
+  /** "item" only: the correct item's modifierTypes key (so the encounter can grant it). */
+  itemId?: string;
+  /** "item" only: the shuffled item-name options (answer + distractors) = the labels. */
+  itemOptions?: string[];
 }
 
 /**
@@ -216,12 +231,101 @@ function buildErBrailleQuestion(optionCount: number): ErQuizQuestion {
   return { ...q, kind: "braille", prompt: brailleEncode(q.cipherWord ?? "") };
 }
 
+/**
+ * The Salvage Yard scrap-heap item pool: recognizable held items that read as
+ * distinct silhouettes AND are worth reclaiming. Each entry is a modifierTypes
+ * key so the encounter can map a correctly-named part back to its reward func.
+ */
+const ER_ITEM_QUIZ_IDS: readonly string[] = [
+  "QUICK_CLAW",
+  "GRIP_CLAW",
+  "WIDE_LENS",
+  "SCOPE_LENS",
+  "MULTI_LENS",
+  "KINGS_ROCK",
+  "LEFTOVERS",
+  "SHELL_BELL",
+  "FOCUS_BAND",
+  "REVIVER_SEED",
+  "SOOTHE_BELL",
+  "GOLDEN_PUNCH",
+  "BATON",
+  "EVIOLITE",
+  "MYSTICAL_ROCK",
+];
+
+/** A baked item descriptor for the item quiz: key + icon frame + display name. */
+interface ErItemDescriptor {
+  id: string;
+  frame: string;
+  name: string;
+}
+
+/**
+ * The item-quiz pool, resolved to {id, frame, name} descriptors. Memoized and
+ * built LAZILY for the same early-init reason as {@linkcode quizSpeciesIds}: the
+ * modifier factories and i18n must be ready, which they are by quiz time but not
+ * at module load. Any id that fails to resolve is skipped (never asked/offered).
+ */
+let cachedItemBank: ErItemDescriptor[] | null = null;
+function itemBank(): ErItemDescriptor[] {
+  if (cachedItemBank === null) {
+    cachedItemBank = [];
+    for (const id of ER_ITEM_QUIZ_IDS) {
+      try {
+        const func = (modifierTypes as Record<string, () => { iconImage: string; name: string }>)[id];
+        if (!func) {
+          continue;
+        }
+        const type = func();
+        if (type?.iconImage && type.name) {
+          cachedItemBank.push({ id, frame: type.iconImage, name: type.name });
+        }
+      } catch {
+        // Skip any item whose factory throws (keeps the rest of the quiz usable).
+      }
+    }
+  }
+  return cachedItemBank;
+}
+
+/**
+ * Build one Salvage Yard item question: the answer item (shown as a silhouette)
+ * plus `optionCount-1` distinct distractor items, all name-labels shuffled.
+ * answerId is unused (-1); the figure is the item's icon frame.
+ */
+function buildErItemQuestion(optionCount: number): ErQuizQuestion {
+  const bank = itemBank();
+  const answer = randSeedItem([...bank]);
+  const distractorTarget = Math.max(1, Math.min(3, optionCount - 1));
+  const distractors = randSeedShuffle(bank.filter(it => it.id !== answer.id)).slice(0, distractorTarget);
+  const itemOptions = randSeedShuffle([answer.name, ...distractors.map(it => it.name)]);
+  return {
+    kind: "item",
+    answerId: -1,
+    options: [],
+    prompt: "",
+    itemIconFrame: answer.frame,
+    itemName: answer.name,
+    itemId: answer.id,
+    itemOptions,
+  };
+}
+
+/** The modifierTypes key for a quiz option name, or undefined if not a known item. */
+export function erItemIdForName(name: string): string | undefined {
+  return itemBank().find(it => it.name === name)?.id;
+}
+
 export function buildErQuizQuestion(kind: ErQuizKind, optionCount = 4): ErQuizQuestion {
   if (kind === "cipher") {
     return buildErCipherQuestion(optionCount);
   }
   if (kind === "braille") {
     return buildErBrailleQuestion(optionCount);
+  }
+  if (kind === "item") {
+    return buildErItemQuestion(optionCount);
   }
   const pool = quizPool(kind);
   const answerId = pool[randSeedInt(pool.length)];
@@ -255,7 +359,12 @@ export function buildErQuizRound(kind: ErQuizKind, count: number, optionCount = 
   let guard = 0;
   while (out.length < count && guard++ < count * 50) {
     const q = buildErQuizQuestion(kind, optionCount);
-    const key = q.kind === "cipher" || q.kind === "braille" ? (q.cipherWord ?? "") : String(q.answerId);
+    const key =
+      q.kind === "cipher" || q.kind === "braille"
+        ? (q.cipherWord ?? "")
+        : q.kind === "item"
+          ? (q.itemId ?? "")
+          : String(q.answerId);
     if (usedAnswers.has(key)) {
       continue;
     }

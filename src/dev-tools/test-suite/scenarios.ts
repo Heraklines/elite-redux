@@ -1729,11 +1729,13 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "ER Salvage Yard (#439)",
     description:
-      "#439 Factory MARKET. Forces ER_SALVAGE_YARD in the FACTORY biome.\n"
-      + "DO: 'Pick through the salvage' or 'Leave it be'.\n"
-      + "EXPECT: Pick opens a no-battle reward of curated reclaimed parts (Quick Claw,\n"
-      + "Grip Claw, Wide Lens, Scope Lens, King's Rock, Leftovers) - pick one. Leave =\n"
-      + "nothing, no cost.",
+      "#439 Factory SCRAP-HEAP minigame (reuses the ErQuiz engine, 'item' kind).\n"
+      + "Forces ER_SALVAGE_YARD in the FACTORY biome.\n"
+      + "DO: 'Sort the scrap heap' (3 part SILHOUETTES, name each from 4 choices) or\n"
+      + "'Leave it be'.\n"
+      + "EXPECT: each part is a held-item icon shown as a black SILHOUETTE. Every part\n"
+      + "you name correctly is reclaimed - a no-battle reward screen grants exactly\n"
+      + "those held items (0-3 of them). Name none = leave empty-handed, no cost.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
