@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
+import { allMoves } from "#data/data-lists";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { MoveId } from "#enums/move-id";
 import { UiMode } from "#enums/ui-mode";
@@ -36,6 +37,9 @@ export interface LearnMoveBatchDeps {
   assign: (moveId: MoveId, slotIndex: number) => void;
   /** Called once when the player finishes or cancels; closes the panel + ends the phase. */
   done: () => void;
+  /** Panic exit: if the panel fails to open/operate, fall back to the per-move
+   * LearnMovePhase flow so the player still learns moves and never softlocks. */
+  fallback: () => void;
 }
 
 /**
@@ -64,7 +68,9 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
     // move the mon truly has, or the "already knows it" filter misses and the same
     // move could be offered/learned twice (mirrors LearnMovePhase's #449 guard).
     const known = pokemon.getMoveset(true).map(m => m.moveId);
-    const learnable = filterLearnableMoves(this.candidateMoveIds, known);
+    // Also drop any id that doesn't resolve to a real Move - a bad/custom id must
+    // never throw inside the panel (the level-up softlock class).
+    const learnable = filterLearnableMoves(this.candidateMoveIds, known).filter(id => allMoves[id] != null);
     // "Only on levels that teach something new" - nothing offerable -> no panel.
     if (learnable.length === 0) {
       this.end();
@@ -74,6 +80,7 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
     const returnMode =
       globalScene.ui.getHandler() instanceof EvolutionSceneUiHandler ? UiMode.EVOLUTION_SCENE : UiMode.MESSAGE;
     const learnedIds: MoveId[] = [];
+    let finished = false;
 
     const deps: LearnMoveBatchDeps = {
       pokemon,
@@ -86,14 +93,35 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
         initMoveAnim(moveId).then(() => loadMoveAnimAssets([moveId], true));
       },
       done: () => {
+        if (finished) {
+          return;
+        }
+        finished = true;
         // Fire any move-learned form change ONCE after the panel closes (not mid-panel).
         if (learnedIds.length > 0) {
           globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeMoveLearnedTrigger, true);
         }
         globalScene.ui.setMode(returnMode).then(() => this.end());
       },
+      fallback: () => {
+        // Panel failed - restore the known-good per-move LearnMovePhase flow so
+        // the player still learns moves and the run NEVER softlocks.
+        if (finished) {
+          return;
+        }
+        finished = true;
+        for (const id of this.candidateMoveIds) {
+          globalScene.phaseManager.unshiftNew("LearnMovePhase", this.partyMemberIndex, id);
+        }
+        globalScene.ui.setMode(returnMode).then(() => this.end());
+      },
     };
 
-    globalScene.ui.setMode(UiMode.LEARN_MOVE_BATCH, deps);
+    try {
+      globalScene.ui.setMode(UiMode.LEARN_MOVE_BATCH, deps);
+    } catch (e) {
+      console.error("[learn-move-batch] panel failed to open synchronously; per-move fallback", e);
+      deps.fallback();
+    }
   }
 }

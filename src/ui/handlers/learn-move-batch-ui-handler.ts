@@ -95,19 +95,28 @@ export class LearnMoveBatchUiHandler extends UiHandler {
   override show(args: any[]): boolean {
     super.show(args);
     this.deps = args[0] as LearnMoveBatchDeps;
-    this.state = "pickNew";
-    this.newCursor = 0;
-    this.slotCursor = 0;
-    this.confirmCursor = 0;
-    this.pendingMoveId = null;
-    this.learnedAny = false;
-    this.titleText.setText(
-      i18next.t("battle:learnMovePrompt", { pokemonName: this.deps.pokemon.getNameToRender() })
-        || `${this.deps.pokemon.getNameToRender()} can learn new moves!`,
-    );
-    this.container.setVisible(true);
-    this.active = true;
-    this.render();
+    try {
+      this.state = "pickNew";
+      this.newCursor = 0;
+      this.slotCursor = 0;
+      this.confirmCursor = 0;
+      this.pendingMoveId = null;
+      this.learnedAny = false;
+      this.titleText.setText(
+        i18next.t("battle:learnMovePrompt", { pokemonName: this.deps.pokemon.getNameToRender() })
+          || `${this.deps.pokemon.getNameToRender()} can learn new moves!`,
+      );
+      this.container.setVisible(true);
+      this.active = true;
+      this.render();
+    } catch (e) {
+      // NEVER softlock the level-up: log the real cause + fall back to the
+      // per-move learn flow on the next tick (deferred so we are not re-entrant
+      // inside setMode/show).
+      console.error("[learn-move-batch] show() failed; per-move fallback", e);
+      const deps = this.deps;
+      globalScene.time.delayedCall(0, () => deps?.fallback());
+    }
     return true;
   }
 
@@ -200,6 +209,17 @@ export class LearnMoveBatchUiHandler extends UiHandler {
   }
 
   processInput(button: Button): boolean {
+    try {
+      return this.handleInput(button);
+    } catch (e) {
+      console.error("[learn-move-batch] input failed; per-move fallback", e);
+      const deps = this.deps;
+      globalScene.time.delayedCall(0, () => deps?.fallback());
+      return true;
+    }
+  }
+
+  private handleInput(button: Button): boolean {
     const deps = this.deps;
     if (!deps) {
       return false;
