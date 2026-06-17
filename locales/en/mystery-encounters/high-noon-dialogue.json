@@ -1,0 +1,23 @@
+{
+  "intro": "Heat shimmers off the cracked flats. A lone figure stands in your path, hand hovering, and the only sound is the wind.",
+  "speaker": "Outlaw",
+  "introDialogue": "You and me, stranger. One draw. We both put up {{ante}}, and the fastest hand walks away with the lot. My draw clocks {{outlawSpeed}} Speed - bring something quicker. Pick your partner... if you've got the nerve.",
+  "title": "High Noon",
+  "description": "An outlaw calls you out for a single-strike duel. You each ante {{ante}}. Its draw clocks {{outlawSpeed}} Speed. Pick ONE Pokemon: if that mon's Speed is at least {{outlawSpeed}} it strikes first and you take the whole pot - otherwise your ante is gone. Only the mon you pick is compared. Or walk away.",
+  "query": "Will you take the duel?",
+  "invalidSelection": "That Pokemon is in no shape to draw.",
+  "option": {
+    "1": {
+      "label": "Take the duel",
+      "tooltip": "(+) Pick your FASTEST mon to win 2x your ante\n(?) Too slow and you lose your ante",
+      "selected": "You step into the flats and square off..."
+    },
+    "2": {
+      "label": "Walk away",
+      "tooltip": "(-) No duel, no cost",
+      "selected": "You tip your hat and back away. The outlaw lets you go."
+    }
+  },
+  "win": "Your Pokemon draws first! The outlaw freezes, beaten, and tosses you the pot with a grudging nod.",
+  "lose": "Too slow - the outlaw's draw lands first. You forfeit your ante and trudge on."
+}

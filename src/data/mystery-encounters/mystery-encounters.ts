@@ -32,6 +32,7 @@ import { GentleGiantEncounter } from "#mystery-encounters/gentle-giant-encounter
 import { GlitteringVeinEncounter } from "#mystery-encounters/glittering-vein-encounter";
 import { GlobalTradeSystemEncounter } from "#mystery-encounters/global-trade-system-encounter";
 import { GravesOfTheFallenEncounter } from "#mystery-encounters/graves-of-the-fallen-encounter";
+import { HighNoonEncounter } from "#mystery-encounters/high-noon-encounter";
 import { HotSpringEncounter } from "#mystery-encounters/hot-spring-encounter";
 import { ImportBazaarEncounter } from "#mystery-encounters/import-bazaar-encounter";
 import { InformantEncounter } from "#mystery-encounters/informant-encounter";
@@ -283,7 +284,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   [BiomeId.LAKE, [MysteryEncounterType.ER_LAKE_SPIRIT, MysteryEncounterType.ER_STILL_WATERS]],
   [BiomeId.SEABED, [MysteryEncounterType.ER_ABYSSAL_VENT, MysteryEncounterType.ER_SUNKEN_VESSEL]],
   [BiomeId.MOUNTAIN, [MysteryEncounterType.ER_HOT_SPRING, MysteryEncounterType.ER_MOUNTAIN_SAGE]],
-  [BiomeId.BADLANDS, [MysteryEncounterType.DANCING_LESSONS]],
+  [BiomeId.BADLANDS, [MysteryEncounterType.DANCING_LESSONS, MysteryEncounterType.ER_HIGH_NOON]],
   [
     BiomeId.CAVE,
     [
@@ -416,6 +417,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_BURIED_CITY] = BuriedCityEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_REACTOR_MELTDOWN] = ReactorMeltdownEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_MOUNTAIN_SAGE] = MountainSageEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_HIGH_NOON] = HighNoonEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

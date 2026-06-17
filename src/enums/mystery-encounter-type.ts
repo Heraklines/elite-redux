@@ -171,6 +171,9 @@ export enum MysteryEncounterType {
   /** ER #522: The Mountain Sage - a Mountain training event; choose a training boon
    * (vitamins + Rare Candy) or a Learner's Shroom (moveset workshop). */
   ER_MOUNTAIN_SAGE,
+  /** ER #516: High Noon - a Badlands single-strike duel; ante money and pick your
+   * fastest mon to out-draw the outlaw for the pot, or lose your ante. */
+  ER_HIGH_NOON,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

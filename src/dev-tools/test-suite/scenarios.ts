@@ -580,6 +580,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Badlands: High Noon (#516)",
+    description:
+      "#516 - High Noon (Badlands single-strike duel). Forces ER_HIGH_NOON in\n"
+      + "BADLANDS.\n"
+      + "DO: 'Take the duel' and pick a Pokemon. The outlaw draws at the party's AVERAGE\n"
+      + "speed, so the FAST mon wins and the SLOW one loses.\n"
+      + "EXPECT: both ante (money drops by the ante); pick the fast Ninjask -> you win\n"
+      + "back 2x the ante (net gain); pick the slow Munchlax -> you lose the ante. No\n"
+      + "battle. 'Walk away' = no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.BADLANDS,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_HIGH_NOON,
+      });
+      return [
+        makeStarter(SpeciesId.NINJASK, {
+          moveset: [MoveId.X_SCISSOR, MoveId.AERIAL_ACE, MoveId.SWORDS_DANCE, MoveId.SPLASH],
+        }),
+        makeStarter(SpeciesId.MUNCHLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
     label: "ER Mountain: The Mountain Sage (#522)",
     description:
       "#522 - The Mountain Sage (Mountain training event). Forces ER_MOUNTAIN_SAGE\n"
