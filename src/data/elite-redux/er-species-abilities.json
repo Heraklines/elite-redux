@@ -19,6 +19,16 @@
       290
     ]
   },
+  "SPECIES_MEDITITE": {
+    "ability1": 72,
+    "ability2": 5190,
+    "hidden": 74,
+    "innates": [
+      39,
+      101,
+      5099
+    ]
+  },
   "SPECIES_ZORUA": {
     "ability1": 5285,
     "ability2": 194,
