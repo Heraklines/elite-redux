@@ -43,6 +43,7 @@ import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
 import { randSeedInt } from "#utils/common";
+import { isSlotUnlocked, unlockSlot } from "#utils/passive-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 const namespace = "mysteryEncounters/innateShrine";
@@ -89,9 +90,30 @@ function buildGuardian(): EnemyPartyConfig {
   };
 }
 
-/** Attune the chosen mon: unlock all its ER innate slots for the run. */
+/**
+ * Attune the chosen mon: unlock ALL its ER innate slots for the REST OF THE RUN,
+ * and PERMANENTLY unlock ONE still-locked innate slot for its species (persists
+ * across runs in starterData, exactly like a candy unlock). The permanent unlock
+ * targets the lowest slot that holds a real innate but is not yet unlocked.
+ */
 function attune(pokemon: Pokemon): void {
   pokemon.customPokemonData.erInnateShrineUnlocked = true;
+
+  const rootId = pokemon.species.getRootSpeciesId();
+  const starterData = globalScene.gameData.starterData[rootId];
+  if (starterData) {
+    const passives = pokemon.getPassiveAbilities();
+    for (const slot of [0, 1, 2] as const) {
+      const ability = passives[slot];
+      if (ability && ability.id !== AbilityId.NONE && !isSlotUnlocked(starterData.passiveAttr, slot)) {
+        // unlockSlot sets the slot's UNLOCKED + ENABLED bits; saveSystem persists it.
+        starterData.passiveAttr = unlockSlot(starterData.passiveAttr, slot);
+        void globalScene.gameData.saveSystem();
+        break;
+      }
+    }
+  }
+
   globalScene.currentBattle.mysteryEncounter!.setDialogueToken("blessedName", pokemon.getNameToRender());
   queueEncounterMessage(`${namespace}:attuned`);
   leaveEncounterWithoutBattle(true);

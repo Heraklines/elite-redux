@@ -21,6 +21,7 @@
  * boostPlayer()/boostEnemy(). resetDevOverrides() runs first so each starts clean.
  */
 
+import { loggedInUser } from "#app/account";
 import { setClearMeOverrideAfterFirst } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
@@ -52,6 +53,7 @@ import type { Variant } from "#sprites/variant";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { Starter, StarterMoveset } from "#types/save-data";
 import { openErMapOverlay } from "#ui/er-map-ui-handler";
+import { isSlotUnlocked, PASSIVE_SLOTS } from "#utils/passive-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 export interface DevScenario {
@@ -182,6 +184,44 @@ function setOverrides(partial: Partial<MutableOverrides>): void {
     // triggers on EVERY launch, not just the lucky seeds.
     O.DISABLE_STANDARD_TRAINERS_OVERRIDE = true;
   }
+}
+
+/**
+ * The ONLY account whose save the Innate-Shrine scenario is allowed to edit. The
+ * scenario force-locks an innate so the unlock is observable, which mutates +
+ * persists starterData - we must NEVER do that to a tester's own save. Gated to
+ * the maintainer's account; everyone else's save is left completely untouched.
+ */
+const INNATE_SHRINE_SAVE_EDIT_ACCOUNT = "Heraklines1";
+
+/**
+ * Dev-only (#514 Innate Shrine): guarantee the given starter species has at least
+ * ONE innate slot still LOCKED, so the shrine's unlock is actually observable. If
+ * every slot is already unlocked, LOCK the first one (clear its unlocked+enabled
+ * bits) and persist.
+ *
+ * SAFETY: this WRITES + persists the save, so it runs ONLY on the maintainer's
+ * account. On any other account it is a complete no-op - we never touch another
+ * player's save. (The shrine itself still works for everyone; only this test
+ * convenience-setup is account-gated.)
+ */
+function ensureLockedInnate(speciesId: SpeciesId): void {
+  if (loggedInUser?.username !== INNATE_SHRINE_SAVE_EDIT_ACCOUNT) {
+    return; // never modify anyone else's save
+  }
+  const rootId = getPokemonSpecies(speciesId).getRootSpeciesId();
+  const data = globalScene.gameData?.starterData?.[rootId];
+  if (!data) {
+    return; // no starter data for this species -> all slots already locked
+  }
+  for (const slot of [0, 1, 2] as const) {
+    if (isSlotUnlocked(data.passiveAttr, slot)) {
+      data.passiveAttr &= ~(PASSIVE_SLOTS[slot].unlocked | PASSIVE_SLOTS[slot].enabled);
+      void globalScene.gameData.saveSystem();
+      return;
+    }
+  }
+  // No unlocked slot found -> the species already has only locked innates. Good.
 }
 
 const MEGA_BRACELET: ModifierOverride = { name: "MEGA_BRACELET" };
@@ -749,11 +789,14 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "ER Temple: The Innate Shrine (#514)",
     description:
       "#514 - The Innate Shrine (Temple trial). Forces ER_INNATE_SHRINE in TEMPLE.\n"
-      + "DO: 'Take the trial', pick a party mon to attune, then beat the shrine guardian\n"
-      + "(Bronzong, a 3-4 bar omni-boosted boss, +5 levels). Or 'Leave the shrine'.\n"
-      + "EXPECT: on WIN, all of the chosen mon's ER innate slots unlock for the run\n"
-      + "(check its Abilities screen - previously locked innates are now active). Lose =\n"
-      + "the run is at risk like any boss. Leave -> no fight, no boon.",
+      + "SETUP: TYRANITAR is forced to have at least one LOCKED innate (so the unlock\n"
+      + "is visible) - on the maintainer account this edits the save; on any other\n"
+      + "account nothing is touched (pick a mon that already has a locked innate).\n"
+      + "DO: open Abilities on TYRANITAR FIRST and note a LOCKED innate. Then 'Take the\n"
+      + "trial', attune TYRANITAR, and beat the guardian (Bronzong, omni-boosted boss).\n"
+      + "EXPECT on WIN: all of that mon's innates are active FOR THE RUN, AND one\n"
+      + "previously-locked innate is PERMANENTLY unlocked - confirm it stays unlocked\n"
+      + "after the run / in Starter Select. Leave -> no fight, no boon.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -763,6 +806,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
         MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
         MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_INNATE_SHRINE,
       });
+      // Maintainer-account-only: make sure TYRANITAR has a locked innate to unlock.
+      ensureLockedInnate(SpeciesId.TYRANITAR);
       return [
         makeStarter(SpeciesId.TYRANITAR, {
           moveset: [MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.STONE_EDGE, MoveId.DRAGON_DANCE],
