@@ -51,6 +51,23 @@ export interface ErAiProfile {
 
 const INACTIVE_PROFILE: ErAiProfile = { active: false, sharpness: 0.5, switchThreshold: 3 };
 
+// MASTER GATE. The smarter AI is OFF in real play until it has been tested and
+// the maintainer turns it on (the `er.ai.enabled` knob, default 0). Until then
+// every consumer takes the vanilla path - so it does NOT affect actual Elite/
+// Hell battles yet. The dev-test scenarios opt IN via setErSmartAiTestForced(),
+// so the team can still validate it in a controlled, scenario-only way.
+let smartAiTestForced = false;
+
+/** Force the smarter AI on for the current dev-test scenario only (reset between scenarios). */
+export function setErSmartAiTestForced(on: boolean): void {
+  smartAiTestForced = on;
+}
+
+/** Master switch: smarter AI runs only if the knob is on OR a test scenario forced it. */
+function erSmartAiMasterEnabled(): boolean {
+  return smartAiTestForced || erBalanceNum("er.ai.enabled") >= 1;
+}
+
 /**
  * Calibration so a real-damage attack score lands on roughly the same scale as
  * the vanilla per-move benefit numbers (so attack-vs-status comparisons stay
@@ -67,12 +84,18 @@ export const ER_KO_BONUS = 1000;
  * the gate is the run difficulty - those paths only run in trainer battles.
  */
 export function isErSmartSwitching(): boolean {
+  if (!erSmartAiMasterEnabled()) {
+    return false;
+  }
   const difficulty = getErDifficulty();
   return difficulty === "elite" || difficulty === "hell";
 }
 
 /** Resolve the AI profile for a given enemy. Active only for Elite/Hell trainers & bosses. */
 export function getErAiProfile(pokemon: ErAiPokemon): ErAiProfile {
+  if (!erSmartAiMasterEnabled()) {
+    return INACTIVE_PROFILE;
+  }
   const difficulty = getErDifficulty();
   const hardMode = difficulty === "elite" || difficulty === "hell";
   if (!hardMode || !(pokemon.hasTrainer() || pokemon.isBoss())) {

@@ -3,6 +3,7 @@ import {
   damageToScore,
   ER_KO_BONUS,
   getErAiProfile,
+  setErSmartAiTestForced,
   strategicMoveScore,
 } from "#data/elite-redux/er-enemy-ai";
 import { getErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
@@ -19,10 +20,20 @@ describe("er-enemy-ai (Elite/Hell smarter AI - Slice 1)", () => {
   const bossMon = { hasTrainer: () => false, isBoss: () => true };
   const wildMon = { hasTrainer: () => false, isBoss: () => false };
 
-  afterEach(() => setErDifficulty("ace"));
+  // The smarter AI is master-OFF in real play; the scenarios/tests opt in.
+  afterEach(() => {
+    setErDifficulty("ace");
+    setErSmartAiTestForced(false);
+  });
 
-  describe("getErAiProfile (difficulty gating)", () => {
+  describe("getErAiProfile (master gate + difficulty gating)", () => {
+    it("is INACTIVE by default even for a Hell trainer (master switch OFF)", () => {
+      setErDifficulty("hell");
+      expect(getErAiProfile(trainerMon).active).toBe(false);
+    });
+
     it("is INACTIVE on the vanilla difficulties (Youngster/Ace)", () => {
+      setErSmartAiTestForced(true);
       setErDifficulty("ace");
       expect(getErAiProfile(trainerMon).active).toBe(false);
       setErDifficulty("youngster");
@@ -30,18 +41,21 @@ describe("er-enemy-ai (Elite/Hell smarter AI - Slice 1)", () => {
     });
 
     it("is INACTIVE for wild mons even on Hell", () => {
+      setErSmartAiTestForced(true);
       setErDifficulty("hell");
       expect(getErAiProfile(wildMon).active).toBe(false);
     });
 
-    it("is ACTIVE and fully sharp for Hell trainers/bosses", () => {
+    it("is ACTIVE and fully sharp for Hell trainers/bosses (when enabled)", () => {
+      setErSmartAiTestForced(true);
       setErDifficulty("hell");
       const p = getErAiProfile(trainerMon);
       expect(p.active).toBe(true);
       expect(p.sharpness).toBe(1); // Hell default = always best move
     });
 
-    it("is ACTIVE and near-optimal for Elite trainers/bosses", () => {
+    it("is ACTIVE and near-optimal for Elite trainers/bosses (when enabled)", () => {
+      setErSmartAiTestForced(true);
       setErDifficulty("elite");
       const p = getErAiProfile(bossMon);
       expect(p.active).toBe(true);

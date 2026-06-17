@@ -832,6 +832,17 @@ export const ER_BALANCE_KNOBS: readonly ErBalanceKnob[] = [
   },
   // ---- Battle AI (Elite/Hell smarter AI) ------------------------------------
   {
+    key: "er.ai.enabled",
+    group: "Battle AI",
+    label: "Smarter AI master switch",
+    help: "MASTER switch for the smarter Elite/Hell AI. 0 = OFF (vanilla AI everywhere, even on Elite/Hell) until it has been tested; 1 = ON for Elite/Hell trainers & bosses.",
+    kind: "scalar",
+    default: 0,
+    min: 0,
+    max: 1,
+    integer: true,
+  },
+  {
     key: "er.ai.sharpnessHell",
     group: "Battle AI",
     label: "Hell AI sharpness",

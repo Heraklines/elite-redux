@@ -27,6 +27,7 @@ import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
 import type { ErCommunityItemKind } from "#data/elite-redux/er-community-items";
+import { setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
 import { seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
@@ -169,6 +170,9 @@ const DEV_OVERRIDE_DEFAULTS = {
  */
 export function resetDevOverrides(): void {
   Object.assign(O, structuredClone(DEV_OVERRIDE_DEFAULTS));
+  // The smarter AI is master-OFF in real play; clear any per-scenario force so
+  // only the AI scenarios (which re-enable it below) ever exercise it.
+  setErSmartAiTestForced(false);
 }
 
 function setOverrides(partial: Partial<MutableOverrides>): void {
@@ -1429,8 +1433,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "EXPECT: the intro shows a Slowking guardian (not a chest); Offer spends 3\n"
       + "berries (check held items: 5 -> 2) and fully restores the WHOLE party via\n"
       + "PartyHealPhase with a 'fully restored' message. The Offer option greys out if\n"
-      + "the party holds fewer than 3 berries. (Party spawns at full HP, so the heal is\n"
-      + "a no-op visually - verify no error and the berries are spent.)",
+      + "the party holds fewer than 3 berries. The whole party starts at ~1/3 HP, so\n"
+      + "the heal is clearly VISIBLE (HP bars jump back to full).",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1445,6 +1449,13 @@ export const DEV_SCENARIOS: DevScenario[] = [
         makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.YAWN] }),
         makeStarter(SpeciesId.PIDGEOT, { moveset: [MoveId.AIR_SLASH, MoveId.HURRICANE, MoveId.ROOST, MoveId.U_TURN] }),
       ];
+    },
+    onBattleStart: () => {
+      // Hurt the whole party to ~1/3 HP so the spring's full-restore is visible.
+      for (const mon of globalScene.getPlayerParty()) {
+        mon.hp = Math.max(1, Math.floor(mon.getMaxHp() / 3));
+        mon.updateInfo();
+      }
     },
   },
   {
@@ -5544,6 +5555,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     setup: () => {
       resetDevOverrides();
       setErDifficulty("hell");
+      setErSmartAiTestForced(true); // opt this scenario into the (master-OFF) smarter AI
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 60,
         ENEMY_SPECIES_OVERRIDE: SpeciesId.TYRANITAR,
@@ -5573,6 +5585,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     setup: () => {
       resetDevOverrides();
       setErDifficulty("hell");
+      setErSmartAiTestForced(true); // opt this scenario into the (master-OFF) smarter AI
       setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 11 });
       return [
         makeStarter(SpeciesId.GARCHOMP, {
@@ -5597,6 +5610,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     setup: () => {
       resetDevOverrides();
       setErDifficulty("hell");
+      setErSmartAiTestForced(true); // opt this scenario into the (master-OFF) smarter AI
       setOverrides({ STARTING_LEVEL_OVERRIDE: 50, STARTING_WAVE_OVERRIDE: 11 });
       return [
         makeStarter(SpeciesId.DRAGONITE, {
@@ -5625,6 +5639,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     setup: () => {
       resetDevOverrides();
       setErDifficulty("hell");
+      setErSmartAiTestForced(true); // opt this scenario into the (master-OFF) smarter AI
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 60,
         BATTLE_STYLE_OVERRIDE: "double", // forces a double battle (BATTLE_TYPE is wild/trainer/ME, not the style)
