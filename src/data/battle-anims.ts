@@ -32,7 +32,10 @@ export class AnimConfig {
     if (source) {
       this.id = source.id;
       this.graphic = source.graphic;
-      const frames: any[][] = source.frames;
+      // Defensive: a malformed/partial source (e.g. an array, or a default-anim
+      // fallback whose own frames never loaded) must NOT crash here on
+      // `undefined.map`. Missing frames -> an empty (harmless) animation.
+      const frames: any[][] = source.frames ?? [];
       frames.map(animFrames => {
         for (let f = 0; f < animFrames.length; f++) {
           animFrames[f] = new ImportedAnimFrame(animFrames[f]);
@@ -40,7 +43,7 @@ export class AnimConfig {
       });
       this.frames = frames;
 
-      const frameTimedEvents = source.frameTimedEvents;
+      const frameTimedEvents = source.frameTimedEvents ?? {};
       for (const fte of Object.keys(frameTimedEvents)) {
         const timedEvents: AnimTimedEvent[] = [];
         for (const te of frameTimedEvents[fte]) {
