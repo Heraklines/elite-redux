@@ -91,7 +91,6 @@ import {
   PokemonTypeChangeAbAttr,
   PostAttackApplyBattlerTagAbAttr,
   PostAttackApplyStatusEffectAbAttr,
-  PostDancingMoveAbAttr,
   PostDefendAbilitySwapAbAttr,
   PostDefendContactDamageAbAttr,
   PostDefendHpGatedStatStageChangeAbAttr,
@@ -6610,13 +6609,16 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         }),
       ]);
     case 842:
-      // Festivities — "Sound moves become dance moves and vice versa."
-      // Sound→Dance (faithful): inject DANCE_MOVE on the holder's sound moves
-      // so they trigger Dancer (via the user-aware doesFlagEffectApply), plus
-      // the holder itself dances (PostDancingMove). Dance→Sound is engine-
-      // blocked — sound consumers (Soundproof/Punk Rock) read the static
-      // hasFlag, which AbAttr injection cannot reach.
-      return ok([new MoveFlagInjectionAbAttr(MoveFlags.DANCE_MOVE, "sound-moves"), new PostDancingMoveAbAttr()]);
+      // Festivities — "Sound moves are also treated as dance moves, benefiting
+      // from Dancer-type abilities."
+      // Faithful read: re-tag the holder's OWN sound moves with the DANCE flag so
+      // that OTHER battlers' Dancer-type abilities copy them. It does NOT grant
+      // the holder Dancer itself - the previous PostDancingMoveAbAttr made
+      // Festivities wrongly "act like Dancer" (#449), so it is removed. (The
+      // "dance moves also count as sound" direction is engine-limited: SOUND
+      // consumers like Soundproof / Punk Rock read the static hasFlag, which an
+      // AbAttr injection cannot reach - see move-flag-injection.ts.)
+      return ok([new MoveFlagInjectionAbAttr(MoveFlags.DANCE_MOVE, "sound-moves")]);
     case 866:
       // Relic Stone — "Other battlers don't benefit from STAB."
       return ok([new StabSuppressAuraAbAttr()]);
