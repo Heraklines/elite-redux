@@ -661,6 +661,68 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Swamp: The Bog Witch's Bargain (#508)",
+    description:
+      "#508 - The Bog Witch's Bargain (Swamp DEAL). Forces ER_BOG_WITCH in SWAMP.\n"
+      + "The witch wants an offering at or above a HIDDEN rarity (Great/Ultra/Rogue),\n"
+      + "which she never names.\n"
+      + "DO: 'Leave an offering', pick a held item. The party here carries items of\n"
+      + "different tiers (Leftovers/Eviolite vs a Soul Dew-tier) to test both outcomes.\n"
+      + "EXPECT: offer >= her hidden bar -> she purges all party status + a Weathervane\n"
+      + "relic reward; offer below it -> a bog-rot curse chips the whole party ~1/6 HP\n"
+      + "(never below 1). The offered item is consumed either way. 'Refuse' = no cost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.SWAMP,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_BOG_WITCH,
+        STARTING_HELD_ITEMS_OVERRIDE: [
+          { name: "LEFTOVERS" },
+          { name: "SOUL_DEW" },
+          { name: "BERRY", type: BerryType.SITRUS },
+        ],
+      });
+      return [
+        makeStarter(SpeciesId.GRIMER, {
+          moveset: [MoveId.SLUDGE_BOMB, MoveId.TOXIC, MoveId.MINIMIZE, MoveId.SPLASH],
+        }),
+        makeStarter(SpeciesId.PIDGEY, { moveset: [MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "ER Swamp: The Sinking Mire (#509)",
+    description:
+      "#509 - The Sinking Mire (Swamp read-the-typing). Forces ER_SINKING_MIRE in\n"
+      + "SWAMP. A random party mon starts sinking.\n"
+      + "DO: 'Haul it out' and pick a rescuer. A Flying/Levitate/light/strong-Attack mon\n"
+      + "succeeds; a heavy weakling flounders. (Party: Crobat = Flying rescuer that\n"
+      + "always works; Munchlax = heavy weakling that flounders.) Or 'Leave it'.\n"
+      + "EXPECT: good rescuer -> a Rogue-tier reward + the sinker's status cleared; bad\n"
+      + "rescuer -> the sinking mon takes ~1/4 HP mire damage + loses a held item. Leave\n"
+      + "-> the bog takes one of the sinker's held items (or chips it), no reward.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.SWAMP,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_SINKING_MIRE,
+        STARTING_HELD_ITEMS_OVERRIDE: [{ name: "LEFTOVERS" }],
+      });
+      return [
+        makeStarter(SpeciesId.CROBAT, {
+          moveset: [MoveId.CROSS_POISON, MoveId.AIR_SLASH, MoveId.ROOST, MoveId.SPLASH],
+        }),
+        makeStarter(SpeciesId.MUNCHLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
     label: "ER Graveyard: Unfinished Business (#517)",
     description:
       "#517 - Unfinished Business (Graveyard score-settling). Forces\n"

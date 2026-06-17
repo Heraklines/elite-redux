@@ -1,0 +1,23 @@
+{
+  "intro": "The ground turns to soup beneath you. With a sucking lurch, {{sinkingName}} drops to its belly and starts to sink into the mire!",
+  "title": "The Sinking Mire",
+  "description": "{{sinkingName}} is going under fast. You can send another Pokemon to haul it free - but the bog only lets up for those who can stay above it or wrench it loose: a Flying or Levitating mon, a light one, or a strong enough lifter. Or you can leave it to claw out alone and pay the bog its toll.",
+  "query": "How do you get it out?",
+  "option": {
+    "1": {
+      "label": "Haul it out",
+      "tooltip": "(?) Pick a rescuer. A Flying/Levitate/light or strong-Attack mon succeeds (a Rogue reward); a heavy weakling flounders (mire damage + a lost item).",
+      "selectPrompt": "Send which Pokemon to the rescue?",
+      "selected": "You send your chosen Pokemon out across the treacherous mud."
+    },
+    "2": {
+      "label": "Leave it",
+      "tooltip": "(-) Don't risk a second mon. The sinking mon claws out alone, but the bog keeps one of its held items.",
+      "selected": "You hold the rest of the team back."
+    }
+  },
+  "invalidSelection": "That is the Pokemon that is sinking.",
+  "rescued": "Your rescuer drags the sinker free of the muck - and comes up clutching something the mire swallowed long ago!",
+  "floundered": "The rescuer can't get a hold and only flounders. The mire drags at the sinking Pokemon, and the bog swallows something it was holding.",
+  "left": "Left to itself, the Pokemon thrashes free of the mire - but the bog keeps a souvenir."
+}

@@ -186,6 +186,14 @@ export enum MysteryEncounterType {
    * ended their run (the stored opponentParty, as a spectral trainer) for a random
    * relic, or walk on. */
   ER_UNFINISHED_BUSINESS,
+  /** ER #508: The Bog Witch's Bargain - a Swamp DEAL; the mire's keeper wants an
+   * offering at or above a HIDDEN rarity she never names. Meet it -> she purges
+   * your team's status + a ward relic; lowball her -> a bog-rot curse. */
+  ER_BOG_WITCH,
+  /** ER #509: The Sinking Mire - a Swamp read-the-typing event; a party mon goes
+   * under. Haul it out with a Flying/Levitate/light/strong rescuer for a Rogue
+   * cache, or leave it and pay the bog a held-item toll. */
+  ER_SINKING_MIRE,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

@@ -7,6 +7,7 @@ import { AnOfferYouCantRefuseEncounter } from "#mystery-encounters/an-offer-you-
 import { AuroraEncounter } from "#mystery-encounters/aurora-encounter";
 import { BerriesAboundEncounter } from "#mystery-encounters/berries-abound-encounter";
 import { BlackMarketEncounter } from "#mystery-encounters/black-market-encounter";
+import { BogWitchEncounter } from "#mystery-encounters/bog-witch-encounter";
 import { BugTypeSuperfanEncounter } from "#mystery-encounters/bug-type-superfan-encounter";
 import { BuriedCityEncounter } from "#mystery-encounters/buried-city-encounter";
 import { CleansingFontEncounter } from "#mystery-encounters/cleansing-font-encounter";
@@ -59,6 +60,7 @@ import { SalvageYardEncounter } from "#mystery-encounters/salvage-yard-encounter
 import { ScrambledPokedexEncounter } from "#mystery-encounters/scrambled-pokedex-encounter";
 import { SealedDoorEncounter } from "#mystery-encounters/sealed-door-encounter";
 import { ShadyVitaminDealerEncounter } from "#mystery-encounters/shady-vitamin-dealer-encounter";
+import { SinkingMireEncounter } from "#mystery-encounters/sinking-mire-encounter";
 import { SlumberingSnorlaxEncounter } from "#mystery-encounters/slumbering-snorlax-encounter";
 import { StillWatersEncounter } from "#mystery-encounters/still-waters-encounter";
 import { SunkenVesselEncounter } from "#mystery-encounters/sunken-vessel-encounter";
@@ -282,7 +284,10 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
       MysteryEncounterType.ER_THE_STORM,
     ],
   ],
-  [BiomeId.SWAMP, [MysteryEncounterType.SAFARI_ZONE]],
+  [
+    BiomeId.SWAMP,
+    [MysteryEncounterType.SAFARI_ZONE, MysteryEncounterType.ER_BOG_WITCH, MysteryEncounterType.ER_SINKING_MIRE],
+  ],
   [BiomeId.BEACH, [MysteryEncounterType.ER_TIDE_POOLS, MysteryEncounterType.ER_X_MARKS_THE_SPOT]],
   [BiomeId.LAKE, [MysteryEncounterType.ER_LAKE_SPIRIT, MysteryEncounterType.ER_STILL_WATERS]],
   [BiomeId.SEABED, [MysteryEncounterType.ER_ABYSSAL_VENT, MysteryEncounterType.ER_SUNKEN_VESSEL]],
@@ -424,6 +429,8 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_WISHING_CRYSTAL] = WishingCrystalEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_FROZEN_IN_TIME] = FrozenInTimeEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_UNFINISHED_BUSINESS] = UnfinishedBusinessEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_BOG_WITCH] = BogWitchEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_SINKING_MIRE] = SinkingMireEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {
