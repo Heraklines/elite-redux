@@ -26,6 +26,7 @@
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
+import { applyErGuardianTokens } from "#data/elite-redux/er-fight-tokens";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { Nature } from "#enums/nature";
@@ -162,6 +163,13 @@ export const FrozenInTimeEncounter: MysteryEncounter = MysteryEncounterBuilder.w
       encounter.enemyPartyConfigs = [{ levelAdditiveModifier: careful ? 0 : 0.5, pokemonConfigs: [pokemonConfig] }];
       queueEncounterMessage(careful ? `${namespace}:thawGentle` : `${namespace}:thawHard`);
       await initBattleWithEnemyConfig(encounter.enemyPartyConfigs[0]);
+      // Hostile (no-fire) crack-out: the angry boss fights with extra challenge
+      // tokens - a damage booster + reducer (and a little endure) for a tougher,
+      // more rewarding fight. These are guardian fight-tokens, so doPostBattleCleanup
+      // strips them the moment the battle ends - they NEVER outlive this fight.
+      if (!careful) {
+        applyErGuardianTokens(2);
+      }
     },
   )
   .withSimpleOption(
