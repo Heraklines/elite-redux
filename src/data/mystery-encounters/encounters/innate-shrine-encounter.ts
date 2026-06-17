@@ -42,7 +42,6 @@ import {
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
-import { randSeedInt } from "#utils/common";
 import { isSlotUnlocked, unlockSlot } from "#utils/passive-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
@@ -60,7 +59,7 @@ function hasUnlockableInnate(p: Pokemon): boolean {
   return p.getPassiveAbilities().some(a => !!a && a.id !== AbilityId.NONE);
 }
 
-/** Enemy level the shrine guardian is pinned to: strongest party member / wave, +5. */
+/** Enemy level the shrine guardian is pinned to: matched to the strongest party member / wave. */
 function guardianLevel(): number {
   let top = 0;
   for (const m of globalScene.getPlayerParty()) {
@@ -69,17 +68,19 @@ function guardianLevel(): number {
     }
   }
   const waveLvl = globalScene.currentBattle?.getLevelForWave?.() ?? top;
-  return Math.max(1, top, Math.round(waveLvl)) + 5;
+  // No level bonus: you face the trial with ONE attuned mon, so a +5 boss was too
+  // steep. Same level, two bars keeps it a real fight without being unwinnable.
+  return Math.max(1, top, Math.round(waveLvl));
 }
 
-/** Build the shrine guardian: an aura totem (multi-bar, omni-boosts on entry). */
+/** Build the shrine guardian: an aura totem (two-bar, omni-boosts on entry). */
 function buildGuardian(): EnemyPartyConfig {
   return {
     pokemonConfigs: [
       {
         species: getPokemonSpecies(SpeciesId.BRONZONG),
         isBoss: true,
-        bossSegments: 3 + randSeedInt(2),
+        bossSegments: 2,
         level: guardianLevel(),
         tags: [BattlerTagType.MYSTERY_ENCOUNTER_POST_SUMMON],
         mysteryEncounterBattleEffects: (pokemon: Pokemon) => {

@@ -15,14 +15,14 @@
 //   value >= 12 -> ULTRA item      else        -> GREAT item
 //   value >= 100 -> a production RELIC (about two Master items' worth, plus a bit)
 //
-//   THE SMELTER: melts the haul into 1-3 ITEMS at that tier (more for bigger hauls),
-//     or a RELIC once the haul is worth >= 100.
-//   THE FABRICATOR: forges the haul into a RELIC at value >= 100; below that it
-//     stamps out a single item at the value's tier (no free relics).
+//   THE SMELTER: feed MANY items (pick one, then another, until "Stop feeding",
+//     up to 6). Melts the haul into 1-3 ITEMS at the value's tier (more for bigger
+//     hauls), or a RELIC once the haul is worth >= 100.
+//   THE FABRICATOR: feed exactly ONE item. Refines it one rarity tier upward
+//     (GREAT -> ULTRA -> ROGUE -> MASTER); a Master-tier item is forged into a RELIC.
 //   WALK AWAY: salvage nothing.
 //
-// Feeding loops: pick an item, then pick another, until you choose "Stop feeding"
-// (up to 6). Whole stacks are fed; value sums across everything.
+// Whole stacks are fed; the Smelter sums value across everything.
 // =============================================================================
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
@@ -171,6 +171,34 @@ async function feedPicker(): Promise<boolean> {
   return fed.length > 0;
 }
 
+/**
+ * The single-item picker (preOptionPhase for the Fabricator): pick exactly ONE
+ * held item - no loop, no "stop feeding" entry. Stores it as misc.fed = [item].
+ */
+async function feedPickerSingle(): Promise<boolean> {
+  const encounter = globalScene.currentBattle.mysteryEncounter!;
+  const fed: PokemonHeldItemModifier[] = [];
+  encounter.misc = { fed } satisfies FabMisc;
+  const onPokemonSelected = (pokemon: PlayerPokemon) => {
+    const validItems = pokemon.getHeldItems().filter(it => it.isTransferable);
+    return validItems.map(
+      (modifier: PokemonHeldItemModifier): OptionSelectItem => ({
+        label: modifier.type.name,
+        handler: () => {
+          fed.push(modifier);
+          return true;
+        },
+      }),
+    );
+  };
+  const selectableFilter = (pokemon: Pokemon) =>
+    pokemon.getHeldItems().some(it => it.isTransferable)
+      ? null
+      : (getEncounterText(`${namespace}:invalidSelection`) ?? null);
+  const proceeded = await selectPokemonForOption(onPokemonSelected, undefined, selectableFilter);
+  return proceeded && fed.length > 0;
+}
+
 /** Consume the whole fed haul (remove each fed item's full stack). */
 async function consumeFed(fed: PokemonHeldItemModifier[]): Promise<void> {
   for (const modifier of fed) {
@@ -202,21 +230,24 @@ async function smelt(): Promise<void> {
   leaveEncounterWithoutBattle(false);
 }
 
-/** Fabricate: forge a RELIC at value >= 100; below that, a single item at the value's tier. */
+/** Fabricate: refine ONE fed item up a rarity tier; a Master-tier item forges a RELIC. */
 async function fabricate(): Promise<void> {
   const fed = getFed();
-  if (fed.length === 0) {
+  const item = fed[0];
+  if (!item) {
     leaveEncounterWithoutBattle(true);
     return;
   }
-  const value = haulValue(fed);
+  const tier = itemTier(item);
   await consumeFed(fed);
-  if (value >= RELIC_VALUE_THRESHOLD) {
+  if (tier >= ModifierTier.MASTER) {
+    // A Master-tier item is premium enough to stamp straight into a relic.
     rewardRelic();
   } else {
-    // Not enough scrap for a relic - the assembler stamps out a normal item by value.
+    // Refine the single item one rarity tier upward (GREAT -> ULTRA -> ROGUE -> MASTER).
+    const out = Math.max(ModifierTier.GREAT, Math.min(tier + 1, ModifierTier.MASTER)) as ModifierTier;
     queueEncounterMessage(`${namespace}:smelted`);
-    setEncounterRewards({ guaranteedModifierTiers: [outputTier(value)], fillRemaining: false });
+    setEncounterRewards({ guaranteedModifierTiers: [out], fillRemaining: false });
   }
   leaveEncounterWithoutBattle(false);
 }
@@ -261,7 +292,7 @@ export const FabricatorEncounter: MysteryEncounter = MysteryEncounterBuilder.wit
         secondOptionPrompt: `${namespace}:option.2.selectPrompt`,
         selected: [{ text: `${namespace}:option.2.selected` }],
       })
-      .withPreOptionPhase(feedPicker)
+      .withPreOptionPhase(feedPickerSingle)
       .withOptionPhase(async () => {
         await fabricate();
         return true;
