@@ -78,6 +78,13 @@ export class CustomPokemonData {
    * and is single-use per Pokemon).
    */
   public erAbilityCapsuleUsed = false;
+  /**
+   * ER Innate Shrine (#514): when `true`, this Pokemon's ER innate slots are all
+   * unlocked for the rest of the run (no candy purchase needed), as if it had
+   * attuned at the Temple shrine. Run-scoped (serialized with the session), not a
+   * permanent account unlock. Checked in {@linkcode Pokemon.canApplyAbility}.
+   */
+  public erInnateShrineUnlocked = false;
 
   constructor(data?: CustomPokemonData | Partial<CustomPokemonData>) {
     this.spriteScale = data?.spriteScale ?? -1;
@@ -94,6 +101,7 @@ export class CustomPokemonData {
     this.erGiftAbilities = data?.erGiftAbilities ?? [];
     this.erGiftIndex = data?.erGiftIndex ?? 0;
     this.erAbilityCapsuleUsed = data?.erAbilityCapsuleUsed ?? false;
+    this.erInnateShrineUnlocked = data?.erInnateShrineUnlocked ?? false;
   }
 }
 

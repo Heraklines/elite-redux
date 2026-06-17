@@ -2957,7 +2957,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         // (gating a downside behind a candy purchase makes no sense).
         const freeInnate =
           passiveSlot < erYoungsterFreeInnateSlots(this.level)
-          || globalScene.gameMode?.isDaily === true
+          || globalScene.gameMode?.isDaily === true // ER Innate Shrine (#514): a mon attuned at the Temple shrine has all its // innate slots unlocked for the run.
+          || this.customPokemonData?.erInnateShrineUnlocked === true
           || ability.id === AbilityId.TRUANT;
         if (!freeInnate && !isSlotActive(passiveAttr, passiveSlot as 0 | 1 | 2)) {
           return false;

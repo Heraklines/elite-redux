@@ -42,6 +42,7 @@ import { HighNoonEncounter } from "#mystery-encounters/high-noon-encounter";
 import { HotSpringEncounter } from "#mystery-encounters/hot-spring-encounter";
 import { ImportBazaarEncounter } from "#mystery-encounters/import-bazaar-encounter";
 import { InformantEncounter } from "#mystery-encounters/informant-encounter";
+import { InnateShrineEncounter } from "#mystery-encounters/innate-shrine-encounter";
 import { IntoTheCalderaEncounter } from "#mystery-encounters/into-the-caldera-encounter";
 import { LakeSpiritEncounter } from "#mystery-encounters/lake-spirit-encounter";
 import { LostAtSeaEncounter } from "#mystery-encounters/lost-at-sea-encounter";
@@ -351,7 +352,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
   // #503: the Totem Trial belongs to ISLAND (transcript line 124231), not Temple.
   // Temple's SIGNATURE is the Innate Shrine (#514, not yet built); the Cleansing
   // Font (#515) is its second event.
-  [BiomeId.TEMPLE, [MysteryEncounterType.ER_CLEANSING_FONT]],
+  [BiomeId.TEMPLE, [MysteryEncounterType.ER_CLEANSING_FONT, MysteryEncounterType.ER_INNATE_SHRINE]],
   [
     BiomeId.SLUM,
     [
@@ -458,6 +459,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_DORMANT_GUARDIAN] = DormantGuardianEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_GREAT_FORGE] = GreatForgeEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_FABRICATOR] = FabricatorEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_INNATE_SHRINE] = InnateShrineEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

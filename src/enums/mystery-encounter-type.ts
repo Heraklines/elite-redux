@@ -218,6 +218,9 @@ export enum MysteryEncounterType {
    * SMELT a held-item stack into a higher-rarity item (value-weighted), or
    * FABRICATE one item into a production relic. */
   ER_FABRICATOR,
+  /** ER #514: The Innate Shrine - a Temple trial; beat the shrine guardian to
+   * unlock all of a chosen party mon's ER innate slots for the run. */
+  ER_INNATE_SHRINE,
   /** Synthetic type used by the LLM Director for runtime-built encounters
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */

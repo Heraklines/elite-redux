@@ -1,0 +1,21 @@
+{
+  "intro": "At the heart of the temple, a shrine hums with old power, watched over by a silent aura totem. They say it can awaken the sleeping gifts in a worthy Pokemon - for those who pass its trial.",
+  "title": "The Innate Shrine",
+  "description": "The shrine can unlock a Pokemon's dormant innate abilities for the rest of your journey - but its guardian must be bested first. Choose the Pokemon to attune, then prove yourself against the totem. Or leave the shrine in peace.",
+  "query": "Do you take the trial?",
+  "option": {
+    "1": {
+      "label": "Take the trial",
+      "tooltip": "(-) Pick a mon to attune, then fight the shrine guardian (a tough boss). (+) Win to unlock all that mon's innate slots for the run.",
+      "selectPrompt": "Attune which Pokemon?",
+      "selected": "You set your chosen one before the shrine and face the guardian."
+    },
+    "2": {
+      "label": "Leave the shrine",
+      "tooltip": "(-) Do not disturb the shrine. No trial, no boon.",
+      "selected": "You bow to the shrine and leave it undisturbed."
+    }
+  },
+  "invalidSelection": "That Pokemon has no dormant innates to awaken.",
+  "attuned": "The shrine blazes with light - {{blessedName}}'s dormant innates awaken, unlocked for the rest of the run!"
+}

@@ -695,6 +695,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Temple: The Innate Shrine (#514)",
+    description:
+      "#514 - The Innate Shrine (Temple trial). Forces ER_INNATE_SHRINE in TEMPLE.\n"
+      + "DO: 'Take the trial', pick a party mon to attune, then beat the shrine guardian\n"
+      + "(Bronzong, a 3-4 bar omni-boosted boss, +5 levels). Or 'Leave the shrine'.\n"
+      + "EXPECT: on WIN, all of the chosen mon's ER innate slots unlock for the run\n"
+      + "(check its Abilities screen - previously locked innates are now active). Lose =\n"
+      + "the run is at risk like any boss. Leave -> no fight, no boon.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 12,
+        STARTING_BIOME_OVERRIDE: BiomeId.TEMPLE,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_INNATE_SHRINE,
+      });
+      return [
+        makeStarter(SpeciesId.TYRANITAR, {
+          moveset: [MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.STONE_EDGE, MoveId.DRAGON_DANCE],
+        }),
+        makeStarter(SpeciesId.CONKELDURR, {
+          moveset: [MoveId.DRAIN_PUNCH, MoveId.MACH_PUNCH, MoveId.KNOCK_OFF, MoveId.BULK_UP],
+        }),
+      ];
+    },
+  },
+  {
     label: "ER Volcano: The Great Forge (#513)",
     description:
       "#513 - The Great Forge (Volcano crafting). Forces ER_GREAT_FORGE in VOLCANO.\n"
