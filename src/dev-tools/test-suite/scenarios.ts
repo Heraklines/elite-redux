@@ -5527,4 +5527,38 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "(note) Hell AI: doubles ally-safety (Slice 4)",
+    description:
+      "Slice 4 of the smarter Elite/Hell AI - doubles. On Elite/Hell, a spread\n"
+      + "move that also hits the enemy's OWN ally (Earthquake, Surf in doubles,\n"
+      + "etc.) is penalized by the damage it would deal that ally - so the AI won't\n"
+      + "Earthquake its grounded partner, and will NEVER pick a spread move that\n"
+      + "KOs its own ally. If the ally is immune (Flying / Levitate) there's no\n"
+      + "penalty, so it still spreads freely.\n"
+      + "DO: this is a forced DOUBLE Hell battle vs two grounded Tyranitar that\n"
+      + "carry Earthquake. EXPECT them to prefer single-target moves over EQ while\n"
+      + "their partner is alive and grounded (the EQ score is reduced - see the\n"
+      + "'Move Scores' log via Send Logs); a Flying/Levitate ally removes the\n"
+      + "penalty. On Ace the old behavior is unchanged.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("hell");
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        BATTLE_TYPE_OVERRIDE: "double",
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.TYRANITAR,
+        ENEMY_HEALTH_SEGMENTS_OVERRIDE: 1,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.EARTHQUAKE, MoveId.CRUNCH, MoveId.STONE_EDGE, MoveId.ICE_PUNCH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.EARTHQUAKE, MoveId.CRUNCH, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.SKARMORY, {
+          moveset: [MoveId.BRAVE_BIRD, MoveId.SPIKES, MoveId.ROOST, MoveId.IRON_HEAD],
+        }),
+      ];
+    },
+  },
 ];
