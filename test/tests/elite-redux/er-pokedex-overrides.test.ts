@@ -52,6 +52,13 @@ describe("applyErPokedexOverrides (editor Pokedex overrides)", () => {
       sp.abilityHidden = abilityHidden;
     });
   }
+  function snapshotPassives(): void {
+    const sp = getPokemonSpecies(ID);
+    const prev = sp.getPassiveAbilities();
+    restores.push(() => {
+      sp.setPassives([prev[0], prev[1], prev[2]]);
+    });
+  }
 
   it("replaces a species' level-up learnset and drops unresolvable move ids", () => {
     snapshotLearnset();
@@ -114,6 +121,27 @@ describe("applyErPokedexOverrides (editor Pokedex overrides)", () => {
     expect(res.abilitiesApplied).toBe(0);
     expect(res.idsDropped).toBeGreaterThanOrEqual(1);
     expect(getPokemonSpecies(ID).ability1).toBe(before);
+  });
+
+  it("replaces the ER innate (passive) triple, dropping unresolvable ids to NONE", () => {
+    snapshotPassives();
+    const res = applyErPokedexOverrides({
+      abilities: { SPECIES_BULBASAUR: { innates: [AbilityId.LEVITATE, 9_999_999, AbilityId.NONE] } },
+    });
+    expect(res.abilitiesApplied).toBe(1);
+    expect(res.idsDropped).toBeGreaterThanOrEqual(1);
+    const passives = getPokemonSpecies(ID).getPassiveAbilities();
+    expect(passives[0]).toBe(AbilityId.LEVITATE);
+    expect(passives[1]).toBe(AbilityId.NONE); // bogus id dropped to NONE
+    expect(passives[2]).toBe(AbilityId.NONE);
+  });
+
+  it("leaves passives untouched when no innates key is present", () => {
+    snapshotPassives();
+    snapshotAbilities();
+    const before = getPokemonSpecies(ID).getPassiveAbilities();
+    applyErPokedexOverrides({ abilities: { SPECIES_BULBASAUR: { ability1: AbilityId.OVERGROW } } });
+    expect(getPokemonSpecies(ID).getPassiveAbilities()).toEqual(before);
   });
 
   it("skips species consts that don't resolve to a live id", () => {

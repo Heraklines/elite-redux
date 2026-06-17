@@ -49,6 +49,8 @@ export interface ErAbilityEntry {
   ability1?: number;
   ability2?: number;
   hidden?: number;
+  /** ER 3-passive triple ("innates"); each an ability id or 0 (NONE). */
+  innates?: number[];
 }
 export type ErSpeciesAbilities = Record<string, ErAbilityEntry>;
 
@@ -295,6 +297,23 @@ function applyAbilities(
     const ah = resolveAbilitySlot(entry.hidden, { allowNone: true }, result);
     if (ah !== undefined) {
       mutable.abilityHidden = ah;
+      changed = true;
+    }
+    // Innates = ER's 3-passive triple. Present → replace the whole triple (an
+    // empty/invalid slot becomes NONE); absent → leave passives untouched.
+    if (Array.isArray(entry.innates)) {
+      const triple = [0, 1, 2].map(i => {
+        const v = entry.innates?.[i];
+        if (v === undefined || v === AbilityId.NONE) {
+          return AbilityId.NONE;
+        }
+        if (allAbilities[v]) {
+          return v as AbilityId;
+        }
+        result.idsDropped++;
+        return AbilityId.NONE;
+      }) as [AbilityId, AbilityId, AbilityId];
+      species.setPassives(triple);
       changed = true;
     }
     if (changed) {

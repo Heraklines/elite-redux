@@ -377,11 +377,15 @@ function validateTmLearnsetsDelta(delta: unknown): ValidationResult {
   return { ok: true };
 }
 
-/** speciesConst → { ability1, ability2, hidden } (each an id, or 0 for none; null deletes). */
+/**
+ * speciesConst → { ability1, ability2, hidden, innates: [a,b,c] } (each an id, or
+ * 0 for none; `innates` is the ER 3-passive triple). null deletes the override.
+ */
 function validateSpeciesAbilitiesDelta(delta: unknown): ValidationResult {
   if (!isPlainObject(delta)) {
     return { ok: false, error: "delta must be an object" };
   }
+  const okSlot = (v: unknown): boolean => v === 0 || okId(v);
   for (const [key, entry] of Object.entries(delta)) {
     if (!SPECIES_CONST_RE.test(key)) {
       return { ok: false, error: `bad species key: ${key}` };
@@ -393,11 +397,16 @@ function validateSpeciesAbilitiesDelta(delta: unknown): ValidationResult {
       return { ok: false, error: `${key}: must be an object or null` };
     }
     for (const [field, value] of Object.entries(entry)) {
-      if (field !== "ability1" && field !== "ability2" && field !== "hidden") {
+      if (field === "innates") {
+        if (!Array.isArray(value) || value.length !== 3 || !value.every(okSlot)) {
+          return { ok: false, error: `${key}.innates: must be 3 ability ids (0 for none)` };
+        }
+      } else if (field === "ability1" || field === "ability2" || field === "hidden") {
+        if (!okSlot(value)) {
+          return { ok: false, error: `${key}.${field}: must be an ability id or 0` };
+        }
+      } else {
         return { ok: false, error: `${key}: unknown field "${field}"` };
-      }
-      if (value !== 0 && !okId(value)) {
-        return { ok: false, error: `${key}.${field}: must be an ability id or 0` };
       }
     }
   }
