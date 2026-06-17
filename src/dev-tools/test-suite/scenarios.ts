@@ -4318,6 +4318,28 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) No custom evo on vanilla (#479)",
+    description:
+      "#479 - on the PURE-VANILLA difficulties (Youngster / Ace) a wild vanilla\n"
+      + "mon must never EVOLVE into its ER custom final stage. A high-wave wild\n"
+      + "Kecleon was being substituted into the custom 'Kecleong' (cost 12).\n"
+      + "Root cause: arena.randomSpecies' level-evolution substitution re-gated only\n"
+      + "by BST, not by custom-id. Now: on a vanilla difficulty, a custom (id >=\n"
+      + "10000) evolution is skipped and the vanilla stage is kept (Elite/Hell keep\n"
+      + "custom evolutions). CHECK (no forced-spawn override exists - the override\n"
+      + "bypasses the evo path): play a YOUNGSTER run to a high wave in a biome with\n"
+      + "a Kecleon-line spawn and confirm NO ER custom ('Kecleong', any Redux/\n"
+      + "paradox name) ever appears as a WILD; only vanilla mons spawn.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Ability screen crash (#443)",
     description:
       "#443 - the Pokemon Info / summary ABILITIES screen no longer hard-\n"

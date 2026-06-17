@@ -59,6 +59,13 @@ import type { NonEmptyTuple } from "type-fest";
 const ER_EARLY_HIGH_BST_THRESHOLD = 600;
 /** Wave before which the Ace/Elite high-BST wild gate applies. */
 const ER_EARLY_HIGH_BST_WAVE = 55;
+/**
+ * First pokerogue id reserved for ER custom species (Redux forms / paradox /
+ * mega / custom evolutions like "Kecleong"). On the pure-vanilla difficulties
+ * (Youngster / Ace, #345) NO custom may ever appear in wild generation - see the
+ * evolution-substitution guard in {@linkcode Arena.randomSpecies} (#479).
+ */
+const ER_CUSTOM_ID_FLOOR = 10000;
 
 /**
  * Map a {@linkcode WeatherType} to the {@linkcode CommonAnim} used for its
@@ -655,7 +662,18 @@ export class Arena {
       // well above 600 BST - the "wave 13 god" reports). Re-gate the evolved
       // species and keep the original (weaker) stage when it trips.
       const evolved = getPokemonSpecies(newSpeciesId);
-      if (this.checkLegendBST(evolved, adjustedWave)) {
+      if (isErVanillaDifficulty() && evolved.speciesId >= ER_CUSTOM_ID_FLOOR) {
+        // ER (#479): on the pure-vanilla difficulties (Youngster / Ace) a vanilla
+        // wild must never evolve into its ER CUSTOM final stage - a high-wave
+        // Kecleon was being substituted into the custom "Kecleong" (cost 12).
+        // Keep the vanilla stage. Elite/Hell still get the custom evolutions.
+        console.log(
+          "ER #479: vanilla-difficulty wild kept as",
+          SpeciesId[species.speciesId],
+          "- skipped custom evolution",
+          evolved.name,
+        );
+      } else if (this.checkLegendBST(evolved, adjustedWave)) {
         console.log(
           "ER #395: substitution",
           SpeciesId[newSpeciesId],
