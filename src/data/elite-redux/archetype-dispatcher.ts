@@ -6444,6 +6444,11 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       return ok([new IgnoreTypeImmunityAbAttr(PokemonType.NORMAL, [PokemonType.GHOST])]);
     case 474:
       // Accelerate — "Moves that need a charge turn are now used instantly."
+      // The actual charge SKIP is applied in MoveChargePhase.end() (the real
+      // charge-resolution hook, same one Power Herb uses) by checking for this
+      // ability id (#449). SkipChargeTurnAbAttr is kept as a harmless registration
+      // marker + belt-and-braces tag clear; the PreAttack approach alone never
+      // skipped the charge turn.
       return ok([new SkipChargeTurnAbAttr()]);
     case 515:
       // Retriever — "Retrieves item on switch-out."

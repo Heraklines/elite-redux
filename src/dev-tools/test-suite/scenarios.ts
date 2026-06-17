@@ -4341,6 +4341,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Accelerate instant charge (#449)",
+    description:
+      "#449 - ER Accelerate ('Moves that need a charge turn are now used instantly')\n"
+      + "now actually skips the charge turn (was a no-op). Player has Accelerate forced\n"
+      + "and Solar Beam + Fly in its moveset.\n"
+      + "EXPECT: Solar Beam and Fly both fire the SAME turn (no charge/semi-invuln turn),\n"
+      + "every time, with no item needed (same skip Power Herb does).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.ACCELERATE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+      });
+      return [
+        makeStarter(SpeciesId.VENUSAUR, {
+          moveset: [MoveId.SOLAR_BEAM, MoveId.FLY, MoveId.SLUDGE_BOMB, MoveId.GIGA_DRAIN],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) No custom evo on vanilla (#479)",
     description:
       "#479 - on the PURE-VANILLA difficulties (Youngster / Ace) a wild vanilla\n"

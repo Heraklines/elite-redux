@@ -1,8 +1,10 @@
 import { globalScene } from "#app/global-scene";
 import { MoveChargeAnim } from "#data/battle-anims";
 import { erTryConsumePowerHerb } from "#data/elite-redux/er-community-items";
+import type { AbilityId } from "#enums/ability-id";
 import type { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { ErAbilityId } from "#enums/er-ability-id";
 import { MoveResult } from "#enums/move-result";
 import type { MoveUseMode } from "#enums/move-use-mode";
 import type { Pokemon } from "#field/pokemon";
@@ -74,6 +76,14 @@ export class MoveChargePhase extends PokemonPhase {
 
     // ER Power Herb (#401): spend one herb charge to skip the charge turn.
     if (!instantCharge.value && erTryConsumePowerHerb(user)) {
+      instantCharge.value = true;
+    }
+
+    // ER Accelerate (#449, ability 474 - "Moves that need a charge turn are now
+    // used instantly"): the holder skips EVERY charge turn, free. Handled here at
+    // the real charge-resolution point (the same hook Power Herb uses) - the prior
+    // PreAttack tag-removal approach never actually skipped the charge.
+    if (!instantCharge.value && user?.hasAbility(ErAbilityId.ACCELERATE as unknown as AbilityId)) {
       instantCharge.value = true;
     }
 
