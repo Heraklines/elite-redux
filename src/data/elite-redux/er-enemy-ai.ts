@@ -79,6 +79,23 @@ export const ER_DAMAGE_SCORE_SCALE = 75;
 export const ER_KO_BONUS = 1000;
 
 /**
+ * Multiplier applied to a SLOW (non-priority) move when the holder will be KO'd
+ * this turn and is outsped: such a move probably won't even execute, so a
+ * priority move should win instead (Phase A threat-awareness).
+ */
+export const ER_SLOW_DOOMED_PENALTY = 0.15;
+
+/**
+ * Threat-aware (Phase A): when the holder will be KO'd this turn AND it does NOT
+ * outspeed the threat, a non-priority move likely won't land before it faints -
+ * so it should be devalued in favor of a priority move (snipe before dying).
+ * Pure (unit-tested).
+ */
+export function shouldDevalueSlowMove(incomingKO: boolean, outspeeds: boolean, movePriority: number): boolean {
+  return incomingKO && !outspeeds && movePriority <= 0;
+}
+
+/**
  * Whether the smarter switching logic is on (Elite/Hell). Used at switch sites
  * that don't have an enemy handle (the forced/faint replacement resolver), where
  * the gate is the run difficulty - those paths only run in trainer battles.

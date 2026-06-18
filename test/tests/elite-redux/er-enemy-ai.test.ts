@@ -4,6 +4,7 @@ import {
   ER_KO_BONUS,
   getErAiProfile,
   setErSmartAiTestForced,
+  shouldDevalueSlowMove,
   strategicMoveScore,
 } from "#data/elite-redux/er-enemy-ai";
 import { getErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
@@ -27,9 +28,10 @@ describe("er-enemy-ai (Elite/Hell smarter AI - Slice 1)", () => {
   });
 
   describe("getErAiProfile (master gate + difficulty gating)", () => {
-    it("is INACTIVE by default even for a Hell trainer (master switch OFF)", () => {
+    it("is ACTIVE for a Hell trainer (smarter AI enabled via the er.ai.enabled override)", () => {
       setErDifficulty("hell");
-      expect(getErAiProfile(trainerMon).active).toBe(false);
+      // er-balance-tuning.json ships er.ai.enabled = 1, so the master gate is on.
+      expect(getErAiProfile(trainerMon).active).toBe(true);
     });
 
     it("is INACTIVE on the vanilla difficulties (Youngster/Ace)", () => {
@@ -115,6 +117,24 @@ describe("er-enemy-ai (Elite/Hell smarter AI - Slice 1)", () => {
 
     it("treats never-miss moves (accuracy <= 0) as 100% accurate", () => {
       expect(damageToScore(30, 100, 100, -1)).toBe(damageToScore(30, 100, 100, 100));
+    });
+  });
+
+  describe("shouldDevalueSlowMove (Phase A: threat-awareness)", () => {
+    it("devalues a SLOW move when doomed and outsped (snipe with priority instead)", () => {
+      expect(shouldDevalueSlowMove(true, false, 0)).toBe(true);
+    });
+
+    it("keeps a PRIORITY move at full value even when doomed + outsped", () => {
+      expect(shouldDevalueSlowMove(true, false, 1)).toBe(false);
+    });
+
+    it("does nothing if the mon outspeeds the threat (it acts first anyway)", () => {
+      expect(shouldDevalueSlowMove(true, true, 0)).toBe(false);
+    });
+
+    it("does nothing when not about to be KO'd", () => {
+      expect(shouldDevalueSlowMove(false, false, 0)).toBe(false);
     });
   });
 
