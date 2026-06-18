@@ -43,6 +43,8 @@ import {
 import { erRivalWaveOrdinal, erRivalWaveSequence } from "#data/elite-redux/er-battle-frequency";
 import { ER_FACTORY_SETS } from "#data/elite-redux/er-factory-sets";
 import { erBalanceMap, erBalanceNum, erBalancePairs } from "#data/elite-redux/er-balance-tuning";
+import { modifierTypes } from "#data/data-lists";
+import { getErBiomeItemFlavor } from "#data/elite-redux/er-biome-item-flavor";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { erNotorietyBstBonus } from "#data/elite-redux/er-biome-notoriety";
 import {
@@ -733,6 +735,29 @@ export function hasErRivalOverride(trainer: Trainer): boolean {
  * to the baseline roll. (Recreated ER-only items and mega-stone force-evolves
  * are layered on separately.)
  */
+/**
+ * Per-mon biome item flavor: on top of the vanilla roll, a wild/trainer mon in
+ * a themed biome may also carry ONE item from that biome's pool (Fire Gem in
+ * the Volcano, Cell Battery at the Power Plant, etc.). Additive + stochastic.
+ */
+function assignErBiomeItemFlavor(enemy: EnemyPokemon): void {
+  const flavor = getErBiomeItemFlavor(globalScene.arena.biomeId);
+  if (!flavor || flavor.pool.length === 0 || enemy.randBattleSeedInt(100) >= flavor.chance) {
+    return;
+  }
+  const key = flavor.pool[enemy.randBattleSeedInt(flavor.pool.length)];
+  const factory = (
+    modifierTypes as Record<string, (() => { newModifier(p: EnemyPokemon): PokemonHeldItemModifier | null }) | undefined>
+  )[key];
+  if (!factory) {
+    return;
+  }
+  const modifier = factory().newModifier(enemy);
+  if (modifier) {
+    globalScene.addEnemyModifier(modifier, true, true);
+  }
+}
+
 export function applyErTrainerHeldItems(party: readonly EnemyPokemon[]): void {
   // Ace / Elite: revert any mon that is ALREADY a mega before the wave gate.
   // forceErMega gates the held-stone path, but some ER rosters field a mega
@@ -750,6 +775,9 @@ export function applyErTrainerHeldItems(party: readonly EnemyPokemon[]): void {
     // ER (#358): per-mon Ward Stone roll (Hell 100+ / Elite 150+; bosses get
     // the higher tiers; Primal Cascoon always carries a full Prime stone).
     maybeAssignErWardStone(enemy);
+    // ER: per-biome enemy item flavor (gems/seeds/reactive themed to the biome),
+    // wild + trainer alike, on top of the vanilla roll.
+    assignErBiomeItemFlavor(enemy);
   }
   for (const enemy of party) {
     const itemId = ER_ITEM_BY_POKEMON.get(enemy);
