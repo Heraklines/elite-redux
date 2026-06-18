@@ -17,6 +17,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { getErBrailleLegendText } from "#data/elite-redux/er-quiz";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
@@ -28,9 +29,12 @@ import { addWindow } from "#ui/ui-theme";
 export interface ErQuizView {
   /** Small caption above the figure/blurb (e.g. "Who's that Pokémon?"). */
   header: string;
-  /** A row of Unown letter icons (the Unown Cipher) - {atlas, frame} per letter,
-   * rendered left-to-right as a centered row. Highest precedence when present. */
-  glyphIcons?: { atlas: string; frame: string }[] | undefined;
+  /** Unown Cipher glyphs as ROWS (one row per word) - each row a left-to-right
+   * centered run of {atlas, frame} letter icons, rows stacked top-to-bottom so a
+   * multi-word phrase wraps neatly. Highest precedence when present. */
+  glyphRows?: { atlas: string; frame: string }[][] | undefined;
+  /** Show the A-Z Braille reference KEY beside the card (Braille seal only). */
+  showBrailleLegend?: boolean | undefined;
   /** Loaded footprint image key, rendered as-is and scaled up (footprint quiz).
    * Takes precedence over the silhouette/icon when present. */
   footprintKey?: string | undefined;
@@ -67,6 +71,8 @@ export class ErQuizUiHandler extends UiHandler {
   private promptText: Phaser.GameObjects.Text;
   private optionButtons: { window: Phaser.GameObjects.NineSlice; label: Phaser.GameObjects.Text }[] = [];
   private cursorObj: Phaser.GameObjects.Rectangle;
+  /** A-Z Braille reference KEY beside the card; shown only for Braille questions. */
+  private brailleLegend: Phaser.GameObjects.Container;
   /** Per-question objects (silhouette sprite) destroyed on clear. */
   private transient: Phaser.GameObjects.GameObject[] = [];
 
@@ -140,6 +146,28 @@ export class ErQuizUiHandler extends UiHandler {
     this.cursorObj.setOrigin(0.5);
     this.cursorObj.setVisible(false);
     this.card.add(this.cursorObj);
+
+    // A-Z Braille reference KEY: a compact panel to the RIGHT of the card (the card
+    // is centered with ~85px clear on each side, so a ~64px legend fits without
+    // cutting into the braille). Built once, hidden, toggled per Braille question.
+    const legendW = 64;
+    this.brailleLegend = globalScene.add.container(PANEL_W + 2, 0);
+    const legendPanel = addWindow(0, 0, legendW, PANEL_H);
+    this.brailleLegend.add(legendPanel);
+    const legendTitle = addTextObject(legendW / 2, 5, "BRAILLE KEY", TextStyle.WINDOW, { fontSize: "32px" });
+    legendTitle.setOrigin(0.5, 0);
+    legendTitle.setTint(GOLD);
+    this.brailleLegend.add(legendTitle);
+    const legendText = addTextObject(legendW / 2, 22, getErBrailleLegendText(), TextStyle.WINDOW, {
+      fontSize: "42px",
+      align: "center",
+    });
+    legendText.setOrigin(0.5, 0);
+    legendText.setLineSpacing(-2);
+    legendText.setTint(INK);
+    this.brailleLegend.add(legendText);
+    this.brailleLegend.setVisible(false);
+    this.card.add(this.brailleLegend);
   }
 
   show(args: any[]): boolean {
@@ -152,23 +180,33 @@ export class ErQuizUiHandler extends UiHandler {
 
     this.headerText.setText(data.header ?? "");
 
-    // Unown Cipher: a centered row of Unown letter icons spelling the answer word.
-    // Highest precedence; rendered as-is (the Unown forms ARE the letters).
-    if (data.glyphIcons && data.glyphIcons.length > 0) {
+    // Unown Cipher: rows of Unown letter icons spelling the answer (one row per
+    // word, stacked + centered so a multi-word phrase wraps neatly). Highest
+    // precedence; rendered as-is (the Unown forms ARE the letters).
+    if (data.glyphRows && data.glyphRows.length > 0) {
       this.promptText.setVisible(false);
-      const n = data.glyphIcons.length;
-      const span = Math.min(24, Math.floor((PANEL_W - 20) / n));
-      const startX = PANEL_W / 2 - ((n - 1) * span) / 2;
-      data.glyphIcons.forEach((g, i) => {
-        if (!globalScene.textures.exists(g.atlas)) {
+      const rows = data.glyphRows;
+      const rowH = 16;
+      const blockTop = 34 - ((rows.length - 1) * rowH) / 2;
+      rows.forEach((row, r) => {
+        const n = row.length;
+        if (n === 0) {
           return;
         }
-        const glyph = globalScene.add.sprite(startX + i * span, 34, g.atlas, g.frame);
-        glyph.setOrigin(0.5, 0.5);
-        const gw = glyph.width || 32;
-        glyph.setScale(Math.max(0.5, Math.min(1, span / gw)));
-        this.card.add(glyph);
-        this.transient.push(glyph);
+        const span = Math.min(24, Math.floor((PANEL_W - 20) / n));
+        const startX = PANEL_W / 2 - ((n - 1) * span) / 2;
+        const y = blockTop + r * rowH;
+        row.forEach((g, i) => {
+          if (!globalScene.textures.exists(g.atlas)) {
+            return;
+          }
+          const glyph = globalScene.add.sprite(startX + i * span, y, g.atlas, g.frame);
+          glyph.setOrigin(0.5, 0.5);
+          const gw = glyph.width || 32;
+          glyph.setScale(Math.max(0.5, Math.min(1, span / gw)));
+          this.card.add(glyph);
+          this.transient.push(glyph);
+        });
       });
     } else if (data.footprintKey && globalScene.textures.exists(data.footprintKey)) {
       // Footprint takes precedence over the silhouette/icon: the player reads the
@@ -206,12 +244,13 @@ export class ErQuizUiHandler extends UiHandler {
       this.promptText.setVisible(true);
       this.promptText.setText(data.prompt ?? "");
       if (data.largePrompt) {
-        // Braille seal: a short word of spaced dot-cells. Render it big and
-        // centered in the figure area so it is easy to read (the default 36px
-        // dex blurb is the smallest text on the card).
-        this.promptText.setFontSize("64px");
+        // Braille seal: spaced dot-cells. Render big + centered so it is easy to
+        // read. A longer two-word PHRASE (the final puzzle) gets a smaller size so
+        // it still fits on one or two centered lines.
+        const isPhrase = (data.prompt ?? "").length > 24;
+        this.promptText.setFontSize(isPhrase ? "44px" : "64px");
         this.promptText.setOrigin(0.5, 0);
-        this.promptText.setPosition(PANEL_W / 2, 22);
+        this.promptText.setPosition(PANEL_W / 2, isPhrase ? 26 : 22);
         this.promptText.setAlign("center");
         this.promptText.setWordWrapWidth((PANEL_W - 8) * 6, false);
       } else {
@@ -238,6 +277,10 @@ export class ErQuizUiHandler extends UiHandler {
         btn.label.setVisible(false);
       }
     }
+
+    // Braille reference KEY: shown only for the Braille seal so the player can
+    // decode the raised glyphs (sits beside the card, never over it).
+    this.brailleLegend.setVisible(!!data.showBrailleLegend);
 
     this.cursor = 0;
     this.moveCursorTo(0);

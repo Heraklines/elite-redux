@@ -148,23 +148,30 @@ export class ErQuizPhase extends Phase {
     }
     const q = this.questions[this.index];
 
-    // CIPHER (Unown): render the answer word as a row of Unown letter icons and
-    // offer the word choices. Unown forms A-Z = formIndex 0-25; the menu-icon
-    // atlas is boot-loaded, so no extra asset load is needed.
+    // CIPHER (Unown): render the answer in Unown letter icons and offer the word
+    // choices. Unown forms A-Z = formIndex 0-25; the menu-icon atlas is boot-loaded,
+    // so no extra asset load is needed. The word is split on spaces into per-word
+    // ROWS so a multi-word phrase (the longer final puzzle) wraps neatly.
     if (q.kind === "cipher") {
       const word = q.cipherWord ?? "";
       const unown = getPokemonSpecies(SpeciesId.UNOWN);
-      const glyphIcons: { atlas: string; frame: string }[] = [];
-      for (const ch of word) {
-        const formIndex = ch.charCodeAt(0) - 65; // 'A' -> 0 ... 'Z' -> 25
-        if (formIndex < 0 || formIndex > 25) {
-          continue;
-        }
-        glyphIcons.push({ atlas: unown.getIconAtlasKey(formIndex), frame: unown.getIconId(false, formIndex) });
-      }
+      const glyphRows = word
+        .split(" ")
+        .map(part => {
+          const row: { atlas: string; frame: string }[] = [];
+          for (const ch of part) {
+            const formIndex = ch.charCodeAt(0) - 65; // 'A' -> 0 ... 'Z' -> 25
+            if (formIndex < 0 || formIndex > 25) {
+              continue;
+            }
+            row.push({ atlas: unown.getIconAtlasKey(formIndex), frame: unown.getIconId(false, formIndex) });
+          }
+          return row;
+        })
+        .filter(row => row.length > 0);
       const cipherView: ErQuizView = {
         header: `What do the glyphs spell?  (${this.index + 1}/${this.questions.length})`,
-        glyphIcons,
+        glyphRows,
         options: q.cipherOptions ?? [],
       };
       globalScene.ui.setMode(UiMode.ER_QUIZ, cipherView, (choice: number) => void this.onAnswer(choice));
@@ -172,12 +179,14 @@ export class ErQuizPhase extends Phase {
     }
 
     // BRAILLE (Dormant Guardian seal): render the answer word as raised Braille
-    // dot-cells in the text prompt (no sprites) and offer the word choices.
+    // dot-cells in the text prompt (no sprites), with the A-Z Braille KEY shown
+    // beside it so the player can decode, and offer the word choices.
     if (q.kind === "braille") {
       const brailleView: ErQuizView = {
         header: `Read the raised glyphs.  (${this.index + 1}/${this.questions.length})`,
         prompt: q.prompt,
         largePrompt: true,
+        showBrailleLegend: true,
         options: q.cipherOptions ?? [],
       };
       globalScene.ui.setMode(UiMode.ER_QUIZ, brailleView, (choice: number) => void this.onAnswer(choice));

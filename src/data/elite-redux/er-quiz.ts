@@ -196,9 +196,17 @@ export function getErDexFlavor(speciesId: number): string | undefined {
  * Build one Unown Cipher question: an answer WORD spelled in Unown letters plus
  * `optionCount-1` distractor words, all shuffled. answerId is unused (-1).
  */
-function buildErCipherQuestion(optionCount: number): ErQuizQuestion {
-  const answer = randSeedItem(ER_CIPHER_WORDS);
+function buildErCipherQuestion(optionCount: number, usePhrase = false): ErQuizQuestion {
   const distractorTarget = Math.max(1, Math.min(3, optionCount - 1));
+  if (usePhrase) {
+    // A longer FINAL puzzle: a two-word phrase. Distractors are other distinct
+    // phrases (no same-length constraint - phrases vary in shape by design).
+    const answer = randSeedItem([...ER_CIPHER_PHRASES]);
+    const distractors = randSeedShuffle(ER_CIPHER_PHRASES.filter(p => p !== answer)).slice(0, distractorTarget);
+    const cipherOptions = randSeedShuffle([answer, ...distractors]);
+    return { kind: "cipher", answerId: -1, options: [], prompt: "", cipherWord: answer, cipherOptions };
+  }
+  const answer = randSeedItem(ER_CIPHER_WORDS);
   // Distractors MUST be the same length as the answer - otherwise the odd-one-out
   // length gives the answer away without reading the glyphs at all. Fall back to
   // any other word only if a length somehow lacks enough peers.
@@ -212,22 +220,70 @@ function buildErCipherQuestion(optionCount: number): ErQuizQuestion {
 /** Standard Braille letter cells A-Z (Unicode U+2801..), index 0='A'..25='Z'. */
 const BRAILLE_CELLS = "⠁⠃⠉⠙⠑⠋⠛⠓⠊⠚⠅⠇⠍⠝⠕⠏⠟⠗⠎⠞⠥⠧⠺⠭⠽⠵";
 
-/** Spell a word in spaced Unicode Braille cells (unknown chars -> a blank cell). */
-function brailleEncode(word: string): string {
-  return [...word]
-    .map(ch => {
-      const i = ch.toUpperCase().charCodeAt(0) - 65;
-      return i >= 0 && i < 26 ? BRAILLE_CELLS[i] : "⠿";
-    })
-    .join(" ");
+/**
+ * Spell a word/phrase in spaced Unicode Braille cells. Spaces between words become
+ * a wider gap (a triple space) so multi-word phrases read as separate words; any
+ * other non-letter becomes a blank cell.
+ */
+function brailleEncode(text: string): string {
+  return text
+    .toUpperCase()
+    .split(" ")
+    .map(word =>
+      [...word]
+        .map(ch => {
+          const i = ch.charCodeAt(0) - 65;
+          return i >= 0 && i < 26 ? BRAILLE_CELLS[i] : "⠿";
+        })
+        .join(" "),
+    )
+    .join("   ");
 }
+
+/**
+ * The A-Z Braille reference key, as 13 two-column lines ("A⠁ N⠝"), rendered beside
+ * the Braille seal so the player can actually decode it (#542 - braille legend).
+ */
+export function getErBrailleLegendText(): string {
+  const lines: string[] = [];
+  for (let i = 0; i < 13; i++) {
+    const left = String.fromCharCode(65 + i) + BRAILLE_CELLS[i];
+    const right = String.fromCharCode(65 + 13 + i) + BRAILLE_CELLS[13 + i];
+    lines.push(`${left} ${right}`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * The Unown Cipher / Braille PHRASE bank: short two-word ruins inscriptions, each
+ * word A-Z and <=7 letters so it renders as one tidy glyph row (and fits an answer
+ * button). The LAST question of a round draws from here for a longer final puzzle.
+ */
+const ER_CIPHER_PHRASES: readonly string[] = [
+  "ANCIENT TOMB",
+  "SEALED VAULT",
+  "STONE WARDEN",
+  "HOLLOW CRYPT",
+  "SACRED RELIC",
+  "FROST CURSE",
+  "DRAGON SOUL",
+  "GOLDEN IDOL",
+  "SHADOW PACT",
+  "BURIED KING",
+  "TITAN BANE",
+  "BONE THRONE",
+  "RUNED DOOR",
+  "DARK OMEN",
+  "LOST CROWN",
+  "GHOST GATE",
+];
 
 /**
  * Build one Braille seal question: the same word bank as the Unown Cipher, but the
  * answer word is rendered as raised Braille dot-cells in the prompt (no sprites).
  */
-function buildErBrailleQuestion(optionCount: number): ErQuizQuestion {
-  const q = buildErCipherQuestion(optionCount);
+function buildErBrailleQuestion(optionCount: number, usePhrase = false): ErQuizQuestion {
+  const q = buildErCipherQuestion(optionCount, usePhrase);
   return { ...q, kind: "braille", prompt: brailleEncode(q.cipherWord ?? "") };
 }
 
@@ -317,12 +373,12 @@ export function erItemIdForName(name: string): string | undefined {
   return itemBank().find(it => it.name === name)?.id;
 }
 
-export function buildErQuizQuestion(kind: ErQuizKind, optionCount = 4): ErQuizQuestion {
+export function buildErQuizQuestion(kind: ErQuizKind, optionCount = 4, usePhrase = false): ErQuizQuestion {
   if (kind === "cipher") {
-    return buildErCipherQuestion(optionCount);
+    return buildErCipherQuestion(optionCount, usePhrase);
   }
   if (kind === "braille") {
-    return buildErBrailleQuestion(optionCount);
+    return buildErBrailleQuestion(optionCount, usePhrase);
   }
   if (kind === "item") {
     return buildErItemQuestion(optionCount);
@@ -358,7 +414,10 @@ export function buildErQuizRound(kind: ErQuizKind, count: number, optionCount = 
   const usedAnswers = new Set<string>();
   let guard = 0;
   while (out.length < count && guard++ < count * 50) {
-    const q = buildErQuizQuestion(kind, optionCount);
+    // The LAST question of a cipher/braille round is a longer two-word PHRASE for a
+    // tougher finale (#542); earlier questions stay single words.
+    const usePhrase = (kind === "cipher" || kind === "braille") && out.length === count - 1;
+    const q = buildErQuizQuestion(kind, optionCount, usePhrase);
     const key =
       q.kind === "cipher" || q.kind === "braille"
         ? (q.cipherWord ?? "")

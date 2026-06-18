@@ -864,8 +864,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
     description:
       "#520 - The Dormant Guardian (Ruins Braille puzzle -> boss). Forces\n"
       + "ER_DORMANT_GUARDIAN in RUINS.\n"
-      + "DO: 'Read the seal' and decode the BRAILLE word (raised dot-cells shown as the\n"
-      + "prompt, pick the matching word), or 'Leave it sealed'.\n"
+      + "DO: 'Read the seal' and decode the BRAILLE (raised dot-cells); the A-Z Braille\n"
+      + "KEY now shows on a panel to the RIGHT of the card so you can decode it (#542).\n"
+      + "Pick the matching word. The LAST question is a longer two-word PHRASE.\n"
+      + "Or 'Leave it sealed'.\n"
       + "EXPECT: correct -> attune, a reward screen with a relic + a Rogue pick, no\n"
       + "fight. Wrong -> the construct (Golurk/Regirock/Registeel/Golem) wakes as a 5-6\n"
       + "bar omni-boosted boss (+5 levels, all stats +1 on entry); win for the same\n"
@@ -1650,11 +1652,11 @@ export const DEV_SCENARIOS: DevScenario[] = [
       "#506 Ruins UNOWN CIPHER (no longer the silhouette game). Forces\n"
       + "ER_SEALED_DOOR in the RUINS biome.\n"
       + "DO: 'Read the glyphs' or 'Leave it sealed'. EXPECT: each of 3 questions shows\n"
-      + "a WORD spelled out in a row of UNOWN letter glyphs; pick the matching word\n"
-      + "from the 4 choices (NOT a Pokemon silhouette). The vault tier scales with\n"
-      + "correct decodes - 3/3 = 3 Rogue picks; 2 = 3 Ultra; 1 = 3 Great; 0 = leave\n"
-      + "with a heal. Leave it sealed = nothing, no cost. CHECK the Unown glyphs render\n"
-      + "(a row of distinct letter icons, not blank).",
+      + "a WORD spelled out in UNOWN letter glyphs; pick the matching word from the 4\n"
+      + "choices. The LAST question is a longer TWO-WORD phrase, shown as two stacked\n"
+      + "glyph rows (#542). The vault tier scales with correct decodes - 3/3 = 3 Rogue\n"
+      + "picks; 2 = 3 Ultra; 1 = 3 Great; 0 = leave with a heal. Leave it sealed =\n"
+      + "nothing, no cost. CHECK the Unown glyphs render (distinct letter icons, not blank).",
     setup: () => {
       resetDevOverrides();
       setOverrides({
