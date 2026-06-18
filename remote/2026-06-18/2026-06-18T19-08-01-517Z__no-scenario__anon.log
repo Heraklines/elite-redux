@@ -1,0 +1,275 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqjts635-jy50
+mode:     0  wave:6
+seed:     YIxSHLCDe0FCgykjGc9YerbR
+party:    Snivy(L7 16hp f0), Mudkip(L5 21hp f0), Fuecoco(L5 22hp f0)
+enemy:    Whismur(L5)
+
+----- CONSOLE -----
+[19:06:24.860] LOG: crit stage: +0
+[19:06:24.862] LOG: Move: Outburst | Base damage: 14.461538461538462 | Power: 250 | Source attack: 9 | Target defense: 13
+[19:06:24.862] LOG: Move: Outburst | Attack damage: 14
+[19:06:24.863] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:06:24.894] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:06:24.895] LOG: %cStart Phase FaintPhase color:green;
+[19:06:25.608] LOG: %cStart Phase MessagePhase color:green;
+[19:06:26.098] LOG: %cStart Phase VictoryPhase color:green;
+[19:06:26.099] LOG: %cStart Phase ExpPhase color:green;
+[19:06:26.558] LOG: %cStart Phase MoveEndPhase color:green;
+[19:06:26.558] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:06:26.558] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:06:26.558] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:06:26.558] LOG: %cStart Phase BerryPhase color:green;
+[19:06:26.558] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:06:26.559] LOG: %cStart Phase TurnEndPhase color:green;
+[19:06:26.559] LOG: %cStart Phase BattleEndPhase color:green;
+[19:06:26.559] LOG: Battle Score: 19 (1 Turns x1)
+[19:06:26.559] LOG: Total Score: 38
+[19:06:26.569] LOG: %cStart Phase EggLapsePhase color:green;
+[19:06:26.569] LOG: %cStart Phase SelectModifierPhase color:green;
+[19:06:26.569] LOG: Wave Seed: ]M|WLPGHi4JGk}onKg=]ivfV 4
+[19:06:26.572] LOG: 8 3 [3,4,5]
+[19:06:26.572] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} 
+[19:06:26.573] LOG: 0 0 [3,4,5]
+[19:06:26.573] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[19:06:26.573] LOG: 7 3 [3,4,5]
+[19:06:26.573] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[19:06:32.095] LOG: %cStart Phase NewBattlePhase color:green;
+[19:06:32.095] LOG: Wave Seed: ^N}XMQHIj5KHl~poLh>^jwgW 5
+[19:06:32.101] LOG: %cStart Phase ReturnPhase color:green;
+[19:06:32.231] LOG: %cStart Phase ShowTrainerPhase color:green;
+[19:06:32.351] LOG: %cStart Phase NextEncounterPhase color:green;
+[19:06:32.356] LOG: UNCOMMON
+[19:06:32.356] LOG: Downgraded trainer Pokemon rarity tier from UNCOMMON to COMMON
+[19:06:32.356] LOG: Bidoof
+[19:06:32.401] LOG: Pokemon: Foe Bidoof | Species ID: 399 | Level: 4 | Nature: Mild (+SpAtk/-Def)
+[19:06:32.401] LOG: Stats (IVs): HP: 19 (11), Atk: 9 (10), Def: 9 (0), Spatk: 9 (15), Spdef: 8 (7), Spd: 7 (10)
+[19:06:32.402] LOG: Ability: Lumberjack | Passive Ability: Unaware 
+[19:06:32.402] LOG: Moveset: ["Growl","Strength","Mud Sport","Defense Curl"]
+[19:06:32.402] LOG: UNCOMMON
+[19:06:32.402] LOG: Downgraded trainer Pokemon rarity tier from UNCOMMON to COMMON
+[19:06:32.402] LOG: Weedle
+[19:06:32.442] LOG: Pokemon: Foe Weedle | Species ID: 13 | Level: 4 | Nature: Sassy (+SpDef/-Spd)
+[19:06:32.442] LOG: Stats (IVs): HP: 17 (1), Atk: 8 (6), Def: 7 (25), Spatk: 7 (16), Spdef: 7 (25), Spd: 8 (13)
+[19:06:32.442] LOG: Ability: Infiltrator | Passive Ability: Swarm 
+[19:06:32.442] LOG: Moveset: ["Lunge","Poison Sting"]
+[19:06:36.272] LOG: Battle Seed: D058975k6HtpN5Iu
+[19:06:36.274] LOG: Generated AI funcs
+[19:06:36.374] DEBUG: Session data saved to slot 0!
+[19:06:36.376] LOG: Wave Seed: ^N}XMQHIj5KHl~poLh>^jwgW 5
+[19:06:36.592] LOG: Youngster Yasu
+[19:06:38.237] LOG: Dialogue saved as seen: dialogue:youngster.encounter.3
+[19:06:38.275] LOG: Youngster Yasu
+[19:06:39.791] LOG: %cStart Phase SummonPhase color:green;
+[19:06:39.792] LOG: Yasu
+[19:06:40.087] LOG: %cStart Phase SummonPhase color:green;
+[19:06:40.286] WARN: cry/495 not found
+[19:06:40.401] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:06:40.403] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:06:40.404] LOG: %cStart Phase PostSummonPhase color:green;
+[19:06:40.404] LOG: Ran PSP for: Snivy
+[19:06:40.405] LOG: %cStart Phase PostSummonPhase color:green;
+[19:06:40.405] LOG: %cStart Phase PostSummonPhase color:green;
+[19:06:40.405] LOG: Ran PSP for: Bidoof
+[19:06:40.406] LOG: %cStart Phase PostSummonPhase color:green;
+[19:06:40.406] LOG: %cStart Phase PostSummonPhase color:green;
+[19:06:40.406] LOG: %cStart Phase TurnInitPhase color:green;
+[19:06:40.406] LOG: %cStart Phase CommandPhase color:green;
+[19:06:41.680] LOG: Move: SLAM Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Snivy
+[19:06:41.682] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:06:41.689] LOG: %cStart Phase TurnStartPhase color:green;
+[19:06:41.693] LOG: %cStart Phase SwitchSummonPhase color:green;
+[19:06:41.694] LOG: Yasu
+[19:06:41.970] LOG: Yasu
+[19:06:42.206] LOG: %cStart Phase PostSummonPhase color:green;
+[19:06:42.206] LOG: Ran PSP for: Weedle
+[19:06:42.206] LOG: %cStart Phase PostSummonPhase color:green;
+[19:06:42.207] LOG: %cStart Phase PostSummonPhase color:green;
+[19:06:42.207] LOG: %cStart Phase MovePhase color:green;
+[19:06:42.207] LOG: %cUser: Snivy
+Move: SLAM
+Use Mode: NORMAL color:orchid
+[19:06:42.211] LOG: %cStart Phase MessagePhase color:green;
+[19:06:42.319] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:06:42.603] LOG: crit stage: +0
+[19:06:42.604] LOG: Move: Slam | Base damage: 13.495000000000003 | Power: 95 | Source attack: 11 | Target defense: 8
+[19:06:42.605] LOG: Move: Slam | Attack damage: 11
+[19:06:42.606] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:06:42.636] LOG: %cStart Phase MoveEndPhase color:green;
+[19:06:42.637] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:06:42.637] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:06:42.637] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:06:42.637] LOG: %cStart Phase BerryPhase color:green;
+[19:06:42.640] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:06:42.640] LOG: %cStart Phase TurnEndPhase color:green;
+[19:06:42.643] LOG: %cStart Phase TurnInitPhase color:green;
+[19:06:42.643] LOG: %cStart Phase CommandPhase color:green;
+[19:06:43.546] LOG: Move: SLAM Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Snivy
+[19:06:43.549] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:06:43.560] LOG: Battle Seed: D058975k6HtpN5Iu
+[19:06:43.564] LOG: Move Pool: ["Lunge","Poison Sting"]
+[19:06:43.564] LOG: Move Scores: [63,42]
+[19:06:43.565] LOG: Sorted Move Pool: ["Lunge","Poison Sting"]
+[19:06:43.565] LOG: Chosen Move: Lunge
+[19:06:43.565] LOG: %cStart Phase TurnStartPhase color:green;
+[19:06:43.567] LOG: %cStart Phase MovePhase color:green;
+[19:06:43.568] LOG: %cUser: Snivy
+Move: SLAM
+Use Mode: NORMAL color:orchid
+[19:06:43.570] LOG: %cStart Phase MessagePhase color:green;
+[19:06:43.647] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:06:43.932] LOG: crit stage: +0
+[19:06:43.933] LOG: Move: Slam | Base damage: 13.495000000000003 | Power: 95 | Source attack: 11 | Target defense: 8
+[19:06:43.933] LOG: Move: Slam | Attack damage: 12
+[19:06:43.934] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:06:43.967] LOG: %cStart Phase FaintPhase color:green;
+[19:06:45.180] LOG: %cStart Phase MessagePhase color:green;
+[19:06:46.116] LOG: %cStart Phase VictoryPhase color:green;
+[19:06:46.117] LOG: %cStart Phase ExpPhase color:green;
+[19:06:47.211] LOG: %cStart Phase MoveEndPhase color:green;
+[19:06:47.211] LOG: %cStart Phase MovePhase color:green;
+[19:06:47.211] LOG: %cStart Phase MoveEndPhase color:green;
+[19:06:47.212] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:06:47.212] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:06:47.212] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:06:47.212] LOG: %cStart Phase BerryPhase color:green;
+[19:06:47.213] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:06:47.213] LOG: %cStart Phase TurnEndPhase color:green;
+[19:06:47.213] LOG: %cStart Phase SwitchSummonPhase color:green;
+[19:06:47.460] LOG: Yasu
+[19:06:47.699] LOG: %cStart Phase PostSummonPhase color:green;
+[19:06:47.699] LOG: Ran PSP for: Bidoof
+[19:06:47.700] LOG: %cStart Phase PostSummonPhase color:green;
+[19:06:47.700] LOG: %cStart Phase PostSummonPhase color:green;
+[19:06:47.701] LOG: %cStart Phase TurnInitPhase color:green;
+[19:06:47.701] LOG: %cStart Phase CommandPhase color:green;
+[19:06:48.552] LOG: Move: SLAM Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Snivy
+[19:06:48.555] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:06:48.561] LOG: Battle Seed: D058975k6HtpN5Iu
+[19:06:48.562] LOG: Move Pool: ["Growl","Strength","Mud Sport","Defense Curl"]
+[19:06:48.562] LOG: Move Scores: [2,18,0,2]
+[19:06:48.562] LOG: Sorted Move Pool: ["Strength","Growl","Defense Curl","Mud Sport"]
+[19:06:48.562] LOG: Chosen Move: Strength
+[19:06:48.562] LOG: %cStart Phase TurnStartPhase color:green;
+[19:06:48.564] LOG: %cStart Phase MovePhase color:green;
+[19:06:48.564] LOG: %cUser: Snivy
+Move: SLAM
+Use Mode: NORMAL color:orchid
+[19:06:48.565] LOG: %cStart Phase MessagePhase color:green;
+[19:06:48.657] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:06:48.941] LOG: crit stage: +0
+[19:06:48.943] LOG: Move: Slam | Base damage: 13.495000000000003 | Power: 95 | Source attack: 11 | Target defense: 8
+[19:06:48.943] LOG: Move: Slam | Attack damage: 12
+[19:06:48.944] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:06:48.976] LOG: %cStart Phase MoveEndPhase color:green;
+[19:06:48.977] LOG: %cStart Phase MovePhase color:green;
+[19:06:48.977] LOG: %cUser: Bidoof
+Move: STRENGTH
+Use Mode: NORMAL color:orchid
+[19:06:48.981] LOG: %cStart Phase MessagePhase color:green;
+[19:06:49.107] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:06:49.407] LOG: crit stage: +0
+[19:06:49.409] LOG: Move: Strength | Base damage: 10.224615384615385 | Power: 165 | Source attack: 9 | Target defense: 13
+[19:06:49.409] LOG: Move: Strength | Attack damage: 8
+[19:06:49.410] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:06:49.442] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:06:49.443] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:06:49.629] LOG: %cStart Phase MessagePhase color:green;
+[19:06:49.875] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:06:50.064] LOG: %cStart Phase MessagePhase color:green;
+[19:06:50.308] LOG: %cStart Phase MoveEndPhase color:green;
+[19:06:50.309] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:06:50.309] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:06:50.309] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:06:50.309] LOG: %cStart Phase BerryPhase color:green;
+[19:06:50.310] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:06:50.311] LOG: %cStart Phase TurnEndPhase color:green;
+[19:06:50.312] LOG: %cStart Phase TurnInitPhase color:green;
+[19:06:50.313] LOG: %cStart Phase CommandPhase color:green;
+[19:06:50.936] LOG: Move: SLAM Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Snivy
+[19:06:50.940] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:06:50.945] LOG: Battle Seed: D058975k6HtpN5Iu
+[19:06:50.946] LOG: Move Pool: ["Growl","Strength","Mud Sport","Defense Curl"]
+[19:06:50.946] LOG: Move Scores: [2,18,0,2]
+[19:06:50.946] LOG: Sorted Move Pool: ["Strength","Growl","Defense Curl","Mud Sport"]
+[19:06:50.946] LOG: Chosen Move: Strength
+[19:06:50.946] LOG: %cStart Phase TurnStartPhase color:green;
+[19:06:50.950] LOG: %cStart Phase MovePhase color:green;
+[19:06:50.950] LOG: %cUser: Snivy
+Move: SLAM
+Use Mode: NORMAL color:orchid
+[19:06:50.951] LOG: %cStart Phase MessagePhase color:green;
+[19:06:51.038] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:06:51.325] LOG: crit stage: +0
+[19:06:51.328] LOG: Move: Slam | Base damage: 20.392000000000003 | Power: 95 | Source attack: 11 | Target defense: 5
+[19:06:51.329] LOG: Move: Slam | Attack damage: 19
+[19:06:51.329] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:06:51.359] LOG: %cStart Phase FaintPhase color:green;
+[19:06:52.541] LOG: %cStart Phase MessagePhase color:green;
+[19:06:52.762] LOG: %cStart Phase VictoryPhase color:green;
+[19:06:52.763] LOG: %cStart Phase ExpPhase color:green;
+[19:07:04.705] LOG: %cStart Phase LevelUpPhase color:green;
+[19:07:04.706] LOG: %cStart Phase MoveEndPhase color:green;
+[19:07:04.709] LOG: %cStart Phase MovePhase color:green;
+[19:07:04.709] LOG: %cStart Phase MoveEndPhase color:green;
+[19:07:04.709] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:07:04.709] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:07:04.709] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:07:04.709] LOG: %cStart Phase BerryPhase color:green;
+[19:07:04.709] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:07:04.710] LOG: %cStart Phase TurnEndPhase color:green;
+[19:07:04.710] LOG: %cStart Phase BattleEndPhase color:green;
+[19:07:04.711] LOG: Battle Score: 25 (4 Turns x0.69)
+[19:07:04.711] LOG: Total Score: 63
+[19:07:04.739] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[19:07:04.744] LOG: Youngster Yasu
+[19:07:04.937] LOG: Youngster Yasu
+[19:07:05.334] LOG: Dialogue saved as seen: dialogue:youngster.victory.3
+[19:07:05.334] LOG: %cStart Phase MoneyRewardPhase color:green;
+[19:07:05.571] LOG: %cStart Phase ModifierRewardPhase color:green;
+[19:07:06.261] LOG: %cStart Phase EggLapsePhase color:green;
+[19:07:06.261] LOG: %cStart Phase SelectModifierPhase color:green;
+[19:07:06.261] LOG: Wave Seed: ^N}XMQHIj5KHl~poLh>^jwgW 5
+[19:07:06.265] LOG: 8 2 [2,3]
+[19:07:06.266] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} 
+[19:07:06.266] LOG: 24 5 [9,11,12,13,15,25]
+[19:07:06.266] LOG: {"id":"EXP_SHARE","localeKey":"modifierType:ModifierType.EXP_SHARE","iconImage":"exp_share","soundName":"se/restore","tier":2} 
+[19:07:06.266] LOG: 0 0 [2,3]
+[19:07:06.266] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[19:07:07.725] LOG: %cStart Phase NewBattlePhase color:green;
+[19:07:07.726] LOG: Wave Seed: _O~YNRIJk6LImqpMi?_kxhX 6
+[19:07:07.730] LOG: %cStart Phase NextEncounterPhase color:green;
+[19:07:07.732] LOG: Starting species pool tier: UNCOMMON
+[19:07:07.777] LOG: Pokemon: Wild Whismur | Species ID: 293 | Level: 5 | Nature: Jolly (+Spd/-SpAtk)
+[19:07:07.778] LOG: Stats (IVs): HP: 22 (2), Atk: 10 (14), Def: 8 (11), Spatk: 10 (8), Spdef: 9 (18), Spd: 10 (11)
+[19:07:07.778] LOG: Ability: Scrappy | Passive Ability: Soundproof 
+[19:07:07.778] LOG: Moveset: ["Growl","Screech","Howl","Astonish"]
+[19:07:16.310] DEBUG: Session data saved to slot 0!
+[19:07:16.312] LOG: Wave Seed: _O~YNRIJk6LImqpMi?_kxhX 6
+[19:07:16.755] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:07:16.756] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:07:55.278] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:07:55.280] LOG: %cStart Phase PostSummonPhase color:green;
+[19:07:55.280] LOG: Ran PSP for: Whismur
+[19:07:55.281] LOG: %cStart Phase PostSummonPhase color:green;
+[19:07:55.281] LOG: %cStart Phase PostSummonPhase color:green;
+[19:07:55.282] LOG: %cStart Phase TurnInitPhase color:green;
+[19:07:55.282] LOG: %cStart Phase CommandPhase color:green;
+[19:07:59.508] LOG: Move: SLAM Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Snivy
+[19:07:59.511] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:07:59.515] LOG: Battle Seed: gcVyKssLE1qClUUn
+[19:07:59.516] LOG: Move Pool: ["Growl","Screech","Howl","Astonish"]
+[19:07:59.517] LOG: Move Scores: [2,6,2,13]
+[19:07:59.517] LOG: Sorted Move Pool: ["Astonish","Screech","Growl","Howl"]
+[19:07:59.517] LOG: Chosen Move: Screech
+[19:07:59.517] LOG: %cStart Phase TurnStartPhase color:green;
+[19:07:59.519] LOG: %cStart Phase MovePhase color:green;
+[19:07:59.519] LOG: %cUser: Snivy
+Move: SLAM
+Use Mode: NORMAL color:orchid
+[19:07:59.520] LOG: %cStart Phase MessagePhase color:green;
