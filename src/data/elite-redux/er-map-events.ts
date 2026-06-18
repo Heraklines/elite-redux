@@ -15,7 +15,7 @@ import { globalScene } from "#app/global-scene";
 import { allBiomes } from "#data/data-lists";
 import { addErEventRevealedNode, revealAllErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import { type ErMapNode, revealMapNodes, setMapTravelTarget } from "#data/elite-redux/er-map-nodes";
-import type { BiomeId } from "#enums/biome-id";
+import { BiomeId } from "#enums/biome-id";
 import { getBiomeName, randSeedItem } from "#utils/common";
 
 /** The current biome's onward biome links, normalized (weighted tuples flattened). */
@@ -57,6 +57,22 @@ export function revealLandmark(biome: BiomeId, label: string): void {
  */
 export function setRandomTravelTarget(): BiomeId | null {
   const options = onwardBiomes();
+  if (options.length === 0) {
+    return null;
+  }
+  const target = randSeedItem(options);
+  setMapTravelTarget(target);
+  return target;
+}
+
+/**
+ * Pick a random ANY-biome travel target - the whole biome graph, not just the
+ * current biome's onward links (the Ultra Wormhole flings you ANYWHERE). Excludes
+ * the current biome and non-travel biomes (Town/End). Returns the biome, or null.
+ */
+export function setAnyBiomeTravelTarget(): BiomeId | null {
+  const current = globalScene.arena.biomeId;
+  const options = [...allBiomes.keys()].filter(b => b !== current && b !== BiomeId.TOWN && b !== BiomeId.END);
   if (options.length === 0) {
     return null;
   }

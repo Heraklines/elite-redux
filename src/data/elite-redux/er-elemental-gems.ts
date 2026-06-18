@@ -61,19 +61,6 @@ function gemName(type: PokemonType): string {
   return `${lower.charAt(0).toUpperCase()}${lower.slice(1)} Gem`;
 }
 
-/** Build the held-item icon from a standalone er-assets texture (not the items atlas). */
-function erIconContainer(textureKey: string, stackText: () => Phaser.GameObjects.BitmapText | null) {
-  const container = globalScene.add.container(0, 0);
-  const item = globalScene.add.sprite(0, 12, textureKey);
-  item.setScale(0.5);
-  item.setOrigin(0, 0.5);
-  container.add(item);
-  const text = stackText();
-  if (text) {
-    container.add(text);
-  }
-  return container;
-}
 
 /** A single-use elemental Gem (self-contained; enemy-side for now). */
 export class ErGemModifier extends PokemonHeldItemModifier {
@@ -101,9 +88,30 @@ export class ErGemModifier extends PokemonHeldItemModifier {
   }
 
   override getIcon(forSummary?: boolean): Phaser.GameObjects.Container {
-    return forSummary
-      ? super.getIcon(forSummary)
-      : erIconContainer(erGemTextureKey(this.gemType), () => this.getIconStackText());
+    if (forSummary) {
+      return super.getIcon(forSummary);
+    }
+    // Mirror PokemonHeldItemModifier.getIcon's item-bar layout so the gem shows
+    // WHOSE it is: the holder's Pokemon icon on the left, then the gem sprite
+    // offset to x=16 (the gem is a standalone er-assets texture, not the items
+    // atlas, so we draw it directly instead of via super). (#fix: gems were
+    // rendering with no holder icon, so you couldn't tell which mon held them.)
+    const container = globalScene.add.container(0, 0);
+    const pokemon = this.getPokemon();
+    if (pokemon) {
+      const pokemonIcon = globalScene.addPokemonIcon(pokemon, -2, 10, 0, 0.5, undefined, true);
+      container.add(pokemonIcon);
+      container.setName(pokemon.id.toString());
+    }
+    const item = globalScene.add.sprite(16, 16, erGemTextureKey(this.gemType));
+    item.setScale(0.5);
+    item.setOrigin(0, 0.5);
+    container.add(item);
+    const stackText = this.getIconStackText();
+    if (stackText) {
+      container.add(stackText);
+    }
+    return container;
   }
 }
 

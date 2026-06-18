@@ -6,13 +6,13 @@
 
 // =============================================================================
 // ER #486 - Ultra Wormhole. A SPACE-biome map TRAVEL event (Phase D): a shimmering
-// rift hangs in the void. Step through and the rift flings the party onward - the
-// next biome transition is forced to a random onward destination (a map travel
-// target). Or leave the rift alone.
+// rift hangs in the void. Step through and the rift flings the party to a biome
+// ANYWHERE on the graph - not just the current biome's natural onward links (the
+// whole point of a wormhole: it can throw you into any biome). Or leave it alone.
 // =============================================================================
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
-import { setRandomTravelTarget } from "#data/elite-redux/er-map-events";
+import { setAnyBiomeTravelTarget } from "#data/elite-redux/er-map-events";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
@@ -48,7 +48,7 @@ export const UltraWormholeEncounter: MysteryEncounter = MysteryEncounterBuilder.
       selected: [{ text: `${namespace}:option.1.selected` }],
     },
     async () => {
-      const target = setRandomTravelTarget();
+      const target = setAnyBiomeTravelTarget();
       queueEncounterMessage(target == null ? `${namespace}:closed` : `${namespace}:flung`);
       await transitionMysteryEncounterIntroVisuals(true, true);
       leaveEncounterWithoutBattle(true);

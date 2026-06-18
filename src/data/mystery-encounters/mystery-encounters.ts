@@ -46,7 +46,6 @@ import { InnateShrineEncounter } from "#mystery-encounters/innate-shrine-encount
 import { IntoTheCalderaEncounter } from "#mystery-encounters/into-the-caldera-encounter";
 import { LakeSpiritEncounter } from "#mystery-encounters/lake-spirit-encounter";
 import { LostAtSeaEncounter } from "#mystery-encounters/lost-at-sea-encounter";
-import { LostWandererEncounter } from "#mystery-encounters/lost-wanderer-encounter";
 import { MessageInABottleEncounter } from "#mystery-encounters/message-in-a-bottle-encounter";
 import { MountainSageEncounter } from "#mystery-encounters/mountain-sage-encounter";
 import { MushroomCircleEncounter } from "#mystery-encounters/mushroom-circle-encounter";
@@ -259,7 +258,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
       MysteryEncounterType.ER_TOWN_RAFFLE,
     ],
   ],
-  [BiomeId.PLAINS, [MysteryEncounterType.SLUMBERING_SNORLAX, MysteryEncounterType.ER_LOST_WANDERER]],
+  [BiomeId.PLAINS, [MysteryEncounterType.SLUMBERING_SNORLAX]],
   [
     BiomeId.GRASS,
     [
@@ -438,7 +437,6 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_INFORMANT] = InformantEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_THE_STORM] = TheStormEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_ULTRA_WORMHOLE] = UltraWormholeEncounter;
-  allMysteryEncounters[MysteryEncounterType.ER_LOST_WANDERER] = LostWandererEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_SUNKEN_VESSEL] = SunkenVesselEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_FORTUNE_TELLER] = FortuneTellerEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_THE_MIRAGE] = TheMirageEncounter;

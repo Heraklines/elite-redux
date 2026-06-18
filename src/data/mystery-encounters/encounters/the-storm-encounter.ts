@@ -5,27 +5,26 @@
  */
 
 // =============================================================================
-// ER #486 - The Storm. A SEA-biome map TRAVEL event (Phase D). A weather front is
-// forming over the open water, its type HIDDEN - but you don't guess it blind.
-// The SIGNAL is your own party: a Pokemon with a weather-reactive ability/innate
-// (Drought/Chlorophyll -> sun, Drizzle/Swift Swim -> rain, Sand Stream/Sand Rush
-// -> sand, Snow Warning/Slush Rush -> snow) STIRS, reading the storm cleanly.
-// Teams with no weather mon get only a murky read.
+// ER #486 - The Storm. A SEA-biome map TRAVEL event (Phase D). A weather front
+// rolls in - its type is rolled fresh each time (sun / rain / sand / snow / fog),
+// so the storm is VARIED. You don't guess it blind: the SIGNAL is your own party.
+// If a Pokemon has an ability that activates in that weather (Chlorophyll, Swift
+// Swim, Sand Rush, Slush Rush, ... - the full weather-ability set), it STIRS and
+// reads the storm clear. The tell is the ABILITY NAME, not the weather - you infer
+// it (a Chlorophyll mon stirring means sun is coming). No matching ability = a
+// murky read. Fog is the one nothing reads (it stays murky by nature).
 //
-// RIDE THE STORM -> a DISTANT land you could not otherwise reach is glimpsed and
-// charted onto the World Map as a selectable (blue) onward route AND, if a mon
-// read the front, you CARRY that favourable weather into the very next biome.
-// Turn back -> ride it out where you are (nothing happens).
+// RIDE THE STORM -> a DISTANT land you could not otherwise reach is charted onto
+// the World Map as a selectable (blue) onward route AND, on a clear read, you
+// CARRY that weather into the very next biome (in your favour). Turn back -> nothing.
 //
-// [Recovered design - er-events-design-recovered.md "The Storm": the maintainer
-// rejected the blind "guess the weather" and approved reading it via your own
-// team's weather ability + carrying the weather + revealing a distant node. The
-// earlier shipped version (random travel target) was BUILT-WRONG.]
+// [Recovered design - er-events-design-recovered.md "The Storm": read via your own
+// team's weather ability + carry the weather + reveal a distant node.]
 // =============================================================================
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
-import { allBiomes } from "#data/data-lists";
+import { allAbilities, allBiomes } from "#data/data-lists";
 import { addErEventRevealedNode, getErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import { setErCarriedWeather } from "#data/elite-redux/er-map-nodes";
 import { AbilityId } from "#enums/ability-id";
@@ -46,39 +45,68 @@ import { randSeedItem } from "#utils/common";
 const namespace = "mysteryEncounters/theStorm";
 
 /**
- * Weather-reactive abilities/innates map to the weather their holder reads in the
- * storm (and would carry, in its favour). Covers the weather SETTERS and the
- * common weather-SYNERGY abilities so a synergy team reads the front cleanly.
+ * Every weather the storm can roll, mapped to the abilities/innates that "read"
+ * it (activate in / benefit from that weather). Fog is intentionally unreadable -
+ * no standard ability keys off it, so a fog front always reads murky.
  */
-const ABILITY_WEATHER: Partial<Record<AbilityId, WeatherType>> = {
-  [AbilityId.DROUGHT]: WeatherType.SUNNY,
-  [AbilityId.CHLOROPHYLL]: WeatherType.SUNNY,
-  [AbilityId.SOLAR_POWER]: WeatherType.SUNNY,
-  [AbilityId.LEAF_GUARD]: WeatherType.SUNNY,
-  [AbilityId.FLOWER_GIFT]: WeatherType.SUNNY,
-  [AbilityId.ORICHALCUM_PULSE]: WeatherType.SUNNY,
-  [AbilityId.DRIZZLE]: WeatherType.RAIN,
-  [AbilityId.SWIFT_SWIM]: WeatherType.RAIN,
-  [AbilityId.RAIN_DISH]: WeatherType.RAIN,
-  [AbilityId.DRY_SKIN]: WeatherType.RAIN,
-  [AbilityId.HYDRATION]: WeatherType.RAIN,
-  [AbilityId.SAND_STREAM]: WeatherType.SANDSTORM,
-  [AbilityId.SAND_RUSH]: WeatherType.SANDSTORM,
-  [AbilityId.SAND_FORCE]: WeatherType.SANDSTORM,
-  [AbilityId.SAND_VEIL]: WeatherType.SANDSTORM,
-  [AbilityId.SNOW_WARNING]: WeatherType.SNOW,
-  [AbilityId.SLUSH_RUSH]: WeatherType.SNOW,
-  [AbilityId.ICE_BODY]: WeatherType.SNOW,
-  [AbilityId.SNOW_CLOAK]: WeatherType.SNOW,
+const WEATHER_ABILITIES: Record<number, AbilityId[]> = {
+  [WeatherType.SUNNY]: [
+    AbilityId.DROUGHT,
+    AbilityId.CHLOROPHYLL,
+    AbilityId.SOLAR_POWER,
+    AbilityId.LEAF_GUARD,
+    AbilityId.FLOWER_GIFT,
+    AbilityId.HARVEST,
+    AbilityId.PROTOSYNTHESIS,
+    AbilityId.ORICHALCUM_PULSE,
+  ],
+  [WeatherType.RAIN]: [
+    AbilityId.DRIZZLE,
+    AbilityId.SWIFT_SWIM,
+    AbilityId.RAIN_DISH,
+    AbilityId.DRY_SKIN,
+    AbilityId.HYDRATION,
+  ],
+  [WeatherType.SANDSTORM]: [
+    AbilityId.SAND_STREAM,
+    AbilityId.SAND_RUSH,
+    AbilityId.SAND_FORCE,
+    AbilityId.SAND_VEIL,
+    AbilityId.OVERCOAT,
+  ],
+  [WeatherType.SNOW]: [
+    AbilityId.SNOW_WARNING,
+    AbilityId.SLUSH_RUSH,
+    AbilityId.ICE_BODY,
+    AbilityId.SNOW_CLOAK,
+    AbilityId.OVERCOAT,
+  ],
+  [WeatherType.FOG]: [],
 };
 
-/** Read the storm via the party: the weather the first weather-attuned mon senses, or null. */
-function readStormWeather(): WeatherType | null {
+/** The weathers the storm rolls from (varied each encounter). */
+const WEATHER_POOL: WeatherType[] = [
+  WeatherType.SUNNY,
+  WeatherType.RAIN,
+  WeatherType.SANDSTORM,
+  WeatherType.SNOW,
+  WeatherType.FOG,
+];
+
+interface StormState {
+  /** The rolled weather front (carried on a clear read). */
+  weather: WeatherType;
+  /** Display name of the party ability that read it, or null (murky read). */
+  abilityName: string | null;
+}
+
+/** The display name of the first party ability that reads `weather`, or null. */
+function readerAbilityName(weather: WeatherType): string | null {
+  const candidates = WEATHER_ABILITIES[weather] ?? [];
   for (const p of globalScene.getPlayerParty()) {
-    for (const key of Object.keys(ABILITY_WEATHER)) {
-      const ability = Number(key) as AbilityId;
+    for (const ability of candidates) {
       if (p.hasAbility(ability)) {
-        return ABILITY_WEATHER[ability] as WeatherType;
+        return allAbilities[ability]?.name ?? null;
       }
     }
   }
@@ -111,13 +139,17 @@ export const TheStormEncounter: MysteryEncounter = MysteryEncounterBuilder.withE
   ])
   .withIntroDialogue([{ text: `${namespace}:intro` }])
   .withOnInit(() => {
-    // Read the front up front so the description can hint whether a mon senses it.
+    // Roll the (varied) weather front now and see if a party ability reads it, so
+    // the description can name the stirring ability and the option can carry it.
     const encounter = globalScene.currentBattle.mysteryEncounter!;
+    const weather = randSeedItem(WEATHER_POOL);
+    const abilityName = readerAbilityName(weather);
+    encounter.misc = { weather, abilityName } satisfies StormState;
     encounter.setDialogueToken(
       "stormTell",
-      readStormWeather() == null
-        ? "No weather-attuned partner stirs - you can only read the storm murkily."
-        : "A weather-attuned partner stirs, reading the storm's currents clearly.",
+      abilityName == null
+        ? "Nothing in your party stirs - you can only read the storm murkily."
+        : `Your ${abilityName} stirs, reading the storm's currents clearly.`,
     );
     return true;
   })
@@ -132,19 +164,17 @@ export const TheStormEncounter: MysteryEncounter = MysteryEncounterBuilder.withE
       selected: [{ text: `${namespace}:option.1.selected` }],
     },
     async () => {
-      // Ride it: chart a distant land as a selectable onward route, and - if a mon
-      // read the front - carry that favourable weather into the next biome.
-      const read = readStormWeather();
+      // Ride it: chart a distant land as a selectable onward route, and - on a
+      // clear read - carry the rolled weather into the next biome.
+      const { weather, abilityName } = globalScene.currentBattle.mysteryEncounter!.misc as StormState;
       const distant = pickDistantBiome();
       if (distant != null) {
         addErEventRevealedNode(distant);
       }
-      if (read == null) {
-        // Murky read: you brave the squall and still glimpse a distant land.
+      if (abilityName == null) {
         queueEncounterMessage(distant == null ? `${namespace}:calm` : `${namespace}:swept`);
       } else {
-        setErCarriedWeather(read);
-        // A clean read: a distant land glimpsed AND the weather carried with you.
+        setErCarriedWeather(weather);
         queueEncounterMessage(`${namespace}:foresaw`);
       }
       await transitionMysteryEncounterIntroVisuals(true, true);
