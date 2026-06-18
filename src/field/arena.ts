@@ -10,6 +10,7 @@ import { getDailyForcedWaveBiomePoolTier } from "#data/daily-seed/daily-run";
 import { allBiomes } from "#data/data-lists";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { erApplyTerrainSeeds } from "#data/elite-redux/er-terrain-seeds";
 import { SpeciesFormChangeRevertWeatherFormTrigger, SpeciesFormChangeWeatherTrigger } from "#data/form-change-triggers";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import type { PositionalTag } from "#data/positional-tags/positional-tag";
@@ -474,6 +475,12 @@ export class Arena {
       );
       applyAbAttrs("PostTerrainChangeAbAttr", { pokemon, terrain });
       applyAbAttrs("TerrainEventTypeChangeAbAttr", { pokemon });
+      // ER: a held terrain seed (Grassy/Electric/Misty/Psychic) procs the instant
+      // its terrain becomes active on the field. This covers self-set terrain -
+      // e.g. a Grassy Surge mon switching in - where the on-summon seed check
+      // (PostSummonPhase) runs BEFORE the ability sets the terrain. Idempotent: the
+      // seed is consumed on proc, so it can't double-fire with the summon check.
+      erApplyTerrainSeeds(pokemon);
     }
 
     return true;
