@@ -30,6 +30,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { HitResult } from "#enums/hit-result";
+import { ModifierTier } from "#enums/modifier-tier";
 import { PokemonType } from "#enums/pokemon-type";
 import { type BattleStat, Stat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
@@ -93,6 +94,9 @@ export const ER_REACTIVE_CONFIG: Readonly<Record<ErReactiveKind, ErReactiveConfi
 };
 
 const ER_REACTIVE_KINDS = Object.keys(ER_REACTIVE_CONFIG) as ErReactiveKind[];
+
+/** Rarity tier for distribution (shops / reward pools). */
+export const ER_REACTIVE_TIER = ModifierTier.ULTRA;
 
 /** Build the held-item icon from a standalone er-assets texture (not the items atlas). */
 function erIconContainer(textureKey: string, stackText: () => Phaser.GameObjects.BitmapText | null) {

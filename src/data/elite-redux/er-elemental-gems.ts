@@ -1,0 +1,150 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Elite Redux - elemental Gems (one-shot 1.3x to a move of the matching type).
+//
+// 18 type Gems (Stellar has none). The first damaging move whose TYPE matches
+// the held Gem is boosted 1.3x, then the Gem SHATTERS (consumed). Rides the same
+// damage-calc hook as the Omni Gem - consumed only on REAL (non-simulated) calcs
+// so the AI's damage previews don't burn it.
+//
+// Self-contained (no modifier.ts / modifier-type.ts surgery): class + runtime
+// ModifierType factory live here; icons are PokeAPI gem sprites on er-assets
+// (er_<type>_gem, loaded in loading-scene). Enemy-side for now (see
+// er-reactive-items.ts for the save-registration follow-up note).
+// =============================================================================
+
+import { globalScene } from "#app/global-scene";
+import { ModifierTier } from "#enums/modifier-tier";
+import { PokemonType } from "#enums/pokemon-type";
+import type { Pokemon } from "#field/pokemon";
+import { type Modifier, PokemonHeldItemModifier } from "#modifiers/modifier";
+import { ModifierType, PokemonHeldItemModifierType } from "#modifiers/modifier-type";
+import { type NumberHolder, toDmgValue } from "#utils/common";
+
+/** The 18 elemental Gem types (no Stellar gem). */
+export const ER_GEM_TYPES: readonly PokemonType[] = [
+  PokemonType.NORMAL,
+  PokemonType.FIRE,
+  PokemonType.WATER,
+  PokemonType.ELECTRIC,
+  PokemonType.GRASS,
+  PokemonType.ICE,
+  PokemonType.FIGHTING,
+  PokemonType.POISON,
+  PokemonType.GROUND,
+  PokemonType.FLYING,
+  PokemonType.PSYCHIC,
+  PokemonType.BUG,
+  PokemonType.ROCK,
+  PokemonType.GHOST,
+  PokemonType.DRAGON,
+  PokemonType.DARK,
+  PokemonType.STEEL,
+  PokemonType.FAIRY,
+];
+
+export const ER_GEM_MULTIPLIER = 1.3;
+/** Rarity tier for distribution (shops / reward pools). */
+export const ER_GEM_TIER = ModifierTier.GREAT;
+
+/** Texture key for a gem (PokeAPI sprite on er-assets), e.g. PokemonType.FIRE -> "er_fire_gem". */
+export function erGemTextureKey(type: PokemonType): string {
+  return `er_${PokemonType[type].toLowerCase()}_gem`;
+}
+function gemName(type: PokemonType): string {
+  const lower = PokemonType[type].toLowerCase();
+  return `${lower.charAt(0).toUpperCase()}${lower.slice(1)} Gem`;
+}
+
+/** Build the held-item icon from a standalone er-assets texture (not the items atlas). */
+function erIconContainer(textureKey: string, stackText: () => Phaser.GameObjects.BitmapText | null) {
+  const container = globalScene.add.container(0, 0);
+  const item = globalScene.add.sprite(0, 12, textureKey);
+  item.setScale(0.5);
+  item.setOrigin(0, 0.5);
+  container.add(item);
+  const text = stackText();
+  if (text) {
+    container.add(text);
+  }
+  return container;
+}
+
+/** A single-use elemental Gem (self-contained; enemy-side for now). */
+export class ErGemModifier extends PokemonHeldItemModifier {
+  public readonly gemType: PokemonType;
+
+  constructor(type: ModifierType, pokemonId: number, gemType: PokemonType, stackCount?: number) {
+    super(type, pokemonId, stackCount);
+    this.gemType = gemType;
+  }
+
+  override matchType(modifier: Modifier): boolean {
+    return modifier instanceof ErGemModifier && modifier.gemType === this.gemType;
+  }
+
+  override clone(): ErGemModifier {
+    return new ErGemModifier(this.type, this.pokemonId, this.gemType, this.stackCount);
+  }
+
+  override apply(): boolean {
+    return true; // the boost is applied at the damage-calc hook, not via this channel
+  }
+
+  override getMaxHeldItemCount(): number {
+    return 1;
+  }
+
+  override getIcon(forSummary?: boolean): Phaser.GameObjects.Container {
+    return forSummary
+      ? super.getIcon(forSummary)
+      : erIconContainer(erGemTextureKey(this.gemType), () => this.getIconStackText());
+  }
+}
+
+/** Build a runtime ModifierType for a gem of the given type. */
+export function erGemItemType(type: PokemonType): ModifierType {
+  const mt = new PokemonHeldItemModifierType(
+    "",
+    erGemTextureKey(type),
+    (t, args) => new ErGemModifier(t, (args[0] as Pokemon).id, type),
+  );
+  const name = gemName(type);
+  Object.defineProperty(mt, "name", { get: () => name, configurable: true });
+  mt.getDescription = () =>
+    `Boosts the power of the holder's first ${PokemonType[type].toLowerCase()}-type move by 30%, then shatters.`;
+  return mt;
+}
+
+/**
+ * Gem hook (called from getAttackDamage beside the Omni Gem): if the attacker
+ * holds a Gem matching the move's type, multiply the damage and shatter it.
+ * The shatter only happens on a REAL (non-simulated) calc.
+ */
+export function erTryApplyGem(
+  source: Pokemon,
+  moveType: PokemonType,
+  damage: NumberHolder,
+  simulated: boolean,
+): void {
+  if (damage.value <= 0) {
+    return;
+  }
+  const gem = source
+    .getHeldItems()
+    .find((m): m is ErGemModifier => m instanceof ErGemModifier && m.gemType === moveType);
+  if (!gem) {
+    return;
+  }
+  damage.value = toDmgValue(damage.value * ER_GEM_MULTIPLIER);
+  if (!simulated) {
+    globalScene.removeModifier(gem, !source.isPlayer());
+    globalScene.updateModifiers(source.isPlayer());
+    globalScene.phaseManager.queueMessage(`The ${gemName(gem.gemType)} strengthened ${source.getNameToRender()}'s move!`);
+  }
+}

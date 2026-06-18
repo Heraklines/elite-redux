@@ -65,6 +65,7 @@ import {
 } from "#data/elite-redux/er-black-shinies";
 import { erBlackSpritePath, erBlackSpritePathFromBase } from "#data/elite-redux/er-black-sprite-manifest";
 import { erTryApplyOmniGem } from "#data/elite-redux/er-community-items";
+import { erTryApplyGem } from "#data/elite-redux/er-elemental-gems";
 import {
   chooseMoveIndex,
   damageToScore,
@@ -5040,6 +5041,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // ER Omni Gem (#387): once per battle, the attacker's first damaging move
     // deals double damage. Consumed only on real (non-simulated) calcs.
     erTryApplyOmniGem(source, damage, simulated);
+
+    // ER elemental Gems: 1.3x to the attacker's first move of the matching type,
+    // then the gem shatters (consumed only on real calcs).
+    erTryApplyGem(source, moveType, damage, simulated);
 
     // ER resistance berries (#357): if the DEFENDER holds the berry matching
     // this hit's type, halve the damage BEFORE it lands and consume the berry
