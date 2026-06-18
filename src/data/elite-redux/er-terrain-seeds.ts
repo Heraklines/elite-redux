@@ -82,19 +82,6 @@ export function seedProcsForTerrain(kind: ErSeedKind, terrain: TerrainType): boo
 }
 
 /** Build the held-item icon from a standalone er-assets texture (not the items atlas). */
-function erIconContainer(textureKey: string, stackText: () => Phaser.GameObjects.BitmapText | null) {
-  const container = globalScene.add.container(0, 0);
-  const item = globalScene.add.sprite(0, 12, textureKey);
-  item.setScale(0.5);
-  item.setOrigin(0, 0.5);
-  container.add(item);
-  const text = stackText();
-  if (text) {
-    container.add(text);
-  }
-  return container;
-}
-
 /** A single-use terrain Seed (self-contained; enemy-side for now). */
 export class ErSeedModifier extends PokemonHeldItemModifier {
   public readonly kind: ErSeedKind;
@@ -121,9 +108,28 @@ export class ErSeedModifier extends PokemonHeldItemModifier {
   }
 
   override getIcon(forSummary?: boolean): Phaser.GameObjects.Container {
-    return forSummary
-      ? super.getIcon(forSummary)
-      : erIconContainer(ER_SEED_CONFIG[this.kind].icon, () => this.getIconStackText());
+    if (forSummary) {
+      return super.getIcon(forSummary);
+    }
+    // Mirror the base held-item item-bar layout so the seed shows WHOSE it is: the
+    // holder Pokemon icon on the left, then the seed sprite offset to x=16 (a
+    // standalone er-assets texture, drawn directly rather than via the items atlas).
+    const container = globalScene.add.container(0, 0);
+    const pokemon = this.getPokemon();
+    if (pokemon) {
+      const pokemonIcon = globalScene.addPokemonIcon(pokemon, -2, 10, 0, 0.5, undefined, true);
+      container.add(pokemonIcon);
+      container.setName(pokemon.id.toString());
+    }
+    const item = globalScene.add.sprite(16, 16, ER_SEED_CONFIG[this.kind].icon);
+    item.setScale(0.5);
+    item.setOrigin(0, 0.5);
+    container.add(item);
+    const stackText = this.getIconStackText();
+    if (stackText) {
+      container.add(stackText);
+    }
+    return container;
   }
 }
 

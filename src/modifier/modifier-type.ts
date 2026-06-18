@@ -2116,8 +2116,7 @@ const modifierTypeInitObj = Object.freeze({
   ER_UPGRADED_MAP: () => {
     const type = new ModifierType("", "map", (t, _args) => new MapModifier(t));
     Object.defineProperty(type, "name", { get: () => "Upgraded Map" });
-    type.getDescription = () =>
-      "An enhanced chart of the region. Reveals one extra onward route on your World Map (press the Map hotkey) so you can see further ahead.";
+    type.getDescription = () => "Reveals one extra onward route on your World Map.";
     type.iconTint = 0xffd24a; // warm gold - reads as an upgraded/premium map
     return type;
   },
