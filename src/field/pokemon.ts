@@ -71,7 +71,13 @@ import {
   damageToScore,
   ER_HAZARD_MOVE_IDS,
   ER_SLOW_DOOMED_PENALTY,
+  type ErBoostStages,
+  type ErDepth1Before,
+  type ErDepth1Move,
+  type ErHazardKind,
+  type ErHazards,
   erAssessThreat,
+  erDepth1MoveScore,
   getErAiProfile,
   shouldDevalueSlowMove,
   strategicMoveScore,
@@ -8263,90 +8269,217 @@ export class EnemyPokemon extends Pokemon {
             // Strategic (Slice 3) context, computed once: how many opposing mons
             // are left to punish, and whether a hazard is already on their side.
             const opponentSide = this.isPlayer() ? ArenaTagSide.ENEMY : ArenaTagSide.PLAYER;
+            const mySide = this.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
             const opponentParty = this.isPlayer() ? globalScene.getEnemyParty() : globalScene.getPlayerParty();
+            const myParty = this.isPlayer() ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
             const opponentBenchCount = opponentParty.filter(p => !p.isFainted()).length;
             const hazardAlreadyUp =
               globalScene.arena.findTagsOnSide(t => t instanceof EntryHazardTag, opponentSide).length > 0;
 
-            // Phase A (threat-awareness): if this mon CANNOT KO this turn (the KO
-            // filter left a normal pool), assess whether an opponent will KO IT
-            // this turn and whether it outspeeds. When doomed AND outsped, a slow
-            // move won't even execute - so below we devalue non-priority moves,
-            // steering the AI toward a priority snipe.
-            const threat = koMoves.length === 0 ? erAssessThreat(this) : { incomingKO: false, outspeeds: true };
+            const activeOpponents = this.getOpponents().filter(o => o.isActive(true));
+            // The experimental (Foul-Play-style) brain plays a depth-1 positional
+            // game: it scores the board AFTER my move + the opponent's best reply.
+            // It models a 1v1 board, so in doubles (or with no single opponent) it
+            // falls back to the standard greedy transforms below.
+            const useDepth1 = erAi.kind === "experimental" && activeOpponents.length === 1 && !this.getAlly();
 
-            movePool.forEach((pokemonMove, moveIndex) => {
-              const move = pokemonMove.getMove();
-              if (moveScores[moveIndex] <= -20) {
-                return;
-              }
-              if (move.is("AttackMove")) {
-                // Slice 1: re-score attacks by real simulated damage.
-                let best = 0;
-                for (const mt of moveTargets[move.id]) {
-                  if (mt === BattlerIndex.ATTACKER) {
-                    continue;
-                  }
-                  const target = globalScene.getField()[mt];
-                  if (!target || target.isPlayer() === this.isPlayer()) {
-                    continue;
-                  }
+            if (useDepth1) {
+              const oppMon = activeOpponents[0];
+              // Worst incoming hit + speed read (fog-aware) - the maximin reply.
+              const threat = erAssessThreat(this);
+              const readBoosts = (p: Pokemon): ErBoostStages => ({
+                atk: p.getStatStage(Stat.ATK),
+                def: p.getStatStage(Stat.DEF),
+                spa: p.getStatStage(Stat.SPATK),
+                spd: p.getStatStage(Stat.SPDEF),
+                spe: p.getStatStage(Stat.SPD),
+              });
+              const readHazards = (side: ArenaTagSide): ErHazards => {
+                const layersOf = (tagType: ArenaTagType): number =>
+                  (globalScene.arena.getTagOnSide(tagType, side) as EntryHazardTag | undefined)?.layers ?? 0;
+                return {
+                  stealthRock: layersOf(ArenaTagType.STEALTH_ROCK) > 0,
+                  spikesLayers: layersOf(ArenaTagType.SPIKES),
+                  toxicSpikesLayers: layersOf(ArenaTagType.TOXIC_SPIKES),
+                  stickyWeb: layersOf(ArenaTagType.STICKY_WEB) > 0,
+                };
+              };
+              const before: ErDepth1Before = {
+                myActive: {
+                  fainted: false,
+                  hpFraction: this.getHpRatio(),
+                  status: this.status?.effect ?? StatusEffect.NONE,
+                  boosts: readBoosts(this),
+                },
+                oppActive: {
+                  fainted: false,
+                  hpFraction: oppMon.getHpRatio(),
+                  status: oppMon.status?.effect ?? StatusEffect.NONE,
+                  boosts: readBoosts(oppMon),
+                },
+                myHp: this.hp,
+                myMaxHp: this.getMaxHp(),
+                oppHp: oppMon.hp,
+                oppMaxHp: oppMon.getMaxHp(),
+                myReserveAlive: Math.max(0, myParty.filter(p => !p.isFainted()).length - 1),
+                oppReserveAlive: Math.max(0, opponentBenchCount - 1),
+                myHazards: readHazards(mySide),
+                oppHazards: readHazards(opponentSide),
+                // Matchup is rank-neutral within a turn (same actives), so 0 here;
+                // switch-time matchup lives in enemy-command-phase.
+                matchup: 0,
+              };
+              const hazardKindOf = (id: number): ErHazardKind | undefined => {
+                switch (id) {
+                  case MoveId.STEALTH_ROCK:
+                    return "stealthRock";
+                  case MoveId.SPIKES:
+                    return "spikes";
+                  case MoveId.TOXIC_SPIKES:
+                    return "toxicSpikes";
+                  case MoveId.STICKY_WEB:
+                    return "stickyWeb";
+                  default:
+                    return;
+                }
+              };
+
+              movePool.forEach((pokemonMove, moveIndex) => {
+                const move = pokemonMove.getMove();
+                if (moveScores[moveIndex] <= -20) {
+                  return; // vanilla flagged this move unusable/failing.
+                }
+                // Raw, accuracy-weighted damage my move deals to the lone opponent.
+                let myDamage = 0;
+                if (move.is("AttackMove")) {
                   const isCritical = move.hasAttr("CritOnlyAttr") || !!this.getTag(BattlerTagType.ALWAYS_CRIT);
-                  const { damage } = target.getAttackDamage({
+                  const { damage } = oppMon.getAttackDamage({
                     source: this,
                     move,
-                    ignoreAbility: !target.waveData.abilityRevealed,
+                    ignoreAbility: !oppMon.waveData.abilityRevealed,
                     ignoreSourceAbility: false,
-                    ignoreAllyAbility: !target.getAlly()?.waveData.abilityRevealed,
+                    ignoreAllyAbility: !oppMon.getAlly()?.waveData.abilityRevealed,
                     ignoreSourceAllyAbility: false,
                     isCritical,
                     simulated: true,
                   });
-                  best = Math.max(best, damageToScore(damage, target.getMaxHp(), target.hp, move.accuracy));
+                  const acc = move.accuracy <= 0 ? 100 : Math.min(move.accuracy, 100);
+                  myDamage = damage * (acc / 100);
                 }
-                // Slice 4 (doubles): a spread move that also hits our own ally is
-                // penalized by the damage it would deal them - so the AI won't
-                // Earthquake its non-immune partner (and never KOs its own ally).
-                const ally = this.getAlly();
-                const hitsAlly =
-                  move.moveTarget === MoveTarget.ALL_NEAR_OTHERS
-                  || move.moveTarget === MoveTarget.ALL_OTHERS
-                  || move.moveTarget === MoveTarget.ALL;
-                if (best > 0 && hitsAlly && ally && !ally.isFainted()) {
-                  const { damage: allyDamage } = ally.getAttackDamage({
-                    source: this,
-                    move,
-                    ignoreAbility: false,
-                    ignoreSourceAbility: false,
-                    ignoreAllyAbility: false,
-                    ignoreSourceAllyAbility: false,
-                    isCritical: false,
-                    simulated: true,
+                // Setup (self stat-boost) delta, read straight off the move's attr.
+                let myBoostDelta: ErBoostStages | undefined;
+                if (move.moveTarget === MoveTarget.USER && move.hasAttr("StatStageChangeAttr")) {
+                  const delta: ErBoostStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+                  for (const attr of move.getAttrs("StatStageChangeAttr")) {
+                    for (const stat of attr.stats) {
+                      if (stat === Stat.ATK) {
+                        delta.atk += attr.stages;
+                      } else if (stat === Stat.DEF) {
+                        delta.def += attr.stages;
+                      } else if (stat === Stat.SPATK) {
+                        delta.spa += attr.stages;
+                      } else if (stat === Stat.SPDEF) {
+                        delta.spd += attr.stages;
+                      } else if (stat === Stat.SPD) {
+                        delta.spe += attr.stages;
+                      }
+                    }
+                  }
+                  myBoostDelta = delta;
+                }
+                const d1: ErDepth1Move = {
+                  myDamage,
+                  oppReplyDamage: threat.worstIncomingDamage,
+                  iMoveFirst: threat.outspeeds || move.priority > 0,
+                  myBoostDelta,
+                  addsOppHazard: ER_HAZARD_MOVE_IDS.has(move.id) ? hazardKindOf(move.id) : undefined,
+                };
+                moveScores[moveIndex] = erDepth1MoveScore(before, d1);
+              });
+            } else {
+              // Phase A (threat-awareness): if this mon CANNOT KO this turn (the KO
+              // filter left a normal pool), assess whether an opponent will KO IT
+              // this turn and whether it outspeeds. When doomed AND outsped, a slow
+              // move won't even execute - so below we devalue non-priority moves,
+              // steering the AI toward a priority snipe.
+              const threat =
+                koMoves.length === 0
+                  ? erAssessThreat(this)
+                  : { incomingKO: false, outspeeds: true, worstIncomingDamage: 0 };
+
+              movePool.forEach((pokemonMove, moveIndex) => {
+                const move = pokemonMove.getMove();
+                if (moveScores[moveIndex] <= -20) {
+                  return;
+                }
+                if (move.is("AttackMove")) {
+                  // Slice 1: re-score attacks by real simulated damage.
+                  let best = 0;
+                  for (const mt of moveTargets[move.id]) {
+                    if (mt === BattlerIndex.ATTACKER) {
+                      continue;
+                    }
+                    const target = globalScene.getField()[mt];
+                    if (!target || target.isPlayer() === this.isPlayer()) {
+                      continue;
+                    }
+                    const isCritical = move.hasAttr("CritOnlyAttr") || !!this.getTag(BattlerTagType.ALWAYS_CRIT);
+                    const { damage } = target.getAttackDamage({
+                      source: this,
+                      move,
+                      ignoreAbility: !target.waveData.abilityRevealed,
+                      ignoreSourceAbility: false,
+                      ignoreAllyAbility: !target.getAlly()?.waveData.abilityRevealed,
+                      ignoreSourceAllyAbility: false,
+                      isCritical,
+                      simulated: true,
+                    });
+                    best = Math.max(best, damageToScore(damage, target.getMaxHp(), target.hp, move.accuracy));
+                  }
+                  // Slice 4 (doubles): a spread move that also hits our own ally is
+                  // penalized by the damage it would deal them - so the AI won't
+                  // Earthquake its non-immune partner (and never KOs its own ally).
+                  const ally = this.getAlly();
+                  const hitsAlly =
+                    move.moveTarget === MoveTarget.ALL_NEAR_OTHERS
+                    || move.moveTarget === MoveTarget.ALL_OTHERS
+                    || move.moveTarget === MoveTarget.ALL;
+                  if (best > 0 && hitsAlly && ally && !ally.isFainted()) {
+                    const { damage: allyDamage } = ally.getAttackDamage({
+                      source: this,
+                      move,
+                      ignoreAbility: false,
+                      ignoreSourceAbility: false,
+                      ignoreAllyAbility: false,
+                      ignoreSourceAllyAbility: false,
+                      isCritical: false,
+                      simulated: true,
+                    });
+                    best -= damageToScore(allyDamage, ally.getMaxHp(), ally.hp, 100);
+                  }
+                  // Phase A: doomed-and-outsped -> a slow move likely won't execute,
+                  // so devalue it (a priority move keeps full value and wins).
+                  if (best > 0 && shouldDevalueSlowMove(threat.incomingKO, threat.outspeeds, move.priority)) {
+                    best *= ER_SLOW_DOOMED_PENALTY;
+                  }
+                  moveScores[moveIndex] = best;
+                  return;
+                }
+                // Slice 3: setup (self stat-boost) + hazard valuation. Other
+                // non-attack moves keep their vanilla benefit score.
+                const isHazard = ER_HAZARD_MOVE_IDS.has(move.id);
+                const isSetup = move.moveTarget === MoveTarget.USER && move.hasAttr("StatStageChangeAttr");
+                if (isHazard || isSetup) {
+                  moveScores[moveIndex] = strategicMoveScore(moveScores[moveIndex], {
+                    isSetup,
+                    isHazard,
+                    userHpRatio: this.getHpRatio(),
+                    opponentBenchCount,
+                    hazardAlreadyUp,
                   });
-                  best -= damageToScore(allyDamage, ally.getMaxHp(), ally.hp, 100);
                 }
-                // Phase A: doomed-and-outsped -> a slow move likely won't execute,
-                // so devalue it (a priority move keeps full value and wins).
-                if (best > 0 && shouldDevalueSlowMove(threat.incomingKO, threat.outspeeds, move.priority)) {
-                  best *= ER_SLOW_DOOMED_PENALTY;
-                }
-                moveScores[moveIndex] = best;
-                return;
-              }
-              // Slice 3: setup (self stat-boost) + hazard valuation. Other
-              // non-attack moves keep their vanilla benefit score.
-              const isHazard = ER_HAZARD_MOVE_IDS.has(move.id);
-              const isSetup = move.moveTarget === MoveTarget.USER && move.hasAttr("StatStageChangeAttr");
-              if (isHazard || isSetup) {
-                moveScores[moveIndex] = strategicMoveScore(moveScores[moveIndex], {
-                  isSetup,
-                  isHazard,
-                  userHpRatio: this.getHpRatio(),
-                  opponentBenchCount,
-                  hazardAlreadyUp,
-                });
-              }
-            });
+              });
+            }
           }
 
           // Sort the move pool in decreasing order of move score

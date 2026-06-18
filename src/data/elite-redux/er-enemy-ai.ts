@@ -28,6 +28,7 @@ import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { Stat } from "#enums/stat";
+import { StatusEffect } from "#enums/status-effect";
 import type { EnemyPokemon } from "#field/pokemon";
 
 /** Entry-hazard moves the strategic scorer recognizes (set vs a big bench). */
@@ -144,6 +145,8 @@ export interface ErThreat {
   incomingKO: boolean;
   /** This mon is at least as fast as the fastest opponent. */
   outspeeds: boolean;
+  /** Raw damage of the opponent's single best hit on this mon (the maximin reply). */
+  worstIncomingDamage: number;
 }
 
 /**
@@ -155,12 +158,14 @@ export interface ErThreat {
 export function erAssessThreat(enemy: EnemyPokemon): ErThreat {
   const opponents = enemy.getOpponents().filter(o => o.isActive(true));
   if (opponents.length === 0) {
-    return { incomingKO: false, outspeeds: true };
+    return { incomingKO: false, outspeeds: true, worstIncomingDamage: 0 };
   }
   let worstIncoming = 0;
   let fastestOpponentSpd = 0;
   for (const opp of opponents) {
     fastestOpponentSpd = Math.max(fastestOpponentSpd, opp.getEffectiveStat(Stat.SPD, enemy));
+    // Scan the opponent's FULL moveset (ER mons can carry 5-8 moves) for the
+    // single hardest hit - that is the maximin reply the AI plans against.
     for (const oppMove of opp.moveset) {
       const move = oppMove?.getMove();
       if (!move || move.category === MoveCategory.STATUS) {
@@ -182,6 +187,7 @@ export function erAssessThreat(enemy: EnemyPokemon): ErThreat {
   return {
     incomingKO: worstIncoming >= enemy.hp,
     outspeeds: enemy.getEffectiveStat(Stat.SPD, opponents[0]) >= fastestOpponentSpd,
+    worstIncomingDamage: worstIncoming,
   };
 }
 
@@ -321,4 +327,292 @@ export function chooseMoveIndex(sortedScores: readonly number[], sharpness: numb
     }
   }
   return i;
+}
+
+// =============================================================================
+// EXPERIMENTAL BRAIN - Foul-Play-style depth-1 position evaluation.
+//
+// Ported from pmariglia's hand-written Showdown AI (MIT):
+//   - eval constants + evaluate_pokemon/evaluate:
+//     showdown/engine/evaluate.py @375ae499ce543d3c124bec53cbba67c74848dad8
+//   - depth-1 maximin ("pick_safest"): showdown/engine/select_best_move.py @same
+//   - refined constants cross-checked vs poke-engine src/genx/evaluate.rs
+//
+// Instead of scoring a move by the damage IT deals (the greedy standard brain),
+// the experimental brain looks ONE PLY ahead: it resolves my move + the
+// opponent's best reply, then scores the WHOLE resulting board. Ranking moves by
+// that score is the maximin pick. See
+// docs/plans/2026-06-18-battle-ai-foulplay-depth1-design.md.
+//
+// ER-FORMAT NOTE: nothing here is tied to a 4-move / single-ability layout. The
+// eval scores HP/faints/status/boosts/hazards/matchup, none of which depend on
+// movepool size or ability count; the move loop (caller) and the opponent-reply
+// scan (erAssessThreat) both iterate the FULL moveset, so 5-8 move mons and
+// multi-innate mons are handled by the live damage sim unchanged.
+// =============================================================================
+
+/** Hand-tuned position-evaluation point values (Foul Play `Scoring`). */
+export const ER_EVAL = {
+  /** Flat points for an un-fainted mon. */
+  ALIVE: 75,
+  /** Points at full HP (linear with HP fraction). */
+  HP: 100,
+  /** Per-stage value of each stat boost (speed weighted higher). */
+  BOOST: { atk: 15, def: 15, spa: 15, spd: 15, spe: 25 },
+  /** Per-status point penalty. */
+  STATUS: { poison: -10, toxic: -30, paralysis: -25, sleep: -25, freeze: -40, burn: -25 },
+  /** Entry-hazard penalty on a side, multiplied by that side's alive reserve count. */
+  HAZARD: { stealthRock: -10, spikes: -7, toxicSpikes: -7 },
+  /** Sticky Web is counted once (not reserve-scaled). */
+  STICKY_WEB: -25,
+  /** Type-matchup bonus, multiplied by effectiveness, applied both directions. */
+  MATCHUP: 20,
+} as const;
+
+/** Diminishing-returns multiplier for a stat-boost stage (Foul Play table). Pure. */
+export function erBoostDiminishing(stage: number): number {
+  const table: Record<number, number> = {
+    [-6]: -3.3,
+    [-5]: -3.15,
+    [-4]: -3,
+    [-3]: -2.5,
+    [-2]: -2,
+    [-1]: -1,
+    0: 0,
+    1: 1,
+    2: 2,
+    3: 2.5,
+    4: 3,
+    5: 3.15,
+    6: 3.3,
+  };
+  return table[Math.max(-6, Math.min(6, Math.trunc(stage)))] ?? 0;
+}
+
+/** The five battle stats' current boost stages (-6..6). */
+export interface ErBoostStages {
+  atk: number;
+  def: number;
+  spa: number;
+  spd: number;
+  spe: number;
+}
+
+/** Foul Play boost contribution: per-stat value * diminishing(stage). Pure. */
+export function erBoostValue(b: ErBoostStages): number {
+  return (
+    erBoostDiminishing(b.atk) * ER_EVAL.BOOST.atk
+    + erBoostDiminishing(b.def) * ER_EVAL.BOOST.def
+    + erBoostDiminishing(b.spa) * ER_EVAL.BOOST.spa
+    + erBoostDiminishing(b.spd) * ER_EVAL.BOOST.spd
+    + erBoostDiminishing(b.spe) * ER_EVAL.BOOST.spe
+  );
+}
+
+/** Per-status point penalty (Foul Play `POKEMON_STATIC_STATUSES`). Pure. */
+export function erStatusValue(status: StatusEffect): number {
+  switch (status) {
+    case StatusEffect.POISON:
+      return ER_EVAL.STATUS.poison;
+    case StatusEffect.TOXIC:
+      return ER_EVAL.STATUS.toxic;
+    case StatusEffect.PARALYSIS:
+      return ER_EVAL.STATUS.paralysis;
+    case StatusEffect.SLEEP:
+      return ER_EVAL.STATUS.sleep;
+    case StatusEffect.FREEZE:
+      return ER_EVAL.STATUS.freeze;
+    case StatusEffect.BURN:
+      return ER_EVAL.STATUS.burn;
+    default:
+      return 0;
+  }
+}
+
+/** A single active mon's state for the position eval. */
+export interface ErEvalMon {
+  fainted: boolean;
+  /** Post-turn HP fraction (0..1). */
+  hpFraction: number;
+  status: StatusEffect;
+  boosts: ErBoostStages;
+}
+
+/**
+ * Foul Play `evaluate_pokemon`: alive bonus + HP + boosts + status. The HP/boost/
+ * status sum is clamped >= 0 BEFORE the alive bonus (poke-engine refinement) so a
+ * near-dead, statused mon never reads as a liability the other side wants alive.
+ * A fainted mon is worth 0. Pure.
+ */
+export function erEvalMon(m: ErEvalMon): number {
+  if (m.fainted || m.hpFraction <= 0) {
+    return 0;
+  }
+  const soft = ER_EVAL.HP * Math.max(0, Math.min(1, m.hpFraction)) + erBoostValue(m.boosts) + erStatusValue(m.status);
+  return ER_EVAL.ALIVE + Math.max(0, soft);
+}
+
+/** Entry hazards on one side. */
+export interface ErHazards {
+  stealthRock: boolean;
+  spikesLayers: number;
+  toxicSpikesLayers: number;
+  stickyWeb: boolean;
+}
+
+/** Hazard penalty for a side, reserve-scaled (more switch-ins = hazards hurt more). Pure. */
+export function erHazardValue(h: ErHazards, aliveReserves: number): number {
+  let v = 0;
+  if (h.stealthRock) {
+    v += ER_EVAL.HAZARD.stealthRock * aliveReserves;
+  }
+  v += ER_EVAL.HAZARD.spikes * Math.max(0, h.spikesLayers) * aliveReserves;
+  v += ER_EVAL.HAZARD.toxicSpikes * Math.max(0, h.toxicSpikesLayers) * aliveReserves;
+  if (h.stickyWeb) {
+    v += ER_EVAL.STICKY_WEB;
+  }
+  return v;
+}
+
+/** A whole battle position from the scoring mon's perspective (zero-sum). */
+export interface ErPosition {
+  myActive: ErEvalMon;
+  oppActive: ErEvalMon;
+  /** Un-fainted benched mons (active excluded). */
+  myReserveAlive: number;
+  oppReserveAlive: number;
+  /** Hazards on MY side (hurt me). */
+  myHazards: ErHazards;
+  /** Hazards on the OPPONENT's side (hurt them). */
+  oppHazards: ErHazards;
+  /** Precomputed ER_EVAL.MATCHUP * (myEffVsThem - theirEffVsMe). */
+  matchup: number;
+}
+
+/** Foul Play `evaluate`: my side minus the opponent's side. >0 = good for me. Pure. */
+export function erEvalPosition(p: ErPosition): number {
+  let score = erEvalMon(p.myActive) - erEvalMon(p.oppActive);
+  score += (Math.max(0, p.myReserveAlive) - Math.max(0, p.oppReserveAlive)) * ER_EVAL.ALIVE;
+  // Hazards on my side subtract from my score; hazards on theirs add to it.
+  score += erHazardValue(p.myHazards, p.myReserveAlive);
+  score -= erHazardValue(p.oppHazards, p.oppReserveAlive);
+  score += p.matchup;
+  return score;
+}
+
+const clampStage = (s: number): number => Math.max(-6, Math.min(6, s));
+
+function addBoosts(b: ErBoostStages, d: ErBoostStages): ErBoostStages {
+  return {
+    atk: clampStage(b.atk + d.atk),
+    def: clampStage(b.def + d.def),
+    spa: clampStage(b.spa + d.spa),
+    spd: clampStage(b.spd + d.spd),
+    spe: clampStage(b.spe + d.spe),
+  };
+}
+
+/** Which entry hazard a move sets on the opponent's side (for board modelling). */
+export type ErHazardKind = "stealthRock" | "spikes" | "toxicSpikes" | "stickyWeb";
+
+function addHazardLayer(h: ErHazards, which: ErHazardKind): ErHazards {
+  const n: ErHazards = { ...h };
+  switch (which) {
+    case "stealthRock":
+      n.stealthRock = true;
+      break;
+    case "spikes":
+      n.spikesLayers = Math.min(3, h.spikesLayers + 1);
+      break;
+    case "toxicSpikes":
+      n.toxicSpikesLayers = Math.min(2, h.toxicSpikesLayers + 1);
+      break;
+    case "stickyWeb":
+      n.stickyWeb = true;
+      break;
+  }
+  return n;
+}
+
+/** The pre-turn board the depth-1 lookahead starts from (raw HP so faints are exact). */
+export interface ErDepth1Before {
+  myActive: ErEvalMon;
+  oppActive: ErEvalMon;
+  myHp: number;
+  myMaxHp: number;
+  oppHp: number;
+  oppMaxHp: number;
+  myReserveAlive: number;
+  oppReserveAlive: number;
+  myHazards: ErHazards;
+  oppHazards: ErHazards;
+  matchup: number;
+}
+
+/** One candidate move's modelled effect for the depth-1 lookahead. */
+export interface ErDepth1Move {
+  /** Raw damage my move deals to the opponent's active (0 for non-damaging). */
+  myDamage: number;
+  /** Raw damage the opponent's best reply deals to my active (its maximin hit). */
+  oppReplyDamage: number;
+  /** Do I act before the target this turn? (priority already folded in). */
+  iMoveFirst: boolean;
+  /** Setup: stat stages this move adds to my active (omit for non-setup). */
+  myBoostDelta?: ErBoostStages | undefined;
+  /** Hazard this move lays on the opponent's side (omit if none). */
+  addsOppHazard?: ErHazardKind | undefined;
+}
+
+/**
+ * Depth-1 maximin move score (the experimental brain's core). Resolves turn
+ * order, faints and the "slow move that never executes" case, applies the move's
+ * own modelled board change, then scores the resulting position. Pure - the
+ * caller (getNextMove) supplies the live damage/speed numbers. Higher = better.
+ */
+export function erDepth1MoveScore(before: ErDepth1Before, move: ErDepth1Move): number {
+  let myDmg = move.myDamage;
+  let oppReply = move.oppReplyDamage;
+  let oppFaints: boolean;
+  let iFaint: boolean;
+
+  if (move.iMoveFirst) {
+    // I hit first: if it KOs, the opponent's active faints before it can reply.
+    oppFaints = myDmg >= before.oppHp;
+    if (oppFaints) {
+      oppReply = 0;
+    }
+    iFaint = !oppFaints && oppReply >= before.myHp;
+  } else {
+    // Opponent hits first: if that KOs me, my move never executes (whiffs).
+    iFaint = oppReply >= before.myHp;
+    if (iFaint) {
+      myDmg = 0;
+    }
+    oppFaints = myDmg >= before.oppHp;
+  }
+  // My move "executed" unless I was KO'd before acting (slow whiff).
+  const moveExecuted = !(!move.iMoveFirst && iFaint);
+
+  const oppHpAfter = Math.max(0, before.oppHp - myDmg) / Math.max(1, before.oppMaxHp);
+  const myHpAfter = Math.max(0, before.myHp - oppReply) / Math.max(1, before.myMaxHp);
+
+  const myBoosts =
+    moveExecuted && move.myBoostDelta ? addBoosts(before.myActive.boosts, move.myBoostDelta) : before.myActive.boosts;
+  const oppHazards =
+    moveExecuted && move.addsOppHazard ? addHazardLayer(before.oppHazards, move.addsOppHazard) : before.oppHazards;
+
+  return erEvalPosition({
+    myActive: { fainted: iFaint, hpFraction: myHpAfter, status: before.myActive.status, boosts: myBoosts },
+    oppActive: {
+      fainted: oppFaints,
+      hpFraction: oppHpAfter,
+      status: before.oppActive.status,
+      boosts: before.oppActive.boosts,
+    },
+    myReserveAlive: before.myReserveAlive,
+    oppReserveAlive: before.oppReserveAlive,
+    myHazards: before.myHazards,
+    oppHazards,
+    matchup: before.matchup,
+  });
 }

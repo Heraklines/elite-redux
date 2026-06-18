@@ -5701,9 +5701,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "EVEN waves use the EXPERIMENTAL brain, ODD waves use STANDARD - so you\n"
       + "fight the two brains back-to-back without one affecting the other.\n"
       + "WATCH the console each enemy turn: 'ER AI: standard|experimental brain\n"
-      + "(sharpness X)' tells you which trainer is on which. (The experimental\n"
-      + "profile is where the deeper one-ply-EV / Foul-Play-style logic will land;\n"
-      + "for now it plays at max sharpness + most aggressive switching.) Press Send\n"
+      + "(sharpness X)' tells you which trainer is on which. The EXPERIMENTAL brain\n"
+      + "is the Foul-Play-style depth-1 evaluator: it scores the board AFTER its\n"
+      + "move + your best reply, so it should secure KOs that deny your turn, snipe\n"
+      + "with priority, refuse to set up into a KO, and trade better. Press Send\n"
       + "Logs to capture a comparison.",
     setup: () => {
       resetDevOverrides();
@@ -5717,6 +5718,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
         }),
         makeStarter(SpeciesId.ROTOM, {
           moveset: [MoveId.THUNDERBOLT, MoveId.SHADOW_BALL, MoveId.VOLT_SWITCH, MoveId.NASTY_PLOT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "AI: experimental (Foul-Play depth-1) brain ON",
+    description:
+      "Forces the EXPERIMENTAL brain on EVERY Hell trainer (mode 'all'), so you\n"
+      + "can stress the depth-1 positional AI directly. It looks one ply ahead -\n"
+      + "its move plus your best reply - and scores the whole resulting board\n"
+      + "(alive/HP/status/boosts/hazards). EXPECT: it favors a KO that also denies\n"
+      + "your turn (incl. via priority), it will NOT walk a slow move into a faint\n"
+      + "or set up in front of a KO, and it picks the better trade rather than the\n"
+      + "biggest number. Singles only (it falls back to standard in doubles).\n"
+      + "WATCH the console: 'ER AI: experimental brain'. Send Logs with notes.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("hell");
+      setErSmartAiTestForced(true);
+      setErAiExperimentalMode("all");
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 60, STARTING_BIOME_OVERRIDE: BiomeId.DOJO });
+      return [
+        makeStarter(SpeciesId.DRAGAPULT, {
+          moveset: [MoveId.DRAGON_DARTS, MoveId.PHANTOM_FORCE, MoveId.U_TURN, MoveId.DRAGON_DANCE],
+        }),
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
         }),
       ];
     },
