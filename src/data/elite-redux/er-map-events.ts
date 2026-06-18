@@ -13,7 +13,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { allBiomes } from "#data/data-lists";
-import { addErEventRevealedNode } from "#data/elite-redux/er-biome-routing";
+import { addErEventRevealedNode, revealAllErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import { type ErMapNode, revealMapNodes, setMapTravelTarget } from "#data/elite-redux/er-map-nodes";
 import type { BiomeId } from "#enums/biome-id";
 import { getBiomeName, randSeedItem } from "#utils/common";
@@ -30,6 +30,10 @@ function onwardBiomes(): BiomeId[] {
  * (e.g. a landmark the event surfaces).
  */
 export function chartOnwardRoutes(extra: ErMapNode[] = []): number {
+  // Flip every hidden ROLLED onward node to revealed - this is what the World Map
+  // overlay + route picker actually read, so the Observatory truly "charts the
+  // whole area" (not just the always-visible base nodes).
+  revealAllErPendingNodes();
   const routes: ErMapNode[] = onwardBiomes().map(biome => ({
     biome,
     label: getBiomeName(biome),

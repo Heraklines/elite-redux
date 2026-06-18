@@ -19,7 +19,7 @@
 //   - TREASURE-MAP fragments: collect a threshold to unlock a guaranteed reward node
 // =============================================================================
 
-import { getErPrevBiome, resetErRouting, restoreErRouting } from "#data/elite-redux/er-biome-routing";
+import { getErPrevBiome, resetErRouting, restoreErRecentBiomes, restoreErRouting } from "#data/elite-redux/er-biome-routing";
 import { getErFairyLuckSave, resetErFairyLuck, restoreErFairyLuck } from "#data/elite-redux/er-fairy-luck";
 import {
   erBiomeOverstayAnchor,
@@ -241,5 +241,10 @@ export function restoreErMapState(data: ErMapSaveData | undefined | null, curren
   );
   if (Array.isArray(data.biomeHistory)) {
     biomeHistory = data.biomeHistory.filter((b): b is number => typeof b === "number").slice(-40) as BiomeId[];
+    // Replay the history tail into the routing no-loopback trail so a reload can't
+    // reset the "can't go back to the last 2 biomes" rule. Drop the last entry
+    // (the current biome, which the roll already excludes) so the trail holds the
+    // PRIOR biomes the player came from.
+    restoreErRecentBiomes(biomeHistory.slice(0, -1));
   }
 }

@@ -52,17 +52,53 @@ export function erBiomeRoutingActive(): boolean {
   return devBuild && !!gm && gm.isClassic && !gm.isDaily && !gm.hasRandomBiomes;
 }
 
-/** The biome the player travelled FROM into the current one (the only exclusion). */
+/** The biome the player travelled FROM into the current one. */
 let prevBiome: BiomeId | null = null;
 
 /**
- * Record a biome entry. Called from newArena on every biome change (and run
- * start). `from` is the biome being left (null at run start).
+ * The last few biomes the player has BEEN through (most recent last). The next-
+ * node roll + any event reveal forbid looping back to these, so you cannot bounce
+ * between the same one or two biomes. Persisted via the run save (the World Map
+ * history tail is replayed into this on load).
+ */
+let recentBiomes: BiomeId[] = [];
+
+/** How many biomes back (besides the current one) you may NOT route back to. */
+const NO_LOOPBACK_WINDOW = 2;
+
+/**
+ * Record a biome entry. Called on every biome transition. `from` is the biome
+ * being left (null at run start) - it becomes both the "previous" biome and the
+ * newest entry in the no-loopback trail.
  */
 export function erRecordBiomeEntry(from: BiomeId | null): void {
   prevBiome = from;
+  if (from != null) {
+    recentBiomes.push(from);
+    if (recentBiomes.length > 8) {
+      recentBiomes = recentBiomes.slice(-8);
+    }
+  }
   // Event-revealed routes are per-biome: clear them as we enter the new biome.
   eventRevealedBiomes = [];
+}
+
+/**
+ * The biomes you may NOT route to right now: the current biome plus the last
+ * {@linkcode NO_LOOPBACK_WINDOW} you came from. Excludes short loops (e.g. you
+ * cannot go Space -> Space, or bounce A -> B -> A).
+ */
+function loopbackExcluded(current: BiomeId): Set<BiomeId> {
+  const set = new Set<BiomeId>([current]);
+  for (const b of recentBiomes.slice(-NO_LOOPBACK_WINDOW)) {
+    set.add(b);
+  }
+  return set;
+}
+
+/** Restore the no-loopback trail from a loaded run (the World Map history tail). */
+export function restoreErRecentBiomes(biomes: BiomeId[]): void {
+  recentBiomes = biomes.slice(-8);
 }
 
 /** The biome the player just came from (excluded from the next node options). */
@@ -89,6 +125,22 @@ export function getErPendingNodes(): ErRouteNode[] {
 }
 
 /**
+ * Reveal EVERY rolled onward node (a "chart the whole area" effect, e.g. the
+ * Observatory). Flips the hidden nodes' revealed flag so the World Map + the
+ * route picker show them all. Returns how many were newly revealed.
+ */
+export function revealAllErPendingNodes(): number {
+  let revealed = 0;
+  for (const node of pendingNodes) {
+    if (!node.revealed) {
+      node.revealed = true;
+      revealed++;
+    }
+  }
+  return revealed;
+}
+
+/**
  * Biomes a mystery event has revealed as onward routes for the CURRENT biome's
  * exit (rendered blue + selectable in the route picker). Reset on every biome
  * entry - an event reveal is only good for the next hop.
@@ -101,6 +153,12 @@ let eventRevealedBiomes: BiomeId[] = [];
  * pending node set so a reveal mid-biome shows up immediately.
  */
 export function addErEventRevealedNode(biome: BiomeId): void {
+  // Never chart the current biome (or one you just came from) as an onward route -
+  // that is how the Observatory was surfacing a "Space -> Space" loop (it reveals a
+  // landmark AT the current biome). Events may only point somewhere genuinely new.
+  if (loopbackExcluded(globalScene.arena?.biomeId ?? biome).has(biome)) {
+    return;
+  }
   if (!eventRevealedBiomes.includes(biome)) {
     eventRevealedBiomes.push(biome);
   }
@@ -114,6 +172,7 @@ export function resetErRouting(): void {
   prevBiome = null;
   pendingNodes = [];
   eventRevealedBiomes = [];
+  recentBiomes = [];
 }
 
 /** Serialized previous-biome for the run save (additive; undefined when unset). */
@@ -171,9 +230,11 @@ export interface ErRouteNode {
  * stable across save/reload like every other ER roll.
  */
 export function rollErNextBiomeNodes(current: BiomeId, prev: BiomeId | null): ErRouteNode[] {
-  // Base = the biome's real links, minus the biome we just came from.
+  // Base = the biome's real links, minus the current biome and the last few you
+  // came from (the no-loopback window), so the route graph never bounces you back
+  // into a biome you just left.
   const chosen: BiomeId[] = [];
-  const seen = new Set<BiomeId>([current]);
+  const seen = loopbackExcluded(current);
   if (prev != null) {
     seen.add(prev);
   }
