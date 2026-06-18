@@ -1,0 +1,281 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqjts635-jy50
+mode:     0  wave:10
+seed:     OWKIRUFJoFouuUCEKKseMz7j
+party:    Cyndaquil(L9 11hp f0), Squirtle(L7 25hp f0), Taillow(L2 6hp f0), Sprigatito(L5 9hp f0), Poochyena(L6 10hp f0), Lillipup(L5 0hp f0)
+enemy:    Poochyena(L6)
+
+----- COMMENT -----
+froze during run
+
+----- CONSOLE -----
+[19:34:53.218] LOG: Applied Super EXP. Charm 
+[19:34:54.229] LOG: %cStart Phase LevelUpPhase color:green;
+[19:34:54.230] LOG: Applied Iron 
+[19:34:55.172] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:34:55.173] LOG: Applied Super EXP. Charm 
+[19:34:56.004] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:34:56.194] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:34:56.194] LOG: Applied Super EXP. Charm 
+[19:34:56.999] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:34:57.194] LOG: %cStart Phase FaintPhase color:green;
+[19:34:58.098] LOG: %cStart Phase MessagePhase color:green;
+[19:34:58.468] LOG: %cStart Phase MoveEndPhase color:green;
+[19:34:58.469] LOG: %cStart Phase MovePhase color:green;
+[19:34:58.470] LOG: %cUser: Squirtle
+Move: POWER_UP_PUNCH
+Use Mode: NORMAL color:orchid
+[19:34:58.471] LOG: %cStart Phase MessagePhase color:green;
+[19:34:58.950] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:34:59.882] LOG: crit stage: +0
+[19:34:59.882] LOG: Move: Power-Up Punch | Base damage: 6.6080000000000005 | Power: 40 | Source attack: 12 | Target defense: 10
+[19:34:59.883] LOG: Move: Power-Up Punch | Attack damage: 11
+[19:34:59.883] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:34:59.976] LOG: %cStart Phase MessagePhase color:green;
+[19:35:00.713] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:35:01.332] LOG: %cStart Phase MessagePhase color:green;
+[19:35:02.032] LOG: %cStart Phase MoveEndPhase color:green;
+[19:35:02.032] LOG: %cStart Phase MovePhase color:green;
+[19:35:02.032] LOG: %cStart Phase MoveEndPhase color:green;
+[19:35:02.032] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:35:02.032] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:35:02.032] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:35:02.032] LOG: %cStart Phase BerryPhase color:green;
+[19:35:02.033] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:35:02.033] LOG: %cStart Phase TurnEndPhase color:green;
+[19:35:02.033] LOG: %cStart Phase SwitchPhase color:green;
+[19:35:04.842] LOG: %cStart Phase SwitchSummonPhase color:green;
+[19:35:05.132] LOG: Applied Calcium 
+[19:35:05.132] LOG: Applied Iron 
+[19:35:05.225] WARN: cry/155 not found
+[19:35:05.588] LOG: %cStart Phase PostSummonPhase color:green;
+[19:35:05.588] LOG: Ran PSP for: Cyndaquil
+[19:35:05.588] LOG: %cStart Phase PostSummonPhase color:green;
+[19:35:05.588] LOG: %cStart Phase TurnInitPhase color:green;
+[19:35:05.589] LOG: %cStart Phase CommandPhase color:green;
+[19:35:10.742] LOG: Move: LEER Move targets: {"targets":[3],"multiple":true} 
+Player Pokemon: Cyndaquil
+[19:35:10.746] LOG: %cStart Phase CommandPhase color:green;
+[19:35:11.803] LOG: Move: POWER_UP_PUNCH Move targets: {"targets":[3,0],"multiple":false} 
+Player Pokemon: Squirtle
+[19:35:11.811] LOG: %cStart Phase SelectTargetPhase color:green;
+[19:35:12.467] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:35:12.473] LOG: Battle Seed: zbaBQr7urG7KnN0n
+[19:35:12.475] LOG: Move Pool: ["Scratch","Growl","Pay Day","Hone Claws"]
+[19:35:12.475] LOG: Move Scores: [12,2,18,4]
+[19:35:12.476] LOG: Sorted Move Pool: ["Pay Day","Scratch","Hone Claws","Growl"]
+[19:35:12.476] LOG: Chosen Move: Hone Claws
+[19:35:12.476] LOG: %cStart Phase TurnStartPhase color:green;
+[19:35:12.479] LOG: %cStart Phase MovePhase color:green;
+[19:35:12.479] LOG: %cUser: Meowth
+Move: HONE_CLAWS
+Use Mode: NORMAL color:orchid
+[19:35:12.482] LOG: %cStart Phase MessagePhase color:green;
+[19:35:12.921] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:35:13.880] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:35:13.880] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:35:14.510] LOG: %cStart Phase MessagePhase color:green;
+[19:35:15.282] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:35:15.920] LOG: %cStart Phase MessagePhase color:green;
+[19:35:16.682] LOG: %cStart Phase MoveEndPhase color:green;
+[19:35:16.682] LOG: %cStart Phase MovePhase color:green;
+[19:35:16.682] LOG: %cUser: Cyndaquil
+Move: LEER
+Use Mode: NORMAL color:orchid
+[19:35:16.685] LOG: %cStart Phase MessagePhase color:green;
+[19:35:17.099] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:35:17.610] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:35:18.263] LOG: %cStart Phase MessagePhase color:green;
+[19:35:19.027] LOG: %cStart Phase MoveEndPhase color:green;
+[19:35:19.028] LOG: %cStart Phase MovePhase color:green;
+[19:35:19.028] LOG: %cUser: Squirtle
+Move: POWER_UP_PUNCH
+Use Mode: NORMAL color:orchid
+[19:35:19.030] LOG: %cStart Phase MessagePhase color:green;
+[19:35:19.484] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:35:20.395] LOG: crit stage: +0
+[19:35:20.396] LOG: Move: Power-Up Punch | Base damage: 13.52 | Power: 40 | Source attack: 18 | Target defense: 6
+[19:35:20.396] LOG: Move: Power-Up Punch | Attack damage: 22
+[19:35:20.396] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:35:20.489] LOG: %cStart Phase MessagePhase color:green;
+[19:35:21.245] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:35:21.923] LOG: %cStart Phase MessagePhase color:green;
+[19:35:22.629] LOG: %cStart Phase FaintPhase color:green;
+[19:35:23.696] LOG: %cStart Phase MessagePhase color:green;
+[19:35:23.925] LOG: %cStart Phase VictoryPhase color:green;
+[19:35:23.926] LOG: %cStart Phase ExpPhase color:green;
+[19:35:23.926] LOG: Applied Super EXP. Charm 
+[19:35:24.612] LOG: %cStart Phase ExpPhase color:green;
+[19:35:24.613] LOG: Applied Super EXP. Charm 
+[19:35:25.248] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:35:25.248] LOG: Applied Super EXP. Charm 
+[19:35:26.005] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:35:26.184] LOG: %cStart Phase MoveEndPhase color:green;
+[19:35:26.184] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:35:26.184] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:35:26.184] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:35:26.184] LOG: %cStart Phase BerryPhase color:green;
+[19:35:26.185] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:35:26.185] LOG: %cStart Phase TurnEndPhase color:green;
+[19:35:26.185] LOG: %cStart Phase BattleEndPhase color:green;
+[19:35:26.186] LOG: Battle Score: 59 (2 Turns x0.84)
+[19:35:26.186] LOG: Total Score: 259
+[19:35:26.198] LOG: Applied Calcium 
+[19:35:26.198] LOG: Applied Iron 
+[19:35:26.201] LOG: %cStart Phase EggLapsePhase color:green;
+[19:35:26.201] LOG: %cStart Phase SelectModifierPhase color:green;
+[19:35:26.201] LOG: Wave Seed: X`TR[^OSxOx~~^LNTT|nV@s 9
+[19:35:26.204] LOG: 9 1 [3]
+[19:35:26.204] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_normal","group":"tm","soundName":"se/restore","tier":0,"moveId":203} 
+[19:35:26.204] LOG: 5 1 [3]
+[19:35:26.204] LOG: {"id":"MAX_ETHER","localeKey":"modifierType:ModifierType.MAX_ETHER","iconImage":"max_ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":-1} 
+[19:35:26.204] LOG: 0 0 [3]
+[19:35:26.204] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[19:35:43.585] LOG: %cStart Phase NewBattlePhase color:green;
+[19:35:43.585] LOG: Wave Seed: YaUS\_PTyPy_MOUU}oWAt 10
+[19:35:43.586] LOG: %cStart Phase NextEncounterPhase color:green;
+[19:35:43.589] LOG: Starting species pool tier: COMMON
+[19:35:43.607] LOG: Pokemon: Wild Poochyena | Species ID: 261 | Level: 6 | Nature: Hasty (+Spd/-Def)
+[19:35:43.608] LOG: Stats (IVs): HP: 21 (18), Atk: 14 (20), Def: 9 (24), Spatk: 9 (24), Spdef: 12 (16), Spd: 18 (29)
+[19:35:43.608] LOG: Ability: Intimidate | Passive Ability: Nocturnal | Boss Bars: 2
+[19:35:43.608] LOG: Moveset: ["Roar","Howl","Hyper Fang","Odor Sleuth"]
+[19:35:44.725] LOG: {"id":"BERRY","localeKey":"","iconImage":"ganlon_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":4} (enemy)
+[19:35:44.800] DEBUG: Session data saved to slot 0!
+[19:35:44.800] LOG: Wave Seed: YaUS\_PTyPy_MOUU}oWAt 10
+[19:35:46.287] LOG: %cStart Phase ReturnPhase color:green;
+[19:35:46.726] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:35:46.967] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:35:48.264] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:35:48.265] LOG: %cStart Phase PostSummonPhase color:green;
+[19:35:48.266] LOG: Ran PSP for: Poochyena
+[19:35:48.267] LOG: %cStart Phase PostSummonPhase color:green;
+[19:35:48.269] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:35:48.969] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:35:49.631] LOG: %cStart Phase MessagePhase color:green;
+[19:35:50.432] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:35:50.509] LOG: %cStart Phase PostSummonPhase color:green;
+[19:35:50.510] LOG: %cStart Phase TurnInitPhase color:green;
+[19:35:50.510] LOG: %cStart Phase CommandPhase color:green;
+[19:35:52.394] LOG: Move: MUD_SHOT Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Cyndaquil
+[19:35:52.400] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:35:52.404] LOG: Battle Seed: oAC2sgMvHQMPKQi6
+[19:35:52.404] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[19:35:52.405] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[19:35:52.408] LOG: Move Pool: ["Roar","Howl","Hyper Fang","Odor Sleuth"]
+[19:35:52.408] LOG: Move Scores: [-20,2,26.785714285714285,0]
+[19:35:52.408] LOG: Sorted Move Pool: ["Hyper Fang","Howl","Odor Sleuth","Roar"]
+[19:35:52.408] LOG: Chosen Move: Hyper Fang
+[19:35:52.408] LOG: ER AI: standard brain (sharpness 0.85)
+[19:35:52.408] LOG: %cStart Phase TurnStartPhase color:green;
+[19:35:52.409] LOG: %cStart Phase MovePhase color:green;
+[19:35:52.409] LOG: %cUser: Cyndaquil
+Move: MUD_SHOT
+Use Mode: NORMAL color:orchid
+[19:35:52.411] LOG: %cStart Phase MessagePhase color:green;
+[19:35:52.828] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:35:52.909] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[19:35:52.910] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[19:35:52.981] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[19:35:53.050] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[19:35:53.121] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[19:35:53.190] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[19:35:53.264] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[19:35:53.342] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[19:35:55.497] LOG: crit stage: +0
+[19:35:55.498] LOG: Move: Mud Shot | Base damage: 9.738181818181818 | Power: 40 | Source attack: 19 | Target defense: 11
+[19:35:55.498] LOG: Move: Mud Shot | Attack damage: 9
+[19:35:55.499] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:35:55.642] LOG: %cStart Phase MoveEndPhase color:green;
+[19:35:55.642] LOG: %cStart Phase MovePhase color:green;
+[19:35:55.642] LOG: %cUser: Poochyena
+Move: HYPER_FANG
+Use Mode: NORMAL color:orchid
+[19:35:55.649] LOG: %cStart Phase MessagePhase color:green;
+[19:35:56.187] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:35:57.418] LOG: crit stage: +0
+[19:35:57.419] LOG: Move: Hyper Fang | Base damage: 10.014285714285716 | Power: 85 | Source attack: 15 | Target defense: 14
+[19:35:57.419] LOG: Move: Hyper Fang | Attack damage: 8
+[19:35:57.420] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:35:57.560] LOG: %cStart Phase MoveEndPhase color:green;
+[19:35:57.561] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:35:57.561] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:35:57.561] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:35:57.561] LOG: %cStart Phase BerryPhase color:green;
+[19:35:57.562] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:35:57.563] LOG: %cStart Phase TurnEndPhase color:green;
+[19:35:57.564] LOG: %cStart Phase TurnInitPhase color:green;
+[19:35:57.565] LOG: %cStart Phase CommandPhase color:green;
+[19:35:58.453] LOG: Move: MUD_SHOT Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Cyndaquil
+[19:35:58.457] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:35:58.460] LOG: Battle Seed: oAC2sgMvHQMPKQi6
+[19:35:58.461] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[19:35:58.462] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[19:35:58.465] LOG: Move Pool: ["Roar","Howl","Hyper Fang","Odor Sleuth"]
+[19:35:58.465] LOG: Move Scores: [-20,2,26.785714285714285,0]
+[19:35:58.466] LOG: Sorted Move Pool: ["Hyper Fang","Howl","Odor Sleuth","Roar"]
+[19:35:58.466] LOG: Chosen Move: Hyper Fang
+[19:35:58.466] LOG: ER AI: standard brain (sharpness 0.85)
+[19:35:58.466] LOG: %cStart Phase TurnStartPhase color:green;
+[19:35:58.467] LOG: %cStart Phase MovePhase color:green;
+[19:35:58.467] LOG: %cUser: Cyndaquil
+Move: MUD_SHOT
+Use Mode: NORMAL color:orchid
+[19:35:58.468] LOG: %cStart Phase MessagePhase color:green;
+[19:35:58.931] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:35:58.996] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[19:35:58.996] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[19:35:59.065] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[19:35:59.135] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[19:35:59.205] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[19:35:59.280] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[19:35:59.363] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[19:35:59.437] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[19:36:01.507] LOG: crit stage: +0
+[19:36:01.508] LOG: Move: Mud Shot | Base damage: 9.738181818181818 | Power: 40 | Source attack: 19 | Target defense: 11
+[19:36:01.508] LOG: Move: Mud Shot | Attack damage: 9
+[19:36:01.509] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:36:01.643] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:36:02.321] LOG: %cStart Phase MessagePhase color:green;
+[19:36:03.134] LOG: %cStart Phase MoveEndPhase color:green;
+[19:36:03.134] LOG: %cStart Phase MovePhase color:green;
+[19:36:03.135] LOG: %cUser: Poochyena
+Move: HYPER_FANG
+Use Mode: NORMAL color:orchid
+[19:36:03.136] LOG: %cStart Phase MessagePhase color:green;
+[19:36:03.668] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:36:04.918] LOG: crit stage: +0
+[19:36:04.919] LOG: Move: Hyper Fang | Base damage: 10.014285714285716 | Power: 85 | Source attack: 15 | Target defense: 14
+[19:36:04.919] LOG: Move: Hyper Fang | Attack damage: 9
+[19:36:04.920] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:36:05.066] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:36:05.692] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[19:36:06.341] LOG: %cStart Phase MessagePhase color:green;
+[19:36:07.149] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:36:07.220] LOG: %cStart Phase MoveEndPhase color:green;
+[19:36:07.221] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:36:07.221] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:36:07.222] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:36:07.222] LOG: %cStart Phase BerryPhase color:green;
+[19:36:07.223] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:36:07.224] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[19:36:07.892] LOG: %cStart Phase MessagePhase color:green;
+[19:36:08.764] LOG: %cStart Phase TurnEndPhase color:green;
+[19:36:08.765] LOG: %cStart Phase TurnInitPhase color:green;
+[19:36:08.765] LOG: %cStart Phase CommandPhase color:green;
+[19:36:10.050] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:36:10.054] LOG: Battle Seed: oAC2sgMvHQMPKQi6
+[19:36:10.054] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[19:36:10.056] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[19:36:10.059] LOG: Move Pool: ["Roar","Howl","Hyper Fang","Odor Sleuth"]
+[19:36:10.059] LOG: Move Scores: [-20,2,13.392857142857142,0]
+[19:36:10.059] LOG: Sorted Move Pool: ["Hyper Fang","Howl","Odor Sleuth","Roar"]
+[19:36:10.059] LOG: Chosen Move: Hyper Fang
+[19:36:10.059] LOG: ER AI: standard brain (sharpness 0.85)
+[19:36:10.059] LOG: %cStart Phase TurnStartPhase color:green;
+[19:36:10.060] LOG: %cStart Phase AttemptCapturePhase color:green;
+[19:36:24.134] LOG: Applied Calcium 
+[19:36:24.135] LOG: Applied Iron 
+[19:36:24.466] LOG: Applied Calcium 
+[19:36:24.467] LOG: Applied Iron 
