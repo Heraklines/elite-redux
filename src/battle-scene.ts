@@ -40,6 +40,7 @@ import { clearErFightTokens } from "#data/elite-redux/er-fight-tokens";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
+import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
 import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
 import {
   erCoinPurseBonusPercent,
@@ -1985,6 +1986,11 @@ export class BattleScene extends SceneBase {
     // rest of the run). The `restoring` flag suppresses the roll on the load path.
     if (erBiomeRoutingActive() && !this.currentBattle && !restoring) {
       erRollBiomeLength(biome, 1);
+    }
+    // ER (#486): log the biome to the run's journey chain (the World Map history).
+    // Skips the save-load path (`restoring`), which restores history from the save.
+    if (erBiomeRoutingActive() && !restoring) {
+      recordErBiomeVisited(biome);
     }
     this.eventTarget.dispatchEvent(new NewArenaEvent());
 

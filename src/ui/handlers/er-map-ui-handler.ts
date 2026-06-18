@@ -5,28 +5,31 @@
  */
 
 // =============================================================================
-// ER World Map overlay (#439 / #486 Phase D, increment 3). A read-only modal that
-// lists the map nodes a SCOUT-style event has revealed this run (upcoming biomes,
-// landmarks, treasure sites) plus the player's Treasure-Map fragment count. It is
-// purely informational right now - it reads the run-scoped substrate
-// (er-map-nodes.ts) and never mutates it. Travel selection (jumping the next
-// biome choice to a node) and fragment payout arrive in later increments.
+// ER World Map overlay (#439 / #486 Phase D). A read-only modal that draws the
+// run's JOURNEY as a visual chain of biome thumbnails (the biomes you've travelled
+// through, oldest -> newest, the current one ringed gold), with the REVEALED
+// onward routes shown as a branch row beneath it ("where you can go next"). Plus
+// the Treasure-Map fragment count.
 //
-// Modeled on ErQuizUiHandler: a full-screen dim with a centred card. The node
-// list is a fixed viewport (VISIBLE rows) that scrolls when there are more nodes
-// than fit. ACTION or CANCEL closes it (reverting to whatever opened it).
+// Biome thumbnails reuse the boot-loaded `${biomeKey}_bg` arena backgrounds, so no
+// extra asset load is needed. Left/Right scrub the journey when it is longer than
+// the visible window; ACTION/CANCEL closes. Opened with the "J" hotkey from the
+// in-battle command screen. Purely informational - it never mutates run state.
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
 import type { ErMapNode } from "#data/elite-redux/er-map-nodes";
 import {
+  getErBiomeHistory,
   getRevealedMapNodes,
   getTreasureFragments,
   TREASURE_FRAGMENTS_FOR_REWARD,
 } from "#data/elite-redux/er-map-nodes";
+import type { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
+import { getBiomeKey } from "#field/arena";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
@@ -35,18 +38,17 @@ import { getBiomeName } from "#utils/common";
 /** Optional callback fired when the overlay is dismissed. */
 export type ErMapCloseCallback = () => void;
 
-const PANEL_W = 210;
-const PANEL_H = 168;
+const PANEL_W = 284;
+const PANEL_H = 176;
 const GOLD = 0xf8d030;
 const INK = 0xe8ecf8;
 const DIM = 0x90a0c0;
+const LINE = 0x6878a0;
 
-/** Short tag shown after each node, by kind. */
-const KIND_LABEL: Record<ErMapNode["kind"], string> = {
-  biome: "Route",
-  landmark: "Landmark",
-  treasure: "Treasure",
-};
+/** Thumbnail tile size (keeps the 320:180 arena aspect, scaled tiny). */
+const TILE_W = 38;
+const TILE_H = 22;
+const TILE_GAP = 8;
 
 export class ErMapUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
@@ -54,22 +56,26 @@ export class ErMapUiHandler extends UiHandler {
   private panel: Phaser.GameObjects.NineSlice;
   private headerText: Phaser.GameObjects.Text;
   private fragmentText: Phaser.GameObjects.Text;
+  private journeyLabel: Phaser.GameObjects.Text;
+  private routesLabel: Phaser.GameObjects.Text;
   private emptyText: Phaser.GameObjects.Text;
   private hintText: Phaser.GameObjects.Text;
-  private rowTexts: Phaser.GameObjects.Text[] = [];
-  private cursorObj: Phaser.GameObjects.Rectangle;
+  private graphics: Phaser.GameObjects.Graphics;
+  /** Per-render tiles / labels destroyed on refresh + clear. */
+  private transient: Phaser.GameObjects.GameObject[] = [];
 
   private onClose: ErMapCloseCallback | null = null;
   private resolved = false;
 
-  /** Snapshot of the nodes taken on show() (the overlay is read-only). */
-  private nodes: readonly ErMapNode[] = [];
-  /** Index of the top visible row in the scrolling list. */
+  private history: readonly BiomeId[] = [];
+  private onward: readonly ErMapNode[] = [];
+  /** Left index of the visible journey window (scrolls when history overflows). */
   private scroll = 0;
 
-  private static readonly VISIBLE = 6;
-  private static readonly ROW_H = 15;
-  private static readonly LIST_Y0 = 44;
+  /** How many journey tiles fit across the panel. */
+  private static readonly VISIBLE = Math.floor((PANEL_W - 20) / (TILE_W + TILE_GAP));
+  private static readonly JOURNEY_Y = 56;
+  private static readonly ROUTES_Y = 116;
 
   constructor() {
     super(UiMode.ER_MAP);
@@ -95,7 +101,7 @@ export class ErMapUiHandler extends UiHandler {
     this.panel = addWindow(0, 0, PANEL_W, PANEL_H);
     this.card.add(this.panel);
 
-    this.headerText = addTextObject(PANEL_W / 2, 6, "World Map", TextStyle.WINDOW, {
+    this.headerText = addTextObject(PANEL_W / 2, 5, "World Map", TextStyle.WINDOW, {
       fontSize: "60px",
       align: "center",
     });
@@ -103,53 +109,42 @@ export class ErMapUiHandler extends UiHandler {
     this.headerText.setTint(GOLD);
     this.card.add(this.headerText);
 
-    this.fragmentText = addTextObject(8, 26, "", TextStyle.WINDOW, { fontSize: "42px" });
-    this.fragmentText.setOrigin(0, 0);
+    this.fragmentText = addTextObject(PANEL_W / 2, 22, "", TextStyle.WINDOW, { fontSize: "38px", align: "center" });
+    this.fragmentText.setOrigin(0.5, 0);
     this.fragmentText.setTint(INK);
     this.card.add(this.fragmentText);
 
-    this.emptyText = addTextObject(PANEL_W / 2, ErMapUiHandler.LIST_Y0 + 18, "", TextStyle.WINDOW, {
-      fontSize: "42px",
+    // Connector graphics sit UNDER the tiles (added before the transient sprites).
+    this.graphics = globalScene.add.graphics();
+    this.card.add(this.graphics);
+
+    this.journeyLabel = addTextObject(10, 38, "Your journey", TextStyle.WINDOW, { fontSize: "38px" });
+    this.journeyLabel.setOrigin(0, 0);
+    this.journeyLabel.setTint(DIM);
+    this.card.add(this.journeyLabel);
+
+    this.routesLabel = addTextObject(10, 98, "Routes ahead", TextStyle.WINDOW, { fontSize: "38px" });
+    this.routesLabel.setOrigin(0, 0);
+    this.routesLabel.setTint(DIM);
+    this.card.add(this.routesLabel);
+
+    this.emptyText = addTextObject(PANEL_W / 2, ErMapUiHandler.ROUTES_Y, "", TextStyle.WINDOW, {
+      fontSize: "38px",
       align: "center",
     });
-    this.emptyText.setOrigin(0.5, 0);
+    this.emptyText.setOrigin(0.5, 0.5);
     this.emptyText.setTint(DIM);
     this.emptyText.setVisible(false);
     this.card.add(this.emptyText);
 
-    // The scrolling row viewport.
-    this.rowTexts = [];
-    for (let i = 0; i < ErMapUiHandler.VISIBLE; i++) {
-      const ry = ErMapUiHandler.LIST_Y0 + i * ErMapUiHandler.ROW_H;
-      const row = addTextObject(12, ry, "", TextStyle.WINDOW, { fontSize: "42px" });
-      row.setOrigin(0, 0);
-      row.setTint(INK);
-      this.card.add(row);
-      this.rowTexts.push(row);
-    }
-
-    this.cursorObj = globalScene.add.rectangle(
-      8,
-      ErMapUiHandler.LIST_Y0,
-      PANEL_W - 16,
-      ErMapUiHandler.ROW_H,
-      0xffffff,
-      0,
-    );
-    this.cursorObj.setStrokeStyle(1, GOLD);
-    this.cursorObj.setOrigin(0, 0);
-    this.cursorObj.setVisible(false);
-    this.card.add(this.cursorObj);
-
-    this.hintText = addTextObject(PANEL_W / 2, PANEL_H - 14, "B: Close", TextStyle.WINDOW, {
-      fontSize: "38px",
+    this.hintText = addTextObject(PANEL_W / 2, PANEL_H - 13, "< > Scroll    B: Close", TextStyle.WINDOW, {
+      fontSize: "36px",
       align: "center",
     });
     this.hintText.setOrigin(0.5, 0);
     this.hintText.setTint(DIM);
     this.card.add(this.hintText);
 
-    // Wire the global "J" opens-the-map hotkey (registered once).
     installErMapHotkey();
   }
 
@@ -158,21 +153,16 @@ export class ErMapUiHandler extends UiHandler {
     this.onClose = args.length > 0 && typeof args[0] === "function" ? (args[0] as ErMapCloseCallback) : null;
     this.resolved = false;
 
-    this.nodes = getRevealedMapNodes();
-    this.scroll = 0;
-    this.cursor = 0;
+    this.history = getErBiomeHistory();
+    this.onward = getRevealedMapNodes().filter(n => n.kind === "biome");
 
     const frags = getTreasureFragments();
     this.fragmentText.setText(`Treasure-Map Fragments: ${frags} / ${TREASURE_FRAGMENTS_FOR_REWARD}`);
 
-    const hasNodes = this.nodes.length > 0;
-    this.emptyText.setVisible(!hasNodes);
-    if (!hasNodes) {
-      this.emptyText.setText("No locations discovered yet.");
-    }
-    this.cursorObj.setVisible(hasNodes);
+    // Default the journey window to the most recent biomes (current at the end).
+    this.scroll = Math.max(0, this.history.length - ErMapUiHandler.VISIBLE);
 
-    this.refreshRows();
+    this.refresh();
 
     this.container.setVisible(true);
     this.container.parentContainer?.bringToTop(this.container);
@@ -180,35 +170,137 @@ export class ErMapUiHandler extends UiHandler {
     return true;
   }
 
-  /** Render the VISIBLE rows starting at the scroll offset, and place the cursor. */
-  private refreshRows(): void {
-    for (let i = 0; i < ErMapUiHandler.VISIBLE; i++) {
-      const node = this.nodes[this.scroll + i];
-      const row = this.rowTexts[i];
-      if (node) {
-        const tag = KIND_LABEL[node.kind] ?? "";
-        row.setText(`${node.label}  -  ${getBiomeName(node.biome)} [${tag}]`);
-        row.setVisible(true);
-      } else {
-        row.setVisible(false);
-      }
+  /** Build one biome thumbnail tile (bg image if loaded, else a dim placeholder). */
+  private makeTile(biome: BiomeId, cx: number, cy: number, highlight: boolean): void {
+    const key = `${getBiomeKey(biome)}_bg`;
+    if (globalScene.textures.exists(key)) {
+      const tile = globalScene.add.sprite(cx, cy, key);
+      tile.setOrigin(0.5, 0.5);
+      tile.setDisplaySize(TILE_W, TILE_H);
+      this.card.add(tile);
+      this.transient.push(tile);
+    } else {
+      const ph = globalScene.add.rectangle(cx, cy, TILE_W, TILE_H, 0x33405c).setOrigin(0.5);
+      this.card.add(ph);
+      this.transient.push(ph);
     }
-    if (this.nodes.length > 0) {
-      const visibleRow = this.cursor - this.scroll;
-      this.cursorObj.setPosition(8, ErMapUiHandler.LIST_Y0 + visibleRow * ErMapUiHandler.ROW_H - 1);
+    // Border: gold + thicker for the current biome, thin grey otherwise.
+    const border = globalScene.add.rectangle(cx, cy, TILE_W + 2, TILE_H + 2, 0xffffff, 0).setOrigin(0.5);
+    border.setStrokeStyle(highlight ? 2 : 1, highlight ? GOLD : LINE);
+    this.card.add(border);
+    this.transient.push(border);
+
+    const name = addTextObject(cx, cy + TILE_H / 2 + 1, getBiomeName(biome), TextStyle.WINDOW, {
+      fontSize: "32px",
+      align: "center",
+    });
+    name.setOrigin(0.5, 0);
+    name.setTint(highlight ? GOLD : INK);
+    this.card.add(name);
+    this.transient.push(name);
+
+    if (highlight) {
+      const here = addTextObject(cx, cy - TILE_H / 2 - 9, "HERE", TextStyle.WINDOW, {
+        fontSize: "30px",
+        align: "center",
+      });
+      here.setOrigin(0.5, 0);
+      here.setTint(GOLD);
+      this.card.add(here);
+      this.transient.push(here);
     }
   }
 
-  override setCursor(cursor: number): boolean {
-    const changed = super.setCursor(cursor);
-    // Keep the selected row inside the viewport, scrolling when it leaves.
-    if (this.cursor < this.scroll) {
-      this.scroll = this.cursor;
-    } else if (this.cursor >= this.scroll + ErMapUiHandler.VISIBLE) {
-      this.scroll = this.cursor - ErMapUiHandler.VISIBLE + 1;
+  /** Render the journey chain + onward routes for the current scroll position. */
+  private refresh(): void {
+    for (const o of this.transient) {
+      o.destroy();
     }
-    this.refreshRows();
-    return changed;
+    this.transient = [];
+    this.graphics.clear();
+
+    const total = this.history.length;
+    const currentBiome = total > 0 ? this.history[total - 1] : globalScene.arena?.biomeId;
+
+    // --- Journey row: the visible window of visited biomes, connected L->R. ---
+    const count = Math.min(ErMapUiHandler.VISIBLE, total);
+    const rowW = count * TILE_W + Math.max(0, count - 1) * TILE_GAP;
+    const startX = (PANEL_W - rowW) / 2 + TILE_W / 2;
+    const cy = ErMapUiHandler.JOURNEY_Y;
+    const tileX: number[] = [];
+    for (let i = 0; i < count; i++) {
+      const cx = startX + i * (TILE_W + TILE_GAP);
+      tileX.push(cx);
+      const histIndex = this.scroll + i;
+      const biome = this.history[histIndex];
+      if (biome === undefined) {
+        continue;
+      }
+      // Connector from the previous tile.
+      if (i > 0) {
+        this.graphics.lineStyle(2, LINE, 0.9);
+        this.graphics.lineBetween(tileX[i - 1] + TILE_W / 2, cy, cx - TILE_W / 2, cy);
+      }
+      this.makeTile(biome, cx, cy, histIndex === total - 1);
+    }
+    // "older biomes" hint when the window is scrolled off the start.
+    if (this.scroll > 0 && count > 0) {
+      const more = addTextObject(4, cy, "<", TextStyle.WINDOW, { fontSize: "44px" });
+      more.setOrigin(0, 0.5);
+      more.setTint(DIM);
+      this.card.add(more);
+      this.transient.push(more);
+    }
+
+    // --- Routes-ahead row: the revealed onward biome routes (branch from now). ---
+    const onwardCount = Math.min(5, this.onward.length);
+    if (onwardCount > 0 && currentBiome !== undefined) {
+      const oRowW = onwardCount * TILE_W + Math.max(0, onwardCount - 1) * TILE_GAP;
+      const oStartX = (PANEL_W - oRowW) / 2 + TILE_W / 2;
+      const oy = ErMapUiHandler.ROUTES_Y;
+      // Branch line down from the current tile (last drawn journey tile) to the row.
+      const fromX = tileX.at(-1) ?? PANEL_W / 2;
+      this.graphics.lineStyle(2, GOLD, 0.7);
+      this.graphics.lineBetween(fromX, cy + TILE_H / 2 + 9, PANEL_W / 2, oy - TILE_H / 2 - 2);
+      for (let i = 0; i < onwardCount; i++) {
+        const cx = oStartX + i * (TILE_W + TILE_GAP);
+        const node = this.onward[i];
+        const key = `${getBiomeKey(node.biome)}_bg`;
+        if (globalScene.textures.exists(key)) {
+          const tile = globalScene.add.sprite(cx, oy, key);
+          tile.setOrigin(0.5, 0.5);
+          tile.setDisplaySize(TILE_W, TILE_H);
+          this.card.add(tile);
+          this.transient.push(tile);
+        } else {
+          const ph = globalScene.add.rectangle(cx, oy, TILE_W, TILE_H, 0x33405c).setOrigin(0.5);
+          this.card.add(ph);
+          this.transient.push(ph);
+        }
+        const border = globalScene.add.rectangle(cx, oy, TILE_W + 2, TILE_H + 2, 0xffffff, 0).setOrigin(0.5);
+        border.setStrokeStyle(1, GOLD);
+        this.card.add(border);
+        this.transient.push(border);
+        const name = addTextObject(cx, oy + TILE_H / 2 + 1, getBiomeName(node.biome), TextStyle.WINDOW, {
+          fontSize: "32px",
+          align: "center",
+        });
+        name.setOrigin(0.5, 0);
+        name.setTint(INK);
+        this.card.add(name);
+        this.transient.push(name);
+      }
+      this.routesLabel.setVisible(true);
+    } else {
+      this.routesLabel.setVisible(false);
+    }
+
+    // Empty state: a brand-new run with nothing to show yet.
+    const nothing = total === 0 && onwardCount === 0;
+    this.emptyText.setVisible(nothing);
+    if (nothing) {
+      this.emptyText.setText("Your journey begins...");
+    }
   }
 
   processInput(button: Button): boolean {
@@ -216,16 +308,18 @@ export class ErMapUiHandler extends UiHandler {
       return false;
     }
     switch (button) {
-      case Button.UP:
-        if (this.nodes.length > 0 && this.cursor > 0) {
-          this.setCursor(this.cursor - 1);
+      case Button.LEFT:
+        if (this.scroll > 0) {
+          this.scroll--;
+          this.refresh();
           globalScene.ui.playSelect();
           return true;
         }
         return false;
-      case Button.DOWN:
-        if (this.nodes.length > 0 && this.cursor < this.nodes.length - 1) {
-          this.setCursor(this.cursor + 1);
+      case Button.RIGHT:
+        if (this.scroll + ErMapUiHandler.VISIBLE < this.history.length) {
+          this.scroll++;
+          this.refresh();
           globalScene.ui.playSelect();
           return true;
         }
@@ -254,10 +348,15 @@ export class ErMapUiHandler extends UiHandler {
   clear(): void {
     super.clear();
     this.container.setVisible(false);
-    this.cursorObj.setVisible(false);
+    for (const o of this.transient) {
+      o.destroy();
+    }
+    this.transient = [];
+    this.graphics.clear();
     this.onClose = null;
     this.resolved = false;
-    this.nodes = [];
+    this.history = [];
+    this.onward = [];
   }
 }
 
@@ -270,14 +369,10 @@ let mapHotkeyInstalled = false;
 
 /**
  * Install the global "J" hotkey that opens the World Map during a run. Registered
- * once (idempotent). Deliberately conservative: it only fires from the in-battle
- * COMMAND screen (the "standing in the field" moment), never while typing in a
- * text field, never outside a run, and never when an overlay is already open - so
- * it can't stomp menus, forms, or the map itself.
+ * once (idempotent). Conservative: only from the in-battle COMMAND screen, never
+ * while a text field is focused, never outside a run, never over another overlay.
  *
- * NOTE: "J" is an UNASSIGNED key in the keyboard config (cfg-keyboard-qwerty maps
- * it to -1), so it can't collide with a real binding. "M" was wrong - it's bound
- * to ALT_BUTTON_MENU (opens the pause menu / settings).
+ * "J" is UNASSIGNED in the keyboard config (maps to -1), so it can't collide.
  */
 export function installErMapHotkey(): void {
   if (mapHotkeyInstalled || typeof window === "undefined") {
@@ -288,7 +383,6 @@ export function installErMapHotkey(): void {
     if (ev.key !== "j" && ev.key !== "J") {
       return;
     }
-    // Ignore the key while a text field has focus (rename/search/password forms).
     const tag = (ev.target as HTMLElement | null)?.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA") {
       return;

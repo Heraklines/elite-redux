@@ -49,15 +49,40 @@ export const TREASURE_FRAGMENTS_FOR_REWARD = 3;
 let revealedNodes: ErMapNode[] = [];
 let travelTarget: BiomeId | null = null;
 let fragmentCount = 0;
+/** Ordered list of biomes the player has entered this run (the journey chain the
+ * World Map draws). Appended on each biome entry; persisted in the run save. */
+let biomeHistory: BiomeId[] = [];
 
 /** Clear all map state. Called once at run start (alongside the other ER resets). */
 export function resetErMapNodes(): void {
   revealedNodes = [];
   travelTarget = null;
   fragmentCount = 0;
+  biomeHistory = [];
   resetErRouting();
   resetErBiomeStructure();
   resetErFairyLuck();
+}
+
+/**
+ * Record that the player has ENTERED `biome` (called from newArena on run start +
+ * every biome transition). De-duped against the last entry so a double newArena
+ * for the same biome does not double-log. Bounded so a very long run cannot bloat
+ * the save (the World Map shows the most recent stretch).
+ */
+export function recordErBiomeVisited(biome: BiomeId): void {
+  if (biomeHistory[biomeHistory.length - 1] === biome) {
+    return;
+  }
+  biomeHistory.push(biome);
+  if (biomeHistory.length > 40) {
+    biomeHistory = biomeHistory.slice(-40);
+  }
+}
+
+/** The ordered biomes visited this run (the World Map's journey chain). */
+export function getErBiomeHistory(): readonly BiomeId[] {
+  return biomeHistory;
 }
 
 /** Drop all revealed "biome" route nodes (keep treasure/landmark). Used when a
@@ -154,6 +179,8 @@ export interface ErMapSaveData {
   /** ER (#542) Fairy's Boon: active temporary luck bonus + the wave it expires on. */
   fairyLuckBonus?: number;
   fairyLuckExpiry?: number;
+  /** ER (#486) World Map: the ordered biomes visited this run (the journey chain). */
+  biomeHistory?: number[];
 }
 
 /** Snapshot the current map state for the session save (#486 increment 2). */
@@ -168,6 +195,7 @@ export function getErMapSaveData(): ErMapSaveData {
     biomeOverstayAnchor: erBiomeOverstayAnchor(),
     fairyLuckBonus: getErFairyLuckSave().bonus,
     fairyLuckExpiry: getErFairyLuckSave().expiryWave,
+    biomeHistory: [...biomeHistory],
   };
 }
 
@@ -211,4 +239,7 @@ export function restoreErMapState(data: ErMapSaveData | undefined | null, curren
     typeof data.fairyLuckBonus === "number" ? data.fairyLuckBonus : null,
     typeof data.fairyLuckExpiry === "number" ? data.fairyLuckExpiry : null,
   );
+  if (Array.isArray(data.biomeHistory)) {
+    biomeHistory = data.biomeHistory.filter((b): b is number => typeof b === "number").slice(-40) as BiomeId[];
+  }
 }
