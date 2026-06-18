@@ -1,0 +1,269 @@
+scenario: ER #486: Lost Wanderer (reveal + fragment)
+url:      https://elite-redux-staging.pages.dev/
+build:    mqjxngk4-6nm2
+mode:     0  wave:12
+seed:     nCO6RayvpJlrsKTxnBd14PZ3
+party:    Pidgey(L30 73hp f0)
+enemy:    
+
+----- CONSOLE -----
+[20:33:08.276] LOG: %cStart Phase MessagePhase color:green;
+[20:33:08.525] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:33:08.526] LOG: %cStart Phase MessagePhase color:green;
+[20:33:08.791] LOG: %cStart Phase MoveEndPhase color:green;
+[20:33:08.791] LOG: %cStart Phase MovePhase color:green;
+[20:33:08.791] LOG: %cUser: Bidoof
+Move: HYPER_FANG
+Use Mode: NORMAL color:orchid
+[20:33:08.794] LOG: %cStart Phase MessagePhase color:green;
+[20:33:08.925] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:33:08.925] LOG: crit stage: +0
+[20:33:08.926] LOG: Move: Hyper Fang | Base damage: 4.791578947368421 | Power: 85 | Source attack: 12 | Target defense: 38
+[20:33:08.926] LOG: Move: Hyper Fang | Attack damage: 6
+[20:33:08.927] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:33:08.959] LOG: %cStart Phase MoveEndPhase color:green;
+[20:33:08.959] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:33:08.959] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:33:08.959] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:33:08.959] LOG: %cStart Phase BerryPhase color:green;
+[20:33:08.960] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:33:08.960] LOG: %cStart Phase TurnEndPhase color:green;
+[20:33:08.961] LOG: %cStart Phase TurnInitPhase color:green;
+[20:33:08.961] LOG: %cStart Phase CommandPhase color:green;
+[20:33:09.469] LOG: Move: SPLASH Move targets: {"targets":[2,3],"multiple":false} 
+Player Pokemon: Pidgey
+[20:33:09.470] LOG: %cStart Phase SelectTargetPhase color:green;
+[20:33:09.990] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:33:09.992] LOG: Battle Seed: o6w9e8ipY8x1NrZ6
+[20:33:09.993] LOG: Move Pool: ["Hyper Fang","Growl","Mud Sport","Strength"]
+[20:33:09.993] LOG: Move Scores: [28.5,2,0,44]
+[20:33:09.993] LOG: Sorted Move Pool: ["Strength","Hyper Fang","Growl","Mud Sport"]
+[20:33:09.993] LOG: Chosen Move: Hyper Fang
+[20:33:09.993] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:33:09.994] LOG: Move Pool: ["Hyper Fang","Strength","Defense Curl","Mud Sport"]
+[20:33:09.994] LOG: Move Scores: [28.5,42,2,0]
+[20:33:09.994] LOG: Sorted Move Pool: ["Strength","Hyper Fang","Defense Curl","Mud Sport"]
+[20:33:09.994] LOG: Chosen Move: Strength
+[20:33:09.994] LOG: %cStart Phase TurnStartPhase color:green;
+[20:33:09.995] LOG: %cStart Phase MovePhase color:green;
+[20:33:09.995] LOG: %cUser: Pidgey
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[20:33:09.996] LOG: %cStart Phase MessagePhase color:green;
+[20:33:10.091] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:33:10.092] LOG: crit stage: +0
+[20:33:10.092] LOG: Move: Splash | Base damage: 26.5 | Power: 40 | Source attack: 35 | Target defense: 16
+[20:33:10.092] LOG: Move: Splash | Attack damage: 39
+[20:33:10.093] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:33:10.126] LOG: %cStart Phase MessagePhase color:green;
+[20:33:10.341] LOG: %cStart Phase FaintPhase color:green;
+[20:33:11.526] LOG: %cStart Phase MessagePhase color:green;
+[20:33:11.823] LOG: %cStart Phase VictoryPhase color:green;
+[20:33:11.824] LOG: %cStart Phase MoveEndPhase color:green;
+[20:33:11.824] LOG: %cStart Phase MovePhase color:green;
+[20:33:11.824] LOG: %cUser: Bidoof
+Move: STRENGTH
+Use Mode: NORMAL color:orchid
+[20:33:11.825] LOG: %cStart Phase MessagePhase color:green;
+[20:33:11.941] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:33:11.942] LOG: crit stage: +0
+[20:33:11.943] LOG: Move: Strength | Base damage: 6.214736842105263 | Power: 110 | Source attack: 13 | Target defense: 38
+[20:33:11.944] LOG: Move: Strength | Attack damage: 11
+[20:33:11.944] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:33:11.990] LOG: %cStart Phase MessagePhase color:green;
+[20:33:12.208] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:33:12.208] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:33:12.210] LOG: %cStart Phase MessagePhase color:green;
+[20:33:12.458] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:33:12.459] LOG: %cStart Phase MessagePhase color:green;
+[20:33:12.724] LOG: %cStart Phase MoveEndPhase color:green;
+[20:33:12.725] LOG: %cStart Phase MovePhase color:green;
+[20:33:12.725] LOG: %cStart Phase MoveEndPhase color:green;
+[20:33:12.725] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:33:12.725] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:33:12.725] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:33:12.725] LOG: %cStart Phase BerryPhase color:green;
+[20:33:12.725] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:33:12.726] LOG: %cStart Phase TurnEndPhase color:green;
+[20:33:12.726] LOG: %cStart Phase TurnInitPhase color:green;
+[20:33:12.726] LOG: %cStart Phase CommandPhase color:green;
+[20:33:13.481] LOG: Move: SPLASH Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Pidgey
+[20:33:13.482] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:33:13.482] LOG: Battle Seed: o6w9e8ipY8x1NrZ6
+[20:33:13.483] LOG: Move Pool: ["Strength"]
+[20:33:13.483] LOG: Move Scores: [42]
+[20:33:13.483] LOG: Sorted Move Pool: ["Strength"]
+[20:33:13.483] LOG: Chosen Move: Strength
+[20:33:13.483] LOG: %cStart Phase TurnStartPhase color:green;
+[20:33:13.484] LOG: %cStart Phase MovePhase color:green;
+[20:33:13.484] LOG: %cUser: Pidgey
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[20:33:13.485] LOG: %cStart Phase MessagePhase color:green;
+[20:33:13.608] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:33:13.608] LOG: crit stage: +0
+[20:33:13.608] LOG: Move: Splash | Base damage: 67.33333333333333 | Power: 40 | Source attack: 35 | Target defense: 6
+[20:33:13.609] LOG: Move: Splash | Attack damage: 59
+[20:33:13.609] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:33:13.643] LOG: %cStart Phase FaintPhase color:green;
+[20:33:14.842] LOG: %cStart Phase MessagePhase color:green;
+[20:33:15.144] LOG: %cStart Phase VictoryPhase color:green;
+[20:33:15.145] LOG: %cStart Phase MoveEndPhase color:green;
+[20:33:15.145] LOG: %cStart Phase MovePhase color:green;
+[20:33:15.145] LOG: %cStart Phase MoveEndPhase color:green;
+[20:33:15.145] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:33:15.145] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:33:15.145] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:33:15.145] LOG: %cStart Phase BerryPhase color:green;
+[20:33:15.145] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:33:15.145] LOG: %cStart Phase TurnEndPhase color:green;
+[20:33:15.145] LOG: %cStart Phase BattleEndPhase color:green;
+[20:33:15.145] LOG: Battle Score: 36 (3 Turns x0.69)
+[20:33:15.145] LOG: Total Score: 36
+[20:33:15.149] LOG: %cStart Phase EggLapsePhase color:green;
+[20:33:15.149] LOG: %cStart Phase SelectModifierPhase color:green;
+[20:33:15.149] LOG: Wave Seed: ]=rFYQcOANP{NQyAPsA} 13
+[20:33:15.150] LOG: 0 0 [4,5]
+[20:33:15.150] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[20:33:15.150] LOG: 0 0 [4,5]
+[20:33:15.150] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[20:33:15.150] LOG: 0 0 [4,5]
+[20:33:15.150] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[20:33:15.150] LOG: 0 0 [4,5]
+[20:33:15.150] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[20:33:15.150] LOG: 0 0 [4,5]
+[20:33:15.150] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[20:33:15.150] LOG: 2 0 [4,5]
+[20:33:15.150] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[20:33:15.150] LOG: 2 0 [4,5]
+[20:33:15.150] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[20:33:15.151] LOG: 0 0 [4,5]
+[20:33:15.151] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[20:33:15.151] LOG: 2 0 [4,5]
+[20:33:15.151] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[20:33:15.151] LOG: 8 2 [4,5]
+[20:33:15.151] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} 
+[20:33:18.377] LOG: %cStart Phase NewBattlePhase color:green;
+[20:33:18.377] LOG: Wave Seed: ^>sGZRdPBOQ|ORzBQtB~ 14
+[20:33:18.377] LOG: %cStart Phase NextEncounterPhase color:green;
+[20:33:18.378] LOG: Starting species pool tier: COMMON
+[20:33:18.384] LOG: Pokemon: Wild Zigzagoon | Species ID: 263 | Level: 9 | Nature: Sassy (+SpDef/-Spd)
+[20:33:18.384] LOG: Stats (IVs): HP: 27 (13), Atk: 17 (20), Def: 14 (23), Spatk: 12 (23), Spdef: 15 (15), Spd: 16 (10)
+[20:33:18.384] LOG: Ability: Scrappy | Passive Ability: Pickup 
+[20:33:18.384] LOG: Moveset: ["Double-Edge","Stomping Tantrum","Mud Sport","Odor Sleuth"]
+[20:33:18.384] LOG: Starting species pool tier: COMMON
+[20:33:18.393] LOG: Pokemon: Wild Lechonk | Species ID: 915 | Level: 8 | Nature: Gentle (+SpDef/-Def)
+[20:33:18.393] LOG: Stats (IVs): HP: 28 (22), Atk: 16 (25), Def: 14 (10), Spatk: 10 (1), Spdef: 15 (0), Spd: 10 (2)
+[20:33:18.393] LOG: Ability: Lingering Aroma | Passive Ability: Thick Fat 
+[20:33:18.393] LOG: Moveset: ["Hyper Fang","Bullet Seed","Tail Slap","Tail Whip"]
+[20:33:19.678] DEBUG: Session data saved to slot 4!
+[20:33:19.678] LOG: Wave Seed: ^>sGZRdPBOQ|ORzBQtB~ 14
+[20:33:20.159] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:33:20.160] LOG: %cStart Phase PostSummonPhase color:green;
+[20:33:20.160] LOG: Ran PSP for: Zigzagoon
+[20:33:20.160] LOG: %cStart Phase PostSummonPhase color:green;
+[20:33:20.160] LOG: %cStart Phase PostSummonPhase color:green;
+[20:33:20.161] LOG: %cStart Phase PostSummonPhase color:green;
+[20:33:20.161] LOG: Ran PSP for: Lechonk
+[20:33:20.161] LOG: %cStart Phase PostSummonPhase color:green;
+[20:33:20.161] LOG: %cStart Phase PostSummonPhase color:green;
+[20:33:20.161] LOG: %cStart Phase TurnInitPhase color:green;
+[20:33:20.161] LOG: %cStart Phase CommandPhase color:green;
+[20:33:27.561] LOG: Seed: 4P3xBEanTxFSLrFTNGc3ke1s
+[20:33:27.561] LOG: Wave Seed: 4P3xBEanTxFSLrFTNGc3ke1s 0
+[20:33:27.722] WARN: AnimationManager key already exists: prompt
+[20:33:27.723] WARN: AnimationManager key already exists: tera_sparkle
+[20:33:27.723] LOG: Seed: wrbQ7yMSbrEsYptjrvmkT2xX
+[20:33:27.723] LOG: Wave Seed: wrbQ7yMSbrEsYptjrvmkT2xX 0
+[20:33:29.682] LOG: %cStart Phase LoginPhase color:green;
+[20:33:30.097] LOG: Client Session: p0vvwbq0w6IxcV2lPFcLZJYyUkjWm4q6
+[20:33:30.752] DEBUG: Using cached system data
+[20:33:30.787] LOG: %cStart Phase TitlePhase color:green;
+[20:33:30.787] LOG: Getting Session Slot id: %d 4
+[20:33:30.793] LOG: use seasonal splash messages true
+[20:33:30.793] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[20:33:30.796] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:33:30.922] LOG: Wave Seed: ~n]CY_n~Qe|v~yw`>d 12
+[20:33:30.922] LOG: %cStart Phase EncounterPhase color:green;
+[20:33:31.263] DEBUG: Session data saved to slot 4!
+[20:33:31.263] LOG: Wave Seed: ~n]CY_n~Qe|v~yw`>d 12
+[20:33:34.961] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[20:33:44.000] LOG: Seed: LYO0efVBTqQD9rCUKa3ZvI9M
+[20:33:44.000] LOG: Wave Seed: LYO0efVBTqQD9rCUKa3ZvI9M 0
+[20:33:44.162] WARN: AnimationManager key already exists: prompt
+[20:33:44.162] WARN: AnimationManager key already exists: tera_sparkle
+[20:33:44.162] LOG: Seed: fjfHPzRhYG2LXBoTZbeGBnja
+[20:33:44.162] LOG: Wave Seed: fjfHPzRhYG2LXBoTZbeGBnja 0
+[20:33:46.080] LOG: %cStart Phase LoginPhase color:green;
+[20:33:46.373] LOG: Client Session: p0vvwbq0w6IxcV2lPFcLZJYyUkjWm4q6
+[20:33:46.936] DEBUG: Using cached system data
+[20:33:46.968] LOG: %cStart Phase TitlePhase color:green;
+[20:33:46.968] LOG: Getting Session Slot id: %d 4
+[20:33:46.973] LOG: use seasonal splash messages true
+[20:33:46.973] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[20:33:46.976] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:33:47.098] LOG: Wave Seed: rvrT\^teS>XdN{`fnqSNzvm 12
+[20:33:47.098] LOG: %cStart Phase EncounterPhase color:green;
+[20:33:47.220] DEBUG: Session data saved to slot 4!
+[20:33:47.220] LOG: Wave Seed: rvrT\^teS>XdN{`fnqSNzvm 12
+[20:33:49.886] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[20:33:51.279] LOG: Seed: zb0gyWxom1WPrQyyjKe1kWBb
+[20:33:51.280] LOG: Wave Seed: zb0gyWxom1WPrQyyjKe1kWBb 0
+[20:33:51.434] WARN: AnimationManager key already exists: prompt
+[20:33:51.434] WARN: AnimationManager key already exists: tera_sparkle
+[20:33:51.434] LOG: Seed: yVImySLERT28pk3c8Y4EWwq0
+[20:33:51.434] LOG: Wave Seed: yVImySLERT28pk3c8Y4EWwq0 0
+[20:33:53.407] LOG: %cStart Phase LoginPhase color:green;
+[20:33:53.743] LOG: Client Session: p0vvwbq0w6IxcV2lPFcLZJYyUkjWm4q6
+[20:33:54.318] DEBUG: Using cached system data
+[20:33:54.356] LOG: %cStart Phase TitlePhase color:green;
+[20:33:54.357] LOG: Getting Session Slot id: %d 4
+[20:33:54.363] LOG: use seasonal splash messages true
+[20:33:54.363] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[20:33:54.367] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:33:54.468] LOG: Wave Seed: bUy_XQ^`>D|w?oDe@Qc}< 12
+[20:33:54.469] LOG: %cStart Phase EncounterPhase color:green;
+[20:33:55.297] DEBUG: Session data saved to slot 4!
+[20:33:55.297] LOG: Wave Seed: bUy_XQ^`>D|w?oDe@Qc}< 12
+[20:33:57.359] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[20:34:05.640] LOG: Seed: BerqdQbNt3ST7EZa00DArj86
+[20:34:05.640] LOG: Wave Seed: BerqdQbNt3ST7EZa00DArj86 0
+[20:34:05.797] WARN: AnimationManager key already exists: prompt
+[20:34:05.797] WARN: AnimationManager key already exists: tera_sparkle
+[20:34:05.797] LOG: Seed: qSqVE4AUkn7XcBOCODPCO1Aw
+[20:34:05.797] LOG: Wave Seed: qSqVE4AUkn7XcBOCODPCO1Aw 0
+[20:34:07.712] LOG: %cStart Phase LoginPhase color:green;
+[20:34:08.086] LOG: Client Session: p0vvwbq0w6IxcV2lPFcLZJYyUkjWm4q6
+[20:34:08.961] DEBUG: Using cached system data
+[20:34:08.993] LOG: %cStart Phase TitlePhase color:green;
+[20:34:08.994] LOG: Getting Session Slot id: %d 4
+[20:34:08.998] LOG: use seasonal splash messages true
+[20:34:08.998] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[20:34:09.003] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:34:09.110] LOG: Wave Seed: }_}bQ@MawzCdoN[O[P\O[=M 12
+[20:34:09.111] LOG: %cStart Phase EncounterPhase color:green;
+[20:34:09.244] DEBUG: Session data saved to slot 4!
+[20:34:09.245] LOG: Wave Seed: }_}bQ@MawzCdoN[O[P\O[=M 12
+[20:34:10.296] LOG: Seed: mpbM1fdifpZRbBIm0DwbBiHY
+[20:34:10.296] LOG: Wave Seed: mpbM1fdifpZRbBIm0DwbBiHY 0
+[20:34:10.469] WARN: AnimationManager key already exists: prompt
+[20:34:10.470] WARN: AnimationManager key already exists: tera_sparkle
+[20:34:10.470] LOG: Seed: nCO6RayvpJlrsKTxnBd14PZ3
+[20:34:10.470] LOG: Wave Seed: nCO6RayvpJlrsKTxnBd14PZ3 0
+[20:34:12.225] LOG: %cStart Phase LoginPhase color:green;
+[20:34:12.591] LOG: Client Session: p0vvwbq0w6IxcV2lPFcLZJYyUkjWm4q6
+[20:34:12.927] DEBUG: Using cached system data
+[20:34:12.961] LOG: %cStart Phase TitlePhase color:green;
+[20:34:12.961] LOG: Getting Session Slot id: %d 4
+[20:34:12.966] LOG: use seasonal splash messages true
+[20:34:12.966] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[20:34:12.968] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:34:13.111] LOG: Wave Seed: zO[B^m|Vx~W`zNp=@\f? 12
+[20:34:13.112] LOG: %cStart Phase EncounterPhase color:green;
+[20:34:13.114] LOG: Starting species pool tier: SUPER_RARE
+[20:34:13.116] LOG: 13 9 [2,3,4,5,6,7,8,9,10,23]
+[20:34:13.116] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[20:34:13.537] DEBUG: Session data saved to slot 4!
+[20:34:13.537] LOG: Wave Seed: zO[B^m|Vx~W`zNp=@\f? 12
+[20:35:00.160] LOG: %cStart Phase MysteryEncounterPhase color:green;
