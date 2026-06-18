@@ -24,7 +24,10 @@
 
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
+import { Stat } from "#enums/stat";
+import type { EnemyPokemon } from "#field/pokemon";
 
 /** Entry-hazard moves the strategic scorer recognizes (set vs a big bench). */
 export const ER_HAZARD_MOVE_IDS: ReadonlySet<number> = new Set<number>([
@@ -93,6 +96,55 @@ export const ER_SLOW_DOOMED_PENALTY = 0.15;
  */
 export function shouldDevalueSlowMove(incomingKO: boolean, outspeeds: boolean, movePriority: number): boolean {
   return incomingKO && !outspeeds && movePriority <= 0;
+}
+
+/** Multiplier on the switch threshold when the active mon is doomed - it pivots more eagerly. */
+export const ER_DOOMED_SWITCH_THRESHOLD_MULT = 0.6;
+
+export interface ErThreat {
+  /** An opponent can KO this mon this turn (best simulated incoming hit >= its HP). */
+  incomingKO: boolean;
+  /** This mon is at least as fast as the fastest opponent. */
+  outspeeds: boolean;
+}
+
+/**
+ * Threat-awareness primitive (Phase A): does an opponent KO this mon THIS turn,
+ * and does it outspeed? Uses the same damage sim + ability fog as the scorer
+ * (the AI does NOT assume the player's unrevealed ability). Shared by the move
+ * scorer (priority snipe) and the switch decision (pivot when doomed).
+ */
+export function erAssessThreat(enemy: EnemyPokemon): ErThreat {
+  const opponents = enemy.getOpponents().filter(o => o.isActive(true));
+  if (opponents.length === 0) {
+    return { incomingKO: false, outspeeds: true };
+  }
+  let worstIncoming = 0;
+  let fastestOpponentSpd = 0;
+  for (const opp of opponents) {
+    fastestOpponentSpd = Math.max(fastestOpponentSpd, opp.getEffectiveStat(Stat.SPD, enemy));
+    for (const oppMove of opp.moveset) {
+      const move = oppMove?.getMove();
+      if (!move || move.category === MoveCategory.STATUS) {
+        continue;
+      }
+      const { damage } = enemy.getAttackDamage({
+        source: opp,
+        move,
+        ignoreAbility: false,
+        ignoreSourceAbility: !opp.waveData.abilityRevealed,
+        ignoreAllyAbility: false,
+        ignoreSourceAllyAbility: !opp.getAlly()?.waveData.abilityRevealed,
+        isCritical: false,
+        simulated: true,
+      });
+      worstIncoming = Math.max(worstIncoming, damage);
+    }
+  }
+  return {
+    incomingKO: worstIncoming >= enemy.hp,
+    outspeeds: enemy.getEffectiveStat(Stat.SPD, opponents[0]) >= fastestOpponentSpd,
+  };
 }
 
 /**

@@ -1,5 +1,5 @@
 import { globalScene } from "#app/global-scene";
-import { getErAiProfile } from "#data/elite-redux/er-enemy-ai";
+import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -74,7 +74,16 @@ export class EnemyCommandPhase extends FieldPhase {
 
           const switchMultiplier = 1 - (battle.enemySwitchCounter ? Math.pow(0.1, 1 / battle.enemySwitchCounter) : 0);
 
-          const switchThreshold = erAi.active ? erAi.switchThreshold : trainer.config.isBoss ? 2 : 3;
+          let switchThreshold = erAi.active ? erAi.switchThreshold : trainer.config.isBoss ? 2 : 3;
+          // Phase A2: if the active mon is DOOMED this turn (an opponent KOs it and
+          // it can't outrun the hit), pivot more eagerly - drop the threshold so a
+          // benched wall triggers the switch. The active dies for nothing otherwise.
+          if (erAi.active) {
+            const threat = erAssessThreat(enemyPokemon);
+            if (threat.incomingKO && !threat.outspeeds) {
+              switchThreshold *= ER_DOOMED_SWITCH_THRESHOLD_MULT;
+            }
+          }
 
           if (sortedPartyMemberScores[0][1] * switchMultiplier >= matchupScore * switchThreshold) {
             const index = trainer.getNextSummonIndex(enemyPokemon.trainerSlot, partyMemberScores);

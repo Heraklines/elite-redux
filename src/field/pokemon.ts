@@ -71,6 +71,7 @@ import {
   damageToScore,
   ER_HAZARD_MOVE_IDS,
   ER_SLOW_DOOMED_PENALTY,
+  erAssessThreat,
   getErAiProfile,
   shouldDevalueSlowMove,
   strategicMoveScore,
@@ -8268,41 +8269,11 @@ export class EnemyPokemon extends Pokemon {
               globalScene.arena.findTagsOnSide(t => t instanceof EntryHazardTag, opponentSide).length > 0;
 
             // Phase A (threat-awareness): if this mon CANNOT KO this turn (the KO
-            // filter left a normal pool), check whether an opponent will KO IT
+            // filter left a normal pool), assess whether an opponent will KO IT
             // this turn and whether it outspeeds. When doomed AND outsped, a slow
             // move won't even execute - so below we devalue non-priority moves,
-            // steering the AI toward a priority snipe. Uses the same ability fog
-            // as the damage scorer (don't assume the player's unrevealed ability).
-            let threatIncomingKO = false;
-            let threatOutspeeds = true;
-            if (koMoves.length === 0) {
-              const liveOpponents = this.getOpponents().filter(o => o.isActive(true));
-              let worstIncoming = 0;
-              let fastestOpponentSpd = 0;
-              for (const opp of liveOpponents) {
-                fastestOpponentSpd = Math.max(fastestOpponentSpd, opp.getEffectiveStat(Stat.SPD, this));
-                for (const oppMove of opp.moveset) {
-                  const om = oppMove?.getMove();
-                  if (!om || om.category === MoveCategory.STATUS) {
-                    continue;
-                  }
-                  const { damage } = this.getAttackDamage({
-                    source: opp,
-                    move: om,
-                    ignoreAbility: false,
-                    ignoreSourceAbility: !opp.waveData.abilityRevealed,
-                    ignoreAllyAbility: false,
-                    ignoreSourceAllyAbility: !opp.getAlly()?.waveData.abilityRevealed,
-                    isCritical: false,
-                    simulated: true,
-                  });
-                  worstIncoming = Math.max(worstIncoming, damage);
-                }
-              }
-              threatIncomingKO = worstIncoming >= this.hp;
-              threatOutspeeds =
-                liveOpponents.length === 0 || this.getEffectiveStat(Stat.SPD, liveOpponents[0]) >= fastestOpponentSpd;
-            }
+            // steering the AI toward a priority snipe.
+            const threat = koMoves.length === 0 ? erAssessThreat(this) : { incomingKO: false, outspeeds: true };
 
             movePool.forEach((pokemonMove, moveIndex) => {
               const move = pokemonMove.getMove();
@@ -8356,7 +8327,7 @@ export class EnemyPokemon extends Pokemon {
                 }
                 // Phase A: doomed-and-outsped -> a slow move likely won't execute,
                 // so devalue it (a priority move keeps full value and wins).
-                if (best > 0 && shouldDevalueSlowMove(threatIncomingKO, threatOutspeeds, move.priority)) {
+                if (best > 0 && shouldDevalueSlowMove(threat.incomingKO, threat.outspeeds, move.priority)) {
                   best *= ER_SLOW_DOOMED_PENALTY;
                 }
                 moveScores[moveIndex] = best;
