@@ -1,0 +1,274 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqjts635-jy50
+mode:     0  wave:30
+seed:     izpfiwxHHddShk6T1rOyjmoM
+party:    Scyther Redux(L24 43hp f0), Fogging(L19 47hp f0), Shinx Redux(L15 0hp f0), Monferno Redux(L17 0hp f0), Seel Redux(L17 53hp f0), Prinplup Redux(L17 55hp f0)
+enemy:    Surskit(L21), Vivillon(L22), Cutiefly(L20)
+
+----- CONSOLE -----
+[19:58:50.212] LOG: Applied Super EXP. Charm 
+[19:58:50.212] LOG: Applied EXP. Charm 
+[19:58:50.213] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:58:50.213] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:58:50.213] LOG: Applied Super EXP. Charm 
+[19:58:50.213] LOG: Applied EXP. Charm 
+[19:58:50.213] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:58:50.213] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:58:50.213] LOG: Applied Super EXP. Charm 
+[19:58:50.213] LOG: Applied EXP. Charm 
+[19:58:50.213] LOG: %cStart Phase LevelUpPhase color:green;
+[19:58:50.214] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:58:50.215] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:58:50.215] LOG: Applied Super EXP. Charm 
+[19:58:50.215] LOG: Applied EXP. Charm 
+[19:58:50.215] LOG: %cStart Phase LevelUpPhase color:green;
+[19:58:50.215] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:58:50.215] LOG: %cStart Phase MoveEndPhase color:green;
+[19:58:50.215] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:58:50.215] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:58:50.215] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:58:50.215] LOG: %cStart Phase BerryPhase color:green;
+[19:58:50.215] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:58:50.215] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[19:58:50.592] LOG: %cStart Phase MessagePhase color:green;
+[19:58:50.824] LOG: %cStart Phase TurnEndPhase color:green;
+[19:58:50.824] LOG: %cStart Phase SwitchSummonPhase color:green;
+[19:58:51.058] LOG: Viola
+[19:58:51.275] LOG: %cStart Phase PostSummonPhase color:green;
+[19:58:51.275] LOG: Ran PSP for: Vivillon
+[19:58:51.276] LOG: %cStart Phase PostSummonPhase color:green;
+[19:58:51.276] LOG: %cStart Phase PostSummonPhase color:green;
+[19:58:51.276] LOG: %cStart Phase MovePhase color:green;
+[19:58:51.276] LOG: %cUser: Vivillon
+Move: POWDER
+Use Mode: INDIRECT color:orchid
+[19:58:51.276] LOG: %cStart Phase MessagePhase color:green;
+[19:58:51.392] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:58:51.392] LOG: Battle Seed: 5IvYm4dftZEeUC4H
+[19:58:51.409] LOG: %cStart Phase MessagePhase color:green;
+[19:58:51.659] LOG: %cStart Phase MoveEndPhase color:green;
+[19:58:51.659] LOG: %cStart Phase TurnInitPhase color:green;
+[19:58:51.659] LOG: %cStart Phase CommandPhase color:green;
+[19:58:52.731] LOG: Move: THUNDER_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Monferno Redux
+[19:58:52.732] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:58:52.735] LOG: Move Pool: ["Air Cutter","Signal Beam","Giga Drain"]
+[19:58:52.735] LOG: Move Scores: [57,11.25,38]
+[19:58:52.735] LOG: Sorted Move Pool: ["Air Cutter","Giga Drain","Signal Beam"]
+[19:58:52.735] LOG: Chosen Move: Signal Beam
+[19:58:52.735] LOG: %cStart Phase TurnStartPhase color:green;
+[19:58:52.735] LOG: %cStart Phase MovePhase color:green;
+[19:58:52.735] LOG: %cUser: Vivillon
+Move: SIGNAL_BEAM
+Use Mode: NORMAL color:orchid
+[19:58:52.736] LOG: %cStart Phase MessagePhase color:green;
+[19:58:52.860] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:58:53.327] LOG: crit stage: +0
+[19:58:53.328] LOG: Move: Signal Beam | Base damage: 29.63529411764706 | Power: 75 | Source attack: 58 | Target defense: 34
+[19:58:53.328] LOG: Move: Signal Beam | Attack damage: 40
+[19:58:53.328] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:58:53.361] LOG: %cStart Phase MessagePhase color:green;
+[19:58:53.578] LOG: %cStart Phase FaintPhase color:green;
+[19:58:53.578] WARN: cry/10783 not found
+[19:58:53.644] LOG: %cStart Phase MessagePhase color:green;
+[19:58:54.012] LOG: %cStart Phase MoveEndPhase color:green;
+[19:58:54.012] LOG: %cStart Phase MovePhase color:green;
+[19:58:54.012] LOG: %cStart Phase MoveEndPhase color:green;
+[19:58:54.012] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:58:54.012] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:58:54.012] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:58:54.012] LOG: %cStart Phase BerryPhase color:green;
+[19:58:54.012] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:58:54.012] LOG: %cStart Phase TurnEndPhase color:green;
+[19:58:54.012] LOG: %cStart Phase SwitchPhase color:green;
+[19:58:55.682] LOG: %cStart Phase SwitchSummonPhase color:green;
+[19:58:55.813] WARN: cry/827 not found
+[19:58:55.914] LOG: %cStart Phase ShinySparklePhase color:green;
+[19:58:56.013] LOG: %cStart Phase PostSummonPhase color:green;
+[19:58:56.013] LOG: Ran PSP for: Scyther Redux
+[19:58:56.013] LOG: %cStart Phase PostSummonPhase color:green;
+[19:58:56.013] LOG: %cStart Phase PostSummonPhase color:green;
+[19:58:56.013] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:58:56.164] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:58:56.214] LOG: %cStart Phase TurnInitPhase color:green;
+[19:58:56.214] LOG: %cStart Phase CommandPhase color:green;
+[19:58:57.116] LOG: Move: ICE_SPINNER Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Scyther Redux
+[19:58:57.116] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:58:57.118] LOG: Battle Seed: 5IvYm4dftZEeUC4H
+[19:58:57.119] LOG: Move Pool: ["Air Cutter","Signal Beam","Poison Powder","Giga Drain"]
+[19:58:57.119] LOG: Move Scores: [25.5,11.25,0,7]
+[19:58:57.119] LOG: Sorted Move Pool: ["Air Cutter","Signal Beam","Giga Drain","Poison Powder"]
+[19:58:57.119] LOG: Chosen Move: Signal Beam
+[19:58:57.119] LOG: %cStart Phase TurnStartPhase color:green;
+[19:58:57.120] LOG: %cStart Phase MovePhase color:green;
+[19:58:57.120] LOG: %cUser: Scyther Redux
+Move: ICE_SPINNER
+Use Mode: NORMAL color:orchid
+[19:58:57.120] LOG: %cStart Phase MessagePhase color:green;
+[19:58:57.247] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:58:57.365] LOG: Applied Scope Lens 
+[19:58:57.365] LOG: crit stage: +1
+[19:58:57.365] LOG: Move: Ice Spinner | Base damage: 32.02810810810811 | Power: 80 | Source attack: 62 | Target defense: 37
+[19:58:57.365] LOG: Move: Ice Spinner | Attack damage: 62
+[19:58:57.366] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:58:57.398] LOG: %cStart Phase MessagePhase color:green;
+[19:58:57.615] LOG: %cStart Phase MoveEndPhase color:green;
+[19:58:57.615] LOG: %cStart Phase MovePhase color:green;
+[19:58:57.615] LOG: %cUser: Vivillon
+Move: SIGNAL_BEAM
+Use Mode: NORMAL color:orchid
+[19:58:57.616] LOG: %cStart Phase MessagePhase color:green;
+[19:58:57.748] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:58:58.216] LOG: crit stage: +0
+[19:58:58.217] LOG: Move: Signal Beam | Base damage: 26.092307692307692 | Power: 75 | Source attack: 58 | Target defense: 39
+[19:58:58.217] LOG: Move: Signal Beam | Attack damage: 32
+[19:58:58.217] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:58:58.249] LOG: %cStart Phase MessagePhase color:green;
+[19:58:58.465] LOG: %cStart Phase MoveEndPhase color:green;
+[19:58:58.465] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:58:58.465] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:58:58.465] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:58:58.465] LOG: %cStart Phase BerryPhase color:green;
+[19:58:58.466] LOG: Applied Petaya Berry (enemy)
+[19:58:58.467] LOG: %cStart Phase CommonAnimPhase color:green;
+[19:58:58.799] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:58:58.983] LOG: %cStart Phase MessagePhase color:green;
+[19:58:59.216] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:58:59.217] LOG: %cStart Phase TurnEndPhase color:green;
+[19:58:59.217] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:58:59.384] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:58:59.568] LOG: %cStart Phase MessagePhase color:green;
+[19:58:59.800] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:58:59.834] LOG: %cStart Phase TurnInitPhase color:green;
+[19:58:59.834] LOG: %cStart Phase CommandPhase color:green;
+[19:59:00.100] LOG: Move: ICE_SPINNER Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Scyther Redux
+[19:59:00.100] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:59:00.102] LOG: Battle Seed: 5IvYm4dftZEeUC4H
+[19:59:00.102] LOG: Move Pool: ["Signal Beam"]
+[19:59:00.102] LOG: Move Scores: [11.25]
+[19:59:00.102] LOG: Sorted Move Pool: ["Signal Beam"]
+[19:59:00.102] LOG: Chosen Move: Signal Beam
+[19:59:00.102] LOG: %cStart Phase TurnStartPhase color:green;
+[19:59:00.102] LOG: %cStart Phase MovePhase color:green;
+[19:59:00.102] LOG: %cUser: Scyther Redux
+Move: ICE_SPINNER
+Use Mode: NORMAL color:orchid
+[19:59:00.103] LOG: %cStart Phase MessagePhase color:green;
+[19:59:00.217] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:59:00.335] LOG: Applied Scope Lens 
+[19:59:00.335] LOG: crit stage: +1
+[19:59:00.335] LOG: Move: Ice Spinner | Base damage: 32.02810810810811 | Power: 80 | Source attack: 62 | Target defense: 37
+[19:59:00.335] LOG: Move: Ice Spinner | Attack damage: 62
+[19:59:00.336] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:59:00.369] LOG: %cStart Phase MessagePhase color:green;
+[19:59:00.585] LOG: %cStart Phase FaintPhase color:green;
+[19:59:00.635] LOG: %cStart Phase MessagePhase color:green;
+[19:59:00.963] LOG: %cStart Phase VictoryPhase color:green;
+[19:59:00.964] LOG: Applied Soothe Bell 
+[19:59:00.964] LOG: %cStart Phase ExpPhase color:green;
+[19:59:00.964] LOG: Applied Super EXP. Charm 
+[19:59:00.964] LOG: Applied EXP. Charm 
+[19:59:01.299] LOG: 13467 17276 13824
+[19:59:01.403] LOG: %cStart Phase LevelUpPhase color:green;
+[19:59:01.403] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[19:59:29.190] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:59:29.192] LOG: Applied Super EXP. Charm 
+[19:59:29.192] LOG: Applied EXP. Charm 
+[19:59:29.192] LOG: %cStart Phase LevelUpPhase color:green;
+[19:59:29.193] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:59:29.193] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:59:29.193] LOG: Applied Super EXP. Charm 
+[19:59:29.193] LOG: Applied EXP. Charm 
+[19:59:29.193] LOG: %cStart Phase LevelUpPhase color:green;
+[19:59:29.193] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[19:59:32.949] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:59:32.949] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:59:32.949] LOG: Applied Super EXP. Charm 
+[19:59:32.949] LOG: Applied EXP. Charm 
+[19:59:32.949] LOG: %cStart Phase LevelUpPhase color:green;
+[19:59:32.950] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[19:59:37.591] LOG: %cStart Phase EvolutionPhase color:green;
+[19:59:37.839] WARN: cry/10785 not found
+[19:59:39.991] ERROR: [uncaught] SecurityError: The operation is insecure. @ https://elite-redux-staging.pages.dev/assets/phaser-COgPIns6.js:63:2433
+[19:59:41.927] WARN: cry/10786 not found
+[19:59:46.229] LOG: %cStart Phase EndEvolutionPhase color:green;
+[19:59:46.284] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:59:46.284] LOG: %cStart Phase MoveEndPhase color:green;
+[19:59:46.284] LOG: %cStart Phase MovePhase color:green;
+[19:59:46.284] LOG: %cStart Phase MoveEndPhase color:green;
+[19:59:46.284] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:59:46.284] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:59:46.284] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:59:46.284] LOG: %cStart Phase BerryPhase color:green;
+[19:59:46.285] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:59:46.285] LOG: %cStart Phase TurnEndPhase color:green;
+[19:59:46.285] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:59:46.465] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:59:46.649] LOG: %cStart Phase MessagePhase color:green;
+[19:59:46.881] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:59:46.915] LOG: %cStart Phase SwitchSummonPhase color:green;
+[19:59:47.149] LOG: Viola
+[19:59:47.349] LOG: %cStart Phase PostSummonPhase color:green;
+[19:59:47.350] LOG: Ran PSP for: Surskit
+[19:59:47.350] LOG: %cStart Phase PostSummonPhase color:green;
+[19:59:47.350] LOG: %cStart Phase PostSummonPhase color:green;
+[19:59:47.350] LOG: %cStart Phase TurnInitPhase color:green;
+[19:59:47.350] LOG: %cStart Phase CommandPhase color:green;
+[19:59:48.773] LOG: Move: DIAMOND_BLADE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Scyther Redux
+[19:59:48.774] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:59:48.777] LOG: Battle Seed: 5IvYm4dftZEeUC4H
+[19:59:48.778] LOG: Move Pool: ["Brine","Skitter Smack","Sweet Scent","Baton Pass"]
+[19:59:48.778] LOG: Move Scores: [21,9.75,6,-20]
+[19:59:48.778] LOG: Sorted Move Pool: ["Brine","Skitter Smack","Sweet Scent","Baton Pass"]
+[19:59:48.778] LOG: Chosen Move: Brine
+[19:59:48.778] LOG: %cStart Phase TurnStartPhase color:green;
+[19:59:48.778] LOG: %cStart Phase MovePhase color:green;
+[19:59:48.778] LOG: %cUser: Scyther Redux
+Move: DIAMOND_BLADE
+Use Mode: NORMAL color:orchid
+[19:59:48.779] LOG: %cStart Phase MessagePhase color:green;
+[19:59:48.900] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:59:49.585] LOG: Applied Scope Lens 
+[19:59:49.585] LOG: crit stage: +1
+[19:59:49.586] LOG: Move: Diamond Blade | Base damage: 42.21333333333334 | Power: 80 | Source attack: 65 | Target defense: 30
+[19:59:49.586] LOG: Move: Diamond Blade | Attack damage: 75
+[19:59:49.586] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:59:49.618] LOG: %cStart Phase MessagePhase color:green;
+[19:59:49.834] LOG: %cStart Phase FaintPhase color:green;
+[19:59:49.902] LOG: %cStart Phase MessagePhase color:green;
+[19:59:50.197] LOG: %cStart Phase VictoryPhase color:green;
+[19:59:50.197] LOG: Applied Soothe Bell 
+[19:59:50.197] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:59:50.197] LOG: Applied Super EXP. Charm 
+[19:59:50.197] LOG: Applied EXP. Charm 
+[19:59:50.198] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:59:50.198] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:59:50.198] LOG: Applied Super EXP. Charm 
+[19:59:50.198] LOG: Applied EXP. Charm 
+[19:59:50.198] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:59:50.198] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:59:50.198] LOG: Applied Super EXP. Charm 
+[19:59:50.198] LOG: Applied EXP. Charm 
+[19:59:50.198] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:59:50.198] LOG: %cStart Phase MoveEndPhase color:green;
+[19:59:50.198] LOG: %cStart Phase MovePhase color:green;
+[19:59:50.199] LOG: %cStart Phase MoveEndPhase color:green;
+[19:59:50.199] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:59:50.199] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:59:50.199] LOG: %cStart Phase TurnEndPhase color:green;
+[19:59:50.199] LOG: %cStart Phase BattleEndPhase color:green;
+[19:59:50.199] LOG: Battle Score: 204 (5 Turns x0.69)
+[19:59:50.199] LOG: Total Score: 1450
+[19:59:50.205] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[19:59:50.206] LOG: Gym Leader Viola
+[19:59:50.533] LOG: Gym Leader Viola
+[19:59:50.845] LOG: Dialogue saved as seen: dialogue:viola.victory.1
+[19:59:50.845] LOG: %cStart Phase MoneyRewardPhase color:green;
+[19:59:51.037] LOG: %cStart Phase ModifierRewardPhase color:green;
+[19:59:51.213] LOG: %cStart Phase ModifierRewardPhase color:green;
+[19:59:51.381] LOG: %cStart Phase EggLapsePhase color:green;
+[19:59:51.381] LOG: %cStart Phase ModifierRewardPhase color:green;
+[19:59:51.581] LOG: %cStart Phase SelectModifierPhase color:green;
