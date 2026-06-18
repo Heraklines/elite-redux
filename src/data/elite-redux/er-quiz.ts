@@ -25,6 +25,7 @@
 // =============================================================================
 
 import { modifierTypes } from "#data/data-lists";
+import { ModifierTier } from "#enums/modifier-tier";
 import { randSeedInt, randSeedItem, randSeedShuffle } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import erDexFlavorRaw from "./er-dex-flavor.json";
@@ -288,11 +289,15 @@ function buildErBrailleQuestion(optionCount: number, usePhrase = false): ErQuizQ
 }
 
 /**
- * The Salvage Yard scrap-heap item pool: recognizable held items that read as
- * distinct silhouettes AND are worth reclaiming. Each entry is a modifierTypes
- * key so the encounter can map a correctly-named part back to its reward func.
+ * The Salvage Yard scrap-heap CANDIDATE item pool: held items / supplies that read
+ * as DISTINCT silhouettes (so the guessing is fair - no two near-identical shapes
+ * like the type gems / seeds / berries). Each entry is a modifierTypes key so the
+ * encounter can map a correctly-named part back to its reward func. The pool is
+ * filtered at bank time to RARITY <= ROGUE (random tier up to Rogue, nothing above
+ * - no Master / relic), per the maintainer's "max rogue rarity" call.
  */
 const ER_ITEM_QUIZ_IDS: readonly string[] = [
+  // Vanilla / base held items.
   "QUICK_CLAW",
   "GRIP_CLAW",
   "WIDE_LENS",
@@ -308,6 +313,23 @@ const ER_ITEM_QUIZ_IDS: readonly string[] = [
   "BATON",
   "EVIOLITE",
   "MYSTICAL_ROCK",
+  "TOXIC_ORB",
+  "FLAME_ORB",
+  // ER community items (#387) - distinct shapes, tier-filtered below.
+  "ER_RUSTY_CLAW",
+  "ER_SPIKED_KNUCKLES",
+  "ER_COPPER_ROD",
+  "ER_LOADED_DICE",
+  "ER_LUCKY_HEART",
+  "ER_OMNI_GEM",
+  "ER_POWER_HERB",
+  "ER_CELL_BATTERY",
+  "ER_ABSORB_BULB",
+  "ER_SNOWBALL",
+  "ER_LUMINOUS_MOSS",
+  "ER_WEAKNESS_POLICY",
+  "ER_CHILI_SAMPLE",
+  "ER_FROSTBITE_ORB",
 ];
 
 /** A baked item descriptor for the item quiz: key + icon frame + display name. */
@@ -317,11 +339,21 @@ interface ErItemDescriptor {
   name: string;
 }
 
+/** Minimal structural shape of a resolved modifier type (avoids a circular import
+ * on the ModifierType class - er-quiz is imported BY modifier-type). */
+interface ResolvedItemType {
+  iconImage: string;
+  name: string;
+  id?: string;
+  getOrInferTier?: () => number | null;
+}
+
 /**
- * The item-quiz pool, resolved to {id, frame, name} descriptors. Memoized and
- * built LAZILY for the same early-init reason as {@linkcode quizSpeciesIds}: the
- * modifier factories and i18n must be ready, which they are by quiz time but not
- * at module load. Any id that fails to resolve is skipped (never asked/offered).
+ * The item-quiz pool, resolved to {id, frame, name} descriptors, filtered to
+ * rarity <= ROGUE. Memoized and built LAZILY for the same early-init reason as
+ * {@linkcode quizSpeciesIds}: the modifier factories + pools must be ready, which
+ * they are by quiz time but not at module load. Any id that fails to resolve, has
+ * no inferable tier, or tiers ABOVE Rogue is skipped (never asked / granted).
  */
 let cachedItemBank: ErItemDescriptor[] | null = null;
 function itemBank(): ErItemDescriptor[] {
@@ -329,14 +361,21 @@ function itemBank(): ErItemDescriptor[] {
     cachedItemBank = [];
     for (const id of ER_ITEM_QUIZ_IDS) {
       try {
-        const func = (modifierTypes as Record<string, () => { iconImage: string; name: string }>)[id];
+        const func = (modifierTypes as Record<string, () => ResolvedItemType>)[id];
         if (!func) {
           continue;
         }
         const type = func();
-        if (type?.iconImage && type.name) {
-          cachedItemBank.push({ id, frame: type.iconImage, name: type.name });
+        if (!type?.iconImage || !type.name) {
+          continue;
         }
+        // Enable tier inference (the raw factory does not set id) and cap at Rogue.
+        type.id = id;
+        const tier = type.getOrInferTier?.() ?? null;
+        if (tier === null || tier > ModifierTier.ROGUE) {
+          continue;
+        }
+        cachedItemBank.push({ id, frame: type.iconImage, name: type.name });
       } catch {
         // Skip any item whose factory throws (keeps the rest of the quiz usable).
       }
