@@ -82,8 +82,8 @@ export interface ErBiomeEconomy {
 export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
   [BiomeId.TOWN]: { cheap: ["HEAL", "BALLS"], dear: ["TM", "HELD"], signature: ["BERRY", "LURE"], priceMod: 1 },
   [BiomeId.PLAINS]: { cheap: ["HEAL", "BALLS"], dear: ["HELD"], signature: ["BERRY", "LURE"], priceMod: 1 },
-  [BiomeId.GRASS]: { cheap: ["BERRY"], dear: ["EVO"], signature: ["BERRY", "LEEK"], priceMod: 1 },
-  [BiomeId.TALL_GRASS]: { cheap: ["BERRY", "BALLS"], dear: ["TM"], signature: ["MAX_LURE", "BERRY"], priceMod: 1 },
+  [BiomeId.GRASS]: { cheap: ["BERRY"], dear: ["EVO"], signature: ["BERRY", "LEEK", "ER_GRASS_GEM", "ER_GRASSY_SEED"], priceMod: 1 },
+  [BiomeId.TALL_GRASS]: { cheap: ["BERRY", "BALLS"], dear: ["TM"], signature: ["MAX_LURE", "BERRY", "ER_GRASSY_SEED"], priceMod: 1 },
   [BiomeId.METROPOLIS]: {
     // The department store: money items + the Mega Bracelet on the shelf.
     cheap: ["TM", "EVO", "VITAMIN"],
@@ -92,15 +92,15 @@ export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
     priceMod: 1,
     buysDear: "HELD",
   },
-  [BiomeId.FOREST]: { cheap: ["BERRY", "PP"], dear: ["BATTLE"], signature: ["LEEK", "SOOTHE_BELL"], priceMod: 1 },
-  [BiomeId.SEA]: { cheap: ["BALLS"], dear: ["EVO"], signature: ["SHELL_BELL", "SOUL_DEW"], priceMod: 1 },
-  [BiomeId.SWAMP]: { cheap: ["HEAL"], dear: ["TM"], signature: ["TOXIC_ORB", "QUICK_CLAW"], priceMod: 1.1 },
+  [BiomeId.FOREST]: { cheap: ["BERRY", "PP"], dear: ["BATTLE"], signature: ["LEEK", "SOOTHE_BELL", "ER_GRASSY_SEED", "ER_BUG_GEM"], priceMod: 1 },
+  [BiomeId.SEA]: { cheap: ["BALLS"], dear: ["EVO"], signature: ["SHELL_BELL", "SOUL_DEW", "ER_WATER_GEM", "ER_ABSORB_BULB"], priceMod: 1 },
+  [BiomeId.SWAMP]: { cheap: ["HEAL"], dear: ["TM"], signature: ["TOXIC_ORB", "QUICK_CLAW", "ER_POISON_GEM"], priceMod: 1.1 },
   [BiomeId.BEACH]: { cheap: ["BERRY", "HEAL"], dear: ["TM"], signature: ["SOOTHE_BELL", "SHELL_BELL"], priceMod: 0.9 },
   [BiomeId.LAKE]: { cheap: ["HEAL", "PP"], dear: ["HELD"], signature: ["SHELL_BELL", "SOUL_DEW"], priceMod: 0.9 },
-  [BiomeId.SEABED]: { cheap: [], dear: ["HEAL"], signature: ["SOUL_DEW", "EVIOLITE"], priceMod: 1.2 },
-  [BiomeId.MOUNTAIN]: { cheap: ["BATTLE"], dear: ["HEAL"], signature: ["KINGS_ROCK", "QUICK_CLAW"], priceMod: 1.1 },
-  [BiomeId.BADLANDS]: { cheap: ["BATTLE"], dear: ["BERRY"], signature: ["QUICK_CLAW", "KINGS_ROCK"], priceMod: 1.1 },
-  [BiomeId.CAVE]: { cheap: ["BALLS"], dear: ["HEAL"], signature: ["EVOLUTION_ITEM", "EVIOLITE"], priceMod: 1 },
+  [BiomeId.SEABED]: { cheap: [], dear: ["HEAL"], signature: ["SOUL_DEW", "EVIOLITE", "ER_WATER_GEM"], priceMod: 1.2 },
+  [BiomeId.MOUNTAIN]: { cheap: ["BATTLE"], dear: ["HEAL"], signature: ["KINGS_ROCK", "QUICK_CLAW", "ER_ROCK_GEM"], priceMod: 1.1 },
+  [BiomeId.BADLANDS]: { cheap: ["BATTLE"], dear: ["BERRY"], signature: ["QUICK_CLAW", "KINGS_ROCK", "ER_GROUND_GEM"], priceMod: 1.1 },
+  [BiomeId.CAVE]: { cheap: ["BALLS"], dear: ["HEAL"], signature: ["EVOLUTION_ITEM", "EVIOLITE", "ER_ROCK_GEM", "ER_GROUND_GEM"], priceMod: 1 },
   [BiomeId.DESERT]: {
     // The caravan: everything pricey, but it stocks exotics (extra ULTRA
     // wildcard rolls; see stock builder).
@@ -109,29 +109,29 @@ export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
     signature: ["GRIP_CLAW", "BATON"],
     priceMod: 1.3,
   },
-  [BiomeId.ICE_CAVE]: { cheap: ["EVO"], dear: ["HEAL"], signature: ["FROSTBITE_ORB", "EVIOLITE"], priceMod: 1.2 },
-  [BiomeId.MEADOW]: { cheap: ["MINT", "BERRY", "VITAMIN"], dear: ["BATTLE"], signature: ["SOOTHE_BELL", "BERRY"], priceMod: 0.9 },
-  [BiomeId.POWER_PLANT]: { cheap: ["TM", "PP"], dear: ["BERRY"], signature: ["MULTI_LENS", "WIDE_LENS"], priceMod: 1 },
-  [BiomeId.VOLCANO]: { cheap: ["EVO"], dear: ["HEAL"], signature: ["FLAME_ORB", "ER_CHILI_SAMPLE"], priceMod: 1.1 },
-  [BiomeId.GRAVEYARD]: { cheap: ["EVO"], dear: ["BALLS"], signature: ["REVIVER_SEED", "ER_RUSTY_CLAW"], priceMod: 1 },
+  [BiomeId.ICE_CAVE]: { cheap: ["EVO"], dear: ["HEAL"], signature: ["FROSTBITE_ORB", "EVIOLITE", "ER_ICE_GEM", "ER_SNOWBALL"], priceMod: 1.2 },
+  [BiomeId.MEADOW]: { cheap: ["MINT", "BERRY", "VITAMIN"], dear: ["BATTLE"], signature: ["SOOTHE_BELL", "BERRY", "ER_GRASSY_SEED"], priceMod: 0.9 },
+  [BiomeId.POWER_PLANT]: { cheap: ["TM", "PP"], dear: ["BERRY"], signature: ["MULTI_LENS", "WIDE_LENS", "ER_ELECTRIC_GEM", "ER_CELL_BATTERY", "ER_ELECTRIC_SEED"], priceMod: 1 },
+  [BiomeId.VOLCANO]: { cheap: ["EVO"], dear: ["HEAL"], signature: ["FLAME_ORB", "ER_CHILI_SAMPLE", "ER_FIRE_GEM"], priceMod: 1.1 },
+  [BiomeId.GRAVEYARD]: { cheap: ["EVO"], dear: ["BALLS"], signature: ["REVIVER_SEED", "ER_RUSTY_CLAW", "ER_GHOST_GEM"], priceMod: 1 },
   // The training hall: vitamins are the headline, and martial mastery puts the
   // Mega Bracelet (KEYSTONE) on offer here too.
-  [BiomeId.DOJO]: { cheap: ["BATTLE", "VITAMIN", "KEYSTONE"], dear: ["TM"], signature: ["FOCUS_BAND", "KINGS_ROCK"], priceMod: 1 },
-  [BiomeId.FACTORY]: { cheap: ["HELD"], dear: ["BERRY"], signature: ["WHITE_HERB", "ER_LOADED_DICE"], priceMod: 1 },
+  [BiomeId.DOJO]: { cheap: ["BATTLE", "VITAMIN", "KEYSTONE"], dear: ["TM"], signature: ["FOCUS_BAND", "KINGS_ROCK", "ER_FIGHTING_GEM", "ER_WEAKNESS_POLICY"], priceMod: 1 },
+  [BiomeId.FACTORY]: { cheap: ["HELD"], dear: ["BERRY"], signature: ["WHITE_HERB", "ER_LOADED_DICE", "ER_STEEL_GEM", "ER_CELL_BATTERY"], priceMod: 1 },
   // Ancient arcane power: Omni Gem / Move Slot Expander / Ability Randomizer.
-  [BiomeId.RUINS]: { cheap: ["ARCANE"], dear: ["HEAL"], signature: ["RELIC_GOLD", "REVIVER_SEED"], priceMod: 1.1 },
+  [BiomeId.RUINS]: { cheap: ["ARCANE"], dear: ["HEAL"], signature: ["RELIC_GOLD", "REVIVER_SEED", "ER_PSYCHIC_GEM", "ER_PSYCHIC_SEED"], priceMod: 1.1 },
   [BiomeId.WASTELAND]: { cheap: ["HEAL"], dear: ["BALLS"], signature: ["DNA_SPLICERS", "REVIVER_SEED"], priceMod: 1.2 },
   [BiomeId.ABYSS]: { cheap: [], dear: [], signature: [], priceMod: 1, noShop: true },
   // Cosmic mutation: the observatory tinkers with abilities/moves (ARCANE).
-  [BiomeId.SPACE]: { cheap: ["HELD", "ARCANE"], dear: ["HEAL", "BERRY"], signature: ["MINI_BLACK_HOLE", "MULTI_LENS"], priceMod: 1.2 },
+  [BiomeId.SPACE]: { cheap: ["HELD", "ARCANE"], dear: ["HEAL", "BERRY"], signature: ["MINI_BLACK_HOLE", "MULTI_LENS", "ER_PSYCHIC_SEED"], priceMod: 1.2 },
   [BiomeId.CONSTRUCTION_SITE]: {
     cheap: ["BATTLE", "VITAMIN"],
     dear: ["MINT"],
-    signature: ["GOLDEN_PUNCH", "FOCUS_BAND"],
+    signature: ["GOLDEN_PUNCH", "FOCUS_BAND", "ER_STEEL_GEM"],
     priceMod: 1,
   },
-  [BiomeId.JUNGLE]: { cheap: ["BERRY", "CANDY"], dear: ["HEAL"], signature: ["LUCKY_EGG", "BERRY"], priceMod: 1.1 },
-  [BiomeId.FAIRY_CAVE]: { cheap: ["MINT"], dear: ["BATTLE"], signature: ["ER_LUCKY_HEART", "SOOTHE_BELL"], priceMod: 1 },
+  [BiomeId.JUNGLE]: { cheap: ["BERRY", "CANDY"], dear: ["HEAL"], signature: ["LUCKY_EGG", "BERRY", "ER_GRASS_GEM", "ER_GRASSY_SEED"], priceMod: 1.1 },
+  [BiomeId.FAIRY_CAVE]: { cheap: ["MINT"], dear: ["BATTLE"], signature: ["ER_LUCKY_HEART", "SOOTHE_BELL", "ER_FAIRY_GEM", "ER_MISTY_SEED"], priceMod: 1 },
   [BiomeId.TEMPLE]: { cheap: [], dear: [], signature: ["LEFTOVERS", "RELIC_GOLD"], priceMod: 1 },
   [BiomeId.SLUM]: {
     // The den: everything is 25% off, no markups. (The "used goods" twist
@@ -142,8 +142,8 @@ export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
     priceMod: 0.75,
     buysDear: "EVO",
   },
-  [BiomeId.SNOWY_FOREST]: { cheap: ["BERRY", "PP"], dear: ["HEAL"], signature: ["REVIVER_SEED", "FROSTBITE_ORB"], priceMod: 1.1 },
-  [BiomeId.ISLAND]: { cheap: [], dear: [], signature: ["ER_DEX_NAV", "SHELL_BELL"], priceMod: 1.15 },
+  [BiomeId.SNOWY_FOREST]: { cheap: ["BERRY", "PP"], dear: ["HEAL"], signature: ["REVIVER_SEED", "FROSTBITE_ORB", "ER_ICE_GEM", "ER_GRASSY_SEED"], priceMod: 1.1 },
+  [BiomeId.ISLAND]: { cheap: [], dear: [], signature: ["ER_DEX_NAV", "SHELL_BELL", "ER_WATER_GEM"], priceMod: 1.15 },
   // The experiment lab: candies + the build-changers (Ability Randomizer,
   // Move Slot Expander, Omni Gem) alongside its Capsule/Shroom signatures.
   [BiomeId.LABORATORY]: {
