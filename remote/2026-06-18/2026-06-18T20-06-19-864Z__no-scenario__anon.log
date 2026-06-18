@@ -1,0 +1,26 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqjts635-jy50
+mode:     0  wave:?
+seed:     n7sCWKsMBqmjuZ3RoJkjjVG7
+party:    
+enemy:    
+
+----- CONSOLE -----
+[20:02:39.459] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[20:02:40.083] WARN: [er-b1c] 1 mega-form injection issues: ["ER mega target 1850 has no primary type"]
+[20:02:40.371] LOG: [ER] build mqjts635-jy50
+[20:02:41.072] LOG: [dev-tools] loaded — 212 scenarios + Send Logs button
+[20:03:19.422] DEBUG: Destroying loading scene
+[20:03:19.423] DEBUG: Destroyed loading scene
+[20:03:19.625] LOG: Seed: n7sCWKsMBqmjuZ3RoJkjjVG7
+[20:03:19.625] LOG: Wave Seed: n7sCWKsMBqmjuZ3RoJkjjVG7 0
+[20:03:24.353] LOG: %cStart Phase LoginPhase color:green;
+[20:04:14.438] LOG: Client Session: 8QUmjr5k4s0T1kc1uNzSWfkvfDiGLQOZ
+[20:04:14.728] WARN: Could not get system savedata! 404 Save data not found.
+[20:04:14.729] LOG: %cStart Phase MessagePhase color:green;
+[20:04:17.143] LOG: %cStart Phase SelectGenderPhase color:green;
+[20:04:19.021] LOG: [er-gift] granted 2 free Legendary eggs (one-time)
+[20:04:20.256] LOG: %cStart Phase TitlePhase color:green;
+[20:04:20.273] LOG: use seasonal splash messages true
+[20:04:20.273] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[20:06:12.425] LOG: %cStart Phase SelectStarterPhase color:green;
