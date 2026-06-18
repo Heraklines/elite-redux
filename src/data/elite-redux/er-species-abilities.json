@@ -1,4 +1,14 @@
 {
+  "SPECIES_BISHARP_REDUX": {
+    "ability1": 128,
+    "ability2": 101,
+    "hidden": 5157,
+    "innates": [
+      5009,
+      22,
+      5304
+    ]
+  },
   "SPECIES_EMOLGA": {
     "ability1": 5208,
     "ability2": 5511,
@@ -17,6 +27,26 @@
       5526,
       5014,
       290
+    ]
+  },
+  "SPECIES_KINGAMBIT_REDUX": {
+    "ability1": 128,
+    "ability2": 101,
+    "hidden": 5157,
+    "innates": [
+      5009,
+      22,
+      5304
+    ]
+  },
+  "SPECIES_KINGAMBIT_REDUX_MEGA": {
+    "ability1": 128,
+    "ability2": 101,
+    "hidden": 5297,
+    "innates": [
+      5169,
+      22,
+      5304
     ]
   },
   "SPECIES_MEDITITE": {
