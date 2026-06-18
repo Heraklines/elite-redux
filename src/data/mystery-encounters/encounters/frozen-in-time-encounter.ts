@@ -36,7 +36,7 @@ import { StatusEffect } from "#enums/status-effect";
 import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import type { EnemyPokemonConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
-  generateModifierType,
+  generateModifierTypeOption,
   initBattleWithEnemyConfig,
   leaveEncounterWithoutBattle,
   setEncounterRewards,
@@ -56,34 +56,35 @@ const namespace = "mysteryEncounters/frozenInTime";
  */
 const FROZEN_SPECIES: SpeciesId[] = [SpeciesId.ARCTOZOLT, SpeciesId.ARCTOVISH, SpeciesId.AURORUS, SpeciesId.AMAURA];
 
-/** The signature preserved loot: a Never-Melt Ice ("Evermelt Ice"). */
-const ICE_BOOSTER: ModifierTypeFunc = () => generateModifierType(modifierTypes.ATTACK_TYPE_BOOSTER, [PokemonType.ICE])!;
-
 /**
  * The chip-out reward pool (#518): ONE thematic, ice-cavern-appropriate item.
  * Heavily weighted toward the signature Never-Melt Ice, with a chance at a
  * Mystical Rock (the weather rock - fitting for an ICE_CAVE's hail/snow) and a
- * rarer perfectly-preserved healing item the frozen mon died clutching.
+ * rarer perfectly-preserved healing item the frozen mon died clutching. Entries
+ * carry optional pregenArgs (the ATTACK_TYPE_BOOSTER needs its type) so each is
+ * generated into a PROPER reward option (id + tier resolved) - a bare custom func
+ * resolves to no id/tier and the reward silently vanishes (#542 fix: the Never-
+ * Melt Ice roll gave nothing).
  */
-const CHIP_POOL: { func: ModifierTypeFunc; weight: number }[] = [
-  { func: ICE_BOOSTER, weight: 50 }, // Never-Melt Ice ("Evermelt Ice")
+const CHIP_POOL: { func: ModifierTypeFunc; pregenArgs?: any[]; weight: number }[] = [
+  { func: modifierTypes.ATTACK_TYPE_BOOSTER, pregenArgs: [PokemonType.ICE], weight: 50 }, // Never-Melt Ice
   { func: modifierTypes.MYSTICAL_ROCK, weight: 30 }, // the "weather rock"
   { func: modifierTypes.FULL_RESTORE, weight: 8 },
   { func: modifierTypes.MAX_REVIVE, weight: 8 },
   { func: modifierTypes.SACRED_ASH, weight: 4 },
 ];
 
-/** Roll ONE reward func from the weighted chip-out pool. */
-function rollChipReward(): ModifierTypeFunc {
+/** Roll ONE entry from the weighted chip-out pool. */
+function rollChipEntry(): { func: ModifierTypeFunc; pregenArgs?: any[] } {
   const total = CHIP_POOL.reduce((sum, e) => sum + e.weight, 0);
   let roll = randSeedInt(total);
   for (const entry of CHIP_POOL) {
     roll -= entry.weight;
     if (roll < 0) {
-      return entry.func;
+      return entry;
     }
   }
-  return ICE_BOOSTER;
+  return CHIP_POOL[0];
 }
 
 interface FrozenState {
@@ -180,9 +181,19 @@ export const FrozenInTimeEncounter: MysteryEncounter = MysteryEncounterBuilder.w
     },
     async () => {
       // Chip out the preserved held item by hand: ONE thematic reward (Never-Melt
-      // Ice, the weather rock, or a preserved healing item). No fight. The intro
-      // sprite is auto-hidden by the option-select phase (see autoHide note above).
-      setEncounterRewards({ guaranteedModifierTypeFuncs: [rollChipReward()], fillRemaining: false });
+      // Ice, the weather rock, or a preserved healing item). No fight. Delivered as
+      // a pre-generated OPTION so its id + tier are resolved (a bare custom func
+      // would vanish from the reward screen). The intro sprite is auto-hidden by
+      // the option-select phase (see autoHide note above).
+      const entry = rollChipEntry();
+      const option = generateModifierTypeOption(entry.func, entry.pregenArgs);
+      if (option) {
+        setEncounterRewards({ guaranteedModifierTypeOptions: [option], fillRemaining: false });
+      } else {
+        // Defensive fallback: a guaranteed registered item so the player is never
+        // left empty-handed if option generation somehow fails.
+        setEncounterRewards({ guaranteedModifierTypeFuncs: [modifierTypes.MYSTICAL_ROCK], fillRemaining: false });
+      }
       leaveEncounterWithoutBattle(false);
       return true;
     },

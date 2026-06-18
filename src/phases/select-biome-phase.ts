@@ -59,10 +59,13 @@ export class SelectBiomePhase extends BattlePhase {
       const nodes = pending.length > 0 ? pending : rollErNextBiomeNodes(currentBiome, getErPrevBiome());
       const revealed = nodes.filter(n => n.revealed);
       if (revealed.length > 1) {
-        // Present the choice as the branching World Map node picker (#486), using
-        // the already-rolled nodes (hidden ones render as gated silhouettes).
+        // Present the choice as the branching World Map node picker (#486). Only the
+        // REVEALED nodes are offered - the extra (green) "upgrade" node appears ONLY
+        // when a Map Upgrade item actually reveals it; we no longer surface locked
+        // "???" placeholders, so a player with no Map Upgrade never sees an
+        // upgrade slot (the #542 fix for "I get the map-upgrade node regardless").
         globalScene.ui.setMode(UiMode.ER_MAP_PICKER, {
-          nodes,
+          nodes: revealed,
           origin: currentBiome,
           onSelect: (biome: BiomeId) => this.setNextBiomeAndEnd(biome),
         });

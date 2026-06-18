@@ -24,12 +24,10 @@
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { AbilityId } from "#enums/ability-id";
-import { BattlerTagType } from "#enums/battler-tag-type";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
-import { Stat } from "#enums/stat";
 import type { PlayerPokemon, Pokemon } from "#field/pokemon";
 import { getEncounterText, queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils";
@@ -46,8 +44,6 @@ import { isSlotUnlocked, unlockSlot } from "#utils/passive-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 const namespace = "mysteryEncounters/innateShrine";
-
-const ALL_STATS = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD] as const;
 
 interface ShrineMisc {
   /** Id of the party mon chosen to attune. */
@@ -73,7 +69,10 @@ function guardianLevel(): number {
   return Math.max(1, top, Math.round(waveLvl));
 }
 
-/** Build the shrine guardian: an aura totem (two-bar, omni-boosts on entry). */
+/** Build the shrine guardian: an aura totem (two-bar boss at party level). No
+ * on-entry omni-boost - with only ONE attuned mon facing it, a fresh +1 to every
+ * stat made it nearly un-soloable (#542). Two bars at party level keeps it a real
+ * fight that a single strong mon can still win. */
 function buildGuardian(): EnemyPartyConfig {
   return {
     pokemonConfigs: [
@@ -82,10 +81,6 @@ function buildGuardian(): EnemyPartyConfig {
         isBoss: true,
         bossSegments: 2,
         level: guardianLevel(),
-        tags: [BattlerTagType.MYSTERY_ENCOUNTER_POST_SUMMON],
-        mysteryEncounterBattleEffects: (pokemon: Pokemon) => {
-          globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, ALL_STATS, 1);
-        },
       },
     ],
   };
