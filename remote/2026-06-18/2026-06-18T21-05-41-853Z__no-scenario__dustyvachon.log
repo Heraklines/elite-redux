@@ -1,0 +1,278 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqjzi1l4-kfgc
+mode:     0  wave:112
+seed:     izpfiwxHHddShk6T1rOyjmoM
+party:    Storming(L93 329hp f0), Scizor Redux(L94 107hp f0), Infernape Redux(L90 0hp f0), Empoleon Redux(L91 291hp f0), Bariong(L92 0hp f0), Luxray Redux(L92 286hp f0)
+enemy:    Ratfioso(L91), Weezing(L93), Toxapex(L93), Garbodor(L97), Mandibuzz(L91), Krookodile(L91)
+
+----- CONSOLE -----
+[21:05:15.140] LOG: Applied HP Up 
+[21:05:15.141] LOG: %cStart Phase ExpPhase color:green;
+[21:05:15.141] LOG: Applied Super EXP. Charm 
+[21:05:15.141] LOG: Applied EXP. Charm 
+[21:05:15.608] LOG: %cStart Phase LevelUpPhase color:green;
+[21:05:15.608] LOG: Applied Foul Shuckle Juice 
+[21:05:15.608] LOG: Applied Carbos 
+[21:05:15.609] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[21:05:15.609] LOG: Applied Super EXP. Charm 
+[21:05:15.609] LOG: Applied EXP. Charm 
+[21:05:15.609] LOG: %cStart Phase LevelUpPhase color:green;
+[21:05:15.609] LOG: Applied Sweet Shuckle Juice 
+[21:05:15.609] LOG: Applied Calcium 
+[21:05:15.609] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[21:05:15.609] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[21:05:15.609] LOG: Applied Super EXP. Charm 
+[21:05:15.609] LOG: Applied EXP. Charm 
+[21:05:15.609] LOG: %cStart Phase LevelUpPhase color:green;
+[21:05:15.609] LOG: Applied Sweet Shuckle Juice 
+[21:05:15.610] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[21:05:15.610] LOG: %cStart Phase MoveEndPhase color:green;
+[21:05:15.610] LOG: %cStart Phase MovePhase color:green;
+[21:05:15.610] LOG: %cStart Phase MoveEndPhase color:green;
+[21:05:15.610] LOG: %cStart Phase MovePhase color:green;
+[21:05:15.610] LOG: %cUser: Toxapex
+Move: LIQUIDATION
+Use Mode: NORMAL color:orchid
+[21:05:15.612] LOG: %cStart Phase MessagePhase color:green;
+[21:05:15.740] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:05:16.708] LOG: crit stage: +0
+[21:05:16.709] LOG: Applied X Defense 
+[21:05:16.709] LOG: Move: Liquidation | Base damage: 57.91632183908047 | Power: 85 | Source attack: 146 | Target defense: 174
+[21:05:16.709] LOG: Move: Liquidation | Attack damage: 56
+[21:05:16.709] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:05:16.742] LOG: %cStart Phase MessagePhase color:green;
+[21:05:16.958] LOG: %cStart Phase MoveEndPhase color:green;
+[21:05:16.958] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:05:16.958] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:05:17.525] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:05:17.525] LOG: %cStart Phase BerryPhase color:green;
+[21:05:17.527] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:05:17.528] LOG: %cStart Phase TurnEndPhase color:green;
+[21:05:17.528] LOG: Applied Leftovers 
+[21:05:17.528] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:05:17.727] LOG: %cStart Phase MessagePhase color:green;
+[21:05:17.992] LOG: %cStart Phase SwitchSummonPhase color:green;
+[21:05:18.226] LOG: Localized grunt name: Team Skull Grunt
+[21:05:18.297] LOG: Applied HP Up (enemy)
+[21:05:18.446] LOG: %cStart Phase PostSummonPhase color:green;
+[21:05:18.449] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:05:18.610] LOG: %cStart Phase MessagePhase color:green;
+[21:05:18.877] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:05:18.911] LOG: %cStart Phase PostSummonPhase color:green;
+[21:05:18.911] LOG: Ran PSP for: Weezing
+[21:05:18.911] LOG: %cStart Phase PostSummonPhase color:green;
+[21:05:18.911] LOG: %cStart Phase TurnInitPhase color:green;
+[21:05:18.912] LOG: %cStart Phase CommandPhase color:green;
+[21:05:19.824] LOG: Move: EARTH_POWER Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Storming
+[21:05:19.825] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:05:20.898] LOG: %cStart Phase CommandPhase color:green;
+[21:05:22.040] LOG: Move: CEASELESS_EDGE Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Scizor Redux
+[21:05:22.041] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:05:22.521] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:05:22.525] LOG: Applied X Defense 
+[21:05:22.526] LOG: Applied X Defense 
+[21:05:22.526] WARN: BattlerTag BANEFUL_BUNKER is missing a score!
+[21:05:22.527] LOG: Battle Seed: 6xoQP8pDK9X44tll
+[21:05:22.528] WARN: BattlerTag BANEFUL_BUNKER is missing a score!
+[21:05:22.530] LOG: Move Pool: ["Baneful Bunker","Venoshock","Liquidation","Toxic"]
+[21:05:22.530] LOG: Move Scores: [-20,-20,13.875,10]
+[21:05:22.530] LOG: Sorted Move Pool: ["Liquidation","Toxic","Baneful Bunker","Venoshock"]
+[21:05:22.530] LOG: Chosen Move: Liquidation
+[21:05:22.530] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:05:22.537] LOG: Move Pool: ["Sludge Wave","Destiny Bond","Hidden Power","Rest"]
+[21:05:22.537] LOG: Move Scores: [30,0,7.75,-20]
+[21:05:22.537] LOG: Sorted Move Pool: ["Sludge Wave","Hidden Power","Destiny Bond","Rest"]
+[21:05:22.537] LOG: Chosen Move: Hidden Power
+[21:05:22.537] LOG: %cStart Phase TurnStartPhase color:green;
+[21:05:22.541] LOG: %cStart Phase MovePhase color:green;
+[21:05:22.541] LOG: %cUser: Storming
+Move: EARTH_POWER
+Use Mode: NORMAL color:orchid
+[21:05:22.544] LOG: %cStart Phase MessagePhase color:green;
+[21:05:22.647] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:05:23.683] LOG: crit stage: +0
+[21:05:23.683] LOG: Move: Earth Power | Base damage: 59.7659661016949 | Power: 90 | Source attack: 244 | Target defense: 295
+[21:05:23.683] LOG: Move: Earth Power | Attack damage: 115
+[21:05:23.684] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:05:23.715] LOG: %cStart Phase MessagePhase color:green;
+[21:05:23.932] LOG: %cStart Phase FaintPhase color:green;
+[21:05:24.000] LOG: %cStart Phase MessagePhase color:green;
+[21:05:24.160] LOG: %cStart Phase VictoryPhase color:green;
+[21:05:24.161] LOG: %cStart Phase ExpPhase color:green;
+[21:05:24.161] LOG: Applied Super EXP. Charm 
+[21:05:24.161] LOG: Applied EXP. Charm 
+[21:05:24.550] LOG: %cStart Phase LevelUpPhase color:green;
+[21:05:24.550] LOG: Applied Sweet Shuckle Juice 
+[21:05:24.550] LOG: Applied HP Up 
+[21:05:24.550] LOG: %cStart Phase ExpPhase color:green;
+[21:05:24.550] LOG: Applied Super EXP. Charm 
+[21:05:24.550] LOG: Applied EXP. Charm 
+[21:05:24.783] LOG: %cStart Phase LevelUpPhase color:green;
+[21:05:24.783] LOG: Applied Foul Shuckle Juice 
+[21:05:24.783] LOG: Applied Carbos 
+[21:05:24.784] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[21:05:24.784] LOG: Applied Super EXP. Charm 
+[21:05:24.784] LOG: Applied EXP. Charm 
+[21:05:24.784] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[21:05:24.784] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[21:05:24.784] LOG: Applied Super EXP. Charm 
+[21:05:24.784] LOG: Applied EXP. Charm 
+[21:05:24.784] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[21:05:24.784] LOG: %cStart Phase MoveEndPhase color:green;
+[21:05:24.785] LOG: %cStart Phase MovePhase color:green;
+[21:05:24.785] LOG: %cUser: Scizor Redux
+Move: CEASELESS_EDGE
+Use Mode: NORMAL color:orchid
+[21:05:24.786] LOG: %cStart Phase MessagePhase color:green;
+[21:05:24.916] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:05:24.917] LOG: Applied Wide Lens 
+[21:05:25.217] LOG: crit stage: +0
+[21:05:25.218] LOG: Move: Ceaseless Edge | Base damage: 25.90487804878049 | Power: 75 | Source attack: 99 | Target defense: 246
+[21:05:25.218] LOG: Move: Ceaseless Edge | Attack damage: 22
+[21:05:25.220] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:05:25.251] LOG: %cStart Phase MessagePhase color:green;
+[21:05:25.550] LOG: %cStart Phase MoveEndPhase color:green;
+[21:05:25.550] LOG: %cStart Phase MovePhase color:green;
+[21:05:25.550] LOG: %cUser: Weezing
+Move: HIDDEN_POWER
+Use Mode: NORMAL color:orchid
+[21:05:25.552] LOG: %cStart Phase MessagePhase color:green;
+[21:05:25.683] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:05:25.700] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:25.701] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:25.701] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:25.701] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:25.701] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:25.701] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:25.717] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:25.717] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:25.717] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:26.034] LOG: crit stage: +0
+[21:05:26.035] LOG: Move: Hidden Power | Base damage: 69.59461139896374 | Power: 80 | Source attack: 208 | Target defense: 193
+[21:05:26.035] LOG: Move: Hidden Power | Attack damage: 48
+[21:05:26.035] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:05:26.068] LOG: %cStart Phase MessagePhase color:green;
+[21:05:26.267] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:05:26.284] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:26.284] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:26.284] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:26.284] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:26.284] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:26.284] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:26.301] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:26.301] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:26.301] WARN: Texture "%s" has no frame "%s" PRAS- Hidden Power 1
+[21:05:26.619] LOG: crit stage: +0
+[21:05:26.619] LOG: Move: Hidden Power | Base damage: 69.59461139896374 | Power: 80 | Source attack: 208 | Target defense: 193
+[21:05:26.619] LOG: Move: Hidden Power | Attack damage: 8
+[21:05:26.620] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:05:26.652] LOG: %cStart Phase MessagePhase color:green;
+[21:05:26.868] LOG: %cStart Phase MessagePhase color:green;
+[21:05:27.069] LOG: %cStart Phase MoveEndPhase color:green;
+[21:05:27.069] LOG: %cStart Phase MovePhase color:green;
+[21:05:27.069] LOG: %cStart Phase MoveEndPhase color:green;
+[21:05:27.069] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:05:27.069] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:05:27.636] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:05:27.636] LOG: %cStart Phase BerryPhase color:green;
+[21:05:27.636] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:05:27.638] LOG: %cStart Phase TurnEndPhase color:green;
+[21:05:27.639] LOG: Applied Leftovers 
+[21:05:27.639] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:05:27.854] LOG: %cStart Phase MessagePhase color:green;
+[21:05:28.120] LOG: %cStart Phase SwitchSummonPhase color:green;
+[21:05:28.353] LOG: Localized grunt name: Team Skull Grunt
+[21:05:28.425] LOG: Applied HP Up (enemy)
+[21:05:28.454] WARN: cry/10077 not found
+[21:05:28.555] LOG: %cStart Phase PostSummonPhase color:green;
+[21:05:28.555] LOG: Ran PSP for: Ratfioso
+[21:05:28.556] LOG: %cStart Phase MessagePhase color:green;
+[21:05:28.804] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:05:28.806] LOG: %cStart Phase PostSummonPhase color:green;
+[21:05:28.806] LOG: %cStart Phase PostSummonPhase color:green;
+[21:05:28.806] LOG: %cStart Phase TurnInitPhase color:green;
+[21:05:28.806] LOG: %cStart Phase CommandPhase color:green;
+[21:05:34.129] LOG: Move: GIGA_DRAIN Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Storming
+[21:05:34.129] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:05:34.753] LOG: %cStart Phase CommandPhase color:green;
+[21:05:36.593] LOG: Move: DIAMOND_BLADE Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Scizor Redux
+[21:05:36.594] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:05:37.081] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:05:37.083] LOG: Applied X Defense 
+[21:05:37.083] LOG: Applied X Defense 
+[21:05:37.084] LOG: Applied X Defense 
+[21:05:37.085] LOG: Applied X Defense 
+[21:05:37.086] LOG: Battle Seed: 6xoQP8pDK9X44tll
+[21:05:37.088] LOG: Move Pool: ["Punishment","Headbutt","Screech","Parting Shot"]
+[21:05:37.088] LOG: Move Scores: [18,24,6,-20]
+[21:05:37.088] LOG: Sorted Move Pool: ["Headbutt","Punishment","Screech","Parting Shot"]
+[21:05:37.088] LOG: Chosen Move: Headbutt
+[21:05:37.088] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:05:37.095] LOG: Move Pool: ["Sludge Wave","Destiny Bond","Hidden Power","Rest"]
+[21:05:37.095] LOG: Move Scores: [30,0,32,-17]
+[21:05:37.095] LOG: Sorted Move Pool: ["Hidden Power","Sludge Wave","Destiny Bond","Rest"]
+[21:05:37.095] LOG: Chosen Move: Sludge Wave
+[21:05:37.095] LOG: %cStart Phase TurnStartPhase color:green;
+[21:05:37.098] LOG: %cStart Phase MovePhase color:green;
+[21:05:37.098] LOG: %cUser: Ratfioso
+Move: HEADBUTT
+Use Mode: NORMAL color:orchid
+[21:05:37.101] LOG: %cStart Phase MessagePhase color:green;
+[21:05:37.212] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:05:37.212] LOG: %cStart Phase MessagePhase color:green;
+[21:05:37.446] LOG: %cStart Phase MoveEndPhase color:green;
+[21:05:37.446] LOG: %cStart Phase MovePhase color:green;
+[21:05:37.446] LOG: %cUser: Storming
+Move: GIGA_DRAIN
+Use Mode: NORMAL color:orchid
+[21:05:37.449] LOG: %cStart Phase MessagePhase color:green;
+[21:05:37.563] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:05:38.464] LOG: crit stage: +0
+[21:05:38.464] LOG: Move: Giga Drain | Base damage: 92.405 | Power: 75 | Source attack: 246 | Target defense: 160
+[21:05:38.464] LOG: Move: Giga Drain | Attack damage: 85
+[21:05:38.465] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:05:38.497] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:05:38.498] LOG: %cStart Phase MessagePhase color:green;
+[21:05:38.714] LOG: %cStart Phase MoveEndPhase color:green;
+[21:05:38.714] LOG: %cStart Phase MovePhase color:green;
+[21:05:38.714] LOG: %cUser: Scizor Redux
+Move: DIAMOND_BLADE
+Use Mode: NORMAL color:orchid
+[21:05:38.717] LOG: %cStart Phase MessagePhase color:green;
+[21:05:38.847] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:05:38.848] LOG: Applied Wide Lens 
+[21:05:39.531] LOG: crit stage: +0
+[21:05:39.532] LOG: Move: Diamond Blade | Base damage: 27.498536585365855 | Power: 80 | Source attack: 99 | Target defense: 246
+[21:05:39.532] LOG: Move: Diamond Blade | Attack damage: 37
+[21:05:39.533] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:05:39.566] LOG: %cStart Phase MessagePhase color:green;
+[21:05:39.764] LOG: %cStart Phase MoveEndPhase color:green;
+[21:05:39.765] LOG: %cStart Phase MovePhase color:green;
+[21:05:39.765] LOG: %cUser: Weezing
+Move: SLUDGE_WAVE
+Use Mode: NORMAL color:orchid
+[21:05:39.767] LOG: %cStart Phase MessagePhase color:green;
+[21:05:39.898] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:05:40.833] LOG: crit stage: +0
+[21:05:40.835] LOG: Move: Sludge Wave | Base damage: 63.475555555555566 | Power: 95 | Source attack: 208 | Target defense: 252
+[21:05:40.835] LOG: Move: Sludge Wave | Attack damage: 65
+[21:05:40.835] LOG: crit stage: +0
+[21:05:40.836] LOG: Move: Sludge Wave | Base damage: 98.82400000000001 | Power: 95 | Source attack: 208 | Target defense: 160
+[21:05:40.836] LOG: Move: Sludge Wave | Attack damage: 143
+[21:05:40.836] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:05:40.867] LOG: %cStart Phase MessagePhase color:green;
+[21:05:41.100] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:05:41.134] LOG: %cStart Phase MessagePhase color:green;
+[21:05:41.333] LOG: %cStart Phase MoveEndPhase color:green;
+[21:05:41.333] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:05:41.333] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:05:41.900] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:05:41.900] LOG: %cStart Phase BerryPhase color:green;
+[21:05:41.902] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:05:41.903] LOG: %cStart Phase TurnEndPhase color:green;
+[21:05:41.906] LOG: Applied Leftovers 
+[21:05:41.906] LOG: %cStart Phase PokemonHealPhase color:green;
