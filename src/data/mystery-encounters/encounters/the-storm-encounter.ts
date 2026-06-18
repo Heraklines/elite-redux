@@ -14,9 +14,9 @@
 // it (a Chlorophyll mon stirring means sun is coming). No matching ability = a
 // murky read. Fog is the one nothing reads (it stays murky by nature).
 //
-// RIDE THE STORM -> a DISTANT land you could not otherwise reach is charted onto
-// the World Map as a selectable (blue) onward route AND, on a clear read, you
-// CARRY that weather into the very next biome (in your favour). Turn back -> nothing.
+// RIDE THE STORM -> the squall SWEEPS your team to a random biome ANYWHERE on the
+// graph (forced next-transition travel) AND, on a clear read, you CARRY that
+// weather into the destination biome (in your favour). Turn back -> nothing.
 //
 // [Recovered design - er-events-design-recovered.md "The Storm": read via your own
 // team's weather ability + carry the weather + reveal a distant node.]
