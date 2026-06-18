@@ -5828,4 +5828,28 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "Grassy Seed insta-proc under Grassy Surge (Rillaboom)",
+    description:
+      "Tests the Grassy Seed held item with a Grassy Surge mon. Rillaboom (forced\n"
+      + "GRASSY SURGE) starts holding an ER Grassy Seed in a NON-grass biome, so the\n"
+      + "ONLY source of Grassy Terrain is its own ability. EXPECT turn 1: Grassy\n"
+      + "Surge sets Grassy Terrain on switch-in, the Grassy Seed procs -> Rillaboom's\n"
+      + "Defense rises +1, then the seed is consumed (gone from its held items). If\n"
+      + "Defense does NOT rise on entry, the seed is checking terrain BEFORE the\n"
+      + "surge sets it (a switch-in ordering bug) - Send Logs and note it.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ABILITY_OVERRIDE: AbilityId.GRASSY_SURGE,
+        STARTING_HELD_ITEMS_OVERRIDE: [{ name: "ER_GRASSY_SEED" }],
+      });
+      return [
+        makeStarter(SpeciesId.RILLABOOM, {
+          moveset: [MoveId.WOOD_HAMMER, MoveId.KNOCK_OFF, MoveId.U_TURN, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
 ];

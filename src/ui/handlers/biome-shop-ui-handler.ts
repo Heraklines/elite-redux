@@ -452,7 +452,16 @@ export class BiomeShopUiHandler extends UiHandler {
       const y = GRID_Y + row * ROW_STEP;
       const type = this.options[i].type;
 
-      const icon = globalScene.add.sprite(x, y - 3, "items", type?.iconImage).setScale(0.75);
+      // Most items are FRAMES in the "items" atlas, but ER customs (gems, terrain
+      // seeds, reactive items) are STANDALONE textures loaded via loadImage. Those
+      // aren't frames in the atlas, so look them up as their own texture first -
+      // otherwise the atlas-frame lookup misses and every one renders the same
+      // placeholder.
+      const iconKey = type?.iconImage;
+      const standalone = iconKey != null && globalScene.textures.exists(iconKey);
+      const icon = standalone
+        ? globalScene.add.sprite(x, y - 3, iconKey).setScale(0.75)
+        : globalScene.add.sprite(x, y - 3, "items", iconKey).setScale(0.75);
       if (type?.iconTint != null) {
         icon.setTint(type.iconTint);
       }
