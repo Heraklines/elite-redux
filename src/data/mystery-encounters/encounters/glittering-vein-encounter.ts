@@ -42,6 +42,7 @@ import {
   mineralHaulHasItems,
   openMineralHaul,
   rollDelveWardOrBerry,
+  rollGem,
   rollKingsRock,
   rollMegaStone,
   rollMineralFind,
@@ -161,6 +162,9 @@ async function mineRound(encounter: MysteryEncounter, round: number): Promise<vo
     messageKey = `${namespace}:foundMegaStone`;
   } else if (rollKingsRock(haul.loot, round)) {
     messageKey = `${namespace}:foundKingsRock`;
+  } else if (rollGem(haul.loot, round)) {
+    // A raw elemental gem chipped from the seam (mining-themed Great-tier find).
+    messageKey = `${namespace}:foundTreasure`;
   } else if (rollDelveWardOrBerry(haul.loot, round)) {
     // Ward Stone / resist berry chipped from the deep seam (find chance climbs with depth).
     messageKey = `${namespace}:foundTreasure`;

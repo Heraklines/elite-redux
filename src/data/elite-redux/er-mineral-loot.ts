@@ -163,6 +163,35 @@ export function rollKingsRock(haul: MineralLootHaul, d: number): boolean {
   return true;
 }
 
+/** Percent chance per strike (from depth 1) to chip a raw elemental GEM from the seam. */
+const GEM_CHANCE = 12;
+
+/** The ore/crystal gem types that read as something you'd mine from a vein. */
+function gemPool(): ModifierTypeFunc[] {
+  return [
+    modifierTypes.ER_ROCK_GEM,
+    modifierTypes.ER_GROUND_GEM,
+    modifierTypes.ER_STEEL_GEM,
+    modifierTypes.ER_FIRE_GEM,
+    modifierTypes.ER_ELECTRIC_GEM,
+    modifierTypes.ER_ICE_GEM,
+    modifierTypes.ER_WATER_GEM,
+    modifierTypes.ER_DRAGON_GEM,
+  ];
+}
+
+/**
+ * A deeper strike can chip a raw elemental GEM from the glittering seam (the
+ * mining theme - gems literally come out of the rock). `d` is depth (0-indexed).
+ */
+export function rollGem(haul: MineralLootHaul, d: number): boolean {
+  if (d < 1 || randSeedInt(100) >= GEM_CHANCE) {
+    return false;
+  }
+  haul.funcs.push(randSeedItem(gemPool()));
+  return true;
+}
+
 // --- Delve special finds: Ward Stones + resist berries -------------------- //
 //
 // #491 - the deeper a delve goes, the more likely it turns up a defensive curio.

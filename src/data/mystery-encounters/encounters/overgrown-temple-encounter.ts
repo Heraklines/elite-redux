@@ -32,6 +32,7 @@
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
+import { modifierTypes } from "#data/data-lists";
 import { guardianForDepth } from "#data/elite-redux/er-delve-guardians";
 import { applyErGuardianTokens } from "#data/elite-redux/er-fight-tokens";
 import {
@@ -164,6 +165,10 @@ async function delveChamber(encounter: MysteryEncounter, chamber: number): Promi
     messageKey = `${namespace}:foundMegaStone`;
   } else if (rollKingsRock(haul.loot, chamber)) {
     messageKey = `${namespace}:foundKingsRock`;
+  } else if (chamber >= 1 && randSeedInt(100) < 12) {
+    // The vines reclaiming the temple yield a Grassy Seed (jungle Grassy terrain).
+    haul.loot.funcs.push(modifierTypes.ER_GRASSY_SEED);
+    messageKey = `${namespace}:foundRelic`;
   } else if (rollDelveWardOrBerry(haul.loot, chamber)) {
     // Ward Stone / resist berry pried from the deeper chambers (find chance climbs with depth).
     messageKey = `${namespace}:foundRelic`;

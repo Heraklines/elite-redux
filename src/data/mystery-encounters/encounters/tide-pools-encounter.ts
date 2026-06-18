@@ -102,7 +102,14 @@ const MEGA_STONE_CHANCE = 3;
 
 // Common washed-up gear by KEY (resolved lazily - modifierTypes is empty until
 // initModifierTypes() runs, so module-load func capture would freeze undefined).
-const BEACH_FIND_KEYS = ["LEFTOVERS", "WIDE_LENS", "QUICK_CLAW", "SCOPE_LENS"] as const;
+const BEACH_FIND_KEYS = [
+  "LEFTOVERS",
+  "WIDE_LENS",
+  "QUICK_CLAW",
+  "SCOPE_LENS",
+  "ER_ABSORB_BULB",
+  "ER_LUMINOUS_MOSS",
+] as const;
 
 /** Of the combs that DO wash up gear, this % are the rare Shell Bell instead. */
 const SHELL_BELL_SHARE = 14;
