@@ -1,0 +1,24 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqjts635-jy50
+mode:     0  wave:?
+seed:     54lFe75t1kKmBR66Cb44CVDo
+party:    
+enemy:    
+
+----- CONSOLE -----
+[19:22:17.675] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[19:22:17.834] WARN: [er-b1c] 1 mega-form injection issues: ["ER mega target 1850 has no primary type"]
+[19:22:17.999] LOG: [ER] build mqjts635-jy50
+[19:22:18.239] LOG: [dev-tools] loaded — 212 scenarios + Send Logs button
+[19:22:33.114] DEBUG: Destroying loading scene
+[19:22:33.114] DEBUG: Destroyed loading scene
+[19:22:33.149] LOG: Seed: 54lFe75t1kKmBR66Cb44CVDo
+[19:22:33.149] LOG: Wave Seed: 54lFe75t1kKmBR66Cb44CVDo 0
+[19:22:33.970] LOG: %cStart Phase LoginPhase color:green;
+[19:23:51.524] WARN: Login failed! 401 
+[19:24:12.993] WARN: Login failed! 401 
+[19:25:17.544] LOG: %cStart Phase LoginPhase color:green;
+[19:25:37.079] LOG: Client Session: tDw9VfJrCO6pNgPkbSLWvtjmGk8ajmB9
+[19:25:37.262] WARN: Could not get system savedata! 404 Save data not found.
+[19:25:37.263] LOG: %cStart Phase MessagePhase color:green;
+[19:25:39.312] LOG: %cStart Phase SelectGenderPhase color:green;
