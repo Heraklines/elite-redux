@@ -32,7 +32,12 @@ import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lis
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
 import { erNotorietyBossChancePct, erNotorietyItemRateMult } from "#data/elite-redux/er-biome-notoriety";
-import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
+import {
+  erBiomeRoutingActive,
+  getErPrevBiome,
+  rollErNextBiomeNodes,
+  setErPendingNodes,
+} from "#data/elite-redux/er-biome-routing";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erIsBiomeEnd, erRollBiomeLength } from "#data/elite-redux/er-biome-structure";
 import { ER_BLACK_SHINY_TINT, isErBlackShiny, promoteToErBlackShinyInBattle } from "#data/elite-redux/er-black-shinies";
@@ -1986,6 +1991,11 @@ export class BattleScene extends SceneBase {
     // rest of the run). The `restoring` flag suppresses the roll on the load path.
     if (erBiomeRoutingActive() && !this.currentBattle && !restoring) {
       erRollBiomeLength(biome, 1);
+      // ER (#486): also roll this STARTING biome's onward routes now, so the World
+      // Map can show "where you can go next" from the very first biome (biome-to-
+      // biome transitions roll theirs in SwitchBiomePhase). SelectBiomePhase reuses
+      // this same pending set at the transition, so this is not a double roll.
+      setErPendingNodes(rollErNextBiomeNodes(biome, getErPrevBiome()));
     }
     // ER (#486): log the biome to the run's journey chain (the World Map history).
     // Skips the save-load path (`restoring`), which restores history from the save.

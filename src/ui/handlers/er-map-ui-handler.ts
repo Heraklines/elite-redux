@@ -18,13 +18,9 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
-import type { ErMapNode } from "#data/elite-redux/er-map-nodes";
-import {
-  getErBiomeHistory,
-  getRevealedMapNodes,
-  getTreasureFragments,
-  TREASURE_FRAGMENTS_FOR_REWARD,
-} from "#data/elite-redux/er-map-nodes";
+import type { ErRouteNode } from "#data/elite-redux/er-biome-routing";
+import { getErPendingNodes } from "#data/elite-redux/er-biome-routing";
+import { getErBiomeHistory, getTreasureFragments, TREASURE_FRAGMENTS_FOR_REWARD } from "#data/elite-redux/er-map-nodes";
 import type { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
@@ -44,6 +40,14 @@ const GOLD = 0xf8d030;
 const INK = 0xe8ecf8;
 const DIM = 0x90a0c0;
 const LINE = 0x6878a0;
+/** Onward-route node colours by source (match the route picker). */
+const GREEN = 0x68d068; // a route a Map Upgrade revealed
+const BLUE = 0x68b0f0; // a route a mystery event (e.g. Fortune Teller) foretold
+
+/** Colour for an onward route by why it is shown. */
+function routeColor(source?: string): number {
+  return source === "event" ? BLUE : source === "upgrade" ? GREEN : GOLD;
+}
 
 /** Thumbnail tile size (keeps the 320:180 arena aspect, scaled tiny). */
 const TILE_W = 38;
@@ -68,7 +72,7 @@ export class ErMapUiHandler extends UiHandler {
   private resolved = false;
 
   private history: readonly BiomeId[] = [];
-  private onward: readonly ErMapNode[] = [];
+  private onward: readonly ErRouteNode[] = [];
   /** Left index of the visible journey window (scrolls when history overflows). */
   private scroll = 0;
 
@@ -154,7 +158,10 @@ export class ErMapUiHandler extends UiHandler {
     this.resolved = false;
 
     this.history = getErBiomeHistory();
-    this.onward = getRevealedMapNodes().filter(n => n.kind === "biome");
+    // Onward routes = the revealed next-biome nodes the routing graph rolled for
+    // this biome (the SAME set the route picker offers at the transition). These
+    // are the tentative paths you can take next; drawn with dashed branches below.
+    this.onward = getErPendingNodes().filter(n => n.revealed);
 
     const frags = getTreasureFragments();
     this.fragmentText.setText(`Treasure-Map Fragments: ${frags} / ${TREASURE_FRAGMENTS_FOR_REWARD}`);
@@ -211,6 +218,25 @@ export class ErMapUiHandler extends UiHandler {
     }
   }
 
+  /** Draw a dashed line on the connector graphics (for not-yet-taken routes). */
+  private drawDashedLine(x1: number, y1: number, x2: number, y2: number, color: number, alpha: number): void {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    if (len === 0) {
+      return;
+    }
+    const dash = 3;
+    const gap = 3;
+    const ux = dx / len;
+    const uy = dy / len;
+    this.graphics.lineStyle(2, color, alpha);
+    for (let d = 0; d < len; d += dash + gap) {
+      const segEnd = Math.min(d + dash, len);
+      this.graphics.lineBetween(x1 + ux * d, y1 + uy * d, x1 + ux * segEnd, y1 + uy * segEnd);
+    }
+  }
+
   /** Render the journey chain + onward routes for the current scroll position. */
   private refresh(): void {
     for (const o of this.transient) {
@@ -253,23 +279,31 @@ export class ErMapUiHandler extends UiHandler {
     }
 
     // --- Routes-ahead row: the revealed onward biome routes (branch from now). ---
+    // These are paths you HAVEN'T taken yet, so they are drawn as DASHED branches
+    // fanning out from below the current biome, and each tile is coloured by why
+    // it is shown (gold = normal, green = Map-Upgrade route, blue = a foretold
+    // mystery-event route).
     const onwardCount = Math.min(5, this.onward.length);
     if (onwardCount > 0 && currentBiome !== undefined) {
       const oRowW = onwardCount * TILE_W + Math.max(0, onwardCount - 1) * TILE_GAP;
       const oStartX = (PANEL_W - oRowW) / 2 + TILE_W / 2;
       const oy = ErMapUiHandler.ROUTES_Y;
-      // Branch line down from the current tile (last drawn journey tile) to the row.
-      const fromX = tileX.at(-1) ?? PANEL_W / 2;
-      this.graphics.lineStyle(2, GOLD, 0.7);
-      this.graphics.lineBetween(fromX, cy + TILE_H / 2 + 9, PANEL_W / 2, oy - TILE_H / 2 - 2);
+      // Branch hub: a point just below the current journey tile that the dashed
+      // routes fan out from.
+      const hubX = tileX.at(-1) ?? PANEL_W / 2;
+      const hubY = cy + TILE_H / 2 + 6;
       for (let i = 0; i < onwardCount; i++) {
         const cx = oStartX + i * (TILE_W + TILE_GAP);
         const node = this.onward[i];
+        const color = routeColor(node.source);
+        // Dashed branch from the hub to this onward tile (a not-yet-taken path).
+        this.drawDashedLine(hubX, hubY, cx, oy - TILE_H / 2 - 2, color, 0.8);
         const key = `${getBiomeKey(node.biome)}_bg`;
         if (globalScene.textures.exists(key)) {
           const tile = globalScene.add.sprite(cx, oy, key);
           tile.setOrigin(0.5, 0.5);
           tile.setDisplaySize(TILE_W, TILE_H);
+          tile.setAlpha(0.85); // slightly faded: a place you have not been yet
           this.card.add(tile);
           this.transient.push(tile);
         } else {
@@ -278,7 +312,7 @@ export class ErMapUiHandler extends UiHandler {
           this.transient.push(ph);
         }
         const border = globalScene.add.rectangle(cx, oy, TILE_W + 2, TILE_H + 2, 0xffffff, 0).setOrigin(0.5);
-        border.setStrokeStyle(1, GOLD);
+        border.setStrokeStyle(1, color);
         this.card.add(border);
         this.transient.push(border);
         const name = addTextObject(cx, oy + TILE_H / 2 + 1, getBiomeName(node.biome), TextStyle.WINDOW, {
@@ -286,7 +320,7 @@ export class ErMapUiHandler extends UiHandler {
           align: "center",
         });
         name.setOrigin(0.5, 0);
-        name.setTint(INK);
+        name.setTint(color);
         this.card.add(name);
         this.transient.push(name);
       }
