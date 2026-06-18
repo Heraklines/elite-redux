@@ -45,6 +45,12 @@ export class LoadingScene extends SceneBase {
       // ER #439 relic icons (PokeAPI item sprites, hosted on er-assets).
       .loadImage("er_field_medic", "items/er")
       .loadImage("er_warm_incubator", "items/er")
+      // ER reactive held items (PokeAPI item sprites, hosted on er-assets).
+      .loadImage("er_cell_battery", "items/er")
+      .loadImage("er_absorb_bulb", "items/er")
+      .loadImage("er_snowball", "items/er")
+      .loadImage("er_luminous_moss", "items/er")
+      .loadImage("er_weakness_policy", "items/er")
       // ER: in-battle "Info" screen backgrounds (ROM gAbilitiesInfo menu, tiles
       // recoloured per page) + overlay sprites.
       .loadImage("er_binfo_side_player", "elite-redux/battle-info", "side-player.png")

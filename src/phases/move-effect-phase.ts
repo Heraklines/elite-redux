@@ -10,6 +10,7 @@ import {
   erMoveAlwaysHitsForUserType,
 } from "#data/elite-redux/archetypes/conditional-always-hit";
 import { erApplyCommunityOnHitItems } from "#data/elite-redux/er-community-items";
+import { erApplyReactiveOnHit } from "#data/elite-redux/er-reactive-items";
 import { applyErLifeOrbRecoil, applyErRockyHelmet } from "#data/elite-redux/er-recreated-items";
 import { SpeciesFormChangePostMoveTrigger } from "#data/form-change-triggers";
 import type { TypeDamageMultiplier } from "#data/type";
@@ -877,6 +878,10 @@ export class MoveEffectPhase extends PokemonPhase {
         target,
         this.move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user, target }),
       );
+      // ER reactive held items (Cell Battery / Absorb Bulb / Snowball / Luminous
+      // Moss / Weakness Policy): the struck holder raises a stat once, then it's
+      // consumed.
+      erApplyReactiveOnHit(target, user.getMoveType(this.move), hitResult, dealsDamage);
     }
   }
 
