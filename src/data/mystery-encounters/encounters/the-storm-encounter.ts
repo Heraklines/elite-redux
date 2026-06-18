@@ -24,11 +24,10 @@
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
-import { allAbilities, allBiomes } from "#data/data-lists";
-import { addErEventRevealedNode, getErPendingNodes } from "#data/elite-redux/er-biome-routing";
+import { allAbilities } from "#data/data-lists";
+import { setAnyBiomeTravelTarget } from "#data/elite-redux/er-map-events";
 import { setErCarriedWeather } from "#data/elite-redux/er-map-nodes";
 import { AbilityId } from "#enums/ability-id";
-import { BiomeId } from "#enums/biome-id";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
@@ -113,20 +112,6 @@ function readerAbilityName(weather: WeatherType): string | null {
   return null;
 }
 
-/** Biomes that are never a valid distant glimpse. */
-const NON_TRAVEL_BIOMES: ReadonlySet<BiomeId> = new Set([BiomeId.TOWN, BiomeId.END]);
-
-/**
- * Pick a DISTANT biome you could not otherwise reach this hop: not the current
- * biome, not one of the already-rolled onward routes, not a non-travel biome.
- */
-function pickDistantBiome(): BiomeId | null {
-  const current = globalScene.arena.biomeId;
-  const onward = new Set(getErPendingNodes().map(n => n.biome));
-  const candidates = [...allBiomes.keys()].filter(b => b !== current && !onward.has(b) && !NON_TRAVEL_BIOMES.has(b));
-  return candidates.length > 0 ? randSeedItem(candidates) : null;
-}
-
 export const TheStormEncounter: MysteryEncounter = MysteryEncounterBuilder.withEncounterType(
   MysteryEncounterType.ER_THE_STORM,
 )
@@ -164,15 +149,13 @@ export const TheStormEncounter: MysteryEncounter = MysteryEncounterBuilder.withE
       selected: [{ text: `${namespace}:option.1.selected` }],
     },
     async () => {
-      // Ride it: chart a distant land as a selectable onward route, and - on a
-      // clear read - carry the rolled weather into the next biome.
+      // Ride it: the squall SWEEPS you to a random biome anywhere on the graph
+      // (forced next-transition travel), and - on a clear read - you carry the
+      // rolled weather into that biome.
       const { weather, abilityName } = globalScene.currentBattle.mysteryEncounter!.misc as StormState;
-      const distant = pickDistantBiome();
-      if (distant != null) {
-        addErEventRevealedNode(distant);
-      }
+      const target = setAnyBiomeTravelTarget();
       if (abilityName == null) {
-        queueEncounterMessage(distant == null ? `${namespace}:calm` : `${namespace}:swept`);
+        queueEncounterMessage(target == null ? `${namespace}:calm` : `${namespace}:swept`);
       } else {
         setErCarriedWeather(weather);
         queueEncounterMessage(`${namespace}:foresaw`);

@@ -17,5 +17,5 @@
       "selected": "You step away from the arena."
     }
   },
-  "reward": "Tournament cleared at the {{tier}} grade! You pocket ₽{{money}}, and a full reward shop of that grade opens."
+  "reward": "Tournament cleared! You claim your prize money, and a full reward shop opens."
 }

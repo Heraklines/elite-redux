@@ -1,7 +1,7 @@
 {
   "intro": "The ground turns to soup beneath you. With a sucking lurch, {{sinkingName}} drops to its belly and starts to sink into the mire!",
   "title": "The Sinking Mire",
-  "description": "{{sinkingName}} is going under fast. You can send another Pokemon to haul it free - but the bog only lets up for those who can stay above it or wrench it loose: a Flying or Levitating mon, a light one, or a strong enough lifter. Or you can leave it to claw out alone and pay the bog its toll.",
+  "description": "{{sinkingName}} is going under fast. You can send another Pokemon to haul it free - but the mire only yields to the right kind of rescuer. Pick the one you think can manage it. Or leave it to claw out alone and pay the bog its toll.",
   "query": "How do you get it out?",
   "option": {
     "1": {
