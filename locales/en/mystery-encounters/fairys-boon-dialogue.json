@@ -1,18 +1,19 @@
 {
-  "intro": "Motes of soft light drift between the crystals, and a gentle presence makes itself felt. A fairy regards your team kindly and offers a blessing, freely given.",
+  "intro": "Motes of soft light drift between the crystals, and a gentle presence makes itself felt. A fairy regards your team kindly and offers a blessing of fortune, freely given.",
   "title": "The Fairy's Boon",
-  "description": "A benevolent fairy offers your team a blessing with no strings attached. Accept it to carry a lasting Relic for the rest of your run, or politely decline.",
+  "description": "A benevolent fairy offers your team a fleeting blessing of luck. Accept it for a surge of fortune over the next several waves, or politely decline.",
   "query": "Will you accept the boon?",
   "option": {
     "1": {
       "label": "Accept the blessing",
-      "tooltip": "(+) Receive a random Formation / buff Relic",
-      "selected": "The fairy's light settles over your team, leaving a gift behind..."
+      "tooltip": "(+) A temporary surge of party luck for the next several waves",
+      "selected": "The fairy's light settles over your team, and fortune begins to favor you..."
     },
     "2": {
       "label": "Decline politely",
       "tooltip": "(-) Nothing gained or lost",
       "selected": "You bow your thanks and leave the blessing untaken."
     }
-  }
+  },
+  "blessed": "Fortune smiles on your team! Your luck is raised by {{luck}} for the next {{waves}} waves."
 }

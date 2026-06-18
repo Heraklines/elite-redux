@@ -5,14 +5,15 @@
  */
 
 // =============================================================================
-// ER #439 - The Import Bazaar. An ISLAND-biome MARKET event (design PART XIX s85).
-// A bustling island bazaar trades in goods you would normally only find elsewhere:
-// browse a curated selection of useful held-item "imports" and take your pick. A
-// straightforward, no-risk shop that leans into the Island's trade-hub identity.
+// ER #439 / #542 - The Import Bazaar. An ISLAND-biome MARKET event. A bustling
+// island bazaar trades in imported held items and supplies. REWORKED (#542): it
+// now opens a REAL paid SHOP screen (ImportBazaarShopPhase, the full-screen 4x4
+// browse-and-buy UI) like the Black Market / Exotic Trader - not a free pick-one
+// reward screen. Browse the stalls and spend your money on what you actually need.
 // =============================================================================
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
-import { modifierTypes } from "#data/data-lists";
+import { globalScene } from "#app/global-scene";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
@@ -20,25 +21,13 @@ import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import {
   leaveEncounterWithoutBattle,
-  setEncounterRewards,
   transitionMysteryEncounterIntroVisuals,
 } from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
-import type { ModifierTypeFunc } from "#types/modifier-types";
 
 const namespace = "mysteryEncounters/importBazaar";
-
-/** The curated "imports" the bazaar lays out (useful held items, player picks one). */
-const IMPORT_FUNCS: ModifierTypeFunc[] = [
-  modifierTypes.WIDE_LENS,
-  modifierTypes.SCOPE_LENS,
-  modifierTypes.LEFTOVERS,
-  modifierTypes.SHELL_BELL,
-  modifierTypes.QUICK_CLAW,
-  modifierTypes.KINGS_ROCK,
-];
 
 export const ImportBazaarEncounter: MysteryEncounter = MysteryEncounterBuilder.withEncounterType(
   MysteryEncounterType.ER_IMPORT_BAZAAR,
@@ -64,7 +53,14 @@ export const ImportBazaarEncounter: MysteryEncounter = MysteryEncounterBuilder.w
         selected: [{ text: `${namespace}:option.1.selected` }],
       })
       .withOptionPhase(async () => {
-        setEncounterRewards({ guaranteedModifierTypeFuncs: IMPORT_FUNCS, fillRemaining: false });
+        // Open the real bazaar SHOP screen (ImportBazaarShopPhase: imported held
+        // items + supplies at fair prices). Launched via the doEncounterRewards
+        // hook so it runs as a real phase BEFORE the post-encounter continuation -
+        // a full browse-and-buy market, not a free reward screen.
+        globalScene.currentBattle.mysteryEncounter!.doEncounterRewards = () => {
+          globalScene.phaseManager.unshiftNew("ImportBazaarShopPhase");
+          return true;
+        };
         await transitionMysteryEncounterIntroVisuals(true, true);
         leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
         return true;

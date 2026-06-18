@@ -11,6 +11,7 @@ import { getDailyEventSeedLuck } from "#data/daily-seed/daily-run";
 import { allMoves, modifierTypes } from "#data/data-lists";
 import { erBiomeShopResolveTier, erBiomeTierPrice, rollErBiomeShopStock } from "#data/elite-redux/er-biome-economy";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
+import { getErTemporaryLuck } from "#data/elite-redux/er-fairy-luck";
 import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-stones";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
@@ -3331,7 +3332,9 @@ export function getPartyLuckValue(party: readonly Pokemon[]): number {
     0,
     MAX_PARTY_LUCK,
   );
-  return Math.min(timedEventManager.getEventLuckBoost() + (luck ?? 0), MAX_PARTY_LUCK);
+  // ER (#542): a Fairy's Boon grants a TEMPORARY party luck surge for a few waves.
+  const fairyLuck = getErTemporaryLuck(globalScene.currentBattle?.waveIndex ?? 0);
+  return Math.min(timedEventManager.getEventLuckBoost() + (luck ?? 0) + fairyLuck, MAX_PARTY_LUCK);
 }
 
 /**

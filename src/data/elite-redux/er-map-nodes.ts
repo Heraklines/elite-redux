@@ -20,6 +20,7 @@
 // =============================================================================
 
 import { getErPrevBiome, resetErRouting, restoreErRouting } from "#data/elite-redux/er-biome-routing";
+import { getErFairyLuckSave, resetErFairyLuck, restoreErFairyLuck } from "#data/elite-redux/er-fairy-luck";
 import {
   erBiomeOverstayAnchor,
   getErBiomeLength,
@@ -56,6 +57,7 @@ export function resetErMapNodes(): void {
   fragmentCount = 0;
   resetErRouting();
   resetErBiomeStructure();
+  resetErFairyLuck();
 }
 
 /** Drop all revealed "biome" route nodes (keep treasure/landmark). Used when a
@@ -149,6 +151,9 @@ export interface ErMapSaveData {
   /** ER (#504) notoriety: the wave the player armed overstay (chose to linger past
    * the free window), or null/undefined if they never did. */
   biomeOverstayAnchor?: number | null;
+  /** ER (#542) Fairy's Boon: active temporary luck bonus + the wave it expires on. */
+  fairyLuckBonus?: number;
+  fairyLuckExpiry?: number;
 }
 
 /** Snapshot the current map state for the session save (#486 increment 2). */
@@ -161,6 +166,8 @@ export function getErMapSaveData(): ErMapSaveData {
     biomeLength: getErBiomeLength(),
     biomeStartWave: getErBiomeStartWave(),
     biomeOverstayAnchor: erBiomeOverstayAnchor(),
+    fairyLuckBonus: getErFairyLuckSave().bonus,
+    fairyLuckExpiry: getErFairyLuckSave().expiryWave,
   };
 }
 
@@ -199,5 +206,9 @@ export function restoreErMapState(data: ErMapSaveData | undefined | null, curren
     // Restore the deliberate-overstay anchor. Absent (older save) = null = no
     // notoriety, which is the safe default (the player was not penalized).
     typeof data.biomeOverstayAnchor === "number" ? data.biomeOverstayAnchor : null,
+  );
+  restoreErFairyLuck(
+    typeof data.fairyLuckBonus === "number" ? data.fairyLuckBonus : null,
+    typeof data.fairyLuckExpiry === "number" ? data.fairyLuckExpiry : null,
   );
 }

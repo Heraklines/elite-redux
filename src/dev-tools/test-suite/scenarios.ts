@@ -1459,13 +1459,14 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "ER Fairy's Boon (#439)",
+    label: "ER Fairy's Boon (#542)",
     description:
-      "#439 Fairy Cave RELIC gift. Forces ER_FAIRYS_BOON in the FAIRY_CAVE biome.\n"
+      "#542 Fairy Cave TEMPORARY LUCK blessing (reworked from a free relic).\n"
+      + "Forces ER_FAIRYS_BOON in the FAIRY_CAVE biome.\n"
       + "DO: 'Accept the blessing' or 'Decline politely'.\n"
-      + "EXPECT: Accept opens a no-battle reward with ONE guaranteed Formation/buff\n"
-      + "Relic (Morale Banner / Second Wind / Mystery Charm / Weathervane) - take it and\n"
-      + "check it lands in your held items + the buff panel. Decline = nothing, no cost.",
+      + "EXPECT: Accept shows a 'Fortune smiles' message (+6 luck for 12 waves) and\n"
+      + "leaves with NO reward screen. Check the in-battle LUCK value jumps by 6 for\n"
+      + "the next ~12 waves, then fades back. Decline = nothing, no cost.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -1618,13 +1619,14 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "ER Import Bazaar (#439)",
+    label: "ER Import Bazaar (#542)",
     description:
-      "#439 Island MARKET. Forces ER_IMPORT_BAZAAR in the ISLAND biome.\n"
-      + "DO: 'Browse the imports' or 'Move on'.\n"
-      + "EXPECT: Browse opens a no-battle reward of curated held-item imports (Wide Lens,\n"
-      + "Scope Lens, Leftovers, Shell Bell, Quick Claw, King's Rock) - pick one. Move on\n"
-      + "= nothing, no cost.",
+      "#542 Island MARKET, now a REAL paid SHOP (reworked from a free pick-one).\n"
+      + "Forces ER_IMPORT_BAZAAR in the ISLAND biome. Start with plenty of money.\n"
+      + "DO: 'Browse the bazaar' or 'Move on'.\n"
+      + "EXPECT: Browse opens the full-screen 4x4 SHOP UI (like Black Market / Exotic\n"
+      + "Trader) stocked with imported held items + supplies at fair prices - BUY with\n"
+      + "money, assign held items to a mon, then leave. Move on = nothing, no cost.",
     setup: () => {
       resetDevOverrides();
       setOverrides({

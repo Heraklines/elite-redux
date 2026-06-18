@@ -48,6 +48,7 @@ import { GameOverModifierRewardPhase } from "#phases/game-over-modifier-reward-p
 import { GameOverPhase } from "#phases/game-over-phase";
 import { HideAbilityPhase } from "#phases/hide-ability-phase";
 import { HidePartyExpBarPhase } from "#phases/hide-party-exp-bar-phase";
+import { ImportBazaarShopPhase } from "#phases/import-bazaar-shop-phase";
 import { InitEncounterPhase } from "#phases/init-encounter-phase";
 import { LearnMoveBatchPhase } from "#phases/learn-move-batch-phase";
 import { LearnMovePhase } from "#phases/learn-move-phase";
@@ -144,6 +145,7 @@ const PHASES = Object.freeze({
   BlackMarketShopPhase,
   ColosseumChoicePhase,
   ExoticShopPhase,
+  ImportBazaarShopPhase,
   ErCrossroadsPhase,
   ErQuizPhase,
   CheckInterludePhase,

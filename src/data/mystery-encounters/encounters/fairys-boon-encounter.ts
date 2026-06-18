@@ -5,43 +5,34 @@
  */
 
 // =============================================================================
-// ER #439 - The Fairy's Boon. A FAIRY_CAVE-biome benevolent gift event (design
-// PART XVII s62 / s76). A fairy presence offers a blessing with no catch: accept
-// it to receive a random Formation / buff RELIC for the rest of the run. Decline
-// and walk on with nothing lost.
+// ER #439 / #542 - The Fairy's Boon. A FAIRY_CAVE-biome benevolent gift event.
+// REWORKED (#542): the old version handed out a permanent free relic, which was
+// too basic and too generous for a no-catch event. Now accepting the blessing
+// grants a TEMPORARY LUCK SURGE - the party's effective luck is boosted by
+// FAIRY_LUCK_BONUS for the next FAIRY_LUCK_DURATION waves (sweetening shiny rolls
+// and reward-tier upgrades while it lasts), then it fades. Decline and walk on.
 //
-// Reuses the ER Relic modifier funcs (er-relics.ts, registered in modifierTypes
-// as ER_RELIC_*) handed to the reward shop via guaranteedModifierTypeFuncs - the
-// same path Town Raffle uses to award its Formation Relic.
+// The temporary luck lives in er-fairy-luck.ts (folded into getPartyLuckValue),
+// run-scoped and persisted across save/load.
 // =============================================================================
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
-import { modifierTypes } from "#data/data-lists";
-import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
+import { globalScene } from "#app/global-scene";
+import { FAIRY_LUCK_BONUS, FAIRY_LUCK_DURATION, grantErFairyLuck } from "#data/elite-redux/er-fairy-luck";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
+import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import {
   leaveEncounterWithoutBattle,
-  setEncounterRewards,
   transitionMysteryEncounterIntroVisuals,
 } from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
-import type { ModifierTypeFunc } from "#types/modifier-types";
-import { randSeedItem } from "#utils/common";
 
 const namespace = "mysteryEncounters/fairysBoon";
-
-/** The blessing pool - protective / fortune-flavored Relics fitting a fairy's gift. */
-const BOON_RELIC_FUNCS: ModifierTypeFunc[] = [
-  modifierTypes.ER_RELIC_MORALE_BANNER,
-  modifierTypes.ER_RELIC_SECOND_WIND,
-  modifierTypes.ER_RELIC_MYSTERY_CHARM,
-  modifierTypes.ER_RELIC_WEATHERVANE,
-];
 
 export const FairysBoonEncounter: MysteryEncounter = MysteryEncounterBuilder.withEncounterType(
   MysteryEncounterType.ER_FAIRYS_BOON,
@@ -67,10 +58,15 @@ export const FairysBoonEncounter: MysteryEncounter = MysteryEncounterBuilder.wit
         selected: [{ text: `${namespace}:option.1.selected` }],
       })
       .withOptionPhase(async () => {
-        const relic = randSeedItem(BOON_RELIC_FUNCS);
-        setEncounterRewards({ guaranteedModifierTypeFuncs: [relic], fillRemaining: false });
+        // Grant the temporary luck surge for the next FAIRY_LUCK_DURATION waves.
+        const wave = globalScene.currentBattle?.waveIndex ?? 0;
+        grantErFairyLuck(FAIRY_LUCK_BONUS, FAIRY_LUCK_DURATION, wave);
+        const encounter = globalScene.currentBattle.mysteryEncounter!;
+        encounter.setDialogueToken("luck", String(FAIRY_LUCK_BONUS));
+        encounter.setDialogueToken("waves", String(FAIRY_LUCK_DURATION));
+        queueEncounterMessage(`${namespace}:blessed`);
         await transitionMysteryEncounterIntroVisuals(true, true);
-        leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
+        leaveEncounterWithoutBattle(true);
         return true;
       })
       .build(),
