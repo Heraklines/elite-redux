@@ -1,10 +1,6 @@
 import { globalScene } from "#app/global-scene";
-import { erBiomeWaveSkipChance } from "#data/elite-redux/er-biome-encounters";
-import { erBiomeOverstay } from "#data/elite-redux/er-biome-notoriety";
-import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
-import { erInLateGameZone, erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
 import { BattleType } from "#enums/battle-type";
-import { BiomeId } from "#enums/biome-id";
+import type { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { TrainerSlot } from "#enums/trainer-slot";
@@ -21,7 +17,6 @@ import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 import { installAuthoredTeam } from "#system/llm-director/install-authored-team";
 import { paginate } from "#system/llm-director/text-pagination";
 import { trainerConfigs } from "#trainers/trainer-config";
-import { randSeedInt } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 export class NewBattlePhase extends BattlePhase {
@@ -32,14 +27,6 @@ export class NewBattlePhase extends BattlePhase {
     globalScene.phaseManager.removeAllPhasesOfType("NewBattlePhase");
 
     globalScene.newBattle();
-
-    // ER (biome composition): the DESERT sometimes just has nothing - a chunk of
-    // its plain waves are EMPTY (no fight, advance straight to the next). If this
-    // wave is skipped, the encounter is cancelled and the run rolls on.
-    if (this.maybeApplyErDesertSkip()) {
-      this.end();
-      return;
-    }
 
     // After newBattle has populated the upcoming wave's enemy levels, consume
     // any pending LLM Director inter-beat override for that wave. v1 applies
@@ -68,78 +55,6 @@ export class NewBattlePhase extends BattlePhase {
     }
 
     this.end();
-  }
-
-  /**
-   * ER (biome composition): the DESERT is a sparse crossing - a chunk of its
-   * plain waves are EMPTY ("nothing out here"), so the run auto-advances past
-   * them. Returns true when THIS wave was skipped (the caller then ends without
-   * queuing the encounter).
-   *
-   * Only PLAIN, mid-biome wild waves can be empty: never a x0 boss/shop wave, a
-   * fixed/gym battle, a trainer, or a mystery encounter - those are exactly the
-   * "something notable" the desert is meant to surface. The skipped wave's index
-   * still advances (the wave is "spent"), matching the long-dead-stretch feel.
-   */
-  private maybeApplyErDesertSkip(): boolean {
-    const battle = globalScene.currentBattle;
-    if (!battle || globalScene.arena?.biomeId !== BiomeId.DESERT) {
-      return false;
-    }
-    // `wave` is the wave being skipped (newBattle already advanced to it, so
-    // battleType / ME-ness are resolved and the gates below are accurate).
-    const wave = battle.waveIndex;
-    if (
-      wave % 10 === 0
-      || globalScene.gameMode.isFixedBattle(wave)
-      || battle.battleType === BattleType.TRAINER
-      || battle.isBattleMysteryEncounter()
-      || erInLateGameZone(wave) // never skip near the finale (vanilla cadence resumes)
-    ) {
-      return false;
-    }
-    const skipChance = erBiomeWaveSkipChance(BiomeId.DESERT);
-    if (skipChance <= 0) {
-      return false;
-    }
-    let skip = false;
-    globalScene.executeWithSeedOffset(() => {
-      skip = randSeedInt(100) < skipChance;
-    }, wave * 9001);
-    if (!skip) {
-      return false;
-    }
-    // EMPTY WAVE. Drop the encounter doPostBattleCleanup just queued for this wave
-    // (and the new-biome path's LevelCapPhase), show the flavor line, then roll on.
-    globalScene.phaseManager.removeAllPhasesOfType("NextEncounterPhase");
-    globalScene.phaseManager.removeAllPhasesOfType("NewBiomeEncounterPhase");
-    globalScene.phaseManager.removeAllPhasesOfType("LevelCapPhase");
-    globalScene.phaseManager.pushNew("MessagePhase", "The desert stretches on. Nothing stirs out here.", null, true);
-
-    // CRITICAL: a skipped wave bypasses VictoryPhase, so we must replicate its
-    // biome-transition tail here (minus the reward/shop/heal half, which only
-    // fires on x0 waves the skip already excludes). Without this the biome-end /
-    // every-5 Crossroads accounting desyncs and biome changes fire on the wrong
-    // waves. Mirrors victory-phase.ts (the biomeEnding / crossroads / notoriety
-    // block); keep the two aligned.
-    const erRouting = erBiomeRoutingActive();
-    const biomeEnding = globalScene.isNewBiome();
-    if (biomeEnding) {
-      globalScene.phaseManager.pushNew("SelectBiomePhase");
-    } else if (erRouting && erShouldRaiseCrossroads(wave) && !globalScene.gameMode.isFixedBattle(wave + 1)) {
-      globalScene.phaseManager.pushNew("ErCrossroadsPhase");
-    }
-    if (erRouting && !biomeEnding && erBiomeOverstay(wave + 1) === 1) {
-      globalScene.phaseManager.pushNew(
-        "MessagePhase",
-        "Word of your lingering has spread, and you are gaining notoriety here. The longer you stay, the more hostile this place will grow.",
-        null,
-        true,
-      );
-    }
-
-    globalScene.phaseManager.pushNew("NewBattlePhase");
-    return true;
   }
 
   /**
