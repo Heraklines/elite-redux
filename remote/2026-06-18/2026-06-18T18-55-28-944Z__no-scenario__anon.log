@@ -1,0 +1,77 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqjts635-jy50
+mode:     0  wave:13
+seed:     EZKpt4PnGmlioyt7NrzmTfYX
+party:    Medicham(L30 85hp f0), Pidgey(L30 73hp f0)
+enemy:    Geodude(L8)
+
+----- COMMENT -----
+medicham dojo works well
+
+----- CONSOLE -----
+[18:52:46.132] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[18:52:47.006] WARN: [er-b1c] 1 mega-form injection issues: ["ER mega target 1850 has no primary type"]
+[18:52:47.460] LOG: [ER] build mqjts635-jy50
+[18:52:47.694] LOG: [dev-tools] loaded — 212 scenarios + Send Logs button
+[18:53:04.616] DEBUG: Destroying loading scene
+[18:53:04.616] DEBUG: Destroyed loading scene
+[18:53:04.853] LOG: Seed: EZKpt4PnGmlioyt7NrzmTfYX
+[18:53:04.853] LOG: Wave Seed: EZKpt4PnGmlioyt7NrzmTfYX 0
+[18:53:11.767] LOG: %cStart Phase LoginPhase color:green;
+[18:53:11.996] LOG: Client Session: FsrdWqGOBpdQuKpZyR5WS4HR3ouEgAU6
+[18:53:12.776] LOG: %cStart Phase TitlePhase color:green;
+[18:53:12.812] LOG: use seasonal splash messages true
+[18:53:12.812] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[18:53:16.625] LOG: %cStart Phase SelectStarterPhase color:green;
+[18:53:29.505] LOG: %cStart Phase TitlePhase color:green;
+[18:53:29.530] LOG: use seasonal splash messages true
+[18:53:29.532] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[18:53:52.005] LOG: %cStart Phase SelectStarterPhase color:green;
+[18:53:53.183] LOG: Wave Seed: QfW|@\zSyxu{CZ~y`red 12
+[18:53:53.187] LOG: %cStart Phase EncounterPhase color:green;
+[18:53:57.642] DEBUG: Session data saved to slot 4!
+[18:53:57.646] LOG: Wave Seed: QfW|@\zSyxu{CZ~y`red 12
+[18:53:57.722] LOG: [dev-tools] TEST RESULT: PASS — ER Mountain: The Mountain Sage (#522)
+[18:54:06.346] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[18:54:14.940] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[18:54:15.210] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[18:54:15.210] LOG: %cStart Phase SelectModifierPhase color:green;
+[18:54:15.211] LOG: Wave Seed: QfW|@\zSyxu{CZ~y`red 12
+[18:54:25.827] LOG: Applied Carbos 
+[18:54:25.834] LOG: %cStart Phase EggLapsePhase color:green;
+[18:54:25.835] LOG: %cStart Phase PostMysteryEncounterPhase color:green;
+[18:54:25.836] LOG: %cStart Phase NewBattlePhase color:green;
+[18:54:25.836] LOG: Wave Seed: RgX}A]{Tzyv|D[zasfe 13
+[18:54:25.838] LOG: %cStart Phase NextEncounterPhase color:green;
+[18:54:25.846] LOG: Starting species pool tier: UNCOMMON
+[18:54:25.908] LOG: Pokemon: Wild Geodude | Species ID: 74 | Level: 8 | Nature: Mild (+SpAtk/-Def)
+[18:54:25.909] LOG: Stats (IVs): HP: 25 (8), Atk: 19 (24), Def: 18 (11), Spatk: 11 (7), Spdef: 11 (21), Spd: 8 (3)
+[18:54:25.909] LOG: Ability: Sand Force | Passive Ability: Let's Roll 
+[18:54:25.909] LOG: Moveset: ["Rock Blast","Self-Destruct","Rock Polish","Mud Sport"]
+[18:54:26.806] LOG: Battle Seed: rEBBdIH0K4hAk8On
+[18:54:26.930] DEBUG: Session data saved to slot 4!
+[18:54:26.932] LOG: Wave Seed: RgX}A]{Tzyv|D[zasfe 13
+[18:54:28.325] LOG: %cStart Phase SummonPhase color:green;
+[18:54:28.823] LOG: Applied Carbos 
+[18:54:29.256] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[18:54:29.258] LOG: %cStart Phase CheckSwitchPhase color:green;
+[18:54:33.892] LOG: %cStart Phase InitEncounterPhase color:green;
+[18:54:33.896] LOG: %cStart Phase PostSummonPhase color:green;
+[18:54:33.896] LOG: Ran PSP for: Medicham
+[18:54:33.898] LOG: %cStart Phase PostSummonPhase color:green;
+[18:54:33.899] LOG: %cStart Phase PostSummonPhase color:green;
+[18:54:33.899] LOG: Ran PSP for: Geodude
+[18:54:33.900] LOG: %cStart Phase PostSummonPhase color:green;
+[18:54:33.900] LOG: %cStart Phase PostSummonPhase color:green;
+[18:54:33.901] LOG: %cStart Phase MovePhase color:green;
+[18:54:33.902] LOG: %cUser: Geodude
+Move: DEFENSE_CURL
+Use Mode: INDIRECT color:orchid
+[18:54:33.909] LOG: %cStart Phase MessagePhase color:green;
+[18:54:34.334] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:54:34.370] LOG: %cStart Phase StatStageChangePhase color:green;
+[18:54:35.086] LOG: %cStart Phase MessagePhase color:green;
+[18:54:35.843] LOG: %cStart Phase MoveEndPhase color:green;
+[18:54:35.844] LOG: %cStart Phase TurnInitPhase color:green;
+[18:54:35.849] LOG: %cStart Phase CommandPhase color:green;
+[18:55:16.167] DEBUG: Session data saved to slot 4!
