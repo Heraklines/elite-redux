@@ -61,10 +61,10 @@ export const saveKey = "x0i2O7WRiANTqPmZ"; // Temporary; secure encryption is no
 /**
  * Spawn chance: (BASE_MYSTERY_ENCOUNTER_SPAWN_WEIGHT + WIGHT_INCREMENT_ON_SPAWN_MISS * <number of missed spawns>) / MYSTERY_ENCOUNTER_SPAWN_MAX_WEIGHT
  */
-// ER: raised 3 -> 5 to lift the on-pace floor rate so the cadence between MEs is
-// smoother (fewer long dry spells). The run MEAN is still governed by the
-// anti-variance target below.
-export const BASE_MYSTERY_ENCOUNTER_SPAWN_WEIGHT = 5;
+// ER: raised 3 -> 5 -> 8 to lift the on-pace floor rate so the cadence between
+// MEs is smoother (fewer long dry spells) and short sessions / early waves see one
+// sooner. The run MEAN is still governed by the anti-variance target below.
+export const BASE_MYSTERY_ENCOUNTER_SPAWN_WEIGHT = 8;
 
 /**
  * The divisor for determining ME spawns, defines the "maximum" weight required for a spawn
@@ -87,10 +87,11 @@ export const WEIGHT_INCREMENT_ON_SPAWN_MISS = 5;
 // ER: the anti-variance mechanic steers each run's TOTAL ME count toward this
 // target, spread across the ME-legal wave span (CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES
 // = [1, 180] -> 179 waves), so the expected gap between MEs is ~ 179 / target.
-// Raised 12 -> 16 to bring the average cadence to ~179/16 = 11.2 waves (was ~14.2),
-// landing in the desired "an ME every 10-15 waves" band across the no-grace-period
-// window.
-export const AVERAGE_ENCOUNTERS_PER_RUN_TARGET = 16;
+// Raised 12 -> 16 -> 24: testers reported MEs felt rare (the per-biome eventMult
+// skews slightly below 1.0 on average, net-reducing the old target). 24 brings the
+// base cadence to ~179/24 = 7.5 waves, so MEs come up clearly more often (the
+// per-biome eventMult still redistributes: haunted biomes denser, quiet ones less).
+export const AVERAGE_ENCOUNTERS_PER_RUN_TARGET = 24;
 
 /**
  * Will increase/decrease the chance of spawning a ME based on the current run's total MEs encountered vs AVERAGE_ENCOUNTERS_PER_RUN_TARGET
