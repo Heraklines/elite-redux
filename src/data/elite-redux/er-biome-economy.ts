@@ -80,8 +80,8 @@ export interface ErBiomeEconomy {
  * Editor-friendly: plain data, no logic.
  */
 export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
-  [BiomeId.TOWN]: { cheap: ["HEAL", "BALLS"], dear: ["TM", "HELD"], signature: ["BERRY", "LURE"], priceMod: 1 },
-  [BiomeId.PLAINS]: { cheap: ["HEAL", "BALLS"], dear: ["HELD"], signature: ["BERRY", "LURE"], priceMod: 1 },
+  [BiomeId.TOWN]: { cheap: ["BALLS", "BERRY"], dear: ["TM", "HELD"], signature: ["BERRY", "LURE"], priceMod: 1 },
+  [BiomeId.PLAINS]: { cheap: ["BALLS", "BERRY"], dear: ["HELD"], signature: ["BERRY", "LURE"], priceMod: 1 },
   [BiomeId.GRASS]: { cheap: ["BERRY"], dear: ["EVO"], signature: ["BERRY", "LEEK", "ER_GRASS_GEM", "ER_GRASSY_SEED"], priceMod: 1 },
   [BiomeId.TALL_GRASS]: { cheap: ["BERRY", "BALLS"], dear: ["TM"], signature: ["MAX_LURE", "BERRY", "ER_GRASSY_SEED"], priceMod: 1 },
   [BiomeId.METROPOLIS]: {
@@ -92,15 +92,15 @@ export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
     priceMod: 1,
     buysDear: "HELD",
   },
-  [BiomeId.FOREST]: { cheap: ["BERRY", "PP"], dear: ["BATTLE"], signature: ["LEEK", "SOOTHE_BELL", "ER_GRASSY_SEED", "ER_BUG_GEM"], priceMod: 1 },
+  [BiomeId.FOREST]: { cheap: ["BERRY", "EVO"], dear: ["BATTLE"], signature: ["LEEK", "SOOTHE_BELL", "ER_GRASSY_SEED", "ER_BUG_GEM"], priceMod: 1 },
   [BiomeId.SEA]: { cheap: ["BALLS"], dear: ["EVO"], signature: ["SHELL_BELL", "SOUL_DEW", "ER_WATER_GEM", "ER_ABSORB_BULB"], priceMod: 1 },
-  [BiomeId.SWAMP]: { cheap: ["HEAL"], dear: ["TM"], signature: ["TOXIC_ORB", "QUICK_CLAW", "ER_POISON_GEM"], priceMod: 1.1 },
-  [BiomeId.BEACH]: { cheap: ["BERRY", "HEAL"], dear: ["TM"], signature: ["SOOTHE_BELL", "SHELL_BELL"], priceMod: 0.9 },
-  [BiomeId.LAKE]: { cheap: ["HEAL", "PP"], dear: ["HELD"], signature: ["SHELL_BELL", "SOUL_DEW"], priceMod: 0.9 },
-  [BiomeId.SEABED]: { cheap: [], dear: ["HEAL"], signature: ["SOUL_DEW", "EVIOLITE", "ER_WATER_GEM"], priceMod: 1.2 },
-  [BiomeId.MOUNTAIN]: { cheap: ["BATTLE"], dear: ["HEAL"], signature: ["KINGS_ROCK", "QUICK_CLAW", "ER_ROCK_GEM"], priceMod: 1.1 },
+  [BiomeId.SWAMP]: { cheap: ["BERRY"], dear: ["TM"], signature: ["TOXIC_ORB", "QUICK_CLAW", "ER_POISON_GEM"], priceMod: 1.1 },
+  [BiomeId.BEACH]: { cheap: ["BERRY", "BALLS"], dear: ["TM"], signature: ["SOOTHE_BELL", "SHELL_BELL"], priceMod: 0.9 },
+  [BiomeId.LAKE]: { cheap: ["BALLS", "BERRY"], dear: ["HELD"], signature: ["SHELL_BELL", "SOUL_DEW"], priceMod: 0.9 },
+  [BiomeId.SEABED]: { cheap: [], dear: ["EVO"], signature: ["SOUL_DEW", "EVIOLITE", "ER_WATER_GEM"], priceMod: 1.2 },
+  [BiomeId.MOUNTAIN]: { cheap: ["BATTLE"], dear: ["BERRY"], signature: ["KINGS_ROCK", "QUICK_CLAW", "ER_ROCK_GEM"], priceMod: 1.1 },
   [BiomeId.BADLANDS]: { cheap: ["BATTLE"], dear: ["BERRY"], signature: ["QUICK_CLAW", "KINGS_ROCK", "ER_GROUND_GEM"], priceMod: 1.1 },
-  [BiomeId.CAVE]: { cheap: ["BALLS"], dear: ["HEAL"], signature: ["EVOLUTION_ITEM", "EVIOLITE", "ER_ROCK_GEM", "ER_GROUND_GEM"], priceMod: 1 },
+  [BiomeId.CAVE]: { cheap: ["BALLS"], dear: ["BALLS"], signature: ["EVOLUTION_ITEM", "EVIOLITE", "ER_ROCK_GEM", "ER_GROUND_GEM"], priceMod: 1 },
   [BiomeId.DESERT]: {
     // The caravan: everything pricey, but it stocks exotics (extra ULTRA
     // wildcard rolls; see stock builder).
@@ -109,28 +109,28 @@ export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
     signature: ["GRIP_CLAW", "BATON"],
     priceMod: 1.3,
   },
-  [BiomeId.ICE_CAVE]: { cheap: ["EVO"], dear: ["HEAL"], signature: ["FROSTBITE_ORB", "EVIOLITE", "ER_ICE_GEM", "ER_SNOWBALL"], priceMod: 1.2 },
+  [BiomeId.ICE_CAVE]: { cheap: ["EVO"], dear: ["BERRY"], signature: ["FROSTBITE_ORB", "EVIOLITE", "ER_ICE_GEM", "ER_SNOWBALL"], priceMod: 1.2 },
   [BiomeId.MEADOW]: { cheap: ["MINT", "BERRY", "VITAMIN"], dear: ["BATTLE"], signature: ["SOOTHE_BELL", "BERRY", "ER_GRASSY_SEED"], priceMod: 0.9 },
-  [BiomeId.POWER_PLANT]: { cheap: ["TM", "PP"], dear: ["BERRY"], signature: ["MULTI_LENS", "WIDE_LENS", "ER_ELECTRIC_GEM", "ER_CELL_BATTERY", "ER_ELECTRIC_SEED"], priceMod: 1 },
-  [BiomeId.VOLCANO]: { cheap: ["EVO"], dear: ["HEAL"], signature: ["FLAME_ORB", "ER_CHILI_SAMPLE", "ER_FIRE_GEM"], priceMod: 1.1 },
+  [BiomeId.POWER_PLANT]: { cheap: ["TM", "BATTLE"], dear: ["BERRY"], signature: ["MULTI_LENS", "WIDE_LENS", "ER_ELECTRIC_GEM", "ER_CELL_BATTERY", "ER_ELECTRIC_SEED"], priceMod: 1 },
+  [BiomeId.VOLCANO]: { cheap: ["EVO"], dear: ["BALLS"], signature: ["FLAME_ORB", "ER_CHILI_SAMPLE", "ER_FIRE_GEM"], priceMod: 1.1 },
   [BiomeId.GRAVEYARD]: { cheap: ["EVO"], dear: ["BALLS"], signature: ["REVIVER_SEED", "ER_RUSTY_CLAW", "ER_GHOST_GEM"], priceMod: 1 },
   // The training hall: vitamins are the headline, and martial mastery puts the
   // Mega Bracelet (KEYSTONE) on offer here too.
   [BiomeId.DOJO]: { cheap: ["BATTLE", "VITAMIN", "KEYSTONE"], dear: ["TM"], signature: ["FOCUS_BAND", "KINGS_ROCK", "ER_FIGHTING_GEM", "ER_WEAKNESS_POLICY"], priceMod: 1 },
   [BiomeId.FACTORY]: { cheap: ["HELD"], dear: ["BERRY"], signature: ["WHITE_HERB", "ER_LOADED_DICE", "ER_STEEL_GEM", "ER_CELL_BATTERY"], priceMod: 1 },
   // Ancient arcane power: Omni Gem / Move Slot Expander / Ability Randomizer.
-  [BiomeId.RUINS]: { cheap: ["ARCANE"], dear: ["HEAL"], signature: ["RELIC_GOLD", "REVIVER_SEED", "ER_PSYCHIC_GEM", "ER_PSYCHIC_SEED"], priceMod: 1.1 },
-  [BiomeId.WASTELAND]: { cheap: ["HEAL"], dear: ["BALLS"], signature: ["DNA_SPLICERS", "REVIVER_SEED"], priceMod: 1.2 },
+  [BiomeId.RUINS]: { cheap: ["ARCANE"], dear: ["BALLS"], signature: ["RELIC_GOLD", "REVIVER_SEED", "ER_PSYCHIC_GEM", "ER_PSYCHIC_SEED"], priceMod: 1.1 },
+  [BiomeId.WASTELAND]: { cheap: ["BATTLE"], dear: ["BALLS"], signature: ["DNA_SPLICERS", "REVIVER_SEED"], priceMod: 1.2 },
   [BiomeId.ABYSS]: { cheap: [], dear: [], signature: [], priceMod: 1, noShop: true },
   // Cosmic mutation: the observatory tinkers with abilities/moves (ARCANE).
-  [BiomeId.SPACE]: { cheap: ["HELD", "ARCANE"], dear: ["HEAL", "BERRY"], signature: ["MINI_BLACK_HOLE", "MULTI_LENS", "ER_PSYCHIC_SEED"], priceMod: 1.2 },
+  [BiomeId.SPACE]: { cheap: ["HELD", "ARCANE"], dear: ["BERRY", "TM"], signature: ["MINI_BLACK_HOLE", "MULTI_LENS", "ER_PSYCHIC_SEED"], priceMod: 1.2 },
   [BiomeId.CONSTRUCTION_SITE]: {
     cheap: ["BATTLE", "VITAMIN"],
     dear: ["MINT"],
     signature: ["GOLDEN_PUNCH", "FOCUS_BAND", "ER_STEEL_GEM"],
     priceMod: 1,
   },
-  [BiomeId.JUNGLE]: { cheap: ["BERRY", "CANDY"], dear: ["HEAL"], signature: ["LUCKY_EGG", "BERRY", "ER_GRASS_GEM", "ER_GRASSY_SEED"], priceMod: 1.1 },
+  [BiomeId.JUNGLE]: { cheap: ["BERRY", "CANDY"], dear: ["BALLS"], signature: ["LUCKY_EGG", "BERRY", "ER_GRASS_GEM", "ER_GRASSY_SEED"], priceMod: 1.1 },
   [BiomeId.FAIRY_CAVE]: { cheap: ["MINT"], dear: ["BATTLE"], signature: ["ER_LUCKY_HEART", "SOOTHE_BELL", "ER_FAIRY_GEM", "ER_MISTY_SEED"], priceMod: 1 },
   [BiomeId.TEMPLE]: { cheap: [], dear: [], signature: ["LEFTOVERS", "RELIC_GOLD"], priceMod: 1 },
   [BiomeId.SLUM]: {
@@ -142,7 +142,7 @@ export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
     priceMod: 0.75,
     buysDear: "EVO",
   },
-  [BiomeId.SNOWY_FOREST]: { cheap: ["BERRY", "PP"], dear: ["HEAL"], signature: ["REVIVER_SEED", "FROSTBITE_ORB", "ER_ICE_GEM", "ER_GRASSY_SEED"], priceMod: 1.1 },
+  [BiomeId.SNOWY_FOREST]: { cheap: ["BERRY", "EVO"], dear: ["BALLS"], signature: ["REVIVER_SEED", "FROSTBITE_ORB", "ER_ICE_GEM", "ER_GRASSY_SEED"], priceMod: 1.1 },
   [BiomeId.ISLAND]: { cheap: [], dear: [], signature: ["ER_DEX_NAV", "SHELL_BELL", "ER_WATER_GEM"], priceMod: 1.15 },
   // The experiment lab: candies + the build-changers (Ability Randomizer,
   // Move Slot Expander, Omni Gem) alongside its Capsule/Shroom signatures.
@@ -312,8 +312,7 @@ export function erBiomeShopResolveTier(
 }
 
 /**
- * Roll the biome market stock for an x0 wave: 3 staples (wave-bracketed heal,
- * status heal, ball), the biome's signature items, picks from its discounted
+ * Roll the biome market stock for an x0 wave: the biome signatures, the biome's signature items, picks from its discounted
  * categories, and wildcards (the Desert caravan rolls extra HELD exotics).
  * Deterministic per wave: runs under the wave seed so the reward phase and the
  * UI handler see the SAME stock.
@@ -358,7 +357,7 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
       // 3. BIOME-SKEWED: up to two distinct picks from each discounted category
       // (the reason this biome's market is worth a look). HEAL is excluded.
       for (const category of eco.cheap) {
-        if (category === "HEAL") {
+        if (category === "HEAL" || category === "PP") {
           continue;
         }
         const pool = ER_SHOP_CATEGORY_POOL[category].filter(k => !seen.has(k));
@@ -376,7 +375,7 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
       // medium-weight wildcard everywhere; HEAL is never included.
       const bag: { key: keyof typeof modifierTypes; cat: ErShopCategory }[] = [];
       const pushCat = (cat: ErShopCategory, weight: number) => {
-        if (cat === "HEAL") {
+        if (cat === "HEAL" || cat === "PP") {
           return;
         }
         for (let w = 0; w < weight; w++) {
@@ -401,7 +400,7 @@ export function rollErBiomeShopStock(biome: BiomeId, waveIndex: number): ErBiome
       // build-changers (ARCANE) and the Mega Bracelet (KEYSTONE) are NOT here -
       // they only stock in their thematic biomes (Lab/Space/Ruins, Metropolis/
       // Dojo) so they stay rare and meaningful.
-      for (const cat of ["EVO", "TM", "BATTLE", "CANDY", "MINT", "PP", "VITAMIN"] as ErShopCategory[]) {
+      for (const cat of ["EVO", "TM", "BATTLE", "CANDY", "MINT", "VITAMIN"] as ErShopCategory[]) {
         pushCat(cat, 1);
       }
       let guard = 0;
