@@ -10,7 +10,7 @@ import { getCharVariantFromDialogue } from "#data/dialogue";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { consumeErCarriedWeather } from "#data/elite-redux/er-map-nodes";
-import { erLookoutPreviewEnemy, erQuartermasterTick } from "#data/elite-redux/er-relics";
+import { erApplyCovenantHeal, erLookoutPreviewEnemy, erQuartermasterTick } from "#data/elite-redux/er-relics";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
 import { getNatureName } from "#data/nature";
@@ -377,6 +377,9 @@ export class EncounterPhase extends BattlePhase {
         // can't re-copy), the slot 5 mon copies one held item from slot 4 or 6.
         if (!this.loaded) {
           erQuartermasterTick();
+          // Covenant of Rest - full team heal every 7th wave (skips the 10-wave
+          // cadence so it never double-fires with the normal biome heal).
+          erApplyCovenantHeal();
         }
       }
 

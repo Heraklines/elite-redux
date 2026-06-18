@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { EntryHazardTag } from "#data/arena-tag";
 import { MysteryEncounterPostSummonTag } from "#data/battler-tags";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import { erApplyCursedIdol } from "#data/elite-redux/er-relics";
 import { erApplyTerrainSeeds } from "#data/elite-redux/er-terrain-seeds";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -43,6 +44,7 @@ export class PostSummonPhase extends PokemonPhase {
 
     this.applyErBiomeSwitchIn(pokemon);
     erApplyTerrainSeeds(pokemon);
+    erApplyCursedIdol(pokemon);
 
     this.end();
   }

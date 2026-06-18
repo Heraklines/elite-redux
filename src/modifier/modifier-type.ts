@@ -2241,6 +2241,8 @@ const modifierTypeInitObj = Object.freeze({
   ER_RELIC_MOLTEN_CORE: () => erRelicModifierType("moltenCore"),
   ER_RELIC_CAPACITOR: () => erRelicModifierType("capacitor"),
   ER_RELIC_PHARAOH_ANKH: () => erRelicModifierType("pharaohAnkh"),
+  ER_RELIC_COVENANT: () => erRelicModifierType("covenant"),
+  ER_RELIC_CURSED_IDOL: () => erRelicModifierType("cursedIdol"),
 
   /*REPEL: () => new DoubleBattleChanceBoosterModifierType('Repel', 5),
   SUPER_REPEL: () => new DoubleBattleChanceBoosterModifierType('Super Repel', 10),

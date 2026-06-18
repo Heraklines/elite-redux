@@ -27,6 +27,8 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { BattlerTagType } from "#enums/battler-tag-type";
+import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import type { SpeciesId } from "#enums/species-id";
 import type { BattleStat } from "#enums/stat";
@@ -52,7 +54,9 @@ export type ErRelicKind =
   | "lookout"
   | "moltenCore"
   | "capacitor"
-  | "pharaohAnkh";
+  | "pharaohAnkh"
+  | "covenant"
+  | "cursedIdol";
 
 export interface ErRelicConfig {
   name: string;
@@ -187,6 +191,23 @@ export const ER_RELIC_CONFIG: Readonly<Record<ErRelicKind, ErRelicConfig>> = {
     description: "Before each battle, scout the lead enemy and report its types.",
     icon: "scope_lens",
     tint: 0x90d0c0,
+    maxStack: 1,
+  },
+  covenant: {
+    name: "Covenant of Rest",
+    description: "A pact struck in the dark. Your whole team is fully healed every 7th wave.",
+    // TODO art-polish: bespoke icon. Reuse the heal-charm frame, tinted abyssal violet.
+    icon: "healing_charm",
+    tint: 0x9060d0,
+    maxStack: 1,
+  },
+  cursedIdol: {
+    name: "Cursed Idol",
+    description:
+      "A leering effigy. Each battle, your first Pokémon out gains a free Substitute, but the next to enter arrives at half HP.",
+    // TODO art-polish: bespoke idol icon. Reuse the soul-dew frame, tinted abyssal violet.
+    icon: "soul_dew",
+    tint: 0x7030a0,
     maxStack: 1,
   },
 };
@@ -694,4 +715,83 @@ export function erLookoutPreviewEnemy(): void {
     null,
     true,
   );
+}
+
+/** Covenant of Rest: heal cadence (every Nth wave). */
+const COVENANT_WAVE_CADENCE = 7;
+/** waveIndex on which Covenant last fired (guards against re-firing in a wave). */
+let COVENANT_LAST_WAVE = -1;
+
+/**
+ * Covenant of Rest (relic, Abyss "Seven Sins" deal): a pact struck with Giratina.
+ * Every {@linkcode COVENANT_WAVE_CADENCE}th wave, fully heal the whole party.
+ * Skips the every-10 cadence waves so it never double-fires with the normal
+ * biome heal (which already heals on those). Called once per wave from
+ * EncounterPhase, alongside {@linkcode erQuartermasterTick}.
+ */
+export function erApplyCovenantHeal(): void {
+  if (!hasErRelic("covenant")) {
+    return;
+  }
+  const wave = globalScene.currentBattle?.waveIndex ?? 0;
+  if (wave < COVENANT_WAVE_CADENCE || wave % COVENANT_WAVE_CADENCE !== 0 || wave % 10 === 0) {
+    return;
+  }
+  if (wave === COVENANT_LAST_WAVE) {
+    return;
+  }
+  COVENANT_LAST_WAVE = wave;
+  globalScene.phaseManager.unshiftNew("PartyHealPhase", false);
+  // ER custom relic - English-only (shared locales submodule).
+  globalScene.phaseManager.queueMessage("The Covenant of Rest mends your team.", null, true, null, true);
+}
+
+// =============================================================================
+// Cursed Idol (relic, Abyss "Seven Sins" deal): the double-edged "Void Gaze".
+// Each BATTLE, the FIRST player Pokemon sent out gains a FREE Substitute (the
+// normal 1/4-HP cost is waived - we add the tag directly, whose onAdd builds the
+// doll without deducting HP), but the NEXT player Pokemon to enter arrives at
+// half its current HP. Send-out order is tracked per wave (re-arms each battle,
+// like Pharaoh's Ankh) and resets when the wave changes.
+// =============================================================================
+
+/** Wave the Cursed Idol send-out counter is currently tracking (re-arms per battle). */
+let CURSED_IDOL_WAVE = -1;
+/** Count of player send-outs observed this battle (1 = lead, 2 = next entrant). */
+let CURSED_IDOL_SENDOUTS = 0;
+
+/**
+ * Cursed Idol (relic): called from PostSummonPhase for every Pokemon that enters.
+ * No-op for enemies or when the relic isn't held. The first player mon out this
+ * battle gets a free Substitute; the second gets its HP halved. Subsequent
+ * entrants are unaffected.
+ */
+export function erApplyCursedIdol(pokemon: Pokemon): void {
+  if (!hasErRelic("cursedIdol") || !pokemon.isPlayer()) {
+    return;
+  }
+  const wave = globalScene.currentBattle?.waveIndex ?? -1;
+  if (wave !== CURSED_IDOL_WAVE) {
+    CURSED_IDOL_WAVE = wave;
+    CURSED_IDOL_SENDOUTS = 0;
+  }
+  CURSED_IDOL_SENDOUTS += 1;
+
+  if (CURSED_IDOL_SENDOUTS === 1) {
+    // Free Substitute: add the tag directly so onAdd builds the doll (hp = maxHp/4)
+    // WITHOUT the move's normal HP cost. Source is the mon itself.
+    if (!pokemon.getTag(BattlerTagType.SUBSTITUTE)) {
+      pokemon.addTag(BattlerTagType.SUBSTITUTE, 0, MoveId.SUBSTITUTE, pokemon.id);
+      // ER custom relic - English-only (shared locales submodule).
+      globalScene.phaseManager.queueMessage(`The Cursed Idol shrouds ${pokemon.getNameToRender()} in a free Substitute!`);
+    }
+  } else if (CURSED_IDOL_SENDOUTS === 2) {
+    const drained = Math.max(1, Math.floor(pokemon.hp / 2));
+    if (pokemon.hp > drained) {
+      pokemon.hp = drained;
+      pokemon.updateInfo();
+      // ER custom relic - English-only (shared locales submodule).
+      globalScene.phaseManager.queueMessage(`The Cursed Idol drains ${pokemon.getNameToRender()} as it enters!`);
+    }
+  }
 }
