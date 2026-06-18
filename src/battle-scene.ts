@@ -4473,8 +4473,25 @@ export class BattleScene extends SceneBase {
       console.log("No Mystery Encounters found, falling back to Mysterious Challengers.");
       return allMysteryEncounters[MysteryEncounterType.MYSTERIOUS_CHALLENGERS];
     }
-    // TODO: should this use `randSeedItem`?
-    encounter = availableEncounters[randSeedInt(availableEncounters.length)];
+    // ER: when a mystery encounter fires, weight the pick toward the NEW ER events
+    // so the (frequently-seen) vanilla events don't dominate. This does NOT change
+    // how OFTEN an ME spawns (the per-wave success rate) or the tier weights - only
+    // WHICH encounter is chosen within the already-rolled tier. ER encounter types
+    // are name-prefixed "ER_"; vanilla candidates get a fraction of an ER one's
+    // selection weight. Uniform within a single-origin tier (all same weight).
+    const erMeWeights = availableEncounters.map(e =>
+      MysteryEncounterType[e.encounterType]?.startsWith("ER_") ? 10 : 3,
+    );
+    let erMeRoll = randSeedInt(erMeWeights.reduce((a, b) => a + b, 0));
+    let erMeIdx = availableEncounters.length - 1;
+    for (let i = 0; i < availableEncounters.length; i++) {
+      erMeRoll -= erMeWeights[i];
+      if (erMeRoll < 0) {
+        erMeIdx = i;
+        break;
+      }
+    }
+    encounter = availableEncounters[erMeIdx];
     // New encounter object to not dirty flags
     encounter = new MysteryEncounter(encounter);
     encounter.populateDialogueTokensFromRequirements();

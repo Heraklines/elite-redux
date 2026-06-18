@@ -125,5 +125,6 @@
   "ppReduced": "It reduced the PP of {{targetName}}’s\n{{moveName}} by {{reduction}}!",
   "mysteryEncounterAppeared": "What’s this?",
   "pokemonTerastallized": "{{pokemonNameWithAffix}} Terastallized into the {{type}} type!",
-  "eggHatchBatchDeferred": "{{count}} more Eggs are ready and will hatch a bit later."
+  "eggHatchBatchDeferred": "{{count}} more Eggs are ready and will hatch a bit later.",
+  "hurtByItem": "{{pokemonNameWithAffix}} was hurt!"
 }
