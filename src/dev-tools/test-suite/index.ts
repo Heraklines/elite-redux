@@ -175,7 +175,15 @@ function injectLogButton(): void {
     cursor: "pointer",
     opacity: "0.85",
   } satisfies Partial<CSSStyleDeclaration>);
+  // A focused <button> is activated by Space/Enter. Those are exactly the keys the
+  // player hammers in the biome market (and elsewhere) to confirm, so if this
+  // button ever holds focus it re-fires the comment prompt on every keypress (the
+  // reported "Send Logs triggers repeatedly"). Keep it OUT of the focus path:
+  // never tab to it, never take focus on click, and drop focus immediately after.
+  button.tabIndex = -1;
+  button.addEventListener("mousedown", e => e.preventDefault());
   button.addEventListener("click", () => {
+    button.blur();
     // Optional free-text comment captured into the report (Cancel = no comment,
     // still sends). A simple prompt is reliable and dev-only.
     const comment = window.prompt("Optional comment for this log (Cancel to skip):", "") ?? "";
