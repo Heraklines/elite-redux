@@ -5909,4 +5909,31 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "(repro) Move-learn loop: candy-evolve a FAINTED mon, then skip",
+    description:
+      "REPRO for the reported bug (helps pinpoint it - Send Logs the moment it\n"
+      + "happens). Charmander starts at lv15 (evolves at 16) alongside a sturdy\n"
+      + "Lapras.\n"
+      + "DO: in the opening battle, let CHARMANDER FAINT (switch it in and let it go\n"
+      + "down), then win with Lapras. In the shop, take the Rare Candy and use it on\n"
+      + "the FAINTED Charmander to push it past lv16 so it evolves and is offered new\n"
+      + "moves. LEARN ONE move, then try to SKIP / cancel the rest.\n"
+      + "EXPECT: it closes cleanly. BUG: if it jumps BACK to the level-up move\n"
+      + "selection instead, press Send Logs RIGHT THEN - the capture will show the\n"
+      + "exact phase that re-fires so the loop can be fixed.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 15 });
+      return [
+        makeStarter(SpeciesId.CHARMANDER, {
+          moveset: [MoveId.EMBER, MoveId.SCRATCH, MoveId.SMOKESCREEN, MoveId.DRAGON_BREATH],
+        }),
+        makeStarter(SpeciesId.LAPRAS, {
+          moveset: [MoveId.SURF, MoveId.ICE_BEAM, MoveId.BODY_SLAM, MoveId.PROTECT],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.RARE_CANDY],
+  },
 ];
