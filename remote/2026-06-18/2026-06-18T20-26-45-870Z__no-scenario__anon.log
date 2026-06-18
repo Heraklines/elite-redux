@@ -1,0 +1,253 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqjxngk4-6nm2
+mode:     0  wave:14
+seed:     Z3Gy9RVg4odFQYxTg32Dp2Wv
+party:    Garchomp(L60 194hp f0)
+enemy:    Shiinotic(L9), Mawile(L10)
+
+----- CONSOLE -----
+[20:22:49.494] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[20:22:49.720] WARN: [er-b1c] 1 mega-form injection issues: ["ER mega target 1850 has no primary type"]
+[20:22:49.845] LOG: [ER] build mqjxngk4-6nm2
+[20:22:50.065] LOG: [dev-tools] loaded — 212 scenarios + Send Logs button
+[20:23:32.824] DEBUG: Destroying loading scene
+[20:23:32.824] DEBUG: Destroyed loading scene
+[20:23:32.896] LOG: Seed: Z3Gy9RVg4odFQYxTg32Dp2Wv
+[20:23:32.896] LOG: Wave Seed: Z3Gy9RVg4odFQYxTg32Dp2Wv 0
+[20:23:35.325] LOG: %cStart Phase LoginPhase color:green;
+[20:23:54.369] LOG: Client Session: hm3NX6Y5IwJoU3Tpg5tSYnHOX5Wp74TQ
+[20:23:54.648] WARN: Could not get system savedata! 404 Save data not found.
+[20:23:54.648] LOG: %cStart Phase MessagePhase color:green;
+[20:23:57.482] LOG: %cStart Phase SelectGenderPhase color:green;
+[20:23:59.375] LOG: [er-gift] granted 2 free Legendary eggs (one-time)
+[20:24:00.688] LOG: %cStart Phase TitlePhase color:green;
+[20:24:00.700] LOG: use seasonal splash messages true
+[20:24:00.700] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[20:24:52.436] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:24:54.507] LOG: Wave Seed: f?SE^bs@{pR]e`s?>P|>c 12
+[20:24:54.508] LOG: %cStart Phase EncounterPhase color:green;
+[20:24:56.548] DEBUG: Session data saved to slot 4!
+[20:24:56.549] LOG: Wave Seed: f?SE^bs@{pR]e`s?>P|>c 12
+[20:25:21.958] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[20:25:27.640] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[20:25:27.757] LOG: Pokemon: Wild Dragonite | Species ID: 149 | Level: 9 | Nature: Timid (+Spd/-Atk) | Friendship: 35
+[20:25:27.757] LOG: Stats (IVs): HP: 37 (17), Atk: 27 (22), Def: 23 (8), Spatk: 23 (9), Spdef: 24 (16), Spd: 22 (21)
+[20:25:27.757] LOG: Ability: Dragon’s Maw | Passive Ability: Multiscale | Boss Bars: 2
+[20:25:27.757] LOG: Moveset: ["Twister","Body Slam","Wrap","Water Gun"]
+[20:25:29.687] LOG: {"id":"BERRY","localeKey":"","iconImage":"apicot_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":6} (enemy)
+[20:25:29.688] LOG: Battle Seed: IQjvf9zv4PUvXHRt
+[20:25:29.690] LOG: %cStart Phase MysteryEncounterBattlePhase color:green;
+[20:25:29.691] LOG: %cStart Phase SummonPhase color:green;
+[20:25:29.907] LOG: %cStart Phase SummonPhase color:green;
+[20:25:30.207] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[20:25:30.209] LOG: %cStart Phase CheckSwitchPhase color:green;
+[20:25:30.209] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:25:30.211] LOG: %cStart Phase PostSummonPhase color:green;
+[20:25:30.211] LOG: Ran PSP for: Garchomp
+[20:25:30.211] LOG: %cStart Phase PostSummonPhase color:green;
+[20:25:30.211] LOG: %cStart Phase PostSummonPhase color:green;
+[20:25:30.211] LOG: Ran PSP for: Dragonite
+[20:25:30.211] LOG: %cStart Phase PostSummonPhase color:green;
+[20:25:30.211] LOG: %cStart Phase PostSummonPhase color:green;
+[20:25:30.212] LOG: %cStart Phase TurnInitPhase color:green;
+[20:25:30.212] LOG: %cStart Phase MysteryEncounterBattleStartCleanupPhase color:green;
+[20:25:30.212] LOG: %cStart Phase CommandPhase color:green;
+[20:25:45.000] LOG: Move: DRAGON_CLAW Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Garchomp
+[20:25:45.002] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:25:45.004] LOG: Applied Damage Token (enemy)
+[20:25:45.004] LOG: Applied Damage Token (enemy)
+[20:25:45.005] LOG: Applied Damage Token (enemy)
+[20:25:45.005] LOG: Applied Damage Token (enemy)
+[20:25:45.008] LOG: Move Pool: ["Twister","Body Slam","Wrap","Water Gun"]
+[20:25:45.008] LOG: Move Scores: [39,20,12,8]
+[20:25:45.008] LOG: Sorted Move Pool: ["Twister","Body Slam","Wrap","Water Gun"]
+[20:25:45.008] LOG: Chosen Move: Twister
+[20:25:45.008] LOG: %cStart Phase TurnStartPhase color:green;
+[20:25:45.009] LOG: %cStart Phase MovePhase color:green;
+[20:25:45.009] LOG: %cUser: Garchomp
+Move: DRAGON_CLAW
+Use Mode: NORMAL color:orchid
+[20:25:45.011] LOG: %cStart Phase MessagePhase color:green;
+[20:25:45.140] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:25:45.142] LOG: crit stage: +1
+[20:25:45.143] LOG: Move: Dragon Claw | Base damage: 340.4727272727273 | Power: 80 | Source attack: 179 | Target defense: 22
+[20:25:45.143] LOG: Applied Protection Token (enemy)
+[20:25:45.143] LOG: Move: Dragon Claw | Attack damage: 454
+[20:25:45.144] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:25:45.175] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:25:45.175] LOG: %cStart Phase MessagePhase color:green;
+[20:25:45.390] LOG: %cStart Phase FaintPhase color:green;
+[20:25:46.808] LOG: %cStart Phase MessagePhase color:green;
+[20:25:47.154] LOG: %cStart Phase VictoryPhase color:green;
+[20:25:47.155] LOG: %cStart Phase MoveEndPhase color:green;
+[20:25:47.155] LOG: %cStart Phase MovePhase color:green;
+[20:25:47.155] LOG: %cStart Phase MoveEndPhase color:green;
+[20:25:47.155] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:25:47.155] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:25:47.155] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:25:47.155] LOG: %cStart Phase BerryPhase color:green;
+[20:25:47.155] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:25:47.155] LOG: %cStart Phase TurnEndPhase color:green;
+[20:25:47.156] LOG: %cStart Phase BattleEndPhase color:green;
+[20:25:47.156] LOG: Battle Score: 239 (1 Turns x1)
+[20:25:47.156] LOG: Total Score: 239
+[20:25:47.161] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[20:25:47.162] LOG: %cStart Phase SelectModifierPhase color:green;
+[20:25:47.162] LOG: Wave Seed: f?SE^bs@{pR]e`s?>P|>c 12
+[20:25:47.165] LOG: 23 2 [9,17]
+[20:25:47.165] LOG: {"id":"MULTI_LENS","localeKey":"modifierType:ModifierType.MULTI_LENS","iconImage":"zoom_lens","soundName":"se/restore","tier":3} 
+[20:25:47.165] LOG: 4 0 [9,17]
+[20:25:47.165] LOG: {"id":"BERRY_POUCH","localeKey":"modifierType:ModifierType.BERRY_POUCH","iconImage":"berry_pouch","soundName":"se/restore","tier":3} 
+[20:25:47.165] LOG: 22 2 [9,17]
+[20:25:47.165] LOG: {"id":"VOUCHER_PLUS","localeKey":"","iconImage":"pair_of_tickets","group":"voucher","soundName":"se/restore","tier":3,"voucherType":1,"count":1} 
+[20:25:47.165] LOG: 35 6 [9,11,12,13,15,25]
+[20:25:47.165] LOG: {"id":"ER_POWER_HERB","localeKey":"","iconImage":"power_herb","iconTint":16777215,"soundName":"se/restore","tier":2} 
+[20:25:47.165] LOG: 18 5 [9,11,12,13,15,25]
+[20:25:47.165] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"dragon_fang","soundName":"se/restore","tier":2,"moveType":15,"boostPercent":20} 
+[20:25:47.165] LOG: 32 6 [9,11,12,13,15,25]
+[20:25:47.165] LOG: {"id":"ER_LOADED_DICE","localeKey":"","iconImage":"wide_lens","iconTint":15255626,"soundName":"se/restore","tier":2} 
+[20:25:47.165] LOG: 8 0 [9,11,12,13,15,25]
+[20:25:47.165] LOG: {"id":"AMULET_COIN","localeKey":"modifierType:ModifierType.AMULET_COIN","iconImage":"amulet_coin","soundName":"se/restore","tier":2} 
+[20:25:47.166] LOG: 23 5 [9,11,12,13,15,25]
+[20:25:47.166] LOG: {"id":"EXP_CHARM","localeKey":"modifierType:ModifierType.EXP_CHARM","iconImage":"exp_charm","soundName":"se/restore","tier":2,"boostPercent":25} 
+[20:25:47.166] LOG: 32 6 [9,11,12,13,15,25]
+[20:25:47.166] LOG: {"id":"ER_LOADED_DICE","localeKey":"","iconImage":"wide_lens","iconTint":15255626,"soundName":"se/restore","tier":2} 
+[20:25:47.166] LOG: 1 0 [9,11,12,13,15,25]
+[20:25:47.166] LOG: {"id":"MAX_LURE","localeKey":"modifierType:ModifierType.MAX_LURE","iconImage":"max_lure","group":"lure","soundName":"se/restore","tier":2,"maxBattles":30} 
+[20:25:51.445] LOG: %cStart Phase EggLapsePhase color:green;
+[20:25:51.445] LOG: %cStart Phase PostMysteryEncounterPhase color:green;
+[20:25:51.445] LOG: %cStart Phase NewBattlePhase color:green;
+[20:25:51.445] LOG: Wave Seed: g@TF_ctA|qS^fat@?Q}?d 13
+[20:25:51.445] LOG: %cStart Phase NextEncounterPhase color:green;
+[20:25:51.447] LOG: Starting species pool tier: BOSS_RARE
+[20:25:51.452] LOG: ER #419: elite BST cap (420 @ w13) - replacing Druddigon (505) with Gloom (415)
+[20:25:51.464] LOG: Pokemon: Wild Gloom | Species ID: 44 | Level: 8 | Nature: Quirky (-)
+[20:25:51.464] LOG: Stats (IVs): HP: 29 (17), Atk: 15 (10), Def: 17 (27), Spatk: 22 (19), Spdef: 20 (16), Spd: 12 (8)
+[20:25:51.464] LOG: Ability: Poison Absorb | Passive Ability: Regenerator | Boss Bars: 2
+[20:25:51.464] LOG: Moveset: ["Acid","Poison Powder","Sweet Scent","Stun Spore"]
+[20:25:52.011] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"carbos","soundName":"se/restore","tier":1,"stat":5,"key":"carbos"} (enemy)
+[20:25:52.011] LOG: Battle Seed: T09YL8x54wOSCpuo
+[20:25:52.011] LOG: Applied Carbos (enemy)
+[20:25:52.051] DEBUG: Session data saved to slot 4!
+[20:25:52.052] LOG: Wave Seed: g@TF_ctA|qS^fat@?Q}?d 13
+[20:25:52.491] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[20:25:52.491] LOG: %cStart Phase CheckSwitchPhase color:green;
+[20:25:52.491] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:25:52.492] LOG: %cStart Phase PostSummonPhase color:green;
+[20:25:52.492] LOG: Ran PSP for: Gloom
+[20:25:52.492] LOG: %cStart Phase PostSummonPhase color:green;
+[20:25:52.492] LOG: %cStart Phase PostSummonPhase color:green;
+[20:25:52.492] LOG: %cStart Phase TurnInitPhase color:green;
+[20:25:52.492] LOG: %cStart Phase CommandPhase color:green;
+[20:25:54.491] LOG: Move: DRAGON_CLAW Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Garchomp
+[20:25:54.492] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:25:54.493] LOG: Move Pool: ["Acid","Poison Powder","Sweet Scent","Stun Spore"]
+[20:25:54.493] LOG: Move Scores: [9.9375,10,6,10]
+[20:25:54.493] LOG: Sorted Move Pool: ["Poison Powder","Stun Spore","Acid","Sweet Scent"]
+[20:25:54.493] LOG: Chosen Move: Poison Powder
+[20:25:54.493] LOG: %cStart Phase TurnStartPhase color:green;
+[20:25:54.494] LOG: %cStart Phase MovePhase color:green;
+[20:25:54.494] LOG: %cUser: Garchomp
+Move: DRAGON_CLAW
+Use Mode: NORMAL color:orchid
+[20:25:54.494] LOG: %cStart Phase MessagePhase color:green;
+[20:25:54.640] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:25:54.641] LOG: Applied Multi Lens 
+[20:25:54.642] LOG: crit stage: +1
+[20:25:54.642] LOG: Move: Dragon Claw | Base damage: 415.6888888888889 | Power: 80 | Source attack: 179 | Target defense: 18
+[20:25:54.642] LOG: Applied Multi Lens 
+[20:25:54.642] LOG: Move: Dragon Claw | Attack damage: 430
+[20:25:54.643] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:25:54.675] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:25:54.675] LOG: %cStart Phase MessagePhase color:green;
+[20:25:54.890] LOG: %cStart Phase FaintPhase color:green;
+[20:25:55.891] LOG: %cStart Phase MessagePhase color:green;
+[20:25:56.103] LOG: %cStart Phase VictoryPhase color:green;
+[20:25:56.103] LOG: %cStart Phase MoveEndPhase color:green;
+[20:25:56.103] LOG: %cStart Phase MovePhase color:green;
+[20:25:56.103] LOG: %cStart Phase MoveEndPhase color:green;
+[20:25:56.103] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:25:56.103] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:25:56.103] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:25:56.103] LOG: %cStart Phase BerryPhase color:green;
+[20:25:56.103] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:25:56.103] LOG: %cStart Phase TurnEndPhase color:green;
+[20:25:56.103] LOG: %cStart Phase BattleEndPhase color:green;
+[20:25:56.103] LOG: Battle Score: 109 (1 Turns x1)
+[20:25:56.103] LOG: Total Score: 348
+[20:25:56.109] LOG: %cStart Phase EggLapsePhase color:green;
+[20:25:56.109] LOG: %cStart Phase SelectModifierPhase color:green;
+[20:25:56.109] LOG: Wave Seed: g@TF_ctA|qS^fat@?Q}?d 13
+[20:25:56.110] LOG: 0 0 [2,3,4,5,6,7,8,9,10,23]
+[20:25:56.110] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[20:25:56.110] LOG: 0 0 [2,3,4,5]
+[20:25:56.110] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[20:25:56.110] LOG: 0 0 [2,3,4,5]
+[20:25:56.110] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[20:25:56.110] LOG: 7 4 [2,3,4,5]
+[20:25:56.110] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[20:25:56.110] LOG: 7 4 [2,3,4,5]
+[20:25:56.110] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[20:25:56.110] LOG: 9 4 [2,3,4,5]
+[20:25:56.110] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_psychic","group":"tm","soundName":"se/restore","tier":0,"moveId":433} 
+[20:25:57.670] LOG: %cStart Phase SelectModifierPhase color:green;
+[20:25:57.671] LOG: 6 4 [2,3,4,5]
+[20:25:57.671] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[20:25:57.671] LOG: 4 0 [5]
+[20:25:57.671] LOG: {"id":"DNA_SPLICERS","localeKey":"modifierType:ModifierType.DNA_SPLICERS","iconImage":"dna_splicers","soundName":"se/restore","tier":4} 
+[20:25:57.672] LOG: 11 9 [2,3,4,5,6,7,8,9,10,23,24]
+[20:25:57.672] LOG: {"id":"DIRE_HIT","localeKey":"modifierType:ModifierType.DIRE_HIT","iconImage":"dire_hit","soundName":"se/restore","tier":1} 
+[20:25:57.672] LOG: 12 9 [2,3,4,5,6,7,8,9,10,23,24]
+[20:25:57.672] LOG: {"id":"SUPER_LURE","localeKey":"modifierType:ModifierType.SUPER_LURE","iconImage":"super_lure","group":"lure","soundName":"se/restore","tier":1,"maxBattles":15} 
+[20:25:57.672] LOG: 21 9 [2,3,4,5,6,7,8,9,10,23,24]
+[20:25:57.672] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"carbos","soundName":"se/restore","tier":1,"stat":5,"key":"carbos"} 
+[20:25:57.672] LOG: 14 9 [2,3,4,5,6,7,8,9,10,23,24]
+[20:25:57.672] LOG: GREAT 0
+[20:25:57.672] LOG: 0 0 [2,3,4,5,6,7,8,9,10,23,24]
+[20:25:57.672] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[20:26:01.369] LOG: %cStart Phase LearnMovePhase color:green;
+[20:26:07.422] LOG: %cStart Phase LearnMovePhase color:green;
+[20:26:09.824] LOG: %cStart Phase LearnMovePhase color:green;
+[20:26:17.380] LOG: %cStart Phase LearnMovePhase color:green;
+[20:26:18.784] LOG: %cStart Phase NewBattlePhase color:green;
+[20:26:18.784] LOG: Wave Seed: hAUG`duB}rT_gbuA@R~@e 14
+[20:26:18.785] LOG: %cStart Phase NextEncounterPhase color:green;
+[20:26:18.786] LOG: Starting species pool tier: BOSS
+[20:26:18.786] LOG: Incompatible level: regenerating...
+[20:26:18.786] LOG: Starting species pool tier: BOSS_RARE
+[20:26:18.787] LOG: ER #419: elite BST cap (420 @ w14) - replacing Aerodactyl (515) with Shiinotic (405)
+[20:26:18.795] LOG: Pokemon: Wild Shiinotic | Species ID: 756 | Level: 9 | Nature: Jolly (+Spd/-SpAtk)
+[20:26:18.795] LOG: Stats (IVs): HP: 30 (22), Atk: 15 (25), Def: 19 (18), Spatk: 20 (29), Spdef: 25 (22), Spd: 13 (12)
+[20:26:18.795] LOG: Ability: Twist. Dimension | Passive Ability: Poison Absorb | Boss Bars: 3
+[20:26:18.795] LOG: Moveset: ["Alluring Voice","Mega Drain","Confusion","Stun Spore"]
+[20:26:18.795] LOG: Starting species pool tier: BOSS
+[20:26:18.795] LOG: Incompatible level: regenerating...
+[20:26:18.795] LOG: Starting species pool tier: BOSS_RARE
+[20:26:18.797] LOG: ER #419: elite BST cap (420 @ w14) - replacing Dracozolt (505) with Mawile (410)
+[20:26:18.806] LOG: Pokemon: Wild Mawile | Species ID: 303 | Level: 10 | Nature: Jolly (+Spd/-SpAtk)
+[20:26:18.806] LOG: Stats (IVs): HP: 31 (22), Atk: 24 (24), Def: 23 (10), Spatk: 17 (29), Spdef: 18 (20), Spd: 18 (10)
+[20:26:18.807] LOG: Ability: Adaptability | Passive Ability: Multi-Headed | Boss Bars: 3
+[20:26:18.807] LOG: Moveset: ["Body Slam","Sweet Scent","Astonish"]
+[20:26:19.557] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"hp_up","soundName":"se/restore","tier":1,"stat":0,"key":"hp_up"} (enemy)
+[20:26:19.557] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} (enemy)
+[20:26:19.557] LOG: Battle Seed: UeUEbgUbHP4TD2JW
+[20:26:19.557] LOG: Applied HP Up (enemy)
+[20:26:19.591] DEBUG: Session data saved to slot 4!
+[20:26:19.591] LOG: Wave Seed: hAUG`duB}rT_gbuA@R~@e 14
+[20:26:20.075] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:26:20.075] LOG: %cStart Phase PostSummonPhase color:green;
+[20:26:20.075] LOG: Ran PSP for: Mawile
+[20:26:20.076] LOG: %cStart Phase PostSummonPhase color:green;
+[20:26:20.076] LOG: %cStart Phase PostSummonPhase color:green;
+[20:26:20.076] LOG: %cStart Phase PostSummonPhase color:green;
+[20:26:20.076] LOG: Ran PSP for: Shiinotic
+[20:26:20.077] LOG: %cStart Phase PostSummonPhase color:green;
+[20:26:20.078] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:26:20.240] LOG: %cStart Phase MessagePhase color:green;
+[20:26:20.507] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:26:20.541] LOG: %cStart Phase PostSummonPhase color:green;
+[20:26:20.541] LOG: %cStart Phase TurnInitPhase color:green;
+[20:26:20.541] LOG: %cStart Phase CommandPhase color:green;
+[20:26:39.472] LOG: [dev-tools] TEST RESULT: PASS — ER Dragon's Hoard (#439)
