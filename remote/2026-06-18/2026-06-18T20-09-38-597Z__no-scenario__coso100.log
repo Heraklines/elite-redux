@@ -1,0 +1,275 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqjts635-jy50
+mode:     0  wave:1
+seed:     VSSnqPkRB0EGNApUFcH5m5cv
+party:    Cyndaquil(L5 20hp f0), Squirtle(L5 20hp f0), Rowlet(L5 22hp f0)
+enemy:    Oddish(L2)
+
+----- CONSOLE -----
+[20:06:32.738] LOG: Pokemon: Wild Kricketune | Species ID: 402 | Level: 15 | Nature: Docile (-)
+[20:06:32.738] LOG: Stats (IVs): HP: 51 (19), Atk: 32 (23), Def: 24 (23), Spatk: 34 (26), Spdef: 22 (18), Spd: 32 (12)
+[20:06:32.738] LOG: Ability: Perfectionist | Passive Ability: Mountaineer | Boss Bars: 2
+[20:06:32.739] LOG: Moveset: ["Skitter Smack","Uproar (P)","Growl"]
+[20:06:33.439] LOG: {"id":"BERRY","localeKey":"","iconImage":"apicot_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":6} (enemy)
+[20:06:33.443] LOG: Battle Seed: bUFIoj2O1pZx4ubM
+[20:06:33.605] DEBUG: Session data saved to slot 0!
+[20:06:33.610] LOG: Wave Seed: ^HuuDJLZzjih^WVfi]H|D 20
+[20:06:35.021] LOG: %cStart Phase ScanIvsPhase color:green;
+[20:06:35.921] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[20:06:35.922] LOG: %cStart Phase CheckSwitchPhase color:green;
+[20:06:36.659] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:06:36.660] LOG: %cStart Phase PostSummonPhase color:green;
+[20:06:36.660] LOG: Ran PSP for: Kricketune
+[20:06:36.661] LOG: %cStart Phase PostSummonPhase color:green;
+[20:06:36.661] LOG: %cStart Phase PostSummonPhase color:green;
+[20:06:36.661] LOG: %cStart Phase TurnInitPhase color:green;
+[20:06:36.661] LOG: %cStart Phase CommandPhase color:green;
+[20:06:37.586] LOG: Move: FLAME_WHEEL Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Cyndaquil
+[20:06:37.591] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:06:37.604] LOG: Move Pool: ["Skitter Smack","Uproar (P)","Growl"]
+[20:06:37.605] LOG: Move Scores: [10.125,27,2]
+[20:06:37.605] LOG: Sorted Move Pool: ["Uproar (P)","Skitter Smack","Growl"]
+[20:06:37.605] LOG: Chosen Move: Uproar (P)
+[20:06:37.605] LOG: %cStart Phase TurnStartPhase color:green;
+[20:06:37.610] LOG: %cStart Phase MovePhase color:green;
+[20:06:37.610] LOG: %cUser: Kricketune
+Move: UPROAR
+Use Mode: NORMAL color:orchid
+[20:06:37.616] LOG: %cStart Phase MessagePhase color:green;
+[20:06:38.034] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:06:38.652] LOG: crit stage: +1
+[20:06:38.653] LOG: Move: Uproar (P) | Base damage: 25.314285714285717 | Power: 90 | Source attack: 34 | Target defense: 21
+[20:06:38.655] LOG: Move: Uproar (P) | Attack damage: 34
+[20:06:38.660] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:06:38.685] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:06:39.214] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[20:06:39.434] LOG: %cStart Phase MessagePhase color:green;
+[20:06:40.174] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:06:40.245] LOG: %cStart Phase FaintPhase color:green;
+[20:06:40.250] WARN: cry/155 not found
+[20:06:40.426] LOG: %cStart Phase MessagePhase color:green;
+[20:06:40.894] LOG: %cStart Phase MoveEndPhase color:green;
+[20:06:40.894] LOG: %cStart Phase MovePhase color:green;
+[20:06:40.894] LOG: %cStart Phase MoveEndPhase color:green;
+[20:06:40.895] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:06:40.896] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:06:40.896] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:06:40.896] LOG: %cStart Phase BerryPhase color:green;
+[20:06:40.898] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:06:40.899] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[20:06:41.100] LOG: %cStart Phase MessagePhase color:green;
+[20:06:41.882] LOG: %cStart Phase TurnEndPhase color:green;
+[20:06:41.883] LOG: %cStart Phase SwitchPhase color:green;
+[20:06:44.891] LOG: %cStart Phase SwitchSummonPhase color:green;
+[20:06:45.264] WARN: cry/10306 not found
+[20:06:45.558] LOG: %cStart Phase PostSummonPhase color:green;
+[20:06:45.558] LOG: Ran PSP for: Floette Blue
+[20:06:45.559] LOG: %cStart Phase PostSummonPhase color:green;
+[20:06:45.559] LOG: %cStart Phase TurnInitPhase color:green;
+[20:06:45.559] LOG: %cStart Phase CommandPhase color:green;
+[20:06:49.118] LOG: Move: FAIRY_WIND Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Floette Blue
+[20:06:49.126] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:06:49.134] LOG: Battle Seed: bUFIoj2O1pZx4ubM
+[20:06:49.135] LOG: Move Pool: ["Skitter Smack","Uproar (P)","Growl"]
+[20:06:49.135] LOG: Move Scores: [10.125,27,2]
+[20:06:49.136] LOG: Sorted Move Pool: ["Uproar (P)","Skitter Smack","Growl"]
+[20:06:49.136] LOG: Chosen Move: Uproar (P)
+[20:06:49.136] LOG: %cStart Phase TurnStartPhase color:green;
+[20:06:49.138] LOG: %cStart Phase MovePhase color:green;
+[20:06:49.138] LOG: %cUser: Floette Blue
+Move: FAIRY_WIND
+Use Mode: NORMAL color:orchid
+[20:06:49.141] LOG: %cStart Phase MessagePhase color:green;
+[20:06:49.549] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:06:49.633] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[20:06:49.676] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[20:06:49.710] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[20:06:49.739] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[20:06:49.773] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[20:06:49.816] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[20:06:49.834] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[20:06:49.893] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[20:06:49.950] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[20:06:50.483] LOG: crit stage: +0
+[20:06:50.484] LOG: Move: Fairy Wind | Base damage: 7.676521739130435 | Power: 40 | Source attack: 24 | Target defense: 23
+[20:06:50.485] LOG: Move: Fairy Wind | Attack damage: 10
+[20:06:50.489] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:06:50.516] LOG: %cStart Phase MoveEndPhase color:green;
+[20:06:50.517] LOG: %cStart Phase MovePhase color:green;
+[20:06:50.517] LOG: %cUser: Kricketune
+Move: UPROAR
+Use Mode: NORMAL color:orchid
+[20:06:50.519] LOG: %cStart Phase MessagePhase color:green;
+[20:06:50.948] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:06:51.573] LOG: crit stage: +1
+[20:06:51.574] LOG: Move: Uproar (P) | Base damage: 18.32 | Power: 90 | Source attack: 34 | Target defense: 30
+[20:06:51.574] LOG: Move: Uproar (P) | Attack damage: 27
+[20:06:51.575] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:06:51.600] LOG: %cStart Phase FaintPhase color:green;
+[20:06:51.603] WARN: cry/10306 not found
+[20:06:51.789] LOG: %cStart Phase MessagePhase color:green;
+[20:06:52.057] LOG: %cStart Phase MoveEndPhase color:green;
+[20:06:52.058] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:06:52.058] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:06:52.058] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:06:52.058] LOG: %cStart Phase BerryPhase color:green;
+[20:06:52.059] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:06:52.059] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[20:06:52.274] LOG: %cStart Phase MessagePhase color:green;
+[20:06:53.080] LOG: %cStart Phase TurnEndPhase color:green;
+[20:06:53.083] LOG: %cStart Phase SwitchPhase color:green;
+[20:06:54.989] LOG: %cStart Phase SwitchSummonPhase color:green;
+[20:06:55.640] LOG: %cStart Phase PostSummonPhase color:green;
+[20:06:55.640] LOG: Ran PSP for: Lechonk
+[20:06:55.640] LOG: %cStart Phase PostSummonPhase color:green;
+[20:06:55.640] LOG: %cStart Phase TurnInitPhase color:green;
+[20:06:55.641] LOG: %cStart Phase CommandPhase color:green;
+[20:06:56.905] LOG: Move: HYPER_FANG Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Lechonk
+[20:06:56.908] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:06:56.917] LOG: Battle Seed: bUFIoj2O1pZx4ubM
+[20:06:56.918] LOG: Move Pool: ["Skitter Smack","Uproar (P)","Growl"]
+[20:06:56.918] LOG: Move Scores: [21,27,2]
+[20:06:56.919] LOG: Sorted Move Pool: ["Uproar (P)","Skitter Smack","Growl"]
+[20:06:56.919] LOG: Chosen Move: Uproar (P)
+[20:06:56.919] LOG: %cStart Phase TurnStartPhase color:green;
+[20:06:56.922] LOG: %cStart Phase MovePhase color:green;
+[20:06:56.922] LOG: %cUser: Kricketune
+Move: UPROAR
+Use Mode: NORMAL color:orchid
+[20:06:56.925] LOG: %cStart Phase MessagePhase color:green;
+[20:06:57.323] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:06:57.925] LOG: crit stage: +1
+[20:06:57.926] LOG: Move: Uproar (P) | Base damage: 27.76842105263158 | Power: 90 | Source attack: 34 | Target defense: 19
+[20:06:57.926] LOG: Move: Uproar (P) | Attack damage: 39
+[20:06:57.927] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:06:57.957] LOG: %cStart Phase FaintPhase color:green;
+[20:06:59.180] LOG: %cStart Phase MessagePhase color:green;
+[20:07:38.034] LOG: %cStart Phase MoveEndPhase color:green;
+[20:07:38.048] LOG: %cStart Phase MovePhase color:green;
+[20:07:38.049] LOG: %cStart Phase MoveEndPhase color:green;
+[20:07:38.050] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:07:38.051] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:07:38.051] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:07:38.051] LOG: %cStart Phase BerryPhase color:green;
+[20:07:38.056] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:07:38.057] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[20:07:38.349] LOG: %cStart Phase MessagePhase color:green;
+[20:07:39.120] LOG: %cStart Phase TurnEndPhase color:green;
+[20:07:39.126] LOG: %cStart Phase SwitchPhase color:green;
+[20:07:41.438] LOG: %cStart Phase SwitchSummonPhase color:green;
+[20:07:42.106] LOG: %cStart Phase PostSummonPhase color:green;
+[20:07:42.107] LOG: Ran PSP for: Rookidee
+[20:07:42.107] LOG: %cStart Phase PostSummonPhase color:green;
+[20:07:42.108] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:07:42.624] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:07:43.262] LOG: %cStart Phase MessagePhase color:green;
+[20:07:43.989] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:07:44.071] LOG: %cStart Phase TurnInitPhase color:green;
+[20:07:44.072] LOG: %cStart Phase CommandPhase color:green;
+[20:07:46.317] LOG: Move: PECK Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Rookidee
+[20:07:46.322] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:07:46.329] LOG: Battle Seed: bUFIoj2O1pZx4ubM
+[20:07:46.334] LOG: Move Pool: ["Skitter Smack","Uproar (P)","Growl"]
+[20:07:46.334] LOG: Move Scores: [9.75,27,2]
+[20:07:46.335] LOG: Sorted Move Pool: ["Uproar (P)","Skitter Smack","Growl"]
+[20:07:46.335] LOG: Chosen Move: Uproar (P)
+[20:07:46.335] LOG: %cStart Phase TurnStartPhase color:green;
+[20:07:46.337] LOG: %cStart Phase MovePhase color:green;
+[20:07:46.337] LOG: %cUser: Kricketune
+Move: UPROAR
+Use Mode: NORMAL color:orchid
+[20:07:46.344] LOG: %cStart Phase MessagePhase color:green;
+[20:07:46.728] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:07:47.338] LOG: crit stage: +1
+[20:07:47.339] LOG: Move: Uproar (P) | Base damage: 29.2 | Power: 90 | Source attack: 34 | Target defense: 18
+[20:07:47.339] LOG: Move: Uproar (P) | Attack damage: 55
+[20:07:47.340] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:07:47.372] LOG: %cStart Phase MessagePhase color:green;
+[20:07:47.994] LOG: %cStart Phase FaintPhase color:green;
+[20:07:50.037] LOG: %cStart Phase MessagePhase color:green;
+[20:07:50.373] LOG: %cStart Phase MoveEndPhase color:green;
+[20:07:50.374] LOG: %cStart Phase MovePhase color:green;
+[20:07:50.374] LOG: %cStart Phase MoveEndPhase color:green;
+[20:07:50.374] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:07:50.374] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:07:50.374] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:07:50.374] LOG: %cStart Phase BerryPhase color:green;
+[20:07:50.378] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:07:50.378] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[20:07:50.579] LOG: %cStart Phase MessagePhase color:green;
+[20:07:51.368] LOG: %cStart Phase TurnEndPhase color:green;
+[20:07:51.370] LOG: %cStart Phase SwitchPhase color:green;
+[20:07:53.994] LOG: %cStart Phase SwitchSummonPhase color:green;
+[20:07:54.343] WARN: cry/722 not found
+[20:07:54.629] LOG: %cStart Phase PostSummonPhase color:green;
+[20:07:54.629] LOG: Ran PSP for: Rowlet
+[20:07:54.629] LOG: %cStart Phase PostSummonPhase color:green;
+[20:07:54.630] LOG: %cStart Phase TurnInitPhase color:green;
+[20:07:54.630] LOG: %cStart Phase CommandPhase color:green;
+[20:07:55.643] LOG: Move: PECK Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Rowlet
+[20:07:55.649] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:07:55.656] LOG: Battle Seed: bUFIoj2O1pZx4ubM
+[20:07:55.657] LOG: Move Pool: ["Uproar (P)","Growl"]
+[20:07:55.657] LOG: Move Scores: [27,2]
+[20:07:55.657] LOG: Sorted Move Pool: ["Uproar (P)","Growl"]
+[20:07:55.657] LOG: Chosen Move: Uproar (P)
+[20:07:55.657] LOG: %cStart Phase TurnStartPhase color:green;
+[20:07:55.660] LOG: %cStart Phase MovePhase color:green;
+[20:07:55.660] LOG: %cUser: Kricketune
+Move: UPROAR
+Use Mode: NORMAL color:orchid
+[20:07:55.665] LOG: %cStart Phase MessagePhase color:green;
+[20:07:56.110] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:07:56.731] LOG: crit stage: +1
+[20:07:56.737] LOG: Move: Uproar (P) | Base damage: 30.8 | Power: 90 | Source attack: 34 | Target defense: 17
+[20:07:56.738] LOG: Move: Uproar (P) | Attack damage: 59
+[20:07:56.739] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:07:56.763] LOG: %cStart Phase MessagePhase color:green;
+[20:07:57.409] LOG: %cStart Phase FaintPhase color:green;
+[20:07:57.427] WARN: cry/722 not found
+[20:07:57.603] LOG: %cStart Phase MessagePhase color:green;
+[20:07:57.885] LOG: %cStart Phase GameOverPhase color:green;
+[20:08:00.467] LOG: Getting Session Slot id: %d 0
+[20:08:00.531] LOG: %cStart Phase PostGameOverPhase color:green;
+[20:08:00.697] DEBUG: Session data saved to slot 0!
+[20:08:01.427] LOG: Seed: VSSnqPkRB0EGNApUFcH5m5cv
+[20:08:01.427] LOG: Wave Seed: VSSnqPkRB0EGNApUFcH5m5cv 0
+[20:08:01.465] LOG: %cStart Phase TitlePhase color:green;
+[20:08:01.621] LOG: use seasonal splash messages true
+[20:08:01.623] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[20:08:06.880] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:08:26.021] LOG: %cStart Phase TitlePhase color:green;
+[20:08:26.083] LOG: use seasonal splash messages true
+[20:08:26.088] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[20:08:30.117] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:08:52.958] WARN: cry/155 not found
+[20:08:56.061] WARN: cry/7 not found
+[20:09:03.069] WARN: cry/722 not found
+[20:09:07.811] LOG: Getting Session Slot id: %d 0
+[20:09:07.864] LOG: Getting Session Slot id: %d 1
+[20:09:07.873] LOG: Getting Session Slot id: %d 2
+[20:09:07.881] LOG: Getting Session Slot id: %d 3
+[20:09:07.889] LOG: Getting Session Slot id: %d 4
+[20:09:08.148] ERROR: Invalid save data JSON detected! Session not found.
+[20:09:08.150] ERROR: Invalid save data JSON detected! Session not found.
+[20:09:08.151] ERROR: Invalid save data JSON detected! Session not found.
+[20:09:08.155] ERROR: Invalid save data JSON detected! Session not found.
+[20:09:08.156] ERROR: Invalid save data JSON detected! Session not found.
+[20:09:10.676] LOG: Wave Seed: WTTorQlSC1FHOBqVGdI6n6dw 1
+[20:09:10.681] LOG: %cStart Phase EncounterPhase color:green;
+[20:09:10.701] LOG: Starting species pool tier: UNCOMMON
+[20:09:10.752] LOG: Pokemon: Wild Oddish | Species ID: 43 | Level: 2 | Nature: Jolly (+Spd/-SpAtk)
+[20:09:10.754] LOG: Stats (IVs): HP: 14 (14), Atk: 7 (9), Def: 7 (10), Spatk: 7 (19), Spdef: 8 (25), Spd: 7 (27)
+[20:09:10.755] LOG: Ability: Chloroplast | Passive Ability: Regenerator 
+[20:09:10.755] LOG: Moveset: ["Acid","Mega Drain","Poison Powder","Sweet Scent"]
+[20:09:10.933] DEBUG: Session data saved to slot 0!
+[20:09:10.939] LOG: Wave Seed: WTTorQlSC1FHOBqVGdI6n6dw 1
+[20:09:12.333] LOG: %cStart Phase SummonPhase color:green;
+[20:09:12.915] WARN: cry/155 not found
+[20:09:13.247] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[20:09:13.249] LOG: %cStart Phase CheckSwitchPhase color:green;
