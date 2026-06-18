@@ -64,7 +64,10 @@ export class SelectBiomePhase extends BattlePhase {
         // when a Map Upgrade item actually reveals it; we no longer surface locked
         // "???" placeholders, so a player with no Map Upgrade never sees an
         // upgrade slot (the #542 fix for "I get the map-upgrade node regardless").
-        globalScene.ui.setMode(UiMode.ER_MAP_PICKER, {
+        // Use the full World Map screen (journey chain + biome thumbnails) as the
+        // route chooser, in pick mode - the same view the J hotkey shows, but here
+        // the onward tiles are selectable (#486: "let me pick from the world map").
+        globalScene.ui.setMode(UiMode.ER_MAP, {
           nodes: revealed,
           origin: currentBiome,
           onSelect: (biome: BiomeId) => this.setNextBiomeAndEnd(biome),

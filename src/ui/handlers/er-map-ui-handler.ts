@@ -76,6 +76,21 @@ export class ErMapUiHandler extends UiHandler {
   /** Left index of the visible journey window (scrolls when history overflows). */
   private scroll = 0;
 
+  // --- Pick mode (the biome-transition route chooser) ---------------------
+  /** True when opened as the LEAVE-biome route picker (selectable), not the
+   * read-only J overlay. */
+  private pickMode = false;
+  /** Fired with the chosen onward biome when the player confirms (pick mode). */
+  private onPick: ((biome: BiomeId) => void) | null = null;
+  /** Cursor index into {@linkcode onward} while picking. */
+  private pickCursor = 0;
+  /** Screen-x of each drawn onward tile (parallel to the visible onward slice). */
+  private onwardTileX: number[] = [];
+  /** Screen-y of the onward tile row (set during refresh). */
+  private onwardRowY = 0;
+  /** Gold selection box around the cursored onward tile (pick mode). */
+  private pickRing: Phaser.GameObjects.Rectangle;
+
   /** How many journey tiles fit across the panel. */
   private static readonly VISIBLE = Math.floor((PANEL_W - 20) / (TILE_W + TILE_GAP));
   private static readonly JOURNEY_Y = 56;
@@ -149,19 +164,47 @@ export class ErMapUiHandler extends UiHandler {
     this.hintText.setTint(DIM);
     this.card.add(this.hintText);
 
+    // Selection box for pick mode (sized to a tile; positioned per cursor move).
+    this.pickRing = globalScene.add.rectangle(0, 0, TILE_W + 6, TILE_H + 6, 0xffffff, 0).setOrigin(0.5);
+    this.pickRing.setStrokeStyle(2, GOLD);
+    this.pickRing.setVisible(false);
+    this.card.add(this.pickRing);
+
     installErMapHotkey();
   }
 
   show(args: any[]): boolean {
     super.show(args);
-    this.onClose = args.length > 0 && typeof args[0] === "function" ? (args[0] as ErMapCloseCallback) : null;
     this.resolved = false;
+    this.pickCursor = 0;
+
+    const arg0 = args.length > 0 ? args[0] : null;
+    const pickCfg =
+      arg0 && typeof arg0 === "object" && typeof arg0.onSelect === "function"
+        ? (arg0 as { nodes?: ErRouteNode[]; onSelect: (biome: BiomeId) => void })
+        : null;
 
     this.history = getErBiomeHistory();
-    // Onward routes = the revealed next-biome nodes the routing graph rolled for
-    // this biome (the SAME set the route picker offers at the transition). These
-    // are the tentative paths you can take next; drawn with dashed branches below.
-    this.onward = getErPendingNodes().filter(n => n.revealed);
+    if (pickCfg) {
+      // PICK MODE: the leave-biome route chooser. Same visual map, but the onward
+      // tiles are selectable (you pick where to travel next).
+      this.pickMode = true;
+      this.onPick = pickCfg.onSelect;
+      this.onClose = null;
+      this.onward = (pickCfg.nodes ?? []).filter(n => n.revealed);
+      this.headerText.setText("Choose your route");
+      this.hintText.setText("< > Choose    A: Travel");
+    } else {
+      // VIEW MODE: the read-only J overlay.
+      this.pickMode = false;
+      this.onPick = null;
+      this.onClose = typeof arg0 === "function" ? (arg0 as ErMapCloseCallback) : null;
+      // Onward routes = the revealed next-biome nodes the routing graph rolled for
+      // this biome (the SAME set the picker offers); drawn as dashed branches.
+      this.onward = getErPendingNodes().filter(n => n.revealed);
+      this.headerText.setText("World Map");
+      this.hintText.setText("< > Scroll    B: Close");
+    }
 
     const frags = getTreasureFragments();
     this.fragmentText.setText(`Treasure-Map Fragments: ${frags} / ${TREASURE_FRAGMENTS_FOR_REWARD}`);
@@ -288,12 +331,15 @@ export class ErMapUiHandler extends UiHandler {
       const oRowW = onwardCount * TILE_W + Math.max(0, onwardCount - 1) * TILE_GAP;
       const oStartX = (PANEL_W - oRowW) / 2 + TILE_W / 2;
       const oy = ErMapUiHandler.ROUTES_Y;
+      this.onwardRowY = oy;
+      this.onwardTileX = [];
       // Branch hub: a point just below the current journey tile that the dashed
       // routes fan out from.
       const hubX = tileX.at(-1) ?? PANEL_W / 2;
       const hubY = cy + TILE_H / 2 + 6;
       for (let i = 0; i < onwardCount; i++) {
         const cx = oStartX + i * (TILE_W + TILE_GAP);
+        this.onwardTileX.push(cx);
         const node = this.onward[i];
         const color = routeColor(node.source);
         // Dashed branch from the hub to this onward tile (a not-yet-taken path).
@@ -325,8 +371,14 @@ export class ErMapUiHandler extends UiHandler {
         this.transient.push(name);
       }
       this.routesLabel.setVisible(true);
+      if (this.pickMode) {
+        this.placePickCursor();
+      } else {
+        this.pickRing.setVisible(false);
+      }
     } else {
       this.routesLabel.setVisible(false);
+      this.pickRing.setVisible(false);
     }
 
     // Empty state: a brand-new run with nothing to show yet.
@@ -337,10 +389,54 @@ export class ErMapUiHandler extends UiHandler {
     }
   }
 
+  /** Position the gold selection box on the cursored onward tile (pick mode). */
+  private placePickCursor(): void {
+    const count = this.onwardTileX.length;
+    if (count === 0) {
+      this.pickRing.setVisible(false);
+      return;
+    }
+    this.pickCursor = Math.max(0, Math.min(this.pickCursor, count - 1));
+    this.pickRing.setPosition(this.onwardTileX[this.pickCursor], this.onwardRowY);
+    this.pickRing.setVisible(true);
+    this.card.bringToTop(this.pickRing);
+  }
+
   processInput(button: Button): boolean {
     if (this.resolved) {
       return false;
     }
+    // PICK MODE: Left/Right move the route cursor; ACTION travels; no cancel.
+    if (this.pickMode) {
+      switch (button) {
+        case Button.LEFT:
+          if (this.pickCursor > 0) {
+            this.pickCursor--;
+            this.placePickCursor();
+            globalScene.ui.playSelect();
+          }
+          return true;
+        case Button.RIGHT:
+          if (this.pickCursor < this.onwardTileX.length - 1) {
+            this.pickCursor++;
+            this.placePickCursor();
+            globalScene.ui.playSelect();
+          }
+          return true;
+        case Button.ACTION: {
+          const node = this.onward[this.pickCursor];
+          if (node) {
+            this.confirmPick(node.biome);
+          }
+          return true;
+        }
+        case Button.CANCEL:
+          // No backing out - the run needs a next biome.
+          return true;
+      }
+      return false;
+    }
+    // VIEW MODE: Left/Right scroll the journey; ACTION/CANCEL close.
     switch (button) {
       case Button.LEFT:
         if (this.scroll > 0) {
@@ -366,6 +462,21 @@ export class ErMapUiHandler extends UiHandler {
     return false;
   }
 
+  /** Confirm the chosen onward biome (pick mode) and hand control back. */
+  private confirmPick(biome: BiomeId): void {
+    if (this.resolved) {
+      return;
+    }
+    this.resolved = true;
+    this.active = false;
+    globalScene.ui.playSelect();
+    const cb = this.onPick;
+    this.onPick = null;
+    // Return the UI to MESSAGE before the biome-switch flow runs, then deliver.
+    globalScene.ui.setMode(UiMode.MESSAGE);
+    cb?.(biome);
+  }
+
   private close(): void {
     if (this.resolved) {
       return;
@@ -388,9 +499,13 @@ export class ErMapUiHandler extends UiHandler {
     this.transient = [];
     this.graphics.clear();
     this.onClose = null;
+    this.onPick = null;
+    this.pickMode = false;
+    this.pickRing.setVisible(false);
     this.resolved = false;
     this.history = [];
     this.onward = [];
+    this.onwardTileX = [];
   }
 }
 

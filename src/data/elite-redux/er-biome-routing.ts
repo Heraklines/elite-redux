@@ -134,6 +134,9 @@ export function revealAllErPendingNodes(): number {
   for (const node of pendingNodes) {
     if (!node.revealed) {
       node.revealed = true;
+      // It was a mystery EVENT (the Observatory) that surfaced this node, not a
+      // Map Upgrade item - so colour it as event (blue), not upgrade (green).
+      node.source = "event";
       revealed++;
     }
   }
