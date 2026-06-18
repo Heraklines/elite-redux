@@ -1019,6 +1019,63 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Abyss: Seven Sins / The Bargain (#544)",
+    description:
+      "#544 - The Bargain (Abyss Seven Sins). Forces ER_THE_BARGAIN (a NEW ER event,\n"
+      + "separate from the vanilla Dark Deal). Giratina Origin (the\n"
+      + "six-winged form) offers 3 RANDOM Sins of 7, plus Leave. All sins are save-safe and the\n"
+      + "party NEVER exceeds 6 (the 7th-slot mechanic is parked).\n"
+      + "DO: read Giratina's dialogue, then take each Sin across repeat runs to see all 7.\n"
+      + "EXPECT per Sin:\n"
+      + " - Greed: empty a mon's candy -> money + a Greater Golden Ball (+2 reward picks).\n"
+      + " - Gluttony: give up 1 mon for the run -> a Legendary Egg in your egg list.\n"
+      + " - Pride: pick the SHINY Garchomp -> it loses its shine + Luck -> +30% to a stat\n"
+      + "   you choose (visible on its summary).\n"
+      + " - Wrath: curse a random stat on one mon (-10%) -> +20% to another mon's best stat.\n"
+      + " - Envy: strip all items off Garchomp (holds 3) -> choose a relic. CURSED IDOL =\n"
+      + "   first mon out each battle gets a FREE Substitute, the next entrant arrives at\n"
+      + "   half HP (verify in the next fight).\n"
+      + " - Sloth: 2 chosen mons drop to Lv 1 + lose candy -> COVENANT OF REST relic (full\n"
+      + "   team heal every 7th wave).\n"
+      + " - Lust: a random stat is cursed across the WHOLE team -> a black-shiny reroll on\n"
+      + "   a chosen mon (it turns black shiny).\n"
+      + "Leave = Giratina's parting line, no cost. Party: shiny Garchomp + 3-item holder,\n"
+      + "all Lv 30 so every Sin is offerable.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 32,
+        STARTING_BIOME_OVERRIDE: BiomeId.ABYSS,
+        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
+        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_THE_BARGAIN,
+        STARTING_HELD_ITEMS_OVERRIDE: [
+          { name: "LEFTOVERS" },
+          { name: "SOUL_DEW" },
+          { name: "BERRY", type: BerryType.SITRUS },
+        ],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          shiny: true,
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.REST, MoveId.SLEEP_TALK],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.SURF, MoveId.NUZZLE, MoveId.QUICK_ATTACK],
+        }),
+        makeStarter(SpeciesId.EEVEE, {
+          moveset: [MoveId.SWIFT, MoveId.BITE, MoveId.QUICK_ATTACK, MoveId.HELPING_HAND],
+        }),
+      ];
+    },
+  },
+  {
     label: "ER Swamp: The Sinking Mire (#509)",
     description:
       "#509 - The Sinking Mire (Swamp read-the-typing). Forces ER_SINKING_MIRE in\n"

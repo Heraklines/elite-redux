@@ -71,6 +71,7 @@ import { SlumberingSnorlaxEncounter } from "#mystery-encounters/slumbering-snorl
 import { StillWatersEncounter } from "#mystery-encounters/still-waters-encounter";
 import { SunkenVesselEncounter } from "#mystery-encounters/sunken-vessel-encounter";
 import { TeleportingHijinksEncounter } from "#mystery-encounters/teleporting-hijinks-encounter";
+import { TheBargainEncounter } from "#mystery-encounters/the-bargain-encounter";
 import { TheExpertPokemonBreederEncounter } from "#mystery-encounters/the-expert-pokemon-breeder-encounter";
 import { TheMirageEncounter } from "#mystery-encounters/the-mirage-encounter";
 import { ThePokemonSalesmanEncounter } from "#mystery-encounters/the-pokemon-salesman-encounter";
@@ -336,7 +337,7 @@ export const mysteryEncountersByBiome = new Map<BiomeId, MysteryEncounterType[]>
       MysteryEncounterType.ER_SCAVENGERS_PACT,
     ],
   ],
-  [BiomeId.ABYSS, [MysteryEncounterType.DANCING_LESSONS]],
+  [BiomeId.ABYSS, [MysteryEncounterType.DANCING_LESSONS, MysteryEncounterType.ER_THE_BARGAIN]],
   [
     BiomeId.SPACE,
     [
@@ -458,6 +459,7 @@ export function initMysteryEncounters() {
   allMysteryEncounters[MysteryEncounterType.ER_GREAT_FORGE] = GreatForgeEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_FABRICATOR] = FabricatorEncounter;
   allMysteryEncounters[MysteryEncounterType.ER_INNATE_SHRINE] = InnateShrineEncounter;
+  allMysteryEncounters[MysteryEncounterType.ER_THE_BARGAIN] = TheBargainEncounter;
 
   // Add extreme encounters to biome map
   extremeBiomeEncounters.forEach(encounter => {

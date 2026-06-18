@@ -39,6 +39,8 @@ export class MysteryEncounterSpriteConfig {
   fileRoot: (KnownFileRoot & string) | string;
   /** Optional replacement for `spriteKey`/`fileRoot`. Just know this defaults to male/genderless, form 0, no shiny */
   species?: SpeciesId;
+  /** When using a `species` sprite, which form index to render (e.g. Giratina Origin = 1). Defaults to 0. */
+  formIndex?: number;
   /** Enable shadow. Defaults to `false` */
   hasShadow?: boolean = false;
   /** Disable animation. Defaults to `false` */
@@ -97,7 +99,13 @@ export class MysteryEncounterIntroVisuals extends Phaser.GameObjects.Container {
       };
 
       if (result.species != null) {
-        const keys = getSpriteKeysFromSpecies(result.species, undefined, undefined, result.isShiny, result.variant);
+        const keys = getSpriteKeysFromSpecies(
+          result.species,
+          undefined,
+          result.formIndex,
+          result.isShiny,
+          result.variant,
+        );
         result.spriteKey = keys.spriteKey;
         result.fileRoot = keys.fileRoot;
         result.isPokemon = true;

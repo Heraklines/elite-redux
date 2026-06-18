@@ -225,4 +225,8 @@ export enum MysteryEncounterType {
    * (dialogue beats authored by the model). Never appears in `allMysteryEncounters`
    * — the encounter instance is pre-set on `currentBattle.mysteryEncounter`. */
   LLM_DIRECTED,
+  /** ER Abyss "Seven Sins": Giratina Origin's bargain. Shows 3 random Sins of 7
+   * (run-scoped cost->payoff), plus Leave. A SEPARATE event from the vanilla
+   * DARK_DEAL (which is untouched). Appended last to keep enum values stable. */
+  ER_THE_BARGAIN,
 }

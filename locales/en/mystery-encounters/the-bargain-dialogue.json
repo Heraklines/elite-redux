@@ -1,0 +1,77 @@
+{
+  "intro": "The dark folds inward. Something vast uncoils where there should be nothing, and a voice older than light settles over you.",
+  "speaker": "Giratina",
+  "introDialogue": "So. A human wanders into my hollow.$How rare. How convenient.$I deal in what you cannot afford to give, and grant what you cannot bear to refuse.$Lay your treasures where I can see them, little thing. Choose.",
+  "title": "The Bargain",
+  "description": "A vast presence coils in the dark and offers a choice of cruel bargains. Every gift it grants has its price.",
+  "query": "Which bargain will you strike?",
+  "option": {
+    "1": {
+      "label": "{{sin1Name}}",
+      "tooltip": "{{sin1Tooltip}}",
+      "selected": "{{sin1Offer}}"
+    },
+    "2": {
+      "label": "{{sin2Name}}",
+      "tooltip": "{{sin2Tooltip}}",
+      "selected": "{{sin2Offer}}"
+    },
+    "3": {
+      "label": "{{sin3Name}}",
+      "tooltip": "{{sin3Tooltip}}",
+      "selected": "{{sin3Offer}}"
+    },
+    "leave": {
+      "label": "Leave",
+      "tooltip": "(-) Strike no bargain and depart.",
+      "line1": "Leaving? With your hands so full of things to lose?",
+      "line2": "The dark does not follow. It does not need to.",
+      "line3": "Come back when you have less."
+    }
+  },
+  "sins": {
+    "greed": {
+      "name": "Greed",
+      "tooltip": "(-) Empty a Pokémon's candy hoard\n(+) A surge of money and a Greater Golden Ball",
+      "offer": "Pour out their sweetness, every grain. And watch your pockets overflow.",
+      "result": "Giratina drinks the sweetness from {{pokeName}}. Coins spill out of the dark and into your hands."
+    },
+    "gluttony": {
+      "name": "Gluttony",
+      "tooltip": "(-) Give up one Pokémon for the rest of the run\n(+) A Legendary Egg",
+      "offer": "Feed me one. Whole. In its place I will leave you... potential.",
+      "result": "{{pokeName}} is drawn into the black and does not return. In your bag, an egg pulses with cold light."
+    },
+    "pride": {
+      "name": "Pride",
+      "tooltip": "(-) Dull a shiny Pokémon, losing its shine and Luck\n(+) +30% to one stat you choose",
+      "offer": "That one shines so proudly. Let me take the light. The power beneath will more than repay it.",
+      "result": "The light leaves {{pokeName}}. Something heavier settles in its place."
+    },
+    "wrath": {
+      "name": "Wrath",
+      "tooltip": "(-) Curse a random stat on one Pokémon\n(+) Strengthen another Pokémon's best stat",
+      "offer": "Wound the one to feed the other. Pain is only strength, moved to a better home.",
+      "result": "A wound opens in {{pokeName}}. Its strength surfaces, screaming, in another."
+    },
+    "envy": {
+      "name": "Envy",
+      "tooltip": "(-) Strip all held items from a Pokémon (needs 3+)\n(+) Choose a powerful relic",
+      "offer": "Strip it bare. What it clutched will buy you something far more interesting.",
+      "result": "{{pokeName}} is stripped bare. The dark presses a relic into your palm."
+    },
+    "sloth": {
+      "name": "Sloth",
+      "tooltip": "(-) Two Pokémon drop to Lv 1 and lose all candy\n(+) Covenant of Rest: full heal every 7 waves",
+      "offer": "Why struggle so? Rest. I will see your weary ones mended, again and again. You need only fall... a little behind.",
+      "result": "Two of yours are emptied to nothing. But the dark promises rest, again and again."
+    },
+    "lust": {
+      "name": "Lust",
+      "tooltip": "(-) Curse a random stat across your whole team\n(+) A black-shiny reroll on one Pokémon",
+      "offer": "Let the wanting spread through them all. And one of yours will return... beautiful, and wrong.",
+      "result": "A craving taints the whole team. The chosen one returns wrong, and beautiful, wreathed in black."
+    }
+  },
+  "outro": "The presence withdraws, satisfied in a way you cannot name. The dark loosens its grip, and lets you pass."
+}
