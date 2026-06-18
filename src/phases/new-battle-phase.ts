@@ -1,5 +1,8 @@
 import { globalScene } from "#app/global-scene";
 import { erBiomeWaveSkipChance } from "#data/elite-redux/er-biome-encounters";
+import { erBiomeOverstay } from "#data/elite-redux/er-biome-notoriety";
+import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
+import { erInLateGameZone, erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
 import { BattleType } from "#enums/battle-type";
 import { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
@@ -83,12 +86,15 @@ export class NewBattlePhase extends BattlePhase {
     if (!battle || globalScene.arena?.biomeId !== BiomeId.DESERT) {
       return false;
     }
+    // `wave` is the wave being skipped (newBattle already advanced to it, so
+    // battleType / ME-ness are resolved and the gates below are accurate).
     const wave = battle.waveIndex;
     if (
       wave % 10 === 0
       || globalScene.gameMode.isFixedBattle(wave)
       || battle.battleType === BattleType.TRAINER
       || battle.isBattleMysteryEncounter()
+      || erInLateGameZone(wave) // never skip near the finale (vanilla cadence resumes)
     ) {
       return false;
     }
@@ -103,10 +109,35 @@ export class NewBattlePhase extends BattlePhase {
     if (!skip) {
       return false;
     }
-    // Empty wave: drop the queued encounter and roll straight on to the next wave.
+    // EMPTY WAVE. Drop the encounter doPostBattleCleanup just queued for this wave
+    // (and the new-biome path's LevelCapPhase), show the flavor line, then roll on.
     globalScene.phaseManager.removeAllPhasesOfType("NextEncounterPhase");
     globalScene.phaseManager.removeAllPhasesOfType("NewBiomeEncounterPhase");
+    globalScene.phaseManager.removeAllPhasesOfType("LevelCapPhase");
     globalScene.phaseManager.pushNew("MessagePhase", "The desert stretches on. Nothing stirs out here.", null, true);
+
+    // CRITICAL: a skipped wave bypasses VictoryPhase, so we must replicate its
+    // biome-transition tail here (minus the reward/shop/heal half, which only
+    // fires on x0 waves the skip already excludes). Without this the biome-end /
+    // every-5 Crossroads accounting desyncs and biome changes fire on the wrong
+    // waves. Mirrors victory-phase.ts (the biomeEnding / crossroads / notoriety
+    // block); keep the two aligned.
+    const erRouting = erBiomeRoutingActive();
+    const biomeEnding = globalScene.isNewBiome();
+    if (biomeEnding) {
+      globalScene.phaseManager.pushNew("SelectBiomePhase");
+    } else if (erRouting && erShouldRaiseCrossroads(wave) && !globalScene.gameMode.isFixedBattle(wave + 1)) {
+      globalScene.phaseManager.pushNew("ErCrossroadsPhase");
+    }
+    if (erRouting && !biomeEnding && erBiomeOverstay(wave + 1) === 1) {
+      globalScene.phaseManager.pushNew(
+        "MessagePhase",
+        "Word of your lingering has spread, and you are gaining notoriety here. The longer you stay, the more hostile this place will grow.",
+        null,
+        true,
+      );
+    }
+
     globalScene.phaseManager.pushNew("NewBattlePhase");
     return true;
   }
