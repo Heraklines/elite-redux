@@ -118,6 +118,7 @@ export function erGemItemType(type: PokemonType): ModifierType {
   Object.defineProperty(mt, "name", { get: () => name, configurable: true });
   mt.getDescription = () =>
     `Boosts the power of the holder's first ${PokemonType[type].toLowerCase()}-type move by 30%, then shatters.`;
+  mt.setTier(ER_GEM_TIER);
   return mt;
 }
 

@@ -133,6 +133,7 @@ export function erSeedItemType(kind: ErSeedKind): ModifierType {
   const mt = new PokemonHeldItemModifierType("", cfg.icon, (t, args) => new ErSeedModifier(t, (args[0] as Pokemon).id, kind));
   Object.defineProperty(mt, "name", { get: () => cfg.name, configurable: true });
   mt.getDescription = () => cfg.description;
+  mt.setTier(ER_SEED_TIER);
   return mt;
 }
 

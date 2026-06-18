@@ -11,9 +11,12 @@ import { getDailyEventSeedLuck } from "#data/daily-seed/daily-run";
 import { allMoves, modifierTypes } from "#data/data-lists";
 import { erBiomeShopResolveTier, erBiomeTierPrice, rollErBiomeShopStock } from "#data/elite-redux/er-biome-economy";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
+import { erGemItemType } from "#data/elite-redux/er-elemental-gems";
 import { getErTemporaryLuck } from "#data/elite-redux/er-fairy-luck";
 import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-stones";
+import { erReactiveItemType } from "#data/elite-redux/er-reactive-items";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
+import { erSeedItemType } from "#data/elite-redux/er-terrain-seeds";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { getPokeballCatchMultiplier, getPokeballName } from "#data/pokeball";
@@ -2156,6 +2159,39 @@ const modifierTypeInitObj = Object.freeze({
   ER_LUCKY_HEART: () => erCommunityItemModifierType("luckyHeart"),
   ER_OMNI_GEM: () => erCommunityItemModifierType("omniGem"),
   ER_POWER_HERB: () => erCommunityItemModifierType("powerHerb"),
+
+  // ER reactive held items (Ultra-ball tier).
+  ER_CELL_BATTERY: () => erReactiveItemType("cellBattery"),
+  ER_ABSORB_BULB: () => erReactiveItemType("absorbBulb"),
+  ER_SNOWBALL: () => erReactiveItemType("snowball"),
+  ER_LUMINOUS_MOSS: () => erReactiveItemType("luminousMoss"),
+  ER_WEAKNESS_POLICY: () => erReactiveItemType("weaknessPolicy"),
+
+  // ER terrain seeds (Great-ball tier).
+  ER_ELECTRIC_SEED: () => erSeedItemType("electricSeed"),
+  ER_GRASSY_SEED: () => erSeedItemType("grassySeed"),
+  ER_MISTY_SEED: () => erSeedItemType("mistySeed"),
+  ER_PSYCHIC_SEED: () => erSeedItemType("psychicSeed"),
+
+  // ER elemental gems (18 types; Great-ball tier).
+  ER_NORMAL_GEM: () => erGemItemType(PokemonType.NORMAL),
+  ER_FIRE_GEM: () => erGemItemType(PokemonType.FIRE),
+  ER_WATER_GEM: () => erGemItemType(PokemonType.WATER),
+  ER_ELECTRIC_GEM: () => erGemItemType(PokemonType.ELECTRIC),
+  ER_GRASS_GEM: () => erGemItemType(PokemonType.GRASS),
+  ER_ICE_GEM: () => erGemItemType(PokemonType.ICE),
+  ER_FIGHTING_GEM: () => erGemItemType(PokemonType.FIGHTING),
+  ER_POISON_GEM: () => erGemItemType(PokemonType.POISON),
+  ER_GROUND_GEM: () => erGemItemType(PokemonType.GROUND),
+  ER_FLYING_GEM: () => erGemItemType(PokemonType.FLYING),
+  ER_PSYCHIC_GEM: () => erGemItemType(PokemonType.PSYCHIC),
+  ER_BUG_GEM: () => erGemItemType(PokemonType.BUG),
+  ER_ROCK_GEM: () => erGemItemType(PokemonType.ROCK),
+  ER_GHOST_GEM: () => erGemItemType(PokemonType.GHOST),
+  ER_DRAGON_GEM: () => erGemItemType(PokemonType.DRAGON),
+  ER_DARK_GEM: () => erGemItemType(PokemonType.DARK),
+  ER_STEEL_GEM: () => erGemItemType(PokemonType.STEEL),
+  ER_FAIRY_GEM: () => erGemItemType(PokemonType.FAIRY),
   ER_ABILITY_CAPSULE: () => new ErAbilityCapsuleModifierType(),
   ER_LEARNERS_SHROOM: () => new ErLearnersShroomModifierType(),
   ER_DEX_NAV: () => new ErDexNavModifierType(),

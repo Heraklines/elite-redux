@@ -178,6 +178,8 @@ export function erReactiveItemType(kind: ErReactiveKind): ModifierType {
   );
   Object.defineProperty(type, "name", { get: () => cfg.name, configurable: true });
   type.getDescription = () => cfg.description;
+  // Pin the tier so the reward UI renders a ball sprite (undefined tier -> blank).
+  type.setTier(ER_REACTIVE_TIER);
   return type;
 }
 
