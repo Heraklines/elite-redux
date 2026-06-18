@@ -10,7 +10,7 @@ import {
   NOTORIETY_MAX_BST_BONUS,
   NOTORIETY_MAX_OVER_LEVEL,
 } from "#data/elite-redux/er-biome-notoriety";
-import { erRollBiomeLength, resetErBiomeStructure } from "#data/elite-redux/er-biome-structure";
+import { erMarkBiomeStay, erRollBiomeLength, resetErBiomeStructure } from "#data/elite-redux/er-biome-structure";
 import { BiomeId } from "#enums/biome-id";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -24,10 +24,38 @@ describe("ER #504 - biome notoriety / overstay escalation", () => {
     Phaser.Math.RND = new Phaser.Math.RandomDataGenerator(["er-biome-notoriety-test"]);
   });
 
-  /** Enter a biome at `startWave` so wavesSinceEnteredBiome reflects overstay. */
+  /**
+   * Enter a biome at `startWave` AND simulate the player deliberately choosing to
+   * stay at the free-window-edge Crossroads (in-biome wave 10) - which is what now
+   * arms notoriety (#504 fix). The armed anchor sits at startWave + 9, so overstay
+   * at wave W is W - (startWave + 9), matching the old free-window-edge behavior.
+   */
   function enterBiomeAt(startWave: number): void {
     erRollBiomeLength(BiomeId.CAVE, startWave);
+    erMarkBiomeStay(startWave + NOTORIETY_FREE_WAVES - 1);
   }
+
+  it("NO notoriety from normal traversal - only a deliberate stay arms it (#504 fix)", () => {
+    // Enter a biome and progress DEEP into it WITHOUT choosing to stay at a
+    // Crossroads. Even far past the old free window, notoriety must stay zero -
+    // this is the fix for "a random grunt 20 levels over me" with no overstay.
+    erRollBiomeLength(BiomeId.CAVE, 1);
+    expect(erBiomeOverstay(25)).toBe(0);
+    expect(erHasNotoriety(25)).toBe(false);
+    expect(erNotorietyOverLevel(25)).toBe(0);
+    expect(erNotorietyBstBonus(25)).toBe(0);
+    // Now the player deliberately stays at the wave-10 Crossroads: notoriety arms.
+    erMarkBiomeStay(10);
+    expect(erBiomeOverstay(25)).toBeGreaterThan(0);
+    expect(erHasNotoriety(25)).toBe(true);
+  });
+
+  it("a stay INSIDE the free window does not arm notoriety", () => {
+    erRollBiomeLength(BiomeId.CAVE, 1);
+    erMarkBiomeStay(5); // in-biome wave 5, still inside the free window
+    expect(erBiomeOverstay(15)).toBe(0);
+    expect(erHasNotoriety(15)).toBe(false);
+  });
 
   it("no overstay within the free window (first 10 in-biome waves)", () => {
     enterBiomeAt(1);

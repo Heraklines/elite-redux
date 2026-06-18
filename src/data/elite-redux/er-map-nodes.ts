@@ -21,6 +21,7 @@
 
 import { getErPrevBiome, resetErRouting, restoreErRouting } from "#data/elite-redux/er-biome-routing";
 import {
+  erBiomeOverstayAnchor,
   getErBiomeLength,
   getErBiomeStartWave,
   resetErBiomeStructure,
@@ -145,6 +146,9 @@ export interface ErMapSaveData {
   biomeLength?: number | null;
   /** ER (#486) structure: the wave the current biome was entered on. */
   biomeStartWave?: number;
+  /** ER (#504) notoriety: the wave the player armed overstay (chose to linger past
+   * the free window), or null/undefined if they never did. */
+  biomeOverstayAnchor?: number | null;
 }
 
 /** Snapshot the current map state for the session save (#486 increment 2). */
@@ -156,6 +160,7 @@ export function getErMapSaveData(): ErMapSaveData {
     prevBiome: getErPrevBiome(),
     biomeLength: getErBiomeLength(),
     biomeStartWave: getErBiomeStartWave(),
+    biomeOverstayAnchor: erBiomeOverstayAnchor(),
   };
 }
 
@@ -191,5 +196,8 @@ export function restoreErMapState(data: ErMapSaveData | undefined | null, curren
     // pins biome notoriety to its max. Anchor to the CURRENT wave instead (zero
     // overstay), which self-heals on the next biome transition.
     typeof data.biomeStartWave === "number" ? data.biomeStartWave : currentWaveIndex,
+    // Restore the deliberate-overstay anchor. Absent (older save) = null = no
+    // notoriety, which is the safe default (the player was not penalized).
+    typeof data.biomeOverstayAnchor === "number" ? data.biomeOverstayAnchor : null,
   );
 }

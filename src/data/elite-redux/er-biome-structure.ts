@@ -66,12 +66,21 @@ let currentLength: number | null = null;
 let currentStartWave = 1;
 /** Set by the Crossroads "Move on" choice: force the next wave to end the biome. */
 let leaveBiomeNow = false;
+/**
+ * The wave the player DELIBERATELY chose to stay past the notoriety-free window in
+ * this biome (via the Crossroads "Stay" choice), or null if they never did.
+ * Notoriety is anchored here - NOT to raw waves-in-biome - so simply progressing
+ * through a long (rolled 7-25) biome never escalates difficulty. Only choosing to
+ * linger past the free window does. Resets on every biome entry.
+ */
+let overstayAnchorWave: number | null = null;
 
 /** Clear all structure state at run start (module state outlives a run). */
 export function resetErBiomeStructure(): void {
   currentLength = null;
   currentStartWave = 1;
   leaveBiomeNow = false;
+  overstayAnchorWave = null;
 }
 
 /** The classic mode final wave (isWaveFinal pins wave 200). */
@@ -106,6 +115,10 @@ export function erInLateGameZone(waveIndex: number): boolean {
 export function erRollBiomeLength(_biome: BiomeId, startWave: number): void {
   leaveBiomeNow = false;
   currentStartWave = startWave;
+  // A fresh biome starts with a clean slate: no deliberate overstay yet, so the
+  // global curve runs untouched until the player CHOOSES to linger past the free
+  // window at a Crossroads.
+  overstayAnchorWave = null;
 
   // Finale safety: never roll a variable length once we're at/inside the late
   // zone, or if the biome's worst case could spill into it.
@@ -122,11 +135,36 @@ export function erRollBiomeLength(_biome: BiomeId, startWave: number): void {
   currentLength = Math.max(a, b);
 }
 
-/** Restore a biome's rolled length + start wave from a loaded save (defensive). */
-export function restoreErBiomeStructure(length: number | null | undefined, startWave: number | null | undefined): void {
+/** Restore a biome's rolled length + start wave + overstay anchor from a save. */
+export function restoreErBiomeStructure(
+  length: number | null | undefined,
+  startWave: number | null | undefined,
+  overstayAnchor?: number | null | undefined,
+): void {
   currentLength = typeof length === "number" && length > 0 ? Math.floor(length) : null;
   currentStartWave = typeof startWave === "number" && startWave > 0 ? Math.floor(startWave) : 1;
+  overstayAnchorWave = typeof overstayAnchor === "number" && overstayAnchor > 0 ? Math.floor(overstayAnchor) : null;
   leaveBiomeNow = false;
+}
+
+/**
+ * Record that the player DELIBERATELY chose to stay (at a Crossroads) at
+ * `waveIndex`. Only the FIRST such choice past the notoriety-free window arms the
+ * overstay anchor - from then on notoriety ramps with each further wave in the
+ * biome. Staying while still inside the free window does nothing (it is free).
+ */
+export function erMarkBiomeStay(waveIndex: number): void {
+  if (overstayAnchorWave !== null) {
+    return;
+  }
+  if (wavesSinceEnteredBiome(waveIndex) >= NOTORIETY_FREE_WAVES) {
+    overstayAnchorWave = waveIndex;
+  }
+}
+
+/** The wave the player armed overstay (chose to linger past the free window), or null. */
+export function erBiomeOverstayAnchor(): number | null {
+  return overstayAnchorWave;
 }
 
 /** The current biome's rolled length, or null if it is on the vanilla cadence. */

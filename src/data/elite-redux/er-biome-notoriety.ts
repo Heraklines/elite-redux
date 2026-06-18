@@ -26,7 +26,7 @@
 // endless / random-biome runs are 100% unchanged.
 // =============================================================================
 
-import { erInLateGameZone, wavesSinceEnteredBiome } from "#data/elite-redux/er-biome-structure";
+import { erBiomeOverstayAnchor, erInLateGameZone } from "#data/elite-redux/er-biome-structure";
 
 /** In-biome waves that run the global curve untouched. Past this = notoriety. */
 export const NOTORIETY_FREE_WAVES = 10;
@@ -45,15 +45,25 @@ export const NOTORIETY_MAX_OVER_LEVEL = 25;
 const NOTORIETY_RAMP_WAVES = 10;
 
 /**
- * Raw overstay at `waveIndex`: waves spent in the biome beyond the free window.
- * 0 inside the free window (and in the finale-safety zone, where notoriety is
- * disabled so the wave-200 finale is untouched).
+ * Overstay at `waveIndex`: waves the player has lingered AFTER deliberately
+ * choosing to stay past the free window (the Crossroads "Stay" choice arms the
+ * anchor - see erMarkBiomeStay). 0 until that choice is made, so simply
+ * progressing through a long (rolled 7-25) biome never escalates difficulty -
+ * only a deliberate decision to linger does. Also 0 in the finale-safety zone
+ * (notoriety disabled so the wave-200 finale is untouched).
+ *
+ * Tying overstay to a deliberate stay - NOT to raw waves-in-biome - is the #504
+ * fix for "a random grunt 20 levels over me" when the player never chose to stay.
  */
 export function erBiomeOverstay(waveIndex: number): number {
   if (erInLateGameZone(waveIndex)) {
     return 0;
   }
-  return Math.max(0, wavesSinceEnteredBiome(waveIndex) - NOTORIETY_FREE_WAVES);
+  const anchor = erBiomeOverstayAnchor();
+  if (anchor === null) {
+    return 0;
+  }
+  return Math.max(0, waveIndex - anchor);
 }
 
 /** Whether notoriety is in effect at `waveIndex` (overstay > 0). */

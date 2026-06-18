@@ -25,7 +25,8 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import { setErLeaveBiomeNow } from "#data/elite-redux/er-biome-structure";
+import { erHasNotoriety } from "#data/elite-redux/er-biome-notoriety";
+import { erMarkBiomeStay, setErLeaveBiomeNow } from "#data/elite-redux/er-biome-structure";
 import { UiMode } from "#enums/ui-mode";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { getBiomeName } from "#utils/common";
@@ -58,7 +59,14 @@ export class ErCrossroadsPhase extends Phase {
       },
     ];
 
-    globalScene.ui.showText(`You reach a crossroads in ${biomeName}. Stay, or leave for a new area?`, null, () => {
+    // Warn once the player is past the free window: from here, staying makes the
+    // locals hostile (enemies grow stronger the longer you linger).
+    const overstaying = erHasNotoriety(globalScene.currentBattle?.waveIndex ?? 0);
+    const prompt = overstaying
+      ? `You have lingered in ${biomeName} a while - the locals are growing restless and stronger. Stay anyway, or leave for a new area?`
+      : `You reach a crossroads in ${biomeName}. Linger here and the locals will turn hostile over time. Stay, or leave for a new area?`;
+
+    globalScene.ui.showText(prompt, null, () => {
       globalScene.ui.setMode(UiMode.OPTION_SELECT, { options, delay: 500 });
     });
   }
@@ -75,8 +83,13 @@ export class ErCrossroadsPhase extends Phase {
       // World Map node picker ahead of the queued NewBattlePhase.
       setErLeaveBiomeNow();
       globalScene.phaseManager.unshiftNew("SelectBiomePhase");
+    } else {
+      // STAY: the run continues in this biome. If this is a deliberate choice to
+      // linger PAST the notoriety-free window, arm the overstay anchor - from here
+      // the locals grow hostile (enemies climb in level + power the longer you
+      // stay). Inside the free window this is a no-op (staying is still free).
+      erMarkBiomeStay(globalScene.currentBattle?.waveIndex ?? 0);
     }
-    // STAY: nothing to do - the run continues to NewBattlePhase in this biome.
     this.end();
   }
 }
