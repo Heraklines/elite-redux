@@ -67,11 +67,15 @@ const FROZEN_SPECIES: SpeciesId[] = [SpeciesId.ARCTOZOLT, SpeciesId.ARCTOVISH, S
  * Melt Ice roll gave nothing).
  */
 const CHIP_POOL: { func: ModifierTypeFunc; pregenArgs?: any[]; weight: number }[] = [
-  { func: modifierTypes.ATTACK_TYPE_BOOSTER, pregenArgs: [PokemonType.ICE], weight: 50 }, // Never-Melt Ice
-  { func: modifierTypes.MYSTICAL_ROCK, weight: 30 }, // the "weather rock"
+  // Weighted by rarity: the common ice trinkets show up most, the signature
+  // Never-Melt Ice + weather rock less often, the perfect-preserved heals rarest.
+  { func: modifierTypes.ER_ICE_GEM, weight: 26 }, // common single-use Ice gem
+  { func: modifierTypes.ER_SNOWBALL, weight: 22 }, // common held item
+  { func: modifierTypes.ATTACK_TYPE_BOOSTER, pregenArgs: [PokemonType.ICE], weight: 22 }, // Never-Melt Ice
+  { func: modifierTypes.MYSTICAL_ROCK, weight: 14 }, // the "weather rock"
   { func: modifierTypes.FULL_RESTORE, weight: 8 },
-  { func: modifierTypes.MAX_REVIVE, weight: 8 },
-  { func: modifierTypes.SACRED_ASH, weight: 4 },
+  { func: modifierTypes.MAX_REVIVE, weight: 6 },
+  { func: modifierTypes.SACRED_ASH, weight: 2 },
 ];
 
 /** Roll ONE entry from the weighted chip-out pool. */

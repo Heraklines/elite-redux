@@ -87,8 +87,13 @@ function eligibleEncountersFor(biome: BiomeId): MysteryEncounterType[] {
 
 function readFortune(): FortuneMisc {
   const current = globalScene.arena.biomeId;
-  const revealed = getErPendingNodes().filter(n => n.revealed);
-  const biome = revealed.length > 0 ? randSeedItem(revealed).biome : current;
+  // Prophecy points AHEAD: only revealed ONWARD routes (a biome you can travel to
+  // next), never the settlement you are standing in - "an event will happen in
+  // Town" while you ARE in Town reads as nonsense. If no onward route is charted
+  // yet, biome stays = current as a sentinel, and the dialogue token renders it as
+  // "the road ahead" rather than naming this town.
+  const onward = getErPendingNodes().filter(n => n.revealed && n.biome !== current);
+  const biome = onward.length > 0 ? randSeedItem(onward).biome : current;
 
   // Fall back to the current biome's pool if the foretold biome offers nothing.
   const eligible = eligibleEncountersFor(biome);
@@ -118,7 +123,10 @@ export const FortuneTellerEncounter: MysteryEncounter = MysteryEncounterBuilder.
     const encounter = globalScene.currentBattle.mysteryEncounter!;
     const fortune = readFortune();
     encounter.misc = fortune satisfies FortuneMisc;
-    encounter.setDialogueToken("biomeName", getBiomeName(fortune.biome));
+    // Name a concrete onward biome when we have one; otherwise a vague "road
+    // ahead" so the seer never claims the event happens in the town you're in.
+    const ahead = fortune.biome !== globalScene.arena.biomeId;
+    encounter.setDialogueToken("biomeName", ahead ? getBiomeName(fortune.biome) : "the lands ahead");
     encounter.setDialogueToken(
       "eventName",
       fortune.type == null ? "a fateful meeting" : prettyEncounterName(fortune.type),
@@ -143,7 +151,12 @@ export const FortuneTellerEncounter: MysteryEncounter = MysteryEncounterBuilder.
           // wave (consumed once - see battle-scene getMysteryEncounter), and chart
           // its biome as an event-revealed (blue) onward route on the World Map.
           globalScene.mysteryEncounterSaveData.queuedEncounters.push({ type, spawnPercent: PROPHECY_SPAWN_PERCENT });
-          addErEventRevealedNode(biome);
+          // Chart it as an event-revealed (blue) onward route on the World Map -
+          // but only when it is a real ONWARD biome (not the current-biome
+          // sentinel, which is not a travel destination).
+          if (biome !== globalScene.arena.biomeId) {
+            addErEventRevealedNode(biome);
+          }
         }
         await transitionMysteryEncounterIntroVisuals(true, true);
         leaveEncounterWithoutBattle(true);

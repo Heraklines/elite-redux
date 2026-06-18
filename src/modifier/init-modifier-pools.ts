@@ -287,7 +287,9 @@ function initGreatModifierPool() {
       8,
     ),
     new WeightedModifierType(
-      modifierTypes.MAP,
+      // ER (#486): the World Map's obtainable upgrade (a recolored, renamed Map
+      // that reveals +1 onward route). Replaces the plain vanilla Map offer.
+      modifierTypes.ER_UPGRADED_MAP,
       () => (globalScene.gameMode.isClassic && globalScene.currentBattle.waveIndex < 180 ? 2 : 0),
       2,
     ),

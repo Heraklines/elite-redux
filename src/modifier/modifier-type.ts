@@ -2108,6 +2108,20 @@ const modifierTypeInitObj = Object.freeze({
 
   MAP: () => new ModifierType("modifierType:ModifierType.MAP", "map", (type, _args) => new MapModifier(type)),
 
+  // ER (#486) World Map: the obtainable "Upgraded Map" reward. Mechanically it is
+  // a MapModifier (so erMapUpgradeTier counts it -> +1 revealed onward route on the
+  // World Map), but it carries its own ER name/description and a gold-tinted map
+  // icon so the reward screen + biome shop read it as a distinct map upgrade, not
+  // the plain vanilla Map. English inline strings (ER custom; no shared locale).
+  ER_UPGRADED_MAP: () => {
+    const type = new ModifierType("", "map", (t, _args) => new MapModifier(t));
+    Object.defineProperty(type, "name", { get: () => "Upgraded Map" });
+    type.getDescription = () =>
+      "An enhanced chart of the region. Reveals one extra onward route on your World Map (press the Map hotkey) so you can see further ahead.";
+    type.iconTint = 0xffd24a; // warm gold - reads as an upgraded/premium map
+    return type;
+  },
+
   POTION: () => new PokemonHpRestoreModifierType("modifierType:ModifierType.POTION", "potion", 20, 10),
   SUPER_POTION: () =>
     new PokemonHpRestoreModifierType("modifierType:ModifierType.SUPER_POTION", "super_potion", 50, 25),
