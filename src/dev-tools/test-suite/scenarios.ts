@@ -27,7 +27,7 @@ import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
 import type { ErCommunityItemKind } from "#data/elite-redux/er-community-items";
-import { setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
+import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
 import { seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
@@ -173,6 +173,7 @@ export function resetDevOverrides(): void {
   // The smarter AI is master-OFF in real play; clear any per-scenario force so
   // only the AI scenarios (which re-enable it below) ever exercise it.
   setErSmartAiTestForced(false);
+  setErAiExperimentalMode("off");
 }
 
 function setOverrides(partial: Partial<MutableOverrides>): void {
@@ -5688,6 +5689,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [
         makeStarter(SpeciesId.GARCHOMP, {
           moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) AI A/B: standard vs experimental, back-to-back",
+    description:
+      "A-B harness for the smarter AI. Drops you into the DOJO on HELL (almost\n"
+      + "every wave is a trainer) with ALTERNATE experimental mode: trainers on\n"
+      + "EVEN waves use the EXPERIMENTAL brain, ODD waves use STANDARD - so you\n"
+      + "fight the two brains back-to-back without one affecting the other.\n"
+      + "WATCH the console each enemy turn: 'ER AI: standard|experimental brain\n"
+      + "(sharpness X)' tells you which trainer is on which. (The experimental\n"
+      + "profile is where the deeper one-ply-EV / Foul-Play-style logic will land;\n"
+      + "for now it plays at max sharpness + most aggressive switching.) Press Send\n"
+      + "Logs to capture a comparison.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("hell");
+      setErSmartAiTestForced(true);
+      setErAiExperimentalMode("alternate");
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 60, STARTING_BIOME_OVERRIDE: BiomeId.DOJO });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.ROTOM, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.SHADOW_BALL, MoveId.VOLT_SWITCH, MoveId.NASTY_PLOT],
         }),
       ];
     },

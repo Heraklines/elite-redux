@@ -3,6 +3,7 @@ import {
   damageToScore,
   ER_KO_BONUS,
   getErAiProfile,
+  setErAiExperimentalMode,
   setErSmartAiTestForced,
   shouldDevalueSlowMove,
   strategicMoveScore,
@@ -25,6 +26,7 @@ describe("er-enemy-ai (Elite/Hell smarter AI - Slice 1)", () => {
   afterEach(() => {
     setErDifficulty("ace");
     setErSmartAiTestForced(false);
+    setErAiExperimentalMode("off");
   });
 
   describe("getErAiProfile (master gate + difficulty gating)", () => {
@@ -117,6 +119,30 @@ describe("er-enemy-ai (Elite/Hell smarter AI - Slice 1)", () => {
 
     it("treats never-miss moves (accuracy <= 0) as 100% accurate", () => {
       expect(damageToScore(30, 100, 100, -1)).toBe(damageToScore(30, 100, 100, 100));
+    });
+  });
+
+  describe("experimental profile (A/B harness)", () => {
+    it("is 'standard' by default", () => {
+      setErSmartAiTestForced(true);
+      setErDifficulty("hell");
+      expect(getErAiProfile(trainerMon).kind).toBe("standard");
+    });
+
+    it("hands the experimental brain to everyone in 'all' mode (max sharpness)", () => {
+      setErSmartAiTestForced(true);
+      setErAiExperimentalMode("all");
+      setErDifficulty("elite");
+      const p = getErAiProfile(trainerMon);
+      expect(p.kind).toBe("experimental");
+      expect(p.sharpness).toBe(1); // experimental plays max-sharp regardless of difficulty
+    });
+
+    it("stays inactive (no kind leak) for wild mons", () => {
+      setErSmartAiTestForced(true);
+      setErAiExperimentalMode("all");
+      setErDifficulty("hell");
+      expect(getErAiProfile(wildMon).active).toBe(false);
     });
   });
 

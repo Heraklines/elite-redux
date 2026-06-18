@@ -8393,6 +8393,9 @@ export class EnemyPokemon extends Pokemon {
           // biome-ignore format: For some reason this gets broken into multiple lines
           console.log("Sorted Move Pool:", sortedMovePool.map((m) => m.getName()));
           console.log("Chosen Move:", chosenMove.getName());
+          if (erAi.active) {
+            console.log(`ER AI: ${erAi.kind} brain (sharpness ${erAi.sharpness})`);
+          }
 
           return {
             move: chosenMove.moveId,

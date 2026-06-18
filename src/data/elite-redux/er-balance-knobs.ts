@@ -843,6 +843,17 @@ export const ER_BALANCE_KNOBS: readonly ErBalanceKnob[] = [
     integer: true,
   },
   {
+    key: "er.ai.experimentalPct",
+    group: "Battle AI",
+    label: "Experimental AI rollout %",
+    help: "Percent of Elite/Hell trainers that use the EXPERIMENTAL AI brain (the deeper, in-trial logic) instead of the standard one. 0 = none (the rest play standard). For gradual rollout / A-B testing.",
+    kind: "scalar",
+    default: 0,
+    min: 0,
+    max: 100,
+    integer: true,
+  },
+  {
     key: "er.ai.sharpnessHell",
     group: "Battle AI",
     label: "Hell AI sharpness",

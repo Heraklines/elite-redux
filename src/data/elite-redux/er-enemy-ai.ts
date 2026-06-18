@@ -22,6 +22,7 @@
 // overrides fall back to the defaults, so a bad edit can never break a build.
 // =============================================================================
 
+import { globalScene } from "#app/global-scene";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { MoveCategory } from "#enums/move-category";
@@ -43,16 +44,53 @@ interface ErAiPokemon {
   isBoss(): boolean;
 }
 
+/**
+ * Which AI brain a mon uses. "standard" is the shipped heuristic AI; "experimental"
+ * is the opt-in profile where deeper logic (the one-ply EV / Foul-Play-style reads)
+ * is being trialled - it can be assigned to SPECIFIC trainers without touching the
+ * rest, so the two can be played back-to-back and compared.
+ */
+export type ErAiKind = "standard" | "experimental";
+
 export interface ErAiProfile {
   /** When false, every consumer takes the vanilla path unchanged. */
   active: boolean;
+  /** Which brain (standard vs experimental). Experimental-only logic gates on this. */
+  kind: ErAiKind;
   /** 0..1. 1 = always play the best evaluated move; <1 = some chance to slide to a worse one. */
   sharpness: number;
   /** Switch eagerness threshold (lower = switches to a counter more readily). Consumed in Slice 2. */
   switchThreshold: number;
 }
 
-const INACTIVE_PROFILE: ErAiProfile = { active: false, sharpness: 0.5, switchThreshold: 3 };
+const INACTIVE_PROFILE: ErAiProfile = { active: false, kind: "standard", sharpness: 0.5, switchThreshold: 3 };
+
+// A/B HARNESS: how the experimental profile is assigned, so it can be trialled
+// on specific trainers WITHOUT changing the rest.
+//   - "off"       : nobody is experimental (the er.ai.experimentalPct knob may still opt some in).
+//   - "all"       : every active mon is experimental.
+//   - "alternate" : trainers on EVEN waves are experimental, odd are standard -
+//                   so consecutive trainer battles alternate brains (back-to-back test).
+export type ErAiExperimentalMode = "off" | "all" | "alternate";
+let erAiExperimentalMode: ErAiExperimentalMode = "off";
+
+/** Dev/test control: set how the experimental AI profile is handed out (reset between scenarios). */
+export function setErAiExperimentalMode(mode: ErAiExperimentalMode): void {
+  erAiExperimentalMode = mode;
+}
+
+/** Whether the mon being resolved should use the experimental brain. */
+function resolveExperimental(): boolean {
+  if (erAiExperimentalMode === "all") {
+    return true;
+  }
+  const wave = globalScene?.currentBattle?.waveIndex ?? 0;
+  if (erAiExperimentalMode === "alternate") {
+    return wave % 2 === 0;
+  }
+  // Production rollout knob (default 0): a deterministic per-wave slice of trainers.
+  return wave % 100 < erBalanceNum("er.ai.experimentalPct");
+}
 
 // MASTER GATE. The smarter AI is OFF in real play until it has been tested and
 // the maintainer turns it on (the `er.ai.enabled` knob, default 0). Until then
@@ -171,8 +209,21 @@ export function getErAiProfile(pokemon: ErAiPokemon): ErAiProfile {
     return INACTIVE_PROFILE;
   }
   const hell = difficulty === "hell";
+  // Experimental brain (opt-in, per the A/B harness): for now it plays at maximum
+  // sharpness + the most aggressive switching, so it's distinguishable back-to-back
+  // from the difficulty-tuned standard brain. The one-ply EV / Foul-Play-style
+  // reads will slot in here, gated on kind === "experimental".
+  if (resolveExperimental()) {
+    return {
+      active: true,
+      kind: "experimental",
+      sharpness: 1,
+      switchThreshold: erBalanceNum("er.ai.switchThresholdHell"),
+    };
+  }
   return {
     active: true,
+    kind: "standard",
     sharpness: hell ? erBalanceNum("er.ai.sharpnessHell") : erBalanceNum("er.ai.sharpnessElite"),
     switchThreshold: hell ? erBalanceNum("er.ai.switchThresholdHell") : erBalanceNum("er.ai.switchThresholdElite"),
   };
