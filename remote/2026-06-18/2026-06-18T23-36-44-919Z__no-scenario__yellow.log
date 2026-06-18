@@ -1,0 +1,136 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqk3wfyr-l32c
+mode:     0  wave:2
+seed:     NaJCLHetjaBe09FxY8kEs17R
+party:    Ivysaur(L17 54hp f0), Charmeleon(L17 53hp f0), Wartortle(L17 54hp f0), Grovyle(L17 49hp f0), Marshtomp(L17 59hp f0), Combusken(L17 54hp f0)
+enemy:    Magikarp(L3)
+
+----- CONSOLE -----
+[23:25:26.922] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[23:25:27.264] WARN: [er-b1c] 1 mega-form injection issues: ["ER mega target 1850 has no primary type"]
+[23:25:27.523] LOG: [ER] build mqk3wfyr-l32c
+[23:25:27.686] LOG: [dev-tools] loaded — 213 scenarios + Send Logs button
+[23:27:07.500] DEBUG: Destroying loading scene
+[23:27:07.500] DEBUG: Destroyed loading scene
+[23:27:07.590] LOG: Seed: NaJCLHetjaBe09FxY8kEs17R
+[23:27:07.590] LOG: Wave Seed: NaJCLHetjaBe09FxY8kEs17R 0
+[23:27:09.869] LOG: %cStart Phase LoginPhase color:green;
+[23:28:50.083] WARN: Login failed! 401 
+[23:28:58.251] WARN: Login failed! 401 
+[23:29:02.641] WARN: Login failed! 401 
+[23:29:05.551] WARN: Login failed! 401 
+[23:29:14.847] WARN: Login failed! 401 
+[23:32:25.850] LOG: %cStart Phase LoginPhase color:green;
+[23:32:40.503] LOG: Client Session: ZAGwsVIZFZe151jHXzP6SI4ntultG6E5
+[23:32:40.844] WARN: Could not get system savedata! 404 Save data not found.
+[23:32:40.845] LOG: %cStart Phase MessagePhase color:green;
+[23:32:43.403] LOG: %cStart Phase SelectGenderPhase color:green;
+[23:32:44.745] LOG: [er-gift] granted 2 free Legendary eggs (one-time)
+[23:32:46.071] LOG: %cStart Phase SelectGenderPhase color:green;
+[23:32:47.397] LOG: %cStart Phase TitlePhase color:green;
+[23:32:47.411] LOG: use seasonal splash messages true
+[23:32:47.411] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[23:32:53.352] LOG: %cStart Phase SelectStarterPhase color:green;
+[23:32:56.653] LOG: Wave Seed: ObKDMIfukbCf1:GyZ9lFt28S 1
+[23:32:56.655] LOG: %cStart Phase EncounterPhase color:green;
+[23:32:56.658] LOG: Starting species pool tier: COMMON
+[23:32:56.675] LOG: Pokemon: Wild Magikarp | Species ID: 129 | Level: 3 | Nature: Careful (+SpDef/-SpAtk)
+[23:32:56.675] LOG: Stats (IVs): HP: 14 (10), Atk: 6 (16), Def: 8 (4), Spatk: 5 (24), Spdef: 7 (7), Spd: 10 (28)
+[23:32:56.675] LOG: Ability: Marvel Scale | Passive Ability: Multiscale 
+[23:32:56.675] LOG: Moveset: ["Splash"]
+[23:32:57.928] DEBUG: Session data saved to slot 4!
+[23:32:57.930] LOG: Wave Seed: ObKDMIfukbCf1:GyZ9lFt28S 1
+[23:32:59.303] LOG: %cStart Phase SummonPhase color:green;
+[23:33:00.206] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[23:33:00.206] LOG: %cStart Phase CheckSwitchPhase color:green;
+[23:33:40.556] LOG: %cStart Phase InitEncounterPhase color:green;
+[23:33:40.557] LOG: %cStart Phase PostSummonPhase color:green;
+[23:33:40.557] LOG: Ran PSP for: Bulbasaur
+[23:33:40.558] LOG: %cStart Phase PostSummonPhase color:green;
+[23:33:40.559] LOG: %cStart Phase PostSummonPhase color:green;
+[23:33:40.559] LOG: Ran PSP for: Magikarp
+[23:33:40.559] LOG: %cStart Phase PostSummonPhase color:green;
+[23:33:40.559] LOG: %cStart Phase PostSummonPhase color:green;
+[23:33:40.559] LOG: %cStart Phase TurnInitPhase color:green;
+[23:33:40.560] LOG: %cStart Phase CommandPhase color:green;
+[23:33:42.027] LOG: Move: ABSORB Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Bulbasaur
+[23:33:42.029] LOG: %cStart Phase EnemyCommandPhase color:green;
+[23:33:42.030] LOG: %cStart Phase TurnStartPhase color:green;
+[23:33:42.031] LOG: %cStart Phase MovePhase color:green;
+[23:33:42.032] LOG: %cUser: Bulbasaur
+Move: ABSORB
+Use Mode: NORMAL color:orchid
+[23:33:42.033] LOG: %cStart Phase MessagePhase color:green;
+[23:33:42.363] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:33:42.365] LOG: Battle Seed: ZSjcIBo5ZTkxwjzA
+[23:33:42.815] LOG: crit stage: +0
+[23:33:42.816] LOG: Move: Absorb | Base damage: 27.2 | Power: 35 | Source attack: 30 | Target defense: 7
+[23:33:42.817] LOG: Move: Absorb | Attack damage: 34
+[23:33:42.819] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:33:42.850] LOG: %cStart Phase MessagePhase color:green;
+[23:33:43.517] LOG: %cStart Phase PokemonHealPhase color:green;
+[23:33:43.517] LOG: %cStart Phase MessagePhase color:green;
+[23:33:44.219] LOG: %cStart Phase FaintPhase color:green;
+[23:33:45.876] LOG: %cStart Phase MessagePhase color:green;
+[23:33:46.546] LOG: %cStart Phase VictoryPhase color:green;
+[23:33:46.547] LOG: %cStart Phase MoveEndPhase color:green;
+[23:33:46.547] LOG: %cStart Phase MovePhase color:green;
+[23:33:46.547] LOG: %cStart Phase MoveEndPhase color:green;
+[23:33:46.547] LOG: %cStart Phase CheckInterludePhase color:green;
+[23:33:46.547] LOG: %cStart Phase WeatherEffectPhase color:green;
+[23:33:46.547] LOG: %cStart Phase PositionalTagPhase color:green;
+[23:33:46.547] LOG: %cStart Phase BerryPhase color:green;
+[23:33:46.548] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[23:33:46.548] LOG: %cStart Phase TurnEndPhase color:green;
+[23:33:46.548] LOG: %cStart Phase BattleEndPhase color:green;
+[23:33:46.548] LOG: Battle Score: 12 (1 Turns x1)
+[23:33:46.548] LOG: Total Score: 12
+[23:33:46.552] LOG: %cStart Phase EggLapsePhase color:green;
+[23:33:46.553] LOG: %cStart Phase SelectModifierPhase color:green;
+[23:33:46.553] LOG: Wave Seed: ObKDMIfukbCf1:GyZ9lFt28S 1
+[23:33:46.557] LOG: 0 0 [2,3,4,5]
+[23:33:46.557] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[23:33:48.648] LOG: %cStart Phase LevelUpPhase color:green;
+[23:33:50.811] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[23:34:10.873] LOG: %cStart Phase EvolutionPhase color:green;
+[23:34:13.618] ERROR: [uncaught] Uncaught SecurityError: Failed to execute 'texImage2D' on 'WebGLRenderingContext': The video element contains cross-origin data, and may not be loaded. @ https://elite-redux-staging.pages.dev/assets/phaser-Bm8NU8rv.js:63:2433
+[23:34:23.552] LOG: %cStart Phase EndEvolutionPhase color:green;
+[23:34:23.721] LOG: %cStart Phase LevelUpPhase color:green;
+[23:34:25.134] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[23:34:28.507] LOG: %cStart Phase EvolutionPhase color:green;
+[23:34:32.197] ERROR: [uncaught] Uncaught SecurityError: Failed to execute 'texImage2D' on 'WebGLRenderingContext': The video element contains cross-origin data, and may not be loaded. @ https://elite-redux-staging.pages.dev/assets/phaser-Bm8NU8rv.js:63:2433
+[23:34:42.146] LOG: %cStart Phase EndEvolutionPhase color:green;
+[23:34:42.282] LOG: %cStart Phase LevelUpPhase color:green;
+[23:34:43.631] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[23:34:52.431] LOG: %cStart Phase EvolutionPhase color:green;
+[23:34:56.260] ERROR: [uncaught] Uncaught SecurityError: Failed to execute 'texImage2D' on 'WebGLRenderingContext': The video element contains cross-origin data, and may not be loaded. @ https://elite-redux-staging.pages.dev/assets/phaser-Bm8NU8rv.js:63:2433
+[23:35:06.009] LOG: %cStart Phase EndEvolutionPhase color:green;
+[23:35:06.146] LOG: %cStart Phase LevelUpPhase color:green;
+[23:35:07.432] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[23:35:18.455] LOG: %cStart Phase EvolutionPhase color:green;
+[23:35:21.111] ERROR: [uncaught] Uncaught SecurityError: Failed to execute 'texImage2D' on 'WebGLRenderingContext': The video element contains cross-origin data, and may not be loaded. @ https://elite-redux-staging.pages.dev/assets/phaser-Bm8NU8rv.js:63:2433
+[23:35:31.166] LOG: %cStart Phase EndEvolutionPhase color:green;
+[23:35:31.313] LOG: %cStart Phase LevelUpPhase color:green;
+[23:35:32.454] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[23:35:42.906] LOG: %cStart Phase EvolutionPhase color:green;
+[23:35:45.693] ERROR: [uncaught] Uncaught SecurityError: Failed to execute 'texImage2D' on 'WebGLRenderingContext': The video element contains cross-origin data, and may not be loaded. @ https://elite-redux-staging.pages.dev/assets/phaser-Bm8NU8rv.js:63:2433
+[23:35:55.349] LOG: %cStart Phase EndEvolutionPhase color:green;
+[23:35:55.494] LOG: %cStart Phase LevelUpPhase color:green;
+[23:36:00.592] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[23:36:05.616] LOG: %cStart Phase EvolutionPhase color:green;
+[23:36:08.269] ERROR: [uncaught] Uncaught SecurityError: Failed to execute 'texImage2D' on 'WebGLRenderingContext': The video element contains cross-origin data, and may not be loaded. @ https://elite-redux-staging.pages.dev/assets/phaser-Bm8NU8rv.js:63:2433
+[23:36:17.805] LOG: %cStart Phase EndEvolutionPhase color:green;
+[23:36:17.952] LOG: %cStart Phase NewBattlePhase color:green;
+[23:36:17.953] LOG: Wave Seed: PcLENJgvlcDg2;Hz[:mGu39T 2
+[23:36:17.954] LOG: %cStart Phase NextEncounterPhase color:green;
+[23:36:17.955] LOG: Starting species pool tier: UNCOMMON
+[23:36:17.964] LOG: Pokemon: Wild Magikarp | Species ID: 129 | Level: 3 | Nature: Brave (+Atk/-Spd)
+[23:36:17.964] LOG: Stats (IVs): HP: 15 (30), Atk: 7 (31), Def: 8 (1), Spatk: 6 (25), Spdef: 6 (1), Spd: 9 (12)
+[23:36:17.964] LOG: Ability: Marvel Scale | Passive Ability: Multiscale 
+[23:36:17.964] LOG: Moveset: ["Splash"]
+[23:36:18.007] DEBUG: Session data saved to slot 4!
+[23:36:18.007] LOG: Wave Seed: PcLENJgvlcDg2;Hz[:mGu39T 2
+[23:36:19.390] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[23:36:19.390] LOG: %cStart Phase CheckSwitchPhase color:green;
+[23:36:23.240] LOG: [dev-tools] TEST RESULT: PASS — QoL: level-up Move Learn panel (mass evolve to 17)
