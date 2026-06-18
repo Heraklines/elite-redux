@@ -1,0 +1,273 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqjts635-jy50
+mode:     0  wave:12
+seed:     ufBJmgcMpHV2cTKxodE7glaZ
+party:    Squirtle(L9 18hp f0), Cyndaquil(L8 26hp f0), Minccino(L5 20hp f0), Sprigatito(L6 21hp f0)
+enemy:    Kadabra(L8), Sableye(L8), Wobbuffet(L8)
+
+----- COMMENT -----
+second stage pokemon on lower waves (12)
+
+----- CONSOLE -----
+[19:53:00.372] LOG: Move: Quick Attack | Base damage: 4.720000000000001 | Power: 40 | Source attack: 17 | Target defense: 24
+[19:53:00.373] LOG: Move: Quick Attack | Attack damage: 4
+[19:53:00.373] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:53:00.506] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:53:01.188] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:53:01.867] LOG: %cStart Phase MessagePhase color:green;
+[19:53:02.666] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:53:02.745] LOG: %cStart Phase MoveEndPhase color:green;
+[19:53:02.746] LOG: %cStart Phase MovePhase color:green;
+[19:53:02.746] LOG: %cUser: Squirtle
+Move: BUBBLE_BEAM
+Use Mode: NORMAL color:orchid
+[19:53:02.752] LOG: %cStart Phase MessagePhase color:green;
+[19:53:03.257] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:53:05.949] LOG: crit stage: +0
+[19:53:05.949] LOG: Move: Bubble Beam | Base damage: 7.956363636363636 | Power: 45 | Source attack: 14 | Target defense: 11
+[19:53:05.950] LOG: Move: Bubble Beam | Attack damage: 11
+[19:53:05.951] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:53:06.087] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:53:06.748] LOG: %cStart Phase MessagePhase color:green;
+[19:53:07.542] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:53:10.131] LOG: crit stage: +0
+[19:53:10.131] LOG: Move: Bubble Beam | Base damage: 6.095 | Power: 45 | Source attack: 14 | Target defense: 16
+[19:53:10.132] LOG: Move: Bubble Beam | Attack damage: 8
+[19:53:10.132] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:53:10.266] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:53:12.996] LOG: crit stage: +0
+[19:53:12.996] LOG: Move: Bubble Beam | Base damage: 6.095 | Power: 45 | Source attack: 14 | Target defense: 16
+[19:53:12.997] LOG: Move: Bubble Beam | Attack damage: 8
+[19:53:12.998] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:53:13.128] LOG: %cStart Phase MessagePhase color:green;
+[19:53:13.864] LOG: %cStart Phase FaintPhase color:green;
+[19:53:14.729] LOG: %cStart Phase MessagePhase color:green;
+[19:53:15.219] LOG: %cStart Phase VictoryPhase color:green;
+[19:53:15.221] LOG: %cStart Phase ExpPhase color:green;
+[19:53:15.221] LOG: Applied Super EXP. Charm 
+[19:53:16.177] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:53:16.179] LOG: Applied Super EXP. Charm 
+[19:53:17.055] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:53:17.272] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:53:17.274] LOG: Applied Super EXP. Charm 
+[19:53:18.133] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:53:18.329] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:53:18.329] LOG: Applied Super EXP. Charm 
+[19:53:19.168] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:53:19.366] LOG: %cStart Phase MoveEndPhase color:green;
+[19:53:19.368] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:53:19.370] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:53:19.370] LOG: %cStart Phase TurnEndPhase color:green;
+[19:53:19.371] LOG: %cStart Phase BattleEndPhase color:green;
+[19:53:19.371] LOG: Battle Score: 53 (2 Turns x0.88)
+[19:53:19.371] LOG: Total Score: 244
+[19:53:19.401] LOG: %cStart Phase EggLapsePhase color:green;
+[19:53:19.401] LOG: %cStart Phase ModifierRewardPhase color:green;
+[19:53:20.220] LOG: %cStart Phase ModifierRewardPhase color:green;
+[19:53:20.749] LOG: %cStart Phase SelectModifierPhase color:green;
+[19:53:33.609] LOG: %cStart Phase SelectBiomePhase color:green;
+[19:53:33.610] LOG: Wave Seed: pLTwqmWzR`<m^UynOAqvkd 10
+[19:53:42.893] LOG: %cStart Phase PartyHealPhase color:green;
+[19:53:45.886] LOG: %cStart Phase ResetStatusPhase color:green;
+[19:53:45.889] LOG: %cStart Phase ResetStatusPhase color:green;
+[19:53:45.890] LOG: %cStart Phase ResetStatusPhase color:green;
+[19:53:45.891] LOG: %cStart Phase ResetStatusPhase color:green;
+[19:53:45.913] LOG: %cStart Phase SwitchBiomePhase color:green;
+[19:53:47.386] LOG: %cStart Phase NewBattlePhase color:green;
+[19:53:47.386] LOG: Wave Seed: qMUxrnX{Sa=n_VzoPBrwle 11
+[19:53:47.386] LOG: %cStart Phase NextEncounterPhase color:green;
+[19:53:47.388] LOG: Starting species pool tier: COMMON
+[19:53:47.397] LOG: Pokemon: Wild Poochyena | Species ID: 261 | Level: 7 | Nature: Bold (+Def/-Atk)
+[19:53:47.397] LOG: Stats (IVs): HP: 23 (17), Atk: 16 (29), Def: 10 (1), Spatk: 9 (5), Spdef: 12 (3), Spd: 18 (26)
+[19:53:47.397] LOG: Ability: Moxie | Passive Ability: Nocturnal 
+[19:53:47.397] LOG: Moveset: ["Hyper Fang","Roar","Odor Sleuth","Howl"]
+[19:53:47.401] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"silk_scarf","soundName":"se/restore","tier":2,"moveType":0,"boostPercent":20} (enemy)
+[19:53:47.482] DEBUG: Session data saved to slot 0!
+[19:53:47.483] LOG: Wave Seed: qMUxrnX{Sa=n_VzoPBrwle 11
+[19:53:48.989] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:53:48.990] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:53:50.271] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:53:50.272] LOG: %cStart Phase PostSummonPhase color:green;
+[19:53:50.272] LOG: Ran PSP for: Poochyena
+[19:53:50.272] LOG: %cStart Phase PostSummonPhase color:green;
+[19:53:50.272] LOG: %cStart Phase PostSummonPhase color:green;
+[19:53:50.272] LOG: %cStart Phase TurnInitPhase color:green;
+[19:53:50.272] LOG: %cStart Phase CommandPhase color:green;
+[19:53:51.441] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Squirtle
+[19:53:51.451] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:53:51.453] LOG: Applied Silk Scarf (enemy)
+[19:53:51.454] LOG: Battle Seed: djZWo2VLNkkDRWfv
+[19:53:51.455] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[19:53:51.457] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[19:53:51.457] LOG: Move Pool: ["Hyper Fang","Roar","Odor Sleuth","Howl"]
+[19:53:51.457] LOG: Move Scores: [19,-20,0,2]
+[19:53:51.457] LOG: Sorted Move Pool: ["Hyper Fang","Howl","Odor Sleuth","Roar"]
+[19:53:51.457] LOG: Chosen Move: Hyper Fang
+[19:53:51.457] LOG: %cStart Phase TurnStartPhase color:green;
+[19:53:51.458] LOG: %cStart Phase MovePhase color:green;
+[19:53:51.458] LOG: %cUser: Poochyena
+Move: HYPER_FANG
+Use Mode: NORMAL color:orchid
+[19:53:51.460] LOG: %cStart Phase MessagePhase color:green;
+[19:53:51.915] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:53:53.288] LOG: crit stage: +0
+[19:53:53.289] LOG: Applied Silk Scarf (enemy)
+[19:53:53.289] LOG: Move: Hyper Fang | Base damage: 6.896 | Power: 102 | Source attack: 16 | Target defense: 32
+[19:53:53.290] LOG: Move: Hyper Fang | Attack damage: 6
+[19:53:53.291] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:53:53.442] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:53:54.112] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:53:54.841] LOG: %cStart Phase MessagePhase color:green;
+[19:53:55.624] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:53:55.712] LOG: %cStart Phase MoveEndPhase color:green;
+[19:53:55.713] LOG: %cStart Phase MovePhase color:green;
+[19:53:55.714] LOG: %cUser: Squirtle
+Move: BUBBLE_BEAM
+Use Mode: NORMAL color:orchid
+[19:53:55.715] LOG: %cStart Phase MessagePhase color:green;
+[19:53:56.497] LOG: %cStart Phase MoveEndPhase color:green;
+[19:53:56.497] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:53:56.497] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:53:56.497] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:53:56.497] LOG: %cStart Phase BerryPhase color:green;
+[19:53:56.498] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:53:56.499] LOG: %cStart Phase TurnEndPhase color:green;
+[19:53:56.500] LOG: %cStart Phase TurnInitPhase color:green;
+[19:53:56.500] LOG: %cStart Phase CommandPhase color:green;
+[19:53:56.999] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Squirtle
+[19:53:57.006] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:53:57.010] LOG: Applied Silk Scarf (enemy)
+[19:53:57.012] LOG: Battle Seed: djZWo2VLNkkDRWfv
+[19:53:57.012] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[19:53:57.013] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[19:53:57.013] LOG: Move Pool: ["Hyper Fang","Roar","Odor Sleuth","Howl"]
+[19:53:57.013] LOG: Move Scores: [19,-20,0,2]
+[19:53:57.013] LOG: Sorted Move Pool: ["Hyper Fang","Howl","Odor Sleuth","Roar"]
+[19:53:57.013] LOG: Chosen Move: Hyper Fang
+[19:53:57.013] LOG: %cStart Phase TurnStartPhase color:green;
+[19:53:57.014] LOG: %cStart Phase MovePhase color:green;
+[19:53:57.014] LOG: %cUser: Poochyena
+Move: HYPER_FANG
+Use Mode: NORMAL color:orchid
+[19:53:57.015] LOG: %cStart Phase MessagePhase color:green;
+[19:53:57.505] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:53:58.871] LOG: crit stage: +0
+[19:53:58.871] LOG: Applied Silk Scarf (enemy)
+[19:53:58.872] LOG: Move: Hyper Fang | Base damage: 5.916799999999999 | Power: 102 | Source attack: 16 | Target defense: 40
+[19:53:58.872] LOG: Move: Hyper Fang | Attack damage: 5
+[19:53:58.872] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:53:59.028] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:53:59.701] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:54:00.370] LOG: %cStart Phase MessagePhase color:green;
+[19:54:01.207] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:54:01.299] LOG: %cStart Phase MoveEndPhase color:green;
+[19:54:01.300] LOG: %cStart Phase MovePhase color:green;
+[19:54:01.300] LOG: %cUser: Squirtle
+Move: BUBBLE_BEAM
+Use Mode: NORMAL color:orchid
+[19:54:01.303] LOG: %cStart Phase MessagePhase color:green;
+[19:54:01.815] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:54:04.706] LOG: crit stage: +0
+[19:54:04.707] LOG: Move: Bubble Beam | Base damage: 5.640000000000001 | Power: 30 | Source attack: 14 | Target defense: 12
+[19:54:04.707] LOG: Move: Bubble Beam | Attack damage: 8
+[19:54:04.707] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:54:04.853] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:54:07.728] LOG: crit stage: +0
+[19:54:07.729] LOG: Move: Bubble Beam | Base damage: 5.640000000000001 | Power: 30 | Source attack: 14 | Target defense: 12
+[19:54:07.729] LOG: Move: Bubble Beam | Attack damage: 7
+[19:54:07.729] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:54:07.878] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:54:10.732] LOG: crit stage: +0
+[19:54:10.733] LOG: Move: Bubble Beam | Base damage: 5.640000000000001 | Power: 30 | Source attack: 14 | Target defense: 12
+[19:54:10.733] LOG: Move: Bubble Beam | Attack damage: 11
+[19:54:10.734] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:54:10.878] LOG: %cStart Phase MessagePhase color:green;
+[19:54:11.590] LOG: %cStart Phase MessagePhase color:green;
+[19:54:12.321] LOG: %cStart Phase FaintPhase color:green;
+[19:54:13.261] LOG: %cStart Phase MessagePhase color:green;
+[19:54:13.846] LOG: %cStart Phase VictoryPhase color:green;
+[19:54:13.846] LOG: %cStart Phase ExpPhase color:green;
+[19:54:13.846] LOG: Applied Super EXP. Charm 
+[19:54:13.846] LOG: Applied EXP. Charm 
+[19:54:15.314] LOG: %cStart Phase LevelUpPhase color:green;
+[19:54:16.477] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:54:16.480] LOG: Applied Super EXP. Charm 
+[19:54:16.480] LOG: Applied EXP. Charm 
+[19:54:17.369] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:54:17.593] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:54:17.594] LOG: Applied Super EXP. Charm 
+[19:54:17.594] LOG: Applied EXP. Charm 
+[19:54:18.473] LOG: %cStart Phase LevelUpPhase color:green;
+[19:54:20.108] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:54:20.398] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:54:20.399] LOG: Applied Super EXP. Charm 
+[19:54:20.400] LOG: Applied EXP. Charm 
+[19:54:21.294] LOG: %cStart Phase LevelUpPhase color:green;
+[19:54:22.387] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:54:22.676] LOG: %cStart Phase MoveEndPhase color:green;
+[19:54:22.678] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:54:22.678] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:54:22.678] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:54:22.678] LOG: %cStart Phase BerryPhase color:green;
+[19:54:22.678] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:54:22.679] LOG: %cStart Phase TurnEndPhase color:green;
+[19:54:22.680] LOG: %cStart Phase BattleEndPhase color:green;
+[19:54:22.680] LOG: Battle Score: 25 (2 Turns x0.84)
+[19:54:22.680] LOG: Total Score: 269
+[19:54:22.716] LOG: %cStart Phase EggLapsePhase color:green;
+[19:54:22.716] LOG: %cStart Phase SelectModifierPhase color:green;
+[19:54:22.717] LOG: Wave Seed: qMUxrnX{Sa=n_VzoPBrwle 11
+[19:54:22.718] LOG: 1 0 [3,4,5]
+[19:54:22.718] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[19:54:22.718] LOG: 9 3 [3,4,5]
+[19:54:22.719] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_ice","group":"tm","soundName":"se/restore","tier":0,"moveId":114} 
+[19:54:22.719] LOG: 1 0 [2,3,4,5,6,7,8,9,10,23]
+[19:54:22.719] LOG: {"id":"PP_UP","localeKey":"modifierType:ModifierType.PP_UP","iconImage":"pp_up","group":"ppUp","soundName":"se/restore","tier":1,"upPoints":1} 
+[19:54:27.855] LOG: %cStart Phase LevelUpPhase color:green;
+[19:54:29.199] LOG: %cStart Phase NewBattlePhase color:green;
+[19:54:29.200] LOG: Wave Seed: rNVysoY|Tb>o`W{pQCsxmf 12
+[19:54:29.202] LOG: Starting trainer pool tier: UNCOMMON
+[19:54:29.208] LOG: %cStart Phase ReturnPhase color:green;
+[19:54:29.640] LOG: %cStart Phase ShowTrainerPhase color:green;
+[19:54:29.981] LOG: %cStart Phase NextEncounterPhase color:green;
+[19:54:29.988] LOG: Rotom Fan
+[19:54:29.997] LOG: ER #419: elite BST cap (420 @ w12) - replacing Rotom Fan (530) with Kadabra (400)
+[19:54:30.011] LOG: Pokemon: Foe Kadabra | Species ID: 64 | Level: 8 | Nature: Adamant (+Atk/-SpAtk)
+[19:54:30.011] LOG: Stats (IVs): HP: 26 (30), Atk: 14 (15), Def: 11 (5), Spatk: 22 (4), Spdef: 18 (28), Spd: 23 (8)
+[19:54:30.011] LOG: Ability: Mystic Power | Passive Ability: Psychic Mind 
+[19:54:30.011] LOG: Moveset: ["Confusion","Copycat","Confuse Ray","Teleport"]
+[19:54:30.016] LOG: Audino
+[19:54:30.018] LOG: ER #419: elite BST cap (420 @ w12) - replacing Audino (485) with Sableye (410)
+[19:54:30.029] LOG: Pokemon: Foe Sableye | Species ID: 302 | Level: 8 | Nature: Lax (+Def/-SpDef)
+[19:54:30.029] LOG: Stats (IVs): HP: 26 (1), Atk: 17 (30), Def: 20 (24), Spatk: 17 (13), Spdef: 15 (10), Spd: 13 (19)
+[19:54:30.029] LOG: Ability: Hypnotist | Passive Ability: Analytic 
+[19:54:30.030] LOG: Moveset: ["Feint Attack","Astonish","Chip Away","Hone Claws"]
+[19:54:30.035] LOG: Stantler
+[19:54:30.038] LOG: ER #419: elite BST cap (420 @ w12) - replacing Stantler (465) with Wobbuffet (405)
+[19:54:30.050] LOG: Pokemon: Foe Wobbuffet | Species ID: 202 | Level: 8 | Nature: Lax (+Def/-SpDef)
+[19:54:30.050] LOG: Stats (IVs): HP: 50 (22), Atk: 12 (20), Def: 18 (12), Spatk: 12 (30), Spdef: 12 (28), Spd: 10 (4)
+[19:54:30.050] LOG: Ability: Magic Guard | Passive Ability: Sticky Hold 
+[19:54:30.050] LOG: Moveset: ["Court Change","Entrainment","Magic Powder","Destiny Bond"]
+[19:54:31.739] LOG: Generated AI funcs
+[19:54:31.802] DEBUG: Session data saved to slot 0!
+[19:54:31.803] LOG: Wave Seed: rNVysoY|Tb>o`W{pQCsxmf 12
+[19:54:32.527] LOG: Ace Trainer Dave
+[19:54:32.857] LOG: Dialogue saved as seen: dialogue:aceTrainer.encounter.1
+[19:54:33.054] LOG: Ace Trainer Dave
+[19:54:34.022] LOG: %cStart Phase SummonPhase color:green;
+[19:54:34.023] LOG: Dave
+[19:54:34.974] LOG: %cStart Phase SummonPhase color:green;
+[19:54:36.055] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:54:36.057] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:54:36.060] LOG: %cStart Phase PostSummonPhase color:green;
+[19:54:36.060] LOG: Ran PSP for: Kadabra
+[19:54:36.062] LOG: %cStart Phase PostSummonPhase color:green;
+[19:54:36.063] LOG: %cStart Phase PostSummonPhase color:green;
+[19:54:36.063] LOG: %cStart Phase PostSummonPhase color:green;
+[19:54:36.063] LOG: Ran PSP for: Squirtle
+[19:54:36.063] LOG: %cStart Phase PostSummonPhase color:green;
+[19:54:36.063] LOG: %cStart Phase PostSummonPhase color:green;
+[19:54:36.064] LOG: %cStart Phase TurnInitPhase color:green;
+[19:54:36.064] LOG: %cStart Phase CommandPhase color:green;
