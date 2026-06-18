@@ -2733,9 +2733,18 @@ export class DownloadAbAttr extends PostSummonAbAttr {
     this.enemyCountTally = 0;
 
     for (const opponent of pokemon.getOpponents()) {
+      // A field slot can be empty/unresolved at switch-in (e.g. this mon post-
+      // summons before an opponent is on the field), so skip null entries rather
+      // than crash on null.getEffectiveStat (the daily-run PostSummon crash).
+      if (!opponent) {
+        continue;
+      }
       this.enemyCountTally++;
       this.enemyDef += opponent.getEffectiveStat(Stat.DEF);
       this.enemySpDef += opponent.getEffectiveStat(Stat.SPDEF);
+    }
+    if (this.enemyCountTally === 0) {
+      return false; // no opponents to read -> Download has nothing to compare
     }
     this.enemyDef = Math.round(this.enemyDef / this.enemyCountTally);
     this.enemySpDef = Math.round(this.enemySpDef / this.enemyCountTally);
@@ -3803,6 +3812,9 @@ export class CritUseLowerDefensiveStatAbAttr extends AbAttr {
   }
 
   override apply({ defender, statHolder }: CritUseLowerDefensiveStatAbAttrParams): void {
+    if (!defender) {
+      return; // no defender resolved (e.g. transient field state) - leave the stat as-is
+    }
     const def = defender.getEffectiveStat(Stat.DEF);
     const spDef = defender.getEffectiveStat(Stat.SPDEF);
     statHolder.value = def <= spDef ? Stat.DEF : Stat.SPDEF;
