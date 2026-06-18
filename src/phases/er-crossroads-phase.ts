@@ -63,8 +63,8 @@ export class ErCrossroadsPhase extends Phase {
     // locals hostile (enemies grow stronger the longer you linger).
     const overstaying = erHasNotoriety(globalScene.currentBattle?.waveIndex ?? 0);
     const prompt = overstaying
-      ? `You have lingered in ${biomeName} a while - the locals are growing restless and stronger. Stay anyway, or leave for a new area?`
-      : `You reach a crossroads in ${biomeName}. Linger here and the locals will turn hostile over time. Stay, or leave for a new area?`;
+      ? `The locals in ${biomeName} grow hostile. Stay anyway, or leave?`
+      : `A crossroads in ${biomeName}. Stay (locals turn hostile over time), or leave?`;
 
     globalScene.ui.showText(prompt, null, () => {
       globalScene.ui.setMode(UiMode.OPTION_SELECT, { options, delay: 500 });

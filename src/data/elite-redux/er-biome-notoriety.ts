@@ -35,7 +35,7 @@ export const NOTORIETY_FREE_WAVES = 10;
 export const NOTORIETY_MAX_BST_BONUS = 100;
 
 /** Over-cap LEVEL ceiling enemies may reach at full notoriety. */
-export const NOTORIETY_MAX_OVER_LEVEL = 25;
+export const NOTORIETY_MAX_OVER_LEVEL = 10;
 
 /**
  * Overstay reached when the additive ceilings (BST +100, level) are hit and HELD.
