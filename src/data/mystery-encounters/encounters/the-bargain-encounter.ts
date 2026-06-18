@@ -61,6 +61,15 @@ const namespace = "mysteryEncounters/theBargain";
 type SinKey = "greed" | "gluttony" | "pride" | "wrath" | "envy" | "sloth" | "lust";
 const SIN_ORDER: readonly SinKey[] = ["greed", "gluttony", "pride", "wrath", "envy", "sloth", "lust"];
 
+/**
+ * Sins temporarily withheld from the offered pool because their reward/cost rides a
+ * system with an open bug. Re-enable simply by removing the key from this set.
+ *   - "lust": its black-shiny reroll depends on the black-shiny system, which has an
+ *     open in-battle regression (black shinies showing as red shinies / Luck 3).
+ *     Pulled until that is fixed so the deal never hands out a glitched reward.
+ */
+const DISABLED_SINS: ReadonlySet<SinKey> = new Set<SinKey>(["lust"]);
+
 /** Stat choices offered for the Pride boost (HP excluded - a chosen combat stat). */
 const STAT_CHOICES: { label: string; stat: Stat }[] = [
   { label: "Attack", stat: Stat.ATK },
@@ -403,7 +412,7 @@ export const TheBargainEncounter: MysteryEncounter = MysteryEncounterBuilder.wit
   .withQuery(`${namespace}:query`)
   .withOnInit(() => {
     const encounter = globalScene.currentBattle.mysteryEncounter!;
-    const available = SIN_ORDER.filter(sinAvailable);
+    const available = SIN_ORDER.filter(key => !DISABLED_SINS.has(key) && sinAvailable(key));
     const chosen = pickThreeSins(available);
     const misc: BargainMisc = { sins: chosen, picks: [] };
     encounter.misc = misc;

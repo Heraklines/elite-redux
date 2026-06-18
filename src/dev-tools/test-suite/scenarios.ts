@@ -1037,10 +1037,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "   half HP (verify in the next fight).\n"
       + " - Sloth: 2 chosen mons drop to Lv 1 + lose candy -> COVENANT OF REST relic (full\n"
       + "   team heal every 7th wave).\n"
-      + " - Lust: a random stat is cursed across the WHOLE team -> a black-shiny reroll on\n"
-      + "   a chosen mon (it turns black shiny).\n"
+      + " - Lust (TEMPORARILY DISABLED - will NOT appear until the black-shiny in-battle\n"
+      + "   bug is fixed): curse a random stat team-wide -> a black-shiny reroll.\n"
       + "Leave = Giratina's parting line, no cost. Party: shiny Garchomp + 3-item holder,\n"
-      + "all Lv 30 so every Sin is offerable.",
+      + "all Lv 30 so every offerable Sin can come up (6 active sins; 3 shown per visit).",
     setup: () => {
       resetDevOverrides();
       setOverrides({
