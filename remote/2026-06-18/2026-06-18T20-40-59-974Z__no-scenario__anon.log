@@ -1,0 +1,287 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqjxngk4-6nm2
+mode:     3  wave:1
+seed:     RAiWWwuy6cQ8ikWSOmwqc6EY
+party:    Tornadus(L20 64hp f0), Kricketune(L20 66hp f0), Flittle(L20 48hp f0)
+enemy:    Wailmer(L19)
+
+----- CONSOLE -----
+[20:39:43.329] LOG: Applied Zinc 
+[20:39:43.331] LOG: %cStart Phase EggLapsePhase color:green;
+[20:39:43.331] LOG: %cStart Phase SelectModifierPhase color:green;
+[20:39:43.331] LOG: Wave Seed: fCRF}@P]G@_`XBYV\hs 14
+[20:39:43.332] LOG: 13 7 [2,5,6,7,8,9,10,23]
+[20:39:43.332] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[20:39:43.332] LOG: 1 0 [3,4,5]
+[20:39:43.332] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[20:39:43.332] LOG: 2 0 [3,4,5]
+[20:39:43.332] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[20:39:47.113] LOG: Applied Soothe Bell 
+[20:39:47.115] LOG: %cStart Phase LevelUpPhase color:green;
+[20:39:47.116] LOG: %cStart Phase NewBattlePhase color:green;
+[20:39:47.116] LOG: Wave Seed: gDSG~AQ^HA`aYCZW]it 15
+[20:39:47.116] LOG: Starting trainer pool tier: COMMON
+[20:39:47.117] LOG: %cStart Phase ReturnPhase color:green;
+[20:39:47.243] LOG: %cStart Phase ShowTrainerPhase color:green;
+[20:39:47.343] LOG: %cStart Phase NextEncounterPhase color:green;
+[20:39:47.353] LOG: Pokemon: Foe Teddiursa | Species ID: 216 | Level: 9 | Nature: Serious (-)
+[20:39:47.354] LOG: Stats (IVs): HP: 31 (27), Atk: 20 (9), Def: 15 (11), Spatk: 14 (6), Spdef: 15 (17), Spd: 17 (8)
+[20:39:47.354] LOG: Ability: Scrappy | Passive Ability: Guts 
+[20:39:47.354] LOG: Moveset: ["Thrash","Sweet Scent","Play Nice","Slash"]
+[20:39:47.360] LOG: Pokemon: Foe Phanpy | Species ID: 231 | Level: 9 | Nature: Serious (-)
+[20:39:47.360] LOG: Stats (IVs): HP: 37 (27), Atk: 18 (9), Def: 19 (11), Spatk: 12 (6), Spdef: 14 (17), Spd: 14 (8)
+[20:39:47.360] LOG: Ability: Readied Action | Passive Ability: Let's Roll 
+[20:39:47.360] LOG: Moveset: ["Rock Smash","Ice Shard","Mud Sport","Defense Curl"]
+[20:39:48.359] LOG: Generated AI funcs
+[20:39:48.385] DEBUG: Session data saved to slot 0!
+[20:39:48.386] LOG: Wave Seed: gDSG~AQ^HA`aYCZW]it 15
+[20:39:48.593] LOG: Twins Eli & Anne
+[20:39:48.931] LOG: Dialogue saved as seen: dialogue:twins.encounter.1
+[20:39:48.977] LOG: Twins Eli & Anne
+[20:39:49.345] LOG: %cStart Phase SummonPhase color:green;
+[20:39:49.345] LOG: Eli
+[20:39:49.609] LOG: %cStart Phase SummonPhase color:green;
+[20:39:49.609] LOG: Anne
+[20:39:49.909] LOG: %cStart Phase SummonPhase color:green;
+[20:39:50.060] LOG: Applied Zinc 
+[20:39:50.093] WARN: cry/255 not found
+[20:39:50.209] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[20:39:50.210] LOG: %cStart Phase SummonPhase color:green;
+[20:39:50.360] LOG: Applied Zinc 
+[20:39:50.393] WARN: cry/152 not found
+[20:39:50.509] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:39:50.511] LOG: %cStart Phase PostSummonPhase color:green;
+[20:39:50.511] LOG: Ran PSP for: Teddiursa
+[20:39:50.512] LOG: %cStart Phase PostSummonPhase color:green;
+[20:39:50.512] LOG: %cStart Phase PostSummonPhase color:green;
+[20:39:50.512] LOG: %cStart Phase PostSummonPhase color:green;
+[20:39:50.512] LOG: Ran PSP for: Torchic
+[20:39:50.513] LOG: %cStart Phase PostSummonPhase color:green;
+[20:39:50.513] LOG: %cStart Phase PostSummonPhase color:green;
+[20:39:50.513] LOG: %cStart Phase PostSummonPhase color:green;
+[20:39:50.513] LOG: Ran PSP for: Phanpy
+[20:39:50.514] LOG: %cStart Phase PostSummonPhase color:green;
+[20:39:50.514] LOG: %cStart Phase PostSummonPhase color:green;
+[20:39:50.514] LOG: %cStart Phase MovePhase color:green;
+[20:39:50.514] LOG: %cUser: Phanpy
+Move: DEFENSE_CURL
+Use Mode: INDIRECT color:orchid
+[20:39:50.515] LOG: %cStart Phase MessagePhase color:green;
+[20:39:50.642] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:39:50.643] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:39:50.645] LOG: %cStart Phase MessagePhase color:green;
+[20:39:50.876] LOG: %cStart Phase MoveEndPhase color:green;
+[20:39:50.876] LOG: %cStart Phase PostSummonPhase color:green;
+[20:39:50.876] LOG: Ran PSP for: Chikorita
+[20:39:50.876] LOG: %cStart Phase PostSummonPhase color:green;
+[20:39:50.876] LOG: %cStart Phase PostSummonPhase color:green;
+[20:39:50.876] LOG: %cStart Phase TurnInitPhase color:green;
+[20:39:50.876] LOG: %cStart Phase CommandPhase color:green;
+[20:39:52.458] LOG: Move: FLAME_WHEEL Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Torchic
+[20:39:52.459] LOG: %cStart Phase SelectTargetPhase color:green;
+[20:39:53.019] LOG: %cStart Phase CommandPhase color:green;
+[20:39:54.205] LOG: Move: MEGA_DRAIN Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Chikorita
+[20:39:54.205] LOG: %cStart Phase SelectTargetPhase color:green;
+[20:39:55.039] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:39:55.039] LOG: Battle Seed: Bsypu79mITH38XxC
+[20:39:55.041] WARN: BattlerTag ER_BLEED is missing a score!
+[20:39:55.041] WARN: BattlerTag ER_BLEED is missing a score!
+[20:39:55.041] WARN: BattlerTag ER_BLEED is missing a score!
+[20:39:55.041] WARN: BattlerTag ER_BLEED is missing a score!
+[20:39:55.041] LOG: Move Pool: ["Thrash","Slash"]
+[20:39:55.041] LOG: Move Scores: [36,25.5]
+[20:39:55.042] LOG: Sorted Move Pool: ["Thrash","Slash"]
+[20:39:55.042] LOG: Chosen Move: Thrash
+[20:39:55.042] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:39:55.045] LOG: Move Pool: ["Rock Smash","Ice Shard","Mud Sport","Defense Curl"]
+[20:39:55.045] LOG: Move Scores: [14,3.5,0,2]
+[20:39:55.045] LOG: Sorted Move Pool: ["Rock Smash","Ice Shard","Defense Curl","Mud Sport"]
+[20:39:55.045] LOG: Chosen Move: Rock Smash
+[20:39:55.045] LOG: %cStart Phase TurnStartPhase color:green;
+[20:39:55.048] LOG: %cStart Phase MovePhase color:green;
+[20:39:55.048] LOG: %cUser: Teddiursa
+Move: THRASH
+Use Mode: NORMAL color:orchid
+[20:39:55.053] LOG: %cStart Phase MessagePhase color:green;
+[20:39:55.159] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:39:55.160] LOG: crit stage: +0
+[20:39:55.161] LOG: Move: Thrash | Base damage: 21.2 | Power: 120 | Source attack: 20 | Target defense: 14
+[20:39:55.161] LOG: Move: Thrash | Attack damage: 31
+[20:39:55.161] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:39:55.194] LOG: %cStart Phase FaintPhase color:green;
+[20:39:55.196] WARN: cry/255 not found
+[20:39:55.260] LOG: %cStart Phase MessagePhase color:green;
+[20:39:55.848] LOG: %cStart Phase MoveEndPhase color:green;
+[20:39:55.849] LOG: %cStart Phase MovePhase color:green;
+[20:39:55.849] LOG: %cStart Phase MoveEndPhase color:green;
+[20:39:55.849] LOG: %cStart Phase MovePhase color:green;
+[20:39:55.849] LOG: %cUser: Phanpy
+Move: ROCK_SMASH
+Use Mode: NORMAL color:orchid
+[20:39:55.850] LOG: %cStart Phase MessagePhase color:green;
+[20:39:55.976] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:39:55.976] LOG: crit stage: +0
+[20:39:55.977] LOG: Move: Rock Smash | Base damage: 11.304615384615385 | Power: 60 | Source attack: 18 | Target defense: 13
+[20:39:55.977] LOG: Move: Rock Smash | Attack damage: 11
+[20:39:55.977] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:39:56.010] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:39:56.011] LOG: %cStart Phase MessagePhase color:green;
+[20:39:56.226] LOG: %cStart Phase MoveEndPhase color:green;
+[20:39:56.226] LOG: %cStart Phase MovePhase color:green;
+[20:39:56.226] LOG: %cUser: Chikorita
+Move: MEGA_DRAIN
+Use Mode: NORMAL color:orchid
+[20:39:56.227] LOG: %cStart Phase MessagePhase color:green;
+[20:39:56.376] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:39:56.376] LOG: crit stage: +0
+[20:39:56.377] LOG: Move: Mega Drain | Base damage: 6.467692307692308 | Power: 60 | Source attack: 11 | Target defense: 13
+[20:39:56.377] LOG: Move: Mega Drain | Attack damage: 18
+[20:39:56.378] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:39:56.410] LOG: %cStart Phase MessagePhase color:green;
+[20:39:56.643] LOG: %cStart Phase PokemonHealPhase color:green;
+[20:39:56.645] LOG: %cStart Phase MessagePhase color:green;
+[20:39:56.893] LOG: %cStart Phase MoveEndPhase color:green;
+[20:39:56.893] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:39:56.893] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:39:56.893] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:39:56.893] LOG: %cStart Phase BerryPhase color:green;
+[20:39:56.894] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:39:56.894] LOG: %cStart Phase TurnEndPhase color:green;
+[20:39:56.894] LOG: %cStart Phase SwitchPhase color:green;
+[20:39:57.996] LOG: %cStart Phase SwitchSummonPhase color:green;
+[20:39:58.094] LOG: Applied Zinc 
+[20:39:58.228] LOG: %cStart Phase PostSummonPhase color:green;
+[20:39:58.228] LOG: Ran PSP for: Zigzagoon
+[20:39:58.228] LOG: %cStart Phase PostSummonPhase color:green;
+[20:39:58.228] LOG: %cStart Phase PostSummonPhase color:green;
+[20:39:58.228] LOG: %cStart Phase TurnInitPhase color:green;
+[20:39:58.228] LOG: %cStart Phase CommandPhase color:green;
+[20:40:01.214] LOG: Move: DOUBLE_EDGE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Zigzagoon
+[20:40:01.215] LOG: %cStart Phase SelectTargetPhase color:green;
+[20:40:02.678] LOG: %cStart Phase CommandPhase color:green;
+[20:40:04.717] LOG: Move: MEGA_DRAIN Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Chikorita
+[20:40:04.718] LOG: %cStart Phase SelectTargetPhase color:green;
+[20:40:05.086] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:40:05.086] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:40:05.088] LOG: Battle Seed: Bsypu79mITH38XxC
+[20:40:05.088] LOG: Move Pool: ["Ice Shard"]
+[20:40:05.088] LOG: Move Scores: [24]
+[20:40:05.088] LOG: Sorted Move Pool: ["Ice Shard"]
+[20:40:05.088] LOG: Chosen Move: Ice Shard
+[20:40:05.088] LOG: %cStart Phase TurnStartPhase color:green;
+[20:40:05.090] LOG: %cStart Phase MovePhase color:green;
+[20:40:05.090] LOG: %cUser: Phanpy
+Move: ICE_SHARD
+Use Mode: NORMAL color:orchid
+[20:40:05.093] LOG: %cStart Phase MessagePhase color:green;
+[20:40:05.226] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:40:05.226] LOG: crit stage: +0
+[20:40:05.227] LOG: Move: Ice Shard | Base damage: 12.08 | Power: 40 | Source attack: 18 | Target defense: 8
+[20:40:05.227] LOG: Move: Ice Shard | Attack damage: 22
+[20:40:05.227] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:40:05.261] LOG: %cStart Phase MessagePhase color:green;
+[20:40:05.476] LOG: %cStart Phase FaintPhase color:green;
+[20:40:05.477] WARN: cry/152 not found
+[20:40:05.543] LOG: %cStart Phase MessagePhase color:green;
+[20:40:05.963] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[20:40:06.027] LOG: %cStart Phase MoveEndPhase color:green;
+[20:40:06.028] LOG: %cStart Phase MovePhase color:green;
+[20:40:06.028] LOG: %cUser: Zigzagoon
+Move: DOUBLE_EDGE
+Use Mode: NORMAL color:orchid
+[20:40:06.029] LOG: %cStart Phase MessagePhase color:green;
+[20:40:06.176] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:40:06.177] LOG: crit stage: +0
+[20:40:06.177] LOG: Move: Double-Edge | Base damage: 19.68 | Power: 130 | Source attack: 17 | Target defense: 14
+[20:40:06.178] LOG: Move: Double-Edge | Attack damage: 27
+[20:40:06.178] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:40:06.211] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:40:06.211] LOG: %cStart Phase MessagePhase color:green;
+[20:40:06.459] LOG: %cStart Phase MoveEndPhase color:green;
+[20:40:06.460] LOG: %cStart Phase MovePhase color:green;
+[20:40:06.460] LOG: %cUser: Teddiursa
+Move: THRASH
+Use Mode: IGNORE_PP color:orchid
+[20:40:06.461] LOG: %cStart Phase MessagePhase color:green;
+[20:40:06.609] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:40:06.610] LOG: crit stage: +0
+[20:40:06.611] LOG: Move: Thrash | Base damage: 21.2 | Power: 120 | Source attack: 20 | Target defense: 14
+[20:40:06.611] LOG: Move: Thrash | Attack damage: 29
+[20:40:06.611] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:40:06.644] LOG: %cStart Phase FaintPhase color:green;
+[20:40:07.427] LOG: %cStart Phase MessagePhase color:green;
+[20:40:07.676] LOG: %cStart Phase GameOverPhase color:green;
+[20:40:10.560] LOG: Getting Session Slot id: %d 0
+[20:40:10.563] LOG: Twins Eli
+[20:40:10.563] LOG: %cStart Phase PostGameOverPhase color:green;
+[20:40:10.594] DEBUG: Session data saved to slot 0!
+[20:40:12.526] LOG: Seed: eYZxd2l0baiCbQBA0gdPx8AH
+[20:40:12.527] LOG: Wave Seed: eYZxd2l0baiCbQBA0gdPx8AH 0
+[20:40:12.529] LOG: %cStart Phase TitlePhase color:green;
+[20:40:12.534] LOG: use seasonal splash messages true
+[20:40:12.534] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[20:40:22.958] LOG: Getting Session Slot id: %d 0
+[20:40:22.960] LOG: Getting Session Slot id: %d 1
+[20:40:22.963] LOG: Getting Session Slot id: %d 2
+[20:40:22.965] LOG: Getting Session Slot id: %d 3
+[20:40:22.968] LOG: Getting Session Slot id: %d 4
+[20:40:23.172] ERROR: Invalid save data JSON detected! Session not found.
+[20:40:23.175] ERROR: Invalid save data JSON detected! Session not found.
+[20:40:23.175] ERROR: Invalid save data JSON detected! Session not found.
+[20:40:23.176] ERROR: Invalid save data JSON detected! Session not found.
+[20:40:23.808] LOG: Wave Seed: RAiWWwuy6cQ8ikWSOmwqc6EY 0
+[20:40:23.837] LOG: {"id":"BERRY","localeKey":"","iconImage":"ganlon_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":4} (enemy)
+[20:40:23.837] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} (enemy)
+[20:40:23.837] LOG: {"id":"SOUL_DEW","localeKey":"modifierType:ModifierType.SOUL_DEW","iconImage":"soul_dew","soundName":"se/restore","tier":2} (enemy)
+[20:40:23.837] LOG: {"id":"GRIP_CLAW","localeKey":"modifierType:ModifierType.GRIP_CLAW","iconImage":"grip_claw","soundName":"se/restore","tier":3,"chancePercent":10} (enemy)
+[20:40:23.837] LOG: {"id":"BERRY","localeKey":"","iconImage":"liechi_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":3} (enemy)
+[20:40:23.837] LOG: {"id":"REVIVER_SEED","localeKey":"modifierType:ModifierType.REVIVER_SEED","iconImage":"reviver_seed","soundName":"se/restore","tier":2} (enemy)
+[20:40:23.837] LOG: {"id":"BERRY","localeKey":"","iconImage":"petaya_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":5} (enemy)
+[20:40:23.837] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"silver_powder","soundName":"se/restore","tier":1,"moveType":6,"boostPercent":20} (enemy)
+[20:40:23.837] LOG: {"id":"BERRY","localeKey":"","iconImage":"petaya_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":5} (enemy)
+[20:40:23.838] LOG: Applied Soul Dew 
+[20:40:23.838] LOG: Applied Soul Dew 
+[20:40:25.840] LOG: Wave Seed: SBjXXxvz7dR9jlXTPnxrd7FZ 1
+[20:40:25.840] LOG: %cStart Phase EncounterPhase color:green;
+[20:40:25.842] LOG: Starting species pool tier: COMMON
+[20:40:25.842] LOG: Applied Ability Charm 
+[20:40:25.842] LOG: Applied Shiny Charm 
+[20:40:25.850] LOG: Pokemon: Wild Wailmer | Species ID: 320 | Level: 19 | Nature: Modest (+SpAtk/-Atk)
+[20:40:25.850] LOG: Stats (IVs): HP: 83 (27), Atk: 29 (11), Def: 21 (19), Spatk: 41 (31), Spdef: 18 (0), Spd: 32 (27)
+[20:40:25.850] LOG: Ability: Stamina | Passive Ability: Thick Fat 
+[20:40:25.850] LOG: Moveset: ["Water Pledge","Roar","Defense Curl","Block"]
+[20:40:30.259] LOG: Battle Seed: g28FdlwvJYaiXQ0m
+[20:40:30.289] DEBUG: Session data saved to slot 0!
+[20:40:30.290] LOG: Wave Seed: SBjXXxvz7dR9jlXTPnxrd7FZ 1
+[20:40:30.726] LOG: %cStart Phase CommonAnimPhase color:green;
+[20:40:30.727] LOG: %cStart Phase MessagePhase color:green;
+[20:40:30.943] LOG: %cStart Phase SummonPhase color:green;
+[20:40:31.094] LOG: Applied Soul Dew 
+[20:40:31.094] LOG: Applied Soul Dew 
+[20:40:31.243] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[20:40:31.244] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:40:31.244] LOG: %cStart Phase PostSummonPhase color:green;
+[20:40:31.244] LOG: Ran PSP for: Tornadus
+[20:40:31.244] LOG: %cStart Phase PostSummonPhase color:green;
+[20:40:31.245] LOG: %cStart Phase PostSummonPhase color:green;
+[20:40:31.245] LOG: %cStart Phase PostSummonPhase color:green;
+[20:40:31.245] LOG: Ran PSP for: Wailmer
+[20:40:31.245] LOG: %cStart Phase PostSummonPhase color:green;
+[20:40:31.245] LOG: %cStart Phase PostSummonPhase color:green;
+[20:40:31.245] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:40:31.415] ERROR: [unhandledrejection] TypeError: Cannot read properties of null (reading 'getEffectiveStat')
+TypeError: Cannot read properties of null (reading 'getEffectiveStat')
+    at https://elite-redux-staging.pages.dev/assets/er-map-nodes-q2l2iiQp.js:1:35924
+    at Array.sort (<anonymous>)
+    at sortBySpeed (https://elite-redux-staging.pages.dev/assets/er-map-nodes-q2l2iiQp.js:1:35845)
+    at sortInSpeedOrder (https://elite-redux-staging.pages.dev/assets/er-map-nodes-q2l2iiQp.js:1:35384)
+    at MovePhasePriorityQueue.reorder (https://elite-redux-staging.pages.dev/assets/battle-scene-CZG-64Yk.js:18:10109)
+    at MovePhasePriorityQueue.reorder (https://elite-redux-staging.pages.dev/assets/battle-scene-CZG-64Yk.js:18:10448)
+    at MovePhasePriorityQueue.pop (https://elite-redux-staging.pages.dev/assets/battle-scene-CZG-64Yk.js:18:11108)
+    at DynamicQueueManager.popNextPhase (https://elite-redux-staging.pages.dev/assets/battle-scene-CZG-64Yk.js:18:15479)
+    at PhaseManager.shiftPhase (https://elite-redux-staging.pages.dev/assets/battle-scene-CZG-64Yk.js:461:18688)
+    at ShowAbilityPhase.end (https://elite-redux-staging.pages.dev/assets/battle-scene-CZG-64Yk.js:18:11383)
