@@ -65,6 +65,14 @@ async function startGame(): Promise<void> {
     dom: {
       createContainer: true,
     },
+    loader: {
+      // ER: bound every individual asset XHR. A stalled CDN request (a jsDelivr
+      // hiccup on a sprite atlas that otherwise exists) would otherwise leave the
+      // loader pending forever and hang the summon / wave transition that awaits
+      // it. 15s is generous for any single file, so a real stall fails fast and
+      // Phaser's onError fallback runs instead of freezing the run.
+      timeout: 15000,
+    },
     antialias: false,
     pipeline: [InvertPostFX] as unknown as Phaser.Types.Core.PipelineConfig,
     scene: [LoadingScene, BattleScene],
