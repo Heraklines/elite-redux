@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
+import { erBiomeWaveSkipChance } from "#data/elite-redux/er-biome-encounters";
 import { BattleType } from "#enums/battle-type";
-import type { BiomeId } from "#enums/biome-id";
+import { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { TrainerSlot } from "#enums/trainer-slot";
@@ -17,6 +18,7 @@ import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 import { installAuthoredTeam } from "#system/llm-director/install-authored-team";
 import { paginate } from "#system/llm-director/text-pagination";
 import { trainerConfigs } from "#trainers/trainer-config";
+import { randSeedInt } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 export class NewBattlePhase extends BattlePhase {
@@ -27,6 +29,14 @@ export class NewBattlePhase extends BattlePhase {
     globalScene.phaseManager.removeAllPhasesOfType("NewBattlePhase");
 
     globalScene.newBattle();
+
+    // ER (biome composition): the DESERT sometimes just has nothing - a chunk of
+    // its plain waves are EMPTY (no fight, advance straight to the next). If this
+    // wave is skipped, the encounter is cancelled and the run rolls on.
+    if (this.maybeApplyErDesertSkip()) {
+      this.end();
+      return;
+    }
 
     // After newBattle has populated the upcoming wave's enemy levels, consume
     // any pending LLM Director inter-beat override for that wave. v1 applies
@@ -55,6 +65,50 @@ export class NewBattlePhase extends BattlePhase {
     }
 
     this.end();
+  }
+
+  /**
+   * ER (biome composition): the DESERT is a sparse crossing - a chunk of its
+   * plain waves are EMPTY ("nothing out here"), so the run auto-advances past
+   * them. Returns true when THIS wave was skipped (the caller then ends without
+   * queuing the encounter).
+   *
+   * Only PLAIN, mid-biome wild waves can be empty: never a x0 boss/shop wave, a
+   * fixed/gym battle, a trainer, or a mystery encounter - those are exactly the
+   * "something notable" the desert is meant to surface. The skipped wave's index
+   * still advances (the wave is "spent"), matching the long-dead-stretch feel.
+   */
+  private maybeApplyErDesertSkip(): boolean {
+    const battle = globalScene.currentBattle;
+    if (!battle || globalScene.arena?.biomeId !== BiomeId.DESERT) {
+      return false;
+    }
+    const wave = battle.waveIndex;
+    if (
+      wave % 10 === 0
+      || globalScene.gameMode.isFixedBattle(wave)
+      || battle.battleType === BattleType.TRAINER
+      || battle.isBattleMysteryEncounter()
+    ) {
+      return false;
+    }
+    const skipChance = erBiomeWaveSkipChance(BiomeId.DESERT);
+    if (skipChance <= 0) {
+      return false;
+    }
+    let skip = false;
+    globalScene.executeWithSeedOffset(() => {
+      skip = randSeedInt(100) < skipChance;
+    }, wave * 9001);
+    if (!skip) {
+      return false;
+    }
+    // Empty wave: drop the queued encounter and roll straight on to the next wave.
+    globalScene.phaseManager.removeAllPhasesOfType("NextEncounterPhase");
+    globalScene.phaseManager.removeAllPhasesOfType("NewBiomeEncounterPhase");
+    globalScene.phaseManager.pushNew("MessagePhase", "The desert stretches on. Nothing stirs out here.", null, true);
+    globalScene.phaseManager.pushNew("NewBattlePhase");
+    return true;
   }
 
   /**

@@ -74,8 +74,12 @@ const ER_BIOME_ENCOUNTERS: Partial<Record<BiomeId, ErBiomeEncounter>> = {
   [BiomeId.MOUNTAIN]: { eventMult: 0.7 },
   [BiomeId.BADLANDS]: { eventMult: 0.7, bossPct: 25 },
   [BiomeId.CAVE]: { trainerMult: 0.6, bossPct: 25 },
-  // DESERT: a sparse crossing - most waves are empty; non-skip waves are notable.
-  [BiomeId.DESERT]: { trainerMult: 0.3, skipChance: 40, skipFallback: { event: 60, boss: 40 } },
+  // DESERT: a sparse crossing - ~40% of plain waves are EMPTY (the skip), trainers
+  // are rare (0.3x), and the waves that DO fire lean hard toward "something notable"
+  // - elevated events (2x) and a high wild-boss % - so a desert wave is mostly
+  // nothing, then an event or a boss. (skipFallback is the eventual hard ME/boss-
+  // only split; for now the elevated event/boss weights approximate it.)
+  [BiomeId.DESERT]: { trainerMult: 0.3, eventMult: 2, bossPct: 45, skipChance: 40, skipFallback: { event: 60, boss: 40 } },
   [BiomeId.ICE_CAVE]: { trainerMult: 0.6, bossPct: 25 },
   [BiomeId.MEADOW]: { trainerMult: 0.6 },
   // POWER_PLANT: vanilla composition (identity is Electric terrain).

@@ -199,6 +199,11 @@ wave (2-3 bars). Db = wild-double 2x. Berry% = wild-berry chance.
   stretches broken only by a notable event or a lone boss. Survival gear (Heavy-
   Duty Boots, Safety Goggles) reads as "you packed for a long crossing". Trainer
   rate stays `--` for the rare non-skip, non-ME/boss case.
+  - BUILT: the empty-wave skip is live (NewBattlePhase gate: DESERT + plain
+    mid-biome wild wave only; never a x0/fixed/trainer/ME wave). The "non-skip =
+    ME/boss" split is currently APPROXIMATED via the composition knobs (eventMult
+    2x + bossPct 45) rather than a hard force; a true ME/boss-only guarantee
+    (forcing the battle type) is a tuning refinement.
 - **SLUM** (your call): the **dirty-fighting** biome — generalizes Fight Club to
   ordinary trainer waves: rigged held items + an opening blind (Sand Attack/Fake
   Out) + occasional lead omni-boost. The "everyone cheats here" den.

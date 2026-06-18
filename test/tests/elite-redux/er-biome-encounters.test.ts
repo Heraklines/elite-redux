@@ -72,6 +72,12 @@ describe("er-biome-encounters (composition table)", () => {
       expect(erBiomeSkipFallback(BiomeId.DESERT)).toEqual({ event: 60, boss: 40 });
     });
 
+    it("makes the non-skipped Desert waves notable (events up, bosses up, trainers down)", () => {
+      expect(erBiomeEventRateMult(BiomeId.DESERT)).toBeGreaterThan(1);
+      expect(erBiomeBossChancePct(BiomeId.DESERT)).toBeGreaterThan(0);
+      expect(erBiomeTrainerRateMult(BiomeId.DESERT)).toBeLessThan(1);
+    });
+
     it("is off for non-skip biomes", () => {
       expect(erBiomeWaveSkipChance(BiomeId.GRAVEYARD)).toBe(0);
       expect(erBiomeSkipFallback(BiomeId.GRAVEYARD)).toBeUndefined();

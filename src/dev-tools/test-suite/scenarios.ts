@@ -5783,7 +5783,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "FORWARD. Wasteland is the every-wild-wave BOSS gauntlet: nearly every\n"
       + "non-trainer wave should be a 2-3 bar boss mon, with trainers rare (0.3x).\n"
       + "A short, brutal stretch. EXPECT back-to-back boss bars. Send Logs after a\n"
-      + "few waves. (Desert's empty-wave SKIP is a separate follow-up, not in yet.)",
+      + "few waves.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -5797,6 +5797,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
         }),
         makeStarter(SpeciesId.DRAGAPULT, {
           moveset: [MoveId.DRAGON_DARTS, MoveId.PHANTOM_FORCE, MoveId.U_TURN, MoveId.DRAGON_DANCE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Biome composition: DESERT (empty-wave skip)",
+    description:
+      "Per-biome ENCOUNTER COMPOSITION. Drops you into the DESERT and you PLAY\n"
+      + "FORWARD. The desert is a sparse crossing: ~40% of plain waves are EMPTY -\n"
+      + "you should see 'The desert stretches on. Nothing stirs out here.' and the\n"
+      + "run advances with NO fight. The waves that DO fire lean hard toward\n"
+      + "SOMETHING NOTABLE (events ~2x, high wild-boss %), trainers rare (0.3x).\n"
+      + "EXPECT: stretches of nothing, then an event or a boss. x0 boss/shop waves\n"
+      + "are never skipped. Send Logs after ~15 waves.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 21,
+        STARTING_BIOME_OVERRIDE: BiomeId.DESERT,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.ROTOM, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.SHADOW_BALL, MoveId.VOLT_SWITCH, MoveId.NASTY_PLOT],
         }),
       ];
     },
