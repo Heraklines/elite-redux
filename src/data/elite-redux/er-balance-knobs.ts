@@ -854,6 +854,17 @@ export const ER_BALANCE_KNOBS: readonly ErBalanceKnob[] = [
     integer: true,
   },
   {
+    key: "er.ai.experimentalHell",
+    group: "Battle AI",
+    label: "Hell uses experimental (Foul-Play) AI",
+    help: "When >= 1, EVERY Hell trainer/boss uses the experimental Foul-Play-style depth-1 brain (Elite stays on the standard brain). Independent of the rollout % above.",
+    kind: "scalar",
+    default: 0,
+    min: 0,
+    max: 1,
+    integer: true,
+  },
+  {
     key: "er.ai.sharpnessHell",
     group: "Battle AI",
     label: "Hell AI sharpness",

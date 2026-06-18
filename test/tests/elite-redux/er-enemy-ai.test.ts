@@ -136,9 +136,15 @@ describe("er-enemy-ai (Elite/Hell smarter AI - Slice 1)", () => {
   });
 
   describe("experimental profile (A/B harness)", () => {
-    it("is 'standard' by default", () => {
+    it("uses the experimental (Foul-Play) brain for Hell trainers (er.ai.experimentalHell)", () => {
       setErSmartAiTestForced(true);
       setErDifficulty("hell");
+      expect(getErAiProfile(trainerMon).kind).toBe("experimental");
+    });
+
+    it("keeps Elite trainers on the standard brain", () => {
+      setErSmartAiTestForced(true);
+      setErDifficulty("elite");
       expect(getErAiProfile(trainerMon).kind).toBe("standard");
     });
 

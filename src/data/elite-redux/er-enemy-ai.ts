@@ -215,11 +215,12 @@ export function getErAiProfile(pokemon: ErAiPokemon): ErAiProfile {
     return INACTIVE_PROFILE;
   }
   const hell = difficulty === "hell";
-  // Experimental brain (opt-in, per the A/B harness): for now it plays at maximum
-  // sharpness + the most aggressive switching, so it's distinguishable back-to-back
-  // from the difficulty-tuned standard brain. The one-ply EV / Foul-Play-style
-  // reads will slot in here, gated on kind === "experimental".
-  if (resolveExperimental()) {
+  // Experimental (Foul-Play depth-1) brain. Assigned via the A/B harness OR the
+  // rollout %, AND - when er.ai.experimentalHell is on - to EVERY Hell trainer/boss
+  // (Elite stays on the difficulty-tuned standard brain). It plays at maximum
+  // sharpness + the most aggressive switching.
+  const hellExperimental = hell && erBalanceNum("er.ai.experimentalHell") >= 1;
+  if (resolveExperimental() || hellExperimental) {
     return {
       active: true,
       kind: "experimental",
