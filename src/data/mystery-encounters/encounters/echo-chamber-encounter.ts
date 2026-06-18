@@ -5,14 +5,24 @@
  */
 
 // =============================================================================
-// ER #486 - Echo Chamber. A CAVE-biome map event (Phase D): a vast resonant
-// cavern. Call out and listen - the returning echoes map the tunnels ahead,
-// revealing the onward routes onto the World Map (press M to view). Or move on
-// quietly.
+// ER #486 - Echo Chamber. A CAVE-biome SCOUT map event (Phase D). Call into the
+// dark and listen: the returning echoes map the tunnels ahead. This is a SOUND-
+// MOVE skill check - a Pokemon that knows a sound move (Hyper Voice, Boomburst,
+// Echoed Voice, Snarl, ...) echoes LOUDER and maps the WHOLE area (every onward
+// route revealed). Without a sound move the echo dies in the dark and you make
+// out only a single faint passage. Or move on quietly (reveal nothing).
+//
+// This is what makes it distinct from the Observatory (which charts everything
+// unconditionally): here the reveal SCALES with bringing the right move.
+//
+// [Recovered design - er-events-design-recovered.md "Echo Chamber": sound-move-
+// gated SCOUT, "a mon with a sound move echoes louder and reveals more."]
 // =============================================================================
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
-import { chartOnwardRoutes } from "#data/elite-redux/er-map-events";
+import { globalScene } from "#app/global-scene";
+import { revealAllErPendingNodes, revealNextHiddenErPendingNode } from "#data/elite-redux/er-biome-routing";
+import { MoveFlags } from "#enums/move-flags";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
@@ -26,6 +36,11 @@ import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 
 const namespace = "mysteryEncounters/echoChamber";
 
+/** True if any party member knows a SOUND-based move (the louder-echo skill check). */
+function partyHasSoundMove(): boolean {
+  return globalScene.getPlayerParty().some(p => p.moveset.some(m => m?.getMove().hasFlag(MoveFlags.SOUND_BASED)));
+}
+
 export const EchoChamberEncounter: MysteryEncounter = MysteryEncounterBuilder.withEncounterType(
   MysteryEncounterType.ER_ECHO_CHAMBER,
 )
@@ -37,6 +52,17 @@ export const EchoChamberEncounter: MysteryEncounter = MysteryEncounterBuilder.wi
     { species: SpeciesId.NOIBAT, spriteKey: "", fileRoot: "", hasShadow: true, repeat: true, y: 5 },
   ])
   .withIntroDialogue([{ text: `${namespace}:intro` }])
+  .withOnInit(() => {
+    // Hint whether the party can make the cavern ring (a sound move) before choosing.
+    const encounter = globalScene.currentBattle.mysteryEncounter!;
+    encounter.setDialogueToken(
+      "echoTell",
+      partyHasSoundMove()
+        ? "A sound-move partner could make the whole cavern ring, mapping every tunnel."
+        : "No sound move in your party - the echo will carry only so far.",
+    );
+    return true;
+  })
   .setLocalizationKey(`${namespace}`)
   .withTitle(`${namespace}:title`)
   .withDescription(`${namespace}:description`)
@@ -48,7 +74,13 @@ export const EchoChamberEncounter: MysteryEncounter = MysteryEncounterBuilder.wi
       selected: [{ text: `${namespace}:option.1.selected` }],
     },
     async () => {
-      chartOnwardRoutes([]);
+      // Sound move -> the cavern rings: every onward route is mapped. Otherwise the
+      // faint echo makes out only one more passage.
+      if (partyHasSoundMove()) {
+        revealAllErPendingNodes();
+      } else {
+        revealNextHiddenErPendingNode();
+      }
       queueEncounterMessage(`${namespace}:charted`);
       await transitionMysteryEncounterIntroVisuals(true, true);
       leaveEncounterWithoutBattle(true);

@@ -49,6 +49,9 @@ export const TREASURE_FRAGMENTS_FOR_REWARD = 3;
 let revealedNodes: ErMapNode[] = [];
 let travelTarget: BiomeId | null = null;
 let fragmentCount = 0;
+/** ER (#486) The Storm: a WeatherType (numeric enum) the player chose to carry
+ * into the NEXT biome, consumed once on that biome's first wave. null = none. */
+let carriedWeather: number | null = null;
 /** Ordered list of biomes the player has entered this run (the journey chain the
  * World Map draws). Appended on each biome entry; persisted in the run save. */
 let biomeHistory: BiomeId[] = [];
@@ -59,6 +62,7 @@ export function resetErMapNodes(): void {
   travelTarget = null;
   fragmentCount = 0;
   biomeHistory = [];
+  carriedWeather = null;
   resetErRouting();
   resetErBiomeStructure();
   resetErFairyLuck();
@@ -133,6 +137,18 @@ export function consumeMapTravelTarget(): BiomeId | null {
   return target;
 }
 
+/** Carry a weather (WeatherType numeric enum) into the next biome (#486 The Storm). */
+export function setErCarriedWeather(weather: number): void {
+  carriedWeather = weather;
+}
+
+/** Take and clear the carried weather, applied once on the next biome's entry. */
+export function consumeErCarriedWeather(): number | null {
+  const w = carriedWeather;
+  carriedWeather = null;
+  return w;
+}
+
 /** Add (or, with a negative n, spend) Treasure-Map fragments. Clamped at 0. Returns the new total. */
 export function addTreasureFragments(n: number): number {
   fragmentCount = Math.max(0, fragmentCount + n);
@@ -181,6 +197,8 @@ export interface ErMapSaveData {
   fairyLuckExpiry?: number;
   /** ER (#486) World Map: the ordered biomes visited this run (the journey chain). */
   biomeHistory?: number[];
+  /** ER (#486) The Storm: a WeatherType to carry into the next biome (pending). */
+  carriedWeather?: number;
 }
 
 /** Snapshot the current map state for the session save (#486 increment 2). */
@@ -196,6 +214,7 @@ export function getErMapSaveData(): ErMapSaveData {
     fairyLuckBonus: getErFairyLuckSave().bonus,
     fairyLuckExpiry: getErFairyLuckSave().expiryWave,
     biomeHistory: [...biomeHistory],
+    ...(carriedWeather != null ? { carriedWeather } : {}),
   };
 }
 
@@ -246,5 +265,8 @@ export function restoreErMapState(data: ErMapSaveData | undefined | null, curren
     // (the current biome, which the roll already excludes) so the trail holds the
     // PRIOR biomes the player came from.
     restoreErRecentBiomes(biomeHistory.slice(0, -1));
+  }
+  if (typeof data.carriedWeather === "number") {
+    carriedWeather = data.carriedWeather;
   }
 }

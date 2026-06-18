@@ -9,6 +9,7 @@ import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims"
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
+import { consumeErCarriedWeather } from "#data/elite-redux/er-map-nodes";
 import { erLookoutPreviewEnemy, erQuartermasterTick } from "#data/elite-redux/er-relics";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
@@ -23,6 +24,7 @@ import { PlayerGender } from "#enums/player-gender";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { UiMode } from "#enums/ui-mode";
+import type { WeatherType } from "#enums/weather-type";
 import { EncounterPhaseEvent } from "#events/battle-scene";
 import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import {
@@ -751,6 +753,13 @@ export class EncounterPhase extends BattlePhase {
     // of rolling the vanilla pool (e.g. Desert/Badlands sandstorm, Ice Cave snow,
     // Graveyard fog). No `user` -> permanent (turnsLeft 0), so it persists across
     // the biome's waves like any ambient biome weather.
+    // ER (#486) The Storm: a weather the player chose to carry into THIS biome
+    // overrides the biome's own ambient, applied once on entry. null = none.
+    const carried = consumeErCarriedWeather();
+    if (carried != null) {
+      globalScene.arena.trySetWeather(carried as WeatherType);
+      return;
+    }
     const forced = erBiomeForcedWeather(globalScene.arena.biomeId);
     if (forced != null) {
       globalScene.arena.trySetWeather(forced);

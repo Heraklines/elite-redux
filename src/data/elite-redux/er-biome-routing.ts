@@ -144,6 +144,21 @@ export function revealAllErPendingNodes(): number {
 }
 
 /**
+ * Reveal just ONE hidden onward node (a faint partial reveal, e.g. the Echo
+ * Chamber WITHOUT a sound move - the echo carries only so far). Marks it as an
+ * event reveal (blue). Returns true if a node was newly revealed.
+ */
+export function revealNextHiddenErPendingNode(): boolean {
+  const node = pendingNodes.find(n => !n.revealed);
+  if (!node) {
+    return false;
+  }
+  node.revealed = true;
+  node.source = "event";
+  return true;
+}
+
+/**
  * Biomes a mystery event has revealed as onward routes for the CURRENT biome's
  * exit (rendered blue + selectable in the route picker). Reset on every biome
  * entry - an event reveal is only good for the next hop.
