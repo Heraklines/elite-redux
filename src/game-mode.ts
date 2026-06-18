@@ -14,6 +14,7 @@ import { parseDailySeed } from "#data/daily-seed/daily-seed-utils";
 import { allSpecies } from "#data/data-lists";
 import { erBalanceMap, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { erForcesTrainerWave } from "#data/elite-redux/er-battle-frequency";
+import { erBiomeTrainerRateMult } from "#data/elite-redux/er-biome-encounters";
 import { erNotorietyTrainerChancePct } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import type { PokemonSpecies } from "#data/pokemon-species";
@@ -306,7 +307,15 @@ export class GameMode implements GameModeConfig {
           return true;
         }
       }
-      return Boolean(allowTrainerBattle && trainerChance && !randSeedInt(trainerChance));
+      // ER (biome composition): scale the generic trainer odds per biome. The roll
+      // is `1/trainerChance`, so a HIGHER mult means a SMALLER divisor (denser
+      // trainers: Metropolis 1.6x), a LOWER mult a larger one (sparser: Desert 0.3x,
+      // Wasteland/Abyss/Space). Base 0 (Town) stays 0. Composes with the difficulty
+      // force + notoriety paths above (those already returned true when they fire).
+      const trainerMult = erBiomeTrainerRateMult(arena.biomeId);
+      const effectiveTrainerChance =
+        trainerMult === 1 ? trainerChance : Math.max(1, Math.round(trainerChance / trainerMult));
+      return Boolean(allowTrainerBattle && trainerChance && !randSeedInt(effectiveTrainerChance));
     }
     return false;
   }

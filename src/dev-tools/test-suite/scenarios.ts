@@ -5749,4 +5749,56 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "(note) Biome composition: GRAVEYARD (event-heavy)",
+    description:
+      "Per-biome ENCOUNTER COMPOSITION. Drops you into the GRAVEYARD mid-run and\n"
+      + "you PLAY FORWARD several waves. Graveyard has eventMult ~2.2x, so mystery\n"
+      + "encounters should fire NOTICEABLY more often than usual (baseline is ~1\n"
+      + "ME / 10-15 waves; here expect bursts). Compare against a quiet biome (Sea/\n"
+      + "Plains ~0.7x) where they should be rare. Trainers are a touch sparser (0.6x)\n"
+      + "and wild bosses a touch more common (+25%). Note: applies on ALL\n"
+      + "difficulties (biome rules are universal). Send Logs after ~15 waves.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 21,
+        STARTING_BIOME_OVERRIDE: BiomeId.GRAVEYARD,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.ROTOM, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.SHADOW_BALL, MoveId.VOLT_SWITCH, MoveId.NASTY_PLOT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Biome composition: WASTELAND (boss gauntlet)",
+    description:
+      "Per-biome ENCOUNTER COMPOSITION. Drops you into the WASTELAND and you PLAY\n"
+      + "FORWARD. Wasteland is the every-wild-wave BOSS gauntlet: nearly every\n"
+      + "non-trainer wave should be a 2-3 bar boss mon, with trainers rare (0.3x).\n"
+      + "A short, brutal stretch. EXPECT back-to-back boss bars. Send Logs after a\n"
+      + "few waves. (Desert's empty-wave SKIP is a separate follow-up, not in yet.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 70,
+        STARTING_WAVE_OVERRIDE: 41,
+        STARTING_BIOME_OVERRIDE: BiomeId.WASTELAND,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.DRAGAPULT, {
+          moveset: [MoveId.DRAGON_DARTS, MoveId.PHANTOM_FORCE, MoveId.U_TURN, MoveId.DRAGON_DANCE],
+        }),
+      ];
+    },
+  },
 ];

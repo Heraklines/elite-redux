@@ -43,6 +43,14 @@ NOT per-biome yet (all single, clean hook points identified):
 - `bossPct` — flat % added to the per-wave boss roll (like the notoriety hook).
 - `bossEveryWave` + `bossBars` — Wasteland-style: every wild is a boss-bar mon,
   bar count forced to a 2-3 toss-up. (NEW: biome-aware boss segments.)
+- `skipChance` — Desert-style: a flat % that a wave is EMPTY (auto-advances, no
+  fight, "nothing out here"). The wave still counts for wave index / biome length.
+  When a wave is NOT skipped, composition is hard-skewed to "something notable"
+  via `skipFallback` (see below) instead of the normal trainer/wild mix. (NEW.)
+- `skipFallback` — when a non-skipped wave fires in a skip biome, the weights for
+  what it becomes: e.g. Desert = ~60% mystery event / ~40% boss monster, ~0
+  ordinary trainer or wild. So the biome is long dead stretches punctuated only by
+  an ME or a boss.
 
 ### B. STYLE — how the fight itself plays
 - `encounterStyle: "dirty"` — trainers fight dirty (subset of Fight Club: rigged
@@ -142,7 +150,7 @@ wave (2-3 bars). Db = wild-double 2x. Berry% = wild-berry chance.
 | MOUNTAIN | · | - | · | wind | 20 | Hard Stone, Eviolite, Charti |
 | BADLANDS | · | - | + | sandstorm | 15 | Smooth Rock, Soft Sand, Shuca |
 | CAVE | - | · | + | darkness | 20 | Eviolite, Hard Stone, Everstone-mons |
-| DESERT | -- | - | · | **less-traveled (sparse everything)**, sandstorm | 10 | Smooth Rock, Safety Goggles, Heavy-Duty Boots |
+| DESERT | -- | (skip) | (skip) | **~40% waves SKIP (empty)**; non-skip = 60% ME / 40% boss, sandstorm | 10 | Smooth Rock, Safety Goggles, Heavy-Duty Boots |
 | ICE_CAVE | - | · | + | hail, frostbite entry | 20 | Icy Rock, Snowball, Yache, NeverMeltIce |
 | MEADOW | - | · | · | cozy (+candy) | 40 | pinch berries, Grassy Seed |
 | POWER_PLANT | · | · | · | Electric terrain | 0 | Cell Battery, Magnet, Electric Seed |
@@ -183,9 +191,14 @@ wave (2-3 bars). Db = wild-double 2x. Berry% = wild-berry chance.
 - **METROPOLIS** (your call): BALANCED trainer + event (not trainer-dominant);
   trainers carry **more items** (a trainer-only `enemyItemMult` ~1.5).
 - **GRAVEYARD** (your call): event-heavy (`++`); fog; ghost-flavored gear.
-- **DESERT** (your call): a sparse, less-traveled stretch — LOW everything (the
-  caravan/double-item idea is dropped). Survival gear (Heavy-Duty Boots, Safety
-  Goggles) reads as "you packed for a long crossing".
+- **DESERT** (your call): a sparse, less-traveled crossing where most waves are
+  literally EMPTY. ~40% of waves SKIP (auto-advance, no fight, "nothing out here")
+  via `skipChance`; the wave still counts toward wave index / biome length. When a
+  wave DOES fire, it is almost never an ordinary trainer/wild - `skipFallback`
+  skews it ~60% mystery event / ~40% boss monster. So Desert plays as long dead
+  stretches broken only by a notable event or a lone boss. Survival gear (Heavy-
+  Duty Boots, Safety Goggles) reads as "you packed for a long crossing". Trainer
+  rate stays `--` for the rare non-skip, non-ME/boss case.
 - **SLUM** (your call): the **dirty-fighting** biome — generalizes Fight Club to
   ordinary trainer waves: rigged held items + an opening blind (Sand Attack/Fake
   Out) + occasional lead omni-boost. The "everyone cheats here" den.

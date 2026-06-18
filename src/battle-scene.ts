@@ -31,6 +31,12 @@ import { getDailyMysteryEncounter } from "#data/daily-seed/daily-run";
 import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
+import {
+  erBiomeBossChancePct,
+  erBiomeBossEveryWave,
+  erBiomeEventRateMult,
+  erBiomeForcedBossBars,
+} from "#data/elite-redux/er-biome-encounters";
 import { erNotorietyBossChancePct, erNotorietyItemRateMult } from "#data/elite-redux/er-biome-notoriety";
 import {
   erBiomeRoutingActive,
@@ -2337,16 +2343,42 @@ export class BattleScene extends SceneBase {
       // function of the per-biome start wave, which resets on biome entry), so the
       // global curve resumes exactly after leaving. Gated to the World Map run.
       const notorietyBossPct = erBiomeRoutingActive() ? erNotorietyBossChancePct(waveIndex) : 0;
+      // ER (biome composition): a flat per-biome boss % (boss-heavy Volcano/Abyss,
+      // +25% in caves/ruins/etc.) ADDS on top of the notoriety overstay %. The
+      // Wasteland is an every-(wild-)wave boss gauntlet. Trainer waves are exempt -
+      // only wild/ME-spawned mons get the every-wave treatment.
+      const biomeId = this.arena.biomeId;
+      const isTrainerWave = this.currentBattle?.battleType === BattleType.TRAINER;
+      const biomeBossPct = erBiomeBossChancePct(biomeId);
+      const everyWaveBoss = !isTrainerWave && erBiomeBossEveryWave(biomeId);
+      const totalBossPct = biomeBossPct + notorietyBossPct;
       this.executeWithSeedOffset(() => {
         isBoss =
-          waveIndex % 10 === 0
-          || (notorietyBossPct > 0 && randSeedInt(100) < notorietyBossPct)
+          everyWaveBoss
+          || waveIndex % 10 === 0
+          || (totalBossPct > 0 && randSeedInt(100) < totalBossPct)
           || (this.gameMode.hasRandomBosses
             && randSeedInt(100) < Math.min(Math.max(Math.ceil((waveIndex - 250) / 50), 0) * 2, 30));
       }, waveIndex << 2);
     }
     if (!isBoss) {
       return 0;
+    }
+
+    // Wasteland-style every-wave boss: force the bar count to its [min, max]
+    // toss-up (a short, brutal loot gauntlet) rather than the level/BST math.
+    const forcedBars = erBiomeForcedBossBars(this.arena.biomeId);
+    if (
+      forcedBars
+      && erBiomeBossEveryWave(this.arena.biomeId)
+      && this.currentBattle?.battleType !== BattleType.TRAINER
+    ) {
+      const [minBars, maxBars] = forcedBars;
+      let bars = minBars;
+      this.executeWithSeedOffset(() => {
+        bars = minBars + randSeedInt(Math.max(1, maxBars - minBars + 1));
+      }, waveIndex << 3);
+      return bars;
     }
 
     let ret = 2;
@@ -4259,7 +4291,14 @@ export class BattleScene extends SceneBase {
       sessionEncounterRate
       + Math.min(currentRunDiffFromAvg * ANTI_VARIANCE_WEIGHT_MODIFIER, MYSTERY_ENCOUNTER_SPAWN_MAX_WEIGHT / 2);
 
-    const successRate = Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE ?? favoredEncounterRate;
+    // ER (biome composition): per-biome event-rate weighting - event-heavy biomes
+    // (Graveyard/Ruins ~2.2x) feel haunted, quiet ones (Sea/Plains ~0.7x) almost
+    // never roll one. Multiplies the per-wave roll, so it composes with the Mystery
+    // Charm run target. Skipped when a rate override is forcing the rate.
+    const successRate =
+      Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE === null
+        ? favoredEncounterRate * erBiomeEventRateMult(this.arena.biomeId)
+        : Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE;
 
     let roll = 0;
     // Always rolls the check on the same offset to ensure no RNG changes from reloading session
