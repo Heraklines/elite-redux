@@ -57,7 +57,7 @@ export class TheBargainPhase extends Phase {
 
   start(): void {
     super.start();
-    void this.run();
+    this.run();
   }
 
   private run(): void {
@@ -71,11 +71,11 @@ export class TheBargainPhase extends Phase {
     // labels/descs for the dedicated bargain screen: the chosen Sins + a Leave row.
     const labels = [...sins.map(k => i18next.t(`${ns}:sins.${k}.name`)), i18next.t(`${ns}:option.leave.label`)];
     const descs = [...sins.map(k => i18next.t(`${ns}:sins.${k}.tooltip`)), ""];
-    const greeting = i18next.t(`${ns}:introDialogue`).replace(/\$/g, " ");
+    // The handler's dialogue box fits a short line; use the first two sentences of
+    // the intro (the full ominous monologue still plays elsewhere as needed).
+    const greeting = i18next.t(`${ns}:introDialogue`).split("$").slice(0, 2).join(" ");
 
-    globalScene.ui.setMode(UiMode.ER_BARGAIN, labels, descs, greeting, (index: number) => {
-      void this.onChoice(sins, index);
-    });
+    globalScene.ui.setMode(UiMode.ER_BARGAIN, labels, descs, greeting, (index: number) => this.onChoice(sins, index));
   }
 
   /** Resolve the player's choice from the bargain screen. */
@@ -102,6 +102,7 @@ export class TheBargainPhase extends Phase {
   }
 
   /** Run one Sin's offer line, party pick(s), cost+payoff, then the result line. */
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: a 7-Sin dispatch switch; each case is a small self-contained deal, clearer kept inline than split across seven helpers
   private async applySin(key: BargainSinKey): Promise<void> {
     await this.giratina(`${ns}:sins.${key}.offer`);
     let pokeName = "";
