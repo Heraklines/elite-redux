@@ -1,0 +1,278 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     4  wave:24  difficulty:hell
+seed:     d8sGHT2dbCxE8JSR5iWXZ87s
+party:    Serena-Delphox(L23 74/74), Togepi(L20 50/50), Meowth(L20 0/52), Rotom(L20 56/56)
+
+----- DESCRIPTION -----
+Beach didn't trigged the Harshy Sunlight
+
+----- CONSOLE -----
+[14:13:19.599] LOG: %cStart Phase MoveEndPhase color:green;
+[14:13:19.605] LOG: %cStart Phase MovePhase color:green;
+[14:13:19.606] LOG: %cUser: Serena-Delphox
+Move: BLUE_FLARE
+Use Mode: NORMAL color:orchid
+[14:13:19.613] LOG: %cStart Phase MessagePhase color:green;
+[14:13:19.734] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:13:19.738] LOG: Applied X Accuracy 
+[14:13:19.746] LOG: crit stage: +0
+[14:13:19.755] LOG: Move: Blue Flare | Base damage: 63.97852631578948 | Power: 169 | Source attack: 67 | Target defense: 38
+[14:13:19.760] LOG: Move: Blue Flare | Attack damage: 220
+[14:13:19.760] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:13:19.939] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:13:19.989] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:13:20.023] LOG: %cStart Phase MessagePhase color:green;
+[14:13:20.266] LOG: %cStart Phase MessagePhase color:green;
+[14:13:20.482] LOG: %cStart Phase MoveEndPhase color:green;
+[14:13:20.489] LOG: %cStart Phase MovePhase color:green;
+[14:13:20.489] LOG: %cUser: Glalie
+Move: DOUBLE_EDGE
+Use Mode: NORMAL color:orchid
+[14:13:20.502] LOG: %cStart Phase MessagePhase color:green;
+[14:13:20.617] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:13:20.627] LOG: crit stage: +0
+[14:13:20.629] LOG: Move: Double-Edge | Base damage: 66.3968 | Power: 187.2 | Source attack: 43 | Target defense: 25
+[14:13:20.630] LOG: Move: Double-Edge | Attack damage: 95
+[14:13:20.635] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:13:20.662] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:13:20.669] LOG: %cStart Phase MessagePhase color:green;
+[14:13:20.910] LOG: %cStart Phase FaintPhase color:green;
+[14:13:22.139] LOG: %cStart Phase MessagePhase color:green;
+[14:13:22.259] LOG: %cStart Phase FaintPhase color:green;
+[14:13:23.738] LOG: %cStart Phase MessagePhase color:green;
+[14:13:24.012] LOG: %cStart Phase VictoryPhase color:green;
+[14:13:24.012] LOG: %cStart Phase ExpPhase color:green;
+[14:13:24.012] LOG: Applied Super EXP. Charm 
+[14:13:24.012] LOG: Applied EXP. Charm 
+[14:13:24.388] LOG: %cStart Phase LevelUpPhase color:green;
+[14:13:24.792] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:13:24.792] LOG: Applied Super EXP. Charm 
+[14:13:24.793] LOG: Applied EXP. Charm 
+[14:13:24.795] LOG: %cStart Phase LevelUpPhase color:green;
+[14:13:25.142] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:13:25.142] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:13:25.143] LOG: Applied Super EXP. Charm 
+[14:13:25.144] LOG: Applied EXP. Charm 
+[14:13:25.145] LOG: %cStart Phase LevelUpPhase color:green;
+[14:13:25.312] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:13:25.312] LOG: %cStart Phase MoveEndPhase color:green;
+[14:13:25.313] LOG: %cStart Phase MovePhase color:green;
+[14:13:25.313] LOG: %cUser: Rhydon
+Move: ROCK_WRECKER
+Use Mode: NORMAL color:orchid
+[14:13:25.322] LOG: %cStart Phase MessagePhase color:green;
+[14:13:25.432] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:13:25.439] LOG: crit stage: +0
+[14:13:25.441] LOG: Move: Rock Wrecker | Base damage: 47.81818181818182 | Power: 180 | Source attack: 70 | Target defense: 55
+[14:13:25.444] LOG: Move: Rock Wrecker | Attack damage: 64
+[14:13:25.446] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:13:25.473] LOG: %cStart Phase MessagePhase color:green;
+[14:13:25.699] LOG: %cStart Phase MoveEndPhase color:green;
+[14:13:25.704] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:13:25.705] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:13:25.705] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:13:25.705] LOG: %cStart Phase BerryPhase color:green;
+[14:13:25.712] LOG: Applied Sitrus Berry 
+[14:13:25.713] LOG: Applied Protein 
+[14:13:25.721] LOG: %cStart Phase CommonAnimPhase color:green;
+[14:13:25.721] LOG: %cStart Phase PokemonHealPhase color:green;
+[14:13:25.725] LOG: %cStart Phase MessagePhase color:green;
+[14:13:26.002] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:13:26.003] LOG: %cStart Phase TurnEndPhase color:green;
+[14:13:26.006] LOG: %cStart Phase SwitchPhase color:green;
+[14:13:27.424] LOG: %cStart Phase SwitchSummonPhase color:green;
+[14:13:27.511] LOG: Applied Protein 
+[14:13:27.532] WARN: cry/175 not found
+[14:13:27.638] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:13:27.732] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:27.732] LOG: Ran PSP for: Togepi
+[14:13:27.734] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:13:27.746] LOG: %cStart Phase MessagePhase color:green;
+[14:13:27.970] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:27.971] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:27.972] LOG: %cStart Phase TurnInitPhase color:green;
+[14:13:27.972] LOG: %cStart Phase CommandPhase color:green;
+[14:13:29.672] DEBUG: Session data saved to slot 0!
+[14:13:31.570] LOG: Seed: 7IHnlR0FQ9Xzs4S7H48ZGYfg
+[14:13:31.570] LOG: Wave Seed: 7IHnlR0FQ9Xzs4S7H48ZGYfg 0
+[14:13:32.040] WARN: AnimationManager key already exists: prompt
+[14:13:32.040] WARN: AnimationManager key already exists: tera_sparkle
+[14:13:32.040] LOG: Seed: U8tSjQdaxJKY7QQ2MBIeNe8w
+[14:13:32.040] LOG: Wave Seed: U8tSjQdaxJKY7QQ2MBIeNe8w 0
+[14:13:37.637] LOG: %cStart Phase LoginPhase color:green;
+[14:13:38.141] LOG: Client Session: gUB6fKGb9aZ1JfjVoMoIM0GgaDlv50tE
+[14:13:39.446] LOG: %cStart Phase TitlePhase color:green;
+[14:13:39.448] LOG: Getting Session Slot id: %d 0
+[14:13:39.894] LOG: use seasonal splash messages true
+[14:13:39.894] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[14:13:40.683] LOG: Getting Session Slot id: %d 0
+[14:13:40.702] LOG: Wave Seed: d8sGHT2dbCxE8JSR5iWXZ87s 0
+[14:13:40.702] LOG: Seed: d8sGHT2dbCxE8JSR5iWXZ87s
+[14:13:40.777] LOG: Wave Seed: |P_`lJ|z[]PbkjMoprPO 24
+[14:13:40.856] LOG: Applied Protein 
+[14:13:40.868] LOG: Applied Protein 
+[14:13:40.878] LOG: Applied Protein 
+[14:13:40.996] LOG: %cStart Phase EncounterPhase color:green;
+[14:13:41.003] LOG: Pokemon: Foe Rhydon | Species ID: 112 | Level: 20 | Nature: Adamant (+Atk/-SpAtk)
+[14:13:41.003] LOG: Stats (IVs): HP: 78 (31), Atk: 70 (31), Def: 59 (31), Spatk: 26 (31), Spdef: 29 (31), Spd: 27 (31)
+[14:13:41.003] LOG: Ability: Lightning Rod | Passive Ability: Solid Rock 
+[14:13:41.004] LOG: Moveset: ["Rock Wrecker","Mountain Chunk","Rocket Shot","Berserker Horn"]
+[14:13:41.005] LOG: Pokemon: Foe Glalie | Species ID: 362 | Level: 20 | Nature: Naive (+Spd/-SpDef)
+[14:13:41.005] LOG: Stats (IVs): HP: 68 (31), Atk: 43 (31), Def: 43 (31), Spatk: 43 (31), Spdef: 38 (31), Spd: 48 (31)
+[14:13:41.005] LOG: Ability: Refrigerate | Passive Ability: Sturdy 
+[14:13:41.005] LOG: Moveset: ["Double-Edge","Head Smash","Freeze-Dry","Explosion"]
+[14:13:41.195] LOG: Generated AI funcs
+[14:13:41.196] LOG: Wave Seed: |P_`lJ|z[]PbkjMoprPO 24
+[14:13:41.405] LOG: Swimmer Matt
+[14:13:41.408] LOG: Dialogue dialogue:swimmer.encounter.2 skipped
+[14:13:41.465] LOG: Swimmer Matt
+[14:13:41.852] LOG: %cStart Phase SummonPhase color:green;
+[14:13:41.854] LOG: Matt
+[14:13:42.149] LOG: %cStart Phase SummonPhase color:green;
+[14:13:42.150] LOG: Matt
+[14:13:42.454] LOG: %cStart Phase SummonPhase color:green;
+[14:13:42.654] LOG: Applied Protein 
+[14:13:42.691] WARN: cry/10454 not found
+[14:13:42.798] LOG: %cStart Phase SummonPhase color:green;
+[14:13:42.955] LOG: Applied Protein 
+[14:13:43.081] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:13:43.198] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:13:43.205] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:43.206] LOG: Ran PSP for: Serena-Delphox
+[14:13:43.211] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:13:43.213] LOG: %cStart Phase MessagePhase color:green;
+[14:13:43.479] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:43.479] LOG: Ran PSP for: Glalie
+[14:13:43.481] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:13:43.484] LOG: %cStart Phase MessagePhase color:green;
+[14:13:43.716] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:43.718] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:43.718] LOG: Ran PSP for: Meowth
+[14:13:43.719] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:13:43.722] LOG: %cStart Phase MessagePhase color:green;
+[14:13:43.920] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:43.930] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:43.933] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:43.934] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:43.936] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:43.941] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:43.941] LOG: Ran PSP for: Rhydon
+[14:13:43.942] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:13:43.950] LOG: %cStart Phase MessagePhase color:green;
+[14:13:44.131] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:44.131] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:44.136] LOG: %cStart Phase TurnInitPhase color:green;
+[14:13:44.138] LOG: %cStart Phase CommandPhase color:green;
+[14:13:45.286] LOG: Move: BLUE_FLARE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Serena-Delphox
+[14:13:45.302] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:13:45.796] LOG: %cStart Phase CommandPhase color:green;
+[14:13:48.483] LOG: Move: FAKE_OUT Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Meowth
+[14:13:48.499] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:13:49.107] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:13:49.131] LOG: Battle Seed: CIFa7JhufHIRGjg0
+[14:13:49.138] LOG: Move Pool: ["Rock Wrecker","Mountain Chunk","Rocket Shot","Berserker Horn"]
+[14:13:49.138] LOG: Move Scores: [1050.6521739130435,1023.3173076923077,15.217391304347828,1142.7884615384614]
+[14:13:49.138] LOG: Sorted Move Pool: ["Berserker Horn","Rock Wrecker","Mountain Chunk","Rocket Shot"]
+[14:13:49.138] LOG: Chosen Move: Berserker Horn
+[14:13:49.138] LOG: ER AI: experimental brain (sharpness 1)
+[14:13:49.138] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:13:49.142] LOG: Applied X Sp. Def 
+[14:13:49.143] LOG: Applied X Sp. Def 
+[14:13:49.165] LOG: Move Pool: ["Double-Edge","Head Smash","Explosion"]
+[14:13:49.165] LOG: Move Scores: [1142.7884615384614,49.891304347826086,127.40384615384596]
+[14:13:49.165] LOG: Sorted Move Pool: ["Double-Edge","Explosion","Head Smash"]
+[14:13:49.165] LOG: Chosen Move: Double-Edge
+[14:13:49.166] LOG: ER AI: experimental brain (sharpness 1)
+[14:13:49.166] LOG: %cStart Phase TurnStartPhase color:green;
+[14:13:49.170] LOG: %cStart Phase MovePhase color:green;
+[14:13:49.170] LOG: %cUser: Meowth
+Move: FAKE_OUT
+Use Mode: NORMAL color:orchid
+[14:13:49.174] LOG: %cStart Phase MessagePhase color:green;
+[14:13:49.265] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:13:49.271] LOG: Applied X Accuracy 
+[14:13:49.272] LOG: crit stage: +1
+[14:13:49.278] LOG: Move: Fake Out | Base damage: 8.711864406779661 | Power: 60 | Source attack: 33 | Target defense: 59
+[14:13:49.279] LOG: Move: Fake Out | Attack damage: 6
+[14:13:49.280] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:13:49.310] LOG: %cStart Phase MessagePhase color:green;
+[14:13:49.521] LOG: %cStart Phase MoveEndPhase color:green;
+[14:13:49.527] LOG: %cStart Phase MovePhase color:green;
+[14:13:49.528] LOG: %cUser: Serena-Delphox
+Move: BLUE_FLARE
+Use Mode: NORMAL color:orchid
+[14:13:49.549] LOG: %cStart Phase MessagePhase color:green;
+[14:13:49.676] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:13:49.684] LOG: Applied X Accuracy 
+[14:13:49.691] LOG: crit stage: +0
+[14:13:49.695] LOG: Move: Blue Flare | Base damage: 63.97852631578948 | Power: 169 | Source attack: 67 | Target defense: 38
+[14:13:49.704] LOG: Move: Blue Flare | Attack damage: 380
+[14:13:49.706] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:13:49.888] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:13:49.938] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:13:49.974] LOG: %cStart Phase MessagePhase color:green;
+[14:13:50.198] LOG: %cStart Phase MessagePhase color:green;
+[14:13:50.402] LOG: %cStart Phase MessagePhase color:green;
+[14:13:50.616] LOG: %cStart Phase MoveEndPhase color:green;
+[14:13:50.622] LOG: %cStart Phase MovePhase color:green;
+[14:13:50.622] LOG: %cUser: Glalie
+Move: DOUBLE_EDGE
+Use Mode: NORMAL color:orchid
+[14:13:50.633] LOG: %cStart Phase MessagePhase color:green;
+[14:13:50.771] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:13:50.776] LOG: crit stage: +0
+[14:13:50.786] LOG: Move: Double-Edge | Base damage: 66.3968 | Power: 187.2 | Source attack: 43 | Target defense: 25
+[14:13:50.787] LOG: Move: Double-Edge | Attack damage: 88
+[14:13:50.792] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:13:50.810] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:13:50.826] LOG: %cStart Phase MessagePhase color:green;
+[14:13:51.089] LOG: %cStart Phase FaintPhase color:green;
+[14:13:52.315] LOG: %cStart Phase MessagePhase color:green;
+[14:13:52.610] LOG: %cStart Phase FaintPhase color:green;
+[14:13:54.096] LOG: %cStart Phase MessagePhase color:green;
+[14:13:54.182] LOG: %cStart Phase VictoryPhase color:green;
+[14:13:54.185] LOG: %cStart Phase ExpPhase color:green;
+[14:13:54.185] LOG: Applied Super EXP. Charm 
+[14:13:54.186] LOG: Applied EXP. Charm 
+[14:13:54.619] LOG: %cStart Phase LevelUpPhase color:green;
+[14:14:04.635] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:14:04.635] LOG: Applied Super EXP. Charm 
+[14:14:04.637] LOG: Applied EXP. Charm 
+[14:14:04.645] LOG: %cStart Phase LevelUpPhase color:green;
+[14:14:04.854] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:14:04.854] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:14:04.855] LOG: Applied Super EXP. Charm 
+[14:14:04.855] LOG: Applied EXP. Charm 
+[14:14:04.856] LOG: %cStart Phase LevelUpPhase color:green;
+[14:14:05.044] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:14:05.044] LOG: %cStart Phase MoveEndPhase color:green;
+[14:14:05.044] LOG: %cStart Phase MovePhase color:green;
+[14:14:05.044] LOG: %cUser: Rhydon
+Move: BERSERKER_HORN
+Use Mode: NORMAL color:orchid
+[14:14:05.044] LOG: %cStart Phase MessagePhase color:green;
+[14:14:05.264] LOG: %cStart Phase MoveEndPhase color:green;
+[14:14:05.268] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:14:05.269] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:14:05.270] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:14:05.270] LOG: %cStart Phase BerryPhase color:green;
+[14:14:05.271] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:14:05.271] LOG: %cStart Phase TurnEndPhase color:green;
+[14:14:05.274] LOG: %cStart Phase SwitchPhase color:green;
+[14:14:06.841] LOG: %cStart Phase SwitchSummonPhase color:green;
+[14:14:06.954] LOG: Applied Protein 
+[14:14:06.983] WARN: cry/175 not found
+[14:14:07.088] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:14:07.197] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:07.201] LOG: Ran PSP for: Togepi
+[14:14:07.203] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:14:07.207] LOG: %cStart Phase MessagePhase color:green;
+[14:14:07.414] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:07.414] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:07.419] LOG: %cStart Phase TurnInitPhase color:green;
+[14:14:07.420] LOG: %cStart Phase CommandPhase color:green;
