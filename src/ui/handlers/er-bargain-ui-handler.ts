@@ -11,10 +11,12 @@
 // waves slot: a dark void, the animated Giratina Origin battle sprite on the
 // left with a small PMD talking-head portrait inset over it, his spoken line in
 // a bottom dialogue box, and the list of bargains in a framed panel on the
-// right. Modeled on BiomeShop/Colosseum (a full-screen UiHandler container the
-// UI shows on top of the field; container sits at y = -h so child (0,0) is the
-// screen top-left). Pure presentation + cursor + a select callback;
-// TheBargainPhase owns all the deal logic.
+// right. A standalone "Check Team" button sits between that panel and the
+// dialogue box (reachable by pressing down past Leave, like the reward shop).
+// Modeled on BiomeShop/Colosseum (a full-screen UiHandler container the UI shows
+// on top of the field; container sits at y = -h so child (0,0) is the screen
+// top-left). Pure presentation + cursor + a select callback; TheBargainPhase
+// owns all the deal logic.
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
@@ -47,21 +49,36 @@ export class ErBargainUiHandler extends UiHandler {
   private descText: Phaser.GameObjects.Text;
   private descWindow: Phaser.GameObjects.NineSlice;
   private optionsWindow: Phaser.GameObjects.NineSlice;
+  /** Standalone "Check Team" button below the panel, above the dialogue box. */
+  private checkTeamWindow: Phaser.GameObjects.NineSlice;
+  private checkTeamText: Phaser.GameObjects.Text;
   private rows: Phaser.GameObjects.Text[] = [];
   private cursorObj: Phaser.GameObjects.Rectangle;
 
   private labels: string[] = [];
   private descs: string[] = [];
   private onSelect: ErBargainSelectCallback | null = null;
+  /** Optional "Check Team" action; when set, a button is appended after Leave. */
+  private onCheckTeam: (() => void) | null = null;
   /** Wall-clock time (ms) the screen opened; input is swallowed briefly after. */
   private openedAt = 0;
 
   // Layout (logical 320x180 screen; container at y=-h so child (0,0) == top-left).
   private static readonly OPT_X = 150;
   private static readonly OPT_W = 162;
-  private static readonly OPT_Y = 20;
-  private static readonly ROW_Y0 = 35;
-  private static readonly ROW_STEP = 16;
+  private static readonly OPT_Y = 16;
+  /** Options panel height - kept short so the Check Team button fits beneath it. */
+  private static readonly PANEL_H = 94;
+  private static readonly ROW_Y0 = 29;
+  private static readonly ROW_STEP = 15;
+  /** The focused option's effect sub-box, inside the panel near its bottom. */
+  private static readonly DESC_Y = 82;
+  private static readonly DESC_H = 24;
+  /** Standalone Check Team button geometry (between the panel and dialogue box). */
+  private static readonly CT_X = 166;
+  private static readonly CT_Y = 114;
+  private static readonly CT_W = 130;
+  private static readonly CT_H = 14;
   /** Foreboding violet tint applied to every framed window (Giratina's gloom). */
   private static readonly FRAME_TINT = 0x8050b0;
 
@@ -89,7 +106,7 @@ export class ErBargainUiHandler extends UiHandler {
     // The actual animated Giratina Origin battle sprite, left side - the main
     // visual. Loaded on demand in show(); hidden until it lands (the small
     // portrait below stands in meanwhile).
-    this.giratina = globalScene.add.sprite(82, 92, "er_bargain_giratina");
+    this.giratina = globalScene.add.sprite(82, 88, "er_bargain_giratina");
     this.giratina.setOrigin(0.5, 0.5);
     this.giratina.setVisible(false);
     this.container.add(this.giratina);
@@ -108,24 +125,65 @@ export class ErBargainUiHandler extends UiHandler {
     this.container.add(this.titleText);
 
     // Framed panel for the bargain list (right side).
-    this.optionsWindow = addWindow(ErBargainUiHandler.OPT_X, ErBargainUiHandler.OPT_Y, ErBargainUiHandler.OPT_W, 110);
+    this.optionsWindow = addWindow(
+      ErBargainUiHandler.OPT_X,
+      ErBargainUiHandler.OPT_Y,
+      ErBargainUiHandler.OPT_W,
+      ErBargainUiHandler.PANEL_H,
+    );
     this.optionsWindow.setTint(ErBargainUiHandler.FRAME_TINT);
     this.container.add(this.optionsWindow);
 
     // The focused bargain's cost -> payoff, in its OWN framed sub-box at the
     // bottom of the panel (a box within the box), with room to breathe.
-    this.descWindow = addWindow(ErBargainUiHandler.OPT_X + 6, 92, ErBargainUiHandler.OPT_W - 12, 36);
+    this.descWindow = addWindow(
+      ErBargainUiHandler.OPT_X + 6,
+      ErBargainUiHandler.DESC_Y,
+      ErBargainUiHandler.OPT_W - 12,
+      ErBargainUiHandler.DESC_H,
+    );
     this.descWindow.setTint(ErBargainUiHandler.FRAME_TINT);
     this.container.add(this.descWindow);
-    this.descText = addTextObject(ErBargainUiHandler.OPT_X + ErBargainUiHandler.OPT_W / 2, 98, "", TextStyle.PARTY, {
-      fontSize: "32px",
-      align: "center",
-      wordWrap: { width: (ErBargainUiHandler.OPT_W - 26) * 6 },
-    });
+    this.descText = addTextObject(
+      ErBargainUiHandler.OPT_X + ErBargainUiHandler.OPT_W / 2,
+      ErBargainUiHandler.DESC_Y + 4,
+      "",
+      TextStyle.PARTY,
+      {
+        fontSize: "30px",
+        align: "center",
+        wordWrap: { width: (ErBargainUiHandler.OPT_W - 26) * 6 },
+      },
+    );
     this.descText.setOrigin(0.5, 0);
     this.container.add(this.descText);
 
-    // Cursor sized to sit INSIDE the options panel (never overflows the frame).
+    // Standalone "Check Team" button: its own framed box below the options panel
+    // and just above the dialogue box. The player drops onto it by pressing down
+    // past Leave; pressing up returns to the bargain list. Hidden until show()
+    // is given an onCheckTeam callback.
+    this.checkTeamWindow = addWindow(
+      ErBargainUiHandler.CT_X,
+      ErBargainUiHandler.CT_Y,
+      ErBargainUiHandler.CT_W,
+      ErBargainUiHandler.CT_H,
+    );
+    this.checkTeamWindow.setTint(ErBargainUiHandler.FRAME_TINT);
+    this.checkTeamWindow.setVisible(false);
+    this.container.add(this.checkTeamWindow);
+    this.checkTeamText = addTextObject(
+      ErBargainUiHandler.CT_X + ErBargainUiHandler.CT_W / 2,
+      ErBargainUiHandler.CT_Y + ErBargainUiHandler.CT_H / 2,
+      "Check Team",
+      TextStyle.WINDOW,
+      { fontSize: "52px" },
+    );
+    this.checkTeamText.setOrigin(0.5, 0.5);
+    this.checkTeamText.setVisible(false);
+    this.container.add(this.checkTeamText);
+
+    // Cursor sized to sit INSIDE the options panel (never overflows the frame);
+    // resized to the Check Team button when focus drops onto it.
     this.cursorObj = globalScene.add.rectangle(
       0,
       0,
@@ -159,6 +217,11 @@ export class ErBargainUiHandler extends UiHandler {
     this.descs = args[1] as string[];
     this.dialogueText.setText((args[2] as string) ?? "");
     this.onSelect = args[3] as ErBargainSelectCallback;
+    this.onCheckTeam = typeof args[4] === "function" ? (args[4] as () => void) : null;
+
+    const showCheck = this.onCheckTeam !== null;
+    this.checkTeamWindow.setVisible(showCheck);
+    this.checkTeamText.setVisible(showCheck);
 
     this.loadGiratina();
     this.buildRows();
@@ -219,23 +282,56 @@ export class ErBargainUiHandler extends UiHandler {
     });
   }
 
+  /** Total navigable items: the option rows plus the Check Team button (if any). */
+  private navCount(): number {
+    return this.rows.length + (this.onCheckTeam ? 1 : 0);
+  }
+
   private moveCursorTo(index: number): void {
-    if (this.rows.length === 0) {
+    const total = this.navCount();
+    if (total === 0) {
       this.cursorObj.setVisible(false);
       return;
     }
-    const i = Math.max(0, Math.min(index, this.rows.length - 1));
+    const i = Math.max(0, Math.min(index, total - 1));
+
+    // The Check Team button (the virtual last item) - move the cursor onto it.
+    if (this.onCheckTeam !== null && i === this.rows.length) {
+      this.cursorObj.setSize(ErBargainUiHandler.CT_W - 6, ErBargainUiHandler.CT_H - 2);
+      this.cursorObj.setPosition(ErBargainUiHandler.CT_X + 3, ErBargainUiHandler.CT_Y + ErBargainUiHandler.CT_H / 2);
+      this.cursorObj.setVisible(true);
+      this.descText.setText("");
+      this.rows.forEach(row => row.setAlpha(0.55));
+      this.checkTeamText.setAlpha(1);
+      return;
+    }
+
+    // A normal option row.
     const y = ErBargainUiHandler.ROW_Y0 + i * ErBargainUiHandler.ROW_STEP;
+    this.cursorObj.setSize(ErBargainUiHandler.OPT_W - 16, ErBargainUiHandler.ROW_STEP);
     this.cursorObj.setPosition(ErBargainUiHandler.OPT_X + 7, y);
     this.cursorObj.setVisible(true);
     this.descText.setText(this.descs[i] ?? "");
     this.rows.forEach((row, r) => row.setAlpha(r === i ? 1 : 0.55));
+    this.checkTeamText.setAlpha(0.55);
   }
 
   override setCursor(cursor: number): boolean {
     const changed = super.setCursor(cursor);
     this.moveCursorTo(this.cursor);
     return changed;
+  }
+
+  /** Fire the focused item: the Check Team button, or a bargain row via onSelect. */
+  private activate(): void {
+    if (this.navCount() === 0) {
+      return;
+    }
+    if (this.onCheckTeam !== null && this.cursor === this.rows.length) {
+      this.onCheckTeam();
+    } else if (this.onSelect) {
+      this.onSelect(this.cursor);
+    }
   }
 
   processInput(button: Button): boolean {
@@ -246,18 +342,14 @@ export class ErBargainUiHandler extends UiHandler {
     if (performance.now() - this.openedAt < 600) {
       return true;
     }
-    const count = this.rows.length;
+    const count = this.navCount();
     let moved = false;
     switch (button) {
       case Button.ACTION:
-        if (this.onSelect && count > 0) {
-          this.onSelect(this.cursor);
-        }
+        this.activate();
         return true;
       case Button.CANCEL:
-        if (this.onSelect) {
-          this.onSelect(-1);
-        }
+        this.onSelect?.(-1);
         return true;
       case Button.UP:
         if (this.cursor > 0) {
@@ -289,5 +381,6 @@ export class ErBargainUiHandler extends UiHandler {
     this.labels = [];
     this.descs = [];
     this.onSelect = null;
+    this.onCheckTeam = null;
   }
 }

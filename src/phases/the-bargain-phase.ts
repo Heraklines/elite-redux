@@ -43,7 +43,6 @@ import { Stat } from "#enums/stat";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import { PokemonFormChangeItemModifier } from "#modifiers/modifier";
-import type { ModifierType } from "#modifiers/modifier-type";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import i18next from "i18next";
 
@@ -67,15 +66,33 @@ export class TheBargainPhase extends Phase {
       this.end();
       return;
     }
+    this.openScreen(sins);
+  }
 
+  /** (Re)open the dedicated bargain screen for these Sins (also used to return from Check Team). */
+  private openScreen(sins: BargainSinKey[]): void {
     // labels/descs for the dedicated bargain screen: the chosen Sins + a Leave row.
     const labels = [...sins.map(k => i18next.t(`${ns}:sins.${k}.name`)), i18next.t(`${ns}:option.leave.label`)];
-    const descs = [...sins.map(k => i18next.t(`${ns}:sins.${k}.tooltip`)), ""];
+    const descs = [...sins.map(k => i18next.t(`${ns}:sins.${k}.tooltip`)), i18next.t(`${ns}:option.leave.tooltip`)];
     // The handler's dialogue box fits a short line; use the first two sentences of
     // the intro (the full ominous monologue still plays elsewhere as needed).
     const greeting = i18next.t(`${ns}:introDialogue`).split("$").slice(0, 2).join(" ");
 
-    globalScene.ui.setMode(UiMode.ER_BARGAIN, labels, descs, greeting, (index: number) => this.onChoice(sins, index));
+    globalScene.ui.setMode(
+      UiMode.ER_BARGAIN,
+      labels,
+      descs,
+      greeting,
+      (index: number) => this.onChoice(sins, index),
+      () => this.checkTeam(sins),
+    );
+  }
+
+  /** View the party read-only (the Check Team button), then re-open the bargain screen. */
+  private checkTeam(sins: BargainSinKey[]): void {
+    globalScene.ui.setMode(UiMode.PARTY, PartyUiMode.CHECK, -1, () => {
+      this.openScreen(sins);
+    });
   }
 
   /** Resolve the player's choice from the bargain screen. */
@@ -84,11 +101,9 @@ export class TheBargainPhase extends Phase {
       return;
     }
     this.resolving = true;
-    this.trace(`onChoice index=${index}`);
     // Hand the UI back to MESSAGE (this tears down the bargain screen) before any
     // dialogue / party-select / reward flow.
     await globalScene.ui.setMode(UiMode.MESSAGE);
-    this.trace("onChoice: MESSAGE mode set");
 
     // Leave: CANCEL (index < 0) or the Leave row (index === sins.length).
     if (index < 0 || index >= sins.length) {
@@ -106,9 +121,7 @@ export class TheBargainPhase extends Phase {
   /** Run one Sin's offer line, party pick(s), cost+payoff, then the result line. */
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: a 7-Sin dispatch switch; each case is a small self-contained deal, clearer kept inline than split across seven helpers
   private async applySin(key: BargainSinKey): Promise<void> {
-    this.trace(`applySin ${key}: show offer`);
     await this.giratina(`${ns}:sins.${key}.offer`);
-    this.trace(`applySin ${key}: offer dismissed`);
     let pokeName = "";
 
     switch (key) {
@@ -165,8 +178,13 @@ export class TheBargainPhase extends Phase {
             globalScene.removeModifier(item);
           }
           globalScene.updateModifiers(true);
-          const relic = await this.pickRelic();
-          globalScene.phaseManager.unshiftNew("ModifierRewardPhase", relic ?? BARGAIN_RELIC_CHOICES[0].make);
+          // Offer the relic on the native reward-select screen (icons + on-focus
+          // descriptions, pick one), restricted to the bargain relics - no bespoke
+          // menu and no softlock.
+          globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, {
+            guaranteedModifierTypeFuncs: BARGAIN_RELIC_CHOICES.map(c => c.make),
+            fillRemaining: false,
+          });
         }
         break;
       }
@@ -201,9 +219,7 @@ export class TheBargainPhase extends Phase {
     }
 
     globalScene.currentBattle.mysteryEncounter?.setDialogueToken("pokeName", pokeName);
-    this.trace(`applySin ${key}: show result`);
     await this.narrate(`${ns}:sins.${key}.result`, { pokeName });
-    this.trace(`applySin ${key}: result dismissed`);
   }
 
   // --- UI helpers ---
@@ -217,13 +233,11 @@ export class TheBargainPhase extends Phase {
   private pickPokemon(filter?: (p: PlayerPokemon) => string | null): Promise<PlayerPokemon | null> {
     return new Promise(resolve => {
       const exitMode = globalScene.ui.getMode();
-      this.trace("pickPokemon: open PARTY");
       globalScene.ui.setMode(
         UiMode.PARTY,
         PartyUiMode.SELECT,
         -1,
         async (slotIndex: number) => {
-          this.trace(`pickPokemon: slot=${slotIndex}`);
           await globalScene.ui.setMode(exitMode);
           const party = globalScene.getPlayerParty();
           resolve(slotIndex >= 0 && slotIndex < party.length ? party[slotIndex] : null);
@@ -233,35 +247,28 @@ export class TheBargainPhase extends Phase {
     });
   }
 
-  // biome-ignore lint/suspicious/noConsole: temporary #550 softlock breadcrumb (removed once verified)
-  private trace(step: string): void {
-    console.log(`[bargain] ${step}`);
-  }
-
   private pickStat(): Promise<Stat | null> {
     return this.subMenu(BARGAIN_STAT_CHOICES.map(c => ({ label: c.label, value: c.stat })));
-  }
-
-  private pickRelic(): Promise<(() => ModifierType) | null> {
-    return this.subMenu(BARGAIN_RELIC_CHOICES.map(c => ({ label: c.label, value: c.make })));
   }
 
   /** A simple labelled choice menu; resolves to the chosen value or null on cancel. */
   private subMenu<T>(choices: { label: string; value: T }[]): Promise<T | null> {
     return new Promise(resolve => {
+      const exitMode = globalScene.ui.getMode();
+      // Tear the option menu back down to the prior mode BEFORE resolving - a non-
+      // awaited restore lets the result/dialogue that follows race the dead
+      // OPTION_SELECT and softlock (same class as the party-select fix).
+      const restore = (value: T | null): boolean => {
+        globalScene.ui.setMode(exitMode).then(() => resolve(value));
+        return true;
+      };
       const options = choices.map(c => ({
         label: c.label,
-        handler: () => {
-          resolve(c.value);
-          return true;
-        },
+        handler: () => restore(c.value),
       }));
       options.push({
         label: i18next.t("menu:cancel"),
-        handler: () => {
-          resolve(null);
-          return true;
-        },
+        handler: () => restore(null),
       });
       globalScene.ui.setMode(UiMode.OPTION_SELECT, { options });
     });

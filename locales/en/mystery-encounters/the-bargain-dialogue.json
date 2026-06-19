@@ -58,7 +58,7 @@
       "name": "Envy",
       "tooltip": "(-) Strip all held items from a Pokémon (needs 3+)\n(+) Choose a powerful relic",
       "offer": "Strip it bare. What it clutched will buy you something far more interesting.",
-      "result": "{{pokeName}} is stripped bare. The dark presses a relic into your palm."
+      "result": "{{pokeName}} is stripped bare. The dark lays out its relics, and waits for you to choose."
     },
     "sloth": {
       "name": "Sloth",
