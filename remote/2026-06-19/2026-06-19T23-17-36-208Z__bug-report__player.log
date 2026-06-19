@@ -1,0 +1,273 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:15  difficulty:youngster
+seed:     iY4MhDxZdntxP9hvpSK3hJSl
+party:    Scyther(L14 22/47), Shelmet(L8 13/28), Morelull(L11 18/32), Karrablast(L8 28/28), Bounsweet(L9 27/27)
+
+----- DESCRIPTION -----
+Double Itempool
+
+----- CONSOLE -----
+[23:15:54.305] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:15:54.306] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:15:54.306] LOG: Applied Super EXP. Charm 
+[23:15:54.306] LOG: Applied EXP. Charm 
+[23:15:54.307] LOG: %cStart Phase LevelUpPhase color:green;
+[23:15:54.307] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:15:54.307] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:15:54.307] LOG: Applied Super EXP. Charm 
+[23:15:54.307] LOG: Applied EXP. Charm 
+[23:15:54.308] LOG: %cStart Phase LevelUpPhase color:green;
+[23:15:54.308] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:15:54.308] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:15:54.308] LOG: Applied Super EXP. Charm 
+[23:15:54.308] LOG: Applied EXP. Charm 
+[23:15:54.308] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:15:54.308] LOG: %cStart Phase MoveEndPhase color:green;
+[23:15:54.308] LOG: %cStart Phase MovePhase color:green;
+[23:15:54.308] LOG: %cStart Phase MoveEndPhase color:green;
+[23:15:54.309] LOG: %cStart Phase CheckInterludePhase color:green;
+[23:15:54.309] LOG: %cStart Phase WeatherEffectPhase color:green;
+[23:15:54.309] LOG: %cStart Phase PositionalTagPhase color:green;
+[23:15:54.309] LOG: %cStart Phase BerryPhase color:green;
+[23:15:54.309] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[23:15:54.309] LOG: %cStart Phase TurnEndPhase color:green;
+[23:15:54.310] LOG: %cStart Phase SwitchSummonPhase color:green;
+[23:15:54.568] LOG: Abner
+[23:15:54.651] LOG: Applied Protein (enemy)
+[23:15:54.785] LOG: %cStart Phase PostSummonPhase color:green;
+[23:15:54.786] LOG: Ran PSP for: Venonat
+[23:15:54.786] LOG: %cStart Phase PostSummonPhase color:green;
+[23:15:54.786] LOG: %cStart Phase PostSummonPhase color:green;
+[23:15:54.786] LOG: %cStart Phase TurnInitPhase color:green;
+[23:15:54.786] LOG: %cStart Phase CommandPhase color:green;
+[23:15:58.203] LOG: Move: BUG_BITE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Scyther
+[23:15:58.206] LOG: %cStart Phase EnemyCommandPhase color:green;
+[23:15:58.212] LOG: Applied X Sp. Def 
+[23:15:58.214] LOG: Applied X Sp. Def 
+[23:15:58.216] LOG: Battle Seed: 7zHzAJnuDGRmigI7
+[23:15:58.220] LOG: Move Pool: ["Signal Beam","Confusion","Poison Powder","Tackle"]
+[23:15:58.220] LOG: Move Scores: [54,11,10,8]
+[23:15:58.220] LOG: Sorted Move Pool: ["Signal Beam","Confusion","Poison Powder","Tackle"]
+[23:15:58.220] LOG: Chosen Move: Signal Beam
+[23:15:58.220] LOG: %cStart Phase TurnStartPhase color:green;
+[23:15:58.221] LOG: %cStart Phase MovePhase color:green;
+[23:15:58.221] LOG: %cUser: Scyther
+Move: BUG_BITE
+Use Mode: NORMAL color:orchid
+[23:15:58.223] LOG: %cStart Phase MessagePhase color:green;
+[23:15:58.303] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:15:58.304] LOG: Applied Multi Lens 
+[23:15:58.688] LOG: crit stage: +0
+[23:15:58.691] LOG: Move: Bug Bite | Base damage: 27.92 | Power: 90 | Source attack: 26 | Target defense: 13
+[23:15:58.691] LOG: Applied Multi Lens 
+[23:15:58.692] LOG: Move: Bug Bite | Attack damage: 55
+[23:15:58.694] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:15:58.721] LOG: %cStart Phase MessagePhase color:green;
+[23:15:58.937] LOG: %cStart Phase MessagePhase color:green;
+[23:15:59.137] LOG: %cStart Phase FaintPhase color:green;
+[23:15:59.196] LOG: %cStart Phase MessagePhase color:green;
+[23:15:59.370] LOG: %cStart Phase VictoryPhase color:green;
+[23:15:59.371] LOG: %cStart Phase ExpPhase color:green;
+[23:15:59.372] LOG: Applied Super EXP. Charm 
+[23:15:59.372] LOG: Applied EXP. Charm 
+[23:15:59.614] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:15:59.614] LOG: Applied Super EXP. Charm 
+[23:15:59.614] LOG: Applied EXP. Charm 
+[23:15:59.615] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:15:59.615] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:15:59.615] LOG: Applied Super EXP. Charm 
+[23:15:59.615] LOG: Applied EXP. Charm 
+[23:15:59.615] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:15:59.615] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:15:59.615] LOG: Applied Super EXP. Charm 
+[23:15:59.616] LOG: Applied EXP. Charm 
+[23:15:59.616] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:15:59.616] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:15:59.616] LOG: Applied Super EXP. Charm 
+[23:15:59.616] LOG: Applied EXP. Charm 
+[23:15:59.616] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:15:59.616] LOG: %cStart Phase MoveEndPhase color:green;
+[23:15:59.617] LOG: %cStart Phase MovePhase color:green;
+[23:15:59.617] LOG: %cStart Phase MoveEndPhase color:green;
+[23:15:59.617] LOG: %cStart Phase CheckInterludePhase color:green;
+[23:15:59.617] LOG: %cStart Phase WeatherEffectPhase color:green;
+[23:15:59.617] LOG: %cStart Phase PositionalTagPhase color:green;
+[23:15:59.617] LOG: %cStart Phase BerryPhase color:green;
+[23:15:59.617] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[23:15:59.617] LOG: %cStart Phase TurnEndPhase color:green;
+[23:15:59.618] LOG: %cStart Phase SwitchSummonPhase color:green;
+[23:15:59.847] LOG: Abner
+[23:15:59.930] LOG: Applied Protein (enemy)
+[23:16:00.082] LOG: %cStart Phase PostSummonPhase color:green;
+[23:16:00.082] LOG: Ran PSP for: Yanma
+[23:16:00.083] LOG: %cStart Phase PostSummonPhase color:green;
+[23:16:00.083] LOG: %cStart Phase PostSummonPhase color:green;
+[23:16:00.083] LOG: %cStart Phase TurnInitPhase color:green;
+[23:16:00.083] LOG: %cStart Phase CommandPhase color:green;
+[23:16:01.148] LOG: Move: BUG_BITE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Scyther
+[23:16:01.152] LOG: %cStart Phase EnemyCommandPhase color:green;
+[23:16:01.157] LOG: Battle Seed: 7zHzAJnuDGRmigI7
+[23:16:01.160] LOG: Move Pool: ["Air Cutter","Screech","Detect","Quick Attack"]
+[23:16:01.160] LOG: Move Scores: [12.375,6,-20,8]
+[23:16:01.160] LOG: Sorted Move Pool: ["Air Cutter","Quick Attack","Screech","Detect"]
+[23:16:01.160] LOG: Chosen Move: Screech
+[23:16:01.160] LOG: %cStart Phase TurnStartPhase color:green;
+[23:16:01.163] LOG: %cStart Phase MovePhase color:green;
+[23:16:01.163] LOG: %cUser: Scyther
+Move: BUG_BITE
+Use Mode: NORMAL color:orchid
+[23:16:01.165] LOG: %cStart Phase MessagePhase color:green;
+[23:16:01.222] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:16:01.222] LOG: Applied Multi Lens 
+[23:16:01.608] LOG: crit stage: +0
+[23:16:01.610] LOG: Move: Bug Bite | Base damage: 26.068571428571428 | Power: 90 | Source attack: 26 | Target defense: 14
+[23:16:01.611] LOG: Applied Multi Lens 
+[23:16:01.611] LOG: Move: Bug Bite | Attack damage: 58
+[23:16:01.613] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:16:01.641] LOG: %cStart Phase MessagePhase color:green;
+[23:16:01.857] LOG: %cStart Phase MessagePhase color:green;
+[23:16:02.057] LOG: %cStart Phase FaintPhase color:green;
+[23:16:02.116] LOG: %cStart Phase MessagePhase color:green;
+[23:16:02.257] LOG: %cStart Phase VictoryPhase color:green;
+[23:16:02.258] LOG: %cStart Phase ExpPhase color:green;
+[23:16:02.258] LOG: Applied Super EXP. Charm 
+[23:16:02.258] LOG: Applied EXP. Charm 
+[23:16:02.884] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:16:02.884] LOG: Applied Super EXP. Charm 
+[23:16:02.884] LOG: Applied EXP. Charm 
+[23:16:02.884] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:16:02.885] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:16:02.885] LOG: Applied Super EXP. Charm 
+[23:16:02.885] LOG: Applied EXP. Charm 
+[23:16:02.885] LOG: %cStart Phase LevelUpPhase color:green;
+[23:16:02.885] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:16:02.885] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:16:02.885] LOG: Applied Super EXP. Charm 
+[23:16:02.885] LOG: Applied EXP. Charm 
+[23:16:02.885] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:16:02.886] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:16:02.886] LOG: Applied Super EXP. Charm 
+[23:16:02.886] LOG: Applied EXP. Charm 
+[23:16:02.886] LOG: %cStart Phase LevelUpPhase color:green;
+[23:16:02.886] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:16:02.886] LOG: %cStart Phase MoveEndPhase color:green;
+[23:16:02.886] LOG: %cStart Phase MovePhase color:green;
+[23:16:02.886] LOG: %cStart Phase MoveEndPhase color:green;
+[23:16:02.886] LOG: %cStart Phase CheckInterludePhase color:green;
+[23:16:02.887] LOG: %cStart Phase WeatherEffectPhase color:green;
+[23:16:02.887] LOG: %cStart Phase PositionalTagPhase color:green;
+[23:16:02.887] LOG: %cStart Phase BerryPhase color:green;
+[23:16:02.887] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[23:16:02.887] LOG: %cStart Phase TurnEndPhase color:green;
+[23:16:02.887] LOG: %cStart Phase SwitchSummonPhase color:green;
+[23:16:03.125] LOG: Abner
+[23:16:03.209] LOG: Applied Protein (enemy)
+[23:16:03.344] LOG: %cStart Phase PostSummonPhase color:green;
+[23:16:03.344] LOG: Ran PSP for: Combee
+[23:16:03.344] LOG: %cStart Phase PostSummonPhase color:green;
+[23:16:03.344] LOG: %cStart Phase PostSummonPhase color:green;
+[23:16:03.344] LOG: %cStart Phase TurnInitPhase color:green;
+[23:16:03.345] LOG: %cStart Phase CommandPhase color:green;
+[23:16:04.552] LOG: Move: BUG_BITE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Scyther
+[23:16:04.554] LOG: %cStart Phase EnemyCommandPhase color:green;
+[23:16:04.557] LOG: Applied X Sp. Def 
+[23:16:04.558] LOG: Battle Seed: 7zHzAJnuDGRmigI7
+[23:16:04.559] LOG: Move Pool: ["Gust","Sweet Scent"]
+[23:16:04.559] LOG: Move Scores: [5.625,6]
+[23:16:04.559] LOG: Sorted Move Pool: ["Sweet Scent","Gust"]
+[23:16:04.559] LOG: Chosen Move: Gust
+[23:16:04.559] LOG: %cStart Phase TurnStartPhase color:green;
+[23:16:04.563] LOG: %cStart Phase MovePhase color:green;
+[23:16:04.563] LOG: %cUser: Combee
+Move: GUST
+Use Mode: NORMAL color:orchid
+[23:16:04.566] LOG: %cStart Phase MessagePhase color:green;
+[23:16:04.660] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:16:05.228] LOG: crit stage: +0
+[23:16:05.230] LOG: Applied X Sp. Def 
+[23:16:05.230] LOG: Move: Gust | Base damage: 4.312258064516129 | Power: 40 | Source attack: 16 | Target defense: 31
+[23:16:05.230] LOG: Move: Gust | Attack damage: 3
+[23:16:05.231] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:16:05.261] LOG: %cStart Phase MessagePhase color:green;
+[23:16:05.477] LOG: %cStart Phase MoveEndPhase color:green;
+[23:16:05.477] LOG: %cStart Phase MovePhase color:green;
+[23:16:05.477] LOG: %cUser: Scyther
+Move: BUG_BITE
+Use Mode: NORMAL color:orchid
+[23:16:05.480] LOG: %cStart Phase MessagePhase color:green;
+[23:16:05.593] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:16:05.594] LOG: Applied Multi Lens 
+[23:16:05.970] LOG: crit stage: +0
+[23:16:05.973] LOG: Move: Bug Bite | Base damage: 27.92 | Power: 90 | Source attack: 26 | Target defense: 13
+[23:16:05.973] LOG: Applied Multi Lens 
+[23:16:05.974] LOG: Move: Bug Bite | Attack damage: 53
+[23:16:05.976] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:16:05.994] LOG: %cStart Phase MessagePhase color:green;
+[23:16:06.228] LOG: %cStart Phase MessagePhase color:green;
+[23:16:06.427] LOG: %cStart Phase FaintPhase color:green;
+[23:16:06.496] LOG: %cStart Phase MessagePhase color:green;
+[23:16:07.146] LOG: %cStart Phase VictoryPhase color:green;
+[23:16:07.152] LOG: %cStart Phase ExpPhase color:green;
+[23:16:07.153] LOG: Applied Super EXP. Charm 
+[23:16:07.153] LOG: Applied EXP. Charm 
+[23:16:07.639] LOG: %cStart Phase LevelUpPhase color:green;
+[23:16:07.640] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:16:07.640] LOG: Applied Super EXP. Charm 
+[23:16:07.640] LOG: Applied EXP. Charm 
+[23:16:07.640] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:16:07.640] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:16:07.640] LOG: Applied Super EXP. Charm 
+[23:16:07.640] LOG: Applied EXP. Charm 
+[23:16:07.641] LOG: %cStart Phase LevelUpPhase color:green;
+[23:16:07.641] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:16:07.641] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:16:07.641] LOG: Applied Super EXP. Charm 
+[23:16:07.641] LOG: Applied EXP. Charm 
+[23:16:07.642] LOG: %cStart Phase LevelUpPhase color:green;
+[23:16:07.642] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:16:07.642] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:16:07.642] LOG: Applied Super EXP. Charm 
+[23:16:07.642] LOG: Applied EXP. Charm 
+[23:16:07.643] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:16:07.643] LOG: %cStart Phase MoveEndPhase color:green;
+[23:16:07.643] LOG: %cStart Phase CheckInterludePhase color:green;
+[23:16:07.643] LOG: %cStart Phase WeatherEffectPhase color:green;
+[23:16:07.643] LOG: %cStart Phase PositionalTagPhase color:green;
+[23:16:07.643] LOG: %cStart Phase BerryPhase color:green;
+[23:16:07.643] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[23:16:07.643] LOG: %cStart Phase TurnEndPhase color:green;
+[23:16:07.644] LOG: %cStart Phase MessagePhase color:green;
+[23:16:07.903] LOG: %cStart Phase BattleEndPhase color:green;
+[23:16:07.904] LOG: Battle Score: 107 (8 Turns x0.57)
+[23:16:07.904] LOG: Total Score: 647
+[23:16:07.925] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[23:16:07.927] LOG: Bug Catcher Abner
+[23:16:08.123] LOG: Bug Catcher Abner
+[23:16:08.124] LOG: Dialogue dialogue:bugCatcher.victory.1 skipped
+[23:16:08.124] LOG: %cStart Phase MoneyRewardPhase color:green;
+[23:16:08.472] LOG: %cStart Phase EggLapsePhase color:green;
+[23:16:08.474] LOG: %cStart Phase SelectModifierPhase color:green;
+[23:16:08.474] LOG: Wave Seed: xhC\wSis}_HwbZBwYb{ 15
+[23:16:08.489] LOG: 9 2 [4,5]
+[23:16:08.489] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_normal","group":"tm","soundName":"se/restore","tier":0,"moveId":270} 
+[23:16:08.489] LOG: 16 5 [9,11,12,13,15,25]
+[23:16:08.490] LOG: {"id":"REVIVER_SEED","localeKey":"modifierType:ModifierType.REVIVER_SEED","iconImage":"reviver_seed","soundName":"se/restore","tier":2} 
+[23:16:08.490] LOG: 2 0 [4,5]
+[23:16:08.492] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[23:16:12.461] LOG: %cStart Phase ErCrossroadsPhase color:green;
+[23:16:19.022] LOG: %cStart Phase SelectBiomePhase color:green;
+[23:16:19.022] LOG: Wave Seed: xhC\wSis}_HwbZBwYb{ 15
+[23:16:26.045] LOG: %cStart Phase SelectModifierPhase color:green;
+[23:16:26.045] LOG: Wave Seed: xhC\wSis}_HwbZBwYb{ 15
+[23:16:26.052] LOG: 9 2 [4,5]
+[23:16:26.052] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_normal","group":"tm","soundName":"se/restore","tier":0,"moveId":270} 
+[23:16:26.052] LOG: 16 5 [9,11,12,13,15,25]
+[23:16:26.052] LOG: {"id":"REVIVER_SEED","localeKey":"modifierType:ModifierType.REVIVER_SEED","iconImage":"reviver_seed","soundName":"se/restore","tier":2} 
+[23:16:26.052] LOG: 2 0 [4,5]
+[23:16:26.052] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
