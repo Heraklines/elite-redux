@@ -144,9 +144,15 @@ export class VictoryPhase extends PokemonPhase {
         const fireBiomeShop = !(currentWaveIndex % 10) && !gameMode.isDaily;
         if (fireBiomeShop) {
           // ER Abyss: the Abyss has no market - its every-10-waves "shop" slot is
-          // Giratina's Bargain (a dialogue event, see TheBargainPhase). Every other
-          // biome gets the normal biome market.
-          if (globalScene.arena.biomeId === BiomeId.ABYSS) {
+          // meant to be Giratina's Bargain (a dialogue event, see TheBargainPhase).
+          // The bargain SCREEN is still being polished (#544: the dedicated handler
+          // doesn't render in-game yet), so it is GATED to staging/dev only. In
+          // production the Abyss x0 slot falls back to the normal market, which is a
+          // no-op in the Abyss (noShop) - i.e. the pre-Giratina behavior - so live
+          // players never hit the unfinished event. Remove the gate once it ships.
+          const env = import.meta.env as unknown as Record<string, unknown>;
+          const bargainStagingOnly = !!env.DEV || env.VITE_DEV_TOOLS === "1";
+          if (globalScene.arena.biomeId === BiomeId.ABYSS && bargainStagingOnly) {
             globalScene.phaseManager.pushNew("TheBargainPhase");
           } else {
             globalScene.phaseManager.pushNew("BiomeShopPhase");
