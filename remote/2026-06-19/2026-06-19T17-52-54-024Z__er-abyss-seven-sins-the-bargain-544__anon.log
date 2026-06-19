@@ -1,0 +1,276 @@
+scenario: ER Abyss: Seven Sins / The Bargain (#544)
+url:      https://elite-redux-staging.pages.dev/
+build:    mql81qzq-ap1v
+mode:     0  wave:11
+seed:     ws4fp4r4LhxOSdIlCU6LGiCR
+party:    Garchomp(L30 53hp f0), Snorlax(L30 145hp f0), Gengar(L30 85hp f0), Pikachu(L30 70hp f0), Eevee(L30 82hp f0)
+enemy:    Gastly(L8)
+
+----- COMMENT -----
+subtitute cursed relic
+
+----- CONSOLE -----
+[17:50:44.537] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:50:44.549] LOG: %cStart Phase MessagePhase color:green;
+[17:50:44.742] LOG: %cStart Phase FaintPhase color:green;
+[17:50:44.799] LOG: %cStart Phase MessagePhase color:green;
+[17:50:45.599] LOG: %cStart Phase VictoryPhase color:green;
+[17:50:45.600] LOG: %cStart Phase MoveEndPhase color:green;
+[17:50:45.600] LOG: %cStart Phase MovePhase color:green;
+[17:50:45.600] LOG: %cStart Phase MoveEndPhase color:green;
+[17:50:45.600] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:50:45.600] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:50:45.600] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:50:45.600] LOG: %cStart Phase BerryPhase color:green;
+[17:50:45.601] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:50:45.601] LOG: %cStart Phase TurnEndPhase color:green;
+[17:50:45.602] LOG: %cStart Phase BattleEndPhase color:green;
+[17:50:45.602] LOG: Battle Score: 44 (1 Turns x1)
+[17:50:45.602] LOG: Total Score: 174
+[17:50:45.606] LOG: %cStart Phase EggLapsePhase color:green;
+[17:50:45.607] LOG: %cStart Phase SelectModifierPhase color:green;
+[17:50:45.607] LOG: Wave Seed: X;oVD<|CBoyw?baVDo]^ 11
+[17:50:45.612] LOG: Applied Greater Golden Ball 
+[17:50:45.612] LOG: 0 0 [2,3,4,5]
+[17:50:45.612] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[17:50:45.612] LOG: 0 0 [2,3,4,5]
+[17:50:45.612] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[17:50:45.612] LOG: 7 4 [2,3,4,5]
+[17:50:45.612] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_def","soundName":"se/restore","tier":0,"stat":4,"nameKey":"x_sp_def","quantityKey":"percentage"} 
+[17:50:45.612] LOG: 35 5 [11,12,13,15,25]
+[17:50:45.612] LOG: {"id":"ER_POWER_HERB","localeKey":"","iconImage":"power_herb","iconTint":16777215,"soundName":"se/restore","tier":2} 
+[17:50:45.612] LOG: 23 4 [11,12,13,15,25]
+[17:50:45.612] LOG: {"id":"EXP_CHARM","localeKey":"modifierType:ModifierType.EXP_CHARM","iconImage":"exp_charm","soundName":"se/restore","tier":2,"boostPercent":25} 
+[17:50:45.613] LOG: 1 0 [11,12,13,15,25]
+[17:50:45.613] LOG: {"id":"MAX_LURE","localeKey":"modifierType:ModifierType.MAX_LURE","iconImage":"max_lure","group":"lure","soundName":"se/restore","tier":2,"maxBattles":30} 
+[17:50:45.613] LOG: 0 0 [2,3,4,5]
+[17:50:45.613] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[17:50:45.613] LOG: 9 4 [2,3,4,5]
+[17:50:45.613] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_normal","group":"tm","soundName":"se/restore","tier":0,"moveId":173} 
+[17:50:45.613] LOG: 24 10 [2,3,4,5,6,7,8,9,10,23]
+[17:50:45.613] LOG: {"id":"VOUCHER","localeKey":"","iconImage":"coupon","group":"voucher","soundName":"se/restore","tier":1,"voucherType":0,"count":1} 
+[17:50:58.170] LOG: Seed: HP0c6vFjPbwQyWv1yWagY7xr
+[17:50:58.170] LOG: Wave Seed: HP0c6vFjPbwQyWv1yWagY7xr 0
+[17:50:58.475] WARN: AnimationManager key already exists: prompt
+[17:50:58.476] WARN: AnimationManager key already exists: tera_sparkle
+[17:50:58.476] LOG: Seed: ws4fp4r4LhxOSdIlCU6LGiCR
+[17:50:58.476] LOG: Wave Seed: ws4fp4r4LhxOSdIlCU6LGiCR 0
+[17:51:02.571] LOG: %cStart Phase LoginPhase color:green;
+[17:51:04.349] LOG: Client Session: AWARv6dm1snBdNPP34VbiP9SdInTEYIm
+[17:51:04.938] DEBUG: Using cached system data
+[17:51:04.981] LOG: %cStart Phase TitlePhase color:green;
+[17:51:04.981] LOG: Getting Session Slot id: %d 4
+[17:51:04.988] LOG: use seasonal splash messages true
+[17:51:04.988] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[17:51:04.997] LOG: %cStart Phase SelectStarterPhase color:green;
+[17:51:05.089] LOG: Wave Seed: }>pz>|>VrY]nSvM_@VQsM\ 10
+[17:51:05.090] LOG: %cStart Phase EncounterPhase color:green;
+[17:51:05.093] LOG: Starting species pool tier: BOSS
+[17:51:05.094] LOG: Replaced CROBAT with ZUBAT
+[17:51:05.109] LOG: Pokemon: Wild Zubat | Species ID: 41 | Level: 7 | Nature: Rash (+SpAtk/-SpDef)
+[17:51:05.109] LOG: Stats (IVs): HP: 24 (21), Atk: 12 (20), Def: 10 (18), Spatk: 14 (26), Spdef: 10 (23), Spd: 14 (26)
+[17:51:05.109] LOG: Ability: Inner Focus | Passive Ability: Sniper | Boss Bars: 2
+[17:51:05.109] LOG: Moveset: ["Air Cutter","Mean Look","Mega Drain","Poison Fang"]
+[17:51:06.845] LOG: Battle Seed: HNKKWrnmyw0VrZDj
+[17:51:06.886] DEBUG: Session data saved to slot 4!
+[17:51:06.887] LOG: Wave Seed: }>pz>|>VrY]nSvM_@VQsM\ 10
+[17:51:07.298] LOG: %cStart Phase SummonPhase color:green;
+[17:51:07.583] LOG: %cStart Phase ShinySparklePhase color:green;
+[17:51:07.686] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[17:51:07.687] LOG: %cStart Phase CheckSwitchPhase color:green;
+[17:51:08.188] LOG: %cStart Phase InitEncounterPhase color:green;
+[17:51:08.189] LOG: %cStart Phase PostSummonPhase color:green;
+[17:51:08.189] LOG: Ran PSP for: Garchomp
+[17:51:08.189] LOG: %cStart Phase PostSummonPhase color:green;
+[17:51:08.189] LOG: %cStart Phase PostSummonPhase color:green;
+[17:51:08.189] LOG: %cStart Phase PostSummonPhase color:green;
+[17:51:08.190] LOG: Ran PSP for: Zubat
+[17:51:08.190] LOG: %cStart Phase PostSummonPhase color:green;
+[17:51:08.190] LOG: %cStart Phase PostSummonPhase color:green;
+[17:51:08.190] LOG: %cStart Phase TurnInitPhase color:green;
+[17:51:08.190] LOG: %cStart Phase CommandPhase color:green;
+[17:51:08.903] LOG: Move: DRAGON_CLAW Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Garchomp
+[17:51:08.904] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:51:08.907] LOG: Move Pool: ["Air Cutter","Mean Look","Mega Drain","Poison Fang"]
+[17:51:08.907] LOG: Move Scores: [25.5,3,10,13.875]
+[17:51:08.907] LOG: Sorted Move Pool: ["Air Cutter","Poison Fang","Mega Drain","Mean Look"]
+[17:51:08.907] LOG: Chosen Move: Air Cutter
+[17:51:08.908] LOG: %cStart Phase TurnStartPhase color:green;
+[17:51:08.909] LOG: %cStart Phase MovePhase color:green;
+[17:51:08.909] LOG: %cUser: Garchomp
+Move: DRAGON_CLAW
+Use Mode: NORMAL color:orchid
+[17:51:08.910] LOG: %cStart Phase MessagePhase color:green;
+[17:51:09.020] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:51:09.194] LOG: crit stage: +1
+[17:51:09.195] LOG: Move: Dragon Claw | Base damage: 189.34545454545457 | Power: 80 | Source attack: 92 | Target defense: 11
+[17:51:09.195] LOG: Move: Dragon Claw | Attack damage: 370
+[17:51:09.195] LOG: %cStart Phase ShowAbilityPhase color:green;
+[17:51:09.354] LOG: %cStart Phase HideAbilityPhase color:green;
+[17:51:09.381] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:51:09.396] LOG: %cStart Phase StatStageChangePhase color:green;
+[17:51:09.396] LOG: %cStart Phase MessagePhase color:green;
+[17:51:09.589] LOG: %cStart Phase MessagePhase color:green;
+[17:51:09.784] LOG: %cStart Phase FaintPhase color:green;
+[17:51:09.840] LOG: %cStart Phase MessagePhase color:green;
+[17:51:10.217] LOG: %cStart Phase VictoryPhase color:green;
+[17:51:10.218] LOG: %cStart Phase MoveEndPhase color:green;
+[17:51:10.218] LOG: %cStart Phase MovePhase color:green;
+[17:51:10.218] LOG: %cStart Phase MoveEndPhase color:green;
+[17:51:10.218] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:51:10.218] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:51:10.218] LOG: %cStart Phase TurnEndPhase color:green;
+[17:51:10.219] LOG: %cStart Phase BattleEndPhase color:green;
+[17:51:10.219] LOG: Battle Score: 53 (1 Turns x1)
+[17:51:10.219] LOG: Total Score: 53
+[17:51:10.224] LOG: %cStart Phase EggLapsePhase color:green;
+[17:51:10.224] LOG: %cStart Phase ModifierRewardPhase color:green;
+[17:51:10.717] LOG: %cStart Phase ModifierRewardPhase color:green;
+[17:51:11.227] LOG: %cStart Phase TheBargainPhase color:green;
+[17:51:24.507] LOG: %cStart Phase SelectModifierPhase color:green;
+[17:51:24.507] LOG: Wave Seed: }>pz>|>VrY]nSvM_@VQsM\ 10
+[17:51:34.843] LOG: %cStart Phase PartyHealPhase color:green;
+[17:51:37.292] LOG: %cStart Phase ResetStatusPhase color:green;
+[17:51:37.292] LOG: %cStart Phase ResetStatusPhase color:green;
+[17:51:37.293] LOG: %cStart Phase ResetStatusPhase color:green;
+[17:51:37.293] LOG: %cStart Phase ResetStatusPhase color:green;
+[17:51:37.293] LOG: %cStart Phase ResetStatusPhase color:green;
+[17:51:37.293] LOG: %cStart Phase ErCrossroadsPhase color:green;
+[17:51:39.162] LOG: %cStart Phase NewBattlePhase color:green;
+[17:51:39.162] LOG: Wave Seed: ~?q{?}?WsZ^oTwN`AWRtN] 11
+[17:51:39.162] LOG: %cStart Phase NextEncounterPhase color:green;
+[17:51:39.164] LOG: Starting species pool tier: BOSS_SUPER_RARE
+[17:51:39.164] LOG: Incompatible level: regenerating...
+[17:51:39.164] LOG: Starting species pool tier: BOSS
+[17:51:39.164] LOG: Replaced GENGAR with GASTLY
+[17:51:39.182] LOG: Pokemon: Wild Gastly | Species ID: 92 | Level: 8 | Nature: Calm (+SpDef/-Atk)
+[17:51:39.183] LOG: Stats (IVs): HP: 23 (3), Atk: 10 (24), Def: 11 (26), Spatk: 21 (22), Spdef: 15 (29), Spd: 19 (26)
+[17:51:39.183] LOG: Ability: Hypnotist | Passive Ability: Levitate | Boss Bars: 2
+[17:51:39.183] LOG: Moveset: ["Poltergeist","Imprison","Poison Gas","Astonish"]
+[17:51:42.664] LOG: {"id":"BERRY","localeKey":"","iconImage":"apicot_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":6} (enemy)
+[17:51:42.664] LOG: Battle Seed: ghxdxnDOhcJpFegA
+[17:51:42.748] DEBUG: Session data saved to slot 4!
+[17:51:42.749] LOG: Wave Seed: ~?q{?}?WsZ^oTwN`AWRtN] 11
+[17:51:43.160] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[17:51:43.160] LOG: %cStart Phase CheckSwitchPhase color:green;
+[17:51:44.376] LOG: %cStart Phase InitEncounterPhase color:green;
+[17:51:44.376] LOG: %cStart Phase PostSummonPhase color:green;
+[17:51:44.376] LOG: Ran PSP for: Gastly
+[17:51:44.376] LOG: %cStart Phase PostSummonPhase color:green;
+[17:51:44.376] LOG: %cStart Phase PostSummonPhase color:green;
+[17:51:44.376] LOG: %cStart Phase TurnInitPhase color:green;
+[17:51:44.376] LOG: %cStart Phase CommandPhase color:green;
+[17:51:51.168] LOG: Move: SWORDS_DANCE Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Garchomp
+[17:51:51.171] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:51:51.175] LOG: Move Pool: ["Poltergeist","Imprison","Poison Gas","Astonish"]
+[17:51:51.175] LOG: Move Scores: [-20,0,0,19.5]
+[17:51:51.175] LOG: Sorted Move Pool: ["Astonish","Imprison","Poison Gas","Poltergeist"]
+[17:51:51.175] LOG: Chosen Move: Astonish
+[17:51:51.175] LOG: %cStart Phase TurnStartPhase color:green;
+[17:51:51.176] LOG: %cStart Phase MovePhase color:green;
+[17:51:51.177] LOG: %cUser: Gastly
+Move: ASTONISH
+Use Mode: NORMAL color:orchid
+[17:51:51.179] LOG: %cStart Phase MessagePhase color:green;
+[17:51:51.284] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:51:51.403] LOG: crit stage: +0
+[17:51:51.403] LOG: Move: Astonish | Base damage: 2.5859154929577466 | Power: 40 | Source attack: 10 | Target defense: 71
+[17:51:51.404] LOG: Move: Astonish | Attack damage: 3
+[17:51:51.405] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:51:51.418] LOG: %cStart Phase ShowAbilityPhase color:green;
+[17:51:51.584] LOG: %cStart Phase MessagePhase color:green;
+[17:51:51.825] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:51:51.829] LOG: %cStart Phase HideAbilityPhase color:green;
+[17:51:51.862] LOG: %cStart Phase MoveEndPhase color:green;
+[17:51:51.862] LOG: %cStart Phase MovePhase color:green;
+[17:51:51.862] LOG: %cUser: Garchomp
+Move: SWORDS_DANCE
+Use Mode: NORMAL color:orchid
+[17:51:51.862] LOG: %cStart Phase MessagePhase color:green;
+[17:51:52.062] LOG: %cStart Phase MoveEndPhase color:green;
+[17:51:52.062] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:51:52.062] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:51:52.062] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:51:52.062] LOG: %cStart Phase BerryPhase color:green;
+[17:51:52.063] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:51:52.063] LOG: %cStart Phase TurnEndPhase color:green;
+[17:51:52.063] LOG: %cStart Phase TurnInitPhase color:green;
+[17:51:52.063] LOG: %cStart Phase CommandPhase color:green;
+[17:52:10.198] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:52:10.199] LOG: Battle Seed: ghxdxnDOhcJpFegA
+[17:52:10.201] LOG: Move Pool: ["Poltergeist","Imprison","Poison Gas","Astonish"]
+[17:52:10.201] LOG: Move Scores: [-20,0,0,-20]
+[17:52:10.201] LOG: Sorted Move Pool: ["Imprison","Poison Gas","Poltergeist","Astonish"]
+[17:52:10.201] LOG: Chosen Move: Imprison
+[17:52:10.201] LOG: %cStart Phase TurnStartPhase color:green;
+[17:52:10.201] LOG: %cStart Phase SwitchSummonPhase color:green;
+[17:52:10.514] LOG: %cStart Phase PostSummonPhase color:green;
+[17:52:10.514] LOG: Ran PSP for: Snorlax
+[17:52:10.515] LOG: %cStart Phase PokemonAnimPhase color:green;
+[17:52:10.515] WARN: PRSFX- Transform not found
+[17:52:10.729] LOG: %cStart Phase MessagePhase color:green;
+[17:52:10.951] LOG: %cStart Phase MessagePhase color:green;
+[17:52:11.221] LOG: %cStart Phase PostSummonPhase color:green;
+[17:52:11.222] LOG: %cStart Phase MovePhase color:green;
+[17:52:11.223] LOG: %cUser: Snorlax
+Move: DEFENSE_CURL
+Use Mode: INDIRECT color:orchid
+[17:52:11.223] LOG: %cStart Phase MessagePhase color:green;
+[17:52:11.340] LOG: %cStart Phase PokemonAnimPhase color:green;
+[17:52:11.423] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:52:11.555] LOG: %cStart Phase StatStageChangePhase color:green;
+[17:52:11.737] LOG: %cStart Phase MessagePhase color:green;
+[17:52:11.944] LOG: %cStart Phase MoveEndPhase color:green;
+[17:52:11.944] LOG: %cStart Phase PostSummonPhase color:green;
+[17:52:11.944] LOG: %cStart Phase MovePhase color:green;
+[17:52:11.944] LOG: %cUser: Gastly
+Move: IMPRISON
+Use Mode: NORMAL color:orchid
+[17:52:11.945] LOG: %cStart Phase MessagePhase color:green;
+[17:52:12.062] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:52:12.230] LOG: %cStart Phase MessagePhase color:green;
+[17:52:12.499] LOG: %cStart Phase MoveEndPhase color:green;
+[17:52:12.499] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:52:12.499] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:52:12.499] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:52:12.499] LOG: %cStart Phase BerryPhase color:green;
+[17:52:12.500] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:52:12.500] LOG: %cStart Phase TurnEndPhase color:green;
+[17:52:12.501] LOG: %cStart Phase TurnInitPhase color:green;
+[17:52:12.501] LOG: %cStart Phase CommandPhase color:green;
+[17:52:36.670] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:52:36.673] LOG: Battle Seed: ghxdxnDOhcJpFegA
+[17:52:36.674] LOG: Move Pool: ["Poltergeist","Imprison","Poison Gas","Astonish"]
+[17:52:36.674] LOG: Move Scores: [-20,-20,0,-20]
+[17:52:36.674] LOG: Sorted Move Pool: ["Poison Gas","Poltergeist","Imprison","Astonish"]
+[17:52:36.674] LOG: Chosen Move: Poison Gas
+[17:52:36.674] LOG: %cStart Phase TurnStartPhase color:green;
+[17:52:36.675] LOG: %cStart Phase SwitchSummonPhase color:green;
+[17:52:36.987] LOG: %cStart Phase ShinySparklePhase color:green;
+[17:52:37.090] LOG: %cStart Phase PostSummonPhase color:green;
+[17:52:37.090] LOG: Ran PSP for: Garchomp
+[17:52:37.091] LOG: %cStart Phase MessagePhase color:green;
+[17:52:37.340] LOG: %cStart Phase PostSummonPhase color:green;
+[17:52:37.340] LOG: %cStart Phase PostSummonPhase color:green;
+[17:52:37.340] LOG: %cStart Phase MovePhase color:green;
+[17:52:37.340] LOG: %cUser: Gastly
+Move: POISON_GAS
+Use Mode: NORMAL color:orchid
+[17:52:37.342] LOG: %cStart Phase MessagePhase color:green;
+[17:52:37.465] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:52:37.757] LOG: crit stage: +0
+[17:52:37.758] LOG: Move: Poison Gas | Base damage: 4.288 | Power: 65 | Source attack: 22 | Target defense: 65
+[17:52:37.758] LOG: Move: Poison Gas | Attack damage: 2
+[17:52:37.759] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:52:37.771] LOG: %cStart Phase MessagePhase color:green;
+[17:52:37.978] LOG: %cStart Phase MoveEndPhase color:green;
+[17:52:37.979] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:52:37.979] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:52:37.979] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:52:37.979] LOG: %cStart Phase BerryPhase color:green;
+[17:52:37.979] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:52:37.979] LOG: %cStart Phase TurnEndPhase color:green;
+[17:52:37.980] LOG: %cStart Phase TurnInitPhase color:green;
+[17:52:37.981] LOG: %cStart Phase CommandPhase color:green;
