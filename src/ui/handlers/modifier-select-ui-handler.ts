@@ -15,7 +15,7 @@ import type { ModifierSelectCallback } from "#phases/select-modifier-phase";
 import { AwaitableUiHandler } from "#ui/awaitable-ui-handler";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { addTextObject, getModifierTierTextTint, getTextColor, getTextStyleOptions } from "#ui/text";
-import { formatMoney, NumberHolder } from "#utils/common";
+import { fixedInt, formatMoney, NumberHolder } from "#utils/common";
 import i18next from "i18next";
 import Phaser from "phaser";
 
@@ -23,6 +23,14 @@ export const SHOP_OPTIONS_ROW_LIMIT = 7;
 const SINGLE_SHOP_ROW_YOFFSET = 12;
 const DOUBLE_SHOP_ROW_YOFFSET = 24;
 const OPTION_BUTTON_YPOSITION = -62;
+
+// ER: dedicated item-description box geometry. X/Y mirror the battle message text
+// (messageContainer at 12,-39) so the box overlays the message box exactly.
+// VISIBLE_H is the masked window height (~the message box's visible text area);
+// descriptions taller than this auto-scroll. Tunable if the clip looks off.
+const ITEM_DESC_X = 12;
+const ITEM_DESC_Y = -39;
+const ITEM_DESC_VISIBLE_H = 34;
 
 export class ModifierSelectUiHandler extends AwaitableUiHandler {
   private modifierContainer: Phaser.GameObjects.Container;
@@ -35,6 +43,14 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
   private lockRarityButtonText: Phaser.GameObjects.Text;
   private moveInfoOverlay: MoveInfoOverlay;
   private moveInfoOverlayActive = false;
+  /**
+   * ER: a dedicated, masked description box for ITEM descriptions only, drawn at
+   * the exact same position/font/wrap as the shared message text so it looks
+   * identical, but it auto-scrolls when the (often long ER) description overflows.
+   * The general message box (`MessageUiHandler`) is left untouched.
+   */
+  private itemDescText: Phaser.GameObjects.Text;
+  private itemDescScroll: Phaser.Tweens.Tween | null = null;
   protected declare onActionInput: ModifierSelectCallback | null;
 
   private rowCursor = 0;
@@ -156,6 +172,60 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     ui.add(this.moveInfoOverlay);
     // register the overlay to receive toggle events
     globalScene.addInfoToggle(this.moveInfoOverlay);
+
+    // ER: dedicated, masked, auto-scrolling description box for ITEM descriptions.
+    // Drawn at the SAME coords/font/wrap as the battle message text (messageContainer
+    // at 12,-39; TextStyle.MESSAGE; wordWrap 1780) so it overlays the message box
+    // pixel-for-pixel - but it scrolls when the description overflows. The shared
+    // message box / MessageUiHandler is left untouched.
+    this.itemDescText = addTextObject(ITEM_DESC_X, ITEM_DESC_Y, "", TextStyle.MESSAGE, {
+      wordWrap: { width: 1780 },
+    }).setOrigin(0, 0);
+    this.itemDescText.setVisible(false);
+    this.modifierContainer.add(this.itemDescText);
+    // Clip to the message text area. Mirror MoveInfoOverlay's mask: a from-bottom y
+    // (negative) maps to an absolute screen y via + canvas height; the graphics is
+    // scaled x6 to match the rendered text. Tunable: ITEM_DESC_VISIBLE_H.
+    const itemDescMask = globalScene.make.graphics();
+    itemDescMask.fillStyle(0xffffff);
+    itemDescMask.fillRect(ITEM_DESC_X, ITEM_DESC_Y + globalScene.scaledCanvas.height, 300, ITEM_DESC_VISIBLE_H);
+    itemDescMask.setScale(6);
+    this.itemDescText.setMask(itemDescMask.createGeometryMask());
+  }
+
+  /**
+   * ER: show an item's description in the dedicated scrolling box (blanking the
+   * shared message text underneath so they don't double up), and start a looping
+   * scroll if it overflows the visible height. Mirrors MoveInfoOverlay's scroll.
+   */
+  private showItemDescription(text: string): void {
+    this.hideItemDescription();
+    this.getUi().showText("", 0);
+    this.itemDescText.setText(text);
+    this.itemDescText.setVisible(true);
+    this.itemDescText.y = ITEM_DESC_Y;
+    const overflow = this.itemDescText.displayHeight - ITEM_DESC_VISIBLE_H;
+    if (overflow > 0) {
+      this.itemDescScroll = globalScene.tweens.add({
+        targets: this.itemDescText,
+        delay: fixedInt(2000),
+        hold: fixedInt(2000),
+        loop: -1,
+        duration: fixedInt(Math.max(1, Math.round(overflow)) * 120),
+        y: `-=${overflow}`,
+      });
+    }
+  }
+
+  /** ER: hide the dedicated item-description box and stop any scroll. */
+  private hideItemDescription(): void {
+    if (this.itemDescScroll) {
+      this.itemDescScroll.remove();
+      this.itemDescScroll = null;
+    }
+    this.itemDescText.y = ITEM_DESC_Y;
+    this.itemDescText.setText("");
+    this.itemDescText.setVisible(false);
   }
 
   show(args: any[]): boolean {
@@ -547,6 +617,9 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
 
     // the modifier selection has been updated, always hide the overlay
     this.moveInfoOverlay.clear();
+    // ER: hide the dedicated item-description box too; the item branch below
+    // re-shows it, non-item rows fall back to the normal message text.
+    this.hideItemDescription();
     if (this.rowCursor) {
       if (this.rowCursor === 1 && options.length === 0) {
         // Continue button when no shop items
@@ -579,7 +652,9 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
       }
 
       const type = options[this.cursor].modifierTypeOption.type;
-      type && ui.showText(type.getDescription());
+      if (type) {
+        this.showItemDescription(type.getDescription());
+      }
       if (type instanceof TmModifierType) {
         // prepare the move overlay to be shown with the toggle
         this.moveInfoOverlay.show(allMoves[type.moveId]);
@@ -700,6 +775,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
 
     this.moveInfoOverlay.clear();
     this.moveInfoOverlayActive = false;
+    this.hideItemDescription();
     this.awaitingActionInput = false;
     this.onActionInput = null;
     this.getUi().clearText();
