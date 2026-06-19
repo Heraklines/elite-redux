@@ -852,10 +852,12 @@ export class EggGachaUiHandler extends MessageUiHandler {
 
   /**
    * "Options..." submenu: the two utility actions (Auto Restock, Discard Eggs)
-   * collapsed into one row so the gacha machine keeps more vertical space.
-   * Opened as an OPTION_SELECT overlay; selecting an entry auto-closes the submenu
-   * (handler returns true) and a deferred call opens the real action on the gacha,
-   * so overlays never stack on top of each other.
+   * collapsed into one row so the gacha machine keeps more vertical space. Opened
+   * as an OPTION_SELECT overlay; every entry calls revertMode() to POP the overlay
+   * (the pause-menu submenu pattern) so control returns to the gacha - relying on
+   * the option-select's auto-clear alone leaves the gacha locked. Auto Restock /
+   * Discard run their real action only AFTER the submenu has reverted, so overlays
+   * never stack.
    */
   private openGachaOptions(): void {
     const ui = this.getUi();
@@ -864,20 +866,23 @@ export class EggGachaUiHandler extends MessageUiHandler {
         {
           label: i18next.t("egg:autoRestockEntry"),
           handler: () => {
-            globalScene.time.delayedCall(fixedInt(10), () => ui.setOverlayMode(UiMode.AUTO_EGG_RESTOCK));
+            ui.revertMode().then(() => ui.setOverlayMode(UiMode.AUTO_EGG_RESTOCK));
             return true;
           },
         },
         {
           label: i18next.t("egg:flushEggsEntry"),
           handler: () => {
-            globalScene.time.delayedCall(fixedInt(10), () => this.flushEggs());
+            ui.revertMode().then(() => this.flushEggs());
             return true;
           },
         },
         {
           label: i18next.t("menu:cancel"),
-          handler: () => true,
+          handler: () => {
+            ui.revertMode();
+            return true;
+          },
         },
       ],
     });
