@@ -14,9 +14,12 @@
 //   - Elite → "insane"  (ER mid roster)
 //   - Hell  → "hell"    (ER hardest roster)
 //
-// Stored module-level (run-scoped). It resets to the default on a fresh page
-// load; persisting it into session save data is a follow-up. `ErRosterTier` is
-// re-exported from the trainer-overlay so callers map difficulty → tier here.
+// Stored module-level (run-scoped). It defaults to "ace" on a fresh page load,
+// but the run's choice IS persisted: GameData.getSessionSaveData writes
+// `erDifficulty` and initSessionFromData restores it via setErDifficulty on load,
+// so a continued/refreshed run keeps its difficulty (legacy saves with no field
+// default to "ace"). `ErRosterTier` is re-exported from the trainer-overlay so
+// callers map difficulty → tier here.
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";

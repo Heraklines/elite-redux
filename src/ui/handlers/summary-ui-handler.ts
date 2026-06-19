@@ -13,6 +13,7 @@ import {
 import { cycleErGiftAbility, getErActiveGiftAbilityId, isErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
 import { getErMoveDetailPages, type MoveDetailRow } from "#data/elite-redux/er-move-details";
+import { erYoungsterFreeInnateSlots } from "#data/elite-redux/er-run-difficulty";
 import { getLevelRelExp, getLevelTotalExp } from "#data/exp";
 import { getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
@@ -1810,10 +1811,24 @@ export class SummaryUiHandler extends UiHandler {
         const enabled = isSlotEnabled(passiveAttr, row.slot);
         const levelReq = isEnemy ? enemyLevelForSlot[row.slot] : 0;
         const levelLocked = isEnemy && mon.level < levelReq;
+        // Player FREE-innate slots, mirroring the in-battle innate panel
+        // (battle-info-overlay): the Youngster level ramp, Daily runs, an Innate
+        // Shrine attunement, and a TRUANT innate (a nerf) are live for free this
+        // run - NOT candy-gated. Without this the summary screen wrongly showed
+        // "unlock with candy" for innates that are actually active (the Youngster
+        // "shows all 4 but not unlocked" report).
+        const freeInnate =
+          !isEnemy
+          && (row.slot < erYoungsterFreeInnateSlots(mon.level)
+            || globalScene.gameMode?.isDaily === true
+            || mon.customPokemonData?.erInnateShrineUnlocked === true
+            || row.ability?.id === AbilityId.TRUANT);
         if (levelLocked) {
           locked = true;
           lockIconKey = "icon_lock";
           reason = i18next.t("pokemonSummary:innateLockedLevel", { level: levelReq });
+        } else if (freeInnate) {
+          // live for free this run - not locked
         } else if (!unlocked && !isEnemy) {
           locked = true;
           lockIconKey = "icon_lock";

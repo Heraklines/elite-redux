@@ -4542,6 +4542,30 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Youngster innates show unlocked",
+    description:
+      "Display fix. On Youngster, innate slots are temp-unlocked by level (1/15/24),\n"
+      + "and the in-battle innate panel showed them unlocked - but the SUMMARY screen's\n"
+      + "Abilities page still showed 'Innate (Locked - unlock with candy)' because it\n"
+      + "only checked the candy bitmask, ignoring the Youngster/Daily/Innate-Shrine/\n"
+      + "TRUANT free-slot rules (the report: 'all 4 unlocked on Youngster but don't show\n"
+      + "as unlocked'). The summary now mirrors the battle panel. (Run difficulty itself\n"
+      + "already persists across reload via the session save - that part was not the\n"
+      + "bug.) CHECK on a YOUNGSTER run: open a mon's summary -> Abilities page; its\n"
+      + "level-unlocked innates show UNLOCKED (no candy-lock icon), matching the battle\n"
+      + "innate panel. Also verify the same mon's panel in battle agrees.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("youngster");
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 30, STARTING_WAVE_OVERRIDE: 5 });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Locked Battle Bond does nothing",
     description:
       "Battle Bond gating fix. Reported: a LOCKED Battle Bond innate still fired on\n"

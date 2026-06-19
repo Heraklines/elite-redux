@@ -586,8 +586,9 @@ export class BattleInfoOverlay {
         }
       } else if (
         slot < youngsterFree
-        || globalScene.gameMode?.isDaily === true // ER (#381): a TRUANT innate is always live for free (it is a nerf).
-        || ability.id === AbilityId.TRUANT
+        || globalScene.gameMode?.isDaily === true
+        || mon.customPokemonData?.erInnateShrineUnlocked === true // ER Innate Shrine (#514): shrine-attuned mon's slots are unlocked for the run.
+        || ability.id === AbilityId.TRUANT // ER (#381): a TRUANT innate is always live for free (it is a nerf).
       ) {
         // live for free this run — fall through unlocked
       } else if (!isSlotUnlocked(passiveAttr, passiveSlot)) {
