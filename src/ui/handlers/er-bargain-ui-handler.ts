@@ -249,6 +249,13 @@ export class ErBargainUiHandler extends UiHandler {
     this.speaking = false;
     this.dialogueText.setText(this.greeting);
 
+    // Restore the choosing UI. show() is the canonical re-entry (after Check Team
+    // or backing out of the party); a prior speak() may have hidden the panel +
+    // sub-box, and they would otherwise stay hidden on re-open.
+    this.optionsWindow.setVisible(true);
+    this.descWindow.setVisible(true);
+    this.descText.setVisible(true);
+
     const showCheck = this.onCheckTeam !== null;
     this.checkTeamWindow.setVisible(showCheck);
     this.checkTeamText.setVisible(showCheck);
