@@ -4542,6 +4542,28 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Biome-leave heals only every 10 waves",
+    description:
+      "Full-heal cadence fix. The biome REST (full heal) is supposed to be every 10\n"
+      + "GLOBAL waves, but with the World Map's variable biome length / Crossroads a\n"
+      + "biome can END off the 10-wave boundary - and SelectBiomePhase was healing on\n"
+      + "EVERY biome leave, so you got a free full-heal 'just for leaving the biome'.\n"
+      + "Now the heal only fires on the every-10 tick (mid-biome x0 waves heal via\n"
+      + "VictoryPhase; biome-ending x0 waves heal here; off-cadence biome leaves do\n"
+      + "NOT). CHECK (classic run, World Map on): leave a biome OFF a x0 wave (Crossroads\n"
+      + "'Move on', or a biome that ends short) - party HP is NOT restored. On x0 waves\n"
+      + "(every 10) the party still fully heals. Before the fix, leaving any biome healed.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 30 });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Reactive items show holder icon",
     description:
       "Held-item icon fix. The 5 reactive items (Cell Battery, Absorb Bulb, Snowball,\n"

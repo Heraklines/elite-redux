@@ -138,26 +138,33 @@ export class SelectBiomePhase extends BattlePhase {
     const currentWaveIndex = globalScene.currentBattle.waveIndex;
     const nextWaveIndex = currentWaveIndex + 1;
 
-    // ER (#486): with variable biome length the biome start is no longer at
-    // %10+1. But SelectBiomePhase only runs at a REAL biome transition (it is
-    // pushed when isNewBiome() is true), so under the gate the heal/interest
-    // always fires here - exactly once per biome start. Vanilla keeps the %10
-    // check for daily / endless / random which share this phase.
+    // ER (#486): with variable biome length the biome start is no longer at %10+1,
+    // and SelectBiomePhase runs at every REAL biome transition (pushed when
+    // isNewBiome()). Money interest still fires per biome start under the gate;
+    // vanilla / daily / endless only reach this block at %10===1.
     if (erBiomeRoutingActive() || nextWaveIndex % 10 === 1) {
       globalScene.applyModifiers(MoneyInterestModifier, true);
-      const healStatus = new BooleanHolder(true);
-      applyChallenges(ChallengeType.PARTY_HEAL, healStatus);
-      if (healStatus.value) {
-        globalScene.phaseManager.unshiftNew("PartyHealPhase", false);
-      } else {
-        globalScene.phaseManager.unshiftNew(
-          "SelectModifierPhase",
-          undefined,
-          undefined,
-          gameMode.isFixedBattle(currentWaveIndex)
-            ? gameMode.getFixedBattle(currentWaveIndex)?.customModifierRewardSettings
-            : undefined,
-        );
+      // ER: the biome REST (full heal, or its challenge-substituted reward) is on the
+      // every-10-GLOBAL-wave cadence - NOT on every World-Map biome leave. With
+      // variable biome length / Crossroads a biome can END off the 10-wave boundary;
+      // healing there handed out a free full-heal "just for leaving the biome". Gate
+      // it to the 10-wave tick (a biome-ending x0 wave). Mid-biome x0 waves heal via
+      // VictoryPhase (#504, which skips biome-ending waves so there is no double-heal).
+      if (nextWaveIndex % 10 === 1) {
+        const healStatus = new BooleanHolder(true);
+        applyChallenges(ChallengeType.PARTY_HEAL, healStatus);
+        if (healStatus.value) {
+          globalScene.phaseManager.unshiftNew("PartyHealPhase", false);
+        } else {
+          globalScene.phaseManager.unshiftNew(
+            "SelectModifierPhase",
+            undefined,
+            undefined,
+            gameMode.isFixedBattle(currentWaveIndex)
+              ? gameMode.getFixedBattle(currentWaveIndex)?.customModifierRewardSettings
+              : undefined,
+          );
+        }
       }
     }
     globalScene.phaseManager.unshiftNew("SwitchBiomePhase", nextBiome);
