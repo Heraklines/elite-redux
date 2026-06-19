@@ -40,16 +40,17 @@ const BASE_VISIBLE_NODES = 2;
 
 /**
  * Whether the branching node graph drives biome transitions this run. Gated to
- * classic, non-daily, non-random-biome runs - and, for now, to dev/staging
- * builds (the same gate as the dev test suite) so it ships to the testing site
- * for verification before it ever reaches a production run. Flip the dev gate
- * once it is play-verified.
+ * classic, non-daily, non-random-biome runs.
+ *
+ * NOTE: this was previously ALSO gated to dev/staging builds for verification.
+ * That dev gate has been FLIPPED now that the World Map (routing + the every-5
+ * Crossroads + variable biome length + notoriety bosses) is play-verified on
+ * staging, so it is LIVE in production too. The Giratina Bargain screen (#544)
+ * stays separately staging-gated in victory-phase.ts until its handler ships.
  */
 export function erBiomeRoutingActive(): boolean {
-  const env = import.meta.env as unknown as { DEV?: boolean; VITE_DEV_TOOLS?: string };
-  const devBuild = !!env.DEV || env.VITE_DEV_TOOLS === "1";
   const gm = globalScene?.gameMode;
-  return devBuild && !!gm && gm.isClassic && !gm.isDaily && !gm.hasRandomBiomes;
+  return !!gm && gm.isClassic && !gm.isDaily && !gm.hasRandomBiomes;
 }
 
 /** The biome the player travelled FROM into the current one. */
