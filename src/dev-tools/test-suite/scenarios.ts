@@ -1021,11 +1021,12 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "ER Abyss: Seven Sins / The Bargain (#544)",
     description:
-      "#544 - The Bargain (Abyss Seven Sins). Forces ER_THE_BARGAIN (a NEW ER event,\n"
-      + "separate from the vanilla Dark Deal). Giratina Origin (the\n"
-      + "six-winged form) offers 3 RANDOM Sins of 7, plus Leave. All sins are save-safe and the\n"
-      + "party NEVER exceeds 6 (the 7th-slot mechanic is parked).\n"
-      + "DO: read Giratina's dialogue, then take each Sin across repeat runs to see all 7.\n"
+      "#544 - The Bargain (Abyss Seven Sins). WIN this wave-10 Abyss battle: Giratina's\n"
+      + "Bargain then fires in the Abyss every-10-waves SHOP SLOT (a dialogue EVENT - not a\n"
+      + "mystery encounter, not the vanilla Dark Deal). Giratina Origin (six-winged) and his\n"
+      + "portrait appear, offering 3 random Sins of 6 active, plus Leave. All sins are\n"
+      + "save-safe; the party never exceeds 6 (7th-slot parked).\n"
+      + "DO: win the fight, read the dialogue + see the portrait, then take each Sin.\n"
       + "EXPECT per Sin:\n"
       + " - Greed: empty a mon's candy -> money + a Greater Golden Ball (+2 reward picks).\n"
       + " - Gluttony: give up 1 mon for the run -> a Legendary Egg in your egg list.\n"
@@ -1045,10 +1046,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
       resetDevOverrides();
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 30,
-        STARTING_WAVE_OVERRIDE: 32,
+        // Start ON a x0 wave in the Abyss: win this battle and the Abyss shop slot
+        // fires Giratina's Bargain (TheBargainPhase) post-victory.
+        STARTING_WAVE_OVERRIDE: 10,
         STARTING_BIOME_OVERRIDE: BiomeId.ABYSS,
-        MYSTERY_ENCOUNTER_RATE_OVERRIDE: 256,
-        MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.ER_THE_BARGAIN,
         STARTING_HELD_ITEMS_OVERRIDE: [
           { name: "LEFTOVERS" },
           { name: "SOUL_DEW" },

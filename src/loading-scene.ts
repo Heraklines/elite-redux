@@ -45,6 +45,8 @@ export class LoadingScene extends SceneBase {
       // ER #439 relic icons (PokeAPI item sprites, hosted on er-assets).
       .loadImage("er_field_medic", "items/er")
       .loadImage("er_warm_incubator", "items/er")
+      // ER Abyss "The Bargain" - Giratina Origin talking portrait (in-repo asset).
+      .loadImage("er_bargain_giratina", "elite-redux/the-bargain", "giratina.png")
       // ER reactive held items (PokeAPI item sprites, hosted on er-assets).
       .loadImage("er_cell_battery", "items/er")
       .loadImage("er_absorb_bulb", "items/er")

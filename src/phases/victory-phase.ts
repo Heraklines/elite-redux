@@ -6,6 +6,7 @@ import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
 import { BattleType } from "#enums/battle-type";
 import type { BattlerIndex } from "#enums/battler-index";
+import { BiomeId } from "#enums/biome-id";
 import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
 import { GameModes } from "#enums/game-modes";
 import { UiMode } from "#enums/ui-mode";
@@ -142,7 +143,14 @@ export class VictoryPhase extends PokemonPhase {
         const biomeEnding = globalScene.isNewBiome();
         const fireBiomeShop = !(currentWaveIndex % 10) && !gameMode.isDaily;
         if (fireBiomeShop) {
-          globalScene.phaseManager.pushNew("BiomeShopPhase");
+          // ER Abyss: the Abyss has no market - its every-10-waves "shop" slot is
+          // Giratina's Bargain (a dialogue event, see TheBargainPhase). Every other
+          // biome gets the normal biome market.
+          if (globalScene.arena.biomeId === BiomeId.ABYSS) {
+            globalScene.phaseManager.pushNew("TheBargainPhase");
+          } else {
+            globalScene.phaseManager.pushNew("BiomeShopPhase");
+          }
         }
 
         // ER (#504): every 10 GLOBAL waves the player also gets a full rest, the

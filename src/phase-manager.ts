@@ -114,6 +114,7 @@ import { SwitchBiomePhase } from "#phases/switch-biome-phase";
 import { SwitchPhase } from "#phases/switch-phase";
 import { SwitchSummonPhase } from "#phases/switch-summon-phase";
 import { TeraPhase } from "#phases/tera-phase";
+import { TheBargainPhase } from "#phases/the-bargain-phase";
 import { TitlePhase } from "#phases/title-phase";
 import { ToggleDoublePositionPhase } from "#phases/toggle-double-position-phase";
 import { TrainerVictoryPhase } from "#phases/trainer-victory-phase";
@@ -144,6 +145,7 @@ const PHASES = Object.freeze({
   BiomeShopPhase,
   BlackMarketShopPhase,
   ColosseumChoicePhase,
+  TheBargainPhase,
   ExoticShopPhase,
   ImportBazaarShopPhase,
   ErCrossroadsPhase,
