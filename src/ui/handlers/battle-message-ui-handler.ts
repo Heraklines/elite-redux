@@ -195,12 +195,20 @@ export class BattleMessageUiHandler extends MessageUiHandler {
     super.showDialogue(text, name, delay, callback, callbackDelay, prompt, promptDelay);
   }
 
-  promptLevelUpStats(partyMemberIndex: number, prevStats: number[], showTotals: boolean): Promise<void> {
+  promptLevelUpStats(
+    partyMemberIndex: number,
+    prevStats: number[],
+    showTotals: boolean,
+    newStatsOverride?: number[],
+  ): Promise<void> {
     return new Promise(resolve => {
       if (!globalScene.showLevelUpStats) {
         return resolve();
       }
-      const newStats = globalScene.getPlayerParty()[partyMemberIndex].stats;
+      // A caller (Rare Candy) may pass a FROZEN "after" snapshot so the displayed
+      // delta matches the level-up it represents even when several level-ups are
+      // queued back-to-back (the live stats would already be at the final level).
+      const newStats = newStatsOverride ?? globalScene.getPlayerParty()[partyMemberIndex].stats;
       let levelUpStatsValuesText = "";
       for (const s of PERMANENT_STATS) {
         levelUpStatsValuesText += `${showTotals ? newStats[s] : newStats[s] - prevStats[s]}\n`;
@@ -211,7 +219,7 @@ export class BattleMessageUiHandler extends MessageUiHandler {
       this.awaitingActionInput = true;
       this.onActionInput = () => {
         if (!showTotals) {
-          return this.promptLevelUpStats(partyMemberIndex, [], true).then(() => resolve());
+          return this.promptLevelUpStats(partyMemberIndex, [], true, newStatsOverride).then(() => resolve());
         }
         this.levelUpStatsContainer.setVisible(false);
         resolve();

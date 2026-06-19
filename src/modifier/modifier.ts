@@ -2619,18 +2619,33 @@ export class PokemonLevelIncrementModifier extends ConsumablePokemonModifier {
   override apply(playerPokemon: PlayerPokemon, levelCount: NumberHolder = new NumberHolder(1)): boolean {
     globalScene.applyModifiers(LevelIncrementBoosterModifier, true, levelCount);
 
+    // Snapshot stats BEFORE the level changes, then recalculate SYNCHRONOUSLY
+    // here. The level-up display normally happens in the deferred LevelUpPhase,
+    // but buying several candies in a row runs every apply() before any phase, so
+    // a phase that recalculated/snapshotted late read an already-advanced level
+    // and showed +0 ("candy adds no stats"). Recalculating now and handing the
+    // phase frozen before/after snapshots makes each level-up show its own
+    // correct stat delta, and guarantees the stats are applied regardless of how
+    // the queued phases interleave.
+    const prevStats = playerPokemon.stats.slice(0);
+    const lastLevel = playerPokemon.level;
+
     playerPokemon.level += levelCount.value;
     if (playerPokemon.level <= globalScene.getMaxExpLevel(true)) {
       playerPokemon.exp = getLevelTotalExp(playerPokemon.level, playerPokemon.species.growthRate);
     }
 
     playerPokemon.addFriendship(erBalanceNum("vanilla.friendship.gainRareCandy"), true);
+    playerPokemon.calculateStats();
+    const newStats = playerPokemon.stats.slice(0);
 
     globalScene.phaseManager.unshiftNew(
       "LevelUpPhase",
       globalScene.getPlayerParty().indexOf(playerPokemon),
-      playerPokemon.level - levelCount.value,
+      lastLevel,
       playerPokemon.level,
+      prevStats,
+      newStats,
     );
 
     return true;

@@ -12,12 +12,23 @@ export class LevelUpPhase extends PlayerPartyMemberPokemonPhase {
   protected lastLevel: number;
   protected level: number;
   protected pokemon: PlayerPokemon = this.getPlayerPokemon();
+  /**
+   * Frozen stat snapshots from a caller that already advanced the level AND
+   * recalculated stats (Rare Candy - see PokemonLevelIncrementModifier). When
+   * present, the phase displays these instead of snapshotting/recalculating live
+   * stats, so several level-ups queued back-to-back each show their own correct
+   * delta instead of one screen showing the whole gain and the rest showing +0.
+   */
+  protected preStats: number[] | undefined;
+  protected postStats: number[] | undefined;
 
-  constructor(partyMemberIndex: number, lastLevel: number, level: number) {
+  constructor(partyMemberIndex: number, lastLevel: number, level: number, preStats?: number[], postStats?: number[]) {
     super(partyMemberIndex);
 
     this.lastLevel = lastLevel;
     this.level = level;
+    this.preStats = preStats;
+    this.postStats = postStats;
   }
 
   public override start() {
@@ -29,8 +40,12 @@ export class LevelUpPhase extends PlayerPartyMemberPokemonPhase {
 
     globalScene.validateAchvs(LevelAchv, new NumberHolder(this.level));
 
-    const prevStats = this.pokemon.stats.slice(0);
-    this.pokemon.calculateStats();
+    // If the caller already advanced the level + recalculated (Rare Candy), use
+    // its frozen snapshots; otherwise snapshot + recalc live (the normal exp flow).
+    const prevStats = this.preStats ?? this.pokemon.stats.slice(0);
+    if (!this.preStats) {
+      this.pokemon.calculateStats();
+    }
     this.pokemon.updateInfo();
     if (globalScene.expParty === ExpNotification.DEFAULT) {
       globalScene.playSound("level_up_fanfare");
@@ -43,7 +58,7 @@ export class LevelUpPhase extends PlayerPartyMemberPokemonPhase {
         () =>
           globalScene.ui
             .getMessageHandler()
-            .promptLevelUpStats(this.partyMemberIndex, prevStats, false)
+            .promptLevelUpStats(this.partyMemberIndex, prevStats, false, this.postStats)
             .then(() => this.end()),
         null,
         true,
@@ -54,7 +69,7 @@ export class LevelUpPhase extends PlayerPartyMemberPokemonPhase {
       // we still want to display the stats if activated
       globalScene.ui
         .getMessageHandler()
-        .promptLevelUpStats(this.partyMemberIndex, prevStats, false)
+        .promptLevelUpStats(this.partyMemberIndex, prevStats, false, this.postStats)
         .then(() => this.end());
     }
   }

@@ -2954,6 +2954,38 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.RARE_CANDY],
   },
   {
+    label: "Candy stats: 2 in a row (no +0)",
+    description:
+      "Rare Candy stat-gain fix. Bug: buying 2+ candies in a row on a level-capped\n"
+      + "mon showed one level-up with the full gain and the next with +0 on every\n"
+      + "stat (looked like 'candy adds no stats'). Cause: candy advanced the level\n"
+      + "eagerly per purchase but the stat recalc/display was deferred to a phase, so\n"
+      + "back-to-back candies raced and one screen diffed against an already-final\n"
+      + "level. DO: this Regice is L50 at wave 5 (well above the cap). Win the opening\n"
+      + "battle, then in the shop BUY BOTH Rare Candies on Regice, one after the\n"
+      + "other. EXPECT: EACH level-up screen shows real POSITIVE stat gains (never +0\n"
+      + "on all six), and Regice's final stats match L52. Before the fix the 2nd\n"
+      + "candy (and retroactively the 1st) showed +0.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.ICE_BEAM, MoveId.THUNDERBOLT, MoveId.ANCIENT_POWER, MoveId.PROTECT],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.REGICE, {
+          moveset: [MoveId.ICE_BEAM, MoveId.THUNDERBOLT, MoveId.ANCIENT_POWER, MoveId.PROTECT],
+        }),
+      ];
+    },
+    // Two guaranteed candies so the tester can buy both back-to-back (the trigger).
+    shopItems: [modifierTypes.RARE_CANDY, modifierTypes.RARE_CANDY],
+  },
+  {
     // The systematic "Redux X → normal evolved form" repro — BOTH shapes:
     //   • form-carry lines (Drilbur→Excadrill-Redux, Kadabra→Alakazam-Redux)
     //   • the LAST-STAGE / single-evo lines whose Redux evolution is a brand-new
