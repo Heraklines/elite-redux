@@ -52,7 +52,11 @@ export class ErBargainUiHandler extends UiHandler {
     const w = globalScene.scaledCanvas.width;
     const h = globalScene.scaledCanvas.height;
 
-    this.container = globalScene.add.container(0, 0);
+    // Full-screen handler containers sit at y = -h so that a child at logical
+    // (0,0) lands at the screen's top-left (the egg-gacha / biome-shop / colosseum
+    // convention). At y = 0 the whole screen renders one full height BELOW the
+    // viewport - invisible - which is why this screen never appeared (#550).
+    this.container = globalScene.add.container(0, -h);
     this.container.setVisible(false);
     ui.add(this.container);
 
