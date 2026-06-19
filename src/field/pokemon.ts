@@ -7530,8 +7530,7 @@ export class PlayerPokemon extends Pokemon {
       // Dugtrio evolving into a form that already has Earthbound as an innate).
       // Drop the redundant override so the active ability re-derives to the
       // form's normal ability (the mon keeps the innate AND gains a distinct
-      // active), and re-arm the single-use capsule so the player can re-pick on
-      // the new form. Only the active-ability override is touched; innate-slot
+      // active). Only the active-ability override is touched; innate-slot
       // overrides (the Ability Randomizer) are independent and left alone.
       const capsuleAbilityId = this.customPokemonData.ability;
       if (capsuleAbilityId != null && capsuleAbilityId !== -1) {
@@ -7539,7 +7538,6 @@ export class PlayerPokemon extends Pokemon {
         if (evolvedInnates.some(a => a?.id === capsuleAbilityId)) {
           this.customPokemonData.ability = -1;
           this.customPokemonData.abilityOverridesForm = false;
-          this.customPokemonData.erAbilityCapsuleUsed = false;
         }
       }
       this.compatibleTms.splice(0, this.compatibleTms.length);

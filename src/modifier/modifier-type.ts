@@ -865,9 +865,6 @@ export class ErAbilityCapsuleModifierType extends PokemonModifierType {
       "ability_capsule",
       (type, args) => new ErAbilityCapsuleModifier(type, (args[0] as PlayerPokemon).id),
       (pokemon: PlayerPokemon) => {
-        if (pokemon.customPokemonData.erAbilityCapsuleUsed) {
-          return PartyUiHandler.NoEffectMessage;
-        }
         const form = pokemon.getSpeciesForm();
         const distinct = new Set([form.ability1, form.ability2, form.abilityHidden].filter(a => a !== AbilityId.NONE));
         if (distinct.size < 2) {

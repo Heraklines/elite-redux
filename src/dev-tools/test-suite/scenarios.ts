@@ -4609,6 +4609,30 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Ability Capsule cycles 1->2->Hidden (repeatable)",
+    description:
+      "ER Ability Capsule fix. It cycles a mon's ACTIVE ability through its legal\n"
+      + "abilities (1 -> 2 -> hidden -> 1), as the description says. Bug: it was\n"
+      + "single-use PER MON - after one use it said 'It won't have an effect', so you\n"
+      + "could never reach the hidden ability ('only works the first time'). Now it is\n"
+      + "REPEATABLE (each use is one consumed capsule). DO: win the opening battle, then\n"
+      + "in the shop use BOTH Ability Capsules on Snorlax, one after the other. EXPECT:\n"
+      + "the FIRST advances its ability (e.g. Immunity -> Thick Fat) and the SECOND\n"
+      + "advances again (-> Gluttony/hidden), never 'won't have an effect'.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 40, STARTING_WAVE_OVERRIDE: 5 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+    // Two capsules so the tester can use both on the same mon and confirm it does
+    // NOT lock after the first (the reported bug).
+    shopItems: [modifierTypes.ER_ABILITY_CAPSULE, modifierTypes.ER_ABILITY_CAPSULE],
+  },
+  {
     label: "(note) Locked Battle Bond does nothing",
     description:
       "Battle Bond gating fix. Reported: a LOCKED Battle Bond innate still fired on\n"

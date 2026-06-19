@@ -43,7 +43,7 @@ describe.skipIf(!RUN)("ER Ability Capsule dedup on evolution (#445)", () => {
       .startingLevel(40);
   });
 
-  it("drops a capsule override that becomes a duplicate innate + re-arms the capsule", async () => {
+  it("drops a capsule override that becomes a duplicate innate on evolution", async () => {
     await game.classicMode.runToSummon(SpeciesId.BULBASAUR);
     const bulba = game.field.getPlayerPokemon();
     // Simulate the capsule having set the active ability to something the
@@ -54,13 +54,11 @@ describe.skipIf(!RUN)("ER Ability Capsule dedup on evolution (#445)", () => {
     expect(ivyInnates.length).toBeGreaterThan(0);
     const dupAbility = ivyInnates[0];
     bulba.customPokemonData.ability = dupAbility;
-    bulba.customPokemonData.erAbilityCapsuleUsed = true;
 
     await bulba.evolve(pokemonEvolutions[SpeciesId.BULBASAUR][0], bulba.species);
 
     expect(bulba.species.speciesId).toBe(SpeciesId.IVYSAUR);
     expect(bulba.customPokemonData.ability).toBe(-1); // redundant override dropped
-    expect(bulba.customPokemonData.erAbilityCapsuleUsed).toBe(false); // re-armed
   });
 
   it("keeps a capsule override that does NOT duplicate an innate", async () => {
@@ -70,11 +68,9 @@ describe.skipIf(!RUN)("ER Ability Capsule dedup on evolution (#445)", () => {
     const nonDup = allAbilities.find(a => a && a.id !== AbilityId.NONE && !ivyInnates.has(a.id));
     expect(nonDup).toBeTruthy();
     bulba.customPokemonData.ability = nonDup!.id;
-    bulba.customPokemonData.erAbilityCapsuleUsed = true;
 
     await bulba.evolve(pokemonEvolutions[SpeciesId.BULBASAUR][0], bulba.species);
 
     expect(bulba.customPokemonData.ability).toBe(nonDup!.id); // preserved
-    expect(bulba.customPokemonData.erAbilityCapsuleUsed).toBe(true);
   });
 });

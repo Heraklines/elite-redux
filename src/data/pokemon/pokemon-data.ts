@@ -73,12 +73,6 @@ export class CustomPokemonData {
   public erGiftAbilities: number[] = [];
   public erGiftIndex = 0;
   /**
-   * ER Ability Capsule (#387): `true` once the capsule has been used on this
-   * Pokemon (it cycles the ACTIVE ability through the species' legal abilities
-   * and is single-use per Pokemon).
-   */
-  public erAbilityCapsuleUsed = false;
-  /**
    * ER Innate Shrine (#514): when `true`, this Pokemon's ER innate slots are all
    * unlocked for the rest of the run (no candy purchase needed), as if it had
    * attuned at the Temple shrine. Run-scoped (serialized with the session), not a
@@ -107,7 +101,6 @@ export class CustomPokemonData {
     this.erBlackShiny = data?.erBlackShiny ?? false;
     this.erGiftAbilities = data?.erGiftAbilities ?? [];
     this.erGiftIndex = data?.erGiftIndex ?? 0;
-    this.erAbilityCapsuleUsed = data?.erAbilityCapsuleUsed ?? false;
     this.erInnateShrineUnlocked = data?.erInnateShrineUnlocked ?? false;
     this.erCursedStat = data?.erCursedStat ?? -1;
   }

@@ -2545,16 +2545,16 @@ export class ErRelicModifier extends PersistentModifier {
 /**
  * ER Ability Capsule (#387, community batch): cycles the targeted Pokemon's
  * ACTIVE ability through the species' legal abilities (ability 1 -> ability 2
- * -> hidden -> ability 1). Single-use per Pokemon
- * ({@linkcode CustomPokemonData.erAbilityCapsuleUsed}); the innate slots are
- * untouched (that is the Ability Randomizer's job).
+ * -> hidden -> ability 1). REPEATABLE - it is a consumable, so each use spends one
+ * capsule and advances ONE step; cycling all the way to the hidden ability takes
+ * multiple capsules (this is what the item's "1 => 2 => Hidden" description
+ * promises). Previously a single-use-per-Pokemon flag blocked every use after the
+ * first, so you could never reach the hidden ability ("only works the first time").
+ * The innate slots are untouched (that is the Ability Randomizer's job).
  */
 export class ErAbilityCapsuleModifier extends ConsumablePokemonModifier {
   override apply(playerPokemon: PlayerPokemon): boolean {
     const custom = playerPokemon.customPokemonData;
-    if (custom.erAbilityCapsuleUsed) {
-      return false;
-    }
     const form = playerPokemon.getSpeciesForm();
     const candidates = [form.ability1, form.ability2, form.abilityHidden].filter(
       (a, i, arr) => a !== AbilityId.NONE && arr.indexOf(a) === i,
@@ -2568,7 +2568,6 @@ export class ErAbilityCapsuleModifier extends ConsumablePokemonModifier {
     if (playerPokemon.usesFormDerivedAbilities()) {
       custom.abilityOverridesForm = true;
     }
-    custom.erAbilityCapsuleUsed = true;
     // Register the newly-selected ability in the dex so starter select offers
     // it on future runs. The capsule cycles the species' OWN legal abilities,
     // so `next` maps cleanly onto one of the three abilityAttr bits (unlike the

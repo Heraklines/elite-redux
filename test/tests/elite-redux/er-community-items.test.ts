@@ -257,10 +257,14 @@ describe.skipIf(!RUN)("ER community item batch (#387/#392)", () => {
     const after = player.getAbility().id;
     expect(after).not.toBe(before);
     expect(candidates).toContain(after);
-    expect(player.customPokemonData.erAbilityCapsuleUsed).toBe(true);
 
-    // Single use per Pokemon.
-    expect(capsule.apply(player)).toBe(false);
+    // REPEATABLE (a consumable in-game): a SECOND use cycles to the next legal
+    // ability instead of being blocked, so the player can reach the hidden
+    // ability (it was single-use-per-mon before, which capped you after one step).
+    expect(capsule.apply(player)).toBe(true);
+    const afterSecond = player.getAbility().id;
+    expect(afterSecond).not.toBe(after);
+    expect(candidates).toContain(afterSecond);
   });
 
   it("Power Herb: 2 charge-turn skips, then empty; regains ONE charge after 10 waves", () => {
