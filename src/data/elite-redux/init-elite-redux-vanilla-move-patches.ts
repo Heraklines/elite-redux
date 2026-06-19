@@ -540,12 +540,18 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     },
   ],
   // STEEL_ROLLER: ER - usable WITHOUT terrain; still clears one when present
-  // (numeric pass pins 80 BP / 15 PP). Drop the vanilla "fails unless terrain
-  // is active" builder condition.
+  // (numeric pass pins 80 BP / 15 PP). Drop the vanilla "fails unless terrain is
+  // active" condition. That condition is registered at SEQUENCE 3
+  // (`.condition(() => !!arena.terrain, 3)` -> conditionsSeq3), so clearing only the
+  // default `conditions` (sequence 4) left it in place and the move still missed
+  // off-terrain. Clear every condition sequence so it truly fires without terrain.
   [
     MoveId.STEEL_ROLLER,
     move => {
-      (move as unknown as { conditions: unknown[] }).conditions.length = 0;
+      const m = move as unknown as { conditions: unknown[]; conditionsSeq2: unknown[]; conditionsSeq3: unknown[] };
+      m.conditions.length = 0;
+      m.conditionsSeq2.length = 0;
+      m.conditionsSeq3.length = 0;
     },
   ],
   // PSYBEAM: lowers SpAtk on hit (chance patched separately).

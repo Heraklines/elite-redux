@@ -4609,6 +4609,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Steel Roller works with NO terrain",
+    description:
+      "ER Steel Roller is usable WITHOUT terrain (it still clears one when present) -\n"
+      + "dex: 'Rolls over the opponent while destroying terrain'. Bug: it still failed\n"
+      + "off-terrain like the base game. Cause: the vanilla 'fails unless terrain'\n"
+      + "condition is at sequence 3 (conditionsSeq3), but the ER patch only cleared the\n"
+      + "default conditions (seq 4). DO: turn 1 (no terrain is active), use Steel Roller\n"
+      + "on the enemy. EXPECT: it CONNECTS and deals damage (no 'But it failed!').\n"
+      + "Before the fix it failed because no terrain was up.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.STEEL_ROLLER, MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.STEELIX, {
+          moveset: [MoveId.STEEL_ROLLER, MoveId.SPLASH, MoveId.IRON_HEAD, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "Ability Capsule cycles 1->2->Hidden (repeatable)",
     description:
       "ER Ability Capsule fix. It cycles a mon's ACTIVE ability through its legal\n"
