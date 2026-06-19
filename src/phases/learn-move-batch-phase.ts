@@ -35,6 +35,9 @@ export interface LearnMoveBatchDeps {
   learnableIds: MoveId[];
   /** Silently place a chosen move into a slot (no "learned X" banner). */
   assign: (moveId: MoveId, slotIndex: number) => void;
+  /** Undo EVERY assignment made this panel session - restore the exact moveset the
+   * mon had before the panel opened (for the "B = oops, undo" exit). */
+  revert: () => void;
   /** Called once when the player finishes or cancels; closes the panel + ends the phase. */
   done: () => void;
   /** Panic exit: if the panel fails to open/operate, fall back to the per-move
@@ -81,6 +84,11 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       globalScene.ui.getHandler() instanceof EvolutionSceneUiHandler ? UiMode.EVOLUTION_SCENE : UiMode.MESSAGE;
     const learnedIds: MoveId[] = [];
     let finished = false;
+    // Snapshot the pre-panel moveset so the panel's "undo" exit can restore it
+    // EXACTLY. setMove() replaces a slot with a NEW PokemonMove, so these held refs
+    // are never mutated - re-seating them is a clean revert.
+    const snapshotMoveset = [...pokemon.moveset];
+    const snapshotSummonMoveset = pokemon.summonData?.moveset ? [...pokemon.summonData.moveset] : null;
 
     const deps: LearnMoveBatchDeps = {
       pokemon,
@@ -91,6 +99,15 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
         pokemon.setMove(slotIndex, moveId);
         learnedIds.push(moveId);
         initMoveAnim(moveId).then(() => loadMoveAnimAssets([moveId], true));
+      },
+      revert: () => {
+        // Restore the exact pre-panel moveset and forget every learn this session
+        // (so the move-learned form change below does NOT fire for undone moves).
+        pokemon.moveset.splice(0, pokemon.moveset.length, ...snapshotMoveset);
+        if (snapshotSummonMoveset && pokemon.summonData?.moveset) {
+          pokemon.summonData.moveset.splice(0, pokemon.summonData.moveset.length, ...snapshotSummonMoveset);
+        }
+        learnedIds.length = 0;
       },
       done: () => {
         if (finished) {

@@ -164,13 +164,72 @@ async function postReport(report: BugReport): Promise<boolean> {
 }
 
 /**
- * Submit a bug report. Always attempts the local fallbacks (clipboard +
- * download) and, when an endpoint is configured, also POSTs it. Never throws —
- * returns a result describing which channels succeeded.
+ * The same remote sink the dev-tools "Send Logs" button uses: the er-editor-api
+ * worker commits each report onto the repo's `dev-logs` branch, which the
+ * maintainer pulls with scripts/pull-dev-logs.mjs. This is the PRIMARY channel for
+ * the in-game "Report a bug" button (works in prod with no player account), so
+ * every report lands where we already collect Send-Logs captures.
+ */
+const DEVLOG_SINK_URL = "https://er-editor-api.heraklines.workers.dev/devlog";
+
+/** Render the report as the plain-text capture format the /devlog sink stores. */
+function buildDevLogText(report: BugReport): string {
+  const s = report.state;
+  const party = s.party.map(p => `${p.species}(L${p.level} ${p.hp})`).join(", ");
+  return [
+    "----- BUG REPORT (in-game) -----",
+    `version:  ${s.version}`,
+    `url:      ${s.url}`,
+    `ua:       ${s.userAgent}`,
+    `mode:     ${s.gameModeId}  wave:${s.waveIndex}  difficulty:${s.erDifficulty}`,
+    `seed:     ${s.seed}`,
+    `party:    ${party}`,
+    "",
+    "----- DESCRIPTION -----",
+    report.description.trim() || "(none)",
+    "",
+    "----- CONSOLE -----",
+    report.logs,
+    "",
+  ].join("\n");
+}
+
+/** POST the report to the /devlog sink (the Send-Logs pipeline). Never throws. */
+async function postToDevLog(report: BugReport): Promise<boolean> {
+  if (typeof fetch !== "function") {
+    return false;
+  }
+  try {
+    const res = await fetch(DEVLOG_SINK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        by: "player",
+        scenario: "bug-report",
+        comment: report.description,
+        report: buildDevLogText(report),
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Submit a bug report. PRIMARY channel is the /devlog sink (the same place the
+ * Send Logs button delivers to - the repo's dev-logs branch), so it works in prod
+ * and the maintainer gets everything via pull-dev-logs.mjs. Also fires the optional
+ * email/webhook relay if one is configured, and ALWAYS copies + downloads as an
+ * offline fallback. Never throws - returns which channels succeeded.
  */
 export async function submitBugReport(description: string): Promise<BugReportResult> {
   const report = buildBugReport(description);
-  const [copied, sent] = await Promise.all([copyReport(report), postReport(report)]);
+  const [devlogOk, relayOk, copied] = await Promise.all([
+    postToDevLog(report),
+    postReport(report),
+    copyReport(report),
+  ]);
   const downloaded = downloadReport(report);
-  return { sent, downloaded, copied };
+  return { sent: devlogOk || relayOk, downloaded, copied };
 }

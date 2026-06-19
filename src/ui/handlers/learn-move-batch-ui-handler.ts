@@ -53,6 +53,9 @@ export class LearnMoveBatchUiHandler extends UiHandler {
   private confirmCursor = 0;
   private pendingMoveId: MoveId | null = null;
   private learnedAny = false;
+  /** What the confirm-cancel prompt means: undo-or-keep (after learning something)
+   * vs the plain skip prompt (nothing learned yet). */
+  private cancelMode: "leaveEmpty" | "revertOrKeep" = "leaveEmpty";
 
   constructor() {
     super(UiMode.LEARN_MOVE_BATCH);
@@ -148,7 +151,9 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       // Fixed 3-line layout (NO word-wrap - the wrap units differ from pixels and
       // overflowed). Short lines so they fit the window at the panel font size.
       this.promptText.setText(
-        `Skip learning\nany new moves?\n  ${this.confirmCursor === 0 ? "> " : "   "}No    ${this.confirmCursor === 1 ? "> " : "   "}Yes`,
+        this.cancelMode === "revertOrKeep"
+          ? `Undo the move(s)\nyou just learned?\n  ${this.confirmCursor === 0 ? "> " : "   "}Keep   ${this.confirmCursor === 1 ? "> " : "   "}Undo`
+          : `Skip learning\nany new moves?\n  ${this.confirmCursor === 0 ? "> " : "   "}No    ${this.confirmCursor === 1 ? "> " : "   "}Yes`,
       );
       this.cursorObj?.setVisible(false);
       this.moveInfoOverlay.clear();
@@ -241,6 +246,14 @@ export class LearnMoveBatchUiHandler extends UiHandler {
           success = true;
           break;
         case Button.ACTION:
+          if (this.cancelMode === "revertOrKeep") {
+            // Undo (cursor 1) restores the pre-panel moveset; Keep (cursor 0) leaves
+            // the learned moves in place. Both then exit the panel.
+            if (this.confirmCursor === 1) {
+              this.deps?.revert();
+            }
+            return this.finish();
+          }
           if (this.confirmCursor === 1) {
             return this.finish(); // Yes - leave without learning more
           }
@@ -366,11 +379,13 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     this.render();
   }
 
-  /** CANCEL in the list: confirm only when nothing was learned this session. */
+  /**
+   * CANCEL (B) in the list. If moves were learned this session it offers UNDO
+   * (restore the exact pre-panel moveset) vs KEEP, so an accidental overwrite can
+   * always be taken back. With nothing learned it's the plain "skip?" confirm.
+   */
   private requestCancel(): boolean {
-    if (this.learnedAny) {
-      return this.finish();
-    }
+    this.cancelMode = this.learnedAny ? "revertOrKeep" : "leaveEmpty";
     this.state = "confirmCancel";
     this.confirmCursor = 0;
     globalScene.ui.playSelect();
