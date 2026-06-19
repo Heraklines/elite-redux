@@ -122,6 +122,37 @@ Read these to see what testers verified / where something hung.
 - NEVER use an em dash in patch notes or any player-facing text. Use a
   regular hyphen, a comma, or restructure the sentence.
 
+## 🔴 Assets (ER-custom images + audio) - READ BEFORE ADDING ANY
+
+ER-custom art/audio is NOT served from this repo. Every custom image, sprite,
+and audio file loads from the **er-assets CDN** (`Heraklines/er-assets` via
+jsDelivr). At runtime `globalScene.loadImage(key, "dir", "file.png")` resolves to
+`https://cdn.jsdelivr.net/gh/Heraklines/er-assets@<pin>/images/dir/file.png` (the
+deploy rewrites `/images/*` etc. to that CDN in `dist/_redirects`). **Putting a
+file in `public/images/...` does NOTHING for the deployed build - it 404s.** (I
+have lost hours to this: the portrait shipped in-repo but the game fetched it from
+the CDN and 404'd. The console error `cdn.jsdelivr.net/gh/Heraklines/er-assets@.../
+images/... 404` is the tell.)
+
+To add a custom asset:
+1. Copy the file into the er-assets checkout at `../er-assets/images/<path>`
+   (local clone: `C:\Users\Hafida\pokerogue\.worktrees\er-assets`, remote
+   `Heraklines/er-assets`, push token already baked into its remote URL).
+2. `git -C ../er-assets add <file>`, commit, then **rebase onto origin/main before
+   pushing** (other agents push there too) and `git push origin HEAD:main`.
+3. Re-run the staging deploy. It auto-resolves the jsDelivr pin to er-assets@main
+   HEAD (`.github/workflows/deploy-staging.yml` step "Resolve er-assets HEAD"), so
+   the new commit's files are served - **no manual pin bump**. jsDelivr caches per
+   `@<sha>`, so the new pin is never stale.
+4. Load it in `src/loading-scene.ts` via `.loadImage(key, "<dir>", "<file>")` and
+   use `key` as the texture in code.
+
+Examples already in-repo (grep `er-assets` in `src/`): relic icons, terrain-seed +
+elemental-gem item sprites, Colosseum chrome, black-market shopkeeper, Cynthia BGM.
+If the custom asset isn't on er-assets yet, fall back to an EXISTING loaded texture
+(as the other ER event intro sprites do) so the screen never shows a missing/green
+texture.
+
 ## Deploy
 - Dev branch / remote: `feat/elite-redux-port` on remote `heraklines`
   (`Heraklines/elite-redux`). Commit + push there.
