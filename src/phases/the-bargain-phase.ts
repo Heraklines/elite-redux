@@ -74,6 +74,9 @@ export class TheBargainPhase extends Phase {
     // labels/descs for the dedicated bargain screen: the chosen Sins + a Leave row.
     const labels = [...sins.map(k => i18next.t(`${ns}:sins.${k}.name`)), i18next.t(`${ns}:option.leave.label`)];
     const descs = [...sins.map(k => i18next.t(`${ns}:sins.${k}.tooltip`)), i18next.t(`${ns}:option.leave.tooltip`)];
+    // Giratina's offer line per Sin - the handler plays it on this screen (bg +
+    // portrait stay) before handing off to the party menu on confirm.
+    const offers = sins.map(k => i18next.t(`${ns}:sins.${k}.offer`));
     // The handler's dialogue box fits a short line; use the first two sentences of
     // the intro (the full ominous monologue still plays elsewhere as needed).
     const greeting = i18next.t(`${ns}:introDialogue`).split("$").slice(0, 2).join(" ");
@@ -83,7 +86,9 @@ export class TheBargainPhase extends Phase {
       labels,
       descs,
       greeting,
-      (index: number) => this.onChoice(sins, index),
+      offers,
+      (sinIndex: number) => this.beginSin(sins, sins[sinIndex]),
+      () => this.leave(),
       () => this.checkTeam(sins),
     );
   }
@@ -95,76 +100,97 @@ export class TheBargainPhase extends Phase {
     });
   }
 
-  /** Resolve the player's choice from the bargain screen. */
-  private async onChoice(sins: BargainSinKey[], index: number): Promise<void> {
+  /**
+   * A Sin's offer was acknowledged on the bargain screen: run the deal. If the
+   * player backs out of the FIRST party pick (nothing applied yet), return to the
+   * bargain choices instead of ending the event.
+   */
+  private async beginSin(sins: BargainSinKey[], key: BargainSinKey): Promise<void> {
     if (this.resolving) {
       return;
     }
     this.resolving = true;
-    // Hand the UI back to MESSAGE (this tears down the bargain screen) before any
-    // dialogue / party-select / reward flow.
+    // The offer already played on the bargain screen; hand off to MESSAGE (tears
+    // down the bargain screen) for the party pick(s) + result.
     await globalScene.ui.setMode(UiMode.MESSAGE);
-
-    // Leave: CANCEL (index < 0) or the Leave row (index === sins.length).
-    if (index < 0 || index >= sins.length) {
-      await this.giratina(`${ns}:option.leave.line1`);
-      await this.narrate(`${ns}:option.leave.line2`);
-      await this.giratina(`${ns}:option.leave.line3`);
+    const committed = await this.applySin(key);
+    if (committed) {
       this.end();
       return;
     }
+    // Backed out before any effect - reopen the choices so the player can pick again.
+    this.resolving = false;
+    this.openScreen(sins);
+  }
 
-    await this.applySin(sins[index]);
+  /** Leave the bargain (the Leave row, or CANCEL on the choices). */
+  private async leave(): Promise<void> {
+    if (this.resolving) {
+      return;
+    }
+    this.resolving = true;
+    await globalScene.ui.setMode(UiMode.MESSAGE);
+    await this.giratina(`${ns}:option.leave.line1`);
+    await this.narrate(`${ns}:option.leave.line2`);
+    await this.giratina(`${ns}:option.leave.line3`);
     this.end();
   }
 
-  /** Run one Sin's offer line, party pick(s), cost+payoff, then the result line. */
+  /**
+   * Run one Sin's party pick(s), cost+payoff, then the result line. The offer line
+   * is shown earlier on the bargain screen. Returns false if the player backed out
+   * of the first pick before anything was applied (so the caller can reopen the
+   * choices); true once the deal has gone through.
+   */
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: a 7-Sin dispatch switch; each case is a small self-contained deal, clearer kept inline than split across seven helpers
-  private async applySin(key: BargainSinKey): Promise<void> {
-    await this.giratina(`${ns}:sins.${key}.offer`);
+  private async applySin(key: BargainSinKey): Promise<boolean> {
     let pokeName = "";
 
     switch (key) {
       case "greed": {
         const mon = await this.pickPokemon();
-        if (mon) {
-          bargainWipeCandy(mon);
-          const wave = globalScene.currentBattle?.waveIndex ?? 1;
-          globalScene.addMoney(2000 + wave * 300);
-          globalScene.phaseManager.unshiftNew("ModifierRewardPhase", modifierTypes.ER_GREATER_GOLDEN_BALL);
-          pokeName = mon.getNameToRender();
+        if (!mon) {
+          return false;
         }
+        bargainWipeCandy(mon);
+        const wave = globalScene.currentBattle?.waveIndex ?? 1;
+        globalScene.addMoney(2000 + wave * 300);
+        globalScene.phaseManager.unshiftNew("ModifierRewardPhase", modifierTypes.ER_GREATER_GOLDEN_BALL);
+        pokeName = mon.getNameToRender();
         break;
       }
       case "gluttony": {
         const mon = await this.pickPokemon();
-        if (mon) {
-          pokeName = mon.getNameToRender();
-          globalScene.removePokemonFromPlayerParty(mon, true);
-          new Egg({ sourceType: EggSourceType.EVENT, tier: EggTier.LEGENDARY }).addEggToGameData();
+        if (!mon) {
+          return false;
         }
+        pokeName = mon.getNameToRender();
+        globalScene.removePokemonFromPlayerParty(mon, true);
+        new Egg({ sourceType: EggSourceType.EVENT, tier: EggTier.LEGENDARY }).addEggToGameData();
         break;
       }
       case "pride": {
         const mon = await this.pickPokemon(p => (p.isShiny() ? null : "This Pokémon does not shine."));
-        if (mon) {
-          pokeName = mon.getNameToRender();
-          const stat = await this.pickStat();
-          bargainDullShine(mon);
-          await mon.loadAssets();
-          bargainGrantStatBoost(mon, stat ?? Stat.ATK, 3);
+        if (!mon) {
+          return false;
         }
+        pokeName = mon.getNameToRender();
+        const stat = await this.pickStat();
+        bargainDullShine(mon);
+        await mon.loadAssets();
+        bargainGrantStatBoost(mon, stat ?? Stat.ATK, 3);
         break;
       }
       case "wrath": {
         const victim = await this.pickPokemon();
-        if (victim) {
-          pokeName = victim.getNameToRender();
-          bargainCurseRandomStat(victim);
-          const beneficiary = await this.pickPokemon(p => (p === victim ? "Choose a different Pokémon." : null));
-          if (beneficiary) {
-            bargainGrantStatBoost(beneficiary, bargainBestCombatStat(beneficiary), 2);
-          }
+        if (!victim) {
+          return false;
+        }
+        pokeName = victim.getNameToRender();
+        bargainCurseRandomStat(victim);
+        const beneficiary = await this.pickPokemon(p => (p === victim ? "Choose a different Pokémon." : null));
+        if (beneficiary) {
+          bargainGrantStatBoost(beneficiary, bargainBestCombatStat(beneficiary), 2);
         }
         break;
       }
@@ -172,54 +198,61 @@ export class TheBargainPhase extends Phase {
         const mon = await this.pickPokemon(p =>
           bargainHeldCount(p) >= 3 ? null : "This Pokémon isn't carrying enough.",
         );
-        if (mon) {
-          pokeName = mon.getNameToRender();
-          for (const item of mon.getHeldItems().filter(m => !(m instanceof PokemonFormChangeItemModifier))) {
-            globalScene.removeModifier(item);
-          }
-          globalScene.updateModifiers(true);
-          // Offer the relic on the native reward-select screen (icons + on-focus
-          // descriptions, pick one), restricted to the bargain relics - no bespoke
-          // menu and no softlock.
-          globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, {
-            guaranteedModifierTypeFuncs: BARGAIN_RELIC_CHOICES.map(c => c.make),
-            fillRemaining: false,
-          });
+        if (!mon) {
+          return false;
         }
+        pokeName = mon.getNameToRender();
+        for (const item of mon.getHeldItems().filter(m => !(m instanceof PokemonFormChangeItemModifier))) {
+          globalScene.removeModifier(item);
+        }
+        globalScene.updateModifiers(true);
+        // Offer the relic on the native reward-select screen (icons + on-focus
+        // descriptions, pick one), restricted to the bargain relics - no bespoke
+        // menu and no softlock.
+        globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, {
+          guaranteedModifierTypeFuncs: BARGAIN_RELIC_CHOICES.map(c => c.make),
+          fillRemaining: false,
+        });
         break;
       }
       case "sloth": {
         const a = await this.pickPokemon();
-        const b = a ? await this.pickPokemon(p => (p === a ? "Choose a different Pokémon." : null)) : null;
-        if (a && b) {
-          for (const mon of [a, b]) {
-            bargainResetToLevelOne(mon);
-            bargainWipeCandy(mon);
-          }
-          globalScene.phaseManager.unshiftNew("ModifierRewardPhase", modifierTypes.ER_RELIC_COVENANT);
+        if (!a) {
+          return false;
         }
+        const b = await this.pickPokemon(p => (p === a ? "Choose a different Pokémon." : null));
+        if (!b) {
+          return false;
+        }
+        for (const mon of [a, b]) {
+          bargainResetToLevelOne(mon);
+          bargainWipeCandy(mon);
+        }
+        globalScene.phaseManager.unshiftNew("ModifierRewardPhase", modifierTypes.ER_RELIC_COVENANT);
         break;
       }
       case "lust": {
         // Disabled (see DISABLED_BARGAIN_SINS); never offered. Kept for completeness.
         const target = await this.pickPokemon();
-        if (target) {
-          pokeName = target.getNameToRender();
-          for (const mon of globalScene.getPlayerParty()) {
-            bargainCurseRandomStat(mon);
-          }
-          applyErBlackShinyKit(target);
-          target.shiny = true;
-          target.variant = 2;
-          await target.loadAssets();
-          target.updateInfo(true);
+        if (!target) {
+          return false;
         }
+        pokeName = target.getNameToRender();
+        for (const mon of globalScene.getPlayerParty()) {
+          bargainCurseRandomStat(mon);
+        }
+        applyErBlackShinyKit(target);
+        target.shiny = true;
+        target.variant = 2;
+        await target.loadAssets();
+        target.updateInfo(true);
         break;
       }
     }
 
     globalScene.currentBattle.mysteryEncounter?.setDialogueToken("pokeName", pokeName);
     await this.narrate(`${ns}:sins.${key}.result`, { pokeName });
+    return true;
   }
 
   // --- UI helpers ---

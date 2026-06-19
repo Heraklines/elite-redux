@@ -13,10 +13,16 @@
 // a bottom dialogue box, and the list of bargains in a framed panel on the
 // right. A standalone "Check Team" button sits between that panel and the
 // dialogue box (reachable by pressing down past Leave, like the reward shop).
+//
+// The screen is the persistent "stage": when a bargain is picked, Giratina's
+// offer line plays HERE (bg + portrait stay, the choice list hides) and only
+// once the player confirms does it hand off to the party menu. Backing out of
+// the offer (or, via TheBargainPhase, the party menu) returns to the choices.
+//
 // Modeled on BiomeShop/Colosseum (a full-screen UiHandler container the UI shows
 // on top of the field; container sits at y = -h so child (0,0) is the screen
-// top-left). Pure presentation + cursor + a select callback; TheBargainPhase
-// owns all the deal logic.
+// top-left). Pure presentation + cursor + select/confirm callbacks;
+// TheBargainPhase owns all the deal logic.
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
@@ -29,8 +35,8 @@ import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
-/** Choose bargain `index`, or leave when `index < 0`. */
-export type ErBargainSelectCallback = (index: number) => void;
+/** Confirm the bargain at `sinIndex` (after its offer line is acknowledged). */
+export type ErBargainConfirmCallback = (sinIndex: number) => void;
 
 /** Giratina Origin forme index (0 = Altered, 1 = Origin) for the battle sprite. */
 const GIRATINA_ORIGIN_FORM = 1;
@@ -57,11 +63,22 @@ export class ErBargainUiHandler extends UiHandler {
 
   private labels: string[] = [];
   private descs: string[] = [];
-  private onSelect: ErBargainSelectCallback | null = null;
+  /** Giratina's offer line per Sin (parallel to the Sin rows, before Leave). */
+  private offers: string[] = [];
+  /** The opening line, restored when backing out of an offer. */
+  private greeting = "";
+  private onConfirm: ErBargainConfirmCallback | null = null;
+  private onLeave: (() => void) | null = null;
   /** Optional "Check Team" action; when set, a button is appended after Leave. */
   private onCheckTeam: (() => void) | null = null;
   /** Wall-clock time (ms) the screen opened; input is swallowed briefly after. */
   private openedAt = 0;
+  /** While true, an offer line is showing (choices hidden) awaiting confirm/back. */
+  private speaking = false;
+  /** The Sin index whose offer is currently showing. */
+  private speakingIndex = 0;
+  /** Wall-clock time (ms) the current offer line began showing. */
+  private spokeAt = 0;
 
   // Layout (logical 320x180 screen; container at y=-h so child (0,0) == top-left).
   private static readonly OPT_X = 150;
@@ -210,14 +227,27 @@ export class ErBargainUiHandler extends UiHandler {
   }
 
   show(args: any[]): boolean {
-    if (!(args.length >= 4 && Array.isArray(args[0]) && typeof args[3] === "function")) {
+    if (
+      !(
+        args.length >= 6
+        && Array.isArray(args[0])
+        && Array.isArray(args[3])
+        && typeof args[4] === "function"
+        && typeof args[5] === "function"
+      )
+    ) {
       return false;
     }
     this.labels = args[0] as string[];
     this.descs = args[1] as string[];
-    this.dialogueText.setText((args[2] as string) ?? "");
-    this.onSelect = args[3] as ErBargainSelectCallback;
-    this.onCheckTeam = typeof args[4] === "function" ? (args[4] as () => void) : null;
+    this.greeting = (args[2] as string) ?? "";
+    this.offers = args[3] as string[];
+    this.onConfirm = args[4] as ErBargainConfirmCallback;
+    this.onLeave = args[5] as () => void;
+    this.onCheckTeam = typeof args[6] === "function" ? (args[6] as () => void) : null;
+
+    this.speaking = false;
+    this.dialogueText.setText(this.greeting);
 
     const showCheck = this.onCheckTeam !== null;
     this.checkTeamWindow.setVisible(showCheck);
@@ -322,19 +352,82 @@ export class ErBargainUiHandler extends UiHandler {
     return changed;
   }
 
-  /** Fire the focused item: the Check Team button, or a bargain row via onSelect. */
+  /**
+   * Present `line` as Giratina's spoken offer on THIS screen (bg + portrait
+   * stay), hiding the choice list. ACTION confirms the Sin; CANCEL returns to
+   * the choices. Driven from activate() when a Sin row is chosen.
+   */
+  private speak(line: string, sinIndex: number): void {
+    this.speaking = true;
+    this.speakingIndex = sinIndex;
+    this.spokeAt = performance.now();
+    this.dialogueText.setText(line);
+    // Hide the choice UI; the Giratina sprite, portrait and backdrop remain.
+    this.optionsWindow.setVisible(false);
+    this.descWindow.setVisible(false);
+    this.descText.setVisible(false);
+    this.cursorObj.setVisible(false);
+    for (const row of this.rows) {
+      row.setVisible(false);
+    }
+    this.checkTeamWindow.setVisible(false);
+    this.checkTeamText.setVisible(false);
+  }
+
+  /** Return from a shown offer line back to the bargain choices (restore UI). */
+  private resumeChoosing(): void {
+    this.speaking = false;
+    this.optionsWindow.setVisible(true);
+    this.descWindow.setVisible(true);
+    this.descText.setVisible(true);
+    for (const row of this.rows) {
+      row.setVisible(true);
+    }
+    const showCheck = this.onCheckTeam !== null;
+    this.checkTeamWindow.setVisible(showCheck);
+    this.checkTeamText.setVisible(showCheck);
+    this.dialogueText.setText(this.greeting);
+    this.moveCursorTo(this.cursor);
+  }
+
+  /** Fire the focused item: Check Team, Leave, or a Sin's offer (then confirm). */
   private activate(): void {
     if (this.navCount() === 0) {
       return;
     }
+    // Check Team (the virtual last item).
     if (this.onCheckTeam !== null && this.cursor === this.rows.length) {
       this.onCheckTeam();
-    } else if (this.onSelect) {
-      this.onSelect(this.cursor);
+      return;
     }
+    // The Leave row sits after the Sins (offers.length is the Sin count).
+    if (this.cursor >= this.offers.length) {
+      this.onLeave?.();
+      return;
+    }
+    // A Sin: speak its offer here; the next ACTION confirms, CANCEL backs out.
+    this.speak(this.offers[this.cursor] ?? "", this.cursor);
+  }
+
+  /** Input while an offer line is showing: ACTION confirms, CANCEL backs out. */
+  private handleSpeakingInput(button: Button): boolean {
+    if (performance.now() - this.spokeAt < 250) {
+      return true;
+    }
+    if (button === Button.ACTION) {
+      const idx = this.speakingIndex;
+      this.speaking = false;
+      this.onConfirm?.(idx);
+    } else if (button === Button.CANCEL) {
+      this.resumeChoosing();
+    }
+    return true;
   }
 
   processInput(button: Button): boolean {
+    if (this.speaking) {
+      return this.handleSpeakingInput(button);
+    }
     // Swallow any input that arrives in the first moments after the screen opens.
     // Without this, a button press carried over from mashing through the post-
     // victory / reward messages instantly auto-selects the first bargain before
@@ -349,7 +442,7 @@ export class ErBargainUiHandler extends UiHandler {
         this.activate();
         return true;
       case Button.CANCEL:
-        this.onSelect?.(-1);
+        this.onLeave?.();
         return true;
       case Button.UP:
         if (this.cursor > 0) {
@@ -380,7 +473,10 @@ export class ErBargainUiHandler extends UiHandler {
     this.rows = [];
     this.labels = [];
     this.descs = [];
-    this.onSelect = null;
+    this.offers = [];
+    this.speaking = false;
+    this.onConfirm = null;
+    this.onLeave = null;
     this.onCheckTeam = null;
   }
 }
