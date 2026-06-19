@@ -166,4 +166,40 @@ describe("System - Game Data", () => {
       expect(updateAllSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe("initSystem - local session preservation (save-loss fix)", () => {
+    beforeEach(async () => {
+      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      vi.spyOn(pokerogueApi.account, "getInfo").mockResolvedValue([
+        { username: "cloud", lastSessionSlot: -1, discordId: "", googleId: "", hasAdminRole: false },
+        200,
+      ]);
+      await account.updateUserInfo();
+    });
+
+    it("keeps local session slots when the server system save is newer-or-equal (no clearLocalData wipe)", async () => {
+      // initParsedSystem applies the system blob to the live scene; this test only
+      // exercises the localStorage branch, so stub it (private -> typed cast, not `any`).
+      vi.spyOn(
+        game.scene.gameData as unknown as { initParsedSystem: (d: SystemSaveData) => void },
+        "initParsedSystem",
+      ).mockImplementation(() => {});
+
+      const localSystem = JSON.stringify({ trainerId: 1, secretId: 2, timestamp: 100 });
+      // Server timestamp >= local: the OLD code hit `else { clearLocalData() }` and
+      // deleted every session slot. A not-yet-synced local run must now survive.
+      const serverSystem = JSON.stringify({ trainerId: 1, secretId: 2, timestamp: 200 });
+      const session0 = JSON.stringify({ slot: 0, party: [], enemyParty: [], timestamp: 999 });
+      const session1 = JSON.stringify({ slot: 1, party: [], enemyParty: [], timestamp: 999 });
+      localStorage.setItem("sessionData_cloud", encrypt(session0, false));
+      localStorage.setItem("sessionData1_cloud", encrypt(session1, false));
+
+      const ok = await game.scene.gameData.initSystem(serverSystem, localSystem);
+
+      expect(ok).toBe(true);
+      expect(localStorage.getItem("sessionData_cloud")).not.toBeNull();
+      expect(localStorage.getItem("sessionData1_cloud")).not.toBeNull();
+      expect(decrypt(localStorage.getItem("sessionData_cloud")!, false)).toBe(session0);
+    });
+  });
 });

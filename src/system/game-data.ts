@@ -764,9 +764,18 @@ export class GameData {
           console.debug("Using cached system data");
           systemData = cachedSystemData;
           systemDataStr = cachedSystemDataStr;
-        } else {
-          this.clearLocalData();
         }
+        // ER save-loss fix: the previous `else` here called clearLocalData(),
+        // which DELETES ALL 5 SESSION SLOTS based on the SYSTEM-save timestamp.
+        // On any normal load the server's system timestamp is >= local, so this
+        // wiped local session slots every refresh - and any run that had NOT yet
+        // synced to the server (the common case right after playing) was lost
+        // ("my run deleted itself"; "Continue loaded slot 1 and wiped the rest").
+        // The server SYSTEM save is still adopted unconditionally below
+        // (localStorage.setItem(`data_...`)), so dropping the wipe only PRESERVES
+        // the local SESSION cache - local wins over not-yet-synced remote, which
+        // is the correct precedence. Per-slot session freshness is reconciled by
+        // getSession / the save path, never by a blanket wipe on system load.
       }
 
       if (isBeta || isDev) {

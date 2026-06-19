@@ -4343,6 +4343,28 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Save loss on refresh/Continue",
+    description:
+      "Save-loss fix (not battle-testable). Runs were vanishing on refresh and\n"
+      + "'Continue' was wiping the other slots. Cause: on load, initSystem compared\n"
+      + "the SYSTEM-save timestamp and, when the server's was >= local (every normal\n"
+      + "load), it called clearLocalData() which DELETED ALL 5 SESSION SLOTS. A run\n"
+      + "that hadn't synced yet was lost. Now session slots are preserved (local wins\n"
+      + "over not-yet-synced remote). CHECK (logged in, not Guest): start a run, get a\n"
+      + "few waves in, then REFRESH the page quickly (before/without a cloud sync) -\n"
+      + "the run must still be there. With multiple saved slots, use Continue and\n"
+      + "confirm the OTHER slots are NOT wiped. Regression-covered by the\n"
+      + "game-data.test.ts 'local session preservation' test.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.EEVEE, {
+          moveset: [MoveId.SWIFT, MoveId.QUICK_ATTACK, MoveId.BITE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "Biome Market preview (#440)",
     description:
       "#440 BIOME MARKET - x0 boss waves now OPEN A BESPOKE SHOP SCREEN (they\n"
