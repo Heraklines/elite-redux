@@ -40,6 +40,8 @@ export class ErBargainUiHandler extends UiHandler {
   private labels: string[] = [];
   private descs: string[] = [];
   private onSelect: ErBargainSelectCallback | null = null;
+  /** Wall-clock time (ms) the screen opened; input is swallowed briefly after. */
+  private openedAt = 0;
 
   constructor() {
     super(UiMode.ER_BARGAIN);
@@ -109,6 +111,7 @@ export class ErBargainUiHandler extends UiHandler {
     this.cursor = 0;
     this.moveCursorTo(0);
 
+    this.openedAt = performance.now();
     this.container.setVisible(true);
     this.active = true;
     return true;
@@ -147,6 +150,14 @@ export class ErBargainUiHandler extends UiHandler {
   }
 
   processInput(button: Button): boolean {
+    // Swallow any input that arrives in the first moments after the screen opens.
+    // Without this, a button press carried over from mashing through the post-
+    // victory / reward messages instantly auto-selects the first bargain before
+    // the player ever sees this screen (the reported "I only see the offer line"
+    // bug). Real-time gated so it can never hang the handler.
+    if (performance.now() - this.openedAt < 600) {
+      return true;
+    }
     const count = this.rows.length;
     let moved = false;
     switch (button) {
