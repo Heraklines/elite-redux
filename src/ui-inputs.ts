@@ -7,6 +7,7 @@ import { Setting, SettingKeys, settingIndex } from "#system/settings";
 import { CommandUiHandler } from "#ui/command-ui-handler";
 import { FightUiHandler } from "#ui/fight-ui-handler";
 import type { MessageUiHandler } from "#ui/message-ui-handler";
+import { PartyUiHandler } from "#ui/party-ui-handler";
 import { PokedexPageUiHandler } from "#ui/pokedex-page-ui-handler";
 import { PokedexUiHandler } from "#ui/pokedex-ui-handler";
 import { RunInfoUiHandler } from "#ui/run-info-ui-handler";
@@ -232,6 +233,9 @@ export class UiInputs {
       // swallowed here and never reached FightUiHandler.processInput — the
       // earlier damage-calc toggle was unreachable for the same reason.
       FightUiHandler,
+      // ER (#562): the fusion-preview's R (CYCLE_SHINY) flips which mon is the base.
+      // Same swallow problem - PartyUiHandler must be whitelisted to receive it.
+      PartyUiHandler,
       StarterSelectUiHandler,
       PokedexUiHandler,
       PokedexPageUiHandler,
