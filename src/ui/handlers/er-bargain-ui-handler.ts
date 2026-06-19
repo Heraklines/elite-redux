@@ -45,6 +45,7 @@ export class ErBargainUiHandler extends UiHandler {
   private dialogueWindow: Phaser.GameObjects.NineSlice;
   private dialogueText: Phaser.GameObjects.Text;
   private descText: Phaser.GameObjects.Text;
+  private descWindow: Phaser.GameObjects.NineSlice;
   private optionsWindow: Phaser.GameObjects.NineSlice;
   private rows: Phaser.GameObjects.Text[] = [];
   private cursorObj: Phaser.GameObjects.Rectangle;
@@ -58,9 +59,11 @@ export class ErBargainUiHandler extends UiHandler {
   // Layout (logical 320x180 screen; container at y=-h so child (0,0) == top-left).
   private static readonly OPT_X = 150;
   private static readonly OPT_W = 162;
-  private static readonly OPT_Y = 22;
-  private static readonly ROW_Y0 = 38;
-  private static readonly ROW_STEP = 18;
+  private static readonly OPT_Y = 20;
+  private static readonly ROW_Y0 = 35;
+  private static readonly ROW_STEP = 16;
+  /** Foreboding violet tint applied to every framed window (Giratina's gloom). */
+  private static readonly FRAME_TINT = 0x8050b0;
 
   constructor() {
     super(UiMode.ER_BARGAIN);
@@ -94,6 +97,7 @@ export class ErBargainUiHandler extends UiHandler {
     // Small PMD talking-head portrait in a framed box, bottom-left, sitting just
     // above the dialogue box (the "speaker" headshot).
     this.portraitWindow = addWindow(6, h - 98, 52, 52);
+    this.portraitWindow.setTint(ErBargainUiHandler.FRAME_TINT);
     this.container.add(this.portraitWindow);
     this.portrait = globalScene.add.sprite(32, h - 72, "er_bargain_giratina");
     this.portrait.setOrigin(0.5, 0.5).setScale(0.28); // ~45px, fits the box
@@ -104,14 +108,19 @@ export class ErBargainUiHandler extends UiHandler {
     this.container.add(this.titleText);
 
     // Framed panel for the bargain list (right side).
-    this.optionsWindow = addWindow(ErBargainUiHandler.OPT_X, ErBargainUiHandler.OPT_Y, ErBargainUiHandler.OPT_W, 96);
+    this.optionsWindow = addWindow(ErBargainUiHandler.OPT_X, ErBargainUiHandler.OPT_Y, ErBargainUiHandler.OPT_W, 110);
+    this.optionsWindow.setTint(ErBargainUiHandler.FRAME_TINT);
     this.container.add(this.optionsWindow);
 
-    // Focused bargain's cost -> payoff line, INSIDE the panel below the rows.
-    this.descText = addTextObject(ErBargainUiHandler.OPT_X + ErBargainUiHandler.OPT_W / 2, 100, "", TextStyle.PARTY, {
-      fontSize: "34px",
+    // The focused bargain's cost -> payoff, in its OWN framed sub-box at the
+    // bottom of the panel (a box within the box), with room to breathe.
+    this.descWindow = addWindow(ErBargainUiHandler.OPT_X + 6, 92, ErBargainUiHandler.OPT_W - 12, 36);
+    this.descWindow.setTint(ErBargainUiHandler.FRAME_TINT);
+    this.container.add(this.descWindow);
+    this.descText = addTextObject(ErBargainUiHandler.OPT_X + ErBargainUiHandler.OPT_W / 2, 98, "", TextStyle.PARTY, {
+      fontSize: "32px",
       align: "center",
-      wordWrap: { width: (ErBargainUiHandler.OPT_W - 14) * 6 },
+      wordWrap: { width: (ErBargainUiHandler.OPT_W - 26) * 6 },
     });
     this.descText.setOrigin(0.5, 0);
     this.container.add(this.descText);
@@ -120,7 +129,7 @@ export class ErBargainUiHandler extends UiHandler {
     this.cursorObj = globalScene.add.rectangle(
       0,
       0,
-      ErBargainUiHandler.OPT_W - 14,
+      ErBargainUiHandler.OPT_W - 16,
       ErBargainUiHandler.ROW_STEP,
       0xffffff,
       0,
@@ -132,6 +141,7 @@ export class ErBargainUiHandler extends UiHandler {
 
     // Giratina's spoken line, in a fitted dialogue box across the bottom.
     this.dialogueWindow = addWindow(4, h - 46, w - 8, 42);
+    this.dialogueWindow.setTint(ErBargainUiHandler.FRAME_TINT);
     this.container.add(this.dialogueWindow);
     this.dialogueText = addTextObject(13, h - 40, "", TextStyle.WINDOW, {
       fontSize: "40px",
