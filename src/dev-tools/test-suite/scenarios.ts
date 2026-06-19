@@ -397,6 +397,42 @@ export const DEV_SCENARIOS: DevScenario[] = [
       modifierTypes.ABILITY_RANDOMIZER,
     ],
   },
+  {
+    label: "Fusion Preview (DNA Splicers) (#560)",
+    description:
+      "#560 - the live fusion PREVIEW. KO the Magikarp, then in the FIRST shop take DNA\n"
+      + "SPLICERS. Pick a Pokemon's APPLY to lock it as the base; a preview panel appears\n"
+      + "on the RIGHT and updates as you move the cursor over each other party member -\n"
+      + "the fused sprite, the fused base stats, and the 4 abilities.\n"
+      + "EXPECT: R (Switch) flips which mon is the base (so you can preview both orders);\n"
+      + "A fuses the SHOWN combo (not the one first clicked); B backs out. Ability order\n"
+      + "= base's active, partner's, base's, partner's. Base stats = the average of both.\n"
+      + "Navigating every combo must never softlock; leaving must close the panel.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.CHARIZARD, {
+          moveset: [MoveId.FLAMETHROWER, MoveId.AIR_SLASH, MoveId.DRAGON_PULSE, MoveId.ROOST],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DARK_PULSE],
+        }),
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.WATERFALL, MoveId.CRUNCH, MoveId.ICE_FANG, MoveId.DRAGON_DANCE],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.DNA_SPLICERS],
+  },
   // ===========================================================================
   // FEATURES — this session
   // ===========================================================================

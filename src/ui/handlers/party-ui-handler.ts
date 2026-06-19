@@ -22,6 +22,7 @@ import type { PokemonMove } from "#moves/pokemon-move";
 import type { CommandPhase } from "#phases/command-phase";
 import { getVariantTint } from "#sprites/variant";
 import type { TurnMove } from "#types/turn-move";
+import { FusionPreviewPanel } from "#ui/fusion-preview-panel";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { PokemonIconAnimHelper, PokemonIconAnimMode } from "#ui/pokemon-icon-anim-helper";
@@ -291,6 +292,10 @@ export class PartyUiHandler extends MessageUiHandler {
     super(UiMode.PARTY);
   }
 
+  /** ER (#560): live fusion preview, active only while a base is locked in SPLICE. */
+  private fusionPreviewPanel: FusionPreviewPanel = new FusionPreviewPanel();
+  private fusionPreviewActive = false;
+
   setup() {
     const ui = this.getUi();
 
@@ -355,6 +360,8 @@ export class PartyUiHandler extends MessageUiHandler {
       width: globalScene.scaledCanvas.width / 2 - 30,
     });
     ui.add(this.moveInfoOverlay);
+
+    this.fusionPreviewPanel.setup();
 
     this.options = [];
 
@@ -1046,6 +1053,11 @@ export class PartyUiHandler extends MessageUiHandler {
       return success;
     }
 
+    // ER (#560): in the live fusion preview, STATS (R) flips which mon is the base.
+    if (this.fusionPreviewActive && button === Button.STATS) {
+      return this.switchFusionOrder();
+    }
+
     if (button === Button.ACTION) {
       return this.processPartyActionInput();
     }
@@ -1076,6 +1088,22 @@ export class PartyUiHandler extends MessageUiHandler {
 
   private processPartyActionInput(): boolean {
     const ui = this.getUi();
+
+    // ER (#560): with the fusion preview up, A fuses the SHOWN combo directly
+    // (base = transferCursor, partner = cursor). No options menu on the 2nd pick.
+    if (this.fusionPreviewActive) {
+      if (this.cursor < 6 && this.cursor !== this.transferCursor && this.selectCallback) {
+        (this.selectCallback as PartyModifierSpliceSelectCallback)(this.transferCursor, this.cursor);
+        this.clearTransfer();
+        ui.playSelect();
+      } else if (this.cursor === 6) {
+        return this.processPartyCancelInput(); // A on Cancel backs out the base lock
+      } else {
+        ui.playError();
+      }
+      return true;
+    }
+
     if (this.cursor < 6) {
       if (
         (this.partyUiMode === PartyUiMode.MODIFIER_TRANSFER && !this.transferMode)
@@ -1283,6 +1311,10 @@ export class PartyUiHandler extends MessageUiHandler {
         this.partyCancelButton.select();
       } else if (cursor === 7) {
         this.partyDiscardModeButton.select();
+      }
+      // ER (#560): refresh the live fusion preview for (locked base, hovered).
+      if (this.fusionPreviewActive) {
+        this.updateFusionPreview();
       }
     }
     return changed;
@@ -1793,11 +1825,57 @@ export class PartyUiHandler extends MessageUiHandler {
     this.transferAll = this.options[this.optionsCursor] === PartyOption.ALL;
 
     this.partySlots[this.transferCursor].setTransfer(true);
+
+    // ER (#560): SPLICE just locked the base mon - bring up the live fusion preview.
+    if (this.partyUiMode === PartyUiMode.SPLICE && this.fusionPreviewPanel.isBuilt()) {
+      this.fusionPreviewActive = true;
+      this.fusionPreviewPanel.setBase(globalScene.getPlayerParty()[this.transferCursor]);
+      this.updateFusionPreview();
+    }
+  }
+
+  /** ER (#560): render the preview for the locked base + currently-hovered mon. */
+  private updateFusionPreview(): void {
+    if (!this.fusionPreviewActive || this.optionsMode) {
+      return;
+    }
+    const party = globalScene.getPlayerParty();
+    const base = party[this.transferCursor];
+    const partner = this.cursor < 6 ? party[this.cursor] : undefined;
+    if (base && partner && this.cursor !== this.transferCursor) {
+      this.fusionPreviewPanel.show(base, partner);
+    } else {
+      this.fusionPreviewPanel.showPlaceholder();
+    }
+  }
+
+  /**
+   * ER (#560): the Switch button - re-lock the base to the currently-hovered mon
+   * and drop the cursor onto the old base, so the same pair shows reversed and
+   * the player keeps varying the partner from there.
+   */
+  private switchFusionOrder(): boolean {
+    if (!this.fusionPreviewActive || this.cursor >= 6 || this.cursor === this.transferCursor) {
+      this.getUi().playError();
+      return true;
+    }
+    const oldBase = this.transferCursor;
+    this.partySlots[oldBase].setTransfer(false);
+    this.transferCursor = this.cursor;
+    this.partySlots[this.transferCursor].setTransfer(true);
+    this.setCursor(oldBase); // triggers updateFusionPreview for the reversed pair
+    this.getUi().playSelect();
+    return true;
   }
 
   clearTransfer(): void {
     this.transferMode = false;
     this.transferAll = false;
+    // ER (#560): tear the fusion preview down when the base lock is released.
+    if (this.fusionPreviewActive) {
+      this.fusionPreviewActive = false;
+      this.fusionPreviewPanel.teardown();
+    }
     this.partySlots[this.transferCursor].setTransfer(false);
     for (const partySlot of this.partySlots) {
       partySlot.slotDescriptionLabel.setVisible(false);
@@ -1934,6 +2012,9 @@ export class PartyUiHandler extends MessageUiHandler {
     super.clear();
     // hide the overlay
     this.moveInfoOverlay.clear();
+    // ER (#560): never leave the fusion preview up when the party screen closes.
+    this.fusionPreviewActive = false;
+    this.fusionPreviewPanel.teardown();
     this.partyContainer.setVisible(false);
     this.clearPartySlots();
   }
