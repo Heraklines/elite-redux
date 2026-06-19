@@ -1,0 +1,269 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     4  wave:67  difficulty:youngster
+seed:     3qqztiDNvE2jGOJ4TeYWDzXI
+party:    Torrentula(L57 182/184), Vivillon(L56 178/178), Dustox(L53 162/162), Heracross(L55 170/170), Scyther(L55 159/159), Tyranjoula(L52 211/211)
+
+----- DESCRIPTION -----
+decorate works wrong
+
+----- CONSOLE -----
+[16:12:12.278] LOG: Applied Super EXP. Charm 
+[16:12:12.278] LOG: Applied EXP. Charm 
+[16:12:12.527] LOG: %cStart Phase LevelUpPhase color:green;
+[16:12:12.783] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:12:12.911] LOG: %cStart Phase MoveEndPhase color:green;
+[16:12:12.911] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:12:12.911] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:12:12.911] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:12:12.911] LOG: %cStart Phase BerryPhase color:green;
+[16:12:12.911] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:12:12.911] LOG: %cStart Phase TurnEndPhase color:green;
+[16:12:12.914] LOG: %cStart Phase SwitchSummonPhase color:green;
+[16:12:13.376] LOG: Matt
+[16:12:13.528] LOG: Applied Calcium (enemy)
+[16:12:13.528] LOG: Applied Carbos (enemy)
+[16:12:13.528] LOG: Applied Iron (enemy)
+[16:12:13.528] LOG: Applied Calcium (enemy)
+[16:12:13.528] LOG: Applied HP Up (enemy)
+[16:12:13.777] LOG: %cStart Phase PostSummonPhase color:green;
+[16:12:13.777] LOG: Ran PSP for: Sharpedo
+[16:12:13.778] LOG: %cStart Phase MessagePhase color:green;
+[16:12:14.276] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:12:14.627] LOG: %cStart Phase MessagePhase color:green;
+[16:12:15.076] LOG: %cStart Phase PostSummonPhase color:green;
+[16:12:15.076] LOG: %cStart Phase PostSummonPhase color:green;
+[16:12:15.076] LOG: %cStart Phase SwitchSummonPhase color:green;
+[16:12:15.543] LOG: Matt
+[16:12:15.694] LOG: Applied Calcium (enemy)
+[16:12:15.694] LOG: Applied Carbos (enemy)
+[16:12:15.694] LOG: Applied Iron (enemy)
+[16:12:15.694] LOG: Applied Calcium (enemy)
+[16:12:15.694] LOG: Applied HP Up (enemy)
+[16:12:15.945] LOG: %cStart Phase PostSummonPhase color:green;
+[16:12:15.945] LOG: Ran PSP for: Mightyena
+[16:12:15.945] LOG: %cStart Phase MessagePhase color:green;
+[16:12:16.426] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:12:16.794] LOG: %cStart Phase MessagePhase color:green;
+[16:12:17.226] LOG: %cStart Phase PostSummonPhase color:green;
+[16:12:17.226] LOG: %cStart Phase PostSummonPhase color:green;
+[16:12:17.226] LOG: %cStart Phase TurnInitPhase color:green;
+[16:12:17.227] LOG: %cStart Phase CommandPhase color:green;
+[16:12:18.041] LOG: Move: FURY_CUTTER Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Torrentula
+[16:12:18.041] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:12:18.490] LOG: %cStart Phase CommandPhase color:green;
+[16:12:21.807] LOG: %cStart Phase CommandPhase color:green;
+[16:12:22.688] LOG: Move: FURY_CUTTER Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Torrentula
+[16:12:22.689] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:12:23.420] LOG: %cStart Phase CommandPhase color:green;
+[16:12:24.197] LOG: Move: GIGA_DRAIN Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Vivillon
+[16:12:24.198] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:12:24.972] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:12:24.974] LOG: Applied X Defense 
+[16:12:24.975] LOG: Applied X Defense 
+[16:12:24.976] LOG: Applied X Defense 
+[16:12:24.977] LOG: Applied X Defense 
+[16:12:24.978] LOG: Battle Seed: dS1Uhz2egWMbmPwL
+[16:12:24.981] LOG: Move Pool: ["Dark Pulse","Aqua Fang","Destiny Bond","Retaliate"]
+[16:12:24.981] LOG: Move Scores: [27,12.9375,0,30]
+[16:12:24.981] LOG: Sorted Move Pool: ["Retaliate","Dark Pulse","Aqua Fang","Destiny Bond"]
+[16:12:24.981] LOG: Chosen Move: Retaliate
+[16:12:24.981] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:12:24.982] LOG: Applied X Defense 
+[16:12:24.983] LOG: Applied X Defense 
+[16:12:24.984] LOG: Applied X Defense 
+[16:12:24.984] LOG: Applied X Defense 
+[16:12:24.985] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[16:12:24.986] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[16:12:24.986] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[16:12:24.986] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[16:12:24.986] LOG: Move Pool: ["Crunch","Double-Edge","Agility","Odor Sleuth"]
+[16:12:24.986] LOG: Move Scores: [27,19,6,0]
+[16:12:24.986] LOG: Sorted Move Pool: ["Crunch","Double-Edge","Agility","Odor Sleuth"]
+[16:12:24.986] LOG: Chosen Move: Crunch
+[16:12:24.986] LOG: %cStart Phase TurnStartPhase color:green;
+[16:12:24.990] LOG: %cStart Phase MovePhase color:green;
+[16:12:24.990] LOG: %cUser: Vivillon
+Move: GIGA_DRAIN
+Use Mode: NORMAL color:orchid
+[16:12:24.995] LOG: %cStart Phase MessagePhase color:green;
+[16:12:25.193] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:12:26.160] LOG: crit stage: +0
+[16:12:26.161] LOG: Applied Miracle Seed 
+[16:12:26.161] LOG: Move: Giga Drain | Base damage: 229.44285714285715 | Power: 90 | Source attack: 290 | Target defense: 56
+[16:12:26.161] LOG: Move: Giga Drain | Attack damage: 390
+[16:12:26.162] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:12:26.194] LOG: %cStart Phase MessagePhase color:green;
+[16:12:26.609] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:12:26.610] LOG: %cStart Phase MessagePhase color:green;
+[16:12:27.043] LOG: %cStart Phase FaintPhase color:green;
+[16:12:28.544] LOG: %cStart Phase MessagePhase color:green;
+[16:12:28.827] LOG: %cStart Phase VictoryPhase color:green;
+[16:12:28.827] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:12:28.827] LOG: Applied Super EXP. Charm 
+[16:12:28.827] LOG: Applied EXP. Charm 
+[16:12:28.828] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:12:28.828] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:12:28.828] LOG: Applied Super EXP. Charm 
+[16:12:28.828] LOG: Applied EXP. Charm 
+[16:12:29.089] LOG: %cStart Phase LevelUpPhase color:green;
+[16:12:29.453] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:12:29.560] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:12:29.560] LOG: Applied Super EXP. Charm 
+[16:12:29.560] LOG: Applied EXP. Charm 
+[16:12:29.810] LOG: %cStart Phase LevelUpPhase color:green;
+[16:12:30.096] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:12:30.210] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:12:30.211] LOG: Applied Super EXP. Charm 
+[16:12:30.211] LOG: Applied EXP. Charm 
+[16:12:30.211] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:12:30.211] LOG: %cStart Phase MoveEndPhase color:green;
+[16:12:30.212] LOG: %cStart Phase MovePhase color:green;
+[16:12:30.212] LOG: %cUser: Torrentula
+Move: FURY_CUTTER
+Use Mode: NORMAL color:orchid
+[16:12:30.214] LOG: %cStart Phase MessagePhase color:green;
+[16:12:30.459] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:12:30.660] LOG: crit stage: +0
+[16:12:30.661] LOG: Move: Fury Cutter | Base damage: 19.17853658536585 | Power: 20 | Source attack: 142 | Target defense: 82
+[16:12:30.662] LOG: Move: Fury Cutter | Attack damage: 52
+[16:12:30.662] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:12:30.694] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:12:30.910] LOG: crit stage: +0
+[16:12:30.911] LOG: Move: Fury Cutter | Base damage: 36.3570731707317 | Power: 40 | Source attack: 142 | Target defense: 82
+[16:12:30.911] LOG: Move: Fury Cutter | Attack damage: 94
+[16:12:30.912] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:12:30.944] LOG: %cStart Phase MessagePhase color:green;
+[16:12:31.359] LOG: %cStart Phase MessagePhase color:green;
+[16:12:31.759] LOG: %cStart Phase FaintPhase color:green;
+[16:12:33.160] LOG: %cStart Phase MessagePhase color:green;
+[16:12:33.401] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:12:33.710] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:12:33.961] LOG: %cStart Phase MessagePhase color:green;
+[16:12:34.442] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:12:34.493] LOG: %cStart Phase VictoryPhase color:green;
+[16:12:34.494] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:12:34.494] LOG: Applied Super EXP. Charm 
+[16:12:34.494] LOG: Applied EXP. Charm 
+[16:12:34.494] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:12:34.494] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:12:34.494] LOG: Applied Super EXP. Charm 
+[16:12:34.494] LOG: Applied EXP. Charm 
+[16:12:34.494] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:12:34.494] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:12:34.494] LOG: Applied Super EXP. Charm 
+[16:12:34.494] LOG: Applied EXP. Charm 
+[16:12:34.495] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:12:34.495] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:12:34.495] LOG: Applied Super EXP. Charm 
+[16:12:34.495] LOG: Applied EXP. Charm 
+[16:12:34.495] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:12:34.495] LOG: %cStart Phase MoveEndPhase color:green;
+[16:12:34.495] LOG: %cStart Phase MovePhase color:green;
+[16:12:34.495] LOG: %cStart Phase MoveEndPhase color:green;
+[16:12:34.495] LOG: %cStart Phase MovePhase color:green;
+[16:12:34.495] LOG: %cStart Phase MoveEndPhase color:green;
+[16:12:34.495] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:12:34.495] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:12:34.495] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:12:34.495] LOG: %cStart Phase BerryPhase color:green;
+[16:12:34.496] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:12:34.496] LOG: %cStart Phase TurnEndPhase color:green;
+[16:12:34.500] LOG: %cStart Phase MessagePhase color:green;
+[16:12:34.942] LOG: %cStart Phase BattleEndPhase color:green;
+[16:12:34.943] LOG: Battle Score: 869 (4 Turns x0.79)
+[16:12:34.943] LOG: Total Score: 9062
+[16:12:34.956] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[16:12:34.957] LOG: Team Aqua Admin Matt
+[16:12:35.408] LOG: Team Aqua Admin Matt
+[16:12:35.613] LOG: Dialogue saved as seen: dialogue:matt.victory.3
+[16:12:35.613] LOG: %cStart Phase MoneyRewardPhase color:green;
+[16:12:35.803] LOG: %cStart Phase EggLapsePhase color:green;
+[16:12:35.803] LOG: %cStart Phase SelectModifierPhase color:green;
+[16:12:35.803] LOG: Wave Seed: u³³¼¶«¸t¬v§¼ 66
+[16:12:35.807] LOG: Applied Golden Poké Ball 
+[16:12:35.807] LOG: 24 9 [2,3,4,5,6,7,8,16,23]
+[16:12:35.807] LOG: {"id":"VOUCHER","localeKey":"","iconImage":"coupon","group":"voucher","soundName":"se/restore","tier":1,"voucherType":0,"count":1} 
+[16:12:35.807] LOG: 5 1 [3]
+[16:12:35.807] LOG: {"id":"MAX_ETHER","localeKey":"modifierType:ModifierType.MAX_ETHER","iconImage":"max_ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":-1} 
+[16:12:35.807] LOG: 4 1 [3]
+[16:12:35.807] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[16:12:35.807] LOG: 8 1 [3]
+[16:12:35.807] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} 
+[16:12:35.807] LOG: 6 1 [3]
+[16:12:35.807] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[16:12:46.278] LOG: %cStart Phase NewBattlePhase color:green;
+[16:12:46.278] LOG: Wave Seed: v´´½·¬¹u­w¨½ 67
+[16:12:46.279] LOG: %cStart Phase NextEncounterPhase color:green;
+[16:12:46.280] LOG: Starting species pool tier: UNCOMMON
+[16:12:46.280] LOG: Replaced HIPPOPOTAS with HIPPOWDON
+[16:12:46.288] LOG: Pokemon: Wild Hippowdon | Species ID: 450 | Level: 46 | Nature: Bashful (-)
+[16:12:46.288] LOG: Stats (IVs): HP: 163 (18), Atk: 118 (23), Def: 126 (29), Spatk: 71 (9), Spdef: 84 (28), Spd: 62 (30)
+[16:12:46.288] LOG: Ability: Sand Stream | Passive Ability: Sand Guard 
+[16:12:46.288] LOG: Moveset: ["Headlong Rush","Fissure","Yawn","Hyper Fang"]
+[16:12:46.737] LOG: Battle Seed: chDpD22AWZB8BbDw
+[16:12:46.774] DEBUG: Session data saved to slot 2!
+[16:12:46.774] LOG: Wave Seed: v´´½·¬¹u­w¨½ 67
+[16:12:47.627] LOG: %cStart Phase ReturnPhase color:green;
+[16:12:47.843] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[16:12:47.960] LOG: %cStart Phase CheckSwitchPhase color:green;
+[16:14:12.046] LOG: %cStart Phase InitEncounterPhase color:green;
+[16:14:12.046] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:12.046] LOG: Ran PSP for: Hippowdon
+[16:14:12.046] LOG: %cStart Phase MessagePhase color:green;
+[16:14:12.557] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:14:12.909] LOG: %cStart Phase MessagePhase color:green;
+[16:14:13.341] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:13.345] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:14:13.658] LOG: %cStart Phase CommonAnimPhase color:green;
+[16:14:14.125] LOG: %cStart Phase MessagePhase color:green;
+[16:14:14.524] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:14:14.575] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:14.575] LOG: %cStart Phase TurnInitPhase color:green;
+[16:14:14.575] LOG: %cStart Phase CommandPhase color:green;
+[16:14:23.706] DEBUG: Session data saved to slot 2!
+[16:14:24.431] LOG: Seed: Yge6fsOrZDS7QvBpjRc9KLiT
+[16:14:24.431] LOG: Wave Seed: Yge6fsOrZDS7QvBpjRc9KLiT 0
+[16:14:24.687] WARN: AnimationManager key already exists: prompt
+[16:14:24.687] WARN: AnimationManager key already exists: tera_sparkle
+[16:14:24.687] LOG: Seed: ZwYfbARsXNJC4R0ssnZrnOUX
+[16:14:24.687] LOG: Wave Seed: ZwYfbARsXNJC4R0ssnZrnOUX 0
+[16:14:26.744] LOG: %cStart Phase LoginPhase color:green;
+[16:14:26.888] LOG: Client Session: 0sFIMhtjCuGBEve0XYJsjXglzQQ9RlDD
+[16:14:27.222] LOG: %cStart Phase TitlePhase color:green;
+[16:14:27.222] LOG: Getting Session Slot id: %d 2
+[16:14:27.343] LOG: use seasonal splash messages true
+[16:14:27.343] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[16:14:28.709] LOG: Getting Session Slot id: %d 2
+[16:14:28.712] LOG: Wave Seed: 3qqztiDNvE2jGOJ4TeYWDzXI 0
+[16:14:28.712] LOG: Seed: 3qqztiDNvE2jGOJ4TeYWDzXI
+[16:14:28.738] LOG: Wave Seed: v´´½·¬¹u­w¨½ 67
+[16:14:28.858] LOG: %cStart Phase EncounterPhase color:green;
+[16:14:28.861] LOG: Pokemon: Wild Hippowdon | Species ID: 450 | Level: 46 | Nature: Bashful (-)
+[16:14:28.861] LOG: Stats (IVs): HP: 163 (18), Atk: 118 (23), Def: 126 (29), Spatk: 71 (9), Spdef: 84 (28), Spd: 62 (30)
+[16:14:28.861] LOG: Ability: Sand Stream | Passive Ability: Sand Guard 
+[16:14:28.861] LOG: Moveset: ["Headlong Rush","Fissure","Yawn","Hyper Fang"]
+[16:14:28.862] LOG: Wave Seed: v´´½·¬¹u­w¨½ 67
+[16:14:29.725] LOG: %cStart Phase SummonPhase color:green;
+[16:14:30.057] WARN: cry/10081 not found
+[16:14:30.274] LOG: %cStart Phase ShinySparklePhase color:green;
+[16:14:30.490] LOG: %cStart Phase CheckSwitchPhase color:green;
+[16:14:31.760] LOG: %cStart Phase InitEncounterPhase color:green;
+[16:14:31.760] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:31.760] LOG: Ran PSP for: Hippowdon
+[16:14:31.761] LOG: %cStart Phase MessagePhase color:green;
+[16:14:32.257] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:14:32.625] LOG: %cStart Phase MessagePhase color:green;
+[16:14:33.057] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:33.062] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:14:33.374] LOG: %cStart Phase CommonAnimPhase color:green;
+[16:14:33.841] LOG: %cStart Phase MessagePhase color:green;
+[16:14:34.240] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:14:34.291] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:34.291] LOG: %cStart Phase TurnInitPhase color:green;
+[16:14:34.291] LOG: %cStart Phase CommandPhase color:green;
