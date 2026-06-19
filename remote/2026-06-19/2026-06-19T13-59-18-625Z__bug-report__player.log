@@ -1,0 +1,268 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     0  wave:136  difficulty:youngster
+seed:     USRDV79dYplkzvmUyMRtOLV4
+party:    Chandelure(L124 200/362), Dachsbun(L122 295/295), Goodra(L122 356/356), Chien-Pao(L126 337/337), Tsareena(L111 308/308), Articuno(L122 363/363)
+
+----- DESCRIPTION -----
+When I beat the "clowning around" mystery event it gave me the ability drought, but when I added it onto my mega chandelure, it didn't actually get drought
+
+----- CONSOLE -----
+[13:57:52.016] LOG: %cStart Phase ResetStatusPhase color:green;
+[13:57:52.016] LOG: %cStart Phase ResetStatusPhase color:green;
+[13:57:52.017] LOG: %cStart Phase ResetStatusPhase color:green;
+[13:57:52.017] LOG: %cStart Phase ResetStatusPhase color:green;
+[13:57:52.017] LOG: %cStart Phase ResetStatusPhase color:green;
+[13:57:52.017] LOG: %cStart Phase SwitchBiomePhase color:green;
+[13:57:52.432] LOG: %cStart Phase NewBattlePhase color:green;
+[13:57:52.432] LOG: Wave Seed: ÝÛÚÌÞ¿ÁìáøôóĂþõÝāÕÚü×ÔÞ¼ 136
+[13:57:52.433] LOG: %cStart Phase NextEncounterPhase color:green;
+[13:57:52.435] LOG: Starting species pool tier: COMMON
+[13:57:52.435] LOG: Replaced BOUNSWEET with TSAREENA
+[13:57:52.435] LOG: Applied Ability Charm 
+[13:57:52.443] LOG: Pokemon: Wild Tsareena | Species ID: 763 | Level: 110 | Nature: Hasty (+Spd/-Def)
+[13:57:52.443] LOG: Stats (IVs): HP: 305 (25), Atk: 302 (30), Def: 189 (8), Spatk: 127 (11), Spdef: 219 (15), Spd: 303 (30)
+[13:57:52.443] LOG: Ability: Oblivious | Passive Ability: Looter 
+[13:57:52.443] LOG: Moveset: ["Triple Kick","Jump Kick","Triple Axel","Trop Kick"]
+[13:57:52.742] LOG: {"id":"BERRY","localeKey":"","iconImage":"apicot_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":6} (enemy)
+[13:57:52.742] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[13:57:52.742] LOG: {"id":"BERRY","localeKey":"","iconImage":"ganlon_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":4} (enemy)
+[13:57:52.742] LOG: Battle Seed: 0Wq4X8hEzhoqndIM
+[13:57:52.780] DEBUG: Session data saved to slot 1!
+[13:57:52.780] LOG: Wave Seed: ÝÛÚÌÞ¿ÁìáøôóĂþõÝāÕÚü×ÔÞ¼ 136
+[13:57:53.215] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[13:57:53.215] LOG: %cStart Phase CheckSwitchPhase color:green;
+[13:57:56.742] LOG: %cStart Phase SwitchPhase color:green;
+[13:57:58.136] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:57:58.348] LOG: Applied HP Up 
+[13:57:58.348] LOG: Applied Zinc 
+[13:57:58.348] LOG: Applied Protein 
+[13:57:58.348] LOG: Applied Calcium 
+[13:57:58.348] LOG: Applied Iron 
+[13:57:58.349] LOG: Applied Protein 
+[13:57:58.350] LOG: Applied Carbos 
+[13:57:58.381] WARN: cry/609-mega-x not found
+[13:57:58.482] LOG: %cStart Phase PostSummonPhase color:green;
+[13:57:58.482] LOG: Ran PSP for: Mega Chandelure X
+[13:57:58.483] LOG: %cStart Phase PostSummonPhase color:green;
+[13:57:58.483] LOG: %cStart Phase PostSummonPhase color:green;
+[13:57:58.483] LOG: %cStart Phase InitEncounterPhase color:green;
+[13:57:58.483] LOG: %cStart Phase PostSummonPhase color:green;
+[13:57:58.483] LOG: Ran PSP for: Tsareena
+[13:57:58.483] LOG: %cStart Phase PostSummonPhase color:green;
+[13:57:58.483] LOG: %cStart Phase PostSummonPhase color:green;
+[13:57:58.483] LOG: %cStart Phase TurnInitPhase color:green;
+[13:57:58.483] LOG: %cStart Phase CommandPhase color:green;
+[13:57:59.599] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:57:59.603] LOG: Move Pool: ["Triple Kick","Jump Kick","Triple Axel","Trop Kick"]
+[13:57:59.603] LOG: Move Scores: [-20,-20,4,12]
+[13:57:59.603] LOG: Sorted Move Pool: ["Trop Kick","Triple Axel","Triple Kick","Jump Kick"]
+[13:57:59.603] LOG: Chosen Move: Trop Kick
+[13:57:59.603] LOG: %cStart Phase TurnStartPhase color:green;
+[13:57:59.603] LOG: %cStart Phase AttemptCapturePhase color:green;
+[13:58:00.266] LOG: %cStart Phase MovePhase color:green;
+[13:58:00.267] LOG: %cUser: Tsareena
+Move: TROP_KICK
+Use Mode: NORMAL color:orchid
+[13:58:00.270] LOG: %cStart Phase MessagePhase color:green;
+[13:58:00.398] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:58:01.049] LOG: crit stage: +0
+[13:58:01.050] LOG: Move: Trop Kick | Base damage: 89.38516129032257 | Power: 97.5 | Source attack: 302 | Target defense: 310
+[13:58:01.051] LOG: Move: Trop Kick | Attack damage: 81
+[13:58:01.053] LOG: %cStart Phase MessagePhase color:green;
+[13:58:01.314] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:58:01.349] LOG: %cStart Phase MessagePhase color:green;
+[13:58:01.565] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:58:01.750] LOG: %cStart Phase MessagePhase color:green;
+[13:58:01.998] LOG: %cStart Phase MoveEndPhase color:green;
+[13:58:01.998] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:58:01.998] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:58:01.998] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:58:01.998] LOG: %cStart Phase BerryPhase color:green;
+[13:58:01.999] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:58:02.000] LOG: %cStart Phase TurnEndPhase color:green;
+[13:58:02.000] LOG: %cStart Phase TurnInitPhase color:green;
+[13:58:02.000] LOG: %cStart Phase CommandPhase color:green;
+[13:58:02.520] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:58:02.521] LOG: Battle Seed: 0Wq4X8hEzhoqndIM
+[13:58:02.523] LOG: Move Pool: ["Triple Kick","Jump Kick","Triple Axel","Trop Kick"]
+[13:58:02.523] LOG: Move Scores: [-20,-20,4,12]
+[13:58:02.523] LOG: Sorted Move Pool: ["Trop Kick","Triple Axel","Triple Kick","Jump Kick"]
+[13:58:02.523] LOG: Chosen Move: Triple Axel
+[13:58:02.523] LOG: %cStart Phase TurnStartPhase color:green;
+[13:58:02.523] LOG: %cStart Phase AttemptCapturePhase color:green;
+[13:58:03.082] LOG: %cStart Phase MovePhase color:green;
+[13:58:03.082] LOG: %cUser: Tsareena
+Move: TRIPLE_AXEL
+Use Mode: NORMAL color:orchid
+[13:58:03.085] LOG: %cStart Phase MessagePhase color:green;
+[13:58:03.231] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:58:03.498] LOG: crit stage: +0
+[13:58:03.499] LOG: Move: Triple Axel | Base damage: 25.302709677419358 | Power: 26 | Source attack: 302 | Target defense: 310
+[13:58:03.500] LOG: Move: Triple Axel | Attack damage: 11
+[13:58:03.500] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:58:03.533] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:58:03.815] LOG: crit stage: +0
+[13:58:03.816] LOG: Move: Triple Axel | Base damage: 48.605419354838716 | Power: 52 | Source attack: 302 | Target defense: 310
+[13:58:03.816] LOG: Move: Triple Axel | Attack damage: 24
+[13:58:03.816] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:58:03.849] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:58:04.132] LOG: crit stage: +0
+[13:58:04.134] LOG: Move: Triple Axel | Base damage: 71.90812903225806 | Power: 78 | Source attack: 302 | Target defense: 310
+[13:58:04.134] LOG: Move: Triple Axel | Attack damage: 35
+[13:58:04.135] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:58:04.165] LOG: %cStart Phase MessagePhase color:green;
+[13:58:04.381] LOG: %cStart Phase MessagePhase color:green;
+[13:58:04.582] LOG: %cStart Phase MoveEndPhase color:green;
+[13:58:04.582] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:58:04.582] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:58:04.582] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:58:04.582] LOG: %cStart Phase BerryPhase color:green;
+[13:58:04.583] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:58:04.584] LOG: %cStart Phase TurnEndPhase color:green;
+[13:58:04.584] LOG: %cStart Phase TurnInitPhase color:green;
+[13:58:04.584] LOG: %cStart Phase CommandPhase color:green;
+[13:58:04.958] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:58:04.960] LOG: Battle Seed: 0Wq4X8hEzhoqndIM
+[13:58:04.961] LOG: Move Pool: ["Triple Kick","Jump Kick","Triple Axel","Trop Kick"]
+[13:58:04.961] LOG: Move Scores: [-20,-20,4,12]
+[13:58:04.961] LOG: Sorted Move Pool: ["Trop Kick","Triple Axel","Triple Kick","Jump Kick"]
+[13:58:04.961] LOG: Chosen Move: Triple Axel
+[13:58:04.961] LOG: %cStart Phase TurnStartPhase color:green;
+[13:58:04.961] LOG: %cStart Phase AttemptCapturePhase color:green;
+[13:58:05.616] LOG: %cStart Phase MovePhase color:green;
+[13:58:05.616] LOG: %cUser: Tsareena
+Move: TRIPLE_AXEL
+Use Mode: NORMAL color:orchid
+[13:58:05.617] LOG: %cStart Phase MessagePhase color:green;
+[13:58:05.764] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:58:06.032] LOG: crit stage: +0
+[13:58:06.033] LOG: Move: Triple Axel | Base damage: 25.302709677419358 | Power: 26 | Source attack: 302 | Target defense: 310
+[13:58:06.033] LOG: Move: Triple Axel | Attack damage: 11
+[13:58:06.034] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:58:06.066] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:58:06.066] LOG: %cStart Phase MessagePhase color:green;
+[13:58:06.314] LOG: %cStart Phase MoveEndPhase color:green;
+[13:58:06.315] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:58:06.315] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:58:06.315] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:58:06.315] LOG: %cStart Phase BerryPhase color:green;
+[13:58:06.316] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:58:06.316] LOG: %cStart Phase TurnEndPhase color:green;
+[13:58:06.317] LOG: %cStart Phase TurnInitPhase color:green;
+[13:58:06.317] LOG: %cStart Phase CommandPhase color:green;
+[13:58:06.887] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:58:06.888] LOG: Battle Seed: 0Wq4X8hEzhoqndIM
+[13:58:06.889] LOG: Move Pool: ["Triple Kick","Jump Kick","Triple Axel","Trop Kick"]
+[13:58:06.889] LOG: Move Scores: [-20,-20,4,12]
+[13:58:06.889] LOG: Sorted Move Pool: ["Trop Kick","Triple Axel","Triple Kick","Jump Kick"]
+[13:58:06.889] LOG: Chosen Move: Trop Kick
+[13:58:06.889] LOG: %cStart Phase TurnStartPhase color:green;
+[13:58:06.890] LOG: %cStart Phase AttemptCapturePhase color:green;
+[13:58:13.249] LOG: Applied HP Up 
+[13:58:13.249] LOG: Applied Zinc 
+[13:58:13.249] LOG: Applied Protein 
+[13:58:13.249] LOG: Applied Calcium 
+[13:58:13.249] LOG: Applied Iron 
+[13:58:13.249] LOG: Applied Protein 
+[13:58:13.250] LOG: Applied Carbos 
+[13:58:13.323] LOG: Applied HP Up 
+[13:58:13.323] LOG: Applied Zinc 
+[13:58:13.323] LOG: Applied Protein 
+[13:58:13.323] LOG: Applied Calcium 
+[13:58:13.323] LOG: Applied Iron 
+[13:58:13.323] LOG: Applied Protein 
+[13:58:13.323] LOG: Applied Carbos 
+[13:58:14.605] LOG: %cStart Phase VictoryPhase color:green;
+[13:58:14.605] LOG: %cStart Phase ExpPhase color:green;
+[13:58:14.605] LOG: Applied Super EXP. Charm 
+[13:58:14.605] LOG: Applied EXP. Charm 
+[13:58:15.299] LOG: %cStart Phase LevelUpPhase color:green;
+[13:58:15.300] LOG: Applied HP Up 
+[13:58:15.300] LOG: Applied Zinc 
+[13:58:15.300] LOG: Applied Protein 
+[13:58:15.300] LOG: Applied Calcium 
+[13:58:15.300] LOG: Applied Iron 
+[13:58:16.134] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[13:58:16.134] LOG: Applied Super EXP. Charm 
+[13:58:16.134] LOG: Applied EXP. Charm 
+[13:58:16.699] LOG: %cStart Phase LevelUpPhase color:green;
+[13:58:16.700] LOG: Applied Protein 
+[13:58:17.333] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[13:58:17.399] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[13:58:17.399] LOG: Applied Super EXP. Charm 
+[13:58:17.399] LOG: Applied EXP. Charm 
+[13:58:17.971] LOG: %cStart Phase LevelUpPhase color:green;
+[13:58:18.583] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[13:58:18.649] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[13:58:18.649] LOG: Applied Super EXP. Charm 
+[13:58:18.649] LOG: Applied EXP. Charm 
+[13:58:19.216] LOG: %cStart Phase LevelUpPhase color:green;
+[13:58:19.822] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[13:58:19.882] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[13:58:19.883] LOG: Applied Super EXP. Charm 
+[13:58:19.883] LOG: Applied EXP. Charm 
+[13:58:20.462] LOG: %cStart Phase LevelUpPhase color:green;
+[13:58:20.462] LOG: Applied Carbos 
+[13:58:21.315] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[13:58:21.381] LOG: %cStart Phase MovePhase color:green;
+[13:58:21.381] LOG: %cStart Phase MoveEndPhase color:green;
+[13:58:21.381] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:58:21.381] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:58:21.381] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:58:21.382] LOG: %cStart Phase BerryPhase color:green;
+[13:58:21.382] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:58:21.382] LOG: %cStart Phase TurnEndPhase color:green;
+[13:58:21.382] LOG: %cStart Phase BattleEndPhase color:green;
+[13:58:21.382] LOG: Battle Score: 129 (4 Turns x0.54)
+[13:58:21.382] LOG: Total Score: 23174
+[13:58:21.383] LOG: Applied HP Up 
+[13:58:21.383] LOG: Applied Zinc 
+[13:58:21.383] LOG: Applied Protein 
+[13:58:21.383] LOG: Applied Calcium 
+[13:58:21.383] LOG: Applied Iron 
+[13:58:21.383] LOG: Applied Protein 
+[13:58:21.384] LOG: Applied Carbos 
+[13:58:21.386] LOG: %cStart Phase EggLapsePhase color:green;
+[13:58:21.386] LOG: %cStart Phase SelectModifierPhase color:green;
+[13:58:21.386] LOG: Wave Seed: ÝÛÚÌÞ¿ÁìáøôóĂþõÝāÕÚü×ÔÞ¼ 136
+[13:58:21.388] LOG: Applied Golden Poké Ball 
+[13:58:21.388] LOG: 7 2 [4,5]
+[13:58:21.388] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[13:58:21.388] LOG: 0 0 [4,5]
+[13:58:21.388] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[13:58:21.388] LOG: 0 0 [4,5]
+[13:58:21.388] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[13:58:21.388] LOG: 9 2 [4,5]
+[13:58:21.388] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_normal","group":"tm","soundName":"se/restore","tier":0,"moveId":219} 
+[13:58:21.388] LOG: 0 0 [4,5]
+[13:58:21.388] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[13:58:21.388] LOG: 2 0 [4,5]
+[13:58:21.388] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[13:58:21.388] LOG: 6 4 [2,3,4,5,7,8,9,10,23]
+[13:58:21.388] LOG: {"id":"HYPER_POTION","localeKey":"modifierType:ModifierType.HYPER_POTION","iconImage":"hyper_potion","group":"potion","soundName":"se/restore","tier":1,"restorePoints":200,"restorePercent":50,"healStatus":false} 
+[13:58:21.388] LOG: 13 8 [2,3,4,5,7,8,9,10,23]
+[13:58:21.388] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[13:58:42.112] LOG: Applied HP Up 
+[13:58:42.112] LOG: Applied Zinc 
+[13:58:42.112] LOG: Applied Protein 
+[13:58:42.112] LOG: Applied Calcium 
+[13:58:42.112] LOG: Applied Iron 
+[13:58:42.113] LOG: Applied Protein 
+[13:58:42.113] LOG: Applied Carbos 
+[13:58:44.683] LOG: Applied HP Up 
+[13:58:44.683] LOG: Applied Zinc 
+[13:58:44.683] LOG: Applied Protein 
+[13:58:44.683] LOG: Applied Calcium 
+[13:58:44.683] LOG: Applied Iron 
+[13:58:44.684] LOG: Applied Protein 
+[13:58:44.685] LOG: Applied Carbos 
+[13:58:46.239] LOG: Applied HP Up 
+[13:58:46.239] LOG: Applied Zinc 
+[13:58:46.239] LOG: Applied Protein 
+[13:58:46.239] LOG: Applied Calcium 
+[13:58:46.239] LOG: Applied Iron 
+[13:58:46.240] LOG: Applied Protein 
+[13:58:46.240] LOG: Applied Carbos 
