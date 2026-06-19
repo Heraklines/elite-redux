@@ -569,6 +569,8 @@ function translatePriorityCondition(cond: unknown): PriorityCondition | "skip" |
       const threshold = cond.threshold;
       return typeof threshold === "number" ? { kind: "low-hp", threshold } : { kind: "low-hp" };
     }
+    case "first-turn":
+      return { kind: "first-turn" };
     default:
       return "skip";
   }
@@ -591,12 +593,30 @@ function dispatchPriorityModifier(params: Record<string, unknown>): DispatchResu
     if (flag !== null) {
       (filter as { flag: MoveFlags }).flag = flag;
     }
+    // A filter was PROVIDED but neither its type nor flag resolved — that's a
+    // dropped/typo'd filter, not "intentionally unfiltered". Silently defaulting to
+    // {} would grant the bonus to EVERY move (the 743/882/923 random-outspeed class).
+    // Skip instead so a classifier miss can never reintroduce blanket priority.
+    if (Object.keys(filter).length === 0) {
+      return skip(`priority-modifier: filter ${JSON.stringify(params.filter)} resolved to nothing - dropped/typo'd?`);
+    }
   }
   const condResult = translatePriorityCondition(params.condition);
   if (condResult === "skip") {
     return skip(
       `priority-modifier: unsupported condition kind ${String((params.condition as Record<string, unknown>)?.kind)}`,
     );
+  }
+  // GUARD (random-outspeed class): a POSITIVE priority with NO filter AND no real
+  // condition means "+priority on EVERY move, always" - i.e. this mon out-prioritizes
+  // everything with anything. No real ability does that; it's a classifier miss that
+  // dropped a type/flag filter (e.g. Cutthroat/Edgelord/Galeforce Wings did exactly
+  // this). Skip rather than wire blanket priority, so a future miss can't reintroduce
+  // the bug. (Negative blanket priority IS legit - Stall-style "always move last" - so
+  // it is NOT skipped; nor is a conditional blanket like "+prio at low HP".)
+  const unconditional = condResult === null || condResult.kind === "always";
+  if (priority > 0 && Object.keys(filter).length === 0 && unconditional) {
+    return skip(`priority-modifier: refusing blanket +${priority} priority (no filter/condition) - classifier miss?`);
   }
   return ok([
     new PriorityModifierAbAttr({

@@ -4588,6 +4588,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Priority abilities only filtered moves (#outspeed)",
+    description:
+      "Random-outspeed fix. Cutthroat(743)/Edgelord(882)/Galeforce Wings(923) were\n"
+      + "mis-classified as a BARE priority and gave +1 priority to EVERY move - the mon\n"
+      + "moved first with anything (the 'faster mon outsped / Hydro Pump moves first'\n"
+      + "reports). Each is now filtered to its move type/flag. CHECK: this Pidgeot has\n"
+      + "Galeforce Wings (Flying moves +1 priority) and is SLOWER than the foe Jolteon.\n"
+      + "Use AIR SLASH (Flying) -> Pidgeot moves FIRST (priority). Use SWIFT (Normal) ->\n"
+      + "the faster Jolteon moves first. Before the fix BOTH moved first.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        ABILITY_OVERRIDE: erAbility(923), // Galeforce Wings
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.AIR_SLASH, MoveId.SWIFT],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.JOLTEON,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.THUNDERBOLT],
+      });
+      return [
+        makeStarter(SpeciesId.PIDGEOT, {
+          moveset: [MoveId.AIR_SLASH, MoveId.SWIFT, MoveId.ROOST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "Restraining Order force-out (#452)",
     description:
       "#452 - Restraining Order (Gooschase sig, ER ability 690) + Chuckster\n"

@@ -25,12 +25,13 @@ import type { Move } from "#moves/move";
 import { NumberHolder } from "#utils/value-holder";
 import { describe, expect, it } from "vitest";
 
-function makeStubPokemon(opts: { hpRatio?: number; fullHp?: boolean } = {}): Pokemon {
+function makeStubPokemon(opts: { hpRatio?: number; fullHp?: boolean; waveTurnCount?: number } = {}): Pokemon {
   const hpRatio = opts.hpRatio ?? 1;
   return {
     getHpRatio: () => hpRatio,
     isFullHp: () => opts.fullHp ?? hpRatio === 1,
     getMoveType: (move: Move) => (move as unknown as { _type: PokemonType })._type,
+    tempSummonData: { waveTurnCount: opts.waveTurnCount ?? 1 },
   } as unknown as Pokemon;
 }
 
@@ -178,6 +179,25 @@ describe("PriorityModifierAbAttr archetype (C1c)", () => {
       });
       expect(runPriority({ attr, pokemon: makeStubPokemon({ hpRatio: 0.5 }), move: makeStubMove() }).fired).toBe(true);
       expect(runPriority({ attr, pokemon: makeStubPokemon({ hpRatio: 0.51 }), move: makeStubMove() }).fired).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("first-turn condition (Cutthroat/Edgelord per-entry approximation)", () => {
+    it("fires only on the entry turn (waveTurnCount === 1), and still honors the filter", () => {
+      const attr = new PriorityModifierAbAttr({
+        priority: 1,
+        filter: { flag: MoveFlags.SLICING_MOVE },
+        condition: { kind: "first-turn" },
+      });
+      const slicing = () => makeStubMove({ flags: MoveFlags.SLICING_MOVE });
+      // Entry turn + slicing move → fires
+      expect(runPriority({ attr, pokemon: makeStubPokemon({ waveTurnCount: 1 }), move: slicing() }).fired).toBe(true);
+      // Later turn → no fire (the per-entry gate)
+      expect(runPriority({ attr, pokemon: makeStubPokemon({ waveTurnCount: 2 }), move: slicing() }).fired).toBe(false);
+      // Entry turn but a NON-slicing move → no fire (filter still applies, not blanket)
+      expect(runPriority({ attr, pokemon: makeStubPokemon({ waveTurnCount: 1 }), move: makeStubMove() }).fired).toBe(
         false,
       );
     });

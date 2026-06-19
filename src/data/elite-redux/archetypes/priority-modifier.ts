@@ -89,7 +89,13 @@ export interface PriorityModifierFilter {
 export type PriorityCondition =
   | { readonly kind: "always" }
   | { readonly kind: "full-hp" }
-  | { readonly kind: "low-hp"; readonly threshold?: number };
+  | { readonly kind: "low-hp"; readonly threshold?: number }
+  // "first move on the entry turn" — the ER approximation for "first <X> move per
+  // entry" abilities (Cutthroat 743, Edgelord 882). Same waveTurnCount===1 gate the
+  // bespoke entry-turn abilities (Coil Up 302, Sidewinder 676) use. Not literally
+  // "first such move per entry" (a move used on a later turn won't qualify), but it
+  // matches the established convention and avoids over-applying every turn.
+  | { readonly kind: "first-turn" };
 
 /** Construction options for {@linkcode PriorityModifierAbAttr}. */
 export interface PriorityModifierOptions {
@@ -216,6 +222,8 @@ export class PriorityModifierAbAttr extends ChangeMovePriorityAbAttr {
         return pokemon.isFullHp();
       case "low-hp":
         return pokemon.getHpRatio() <= (condition.threshold ?? 0.5);
+      case "first-turn":
+        return pokemon.tempSummonData.waveTurnCount === 1;
     }
   }
 }

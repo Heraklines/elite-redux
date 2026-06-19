@@ -509,7 +509,13 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   740: { erAbilityId: 740, archetype: "bespoke", params: null },
   741: { erAbilityId: 741, archetype: "composite-vanilla-mashup", params: {"parts":["Swift Swim","Stall"]} },
   742: { erAbilityId: 742, archetype: "bespoke", params: null },
-  743: { erAbilityId: 743, archetype: "priority-modifier", params: {"priority":1} },
+  // 743 Cutthroat: "first slicing move on each entry gets +1 priority". The classifier
+  // dropped the SLICING filter, leaving a BARE priority that gave EVERY move +1 (the
+  // "random outspeed" bug). Restored the SLICING_MOVE filter + the first-turn (entry-
+  // turn, waveTurnCount===1) gate - ER's standard approximation of "first move per
+  // entry" (same as Coil Up 302 / Sidewinder 676). Minor divergence: a slicing move
+  // used on a LATER turn won't qualify (the literal "first per entry" isn't tracked).
+  743: { erAbilityId: 743, archetype: "priority-modifier", params: {"priority":1,"filter":{"flag":"SLICING_MOVE"},"condition":{"kind":"first-turn"}} },
   744: { erAbilityId: 744, archetype: "composite-vanilla-mashup", params: {"parts":["Sand Stream","Sand Force"]} },
   745: { erAbilityId: 745, archetype: "bespoke", params: null },
   746: { erAbilityId: 746, archetype: "composite-vanilla-mashup", params: {"parts":["Desolate Land","Earth Eater"]} },
@@ -533,7 +539,8 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   764: { erAbilityId: 764, archetype: "bespoke", params: null },
   765: { erAbilityId: 765, archetype: "composite-vanilla-mashup", params: {"parts":["Soul Eater","Phantom Pain"]} },
   766: { erAbilityId: 766, archetype: "composite-vanilla-mashup", params: {"parts":["Intimidate","Violent Rush"]} },
-  767: { erAbilityId: 767, archetype: "priority-modifier", params: {"priority":1,"filter":{"flag":"SOUND_BASED"}} },
+  // 767 Presto: "Sound moves get +1 priority AT FULL HP" - the full-HP gate was missing.
+  767: { erAbilityId: 767, archetype: "priority-modifier", params: {"priority":1,"filter":{"flag":"SOUND_BASED"},"condition":{"kind":"max-hp"}} },
   768: { erAbilityId: 768, archetype: "composite-vanilla-mashup", params: {"parts":["Striker","Dancer"]} },
   769: { erAbilityId: 769, archetype: "bespoke", params: null },
   770: { erAbilityId: 770, archetype: "type-damage-boost", params: {"type":"FIGHTING","multiplier":1.3,"lowHpMultiplier":1.8,"lowHpThreshold":0.3333333333333333} },
@@ -648,7 +655,12 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   879: { erAbilityId: 879, archetype: "bespoke", params: null },
   880: { erAbilityId: 880, archetype: "bespoke", params: null },
   881: { erAbilityId: 881, archetype: "composite-vanilla-mashup", params: {"parts":["Fossilized","Rock moves ignore abilities"]} },
-  882: { erAbilityId: 882, archetype: "priority-modifier", params: {"priority":1} },
+  // 882 Edgelord: "first Keen Edge move each entry gets +1 priority. Resets on KO".
+  // Keen Edge = SLICING_MOVE. Classifier dropped the filter -> bare priority gave EVERY
+  // move +1 (random-outspeed bug). Restored the SLICING_MOVE filter + first-turn (entry-
+  // turn) gate, ER's approximation of "first move per entry". Minor divergence: the
+  // literal "first per entry / resets on KO" isn't tracked (uses the entry turn instead).
+  882: { erAbilityId: 882, archetype: "priority-modifier", params: {"priority":1,"filter":{"flag":"SLICING_MOVE"},"condition":{"kind":"first-turn"}} },
   883: { erAbilityId: 883, archetype: "bespoke", params: null },
   884: { erAbilityId: 884, archetype: "bespoke", params: null },
   885: { erAbilityId: 885, archetype: "bespoke", params: null },
@@ -689,7 +701,10 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   920: { erAbilityId: 920, archetype: "composite-vanilla-mashup", params: {"parts":["Tough Claws","Mineralize"]} },
   921: { erAbilityId: 921, archetype: "bespoke", params: null },
   922: { erAbilityId: 922, archetype: "bespoke", params: null },
-  923: { erAbilityId: 923, archetype: "priority-modifier", params: {"priority":1} },
+  // 923 Galeforce Wings: "Flying moves get +1 Priority" (Gale Wings). Classifier dropped
+  // the FLYING type filter -> bare priority gave EVERY move +1 (random-outspeed bug).
+  // Restored the type filter; now faithful to the dex.
+  923: { erAbilityId: 923, archetype: "priority-modifier", params: {"priority":1,"filter":{"type":"FLYING"}} },
   924: { erAbilityId: 924, archetype: "composite-vanilla-mashup", params: {"parts":["Queenly Majesty","Rivalry"]} },
   925: { erAbilityId: 925, archetype: "bespoke", params: null },
   926: { erAbilityId: 926, archetype: "composite-vanilla-mashup", params: {"parts":["Fire Scales","Taste the Rainbow"]} },
