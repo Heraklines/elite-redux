@@ -4542,6 +4542,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Reactive items show holder icon",
+    description:
+      "Held-item icon fix. The 5 reactive items (Cell Battery, Absorb Bulb, Snowball,\n"
+      + "Luminous Moss, Weakness Policy) are standalone er-assets textures, not in the\n"
+      + "items atlas. Their held-item bar entry rendered ONLY the item sprite with NO\n"
+      + "holder Pokemon icon, so you couldn't tell WHICH mon held it (esp. enemy-held) -\n"
+      + "the same bug the gems/seeds had. getIcon now draws the holder's Pokemon icon +\n"
+      + "the standalone sprite, matching the gems/seeds. CHECK: face/spawn an enemy (or\n"
+      + "a player mon) holding a reactive item - the item-bar icon shows the holder's\n"
+      + "Pokemon icon on the left, then the item sprite (not a bare/blank item).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 5, STARTING_LEVEL_OVERRIDE: 30 });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Youngster innates show unlocked",
     description:
       "Display fix. On Youngster, innate slots are temp-unlocked by level (1/15/24),\n"

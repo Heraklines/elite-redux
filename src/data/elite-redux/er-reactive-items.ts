@@ -98,20 +98,6 @@ const ER_REACTIVE_KINDS = Object.keys(ER_REACTIVE_CONFIG) as ErReactiveKind[];
 /** Rarity tier for distribution (shops / reward pools). */
 export const ER_REACTIVE_TIER = ModifierTier.ULTRA;
 
-/** Build the held-item icon from a standalone er-assets texture (not the items atlas). */
-function erIconContainer(textureKey: string, stackText: () => Phaser.GameObjects.BitmapText | null) {
-  const container = globalScene.add.container(0, 0);
-  const item = globalScene.add.sprite(0, 12, textureKey);
-  item.setScale(0.5);
-  item.setOrigin(0, 0.5);
-  container.add(item);
-  const text = stackText();
-  if (text) {
-    container.add(text);
-  }
-  return container;
-}
-
 /**
  * Decide whether a reactive item procs and what to boost. PURE (unit-tested) -
  * no globals, so the trigger rules are testable without a battle.
@@ -162,9 +148,30 @@ export class ErReactiveItemModifier extends PokemonHeldItemModifier {
   }
 
   override getIcon(forSummary?: boolean): Phaser.GameObjects.Container {
-    return forSummary
-      ? super.getIcon(forSummary)
-      : erIconContainer(ER_REACTIVE_CONFIG[this.kind].icon, () => this.getIconStackText());
+    if (forSummary) {
+      return super.getIcon(forSummary);
+    }
+    // Item-bar layout matching the elemental gems: the HOLDER's Pokemon icon on the
+    // left, THEN the reactive item's standalone er-assets sprite (it is NOT in the
+    // items atlas, so draw it directly rather than via super). Without the holder
+    // icon you couldn't tell WHICH mon held the item - the bar showed only the item
+    // sprite, with no owner (the same bug the gems had, esp. visible on enemy-held).
+    const container = globalScene.add.container(0, 0);
+    const pokemon = this.getPokemon();
+    if (pokemon) {
+      const pokemonIcon = globalScene.addPokemonIcon(pokemon, -2, 10, 0, 0.5, undefined, true);
+      container.add(pokemonIcon);
+      container.setName(pokemon.id.toString());
+    }
+    const item = globalScene.add.sprite(16, 16, ER_REACTIVE_CONFIG[this.kind].icon);
+    item.setScale(0.5);
+    item.setOrigin(0, 0.5);
+    container.add(item);
+    const stackText = this.getIconStackText();
+    if (stackText) {
+      container.add(stackText);
+    }
+    return container;
   }
 }
 
