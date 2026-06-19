@@ -2930,6 +2930,18 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!ability) {
       return false;
     }
+    // Battle Bond is a POWER SPIKE (Greninja -> Ash, Darmanitan-Bond -> Blunder,
+    // plus a stat boost on form-less users), NOT passive species identity like the
+    // weather/turn/summon form changes below. It must gate like any other innate:
+    // a LOCKED Battle Bond innate does NOTHING on a KO (no form change AND no stat
+    // boost) until the slot is unlocked - whereas before, because the ability
+    // *carries* form-change-driver attrs, the whole ability (incl. the stat boost)
+    // bypassed the unlock gate (the "Battle Bond procced/boosted while locked" bug).
+    // When the slot IS unlocked, the form (when a path exists) or the boost fires
+    // normally. Excluded explicitly here, the inverse of the STANCE_CHANGE case.
+    if (ability.id === AbilityId.BATTLE_BOND) {
+      return false;
+    }
     // ER relocates Stance Change into an INNATE slot (Aegislash #480). Unlike the
     // weather/turn form abilities above, Stance Change is a gate-only MARKER with
     // no form-change AbAttr — the actual swap lives in the form-change table keyed
@@ -2969,6 +2981,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // Form-change-driving innates (Forecast/Hunger Switch/Flower Gift/… relocated
     // by ER into an innate slot) are species identity and must never be gated
     // behind the candy passive unlock — see {@linkcode abilityDrivesFormChange}.
+    // (Battle Bond is deliberately EXCLUDED from that exemption — it is a power
+    // spike, not passive identity, so a locked Battle Bond innate does nothing.)
     const drivesFormChange = passive && this.abilityDrivesFormChange(ability);
     // ER Black Shinies (#349): the GIFT slot (>= 3) is exempt from hasPassive
     // and from candy unlock gates — it is always live (suppression below still

@@ -4502,6 +4502,31 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Locked Battle Bond does nothing",
+    description:
+      "Battle Bond gating fix. Reported: a LOCKED Battle Bond innate still fired on\n"
+      + "a KO - it form-changed / applied its Atk+SpA+Spe stat boost even though the\n"
+      + "innate wasn't unlocked (e.g. Lv8, no candy, non-Youngster). Cause: Battle\n"
+      + "Bond carries form-change-driver attrs, and the 'form-change innates are never\n"
+      + "gated' exemption was per-ABILITY, so the whole ability (boost included)\n"
+      + "bypassed the unlock lock. Fix: Battle Bond is treated as a power spike, NOT\n"
+      + "passive identity (unlike Forecast/Stance Change), so it gates like any innate.\n"
+      + "CHECK (Elite/Hell, where innate slots are candy-locked): a mon with Battle\n"
+      + "Bond in a LOCKED innate slot KOs a foe -> NOTHING happens (no form change, no\n"
+      + "stat boost). Once the slot is unlocked (candy / Innate Shrine), the form (if a\n"
+      + "path exists) or the boost fires normally. Battle Bond as a mon's MAIN ability\n"
+      + "is unaffected (only innate-slot Battle Bond is gated).",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("elite");
+      return [
+        makeStarter(SpeciesId.GRENINJA, {
+          moveset: [MoveId.WATER_SHURIKEN, MoveId.DARK_PULSE, MoveId.ICE_BEAM, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "Restraining Order force-out (#452)",
     description:
       "#452 - Restraining Order (Gooschase sig, ER ability 690) + Chuckster\n"
