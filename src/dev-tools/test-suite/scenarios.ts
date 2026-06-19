@@ -4527,6 +4527,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Granted ability sticks on a Mega",
+    description:
+      "Ability-grant on mega fix. Reported: the Clowning Around ME granted Drought,\n"
+      + "but adding it to a Mega Chandelure did nothing - the mega kept its native\n"
+      + "ability (Oblivious). Cause: the grant wrote customPokemonData.ability but not\n"
+      + "abilityOverridesForm, and mega/G-max forms DERIVE their ability from the form\n"
+      + "data, shadowing the grant. Fix: applyAbilityOverrideToPokemon now sets\n"
+      + "abilityOverridesForm when the mon uses form-derived abilities (mirrors the\n"
+      + "Ability Randomizer). CHECK: run Clowning Around, grant an ability to a mon,\n"
+      + "then mega it (or grant it to an already-mega'd mon) - the GRANTED ability must\n"
+      + "show on the summary and actually work in battle, not the mega's default.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.CHANDELURE, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.FLAMETHROWER, MoveId.ENERGY_BALL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "Restraining Order force-out (#452)",
     description:
       "#452 - Restraining Order (Gooschase sig, ER ability 690) + Chuckster\n"

@@ -1048,4 +1048,13 @@ export function applyAbilityOverrideToPokemon(pokemon: Pokemon, ability: Ability
   } else {
     pokemon.customPokemonData.ability = ability;
   }
+  // Mega / G-max forms DERIVE their ability from the form's species data, which
+  // otherwise SHADOWS this grant - so granting e.g. Clowning Around's Drought to a
+  // Mega Chandelure showed the mega's native ability instead of the grant. Mark the
+  // override form-applicable so it actually takes effect (mirrors the Ability
+  // Randomizer). The flag lives on the MAIN customPokemonData because
+  // customAbilityOverridesApply() reads it there, even for a fusion.
+  if (pokemon.usesFormDerivedAbilities()) {
+    pokemon.customPokemonData.abilityOverridesForm = true;
+  }
 }
