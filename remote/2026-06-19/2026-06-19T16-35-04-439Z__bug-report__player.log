@@ -1,0 +1,274 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     3  wave:38  difficulty:ace
+seed:     OIUEmQyO48yOKG6UM6qam8iQ
+party:    Hitmonlee(L55 170/170), Escarginite(L58 52/183), Grotom(L55 0/154), Clawtificer(L57 89/178), Pentadug Alolan(L58 193/193), Barbaracle(L53 111/146)
+
+----- DESCRIPTION -----
+Blast Burn made me rest a turn instead of letting me choose a different move
+
+----- CONSOLE -----
+[16:33:46.348] LOG: Move: Head Smash | Attack damage: 118
+[16:33:46.351] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:33:46.380] LOG: %cStart Phase MessagePhase color:green;
+[16:33:46.894] LOG: %cStart Phase FaintPhase color:green;
+[16:33:46.897] WARN: cry/10689 not found
+[16:33:47.032] LOG: %cStart Phase MessagePhase color:green;
+[16:33:47.491] LOG: %cStart Phase MoveEndPhase color:green;
+[16:33:47.492] LOG: %cStart Phase MovePhase color:green;
+[16:33:47.492] LOG: %cUser: Crabominable
+Move: CRABHAMMER
+Use Mode: NORMAL color:orchid
+[16:33:47.501] LOG: %cStart Phase MessagePhase color:green;
+[16:33:47.811] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:33:48.145] LOG: crit stage: +1
+[16:33:48.147] LOG: Move: Crabhammer | Base damage: 88.944 | Power: 130 | Source attack: 228 | Target defense: 150
+[16:33:48.148] LOG: Move: Crabhammer | Attack damage: 107
+[16:33:48.149] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:33:48.546] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:33:48.613] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:33:48.647] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:33:48.995] LOG: crit stage: +1
+[16:33:48.997] LOG: Move: Crabhammer | Base damage: 88.944 | Power: 130 | Source attack: 228 | Target defense: 150
+[16:33:48.998] LOG: Move: Crabhammer | Attack damage: 24
+[16:33:48.999] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:33:49.030] LOG: %cStart Phase MessagePhase color:green;
+[16:33:49.544] LOG: %cStart Phase MessagePhase color:green;
+[16:33:50.027] LOG: %cStart Phase MoveEndPhase color:green;
+[16:33:50.028] LOG: %cStart Phase MovePhase color:green;
+[16:33:50.028] LOG: %cUser: Escarginite
+Move: BLAST_BURN
+Use Mode: NORMAL color:orchid
+[16:33:50.034] LOG: %cStart Phase MessagePhase color:green;
+[16:33:50.327] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:33:51.980] LOG: crit stage: +0
+[16:33:51.983] LOG: Move: Blast Burn | Base damage: 135.02692307692308 | Power: 225 | Source attack: 122 | Target defense: 104
+[16:33:51.984] LOG: Move: Blast Burn | Attack damage: 565
+[16:33:51.986] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:33:52.014] LOG: %cStart Phase MessagePhase color:green;
+[16:33:52.493] LOG: %cStart Phase MessagePhase color:green;
+[16:33:53.010] LOG: %cStart Phase FaintPhase color:green;
+[16:33:54.563] LOG: %cStart Phase MessagePhase color:green;
+[16:33:55.399] LOG: %cStart Phase VictoryPhase color:green;
+[16:33:55.400] LOG: %cStart Phase ExpPhase color:green;
+[16:33:55.400] LOG: Applied Golden EXP. Charm 
+[16:33:55.400] LOG: Applied EXP. Charm 
+[16:33:55.795] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:33:55.796] LOG: Applied Golden EXP. Charm 
+[16:33:55.796] LOG: Applied EXP. Charm 
+[16:33:55.797] LOG: %cStart Phase LevelUpPhase color:green;
+[16:33:55.798] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:33:55.798] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:33:55.798] LOG: Applied Golden EXP. Charm 
+[16:33:55.798] LOG: Applied EXP. Charm 
+[16:33:55.799] LOG: %cStart Phase LevelUpPhase color:green;
+[16:33:55.799] LOG: Applied Carbos 
+[16:33:55.800] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:33:55.800] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:33:55.800] LOG: Applied Golden EXP. Charm 
+[16:33:55.800] LOG: Applied EXP. Charm 
+[16:33:55.801] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:33:55.801] LOG: %cStart Phase MoveEndPhase color:green;
+[16:33:55.801] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:33:55.801] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:33:55.947] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:33:55.947] LOG: %cStart Phase BerryPhase color:green;
+[16:33:55.948] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:33:55.949] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[16:33:56.127] LOG: %cStart Phase MessagePhase color:green;
+[16:33:56.726] LOG: %cStart Phase TurnEndPhase color:green;
+[16:33:56.730] LOG: %cStart Phase SwitchPhase color:green;
+[16:33:59.724] LOG: %cStart Phase SwitchSummonPhase color:green;
+[16:33:59.913] LOG: Applied Carbos 
+[16:33:59.913] LOG: Applied HP Up 
+[16:33:59.913] LOG: Applied Calcium 
+[16:33:59.914] LOG: Applied Carbos 
+[16:33:59.915] LOG: Applied Iron 
+[16:33:59.915] LOG: Applied Protein 
+[16:34:00.230] LOG: %cStart Phase PostSummonPhase color:green;
+[16:34:00.230] LOG: Ran PSP for: Barbaracle
+[16:34:00.231] LOG: Battle Seed: 4guQeIhr96ioQg6P
+[16:34:00.231] LOG: %cStart Phase PostSummonPhase color:green;
+[16:34:00.231] LOG: %cStart Phase PostSummonPhase color:green;
+[16:34:00.232] LOG: %cStart Phase TurnInitPhase color:green;
+[16:34:00.232] LOG: %cStart Phase CommandPhase color:green;
+[16:34:00.906] LOG: Move: WATERFALL Move targets: {"targets":[3,1],"multiple":false} 
+Player Pokemon: Barbaracle
+[16:34:00.908] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:34:01.152] LOG: %cStart Phase CommandPhase color:green;
+[16:34:01.153] LOG: Move: NONE Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Escarginite
+[16:34:01.154] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:34:01.183] LOG: Move Pool: ["Drain Punch","Superpower","Amnesia","Crabhammer"]
+[16:34:01.183] LOG: Move Scores: [63,72,6,228]
+[16:34:01.184] LOG: Sorted Move Pool: ["Crabhammer","Superpower","Drain Punch","Amnesia"]
+[16:34:01.184] LOG: Chosen Move: Crabhammer
+[16:34:01.184] LOG: %cStart Phase TurnStartPhase color:green;
+[16:34:01.189] LOG: %cStart Phase MovePhase color:green;
+[16:34:01.189] LOG: %cUser: Barbaracle
+Move: WATERFALL
+Use Mode: NORMAL color:orchid
+[16:34:01.194] LOG: %cStart Phase MessagePhase color:green;
+[16:34:01.443] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:34:02.127] LOG: crit stage: +0
+[16:34:02.131] LOG: Move: Waterfall | Base damage: 43.74066666666667 | Power: 110.5 | Source attack: 127 | Target defense: 156
+[16:34:02.132] LOG: Move: Waterfall | Attack damage: 65
+[16:34:02.133] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:34:02.163] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:34:02.562] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:34:03.014] LOG: %cStart Phase MessagePhase color:green;
+[16:34:03.576] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:34:03.628] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:34:04.326] LOG: crit stage: +0
+[16:34:04.329] LOG: Move: Waterfall | Base damage: 43.74066666666667 | Power: 110.5 | Source attack: 127 | Target defense: 156
+[16:34:04.330] LOG: Move: Waterfall | Attack damage: 11
+[16:34:04.331] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:34:04.362] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:34:04.762] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:34:05.214] LOG: %cStart Phase MessagePhase color:green;
+[16:34:05.775] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:34:05.828] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:34:06.543] LOG: crit stage: +0
+[16:34:06.546] LOG: Move: Waterfall | Base damage: 43.74066666666667 | Power: 110.5 | Source attack: 127 | Target defense: 156
+[16:34:06.547] LOG: Move: Waterfall | Attack damage: 8
+[16:34:06.549] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:34:06.578] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:34:06.978] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:34:07.431] LOG: %cStart Phase MessagePhase color:green;
+[16:34:07.992] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:34:08.044] LOG: %cStart Phase MessagePhase color:green;
+[16:34:08.525] LOG: %cStart Phase MoveEndPhase color:green;
+[16:34:08.526] LOG: %cStart Phase MovePhase color:green;
+[16:34:08.527] LOG: %cUser: Crabominable
+Move: CRABHAMMER
+Use Mode: NORMAL color:orchid
+[16:34:08.528] LOG: %cStart Phase MessagePhase color:green;
+[16:34:09.075] LOG: %cStart Phase MoveEndPhase color:green;
+[16:34:09.075] LOG: %cStart Phase MovePhase color:green;
+[16:34:09.076] LOG: %cUser: Escarginite
+Move: NONE
+Use Mode: NORMAL color:orchid
+[16:34:09.076] WARN: Escarginite is attempting to use 0
+[16:34:09.077] LOG: %cStart Phase MessagePhase color:green;
+[16:34:09.608] LOG: %cStart Phase MoveEndPhase color:green;
+[16:34:09.608] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:34:09.609] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:34:10.359] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:34:10.359] LOG: %cStart Phase BerryPhase color:green;
+[16:34:10.362] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:34:10.365] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[16:34:10.525] LOG: %cStart Phase MessagePhase color:green;
+[16:34:11.125] LOG: %cStart Phase FaintPhase color:green;
+[16:34:12.994] LOG: %cStart Phase MessagePhase color:green;
+[16:34:13.212] LOG: %cStart Phase VictoryPhase color:green;
+[16:34:13.213] LOG: %cStart Phase ExpPhase color:green;
+[16:34:13.213] LOG: Applied Golden EXP. Charm 
+[16:34:13.214] LOG: Applied EXP. Charm 
+[16:34:13.543] LOG: %cStart Phase ExpPhase color:green;
+[16:34:13.543] LOG: Applied Golden EXP. Charm 
+[16:34:13.544] LOG: Applied EXP. Charm 
+[16:34:13.843] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:34:13.843] LOG: Applied Golden EXP. Charm 
+[16:34:13.844] LOG: Applied EXP. Charm 
+[16:34:13.844] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:34:13.844] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:34:13.845] LOG: Applied Golden EXP. Charm 
+[16:34:13.845] LOG: Applied EXP. Charm 
+[16:34:13.845] LOG: %cStart Phase LevelUpPhase color:green;
+[16:34:13.846] LOG: Applied Iron 
+[16:34:13.846] LOG: Applied Protein 
+[16:34:13.847] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:34:13.847] LOG: %cStart Phase TurnEndPhase color:green;
+[16:34:13.849] LOG: %cStart Phase BattleEndPhase color:green;
+[16:34:13.849] LOG: Battle Score: 238 (2 Turns x0.84)
+[16:34:13.850] LOG: Total Score: 4580
+[16:34:13.866] LOG: Applied Carbos 
+[16:34:13.867] LOG: Applied HP Up 
+[16:34:13.867] LOG: Applied Calcium 
+[16:34:13.868] LOG: Applied Carbos 
+[16:34:13.869] LOG: Applied Iron 
+[16:34:13.869] LOG: Applied Protein 
+[16:34:13.872] LOG: %cStart Phase EggLapsePhase color:green;
+[16:34:13.873] LOG: %cStart Phase SelectModifierPhase color:green;
+[16:34:13.873] LOG: Wave Seed: tnzjvtY]tpl[zr[]v 37
+[16:34:13.880] LOG: Applied Golden Poké Ball 
+[16:34:13.881] LOG: 3 0 [4,5]
+[16:34:13.881] LOG: {"id":"SUPER_POTION","localeKey":"modifierType:ModifierType.SUPER_POTION","iconImage":"super_potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":50,"restorePercent":25,"healStatus":false} 
+[16:34:13.881] LOG: 2 0 [4,5]
+[16:34:13.881] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[16:34:13.881] LOG: 0 0 [4,5]
+[16:34:13.881] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[16:34:13.881] LOG: 7 2 [4,5]
+[16:34:13.881] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_def","soundName":"se/restore","tier":0,"stat":4,"nameKey":"x_sp_def","quantityKey":"percentage"} 
+[16:34:13.881] LOG: 6 2 [4,5]
+[16:34:13.881] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[16:34:13.881] LOG: 2 0 [4,5]
+[16:34:13.882] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[16:34:13.882] LOG: 0 0 [4,5]
+[16:34:13.882] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[16:34:13.882] LOG: 8 2 [4,5]
+[16:34:13.882] LOG: {"id":"BERRY","localeKey":"","iconImage":"lansat_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":8} 
+[16:34:18.057] LOG: %cStart Phase SelectModifierPhase color:green;
+[16:34:18.069] LOG: Applied Golden Poké Ball 
+[16:34:18.069] LOG: 1 0 [4,5]
+[16:34:18.069] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[16:34:18.070] LOG: 3 1 [2,5,8,9,10,16,23,24]
+[16:34:18.070] LOG: {"id":"REVIVE","localeKey":"modifierType:ModifierType.REVIVE","iconImage":"revive","group":"revive","soundName":"se/restore","tier":1,"restorePoints":0,"restorePercent":50,"healStatus":false} 
+[16:34:18.070] LOG: 9 2 [4,5]
+[16:34:18.070] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_normal","group":"tm","soundName":"se/restore","tier":0,"moveId":213} 
+[16:34:18.071] LOG: 6 0 [9,11,12,13,15]
+[16:34:18.071] LOG: ULTRA 1
+[16:34:18.071] LOG: 6 0 [9,11,12,13,15]
+[16:34:18.071] LOG: ULTRA 1
+[16:34:18.071] LOG: 5 0 [9,11,12,13,15]
+[16:34:18.071] LOG: {"id":"SPEED_ORDER","localeKey":"","iconImage":"scanner","soundName":"se/restore","tier":2} 
+[16:34:18.071] LOG: 27 5 [9,11,12,13,15]
+[16:34:18.071] LOG: {"id":"WIDE_LENS","localeKey":"modifierType:ModifierType.WIDE_LENS","iconImage":"wide_lens","soundName":"se/restore","tier":2,"amount":5} 
+[16:34:18.072] LOG: 27 5 [9,11,12,13,15]
+[16:34:18.072] LOG: {"id":"WIDE_LENS","localeKey":"modifierType:ModifierType.WIDE_LENS","iconImage":"wide_lens","soundName":"se/restore","tier":2,"amount":5} 
+[16:34:18.072] LOG: 10 1 [9,11,12,13,15]
+[16:34:18.072] LOG: ULTRA 1
+[16:34:18.073] LOG: 2 0 [9,11,12,13,15]
+[16:34:18.073] LOG: {"id":"BIG_NUGGET","localeKey":"modifierType:ModifierType.BIG_NUGGET","iconImage":"big_nugget","group":"money","soundName":"se/buy","tier":2,"moneyMultiplier":2.5,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.moderate"} 
+[16:34:18.074] LOG: 3 1 [2,5,8,9,10,16,23,24]
+[16:34:18.074] LOG: {"id":"REVIVE","localeKey":"modifierType:ModifierType.REVIVE","iconImage":"revive","group":"revive","soundName":"se/restore","tier":1,"restorePoints":0,"restorePercent":50,"healStatus":false} 
+[16:34:18.074] LOG: 12 5 [2,5,8,9,10,16,23,24]
+[16:34:18.074] LOG: {"id":"SUPER_LURE","localeKey":"modifierType:ModifierType.SUPER_LURE","iconImage":"super_lure","group":"lure","soundName":"se/restore","tier":1,"maxBattles":15} 
+[16:34:21.645] LOG: %cStart Phase NewBattlePhase color:green;
+[16:34:21.645] LOG: Wave Seed: uo{kwuZ^uqm\{s\^w 38
+[16:34:21.647] LOG: %cStart Phase NextEncounterPhase color:green;
+[16:34:21.649] LOG: Starting species pool tier: COMMON
+[16:34:21.650] LOG: Replaced SWINUB with PILOSWINE
+[16:34:21.650] LOG: Applied Ability Charm 
+[16:34:21.653] LOG: Applied Shiny Charm 
+[16:34:21.674] LOG: Pokemon: Wild Piloswine | Species ID: 221 | Level: 49 | Nature: Brave (+Atk/-Spd)
+[16:34:21.674] LOG: Stats (IVs): HP: 164 (15), Atk: 120 (14), Def: 85 (5), Spatk: 69 (11), Spdef: 67 (8), Spd: 59 (25)
+[16:34:21.674] LOG: Ability: Mountaineer | Passive Ability: Thick Fat 
+[16:34:21.674] LOG: Moveset: ["Avalanche","Body Slam","Defense Curl","Chip Away"]
+[16:34:21.870] LOG: Battle Seed: NvqsF0HQaVPMStyj
+[16:34:21.928] DEBUG: Session data saved to slot 1!
+[16:34:21.928] LOG: Wave Seed: uo{kwuZ^uqm\{s\^w 38
+[16:34:22.977] LOG: %cStart Phase ReturnPhase color:green;
+[16:34:23.257] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[16:34:23.393] LOG: %cStart Phase CheckSwitchPhase color:green;
+[16:34:23.639] LOG: %cStart Phase SwitchPhase color:green;
+[16:34:29.405] LOG: %cStart Phase SwitchSummonPhase color:green;
+[16:34:29.875] LOG: Applied Iron 
+[16:34:29.875] LOG: Applied Protein 
+[16:34:29.877] LOG: Applied Carbos 
+[16:34:29.877] LOG: Applied HP Up 
+[16:34:29.877] LOG: Applied Calcium 
+[16:34:29.878] LOG: Applied Carbos 
+[16:34:30.242] LOG: %cStart Phase PostSummonPhase color:green;
+[16:34:30.242] LOG: Ran PSP for: Hitmonlee
+[16:34:30.243] LOG: %cStart Phase PostSummonPhase color:green;
+[16:34:30.243] LOG: %cStart Phase PostSummonPhase color:green;
+[16:34:30.243] LOG: %cStart Phase InitEncounterPhase color:green;
+[16:34:30.243] LOG: %cStart Phase PostSummonPhase color:green;
+[16:34:30.243] LOG: Ran PSP for: Piloswine
+[16:34:30.244] LOG: %cStart Phase PostSummonPhase color:green;
+[16:34:30.244] LOG: %cStart Phase PostSummonPhase color:green;
+[16:34:30.244] LOG: %cStart Phase TurnInitPhase color:green;
+[16:34:30.244] LOG: %cStart Phase CommandPhase color:green;
