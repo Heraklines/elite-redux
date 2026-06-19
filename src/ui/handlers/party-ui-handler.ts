@@ -362,6 +362,14 @@ export class PartyUiHandler extends MessageUiHandler {
     ui.add(this.moveInfoOverlay);
 
     this.fusionPreviewPanel.setup();
+    // ER (#562): the panel's on-screen Fuse / Switch / Back buttons (mobile touch).
+    this.fusionPreviewPanel.setActions(
+      () => this.confirmFusionPreview(),
+      () => {
+        this.switchFusionOrder();
+      },
+      () => this.cancelFusionPreview(),
+    );
 
     this.options = [];
 
@@ -1090,18 +1098,12 @@ export class PartyUiHandler extends MessageUiHandler {
   private processPartyActionInput(): boolean {
     const ui = this.getUi();
 
-    // ER (#560): with the fusion preview up, A fuses the SHOWN combo directly
-    // (base = transferCursor, partner = cursor). No options menu on the 2nd pick.
+    // ER (#560): with the fusion preview up, A fuses the SHOWN combo directly.
     if (this.fusionPreviewActive) {
-      if (this.cursor < 6 && this.cursor !== this.transferCursor && this.selectCallback) {
-        (this.selectCallback as PartyModifierSpliceSelectCallback)(this.transferCursor, this.cursor);
-        this.clearTransfer();
-        ui.playSelect();
-      } else if (this.cursor === 6) {
+      if (this.cursor === 6) {
         return this.processPartyCancelInput(); // A on Cancel backs out the base lock
-      } else {
-        ui.playError();
       }
+      this.confirmFusionPreview();
       return true;
     }
 
@@ -1848,6 +1850,31 @@ export class PartyUiHandler extends MessageUiHandler {
     } else {
       this.fusionPreviewPanel.showPlaceholder();
     }
+  }
+
+  /** ER (#560/#562): fuse the SHOWN combo (base = transferCursor, partner = cursor).
+   * Shared by the A button and the panel's on-screen Fuse button. */
+  private confirmFusionPreview(): void {
+    if (!this.fusionPreviewActive) {
+      return;
+    }
+    const ui = this.getUi();
+    if (this.cursor < 6 && this.cursor !== this.transferCursor && this.selectCallback) {
+      (this.selectCallback as PartyModifierSpliceSelectCallback)(this.transferCursor, this.cursor);
+      this.clearTransfer();
+      ui.playSelect();
+    } else {
+      ui.playError();
+    }
+  }
+
+  /** ER (#562): the panel's on-screen Back button - release the base lock (= B). */
+  private cancelFusionPreview(): void {
+    if (!this.fusionPreviewActive) {
+      return;
+    }
+    this.clearTransfer();
+    this.getUi().playSelect();
   }
 
   /**

@@ -21,23 +21,28 @@ const RIGHT_MARGIN = 2;
 const TOP_MARGIN = 3;
 
 const SPRITE_X = 40;
-const SPRITE_Y = 37;
-const SPRITE_SCALE = 0.5;
+const SPRITE_Y = 34;
+const SPRITE_SCALE = 0.48;
 
 const INFO_X = 78; // name/types column, right of the sprite
-const NAME_Y = 28;
-const TYPES_Y = 44;
+const NAME_Y = 22;
+const TYPES_Y = 36;
 
-const STATS_HEADER_Y = 63;
+const STATS_HEADER_Y = 58;
 const STATS_X0 = 10; // HP / Atk / Def column
 const STATS_X1 = 84; // SpA / SpD / Spe column
-const STATS_Y = 75;
+const STATS_Y = 69;
 const STATS_ROW_H = 11;
 const STATS_VALUE_DX = 64;
 
-const ABIL_LABEL_Y = 111;
-const ABIL_Y = 122;
-const ABIL_ROW_H = 11;
+const ABIL_LABEL_Y = 104;
+const ABIL_Y = 114;
+const ABIL_ROW_H = 10;
+
+// Bottom row of tappable controls (Fuse / Switch / Back) - the on-screen buttons
+// that make the whole preview operable by touch on mobile.
+const BTN_Y = 163;
+const BTN_X = [30, 78, 126] as const;
 
 /** A cached blended-sprite render for one partner (keyed by partner id). */
 interface SpriteCacheEntry {
@@ -63,7 +68,10 @@ interface SpriteCacheEntry {
 export class FusionPreviewPanel {
   private container: Phaser.GameObjects.Container;
   private titleText: Phaser.GameObjects.Text;
-  private switchHint: Phaser.GameObjects.Text;
+  /** Tappable bottom-row control callbacks (the on-screen buttons for mobile). */
+  private onConfirm: (() => void) | null = null;
+  private onSwitch: (() => void) | null = null;
+  private onCancel: (() => void) | null = null;
   private sprite: Phaser.GameObjects.Sprite;
   private nameText: Phaser.GameObjects.Text;
   private typesText: Phaser.GameObjects.Text;
@@ -94,9 +102,7 @@ export class FusionPreviewPanel {
     this.container.add(addWindow(0, 0, PANEL_W, PANEL_H));
 
     this.titleText = addTextObject(6, 4, i18next.t("partyUiHandler:fusionPreviewTitle"), TextStyle.WINDOW_ALT);
-    this.switchHint = addTextObject(PANEL_W - 6, 4, i18next.t("partyUiHandler:fusionPreviewSwitch"), TextStyle.WINDOW);
-    this.switchHint.setOrigin(1, 0);
-    this.container.add([this.titleText, this.switchHint]);
+    this.container.add(this.titleText);
 
     this.sprite = globalScene.initPokemonSprite(
       globalScene.add.sprite(SPRITE_X, SPRITE_Y, "pkmn__sub"),
@@ -162,7 +168,32 @@ export class FusionPreviewPanel {
     this.placeholderText.setVisible(false);
     this.container.add(this.placeholderText);
 
+    // Bottom row: tappable Fuse / Switch / Back. These are the on-screen buttons
+    // that make the preview fully operable by touch on mobile (where there is no
+    // R / C key); on keyboard/controller A, R and B still work too.
+    this.makeButton(BTN_X[0], "partyUiHandler:fusionPreviewFuse", () => this.onConfirm?.());
+    this.makeButton(BTN_X[1], "partyUiHandler:fusionPreviewSwitch", () => this.onSwitch?.());
+    this.makeButton(BTN_X[2], "partyUiHandler:fusionPreviewBack", () => this.onCancel?.());
+
     this.built = true;
+  }
+
+  /** Build one tappable bottom-row button (a text label with a touch hit area). */
+  private makeButton(x: number, i18nKey: string, onTap: () => void): Phaser.GameObjects.Text {
+    const t = addTextObject(x, BTN_Y, i18next.t(i18nKey), TextStyle.WINDOW).setOrigin(0.5, 0.5);
+    // Auto hit area = the text bounds (origin-aware); at 6x render it is a fine
+    // tap target. on pointerup so a tap, not a drag, fires the action.
+    t.setInteractive({ useHandCursor: true });
+    t.on("pointerup", onTap);
+    this.container.add(t);
+    return t;
+  }
+
+  /** Wire the three button actions (called once by the party handler). */
+  setActions(onConfirm: () => void, onSwitch: () => void, onCancel: () => void): void {
+    this.onConfirm = onConfirm;
+    this.onSwitch = onSwitch;
+    this.onCancel = onCancel;
   }
 
   isBuilt(): boolean {
