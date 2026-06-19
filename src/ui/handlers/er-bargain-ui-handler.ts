@@ -91,11 +91,12 @@ export class ErBargainUiHandler extends UiHandler {
     this.giratina.setVisible(false);
     this.container.add(this.giratina);
 
-    // Small PMD talking-head portrait in a framed box, top-left, over the sprite.
-    this.portraitWindow = addWindow(6, 14, 56, 56);
+    // Small PMD talking-head portrait in a framed box, bottom-left, sitting just
+    // above the dialogue box (the "speaker" headshot).
+    this.portraitWindow = addWindow(6, h - 104, 52, 52);
     this.container.add(this.portraitWindow);
-    this.portrait = globalScene.add.sprite(34, 42, "er_bargain_giratina");
-    this.portrait.setOrigin(0.5, 0.5).setScale(0.3); // 160 * 0.3 ~= 48px, fits the box
+    this.portrait = globalScene.add.sprite(32, h - 78, "er_bargain_giratina");
+    this.portrait.setOrigin(0.5, 0.5).setScale(0.28); // ~45px, fits the box
     this.container.add(this.portrait);
 
     this.titleText = addTextObject(w / 2, 3, "GIRATINA'S BARGAIN", TextStyle.WINDOW, { fontSize: "70px" });

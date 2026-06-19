@@ -84,9 +84,11 @@ export class TheBargainPhase extends Phase {
       return;
     }
     this.resolving = true;
+    this.trace(`onChoice index=${index}`);
     // Hand the UI back to MESSAGE (this tears down the bargain screen) before any
     // dialogue / party-select / reward flow.
     await globalScene.ui.setMode(UiMode.MESSAGE);
+    this.trace("onChoice: MESSAGE mode set");
 
     // Leave: CANCEL (index < 0) or the Leave row (index === sins.length).
     if (index < 0 || index >= sins.length) {
@@ -104,7 +106,9 @@ export class TheBargainPhase extends Phase {
   /** Run one Sin's offer line, party pick(s), cost+payoff, then the result line. */
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: a 7-Sin dispatch switch; each case is a small self-contained deal, clearer kept inline than split across seven helpers
   private async applySin(key: BargainSinKey): Promise<void> {
+    this.trace(`applySin ${key}: show offer`);
     await this.giratina(`${ns}:sins.${key}.offer`);
+    this.trace(`applySin ${key}: offer dismissed`);
     let pokeName = "";
 
     switch (key) {
@@ -200,26 +204,41 @@ export class TheBargainPhase extends Phase {
     }
 
     globalScene.currentBattle.mysteryEncounter?.setDialogueToken("pokeName", pokeName);
+    this.trace(`applySin ${key}: show result`);
     await this.narrate(`${ns}:sins.${key}.result`, { pokeName });
+    this.trace(`applySin ${key}: result dismissed`);
   }
 
   // --- UI helpers ---
 
-  /** Open the party menu; resolves to the chosen mon, or null if backed out. */
+  /**
+   * Open the party menu; resolves to the chosen mon, or null if backed out.
+   * Mirrors the ME framework's selectPokemonForOption: capture the mode to return
+   * to, AWAIT the restore inside the callback before resolving (a non-awaited
+   * restore raced the next setMode and softlocked the deal flow, #550).
+   */
   private pickPokemon(filter?: (p: PlayerPokemon) => string | null): Promise<PlayerPokemon | null> {
     return new Promise(resolve => {
+      const exitMode = globalScene.ui.getMode();
+      this.trace("pickPokemon: open PARTY");
       globalScene.ui.setMode(
         UiMode.PARTY,
         PartyUiMode.SELECT,
         -1,
-        (slotIndex: number) => {
-          globalScene.ui.setMode(UiMode.MESSAGE);
+        async (slotIndex: number) => {
+          this.trace(`pickPokemon: slot=${slotIndex}`);
+          await globalScene.ui.setMode(exitMode);
           const party = globalScene.getPlayerParty();
           resolve(slotIndex >= 0 && slotIndex < party.length ? party[slotIndex] : null);
         },
         filter,
       );
     });
+  }
+
+  // biome-ignore lint/suspicious/noConsole: temporary #550 softlock breadcrumb (removed once verified)
+  private trace(step: string): void {
+    console.log(`[bargain] ${step}`);
   }
 
   private pickStat(): Promise<Stat | null> {
