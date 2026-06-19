@@ -1,0 +1,99 @@
+scenario: ER Abyss: Seven Sins / The Bargain (#544)
+url:      https://elite-redux-staging.pages.dev/
+build:    mql1grro-gkj1
+mode:     0  wave:10
+seed:     f8vkrLunMZ6RQMc09FeEIijz
+party:    Garchomp(L30 114hp f0), Snorlax(L30 145hp f0), Gengar(L30 85hp f0), Pikachu(L30 70hp f0), Eevee(L30 82hp f0)
+enemy:    Zorua(L8)
+
+----- COMMENT -----
+trying to take the cursed idol butthen it softlocks after the dialogue.
+
+----- CONSOLE -----
+[14:44:49.332] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[14:44:49.699] WARN: [er-b1c] 1 mega-form injection issues: ["ER mega target 1850 has no primary type"]
+[14:44:49.866] LOG: [ER] build mql1grro-gkj1
+[14:44:49.913] LOG: [dev-tools] loaded — 218 scenarios + Send Logs button
+[14:48:07.996] DEBUG: Destroying loading scene
+[14:48:07.996] DEBUG: Destroyed loading scene
+[14:48:08.116] LOG: Seed: f8vkrLunMZ6RQMc09FeEIijz
+[14:48:08.116] LOG: Wave Seed: f8vkrLunMZ6RQMc09FeEIijz 0
+[14:48:12.590] LOG: %cStart Phase LoginPhase color:green;
+[14:48:12.882] LOG: Client Session: RduxHL54qtxY6KbeYALvZv6TbuK8RsXb
+[14:48:13.448] DEBUG: Using cached system data
+[14:48:13.523] LOG: %cStart Phase TitlePhase color:green;
+[14:48:13.524] LOG: Getting Session Slot id: %d 4
+[14:48:13.549] LOG: use seasonal splash messages true
+[14:48:13.549] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[14:48:21.047] LOG: %cStart Phase SelectStarterPhase color:green;
+[14:48:22.958] LOG: Wave Seed: pBu|VxWd@\[Wm:CPoOSst 10
+[14:48:22.960] LOG: %cStart Phase EncounterPhase color:green;
+[14:48:22.966] LOG: Starting species pool tier: BOSS
+[14:48:22.967] LOG: Replaced ZOROARK with ZORUA
+[14:48:22.992] LOG: Pokemon: Wild Zorua | Species ID: 570 | Level: 8 | Nature: Hardy (-)
+[14:48:22.992] LOG: Stats (IVs): HP: 24 (23), Atk: 18 (21), Def: 12 (13), Spatk: 17 (21), Spdef: 11 (14), Spd: 15 (11)
+[14:48:22.993] LOG: Ability: Ill Will | Passive Ability: Illusion (N) | Boss Bars: 2
+[14:48:22.993] LOG: Moveset: ["Night Daze","Fake Tears","Fury Swipes"]
+[14:48:23.461] LOG: Battle Seed: Mxtx4gpvliqbkAwv
+[14:48:23.525] DEBUG: Session data saved to slot 4!
+[14:48:23.526] LOG: Wave Seed: pBu|VxWd@\[Wm:CPoOSst 10
+[14:48:23.949] LOG: %cStart Phase SummonPhase color:green;
+[14:48:24.265] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:48:24.365] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:48:24.366] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:48:24.985] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:48:24.987] LOG: %cStart Phase PostSummonPhase color:green;
+[14:48:24.987] LOG: Ran PSP for: Garchomp
+[14:48:24.990] LOG: %cStart Phase PostSummonPhase color:green;
+[14:48:24.991] LOG: %cStart Phase PostSummonPhase color:green;
+[14:48:24.991] LOG: %cStart Phase PostSummonPhase color:green;
+[14:48:24.992] LOG: Ran PSP for: Zorua
+[14:48:24.992] LOG: %cStart Phase PostSummonPhase color:green;
+[14:48:24.992] LOG: %cStart Phase PostSummonPhase color:green;
+[14:48:24.992] LOG: %cStart Phase TurnInitPhase color:green;
+[14:48:24.992] LOG: %cStart Phase CommandPhase color:green;
+[14:48:25.774] LOG: Move: DRAGON_CLAW Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Garchomp
+[14:48:25.776] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:48:25.785] LOG: Move Pool: ["Night Daze","Fake Tears","Fury Swipes"]
+[14:48:25.786] LOG: Move Scores: [15,6,23]
+[14:48:25.786] LOG: Sorted Move Pool: ["Fury Swipes","Night Daze","Fake Tears"]
+[14:48:25.786] LOG: Chosen Move: Fury Swipes
+[14:48:25.786] LOG: %cStart Phase TurnStartPhase color:green;
+[14:48:25.788] LOG: %cStart Phase MovePhase color:green;
+[14:48:25.788] LOG: %cUser: Garchomp
+Move: DRAGON_CLAW
+Use Mode: NORMAL color:orchid
+[14:48:25.790] LOG: %cStart Phase MessagePhase color:green;
+[14:48:25.897] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:48:26.250] LOG: crit stage: +1
+[14:48:26.251] LOG: Move: Dragon Claw | Base damage: 173.73333333333332 | Power: 80 | Source attack: 92 | Target defense: 12
+[14:48:26.252] LOG: Move: Dragon Claw | Attack damage: 239
+[14:48:26.265] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:48:26.399] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:48:26.449] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:48:26.483] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:48:26.484] LOG: %cStart Phase MessagePhase color:green;
+[14:48:26.697] LOG: %cStart Phase FaintPhase color:green;
+[14:48:26.766] LOG: %cStart Phase MessagePhase color:green;
+[14:48:27.013] LOG: %cStart Phase VictoryPhase color:green;
+[14:48:27.015] LOG: %cStart Phase MoveEndPhase color:green;
+[14:48:27.015] LOG: %cStart Phase MovePhase color:green;
+[14:48:27.016] LOG: %cStart Phase MoveEndPhase color:green;
+[14:48:27.016] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:48:27.016] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:48:27.016] LOG: %cStart Phase TurnEndPhase color:green;
+[14:48:27.016] LOG: %cStart Phase BattleEndPhase color:green;
+[14:48:27.017] LOG: Battle Score: 77 (1 Turns x1)
+[14:48:27.017] LOG: Total Score: 77
+[14:48:27.025] LOG: %cStart Phase EggLapsePhase color:green;
+[14:48:27.025] LOG: %cStart Phase ModifierRewardPhase color:green;
+[14:48:27.354] LOG: %cStart Phase ModifierRewardPhase color:green;
+[14:48:27.699] LOG: %cStart Phase TheBargainPhase color:green;
+[14:49:23.861] LOG: [bargain] onChoice index=1
+[14:49:23.863] LOG: [bargain] onChoice: MESSAGE mode set
+[14:49:23.864] LOG: [bargain] applySin envy: show offer
+[14:49:24.538] LOG: [bargain] applySin envy: offer dismissed
+[14:49:24.539] LOG: [bargain] pickPokemon: open PARTY
+[14:49:34.635] LOG: [bargain] pickPokemon: slot=0
+[14:49:43.314] LOG: [bargain] applySin envy: show result
