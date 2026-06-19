@@ -93,9 +93,9 @@ export class ErBargainUiHandler extends UiHandler {
 
     // Small PMD talking-head portrait in a framed box, bottom-left, sitting just
     // above the dialogue box (the "speaker" headshot).
-    this.portraitWindow = addWindow(6, h - 104, 52, 52);
+    this.portraitWindow = addWindow(6, h - 98, 52, 52);
     this.container.add(this.portraitWindow);
-    this.portrait = globalScene.add.sprite(32, h - 78, "er_bargain_giratina");
+    this.portrait = globalScene.add.sprite(32, h - 72, "er_bargain_giratina");
     this.portrait.setOrigin(0.5, 0.5).setScale(0.28); // ~45px, fits the box
     this.container.add(this.portrait);
 

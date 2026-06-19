@@ -118,7 +118,7 @@ export class TheBargainPhase extends Phase {
           bargainWipeCandy(mon);
           const wave = globalScene.currentBattle?.waveIndex ?? 1;
           globalScene.addMoney(2000 + wave * 300);
-          globalScene.addModifier(modifierTypes.ER_GREATER_GOLDEN_BALL().newModifier(), false, true);
+          globalScene.phaseManager.unshiftNew("ModifierRewardPhase", modifierTypes.ER_GREATER_GOLDEN_BALL);
           pokeName = mon.getNameToRender();
         }
         break;
@@ -166,10 +166,7 @@ export class TheBargainPhase extends Phase {
           }
           globalScene.updateModifiers(true);
           const relic = await this.pickRelic();
-          const made = (relic ?? BARGAIN_RELIC_CHOICES[0].make)().newModifier();
-          if (made) {
-            globalScene.addModifier(made, false, true);
-          }
+          globalScene.phaseManager.unshiftNew("ModifierRewardPhase", relic ?? BARGAIN_RELIC_CHOICES[0].make);
         }
         break;
       }
@@ -181,7 +178,7 @@ export class TheBargainPhase extends Phase {
             bargainResetToLevelOne(mon);
             bargainWipeCandy(mon);
           }
-          globalScene.addModifier(modifierTypes.ER_RELIC_COVENANT().newModifier(), false, true);
+          globalScene.phaseManager.unshiftNew("ModifierRewardPhase", modifierTypes.ER_RELIC_COVENANT);
         }
         break;
       }
