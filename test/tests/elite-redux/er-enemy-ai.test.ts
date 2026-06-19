@@ -3,6 +3,7 @@ import {
   damageToScore,
   ER_EVAL,
   ER_KO_BONUS,
+  ER_UNUSABLE_MOVE_SCORE,
   type ErBoostStages,
   type ErDepth1Before,
   erBoostDiminishing,
@@ -383,6 +384,40 @@ describe("er-enemy-ai (experimental brain - Foul-Play depth-1 eval)", () => {
       });
       const doNothing = erDepth1MoveScore(benchy, { myDamage: 0, oppReplyDamage: 0, iMoveFirst: true });
       expect(rocks).toBeGreaterThan(doNothing);
+    });
+
+    it("a no-effect (0-damage) move ranks below a damaging one under a heavy hit", () => {
+      // The Rapidash bug: a move that does NOTHING (Ground vs a Flying target)
+      // must score BELOW one that connects (super-effective Wild Charge) so it is
+      // never chosen as the "least bad" option. Both take the same big (non-KO)
+      // hit, so the move executes and the damage difference decides the ranking.
+      const immune = erDepth1MoveScore(before, { myDamage: 0, oppReplyDamage: 60, iMoveFirst: false });
+      const superEffective = erDepth1MoveScore(before, { myDamage: 90, oppReplyDamage: 60, iMoveFirst: false });
+      expect(immune).toBeLessThan(superEffective);
+    });
+
+    it("the unusable-move sentinel sits far below any real depth-1 score", () => {
+      // A move that genuinely cannot be used (unimplemented / failing condition)
+      // is forced to ER_UNUSABLE_MOVE_SCORE. erEvalPosition is bounded by the
+      // ER_EVAL constants, so even the most catastrophic real position stays
+      // orders of magnitude above the sentinel - it can never out-sort a usable
+      // move, no matter how bad the board.
+      const catastrophic: ErDepth1Before = {
+        ...before,
+        myHp: 1,
+        oppReserveAlive: 5,
+        oppActive: {
+          fainted: false,
+          hpFraction: 1,
+          status: StatusEffect.NONE,
+          boosts: { atk: 6, def: 6, spa: 6, spd: 6, spe: 6 },
+        },
+        myHazards: { stealthRock: true, spikesLayers: 3, toxicSpikesLayers: 2, stickyWeb: true },
+        matchup: -10,
+      };
+      const worst = erDepth1MoveScore(catastrophic, { myDamage: 0, oppReplyDamage: 100, iMoveFirst: false });
+      expect(worst).toBeGreaterThan(-100_000); // real scores are bounded...
+      expect(ER_UNUSABLE_MOVE_SCORE).toBeLessThan(worst); // ...the sentinel is below them all.
     });
   });
 });

@@ -71,6 +71,7 @@ import {
   damageToScore,
   ER_HAZARD_MOVE_IDS,
   ER_SLOW_DOOMED_PENALTY,
+  ER_UNUSABLE_MOVE_SCORE,
   type ErBoostStages,
   type ErDepth1Before,
   type ErDepth1Move,
@@ -8346,8 +8347,28 @@ export class EnemyPokemon extends Pokemon {
 
               movePool.forEach((pokemonMove, moveIndex) => {
                 const move = pokemonMove.getMove();
+                // The vanilla pass flags two very different things with the same
+                // <= -20: a move that CANNOT be used (unimplemented, or its
+                // conditions fail this turn - e.g. Fake Out after turn 1), and a
+                // move that simply does NOTHING (immune / 0 effectiveness, e.g.
+                // Ground vs a Flying target). They must be ranked differently:
+                //   - unusable  -> forced below every real score (never picked).
+                //   - no-effect -> falls through and is scored on its true 0
+                //     damage, so it ranks HONESTLY below moves that connect.
+                // Leaving no-effect moves at the fixed -20 sentinel was a bug: in
+                // a losing position real moves' depth-1 scores drop below -20, so
+                // the immune move out-sorted them (Rapidash High Horsepower into a
+                // Flying target over a super-effective Wild Charge).
                 if (moveScores[moveIndex] <= -20) {
-                  return; // vanilla flagged this move unusable/failing.
+                  const unusable =
+                    move.name.endsWith(" (N)")
+                    || (!move.applyConditions(this, oppMon, -1)
+                      && ![MoveId.SUCKER_PUNCH, MoveId.UPPER_HAND, MoveId.THUNDERCLAP].includes(move.id));
+                  if (unusable) {
+                    moveScores[moveIndex] = ER_UNUSABLE_MOVE_SCORE;
+                    return;
+                  }
+                  // else: usable but no-effect - score it (getAttackDamage yields 0).
                 }
                 // Raw, accuracy-weighted damage my move deals to the lone opponent.
                 let myDamage = 0;

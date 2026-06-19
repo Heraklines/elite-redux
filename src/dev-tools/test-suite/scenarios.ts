@@ -2413,6 +2413,36 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Hell AI: no immune move into Flying",
+    description:
+      "Experimental (Foul-Play) AI must NOT pick a move that does NOTHING.\n"
+      + "Reported: a Hell Rapidash kept using HIGH HORSEPOWER (Ground) into a\n"
+      + "Flying target (0x immune) instead of its super-effective Wild Charge.\n"
+      + "Cause: a no-effect move was left at the fixed -20 sentinel, which\n"
+      + "out-sorted the real moves' (more-negative) depth-1 scores in a losing\n"
+      + "position. DO: this is a HELL BOSS Rapidash (confirm the console logs\n"
+      + "'ER AI: experimental brain'); let it attack your Togetic (Fairy/Flying)\n"
+      + "for a few turns. EXPECT: it uses WILD CHARGE (2x on Flying), Blaze Kick,\n"
+      + "or High Jump Kick - NEVER High Horsepower (check 'Chosen Move' in the\n"
+      + "console). Before the fix 'Chosen Move: High Horsepower' vs the Flying mon.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("hell");
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 10,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.RAPIDASH,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.BLAZE_KICK, MoveId.WILD_CHARGE, MoveId.HIGH_HORSEPOWER, MoveId.HIGH_JUMP_KICK],
+      });
+      return [
+        makeStarter(SpeciesId.TOGETIC, {
+          moveset: [MoveId.DAZZLING_GLEAM, MoveId.AIR_SLASH, MoveId.ANCIENT_POWER, MoveId.ROOST],
+        }),
+      ];
+    },
+  },
+  {
     label: "Fury Cutter/Echoed Voice x3",
     description:
       "#360 Fury Cutter + Echoed Voice — Triple Kick's effect.\n"

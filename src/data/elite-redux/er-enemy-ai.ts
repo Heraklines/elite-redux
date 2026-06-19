@@ -121,6 +121,18 @@ export const ER_DAMAGE_SCORE_SCALE = 75;
 export const ER_KO_BONUS = 1000;
 
 /**
+ * Score forced onto a move that genuinely CANNOT be used this turn (unimplemented,
+ * or its conditions fail - e.g. Fake Out after turn 1). It sits far below any
+ * {@linkcode erEvalPosition} output (whose magnitude is bounded by the ER_EVAL
+ * constants, a few thousand at most), so an unusable move can never out-sort a
+ * real one - even in a losing position where every real move's depth-1 score is
+ * deeply negative. A no-EFFECT-but-usable move (e.g. Ground vs a Flying target)
+ * is NOT given this; it flows through the scorer with its true 0 damage so it
+ * ranks honestly below moves that actually connect.
+ */
+export const ER_UNUSABLE_MOVE_SCORE = -1e6;
+
+/**
  * Multiplier applied to a SLOW (non-priority) move when the holder will be KO'd
  * this turn and is outsped: such a move probably won't even execute, so a
  * priority move should win instead (Phase A threat-awareness).
