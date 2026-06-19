@@ -77,7 +77,7 @@ import {
   VariableMoveTypeAttr,
   WeatherChangeAttr,
 } from "#data/moves/move";
-import { FirstMoveCondition } from "#data/moves/move-condition";
+import { consecutiveUseRestriction, FirstMoveCondition } from "#data/moves/move-condition";
 import { TerrainType } from "#data/terrain";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -287,8 +287,14 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       move.power = 80;
       move.accuracy = 100;
       move.moveTarget = MoveTarget.NEAR_OTHER;
+      orFlag(move, MoveFlags.MAKES_CONTACT);
       removeAttrsByName(move, ["StatStageChangeAttr"]);
+      // ER Decorate (dex #705): "Damages foes. Raises allies' Attack, Special Attack,
+      // and Crit by 2 stages." The Atk/SpAtk +2 was here; the CRIT +2 (the missing
+      // secondary effect) is the Focus-Energy CRIT_BOOST tag. Self-targeted, which is
+      // correct in singles (the lone "ally"); in doubles the dex also buffs the partner.
       addAttrUnique(move, new StatStageChangeAttr([Stat.ATK, Stat.SPATK], 2, true));
+      addAttrUnique(move, new AddBattlerTagAttr(BattlerTagType.CRIT_BOOST, true, false));
     },
   ],
   // CAPTIVATE: vanilla status (SpAtk -2 opposite-gender) → ER Special Fairy damaging.
@@ -409,9 +415,42 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
   // ER's USE_HIGHEST_OFFENSE category-derivation matches pokerogue's
   // PhotonGeyserCategoryAttr semantics exactly (set category to PHYSICAL if
   // user's Atk > SpAtk). Re-use that attr on all ER USE_HIGHEST_OFFENSE moves.
-  [MoveId.BLAST_BURN, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
-  [MoveId.HYDRO_CANNON, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
-  [MoveId.FRENZY_PLANT, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  // BLAST_BURN / HYDRO_CANNON / FRENZY_PLANT / PRISMATIC_LASER: the ER dex says these
+  // "can't be used next turn" - the MOVE is locked for one turn but the user STILL
+  // ACTS that turn (the Gigaton Hammer model, consecutiveUseRestriction). This is NOT
+  // the vanilla recharge that makes the user "immobile / rest" next turn - Hyper Beam,
+  // Giga Impact, Rock Wrecker and Eternabeam say exactly that and keep RechargeAttr.
+  // So swap RechargeAttr for the consecutive-use restriction on these four.
+  [
+    MoveId.BLAST_BURN,
+    move => {
+      addAttrUnique(move, new PhotonGeyserCategoryAttr());
+      removeAttrsByName(move, ["RechargeAttr"]);
+      (move as unknown as { restrictions: (typeof consecutiveUseRestriction)[] }).restrictions.push(
+        consecutiveUseRestriction,
+      );
+    },
+  ],
+  [
+    MoveId.HYDRO_CANNON,
+    move => {
+      addAttrUnique(move, new PhotonGeyserCategoryAttr());
+      removeAttrsByName(move, ["RechargeAttr"]);
+      (move as unknown as { restrictions: (typeof consecutiveUseRestriction)[] }).restrictions.push(
+        consecutiveUseRestriction,
+      );
+    },
+  ],
+  [
+    MoveId.FRENZY_PLANT,
+    move => {
+      addAttrUnique(move, new PhotonGeyserCategoryAttr());
+      removeAttrsByName(move, ["RechargeAttr"]);
+      (move as unknown as { restrictions: (typeof consecutiveUseRestriction)[] }).restrictions.push(
+        consecutiveUseRestriction,
+      );
+    },
+  ],
   [MoveId.TRI_ATTACK, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
   [MoveId.ATTACK_ORDER, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
   [
@@ -430,6 +469,11 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     move => {
       addAttrUnique(move, new PhotonGeyserCategoryAttr());
       orFlag(move, MoveFlags.PULSE_MOVE);
+      // ER dex: "can't be used next turn" (user still acts) - see the recharge note above.
+      removeAttrsByName(move, ["RechargeAttr"]);
+      (move as unknown as { restrictions: (typeof consecutiveUseRestriction)[] }).restrictions.push(
+        consecutiveUseRestriction,
+      );
     },
   ],
   // ER Pledges: highest-attack 90 BP, single-cast field effects keyed to weather

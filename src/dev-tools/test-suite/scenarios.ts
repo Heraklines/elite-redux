@@ -4609,6 +4609,59 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Blast Burn: can act next turn (no recharge)",
+    description:
+      "ER dex: Blast Burn / Hydro Cannon / Frenzy Plant / Prismatic Laser 'can't be\n"
+      + "used next turn' - the MOVE locks for a turn but the user STILL ACTS (Gigaton\n"
+      + "Hammer model), NOT the vanilla recharge that makes you 'rest'. (Hyper Beam /\n"
+      + "Giga Impact / Rock Wrecker / Eternabeam DO rest - dex 'leaves the user\n"
+      + "immobile'.) DO: use Blast Burn turn 1; turn 2 you get the move menu - Blast Burn\n"
+      + "itself is unselectable (greyed), but you can pick Flamethrower. EXPECT: no\n"
+      + "forced 'must recharge' turn. Before the fix Blast Burn made you rest.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.BLAST_BURN, MoveId.FLAMETHROWER],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.CHARIZARD, {
+          moveset: [MoveId.BLAST_BURN, MoveId.FLAMETHROWER, MoveId.AIR_SLASH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Decorate: damages + raises Atk/SpAtk/Crit",
+    description:
+      "ER Decorate (dex #705): 'Damages foes. Raises allies' Attack, Special Attack,\n"
+      + "and Crit by 2 stages.' Bug: the patch damaged the foe and raised Atk/SpAtk but\n"
+      + "was MISSING the +2 crit-stage boost (and the contact flag). DO: use Decorate on\n"
+      + "the enemy. EXPECT: it DAMAGES the foe (80 BP Special Fairy) AND raises your\n"
+      + "Atk +2, SpAtk +2, and crit stage +2 (a 'getting pumped'/crit-up message), and\n"
+      + "it makes contact. Before the fix there was no crit boost.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.DECORATE, MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.ALCREMIE, {
+          moveset: [MoveId.DECORATE, MoveId.DAZZLING_GLEAM, MoveId.RECOVER, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "Steel Roller works with NO terrain",
     description:
       "ER Steel Roller is usable WITHOUT terrain (it still clears one when present) -\n"
