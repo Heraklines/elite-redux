@@ -1,0 +1,83 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     0  wave:21  difficulty:elite
+seed:     cCHAQkdzxif559rmxCRctRge
+party:    Bouffalant(L16 64/64), Unown(L12 39/39), Ralts Redux(L10 31/31), Impidimp(L10 32/32), Larvitar Redux(L12 47/47), Magikarp(L10 27/27)
+
+----- DESCRIPTION -----
+test
+
+----- CONSOLE -----
+[13:55:10.710] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[13:55:10.931] WARN: [er-b1c] 1 mega-form injection issues: ["ER mega target 1850 has no primary type"]
+[13:55:11.077] LOG: [ER] build mqkvka3n-lfet
+[13:55:31.274] DEBUG: Destroying loading scene
+[13:55:31.274] DEBUG: Destroyed loading scene
+[13:55:31.482] LOG: Seed: xa0AJFKodhFSotUfG08XeunD
+[13:55:31.483] LOG: Wave Seed: xa0AJFKodhFSotUfG08XeunD 0
+[13:55:33.768] LOG: %cStart Phase LoginPhase color:green;
+[13:55:34.184] LOG: Client Session: JMuIG01IBN7WDJQCEesgADQHkYgj9Pxu
+[13:55:35.186] LOG: %cStart Phase TitlePhase color:green;
+[13:55:35.186] LOG: Getting Session Slot id: %d 2
+[13:55:35.582] LOG: use seasonal splash messages true
+[13:55:35.582] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[13:55:46.238] LOG: Getting Session Slot id: %d 0
+[13:55:46.240] LOG: Getting Session Slot id: %d 1
+[13:55:46.242] LOG: Getting Session Slot id: %d 2
+[13:55:46.252] LOG: Getting Session Slot id: %d 3
+[13:55:46.253] LOG: Getting Session Slot id: %d 4
+[13:55:46.255] LOG: Getting Session Slot id: %d 2
+[13:55:46.553] ERROR: Invalid save data JSON detected! Session not found.
+[13:55:46.554] ERROR: Invalid save data JSON detected! Session not found.
+[13:55:50.055] LOG: Getting Session Slot id: %d 2
+[13:55:50.060] LOG: Wave Seed: cCHAQkdzxif559rmxCRctRge 0
+[13:55:50.060] LOG: Seed: cCHAQkdzxif559rmxCRctRge
+[13:55:50.116] LOG: Wave Seed: xX]Vfy~{JJNXgxg|z 21
+[13:55:50.148] LOG: Applied HP Up 
+[13:55:50.150] LOG: Applied Calcium 
+[13:55:50.154] LOG: Applied HP Up 
+[13:55:50.155] LOG: Applied Calcium 
+[13:55:50.158] LOG: Applied HP Up 
+[13:55:50.158] LOG: Applied Calcium 
+[13:55:50.232] LOG: %cStart Phase EncounterPhase color:green;
+[13:55:50.238] LOG: Pokemon: Wild Zigzagoon | Species ID: 263 | Level: 13 | Nature: Quirky (-)
+[13:55:50.238] LOG: Stats (IVs): HP: 33 (1), Atk: 21 (10), Def: 18 (19), Spatk: 16 (26), Spdef: 16 (8), Spd: 23 (5)
+[13:55:50.238] LOG: Ability: Momentum | Passive Ability: Pickup 
+[13:55:50.238] LOG: Moveset: ["Double-Edge","Growl","Stomping Tantrum","Mud Sport"]
+[13:55:50.239] LOG: Pokemon: Wild Lillipup | Species ID: 506 | Level: 13 | Nature: Calm (+SpDef/-Atk)
+[13:55:50.239] LOG: Stats (IVs): HP: 38 (27), Atk: 23 (26), Def: 18 (17), Spatk: 11 (3), Spdef: 19 (7), Spd: 24 (19)
+[13:55:50.239] LOG: Ability: Vital Spirit | Passive Ability: Fluffy 
+[13:55:50.239] LOG: Moveset: ["Growl","Roar","Odor Sleuth","Tackle"]
+[13:55:56.891] LOG: Wave Seed: xX]Vfy~{JJNXgxg|z 21
+[13:55:57.342] LOG: %cStart Phase SummonPhase color:green;
+[13:55:57.495] LOG: Applied HP Up 
+[13:55:57.495] LOG: Applied Calcium 
+[13:55:57.626] LOG: %cStart Phase ShinySparklePhase color:green;
+[13:55:57.730] LOG: %cStart Phase SummonPhase color:green;
+[13:55:57.883] LOG: Applied HP Up 
+[13:55:57.884] LOG: Applied Calcium 
+[13:55:57.911] WARN: cry/201 not found
+[13:55:58.015] LOG: %cStart Phase ShinySparklePhase color:green;
+[13:55:58.119] LOG: %cStart Phase CheckSwitchPhase color:green;
+[13:55:58.119] LOG: %cStart Phase CheckSwitchPhase color:green;
+[13:55:58.119] LOG: %cStart Phase InitEncounterPhase color:green;
+[13:55:58.122] LOG: %cStart Phase PostSummonPhase color:green;
+[13:55:58.122] LOG: Ran PSP for: Bouffalant
+[13:55:58.124] LOG: %cStart Phase PostSummonPhase color:green;
+[13:55:58.125] LOG: %cStart Phase PostSummonPhase color:green;
+[13:55:58.125] LOG: Ran PSP for: Lillipup
+[13:55:58.126] LOG: %cStart Phase PostSummonPhase color:green;
+[13:55:58.127] LOG: %cStart Phase PostSummonPhase color:green;
+[13:55:58.127] LOG: %cStart Phase PostSummonPhase color:green;
+[13:55:58.127] LOG: Ran PSP for: Zigzagoon
+[13:55:58.128] LOG: %cStart Phase PostSummonPhase color:green;
+[13:55:58.129] LOG: %cStart Phase PostSummonPhase color:green;
+[13:55:58.129] LOG: %cStart Phase PostSummonPhase color:green;
+[13:55:58.129] LOG: Ran PSP for: Unown
+[13:55:58.130] LOG: %cStart Phase PostSummonPhase color:green;
+[13:55:58.130] LOG: %cStart Phase PostSummonPhase color:green;
+[13:55:58.130] LOG: %cStart Phase PostSummonPhase color:green;
+[13:55:58.131] LOG: %cStart Phase TurnInitPhase color:green;
+[13:55:58.131] LOG: %cStart Phase CommandPhase color:green;
