@@ -12,7 +12,7 @@ import { addWindow } from "#ui/ui-theme";
 
 /** Panel sub-state. Kept INTERNAL (no UiMode switches) so the panel can never
  * desync the mode stack - the softlock class this avoids. */
-type PanelState = "pickNew" | "pickSlot" | "confirmCancel";
+type PanelState = "pickNew" | "pickSlot";
 
 const PANEL_X = 6;
 const PANEL_Y = 22;
@@ -38,24 +38,23 @@ export class LearnMoveBatchUiHandler extends UiHandler {
   private currentHeader: Phaser.GameObjects.Text;
   private learnableTexts: Phaser.GameObjects.Text[] = [];
   private currentTexts: Phaser.GameObjects.Text[] = [];
-  private cancelText: Phaser.GameObjects.Text;
-  private promptText: Phaser.GameObjects.Text;
+  /** Bottom action rows: an "Undo" row (shown only after something's learned) and
+   * a "Done" row (always last). B also triggers Done. */
+  private undoText: Phaser.GameObjects.Text;
+  private doneText: Phaser.GameObjects.Text;
   private cursorObj: Phaser.GameObjects.Image | null = null;
   private moveInfoOverlay: MoveInfoOverlay;
 
   private deps: LearnMoveBatchDeps | null = null;
   private state: PanelState = "pickNew";
-  /** Cursor in the LEARNABLE column; the extra final row is the Cancel button. */
+  /** Cursor in the LEARNABLE column; the trailing rows are Undo (if any) then Done. */
   private newCursor = 0;
   /** Cursor in the CURRENT column when choosing which move to overwrite. */
   private slotCursor = 0;
-  /** Cursor over the confirm-cancel choice: 0 = No (go back), 1 = Yes (leave). */
-  private confirmCursor = 0;
   private pendingMoveId: MoveId | null = null;
   private learnedAny = false;
-  /** What the confirm-cancel prompt means: undo-or-keep (after learning something)
-   * vs the plain skip prompt (nothing learned yet). */
-  private cancelMode: "leaveEmpty" | "revertOrKeep" = "leaveEmpty";
+  /** The full learnable list when the panel opened, so "Undo" can restore it. */
+  private originalLearnable: MoveId[] = [];
 
   constructor() {
     super(UiMode.LEARN_MOVE_BATCH);
@@ -80,9 +79,9 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     this.container.add(addWindow(PANEL_X, PANEL_Y, PANEL_W, PANEL_H));
     this.learnableHeader = addTextObject(PANEL_X + 6, ROW_TOP - 18, "Learnable", TextStyle.WINDOW_ALT);
     this.currentHeader = addTextObject(PANEL_X + 6 + COL_GAP, ROW_TOP - 18, "Current", TextStyle.WINDOW_ALT);
-    this.cancelText = addTextObject(PANEL_X + 6, ROW_TOP + ROW_H * 5, "Cancel", TextStyle.WINDOW);
-    this.promptText = addTextObject(PANEL_X + 8, PANEL_Y + 8, "", TextStyle.WINDOW).setVisible(false);
-    this.container.add([this.learnableHeader, this.currentHeader, this.cancelText, this.promptText]);
+    this.undoText = addTextObject(PANEL_X + 6, ROW_TOP + ROW_H * 4, "Undo", TextStyle.WINDOW).setVisible(false);
+    this.doneText = addTextObject(PANEL_X + 6, ROW_TOP + ROW_H * 5, "Done", TextStyle.WINDOW);
+    this.container.add([this.learnableHeader, this.currentHeader, this.undoText, this.doneText]);
 
     this.cursorObj = globalScene.add.image(0, 0, "cursor").setOrigin(0, 0.5);
     this.container.add(this.cursorObj);
@@ -108,9 +107,9 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       this.state = "pickNew";
       this.newCursor = 0;
       this.slotCursor = 0;
-      this.confirmCursor = 0;
       this.pendingMoveId = null;
       this.learnedAny = false;
+      this.originalLearnable = [...this.deps.learnableIds];
       this.container.setVisible(true);
       this.active = true;
       this.render();
@@ -136,30 +135,6 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     if (!deps) {
       return;
     }
-    const confirming = this.state === "confirmCancel";
-    this.promptText.setVisible(confirming);
-    for (const t of [this.learnableHeader, this.currentHeader, this.cancelText]) {
-      t.setVisible(!confirming);
-    }
-
-    if (confirming) {
-      // Hide the move lists + cursor so only the confirm prompt shows (otherwise
-      // the Learnable/Current rows bleed through behind the question).
-      for (const t of [...this.learnableTexts, ...this.currentTexts]) {
-        t.setVisible(false);
-      }
-      // Fixed 3-line layout (NO word-wrap - the wrap units differ from pixels and
-      // overflowed). Short lines so they fit the window at the panel font size.
-      this.promptText.setText(
-        this.cancelMode === "revertOrKeep"
-          ? `Undo the move(s)\nyou just learned?\n  ${this.confirmCursor === 0 ? "> " : "   "}Keep   ${this.confirmCursor === 1 ? "> " : "   "}Undo`
-          : `Skip learning\nany new moves?\n  ${this.confirmCursor === 0 ? "> " : "   "}No    ${this.confirmCursor === 1 ? "> " : "   "}Yes`,
-      );
-      this.cursorObj?.setVisible(false);
-      this.moveInfoOverlay.clear();
-      return;
-    }
-
     // LEARNABLE column (left).
     for (const t of this.learnableTexts) {
       t.destroy();
@@ -169,7 +144,12 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       this.container.add(t);
       return t;
     });
-    this.cancelText.setY(ROW_TOP + deps.learnableIds.length * ROW_H);
+    // Trailing action rows: "Undo" (only once something's been learned this
+    // session) then "Done". Their row indices shift with the learnable count.
+    const L = deps.learnableIds.length;
+    this.undoText.setVisible(this.learnedAny);
+    this.undoText.setY(ROW_TOP + L * ROW_H);
+    this.doneText.setY(ROW_TOP + (L + (this.learnedAny ? 1 : 0)) * ROW_H);
 
     // CURRENT column (right): the live moveset + any empty slots.
     for (const t of this.currentTexts) {
@@ -238,40 +218,6 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     }
     let success = false;
 
-    if (this.state === "confirmCancel") {
-      switch (button) {
-        case Button.LEFT:
-        case Button.RIGHT:
-          this.confirmCursor = this.confirmCursor === 0 ? 1 : 0;
-          success = true;
-          break;
-        case Button.ACTION:
-          if (this.cancelMode === "revertOrKeep") {
-            // Undo (cursor 1) restores the pre-panel moveset; Keep (cursor 0) leaves
-            // the learned moves in place. Both then exit the panel.
-            if (this.confirmCursor === 1) {
-              this.deps?.revert();
-            }
-            return this.finish();
-          }
-          if (this.confirmCursor === 1) {
-            return this.finish(); // Yes - leave without learning more
-          }
-          this.state = "pickNew"; // No - back to the list
-          success = true;
-          break;
-        case Button.CANCEL:
-          this.state = "pickNew";
-          success = true;
-          break;
-      }
-      if (success) {
-        globalScene.ui.playSelect();
-        this.render();
-      }
-      return success;
-    }
-
     if (this.state === "pickSlot") {
       const max = deps.pokemon.getMaxMoveCount();
       switch (button) {
@@ -297,8 +243,8 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       return success;
     }
 
-    // pickNew
-    const rowCount = deps.learnableIds.length + 1; // + Cancel row
+    // pickNew - rows: [learnable moves...] [Undo (only if learnedAny)] [Done].
+    const rowCount = deps.learnableIds.length + (this.learnedAny ? 1 : 0) + 1;
     switch (button) {
       case Button.UP:
         success = this.newCursor > 0 && this.moveNewCursor(-1);
@@ -309,7 +255,7 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       case Button.ACTION:
         return this.confirmNew();
       case Button.CANCEL:
-        return this.requestCancel();
+        return this.finish(); // B = Done: leave the panel, KEEPING what you learned
     }
     if (success) {
       globalScene.ui.playSelect();
@@ -332,8 +278,14 @@ export class LearnMoveBatchUiHandler extends UiHandler {
   /** ACTION in the LEARNABLE column: learn into a free slot, or pick a slot to overwrite. */
   private confirmNew(): boolean {
     const deps = this.deps!;
-    if (this.newCursor >= deps.learnableIds.length) {
-      return this.requestCancel(); // the Cancel row
+    const L = deps.learnableIds.length;
+    if (this.newCursor >= L) {
+      // Trailing rows: Undo (only when learnedAny) then Done.
+      if (this.learnedAny && this.newCursor === L) {
+        this.undoAll();
+        return true;
+      }
+      return this.finish(); // Done row: leave, keeping what was learned
     }
     const moveId = deps.learnableIds[this.newCursor];
     const free = this.freeSlotIndex();
@@ -380,17 +332,21 @@ export class LearnMoveBatchUiHandler extends UiHandler {
   }
 
   /**
-   * CANCEL (B) in the list. If moves were learned this session it offers UNDO
-   * (restore the exact pre-panel moveset) vs KEEP, so an accidental overwrite can
-   * always be taken back. With nothing learned it's the plain "skip?" confirm.
+   * UNDO: immediately restore the EXACT pre-panel moveset and the full learnable
+   * list, then STAY in the panel so the player can re-pick. No confirmation - the
+   * point is to instantly take back an accidental overwrite without leaving.
    */
-  private requestCancel(): boolean {
-    this.cancelMode = this.learnedAny ? "revertOrKeep" : "leaveEmpty";
-    this.state = "confirmCancel";
-    this.confirmCursor = 0;
+  private undoAll(): void {
+    this.deps!.revert();
+    this.deps!.learnableIds = [...this.originalLearnable];
+    this.learnedAny = false;
+    // The Undo row just disappeared (learnedAny=false); the Done row is now last.
+    const lastRow = this.deps!.learnableIds.length;
+    if (this.newCursor > lastRow) {
+      this.newCursor = lastRow;
+    }
     globalScene.ui.playSelect();
     this.render();
-    return true;
   }
 
   private finish(): boolean {
