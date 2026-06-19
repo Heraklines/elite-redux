@@ -118,6 +118,46 @@ Nothing is overwritten, and captures are AUTO-TRIAGED by scenario:
   PASS/FAIL — <scenario> — <comment>`).
 Read these to see what testers verified / where something hung.
 
+### 🔴 Reading REMOTE tester logs (prod/staging "Report a bug" + "Send Logs")
+
+This is the one to use day-to-day — it's how live players' captures reach this PC.
+Both the in-game **Report a bug** button (prod + staging) and the dev **Send Logs**
+button POST to the er-editor-api worker's `/devlog` sink
+(`https://er-editor-api.heraklines.workers.dev/devlog`), which commits each capture
+onto the repo's **`dev-logs` branch** (see `src/data/elite-redux/er-bug-report.ts`
+and `src/dev-tools/test-suite/index.ts`). To pull them down locally:
+
+```
+# from the repo root; needs a GitHub token to read the dev-logs branch
+export GH_TOKEN="$(tr -d ' \r\n' < /c/Users/Hafida/Desktop/github_token.txt)"
+node scripts/pull-dev-logs.mjs        # one-shot; only downloads NEW files
+```
+
+- Files land (gitignored) under `dev-logs/remote/<YYYY-MM-DD>/<timestamp>__<scenario-or-"bug-report">__<tester-or-"player">.log`.
+- Each file has a header (`version / url / mode / wave / difficulty / seed / party`),
+  a `----- DESCRIPTION -----` (the player's free text), and `----- CONSOLE -----`
+  (the console ring buffer — incl. the AI's `Move Pool / Move Scores / Chosen Move`
+  lines, asset 404s, stack traces). Grep the descriptions to triage fast:
+  `grep -rl -A3 "DESCRIPTION" dev-logs/remote/<date>/`.
+- To find what scored/crashed: read the `----- CONSOLE -----` tail of the file.
+
+### Scraping the Discord bug channels (bulk triage)
+
+For a multi-day sweep of the Discord (`#bugs`, `#bug-reports`, `#suggestions`, etc.),
+the scraper lives at `C:\Users\Hafida\discord-bug-bot` (a tsx bot; `.env` holds the
+bot token + server id — never print/commit it). Run:
+
+```
+cd /c/Users/Hafida/discord-bug-bot
+LOOKBACK_DAYS=4 PATCH_NOTES_DIR= npx tsx src/index.ts --once   # last 4 days, skip the patch-notes fixed-check
+```
+
+It scrapes → categorizes each message (Codex for text, Claude for images) into
+**Bugs / Feature Requests / Suggestions** → writes `reports/<YYYY-MM-DD>.md`.
+Override `LOOKBACK_DAYS` (default 1) for the window; leave `PATCH_NOTES_DIR` empty to
+skip cross-referencing against patch notes. The two env overrides do NOT touch `.env`
+(dotenv won't override an already-set process var).
+
 ## Writing rules (maintainer)
 - NEVER use an em dash in patch notes or any player-facing text. Use a
   regular hyphen, a comma, or restructure the sentence.
