@@ -1,0 +1,126 @@
+scenario: ER Abyss: Seven Sins / The Bargain (#544)
+url:      https://elite-redux-staging.pages.dev/
+build:    mqkzsmu4-4qta
+mode:     0  wave:10
+seed:     r97XDaRGoYzQsY7HoM5BQOsC
+party:    Garchomp(L30 114hp f0), Snorlax(L30 145hp f0), Gengar(L30 85hp f0), Pikachu(L30 70hp f0)
+enemy:    Sableye(L7)
+
+----- COMMENT -----
+giratina soft lock
+
+----- CONSOLE -----
+[14:00:09.840] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[14:00:10.054] WARN: [er-b1c] 1 mega-form injection issues: ["ER mega target 1850 has no primary type"]
+[14:00:10.195] LOG: [ER] build mqkzsmu4-4qta
+[14:00:10.579] LOG: [dev-tools] loaded — 215 scenarios + Send Logs button
+[14:00:26.292] DEBUG: Destroying loading scene
+[14:00:26.292] DEBUG: Destroyed loading scene
+[14:00:26.352] LOG: Seed: pRf3zaJNDpNNHPd0LUGVVf5D
+[14:00:26.353] LOG: Wave Seed: pRf3zaJNDpNNHPd0LUGVVf5D 0
+[14:00:28.768] LOG: %cStart Phase LoginPhase color:green;
+[14:00:28.933] LOG: Client Session: 3rhrcRzZ4QbUIjeRwDeNc8EdmfQAq3RO
+[14:00:29.358] DEBUG: Using cached system data
+[14:00:29.409] LOG: %cStart Phase TitlePhase color:green;
+[14:00:29.409] LOG: Getting Session Slot id: %d 4
+[14:00:29.424] LOG: use seasonal splash messages true
+[14:00:29.424] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[14:01:17.757] LOG: Getting Session Slot id: %d 4
+[14:01:17.765] LOG: Wave Seed: TI5ptO9qjqz2Hxh4aLms9UeS 0
+[14:01:17.765] LOG: Seed: TI5ptO9qjqz2Hxh4aLms9UeS
+[14:01:17.802] LOG: Wave Seed: ^S?z~YC{t{<Rr>kVw}C_o] 10
+[14:01:17.866] LOG: %cStart Phase EncounterPhase color:green;
+[14:01:17.872] LOG: Pokemon: Wild Snorunt | Species ID: 361 | Level: 6 | Nature: Impish (+Def/-SpAtk)
+[14:01:17.872] LOG: Stats (IVs): HP: 24 (24), Atk: 13 (17), Def: 15 (24), Spatk: 10 (3), Spdef: 13 (16), Spd: 15 (27)
+[14:01:17.872] LOG: Ability: Refrigerate | Passive Ability: Sturdy | Boss Bars: 2
+[14:01:17.872] LOG: Moveset: ["Ice Fang","Frost Breath","Astonish","Defense Curl"]
+[14:01:19.196] LOG: Wave Seed: ^S?z~YC{t{<Rr>kVw}C_o] 10
+[14:01:19.613] LOG: %cStart Phase SummonPhase color:green;
+[14:01:19.897] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:01:20.001] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:01:20.871] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:01:20.871] LOG: %cStart Phase PostSummonPhase color:green;
+[14:01:20.871] LOG: Ran PSP for: Snorunt
+[14:01:20.871] LOG: %cStart Phase PostSummonPhase color:green;
+[14:01:20.872] LOG: %cStart Phase PostSummonPhase color:green;
+[14:01:20.872] LOG: %cStart Phase TurnInitPhase color:green;
+[14:01:20.872] LOG: %cStart Phase CommandPhase color:green;
+[14:01:22.405] DEBUG: Session data saved to slot 4!
+[14:01:23.384] LOG: Seed: A76nFrrur37nU7ic160w3l2U
+[14:01:23.384] LOG: Wave Seed: A76nFrrur37nU7ic160w3l2U 0
+[14:01:23.561] WARN: AnimationManager key already exists: prompt
+[14:01:23.561] WARN: AnimationManager key already exists: tera_sparkle
+[14:01:23.561] LOG: Seed: r97XDaRGoYzQsY7HoM5BQOsC
+[14:01:23.561] LOG: Wave Seed: r97XDaRGoYzQsY7HoM5BQOsC 0
+[14:01:25.928] LOG: %cStart Phase LoginPhase color:green;
+[14:01:26.113] LOG: Client Session: 3rhrcRzZ4QbUIjeRwDeNc8EdmfQAq3RO
+[14:01:26.496] LOG: %cStart Phase TitlePhase color:green;
+[14:01:26.496] LOG: Getting Session Slot id: %d 4
+[14:01:26.502] LOG: use seasonal splash messages true
+[14:01:26.502] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[14:01:31.880] LOG: %cStart Phase SelectStarterPhase color:green;
+[14:01:32.649] LOG: Wave Seed: |CAbNk\Qyc[}cARyW?L[Y}M 10
+[14:01:32.650] LOG: %cStart Phase EncounterPhase color:green;
+[14:01:32.653] LOG: Starting species pool tier: BOSS
+[14:01:32.667] LOG: Pokemon: Wild Sableye | Species ID: 302 | Level: 7 | Nature: Bold (+Def/-Atk)
+[14:01:32.667] LOG: Stats (IVs): HP: 24 (24), Atk: 13 (9), Def: 17 (16), Spatk: 14 (11), Spdef: 16 (29), Spd: 12 (25)
+[14:01:32.667] LOG: Ability: Prankster | Passive Ability: Analytic | Boss Bars: 2
+[14:01:32.667] LOG: Moveset: ["Feint Attack","Chip Away","Slash","Hone Claws"]
+[14:01:33.201] LOG: Battle Seed: 2jB8VCBxCabIpMYP
+[14:01:33.246] DEBUG: Session data saved to slot 4!
+[14:01:33.247] LOG: Wave Seed: |CAbNk\Qyc[}cARyW?L[Y}M 10
+[14:01:33.661] LOG: %cStart Phase SummonPhase color:green;
+[14:01:33.946] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:01:34.050] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:01:34.051] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:01:36.105] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:01:36.106] LOG: %cStart Phase PostSummonPhase color:green;
+[14:01:36.107] LOG: Ran PSP for: Garchomp
+[14:01:36.107] LOG: %cStart Phase PostSummonPhase color:green;
+[14:01:36.107] LOG: %cStart Phase PostSummonPhase color:green;
+[14:01:36.107] LOG: %cStart Phase PostSummonPhase color:green;
+[14:01:36.107] LOG: Ran PSP for: Sableye
+[14:01:36.107] LOG: %cStart Phase PostSummonPhase color:green;
+[14:01:36.107] LOG: %cStart Phase PostSummonPhase color:green;
+[14:01:36.107] LOG: %cStart Phase TurnInitPhase color:green;
+[14:01:36.107] LOG: %cStart Phase CommandPhase color:green;
+[14:01:37.406] LOG: Move: DRAGON_CLAW Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Garchomp
+[14:01:37.407] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:01:37.413] WARN: BattlerTag ER_BLEED is missing a score!
+[14:01:37.414] WARN: BattlerTag ER_BLEED is missing a score!
+[14:01:37.414] LOG: Move Pool: ["Feint Attack","Chip Away","Slash","Hone Claws"]
+[14:01:37.414] LOG: Move Scores: [18,19,17,4]
+[14:01:37.414] LOG: Sorted Move Pool: ["Chip Away","Feint Attack","Slash","Hone Claws"]
+[14:01:37.414] LOG: Chosen Move: Chip Away
+[14:01:37.414] LOG: %cStart Phase TurnStartPhase color:green;
+[14:01:37.416] LOG: %cStart Phase MovePhase color:green;
+[14:01:37.416] LOG: %cUser: Garchomp
+Move: DRAGON_CLAW
+Use Mode: NORMAL color:orchid
+[14:01:37.418] LOG: %cStart Phase MessagePhase color:green;
+[14:01:37.522] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:01:37.689] LOG: crit stage: +1
+[14:01:37.690] LOG: Move: Dragon Claw | Base damage: 116.48888888888888 | Power: 80 | Source attack: 92 | Target defense: 18
+[14:01:37.690] LOG: Move: Dragon Claw | Attack damage: 153
+[14:01:37.691] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:01:37.849] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:01:37.877] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:01:37.891] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:01:37.891] LOG: %cStart Phase MessagePhase color:green;
+[14:01:38.084] LOG: %cStart Phase FaintPhase color:green;
+[14:01:38.141] LOG: %cStart Phase MessagePhase color:green;
+[14:01:38.478] LOG: %cStart Phase VictoryPhase color:green;
+[14:01:38.480] LOG: %cStart Phase MoveEndPhase color:green;
+[14:01:38.480] LOG: %cStart Phase MovePhase color:green;
+[14:01:38.480] LOG: %cStart Phase MoveEndPhase color:green;
+[14:01:38.480] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:01:38.481] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:01:38.481] LOG: %cStart Phase TurnEndPhase color:green;
+[14:01:38.481] LOG: %cStart Phase BattleEndPhase color:green;
+[14:01:38.481] LOG: Battle Score: 138 (1 Turns x1)
+[14:01:38.481] LOG: Total Score: 138
+[14:01:38.485] LOG: %cStart Phase EggLapsePhase color:green;
+[14:01:38.486] LOG: %cStart Phase ModifierRewardPhase color:green;
+[14:01:38.770] LOG: %cStart Phase ModifierRewardPhase color:green;
+[14:01:39.066] LOG: %cStart Phase TheBargainPhase color:green;
