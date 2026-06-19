@@ -1053,8 +1053,9 @@ export class PartyUiHandler extends MessageUiHandler {
       return success;
     }
 
-    // ER (#560): in the live fusion preview, STATS (R) flips which mon is the base.
-    if (this.fusionPreviewActive && button === Button.STATS) {
+    // ER (#560): in the live fusion preview, R (CYCLE_SHINY) flips which mon is the
+    // base. Also accept STATS (C) so it works regardless of the control scheme.
+    if (this.fusionPreviewActive && (button === Button.CYCLE_SHINY || button === Button.STATS)) {
       return this.switchFusionOrder();
     }
 

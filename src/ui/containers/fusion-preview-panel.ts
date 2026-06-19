@@ -2,7 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { CustomPokemonData } from "#data/pokemon-data";
 import { AbilityId } from "#enums/ability-id";
 import { PokemonType } from "#enums/pokemon-type";
-import { getStatKey, PERMANENT_STATS } from "#enums/stat";
+import { getStatKey, PERMANENT_STATS, Stat } from "#enums/stat";
 import { TextStyle } from "#enums/text-style";
 import type { PlayerPokemon } from "#field/pokemon";
 import { addTextObject } from "#ui/text";
@@ -20,25 +20,24 @@ const PANEL_H = 176;
 const RIGHT_MARGIN = 2;
 const TOP_MARGIN = 3;
 
-const SPRITE_X = 42;
-const SPRITE_Y = 54;
-const SPRITE_SCALE = 0.55;
+const SPRITE_X = 40;
+const SPRITE_Y = 37;
+const SPRITE_SCALE = 0.5;
 
-const INFO_X = 80; // name/types column, right of the sprite
-const NAME_Y = 30;
+const INFO_X = 78; // name/types column, right of the sprite
+const NAME_Y = 28;
 const TYPES_Y = 44;
 
+const STATS_HEADER_Y = 63;
 const STATS_X0 = 10; // HP / Atk / Def column
 const STATS_X1 = 84; // SpA / SpD / Spe column
-const STATS_Y = 84;
+const STATS_Y = 75;
 const STATS_ROW_H = 11;
 const STATS_VALUE_DX = 64;
 
-const ABIL_LABEL_Y = 122;
-const ABIL_Y = 132;
-const ABIL_ROW_H = 10;
-
-const HINT_Y = PANEL_H - 8;
+const ABIL_LABEL_Y = 111;
+const ABIL_Y = 122;
+const ABIL_ROW_H = 11;
 
 /** A cached blended-sprite render for one partner (keyed by partner id). */
 interface SpriteCacheEntry {
@@ -73,7 +72,7 @@ export class FusionPreviewPanel {
   private abilityLabel: Phaser.GameObjects.Text;
   private abilityTexts: Phaser.GameObjects.Text[] = [];
   private placeholderText: Phaser.GameObjects.Text;
-  private hintText: Phaser.GameObjects.Text;
+  private statsHeader: Phaser.GameObjects.Text;
 
   /** The clone of the locked base mon (re-fused per partner). */
   private clone: PlayerPokemon | null = null;
@@ -115,12 +114,22 @@ export class FusionPreviewPanel {
     this.container.add([this.nameText, this.typesText]);
 
     // Six base-stat cells (2 cols x 3 rows), mirroring the summary stats page.
+    this.statsHeader = addTextObject(
+      STATS_X0,
+      STATS_HEADER_Y,
+      i18next.t("partyUiHandler:fusionPreviewBaseStats"),
+      TextStyle.SUMMARY_GOLD,
+    );
+    this.container.add(this.statsHeader);
+    // Six BASE-stat cells (2 cols x 3 rows): raw fused base stats, NOT effective.
     PERMANENT_STATS.forEach((stat, s) => {
       const col = Math.floor(s / 3);
       const row = s % 3;
       const colX = col === 0 ? STATS_X0 : STATS_X1;
       const y = STATS_Y + row * STATS_ROW_H;
-      const label = addTextObject(colX, y, i18next.t(getStatKey(stat)), TextStyle.SUMMARY_STATS).setOrigin(0, 0);
+      // "Max. HP" reads as effective - use plain "HP" for a base-stat readout.
+      const labelText = stat === Stat.HP ? "HP" : i18next.t(getStatKey(stat));
+      const label = addTextObject(colX, y, labelText, TextStyle.SUMMARY_STATS).setOrigin(0, 0);
       const value = addTextObject(colX + STATS_VALUE_DX, y, "0", TextStyle.WINDOW_ALT).setOrigin(1, 0);
       this.statLabels.push(label);
       this.statValues.push(value);
@@ -140,15 +149,6 @@ export class FusionPreviewPanel {
       this.abilityTexts.push(t);
       this.container.add(t);
     }
-
-    this.hintText = addTextObject(
-      PANEL_W / 2,
-      HINT_Y,
-      i18next.t("partyUiHandler:fusionPreviewHint"),
-      TextStyle.WINDOW_ALT,
-    );
-    this.hintText.setOrigin(0.5, 0);
-    this.container.add(this.hintText);
 
     // Shown when the cursor is not on a valid partner (the base itself / cancel).
     this.placeholderText = addTextObject(
@@ -256,6 +256,7 @@ export class FusionPreviewPanel {
     this.sprite.setVisible(visible);
     this.nameText.setVisible(visible);
     this.typesText.setVisible(visible);
+    this.statsHeader.setVisible(visible);
     this.abilityLabel.setVisible(visible);
     for (const t of [...this.statLabels, ...this.statValues, ...this.abilityTexts]) {
       t.setVisible(visible);
