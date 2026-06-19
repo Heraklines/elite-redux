@@ -2410,24 +2410,6 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (Overrides.ENEMY_ABILITY_OVERRIDE && this.isEnemy()) {
       return allAbilities[Overrides.ENEMY_ABILITY_OVERRIDE];
     }
-    if (this.isFusion()) {
-      // An explicit active-ability override (e.g. the Ability Randomizer item,
-      // which writes customPokemonData.ability via setAbilityOverrideForSlot(0))
-      // must win for fused mons too. Previously this branch returned the
-      // fusion-derived ability and never consulted customPokemonData.ability, so
-      // rerolling a fused mon's ability silently no-opped.
-      if (
-        this.customPokemonData.ability != null
-        && this.customPokemonData.ability !== -1
-        && this.customAbilityOverridesApply()
-      ) {
-        return allAbilities[this.customPokemonData.ability];
-      }
-      if (this.fusionCustomPokemonData?.ability != null && this.fusionCustomPokemonData.ability !== -1) {
-        return allAbilities[this.fusionCustomPokemonData.ability];
-      }
-      return allAbilities[this.getFusionSpeciesForm(ignoreOverride).getAbility(this.fusionAbilityIndex)];
-    }
     if (
       this.customPokemonData.ability != null
       && this.customPokemonData.ability !== -1
@@ -2462,6 +2444,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns The passive {@linkcode Ability} of the pokemon
    */
   public getPassiveAbility(): Ability {
+    if (this.isFusion()) {
+      return this.getPassiveAbilities()[0] ?? allAbilities[AbilityId.NONE];
+    }
     if (Overrides.PASSIVE_ABILITY_OVERRIDE && this.isPlayer()) {
       return allAbilities[Overrides.PASSIVE_ABILITY_OVERRIDE];
     }
@@ -2495,16 +2480,6 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * {@linkcode getPassiveAbility}, so legacy single-passive behavior is
    * preserved when no 3-passive override has been installed on the species.
    *
-   * When this Pokemon is a fusion, the base and fusion species' passive
-   * triples are interleaved (slot 0 from base, slot 1 from fusion, slot 2
-   * picked from the remaining non-NONE entries with dedup by ability id) so
-   * both parents contribute to the final passive set. This matches the
-   * "both parents inherit passives" semantic for ER's 4-ability model. Vanilla
-   * fusion behavior (base species drives passives) is preserved when only one
-   * side has multi-passive `_passives` installed, because the fusion side
-   * falls back to its legacy single passive and dedup keeps the base triple
-   * intact.
-   *
    * When a transform override has been installed via
    * {@linkcode setTempPassives} (`summonData.passiveAbilities`), each
    * non-undefined slot in the override replaces the corresponding derived
@@ -2524,22 +2499,19 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       slot0 = allAbilities[Overrides.PASSIVE_ABILITY_OVERRIDE];
     } else if (Overrides.ENEMY_PASSIVE_ABILITY_OVERRIDE && this.isEnemy()) {
       slot0 = allAbilities[Overrides.ENEMY_PASSIVE_ABILITY_OVERRIDE];
-    } else if (
-      this.customPokemonData.passive != null
-      && this.customPokemonData.passive !== -1
-      && this.customAbilityOverridesApply()
-    ) {
-      slot0 = allAbilities[this.customPokemonData.passive];
-    } else if (this.isBoss() && isDailyFinalBoss()) {
+    } else {
+      const customSlot0 = this.getAbilityOverrideForSlot(1);
+      if (customSlot0 !== undefined) {
+        slot0 = allAbilities[customSlot0];
+      }
+    }
+    if (slot0 === null && this.isBoss() && isDailyFinalBoss()) {
       const eventBoss = getDailyEventSeedBoss();
       if (eventBoss?.passive != null) {
         slot0 = allAbilities[eventBoss.passive];
       }
     }
 
-    // Build the derived passive triple from species data, merging base + fusion
-    // for fusions (Option C from the fusion/transform audit, generalized:
-    // interleave with dedup so both parents contribute when both are ER-custom).
     const derivedIds = this.resolveDerivedPassiveIds();
 
     if (slot0 === null) {
@@ -2550,23 +2522,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // override of `undefined` means "no override for this slot" (keep derived).
     // A slot override of `AbilityId.NONE` means "explicitly empty this slot".
     const transformOverride = this.summonData.passiveAbilities;
-    // Persistent per-Pokémon overrides for innate slots 1/2 (e.g. the ER Ability
-    // Randomizer consumable) take priority over the species-derived ids, mirroring
-    // how `customPokemonData.passive` overrides slot 0 above.
-    // Battle-only forms (mega/max) use their own species innates — skip the
-    // per-Pokémon innate-slot overrides while in such a form (see
-    // {@linkcode usesFormDerivedAbilities}). Overrides are preserved for revert.
-    // Exception: an override the ER Ability Randomizer set on this very form
-    // (abilityOverridesForm) still applies — see {@linkcode customAbilityOverridesApply}.
-    const useFormInnates = !this.customAbilityOverridesApply();
-    const customSlot1 =
-      !useFormInnates && this.customPokemonData.passive2 != null && this.customPokemonData.passive2 !== -1
-        ? this.customPokemonData.passive2
-        : undefined;
-    const customSlot2 =
-      !useFormInnates && this.customPokemonData.passive3 != null && this.customPokemonData.passive3 !== -1
-        ? this.customPokemonData.passive3
-        : undefined;
+    const customSlot1 = this.getAbilityOverrideForSlot(2);
+    const customSlot2 = this.getAbilityOverrideForSlot(3);
     const slot1Id = customSlot1 ?? transformOverride?.[1] ?? derivedIds[1];
     const slot2Id = customSlot2 ?? transformOverride?.[2] ?? derivedIds[2];
     if (transformOverride?.[0] != null) {
@@ -2616,68 +2573,64 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * it survives the run. Used by the ER Ability Randomizer consumable.
    */
   public setAbilityOverrideForSlot(slot: number, abilityId: AbilityId): void {
-    switch (slot) {
-      case 0:
-        this.customPokemonData.ability = abilityId;
-        break;
-      case 1:
-        this.customPokemonData.passive = abilityId;
-        break;
-      case 2:
-        this.customPokemonData.passive2 = abilityId;
-        break;
-      case 3:
-        this.customPokemonData.passive3 = abilityId;
-        break;
+    const owner = this.getAbilitySlotOwner(slot, true);
+    if (!owner) {
+      return;
+    }
+    owner.data[owner.key] = abilityId;
+    if (owner.usesFormDerivedAbilities) {
+      owner.data.abilityOverridesForm = true;
     }
   }
 
-  /**
-   * Resolve the 3-slot passive id tuple from species data, interleaving base
-   * and fusion species passives when this Pokemon is a fusion.
-   *
-   * Merge strategy (deterministic, dedupe-aware):
-   * - Non-fusion: returns `this.species.getPassiveAbilities(this.formIndex)`.
-   * - Fusion: slot 0 from base[0], slot 1 from fusion[0], slot 2 picked from
-   *   `[base[1], base[2], fusion[1], fusion[2]]` — the first non-NONE entry
-   *   whose ability id hasn't already been placed in slot 0 or slot 1.
-   *
-   * This preserves vanilla fusion's "base species drives identity" feel
-   * (slot 0 is always the base's primary passive) while letting the fusion
-   * species contribute its primary passive in slot 1 — addressing the
-   * fusion-passive gap from the elite-redux-fusion-transform-audit (Option C
-   * generalized for both parents being ER-custom).
-   */
+  private getAbilityOverrideForSlot(slot: number): AbilityId | undefined {
+    const owner = this.getAbilitySlotOwner(slot);
+    if (!owner || (owner.usesFormDerivedAbilities && !owner.data.abilityOverridesForm)) {
+      return;
+    }
+    const abilityId = owner.data[owner.key];
+    return abilityId == null || abilityId === -1 ? undefined : abilityId;
+  }
+
+  private getAbilitySlotOwner(
+    slot: number,
+    createFusionData = false,
+  ): {
+    data: CustomPokemonData;
+    key: "ability" | "passive" | "passive2" | "passive3";
+    usesFormDerivedAbilities: boolean;
+  } | null {
+    const baseOwner = (key: "ability" | "passive" | "passive2" | "passive3") => ({
+      data: this.customPokemonData,
+      key,
+      usesFormDerivedAbilities: this.baseUsesFormDerivedAbilities(),
+    });
+    const fusionOwner = (key: "passive" | "passive3") => {
+      const data =
+        this.fusionCustomPokemonData
+        ?? (createFusionData ? (this.fusionCustomPokemonData = new CustomPokemonData()) : null);
+      return data
+        ? {
+            data,
+            key,
+            usesFormDerivedAbilities: this.fusionUsesFormDerivedAbilities(),
+          }
+        : null;
+    };
+
+    if (!this.isFusion()) {
+      return [baseOwner("ability"), baseOwner("passive"), baseOwner("passive2"), baseOwner("passive3")][slot] ?? null;
+    }
+    return [baseOwner("ability"), fusionOwner("passive"), baseOwner("passive2"), fusionOwner("passive3")][slot] ?? null;
+  }
+
   private resolveDerivedPassiveIds(): readonly [AbilityId, AbilityId, AbilityId] {
     const baseIds = this.species.getPassiveAbilities(this.formIndex);
     if (!this.isFusion() || !this.fusionSpecies) {
       return baseIds;
     }
     const fusionIds = this.fusionSpecies.getPassiveAbilities(this.fusionFormIndex);
-
-    const slot0 = baseIds[0];
-    // slot 1: take fusion's primary passive. If fusion's primary is the same
-    // id as slot 0, fall through to base's slot 1 so we don't waste a slot
-    // on a duplicate.
-    let slot1: AbilityId = AbilityId.NONE;
-    if (fusionIds[0] !== AbilityId.NONE && fusionIds[0] !== slot0) {
-      slot1 = fusionIds[0];
-    } else if (baseIds[1] !== AbilityId.NONE && baseIds[1] !== slot0) {
-      slot1 = baseIds[1];
-    }
-
-    // slot 2: first remaining non-NONE id from the prioritized pool.
-    let slot2: AbilityId = AbilityId.NONE;
-    const candidates: AbilityId[] = [baseIds[1], baseIds[2], fusionIds[1], fusionIds[2]];
-    for (const candidate of candidates) {
-      if (candidate === AbilityId.NONE || candidate === slot0 || candidate === slot1) {
-        continue;
-      }
-      slot2 = candidate;
-      break;
-    }
-
-    return [slot0, slot1, slot2];
+    return [fusionIds[0], baseIds[1], fusionIds[2]];
   }
 
   /**
@@ -5341,6 +5294,27 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     );
   }
 
+  private formUsesDerivedAbilities(formKey: string | null | undefined): boolean {
+    return (
+      formKey === SpeciesFormKey.MEGA
+      || formKey === SpeciesFormKey.MEGA_X
+      || formKey === SpeciesFormKey.MEGA_Y
+      || formKey === SpeciesFormKey.PRIMAL
+      || formKey === SpeciesFormKey.GIGANTAMAX
+      || formKey === SpeciesFormKey.GIGANTAMAX_RAPID
+      || formKey === SpeciesFormKey.GIGANTAMAX_SINGLE
+      || formKey === SpeciesFormKey.ETERNAMAX
+    );
+  }
+
+  private baseUsesFormDerivedAbilities(): boolean {
+    return this.formUsesDerivedAbilities(this.getFormKey());
+  }
+
+  private fusionUsesFormDerivedAbilities(): boolean {
+    return this.formUsesDerivedAbilities(this.getFusionFormKey());
+  }
+
   /**
    * ER: Mega / Gigantamax / Eternamax / Primal forms carry their OWN ability
    * set in species data (active ability + the 3 innate slots). Per-Pokémon
@@ -5358,7 +5332,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * manually reverted.
    */
   public usesFormDerivedAbilities(): boolean {
-    return this.isMega() || this.isMax();
+    return this.baseUsesFormDerivedAbilities() || this.fusionUsesFormDerivedAbilities();
   }
 
   /**
@@ -5373,7 +5347,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * silently shadowed.
    */
   public customAbilityOverridesApply(): boolean {
-    return !this.usesFormDerivedAbilities() || this.customPokemonData.abilityOverridesForm;
+    return !this.baseUsesFormDerivedAbilities() || this.customPokemonData.abilityOverridesForm;
   }
 
   /**
@@ -7785,7 +7759,7 @@ export class PlayerPokemon extends Pokemon {
     this.fusionVariant = pokemon.variant;
     this.fusionGender = pokemon.gender;
     this.fusionLuck = pokemon.luck;
-    this.fusionCustomPokemonData = pokemon.customPokemonData;
+    this.fusionCustomPokemonData = new CustomPokemonData(pokemon.customPokemonData);
     if (pokemon.pauseEvolutions || this.pauseEvolutions) {
       this.pauseEvolutions = true;
     }

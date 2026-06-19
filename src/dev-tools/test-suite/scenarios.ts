@@ -135,6 +135,8 @@ const DEV_OVERRIDE_DEFAULTS = {
   BATTLE_STYLE_OVERRIDE: null,
   STARTING_BIOME_OVERRIDE: null,
   STARTER_FORM_OVERRIDES: {},
+  STARTER_FUSION_OVERRIDE: false,
+  STARTER_FUSION_SPECIES_OVERRIDE: null,
   ABILITY_OVERRIDE: AbilityId.NONE,
   PASSIVE_ABILITY_OVERRIDE: AbilityId.NONE,
   MOVESET_OVERRIDE: [],
@@ -327,6 +329,44 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
     shopItems: [modifierTypes.RARER_CANDY, modifierTypes.RARER_CANDY],
+  },
+  {
+    label: "Fusion ability slot ownership",
+    description:
+      "Bulbasaur is fused with Charmander. Open SUMMARY and inspect Abilities.\n"
+      + "EXPECT this exact order: STURDY, DRIZZLE, MOXIE, SAND STREAM.\n"
+      + "These represent base slot 1, absorbed slot 2, base slot 3, absorbed slot 4.\n"
+      + "KO Magikarp to receive four Ability Randomizers. Reroll each slot once.\n"
+      + "EXPECT only the selected final slot changes and all four changes persist.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 20,
+        STARTER_FUSION_OVERRIDE: true,
+        STARTER_FUSION_SPECIES_OVERRIDE: SpeciesId.CHARMANDER,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.BULBASAUR, { moveset: [MoveId.TACKLE, MoveId.GROWL] })];
+    },
+    onBattleStart: () => {
+      const player = globalScene.getPlayerPokemon();
+      if (!player) {
+        return;
+      }
+      player.setAbilityOverrideForSlot(0, AbilityId.STURDY);
+      player.setAbilityOverrideForSlot(1, AbilityId.DRIZZLE);
+      player.setAbilityOverrideForSlot(2, AbilityId.MOXIE);
+      player.setAbilityOverrideForSlot(3, AbilityId.SAND_STREAM);
+      player.updateInfo();
+    },
+    shopItems: [
+      modifierTypes.ABILITY_RANDOMIZER,
+      modifierTypes.ABILITY_RANDOMIZER,
+      modifierTypes.ABILITY_RANDOMIZER,
+      modifierTypes.ABILITY_RANDOMIZER,
+    ],
   },
   // ===========================================================================
   // FEATURES — this session

@@ -4,60 +4,95 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// =============================================================================
-// Bug: the Ability Randomizer item did nothing on FUSED Pokémon. Root cause:
-// Pokemon.getAbility() returned early in the isFusion() branch and never
-// consulted customPokemonData.ability — the exact field the randomizer writes
-// (setAbilityOverrideForSlot(0)). So a fused mon always showed its fusion-derived
-// ability and the reroll silently no-opped. This test pins that an active-ability
-// override is now honored for a fused mon.
-//
-// Gated behind ER_SCENARIO=1.
-// =============================================================================
-
+import { CustomPokemonData } from "#data/pokemon-data";
 import { AbilityId } from "#enums/ability-id";
-import { MoveId } from "#enums/move-id";
-import { SpeciesId } from "#enums/species-id";
-import { GameManager } from "#test/framework/game-manager";
-import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { PlayerPokemon } from "#field/pokemon";
+import { describe, expect, it } from "vitest";
 
-const RUN = process.env.ER_SCENARIO === "1";
+function makeFusion(
+  basePassives: readonly [AbilityId, AbilityId, AbilityId] = [
+    AbilityId.OVERGROW,
+    AbilityId.CHLOROPHYLL,
+    AbilityId.LEAF_GUARD,
+  ],
+  fusionPassives: readonly [AbilityId, AbilityId, AbilityId] = [
+    AbilityId.BLAZE,
+    AbilityId.SOLAR_POWER,
+    AbilityId.FLAME_BODY,
+  ],
+): PlayerPokemon {
+  const player = Object.create(PlayerPokemon.prototype) as PlayerPokemon;
+  Object.assign(player, {
+    summonData: { ability: 0 },
+    customPokemonData: new CustomPokemonData(),
+    fusionCustomPokemonData: new CustomPokemonData(),
+    species: {
+      ability1: AbilityId.OVERGROW,
+      getPassiveAbilities: () => basePassives,
+    },
+    fusionSpecies: {
+      getPassiveAbilities: () => fusionPassives,
+    },
+    formIndex: 0,
+    fusionFormIndex: 0,
+    abilityIndex: 0,
+    getSpeciesForm: () => ({ getAbility: () => AbilityId.OVERGROW }),
+    getFormKey: () => "",
+    getFusionFormKey: () => "",
+    isPlayer: () => false,
+    isEnemy: () => false,
+    isBoss: () => false,
+    isOnField: () => false,
+  });
+  return player;
+}
 
-describe.skipIf(!RUN)("ER Ability Randomizer works on fused mons", () => {
-  let phaserGame: Phaser.Game;
-  let game: GameManager;
+describe("ER fusion ability slots", () => {
+  it("inherits slots 1 and 3 from the base and slots 2 and 4 from the absorbed Pokemon", () => {
+    const player = makeFusion();
 
-  beforeAll(() => {
-    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+    expect(player.getAbility().id).toBe(AbilityId.OVERGROW);
+    expect(
+      player
+        .getPassiveAbilities()
+        .slice(0, 3)
+        .map(ability => ability?.id),
+    ).toEqual([AbilityId.BLAZE, AbilityId.CHLOROPHYLL, AbilityId.FLAME_BODY]);
+    expect(player.getPassiveAbility().id).toBe(AbilityId.BLAZE);
   });
 
-  beforeEach(() => {
-    game = new GameManager(phaserGame);
-    game.override
-      .battleStyle("single")
-      .enemySpecies(SpeciesId.RATTATA)
-      .enemyAbility(AbilityId.BALL_FETCH)
-      .enemyMoveset(MoveId.SPLASH)
-      .moveset([MoveId.SPLASH]);
+  it("preserves duplicate abilities inherited from different slots", () => {
+    const player = makeFusion(
+      [AbilityId.OVERGROW, AbilityId.CHLOROPHYLL, AbilityId.LEAF_GUARD],
+      [AbilityId.CHLOROPHYLL, AbilityId.SOLAR_POWER, AbilityId.FLAME_BODY],
+    );
+
+    expect(
+      player
+        .getPassiveAbilities()
+        .slice(0, 3)
+        .map(ability => ability?.id),
+    ).toEqual([AbilityId.CHLOROPHYLL, AbilityId.CHLOROPHYLL, AbilityId.FLAME_BODY]);
   });
 
-  it("getAbility honors an active-ability override on a fused Pokémon", async () => {
-    game.override.enableStarterFusion().starterFusionSpecies(SpeciesId.CHARMANDER);
-    await game.classicMode.startBattle(SpeciesId.BULBASAUR);
+  it("routes final slot overrides to the parent that owns them", () => {
+    const player = makeFusion();
 
-    const player = game.field.getPlayerPokemon();
-    expect(player.isFusion()).toBe(true);
+    player.setAbilityOverrideForSlot(0, AbilityId.STURDY);
+    player.setAbilityOverrideForSlot(1, AbilityId.DRIZZLE);
+    player.setAbilityOverrideForSlot(2, AbilityId.MOXIE);
+    player.setAbilityOverrideForSlot(3, AbilityId.SAND_STREAM);
 
-    const before = player.getAbility().id;
-    // Pick a deterministic override distinct from the current ability.
-    const override = before === AbilityId.IMPOSTER ? AbilityId.STURDY : AbilityId.IMPOSTER;
-
-    // This is exactly what the Ability Randomizer does for the active slot.
-    player.setAbilityOverrideForSlot(0, override);
-
-    // Pre-fix this returned the fusion-derived ability (override ignored).
-    expect(player.getAbility().id).toBe(override);
-    expect(player.getAbility().id).not.toBe(before);
+    expect(player.customPokemonData.ability).toBe(AbilityId.STURDY);
+    expect(player.fusionCustomPokemonData?.passive).toBe(AbilityId.DRIZZLE);
+    expect(player.customPokemonData.passive2).toBe(AbilityId.MOXIE);
+    expect(player.fusionCustomPokemonData?.passive3).toBe(AbilityId.SAND_STREAM);
+    expect(player.getAbility().id).toBe(AbilityId.STURDY);
+    expect(
+      player
+        .getPassiveAbilities()
+        .slice(0, 3)
+        .map(ability => ability?.id),
+    ).toEqual([AbilityId.DRIZZLE, AbilityId.MOXIE, AbilityId.SAND_STREAM]);
   });
 });

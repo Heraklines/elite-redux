@@ -2338,13 +2338,6 @@ export class PokemonRandomizeAbilityModifier extends ConsumablePokemonModifier {
     }
     const chosen = randSeedItem(pool);
     playerPokemon.setAbilityOverrideForSlot(target.slot, chosen);
-    // If the Pokémon is currently in a form that derives its abilities from the
-    // form's species data (mega / G-max), the override would normally be shadowed
-    // by the form's native ability and the reroll would appear to do nothing.
-    // Mark the override as form-applicable so it actually takes effect here.
-    if (playerPokemon.usesFormDerivedAbilities()) {
-      playerPokemon.customPokemonData.abilityOverridesForm = true;
-    }
     playerPokemon.updateInfo();
     return true;
   }
