@@ -331,6 +331,35 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.RARER_CANDY, modifierTypes.RARER_CANDY],
   },
   {
+    label: "QoL: reward-shop long-desc auto-scroll (#557)",
+    description:
+      "#557 - long ER item descriptions auto-scroll in the REWARD screen instead of\n"
+      + "being clipped (they used the shared message box, which wraps but never scrolls).\n"
+      + "KO the Magikarp (one Body Slam), then on the FIRST reward screen move the cursor\n"
+      + "across the options. The three guaranteed picks have LONG descriptions; the\n"
+      + "normally-rolled options (Potion etc.) have SHORT ones.\n"
+      + "EXPECT: focusing CURSED IDOL / LEARNER'S SHROOM / OMNI GEM shows the FULL text in\n"
+      + "the description box, which slowly scrolls up and loops so the clipped tail becomes\n"
+      + "readable; focusing a short item shows static text with no scroll. The box must\n"
+      + "look IDENTICAL to the normal message box (same position/font) - only long text\n"
+      + "moves. Cursed Idol's line is the longest, so its scroll is the clearest.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.ER_RELIC_CURSED_IDOL, modifierTypes.ER_LEARNERS_SHROOM, modifierTypes.ER_OMNI_GEM],
+  },
+  {
     label: "Fusion ability slot ownership",
     description:
       "Bulbasaur is fused with Charmander. Open SUMMARY and inspect Abilities.\n"
