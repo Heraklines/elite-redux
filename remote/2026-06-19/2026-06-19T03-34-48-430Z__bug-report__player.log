@@ -1,0 +1,280 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     0  wave:42  difficulty:hell
+seed:     8CzKsgOhosTRVs7UH1nnJGgO
+party:    Amphybuzz(L36 102/136), Delcatty(L35 101/101), Togetic(L35 104/104), Meowth(L35 83/83), Serena-Delphox(L35 108/108)
+
+----- DESCRIPTION -----
+Enemy IA being dumb
+
+----- CONSOLE -----
+[03:29:01.059] LOG: %cStart Phase MessagePhase color:green;
+[03:29:01.142] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:29:01.142] LOG: Applied Dire Hit 
+[03:29:01.143] LOG: crit stage: +1
+[03:29:01.145] LOG: Move: Fake Out | Base damage: 23.91186440677966 | Power: 40 | Source attack: 101 | Target defense: 59
+[03:29:01.146] LOG: Move: Fake Out | Attack damage: 31
+[03:29:01.156] WARN: Failed to get source Pokemon for InfatuatedTag canAdd; id: undefined
+[03:29:01.157] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:29:01.177] LOG: %cStart Phase MoveEndPhase color:green;
+[03:29:01.177] LOG: %cStart Phase MovePhase color:green;
+[03:29:01.177] LOG: %cUser: Swellow
+Move: BOOMBURST
+Use Mode: NORMAL color:orchid
+[03:29:01.180] LOG: %cStart Phase MessagePhase color:green;
+[03:29:01.408] LOG: %cStart Phase MoveEndPhase color:green;
+[03:29:01.409] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:29:01.409] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:29:01.409] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:29:01.409] LOG: %cStart Phase BerryPhase color:green;
+[03:29:01.409] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:29:01.409] LOG: %cStart Phase TurnEndPhase color:green;
+[03:29:01.410] LOG: %cStart Phase TurnInitPhase color:green;
+[03:29:01.410] LOG: %cStart Phase CommandPhase color:green;
+[03:29:03.021] LOG: Move: THUNDEROUS_KICK Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Delcatty
+[03:29:03.036] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:29:03.048] LOG: Battle Seed: kH1sKpouwtKi4Gcs
+[03:29:03.053] LOG: Move Pool: ["Boomburst","Heat Wave","Hurricane"]
+[03:29:03.053] LOG: Move Scores: [-6,-6,-6]
+[03:29:03.053] LOG: Sorted Move Pool: ["Boomburst","Heat Wave","Hurricane"]
+[03:29:03.053] LOG: Chosen Move: Boomburst
+[03:29:03.053] LOG: ER AI: experimental brain (sharpness 1)
+[03:29:03.053] LOG: %cStart Phase TurnStartPhase color:green;
+[03:29:03.054] LOG: %cStart Phase MovePhase color:green;
+[03:29:03.054] LOG: %cUser: Swellow
+Move: BOOMBURST
+Use Mode: NORMAL color:orchid
+[03:29:03.055] LOG: %cStart Phase MessagePhase color:green;
+[03:29:03.156] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:29:03.159] LOG: crit stage: +0
+[03:29:03.163] LOG: Move: Boomburst | Base damage: 99.7925925925926 | Power: 140 | Source attack: 115 | Target defense: 54
+[03:29:03.170] LOG: Move: Boomburst | Attack damage: 100
+[03:29:03.173] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:29:03.196] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:29:03.207] LOG: %cStart Phase MessagePhase color:green;
+[03:29:03.460] LOG: %cStart Phase FaintPhase color:green;
+[03:29:04.891] LOG: %cStart Phase MessagePhase color:green;
+[03:29:05.100] LOG: %cStart Phase MoveEndPhase color:green;
+[03:29:05.101] LOG: %cStart Phase MovePhase color:green;
+[03:29:05.101] LOG: %cStart Phase MoveEndPhase color:green;
+[03:29:05.102] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:29:05.102] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:29:05.102] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:29:05.102] LOG: %cStart Phase BerryPhase color:green;
+[03:29:05.106] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:29:05.108] LOG: %cStart Phase TurnEndPhase color:green;
+[03:29:05.109] LOG: %cStart Phase SwitchPhase color:green;
+[03:29:06.410] LOG: %cStart Phase SwitchSummonPhase color:green;
+[03:29:06.643] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:29:06.752] LOG: %cStart Phase PostSummonPhase color:green;
+[03:29:06.752] LOG: Ran PSP for: Togetic
+[03:29:06.758] LOG: %cStart Phase PostSummonPhase color:green;
+[03:29:06.759] LOG: %cStart Phase PostSummonPhase color:green;
+[03:29:06.759] LOG: %cStart Phase TurnInitPhase color:green;
+[03:29:06.759] LOG: %cStart Phase CommandPhase color:green;
+[03:29:08.339] LOG: Move: PIXIE_BEAM Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Togetic
+[03:29:08.347] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:29:08.365] LOG: %cStart Phase TurnStartPhase color:green;
+[03:29:08.370] LOG: %cStart Phase SwitchSummonPhase color:green;
+[03:29:08.371] LOG: Finn
+[03:29:08.639] LOG: Finn
+[03:29:08.882] LOG: %cStart Phase PostSummonPhase color:green;
+[03:29:08.883] LOG: Ran PSP for: Rapidash
+[03:29:08.891] LOG: %cStart Phase PostSummonPhase color:green;
+[03:29:08.893] LOG: %cStart Phase PostSummonPhase color:green;
+[03:29:08.894] LOG: %cStart Phase MovePhase color:green;
+[03:29:08.894] LOG: %cUser: Togetic
+Move: PIXIE_BEAM
+Use Mode: NORMAL color:orchid
+[03:29:08.895] LOG: %cStart Phase MessagePhase color:green;
+[03:29:09.008] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:29:09.009] LOG: Applied Dire Hit 
+[03:29:09.013] LOG: crit stage: +1
+[03:29:09.014] LOG: Battle Seed: kH1sKpouwtKi4Gcs
+[03:29:09.024] LOG: Move: Pixie Beam | Base damage: 31.413698630136988 | Power: 110 | Source attack: 61 | Target defense: 73
+[03:29:09.024] LOG: Move: Pixie Beam | Attack damage: 21
+[03:29:09.025] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:29:09.074] LOG: %cStart Phase MessagePhase color:green;
+[03:29:09.274] LOG: %cStart Phase MoveEndPhase color:green;
+[03:29:09.278] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:29:09.279] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:29:09.280] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:29:09.280] LOG: %cStart Phase BerryPhase color:green;
+[03:29:09.281] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:29:09.281] LOG: %cStart Phase TurnEndPhase color:green;
+[03:29:09.281] LOG: %cStart Phase TurnInitPhase color:green;
+[03:29:09.281] LOG: %cStart Phase CommandPhase color:green;
+[03:29:10.454] LOG: Move: SCORCHING_SANDS Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Togetic
+[03:29:10.470] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:29:10.481] LOG: Battle Seed: kH1sKpouwtKi4Gcs
+[03:29:10.488] LOG: Move Pool: ["Blaze Kick","Wild Charge","High Horsepower","High Jump Kick"]
+[03:29:10.488] LOG: Move Scores: [-77.20013037809647,-55.08474576271186,-20,-117.96936114732728]
+[03:29:10.488] LOG: Sorted Move Pool: ["High Horsepower","Wild Charge","Blaze Kick","High Jump Kick"]
+[03:29:10.488] LOG: Chosen Move: High Horsepower
+[03:29:10.488] LOG: ER AI: experimental brain (sharpness 1)
+[03:29:10.488] LOG: %cStart Phase TurnStartPhase color:green;
+[03:29:10.489] LOG: %cStart Phase MovePhase color:green;
+[03:29:10.489] LOG: %cUser: Rapidash
+Move: HIGH_HORSEPOWER
+Use Mode: NORMAL color:orchid
+[03:29:10.491] LOG: %cStart Phase MessagePhase color:green;
+[03:29:10.594] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:29:10.599] LOG: %cStart Phase MessagePhase color:green;
+[03:29:10.820] LOG: %cStart Phase MoveEndPhase color:green;
+[03:29:10.821] LOG: %cStart Phase MovePhase color:green;
+[03:29:10.821] LOG: %cUser: Togetic
+Move: SCORCHING_SANDS
+Use Mode: NORMAL color:orchid
+[03:29:10.833] LOG: %cStart Phase MessagePhase color:green;
+[03:29:10.957] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:29:10.963] LOG: Applied Dire Hit 
+[03:29:10.965] LOG: crit stage: +1
+[03:29:10.972] LOG: Move: Scorching Sands | Base damage: 22.054794520547947 | Power: 75 | Source attack: 61 | Target defense: 73
+[03:29:10.973] LOG: Move: Scorching Sands | Attack damage: 61
+[03:29:10.974] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:29:10.988] LOG: %cStart Phase MessagePhase color:green;
+[03:29:11.210] LOG: %cStart Phase MessagePhase color:green;
+[03:29:11.447] LOG: %cStart Phase MoveEndPhase color:green;
+[03:29:11.449] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:29:11.450] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:29:11.452] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:29:11.458] LOG: %cStart Phase BerryPhase color:green;
+[03:29:11.459] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:29:11.460] LOG: %cStart Phase TurnEndPhase color:green;
+[03:29:11.461] LOG: %cStart Phase TurnInitPhase color:green;
+[03:29:11.465] LOG: %cStart Phase CommandPhase color:green;
+[03:30:39.436] LOG: Move: SCORCHING_SANDS Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Togetic
+[03:30:39.450] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:30:39.472] LOG: Battle Seed: kH1sKpouwtKi4Gcs
+[03:30:39.482] LOG: Move Pool: ["Blaze Kick","Wild Charge","High Horsepower","High Jump Kick"]
+[03:30:39.482] LOG: Move Scores: [-197.1153846153846,-175,-20,-237.88461538461542]
+[03:30:39.483] LOG: Sorted Move Pool: ["High Horsepower","Wild Charge","Blaze Kick","High Jump Kick"]
+[03:30:39.483] LOG: Chosen Move: High Horsepower
+[03:30:39.483] LOG: ER AI: experimental brain (sharpness 1)
+[03:30:39.484] LOG: %cStart Phase TurnStartPhase color:green;
+[03:30:39.485] LOG: %cStart Phase MovePhase color:green;
+[03:30:39.486] LOG: %cUser: Rapidash
+Move: HIGH_HORSEPOWER
+Use Mode: NORMAL color:orchid
+[03:30:39.492] LOG: %cStart Phase MessagePhase color:green;
+[03:30:40.038] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:30:40.039] LOG: %cStart Phase MessagePhase color:green;
+[03:30:41.088] LOG: %cStart Phase MoveEndPhase color:green;
+[03:30:41.089] LOG: %cStart Phase MovePhase color:green;
+[03:30:41.090] LOG: %cUser: Togetic
+Move: SCORCHING_SANDS
+Use Mode: NORMAL color:orchid
+[03:30:41.095] LOG: %cStart Phase MessagePhase color:green;
+[03:30:41.654] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:30:41.662] LOG: Applied Dire Hit 
+[03:30:41.662] LOG: crit stage: +1
+[03:30:41.663] LOG: Move: Scorching Sands | Base damage: 22.054794520547947 | Power: 75 | Source attack: 61 | Target defense: 73
+[03:30:41.665] LOG: Move: Scorching Sands | Attack damage: 41
+[03:30:41.682] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:30:41.784] LOG: %cStart Phase MessagePhase color:green;
+[03:30:42.767] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:30:43.542] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[03:30:43.556] LOG: %cStart Phase MessagePhase color:green;
+[03:31:54.831] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:31:54.948] LOG: %cStart Phase FaintPhase color:green;
+[03:31:56.902] LOG: %cStart Phase MessagePhase color:green;
+[03:31:57.224] LOG: %cStart Phase VictoryPhase color:green;
+[03:31:57.225] LOG: %cStart Phase ExpPhase color:green;
+[03:31:57.226] LOG: Applied Super EXP. Charm 
+[03:31:57.226] LOG: Applied EXP. Charm 
+[03:31:58.052] LOG: %cStart Phase LevelUpPhase color:green;
+[03:31:58.769] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[03:32:00.603] LOG: %cStart Phase EvolutionPhase color:green;
+[03:32:28.031] LOG: %cStart Phase EndEvolutionPhase color:green;
+[03:32:28.253] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[03:32:28.259] LOG: Applied Super EXP. Charm 
+[03:32:28.260] LOG: Applied EXP. Charm 
+[03:32:28.269] LOG: %cStart Phase LevelUpPhase color:green;
+[03:32:28.886] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[03:32:30.309] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[03:32:30.314] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[03:32:30.319] LOG: Applied Super EXP. Charm 
+[03:32:30.323] LOG: Applied EXP. Charm 
+[03:32:30.324] LOG: %cStart Phase LevelUpPhase color:green;
+[03:32:30.790] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[03:32:30.790] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[03:32:30.790] LOG: Applied Super EXP. Charm 
+[03:32:30.790] LOG: Applied EXP. Charm 
+[03:32:30.792] LOG: %cStart Phase LevelUpPhase color:green;
+[03:32:31.191] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[03:32:31.192] LOG: %cStart Phase MoveEndPhase color:green;
+[03:32:31.192] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:32:31.192] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:32:31.192] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:32:31.193] LOG: %cStart Phase BerryPhase color:green;
+[03:32:31.209] LOG: Applied Lum Berry 
+[03:32:31.251] LOG: %cStart Phase CommonAnimPhase color:green;
+[03:32:31.251] LOG: %cStart Phase MessagePhase color:green;
+[03:32:32.294] LOG: %cStart Phase ResetStatusPhase color:green;
+[03:32:32.300] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:32:32.300] LOG: %cStart Phase TurnEndPhase color:green;
+[03:32:32.304] LOG: %cStart Phase SwitchSummonPhase color:green;
+[03:32:33.448] LOG: Finn
+[03:32:34.452] LOG: %cStart Phase PostSummonPhase color:green;
+[03:32:34.452] LOG: Ran PSP for: Swellow
+[03:32:34.452] LOG: %cStart Phase PostSummonPhase color:green;
+[03:32:34.452] LOG: %cStart Phase PostSummonPhase color:green;
+[03:32:34.452] LOG: %cStart Phase TurnInitPhase color:green;
+[03:32:34.454] LOG: %cStart Phase CommandPhase color:green;
+[03:33:13.760] DEBUG: Session data saved to slot 0!
+[03:33:15.937] LOG: Seed: 4Xn8Q8TG0EUqe4bp9V3RNbnr
+[03:33:15.937] LOG: Wave Seed: 4Xn8Q8TG0EUqe4bp9V3RNbnr 0
+[03:33:16.472] WARN: AnimationManager key already exists: prompt
+[03:33:16.472] WARN: AnimationManager key already exists: tera_sparkle
+[03:33:16.472] LOG: Seed: IzURMoupXqJYCkRKwRLXJE0Z
+[03:33:16.472] LOG: Wave Seed: IzURMoupXqJYCkRKwRLXJE0Z 0
+[03:33:21.837] LOG: %cStart Phase LoginPhase color:green;
+[03:33:22.298] LOG: Client Session: aHpa1Uy7U5JG2vcMcLM4EKOaq5xrdp0t
+[03:33:23.418] LOG: %cStart Phase TitlePhase color:green;
+[03:33:23.421] LOG: Getting Session Slot id: %d 0
+[03:33:23.795] LOG: use seasonal splash messages true
+[03:33:23.795] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[03:33:41.535] LOG: Getting Session Slot id: %d 0
+[03:33:41.547] LOG: Wave Seed: 8CzKsgOhosTRVs7UH1nnJGgO 0
+[03:33:41.548] LOG: Seed: 8CzKsgOhosTRVs7UH1nnJGgO
+[03:33:41.633] LOG: Wave Seed: bm¤uy~|ar[tqy 42
+[03:33:41.857] LOG: %cStart Phase EncounterPhase color:green;
+[03:33:41.861] LOG: Pokemon: Foe Swellow | Species ID: 277 | Level: 36 | Nature: Timid (+Spd/-Atk)
+[03:33:41.861] LOG: Stats (IVs): HP: 100 (31), Atk: 69 (31), Def: 59 (31), Spatk: 77 (31), Spdef: 52 (31), Spd: 117 (31)
+[03:33:41.861] LOG: Ability: Determination | Passive Ability: Flock 
+[03:33:41.861] LOG: Moveset: ["Boomburst","Protect","Heat Wave","Hurricane"]
+[03:33:41.862] LOG: Pokemon: Foe Rapidash | Species ID: 78 | Level: 36 | Nature: Jolly (+Spd/-SpAtk)
+[03:33:41.862] LOG: Stats (IVs): HP: 118 (31), Atk: 95 (31), Def: 66 (31), Spatk: 63 (31), Spdef: 73 (31), Spd: 113 (31)
+[03:33:41.862] LOG: Ability: Deadly Precision | Passive Ability: Flame Body 
+[03:33:41.862] LOG: Moveset: ["Blaze Kick","Wild Charge","High Horsepower","High Jump Kick"]
+[03:33:41.863] LOG: Pokemon: Foe Grovyle | Species ID: 253 | Level: 36 | Nature: Jolly (+Spd/-SpAtk)
+[03:33:41.863] LOG: Stats (IVs): HP: 93 (31), Atk: 77 (31), Def: 59 (31), Spatk: 55 (31), Spdef: 62 (31), Spd: 93 (31)
+[03:33:41.863] LOG: Ability: Unburden | Passive Ability: Overgrow 
+[03:33:41.863] LOG: Moveset: ["Bullet Seed","Breaking Swipe","Aerial Ace","Fluttering Leaf"]
+[03:33:41.916] LOG: Generated AI funcs
+[03:33:41.927] LOG: Wave Seed: bm¤uy~|ar[tqy 42
+[03:33:42.149] LOG: Rival Finn
+[03:33:42.149] LOG: Dialogue dialogue:rival2.encounter.1 skipped
+[03:33:42.203] LOG: Rival Finn
+[03:33:42.585] LOG: %cStart Phase SummonPhase color:green;
+[03:33:42.585] LOG: Finn
+[03:33:42.891] LOG: %cStart Phase SummonPhase color:green;
+[03:33:43.101] WARN: cry/31-mega not found
+[03:33:43.208] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:33:43.325] LOG: %cStart Phase InitEncounterPhase color:green;
+[03:33:43.332] LOG: %cStart Phase PostSummonPhase color:green;
+[03:33:43.332] LOG: Ran PSP for: Swellow
+[03:33:43.337] LOG: %cStart Phase PostSummonPhase color:green;
+[03:33:43.339] LOG: %cStart Phase PostSummonPhase color:green;
+[03:33:43.339] LOG: %cStart Phase PostSummonPhase color:green;
+[03:33:43.340] LOG: Ran PSP for: Mega Amphybuzz
+[03:33:43.341] LOG: %cStart Phase PostSummonPhase color:green;
+[03:33:43.341] LOG: %cStart Phase PostSummonPhase color:green;
+[03:33:43.341] LOG: %cStart Phase TurnInitPhase color:green;
+[03:33:43.341] LOG: %cStart Phase CommandPhase color:green;
