@@ -1,0 +1,51 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 OPR/132.0.0.0
+mode:     4  wave:50  difficulty:hell
+seed:     wYxDmk3C6WmvAtYSCV4nmoHO
+party:    Moltres Ex(L40 134/134), Makuhita Redux(L38 104/104), Heliolisk(L38 106/106)
+
+----- DESCRIPTION -----
+Fluffiest doesn't correctly calculate fire weakness (Bewarden taking >half from fire move)
+
+----- CONSOLE -----
+[19:26:41.263] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[19:26:41.554] WARN: [er-b1c] 1 mega-form injection issues: ["ER mega target 1850 has no primary type"]
+[19:26:41.778] LOG: [ER] build mqkvka3n-lfet
+[19:27:00.583] DEBUG: Destroying loading scene
+[19:27:00.583] DEBUG: Destroyed loading scene
+[19:27:00.652] LOG: Seed: WwYh1gUicuXeRc99FOzjAWoJ
+[19:27:00.652] LOG: Wave Seed: WwYh1gUicuXeRc99FOzjAWoJ 0
+[19:27:02.581] LOG: %cStart Phase LoginPhase color:green;
+[19:27:02.968] LOG: Client Session: U5lpC4SysdkVO8tG54788i8UzlsNb3KS
+[19:27:03.892] DEBUG: Using cached system data
+[19:27:03.971] LOG: %cStart Phase TitlePhase color:green;
+[19:27:03.973] LOG: Getting Session Slot id: %d 0
+[19:27:03.988] LOG: use seasonal splash messages true
+[19:27:03.988] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[19:27:09.143] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of null (reading 'deviceMapping') @ https://elite-redux.pages.dev/assets/battle-scene-DLN4_AMj.js:2:29121
+[19:27:09.706] LOG: Getting Session Slot id: %d 0
+[19:27:09.719] LOG: Wave Seed: wYxDmk3C6WmvAtYSCV4nmoHO 0
+[19:27:09.719] LOG: Seed: wYxDmk3C6WmvAtYSCV4nmoHO
+[19:27:09.756] LOG: Wave Seed: ©ªveuh¨s¦uf ¡z 50
+[19:27:09.780] LOG: Applied Zinc 
+[19:27:09.783] LOG: Applied Zinc 
+[19:27:09.786] LOG: Applied Zinc 
+[19:27:09.844] LOG: %cStart Phase EncounterPhase color:green;
+[19:27:09.850] LOG: Pokemon: Wild Revavroom | Species ID: 966 | Level: 40 | Nature: Modest (+SpAtk/-Atk)
+[19:27:09.850] LOG: Stats (IVs): HP: 122 (21), Atk: 92 (9), Def: 84 (18), Spatk: 61 (19), Spdef: 61 (7), Spd: 85 (20)
+[19:27:09.850] LOG: Ability: Speed Force | Passive Ability: Speed Boost | Boss Bars: 2
+[19:27:09.850] LOG: Moveset: ["Blazing Torque","Noxious Torque","Speed Swap","Steel Roller"]
+[19:27:11.669] LOG: Wave Seed: ©ªveuh¨s¦uf ¡z 50
+[19:27:12.096] LOG: %cStart Phase SummonPhase color:green;
+[19:27:12.248] LOG: Applied Zinc 
+[19:27:12.278] WARN: cry/622 not found
+[19:27:12.381] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:27:12.995] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:27:12.995] LOG: %cStart Phase PostSummonPhase color:green;
+[19:27:12.995] LOG: Ran PSP for: Revavroom
+[19:27:12.996] LOG: %cStart Phase PostSummonPhase color:green;
+[19:27:12.996] LOG: %cStart Phase PostSummonPhase color:green;
+[19:27:12.996] LOG: %cStart Phase TurnInitPhase color:green;
+[19:27:12.996] LOG: %cStart Phase CommandPhase color:green;
