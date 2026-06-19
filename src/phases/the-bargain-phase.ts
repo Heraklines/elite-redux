@@ -5,15 +5,15 @@
  */
 
 // =============================================================================
-// ER Abyss "The Bargain" - Giratina's deal, a DIALOGUE EVENT that fills the
+// ER Abyss "The Bargain" - Giratina's deal. A dialogue EVENT that fills the
 // Abyss's every-10-waves shop slot (the Abyss has no market - this is its
 // "shop"). Pushed from VictoryPhase on x0 waves when the biome is the Abyss.
 //
-// It is NOT a mystery encounter (it runs post-victory like the biome shop) and it
-// is NOT a grid shop - it is a talking event: Giratina's portrait + dialogue, then
-// a menu of 3 random Sins (of 6 active) + Leave. Each Sin is a run-scoped
-// cost->payoff (see er-bargain-sins). All deal logic is save-safe; the party never
-// exceeds 6 and no new serialized save state is added.
+// The presentation is the dedicated full-screen ErBargainUiHandler (UiMode.
+// ER_BARGAIN): a dark void backdrop, Giratina Origin's portrait, his line, and
+// the bargain list. This phase owns the deal LOGIC: it opens that screen, then on
+// a pick runs the chosen Sin's cost/payoff (party pick -> apply -> result). All
+// deal logic is save-safe (party never exceeds 6; no new serialized save state).
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
@@ -44,7 +44,6 @@ import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import { PokemonFormChangeItemModifier } from "#modifiers/modifier";
 import type { ModifierType } from "#modifiers/modifier-type";
-import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import i18next from "i18next";
 
@@ -53,8 +52,6 @@ const ns = "mysteryEncounters/theBargain";
 export class TheBargainPhase extends Phase {
   public readonly phaseName = "TheBargainPhase";
 
-  /** The Giratina portrait overlay, torn down when the event ends. */
-  private portrait: Phaser.GameObjects.Sprite | undefined;
   /** Guards against a double input resolving the event twice. */
   private resolving = false;
 
@@ -63,87 +60,52 @@ export class TheBargainPhase extends Phase {
     void this.run();
   }
 
-  private async run(): Promise<void> {
+  private run(): void {
     const available = BARGAIN_SIN_ORDER.filter(k => !DISABLED_BARGAIN_SINS.has(k) && bargainSinAvailable(k));
-    // Always >= 3 with a party of 2+ (greed/gluttony/wrath/sloth). If somehow not,
-    // just show however many are offerable; never error.
     const sins = pickBargainSins(available, Math.min(3, available.length));
     if (sins.length === 0) {
       this.end();
       return;
     }
 
-    this.showPortrait();
-    await this.narrate(`${ns}:intro`);
-    await this.giratina(`${ns}:introDialogue`);
-    await this.showMenu(sins);
-  }
+    // labels/descs for the dedicated bargain screen: the chosen Sins + a Leave row.
+    const labels = [...sins.map(k => i18next.t(`${ns}:sins.${k}.name`)), i18next.t(`${ns}:option.leave.label`)];
+    const descs = [...sins.map(k => i18next.t(`${ns}:sins.${k}.tooltip`)), ""];
+    const greeting = i18next.t(`${ns}:introDialogue`).replace(/\$/g, " ");
 
-  /** Add Giratina's portrait as a fixed overlay (top-left, above the dialogue box). */
-  private showPortrait(): void {
-    if (this.portrait) {
-      return;
-    }
-    const sprite = globalScene.add.sprite(28, 22, "er_bargain_giratina");
-    sprite.setOrigin(0, 0).setScale(0.55).setScrollFactor(0).setDepth(1000);
-    globalScene.fieldUI.add(sprite);
-    this.portrait = sprite;
-  }
-
-  private clearPortrait(): void {
-    this.portrait?.destroy();
-    this.portrait = undefined;
-  }
-
-  /** Present the 3 chosen Sins + Leave. */
-  private showMenu(sins: BargainSinKey[]): Promise<void> {
-    return new Promise(resolve => {
-      const options: OptionSelectItem[] = sins.map(key => ({
-        label: i18next.t(`${ns}:sins.${key}.name`),
-        handler: () => {
-          void this.resolveSin(key).then(resolve);
-          return true;
-        },
-        onHover: () => {
-          globalScene.ui.showText(i18next.t(`${ns}:sins.${key}.tooltip`), 0, undefined, 0);
-        },
-      }));
-      options.push({
-        label: i18next.t("menu:cancel"),
-        handler: () => {
-          void this.leave().then(resolve);
-          return true;
-        },
-      });
-      globalScene.ui.showText(i18next.t(`${ns}:query`), null, () => {
-        globalScene.ui.setMode(UiMode.OPTION_SELECT, { options, supportHover: true });
-      });
+    globalScene.ui.setMode(UiMode.ER_BARGAIN, labels, descs, greeting, (index: number) => {
+      void this.onChoice(sins, index);
     });
   }
 
-  /** Walk away: Giratina's parting lines, then end. */
-  private async leave(): Promise<void> {
+  /** Resolve the player's choice from the bargain screen. */
+  private async onChoice(sins: BargainSinKey[], index: number): Promise<void> {
     if (this.resolving) {
       return;
     }
     this.resolving = true;
+    // Hand the UI back to MESSAGE (this tears down the bargain screen) before any
+    // dialogue / party-select / reward flow.
     await globalScene.ui.setMode(UiMode.MESSAGE);
-    await this.giratina(`${ns}:option.leave.line1`);
-    await this.narrate(`${ns}:option.leave.line2`);
-    await this.giratina(`${ns}:option.leave.line3`);
-    this.finish();
+
+    // Leave: CANCEL (index < 0) or the Leave row (index === sins.length).
+    if (index < 0 || index >= sins.length) {
+      await this.giratina(`${ns}:option.leave.line1`);
+      await this.narrate(`${ns}:option.leave.line2`);
+      await this.giratina(`${ns}:option.leave.line3`);
+      this.end();
+      return;
+    }
+
+    await this.applySin(sins[index]);
+    this.end();
   }
 
-  /** Run the chosen Sin's offer line, party pick(s), cost+payoff, result, then end. */
-  private async resolveSin(key: BargainSinKey): Promise<void> {
-    if (this.resolving) {
-      return;
-    }
-    this.resolving = true;
-    await globalScene.ui.setMode(UiMode.MESSAGE);
+  /** Run one Sin's offer line, party pick(s), cost+payoff, then the result line. */
+  private async applySin(key: BargainSinKey): Promise<void> {
     await this.giratina(`${ns}:sins.${key}.offer`);
-
     let pokeName = "";
+
     switch (key) {
       case "greed": {
         const mon = await this.pickPokemon();
@@ -236,11 +198,11 @@ export class TheBargainPhase extends Phase {
       }
     }
 
+    globalScene.currentBattle.mysteryEncounter?.setDialogueToken("pokeName", pokeName);
     await this.narrate(`${ns}:sins.${key}.result`, { pokeName });
-    this.finish();
   }
 
-  // --- UI helpers (generic, no mystery-encounter coupling) ---
+  // --- UI helpers ---
 
   /** Open the party menu; resolves to the chosen mon, or null if backed out. */
   private pickPokemon(filter?: (p: PlayerPokemon) => string | null): Promise<PlayerPokemon | null> {
@@ -270,7 +232,7 @@ export class TheBargainPhase extends Phase {
   /** A simple labelled choice menu; resolves to the chosen value or null on cancel. */
   private subMenu<T>(choices: { label: string; value: T }[]): Promise<T | null> {
     return new Promise(resolve => {
-      const options: OptionSelectItem[] = choices.map(c => ({
+      const options = choices.map(c => ({
         label: c.label,
         handler: () => {
           resolve(c.value);
@@ -298,11 +260,5 @@ export class TheBargainPhase extends Phase {
     return new Promise(resolve => {
       globalScene.ui.showText(i18next.t(textKey, tokens ?? {}), null, () => resolve(), null, true);
     });
-  }
-
-  /** Tear down the portrait, return to MESSAGE, and end the phase. */
-  private finish(): void {
-    this.clearPortrait();
-    globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
   }
 }

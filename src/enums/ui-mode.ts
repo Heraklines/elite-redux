@@ -62,4 +62,6 @@ export enum UiMode {
   ER_MAP_PICKER,
   /** ER QoL: the level-up Move Learn panel (LEARNABLE | CURRENT, silent thin-down). */
   LEARN_MOVE_BATCH,
+  /** ER Abyss "The Bargain": Giratina's full-screen deal screen (portrait + bargains). */
+  ER_BARGAIN,
 }
