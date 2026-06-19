@@ -1,0 +1,251 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqkd01zu-ecp2
+mode:     4  wave:70
+seed:     H2JWXXWjSAT815XhoSVtOz7T
+party:    Milotic(L56 166hp f1), Gimmighoul(L56 72hp f0), Kingambit Redux(L54 153hp f0), Gallade Redux(L52 0hp f0)
+enemy:    Baxcalibur(L56)
+
+----- COMMENT -----
+Did a double fusion, It bugged out pretty bad. Gonna report in server
+
+----- CONSOLE -----
+[07:36:12.756] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[07:36:12.914] WARN: [er-b1c] 1 mega-form injection issues: ["ER mega target 1850 has no primary type"]
+[07:36:13.024] LOG: [ER] build mqkd01zu-ecp2
+[07:36:13.060] LOG: [dev-tools] loaded — 213 scenarios + Send Logs button
+[07:36:19.420] DEBUG: Destroying loading scene
+[07:36:19.420] DEBUG: Destroyed loading scene
+[07:36:19.459] LOG: Seed: OC9FVMUub0LRL4GI7jeEhREu
+[07:36:19.459] LOG: Wave Seed: OC9FVMUub0LRL4GI7jeEhREu 0
+[07:36:20.839] LOG: %cStart Phase LoginPhase color:green;
+[07:36:21.147] LOG: Client Session: DW0kYb5I3DvoZWN5pMgWEzjaYEXVlFbY
+[07:36:21.451] DEBUG: Using cached system data
+[07:36:21.489] LOG: %cStart Phase TitlePhase color:green;
+[07:36:21.490] LOG: Getting Session Slot id: %d 3
+[07:36:21.499] LOG: use seasonal splash messages true
+[07:36:21.500] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[07:36:22.232] LOG: Getting Session Slot id: %d 3
+[07:36:22.238] LOG: Wave Seed: H2JWXXWjSAT815XhoSVtOz7T 0
+[07:36:22.238] LOG: Seed: H2JWXXWjSAT815XhoSVtOz7T
+[07:36:22.266] LOG: Wave Seed: x°~w{®µºÀ} 70
+[07:36:22.277] LOG: Applied Carbos 
+[07:36:22.278] LOG: Applied Carbos 
+[07:36:22.279] LOG: Applied Carbos 
+[07:36:22.279] LOG: Applied Carbos 
+[07:36:22.281] LOG: Applied Carbos 
+[07:36:22.281] LOG: Applied Carbos 
+[07:36:22.319] LOG: %cStart Phase EncounterPhase color:green;
+[07:36:22.321] LOG: Pokemon: Wild Baxcalibur | Species ID: 998 | Level: 56 | Nature: Quiet (+SpAtk/-Spd)
+[07:36:22.321] LOG: Stats (IVs): HP: 199 (9), Atk: 178 (20), Def: 115 (14), Spatk: 114 (25), Spdef: 112 (20), Spd: 104 (25)
+[07:36:22.321] LOG: Ability: Freezing Point | Passive Ability: Thermal Exchange | Boss Bars: 3
+[07:36:22.321] LOG: Moveset: ["Outrage","Mountain Gale","Dragon Rush","Glaive Rush"]
+[07:36:22.937] LOG: Wave Seed: x°~w{®µºÀ} 70
+[07:36:23.357] LOG: %cStart Phase SummonPhase color:green;
+[07:36:23.510] LOG: Applied Carbos 
+[07:36:23.510] LOG: Applied Carbos 
+[07:36:23.539] WARN: cry/350-mega not found
+[07:36:23.642] LOG: %cStart Phase CheckSwitchPhase color:green;
+[07:36:24.516] LOG: %cStart Phase SwitchPhase color:green;
+[07:36:25.988] LOG: %cStart Phase SwitchSummonPhase color:green;
+[07:36:26.170] LOG: Applied Carbos 
+[07:36:26.170] LOG: Applied Carbos 
+[07:36:26.200] WARN: cry/853 not found
+[07:36:26.304] LOG: %cStart Phase ShinySparklePhase color:green;
+[07:36:26.406] LOG: %cStart Phase PostSummonPhase color:green;
+[07:36:26.406] LOG: Ran PSP for: Gallade Redux
+[07:36:26.406] LOG: %cStart Phase PostSummonPhase color:green;
+[07:36:26.406] LOG: %cStart Phase PostSummonPhase color:green;
+[07:36:26.407] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:36:26.564] LOG: %cStart Phase MovePhase color:green;
+[07:36:26.565] LOG: %cUser: Gallade Redux
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[07:36:26.566] LOG: %cStart Phase MessagePhase color:green;
+[07:36:26.684] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:36:26.691] LOG: Battle Seed: rYE0AGwmi0OqRiPD
+[07:36:26.692] LOG: %cStart Phase MessagePhase color:green;
+[07:36:26.957] LOG: %cStart Phase MoveEndPhase color:green;
+[07:36:26.958] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:36:26.983] LOG: %cStart Phase InitEncounterPhase color:green;
+[07:36:26.983] LOG: %cStart Phase PostSummonPhase color:green;
+[07:36:26.983] LOG: Ran PSP for: Baxcalibur
+[07:36:26.983] LOG: %cStart Phase PostSummonPhase color:green;
+[07:36:26.983] LOG: %cStart Phase PostSummonPhase color:green;
+[07:36:26.983] LOG: %cStart Phase TurnInitPhase color:green;
+[07:36:26.984] LOG: %cStart Phase CommandPhase color:green;
+[07:36:28.055] LOG: Move: PIXIE_SLASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Gallade Redux
+[07:36:28.056] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:36:28.062] LOG: Move Pool: ["Outrage","Mountain Gale","Dragon Rush","Glaive Rush"]
+[07:36:28.062] LOG: Move Scores: [36,13.5,21,28.5]
+[07:36:28.062] LOG: Sorted Move Pool: ["Outrage","Glaive Rush","Dragon Rush","Mountain Gale"]
+[07:36:28.062] LOG: Chosen Move: Outrage
+[07:36:28.063] LOG: %cStart Phase TurnStartPhase color:green;
+[07:36:28.064] LOG: %cStart Phase MovePhase color:green;
+[07:36:28.064] LOG: %cUser: Baxcalibur
+Move: OUTRAGE
+Use Mode: NORMAL color:orchid
+[07:36:28.065] LOG: %cStart Phase MessagePhase color:green;
+[07:36:28.175] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:36:28.437] LOG: crit stage: +0
+[07:36:28.437] LOG: Move: Outrage | Base damage: 111.72294736842105 | Power: 120 | Source attack: 178 | Target defense: 95
+[07:36:28.437] LOG: Move: Outrage | Attack damage: 145
+[07:36:28.439] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:36:28.450] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:36:28.613] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:36:28.642] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:36:28.806] LOG: %cStart Phase MessagePhase color:green;
+[07:36:29.054] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:36:29.056] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:36:29.091] LOG: %cStart Phase MoveEndPhase color:green;
+[07:36:29.091] LOG: %cStart Phase MovePhase color:green;
+[07:36:29.091] LOG: %cUser: Gallade Redux
+Move: PIXIE_SLASH
+Use Mode: NORMAL color:orchid
+[07:36:29.092] LOG: %cStart Phase MessagePhase color:green;
+[07:36:29.217] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:36:29.690] LOG: crit stage: +1
+[07:36:29.691] LOG: Move: Pixie Slash | Base damage: 33.761391304347825 | Power: 90 | Source attack: 89 | Target defense: 115
+[07:36:29.691] LOG: Move: Pixie Slash | Attack damage: 97
+[07:36:29.692] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:36:29.705] LOG: %cStart Phase StatStageChangePhase color:green;
+[07:36:29.888] LOG: %cStart Phase MessagePhase color:green;
+[07:36:30.102] LOG: %cStart Phase MessagePhase color:green;
+[07:36:30.303] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:36:30.461] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:36:30.491] LOG: %cStart Phase MoveEndPhase color:green;
+[07:36:30.491] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:36:30.491] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:36:30.491] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:36:30.491] LOG: %cStart Phase BerryPhase color:green;
+[07:36:30.492] LOG: Applied Enigma Berry (enemy)
+[07:36:30.493] LOG: %cStart Phase CommonAnimPhase color:green;
+[07:36:30.630] LOG: %cStart Phase PokemonHealPhase color:green;
+[07:36:30.729] LOG: %cStart Phase MessagePhase color:green;
+[07:36:31.024] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:36:31.025] LOG: %cStart Phase TurnEndPhase color:green;
+[07:36:31.026] LOG: %cStart Phase PokemonHealPhase color:green;
+[07:36:31.130] LOG: %cStart Phase MessagePhase color:green;
+[07:36:31.362] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:36:31.365] LOG: %cStart Phase TurnInitPhase color:green;
+[07:36:31.365] LOG: %cStart Phase CommandPhase color:green;
+[07:36:32.012] LOG: Move: PIXIE_SLASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Gallade Redux
+[07:36:32.014] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:36:32.014] LOG: %cStart Phase TurnStartPhase color:green;
+[07:36:32.014] LOG: %cStart Phase MovePhase color:green;
+[07:36:32.014] LOG: %cUser: Baxcalibur
+Move: OUTRAGE
+Use Mode: IGNORE_PP color:orchid
+[07:36:32.015] LOG: %cStart Phase MessagePhase color:green;
+[07:36:32.132] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:36:32.133] LOG: Battle Seed: rYE0AGwmi0OqRiPD
+[07:36:32.395] LOG: crit stage: +0
+[07:36:32.395] LOG: Move: Outrage | Base damage: 166.5844210526316 | Power: 120 | Source attack: 267 | Target defense: 95
+[07:36:32.395] LOG: Move: Outrage | Attack damage: 217
+[07:36:32.396] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:36:32.406] LOG: %cStart Phase CommonAnimPhase color:green;
+[07:36:32.557] LOG: %cStart Phase MessagePhase color:green;
+[07:36:32.781] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:36:32.939] LOG: %cStart Phase MessagePhase color:green;
+[07:36:33.187] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:36:33.189] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:36:33.224] LOG: %cStart Phase FaintPhase color:green;
+[07:36:33.225] WARN: cry/10853 not found
+[07:36:33.285] LOG: %cStart Phase MessagePhase color:green;
+[07:36:33.799] LOG: %cStart Phase MoveEndPhase color:green;
+[07:36:33.799] LOG: %cStart Phase MovePhase color:green;
+[07:36:33.799] LOG: %cStart Phase MoveEndPhase color:green;
+[07:36:33.800] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:36:33.800] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:36:33.800] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:36:33.800] LOG: %cStart Phase BerryPhase color:green;
+[07:36:33.800] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:36:33.800] LOG: %cStart Phase TurnEndPhase color:green;
+[07:36:33.800] LOG: %cStart Phase SwitchPhase color:green;
+[07:36:35.228] LOG: %cStart Phase SwitchSummonPhase color:green;
+[07:36:35.310] LOG: Applied Carbos 
+[07:36:35.310] LOG: Applied Carbos 
+[07:36:35.338] WARN: cry/350-mega not found
+[07:36:35.442] LOG: %cStart Phase PostSummonPhase color:green;
+[07:36:35.442] LOG: Ran PSP for: Mega Milotic
+[07:36:35.442] LOG: %cStart Phase PostSummonPhase color:green;
+[07:36:35.442] LOG: %cStart Phase PostSummonPhase color:green;
+[07:36:35.442] LOG: %cStart Phase TurnInitPhase color:green;
+[07:36:35.442] LOG: %cStart Phase CommandPhase color:green;
+[07:36:36.151] LOG: Move: MOONBLAST Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega Milotic
+[07:36:36.152] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:36:36.155] LOG: Battle Seed: rYE0AGwmi0OqRiPD
+[07:36:36.156] LOG: Move Pool: ["Outrage","Glaive Rush"]
+[07:36:36.156] LOG: Move Scores: [36,28.5]
+[07:36:36.156] LOG: Sorted Move Pool: ["Outrage","Glaive Rush"]
+[07:36:36.156] LOG: Chosen Move: Outrage
+[07:36:36.156] LOG: %cStart Phase TurnStartPhase color:green;
+[07:36:36.157] LOG: %cStart Phase MovePhase color:green;
+[07:36:36.157] LOG: %cUser: Mega Milotic
+Move: MOONBLAST
+Use Mode: NORMAL color:orchid
+[07:36:36.158] LOG: %cStart Phase MessagePhase color:green;
+[07:36:36.266] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:36:36.751] LOG: crit stage: +0
+[07:36:36.752] LOG: Move: Moonblast | Base damage: 66.98678571428572 | Power: 95 | Source attack: 157 | Target defense: 112
+[07:36:36.752] LOG: Move: Moonblast | Attack damage: 251
+[07:36:36.753] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:36:36.764] LOG: %cStart Phase StatStageChangePhase color:green;
+[07:36:36.764] LOG: %cStart Phase MessagePhase color:green;
+[07:36:36.962] LOG: %cStart Phase FaintPhase color:green;
+[07:36:37.018] LOG: %cStart Phase MessagePhase color:green;
+[07:36:37.441] LOG: %cStart Phase VictoryPhase color:green;
+[07:36:37.442] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[07:36:37.442] LOG: Applied EXP. Charm 
+[07:36:37.442] LOG: Applied Super EXP. Charm 
+[07:36:37.563] LOG: %cStart Phase LevelUpPhase color:green;
+[07:36:37.564] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[07:36:37.624] LOG: %cStart Phase MoveEndPhase color:green;
+[07:36:37.624] LOG: %cStart Phase MovePhase color:green;
+[07:36:37.624] LOG: %cStart Phase MoveEndPhase color:green;
+[07:36:37.625] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:36:37.625] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:36:37.625] LOG: %cStart Phase TurnEndPhase color:green;
+[07:36:37.625] LOG: %cStart Phase BattleEndPhase color:green;
+[07:36:37.625] LOG: Battle Score: 458 (3 Turns x0.84)
+[07:36:37.625] LOG: Total Score: 8525
+[07:36:37.628] LOG: Applied Carbos 
+[07:36:37.629] LOG: Applied Carbos 
+[07:36:37.630] LOG: %cStart Phase EggLapsePhase color:green;
+[07:36:37.631] LOG: %cStart Phase ModifierRewardPhase color:green;
+[07:36:37.631] LOG: Applied Carbos 
+[07:36:37.631] LOG: Applied Carbos 
+[07:36:38.254] LOG: %cStart Phase SelectModifierPhase color:green;
+[07:36:49.087] WARN: cry/10027 not found
+[07:36:52.191] WARN: cry/741 not found
+[07:37:03.044] LOG: Applied Carbos 
+[07:37:03.045] LOG: Applied Carbos 
+[07:37:03.047] LOG: Applied Carbos 
+[07:37:03.047] LOG: Applied Carbos 
+[07:37:05.920] WARN: cry/741 not found
+[07:37:36.353] WARN: cry/853 not found
+[07:37:36.819] WARN: cry/741 not found
+[07:37:57.775] WARN: cry/741 not found
+[07:37:57.985] WARN: cry/853 not found
+[07:37:58.523] WARN: cry/741 not found
+[07:37:59.183] WARN: cry/741 not found
+[07:37:59.363] WARN: cry/853 not found
+[07:38:03.732] WARN: cry/741 not found
+[07:38:05.287] WARN: cry/741 not found
+[07:38:05.482] WARN: cry/853 not found
+[07:38:07.148] WARN: cry/741 not found
+[07:38:09.666] WARN: cry/741 not found
+[07:38:09.861] WARN: cry/853 not found
+[07:38:30.366] WARN: cry/853 not found
+[07:38:50.258] WARN: cry/853 not found
+[07:38:55.239] LOG: Applied Carbos 
+[07:38:55.239] LOG: Applied Carbos 
+[07:38:55.240] LOG: Applied Carbos 
+[07:38:55.240] LOG: Applied Carbos 
+[07:39:00.522] WARN: cry/853 not found
+[07:39:17.172] WARN: cry/853 not found
+[07:39:18.417] WARN: cry/853 not found
+[07:39:25.825] LOG: %cStart Phase LearnMovePhase color:green;
+[07:39:27.355] WARN: cry/853 not found
