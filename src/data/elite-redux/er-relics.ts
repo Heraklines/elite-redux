@@ -204,7 +204,7 @@ export const ER_RELIC_CONFIG: Readonly<Record<ErRelicKind, ErRelicConfig>> = {
   cursedIdol: {
     name: "Cursed Idol",
     description:
-      "A leering effigy. Each battle, your first Pokémon out gains a free Substitute, but the next to enter arrives at half HP.",
+      "A leering effigy. Each battle, the first Pokémon you switch in gains a free Substitute, but the next to enter arrives at half HP.",
     // TODO art-polish: bespoke idol icon. Reuse the soul-dew frame, tinted abyssal violet.
     icon: "soul_dew",
     tint: 0x7030a0,

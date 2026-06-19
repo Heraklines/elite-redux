@@ -273,31 +273,41 @@ export class ErBargainUiHandler extends UiHandler {
 
   /**
    * Load + show the real animated Giratina Origin battle sprite behind the
-   * portrait. Async (sprites load on demand); the small PMD portrait stands in
-   * until it lands. No-ops if the screen has since closed or the sprite failed.
+   * portrait. If the sprite is already cached (re-entry from Check Team / the
+   * party), show it immediately so it doesn't flicker out and reload. Otherwise
+   * load on demand (the small PMD portrait stands in until it lands). No-ops if
+   * the screen has since closed or the sprite failed.
    */
   private loadGiratina(): void {
     const species = getPokemonSpecies(SpeciesId.GIRATINA);
+    const key = species.getSpriteKey(false, GIRATINA_ORIGIN_FORM, false, 0);
+    if (globalScene.textures.exists(key)) {
+      this.showGiratinaSprite(key);
+      return;
+    }
     species
       // female=false, Origin forme, non-shiny, variant 0, startLoad, front, spriteOnly
       .loadAssets(false, GIRATINA_ORIGIN_FORM, false, 0, true, false, true)
       .then(() => {
-        const key = species.getSpriteKey(false, GIRATINA_ORIGIN_FORM, false, 0);
         if (!this.active || !globalScene.textures.exists(key)) {
           return;
         }
-        this.giratina.setTexture(key);
-        if (globalScene.anims.exists(key)) {
-          this.giratina.play(key);
-        }
-        // Fit the full sprite into the left visual area.
-        this.giratina.setScale(1);
-        const sh = this.giratina.height || 1;
-        const maxH = 122;
-        this.giratina.setScale(sh > maxH ? maxH / sh : 1);
-        this.giratina.setVisible(true);
+        this.showGiratinaSprite(key);
       })
       .catch(() => {});
+  }
+
+  /** Apply the Giratina texture/anim, fit it to the left visual area, reveal it. */
+  private showGiratinaSprite(key: string): void {
+    this.giratina.setTexture(key);
+    if (globalScene.anims.exists(key)) {
+      this.giratina.play(key);
+    }
+    this.giratina.setScale(1);
+    const sh = this.giratina.height || 1;
+    const maxH = 122;
+    this.giratina.setScale(sh > maxH ? maxH / sh : 1);
+    this.giratina.setVisible(true);
   }
 
   private buildRows(): void {
