@@ -262,8 +262,8 @@ export class EggGachaUiHandler extends MessageUiHandler {
         eggGachaOptionSelectWidth = 96;
     }
 
-    // 8 rows total: 5 voucher pull options + auto-restock + discard-eggs + cancel.
-    this.eggGachaOptionSelectBg = addWindow(0, 0, eggGachaOptionSelectWidth, 16 + 768 * this.scale).setOrigin(1);
+    // 7 rows total: 5 voucher pull options + an "Options..." submenu row + cancel.
+    this.eggGachaOptionSelectBg = addWindow(0, 0, eggGachaOptionSelectWidth, 16 + 672 * this.scale).setOrigin(1);
     this.eggGachaOptionsContainer = globalScene.add
       .container(globalScene.scaledCanvas.width, 148)
       .add(this.eggGachaOptionSelectBg);
@@ -313,12 +313,11 @@ export class EggGachaUiHandler extends MessageUiHandler {
       })
       .join("\n");
 
-    const autoRestockEntryLine = `     ${i18next.t("egg:autoRestockEntry")}`;
-    const flushEggsEntryLine = `     ${i18next.t("egg:flushEggsEntry")}`;
+    const optionsEntryLine = `     ${i18next.t("egg:optionsEntry")}`;
     const optionText = addTextObject(
       0,
       0,
-      `${pullOptionsText}\n${autoRestockEntryLine}\n${flushEggsEntryLine}\n${i18next.t("menu:cancel")}`,
+      `${pullOptionsText}\n${optionsEntryLine}\n${i18next.t("menu:cancel")}`,
       TextStyle.WINDOW,
     )
       .setLineSpacing(28)
@@ -828,20 +827,17 @@ export class EggGachaUiHandler extends MessageUiHandler {
    */
   private handleVoucherSelectAction(cursor: number): boolean | undefined {
     // Cursors that are out of range should not be processed
-    if (cursor < 0 || cursor > 7) {
+    if (cursor < 0 || cursor > 6) {
       return;
     }
     const ui = this.getUi();
 
-    // Cursor 5 = "Auto Restock...", 6 = "Discard Eggs...", 7 = cancel.
+    // Cursor 5 = "Options..." (Auto Restock + Discard Eggs submenu), 6 = cancel.
     if (cursor === 5) {
-      void ui.setOverlayMode(UiMode.AUTO_EGG_RESTOCK);
+      this.openGachaOptions();
       return true;
     }
     if (cursor === 6) {
-      return this.flushEggs();
-    }
-    if (cursor === 7) {
       ui.revertMode();
       return true;
     }
@@ -852,6 +848,39 @@ export class EggGachaUiHandler extends MessageUiHandler {
     this.editingMultiplierRow = cursor;
     this.refreshMultiplierLabel(cursor);
     return true;
+  }
+
+  /**
+   * "Options..." submenu: the two utility actions (Auto Restock, Discard Eggs)
+   * collapsed into one row so the gacha machine keeps more vertical space.
+   * Opened as an OPTION_SELECT overlay; selecting an entry auto-closes the submenu
+   * (handler returns true) and a deferred call opens the real action on the gacha,
+   * so overlays never stack on top of each other.
+   */
+  private openGachaOptions(): void {
+    const ui = this.getUi();
+    ui.setOverlayMode(UiMode.OPTION_SELECT, {
+      options: [
+        {
+          label: i18next.t("egg:autoRestockEntry"),
+          handler: () => {
+            globalScene.time.delayedCall(fixedInt(10), () => ui.setOverlayMode(UiMode.AUTO_EGG_RESTOCK));
+            return true;
+          },
+        },
+        {
+          label: i18next.t("egg:flushEggsEntry"),
+          handler: () => {
+            globalScene.time.delayedCall(fixedInt(10), () => this.flushEggs());
+            return true;
+          },
+        },
+        {
+          label: i18next.t("menu:cancel"),
+          handler: () => true,
+        },
+      ],
+    });
   }
 
   /**
@@ -998,7 +1027,7 @@ export class EggGachaUiHandler extends MessageUiHandler {
         }
         break;
       case Button.DOWN:
-        if (this.cursor < 7) {
+        if (this.cursor < 6) {
           success = this.setCursor(this.cursor + 1);
         }
         break;

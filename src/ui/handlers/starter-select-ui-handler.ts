@@ -975,6 +975,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       i18next.t("starterSelectUiHandler:useLastTeam"),
       TextStyle.TOOLTIP_CONTENT,
     ).setOrigin(0.5, 0);
+    // "Use Last Team" runs wider than this compact action button - shrink to fit.
+    if (lastTeamSelectLabel.displayWidth > 24) {
+      lastTeamSelectLabel.setScale(lastTeamSelectLabel.scaleX * (24 / lastTeamSelectLabel.displayWidth));
+    }
 
     this.lastTeamCursorObj = globalScene.add
       .nineslice(teamWindowX + 4, 21, "select_cursor", undefined, 26, 15, 6, 6, 6, 6)
