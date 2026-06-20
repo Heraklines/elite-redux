@@ -1,0 +1,285 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     4  wave:112  difficulty:elite
+seed:     iJPYVez0U53b60JHWye3fgPf
+party:    Quagsire(L97 295/295), Hypnocroak(L97 92/318), Unfezant(L97 325/325), Gooschase(L94 0/314), Kecleon(L97 240/240), Duelumber(L97 294/294)
+
+----- DESCRIPTION -----
+Aqua Grunts with full Fire type team
+
+----- CONSOLE -----
+[11:55:26.326] LOG: %cStart Phase PostSummonPhase color:green;
+[11:55:26.326] LOG: %cStart Phase MoveEndPhase color:green;
+[11:55:26.326] LOG: %cStart Phase MovePhase color:green;
+[11:55:26.326] LOG: %cUser: Iron Moth
+Move: BOILING_FLAME
+Use Mode: NORMAL color:orchid
+[11:55:26.332] LOG: %cStart Phase MessagePhase color:green;
+[11:55:26.633] LOG: %cStart Phase MoveEffectPhase color:green;
+[11:55:27.084] LOG: crit stage: +0
+[11:55:27.085] LOG: Move: Boiling Flame | Base damage: 121.55891891891892 | Power: 80 | Source attack: 432 | Target defense: 222
+[11:55:27.085] LOG: Move: Boiling Flame | Attack damage: 160
+[11:55:27.086] LOG: %cStart Phase DamageAnimPhase color:green;
+[11:55:27.119] LOG: %cStart Phase FaintPhase color:green;
+[11:55:27.123] WARN: cry/10013 not found
+[11:55:27.273] LOG: %cStart Phase MessagePhase color:green;
+[11:55:27.749] LOG: %cStart Phase MoveEndPhase color:green;
+[11:55:27.749] LOG: %cStart Phase MovePhase color:green;
+[11:55:27.749] LOG: %cUser: Hypnocroak
+Move: SLEEP_POWDER
+Use Mode: NORMAL color:orchid
+[11:55:27.754] LOG: %cStart Phase MessagePhase color:green;
+[11:55:28.033] LOG: %cStart Phase MoveEffectPhase color:green;
+[11:55:28.670] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[11:55:29.050] LOG: %cStart Phase MessagePhase color:green;
+[11:55:29.583] LOG: %cStart Phase MoveEndPhase color:green;
+[11:55:29.584] LOG: %cStart Phase CheckInterludePhase color:green;
+[11:55:29.584] LOG: %cStart Phase WeatherEffectPhase color:green;
+[11:55:29.584] LOG: %cStart Phase PositionalTagPhase color:green;
+[11:55:29.584] LOG: %cStart Phase BerryPhase color:green;
+[11:55:29.588] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[11:55:29.590] LOG: %cStart Phase TurnEndPhase color:green;
+[11:55:29.594] LOG: %cStart Phase ShowAbilityPhase color:green;
+[11:55:29.985] LOG: %cStart Phase DamageAnimPhase color:green;
+[11:55:29.988] LOG: %cStart Phase HideAbilityPhase color:green;
+[11:55:30.050] LOG: %cStart Phase SwitchPhase color:green;
+[11:55:31.859] LOG: %cStart Phase SwitchSummonPhase color:green;
+[11:55:32.053] LOG: Applied Protein 
+[11:55:32.054] LOG: Applied Calcium 
+[11:55:32.375] LOG: %cStart Phase PostSummonPhase color:green;
+[11:55:32.375] LOG: Ran PSP for: Quagsire
+[11:55:32.376] LOG: %cStart Phase PostSummonPhase color:green;
+[11:55:32.376] LOG: %cStart Phase PostSummonPhase color:green;
+[11:55:32.376] LOG: %cStart Phase TurnInitPhase color:green;
+[11:55:32.376] LOG: %cStart Phase CommandPhase color:green;
+[11:55:33.172] LOG: Move: MUD_SHOT Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Quagsire
+[11:55:33.173] LOG: %cStart Phase SelectTargetPhase color:green;
+[11:55:34.305] LOG: %cStart Phase CommandPhase color:green;
+[11:55:34.973] LOG: Move: MUDDY_WATER Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Quagsire
+[11:55:34.974] LOG: %cStart Phase SelectTargetPhase color:green;
+[11:55:35.104] LOG: %cStart Phase CommandPhase color:green;
+[11:55:38.628] LOG: Move: NOXIOUS_TORQUE Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Hypnocroak
+[11:55:38.629] LOG: %cStart Phase SelectTargetPhase color:green;
+[11:55:39.627] LOG: %cStart Phase EnemyCommandPhase color:green;
+[11:55:39.645] LOG: Battle Seed: YE9K3NcROe7MCktF
+[11:55:39.646] LOG: Move Pool: ["Crunch"]
+[11:55:39.646] LOG: Move Scores: [58.21678321678322]
+[11:55:39.646] LOG: Sorted Move Pool: ["Crunch"]
+[11:55:39.646] LOG: Chosen Move: Crunch
+[11:55:39.646] LOG: ER AI: standard brain (sharpness 0.85)
+[11:55:39.646] LOG: %cStart Phase EnemyCommandPhase color:green;
+[11:55:39.683] LOG: Move Pool: ["Sludge Wave","Boiling Flame","Quiver Dance","Parabolic Charge"]
+[11:55:39.683] LOG: Move Scores: [-27.978087410744244,59.65909090909091,20,-0.7134470695356327]
+[11:55:39.683] LOG: Sorted Move Pool: ["Boiling Flame","Quiver Dance","Parabolic Charge","Sludge Wave"]
+[11:55:39.683] LOG: Chosen Move: Boiling Flame
+[11:55:39.683] LOG: ER AI: standard brain (sharpness 0.85)
+[11:55:39.683] LOG: %cStart Phase TurnStartPhase color:green;
+[11:55:39.689] LOG: %cStart Phase MovePhase color:green;
+[11:55:39.689] LOG: %cUser: Iron Moth
+Move: BOILING_FLAME
+Use Mode: NORMAL color:orchid
+[11:55:39.696] LOG: %cStart Phase MessagePhase color:green;
+[11:55:39.931] LOG: %cStart Phase MoveEffectPhase color:green;
+[11:55:40.381] LOG: crit stage: +0
+[11:55:40.383] LOG: Move: Boiling Flame | Base damage: 163.8419512195122 | Power: 80 | Source attack: 432 | Target defense: 164
+[11:55:40.383] LOG: Move: Boiling Flame | Attack damage: 226
+[11:55:40.384] LOG: %cStart Phase DamageAnimPhase color:green;
+[11:55:40.415] LOG: %cStart Phase MoveEndPhase color:green;
+[11:55:40.417] LOG: %cStart Phase MovePhase color:green;
+[11:55:40.417] LOG: %cUser: Houndoom
+Move: CRUNCH
+Use Mode: NORMAL color:orchid
+[11:55:40.417] LOG: %cStart Phase MessagePhase color:green;
+[11:55:40.964] LOG: %cStart Phase CommonAnimPhase color:green;
+[11:55:41.348] LOG: %cStart Phase MoveEndPhase color:green;
+[11:55:41.349] LOG: %cStart Phase MovePhase color:green;
+[11:55:41.349] LOG: %cUser: Hypnocroak
+Move: NOXIOUS_TORQUE
+Use Mode: NORMAL color:orchid
+[11:55:41.354] LOG: %cStart Phase MessagePhase color:green;
+[11:55:41.664] LOG: %cStart Phase MoveEffectPhase color:green;
+[11:55:42.265] LOG: crit stage: +0
+[11:55:42.266] LOG: Move: Noxious Torque | Base damage: 72.83380281690141 | Power: 100 | Source attack: 127 | Target defense: 142
+[11:55:42.266] LOG: Move: Noxious Torque | Attack damage: 51
+[11:55:42.266] LOG: %cStart Phase DamageAnimPhase color:green;
+[11:55:42.300] LOG: %cStart Phase MessagePhase color:green;
+[11:55:42.831] LOG: %cStart Phase MoveEndPhase color:green;
+[11:55:42.831] LOG: %cStart Phase MovePhase color:green;
+[11:55:42.831] LOG: %cUser: Quagsire
+Move: MUDDY_WATER
+Use Mode: NORMAL color:orchid
+[11:55:42.834] LOG: %cStart Phase MessagePhase color:green;
+[11:55:43.114] LOG: %cStart Phase MoveEffectPhase color:green;
+[11:55:44.249] LOG: crit stage: +0
+[11:55:44.251] LOG: Move: Muddy Water | Base damage: 90.90417582417582 | Power: 90 | Source attack: 227 | Target defense: 182
+[11:55:44.251] LOG: Move: Muddy Water | Attack damage: 184
+[11:55:44.252] LOG: crit stage: +0
+[11:55:44.253] LOG: Move: Muddy Water | Base damage: 71.4444635193133 | Power: 90 | Source attack: 227 | Target defense: 233
+[11:55:44.254] LOG: Move: Muddy Water | Attack damage: 123
+[11:55:44.255] LOG: %cStart Phase DamageAnimPhase color:green;
+[11:55:44.282] LOG: %cStart Phase MessagePhase color:green;
+[11:55:44.797] LOG: %cStart Phase DamageAnimPhase color:green;
+[11:55:44.832] LOG: %cStart Phase MessagePhase color:green;
+[11:55:45.347] LOG: %cStart Phase MoveEndPhase color:green;
+[11:55:45.347] LOG: %cStart Phase CheckInterludePhase color:green;
+[11:55:45.347] LOG: %cStart Phase WeatherEffectPhase color:green;
+[11:55:45.347] LOG: %cStart Phase PositionalTagPhase color:green;
+[11:55:45.347] LOG: %cStart Phase BerryPhase color:green;
+[11:55:45.351] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[11:55:45.355] LOG: %cStart Phase TurnEndPhase color:green;
+[11:55:45.358] LOG: %cStart Phase ShowAbilityPhase color:green;
+[11:55:45.748] LOG: %cStart Phase DamageAnimPhase color:green;
+[11:55:45.750] LOG: %cStart Phase HideAbilityPhase color:green;
+[11:55:45.831] LOG: %cStart Phase FaintPhase color:green;
+[11:55:47.317] LOG: %cStart Phase MessagePhase color:green;
+[11:55:47.599] LOG: %cStart Phase VictoryPhase color:green;
+[11:55:47.600] LOG: %cStart Phase ExpPhase color:green;
+[11:55:47.600] LOG: Applied Super EXP. Charm 
+[11:55:47.600] LOG: Applied EXP. Charm 
+[11:55:48.032] LOG: %cStart Phase LevelUpPhase color:green;
+[11:55:48.033] LOG: %cStart Phase ExpPhase color:green;
+[11:55:48.034] LOG: Applied Super EXP. Charm 
+[11:55:48.034] LOG: Applied EXP. Charm 
+[11:55:48.616] LOG: %cStart Phase LevelUpPhase color:green;
+[11:55:48.617] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[11:55:48.618] LOG: Applied Super EXP. Charm 
+[11:55:48.618] LOG: Applied EXP. Charm 
+[11:55:48.619] LOG: %cStart Phase LevelUpPhase color:green;
+[11:55:48.619] LOG: Applied Protein 
+[11:55:48.619] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[11:55:48.620] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[11:55:48.620] LOG: Applied Super EXP. Charm 
+[11:55:48.620] LOG: Applied EXP. Charm 
+[11:55:48.621] LOG: %cStart Phase LevelUpPhase color:green;
+[11:55:48.622] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[11:55:48.622] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[11:55:48.622] LOG: Applied Super EXP. Charm 
+[11:55:48.622] LOG: Applied EXP. Charm 
+[11:55:48.623] LOG: %cStart Phase LevelUpPhase color:green;
+[11:55:48.623] LOG: Applied Calcium 
+[11:55:48.623] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[11:55:48.623] LOG: %cStart Phase SwitchSummonPhase color:green;
+[11:55:49.198] LOG: Localized grunt name: Aqua Grunt
+[11:55:49.382] LOG: Applied Protein (enemy)
+[11:55:49.383] LOG: Applied HP Up (enemy)
+[11:55:49.722] LOG: %cStart Phase PostSummonPhase color:green;
+[11:55:49.722] LOG: Ran PSP for: Flareon
+[11:55:49.722] LOG: %cStart Phase PostSummonPhase color:green;
+[11:55:49.722] LOG: %cStart Phase PostSummonPhase color:green;
+[11:55:49.722] LOG: %cStart Phase TurnInitPhase color:green;
+[11:55:49.722] LOG: %cStart Phase CommandPhase color:green;
+[11:55:50.684] LOG: Move: MUD_SHOT Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Quagsire
+[11:55:50.686] LOG: %cStart Phase SelectTargetPhase color:green;
+[11:55:51.661] LOG: %cStart Phase CommandPhase color:green;
+[11:55:54.000] LOG: Move: SLEEP_POWDER Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Hypnocroak
+[11:55:54.002] LOG: %cStart Phase SelectTargetPhase color:green;
+[11:55:54.573] LOG: %cStart Phase EnemyCommandPhase color:green;
+[11:55:54.589] LOG: Applied Charcoal (enemy)
+[11:55:54.590] LOG: Applied Charcoal (enemy)
+[11:55:54.596] LOG: Battle Seed: YE9K3NcROe7MCktF
+[11:55:54.600] LOG: Applied Charcoal (enemy)
+[11:55:54.601] LOG: Move Pool: ["Flare Blitz","Solar Blade","Wild Charge"]
+[11:55:54.601] LOG: Move Scores: [34.77508650519031,1161.4186851211073,-20]
+[11:55:54.601] LOG: Sorted Move Pool: ["Solar Blade","Flare Blitz","Wild Charge"]
+[11:55:54.601] LOG: Chosen Move: Solar Blade
+[11:55:54.601] LOG: ER AI: standard brain (sharpness 0.85)
+[11:55:54.601] LOG: %cStart Phase EnemyCommandPhase color:green;
+[11:55:54.622] LOG: Move Pool: ["Sludge Wave","Boiling Flame","Parabolic Charge"]
+[11:55:54.622] LOG: Move Scores: [966.863537952114,26.211072664359865,995.6889964340295]
+[11:55:54.622] LOG: Sorted Move Pool: ["Parabolic Charge","Sludge Wave","Boiling Flame"]
+[11:55:54.622] LOG: Chosen Move: Parabolic Charge
+[11:55:54.622] LOG: ER AI: standard brain (sharpness 0.85)
+[11:55:54.622] LOG: %cStart Phase TurnStartPhase color:green;
+[11:55:54.626] LOG: %cStart Phase MovePhase color:green;
+[11:55:54.626] LOG: %cUser: Quagsire
+Move: MUD_SHOT
+Use Mode: NORMAL color:orchid
+[11:55:54.630] LOG: %cStart Phase MessagePhase color:green;
+[11:55:54.830] LOG: %cStart Phase MoveEffectPhase color:green;
+[11:55:54.847] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[11:55:54.847] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[11:55:54.864] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[11:55:54.880] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[11:55:54.897] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[11:55:54.913] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[11:55:54.930] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[11:55:54.946] WARN: Texture "%s" has no frame "%s" PRAS- Mud Shot 1
+[11:55:55.581] LOG: crit stage: +0
+[11:55:55.583] LOG: Move: Mud Shot | Base damage: 33.45064377682404 | Power: 40 | Source attack: 229 | Target defense: 233
+[11:55:55.584] LOG: Move: Mud Shot | Attack damage: 148
+[11:55:55.585] LOG: %cStart Phase DamageAnimPhase color:green;
+[11:55:55.616] LOG: %cStart Phase MessagePhase color:green;
+[11:55:56.130] LOG: %cStart Phase FaintPhase color:green;
+[11:55:59.032] LOG: %cStart Phase MessagePhase color:green;
+[11:55:59.238] LOG: %cStart Phase VictoryPhase color:green;
+[11:55:59.239] LOG: %cStart Phase ExpPhase color:green;
+[11:55:59.239] LOG: Applied Super EXP. Charm 
+[11:55:59.239] LOG: Applied EXP. Charm 
+[11:55:59.732] LOG: %cStart Phase LevelUpPhase color:green;
+[11:55:59.733] LOG: %cStart Phase ExpPhase color:green;
+[11:55:59.733] LOG: Applied Super EXP. Charm 
+[11:55:59.733] LOG: Applied EXP. Charm 
+[11:56:00.480] LOG: %cStart Phase LevelUpPhase color:green;
+[11:56:00.481] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[11:56:00.481] LOG: Applied Super EXP. Charm 
+[11:56:00.481] LOG: Applied EXP. Charm 
+[11:56:00.482] LOG: %cStart Phase LevelUpPhase color:green;
+[11:56:00.482] LOG: Applied Protein 
+[11:56:00.482] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[11:56:00.482] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[11:56:00.482] LOG: Applied Super EXP. Charm 
+[11:56:00.482] LOG: Applied EXP. Charm 
+[11:56:00.482] LOG: %cStart Phase LevelUpPhase color:green;
+[11:56:00.483] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[11:56:00.483] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[11:56:00.483] LOG: Applied Super EXP. Charm 
+[11:56:00.483] LOG: Applied EXP. Charm 
+[11:56:00.483] LOG: %cStart Phase LevelUpPhase color:green;
+[11:56:00.483] LOG: Applied Calcium 
+[11:56:00.483] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[11:56:00.483] LOG: %cStart Phase MoveEndPhase color:green;
+[11:56:00.484] LOG: %cStart Phase MovePhase color:green;
+[11:56:00.484] LOG: %cStart Phase MoveEndPhase color:green;
+[11:56:00.485] LOG: %cStart Phase MovePhase color:green;
+[11:56:00.485] LOG: %cUser: Flareon
+Move: SOLAR_BLADE
+Use Mode: NORMAL color:orchid
+[11:56:00.488] LOG: %cStart Phase MessagePhase color:green;
+[11:56:00.779] LOG: %cStart Phase MoveChargePhase color:green;
+[11:56:01.647] LOG: %cStart Phase MessagePhase color:green;
+[11:56:02.279] LOG: %cStart Phase MoveEndPhase color:green;
+[11:56:02.279] LOG: %cStart Phase MovePhase color:green;
+[11:56:02.280] LOG: %cUser: Hypnocroak
+Move: SLEEP_POWDER
+Use Mode: NORMAL color:orchid
+[11:56:02.286] LOG: %cStart Phase MessagePhase color:green;
+[11:56:02.579] LOG: %cStart Phase MoveEffectPhase color:green;
+[11:56:03.213] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[11:56:03.596] LOG: %cStart Phase MessagePhase color:green;
+[11:56:04.129] LOG: %cStart Phase MoveEndPhase color:green;
+[11:56:04.129] LOG: %cStart Phase CheckInterludePhase color:green;
+[11:56:04.129] LOG: %cStart Phase WeatherEffectPhase color:green;
+[11:56:04.129] LOG: %cStart Phase PositionalTagPhase color:green;
+[11:56:04.129] LOG: %cStart Phase BerryPhase color:green;
+[11:56:04.132] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[11:56:04.133] LOG: %cStart Phase TurnEndPhase color:green;
+[11:56:04.134] LOG: %cStart Phase ShowAbilityPhase color:green;
+[11:56:04.512] LOG: %cStart Phase DamageAnimPhase color:green;
+[11:56:04.514] LOG: %cStart Phase HideAbilityPhase color:green;
+[11:56:04.580] LOG: %cStart Phase SwitchSummonPhase color:green;
+[11:56:05.162] LOG: Localized grunt name: Aqua Grunt
+[11:56:05.347] LOG: Applied Protein (enemy)
+[11:56:05.347] LOG: Applied HP Up (enemy)
+[11:56:05.686] LOG: %cStart Phase PostSummonPhase color:green;
+[11:56:05.686] LOG: Ran PSP for: Magmortar
+[11:56:05.687] LOG: %cStart Phase PostSummonPhase color:green;
+[11:56:05.687] LOG: %cStart Phase PostSummonPhase color:green;
+[11:56:05.687] LOG: %cStart Phase TurnInitPhase color:green;
+[11:56:05.687] LOG: %cStart Phase CommandPhase color:green;
