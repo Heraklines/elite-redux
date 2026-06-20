@@ -1,0 +1,282 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     3  wave:32  difficulty:ace
+seed:     NOygo802M8saYGySO26SS4Ac
+party:    Carbink(L52 69/123), Dewgong(L52 156/156), Uxie(L52 143/143), Spiritomb(L52 130/130), Ursaring(L52 164/164), Thievul(L52 145/145)
+
+----- DESCRIPTION -----
+Enemy Accelgor used Recover before my Gem Missile (priority)
+
+----- CONSOLE -----
+[10:34:38.833] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[10:34:38.835] LOG: %cStart Phase CheckSwitchPhase color:green;
+[10:34:39.112] LOG: %cStart Phase SwitchPhase color:green;
+[10:34:42.391] LOG: %cStart Phase SwitchSummonPhase color:green;
+[10:34:42.852] LOG: Applied Calcium 
+[10:34:42.853] LOG: Applied Protein 
+[10:34:43.184] LOG: %cStart Phase PostSummonPhase color:green;
+[10:34:43.184] LOG: Ran PSP for: Carbink
+[10:34:43.185] LOG: %cStart Phase PostSummonPhase color:green;
+[10:34:43.185] LOG: %cStart Phase PostSummonPhase color:green;
+[10:34:43.185] LOG: %cStart Phase InitEncounterPhase color:green;
+[10:34:43.185] LOG: %cStart Phase PostSummonPhase color:green;
+[10:34:43.185] LOG: Ran PSP for: Spidops
+[10:34:43.185] LOG: %cStart Phase PostSummonPhase color:green;
+[10:34:43.189] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:34:43.568] LOG: %cStart Phase MessagePhase color:green;
+[10:34:44.283] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:34:44.335] LOG: %cStart Phase PostSummonPhase color:green;
+[10:34:44.335] LOG: %cStart Phase TurnInitPhase color:green;
+[10:34:44.336] LOG: %cStart Phase CommandPhase color:green;
+[10:34:54.187] LOG: Move: DIAMOND_STORM Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Carbink
+[10:34:54.189] LOG: %cStart Phase EnemyCommandPhase color:green;
+[10:34:54.193] WARN: BattlerTag THROAT_CHOPPED is missing a score!
+[10:34:54.194] WARN: BattlerTag THROAT_CHOPPED is missing a score!
+[10:34:54.194] LOG: Move Pool: ["Sticky Web","Insect Impact","Sucker Punch","Throat Chop"]
+[10:34:54.194] LOG: Move Scores: [0,12.9375,6.625,7.625]
+[10:34:54.194] LOG: Sorted Move Pool: ["Insect Impact","Throat Chop","Sucker Punch","Sticky Web"]
+[10:34:54.194] LOG: Chosen Move: Insect Impact
+[10:34:54.195] LOG: %cStart Phase TurnStartPhase color:green;
+[10:34:54.195] LOG: %cStart Phase MovePhase color:green;
+[10:34:54.195] LOG: %cUser: Carbink
+Move: DIAMOND_STORM
+Use Mode: NORMAL color:orchid
+[10:34:54.196] LOG: %cStart Phase MessagePhase color:green;
+[10:34:54.482] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:34:55.449] LOG: crit stage: +0
+[10:34:55.450] LOG: Move: Diamond Storm | Base damage: 37.46666666666667 | Power: 100 | Source attack: 63 | Target defense: 81
+[10:34:55.451] LOG: Move: Diamond Storm | Attack damage: 111
+[10:34:55.452] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:34:55.484] LOG: %cStart Phase MessagePhase color:green;
+[10:34:55.998] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:34:56.451] LOG: %cStart Phase MessagePhase color:green;
+[10:34:57.015] LOG: %cStart Phase MoveEndPhase color:green;
+[10:34:57.015] LOG: %cStart Phase MovePhase color:green;
+[10:34:57.015] LOG: %cUser: Spidops
+Move: INSECT_IMPACT
+Use Mode: NORMAL color:orchid
+[10:34:57.018] LOG: %cStart Phase MessagePhase color:green;
+[10:34:57.332] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:34:57.983] LOG: crit stage: +0
+[10:34:57.985] LOG: Move: Insect Impact | Base damage: 17.80393063583815 | Power: 80 | Source attack: 89 | Target defense: 173
+[10:34:57.986] LOG: Move: Insect Impact | Attack damage: 19
+[10:34:57.987] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:34:58.016] LOG: %cStart Phase MessagePhase color:green;
+[10:34:58.498] LOG: %cStart Phase MessagePhase color:green;
+[10:34:59.031] LOG: %cStart Phase MoveEndPhase color:green;
+[10:34:59.032] LOG: %cStart Phase CheckInterludePhase color:green;
+[10:34:59.032] LOG: %cStart Phase WeatherEffectPhase color:green;
+[10:34:59.983] LOG: %cStart Phase PositionalTagPhase color:green;
+[10:34:59.983] LOG: %cStart Phase BerryPhase color:green;
+[10:34:59.984] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[10:34:59.984] LOG: %cStart Phase TurnEndPhase color:green;
+[10:34:59.987] LOG: %cStart Phase TurnInitPhase color:green;
+[10:34:59.987] LOG: %cStart Phase CommandPhase color:green;
+[10:35:00.526] LOG: Move: GEM_MISSILE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Carbink
+[10:35:00.527] LOG: %cStart Phase EnemyCommandPhase color:green;
+[10:35:00.529] LOG: Battle Seed: rnZI1gOGD5TyNji0
+[10:35:00.529] WARN: BattlerTag THROAT_CHOPPED is missing a score!
+[10:35:00.531] WARN: BattlerTag THROAT_CHOPPED is missing a score!
+[10:35:00.531] LOG: Move Pool: ["Sticky Web","Insect Impact","Sucker Punch","Throat Chop"]
+[10:35:00.531] LOG: Move Scores: [0,12.9375,6.625,7.625]
+[10:35:00.531] LOG: Sorted Move Pool: ["Insect Impact","Throat Chop","Sucker Punch","Sticky Web"]
+[10:35:00.531] LOG: Chosen Move: Insect Impact
+[10:35:00.532] LOG: %cStart Phase TurnStartPhase color:green;
+[10:35:00.533] LOG: %cStart Phase MovePhase color:green;
+[10:35:00.533] LOG: %cUser: Carbink
+Move: GEM_MISSILE
+Use Mode: NORMAL color:orchid
+[10:35:00.533] LOG: %cStart Phase MessagePhase color:green;
+[10:35:00.797] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:35:01.349] LOG: crit stage: +0
+[10:35:01.350] LOG: Move: Gem Missile | Base damage: 16.186666666666667 | Power: 40 | Source attack: 63 | Target defense: 81
+[10:35:01.351] LOG: Move: Gem Missile | Attack damage: 43
+[10:35:01.352] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:35:01.383] LOG: %cStart Phase MessagePhase color:green;
+[10:35:01.898] LOG: %cStart Phase FaintPhase color:green;
+[10:35:04.633] LOG: %cStart Phase MessagePhase color:green;
+[10:35:04.855] LOG: %cStart Phase VictoryPhase color:green;
+[10:35:04.855] LOG: %cStart Phase ExpPhase color:green;
+[10:35:04.855] LOG: Applied Golden EXP. Charm 
+[10:35:04.855] LOG: Applied EXP. Charm 
+[10:35:05.149] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:35:05.150] LOG: Applied Golden EXP. Charm 
+[10:35:05.150] LOG: Applied EXP. Charm 
+[10:35:05.151] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:35:05.151] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:35:05.151] LOG: Applied Golden EXP. Charm 
+[10:35:05.151] LOG: Applied EXP. Charm 
+[10:35:05.152] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:35:05.152] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:35:05.152] LOG: Applied Golden EXP. Charm 
+[10:35:05.152] LOG: Applied EXP. Charm 
+[10:35:05.152] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:35:05.152] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:35:05.152] LOG: Applied Golden EXP. Charm 
+[10:35:05.152] LOG: Applied EXP. Charm 
+[10:35:05.152] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:35:05.152] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:35:05.153] LOG: Applied Golden EXP. Charm 
+[10:35:05.153] LOG: Applied EXP. Charm 
+[10:35:05.153] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:35:05.153] LOG: %cStart Phase MoveEndPhase color:green;
+[10:35:05.153] LOG: %cStart Phase MovePhase color:green;
+[10:35:05.153] LOG: %cStart Phase MoveEndPhase color:green;
+[10:35:05.154] LOG: %cStart Phase CheckInterludePhase color:green;
+[10:35:05.154] LOG: %cStart Phase WeatherEffectPhase color:green;
+[10:35:06.098] LOG: %cStart Phase PositionalTagPhase color:green;
+[10:35:06.098] LOG: %cStart Phase BerryPhase color:green;
+[10:35:06.098] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[10:35:06.099] LOG: %cStart Phase TurnEndPhase color:green;
+[10:35:06.102] LOG: %cStart Phase BattleEndPhase color:green;
+[10:35:06.102] LOG: Battle Score: 92 (2 Turns x0.84)
+[10:35:06.102] LOG: Total Score: 3729
+[10:35:06.106] LOG: Applied Calcium 
+[10:35:06.106] LOG: Applied Protein 
+[10:35:06.107] LOG: %cStart Phase EggLapsePhase color:green;
+[10:35:06.107] LOG: %cStart Phase SelectModifierPhase color:green;
+[10:35:06.107] LOG: Wave Seed: mnWOQlWxfrnQUrrS` 31
+[10:35:06.110] LOG: Applied Golden Poké Ball 
+[10:35:06.110] LOG: 20 10 [2,3,4,5,6,7,8,9,10,16,23,24]
+[10:35:06.110] LOG: {"id":"ER_ABILITY_CAPSULE","localeKey":"","iconImage":"ability_capsule","soundName":"se/restore","tier":1} 
+[10:35:06.110] LOG: 9 3 [3,4,5]
+[10:35:06.111] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_fairy","group":"tm","soundName":"se/restore","tier":0,"moveId":581} 
+[10:35:06.111] LOG: 21 10 [2,3,4,5,6,7,8,9,10,16,23,24]
+[10:35:06.111] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"protein","soundName":"se/restore","tier":1,"stat":1,"key":"protein"} 
+[10:35:06.111] LOG: 13 9 [2,3,4,5,6,7,8,9,10,16,23,24]
+[10:35:06.111] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[10:35:06.111] LOG: 0 0 [3,4,5]
+[10:35:06.111] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[10:35:06.111] LOG: 7 3 [3,4,5]
+[10:35:06.111] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[10:35:06.111] LOG: 2 0 [3,4,5]
+[10:35:06.111] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[10:35:22.835] LOG: %cStart Phase NewBattlePhase color:green;
+[10:35:22.835] LOG: Wave Seed: noXPRmXygsoRVssTa 32
+[10:35:22.835] LOG: %cStart Phase NextEncounterPhase color:green;
+[10:35:22.836] LOG: Starting species pool tier: RARE
+[10:35:22.836] LOG: Replaced SHELMET with ACCELGOR
+[10:35:22.837] LOG: Applied Ability Charm 
+[10:35:22.838] LOG: Applied Shiny Charm 
+[10:35:22.846] LOG: Pokemon: Wild Accelgor | Species ID: 617 | Level: 48 | Nature: Calm (+SpDef/-Atk)
+[10:35:22.846] LOG: Stats (IVs): HP: 144 (21), Atk: 101 (15), Def: 43 (0), Spatk: 119 (29), Spdef: 72 (7), Spd: 157 (28)
+[10:35:22.846] LOG: Ability: Unburden | Passive Ability: Swarm 
+[10:35:22.846] LOG: Moveset: ["Struggle Bug","Encore","Beatdown","Recover"]
+[10:35:22.977] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} (enemy)
+[10:35:22.977] LOG: Battle Seed: I5lf4S8ingVAJ58r
+[10:35:23.010] DEBUG: Session data saved to slot 1!
+[10:35:23.011] LOG: Wave Seed: noXPRmXygsoRVssTa 32
+[10:35:24.047] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[10:35:24.047] LOG: %cStart Phase CheckSwitchPhase color:green;
+[10:35:24.345] LOG: %cStart Phase SwitchPhase color:green;
+[10:35:28.253] LOG: %cStart Phase InitEncounterPhase color:green;
+[10:35:28.253] LOG: %cStart Phase PostSummonPhase color:green;
+[10:35:28.253] LOG: Ran PSP for: Accelgor
+[10:35:28.253] LOG: %cStart Phase PostSummonPhase color:green;
+[10:35:28.253] LOG: %cStart Phase PostSummonPhase color:green;
+[10:35:28.253] LOG: %cStart Phase TurnInitPhase color:green;
+[10:35:28.256] LOG: Move Pool: ["Struggle Bug","Encore","Beatdown","Recover"]
+[10:35:28.256] LOG: Move Scores: [15.1875,2,14.625,-7]
+[10:35:28.256] LOG: Sorted Move Pool: ["Struggle Bug","Beatdown","Encore","Recover"]
+[10:35:28.256] LOG: Chosen Move: Struggle Bug
+[10:35:28.256] LOG: %cStart Phase MovePhase color:green;
+[10:35:28.256] LOG: %cUser: Accelgor
+Move: STRUGGLE_BUG
+Use Mode: NORMAL color:orchid
+[10:35:28.257] LOG: %cStart Phase MessagePhase color:green;
+[10:35:28.561] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:35:28.946] LOG: %cStart Phase MessagePhase color:green;
+[10:35:29.577] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:35:29.647] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:35:30.279] LOG: crit stage: +1
+[10:35:30.282] LOG: Move: Struggle Bug | Base damage: 31.535219512195123 | Power: 96 | Source attack: 119 | Target defense: 164
+[10:35:30.283] LOG: Move: Struggle Bug | Attack damage: 14
+[10:35:30.283] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:35:30.313] LOG: %cStart Phase MessagePhase color:green;
+[10:35:30.844] LOG: %cStart Phase MoveEndPhase color:green;
+[10:35:30.845] LOG: %cStart Phase CommandPhase color:green;
+[10:35:32.114] LOG: Move: DIAMOND_STORM Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Carbink
+[10:35:32.115] LOG: %cStart Phase EnemyCommandPhase color:green;
+[10:35:32.118] LOG: Move Pool: ["Struggle Bug","Encore","Beatdown","Recover"]
+[10:35:32.118] LOG: Move Scores: [15.1875,2,9.75,-7]
+[10:35:32.118] LOG: Sorted Move Pool: ["Struggle Bug","Beatdown","Encore","Recover"]
+[10:35:32.118] LOG: Chosen Move: Struggle Bug
+[10:35:32.118] LOG: %cStart Phase TurnStartPhase color:green;
+[10:35:32.119] LOG: %cStart Phase MovePhase color:green;
+[10:35:32.119] LOG: %cUser: Accelgor
+Move: STRUGGLE_BUG
+Use Mode: NORMAL color:orchid
+[10:35:32.120] LOG: %cStart Phase MessagePhase color:green;
+[10:35:32.427] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:35:33.028] LOG: crit stage: +1
+[10:35:33.030] LOG: Move: Struggle Bug | Base damage: 31.535219512195123 | Power: 96 | Source attack: 119 | Target defense: 164
+[10:35:33.031] LOG: Move: Struggle Bug | Attack damage: 21
+[10:35:33.032] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:35:33.063] LOG: %cStart Phase MessagePhase color:green;
+[10:35:33.544] LOG: %cStart Phase MessagePhase color:green;
+[10:35:34.077] LOG: %cStart Phase MoveEndPhase color:green;
+[10:35:34.078] LOG: %cStart Phase MovePhase color:green;
+[10:35:34.078] LOG: %cUser: Carbink
+Move: DIAMOND_STORM
+Use Mode: NORMAL color:orchid
+[10:35:34.081] LOG: %cStart Phase MessagePhase color:green;
+[10:35:34.377] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:35:35.344] LOG: crit stage: +0
+[10:35:35.346] LOG: Move: Diamond Storm | Base damage: 41.9 | Power: 100 | Source attack: 63 | Target defense: 72
+[10:35:35.346] LOG: Move: Diamond Storm | Attack damage: 115
+[10:35:35.347] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:35:35.378] LOG: %cStart Phase MessagePhase color:green;
+[10:35:35.894] LOG: %cStart Phase MoveEndPhase color:green;
+[10:35:35.894] LOG: %cStart Phase CheckInterludePhase color:green;
+[10:35:35.894] LOG: %cStart Phase WeatherEffectPhase color:green;
+[10:35:36.844] LOG: %cStart Phase PositionalTagPhase color:green;
+[10:35:36.844] LOG: %cStart Phase BerryPhase color:green;
+[10:35:36.844] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[10:35:36.845] LOG: %cStart Phase TurnEndPhase color:green;
+[10:35:36.848] LOG: %cStart Phase TurnInitPhase color:green;
+[10:35:36.848] LOG: %cStart Phase CommandPhase color:green;
+[10:35:37.703] LOG: Move: GEM_MISSILE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Carbink
+[10:35:37.705] LOG: %cStart Phase EnemyCommandPhase color:green;
+[10:35:37.708] LOG: Battle Seed: I5lf4S8ingVAJ58r
+[10:35:37.710] LOG: Move Pool: ["Struggle Bug","Encore","Beatdown","Recover"]
+[10:35:37.710] LOG: Move Scores: [15.1875,2,9.75,15]
+[10:35:37.710] LOG: Sorted Move Pool: ["Struggle Bug","Recover","Beatdown","Encore"]
+[10:35:37.710] LOG: Chosen Move: Recover
+[10:35:37.710] LOG: %cStart Phase TurnStartPhase color:green;
+[10:35:37.712] LOG: %cStart Phase MovePhase color:green;
+[10:35:37.712] LOG: %cUser: Accelgor
+Move: RECOVER
+Use Mode: NORMAL color:orchid
+[10:35:37.714] LOG: %cStart Phase MessagePhase color:green;
+[10:35:37.993] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:35:38.380] LOG: %cStart Phase MessagePhase color:green;
+[10:35:39.027] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:35:39.079] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:35:39.578] LOG: %cStart Phase PokemonHealPhase color:green;
+[10:35:39.583] LOG: %cStart Phase MessagePhase color:green;
+[10:35:40.159] LOG: %cStart Phase MoveEndPhase color:green;
+[10:35:40.159] LOG: %cStart Phase MovePhase color:green;
+[10:35:40.160] LOG: %cUser: Carbink
+Move: GEM_MISSILE
+Use Mode: NORMAL color:orchid
+[10:35:40.161] LOG: %cStart Phase MessagePhase color:green;
+[10:35:40.443] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:35:40.994] LOG: crit stage: +0
+[10:35:40.995] LOG: Move: Gem Missile | Base damage: 17.96 | Power: 40 | Source attack: 63 | Target defense: 72
+[10:35:40.996] LOG: Move: Gem Missile | Attack damage: 25
+[10:35:40.996] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:35:41.028] LOG: %cStart Phase MoveEndPhase color:green;
+[10:35:41.028] LOG: %cStart Phase CheckInterludePhase color:green;
+[10:35:41.028] LOG: %cStart Phase WeatherEffectPhase color:green;
+[10:35:41.976] LOG: %cStart Phase PositionalTagPhase color:green;
+[10:35:41.976] LOG: %cStart Phase BerryPhase color:green;
+[10:35:41.977] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[10:35:41.978] LOG: %cStart Phase TurnEndPhase color:green;
+[10:35:41.980] LOG: %cStart Phase TurnInitPhase color:green;
+[10:35:41.981] LOG: %cStart Phase CommandPhase color:green;
