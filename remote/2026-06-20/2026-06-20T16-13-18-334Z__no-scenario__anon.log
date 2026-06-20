@@ -1,0 +1,78 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqmjrzx4-3ype
+mode:     0  wave:1
+seed:     Furr7sckDgJ5qqX0mqDdqJ8t
+party:    Vulpix(L5 20hp f0), Magikarp(L5 18hp f0), Shuckle(L5 21hp f0), Bouffalant(L5 26hp f0)
+enemy:    Spinarak(L2)
+
+----- COMMENT -----
+still isnt fixed
+
+----- CONSOLE -----
+[16:10:58.063] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[16:10:58.359] LOG: [ER] build mqmjrzx4-3ype
+[16:10:58.383] LOG: [dev-tools] loaded — 272 scenarios + Send Logs button
+[16:12:53.371] DEBUG: Destroying loading scene
+[16:12:53.371] DEBUG: Destroyed loading scene
+[16:12:53.432] LOG: Seed: RaDf2sSI8jyZVVklVb6eIQzb
+[16:12:53.432] LOG: Wave Seed: RaDf2sSI8jyZVVklVb6eIQzb 0
+[16:12:56.054] LOG: %cStart Phase LoginPhase color:green;
+[16:12:56.471] LOG: Client Session: hgMnhEpCyyczfgb7LPjlOZHoV2SB0YBi
+[16:12:56.887] LOG: %cStart Phase TitlePhase color:green;
+[16:12:56.888] LOG: Getting Session Slot id: %d 4
+[16:12:56.900] LOG: use seasonal splash messages true
+[16:12:56.900] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[16:13:00.527] LOG: Getting Session Slot id: %d 0
+[16:13:00.532] LOG: Getting Session Slot id: %d 1
+[16:13:00.536] LOG: Getting Session Slot id: %d 2
+[16:13:00.539] LOG: Getting Session Slot id: %d 3
+[16:13:00.542] LOG: Getting Session Slot id: %d 4
+[16:13:00.675] LOG: Getting Session Slot id: %d 4
+[16:13:02.545] LOG: Getting Session Slot id: %d 4
+[16:13:02.547] LOG: Wave Seed: Furr7sckDgJ5qqX0mqDdqJ8t 0
+[16:13:02.547] LOG: Seed: Furr7sckDgJ5qqX0mqDdqJ8t
+[16:13:02.571] LOG: Wave Seed: Gvss8tdlEhK6rrY1nrEerK9u 1
+[16:13:02.661] LOG: %cStart Phase EncounterPhase color:green;
+[16:13:02.664] LOG: Pokemon: Wild Spinarak | Species ID: 167 | Level: 2 | Nature: Hasty (+Spd/-Def)
+[16:13:02.664] LOG: Stats (IVs): HP: 13 (9), Atk: 7 (0), Def: 6 (12), Spatk: 6 (11), Spdef: 7 (16), Spd: 7 (2)
+[16:13:02.665] LOG: Ability: Prankster | Passive Ability: Poison Touch 
+[16:13:02.665] LOG: Moveset: ["Pounce","Poison Sting","Toxic Thread","Sonic Boom"]
+[16:13:03.427] LOG: Wave Seed: Gvss8tdlEhK6rrY1nrEerK9u 1
+[16:13:03.846] LOG: %cStart Phase SummonPhase color:green;
+[16:13:04.130] LOG: %cStart Phase ShinySparklePhase color:green;
+[16:13:04.233] LOG: %cStart Phase CheckSwitchPhase color:green;
+[16:13:04.688] LOG: %cStart Phase InitEncounterPhase color:green;
+[16:13:04.690] LOG: %cStart Phase PostSummonPhase color:green;
+[16:13:04.690] LOG: Ran PSP for: Vulpix
+[16:13:04.691] LOG: %cStart Phase PostSummonPhase color:green;
+[16:13:04.693] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:13:04.852] LOG: %cStart Phase CommonAnimPhase color:green;
+[16:13:05.040] LOG: %cStart Phase MessagePhase color:green;
+[16:13:05.247] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:13:05.269] LOG: %cStart Phase PostSummonPhase color:green;
+[16:13:05.269] LOG: %cStart Phase PostSummonPhase color:green;
+[16:13:05.270] LOG: Ran PSP for: Spinarak
+[16:13:05.270] LOG: %cStart Phase PostSummonPhase color:green;
+[16:13:05.270] LOG: %cStart Phase PostSummonPhase color:green;
+[16:13:05.270] LOG: %cStart Phase TurnInitPhase color:green;
+[16:13:05.270] LOG: %cStart Phase CommandPhase color:green;
+[16:13:06.101] LOG: Move: MOONBLAST Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Vulpix
+[16:13:06.102] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:13:06.107] LOG: Move Pool: ["Sonic Boom"]
+[16:13:06.108] LOG: Move Scores: [-20]
+[16:13:06.108] LOG: Sorted Move Pool: ["Sonic Boom"]
+[16:13:06.108] LOG: Chosen Move: Sonic Boom
+[16:13:06.108] LOG: %cStart Phase TurnStartPhase color:green;
+[16:13:06.117] ERROR: [unhandledrejection] TypeError: Cannot read properties of null (reading 'getAllActiveAbilityAttrs')
+TypeError: Cannot read properties of null (reading 'getAllActiveAbilityAttrs')
+    at TurnStartPhase.queuePreemptiveCounters (https://elite-redux-staging.pages.dev/assets/battle-scene-D_LCtssm.js:461:7111)
+    at TurnStartPhase.start (https://elite-redux-staging.pages.dev/assets/battle-scene-D_LCtssm.js:461:8039)
+    at PhaseManager.startCurrentPhase (https://elite-redux-staging.pages.dev/assets/battle-scene-D_LCtssm.js:461:19255)
+    at PhaseManager.shiftPhase (https://elite-redux-staging.pages.dev/assets/battle-scene-D_LCtssm.js:461:19122)
+    at EnemyCommandPhase.end (https://elite-redux-staging.pages.dev/assets/battle-scene-D_LCtssm.js:18:11383)
+    at EnemyCommandPhase.start (https://elite-redux-staging.pages.dev/assets/battle-scene-D_LCtssm.js:22:46270)
+    at PhaseManager.startCurrentPhase (https://elite-redux-staging.pages.dev/assets/battle-scene-D_LCtssm.js:461:19255)
+    at PhaseManager.shiftPhase (https://elite-redux-staging.pages.dev/assets/battle-scene-D_LCtssm.js:461:19122)
+    at CommandPhase.end (https://elite-redux-staging.pages.dev/assets/battle-scene-D_LCtssm.js:18:11383)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-D_LCtssm.js:20:4164
