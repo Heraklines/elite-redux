@@ -2,6 +2,7 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
+import { pokemonEvolutions, pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { NIGHT_TIME } from "#constants/game-constants";
 import type { ArenaTag, ArenaTagTypeMap } from "#data/arena-tag";
 import { EntryHazardTag, getArenaTag } from "#data/arena-tag";
@@ -60,6 +61,46 @@ import type { NonEmptyTuple } from "type-fest";
 const ER_EARLY_HIGH_BST_THRESHOLD = 600;
 /** Wave before which the Ace/Elite high-BST wild gate applies. */
 const ER_EARLY_HIGH_BST_WAVE = 55;
+
+// ER (#19): BST-proportional legendary wave gate. A LEGEND-like wild of base-stat
+// total BST may not appear until clamp(FLOOR + (BST - ANCHOR)*SLOPE, FLOOR, CEIL).
+// Replaces a flat step (sub-660 legendaries appeared from a flat wave 55, leaking
+// e.g. Regidrago - BST 580 - into the mid-game as a Lv85 boss). Anchors: 580->65,
+// 600->70, 660->85, 680->90.
+const ER_LEGEND_GATE_BST_ANCHOR = 540;
+const ER_LEGEND_GATE_SLOPE = 0.25;
+const ER_LEGEND_GATE_FLOOR_WAVE = 55;
+const ER_LEGEND_GATE_CEIL_WAVE = 90;
+
+/** Minimum wild-appearance wave for a legend-like species of the given BST (#19). */
+export function erLegendMinWave(baseTotal: number): number {
+  const raw = ER_LEGEND_GATE_FLOOR_WAVE + (baseTotal - ER_LEGEND_GATE_BST_ANCHOR) * ER_LEGEND_GATE_SLOPE;
+  return Math.min(ER_LEGEND_GATE_CEIL_WAVE, Math.max(ER_LEGEND_GATE_FLOOR_WAVE, Math.round(raw)));
+}
+
+/**
+ * ER (#19): de-evolve a wild that is too evolved for its encounter level. A biome
+ * pool can list an evolved form directly (e.g. Primeape), and the level->species
+ * step only evolves UP, never down - so a low-level encounter (a high-tier biome
+ * reached early via the World Map) spawned a Lv13 Primeape (it evolves at 28). Walk
+ * back to the stage whose LEVEL evolution requirement is at or below the level.
+ * Item / condition evolutions (level <= 1) are left alone (valid at any level).
+ */
+export function deEvolveWildForLevel(species: PokemonSpecies, level: number): PokemonSpecies {
+  let current = species;
+  for (let guard = 0; guard < 5; guard++) {
+    const prevoId = pokemonPrevolutions[current.speciesId];
+    if (prevoId === undefined) {
+      break;
+    }
+    const evo = pokemonEvolutions[prevoId]?.find(e => e.speciesId === current.speciesId);
+    if (!evo || evo.level <= 1 || evo.level <= level) {
+      break;
+    }
+    current = getPokemonSpecies(prevoId);
+  }
+  return current;
+}
 /**
  * First pokerogue id reserved for ER custom species (Redux forms / paradox /
  * mega / custom evolutions like "Kecleong"). On the pure-vanilla difficulties
@@ -693,6 +734,10 @@ export class Arena {
       }
     }
 
+    // ER (#19): final guard - de-evolve a stage that's too evolved for the level
+    // (e.g. a pool listing Primeape drawn at Lv13; Primeape evolves at 28).
+    species = deEvolveWildForLevel(species, level);
+
     return species;
   }
 
@@ -755,9 +800,9 @@ export class Arena {
       return false;
     }
 
-    return species.baseTotal >= 660
-      ? adjustedWave < 80 // Wave 50+ in daily (however, max Daily wave is 50 currently so not possible)
-      : adjustedWave < 55; // Wave 25+ in daily
+    // ER (#19): BST-proportional wave gate (see erLegendMinWave) - replaces the
+    // flat sub-660 -> wave 55 that let Regidrago (BST 580) leak into the mid-game.
+    return adjustedWave < erLegendMinWave(species.baseTotal);
   }
 
   // #endregion
