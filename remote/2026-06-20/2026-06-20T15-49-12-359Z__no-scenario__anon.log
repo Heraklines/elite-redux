@@ -1,0 +1,88 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqmifnxn-ldhi
+mode:     0  wave:1
+seed:     Furr7sckDgJ5qqX0mqDdqJ8t
+party:    Vulpix(L5 20hp f0), Magikarp(L5 18hp f0), Shuckle(L5 21hp f0), Bouffalant(L5 26hp f0)
+enemy:    Spinarak(L2)
+
+----- COMMENT -----
+gamebreaking bug, after choosing any move the game doesnt continue and you cannot input anythinganymore
+
+----- CONSOLE -----
+[15:47:41.495] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[15:47:42.175] LOG: [ER] build mqmifnxn-ldhi
+[15:47:42.202] LOG: [dev-tools] loaded — 272 scenarios + Send Logs button
+[15:47:56.304] DEBUG: Destroying loading scene
+[15:47:56.304] DEBUG: Destroyed loading scene
+[15:47:56.384] LOG: Seed: Furr7sckDgJ5qqX0mqDdqJ8t
+[15:47:56.384] LOG: Wave Seed: Furr7sckDgJ5qqX0mqDdqJ8t 0
+[15:48:01.978] LOG: %cStart Phase LoginPhase color:green;
+[15:48:02.125] LOG: Client Session: d7nU0IbzBxDmCLH3VuFhkxROSANcsi5T
+[15:48:02.609] DEBUG: Using cached system data
+[15:48:02.689] LOG: %cStart Phase TitlePhase color:green;
+[15:48:02.690] LOG: Getting Session Slot id: %d 4
+[15:48:02.711] LOG: use seasonal splash messages true
+[15:48:02.711] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[15:48:09.792] LOG: %cStart Phase SelectStarterPhase color:green;
+[15:48:13.883] WARN: cry/13 not found
+[15:48:15.811] WARN: Missing animation: pkmn__14
+[15:48:17.159] WARN: Missing animation: pkmn__15
+[15:48:25.955] WARN: cry/37 not found
+[15:48:25.972] WARN: cry/213 not found
+[15:48:25.981] WARN: cry/626 not found
+[15:48:31.024] LOG: Getting Session Slot id: %d 0
+[15:48:31.045] LOG: Getting Session Slot id: %d 1
+[15:48:31.051] LOG: Getting Session Slot id: %d 2
+[15:48:31.056] LOG: Getting Session Slot id: %d 3
+[15:48:31.060] LOG: Getting Session Slot id: %d 4
+[15:48:31.283] LOG: Getting Session Slot id: %d 4
+[15:48:37.420] DEBUG: %cSending a request to delete session in slot %d color: blue 4
+[15:48:39.030] LOG: Wave Seed: Gvss8tdlEhK6rrY1nrEerK9u 1
+[15:48:39.033] LOG: %cStart Phase EncounterPhase color:green;
+[15:48:39.039] LOG: Starting species pool tier: COMMON
+[15:48:39.061] LOG: Pokemon: Wild Spinarak | Species ID: 167 | Level: 2 | Nature: Hasty (+Spd/-Def)
+[15:48:39.061] LOG: Stats (IVs): HP: 13 (9), Atk: 7 (0), Def: 6 (12), Spatk: 6 (11), Spdef: 7 (16), Spd: 7 (2)
+[15:48:39.061] LOG: Ability: Prankster | Passive Ability: Poison Touch 
+[15:48:39.061] LOG: Moveset: ["Pounce","Poison Sting","Toxic Thread","Sonic Boom"]
+[15:48:40.453] DEBUG: Session data saved to slot 4!
+[15:48:41.747] LOG: Wave Seed: Gvss8tdlEhK6rrY1nrEerK9u 1
+[15:48:42.212] LOG: %cStart Phase SummonPhase color:green;
+[15:48:42.412] WARN: cry/37 not found
+[15:48:42.529] LOG: %cStart Phase ShinySparklePhase color:green;
+[15:48:42.645] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[15:48:42.646] LOG: %cStart Phase CheckSwitchPhase color:green;
+[15:48:43.164] LOG: %cStart Phase InitEncounterPhase color:green;
+[15:48:43.166] LOG: %cStart Phase PostSummonPhase color:green;
+[15:48:43.166] LOG: Ran PSP for: Vulpix
+[15:48:43.168] LOG: %cStart Phase PostSummonPhase color:green;
+[15:48:43.172] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:48:43.329] LOG: %cStart Phase CommonAnimPhase color:green;
+[15:48:43.679] LOG: %cStart Phase MessagePhase color:green;
+[15:48:43.911] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:48:43.946] LOG: %cStart Phase PostSummonPhase color:green;
+[15:48:43.947] LOG: %cStart Phase PostSummonPhase color:green;
+[15:48:43.947] LOG: Ran PSP for: Spinarak
+[15:48:43.947] LOG: %cStart Phase PostSummonPhase color:green;
+[15:48:43.947] LOG: %cStart Phase PostSummonPhase color:green;
+[15:48:43.947] LOG: %cStart Phase TurnInitPhase color:green;
+[15:48:43.948] LOG: %cStart Phase CommandPhase color:green;
+[15:48:44.513] LOG: Move: TAIL_GLOW Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Vulpix
+[15:48:44.517] LOG: %cStart Phase EnemyCommandPhase color:green;
+[15:48:44.527] LOG: Move Pool: ["Sonic Boom"]
+[15:48:44.527] LOG: Move Scores: [-20]
+[15:48:44.527] LOG: Sorted Move Pool: ["Sonic Boom"]
+[15:48:44.527] LOG: Chosen Move: Sonic Boom
+[15:48:44.527] LOG: %cStart Phase TurnStartPhase color:green;
+[15:48:44.528] ERROR: [unhandledrejection] TypeError: Cannot read properties of null (reading 'getAllActiveAbilityAttrs')
+TypeError: Cannot read properties of null (reading 'getAllActiveAbilityAttrs')
+    at TurnStartPhase.queuePreemptiveCounters (https://elite-redux-staging.pages.dev/assets/battle-scene-2D8qyeS8.js:461:7111)
+    at TurnStartPhase.start (https://elite-redux-staging.pages.dev/assets/battle-scene-2D8qyeS8.js:461:8039)
+    at PhaseManager.startCurrentPhase (https://elite-redux-staging.pages.dev/assets/battle-scene-2D8qyeS8.js:461:19255)
+    at PhaseManager.shiftPhase (https://elite-redux-staging.pages.dev/assets/battle-scene-2D8qyeS8.js:461:19122)
+    at EnemyCommandPhase.end (https://elite-redux-staging.pages.dev/assets/battle-scene-2D8qyeS8.js:18:11383)
+    at EnemyCommandPhase.start (https://elite-redux-staging.pages.dev/assets/battle-scene-2D8qyeS8.js:22:46270)
+    at PhaseManager.startCurrentPhase (https://elite-redux-staging.pages.dev/assets/battle-scene-2D8qyeS8.js:461:19255)
+    at PhaseManager.shiftPhase (https://elite-redux-staging.pages.dev/assets/battle-scene-2D8qyeS8.js:461:19122)
+    at CommandPhase.end (https://elite-redux-staging.pages.dev/assets/battle-scene-2D8qyeS8.js:18:11383)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-2D8qyeS8.js:20:4164
