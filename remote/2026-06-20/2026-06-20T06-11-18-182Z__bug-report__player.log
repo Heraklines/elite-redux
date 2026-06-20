@@ -1,0 +1,273 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Avast/148.0.0.0
+mode:     0  wave:44  difficulty:youngster
+seed:     16EtcZgMQ1Gl4VRbQ6zC5UXG
+party:    Excadrill(L34 114/129), Furret(L33 109/109), Zweilous(L27 83/83), Gyarevelry(L25 97/97), Mantine(L25 85/85), Zebstrika(L29 95/95)
+
+----- DESCRIPTION -----
+Mega Excadrill doesn't have Mega Drill
+
+----- CONSOLE -----
+[06:09:44.403] LOG: Move Pool: ["Brick Break","Smack Down","Wood Hammer","Smelling Salts"]
+[06:09:44.403] LOG: Move Scores: [63,2.9375,18,54]
+[06:09:44.403] LOG: Sorted Move Pool: ["Brick Break","Smelling Salts","Wood Hammer","Smack Down"]
+[06:09:44.403] LOG: Chosen Move: Brick Break
+[06:09:44.403] LOG: %cStart Phase TurnStartPhase color:green;
+[06:09:44.404] LOG: %cStart Phase MovePhase color:green;
+[06:09:44.404] LOG: %cUser: Mega Excadrill
+Move: SEISMIC_FIST
+Use Mode: NORMAL color:orchid
+[06:09:44.405] LOG: %cStart Phase MessagePhase color:green;
+[06:09:44.633] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:09:44.634] LOG: Applied Wide Lens 
+[06:09:45.343] LOG: Applied Scope Lens 
+[06:09:45.343] LOG: crit stage: +1
+[06:09:45.344] LOG: Applied X Attack 
+[06:09:45.344] LOG: Move: Seismic Fist | Base damage: 78.82785714285714 | Power: 85 | Source attack: 171 | Target defense: 56
+[06:09:45.344] LOG: Move: Seismic Fist | Attack damage: 115
+[06:09:45.344] LOG: Applied Amulet Coin 
+[06:09:45.345] LOG: Applied Golden Punch 
+[06:09:45.345] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:09:45.352] LOG: %cStart Phase FaintPhase color:green;
+[06:09:47.061] LOG: %cStart Phase MessagePhase color:green;
+[06:09:47.509] LOG: %cStart Phase VictoryPhase color:green;
+[06:09:47.509] LOG: Applied Soothe Bell 
+[06:09:47.509] LOG: %cStart Phase ExpPhase color:green;
+[06:09:47.510] LOG: Applied Super EXP. Charm 
+[06:09:47.510] LOG: Applied EXP. Charm 
+[06:09:48.021] LOG: %cStart Phase LevelUpPhase color:green;
+[06:09:48.021] LOG: Applied Protein 
+[06:09:48.021] LOG: Applied Zinc 
+[06:09:48.021] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:09:48.021] LOG: Applied Super EXP. Charm 
+[06:09:48.021] LOG: Applied EXP. Charm 
+[06:09:48.021] LOG: %cStart Phase LevelUpPhase color:green;
+[06:09:48.022] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:09:48.022] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:09:48.022] LOG: Applied Super EXP. Charm 
+[06:09:48.022] LOG: Applied EXP. Charm 
+[06:09:48.022] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:09:48.022] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:09:48.022] LOG: Applied Super EXP. Charm 
+[06:09:48.022] LOG: Applied EXP. Charm 
+[06:09:48.022] LOG: %cStart Phase LevelUpPhase color:green;
+[06:09:48.022] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:09:48.022] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:09:48.022] LOG: Applied Super EXP. Charm 
+[06:09:48.022] LOG: Applied EXP. Charm 
+[06:09:48.022] LOG: %cStart Phase LevelUpPhase color:green;
+[06:09:48.023] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:09:48.023] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:09:48.023] LOG: Applied Super EXP. Charm 
+[06:09:48.023] LOG: Applied EXP. Charm 
+[06:09:48.023] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:09:48.023] LOG: %cStart Phase MoveEndPhase color:green;
+[06:09:48.023] LOG: %cStart Phase MovePhase color:green;
+[06:09:48.023] LOG: %cStart Phase MoveEndPhase color:green;
+[06:09:48.023] LOG: %cStart Phase CheckInterludePhase color:green;
+[06:09:48.023] LOG: %cStart Phase WeatherEffectPhase color:green;
+[06:09:48.023] LOG: %cStart Phase PositionalTagPhase color:green;
+[06:09:48.023] LOG: %cStart Phase BerryPhase color:green;
+[06:09:48.023] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[06:09:48.023] LOG: %cStart Phase TurnEndPhase color:green;
+[06:09:48.023] LOG: %cStart Phase BattleEndPhase color:green;
+[06:09:48.023] LOG: Battle Score: 111 (1 Turns x1)
+[06:09:48.023] LOG: Total Score: 3495
+[06:09:48.026] LOG: Applied Protein 
+[06:09:48.026] LOG: Applied Zinc 
+[06:09:48.030] LOG: %cStart Phase EggLapsePhase color:green;
+[06:09:48.030] LOG: %cStart Phase SelectModifierPhase color:green;
+[06:09:48.030] LOG: Wave Seed: \apx|\r_}|a¥n`r 43
+[06:09:48.032] LOG: 7 4 [2,3,4,5]
+[06:09:48.033] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[06:09:48.033] LOG: 13 9 [2,3,4,5,6,7,8,9,10,16,23]
+[06:09:48.033] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[06:09:48.033] LOG: 7 4 [2,3,4,5]
+[06:09:48.033] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_def","soundName":"se/restore","tier":0,"stat":4,"nameKey":"x_sp_def","quantityKey":"percentage"} 
+[06:09:48.033] LOG: 7 4 [2,3,4,5]
+[06:09:48.033] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[06:09:48.033] LOG: 9 4 [2,3,4,5]
+[06:09:48.034] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_fire","group":"tm","soundName":"se/restore","tier":0,"moveId":261} 
+[06:09:49.085] LOG: Applied Amulet Coin 
+[06:09:50.037] LOG: Applied Amulet Coin 
+[06:09:50.042] LOG: %cStart Phase NewBattlePhase color:green;
+[06:09:50.042] LOG: Wave Seed: ]bq y}]s`~}b¦oas 44
+[06:09:50.042] LOG: Applied Lure 
+[06:09:50.042] LOG: %cStart Phase NextEncounterPhase color:green;
+[06:09:50.042] LOG: Starting species pool tier: UNCOMMON
+[06:09:50.051] LOG: Pokemon: Wild Scraggy | Species ID: 559 | Level: 28 | Nature: Serious (-)
+[06:09:50.052] LOG: Stats (IVs): HP: 68 (8), Atk: 53 (22), Def: 52 (28), Spatk: 26 (5), Spdef: 49 (18), Spd: 34 (10)
+[06:09:50.052] LOG: Ability: Rivalry | Passive Ability: Shed Skin 
+[06:09:50.052] LOG: Moveset: ["Lash Out","Stomping Tantrum","Stomp","Chip Away"]
+[06:09:50.052] LOG: Starting species pool tier: UNCOMMON
+[06:09:50.062] LOG: Pokemon: Wild Drilbur | Species ID: 529 | Level: 27 | Nature: Naughty (+Atk/-SpDef)
+[06:09:50.062] LOG: Stats (IVs): HP: 74 (18), Atk: 57 (2), Def: 29 (11), Spatk: 27 (23), Spdef: 30 (19), Spd: 46 (17)
+[06:09:50.062] LOG: Ability: Mold Breaker | Passive Ability: Sand Rush 
+[06:09:50.062] LOG: Moveset: ["Seismic Fist","Hone Claws","Slash","Mud Sport"]
+[06:09:50.207] LOG: Battle Seed: 2sZePxfr3nCX7JdV
+[06:09:50.249] DEBUG: Session data saved to slot 3!
+[06:09:50.250] LOG: Wave Seed: ]bq y}]s`~}b¦oas 44
+[06:09:51.104] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[06:09:51.208] LOG: %cStart Phase SummonPhase color:green;
+[06:09:51.491] LOG: Applied Protein 
+[06:09:51.491] LOG: Applied Zinc 
+[06:09:51.741] LOG: %cStart Phase ShinySparklePhase color:green;
+[06:09:51.941] LOG: %cStart Phase CheckSwitchPhase color:green;
+[06:09:52.685] LOG: %cStart Phase CheckSwitchPhase color:green;
+[06:09:53.078] LOG: %cStart Phase InitEncounterPhase color:green;
+[06:09:53.079] LOG: %cStart Phase PostSummonPhase color:green;
+[06:09:53.079] LOG: Ran PSP for: Furret
+[06:09:53.081] LOG: %cStart Phase PostSummonPhase color:green;
+[06:09:53.082] LOG: %cStart Phase PostSummonPhase color:green;
+[06:09:53.082] LOG: %cStart Phase PostSummonPhase color:green;
+[06:09:53.082] LOG: Ran PSP for: Drilbur
+[06:09:53.083] LOG: %cStart Phase PostSummonPhase color:green;
+[06:09:53.083] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:09:53.385] LOG: %cStart Phase MessagePhase color:green;
+[06:09:53.806] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:09:53.849] LOG: %cStart Phase PostSummonPhase color:green;
+[06:09:53.849] LOG: %cStart Phase PostSummonPhase color:green;
+[06:09:53.849] LOG: Ran PSP for: Scraggy
+[06:09:53.849] LOG: %cStart Phase PostSummonPhase color:green;
+[06:09:53.849] LOG: %cStart Phase PostSummonPhase color:green;
+[06:09:53.849] LOG: %cStart Phase TurnInitPhase color:green;
+[06:09:53.850] LOG: %cStart Phase CommandPhase color:green;
+[06:09:53.975] LOG: Applied X Attack 
+[06:09:53.981] LOG: Applied X Attack 
+[06:09:54.637] LOG: Move: SEISMIC_FIST Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Mega Excadrill
+[06:09:54.638] LOG: %cStart Phase SelectTargetPhase color:green;
+[06:09:55.805] LOG: %cStart Phase CommandPhase color:green;
+[06:09:55.967] LOG: Applied X Attack 
+[06:09:55.975] LOG: Applied X Attack 
+[06:09:56.238] LOG: Applied X Attack 
+[06:09:56.364] LOG: Move: FAKE_OUT Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Furret
+[06:09:56.365] LOG: %cStart Phase SelectTargetPhase color:green;
+[06:09:56.716] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:09:56.717] LOG: Applied Eviolite 
+[06:09:56.719] LOG: Applied Eviolite 
+[06:09:56.722] LOG: Applied Eviolite 
+[06:09:56.724] LOG: Applied Eviolite 
+[06:09:56.731] LOG: Move Pool: ["Lash Out","Stomping Tantrum","Stomp","Chip Away"]
+[06:09:56.731] LOG: Move Scores: [22.5,15,15,19]
+[06:09:56.731] LOG: Sorted Move Pool: ["Lash Out","Chip Away","Stomping Tantrum","Stomp"]
+[06:09:56.731] LOG: Chosen Move: Stomping Tantrum
+[06:09:56.731] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:09:56.732] LOG: Applied Eviolite 
+[06:09:56.735] LOG: Applied Eviolite 
+[06:09:56.737] WARN: BattlerTag ER_BLEED is missing a score!
+[06:09:56.738] WARN: BattlerTag ER_BLEED is missing a score!
+[06:09:56.738] WARN: BattlerTag ER_BLEED is missing a score!
+[06:09:56.739] WARN: BattlerTag ER_BLEED is missing a score!
+[06:09:56.740] LOG: Move Pool: ["Seismic Fist","Hone Claws","Slash","Mud Sport"]
+[06:09:56.740] LOG: Move Scores: [69,4,17,0]
+[06:09:56.740] LOG: Sorted Move Pool: ["Seismic Fist","Slash","Hone Claws","Mud Sport"]
+[06:09:56.740] LOG: Chosen Move: Seismic Fist
+[06:09:56.740] LOG: %cStart Phase TurnStartPhase color:green;
+[06:09:56.748] LOG: %cStart Phase MovePhase color:green;
+[06:09:56.748] LOG: %cUser: Furret
+Move: FAKE_OUT
+Use Mode: NORMAL color:orchid
+[06:09:56.755] LOG: %cStart Phase MessagePhase color:green;
+[06:09:56.905] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:09:57.264] LOG: crit stage: +0
+[06:09:57.265] LOG: Applied X Attack 
+[06:09:57.265] LOG: Move: Fake Out | Base damage: 25.384615384615387 | Power: 40 | Source attack: 100 | Target defense: 52
+[06:09:57.266] LOG: Move: Fake Out | Attack damage: 36
+[06:09:57.266] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:09:57.273] LOG: %cStart Phase MoveEndPhase color:green;
+[06:09:57.274] LOG: %cStart Phase MovePhase color:green;
+[06:09:57.274] LOG: %cUser: Mega Excadrill
+Move: SEISMIC_FIST
+Use Mode: NORMAL color:orchid
+[06:09:57.281] LOG: %cStart Phase MessagePhase color:green;
+[06:09:57.510] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:09:57.510] LOG: Applied Wide Lens 
+[06:09:58.223] LOG: Applied Scope Lens 
+[06:09:58.224] LOG: crit stage: +1
+[06:09:58.224] LOG: Applied X Attack 
+[06:09:58.225] LOG: Move: Seismic Fist | Base damage: 168.43586206896552 | Power: 85 | Source attack: 182 | Target defense: 29
+[06:09:58.225] LOG: Move: Seismic Fist | Attack damage: 224
+[06:09:58.225] LOG: Applied Amulet Coin 
+[06:09:58.225] LOG: Applied Golden Punch 
+[06:09:58.225] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:09:58.232] LOG: %cStart Phase FaintPhase color:green;
+[06:09:59.676] LOG: %cStart Phase MessagePhase color:green;
+[06:09:59.846] LOG: %cStart Phase VictoryPhase color:green;
+[06:09:59.846] LOG: Applied Soothe Bell 
+[06:09:59.847] LOG: %cStart Phase ExpPhase color:green;
+[06:09:59.847] LOG: Applied Super EXP. Charm 
+[06:09:59.847] LOG: Applied EXP. Charm 
+[06:10:00.104] LOG: %cStart Phase ExpPhase color:green;
+[06:10:00.104] LOG: Applied Super EXP. Charm 
+[06:10:00.105] LOG: Applied EXP. Charm 
+[06:10:00.517] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:10:00.518] LOG: Applied Super EXP. Charm 
+[06:10:00.518] LOG: Applied EXP. Charm 
+[06:10:00.518] LOG: %cStart Phase LevelUpPhase color:green;
+[06:10:00.518] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:10:00.518] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:10:00.518] LOG: Applied Super EXP. Charm 
+[06:10:00.518] LOG: Applied EXP. Charm 
+[06:10:00.518] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:10:00.518] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:10:00.518] LOG: Applied Super EXP. Charm 
+[06:10:00.518] LOG: Applied EXP. Charm 
+[06:10:00.519] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:10:00.519] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:10:00.519] LOG: Applied Super EXP. Charm 
+[06:10:00.519] LOG: Applied EXP. Charm 
+[06:10:00.519] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:10:00.519] LOG: %cStart Phase MoveEndPhase color:green;
+[06:10:00.519] LOG: %cStart Phase MovePhase color:green;
+[06:10:00.519] LOG: %cStart Phase MoveEndPhase color:green;
+[06:10:00.519] LOG: %cStart Phase MovePhase color:green;
+[06:10:00.519] LOG: %cUser: Scraggy
+Move: STOMPING_TANTRUM
+Use Mode: NORMAL color:orchid
+[06:10:00.519] LOG: %cStart Phase MessagePhase color:green;
+[06:10:00.913] LOG: %cStart Phase MoveEndPhase color:green;
+[06:10:00.913] LOG: %cStart Phase CheckInterludePhase color:green;
+[06:10:00.913] LOG: %cStart Phase WeatherEffectPhase color:green;
+[06:10:00.913] LOG: %cStart Phase PositionalTagPhase color:green;
+[06:10:00.913] LOG: %cStart Phase BerryPhase color:green;
+[06:10:00.914] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[06:10:00.915] LOG: %cStart Phase TurnEndPhase color:green;
+[06:10:00.916] LOG: %cStart Phase TurnInitPhase color:green;
+[06:10:00.916] LOG: %cStart Phase CommandPhase color:green;
+[06:10:01.245] LOG: Applied X Attack 
+[06:10:01.250] LOG: Applied X Attack 
+[06:10:01.822] LOG: Applied X Attack 
+[06:10:02.245] LOG: Move: ICICLE_IMPALE Move targets: {"targets":[2,1],"multiple":false} 
+Player Pokemon: Mega Excadrill
+[06:10:02.245] LOG: %cStart Phase SelectTargetPhase color:green;
+[06:10:02.892] LOG: %cStart Phase CommandPhase color:green;
+[06:10:03.181] LOG: Applied X Attack 
+[06:10:03.187] LOG: Applied X Attack 
+[06:10:03.757] LOG: Applied X Attack 
+[06:10:04.365] LOG: Applied X Attack 
+[06:10:05.206] LOG: Applied X Attack 
+[06:10:05.262] LOG: Applied X Attack 
+[06:10:07.879] LOG: Applied X Attack 
+[06:10:07.942] LOG: Applied X Attack 
+[06:10:10.613] LOG: Applied X Attack 
+[06:10:10.870] LOG: Applied X Attack 
+[06:10:15.215] LOG: Applied X Attack 
+[06:10:15.318] LOG: Applied X Attack 
+[06:10:16.533] LOG: Applied X Attack 
+[06:10:16.630] LOG: Applied X Attack 
+[06:10:18.662] LOG: Applied X Attack 
+[06:10:18.781] LOG: Applied X Attack 
+[06:10:19.406] LOG: Applied X Attack 
+[06:10:19.470] LOG: Applied X Attack 
+[06:10:20.102] LOG: Applied X Attack 
+[06:10:20.182] LOG: Applied X Attack 
+[06:10:21.421] LOG: Applied X Attack 
+[06:10:21.502] LOG: Applied X Attack 
+[06:10:36.070] LOG: Applied X Attack 
+[06:10:36.074] LOG: Applied X Attack 
+[06:10:37.022] LOG: Applied X Attack 
+[06:10:37.117] LOG: Applied X Attack 
