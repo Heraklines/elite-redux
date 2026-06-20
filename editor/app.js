@@ -2000,23 +2000,40 @@ function buildDeltas() {
     deltas["tm-learnsets"] = tmDelta;
   }
 
-  // Abilities: changed species → {ability1, ability2, hidden} (0 = none). Each
-  // non-zero id must resolve to a known ability.
+  // Abilities: changed species → ONLY the slots that actually changed (innates
+  // emitted as the full triple when that triple changed). Field-granular - like
+  // species tuning above - so a save NEVER re-writes a slot the user did not
+  // touch. The old whole-entry delta let a stale tab/reload carry a stale slot
+  // value back over a concurrently-saved change (the Kingambit 101->5191->101
+  // ability flip: a save meant for one slot silently reverted another). The
+  // worker deep-merges per slot and the game loader applies each slot
+  // independently, so a partial entry is safe; non-zero ids are still validated.
   const abDelta = {};
   for (const s of POKEDEX_SPECIES) {
     if (jsonEq(abil.current[s.const], abil.baseline[s.const])) {
       continue;
     }
     const cur = abil.current[s.const] || {};
-    const innates = (cur.innates || [0, 0, 0]).map(id => Number(id) || 0);
-    const entry = {
-      ability1: Number(cur.ability1) || 0,
-      ability2: Number(cur.ability2) || 0,
-      hidden: Number(cur.hidden) || 0,
-      innates: [innates[0] || 0, innates[1] || 0, innates[2] || 0],
-    };
-    const allIds = [entry.ability1, entry.ability2, entry.hidden, ...entry.innates];
-    if (allIds.every(id => id === 0 || abilById.has(id))) {
+    const base = abil.baseline[s.const] || {};
+    const entry = {};
+    const ids = [];
+    for (const slot of ["ability1", "ability2", "hidden"]) {
+      const curVal = Number(cur[slot]) || 0;
+      if (curVal !== (Number(base[slot]) || 0)) {
+        entry[slot] = curVal;
+        ids.push(curVal);
+      }
+    }
+    const curInn = (cur.innates || [0, 0, 0]).map(id => Number(id) || 0);
+    const baseInn = (base.innates || [0, 0, 0]).map(id => Number(id) || 0);
+    if (!jsonEq(curInn, baseInn)) {
+      entry.innates = [curInn[0] || 0, curInn[1] || 0, curInn[2] || 0];
+      ids.push(...entry.innates);
+    }
+    if (Object.keys(entry).length === 0) {
+      continue; // reference differs but no slot-level change
+    }
+    if (ids.every(id => id === 0 || abilById.has(id))) {
       abDelta[s.const] = entry;
     } else {
       bad.push(`${s.name}: unknown ability id`);
@@ -2241,12 +2258,17 @@ async function init() {
       const tmBase = (tmData[s.id] || []).slice();
       tms.current[s.const] = Array.isArray(tmLive[s.const]) ? tmLive[s.const].slice() : tmBase;
       const abBase = abData[s.id] || EMPTY_ABIL;
-      const o = abLive[s.const] && typeof abLive[s.const] === "object" ? abLive[s.const] : abBase;
+      // A live override may be PARTIAL (saves now carry only changed slots), so
+      // merge it OVER the shipped base - each absent slot falls back to the
+      // shipped value, mirroring what the game's override loader does. Seeding a
+      // missing slot to 0 here would make the editor show (and a later save
+      // re-write) NONE for an ability the user never touched.
+      const o = abLive[s.const] && typeof abLive[s.const] === "object" ? abLive[s.const] : {};
       const oi = Array.isArray(o.innates) ? o.innates : abBase.innates || [0, 0, 0];
       abil.current[s.const] = {
-        ability1: o.ability1 ?? 0,
-        ability2: o.ability2 ?? 0,
-        hidden: o.hidden ?? 0,
+        ability1: o.ability1 ?? abBase.ability1 ?? 0,
+        ability2: o.ability2 ?? abBase.ability2 ?? 0,
+        hidden: o.hidden ?? abBase.hidden ?? 0,
         innates: [oi[0] || 0, oi[1] || 0, oi[2] || 0],
       };
     }
