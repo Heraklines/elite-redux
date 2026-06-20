@@ -1,0 +1,269 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Avast/148.0.0.0
+mode:     0  wave:119  difficulty:youngster
+seed:     16EtcZgMQ1Gl4VRbQ6zC5UXG
+party:    Excadrill(L105 354/378), Hydreigon(L104 311/334), Mantine(L104 323/323), Gyarevelry(L104 372/372), Regieleki(L104 309/309), Furret(L104 323/323)
+
+----- DESCRIPTION -----
+Rip and tear isn't a biting move
+
+----- CONSOLE -----
+[19:08:35.646] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:08:35.949] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:08:36.301] LOG: %cStart Phase MessagePhase color:green;
+[19:08:36.724] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:08:36.767] LOG: %cStart Phase VictoryPhase color:green;
+[19:08:36.767] LOG: Applied Soothe Bell 
+[19:08:36.767] LOG: %cStart Phase MoveEndPhase color:green;
+[19:08:36.767] LOG: %cStart Phase MovePhase color:green;
+[19:08:36.767] LOG: %cStart Phase MoveEndPhase color:green;
+[19:08:36.768] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:08:36.768] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:08:36.768] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:08:36.768] LOG: %cStart Phase BerryPhase color:green;
+[19:08:36.768] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:08:36.768] LOG: %cStart Phase TurnEndPhase color:green;
+[19:08:36.768] LOG: %cStart Phase BattleEndPhase color:green;
+[19:08:36.768] LOG: Battle Score: 93 (1 Turns x1)
+[19:08:36.768] LOG: Total Score: 24929
+[19:08:36.772] LOG: Applied Protein 
+[19:08:36.772] LOG: Applied Zinc 
+[19:08:36.773] LOG: Applied Calcium 
+[19:08:36.773] LOG: Applied Calcium 
+[19:08:36.773] LOG: Applied Zinc 
+[19:08:36.773] LOG: Applied HP Up 
+[19:08:36.778] LOG: %cStart Phase EggLapsePhase color:green;
+[19:08:36.778] LOG: %cStart Phase SelectModifierPhase color:green;
+[19:08:36.778] LOG: Wave Seed: ¦«ºéØÏÜÂÆ¦¼á©ËÇ×Æ«ï¸ªÊÍ¼ 117
+[19:08:36.782] LOG: Applied Golden Poké Ball 
+[19:08:36.782] LOG: 0 0 [2,3,6]
+[19:08:36.782] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[19:08:36.782] LOG: 20 8 [2,3,4,5,6,7,8,16,23]
+[19:08:36.782] LOG: {"id":"ER_ABILITY_CAPSULE","localeKey":"","iconImage":"ability_capsule","soundName":"se/restore","tier":1} 
+[19:08:36.782] LOG: 11 7 [2,3,4,5,6,7,8,16,23]
+[19:08:36.782] LOG: {"id":"DIRE_HIT","localeKey":"modifierType:ModifierType.DIRE_HIT","iconImage":"dire_hit","soundName":"se/restore","tier":1} 
+[19:08:36.782] LOG: 11 7 [2,3,4,5,6,7,8,16,23]
+[19:08:36.782] LOG: {"id":"DIRE_HIT","localeKey":"modifierType:ModifierType.DIRE_HIT","iconImage":"dire_hit","soundName":"se/restore","tier":1} 
+[19:08:36.782] LOG: 0 0 [2,3,4,5,6,7,8,16,23]
+[19:08:36.782] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[19:08:36.782] LOG: 19 8 [2,3,4,5,6,7,8,16,23]
+[19:08:36.782] LOG: {"id":"MEMORY_MUSHROOM","localeKey":"modifierType:ModifierType.MEMORY_MUSHROOM","iconImage":"big_mushroom","soundName":"se/restore","tier":1} 
+[19:08:36.782] LOG: 12 7 [2,3,4,5,6,7,8,16,23]
+[19:08:36.782] LOG: {"id":"SUPER_LURE","localeKey":"modifierType:ModifierType.SUPER_LURE","iconImage":"super_lure","group":"lure","soundName":"se/restore","tier":1,"maxBattles":15} 
+[19:08:36.782] LOG: 0 0 [2,3,6]
+[19:08:36.782] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[19:08:36.783] LOG: 4 2 [2,3,6]
+[19:08:36.783] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[19:08:36.783] LOG: 7 3 [2,3,6]
+[19:08:36.783] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[19:08:36.783] LOG: 8 3 [2,3,6]
+[19:08:36.783] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} 
+[19:08:52.638] LOG: Applied Protein 
+[19:08:52.638] LOG: Applied Zinc 
+[19:08:52.639] LOG: Applied Calcium 
+[19:08:52.639] LOG: Applied Calcium 
+[19:08:52.639] LOG: Applied Zinc 
+[19:08:52.639] LOG: Applied HP Up 
+[19:08:52.651] LOG: %cStart Phase NewBattlePhase color:green;
+[19:08:52.651] LOG: Wave Seed: §¬»êÙÐÝÃÇ§½âªÌÈØÇ¬ð¹«ËÎ½ 118
+[19:08:52.651] LOG: Applied Lure 
+[19:08:52.651] LOG: Applied Super Lure 
+[19:08:52.651] LOG: %cStart Phase NextEncounterPhase color:green;
+[19:08:52.652] LOG: Starting species pool tier: UNCOMMON
+[19:08:52.652] LOG: Replaced PIKACHU with RAICHU
+[19:08:52.664] LOG: Pokemon: Wild Raichu | Species ID: 26 | Level: 93 | Nature: Bold (+Def/-Atk)
+[19:08:52.664] LOG: Stats (IVs): HP: 236 (24), Atk: 158 (4), Def: 122 (3), Spatk: 172 (0), Spdef: 166 (14), Spd: 228 (10)
+[19:08:52.664] LOG: Ability: Generator | Passive Ability: Short Circuit 
+[19:08:52.664] LOG: Moveset: ["Headlong Rush","Magnetic Flux","Encore","Smite"]
+[19:08:52.664] LOG: Starting species pool tier: RARE
+[19:08:52.664] LOG: Replaced BUNEARY with LOPUNNY
+[19:08:52.674] LOG: Pokemon: Wild Lopunny | Species ID: 428 | Level: 85 | Nature: Rash (+SpAtk/-SpDef)
+[19:08:52.674] LOG: Stats (IVs): HP: 210 (6), Atk: 141 (8), Def: 135 (26), Spatk: 112 (5), Spdef: 157 (8), Spd: 207 (8)
+[19:08:52.675] LOG: Ability: Fighting Spirit | Passive Ability: Limber 
+[19:08:52.675] LOG: Moveset: ["Mega Kick","Cosmic Power","Encore","Dizzy Punch"]
+[19:08:53.027] LOG: {"id":"BERRY","localeKey":"","iconImage":"lansat_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":8} (enemy)
+[19:08:53.027] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} (enemy)
+[19:08:53.076] DEBUG: Session data saved to slot 3!
+[19:08:53.077] LOG: Wave Seed: §¬»êÙÐÝÃÇ§½âªÌÈØÇ¬ð¹«ËÎ½ 118
+[19:08:53.927] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:08:53.927] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:08:54.143] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:08:54.351] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:08:54.352] LOG: %cStart Phase PostSummonPhase color:green;
+[19:08:54.352] LOG: Ran PSP for: Raichu
+[19:08:54.352] LOG: %cStart Phase PostSummonPhase color:green;
+[19:08:54.354] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:08:54.657] LOG: %cStart Phase MessagePhase color:green;
+[19:08:55.169] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:08:55.212] LOG: %cStart Phase PostSummonPhase color:green;
+[19:08:55.212] LOG: %cStart Phase PostSummonPhase color:green;
+[19:08:55.212] LOG: Ran PSP for: Lopunny
+[19:08:55.212] LOG: %cStart Phase PostSummonPhase color:green;
+[19:08:55.213] LOG: %cStart Phase PostSummonPhase color:green;
+[19:08:55.213] LOG: %cStart Phase TurnInitPhase color:green;
+[19:08:55.213] LOG: %cStart Phase CommandPhase color:green;
+[19:08:56.932] WARN: cry/530-mega not found
+[19:13:30.400] WARN: cry/635-mega not found
+[19:16:06.310] LOG: Move: ICICLE_IMPALE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Mega Excadrill
+[19:16:06.311] LOG: %cStart Phase SelectTargetPhase color:green;
+[19:16:06.718] LOG: %cStart Phase CommandPhase color:green;
+[19:16:08.512] LOG: Move: DRACONIC_FANGS Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Mega Hydreigon
+[19:16:08.513] LOG: %cStart Phase SelectTargetPhase color:green;
+[19:16:09.062] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:16:09.063] LOG: Applied Eviolite 
+[19:16:09.066] LOG: Applied Eviolite 
+[19:16:09.068] LOG: Battle Seed: 3v3gks1d4o3ZIUfi
+[19:16:09.069] WARN: BattlerTag IGNORE_FLYING is missing a score!
+[19:16:09.070] WARN: BattlerTag IGNORE_FLYING is missing a score!
+[19:16:09.071] WARN: BattlerTag IGNORE_FLYING is missing a score!
+[19:16:09.073] WARN: BattlerTag IGNORE_FLYING is missing a score!
+[19:16:09.073] LOG: Move Pool: ["Headlong Rush","Magnetic Flux","Encore","Smite"]
+[19:16:09.073] LOG: Move Scores: [66,-20,2,15.375]
+[19:16:09.073] LOG: Sorted Move Pool: ["Headlong Rush","Smite","Encore","Magnetic Flux"]
+[19:16:09.073] LOG: Chosen Move: Smite
+[19:16:09.073] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:16:09.074] LOG: Applied Eviolite 
+[19:16:09.076] LOG: Applied Eviolite 
+[19:16:09.081] LOG: Move Pool: ["Mega Kick","Cosmic Power","Encore","Dizzy Punch"]
+[19:16:09.081] LOG: Move Scores: [54.75,4,2,45]
+[19:16:09.081] LOG: Sorted Move Pool: ["Mega Kick","Dizzy Punch","Cosmic Power","Encore"]
+[19:16:09.081] LOG: Chosen Move: Mega Kick
+[19:16:09.081] LOG: %cStart Phase TurnStartPhase color:green;
+[19:16:09.090] LOG: %cStart Phase MovePhase color:green;
+[19:16:09.090] LOG: %cUser: Mega Excadrill
+Move: ICICLE_IMPALE
+Use Mode: NORMAL color:orchid
+[19:16:09.096] LOG: %cStart Phase MessagePhase color:green;
+[19:16:09.302] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:16:09.303] LOG: Applied Wide Lens 
+[19:16:09.503] LOG: Applied Scope Lens 
+[19:16:09.503] LOG: crit stage: +1
+[19:16:09.504] LOG: Move: Icicle Impale | Base damage: 804.6754098360656 | Power: 104 | Source attack: 1070 | Target defense: 122
+[19:16:09.505] LOG: Move: Icicle Impale | Attack damage: 1416
+[19:16:09.505] LOG: Applied Amulet Coin 
+[19:16:09.505] LOG: Applied Golden Punch 
+[19:16:09.506] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:16:09.512] LOG: %cStart Phase MessagePhase color:green;
+[19:16:09.903] LOG: %cStart Phase FaintPhase color:green;
+[19:16:11.524] LOG: %cStart Phase MessagePhase color:green;
+[19:16:11.614] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:16:11.923] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:16:12.274] LOG: %cStart Phase MessagePhase color:green;
+[19:16:12.698] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:16:12.741] LOG: %cStart Phase VictoryPhase color:green;
+[19:16:12.741] LOG: Applied Soothe Bell 
+[19:16:12.742] LOG: %cStart Phase MoveEndPhase color:green;
+[19:16:12.743] LOG: %cStart Phase MovePhase color:green;
+[19:16:12.743] LOG: %cUser: Mega Hydreigon
+Move: DRACONIC_FANGS
+Use Mode: NORMAL color:orchid
+[19:16:12.745] LOG: %cStart Phase MessagePhase color:green;
+[19:16:12.985] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:16:13.445] LOG: crit stage: +0
+[19:16:13.447] LOG: Move: Draconic Fangs | Base damage: 1201.096888888889 | Power: 110.5 | Source attack: 1680 | Target defense: 135
+[19:16:13.447] LOG: Move: Draconic Fangs | Attack damage: 882
+[19:16:13.447] WARN: Failed to get source Pokemon for CursedTag onAdd; id: undefined
+[19:16:13.448] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:16:13.453] LOG: %cStart Phase MessagePhase color:green;
+[19:16:13.815] LOG: %cStart Phase FaintPhase color:green;
+[19:16:15.997] LOG: %cStart Phase MessagePhase color:green;
+[19:16:16.307] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:16:16.612] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:16:16.962] LOG: %cStart Phase MessagePhase color:green;
+[19:16:17.386] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:16:17.428] LOG: %cStart Phase VictoryPhase color:green;
+[19:16:17.428] LOG: Applied Soothe Bell 
+[19:16:17.428] LOG: %cStart Phase MoveEndPhase color:green;
+[19:16:17.429] LOG: %cStart Phase MovePhase color:green;
+[19:16:17.429] LOG: %cStart Phase MoveEndPhase color:green;
+[19:16:17.429] LOG: %cStart Phase MovePhase color:green;
+[19:16:17.429] LOG: %cStart Phase MoveEndPhase color:green;
+[19:16:17.429] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:16:17.429] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:16:17.429] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:16:17.429] LOG: %cStart Phase BerryPhase color:green;
+[19:16:17.430] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:16:17.430] LOG: %cStart Phase TurnEndPhase color:green;
+[19:16:17.430] LOG: %cStart Phase MessagePhase color:green;
+[19:16:17.937] LOG: %cStart Phase BattleEndPhase color:green;
+[19:16:17.937] LOG: Battle Score: 328 (1 Turns x1)
+[19:16:17.937] LOG: Total Score: 25257
+[19:16:17.942] LOG: Applied Protein 
+[19:16:17.942] LOG: Applied Zinc 
+[19:16:17.942] LOG: Applied Calcium 
+[19:16:17.942] LOG: Applied Calcium 
+[19:16:17.943] LOG: Applied Zinc 
+[19:16:17.943] LOG: Applied HP Up 
+[19:16:17.948] LOG: %cStart Phase EggLapsePhase color:green;
+[19:16:17.949] LOG: %cStart Phase SelectModifierPhase color:green;
+[19:16:17.949] LOG: Wave Seed: §¬»êÙÐÝÃÇ§½âªÌÈØÇ¬ð¹«ËÎ½ 118
+[19:16:17.954] LOG: Applied Golden Poké Ball 
+[19:16:17.954] LOG: 8 2 [2,3]
+[19:16:17.954] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} 
+[19:16:17.954] LOG: 19 9 [2,3,4,5,6,7,8,12,16,23]
+[19:16:17.954] LOG: {"id":"MEMORY_MUSHROOM","localeKey":"modifierType:ModifierType.MEMORY_MUSHROOM","iconImage":"big_mushroom","soundName":"se/restore","tier":1} 
+[19:16:17.954] LOG: 6 2 [2,3]
+[19:16:17.954] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[19:16:17.954] LOG: 30 7 [7,9,11,12,13,15,25]
+[19:16:17.954] LOG: {"id":"ER_RUSTY_CLAW","localeKey":"","iconImage":"quick_claw","iconTint":10115891,"soundName":"se/restore","tier":2} 
+[19:16:17.954] LOG: 32 7 [7,9,11,12,13,15,25]
+[19:16:17.954] LOG: {"id":"ER_LOADED_DICE","localeKey":"","iconImage":"wide_lens","iconTint":15255626,"soundName":"se/restore","tier":2} 
+[19:16:17.954] LOG: 4 0 [7,9,11,12,13,15,25]
+[19:16:17.954] LOG: {"id":"MINT","localeKey":"","iconImage":"mint_spd","group":"mint","soundName":"se/restore","tier":2,"nature":13} 
+[19:16:17.955] LOG: 18 9 [2,3,4,5,6,7,8,12,16,23]
+[19:16:17.955] LOG: {"id":"TM_GREAT","localeKey":"","iconImage":"tm_dragon","group":"tm","soundName":"se/restore","tier":1,"moveId":784} 
+[19:16:28.183] WARN: cry/635-mega not found
+[19:16:31.424] WARN: cry/10857 not found
+[19:16:47.664] LOG: %cStart Phase LearnMovePhase color:green;
+[19:16:49.537] WARN: cry/635-mega not found
+[19:16:52.646] LOG: %cStart Phase NewBattlePhase color:green;
+[19:16:52.646] LOG: Wave Seed: ¨­¼ëÚÑÞÄÈ¨¾ã«ÍÉÙÈ­ñº¬ÌÏ¾ 119
+[19:16:52.646] LOG: Applied Lure 
+[19:16:52.646] LOG: Applied Super Lure 
+[19:16:52.646] LOG: %cStart Phase NextEncounterPhase color:green;
+[19:16:52.647] LOG: Starting species pool tier: UNCOMMON
+[19:16:52.647] LOG: ER #479: vanilla-difficulty wild kept as SPEAROW - skipped custom evolution Terrow
+[19:16:52.658] LOG: Pokemon: Wild Spearow | Species ID: 21 | Level: 90 | Nature: Relaxed (+Def/-Spd)
+[19:16:52.658] LOG: Stats (IVs): HP: 193 (24), Atk: 126 (15), Def: 84 (19), Spatk: 73 (14), Spdef: 72 (13), Spd: 121 (5)
+[19:16:52.659] LOG: Ability: Gale Wings | Passive Ability: Frisk 
+[19:16:52.659] LOG: Moveset: ["Brave Bird","Slash","Air Cutter","Lash Out"]
+[19:16:52.659] LOG: Starting species pool tier: RARE
+[19:16:52.659] LOG: ER #479: vanilla-difficulty wild kept as SHINX - skipped custom evolution Luxzero
+[19:16:52.669] LOG: Pokemon: Wild Shinx | Species ID: 403 | Level: 88 | Nature: Quiet (+SpAtk/-Spd)
+[19:16:52.669] LOG: Stats (IVs): HP: 196 (2), Atk: 122 (3), Def: 92 (31), Spatk: 73 (10), Spdef: 71 (7), Spd: 125 (23)
+[19:16:52.669] LOG: Ability: Intimidate | Passive Ability: Short Circuit 
+[19:16:52.669] LOG: Moveset: ["Volt Tackle","Roar","Trailblaze","Swagger"]
+[19:16:52.986] DEBUG: Session data saved to slot 3!
+[19:16:52.988] LOG: Wave Seed: ¨­¼ëÚÑÞÄÈ¨¾ã«ÍÉÙÈ­ñº¬ÌÏ¾ 119
+[19:16:53.834] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:16:53.834] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:16:54.472] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:16:54.840] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:16:54.841] LOG: %cStart Phase PostSummonPhase color:green;
+[19:16:54.841] LOG: Ran PSP for: Shinx
+[19:16:54.842] LOG: %cStart Phase PostSummonPhase color:green;
+[19:16:54.843] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:16:55.149] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:16:55.499] LOG: %cStart Phase MessagePhase color:green;
+[19:16:55.918] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:16:56.270] LOG: %cStart Phase MessagePhase color:green;
+[19:16:56.690] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:16:56.737] LOG: %cStart Phase PostSummonPhase color:green;
+[19:16:56.737] LOG: %cStart Phase PostSummonPhase color:green;
+[19:16:56.737] LOG: Ran PSP for: Spearow
+[19:16:56.738] LOG: %cStart Phase PostSummonPhase color:green;
+[19:16:56.738] LOG: %cStart Phase PostSummonPhase color:green;
+[19:16:56.739] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:16:57.045] LOG: %cStart Phase MessagePhase color:green;
+[19:16:57.553] LOG: %cStart Phase MessagePhase color:green;
+[19:16:58.091] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:16:58.134] LOG: %cStart Phase TurnInitPhase color:green;
+[19:16:58.134] LOG: %cStart Phase CommandPhase color:green;
+[19:16:59.534] LOG: Move: ICICLE_IMPALE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Mega Excadrill
+[19:16:59.536] LOG: %cStart Phase SelectTargetPhase color:green;
+[19:17:00.022] LOG: %cStart Phase CommandPhase color:green;
