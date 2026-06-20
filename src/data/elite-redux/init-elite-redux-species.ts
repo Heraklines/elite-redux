@@ -287,14 +287,20 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
         if (actives[0] !== AbilityId.NONE) {
           form.setActiveAbilities(actives);
         }
-        // The DEFAULT form (index 0) must also inherit the species' ER type
-        // override — otherwise a re-typed multi-form species shows its old
-        // vanilla typing on its base form (e.g. Lycanroc Midday displayed pure
-        // Rock instead of ER's Rock/Ground). Gated to the base form so NON-default
-        // forms that legitimately differ but lack their own ER record (Wormadam
-        // cloaks, Rotom appliances) keep their own vanilla types.
-        if (species.forms[0] === form && type1 !== null) {
-          form.setTypes(type1, type2);
+        // The DEFAULT form (index 0) must also inherit the species' ER base STATS
+        // and type override. setBaseStats above writes the species-level stats, but
+        // the Pokedex/summary read the FORM's stats - so a species pokerogue ships
+        // with a native form (e.g. Beedrill, which has a vanilla Mega, so forms[0]
+        // is a pre-built vanilla base form) displayed VANILLA base stats in the dex
+        // even though battle used the ER species stats. Mirror the species stats +
+        // types onto the base form. Gated to forms[0] so NON-default forms that
+        // legitimately differ but lack their own ER record (Wormadam cloaks, Rotom
+        // appliances, Lycanroc forms) keep their own vanilla kit.
+        if (species.forms[0] === form) {
+          form.setBaseStats(draft.baseStats);
+          if (type1 !== null) {
+            form.setTypes(type1, type2);
+          }
         }
         continue;
       }
