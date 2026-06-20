@@ -1,0 +1,283 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     3  wave:9  difficulty:ace
+seed:     NOygo802M8saYGySO26SS4Ac
+party:    Uxie(L29 54/84), Spiritomb(L27 44/72), Thievul(L28 44/83), Carbink(L27 57/68), Audino(L26 90/90)
+
+----- DESCRIPTION -----
+Stole a fairy gem, gave it to my Uxie with no fairy moves for later, gem triggered when Uxie got attacked by a fairy move but can't tell if it actually got strengthened
+
+----- CONSOLE -----
+[10:03:59.214] LOG: Move: Fairy Wind | Attack damage: 9
+[10:03:59.216] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:03:59.243] LOG: %cStart Phase MessagePhase color:green;
+[10:03:59.758] LOG: %cStart Phase MoveEndPhase color:green;
+[10:03:59.762] LOG: %cStart Phase MovePhase color:green;
+[10:03:59.762] LOG: %cUser: Spritzee
+Move: SMOG
+Use Mode: NORMAL color:orchid
+[10:03:59.770] LOG: %cStart Phase MessagePhase color:green;
+[10:04:00.041] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:04:00.675] LOG: crit stage: +0
+[10:04:00.678] LOG: Move: Smog | Base damage: 7.08235294117647 | Power: 50 | Source attack: 36 | Target defense: 85
+[10:04:00.678] LOG: Move: Smog | Attack damage: 6
+[10:04:00.679] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:04:00.709] LOG: %cStart Phase MoveEndPhase color:green;
+[10:04:00.710] LOG: %cStart Phase MovePhase color:green;
+[10:04:00.710] LOG: %cUser: Spiritomb
+Move: FEINT_ATTACK
+Use Mode: NORMAL color:orchid
+[10:04:00.717] LOG: %cStart Phase MessagePhase color:green;
+[10:04:01.007] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:04:01.658] LOG: Applied Dire Hit 
+[10:04:01.659] LOG: crit stage: +1
+[10:04:01.662] LOG: Applied X Attack 
+[10:04:01.663] LOG: Move: Feint Attack | Base damage: 23.689491525423726 | Power: 60 | Source attack: 86 | Target defense: 59
+[10:04:01.664] LOG: Move: Feint Attack | Attack damage: 32
+[10:04:01.665] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:04:01.693] LOG: %cStart Phase MoveEndPhase color:green;
+[10:04:01.693] LOG: %cStart Phase MovePhase color:green;
+[10:04:01.693] LOG: %cUser: Uxie
+Move: MYSTICAL_FIRE
+Use Mode: NORMAL color:orchid
+[10:04:01.700] LOG: %cStart Phase MessagePhase color:green;
+[10:04:01.974] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:04:02.725] LOG: Applied Dire Hit 
+[10:04:02.726] LOG: crit stage: +1
+[10:04:02.729] LOG: Move: Mystical Fire | Base damage: 54.58448979591837 | Power: 80 | Source attack: 122 | Target defense: 49
+[10:04:02.729] LOG: Move: Mystical Fire | Attack damage: 50
+[10:04:02.730] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:04:02.759] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:04:03.210] LOG: %cStart Phase MessagePhase color:green;
+[10:04:03.757] LOG: %cStart Phase MoveEndPhase color:green;
+[10:04:03.758] LOG: %cStart Phase CheckInterludePhase color:green;
+[10:04:03.758] LOG: %cStart Phase WeatherEffectPhase color:green;
+[10:04:03.758] LOG: %cStart Phase PositionalTagPhase color:green;
+[10:04:03.758] LOG: %cStart Phase BerryPhase color:green;
+[10:04:03.765] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[10:04:03.771] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[10:04:03.771] LOG: %cStart Phase TurnEndPhase color:green;
+[10:04:03.777] LOG: %cStart Phase TurnInitPhase color:green;
+[10:04:03.777] LOG: %cStart Phase CommandPhase color:green;
+[10:04:04.478] LOG: Move: MYSTICAL_FIRE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Uxie
+[10:04:04.480] LOG: %cStart Phase SelectTargetPhase color:green;
+[10:04:05.025] LOG: %cStart Phase CommandPhase color:green;
+[10:04:05.318] LOG: Move: FEINT_ATTACK Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Spiritomb
+[10:04:05.319] LOG: %cStart Phase SelectTargetPhase color:green;
+[10:04:05.456] LOG: %cStart Phase EnemyCommandPhase color:green;
+[10:04:05.471] LOG: Battle Seed: SuQTcKoPGa7PjY6V
+[10:04:05.475] LOG: Move Pool: ["Body Slam","Cutsie Slap","Fairy Wind","Encore"]
+[10:04:05.475] LOG: Move Scores: [-20,40,20,2]
+[10:04:05.475] LOG: Sorted Move Pool: ["Cutsie Slap","Fairy Wind","Encore","Body Slam"]
+[10:04:05.475] LOG: Chosen Move: Fairy Wind
+[10:04:05.475] LOG: %cStart Phase EnemyCommandPhase color:green;
+[10:04:05.483] LOG: Move Pool: ["Captivate","Disarming Voice","Smog","Sweet Scent"]
+[10:04:05.483] LOG: Move Scores: [6,42,7,6]
+[10:04:05.483] LOG: Sorted Move Pool: ["Disarming Voice","Smog","Captivate","Sweet Scent"]
+[10:04:05.483] LOG: Chosen Move: Smog
+[10:04:05.483] LOG: %cStart Phase TurnStartPhase color:green;
+[10:04:05.488] LOG: %cStart Phase MovePhase color:green;
+[10:04:05.488] LOG: %cUser: Audino
+Move: FAIRY_WIND
+Use Mode: NORMAL color:orchid
+[10:04:05.491] LOG: %cStart Phase MessagePhase color:green;
+[10:04:05.740] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:04:05.790] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[10:04:05.807] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[10:04:05.840] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[10:04:05.873] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[10:04:05.907] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[10:04:05.957] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[10:04:05.973] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[10:04:06.023] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[10:04:06.073] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[10:04:06.559] LOG: crit stage: +0
+[10:04:06.561] LOG: Move: Fairy Wind | Base damage: 9.623529411764707 | Power: 60 | Source attack: 36 | Target defense: 68
+[10:04:06.562] LOG: Move: Fairy Wind | Attack damage: 19
+[10:04:06.563] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:04:06.593] LOG: %cStart Phase MessagePhase color:green;
+[10:04:07.107] LOG: %cStart Phase MoveEndPhase color:green;
+[10:04:07.110] LOG: %cStart Phase MovePhase color:green;
+[10:04:07.110] LOG: %cUser: Spritzee
+Move: SMOG
+Use Mode: NORMAL color:orchid
+[10:04:07.118] LOG: %cStart Phase MessagePhase color:green;
+[10:04:07.390] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:04:08.024] LOG: crit stage: +0
+[10:04:08.027] LOG: Move: Smog | Base damage: 5.3882352941176475 | Power: 50 | Source attack: 24 | Target defense: 85
+[10:04:08.027] LOG: Move: Smog | Attack damage: 5
+[10:04:08.028] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:04:08.059] LOG: %cStart Phase MoveEndPhase color:green;
+[10:04:08.060] LOG: %cStart Phase MovePhase color:green;
+[10:04:08.060] LOG: %cUser: Spiritomb
+Move: FEINT_ATTACK
+Use Mode: NORMAL color:orchid
+[10:04:08.067] LOG: %cStart Phase MessagePhase color:green;
+[10:04:08.356] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:04:09.007] LOG: Applied Dire Hit 
+[10:04:09.008] LOG: crit stage: +1
+[10:04:09.010] LOG: Applied X Attack 
+[10:04:09.010] LOG: Move: Feint Attack | Base damage: 23.689491525423726 | Power: 60 | Source attack: 86 | Target defense: 59
+[10:04:09.011] LOG: Move: Feint Attack | Attack damage: 30
+[10:04:09.020] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:04:09.041] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:04:09.441] LOG: %cStart Phase MessagePhase color:green;
+[10:04:10.103] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:04:10.158] LOG: %cStart Phase MoveEndPhase color:green;
+[10:04:10.158] LOG: %cStart Phase MovePhase color:green;
+[10:04:10.158] LOG: %cUser: Uxie
+Move: MYSTICAL_FIRE
+Use Mode: NORMAL color:orchid
+[10:04:10.167] LOG: %cStart Phase MessagePhase color:green;
+[10:04:10.439] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:04:11.190] LOG: Applied Dire Hit 
+[10:04:11.190] LOG: crit stage: +1
+[10:04:11.192] LOG: Move: Mystical Fire | Base damage: 54.58448979591837 | Power: 80 | Source attack: 122 | Target defense: 49
+[10:04:11.193] LOG: Move: Mystical Fire | Attack damage: 46
+[10:04:11.193] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:04:11.225] LOG: %cStart Phase FaintPhase color:green;
+[10:04:12.228] LOG: %cStart Phase MessagePhase color:green;
+[10:04:12.593] LOG: %cStart Phase VictoryPhase color:green;
+[10:04:12.593] LOG: %cStart Phase ExpPhase color:green;
+[10:04:12.594] LOG: Applied Golden EXP. Charm 
+[10:04:13.041] LOG: %cStart Phase LevelUpPhase color:green;
+[10:04:13.042] LOG: %cStart Phase ExpPhase color:green;
+[10:04:13.042] LOG: Applied Golden EXP. Charm 
+[10:04:13.591] LOG: %cStart Phase LevelUpPhase color:green;
+[10:04:13.593] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:04:13.593] LOG: Applied Golden EXP. Charm 
+[10:04:13.593] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:04:13.593] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:04:13.593] LOG: Applied Golden EXP. Charm 
+[10:04:13.594] LOG: %cStart Phase LevelUpPhase color:green;
+[10:04:13.594] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:04:13.594] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:04:13.595] LOG: Applied Golden EXP. Charm 
+[10:04:13.595] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:04:13.595] LOG: %cStart Phase MoveEndPhase color:green;
+[10:04:13.595] LOG: %cStart Phase CheckInterludePhase color:green;
+[10:04:13.595] LOG: %cStart Phase WeatherEffectPhase color:green;
+[10:04:13.595] LOG: %cStart Phase PositionalTagPhase color:green;
+[10:04:13.595] LOG: %cStart Phase BerryPhase color:green;
+[10:04:13.598] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[10:04:13.599] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[10:04:13.599] LOG: %cStart Phase TurnEndPhase color:green;
+[10:04:13.601] LOG: %cStart Phase BattleEndPhase color:green;
+[10:04:13.601] LOG: Battle Score: 47 (2 Turns x0.84)
+[10:04:13.601] LOG: Total Score: 601
+[10:04:13.606] LOG: Applied Protein 
+[10:04:13.608] LOG: %cStart Phase EggLapsePhase color:green;
+[10:04:13.608] LOG: %cStart Phase SelectModifierPhase color:green;
+[10:04:13.608] LOG: Wave Seed: VWow@8:U@{iaO[W:>[[<Ik 8
+[10:04:13.612] LOG: 26 5 [9,11,12,13,15]
+[10:04:13.612] LOG: {"id":"QUICK_CLAW","localeKey":"modifierType:ModifierType.QUICK_CLAW","iconImage":"quick_claw","soundName":"se/restore","tier":2} 
+[10:04:13.612] LOG: 0 0 [4,5]
+[10:04:13.612] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[10:04:13.612] LOG: 7 2 [4,5]
+[10:04:13.612] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[10:04:13.613] LOG: 0 0 [4,5]
+[10:04:13.613] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[10:04:13.613] LOG: 2 0 [4,5]
+[10:04:13.613] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[10:04:16.349] LOG: Applied Protein 
+[10:04:16.356] LOG: %cStart Phase NewBattlePhase color:green;
+[10:04:16.356] LOG: Wave Seed: WXpxA9;VA|jbP\X;?\\=Jl 9
+[10:04:16.356] LOG: %cStart Phase NextEncounterPhase color:green;
+[10:04:16.357] LOG: Starting species pool tier: COMMON
+[10:04:16.357] LOG: Applied Ability Charm 
+[10:04:16.358] LOG: Applied Shiny Charm 
+[10:04:16.365] LOG: Pokemon: Wild Swirlix | Species ID: 684 | Level: 26 | Nature: Naive (+Spd/-SpDef)
+[10:04:16.365] LOG: Stats (IVs): HP: 78 (31), Atk: 33 (1), Def: 46 (29), Spatk: 36 (3), Spdef: 33 (12), Spd: 41 (14)
+[10:04:16.365] LOG: Ability: Oblivious | Passive Ability: Cotton Down 
+[10:04:16.365] LOG: Moveset: ["Bonk","Lovely Bite","Fire Fang","Belly Drum"]
+[10:04:16.602] LOG: Battle Seed: YSJ3lqTqxLADlmvR
+[10:04:16.643] DEBUG: Session data saved to slot 1!
+[10:04:16.644] LOG: Wave Seed: WXpxA9;VA|jbP\X;?\\=Jl 9
+[10:04:17.691] LOG: %cStart Phase ReturnPhase color:green;
+[10:04:17.973] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[10:04:18.108] LOG: %cStart Phase CheckSwitchPhase color:green;
+[10:04:19.752] LOG: %cStart Phase SwitchPhase color:green;
+[10:04:20.676] LOG: %cStart Phase InitEncounterPhase color:green;
+[10:04:20.676] LOG: %cStart Phase PostSummonPhase color:green;
+[10:04:20.676] LOG: Ran PSP for: Swirlix
+[10:04:20.676] LOG: %cStart Phase PostSummonPhase color:green;
+[10:04:20.676] LOG: %cStart Phase PostSummonPhase color:green;
+[10:04:20.676] LOG: %cStart Phase TurnInitPhase color:green;
+[10:04:20.676] LOG: %cStart Phase CommandPhase color:green;
+[10:04:22.074] LOG: Move: MYSTICAL_FIRE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Uxie
+[10:04:22.077] LOG: %cStart Phase EnemyCommandPhase color:green;
+[10:04:22.082] LOG: Move Pool: ["Bonk","Lovely Bite","Fire Fang","Belly Drum"]
+[10:04:22.082] LOG: Move Scores: [27,27,8.25,22]
+[10:04:22.082] LOG: Sorted Move Pool: ["Bonk","Lovely Bite","Belly Drum","Fire Fang"]
+[10:04:22.082] LOG: Chosen Move: Lovely Bite
+[10:04:22.082] LOG: %cStart Phase TurnStartPhase color:green;
+[10:04:22.083] LOG: %cStart Phase MovePhase color:green;
+[10:04:22.083] LOG: %cUser: Swirlix
+Move: LOVELY_BITE
+Use Mode: NORMAL color:orchid
+[10:04:22.084] LOG: %cStart Phase MessagePhase color:green;
+[10:04:22.388] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:04:23.590] LOG: crit stage: +0
+[10:04:23.592] LOG: Move: Lovely Bite | Base damage: 9.644395604395605 | Power: 85 | Source attack: 33 | Target defense: 91
+[10:04:23.593] LOG: Move: Lovely Bite | Attack damage: 15
+[10:04:23.595] LOG: %cStart Phase MessagePhase color:green;
+[10:04:24.205] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:04:24.240] LOG: %cStart Phase MoveEndPhase color:green;
+[10:04:24.240] LOG: %cStart Phase MovePhase color:green;
+[10:04:24.240] LOG: %cUser: Uxie
+Move: MYSTICAL_FIRE
+Use Mode: NORMAL color:orchid
+[10:04:24.242] LOG: %cStart Phase MessagePhase color:green;
+[10:04:24.522] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:04:25.273] LOG: crit stage: +0
+[10:04:25.275] LOG: Move: Mystical Fire | Base damage: 84.42424242424242 | Power: 80 | Source attack: 125 | Target defense: 33
+[10:04:25.276] LOG: Move: Mystical Fire | Attack damage: 144
+[10:04:25.278] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:04:25.306] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:04:25.707] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:04:26.156] LOG: %cStart Phase MessagePhase color:green;
+[10:04:26.655] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:04:26.723] LOG: %cStart Phase FaintPhase color:green;
+[10:04:29.241] LOG: %cStart Phase MessagePhase color:green;
+[10:04:30.912] LOG: %cStart Phase VictoryPhase color:green;
+[10:04:30.912] LOG: %cStart Phase ExpPhase color:green;
+[10:04:30.912] LOG: Applied Golden EXP. Charm 
+[10:04:31.855] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:04:31.855] LOG: Applied Golden EXP. Charm 
+[10:04:31.856] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:04:31.856] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:04:31.856] LOG: Applied Golden EXP. Charm 
+[10:04:31.856] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:04:31.857] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:04:31.857] LOG: Applied Golden EXP. Charm 
+[10:04:31.857] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:04:31.857] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:04:31.857] LOG: Applied Golden EXP. Charm 
+[10:04:31.857] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:04:31.857] LOG: %cStart Phase MoveEndPhase color:green;
+[10:04:31.857] LOG: %cStart Phase CheckInterludePhase color:green;
+[10:04:31.857] LOG: %cStart Phase WeatherEffectPhase color:green;
+[10:04:31.857] LOG: %cStart Phase PositionalTagPhase color:green;
+[10:04:31.857] LOG: %cStart Phase BerryPhase color:green;
+[10:04:31.858] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[10:04:31.858] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[10:04:31.858] LOG: %cStart Phase TurnEndPhase color:green;
+[10:04:31.859] LOG: %cStart Phase MessagePhase color:green;
+[10:04:32.471] LOG: %cStart Phase BattleEndPhase color:green;
+[10:04:32.472] LOG: Battle Score: 55 (1 Turns x1)
+[10:04:32.472] LOG: Total Score: 656
+[10:04:32.478] LOG: Applied Protein 
+[10:04:32.480] LOG: %cStart Phase EggLapsePhase color:green;
+[10:04:32.480] LOG: %cStart Phase SelectModifierPhase color:green;
+[10:04:32.480] LOG: Wave Seed: WXpxA9;VA|jbP\X;?\\=Jl 9
+[10:04:32.483] LOG: 2 0 [4,5]
+[10:04:32.483] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[10:04:32.483] LOG: 7 2 [4,5]
+[10:04:32.483] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_def","soundName":"se/restore","tier":0,"stat":4,"nameKey":"x_sp_def","quantityKey":"percentage"} 
+[10:04:32.483] LOG: 9 2 [4,5]
+[10:04:32.483] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_normal","group":"tm","soundName":"se/restore","tier":0,"moveId":206} 
