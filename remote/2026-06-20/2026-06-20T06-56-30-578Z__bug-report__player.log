@@ -1,0 +1,274 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     0  wave:null  difficulty:youngster
+seed:     QykHeHTux1dNOnbCMkT6g9OJ
+party:    
+
+----- DESCRIPTION -----
+doubles bug? made me end my run
+
+----- CONSOLE -----
+[06:54:57.223] LOG: 2 1 [0,4,5]
+[06:54:57.223] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[06:54:57.223] LOG: 6 3 [0,4,5]
+[06:54:57.223] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[06:55:20.763] LOG: Applied Soothe Bell 
+[06:55:20.764] LOG: Applied Carbos 
+[06:55:20.764] LOG: Applied Iron 
+[06:55:20.770] LOG: %cStart Phase LevelUpPhase color:green;
+[06:55:20.770] LOG: %cStart Phase NewBattlePhase color:green;
+[06:55:20.770] LOG: Wave Seed: ¨s§·£­³·x§µ¯r§« 63
+[06:55:20.771] LOG: Applied Super Lure 
+[06:55:20.772] LOG: %cStart Phase NextEncounterPhase color:green;
+[06:55:20.773] LOG: Starting species pool tier: RARE
+[06:55:20.780] LOG: Pokemon: Wild Rotom | Species ID: 479 | Level: 42 | Nature: Lonely (+Atk/-Def)
+[06:55:20.780] LOG: Stats (IVs): HP: 100 (16), Atk: 69 (8), Def: 96 (31), Spatk: 105 (9), Spdef: 102 (18), Spd: 77 (0)
+[06:55:20.780] LOG: Ability: Pyromancy | Passive Ability: Levitate 
+[06:55:20.780] LOG: Moveset: ["Overheat","Substitute","Confuse Ray","Thunder Shock"]
+[06:55:20.780] LOG: Starting species pool tier: RARE
+[06:55:20.787] LOG: Pokemon: Wild Porygon | Species ID: 137 | Level: 42 | Nature: Hardy (-)
+[06:55:20.787] LOG: Stats (IVs): HP: 115 (21), Atk: 58 (7), Def: 71 (18), Spatk: 80 (9), Spdef: 78 (24), Spd: 48 (24)
+[06:55:20.787] LOG: Ability: Trace | Passive Ability: Levitate 
+[06:55:20.787] LOG: Moveset: ["Swift","Reflect Type","Recover","Growth"]
+[06:55:21.590] DEBUG: Session data saved to slot 0!
+[06:55:21.591] LOG: Wave Seed: ¨s§·£­³·x§µ¯r§« 63
+[06:55:22.057] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[06:55:22.057] LOG: %cStart Phase CheckSwitchPhase color:green;
+[06:55:27.308] LOG: %cStart Phase CheckSwitchPhase color:green;
+[06:55:27.665] LOG: %cStart Phase InitEncounterPhase color:green;
+[06:55:27.668] LOG: %cStart Phase PostSummonPhase color:green;
+[06:55:27.668] LOG: Ran PSP for: Rotom
+[06:55:27.670] LOG: %cStart Phase PostSummonPhase color:green;
+[06:55:27.671] LOG: %cStart Phase PostSummonPhase color:green;
+[06:55:27.671] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:55:27.837] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:55:27.888] LOG: %cStart Phase PostSummonPhase color:green;
+[06:55:27.888] LOG: Ran PSP for: Porygon
+[06:55:27.890] LOG: %cStart Phase PostSummonPhase color:green;
+[06:55:27.893] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:55:28.055] LOG: %cStart Phase MessagePhase color:green;
+[06:55:28.302] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:55:28.339] LOG: %cStart Phase PostSummonPhase color:green;
+[06:55:28.340] LOG: Applied Eviolite 
+[06:55:28.341] LOG: Applied X Defense 
+[06:55:28.341] LOG: Applied Eviolite 
+[06:55:28.344] LOG: Applied X Defense 
+[06:55:28.346] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:55:28.521] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:55:28.705] LOG: %cStart Phase MessagePhase color:green;
+[06:55:28.937] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:55:28.971] LOG: %cStart Phase TurnInitPhase color:green;
+[06:55:28.971] LOG: %cStart Phase CommandPhase color:green;
+[06:55:32.157] LOG: Move: DOUBLE_IRON_BASH Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Scyther
+[06:55:32.159] LOG: %cStart Phase SelectTargetPhase color:green;
+[06:55:33.130] LOG: %cStart Phase CommandPhase color:green;
+[06:55:34.534] LOG: Move: FAKE_OUT Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Accelgor
+[06:55:34.538] LOG: %cStart Phase SelectTargetPhase color:green;
+[06:55:35.528] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:55:35.534] LOG: Applied Eviolite 
+[06:55:35.544] LOG: Applied Eviolite 
+[06:55:35.551] LOG: Battle Seed: P6kGYigw1HJY7Qs1
+[06:55:35.559] LOG: Move Pool: ["Overheat","Substitute","Confuse Ray","Thunder Shock"]
+[06:55:35.559] LOG: Move Scores: [18.75,5,5,12]
+[06:55:35.559] LOG: Sorted Move Pool: ["Overheat","Thunder Shock","Substitute","Confuse Ray"]
+[06:55:35.559] LOG: Chosen Move: Substitute
+[06:55:35.559] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:55:35.562] LOG: Applied Eviolite 
+[06:55:35.565] LOG: Move Pool: ["Swift"]
+[06:55:35.565] LOG: Move Scores: [18]
+[06:55:35.565] LOG: Sorted Move Pool: ["Swift"]
+[06:55:35.565] LOG: Chosen Move: Swift
+[06:55:35.565] LOG: %cStart Phase TurnStartPhase color:green;
+[06:55:35.578] LOG: %cStart Phase MovePhase color:green;
+[06:55:35.578] LOG: %cUser: Accelgor
+Move: FAKE_OUT
+Use Mode: NORMAL color:orchid
+[06:55:35.586] LOG: %cStart Phase MessagePhase color:green;
+[06:55:35.659] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:55:35.829] LOG: %cStart Phase MessagePhase color:green;
+[06:55:36.093] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:55:36.130] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:55:36.512] LOG: crit stage: +1
+[06:55:36.519] LOG: Move: Fake Out | Base damage: 37.33521126760563 | Power: 40 | Source attack: 140 | Target defense: 71
+[06:55:36.520] LOG: Move: Fake Out | Attack damage: 51
+[06:55:36.524] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:55:36.546] LOG: %cStart Phase MoveEndPhase color:green;
+[06:55:36.549] LOG: %cStart Phase MovePhase color:green;
+[06:55:36.549] LOG: %cUser: Porygon
+Move: SWIFT
+Use Mode: NORMAL color:orchid
+[06:55:36.549] LOG: %cStart Phase MessagePhase color:green;
+[06:55:36.761] LOG: %cStart Phase MoveEndPhase color:green;
+[06:55:36.765] LOG: %cStart Phase MovePhase color:green;
+[06:55:36.765] LOG: %cUser: Scyther
+Move: DOUBLE_IRON_BASH
+Use Mode: NORMAL color:orchid
+[06:55:36.792] LOG: %cStart Phase MessagePhase color:green;
+[06:55:36.911] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:55:37.296] LOG: crit stage: +0
+[06:55:37.303] LOG: Move: Double Iron Bash | Base damage: 58.0025 | Power: 90 | Source attack: 131 | Target defense: 96
+[06:55:37.305] LOG: Move: Double Iron Bash | Attack damage: 218
+[06:55:37.307] LOG: Applied Shell Bell 
+[06:55:37.307] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:55:37.330] LOG: %cStart Phase MessagePhase color:green;
+[06:55:37.545] LOG: %cStart Phase MessagePhase color:green;
+[06:55:37.746] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:55:37.968] LOG: %cStart Phase MessagePhase color:green;
+[06:55:38.229] LOG: %cStart Phase FaintPhase color:green;
+[06:55:38.303] LOG: %cStart Phase MessagePhase color:green;
+[06:55:38.876] LOG: %cStart Phase VictoryPhase color:green;
+[06:55:38.877] LOG: Applied Soothe Bell 
+[06:55:38.877] LOG: Applied Soothe Bell 
+[06:55:38.879] LOG: %cStart Phase ExpPhase color:green;
+[06:55:38.879] LOG: Applied Super EXP. Charm 
+[06:55:38.880] LOG: Applied EXP. Charm 
+[06:55:39.381] LOG: %cStart Phase ExpPhase color:green;
+[06:55:39.382] LOG: Applied Super EXP. Charm 
+[06:55:39.382] LOG: Applied EXP. Charm 
+[06:55:39.815] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:55:39.816] LOG: Applied Super EXP. Charm 
+[06:55:39.816] LOG: Applied EXP. Charm 
+[06:55:39.816] LOG: %cStart Phase LevelUpPhase color:green;
+[06:55:39.817] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:55:39.817] LOG: %cStart Phase MoveEndPhase color:green;
+[06:55:39.817] LOG: %cStart Phase MovePhase color:green;
+[06:55:39.817] LOG: %cStart Phase MoveEndPhase color:green;
+[06:55:39.817] LOG: %cStart Phase CheckInterludePhase color:green;
+[06:55:39.817] LOG: %cStart Phase WeatherEffectPhase color:green;
+[06:55:39.817] LOG: %cStart Phase PositionalTagPhase color:green;
+[06:55:39.817] LOG: %cStart Phase BerryPhase color:green;
+[06:55:39.819] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[06:55:39.821] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[06:55:40.190] LOG: %cStart Phase MessagePhase color:green;
+[06:55:40.423] LOG: %cStart Phase TurnEndPhase color:green;
+[06:55:40.430] LOG: %cStart Phase TurnInitPhase color:green;
+[06:55:40.430] LOG: %cStart Phase CommandPhase color:green;
+[06:55:41.716] LOG: %cStart Phase CommandPhase color:green;
+[06:55:41.717] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:55:41.719] LOG: Applied Eviolite 
+[06:55:41.733] LOG: Move Pool: ["Swift"]
+[06:55:41.733] LOG: Move Scores: [18]
+[06:55:41.733] LOG: Sorted Move Pool: ["Swift"]
+[06:55:41.733] LOG: Chosen Move: Swift
+[06:55:41.733] LOG: %cStart Phase TurnStartPhase color:green;
+[06:55:41.737] LOG: %cStart Phase AttemptCapturePhase color:green;
+[06:55:41.738] LOG: Battle Seed: P6kGYigw1HJY7Qs1
+[06:55:42.402] LOG: %cStart Phase MovePhase color:green;
+[06:55:42.402] LOG: %cUser: Porygon
+Move: SWIFT
+Use Mode: NORMAL color:orchid
+[06:55:42.406] LOG: %cStart Phase MessagePhase color:green;
+[06:55:42.517] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:55:42.533] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:42.533] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:42.534] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:42.534] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:42.550] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:42.550] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:42.550] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:42.550] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:42.583] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:42.583] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:42.583] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:42.583] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:42.616] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:42.616] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:43.002] LOG: crit stage: +0
+[06:55:43.004] LOG: Applied Eviolite 
+[06:55:43.005] LOG: Move: Swift | Base damage: 46.78823529411765 | Power: 135 | Source attack: 120 | Target defense: 136
+[06:55:43.005] LOG: Move: Swift | Attack damage: 47
+[06:55:43.006] LOG: crit stage: +0
+[06:55:43.008] LOG: Move: Swift | Base damage: 76.28292682926829 | Power: 135 | Source attack: 120 | Target defense: 82
+[06:55:43.008] LOG: Move: Swift | Attack damage: 76
+[06:55:43.008] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:55:43.034] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:55:43.068] LOG: %cStart Phase MoveEndPhase color:green;
+[06:55:43.069] LOG: %cStart Phase CheckInterludePhase color:green;
+[06:55:43.069] LOG: %cStart Phase WeatherEffectPhase color:green;
+[06:55:43.069] LOG: %cStart Phase PositionalTagPhase color:green;
+[06:55:43.069] LOG: %cStart Phase BerryPhase color:green;
+[06:55:43.071] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[06:55:43.074] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[06:55:43.493] LOG: %cStart Phase MessagePhase color:green;
+[06:55:43.726] LOG: %cStart Phase FaintPhase color:green;
+[06:55:43.796] LOG: %cStart Phase MessagePhase color:green;
+[06:55:44.335] LOG: %cStart Phase TurnEndPhase color:green;
+[06:55:44.338] LOG: %cStart Phase SwitchPhase color:green;
+[06:55:45.814] LOG: %cStart Phase SwitchSummonPhase color:green;
+[06:55:45.896] LOG: Applied Carbos 
+[06:55:45.896] LOG: Applied Iron 
+[06:55:46.050] LOG: %cStart Phase PostSummonPhase color:green;
+[06:55:46.050] LOG: Ran PSP for: Klefki
+[06:55:46.052] LOG: %cStart Phase PostSummonPhase color:green;
+[06:55:46.052] LOG: %cStart Phase PostSummonPhase color:green;
+[06:55:46.052] LOG: %cStart Phase TurnInitPhase color:green;
+[06:55:46.052] LOG: %cStart Phase CommandPhase color:green;
+[06:55:46.724] LOG: %cStart Phase CommandPhase color:green;
+[06:55:46.725] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:55:46.730] LOG: Applied Eviolite 
+[06:55:46.736] LOG: Move Pool: ["Swift"]
+[06:55:46.737] LOG: Move Scores: [48]
+[06:55:46.737] LOG: Sorted Move Pool: ["Swift"]
+[06:55:46.737] LOG: Chosen Move: Swift
+[06:55:46.737] LOG: %cStart Phase TurnStartPhase color:green;
+[06:55:46.744] LOG: %cStart Phase AttemptCapturePhase color:green;
+[06:55:46.745] LOG: Battle Seed: P6kGYigw1HJY7Qs1
+[06:55:47.322] LOG: %cStart Phase MovePhase color:green;
+[06:55:47.322] LOG: %cUser: Porygon
+Move: SWIFT
+Use Mode: NORMAL color:orchid
+[06:55:47.327] LOG: %cStart Phase MessagePhase color:green;
+[06:55:47.438] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:55:47.456] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:47.456] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:47.457] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:47.458] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:47.471] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:47.471] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:47.471] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:47.471] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:47.505] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:47.505] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:47.505] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:47.505] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:47.537] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:47.538] WARN: Texture "%s" has no frame "%s" PRAS- Swift 1
+[06:55:47.914] LOG: crit stage: +0
+[06:55:47.916] LOG: Applied Eviolite 
+[06:55:47.916] LOG: Move: Swift | Base damage: 46.78823529411765 | Power: 135 | Source attack: 120 | Target defense: 136
+[06:55:47.917] LOG: Move: Swift | Attack damage: 24
+[06:55:47.918] LOG: crit stage: +0
+[06:55:47.920] LOG: Move: Swift | Base damage: 68.20869565217392 | Power: 135 | Source attack: 120 | Target defense: 92
+[06:55:47.920] LOG: Move: Swift | Attack damage: 204
+[06:55:47.921] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:55:48.074] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:55:48.126] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:55:48.156] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:55:48.190] LOG: %cStart Phase MessagePhase color:green;
+[06:55:48.405] LOG: %cStart Phase FaintPhase color:green;
+[06:55:48.473] LOG: %cStart Phase MessagePhase color:green;
+[06:55:48.660] LOG: %cStart Phase GameOverPhase color:green;
+[06:55:54.432] LOG: Getting Session Slot id: %d 0
+[06:55:54.530] LOG: %cStart Phase PostGameOverPhase color:green;
+[06:55:54.572] DEBUG: Session data saved to slot 0!
+[06:55:56.111] LOG: Seed: QykHeHTux1dNOnbCMkT6g9OJ
+[06:55:56.111] LOG: Wave Seed: QykHeHTux1dNOnbCMkT6g9OJ 0
+[06:55:56.114] LOG: %cStart Phase TitlePhase color:green;
+[06:55:56.119] LOG: use seasonal splash messages true
+[06:55:56.119] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[06:55:58.836] LOG: Getting Session Slot id: %d 0
+[06:55:58.839] LOG: Getting Session Slot id: %d 1
+[06:55:58.847] LOG: Getting Session Slot id: %d 2
+[06:55:58.849] LOG: Getting Session Slot id: %d 3
+[06:55:58.850] LOG: Getting Session Slot id: %d 4
+[06:55:59.101] ERROR: Invalid save data JSON detected! Session not found.
+[06:55:59.106] ERROR: Invalid save data JSON detected! Session not found.
+[06:55:59.107] ERROR: Invalid save data JSON detected! Session not found.
+[06:55:59.108] ERROR: Invalid save data JSON detected! Session not found.
+[06:56:04.213] WARN: Attempted to load save slot of -1 through load game menu!
+[06:56:04.223] LOG: use seasonal splash messages true
+[06:56:04.223] LOG: Adding 2 Pride Month splash messages (weight: x15)
