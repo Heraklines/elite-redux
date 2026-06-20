@@ -19,7 +19,7 @@ type PanelState = "pickNew" | "pickSlot" | "confirmCancel";
 const PANEL_X = 6;
 const PANEL_Y = 22;
 const PANEL_W = 180;
-const PANEL_H = 96;
+const PANEL_H = 106;
 const COL_GAP = 92;
 const ROW_H = 14;
 const ROW_TOP = 44;
@@ -27,13 +27,13 @@ const ROW_TOP = 44;
 const VISIBLE_ROWS = 5;
 /** Left side panel (learning mon's icon + base stats), drawn just left of the main window. */
 const LEFT_W = 56;
-const LEFT_GAP = 3;
+const LEFT_GAP = 0; // flush against the main panel (touching, not overlapping)
 const LEFT_X = PANEL_X - LEFT_W - LEFT_GAP;
 const LEFT_H = PANEL_H;
 const STAT_LABEL_DX = 5; // left inset for a stat label
 const STAT_VALUE_DX = LEFT_W - 5; // right edge for a (right-aligned) stat value
-const STAT_Y0 = PANEL_Y + 31; // first stat row, below the icon
-const STAT_ROW_H = 10;
+const STAT_Y0 = PANEL_Y + 32; // first stat row, below the icon
+const STAT_ROW_H = 12; // spread to fill the taller panel
 
 /**
  * ER QoL Move Learn panel (see {@linkcode LearnMoveBatchPhase}). One screen on
@@ -125,7 +125,7 @@ export class LearnMoveBatchUiHandler extends UiHandler {
 
     // Scroll arrows: ^ just under each header, v just under the last visible row.
     const arrowTopY = ROW_TOP - 9;
-    const arrowBotY = ROW_TOP + VISIBLE_ROWS * ROW_H - 4;
+    const arrowBotY = ROW_TOP + VISIBLE_ROWS * ROW_H; // below the last row, inside the taller panel
     this.learnUp = addTextObject(PANEL_X + 78, arrowTopY, "↑", TextStyle.WINDOW)
       .setOrigin(1, 0)
       .setVisible(false);
