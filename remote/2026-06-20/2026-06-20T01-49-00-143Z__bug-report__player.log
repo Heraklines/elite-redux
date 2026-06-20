@@ -1,0 +1,268 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     4  wave:44  difficulty:hell
+seed:     zC9jAQiBVhMFgkRF3O5KJnIk
+party:    Silvally(L38 131/131), Palossand(L37 121/121), Mimikyu(L37 99/99), Golisopod(L37 113/113), Togedemaru(L37 106/106), Pentadug Alolan(L37 128/128)
+
+----- DESCRIPTION -----
+shiny pentadug alolan has a weird shiny sprite
+
+----- CONSOLE -----
+[01:44:52.846] LOG: Applied Super EXP. Charm 
+[01:44:52.846] LOG: Applied EXP. Charm 
+[01:44:52.997] LOG: %cStart Phase LevelUpPhase color:green;
+[01:44:52.999] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:44:53.094] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:44:53.095] LOG: Applied Super EXP. Charm 
+[01:44:53.095] LOG: Applied EXP. Charm 
+[01:44:53.248] LOG: %cStart Phase LevelUpPhase color:green;
+[01:44:53.250] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:44:53.346] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:44:53.347] LOG: Applied Super EXP. Charm 
+[01:44:53.347] LOG: Applied EXP. Charm 
+[01:44:53.497] LOG: %cStart Phase LevelUpPhase color:green;
+[01:44:53.499] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:44:53.564] LOG: %cStart Phase MoveEndPhase color:green;
+[01:44:53.565] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:44:53.565] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:44:53.565] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:44:53.565] LOG: %cStart Phase BerryPhase color:green;
+[01:44:53.566] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:44:53.566] LOG: %cStart Phase TurnEndPhase color:green;
+[01:44:53.567] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:44:53.568] LOG: Applied X Speed 
+[01:44:53.841] LOG: Ivy
+[01:44:54.076] LOG: Applied X Speed 
+[01:44:54.076] LOG: %cStart Phase PostSummonPhase color:green;
+[01:44:54.076] LOG: Ran PSP for: Swellow
+[01:44:54.076] LOG: %cStart Phase PostSummonPhase color:green;
+[01:44:54.076] LOG: %cStart Phase PostSummonPhase color:green;
+[01:44:54.076] LOG: %cStart Phase TurnInitPhase color:green;
+[01:44:54.077] LOG: %cStart Phase CommandPhase color:green;
+[01:44:54.654] LOG: Move: DIRE_CLAW Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Silvally
+[01:44:54.658] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:44:54.664] LOG: Battle Seed: d4qQt7uw7SE3yaFs
+[01:44:54.671] LOG: Applied X Speed 
+[01:44:54.684] LOG: Move Pool: ["Boomburst","Protect","Heat Wave","Hurricane"]
+[01:44:54.684] LOG: Move Scores: [-635,-1000000,-635,-635]
+[01:44:54.684] LOG: Sorted Move Pool: ["Boomburst","Heat Wave","Hurricane","Protect"]
+[01:44:54.685] LOG: Chosen Move: Boomburst
+[01:44:54.685] LOG: ER AI: experimental brain (sharpness 1)
+[01:44:54.685] LOG: %cStart Phase TurnStartPhase color:green;
+[01:44:54.686] LOG: Applied X Speed 
+[01:44:54.687] LOG: Applied X Speed 
+[01:44:54.688] LOG: Applied X Speed 
+[01:44:54.689] LOG: %cStart Phase MovePhase color:green;
+[01:44:54.689] LOG: %cUser: Silvally
+Move: DIRE_CLAW
+Use Mode: NORMAL color:orchid
+[01:44:54.690] LOG: Applied X Speed 
+[01:44:54.692] LOG: Applied X Speed 
+[01:44:54.692] LOG: %cStart Phase MessagePhase color:green;
+[01:44:54.858] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:44:54.860] LOG: Applied X Accuracy 
+[01:44:55.827] LOG: crit stage: +0
+[01:44:55.830] LOG: Move: Dire Claw | Base damage: 102.84114285714284 | Power: 96 | Source attack: 171 | Target defense: 56
+[01:44:55.831] LOG: Move: Dire Claw | Attack damage: 185
+[01:44:55.833] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:44:55.863] LOG: %cStart Phase FaintPhase color:green;
+[01:44:55.945] LOG: %cStart Phase MessagePhase color:green;
+[01:45:01.331] LOG: %cStart Phase VictoryPhase color:green;
+[01:45:01.331] LOG: Applied Soothe Bell 
+[01:45:01.332] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:45:01.332] LOG: Applied Super EXP. Charm 
+[01:45:01.332] LOG: Applied EXP. Charm 
+[01:45:01.480] LOG: %cStart Phase LevelUpPhase color:green;
+[01:45:01.482] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[01:45:12.403] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:45:12.496] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:45:12.496] LOG: Applied Super EXP. Charm 
+[01:45:12.497] LOG: Applied EXP. Charm 
+[01:45:12.665] LOG: %cStart Phase LevelUpPhase color:green;
+[01:45:12.667] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[01:45:17.131] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:45:17.197] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:45:17.198] LOG: Applied Super EXP. Charm 
+[01:45:17.198] LOG: Applied EXP. Charm 
+[01:45:17.380] LOG: %cStart Phase LevelUpPhase color:green;
+[01:45:17.381] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[01:45:23.714] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:45:23.794] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:45:23.794] LOG: Applied Super EXP. Charm 
+[01:45:23.795] LOG: Applied EXP. Charm 
+[01:45:23.946] LOG: %cStart Phase LevelUpPhase color:green;
+[01:45:23.947] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[01:45:36.659] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:45:36.749] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:45:36.750] LOG: Applied Super EXP. Charm 
+[01:45:36.750] LOG: Applied EXP. Charm 
+[01:45:36.882] LOG: %cStart Phase LevelUpPhase color:green;
+[01:45:36.887] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[01:45:46.647] LOG: %cStart Phase EvolutionPhase color:green;
+[01:45:49.175] ERROR: [uncaught] Uncaught SecurityError: Failed to execute 'texImage2D' on 'WebGLRenderingContext': The video element contains cross-origin data, and may not be loaded. @ https://elite-redux.pages.dev/assets/phaser-DPrVs4l9.js:63:2433
+[01:45:53.310] WARN: cry/10645 not found
+[01:46:21.118] LOG: %cStart Phase EndEvolutionPhase color:green;
+[01:46:21.215] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:46:21.295] LOG: %cStart Phase MoveEndPhase color:green;
+[01:46:21.296] LOG: %cStart Phase MovePhase color:green;
+[01:46:21.296] LOG: %cStart Phase MoveEndPhase color:green;
+[01:46:21.296] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:46:21.296] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:46:21.296] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:46:21.296] LOG: %cStart Phase BerryPhase color:green;
+[01:46:21.297] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:46:21.297] LOG: %cStart Phase TurnEndPhase color:green;
+[01:46:21.297] LOG: %cStart Phase BattleEndPhase color:green;
+[01:46:21.297] LOG: Battle Score: 332 (4 Turns x0.76)
+[01:46:21.298] LOG: Total Score: 6488
+[01:46:21.327] LOG: Applied Protein 
+[01:46:21.351] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[01:46:21.357] LOG: Rival Ivy
+[01:46:22.178] LOG: Rival Ivy
+[01:46:24.316] LOG: Dialogue saved as seen: dialogue:rival2Female.victory.1
+[01:46:24.615] LOG: %cStart Phase MoneyRewardPhase color:green;
+[01:46:24.616] LOG: Applied Amulet Coin 
+[01:46:25.071] LOG: %cStart Phase ModifierRewardPhase color:green;
+[01:46:25.072] LOG: Applied Protein 
+[01:46:25.483] LOG: %cStart Phase ModifierRewardPhase color:green;
+[01:46:25.864] LOG: %cStart Phase ModifierRewardPhase color:green;
+[01:46:26.380] LOG: %cStart Phase ModifierRewardPhase color:green;
+[01:46:26.843] LOG: %cStart Phase EggLapsePhase color:green;
+[01:46:26.843] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:46:26.844] LOG: Wave Seed: ¤mck{lwp|p]y_uts 42
+[01:46:26.862] LOG: 9 4 [2,3,4,5]
+[01:46:26.863] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_normal","group":"tm","soundName":"se/restore","tier":0,"moveId":805} 
+[01:46:26.864] LOG: 24 5 [9,11,12,13,15,25]
+[01:46:26.864] LOG: {"id":"EXP_SHARE","localeKey":"modifierType:ModifierType.EXP_SHARE","iconImage":"exp_share","soundName":"se/restore","tier":2} 
+[01:46:26.866] LOG: 6 4 [2,3,4,5]
+[01:46:26.866] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[01:46:29.266] LOG: Applied Protein 
+[01:46:29.306] LOG: %cStart Phase NewBattlePhase color:green;
+[01:46:29.306] LOG: Wave Seed: ¥ndl|mxq}q^z`vut 43
+[01:46:29.308] LOG: %cStart Phase ReturnPhase color:green;
+[01:46:29.453] LOG: %cStart Phase ShowTrainerPhase color:green;
+[01:46:29.597] LOG: %cStart Phase NextEncounterPhase color:green;
+[01:46:30.229] DEBUG: Session data saved to slot 0!
+[01:46:30.230] LOG: Wave Seed: ¥ndl|mxq}q^z`vut 43
+[01:46:31.846] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[01:48:15.432] LOG: %cStart Phase LearnMovePhase color:green;
+[01:48:20.212] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[01:48:20.317] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[01:48:20.317] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:48:20.317] LOG: Wave Seed: ¥ndl|mxq}q^z`vut 43
+[01:48:21.186] LOG: %cStart Phase EggLapsePhase color:green;
+[01:48:21.187] LOG: %cStart Phase PostMysteryEncounterPhase color:green;
+[01:48:21.187] LOG: %cStart Phase NewBattlePhase color:green;
+[01:48:21.187] LOG: Wave Seed: ¦oem}nyr~r_{awvu 44
+[01:48:21.188] LOG: [er-ghost] wave 44: ghost 'EliteSees' (run ended at 60)
+[01:48:21.193] LOG: %cStart Phase NextEncounterPhase color:green;
+[01:48:21.227] LOG: Pokemon: Foe Lillipup | Species ID: 506 | Level: 38 | Nature: Lonely (+Atk/-Def)
+[01:48:21.227] LOG: Stats (IVs): HP: 85 (31), Atk: 66 (31), Def: 49 (26), Spatk: 28 (31), Spdef: 50 (21), Spd: 64 (30)
+[01:48:21.228] LOG: Ability: Pickup | Passive Ability: Fluffy 
+[01:48:21.228] LOG: Moveset: ["Lovely Bite","Howl","Stomping Tantrum","Yawn"]
+[01:48:21.286] LOG: Pokemon: Foe Raticate | Species ID: 20 | Level: 38 | Nature: Rash (+SpAtk/-SpDef)
+[01:48:21.287] LOG: Stats (IVs): HP: 92 (20), Atk: 71 (23), Def: 52 (18), Spatk: 48 (26), Spdef: 66 (31), Spd: 85 (21)
+[01:48:21.288] LOG: Ability: Anger Point | Passive Ability: Poison Touch 
+[01:48:21.288] LOG: Moveset: ["Ice Fang","Thunder Fang","Fire Fang","Super Fang"]
+[01:48:21.354] LOG: Pokemon: Foe Maushold | Species ID: 925 | Level: 38 | Nature: Lonely (+Atk/-Def)
+[01:48:21.354] LOG: Stats (IVs): HP: 114 (10), Atk: 67 (22), Def: 66 (9), Spatk: 49 (22), Spdef: 76 (11), Spd: 92 (10)
+[01:48:21.355] LOG: Ability: Friend Guard | Passive Ability: Own Tempo 
+[01:48:21.355] LOG: Moveset: ["Quick Attack","Population Bomb","Super Fang","Tickle"]
+[01:48:21.431] LOG: Pokemon: Foe Zweilous | Species ID: 634 | Level: 38 | Nature: Naive (+Spd/-SpDef)
+[01:48:21.431] LOG: Stats (IVs): HP: 110 (29), Atk: 57 (30), Def: 76 (26), Spatk: 73 (25), Spdef: 66 (25), Spd: 45 (25)
+[01:48:21.432] LOG: Ability: Sheer Force | Passive Ability: Multi-Headed 
+[01:48:21.432] LOG: Moveset: ["Mystic Dance","Fiery Wrath","Sludge Bomb","Dragon Breath"]
+[01:48:21.493] LOG: Pokemon: Foe Florges Blue | Species ID: 10311 | Level: 38 | Nature: Hasty (+Spd/-Def)
+[01:48:21.493] LOG: Stats (IVs): HP: 114 (31), Atk: 51 (29), Def: 81 (29), Spatk: 90 (25), Spdef: 123 (29), Spd: 54 (31)
+[01:48:21.494] LOG: Ability: Misty Surge | Passive Ability: Natural Cure 
+[01:48:21.494] LOG: Moveset: ["Draining Kiss","Strength Sap","Sweet Scent","Alluring Voice"]
+[01:48:21.557] LOG: Pokemon: Foe Heracross | Species ID: 214 | Level: 38 | Nature: Timid (+Spd/-Atk)
+[01:48:21.558] LOG: Stats (IVs): HP: 116 (17), Atk: 100 (11), Def: 77 (30), Spatk: 40 (21), Spdef: 74 (31), Spd: 77 (31)
+[01:48:21.558] LOG: Ability: Skill Link | Passive Ability: Swarm 
+[01:48:21.558] LOG: Moveset: ["Pin Missile","Bullet Seed","Rock Blast","Arm Thrust"]
+[01:48:22.432] LOG: Battle Seed: AHEe9Bat826OkPC3
+[01:48:22.437] LOG: Generated AI funcs
+[01:48:22.656] DEBUG: Session data saved to slot 0!
+[01:48:22.661] LOG: Wave Seed: ¦oem}nyr~r_{awvu 44
+[01:48:22.967] LOG: Scientist EliteSees
+[01:48:23.638] LOG: Dialogue saved as seen: dialogue:scientist.encounter.1
+[01:48:23.749] LOG: Scientist EliteSees
+[01:48:24.312] LOG: %cStart Phase SummonPhase color:green;
+[01:48:24.313] LOG: EliteSees
+[01:48:24.861] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:48:25.026] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:48:25.176] LOG: %cStart Phase SummonPhase color:green;
+[01:48:25.345] LOG: Applied Protein 
+[01:48:25.493] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:48:25.609] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:48:25.612] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:48:25.613] LOG: Applied X Speed 
+[01:48:25.613] LOG: %cStart Phase PostSummonPhase color:green;
+[01:48:25.613] LOG: Ran PSP for: Silvally
+[01:48:25.614] LOG: Applied X Speed 
+[01:48:25.614] LOG: %cStart Phase PostSummonPhase color:green;
+[01:48:25.615] LOG: Applied X Speed 
+[01:48:25.615] LOG: %cStart Phase PostSummonPhase color:green;
+[01:48:25.615] LOG: %cStart Phase PostSummonPhase color:green;
+[01:48:25.615] LOG: Ran PSP for: Lillipup
+[01:48:25.616] LOG: %cStart Phase PostSummonPhase color:green;
+[01:48:25.616] LOG: %cStart Phase PostSummonPhase color:green;
+[01:48:25.616] LOG: %cStart Phase TurnInitPhase color:green;
+[01:48:25.616] LOG: %cStart Phase CommandPhase color:green;
+[01:48:26.784] LOG: Move: NO_RETREAT Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Silvally
+[01:48:26.788] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:48:26.790] LOG: Applied X Speed 
+[01:48:26.791] LOG: Applied X Speed 
+[01:48:26.793] LOG: Applied X Speed 
+[01:48:26.794] LOG: Applied X Speed 
+[01:48:26.795] LOG: Applied X Speed 
+[01:48:26.797] LOG: Applied X Speed 
+[01:48:26.798] LOG: Applied X Speed 
+[01:48:26.807] LOG: %cStart Phase TurnStartPhase color:green;
+[01:48:26.809] LOG: Applied X Speed 
+[01:48:26.810] LOG: Applied X Speed 
+[01:48:26.810] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:48:26.812] LOG: EliteSees
+[01:48:26.913] LOG: Applied X Speed 
+[01:48:27.276] LOG: EliteSees
+[01:48:27.613] LOG: Applied X Speed 
+[01:48:27.613] LOG: %cStart Phase PostSummonPhase color:green;
+[01:48:27.614] LOG: Ran PSP for: Heracross
+[01:48:27.614] LOG: %cStart Phase PostSummonPhase color:green;
+[01:48:27.614] LOG: %cStart Phase PostSummonPhase color:green;
+[01:48:27.614] LOG: %cStart Phase MovePhase color:green;
+[01:48:27.614] LOG: %cUser: Silvally
+Move: NO_RETREAT
+Use Mode: NORMAL color:orchid
+[01:48:27.615] LOG: Applied X Speed 
+[01:48:27.617] LOG: Applied X Speed 
+[01:48:27.618] LOG: %cStart Phase MessagePhase color:green;
+[01:48:27.861] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:48:29.155] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:48:29.155] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:48:29.383] LOG: %cStart Phase MessagePhase color:green;
+[01:48:29.652] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:48:29.871] LOG: %cStart Phase MessagePhase color:green;
+[01:48:30.313] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:48:30.598] LOG: %cStart Phase MessagePhase color:green;
+[01:48:30.926] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:48:31.064] LOG: %cStart Phase MessagePhase color:green;
+[01:48:31.361] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:48:31.513] LOG: %cStart Phase MessagePhase color:green;
+[01:48:31.876] LOG: %cStart Phase MessagePhase color:green;
+[01:48:32.226] LOG: %cStart Phase MoveEndPhase color:green;
+[01:48:32.227] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:48:32.227] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:48:32.227] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:48:32.227] LOG: %cStart Phase BerryPhase color:green;
+[01:48:32.228] LOG: Applied X Speed 
+[01:48:32.228] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:48:32.229] LOG: Applied X Speed 
+[01:48:32.229] LOG: %cStart Phase TurnEndPhase color:green;
+[01:48:32.230] LOG: Applied X Speed 
+[01:48:32.231] LOG: %cStart Phase TurnInitPhase color:green;
+[01:48:32.231] LOG: %cStart Phase CommandPhase color:green;
