@@ -970,6 +970,15 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       addAttrUnique(move, new MovePowerMultiplierAttr((_u, target) => (target.isOfType(PokemonType.STEEL) ? 2 : 1)));
     },
   ],
+  // Dynamax Cannon - ER dex #690 "Deals 2x damage to Mega foes." (No Dynamax in
+  // ER; the clause lands on Mega-evolved targets.) Vanilla ships it as a plain
+  // 100 BP Dragon special with no such multiplier.
+  [
+    MoveId.DYNAMAX_CANNON,
+    move => {
+      addAttrUnique(move, new MovePowerMultiplierAttr((_u, target) => (target.isMega() ? 2 : 1)));
+    },
+  ],
   // Ominous Wind — ER "Deals double damage in fog." (keeps its vanilla 60 BP
   // Ghost-special + 10% all-stats raise.)
   [

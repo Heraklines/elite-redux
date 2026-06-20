@@ -3061,6 +3061,32 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Dynamax Cannon: 2x vs Mega",
+    description:
+      "#690 Dynamax Cannon - 'Deals 2x damage to Mega foes' (no Dynamax in ER, so the\n"
+      + "clause applies to Mega-evolved targets). Vanilla shipped it as a plain 100 BP\n"
+      + "Dragon special. DO: use Dynamax Cannon on the Mega Gengar. EXPECT: roughly\n"
+      + "DOUBLE the damage (Dragon is neutral on Gengar, so Mega is the only multiplier\n"
+      + "- remove the ENEMY_FORM_OVERRIDES in scenarios.ts to see the 1x baseline).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 70,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.DYNAMAX_CANNON, MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.GENGAR,
+        ENEMY_FORM_OVERRIDES: { [SpeciesId.GENGAR]: formIndexByKey(SpeciesId.GENGAR, "mega") },
+        ENEMY_LEVEL_OVERRIDE: 70,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.LATIOS, {
+          moveset: [MoveId.DYNAMAX_CANNON, MoveId.SPLASH, MoveId.PSYCHIC, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "Aura Force vs Ghost",
     description:
       "#326 Aura Force (ER Fighting move) is super-effective vs Ghost.\n"
