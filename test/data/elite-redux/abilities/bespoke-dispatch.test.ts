@@ -37,6 +37,7 @@ import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
 import {
   ChanceBattlerTagOnAttackAbAttr,
   ChanceBattlerTagOnHitAbAttr,
+  ChanceStatusOnAttackAbAttr,
 } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
 import { ConditionalDamageAbAttr } from "#data/elite-redux/archetypes/conditional-damage";
@@ -1954,5 +1955,39 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     const res = dispatchArchetype("bespoke", null);
     expect(res.attrs).toHaveLength(0);
     expect(res.skipReason).toMatch(/hand-written implementation pending/);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Audit follow-up (CRITICAL blanket-effect fixes vs the v2.65 dex).
+  // ---------------------------------------------------------------------------
+
+  it("er id 471 (Cold Plasma) burns only on ELECTRIC moves, not every move", () => {
+    const res = dispatchArchetype("bespoke", null, 471);
+    expect(res.skipReason).toBeNull();
+    // The prior wire was an unfiltered PostAttackApplyStatusEffectAbAttr (every move).
+    expect(res.attrs.some(a => a.constructor.name === "PostAttackApplyStatusEffectAbAttr")).toBe(false);
+    const attr = res.attrs.find((a): a is ChanceStatusOnAttackAbAttr => a instanceof ChanceStatusOnAttackAbAttr);
+    expect(attr).toBeDefined();
+    expect(attr!.getEffects()).toEqual([StatusEffect.BURN]);
+    expect(attr!.getFilter()).toEqual({ type: PokemonType.ELECTRIC });
+  });
+
+  it("er id 342 (Seaweed) gates BOTH Fire modifiers on the holder being Grass-type", () => {
+    const res = dispatchArchetype("bespoke", null, 342);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs).toHaveLength(2);
+    // Both the offensive 2x-vs-Fire and the defensive 0.5-from-Fire carry a self-Grass gate.
+    expect(res.attrs.every(a => a.getCondition() != null)).toBe(true);
+  });
+
+  it("er id 463 (Jungle's Guard) is Flower Veil: Grass-ally status + stat-drop protection", () => {
+    const res = dispatchArchetype("bespoke", null, 463);
+    expect(res.skipReason).toBeNull();
+    const names = res.attrs.map(a => a.constructor.name);
+    expect(names).toContain("ConditionalUserFieldStatusEffectImmunityAbAttr");
+    expect(names).toContain("ConditionalUserFieldProtectStatAbAttr");
+    expect(names).toContain("ConditionalUserFieldBattlerTagImmunityAbAttr");
+    // The old blanket all-allies immunity must be gone.
+    expect(names).not.toContain("UserFieldStatusEffectImmunityAbAttr");
   });
 });

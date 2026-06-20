@@ -69,6 +69,9 @@ import {
   BugPowderImmunityAbAttr,
   BypassBurnDamageReductionAbAttr,
   ConditionalCritAbAttr,
+  ConditionalUserFieldBattlerTagImmunityAbAttr,
+  ConditionalUserFieldProtectStatAbAttr,
+  ConditionalUserFieldStatusEffectImmunityAbAttr,
   CritUseLowerDefensiveStatAbAttr,
   EnemyMinDamageRollAbAttr,
   FieldMoveTypePowerBoostAbAttr,
@@ -115,7 +118,6 @@ import {
   StatMultiplierAbAttr,
   SuppressWeatherEffectAbAttr,
   UserFieldMoveTypePowerBoostAbAttr,
-  UserFieldStatusEffectImmunityAbAttr,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { TrappedTag } from "#data/battler-tags";
@@ -313,6 +315,7 @@ import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { ErMoveId } from "#enums/er-move-id";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
@@ -3210,7 +3213,8 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // pokerogue's vanilla MoveId enum.
       return ok([
         new PostAttackScriptedMoveAbAttr({
-          moveId: MoveId.OUTRAGE,
+          moveId: ErMoveId.OUTBURST as MoveId,
+          power: 50,
           flagFilter: MoveFlags.PULSE_MOVE,
         }),
       ]);
@@ -3337,10 +3341,17 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([new EntryArenaTagOnFoeSideAbAttr(ArenaTagType.WATER_FIRE_PLEDGE, 4, "self")]);
     case 471:
       // Cold Plasma — "Electric type moves now inflict burn instead of paralysis."
-      // Engine-side flip: when holder uses Electric move with paralysis chance,
-      // change to burn. Pokerogue doesn't expose move-effect type swap as a
-      // primitive yet. Wire as 10% burn on Electric attacks (substitute).
-      return ok([new PostAttackApplyStatusEffectAbAttr(false, 10, StatusEffect.BURN)]);
+      // No move-effect type-swap primitive exists, so approximate by gating the
+      // burn proc to the holder's ELECTRIC-type moves only (the prior wire fired
+      // on EVERY move). Chance is a representative 10% - a per-move paralysis ->
+      // burn swap at the move's own chance is a deeper engine feature.
+      return ok([
+        new ChanceStatusOnAttackAbAttr({
+          chance: 10,
+          effects: [StatusEffect.BURN],
+          filter: { type: PokemonType.ELECTRIC },
+        }),
+      ]);
     case 350:
       // Violent Rush — ER ROM C source (battle_main.c:4892 + battle_util.c:13305):
       //   - speed = (speed * 150) / 100  (1.5× speed multiplier on first turn)
@@ -3634,6 +3645,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([
         new PostAttackScriptedMoveAbAttr({
           moveId: MoveId.ERUPTION,
+          power: 50,
           typeFilter: [PokemonType.FIRE],
         }),
       ]);
@@ -3679,7 +3691,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 718:
       // Jumpscare — "Attacks with Astonish on first switch-in."
       // PostSummon only fires once per switch-in, so "first" is implicit.
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.ASTONISH })]);
+      return ok([
+        new PostSummonScriptedMoveAbAttr({
+          moveId: MoveId.ASTONISH,
+          power: 40,
+          oncePerBattleKey: "jumpscare-scripted-move",
+        }),
+      ]);
     case 745:
       // Sand Pit — "Attacks with 20BP Sand Tomb on switch-in."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.SAND_TOMB, power: 20 })]);
@@ -4621,10 +4639,20 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return SKIP_BESPOKE;
     case 463:
       // Jungle's Guard — "Protects Grass-type allies from status and stat
-      // drops." Wire UserFieldStatusEffectImmunity for the status side.
-      // Grass-type-only filter not directly supported (UserField applies to
-      // all allies); approximation grants all allies status immunity.
-      return ok([new UserFieldStatusEffectImmunityAbAttr()]);
+      // drops." This is exactly vanilla Flower Veil: GRASS-type allies (not the
+      // holder itself) get status immunity + stat-drop protection (+ Drowsy/Yawn
+      // immunity). Reuse the conditional user-field attrs gated on the ally being
+      // Grass-type, so non-Grass allies are unaffected.
+      return ok([
+        new ConditionalUserFieldStatusEffectImmunityAbAttr(
+          (target, source) => !!source && target.id !== source.id && target.isOfType(PokemonType.GRASS, true, true),
+        ),
+        new ConditionalUserFieldBattlerTagImmunityAbAttr(
+          target => target.isOfType(PokemonType.GRASS, true, true),
+          [BattlerTagType.DROWSY],
+        ),
+        new ConditionalUserFieldProtectStatAbAttr(target => target.isOfType(PokemonType.GRASS, true, true)),
+      ]);
     case 838838:
       // (Sentinel — Guardian Coat wired R35.)
       return SKIP_BESPOKE;
@@ -5008,19 +5036,22 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new TypeDamageBoostAbAttr({ type: PokemonType.GRASS, multiplier: 1.2 }),
         new DamageReductionAbAttr({ reduction: 0.5, filter: { kind: "move-type", type: PokemonType.GRASS } }),
       ]);
-    case 342:
+    case 342: {
       // Seaweed — "Takes 1/2 dmg from Fire if Grass. Grass deals x2 dmg to
-      // Fire." Compose: defensive 0.5 from Fire + offensive 2x vs Fire.
-      // The "if Grass" predicate is type-self gated; type-effectiveness-mod
-      // doesn't currently gate on self-type — approximation lands the
-      // damage shape on any holder.
-      return ok([
-        ...buildTypeEffectivenessModAttrs({
-          type: PokemonType.FIRE,
-          offensiveMultiplier: 2.0,
-          defensiveMultiplier: 0.5,
-        }),
-      ]);
+      // Fire." Defensive 0.5 from Fire + offensive 2x vs Fire, BOTH gated on the
+      // holder currently being Grass-type (the "if Grass" predicate). isOfType
+      // honours Tera/typed-override defaults, so a holder that loses Grass loses
+      // the modifiers too.
+      const seaweedAttrs = buildTypeEffectivenessModAttrs({
+        type: PokemonType.FIRE,
+        offensiveMultiplier: 2.0,
+        defensiveMultiplier: 0.5,
+      });
+      for (const attr of seaweedAttrs) {
+        attr.addCondition(holder => holder.isOfType(PokemonType.GRASS));
+      }
+      return ok(seaweedAttrs);
+    }
     case 273:
       // Power Fists — "Iron Fist (punching) moves target Special Defense and
       // get a 1.3x boost." 1.3x via FlagDamageBoost + the SpDef-targeting via
@@ -6254,7 +6285,12 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
     case 491:
       // Aftershock — "Triggers Magnitude after using a damaging move."
       // Was wired as CounterAttackOnHit (PostDefend) — should be PostAttack.
-      return ok([new PostAttackScriptedMoveAbAttr({ moveId: MoveId.MAGNITUDE })]);
+      return ok([
+        new PostAttackScriptedMoveAbAttr({
+          moveId: MoveId.MAGNITUDE,
+          magnitudeRange: [4, 7],
+        }),
+      ]);
     case 611:
       // Entrance — "Confusion also inflicts infatuation." When the holder's hit
       // leaves the target confused, also infatuate it (status-cascade via the
@@ -6309,13 +6345,19 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // Sludge Spit — "follows up with 35BP Venom Bolt after using an
       // attack." Venom Bolt is an ER custom move; SLUDGE is the closest vanilla
       // stand-in, cast at the ER-specified 35 BP.
-      return ok([new PostAttackScriptedMoveAbAttr({ moveId: MoveId.SLUDGE, power: 35 })]);
+      return ok([
+        new PostAttackScriptedMoveAbAttr({
+          moveId: ErMoveId.VENOM_BOLT as MoveId,
+          power: 35,
+        }),
+      ]);
     case 993:
       // Thunder Clouds — "After using a special move, launch 35BP Thunderbolt."
       // Was wired defensively. PostAttack with SPECIAL category gate.
       return ok([
         new PostAttackScriptedMoveAbAttr({
           moveId: MoveId.THUNDERBOLT,
+          power: 35,
           categoryFilter: MoveCategory.SPECIAL,
         }),
       ]);
