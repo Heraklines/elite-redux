@@ -1,0 +1,21 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqlxypo0-iynu
+mode:     0  wave:?
+seed:     hbAnXrsUn1dxCavIbiBly2ic
+party:    
+enemy:    
+
+----- CONSOLE -----
+[06:00:07.928] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[06:00:08.280] LOG: [ER] build mqlxypo0-iynu
+[06:00:10.042] LOG: [dev-tools] loaded — 246 scenarios + Send Logs button
+[06:00:23.797] DEBUG: Destroying loading scene
+[06:00:23.797] DEBUG: Destroyed loading scene
+[06:00:23.856] LOG: Seed: hbAnXrsUn1dxCavIbiBly2ic
+[06:00:23.856] LOG: Wave Seed: hbAnXrsUn1dxCavIbiBly2ic 0
+[06:00:25.100] LOG: %cStart Phase LoginPhase color:green;
+[06:00:25.529] LOG: Client Session: V4PE08HwaRu8itM4MgQ1Qu9vgZ3nXA5V
+[06:00:26.374] DEBUG: Using cached system data
+[06:00:26.409] LOG: %cStart Phase TitlePhase color:green;
+[06:00:26.417] LOG: use seasonal splash messages true
+[06:00:26.417] LOG: Adding 2 Pride Month splash messages (weight: x15)
