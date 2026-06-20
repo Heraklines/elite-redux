@@ -41,8 +41,8 @@ const ABIL_ROW_H = 10;
 
 // Bottom row of tappable controls (Fuse / Switch) - small on-screen buttons that
 // also show which key triggers them. Tapping works on mobile; B cancels as usual.
-// Fuse / Switch controls, stacked at the TOP-RIGHT (clear of the abilities AND of
-// any screen-capture overlay along the bottom edge). Small font = reads as a hint.
+// Fuse / Switch controls, stacked at the TOP-RIGHT. BTN_SCALE is a FRACTION of the
+// panel's normal text size (applied relative to the scale addTextObject sets).
 const BTN_X_RIGHT = PANEL_W - 5;
 const BTN_Y_FUSE = 4;
 const BTN_Y_SWITCH = 13;
@@ -181,8 +181,12 @@ export class FusionPreviewPanel {
 
   /** Build one tappable bottom-row button (a text label with a touch hit area). */
   private makeButton(y: number, i18nKey: string, onTap: () => void): Phaser.GameObjects.Text {
-    // Right-aligned to the panel edge (origin 1,0), small font.
-    const t = addTextObject(BTN_X_RIGHT, y, i18next.t(i18nKey), TextStyle.WINDOW).setOrigin(1, 0).setScale(BTN_SCALE);
+    const t = addTextObject(BTN_X_RIGHT, y, i18next.t(i18nKey), TextStyle.WINDOW).setOrigin(1, 0);
+    // addTextObject already applies a sub-1 scale (the 96px font rendered at ~1/6).
+    // MULTIPLY that existing scale - an ABSOLUTE setScale overrode it and rendered
+    // the raw 96px font huge (the "way too big" bug). BTN_SCALE is a fraction of the
+    // panel's normal text size.
+    t.setScale(t.scaleX * BTN_SCALE, t.scaleY * BTN_SCALE);
     // Auto hit area = the text bounds (origin/scale-aware); a fine tap target at
     // 6x render. on pointerup so a tap, not a drag, fires the action.
     t.setInteractive({ useHandCursor: true });
