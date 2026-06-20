@@ -298,10 +298,18 @@ export class SelectModifierPhase extends BattlePhase {
    */
   protected applyModifier(modifier: Modifier, cost = -1, playSound = false): void {
     const result = globalScene.addModifier(modifier, false, playSound, undefined, undefined, cost);
-    // Queue a copy of this phase when applying a TM or Memory Mushroom.
-    // If the player selects either of these, then escapes out of consuming them,
-    // they are returned to a shop in the same state.
-    if (modifier.type instanceof RememberMoveModifierType || modifier.type instanceof TmModifierType) {
+    // Queue a copy of this phase when applying a TM, Memory Mushroom, or ER
+    // Learner's Shroom. If the player selects one of these, then escapes out of
+    // the move-learn without consuming it, they are returned to the shop in the
+    // same state. The Learner's Shroom (#404) is modeled on remember-move
+    // (LearnMoveType.MEMORY) and was missing here, so backing out of its
+    // move-select consumed it without granting a move (#25). The successful-learn
+    // cleanup (learn-move-phase MEMORY branch) removes this copy.
+    if (
+      modifier.type instanceof RememberMoveModifierType
+      || modifier.type instanceof TmModifierType
+      || modifier.type instanceof ErLearnersShroomModifierType
+    ) {
       globalScene.phaseManager.unshiftPhase(this.copy());
     }
 

@@ -3946,6 +3946,35 @@ export const DEV_SCENARIOS: DevScenario[] = [
     ],
   },
   {
+    label: "Learner's Shroom: back-out doesn't consume it (#25)",
+    description:
+      "#25 - Backing out of the move-learn after picking a Learner's Shroom used to\n"
+      + "CONSUME the Shroom without teaching a move (the level-up Memory Mushroom was\n"
+      + "fine; the Shroom was missing the 'return to shop' copy that TM/Memory get).\n"
+      + "Snorlax starts with a FULL 4-move set so the forget screen appears.\n"
+      + "DO: KO the Magikarp, take the LEARNER'S SHROOM, pick Snorlax, pick any move,\n"
+      + "then at 'forget which move?' BACK OUT (cancel / pick the new move row / answer\n"
+      + "No to 'stop teaching'). \n"
+      + "EXPECT: you are returned to the SAME reward screen with the Learner's Shroom\n"
+      + "STILL AVAILABLE to pick again - it is NOT consumed. (If you DO teach a move,\n"
+      + "the reward screen closes normally, as before.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.ER_LEARNERS_SHROOM],
+  },
+  {
     label: "Black shiny: REDUX form (#393)",
     description:
       "#393 CRITICAL - Redux-form (and ER-custom) black shinies showed the\n"

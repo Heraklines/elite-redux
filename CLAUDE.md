@@ -118,6 +118,13 @@ Nothing is overwritten, and captures are AUTO-TRIAGED by scenario:
   PASS/FAIL — <scenario> — <comment>`).
 Read these to see what testers verified / where something hung.
 
+### 🔴 Triage ledger - read BEFORE re-triaging tester logs
+
+`dev-logs/TRIAGE.md` (force-tracked; the dir is gitignored) records which reported
+bugs are RESOLVED / by-design / won't-fix, so already-handled reports are not
+re-raised when re-reading `dev-logs/remote/`. Read it first when triaging, and
+append to it as you resolve or dismiss reports.
+
 ### 🔴 Reading REMOTE tester logs (prod/staging "Report a bug" + "Send Logs")
 
 This is the one to use day-to-day — it's how live players' captures reach this PC.
