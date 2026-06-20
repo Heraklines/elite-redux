@@ -103,6 +103,37 @@ export function installErFormSpriteRedirect(form: PokemonForm, slug: string): vo
   };
 }
 
+/**
+ * Build a sprite's animation if its atlas texture is loaded but the anim was
+ * never created. `PokemonSpeciesForm.loadAssets` builds the (single-frame for ER
+ * art) anim in `finalize()` once the atlas lands — but its safety backstop can
+ * settle the awaited promise BEFORE `finalize` runs on a slow/contended load,
+ * leaving `Missing animation: pkmn__er__<slug>` and the BASE sprite shown in the
+ * preview UIs (starter-select / Pokedex). The battle field already gap-fills this
+ * (see `Pokemon.loadAssets` in pokemon.ts); the preview screens did not, so a
+ * redirected ER mega/primal/costume form rendered as the base mon there.
+ *
+ * Safe + idempotent: no-op when the texture is absent or the anim already exists;
+ * never creates an empty (frame-less) anim.
+ */
+export function ensureErSpriteAnim(spriteKey: string): void {
+  if (!globalScene.textures.exists(spriteKey) || globalScene.anims.exists(spriteKey)) {
+    return;
+  }
+  const originalWarn = console.warn;
+  console.warn = () => {}; // generateFrameNames warns once per missing frame index
+  const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
+    zeroPad: 4,
+    suffix: ".png",
+    start: 1,
+    end: 400,
+  });
+  console.warn = originalWarn;
+  if (frameNames.length > 0) {
+    globalScene.anims.create({ key: spriteKey, frames: frameNames, frameRate: 10, repeat: -1 });
+  }
+}
+
 /** Sprite/icon/asset methods shared by PokemonSpecies and PokemonForm. */
 interface ErSpriteCarrier {
   formIndex?: number;

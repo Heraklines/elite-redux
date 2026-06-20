@@ -20,6 +20,7 @@ import { allAbilities, allMoves, allSpecies } from "#data/data-lists";
 import { Egg, getEggTierForSpecies, MAX_EGG_COUNT } from "#data/egg";
 import { matchesAbilityText } from "#data/elite-redux/er-ability-search";
 import { ER_BLACK_SHINY_TINT } from "#data/elite-redux/er-black-shinies";
+import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes } from "#data/elite-redux/er-map-nodes";
 import { resetErMoneyStreaks } from "#data/elite-redux/er-money-streak";
@@ -4674,15 +4675,23 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     if (this.pokemonSprite.pipelineData["spriteKey"] === spriteKey) {
       return; // already showing the right sprite
     }
-    if (globalScene.textures.exists(spriteKey) && globalScene.anims.exists(spriteKey)) {
-      this.speciesLoaded.set(species.speciesId, true);
-      this.pokemonSprite
-        .play(spriteKey)
-        .setPipelineData("shiny", props.shiny)
-        .setPipelineData("variant", props.variant)
-        .setPipelineData("spriteKey", spriteKey)
-        .setVisible(!this.statsMode);
-      return;
+    if (globalScene.textures.exists(spriteKey)) {
+      // ER: loadAssets' finalize can settle (via its safety backstop) BEFORE it
+      // builds the single-frame anim for a redirected ER form sprite (mega/primal/
+      // costume), leaving "Missing animation: pkmn__er__<slug>" and the BASE sprite
+      // shown in the preview. The atlas texture IS present, so gap-fill the anim
+      // here (same pattern as the battle-side rebuild in pokemon.ts) then play it.
+      ensureErSpriteAnim(spriteKey);
+      if (globalScene.anims.exists(spriteKey)) {
+        this.speciesLoaded.set(species.speciesId, true);
+        this.pokemonSprite
+          .play(spriteKey)
+          .setPipelineData("shiny", props.shiny)
+          .setPipelineData("variant", props.variant)
+          .setPipelineData("spriteKey", spriteKey)
+          .setVisible(!this.statsMode);
+        return;
+      }
     }
     if ((this.spriteLoadAttempts.get(spriteKey) ?? 0) >= StarterSelectUiHandler.MAX_SPRITE_LOAD_ATTEMPTS) {
       return; // this sprite won't load — stop retrying so the preview doesn't freeze

@@ -23,6 +23,7 @@ import { speciesTmMoves } from "#balance/tms";
 import { allAbilities, allMoves, allSpecies, catchableSpecies } from "#data/data-lists";
 import { Egg, getEggTierForSpecies, MAX_EGG_COUNT } from "#data/egg";
 import { getErFormChangesFor } from "#data/elite-redux/er-form-change-overlay";
+import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { GrowthRate, getGrowthRateColor } from "#data/exp";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
@@ -2784,13 +2785,17 @@ export class PokedexPageUiHandler extends MessageUiHandler {
           }
           this.assetLoadCancelled = null;
           this.speciesLoaded.set(species.speciesId, true);
-          this.pokemonSprite.play(species.getSpriteKey(female!, formIndex, shiny, variant, back)); // TODO: is this bang correct?
+          const spriteKey = species.getSpriteKey(female!, formIndex, shiny, variant, back); // TODO: is this bang correct?
+          // ER: gap-fill the single-frame anim for a redirected ER form sprite whose
+          // loadAssets finalize backstopped before building it (else "Missing
+          // animation: pkmn__er__<slug>" + the BASE sprite shows). See pokemon.ts.
+          ensureErSpriteAnim(spriteKey);
+          if (globalScene.anims.exists(spriteKey)) {
+            this.pokemonSprite.play(spriteKey);
+          }
           this.pokemonSprite.setPipelineData("shiny", shiny);
           this.pokemonSprite.setPipelineData("variant", variant);
-          this.pokemonSprite.setPipelineData(
-            "spriteKey",
-            species.getSpriteKey(female!, formIndex, shiny, variant, back), // TODO: is this bang correct?
-          );
+          this.pokemonSprite.setPipelineData("spriteKey", spriteKey);
           this.pokemonSprite.setVisible(!this.statsMode);
         });
       } else {

@@ -3434,7 +3434,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "MEGA STONE (Wigglytuffite / Wigglytuffite X / Wigglytuffite Y) and give it to\n"
       + "Wigglytuff; re-run to try the other stones.\n"
       + "EXPECT: Wigglytuff takes its Mega form with a DISTINCT mega sprite (not the\n"
-      + "plain Wigglytuff sprite). Check front + back + shiny.",
+      + "plain Wigglytuff sprite). Check front + back + shiny.\n"
+      + "ALSO (UI surface): in the Pokedex / starter-select preview, browse to a mega\n"
+      + "form (e.g. Wigglytuff Mega) and toggle shiny - the mega sprite must render\n"
+      + "there too, with NO 'Missing animation: pkmn__er__<slug>' in the console.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
