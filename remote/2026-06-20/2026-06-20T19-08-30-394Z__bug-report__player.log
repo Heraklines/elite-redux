@@ -1,0 +1,285 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     0  wave:12  difficulty:youngster
+seed:     0v7z7rNpLIqxZnI6IDnya7ZB
+party:    Igglybuff(L12 12/46), Mankey(L12 0/32), Silcoon(L8 27/27), Patrat(L8 26/26), Seviper(L8 0/30), Happiny(L8 34/34)
+
+----- DESCRIPTION -----
+Jigglypuff's Cute Charm ability caused Attract on opponent Pokemon but did not cut Atk + S. Atk in half like ER - caused vanilla infatuation effects.
+
+----- CONSOLE -----
+[19:03:25.656] LOG: %cStart Phase BerryPhase color:green;
+[19:03:25.656] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:03:25.656] LOG: %cStart Phase TurnEndPhase color:green;
+[19:03:25.656] LOG: %cStart Phase SwitchPhase color:green;
+[19:03:31.729] LOG: %cStart Phase SwitchSummonPhase color:green;
+[19:03:32.393] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:32.393] LOG: Ran PSP for: Seviper
+[19:03:32.394] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:32.394] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:32.394] LOG: %cStart Phase TurnInitPhase color:green;
+[19:03:32.394] LOG: %cStart Phase CommandPhase color:green;
+[19:03:36.991] LOG: Move: POISON_FANG Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Seviper
+[19:03:36.992] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:03:36.994] LOG: Battle Seed: mA6RmW6zkDwEelKK
+[19:03:36.994] LOG: Move Pool: ["Growl","Peck","Fury Attack"]
+[19:03:36.994] LOG: Move Scores: [2,30,34.5]
+[19:03:36.994] LOG: Sorted Move Pool: ["Fury Attack","Peck","Growl"]
+[19:03:36.994] LOG: Chosen Move: Fury Attack
+[19:03:36.994] LOG: %cStart Phase TurnStartPhase color:green;
+[19:03:36.995] LOG: %cStart Phase MovePhase color:green;
+[19:03:36.995] LOG: %cUser: Seviper
+Move: POISON_FANG
+Use Mode: NORMAL color:orchid
+[19:03:36.995] LOG: %cStart Phase MessagePhase color:green;
+[19:03:37.352] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:03:37.853] LOG: crit stage: +0
+[19:03:37.853] LOG: Move: Poison Fang | Base damage: 7.338666666666667 | Power: 70 | Source attack: 22 | Target defense: 30
+[19:03:37.853] LOG: Move: Poison Fang | Attack damage: 9
+[19:03:37.854] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:03:37.867] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[19:03:38.242] LOG: %cStart Phase MessagePhase color:green;
+[19:03:38.985] LOG: %cStart Phase MoveEndPhase color:green;
+[19:03:38.985] LOG: %cStart Phase MovePhase color:green;
+[19:03:38.985] LOG: %cUser: Toucannon
+Move: FURY_ATTACK
+Use Mode: NORMAL color:orchid
+[19:03:38.986] LOG: %cStart Phase MessagePhase color:green;
+[19:03:39.387] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:03:39.631] LOG: crit stage: +2
+[19:03:39.631] LOG: Move: Fury Attack | Base damage: 9.771428571428572 | Power: 25 | Source attack: 34 | Target defense: 14
+[19:03:39.631] LOG: Move: Fury Attack | Attack damage: 21
+[19:03:39.632] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:03:39.645] LOG: %cStart Phase MessagePhase color:green;
+[19:03:40.263] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:03:40.770] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:03:41.361] LOG: %cStart Phase MessagePhase color:green;
+[19:03:42.034] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:03:42.104] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:03:42.618] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:03:43.208] LOG: %cStart Phase MessagePhase color:green;
+[19:03:43.965] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:03:44.034] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:03:44.284] LOG: crit stage: +2
+[19:03:44.285] LOG: Move: Fury Attack | Base damage: 9.771428571428572 | Power: 25 | Source attack: 34 | Target defense: 14
+[19:03:44.285] LOG: Move: Fury Attack | Attack damage: 12
+[19:03:44.285] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:03:44.299] LOG: %cStart Phase MessagePhase color:green;
+[19:03:44.909] LOG: %cStart Phase FaintPhase color:green;
+[19:03:45.945] LOG: %cStart Phase MessagePhase color:green;
+[19:03:46.132] LOG: %cStart Phase MoveEndPhase color:green;
+[19:03:46.132] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:03:46.132] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:03:46.132] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:03:46.132] LOG: %cStart Phase BerryPhase color:green;
+[19:03:46.132] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:03:46.133] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[19:03:46.507] LOG: %cStart Phase MessagePhase color:green;
+[19:03:47.243] LOG: %cStart Phase TurnEndPhase color:green;
+[19:03:47.243] LOG: %cStart Phase SwitchPhase color:green;
+[19:03:49.858] LOG: %cStart Phase SwitchSummonPhase color:green;
+[19:03:50.522] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:50.522] LOG: Ran PSP for: Igglybuff
+[19:03:50.522] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:50.522] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:50.522] LOG: %cStart Phase TurnInitPhase color:green;
+[19:03:50.522] LOG: %cStart Phase CommandPhase color:green;
+[19:03:53.210] LOG: Move: ECHOED_VOICE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Igglybuff
+[19:03:53.211] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:03:53.211] LOG: %cStart Phase TurnStartPhase color:green;
+[19:03:53.212] LOG: %cStart Phase SwitchSummonPhase color:green;
+[19:03:53.212] LOG: Larry
+[19:03:54.057] LOG: Larry
+[19:03:54.710] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:54.711] LOG: Ran PSP for: Komala
+[19:03:54.711] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:54.711] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:54.711] LOG: %cStart Phase MovePhase color:green;
+[19:03:54.711] LOG: %cUser: Igglybuff
+Move: ECHOED_VOICE
+Use Mode: NORMAL color:orchid
+[19:03:54.711] LOG: %cStart Phase MessagePhase color:green;
+[19:03:55.092] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:03:55.093] LOG: Battle Seed: mA6RmW6zkDwEelKK
+[19:03:55.843] LOG: crit stage: +0
+[19:03:55.843] LOG: Move: Echoed Voice | Base damage: 3.2 | Power: 20 | Source attack: 15 | Target defense: 26
+[19:03:55.843] LOG: Move: Echoed Voice | Attack damage: 4
+[19:03:55.843] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:03:55.857] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:03:56.607] LOG: crit stage: +0
+[19:03:56.607] LOG: Move: Echoed Voice | Base damage: 4.4 | Power: 40 | Source attack: 15 | Target defense: 26
+[19:03:56.607] LOG: Move: Echoed Voice | Attack damage: 9
+[19:03:56.607] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:03:56.621] LOG: %cStart Phase MessagePhase color:green;
+[19:03:57.238] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:03:57.982] LOG: crit stage: +0
+[19:03:57.982] LOG: Move: Echoed Voice | Base damage: 5.6 | Power: 60 | Source attack: 15 | Target defense: 26
+[19:03:57.982] LOG: Move: Echoed Voice | Attack damage: 7
+[19:03:57.983] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:03:57.996] LOG: %cStart Phase MessagePhase color:green;
+[19:03:58.607] LOG: %cStart Phase MoveEndPhase color:green;
+[19:03:58.607] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:03:58.607] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:03:58.607] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:03:58.607] LOG: %cStart Phase BerryPhase color:green;
+[19:03:58.607] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:03:58.607] LOG: %cStart Phase TurnEndPhase color:green;
+[19:03:58.608] LOG: %cStart Phase TurnInitPhase color:green;
+[19:03:58.608] LOG: %cStart Phase CommandPhase color:green;
+[19:04:34.788] LOG: Move: ECHOED_VOICE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Igglybuff
+[19:04:34.789] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:04:34.790] LOG: Battle Seed: mA6RmW6zkDwEelKK
+[19:04:34.790] WARN: BattlerTag STOCKPILING is missing a score!
+[19:04:34.790] WARN: BattlerTag STOCKPILING is missing a score!
+[19:04:34.790] LOG: Move Pool: ["Last Resort","Stockpile","Defense Curl","Yawn"]
+[19:04:34.790] LOG: Move Scores: [-20,0,2,5]
+[19:04:34.790] LOG: Sorted Move Pool: ["Yawn","Defense Curl","Stockpile","Last Resort"]
+[19:04:34.790] LOG: Chosen Move: Yawn
+[19:04:34.790] LOG: %cStart Phase TurnStartPhase color:green;
+[19:04:34.791] LOG: %cStart Phase MovePhase color:green;
+[19:04:34.791] LOG: %cUser: Komala
+Move: YAWN
+Use Mode: NORMAL color:orchid
+[19:04:34.791] LOG: %cStart Phase MessagePhase color:green;
+[19:04:35.121] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:04:35.566] LOG: %cStart Phase MessagePhase color:green;
+[19:04:36.233] LOG: %cStart Phase MoveEndPhase color:green;
+[19:04:36.233] LOG: %cStart Phase MovePhase color:green;
+[19:04:36.233] LOG: %cUser: Igglybuff
+Move: ECHOED_VOICE
+Use Mode: NORMAL color:orchid
+[19:04:36.233] LOG: %cStart Phase MessagePhase color:green;
+[19:04:36.615] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:04:36.615] LOG: %cStart Phase MessagePhase color:green;
+[19:04:37.337] LOG: %cStart Phase MoveEndPhase color:green;
+[19:04:37.337] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:04:37.337] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:04:37.337] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:04:37.337] LOG: %cStart Phase BerryPhase color:green;
+[19:04:37.337] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:04:37.337] LOG: %cStart Phase TurnEndPhase color:green;
+[19:04:37.338] LOG: %cStart Phase TurnInitPhase color:green;
+[19:04:37.338] LOG: %cStart Phase CommandPhase color:green;
+[19:04:39.053] LOG: Move: ECHOED_VOICE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Igglybuff
+[19:04:39.054] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:04:39.054] LOG: Battle Seed: mA6RmW6zkDwEelKK
+[19:04:39.054] WARN: BattlerTag STOCKPILING is missing a score!
+[19:04:39.055] WARN: BattlerTag STOCKPILING is missing a score!
+[19:04:39.055] LOG: Move Pool: ["Last Resort","Stockpile","Defense Curl","Yawn"]
+[19:04:39.055] LOG: Move Scores: [-20,0,2,-20]
+[19:04:39.055] LOG: Sorted Move Pool: ["Defense Curl","Stockpile","Last Resort","Yawn"]
+[19:04:39.055] LOG: Chosen Move: Defense Curl
+[19:04:39.055] LOG: %cStart Phase TurnStartPhase color:green;
+[19:04:39.055] LOG: %cStart Phase MovePhase color:green;
+[19:04:39.055] LOG: %cUser: Komala
+Move: DEFENSE_CURL
+Use Mode: NORMAL color:orchid
+[19:04:39.056] LOG: %cStart Phase MessagePhase color:green;
+[19:04:39.442] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:04:39.789] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:04:40.380] LOG: %cStart Phase MessagePhase color:green;
+[19:04:41.074] LOG: %cStart Phase MoveEndPhase color:green;
+[19:04:41.074] LOG: %cStart Phase MovePhase color:green;
+[19:04:41.074] LOG: %cUser: Igglybuff
+Move: ECHOED_VOICE
+Use Mode: NORMAL color:orchid
+[19:04:41.075] LOG: %cStart Phase MessagePhase color:green;
+[19:04:41.456] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:04:42.206] LOG: crit stage: +0
+[19:04:42.207] LOG: Move: Echoed Voice | Base damage: 3.2 | Power: 20 | Source attack: 15 | Target defense: 26
+[19:04:42.207] LOG: Move: Echoed Voice | Attack damage: 4
+[19:04:42.207] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:04:42.221] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:04:42.970] LOG: crit stage: +0
+[19:04:42.971] LOG: Move: Echoed Voice | Base damage: 4.4 | Power: 40 | Source attack: 15 | Target defense: 26
+[19:04:42.971] LOG: Move: Echoed Voice | Attack damage: 5
+[19:04:42.971] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:04:42.984] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:04:43.734] LOG: crit stage: +0
+[19:04:43.735] LOG: Move: Echoed Voice | Base damage: 5.6 | Power: 60 | Source attack: 15 | Target defense: 26
+[19:04:43.735] LOG: Move: Echoed Voice | Attack damage: 7
+[19:04:43.735] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:04:43.748] LOG: %cStart Phase MessagePhase color:green;
+[19:04:44.359] LOG: %cStart Phase FaintPhase color:green;
+[19:04:45.818] LOG: %cStart Phase MessagePhase color:green;
+[19:04:46.520] LOG: %cStart Phase VictoryPhase color:green;
+[19:04:46.520] LOG: %cStart Phase ExpPhase color:green;
+[19:04:46.520] LOG: Applied Super EXP. Charm 
+[19:04:46.520] LOG: Applied EXP. Charm 
+[19:04:47.610] LOG: %cStart Phase LevelUpPhase color:green;
+[19:04:47.610] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:04:47.610] LOG: Applied Super EXP. Charm 
+[19:04:47.610] LOG: Applied EXP. Charm 
+[19:04:47.867] LOG: %cStart Phase LevelUpPhase color:green;
+[19:04:47.867] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:04:48.041] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:04:48.041] LOG: Applied Super EXP. Charm 
+[19:04:48.041] LOG: Applied EXP. Charm 
+[19:04:48.291] LOG: %cStart Phase LevelUpPhase color:green;
+[19:04:48.291] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:04:48.471] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:04:48.472] LOG: Applied Super EXP. Charm 
+[19:04:48.472] LOG: Applied EXP. Charm 
+[19:04:48.722] LOG: %cStart Phase LevelUpPhase color:green;
+[19:04:48.722] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:04:48.895] LOG: %cStart Phase MoveEndPhase color:green;
+[19:04:48.895] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:04:48.895] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:04:48.895] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:04:48.895] LOG: %cStart Phase BerryPhase color:green;
+[19:04:48.895] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:04:48.895] LOG: %cStart Phase TurnEndPhase color:green;
+[19:04:48.896] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[19:04:48.896] LOG: Battle Seed: mA6RmW6zkDwEelKK
+[19:04:49.319] LOG: %cStart Phase MessagePhase color:green;
+[19:04:49.986] LOG: %cStart Phase SwitchSummonPhase color:green;
+[19:04:50.736] LOG: Larry
+[19:04:51.389] LOG: %cStart Phase PostSummonPhase color:green;
+[19:04:51.389] LOG: Ran PSP for: Dunsparce
+[19:04:51.389] LOG: %cStart Phase PostSummonPhase color:green;
+[19:04:51.389] LOG: %cStart Phase PostSummonPhase color:green;
+[19:04:51.389] LOG: %cStart Phase TurnInitPhase color:green;
+[19:04:51.389] LOG: %cStart Phase CommandPhase color:green;
+[19:04:57.820] LOG: Move: SING Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Igglybuff
+[19:04:57.821] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:04:57.823] LOG: Move Pool: ["Body Slam","Coil","Lucky Chant","Rollout (P)"]
+[19:04:57.823] LOG: Move Scores: [25.5,6,0,8]
+[19:04:57.823] LOG: Sorted Move Pool: ["Body Slam","Rollout (P)","Coil","Lucky Chant"]
+[19:04:57.823] LOG: Chosen Move: Body Slam
+[19:04:57.823] LOG: %cStart Phase TurnStartPhase color:green;
+[19:04:57.824] LOG: %cStart Phase MovePhase color:green;
+[19:04:57.824] LOG: %cUser: Dunsparce
+Move: BODY_SLAM
+Use Mode: NORMAL color:orchid
+[19:04:57.825] LOG: %cStart Phase MessagePhase color:green;
+[19:04:58.209] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:04:58.605] LOG: crit stage: +1
+[19:04:58.606] LOG: Move: Body Slam | Base damage: 24.06909090909091 | Power: 85 | Source attack: 21 | Target defense: 11
+[19:04:58.606] LOG: Move: Body Slam | Attack damage: 34
+[19:04:58.607] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:04:58.620] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:04:59.141] LOG: %cStart Phase MessagePhase color:green;
+[19:04:59.946] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:05:00.016] LOG: %cStart Phase MoveEndPhase color:green;
+[19:05:00.016] LOG: %cStart Phase MovePhase color:green;
+[19:05:00.016] LOG: %cUser: Igglybuff
+Move: SING
+Use Mode: NORMAL color:orchid
+[19:05:00.016] LOG: %cStart Phase MessagePhase color:green;
+[19:05:00.703] LOG: %cStart Phase CommonAnimPhase color:green;
+[19:05:01.113] LOG: %cStart Phase MoveEndPhase color:green;
+[19:05:01.113] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:05:01.113] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:05:01.113] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:05:01.113] LOG: %cStart Phase BerryPhase color:green;
+[19:05:01.113] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:05:01.113] LOG: %cStart Phase TurnEndPhase color:green;
+[19:05:01.113] LOG: %cStart Phase TurnInitPhase color:green;
+[19:05:01.113] LOG: %cStart Phase CommandPhase color:green;
