@@ -32,8 +32,8 @@ const LEFT_X = PANEL_X - LEFT_W - LEFT_GAP;
 const LEFT_H = PANEL_H;
 const STAT_LABEL_DX = 5; // left inset for a stat label
 const STAT_VALUE_DX = LEFT_W - 5; // right edge for a (right-aligned) stat value
-const STAT_Y0 = PANEL_Y + 32; // first stat row, below the icon
-const STAT_ROW_H = 12; // spread to fill the taller panel
+const STAT_Y0 = PANEL_Y + 30; // first stat row, below the icon
+const STAT_ROW_H = 11; // keep all 6 rows inside the panel (last row was spilling out)
 
 /**
  * ER QoL Move Learn panel (see {@linkcode LearnMoveBatchPhase}). One screen on
