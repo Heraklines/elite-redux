@@ -56,6 +56,13 @@ export class MockContainer implements MockGameObject {
     return this;
   }
 
+  setDisplaySize(_width: number, _height: number): this {
+    // Sets the display size of this Game Object (real Phaser Image/Sprite have
+    // this via the Size component). Stubbed so handlers that scale a backdrop in
+    // setup() — e.g. BiomeShopUiHandler — don't crash the headless scene.
+    return this;
+  }
+
   setMask(): this {
     /// Sets the mask that this Game Object will use to render with.
     return this;

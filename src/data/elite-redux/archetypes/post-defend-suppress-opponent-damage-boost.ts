@@ -31,6 +31,11 @@ export class PostDefendSuppressOpponentDamageBoostAbAttr extends AbAttr {
 }
 
 export function suppressesOpponentDamageBoosts(pokemon: Pokemon): boolean {
+  // Defensive: damage helpers can reach this with a not-yet-initialized holder
+  // (e.g. a partially set-up scene in the headless test harness).
+  if (!pokemon) {
+    return false;
+  }
   return pokemon
     .getAllActiveAbilityAttrs()
     .some(attr => attr.constructor.name === "PostDefendSuppressOpponentDamageBoostAbAttr");

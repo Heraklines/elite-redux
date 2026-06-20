@@ -2685,7 +2685,7 @@ export class BattleScene extends SceneBase {
     const offsetY = (this.scoreText.visible ? this.scoreText : this.moneyText).y + 15;
     this.partyExpBar.setY(offsetY);
     this.candyBar.setY(offsetY + 15);
-    this.ui?.achvBar.setY(this.scaledCanvas.height + offsetY);
+    this.ui?.achvBar?.setY(this.scaledCanvas.height + offsetY);
   }
 
   /**

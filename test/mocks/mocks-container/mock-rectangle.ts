@@ -91,6 +91,25 @@ export class MockRectangle implements MockGameObject {
     return this;
   }
 
+  setStrokeStyle(_thickness?: number, _color?: number, _alpha?: number): this {
+    // Real Phaser shapes (Rectangle/Arc/...) expose this; stubbed so handlers
+    // that stroke a shape in setup() (e.g. BiomeShopUiHandler's cursor) don't
+    // crash the headless scene.
+    return this;
+  }
+
+  setFillStyle(_color?: number, _alpha?: number): this {
+    return this;
+  }
+
+  setDisplaySize(_width: number, _height: number): this {
+    return this;
+  }
+
+  setSize(_width: number, _height: number): this {
+    return this;
+  }
+
   off(): this {
     return this;
   }
