@@ -509,6 +509,31 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "ER Relic persistence: survives Save & Quit (#439)",
+    description:
+      "Relics granted from a REWARD/Bargain (not the starting bar) used to VANISH on\n"
+      + "reload: the relic's modifier type was built with an empty id, so the save\n"
+      + "recorded a blank type and the load dropped it.\n"
+      + "DO: KO the Magikarp, then in the shop TAKE both relic rewards (CURSED IDOL +\n"
+      + "COVENANT). Confirm they appear in the item bar. Now open the menu, SAVE & QUIT,\n"
+      + "then RELOAD the page and CONTINUE this run.\n"
+      + "EXPECT: after Continue, BOTH relics are STILL in the item bar (before the fix\n"
+      + "they were gone). The other ER items in the offer (Omni Gem) must also persist.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST] }),
+      ];
+    },
+    shopItems: [modifierTypes.ER_RELIC_CURSED_IDOL, modifierTypes.ER_RELIC_COVENANT, modifierTypes.ER_OMNI_GEM],
+  },
+  {
     label: "ER Relic: Field Medic (reserves) (#439)",
     description:
       "#439 - Field Medic heals the BENCHED reserves (slots 2 and 3), NOT the active\n"

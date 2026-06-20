@@ -838,9 +838,28 @@ export function erCommunityItemModifierType(kind: ErCommunityItemKind): PokemonH
  * description from the config; icon = an existing atlas frame, tinted via the
  * modifier's getIcon override and the type's iconTint so the shop matches).
  */
+/**
+ * The `modifierTypeInitObj` registry key for a relic kind, i.e.
+ * `ER_RELIC_<SCREAMING_SNAKE(kind)>` ("cursedIdol" -> "ER_RELIC_CURSED_IDOL").
+ * Relics are granted off-pool (Giratina's Bargain, abyss events), so they never
+ * pass through the reward-screen id fix-up in {@linkcode getPlayerModifierTypeOptions}
+ * - and the Bargain in particular wraps each func in a fresh arrow, so even that
+ * reverse-lookup misses. Without a `type.id`, {@linkcode ModifierData} records
+ * `typeId=""`, and on load `getModifierTypeFuncById("")` is `undefined`, so the
+ * relic is silently dropped on reload/Continue. Deriving the id here pins it for
+ * EVERY grant path. (er-relic-save-persistence.test asserts the convention holds
+ * for all registered relics, so a future kind that breaks it fails loudly.)
+ */
+function erRelicTypeId(kind: ErRelicKind): string {
+  return `ER_RELIC_${kind.replace(/([A-Z])/g, "_$1").toUpperCase()}`;
+}
+
 export function erRelicModifierType(kind: ErRelicKind): ModifierType {
   const cfg = ER_RELIC_CONFIG[kind];
   const type = new ModifierType("", cfg.icon, (t, _args) => new ErRelicModifier(t, kind));
+  // Pin the registry id so the relic survives save/load no matter how it was
+  // granted (see erRelicTypeId).
+  type.id = erRelicTypeId(kind);
   Object.defineProperty(type, "name", { get: () => cfg.name });
   type.getDescription = () => cfg.description;
   type.iconTint = cfg.tint;
