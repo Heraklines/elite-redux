@@ -6371,4 +6371,124 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
     shopItems: [modifierTypes.RARE_CANDY],
   },
+  {
+    label: "ER ID 388: Thundercall",
+    description:
+      "ID 388 - Thundercall must not load Discipline or another neighboring ability.\n"
+      + "DO: use Thunder Shock, then use Tackle. EXPECT: Thunder Shock triggers the\n"
+      + "extra Electric follow-up; Tackle does not. The ability name is Thundercall.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.THUNDERCALL),
+        MOVESET_OVERRIDE: [MoveId.THUNDER_SHOCK, MoveId.TACKLE, MoveId.QUICK_ATTACK, MoveId.THUNDER_WAVE],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.TACKLE, MoveId.REST, MoveId.PROTECT],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDER_SHOCK, MoveId.TACKLE, MoveId.QUICK_ATTACK, MoveId.THUNDER_WAVE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER ID 869: Blistering Sun",
+    description:
+      "ID 869 - Blistering Sun must not load Fire Aspect or another neighboring ability.\n"
+      + "DO: start the battle and inspect the field and ability name. EXPECT: Blistering\n"
+      + "Sun activates its Desolate Land/Air Blower package, not Fire absorption/burn.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.BLISTERING_SUN),
+        MOVESET_OVERRIDE: [MoveId.FLAMETHROWER, MoveId.AIR_SLASH, MoveId.SOLAR_BEAM, MoveId.PROTECT],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLASTOISE,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.WATER_PULSE, MoveId.ICE_BEAM, MoveId.TACKLE, MoveId.PROTECT],
+      });
+      return [
+        makeStarter(SpeciesId.CHARIZARD, {
+          moveset: [MoveId.FLAMETHROWER, MoveId.AIR_SLASH, MoveId.SOLAR_BEAM, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER ID 907: Laser Drill",
+    description:
+      "ID 907 - Laser Drill must not load Turf War or another neighboring ability.\n"
+      + "DO: repeatedly use Horn Attack, then Earthquake. EXPECT: horn attacks have\n"
+      + "the 50% burn rider; Earthquake does not. The ability name is Laser Drill.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.LASER_DRILL),
+        MOVESET_OVERRIDE: [MoveId.HORN_ATTACK, MoveId.MEGAHORN, MoveId.EARTHQUAKE, MoveId.PROTECT],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.TACKLE, MoveId.REST, MoveId.PROTECT],
+      });
+      return [
+        makeStarter(SpeciesId.NIDOKING, {
+          moveset: [MoveId.HORN_ATTACK, MoveId.MEGAHORN, MoveId.EARTHQUAKE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER ID 945: Chainsaw",
+    description:
+      "ID 945 - Chainsaw must not load Echolocation or another neighboring ability.\n"
+      + "DO: use X-Scissor, then Close Combat. EXPECT: the slicing attack lowers the\n"
+      + "target's Defense by one stage; the non-slicing attack does not.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.CHAINSAW),
+        MOVESET_OVERRIDE: [MoveId.X_SCISSOR, MoveId.NIGHT_SLASH, MoveId.CLOSE_COMBAT, MoveId.PROTECT],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.TACKLE, MoveId.REST, MoveId.PROTECT],
+      });
+      return [
+        makeStarter(SpeciesId.GALLADE, {
+          moveset: [MoveId.X_SCISSOR, MoveId.NIGHT_SLASH, MoveId.CLOSE_COMBAT, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "ER ID 1025: Foul Energy",
+    description:
+      "ID 1025 - Foul Energy must not load Reaper's Embarce or another neighboring\n"
+      + "ability. DO: compare Crunch with Earthquake, then repeat below one-third HP.\n"
+      + "EXPECT: Dark moves receive the stated 1.2x boost, increasing to 1.5x at low HP.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.FOUL_ENERGY),
+        MOVESET_OVERRIDE: [MoveId.CRUNCH, MoveId.DARK_PULSE, MoveId.EARTHQUAKE, MoveId.PROTECT],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.BODY_SLAM, MoveId.TACKLE, MoveId.REST, MoveId.PROTECT],
+      });
+      return [
+        makeStarter(SpeciesId.KROOKODILE, {
+          moveset: [MoveId.CRUNCH, MoveId.DARK_PULSE, MoveId.EARTHQUAKE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
 ];

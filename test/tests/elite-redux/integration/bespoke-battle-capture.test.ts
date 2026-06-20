@@ -21,16 +21,16 @@
 // REAL phase pipeline, not a parallel test engine.
 // =============================================================================
 
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { ER_ABILITY_ARCHETYPES } from "#data/elite-redux/er-ability-archetypes";
-import { dispatchBespoke } from "#data/elite-redux/archetype-dispatcher";
-import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { allAbilities } from "#data/data-lists";
-import { AbilityId } from "#enums/ability-id";
+import { dispatchBespoke } from "#data/elite-redux/archetype-dispatcher";
+import { ER_ABILITY_ARCHETYPES } from "#data/elite-redux/er-ability-archetypes";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import type { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -74,7 +74,7 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
     { erId: 313, label: "Dragonslayer (type-effectiveness mod)" },
     { erId: 273, label: "Power Fists (defense-stat swap + 1.3x)" },
     { erId: 268, label: "Chloroplast (weather-stat multiplier)" },
-    { erId: 923, label: "Galeforce Wings (priority modifier)" },
+    { erId: 946, label: "Galeforce Wings (priority modifier)" },
     { erId: 634, label: "Last Stand (hp-conditional stat boost)" },
     { erId: 904, label: "Strong Foundation (resist + force-switch immune)" },
     { erId: 429, label: "Coward (PROTECTED tag once per battle)" },
@@ -175,9 +175,7 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
         const csv = ["er_id,pokerogue_id,status,observable,error"];
         for (const r of results) {
           const safe = (s: string) => s.replace(/,/g, ";").replace(/\n/g, " ").replace(/"/g, "'");
-          csv.push(
-            `${r.erId},${r.pokerogueId},${r.status},"${safe(r.observable)}","${safe(r.error)}"`,
-          );
+          csv.push(`${r.erId},${r.pokerogueId},${r.status},"${safe(r.observable)}","${safe(r.error)}"`);
         }
         writeFileSync(REPORT_PATH, csv.join("\n"));
 
@@ -192,10 +190,7 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
   // on-demand full coverage.
   it("every sampled ability dispatches without throwing", () => {
     for (const sample of SAMPLE_ABILITIES) {
-      expect(
-        () => dispatchBespoke(sample.erId),
-        `${sample.label} (er ${sample.erId})`,
-      ).not.toThrow();
+      expect(() => dispatchBespoke(sample.erId), `${sample.label} (er ${sample.erId})`).not.toThrow();
       const res = dispatchBespoke(sample.erId);
       expect(res, `${sample.label} returned non-null`).not.toBeNull();
       // Either wired (attrs.length > 0) or honestly skipped (skipReason set).
@@ -232,7 +227,13 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
       async () => {
         const pkrgId = ER_ID_MAP.abilities[erId];
         if (pkrgId === undefined || !allAbilities[pkrgId]) {
-          fullResults.push({ erId, pokerogueId: pkrgId ?? -1, status: "INIT-FAILED", observable: "", error: "no pokerogue ability" });
+          fullResults.push({
+            erId,
+            pokerogueId: pkrgId ?? -1,
+            status: "INIT-FAILED",
+            observable: "",
+            error: "no pokerogue ability",
+          });
           emitFullCsv();
           return;
         }
@@ -243,7 +244,8 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
           return;
         }
 
-        let observable = "", error = "";
+        let observable = "";
+        let error = "";
         let status: BattleCapture["status"] = "OK";
         try {
           game.override
@@ -257,7 +259,8 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
           await game.classicMode.startBattle(SpeciesId.PIKACHU);
           const enemy = game.field.getEnemyPokemon();
           const player = game.field.getPlayerPokemon();
-          const eHp0 = enemy.hp, pHp0 = player.hp;
+          const eHp0 = enemy.hp;
+          const pHp0 = player.hp;
           const eTags0 = enemy.summonData.tags.length;
           const pTags0 = player.summonData.tags.length;
 
@@ -265,14 +268,28 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
           await game.toEndOfTurn();
 
           const obs: string[] = [];
-          if (eHp0 !== enemy.hp) obs.push(`eHp:${eHp0}→${enemy.hp}`);
-          if (pHp0 !== player.hp) obs.push(`pHp:${pHp0}→${player.hp}`);
-          if (eTags0 !== enemy.summonData.tags.length) obs.push(`eTags:${eTags0}→${enemy.summonData.tags.length}`);
-          if (pTags0 !== player.summonData.tags.length) obs.push(`pTags:${pTags0}→${player.summonData.tags.length}`);
-          if (enemy.status) obs.push(`eStatus:${enemy.status.effect}`);
-          if (player.status) obs.push(`pStatus:${player.status.effect}`);
+          if (eHp0 !== enemy.hp) {
+            obs.push(`eHp:${eHp0}→${enemy.hp}`);
+          }
+          if (pHp0 !== player.hp) {
+            obs.push(`pHp:${pHp0}→${player.hp}`);
+          }
+          if (eTags0 !== enemy.summonData.tags.length) {
+            obs.push(`eTags:${eTags0}→${enemy.summonData.tags.length}`);
+          }
+          if (pTags0 !== player.summonData.tags.length) {
+            obs.push(`pTags:${pTags0}→${player.summonData.tags.length}`);
+          }
+          if (enemy.status) {
+            obs.push(`eStatus:${enemy.status.effect}`);
+          }
+          if (player.status) {
+            obs.push(`pStatus:${player.status.effect}`);
+          }
           observable = obs.join("; ") || "none";
-          if (observable === "none") status = "NO-OBSERVABLE";
+          if (observable === "none") {
+            status = "NO-OBSERVABLE";
+          }
         } catch (err) {
           status = "CRASHED";
           error = err instanceof Error ? err.message : String(err);
@@ -292,9 +309,7 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
     "FULL-262 (DEPRECATED — single-it loop crashed; use per-ability instead)",
     async () => {
       const FULL_REPORT_PATH = join(process.cwd(), "docs", "plans", "bespoke-battle-capture-full.csv");
-      const bespoke = Object.values(ER_ABILITY_ARCHETYPES).filter(
-        e => e.archetype === "bespoke" && e.erAbilityId > 0,
-      );
+      const bespoke = Object.values(ER_ABILITY_ARCHETYPES).filter(e => e.archetype === "bespoke" && e.erAbilityId > 0);
       const allResults: BattleCapture[] = [];
 
       for (const entry of bespoke) {
@@ -302,8 +317,11 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
         const pkrgId = ER_ID_MAP.abilities[erId];
         if (pkrgId === undefined || !allAbilities[pkrgId]) {
           allResults.push({
-            erId, pokerogueId: pkrgId ?? -1, status: "INIT-FAILED",
-            observable: "", error: "no pokerogue ability for er id",
+            erId,
+            pokerogueId: pkrgId ?? -1,
+            status: "INIT-FAILED",
+            observable: "",
+            error: "no pokerogue ability for er id",
           });
           continue;
         }
@@ -311,8 +329,11 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
         const res = dispatchBespoke(erId);
         if ((res.attrs?.length ?? 0) === 0) {
           allResults.push({
-            erId, pokerogueId: pkrgId, status: "INIT-FAILED",
-            observable: "", error: "empty wire (no attrs)",
+            erId,
+            pokerogueId: pkrgId,
+            status: "INIT-FAILED",
+            observable: "",
+            error: "empty wire (no attrs)",
           });
           continue;
         }
@@ -334,7 +355,8 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
           await game.classicMode.startBattle(SpeciesId.PIKACHU);
           const enemy = game.field.getEnemyPokemon();
           const player = game.field.getPlayerPokemon();
-          const eHp0 = enemy.hp, pHp0 = player.hp;
+          const eHp0 = enemy.hp;
+          const pHp0 = player.hp;
           const eTags0 = enemy.summonData.tags.length;
           const pTags0 = player.summonData.tags.length;
 
@@ -342,14 +364,28 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
           await game.toEndOfTurn();
 
           const obs: string[] = [];
-          if (eHp0 !== enemy.hp) obs.push(`eHp:${eHp0}→${enemy.hp}`);
-          if (pHp0 !== player.hp) obs.push(`pHp:${pHp0}→${player.hp}`);
-          if (eTags0 !== enemy.summonData.tags.length) obs.push(`eTags:${eTags0}→${enemy.summonData.tags.length}`);
-          if (pTags0 !== player.summonData.tags.length) obs.push(`pTags:${pTags0}→${player.summonData.tags.length}`);
-          if (enemy.status) obs.push(`eStatus:${enemy.status.effect}`);
-          if (player.status) obs.push(`pStatus:${player.status.effect}`);
+          if (eHp0 !== enemy.hp) {
+            obs.push(`eHp:${eHp0}→${enemy.hp}`);
+          }
+          if (pHp0 !== player.hp) {
+            obs.push(`pHp:${pHp0}→${player.hp}`);
+          }
+          if (eTags0 !== enemy.summonData.tags.length) {
+            obs.push(`eTags:${eTags0}→${enemy.summonData.tags.length}`);
+          }
+          if (pTags0 !== player.summonData.tags.length) {
+            obs.push(`pTags:${pTags0}→${player.summonData.tags.length}`);
+          }
+          if (enemy.status) {
+            obs.push(`eStatus:${enemy.status.effect}`);
+          }
+          if (player.status) {
+            obs.push(`pStatus:${player.status.effect}`);
+          }
           observable = obs.join("; ") || "none";
-          if (observable === "none") status = "NO-OBSERVABLE";
+          if (observable === "none") {
+            status = "NO-OBSERVABLE";
+          }
         } catch (err) {
           status = "CRASHED";
           error = err instanceof Error ? err.message : String(err);
@@ -369,9 +405,9 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
       const crashed = allResults.filter(r => r.status === "CRASHED");
       console.info(
         `\nFULL-262 capture: ${allResults.length} ran, ${allResults.filter(r => r.status === "OK").length} OK, `
-        + `${allResults.filter(r => r.status === "NO-OBSERVABLE").length} no-observable, `
-        + `${crashed.length} crashed, `
-        + `${allResults.filter(r => r.status === "INIT-FAILED").length} init-failed.`,
+          + `${allResults.filter(r => r.status === "NO-OBSERVABLE").length} no-observable, `
+          + `${crashed.length} crashed, `
+          + `${allResults.filter(r => r.status === "INIT-FAILED").length} init-failed.`,
       );
       expect(crashed, `${crashed.length} abilities crashed in battle`).toHaveLength(0);
     },
@@ -379,9 +415,7 @@ describe("Bespoke ability battle capture (real GameManager — one round each)",
   );
 
   it("classifies coverage across every bespoke ability via dispatchBespoke", () => {
-    const bespoke = Object.values(ER_ABILITY_ARCHETYPES).filter(
-      e => e.archetype === "bespoke" && e.erAbilityId > 0,
-    );
+    const bespoke = Object.values(ER_ABILITY_ARCHETYPES).filter(e => e.archetype === "bespoke" && e.erAbilityId > 0);
     let wired = 0;
     let skipped = 0;
     let empty = 0;

@@ -1615,7 +1615,7 @@ export const ER_ABILITIES: readonly ErAbilityDraft[] = [
     "archetype": "unknown"
   },
   {
-    "id": 266,
+    "id": 267,
     "name": "As One",
     "description": "Unnerve + Grim Neigh.",
     "archetype": "unknown"
@@ -2329,49 +2329,49 @@ export const ER_ABILITIES: readonly ErAbilityDraft[] = [
     "archetype": "unknown"
   },
   {
-    "id": 386,
+    "id": 393,
     "name": "Spectralize",
     "description": "Normal moves become Ghost. Ghost moves are empowered.",
     "archetype": "unknown"
   },
   {
-    "id": 387,
+    "id": 386,
     "name": "Spectral Shroud",
     "description": "Spectralize + 30% chance to badly poison the foe.",
     "archetype": "unknown"
   },
   {
-    "id": 388,
+    "id": 387,
     "name": "Discipline",
     "description": "Can switch while rampaging. Can't be confused or intimidated.",
     "archetype": "unknown"
   },
   {
-    "id": 389,
+    "id": 388,
     "name": "Thundercall",
     "description": "Triggers Smite at 20% power when using an Electric move.",
     "archetype": "unknown"
   },
   {
-    "id": 390,
+    "id": 389,
     "name": "Marine Apex",
     "description": "50% more damage to Water-types + Infiltrator.",
     "archetype": "unknown"
   },
   {
-    "id": 391,
+    "id": 390,
     "name": "Mighty Horn",
     "description": "Boosts the power of horn and drill-based by 1.3x.",
     "archetype": "unknown"
   },
   {
-    "id": 392,
+    "id": 391,
     "name": "Hardened Sheath",
     "description": "Ups Attack by +1 when using horn moves.",
     "archetype": "unknown"
   },
   {
-    "id": 393,
+    "id": 392,
     "name": "Arctic Fur",
     "description": "Weakens incoming physical and special moves by 35%.",
     "archetype": "unknown"
@@ -4789,19 +4789,19 @@ export const ER_ABILITIES: readonly ErAbilityDraft[] = [
     "archetype": "unknown"
   },
   {
-    "id": 795,
+    "id": 796,
     "name": "Embody Aspect",
     "description": "+1 Attack on Entry.",
     "archetype": "unknown"
   },
   {
-    "id": 795,
+    "id": 797,
     "name": "Embody Aspect",
     "description": "+1 Defense on Entry.",
     "archetype": "unknown"
   },
   {
-    "id": 795,
+    "id": 798,
     "name": "Embody Aspect",
     "description": "+1 Spdef on Entry.",
     "archetype": "unknown"
@@ -5227,31 +5227,31 @@ export const ER_ABILITIES: readonly ErAbilityDraft[] = [
     "archetype": "unknown"
   },
   {
-    "id": 869,
+    "id": 871,
     "name": "Fire Aspect",
     "description": "Absorbs fire moves and always burns with fire.",
     "archetype": "unknown"
   },
   {
-    "id": 870,
+    "id": 873,
     "name": "Ice Plumes",
     "description": "Halves damage taken by Special moves. Does NOT double SpDef.",
     "archetype": "unknown"
   },
   {
-    "id": 871,
+    "id": 869,
     "name": "Blistering Sun",
     "description": "Desolate Land + Air Blower.",
     "archetype": "unknown"
   },
   {
-    "id": 872,
+    "id": 870,
     "name": "Molten Core",
     "description": "Furnace + Absorbs Rock-moves/Stealth Rocks.",
     "archetype": "unknown"
   },
   {
-    "id": 873,
+    "id": 872,
     "name": "Aurora's Gale",
     "description": "Majestic Bird + North Wind.",
     "archetype": "unknown"
@@ -5455,37 +5455,37 @@ export const ER_ABILITIES: readonly ErAbilityDraft[] = [
     "archetype": "unknown"
   },
   {
-    "id": 907,
+    "id": 910,
     "name": "Turf War",
     "description": "Destroys terrain and boosts highest stat on entry.",
     "archetype": "unknown"
   },
   {
-    "id": 908,
+    "id": 911,
     "name": "Greedy",
     "description": "Uses Thief when it loses an item.",
     "archetype": "unknown"
   },
   {
-    "id": 909,
+    "id": 908,
     "name": "Lightsaber",
     "description": "Adds Fire-type. Keen Edge moves have 25% burn or paralysis.",
     "archetype": "unknown"
   },
   {
-    "id": 910,
+    "id": 909,
     "name": "Loose Thorns",
     "description": "Sets Creeping Thorns when hit by contact.",
     "archetype": "unknown"
   },
   {
-    "id": 911,
+    "id": 912,
     "name": "Musical Notes",
     "description": "Status moves become sound-based.",
     "archetype": "unknown"
   },
   {
-    "id": 912,
+    "id": 907,
     "name": "Laser Drill",
     "description": "Horn moves have a 50% burn chance.",
     "archetype": "unknown"
@@ -5527,13 +5527,13 @@ export const ER_ABILITIES: readonly ErAbilityDraft[] = [
     "archetype": "unknown"
   },
   {
-    "id": 919,
+    "id": 920,
     "name": "Rocky Exterior",
     "description": "Adds Rock type on entry.",
     "archetype": "unknown"
   },
   {
-    "id": 920,
+    "id": 919,
     "name": "Lead Claws",
     "description": "Tough Claws + Mineralize.",
     "archetype": "unknown"
@@ -5545,73 +5545,73 @@ export const ER_ABILITIES: readonly ErAbilityDraft[] = [
     "archetype": "unknown"
   },
   {
-    "id": 922,
+    "id": 945,
     "name": "Chainsaw",
     "description": "Keen edge attacks lower defense by -1.",
     "archetype": "unknown"
   },
   {
-    "id": 923,
+    "id": 946,
     "name": "Galeforce Wings",
     "description": "Flying moves get +1 Priority.",
     "archetype": "unknown"
   },
   {
-    "id": 924,
+    "id": 922,
     "name": "Empress",
     "description": "Queenly Majesty + Rivalry.",
     "archetype": "unknown"
   },
   {
-    "id": 925,
+    "id": 923,
     "name": "Mashed Potato",
     "description": "Syrup Bomb effect on the foe for 3 turns.",
     "archetype": "unknown"
   },
   {
-    "id": 926,
+    "id": 925,
     "name": "Rainbow Scales",
     "description": "Fire Scales + Taste the Rainbow.",
     "archetype": "unknown"
   },
   {
-    "id": 927,
+    "id": 924,
     "name": "Taste the Rainbow",
     "description": "Summons the Rainbow Pledge effect on entry.",
     "archetype": "unknown"
   },
   {
-    "id": 928,
+    "id": 926,
     "name": "Hypnotic Touch",
     "description": "20% chance to sleep on contact. Also works on offense.",
     "archetype": "unknown"
   },
   {
-    "id": 929,
+    "id": 928,
     "name": "Hydra",
     "description": "Multi-Headed + Hubris.",
     "archetype": "unknown"
   },
   {
-    "id": 930,
+    "id": 927,
     "name": "Wings of Pestilence",
     "description": "Every attack has a 20% Bleed chance and 10% Curse chance.",
     "archetype": "unknown"
   },
   {
-    "id": 931,
+    "id": 929,
     "name": "Sundae",
     "description": "Snow Warning + Ice Body.",
     "archetype": "unknown"
   },
   {
-    "id": 932,
+    "id": 930,
     "name": "Ice Picks",
     "description": "Tough Claws + Slush Rush.",
     "archetype": "unknown"
   },
   {
-    "id": 933,
+    "id": 931,
     "name": "Hammer Fist",
     "description": "Boosts punch and hammer moves by 25%.",
     "archetype": "unknown"
@@ -5683,277 +5683,277 @@ export const ER_ABILITIES: readonly ErAbilityDraft[] = [
     "archetype": "unknown"
   },
   {
-    "id": 945,
+    "id": 947,
     "name": "Echolocation",
     "description": "In fog, deal 20% more damage and never miss.",
     "archetype": "unknown"
   },
   {
-    "id": 946,
+    "id": 948,
     "name": "Massive Pelt",
     "description": "Tangling Hair + Fluffy.",
     "archetype": "unknown"
   },
   {
-    "id": 947,
+    "id": 949,
     "name": "I Am Steve",
     "description": "Uses No Retreat on entry.",
     "archetype": "unknown"
   },
   {
-    "id": 948,
+    "id": 950,
     "name": "Tangled Tails",
     "description": "Know Your Place + Grappler.",
     "archetype": "unknown"
   },
   {
-    "id": 949,
+    "id": 951,
     "name": "Foamy Web",
     "description": "Casts an unremovable Sticky Web on entry. Lasts 5 turns.",
     "archetype": "unknown"
   },
   {
-    "id": 950,
+    "id": 952,
     "name": "Sharp Talons",
     "description": "Kicking moves have a 50% Bleed chance.",
     "archetype": "unknown"
   },
   {
-    "id": 951,
+    "id": 953,
     "name": "Zen Garden",
     "description": "Sets up Grassy or Psychic Terrain at random.",
     "archetype": "unknown"
   },
   {
-    "id": 952,
+    "id": 954,
     "name": "Tummyache",
     "description": "Thick Fat + Corrosion.",
     "archetype": "unknown"
   },
   {
-    "id": 953,
+    "id": 955,
     "name": "Hypnotic Trance",
     "description": "Hypnosis never misses and also causes Confusion.",
     "archetype": "unknown"
   },
   {
-    "id": 954,
+    "id": 956,
     "name": "Brain Overload",
     "description": "When hit, sets up Psychic Terrain.",
     "archetype": "unknown"
   },
   {
-    "id": 955,
+    "id": 957,
     "name": "Brain Mass",
     "description": "Halves damage taken while at full HP.",
     "archetype": "unknown"
   },
   {
-    "id": 956,
+    "id": 958,
     "name": "Chestnut Shield",
     "description": "Impenetrable + Bulletproof",
     "archetype": "unknown"
   },
   {
-    "id": 957,
+    "id": 959,
     "name": "Chestnut Axe",
     "description": "Keen edge + Grass moves become Keen Edge boosted.",
     "archetype": "unknown"
   },
   {
-    "id": 958,
+    "id": 960,
     "name": "Giant Shuriken",
     "description": "Water Shuriken hits once with 100BP and +1 crit.",
     "archetype": "unknown"
   },
   {
-    "id": 959,
+    "id": 987,
     "name": "Rain Shroud",
     "description": "Ups evasion by 30% in rain.",
     "archetype": "unknown"
   },
   {
-    "id": 960,
+    "id": 961,
     "name": "Witch Broom",
     "description": "Hyper Aggressive + Hover.",
     "archetype": "unknown"
   },
   {
-    "id": 961,
+    "id": 962,
     "name": "Angelic Wings",
     "description": "Prism Scales + Huge Wings.",
     "archetype": "unknown"
   },
   {
-    "id": 962,
+    "id": 963,
     "name": "Wrestle Showman",
     "description": "Flying Press gains +10BP and causes Taunt.",
     "archetype": "unknown"
   },
   {
-    "id": 963,
+    "id": 965,
     "name": "Fire Ruler",
     "description": "King's Wrath + Flame Shield",
     "archetype": "unknown"
   },
   {
-    "id": 964,
+    "id": 966,
     "name": "Chandelier",
     "description": "Illuminate + Pyromancy.",
     "archetype": "unknown"
   },
   {
-    "id": 965,
+    "id": 967,
     "name": "Foggy Eye",
     "description": "While in Fog, boost Ghost moves by 50% and resist Ghost moves.",
     "archetype": "unknown"
   },
   {
-    "id": 966,
+    "id": 968,
     "name": "Toxic Shell",
     "description": "Shell Armor + Poison Point.",
     "archetype": "unknown"
   },
   {
-    "id": 967,
+    "id": 969,
     "name": "Hand Barnacles",
     "description": "Multi-Headed + Water STAB.",
     "archetype": "unknown"
   },
   {
-    "id": 968,
+    "id": 970,
     "name": "Voltron",
     "description": "Metallic + Battle Armor.",
     "archetype": "unknown"
   },
   {
-    "id": 969,
+    "id": 971,
     "name": "Fire's Wrath",
     "description": "Intimidate + Scare; 10% burn chance on non contact moves.",
     "archetype": "unknown"
   },
   {
-    "id": 970,
+    "id": 972,
     "name": "Emperor's Wrath",
     "description": "King's Wrath + Queen's Mourning.",
     "archetype": "unknown"
   },
   {
-    "id": 971,
+    "id": 973,
     "name": "Lepidopteran",
     "description": "Swarm + Unaware.",
     "archetype": "unknown"
   },
   {
-    "id": 972,
+    "id": 974,
     "name": "Break it Down",
     "description": "After using an attack, follow up with a 20BP Rapid Spin.",
     "archetype": "unknown"
   },
   {
-    "id": 973,
+    "id": 975,
     "name": "Talon Trap",
     "description": "50% chance to trap on contact. 100% if entered this turn.",
     "archetype": "unknown"
   },
   {
-    "id": 974,
+    "id": 976,
     "name": "Backstreet Boy",
     "description": "Striker + Kicking moves are Dance moves and vise-versa.",
     "archetype": "unknown"
   },
   {
-    "id": 975,
+    "id": 977,
     "name": "Backflip",
     "description": "After using a Dance move, follow up with a 50BP Chip Away.",
     "archetype": "unknown"
   },
   {
-    "id": 976,
+    "id": 978,
     "name": "Crushing Jaw",
     "description": "Strong Jaw + Biting moves have a 50% chance to lower defense.",
     "archetype": "unknown"
   },
   {
-    "id": 977,
+    "id": 979,
     "name": "Eternal Flower",
     "description": "Reduces the stats of other Megas by 20%.",
     "archetype": "unknown"
   },
   {
-    "id": 978,
+    "id": 980,
     "name": "Nihil Blaster",
     "description": "Aura Break + Mega Launcher.",
     "archetype": "unknown"
   },
   {
-    "id": 979,
+    "id": 981,
     "name": "Hollow Ice Zone",
     "description": "Ice-type moves apply Ice Statue and then make the user switch.",
     "archetype": "unknown"
   },
   {
-    "id": 980,
+    "id": 983,
     "name": "Overcast",
     "description": "Low Visibility + Sets Mist on entry.",
     "archetype": "unknown"
   },
   {
-    "id": 981,
+    "id": 982,
     "name": "Cryostasis",
     "description": "Cryomancy + Frostbite causes flinching.",
     "archetype": "unknown"
   },
   {
-    "id": 982,
+    "id": 984,
     "name": "Flower Necklace",
     "description": "This Pokémon's SpDef gets a 1.5x boost in Grassy Terrain.",
     "archetype": "unknown"
   },
   {
-    "id": 983,
+    "id": 985,
     "name": "Mega Drill",
     "description": "Mighty Horn + all Drill moves are 30% stronger.",
     "archetype": "unknown"
   },
   {
-    "id": 984,
+    "id": 986,
     "name": "Mucus Membrane",
     "description": "Takes 30% less damage from attacks + Gooey",
     "archetype": "unknown"
   },
   {
-    "id": 985,
+    "id": 964,
     "name": "Lucha Libre",
     "description": "Dazzling + Defiant.",
     "archetype": "unknown"
   },
   {
-    "id": 986,
+    "id": 988,
     "name": "Curlipede",
     "description": "Let's Roll + Coil Up",
     "archetype": "unknown"
   },
   {
-    "id": 987,
+    "id": 989,
     "name": "Storm Cloud",
     "description": "Summon rain on entry for 8 turns. Gain Electric-type STAB.",
     "archetype": "unknown"
   },
   {
-    "id": 988,
+    "id": 990,
     "name": "Waterborne",
     "description": "Aquatic + Adaptability",
     "archetype": "unknown"
   },
   {
-    "id": 989,
+    "id": 932,
     "name": "Drakelp Head",
     "description": "Weakens first move taken and drops opponent's attack.",
     "archetype": "unknown"
   },
   {
-    "id": 990,
+    "id": 933,
     "name": "Polarity",
     "description": "Increases the party's highest stat by 30%",
     "archetype": "unknown"
@@ -6163,13 +6163,13 @@ export const ER_ABILITIES: readonly ErAbilityDraft[] = [
     "archetype": "unknown"
   },
   {
-    "id": 1025,
+    "id": 1026,
     "name": "Reaper's Embarce",
     "description": "Tough Claws + Foul Energy.",
     "archetype": "unknown"
   },
   {
-    "id": 1026,
+    "id": 1025,
     "name": "Foul Energy",
     "description": "Boosts Dark-type moves by 1.2x, or 1.5x when under 1/3 HP.",
     "archetype": "unknown"

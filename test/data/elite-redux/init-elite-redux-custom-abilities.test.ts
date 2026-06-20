@@ -149,12 +149,12 @@ describe("initEliteReduxCustomAbilities (D3): archetype wire-up", () => {
     expect(attr.getLowHpMultiplier()).toBeNull();
   });
 
-  it("SPECTRAL_SHROUD (er id 387, bespoke) wires Spectralize (Normal→Ghost) + 30% Toxic chance", () => {
+  it("SPECTRAL_SHROUD (er id 386, bespoke) wires Spectralize (Normal→Ghost) + 30% Toxic chance", () => {
     // Spectral Shroud = "Spectralize + 30% chance to badly poison the foe".
     // Audit-fix: reclassified from chance-status-on-hit to bespoke so it carries
     // BOTH halves — the Spectralize identity (Normal→Ghost type conversion +
     // 1.2x boost) AND the offensive 30% Toxic chance.
-    const id = ER_ID_MAP.abilities[387];
+    const id = ER_ID_MAP.abilities[386];
     expect(id).toBeDefined();
     const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();

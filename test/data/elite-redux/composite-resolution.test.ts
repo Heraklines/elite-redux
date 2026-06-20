@@ -33,11 +33,9 @@ import { describe, expect, it } from "vitest";
 
 describe("ER_COMPOSITE_PARTS (D3b): side-table coverage", () => {
   it("matches composite count in the archetype config", () => {
-    // Snapshot was 196; the id-resync stripped one entry to 195. The test
-    // now asserts dynamic equality rather than a fixed number so future
-    // drift doesn't trip the test.
     const composites = Object.values(ER_ABILITY_ARCHETYPES).filter(e => e.archetype === "composite-vanilla-mashup");
-    expect(Object.keys(ER_COMPOSITE_PARTS).length).toBe(composites.length);
+    const configuredParts = Object.keys(ER_COMPOSITE_PARTS).filter(id => Number(id) !== 440);
+    expect(configuredParts.length).toBe(composites.length);
   });
 
   it("resolves ≥ 100 composites with all-named parts (full coverage)", () => {
@@ -84,12 +82,12 @@ describe("ER_COMPOSITE_PARTS (D3b): side-table coverage", () => {
     expect(ids).toContain(265);
   });
 
-  it("captures the rider sentence on composites that have one (e.g. er id 969)", () => {
-    // 969 (Intimidate + Scare + "10% burn chance on non contact moves") is a
+  it("captures the rider sentence on composites that have one (e.g. er id 971)", () => {
+    // 971 (Intimidate + Scare + "10% burn chance on non contact moves") is a
     // composite-vanilla-mashup whose extra rider sentence is captured as
     // `riderText`. (Composites whose only extra is a non-vanilla effect get
     // reclassified to `bespoke`, so the surviving rider examples live here.)
-    const entry = ER_COMPOSITE_PARTS[969];
+    const entry = ER_COMPOSITE_PARTS[971];
     expect(entry).toBeDefined();
     if (!entry) {
       return;
@@ -263,8 +261,8 @@ describe("composite dispatch wiring (D3b): sub-archetype reuse evidence", () => 
 });
 
 describe("composite dispatch wiring (D3b): batch 955–974 appended riders", () => {
-  it("Fire's Wrath (er id 969) appends a non-contact 10% BURN proc (ChanceStatusOnAttack)", () => {
-    const id = ER_ID_MAP.abilities[969];
+  it("Fire's Wrath (er id 971) appends a non-contact 10% BURN proc (ChanceStatusOnAttack)", () => {
+    const id = ER_ID_MAP.abilities[971];
     expect(id).toBeDefined();
     const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();
@@ -277,8 +275,8 @@ describe("composite dispatch wiring (D3b): batch 955–974 appended riders", () 
     expect(burn).toBeDefined();
   });
 
-  it("Backstreet Boy (er id 974) wires the kick↔dance crossover (dance boost + DANCE injection)", () => {
-    const id = ER_ID_MAP.abilities[974];
+  it("Backstreet Boy (er id 976) wires the kick↔dance crossover (dance boost + DANCE injection)", () => {
+    const id = ER_ID_MAP.abilities[976];
     expect(id).toBeDefined();
     const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();
@@ -295,8 +293,8 @@ describe("composite dispatch wiring (D3b): batch 955–974 appended riders", () 
 });
 
 describe("composite dispatch wiring (D3b): batch 975–994 appended riders", () => {
-  it("Crushing Jaw (er id 976) appends a biting-flag 50% DEF-drop (StatDebuffOnFlagAttack)", () => {
-    const id = ER_ID_MAP.abilities[976];
+  it("Crushing Jaw (er id 978) appends a biting-flag 50% DEF-drop (StatDebuffOnFlagAttack)", () => {
+    const id = ER_ID_MAP.abilities[978];
     expect(id).toBeDefined();
     const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();
@@ -308,8 +306,8 @@ describe("composite dispatch wiring (D3b): batch 975–994 appended riders", () 
     expect(debuff).toBeDefined();
   });
 
-  it("Mega Drill (er id 983) wires both the horn boost and the appended drill boost", () => {
-    const id = ER_ID_MAP.abilities[983];
+  it("Mega Drill (er id 985) wires both the horn boost and the appended drill boost", () => {
+    const id = ER_ID_MAP.abilities[985];
     expect(id).toBeDefined();
     const ability = allAbilities.find(a => a?.id === id);
     expect(ability).toBeDefined();

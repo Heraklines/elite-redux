@@ -5,7 +5,7 @@
 // Regression for the reported bug: "Using Thunder Shock doesn't trigger
 // Thundercall."
 //
-// Thundercall (ER ability 389) per its ROM description: "After using any
+// Thundercall (ER ability 388) per its ROM description: "After using any
 // Electric-type move, Thundercall automatically triggers a follow-up Smite
 // attack at 20% power." It is wired as a PostAttackScriptedMoveAbAttr that casts
 // MoveId.THUNDER_SHOCK (the closest vanilla analog of ER's Smite) gated on the
@@ -34,7 +34,7 @@ async function erAbility(id: number): Promise<AbilityId | undefined> {
   return erIdMap.abilities[id] as AbilityId | undefined;
 }
 
-describe.skipIf(!RUN)("ER Thundercall (389) — triggers from Thunder Shock", () => {
+describe.skipIf(!RUN)("ER Thundercall (388) — triggers from Thunder Shock", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
 
@@ -47,7 +47,7 @@ describe.skipIf(!RUN)("ER Thundercall (389) — triggers from Thunder Shock", ()
   });
 
   it("a genuine Thunder Shock by the holder casts the scripted Thunder Shock follow-up", async () => {
-    const thundercall = await erAbility(389);
+    const thundercall = await erAbility(388);
     expect(thundercall).toBeDefined();
 
     game.override
@@ -92,7 +92,7 @@ describe.skipIf(!RUN)("ER Thundercall (389) — triggers from Thunder Shock", ()
   });
 
   it("does NOT trigger from a non-Electric move (type gate intact)", async () => {
-    const thundercall = await erAbility(389);
+    const thundercall = await erAbility(388);
     expect(thundercall).toBeDefined();
 
     game.override

@@ -23,11 +23,11 @@
 // primitive cluster (entry, stat-trigger, counter-attack, post-faint, etc).
 // =============================================================================
 
-import { ER_ABILITY_ARCHETYPES } from "#data/elite-redux/er-ability-archetypes";
-import { dispatchBespoke } from "#data/elite-redux/archetype-dispatcher";
-import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { allAbilities } from "#data/data-lists";
-import { AbilityId } from "#enums/ability-id";
+import { dispatchBespoke } from "#data/elite-redux/archetype-dispatcher";
+import { ER_ABILITY_ARCHETYPES } from "#data/elite-redux/er-ability-archetypes";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import type { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
@@ -47,7 +47,7 @@ const SMOKE_SAMPLE: { erId: number; label: string }[] = [
   { erId: 313, label: "Dragonslayer (type-effectiveness-mod)" },
   { erId: 273, label: "Power Fists (flag-damage-boost)" },
   { erId: 268, label: "Chloroplast (weather-stat-multiplier)" },
-  { erId: 923, label: "Galeforce Wings (priority-modifier)" },
+  { erId: 946, label: "Galeforce Wings (priority-modifier)" },
   { erId: 634, label: "Last Stand (hp-conditional stat boost)" },
   { erId: 904, label: "Strong Foundation (force-switch-immunity)" },
 ];
@@ -84,35 +84,30 @@ describe("ER bespoke ability battle smoke (real GameManager)", () => {
   // initialization (see test/tests/abilities/intimidate.test.ts) that
   // contaminate the assertions here. The construction-smoke + verifier
   // tests above provide the same coverage signal at 1% of the cost.
-  it.skipIf(true)(
-    "wired bespoke abilities survive a one-turn battle as enemy",
-    async () => {
-      for (const sample of SMOKE_SAMPLE) {
-        const pkrgId = ER_ID_MAP.abilities[sample.erId];
-        if (pkrgId === undefined || !allAbilities[pkrgId]) {
-          continue;
-        }
-        try {
-          game.override
-            .battleStyle("single")
-            .enemySpecies(SpeciesId.RATTATA)
-            .enemyAbility(pkrgId as AbilityId)
-            .enemyMoveset(MoveId.SPLASH)
-            .hasPassiveAbility(true);
-          await game.classicMode.startBattle(SpeciesId.PIKACHU);
-          game.move.use(MoveId.TACKLE);
-          await game.toEndOfTurn();
-        } catch (err) {
-          throw new Error(`${sample.label} crashed in battle: ${err}`);
-        }
+  it.skipIf(true)("wired bespoke abilities survive a one-turn battle as enemy", async () => {
+    for (const sample of SMOKE_SAMPLE) {
+      const pkrgId = ER_ID_MAP.abilities[sample.erId];
+      if (pkrgId === undefined || !allAbilities[pkrgId]) {
+        continue;
       }
-    },
-  );
+      try {
+        game.override
+          .battleStyle("single")
+          .enemySpecies(SpeciesId.RATTATA)
+          .enemyAbility(pkrgId as AbilityId)
+          .enemyMoveset(MoveId.SPLASH)
+          .hasPassiveAbility(true);
+        await game.classicMode.startBattle(SpeciesId.PIKACHU);
+        game.move.use(MoveId.TACKLE);
+        await game.toEndOfTurn();
+      } catch (err) {
+        throw new Error(`${sample.label} crashed in battle: ${err}`);
+      }
+    }
+  });
 
   it("classifies coverage across all bespoke abilities", () => {
-    const bespoke = Object.values(ER_ABILITY_ARCHETYPES).filter(
-      e => e.archetype === "bespoke" && e.erAbilityId > 0,
-    );
+    const bespoke = Object.values(ER_ABILITY_ARCHETYPES).filter(e => e.archetype === "bespoke" && e.erAbilityId > 0);
     let wired = 0;
     let skipped = 0;
     for (const entry of bespoke) {
