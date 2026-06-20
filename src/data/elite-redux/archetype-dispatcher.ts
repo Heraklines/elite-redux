@@ -6694,16 +6694,23 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         }),
       ]);
     case 842:
-      // Festivities — "Sound moves are also treated as dance moves, benefiting
-      // from Dancer-type abilities."
-      // Faithful read: re-tag the holder's OWN sound moves with the DANCE flag so
-      // that OTHER battlers' Dancer-type abilities copy them. It does NOT grant
-      // the holder Dancer itself - the previous PostDancingMoveAbAttr made
-      // Festivities wrongly "act like Dancer" (#449), so it is removed. (The
-      // "dance moves also count as sound" direction is engine-limited: SOUND
-      // consumers like Soundproof / Punk Rock read the static hasFlag, which an
-      // AbAttr injection cannot reach - see move-flag-injection.ts.)
-      return ok([new MoveFlagInjectionAbAttr(MoveFlags.DANCE_MOVE, "sound-moves")]);
+      // Festivities — "Sound moves become dance moves and vice versa." Both
+      // directions (the dex is bidirectional):
+      //   - SOUND -> DANCE: the holder's sound moves count as dance, so OTHER
+      //     battlers' Dancer-type abilities copy them.
+      //   - DANCE -> SOUND: the holder's dance moves count as sound, so they
+      //     benefit from / are subject to sound-based abilities (Punk Rock boost,
+      //     Soundproof immunity, Liquid Voice) and bypass Substitute.
+      // It does NOT grant the holder Dancer itself - the previous
+      // PostDancingMoveAbAttr made Festivities wrongly "act like Dancer" (#449),
+      // so that is gone. Both halves work because their consumers route through
+      // Move.doesFlagEffectApply (the user-aware flag check), which honors these
+      // injections - the SOUND consumers were switched off the static hasFlag for
+      // exactly this (see init-abilities Soundproof/Punk Rock/Liquid Voice).
+      return ok([
+        new MoveFlagInjectionAbAttr(MoveFlags.DANCE_MOVE, "sound-moves"),
+        new MoveFlagInjectionAbAttr(MoveFlags.SOUND_BASED, "dance-moves"),
+      ]);
     case 866:
       // Relic Stone — "Other battlers don't benefit from STAB."
       return ok([new StabSuppressAuraAbAttr()]);

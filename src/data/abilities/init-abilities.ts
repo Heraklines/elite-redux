@@ -472,7 +472,10 @@ export function initAbilities() {
     new AbBuilder(AbilityId.SOUNDPROOF, 3) //
       .attr(
         MoveImmunityAbAttr,
-        (pokemon, attacker, move) => pokemon !== attacker && move.hasFlag(MoveFlags.SOUND_BASED),
+        // doesFlagEffectApply (not raw hasFlag) so ER's Festivities, which makes
+        // the user's dance moves count as sound, is honored here too.
+        (pokemon, attacker, move) =>
+          pokemon !== attacker && move.doesFlagEffectApply({ flag: MoveFlags.SOUND_BASED, user: attacker }),
       )
       .ignorable()
       .build(),
@@ -1447,7 +1450,8 @@ export function initAbilities() {
         MoveTypeChangeAbAttr,
         PokemonType.WATER,
         (user, target, move) =>
-          move.hasFlag(MoveFlags.SOUND_BASED) && anyTypeMoveConversionCondition(user, target, move),
+          move.doesFlagEffectApply({ flag: MoveFlags.SOUND_BASED, user })
+          && anyTypeMoveConversionCondition(user, target, move),
       )
       .build(),
     new AbBuilder(AbilityId.TRIAGE, 7) //
@@ -1772,8 +1776,18 @@ export function initAbilities() {
       )
       .build(),
     new AbBuilder(AbilityId.PUNK_ROCK, 8) //
-      .attr(MovePowerBoostAbAttr, (_user, _target, move) => move.hasFlag(MoveFlags.SOUND_BASED), 1.3)
-      .attr(ReceivedMoveDamageMultiplierAbAttr, (_target, _user, move) => move.hasFlag(MoveFlags.SOUND_BASED), 0.5)
+      // doesFlagEffectApply (user-aware) so ER Festivities' dance->sound moves get
+      // Punk Rock's boost (offensive) and damage reduction (defensive) too.
+      .attr(
+        MovePowerBoostAbAttr,
+        (user, _target, move) => move.doesFlagEffectApply({ flag: MoveFlags.SOUND_BASED, user }),
+        1.3,
+      )
+      .attr(
+        ReceivedMoveDamageMultiplierAbAttr,
+        (_target, user, move) => move.doesFlagEffectApply({ flag: MoveFlags.SOUND_BASED, user }),
+        0.5,
+      )
       .ignorable()
       .build(),
     new AbBuilder(AbilityId.SAND_SPIT, 8) //

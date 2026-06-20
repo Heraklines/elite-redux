@@ -968,6 +968,13 @@ export abstract class Move implements Localizable {
         // moves). Scanned by name (registration-free). Consumers that route
         // their flag check through `doesFlagEffectApply` (the user-aware path)
         // therefore respect the injected flag.
+        // Defensive: SOUND/DANCE consumers (Soundproof, Punk Rock, Liquid Voice)
+        // route through here, and damage/AI helpers can reach them with a null
+        // user (e.g. simulated/preview calcs). No user -> no injection; fall back
+        // to the static flag instead of dereferencing null (would freeze the turn).
+        if (!user) {
+          break;
+        }
         const injectAttrs = user.getAllActiveAbilityAttrs();
         for (const attr of injectAttrs) {
           if (

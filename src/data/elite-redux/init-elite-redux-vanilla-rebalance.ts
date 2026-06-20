@@ -1115,7 +1115,14 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   [
     AbilityId.LIQUID_VOICE,
     ab => {
-      ab.attrs.push(new MovePowerBoostAbAttr((_user, _t, move) => !!move && move.hasFlag(MoveFlags.SOUND_BASED), 1.2));
+      // doesFlagEffectApply (user-aware) so ER Festivities' dance->sound moves
+      // also get this boost.
+      ab.attrs.push(
+        new MovePowerBoostAbAttr(
+          (user, _t, move) => !!move && move.doesFlagEffectApply({ flag: MoveFlags.SOUND_BASED, user }),
+          1.2,
+        ),
+      );
     },
   ],
 
