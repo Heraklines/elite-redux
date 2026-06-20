@@ -1,0 +1,283 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:72  difficulty:youngster
+seed:     PQLb9SgZgt5tUseKOAyuUlhR
+party:    Vanilluxe(L54 181/194), Kecleon(L58 66/132), Sagaracas(L51 153/153), Marowak(L56 149/149), Azumarill(L57 153/153), Steelix(L56 103/103)
+
+----- DESCRIPTION -----
+Multi-headed on Mega Vanillish should go for the max 3 hits but only hits 2 times. it should hit for 15% then 10%
+
+----- CONSOLE -----
+[23:33:56.063] LOG: Move Scores: [-7,30,15,-1.75]
+[23:33:56.063] LOG: Sorted Move Pool: ["Earth Power","Steel Beam","Rock Wrecker","Shore Up"]
+[23:33:56.063] LOG: Chosen Move: Earth Power
+[23:33:56.063] LOG: %cStart Phase TurnStartPhase color:green;
+[23:33:56.064] LOG: %cStart Phase MovePhase color:green;
+[23:33:56.064] LOG: %cUser: Mega Vanilluxe
+Move: AURORA_VEIL
+Use Mode: NORMAL color:orchid
+[23:33:56.066] LOG: %cStart Phase MessagePhase color:green;
+[23:33:56.174] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:33:57.147] LOG: %cStart Phase MessagePhase color:green;
+[23:33:57.458] LOG: %cStart Phase MoveEndPhase color:green;
+[23:33:57.459] LOG: %cStart Phase MovePhase color:green;
+[23:33:57.459] LOG: %cUser: Mega Vanilluxe
+Move: BLIZZARD
+Use Mode: INDIRECT color:orchid
+[23:33:57.462] LOG: %cStart Phase MessagePhase color:green;
+[23:33:57.591] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:33:57.608] LOG: Applied Dire Hit 
+[23:33:57.609] LOG: crit stage: +1
+[23:33:57.610] LOG: Move: Blizzard | Base damage: 27.260431654676257 | Power: 50 | Source attack: 154 | Target defense: 139
+[23:33:57.611] LOG: Move: Blizzard | Attack damage: 39
+[23:33:57.612] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:33:57.643] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:33:57.827] LOG: %cStart Phase MessagePhase color:green;
+[23:33:58.058] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:33:58.076] LOG: Applied Dire Hit 
+[23:33:58.077] LOG: crit stage: +1
+[23:33:58.079] LOG: Move: Blizzard | Base damage: 27.260431654676257 | Power: 50 | Source attack: 154 | Target defense: 139
+[23:33:58.080] LOG: Move: Blizzard | Attack damage: 10
+[23:33:58.082] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:33:58.110] LOG: %cStart Phase MessagePhase color:green;
+[23:33:58.324] LOG: %cStart Phase MoveEndPhase color:green;
+[23:33:58.325] LOG: %cStart Phase MovePhase color:green;
+[23:33:58.325] LOG: %cUser: Steelix
+Move: EARTH_POWER
+Use Mode: NORMAL color:orchid
+[23:33:58.331] LOG: %cStart Phase MessagePhase color:green;
+[23:33:58.474] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:33:59.512] LOG: crit stage: +0
+[23:33:59.515] LOG: Move: Earth Power | Base damage: 135.75636363636363 | Power: 90 | Source attack: 402 | Target defense: 132
+[23:33:59.516] LOG: Move: Earth Power | Attack damage: 88
+[23:33:59.517] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:33:59.544] LOG: %cStart Phase MoveEndPhase color:green;
+[23:33:59.544] LOG: %cStart Phase CheckInterludePhase color:green;
+[23:33:59.544] LOG: %cStart Phase WeatherEffectPhase color:green;
+[23:34:00.124] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:34:00.293] LOG: %cStart Phase PokemonHealPhase color:green;
+[23:34:00.509] LOG: Applied Healing Charm 
+[23:34:00.511] LOG: %cStart Phase MessagePhase color:green;
+[23:34:00.774] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:34:00.809] LOG: %cStart Phase PositionalTagPhase color:green;
+[23:34:00.809] LOG: %cStart Phase BerryPhase color:green;
+[23:34:00.811] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[23:34:00.811] LOG: %cStart Phase TurnEndPhase color:green;
+[23:34:00.829] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:34:01.008] LOG: %cStart Phase PokemonHealPhase color:green;
+[23:34:01.218] LOG: %cStart Phase MessagePhase color:green;
+[23:34:01.507] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:34:01.543] LOG: %cStart Phase TurnInitPhase color:green;
+[23:34:01.544] LOG: %cStart Phase CommandPhase color:green;
+[23:34:02.598] LOG: Move: DRAIN_BRAIN Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega Vanilluxe
+[23:34:02.600] LOG: %cStart Phase EnemyCommandPhase color:green;
+[23:34:02.605] LOG: Battle Seed: v55nOPod28UnpX1F
+[23:34:02.608] LOG: Move Pool: ["Shore Up","Earth Power","Steel Beam","Rock Wrecker"]
+[23:34:02.608] LOG: Move Scores: [3,30,15,-1.75]
+[23:34:02.608] LOG: Sorted Move Pool: ["Earth Power","Steel Beam","Shore Up","Rock Wrecker"]
+[23:34:02.608] LOG: Chosen Move: Steel Beam
+[23:34:02.608] LOG: %cStart Phase TurnStartPhase color:green;
+[23:34:02.609] LOG: %cStart Phase MovePhase color:green;
+[23:34:02.609] LOG: %cUser: Mega Vanilluxe
+Move: DRAIN_BRAIN
+Use Mode: NORMAL color:orchid
+[23:34:02.610] LOG: %cStart Phase MessagePhase color:green;
+[23:34:02.740] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:34:03.480] LOG: %cStart Phase PokemonHealPhase color:green;
+[23:34:03.480] LOG: Applied Healing Charm 
+[23:34:03.483] LOG: %cStart Phase MessagePhase color:green;
+[23:34:03.741] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:34:03.927] LOG: %cStart Phase MessagePhase color:green;
+[23:34:04.175] LOG: %cStart Phase MoveEndPhase color:green;
+[23:34:04.175] LOG: %cStart Phase MovePhase color:green;
+[23:34:04.175] LOG: %cUser: Steelix
+Move: STEEL_BEAM
+Use Mode: NORMAL color:orchid
+[23:34:04.181] LOG: %cStart Phase MessagePhase color:green;
+[23:34:04.324] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:34:05.176] LOG: crit stage: +0
+[23:34:05.179] LOG: Move: Steel Beam | Base damage: 140.71030303030304 | Power: 140 | Source attack: 268 | Target defense: 132
+[23:34:05.180] LOG: Move: Steel Beam | Attack damage: 50
+[23:34:05.181] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:34:05.209] LOG: %cStart Phase MessagePhase color:green;
+[23:34:05.440] LOG: %cStart Phase MoveEndPhase color:green;
+[23:34:05.441] LOG: %cStart Phase CheckInterludePhase color:green;
+[23:34:05.441] LOG: %cStart Phase WeatherEffectPhase color:green;
+[23:34:06.007] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:34:06.177] LOG: %cStart Phase PokemonHealPhase color:green;
+[23:34:06.408] LOG: Applied Healing Charm 
+[23:34:06.410] LOG: %cStart Phase MessagePhase color:green;
+[23:34:06.691] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:34:06.727] LOG: %cStart Phase PositionalTagPhase color:green;
+[23:34:06.727] LOG: %cStart Phase BerryPhase color:green;
+[23:34:06.730] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[23:34:06.731] LOG: %cStart Phase TurnEndPhase color:green;
+[23:34:06.749] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:34:06.927] LOG: %cStart Phase PokemonHealPhase color:green;
+[23:34:07.159] LOG: %cStart Phase MessagePhase color:green;
+[23:34:07.441] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:34:07.476] LOG: %cStart Phase TurnInitPhase color:green;
+[23:34:07.477] LOG: %cStart Phase CommandPhase color:green;
+[23:34:09.749] LOG: Move: CALM_MIND Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Mega Vanilluxe
+[23:34:09.751] LOG: %cStart Phase EnemyCommandPhase color:green;
+[23:34:09.758] LOG: Battle Seed: v55nOPod28UnpX1F
+[23:34:09.762] LOG: Move Pool: ["Shore Up","Earth Power","Steel Beam","Rock Wrecker"]
+[23:34:09.762] LOG: Move Scores: [2,30,15,-1.75]
+[23:34:09.762] LOG: Sorted Move Pool: ["Earth Power","Steel Beam","Shore Up","Rock Wrecker"]
+[23:34:09.762] LOG: Chosen Move: Earth Power
+[23:34:09.762] LOG: %cStart Phase TurnStartPhase color:green;
+[23:34:09.763] LOG: %cStart Phase MovePhase color:green;
+[23:34:09.763] LOG: %cUser: Mega Vanilluxe
+Move: CALM_MIND
+Use Mode: NORMAL color:orchid
+[23:34:09.764] LOG: %cStart Phase MessagePhase color:green;
+[23:34:09.874] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:34:10.361] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:34:10.361] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:34:10.545] LOG: %cStart Phase MessagePhase color:green;
+[23:34:10.774] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:34:10.962] LOG: %cStart Phase MessagePhase color:green;
+[23:34:11.207] LOG: %cStart Phase MoveEndPhase color:green;
+[23:34:11.208] LOG: %cStart Phase MovePhase color:green;
+[23:34:11.208] LOG: %cUser: Steelix
+Move: EARTH_POWER
+Use Mode: NORMAL color:orchid
+[23:34:11.211] LOG: %cStart Phase MessagePhase color:green;
+[23:34:11.357] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:34:12.393] LOG: crit stage: +0
+[23:34:12.395] LOG: Move: Earth Power | Base damage: 61.44727272727273 | Power: 90 | Source attack: 268 | Target defense: 198
+[23:34:12.396] LOG: Move: Earth Power | Attack damage: 39
+[23:34:12.397] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:34:12.426] LOG: %cStart Phase MoveEndPhase color:green;
+[23:34:12.427] LOG: %cStart Phase CheckInterludePhase color:green;
+[23:34:12.427] LOG: %cStart Phase WeatherEffectPhase color:green;
+[23:34:13.007] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:34:13.176] LOG: %cStart Phase PokemonHealPhase color:green;
+[23:34:13.392] LOG: Applied Healing Charm 
+[23:34:13.394] LOG: %cStart Phase MessagePhase color:green;
+[23:34:13.674] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:34:13.709] LOG: %cStart Phase PositionalTagPhase color:green;
+[23:34:13.709] LOG: %cStart Phase BerryPhase color:green;
+[23:34:13.711] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[23:34:13.712] LOG: %cStart Phase TurnEndPhase color:green;
+[23:34:13.732] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:34:13.909] LOG: %cStart Phase PokemonHealPhase color:green;
+[23:34:14.127] LOG: %cStart Phase MessagePhase color:green;
+[23:34:14.408] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:34:14.441] LOG: %cStart Phase TurnInitPhase color:green;
+[23:34:14.442] LOG: %cStart Phase CommandPhase color:green;
+[23:34:15.330] LOG: Move: GLACIATE Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Mega Vanilluxe
+[23:34:15.333] LOG: %cStart Phase EnemyCommandPhase color:green;
+[23:34:15.340] LOG: Battle Seed: v55nOPod28UnpX1F
+[23:34:15.344] LOG: Move Pool: ["Shore Up","Earth Power","Steel Beam","Rock Wrecker"]
+[23:34:15.344] LOG: Move Scores: [0,30,15,-1.75]
+[23:34:15.344] LOG: Sorted Move Pool: ["Earth Power","Steel Beam","Shore Up","Rock Wrecker"]
+[23:34:15.344] LOG: Chosen Move: Earth Power
+[23:34:15.344] LOG: %cStart Phase TurnStartPhase color:green;
+[23:34:15.346] LOG: %cStart Phase MovePhase color:green;
+[23:34:15.346] LOG: %cUser: Mega Vanilluxe
+Move: GLACIATE
+Use Mode: NORMAL color:orchid
+[23:34:15.347] LOG: %cStart Phase MessagePhase color:green;
+[23:34:15.458] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:34:16.700] LOG: Applied Dire Hit 
+[23:34:16.700] LOG: crit stage: +1
+[23:34:16.701] LOG: Move: Glaciate | Base damage: 62.62503597122302 | Power: 80 | Source attack: 231 | Target defense: 139
+[23:34:16.702] LOG: Move: Glaciate | Attack damage: 91
+[23:34:16.702] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:34:16.735] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:34:16.919] LOG: %cStart Phase MessagePhase color:green;
+[23:34:17.175] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:34:17.353] LOG: %cStart Phase MessagePhase color:green;
+[23:34:17.591] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:34:18.826] LOG: Applied Dire Hit 
+[23:34:18.827] LOG: crit stage: +1
+[23:34:18.828] LOG: Move: Glaciate | Base damage: 62.62503597122302 | Power: 80 | Source attack: 231 | Target defense: 139
+[23:34:18.829] LOG: Move: Glaciate | Attack damage: 20
+[23:34:18.830] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:34:18.862] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:34:19.044] LOG: %cStart Phase MessagePhase color:green;
+[23:34:19.275] LOG: %cStart Phase MessagePhase color:green;
+[23:34:19.474] LOG: %cStart Phase MoveEndPhase color:green;
+[23:34:19.476] LOG: %cStart Phase MovePhase color:green;
+[23:34:19.477] LOG: %cUser: Mega Vanilluxe
+Move: BLIZZARD
+Use Mode: INDIRECT color:orchid
+[23:34:19.479] LOG: %cStart Phase MessagePhase color:green;
+[23:34:19.608] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:34:19.626] LOG: Applied Dire Hit 
+[23:34:19.627] LOG: crit stage: +1
+[23:34:19.630] LOG: Move: Blizzard | Base damage: 39.89064748201439 | Power: 50 | Source attack: 231 | Target defense: 139
+[23:34:19.631] LOG: Move: Blizzard | Attack damage: 55
+[23:34:19.633] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:34:19.661] LOG: %cStart Phase MessagePhase color:green;
+[23:34:19.874] LOG: %cStart Phase FaintPhase color:green;
+[23:34:22.077] LOG: %cStart Phase MessagePhase color:green;
+[23:34:22.406] LOG: %cStart Phase VictoryPhase color:green;
+[23:34:22.406] LOG: Applied Soothe Bell 
+[23:34:22.407] LOG: %cStart Phase ExpPhase color:green;
+[23:34:22.407] LOG: Applied Super EXP. Charm 
+[23:34:22.407] LOG: Applied EXP. Charm 
+[23:34:22.960] LOG: %cStart Phase LevelUpPhase color:green;
+[23:34:22.961] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:34:22.961] LOG: Applied Super EXP. Charm 
+[23:34:22.962] LOG: Applied EXP. Charm 
+[23:34:22.962] LOG: %cStart Phase LevelUpPhase color:green;
+[23:34:22.962] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:34:22.962] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:34:22.963] LOG: Applied Super EXP. Charm 
+[23:34:22.963] LOG: Applied EXP. Charm 
+[23:34:22.963] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:34:22.963] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:34:22.963] LOG: Applied Super EXP. Charm 
+[23:34:22.963] LOG: Applied EXP. Charm 
+[23:34:22.963] LOG: %cStart Phase LevelUpPhase color:green;
+[23:34:22.964] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[23:34:30.294] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:34:30.294] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:34:30.295] LOG: Applied Super EXP. Charm 
+[23:34:30.295] LOG: Applied EXP. Charm 
+[23:34:30.295] LOG: %cStart Phase LevelUpPhase color:green;
+[23:34:30.296] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:34:30.296] LOG: %cStart Phase MoveEndPhase color:green;
+[23:34:30.296] LOG: %cStart Phase MovePhase color:green;
+[23:34:30.296] LOG: %cStart Phase MoveEndPhase color:green;
+[23:34:30.296] LOG: %cStart Phase CheckInterludePhase color:green;
+[23:34:30.296] LOG: %cStart Phase WeatherEffectPhase color:green;
+[23:34:30.841] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:34:31.009] LOG: %cStart Phase PokemonHealPhase color:green;
+[23:34:31.241] LOG: Applied Healing Charm 
+[23:34:31.243] LOG: %cStart Phase MessagePhase color:green;
+[23:34:31.525] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:34:31.560] LOG: %cStart Phase PositionalTagPhase color:green;
+[23:34:31.560] LOG: %cStart Phase BerryPhase color:green;
+[23:34:31.560] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[23:34:31.561] LOG: %cStart Phase TurnEndPhase color:green;
+[23:34:31.579] LOG: %cStart Phase BattleEndPhase color:green;
+[23:34:31.579] LOG: Battle Score: 243 (4 Turns x0.76)
+[23:34:31.579] LOG: Total Score: 10456
+[23:34:31.588] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[23:34:31.592] LOG: %cStart Phase MessagePhase color:green;
+[23:34:32.258] LOG: %cStart Phase MessagePhase color:green;
+[23:34:32.948] LOG: %cStart Phase SelectModifierPhase color:green;
+[23:34:32.949] LOG: Wave Seed: ª¯¢¯¼}¼»­Á½´° 72
+[23:34:32.956] LOG: Applied Golden Poké Ball 
+[23:34:32.956] LOG: 0 0 [4,5]
+[23:34:32.956] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[23:34:32.956] LOG: 2 0 [4,5]
+[23:34:32.956] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[23:34:32.956] LOG: 14 9 [2,3,4,5,6,7,8,9,10,23]
+[23:34:32.956] LOG: GREAT 0
+[23:34:32.957] LOG: 11 9 [2,3,4,5,6,7,8,9,10,23]
+[23:34:32.957] LOG: {"id":"DIRE_HIT","localeKey":"modifierType:ModifierType.DIRE_HIT","iconImage":"dire_hit","soundName":"se/restore","tier":1} 
+[23:34:32.957] LOG: 7 2 [4,5]
+[23:34:32.957] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_def","soundName":"se/restore","tier":0,"stat":4,"nameKey":"x_sp_def","quantityKey":"percentage"} 
+[23:34:32.957] LOG: 1 0 [4,5]
+[23:34:32.957] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[23:34:32.957] LOG: 9 2 [4,5]
+[23:34:32.958] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_fairy","group":"tm","soundName":"se/restore","tier":0,"moveId":581} 
