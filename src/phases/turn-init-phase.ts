@@ -36,13 +36,23 @@ export class TurnInitPhase extends FieldPhase {
     }
 
     globalScene.getPlayerField().forEach(p => {
-      // If this pokemon is in play and evolved into something illegal under the current challenge, force a switch
+      // If this pokemon is in play and can't legally be here, force a switch.
+      // isAllowedInBattle() is `!isFainted() && isAllowedInChallenge()`, so a mon
+      // that merely FAINTED (but is otherwise challenge-legal) also lands here and
+      // is cleaned off the field - but it must NOT be announced as "ineligible for
+      // this challenge". That challenge-worded notice only applies when the mon is
+      // actually illegal under a challenge (e.g. evolved into a banned form);
+      // showing it for a fainted lead was wrong, and doubly so since ER difficulty
+      // tiers (Youngster/Ace/Elite/Hell) aren't challenges at all. (Scyther Redux
+      // report: a fainted lead mislabeled "ineligible for the challenge".)
       if (p.isOnField() && !p.isAllowedInBattle()) {
-        globalScene.phaseManager.queueMessage(
-          i18next.t("challenges:illegalEvolution", { pokemon: p.name }),
-          null,
-          true,
-        );
+        if (!p.isAllowedInChallenge()) {
+          globalScene.phaseManager.queueMessage(
+            i18next.t("challenges:illegalEvolution", { pokemon: p.name }),
+            null,
+            true,
+          );
+        }
 
         const allowedPokemon = globalScene.getPokemonAllowedInBattle();
 

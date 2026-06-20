@@ -4610,6 +4610,29 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Fainted lead not 'ineligible for challenge'",
+    description:
+      "Bugfix (hard to stage in one battle). When an on-field player mon can't\n"
+      + "legally be there, turn-init switches it out. The gate is isAllowedInBattle()\n"
+      + "= !isFainted() && isAllowedInChallenge(), so a mon that merely FAINTED also\n"
+      + "tripped it - and was wrongly announced as 'changed into an ineligible Pokemon\n"
+      + "for this challenge!' (reported: a fainted Scyther Redux on the field, with NO\n"
+      + "challenge active - ER difficulty tiers like Elite are not challenges). FIX:\n"
+      + "that challenge-worded message now shows ONLY when the mon is genuinely illegal\n"
+      + "under a challenge (!isAllowedInChallenge()); a fainted lead is switched out\n"
+      + "silently. CHECK: if you ever see 'ineligible ... for this challenge' when a mon\n"
+      + "simply fainted (and you are not in a Mono-Gen/Type/Color challenge), that is\n"
+      + "the regression - it must never appear.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SCYTHER, {
+          moveset: [MoveId.X_SCISSOR, MoveId.AERIAL_ACE, MoveId.SWORDS_DANCE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Save loss on refresh/Continue",
     description:
       "Save-loss fix (not battle-testable). Runs were vanishing on refresh and\n"
@@ -7001,6 +7024,77 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [
         makeStarter(SpeciesId.GENGAR, {
           moveset: [MoveId.SPLASH, MoveId.SHADOW_BALL, MoveId.PROTECT, MoveId.CONFUSE_RAY],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Wonder Skin boost block",
+    description:
+      "IDs 147/341/486/827 - blocks opponent damage-boosting and added-hit\n"
+      + "abilities without reducing ordinary damage. DO: compare enemy Crunch\n"
+      + "and Tackle. EXPECT: Strong Jaw does not boost Crunch; Tackle is not reduced.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: AbilityId.WONDER_SKIN,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.STRONG_JAW,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.CRUNCH, MoveId.TACKLE, MoveId.BITE, MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SHUCKLE, {
+          moveset: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.HARDEN],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Sand Force highest attack",
+    description:
+      "IDs 159/744/900 - in sand, Sand Force multiplies only the holder's higher\n"
+      + "calculated attacking stat by 1.5 and grants sand immunity. DO: compare\n"
+      + "physical and special moves. EXPECT: the higher Attack is boosted regardless of move type.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        WEATHER_OVERRIDE: WeatherType.SANDSTORM,
+        ABILITY_OVERRIDE: AbilityId.SAND_FORCE,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.EXCADRILL, {
+          moveset: [MoveId.IRON_HEAD, MoveId.EARTH_POWER, MoveId.BRICK_BREAK, MoveId.FLASH_CANNON],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Berserk single trigger",
+    description:
+      "IDs 201/661/992 - an opposing attack crossing half HP raises only the\n"
+      + "higher calculated attacking stat by one stage, once per battle. DO:\n"
+      + "let Snorlax attack through half HP, heal, and cross again. EXPECT: only Attack rises once.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: AbilityId.BERSERK,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.BODY_SLAM, MoveId.TACKLE, MoveId.SPLASH, MoveId.PROTECT],
+      });
+      return [
+        makeStarter(SpeciesId.TAUROS, {
+          moveset: [MoveId.REST, MoveId.SLEEP_TALK, MoveId.TACKLE, MoveId.PROTECT],
         }),
       ];
     },
