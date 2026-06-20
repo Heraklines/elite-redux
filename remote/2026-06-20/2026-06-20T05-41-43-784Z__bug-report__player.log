@@ -1,0 +1,275 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 OPR/132.0.0.0
+mode:     0  wave:19  difficulty:elite
+seed:     rWTGcgN1IaAlmEwTd5f8WTdP
+party:    Honedge Redux(L10 32/32), Merrykarp(L13 0/37), Blocli(L10 34/34), Scyther Redux(L14 0/47), Noibat Redux(L10 33/33), Turtwig Redux(L14 12/44)
+
+----- DESCRIPTION -----
+Redux Scyther fainted, then did the encounter with the Oddish. Stated that my scyther was ineligible for the challenge and then this kind of happened.
+
+----- CONSOLE -----
+[05:38:10.384] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:38:10.384] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:38:10.384] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:38:10.384] LOG: %cStart Phase BerryPhase color:green;
+[05:38:10.384] LOG: Applied X Speed 
+[05:38:10.384] LOG: Applied X Speed 
+[05:38:10.384] LOG: Applied X Speed 
+[05:38:10.384] LOG: Applied X Speed 
+[05:38:10.384] LOG: Applied X Speed 
+[05:38:10.384] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:38:10.385] LOG: Applied X Speed 
+[05:38:10.385] LOG: Applied X Speed 
+[05:38:10.385] LOG: Applied X Speed 
+[05:38:10.385] LOG: Applied X Speed 
+[05:38:10.385] LOG: Applied X Speed 
+[05:38:10.385] LOG: %cStart Phase TurnEndPhase color:green;
+[05:38:10.385] LOG: Applied X Speed 
+[05:38:10.385] LOG: Applied X Speed 
+[05:38:10.385] LOG: Applied X Speed 
+[05:38:10.385] LOG: Applied X Speed 
+[05:38:10.386] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:38:10.701] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:38:11.051] LOG: %cStart Phase MessagePhase color:green;
+[05:38:11.500] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:38:11.551] LOG: %cStart Phase TurnInitPhase color:green;
+[05:38:11.551] LOG: %cStart Phase CommandPhase color:green;
+[05:38:34.224] LOG: Move: SLUDGE_BOMB Move targets: {"targets":[3,1],"multiple":false} 
+Player Pokemon: Scyther Redux
+[05:38:34.225] LOG: %cStart Phase SelectTargetPhase color:green;
+[05:38:34.349] LOG: %cStart Phase CommandPhase color:green;
+[05:38:36.458] LOG: Move: AUTOTOMIZE Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Honedge Redux
+[05:38:36.459] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:38:36.459] LOG: Battle Seed: lmPngqf8ssGrIcQn
+[05:38:36.459] LOG: Move Pool: ["Encore","Destiny Bond"]
+[05:38:36.459] LOG: Move Scores: [2,-20]
+[05:38:36.459] LOG: Sorted Move Pool: ["Encore","Destiny Bond"]
+[05:38:36.459] LOG: Chosen Move: Encore
+[05:38:36.459] LOG: %cStart Phase TurnStartPhase color:green;
+[05:38:36.459] LOG: Applied X Speed 
+[05:38:36.459] LOG: Applied X Speed 
+[05:38:36.460] LOG: Applied X Speed 
+[05:38:36.460] LOG: Applied X Speed 
+[05:38:36.460] LOG: Applied X Speed 
+[05:38:36.460] LOG: Applied X Speed 
+[05:38:36.460] LOG: Applied X Speed 
+[05:38:36.461] LOG: Applied X Speed 
+[05:38:36.461] LOG: Applied X Speed 
+[05:38:36.461] LOG: Applied X Speed 
+[05:38:36.461] LOG: Applied X Speed 
+[05:38:36.461] LOG: %cStart Phase MovePhase color:green;
+[05:38:36.461] LOG: %cUser: Scyther Redux
+Move: SLUDGE_BOMB
+Use Mode: NORMAL color:orchid
+[05:38:36.461] LOG: Applied X Speed 
+[05:38:36.461] LOG: Applied X Speed 
+[05:38:36.461] LOG: Applied X Speed 
+[05:38:36.461] LOG: Applied X Speed 
+[05:38:36.462] LOG: Applied X Speed 
+[05:38:36.462] LOG: Applied X Speed 
+[05:38:36.462] LOG: Applied X Speed 
+[05:38:36.462] LOG: Applied X Speed 
+[05:38:36.462] LOG: %cStart Phase MessagePhase color:green;
+[05:38:36.668] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:38:37.301] LOG: crit stage: +0
+[05:38:37.301] LOG: Applied X Speed 
+[05:38:37.301] LOG: Applied X Speed 
+[05:38:37.302] LOG: Move: Sludge Bomb | Base damage: 30.96941176470588 | Power: 90 | Source attack: 36 | Target defense: 17
+[05:38:37.303] LOG: Move: Sludge Bomb | Attack damage: 90
+[05:38:37.304] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:38:37.618] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:38:37.685] LOG: %cStart Phase MessagePhase color:green;
+[05:38:38.267] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:38:38.302] LOG: %cStart Phase MessagePhase color:green;
+[05:38:38.684] LOG: %cStart Phase FaintPhase color:green;
+[05:38:40.184] LOG: %cStart Phase MessagePhase color:green;
+[05:38:40.717] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:38:41.752] LOG: %cStart Phase MessagePhase color:green;
+[05:38:42.214] LOG: %cStart Phase VictoryPhase color:green;
+[05:38:42.214] LOG: %cStart Phase ExpPhase color:green;
+[05:38:42.214] LOG: Applied Super EXP. Charm 
+[05:38:42.214] LOG: Applied EXP. Charm 
+[05:38:42.852] LOG: %cStart Phase LevelUpPhase color:green;
+[05:38:42.854] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:38:42.854] LOG: Applied Super EXP. Charm 
+[05:38:42.855] LOG: Applied EXP. Charm 
+[05:38:42.855] LOG: %cStart Phase LevelUpPhase color:green;
+[05:38:42.856] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:38:42.856] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:38:42.856] LOG: Applied Super EXP. Charm 
+[05:38:42.856] LOG: Applied EXP. Charm 
+[05:38:42.856] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:38:42.856] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:38:42.856] LOG: Applied Super EXP. Charm 
+[05:38:42.856] LOG: Applied EXP. Charm 
+[05:38:42.857] LOG: %cStart Phase LevelUpPhase color:green;
+[05:38:42.857] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:38:42.857] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:38:42.857] LOG: Applied Super EXP. Charm 
+[05:38:42.857] LOG: Applied EXP. Charm 
+[05:38:42.857] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:38:42.857] LOG: %cStart Phase FaintPhase color:green;
+[05:38:42.857] WARN: cry/10827 not found
+[05:38:42.984] LOG: %cStart Phase MessagePhase color:green;
+[05:38:43.313] LOG: %cStart Phase MoveEndPhase color:green;
+[05:38:43.313] LOG: Applied X Speed 
+[05:38:43.313] LOG: %cStart Phase MovePhase color:green;
+[05:38:43.313] LOG: %cUser: Honedge Redux
+Move: AUTOTOMIZE
+Use Mode: NORMAL color:orchid
+[05:38:43.314] LOG: %cStart Phase MessagePhase color:green;
+[05:38:43.550] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:38:44.135] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:38:44.501] LOG: %cStart Phase MessagePhase color:green;
+[05:38:44.967] LOG: %cStart Phase MessagePhase color:green;
+[05:38:45.401] LOG: %cStart Phase MoveEndPhase color:green;
+[05:38:45.401] LOG: %cStart Phase MovePhase color:green;
+[05:38:45.401] LOG: %cStart Phase MoveEndPhase color:green;
+[05:38:45.401] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:38:45.401] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:38:45.401] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:38:45.401] LOG: %cStart Phase BerryPhase color:green;
+[05:38:45.401] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:38:45.401] LOG: %cStart Phase TurnEndPhase color:green;
+[05:38:45.401] LOG: %cStart Phase BattleEndPhase color:green;
+[05:38:45.401] LOG: Battle Score: 117 (2 Turns x0.84)
+[05:38:45.401] LOG: Total Score: 886
+[05:38:45.405] LOG: %cStart Phase EggLapsePhase color:green;
+[05:38:45.405] LOG: %cStart Phase SelectModifierPhase color:green;
+[05:38:45.406] LOG: Wave Seed: ifYuy`C[sS~WfvGxJifvb 18
+[05:38:45.407] LOG: 0 0 [4,5]
+[05:38:45.407] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[05:38:45.407] LOG: 0 0 [11,12,13,15,25]
+[05:38:45.407] LOG: {"id":"ULTRA_BALL","localeKey":"","iconImage":"ub","group":"pb","soundName":"se/pb_bounce_1","tier":2,"pokeballType":2,"count":5} 
+[05:38:45.407] LOG: 16 4 [11,12,13,15,25]
+[05:38:45.407] LOG: {"id":"REVIVER_SEED","localeKey":"modifierType:ModifierType.REVIVER_SEED","iconImage":"reviver_seed","soundName":"se/restore","tier":2} 
+[05:38:45.407] LOG: 0 0 [4,5]
+[05:38:45.407] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[05:38:45.407] LOG: 9 2 [4,5]
+[05:38:45.407] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_dark","group":"tm","soundName":"se/restore","tier":0,"moveId":269} 
+[05:38:50.058] LOG: %cStart Phase NewBattlePhase color:green;
+[05:38:50.058] LOG: Wave Seed: jgZvzaD\tTXgwHyKjgwc 19
+[05:38:50.059] LOG: %cStart Phase NextEncounterPhase color:green;
+[05:38:50.059] LOG: Starting species pool tier: COMMON
+[05:38:50.065] LOG: Pokemon: Wild Oddish | Species ID: 43 | Level: 12 | Nature: Impish (+Def/-SpAtk)
+[05:38:50.065] LOG: Stats (IVs): HP: 35 (23), Atk: 19 (18), Def: 22 (21), Spatk: 24 (15), Spdef: 23 (4), Spd: 12 (3)
+[05:38:50.066] LOG: Ability: Poison Absorb | Passive Ability: Regenerator 
+[05:38:50.066] LOG: Moveset: ["Acid","Stun Spore","Sweet Scent","Growth"]
+[05:38:50.618] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"calcium","soundName":"se/restore","tier":1,"stat":3,"key":"calcium"} (enemy)
+[05:38:50.618] LOG: Battle Seed: TOcVM6LHZcPRXnER
+[05:38:50.618] LOG: Applied Calcium (enemy)
+[05:38:50.651] DEBUG: Session data saved to slot 0!
+[05:38:50.651] LOG: Wave Seed: jgZvzaD\tTXgwHyKjgwc 19
+[05:38:51.485] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[05:38:51.485] LOG: %cStart Phase CheckSwitchPhase color:green;
+[05:38:51.485] LOG: %cStart Phase SummonMissingPhase color:green;
+[05:38:51.736] WARN: cry/827 not found
+[05:38:51.966] LOG: %cStart Phase ShinySparklePhase color:green;
+[05:38:52.180] LOG: %cStart Phase InitEncounterPhase color:green;
+[05:38:52.180] LOG: %cStart Phase PostSummonPhase color:green;
+[05:38:52.180] LOG: Ran PSP for: Oddish
+[05:38:52.180] LOG: %cStart Phase PostSummonPhase color:green;
+[05:38:52.180] LOG: %cStart Phase PostSummonPhase color:green;
+[05:38:52.180] LOG: %cStart Phase TurnInitPhase color:green;
+[05:38:52.180] LOG: %cStart Phase MessagePhase color:green;
+[05:39:31.731] LOG: %cStart Phase SwitchSummonPhase color:green;
+[05:39:31.956] WARN: cry/10856 not found
+[05:39:32.167] LOG: Applied X Speed 
+[05:39:32.167] LOG: %cStart Phase PostSummonPhase color:green;
+[05:39:32.167] LOG: Ran PSP for: Merrykarp
+[05:39:32.167] LOG: %cStart Phase PostSummonPhase color:green;
+[05:39:32.167] LOG: %cStart Phase PostSummonPhase color:green;
+[05:39:32.167] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:39:32.167] LOG: Move Pool: ["Acid"]
+[05:39:32.167] LOG: Move Scores: [54]
+[05:39:32.167] LOG: Sorted Move Pool: ["Acid"]
+[05:39:32.167] LOG: Chosen Move: Acid
+[05:39:32.167] LOG: %cStart Phase TurnStartPhase color:green;
+[05:39:32.168] LOG: Applied X Speed 
+[05:39:32.168] LOG: Applied X Speed 
+[05:39:32.168] LOG: %cStart Phase MovePhase color:green;
+[05:39:32.168] LOG: %cUser: Oddish
+Move: ACID
+Use Mode: NORMAL color:orchid
+[05:39:32.168] LOG: Applied X Speed 
+[05:39:32.169] LOG: Applied X Speed 
+[05:39:32.169] LOG: %cStart Phase MessagePhase color:green;
+[05:39:32.405] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:39:32.941] LOG: crit stage: +0
+[05:39:32.941] LOG: Move: Acid | Base damage: 19.68 | Power: 70 | Source attack: 26 | Target defense: 14
+[05:39:32.941] LOG: Move: Acid | Attack damage: 53
+[05:39:32.942] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:39:32.986] LOG: %cStart Phase MessagePhase color:green;
+[05:39:33.390] LOG: %cStart Phase FaintPhase color:green;
+[05:39:33.391] WARN: cry/10856 not found
+[05:39:33.496] LOG: %cStart Phase MessagePhase color:green;
+[05:39:35.513] LOG: %cStart Phase MoveEndPhase color:green;
+[05:39:35.513] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:39:35.513] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:39:35.513] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:39:35.513] LOG: %cStart Phase BerryPhase color:green;
+[05:39:35.513] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:39:35.513] LOG: %cStart Phase TurnEndPhase color:green;
+[05:39:35.513] LOG: %cStart Phase SwitchPhase color:green;
+[05:39:37.581] LOG: %cStart Phase SwitchSummonPhase color:green;
+[05:39:37.816] WARN: cry/10690 not found
+[05:39:38.023] LOG: Applied X Speed 
+[05:39:38.023] LOG: %cStart Phase ShinySparklePhase color:green;
+[05:39:38.226] LOG: %cStart Phase PostSummonPhase color:green;
+[05:39:38.226] LOG: Ran PSP for: Honedge Redux
+[05:39:38.226] LOG: %cStart Phase PostSummonPhase color:green;
+[05:39:38.226] LOG: %cStart Phase PostSummonPhase color:green;
+[05:39:38.226] LOG: %cStart Phase TurnInitPhase color:green;
+[05:39:38.226] LOG: %cStart Phase CommandPhase color:green;
+[05:39:40.105] LOG: Move: BITTER_BLADE Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Honedge Redux
+[05:39:40.105] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:39:40.106] LOG: Battle Seed: TOcVM6LHZcPRXnER
+[05:39:40.106] LOG: Move Pool: ["Acid","Stun Spore","Sweet Scent","Growth"]
+[05:39:40.106] LOG: Move Scores: [9.75,10,6,0]
+[05:39:40.106] LOG: Sorted Move Pool: ["Stun Spore","Acid","Sweet Scent","Growth"]
+[05:39:40.106] LOG: Chosen Move: Stun Spore
+[05:39:40.106] LOG: %cStart Phase TurnStartPhase color:green;
+[05:39:40.107] LOG: Applied X Speed 
+[05:39:40.107] LOG: Applied X Speed 
+[05:39:40.107] LOG: Applied X Speed 
+[05:39:40.107] LOG: %cStart Phase MovePhase color:green;
+[05:39:40.107] LOG: %cUser: Honedge Redux
+Move: BITTER_BLADE
+Use Mode: NORMAL color:orchid
+[05:39:40.107] LOG: Applied X Speed 
+[05:39:40.107] LOG: Applied X Speed 
+[05:39:40.107] LOG: %cStart Phase MessagePhase color:green;
+[05:39:40.330] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:39:41.187] LOG: crit stage: +0
+[05:39:41.187] LOG: Move: Bitter Blade | Base damage: 15.254545454545456 | Power: 90 | Source attack: 27 | Target defense: 22
+[05:39:41.188] LOG: Move: Bitter Blade | Attack damage: 29
+[05:39:41.189] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:39:41.233] LOG: %cStart Phase MessagePhase color:green;
+[05:39:41.651] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:39:41.651] LOG: %cStart Phase MessagePhase color:green;
+[05:39:42.110] LOG: %cStart Phase MoveEndPhase color:green;
+[05:39:42.110] LOG: %cStart Phase MovePhase color:green;
+[05:39:42.110] LOG: %cUser: Oddish
+Move: STUN_SPORE
+Use Mode: NORMAL color:orchid
+[05:39:42.110] LOG: Applied X Speed 
+[05:39:42.111] LOG: Applied X Speed 
+[05:39:42.111] LOG: %cStart Phase MessagePhase color:green;
+[05:39:42.358] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:39:42.359] LOG: %cStart Phase MessagePhase color:green;
+[05:39:42.835] LOG: %cStart Phase MoveEndPhase color:green;
+[05:39:42.835] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:39:42.835] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:39:42.835] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:39:42.835] LOG: %cStart Phase BerryPhase color:green;
+[05:39:42.835] LOG: Applied X Speed 
+[05:39:42.835] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:39:42.835] LOG: Applied X Speed 
+[05:39:42.835] LOG: %cStart Phase TurnEndPhase color:green;
+[05:39:42.836] LOG: Applied X Speed 
+[05:39:42.836] LOG: %cStart Phase TurnInitPhase color:green;
+[05:39:42.836] LOG: %cStart Phase CommandPhase color:green;
