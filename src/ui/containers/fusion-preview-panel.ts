@@ -39,10 +39,11 @@ const ABIL_LABEL_Y = 104;
 const ABIL_Y = 114;
 const ABIL_ROW_H = 10;
 
-// Bottom row of tappable controls (Fuse / Switch / Back) - the on-screen buttons
-// that make the whole preview operable by touch on mobile.
-const BTN_Y = 163;
-const BTN_X = [30, 78, 126] as const;
+// Bottom row of tappable controls (Fuse / Switch) - small on-screen buttons that
+// also show which key triggers them. Tapping works on mobile; B cancels as usual.
+const BTN_Y = 166;
+const BTN_X = [52, 104] as const;
+const BTN_SCALE = 0.85;
 
 /** A cached blended-sprite render for one partner (keyed by partner id). */
 interface SpriteCacheEntry {
@@ -71,7 +72,6 @@ export class FusionPreviewPanel {
   /** Tappable bottom-row control callbacks (the on-screen buttons for mobile). */
   private onConfirm: (() => void) | null = null;
   private onSwitch: (() => void) | null = null;
-  private onCancel: (() => void) | null = null;
   private sprite: Phaser.GameObjects.Sprite;
   private nameText: Phaser.GameObjects.Text;
   private typesText: Phaser.GameObjects.Text;
@@ -168,32 +168,29 @@ export class FusionPreviewPanel {
     this.placeholderText.setVisible(false);
     this.container.add(this.placeholderText);
 
-    // Bottom row: tappable Fuse / Switch / Back. These are the on-screen buttons
-    // that make the preview fully operable by touch on mobile (where there is no
-    // R / C key); on keyboard/controller A, R and B still work too.
+    // Bottom row: tappable Fuse / Switch labels that also name their key. Tapping
+    // works on mobile; A/R still work on keyboard/controller, and B cancels.
     this.makeButton(BTN_X[0], "partyUiHandler:fusionPreviewFuse", () => this.onConfirm?.());
     this.makeButton(BTN_X[1], "partyUiHandler:fusionPreviewSwitch", () => this.onSwitch?.());
-    this.makeButton(BTN_X[2], "partyUiHandler:fusionPreviewBack", () => this.onCancel?.());
 
     this.built = true;
   }
 
   /** Build one tappable bottom-row button (a text label with a touch hit area). */
   private makeButton(x: number, i18nKey: string, onTap: () => void): Phaser.GameObjects.Text {
-    const t = addTextObject(x, BTN_Y, i18next.t(i18nKey), TextStyle.WINDOW).setOrigin(0.5, 0.5);
-    // Auto hit area = the text bounds (origin-aware); at 6x render it is a fine
-    // tap target. on pointerup so a tap, not a drag, fires the action.
+    const t = addTextObject(x, BTN_Y, i18next.t(i18nKey), TextStyle.WINDOW).setOrigin(0.5, 0.5).setScale(BTN_SCALE);
+    // Auto hit area = the text bounds (origin/scale-aware); a fine tap target at
+    // 6x render. on pointerup so a tap, not a drag, fires the action.
     t.setInteractive({ useHandCursor: true });
     t.on("pointerup", onTap);
     this.container.add(t);
     return t;
   }
 
-  /** Wire the three button actions (called once by the party handler). */
-  setActions(onConfirm: () => void, onSwitch: () => void, onCancel: () => void): void {
+  /** Wire the two button actions (called once by the party handler). */
+  setActions(onConfirm: () => void, onSwitch: () => void): void {
     this.onConfirm = onConfirm;
     this.onSwitch = onSwitch;
-    this.onCancel = onCancel;
   }
 
   isBuilt(): boolean {

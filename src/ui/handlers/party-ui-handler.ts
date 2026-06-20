@@ -362,13 +362,13 @@ export class PartyUiHandler extends MessageUiHandler {
     ui.add(this.moveInfoOverlay);
 
     this.fusionPreviewPanel.setup();
-    // ER (#562): the panel's on-screen Fuse / Switch / Back buttons (mobile touch).
+    // ER (#562): the panel's on-screen Fuse / Switch buttons (mobile touch). B
+    // still cancels, so there is no on-screen Back button.
     this.fusionPreviewPanel.setActions(
       () => this.confirmFusionPreview(),
       () => {
         this.switchFusionOrder();
       },
-      () => this.cancelFusionPreview(),
     );
 
     this.options = [];
@@ -1866,15 +1866,6 @@ export class PartyUiHandler extends MessageUiHandler {
     } else {
       ui.playError();
     }
-  }
-
-  /** ER (#562): the panel's on-screen Back button - release the base lock (= B). */
-  private cancelFusionPreview(): void {
-    if (!this.fusionPreviewActive) {
-      return;
-    }
-    this.clearTransfer();
-    this.getUi().playSelect();
   }
 
   /**
