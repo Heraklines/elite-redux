@@ -85,6 +85,15 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
     if (lastUseMode !== undefined && isVirtual(lastUseMode)) {
       return false;
     }
+    // Multi-hit guard: the PostAttack hook fires once per HIT, so a multi-hit
+    // trigger move (e.g. a 2-5 strike Water move for High Tide) would enqueue the
+    // scripted follow-up on every strike — the reported runaway "fires ~50x"
+    // stack. Fire only on the final hit (hitsLeft === 1) so the follow-up
+    // triggers once per move use, mirroring the once-per-multihit `hitsLeft > 1`
+    // guard used across ab-attrs.
+    if (pokemon.turnData.hitsLeft > 1) {
+      return false;
+    }
     if (this.opts.categoryFilter !== undefined && move.category !== this.opts.categoryFilter) {
       return false;
     }

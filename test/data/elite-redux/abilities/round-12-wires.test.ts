@@ -113,7 +113,10 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): round 12 wires", () =
   });
 
   // ---------- compositions ----------
-  it("er id 599 (Dead Power) wires StatMultiplier(ATK 1.5x) + ChanceBattlerTagOnHit(20%, CURSED)", () => {
+  it("er id 599 (Dead Power) wires StatMultiplier(ATK 1.5x) + ChanceBattlerTagOnAttack(20%, CURSED)", () => {
+    // Dex: "1.5x Attack boost. 20% chance to curse on contact moves." The curse
+    // is an OFFENSIVE proc (the holder's own contact moves curse the target), so
+    // it is ChanceBattlerTagOnAttack, not the defensive on-hit variant.
     const res = dispatchArchetype("bespoke", null, 599);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(2);
@@ -121,7 +124,7 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): round 12 wires", () =
     expect(statMult).toBeInstanceOf(StatMultiplierAbAttr);
     expect(statMult.stat).toBe(Stat.ATK);
     expect(statMult.multiplier).toBeCloseTo(1.5);
-    expect(res.attrs[1]).toBeInstanceOf(ChanceBattlerTagOnHitAbAttr);
+    expect(res.attrs[1]).toBeInstanceOf(ChanceBattlerTagOnAttackAbAttr);
   });
 
   it("er id 892 (Crispy Cream) wires 30%-burn + 30%-frostbite chance-on-contact", () => {
