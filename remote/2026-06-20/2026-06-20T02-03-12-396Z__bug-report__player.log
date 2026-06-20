@@ -1,0 +1,212 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     1  wave:69  difficulty:youngster
+seed:     3P7fZgmBhIpgKxuzMSJ9vwDV
+party:    Kartana Fallen(L57 142/260), Excadrill Redux(L40 140/140), Scovillain(L41 74/117), Meganium(L40 126/126), Sawsbuck(L38 120/120), Froslass Redux(L37 110/110)
+
+----- DESCRIPTION -----
+Save file saying saved locally but not cloud saved
+
+----- CONSOLE -----
+[01:58:13.012] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[01:58:13.199] WARN: [er-b1c] 1 mega-form injection issues: ["ER mega target 1850 has no primary type"]
+[01:58:13.327] LOG: [ER] build mqkvka3n-lfet
+[01:58:43.715] DEBUG: Destroying loading scene
+[01:58:43.715] DEBUG: Destroyed loading scene
+[01:58:43.770] LOG: Seed: Y1I5RFxCEciNVPKb4Je28yUX
+[01:58:43.770] LOG: Wave Seed: Y1I5RFxCEciNVPKb4Je28yUX 0
+[01:58:45.260] LOG: %cStart Phase LoginPhase color:green;
+[01:58:45.800] LOG: Client Session: fKFxydbPB5Tr1TjvdkhY14pyKcJPhmlb
+[01:58:46.574] DEBUG: Using cached system data
+[01:58:46.770] LOG: %cStart Phase TitlePhase color:green;
+[01:58:46.771] LOG: Getting Session Slot id: %d 3
+[01:58:46.778] LOG: use seasonal splash messages true
+[01:58:46.779] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[01:58:58.388] LOG: Getting Session Slot id: %d 0
+[01:58:58.399] LOG: Getting Session Slot id: %d 1
+[01:58:58.404] LOG: Getting Session Slot id: %d 2
+[01:58:58.408] LOG: Getting Session Slot id: %d 3
+[01:58:58.412] LOG: Getting Session Slot id: %d 4
+[01:58:58.487] LOG: Getting Session Slot id: %d 3
+[01:58:58.619] ERROR: Invalid save data JSON detected! Session not found.
+[01:59:00.262] LOG: %cStart Phase TitlePhase color:green;
+[01:59:00.263] LOG: Getting Session Slot id: %d 3
+[01:59:00.271] LOG: use seasonal splash messages true
+[01:59:00.271] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[01:59:00.891] LOG: Getting Session Slot id: %d 3
+[01:59:00.895] LOG: Wave Seed: 3P7fZgmBhIpgKxuzMSJ9vwDV 0
+[01:59:00.895] LOG: Seed: 3P7fZgmBhIpgKxuzMSJ9vwDV
+[01:59:00.923] LOG: Wave Seed: w{ª«±¬´«¼¹¾}º» 68
+[01:59:00.933] LOG: Applied Carbos 
+[01:59:00.935] LOG: Applied Carbos 
+[01:59:00.936] LOG: Applied Carbos 
+[01:59:00.976] LOG: %cStart Phase EncounterPhase color:green;
+[01:59:00.981] LOG: Pokemon: Wild Iron Treads | Species ID: 990 | Level: 46 | Nature: Lonely (+Atk/-Def)
+[01:59:00.981] LOG: Stats (IVs): HP: 148 (21), Atk: 130 (23), Def: 112 (23), Spatk: 82 (24), Spdef: 80 (24), Spd: 114 (25)
+[01:59:00.981] LOG: Ability: Let's Roll | Passive Ability: Quark Drive | Boss Bars: 2
+[01:59:00.981] LOG: Moveset: ["Rocket Shot","Megahorn","Headlong Rush","Volt Tackle"]
+[01:59:02.060] LOG: Wave Seed: w{ª«±¬´«¼¹¾}º» 68
+[01:59:02.494] LOG: %cStart Phase SummonPhase color:green;
+[01:59:02.647] LOG: Applied Carbos 
+[01:59:02.681] WARN: cry/10777 not found
+[01:59:02.784] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:59:03.275] LOG: %cStart Phase ScanIvsPhase color:green;
+[01:59:03.906] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:59:03.906] LOG: %cStart Phase PostSummonPhase color:green;
+[01:59:03.906] LOG: Ran PSP for: Iron Treads
+[01:59:03.906] LOG: %cStart Phase PostSummonPhase color:green;
+[01:59:03.906] LOG: %cStart Phase MovePhase color:green;
+[01:59:03.906] LOG: %cUser: Iron Treads
+Move: DEFENSE_CURL
+Use Mode: INDIRECT color:orchid
+[01:59:03.908] LOG: %cStart Phase MessagePhase color:green;
+[01:59:04.041] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:59:04.049] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:59:04.239] LOG: %cStart Phase MessagePhase color:green;
+[01:59:04.458] LOG: %cStart Phase MoveEndPhase color:green;
+[01:59:04.459] LOG: %cStart Phase PostSummonPhase color:green;
+[01:59:04.459] LOG: %cStart Phase TurnInitPhase color:green;
+[01:59:04.459] LOG: %cStart Phase CommandPhase color:green;
+[01:59:06.982] DEBUG: Session data saved to slot 3!
+[01:59:08.566] ERROR: Internal server error.
+[01:59:14.482] DEBUG: Session data saved to slot 3!
+[01:59:16.092] ERROR: Internal server error.
+[01:59:24.740] DEBUG: Session data saved to slot 3!
+[01:59:25.111] DEBUG: Session data saved to slot 3!
+[01:59:26.379] ERROR: Internal server error.
+[01:59:26.969] ERROR: Internal server error.
+[02:01:08.297] DEBUG: Session data saved to slot 3!
+[02:01:09.222] ERROR: Internal server error.
+[02:01:13.692] LOG: Move: AQUA_CUTTER Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Kartana Fallen
+[02:01:13.692] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:01:13.694] LOG: Applied Silver Powder (enemy)
+[02:01:13.696] LOG: Battle Seed: eLCnyWY0K10wXMH9
+[02:01:13.699] LOG: Move Pool: ["Rocket Shot","Megahorn","Headlong Rush","Volt Tackle"]
+[02:01:13.699] LOG: Move Scores: [14.25,20,30,9]
+[02:01:13.699] LOG: Sorted Move Pool: ["Headlong Rush","Megahorn","Rocket Shot","Volt Tackle"]
+[02:01:13.699] LOG: Chosen Move: Megahorn
+[02:01:13.699] LOG: %cStart Phase TurnStartPhase color:green;
+[02:01:13.700] LOG: %cStart Phase MovePhase color:green;
+[02:01:13.700] LOG: %cUser: Kartana Fallen
+Move: AQUA_CUTTER
+Use Mode: NORMAL color:orchid
+[02:01:13.701] LOG: %cStart Phase MessagePhase color:green;
+[02:01:13.822] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:01:13.947] LOG: crit stage: +1
+[02:01:13.948] LOG: Move: Aqua Cutter | Base damage: 182.48642857142858 | Power: 97.5 | Source attack: 627 | Target defense: 168
+[02:01:13.948] LOG: Move: Aqua Cutter | Attack damage: 332
+[02:01:13.949] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:01:13.963] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:01:13.963] LOG: %cStart Phase MessagePhase color:green;
+[02:01:14.169] LOG: %cStart Phase FaintPhase color:green;
+[02:01:16.997] LOG: %cStart Phase MessagePhase color:green;
+[02:01:17.310] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:01:17.475] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:01:17.668] LOG: %cStart Phase MessagePhase color:green;
+[02:01:17.884] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:01:17.912] LOG: %cStart Phase VictoryPhase color:green;
+[02:01:17.913] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:01:17.913] LOG: Applied Super EXP. Charm 
+[02:01:17.913] LOG: Applied EXP. Charm 
+[02:01:17.913] LOG: %cStart Phase LevelUpPhase color:green;
+[02:01:18.574] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:01:18.574] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:01:18.574] LOG: Applied Super EXP. Charm 
+[02:01:18.574] LOG: Applied EXP. Charm 
+[02:01:18.574] LOG: %cStart Phase LevelUpPhase color:green;
+[02:01:19.144] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:01:19.144] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:01:19.144] LOG: Applied Super EXP. Charm 
+[02:01:19.144] LOG: Applied EXP. Charm 
+[02:01:19.145] LOG: %cStart Phase LevelUpPhase color:green;
+[02:01:19.662] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:01:19.662] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:01:19.662] LOG: Applied Super EXP. Charm 
+[02:01:19.662] LOG: Applied EXP. Charm 
+[02:01:19.663] LOG: %cStart Phase LevelUpPhase color:green;
+[02:01:20.184] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:01:20.184] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:01:20.184] LOG: Applied Super EXP. Charm 
+[02:01:20.184] LOG: Applied EXP. Charm 
+[02:01:20.185] LOG: %cStart Phase LevelUpPhase color:green;
+[02:01:20.737] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[02:01:23.857] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:01:23.857] LOG: %cStart Phase MoveEndPhase color:green;
+[02:01:23.858] LOG: %cStart Phase MovePhase color:green;
+[02:01:23.858] LOG: %cStart Phase MoveEndPhase color:green;
+[02:01:23.858] LOG: %cStart Phase CheckInterludePhase color:green;
+[02:01:23.858] LOG: %cStart Phase WeatherEffectPhase color:green;
+[02:01:24.085] LOG: %cStart Phase PositionalTagPhase color:green;
+[02:01:24.085] LOG: %cStart Phase BerryPhase color:green;
+[02:01:24.085] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[02:01:24.085] LOG: %cStart Phase TurnEndPhase color:green;
+[02:01:24.086] LOG: %cStart Phase BattleEndPhase color:green;
+[02:01:24.086] LOG: Battle Score: 438 (1 Turns x1)
+[02:01:24.086] LOG: Total Score: 6190
+[02:01:24.090] LOG: Applied Carbos 
+[02:01:24.093] LOG: %cStart Phase EggLapsePhase color:green;
+[02:01:24.093] LOG: %cStart Phase SelectModifierPhase color:green;
+[02:01:24.093] LOG: Wave Seed: w{ª«±¬´«¼¹¾}º» 68
+[02:01:24.096] LOG: Applied Golden Poké Ball 
+[02:01:24.096] LOG: 7 0 [9,11,12,13,15,22]
+[02:01:24.096] LOG: {"id":"FORM_CHANGE_ITEM","localeKey":"","iconImage":"lucarionite","soundName":"se/restore","tier":2,"formChangeItem":282} 
+[02:01:24.096] LOG: 9 2 [4,5]
+[02:01:24.097] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_ghost","group":"tm","soundName":"se/restore","tier":0,"moveId":101} 
+[02:01:24.097] LOG: 8 2 [4,5]
+[02:01:24.097] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} 
+[02:01:24.097] LOG: 23 6 [9,11,12,13,15,22]
+[02:01:24.097] LOG: {"id":"EXP_CHARM","localeKey":"modifierType:ModifierType.EXP_CHARM","iconImage":"exp_charm","soundName":"se/restore","tier":2,"boostPercent":25} 
+[02:01:24.098] LOG: 10 1 [9,11,12,13,15,22]
+[02:01:24.098] LOG: ULTRA 1
+[02:01:24.098] LOG: 35 6 [9,11,12,13,15,22]
+[02:01:24.098] LOG: {"id":"ER_POWER_HERB","localeKey":"","iconImage":"power_herb","iconTint":16777215,"soundName":"se/restore","tier":2} 
+[02:01:24.098] LOG: 24 6 [9,11,12,13,15,22]
+[02:01:24.098] LOG: {"id":"EXP_SHARE","localeKey":"modifierType:ModifierType.EXP_SHARE","iconImage":"exp_share","soundName":"se/restore","tier":2} 
+[02:01:24.098] LOG: 19 5 [9,11,12,13,15,22]
+[02:01:24.098] LOG: {"id":"TM_ULTRA","localeKey":"","iconImage":"tm_steel","group":"tm","soundName":"se/restore","tier":2,"moveId":5006} 
+[02:01:24.098] LOG: 17 5 [9,11,12,13,15,22]
+[02:01:24.098] LOG: {"id":"CANDY_JAR","localeKey":"modifierType:ModifierType.CANDY_JAR","iconImage":"candy_jar","soundName":"se/restore","tier":2} 
+[02:01:24.099] LOG: 10 1 [9,11,12,13,15,22]
+[02:01:24.099] LOG: ULTRA 1
+[02:01:24.099] LOG: 0 0 [9,11,12,13,15,22]
+[02:01:24.099] LOG: {"id":"ULTRA_BALL","localeKey":"","iconImage":"ub","group":"pb","soundName":"se/pb_bounce_1","tier":2,"pokeballType":2,"count":5} 
+[02:01:29.311] LOG: Applied Carbos 
+[02:01:29.314] LOG: %cStart Phase FormChangePhase color:green;
+[02:01:31.242] ERROR: [uncaught] Uncaught SecurityError: Failed to execute 'texImage2D' on 'WebGLRenderingContext': The video element contains cross-origin data, and may not be loaded. @ https://elite-redux.pages.dev/assets/phaser-DPrVs4l9.js:63:2433
+[02:01:31.753] LOG: Applied Carbos 
+[02:01:32.076] WARN: cry/154-mega not found
+[02:01:38.222] LOG: %cStart Phase EndEvolutionPhase color:green;
+[02:01:38.264] LOG: %cStart Phase NewBattlePhase color:green;
+[02:01:38.264] LOG: Wave Seed: x|«¬²­µ¬½º¿~»¼ 69
+[02:01:38.265] LOG: %cStart Phase NextEncounterPhase color:green;
+[02:01:38.265] LOG: Starting species pool tier: BOSS
+[02:01:38.277] LOG: Pokemon: Wild Gliscor | Species ID: 472 | Level: 44 | Nature: Relaxed (+Def/-Spd)
+[02:01:38.277] LOG: Stats (IVs): HP: 122 (16), Atk: 100 (23), Def: 139 (25), Spatk: 47 (18), Spdef: 78 (15), Spd: 90 (28)
+[02:01:38.277] LOG: Ability: Tectonize | Passive Ability: Hyper Cutter | Boss Bars: 2
+[02:01:38.277] LOG: Moveset: ["Air Cutter","Smack Down","Pounce","Zephyr Rush"]
+[02:01:38.461] LOG: {"id":"BERRY","localeKey":"","iconImage":"liechi_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":3} (enemy)
+[02:01:38.461] LOG: {"id":"BERRY","localeKey":"","iconImage":"salac_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":7} (enemy)
+[02:01:38.461] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"carbos","soundName":"se/restore","tier":1,"stat":5,"key":"carbos"} (enemy)
+[02:01:38.461] LOG: Battle Seed: ADOtCtSKVW9QLofz
+[02:01:38.462] LOG: Applied Carbos (enemy)
+[02:01:38.677] DEBUG: Session data saved to slot 3!
+[02:01:38.678] LOG: Wave Seed: x|«¬²­µ¬½º¿~»¼ 69
+[02:01:39.098] LOG: %cStart Phase ScanIvsPhase color:green;
+[02:01:40.626] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[02:01:40.626] LOG: %cStart Phase CheckSwitchPhase color:green;
+[02:01:41.321] LOG: %cStart Phase InitEncounterPhase color:green;
+[02:01:41.321] LOG: %cStart Phase PostSummonPhase color:green;
+[02:01:41.322] LOG: Ran PSP for: Gliscor
+[02:01:41.322] LOG: %cStart Phase PostSummonPhase color:green;
+[02:01:41.322] LOG: %cStart Phase PostSummonPhase color:green;
+[02:01:41.322] LOG: %cStart Phase TurnInitPhase color:green;
+[02:01:41.322] LOG: %cStart Phase CommandPhase color:green;
+[02:02:09.117] DEBUG: Session data saved to slot 3!
+[02:02:10.540] ERROR: Internal server error.
+[02:02:14.007] DEBUG: Session data saved to slot 3!
+[02:02:14.904] DEBUG: Session data saved to slot 3!
+[02:02:15.034] ERROR: Internal server error.
+[02:02:16.248] ERROR: Internal server error.
