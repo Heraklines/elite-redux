@@ -118,12 +118,14 @@ Nothing is overwritten, and captures are AUTO-TRIAGED by scenario:
   PASS/FAIL — <scenario> — <comment>`).
 Read these to see what testers verified / where something hung.
 
-### 🔴 Triage ledger - read BEFORE re-triaging tester logs
+### 🔴 Marking a tester log DONE (so it isn't re-triaged)
 
-`dev-logs/TRIAGE.md` (force-tracked; the dir is gitignored) records which reported
-bugs are RESOLVED / by-design / won't-fix, so already-handled reports are not
-re-raised when re-reading `dev-logs/remote/`. Read it first when triaging, and
-append to it as you resolve or dismiss reports.
+When a report is RESOLVED / by-design / won't-fix, mark its log file done by
+renaming it IN PLACE to insert `.DONE` before the extension:
+`<...>__player.log` -> `<...>__player.DONE.log`. The pull script
+(`scripts/pull-dev-logs.mjs`) treats a `.DONE.log` twin as already-present, so a
+done log is never re-downloaded. When triaging, SKIP any `*.DONE.log` - those are
+already handled. (No separate ledger file; the filename is the status.)
 
 ### 🔴 Reading REMOTE tester logs (prod/staging "Report a bug" + "Send Logs")
 

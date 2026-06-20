@@ -38,7 +38,11 @@ async function main() {
   let downloaded = 0;
   for (const entry of logs) {
     const outPath = join(OUT_ROOT, entry.path);
-    if (existsSync(outPath)) {
+    // Skip already-pulled files. A triaged report is marked "done" by renaming it
+    // to `<name>.DONE.log` (in place); treat that twin as present so a done log is
+    // never re-downloaded back into the folder.
+    const donePath = outPath.replace(/\.log$/, ".DONE.log");
+    if (existsSync(outPath) || existsSync(donePath)) {
       continue;
     }
     const raw = await fetch(`https://raw.githubusercontent.com/${REPO}/${BRANCH}/${entry.path}`, { headers });
