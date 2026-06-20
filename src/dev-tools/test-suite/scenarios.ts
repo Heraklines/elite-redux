@@ -3419,6 +3419,43 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.FORM_CHANGE_ITEM],
   },
   {
+    // Sprite regression: an injected mega whose form was registered by an earlier
+    // pass (skipped by injectAllErMegaForms as "already present") never got its
+    // `elite-redux/<slug>` sprite redirect, so it fell back to the vanilla
+    // `{id}-{formKey}` path, 404'd, and rendered the BASE sprite. The "Wigglytuff
+    // Mega shows the NORMAL Wigglytuff" report. installAllErMegaSpriteRedirects()
+    // now redirects EVERY mega form. Wigglytuff has 3 stones (Mega, Mega X, Mega Y),
+    // so a few Form-Change Items let you check each one's sprite.
+    label: "Store: Mega sprite renders (Wigglytuff)",
+    description:
+      "Mega forms were showing the BASE sprite (e.g. Wigglytuff Mega looked like a\n"
+      + "normal Wigglytuff) - the mega sprite 404'd and fell back. You have a lone\n"
+      + "Wigglytuff + a Mega Bracelet. DO: win the opening battle, take an offered\n"
+      + "MEGA STONE (Wigglytuffite / Wigglytuffite X / Wigglytuffite Y) and give it to\n"
+      + "Wigglytuff; re-run to try the other stones.\n"
+      + "EXPECT: Wigglytuff takes its Mega form with a DISTINCT mega sprite (not the\n"
+      + "plain Wigglytuff sprite). Check front + back + shiny.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 80,
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_MODIFIER_OVERRIDE: [MEGA_BRACELET],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.WIGGLYTUFF, {
+          moveset: [MoveId.DAZZLING_GLEAM, MoveId.HYPER_VOICE, MoveId.ICE_BEAM, MoveId.THUNDERBOLT],
+        }),
+      ];
+    },
+    // Lone Wigglytuff → each Form-Change Item rolls one of its mega stones; a few
+    // so the tester can verify the sprite of each mega form.
+    shopItems: [modifierTypes.FORM_CHANGE_ITEM, modifierTypes.FORM_CHANGE_ITEM, modifierTypes.FORM_CHANGE_ITEM],
+  },
+  {
     // #359/#318 verification: these holders' megas were among the 51 that had
     // NO working stone before the form-change-bridge fix — second megas of
     // multi-mega species (Venusaur Mega-Y, Gyarados Mega-X, Lucario Mega-X AND

@@ -25,7 +25,11 @@ import { initEliteReduxFormChanges } from "#data/elite-redux/init-elite-redux-fo
 import { initEliteReduxItemTuning } from "#data/elite-redux/init-elite-redux-item-tuning";
 import { initEliteReduxMovesets } from "#data/elite-redux/init-elite-redux-movesets";
 import { initEliteReduxPokedexOverrides } from "#data/elite-redux/init-elite-redux-pokedex-overrides";
-import { initEliteReduxSpecies, injectAllErMegaForms } from "#data/elite-redux/init-elite-redux-species";
+import {
+  initEliteReduxSpecies,
+  injectAllErMegaForms,
+  installAllErMegaSpriteRedirects,
+} from "#data/elite-redux/init-elite-redux-species";
 import { initEliteReduxSpeciesTuning } from "#data/elite-redux/init-elite-redux-species-tuning";
 import { initEliteReduxStarterCosts } from "#data/elite-redux/init-elite-redux-starter-costs";
 import { initEliteReduxTmMoves } from "#data/elite-redux/init-elite-redux-tm-moves";
@@ -139,6 +143,17 @@ export function initializeGame() {
   }
   console.info(
     `[er-custom-forms] injected ${erCustomFormResult.formsInjected} battle forms, registered ${erCustomFormResult.formChangesRegistered} form-change edges`,
+  );
+  // Elite Redux: point EVERY ER mega/primal form at its `elite-redux/{slug}` art.
+  // injectAllErMegaForms() only redirects the forms it freshly injects; megas
+  // whose form already existed (skipped as "already present") otherwise keep the
+  // vanilla `{id}-{formKey}` sprite path, which 404s → the mega renders as the
+  // BASE sprite (the "Wigglytuff Mega shows normal Wigglytuff" bug). Must run
+  // AFTER injectAllErMegaForms() AND initEliteReduxErCustomFormChanges() so all
+  // form objects exist; idempotent, so already-redirected forms are untouched.
+  const megaSpriteResult = installAllErMegaSpriteRedirects();
+  console.info(
+    `[er-b1c2] mega sprite redirects: ${megaSpriteResult.applied} applied, ${megaSpriteResult.missing} unresolved`,
   );
   // Elite Redux #151: repair scrambled gen8/9 move id-map entries (by name)
   // BEFORE the rebalance + move-patches consume the map, so stats and effects

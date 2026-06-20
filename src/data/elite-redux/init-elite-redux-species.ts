@@ -806,3 +806,46 @@ export function injectAllErMegaForms(): InjectErMegaFormsResult {
   }
   return result;
 }
+
+/**
+ * Install the ER `elite-redux/{slug}` sprite redirect on EVERY ER mega/primal/
+ * origin form, regardless of which pass registered it.
+ *
+ * {@linkcode injectAllErMegaForms} only redirects the forms IT injects; a mega
+ * whose form already existed (seeded by a custom-species build or an earlier
+ * pass) is SKIPPED there (`skippedExisting`) and otherwise keeps the vanilla
+ * `{speciesId}-{formKey}` sprite path. That path 404s for ER art (which lives
+ * under `elite-redux/{slug}/`), so the form falls back to the BASE sprite - the
+ * "mega shows the normal mon" bug (e.g. Wigglytuff Mega Y). The sprite manifest
+ * maps every mega target id to its slug and the art exists for all of them, so
+ * this sweep makes 100% resolve. `installErFormSpriteRedirect` is idempotent, so
+ * forms already redirected by injection are untouched. MUST run AFTER all form
+ * registration (mega injection + ER-custom form changes).
+ */
+export function installAllErMegaSpriteRedirects(): { applied: number; missing: number } {
+  const byId = new Map<number, (typeof allSpecies)[number]>();
+  for (const s of allSpecies) {
+    byId.set(s.speciesId, s);
+  }
+  let applied = 0;
+  let missing = 0;
+  for (const entry of ER_MEGA_FORMS) {
+    const pokerogueId = ER_ID_MAP.species[entry.baseErId];
+    if (pokerogueId === undefined) {
+      continue; // base species unmapped (id-map drift) — nothing to attach to
+    }
+    const species = byId.get(pokerogueId);
+    if (!species) {
+      continue;
+    }
+    const form = species.forms.find(f => f.formKey === entry.formKey);
+    const slug = ER_SLUG_BY_ER_ID.get(entry.targetErId);
+    if (!form || !slug) {
+      missing++;
+      continue;
+    }
+    installErFormSpriteRedirect(form, slug); // idempotent — no-op if already redirected
+    applied++;
+  }
+  return { applied, missing };
+}
