@@ -1,0 +1,251 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     4  wave:87  difficulty:youngster
+seed:     PoUIGENmiR8kAHLlgp7HkKOC
+party:    Xerneas(L72 279/292), Mawile(L70 194/194), Machamp(L62 139/198), Flairgrance(L68 254/254), Primarina(L68 190/190), Dachsbun(L68 157/157)
+
+----- DESCRIPTION -----
+Type gems, seeds, and the other new items disappear when I reload the game
+
+----- CONSOLE -----
+[22:47:06.591] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[22:47:06.920] LOG: [ER] build mqmoviga-km6o
+[22:47:14.729] DEBUG: Destroying loading scene
+[22:47:14.729] DEBUG: Destroyed loading scene
+[22:47:14.769] LOG: Seed: oZDyEVH2cggUjEXH4C9HXgOZ
+[22:47:14.769] LOG: Wave Seed: oZDyEVH2cggUjEXH4C9HXgOZ 0
+[22:47:15.948] LOG: %cStart Phase LoginPhase color:green;
+[22:47:16.467] LOG: Client Session: jMcTN4B6WNvlGzCoqTxK0QZIUqnWxVFP
+[22:47:17.203] DEBUG: Using cached system data
+[22:47:17.242] LOG: %cStart Phase TitlePhase color:green;
+[22:47:17.242] LOG: Getting Session Slot id: %d 0
+[22:47:17.249] LOG: use seasonal splash messages true
+[22:47:17.249] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[22:47:41.627] LOG: Getting Session Slot id: %d 0
+[22:47:41.632] LOG: Wave Seed: PoUIGENmiR8kAHLlgp7HkKOC 0
+[22:47:41.632] LOG: Seed: PoUIGENmiR8kAHLlgp7HkKOC
+[22:47:41.666] LOG: Wave Seed: §Æ¬ ¥ÄÀ©Â£Ã¾ÇÂ¢¦ 87
+[22:47:41.681] LOG: Applied Zinc 
+[22:47:41.681] LOG: Applied HP Up 
+[22:47:41.682] LOG: Applied Protein 
+[22:47:41.682] LOG: Applied Protein 
+[22:47:41.683] LOG: Applied Zinc 
+[22:47:41.683] LOG: Applied HP Up 
+[22:47:41.683] LOG: Applied Protein 
+[22:47:41.684] LOG: Applied Protein 
+[22:47:41.685] LOG: Applied Zinc 
+[22:47:41.685] LOG: Applied HP Up 
+[22:47:41.686] LOG: Applied Protein 
+[22:47:41.686] LOG: Applied Protein 
+[22:47:41.755] LOG: %cStart Phase EncounterPhase color:green;
+[22:47:41.760] LOG: Pokemon: Wild Machamp | Species ID: 68 | Level: 64 | Nature: Adamant (+Atk/-SpAtk)
+[22:47:41.760] LOG: Stats (IVs): HP: 195 (10), Atk: 211 (31), Def: 119 (19), Spatk: 85 (12), Spdef: 133 (31), Spd: 83 (13)
+[22:47:41.760] LOG: Ability: Guts | Passive Ability: No Guard 
+[22:47:41.760] LOG: Moveset: ["Brick Break","Seismic Fist","Meteor Mash","Close Combat"]
+[22:47:41.760] LOG: Pokemon: Wild Probopass | Species ID: 476 | Level: 57 | Nature: Timid (+Spd/-Atk)
+[22:47:41.760] LOG: Stats (IVs): HP: 149 (25), Atk: 75 (30), Def: 182 (21), Spatk: 120 (12), Spdef: 189 (23), Spd: 74 (29)
+[22:47:41.760] LOG: Ability: Impenetrable | Passive Ability: Multi-Headed 
+[22:47:41.760] LOG: Moveset: ["Meteor Beam","Rock Polish","Steel Beam","Power Trick"]
+[22:47:42.267] LOG: Wave Seed: §Æ¬ ¥ÄÀ©Â£Ã¾ÇÂ¢¦ 87
+[22:47:42.924] LOG: %cStart Phase SummonPhase color:green;
+[22:47:43.158] LOG: Applied Zinc 
+[22:47:43.158] LOG: Applied HP Up 
+[22:47:43.159] LOG: Applied Protein 
+[22:47:43.160] LOG: Applied Protein 
+[22:47:43.372] LOG: %cStart Phase SummonPhase color:green;
+[22:47:43.590] LOG: Applied Zinc 
+[22:47:43.590] LOG: Applied HP Up 
+[22:47:43.591] LOG: Applied Protein 
+[22:47:43.592] LOG: Applied Protein 
+[22:47:43.789] LOG: %cStart Phase CheckSwitchPhase color:green;
+[22:47:55.969] LOG: %cStart Phase CheckSwitchPhase color:green;
+[22:47:56.510] LOG: %cStart Phase ScanIvsPhase color:green;
+[22:47:57.321] LOG: %cStart Phase ScanIvsPhase color:green;
+[22:47:57.960] LOG: %cStart Phase InitEncounterPhase color:green;
+[22:47:57.961] LOG: %cStart Phase PostSummonPhase color:green;
+[22:47:57.961] LOG: Ran PSP for: Machamp
+[22:47:57.962] LOG: %cStart Phase PostSummonPhase color:green;
+[22:47:57.963] LOG: %cStart Phase PostSummonPhase color:green;
+[22:47:57.963] LOG: %cStart Phase PostSummonPhase color:green;
+[22:47:57.963] LOG: Ran PSP for: Probopass
+[22:47:57.963] LOG: %cStart Phase PostSummonPhase color:green;
+[22:47:57.963] LOG: %cStart Phase PostSummonPhase color:green;
+[22:47:57.963] LOG: %cStart Phase TurnInitPhase color:green;
+[22:47:57.963] LOG: %cStart Phase CommandPhase color:green;
+[22:47:58.825] LOG: Move: SPARKLY_SWIRL Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Xerneas
+[22:47:58.828] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:47:59.346] LOG: %cStart Phase CommandPhase color:green;
+[22:48:01.161] LOG: Move: METEOR_MASH Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Mawile
+[22:48:01.162] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:48:01.708] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:48:01.720] LOG: Battle Seed: jHonudub5zUrxK1s
+[22:48:01.723] LOG: Move Pool: ["Seismic Fist","Close Combat"]
+[22:48:01.723] LOG: Move Scores: [46,30]
+[22:48:01.723] LOG: Sorted Move Pool: ["Seismic Fist","Close Combat"]
+[22:48:01.723] LOG: Chosen Move: Seismic Fist
+[22:48:01.723] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:48:01.729] WARN: BattlerTag POWER_TRICK is missing a score!
+[22:48:01.730] WARN: BattlerTag POWER_TRICK is missing a score!
+[22:48:01.730] LOG: Move Pool: ["Meteor Beam","Rock Polish","Steel Beam","Power Trick"]
+[22:48:01.730] LOG: Move Scores: [18,6,31.5,0]
+[22:48:01.730] LOG: Sorted Move Pool: ["Steel Beam","Meteor Beam","Rock Polish","Power Trick"]
+[22:48:01.730] LOG: Chosen Move: Meteor Beam
+[22:48:01.730] LOG: %cStart Phase TurnStartPhase color:green;
+[22:48:01.733] LOG: %cStart Phase MovePhase color:green;
+[22:48:01.733] LOG: %cUser: Xerneas
+Move: SPARKLY_SWIRL
+Use Mode: NORMAL color:orchid
+[22:48:01.737] LOG: %cStart Phase MessagePhase color:green;
+[22:48:01.889] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:48:01.889] LOG: Applied Multi Lens 
+[22:48:01.890] LOG: Applied Wide Lens 
+[22:48:02.873] LOG: crit stage: +0
+[22:48:02.874] LOG: Move: Sparkly Swirl | Base damage: 152.13533834586465 | Power: 160 | Source attack: 208 | Target defense: 133
+[22:48:02.874] LOG: Applied Multi Lens 
+[22:48:02.874] LOG: Move: Sparkly Swirl | Attack damage: 342
+[22:48:02.874] LOG: Applied Amulet Coin 
+[22:48:02.876] LOG: Applied Golden Punch 
+[22:48:02.877] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:48:02.907] LOG: %cStart Phase MessagePhase color:green;
+[22:48:03.205] LOG: %cStart Phase ResetStatusPhase color:green;
+[22:48:03.206] LOG: %cStart Phase ResetStatusPhase color:green;
+[22:48:03.207] LOG: %cStart Phase ResetStatusPhase color:green;
+[22:48:03.208] LOG: %cStart Phase ResetStatusPhase color:green;
+[22:48:03.208] LOG: %cStart Phase ResetStatusPhase color:green;
+[22:48:03.208] LOG: %cStart Phase ResetStatusPhase color:green;
+[22:48:03.208] LOG: %cStart Phase MessagePhase color:green;
+[22:48:03.488] LOG: %cStart Phase FaintPhase color:green;
+[22:48:04.762] LOG: %cStart Phase MessagePhase color:green;
+[22:52:16.120] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:52:16.357] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:52:16.626] LOG: %cStart Phase MessagePhase color:green;
+[22:52:16.939] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:52:16.974] LOG: %cStart Phase VictoryPhase color:green;
+[22:52:16.975] LOG: Applied Soothe Bell 
+[22:52:16.976] LOG: %cStart Phase ExpPhase color:green;
+[22:52:16.976] LOG: Applied Super EXP. Charm 
+[22:52:16.976] LOG: Applied EXP. Charm 
+[22:52:17.939] LOG: %cStart Phase LevelUpPhase color:green;
+[22:52:17.939] LOG: Applied Zinc 
+[22:52:17.939] LOG: Applied HP Up 
+[22:52:18.629] LOG: %cStart Phase ExpPhase color:green;
+[22:52:18.630] LOG: Applied Super EXP. Charm 
+[22:52:18.630] LOG: Applied EXP. Charm 
+[22:52:19.239] LOG: %cStart Phase LevelUpPhase color:green;
+[22:52:19.239] LOG: Applied Protein 
+[22:52:42.493] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:52:42.493] LOG: Applied Super EXP. Charm 
+[22:52:42.493] LOG: Applied EXP. Charm 
+[22:52:43.095] LOG: %cStart Phase LevelUpPhase color:green;
+[22:52:56.669] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:52:56.757] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:52:56.757] LOG: Applied Super EXP. Charm 
+[22:52:56.758] LOG: Applied EXP. Charm 
+[22:52:57.359] LOG: %cStart Phase LevelUpPhase color:green;
+[22:55:02.074] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:55:02.172] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:55:02.172] LOG: Applied Super EXP. Charm 
+[22:55:02.172] LOG: Applied EXP. Charm 
+[22:55:02.777] LOG: %cStart Phase LevelUpPhase color:green;
+[22:55:02.777] LOG: Applied Protein 
+[22:55:03.559] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:55:03.656] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:55:03.656] LOG: Applied Super EXP. Charm 
+[22:55:03.656] LOG: Applied EXP. Charm 
+[22:55:04.259] LOG: %cStart Phase LevelUpPhase color:green;
+[22:55:04.858] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:55:04.956] LOG: %cStart Phase MoveEndPhase color:green;
+[22:55:04.958] LOG: %cStart Phase MovePhase color:green;
+[22:55:04.958] LOG: %cStart Phase MoveEndPhase color:green;
+[22:55:04.958] LOG: %cStart Phase MovePhase color:green;
+[22:55:04.958] LOG: %cUser: Mawile
+Move: METEOR_MASH
+Use Mode: NORMAL color:orchid
+[22:55:04.960] LOG: %cStart Phase MessagePhase color:green;
+[22:55:05.138] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:55:06.090] LOG: crit stage: +0
+[22:55:06.092] LOG: Move: Meteor Mash | Base damage: 62.30593406593406 | Power: 90 | Source attack: 206 | Target defense: 182
+[22:55:06.093] LOG: Move: Meteor Mash | Attack damage: 120
+[22:55:06.093] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:55:06.123] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:55:06.390] LOG: %cStart Phase MessagePhase color:green;
+[22:55:06.688] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:55:07.638] LOG: crit stage: +0
+[22:55:07.640] LOG: Move: Meteor Mash | Base damage: 92.4589010989011 | Power: 90 | Source attack: 309 | Target defense: 182
+[22:55:07.641] LOG: Move: Meteor Mash | Attack damage: 44
+[22:55:07.641] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:55:07.673] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:55:07.924] LOG: %cStart Phase MessagePhase color:green;
+[22:55:08.221] LOG: %cStart Phase MessagePhase color:green;
+[22:55:08.504] LOG: %cStart Phase FaintPhase color:green;
+[22:55:10.623] LOG: %cStart Phase MessagePhase color:green;
+[22:55:36.965] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:55:37.206] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:55:37.473] LOG: %cStart Phase MessagePhase color:green;
+[22:55:37.788] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:55:37.822] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:55:38.071] LOG: %cStart Phase PokemonHealPhase color:green;
+[22:55:38.306] LOG: Applied Healing Charm 
+[22:55:38.308] LOG: %cStart Phase MessagePhase color:green;
+[22:55:38.654] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:55:38.689] LOG: %cStart Phase VictoryPhase color:green;
+[22:55:38.689] LOG: Applied Soothe Bell 
+[22:55:38.690] LOG: %cStart Phase ExpPhase color:green;
+[22:55:38.690] LOG: Applied Super EXP. Charm 
+[22:55:38.690] LOG: Applied EXP. Charm 
+[22:55:39.539] LOG: %cStart Phase LevelUpPhase color:green;
+[22:55:39.539] LOG: Applied Zinc 
+[22:55:39.539] LOG: Applied HP Up 
+[22:55:40.395] LOG: %cStart Phase ExpPhase color:green;
+[22:55:40.395] LOG: Applied Super EXP. Charm 
+[22:55:40.395] LOG: Applied EXP. Charm 
+[22:55:41.122] LOG: %cStart Phase LevelUpPhase color:green;
+[22:55:41.122] LOG: Applied Protein 
+[22:55:41.678] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:55:41.678] LOG: Applied Super EXP. Charm 
+[22:55:41.678] LOG: Applied EXP. Charm 
+[22:55:42.273] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:55:42.373] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:55:42.373] LOG: Applied Super EXP. Charm 
+[22:55:42.373] LOG: Applied EXP. Charm 
+[22:55:42.973] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:55:43.072] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:55:43.072] LOG: Applied Super EXP. Charm 
+[22:55:43.073] LOG: Applied EXP. Charm 
+[22:55:43.673] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:55:43.772] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:55:43.773] LOG: Applied Super EXP. Charm 
+[22:55:43.773] LOG: Applied EXP. Charm 
+[22:55:44.371] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:55:44.471] LOG: %cStart Phase MoveEndPhase color:green;
+[22:55:44.471] LOG: %cStart Phase MovePhase color:green;
+[22:55:44.471] LOG: %cStart Phase MoveEndPhase color:green;
+[22:55:44.471] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:55:44.471] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:55:44.471] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:55:44.471] LOG: %cStart Phase BerryPhase color:green;
+[22:55:44.472] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:55:44.472] LOG: %cStart Phase TurnEndPhase color:green;
+[22:55:44.473] LOG: %cStart Phase BattleEndPhase color:green;
+[22:55:44.473] LOG: Battle Score: 387 (1 Turns x1)
+[22:55:44.473] LOG: Total Score: 11685
+[22:55:44.477] LOG: Applied Zinc 
+[22:55:44.477] LOG: Applied HP Up 
+[22:55:44.477] LOG: Applied Protein 
+[22:55:44.478] LOG: Applied Protein 
+[22:55:44.481] LOG: %cStart Phase EggLapsePhase color:green;
+[22:55:44.481] LOG: %cStart Phase SelectModifierPhase color:green;
+[22:55:44.481] LOG: Wave Seed: §Æ¬ ¥ÄÀ©Â£Ã¾ÇÂ¢¦ 87
+[22:55:44.487] LOG: Applied Golden Poké Ball 
+[22:55:44.487] LOG: 0 0 [4,5]
+[22:55:44.487] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[22:55:44.487] LOG: 1 0 [2,3,4,5,6,7,8,9,10,16,23]
+[22:55:44.487] LOG: {"id":"PP_UP","localeKey":"modifierType:ModifierType.PP_UP","iconImage":"pp_up","group":"ppUp","soundName":"se/restore","tier":1,"upPoints":1} 
+[22:55:44.487] LOG: 18 5 [9,11,12,13,15,22,25]
+[22:55:44.487] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"hard_stone","soundName":"se/restore","tier":2,"moveType":5,"boostPercent":20} 
+[22:55:44.488] LOG: 3 0 [4,5]
+[22:55:44.488] LOG: {"id":"SUPER_POTION","localeKey":"modifierType:ModifierType.SUPER_POTION","iconImage":"super_potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":50,"restorePercent":25,"healStatus":false} 
