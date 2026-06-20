@@ -21,6 +21,13 @@ const PANEL_H = 96;
 const COL_GAP = 92;
 const ROW_H = 14;
 const ROW_TOP = 44;
+/** How many list rows show at once per column before the column scrolls. */
+const VISIBLE_ROWS = 5;
+/** Left side panel (learning mon's icon + BST), drawn left of the main window. */
+const LEFT_W = 48;
+const LEFT_GAP = 6;
+const LEFT_X = PANEL_X - LEFT_W - LEFT_GAP;
+const LEFT_H = 62;
 
 /**
  * ER QoL Move Learn panel (see {@linkcode LearnMoveBatchPhase}). One screen on
@@ -30,7 +37,11 @@ const ROW_TOP = 44;
  * The learned move drops off the LEARNABLE list (it thins down) so the same move
  * can never be learned twice. Cancel (X / controller / mobile) asks to confirm
  * only when nothing was learned. The highlighted move's info shows via the shared
- * {@linkcode MoveInfoOverlay} (the same panel the combat move-select uses).
+ * {@linkcode MoveInfoOverlay}.
+ *
+ * Both columns SCROLL within a fixed {@linkcode VISIBLE_ROWS} window, so a long
+ * learnable list (mass level-up) and a large moveset (up to 8 slots) never
+ * overflow the panel. A small left panel shows the learning mon's icon + BST.
  */
 export class LearnMoveBatchUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
@@ -38,23 +49,31 @@ export class LearnMoveBatchUiHandler extends UiHandler {
   private currentHeader: Phaser.GameObjects.Text;
   private learnableTexts: Phaser.GameObjects.Text[] = [];
   private currentTexts: Phaser.GameObjects.Text[] = [];
-  private cancelText: Phaser.GameObjects.Text;
   private promptText: Phaser.GameObjects.Text;
   private cursorObj: Phaser.GameObjects.Image | null = null;
   private moveInfoOverlay: MoveInfoOverlay;
+  // Scroll indicators (one pair per column), shown only when there's more to see.
+  private learnUp: Phaser.GameObjects.Text;
+  private learnDown: Phaser.GameObjects.Text;
+  private currentUp: Phaser.GameObjects.Text;
+  private currentDown: Phaser.GameObjects.Text;
+  // Left panel: the learning mon's icon (built per-show) + its BST.
+  private bstValue: Phaser.GameObjects.Text;
+  private sideIcon: Phaser.GameObjects.Container | null = null;
 
   private deps: LearnMoveBatchDeps | null = null;
   private state: PanelState = "pickNew";
-  /** Cursor in the LEARNABLE column; the extra final row is the Cancel button. */
+  /** Cursor in the LEARNABLE column; the extra final rows are Undo / Cancel. */
   private newCursor = 0;
   /** Cursor in the CURRENT column when choosing which move to overwrite. */
   private slotCursor = 0;
+  /** Top visible row of each column (scroll offset). */
+  private newScroll = 0;
+  private slotScroll = 0;
   /** Cursor over the confirm-cancel choice: 0 = No (go back), 1 = Yes (leave). */
   private confirmCursor = 0;
   private pendingMoveId: MoveId | null = null;
   private learnedAny = false;
-  /** Bottom "Undo" row, shown only after a move's been learned this session. */
-  private undoText: Phaser.GameObjects.Text;
   /** The full learnable list when the panel opened, so Undo can restore it. */
   private originalLearnable: MoveId[] = [];
 
@@ -64,27 +83,46 @@ export class LearnMoveBatchUiHandler extends UiHandler {
 
   setup(): void {
     const ui = this.getUi();
-    // The UI container's origin is BOTTOM-left (positive y = DOWN / off-screen),
-    // so a visible panel must shift UP by ~canvas height (see ErQuizUiHandler at
-    // (0, -height)). Position the container so the window lands CENTERED on screen;
-    // children keep their positive PANEL_X/PANEL_Y offsets.
     const sc = globalScene.scaledCanvas;
     const overlayH = MoveInfoOverlay.getHeight(true);
-    const winX = Math.floor((sc.width - PANEL_W) / 2);
-    // Centre the panel in the space ABOVE the bottom move-info strip so it never
-    // overlaps the description/stats box.
+    // Centre the LEFT panel + main panel as a group in the space above the
+    // bottom move-info strip. Children keep their PANEL_X / LEFT_X offsets.
+    const totalW = LEFT_W + LEFT_GAP + PANEL_W;
+    const mainX = Math.floor((sc.width - totalW) / 2) + LEFT_W + LEFT_GAP;
     const winY = Math.floor((sc.height - overlayH - PANEL_H) / 2) - sc.height;
-    this.container = globalScene.add.container(winX - PANEL_X, winY - PANEL_Y);
+    this.container = globalScene.add.container(mainX - PANEL_X, winY - PANEL_Y);
     this.container.setVisible(false);
     ui.add(this.container);
 
     this.container.add(addWindow(PANEL_X, PANEL_Y, PANEL_W, PANEL_H));
+
+    // Left panel: window + "BST" label (the icon + value are built per-show).
+    this.container.add(addWindow(LEFT_X, PANEL_Y, LEFT_W, LEFT_H));
+    const bstLabel = addTextObject(LEFT_X + LEFT_W / 2, PANEL_Y + 40, "BST", TextStyle.SUMMARY_GOLD).setOrigin(0.5, 0);
+    this.bstValue = addTextObject(LEFT_X + LEFT_W / 2, PANEL_Y + 50, "", TextStyle.WINDOW).setOrigin(0.5, 0);
+    this.container.add([bstLabel, this.bstValue]);
+
     this.learnableHeader = addTextObject(PANEL_X + 6, ROW_TOP - 18, "Learnable", TextStyle.WINDOW_ALT);
     this.currentHeader = addTextObject(PANEL_X + 6 + COL_GAP, ROW_TOP - 18, "Current", TextStyle.WINDOW_ALT);
-    this.cancelText = addTextObject(PANEL_X + 6, ROW_TOP + ROW_H * 5, "Cancel", TextStyle.WINDOW);
-    this.undoText = addTextObject(PANEL_X + 6, ROW_TOP + ROW_H * 4, "Undo", TextStyle.WINDOW).setVisible(false);
     this.promptText = addTextObject(PANEL_X + 8, PANEL_Y + 8, "", TextStyle.WINDOW).setVisible(false);
-    this.container.add([this.learnableHeader, this.currentHeader, this.cancelText, this.undoText, this.promptText]);
+    this.container.add([this.learnableHeader, this.currentHeader, this.promptText]);
+
+    // Scroll arrows: ^ just under each header, v just under the last visible row.
+    const arrowTopY = ROW_TOP - 9;
+    const arrowBotY = ROW_TOP + VISIBLE_ROWS * ROW_H - 4;
+    this.learnUp = addTextObject(PANEL_X + 78, arrowTopY, "↑", TextStyle.WINDOW)
+      .setOrigin(1, 0)
+      .setVisible(false);
+    this.learnDown = addTextObject(PANEL_X + 78, arrowBotY, "↓", TextStyle.WINDOW)
+      .setOrigin(1, 0)
+      .setVisible(false);
+    this.currentUp = addTextObject(PANEL_X + 78 + COL_GAP, arrowTopY, "↑", TextStyle.WINDOW)
+      .setOrigin(1, 0)
+      .setVisible(false);
+    this.currentDown = addTextObject(PANEL_X + 78 + COL_GAP, arrowBotY, "↓", TextStyle.WINDOW)
+      .setOrigin(1, 0)
+      .setVisible(false);
+    this.container.add([this.learnUp, this.learnDown, this.currentUp, this.currentDown]);
 
     this.cursorObj = globalScene.add.image(0, 0, "cursor").setOrigin(0, 0.5);
     this.container.add(this.cursorObj);
@@ -110,10 +148,13 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       this.state = "pickNew";
       this.newCursor = 0;
       this.slotCursor = 0;
+      this.newScroll = 0;
+      this.slotScroll = 0;
       this.confirmCursor = 0;
       this.pendingMoveId = null;
       this.learnedAny = false;
       this.originalLearnable = [...this.deps.learnableIds];
+      this.buildSidePanel();
       this.container.setVisible(true);
       this.active = true;
       this.render();
@@ -128,10 +169,40 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     return true;
   }
 
+  /** Build the left panel's icon + BST for the current mon. */
+  private buildSidePanel(): void {
+    this.destroySideIcon();
+    const pokemon = this.deps!.pokemon;
+    this.sideIcon = globalScene.addPokemonIcon(pokemon, LEFT_X + LEFT_W / 2, PANEL_Y + 22, 0.5, 0.5, true);
+    this.container.add(this.sideIcon);
+    this.bstValue.setText(`${pokemon.getSpeciesForm().getBaseStatTotal()}`);
+  }
+
   /** Free slots available on the mon right now. */
   private freeSlotIndex(): number {
     const moveset = this.deps!.pokemon.getMoveset(true);
     return moveset.length < this.deps!.pokemon.getMaxMoveCount() ? moveset.length : -1;
+  }
+
+  /** LEARNABLE rows: the learnable moves, then Undo (if anything's been learned) then Cancel. */
+  private learnableRows(): string[] {
+    const rows = this.deps!.learnableIds.map(id => allMoves[id].name);
+    if (this.learnedAny) {
+      rows.push("Undo");
+    }
+    rows.push("Cancel");
+    return rows;
+  }
+
+  /** CURRENT rows: the live moveset, padded with "(empty)" up to the max slots. */
+  private currentRows(): string[] {
+    const moveset = this.deps!.pokemon.getMoveset(true);
+    const max = this.deps!.pokemon.getMaxMoveCount();
+    const rows: string[] = [];
+    for (let i = 0; i < max; i++) {
+      rows.push(i < moveset.length ? moveset[i].getName() : "(empty)");
+    }
+    return rows;
   }
 
   private render(): void {
@@ -141,19 +212,18 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     }
     const confirming = this.state === "confirmCancel";
     this.promptText.setVisible(confirming);
-    for (const t of [this.learnableHeader, this.currentHeader, this.cancelText]) {
+    for (const t of [this.learnableHeader, this.currentHeader]) {
       t.setVisible(!confirming);
     }
 
     if (confirming) {
-      // Hide the move lists + cursor so only the confirm prompt shows (otherwise
-      // the Learnable/Current rows bleed through behind the question).
+      // Hide the move lists + arrows + cursor so only the confirm prompt shows.
       for (const t of [...this.learnableTexts, ...this.currentTexts]) {
         t.setVisible(false);
       }
-      this.undoText.setVisible(false);
-      // Fixed 3-line layout (NO word-wrap - the wrap units differ from pixels and
-      // overflowed). Short lines so they fit the window at the panel font size.
+      for (const a of [this.learnUp, this.learnDown, this.currentUp, this.currentDown]) {
+        a.setVisible(false);
+      }
       this.promptText.setText(
         `Skip learning\nany new moves?\n  ${this.confirmCursor === 0 ? "> " : "   "}No    ${this.confirmCursor === 1 ? "> " : "   "}Yes`,
       );
@@ -162,37 +232,52 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       return;
     }
 
-    // LEARNABLE column (left).
-    for (const t of this.learnableTexts) {
-      t.destroy();
-    }
-    this.learnableTexts = deps.learnableIds.map((id, i) => {
-      const t = addTextObject(PANEL_X + 12, ROW_TOP + i * ROW_H, allMoves[id].name, TextStyle.WINDOW);
-      this.container.add(t);
-      return t;
-    });
-    // Trailing rows: "Undo" (only after a move's been learned) then "Cancel".
-    const learnCount = deps.learnableIds.length;
-    this.undoText.setVisible(this.learnedAny);
-    this.undoText.setY(ROW_TOP + learnCount * ROW_H);
-    this.cancelText.setY(ROW_TOP + (learnCount + (this.learnedAny ? 1 : 0)) * ROW_H);
-
-    // CURRENT column (right): the live moveset + any empty slots.
-    for (const t of this.currentTexts) {
-      t.destroy();
-    }
-    const moveset = deps.pokemon.getMoveset(true);
-    const max = deps.pokemon.getMaxMoveCount();
-    this.currentTexts = [];
-    for (let i = 0; i < max; i++) {
-      const label = i < moveset.length ? moveset[i].getName() : "(empty)";
-      const t = addTextObject(PANEL_X + 12 + COL_GAP, ROW_TOP + i * ROW_H, label, TextStyle.WINDOW);
-      this.container.add(t);
-      this.currentTexts.push(t);
-    }
+    this.learnableTexts = this.renderColumn(
+      this.learnableTexts,
+      this.learnableRows(),
+      this.newScroll,
+      PANEL_X + 12,
+      this.learnUp,
+      this.learnDown,
+    );
+    this.currentTexts = this.renderColumn(
+      this.currentTexts,
+      this.currentRows(),
+      this.slotScroll,
+      PANEL_X + 12 + COL_GAP,
+      this.currentUp,
+      this.currentDown,
+    );
 
     this.positionCursor();
     this.updateInfo();
+  }
+
+  /**
+   * Render one column's VISIBLE_ROWS-tall window of `rows` starting at `scroll`,
+   * reusing/destroying the old text objects, and toggle its up/down arrows.
+   */
+  private renderColumn(
+    old: Phaser.GameObjects.Text[],
+    rows: string[],
+    scroll: number,
+    x: number,
+    upArrow: Phaser.GameObjects.Text,
+    downArrow: Phaser.GameObjects.Text,
+  ): Phaser.GameObjects.Text[] {
+    for (const t of old) {
+      t.destroy();
+    }
+    const out: Phaser.GameObjects.Text[] = [];
+    const end = Math.min(scroll + VISIBLE_ROWS, rows.length);
+    for (let i = scroll; i < end; i++) {
+      const t = addTextObject(x, ROW_TOP + (i - scroll) * ROW_H, rows[i], TextStyle.WINDOW);
+      this.container.add(t);
+      out.push(t);
+    }
+    upArrow.setVisible(scroll > 0);
+    downArrow.setVisible(scroll + VISIBLE_ROWS < rows.length);
+    return out;
   }
 
   private positionCursor(): void {
@@ -200,10 +285,28 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       return;
     }
     this.cursorObj.setVisible(true);
-    // Origin is (0, 0.5): x = arrow's left edge (just left of the column text at
-    // PANEL_X + 12), y = vertical centre of the row.
-    const cy = ROW_TOP + (this.state === "pickSlot" ? this.slotCursor : this.newCursor) * ROW_H + Math.floor(ROW_H / 2);
-    this.cursorObj.setPosition(PANEL_X + 4 + (this.state === "pickSlot" ? COL_GAP : 0), cy);
+    const isSlot = this.state === "pickSlot";
+    const cursor = isSlot ? this.slotCursor : this.newCursor;
+    const scroll = isSlot ? this.slotScroll : this.newScroll;
+    // Origin (0, 0.5): x = arrow's left edge (just left of the column text at
+    // PANEL_X + 12), y = vertical centre of the cursor's VISIBLE row.
+    const cy = ROW_TOP + (cursor - scroll) * ROW_H + Math.floor(ROW_H / 2);
+    this.cursorObj.setPosition(PANEL_X + 4 + (isSlot ? COL_GAP : 0), cy);
+  }
+
+  /** Keep the active column's cursor inside its visible window (scroll if needed). */
+  private clampScroll(): void {
+    if (this.state === "pickSlot") {
+      if (this.slotCursor < this.slotScroll) {
+        this.slotScroll = this.slotCursor;
+      } else if (this.slotCursor >= this.slotScroll + VISIBLE_ROWS) {
+        this.slotScroll = this.slotCursor - VISIBLE_ROWS + 1;
+      }
+    } else if (this.newCursor < this.newScroll) {
+      this.newScroll = this.newCursor;
+    } else if (this.newCursor >= this.newScroll + VISIBLE_ROWS) {
+      this.newScroll = this.newCursor - VISIBLE_ROWS + 1;
+    }
   }
 
   /** Show the highlighted move's info (learnable move, or the slot's current move). */
@@ -289,8 +392,7 @@ export class LearnMoveBatchUiHandler extends UiHandler {
       }
       if (success) {
         globalScene.ui.playSelect();
-        this.positionCursor();
-        this.updateInfo();
+        this.render();
       }
       return success;
     }
@@ -311,19 +413,20 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     }
     if (success) {
       globalScene.ui.playSelect();
-      this.positionCursor();
-      this.updateInfo();
+      this.render();
     }
     return success;
   }
 
   private moveNewCursor(delta: number): boolean {
     this.newCursor += delta;
+    this.clampScroll();
     return true;
   }
 
   private moveSlotCursor(delta: number): boolean {
     this.slotCursor += delta;
+    this.clampScroll();
     return true;
   }
 
@@ -349,9 +452,9 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     this.pendingMoveId = moveId;
     this.state = "pickSlot";
     this.slotCursor = 0;
+    this.slotScroll = 0;
     globalScene.ui.playSelect();
-    this.positionCursor();
-    this.updateInfo();
+    this.render();
     return true;
   }
 
@@ -380,6 +483,7 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     if (this.newCursor > this.deps!.learnableIds.length) {
       this.newCursor = this.deps!.learnableIds.length; // keep cursor in range (Cancel row)
     }
+    this.clampScroll();
     this.render();
   }
 
@@ -409,6 +513,7 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     if (this.newCursor > lastRow) {
       this.newCursor = lastRow;
     }
+    this.clampScroll();
     globalScene.ui.playSelect();
     this.render();
   }
@@ -422,6 +527,13 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     return true;
   }
 
+  private destroySideIcon(): void {
+    if (this.sideIcon) {
+      this.sideIcon.destroy();
+      this.sideIcon = null;
+    }
+  }
+
   override clear(): void {
     super.clear();
     this.container.setVisible(false);
@@ -431,6 +543,7 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     }
     this.learnableTexts = [];
     this.currentTexts = [];
+    this.destroySideIcon();
     this.deps = null;
   }
 }
