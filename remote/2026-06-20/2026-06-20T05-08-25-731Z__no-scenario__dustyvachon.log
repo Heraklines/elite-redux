@@ -1,0 +1,24 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqlvdap9-3svb
+mode:     0  wave:?
+seed:     uKxE528MbskKHPacuSFx2ygf
+party:    
+enemy:    
+
+----- COMMENT -----
+When scrolling through the Dev Scenarios and back out, the game freezes in its entirety and forces you to refresh
+
+----- CONSOLE -----
+[05:05:20.103] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[05:05:20.454] LOG: [ER] build mqlvdap9-3svb
+[05:05:20.842] LOG: [dev-tools] loaded — 245 scenarios + Send Logs button
+[05:06:42.766] DEBUG: Destroying loading scene
+[05:06:42.766] DEBUG: Destroyed loading scene
+[05:06:42.814] LOG: Seed: uKxE528MbskKHPacuSFx2ygf
+[05:06:42.814] LOG: Wave Seed: uKxE528MbskKHPacuSFx2ygf 0
+[05:06:43.719] LOG: %cStart Phase LoginPhase color:green;
+[05:06:44.472] LOG: Client Session: PHSZ3Ls1rSmzWX0CTqbjEsYBd4hxXJzz
+[05:06:45.197] LOG: %cStart Phase TitlePhase color:green;
+[05:06:45.197] LOG: Getting Session Slot id: %d 0
+[05:06:45.210] LOG: use seasonal splash messages true
+[05:06:45.210] LOG: Adding 2 Pride Month splash messages (weight: x15)
