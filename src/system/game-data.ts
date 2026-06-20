@@ -168,6 +168,35 @@ interface CloudSyncState {
   failureCount?: number;
 }
 
+/**
+ * Write to localStorage without letting a failure abort the save flow. A bloated
+ * system save - most often a very large egg inventory - can push `data_<user>`
+ * (or a `sessionData_<user>` slot) past the browser's ~5MB localStorage quota, at
+ * which point `setItem` throws QuotaExceededError. Left uncaught inside
+ * {@linkcode GameData.saveSystem} / {@linkcode GameData.saveAll}, that rejected
+ * the save promise mid-flow: the saving icon spun forever (Save & Quit appeared to
+ * "freeze"), the cloud push was skipped, and the player had to refresh. This
+ * swallows the error and returns false so callers can warn the player and still
+ * push to the cloud (which serializes from the in-memory objects, not from
+ * localStorage, so a too-large local save can still sync).
+ * @returns true if the write landed, false if it was rejected (e.g. quota full).
+ */
+export function trySetLocalStorageItem(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (err) {
+    const quota =
+      err instanceof DOMException
+      && (err.name === "QuotaExceededError" || err.name === "NS_ERROR_DOM_QUOTA_REACHED" || err.code === 22);
+    console.error(
+      `Failed to write "${key}" to localStorage${quota ? " - browser storage is full (save too large, e.g. too many eggs)" : ""}:`,
+      err,
+    );
+    return false;
+  }
+}
+
 export class GameData {
   public trainerId: number;
   public secretId: number;
@@ -186,6 +215,17 @@ export class GameData {
    * save is local-only right now.
    */
   public lastCloudSyncFailed = false;
+
+  /**
+   * ER: set when a localStorage write (system or session save) was rejected -
+   * typically QuotaExceededError, the browser's ~5MB cap exceeded by a bloated
+   * save (e.g. a very large egg inventory). The save flow no longer throws on this
+   * (which froze Save & Quit); it warns once and still attempts the cloud push.
+   * Reset on the next successful local write.
+   */
+  public lastLocalSaveFailed = false;
+  /** Guards the "storage full" player notice so it shows once, not every save. */
+  private warnedLocalStorageFull = false;
 
   public gender: PlayerGender;
 
@@ -315,6 +355,30 @@ export class GameData {
     return this.unlocks[unlockable];
   }
 
+  /**
+   * Surface a one-time, non-blocking notice that a local save was rejected for
+   * lack of browser storage (see {@linkcode trySetLocalStorageItem}). Best-effort:
+   * if the current UI context can't show a queued message, the console error from
+   * the failed write is the fallback. The guard resets on the next save that fits,
+   * so the player is re-warned if they fill storage again.
+   */
+  private warnLocalStorageFull(): void {
+    this.lastLocalSaveFailed = true;
+    if (this.warnedLocalStorageFull) {
+      return;
+    }
+    this.warnedLocalStorageFull = true;
+    try {
+      globalScene.phaseManager.queueMessage(
+        "This browser's storage is full, so your game could not be saved locally - your save has grown too large, usually from holding too many eggs. Hatch or release some eggs, then save again. (Cloud sync was still attempted.)",
+        null,
+        true,
+      );
+    } catch (e) {
+      console.debug("Could not show the localStorage-full notice in the current UI context:", e);
+    }
+  }
+
   public async saveSystem(forceSync = false): Promise<boolean> {
     globalScene.ui.savingIcon.show();
     // Catch-all for the one-time Legendary-egg gift: a brand-new account never
@@ -328,16 +392,24 @@ export class GameData {
       typeof v === "bigint" ? (v <= maxIntAttrValue ? Number(v) : v.toString()) : v,
     );
 
-    localStorage.setItem(`data_${loggedInUser?.username}`, encrypt(systemData, bypassLogin));
+    const localSaved = trySetLocalStorageItem(`data_${loggedInUser?.username}`, encrypt(systemData, bypassLogin));
+    if (localSaved) {
+      this.warnedLocalStorageFull = false;
+      this.lastLocalSaveFailed = false;
+    } else {
+      // Storage full: warn once and fall through so the cloud push still runs (it
+      // serializes from `systemData`, not localStorage) instead of freezing here.
+      this.warnLocalStorageFull();
+    }
 
     if (bypassLogin) {
       globalScene.ui.savingIcon.hide();
-      return true;
+      return localSaved;
     }
 
     if (!forceSync && !this.shouldAttemptCloudSync()) {
       globalScene.ui.savingIcon.hide();
-      return true;
+      return localSaved;
     }
 
     const error = await pokerogueApi.savedata.system.update({ clientSessionId }, systemData);
@@ -1718,7 +1790,7 @@ export class GameData {
       clientSessionId,
     };
 
-    localStorage.setItem(
+    const systemSaved = trySetLocalStorageItem(
       `data_${loggedInUser?.username}`,
       encrypt(
         JSON.stringify(systemData, (_k: any, v: any) =>
@@ -1728,10 +1800,20 @@ export class GameData {
       ),
     );
 
-    localStorage.setItem(
+    const sessionSaved = trySetLocalStorageItem(
       getSessionDataLocalStorageKey(globalScene.sessionSlotId),
       encrypt(JSON.stringify(sessionData), bypassLogin),
     );
+
+    if (systemSaved && sessionSaved) {
+      this.warnedLocalStorageFull = false;
+      this.lastLocalSaveFailed = false;
+    } else {
+      // Storage full: warn once and keep going - the cloud `updateAll` below pushes
+      // `request` (built from the in-memory data, not localStorage), so progress
+      // still syncs and Save & Quit no longer freezes on a QuotaExceededError.
+      this.warnLocalStorageFull();
+    }
 
     console.debug(`Session data saved to slot ${globalScene.sessionSlotId}!`);
 
