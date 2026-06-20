@@ -1,0 +1,91 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqlzms76-66xq
+mode:     4  wave:70
+seed:     H2JWXXWjSAT815XhoSVtOz7T
+party:    Gallade Redux(L52 187hp f0), Slyduck(L56 143hp f0), Gimmighoul(L56 72hp f0), Ampharos(L46 0hp f0), Kingambit Redux(L52 161hp f0), Milotic(L56 166hp f1)
+enemy:    Baxcalibur(L56)
+
+----- CONSOLE -----
+[10:34:12.267] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[10:34:12.519] LOG: [ER] build mqlzms76-66xq
+[10:34:12.552] LOG: [dev-tools] loaded — 258 scenarios + Send Logs button
+[10:34:19.885] DEBUG: Destroying loading scene
+[10:34:19.885] DEBUG: Destroyed loading scene
+[10:34:19.923] LOG: Seed: m5NZP3yReJdvOdJn6xk9vK9d
+[10:34:19.924] LOG: Wave Seed: m5NZP3yReJdvOdJn6xk9vK9d 0
+[10:34:21.335] LOG: %cStart Phase LoginPhase color:green;
+[10:34:21.670] LOG: Client Session: 66LvU1NVnND3kMmV40iFiy86rqDxOil9
+[10:34:22.318] DEBUG: Using cached system data
+[10:34:22.355] LOG: %cStart Phase TitlePhase color:green;
+[10:34:22.356] LOG: Getting Session Slot id: %d 3
+[10:34:22.364] LOG: use seasonal splash messages true
+[10:34:22.364] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[10:34:24.479] LOG: Getting Session Slot id: %d 3
+[10:34:24.484] LOG: Wave Seed: H2JWXXWjSAT815XhoSVtOz7T 0
+[10:34:24.485] LOG: Seed: H2JWXXWjSAT815XhoSVtOz7T
+[10:34:24.514] LOG: Wave Seed: x°~w{®µºÀ} 70
+[10:34:24.522] LOG: Applied Carbos 
+[10:34:24.522] LOG: Applied Carbos 
+[10:34:24.523] LOG: Applied Carbos 
+[10:34:24.523] LOG: Applied Carbos 
+[10:34:24.525] LOG: Applied Carbos 
+[10:34:24.525] LOG: Applied Carbos 
+[10:34:24.558] LOG: %cStart Phase EncounterPhase color:green;
+[10:34:24.561] LOG: Pokemon: Wild Baxcalibur | Species ID: 998 | Level: 56 | Nature: Quiet (+SpAtk/-Spd)
+[10:34:24.562] LOG: Stats (IVs): HP: 199 (9), Atk: 178 (20), Def: 115 (14), Spatk: 114 (25), Spdef: 112 (20), Spd: 104 (25)
+[10:34:24.562] LOG: Ability: Freezing Point | Passive Ability: Thermal Exchange | Boss Bars: 3
+[10:34:24.562] LOG: Moveset: ["Outrage","Mountain Gale","Dragon Rush","Glaive Rush"]
+[10:34:25.221] LOG: Wave Seed: x°~w{®µºÀ} 70
+[10:34:25.643] LOG: %cStart Phase SummonPhase color:green;
+[10:34:25.795] LOG: Applied Carbos 
+[10:34:25.796] LOG: Applied Carbos 
+[10:34:25.824] WARN: cry/350-mega not found
+[10:34:25.927] LOG: %cStart Phase CheckSwitchPhase color:green;
+[10:34:27.225] LOG: %cStart Phase SwitchPhase color:green;
+[10:34:28.272] LOG: %cStart Phase SwitchSummonPhase color:green;
+[10:34:28.455] LOG: Applied Carbos 
+[10:34:28.455] LOG: Applied Carbos 
+[10:34:28.479] WARN: cry/853 not found
+[10:34:28.600] LOG: %cStart Phase ShinySparklePhase color:green;
+[10:34:28.689] LOG: %cStart Phase PostSummonPhase color:green;
+[10:34:28.689] LOG: Ran PSP for: Gallade Redux
+[10:34:28.690] LOG: %cStart Phase PostSummonPhase color:green;
+[10:34:28.690] LOG: %cStart Phase PostSummonPhase color:green;
+[10:34:28.690] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:34:28.849] LOG: %cStart Phase MovePhase color:green;
+[10:34:28.849] LOG: %cUser: Gallade Redux
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[10:34:28.851] LOG: %cStart Phase MessagePhase color:green;
+[10:34:28.969] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:34:28.977] LOG: %cStart Phase MessagePhase color:green;
+[10:34:29.242] LOG: %cStart Phase MoveEndPhase color:green;
+[10:34:29.242] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:34:29.267] LOG: %cStart Phase InitEncounterPhase color:green;
+[10:34:29.267] LOG: %cStart Phase PostSummonPhase color:green;
+[10:34:29.267] LOG: Ran PSP for: Baxcalibur
+[10:34:29.267] LOG: %cStart Phase PostSummonPhase color:green;
+[10:34:29.267] LOG: %cStart Phase PostSummonPhase color:green;
+[10:34:29.268] LOG: %cStart Phase TurnInitPhase color:green;
+[10:34:29.268] LOG: %cStart Phase CommandPhase color:green;
+[10:34:30.376] LOG: Move: PIXIE_SLASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Gallade Redux
+[10:34:30.378] LOG: %cStart Phase EnemyCommandPhase color:green;
+[10:34:30.382] LOG: Battle Seed: rYE0AGwmi0OqRiPD
+[10:34:30.385] LOG: Move Pool: ["Outrage","Mountain Gale","Dragon Rush","Glaive Rush"]
+[10:34:30.385] LOG: Move Scores: [36,13.5,21,28.5]
+[10:34:30.385] LOG: Sorted Move Pool: ["Outrage","Glaive Rush","Dragon Rush","Mountain Gale"]
+[10:34:30.385] LOG: Chosen Move: Glaive Rush
+[10:34:30.385] LOG: %cStart Phase TurnStartPhase color:green;
+[10:34:30.385] ERROR: [unhandledrejection] TypeError: Cannot read properties of null (reading 'getAllActiveAbilityAttrs')
+TypeError: Cannot read properties of null (reading 'getAllActiveAbilityAttrs')
+    at TurnStartPhase.queuePreemptiveCounters (https://elite-redux-staging.pages.dev/assets/battle-scene-0-2S0oqT.js:461:7111)
+    at TurnStartPhase.start (https://elite-redux-staging.pages.dev/assets/battle-scene-0-2S0oqT.js:461:8039)
+    at PhaseManager.startCurrentPhase (https://elite-redux-staging.pages.dev/assets/battle-scene-0-2S0oqT.js:461:19255)
+    at PhaseManager.shiftPhase (https://elite-redux-staging.pages.dev/assets/battle-scene-0-2S0oqT.js:461:19122)
+    at EnemyCommandPhase.end (https://elite-redux-staging.pages.dev/assets/battle-scene-0-2S0oqT.js:18:11383)
+    at EnemyCommandPhase.start (https://elite-redux-staging.pages.dev/assets/battle-scene-0-2S0oqT.js:22:46270)
+    at PhaseManager.startCurrentPhase (https://elite-redux-staging.pages.dev/assets/battle-scene-0-2S0oqT.js:461:19255)
+    at PhaseManager.shiftPhase (https://elite-redux-staging.pages.dev/assets/battle-scene-0-2S0oqT.js:461:19122)
+    at CommandPhase.end (https://elite-redux-staging.pages.dev/assets/battle-scene-0-2S0oqT.js:18:11383)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-0-2S0oqT.js:20:4164
