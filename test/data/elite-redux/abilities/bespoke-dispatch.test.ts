@@ -162,15 +162,15 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(res.attrs.filter(a => a.constructor.name === "MovePowerBoostAbAttr").length).toBeGreaterThanOrEqual(2);
   });
 
-  it("er id 927 (Taste the Rainbow) sets the WATER_FIRE_PLEDGE (rainbow) arena tag, not a rain approximation", () => {
-    const res = dispatchArchetype("bespoke", null, 927);
+  it("er id 924 (Taste the Rainbow) sets the WATER_FIRE_PLEDGE (rainbow) arena tag, not a rain approximation", () => {
+    const res = dispatchArchetype("bespoke", null, 924);
     expect(res.skipReason).toBeNull();
     expect(res.attrs.some(a => a.constructor.name === "EntryArenaTagOnFoeSideAbAttr")).toBe(true);
     expect(res.attrs.some(a => a.constructor.name === "PostSummonScriptedMoveAbAttr")).toBe(false);
   });
 
-  it("er id 909 (Lightsaber) Keen-Edge status proc can inflict burn OR paralysis (not burn only)", () => {
-    const res = dispatchArchetype("bespoke", null, 909);
+  it("er id 908 (Lightsaber) Keen-Edge status proc can inflict burn OR paralysis (not burn only)", () => {
+    const res = dispatchArchetype("bespoke", null, 908);
     expect(res.skipReason).toBeNull();
     const cs = res.attrs.find(a => a.constructor.name === "ChanceStatusOnAttackAbAttr");
     expect(cs).toBeDefined();
@@ -219,7 +219,7 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     const res = dispatchArchetype("bespoke", null, 864);
     expect(res.skipReason).toBeNull();
     expect(res.attrs.some(a => a.constructor.name === "OncePerEntryContactDamageReductionAbAttr")).toBe(true);
-    expect(res.attrs.some(a => a.constructor.name === "PostDamageForceSwitchAbAttr")).toBe(true);
+    expect(res.attrs.some(a => a.constructor.name === "PostDamageForceAttackerOutAbAttr")).toBe(true);
   });
 
   it("er id 861 (Hungry Maws) KO-heal is biting-conditional (0.25 base, 0.5 on biting moves)", () => {
@@ -688,22 +688,22 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(sAttr.requiresContact()).toBe(false);
   });
 
-  it("er id 910 (Loose Thorns) wires SetArenaTagOnHit with contactRequired=true", () => {
-    const res = dispatchArchetype("bespoke", null, 910);
+  it("er id 909 (Loose Thorns) wires SetArenaTagOnHit with contactRequired=true", () => {
+    const res = dispatchArchetype("bespoke", null, 909);
     expect(res.skipReason).toBeNull();
     const sAttr = res.attrs[0] as SetArenaTagOnHitAbAttr;
     expect(sAttr.requiresContact()).toBe(true);
   });
 
-  it("er id 954 (Brain Overload) wires SetTerrainOnHit with Psychic Terrain", () => {
-    const res = dispatchArchetype("bespoke", null, 954);
+  it("er id 956 (Brain Overload) wires SetTerrainOnHit with Psychic Terrain", () => {
+    const res = dispatchArchetype("bespoke", null, 956);
     expect(res.skipReason).toBeNull();
     const stAttr = res.attrs[0] as SetTerrainOnHitAbAttr;
     expect(stAttr.getTerrain()).toBe(TerrainType.PSYCHIC);
   });
 
-  it("er id 955 (Brain Mass) wires DamageReductionAbAttr with full-hp filter", () => {
-    const res = dispatchArchetype("bespoke", null, 955);
+  it("er id 957 (Brain Mass) wires DamageReductionAbAttr with full-hp filter", () => {
+    const res = dispatchArchetype("bespoke", null, 957);
     expect(res.skipReason).toBeNull();
     const drAttr = res.attrs[0] as DamageReductionAbAttr;
     expect(drAttr).toBeInstanceOf(DamageReductionAbAttr);
@@ -722,8 +722,8 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(attr.getStages()).toBe(1);
   });
 
-  it("er id 392 (Hardened Sheath) wires StatBoostOnFlagAttack with HORN_BASED +1 ATK", () => {
-    const res = dispatchArchetype("bespoke", null, 392);
+  it("er id 391 (Hardened Sheath) wires StatBoostOnFlagAttack with HORN_BASED +1 ATK", () => {
+    const res = dispatchArchetype("bespoke", null, 391);
     expect(res.skipReason).toBeNull();
     const attr = res.attrs[0] as StatBoostOnFlagAttackAbAttr;
     expect(attr.getFlag()).toBe(MoveFlags.HORN_BASED);
@@ -843,8 +843,8 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(attr.getRequiredWeathers()).toEqual([WeatherType.HAIL, WeatherType.SNOW]);
   });
 
-  it("er id 922 (Chainsaw) wires StatDebuffOnFlagAttack (SLICING -1 DEF)", () => {
-    const res = dispatchArchetype("bespoke", null, 922);
+  it("er id 945 (Chainsaw) wires StatDebuffOnFlagAttack (SLICING -1 DEF)", () => {
+    const res = dispatchArchetype("bespoke", null, 945);
     expect(res.skipReason).toBeNull();
     const attr = res.attrs[0] as StatDebuffOnFlagAttackAbAttr;
     expect(attr.getFlag()).toBe(MoveFlags.SLICING_MOVE);
@@ -1160,8 +1160,8 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(seReducer.getReduction()).toBeCloseTo(0.176);
   });
 
-  it("er id 933 (Hammer Fist) wires two FlagDamageBoost instances (PUNCHING_MOVE 1.25x + HAMMER_BASED 1.25x)", () => {
-    const res = dispatchArchetype("bespoke", null, 933);
+  it("er id 931 (Hammer Fist) wires two FlagDamageBoost instances (PUNCHING_MOVE 1.25x + HAMMER_BASED 1.25x)", () => {
+    const res = dispatchArchetype("bespoke", null, 931);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(2);
     const a0 = res.attrs[0] as FlagDamageBoostAbAttr;
@@ -1225,11 +1225,11 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     }
   });
 
-  it("er id 973 (Talon Trap) wires ChanceBattlerTag on BOTH defense (on-hit) and offense (on-attack)", () => {
+  it("er id 975 (Talon Trap) wires ChanceBattlerTag on BOTH defense (on-hit) and offense (on-attack)", () => {
     // "50% chance to trap on contact (offense AND defense), 100% if entered
     // this turn." Faithfully wired as two halves: the defensive on-hit proc
     // and the offensive on-attack proc, both 50%/100%-first-turn, contact-gated.
-    const res = dispatchArchetype("bespoke", null, 973);
+    const res = dispatchArchetype("bespoke", null, 975);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(2);
     const defAttr = res.attrs[0] as ChanceBattlerTagOnHitAbAttr;
@@ -1478,7 +1478,10 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     // weaknesses (Dark/Ghost/Bug 2x→neutral), not incoming Psychic moves.
     const res = dispatchArchetype("bespoke", null, 422);
     expect(res.skipReason).toBeNull();
-    expect(res.attrs.filter(a => a.constructor.name === "ReceivedTypeDamageMultiplierAbAttr")).toHaveLength(3);
+    // "Nulls Psychic weakness" wired via the dedicated DefensiveTypeWeaknessNull
+    // primitive (nulls only the Psychic-type weakness contribution, so a second
+    // type's weakness still applies) + status-move always-hit.
+    expect(res.attrs.find(a => a.constructor.name === "DefensiveTypeWeaknessNullAbAttr")).toBeDefined();
     expect(res.attrs.find(a => a.constructor.name === "ConditionalAlwaysHitAbAttr")).toBeDefined();
     // The wrong-direction PSYCHIC damage reduction must be gone.
     expect(res.attrs.find(a => a.constructor.name === "DamageReductionAbAttr")).toBeUndefined();
@@ -1515,9 +1518,12 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
   it("er id 302 (Coil Up) gates the biting +1 priority to the entry turn", () => {
     const res = dispatchArchetype("bespoke", null, 302);
     expect(res.skipReason).toBeNull();
-    const prio = res.attrs.find(a => a.constructor.name === "PriorityModifierAbAttr");
+    // Coil Up's dex: "+1 priority once to the first biting move used." Wired via
+    // the dedicated first-flagged-priority primitive (+ its consume companion),
+    // not the generic PriorityModifier.
+    const prio = res.attrs.find(a => a.constructor.name === "FirstFlaggedMovePriorityAbAttr");
     expect(prio).toBeDefined();
-    expect(prio?.getCondition()).not.toBeNull(); // first-turn gate
+    expect(res.attrs.some(a => a.constructor.name === "ConsumeFirstFlaggedMovePriorityAbAttr")).toBe(true);
   });
 
   it("er id 644 (Ice Cold Hunter) wires hail-gated Ice HitMultiplier + hail immunity", () => {
@@ -1575,10 +1581,10 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(res.attrs.find(a => a.constructor.name === "IgnoreTypeStatusEffectImmunityAbAttr")).toBeDefined();
   });
 
-  it("er id 388 (Discipline) wires Intimidate immunity + confusion immunity (BattlerTagImmunity)", () => {
+  it("er id 387 (Discipline) wires Intimidate immunity + confusion immunity (BattlerTagImmunity)", () => {
     // Audit-fix: CONFUSION isn't a vanilla StatusEffect; status-immunity dropped
     // it. Now wired via BattlerTagImmunity(CONFUSED).
-    const res = dispatchArchetype("bespoke", null, 388);
+    const res = dispatchArchetype("bespoke", null, 387);
     expect(res.skipReason).toBeNull();
     expect(res.attrs.find(a => a.constructor.name === "IntimidateImmunityAbAttrEr")).toBeDefined();
     expect(res.attrs.find(a => a.constructor.name === "BattlerTagImmunityAbAttr")).toBeDefined();
@@ -1754,10 +1760,10 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(res.attrs.find(a => a.constructor.name === "MovePowerBoostAbAttr")).toBeDefined();
   });
 
-  it("er id 387 (Spectral Shroud) wires Spectralize (TypeConversion+boost) + 30% Toxic chance", () => {
+  it("er id 386 (Spectral Shroud) wires Spectralize (TypeConversion+boost) + 30% Toxic chance", () => {
     // Audit-fix: ER spec is "Spectralize + 30% chance to badly poison." Was
     // chance-status-on-hit (poison only); the Spectralize half was dropped.
-    const res = dispatchArchetype("bespoke", null, 387);
+    const res = dispatchArchetype("bespoke", null, 386);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(3);
     expect(res.attrs.find(a => a.constructor.name === "TypeConversionAbAttr")).toBeDefined();
@@ -1866,8 +1872,8 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(res.attrs.some(a => a.constructor.name === "PostTurnFoeStatDropAbAttr")).toBe(true);
   });
 
-  it("er id 959 (Rain Shroud) wires WeatherStatMultiplier(EVA, 1.3, [RAIN, HEAVY_RAIN])", () => {
-    const res = dispatchArchetype("bespoke", null, 959);
+  it("er id 987 (Rain Shroud) wires WeatherStatMultiplier(EVA, 1.3, [RAIN, HEAVY_RAIN])", () => {
+    const res = dispatchArchetype("bespoke", null, 987);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(1);
     const attr = res.attrs[0] as WeatherStatMultiplierAbAttr;
@@ -1888,8 +1894,8 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(attr.getWeathers()).toEqual([WeatherType.HAIL, WeatherType.SNOW]);
   });
 
-  it("er id 953 (Hypnotic Trance) wires Hypnosis never-miss + 100% confuse rider", () => {
-    const res = dispatchArchetype("bespoke", null, 953);
+  it("er id 955 (Hypnotic Trance) wires Hypnosis never-miss + 100% confuse rider", () => {
+    const res = dispatchArchetype("bespoke", null, 955);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(2);
     const alwaysHit = res.attrs[0] as ConditionalAlwaysHitAbAttr;
@@ -1901,8 +1907,8 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(confuse.getTags()).toEqual([BattlerTagType.CONFUSED]);
   });
 
-  it("er id 949 (Foamy Web) wires a foe-side FOAMY_WEB entry hazard", () => {
-    const res = dispatchArchetype("bespoke", null, 949);
+  it("er id 951 (Foamy Web) wires a foe-side FOAMY_WEB entry hazard", () => {
+    const res = dispatchArchetype("bespoke", null, 951);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(1);
     const attr = res.attrs[0] as EntryEffectAbAttr;
