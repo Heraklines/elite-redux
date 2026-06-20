@@ -14,6 +14,7 @@
 // =============================================================================
 
 import { allSpecies } from "#data/data-lists";
+import { dexAbilityId } from "#data/elite-redux/er-ability-position-map";
 import { installErFormSpriteRedirect } from "#data/elite-redux/er-form-sprite-redirect";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
@@ -616,11 +617,15 @@ function mapAbilityId(erAbilityId: number): AbilityId {
   if (erAbilityId === 0) {
     return AbilityId.NONE;
   }
-  const remapped = ER_ABILITY_ID_REMAP[erAbilityId];
+  // er-species refs are array POSITIONS; the engine / ER_ID_MAP are keyed by the
+  // dex id-FIELD. Translate before lookup (identity for all but 81 abilities) so
+  // mega/primal forms resolve to the right ability. See er-ability-position-map.
+  const id = dexAbilityId(erAbilityId);
+  const remapped = ER_ABILITY_ID_REMAP[id];
   if (remapped !== undefined) {
     return remapped;
   }
-  const mapped = ER_ID_MAP.abilities[erAbilityId];
+  const mapped = ER_ID_MAP.abilities[id];
   if (mapped === undefined) {
     return AbilityId.NONE;
   }

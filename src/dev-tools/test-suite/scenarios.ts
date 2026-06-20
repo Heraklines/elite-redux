@@ -3350,6 +3350,42 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Mega abilities are the DEX abilities (Hydreigon/Excadrill)",
+    description:
+      "Mega/primal forms showed the WRONG abilities: the dex resolves a species'\n"
+      + "ability refs by ARRAY POSITION, but the ER engine was keyed by the dex id\n"
+      + "field, which differs for 81 (mega-exclusive) abilities. So Hydreigon Mega\n"
+      + "showed Ice Picks/Sundae and Excadrill Mega showed Overcast. mapAbilityId now\n"
+      + "translates position -> id, so megas get their real dex abilities.\n"
+      + "DO: win the opening battle, take a MEGA STONE for Hydreigon (then re-run for\n"
+      + "Excadrill), mega it, open SUMMARY -> Abilities/Innates.\n"
+      + "EXPECT Hydreigon Mega: ability WINGS OF PESTILENCE; innates HYDRA, MIND\n"
+      + "CRUNCH, MERCILESS (NOT Ice Picks / Sundae).\n"
+      + "EXPECT Excadrill Mega: abilities MOLD BREAKER / SAND RUSH / SAND GUARD;\n"
+      + "innates MEGA DRILL, STEELWORKER, AFTERSHOCK (NOT Overcast).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 80,
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_MODIFIER_OVERRIDE: [MEGA_BRACELET],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.HYDREIGON, {
+          moveset: [MoveId.DRAGON_PULSE, MoveId.DARK_PULSE, MoveId.FLAMETHROWER, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.EXCADRILL, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.IRON_HEAD, MoveId.ROCK_SLIDE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+    // Two-mon party so the Form-Change Item can roll either mega stone.
+    shopItems: [modifierTypes.FORM_CHANGE_ITEM, modifierTypes.FORM_CHANGE_ITEM],
+  },
+  {
     // In ER, a mega is a permanent form/evo ACTIVATED by giving the mon its mega
     // stone (not an in-battle toggle). This tests the store path: get the stone
     // for a specific mon and apply it. Party is JUST Venusaur, so the guaranteed

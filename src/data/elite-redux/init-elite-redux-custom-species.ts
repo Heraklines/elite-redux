@@ -18,6 +18,7 @@
 import { globalScene } from "#app/global-scene";
 import { starterColors } from "#app/global-vars/starter-colors";
 import { allSpecies } from "#data/data-lists";
+import { dexAbilityId } from "#data/elite-redux/er-ability-position-map";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import type { ErSpeciesDraft } from "#data/elite-redux/er-species";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
@@ -157,7 +158,10 @@ function mapAbilityId(erAbilityId: number): AbilityId {
   if (erAbilityId === 0) {
     return AbilityId.NONE;
   }
-  const mapped = ER_ID_MAP.abilities[erAbilityId];
+  // er-species refs are array POSITIONS; ER_ID_MAP is keyed by the dex id-FIELD.
+  // Translate before lookup (identity for all but 81 abilities). See
+  // er-ability-position-map (same fix as init-elite-redux-species.mapAbilityId).
+  const mapped = ER_ID_MAP.abilities[dexAbilityId(erAbilityId)];
   if (mapped === undefined) {
     return AbilityId.NONE;
   }
