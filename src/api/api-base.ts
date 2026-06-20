@@ -5,6 +5,16 @@ import type { SetRequired, UndefinedOnPartialDeep } from "type-fest";
 type DataType = "json" | "form-urlencoded";
 
 /**
+ * Hard ceiling on any single API request. A hung/slow endpoint must never freeze
+ * the client: Save & Quit awaits the cloud push, and with no timeout a stalled
+ * request left players stuck on the menu until a manual refresh (a regression
+ * once the login feature made the quit path await the server). Abort after this
+ * so the caller's await rejects, the savedata API's catch returns an error, and
+ * saveAll falls back to local-only. Saves are tiny (<<50 KB), so 15s is generous.
+ */
+const API_REQUEST_TIMEOUT_MS = 15_000;
+
+/**
  * Configuration type for {@linkcode ApiBase.doFetch}.
  * @internal
  */
@@ -91,8 +101,19 @@ export abstract class ApiBase {
       console.log(`Sending ${config.method} request to: `, this.base + path, config);
     }
 
-    // TODO: need some sort of error handling here?
-    return await fetch(this.base + path, config as RequestInit);
+    // Abort a hung/slow request so the await rejects instead of freezing the
+    // client (see API_REQUEST_TIMEOUT_MS). A caller-supplied signal is honored
+    // in preference to the timeout one.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS);
+    try {
+      return await fetch(this.base + path, {
+        ...(config as RequestInit),
+        signal: config.signal ?? controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /**
