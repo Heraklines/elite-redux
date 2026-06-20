@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import { Button } from "#enums/buttons";
 import type { MoveId } from "#enums/move-id";
+import { getShortenedStatKey, PERMANENT_STATS } from "#enums/stat";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import type { LearnMoveBatchDeps } from "#phases/learn-move-batch-phase";
@@ -9,6 +10,7 @@ import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
+import i18next from "i18next";
 
 /** Panel sub-state. Kept INTERNAL (no UiMode switches) so the panel can never
  * desync the mode stack - the softlock class this avoids. */
@@ -23,11 +25,15 @@ const ROW_H = 14;
 const ROW_TOP = 44;
 /** How many list rows show at once per column before the column scrolls. */
 const VISIBLE_ROWS = 5;
-/** Left side panel (learning mon's icon + BST), drawn left of the main window. */
-const LEFT_W = 48;
-const LEFT_GAP = 6;
+/** Left side panel (learning mon's icon + base stats), drawn just left of the main window. */
+const LEFT_W = 56;
+const LEFT_GAP = 3;
 const LEFT_X = PANEL_X - LEFT_W - LEFT_GAP;
-const LEFT_H = 62;
+const LEFT_H = PANEL_H;
+const STAT_LABEL_DX = 5; // left inset for a stat label
+const STAT_VALUE_DX = LEFT_W - 5; // right edge for a (right-aligned) stat value
+const STAT_Y0 = PANEL_Y + 31; // first stat row, below the icon
+const STAT_ROW_H = 10;
 
 /**
  * ER QoL Move Learn panel (see {@linkcode LearnMoveBatchPhase}). One screen on
@@ -41,7 +47,7 @@ const LEFT_H = 62;
  *
  * Both columns SCROLL within a fixed {@linkcode VISIBLE_ROWS} window, so a long
  * learnable list (mass level-up) and a large moveset (up to 8 slots) never
- * overflow the panel. A small left panel shows the learning mon's icon + BST.
+ * overflow the panel. A small left panel shows the learning mon's icon + its base stats.
  */
 export class LearnMoveBatchUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
@@ -57,8 +63,8 @@ export class LearnMoveBatchUiHandler extends UiHandler {
   private learnDown: Phaser.GameObjects.Text;
   private currentUp: Phaser.GameObjects.Text;
   private currentDown: Phaser.GameObjects.Text;
-  // Left panel: the learning mon's icon (built per-show) + its BST.
-  private bstValue: Phaser.GameObjects.Text;
+  // Left panel: the learning mon's icon (built per-show) + its 6 base-stat values.
+  private statValues: Phaser.GameObjects.Text[] = [];
   private sideIcon: Phaser.GameObjects.Container | null = null;
 
   private deps: LearnMoveBatchDeps | null = null;
@@ -96,11 +102,21 @@ export class LearnMoveBatchUiHandler extends UiHandler {
 
     this.container.add(addWindow(PANEL_X, PANEL_Y, PANEL_W, PANEL_H));
 
-    // Left panel: window + "BST" label (the icon + value are built per-show).
+    // Left panel: window + the 6 base-stat rows (labels are static; the icon +
+    // the per-stat values are filled in per-show by buildSidePanel).
     this.container.add(addWindow(LEFT_X, PANEL_Y, LEFT_W, LEFT_H));
-    const bstLabel = addTextObject(LEFT_X + LEFT_W / 2, PANEL_Y + 40, "BST", TextStyle.SUMMARY_GOLD).setOrigin(0.5, 0);
-    this.bstValue = addTextObject(LEFT_X + LEFT_W / 2, PANEL_Y + 50, "", TextStyle.WINDOW).setOrigin(0.5, 0);
-    this.container.add([bstLabel, this.bstValue]);
+    PERMANENT_STATS.forEach((stat, i) => {
+      const y = STAT_Y0 + i * STAT_ROW_H;
+      const label = addTextObject(
+        LEFT_X + STAT_LABEL_DX,
+        y,
+        i18next.t(getShortenedStatKey(stat)),
+        TextStyle.SUMMARY_GOLD,
+      );
+      const value = addTextObject(LEFT_X + STAT_VALUE_DX, y, "", TextStyle.WINDOW).setOrigin(1, 0);
+      this.statValues.push(value);
+      this.container.add([label, value]);
+    });
 
     this.learnableHeader = addTextObject(PANEL_X + 6, ROW_TOP - 18, "Learnable", TextStyle.WINDOW_ALT);
     this.currentHeader = addTextObject(PANEL_X + 6 + COL_GAP, ROW_TOP - 18, "Current", TextStyle.WINDOW_ALT);
@@ -169,13 +185,14 @@ export class LearnMoveBatchUiHandler extends UiHandler {
     return true;
   }
 
-  /** Build the left panel's icon + BST for the current mon. */
+  /** Build the left panel's icon + per-stat base values for the current mon. */
   private buildSidePanel(): void {
     this.destroySideIcon();
     const pokemon = this.deps!.pokemon;
-    this.sideIcon = globalScene.addPokemonIcon(pokemon, LEFT_X + LEFT_W / 2, PANEL_Y + 22, 0.5, 0.5, true);
+    this.sideIcon = globalScene.addPokemonIcon(pokemon, LEFT_X + LEFT_W / 2, PANEL_Y + 14, 0.5, 0.5, true);
     this.container.add(this.sideIcon);
-    this.bstValue.setText(`${pokemon.getSpeciesForm().getBaseStatTotal()}`);
+    const baseStats = pokemon.getSpeciesForm().baseStats;
+    PERMANENT_STATS.forEach((stat, i) => this.statValues[i].setText(`${baseStats[stat]}`));
   }
 
   /** Free slots available on the mon right now. */
