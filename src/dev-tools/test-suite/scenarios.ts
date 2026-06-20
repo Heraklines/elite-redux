@@ -433,6 +433,46 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
     shopItems: [modifierTypes.DNA_SPLICERS],
   },
+  {
+    label: "Move Learn menu: scroll + icon/BST panel (#563)",
+    description:
+      "#563 - the level-up Move Learn panel. Garchomp starts at L5, and the huge XP\n"
+      + "multiplier makes one kill jump ~30 levels at once, so it tries to learn MANY\n"
+      + "moves in one go (the case that used to overflow the panel).\n"
+      + "DO: KO the Magikarp with EARTHQUAKE (it can only Splash). ONE Move Learn panel\n"
+      + "opens (not a message barrage). In it, hold UP/DOWN to move through the LEARNABLE\n"
+      + "list (left) and the CURRENT list (right; this mon is given 8 slots for the test).\n"
+      + "EXPECT: both lists SCROLL inside the panel with ↑/↓ arrows when there's more\n"
+      + "above/below - nothing overflows past the window. A small panel to the LEFT shows\n"
+      + "Garchomp's party icon + its BST (600). Picking a learnable move fills an empty\n"
+      + "slot silently (or asks which to overwrite when full); the list thins down. B or\n"
+      + "Cancel leaves with no softlock.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 5,
+        LEVEL_CAP_OVERRIDE: 100,
+        XP_MULTIPLIER_OVERRIDE: 5000,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.TACKLE, MoveId.EARTHQUAKE, MoveId.CRUNCH, MoveId.BODY_SLAM],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      // Future-proof the CURRENT column: give the mon 8 move slots (MAX_BONUS_SLOTS
+      // is normally 1) so its CURRENT list is long enough to actually scroll, the
+      // way it will once mons routinely run 8 moves.
+      const player = globalScene.getPlayerPokemon();
+      if (player) {
+        player.customPokemonData.bonusMoveSlots = 4;
+      }
+    },
+  },
   // ===========================================================================
   // FEATURES — this session
   // ===========================================================================
