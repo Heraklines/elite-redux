@@ -44,10 +44,10 @@ const ABIL_ROW_H = 10;
 // Fuse / Switch controls, stacked (one above the other) on the right, beside the
 // abilities list. BTN_SCALE is a FRACTION of the panel's normal text size (applied
 // relative to the scale addTextObject sets - absolute would render 96px font huge).
-const BTN_X = PANEL_W - 16;
+const BTN_X = PANEL_W - 62; // LEFT edge of both labels (left-aligned, so A / R line up)
 const BTN_Y_FUSE = 120;
 const BTN_Y_SWITCH = 136;
-const BTN_SCALE = 0.8;
+const BTN_SCALE = 0.95;
 
 /** A cached blended-sprite render for one partner (keyed by partner id). */
 interface SpriteCacheEntry {
@@ -182,7 +182,7 @@ export class FusionPreviewPanel {
 
   /** Build one tappable bottom-row button (a text label with a touch hit area). */
   private makeButton(y: number, i18nKey: string, onTap: () => void): Phaser.GameObjects.Text {
-    const t = addTextObject(BTN_X, y, i18next.t(i18nKey), TextStyle.WINDOW).setOrigin(1, 0);
+    const t = addTextObject(BTN_X, y, i18next.t(i18nKey), TextStyle.WINDOW).setOrigin(0, 0);
     // addTextObject already applies a sub-1 scale (the 96px font rendered at ~1/6).
     // MULTIPLY that existing scale - an ABSOLUTE setScale overrode it and rendered
     // the raw 96px font huge (the "way too big" bug). BTN_SCALE is a fraction of the
