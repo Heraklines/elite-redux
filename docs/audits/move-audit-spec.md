@@ -128,27 +128,24 @@ flag, P2 = cosmetic/text. Fix locations: numeric/flag → `init-elite-redux-vani
 patches.ts` (vanilla) or `init-elite-redux-custom-moves.ts` (custom); effect/attrs →
 those + `er-move-archetypes.ts` / the relevant attr class.
 
-## 5b. 🔴 THE CENTRAL SCOPING QUESTION — vanilla move stats
+## 5b. Numeric fidelity is CLEAN — and the test-harness trap that hides it
 
-A runtime-vs-dex numeric diff (2026-06-20) found the vanilla-move patch loop
-(`init-elite-redux-vanilla-move-patches.ts` ~line 1241) pins the ER **description**
-onto vanilla moves but does **NOT apply ER's power/accuracy/pp rebalance**. Measured
-real (−1↔0 normalized) diffs vs the dex:
+Numerics (power/accuracy/pp/priority/chance) are **already correct in-game**:
+`initEliteReduxVanillaRebalance()` (`init-elite-redux-vanilla-rebalance.ts:1322+`,
+`target.power/accuracy/pp = draft.X`) applies ER's stats from the dex-faithful
+`ER_MOVES`. Verified 2026-06-20: after the full rebalance runs, **0 power / 0
+accuracy / 0 priority / 0 chance diffs** vs the dex across all 1031 moves (the
+only flag is Airborne Slam `pp=0`, a dex data-hole placeholder).
 
-- **power: 118 moves** (e.g. Fire/Ice/Thunder Punch in-game 75 vs dex **85**; Vise Grip 70→120; Headbutt 70→85)
-- **accuracy: 60 moves** · **pp: 98 moves** · priority: 0
-
-So many vanilla moves **show the ER mechanic in their text but keep vanilla
-pokerogue stats.** Before auditing, the maintainer MUST decide:
-
-- **(A) ER stats should apply** → these ~280 numeric diffs are the bug list; fix by
-  having the patch loop also set `power/accuracy/pp` from `ER_MOVES` (which is dex-faithful).
-- **(B) vanilla stats are intentionally kept** (port uses pokerogue balance for vanilla
-  moves, ER only for descriptions/effects/flags/custom moves) → the audit IGNORES vanilla
-  stat diffs and focuses on effects/flags + ER-custom moves only.
-
-The run script in §5/§7 reports these so the decision is data-driven. ER-CUSTOM moves
-(no vanilla equivalent) should match the dex stats regardless of (A)/(B).
+🔴 **HARNESS TRAP (do not repeat my mistake):** the test harness **re-initializes
+`allMoves` to VANILLA after the ER patches run in global setup**. So a naive
+`allMoves[id]` read in a probe shows *unpatched vanilla* stats and produces ~280
+FALSE mismatches (Fire Punch reads 75, not its real in-game 85). To measure the
+real game state you MUST re-run the rebalance first:
+`initEliteReduxVanillaRebalance()` then compare — see `er-move-audit.test.ts`.
+(`allSpecies` does NOT get re-initialized this way; `allMoves` does — a quirk of
+the harness, not the game.) Net: **the numeric phase is DONE/clean; spend the
+audit on Phase B (effects/behavior).**
 
 ## 7. Runnable Phase-A tool
 
