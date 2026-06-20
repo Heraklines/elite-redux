@@ -59,6 +59,16 @@
       5099
     ]
   },
+  "SPECIES_SAWSBUCK": {
+    "ability1": 92,
+    "ability2": 91,
+    "hidden": 34,
+    "innates": [
+      5129,
+      5088,
+      5511
+    ]
+  },
   "SPECIES_ZORUA": {
     "ability1": 5285,
     "ability2": 194,
