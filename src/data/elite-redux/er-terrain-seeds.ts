@@ -91,6 +91,11 @@ export class ErSeedModifier extends PokemonHeldItemModifier {
     this.kind = kind;
   }
 
+  /** Persist the seed kind so the held item round-trips on save/load (item-persist fix). */
+  override getArgs(): unknown[] {
+    return [...super.getArgs(), this.kind];
+  }
+
   override matchType(modifier: Modifier): boolean {
     return modifier instanceof ErSeedModifier && modifier.kind === this.kind;
   }

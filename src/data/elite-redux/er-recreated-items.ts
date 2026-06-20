@@ -76,6 +76,12 @@ export class ErAssaultVestModifier extends StatBoosterModifier {
   constructor(type: ModifierType, pokemonId: number, stackCount?: number) {
     super(type, pokemonId, [Stat.SPDEF], 1.5, stackCount);
   }
+  // The stats/multiplier are fixed in the ctor, so serialize ONLY the pokemonId -
+  // StatBoosterModifier.getArgs would emit [pokemonId, stats, multiplier], which
+  // this 1-arg ctor would mis-reconstruct (stats array landing in stackCount).
+  override getArgs(): unknown[] {
+    return [this.pokemonId];
+  }
   override matchType(modifier: Modifier): boolean {
     return modifier instanceof ErAssaultVestModifier;
   }

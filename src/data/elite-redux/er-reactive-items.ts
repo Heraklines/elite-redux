@@ -131,6 +131,11 @@ export class ErReactiveItemModifier extends PokemonHeldItemModifier {
     this.kind = kind;
   }
 
+  /** Persist the reactive kind so the held item round-trips on save/load (item-persist fix). */
+  override getArgs(): unknown[] {
+    return [...super.getArgs(), this.kind];
+  }
+
   override matchType(modifier: Modifier): boolean {
     return modifier instanceof ErReactiveItemModifier && modifier.kind === this.kind;
   }

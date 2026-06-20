@@ -71,6 +71,11 @@ export class ErGemModifier extends PokemonHeldItemModifier {
     this.gemType = gemType;
   }
 
+  /** Persist the gem type so the held item round-trips on save/load (item-persist fix). */
+  override getArgs(): unknown[] {
+    return [...super.getArgs(), this.gemType];
+  }
+
   override matchType(modifier: Modifier): boolean {
     return modifier instanceof ErGemModifier && modifier.gemType === this.gemType;
   }

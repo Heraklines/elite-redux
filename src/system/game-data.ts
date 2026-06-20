@@ -18,6 +18,7 @@ import { Egg } from "#data/egg";
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
 import { getErMapSaveData, restoreErMapState } from "#data/elite-redux/er-map-nodes";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
+import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
 import { getErReduxCounterpartId, migrateErReduxDexHijack } from "#data/elite-redux/er-redux-dex-redirect";
 import { getErResistBerryEntries, restoreErResistBerries } from "#data/elite-redux/er-resist-berries";
 import { getErDifficulty, getErDifficultyCandyMultiplier, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
@@ -1447,7 +1448,9 @@ export class GameData {
       globalScene.modifiers = [];
     }
     for (const modifierData of fromSession.modifiers) {
-      const modifier = modifierData.toModifier(Modifier[modifierData.className]);
+      const modifier = modifierData.toModifier(
+        Modifier[modifierData.className] ?? resolveErModifierClass(modifierData.className),
+      );
       if (modifier) {
         globalScene.addModifier(modifier, true);
       }
@@ -1462,7 +1465,9 @@ export class GameData {
     restoreErWardStones(fromSession.erWardStones);
 
     for (const enemyModifierData of fromSession.enemyModifiers) {
-      const modifier = enemyModifierData.toModifier(Modifier[enemyModifierData.className]);
+      const modifier = enemyModifierData.toModifier(
+        Modifier[enemyModifierData.className] ?? resolveErModifierClass(enemyModifierData.className),
+      );
       if (modifier) {
         globalScene.addEnemyModifier(modifier, true);
       }
