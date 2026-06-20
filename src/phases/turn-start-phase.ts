@@ -16,6 +16,14 @@ export class TurnStartPhase extends FieldPhase {
 
   private queuePreemptiveCounters(field: Pokemon[]): void {
     for (const pokemon of field) {
+      // globalScene.getField() returns a length-4 array with `null` in every
+      // unoccupied slot (slots 1 & 3 in a single battle), so guard before the
+      // deref - otherwise TurnStartPhase crashed on the first turn of EVERY
+      // single battle ("Cannot read properties of null (reading
+      // 'getAllActiveAbilityAttrs')"), freezing the run after any move.
+      if (!pokemon) {
+        continue;
+      }
       for (const attr of pokemon.getAllActiveAbilityAttrs()) {
         const condition = attr.getCondition();
         if (attr.constructor.name === "PreemptivePriorityCounterAbAttr" && (condition === null || condition(pokemon))) {
