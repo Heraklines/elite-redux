@@ -1,0 +1,172 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     4  wave:53  difficulty:youngster
+seed:     PoUIGENmiR8kAHLlgp7HkKOC
+party:    Mawile(L40 60/99), Xerneas(L39 103/153), Dachsbun(L39 94/94), Azumarill(L39 130/130), Aromatisse(L39 134/134), Primarina(L36 105/105)
+
+----- DESCRIPTION -----
+Liquid Voice turns every sound move into water-type, not just normal type moves
+
+----- CONSOLE -----
+[17:24:17.960] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[17:24:18.279] LOG: [ER] build mqlxahe8-8air
+[17:24:24.072] DEBUG: Destroying loading scene
+[17:24:24.072] DEBUG: Destroyed loading scene
+[17:24:24.113] LOG: Seed: ZuuOpGXAIphDcD1mjasF3nPp
+[17:24:24.113] LOG: Wave Seed: ZuuOpGXAIphDcD1mjasF3nPp 0
+[17:24:25.184] LOG: %cStart Phase LoginPhase color:green;
+[17:24:25.655] LOG: Client Session: NabxvN9T1bmWuMjaeYxBdEOGSINrvNap
+[17:24:26.386] DEBUG: Using cached system data
+[17:24:26.426] LOG: %cStart Phase TitlePhase color:green;
+[17:24:26.426] LOG: Getting Session Slot id: %d 0
+[17:24:26.432] LOG: use seasonal splash messages true
+[17:24:26.432] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[17:24:27.848] LOG: Getting Session Slot id: %d 0
+[17:24:27.853] LOG: Wave Seed: PoUIGENmiR8kAHLlgp7HkKOC 0
+[17:24:27.853] LOG: Seed: PoUIGENmiR8kAHLlgp7HkKOC
+[17:24:27.878] LOG: Wave Seed: ¤~|z¢m v}¡¥l} x 53
+[17:24:27.886] LOG: Applied Zinc 
+[17:24:27.887] LOG: Applied Protein 
+[17:24:27.889] LOG: Applied Zinc 
+[17:24:27.890] LOG: Applied Protein 
+[17:24:27.892] LOG: Applied Zinc 
+[17:24:27.893] LOG: Applied Protein 
+[17:24:27.934] LOG: %cStart Phase EncounterPhase color:green;
+[17:24:27.937] LOG: Pokemon: Wild Linoone | Species ID: 264 | Level: 35 | Nature: Relaxed (+Def/-Spd)
+[17:24:27.937] LOG: Stats (IVs): HP: 108 (25), Atk: 82 (20), Def: 61 (21), Spatk: 47 (20), Spdef: 57 (29), Spd: 77 (14)
+[17:24:27.938] LOG: Ability: Momentum | Passive Ability: Field Explorer 
+[17:24:27.938] LOG: Moveset: ["Double-Edge","Strength","High Horsepower","Rock Smash"]
+[17:24:29.084] LOG: Wave Seed: ¤~|z¢m v}¡¥l} x 53
+[17:24:29.531] LOG: %cStart Phase SummonPhase color:green;
+[17:24:29.683] LOG: Applied Zinc 
+[17:24:29.684] LOG: Applied Protein 
+[17:24:29.830] LOG: %cStart Phase CheckSwitchPhase color:green;
+[17:24:31.178] LOG: %cStart Phase SwitchPhase color:green;
+[17:24:33.337] LOG: %cStart Phase SwitchSummonPhase color:green;
+[17:24:33.380] LOG: Applied X Speed 
+[17:24:33.548] LOG: Applied Zinc 
+[17:24:33.549] LOG: Applied Protein 
+[17:24:33.682] LOG: Applied X Speed 
+[17:24:33.683] LOG: %cStart Phase PostSummonPhase color:green;
+[17:24:33.683] LOG: Ran PSP for: Mawile
+[17:24:33.683] LOG: %cStart Phase PostSummonPhase color:green;
+[17:24:33.683] LOG: %cStart Phase PostSummonPhase color:green;
+[17:24:33.684] LOG: %cStart Phase ScanIvsPhase color:green;
+[17:24:34.424] LOG: %cStart Phase InitEncounterPhase color:green;
+[17:24:34.424] LOG: %cStart Phase PostSummonPhase color:green;
+[17:24:34.424] LOG: Ran PSP for: Linoone
+[17:24:34.424] LOG: %cStart Phase PostSummonPhase color:green;
+[17:24:34.424] LOG: %cStart Phase PostSummonPhase color:green;
+[17:24:34.424] LOG: %cStart Phase TurnInitPhase color:green;
+[17:24:34.424] LOG: %cStart Phase CommandPhase color:green;
+[17:24:37.404] LOG: Move: LOVELY_BITE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mawile
+[17:24:37.405] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:24:37.408] LOG: Battle Seed: ShjTOcNJD3uW2anS
+[17:24:37.409] LOG: Move Pool: ["High Horsepower"]
+[17:24:37.409] LOG: Move Scores: [46]
+[17:24:37.409] LOG: Sorted Move Pool: ["High Horsepower"]
+[17:24:37.409] LOG: Chosen Move: High Horsepower
+[17:24:37.409] LOG: %cStart Phase TurnStartPhase color:green;
+[17:24:37.409] LOG: Applied X Speed 
+[17:24:37.409] LOG: Applied X Speed 
+[17:24:37.410] LOG: Applied X Speed 
+[17:24:37.410] LOG: %cStart Phase MovePhase color:green;
+[17:24:37.410] LOG: %cUser: Linoone
+Move: HIGH_HORSEPOWER
+Use Mode: NORMAL color:orchid
+[17:24:37.410] LOG: Applied X Speed 
+[17:24:37.411] LOG: Applied X Speed 
+[17:24:37.412] LOG: %cStart Phase MessagePhase color:green;
+[17:24:37.563] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:24:38.181] LOG: crit stage: +0
+[17:24:38.182] LOG: Move: High Horsepower | Base damage: 33.63243243243244 | Power: 95 | Source attack: 77 | Target defense: 74
+[17:24:38.182] LOG: Move: High Horsepower | Attack damage: 86
+[17:24:38.183] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:24:38.216] LOG: %cStart Phase MessagePhase color:green;
+[17:24:38.414] LOG: %cStart Phase MessagePhase color:green;
+[17:24:38.630] LOG: %cStart Phase MoveEndPhase color:green;
+[17:24:38.631] LOG: %cStart Phase MovePhase color:green;
+[17:24:38.631] LOG: %cUser: Mawile
+Move: LOVELY_BITE
+Use Mode: NORMAL color:orchid
+[17:24:38.631] LOG: Applied X Speed 
+[17:24:38.632] LOG: Applied X Speed 
+[17:24:38.633] LOG: %cStart Phase MessagePhase color:green;
+[17:24:38.763] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:24:39.898] LOG: crit stage: +0
+[17:24:39.899] LOG: Move: Lovely Bite | Base damage: 83.48852459016393 | Power: 85 | Source attack: 170 | Target defense: 61
+[17:24:39.899] LOG: Move: Lovely Bite | Attack damage: 247
+[17:24:39.900] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:24:39.931] LOG: %cStart Phase MessagePhase color:green;
+[17:24:40.131] LOG: %cStart Phase MessagePhase color:green;
+[17:24:40.346] LOG: %cStart Phase FaintPhase color:green;
+[17:24:42.283] LOG: %cStart Phase MessagePhase color:green;
+[17:24:42.645] LOG: %cStart Phase ShowAbilityPhase color:green;
+[17:24:42.832] LOG: %cStart Phase PokemonHealPhase color:green;
+[17:24:43.065] LOG: %cStart Phase MessagePhase color:green;
+[17:24:43.331] LOG: %cStart Phase HideAbilityPhase color:green;
+[17:24:43.365] LOG: %cStart Phase VictoryPhase color:green;
+[17:24:43.367] LOG: %cStart Phase ExpPhase color:green;
+[17:24:43.367] LOG: Applied Super EXP. Charm 
+[17:24:43.367] LOG: Applied EXP. Charm 
+[17:24:44.266] LOG: %cStart Phase LevelUpPhase color:green;
+[17:25:10.581] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:25:10.581] LOG: Applied Super EXP. Charm 
+[17:25:10.582] LOG: Applied EXP. Charm 
+[17:25:11.161] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:25:11.215] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:25:11.215] LOG: Applied Super EXP. Charm 
+[17:25:11.215] LOG: Applied EXP. Charm 
+[17:25:11.796] LOG: %cStart Phase LevelUpPhase color:green;
+[17:25:13.717] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:25:13.797] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:25:13.797] LOG: Applied Super EXP. Charm 
+[17:25:13.797] LOG: Applied EXP. Charm 
+[17:25:14.378] LOG: %cStart Phase LevelUpPhase color:green;
+[17:25:14.999] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:25:15.083] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:25:15.083] LOG: Applied Super EXP. Charm 
+[17:25:15.084] LOG: Applied EXP. Charm 
+[17:25:15.663] LOG: %cStart Phase LevelUpPhase color:green;
+[17:25:16.314] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:25:16.381] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:25:16.381] LOG: Applied Super EXP. Charm 
+[17:25:16.381] LOG: Applied EXP. Charm 
+[17:25:16.948] LOG: %cStart Phase LevelUpPhase color:green;
+[17:25:16.949] LOG: Applied Protein 
+[17:25:17.672] LOG: %cStart Phase EvolutionPhase color:green;
+[17:25:18.748] ERROR: [uncaught] Uncaught SecurityError: Failed to execute 'texImage2D' on 'WebGLRenderingContext': The video element contains cross-origin data, and may not be loaded. @ https://elite-redux.pages.dev/assets/phaser-DJMy9QBm.js:63:2433
+[17:25:20.253] LOG: Applied Protein 
+[17:25:25.907] LOG: %cStart Phase EndEvolutionPhase color:green;
+[17:25:25.965] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:25:26.047] LOG: %cStart Phase MoveEndPhase color:green;
+[17:25:26.048] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:25:26.048] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:25:26.048] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:25:26.048] LOG: %cStart Phase BerryPhase color:green;
+[17:25:26.048] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:25:26.048] LOG: %cStart Phase TurnEndPhase color:green;
+[17:25:26.048] LOG: %cStart Phase BattleEndPhase color:green;
+[17:25:26.049] LOG: Battle Score: 116 (1 Turns x1)
+[17:25:26.049] LOG: Total Score: 5165
+[17:25:26.053] LOG: Applied Zinc 
+[17:25:26.053] LOG: Applied Protein 
+[17:25:26.054] LOG: %cStart Phase EggLapsePhase color:green;
+[17:25:26.054] LOG: %cStart Phase SelectModifierPhase color:green;
+[17:25:26.054] LOG: Wave Seed: ¤~|z¢m v}¡¥l} x 53
+[17:25:26.057] LOG: Applied Golden Poké Ball 
+[17:25:26.057] LOG: 13 9 [2,3,4,5,6,7,8,9,10,23]
+[17:25:26.057] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[17:25:26.057] LOG: 2 0 [4,5]
+[17:25:26.057] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[17:25:26.057] LOG: 7 2 [4,5]
+[17:25:26.057] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[17:25:26.057] LOG: 7 2 [4,5]
+[17:25:26.057] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[17:25:26.057] LOG: 0 0 [4,5]
+[17:25:26.057] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[17:25:26.399] LOG: Applied Amulet Coin 
+[17:25:26.402] LOG: Applied Amulet Coin 
