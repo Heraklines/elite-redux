@@ -1,0 +1,283 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     3  wave:5  difficulty:ace
+seed:     NOygo802M8saYGySO26SS4Ac
+party:    Thievul(L26 59/77), Uxie(L27 14/79), Spiritomb(L25 67/67), Carbink(L25 53/64), Audino(L24 84/84)
+
+----- DESCRIPTION -----
+Switched into Thievul, Low Blow triggered only after the enemy Flaaffy used Shock Wave
+
+----- CONSOLE -----
+[09:55:45.682] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:55:45.682] LOG: Applied Golden EXP. Charm 
+[09:55:45.682] LOG: %cStart Phase LevelUpPhase color:green;
+[09:55:45.683] LOG: Applied Protein 
+[09:55:45.683] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:55:45.683] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:55:45.683] LOG: Applied Golden EXP. Charm 
+[09:55:45.683] LOG: %cStart Phase LevelUpPhase color:green;
+[09:55:45.684] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:55:45.684] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:55:45.684] LOG: Applied Golden EXP. Charm 
+[09:55:45.684] LOG: %cStart Phase LevelUpPhase color:green;
+[09:55:45.684] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:55:45.684] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:55:45.684] LOG: Applied Golden EXP. Charm 
+[09:55:45.684] LOG: %cStart Phase LevelUpPhase color:green;
+[09:55:45.685] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[09:56:00.932] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:56:00.933] LOG: %cStart Phase MoveEndPhase color:green;
+[09:56:00.933] LOG: %cStart Phase MovePhase color:green;
+[09:56:00.933] LOG: %cStart Phase MoveEndPhase color:green;
+[09:56:00.933] LOG: %cStart Phase CheckInterludePhase color:green;
+[09:56:00.933] LOG: %cStart Phase WeatherEffectPhase color:green;
+[09:56:00.933] LOG: %cStart Phase PositionalTagPhase color:green;
+[09:56:00.933] LOG: %cStart Phase BerryPhase color:green;
+[09:56:00.933] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[09:56:00.934] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[09:56:00.934] LOG: %cStart Phase TurnEndPhase color:green;
+[09:56:00.936] LOG: %cStart Phase SwitchSummonPhase color:green;
+[09:56:01.512] LOG: Samantha
+[09:56:02.013] LOG: %cStart Phase PostSummonPhase color:green;
+[09:56:02.014] LOG: Ran PSP for: Flaaffy
+[09:56:02.014] LOG: %cStart Phase PostSummonPhase color:green;
+[09:56:02.014] LOG: %cStart Phase PostSummonPhase color:green;
+[09:56:02.014] LOG: %cStart Phase TurnInitPhase color:green;
+[09:56:02.014] LOG: %cStart Phase CommandPhase color:green;
+[09:56:02.847] LOG: Move: CONFUSION Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Uxie
+[09:56:02.848] LOG: %cStart Phase EnemyCommandPhase color:green;
+[09:56:02.851] LOG: Battle Seed: MrvZGWyNIW70hzGb
+[09:56:02.852] WARN: BattlerTag ELECTRIFIED is missing a score!
+[09:56:02.852] WARN: BattlerTag ELECTRIFIED is missing a score!
+[09:56:02.852] LOG: Move Pool: ["Shock Wave","Slack Off","Heal Bell","Electrify"]
+[09:56:02.852] LOG: Move Scores: [12,-7,0,0]
+[09:56:02.852] LOG: Sorted Move Pool: ["Shock Wave","Heal Bell","Electrify","Slack Off"]
+[09:56:02.852] LOG: Chosen Move: Shock Wave
+[09:56:02.852] LOG: %cStart Phase TurnStartPhase color:green;
+[09:56:02.853] LOG: %cStart Phase MovePhase color:green;
+[09:56:02.853] LOG: %cUser: Flaaffy
+Move: SHOCK_WAVE
+Use Mode: NORMAL color:orchid
+[09:56:02.854] LOG: %cStart Phase MessagePhase color:green;
+[09:56:03.144] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:56:03.845] LOG: crit stage: +0
+[09:56:03.847] LOG: Move: Shock Wave | Base damage: 8.061367088607593 | Power: 48 | Source attack: 43 | Target defense: 79
+[09:56:03.847] LOG: Move: Shock Wave | Attack damage: 5
+[09:56:03.848] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:56:03.879] LOG: %cStart Phase MoveEndPhase color:green;
+[09:56:03.880] LOG: %cStart Phase MovePhase color:green;
+[09:56:03.880] LOG: %cUser: Uxie
+Move: CONFUSION
+Use Mode: NORMAL color:orchid
+[09:56:03.881] LOG: %cStart Phase MessagePhase color:green;
+[09:56:04.144] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:56:05.062] LOG: Applied Dire Hit 
+[09:56:05.062] LOG: crit stage: +1
+[09:56:05.063] LOG: Move: Confusion | Base damage: 18.411764705882355 | Power: 50 | Source attack: 45 | Target defense: 34
+[09:56:05.063] LOG: Move: Confusion | Attack damage: 25
+[09:56:05.064] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:56:05.095] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:56:05.497] LOG: %cStart Phase StatStageChangePhase color:green;
+[09:56:05.947] LOG: %cStart Phase MessagePhase color:green;
+[09:56:06.444] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:56:06.495] LOG: %cStart Phase MoveEndPhase color:green;
+[09:56:06.495] LOG: %cStart Phase CheckInterludePhase color:green;
+[09:56:06.495] LOG: %cStart Phase WeatherEffectPhase color:green;
+[09:56:06.495] LOG: %cStart Phase PositionalTagPhase color:green;
+[09:56:06.495] LOG: %cStart Phase BerryPhase color:green;
+[09:56:06.496] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[09:56:06.496] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[09:56:06.496] LOG: %cStart Phase TurnEndPhase color:green;
+[09:56:06.497] LOG: %cStart Phase MessagePhase color:green;
+[09:56:07.061] LOG: %cStart Phase TurnInitPhase color:green;
+[09:56:07.061] LOG: %cStart Phase CommandPhase color:green;
+[09:56:07.191] LOG: Move: CONFUSION Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Uxie
+[09:56:07.192] LOG: %cStart Phase EnemyCommandPhase color:green;
+[09:56:07.195] LOG: Battle Seed: MrvZGWyNIW70hzGb
+[09:56:07.196] WARN: BattlerTag ELECTRIFIED is missing a score!
+[09:56:07.196] WARN: BattlerTag ELECTRIFIED is missing a score!
+[09:56:07.196] LOG: Move Pool: ["Shock Wave","Slack Off","Heal Bell","Electrify"]
+[09:56:07.196] LOG: Move Scores: [12,2,0,0]
+[09:56:07.196] LOG: Sorted Move Pool: ["Shock Wave","Slack Off","Heal Bell","Electrify"]
+[09:56:07.196] LOG: Chosen Move: Shock Wave
+[09:56:07.196] LOG: %cStart Phase TurnStartPhase color:green;
+[09:56:07.197] LOG: %cStart Phase MovePhase color:green;
+[09:56:07.197] LOG: %cUser: Flaaffy
+Move: SHOCK_WAVE
+Use Mode: NORMAL color:orchid
+[09:56:07.198] LOG: %cStart Phase MessagePhase color:green;
+[09:56:07.478] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:56:08.178] LOG: crit stage: +0
+[09:56:08.179] LOG: Move: Shock Wave | Base damage: 8.061367088607593 | Power: 48 | Source attack: 43 | Target defense: 79
+[09:56:08.180] LOG: Move: Shock Wave | Attack damage: 11
+[09:56:08.180] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:56:08.213] LOG: %cStart Phase MoveEndPhase color:green;
+[09:56:08.213] LOG: %cStart Phase MovePhase color:green;
+[09:56:08.213] LOG: %cUser: Uxie
+Move: CONFUSION
+Use Mode: NORMAL color:orchid
+[09:56:08.215] LOG: %cStart Phase MessagePhase color:green;
+[09:56:08.478] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:56:09.394] LOG: Applied Dire Hit 
+[09:56:09.395] LOG: crit stage: +1
+[09:56:09.395] LOG: Move: Confusion | Base damage: 18.411764705882355 | Power: 50 | Source attack: 45 | Target defense: 34
+[09:56:09.396] LOG: Move: Confusion | Attack damage: 24
+[09:56:09.396] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:56:09.428] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:56:09.829] LOG: %cStart Phase StatStageChangePhase color:green;
+[09:56:10.280] LOG: %cStart Phase MessagePhase color:green;
+[09:56:10.777] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:56:10.829] LOG: %cStart Phase MoveEndPhase color:green;
+[09:56:10.829] LOG: %cStart Phase CheckInterludePhase color:green;
+[09:56:10.830] LOG: %cStart Phase WeatherEffectPhase color:green;
+[09:56:10.830] LOG: %cStart Phase PositionalTagPhase color:green;
+[09:56:10.830] LOG: %cStart Phase BerryPhase color:green;
+[09:56:10.831] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[09:56:10.832] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[09:56:10.832] LOG: %cStart Phase TurnEndPhase color:green;
+[09:56:10.833] LOG: %cStart Phase TurnInitPhase color:green;
+[09:56:10.833] LOG: %cStart Phase CommandPhase color:green;
+[09:56:11.272] LOG: Move: CONFUSION Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Uxie
+[09:56:11.274] LOG: %cStart Phase EnemyCommandPhase color:green;
+[09:56:11.278] LOG: Battle Seed: MrvZGWyNIW70hzGb
+[09:56:11.278] WARN: BattlerTag ELECTRIFIED is missing a score!
+[09:56:11.279] WARN: BattlerTag ELECTRIFIED is missing a score!
+[09:56:11.279] LOG: Move Pool: ["Shock Wave","Slack Off","Heal Bell","Electrify"]
+[09:56:11.279] LOG: Move Scores: [12,11,0,0]
+[09:56:11.279] LOG: Sorted Move Pool: ["Shock Wave","Slack Off","Heal Bell","Electrify"]
+[09:56:11.279] LOG: Chosen Move: Shock Wave
+[09:56:11.279] LOG: %cStart Phase TurnStartPhase color:green;
+[09:56:11.280] LOG: %cStart Phase MovePhase color:green;
+[09:56:11.280] LOG: %cUser: Flaaffy
+Move: SHOCK_WAVE
+Use Mode: NORMAL color:orchid
+[09:56:11.281] LOG: %cStart Phase MessagePhase color:green;
+[09:56:11.561] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:56:12.261] LOG: crit stage: +0
+[09:56:12.263] LOG: Move: Shock Wave | Base damage: 8.061367088607593 | Power: 48 | Source attack: 43 | Target defense: 79
+[09:56:12.264] LOG: Move: Shock Wave | Attack damage: 10
+[09:56:12.264] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:56:12.296] LOG: %cStart Phase MoveEndPhase color:green;
+[09:56:12.296] LOG: %cStart Phase MovePhase color:green;
+[09:56:12.296] LOG: %cUser: Uxie
+Move: CONFUSION
+Use Mode: NORMAL color:orchid
+[09:56:12.298] LOG: %cStart Phase MessagePhase color:green;
+[09:56:12.561] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:56:13.461] LOG: Applied Dire Hit 
+[09:56:13.461] LOG: crit stage: +1
+[09:56:13.462] LOG: Move: Confusion | Base damage: 18.411764705882355 | Power: 50 | Source attack: 45 | Target defense: 34
+[09:56:13.462] LOG: Move: Confusion | Attack damage: 25
+[09:56:13.463] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:56:13.495] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:56:13.895] LOG: %cStart Phase StatStageChangePhase color:green;
+[09:56:14.346] LOG: %cStart Phase MessagePhase color:green;
+[09:56:14.843] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:56:14.896] LOG: %cStart Phase MoveEndPhase color:green;
+[09:56:14.896] LOG: %cStart Phase CheckInterludePhase color:green;
+[09:56:14.896] LOG: %cStart Phase WeatherEffectPhase color:green;
+[09:56:14.896] LOG: %cStart Phase PositionalTagPhase color:green;
+[09:56:14.896] LOG: %cStart Phase BerryPhase color:green;
+[09:56:14.899] LOG: Applied Ganlon Berry 
+[09:56:14.899] LOG: Applied Petaya Berry 
+[09:56:14.901] LOG: Applied Protein 
+[09:56:14.906] LOG: %cStart Phase CommonAnimPhase color:green;
+[09:56:15.277] LOG: %cStart Phase StatStageChangePhase color:green;
+[09:56:15.727] LOG: %cStart Phase MessagePhase color:green;
+[09:56:16.227] LOG: %cStart Phase StatStageChangePhase color:green;
+[09:56:16.680] LOG: %cStart Phase MessagePhase color:green;
+[09:56:17.193] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[09:56:17.195] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[09:56:17.195] LOG: %cStart Phase TurnEndPhase color:green;
+[09:56:17.196] LOG: %cStart Phase TurnInitPhase color:green;
+[09:56:17.196] LOG: %cStart Phase CommandPhase color:green;
+[09:56:22.266] LOG: %cStart Phase EnemyCommandPhase color:green;
+[09:56:22.268] LOG: Battle Seed: MrvZGWyNIW70hzGb
+[09:56:22.269] LOG: Move Pool: ["Shock Wave"]
+[09:56:22.269] LOG: Move Scores: [12]
+[09:56:22.269] LOG: Sorted Move Pool: ["Shock Wave"]
+[09:56:22.269] LOG: Chosen Move: Shock Wave
+[09:56:22.269] LOG: %cStart Phase TurnStartPhase color:green;
+[09:56:22.269] LOG: %cStart Phase SwitchSummonPhase color:green;
+[09:56:22.728] LOG: Applied Protein 
+[09:56:23.044] LOG: %cStart Phase PostSummonPhase color:green;
+[09:56:23.044] LOG: Ran PSP for: Thievul
+[09:56:23.044] LOG: %cStart Phase PostSummonPhase color:green;
+[09:56:23.044] LOG: %cStart Phase PostSummonPhase color:green;
+[09:56:23.046] LOG: %cStart Phase MovePhase color:green;
+[09:56:23.046] LOG: %cUser: Flaaffy
+Move: SHOCK_WAVE
+Use Mode: NORMAL color:orchid
+[09:56:23.049] LOG: %cStart Phase MessagePhase color:green;
+[09:56:23.342] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:56:24.043] LOG: crit stage: +0
+[09:56:24.045] LOG: Move: Shock Wave | Base damage: 13.736470588235296 | Power: 60 | Source attack: 43 | Target defense: 51
+[09:56:24.045] LOG: Move: Shock Wave | Attack damage: 18
+[09:56:24.046] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:56:24.077] LOG: %cStart Phase MoveEndPhase color:green;
+[09:56:24.077] LOG: %cStart Phase MovePhase color:green;
+[09:56:24.078] LOG: %cUser: Thievul
+Move: FEINT_ATTACK
+Use Mode: INDIRECT color:orchid
+[09:56:24.079] LOG: %cStart Phase MessagePhase color:green;
+[09:56:24.359] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:56:25.009] LOG: Applied Dire Hit 
+[09:56:25.010] LOG: crit stage: +1
+[09:56:25.011] LOG: Applied X Attack 
+[09:56:25.012] LOG: Move: Feint Attack | Base damage: 30.8 | Power: 60 | Source attack: 60 | Target defense: 30
+[09:56:25.012] LOG: Move: Feint Attack | Attack damage: 23
+[09:56:25.014] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:56:25.043] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:56:25.442] LOG: %cStart Phase StatStageChangePhase color:green;
+[09:56:25.894] LOG: %cStart Phase MessagePhase color:green;
+[09:56:26.409] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:56:26.461] LOG: %cStart Phase FaintPhase color:green;
+[09:56:27.793] LOG: %cStart Phase MessagePhase color:green;
+[09:56:32.336] LOG: %cStart Phase VictoryPhase color:green;
+[09:56:32.336] LOG: %cStart Phase ExpPhase color:green;
+[09:56:32.337] LOG: Applied Golden EXP. Charm 
+[09:56:33.144] LOG: %cStart Phase LevelUpPhase color:green;
+[09:56:33.144] LOG: Applied Protein 
+[09:56:33.145] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:56:33.145] LOG: Applied Golden EXP. Charm 
+[09:56:33.146] LOG: %cStart Phase LevelUpPhase color:green;
+[09:56:33.146] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:56:33.146] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:56:33.147] LOG: Applied Golden EXP. Charm 
+[09:56:33.147] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:56:33.147] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:56:33.147] LOG: Applied Golden EXP. Charm 
+[09:56:33.147] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:56:33.148] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:56:33.148] LOG: Applied Golden EXP. Charm 
+[09:56:33.148] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:56:33.148] LOG: %cStart Phase MoveEndPhase color:green;
+[09:56:33.148] LOG: %cStart Phase CheckInterludePhase color:green;
+[09:56:33.148] LOG: %cStart Phase WeatherEffectPhase color:green;
+[09:56:33.148] LOG: %cStart Phase PositionalTagPhase color:green;
+[09:56:33.148] LOG: %cStart Phase BerryPhase color:green;
+[09:56:33.148] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[09:56:33.148] LOG: %cStart Phase TurnEndPhase color:green;
+[09:56:33.149] LOG: %cStart Phase SwitchSummonPhase color:green;
+[09:56:33.724] LOG: Samantha
+[09:56:34.227] LOG: %cStart Phase PostSummonPhase color:green;
+[09:56:34.227] LOG: Ran PSP for: Goldeen
+[09:56:34.228] LOG: %cStart Phase PostSummonPhase color:green;
+[09:56:34.228] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:56:34.610] LOG: %cStart Phase MovePhase color:green;
+[09:56:34.610] LOG: %cUser: Goldeen
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[09:56:34.612] LOG: %cStart Phase MessagePhase color:green;
+[09:56:34.908] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:56:34.925] LOG: %cStart Phase MessagePhase color:green;
+[09:56:35.591] LOG: %cStart Phase MoveEndPhase color:green;
+[09:56:35.591] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:56:35.643] LOG: %cStart Phase PostSummonPhase color:green;
+[09:56:35.643] LOG: %cStart Phase TurnInitPhase color:green;
+[09:56:35.643] LOG: %cStart Phase CommandPhase color:green;
