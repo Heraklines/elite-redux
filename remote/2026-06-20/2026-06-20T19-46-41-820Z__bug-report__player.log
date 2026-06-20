@@ -1,0 +1,271 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     0  wave:127  difficulty:youngster
+seed:     P3bkn7KuC8GeiKFuxTwf7HqY
+party:    Reuniclus Redux(L113 239/384), Storming(L111 446/446), Scolipede(L111 344/344), Phione(L111 362/362), Chesnaught(L111 349/349), Latias(L111 304/304)
+
+----- DESCRIPTION -----
+shiftry exploded before I could even select a move
+
+----- CONSOLE -----
+[19:43:08.804] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:43:08.806] LOG: %cStart Phase PostSummonPhase color:green;
+[19:43:08.806] LOG: Ran PSP for: Accelgor
+[19:43:08.808] LOG: %cStart Phase PostSummonPhase color:green;
+[19:43:08.809] LOG: %cStart Phase PostSummonPhase color:green;
+[19:43:08.810] LOG: %cStart Phase PostSummonPhase color:green;
+[19:43:08.810] LOG: Ran PSP for: Storming
+[19:43:08.811] LOG: %cStart Phase PostSummonPhase color:green;
+[19:43:08.812] LOG: %cStart Phase PostSummonPhase color:green;
+[19:43:08.812] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:43:08.966] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:43:08.991] LOG: %cStart Phase PostSummonPhase color:green;
+[19:43:08.991] LOG: Ran PSP for: Reuniclus Redux
+[19:43:08.992] LOG: %cStart Phase PostSummonPhase color:green;
+[19:43:08.992] LOG: %cStart Phase PostSummonPhase color:green;
+[19:43:08.992] LOG: %cStart Phase PostSummonPhase color:green;
+[19:43:08.992] LOG: Ran PSP for: Spinarak
+[19:43:08.992] LOG: %cStart Phase PostSummonPhase color:green;
+[19:43:08.993] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:43:09.149] LOG: %cStart Phase MessagePhase color:green;
+[19:43:09.431] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:43:09.453] LOG: %cStart Phase PostSummonPhase color:green;
+[19:43:09.453] LOG: %cStart Phase TurnInitPhase color:green;
+[19:43:09.453] LOG: %cStart Phase CommandPhase color:green;
+[19:43:11.158] LOG: Applied Soft Sand 
+[19:43:13.077] LOG: Move: STEAM_ERUPTION Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Reuniclus Redux
+[19:43:13.078] LOG: %cStart Phase SelectTargetPhase color:green;
+[19:43:13.573] LOG: %cStart Phase CommandPhase color:green;
+[19:43:14.693] LOG: Move: ERUPTION Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Reuniclus Redux
+[19:43:14.694] LOG: %cStart Phase SelectTargetPhase color:green;
+[19:43:15.061] LOG: %cStart Phase CommandPhase color:green;
+[19:43:16.567] LOG: Applied Magnet 
+[19:43:19.046] LOG: Move: CALM_MIND Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Storming
+[19:43:19.047] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:43:19.048] LOG: Applied X Defense 
+[19:43:19.049] LOG: Applied X Defense 
+[19:43:19.050] LOG: Applied X Defense 
+[19:43:19.051] LOG: Applied X Defense 
+[19:43:19.052] LOG: Applied X Defense 
+[19:43:19.054] LOG: Applied X Defense 
+[19:43:19.062] LOG: Move Pool: ["Poison Sting","Megahorn","Cross Poison","Toxic Thread"]
+[19:43:19.062] LOG: Move Scores: [7.5,14.25,37.5,12]
+[19:43:19.062] LOG: Sorted Move Pool: ["Cross Poison","Megahorn","Toxic Thread","Poison Sting"]
+[19:43:19.062] LOG: Chosen Move: Cross Poison
+[19:43:19.062] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:43:19.063] LOG: Applied X Defense 
+[19:43:19.064] LOG: Applied X Defense 
+[19:43:19.070] LOG: Move Pool: ["Insect Impact","Giga Drain","Quiver Dance","Quash"]
+[19:43:19.070] LOG: Move Scores: [27,15,6,0]
+[19:43:19.070] LOG: Sorted Move Pool: ["Insect Impact","Giga Drain","Quiver Dance","Quash"]
+[19:43:19.070] LOG: Chosen Move: Insect Impact
+[19:43:19.070] LOG: %cStart Phase TurnStartPhase color:green;
+[19:43:19.076] LOG: %cStart Phase MovePhase color:green;
+[19:43:19.076] LOG: %cUser: Reuniclus Redux
+Move: ERUPTION
+Use Mode: NORMAL color:orchid
+[19:43:19.078] LOG: %cStart Phase MessagePhase color:green;
+[19:43:19.169] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:43:19.478] LOG: crit stage: +0
+[19:43:19.479] LOG: Move: Eruption | Base damage: 440.98275862068965 | Power: 225 | Source attack: 246 | Target defense: 116
+[19:43:19.480] LOG: Move: Eruption | Attack damage: 892
+[19:43:19.480] LOG: crit stage: +0
+[19:43:19.481] LOG: Move: Eruption | Base damage: 324.29113924050637 | Power: 225 | Source attack: 246 | Target defense: 158
+[19:43:19.481] LOG: Move: Eruption | Attack damage: 826
+[19:43:19.481] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:43:19.486] LOG: %cStart Phase MessagePhase color:green;
+[19:43:19.690] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:43:19.699] LOG: %cStart Phase MessagePhase color:green;
+[19:43:19.902] LOG: %cStart Phase FaintPhase color:green;
+[19:43:20.910] LOG: %cStart Phase MessagePhase color:green;
+[19:43:21.078] LOG: %cStart Phase VictoryPhase color:green;
+[19:43:21.078] LOG: Applied Soothe Bell 
+[19:43:21.078] LOG: Applied Soothe Bell 
+[19:43:21.078] LOG: %cStart Phase ExpPhase color:green;
+[19:43:21.078] LOG: Applied Super EXP. Charm 
+[19:43:21.078] LOG: Applied EXP. Charm 
+[19:43:21.371] LOG: %cStart Phase LevelUpPhase color:green;
+[19:43:21.372] LOG: %cStart Phase ExpPhase color:green;
+[19:43:21.372] LOG: Applied Super EXP. Charm 
+[19:43:21.372] LOG: Applied EXP. Charm 
+[19:43:21.563] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:43:21.563] LOG: Applied Super EXP. Charm 
+[19:43:21.563] LOG: Applied EXP. Charm 
+[19:43:21.564] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:43:21.564] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:43:21.564] LOG: Applied Super EXP. Charm 
+[19:43:21.564] LOG: Applied EXP. Charm 
+[19:43:21.564] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:43:21.564] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:43:21.564] LOG: Applied Super EXP. Charm 
+[19:43:21.564] LOG: Applied EXP. Charm 
+[19:43:21.564] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:43:21.564] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:43:21.564] LOG: Applied Super EXP. Charm 
+[19:43:21.564] LOG: Applied EXP. Charm 
+[19:43:21.564] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:43:21.564] LOG: %cStart Phase FaintPhase color:green;
+[19:43:22.653] LOG: %cStart Phase MessagePhase color:green;
+[19:43:22.887] LOG: %cStart Phase VictoryPhase color:green;
+[19:43:22.887] LOG: Applied Soothe Bell 
+[19:43:22.888] LOG: Applied Soothe Bell 
+[19:43:22.888] LOG: %cStart Phase ExpPhase color:green;
+[19:43:22.888] LOG: Applied Super EXP. Charm 
+[19:43:22.888] LOG: Applied EXP. Charm 
+[19:43:23.148] LOG: %cStart Phase ExpPhase color:green;
+[19:43:23.149] LOG: Applied Super EXP. Charm 
+[19:43:23.149] LOG: Applied EXP. Charm 
+[19:43:23.610] LOG: %cStart Phase LevelUpPhase color:green;
+[19:43:23.611] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:43:23.611] LOG: Applied Super EXP. Charm 
+[19:43:23.611] LOG: Applied EXP. Charm 
+[19:43:23.611] LOG: %cStart Phase LevelUpPhase color:green;
+[19:43:23.611] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:43:23.611] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:43:23.611] LOG: Applied Super EXP. Charm 
+[19:43:23.611] LOG: Applied EXP. Charm 
+[19:43:23.611] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:43:23.611] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:43:23.611] LOG: Applied Super EXP. Charm 
+[19:43:23.611] LOG: Applied EXP. Charm 
+[19:43:23.611] LOG: %cStart Phase LevelUpPhase color:green;
+[19:43:23.611] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:43:23.611] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:43:23.611] LOG: Applied Super EXP. Charm 
+[19:43:23.612] LOG: Applied EXP. Charm 
+[19:43:23.612] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:43:23.612] LOG: %cStart Phase MoveEndPhase color:green;
+[19:43:23.612] LOG: %cStart Phase MovePhase color:green;
+[19:43:23.612] LOG: %cStart Phase MoveEndPhase color:green;
+[19:43:23.613] LOG: %cStart Phase MovePhase color:green;
+[19:43:23.613] LOG: %cUser: Storming
+Move: CALM_MIND
+Use Mode: NORMAL color:orchid
+[19:43:23.613] LOG: %cStart Phase MessagePhase color:green;
+[19:43:23.718] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:43:23.918] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:43:23.918] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:43:24.098] LOG: %cStart Phase MessagePhase color:green;
+[19:43:24.305] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:43:24.485] LOG: %cStart Phase MessagePhase color:green;
+[19:43:24.692] LOG: %cStart Phase MoveEndPhase color:green;
+[19:43:24.692] LOG: %cStart Phase MovePhase color:green;
+[19:43:24.692] LOG: %cStart Phase MoveEndPhase color:green;
+[19:43:24.692] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:43:24.692] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:43:25.025] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:43:25.025] LOG: %cStart Phase BerryPhase color:green;
+[19:43:25.025] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:43:25.026] LOG: %cStart Phase TurnEndPhase color:green;
+[19:43:25.027] LOG: %cStart Phase BattleEndPhase color:green;
+[19:43:25.027] LOG: Battle Score: 198 (1 Turns x1)
+[19:43:25.027] LOG: Total Score: 20497
+[19:43:25.031] LOG: Applied Calcium 
+[19:43:25.034] LOG: %cStart Phase EggLapsePhase color:green;
+[19:43:25.034] LOG: %cStart Phase SelectModifierPhase color:green;
+[19:43:25.034] LOG: Wave Seed: Î±àéìµÉóÁ¶ÅãçÉÄóöÒõäµÆï× 126
+[19:43:25.038] LOG: Applied Golden Poké Ball 
+[19:43:25.038] LOG: 20 10 [2,3,4,5,6,7,8,9,10,16,23]
+[19:43:25.038] LOG: {"id":"ER_ABILITY_CAPSULE","localeKey":"","iconImage":"ability_capsule","soundName":"se/restore","tier":1} 
+[19:43:25.038] LOG: 11 1 [9,17,20,21]
+[19:43:25.038] LOG: {"id":"ABILITY_RANDOMIZER","localeKey":"","iconImage":"ability_randomizer","group":"ability_capsule","soundName":"se/restore","tier":3} 
+[19:43:25.038] LOG: 7 4 [2,3,4,5]
+[19:43:25.038] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[19:43:25.038] LOG: 8 4 [2,3,4,5]
+[19:43:25.038] LOG: {"id":"BERRY","localeKey":"","iconImage":"liechi_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":3} 
+[19:43:25.038] LOG: 6 4 [2,3,4,5]
+[19:43:25.038] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[19:43:25.038] LOG: 0 0 [2,3,4,5]
+[19:43:25.038] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[19:43:29.641] WARN: cry/720 not found
+[19:43:41.847] WARN: cry/10849 not found
+[19:43:50.103] WARN: cry/10849 not found
+[19:43:50.548] WARN: cry/10850 not found
+[19:43:51.070] WARN: cry/10849 not found
+[19:43:57.133] WARN: cry/10849 not found
+[19:44:03.128] WARN: cry/545-mega not found
+[19:44:34.108] WARN: cry/720 not found
+[19:44:34.802] WARN: cry/10849 not found
+[19:44:39.875] WARN: cry/10849 not found
+[19:44:40.067] WARN: cry/720 not found
+[19:45:44.491] LOG: %cStart Phase NewBattlePhase color:green;
+[19:45:44.491] LOG: Wave Seed: Ï²áêí¶ÊôÂ·ÆäèÊÅô÷Óöå¶ÇðØ 127
+[19:45:44.491] LOG: %cStart Phase NextEncounterPhase color:green;
+[19:45:44.492] LOG: Starting species pool tier: COMMON
+[19:45:44.492] LOG: Replaced SEEDOT with SHIFTRY
+[19:45:44.500] LOG: Pokemon: Wild Shiftry | Species ID: 275 | Level: 92 | Nature: Relaxed (+Def/-Spd)
+[19:45:44.500] LOG: Stats (IVs): HP: 267 (0), Atk: 223 (18), Def: 132 (6), Spatk: 215 (29), Spdef: 136 (23), Spd: 142 (7)
+[19:45:44.500] LOG: Ability: Moxie | Passive Ability: Overgrow 
+[19:45:44.500] LOG: Moveset: ["Leaf Storm","Explosion","Perish Song","Flame Tongue"]
+[19:45:45.419] LOG: Battle Seed: WQCONHFVWuwHR97R
+[19:45:45.451] DEBUG: Session data saved to slot 0!
+[19:45:45.451] LOG: Wave Seed: Ï²áêí¶ÊôÂ·ÆäèÊÅô÷Óöå¶ÇðØ 127
+[19:45:45.863] LOG: %cStart Phase ReturnPhase color:green;
+[19:45:45.971] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:45:46.025] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:45:48.735] LOG: %cStart Phase SwitchPhase color:green;
+[19:45:51.625] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:45:51.625] LOG: %cStart Phase PostSummonPhase color:green;
+[19:45:51.625] LOG: Ran PSP for: Shiftry
+[19:45:51.625] LOG: %cStart Phase PostSummonPhase color:green;
+[19:45:51.625] LOG: %cStart Phase PostSummonPhase color:green;
+[19:45:51.626] LOG: %cStart Phase TurnInitPhase color:green;
+[19:45:51.627] LOG: Applied X Defense 
+[19:45:51.628] LOG: Applied X Defense 
+[19:45:51.629] LOG: Move Pool: ["Leaf Storm","Explosion","Perish Song","Flame Tongue"]
+[19:45:51.629] LOG: Move Scores: [30,45,16,7.75]
+[19:45:51.629] LOG: Sorted Move Pool: ["Explosion","Leaf Storm","Perish Song","Flame Tongue"]
+[19:45:51.629] LOG: Chosen Move: Explosion
+[19:45:51.629] LOG: %cStart Phase MovePhase color:green;
+[19:45:51.629] LOG: %cUser: Shiftry
+Move: EXPLOSION
+Use Mode: NORMAL color:orchid
+[19:45:51.631] LOG: %cStart Phase MessagePhase color:green;
+[19:45:51.738] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:45:52.205] LOG: crit stage: +0
+[19:45:52.205] LOG: Applied X Defense 
+[19:45:52.206] LOG: Move: Explosion | Base damage: 145.72757475083057 | Power: 250 | Source attack: 223 | Target defense: 301
+[19:45:52.206] LOG: Move: Explosion | Attack damage: 145
+[19:45:52.206] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:45:52.213] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:45:52.214] LOG: %cStart Phase FaintPhase color:green;
+[19:45:53.537] LOG: %cStart Phase MessagePhase color:green;
+[19:45:53.887] LOG: %cStart Phase VictoryPhase color:green;
+[19:45:53.888] LOG: Applied Soothe Bell 
+[19:45:53.888] LOG: %cStart Phase ExpPhase color:green;
+[19:45:53.888] LOG: Applied Super EXP. Charm 
+[19:45:53.888] LOG: Applied EXP. Charm 
+[19:45:54.248] LOG: %cStart Phase LevelUpPhase color:green;
+[19:45:54.248] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:45:54.249] LOG: Applied Super EXP. Charm 
+[19:45:54.249] LOG: Applied EXP. Charm 
+[19:45:54.249] LOG: %cStart Phase LevelUpPhase color:green;
+[19:45:54.249] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:45:54.249] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:45:54.249] LOG: Applied Super EXP. Charm 
+[19:45:54.249] LOG: Applied EXP. Charm 
+[19:45:54.249] LOG: %cStart Phase LevelUpPhase color:green;
+[19:45:54.249] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:45:54.249] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:45:54.249] LOG: Applied Super EXP. Charm 
+[19:45:54.249] LOG: Applied EXP. Charm 
+[19:45:54.249] LOG: %cStart Phase LevelUpPhase color:green;
+[19:45:54.250] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:45:54.250] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:45:54.250] LOG: Applied Super EXP. Charm 
+[19:45:54.250] LOG: Applied EXP. Charm 
+[19:45:54.250] LOG: %cStart Phase LevelUpPhase color:green;
+[19:45:54.250] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:45:54.250] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:45:54.250] LOG: Applied Super EXP. Charm 
+[19:45:54.250] LOG: Applied EXP. Charm 
+[19:45:54.250] LOG: %cStart Phase LevelUpPhase color:green;
+[19:45:54.250] LOG: Applied Calcium 
+[19:45:54.250] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:45:54.250] LOG: %cStart Phase MoveEndPhase color:green;
+[19:45:54.250] LOG: %cStart Phase CommandPhase color:green;
