@@ -2076,8 +2076,7 @@ export class PostAttackApplyStatusEffectAbAttr extends PostAttackAbAttr {
           && pokemon !== opponent
           && (!this.contactRequired
             || move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target: opponent }))
-          && pokemon.randBattleSeedInt(100) < this.chance
-          && !pokemon.status))
+          && pokemon.randBattleSeedInt(100) < this.chance))
     ) {
       const effect =
         this.effects.length === 1 ? this.effects[0] : this.effects[pokemon.randBattleSeedInt(this.effects.length)];
@@ -2125,9 +2124,8 @@ export class PostAttackApplyBattlerTagAbAttr extends PostAttackAbAttr {
       && !opponent.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr")
       && pokemon !== opponent
       && (!this.contactRequired
-        || move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: opponent, target: pokemon }))
-      && pokemon.randBattleSeedInt(100) < this.chance(opponent, pokemon, move)
-      && !pokemon.status
+        || move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target: opponent }))
+      && pokemon.randBattleSeedInt(100) < this.chance(pokemon, opponent, move)
     );
   }
 

@@ -93,7 +93,7 @@ import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { allAbilities, allMoves } from "#data/data-lists";
-import { ChanceStatusOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
+import { ChanceStatusOnAttackAbAttr, ChanceStatusOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
 import { CritStageBonusAbAttr } from "#data/elite-redux/archetypes/crit-mod";
 import {
@@ -680,6 +680,7 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     ab => {
       addNonContactStatusChance(ab, StatusEffect.BURN, 20);
       addOffenseContactStatusChance(ab, StatusEffect.BURN, 30);
+      addOffenseNonContactStatusChance(ab, StatusEffect.BURN, 20);
     },
   ],
 
@@ -1614,7 +1615,19 @@ function addNonContactStatusChance(ability: MutableAbility, effect: StatusEffect
  * mechanic, same RNG path.
  */
 function addOffenseContactStatusChance(ability: MutableAbility, effect: StatusEffect, chance: number): void {
-  ability.attrs.push(new PostAttackContactApplyStatusEffectAbAttr(chance, effect));
+  if (!ability.attrs.some(attr => attr instanceof PostAttackContactApplyStatusEffectAbAttr)) {
+    ability.attrs.push(new PostAttackContactApplyStatusEffectAbAttr(chance, effect));
+  }
+}
+
+function addOffenseNonContactStatusChance(ability: MutableAbility, effect: StatusEffect, chance: number): void {
+  ability.attrs.push(
+    new ChanceStatusOnAttackAbAttr({
+      chance,
+      effects: [effect],
+      contactExcluded: true,
+    }),
+  );
 }
 
 /**

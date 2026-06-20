@@ -664,6 +664,17 @@ describe("ER vanilla ability rebalance — R4/R5 non-contact tier (contactExclud
   it("POISON_TOUCH — has NO ER-added non-contact ChanceStatusOnHit tier (contact-only spec)", () => {
     const ab = getAbility(AbilityId.POISON_TOUCH);
     expect(ab.attrs.filter(a => a.constructor.name === "ChanceStatusOnHitAbAttr").length).toBe(0);
-    expect(ab.attrs.some(a => a.constructor.name === "PostAttackContactApplyStatusEffectAbAttr")).toBe(true);
+    expect(ab.attrs.filter(a => a.constructor.name === "PostAttackContactApplyStatusEffectAbAttr")).toHaveLength(1);
+  });
+
+  it("FLAME_BODY has one contact and one non-contact offensive tier", () => {
+    const ab = getAbility(AbilityId.FLAME_BODY);
+    expect(ab.attrs.filter(a => a.constructor.name === "PostAttackContactApplyStatusEffectAbAttr")).toHaveLength(1);
+    expect(ab.attrs.filter(a => a.constructor.name === "ChanceStatusOnAttackAbAttr")).toHaveLength(1);
+  });
+
+  it("POISON_POINT has exactly one offensive contact tier", () => {
+    const ab = getAbility(AbilityId.POISON_POINT);
+    expect(ab.attrs.filter(a => a.constructor.name === "PostAttackContactApplyStatusEffectAbAttr")).toHaveLength(1);
   });
 });
