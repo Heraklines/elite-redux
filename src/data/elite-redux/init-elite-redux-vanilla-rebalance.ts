@@ -93,6 +93,7 @@ import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { BerserkOnThresholdAbAttr } from "#data/elite-redux/archetypes/berserk-on-threshold";
 import { ChanceStatusOnAttackAbAttr, ChanceStatusOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
 import { CritStageBonusAbAttr } from "#data/elite-redux/archetypes/crit-mod";
@@ -110,6 +111,7 @@ import { PostDefendChangeAttackerTypeAbAttr } from "#data/elite-redux/archetypes
 import { PostDefendSuppressOpponentDamageBoostAbAttr } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import { PostFaintDetonateAbAttr } from "#data/elite-redux/archetypes/post-faint-detonate";
 import { RecoilDamageMultiplierAbAttr } from "#data/elite-redux/archetypes/recoil-damage-multiplier";
+import { SelfHighestStatMultiplierAbAttr } from "#data/elite-redux/archetypes/self-highest-stat-multiplier";
 import {
   StatTriggerOnHitAbAttr,
   StatTriggerOnStatLoweredAbAttr,
@@ -808,8 +810,19 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // 105 SUPER_LUCK: vanilla +1 crit stage. ER also gives 1.3x crit dmg.
   // pokerogue's crit damage multiplier is fixed; mutate via additive attrs
   // — the BonusCritDamageMultiplier path is private. Defer: would need new primitive.
-  // 159 SAND_FORCE: vanilla 1.3x Rock/Steel/Ground in sand → ER "highest atk
-  // stat 1.5x in sand". Complex; defer.
+  [
+    AbilityId.SAND_FORCE,
+    ab => {
+      ab.attrs = ab.attrs.filter(attr => attr.constructor.name !== "MoveTypePowerBoostAbAttr");
+      ab.attrs.push(
+        new SelfHighestStatMultiplierAbAttr({
+          candidates: [Stat.ATK, Stat.SPATK],
+          multiplier: 1.5,
+          weathers: [WeatherType.SANDSTORM],
+        }),
+      );
+    },
+  ],
   // 85 HEATPROOF: vanilla 0.5x Fire dmg + no burn damage. Same as ER.
   // 47 THICK_FAT: vanilla 0.5x Fire/Ice dmg. Same as ER.
   // 91 ADAPTABILITY: vanilla 2x STAB. Same as ER.
@@ -937,6 +950,7 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   [
     AbilityId.WONDER_SKIN,
     ab => {
+      ab.attrs = ab.attrs.filter(attr => attr.constructor.name !== "WonderSkinAbAttr");
       ab.attrs.push(new PostDefendSuppressOpponentDamageBoostAbAttr());
     },
   ],
@@ -1000,9 +1014,12 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   [
     AbilityId.BERSERK,
     ab => {
-      ab.attrs.push(
-        new PostDefendStatStageChangeAbAttr((target, _user, _move) => target.getHpRatio() <= 0.5, Stat.ATK, 1, true),
+      ab.attrs = ab.attrs.filter(
+        attr =>
+          attr.constructor.name !== "PostDefendHpGatedStatStageChangeAbAttr"
+          && attr.constructor.name !== "PostDefendStatStageChangeAbAttr",
       );
+      ab.attrs.push(new BerserkOnThresholdAbAttr());
     },
   ],
   // 215 INNARDS_OUT: vanilla deals attacker's HP-damage equal to fatal hit.

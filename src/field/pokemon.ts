@@ -56,6 +56,7 @@ import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/dai
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
+import { suppressesOpponentDamageBoosts } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import {
   getErSharedGiftAbilityIdsFor,
@@ -3303,8 +3304,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     simulated = true,
     cancelled?: BooleanHolder,
     useIllusion = false,
+    ignoreSourceAbility = false,
   ): TypeDamageMultiplier {
-    if (this.turnData?.moveEffectiveness != null) {
+    if (!ignoreSourceAbility && this.turnData?.moveEffectiveness != null) {
       return this.turnData?.moveEffectiveness;
     }
 
@@ -3315,7 +3317,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     const typeMultiplier = new NumberHolder(
       move.category !== MoveCategory.STATUS || move.hasAttr("RespectAttackTypeImmunityAttr")
-        ? this.getAttackTypeEffectiveness(moveType, { source, simulated, move, useIllusion })
+        ? this.getAttackTypeEffectiveness(moveType, { source, simulated, move, useIllusion, ignoreSourceAbility })
         : 1,
     );
 
@@ -3390,6 +3392,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     moveType: PokemonType,
     {
       source,
+      ignoreSourceAbility = false,
       ignoreStrongWinds = false,
       simulated = true,
       move,
@@ -3422,7 +3425,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       if (
         source?.isActive(true)
         && typeMulti === 0
-        && this.checkIgnoreTypeImmunity({ source, simulated, moveType, defenderType })
+        && this.checkIgnoreTypeImmunity({ source, simulated, moveType, defenderType, ignoreSourceAbility })
       ) {
         continue;
       }
@@ -3438,7 +3441,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // its own move type interacts with the defender's types (e.g. Ground Shock,
     // Molten Down). Scanned by name (same registration-free pattern as
     // RecoilDamageMultiplierAbAttr) so no central AbAttr-map edit is needed.
-    if (source) {
+    if (source && !ignoreSourceAbility) {
       const sourceAttrs = source.getAllActiveAbilityAttrs();
       for (const attr of sourceAttrs) {
         if (attr?.constructor?.name === "OffensiveTypeChartOverrideAbAttr") {
@@ -3522,11 +3525,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     simulated,
     moveType,
     defenderType,
+    ignoreSourceAbility,
   }: {
     source: Pokemon;
     simulated: boolean;
     moveType: PokemonType;
     defenderType: PokemonType;
+    ignoreSourceAbility: boolean;
   }): boolean {
     // TODO: remove type assertion once method is properly typed
     const hasExposed = !!this.findTag(
@@ -3539,13 +3544,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
 
     const ignoreImmunity = new BooleanHolder(false);
-    applyAbAttrs("IgnoreTypeImmunityAbAttr", {
-      pokemon: source,
-      cancelled: ignoreImmunity,
-      simulated,
-      moveType,
-      defenderType,
-    });
+    if (!ignoreSourceAbility) {
+      applyAbAttrs("IgnoreTypeImmunityAbAttr", {
+        pokemon: source,
+        cancelled: ignoreImmunity,
+        simulated,
+        moveType,
+        defenderType,
+      });
+    }
     return ignoreImmunity.value;
   }
 
@@ -4512,7 +4519,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     const levelMultiplier = (2 * source.level) / 5 + 2;
 
     /** The power of the move after power boosts from abilities, etc. have applied */
-    const power = move.calculateBattlePower(source, this, simulated);
+    const power = move.calculateBattlePower(source, this, simulated, ignoreSourceAbility);
 
     /**
      * The attacker's offensive stat for the given move's category.
@@ -4701,6 +4708,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     isCritical = false,
     simulated = true,
     effectiveness,
+    forcedRandomMultiplier,
+    skipOpponentDamageBoostSuppression = false,
   }: GetAttackDamageParams): DamageCalculationResult {
     const damage = new NumberHolder(0);
     const defendingSide = this.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
@@ -4720,10 +4729,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
      * accounts for changes in effectiveness from the move's attributes and the
      * abilities of both the source and this Pokemon.
      *
-     * Note that the source's abilities are not ignored here
      */
     const typeMultiplier =
-      effectiveness ?? this.getMoveEffectiveness(source, move, ignoreAbility, simulated, cancelled);
+      effectiveness
+      ?? this.getMoveEffectiveness(source, move, ignoreAbility, simulated, cancelled, false, ignoreSourceAbility);
 
     const isPhysical = moveCategory === MoveCategory.PHYSICAL;
 
@@ -4862,13 +4871,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     /** The damage multiplier when the given move critically hits */
     const criticalMultiplier = new NumberHolder(isCritical ? 1.5 : 1);
-    applyAbAttrs("MultCritAbAttr", { pokemon: source, simulated, critMult: criticalMultiplier });
+    if (!ignoreSourceAbility) {
+      applyAbAttrs("MultCritAbAttr", { pokemon: source, simulated, critMult: criticalMultiplier });
+    }
 
     /**
      * A multiplier for random damage spread in the range [0.85, 1]
      * This is always 1 for simulated calls.
      */
-    const randomMultiplierHolder = new NumberHolder(simulated ? 1 : this.randBattleSeedIntRange(85, 100) / 100);
+    const randomMultiplierHolder = new NumberHolder(
+      forcedRandomMultiplier ?? (simulated ? 1 : this.randBattleSeedIntRange(85, 100) / 100),
+    );
     // Elite Redux: abilities like Bad Luck / Bad Omen force attacks against the
     // holder (`this` = the defender) to roll minimum damage. No-op for every
     // ability lacking EnemyMinDamageRollAbAttr.
@@ -5018,6 +5031,25 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       });
     }
 
+    const opponentDamageBoostSuppressionCeiling =
+      !skipOpponentDamageBoostSuppression
+      && !ignoreAbility
+      && !ignoreSourceAbility
+      && suppressesOpponentDamageBoosts(this)
+        ? this.getAttackDamage({
+            source,
+            move,
+            ignoreAbility,
+            ignoreSourceAbility: true,
+            ignoreAllyAbility: true,
+            ignoreSourceAllyAbility: true,
+            isCritical,
+            simulated: true,
+            forcedRandomMultiplier: randomMultiplierHolder.value,
+            skipOpponentDamageBoostSuppression: true,
+          }).damage
+        : null;
+
     /** Apply the enemy's Damage and Resistance tokens */
     if (!source.isPlayer()) {
       globalScene.applyModifiers(EnemyDamageBoosterModifier, false, damage);
@@ -5088,6 +5120,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // site. (Round 7 of the ER bespoke ability grind.)
     if (!ignoreAbility) {
       applyAbAttrs("PreDefendFullHpEndureAbAttr", abAttrParams);
+    }
+
+    if (opponentDamageBoostSuppressionCeiling !== null) {
+      damage.value = Math.min(damage.value, opponentDamageBoostSuppressionCeiling);
     }
 
     // debug message for when damage is applied

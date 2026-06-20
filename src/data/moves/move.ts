@@ -1171,7 +1171,7 @@ export abstract class Move implements Localizable {
    * @param target {@linkcode Pokemon} The Pokémon being targeted by the move.
    * @returns The calculated power of the move.
    */
-  calculateBattlePower(source: Pokemon, target: Pokemon, simulated = false): number {
+  calculateBattlePower(source: Pokemon, target: Pokemon, simulated = false, ignoreSourceAbility = false): number {
     if (this.category === MoveCategory.STATUS) {
       return -1;
     }
@@ -1198,10 +1198,12 @@ export abstract class Move implements Localizable {
       move: this,
     };
 
-    applyAbAttrs("VariableMovePowerAbAttr", abAttrParams);
-    const ally = source.getAlly();
-    if (ally != null) {
-      applyAbAttrs("AllyMoveCategoryPowerBoostAbAttr", { ...abAttrParams, pokemon: ally });
+    if (!ignoreSourceAbility) {
+      applyAbAttrs("VariableMovePowerAbAttr", abAttrParams);
+      const ally = source.getAlly();
+      if (ally != null) {
+        applyAbAttrs("AllyMoveCategoryPowerBoostAbAttr", { ...abAttrParams, pokemon: ally });
+      }
     }
 
     const sourceTeraType = source.getTeraType();
@@ -1217,21 +1219,28 @@ export abstract class Move implements Localizable {
       power.value = 60;
     }
 
-    const fieldAuras = new Set(
-      globalScene.getField(true).flatMap(p =>
-        p.getAbilityAttrs("FieldMoveTypePowerBoostAbAttr").filter(attr => {
-          const condition = attr.getCondition();
-          return !condition || condition(p);
-        }),
-      ),
-    );
-    for (const aura of fieldAuras) {
-      // TODO: Refactor the fieldAura attribute so that its apply method is not directly called
-      aura.apply({ pokemon: source, simulated, opponent: target, move: this, power });
-    }
+    if (!ignoreSourceAbility) {
+      const fieldAuras = new Set(
+        globalScene.getField(true).flatMap(p =>
+          p.getAbilityAttrs("FieldMoveTypePowerBoostAbAttr").filter(attr => {
+            const condition = attr.getCondition();
+            return !condition || condition(p);
+          }),
+        ),
+      );
+      for (const aura of fieldAuras) {
+        aura.apply({ pokemon: source, simulated, opponent: target, move: this, power });
+      }
 
-    for (const p of source.getAlliesGenerator()) {
-      applyAbAttrs("UserFieldMoveTypePowerBoostAbAttr", { pokemon: p, opponent: target, move: this, simulated, power });
+      for (const p of source.getAlliesGenerator()) {
+        applyAbAttrs("UserFieldMoveTypePowerBoostAbAttr", {
+          pokemon: p,
+          opponent: target,
+          move: this,
+          simulated,
+          power,
+        });
+      }
     }
 
     const typeBoost = source.findTag(
@@ -1250,7 +1259,10 @@ export abstract class Move implements Localizable {
       power.value *= 1.5;
     }
 
-    power.value *= (source.getTag(BattlerTagType.SUPREME_OVERLORD) as SupremeOverlordTag | undefined)?.getBoost() ?? 1;
+    if (!ignoreSourceAbility) {
+      power.value *=
+        (source.getTag(BattlerTagType.SUPREME_OVERLORD) as SupremeOverlordTag | undefined)?.getBoost() ?? 1;
+    }
 
     return power.value;
   }
@@ -3091,11 +3103,14 @@ export class MultiHitAttr extends MoveAttr {
    * @returns True
    */
   apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    const ignoreUserAbility = args[1] === true;
     const hitType = new NumberHolder(this.intrinsicMultiHitType);
-    applyMoveAttrs("ChangeMultiHitTypeAttr", user, target, move, hitType);
+    if (!ignoreUserAbility) {
+      applyMoveAttrs("ChangeMultiHitTypeAttr", user, target, move, hitType);
+    }
     this.multiHitType = hitType.value;
 
-    (args[0] as NumberHolder).value = this.getHitCount(user, target);
+    (args[0] as NumberHolder).value = this.getHitCount(user, target, ignoreUserAbility);
     return true;
   }
 
@@ -3111,12 +3126,14 @@ export class MultiHitAttr extends MoveAttr {
    * @param target {@linkcode Pokemon} targeted by the attack
    * @returns The number of hits this attack should deal
    */
-  getHitCount(user: Pokemon, _target: Pokemon): number {
+  getHitCount(user: Pokemon, _target: Pokemon, ignoreUserAbility = false): number {
     switch (this.multiHitType) {
       case MultiHitType.TWO_TO_FIVE: {
         const rand = user.randBattleSeedInt(20);
         const hitValue = new NumberHolder(rand);
-        applyAbAttrs("MaxMultiHitAbAttr", { pokemon: user, hits: hitValue });
+        if (!ignoreUserAbility) {
+          applyAbAttrs("MaxMultiHitAbAttr", { pokemon: user, hits: hitValue });
+        }
         let count: number;
         if (hitValue.value >= 13) {
           count = 2;

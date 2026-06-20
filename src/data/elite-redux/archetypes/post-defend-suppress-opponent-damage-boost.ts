@@ -21,15 +21,21 @@
 // halve multihit-bonus damage.
 // =============================================================================
 
-import { ReceivedMoveDamageMultiplierAbAttr } from "#abilities/ab-attrs";
-import type { PreDefendModifyDamageAbAttrParams } from "#types/ability-types";
+import { AbAttr } from "#abilities/ab-attrs";
+import type { Pokemon } from "#field/pokemon";
 
-export class PostDefendSuppressOpponentDamageBoostAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
+export class PostDefendSuppressOpponentDamageBoostAbAttr extends AbAttr {
   constructor() {
-    super(() => true, 0.77);
+    super(false);
   }
+}
 
-  override canApply(params: PreDefendModifyDamageAbAttrParams): boolean {
-    return super.canApply(params) && !!params.move?.is("AttackMove");
-  }
+export function suppressesOpponentDamageBoosts(pokemon: Pokemon): boolean {
+  return pokemon
+    .getAllActiveAbilityAttrs()
+    .some(attr => attr.constructor.name === "PostDefendSuppressOpponentDamageBoostAbAttr");
+}
+
+export function bypassesOpponentMultiHitSuppression(attr: AbAttr): boolean {
+  return attr.constructor.name === "AddSecondStrikeAbAttr" || attr.constructor.name === "ErMultiHeadedAbAttr";
 }

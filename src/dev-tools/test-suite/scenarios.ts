@@ -7077,6 +7077,30 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Wonder Skin multihit block",
+    description:
+      "IDs 147/341/486/827 - suppresses opponent multihit abilities except\n"
+      + "Parental Bond and Multi-Headed. DO: let the enemy use Tackle.\n"
+      + "EXPECT: Unrelenting does not turn Tackle into a 2-5 hit move.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: AbilityId.WONDER_SKIN,
+        ENEMY_ABILITY_OVERRIDE: erAbility(ErAbilityId.UNRELENTING),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE, MoveId.SPLASH, MoveId.PROTECT, MoveId.REST],
+      });
+      return [
+        makeStarter(SpeciesId.SHUCKLE, {
+          moveset: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.HARDEN],
+        }),
+      ];
+    },
+  },
+  {
     label: "Berserk single trigger",
     description:
       "IDs 201/661/992 - an opposing attack crossing half HP raises only the\n"

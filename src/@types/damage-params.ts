@@ -30,6 +30,8 @@ interface DamageParams {
   simulated?: boolean;
   /** If defined, used in place of calculated effectiveness values */
   effectiveness?: number;
+  forcedRandomMultiplier?: number;
+  skipOpponentDamageBoostSuppression?: boolean;
 }
 
 /**
@@ -53,6 +55,7 @@ export interface GetAttackTypeEffectivenessParams {
    * and the effects of Foresight/Odor Sleuth.
    */
   source?: Pokemon;
+  ignoreSourceAbility?: boolean;
   /**
    * If `true`, ignores the effect of strong winds (used by anticipation, forewarn, stealth rocks)
    * @defaultValue `false`

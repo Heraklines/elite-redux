@@ -207,6 +207,15 @@ export function applyAbAttrs<T extends CallableAbAttrString>(
   applyAbAttrsInternal(attrType, params, { messages });
 }
 
+export function applyFilteredAbAttrs<T extends CallableAbAttrString>(
+  attrType: T,
+  params: AbAttrParamMap[T],
+  attrFilter: (attr: AbAttrMap[T]) => boolean,
+  messages?: string[],
+): void {
+  applyAbAttrsInternal(attrType, params, { attrFilter, messages });
+}
+
 /**
  * Apply `PostSummonAbAttr` for ALL of a Pokémon's passive (innate) slots.
  *

@@ -1,5 +1,5 @@
 import type { PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
-import { applyAbAttrs } from "#abilities/apply-ab-attrs";
+import { applyAbAttrs, applyFilteredAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { ConditionalProtectTag } from "#data/arena-tag";
@@ -9,6 +9,10 @@ import {
   ConditionalAlwaysHitAbAttr,
   erMoveAlwaysHitsForUserType,
 } from "#data/elite-redux/archetypes/conditional-always-hit";
+import {
+  bypassesOpponentMultiHitSuppression,
+  suppressesOpponentDamageBoosts,
+} from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import { erApplyCommunityOnHitItems } from "#data/elite-redux/er-community-items";
 import { erApplyReactiveOnHit } from "#data/elite-redux/er-reactive-items";
 import { applyErLifeOrbRecoil, applyErRockyHelmet } from "#data/elite-redux/er-recreated-items";
@@ -175,12 +179,24 @@ export class MoveEffectPhase extends PokemonPhase {
      */
     if (user.turnData.hitsLeft === -1) {
       const hitCount = new NumberHolder(1);
+      const opponent = this.getFirstTarget();
+      const suppressesMultiHitAbilities =
+        opponent != null
+        && !move.doesFlagEffectApply({ flag: MoveFlags.IGNORE_ABILITIES, user, target: opponent })
+        && suppressesOpponentDamageBoosts(opponent);
       // Assume single target for multi hit
-      applyMoveAttrs("MultiHitAttr", user, this.getFirstTarget() ?? null, move, hitCount);
+      applyMoveAttrs("MultiHitAttr", user, opponent ?? null, move, hitCount, suppressesMultiHitAbilities);
       // If Parental Bond is applicable, add another hit
-      applyAbAttrs("AddSecondStrikeAbAttr", { pokemon: user, move, hitCount, opponent: this.getFirstTarget() });
+      const addStrikeParams = { pokemon: user, move, hitCount, opponent };
+      if (suppressesMultiHitAbilities) {
+        applyFilteredAbAttrs("AddSecondStrikeAbAttr", addStrikeParams, bypassesOpponentMultiHitSuppression);
+      } else {
+        applyAbAttrs("AddSecondStrikeAbAttr", addStrikeParams);
+      }
       // ER Unrelenting (994): turn an eligible single-hit move into a 2-5-hit move.
-      applyAbAttrs("AllAttacksMultiHitAbAttr", { pokemon: user, move, hitCount, opponent: this.getFirstTarget() });
+      if (!suppressesMultiHitAbilities) {
+        applyAbAttrs("AllAttacksMultiHitAbAttr", { pokemon: user, move, hitCount, opponent });
+      }
       // If Multi-Lens is applicable, add hits equal to the number of held Multi-Lenses
       globalScene.applyModifiers(PokemonMultiHitModifier, user.isPlayer(), user, move.id, hitCount);
       // Set the user's relevant turnData fields to reflect the final hit count
