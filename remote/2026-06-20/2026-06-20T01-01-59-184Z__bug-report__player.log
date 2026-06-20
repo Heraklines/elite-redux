@@ -1,0 +1,273 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     0  wave:17  difficulty:hell
+seed:     M04AFJffdrFRPIaFts7LRQ6J
+party:    Uxie Redux(L16 56/56), Snivy(L15 41/43), Krabby(L10 34/34), Eevee(L10 34/34), Cleffa(L11 35/35), Aipom(L12 38/38)
+
+----- DESCRIPTION -----
+Black shinies showing as red shinies when you look at icons in the eggs but going over them it shows the black sparkles
+
+----- CONSOLE -----
+[00:57:35.422] WARN: cry/495 not found
+[00:57:35.526] LOG: %cStart Phase ShinySparklePhase color:green;
+[00:57:35.629] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[00:57:35.630] LOG: %cStart Phase InitEncounterPhase color:green;
+[00:57:35.631] LOG: %cStart Phase PostSummonPhase color:green;
+[00:57:35.631] LOG: Ran PSP for: Snivy
+[00:57:35.631] LOG: %cStart Phase PostSummonPhase color:green;
+[00:57:35.631] LOG: %cStart Phase PostSummonPhase color:green;
+[00:57:35.631] LOG: %cStart Phase PostSummonPhase color:green;
+[00:57:35.631] LOG: Ran PSP for: Treecko
+[00:57:35.631] LOG: %cStart Phase PostSummonPhase color:green;
+[00:57:35.631] LOG: %cStart Phase PostSummonPhase color:green;
+[00:57:35.631] LOG: %cStart Phase TurnInitPhase color:green;
+[00:57:35.631] LOG: %cStart Phase CommandPhase color:green;
+[00:57:36.870] LOG: Move: LEECH_LIFE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Snivy
+[00:57:36.872] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:57:36.877] LOG: Move Pool: ["Acrobatics"]
+[00:57:36.877] LOG: Move Scores: [-214.1891891891892]
+[00:57:36.877] LOG: Sorted Move Pool: ["Acrobatics"]
+[00:57:36.877] LOG: Chosen Move: Acrobatics
+[00:57:36.877] LOG: ER AI: experimental brain (sharpness 1)
+[00:57:36.877] LOG: %cStart Phase TurnStartPhase color:green;
+[00:57:36.878] LOG: %cStart Phase MovePhase color:green;
+[00:57:36.878] LOG: %cUser: Snivy
+Move: LEECH_LIFE
+Use Mode: NORMAL color:orchid
+[00:57:36.879] LOG: %cStart Phase MessagePhase color:green;
+[00:57:36.977] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:57:37.166] LOG: crit stage: +0
+[00:57:37.166] LOG: Move: Leech Life | Base damage: 16.72 | Power: 80 | Source attack: 23 | Target defense: 20
+[00:57:37.166] LOG: Move: Leech Life | Attack damage: 31
+[00:57:37.167] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:57:37.180] LOG: %cStart Phase MessagePhase color:green;
+[00:57:37.387] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:57:37.388] LOG: %cStart Phase MessagePhase color:green;
+[00:57:37.596] LOG: %cStart Phase MoveEndPhase color:green;
+[00:57:37.596] LOG: %cStart Phase MovePhase color:green;
+[00:57:37.596] LOG: %cUser: Treecko
+Move: ACROBATICS
+Use Mode: NORMAL color:orchid
+[00:57:37.597] LOG: %cStart Phase MessagePhase color:green;
+[00:57:37.721] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:57:37.964] LOG: crit stage: +0
+[00:57:37.964] LOG: Move: Acrobatics | Base damage: 18.426666666666666 | Power: 110 | Source attack: 28 | Target defense: 27
+[00:57:37.964] LOG: Move: Acrobatics | Attack damage: 35
+[00:57:37.965] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:57:37.978] LOG: %cStart Phase MessagePhase color:green;
+[00:57:38.186] LOG: %cStart Phase FaintPhase color:green;
+[00:57:38.187] WARN: cry/495 not found
+[00:57:38.242] LOG: %cStart Phase MessagePhase color:green;
+[00:57:38.597] LOG: %cStart Phase MoveEndPhase color:green;
+[00:57:38.597] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:57:38.597] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:57:38.597] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:57:38.597] LOG: %cStart Phase BerryPhase color:green;
+[00:57:38.597] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:57:38.597] LOG: %cStart Phase TurnEndPhase color:green;
+[00:57:38.597] LOG: %cStart Phase SwitchPhase color:green;
+[00:57:40.043] LOG: %cStart Phase SwitchSummonPhase color:green;
+[00:57:40.130] LOG: Applied Carbos 
+[00:57:40.158] WARN: cry/10714 not found
+[00:57:40.262] LOG: %cStart Phase ShinySparklePhase color:green;
+[00:57:40.365] LOG: %cStart Phase PostSummonPhase color:green;
+[00:57:40.366] LOG: Ran PSP for: Uxie Redux
+[00:57:40.366] LOG: %cStart Phase PostSummonPhase color:green;
+[00:57:40.366] LOG: %cStart Phase PostSummonPhase color:green;
+[00:57:40.366] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:57:40.526] LOG: %cStart Phase MessagePhase color:green;
+[00:57:40.761] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:57:40.783] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:57:40.950] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:57:41.132] LOG: %cStart Phase MessagePhase color:green;
+[00:57:41.338] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:57:41.523] LOG: %cStart Phase MessagePhase color:green;
+[00:57:41.734] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:57:41.756] LOG: %cStart Phase TurnInitPhase color:green;
+[00:57:41.756] LOG: %cStart Phase CommandPhase color:green;
+[00:57:42.895] LOG: Move: NIGHT_DAZE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Uxie Redux
+[00:57:42.896] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:57:42.899] LOG: Battle Seed: rSkkF05X1paH6F0N
+[00:57:42.904] LOG: Move Pool: ["Swords Dance","Seed Bomb","Acrobatics","Slam"]
+[00:57:42.904] LOG: Move Scores: [-374,-374,-374,-374]
+[00:57:42.904] LOG: Sorted Move Pool: ["Swords Dance","Seed Bomb","Acrobatics","Slam"]
+[00:57:42.904] LOG: Chosen Move: Swords Dance
+[00:57:42.904] LOG: ER AI: experimental brain (sharpness 1)
+[00:57:42.904] LOG: %cStart Phase TurnStartPhase color:green;
+[00:57:42.905] LOG: %cStart Phase MovePhase color:green;
+[00:57:42.905] LOG: %cUser: Uxie Redux
+Move: NIGHT_DAZE
+Use Mode: NORMAL color:orchid
+[00:57:42.905] LOG: %cStart Phase MessagePhase color:green;
+[00:57:43.011] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:57:43.407] LOG: crit stage: +0
+[00:57:43.408] LOG: Move: Night Daze | Base damage: 12.926376811594201 | Power: 53.33333333333333 | Source attack: 31 | Target defense: 23
+[00:57:43.408] LOG: Move: Night Daze | Attack damage: 17
+[00:57:43.408] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:57:43.422] LOG: %cStart Phase FaintPhase color:green;
+[00:57:43.422] WARN: cry/252 not found
+[00:57:43.484] LOG: %cStart Phase MessagePhase color:green;
+[00:57:43.700] LOG: %cStart Phase VictoryPhase color:green;
+[00:57:43.700] LOG: Applied Lucky Egg 
+[00:57:43.700] LOG: %cStart Phase ExpPhase color:green;
+[00:57:43.700] LOG: Applied Super EXP. Charm 
+[00:57:43.700] LOG: Applied EXP. Charm 
+[00:57:43.942] LOG: %cStart Phase LevelUpPhase color:green;
+[00:57:43.942] LOG: Applied Carbos 
+[00:57:44.429] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:57:44.429] LOG: Applied Super EXP. Charm 
+[00:57:44.429] LOG: Applied EXP. Charm 
+[00:57:44.429] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:57:44.429] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:57:44.429] LOG: Applied Super EXP. Charm 
+[00:57:44.429] LOG: Applied EXP. Charm 
+[00:57:44.429] LOG: %cStart Phase LevelUpPhase color:green;
+[00:57:45.044] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:57:45.044] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:57:45.044] LOG: Applied Super EXP. Charm 
+[00:57:45.044] LOG: Applied EXP. Charm 
+[00:57:45.045] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:57:45.045] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:57:45.045] LOG: Applied Super EXP. Charm 
+[00:57:45.045] LOG: Applied EXP. Charm 
+[00:57:45.045] LOG: %cStart Phase LevelUpPhase color:green;
+[00:57:45.621] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:57:45.621] LOG: %cStart Phase MoveEndPhase color:green;
+[00:57:45.621] LOG: %cStart Phase MovePhase color:green;
+[00:57:45.621] LOG: %cStart Phase MoveEndPhase color:green;
+[00:57:45.621] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:57:45.621] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:57:45.621] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:57:45.621] LOG: %cStart Phase BerryPhase color:green;
+[00:57:45.621] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:57:45.622] LOG: %cStart Phase TurnEndPhase color:green;
+[00:57:45.622] LOG: %cStart Phase SwitchSummonPhase color:green;
+[00:57:45.844] LOG: Finn
+[00:57:45.948] WARN: cry/704 not found
+[00:57:46.053] LOG: %cStart Phase PostSummonPhase color:green;
+[00:57:46.053] LOG: Ran PSP for: Goomy
+[00:57:46.053] LOG: %cStart Phase PostSummonPhase color:green;
+[00:57:46.053] LOG: %cStart Phase PostSummonPhase color:green;
+[00:57:46.053] LOG: %cStart Phase TurnInitPhase color:green;
+[00:57:46.053] LOG: %cStart Phase CommandPhase color:green;
+[00:57:46.977] LOG: Move: DRAINING_KISS Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Uxie Redux
+[00:57:46.978] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:57:46.979] LOG: Battle Seed: rSkkF05X1paH6F0N
+[00:57:46.983] LOG: Move Pool: ["Hidden Power","Mega Drain","Water Pulse","Protect"]
+[00:57:46.983] LOG: Move Scores: [-450.47169811320754,-450.47169811320754,-450.47169811320754,-1000000]
+[00:57:46.983] LOG: Sorted Move Pool: ["Hidden Power","Mega Drain","Water Pulse","Protect"]
+[00:57:46.983] LOG: Chosen Move: Hidden Power
+[00:57:46.983] LOG: ER AI: experimental brain (sharpness 1)
+[00:57:46.983] LOG: %cStart Phase TurnStartPhase color:green;
+[00:57:46.984] LOG: %cStart Phase MovePhase color:green;
+[00:57:46.984] LOG: %cUser: Uxie Redux
+Move: DRAINING_KISS
+Use Mode: NORMAL color:orchid
+[00:57:46.984] LOG: %cStart Phase MessagePhase color:green;
+[00:57:47.100] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:57:47.281] LOG: crit stage: +0
+[00:57:47.282] LOG: Move: Draining Kiss | Base damage: 16.142857142857142 | Power: 75 | Source attack: 33 | Target defense: 28
+[00:57:47.282] LOG: Move: Draining Kiss | Attack damage: 43
+[00:57:47.282] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:57:47.296] LOG: %cStart Phase MessagePhase color:green;
+[00:57:47.503] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:57:47.504] LOG: %cStart Phase MessagePhase color:green;
+[00:57:47.718] LOG: %cStart Phase FaintPhase color:green;
+[00:57:47.719] WARN: cry/704 not found
+[00:57:47.774] LOG: %cStart Phase MessagePhase color:green;
+[00:57:47.840] LOG: %cStart Phase VictoryPhase color:green;
+[00:57:47.840] LOG: Applied Lucky Egg 
+[00:57:47.840] LOG: %cStart Phase ExpPhase color:green;
+[00:57:47.840] LOG: Applied Super EXP. Charm 
+[00:57:47.840] LOG: Applied EXP. Charm 
+[00:57:48.046] LOG: 3892 4456 4096
+[00:57:48.115] LOG: %cStart Phase LevelUpPhase color:green;
+[00:57:48.115] LOG: Applied Carbos 
+[00:57:48.735] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:57:48.735] LOG: Applied Super EXP. Charm 
+[00:57:48.735] LOG: Applied EXP. Charm 
+[00:57:48.735] LOG: %cStart Phase LevelUpPhase color:green;
+[00:57:49.526] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:57:49.526] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:57:49.527] LOG: Applied Super EXP. Charm 
+[00:57:49.527] LOG: Applied EXP. Charm 
+[00:57:49.527] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:57:49.527] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:57:49.527] LOG: Applied Super EXP. Charm 
+[00:57:49.527] LOG: Applied EXP. Charm 
+[00:57:49.527] LOG: %cStart Phase LevelUpPhase color:green;
+[00:57:50.087] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:57:50.087] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:57:50.087] LOG: Applied Super EXP. Charm 
+[00:57:50.087] LOG: Applied EXP. Charm 
+[00:57:50.088] LOG: %cStart Phase LevelUpPhase color:green;
+[00:57:50.685] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:57:50.685] LOG: %cStart Phase MoveEndPhase color:green;
+[00:57:50.685] LOG: %cStart Phase MovePhase color:green;
+[00:57:50.685] LOG: %cStart Phase MoveEndPhase color:green;
+[00:57:50.685] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:57:50.685] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:57:50.685] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:57:50.685] LOG: %cStart Phase BerryPhase color:green;
+[00:57:50.685] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:57:50.685] LOG: %cStart Phase TurnEndPhase color:green;
+[00:57:50.685] LOG: %cStart Phase BattleEndPhase color:green;
+[00:57:50.685] LOG: Battle Score: 96 (3 Turns x0.79)
+[00:57:50.685] LOG: Total Score: 944
+[00:57:50.690] LOG: Applied Carbos 
+[00:57:50.691] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[00:57:50.692] LOG: Rival Finn
+[00:57:50.873] LOG: Rival Finn
+[00:57:50.874] LOG: Dialogue dialogue:rival.victory.1 skipped
+[00:57:50.874] LOG: %cStart Phase MoneyRewardPhase color:green;
+[00:57:51.105] LOG: %cStart Phase ModifierRewardPhase color:green;
+[00:57:51.105] LOG: Applied Carbos 
+[00:57:51.306] LOG: %cStart Phase ModifierRewardPhase color:green;
+[00:57:51.306] LOG: Applied Carbos 
+[00:57:51.502] LOG: %cStart Phase ModifierRewardPhase color:green;
+[00:57:51.702] LOG: %cStart Phase ModifierRewardPhase color:green;
+[00:57:51.983] LOG: %cStart Phase ModifierRewardPhase color:green;
+[00:57:52.625] LOG: %cStart Phase EggLapsePhase color:green;
+[00:58:08.942] LOG: %cStart Phase MessagePhase color:green;
+[00:58:10.362] LOG: %cStart Phase EggSummaryPhase color:green;
+[01:01:07.145] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:01:07.145] LOG: Wave Seed: ]@DQVZvvtVb`YqVG\baFZ 16
+[01:01:07.147] LOG: 8 4 [2,3,4,5]
+[01:01:07.147] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} 
+[01:01:07.147] LOG: 7 4 [2,3,4,5]
+[01:01:07.147] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_attack","soundName":"se/restore","tier":0,"stat":1,"nameKey":"x_attack","quantityKey":"percentage"} 
+[01:01:07.147] LOG: 0 0 [2,3,4,5]
+[01:01:07.147] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[01:01:07.154] WARN: Missing animation: pkmn__1
+[01:01:17.085] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:01:17.087] LOG: 0 0 [2,3,4,5]
+[01:01:17.088] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[01:01:17.088] LOG: 8 4 [2,3,4,5]
+[01:01:17.088] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} 
+[01:01:17.088] LOG: 7 4 [2,3,4,5]
+[01:01:17.088] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[01:01:18.509] LOG: %cStart Phase NewBattlePhase color:green;
+[01:01:18.509] LOG: Wave Seed: ^AERW[wwuWcaZrWH]cbG[ 17
+[01:01:18.509] LOG: %cStart Phase NextEncounterPhase color:green;
+[01:01:18.510] LOG: Starting species pool tier: COMMON
+[01:01:18.519] LOG: Pokemon: Wild Lechonk | Species ID: 915 | Level: 14 | Nature: Naive (+Spd/-SpDef)
+[01:01:18.519] LOG: Stats (IVs): HP: 39 (5), Atk: 25 (26), Def: 24 (12), Spatk: 15 (7), Spdef: 18 (20), Spd: 19 (20)
+[01:01:18.519] LOG: Ability: Lingering Aroma | Passive Ability: Thick Fat 
+[01:01:18.519] LOG: Moveset: ["Hyper Fang","Sweet Scent","Tail Whip","Quick Attack"]
+[01:01:18.706] DEBUG: Session data saved to slot 3!
+[01:01:18.706] LOG: Wave Seed: ^AERW[wwuWcaZrWH]cbG[ 17
+[01:01:18.914] WARN: cry/915 not found
+[01:01:19.123] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:01:19.123] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:01:19.707] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:01:19.707] LOG: %cStart Phase PostSummonPhase color:green;
+[01:01:19.707] LOG: Ran PSP for: Lechonk
+[01:01:19.708] LOG: %cStart Phase PostSummonPhase color:green;
+[01:01:19.708] LOG: %cStart Phase PostSummonPhase color:green;
+[01:01:19.708] LOG: %cStart Phase TurnInitPhase color:green;
+[01:01:19.708] LOG: %cStart Phase CommandPhase color:green;
