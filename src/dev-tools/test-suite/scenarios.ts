@@ -135,6 +135,11 @@ const O = Overrides as unknown as MutableOverrides;
 const DEV_OVERRIDE_DEFAULTS = {
   STARTING_LEVEL_OVERRIDE: 0,
   STARTING_WAVE_OVERRIDE: null,
+  // #563: a level-up scenario set these to force a big XP jump; they were NOT in
+  // this reset list, so they leaked into every later scenario (and into normal
+  // runs from the title), levelling everything to the cap. Reset to engine defaults.
+  XP_MULTIPLIER_OVERRIDE: null,
+  LEVEL_CAP_OVERRIDE: 0,
   STARTING_MONEY_OVERRIDE: 0,
   BATTLE_STYLE_OVERRIDE: null,
   STARTING_BIOME_OVERRIDE: null,
@@ -438,27 +443,26 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.DNA_SPLICERS],
   },
   {
-    label: "Move Learn menu: scroll + icon/BST panel (#563)",
+    label: "Move Learn menu: scroll + icon/stats panel (#563)",
     description:
-      "#563 - the level-up Move Learn panel. Garchomp starts at L5, and the huge XP\n"
-      + "multiplier makes one kill jump ~30 levels at once, so it tries to learn MANY\n"
-      + "moves in one go (the case that used to overflow the panel).\n"
-      + "DO: KO the Magikarp with EARTHQUAKE (it can only Splash). ONE Move Learn panel\n"
-      + "opens (not a message barrage). In it, hold UP/DOWN to move through the LEARNABLE\n"
-      + "list (left) and the CURRENT list (right; this mon is given 8 slots for the test).\n"
-      + "EXPECT: both lists SCROLL inside the panel with ↑/↓ arrows when there's more\n"
-      + "above/below - nothing overflows past the window. A small panel to the LEFT shows\n"
-      + "Garchomp's party icon + its BST (600). Picking a learnable move fills an empty\n"
-      + "slot silently (or asks which to overwrite when full); the list thins down. B or\n"
-      + "Cancel leaves with no softlock.",
+      "#563 - the level-up Move Learn panel. Uses NO global XP / level-cap override\n"
+      + "(those leaked into other scenarios, so they were removed). Garchomp starts\n"
+      + "under-levelled (L5) so it still has moves to learn, and is given 8 move slots.\n"
+      + "DO: KO the Magikarp (it only Splashes) - the level-up opens ONE Move Learn panel\n"
+      + "(not a message barrage). To see more, take the RARE CANDIES in the shop and use\n"
+      + "them on Garchomp; the panel reopens whenever a level teaches new moves.\n"
+      + "EXPECT: a small panel to the LEFT shows Garchomp's icon + its 6 base stats. Hold\n"
+      + "UP/DOWN in each column: the CURRENT list (right, 8 slots) SCROLLS with up/down\n"
+      + "arrows so nothing overflows the window; the LEARNABLE list scrolls the same way\n"
+      + "when a level teaches enough moves. Learning fills an empty slot silently (or asks\n"
+      + "which to overwrite when full); the list thins down. B / Cancel leaves with no\n"
+      + "softlock.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
         STARTING_LEVEL_OVERRIDE: 5,
-        LEVEL_CAP_OVERRIDE: 100,
-        XP_MULTIPLIER_OVERRIDE: 5000,
         ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
-        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_LEVEL_OVERRIDE: 20,
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
       });
       return [
@@ -470,12 +474,15 @@ export const DEV_SCENARIOS: DevScenario[] = [
     onBattleStart: () => {
       // Future-proof the CURRENT column: give the mon 8 move slots (MAX_BONUS_SLOTS
       // is normally 1) so its CURRENT list is long enough to actually scroll, the
-      // way it will once mons routinely run 8 moves.
+      // way it will once mons routinely run 8 moves. Scoped to this mon - no leak.
       const player = globalScene.getPlayerPokemon();
       if (player) {
         player.customPokemonData.bonusMoveSlots = 4;
       }
     },
+    // Rare Candies bypass the level cap (level += 1 directly), so the tester can
+    // keep levelling Garchomp to reopen the panel - no global XP override needed.
+    shopItems: [modifierTypes.RARE_CANDY, modifierTypes.RARE_CANDY, modifierTypes.RARE_CANDY],
   },
   // ===========================================================================
   // FEATURES — this session
