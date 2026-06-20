@@ -734,10 +734,12 @@ export class Arena {
       }
     }
 
-    // ER (#19): final guard - de-evolve a stage that's too evolved for the level
-    // (e.g. a pool listing Primeape drawn at Lv13; Primeape evolves at 28).
-    species = deEvolveWildForLevel(species, level);
-
+    // ER (#19): de-evolution of over-evolved-for-level wilds is DISABLED. The ER
+    // evolution levels aren't fully audited yet, so deEvolveWildForLevel was
+    // mis-firing on correctly-evolved mons (e.g. a Lv100 Watchog shown as Patrat,
+    // even in Hell) - a far worse regression than the under-leveled-evo it was
+    // meant to catch. Re-enable only after the evolution-level data is audited
+    // (tasks #58-60). The function + its unit test are kept for that work.
     return species;
   }
 
