@@ -194,10 +194,21 @@ If the custom asset isn't on er-assets yet, fall back to an EXISTING loaded text
 texture.
 
 ## Deploy
+
+🔴 **We work and deploy entirely from `feat/elite-redux-port`. NEVER touch `main`.**
+`main` only holds CI workflow config and is ~thousands of commits behind feat -
+that divergence is EXPECTED and IRRELEVANT. Do not merge feat into main, do not
+push main, do not compare against `heraklines/main` to decide what ships. Both
+staging AND production build from the HEAD of `feat/elite-redux-port` via
+manual-dispatch workflows (the `--branch main` in deploy-prod.yml is just the
+Cloudflare Pages production alias, not a git branch we maintain).
+
 - Dev branch / remote: `feat/elite-redux-port` on remote `heraklines`
   (`Heraklines/elite-redux`). Commit + push there.
 - **Staging deploy:** `gh workflow run deploy-staging.yml --ref feat/elite-redux-port -R Heraklines/elite-redux`
   (GH token in `C:\Users\Hafida\Desktop\github_token.txt`; set `GH_TOKEN`, never print it). Builds + deploys to `elite-redux-staging.pages.dev`.
+- **Production deploy:** `gh workflow run deploy-prod.yml --ref feat/elite-redux-port -R Heraklines/elite-redux`
+  (manual dispatch; builds feat HEAD, no dev tools, points at the prod worker, ships to `elite-redux.pages.dev`).
 - **Never deploy to production without explicit permission.**
 - You are free to push + staging-deploy after making changes.
 
