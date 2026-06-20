@@ -1,0 +1,278 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     3  wave:5  difficulty:ace
+seed:     NOygo802M8saYGySO26SS4Ac
+party:    Thievul(L26 38/77), Uxie(L27 14/79), Spiritomb(L25 67/67), Carbink(L25 53/64), Audino(L25 87/87)
+
+----- DESCRIPTION -----
+Pickpocket only works when you are attacked, should work both offensively and defensively
+
+----- CONSOLE -----
+[09:56:13.461] LOG: crit stage: +1
+[09:56:13.462] LOG: Move: Confusion | Base damage: 18.411764705882355 | Power: 50 | Source attack: 45 | Target defense: 34
+[09:56:13.462] LOG: Move: Confusion | Attack damage: 25
+[09:56:13.463] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:56:13.495] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:56:13.895] LOG: %cStart Phase StatStageChangePhase color:green;
+[09:56:14.346] LOG: %cStart Phase MessagePhase color:green;
+[09:56:14.843] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:56:14.896] LOG: %cStart Phase MoveEndPhase color:green;
+[09:56:14.896] LOG: %cStart Phase CheckInterludePhase color:green;
+[09:56:14.896] LOG: %cStart Phase WeatherEffectPhase color:green;
+[09:56:14.896] LOG: %cStart Phase PositionalTagPhase color:green;
+[09:56:14.896] LOG: %cStart Phase BerryPhase color:green;
+[09:56:14.899] LOG: Applied Ganlon Berry 
+[09:56:14.899] LOG: Applied Petaya Berry 
+[09:56:14.901] LOG: Applied Protein 
+[09:56:14.906] LOG: %cStart Phase CommonAnimPhase color:green;
+[09:56:15.277] LOG: %cStart Phase StatStageChangePhase color:green;
+[09:56:15.727] LOG: %cStart Phase MessagePhase color:green;
+[09:56:16.227] LOG: %cStart Phase StatStageChangePhase color:green;
+[09:56:16.680] LOG: %cStart Phase MessagePhase color:green;
+[09:56:17.193] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[09:56:17.195] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[09:56:17.195] LOG: %cStart Phase TurnEndPhase color:green;
+[09:56:17.196] LOG: %cStart Phase TurnInitPhase color:green;
+[09:56:17.196] LOG: %cStart Phase CommandPhase color:green;
+[09:56:22.266] LOG: %cStart Phase EnemyCommandPhase color:green;
+[09:56:22.268] LOG: Battle Seed: MrvZGWyNIW70hzGb
+[09:56:22.269] LOG: Move Pool: ["Shock Wave"]
+[09:56:22.269] LOG: Move Scores: [12]
+[09:56:22.269] LOG: Sorted Move Pool: ["Shock Wave"]
+[09:56:22.269] LOG: Chosen Move: Shock Wave
+[09:56:22.269] LOG: %cStart Phase TurnStartPhase color:green;
+[09:56:22.269] LOG: %cStart Phase SwitchSummonPhase color:green;
+[09:56:22.728] LOG: Applied Protein 
+[09:56:23.044] LOG: %cStart Phase PostSummonPhase color:green;
+[09:56:23.044] LOG: Ran PSP for: Thievul
+[09:56:23.044] LOG: %cStart Phase PostSummonPhase color:green;
+[09:56:23.044] LOG: %cStart Phase PostSummonPhase color:green;
+[09:56:23.046] LOG: %cStart Phase MovePhase color:green;
+[09:56:23.046] LOG: %cUser: Flaaffy
+Move: SHOCK_WAVE
+Use Mode: NORMAL color:orchid
+[09:56:23.049] LOG: %cStart Phase MessagePhase color:green;
+[09:56:23.342] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:56:24.043] LOG: crit stage: +0
+[09:56:24.045] LOG: Move: Shock Wave | Base damage: 13.736470588235296 | Power: 60 | Source attack: 43 | Target defense: 51
+[09:56:24.045] LOG: Move: Shock Wave | Attack damage: 18
+[09:56:24.046] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:56:24.077] LOG: %cStart Phase MoveEndPhase color:green;
+[09:56:24.077] LOG: %cStart Phase MovePhase color:green;
+[09:56:24.078] LOG: %cUser: Thievul
+Move: FEINT_ATTACK
+Use Mode: INDIRECT color:orchid
+[09:56:24.079] LOG: %cStart Phase MessagePhase color:green;
+[09:56:24.359] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:56:25.009] LOG: Applied Dire Hit 
+[09:56:25.010] LOG: crit stage: +1
+[09:56:25.011] LOG: Applied X Attack 
+[09:56:25.012] LOG: Move: Feint Attack | Base damage: 30.8 | Power: 60 | Source attack: 60 | Target defense: 30
+[09:56:25.012] LOG: Move: Feint Attack | Attack damage: 23
+[09:56:25.014] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:56:25.043] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:56:25.442] LOG: %cStart Phase StatStageChangePhase color:green;
+[09:56:25.894] LOG: %cStart Phase MessagePhase color:green;
+[09:56:26.409] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:56:26.461] LOG: %cStart Phase FaintPhase color:green;
+[09:56:27.793] LOG: %cStart Phase MessagePhase color:green;
+[09:56:32.336] LOG: %cStart Phase VictoryPhase color:green;
+[09:56:32.336] LOG: %cStart Phase ExpPhase color:green;
+[09:56:32.337] LOG: Applied Golden EXP. Charm 
+[09:56:33.144] LOG: %cStart Phase LevelUpPhase color:green;
+[09:56:33.144] LOG: Applied Protein 
+[09:56:33.145] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:56:33.145] LOG: Applied Golden EXP. Charm 
+[09:56:33.146] LOG: %cStart Phase LevelUpPhase color:green;
+[09:56:33.146] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:56:33.146] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:56:33.147] LOG: Applied Golden EXP. Charm 
+[09:56:33.147] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:56:33.147] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:56:33.147] LOG: Applied Golden EXP. Charm 
+[09:56:33.147] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:56:33.148] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:56:33.148] LOG: Applied Golden EXP. Charm 
+[09:56:33.148] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:56:33.148] LOG: %cStart Phase MoveEndPhase color:green;
+[09:56:33.148] LOG: %cStart Phase CheckInterludePhase color:green;
+[09:56:33.148] LOG: %cStart Phase WeatherEffectPhase color:green;
+[09:56:33.148] LOG: %cStart Phase PositionalTagPhase color:green;
+[09:56:33.148] LOG: %cStart Phase BerryPhase color:green;
+[09:56:33.148] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[09:56:33.148] LOG: %cStart Phase TurnEndPhase color:green;
+[09:56:33.149] LOG: %cStart Phase SwitchSummonPhase color:green;
+[09:56:33.724] LOG: Samantha
+[09:56:34.227] LOG: %cStart Phase PostSummonPhase color:green;
+[09:56:34.227] LOG: Ran PSP for: Goldeen
+[09:56:34.228] LOG: %cStart Phase PostSummonPhase color:green;
+[09:56:34.228] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:56:34.610] LOG: %cStart Phase MovePhase color:green;
+[09:56:34.610] LOG: %cUser: Goldeen
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[09:56:34.612] LOG: %cStart Phase MessagePhase color:green;
+[09:56:34.908] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:56:34.925] LOG: %cStart Phase MessagePhase color:green;
+[09:56:35.591] LOG: %cStart Phase MoveEndPhase color:green;
+[09:56:35.591] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:56:35.643] LOG: %cStart Phase PostSummonPhase color:green;
+[09:56:35.643] LOG: %cStart Phase TurnInitPhase color:green;
+[09:56:35.643] LOG: %cStart Phase CommandPhase color:green;
+[09:58:08.583] LOG: Move: FURY_SWIPES Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Thievul
+[09:58:08.584] LOG: %cStart Phase EnemyCommandPhase color:green;
+[09:58:08.588] LOG: Battle Seed: MrvZGWyNIW70hzGb
+[09:58:08.589] LOG: Move Pool: ["Wave Crash","Waterfall"]
+[09:58:08.589] LOG: Move Scores: [27,27]
+[09:58:08.589] LOG: Sorted Move Pool: ["Wave Crash","Waterfall"]
+[09:58:08.589] LOG: Chosen Move: Waterfall
+[09:58:08.589] LOG: %cStart Phase TurnStartPhase color:green;
+[09:58:08.590] LOG: %cStart Phase MovePhase color:green;
+[09:58:08.590] LOG: %cUser: Thievul
+Move: FURY_SWIPES
+Use Mode: NORMAL color:orchid
+[09:58:08.591] LOG: %cStart Phase MessagePhase color:green;
+[09:58:08.864] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:58:09.149] LOG: Applied Dire Hit 
+[09:58:09.149] LOG: crit stage: +2
+[09:58:09.150] LOG: Applied X Attack 
+[09:58:09.151] LOG: Move: Fury Swipes | Base damage: 17.173684210526318 | Power: 37.5 | Source attack: 62 | Target defense: 38
+[09:58:09.151] LOG: Move: Fury Swipes | Attack damage: 12
+[09:58:09.152] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:58:09.183] LOG: %cStart Phase MessagePhase color:green;
+[09:58:09.664] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:58:09.949] LOG: Applied Dire Hit 
+[09:58:09.950] LOG: crit stage: +2
+[09:58:09.951] LOG: Applied X Attack 
+[09:58:09.951] LOG: Move: Fury Swipes | Base damage: 17.173684210526318 | Power: 37.5 | Source attack: 62 | Target defense: 38
+[09:58:09.952] LOG: Move: Fury Swipes | Attack damage: 15
+[09:58:09.952] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:58:09.982] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:58:10.282] LOG: Applied Dire Hit 
+[09:58:10.283] LOG: crit stage: +2
+[09:58:10.284] LOG: Applied X Attack 
+[09:58:10.284] LOG: Move: Fury Swipes | Base damage: 17.173684210526318 | Power: 37.5 | Source attack: 62 | Target defense: 38
+[09:58:10.285] LOG: Move: Fury Swipes | Attack damage: 16
+[09:58:10.286] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:58:10.316] LOG: %cStart Phase MessagePhase color:green;
+[09:58:10.797] LOG: %cStart Phase MoveEndPhase color:green;
+[09:58:10.798] LOG: %cStart Phase MovePhase color:green;
+[09:58:10.798] LOG: %cUser: Goldeen
+Move: WATERFALL
+Use Mode: NORMAL color:orchid
+[09:58:10.801] LOG: %cStart Phase MessagePhase color:green;
+[09:58:11.097] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:58:11.782] LOG: crit stage: +0
+[09:58:11.783] LOG: Move: Waterfall | Base damage: 44.473846153846154 | Power: 127.5 | Source attack: 56 | Target defense: 39
+[09:58:11.784] LOG: Move: Waterfall | Attack damage: 58
+[09:58:11.787] LOG: Applied Protein 
+[09:58:11.794] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:58:11.815] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:58:12.215] LOG: %cStart Phase MessagePhase color:green;
+[09:58:12.797] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:58:12.864] LOG: %cStart Phase MoveEndPhase color:green;
+[09:58:12.865] LOG: %cStart Phase CheckInterludePhase color:green;
+[09:58:12.865] LOG: %cStart Phase WeatherEffectPhase color:green;
+[09:58:12.865] LOG: %cStart Phase PositionalTagPhase color:green;
+[09:58:12.865] LOG: %cStart Phase BerryPhase color:green;
+[09:58:12.865] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[09:58:12.866] LOG: %cStart Phase TurnEndPhase color:green;
+[09:58:12.866] LOG: %cStart Phase PokemonHealPhase color:green;
+[09:58:13.135] LOG: %cStart Phase MessagePhase color:green;
+[09:58:13.713] LOG: %cStart Phase TurnInitPhase color:green;
+[09:58:13.713] LOG: %cStart Phase CommandPhase color:green;
+[09:58:15.199] LOG: Move: FURY_SWIPES Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Thievul
+[09:58:15.201] LOG: %cStart Phase EnemyCommandPhase color:green;
+[09:58:15.205] LOG: Battle Seed: MrvZGWyNIW70hzGb
+[09:58:15.207] LOG: Move Pool: ["Wave Crash","Hyper Drill","Waterfall"]
+[09:58:15.207] LOG: Move Scores: [27,20,27]
+[09:58:15.207] LOG: Sorted Move Pool: ["Wave Crash","Waterfall","Hyper Drill"]
+[09:58:15.207] LOG: Chosen Move: Wave Crash
+[09:58:15.207] LOG: %cStart Phase TurnStartPhase color:green;
+[09:58:15.207] LOG: %cStart Phase MovePhase color:green;
+[09:58:15.207] LOG: %cUser: Goldeen
+Move: WAVE_CRASH
+Use Mode: NORMAL color:orchid
+[09:58:15.209] LOG: %cStart Phase MessagePhase color:green;
+[09:58:15.497] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:58:16.214] LOG: crit stage: +0
+[09:58:16.215] LOG: Move: Wave Crash | Base damage: 41.97538461538461 | Power: 120 | Source attack: 56 | Target defense: 39
+[09:58:16.216] LOG: Move: Wave Crash | Attack damage: 60
+[09:58:16.219] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:58:16.248] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:58:16.250] LOG: %cStart Phase MessagePhase color:green;
+[09:58:16.846] LOG: %cStart Phase FaintPhase color:green;
+[09:58:16.849] LOG: Applied Reviver Seed 
+[09:58:16.849] LOG: Applied Protein 
+[09:58:16.856] LOG: %cStart Phase PokemonHealPhase color:green;
+[09:58:17.117] LOG: %cStart Phase MessagePhase color:green;
+[09:58:17.730] LOG: %cStart Phase MoveEndPhase color:green;
+[09:58:17.731] LOG: %cStart Phase MovePhase color:green;
+[09:58:17.731] LOG: %cUser: Thievul
+Move: FURY_SWIPES
+Use Mode: NORMAL color:orchid
+[09:58:17.733] LOG: %cStart Phase MessagePhase color:green;
+[09:58:18.013] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:58:18.298] LOG: Applied Dire Hit 
+[09:58:18.298] LOG: crit stage: +2
+[09:58:18.299] LOG: Applied X Attack 
+[09:58:18.300] LOG: Move: Fury Swipes | Base damage: 17.173684210526318 | Power: 37.5 | Source attack: 62 | Target defense: 38
+[09:58:18.301] LOG: Move: Fury Swipes | Attack damage: 24
+[09:58:18.302] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:58:18.331] LOG: %cStart Phase MessagePhase color:green;
+[09:58:18.812] LOG: %cStart Phase MessagePhase color:green;
+[09:58:19.296] LOG: %cStart Phase FaintPhase color:green;
+[09:58:20.247] LOG: %cStart Phase MessagePhase color:green;
+[09:58:21.936] LOG: %cStart Phase VictoryPhase color:green;
+[09:58:21.937] LOG: %cStart Phase ExpPhase color:green;
+[09:58:21.937] LOG: Applied Golden EXP. Charm 
+[09:58:23.064] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:58:23.064] LOG: Applied Golden EXP. Charm 
+[09:58:23.064] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:58:23.065] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:58:23.065] LOG: Applied Golden EXP. Charm 
+[09:58:23.065] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:58:23.065] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:58:23.066] LOG: Applied Golden EXP. Charm 
+[09:58:23.066] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:58:23.066] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:58:23.067] LOG: Applied Golden EXP. Charm 
+[09:58:23.067] LOG: %cStart Phase LevelUpPhase color:green;
+[09:58:23.068] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:58:23.068] LOG: %cStart Phase MoveEndPhase color:green;
+[09:58:23.068] LOG: %cStart Phase CheckInterludePhase color:green;
+[09:58:23.068] LOG: %cStart Phase WeatherEffectPhase color:green;
+[09:58:23.068] LOG: %cStart Phase PositionalTagPhase color:green;
+[09:58:23.068] LOG: %cStart Phase BerryPhase color:green;
+[09:58:23.068] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[09:58:23.069] LOG: %cStart Phase TurnEndPhase color:green;
+[09:58:23.069] LOG: %cStart Phase BattleEndPhase color:green;
+[09:58:23.069] LOG: Battle Score: 87 (8 Turns x0.47)
+[09:58:23.069] LOG: Total Score: 442
+[09:58:23.087] LOG: Applied Protein 
+[09:58:23.092] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[09:58:23.093] LOG: Beauty Samantha
+[09:58:23.432] LOG: Beauty Samantha
+[09:58:23.793] LOG: Dialogue saved as seen: dialogue:beauty.victory.1
+[09:58:23.793] LOG: %cStart Phase MoneyRewardPhase color:green;
+[09:58:24.088] LOG: %cStart Phase ModifierRewardPhase color:green;
+[09:58:24.432] LOG: %cStart Phase EggLapsePhase color:green;
+[09:58:24.432] LOG: %cStart Phase SelectModifierPhase color:green;
+[09:58:24.433] LOG: Wave Seed: ST~lt=57R=xf^L~XT7;XX9Fh 5
+[09:58:24.437] LOG: 2 0 [4,5]
+[09:58:24.437] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[09:58:24.437] LOG: 7 2 [4,5]
+[09:58:24.437] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[09:58:24.437] LOG: 2 0 [4,5]
+[09:58:24.437] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[09:58:24.437] LOG: 1 0 [4,5]
+[09:58:24.437] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[09:58:24.437] LOG: 7 2 [4,5]
+[09:58:24.437] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[09:58:24.437] LOG: 0 0 [4,5]
+[09:58:24.437] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[09:58:29.299] LOG: Applied Protein 
