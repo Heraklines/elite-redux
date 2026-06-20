@@ -5788,7 +5788,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // own once-per-entry charge (summonData) consumed on the first contact hit.
       // The force-out targets the ATTACKER (not the holder) - same fix as
       // Restraining Order (690); the prior PostDamageForceSwitch wire was Wimp Out.
-      return ok([new OncePerEntryContactDamageReductionAbAttr(0.5), new PostDamageForceAttackerOutAbAttr()]);
+      return ok([new OncePerEntryContactDamageReductionAbAttr(0.5), new PostDamageForceAttackerOutAbAttr(true)]);
     // -------------------------------------------------------------------------
     // Round 29 — PostDefendMoveDisable / PerishBody-style wires
     // -------------------------------------------------------------------------

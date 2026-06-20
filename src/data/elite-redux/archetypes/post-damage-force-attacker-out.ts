@@ -25,11 +25,18 @@
 import { ForceSwitchOutHelper, PostDamageAbAttr, type PostDamageAbAttrParams } from "#abilities/ab-attrs";
 import { allMoves } from "#data/data-lists";
 import { MoveCategory } from "#enums/move-category";
+import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { SwitchType } from "#enums/switch-type";
 
 export class PostDamageForceAttackerOutAbAttr extends PostDamageAbAttr {
   private readonly helper = new ForceSwitchOutHelper(SwitchType.SWITCH);
+
+  // contactRequired gates the force-out to CONTACT moves only (Chuckster 864).
+  // Restraining Order (690) leaves it false - it forces out on ANY hit.
+  constructor(private readonly contactRequired = false) {
+    super();
+  }
 
   override canApply({ pokemon, source }: PostDamageAbAttrParams): boolean {
     // Need a living opposing attacker, and the holder must still be on the field.
@@ -47,6 +54,15 @@ export class PostDamageForceAttackerOutAbAttr extends PostDamageAbAttr {
     // status DoT, or the holder's self-inflicted damage.
     const lastMove = source.getLastXMoves()[0];
     if (!lastMove || lastMove.move === MoveId.NONE || allMoves[lastMove.move]?.category === MoveCategory.STATUS) {
+      return false;
+    }
+    // Chuckster (contactRequired): only the first CONTACT hit per entry forces
+    // out - non-contact attacks must not trigger it. Its damage-halving half is
+    // likewise contact-gated, so the two fire together on that same hit.
+    if (
+      this.contactRequired
+      && !allMoves[lastMove.move]?.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: source, target: pokemon })
+    ) {
       return false;
     }
     // Respect the standard force-switch eligibility (trapping, last mon, etc.) -
