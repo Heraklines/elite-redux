@@ -1,0 +1,272 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     0  wave:178  difficulty:youngster
+seed:     USRDV79dYplkzvmUyMRtOLV4
+party:    Mimikyu Apex(L172 491/491), Chandelure(L173 497/529), Glalie(L148 158/419), Goodra(L171 495/495), Articuno(L174 300/514)
+
+----- DESCRIPTION -----
+Mimikyu Apex's disguise isn't working
+
+----- CONSOLE -----
+[00:11:40.142] LOG: Applied Protein 
+[00:11:40.142] LOG: Applied Calcium 
+[00:11:40.142] LOG: Applied Iron 
+[00:11:40.143] LOG: Applied Carbos 
+[00:11:40.143] LOG: Applied Protein 
+[00:11:40.146] LOG: Applied Grip Claw (enemy)
+[00:11:40.146] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:11:40.308] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:11:40.356] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:11:40.390] LOG: %cStart Phase MessagePhase color:green;
+[00:11:40.705] LOG: %cStart Phase MessagePhase color:green;
+[00:11:40.905] LOG: %cStart Phase FaintPhase color:green;
+[00:11:40.907] LOG: Applied Reviver Seed 
+[00:11:40.908] LOG: Applied HP Up 
+[00:11:40.908] LOG: Applied Zinc 
+[00:11:40.908] LOG: Applied Protein 
+[00:11:40.908] LOG: Applied Calcium 
+[00:11:40.908] LOG: Applied Iron 
+[00:11:40.908] LOG: Applied Carbos 
+[00:11:40.908] LOG: Applied Protein 
+[00:11:40.911] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:11:41.124] LOG: %cStart Phase MessagePhase color:green;
+[00:11:41.372] LOG: %cStart Phase MoveEndPhase color:green;
+[00:11:41.372] LOG: %cStart Phase MovePhase color:green;
+[00:11:41.372] LOG: %cUser: Goodra
+Move: DRAGON_RAGE
+Use Mode: NORMAL color:orchid
+[00:11:41.373] LOG: %cStart Phase MessagePhase color:green;
+[00:11:41.505] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:11:41.956] LOG: crit stage: +0
+[00:11:41.957] LOG: Applied Dragon Fang 
+[00:11:41.957] LOG: Move: Dragon Rage | Base damage: 239.89568000000003 | Power: 96 | Source attack: 528 | Target defense: 300
+[00:11:41.957] LOG: Move: Dragon Rage | Attack damage: 356
+[00:11:41.958] LOG: Applied Focus Band (enemy)
+[00:11:41.958] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:11:41.990] LOG: %cStart Phase MessagePhase color:green;
+[00:11:42.256] LOG: %cStart Phase MoveEndPhase color:green;
+[00:11:42.256] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:11:42.256] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:11:42.256] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:11:42.256] LOG: %cStart Phase BerryPhase color:green;
+[00:11:42.257] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:11:42.257] LOG: %cStart Phase TurnEndPhase color:green;
+[00:11:42.258] LOG: Applied Flame Orb 
+[00:11:42.258] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[00:11:42.405] LOG: %cStart Phase MessagePhase color:green;
+[00:11:42.671] LOG: %cStart Phase TurnInitPhase color:green;
+[00:11:42.672] LOG: %cStart Phase CommandPhase color:green;
+[00:11:44.253] LOG: Move: DRAGON_RAGE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Goodra
+[00:11:44.255] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:11:44.257] LOG: Applied Multi Lens (enemy)
+[00:11:44.257] LOG: Applied Black Glasses (enemy)
+[00:11:44.258] LOG: Applied Multi Lens (enemy)
+[00:11:44.258] LOG: Applied Multi Lens (enemy)
+[00:11:44.259] LOG: Battle Seed: CVL1xXVnZuPGZjvE
+[00:11:44.261] LOG: Move Pool: ["Ice Fang","Crunch","Sacred Sword","Hone Claws"]
+[00:11:44.261] LOG: Move Scores: [27,27,40,4]
+[00:11:44.261] LOG: Sorted Move Pool: ["Sacred Sword","Ice Fang","Crunch","Hone Claws"]
+[00:11:44.261] LOG: Chosen Move: Ice Fang
+[00:11:44.261] LOG: %cStart Phase TurnStartPhase color:green;
+[00:11:44.261] LOG: %cStart Phase TeraPhase color:green;
+[00:11:44.590] LOG: %cStart Phase MessagePhase color:green;
+[00:11:44.838] LOG: %cStart Phase MovePhase color:green;
+[00:11:44.839] LOG: %cUser: Mega Chien-Pao
+Move: ICE_FANG
+Use Mode: NORMAL color:orchid
+[00:11:44.840] LOG: %cStart Phase MessagePhase color:green;
+[00:11:44.989] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:11:44.989] LOG: Applied Multi Lens (enemy)
+[00:11:45.239] LOG: crit stage: +0
+[00:11:45.240] LOG: Move: Ice Fang | Base damage: 244.843018469657 | Power: 104 | Source attack: 618 | Target defense: 379
+[00:11:45.240] LOG: Applied Multi Lens (enemy)
+[00:11:45.241] LOG: Move: Ice Fang | Attack damage: 97
+[00:11:45.241] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:11:45.390] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:11:45.440] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:11:45.475] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:11:45.739] LOG: crit stage: +0
+[00:11:45.740] LOG: Move: Ice Fang | Base damage: 244.843018469657 | Power: 104 | Source attack: 618 | Target defense: 379
+[00:11:45.740] LOG: Applied Multi Lens (enemy)
+[00:11:45.741] LOG: Move: Ice Fang | Attack damage: 13
+[00:11:45.741] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:11:45.773] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:11:46.039] LOG: crit stage: +0
+[00:11:46.039] LOG: Move: Ice Fang | Base damage: 244.843018469657 | Power: 104 | Source attack: 618 | Target defense: 379
+[00:11:46.040] LOG: Move: Ice Fang | Attack damage: 52
+[00:11:46.040] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:11:46.074] LOG: %cStart Phase MessagePhase color:green;
+[00:11:46.289] LOG: %cStart Phase MessagePhase color:green;
+[00:11:46.505] LOG: %cStart Phase MoveEndPhase color:green;
+[00:11:46.505] LOG: %cStart Phase MovePhase color:green;
+[00:11:46.505] LOG: %cUser: Goodra
+Move: DRAGON_RAGE
+Use Mode: NORMAL color:orchid
+[00:11:46.505] LOG: %cStart Phase MessagePhase color:green;
+[00:11:46.705] LOG: %cStart Phase MoveEndPhase color:green;
+[00:11:46.705] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:11:46.705] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:11:46.706] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:11:46.706] LOG: %cStart Phase BerryPhase color:green;
+[00:11:46.706] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:11:46.707] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[00:11:46.708] LOG: %cStart Phase TurnEndPhase color:green;
+[00:11:46.708] LOG: %cStart Phase TurnInitPhase color:green;
+[00:11:46.709] LOG: %cStart Phase CommandPhase color:green;
+[00:11:47.341] LOG: Move: DRAGON_RAGE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Goodra
+[00:11:47.343] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:11:47.345] LOG: Applied Multi Lens (enemy)
+[00:11:47.345] LOG: Applied Black Glasses (enemy)
+[00:11:47.345] LOG: Applied Multi Lens (enemy)
+[00:11:47.345] LOG: Applied Multi Lens (enemy)
+[00:11:47.346] LOG: Battle Seed: CVL1xXVnZuPGZjvE
+[00:11:47.346] LOG: Move Pool: ["Sacred Sword"]
+[00:11:47.346] LOG: Move Scores: [40]
+[00:11:47.346] LOG: Sorted Move Pool: ["Sacred Sword"]
+[00:11:47.346] LOG: Chosen Move: Sacred Sword
+[00:11:47.346] LOG: %cStart Phase TurnStartPhase color:green;
+[00:11:47.346] LOG: %cStart Phase MovePhase color:green;
+[00:11:47.346] LOG: %cUser: Mega Chien-Pao
+Move: SACRED_SWORD
+Use Mode: NORMAL color:orchid
+[00:11:47.347] LOG: %cStart Phase MessagePhase color:green;
+[00:11:47.489] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:11:47.489] LOG: Applied Multi Lens (enemy)
+[00:11:47.989] LOG: crit stage: +0
+[00:11:47.989] LOG: Move: Sacred Sword | Base damage: 275.1983957783641 | Power: 117 | Source attack: 618 | Target defense: 379
+[00:11:47.989] LOG: Applied Multi Lens (enemy)
+[00:11:47.990] LOG: Move: Sacred Sword | Attack damage: 186
+[00:11:47.990] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:11:48.023] LOG: %cStart Phase MessagePhase color:green;
+[00:11:48.239] LOG: %cStart Phase MessagePhase color:green;
+[00:11:48.438] LOG: %cStart Phase FaintPhase color:green;
+[00:11:48.440] WARN: cry/706-mega not found
+[00:11:48.505] LOG: %cStart Phase MessagePhase color:green;
+[00:11:48.911] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:11:49.073] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:11:49.308] LOG: %cStart Phase MessagePhase color:green;
+[00:11:49.588] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:11:49.623] LOG: %cStart Phase MoveEndPhase color:green;
+[00:11:49.624] LOG: %cStart Phase MovePhase color:green;
+[00:11:49.624] LOG: %cStart Phase MoveEndPhase color:green;
+[00:11:49.624] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:11:49.624] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:11:49.624] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:11:49.624] LOG: %cStart Phase BerryPhase color:green;
+[00:11:49.624] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:11:49.624] LOG: %cStart Phase TurnEndPhase color:green;
+[00:11:49.624] LOG: %cStart Phase SwitchPhase color:green;
+[00:11:50.845] LOG: %cStart Phase SwitchSummonPhase color:green;
+[00:11:50.922] LOG: Applied Carbos 
+[00:11:50.923] LOG: Applied HP Up 
+[00:11:50.923] LOG: Applied Zinc 
+[00:11:50.923] LOG: Applied Protein 
+[00:11:50.923] LOG: Applied Calcium 
+[00:11:50.923] LOG: Applied Iron 
+[00:11:50.924] LOG: Applied Protein 
+[00:11:51.058] LOG: %cStart Phase PostSummonPhase color:green;
+[00:11:51.058] LOG: Ran PSP for: Articuno
+[00:11:51.058] LOG: %cStart Phase PostSummonPhase color:green;
+[00:11:51.061] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:11:51.224] LOG: %cStart Phase CommonAnimPhase color:green;
+[00:11:51.722] LOG: %cStart Phase MessagePhase color:green;
+[00:11:51.955] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:11:51.991] LOG: %cStart Phase PostSummonPhase color:green;
+[00:11:51.991] LOG: %cStart Phase TurnInitPhase color:green;
+[00:11:51.991] LOG: %cStart Phase CommandPhase color:green;
+[00:11:54.729] DEBUG: Session data saved to slot 1!
+[00:11:55.731] LOG: Seed: UZYzqqIgovuZEXoSKS3HwhiY
+[00:11:55.731] LOG: Wave Seed: UZYzqqIgovuZEXoSKS3HwhiY 0
+[00:11:55.867] WARN: AnimationManager key already exists: prompt
+[00:11:55.867] WARN: AnimationManager key already exists: tera_sparkle
+[00:11:55.867] LOG: Seed: cBkxmxzgQqve3vqSh07TGj4T
+[00:11:55.867] LOG: Wave Seed: cBkxmxzgQqve3vqSh07TGj4T 0
+[00:11:56.998] LOG: %cStart Phase LoginPhase color:green;
+[00:11:57.332] LOG: Client Session: l7IjYhTPAJhExyfDTAfxqw84IVYjEc9I
+[00:11:58.441] LOG: %cStart Phase TitlePhase color:green;
+[00:11:58.442] LOG: Getting Session Slot id: %d 1
+[00:11:58.662] LOG: use seasonal splash messages true
+[00:11:58.662] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[00:11:58.835] LOG: Getting Session Slot id: %d 1
+[00:11:58.840] LOG: Wave Seed: USRDV79dYplkzvmUyMRtOLV4 0
+[00:11:58.840] LOG: Seed: USRDV79dYplkzvmUyMRtOLV4
+[00:11:58.856] LOG: Wave Seed: ćąĄöĈéëĖċĢĞĝĬĨğćīÿĄĦāþĈæ 178
+[00:11:58.857] LOG: Applied Carbos 
+[00:11:58.858] LOG: Applied HP Up 
+[00:11:58.858] LOG: Applied Zinc 
+[00:11:58.858] LOG: Applied Protein 
+[00:11:58.858] LOG: Applied Calcium 
+[00:11:58.858] LOG: Applied Iron 
+[00:11:58.858] LOG: Applied Protein 
+[00:11:58.859] LOG: Applied Carbos 
+[00:11:58.859] LOG: Applied HP Up 
+[00:11:58.859] LOG: Applied Zinc 
+[00:11:58.859] LOG: Applied Protein 
+[00:11:58.859] LOG: Applied Calcium 
+[00:11:58.859] LOG: Applied Iron 
+[00:11:58.859] LOG: Applied Protein 
+[00:11:58.860] LOG: Applied Carbos 
+[00:11:58.860] LOG: Applied HP Up 
+[00:11:58.860] LOG: Applied Zinc 
+[00:11:58.860] LOG: Applied Protein 
+[00:11:58.860] LOG: Applied Calcium 
+[00:11:58.860] LOG: Applied Iron 
+[00:11:58.861] LOG: Applied Protein 
+[00:11:58.906] LOG: %cStart Phase EncounterPhase color:green;
+[00:11:58.947] LOG: Wave Seed: ćąĄöĈéëĖċĢĞĝĬĨğćīÿĄĦāþĈæ 178
+[00:11:59.973] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[00:12:03.324] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[00:12:03.424] LOG: Applied Carbos 
+[00:12:03.424] LOG: Applied HP Up 
+[00:12:03.425] LOG: Applied Zinc 
+[00:12:03.425] LOG: Applied Protein 
+[00:12:03.425] LOG: Applied Calcium 
+[00:12:03.425] LOG: Applied Iron 
+[00:12:03.425] LOG: Applied Protein 
+[00:12:03.433] LOG: Pokemon: Wild Mega Chien-Pao | Species ID: 1002 | Level: 174 | Nature: Careful (+SpDef/-SpAtk) | Friendship: 255
+[00:12:03.433] LOG: Stats (IVs): HP: 462 (0), Atk: 618 (0), Def: 353 (0), Spatk: 348 (0), Spdef: 300 (0), Spd: 509 (0)
+[00:12:03.433] LOG: Ability: Sword of Damnation | Passive Ability: Apex Predator | Boss Bars: 5
+[00:12:03.433] LOG: Moveset: ["Ice Fang","Crunch","Sacred Sword","Hone Claws"]
+[00:12:03.433] LOG: Battle Seed: CVL1xXVnZuPGZjvE
+[00:12:03.433] LOG: %cStart Phase MysteryEncounterBattlePhase color:green;
+[00:12:03.434] LOG: %cStart Phase SummonPhase color:green;
+[00:12:03.539] WARN: cry/1002-mega not found
+[00:12:03.655] LOG: %cStart Phase SummonPhase color:green;
+[00:12:03.807] LOG: Applied Carbos 
+[00:12:03.807] LOG: Applied HP Up 
+[00:12:03.808] LOG: Applied Zinc 
+[00:12:03.808] LOG: Applied Protein 
+[00:12:03.808] LOG: Applied Calcium 
+[00:12:03.808] LOG: Applied Iron 
+[00:12:03.808] LOG: Applied Protein 
+[00:12:03.939] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[00:12:03.941] LOG: %cStart Phase CheckSwitchPhase color:green;
+[00:12:04.318] LOG: %cStart Phase SwitchPhase color:green;
+[00:12:05.809] LOG: %cStart Phase SwitchSummonPhase color:green;
+[00:12:06.022] LOG: Applied Protein 
+[00:12:06.023] LOG: Applied HP Up 
+[00:12:06.023] LOG: Applied Zinc 
+[00:12:06.023] LOG: Applied Protein 
+[00:12:06.023] LOG: Applied Calcium 
+[00:12:06.023] LOG: Applied Iron 
+[00:12:06.023] LOG: Applied Carbos 
+[00:12:06.055] WARN: cry/10821 not found
+[00:12:06.157] LOG: %cStart Phase PostSummonPhase color:green;
+[00:12:06.157] LOG: Ran PSP for: Mimikyu Apex
+[00:12:06.157] LOG: %cStart Phase PostSummonPhase color:green;
+[00:12:06.157] LOG: %cStart Phase PostSummonPhase color:green;
+[00:12:06.157] LOG: %cStart Phase InitEncounterPhase color:green;
+[00:12:06.158] LOG: %cStart Phase PostSummonPhase color:green;
+[00:12:06.158] LOG: Ran PSP for: Mega Chien-Pao
+[00:12:06.158] LOG: %cStart Phase PostSummonPhase color:green;
+[00:12:06.158] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:12:06.324] LOG: %cStart Phase MessagePhase color:green;
+[00:12:06.662] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:12:06.689] LOG: %cStart Phase PostSummonPhase color:green;
+[00:12:06.690] LOG: %cStart Phase TurnInitPhase color:green;
+[00:12:06.690] LOG: %cStart Phase MysteryEncounterBattleStartCleanupPhase color:green;
+[00:12:06.690] LOG: %cStart Phase CommandPhase color:green;
