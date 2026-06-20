@@ -41,10 +41,11 @@ const ABIL_ROW_H = 10;
 
 // Bottom row of tappable controls (Fuse / Switch) - small on-screen buttons that
 // also show which key triggers them. Tapping works on mobile; B cancels as usual.
-const BTN_Y = 166;
-const BTN_X = [52, 104] as const;
-// Small label font for the Fuse / Switch controls (clearly smaller than the
-// panel's body text). Tune this if they read too big/small.
+// Fuse / Switch controls, stacked at the TOP-RIGHT (clear of the abilities AND of
+// any screen-capture overlay along the bottom edge). Small font = reads as a hint.
+const BTN_X_RIGHT = PANEL_W - 5;
+const BTN_Y_FUSE = 4;
+const BTN_Y_SWITCH = 13;
 const BTN_SCALE = 0.6;
 
 /** A cached blended-sprite render for one partner (keyed by partner id). */
@@ -170,17 +171,18 @@ export class FusionPreviewPanel {
     this.placeholderText.setVisible(false);
     this.container.add(this.placeholderText);
 
-    // Bottom row: tappable Fuse / Switch labels that also name their key. Tapping
+    // Top-right: tappable Fuse / Switch labels that also name their key. Tapping
     // works on mobile; A/R still work on keyboard/controller, and B cancels.
-    this.makeButton(BTN_X[0], "partyUiHandler:fusionPreviewFuse", () => this.onConfirm?.());
-    this.makeButton(BTN_X[1], "partyUiHandler:fusionPreviewSwitch", () => this.onSwitch?.());
+    this.makeButton(BTN_Y_FUSE, "partyUiHandler:fusionPreviewFuse", () => this.onConfirm?.());
+    this.makeButton(BTN_Y_SWITCH, "partyUiHandler:fusionPreviewSwitch", () => this.onSwitch?.());
 
     this.built = true;
   }
 
   /** Build one tappable bottom-row button (a text label with a touch hit area). */
-  private makeButton(x: number, i18nKey: string, onTap: () => void): Phaser.GameObjects.Text {
-    const t = addTextObject(x, BTN_Y, i18next.t(i18nKey), TextStyle.WINDOW).setOrigin(0.5, 0.5).setScale(BTN_SCALE);
+  private makeButton(y: number, i18nKey: string, onTap: () => void): Phaser.GameObjects.Text {
+    // Right-aligned to the panel edge (origin 1,0), small font.
+    const t = addTextObject(BTN_X_RIGHT, y, i18next.t(i18nKey), TextStyle.WINDOW).setOrigin(1, 0).setScale(BTN_SCALE);
     // Auto hit area = the text bounds (origin/scale-aware); a fine tap target at
     // 6x render. on pointerup so a tap, not a drag, fires the action.
     t.setInteractive({ useHandCursor: true });
