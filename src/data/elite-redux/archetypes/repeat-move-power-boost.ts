@@ -14,7 +14,6 @@
 //
 // Wires:
 //   - 640 Rhythmic — "Deals 10% more damage for each repeated move use."
-//     (bonus 0.1, cap 5x.)
 // =============================================================================
 
 import { MovePowerBoostAbAttr } from "#abilities/ab-attrs";
@@ -34,7 +33,7 @@ export class RepeatMovePowerBoostAbAttr extends MovePowerBoostAbAttr {
   constructor(options: RepeatMovePowerBoostOptions) {
     super(() => true, 1);
     this.bonus = options.bonus;
-    this.cap = options.cap ?? 5;
+    this.cap = options.cap ?? Number.POSITIVE_INFINITY;
   }
 
   override apply(params: Parameters<MovePowerBoostAbAttr["apply"]>[0]): void {

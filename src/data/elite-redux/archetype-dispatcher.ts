@@ -68,7 +68,6 @@ import {
   BlockWeatherDamageAttr,
   BugPowderImmunityAbAttr,
   BypassBurnDamageReductionAbAttr,
-  ChangeMovePriorityAbAttr,
   ConditionalCritAbAttr,
   CritUseLowerDefensiveStatAbAttr,
   EnemyMinDamageRollAbAttr,
@@ -165,6 +164,11 @@ import { EntryArenaTagOnFoeSideAbAttr } from "#data/elite-redux/archetypes/entry
 import { type EntryEffect, EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
 import { FieldCritBoostAbAttr } from "#data/elite-redux/archetypes/field-crit-boost";
 import { FieldStatShareAbAttr } from "#data/elite-redux/archetypes/field-stat-share";
+import {
+  ConsumeFirstFlaggedMovePriorityAbAttr,
+  FirstFlaggedMovePriorityAbAttr,
+  FirstTurnPriorityClampAbAttr,
+} from "#data/elite-redux/archetypes/first-move-priority";
 import { FirstTurnStatMultiplierAbAttr } from "#data/elite-redux/archetypes/first-turn-stat-multiplier";
 import { FlagDamageBoostAbAttr } from "#data/elite-redux/archetypes/flag-damage-boost";
 import { FoeStrongestStatSelfBoostAbAttr } from "#data/elite-redux/archetypes/foe-strongest-stat-self-boost";
@@ -3554,11 +3558,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 648:
-      // On the Prowl — "+1 priority for the first turn." All of the holder's
-      // moves get +1 priority on its first turn after entry (tempSummonData
-      // .turnCount resets on switch). The "negative priority becomes +0"
-      // nuance is a minor secondary, deferred.
-      return ok([new ChangeMovePriorityAbAttr(pokemon => pokemon.tempSummonData.waveTurnCount === 1, 1)]);
+      return ok([new FirstTurnPriorityClampAbAttr()]);
     case 669:
       // Flammable Coat — "Transforms Lumbering Sloth into its Engulfed form when
       // hit by/using Fire moves. Cannot be copied or suppressed." The
@@ -3576,15 +3576,9 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 676:
-      // Sidewinder — "First biting move each entry gets +1 priority." The
-      // holder's BITING moves get +1 priority on its first turn after entry
-      // (approximates "first biting move each entry" without a per-move-use
-      // once-gate; tempSummonData.turnCount resets on switch).
       return ok([
-        new ChangeMovePriorityAbAttr(
-          (pokemon, move) => pokemon.tempSummonData.waveTurnCount === 1 && move.hasFlag(MoveFlags.BITING_MOVE),
-          1,
-        ),
+        new FirstFlaggedMovePriorityAbAttr(MoveFlags.BITING_MOVE),
+        new ConsumeFirstFlaggedMovePriorityAbAttr(MoveFlags.BITING_MOVE, true),
       ]);
     case 791:
       // DNA Scramble — "Changes forms based on the move used." Implemented
@@ -5049,16 +5043,9 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new PriorityModifierAbAttr({ priority: 1, filter: { maxBasePower: 25 } }),
       ]);
     case 302:
-      // Coil Up — "On entry, gives +1 priority to the first biting move used."
-      // Biting-move +1 priority gated to the holder's ENTRY turn
-      // (tempSummonData.waveTurnCount === 1, same signal as Sidewinder 676) —
-      // approximates "on entry, first biting move" far better than the prior
-      // always-on wire. (The exact "consumed after one landing" is a turn-state
-      // nuance; first-turn gating is the close, safe approximation.)
       return ok([
-        new PriorityModifierAbAttr({ priority: 1, filter: { flag: MoveFlags.BITING_MOVE } }).addCondition(
-          pokemon => pokemon.tempSummonData.waveTurnCount === 1,
-        ),
+        new FirstFlaggedMovePriorityAbAttr(MoveFlags.BITING_MOVE),
+        new ConsumeFirstFlaggedMovePriorityAbAttr(MoveFlags.BITING_MOVE),
       ]);
     case 465:
       // Pixie Power — "1.2x accuracy. Boosts Fairy moves by 1.33x for ALL
@@ -6569,7 +6556,7 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       return null;
     case 640:
       // Rhythmic — "Deals 10% more damage for each repeated move use."
-      return ok([new RepeatMovePowerBoostAbAttr({ bonus: 0.1, cap: 2.0 })]);
+      return ok([new RepeatMovePowerBoostAbAttr({ bonus: 0.1 })]);
     case 656:
       // Tag — "Attacks switching opponents with a 20BP Pursuit." R53 now
       // uses the new OnOpponentSwitchOutAbAttr primitive + engine-side

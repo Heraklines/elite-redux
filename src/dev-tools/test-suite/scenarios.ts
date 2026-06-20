@@ -7123,4 +7123,96 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "ER constants (note)",
+    description:
+      "IDs 8/81/55/120/125/148 and composites - numeric dex corrections.\n"
+      + "EXPECT: Sand Veil/Snow Cloak 1.25 evasion; Hustle 1.4 damage and 0.9\n"
+      + "accuracy on all attacks; Reckless 1.2; Sheer Force/Analytic 1.3.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: AbilityId.HUSTLE,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.MACHAMP, {
+          moveset: [MoveId.BRICK_BREAK, MoveId.FOCUS_BLAST, MoveId.TACKLE, MoveId.SWIFT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Rhythmic no cap",
+    description:
+      "ID 640 - each consecutive successful use of the same move adds 10%\n"
+      + "damage with no cap; a fail or different move resets it. DO: spam Tackle,\n"
+      + "then use Splash and return to Tackle. EXPECT: damage keeps rising, then resets.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.RHYTHMIC),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SOFT_BOILED, MoveId.SPLASH, MoveId.PROTECT, MoveId.HEAL_PULSE],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.TACKLE, MoveId.SPLASH, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "First bite priority",
+    description:
+      "IDs 302/676 - only the first landed biting move after entry gets +1\n"
+      + "priority; Sidewinder regains it after a direct KO. DO: use Bite twice.\n"
+      + "EXPECT: Bite moves before Quick Attack once, then Quick Attack moves first.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.COIL_UP),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.QUICK_ATTACK, MoveId.SPLASH, MoveId.PROTECT, MoveId.REST],
+      });
+      return [
+        makeStarter(SpeciesId.AERODACTYL, {
+          moveset: [MoveId.BITE, MoveId.CRUNCH, MoveId.TACKLE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "On the Prowl clamp",
+    description:
+      "IDs 648/727 - first turn: priority 0+ moves gain +1 and negative\n"
+      + "priority becomes exactly 0. DO: use Dragon Tail on turns one and two.\n"
+      + "EXPECT: it acts at normal speed first turn, then returns to negative priority.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.ON_THE_PROWL),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE, MoveId.SPLASH, MoveId.PROTECT, MoveId.REST],
+      });
+      return [
+        makeStarter(SpeciesId.AERODACTYL, {
+          moveset: [MoveId.DRAGON_TAIL, MoveId.TACKLE, MoveId.PROTECT, MoveId.ROOST],
+        }),
+      ];
+    },
+  },
 ];

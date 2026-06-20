@@ -47,6 +47,8 @@
 import {
   type AbAttr,
   type AbAttrBaseParams,
+  AiMovegenMoveStatsAbAttr,
+  type AiMovegenMoveStatsAbAttrParams,
   AlliedFieldDamageReductionAbAttr,
   AllyStatMultiplierAbAttr,
   ArenaTrapAbAttr,
@@ -138,6 +140,7 @@ import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { BerryModifier } from "#modifiers/modifier";
+import type { Move } from "#moves/move";
 import i18next from "i18next";
 
 /**
@@ -728,13 +731,9 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // 105 SUPER_LUCK: vanilla +1 crit stage. ER also gives 1.3x dmg to crits.
   // Approximated via CritDamageMultiplier; that's in archetypes/crit-mod.
   // Deferred — vanilla pokerogue doesn't expose easy hook for "boost own crit damage".
-  // 95 ROCK_HEAD: vanilla recoil immune. ER also gives 1.2x dmg to recoil moves.
-  // Add a flag-power-boost on RECOIL flag.
-  [AbilityId.ROCK_HEAD, ab => mutateFlagPowerBoost(ab, MoveFlags.RECKLESS_MOVE, 1.2)],
   // 23 SHED_SKIN: vanilla 33% post-turn status cure. ER also heals 1/8 if cured.
   // Approximation: keep vanilla cure path; rider is too niche to wire cleanly.
-  // 117 ANALYTIC: vanilla 1.3x boost if moving last. ER ups to 1.5x.
-  [AbilityId.ANALYTIC, ab => mutateMovePowerBoost(ab, 1.5)],
+  [AbilityId.ANALYTIC, ab => mutateMovePowerBoost(ab, 1.3)],
   // 137 HEAVY_METAL: handled above.
   // 192 BULLETPROOF: ER same as vanilla (immune to BALLBOMB).
   // 235 STAKEOUT: vanilla 2x on switch-in. ER ups to 2x always against statused
@@ -758,7 +757,6 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     },
   ],
   // 263 DRAGONS_MAW: vanilla 1.5x Dragon. ER 1.5x same.
-  // 60 HUSTLE: vanilla 1.5x ATK / 0.8 acc on physical. Same.
   // 188 STORM_DRAIN: redirect Water + raise SPATK on absorption. Vanilla same.
   // 184 ANTICIPATION: ER spec is "Senses Super-effective moves. Dodges one
   // Super-effective hit." The vanilla base already does the sense/shudder on
@@ -773,15 +771,12 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     },
   ],
   // 209 BIG_PECKS already total.
-  // 156 RECKLESS: vanilla 1.2x recoil moves. ER ups to 1.3x.
-  [AbilityId.RECKLESS, ab => mutateFlagPowerBoost(ab, MoveFlags.RECKLESS_MOVE, 1.3)],
+  [AbilityId.RECKLESS, ab => mutateFlagPowerBoost(ab, MoveFlags.RECKLESS_MOVE, 1.2)],
   // 158 MULTISCALE: vanilla 0.5x dmg at full HP. ER says "Halves damage and
   // ignores type for first turn out". The first-turn-after-entry is a
   // narrower trigger — keep vanilla full-HP since it covers turn 1.
   // 220 AERILATE / 224 PIXILATE / 175 REFRIGERATE / 211 GALVANIZE — already done.
-  // 198 SHEER_FORCE: vanilla 1.3x boost on moves with secondary effect.
-  // ER ups to 1.5x.
-  [AbilityId.SHEER_FORCE, ab => mutateMovePowerBoost(ab, 1.5)],
+  [AbilityId.SHEER_FORCE, ab => mutateMovePowerBoost(ab, 1.3)],
   // 270 LIQUID_VOICE: vanilla sound moves become water. ER same.
   // 174 TRUANT: vanilla skips every other turn. ER unchanged.
   // 213 SWEET_VEIL: vanilla sleep immunity for user + allies. ER unchanged.
@@ -789,10 +784,29 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // 197 PRANKSTER already extended.
 
   // ===== Round 7: ER-specific deltas surfaced from vanilla-audit =====
-  // 55 HUSTLE: vanilla 1.5x ATK / 0.8 acc → ER 1.4x ATK / 0.9 acc.
-  // We can only mutate the StatMultiplier — accuracy gating is handled
-  // separately in pokerogue and not easily mutable.
-  [AbilityId.HUSTLE, ab => mutateStatMultiplier(ab, Stat.ATK, 1.4)],
+  [
+    AbilityId.HUSTLE,
+    ab => {
+      ab.attrs = ab.attrs.filter(
+        attr =>
+          !(attr instanceof StatMultiplierAbAttr && (attr.stat === Stat.ATK || attr.stat === Stat.ACC))
+          && !(attr instanceof AiMovegenMoveStatsAbAttr),
+      );
+      const attacksOnly = (_user: Pokemon, _target: Pokemon | null, move: Move) =>
+        move.category !== MoveCategory.STATUS;
+      ab.attrs.push(new MovePowerBoostAbAttr(attacksOnly, 1.4));
+      ab.attrs.push(new StatMultiplierAbAttr(Stat.ACC, 0.9, attacksOnly));
+      ab.attrs.push(
+        new AiMovegenMoveStatsAbAttr(({ move, accMult }: AiMovegenMoveStatsAbAttrParams) => {
+          if (move.category !== MoveCategory.STATUS) {
+            accMult.value *= 0.9;
+          }
+        }),
+      );
+    },
+  ],
+  [AbilityId.SAND_VEIL, ab => mutateStatMultiplier(ab, Stat.EVA, 1.25)],
+  [AbilityId.SNOW_CLOAK, ab => mutateStatMultiplier(ab, Stat.EVA, 1.25)],
   // 96 NORMALIZE: vanilla converts all moves to Normal-type. ER adds a 1.1x
   // boost on Normal-type moves AND makes those moves IGNORE the target's
   // resistances (but not immunities) — the IgnoreResistancesAbAttr marker is
@@ -1002,8 +1016,6 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
 
   // 138 FLARE_BOOST: vanilla 1.5x SpAtk if burned. ER same. No patch.
   // 90 POISON_HEAL: vanilla 1/8 hp heal if poisoned. ER same. No patch.
-
-  // 198 SHEER_FORCE already done at 1.5x in Round 6.
 
   // ===== Round 9 — actual mutates =====
   // 167 FUR_COAT: vanilla halves Physical dmg. ER same. No patch.
