@@ -44,10 +44,10 @@ const ABIL_ROW_H = 10;
 // Fuse / Switch controls, stacked (one above the other) on the right, beside the
 // abilities list. BTN_SCALE is a FRACTION of the panel's normal text size (applied
 // relative to the scale addTextObject sets - absolute would render 96px font huge).
-const BTN_X = PANEL_W - 5;
+const BTN_X = PANEL_W - 16;
 const BTN_Y_FUSE = 120;
 const BTN_Y_SWITCH = 136;
-const BTN_SCALE = 0.7;
+const BTN_SCALE = 0.8;
 
 /** A cached blended-sprite render for one partner (keyed by partner id). */
 interface SpriteCacheEntry {
