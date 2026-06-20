@@ -6,11 +6,17 @@
 
 // =============================================================================
 // Disguise / Ice Face nullify the first hit by transforming into a "busted" /
-// "noice" form. A holder that has the ability but NO such form change (an ER
-// custom fusion like Mimikyu Rayquaza — which has no forms — or a randomized-on
-// Disguise) used to block EVERY hit forever (effectively invincible). The
-// damage-block now only applies if the holder can actually break into its other
-// form. Real Mimikyu / Eiscue (which register the form change) are unaffected.
+// "noice" form. A holder with the ability but NO such form change blocks EVERY
+// hit forever (effectively invincible), so the damage-block is guarded by
+// canBreakForm: it only applies if the holder can actually break into its other
+// form.
+//
+// The Mimikyu Apex line (Apex/Apex Busted, Rayquaza/Primal) ships as separate ER
+// species, NOT forms, so they had no busted form change and their Disguise innate
+// silently did nothing. The fix injects each disguised tier's busted counterpart
+// as a form + an ability-trigger edge (the Battle Bond model), so Disguise now
+// works for them. This test asserts (a) those edges exist, and (b) a genuinely
+// formless Disguise holder (the guard's real target) still takes full damage.
 //
 // Gated behind ER_SCENARIO=1.
 // =============================================================================
@@ -47,7 +53,7 @@ describe.skipIf(!RUN)("Disguise only blocks when the holder can break form", () 
 
   it("vanilla Mimikyu still nullifies the first hit (regression)", async () => {
     game.override.enemySpecies(SpeciesId.MIMIKYU);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const enemy = game.field.getEnemyPokemon();
     const maxHp = enemy.getMaxHp();
 
@@ -61,13 +67,33 @@ describe.skipIf(!RUN)("Disguise only blocks when the holder can break form", () 
     expect(enemy.hp).toBeGreaterThan(maxHp - Math.ceil(maxHp / 8) - 1);
   });
 
-  it("Mimikyu Rayquaza (custom, no busted form) has no ability-trigger form change, so Disguise can't infinitely block", () => {
-    const fusion = allSpecies.find(s => s.name === "Mimikyu Rayquaza");
-    expect(fusion).toBeDefined();
-    const changes = pokemonFormChanges[fusion!.speciesId] ?? [];
-    const hasAbilityFormChange = changes.some(fc => fc.findTrigger(SpeciesFormChangeAbilityTrigger));
-    // No form to break into → the damage-block guard (canBreakForm) returns false,
-    // so the holder takes damage normally instead of being invincible.
-    expect(hasAbilityFormChange).toBe(false);
+  it("Mimikyu Apex + Rayquaza now register a busted form change so Disguise works", () => {
+    // The fix: each disguised tier gets its busted counterpart injected as a form
+    // + an ability-trigger edge, so canBreakForm passes and Disguise blocks the
+    // first hit (instead of doing nothing). Both tiers must have the edge now.
+    for (const name of ["Mimikyu Apex", "Mimikyu Rayquaza"]) {
+      const species = allSpecies.find(s => s.name === name);
+      expect(species, name).toBeDefined();
+      const changes = pokemonFormChanges[species!.speciesId] ?? [];
+      const hasAbilityFormChange = changes.some(fc => fc.findTrigger(SpeciesFormChangeAbilityTrigger));
+      expect(hasAbilityFormChange, `${name} ability form change`).toBe(true);
+      // A disguised (index 0) + busted (index 1) form pair must exist to break into.
+      expect(species!.forms.length, `${name} forms`).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("a genuinely formless Disguise holder still takes full damage (guard intact)", async () => {
+    // Snorlax has no busted form change, so the canBreakForm guard must keep
+    // Disguise from infinitely blocking - it takes a normal Tackle.
+    game.override.enemySpecies(SpeciesId.SNORLAX);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    const enemy = game.field.getEnemyPokemon();
+    const maxHp = enemy.getMaxHp();
+
+    game.move.use(MoveId.TACKLE);
+    await game.toEndOfTurn();
+
+    // Damage was NOT nullified: it lost more than the 1/8 recoil a real disguise costs.
+    expect(enemy.hp).toBeLessThan(maxHp - Math.ceil(maxHp / 8));
   });
 });

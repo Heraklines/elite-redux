@@ -39,6 +39,7 @@ import { BerryType } from "#enums/berry-type";
 import { BiomeId } from "#enums/biome-id";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { ErMoveId } from "#enums/er-move-id";
+import { ErSpeciesId } from "#enums/er-species-id";
 import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { Nature } from "#enums/nature";
@@ -121,6 +122,9 @@ const erAbility = (id: number): AbilityId => id as unknown as AbilityId;
 
 /** Cast an ER custom move id (≥5000) into the MoveId space (for MOVESET_OVERRIDE). */
 const erMove = (id: number): MoveId => id as unknown as MoveId;
+
+/** Cast an ER custom species id (≥10000) into the SpeciesId space (for starters/overrides). */
+const erSpecies = (id: number): SpeciesId => id as unknown as SpeciesId;
 
 // The Overrides singleton fields are `readonly` at compile time but mutable at
 // runtime — this is exactly how the dev override workflow is meant to be driven.
@@ -3019,6 +3023,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
         ENEMY_MOVESET_OVERRIDE: [MoveId.PSYCHIC],
       });
       return [makeStarter(SpeciesId.MACHAMP, { moveset: [MoveId.SPLASH] })];
+    },
+  },
+  {
+    label: "Mimikyu Apex: Disguise blocks first hit",
+    description:
+      "Mimikyu Apex's Disguise did NOTHING (the Apex / Rayquaza tiers ship as separate\n"
+      + "ER species, not forms, so there was no busted form to break into - the\n"
+      + "canBreakForm guard disabled the block). Fix: the busted counterpart is now\n"
+      + "injected as a form. DO: use Splash and let Gengar hit your Mimikyu Apex with\n"
+      + "Shadow Ball twice. EXPECT: turn 1 the hit is NULLIFIED (Mimikyu keeps almost\n"
+      + "all HP, loses only ~1/8 to recoil) and it BUSTS (broken-disguise sprite); turn\n"
+      + "2 it takes FULL super-effective damage. Before the fix turn 1 was not blocked.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 90,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: AbilityId.DISGUISE,
+        MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.GENGAR,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SHADOW_BALL],
+      });
+      return [
+        makeStarter(erSpecies(ErSpeciesId.MIMIKYU_APEX), {
+          moveset: [MoveId.SPLASH, MoveId.SHADOW_SNEAK, MoveId.PLAY_ROUGH, MoveId.PROTECT],
+        }),
+      ];
     },
   },
   {
@@ -6527,6 +6559,199 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [
         makeStarter(SpeciesId.KROOKODILE, {
           moveset: [MoveId.CRUNCH, MoveId.DARK_PULSE, MoveId.EARTHQUAKE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Poison Point while burned",
+    description:
+      "ID 38 - an existing status on the ability holder must not disable its\n"
+      + "offensive Poison Point roll. DO: use Tackle repeatedly while burned.\n"
+      + "EXPECT: contact attacks can still poison the enemy at the stated 30% rate.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        STATUS_OVERRIDE: StatusEffect.BURN,
+        ABILITY_OVERRIDE: AbilityId.POISON_POINT,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.NIDOKING, {
+          moveset: [MoveId.TACKLE, MoveId.POISON_JAB, MoveId.EARTHQUAKE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Flame Body offense tiers",
+    description:
+      "ID 49 - Flame Body works offensively even while its holder is burned.\n"
+      + "DO: alternate Tackle and Swift repeatedly. EXPECT: Tackle can burn at\n"
+      + "30%; non-contact Swift can burn at 20%. Neither tier is disabled.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        STATUS_OVERRIDE: StatusEffect.BURN,
+        ABILITY_OVERRIDE: AbilityId.FLAME_BODY,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.MAGMAR, {
+          moveset: [MoveId.TACKLE, MoveId.SWIFT, MoveId.FLAMETHROWER, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Poison Touch single roll",
+    description:
+      "ID 143 - Poison Touch had two independent offensive 30% rolls.\n"
+      + "DO: use Tackle repeatedly while burned. EXPECT: it still poisons while\n"
+      + "statused, but uses one 30% roll rather than the old effective 51% rate.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        STATUS_OVERRIDE: StatusEffect.BURN,
+        ABILITY_OVERRIDE: AbilityId.POISON_TOUCH,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.GRIMER, {
+          moveset: [MoveId.TACKLE, MoveId.POISON_JAB, MoveId.SLUDGE_BOMB, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Toxic Chain while burned",
+    description:
+      "ID 608 - an existing status on the holder must not disable Toxic Chain.\n"
+      + "DO: use Water Gun repeatedly while burned. EXPECT: damaging moves can\n"
+      + "still badly poison the enemy at the stated 30% rate.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        STATUS_OVERRIDE: StatusEffect.BURN,
+        ABILITY_OVERRIDE: AbilityId.TOXIC_CHAIN,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.OKIDOGI, {
+          moveset: [MoveId.WATER_GUN, MoveId.TACKLE, MoveId.BITE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Cute Charm offense direction",
+    description:
+      "ID 56 - offensive Cute Charm used reversed contact participants and was\n"
+      + "disabled by holder status. DO: use Tackle repeatedly while burned.\n"
+      + "EXPECT: the female Lopunny can become infatuated by the male holder.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        STATUS_OVERRIDE: StatusEffect.BURN,
+        ABILITY_OVERRIDE: AbilityId.CUTE_CHARM,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.LOPUNNY,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.TACKLE, MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.PROTECT],
+          female: false,
+        }),
+      ];
+    },
+  },
+  {
+    label: "Frostmaw offense direction",
+    description:
+      "ID 692 - Frostmaw must evaluate the holder as the attacker even while\n"
+      + "statused. DO: use Crunch repeatedly. EXPECT: biting moves can inflict\n"
+      + "frostbite at 50%; non-biting Earthquake cannot.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        STATUS_OVERRIDE: StatusEffect.BURN,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.FROSTMAW),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.FERALIGATR, {
+          moveset: [MoveId.CRUNCH, MoveId.ICE_FANG, MoveId.EARTHQUAKE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Deep Cuts offense direction",
+    description:
+      "ID 736 - Deep Cuts must evaluate the holder as the attacker even while\n"
+      + "statused. DO: use X-Scissor repeatedly. EXPECT: slicing moves can inflict\n"
+      + "bleed at 50%; non-slicing Close Combat cannot.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        STATUS_OVERRIDE: StatusEffect.BURN,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.DEEP_CUTS),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.GALLADE, {
+          moveset: [MoveId.X_SCISSOR, MoveId.NIGHT_SLASH, MoveId.CLOSE_COMBAT, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Icicle Fist offense direction",
+    description:
+      "ID 1017 - Icicle Fist must evaluate the holder as the attacker even while\n"
+      + "statused. DO: use Mach Punch repeatedly. EXPECT: punching moves can cause\n"
+      + "frostbite at 30%; non-punching Ice Beam cannot.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        STATUS_OVERRIDE: StatusEffect.BURN,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.ICICLE_FIST),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.HITMONCHAN, {
+          moveset: [MoveId.MACH_PUNCH, MoveId.ICE_PUNCH, MoveId.ICE_BEAM, MoveId.PROTECT],
         }),
       ];
     },

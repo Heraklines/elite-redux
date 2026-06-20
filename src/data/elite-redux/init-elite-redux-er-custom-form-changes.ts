@@ -143,6 +143,35 @@ const ER_CUSTOM_FORM_SPECS: readonly ErCustomFormSpec[] = [
     formName: "Blunder",
     trigger: "ability",
   },
+  {
+    // Disguise (Mimikyu Apex): Apex ⇄ Apex Busted on a blocked hit. Mimikyu's
+    // Disguise innate (ER 209 → vanilla DISGUISE) is `FormBlockDamageAbAttr(0)`,
+    // which only blocks if `canBreakForm` finds a SpeciesFormChangeAbilityTrigger
+    // edge to break into (the guard that otherwise made these custom Mimikyu
+    // forms invincible - see ab-attrs FormBlockDamageAbAttr.canBreakForm). Base
+    // Mimikyu has that edge; the Apex/Rayquaza tiers (separate ER species, not
+    // forms) did NOT, so their Disguise silently did nothing. Inject the busted
+    // counterpart as form index 1 + the ability edge - identical stats/abilities,
+    // so the swap is purely the broken-disguise sprite. One-way like Battle Bond;
+    // vanilla DISGUISE's PostBattleInitFormChangeAbAttr(()=>0) re-disguises each
+    // battle, so no revert edge is needed.
+    baseErId: 2638, // SPECIES_MIMIKYU_APEX → pkrg 10821
+    sourceErId: 2639, // SPECIES_MIMIKYU_APEX_BUSTED → pkrg 10822
+    formKey: "busted",
+    formName: "Busted",
+    trigger: "ability",
+  },
+  {
+    // Disguise (Mimikyu Rayquaza, the stoneless-mega tier): Rayquaza ⇄ Primal on
+    // a blocked hit. Same model as the Apex tier above; the mega tier's Disguise
+    // is ER 693 (Disguise + curse the attacker), which also routes through
+    // FormBlockDamageAbAttr's break path. Rayquaza's busted counterpart is Primal.
+    baseErId: 2584, // SPECIES_MIMIKYU_RAYQUAZA → pkrg 10767
+    sourceErId: 1855, // SPECIES_MIMIKYU_PRIMAL (Rayquaza Busted) → pkrg 10447
+    formKey: "busted",
+    formName: "Busted",
+    trigger: "ability",
+  },
 ];
 
 /** Per-spec outcome detail (surfaced for diagnostics / tests). */
