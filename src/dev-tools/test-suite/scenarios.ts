@@ -3459,6 +3459,48 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.FORM_CHANGE_ITEM, modifierTypes.FORM_CHANGE_ITEM, modifierTypes.FORM_CHANGE_ITEM],
   },
   {
+    // Reachability check for a mon ER SPLITS across species: Oricorio Baile is
+    // VANILLA (SpeciesId.ORICORIO, 741) but Pom-Pom / Pa'u / Sensu are ER-CUSTOM
+    // species (10336 / 10337 / 10338). All four share the SAME Oricorionite -> Mega.
+    // Reported: the Oricorio Mega is NOT listed in the Pokedex form browser. This
+    // scenario tests BOTH the in-run reachability (does the stone mega-evolve it?)
+    // and the Pokedex listing, for the vanilla AND the custom variants.
+    label: "Store: Oricorio mega reachable (Baile)",
+    description:
+      "ER splits Oricorio across species: Baile = VANILLA 741 (this scenario), while\n"
+      + "Pom-Pom/Pa'u/Sensu are SEPARATE ER-custom species (10336-8). All share the\n"
+      + "Oricorionite -> Mega. Reported: Oricorio Mega is MISSING from the Pokedex form\n"
+      + "list - and Baile is the one gated out of the dex's ER-mega path.\n"
+      + "DO: win the opening battle, take the offered MEGA STONE (Oricorionite) and give\n"
+      + "it to Oricorio.\n"
+      + "EXPECT (reachability): Oricorio MEGA-EVOLVES to its Mega form (sprite + stat /\n"
+      + "type / ability change). If the stone never appears or won't apply, that is a\n"
+      + "real reachability regression.\n"
+      + "ALSO (Pokedex): open the dex / starter form browser on Oricorio and confirm the\n"
+      + "Mega form is LISTED / browsable. (Pom-Pom/Pa'u/Sensu are distinct dex entries -\n"
+      + "check those separately in the Pokedex if you've seen them.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 80,
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_MODIFIER_OVERRIDE: [MEGA_BRACELET],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      // Lone VANILLA Baile Oricorio (741) - guaranteed-valid starter, and the form
+      // gated out of the dex ER-mega path; a lone mon makes the Form-Change Item
+      // resolve to its Oricorionite.
+      return [
+        makeStarter(SpeciesId.ORICORIO, {
+          moveset: [MoveId.REVELATION_DANCE, MoveId.AIR_SLASH, MoveId.HURRICANE, MoveId.ROOST],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.FORM_CHANGE_ITEM, modifierTypes.FORM_CHANGE_ITEM],
+  },
+  {
     // #359/#318 verification: these holders' megas were among the 51 that had
     // NO working stone before the form-change-bridge fix — second megas of
     // multi-mega species (Venusaur Mega-Y, Gyarados Mega-X, Lucario Mega-X AND
