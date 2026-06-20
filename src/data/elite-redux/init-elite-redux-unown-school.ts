@@ -132,8 +132,9 @@ const ER_TYPE_TO_POKEROGUE: readonly (PokemonType | null)[] = [
   PokemonType.DRAGON,
   PokemonType.GHOST,
   PokemonType.FAIRY,
-  null,
-  null,
+  null, // 18 Mystery
+  null, // 19 None
+  PokemonType.STELLAR, // 20 Stellar (Terapagos) - keep in sync with init-elite-redux-species (#9)
 ];
 
 function mapErType(erTypeId: number | null): PokemonType | null {

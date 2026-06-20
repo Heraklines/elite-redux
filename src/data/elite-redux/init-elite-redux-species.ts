@@ -61,6 +61,9 @@ const ER_TYPE_TO_POKEROGUE: readonly (PokemonType | null)[] = [
   PokemonType.FAIRY, // 17
   null, // 18 Mystery
   null, // 19 None
+  PokemonType.STELLAR, // 20 Stellar - e.g. Terapagos Primal. Was missing, so mapErType
+  // returned null for its primary type and the whole mega-form injection failed
+  // ("ER mega target 1850 has no primary type"), leaving it unregistered as a Mega (#9).
 ];
 
 function mapErType(erTypeId: number | null): PokemonType | null {
