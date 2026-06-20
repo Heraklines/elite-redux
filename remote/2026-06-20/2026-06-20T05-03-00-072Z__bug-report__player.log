@@ -1,0 +1,272 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     4  wave:35  difficulty:youngster
+seed:     NM4kxvYp4N1XXIoKVtMXlAME
+party:    Carnivine(L32 81/109)
+
+----- DESCRIPTION -----
+Item from Deal dessapeared after rejoin the run
+
+----- CONSOLE -----
+[05:00:18.229] LOG: %cStart Phase VictoryPhase color:green;
+[05:00:18.229] LOG: %cStart Phase MoveEndPhase color:green;
+[05:00:18.231] LOG: %cStart Phase MovePhase color:green;
+[05:00:18.234] LOG: %cUser: Nidorino
+Move: POISON_FANG
+Use Mode: NORMAL color:orchid
+[05:00:18.244] LOG: Applied X Speed 
+[05:00:18.254] LOG: Applied X Speed 
+[05:00:18.259] LOG: %cStart Phase MessagePhase color:green;
+[05:00:18.374] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:00:18.376] LOG: %cStart Phase MessagePhase color:green;
+[05:00:18.620] LOG: %cStart Phase MoveEndPhase color:green;
+[05:00:18.622] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:00:18.622] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:00:18.623] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:00:18.623] LOG: %cStart Phase BerryPhase color:green;
+[05:00:18.629] LOG: Applied X Speed 
+[05:00:18.630] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:00:18.630] LOG: Applied X Speed 
+[05:00:18.630] LOG: %cStart Phase TurnEndPhase color:green;
+[05:00:18.631] LOG: Applied X Speed 
+[05:00:18.631] LOG: %cStart Phase TurnInitPhase color:green;
+[05:00:18.631] LOG: %cStart Phase CommandPhase color:green;
+[05:00:19.457] LOG: Move: FIRE_LASH Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Carnivine
+[05:00:19.468] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:00:19.482] LOG: Battle Seed: gCB26VMwdv8mj0HG
+[05:00:19.484] LOG: Move Pool: ["Poison Fang","Quick Guard","Focus Energy","After You"]
+[05:00:19.484] LOG: Move Scores: [69,-20,5,0]
+[05:00:19.484] LOG: Sorted Move Pool: ["Poison Fang","Focus Energy","After You","Quick Guard"]
+[05:00:19.484] LOG: Chosen Move: Poison Fang
+[05:00:19.484] LOG: %cStart Phase TurnStartPhase color:green;
+[05:00:19.484] LOG: Applied X Speed 
+[05:00:19.487] LOG: Applied X Speed 
+[05:00:19.491] LOG: Applied X Speed 
+[05:00:19.492] LOG: %cStart Phase MovePhase color:green;
+[05:00:19.493] LOG: %cUser: Carnivine
+Move: FIRE_LASH
+Use Mode: NORMAL color:orchid
+[05:00:19.493] LOG: Applied X Speed 
+[05:00:19.494] LOG: Applied X Speed 
+[05:00:19.494] LOG: %cStart Phase MessagePhase color:green;
+[05:00:19.605] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:00:19.613] LOG: Applied Dire Hit 
+[05:00:19.613] LOG: crit stage: +1
+[05:00:19.613] LOG: Move: Fire Lash | Base damage: 57.25333333333333 | Power: 80 | Source attack: 98 | Target defense: 42
+[05:00:19.614] LOG: Move: Fire Lash | Attack damage: 51
+[05:00:19.620] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:00:19.647] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:00:19.648] LOG: %cStart Phase MessagePhase color:green;
+[05:00:19.890] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:00:20.070] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:00:20.071] LOG: %cStart Phase MessagePhase color:green;
+[05:00:20.302] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:00:20.338] LOG: %cStart Phase MoveEndPhase color:green;
+[05:00:20.339] LOG: %cStart Phase MovePhase color:green;
+[05:00:20.339] LOG: %cUser: Nidorino
+Move: POISON_FANG
+Use Mode: NORMAL color:orchid
+[05:00:20.346] LOG: Applied X Speed 
+[05:00:20.347] LOG: Applied X Speed 
+[05:00:20.348] LOG: %cStart Phase MessagePhase color:green;
+[05:00:20.484] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:00:20.487] LOG: crit stage: +0
+[05:00:20.497] LOG: Move: Poison Fang | Base damage: 21.945205479452053 | Power: 87.5 | Source attack: 65 | Target defense: 73
+[05:00:20.498] LOG: Move: Poison Fang | Attack damage: 65
+[05:00:20.503] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:00:20.531] LOG: %cStart Phase MessagePhase color:green;
+[05:00:20.757] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[05:00:20.761] LOG: %cStart Phase MessagePhase color:green;
+[05:00:20.991] LOG: %cStart Phase MoveEndPhase color:green;
+[05:00:20.991] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:00:20.991] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:00:20.991] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:00:20.991] LOG: %cStart Phase BerryPhase color:green;
+[05:00:20.992] LOG: Applied X Speed 
+[05:00:20.992] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:00:20.997] LOG: Applied X Speed 
+[05:00:21.006] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[05:00:21.026] LOG: %cStart Phase MessagePhase color:green;
+[05:00:21.220] LOG: %cStart Phase TurnEndPhase color:green;
+[05:00:21.228] LOG: Applied X Speed 
+[05:00:21.229] LOG: %cStart Phase TurnInitPhase color:green;
+[05:00:21.229] LOG: %cStart Phase CommandPhase color:green;
+[05:00:21.713] LOG: Move: FIRE_LASH Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Carnivine
+[05:00:21.730] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:00:21.743] LOG: Battle Seed: gCB26VMwdv8mj0HG
+[05:00:21.751] LOG: Move Pool: ["Poison Fang"]
+[05:00:21.751] LOG: Move Scores: [54]
+[05:00:21.751] LOG: Sorted Move Pool: ["Poison Fang"]
+[05:00:21.752] LOG: Chosen Move: Poison Fang
+[05:00:21.752] LOG: %cStart Phase TurnStartPhase color:green;
+[05:00:21.752] LOG: Applied X Speed 
+[05:00:21.753] LOG: Applied X Speed 
+[05:00:21.753] LOG: Applied X Speed 
+[05:00:21.753] LOG: %cStart Phase MovePhase color:green;
+[05:00:21.753] LOG: %cUser: Carnivine
+Move: FIRE_LASH
+Use Mode: NORMAL color:orchid
+[05:00:21.754] LOG: Applied X Speed 
+[05:00:21.755] LOG: Applied X Speed 
+[05:00:21.755] LOG: %cStart Phase MessagePhase color:green;
+[05:00:21.841] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:00:21.842] LOG: Applied Dire Hit 
+[05:00:21.842] LOG: crit stage: +1
+[05:00:21.843] LOG: Move: Fire Lash | Base damage: 84.88 | Power: 80 | Source attack: 98 | Target defense: 28
+[05:00:21.843] LOG: Move: Fire Lash | Attack damage: 84
+[05:00:21.843] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:00:21.877] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:00:22.062] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:00:22.064] LOG: %cStart Phase MessagePhase color:green;
+[05:00:22.304] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:00:22.328] LOG: %cStart Phase FaintPhase color:green;
+[05:00:23.442] LOG: %cStart Phase MessagePhase color:green;
+[05:00:24.496] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:00:24.663] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:00:24.673] LOG: %cStart Phase MessagePhase color:green;
+[05:00:24.923] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:00:24.959] LOG: %cStart Phase VictoryPhase color:green;
+[05:00:24.961] LOG: %cStart Phase MoveEndPhase color:green;
+[05:00:24.963] LOG: %cStart Phase MovePhase color:green;
+[05:00:24.965] LOG: %cStart Phase MoveEndPhase color:green;
+[05:00:24.971] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:00:24.972] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:00:24.972] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:00:24.974] LOG: %cStart Phase BerryPhase color:green;
+[05:00:24.975] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:00:24.975] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[05:00:24.989] LOG: %cStart Phase MessagePhase color:green;
+[05:00:25.207] LOG: %cStart Phase TurnEndPhase color:green;
+[05:00:25.207] LOG: %cStart Phase BattleEndPhase color:green;
+[05:00:25.207] LOG: Battle Score: 269 (4 Turns x0.65)
+[05:00:25.208] LOG: Total Score: 1823
+[05:00:25.241] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[05:00:25.242] LOG: Veteran Duo Harlan & Karla
+[05:00:25.386] LOG: Veteran Harlan
+[05:00:25.387] LOG: Dialogue dialogue:veteran.victory.1 skipped
+[05:00:25.387] LOG: %cStart Phase MoneyRewardPhase color:green;
+[05:00:25.861] LOG: %cStart Phase EggLapsePhase color:green;
+[05:00:25.862] LOG: %cStart Phase SelectModifierPhase color:green;
+[05:00:25.862] LOG: Wave Seed: poV{VpSzzkmxozcog 34
+[05:00:25.869] LOG: 20 9 [3,4,5,6,7,8,9,10,16,23]
+[05:00:25.870] LOG: {"id":"ER_ABILITY_CAPSULE","localeKey":"","iconImage":"ability_capsule","soundName":"se/restore","tier":1} 
+[05:00:25.872] LOG: 3 0 [9,17]
+[05:00:25.874] LOG: {"id":"SHELL_BELL","localeKey":"modifierType:ModifierType.SHELL_BELL","iconImage":"shell_bell","soundName":"se/restore","tier":3} 
+[05:00:25.876] LOG: 4 0 [9,17]
+[05:00:25.876] LOG: {"id":"BERRY_POUCH","localeKey":"modifierType:ModifierType.BERRY_POUCH","iconImage":"berry_pouch","soundName":"se/restore","tier":3} 
+[05:00:25.876] LOG: 5 0 [9,17]
+[05:00:25.876] LOG: {"id":"GRIP_CLAW","localeKey":"modifierType:ModifierType.GRIP_CLAW","iconImage":"grip_claw","soundName":"se/restore","tier":3,"chancePercent":10} 
+[05:00:25.876] LOG: 12 1 [9,17]
+[05:00:25.876] LOG: {"id":"MOVE_SLOT_EXPANDER","localeKey":"","iconImage":"move_slot_expander","soundName":"se/restore","tier":3} 
+[05:00:25.880] LOG: 10 1 [9,17]
+[05:00:25.880] LOG: {"id":"ABILITY_CHARM","localeKey":"modifierType:ModifierType.ABILITY_CHARM","iconImage":"ability_charm","soundName":"se/restore","tier":3} 
+[05:00:25.881] LOG: 8 0 [9,17]
+[05:00:25.882] LOG: {"id":"SOUL_DEW","localeKey":"modifierType:ModifierType.SOUL_DEW","iconImage":"soul_dew","soundName":"se/restore","tier":3} 
+[05:00:25.886] LOG: 20 2 [9,17]
+[05:00:25.886] LOG: {"id":"MEGA_BRACELET","localeKey":"modifierType:ModifierType.MEGA_BRACELET","iconImage":"mega_bracelet","soundName":"se/restore","tier":3} 
+[05:00:25.886] LOG: 19 2 [9,17]
+[05:00:25.887] LOG: ROGUE 0
+[05:00:25.887] LOG: 0 0 [9,17]
+[05:00:25.887] LOG: {"id":"ROGUE_BALL","localeKey":"","iconImage":"rb","group":"pb","soundName":"se/pb_bounce_1","tier":3,"pokeballType":3,"count":5} 
+[05:00:25.887] LOG: 1 0 [3,4,5,6,7,8,9,10,16,23]
+[05:00:25.887] LOG: {"id":"PP_UP","localeKey":"modifierType:ModifierType.PP_UP","iconImage":"pp_up","group":"ppUp","soundName":"se/restore","tier":1,"upPoints":1} 
+[05:00:27.695] LOG: %cStart Phase NewBattlePhase color:green;
+[05:00:27.696] LOG: Wave Seed: qpW|WqT{{lnyp{dph 35
+[05:00:27.705] LOG: %cStart Phase ReturnPhase color:green;
+[05:00:27.851] LOG: %cStart Phase ShowTrainerPhase color:green;
+[05:00:27.956] LOG: %cStart Phase NextEncounterPhase color:green;
+[05:00:27.961] LOG: RARE
+[05:00:27.961] LOG: Sneasel
+[05:00:28.006] LOG: Pokemon: Foe Sneasel | Species ID: 215 | Level: 29 | Nature: Docile (-)
+[05:00:28.006] LOG: Stats (IVs): HP: 74 (12), Atk: 63 (15), Def: 43 (13), Spatk: 34 (9), Spdef: 52 (29), Spd: 78 (15)
+[05:00:28.006] LOG: Ability: Hyper Aggressive | Passive Ability: Freezing Point 
+[05:00:28.006] LOG: Moveset: ["Ice Shard","Beatdown","Swagger","Slash"]
+[05:00:28.006] LOG: UNCOMMON
+[05:00:28.006] LOG: Yanma
+[05:00:28.032] LOG: Pokemon: Foe Yanma | Species ID: 193 | Level: 29 | Nature: Docile (-)
+[05:00:28.032] LOG: Stats (IVs): HP: 81 (20), Atk: 50 (28), Def: 39 (18), Spatk: 50 (9), Spdef: 40 (19), Spd: 63 (8)
+[05:00:28.033] LOG: Ability: Aerodynamics | Passive Ability: Speed Boost 
+[05:00:28.033] LOG: Moveset: ["Air Cutter","Signal Beam","Metronome","Detect"]
+[05:00:28.515] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"hp_up","soundName":"se/restore","tier":0,"stat":0,"key":"hp_up"} (enemy)
+[05:00:28.516] LOG: Battle Seed: k20QhcybKzvec20k
+[05:00:28.516] LOG: Applied HP Up (enemy)
+[05:00:28.517] LOG: Generated AI funcs
+[05:00:28.566] DEBUG: Session data saved to slot 0!
+[05:00:28.568] LOG: Wave Seed: qpW|WqT{{lnyp{dph 35
+[05:00:28.790] LOG: Localized grunt name: Galactic Grunt
+[05:00:28.790] LOG: Dialogue dialogue:galacticGrunt.encounter.1 skipped
+[05:00:28.840] LOG: Localized grunt name: Galactic Grunt
+[05:00:29.094] LOG: %cStart Phase SummonPhase color:green;
+[05:00:29.094] LOG: Localized grunt name: Galactic Grunt
+[05:00:29.238] LOG: Applied HP Up (enemy)
+[05:00:29.372] LOG: %cStart Phase SummonPhase color:green;
+[05:00:29.672] LOG: %cStart Phase ShinySparklePhase color:green;
+[05:00:29.769] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[05:00:29.774] LOG: %cStart Phase InitEncounterPhase color:green;
+[05:00:29.785] LOG: %cStart Phase PostSummonPhase color:green;
+[05:00:29.786] LOG: Ran PSP for: Sneasel
+[05:00:29.786] LOG: %cStart Phase PostSummonPhase color:green;
+[05:00:29.787] LOG: %cStart Phase PostSummonPhase color:green;
+[05:00:29.790] LOG: %cStart Phase PostSummonPhase color:green;
+[05:00:29.790] LOG: Ran PSP for: Carnivine
+[05:00:29.798] LOG: %cStart Phase PokemonAnimPhase color:green;
+[05:00:29.801] WARN: PRSFX- Transform not found
+[05:00:30.038] LOG: %cStart Phase MessagePhase color:green;
+[05:00:30.290] LOG: %cStart Phase MessagePhase color:green;
+[05:00:30.587] LOG: %cStart Phase PostSummonPhase color:green;
+[05:00:30.587] LOG: %cStart Phase PostSummonPhase color:green;
+[05:00:30.588] LOG: %cStart Phase TurnInitPhase color:green;
+[05:00:30.594] LOG: %cStart Phase CommandPhase color:green;
+[05:00:34.488] DEBUG: Session data saved to slot 0!
+[05:00:36.142] LOG: Seed: DumALQzOdwFd4lAI2VNaB00Y
+[05:00:36.142] LOG: Wave Seed: DumALQzOdwFd4lAI2VNaB00Y 0
+[05:00:36.592] WARN: AnimationManager key already exists: prompt
+[05:00:36.592] WARN: AnimationManager key already exists: tera_sparkle
+[05:00:36.592] LOG: Seed: fWHFhpJeZHiAQUFeSh0EM3QR
+[05:00:36.592] LOG: Wave Seed: fWHFhpJeZHiAQUFeSh0EM3QR 0
+[05:00:41.326] LOG: %cStart Phase LoginPhase color:green;
+[05:00:41.812] LOG: Client Session: xJbOBpYuHryRbTiAwr0m6tDxAWeeRJ7X
+[05:00:43.271] LOG: %cStart Phase TitlePhase color:green;
+[05:00:43.272] LOG: Getting Session Slot id: %d 0
+[05:00:43.291] LOG: use seasonal splash messages true
+[05:00:43.292] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[05:00:44.160] LOG: Getting Session Slot id: %d 0
+[05:00:44.172] LOG: Wave Seed: NM4kxvYp4N1XXIoKVtMXlAME 0
+[05:00:44.172] LOG: Seed: NM4kxvYp4N1XXIoKVtMXlAME
+[05:00:44.220] LOG: Wave Seed: qpW|WqT{{lnyp{dph 35
+[05:00:44.372] LOG: Applied HP Up (enemy)
+[05:00:44.476] LOG: %cStart Phase EncounterPhase color:green;
+[05:00:44.479] LOG: Pokemon: Foe Sneasel | Species ID: 215 | Level: 29 | Nature: Docile (-)
+[05:00:44.479] LOG: Stats (IVs): HP: 80 (12), Atk: 61 (15), Def: 40 (13), Spatk: 27 (9), Spdef: 56 (29), Spd: 76 (15)
+[05:00:44.479] LOG: Ability: Hyper Aggressive | Passive Ability: Freezing Point 
+[05:00:44.480] LOG: Moveset: ["Ice Shard","Beatdown","Swagger","Slash"]
+[05:00:44.480] LOG: Pokemon: Foe Yanma | Species ID: 193 | Level: 29 | Nature: Docile (-)
+[05:00:44.480] LOG: Stats (IVs): HP: 82 (20), Atk: 50 (28), Def: 36 (18), Spatk: 51 (9), Spdef: 36 (19), Spd: 62 (8)
+[05:00:44.481] LOG: Ability: Aerodynamics | Passive Ability: Speed Boost 
+[05:00:44.481] LOG: Moveset: ["Air Cutter","Signal Beam","Metronome","Detect"]
+[05:00:44.538] LOG: Generated AI funcs
+[05:00:44.539] LOG: Applied HP Up (enemy)
+[05:00:44.546] LOG: Wave Seed: qpW|WqT{{lnyp{dph 35
+[05:00:44.757] LOG: Localized grunt name: Galactic Grunt
+[05:00:44.758] LOG: Dialogue dialogue:galacticGrunt.encounter.1 skipped
+[05:00:44.807] LOG: Localized grunt name: Galactic Grunt
+[05:00:45.788] LOG: %cStart Phase SummonPhase color:green;
+[05:00:45.789] LOG: Localized grunt name: Galactic Grunt
+[05:00:45.945] LOG: Applied HP Up (enemy)
+[05:00:46.078] LOG: %cStart Phase SummonPhase color:green;
+[05:00:46.382] LOG: %cStart Phase ShinySparklePhase color:green;
+[05:00:46.503] LOG: %cStart Phase InitEncounterPhase color:green;
+[05:00:46.513] LOG: %cStart Phase PostSummonPhase color:green;
+[05:00:46.513] LOG: Ran PSP for: Sneasel
+[05:00:46.515] LOG: %cStart Phase PostSummonPhase color:green;
+[05:00:46.523] LOG: %cStart Phase PostSummonPhase color:green;
+[05:00:46.523] LOG: %cStart Phase PostSummonPhase color:green;
+[05:00:46.523] LOG: Ran PSP for: Carnivine
+[05:00:46.523] LOG: %cStart Phase PostSummonPhase color:green;
+[05:00:46.524] LOG: %cStart Phase PostSummonPhase color:green;
+[05:00:46.524] LOG: %cStart Phase TurnInitPhase color:green;
+[05:00:46.524] LOG: %cStart Phase CommandPhase color:green;
