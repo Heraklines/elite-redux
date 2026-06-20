@@ -37,7 +37,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
-import type { PokemonForm } from "#data/pokemon-species";
+import type { PokemonForm, PokemonSpecies } from "#data/pokemon-species";
 
 /** ER-scheme sprite atlas PATH for a slug (mirrors ErCustomSpecies). */
 function erAtlasPath(slug: string, shiny?: boolean, variant?: number, back?: boolean): string {
@@ -100,5 +100,88 @@ export function installErFormSpriteRedirect(form: PokemonForm, slug: string): vo
     }
     // Force sprite-only: ER art has no cry audio / no variantData colour entry.
     return origLoadAssets(female, formIndex, shiny, variant, startLoad, back, true);
+  };
+}
+
+/** Sprite/icon/asset methods shared by PokemonSpecies and PokemonForm. */
+interface ErSpriteCarrier {
+  formIndex?: number;
+  forms?: ErRedirectableForm[];
+  getSpriteAtlasPath(female: boolean, formIndex?: number, shiny?: boolean, variant?: number, back?: boolean): string;
+  getSpriteId(female: boolean, formIndex?: number, shiny?: boolean, variant?: number, back?: boolean): string;
+  getSpriteKey(female: boolean, formIndex?: number, shiny?: boolean, variant?: number, back?: boolean): string;
+  getIconAtlasKey(formIndex?: number, shiny?: boolean, variant?: number): string;
+  getIconId(female: boolean, formIndex?: number, shiny?: boolean, variant?: number): string;
+  loadAssets(
+    female?: boolean,
+    formIndex?: number,
+    shiny?: boolean,
+    variant?: number,
+    startLoad?: boolean,
+    back?: boolean,
+    spriteOnly?: boolean,
+  ): Promise<void>;
+}
+interface ErRedirectableForm extends ErSpriteCarrier {
+  __erFormSpriteRedirect?: boolean;
+}
+
+/**
+ * Bridge the SPECIES-level sprite path to a form's {@linkcode installErFormSpriteRedirect}.
+ *
+ * pokerogue resolves a form sprite TWO ways. The battle path uses
+ * `getSpeciesForm(formIndex).getSpriteAtlasPath()` — the FORM object, which the
+ * per-form redirect patches. But UI paths (starter select, Pokedex, party screen)
+ * call the SPECIES-level `species.getSpriteAtlasPath(female, formIndex, …)`, and
+ * `getBaseSpriteKey` builds the key from `this.speciesId` + `getFormSpriteKey(formIndex)`
+ * — i.e. the vanilla `{speciesId}-{formKey}` path computed from the SPECIES, never
+ * touching the patched form. So an ER mega rendered through the UI still 404s and
+ * shows the BASE sprite. This makes the species method delegate to the redirected
+ * form for that formIndex; the base form and every non-redirected form keep the
+ * original behaviour (incl. ErCustomSpecies' own slug override). Idempotent.
+ */
+export function installErSpeciesFormSpriteDispatch(species: PokemonSpecies): void {
+  const sp = species as unknown as ErSpriteCarrier & { __erSpeciesSpriteDispatch?: boolean };
+  if (sp.__erSpeciesSpriteDispatch) {
+    return;
+  }
+  sp.__erSpeciesSpriteDispatch = true;
+
+  // The redirected form for a given formIndex, or undefined to keep the original.
+  const formFor = (formIndex?: number): ErRedirectableForm | undefined => {
+    const fi = formIndex ?? sp.formIndex ?? 0;
+    const f = sp.forms?.[fi];
+    return f && (f as object) !== (sp as object) && f.__erFormSpriteRedirect ? f : undefined;
+  };
+
+  const oAtlas = sp.getSpriteAtlasPath.bind(sp);
+  sp.getSpriteAtlasPath = (female, formIndex, shiny, variant, back) =>
+    formFor(formIndex)?.getSpriteAtlasPath(female, formIndex, shiny, variant, back)
+    ?? oAtlas(female, formIndex, shiny, variant, back);
+
+  const oId = sp.getSpriteId.bind(sp);
+  sp.getSpriteId = (female, formIndex, shiny, variant, back) =>
+    formFor(formIndex)?.getSpriteId(female, formIndex, shiny, variant, back)
+    ?? oId(female, formIndex, shiny, variant, back);
+
+  const oKey = sp.getSpriteKey.bind(sp);
+  sp.getSpriteKey = (female, formIndex, shiny, variant, back) =>
+    formFor(formIndex)?.getSpriteKey(female, formIndex, shiny, variant, back)
+    ?? oKey(female, formIndex, shiny, variant, back);
+
+  const oIconKey = sp.getIconAtlasKey.bind(sp);
+  sp.getIconAtlasKey = (formIndex, shiny, variant) =>
+    formFor(formIndex)?.getIconAtlasKey(formIndex, shiny, variant) ?? oIconKey(formIndex, shiny, variant);
+
+  const oIconId = sp.getIconId.bind(sp);
+  sp.getIconId = (female, formIndex, shiny, variant) =>
+    formFor(formIndex)?.getIconId(female, formIndex, shiny, variant) ?? oIconId(female, formIndex, shiny, variant);
+
+  const oLoad = sp.loadAssets.bind(sp);
+  sp.loadAssets = (female, formIndex, shiny, variant, startLoad, back, spriteOnly) => {
+    const f = formFor(formIndex);
+    return f
+      ? f.loadAssets(female, formIndex, shiny, variant, startLoad, back, spriteOnly)
+      : oLoad(female, formIndex, shiny, variant, startLoad, back, spriteOnly);
   };
 }

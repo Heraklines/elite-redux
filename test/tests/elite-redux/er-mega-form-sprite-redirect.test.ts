@@ -29,7 +29,11 @@ describe.skipIf(!RUN)("ER mega/primal forms all use the ER slug sprite scheme", 
     void new GameManager(phaserGame);
   });
 
-  it("every reachable ER mega form's sprite path is elite-redux/<slug>, never the vanilla {id}-{key} fallback", () => {
+  // The SPECIES-level call (`species.getSpriteAtlasPath(female, formIndex, …)`) is
+  // the path the UI (starter select / Pokedex / party) uses; it was the one still
+  // 404ing after the per-form redirect, so assert it directly (the form-level path
+  // was already covered by the battle render).
+  it("every reachable ER mega form's SPECIES-level sprite path is elite-redux/<slug>, never the {id}-{key} fallback", () => {
     const byId = new Map(allSpecies.map(s => [s.speciesId, s]));
     const broken: string[] = [];
     let checked = 0;
@@ -41,9 +45,15 @@ describe.skipIf(!RUN)("ER mega/primal forms all use the ER slug sprite scheme", 
         continue; // base unmapped / form not registered — out of scope (the sweep skips it too)
       }
       checked++;
-      const path = form.getSpriteAtlasPath(false, species.forms.indexOf(form), false, 0, false);
-      if (!path.startsWith("elite-redux/")) {
-        broken.push(`${entry.formName} of species ${pkrgId} (formKey "${entry.formKey}") -> "${path}"`);
+      const formIndex = species.forms.indexOf(form);
+      // Species-level call (UI path) AND form-level call (battle path) must BOTH
+      // resolve to the ER slug scheme.
+      const speciesPath = species.getSpriteAtlasPath(false, formIndex, false, 0, false);
+      const formPath = form.getSpriteAtlasPath(false, formIndex, false, 0, false);
+      if (!speciesPath.startsWith("elite-redux/") || !formPath.startsWith("elite-redux/")) {
+        broken.push(
+          `${entry.formName} of species ${pkrgId} (formKey "${entry.formKey}") -> species="${speciesPath}" form="${formPath}"`,
+        );
       }
     }
     // Sanity: the full mega set (294 entries minus a few id-map-drift drops) was examined.
@@ -51,13 +61,16 @@ describe.skipIf(!RUN)("ER mega/primal forms all use the ER slug sprite scheme", 
     expect(broken, `megas still on the vanilla sprite path (should be empty):\n${broken.join("\n")}`).toEqual([]);
   });
 
-  it("Wigglytuff Mega Y (the reported case) resolves to elite-redux/wigglytuff_mega", () => {
+  it("Wigglytuff Mega Y (the reported case) resolves to elite-redux/wigglytuff_mega via the SPECIES method", () => {
     const wigglytuff = allSpecies.find(s => s.speciesId === 40);
     expect(wigglytuff, "Wigglytuff (species 40) should exist").toBeDefined();
     const megaY = wigglytuff!.forms.find(f => f.formKey === "mega-y");
     expect(megaY, "Wigglytuff should have a mega-y form injected").toBeDefined();
     const idx = wigglytuff!.forms.indexOf(megaY!);
-    expect(megaY!.getSpriteAtlasPath(false, idx, false, 0, false)).toBe("elite-redux/wigglytuff_mega/front");
-    expect(megaY!.getSpriteAtlasPath(false, idx, false, 0, true)).toBe("elite-redux/wigglytuff_mega/back");
+    // The UI path that was 404ing on `40-mega-y`:
+    expect(wigglytuff!.getSpriteAtlasPath(false, idx, false, 0, false)).toBe("elite-redux/wigglytuff_mega/front");
+    expect(wigglytuff!.getSpriteKey(false, idx, false, 0, false)).toBe("pkmn__er__wigglytuff_mega");
+    // The base form (formIndex 0) must be UNAFFECTED — NOT hijacked onto a slug.
+    expect(wigglytuff!.getSpriteAtlasPath(false, 0, false, 0, false)).not.toMatch(/^elite-redux\//);
   });
 });

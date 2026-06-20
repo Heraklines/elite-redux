@@ -15,7 +15,10 @@
 
 import { allSpecies } from "#data/data-lists";
 import { dexAbilityId } from "#data/elite-redux/er-ability-position-map";
-import { installErFormSpriteRedirect } from "#data/elite-redux/er-form-sprite-redirect";
+import {
+  installErFormSpriteRedirect,
+  installErSpeciesFormSpriteDispatch,
+} from "#data/elite-redux/er-form-sprite-redirect";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
@@ -845,6 +848,10 @@ export function installAllErMegaSpriteRedirects(): { applied: number; missing: n
       continue;
     }
     installErFormSpriteRedirect(form, slug); // idempotent — no-op if already redirected
+    // Also bridge the SPECIES-level sprite path (starter select / Pokedex / party
+    // UI call species.getSpriteAtlasPath(formIndex), which bypasses the per-form
+    // patch and produces the vanilla {id}-{formKey} 404). Idempotent per species.
+    installErSpeciesFormSpriteDispatch(species);
     applied++;
   }
   return { applied, missing };
