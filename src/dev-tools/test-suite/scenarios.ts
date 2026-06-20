@@ -6814,4 +6814,195 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "Grip Pincer trapped target",
+    description:
+      "IDs 373/849 - Grip Pincer must trap on the holder's contact attacks.\n"
+      + "DO: use Tackle until Wrap appears, then use Focus Blast. EXPECT: the\n"
+      + "target takes trap damage and attacks against it ignore accuracy and defensive stat changes.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.GRIP_PINCER),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.IRON_DEFENSE, MoveId.AMNESIA, MoveId.SPLASH, MoveId.PROTECT],
+      });
+      return [
+        makeStarter(SpeciesId.MACHAMP, {
+          moveset: [MoveId.TACKLE, MoveId.FOCUS_BLAST, MoveId.BRICK_BREAK, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Fungal Infection offense",
+    description:
+      "ID 398 - contact moves seed the target, not attackers that hit the holder.\n"
+      + "DO: use Tackle. EXPECT: Snorlax receives Leech Seed. Use Swift after a\n"
+      + "fresh restart to confirm a non-contact move does not seed.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.FUNGAL_INFECTION),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.BRELOOM, {
+          moveset: [MoveId.TACKLE, MoveId.SWIFT, MoveId.MACH_PUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Fearmonger offense",
+    description:
+      "ID 408 - entry lowers enemy Attack and Sp. Atk, and the holder's contact\n"
+      + "moves have a 10% fear chance. DO: verify both entry drops, then use\n"
+      + "Tackle repeatedly. EXPECT: fear can affect Snorlax, never the holder.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.FEARMONGER),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.TACKLE, MoveId.SHADOW_PUNCH, MoveId.SHADOW_BALL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Absorbant drain boost",
+    description:
+      "ID 425 - drain moves recover 50% more and seed their target. DO: use\n"
+      + "Giga Drain or Mega Drain while injured. EXPECT: boosted immediate healing\n"
+      + "and Leech Seed on Snorlax. Tackle must do neither.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.ABSORBANT),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.VENUSAUR, {
+          moveset: [MoveId.GIGA_DRAIN, MoveId.MEGA_DRAIN, MoveId.STRENGTH_SAP, MoveId.TACKLE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const player = globalScene.getPlayerField()[0];
+      if (player) {
+        player.hp = Math.max(1, Math.floor(player.getMaxHp() / 4));
+      }
+    },
+  },
+  {
+    label: "Freezing Point tiers",
+    description:
+      "IDs 492/493 - frostbite works offensively and defensively: 20% on contact,\n"
+      + "30% on non-contact. DO: alternate Tackle and Swift while Snorlax attacks.\n"
+      + "EXPECT: exactly one applicable tier rolls per hit; contact never gets both rolls.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.FREEZING_POINT),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE, MoveId.SWIFT, MoveId.REST, MoveId.PROTECT],
+      });
+      return [
+        makeStarter(SpeciesId.GLALIE, {
+          moveset: [MoveId.TACKLE, MoveId.SWIFT, MoveId.ICE_BEAM, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Dead Power offense",
+    description:
+      "ID 599 - the holder has 1.5x Attack and its own contact moves have a 20%\n"
+      + "curse chance. DO: use Tackle repeatedly. EXPECT: Snorlax can be cursed;\n"
+      + "Snorlax hitting the holder must not curse itself.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.DEAD_POWER),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE, MoveId.SPLASH, MoveId.REST, MoveId.PROTECT],
+      });
+      return [
+        makeStarter(SpeciesId.DUSKNOIR, {
+          moveset: [MoveId.TACKLE, MoveId.SHADOW_PUNCH, MoveId.SHADOW_BALL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Serpent Bind offense",
+    description:
+      "IDs 818/819 - any holder attack has a 50% chance to trap, then trapped\n"
+      + "targets lose one Speed stage each turn. DO: alternate Tackle and Swift.\n"
+      + "EXPECT: either attack can apply a 4-5 turn damaging trap and Speed drops each turn.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.SERPENT_BIND),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.SEVIPER, {
+          moveset: [MoveId.TACKLE, MoveId.SWIFT, MoveId.POISON_JAB, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Surprise priority counter",
+    description:
+      "ID 623 - in fog, enemy priority moves are preempted by a 40 BP +3 Astonish\n"
+      + "that always flinches. DO: use Splash while the enemy selects Quick Attack.\n"
+      + "EXPECT: Astonish lands first and the enemy's priority move is stopped.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        WEATHER_OVERRIDE: WeatherType.FOG,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.SURPRISE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.LUCARIO,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.QUICK_ATTACK, MoveId.MACH_PUNCH, MoveId.TACKLE, MoveId.PROTECT],
+      });
+      return [
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SPLASH, MoveId.SHADOW_BALL, MoveId.PROTECT, MoveId.CONFUSE_RAY],
+        }),
+      ];
+    },
+  },
 ];

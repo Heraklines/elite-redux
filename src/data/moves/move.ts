@@ -3007,9 +3007,16 @@ export class HitHealAttr extends MoveEffectAttr {
   }
 
   public getHealAmount(user: Pokemon, target: Pokemon): number {
-    return this.healStat
+    const healAmount = this.healStat
       ? target.getEffectiveStat(this.healStat)
       : toDmgValue(user.turnData.singleHitDamageDealt * this.healRatio);
+    const multiplier = new NumberHolder(1);
+    for (const attr of user.getAllActiveAbilityAttrs()) {
+      if (attr.constructor.name === "AbsorbantAbAttr") {
+        (attr as unknown as { fire: (holder: NumberHolder) => void }).fire(multiplier);
+      }
+    }
+    return Math.floor(healAmount * multiplier.value);
   }
 }
 

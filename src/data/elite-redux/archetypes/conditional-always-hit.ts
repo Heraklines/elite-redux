@@ -27,8 +27,10 @@
 
 import { AbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { TrappedTag } from "#data/battler-tags";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import type { Move } from "#data/moves/move";
+import type { BattlerTagType } from "#enums/battler-tag-type";
 import type { MoveCategory } from "#enums/move-category";
 import type { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
@@ -52,6 +54,8 @@ export interface ConditionalAlwaysHitOptions {
    * never miss").
    */
   readonly superEffective?: boolean;
+  readonly targetHasTag?: BattlerTagType;
+  readonly targetTrapped?: boolean;
 }
 
 /**
@@ -73,29 +77,39 @@ export class ConditionalAlwaysHitAbAttr extends AbAttr {
 
   override apply(_params: AbAttrBaseParams): void {}
 
-  /**
-   * Returns true if the configured predicate matches the move/user/target.
-   */
-  public matches(move: Move, user: Pokemon, target: Pokemon): boolean {
+  private matchesMove(move: Move): boolean {
     if (this.opts.flag !== undefined && !move.hasFlag(this.opts.flag)) {
       return false;
     }
     if (this.opts.categories !== undefined && !this.opts.categories.includes(move.category)) {
       return false;
     }
-    if (this.opts.moveIds !== undefined && !this.opts.moveIds.includes(move.id)) {
-      return false;
+    return this.opts.moveIds === undefined || this.opts.moveIds.includes(move.id);
+  }
+
+  private matchesWeather(): boolean {
+    if (this.opts.weather === undefined) {
+      return true;
     }
-    if (this.opts.weather !== undefined) {
-      const current = globalScene.arena.weather?.weatherType ?? WeatherType.NONE;
-      if (!this.opts.weather.includes(current)) {
-        return false;
-      }
-    }
+    const current = globalScene.arena.weather?.weatherType ?? WeatherType.NONE;
+    return this.opts.weather.includes(current);
+  }
+
+  private matchesTarget(move: Move, user: Pokemon, target: Pokemon): boolean {
     if (this.opts.superEffective && target.getMoveEffectiveness(user, move) <= 1) {
       return false;
     }
-    return true;
+    if (this.opts.targetHasTag !== undefined && !target.getTag(this.opts.targetHasTag)) {
+      return false;
+    }
+    return !this.opts.targetTrapped || !!target.getTag(TrappedTag);
+  }
+
+  /**
+   * Returns true if the configured predicate matches the move/user/target.
+   */
+  public matches(move: Move, user: Pokemon, target: Pokemon): boolean {
+    return this.matchesMove(move) && this.matchesWeather() && this.matchesTarget(move, user, target);
   }
 }
 

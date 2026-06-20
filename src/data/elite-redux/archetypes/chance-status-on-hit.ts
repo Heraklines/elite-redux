@@ -61,6 +61,8 @@ import { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { StatusEffect } from "#enums/status-effect";
+import type { Pokemon } from "#field/pokemon";
+import type { Move } from "#types/move-types";
 
 /**
  * The set of {@linkcode HitResult}s that represent an actual *damaging attack*
@@ -363,6 +365,7 @@ export interface ChanceBattlerTagOnHitOptions {
    * @defaultValue `true`
    */
   readonly contactRequired?: boolean;
+  readonly contactExcluded?: boolean;
   /**
    * Number of turns the tag persists. Most battler tags use the engine's
    * default duration (e.g. CONFUSED rolls 2-5 turns internally) — pass
@@ -370,6 +373,8 @@ export interface ChanceBattlerTagOnHitOptions {
    * @defaultValue `undefined` (engine default)
    */
   readonly turns?: number;
+  readonly turnRange?: readonly [number, number];
+  readonly damageDenominator?: number;
   /**
    * Optional gate on the incoming move (flag or type). See
    * {@linkcode ChanceStatusOnHitOptions.filter} for details — the semantics
@@ -439,7 +444,10 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
   private readonly chance: number;
   private readonly tags: readonly BattlerTagType[];
   private readonly contactRequired: boolean;
+  private readonly contactExcluded: boolean;
   private readonly turns: number | undefined;
+  private readonly turnRange: readonly [number, number] | undefined;
+  private readonly damageDenominator: number | undefined;
   private readonly filter: ChanceStatusFilter | undefined;
   private readonly firstTurnChance: number | undefined;
 
@@ -450,11 +458,20 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
     if (opts.tags.length === 0) {
       throw new Error("[ChanceBattlerTagOnHitAbAttr] must configure at least one battler tag");
     }
+    if (opts.contactRequired === true && opts.contactExcluded === true) {
+      throw new Error("[ChanceBattlerTagOnHitAbAttr] contactRequired and contactExcluded are mutually exclusive");
+    }
+    if (opts.turns !== undefined && opts.turnRange !== undefined) {
+      throw new Error("[ChanceBattlerTagOnHitAbAttr] turns and turnRange are mutually exclusive");
+    }
     super();
     this.chance = opts.chance;
     this.tags = opts.tags;
-    this.contactRequired = opts.contactRequired ?? opts.filter === undefined;
+    this.contactExcluded = opts.contactExcluded ?? false;
+    this.contactRequired = opts.contactRequired ?? (opts.filter === undefined && !this.contactExcluded);
     this.turns = opts.turns;
+    this.turnRange = opts.turnRange;
+    this.damageDenominator = opts.damageDenominator;
     this.filter = opts.filter;
     this.firstTurnChance = opts.firstTurnChance;
   }
@@ -479,6 +496,10 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
     return this.contactRequired;
   }
 
+  public excludesContact(): boolean {
+    return this.contactExcluded;
+  }
+
   /** The configured turn override, or `undefined` to use the engine default. */
   public getTurns(): number | undefined {
     return this.turns;
@@ -486,6 +507,12 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
 
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, move, opponent: attacker } = params;
+    if (
+      this.contactExcluded
+      && (move.hasFlag(MoveFlags.MAKES_CONTACT) || !DAMAGING_HIT_RESULTS.has(params.hitResult))
+    ) {
+      return false;
+    }
     if (
       this.contactRequired
       && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
@@ -514,7 +541,13 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
     }
     const { pokemon, opponent: attacker } = params;
     const tag = this.pickTag(pokemon);
-    attacker.addTag(tag, resolveTagTurns(tag, this.turns, pokemon), undefined, pokemon.id);
+    attacker.addTag(tag, resolveTagTurns(tag, this.turns, this.turnRange, pokemon), undefined, pokemon.id);
+    if (this.damageDenominator !== undefined) {
+      const appliedTag = attacker.getTag(tag);
+      if (appliedTag) {
+        (appliedTag as { damageDenominatorOverride?: number }).damageDenominatorOverride = this.damageDenominator;
+      }
+    }
   }
 
   /**
@@ -674,7 +707,10 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
   private readonly chance: number;
   private readonly tags: readonly BattlerTagType[];
   private readonly contactRequired: boolean;
+  private readonly contactExcluded: boolean;
   private readonly turns: number | undefined;
+  private readonly turnRange: readonly [number, number] | undefined;
+  private readonly damageDenominator: number | undefined;
   private readonly filter: ChanceStatusFilter | undefined;
   private readonly targetHasTag: BattlerTagType | undefined;
   private readonly targetHasStatus: StatusEffect | undefined;
@@ -689,6 +725,12 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
     if (opts.tags.length === 0) {
       throw new Error("[ChanceBattlerTagOnAttackAbAttr] must configure at least one battler tag");
     }
+    if (opts.contactRequired === true && opts.contactExcluded === true) {
+      throw new Error("[ChanceBattlerTagOnAttackAbAttr] contactRequired and contactExcluded are mutually exclusive");
+    }
+    if (opts.turns !== undefined && opts.turnRange !== undefined) {
+      throw new Error("[ChanceBattlerTagOnAttackAbAttr] turns and turnRange are mutually exclusive");
+    }
     // When gated to specific move ids, override the default PostAttack
     // attackCondition (which excludes status moves) so by-name riders on a
     // status move (e.g. Hypnosis) can trigger.
@@ -698,6 +740,7 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
     this.critRequired = opts.critRequired ?? false;
     this.firstTurnChance = opts.firstTurnChance;
     this.moveIds = opts.moveIds;
+    this.contactExcluded = opts.contactExcluded ?? false;
     // A target-state gate (targetHasTag), crit gate, or move-id gate replaces
     // contact as the trigger when set.
     this.contactRequired =
@@ -706,8 +749,11 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
         && opts.targetHasTag === undefined
         && opts.targetHasStatus === undefined
         && opts.moveIds === undefined
-        && !this.critRequired);
+        && !this.critRequired
+        && !this.contactExcluded);
     this.turns = opts.turns;
+    this.turnRange = opts.turnRange;
+    this.damageDenominator = opts.damageDenominator;
     this.filter = opts.filter;
     this.targetHasTag = opts.targetHasTag;
     this.targetHasStatus = opts.targetHasStatus;
@@ -728,6 +774,45 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
     return this.tags;
   }
 
+  public requiresContact(): boolean {
+    return this.contactRequired;
+  }
+
+  public excludesContact(): boolean {
+    return this.contactExcluded;
+  }
+
+  private matchesMove(move: Move, pokemon: Pokemon, target: Pokemon): boolean {
+    if (this.moveIds !== undefined && !this.moveIds.includes(move.id)) {
+      return false;
+    }
+    if (this.contactExcluded && move.hasFlag(MoveFlags.MAKES_CONTACT)) {
+      return false;
+    }
+    if (this.contactRequired && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target })) {
+      return false;
+    }
+    return this.filter === undefined || checkChanceStatusFilter(this.filter, move);
+  }
+
+  private matchesTarget(target: Pokemon): boolean {
+    if (this.targetHasTag !== undefined && !target.getTag(this.targetHasTag)) {
+      return false;
+    }
+    if (this.targetHasStatus !== undefined && target.status?.effect !== this.targetHasStatus) {
+      return false;
+    }
+    return !this.critRequired || !!target.turnData?.attacksReceived?.[0]?.critical;
+  }
+
+  private passesChance(pokemon: Pokemon): boolean {
+    const chance =
+      this.firstTurnChance !== undefined && pokemon.tempSummonData?.waveTurnCount === 1
+        ? this.firstTurnChance
+        : this.chance;
+    return chance === 100 || pokemon.randBattleSeedInt(100) < chance;
+  }
+
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, move, opponent: target } = params;
     if (!super.canApply(params)) {
@@ -736,35 +821,14 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
     if (target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") || pokemon === target) {
       return false;
     }
-    if (this.moveIds !== undefined && !this.moveIds.includes(move.id)) {
+    if (!this.matchesMove(move, pokemon, target)) {
       return false;
     }
-    if (this.contactRequired && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target })) {
+    if (!this.matchesTarget(target)) {
       return false;
     }
-    if (this.filter !== undefined && !checkChanceStatusFilter(this.filter, move)) {
+    if (!this.passesChance(pokemon)) {
       return false;
-    }
-    if (this.targetHasTag !== undefined && !target.getTag(this.targetHasTag)) {
-      return false;
-    }
-    if (this.targetHasStatus !== undefined && target.status?.effect !== this.targetHasStatus) {
-      return false;
-    }
-    // Crit gate: only fire when this interaction landed a critical hit on the
-    // target (mirrors OnCritStatBoostLowest's detection via the target's
-    // most-recent received attack).
-    if (this.critRequired && !target.turnData?.attacksReceived?.[0]?.critical) {
-      return false;
-    }
-    {
-      const effChance =
-        this.firstTurnChance !== undefined && pokemon.tempSummonData?.waveTurnCount === 1
-          ? this.firstTurnChance
-          : this.chance;
-      if (effChance !== 100 && pokemon.randBattleSeedInt(100) >= effChance) {
-        return false;
-      }
     }
     const tag = this.pickTag(pokemon);
     return target.canAddTag(tag);
@@ -776,7 +840,13 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
     }
     const { pokemon, opponent: target } = params;
     const tag = this.pickTag(pokemon);
-    target.addTag(tag, resolveTagTurns(tag, this.turns, pokemon), undefined, pokemon.id);
+    target.addTag(tag, resolveTagTurns(tag, this.turns, this.turnRange, pokemon), undefined, pokemon.id);
+    if (this.damageDenominator !== undefined) {
+      const appliedTag = target.getTag(tag);
+      if (appliedTag) {
+        (appliedTag as { damageDenominatorOverride?: number }).damageDenominatorOverride = this.damageDenominator;
+      }
+    }
   }
 
   private pickTag(pokemon: Parameters<PostAttackAbAttr["apply"]>[0]["pokemon"]): BattlerTagType {
@@ -804,10 +874,14 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
 function resolveTagTurns(
   tag: BattlerTagType,
   turns: number | undefined,
+  turnRange: readonly [number, number] | undefined,
   pokemon: { randBattleSeedIntRange(min: number, max: number): number },
 ): number | undefined {
   if (turns !== undefined) {
     return turns;
+  }
+  if (turnRange !== undefined) {
+    return pokemon.randBattleSeedIntRange(turnRange[0], turnRange[1]);
   }
   if (tag === BattlerTagType.CONFUSED) {
     return pokemon.randBattleSeedIntRange(2, 5);

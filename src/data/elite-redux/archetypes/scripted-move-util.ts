@@ -26,6 +26,7 @@
 // undefined for a custom scripted move.
 // =============================================================================
 
+import { FirstMoveCondition } from "#data/moves/move-condition";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import type { MoveId } from "#enums/move-id";
 import type { Move } from "#moves/move";
@@ -33,12 +34,14 @@ import type { Move } from "#moves/move";
 class PowerOverriddenPokemonMove extends PokemonMove {
   private readonly power: number | undefined;
   private readonly alwaysHit: boolean;
+  private readonly bypassFirstMoveCondition: boolean;
   private cached: Move | undefined;
 
-  constructor(moveId: MoveId, power: number | undefined, alwaysHit: boolean) {
+  constructor(moveId: MoveId, power: number | undefined, alwaysHit: boolean, bypassFirstMoveCondition: boolean) {
     super(moveId);
     this.power = power;
     this.alwaysHit = alwaysHit;
+    this.bypassFirstMoveCondition = bypassFirstMoveCondition;
   }
 
   public override getMove(): Move {
@@ -57,6 +60,12 @@ class PowerOverriddenPokemonMove extends PokemonMove {
         // accuracy -1 = "bypasses the accuracy check" (Swift/Aerial Ace style).
         (clone as unknown as { accuracy: number }).accuracy = -1;
       }
+      if (this.bypassFirstMoveCondition) {
+        const cloneConditions = clone as unknown as { conditionsSeq3: unknown[] };
+        cloneConditions.conditionsSeq3 = cloneConditions.conditionsSeq3.filter(
+          condition => !(condition instanceof FirstMoveCondition),
+        );
+      }
       this.cached = clone;
     }
     return this.cached;
@@ -72,9 +81,14 @@ class PowerOverriddenPokemonMove extends PokemonMove {
  * @param opts.alwaysHit - when true, the cast bypasses the accuracy check
  *   (accuracy -1) — e.g. Retribution Blow's Hyper Beam "cannot miss".
  */
-export function scriptedPokemonMove(moveId: MoveId, power?: number, opts?: { alwaysHit?: boolean }): PokemonMove {
+export function scriptedPokemonMove(
+  moveId: MoveId,
+  power?: number,
+  opts?: { alwaysHit?: boolean; bypassFirstMoveCondition?: boolean },
+): PokemonMove {
   const alwaysHit = opts?.alwaysHit ?? false;
-  return power === undefined && !alwaysHit
+  const bypassFirstMoveCondition = opts?.bypassFirstMoveCondition ?? false;
+  return power === undefined && !alwaysHit && !bypassFirstMoveCondition
     ? new PokemonMove(moveId)
-    : new PowerOverriddenPokemonMove(moveId, power, alwaysHit);
+    : new PowerOverriddenPokemonMove(moveId, power, alwaysHit, bypassFirstMoveCondition);
 }

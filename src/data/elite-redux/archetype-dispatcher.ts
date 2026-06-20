@@ -79,6 +79,7 @@ import {
   GorillaTacticsAbAttr,
   getWeatherCondition,
   IgnoreMoveEffectsAbAttr,
+  IgnoreOpponentStatStagesAbAttr,
   IgnoreProtectByFlagAbAttr,
   IgnoreProtectOnContactAbAttr,
   IgnoreTypeImmunityAbAttr,
@@ -118,6 +119,7 @@ import {
   UserFieldStatusEffectImmunityAbAttr,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { TrappedTag } from "#data/battler-tags";
 import { allAbilities } from "#data/data-lists";
 import { PostTurnHurtNonTypedAbAttr } from "#data/elite-redux/abilities/post-turn-hurt-non-typed";
 import { PpReductionOnContactAbAttr } from "#data/elite-redux/abilities/pp-reduction-on-contact";
@@ -125,6 +127,7 @@ import { SetArenaTagOnHitAbAttr, SetTerrainOnHitAbAttr } from "#data/elite-redux
 import { StatBoostOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-boost-on-flag-attack";
 import { StatChangeOnCategoryAttackAbAttr } from "#data/elite-redux/abilities/stat-change-on-category-attack";
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
+import { AbsorbantAbAttr } from "#data/elite-redux/archetypes/absorbant";
 import { AddTypeToAttackerOnContactAbAttr } from "#data/elite-redux/archetypes/add-type-to-attacker-on-contact";
 import { AllyAttackPowerBoostAbAttr } from "#data/elite-redux/archetypes/ally-attack-power-boost";
 import { AttackStatSubstituteAbAttr } from "#data/elite-redux/archetypes/attack-stat-substitute";
@@ -228,6 +231,7 @@ import {
 } from "#data/elite-redux/archetypes/power-boost-on-ally-faint";
 import { PreFaintReviveAbAttr } from "#data/elite-redux/archetypes/pre-faint-revive";
 import { PreSwitchOutItemRestoreAbAttr } from "#data/elite-redux/archetypes/pre-switch-out-item-restore";
+import { PreemptivePriorityCounterAbAttr } from "#data/elite-redux/archetypes/preemptive-priority-counter";
 import {
   type PriorityCondition,
   PriorityModifierAbAttr,
@@ -312,6 +316,7 @@ import { PokemonType } from "#enums/pokemon-type";
 import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
+import type { Pokemon } from "#field/pokemon";
 
 /**
  * Result of a single archetype-dispatch call. Carries the list of constructed
@@ -1861,6 +1866,20 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
       }
     }
   }
+  if (erAbilityId === 818) {
+    for (let i = 0; i < out.length; i++) {
+      const attr = out[i];
+      if (attr instanceof ChanceBattlerTagOnAttackAbAttr && attr.getTags().includes(BattlerTagType.WRAP)) {
+        out[i] = new ChanceBattlerTagOnAttackAbAttr({
+          chance: 50,
+          tags: [BattlerTagType.WRAP],
+          contactRequired: false,
+          turns: 6,
+          damageDenominator: 6,
+        });
+      }
+    }
+  }
   // Trash Heap 725 (Corrosion + Toxic Spill) — the Corrosion part wires the
   // status-immunity bypass (poison Steel/Poison) but NOT the "Poison-type moves
   // become super-effective against Steel" damage clause; append it.
@@ -2691,7 +2710,11 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // is gated to contact moves per the description.
       return ok([
         new PostSummonStatStageChangeAbAttr([Stat.ATK, Stat.SPATK], -1, false, true),
-        new ChanceBattlerTagOnHitAbAttr({ chance: 10, tags: [BattlerTagType.ER_FEAR], contactRequired: true }),
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 10,
+          tags: [BattlerTagType.ER_FEAR],
+          contactRequired: true,
+        }),
       ]);
     case 433: {
       // Dual Wield — "Mega Launcher and Keen Edge moves hit twice for 70%
@@ -4018,10 +4041,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // currently-TRAPPED foe (the speed-drop piece was previously unwired).
       // Cascades to 818 Tentalock, which composites Serpent Bind.
       return ok([
-        new ChanceBattlerTagOnHitAbAttr({
+        new ChanceBattlerTagOnAttackAbAttr({
           chance: 50,
-          tags: [BattlerTagType.TRAPPED],
-          contactRequired: true,
+          tags: [BattlerTagType.WRAP],
+          contactRequired: false,
+          turnRange: [4, 5],
+          damageDenominator: 8,
         }),
         new PostTurnFoeStatDropAbAttr({ stat: Stat.SPD, stages: -1, onlyIfTrapped: true }),
       ]);
@@ -4125,7 +4150,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // calc vs. post-defend tag application).
       return ok([
         new StatMultiplierAbAttr(Stat.ATK, 1.5),
-        new ChanceBattlerTagOnHitAbAttr({
+        new ChanceBattlerTagOnAttackAbAttr({
           chance: 20,
           tags: [BattlerTagType.CURSED],
           contactRequired: true,
@@ -4344,7 +4369,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([new BattlerTagImmunityAbAttrEr({ tags: [BattlerTagType.CONFUSED] })]);
     case 398:
       // Fungal Infection — "Contact moves inflict Leech Seed on the target."
-      return ok([new ChanceBattlerTagOnHitAbAttr({ chance: 100, tags: [BattlerTagType.SEEDED] })]);
+      return ok([
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.SEEDED],
+          contactRequired: true,
+        }),
+      ]);
     case 426:
       // Clueless — "Negates Weather, Rooms and Terrains." Cloud Nine continuously
       // suppresses weather effects; terrain is cleared on entry. (Room tags —
@@ -4676,7 +4707,20 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 373:
       // Grip Pincer — "50% chance to trap. Then ignores Defense & accuracy
       // checks." Wire the 50% TRAPPED battler tag on hit.
-      return ok([new ChanceBattlerTagOnHitAbAttr({ chance: 50, tags: [BattlerTagType.TRAPPED] })]);
+      return ok([
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 50,
+          tags: [BattlerTagType.WRAP],
+          contactRequired: true,
+          turnRange: [4, 5],
+          damageDenominator: 8,
+        }),
+        new IgnoreOpponentStatStagesAbAttr(
+          [Stat.DEF, Stat.SPDEF],
+          opponent => opponent.getTag(TrappedTag) !== undefined,
+        ),
+        new ConditionalAlwaysHitAbAttr({ targetTrapped: true }),
+      ]);
     case 394:
       // Lethargy — "Damage drops 20% each turn to 20%. Resets on switch-in."
       // Multi-tier turn-decaying multiplier. Defer (needs per-turn-counter
@@ -5348,7 +5392,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new ChanceBattlerTagOnHitAbAttr({
           chance: 30,
           tags: [BattlerTagType.ER_FROSTBITE],
-          contactRequired: false,
+          contactExcluded: true,
         }),
         new ChanceBattlerTagOnAttackAbAttr({
           chance: 20,
@@ -5358,7 +5402,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new ChanceBattlerTagOnAttackAbAttr({
           chance: 30,
           tags: [BattlerTagType.ER_FROSTBITE],
-          contactRequired: false,
+          contactExcluded: true,
         }),
       ]);
     case 476:
@@ -5660,14 +5704,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Boosts drain effectiveness + apply leech-seed. The +50% drain boost
       // needs a drain-fraction modifier primitive. Wire only the apply-
       // leech-seed piece (100% on drain-flagged hits).
-      return ok([
-        new ChanceBattlerTagOnHitAbAttr({
-          chance: 100,
-          tags: [BattlerTagType.SEEDED],
-          filter: { flag: MoveFlags.TRIAGE_MOVE },
-          contactRequired: false,
-        }),
-      ]);
+      return ok([new AbsorbantAbAttr()]);
     // -------------------------------------------------------------------------
     // Round 27 — vanilla PostDefend specialty wires
     // -------------------------------------------------------------------------
@@ -6522,13 +6559,7 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // Surprise! — "Astonishes enemy priority users in fog." Now uses the
       // real WeatherType.FOG (pokerogue ships FOG in the WeatherType enum).
       // Flinch chance gated on fog being active.
-      return ok([
-        new ChanceBattlerTagOnHitAbAttr({
-          chance: 100, // always when conditions met (fog + priority user)
-          tags: [BattlerTagType.FLINCHED],
-          contactRequired: false,
-        }),
-      ]);
+      return ok([new PreemptivePriorityCounterAbAttr().addCondition(getWeatherCondition(WeatherType.FOG))]);
     case 629:
       // Shallow Grave — "Revives at 25% HP once after fainting in fog."
       // Uses the real WeatherType.FOG (no longer MISTY proxy).

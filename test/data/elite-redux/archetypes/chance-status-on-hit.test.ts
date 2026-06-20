@@ -17,6 +17,7 @@
 // =============================================================================
 
 import {
+  ChanceBattlerTagOnAttackAbAttr,
   ChanceBattlerTagOnHitAbAttr,
   ChanceStatusOnHitAbAttr,
 } from "#data/elite-redux/archetypes/chance-status-on-hit";
@@ -281,6 +282,7 @@ describe("ChanceStatusOnHitAbAttr archetype (C1)", () => {
 type StubTagPokemonOpts = {
   canAddTag?: boolean;
   rolls?: number[];
+  tag?: object;
 };
 
 function makeStubTagPokemon(opts: StubTagPokemonOpts = {}): Pokemon {
@@ -290,11 +292,14 @@ function makeStubTagPokemon(opts: StubTagPokemonOpts = {}): Pokemon {
     id: 1,
     canAddTag: vi.fn(() => opts.canAddTag ?? true),
     addTag: vi.fn(),
+    getTag: vi.fn(() => opts.tag),
+    hasAbilityWithAttr: vi.fn(() => false),
     randBattleSeedInt: vi.fn(() => {
       const v = rolls[idx % rolls.length];
       idx++;
       return v;
     }),
+    randBattleSeedIntRange: vi.fn((min: number) => min),
   } as unknown as Pokemon;
 }
 
@@ -399,6 +404,86 @@ describe("ChanceBattlerTagOnHitAbAttr archetype (round-2 extension)", () => {
     expect(attr.getTags()).toEqual([BattlerTagType.CONFUSED, BattlerTagType.INFATUATED]);
     expect(attr.requiresContact()).toBe(false);
     expect(attr.getTurns()).toBe(4);
+  });
+
+  it("contactExcluded accepts only non-contact damaging hits", () => {
+    const attr = new ChanceBattlerTagOnHitAbAttr({
+      chance: 100,
+      tags: [BattlerTagType.ER_FROSTBITE],
+      contactExcluded: true,
+    });
+    const defender = makeStubTagPokemon();
+    const attacker = makeStubTagPokemon();
+    expect(
+      attr.canApply(
+        makeParams({
+          defender,
+          attacker,
+          move: makeStubMove({ makesContact: false }),
+          hitResult: HitResult.EFFECTIVE,
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      attr.canApply(
+        makeParams({
+          defender,
+          attacker,
+          move: makeStubMove({ makesContact: true, flags: MoveFlags.MAKES_CONTACT }),
+          hitResult: HitResult.EFFECTIVE,
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      attr.canApply(
+        makeParams({
+          defender,
+          attacker,
+          move: makeStubMove({ makesContact: false }),
+          hitResult: HitResult.STATUS,
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("ChanceBattlerTagOnAttackAbAttr", () => {
+  it("contactExcluded accepts only inherently non-contact attacks", () => {
+    const attr = new ChanceBattlerTagOnAttackAbAttr({
+      chance: 100,
+      tags: [BattlerTagType.ER_FROSTBITE],
+      contactExcluded: true,
+    });
+    const attacker = makeStubTagPokemon();
+    const target = makeStubTagPokemon();
+    expect(
+      attr.canApply(makeParams({ defender: attacker, attacker: target, move: makeStubMove({ makesContact: false }) })),
+    ).toBe(true);
+    expect(
+      attr.canApply(
+        makeParams({
+          defender: attacker,
+          attacker: target,
+          move: makeStubMove({ makesContact: true, flags: MoveFlags.MAKES_CONTACT }),
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("applies a ranged-duration damaging trap override", () => {
+    const trap = {};
+    const attr = new ChanceBattlerTagOnAttackAbAttr({
+      chance: 100,
+      tags: [BattlerTagType.WRAP],
+      contactRequired: false,
+      turnRange: [4, 5],
+      damageDenominator: 8,
+    });
+    const attacker = makeStubTagPokemon();
+    const target = makeStubTagPokemon({ tag: trap });
+    attr.apply(makeParams({ defender: attacker, attacker: target, move: makeStubMove({ makesContact: false }) }));
+    expect(target.addTag).toHaveBeenCalledWith(BattlerTagType.WRAP, 4, undefined, attacker.id);
+    expect(trap).toEqual({ damageDenominatorOverride: 8 });
   });
 });
 

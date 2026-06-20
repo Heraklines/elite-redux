@@ -24,6 +24,7 @@
 
 import { type AbAttrBaseParams, PostTurnAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { TrappedTag } from "#data/battler-tags";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import type { BattleStat, EffectiveStat } from "#enums/stat";
 import type { StatusEffect } from "#enums/status-effect";
@@ -56,7 +57,7 @@ export class PostTurnFoeStatDropAbAttr extends PostTurnAbAttr {
     if (!opp || opp.isFainted()) {
       return false;
     }
-    return !this.opts.onlyIfTrapped || opp.getTag(BattlerTagType.TRAPPED) != null;
+    return !this.opts.onlyIfTrapped || opp.getTag(TrappedTag) != null;
   }
 
   override canApply({ pokemon }: AbAttrBaseParams): boolean {

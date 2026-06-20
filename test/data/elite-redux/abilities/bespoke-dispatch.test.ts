@@ -295,7 +295,7 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
   it("er id 819 (Serpent Bind) wires 50% trap-on-contact AND the per-turn -1 SPD on trapped foes", () => {
     const res = dispatchArchetype("bespoke", null, 819);
     expect(res.skipReason).toBeNull();
-    expect(res.attrs.some(a => a.constructor.name === "ChanceBattlerTagOnHitAbAttr")).toBe(true);
+    expect(res.attrs.some(a => a.constructor.name === "ChanceBattlerTagOnAttackAbAttr")).toBe(true);
     const drop = res.attrs.find(a => a.constructor.name === "PostTurnFoeStatDropAbAttr");
     expect(drop).toBeDefined();
     expect((drop as unknown as { opts: { onlyIfTrapped?: boolean } }).opts.onlyIfTrapped).toBe(true);
@@ -306,6 +306,29 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(res.skipReason).toBeNull();
     expect(res.attrs.some(a => a.constructor.name === "TrapDurationModifierAbAttr")).toBe(true);
     expect(res.attrs.some(a => a.constructor.name === "PostTurnFoeStatDropAbAttr")).toBe(true);
+  });
+
+  it.each([398, 408, 599])("er id %i uses an offensive battler-tag proc", id => {
+    const res = dispatchArchetype("bespoke", null, id);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs.some(a => a instanceof ChanceBattlerTagOnAttackAbAttr)).toBe(true);
+    expect(res.attrs.some(a => a instanceof ChanceBattlerTagOnHitAbAttr)).toBe(false);
+  });
+
+  it("er id 373 wires offensive trap, trapped-target stat bypass, and trapped-target always-hit", () => {
+    const res = dispatchArchetype("bespoke", null, 373);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs.some(a => a instanceof ChanceBattlerTagOnAttackAbAttr)).toBe(true);
+    expect(res.attrs.some(a => a.constructor.name === "IgnoreOpponentStatStagesAbAttr")).toBe(true);
+    const alwaysHit = res.attrs.find(a => a instanceof ConditionalAlwaysHitAbAttr) as ConditionalAlwaysHitAbAttr;
+    expect(alwaysHit.opts.targetTrapped).toBe(true);
+  });
+
+  it("er id 492 splits contact and non-contact tiers on offense and defense", () => {
+    const res = dispatchArchetype("bespoke", null, 492);
+    expect(res.skipReason).toBeNull();
+    expect(res.attrs.filter(a => a instanceof ChanceBattlerTagOnHitAbAttr)).toHaveLength(2);
+    expect(res.attrs.filter(a => a instanceof ChanceBattlerTagOnAttackAbAttr)).toHaveLength(2);
   });
 
   it("er id 829 (Stainless Steel) appends Steel STAB (Steelworker's 'otherwise' clause)", () => {
@@ -1691,7 +1714,7 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(2);
     expect(res.attrs.find(a => a.constructor.name === "PostSummonStatStageChangeAbAttr")).toBeDefined();
-    expect(res.attrs.find(a => a.constructor.name === "ChanceBattlerTagOnHitAbAttr")).toBeDefined();
+    expect(res.attrs.find(a => a.constructor.name === "ChanceBattlerTagOnAttackAbAttr")).toBeDefined();
   });
 
   it("er id 368 (Sighting System) wires AlwaysHit + PriorityModifier(-3 for <80% acc moves)", () => {
@@ -1829,15 +1852,15 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(attr.getWeathers()).toEqual([WeatherType.FOG]);
   });
 
-  it("er id 819 (Serpent Bind) wires ChanceBattlerTagOnHit(50% TRAPPED on contact) + per-turn trapped speed drop", () => {
+  it("er id 819 (Serpent Bind) wires an offensive 50% damaging trap + per-turn trapped speed drop", () => {
     const res = dispatchArchetype("bespoke", null, 819);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(2);
-    const attr = res.attrs.find(a => a instanceof ChanceBattlerTagOnHitAbAttr) as ChanceBattlerTagOnHitAbAttr;
-    expect(attr).toBeInstanceOf(ChanceBattlerTagOnHitAbAttr);
+    const attr = res.attrs.find(a => a instanceof ChanceBattlerTagOnAttackAbAttr) as ChanceBattlerTagOnAttackAbAttr;
+    expect(attr).toBeInstanceOf(ChanceBattlerTagOnAttackAbAttr);
     expect(attr.getChance()).toBe(50);
-    expect(attr.getTags()).toEqual([BattlerTagType.TRAPPED]);
-    expect(attr.requiresContact()).toBe(true);
+    expect(attr.getTags()).toEqual([BattlerTagType.WRAP]);
+    expect(attr.requiresContact()).toBe(false);
     // The "speed drops by one stage each turn they remain on the field" piece.
     expect(res.attrs.some(a => a.constructor.name === "PostTurnFoeStatDropAbAttr")).toBe(true);
   });

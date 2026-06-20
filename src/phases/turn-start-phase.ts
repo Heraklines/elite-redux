@@ -14,6 +14,17 @@ import { inSpeedOrder } from "#utils/speed-order-generator";
 export class TurnStartPhase extends FieldPhase {
   public readonly phaseName = "TurnStartPhase";
 
+  private queuePreemptiveCounters(field: Pokemon[]): void {
+    for (const pokemon of field) {
+      for (const attr of pokemon.getAllActiveAbilityAttrs()) {
+        const condition = attr.getCondition();
+        if (attr.constructor.name === "PreemptivePriorityCounterAbAttr" && (condition === null || condition(pokemon))) {
+          (attr as unknown as { queueCounters: (holder: Pokemon) => void }).queueCounters(pokemon);
+        }
+      }
+    }
+  }
+
   /**
    * Returns an ordering of the current field based on command priority
    * @returns The sequence of commands for this turn
@@ -76,6 +87,8 @@ export class TurnStartPhase extends FieldPhase {
       applyAbAttrs("BypassSpeedChanceAbAttr", { pokemon });
       globalScene.applyModifiers(BypassSpeedChanceModifier, pokemon.isPlayer(), pokemon);
     }
+
+    this.queuePreemptiveCounters(field);
 
     moveOrder.forEach((o, index) => {
       const pokemon = field[o];

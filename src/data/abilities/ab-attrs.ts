@@ -2367,6 +2367,7 @@ export interface IgnoreOpponentStatStagesAbAttrParams extends AbAttrBaseParams {
   stat: BattleStat;
   /** Holds whether the stat is ignored by the ability */
   ignored: BooleanHolder;
+  opponent?: Pokemon | undefined;
 }
 
 /**
@@ -2375,15 +2376,20 @@ export interface IgnoreOpponentStatStagesAbAttrParams extends AbAttrBaseParams {
  */
 export class IgnoreOpponentStatStagesAbAttr extends AbAttr {
   private readonly stats: readonly BattleStat[];
+  private readonly opponentCondition: ((opponent: Pokemon) => boolean) | undefined;
 
-  constructor(stats?: BattleStat[]) {
+  constructor(stats?: BattleStat[], opponentCondition?: (opponent: Pokemon) => boolean) {
     super(false);
 
     this.stats = stats ?? BATTLE_STATS;
+    this.opponentCondition = opponentCondition;
   }
 
-  override canApply({ stat }: IgnoreOpponentStatStagesAbAttrParams): boolean {
-    return this.stats.includes(stat);
+  override canApply({ stat, opponent }: IgnoreOpponentStatStagesAbAttrParams): boolean {
+    return (
+      this.stats.includes(stat)
+      && (this.opponentCondition === undefined || (opponent !== undefined && this.opponentCondition(opponent)))
+    );
   }
 
   override apply({ ignored }: IgnoreOpponentStatStagesAbAttrParams): void {

@@ -4370,6 +4370,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
           ignored: ignoreStatStage,
           stat,
           simulated,
+          opponent: this,
         });
       }
       if (move) {
@@ -4410,8 +4411,18 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     const ignoreEvaStatStage = new BooleanHolder(false);
 
     // TODO: consider refactoring this method to accept `simulated` and then pass simulated to these applyAbAttrs
-    applyAbAttrs("IgnoreOpponentStatStagesAbAttr", { pokemon: target, stat: Stat.ACC, ignored: ignoreAccStatStage });
-    applyAbAttrs("IgnoreOpponentStatStagesAbAttr", { pokemon: this, stat: Stat.EVA, ignored: ignoreEvaStatStage });
+    applyAbAttrs("IgnoreOpponentStatStagesAbAttr", {
+      pokemon: target,
+      stat: Stat.ACC,
+      ignored: ignoreAccStatStage,
+      opponent: this,
+    });
+    applyAbAttrs("IgnoreOpponentStatStagesAbAttr", {
+      pokemon: this,
+      stat: Stat.EVA,
+      ignored: ignoreEvaStatStage,
+      opponent: target,
+    });
     applyMoveAttrs("IgnoreOpponentStatStagesAttr", this, target, sourceMove, ignoreEvaStatStage);
 
     globalScene.applyModifiers(TempStatStageBoosterModifier, this.isPlayer(), Stat.ACC, userAccStage);
