@@ -30,9 +30,9 @@
     ]
   },
   "SPECIES_KINGAMBIT_REDUX": {
-    "ability1": 128,
-    "ability2": 101,
-    "hidden": 5157,
+    "ability1": 5312,
+    "ability2": 5191,
+    "hidden": 5297,
     "innates": [
       5009,
       22,
