@@ -17,12 +17,8 @@ import i18next from "i18next";
 // trick LearnMoveBatchUiHandler uses). ---
 const PANEL_W = 156;
 const PANEL_H = 176;
-const RIGHT_MARGIN = 3;
-const TOP_MARGIN = 4;
-// The whole panel is drawn at PANEL_W x PANEL_H then scaled down so it occupies a
-// compact corner of the party screen instead of half of it. Everything (window,
-// text, sprite, buttons) shrinks together.
-const PANEL_SCALE = 0.62;
+const RIGHT_MARGIN = 2;
+const TOP_MARGIN = 3;
 
 const SPRITE_X = 40;
 const SPRITE_Y = 34;
@@ -47,7 +43,9 @@ const ABIL_ROW_H = 10;
 // also show which key triggers them. Tapping works on mobile; B cancels as usual.
 const BTN_Y = 166;
 const BTN_X = [52, 104] as const;
-const BTN_SCALE = 0.85;
+// Small label font for the Fuse / Switch controls (clearly smaller than the
+// panel's body text). Tune this if they read too big/small.
+const BTN_SCALE = 0.6;
 
 /** A cached blended-sprite render for one partner (keyed by partner id). */
 interface SpriteCacheEntry {
@@ -97,12 +95,9 @@ export class FusionPreviewPanel {
 
   setup(): void {
     const sc = globalScene.scaledCanvas;
-    // Right-align + top-anchor the SCALED panel (scale grows downward from the top
-    // edge, which sits TOP_MARGIN below the top of the screen).
-    const winX = sc.width - PANEL_W * PANEL_SCALE - RIGHT_MARGIN;
+    const winX = sc.width - PANEL_W - RIGHT_MARGIN;
     const winY = TOP_MARGIN - sc.height;
     this.container = globalScene.add.container(winX, winY);
-    this.container.setScale(PANEL_SCALE);
     this.container.setVisible(false);
     globalScene.ui.add(this.container);
 
