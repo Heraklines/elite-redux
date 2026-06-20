@@ -41,11 +41,12 @@ const ABIL_ROW_H = 10;
 
 // Bottom row of tappable controls (Fuse / Switch) - small on-screen buttons that
 // also show which key triggers them. Tapping works on mobile; B cancels as usual.
-// Fuse / Switch controls, stacked at the TOP-RIGHT. BTN_SCALE is a FRACTION of the
-// panel's normal text size (applied relative to the scale addTextObject sets).
-const BTN_X_RIGHT = PANEL_W - 5;
-const BTN_Y_FUSE = 4;
-const BTN_Y_SWITCH = 13;
+// Fuse / Switch controls, side by side on the right of the "Abilities" header row.
+// BTN_SCALE is a FRACTION of the panel's normal text size (applied relative to the
+// scale addTextObject sets - an absolute setScale would render the 96px font huge).
+const BTN_Y = ABIL_LABEL_Y;
+const BTN_X_FUSE = PANEL_W - 48;
+const BTN_X_SWITCH = PANEL_W - 5;
 const BTN_SCALE = 0.6;
 
 /** A cached blended-sprite render for one partner (keyed by partner id). */
@@ -171,17 +172,17 @@ export class FusionPreviewPanel {
     this.placeholderText.setVisible(false);
     this.container.add(this.placeholderText);
 
-    // Top-right: tappable Fuse / Switch labels that also name their key. Tapping
-    // works on mobile; A/R still work on keyboard/controller, and B cancels.
-    this.makeButton(BTN_Y_FUSE, "partyUiHandler:fusionPreviewFuse", () => this.onConfirm?.());
-    this.makeButton(BTN_Y_SWITCH, "partyUiHandler:fusionPreviewSwitch", () => this.onSwitch?.());
+    // Tappable Fuse / Switch labels (right of the Abilities header) that also name
+    // their key. Tapping works on mobile; A/R still work on keyboard, B cancels.
+    this.makeButton(BTN_X_FUSE, "partyUiHandler:fusionPreviewFuse", () => this.onConfirm?.());
+    this.makeButton(BTN_X_SWITCH, "partyUiHandler:fusionPreviewSwitch", () => this.onSwitch?.());
 
     this.built = true;
   }
 
   /** Build one tappable bottom-row button (a text label with a touch hit area). */
-  private makeButton(y: number, i18nKey: string, onTap: () => void): Phaser.GameObjects.Text {
-    const t = addTextObject(BTN_X_RIGHT, y, i18next.t(i18nKey), TextStyle.WINDOW).setOrigin(1, 0);
+  private makeButton(x: number, i18nKey: string, onTap: () => void): Phaser.GameObjects.Text {
+    const t = addTextObject(x, BTN_Y, i18next.t(i18nKey), TextStyle.WINDOW).setOrigin(1, 0);
     // addTextObject already applies a sub-1 scale (the 96px font rendered at ~1/6).
     // MULTIPLY that existing scale - an ABSOLUTE setScale overrode it and rendered
     // the raw 96px font huge (the "way too big" bug). BTN_SCALE is a fraction of the
