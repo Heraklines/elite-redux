@@ -45,7 +45,7 @@ import {
   setErPendingNodes,
 } from "#data/elite-redux/er-biome-routing";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
-import { erIsBiomeEnd, erRollBiomeLength } from "#data/elite-redux/er-biome-structure";
+import { erBiomeJustEnteredAfterWave, erIsBiomeEnd, erRollBiomeLength } from "#data/elite-redux/er-biome-structure";
 import { ER_BLACK_SHINY_TINT, isErBlackShiny, promoteToErBlackShinyInBattle } from "#data/elite-redux/er-black-shinies";
 import { clearErFightTokens } from "#data/elite-redux/er-fight-tokens";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
@@ -1497,6 +1497,16 @@ export class BattleScene extends SceneBase {
     // finale-safety zone) - in which case we fall through to vanilla %10 so the
     // wave-200 END biome / finale align exactly.
     if (erBiomeRoutingActive()) {
+      // After a biome switch, SwitchBiomePhase has already rolled the NEW biome's
+      // structure forward (its start wave is the wave we just cleared + 1), so a raw
+      // erIsBiomeEnd() about that cleared wave would wrongly read "0 waves in, not an
+      // end". doPostBattleCleanup consults isNewBiome AFTER that roll to pick the next
+      // encounter phase; without this it queued NextEncounterPhase, so the new biome's
+      // weather/terrain + arena reset never ran (e.g. Beach never set its sun). Detect
+      // the post-switch state directly. #486
+      if (erBiomeJustEnteredAfterWave(currentBattle.waveIndex)) {
+        return true;
+      }
       const erEnd = erIsBiomeEnd(currentBattle.waveIndex);
       if (erEnd !== null) {
         // Don't end the biome right before a SCRIPTED fixed battle (rival / evil

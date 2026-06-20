@@ -177,6 +177,25 @@ export function getErBiomeStartWave(): number {
   return currentStartWave;
 }
 
+/**
+ * True when the biome structure has ALREADY been rolled forward to a new biome
+ * that starts on the wave AFTER `waveIndex` - i.e. a {@link SwitchBiomePhase} has
+ * run {@link erRollBiomeLength} with `startWave = waveIndex + 1`, so `waveIndex`
+ * was the FINAL wave of the biome we just left.
+ *
+ * `isNewBiome` is consulted twice across the SwitchBiomePhase boundary: VictoryPhase
+ * reads it (correctly true) to push the biome change, then doPostBattleCleanup reads
+ * it again to pick the next encounter phase - but by then erRollBiomeLength has reset
+ * `currentStartWave` to the NEW biome, so a raw `erIsBiomeEnd(waveIndex)` wrongly says
+ * "0 waves in, not an end" and `NextEncounterPhase` runs instead of
+ * `NewBiomeEncounterPhase`, skipping the new biome's weather/terrain + arena reset
+ * (e.g. Beach never set its sun). This post-switch signal restores the correct answer
+ * without re-deriving from the rolled-forward length. #486
+ */
+export function erBiomeJustEnteredAfterWave(waveIndex: number): boolean {
+  return currentStartWave === waveIndex + 1;
+}
+
 /** How many waves have been spent in the current biome AT `waveIndex` (1-based). */
 export function wavesSinceEnteredBiome(waveIndex: number): number {
   return waveIndex - currentStartWave + 1;

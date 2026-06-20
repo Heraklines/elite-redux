@@ -4782,6 +4782,32 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) New biome sets its weather/terrain (World Map)",
+    description:
+      "World-Map biome-entry fix. On every World Map biome change the new biome's\n"
+      + "weather + terrain (and the arena-effect reset) were SKIPPED, because the\n"
+      + "encounter that starts the new biome ran as NextEncounterPhase (same-biome)\n"
+      + "instead of NewBiomeEncounterPhase. Cause: isNewBiome is stateful under the\n"
+      + "World Map, and SwitchBiomePhase rolled the new biome's structure forward\n"
+      + "BEFORE isNewBiome was consulted to pick the encounter phase, so it read the\n"
+      + "cleared wave as 'mid-biome'. Reported as 'Beach didn't trigger the harsh\n"
+      + "sunlight'. CHECK (classic run, World Map on): travel into a biome with a\n"
+      + "signature weather/terrain - Desert/Badlands (sandstorm), Ice Cave (snow),\n"
+      + "Graveyard (fog), Beach/Island (a chance of sun), Power Plant (Electric\n"
+      + "Terrain) - the weather/terrain must appear on the FIRST wave of that biome.\n"
+      + "Before the fix, the new biome opened with whatever weather carried over (or\n"
+      + "none). Hatch/entry-effect abilities (Drought etc.) still set their own.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_LEVEL_OVERRIDE: 30 });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Reactive items show holder icon",
     description:
       "Held-item icon fix. The 5 reactive items (Cell Battery, Absorb Bulb, Snowball,\n"
@@ -7211,6 +7237,141 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [
         makeStarter(SpeciesId.AERODACTYL, {
           moveset: [MoveId.DRAGON_TAIL, MoveId.TACKLE, MoveId.PROTECT, MoveId.ROOST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Volcano Rage follow-up",
+    description:
+      "ID 382 - DO: use Flamethrower, then Slash. EXPECT: the Fire move is\n"
+      + "immediately followed by a 50 BP Eruption; the Normal move has no follow-up.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.VOLCANO_RAGE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 70,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.SOFT_BOILED, MoveId.PROTECT, MoveId.HEAL_PULSE],
+      });
+      return [
+        makeStarter(SpeciesId.CHARIZARD, {
+          moveset: [MoveId.FLAMETHROWER, MoveId.SLASH, MoveId.ROOST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Pyro Shells Outburst",
+    description:
+      "ID 397 - DO: use Water Pulse, then Surf. EXPECT: the pulse move is\n"
+      + "immediately followed by the real 50 BP Outburst; Surf has no follow-up.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.PYRO_SHELLS),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 70,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.SOFT_BOILED, MoveId.PROTECT, MoveId.HEAL_PULSE],
+      });
+      return [
+        makeStarter(SpeciesId.BLASTOISE, {
+          moveset: [MoveId.WATER_PULSE, MoveId.SURF, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Aftershock Magnitude 4-7",
+    description:
+      "ID 491 - DO: repeatedly use Tackle. EXPECT: every landed attack is\n"
+      + "followed by Magnitude, and its message is always Magnitude 4, 5, 6, or 7.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.AFTERSHOCK),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.SOFT_BOILED, MoveId.PROTECT, MoveId.HEAL_PULSE],
+      });
+      return [
+        makeStarter(SpeciesId.GOLEM, {
+          moveset: [MoveId.TACKLE, MoveId.ROCK_SLIDE, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Jumpscare first entry",
+    description:
+      "ID 718 - EXPECT: Gengar uses 40 BP Astonish on its opening entry. DO:\n"
+      + "switch to Snorlax and back. EXPECT: Astonish does not fire a second time.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.JUMPSCARE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 70,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.SOFT_BOILED, MoveId.PROTECT, MoveId.HEAL_PULSE],
+      });
+      return [
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.HYPNOSIS, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Sludge Spit Venom Bolt",
+    description:
+      "ID 876 - DO: use Tackle. EXPECT: it is immediately followed by the\n"
+      + "real ER Venom Bolt at 35 BP, not vanilla Sludge.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.SLUDGE_SPIT),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 70,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.SOFT_BOILED, MoveId.PROTECT, MoveId.HEAL_PULSE],
+      });
+      return [
+        makeStarter(SpeciesId.MUK, {
+          moveset: [MoveId.TACKLE, MoveId.POISON_JAB, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Thunder Clouds 35 BP",
+    description:
+      "ID 993 - DO: use Thunder Shock, then Tackle. EXPECT: only the special\n"
+      + "move is immediately followed by a 35 BP Thunderbolt.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.THUNDER_CLOUDS),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 70,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.SOFT_BOILED, MoveId.PROTECT, MoveId.HEAL_PULSE],
+      });
+      return [
+        makeStarter(SpeciesId.RAICHU, {
+          moveset: [MoveId.THUNDER_SHOCK, MoveId.TACKLE, MoveId.REST, MoveId.PROTECT],
         }),
       ];
     },

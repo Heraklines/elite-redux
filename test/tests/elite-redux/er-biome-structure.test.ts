@@ -1,4 +1,5 @@
 import {
+  erBiomeJustEnteredAfterWave,
   erInLateGameZone,
   erIsBiomeEnd,
   erRollBiomeLength,
@@ -81,6 +82,35 @@ describe("ER #486 - variable biome length / structure", () => {
     expect(erIsBiomeEnd(12)).toBe(false);
     setErLeaveBiomeNow();
     expect(erIsBiomeEnd(12)).toBe(true);
+  });
+
+  // Regression: weather/terrain skipped on World-Map biome changes (Beach report).
+  // isNewBiome is consulted twice across the SwitchBiomePhase boundary; by the
+  // second read (doPostBattleCleanup, which picks the encounter phase) SwitchBiomePhase
+  // has already rolled the NEW biome forward via erRollBiomeLength(next, clearedWave+1),
+  // so a raw erIsBiomeEnd(clearedWave) reads "0 waves in -> not an end" and the new
+  // biome's weather/terrain never set. erBiomeJustEnteredAfterWave restores the truth.
+  it("post-switch: detects the cleared wave as a biome end (new-biome weather fix)", () => {
+    // In Grass, ending at wave 16.
+    erRollBiomeLength(BiomeId.GRASS, 11);
+    // Player clears wave 16; SwitchBiomePhase enters Beach starting wave 17.
+    erRollBiomeLength(BiomeId.BEACH, 17);
+    // Raw erIsBiomeEnd about the cleared wave now lies (0 waves into Beach):
+    expect(erIsBiomeEnd(16)).toBe(false);
+    // ...but the post-switch signal correctly says wave 16 ended a biome:
+    expect(erBiomeJustEnteredAfterWave(16)).toBe(true);
+    // And it must NOT fire for any other wave (no false biome ends mid-biome):
+    expect(erBiomeJustEnteredAfterWave(17)).toBe(false); // first wave of Beach
+    expect(erBiomeJustEnteredAfterWave(20)).toBe(false); // mid Beach
+    expect(erBiomeJustEnteredAfterWave(15)).toBe(false); // a prior wave
+  });
+
+  it("post-switch signal is inert mid-biome (no spurious new-biome detection)", () => {
+    erRollBiomeLength(BiomeId.GRASS, 11); // start wave 11
+    // For every wave at/after the start, the start can never equal wave+1.
+    for (let w = 11; w <= 30; w++) {
+      expect(erBiomeJustEnteredAfterWave(w)).toBe(false);
+    }
   });
 
   // ---- FINALE SAFETY (critical) ----
