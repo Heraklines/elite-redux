@@ -16,6 +16,7 @@ import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed/da
 import { allMoves, allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
+import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
 import { getErMapSaveData, restoreErMapState } from "#data/elite-redux/er-map-nodes";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
@@ -2169,7 +2170,12 @@ export class GameData {
     // candy and unlocks across stages - the in-battle Abilities page reads the
     // root and showed everything "Locked - unlock with candy" even after paying.
     // Falls back to the raw id for synthetic/custom species not in the table.
-    const rootId = getPokemonSpecies(speciesId)?.getRootSpeciesId() ?? speciesId;
+    // ER: a custom MEGA form (e.g. Flygon Redux B Mega) is a battle form of its
+    // base, not a separate line - resolve it to the base FIRST (before the evo
+    // root) so its candy/passive/ability unlocks pool on the base and it never
+    // shows a split candy count.
+    const baseId = erMegaTargetToBaseSpeciesId(speciesId) ?? speciesId;
+    const rootId = getPokemonSpecies(baseId)?.getRootSpeciesId() ?? baseId;
     return (this.starterData[rootId] ??= this.createStarterDataEntry(rootId));
   }
 
@@ -2188,7 +2194,14 @@ export class GameData {
       if (!species) {
         continue;
       }
-      const rootId = species.getRootSpeciesId();
+      // ER: fold a custom MEGA form's stray bucket into its base too (mega has no
+      // prevolution, so getRootSpeciesId returns itself - resolve mega->base first
+      // so an already-split save (base candy X, mega candy Y) heals to base X+Y).
+      const megaBase = erMegaTargetToBaseSpeciesId(speciesId);
+      const rootId =
+        megaBase === undefined
+          ? species.getRootSpeciesId()
+          : (getPokemonSpecies(megaBase)?.getRootSpeciesId() ?? megaBase);
       if (rootId === speciesId) {
         continue;
       }
@@ -2500,7 +2513,11 @@ export class GameData {
    * @returns Whether the candy count was incremented
    */
   public addStarterCandy(speciesId: SpeciesId, count: number, fromEgg = false): boolean {
-    const starterEntry = this.getStarterDataEntry(speciesId);
+    // ER: route a custom MEGA form id to its base so the candy lands on the base
+    // bucket AND the candy bar (which does a raw starterData[id] read) is handed
+    // an id whose bucket getStarterDataEntry just guaranteed.
+    const baseId = (erMegaTargetToBaseSpeciesId(speciesId) ?? speciesId) as SpeciesId;
+    const starterEntry = this.getStarterDataEntry(baseId);
     const { candyCount } = starterEntry;
 
     if (candyCount >= MAX_STARTER_CANDY_COUNT) {

@@ -57,6 +57,33 @@ function megaTargetIds(): Set<number> {
   return ids;
 }
 
+/** Lazily-built map: a mega-target custom pk id -> its BASE species pk id. */
+let ER_MEGA_TARGET_TO_BASE: Map<number, number> | null = null;
+/**
+ * For an ER custom MEGA-form species (e.g. Flygon Redux B Mega), return its BASE
+ * species id (Flygon Redux B); `undefined` for everything else. A mega is a battle
+ * FORM of its base, not a separate dex/breeding line - but ER builds it as a
+ * standalone custom species with its own id, so its `starterData` (candy, passive /
+ * ability unlocks, ...) pooled under a SEPARATE bucket and showed a split candy
+ * count. Callers resolve the mega to its base so all of that pools on the base,
+ * exactly like a normal evolution line. (Derived from `ER_MEGA_FORMS`, the single
+ * source of truth for base<->mega, resolved through `ER_ID_MAP.species`.)
+ */
+export function erMegaTargetToBaseSpeciesId(speciesId: number): number | undefined {
+  if (ER_MEGA_TARGET_TO_BASE === null) {
+    const map = new Map<number, number>();
+    for (const entry of ER_MEGA_FORMS) {
+      const target = ER_ID_MAP.species[entry.targetErId];
+      const base = ER_ID_MAP.species[entry.baseErId];
+      if (target !== undefined && base !== undefined && target >= ER_CUSTOM_ID_CUTOFF && target !== base) {
+        map.set(target, base);
+      }
+    }
+    ER_MEGA_TARGET_TO_BASE = map;
+  }
+  return ER_MEGA_TARGET_TO_BASE.get(speciesId);
+}
+
 /**
  * True if this custom species is a battle-only form record (mega / primal /
  * origin / Hangry / Blade / Gigantamax / ...) that must never be handed to the

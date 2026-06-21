@@ -5160,6 +5160,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Mega forms share their base's candy",
+    description:
+      "Candy-pooling fix (dex/UI, not battle-testable). An ER custom Mega (e.g. Flygon\n"
+      + "Redux B Mega) is a battle FORM of its base, but it was built as a standalone\n"
+      + "species with no prevolution, so it kept its OWN candy bucket and showed a\n"
+      + "SEPARATE candy count from Flygon Redux B. Now a mega-target id pools its candy /\n"
+      + "passive / ability unlocks onto the base (getStarterDataEntry resolves mega->base;\n"
+      + "consolidateStarterDataToRoots heals already-split saves to base = X+Y).\n"
+      + "CHECK: in the Pokedex, the base and its Mega show the SAME candy count, and\n"
+      + "spending candy on one is reflected on the other. Regression-covered by\n"
+      + "er-mega-candy-merge.test.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.FLYGON, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.U_TURN, MoveId.ROOST],
+        }),
+      ];
+    },
+  },
+  {
     label: "Biome Market preview (#440)",
     description:
       "#440 BIOME MARKET - x0 boss waves now OPEN A BESPOKE SHOP SCREEN (they\n"
