@@ -126,11 +126,15 @@ export function initErNotifications(): void {
   });
   notificationManager.registerSource(GHOST_TYPE, fetchGhostNotifications, GHOST_NOTIF_SETTING_KEY);
 
+  // Retire the pre-icon demo from earlier builds (it had names but no speciesId,
+  // so the team icons could not render). Safe no-op once it is gone.
+  notificationManager.remove("ghost-battle:demo-v1");
+
   // Seed the welcome (+ staging demo) ONCE per user. Without this guard they would
   // re-appear on every title visit and "Clear all" could never stick. Per-user key
   // (this runs once logged in) so each account is seeded independently.
   const user = loggedInUser?.username ?? "guest";
-  const seededKey = `er-notif-seeded-v2_${user}`;
+  const seededKey = `er-notif-seeded-v3_${user}`;
   let seeded = false;
   try {
     seeded = typeof localStorage !== "undefined" && localStorage.getItem(seededKey) === "1";
@@ -160,7 +164,7 @@ export function initErNotifications(): void {
   const env = import.meta.env as unknown as Record<string, unknown> | undefined;
   if (env?.DEV === true || env?.VITE_DEV_TOOLS === "1") {
     notificationManager.push({
-      id: "ghost-battle:demo-v1",
+      id: "ghost-battle:demo-v2",
       type: GHOST_TYPE,
       timestamp: Date.now(),
       read: false,

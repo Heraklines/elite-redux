@@ -190,6 +190,16 @@ class NotificationManager {
     }
   }
 
+  /** Remove a single notification by id (e.g. to retire a superseded demo entry). */
+  remove(id: string): void {
+    this.load();
+    const next = this.items.filter(x => x.id !== id);
+    if (next.length !== this.items.length) {
+      this.items = next;
+      this.persist();
+    }
+  }
+
   markAllRead(): void {
     this.load();
     let changed = false;

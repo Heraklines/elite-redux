@@ -303,11 +303,11 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     const def = notificationManager.getType(n.type);
     const detail = def?.detail?.(n);
     const summary = def ? def.summary(n) : n.type;
-    const title = this.clipInbox(detail?.title ?? summary, 30);
+    const title = this.clipInbox(detail?.title ?? summary, 36);
     const isGhost = detail?.customView === "ghost-battle";
 
     const w = 150;
-    const h = isGhost ? 96 : 74;
+    const h = isGhost ? 104 : 74;
     // Centre in the open left region (the title menu occupies the right side).
     const cx = Math.round(globalScene.scaledCanvas.width * 0.33);
     const cy = Math.round(globalScene.scaledCanvas.height * 0.52);
@@ -318,10 +318,10 @@ export class TitleUiHandler extends OptionSelectUiHandler {
 
     const left = -w / 2 + 8;
     let y = -h / 2 + 6;
-    const titleText = addTextObject(left, y, title, TextStyle.WINDOW, { fontSize: "60px" }).setOrigin(0, 0);
+    const titleText = addTextObject(left, y, title, TextStyle.WINDOW, { fontSize: "54px" }).setOrigin(0, 0);
     titleText.setColor("#ffe066");
     panel.add(titleText);
-    y += 14;
+    y += 13;
 
     if (isGhost) {
       const d = n.data as { beaten?: number; ghostTeam?: unknown; victimTeam?: unknown };
