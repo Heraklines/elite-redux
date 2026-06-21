@@ -1,0 +1,271 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Avast/148.0.0.0
+mode:     0  wave:174  difficulty:youngster
+seed:     OCsR9Wa4om5OPwh9BQqaPceO
+party:    Zacian(L174 578/578), Zebstrika(L174 525/525), Dewgong(L172 543/543), Staraptor(L174 265/530), Furret(L170 263/521), Celesteela(L169 554/554)
+
+----- DESCRIPTION -----
+Zacian-Crownd seems to be vanilla pokerogue version
+
+----- CONSOLE -----
+[08:19:46.119] LOG: %cStart Phase PostSummonPhase color:green;
+[08:19:46.119] LOG: Ran PSP for: Zebstrika
+[08:19:46.120] LOG: %cStart Phase PostSummonPhase color:green;
+[08:19:46.120] LOG: %cStart Phase PostSummonPhase color:green;
+[08:19:46.120] LOG: %cStart Phase TurnInitPhase color:green;
+[08:19:46.120] LOG: %cStart Phase CommandPhase color:green;
+[08:19:50.550] LOG: Move: FROST_BRAND Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Zacian
+[08:19:50.551] LOG: %cStart Phase SelectTargetPhase color:green;
+[08:19:51.710] LOG: %cStart Phase CommandPhase color:green;
+[08:19:52.432] LOG: %cStart Phase CommandPhase color:green;
+[08:19:54.230] LOG: Move: FROST_BRAND Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Zacian
+[08:19:54.231] LOG: %cStart Phase SelectTargetPhase color:green;
+[08:19:54.926] LOG: %cStart Phase CommandPhase color:green;
+[08:19:55.478] LOG: Move: SUPERCELL_SLAM Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Zebstrika
+[08:19:55.479] LOG: %cStart Phase SelectTargetPhase color:green;
+[08:19:56.254] LOG: %cStart Phase EnemyCommandPhase color:green;
+[08:19:56.264] LOG: Battle Seed: lUkCeCrEX3ZO1KQl
+[08:19:56.268] LOG: Move Pool: ["Leaf Storm","Return","Venoshock","Camouflage"]
+[08:19:56.268] LOG: Move Scores: [14.625,20,19.5,0]
+[08:19:56.268] LOG: Sorted Move Pool: ["Return","Venoshock","Leaf Storm","Camouflage"]
+[08:19:56.268] LOG: Chosen Move: Venoshock
+[08:19:56.268] LOG: %cStart Phase EnemyCommandPhase color:green;
+[08:19:56.281] LOG: Move Pool: ["Aeroblast","Double-Edge","Moonblast","Mimic"]
+[08:19:56.281] LOG: Move Scores: [16.5,19,15,-20]
+[08:19:56.281] LOG: Sorted Move Pool: ["Double-Edge","Aeroblast","Moonblast","Mimic"]
+[08:19:56.281] LOG: Chosen Move: Aeroblast
+[08:19:56.281] LOG: %cStart Phase TurnStartPhase color:green;
+[08:19:56.289] LOG: %cStart Phase MovePhase color:green;
+[08:19:56.289] LOG: %cUser: Zacian
+Move: FROST_BRAND
+Use Mode: NORMAL color:orchid
+[08:19:56.294] LOG: %cStart Phase MessagePhase color:green;
+[08:19:56.455] LOG: %cStart Phase MoveEffectPhase color:green;
+[08:19:56.655] LOG: crit stage: +0
+[08:19:56.656] LOG: Move: Frost Brand | Base damage: 853.9523265306121 | Power: 80 | Source attack: 1822 | Target defense: 245
+[08:19:56.657] LOG: Move: Frost Brand | Attack damage: 2228
+[08:19:56.657] LOG: Applied Shell Bell 
+[08:19:56.657] LOG: %cStart Phase DamageAnimPhase color:green;
+[08:19:56.664] LOG: %cStart Phase MessagePhase color:green;
+[08:19:57.031] LOG: %cStart Phase MessagePhase color:green;
+[08:19:57.423] LOG: %cStart Phase FaintPhase color:green;
+[08:19:59.135] LOG: %cStart Phase MessagePhase color:green;
+[08:19:59.359] LOG: %cStart Phase ShowAbilityPhase color:green;
+[08:19:59.663] LOG: %cStart Phase StatStageChangePhase color:green;
+[08:20:00.014] LOG: %cStart Phase MessagePhase color:green;
+[08:20:00.414] LOG: %cStart Phase HideAbilityPhase color:green;
+[08:20:00.456] LOG: %cStart Phase VictoryPhase color:green;
+[08:20:00.456] LOG: Applied Soothe Bell 
+[08:20:00.456] LOG: %cStart Phase ExpPhase color:green;
+[08:20:00.456] LOG: Applied Super EXP. Charm 
+[08:20:00.456] LOG: Applied EXP. Charm 
+[08:20:00.761] LOG: %cStart Phase LevelUpPhase color:green;
+[08:20:00.761] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[08:20:00.761] LOG: Applied Super EXP. Charm 
+[08:20:00.761] LOG: Applied EXP. Charm 
+[08:20:00.761] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[08:20:00.761] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[08:20:00.761] LOG: Applied Super EXP. Charm 
+[08:20:00.761] LOG: Applied EXP. Charm 
+[08:20:00.761] LOG: %cStart Phase LevelUpPhase color:green;
+[08:20:00.761] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[08:20:00.761] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[08:20:00.762] LOG: Applied Super EXP. Charm 
+[08:20:00.762] LOG: Applied EXP. Charm 
+[08:20:00.762] LOG: %cStart Phase LevelUpPhase color:green;
+[08:20:00.762] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[08:20:00.762] LOG: %cStart Phase MoveEndPhase color:green;
+[08:20:00.763] LOG: %cStart Phase MovePhase color:green;
+[08:20:00.763] LOG: %cUser: Zebstrika
+Move: SUPERCELL_SLAM
+Use Mode: NORMAL color:orchid
+[08:20:00.765] LOG: %cStart Phase MessagePhase color:green;
+[08:20:00.985] LOG: %cStart Phase MoveEffectPhase color:green;
+[08:20:00.986] LOG: Applied Wide Lens 
+[08:20:01.436] LOG: crit stage: +0
+[08:20:01.437] LOG: Move: Supercell Slam | Base damage: 226.50036363636366 | Power: 120 | Source attack: 436 | Target defense: 330
+[08:20:01.437] LOG: Move: Supercell Slam | Attack damage: 659
+[08:20:01.437] LOG: %cStart Phase DamageAnimPhase color:green;
+[08:20:01.444] LOG: %cStart Phase MessagePhase color:green;
+[08:20:01.836] LOG: %cStart Phase FaintPhase color:green;
+[08:20:04.285] LOG: %cStart Phase MessagePhase color:green;
+[08:20:04.398] LOG: %cStart Phase ShowAbilityPhase color:green;
+[08:20:04.702] LOG: %cStart Phase StatStageChangePhase color:green;
+[08:20:05.053] LOG: %cStart Phase MessagePhase color:green;
+[08:20:05.452] LOG: %cStart Phase HideAbilityPhase color:green;
+[08:20:05.494] LOG: %cStart Phase VictoryPhase color:green;
+[08:20:05.494] LOG: Applied Soothe Bell 
+[08:20:05.494] LOG: %cStart Phase ExpPhase color:green;
+[08:20:05.494] LOG: Applied Super EXP. Charm 
+[08:20:05.494] LOG: Applied EXP. Charm 
+[08:20:05.646] LOG: 5134545 5270302 5268024
+[08:20:05.803] LOG: %cStart Phase LevelUpPhase color:green;
+[08:20:05.803] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[08:20:05.803] LOG: Applied Super EXP. Charm 
+[08:20:05.803] LOG: Applied EXP. Charm 
+[08:20:05.804] LOG: %cStart Phase LevelUpPhase color:green;
+[08:20:05.804] LOG: Applied Calcium 
+[08:20:05.804] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[08:20:05.804] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[08:20:05.804] LOG: Applied Super EXP. Charm 
+[08:20:05.804] LOG: Applied EXP. Charm 
+[08:20:05.804] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[08:20:05.804] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[08:20:05.804] LOG: Applied Super EXP. Charm 
+[08:20:05.804] LOG: Applied EXP. Charm 
+[08:20:05.804] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[08:20:05.804] LOG: %cStart Phase MoveEndPhase color:green;
+[08:20:05.804] LOG: %cStart Phase MovePhase color:green;
+[08:20:05.804] LOG: %cStart Phase MoveEndPhase color:green;
+[08:20:05.804] LOG: %cStart Phase MovePhase color:green;
+[08:20:05.804] LOG: %cStart Phase MoveEndPhase color:green;
+[08:20:05.804] LOG: %cStart Phase CheckInterludePhase color:green;
+[08:20:05.804] LOG: %cStart Phase WeatherEffectPhase color:green;
+[08:20:05.804] LOG: %cStart Phase PositionalTagPhase color:green;
+[08:20:05.804] LOG: %cStart Phase BerryPhase color:green;
+[08:20:05.805] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[08:20:05.805] LOG: %cStart Phase TurnEndPhase color:green;
+[08:20:05.805] LOG: %cStart Phase BattleEndPhase color:green;
+[08:20:05.805] LOG: Battle Score: 907 (4 Turns x0.79)
+[08:20:05.805] LOG: Total Score: 38618
+[08:20:05.814] LOG: Applied Carbos 
+[08:20:05.814] LOG: Applied Protein 
+[08:20:05.814] LOG: Applied Iron 
+[08:20:05.814] LOG: Applied Zinc 
+[08:20:05.814] LOG: Applied HP Up 
+[08:20:05.814] LOG: Applied Soul Dew 
+[08:20:05.814] LOG: Applied Soul Dew 
+[08:20:05.815] LOG: Applied Calcium 
+[08:20:05.821] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[08:20:05.821] LOG: Breeders Albert & Savannah
+[08:20:06.255] LOG: Breeder Albert
+[08:20:06.735] LOG: Dialogue saved as seen: dialogue:breeder.victory.1
+[08:20:06.735] LOG: %cStart Phase MoneyRewardPhase color:green;
+[08:20:06.735] LOG: Applied Amulet Coin 
+[08:20:06.959] LOG: %cStart Phase EggLapsePhase color:green;
+[08:20:06.960] LOG: %cStart Phase SelectModifierPhase color:green;
+[08:20:06.960] LOG: Wave Seed: üðĠÿæĄĎáĜĚâüýĤĕæïþĞĎýĐĒü 173
+[08:20:06.966] LOG: Applied Golden Poké Ball 
+[08:20:06.966] LOG: 19 7 [2,5,8,9,10,12,16,23]
+[08:20:06.966] LOG: {"id":"MEMORY_MUSHROOM","localeKey":"modifierType:ModifierType.MEMORY_MUSHROOM","iconImage":"big_mushroom","soundName":"se/restore","tier":1} 
+[08:20:06.967] LOG: 7 2 [4,5]
+[08:20:06.967] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[08:20:06.967] LOG: 0 0 [4,5]
+[08:20:06.967] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[08:20:06.967] LOG: 7 2 [4,5]
+[08:20:06.967] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_accuracy","soundName":"se/restore","tier":0,"stat":6,"nameKey":"x_accuracy","quantityKey":"stage"} 
+[08:20:06.967] LOG: 0 0 [4,5]
+[08:20:06.967] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[08:20:06.967] LOG: 9 2 [4,5]
+[08:20:06.967] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_electric","group":"tm","soundName":"se/restore","tier":0,"moveId":148} 
+[08:20:06.967] LOG: 1 0 [2,5,8,9,10,12,16,23]
+[08:20:06.967] LOG: {"id":"PP_UP","localeKey":"modifierType:ModifierType.PP_UP","iconImage":"pp_up","group":"ppUp","soundName":"se/restore","tier":1,"upPoints":1} 
+[08:20:06.968] LOG: 2 0 [4,5]
+[08:20:06.968] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[08:20:06.968] LOG: 7 2 [4,5]
+[08:20:06.968] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_accuracy","soundName":"se/restore","tier":0,"stat":6,"nameKey":"x_accuracy","quantityKey":"stage"} 
+[08:20:06.968] LOG: 7 2 [4,5]
+[08:20:06.968] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[08:20:06.968] LOG: 6 2 [4,5]
+[08:20:06.968] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[08:20:58.771] LOG: %cStart Phase LearnMovePhase color:green;
+[08:21:07.935] LOG: %cStart Phase NewBattlePhase color:green;
+[08:21:07.935] LOG: Wave Seed: ýñġĀçąďâĝěãýþĥĖçðÿğďþđēý 174
+[08:21:07.936] LOG: Starting trainer pool tier: COMMON
+[08:21:07.936] LOG: Applied Lure 
+[08:21:07.936] LOG: Applied Super Lure 
+[08:21:07.937] LOG: %cStart Phase ReturnPhase color:green;
+[08:21:08.139] LOG: %cStart Phase ReturnPhase color:green;
+[08:21:08.343] LOG: %cStart Phase ShowTrainerPhase color:green;
+[08:21:08.543] LOG: %cStart Phase NextEncounterPhase color:green;
+[08:21:08.545] LOG: RARE
+[08:21:08.545] LOG: Sinistcha
+[08:21:08.553] LOG: Pokemon: Foe Sinistcha | Species ID: 1013 | Level: 161 | Nature: Careful (+SpDef/-SpAtk)
+[08:21:08.553] LOG: Stats (IVs): HP: 449 (27), Atk: 223 (30), Def: 354 (20), Spatk: 361 (30), Spdef: 310 (30), Spd: 273 (25)
+[08:21:08.553] LOG: Ability: Ill Will | Passive Ability: Heatproof 
+[08:21:08.553] LOG: Moveset: ["Matcha Gotcha","Raging Souls","Shell Smash","Pain Split"]
+[08:21:08.553] LOG: UNCOMMON
+[08:21:08.553] LOG: Indeedee
+[08:21:08.564] LOG: Pokemon: Foe Indeedee | Species ID: 876 | Level: 161 | Nature: Naive (+Spd/-SpDef)
+[08:21:08.564] LOG: Stats (IVs): HP: 410 (24), Atk: 188 (20), Def: 296 (17), Spatk: 346 (22), Spdef: 338 (27), Spd: 326 (29)
+[08:21:08.564] LOG: Ability: Psychic Surge | Passive Ability: Telekinetic 
+[08:21:08.564] LOG: Moveset: ["Psyshock","Energy Wave","Helping Hand","Calm Mind"]
+[08:21:08.920] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"calcium","soundName":"se/restore","tier":0,"stat":3,"key":"calcium"} (enemy)
+[08:21:08.920] LOG: Applied Calcium (enemy)
+[08:21:08.921] LOG: Generated AI funcs
+[08:21:08.966] DEBUG: Session data saved to slot 3!
+[08:21:08.966] LOG: Wave Seed: ýñġĀçąďâĝěãýþĥĖçðÿğďþđēý 174
+[08:21:09.370] LOG: Restaurant Staff Maxwell & Jan
+[08:21:10.192] LOG: %cStart Phase SummonPhase color:green;
+[08:21:10.192] LOG: Maxwell
+[08:21:10.442] LOG: Applied Calcium (enemy)
+[08:21:10.692] LOG: %cStart Phase SummonPhase color:green;
+[08:21:10.692] LOG: Jan
+[08:21:10.921] LOG: Applied Calcium (enemy)
+[08:21:10.971] WARN: cry/876-female not found
+[08:21:11.171] LOG: %cStart Phase SummonPhase color:green;
+[08:21:11.459] LOG: Applied Carbos 
+[08:21:11.459] LOG: Applied Protein 
+[08:21:11.459] LOG: Applied Iron 
+[08:21:11.459] LOG: Applied Zinc 
+[08:21:11.459] LOG: Applied HP Up 
+[08:21:11.460] LOG: Applied Soul Dew 
+[08:21:11.460] LOG: Applied Soul Dew 
+[08:21:11.460] LOG: Applied Calcium 
+[08:21:11.709] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[08:21:11.710] LOG: %cStart Phase SummonPhase color:green;
+[08:21:11.989] LOG: Applied Carbos 
+[08:21:11.989] LOG: Applied Protein 
+[08:21:11.989] LOG: Applied Iron 
+[08:21:11.989] LOG: Applied Zinc 
+[08:21:11.989] LOG: Applied HP Up 
+[08:21:11.989] LOG: Applied Soul Dew 
+[08:21:11.989] LOG: Applied Soul Dew 
+[08:21:11.990] LOG: Applied Calcium 
+[08:21:12.239] LOG: %cStart Phase ShinySparklePhase color:green;
+[08:21:12.439] LOG: %cStart Phase InitEncounterPhase color:green;
+[08:21:12.441] LOG: %cStart Phase PostSummonPhase color:green;
+[08:21:12.441] LOG: Ran PSP for: Zacian
+[08:21:12.442] LOG: %cStart Phase PostSummonPhase color:green;
+[08:21:12.443] LOG: %cStart Phase ShowAbilityPhase color:green;
+[08:21:12.745] LOG: %cStart Phase StatStageChangePhase color:green;
+[08:21:13.095] LOG: %cStart Phase MessagePhase color:green;
+[08:21:13.507] LOG: %cStart Phase StatStageChangePhase color:green;
+[08:21:13.859] LOG: %cStart Phase MessagePhase color:green;
+[08:21:14.275] LOG: %cStart Phase HideAbilityPhase color:green;
+[08:21:14.322] LOG: %cStart Phase PostSummonPhase color:green;
+[08:21:14.322] LOG: %cStart Phase ShowAbilityPhase color:green;
+[08:21:14.630] LOG: %cStart Phase StatStageChangePhase color:green;
+[08:21:14.981] LOG: %cStart Phase MessagePhase color:green;
+[08:21:15.371] LOG: %cStart Phase HideAbilityPhase color:green;
+[08:21:15.415] LOG: %cStart Phase PostSummonPhase color:green;
+[08:21:15.415] LOG: Ran PSP for: Zebstrika
+[08:21:15.416] LOG: %cStart Phase PostSummonPhase color:green;
+[08:21:15.417] LOG: %cStart Phase PostSummonPhase color:green;
+[08:21:15.418] LOG: %cStart Phase PostSummonPhase color:green;
+[08:21:15.418] LOG: Ran PSP for: Indeedee
+[08:21:15.418] LOG: %cStart Phase PostSummonPhase color:green;
+[08:21:15.423] LOG: %cStart Phase ShowAbilityPhase color:green;
+[08:21:15.726] LOG: %cStart Phase CommonAnimPhase color:green;
+[08:21:16.348] LOG: %cStart Phase MessagePhase color:green;
+[08:21:16.756] LOG: %cStart Phase HideAbilityPhase color:green;
+[08:21:16.799] LOG: %cStart Phase PostSummonPhase color:green;
+[08:21:16.799] LOG: %cStart Phase MovePhase color:green;
+[08:21:16.799] LOG: %cUser: Indeedee
+Move: TELEKINESIS
+Use Mode: INDIRECT color:orchid
+[08:21:16.803] LOG: %cStart Phase MessagePhase color:green;
+[08:21:17.023] LOG: %cStart Phase MoveEffectPhase color:green;
+[08:21:17.037] LOG: %cStart Phase MessagePhase color:green;
+[08:21:17.465] LOG: %cStart Phase MoveEndPhase color:green;
+[08:21:17.465] LOG: %cStart Phase PostSummonPhase color:green;
+[08:21:17.465] LOG: Ran PSP for: Sinistcha
+[08:21:17.466] LOG: %cStart Phase PostSummonPhase color:green;
+[08:21:17.466] LOG: %cStart Phase PostSummonPhase color:green;
+[08:21:17.466] LOG: %cStart Phase TurnInitPhase color:green;
+[08:21:17.466] LOG: %cStart Phase CommandPhase color:green;
