@@ -580,6 +580,35 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Abilities — Corrosion makes the holder's Poison moves SE vs Steel
+  // ===========================================================================
+  {
+    label: "Corrosion: Poison moves are super effective vs Steel",
+    description:
+      "ER Corrosion fix (dex 212: 'Poison is super effective vs Steel. Can poison any\n"
+      + "type.'). Your Roselia has Corrosion and Acid Spray; the enemy is Skarmory\n"
+      + "(Steel/Flying). DO: use ACID SPRAY on the Skarmory. EXPECT: it's SUPER EFFECTIVE\n"
+      + "(big damage, 'It's super effective!'), NOT 'It doesn't affect Skarmory'. Before\n"
+      + "the fix only the status half was wired, so Poison damaging moves still did 0 to\n"
+      + "Steel even with Corrosion. (Your Sludge Bomb is SE too; Tackle stays resisted.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 60,
+        ABILITY_OVERRIDE: AbilityId.CORROSION,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SKARMORY,
+        ENEMY_LEVEL_OVERRIDE: 55,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.ROSELIA, {
+          moveset: [MoveId.ACID_SPRAY, MoveId.SLUDGE_BOMB, MoveId.GIGA_DRAIN, MoveId.TACKLE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // QoL — level-up Move Learn panel
   // ===========================================================================
   {

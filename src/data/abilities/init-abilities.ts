@@ -187,6 +187,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { GroundedTag } from "#data/battler-tags";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { OffensiveTypeChartOverrideAbAttr } from "#data/elite-redux/archetypes/offensive-type-chart-override";
 import { SpeciesFormChangeAbilityTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
 import { pokemonFormChanges } from "#data/pokemon-forms";
@@ -1559,6 +1560,17 @@ export function initAbilities() {
       .bypassFaint()
       .build(),
     new AbBuilder(AbilityId.CORROSION, 7) //
+      // ER Corrosion (dex 212): "Poison is super effective vs Steel. Can poison any
+      // type." The IgnoreTypeStatusEffectImmunity below is the "poison any type"
+      // half; the OffensiveTypeChartOverride is the headline OFFENSIVE half - the
+      // holder's Poison damaging moves hit Steel for 2x (overriding the 0x
+      // immunity). Without it, e.g. Acid Spray did nothing to Steel even with
+      // Corrosion. Composite abilities that name "Corrosion" as a part inherit this
+      // via resolveCompositePartAttrs (it copies allAbilities[CORROSION].attrs), so
+      // this single source also fixes Molten Down+Corrosion / Thick Fat+Corrosion.
+      .attr(OffensiveTypeChartOverrideAbAttr, {
+        rules: [{ attackType: PokemonType.POISON, defenderType: PokemonType.STEEL, newMultiplier: 2 }],
+      })
       .attr(
         IgnoreTypeStatusEffectImmunityAbAttr,
         [StatusEffect.POISON, StatusEffect.TOXIC],
