@@ -795,6 +795,12 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
     case 976: // Take Flight
       move.attr(ForceSwitchOutAttr, true);
       break;
+    case 807: // Draco Missile - "Hits both foes on the field." The ER target
+      // field is 0 (single target) because the dex entry is half-finished (its
+      // short description literally reads "Not done yet."), but the authoritative
+      // longDescription says it hits both foes, so make it a both-foes spread move.
+      move.target(MoveTarget.ALL_NEAR_ENEMIES);
+      break;
     // ---- Double damage / super-effective vs a specific defender type ----
     // ER's "double damage on X" / "super-effective vs X" — a ×2 power multiplier
     // when the target is of that type (matches the stated damage outcome).

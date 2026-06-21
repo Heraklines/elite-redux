@@ -461,6 +461,37 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Combat — Draco Missile hits both foes (double battle)
+  // ===========================================================================
+  {
+    label: "Draco Missile: hits BOTH foes (doubles)",
+    description:
+      "Draco Missile fix. Its dex entry is half-done (short desc 'Not done yet.', target\n"
+      + "field 0 = single target), but the authoritative longDescription says 'Hits both\n"
+      + "foes on the field', so it must be a spread move. DOUBLE battle; your Salamence\n"
+      + "knows Draco Missile. DO: select DRACO MISSILE. EXPECT: it hits BOTH enemy Pokemon\n"
+      + "at once (before the fix it only hit one).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 60,
+        BATTLE_STYLE_OVERRIDE: "double",
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 30,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SALAMENCE, {
+          moveset: [erMove(ErMoveId.DRAKE_MISSILE), MoveId.DRAGON_CLAW, MoveId.PROTECT, MoveId.ROOST],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.PROTECT, MoveId.IRON_TAIL],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Combat — Mega Vanilluxe Multi-headed strikes 3 times
   // ===========================================================================
   {
