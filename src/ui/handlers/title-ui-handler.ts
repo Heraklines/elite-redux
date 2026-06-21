@@ -3,7 +3,7 @@ import { loggedInUser } from "#app/account";
 import { FAKE_TITLE_LOGO_CHANCE } from "#app/constants";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
-import { isBeta, isDev } from "#constants/app-constants";
+import { ER_VERSION, isBeta, isDev } from "#constants/app-constants";
 import { GHOST_NOTIF_SETTING_KEY, initErNotifications } from "#data/elite-redux/er-ghost-notifications";
 import { getSplashMessages } from "#data/splash-messages";
 import { Button } from "#enums/buttons";
@@ -11,7 +11,6 @@ import { PlayerGender } from "#enums/player-gender";
 import type { SpeciesId } from "#enums/species-id";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
-import { version } from "#package.json";
 import { type ErNotification, notificationManager } from "#system/notifications/notification-manager";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { TimedEventDisplay } from "#ui/event-display";
@@ -483,7 +482,8 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     // cached builds have repeatedly produced "ghost" reports of already-fixed
     // issues. `typeof` guard mirrors init-update-checker (define may be absent).
     const buildId = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "";
-    this.appVersionText.setText("v" + version + betaText + (buildId ? "  build " + buildId : ""));
+    // ER: show the Elite Redux mod version (not the upstream package.json version).
+    this.appVersionText.setText("v" + ER_VERSION + betaText + (buildId ? "  build " + buildId : ""));
 
     const ui = this.getUi();
 

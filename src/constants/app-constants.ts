@@ -19,3 +19,10 @@ export const isApp = import.meta.env.MODE === "app";
 export const IS_TEST = import.meta.env.MODE === "test";
 
 export const bypassLogin = import.meta.env.VITE_BYPASS_LOGIN === "1";
+
+/**
+ * Elite Redux mod version, shown on the title screen instead of the upstream
+ * PokeRogue `package.json` version. Bump this with each player-facing patch
+ * (keep it in sync with the matching `docs/patch-notes/<version>.md`).
+ */
+export const ER_VERSION = "0.0.5.2";
