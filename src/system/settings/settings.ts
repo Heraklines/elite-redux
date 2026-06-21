@@ -183,6 +183,7 @@ export const SettingKeys = {
   Show_Missing_Ribbons: "SHOW_MISSING_RIBBONS",
   Move_Touch_Controls: "MOVE_TOUCH_CONTROLS",
   Shop_Overlay_Opacity: "SHOP_OVERLAY_OPACITY",
+  Ghost_Notifications: "GHOST_NOTIFICATIONS",
 };
 
 export enum MusicPreference {
@@ -649,6 +650,15 @@ export const Setting: Setting[] = [
     type: SettingType.DISPLAY,
   },
   {
+    // ER-custom: gate the title-screen inbox bell's ghost-battle alerts. Literal
+    // label (the shared locales package has no key for this fork-only setting).
+    key: SettingKeys.Ghost_Notifications,
+    label: "Ghost Battle Notifications",
+    options: OFF_ON,
+    default: 1,
+    type: SettingType.GENERAL,
+  },
+  {
     key: SettingKeys.Master_Volume,
     label: i18next.t("settings:masterVolume"),
     options: VOLUME_OPTIONS,
@@ -819,6 +829,9 @@ export function setSetting(setting: string, value: number): boolean {
       break;
     case SettingKeys.Show_BGM_Bar:
       globalScene.showBgmBar = Setting[index].options[value].value === "On";
+      break;
+    case SettingKeys.Ghost_Notifications:
+      globalScene.ghostNotifications = Setting[index].options[value].value === "On";
       break;
     case SettingKeys.Hide_Username:
       globalScene.hideUsername = Setting[index].options[value].value === "On";

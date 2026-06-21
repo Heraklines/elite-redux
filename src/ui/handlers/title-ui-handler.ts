@@ -4,7 +4,7 @@ import { FAKE_TITLE_LOGO_CHANCE } from "#app/constants";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { isBeta, isDev } from "#constants/app-constants";
-import { initErNotifications } from "#data/elite-redux/er-ghost-notifications";
+import { GHOST_NOTIF_SETTING_KEY, initErNotifications } from "#data/elite-redux/er-ghost-notifications";
 import { getSplashMessages } from "#data/splash-messages";
 import { PlayerGender } from "#enums/player-gender";
 import type { SpeciesId } from "#enums/species-id";
@@ -122,7 +122,11 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     // + system) and drop a bell at top-right (below the username/playercount
     // labels). Type-agnostic - the bell renders whatever the manager holds.
     initErNotifications();
-    this.notificationBell = new NotificationBell(scaledWidth - 2, 28, () => true);
+    // Predicate bridges a type's settingKey to the live scene toggle. Unknown
+    // keys default to enabled, so a new notification type shows until it opts in.
+    this.notificationBell = new NotificationBell(scaledWidth - 2, 28, key =>
+      key === GHOST_NOTIF_SETTING_KEY ? globalScene.ghostNotifications !== false : true,
+    );
     this.titleContainer.add(this.notificationBell);
   }
 

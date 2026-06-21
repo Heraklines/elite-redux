@@ -248,6 +248,8 @@ export class BattleScene extends SceneBase {
   public showMovesetFlyout = true;
   public showArenaFlyout = true;
   public showTimeOfDayWidget = true;
+  /** ER: gate ghost-battle notifications (the inbox bell). Set via the GENERAL setting. */
+  public ghostNotifications = true;
   public timeOfDayAnimation: EaseType = EaseType.NONE;
   public showLevelUpStats = true;
   public enableTutorials: boolean = import.meta.env.VITE_BYPASS_TUTORIAL === "1";
