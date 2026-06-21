@@ -126,15 +126,17 @@ export function initErNotifications(): void {
   });
   notificationManager.registerSource(GHOST_TYPE, fetchGhostNotifications, GHOST_NOTIF_SETTING_KEY);
 
-  // Retire the pre-icon demo from earlier builds (it had names but no speciesId,
-  // so the team icons could not render). Safe no-op once it is gone.
+  // Retire sample notifications from earlier builds so players who already loaded a
+  // staging/demo build start clean. The inbox MUST be empty for players on first
+  // use - the only seeded entry now is the staging-only demo below.
   notificationManager.remove("ghost-battle:demo-v1");
+  notificationManager.remove("system:welcome-v1");
 
-  // Seed the welcome (+ staging demo) ONCE per user. Without this guard they would
-  // re-appear on every title visit and "Clear all" could never stick. Per-user key
-  // (this runs once logged in) so each account is seeded independently.
+  // Seed the staging demo ONCE per user. Without this guard it would re-appear on
+  // every title visit and "Clear all" could never stick. Per-user key (this runs
+  // once logged in) so each account is seeded independently.
   const user = loggedInUser?.username ?? "guest";
-  const seededKey = `er-notif-seeded-v3_${user}`;
+  const seededKey = `er-notif-seeded-v4_${user}`;
   let seeded = false;
   try {
     seeded = typeof localStorage !== "undefined" && localStorage.getItem(seededKey) === "1";
@@ -144,17 +146,6 @@ export function initErNotifications(): void {
   if (seeded) {
     return;
   }
-
-  notificationManager.push({
-    id: "system:welcome-v1",
-    type: SYSTEM_TYPE,
-    timestamp: Date.now(),
-    read: false,
-    data: {
-      title: "Notifications are here",
-      body: "Your ghost's battle results show up here, plus other news. You can toggle ghost alerts in Settings.",
-    },
-  });
 
   // Staging/dev ONLY: a SAMPLE ghost-battle notification so the team can see
   // exactly how a real one looks (summary + team comparison) before live data

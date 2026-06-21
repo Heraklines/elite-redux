@@ -184,6 +184,7 @@ export const SettingKeys = {
   Move_Touch_Controls: "MOVE_TOUCH_CONTROLS",
   Shop_Overlay_Opacity: "SHOP_OVERLAY_OPACITY",
   Ghost_Notifications: "GHOST_NOTIFICATIONS",
+  Day_Night_Tint: "DAY_NIGHT_TINT",
 };
 
 export enum MusicPreference {
@@ -659,6 +660,16 @@ export const Setting: Setting[] = [
     type: SettingType.GENERAL,
   },
   {
+    // ER-custom: when Off, the field keeps daytime brightness (no dusk/night
+    // darkening) and the time-of-day icon shows so you still know the time.
+    // Literal label (the shared locales package has no key for this setting).
+    key: SettingKeys.Day_Night_Tint,
+    label: "Day/Night Tint",
+    options: OFF_ON,
+    default: 1,
+    type: SettingType.DISPLAY,
+  },
+  {
     key: SettingKeys.Master_Volume,
     label: i18next.t("settings:masterVolume"),
     options: VOLUME_OPTIONS,
@@ -832,6 +843,9 @@ export function setSetting(setting: string, value: number): boolean {
       break;
     case SettingKeys.Ghost_Notifications:
       globalScene.ghostNotifications = Setting[index].options[value].value === "On";
+      break;
+    case SettingKeys.Day_Night_Tint:
+      globalScene.dayNightTint = Setting[index].options[value].value === "On";
       break;
     case SettingKeys.Hide_Username:
       globalScene.hideUsername = Setting[index].options[value].value === "On";

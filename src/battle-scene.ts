@@ -248,6 +248,8 @@ export class BattleScene extends SceneBase {
   public showMovesetFlyout = true;
   public showArenaFlyout = true;
   public showTimeOfDayWidget = true;
+  /** ER: when false, the field stays at daytime brightness (no dusk/night darkening). */
+  public dayNightTint = true;
   /** ER: gate ghost-battle notifications (the inbox bell). Set via the GENERAL setting. */
   public ghostNotifications = true;
   public timeOfDayAnimation: EaseType = EaseType.NONE;

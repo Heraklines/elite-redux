@@ -49,8 +49,11 @@ export class TimeOfDayWidget extends Phaser.GameObjects.Container {
   constructor(x = 0, y = 0) {
     super(globalScene, x, y);
 
-    this.setVisible(globalScene.showTimeOfDayWidget);
-    if (!globalScene.showTimeOfDayWidget) {
+    // ER: also surface the time icon when the day/night tint is OFF, since the
+    // screen no longer changes colour to signal the time of day.
+    const showWidget = globalScene.showTimeOfDayWidget || globalScene.dayNightTint === false;
+    this.setVisible(showWidget);
+    if (!showWidget) {
       return;
     }
 

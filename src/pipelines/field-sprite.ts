@@ -36,9 +36,16 @@ export class FieldSpritePipeline extends Phaser.Renderer.WebGL.Pipelines.MultiPi
     const ignoreTimeTint = !!data["ignoreTimeTint"];
     const terrainColorRatio = (data["terrainColorRatio"] as number) ?? 0;
 
-    const time = globalScene.currentBattle?.waveIndex
-      ? ((globalScene.currentBattle.waveIndex + globalScene.waveCycleOffset) % 40) / 40 // ((new Date().getSeconds() * 1000 + new Date().getMilliseconds()) % 10000) / 10000
-      : getCurrentTime();
+    // ER: when the player turns the day/night tint off, pin the visual time to
+    // daytime (~0.1) so dusk/night never darken the screen. Only the SHADER time
+    // is overridden here - the real time of day (encounters, abilities) is
+    // untouched.
+    const time =
+      globalScene.dayNightTint === false
+        ? 0.1
+        : globalScene.currentBattle?.waveIndex
+          ? ((globalScene.currentBattle.waveIndex + globalScene.waveCycleOffset) % 40) / 40 // ((new Date().getSeconds() * 1000 + new Date().getMilliseconds()) % 10000) / 10000
+          : getCurrentTime();
 
     this.set1f("time", time)
       .setBoolean("ignoreTimeTint", ignoreTimeTint)
