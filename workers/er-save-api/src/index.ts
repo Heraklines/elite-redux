@@ -617,6 +617,8 @@ async function handleRunCreate(
     killedByGhost?: unknown;
     ghostSourceName?: unknown;
     ghostSourceRunId?: unknown;
+    /** ER ghost notifications: every ghost this run fought (additive/optional). */
+    ghostsFought?: unknown;
   };
   try {
     run = JSON.parse(raw);
@@ -661,7 +663,117 @@ async function handleRunCreate(
       typeof run.ghostSourceRunId === "string" ? run.ghostSourceRunId : null,
     )
     .run();
+  // ER ghost notifications (ADDITIVE): record every ghost this run fought so the
+  // ghost's OWNER can read it back on login. Old clients omit `ghostsFought`, so
+  // this no-ops for them. Best-effort + isolated table — a failure here must NEVER
+  // affect the run save above (already committed) or `saves`.
+  await recordGhostBattles(env, id, auth.u, run.ghostsFought);
   return text("", 200, cors);
+}
+
+/** Lazily create the (isolated) ghost-battle log. Mirrors the devtest_events pattern. */
+async function ensureGhostBattlesTable(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS ghost_battles (
+       id INTEGER PRIMARY KEY AUTOINCREMENT,
+       ghost_owner TEXT NOT NULL,
+       owner_run_id TEXT,
+       victim TEXT NOT NULL,
+       victim_run_id TEXT NOT NULL,
+       beaten_count INTEGER NOT NULL DEFAULT 0,
+       ended_run INTEGER NOT NULL DEFAULT 0,
+       created_at INTEGER NOT NULL
+     )`,
+  ).run();
+  await env.DB.prepare(
+    "CREATE INDEX IF NOT EXISTS idx_ghost_battles_owner ON ghost_battles (ghost_owner, created_at)",
+  ).run();
+}
+
+/** Write one ghost_battles row per ghost the victim fought. Best-effort (swallows errors). */
+async function recordGhostBattles(env: Env, victimRunId: string, victim: string, ghostsFought: unknown): Promise<void> {
+  try {
+    if (!Array.isArray(ghostsFought) || ghostsFought.length === 0) {
+      return;
+    }
+    const entries = ghostsFought
+      .filter(
+        (e): e is { owner: string; ownerRunId?: unknown; beaten?: unknown; endedRun?: unknown } =>
+          !!e && typeof e === "object" && typeof (e as { owner?: unknown }).owner === "string",
+      )
+      .slice(0, 12);
+    if (entries.length === 0) {
+      return;
+    }
+    await ensureGhostBattlesTable(env);
+    const now = Date.now();
+    const stmt = env.DB.prepare(
+      `INSERT INTO ghost_battles (ghost_owner, owner_run_id, victim, victim_run_id, beaten_count, ended_run, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+    );
+    await env.DB.batch(
+      entries.map(e =>
+        stmt.bind(
+          e.owner,
+          typeof e.ownerRunId === "string" ? e.ownerRunId : null,
+          victim,
+          victimRunId,
+          typeof e.beaten === "number" && Number.isFinite(e.beaten) ? Math.max(0, Math.trunc(e.beaten)) : 0,
+          e.endedRun === true ? 1 : 0,
+          now,
+        ),
+      ),
+    );
+  } catch (err) {
+    console.error("er-save-api recordGhostBattles (non-fatal):", err);
+  }
+}
+
+/**
+ * ER ghost notifications: the battles where the CALLER's ghost fought another
+ * player, since `?since=<ts>` (the client tracks last-seen locally — no write).
+ * Joins each row to the victim's team and the ghost's team for the comparison.
+ */
+async function handleGhostNotifications(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const sinceParsed = Number.parseInt(url.searchParams.get("since") ?? "", 10);
+  const since = Number.isFinite(sinceParsed) ? Math.max(sinceParsed, 0) : 0;
+  await ensureGhostBattlesTable(env);
+  const { results } = await env.DB.prepare(
+    `SELECT gb.victim, gb.beaten_count, gb.ended_run, gb.created_at,
+            v.player_team AS victim_team, o.player_team AS ghost_team
+       FROM ghost_battles gb
+       LEFT JOIN runs v ON v.id = gb.victim_run_id
+       LEFT JOIN runs o ON o.id = gb.owner_run_id
+      WHERE gb.ghost_owner = ?1 AND gb.created_at > ?2
+      ORDER BY gb.created_at DESC
+      LIMIT 50`,
+  )
+    .bind(auth.u, since)
+    .all();
+  const safeParse = (s: unknown): unknown => {
+    if (typeof s !== "string") {
+      return null;
+    }
+    try {
+      return JSON.parse(s);
+    } catch {
+      return null;
+    }
+  };
+  const items = (results ?? []).map((r: Record<string, unknown>) => ({
+    victim: r.victim,
+    beaten: r.beaten_count,
+    endedRun: r.ended_run === 1,
+    when: r.created_at,
+    victimTeam: safeParse(r.victim_team),
+    ghostTeam: safeParse(r.ghost_team),
+  }));
+  return json({ items }, 200, cors);
 }
 
 /** Sample winning runs (excluding the caller's own) as ghost-team snapshots. */
@@ -1114,6 +1226,9 @@ export default {
       }
       if (pathname === "/savedata/run/deadliest" && method === "GET") {
         return await handleRunDeadliest(url, auth, env, cors);
+      }
+      if (pathname === "/savedata/run/ghost-notifications" && method === "GET") {
+        return await handleGhostNotifications(url, auth, env, cors);
       }
 
       return text("Not found.", 404, cors);
