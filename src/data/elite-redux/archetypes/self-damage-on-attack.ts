@@ -26,7 +26,9 @@
 // =============================================================================
 
 import { PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
+import { globalScene } from "#app/global-scene";
 import { HitResult } from "#enums/hit-result";
+import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { toDmgValue } from "#utils/common";
 
 export type SelfDamageBasis = "damageDealt" | "maxHp";
@@ -36,20 +38,37 @@ export interface SelfDamageOnAttackOptions {
   readonly basis: SelfDamageBasis;
   /** Fraction of the basis to lose (0.25 = 25%). */
   readonly fraction: number;
+  /**
+   * Marks this instance as the OFFENSIVE half of Soul Linker (332). Soul Linker
+   * is disabled during the Fun and Games (Wobbuffet) minigame - the player taps
+   * the Wobbuffet down to a target HP, and self-recoil there would faint the
+   * player's mon and break the game. Only Soul Linker is suppressed; Super Strain
+   * / Blood Price recoil are unaffected. Self-restoring: works normally after.
+   */
+  readonly soulLink?: boolean;
 }
 
 export class SelfDamageOnAttackAbAttr extends PostAttackAbAttr {
   private readonly basis: SelfDamageBasis;
   private readonly fraction: number;
+  private readonly soulLink: boolean;
 
   constructor(options: SelfDamageOnAttackOptions) {
     super();
     this.basis = options.basis;
     this.fraction = options.fraction;
+    this.soulLink = options.soulLink ?? false;
   }
 
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     const { simulated, damage, pokemon } = params;
+    // Soul Linker is suppressed inside the Fun and Games (Wobbuffet) minigame.
+    if (
+      this.soulLink
+      && globalScene.currentBattle?.mysteryEncounter?.encounterType === MysteryEncounterType.FUN_AND_GAMES
+    ) {
+      return false;
+    }
     // Damaging move (super) + actually connected for damage this hit.
     if (!super.canApply(params) || simulated || damage <= 0) {
       return false;

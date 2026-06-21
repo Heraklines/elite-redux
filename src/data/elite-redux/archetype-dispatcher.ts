@@ -4630,7 +4630,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // holder, AND the holder takes the damage it deals (offensive side).
       return ok([
         new ReflectDamageOnDefendAbAttr(),
-        new SelfDamageOnAttackAbAttr({ basis: "damageDealt", fraction: 1.0 }),
+        new SelfDamageOnAttackAbAttr({ basis: "damageDealt", fraction: 1.0, soulLink: true }),
       ]);
     case 341:
       // Fort Knox — "Blocks most damage boosting and multihit abilities."
