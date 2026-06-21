@@ -142,6 +142,10 @@ export class ErSeedModifier extends PokemonHeldItemModifier {
 export function erSeedItemType(kind: ErSeedKind): ModifierType {
   const cfg = ER_SEED_CONFIG[kind];
   const mt = new PokemonHeldItemModifierType("", cfg.icon, (t, args) => new ErSeedModifier(t, (args[0] as Pokemon).id, kind));
+  // Pin the modifierTypeInitObj id so the seed persists from EVERY grant path
+  // (off-pool grants keep id="" -> typeId="" -> dropped on reload). See the gem
+  // fix in er-elemental-gems.ts. "electricSeed" -> "ER_ELECTRIC_SEED".
+  mt.id = `ER_${kind.replace(/([A-Z])/g, "_$1").toUpperCase()}`;
   Object.defineProperty(mt, "name", { get: () => cfg.name, configurable: true });
   mt.getDescription = () => cfg.description;
   mt.setTier(ER_SEED_TIER);

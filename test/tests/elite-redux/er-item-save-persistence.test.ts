@@ -14,11 +14,11 @@
 // round-trip. This test pins both, with no game init (pure reconstruction).
 // =============================================================================
 
-import { ErGemModifier } from "#data/elite-redux/er-elemental-gems";
+import { ErGemModifier, erGemItemType } from "#data/elite-redux/er-elemental-gems";
 import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
-import { ErReactiveItemModifier } from "#data/elite-redux/er-reactive-items";
+import { ErReactiveItemModifier, erReactiveItemType } from "#data/elite-redux/er-reactive-items";
 import { ErAssaultVestModifier } from "#data/elite-redux/er-recreated-items";
-import { ErSeedModifier } from "#data/elite-redux/er-terrain-seeds";
+import { ErSeedModifier, erSeedItemType } from "#data/elite-redux/er-terrain-seeds";
 import { PokemonType } from "#enums/pokemon-type";
 import type { ModifierType } from "#modifiers/modifier-type";
 import { describe, expect, it } from "vitest";
@@ -55,6 +55,20 @@ describe("ER held-item save persistence", () => {
     expect(restored.pokemonId).toBe(123);
     expect(restored.gemType).toBe(PokemonType.WATER);
     expect(restored.matchType(original)).toBe(true);
+  });
+
+  it("pins the modifierType id (ER_*) so items persist from EVERY grant path, not just rewards", () => {
+    // The class registry above only matters once toModifier gets past its
+    // getModifierTypeFuncById(typeId) guard. These builders used id="", so an
+    // off-pool grant (loot/event) saved typeId="" and the load dropped it (the
+    // "gems vanish for some people" report). Each id must equal its
+    // modifierTypeInitObj key.
+    expect(erGemItemType(PokemonType.FIRE).id).toBe("ER_FIRE_GEM");
+    expect(erGemItemType(PokemonType.WATER).id).toBe("ER_WATER_GEM");
+    expect(erSeedItemType("electricSeed").id).toBe("ER_ELECTRIC_SEED");
+    expect(erSeedItemType("grassySeed").id).toBe("ER_GRASSY_SEED");
+    expect(erReactiveItemType("cellBattery").id).toBe("ER_CELL_BATTERY");
+    expect(erReactiveItemType("weaknessPolicy").id).toBe("ER_WEAKNESS_POLICY");
   });
 
   it("round-trips Assault Vest WITHOUT the StatBooster stats leaking into stackCount", () => {

@@ -127,6 +127,12 @@ export function erGemItemType(type: PokemonType): ModifierType {
     erGemTextureKey(type),
     (t, args) => new ErGemModifier(t, (args[0] as Pokemon).id, type),
   );
+  // Pin the modifierTypeInitObj id (ER_<TYPE>_GEM) so the gem persists across
+  // reload from EVERY grant path. Reward-pool grants get their id stamped by the
+  // reward-screen fix-up, but gems handed out off-pool (mineral loot, events,
+  // direct grants) keep id="" -> ModifierData records typeId="" -> the load drops
+  // them (this is why gems vanished only "for some people"). Mirrors the relic fix.
+  mt.id = `ER_${PokemonType[type]}_GEM`;
   const name = gemName(type);
   Object.defineProperty(mt, "name", { get: () => name, configurable: true });
   mt.getDescription = () =>

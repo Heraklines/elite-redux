@@ -188,6 +188,10 @@ export function erReactiveItemType(kind: ErReactiveKind): ModifierType {
     cfg.icon,
     (t, args) => new ErReactiveItemModifier(t, (args[0] as Pokemon).id, kind),
   );
+  // Pin the modifierTypeInitObj id so the item persists from EVERY grant path
+  // (off-pool grants keep id="" -> typeId="" -> dropped on reload). See the gem
+  // fix in er-elemental-gems.ts. "cellBattery" -> "ER_CELL_BATTERY".
+  type.id = `ER_${kind.replace(/([A-Z])/g, "_$1").toUpperCase()}`;
   Object.defineProperty(type, "name", { get: () => cfg.name, configurable: true });
   type.getDescription = () => cfg.description;
   // Pin the tier so the reward UI renders a ball sprite (undefined tier -> blank).
