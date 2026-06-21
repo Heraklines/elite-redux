@@ -3,7 +3,6 @@ import { loggedInUser } from "#app/account";
 import { FAKE_TITLE_LOGO_CHANCE } from "#app/constants";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
-import { type AutoScrollHandle, attachAutoScroll } from "#app/ui/auto-scroll-text";
 import { isBeta, isDev } from "#constants/app-constants";
 import { GHOST_NOTIF_SETTING_KEY, initErNotifications } from "#data/elite-redux/er-ghost-notifications";
 import { getSplashMessages } from "#data/splash-messages";
@@ -41,7 +40,6 @@ export class TitleUiHandler extends OptionSelectUiHandler {
   private inboxHighlight: Phaser.GameObjects.Rectangle;
   private inboxFocused = false;
   private inboxDetail: Phaser.GameObjects.Container | undefined;
-  private inboxDetailScroll: AutoScrollHandle | undefined;
   private detailOpen = false;
 
   private titleStatsTimer: NodeJS.Timeout | null;
@@ -322,15 +320,11 @@ export class TitleUiHandler extends OptionSelectUiHandler {
       y += 11;
       this.renderTeamIcons(d.victimTeam, left + 4, y + 7, panel);
     } else {
-      // Text-only detail (welcome / system). Auto-scroll if it overflows the box.
+      // Text-only detail (welcome / system): wrapped text inside the panel.
       const body = detail?.body ?? "";
-      const boxW = w - 16;
-      const boxH = h - 22;
       const bodyText = addTextObject(left, y, body, TextStyle.WINDOW, { fontSize: "54px" }).setOrigin(0, 0);
-      bodyText.setWordWrapWidth(boxW * 6);
+      bodyText.setWordWrapWidth((w - 16) * 6);
       panel.add(bodyText);
-      this.inboxDetailScroll = attachAutoScroll(bodyText, cx - w / 2 + 8, cy - h / 2 + 6 + 14, boxW, boxH);
-      this.inboxDetailScroll.refresh();
     }
 
     panel.add(addTextObject(0, h / 2 - 9, "B: Back", TextStyle.WINDOW, { fontSize: "54px" }).setOrigin(0.5, 0));
@@ -367,8 +361,6 @@ export class TitleUiHandler extends OptionSelectUiHandler {
   }
 
   private closeInboxDetail(): void {
-    this.inboxDetailScroll?.stop();
-    this.inboxDetailScroll = undefined;
     this.inboxDetail?.destroy();
     this.inboxDetail = undefined;
     this.detailOpen = false;
