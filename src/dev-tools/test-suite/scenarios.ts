@@ -47,6 +47,7 @@ import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
+import { TimeOfDay } from "#enums/time-of-day";
 import { WeatherType } from "#enums/weather-type";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { ModifierOverride } from "#modifiers/modifier-type";
@@ -367,6 +368,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [
         makeStarter(SpeciesId.WEAVILE, {
           moveset: [MoveId.THROAT_CHOP, MoveId.ICE_SHARD, MoveId.NIGHT_SLASH, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Display — Day/Night Tint toggle (force night so the effect is visible)
+  // ===========================================================================
+  {
+    label: "Day/Night Tint toggle (forced night)",
+    description:
+      "Day/Night Tint setting. This battle is forced to NIGHT so the effect is\n"
+      + "visible. DO: open Settings > Display > Day/Night Tint and flip it. EXPECT:\n"
+      + "ON = the field is dark (night); OFF = the field snaps to daytime brightness\n"
+      + "and stays bright, and the time-of-day icon appears (open the arena/weather\n"
+      + "flyout to see it). The toggle should take effect immediately, no reload.\n"
+      + "(Real time of day is unchanged - only the screen tint.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        TIME_OF_DAY_OVERRIDE: TimeOfDay.NIGHT,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.SURF],
         }),
       ];
     },
