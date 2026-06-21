@@ -54,6 +54,7 @@ import {
   erTunedFactoryTeamPct,
 } from "#data/elite-redux/er-trainer-tuning";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { erBattleFormDumpToBaseSpeciesId } from "#data/elite-redux/init-elite-redux-er-custom-form-changes";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { ER_MEGA_STONE_NAME_BY_ITEM } from "#data/elite-redux/er-mega-stone-item-ids";
 import { maybeAssignErResistBerry } from "#data/elite-redux/er-resist-berries";
@@ -467,7 +468,13 @@ function buildErEnemyFromMember(
   index: number,
   member: ErPartyMemberRegistered,
 ): EnemyPokemon | null {
-  const species = getPokemonSpecies(member.speciesId);
+  // ER battle-FORM dump species (e.g. Wispywaspy Hivemind) are not real standalone
+  // battlers - they have no usable learnset, so a trainer fielding one spawns a mon
+  // with no moves that only Struggles. Spawn the BASE species instead; it has a
+  // real moveset + the form-change innate (Locust Swarm) that schools it into the
+  // alternate form (the "hivemind" form is injected on the base).
+  const spawnSpeciesId = erBattleFormDumpToBaseSpeciesId(member.speciesId) ?? member.speciesId;
+  const species = getPokemonSpecies(spawnSpeciesId);
   if (!species) {
     return null;
   }

@@ -665,6 +665,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "Wispywaspy School: Hivemind form (Locust Swarm) + trainer fix",
+    description:
+      "Wispywaspy School (Locust Swarm). Per the dex 'Changes into Hivemind form until\n"
+      + "1/4 HP or less': it is the strong HIVEMIND form while ABOVE 1/4 HP and reverts to\n"
+      + "the base form at/below 1/4. DO: at high HP take a hit (Blissey's weak Water Gun)\n"
+      + "and watch it school to HIVEMIND; then drop it below 1/4 HP and watch it REVERT.\n"
+      + "Trainer fix (the reported bug): gym leaders used to field the Hivemind DUMP\n"
+      + "species directly - no moves, only Struggle. They now spawn base Wispywaspy with a\n"
+      + "real moveset, which schools, so a gym Wispywaspy fights normally.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 60,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.LOCUST_SWARM),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 20,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.WATER_GUN],
+      });
+      return [
+        makeStarter(erSpecies(ErSpeciesId.WISPYWASPY), {
+          moveset: [MoveId.LICK, MoveId.BUG_BITE, MoveId.PROTECT, MoveId.REST],
+        }),
+      ];
+    },
+  },
   // ===========================================================================
   // QoL — level-up Move Learn panel
   // ===========================================================================

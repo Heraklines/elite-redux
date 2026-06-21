@@ -175,6 +175,35 @@ const ER_CUSTOM_FORM_SPECS: readonly ErCustomFormSpec[] = [
   },
 ];
 
+/** Lazily-built map: an ER battle-FORM dump species pk id -> its BASE species pk id. */
+let ER_BATTLE_FORM_DUMP_TO_BASE: Map<number, number> | null = null;
+/**
+ * For an ER battle-FORM dump species (the standalone source species ER ships for
+ * an alternate form - Wispywaspy Hivemind, Darmanitan Blunder, Mimikyu Busted),
+ * return the BASE species id it should be SPAWNED as; `undefined` for anything
+ * else. These dumps are not real standalone battlers - their learnset is the
+ * form's, not a usable one, so a trainer/encounter that fields one directly gets
+ * a mon with no real moves that only Struggles (the live Wispywaspy Hivemind
+ * report). Spawning the BASE instead gives it a real moveset + the form-change
+ * innate (Locust Swarm / Battle Bond / Disguise) that puts it into the alternate
+ * form in battle (the "hivemind" form is injected on the BASE by this module).
+ * Derived from {@linkcode ER_CUSTOM_FORM_SPECS}, resolved through ER_ID_MAP.species.
+ */
+export function erBattleFormDumpToBaseSpeciesId(speciesId: number): number | undefined {
+  if (ER_BATTLE_FORM_DUMP_TO_BASE === null) {
+    const map = new Map<number, number>();
+    for (const spec of ER_CUSTOM_FORM_SPECS) {
+      const dump = ER_ID_MAP.species[spec.sourceErId];
+      const base = ER_ID_MAP.species[spec.baseErId];
+      if (dump !== undefined && base !== undefined && dump !== base) {
+        map.set(dump, base);
+      }
+    }
+    ER_BATTLE_FORM_DUMP_TO_BASE = map;
+  }
+  return ER_BATTLE_FORM_DUMP_TO_BASE.get(speciesId);
+}
+
 /** Per-spec outcome detail (surfaced for diagnostics / tests). */
 export interface ErCustomFormChangeDetail {
   readonly baseSpeciesId: number;
