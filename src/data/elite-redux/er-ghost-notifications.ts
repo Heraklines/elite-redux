@@ -12,6 +12,7 @@
 // =============================================================================
 
 import { bypassLogin } from "#constants/app-constants";
+import { SpeciesId } from "#enums/species-id";
 import { type ErNotification, notificationManager } from "#system/notifications/notification-manager";
 import { sessionIdKey } from "#utils/common";
 import { getCookie } from "#utils/cookies";
@@ -103,9 +104,12 @@ export function initErNotifications(): void {
     },
     detail(n) {
       const d = n.data as GhostNotifData;
+      // customView tells the inbox UI to render the team comparison as Pokemon
+      // icons (6 vs 6); body stays as a text fallback for any text-only context.
       return {
-        title: `Your ghost ${d.endedRun ? "BEAT" : "fought"} ${d.victim}`,
+        title: `Your ghost ${d.endedRun ? "beat" : "fought"} ${d.victim}`,
         body: `Downed ${d.beaten} of their Pokemon.\n\nYour ghost:\n${teamNames(d.ghostTeam)}\n\nTheir team:\n${teamNames(d.victimTeam)}`,
+        customView: "ghost-battle",
       };
     },
   });
@@ -152,20 +156,20 @@ export function initErNotifications(): void {
         beaten: 3,
         endedRun: false,
         ghostTeam: [
-          { name: "Tyranitar" },
-          { name: "Gengar" },
-          { name: "Dragonite" },
-          { name: "Garchomp" },
-          { name: "Volcarona" },
-          { name: "Azumarill" },
+          { speciesId: SpeciesId.TYRANITAR, name: "Tyranitar" },
+          { speciesId: SpeciesId.GENGAR, name: "Gengar" },
+          { speciesId: SpeciesId.DRAGONITE, name: "Dragonite" },
+          { speciesId: SpeciesId.GARCHOMP, name: "Garchomp" },
+          { speciesId: SpeciesId.VOLCARONA, name: "Volcarona" },
+          { speciesId: SpeciesId.AZUMARILL, name: "Azumarill" },
         ],
         victimTeam: [
-          { name: "Charizard" },
-          { name: "Blastoise" },
-          { name: "Venusaur" },
-          { name: "Snorlax" },
-          { name: "Alakazam" },
-          { name: "Lapras" },
+          { speciesId: SpeciesId.CHARIZARD, name: "Charizard" },
+          { speciesId: SpeciesId.BLASTOISE, name: "Blastoise" },
+          { speciesId: SpeciesId.VENUSAUR, name: "Venusaur" },
+          { speciesId: SpeciesId.SNORLAX, name: "Snorlax" },
+          { speciesId: SpeciesId.ALAKAZAM, name: "Alakazam" },
+          { speciesId: SpeciesId.LAPRAS, name: "Lapras" },
         ],
       } satisfies GhostNotifData,
     });

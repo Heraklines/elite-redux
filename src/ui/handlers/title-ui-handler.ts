@@ -14,6 +14,7 @@ import { UiMode } from "#enums/ui-mode";
 import { version } from "#package.json";
 import { type ErNotification, notificationManager } from "#system/notifications/notification-manager";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
+import { type AutoScrollHandle, attachAutoScroll } from "#ui/auto-scroll-text";
 import { TimedEventDisplay } from "#ui/event-display";
 import { OptionSelectUiHandler } from "#ui/option-select-ui-handler";
 import { addTextObject } from "#ui/text";
@@ -39,6 +40,9 @@ export class TitleUiHandler extends OptionSelectUiHandler {
   private inboxBadge: Phaser.GameObjects.Ellipse;
   private inboxHighlight: Phaser.GameObjects.Rectangle;
   private inboxFocused = false;
+  private inboxDetail: Phaser.GameObjects.Container | undefined;
+  private inboxDetailScroll: AutoScrollHandle | undefined;
+  private detailOpen = false;
 
   private titleStatsTimer: NodeJS.Timeout | null;
 
@@ -185,6 +189,15 @@ export class TitleUiHandler extends OptionSelectUiHandler {
   }
 
   override processInput(button: Button): boolean {
+    // While a notification detail panel is up, any confirm/cancel closes it and
+    // returns to the inbox list; all other input is swallowed.
+    if (this.detailOpen) {
+      if (button === Button.ACTION || button === Button.CANCEL || button === Button.SUBMIT) {
+        this.closeInboxDetail();
+        this.openInbox();
+      }
+      return true;
+    }
     // While the inbox icon is focused, ACTION opens it; DOWN/CANCEL drops back to
     // the menu; everything else is swallowed so the menu cursor doesn't move.
     if (this.inboxFocused) {
@@ -232,7 +245,7 @@ export class TitleUiHandler extends OptionSelectUiHandler {
         handler: () => {
           notificationManager.markRead(n.id);
           this.redrawInbox();
-          globalScene.ui.revertMode().then(() => this.showInboxDetail(n));
+          globalScene.ui.revertMode().then(() => this.openInboxDetail(n));
           return true;
         },
         keepOpen: true,
@@ -258,32 +271,107 @@ export class TitleUiHandler extends OptionSelectUiHandler {
       },
       keepOpen: true,
     });
-    globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options, maxOptions: 8 });
+    // Cap the visible rows so a tall inbox scrolls instead of overflowing.
+    globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options, maxOptions: 6 });
   }
 
-  /** Show one notification's detail as a read-only, navigable window (Back returns to the list). */
-  private showInboxDetail(n: ErNotification): void {
+  /**
+   * Show one notification's detail as a compact custom panel. Ghost-battle alerts
+   * render the two teams as Pokemon party icons (yours vs theirs); other types
+   * show auto-scrolling text. B / confirm returns to the inbox list.
+   */
+  private openInboxDetail(n: ErNotification): void {
+    this.closeInboxDetail();
     const def = notificationManager.getType(n.type);
     const detail = def?.detail?.(n);
     const summary = def ? def.summary(n) : n.type;
-    const title = detail?.title ?? summary;
-    const body = detail?.body ?? "";
-    const text = body ? `${title}\n\n${body}` : title;
-    const options: OptionSelectItem[] = text.split("\n").map(line => ({
-      // Empty lines render as a blank spacer row; all body rows are non-selectable.
-      label: line.length > 0 ? line : " ",
-      handler: () => false,
-      skip: true,
-    }));
-    options.push({
-      label: i18next.t("menu:cancel"),
-      handler: () => {
-        globalScene.ui.revertMode().then(() => this.openInbox());
-        return true;
-      },
-      keepOpen: true,
+    const title = this.clipInbox(detail?.title ?? summary, 30);
+    const isGhost = detail?.customView === "ghost-battle";
+
+    const cx = globalScene.scaledCanvas.width / 2;
+    const cy = globalScene.scaledCanvas.height / 2 - 6;
+    const w = 184;
+    const h = isGhost ? 96 : 64;
+    const panel = globalScene.add.container(cx, cy);
+    const bg = globalScene.add.rectangle(0, 0, w, h, 0x16161f, 0.96).setOrigin(0.5);
+    bg.setStrokeStyle(1, 0x6c8cff, 0.95);
+    panel.add(bg);
+
+    const left = -w / 2 + 8;
+    let y = -h / 2 + 6;
+    const titleText = addTextObject(left, y, title, TextStyle.WINDOW, { fontSize: "60px" }).setOrigin(0, 0);
+    titleText.setColor("#ffe066");
+    panel.add(titleText);
+    y += 14;
+
+    if (isGhost) {
+      const d = n.data as { beaten?: number; ghostTeam?: unknown; victimTeam?: unknown };
+      const downed = typeof d.beaten === "number" ? d.beaten : 0;
+      panel.add(
+        addTextObject(left, y, `Downed ${downed} of their Pokemon.`, TextStyle.WINDOW, { fontSize: "54px" }).setOrigin(
+          0,
+          0,
+        ),
+      );
+      y += 14;
+      panel.add(addTextObject(left, y, "Your ghost", TextStyle.WINDOW, { fontSize: "54px" }).setOrigin(0, 0));
+      y += 11;
+      this.renderTeamIcons(d.ghostTeam, left + 4, y + 7, panel);
+      y += 18;
+      panel.add(addTextObject(left, y, "Their team", TextStyle.WINDOW, { fontSize: "54px" }).setOrigin(0, 0));
+      y += 11;
+      this.renderTeamIcons(d.victimTeam, left + 4, y + 7, panel);
+    } else {
+      // Text-only detail (welcome / system). Auto-scroll if it overflows the box.
+      const body = detail?.body ?? "";
+      const boxW = w - 16;
+      const boxH = h - 22;
+      const bodyText = addTextObject(left, y, body, TextStyle.WINDOW, { fontSize: "54px" }).setOrigin(0, 0);
+      bodyText.setWordWrapWidth(boxW * 6);
+      panel.add(bodyText);
+      this.inboxDetailScroll = attachAutoScroll(bodyText, cx - w / 2 + 8, cy - h / 2 + 6 + 14, boxW, boxH);
+      this.inboxDetailScroll.refresh();
+    }
+
+    panel.add(addTextObject(0, h / 2 - 9, "B: Back", TextStyle.WINDOW, { fontSize: "54px" }).setOrigin(0.5, 0));
+    this.getUi().add(panel);
+    this.inboxDetail = panel;
+    this.detailOpen = true;
+  }
+
+  /** Render up to 6 party icons for a serialised team at (x, yCentre) into a panel. */
+  private renderTeamIcons(team: unknown, x: number, yCentre: number, container: Phaser.GameObjects.Container): void {
+    if (!Array.isArray(team)) {
+      return;
+    }
+    const spacing = 18;
+    team.slice(0, 6).forEach((m, i) => {
+      const o = m as { speciesId?: number; formIndex?: number; gender?: number; shiny?: boolean; variant?: number };
+      if (typeof o?.speciesId !== "number") {
+        return;
+      }
+      try {
+        const species = getPokemonSpecies(o.speciesId as SpeciesId);
+        const female = o.gender === 1; // Gender.FEMALE
+        const form = typeof o.formIndex === "number" ? o.formIndex : 0;
+        const shiny = o.shiny === true;
+        const variant = typeof o.variant === "number" ? o.variant : 0;
+        const icon = globalScene.add.sprite(x + i * spacing, yCentre, species.getIconAtlasKey(form, shiny, variant));
+        icon.setFrame(species.getIconId(female, form, shiny, variant));
+        icon.setOrigin(0, 0.5).setScale(0.5);
+        container.add(icon);
+      } catch {
+        // Unknown species id / missing icon frame - skip this slot.
+      }
     });
-    globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options, maxOptions: 14 });
+  }
+
+  private closeInboxDetail(): void {
+    this.inboxDetailScroll?.stop();
+    this.inboxDetailScroll = undefined;
+    this.inboxDetail?.destroy();
+    this.inboxDetail = undefined;
+    this.detailOpen = false;
   }
 
   private clipInbox(s: string, max: number): string {
@@ -349,6 +437,7 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     // Register types/sources + seed welcome/demo notifications now (logged in), so
     // they land in this user's bucket, then refresh the badge.
     initErNotifications();
+    this.closeInboxDetail();
     this.setInboxFocused(false);
     this.refreshInbox(); // re-pull notification sources each time the title appears
 
@@ -418,6 +507,7 @@ export class TitleUiHandler extends OptionSelectUiHandler {
 
     const ui = this.getUi();
 
+    this.closeInboxDetail();
     this.eventDisplay?.clear();
 
     this.titleStatsTimer && clearInterval(this.titleStatsTimer);
