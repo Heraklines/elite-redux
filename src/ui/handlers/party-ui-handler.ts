@@ -147,6 +147,9 @@ export enum PartyOption {
   RENAME,
   SELECT,
   DISCARD,
+  /** ER: out-of-battle party reorder — pick this on a mon to start a swap, then
+   * pick it on a second mon to swap their party slots (CHECK mode only). */
+  MOVE,
   SCROLL_UP = 1000,
   SCROLL_DOWN = 1001,
   FORM_CHANGE_ITEM = 2000,
@@ -956,6 +959,26 @@ export class PartyUiHandler extends MessageUiHandler {
       return true;
     }
 
+    // ER: out-of-battle party reorder (CHECK mode). The first MOVE picks the source
+    // mon (enter transferMode, mirroring SPLICE); the second MOVE on a DIFFERENT mon
+    // swaps their party slots. The new order is in `getPlayerParty()` and serializes
+    // with the session at the next save (wave end / Save & Quit).
+    if (this.partyUiMode === PartyUiMode.CHECK && option === PartyOption.MOVE) {
+      if (this.transferMode) {
+        const party = globalScene.getPlayerParty();
+        const src = this.transferCursor;
+        const dst = this.cursor;
+        this.clearTransfer(); // un-highlight the source slot BEFORE rebuilding slots
+        [party[src], party[dst]] = [party[dst], party[src]];
+        this.populatePartySlots(); // re-render the list in the new order
+      } else {
+        this.startTransfer();
+      }
+      this.clearOptions();
+      ui.playSelect();
+      return true;
+    }
+
     // This is used when switching out using the Pokemon command (possibly holding a Baton held item). In this case there is no callback.
     if (
       (option === PartyOption.PASS_BATON || option === PartyOption.SEND_OUT)
@@ -1158,7 +1181,9 @@ export class PartyUiHandler extends MessageUiHandler {
   private processPartyCancelInput(): boolean {
     const ui = this.getUi();
     if (
-      (this.partyUiMode === PartyUiMode.MODIFIER_TRANSFER || this.partyUiMode === PartyUiMode.SPLICE)
+      (this.partyUiMode === PartyUiMode.MODIFIER_TRANSFER
+        || this.partyUiMode === PartyUiMode.SPLICE
+        || this.partyUiMode === PartyUiMode.CHECK) // ER: B cancels an in-progress reorder
       && this.transferMode
     ) {
       this.clearTransfer();
@@ -1638,6 +1663,16 @@ export class PartyUiHandler extends MessageUiHandler {
         this.addCommonOptions(pokemon);
         break;
       case PartyUiMode.CHECK:
+        // ER: out-of-battle party reorder. `transferMode` here means a move is in
+        // progress (a source mon was picked); the option on a DIFFERENT mon swaps
+        // the two slots. Otherwise offer "Move" to start one (needs >1 mon).
+        if (this.transferMode) {
+          if (this.cursor !== this.transferCursor) {
+            this.options.push(PartyOption.MOVE);
+          }
+        } else if (globalScene.getPlayerParty().length > 1) {
+          this.options.push(PartyOption.MOVE);
+        }
         this.addCommonOptions(pokemon);
         if (globalScene.phaseManager.getCurrentPhase().is("SelectModifierPhase")) {
           if (pokemon.isFusion()) {
@@ -1753,6 +1788,9 @@ export class PartyUiHandler extends MessageUiHandler {
               optionName = `${modifier.active ? i18next.t("partyUiHandler:deactivate") : i18next.t("partyUiHandler:activate")} ${modifier.type.name}`;
             } else if (option === PartyOption.UNPAUSE_EVOLUTION) {
               optionName = `${pokemon.pauseEvolutions ? i18next.t("partyUiHandler:unpauseEvolution") : i18next.t("partyUiHandler:pauseEvolution")}`;
+            } else if (option === PartyOption.MOVE) {
+              // ER party reorder: "Move" picks the source mon, "Swap here" the target.
+              optionName = this.transferMode ? "Swap here" : "Move";
             } else if (this.localizedOptions.includes(option)) {
               optionName = i18next.t(`partyUiHandler:${toCamelCase(PartyOption[option])}`);
             } else {

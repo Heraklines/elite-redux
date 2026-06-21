@@ -307,6 +307,41 @@ function givePlayerCommunityItems(items: [ErCommunityItemKind, number][]): void 
 
 export const DEV_SCENARIOS: DevScenario[] = [
   // ===========================================================================
+  // QoL — out-of-battle party reorder
+  // ===========================================================================
+  {
+    label: "QoL: reorder party (Move in team check)",
+    description:
+      "ER party reorder: between waves you can SWAP party positions. DO: win the\n"
+      + "opening battle to reach the rewards, open the party screen (Check Team), select\n"
+      + "a mon and choose the new 'Move' option, then select a SECOND mon and choose\n"
+      + "'Swap here'. Press B mid-move to cancel.\n"
+      + "EXPECT: the two mons trade slots; everyone else stays put. The new order should\n"
+      + "persist across Save & Quit + reload. The 'Move' option must NOT appear during a\n"
+      + "battle's switch menu, and is hidden with a 1-mon party.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST] }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.WATERFALL, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.DRAGON_DANCE],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.NUZZLE, MoveId.IRON_TAIL, MoveId.SURF],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // QoL — level-up Move Learn panel
   // ===========================================================================
   {
