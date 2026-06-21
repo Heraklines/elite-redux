@@ -131,27 +131,47 @@ function withErText(type: ModifierType, name: string, description: string): Modi
   return type;
 }
 
+// Registry ids - MUST match these items' keys in `modifierTypeInitObj`
+// (modifier-type.ts). Pinning `type.id` here is what lets them round-trip on
+// save/load: these are trainer-only grants that never pass through the reward
+// screen's id fix-up, so without a pinned id `ModifierData` records typeId="" and
+// the loader's `getModifierTypeFuncById("")` guard drops the item on Continue
+// (the same class of bug as the ER gems/relics). See er-item-save-persistence.test.
+export const ER_LIFE_ORB_ID = "ER_LIFE_ORB";
+export const ER_ASSAULT_VEST_ID = "ER_ASSAULT_VEST";
+export const ER_ROCKY_HELMET_ID = "ER_ROCKY_HELMET";
+
+/** Build an ER recreated-item type with its name/description AND its pinned id. */
+function withErId(type: ModifierType, id: string, name: string, description: string): ModifierType {
+  withErText(type, name, description);
+  type.id = id;
+  return type;
+}
+
 export const ER_LIFE_ORB_TYPE = (): ModifierType =>
-  withErText(
+  withErId(
     new PokemonHeldItemModifierType("", ER_LIFE_ORB_TEXTURE, (type, args) =>
       new ErLifeOrbModifier(type, (args[0] as Pokemon).id),
     ),
+    ER_LIFE_ORB_ID,
     "Life Orb",
     "Boosts the holder's attacks by 30%, but the holder takes a little recoil damage each time it attacks.",
   );
 export const ER_ASSAULT_VEST_TYPE = (): ModifierType =>
-  withErText(
+  withErId(
     new PokemonHeldItemModifierType("", ER_ASSAULT_VEST_TEXTURE, (type, args) =>
       new ErAssaultVestModifier(type, (args[0] as Pokemon).id),
     ),
+    ER_ASSAULT_VEST_ID,
     "Assault Vest",
     "Raises the holder's Sp. Def by 50%.",
   );
 export const ER_ROCKY_HELMET_TYPE = (): ModifierType =>
-  withErText(
+  withErId(
     new PokemonHeldItemModifierType("", ER_ROCKY_HELMET_TEXTURE, (type, args) =>
       new ErRockyHelmetModifier(type, (args[0] as Pokemon).id),
     ),
+    ER_ROCKY_HELMET_ID,
     "Rocky Helmet",
     "If the holder is hit by a contact move, the attacker loses 1/6 of its max HP.",
   );

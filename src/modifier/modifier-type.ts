@@ -15,6 +15,7 @@ import { erGemItemType } from "#data/elite-redux/er-elemental-gems";
 import { getErTemporaryLuck } from "#data/elite-redux/er-fairy-luck";
 import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-stones";
 import { erReactiveItemType } from "#data/elite-redux/er-reactive-items";
+import { ER_ASSAULT_VEST_TYPE, ER_LIFE_ORB_TYPE, ER_ROCKY_HELMET_TYPE } from "#data/elite-redux/er-recreated-items";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
 import { erSeedItemType } from "#data/elite-redux/er-terrain-seeds";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
@@ -814,6 +815,20 @@ export class PokemonAddMoveSlotModifierType extends PokemonModifierType {
 }
 
 /**
+ * The `modifierTypeInitObj` registry key for a community-item kind, i.e.
+ * `ER_<SCREAMING_SNAKE(kind)>` ("powerHerb" -> "ER_POWER_HERB"). Community items
+ * are often trainer-held or event-granted, so they skip the reward-screen id
+ * fix-up; without a pinned `type.id`, {@linkcode ModifierData} records `typeId=""`
+ * and on load `getModifierTypeFuncById("")` is `undefined`, so the item is silently
+ * dropped on reload/Continue (same failure mode as the ER gems/relics). Deriving
+ * the id here pins it for EVERY grant path. (er-item-save-persistence.test asserts
+ * every kind's id resolves, so a kind that breaks the convention fails loudly.)
+ */
+export function erCommunityItemTypeId(kind: ErCommunityItemKind): string {
+  return `ER_${kind.replace(/([A-Z])/g, "_$1").toUpperCase()}`;
+}
+
+/**
  * ER community held items (#387): build the ModifierType for a community item
  * kind (live name/description from the config; icon = existing atlas frame,
  * tinted by the modifier's getIcon override).
@@ -825,6 +840,9 @@ export function erCommunityItemModifierType(kind: ErCommunityItemKind): PokemonH
     cfg.icon,
     (t, args) => new ErCommunityItemModifier(t, (args[0] as Pokemon).id, kind),
   );
+  // Pin the registry id so the item survives save/load no matter how it was
+  // granted (see erCommunityItemTypeId).
+  type.id = erCommunityItemTypeId(kind);
   Object.defineProperty(type, "name", { get: () => cfg.name });
   type.getDescription = () => cfg.description;
   // Carry the reskin tint on the type so the SHOP shows the recolored icon
@@ -2188,6 +2206,14 @@ const modifierTypeInitObj = Object.freeze({
   ER_LUCKY_HEART: () => erCommunityItemModifierType("luckyHeart"),
   ER_OMNI_GEM: () => erCommunityItemModifierType("omniGem"),
   ER_POWER_HERB: () => erCommunityItemModifierType("powerHerb"),
+
+  // ER recreated trainer-only items (Life Orb / Assault Vest / Rocky Helmet).
+  // Registered ONLY so the loader's getModifierTypeFuncById(typeId) guard resolves
+  // them and they round-trip on Continue (type.id pinned in the factories). They
+  // are NOT added to any reward pool - trainers grant them directly.
+  ER_LIFE_ORB: () => ER_LIFE_ORB_TYPE(),
+  ER_ASSAULT_VEST: () => ER_ASSAULT_VEST_TYPE(),
+  ER_ROCKY_HELMET: () => ER_ROCKY_HELMET_TYPE(),
 
   // ER reactive held items (Ultra-ball tier).
   ER_CELL_BATTERY: () => erReactiveItemType("cellBattery"),

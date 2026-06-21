@@ -14,14 +14,32 @@
 // round-trip. This test pins both, with no game init (pure reconstruction).
 // =============================================================================
 
+import type { BattleScene } from "#app/battle-scene";
+import { initGlobalScene } from "#app/global-scene";
+import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { ErGemModifier, erGemItemType } from "#data/elite-redux/er-elemental-gems";
 import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
 import { ErReactiveItemModifier, erReactiveItemType } from "#data/elite-redux/er-reactive-items";
-import { ErAssaultVestModifier } from "#data/elite-redux/er-recreated-items";
+import {
+  ER_ASSAULT_VEST_TYPE,
+  ER_LIFE_ORB_TYPE,
+  ER_ROCKY_HELMET_TYPE,
+  ErAssaultVestModifier,
+  ErLifeOrbModifier,
+  ErRockyHelmetModifier,
+} from "#data/elite-redux/er-recreated-items";
 import { ErSeedModifier, erSeedItemType } from "#data/elite-redux/er-terrain-seeds";
 import { PokemonType } from "#enums/pokemon-type";
-import type { ModifierType } from "#modifiers/modifier-type";
-import { describe, expect, it } from "vitest";
+import * as Modifier from "#modifiers/modifier";
+import { ErCommunityItemModifier, type PersistentModifier } from "#modifiers/modifier";
+import {
+  erCommunityItemModifierType,
+  erCommunityItemTypeId,
+  getModifierTypeFuncById,
+  type ModifierType,
+} from "#modifiers/modifier-type";
+import { ModifierData } from "#system/modifier-data";
+import { beforeAll, describe, expect, it } from "vitest";
 
 /** Minimal stand-in - the round-trip never reads the type, only stores it. */
 const stubType = (id: string): ModifierType => ({ id }) as unknown as ModifierType;
@@ -35,7 +53,30 @@ function roundTrip<T extends ErGemModifier | ErReactiveItemModifier | ErSeedModi
   return Reflect.construct(Cls!, [original.type, ...original.getArgs(), original.stackCount]) as T;
 }
 
+type ModCtor = new (...args: any[]) => PersistentModifier;
+
+/**
+ * The REAL save->load path: serialize to ModifierData, then rebuild it exactly as
+ * GameData.loadSession does - `Modifier[className] ?? resolveErModifierClass(...)`
+ * fed to `toModifier`, which FIRST gates on `getModifierTypeFuncById(typeId)`. The
+ * `roundTrip` helper above skips that guard, so it can't catch a typeId="" drop;
+ * this one does. Returns null exactly where the loader would drop the item.
+ */
+function reload(original: PersistentModifier): PersistentModifier | null {
+  const data = new ModifierData(original, true);
+  const registry = Modifier as unknown as Record<string, ModCtor | undefined>;
+  const ctor = registry[data.className] ?? resolveErModifierClass(data.className);
+  return data.toModifier(ctor);
+}
+
 describe("ER held-item save persistence", () => {
+  // `toModifier` clamps stackCount via getMaxStackCount -> globalScene.getPokemonById.
+  // We don't spin up a game; a 1-method stub is enough for the held-item caps
+  // (which ignore the pokemon for these ER items).
+  beforeAll(() => {
+    initGlobalScene({ getPokemonById: () => ({ isPlayer: () => false }) } as unknown as BattleScene);
+  });
+
   it("registers the un-side-channeled ER classes, and NOT the side-channeled ones", () => {
     expect(resolveErModifierClass("ErGemModifier")).toBe(ErGemModifier);
     expect(resolveErModifierClass("ErSeedModifier")).toBe(ErSeedModifier);
@@ -79,5 +120,50 @@ describe("ER held-item save persistence", () => {
     const restored = roundTrip(original);
     expect(restored.pokemonId).toBe(9);
     expect(restored.stackCount).toBe(3);
+  });
+
+  it("pins + registers the recreated trainer items so they survive the FULL load path", () => {
+    // Both halves must line up: a pinned type.id AND a modifierTypeInitObj entry
+    // under that same id. The class registry alone isn't enough - toModifier bails
+    // at getModifierTypeFuncById(typeId) before it ever reaches the ctor.
+    for (const make of [ER_LIFE_ORB_TYPE, ER_ASSAULT_VEST_TYPE, ER_ROCKY_HELMET_TYPE]) {
+      const id = make().id;
+      expect(id, "recreated item must pin a non-empty id").toBeTruthy();
+      expect(getModifierTypeFuncById(id), `getModifierTypeFuncById(${id})`).toBeDefined();
+    }
+
+    // Round-trip the two PokemonHeldItem-shaped ones through the real loader.
+    const orb = reload(new ErLifeOrbModifier(ER_LIFE_ORB_TYPE(), 7));
+    expect(orb).toBeInstanceOf(ErLifeOrbModifier);
+    expect((orb as ErLifeOrbModifier).pokemonId).toBe(7);
+
+    const helmet = reload(new ErRockyHelmetModifier(ER_ROCKY_HELMET_TYPE(), 8));
+    expect(helmet).toBeInstanceOf(ErRockyHelmetModifier);
+    expect((helmet as ErRockyHelmetModifier).pokemonId).toBe(8);
+
+    // Assault Vest through the real loader (not just resolveErModifierClass).
+    const vest = reload(new ErAssaultVestModifier(ER_ASSAULT_VEST_TYPE(), 9));
+    expect(vest).toBeInstanceOf(ErAssaultVestModifier);
+    expect((vest as ErAssaultVestModifier).pokemonId).toBe(9);
+  });
+
+  it("round-trips EVERY community item through the full load path, preserving kind + charges", () => {
+    const kinds = Object.keys(ER_COMMUNITY_ITEM_CONFIG) as ErCommunityItemKind[];
+    expect(kinds.length).toBeGreaterThan(0);
+    for (const kind of kinds) {
+      const id = erCommunityItemTypeId(kind);
+      // The derived id MUST be a real registry key, or the loader drops the item.
+      expect(getModifierTypeFuncById(id), `getModifierTypeFuncById(${id})`).toBeDefined();
+      expect(erCommunityItemModifierType(kind).id, kind).toBe(id);
+
+      // A non-default charge state must survive (Omni Gem / Power Herb spend charges).
+      const original = new ErCommunityItemModifier(erCommunityItemModifierType(kind), 42, kind, 1, 4);
+      const restored = reload(original) as ErCommunityItemModifier | null;
+      expect(restored, kind).toBeInstanceOf(ErCommunityItemModifier);
+      expect(restored!.kind, kind).toBe(kind);
+      expect(restored!.pokemonId).toBe(42);
+      expect(restored!.charges).toBe(1);
+      expect(restored!.waveProgress).toBe(4);
+    }
   });
 });

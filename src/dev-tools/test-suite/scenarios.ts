@@ -807,6 +807,36 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.ER_RELIC_CURSED_IDOL, modifierTypes.ER_RELIC_COVENANT, modifierTypes.ER_OMNI_GEM],
   },
   {
+    label: "Item persistence: community + recreated items survive reload (#85)",
+    description:
+      "ER community items (Power Herb / Omni Gem) and the recreated trainer items (Life\n"
+      + "Orb / Assault Vest / Rocky Helmet) used to VANISH on reload: their modifier type\n"
+      + "was built with an empty id, so the save recorded a blank type and the load\n"
+      + "dropped them. Your lead holds POWER HERB + OMNI GEM; the enemy holds LIFE ORB,\n"
+      + "ASSAULT VEST and ROCKY HELMET.\n"
+      + "DO: hover your lead AND the enemy to confirm all 5 items (note the Power Herb /\n"
+      + "Omni Gem charge counts). The enemy only Splashes, so DON'T attack - just open the\n"
+      + "menu, SAVE & QUIT, RELOAD the page and CONTINUE this run.\n"
+      + "EXPECT: after Continue, all 5 items are STILL there (yours AND the enemy's), with\n"
+      + "the SAME charge counts. Before the fix they were gone after reload.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_HELD_ITEMS_OVERRIDE: [{ name: "ER_POWER_HERB" }, { name: "ER_OMNI_GEM" }],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_HELD_ITEMS_OVERRIDE: [{ name: "ER_LIFE_ORB" }, { name: "ER_ASSAULT_VEST" }, { name: "ER_ROCKY_HELMET" }],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  {
     label: "ER Relic: Field Medic (reserves) (#439)",
     description:
       "#439 - Field Medic heals the BENCHED reserves (slots 2 and 3), NOT the active\n"
