@@ -9,6 +9,7 @@ import { Button } from "#enums/buttons";
 import { ChallengeType } from "#enums/challenge-type";
 import { Challenges } from "#enums/challenges";
 import { Command } from "#enums/command";
+import { FieldPosition } from "#enums/field-position";
 import { FormChangeItem } from "#enums/form-change-item";
 import { MoveId } from "#enums/move-id";
 import { MoveResult } from "#enums/move-result";
@@ -969,7 +970,16 @@ export class PartyUiHandler extends MessageUiHandler {
         const src = this.transferCursor;
         const dst = this.cursor;
         this.clearTransfer(); // un-highlight the source slot BEFORE rebuilding slots
+        // Capture who is ON THE FIELD before the swap (the reorder runs in the
+        // reward shop, where the active mon's sprite is live). Swapping an on-field
+        // slot would otherwise leave the displaced lead's sprite on the field and
+        // stack the new lead on top of it.
+        const fieldSize = globalScene.currentBattle?.double ? 2 : 1;
+        const onFieldBefore = party.slice(0, fieldSize);
         [party[src], party[dst]] = [party[dst], party[src]];
+        if (src < fieldSize || dst < fieldSize) {
+          this.reconcilePlayerFieldAfterSwap(onFieldBefore, fieldSize);
+        }
         this.populatePartySlots(); // re-render the list in the new order
       } else {
         this.startTransfer();
@@ -1941,6 +1951,53 @@ export class PartyUiHandler extends MessageUiHandler {
       partySlot.slotHpOverlay.setVisible(true);
       partySlot.slotHpText.setVisible(true);
     }
+  }
+
+  /**
+   * ER party reorder (CHECK mode): after a slot swap that changes who occupies an
+   * ON-FIELD slot, reconcile the field sprites. The reorder runs in the reward shop
+   * where the active mon's sprite is live; without this the displaced lead's sprite
+   * lingers and the newly-promoted lead stacks on top of it. Removes the sprites of
+   * mons that left the field, repositions any active mon whose field slot changed
+   * (doubles slot 0<->1), and silently places (no pokeball animation) mons promoted
+   * from the bench. Scoped to the reorder path - never runs during a normal switch.
+   */
+  private reconcilePlayerFieldAfterSwap(onFieldBefore: PlayerPokemon[], fieldSize: number): void {
+    const onFieldAfter = globalScene.getPlayerParty().slice(0, fieldSize);
+    // Pull the sprites of mons that left the field entirely (keep their summon
+    // data / stat stages: clearEffects=false).
+    for (const mon of onFieldBefore) {
+      if (mon && !onFieldAfter.includes(mon) && mon.isOnField()) {
+        mon.leaveField(false, true, false);
+      }
+    }
+    // Place / reposition the mons that now occupy a field slot.
+    onFieldAfter.forEach((mon, index) => {
+      if (!mon) {
+        return;
+      }
+      const position = fieldSize > 1 ? (index === 0 ? FieldPosition.LEFT : FieldPosition.RIGHT) : FieldPosition.CENTER;
+      if (onFieldBefore.includes(mon)) {
+        // Already on the field - only its slot changed (doubles slot 0<->1 swap).
+        if (mon.fieldPosition !== position) {
+          void mon.setFieldPosition(position, 0);
+        }
+        return;
+      }
+      // Promoted from the bench: place it silently, mirroring SummonPhase's steps
+      // but with no pokeball animation.
+      void mon.loadAssets(false).then(() => {
+        globalScene.field.add(mon);
+        // setFieldPosition early-returns when the target equals the stored position,
+        // which would leave a never-placed bench mon at the origin - nudge off-target.
+        mon.fieldPosition = position === FieldPosition.CENTER ? FieldPosition.LEFT : FieldPosition.CENTER;
+        void mon.setFieldPosition(position, 0);
+        mon.setVisible(true);
+        mon.getSprite().setVisible(true);
+        mon.showInfo();
+        mon.fieldSetup();
+      });
+    });
   }
 
   doRelease(slotIndex: number): void {
