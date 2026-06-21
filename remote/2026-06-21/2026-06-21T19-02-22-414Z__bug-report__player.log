@@ -1,0 +1,272 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:154  difficulty:hell
+seed:     3FBiZDDiqLdYGmrv6brfIJXD
+party:    Escarginite(L149 254/445), Phione(L148 597/597), Mr. Rime(L146 405/405), Meowscarada(L146 553/553), Amphybuzz(L146 347/347)
+
+----- DESCRIPTION -----
+Ruination does not clear the field's stat boosts like Freezy Frost, as it does in ER
+
+----- CONSOLE -----
+[19:01:04.451] LOG: Stats (IVs): HP: 509 (31), Atk: 284 (31), Def: 429 (31), Spatk: 251 (31), Spdef: 351 (31), Spd: 246 (31)
+[19:01:04.451] LOG: Ability: Pixilate | Passive Ability: Pixie Power 
+[19:01:04.451] LOG: Moveset: ["Ruination","Charm","Springtide Storm","Roost"]
+[19:01:04.853] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} (enemy)
+[19:01:04.853] LOG: Battle Seed: g9stzeouVFn57xaB
+[19:01:04.854] LOG: Generated AI funcs
+[19:01:04.907] DEBUG: Session data saved to slot 3!
+[19:01:04.907] LOG: Wave Seed: ÍàÜăôÞÞăċæþóáćČĐÐüČĀãäòÞ 154
+[19:01:05.110] LOG: Camper Elliot
+[19:01:05.111] LOG: Dialogue dialogue:camper.encounter.3 skipped
+[19:01:05.158] LOG: Camper Elliot
+[19:01:05.423] LOG: %cStart Phase PartyHealPhase color:green;
+[19:01:07.889] LOG: %cStart Phase ResetStatusPhase color:green;
+[19:01:07.890] LOG: %cStart Phase ResetStatusPhase color:green;
+[19:01:07.890] LOG: %cStart Phase ResetStatusPhase color:green;
+[19:01:07.890] LOG: %cStart Phase ResetStatusPhase color:green;
+[19:01:07.890] LOG: %cStart Phase ResetStatusPhase color:green;
+[19:01:07.891] LOG: %cStart Phase SummonPhase color:green;
+[19:01:07.891] LOG: Elliot
+[19:01:08.172] LOG: %cStart Phase SummonPhase color:green;
+[19:01:08.172] LOG: Elliot
+[19:01:08.451] LOG: %cStart Phase MessagePhase color:green;
+[19:01:09.120] LOG: %cStart Phase SummonPhase color:green;
+[19:01:09.264] LOG: Applied HP Up 
+[19:01:09.264] LOG: Applied Carbos 
+[19:01:09.264] LOG: Applied Calcium 
+[19:01:09.265] LOG: Applied Zinc 
+[19:01:09.265] LOG: Applied Calcium 
+[19:01:09.265] LOG: Applied HP Up 
+[19:01:09.266] LOG: Applied Carbos 
+[19:01:09.266] LOG: Applied Soul Dew 
+[19:01:09.266] LOG: Applied Soul Dew 
+[19:01:09.299] WARN: cry/10002 not found
+[19:01:09.405] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:01:09.406] LOG: %cStart Phase SummonPhase color:green;
+[19:01:09.557] LOG: Applied HP Up 
+[19:01:09.557] LOG: Applied Carbos 
+[19:01:09.557] LOG: Applied Calcium 
+[19:01:09.558] LOG: Applied Zinc 
+[19:01:09.558] LOG: Applied Calcium 
+[19:01:09.558] LOG: Applied HP Up 
+[19:01:09.558] LOG: Applied Carbos 
+[19:01:09.558] LOG: Applied Soul Dew 
+[19:01:09.559] LOG: Applied Soul Dew 
+[19:01:09.697] LOG: %cStart Phase ShinySparklePhase color:green;
+[19:01:09.805] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:01:09.809] LOG: %cStart Phase PostSummonPhase color:green;
+[19:01:09.809] LOG: Ran PSP for: Phione
+[19:01:09.811] LOG: %cStart Phase PokemonAnimPhase color:green;
+[19:01:09.811] WARN: PRSFX- Transform not found
+[19:01:10.030] LOG: %cStart Phase MessagePhase color:green;
+[19:01:10.280] LOG: %cStart Phase MessagePhase color:green;
+[19:01:10.584] LOG: %cStart Phase PostSummonPhase color:green;
+[19:01:10.587] LOG: %cStart Phase PostSummonPhase color:green;
+[19:01:10.588] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:01:10.749] LOG: %cStart Phase MovePhase color:green;
+[19:01:10.749] LOG: %cUser: Phione
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[19:01:10.757] LOG: %cStart Phase MessagePhase color:green;
+[19:01:10.880] LOG: %cStart Phase PokemonAnimPhase color:green;
+[19:01:10.964] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:01:10.982] LOG: %cStart Phase MessagePhase color:green;
+[19:01:11.247] LOG: %cStart Phase MoveEndPhase color:green;
+[19:01:11.247] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:01:11.284] LOG: %cStart Phase PostSummonPhase color:green;
+[19:01:11.285] LOG: Ran PSP for: Wo-Chien
+[19:01:11.288] LOG: %cStart Phase PostSummonPhase color:green;
+[19:01:11.291] LOG: %cStart Phase PostSummonPhase color:green;
+[19:01:11.292] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:01:11.447] LOG: %cStart Phase MessagePhase color:green;
+[19:01:11.771] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:01:11.798] LOG: %cStart Phase PostSummonPhase color:green;
+[19:01:11.798] LOG: Ran PSP for: Escaymin
+[19:01:11.799] LOG: %cStart Phase MessagePhase color:green;
+[19:01:12.081] LOG: %cStart Phase PostSummonPhase color:green;
+[19:01:12.082] LOG: %cStart Phase PostSummonPhase color:green;
+[19:01:12.082] LOG: %cStart Phase PostSummonPhase color:green;
+[19:01:12.082] LOG: Ran PSP for: Chien-Pao
+[19:01:12.083] LOG: %cStart Phase PostSummonPhase color:green;
+[19:01:12.083] LOG: %cStart Phase PostSummonPhase color:green;
+[19:01:12.084] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:01:12.256] LOG: %cStart Phase MessagePhase color:green;
+[19:01:12.588] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:01:12.623] LOG: %cStart Phase TurnInitPhase color:green;
+[19:01:12.624] LOG: %cStart Phase CommandPhase color:green;
+[19:01:14.186] LOG: Move: SHELL_SMASH Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Escaymin
+[19:01:14.188] LOG: %cStart Phase CommandPhase color:green;
+[19:01:16.170] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Phione
+[19:01:16.172] LOG: %cStart Phase SelectTargetPhase color:green;
+[19:01:16.888] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:01:16.895] LOG: Applied Multi Lens 
+[19:01:16.897] LOG: Applied Multi Lens 
+[19:01:16.899] LOG: Applied Multi Lens 
+[19:01:16.901] LOG: Applied Mystic Water 
+[19:01:16.903] LOG: Applied Mystic Water 
+[19:01:16.913] LOG: Applied Multi Lens 
+[19:01:16.914] LOG: Applied Multi Lens 
+[19:01:16.915] LOG: Applied Multi Lens 
+[19:01:16.916] LOG: Applied Mystic Water 
+[19:01:16.918] LOG: Applied Mystic Water 
+[19:01:16.920] LOG: Move Pool: ["Strength Sap","Ruination","Whirlwind","Creeping Thorns"]
+[19:01:16.920] LOG: Move Scores: [3,18.621867881548976,0,0]
+[19:01:16.920] LOG: Sorted Move Pool: ["Ruination","Strength Sap","Whirlwind","Creeping Thorns"]
+[19:01:16.920] LOG: Chosen Move: Ruination
+[19:01:16.920] LOG: ER AI: experimental brain (sharpness 1)
+[19:01:16.920] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:01:16.923] LOG: Applied Multi Lens 
+[19:01:16.924] LOG: Applied Multi Lens 
+[19:01:16.925] LOG: Applied Multi Lens 
+[19:01:16.926] LOG: Applied Mystic Water 
+[19:01:16.927] LOG: Applied Mystic Water 
+[19:01:16.938] WARN: BattlerTag ER_BLEED is missing a score!
+[19:01:16.938] WARN: BattlerTag ER_BLEED is missing a score!
+[19:01:16.938] WARN: BattlerTag ER_BLEED is missing a score!
+[19:01:16.939] WARN: BattlerTag ER_BLEED is missing a score!
+[19:01:16.940] LOG: Applied Multi Lens 
+[19:01:16.940] LOG: Applied Multi Lens 
+[19:01:16.941] LOG: Applied Multi Lens 
+[19:01:16.941] LOG: Applied Mystic Water 
+[19:01:16.942] LOG: Applied Mystic Water 
+[19:01:16.944] LOG: Move Pool: ["Mean Look","Ice Fang","Ruination","Black Magic"]
+[19:01:16.944] LOG: Move Scores: [3,26.993166287015942,37.43633276740238,15.66213921901528]
+[19:01:16.944] LOG: Sorted Move Pool: ["Ruination","Ice Fang","Black Magic","Mean Look"]
+[19:01:16.944] LOG: Chosen Move: Ruination
+[19:01:16.944] LOG: ER AI: experimental brain (sharpness 1)
+[19:01:16.944] LOG: %cStart Phase TurnStartPhase color:green;
+[19:01:16.947] LOG: %cStart Phase MovePhase color:green;
+[19:01:16.947] LOG: %cUser: Phione
+Move: BUBBLE_BEAM
+Use Mode: NORMAL color:orchid
+[19:01:16.950] LOG: %cStart Phase MessagePhase color:green;
+[19:01:17.021] LOG: %cStart Phase PokemonAnimPhase color:green;
+[19:01:17.105] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:01:17.706] LOG: crit stage: +0
+[19:01:17.708] LOG: Applied Mystic Water 
+[19:01:17.709] LOG: Move: Bubble Beam | Base damage: 67.685 | Power: 30 | Source attack: 464 | Target defense: 256
+[19:01:17.710] LOG: Move: Bubble Beam | Attack damage: 128
+[19:01:17.710] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:01:17.740] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:01:18.356] LOG: crit stage: +0
+[19:01:18.357] LOG: Applied Mystic Water 
+[19:01:18.357] LOG: Move: Bubble Beam | Base damage: 67.685 | Power: 30 | Source attack: 464 | Target defense: 256
+[19:01:18.358] LOG: Move: Bubble Beam | Attack damage: 123
+[19:01:18.358] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:01:18.390] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:01:19.006] LOG: crit stage: +0
+[19:01:19.008] LOG: Applied Mystic Water 
+[19:01:19.009] LOG: Move: Bubble Beam | Base damage: 67.685 | Power: 30 | Source attack: 464 | Target defense: 256
+[19:01:19.010] LOG: Move: Bubble Beam | Attack damage: 124
+[19:01:19.011] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:01:19.041] LOG: %cStart Phase MessagePhase color:green;
+[19:01:19.255] LOG: %cStart Phase MessagePhase color:green;
+[19:01:19.455] LOG: %cStart Phase FaintPhase color:green;
+[19:01:21.759] LOG: %cStart Phase MessagePhase color:green;
+[19:01:21.877] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:01:22.048] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:01:22.240] LOG: %cStart Phase MessagePhase color:green;
+[19:01:22.450] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:01:22.481] LOG: %cStart Phase VictoryPhase color:green;
+[19:01:22.482] LOG: Applied Soothe Bell 
+[19:01:22.482] LOG: Applied Soothe Bell 
+[19:01:22.483] LOG: %cStart Phase ExpPhase color:green;
+[19:01:22.483] LOG: Applied Super EXP. Charm 
+[19:01:22.483] LOG: Applied EXP. Charm 
+[19:01:22.765] LOG: %cStart Phase LevelUpPhase color:green;
+[19:01:22.766] LOG: Applied HP Up 
+[19:01:22.766] LOG: Applied Carbos 
+[19:01:22.766] LOG: Applied Calcium 
+[19:01:22.766] LOG: %cStart Phase ExpPhase color:green;
+[19:01:22.766] LOG: Applied Super EXP. Charm 
+[19:01:22.766] LOG: Applied EXP. Charm 
+[19:01:23.248] LOG: %cStart Phase LevelUpPhase color:green;
+[19:01:23.248] LOG: Applied Zinc 
+[19:01:23.248] LOG: Applied Calcium 
+[19:01:23.248] LOG: Applied HP Up 
+[19:01:23.248] LOG: Applied Carbos 
+[19:01:23.248] LOG: Applied Soul Dew 
+[19:01:23.248] LOG: Applied Soul Dew 
+[19:01:23.249] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:01:23.249] LOG: Applied Super EXP. Charm 
+[19:01:23.249] LOG: Applied EXP. Charm 
+[19:01:23.249] LOG: %cStart Phase LevelUpPhase color:green;
+[19:01:23.250] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:01:23.250] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:01:23.250] LOG: Applied Super EXP. Charm 
+[19:01:23.250] LOG: Applied EXP. Charm 
+[19:01:23.250] LOG: %cStart Phase LevelUpPhase color:green;
+[19:01:23.250] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:01:23.250] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:01:23.250] LOG: Applied Super EXP. Charm 
+[19:01:23.250] LOG: Applied EXP. Charm 
+[19:01:23.250] LOG: %cStart Phase LevelUpPhase color:green;
+[19:01:23.251] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:01:23.251] LOG: %cStart Phase MoveEndPhase color:green;
+[19:01:23.251] LOG: %cStart Phase PokemonAnimPhase color:green;
+[19:01:23.358] LOG: %cStart Phase MovePhase color:green;
+[19:01:23.358] LOG: %cStart Phase MoveEndPhase color:green;
+[19:01:23.359] LOG: %cStart Phase MovePhase color:green;
+[19:01:23.359] LOG: %cUser: Escaymin
+Move: SHELL_SMASH
+Use Mode: NORMAL color:orchid
+[19:01:23.363] LOG: %cStart Phase MessagePhase color:green;
+[19:01:23.497] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:01:24.148] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:01:24.148] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:01:24.148] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:01:24.324] LOG: %cStart Phase MessagePhase color:green;
+[19:01:24.580] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:01:24.766] LOG: %cStart Phase MessagePhase color:green;
+[19:01:25.030] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:01:25.216] LOG: %cStart Phase MessagePhase color:green;
+[19:01:25.463] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:01:25.650] LOG: %cStart Phase MessagePhase color:green;
+[19:01:25.880] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:01:26.065] LOG: %cStart Phase MessagePhase color:green;
+[19:01:26.313] LOG: %cStart Phase MoveEndPhase color:green;
+[19:01:26.313] LOG: %cStart Phase MovePhase color:green;
+[19:01:26.313] LOG: %cUser: Chien-Pao
+Move: RUINATION
+Use Mode: NORMAL color:orchid
+[19:01:26.318] LOG: %cStart Phase MessagePhase color:green;
+[19:01:26.447] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:01:26.931] LOG: %cStart Phase MessagePhase color:green;
+[19:01:27.197] LOG: %cStart Phase PokemonAnimPhase color:green;
+[19:01:27.279] WARN: PRSFX- Substitute2.wav not found
+[19:01:27.279] WARN: PRSFX- Substitute2.wav not found
+[19:01:27.279] WARN: PRSFX- Substitute2.wav not found
+[19:01:27.279] WARN: PRSFX- Substitute2.wav not found
+[19:01:27.279] WARN: PRSFX- Substitute2.wav not found
+[19:01:27.279] WARN: PRSFX- Substitute2.wav not found
+[19:01:27.279] WARN: PRSFX- Substitute2.wav not found
+[19:01:27.296] WARN: PRSFX- Substitute2.wav not found
+[19:01:27.380] LOG: %cStart Phase MessagePhase color:green;
+[19:01:27.622] LOG: %cStart Phase MoveEndPhase color:green;
+[19:01:27.622] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:01:27.622] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:01:27.622] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:01:27.622] LOG: %cStart Phase BerryPhase color:green;
+[19:01:27.626] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:01:27.628] LOG: %cStart Phase TurnEndPhase color:green;
+[19:01:27.632] LOG: %cStart Phase PokemonHealPhase color:green;
+[19:01:27.839] LOG: Applied Healing Charm 
+[19:01:27.840] LOG: %cStart Phase MessagePhase color:green;
+[19:01:28.088] LOG: %cStart Phase PokemonHealPhase color:green;
+[19:01:28.088] LOG: %cStart Phase MessagePhase color:green;
+[19:01:28.305] LOG: %cStart Phase PokemonHealPhase color:green;
+[19:01:28.306] LOG: %cStart Phase MessagePhase color:green;
+[19:01:28.521] LOG: %cStart Phase PokemonHealPhase color:green;
+[19:01:28.522] LOG: %cStart Phase MessagePhase color:green;
+[19:01:28.755] LOG: %cStart Phase SwitchSummonPhase color:green;
+[19:01:29.005] LOG: Elliot
+[19:01:29.215] LOG: %cStart Phase PostSummonPhase color:green;
+[19:01:29.215] LOG: Ran PSP for: Enamorus
+[19:01:29.216] LOG: %cStart Phase PostSummonPhase color:green;
+[19:01:29.216] LOG: %cStart Phase PostSummonPhase color:green;
+[19:01:29.216] LOG: %cStart Phase TurnInitPhase color:green;
+[19:01:29.216] LOG: %cStart Phase CommandPhase color:green;
