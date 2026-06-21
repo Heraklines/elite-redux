@@ -11,6 +11,7 @@
 // type used for one-off announcements (e.g. the welcome notice).
 // =============================================================================
 
+import { loggedInUser } from "#app/account";
 import { bypassLogin } from "#constants/app-constants";
 import { SpeciesId } from "#enums/species-id";
 import { type ErNotification, notificationManager } from "#system/notifications/notification-manager";
@@ -125,9 +126,21 @@ export function initErNotifications(): void {
   });
   notificationManager.registerSource(GHOST_TYPE, fetchGhostNotifications, GHOST_NOTIF_SETTING_KEY);
 
-  // Welcome note. push() dedupes by id and persists per user, so this is
-  // effectively one-time without a separate flag (and lands in the right per-user
-  // bucket because this runs once the player is logged in).
+  // Seed the welcome (+ staging demo) ONCE per user. Without this guard they would
+  // re-appear on every title visit and "Clear all" could never stick. Per-user key
+  // (this runs once logged in) so each account is seeded independently.
+  const user = loggedInUser?.username ?? "guest";
+  const seededKey = `er-notif-seeded-v2_${user}`;
+  let seeded = false;
+  try {
+    seeded = typeof localStorage !== "undefined" && localStorage.getItem(seededKey) === "1";
+  } catch {
+    seeded = false;
+  }
+  if (seeded) {
+    return;
+  }
+
   notificationManager.push({
     id: "system:welcome-v1",
     type: SYSTEM_TYPE,
@@ -173,5 +186,11 @@ export function initErNotifications(): void {
         ],
       } satisfies GhostNotifData,
     });
+  }
+
+  try {
+    localStorage.setItem(seededKey, "1");
+  } catch {
+    // localStorage unavailable - non-fatal; notifications just won't persist.
   }
 }

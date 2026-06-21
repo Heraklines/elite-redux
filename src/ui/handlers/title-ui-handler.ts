@@ -37,6 +37,7 @@ export class TitleUiHandler extends OptionSelectUiHandler {
   // menu option to highlight it, then ACTION to open the inbox window.
   private inboxIcon: Phaser.GameObjects.Container;
   private inboxBadge: Phaser.GameObjects.Ellipse;
+  private inboxCount: Phaser.GameObjects.Text;
   private inboxHighlight: Phaser.GameObjects.Rectangle;
   private inboxFocused = false;
   private inboxDetail: Phaser.GameObjects.Container | undefined;
@@ -158,9 +159,12 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     env.lineTo(-w / 2, 0);
     env.lineTo(0, -h / 2);
     env.strokePath();
-    // Unread dot at the top-right corner (hidden when nothing is unread).
-    this.inboxBadge = globalScene.add.ellipse(0, -h / 2, 5, 5, 0xff5555).setVisible(false);
-    this.inboxIcon.add([this.inboxHighlight, env, this.inboxBadge]);
+    // Unread dot at the top-right corner + a bright count to the left of the
+    // envelope, both hidden when nothing is unread.
+    this.inboxBadge = globalScene.add.ellipse(0, -h / 2, 6, 6, 0xff4444).setVisible(false);
+    this.inboxCount = addTextObject(-w - 4, -1, "", TextStyle.MONEY, { fontSize: "64px" }).setOrigin(1, 0.5);
+    this.inboxCount.setColor("#ffe066");
+    this.inboxIcon.add([this.inboxHighlight, env, this.inboxBadge, this.inboxCount]);
     this.titleContainer.add(this.inboxIcon);
     this.redrawInbox();
   }
@@ -176,9 +180,11 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     this.redrawInbox();
   }
 
-  /** Show/hide the unread dot from the current unread count. */
+  /** Show/hide the unread dot + count from the current unread count. */
   private redrawInbox(): void {
-    this.inboxBadge?.setVisible(notificationManager.unreadCount(this.notifEnabled) > 0);
+    const unread = notificationManager.unreadCount(this.notifEnabled);
+    this.inboxBadge?.setVisible(unread > 0);
+    this.inboxCount?.setText(unread > 0 ? String(unread) : "").setVisible(unread > 0);
   }
 
   private setInboxFocused(focused: boolean): void {
@@ -261,6 +267,18 @@ export class TitleUiHandler extends OptionSelectUiHandler {
         keepOpen: true,
       });
     }
+    if (list.length > 0) {
+      options.push({
+        label: "Clear all",
+        handler: () => {
+          notificationManager.clear();
+          this.redrawInbox();
+          globalScene.ui.revertMode().then(() => this.openInbox());
+          return true;
+        },
+        keepOpen: true,
+      });
+    }
     options.push({
       label: i18next.t("menu:cancel"),
       handler: () => {
@@ -276,7 +294,9 @@ export class TitleUiHandler extends OptionSelectUiHandler {
   /**
    * Show one notification's detail as a compact custom panel. Ghost-battle alerts
    * render the two teams as Pokemon party icons (yours vs theirs); other types
-   * show auto-scrolling text. B / confirm returns to the inbox list.
+   * show wrapped text. B / confirm returns to the inbox list. The panel sits in
+   * the empty left area so it never collides with the right-side title menu, and
+   * lives in titleContainer (the title's reliable, visible render layer).
    */
   private openInboxDetail(n: ErNotification): void {
     this.closeInboxDetail();
@@ -286,10 +306,11 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     const title = this.clipInbox(detail?.title ?? summary, 30);
     const isGhost = detail?.customView === "ghost-battle";
 
-    const cx = globalScene.scaledCanvas.width / 2;
-    const cy = globalScene.scaledCanvas.height / 2 - 6;
-    const w = 184;
-    const h = isGhost ? 96 : 64;
+    const w = 150;
+    const h = isGhost ? 96 : 74;
+    // Centre in the open left region (the title menu occupies the right side).
+    const cx = Math.round(globalScene.scaledCanvas.width * 0.33);
+    const cy = Math.round(globalScene.scaledCanvas.height * 0.52);
     const panel = globalScene.add.container(cx, cy);
     const bg = globalScene.add.rectangle(0, 0, w, h, 0x16161f, 0.96).setOrigin(0.5);
     bg.setStrokeStyle(1, 0x6c8cff, 0.95);
@@ -328,7 +349,8 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     }
 
     panel.add(addTextObject(0, h / 2 - 9, "B: Back", TextStyle.WINDOW, { fontSize: "54px" }).setOrigin(0.5, 0));
-    this.getUi().add(panel);
+    this.titleContainer.add(panel);
+    this.titleContainer.bringToTop(panel);
     this.inboxDetail = panel;
     this.detailOpen = true;
   }
