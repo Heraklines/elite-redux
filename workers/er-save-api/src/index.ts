@@ -729,10 +729,30 @@ async function recordGhostBattles(env: Env, victimRunId: string, victim: string,
   }
 }
 
+/** Lazily index runs by ghost_source_name so the derived notification scan is cheap. */
+async function ensureRunsGhostIndex(env: Env): Promise<void> {
+  try {
+    await env.DB.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_runs_ghost_source ON runs (ghost_source_name, created_at)",
+    ).run();
+  } catch {
+    // Index is an optimization only; the query is correct without it.
+  }
+}
+
 /**
  * ER ghost notifications: the battles where the CALLER's ghost fought another
  * player, since `?since=<ts>` (the client tracks last-seen locally — no write).
- * Joins each row to the victim's team and the ghost's team for the comparison.
+ *
+ * Two sources, merged + deduped by victim run:
+ *  (1) `ghost_battles` — precise per-ghost rows (incl. "fought but didn't end")
+ *      written when a client sends `ghostsFought`. Empty until clients do so.
+ *  (2) DERIVED from the `runs` table — every run a victim already wrote records
+ *      `ghost_source_name` (= the ghost owner's username, see captureGhostTeam)
+ *      when a ghost ENDED it. So "did my ghost beat anyone" is a read of data
+ *      already present: no client recording, and it works retroactively.
+ * Each row is joined to the victim's team + the ghost's source-run team for the
+ * comparison.
  */
 async function handleGhostNotifications(
   url: URL,
@@ -742,19 +762,6 @@ async function handleGhostNotifications(
 ): Promise<Response> {
   const sinceParsed = Number.parseInt(url.searchParams.get("since") ?? "", 10);
   const since = Number.isFinite(sinceParsed) ? Math.max(sinceParsed, 0) : 0;
-  await ensureGhostBattlesTable(env);
-  const { results } = await env.DB.prepare(
-    `SELECT gb.victim, gb.beaten_count, gb.ended_run, gb.created_at,
-            v.player_team AS victim_team, o.player_team AS ghost_team
-       FROM ghost_battles gb
-       LEFT JOIN runs v ON v.id = gb.victim_run_id
-       LEFT JOIN runs o ON o.id = gb.owner_run_id
-      WHERE gb.ghost_owner = ?1 AND gb.created_at > ?2
-      ORDER BY gb.created_at DESC
-      LIMIT 50`,
-  )
-    .bind(auth.u, since)
-    .all();
   const safeParse = (s: unknown): unknown => {
     if (typeof s !== "string") {
       return null;
@@ -765,15 +772,70 @@ async function handleGhostNotifications(
       return null;
     }
   };
-  const items = (results ?? []).map((r: Record<string, unknown>) => ({
-    victim: r.victim,
-    beaten: r.beaten_count,
-    endedRun: r.ended_run === 1,
-    when: r.created_at,
-    victimTeam: safeParse(r.victim_team),
-    ghostTeam: safeParse(r.ghost_team),
-  }));
-  return json({ items }, 200, cors);
+  const teamLen = (t: unknown): number => (Array.isArray(t) ? t.length : 0);
+
+  await ensureGhostBattlesTable(env);
+  await ensureRunsGhostIndex(env);
+
+  const precise = await env.DB.prepare(
+    `SELECT gb.victim, gb.beaten_count, gb.ended_run, gb.created_at, gb.victim_run_id,
+            v.player_team AS victim_team, o.player_team AS ghost_team
+       FROM ghost_battles gb
+       LEFT JOIN runs v ON v.id = gb.victim_run_id
+       LEFT JOIN runs o ON o.id = gb.owner_run_id
+      WHERE gb.ghost_owner = ?1 AND gb.created_at > ?2
+      ORDER BY gb.created_at DESC
+      LIMIT 50`,
+  )
+    .bind(auth.u, since)
+    .all();
+
+  const derived = await env.DB.prepare(
+    `SELECT r.username AS victim, r.id AS victim_run_id, r.created_at AS created_at,
+            r.player_team AS victim_team, g.player_team AS ghost_team
+       FROM runs r
+       LEFT JOIN runs g ON g.id = r.ghost_source_run_id
+      WHERE r.ghost_source_name = ?1 AND r.ghost_source_run_id IS NOT NULL
+        AND r.username != ?1 AND r.created_at > ?2
+      ORDER BY r.created_at DESC
+      LIMIT 50`,
+  )
+    .bind(auth.u, since)
+    .all();
+
+  const seen = new Set<string>();
+  const items: Record<string, unknown>[] = [];
+  for (const r of precise.results ?? []) {
+    const row = r as Record<string, unknown>;
+    seen.add(String(row.victim_run_id ?? `${row.victim}:${row.created_at}`));
+    items.push({
+      victim: row.victim,
+      beaten: row.beaten_count,
+      endedRun: row.ended_run === 1,
+      when: row.created_at,
+      victimTeam: safeParse(row.victim_team),
+      ghostTeam: safeParse(row.ghost_team),
+    });
+  }
+  for (const r of derived.results ?? []) {
+    const row = r as Record<string, unknown>;
+    const key = String(row.victim_run_id ?? `${row.victim}:${row.created_at}`);
+    if (seen.has(key)) {
+      continue; // a precise ghost_battles row already covers this victim run
+    }
+    const victimTeam = safeParse(row.victim_team);
+    items.push({
+      victim: row.victim,
+      // Ghost ENDED their run, so their active party went down: report its size.
+      beaten: Math.min(6, teamLen(victimTeam)),
+      endedRun: true,
+      when: row.created_at,
+      victimTeam,
+      ghostTeam: safeParse(row.ghost_team),
+    });
+  }
+  items.sort((a, b) => (b.when as number) - (a.when as number));
+  return json({ items: items.slice(0, 50) }, 200, cors);
 }
 
 /** Sample winning runs (excluding the caller's own) as ghost-team snapshots. */

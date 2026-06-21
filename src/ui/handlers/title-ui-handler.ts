@@ -4,7 +4,6 @@ import { FAKE_TITLE_LOGO_CHANCE } from "#app/constants";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { isBeta, isDev } from "#constants/app-constants";
-import { GHOST_NOTIF_SETTING_KEY, initErNotifications } from "#data/elite-redux/er-ghost-notifications";
 import { getSplashMessages } from "#data/splash-messages";
 import { PlayerGender } from "#enums/player-gender";
 import type { SpeciesId } from "#enums/species-id";
@@ -12,7 +11,6 @@ import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import { version } from "#package.json";
 import { TimedEventDisplay } from "#ui/event-display";
-import { NotificationBell } from "#ui/notification-bell";
 import { OptionSelectUiHandler } from "#ui/option-select-ui-handler";
 import { addTextObject } from "#ui/text";
 import { fixedInt, randInt, randItem } from "#utils/common";
@@ -30,7 +28,6 @@ export class TitleUiHandler extends OptionSelectUiHandler {
   private splashMessageText: Phaser.GameObjects.Text;
   private eventDisplay: TimedEventDisplay;
   private appVersionText: Phaser.GameObjects.Text;
-  private notificationBell?: NotificationBell;
 
   private titleStatsTimer: NodeJS.Timeout | null;
 
@@ -117,17 +114,6 @@ export class TitleUiHandler extends OptionSelectUiHandler {
       this.splashMessageText,
       this.appVersionText,
     ]);
-
-    // ER notification inbox: register the notification types/sources (ghost-battle
-    // + system) and drop a bell at top-right (below the username/playercount
-    // labels). Type-agnostic - the bell renders whatever the manager holds.
-    initErNotifications();
-    // Predicate bridges a type's settingKey to the live scene toggle. Unknown
-    // keys default to enabled, so a new notification type shows until it opts in.
-    this.notificationBell = new NotificationBell(scaledWidth - 2, 28, key =>
-      key === GHOST_NOTIF_SETTING_KEY ? globalScene.ghostNotifications !== false : true,
-    );
-    this.titleContainer.add(this.notificationBell);
   }
 
   updateTitleStats(): void {
@@ -186,7 +172,6 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     const windowHeight = this.getWindowHeight();
 
     this.updateUsername();
-    this.notificationBell?.refresh(); // re-pull notification sources each time the title appears
 
     // Moving username and player count to top of the menu
     // and sorting it, to display the shorter one on top

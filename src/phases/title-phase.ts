@@ -9,6 +9,7 @@ import { Phase } from "#app/phase";
 import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-seed/daily-run";
 import { modifierTypes } from "#data/data-lists";
+import { GHOST_NOTIF_SETTING_KEY, initErNotifications } from "#data/elite-redux/er-ghost-notifications";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -19,6 +20,7 @@ import { getBiomeKey } from "#field/arena";
 import type { Modifier } from "#modifiers/modifier";
 import { getDailyRunStarterModifiers, regenerateModifierPoolThresholds } from "#modifiers/modifier-type";
 import { isDirectorConfigured } from "#system/llm-director/director-runtime";
+import { type NotificationDetail, notificationManager } from "#system/notifications/notification-manager";
 import { vouchers } from "#system/voucher";
 import type { OptionSelectConfig, OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
@@ -79,8 +81,19 @@ export class TitlePhase extends Phase {
     }
   }
 
+  /** Predicate bridging a notification type's settingKey to the live scene toggle. */
+  private readonly notifEnabled = (key: string): boolean =>
+    key === GHOST_NOTIF_SETTING_KEY ? globalScene.ghostNotifications !== false : true;
+
   private async showOptions(lastSessionSlot: number): Promise<void> {
     const options: OptionSelectItem[] = [];
+    // ER notifications: register types/sources (idempotent) and kick a background
+    // pull so the unread count is fresh on the NEXT title build. Non-blocking - the
+    // title menu must never wait on the network.
+    initErNotifications();
+    notificationManager.refresh(this.notifEnabled).catch(() => {
+      /* manager isolates its own source errors; nothing to do here */
+    });
     // Add a "continue" menu if the session slot ID is >-1
     if (lastSessionSlot > NO_SAVE_SLOT) {
       options.push({
@@ -223,12 +236,80 @@ export class TitlePhase extends Phase {
       this.end();
     };
     options.push(...getDevMenuItems({ startRunWithMode }));
+    // ER notification inbox. Placed LAST so pressing UP from "Continue" (the top
+    // option) wraps straight to it - directionally reachable, not click-only. The
+    // unread count is shown inline so the entry is visible without extra chrome.
+    const unread = notificationManager.unreadCount(this.notifEnabled);
+    options.push({
+      label: unread > 0 ? `Inbox (${unread})` : "Inbox",
+      handler: () => {
+        this.openInbox();
+        return true;
+      },
+      keepOpen: true,
+    });
     const config: OptionSelectConfig = {
       options,
       noCancel: true,
       yOffset: 47,
     };
     await globalScene.ui.setMode(UiMode.TITLE, config);
+  }
+
+  /**
+   * Open the notification inbox as a directionally-navigable option list (B or
+   * "Close" returns to the title menu). Selecting an entry marks it read and
+   * shows its detail; "Mark all read" clears the badge. Re-entrant: reading a
+   * detail reopens the list.
+   */
+  private openInbox(): void {
+    const list = notificationManager.list(this.notifEnabled);
+    const options: OptionSelectItem[] = [];
+    if (list.length === 0) {
+      options.push({ label: "No notifications yet", handler: () => false, skip: true });
+    }
+    for (const n of list) {
+      const def = notificationManager.getType(n.type);
+      const summary = def ? def.summary(n) : n.type;
+      const label = `${n.read ? "  " : "* "}${this.clipText(summary, 34)}`;
+      options.push({
+        label,
+        handler: () => {
+          notificationManager.markRead(n.id);
+          const detail: NotificationDetail | undefined = def?.detail?.(n);
+          const title = detail?.title ?? summary;
+          const body = detail?.body ?? "";
+          const text = body ? `${title}\n\n${body}` : title;
+          globalScene.ui.revertMode().then(() => {
+            globalScene.ui.showText(text, null, () => this.openInbox(), null, true);
+          });
+          return true;
+        },
+      });
+    }
+    if (list.some(n => !n.read)) {
+      options.push({
+        label: "Mark all read",
+        handler: () => {
+          notificationManager.markAllRead();
+          globalScene.ui.revertMode().then(() => this.openInbox());
+          return true;
+        },
+      });
+    }
+    options.push({
+      label: i18next.t("menu:cancel"),
+      handler: () => {
+        globalScene.ui.revertMode();
+        return true;
+      },
+    });
+    globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options, maxOptions: 8 });
+  }
+
+  /** Trim a one-line inbox summary to fit the option row. */
+  private clipText(s: string, max: number): string {
+    return s.length > max ? `${s.slice(0, max - 1)}…` : s;
   }
 
   // TODO: Make callers actually wait for the save slot to load
