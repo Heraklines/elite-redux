@@ -846,6 +846,8 @@ export function setSetting(setting: string, value: number): boolean {
       break;
     case SettingKeys.Day_Night_Tint:
       globalScene.dayNightTint = Setting[index].options[value].value === "On";
+      // Toggle the standalone corner time icon live (visible only while off).
+      globalScene.timeOfDayCornerWidget?.setVisible(!globalScene.dayNightTint);
       break;
     case SettingKeys.Hide_Username:
       globalScene.hideUsername = Setting[index].options[value].value === "On";

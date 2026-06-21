@@ -46,14 +46,20 @@ export class TimeOfDayWidget extends Phaser.GameObjects.Container {
     this._parentVisible = visible;
   }
 
-  constructor(x = 0, y = 0) {
+  /**
+   * @param forceInit - ER: always build the sprites (used by the standalone
+   *   corner instance), so the day/night tint can be toggled live. That instance
+   *   is only VISIBLE while the tint is off; the flyout instance shows whenever it
+   *   inits (the flyout controls its own visibility).
+   */
+  constructor(x = 0, y = 0, forceInit = false) {
     super(globalScene, x, y);
 
     // ER: also surface the time icon when the day/night tint is OFF, since the
     // screen no longer changes colour to signal the time of day.
-    const showWidget = globalScene.showTimeOfDayWidget || globalScene.dayNightTint === false;
-    this.setVisible(showWidget);
-    if (!showWidget) {
+    const shouldInit = forceInit || globalScene.showTimeOfDayWidget || globalScene.dayNightTint === false;
+    this.setVisible(forceInit ? globalScene.dayNightTint === false : shouldInit);
+    if (!shouldInit) {
       return;
     }
 

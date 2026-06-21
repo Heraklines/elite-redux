@@ -175,6 +175,7 @@ import { PartyExpBar } from "#ui/party-exp-bar";
 import { PokeballTray } from "#ui/pokeball-tray";
 import { PokemonInfoContainer } from "#ui/pokemon-info-container";
 import { addTextObject, getTextColor, RAINBOW_TINT } from "#ui/text";
+import { TimeOfDayWidget } from "#ui/time-of-day-widget";
 import { UI } from "#ui/ui";
 import { addUiThemeOverrides } from "#ui/ui-theme";
 import { playTween } from "#utils/anim-utils";
@@ -375,6 +376,8 @@ export class BattleScene extends SceneBase {
   private modifierBar: ModifierBar;
   private enemyModifierBar: ModifierBar;
   public arenaFlyout: ArenaFlyout;
+  /** ER: persistent corner time-of-day icon, shown only while the day/night tint is off. */
+  public timeOfDayCornerWidget: TimeOfDayWidget;
 
   private fieldOverlay: Phaser.GameObjects.Rectangle;
   /** ER: scrolling fog overlay shown while {@linkcode WeatherType.FOG} is active (ROM fog sprite). */
@@ -732,6 +735,11 @@ export class BattleScene extends SceneBase {
       .setVisible(false);
 
     this.arenaFlyout = new ArenaFlyout();
+    // ER: a standalone time-of-day icon pinned top-left, shown only while the
+    // day/night tint is off (the screen no longer darkens to signal night).
+    // parentVisible=true so its transition tweens actually play.
+    this.timeOfDayCornerWidget = new TimeOfDayWidget(16, -this.scaledCanvas.height + 16, true);
+    this.timeOfDayCornerWidget.parentVisible = true;
     this.pokemonInfoContainer = new PokemonInfoContainer(this.scaledCanvas.width + 52, -this.scaledCanvas.height + 66) //
       .setup();
     this.updateUIPositions();
@@ -757,6 +765,7 @@ export class BattleScene extends SceneBase {
         this.luckText,
         this.luckLabelText,
         this.arenaFlyout,
+        this.timeOfDayCornerWidget,
         this.pokemonInfoContainer,
       ])
       .moveBelow<Phaser.GameObjects.GameObject>(this.arenaFlyout, this.fieldOverlay);
