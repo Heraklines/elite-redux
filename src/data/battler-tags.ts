@@ -347,16 +347,32 @@ export abstract class MoveRestrictionBattlerTag extends SerializableBattlerTag {
 export class ThroatChoppedTag extends MoveRestrictionBattlerTag {
   public override readonly tagType = BattlerTagType.THROAT_CHOPPED;
   constructor() {
-    super(BattlerTagType.THROAT_CHOPPED, BattlerTagLapseType.TURN_END, 2, MoveId.THROAT_CHOP);
+    // PRE_MOVE so the restriction also CANCELS a sound move at use-time (e.g. a
+    // foe that already locked in / was forced into a sound move that same turn),
+    // not just block selection. Without it the cancel in lapse(PRE_MOVE) never
+    // fired (the tag only lapsed at TURN_END), so throat-chopped sound moves still
+    // went through. TURN_END is kept for the 2-turn duration countdown.
+    super(
+      BattlerTagType.THROAT_CHOPPED,
+      [BattlerTagLapseType.PRE_MOVE, BattlerTagLapseType.TURN_END],
+      2,
+      MoveId.THROAT_CHOP,
+    );
   }
 
   /**
    * Check if a move is restricted by Throat Chop.
    * @param move - The {@linkcode MoveId | ID } of the move to check for sound-based restriction
+   * @param user - The restricted {@linkcode Pokemon} (so ER Festivities' dance->sound
+   *   injection is honored: a dance move counts as sound and is throat-chopped too).
    * @returns Whether the move is sound based
    */
-  override isMoveRestricted(move: MoveId): boolean {
-    return allMoves[move].hasFlag(MoveFlags.SOUND_BASED);
+  override isMoveRestricted(move: MoveId, user?: Pokemon): boolean {
+    // With a user, honor Festivities' dance->sound injection; without one, fall
+    // back to the static flag (same result doesFlagEffectApply gives for no user).
+    return user
+      ? allMoves[move].doesFlagEffectApply({ flag: MoveFlags.SOUND_BASED, user })
+      : allMoves[move].hasFlag(MoveFlags.SOUND_BASED);
   }
 
   /**

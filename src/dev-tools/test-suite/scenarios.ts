@@ -342,6 +342,36 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Combat — Throat Chop blocks sound moves (incl. same-turn cancel)
+  // ===========================================================================
+  {
+    label: "Throat Chop stops sound moves (same-turn cancel)",
+    description:
+      "Throat Chop fix: a throat-chopped Pokemon cannot use SOUND moves for 2 turns,\n"
+      + "and a sound move already locked in THAT turn is CANCELLED (not just blocked at\n"
+      + "selection). DO: turn 1, use Throat Chop on the enemy Exploud (your Weavile\n"
+      + "outspeeds it). EXPECT: Exploud's Boomburst is cancelled that turn (it does not\n"
+      + "fire), and on later turns Exploud cannot use Boomburst at all (it Struggles, as\n"
+      + "that is its only move). Before the fix the same-turn Boomburst still went off.\n"
+      + "(Festivities' dance<->sound interchange is covered by the er-festivities unit\n"
+      + "tests; this scenario covers the Throat Chop sound-restriction itself.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.EXPLOUD,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.BOOMBURST],
+      });
+      return [
+        makeStarter(SpeciesId.WEAVILE, {
+          moveset: [MoveId.THROAT_CHOP, MoveId.ICE_SHARD, MoveId.NIGHT_SLASH, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // QoL — level-up Move Learn panel
   // ===========================================================================
   {
