@@ -401,6 +401,125 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Combat — Deadeye cannon/arrow moves never miss (even as an innate)
+  // ===========================================================================
+  {
+    label: "Deadeye: Zap Cannon never misses (innate)",
+    description:
+      "Deadeye fix: arrow + cannon moves never miss, even when Deadeye is an INNATE\n"
+      + "rather than the primary ability. The enemy Porygon-Z has Deadeye as an innate\n"
+      + "and only knows Zap Cannon (a cannon move, 50% base accuracy). DO: stall with\n"
+      + "Soft-Boiled and let it attack many turns. EXPECT: Zap Cannon NEVER misses.\n"
+      + "Before the fix the innate (slot 2) was ignored, so it missed ~half the time.\n"
+      + "(Enemies always have innates active, so no unlock is needed.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 60,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.PORYGON_Z,
+        ENEMY_LEVEL_OVERRIDE: 40,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.ZAP_CANNON],
+      });
+      return [
+        makeStarter(SpeciesId.BLISSEY, {
+          moveset: [MoveId.SOFT_BOILED, MoveId.SEISMIC_TOSS, MoveId.THUNDER_WAVE, MoveId.TOXIC],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Combat — High Tide follow-up Surf hits all foes (double battle)
+  // ===========================================================================
+  {
+    label: "High Tide: follow-up Surf hits BOTH foes",
+    description:
+      "High Tide fix: after a Water move, the 50 BP Surf follow-up must hit ALL foes,\n"
+      + "not just one. Double battle; both your mons have High Tide. DO: use Water Pulse\n"
+      + "(single target) on one foe. EXPECT: the triggered follow-up Surf then hits BOTH\n"
+      + "opposing Pokemon (before the fix it only hit one). Same fix covers Glacial\n"
+      + "Rage's Blizzard follow-up.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 55,
+        BATTLE_STYLE_OVERRIDE: "double",
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.HIGH_TIDE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 30,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GRENINJA, {
+          moveset: [MoveId.WATER_PULSE, MoveId.SURF, MoveId.ICE_BEAM, MoveId.DARK_PULSE],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.WATER_PULSE, MoveId.IRON_TAIL],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Combat — Mega Vanilluxe Multi-headed strikes 3 times
+  // ===========================================================================
+  {
+    label: "Mega Vanilluxe Multi-headed hits 3x",
+    description:
+      "Multi-headed fix: a mega that GAINS a 3rd head (Vanilluxe, Mawile, Shuckle)\n"
+      + "should strike 3 times (100% / 20% / 15%), not 2 (100% / 25%). DO: win the\n"
+      + "opening battle, take Vanilluxe's Mega Stone from the shop, mega-evolve it next\n"
+      + "battle, then attack with Ice Beam (a single-target move). EXPECT: THREE hits.\n"
+      + "Before the fix the mega head-count lookup missed and it only hit twice.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 60,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.VANILLUXE, {
+          moveset: [MoveId.ICE_BEAM, MoveId.FLASH_CANNON, MoveId.FREEZE_DRY, MoveId.MIRROR_COAT],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.FORM_CHANGE_ITEM],
+  },
+  // ===========================================================================
+  // UI — Redux Litwick line renders its own sprite (not Pansear)
+  // ===========================================================================
+  {
+    label: "Redux Litwick shows its own sprite (not Pansear)",
+    description:
+      "Sprite fix: the Redux Litwick line rendered the Redux Pansear line's art in the\n"
+      + "Pokedex / starter / party UI (the species-level sprite bridge only covered mega\n"
+      + "forms, not redux forms). DO: from this battle open the menu > Check Team and\n"
+      + "view the Redux Litwick's summary/sprite (also check it in the Pokedex). EXPECT:\n"
+      + "the Litwick redux art, NOT a Pansear/Simisear monkey. The battle field was\n"
+      + "already correct; this verifies the UI screens.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.LITWICK, {
+          formIndex: formIndexByKey(SpeciesId.LITWICK, "redux"),
+          moveset: [MoveId.FIRE_BLAST, MoveId.SHADOW_BALL, MoveId.ENERGY_BALL, MoveId.FLAME_BURST],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.SURF],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // QoL — level-up Move Learn panel
   // ===========================================================================
   {

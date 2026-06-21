@@ -29,6 +29,7 @@ import {
   initEliteReduxSpecies,
   injectAllErMegaForms,
   installAllErMegaSpriteRedirects,
+  installAllErReduxSpriteRedirects,
 } from "#data/elite-redux/init-elite-redux-species";
 import { initEliteReduxSpeciesTuning } from "#data/elite-redux/init-elite-redux-species-tuning";
 import { initEliteReduxStarterCosts } from "#data/elite-redux/init-elite-redux-starter-costs";
@@ -155,6 +156,11 @@ export function initializeGame() {
   console.info(
     `[er-b1c2] mega sprite redirects: ${megaSpriteResult.applied} applied, ${megaSpriteResult.missing} unresolved`,
   );
+  // Same species-level UI sprite gap for ER "redux" forms (e.g. Redux Litwick
+  // showing Redux Pansear art in the Pokedex/starter/party screens). Bridge them
+  // the same way; the battle path already worked via the per-form redirect.
+  const reduxSpriteCount = installAllErReduxSpriteRedirects();
+  console.info(`[er] redux sprite dispatch installed on ${reduxSpriteCount} species`);
   // Elite Redux #151: repair scrambled gen8/9 move id-map entries (by name)
   // BEFORE the rebalance + move-patches consume the map, so stats and effects
   // land on the correct pokerogue move (e.g. Kowtow Cleave, not Blood Moon).

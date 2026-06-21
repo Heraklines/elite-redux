@@ -35,20 +35,20 @@ import { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
 
 /**
- * Elite Redux: walk both `user.getAbility()` and `user.getPassiveAbility()`,
- * and check each ability's attrs for any `ConditionalAlwaysHitAbAttr` whose
- * predicate matches the current move. Returns true if at least one matches.
+ * Elite Redux: scan ALL of the user's active ability attrs (primary ability +
+ * every eligible innate slot) for a `ConditionalAlwaysHitAbAttr` whose predicate
+ * matches the current move. Returns true if at least one matches.
+ *
+ * Uses `getAllActiveAbilityAttrs()` (innate-aware): the previous version only
+ * walked `getAbility()` + `getPassiveAbility()` (innate slot 0), so a
+ * conditional-always-hit ability living in innate slot 1-2 (e.g. Deadeye on
+ * Porygon-Z, whose Zap Cannon kept missing) was invisible and its moves could
+ * still miss.
  */
 function erUserHasConditionalAlwaysHit(user: Pokemon, move: import("#moves/move").Move, target: Pokemon): boolean {
-  const abilities = [user.getAbility(), user.getPassiveAbility()];
-  for (const ab of abilities) {
-    if (!ab) {
-      continue;
-    }
-    for (const attr of ab.attrs) {
-      if (attr instanceof ConditionalAlwaysHitAbAttr && attr.matches(move, user, target)) {
-        return true;
-      }
+  for (const attr of user.getAllActiveAbilityAttrs()) {
+    if (attr instanceof ConditionalAlwaysHitAbAttr && attr.matches(move, user, target)) {
+      return true;
     }
   }
   return false;

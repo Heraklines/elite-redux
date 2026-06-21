@@ -31,6 +31,7 @@ import type { MoveId } from "#enums/move-id";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
 import { isVirtual, MoveUseMode } from "#enums/move-use-mode";
 import type { PokemonType } from "#enums/pokemon-type";
+import { getMoveTargets } from "#moves/move-utils";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 
 export interface PostAttackScriptedMoveOptions {
@@ -53,6 +54,7 @@ export interface PostAttackScriptedMoveOptions {
    * (e.g. `MoveFlags.DANCE_MOVE` for "after dance move" triggers).
    */
   readonly flagFilter?: MoveFlags;
+  readonly magnitudeRange?: readonly [min: number, max: number];
 }
 
 export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
@@ -130,11 +132,18 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
     // `MovePhaseTimingModifier.FIRST` forces it ahead of any remaining queued
     // moves — i.e. it resolves immediately after the triggering attack, exactly
     // how vanilla Dancer chains its replicated move.
+    // Spread follow-ups (High Tide's Surf, Glacial Rage's Blizzard) must hit
+    // EVERY valid target, not just the one foe the trigger interacted with.
+    // Resolve the scripted move's real target set from its MoveTarget; for
+    // single-target follow-ups (Leaf Blade, Revelation Dance, ...) keep the
+    // guarded `opponent` so self-targeting status dances still aim at a real foe.
+    const { targets: spreadTargets, multiple } = getMoveTargets(pokemon, this.opts.moveId);
+    const followUpTargets = multiple && spreadTargets.length > 0 ? spreadTargets : [opponent.getBattlerIndex()];
     globalScene.phaseManager.unshiftNew(
       "MovePhase",
       pokemon,
-      [opponent.getBattlerIndex()],
-      scriptedPokemonMove(this.opts.moveId, this.opts.power),
+      followUpTargets,
+      scriptedPokemonMove(this.opts.moveId, this.opts.power, { magnitudeRange: this.opts.magnitudeRange }),
       MoveUseMode.INDIRECT,
       MovePhaseTimingModifier.FIRST,
     );

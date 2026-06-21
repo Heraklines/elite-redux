@@ -856,3 +856,28 @@ export function installAllErMegaSpriteRedirects(): { applied: number; missing: n
   }
   return { applied, missing };
 }
+
+/**
+ * Companion to {@linkcode installAllErMegaSpriteRedirects} for ER "redux" forms.
+ * A vanilla species wearing its injected "redux" form has the per-form sprite
+ * redirect installed (so the BATTLE path resolves), but the SPECIES-level path
+ * used by the starter/Pokedex/party UI builds the vanilla `{id}-redux` key, which
+ * 404s and falls back to whatever ER redux texture is resident in the shared atlas
+ * cache (e.g. Redux Litwick rendering Redux Pansear art). Installing the species
+ * dispatch makes the UI delegate to the redirected redux form. The dispatch's
+ * own `formFor` checks the per-form redirect flag, so a redux form without art
+ * safely falls back. Idempotent per species; MUST run AFTER all form registration.
+ */
+export function installAllErReduxSpriteRedirects(): number {
+  let applied = 0;
+  for (const species of allSpecies) {
+    if (species.speciesId >= 10000) {
+      continue; // ER-custom dump species render via their own ErCustomSpecies overrides
+    }
+    if (species.forms.some(f => f.formKey === "redux")) {
+      installErSpeciesFormSpriteDispatch(species);
+      applied++;
+    }
+  }
+  return applied;
+}

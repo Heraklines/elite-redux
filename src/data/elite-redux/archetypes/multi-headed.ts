@@ -48,18 +48,38 @@ import type { Pokemon } from "#field/pokemon";
 // `SPECIES_*_MEGA` dump entry's count is keyed under the mega-only map.
 const BASE_HEAD_COUNT = new Map<number, number>();
 const MEGA_HEAD_COUNT = new Map<number, number>();
+// speciesConst -> pokerogue species id. Needed because a `SPECIES_*_MEGA` dump
+// entry has its OWN dump id, but at runtime a mega is a FORM of the base species
+// and keeps the BASE `speciesId`. So a mega's head count must be keyed under the
+// base species' pokerogue id, resolved from the base `speciesConst`.
+const CONST_TO_PK_ID = new Map<string, number>();
+for (const draft of ER_SPECIES) {
+  const pk = ER_ID_MAP.species[(draft as { id: number }).id];
+  if (pk !== undefined) {
+    CONST_TO_PK_ID.set((draft as { speciesConst: string }).speciesConst, pk);
+  }
+}
 for (const draft of ER_SPECIES) {
   const flags = (draft as { flags?: string }).flags ?? "";
   const count = flags.includes("F_THREE_HEADED") ? 3 : flags.includes("F_TWO_HEADED") ? 2 : 0;
   if (count === 0) {
     continue;
   }
-  const pkId = ER_ID_MAP.species[(draft as { id: number }).id];
-  if (pkId === undefined) {
+  const speciesConst = (draft as { speciesConst: string }).speciesConst;
+  // A mega (`SPECIES_X_MEGA`, `_MEGA_X`, `_MEGA_Y`) keys under its BASE id, since
+  // that is the speciesId the mega'd mon presents in battle.
+  const megaMatch = /^(.*)_MEGA(?:_[XY])?$/.exec(speciesConst);
+  if (megaMatch) {
+    const baseId = CONST_TO_PK_ID.get(megaMatch[1]);
+    if (baseId !== undefined) {
+      MEGA_HEAD_COUNT.set(baseId, count);
+    }
     continue;
   }
-  const isMegaEntry = /_MEGA\b/.test((draft as { speciesConst: string }).speciesConst);
-  (isMegaEntry ? MEGA_HEAD_COUNT : BASE_HEAD_COUNT).set(pkId, count);
+  const pkId = ER_ID_MAP.species[(draft as { id: number }).id];
+  if (pkId !== undefined) {
+    BASE_HEAD_COUNT.set(pkId, count);
+  }
 }
 
 /** Whether the holder is currently in a Mega form (any mega form key). */
