@@ -140,4 +140,46 @@ export function initErNotifications(): void {
   } catch {
     // localStorage unavailable — skip the welcome, no harm.
   }
+
+  // Staging/dev ONLY: a one-time SAMPLE ghost-battle notification so the team can
+  // see exactly how a real one looks (summary + team comparison) before live data
+  // exists. Gated like the dev test suite, so production never shows fake alerts.
+  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+  if (env?.DEV === true || env?.VITE_DEV_TOOLS === "1") {
+    try {
+      const key = "er-notif-demo-ghost-v1";
+      if (typeof localStorage !== "undefined" && !localStorage.getItem(key)) {
+        notificationManager.push({
+          id: "ghost-battle:demo-v1",
+          type: GHOST_TYPE,
+          timestamp: Date.now(),
+          read: false,
+          data: {
+            victim: "RivalRed",
+            beaten: 4,
+            endedRun: true,
+            ghostTeam: [
+              { name: "Tyranitar" },
+              { name: "Gengar" },
+              { name: "Dragonite" },
+              { name: "Garchomp" },
+              { name: "Volcarona" },
+              { name: "Azumarill" },
+            ],
+            victimTeam: [
+              { name: "Charizard" },
+              { name: "Blastoise" },
+              { name: "Venusaur" },
+              { name: "Snorlax" },
+              { name: "Alakazam" },
+              { name: "Lapras" },
+            ],
+          } satisfies GhostNotifData,
+        });
+        localStorage.setItem(key, "1");
+      }
+    } catch {
+      // localStorage unavailable — skip the demo, no harm.
+    }
+  }
 }

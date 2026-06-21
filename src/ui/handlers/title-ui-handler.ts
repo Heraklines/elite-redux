@@ -4,12 +4,16 @@ import { FAKE_TITLE_LOGO_CHANCE } from "#app/constants";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { isBeta, isDev } from "#constants/app-constants";
+import { GHOST_NOTIF_SETTING_KEY, initErNotifications } from "#data/elite-redux/er-ghost-notifications";
 import { getSplashMessages } from "#data/splash-messages";
+import { Button } from "#enums/buttons";
 import { PlayerGender } from "#enums/player-gender";
 import type { SpeciesId } from "#enums/species-id";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import { version } from "#package.json";
+import { type ErNotification, notificationManager } from "#system/notifications/notification-manager";
+import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { TimedEventDisplay } from "#ui/event-display";
 import { OptionSelectUiHandler } from "#ui/option-select-ui-handler";
 import { addTextObject } from "#ui/text";
@@ -29,7 +33,18 @@ export class TitleUiHandler extends OptionSelectUiHandler {
   private eventDisplay: TimedEventDisplay;
   private appVersionText: Phaser.GameObjects.Text;
 
+  // ER notification inbox: a focusable icon at top-right. Press UP from the top
+  // menu option to highlight it, then ACTION to open the inbox window.
+  private inboxIcon: Phaser.GameObjects.Container;
+  private inboxLabel: Phaser.GameObjects.Text;
+  private inboxCursor: Phaser.GameObjects.Image;
+  private inboxFocused = false;
+
   private titleStatsTimer: NodeJS.Timeout | null;
+
+  /** Bridges a notification type's settingKey to the live scene toggle. */
+  private readonly notifEnabled = (key: string): boolean =>
+    key === GHOST_NOTIF_SETTING_KEY ? globalScene.ghostNotifications !== false : true;
 
   /**
    * Returns the username of logged in user. If the username is hidden, the trainer name based on gender will be displayed.
@@ -114,6 +129,160 @@ export class TitleUiHandler extends OptionSelectUiHandler {
       this.splashMessageText,
       this.appVersionText,
     ]);
+
+    // ER notifications: register types/sources (idempotent) and build the inbox icon.
+    initErNotifications();
+    this.buildInboxIcon(scaledWidth);
+  }
+
+  /** Top-right inbox button + a focus arrow (the menu's own cursor texture). */
+  private buildInboxIcon(scaledWidth: number): void {
+    const x = scaledWidth - 2;
+    const y = 30;
+    this.inboxIcon = globalScene.add.container(x, y);
+    const bg = globalScene.add.rectangle(0, 0, 58, 16, 0x202036, 0.85).setOrigin(1, 0.5);
+    bg.setStrokeStyle(1, 0x6c8cff, 0.9);
+    this.inboxLabel = addTextObject(-5, -1, "Inbox", TextStyle.MONEY, { fontSize: "64px" }).setOrigin(1, 0.5);
+    // The menu cursor arrow sits to the left of the box, shown only while focused.
+    this.inboxCursor = globalScene.add.image(-62, 0, "cursor").setOrigin(1, 0.5).setVisible(false);
+    this.inboxIcon.add([bg, this.inboxLabel, this.inboxCursor]);
+    this.titleContainer.add(this.inboxIcon);
+    this.redrawInbox();
+  }
+
+  /** Re-pull sources (background) + redraw the badge. */
+  private refreshInbox(): void {
+    notificationManager
+      .refresh(this.notifEnabled)
+      .then(() => this.redrawInbox())
+      .catch(() => {
+        /* manager isolates its own source errors */
+      });
+    this.redrawInbox();
+  }
+
+  /** Repaint the icon label/colour from the current unread count. */
+  private redrawInbox(): void {
+    if (!this.inboxLabel) {
+      return;
+    }
+    const unread = notificationManager.unreadCount(this.notifEnabled);
+    this.inboxLabel.setText(unread > 0 ? `Inbox ${unread}` : "Inbox");
+    this.inboxLabel.setColor(unread > 0 ? "#ffe066" : "#cfd6ff");
+  }
+
+  private setInboxFocused(focused: boolean): void {
+    this.inboxFocused = focused;
+    this.inboxCursor?.setVisible(focused);
+    this.inboxLabel?.setColor(
+      focused ? "#ffffff" : notificationManager.unreadCount(this.notifEnabled) > 0 ? "#ffe066" : "#cfd6ff",
+    );
+  }
+
+  override processInput(button: Button): boolean {
+    // While the inbox icon is focused, ACTION opens it; DOWN/CANCEL drops back to
+    // the menu; everything else is swallowed so the menu cursor doesn't move.
+    if (this.inboxFocused) {
+      switch (button) {
+        case Button.ACTION:
+        case Button.SUBMIT:
+          this.setInboxFocused(false);
+          this.openInbox();
+          return true;
+        case Button.DOWN:
+        case Button.CANCEL:
+          this.setInboxFocused(false);
+          this.getUi().playSelect();
+          return true;
+        default:
+          return true;
+      }
+    }
+    // Pressing UP from the top menu option jumps focus up to the inbox icon
+    // (instead of wrapping to the bottom of the menu).
+    if (button === Button.UP && this.fullCursor === 0) {
+      this.setInboxFocused(true);
+      this.getUi().playSelect();
+      return true;
+    }
+    return super.processInput(button);
+  }
+
+  /**
+   * Open the inbox as a small navigable window (option-select overlay). Selecting
+   * an entry marks it read and shows its detail; "Mark all read" clears the
+   * badge; B / Close returns to the title. Re-entrant (reading reopens the list).
+   */
+  private openInbox(): void {
+    const list = notificationManager.list(this.notifEnabled);
+    const options: OptionSelectItem[] = [];
+    if (list.length === 0) {
+      options.push({ label: "No notifications yet", handler: () => false, skip: true });
+    }
+    for (const n of list) {
+      const def = notificationManager.getType(n.type);
+      const summary = def ? def.summary(n) : n.type;
+      options.push({
+        label: `${n.read ? "  " : "* "}${this.clipInbox(summary, 32)}`,
+        handler: () => {
+          notificationManager.markRead(n.id);
+          this.redrawInbox();
+          globalScene.ui.revertMode().then(() => this.showInboxDetail(n));
+          return true;
+        },
+        keepOpen: true,
+      });
+    }
+    if (list.some(n => !n.read)) {
+      options.push({
+        label: "Mark all read",
+        handler: () => {
+          notificationManager.markAllRead();
+          this.redrawInbox();
+          globalScene.ui.revertMode().then(() => this.openInbox());
+          return true;
+        },
+        keepOpen: true,
+      });
+    }
+    options.push({
+      label: i18next.t("menu:cancel"),
+      handler: () => {
+        globalScene.ui.revertMode();
+        return true;
+      },
+      keepOpen: true,
+    });
+    globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options, maxOptions: 8 });
+  }
+
+  /** Show one notification's detail as a read-only, navigable window (Back returns to the list). */
+  private showInboxDetail(n: ErNotification): void {
+    const def = notificationManager.getType(n.type);
+    const detail = def?.detail?.(n);
+    const summary = def ? def.summary(n) : n.type;
+    const title = detail?.title ?? summary;
+    const body = detail?.body ?? "";
+    const text = body ? `${title}\n\n${body}` : title;
+    const options: OptionSelectItem[] = text.split("\n").map(line => ({
+      // Empty lines render as a blank spacer row; all body rows are non-selectable.
+      label: line.length > 0 ? line : " ",
+      handler: () => false,
+      skip: true,
+    }));
+    options.push({
+      label: i18next.t("menu:cancel"),
+      handler: () => {
+        globalScene.ui.revertMode().then(() => this.openInbox());
+        return true;
+      },
+      keepOpen: true,
+    });
+    globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options, maxOptions: 14 });
+  }
+
+  private clipInbox(s: string, max: number): string {
+    return s.length > max ? `${s.slice(0, max - 1)}…` : s;
   }
 
   updateTitleStats(): void {
@@ -172,6 +341,8 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     const windowHeight = this.getWindowHeight();
 
     this.updateUsername();
+    this.setInboxFocused(false);
+    this.refreshInbox(); // re-pull notification sources each time the title appears
 
     // Moving username and player count to top of the menu
     // and sorting it, to display the shorter one on top
