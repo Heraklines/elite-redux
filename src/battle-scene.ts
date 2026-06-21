@@ -738,7 +738,8 @@ export class BattleScene extends SceneBase {
     // ER: a standalone time-of-day icon pinned top-left, shown only while the
     // day/night tint is off (the screen no longer darkens to signal night).
     // parentVisible=true so its transition tweens actually play.
-    this.timeOfDayCornerWidget = new TimeOfDayWidget(16, -this.scaledCanvas.height + 16, true);
+    this.timeOfDayCornerWidget = new TimeOfDayWidget(12, -this.scaledCanvas.height + 12, true);
+    this.timeOfDayCornerWidget.setScale(0.6);
     this.timeOfDayCornerWidget.parentVisible = true;
     this.pokemonInfoContainer = new PokemonInfoContainer(this.scaledCanvas.width + 52, -this.scaledCanvas.height + 66) //
       .setup();
