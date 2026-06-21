@@ -1447,12 +1447,21 @@ export function initAbilities() {
       .attr(IgnoreContactAbAttr)
       .build(),
     new AbBuilder(AbilityId.LIQUID_VOICE, 7) //
+      // ER Liquid Voice (dex: "Sound moves get a 1.2x boost and become Water if
+      // Normal"): convert ONLY Normal-type sound moves to Water (the old port
+      // converted EVERY sound move regardless of type), and give a 1.2x boost to
+      // ALL sound moves.
       .attr(
         MoveTypeChangeAbAttr,
         PokemonType.WATER,
         (user, target, move) =>
           move.doesFlagEffectApply({ flag: MoveFlags.SOUND_BASED, user })
-          && anyTypeMoveConversionCondition(user, target, move),
+          && normalTypeMoveConversionCondition(user, target, move),
+      )
+      .attr(
+        MovePowerBoostAbAttr,
+        (user, _target, move) => move.doesFlagEffectApply({ flag: MoveFlags.SOUND_BASED, user }),
+        1.2,
       )
       .build(),
     new AbBuilder(AbilityId.TRIAGE, 7) //

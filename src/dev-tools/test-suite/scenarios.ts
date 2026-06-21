@@ -608,6 +608,32 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "Liquid Voice: only NORMAL-type sound moves become Water",
+    description:
+      "ER Liquid Voice fix (dex: 'Sound moves get a 1.2x boost and become Water if\n"
+      + "Normal'). Your Exploud has Liquid Voice; the enemy is Camerupt (Fire/Ground).\n"
+      + "DO: use HYPER VOICE, then BUG BUZZ. EXPECT: Hyper Voice (a Normal sound move) is\n"
+      + "now WATER and hits for 4x super effective; Bug Buzz (a NON-Normal sound move)\n"
+      + "stays BUG and is weak (0.5x) - it must NOT turn Water. Both hit ~1.2x harder than\n"
+      + "normal. Before the fix EVERY sound move turned Water, so Bug Buzz also hit 4x.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 60,
+        ABILITY_OVERRIDE: AbilityId.LIQUID_VOICE,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CAMERUPT,
+        ENEMY_LEVEL_OVERRIDE: 55,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.EXPLOUD, {
+          moveset: [MoveId.HYPER_VOICE, MoveId.BUG_BUZZ, MoveId.SNARL, MoveId.BOOMBURST],
+        }),
+      ];
+    },
+  },
   // ===========================================================================
   // QoL — level-up Move Learn panel
   // ===========================================================================
