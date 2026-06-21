@@ -57,6 +57,41 @@ comparison. Client tracks `since` (last-seen ts) in localStorage → no write.
    **team-comparison panel** (your ghost's 6 vs the opponent's 6).
 4. Setting "Ghost battle notifications: On/Off" (default On). Off ⇒ no fetch.
 
+## Reusable framework (GENERAL notification system — ghost-battle is just type #1)
+
+The system is type-agnostic; new notification kinds (patch notes, egg hatch,
+achievements, event announcements, friend activity, ...) plug in without touching
+the framework or the UI.
+
+- **Model** (`src/system/notifications/notification-manager.ts`):
+  ```
+  interface ErNotification { id: string; type: string; timestamp: number; read: boolean; data: unknown }
+  interface NotificationTypeDef {
+    type: string;                                  // unique key, e.g. "ghost-battle"
+    iconKey?: string;                              // inbox icon
+    summary(n): string;                            // one-line list text
+    detail?(n): NotificationDetail;                // optional expanded view (text or custom builder)
+    settingKey?: string;                           // optional per-type on/off setting
+  }
+  ```
+- **Manager** (module singleton `notificationManager`): `register(def)`,
+  `registerSource(async () => ErNotification[])` (pull-on-login sources, e.g. the
+  ghost endpoint), `push(n)` (client-side notifications, e.g. "egg hatched"),
+  `refresh()` (runs enabled sources, dedupes by id), `list()`, `unreadCount()`,
+  `markRead`/`markAllRead`, `persist()`/`load()` (per-user localStorage, plus the
+  per-source last-seen cursor so sources only fetch deltas).
+- **UI** (`notification-ui-handler.ts`): generic bell + badge + list + detail.
+  The list shows `def.summary(n)`; opening one calls `def.detail(n)`. The UI never
+  knows about ghosts - it dispatches to the registered type's renderers.
+- **Ghost type** (`er-ghost-notifications.ts`): registers `type:"ghost-battle"`
+  with a `summary` ("Your ghost beat <victim> - downed N"), a `detail` that builds
+  the team-comparison panel, a `source` that calls
+  `GET /savedata/run/ghost-notifications`, and a `settingKey`. This file is the
+  ONLY place ghost specifics live; everything else is generic.
+
+New types = one file: a `NotificationTypeDef` + (a `registerSource` for pulled
+ones, or `notificationManager.push()` for locally-emitted ones).
+
 ## Phasing
 
 - **Phase 1:** worker (table + write + read endpoint) + client recording + inbox
