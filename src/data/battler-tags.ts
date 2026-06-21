@@ -3908,17 +3908,68 @@ export class ErFearTag extends SerializableBattlerTag {
 }
 
 /**
- * ER Frisk's "disable held items" rider. Applied to a foe on the holder's
- * switch-in for 2 turns; while present, {@linkcode PokemonHeldItemModifier}s on
- * the tagged Pokémon do not apply (gated in `PokemonHeldItemModifier.shouldApply`).
- * Ticks down at each turn end (TURN_END lapse). Serializable so it survives a
- * mid-battle save.
+ * ER held-item lock (Frisk's on-entry rider, Supersweet Syrup's on-contact rider).
+ * Applied to a foe for 2 turns; while present, the LOCKED held items on the tagged
+ * Pokémon do not apply (gated via {@linkcode erIsHeldItemDisabled} in
+ * `PokemonHeldItemModifier.shouldApply`). Ticks down at each turn end. Serializable
+ * so it survives a mid-battle save.
+ *
+ * Per the dex it locks only the holder's FIRST item (mons can hold many here, so
+ * locking all would be too strong), and never a Mega Stone / form-change item.
+ * `onAdd`/`onOverlap` compute that target, recorded in {@linkcode suppressedTypeIds}.
  */
 export class ErItemDisabledTag extends SerializableBattlerTag {
   public override readonly tagType = BattlerTagType.ER_ITEM_DISABLED;
+  /** modifierType ids of the locked held item(s). Empty = legacy "all items" (old saves). */
+  public suppressedTypeIds: string[] = [];
+
   constructor(turnCount = 2) {
     super(BattlerTagType.ER_ITEM_DISABLED, BattlerTagLapseType.TURN_END, turnCount);
   }
+
+  /** Lock the holder's FIRST non-Mega-Stone held item (form-change items carry `formChangeItem`). */
+  private lockFirstItem(pokemon: Pokemon): void {
+    const items = pokemon.getHeldItems() as ReadonlyArray<{ type?: { id?: string }; formChangeItem?: unknown }>;
+    const first = items.find(m => m.formChangeItem === undefined && !!m.type?.id);
+    this.suppressedTypeIds = first?.type?.id ? [first.type.id] : [];
+  }
+
+  override onAdd(pokemon: Pokemon): void {
+    super.onAdd(pokemon);
+    this.lockFirstItem(pokemon);
+  }
+
+  override onOverlap(pokemon: Pokemon): void {
+    // Re-applied (re-frisked / second contact): refresh the duration and re-lock.
+    this.turnCount = Math.max(this.turnCount, 2);
+    this.lockFirstItem(pokemon);
+  }
+
+  /** Whether the held item with `typeId` is currently locked by this tag. */
+  public suppresses(typeId: string | undefined): boolean {
+    if (!typeId) {
+      return false;
+    }
+    // Empty list = legacy "all items" (a tag restored from a pre-scoping save).
+    return this.suppressedTypeIds.length === 0 || this.suppressedTypeIds.includes(typeId);
+  }
+
+  public override loadTag<const T extends this>(
+    source: BaseBattlerTag & Pick<T, "tagType" | "suppressedTypeIds">,
+  ): void {
+    super.loadTag(source);
+    this.suppressedTypeIds = Array.isArray(source.suppressedTypeIds) ? [...source.suppressedTypeIds] : [];
+  }
+}
+
+/**
+ * True when `pokemon`'s held item with `itemTypeId` is currently locked by an ER
+ * `ER_ITEM_DISABLED` tag (Frisk / Supersweet Syrup). Consulted by the held-item
+ * apply gate and the power-herb consumer, so ONLY the locked item is suppressed.
+ */
+export function erIsHeldItemDisabled(pokemon: Pokemon, itemTypeId: string | undefined): boolean {
+  const tag = pokemon.getTag(BattlerTagType.ER_ITEM_DISABLED);
+  return tag instanceof ErItemDisabledTag && tag.suppresses(itemTypeId);
 }
 
 /**

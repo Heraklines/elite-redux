@@ -32,6 +32,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { erIsHeldItemDisabled } from "#data/battler-tags";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { StatusEffect } from "#enums/status-effect";
 import type { Pokemon } from "#field/pokemon";
@@ -262,7 +263,9 @@ function getPowerHerb(pokemon: Pokemon): ErCommunityItemModifier | undefined {
  */
 export function erTryConsumePowerHerb(user: Pokemon): boolean {
   const herb = getPowerHerb(user);
-  if (!herb || herb.charges <= 0 || user.getTag(BattlerTagType.ER_ITEM_DISABLED)) {
+  // Blocked only if the Power Herb itself is the Frisk-locked item (the lock now
+  // targets just the holder's first item, not every item).
+  if (!herb || herb.charges <= 0 || erIsHeldItemDisabled(user, herb.type?.id)) {
     return false;
   }
   herb.charges--;

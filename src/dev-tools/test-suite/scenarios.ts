@@ -550,6 +550,36 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.ER_RELIC_CURSED_IDOL],
   },
   // ===========================================================================
+  // Abilities — Frisk reveals items + locks only the FIRST item
+  // ===========================================================================
+  {
+    label: "Frisk: reveals items, locks only the FIRST item",
+    description:
+      "ER Frisk fix. Your lead has Frisk; the enemy Snorlax holds Leftovers (first)\n"
+      + "AND a Sitrus Berry. DO: start the battle, read the entry message, then chip\n"
+      + "the enemy. EXPECT: Frisk reveals the enemy's HELD ITEMS (not its ability), and\n"
+      + "only the FIRST item (Leftovers) is locked for ~2 turns - the enemy gets NO\n"
+      + "Leftovers recovery for those turns, then it heals again; its Sitrus Berry still\n"
+      + "works. Before the fix Frisk revealed the ABILITY and locked ALL items.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 50,
+        ABILITY_OVERRIDE: AbilityId.FRISK,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_HELD_ITEMS_OVERRIDE: [{ name: "LEFTOVERS" }, { name: "BERRY", type: BerryType.SITRUS }],
+      });
+      return [
+        makeStarter(SpeciesId.GRENINJA, {
+          moveset: [MoveId.WATER_SHURIKEN, MoveId.ICE_BEAM, MoveId.DARK_PULSE, MoveId.U_TURN],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // QoL — level-up Move Learn panel
   // ===========================================================================
   {

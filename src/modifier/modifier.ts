@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { FusionSpeciesFormEvolution, pokemonEvolutions } from "#balance/pokemon-evolutions";
+import { erIsHeldItemDisabled } from "#data/battler-tags";
 import { getBerryEffectFunc, getBerryPredicate } from "#data/berry";
 import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
@@ -696,11 +697,11 @@ export abstract class PokemonHeldItemModifier extends PersistentModifier {
     if (!pokemon || !(this.pokemonId === -1 || pokemon.id === this.pokemonId)) {
       return false;
     }
-    // ER Frisk's "disable held items" rider: while the holder carries the
-    // ER_ITEM_DISABLED tag, none of its held-item effects apply (berries,
-    // leftovers, choice items, etc.). Mega Stones / form-change items are not
-    // gated through this path, matching ER's "does not prevent Mega Stones".
-    if (pokemon.getTag(BattlerTagType.ER_ITEM_DISABLED)) {
+    // ER Frisk / Supersweet Syrup "disable held item" rider: the ER_ITEM_DISABLED
+    // tag locks only the holder's FIRST item (not all - mons hold many here), so
+    // suppress THIS item's effect only when it is the locked one. Mega Stones /
+    // form-change items are never the locked target ("does not prevent Mega Stones").
+    if (erIsHeldItemDisabled(pokemon, this.type?.id)) {
       return false;
     }
     return true;
