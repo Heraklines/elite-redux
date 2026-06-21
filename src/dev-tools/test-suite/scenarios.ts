@@ -2719,6 +2719,40 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Final boss — Primal Cascoon two-phase fight (Elite)
+  // ===========================================================================
+  {
+    label: "Primal Cascoon: two-phase final boss (Elite)",
+    description:
+      "Final-boss test. On ELITE the classic finale is a two-phase Cascoon -> Primal\n"
+      + "Cascoon fight (like Eternatus -> Eternamax). DO: break the FIRST health bar.\n"
+      + "EXPECT: Cascoon TRANSFORMS into Primal Cascoon with a FRESH full health bar and\n"
+      + "keeps fighting (Angel's Wrath kit) - it must NOT just drop to 0 / the victory\n"
+      + "screen. Open the boss Summary/Abilities: its innate must read PRISMATIC FUR (not\n"
+      + "Color Change). If phase 2 STILL dies instantly, hit Send Logs - that capture\n"
+      + "pins the exact phase ordering so the death can be fixed.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("elite");
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 200,
+        STARTING_LEVEL_OVERRIDE: 100,
+      });
+      return [
+        ...colosseumTestParty(),
+        makeStarter(SpeciesId.GHOLDENGO, {
+          moveset: [MoveId.MAKE_IT_RAIN, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT, MoveId.NASTY_PLOT],
+        }),
+        makeStarter(SpeciesId.DRAGONITE, {
+          moveset: [MoveId.DRAGON_CLAW, MoveId.EARTHQUAKE, MoveId.EXTREME_SPEED, MoveId.ROOST],
+        }),
+        makeStarter(SpeciesId.TYRANITAR, {
+          moveset: [MoveId.STONE_EDGE, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.DRAGON_DANCE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // FIXES — this session
   // ===========================================================================
   {

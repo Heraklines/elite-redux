@@ -316,7 +316,17 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
       // Sinistea/Polteageist ANTIQUE) — applying them verbatim WIPED the
       // form's innates (user report: "the special form for Sinistea doesn't
       // have any innates"). Inherit the base species' ER innates instead.
-      const formPassives = rawFormPassives.every(a => a === AbilityId.NONE) ? passives : rawFormPassives;
+      let formPassives = rawFormPassives.every(a => a === AbilityId.NONE) ? passives : rawFormPassives;
+      // ER: Primal Cascoon (the Elite/Hell classic final-boss form) ships the plain
+      // Color Change innate, but ER intends the upgraded Prismatic Fur (Color Change
+      // + Protean + Fur Coat + Ice Scales). Swap just that one innate, gated tightly
+      // to Cascoon's "primal" form so no other species/form is touched.
+      if (species.speciesId === SpeciesId.CASCOON && form.formKey === "primal") {
+        const colorChange = mapAbilityId(16);
+        const prismaticFur = mapAbilityId(440);
+        const swap = (a: AbilityId): AbilityId => (a === colorChange ? prismaticFur : a);
+        formPassives = [swap(formPassives[0]), swap(formPassives[1]), swap(formPassives[2])];
+      }
       form.setPassives(formPassives);
 
       // Mega forms have their own stat lines and type assignments in ER
