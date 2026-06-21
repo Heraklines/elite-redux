@@ -20,6 +20,7 @@ import { getErMapSaveData, restoreErMapState } from "#data/elite-redux/er-map-no
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
 import { getErReduxCounterpartId, migrateErReduxDexHijack } from "#data/elite-redux/er-redux-dex-redirect";
+import { getErRelicBattleState, restoreErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
 import { getErResistBerryEntries, restoreErResistBerries } from "#data/elite-redux/er-resist-berries";
 import { getErDifficulty, getErDifficultyCandyMultiplier, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ER_CANDY_GAIN_MULTIPLIER, getRunCandyMultiplier } from "#data/elite-redux/er-shiny-favour";
@@ -1289,6 +1290,10 @@ export class GameData {
       // ER (#486): persist the run's Map state (revealed nodes / travel target /
       // Treasure-Map fragments) - run-scoped module state a reload would wipe.
       erMapState: getErMapSaveData(),
+      // ER: per-battle relic counters (Cursed Idol / Pharaoh's Ankh / future
+      // per-battle relics), scoped to the current wave so a reload doesn't reset
+      // them and re-fire the effect.
+      erRelicBattleState: getErRelicBattleState(),
     } as SessionSaveData;
   }
 
@@ -1403,6 +1408,9 @@ export class GameData {
     setErDifficulty(fromSession.erDifficulty ?? "ace");
     restoreErRunTrainerTracking(fromSession.erUsedTrainerKeys);
     restoreErMoneyStreaks(fromSession.erMoneyStreaks);
+    // ER: restore in-progress per-battle relic counters so a reload mid-battle
+    // doesn't re-fire Cursed Idol / Pharaoh's Ankh (older saves -> empty/re-arm).
+    restoreErRelicBattleState(fromSession.erRelicBattleState);
     // ER (#486): restore the run's Map state (revealed nodes / travel target /
     // fragments). Tolerant of older saves with no field (clean, empty map).
     restoreErMapState(fromSession.erMapState, fromSession.waveIndex);

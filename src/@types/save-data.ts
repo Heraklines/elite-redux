@@ -1,6 +1,7 @@
 import type { PokeballCounts } from "#app/battle-scene";
 import type { Tutorial } from "#app/tutorial";
 import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
+import type { ErRelicBattleStateData } from "#data/elite-redux/er-relic-battle-state";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import type { BattleType } from "#enums/battle-type";
 import type { GameModes } from "#enums/game-modes";
@@ -124,6 +125,12 @@ export interface SessionSaveData {
    * fresh, empty map).
    */
   erMapState?: ErMapSaveData;
+  /**
+   * ER: per-battle relic counters (Cursed Idol send-out count, Pharaoh's Ankh
+   * "used", ...) scoped to the current wave, so a reload doesn't reset them and
+   * re-fire the effect. Optional for backwards compatibility (older saves re-arm).
+   */
+  erRelicBattleState?: ErRelicBattleStateData;
 }
 
 export interface Unlocks {

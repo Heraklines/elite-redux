@@ -520,6 +520,36 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Relics — Cursed Idol -50% HP must NOT re-apply on reload
+  // ===========================================================================
+  {
+    label: "Cursed Idol: -50% does NOT re-apply on reload",
+    description:
+      "Cursed Idol persistence fix. DO: win the opening battle and TAKE the Cursed\n"
+      + "Idol relic from the shop. In the NEXT battle your lead (Snorlax) gets a free\n"
+      + "Substitute; SWITCH to your 2nd mon (Blissey) - it arrives at HALF HP (note the\n"
+      + "exact HP). Now open the menu, SAVE & QUIT, RELOAD the page and CONTINUE.\n"
+      + "EXPECT: after Continue, Blissey's HP is UNCHANGED - it is NOT halved a second\n"
+      + "time, and no new Substitute appears (before the fix, rejoining re-applied the\n"
+      + "-50%). The per-battle relic state now persists across the reload.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST] }),
+        makeStarter(SpeciesId.BLISSEY, {
+          moveset: [MoveId.SEISMIC_TOSS, MoveId.SOFT_BOILED, MoveId.THUNDER_WAVE, MoveId.TOXIC],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.ER_RELIC_CURSED_IDOL],
+  },
+  // ===========================================================================
   // QoL — level-up Move Learn panel
   // ===========================================================================
   {

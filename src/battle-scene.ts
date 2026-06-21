@@ -53,6 +53,7 @@ import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
 import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
+import { resetErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
 import {
   erCoinPurseBonusPercent,
   erMysteryCharmTargetBonus,
@@ -2005,6 +2006,13 @@ export class BattleScene extends SceneBase {
     // Second Wind / Anchor once-per-biome charges, Scrap Magnet wave-roll cache)
     // on every biome entry.
     resetErRelicBiomeState();
+    // ER: clear per-battle relic counters (Cursed Idol / Pharaoh's Ankh) for a
+    // genuinely new biome/run, so a fresh battle re-arms them. NOT on a reload
+    // (restoring=true) - there the in-progress counters were just restored from
+    // the save and must survive so the effect doesn't re-fire on Continue.
+    if (!restoring) {
+      resetErRelicBattleState();
+    }
     // ER: belt-and-braces - never carry guardian challenge tokens across a biome.
     clearErFightTokens();
 

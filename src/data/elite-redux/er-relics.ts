@@ -27,6 +27,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { erBattleEntrantOrdinal, erBattleOnce } from "#data/elite-redux/er-relic-battle-state";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
@@ -482,24 +483,19 @@ export function erTrySecondWind(pokemon: Pokemon): boolean {
   return true;
 }
 
-/** The wave on which Pharaoh's Ankh last saved a Pokémon (re-arms each new battle). */
-let PHARAOH_ANKH_USED_WAVE = -1;
-
 /**
  * Pharaoh's Ankh (relic): once per BATTLE, when ANY player Pokémon would faint it
- * instead clings to life at 1 HP. Re-arms automatically on the next wave (no biome
- * reset needed - keyed on the wave index, which also self-heals across new runs).
- * Called from {@linkcode Pokemon.damage} after Second Wind.
+ * instead clings to life at 1 HP. Re-arms each battle and survives a reload via
+ * the persisted per-battle relic state (so a mid-battle Continue can't grant a
+ * second revive). Called from {@linkcode Pokemon.damage} after Second Wind.
  */
 export function erTryPharaohAnkh(pokemon: Pokemon): boolean {
   if (!pokemon.isPlayer() || pokemon.hp < 1 || !hasErRelic("pharaohAnkh")) {
     return false;
   }
-  const wave = globalScene.currentBattle?.waveIndex ?? 0;
-  if (PHARAOH_ANKH_USED_WAVE === wave) {
-    return false;
+  if (!erBattleOnce("pharaohAnkh")) {
+    return false; // already saved a mon this battle (persists across reload)
   }
-  PHARAOH_ANKH_USED_WAVE = wave;
   globalScene.phaseManager.queueMessage(
     `${pokemon.getNameToRender()} was pulled back from the brink by the Pharaoh's Ankh!`,
   );
@@ -755,29 +751,27 @@ export function erApplyCovenantHeal(): void {
 // like Pharaoh's Ankh) and resets when the wave changes.
 // =============================================================================
 
-/** Wave the Cursed Idol send-out counter is currently tracking (re-arms per battle). */
-let CURSED_IDOL_WAVE = -1;
-/** Count of player send-outs observed this battle (1 = lead, 2 = next entrant). */
-let CURSED_IDOL_SENDOUTS = 0;
-
 /**
  * Cursed Idol (relic): called from PostSummonPhase for every Pokemon that enters.
  * No-op for enemies or when the relic isn't held. The first player mon out this
  * battle gets a free Substitute; the second gets its HP halved. Subsequent
  * entrants are unaffected.
+ *
+ * Send-out order is tracked in the persisted, per-mon-idempotent per-battle relic
+ * state (er-relic-battle-state): it re-arms each battle AND survives a reload, so
+ * a Continue mid-battle doesn't re-count and re-halve an already-processed mon
+ * (the reported "Cursed Idol -50% applies again if I rejoin" bug).
  */
 export function erApplyCursedIdol(pokemon: Pokemon): void {
   if (!hasErRelic("cursedIdol") || !pokemon.isPlayer()) {
     return;
   }
-  const wave = globalScene.currentBattle?.waveIndex ?? -1;
-  if (wave !== CURSED_IDOL_WAVE) {
-    CURSED_IDOL_WAVE = wave;
-    CURSED_IDOL_SENDOUTS = 0;
+  const { ordinal, firstTime } = erBattleEntrantOrdinal("cursedIdol", pokemon.id);
+  if (!firstTime) {
+    return; // already processed this mon this battle (e.g. a reload re-summon)
   }
-  CURSED_IDOL_SENDOUTS += 1;
 
-  if (CURSED_IDOL_SENDOUTS === 1) {
+  if (ordinal === 1) {
     // Free Substitute: add the tag directly so onAdd builds the doll (hp = maxHp/4)
     // WITHOUT the move's normal HP cost. Source is the mon itself.
     if (!pokemon.getTag(BattlerTagType.SUBSTITUTE)) {
@@ -785,7 +779,7 @@ export function erApplyCursedIdol(pokemon: Pokemon): void {
       // ER custom relic - English-only (shared locales submodule).
       globalScene.phaseManager.queueMessage(`The Cursed Idol shrouds ${pokemon.getNameToRender()} in a free Substitute!`);
     }
-  } else if (CURSED_IDOL_SENDOUTS === 2) {
+  } else if (ordinal === 2) {
     const drained = Math.max(1, Math.floor(pokemon.hp / 2));
     if (pokemon.hp > drained) {
       pokemon.hp = drained;
