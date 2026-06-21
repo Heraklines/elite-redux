@@ -4266,17 +4266,25 @@ export class FriskAbAttr extends PostSummonAbAttr {
   }
 
   override apply({ simulated, pokemon }: AbAttrBaseParams): void {
-    if (!simulated) {
-      for (const opponent of pokemon.getOpponentsGenerator()) {
-        globalScene.phaseManager.queueMessage(
-          i18next.t("abilityTriggers:frisk", {
-            pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
-            opponentName: opponent.name,
-            opponentAbilityName: opponent.getAbility().name,
-          }),
-        );
-        opponent.revealAbility();
+    if (simulated) {
+      return;
+    }
+    // ER Frisk (2.65 dex): on entry, reveal the opponents' HELD ITEMS - NOT their
+    // ability (the vanilla behaviour, which was the reported "Frisk identifies the
+    // opponent's ability" bug). [The dex also disables the opponent's first item
+    // for 2 turns; that needs a per-item disable mechanism and is a separate pass.]
+    for (const opponent of pokemon.getOpponentsGenerator()) {
+      const itemNames = opponent
+        .getHeldItems()
+        .map(m => m.type?.name)
+        .filter((n): n is string => !!n);
+      if (itemNames.length === 0) {
+        continue;
       }
+      // ER custom message - English-only (the shared locales submodule has no key).
+      globalScene.phaseManager.queueMessage(
+        `${getPokemonNameWithAffix(pokemon)} frisked ${opponent.name} and found: ${itemNames.join(", ")}!`,
+      );
     }
   }
 }
