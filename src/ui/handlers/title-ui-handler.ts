@@ -476,14 +476,8 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     );
 
     const betaText = isBeta || isDev ? " (Beta)" : "";
-    // ER: surface the per-build id (baked in by build-id-plugin, the same value
-    // logged as "[ER] build <id>") on the title screen so testers can verify at a
-    // glance whether they're on a fresh bundle BEFORE reporting a bug - stale
-    // cached builds have repeatedly produced "ghost" reports of already-fixed
-    // issues. `typeof` guard mirrors init-update-checker (define may be absent).
-    const buildId = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "";
     // ER: show the Elite Redux mod version (not the upstream package.json version).
-    this.appVersionText.setText("v" + ER_VERSION + betaText + (buildId ? "  build " + buildId : ""));
+    this.appVersionText.setText("v" + ER_VERSION + betaText);
 
     const ui = this.getUi();
 
