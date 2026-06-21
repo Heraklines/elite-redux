@@ -33,11 +33,11 @@ export class TitleUiHandler extends OptionSelectUiHandler {
   private eventDisplay: TimedEventDisplay;
   private appVersionText: Phaser.GameObjects.Text;
 
-  // ER notification inbox: a focusable icon at top-right. Press UP from the top
+  // ER notification inbox: a small mail icon at top-right. Press UP from the top
   // menu option to highlight it, then ACTION to open the inbox window.
   private inboxIcon: Phaser.GameObjects.Container;
-  private inboxLabel: Phaser.GameObjects.Text;
-  private inboxCursor: Phaser.GameObjects.Image;
+  private inboxBadge: Phaser.GameObjects.Ellipse;
+  private inboxHighlight: Phaser.GameObjects.Rectangle;
   private inboxFocused = false;
 
   private titleStatsTimer: NodeJS.Timeout | null;
@@ -130,22 +130,35 @@ export class TitleUiHandler extends OptionSelectUiHandler {
       this.appVersionText,
     ]);
 
-    // ER notifications: register types/sources (idempotent) and build the inbox icon.
-    initErNotifications();
+    // Build the small inbox mail icon (types/sources + welcome are registered in
+    // show(), once the player is logged in, so notifications land in their bucket).
     this.buildInboxIcon(scaledWidth);
   }
 
-  /** Top-right inbox button + a focus arrow (the menu's own cursor texture). */
+  /** A small envelope icon (drawn with shapes, asset-free) + an unread dot. */
   private buildInboxIcon(scaledWidth: number): void {
-    const x = scaledWidth - 2;
-    const y = 30;
-    this.inboxIcon = globalScene.add.container(x, y);
-    const bg = globalScene.add.rectangle(0, 0, 58, 16, 0x202036, 0.85).setOrigin(1, 0.5);
-    bg.setStrokeStyle(1, 0x6c8cff, 0.9);
-    this.inboxLabel = addTextObject(-5, -1, "Inbox", TextStyle.MONEY, { fontSize: "64px" }).setOrigin(1, 0.5);
-    // The menu cursor arrow sits to the left of the box, shown only while focused.
-    this.inboxCursor = globalScene.add.image(-62, 0, "cursor").setOrigin(1, 0.5).setVisible(false);
-    this.inboxIcon.add([bg, this.inboxLabel, this.inboxCursor]);
+    const w = 13;
+    const h = 9;
+    this.inboxIcon = globalScene.add.container(scaledWidth - 4, 30);
+    // Focus highlight: a yellow outline shown while the icon is selected.
+    this.inboxHighlight = globalScene.add
+      .rectangle(-w / 2, 0, w + 6, h + 6, 0x000000, 0)
+      .setStrokeStyle(1, 0xffe066, 1)
+      .setVisible(false);
+    const env = globalScene.add.graphics();
+    env.fillStyle(0x303048, 0.95);
+    env.fillRect(-w, -h / 2, w, h);
+    env.lineStyle(1, 0xe8ecff, 1);
+    env.strokeRect(-w, -h / 2, w, h);
+    // The envelope flap: a "V" from the two top corners to the centre.
+    env.beginPath();
+    env.moveTo(-w, -h / 2);
+    env.lineTo(-w / 2, 0);
+    env.lineTo(0, -h / 2);
+    env.strokePath();
+    // Unread dot at the top-right corner (hidden when nothing is unread).
+    this.inboxBadge = globalScene.add.ellipse(0, -h / 2, 5, 5, 0xff5555).setVisible(false);
+    this.inboxIcon.add([this.inboxHighlight, env, this.inboxBadge]);
     this.titleContainer.add(this.inboxIcon);
     this.redrawInbox();
   }
@@ -161,22 +174,14 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     this.redrawInbox();
   }
 
-  /** Repaint the icon label/colour from the current unread count. */
+  /** Show/hide the unread dot from the current unread count. */
   private redrawInbox(): void {
-    if (!this.inboxLabel) {
-      return;
-    }
-    const unread = notificationManager.unreadCount(this.notifEnabled);
-    this.inboxLabel.setText(unread > 0 ? `Inbox ${unread}` : "Inbox");
-    this.inboxLabel.setColor(unread > 0 ? "#ffe066" : "#cfd6ff");
+    this.inboxBadge?.setVisible(notificationManager.unreadCount(this.notifEnabled) > 0);
   }
 
   private setInboxFocused(focused: boolean): void {
     this.inboxFocused = focused;
-    this.inboxCursor?.setVisible(focused);
-    this.inboxLabel?.setColor(
-      focused ? "#ffffff" : notificationManager.unreadCount(this.notifEnabled) > 0 ? "#ffe066" : "#cfd6ff",
-    );
+    this.inboxHighlight?.setVisible(focused);
   }
 
   override processInput(button: Button): boolean {
@@ -341,6 +346,9 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     const windowHeight = this.getWindowHeight();
 
     this.updateUsername();
+    // Register types/sources + seed welcome/demo notifications now (logged in), so
+    // they land in this user's bucket, then refresh the badge.
+    initErNotifications();
     this.setInboxFocused(false);
     this.refreshInbox(); // re-pull notification sources each time the title appears
 

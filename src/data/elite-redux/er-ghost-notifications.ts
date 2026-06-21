@@ -121,65 +121,53 @@ export function initErNotifications(): void {
   });
   notificationManager.registerSource(GHOST_TYPE, fetchGhostNotifications, GHOST_NOTIF_SETTING_KEY);
 
-  // One-time welcome so the inbox demonstrates itself on first use.
-  try {
-    const key = "er-notif-welcome-v1";
-    if (typeof localStorage !== "undefined" && !localStorage.getItem(key)) {
-      notificationManager.push({
-        id: "system:welcome-v1",
-        type: SYSTEM_TYPE,
-        timestamp: Date.now(),
-        read: false,
-        data: {
-          title: "Notifications are here",
-          body: "Your ghost's battle results show up here, plus other news. You can toggle ghost alerts in Settings.",
-        },
-      });
-      localStorage.setItem(key, "1");
-    }
-  } catch {
-    // localStorage unavailable — skip the welcome, no harm.
-  }
+  // Welcome note. push() dedupes by id and persists per user, so this is
+  // effectively one-time without a separate flag (and lands in the right per-user
+  // bucket because this runs once the player is logged in).
+  notificationManager.push({
+    id: "system:welcome-v1",
+    type: SYSTEM_TYPE,
+    timestamp: Date.now(),
+    read: false,
+    data: {
+      title: "Notifications are here",
+      body: "Your ghost's battle results show up here, plus other news. You can toggle ghost alerts in Settings.",
+    },
+  });
 
-  // Staging/dev ONLY: a one-time SAMPLE ghost-battle notification so the team can
-  // see exactly how a real one looks (summary + team comparison) before live data
+  // Staging/dev ONLY: a SAMPLE ghost-battle notification so the team can see
+  // exactly how a real one looks (summary + team comparison) before live data
   // exists. Gated like the dev test suite, so production never shows fake alerts.
+  // endedRun:false => "fought" (not "beat") since the ghost downed only some of
+  // their team, which is the common case.
   const env = import.meta.env as unknown as Record<string, unknown> | undefined;
   if (env?.DEV === true || env?.VITE_DEV_TOOLS === "1") {
-    try {
-      const key = "er-notif-demo-ghost-v1";
-      if (typeof localStorage !== "undefined" && !localStorage.getItem(key)) {
-        notificationManager.push({
-          id: "ghost-battle:demo-v1",
-          type: GHOST_TYPE,
-          timestamp: Date.now(),
-          read: false,
-          data: {
-            victim: "RivalRed",
-            beaten: 4,
-            endedRun: true,
-            ghostTeam: [
-              { name: "Tyranitar" },
-              { name: "Gengar" },
-              { name: "Dragonite" },
-              { name: "Garchomp" },
-              { name: "Volcarona" },
-              { name: "Azumarill" },
-            ],
-            victimTeam: [
-              { name: "Charizard" },
-              { name: "Blastoise" },
-              { name: "Venusaur" },
-              { name: "Snorlax" },
-              { name: "Alakazam" },
-              { name: "Lapras" },
-            ],
-          } satisfies GhostNotifData,
-        });
-        localStorage.setItem(key, "1");
-      }
-    } catch {
-      // localStorage unavailable — skip the demo, no harm.
-    }
+    notificationManager.push({
+      id: "ghost-battle:demo-v1",
+      type: GHOST_TYPE,
+      timestamp: Date.now(),
+      read: false,
+      data: {
+        victim: "Sample Trainer",
+        beaten: 3,
+        endedRun: false,
+        ghostTeam: [
+          { name: "Tyranitar" },
+          { name: "Gengar" },
+          { name: "Dragonite" },
+          { name: "Garchomp" },
+          { name: "Volcarona" },
+          { name: "Azumarill" },
+        ],
+        victimTeam: [
+          { name: "Charizard" },
+          { name: "Blastoise" },
+          { name: "Venusaur" },
+          { name: "Snorlax" },
+          { name: "Alakazam" },
+          { name: "Lapras" },
+        ],
+      } satisfies GhostNotifData,
+    });
   }
 }
