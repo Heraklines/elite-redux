@@ -1,0 +1,274 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:14  difficulty:hell
+seed:     3FBiZDDiqLdYGmrv6brfIJXD
+party:    Phione(L11 45/45), Shaymin(L12 49/49), Sprigatito(L8 31/31), Mime Jr.(L6 25/25), Slugma(L6 20/20), Marbeep(L7 23/23)
+
+----- DESCRIPTION -----
+Gave a rare candy to Sprigatito to level 8 and it tried learning Astral Hand (not even a move it learns)
+
+----- CONSOLE -----
+[06:29:38.481] LOG: %cStart Phase MessagePhase color:green;
+[06:29:38.554] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:29:38.975] LOG: %cStart Phase MessagePhase color:green;
+[06:29:39.222] LOG: %cStart Phase MoveEndPhase color:green;
+[06:29:39.226] LOG: %cStart Phase MovePhase color:green;
+[06:29:39.226] LOG: %cUser: Phione
+Move: MYSTIC_DANCE
+Use Mode: NORMAL color:orchid
+[06:29:39.239] LOG: %cStart Phase MessagePhase color:green;
+[06:29:39.355] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:29:40.090] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:29:40.091] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:29:40.276] LOG: %cStart Phase MessagePhase color:green;
+[06:29:40.488] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:29:40.676] LOG: %cStart Phase MessagePhase color:green;
+[06:29:40.888] LOG: %cStart Phase MoveEndPhase color:green;
+[06:29:40.890] LOG: %cStart Phase MovePhase color:green;
+[06:29:40.890] LOG: %cUser: Shaymin
+Move: MATCHA_GOTCHA
+Use Mode: NORMAL color:orchid
+[06:29:40.899] LOG: %cStart Phase MessagePhase color:green;
+[06:29:41.038] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:29:41.039] LOG: Applied Multi Lens 
+[06:29:41.498] LOG: crit stage: +0
+[06:29:41.501] LOG: Move: Matcha Gotcha | Base damage: 21.2 | Power: 80 | Source attack: 30 | Target defense: 16
+[06:29:41.501] LOG: Applied Multi Lens 
+[06:29:41.502] LOG: Move: Matcha Gotcha | Attack damage: 91
+[06:29:41.504] LOG: %cStart Phase MessagePhase color:green;
+[06:29:41.746] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:29:41.782] LOG: %cStart Phase MessagePhase color:green;
+[06:29:41.996] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:29:41.997] LOG: %cStart Phase MessagePhase color:green;
+[06:29:42.213] LOG: %cStart Phase MessagePhase color:green;
+[06:29:42.413] LOG: %cStart Phase FaintPhase color:green;
+[06:29:42.419] WARN: cry/46 not found
+[06:29:42.486] LOG: %cStart Phase MessagePhase color:green;
+[06:29:42.956] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:29:43.123] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:29:43.308] LOG: %cStart Phase MessagePhase color:green;
+[06:29:43.513] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:29:43.548] LOG: %cStart Phase VictoryPhase color:green;
+[06:29:43.549] LOG: %cStart Phase ExpPhase color:green;
+[06:29:43.549] LOG: Applied Super EXP. Charm 
+[06:29:43.549] LOG: Applied EXP. Charm 
+[06:29:43.972] LOG: %cStart Phase ExpPhase color:green;
+[06:29:43.973] LOG: Applied Super EXP. Charm 
+[06:29:43.973] LOG: Applied EXP. Charm 
+[06:29:44.582] LOG: %cStart Phase LevelUpPhase color:green;
+[06:29:44.583] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:29:44.583] LOG: Applied Super EXP. Charm 
+[06:29:44.583] LOG: Applied EXP. Charm 
+[06:29:44.583] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:29:44.584] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:29:44.584] LOG: Applied Super EXP. Charm 
+[06:29:44.584] LOG: Applied EXP. Charm 
+[06:29:44.584] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:29:44.584] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:29:44.584] LOG: Applied Super EXP. Charm 
+[06:29:44.584] LOG: Applied EXP. Charm 
+[06:29:44.584] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:29:44.584] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:29:44.584] LOG: Applied Super EXP. Charm 
+[06:29:44.585] LOG: Applied EXP. Charm 
+[06:29:44.585] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:29:44.585] LOG: %cStart Phase MoveEndPhase color:green;
+[06:29:44.585] LOG: %cStart Phase MovePhase color:green;
+[06:29:44.585] LOG: %cStart Phase MoveEndPhase color:green;
+[06:29:44.585] LOG: %cStart Phase CheckInterludePhase color:green;
+[06:29:44.585] LOG: %cStart Phase WeatherEffectPhase color:green;
+[06:29:45.171] LOG: %cStart Phase PositionalTagPhase color:green;
+[06:29:45.171] LOG: %cStart Phase BerryPhase color:green;
+[06:29:45.176] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[06:29:45.179] LOG: %cStart Phase TurnEndPhase color:green;
+[06:29:45.186] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:29:45.186] LOG: %cStart Phase MessagePhase color:green;
+[06:29:45.387] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:29:45.388] LOG: %cStart Phase MessagePhase color:green;
+[06:29:45.621] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:29:45.622] LOG: %cStart Phase MessagePhase color:green;
+[06:29:45.838] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:29:45.838] LOG: %cStart Phase MessagePhase color:green;
+[06:29:46.063] LOG: %cStart Phase TurnInitPhase color:green;
+[06:29:46.064] LOG: %cStart Phase CommandPhase color:green;
+[06:29:47.253] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[3,1],"multiple":false} 
+Player Pokemon: Phione
+[06:29:47.256] LOG: %cStart Phase SelectTargetPhase color:green;
+[06:29:47.541] LOG: %cStart Phase CommandPhase color:green;
+[06:29:49.046] LOG: Move: HEAT_WAVE Move targets: {"targets":[3],"multiple":true} 
+Player Pokemon: Shaymin
+[06:29:49.048] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:29:49.056] LOG: Battle Seed: l82uCQ3GM0T6bPYm
+[06:29:49.060] LOG: Move Pool: ["Lunge","Pounce","Astonish","Detect"]
+[06:29:49.060] LOG: Move Scores: [13.125,18,-20,-20]
+[06:29:49.060] LOG: Sorted Move Pool: ["Pounce","Lunge","Astonish","Detect"]
+[06:29:49.060] LOG: Chosen Move: Pounce
+[06:29:49.060] LOG: %cStart Phase TurnStartPhase color:green;
+[06:29:49.063] LOG: %cStart Phase MovePhase color:green;
+[06:29:49.063] LOG: %cUser: Phione
+Move: BUBBLE_BEAM
+Use Mode: NORMAL color:orchid
+[06:29:49.067] LOG: %cStart Phase MessagePhase color:green;
+[06:29:49.146] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:29:49.746] LOG: crit stage: +0
+[06:29:49.747] LOG: Move: Bubble Beam | Base damage: 20.56 | Power: 25 | Source attack: 87 | Target defense: 15
+[06:29:49.747] LOG: Move: Bubble Beam | Attack damage: 45
+[06:29:49.747] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:29:49.783] LOG: %cStart Phase MessagePhase color:green;
+[06:29:49.988] LOG: %cStart Phase FaintPhase color:green;
+[06:29:51.040] LOG: %cStart Phase MessagePhase color:green;
+[06:29:51.293] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:29:51.456] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:29:51.644] LOG: %cStart Phase MessagePhase color:green;
+[06:29:51.862] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:29:51.888] LOG: %cStart Phase VictoryPhase color:green;
+[06:29:51.889] LOG: %cStart Phase ExpPhase color:green;
+[06:29:51.889] LOG: Applied Super EXP. Charm 
+[06:29:51.889] LOG: Applied EXP. Charm 
+[06:29:52.048] LOG: %cStart Phase ExpPhase color:green;
+[06:29:52.048] LOG: Applied Super EXP. Charm 
+[06:29:52.048] LOG: Applied EXP. Charm 
+[06:29:52.282] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:29:52.283] LOG: Applied Super EXP. Charm 
+[06:29:52.283] LOG: Applied EXP. Charm 
+[06:29:52.284] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:29:52.284] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:29:52.284] LOG: Applied Super EXP. Charm 
+[06:29:52.284] LOG: Applied EXP. Charm 
+[06:29:52.284] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:29:52.285] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:29:52.285] LOG: Applied Super EXP. Charm 
+[06:29:52.285] LOG: Applied EXP. Charm 
+[06:29:52.285] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:29:52.285] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:29:52.285] LOG: Applied Super EXP. Charm 
+[06:29:52.285] LOG: Applied EXP. Charm 
+[06:29:52.286] LOG: %cStart Phase LevelUpPhase color:green;
+[06:29:52.286] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:29:52.286] LOG: %cStart Phase MoveEndPhase color:green;
+[06:29:52.288] LOG: %cStart Phase MovePhase color:green;
+[06:29:52.288] LOG: %cUser: Shaymin
+Move: HEAT_WAVE
+Use Mode: NORMAL color:orchid
+[06:29:52.289] LOG: %cStart Phase MessagePhase color:green;
+[06:29:52.404] LOG: %cStart Phase MessagePhase color:green;
+[06:29:52.605] LOG: %cStart Phase MoveEndPhase color:green;
+[06:29:52.605] LOG: %cStart Phase MovePhase color:green;
+[06:29:52.605] LOG: %cStart Phase MoveEndPhase color:green;
+[06:29:52.605] LOG: %cStart Phase CheckInterludePhase color:green;
+[06:29:52.605] LOG: %cStart Phase WeatherEffectPhase color:green;
+[06:29:53.204] LOG: %cStart Phase PositionalTagPhase color:green;
+[06:29:53.205] LOG: %cStart Phase BerryPhase color:green;
+[06:29:53.206] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[06:29:53.207] LOG: %cStart Phase TurnEndPhase color:green;
+[06:29:53.213] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:29:53.214] LOG: %cStart Phase MessagePhase color:green;
+[06:29:53.438] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:29:53.438] LOG: %cStart Phase MessagePhase color:green;
+[06:29:53.672] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:29:53.672] LOG: %cStart Phase MessagePhase color:green;
+[06:29:53.897] LOG: %cStart Phase BattleEndPhase color:green;
+[06:29:53.897] LOG: Battle Score: 49 (2 Turns x0.84)
+[06:29:53.897] LOG: Total Score: 718
+[06:29:53.916] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:29:53.916] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:29:53.947] LOG: %cStart Phase MessagePhase color:green;
+[06:29:54.354] LOG: %cStart Phase EggLapsePhase color:green;
+[06:29:54.354] LOG: %cStart Phase SelectModifierPhase color:green;
+[06:29:54.354] LOG: Wave Seed: @SOvgQQv~YqfTzCosVWeQ 13
+[06:29:54.362] LOG: 6 4 [2,3,4,5]
+[06:29:54.363] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[06:29:54.363] LOG: 1 0 [2,3,4,5]
+[06:29:54.363] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[06:29:54.363] LOG: 6 4 [2,3,4,5]
+[06:29:54.363] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[06:29:54.363] LOG: 7 4 [2,3,4,5]
+[06:29:54.363] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_attack","soundName":"se/restore","tier":0,"stat":1,"nameKey":"x_attack","quantityKey":"percentage"} 
+[06:29:54.363] LOG: 0 0 [2,3,4,5]
+[06:29:54.363] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[06:29:57.171] LOG: %cStart Phase LevelUpPhase color:green;
+[06:29:57.171] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[06:30:00.897] LOG: %cStart Phase NewBattlePhase color:green;
+[06:30:00.898] LOG: Wave Seed: ATPwhRRwZrgU{DptWXfR 14
+[06:30:00.898] LOG: Starting trainer pool tier: UNCOMMON
+[06:30:00.898] LOG: Applied Lure 
+[06:30:00.901] LOG: %cStart Phase ReturnPhase color:green;
+[06:30:01.022] LOG: %cStart Phase ReturnPhase color:green;
+[06:30:01.147] LOG: %cStart Phase ShowTrainerPhase color:green;
+[06:30:01.263] LOG: %cStart Phase NextEncounterPhase color:green;
+[06:30:01.272] LOG: ER #419: elite BST cap (460 @ w14) - replacing Octillery (510) with Remoraid (300)
+[06:30:01.285] LOG: Pokemon: Foe Remoraid | Species ID: 223 | Level: 10 | Nature: Modest (+SpAtk/-Atk)
+[06:30:01.285] LOG: Stats (IVs): HP: 33 (31), Atk: 12 (31), Def: 18 (31), Spatk: 13 (31), Spdef: 20 (31), Spd: 15 (31)
+[06:30:01.285] LOG: Ability: Artillery | Passive Ability: Torrent 
+[06:30:01.285] LOG: Moveset: ["Snipe Shot","Scorching Sands","Searing Shot","Octolock"]
+[06:30:01.286] LOG: ER #419: elite BST cap (460 @ w14) - replacing Floatzel (495) with Buizel (330)
+[06:30:01.292] LOG: Pokemon: Foe Buizel | Species ID: 418 | Level: 10 | Nature: Jolly (+Spd/-SpAtk)
+[06:30:01.292] LOG: Stats (IVs): HP: 39 (31), Atk: 12 (31), Def: 19 (31), Spatk: 13 (31), Spdef: 21 (31), Spd: 19 (31)
+[06:30:01.292] LOG: Ability: Tidal Rush | Passive Ability: Field Explorer 
+[06:30:01.292] LOG: Moveset: ["Aqua Jet","Triple Dive","Slash","Fake Out"]
+[06:30:01.297] LOG: Pokemon: Foe Linoone | Species ID: 264 | Level: 10 | Nature: Jolly (+Spd/-SpAtk)
+[06:30:01.297] LOG: Stats (IVs): HP: 42 (31), Atk: 17 (31), Def: 16 (31), Spatk: 20 (31), Spdef: 25 (31), Spd: 20 (31)
+[06:30:01.297] LOG: Ability: Gluttony | Passive Ability: Field Explorer 
+[06:30:01.297] LOG: Moveset: ["Extreme Speed","Flail","Headlong Rush","Belly Drum"]
+[06:30:01.297] LOG: ER #419: elite BST cap (460 @ w14) - replacing Empoleon (535) with Prinplup (420)
+[06:30:01.301] LOG: Pokemon: Foe Prinplup | Species ID: 394 | Level: 10 | Nature: Timid (+Spd/-Atk)
+[06:30:01.302] LOG: Stats (IVs): HP: 32 (31), Atk: 22 (31), Def: 24 (31), Spatk: 18 (31), Spdef: 18 (31), Spd: 21 (31)
+[06:30:01.302] LOG: Ability: Competitive | Passive Ability: Torrent 
+[06:30:01.302] LOG: Moveset: ["Hydro Cannon","Hurricane","Steel Beam","Ice Beam"]
+[06:30:02.028] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"protein","soundName":"se/restore","tier":0,"stat":1,"key":"protein"} (enemy)
+[06:30:02.028] LOG: Battle Seed: nNAGhR4IVbvLT55e
+[06:30:02.030] LOG: Applied Protein (enemy)
+[06:30:02.031] LOG: Generated AI funcs
+[06:30:02.081] DEBUG: Session data saved to slot 3!
+[06:30:02.081] LOG: Wave Seed: ATPwhRRwZrgU{DptWXfR 14
+[06:30:02.297] LOG: Breeder Albert
+[06:30:02.300] LOG: Dialogue dialogue:breeder.encounter.1 skipped
+[06:30:02.351] LOG: Breeder Albert
+[06:30:21.892] LOG: %cStart Phase SummonPhase color:green;
+[06:30:21.893] LOG: Albert
+[06:30:22.052] LOG: Applied Protein (enemy)
+[06:30:22.083] WARN: cry/223 not found
+[06:30:22.199] LOG: %cStart Phase SummonPhase color:green;
+[06:30:22.200] LOG: Albert
+[06:30:22.351] LOG: Applied Protein (enemy)
+[06:30:22.383] WARN: cry/418 not found
+[06:30:22.499] LOG: %cStart Phase SummonPhase color:green;
+[06:30:22.683] WARN: cry/489 not found
+[06:30:22.800] LOG: %cStart Phase ShinySparklePhase color:green;
+[06:30:22.916] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[06:30:22.917] LOG: %cStart Phase SummonPhase color:green;
+[06:30:23.216] LOG: %cStart Phase ShinySparklePhase color:green;
+[06:30:23.333] LOG: %cStart Phase InitEncounterPhase color:green;
+[06:30:23.338] LOG: %cStart Phase PostSummonPhase color:green;
+[06:30:23.338] LOG: Ran PSP for: Shaymin
+[06:30:23.344] LOG: %cStart Phase PostSummonPhase color:green;
+[06:30:23.344] LOG: Ran PSP for: Phione
+[06:30:23.348] LOG: %cStart Phase PostSummonPhase color:green;
+[06:30:23.351] LOG: %cStart Phase PostSummonPhase color:green;
+[06:30:23.354] LOG: %cStart Phase PostSummonPhase color:green;
+[06:30:23.355] LOG: %cStart Phase PostSummonPhase color:green;
+[06:30:23.355] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:30:23.511] LOG: %cStart Phase MovePhase color:green;
+[06:30:23.511] LOG: %cUser: Phione
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[06:30:23.520] LOG: %cStart Phase MessagePhase color:green;
+[06:30:23.624] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:30:23.644] LOG: %cStart Phase MessagePhase color:green;
+[06:30:23.908] LOG: %cStart Phase MoveEndPhase color:green;
+[06:30:23.908] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:30:23.944] LOG: %cStart Phase PostSummonPhase color:green;
+[06:30:23.944] LOG: Ran PSP for: Buizel
+[06:30:23.946] LOG: %cStart Phase PostSummonPhase color:green;
+[06:30:23.947] LOG: %cStart Phase PostSummonPhase color:green;
+[06:30:23.947] LOG: %cStart Phase PostSummonPhase color:green;
+[06:30:23.947] LOG: Ran PSP for: Remoraid
+[06:30:23.949] LOG: Applied Protein (enemy)
+[06:30:23.949] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:30:24.128] LOG: %cStart Phase MessagePhase color:green;
+[06:30:24.358] LOG: %cStart Phase PostSummonPhase color:green;
+[06:30:24.358] LOG: %cStart Phase PostSummonPhase color:green;
+[06:30:24.358] LOG: %cStart Phase TurnInitPhase color:green;
+[06:30:24.358] LOG: %cStart Phase CommandPhase color:green;
