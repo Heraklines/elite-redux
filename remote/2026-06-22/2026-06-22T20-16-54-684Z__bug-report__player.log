@@ -1,0 +1,269 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     0  wave:182  difficulty:ace
+seed:     e8RtHcVUexsv6Sq0Yk9QSfLe
+party:    Koraidon(L187 952/1029), Kecleon(L185 472/472), Beautifly(L185 492/492), Escavalier(L185 496/496), Slaking(L184 769/769)
+
+----- DESCRIPTION -----
+Dakrai Mega has bugged sprite
+
+----- CONSOLE -----
+[20:15:33.175] LOG: Applied Macho Brace 
+[20:15:33.175] LOG: Applied Macho Brace 
+[20:15:33.175] LOG: Applied Macho Brace 
+[20:15:33.175] LOG: Applied Macho Brace 
+[20:15:33.175] LOG: Applied Macho Brace 
+[20:15:33.175] LOG: Applied Macho Brace 
+[20:15:33.674] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:15:33.674] LOG: Applied Super EXP. Charm 
+[20:15:33.674] LOG: Applied EXP. Charm 
+[20:15:33.993] LOG: %cStart Phase LevelUpPhase color:green;
+[20:15:34.512] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:15:34.643] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:15:34.643] LOG: Applied Super EXP. Charm 
+[20:15:34.643] LOG: Applied EXP. Charm 
+[20:15:34.968] LOG: %cStart Phase LevelUpPhase color:green;
+[20:15:35.462] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:15:35.593] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:15:35.593] LOG: Applied Super EXP. Charm 
+[20:15:35.593] LOG: Applied EXP. Charm 
+[20:15:35.918] LOG: %cStart Phase LevelUpPhase color:green;
+[20:15:35.918] LOG: Applied Protein 
+[20:15:36.499] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:15:36.630] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:15:36.631] LOG: Applied Super EXP. Charm 
+[20:15:36.631] LOG: Applied EXP. Charm 
+[20:15:36.949] LOG: %cStart Phase LevelUpPhase color:green;
+[20:15:36.949] LOG: Applied Iron 
+[20:15:36.949] LOG: Applied HP Up 
+[20:15:37.412] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:15:37.543] LOG: %cStart Phase MoveEndPhase color:green;
+[20:15:37.543] LOG: %cStart Phase MovePhase color:green;
+[20:15:37.543] LOG: %cStart Phase MoveEndPhase color:green;
+[20:15:37.543] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:15:37.543] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:15:38.049] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:15:38.049] LOG: %cStart Phase BerryPhase color:green;
+[20:15:38.049] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:15:38.049] LOG: %cStart Phase TurnEndPhase color:green;
+[20:15:38.050] LOG: Applied Leftovers 
+[20:15:38.050] LOG: %cStart Phase MessagePhase color:green;
+[20:15:38.636] LOG: %cStart Phase PokemonHealPhase color:green;
+[20:15:38.856] LOG: %cStart Phase MessagePhase color:green;
+[20:15:39.492] LOG: %cStart Phase MessagePhase color:green;
+[20:15:39.974] LOG: %cStart Phase SwitchSummonPhase color:green;
+[20:15:40.543] LOG: Malva
+[20:15:40.711] LOG: Applied Calcium (enemy)
+[20:15:40.711] LOG: Applied HP Up (enemy)
+[20:15:40.711] LOG: Applied Zinc (enemy)
+[20:15:40.712] LOG: Applied Calcium (enemy)
+[20:15:40.712] LOG: Applied HP Up (enemy)
+[20:15:40.712] LOG: Applied Iron (enemy)
+[20:15:40.712] LOG: Applied Zinc (enemy)
+[20:15:40.712] LOG: Applied Protein (enemy)
+[20:15:40.712] LOG: Applied HP Up (enemy)
+[20:15:40.712] LOG: Applied Carbos (enemy)
+[20:15:40.712] LOG: Applied HP Up (enemy)
+[20:15:40.712] LOG: Applied Calcium (enemy)
+[20:15:40.712] LOG: Applied Calcium (enemy)
+[20:15:40.712] LOG: Applied Carbos (enemy)
+[20:15:40.712] LOG: Applied Zinc (enemy)
+[20:15:40.712] LOG: Applied Iron (enemy)
+[20:15:40.712] LOG: Applied Calcium (enemy)
+[20:15:40.774] WARN: cry/324 not found
+[20:15:41.030] LOG: %cStart Phase PostSummonPhase color:green;
+[20:15:41.031] LOG: Ran PSP for: Torkoal
+[20:15:41.031] LOG: %cStart Phase PostSummonPhase color:green;
+[20:15:41.031] LOG: %cStart Phase PostSummonPhase color:green;
+[20:15:41.032] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:15:41.411] LOG: %cStart Phase MessagePhase color:green;
+[20:15:42.011] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:15:42.062] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:15:42.443] LOG: %cStart Phase CommonAnimPhase color:green;
+[20:15:42.830] LOG: %cStart Phase MessagePhase color:green;
+[20:15:43.342] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:15:43.393] LOG: %cStart Phase TurnInitPhase color:green;
+[20:15:43.393] LOG: %cStart Phase CommandPhase color:green;
+[20:15:43.525] LOG: Applied Multi Lens 
+[20:15:43.528] LOG: Applied Multi Lens 
+[20:15:44.257] LOG: Applied Multi Lens 
+[20:15:44.425] LOG: Applied Multi Lens 
+[20:15:44.637] LOG: Applied Multi Lens 
+[20:15:44.806] LOG: Applied Multi Lens 
+[20:15:45.331] LOG: Applied Multi Lens 
+[20:15:45.600] LOG: Applied Multi Lens 
+[20:15:45.781] LOG: Applied Multi Lens 
+[20:15:45.919] LOG: Applied Multi Lens 
+[20:15:46.181] LOG: Applied Multi Lens 
+[20:15:46.337] LOG: Applied Multi Lens 
+[20:15:46.486] LOG: Move: HIGH_JUMP_KICK Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Koraidon
+[20:15:46.487] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:15:46.489] LOG: Applied Black Belt (enemy)
+[20:15:46.490] LOG: Battle Seed: 2lTBCYLAzawsbRLg
+[20:15:46.490] WARN: BattlerTag BURNING_BULWARK is missing a score!
+[20:15:46.490] WARN: BattlerTag BURNING_BULWARK is missing a score!
+[20:15:46.491] LOG: Move Pool: ["Inferno","Scorching Sands","Burning Bulwark","Body Press"]
+[20:15:46.491] LOG: Move Scores: [16.125,18,-20,16]
+[20:15:46.491] LOG: Sorted Move Pool: ["Scorching Sands","Inferno","Body Press","Burning Bulwark"]
+[20:15:46.491] LOG: Chosen Move: Scorching Sands
+[20:15:46.491] LOG: %cStart Phase TurnStartPhase color:green;
+[20:15:46.491] LOG: %cStart Phase MovePhase color:green;
+[20:15:46.491] LOG: %cUser: Koraidon
+Move: HIGH_JUMP_KICK
+Use Mode: NORMAL color:orchid
+[20:15:46.492] LOG: %cStart Phase MessagePhase color:green;
+[20:15:46.767] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:15:46.767] LOG: Applied Multi Lens 
+[20:15:46.768] LOG: Applied Wide Lens 
+[20:15:47.174] LOG: Applied Scope Lens 
+[20:15:47.174] LOG: Applied Dire Hit 
+[20:15:47.174] LOG: crit stage: +2
+[20:15:47.174] LOG: Move: High Jump Kick | Base damage: 408.34285714285716 | Power: 130 | Source attack: 1094 | Target defense: 532
+[20:15:47.174] LOG: Applied Multi Lens 
+[20:15:47.174] LOG: Move: High Jump Kick | Attack damage: 237
+[20:15:47.174] LOG: Applied Amulet Coin 
+[20:15:47.175] LOG: Applied Golden Punch 
+[20:15:47.175] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:15:47.187] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:15:47.187] LOG: Applied Wide Lens 
+[20:15:47.599] LOG: Applied Scope Lens 
+[20:15:47.599] LOG: Applied Dire Hit 
+[20:15:47.599] LOG: crit stage: +2
+[20:15:47.599] LOG: Move: High Jump Kick | Base damage: 408.34285714285716 | Power: 130 | Source attack: 1094 | Target defense: 532
+[20:15:47.599] LOG: Applied Multi Lens 
+[20:15:47.599] LOG: Move: High Jump Kick | Attack damage: 114
+[20:15:47.599] LOG: Applied Amulet Coin 
+[20:15:47.600] LOG: Applied Golden Punch 
+[20:15:47.600] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:15:47.612] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:15:47.612] LOG: Applied Wide Lens 
+[20:15:48.024] LOG: Applied Scope Lens 
+[20:15:48.024] LOG: Applied Dire Hit 
+[20:15:48.024] LOG: crit stage: +2
+[20:15:48.024] LOG: Move: High Jump Kick | Base damage: 408.34285714285716 | Power: 130 | Source attack: 1094 | Target defense: 532
+[20:15:48.024] LOG: Applied Multi Lens 
+[20:15:48.024] LOG: Move: High Jump Kick | Attack damage: 116
+[20:15:48.024] LOG: Applied Amulet Coin 
+[20:15:48.025] LOG: Applied Golden Punch 
+[20:15:48.025] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:15:48.037] LOG: %cStart Phase MessagePhase color:green;
+[20:15:48.498] LOG: %cStart Phase MoveEndPhase color:green;
+[20:15:48.499] LOG: %cStart Phase MovePhase color:green;
+[20:15:48.499] LOG: %cUser: Koraidon
+Move: MAGNITUDE
+Use Mode: INDIRECT color:orchid
+[20:15:48.499] LOG: %cStart Phase MessagePhase color:green;
+[20:15:48.761] LOG: %cStart Phase MessagePhase color:green;
+[20:15:48.961] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:15:48.961] LOG: Applied Multi Lens 
+[20:15:48.961] LOG: Applied Wide Lens 
+[20:15:48.980] LOG: Applied Scope Lens 
+[20:15:48.980] LOG: Applied Dire Hit 
+[20:15:48.980] LOG: crit stage: +2
+[20:15:48.980] LOG: Move: Magnitude | Base damage: 293.004 | Power: 93.10000000000001 | Source attack: 1094 | Target defense: 532
+[20:15:48.980] LOG: Applied Multi Lens 
+[20:15:48.980] LOG: Move: Magnitude | Attack damage: 222
+[20:15:48.981] LOG: Applied Amulet Coin 
+[20:15:48.981] LOG: Applied Golden Punch 
+[20:15:48.981] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:15:48.993] LOG: %cStart Phase MessagePhase color:green;
+[20:15:49.480] LOG: %cStart Phase MessagePhase color:green;
+[20:15:49.936] LOG: %cStart Phase FaintPhase color:green;
+[20:15:49.936] WARN: cry/324 not found
+[20:15:50.067] LOG: %cStart Phase MessagePhase color:green;
+[20:15:50.186] LOG: %cStart Phase VictoryPhase color:green;
+[20:15:50.186] LOG: Applied Soothe Bell 
+[20:15:50.186] LOG: %cStart Phase ExpPhase color:green;
+[20:15:50.186] LOG: Applied Super EXP. Charm 
+[20:15:50.186] LOG: Applied EXP. Charm 
+[20:15:50.624] LOG: %cStart Phase LevelUpPhase color:green;
+[20:15:50.624] LOG: Applied Zinc 
+[20:15:50.624] LOG: Applied Carbos 
+[20:15:50.624] LOG: Applied HP Up 
+[20:15:50.624] LOG: Applied Calcium 
+[20:15:50.624] LOG: Applied Protein 
+[20:15:50.624] LOG: Applied Iron 
+[20:15:50.624] LOG: Applied Macho Brace 
+[20:15:50.624] LOG: Applied Macho Brace 
+[20:15:50.624] LOG: Applied Macho Brace 
+[20:15:50.624] LOG: Applied Macho Brace 
+[20:15:50.624] LOG: Applied Macho Brace 
+[20:15:50.624] LOG: Applied Macho Brace 
+[20:15:51.093] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:15:51.093] LOG: Applied Super EXP. Charm 
+[20:15:51.093] LOG: Applied EXP. Charm 
+[20:15:51.411] LOG: %cStart Phase LevelUpPhase color:green;
+[20:15:51.905] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:15:52.036] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:15:52.036] LOG: Applied Super EXP. Charm 
+[20:15:52.036] LOG: Applied EXP. Charm 
+[20:15:52.361] LOG: %cStart Phase LevelUpPhase color:green;
+[20:15:52.886] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:15:53.017] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:15:53.017] LOG: Applied Super EXP. Charm 
+[20:15:53.017] LOG: Applied EXP. Charm 
+[20:15:53.336] LOG: %cStart Phase LevelUpPhase color:green;
+[20:15:53.336] LOG: Applied Protein 
+[20:15:53.867] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:15:53.999] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:15:53.999] LOG: Applied Super EXP. Charm 
+[20:15:53.999] LOG: Applied EXP. Charm 
+[20:15:54.317] LOG: %cStart Phase LevelUpPhase color:green;
+[20:15:54.318] LOG: Applied Iron 
+[20:15:54.318] LOG: Applied HP Up 
+[20:15:54.805] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:15:54.936] LOG: %cStart Phase MoveEndPhase color:green;
+[20:15:54.936] LOG: %cStart Phase MovePhase color:green;
+[20:15:54.936] LOG: %cStart Phase MoveEndPhase color:green;
+[20:15:54.936] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:15:54.936] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:15:55.442] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:15:55.442] LOG: %cStart Phase BerryPhase color:green;
+[20:15:55.442] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:15:55.442] LOG: %cStart Phase TurnEndPhase color:green;
+[20:15:55.443] LOG: Applied Leftovers 
+[20:15:55.443] LOG: %cStart Phase PokemonHealPhase color:green;
+[20:15:55.662] LOG: %cStart Phase MessagePhase color:green;
+[20:15:56.298] LOG: %cStart Phase SwitchSummonPhase color:green;
+[20:15:56.867] LOG: Malva
+[20:15:57.036] LOG: Applied Iron (enemy)
+[20:15:57.036] LOG: Applied Calcium (enemy)
+[20:15:57.036] LOG: Applied Calcium (enemy)
+[20:15:57.036] LOG: Applied HP Up (enemy)
+[20:15:57.036] LOG: Applied Iron (enemy)
+[20:15:57.036] LOG: Applied Zinc (enemy)
+[20:15:57.036] LOG: Applied Protein (enemy)
+[20:15:57.036] LOG: Applied HP Up (enemy)
+[20:15:57.036] LOG: Applied Carbos (enemy)
+[20:15:57.036] LOG: Applied HP Up (enemy)
+[20:15:57.036] LOG: Applied Calcium (enemy)
+[20:15:57.036] LOG: Applied Calcium (enemy)
+[20:15:57.036] LOG: Applied Carbos (enemy)
+[20:15:57.036] LOG: Applied Zinc (enemy)
+[20:15:57.037] LOG: Applied Calcium (enemy)
+[20:15:57.037] LOG: Applied HP Up (enemy)
+[20:15:57.037] LOG: Applied Zinc (enemy)
+[20:15:57.104] WARN: cry/10867 not found
+[20:15:57.361] LOG: %cStart Phase PostSummonPhase color:green;
+[20:15:57.361] LOG: Ran PSP for: Darkrai Mega
+[20:15:57.361] LOG: %cStart Phase PostSummonPhase color:green;
+[20:15:57.361] LOG: %cStart Phase MovePhase color:green;
+[20:15:57.361] LOG: %cUser: Darkrai Mega
+Move: FIRE_SPIN
+Use Mode: INDIRECT color:orchid
+[20:15:57.361] LOG: %cStart Phase MessagePhase color:green;
+[20:15:57.654] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:15:57.655] LOG: Battle Seed: 2lTBCYLAzawsbRLg
+[20:15:57.673] LOG: crit stage: +0
+[20:15:57.674] LOG: Move: Fire Spin | Base damage: 70.1730612244898 | Power: 65 | Source attack: 584 | Target defense: 784
+[20:15:57.674] LOG: Move: Fire Spin | Attack damage: 71
+[20:15:57.674] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:15:57.686] LOG: %cStart Phase MessagePhase color:green;
+[20:15:58.198] LOG: %cStart Phase MessagePhase color:green;
+[20:15:58.767] LOG: %cStart Phase MoveEndPhase color:green;
+[20:15:58.767] LOG: %cStart Phase PostSummonPhase color:green;
+[20:15:58.767] LOG: %cStart Phase TurnInitPhase color:green;
+[20:15:58.767] LOG: %cStart Phase CommandPhase color:green;
