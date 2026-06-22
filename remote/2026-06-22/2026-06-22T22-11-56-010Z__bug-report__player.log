@@ -1,0 +1,282 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 OPR/132.0.0.0
+mode:     0  wave:110  difficulty:ace
+seed:     Rn27MZBYsZ2ib62KSquZN4Rs
+party:    Reuniclus Redux(L94 137/360), Escarginite Redux(L94 0/321), Houndoom Redux(L94 0/274), Kleavor Redux(L94 0/264), Mimikyu Apex(L94 0/281), Hydreigon Redux(L94 0/321)
+
+----- DESCRIPTION -----
+Mimi Apex Disguise status refuses to be refreshed after switching out of battle. Also, Disguise doesnt always work when being hit by a move, regardless of type
+
+----- CONSOLE -----
+[22:10:00.405] LOG: crit stage: +0
+[22:10:00.405] LOG: Applied Charcoal (enemy)
+[22:10:00.405] LOG: Applied X Sp. Def 
+[22:10:00.405] LOG: Move: Mystical Fire | Base damage: 117.21551515151515 | Power: 96 | Source attack: 316 | Target defense: 198
+[22:10:00.405] LOG: Move: Mystical Fire | Attack damage: 164
+[22:10:00.406] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:10:00.450] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:10:00.812] LOG: %cStart Phase MessagePhase color:green;
+[22:10:01.267] LOG: %cStart Phase MoveEndPhase color:green;
+[22:10:01.267] LOG: %cStart Phase MovePhase color:green;
+[22:10:01.267] LOG: %cUser: Escarginite Redux
+Move: SLUDGE_BOMB
+Use Mode: NORMAL color:orchid
+[22:10:01.267] LOG: %cStart Phase MessagePhase color:green;
+[22:10:01.545] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:10:02.379] LOG: crit stage: +0
+[22:10:02.379] LOG: Move: Sludge Bomb | Base damage: 63.69263157894736 | Power: 90 | Source attack: 148 | Target defense: 171
+[22:10:02.380] LOG: Move: Sludge Bomb | Attack damage: 118
+[22:10:02.380] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:10:02.425] LOG: %cStart Phase MessagePhase color:green;
+[22:10:02.842] LOG: %cStart Phase MoveEndPhase color:green;
+[22:10:02.842] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:10:02.842] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:10:03.470] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:10:03.470] LOG: %cStart Phase BerryPhase color:green;
+[22:10:03.471] LOG: Applied Sitrus Berry (enemy)
+[22:10:03.471] LOG: Applied HP Up (enemy)
+[22:10:03.471] LOG: Applied Calcium (enemy)
+[22:10:03.471] LOG: Applied Zinc (enemy)
+[22:10:03.472] LOG: Applied Protein (enemy)
+[22:10:03.472] LOG: Applied Zinc (enemy)
+[22:10:03.472] LOG: Applied Carbos (enemy)
+[22:10:03.472] LOG: Applied Protein (enemy)
+[22:10:03.472] LOG: Applied Sitrus Berry 
+[22:10:03.473] LOG: Applied HP Up 
+[22:10:03.474] LOG: %cStart Phase CommonAnimPhase color:green;
+[22:10:03.953] LOG: %cStart Phase PokemonHealPhase color:green;
+[22:10:04.264] LOG: %cStart Phase MessagePhase color:green;
+[22:10:04.837] LOG: %cStart Phase CommonAnimPhase color:green;
+[22:10:05.288] LOG: %cStart Phase PokemonHealPhase color:green;
+[22:10:05.598] LOG: %cStart Phase MessagePhase color:green;
+[22:10:06.203] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:10:06.203] LOG: %cStart Phase TurnEndPhase color:green;
+[22:10:06.204] LOG: Applied HP Up 
+[22:10:06.205] LOG: %cStart Phase PokemonHealPhase color:green;
+[22:10:06.497] LOG: %cStart Phase MessagePhase color:green;
+[22:10:06.954] LOG: %cStart Phase PokemonHealPhase color:green;
+[22:10:07.263] LOG: %cStart Phase MessagePhase color:green;
+[22:10:07.744] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:10:08.069] LOG: %cStart Phase MessagePhase color:green;
+[22:10:08.596] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:10:08.641] LOG: %cStart Phase TurnInitPhase color:green;
+[22:10:08.641] LOG: %cStart Phase CommandPhase color:green;
+[22:10:09.224] LOG: Move: SLUDGE_BOMB Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Escarginite Redux
+[22:10:09.224] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:10:09.226] LOG: Applied Miracle Seed (enemy)
+[22:10:09.226] LOG: Applied Charcoal (enemy)
+[22:10:09.226] LOG: Applied X Sp. Def 
+[22:10:09.227] LOG: Battle Seed: 0WAkZHnG0VIZtwfv
+[22:10:09.227] LOG: Move Pool: ["Mystical Fire"]
+[22:10:09.227] LOG: Move Scores: [27]
+[22:10:09.227] LOG: Sorted Move Pool: ["Mystical Fire"]
+[22:10:09.227] LOG: Chosen Move: Mystical Fire
+[22:10:09.227] LOG: %cStart Phase TurnStartPhase color:green;
+[22:10:09.228] LOG: %cStart Phase MovePhase color:green;
+[22:10:09.228] LOG: %cUser: Sunflora
+Move: MYSTICAL_FIRE
+Use Mode: NORMAL color:orchid
+[22:10:09.228] LOG: %cStart Phase MessagePhase color:green;
+[22:10:09.448] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:10:10.328] LOG: crit stage: +0
+[22:10:10.329] LOG: Applied Charcoal (enemy)
+[22:10:10.329] LOG: Applied X Sp. Def 
+[22:10:10.329] LOG: Move: Mystical Fire | Base damage: 117.21551515151515 | Power: 96 | Source attack: 316 | Target defense: 198
+[22:10:10.329] LOG: Move: Mystical Fire | Attack damage: 161
+[22:10:10.329] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:10:10.374] LOG: %cStart Phase FaintPhase color:green;
+[22:10:10.375] WARN: cry/10751 not found
+[22:10:10.504] LOG: %cStart Phase MessagePhase color:green;
+[22:10:10.833] LOG: %cStart Phase MoveEndPhase color:green;
+[22:10:10.833] LOG: %cStart Phase MovePhase color:green;
+[22:10:10.833] LOG: %cStart Phase MoveEndPhase color:green;
+[22:10:10.833] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:10:10.833] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:10:10.935] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:10:10.935] LOG: %cStart Phase BerryPhase color:green;
+[22:10:10.935] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:10:10.935] LOG: %cStart Phase TurnEndPhase color:green;
+[22:10:10.936] LOG: %cStart Phase PokemonHealPhase color:green;
+[22:10:11.169] LOG: %cStart Phase MessagePhase color:green;
+[22:10:11.635] LOG: %cStart Phase SwitchPhase color:green;
+[22:10:13.468] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:10:13.619] LOG: Applied HP Up 
+[22:10:13.668] WARN: cry/821 not found
+[22:10:13.884] LOG: %cStart Phase ShinySparklePhase color:green;
+[22:10:14.100] LOG: %cStart Phase PostSummonPhase color:green;
+[22:10:14.100] LOG: Ran PSP for: Mimikyu Apex
+[22:10:14.100] LOG: %cStart Phase PostSummonPhase color:green;
+[22:10:14.100] LOG: %cStart Phase PostSummonPhase color:green;
+[22:10:14.100] LOG: %cStart Phase TurnInitPhase color:green;
+[22:10:14.100] LOG: %cStart Phase CommandPhase color:green;
+[22:10:29.380] LOG: Move: CORE_ENFORCER Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Mimikyu Apex
+[22:10:29.380] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:10:29.381] LOG: Applied Miracle Seed (enemy)
+[22:10:29.382] LOG: Applied Charcoal (enemy)
+[22:10:29.382] LOG: Applied X Sp. Def 
+[22:10:29.382] LOG: Battle Seed: 0WAkZHnG0VIZtwfv
+[22:10:29.383] LOG: Move Pool: ["Seed Bomb","Mystical Fire","Confide","Baton Pass"]
+[22:10:29.383] LOG: Move Scores: [27,27,2,3.5]
+[22:10:29.383] LOG: Sorted Move Pool: ["Seed Bomb","Mystical Fire","Baton Pass","Confide"]
+[22:10:29.383] LOG: Chosen Move: Seed Bomb
+[22:10:29.383] LOG: %cStart Phase TurnStartPhase color:green;
+[22:10:29.383] LOG: %cStart Phase MovePhase color:green;
+[22:10:29.383] LOG: %cUser: Mimikyu Apex
+Move: CORE_ENFORCER
+Use Mode: NORMAL color:orchid
+[22:10:29.383] LOG: %cStart Phase MessagePhase color:green;
+[22:10:29.604] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:10:31.178] LOG: crit stage: +0
+[22:10:31.179] LOG: Move: Core Enforcer | Base damage: 94.4 | Power: 100 | Source attack: 203 | Target defense: 174
+[22:10:31.179] LOG: Move: Core Enforcer | Attack damage: 85
+[22:10:31.179] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:10:31.223] LOG: %cStart Phase MoveEndPhase color:green;
+[22:10:31.223] LOG: %cStart Phase MovePhase color:green;
+[22:10:31.223] LOG: %cUser: Sunflora
+Move: SEED_BOMB
+Use Mode: NORMAL color:orchid
+[22:10:31.226] LOG: %cStart Phase MessagePhase color:green;
+[22:10:31.481] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:10:32.005] LOG: crit stage: +0
+[22:10:32.005] LOG: Applied Miracle Seed (enemy)
+[22:10:32.005] LOG: Move: Seed Bomb | Base damage: 69.97426086956523 | Power: 108 | Source attack: 154 | Target defense: 184
+[22:10:32.006] LOG: Move: Seed Bomb | Attack damage: 130
+[22:10:32.006] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:10:32.049] LOG: %cStart Phase MoveEndPhase color:green;
+[22:10:32.049] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:10:32.049] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:10:32.688] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:10:32.688] LOG: %cStart Phase BerryPhase color:green;
+[22:10:32.689] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:10:32.689] LOG: %cStart Phase TurnEndPhase color:green;
+[22:10:32.690] LOG: %cStart Phase PokemonHealPhase color:green;
+[22:10:32.995] LOG: %cStart Phase MessagePhase color:green;
+[22:10:33.461] LOG: %cStart Phase PokemonHealPhase color:green;
+[22:10:33.781] LOG: %cStart Phase MessagePhase color:green;
+[22:10:34.258] LOG: %cStart Phase TurnInitPhase color:green;
+[22:10:34.258] LOG: %cStart Phase CommandPhase color:green;
+[22:10:36.232] LOG: Move: CORE_ENFORCER Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Mimikyu Apex
+[22:10:36.233] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:10:36.234] LOG: Applied Miracle Seed (enemy)
+[22:10:36.234] LOG: Applied Charcoal (enemy)
+[22:10:36.234] LOG: Applied X Sp. Def 
+[22:10:36.234] LOG: Battle Seed: 0WAkZHnG0VIZtwfv
+[22:10:36.235] LOG: Move Pool: ["Seed Bomb","Mystical Fire"]
+[22:10:36.235] LOG: Move Scores: [27,27]
+[22:10:36.235] LOG: Sorted Move Pool: ["Seed Bomb","Mystical Fire"]
+[22:10:36.235] LOG: Chosen Move: Seed Bomb
+[22:10:36.235] LOG: %cStart Phase TurnStartPhase color:green;
+[22:10:36.236] LOG: %cStart Phase MovePhase color:green;
+[22:10:36.236] LOG: %cUser: Mimikyu Apex
+Move: CORE_ENFORCER
+Use Mode: NORMAL color:orchid
+[22:10:36.236] LOG: %cStart Phase MessagePhase color:green;
+[22:10:36.442] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:10:38.039] LOG: crit stage: +0
+[22:10:38.039] LOG: Move: Core Enforcer | Base damage: 94.4 | Power: 100 | Source attack: 203 | Target defense: 174
+[22:10:38.040] LOG: Move: Core Enforcer | Attack damage: 91
+[22:10:38.040] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:10:38.085] LOG: %cStart Phase MoveEndPhase color:green;
+[22:10:38.086] LOG: %cStart Phase MovePhase color:green;
+[22:10:38.086] LOG: %cUser: Sunflora
+Move: SEED_BOMB
+Use Mode: NORMAL color:orchid
+[22:10:38.088] LOG: %cStart Phase MessagePhase color:green;
+[22:10:38.346] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:10:38.875] LOG: crit stage: +0
+[22:10:38.876] LOG: Applied Miracle Seed (enemy)
+[22:10:38.876] LOG: Move: Seed Bomb | Base damage: 69.97426086956523 | Power: 108 | Source attack: 154 | Target defense: 184
+[22:10:38.876] LOG: Move: Seed Bomb | Attack damage: 122
+[22:10:38.876] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:10:38.921] LOG: %cStart Phase FaintPhase color:green;
+[22:10:38.922] WARN: cry/10821 not found
+[22:10:39.049] LOG: %cStart Phase MessagePhase color:green;
+[22:10:39.418] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:10:39.736] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:10:39.804] LOG: %cStart Phase MoveEndPhase color:green;
+[22:10:39.804] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:10:39.804] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:10:39.919] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:10:39.919] LOG: %cStart Phase BerryPhase color:green;
+[22:10:39.919] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:10:39.919] LOG: %cStart Phase TurnEndPhase color:green;
+[22:10:39.919] LOG: %cStart Phase PokemonHealPhase color:green;
+[22:10:40.171] LOG: %cStart Phase MessagePhase color:green;
+[22:10:40.618] LOG: %cStart Phase SwitchPhase color:green;
+[22:10:42.104] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:10:42.253] LOG: Applied HP Up 
+[22:10:42.322] WARN: cry/720 not found
+[22:10:42.540] LOG: %cStart Phase ShinySparklePhase color:green;
+[22:10:42.755] LOG: %cStart Phase PostSummonPhase color:green;
+[22:10:42.755] LOG: Ran PSP for: Reuniclus Redux
+[22:10:42.756] LOG: %cStart Phase PostSummonPhase color:green;
+[22:10:42.756] LOG: %cStart Phase PostSummonPhase color:green;
+[22:10:42.756] LOG: %cStart Phase TurnInitPhase color:green;
+[22:10:42.756] LOG: %cStart Phase CommandPhase color:green;
+[22:10:46.622] LOG: Move: STEAM_ERUPTION Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Reuniclus Redux
+[22:10:46.622] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:10:46.623] LOG: Applied Miracle Seed (enemy)
+[22:10:46.624] LOG: Applied Charcoal (enemy)
+[22:10:46.624] LOG: Applied X Sp. Def 
+[22:10:46.624] LOG: Battle Seed: 0WAkZHnG0VIZtwfv
+[22:10:46.625] LOG: Move Pool: ["Seed Bomb","Mystical Fire","Confide","Baton Pass"]
+[22:10:46.625] LOG: Move Scores: [27,5.90625,2,8]
+[22:10:46.625] LOG: Sorted Move Pool: ["Seed Bomb","Baton Pass","Mystical Fire","Confide"]
+[22:10:46.625] LOG: Chosen Move: Seed Bomb
+[22:10:46.625] LOG: %cStart Phase TurnStartPhase color:green;
+[22:10:46.625] LOG: %cStart Phase MovePhase color:green;
+[22:10:46.625] LOG: %cUser: Sunflora
+Move: SEED_BOMB
+Use Mode: NORMAL color:orchid
+[22:10:46.626] LOG: %cStart Phase MessagePhase color:green;
+[22:10:46.807] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:10:47.329] LOG: crit stage: +0
+[22:10:47.329] LOG: Applied Miracle Seed (enemy)
+[22:10:47.330] LOG: Move: Seed Bomb | Base damage: 66.80447668393782 | Power: 108 | Source attack: 154 | Target defense: 193
+[22:10:47.330] LOG: Move: Seed Bomb | Attack damage: 170
+[22:10:47.330] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:10:47.375] LOG: %cStart Phase MessagePhase color:green;
+[22:10:47.763] LOG: %cStart Phase MoveEndPhase color:green;
+[22:10:47.763] LOG: %cStart Phase MovePhase color:green;
+[22:10:47.763] LOG: %cUser: Reuniclus Redux
+Move: STEAM_ERUPTION
+Use Mode: NORMAL color:orchid
+[22:10:47.763] LOG: %cStart Phase MessagePhase color:green;
+[22:10:48.044] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:10:50.074] LOG: crit stage: +0
+[22:10:50.075] LOG: Move: Steam Eruption | Base damage: 384.10526315789474 | Power: 330 | Source attack: 250 | Target defense: 171
+[22:10:50.075] LOG: Move: Steam Eruption | Attack damage: 553
+[22:10:50.075] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:10:50.120] LOG: %cStart Phase FaintPhase color:green;
+[22:10:51.354] LOG: %cStart Phase MessagePhase color:green;
+[22:10:53.118] LOG: %cStart Phase VictoryPhase color:green;
+[22:10:53.118] LOG: %cStart Phase MoveEndPhase color:green;
+[22:10:53.118] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:10:53.118] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:10:53.721] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:10:53.721] LOG: %cStart Phase BerryPhase color:green;
+[22:10:53.721] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:10:53.721] LOG: %cStart Phase TurnEndPhase color:green;
+[22:10:53.722] LOG: %cStart Phase PokemonHealPhase color:green;
+[22:10:54.037] LOG: %cStart Phase MessagePhase color:green;
+[22:10:54.517] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:10:54.980] LOG: Brassius
+[22:10:55.146] LOG: Applied Protein (enemy)
+[22:10:55.146] LOG: Applied Zinc (enemy)
+[22:10:55.146] LOG: Applied Calcium (enemy)
+[22:10:55.146] LOG: Applied Zinc (enemy)
+[22:10:55.146] LOG: Applied HP Up (enemy)
+[22:10:55.146] LOG: Applied Carbos (enemy)
+[22:10:55.146] LOG: Applied Protein (enemy)
+[22:10:55.418] LOG: %cStart Phase PostSummonPhase color:green;
+[22:10:55.418] LOG: Ran PSP for: Arboliva
+[22:10:55.418] LOG: %cStart Phase PostSummonPhase color:green;
+[22:10:55.418] LOG: %cStart Phase PostSummonPhase color:green;
+[22:10:55.418] LOG: %cStart Phase TurnInitPhase color:green;
+[22:10:55.418] LOG: %cStart Phase CommandPhase color:green;
