@@ -38,3 +38,5 @@ ignore:
    - workers
    - "LICENSES"
    - vendor
+   - _stats_deploy
+   - stats/_stats_deploy

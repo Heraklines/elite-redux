@@ -60,6 +60,47 @@ This is mandatory, not optional. Do it as part of the fix, in the same batch.
 
 If you ever can't remember the testing workflow: it's all here. Re-read this rule.
 
+## Headless scenario runner (fast, no browser) - test bugs autonomously
+
+To reproduce / verify a combat bug WITHOUT a browser (Puppeteer is slow and flaky),
+play a dev `ScenarioSpec` through the REAL game logic headlessly via the vitest
+`GameManager`. All battle phases, ER abilities/innates/moves/AI/RNG run for real;
+the game's own `console.*` output is captured to stdout. ~30-50s cold (one-time ER
+init) then ~1-2s per scenario - batch scenarios in one run to amortize.
+
+```
+node scripts/run-scenario.mjs <ERS1-code | @spec.json | demo> [--turns N] [--move MOVE]
+```
+
+- `demo` runs a built-in smoke battle. An `ERS1.` share code (from the in-game
+  scenario builder / a bug report) reproduces that exact situation. `@file.json`
+  or inline JSON is a raw `ScenarioSpec`.
+- **Authoring JSON specs:** use enum NAMES anywhere an id is expected
+  (`species:"GRENINJA"`, `ability:"HIGH_TIDE"`, `moves:["SURF"]`, `weather:"RAIN"`).
+  Force an arbitrary ability/innate (incl. ER ids) per mon with `ability` /
+  `passiveAbility` (player lead + enemy); give the enemy items with `heldItems:
+  [{name:"LEFTOVERS"}]`. Script the player's turns with `script:[{move,target,
+  move2,target2}]` (target is a BattlerIndex: 2/3 = enemies). Self-verify with an
+  `expect` block: `playerAbility`/`enemyAbility`, `player/enemyStatus`,
+  `player/enemyHp` ({min,max,equals}), `player/enemyStage` ({stat,value}),
+  `player/enemyFainted`, `weather`, `maxHits`, `outcome`, and `logIncludes` /
+  `logExcludes` (substring match on the battle message log — the catch-all). A
+  failed `expect` exits nonzero with the exact mismatches.
+- Output: a `=== TURN n ===` block per turn with a `STATE {…}` snapshot (each
+  side's hp / status / stat stages / ability + weather), interleaved game logs,
+  and a final `RESULT {…}`. A thrown error or phase-advance timeout (soft-lock /
+  freeze) fails with a nonzero exit + full console - so hangs surface immediately.
+- Files: `test/tools/run-scenario.test.ts` (the harness, reuses
+  `buildDevScenario` for parity with the in-game launch) + `scripts/run-scenario.mjs`
+  (CLI wrapper; also `pnpm er:scenario <args>`). It sets `ER_SCENARIO=1` for you.
+
+For assertion-style regression tests, write a normal vitest test under
+`test/tests/elite-redux/` driving `GameManager` directly (see e.g.
+`er-anger-point.test.ts`). NOTE: the headless `GameManager` mock lives in
+`test/mocks/mock-texture-manager.ts` - if a UI handler calls a Phaser
+`scene.add.*` factory method that isn't stubbed there (or a `MockGraphics`
+method), every battle test throws during construction; add the stub.
+
 ## The in-game dev test suite
 
 - `src/dev-tools/test-suite/` — **TRACKED**. The shared suite: `scenarios.ts`

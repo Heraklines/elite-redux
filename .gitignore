@@ -85,3 +85,7 @@ docs/plans/er-events-reconciliation.md
 
 # ER #498: footprint extraction staging (published to er-assets CDN, not bundled)
 footprints-out/
+
+# er-stats Cloudflare Pages deploy staging dir (built by stats/ deploy, never committed)
+_stats_deploy/
+stats/_stats_deploy/

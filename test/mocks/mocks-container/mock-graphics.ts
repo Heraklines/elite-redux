@@ -24,6 +24,52 @@ export class MockGraphics implements MockGameObject {
     return this;
   }
 
+  // Stroke / path drawing methods (used by e.g. the title inbox icon). All
+  // no-op chainable stubs — the headless harness draws nothing.
+  lineStyle(_lineWidth, _color, _alpha): this {
+    return this;
+  }
+
+  strokeRect(_x, _y, _width, _height): this {
+    return this;
+  }
+
+  moveTo(_x, _y): this {
+    return this;
+  }
+
+  lineTo(_x, _y): this {
+    return this;
+  }
+
+  lineBetween(_x1, _y1, _x2, _y2): this {
+    return this;
+  }
+
+  closePath(): this {
+    return this;
+  }
+
+  strokePath(): this {
+    return this;
+  }
+
+  fillPath(): this {
+    return this;
+  }
+
+  fillCircle(_x, _y, _radius): this {
+    return this;
+  }
+
+  strokeCircle(_x, _y, _radius): this {
+    return this;
+  }
+
+  clear(): this {
+    return this;
+  }
+
   createGeometryMask(): this {
     // Creates a geometry mask.
     return this;

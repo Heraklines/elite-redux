@@ -49,8 +49,19 @@ export interface SpecMon {
   /** Numeric SpeciesId (vanilla or ER custom). */
   species: number;
   formIndex?: number | undefined;
-  /** Ability slot 0/1/2. */
+  /** Ability slot 0/1/2 (the species' natural abilities). */
   abilitySlot?: number | undefined;
+  /**
+   * Force an arbitrary active ability by numeric AbilityId (vanilla OR ER custom
+   * id, incl. ids >= 5000). Takes precedence over `abilitySlot` and lets a
+   * scenario test an ability the mon does not naturally have (e.g. force High
+   * Tide / Corrosion / Frisk). Applies via ABILITY_OVERRIDE (player) /
+   * ENEMY_ABILITY_OVERRIDE (enemy) — so in multi-mon parties it hits that whole
+   * side; pin it on the lead for a clean 1v1 ability test.
+   */
+  ability?: number | undefined;
+  /** Force an arbitrary ER innate/passive by numeric AbilityId. */
+  passiveAbility?: number | undefined;
   nature?: number | undefined;
   /** Up to 4 numeric MoveIds. */
   moves?: number[] | undefined;
@@ -65,6 +76,12 @@ export interface SpecEnemyMon extends SpecMon {
   isBoss?: boolean | undefined;
   status?: number | undefined;
   bossSegments?: number | undefined;
+  /**
+   * Enemy held items / modifiers ({name: modifierTypes key, count?, type?}).
+   * Applies via ENEMY_HELD_ITEMS_OVERRIDE (the whole enemy side), enabling
+   * Frisk / Knock Off / Trick / Bug Bite / berry tests.
+   */
+  heldItems?: SpecItemRow[] | undefined;
 }
 
 /** A player item/modifier row: a modifierTypes key + optional count/sub-type. */
@@ -275,6 +292,22 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
     O.ENEMY_SHINY_OVERRIDE = null;
     O.ENEMY_VARIANT_OVERRIDE = null;
     O.ENEMY_HELD_ITEMS_OVERRIDE = [];
+    // Ability/passive overrides (not all are in the dev-defaults reset table).
+    O.HAS_PASSIVE_ABILITY_OVERRIDE = null;
+    O.ENEMY_PASSIVE_ABILITY_OVERRIDE = AbilityId.NONE;
+    O.ENEMY_HAS_PASSIVE_ABILITY_OVERRIDE = null;
+
+    // Player lead: force an arbitrary active ability / innate by id when given
+    // (ABILITY_OVERRIDE applies to the player side; pin on a 1-mon party for a
+    // clean ability test). `ability` wins over the natural `abilitySlot`.
+    const lead = spec.party[0];
+    if (lead?.ability) {
+      O.ABILITY_OVERRIDE = lead.ability as AbilityId;
+    }
+    if (lead?.passiveAbility) {
+      O.PASSIVE_ABILITY_OVERRIDE = lead.passiveAbility as AbilityId;
+      O.HAS_PASSIVE_ABILITY_OVERRIDE = true;
+    }
 
     if (run.wave && run.wave >= 1) {
       O.STARTING_WAVE_OVERRIDE = run.wave;
@@ -318,6 +351,16 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
         // Resolve the slot to the concrete ability so it works for every species.
         // (Done live in onBattleStart instead - the species tables are simpler there.)
       }
+      if (w.ability) {
+        O.ENEMY_ABILITY_OVERRIDE = w.ability as AbilityId;
+      }
+      if (w.passiveAbility) {
+        O.ENEMY_PASSIVE_ABILITY_OVERRIDE = w.passiveAbility as AbilityId;
+        O.ENEMY_HAS_PASSIVE_ABILITY_OVERRIDE = true;
+      }
+      if (w.heldItems && w.heldItems.length > 0) {
+        O.ENEMY_HELD_ITEMS_OVERRIDE = toModifierOverrides(w.heldItems);
+      }
       if (w.bossSegments && w.bossSegments >= 1) {
         O.ENEMY_HEALTH_SEGMENTS_OVERRIDE = Math.min(10, w.bossSegments);
       }
@@ -350,6 +393,19 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
       setPendingDevEnemyParty(devParty);
       if (devParty.length >= 2) {
         O.BATTLE_STYLE_OVERRIDE = "double";
+      }
+      // Arbitrary ability / passive / held items for the enemy side (the global
+      // enemy overrides hit every enemy, so they read off the first custom mon).
+      const e0 = enemy.party[0];
+      if (e0?.ability) {
+        O.ENEMY_ABILITY_OVERRIDE = e0.ability as AbilityId;
+      }
+      if (e0?.passiveAbility) {
+        O.ENEMY_PASSIVE_ABILITY_OVERRIDE = e0.passiveAbility as AbilityId;
+        O.ENEMY_HAS_PASSIVE_ABILITY_OVERRIDE = true;
+      }
+      if (e0?.heldItems && e0.heldItems.length > 0) {
+        O.ENEMY_HELD_ITEMS_OVERRIDE = toModifierOverrides(e0.heldItems);
       }
     }
 
