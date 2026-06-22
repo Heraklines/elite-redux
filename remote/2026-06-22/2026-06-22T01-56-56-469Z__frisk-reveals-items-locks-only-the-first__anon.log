@@ -1,0 +1,274 @@
+scenario: Frisk: reveals items, locks only the FIRST item
+url:      https://elite-redux-staging.pages.dev/
+build:    mqohwu1r-co92
+mode:     0  wave:5
+seed:     4VMrHsAkUJbmyblxrCQV2Wm6
+party:    Greninja(L50 122hp f0)
+enemy:    Munchlax(L50), Munchlax(L50)
+
+----- COMMENT -----
+frisk only locks the item for 1 turn
+
+----- CONSOLE -----
+[01:55:31.761] LOG: Pokemon: Foe Magikarp | Species ID: 129 | Level: 5 | Nature: Relaxed (+Def/-Spd)
+[01:55:31.761] LOG: Stats (IVs): HP: 18 (18), Atk: 7 (10), Def: 13 (10), Spatk: 6 (28), Spdef: 7 (27), Spd: 11 (24)
+[01:55:31.761] LOG: Ability: Guilt Trip | Passive Ability: Multiscale 
+[01:55:31.761] LOG: Moveset: ["Splash"]
+[01:55:31.761] LOG: UNCOMMON
+[01:55:31.762] LOG: Downgraded trainer Pokemon rarity tier from UNCOMMON to COMMON
+[01:55:31.762] LOG: Bidoof
+[01:55:31.769] LOG: Pokemon: Foe Magikarp | Species ID: 129 | Level: 5 | Nature: Bashful (-)
+[01:55:31.769] LOG: Stats (IVs): HP: 17 (10), Atk: 7 (20), Def: 10 (31), Spatk: 7 (24), Spdef: 7 (29), Spd: 14 (27)
+[01:55:31.769] LOG: Ability: Marvel Scale | Passive Ability: Multiscale 
+[01:55:31.769] LOG: Moveset: ["Splash"]
+[01:55:31.847] LOG: Battle Seed: zpWtLa7dS3DhGTjF
+[01:55:31.848] LOG: Generated AI funcs
+[01:55:31.882] DEBUG: Session data saved to slot 4!
+[01:55:31.883] LOG: Wave Seed: JVwXtY~GqKixVjmiynxN^:P 5
+[01:55:32.112] LOG: Youngster Oliver
+[01:55:33.708] LOG: Dialogue saved as seen: dialogue:youngster.encounter.2
+[01:55:33.739] LOG: Youngster Oliver
+[01:55:34.244] LOG: %cStart Phase SummonPhase color:green;
+[01:55:34.244] LOG: Oliver
+[01:55:34.515] LOG: %cStart Phase SummonPhase color:green;
+[01:55:34.799] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:55:34.800] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:55:34.800] LOG: %cStart Phase PostSummonPhase color:green;
+[01:55:34.800] LOG: Ran PSP for: Vanilluxe
+[01:55:34.801] LOG: %cStart Phase PostSummonPhase color:green;
+[01:55:34.801] LOG: %cStart Phase PostSummonPhase color:green;
+[01:55:34.801] LOG: %cStart Phase PostSummonPhase color:green;
+[01:55:34.801] LOG: Ran PSP for: Magikarp
+[01:55:34.801] LOG: %cStart Phase PostSummonPhase color:green;
+[01:55:34.801] LOG: %cStart Phase PostSummonPhase color:green;
+[01:55:34.801] LOG: %cStart Phase TurnInitPhase color:green;
+[01:55:34.801] LOG: %cStart Phase CommandPhase color:green;
+[01:56:03.761] LOG: Seed: hBvqh4i5LHiMPNoagREkkS2Y
+[01:56:03.761] LOG: Wave Seed: hBvqh4i5LHiMPNoagREkkS2Y 0
+[01:56:03.934] WARN: AnimationManager key already exists: prompt
+[01:56:03.934] WARN: AnimationManager key already exists: tera_sparkle
+[01:56:03.934] LOG: Seed: laiB3w6dUsmcmKTzxN3qwldg
+[01:56:03.934] LOG: Wave Seed: laiB3w6dUsmcmKTzxN3qwldg 0
+[01:56:06.533] LOG: %cStart Phase LoginPhase color:green;
+[01:56:06.733] LOG: Client Session: 8zOUrmRvxrVC9x99ZCddVrTnxUVPYBmt
+[01:56:07.144] DEBUG: Using cached system data
+[01:56:07.184] LOG: %cStart Phase TitlePhase color:green;
+[01:56:07.185] LOG: Getting Session Slot id: %d 4
+[01:56:07.191] LOG: use seasonal splash messages true
+[01:56:07.191] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[01:56:07.195] LOG: %cStart Phase SelectStarterPhase color:green;
+[01:56:07.896] LOG: Wave Seed: qfnG8|;iZxrhrPY}S8v|qil 5
+[01:56:07.897] LOG: %cStart Phase EncounterPhase color:green;
+[01:56:07.900] LOG: COMMON
+[01:56:07.900] LOG: Patrat
+[01:56:07.910] LOG: Pokemon: Foe Magikarp | Species ID: 129 | Level: 5 | Nature: Bold (+Def/-Atk)
+[01:56:07.910] LOG: Stats (IVs): HP: 17 (29), Atk: 5 (26), Def: 13 (17), Spatk: 6 (5), Spdef: 7 (28), Spd: 14 (29)
+[01:56:07.910] LOG: Ability: Guilt Trip | Passive Ability: Multiscale 
+[01:56:07.910] LOG: Moveset: ["Splash"]
+[01:56:07.910] LOG: COMMON
+[01:56:07.910] LOG: Lillipup
+[01:56:07.916] LOG: Pokemon: Foe Magikarp | Species ID: 129 | Level: 5 | Nature: Brave (+Atk/-Spd)
+[01:56:07.916] LOG: Stats (IVs): HP: 17 (20), Atk: 7 (22), Def: 11 (13), Spatk: 7 (20), Spdef: 8 (11), Spd: 11 (15)
+[01:56:07.916] LOG: Ability: Guilt Trip | Passive Ability: Multiscale 
+[01:56:07.916] LOG: Moveset: ["Splash"]
+[01:56:08.004] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"zinc","soundName":"se/restore","tier":1,"stat":4,"key":"zinc"} (enemy)
+[01:56:08.004] LOG: Battle Seed: Ls3Lo5sqn9AvfuyI
+[01:56:08.004] LOG: Applied Zinc (enemy)
+[01:56:08.005] LOG: Generated AI funcs
+[01:56:08.042] DEBUG: Session data saved to slot 4!
+[01:56:08.043] LOG: Applied Zinc (enemy)
+[01:56:08.043] LOG: Wave Seed: qfnG8|;iZxrhrPY}S8v|qil 5
+[01:56:08.244] LOG: Youngster Josh
+[01:56:09.884] LOG: Dialogue saved as seen: dialogue:youngster.encounter.4
+[01:56:09.912] LOG: Youngster Josh
+[01:56:10.334] LOG: %cStart Phase SummonPhase color:green;
+[01:56:10.334] LOG: Josh
+[01:56:10.466] LOG: Applied Zinc (enemy)
+[01:56:10.597] LOG: %cStart Phase SummonPhase color:green;
+[01:56:10.779] WARN: cry/607 not found
+[01:56:10.882] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:56:10.883] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:56:10.884] LOG: %cStart Phase PostSummonPhase color:green;
+[01:56:10.884] LOG: Ran PSP for: Magikarp
+[01:56:10.884] LOG: %cStart Phase PostSummonPhase color:green;
+[01:56:10.885] LOG: %cStart Phase PostSummonPhase color:green;
+[01:56:10.885] LOG: %cStart Phase PostSummonPhase color:green;
+[01:56:10.885] LOG: Ran PSP for: Litwick
+[01:56:10.885] LOG: %cStart Phase PostSummonPhase color:green;
+[01:56:10.885] LOG: %cStart Phase PostSummonPhase color:green;
+[01:56:10.885] LOG: %cStart Phase TurnInitPhase color:green;
+[01:56:10.885] LOG: %cStart Phase CommandPhase color:green;
+[01:56:11.478] LOG: Seed: UuerQonKTaPAJvtMcIfJwZIF
+[01:56:11.478] LOG: Wave Seed: UuerQonKTaPAJvtMcIfJwZIF 0
+[01:56:11.637] WARN: AnimationManager key already exists: prompt
+[01:56:11.637] WARN: AnimationManager key already exists: tera_sparkle
+[01:56:11.637] LOG: Seed: 508i7cxan7HPtDqRppcVPFSW
+[01:56:11.637] LOG: Wave Seed: 508i7cxan7HPtDqRppcVPFSW 0
+[01:56:14.156] LOG: %cStart Phase LoginPhase color:green;
+[01:56:14.252] LOG: Client Session: 8zOUrmRvxrVC9x99ZCddVrTnxUVPYBmt
+[01:56:14.504] DEBUG: Using cached system data
+[01:56:14.543] LOG: %cStart Phase TitlePhase color:green;
+[01:56:14.543] LOG: Getting Session Slot id: %d 4
+[01:56:14.549] LOG: use seasonal splash messages true
+[01:56:14.549] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[01:56:14.552] LOG: %cStart Phase SelectStarterPhase color:green;
+[01:56:14.628] LOG: Wave Seed: 619j8dybo8IQuErSqqdWQGTX 1
+[01:56:14.629] LOG: %cStart Phase EncounterPhase color:green;
+[01:56:14.631] LOG: Starting species pool tier: COMMON
+[01:56:14.638] LOG: Pokemon: Wild Magikarp | Species ID: 129 | Level: 3 | Nature: Naive (+Spd/-SpDef)
+[01:56:14.638] LOG: Stats (IVs): HP: 14 (12), Atk: 6 (4), Def: 9 (26), Spatk: 6 (4), Spdef: 5 (24), Spd: 11 (10)
+[01:56:14.638] LOG: Ability: Guilt Trip | Passive Ability: Multiscale 
+[01:56:14.638] LOG: Moveset: ["Splash"]
+[01:56:14.673] DEBUG: Session data saved to slot 4!
+[01:56:15.656] LOG: Wave Seed: 619j8dybo8IQuErSqqdWQGTX 1
+[01:56:16.078] LOG: %cStart Phase SummonPhase color:green;
+[01:56:16.362] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:56:16.363] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:56:23.867] LOG: Seed: eW73OZzv9KgMF3wEYPKbIcBD
+[01:56:23.867] LOG: Wave Seed: eW73OZzv9KgMF3wEYPKbIcBD 0
+[01:56:24.045] WARN: AnimationManager key already exists: prompt
+[01:56:24.045] WARN: AnimationManager key already exists: tera_sparkle
+[01:56:24.045] LOG: Seed: 4VMrHsAkUJbmyblxrCQV2Wm6
+[01:56:24.045] LOG: Wave Seed: 4VMrHsAkUJbmyblxrCQV2Wm6 0
+[01:56:26.635] LOG: %cStart Phase LoginPhase color:green;
+[01:56:26.749] LOG: Client Session: 8zOUrmRvxrVC9x99ZCddVrTnxUVPYBmt
+[01:56:27.090] LOG: %cStart Phase TitlePhase color:green;
+[01:56:27.090] LOG: Getting Session Slot id: %d 4
+[01:56:27.096] LOG: use seasonal splash messages true
+[01:56:27.096] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[01:56:27.100] LOG: %cStart Phase SelectStarterPhase color:green;
+[01:56:27.327] LOG: Wave Seed: 9[RwMxFpZOgr~gq}wHV[7\r; 5
+[01:56:27.328] LOG: %cStart Phase EncounterPhase color:green;
+[01:56:27.330] LOG: UNCOMMON
+[01:56:27.330] LOG: Downgraded trainer Pokemon rarity tier from UNCOMMON to COMMON
+[01:56:27.330] LOG: Bidoof
+[01:56:27.330] LOG: ER #419: elite BST cap (420 @ w5) - replacing Snorlax (540) with Munchlax (390)
+[01:56:27.339] LOG: Pokemon: Foe Munchlax | Species ID: 446 | Level: 50 | Nature: Docile (-)
+[01:56:27.339] LOG: Stats (IVs): HP: 199 (31), Atk: 93 (8), Def: 47 (6), Spatk: 54 (21), Spdef: 104 (10), Spd: 15 (29)
+[01:56:27.339] LOG: Ability: Oblivious | Passive Ability: Thick Fat 
+[01:56:27.339] LOG: Moveset: ["Splash"]
+[01:56:27.339] LOG: COMMON
+[01:56:27.339] LOG: Lillipup
+[01:56:27.339] LOG: ER #419: elite BST cap (420 @ w5) - replacing Snorlax (540) with Munchlax (390)
+[01:56:27.346] LOG: Pokemon: Foe Munchlax | Species ID: 446 | Level: 50 | Nature: Quirky (-)
+[01:56:27.346] LOG: Stats (IVs): HP: 207 (15), Atk: 97 (5), Def: 56 (8), Spatk: 56 (12), Spdef: 101 (22), Spd: 25 (21)
+[01:56:27.346] LOG: Ability: Oblivious | Passive Ability: Thick Fat 
+[01:56:27.346] LOG: Moveset: ["Splash"]
+[01:56:27.458] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"iron","soundName":"se/restore","tier":0,"stat":2,"key":"iron"} (enemy)
+[01:56:27.458] LOG: Battle Seed: dhH1O6eRGLESS4yc
+[01:56:27.458] LOG: Applied Iron (enemy)
+[01:56:27.459] LOG: Applied Iron (enemy)
+[01:56:27.460] LOG: Generated AI funcs
+[01:56:27.494] DEBUG: Session data saved to slot 4!
+[01:56:27.495] LOG: Applied Iron (enemy)
+[01:56:27.495] LOG: Wave Seed: 9[RwMxFpZOgr~gq}wHV[7\r; 5
+[01:56:28.036] LOG: Youngster Kenway
+[01:56:29.977] LOG: Dialogue saved as seen: dialogue:youngster.encounter.5
+[01:56:30.009] LOG: Youngster Kenway
+[01:56:30.418] LOG: %cStart Phase SummonPhase color:green;
+[01:56:30.418] LOG: Kenway
+[01:56:30.557] LOG: Applied Iron (enemy)
+[01:56:30.688] LOG: %cStart Phase SummonPhase color:green;
+[01:56:30.973] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:56:30.974] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:56:30.974] LOG: %cStart Phase PostSummonPhase color:green;
+[01:56:30.974] LOG: Ran PSP for: Greninja
+[01:56:30.975] LOG: %cStart Phase PostSummonPhase color:green;
+[01:56:30.975] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:56:31.141] LOG: %cStart Phase MessagePhase color:green;
+[01:56:31.424] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:56:31.446] LOG: %cStart Phase PostSummonPhase color:green;
+[01:56:31.446] LOG: %cStart Phase PostSummonPhase color:green;
+[01:56:31.446] LOG: Ran PSP for: Munchlax
+[01:56:31.447] LOG: %cStart Phase PostSummonPhase color:green;
+[01:56:31.447] LOG: %cStart Phase PostSummonPhase color:green;
+[01:56:31.447] LOG: %cStart Phase MovePhase color:green;
+[01:56:31.447] LOG: %cUser: Munchlax
+Move: DEFENSE_CURL
+Use Mode: INDIRECT color:orchid
+[01:56:31.447] LOG: %cStart Phase MessagePhase color:green;
+[01:56:31.570] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:56:31.578] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:56:31.759] LOG: %cStart Phase MessagePhase color:green;
+[01:56:31.980] LOG: %cStart Phase MoveEndPhase color:green;
+[01:56:31.980] LOG: %cStart Phase TurnInitPhase color:green;
+[01:56:31.980] LOG: %cStart Phase CommandPhase color:green;
+[01:56:34.863] LOG: Move: U_TURN Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Greninja
+[01:56:34.864] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:56:34.866] LOG: %cStart Phase TurnStartPhase color:green;
+[01:56:34.867] LOG: %cStart Phase MovePhase color:green;
+[01:56:34.867] LOG: %cUser: Greninja
+Move: U_TURN
+Use Mode: NORMAL color:orchid
+[01:56:34.868] LOG: %cStart Phase MessagePhase color:green;
+[01:56:34.973] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:56:35.210] LOG: crit stage: +0
+[01:56:35.210] LOG: Move: U-turn | Base damage: 63.6 | Power: 84 | Source attack: 120 | Target defense: 72
+[01:56:35.211] LOG: Move: U-turn | Attack damage: 62
+[01:56:35.212] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:56:35.224] LOG: %cStart Phase MoveEndPhase color:green;
+[01:56:35.224] LOG: %cStart Phase MovePhase color:green;
+[01:56:35.224] LOG: %cUser: Munchlax
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[01:56:35.225] LOG: %cStart Phase MessagePhase color:green;
+[01:56:35.341] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:56:35.585] LOG: crit stage: +0
+[01:56:35.585] LOG: Move: Splash | Base damage: 30.524137931034485 | Power: 60 | Source attack: 94 | Target defense: 87
+[01:56:35.586] LOG: Move: Splash | Attack damage: 12
+[01:56:35.586] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:56:35.599] LOG: %cStart Phase MessagePhase color:green;
+[01:56:35.806] LOG: %cStart Phase MoveEndPhase color:green;
+[01:56:35.807] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:56:35.807] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:56:35.807] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:56:35.807] LOG: %cStart Phase BerryPhase color:green;
+[01:56:35.808] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:56:35.808] LOG: %cStart Phase TurnEndPhase color:green;
+[01:56:35.809] LOG: %cStart Phase TurnInitPhase color:green;
+[01:56:35.810] LOG: %cStart Phase CommandPhase color:green;
+[01:56:37.779] LOG: Move: U_TURN Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Greninja
+[01:56:37.780] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:56:37.781] LOG: %cStart Phase TurnStartPhase color:green;
+[01:56:37.782] LOG: %cStart Phase MovePhase color:green;
+[01:56:37.782] LOG: %cUser: Greninja
+Move: U_TURN
+Use Mode: NORMAL color:orchid
+[01:56:37.783] LOG: %cStart Phase MessagePhase color:green;
+[01:56:37.883] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:56:37.883] LOG: Battle Seed: dhH1O6eRGLESS4yc
+[01:56:38.119] LOG: crit stage: +0
+[01:56:38.120] LOG: Move: U-turn | Base damage: 63.6 | Power: 84 | Source attack: 120 | Target defense: 72
+[01:56:38.120] LOG: Move: U-turn | Attack damage: 61
+[01:56:38.120] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:56:38.133] LOG: %cStart Phase MoveEndPhase color:green;
+[01:56:38.134] LOG: %cStart Phase MovePhase color:green;
+[01:56:38.134] LOG: %cUser: Munchlax
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[01:56:38.134] LOG: %cStart Phase MessagePhase color:green;
+[01:56:38.251] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:56:38.494] LOG: crit stage: +0
+[01:56:38.495] LOG: Move: Splash | Base damage: 30.524137931034485 | Power: 60 | Source attack: 94 | Target defense: 87
+[01:56:38.495] LOG: Move: Splash | Attack damage: 13
+[01:56:38.495] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:56:38.508] LOG: %cStart Phase MessagePhase color:green;
+[01:56:38.716] LOG: %cStart Phase MoveEndPhase color:green;
+[01:56:38.716] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:56:38.716] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:56:38.716] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:56:38.716] LOG: %cStart Phase BerryPhase color:green;
+[01:56:38.717] LOG: Applied Sitrus Berry (enemy)
+[01:56:38.718] LOG: Applied Iron (enemy)
+[01:56:38.719] LOG: %cStart Phase CommonAnimPhase color:green;
+[01:56:38.876] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:56:38.982] LOG: %cStart Phase MessagePhase color:green;
+[01:56:39.258] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:56:39.258] LOG: %cStart Phase TurnEndPhase color:green;
+[01:56:39.259] LOG: Applied Leftovers (enemy)
+[01:56:39.259] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:56:39.364] LOG: %cStart Phase MessagePhase color:green;
+[01:56:39.633] LOG: %cStart Phase TurnInitPhase color:green;
+[01:56:39.633] LOG: %cStart Phase CommandPhase color:green;
