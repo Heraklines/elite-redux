@@ -1,0 +1,289 @@
+scenario: Deadeye: Zap Cannon never misses (innate)
+url:      https://elite-redux-staging.pages.dev/
+build:    mqohwu1r-co92
+mode:     0  wave:5
+seed:     C1kLSwuCRvXJWwyML0h3dVba
+party:    Blissey(L60 394hp f0)
+enemy:    Porygon(L40), Porygon(L40)
+
+----- COMMENT -----
+zap canon
+
+----- CONSOLE -----
+[01:36:57.840] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[01:37:50.808] LOG: %cStart Phase SelectStarterPhase color:green;
+[01:37:51.755] LOG: Wave Seed: w8t}}Rm>i6vq:L]Rg>6q|]lj 5
+[01:37:51.759] LOG: %cStart Phase EncounterPhase color:green;
+[01:37:51.761] LOG: COMMON
+[01:37:51.762] LOG: Sentret
+[01:37:51.763] LOG: ER #419: elite BST cap (420 @ w5) - replacing Exploud (600) with Loudred (420)
+[01:37:51.777] LOG: Pokemon: Foe Loudred | Species ID: 294 | Level: 50 | Nature: Naive (+Spd/-SpDef)
+[01:37:51.777] LOG: Stats (IVs): HP: 167 (9), Atk: 85 (10), Def: 71 (18), Spatk: 108 (1), Spdef: 54 (6), Spd: 79 (21)
+[01:37:51.777] LOG: Ability: Loud Bang | Passive Ability: Soundproof 
+[01:37:51.777] LOG: Moveset: ["Boomburst"]
+[01:37:51.778] LOG: COMMON
+[01:37:51.778] LOG: Caterpie
+[01:37:51.778] LOG: ER #419: elite BST cap (420 @ w5) - replacing Exploud (600) with Loudred (420)
+[01:37:51.786] LOG: Pokemon: Foe Loudred | Species ID: 294 | Level: 50 | Nature: Serious (-)
+[01:37:51.786] LOG: Stats (IVs): HP: 156 (15), Atk: 86 (24), Def: 70 (4), Spatk: 99 (31), Spdef: 70 (7), Spd: 72 (4)
+[01:37:51.786] LOG: Ability: Scrappy | Passive Ability: Soundproof 
+[01:37:51.786] LOG: Moveset: ["Boomburst"]
+[01:37:52.617] LOG: Battle Seed: jb9DRIGTtB4yidJO
+[01:37:52.618] LOG: Generated AI funcs
+[01:37:52.704] DEBUG: Session data saved to slot 4!
+[01:37:52.705] LOG: Wave Seed: w8t}}Rm>i6vq:L]Rg>6q|]lj 5
+[01:37:52.912] LOG: Youngster Destin
+[01:37:54.787] LOG: Dialogue saved as seen: dialogue:youngster.encounter.10
+[01:37:54.815] LOG: Youngster Destin
+[01:37:55.863] LOG: %cStart Phase SummonPhase color:green;
+[01:37:55.864] LOG: Destin
+[01:37:56.126] LOG: %cStart Phase SummonPhase color:green;
+[01:37:56.411] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:37:56.412] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:37:56.413] LOG: %cStart Phase PostSummonPhase color:green;
+[01:37:56.413] LOG: Ran PSP for: Weavile
+[01:37:56.414] LOG: %cStart Phase PostSummonPhase color:green;
+[01:37:56.414] LOG: %cStart Phase PostSummonPhase color:green;
+[01:37:56.414] LOG: %cStart Phase PostSummonPhase color:green;
+[01:37:56.415] LOG: Ran PSP for: Loudred
+[01:37:56.415] LOG: %cStart Phase PostSummonPhase color:green;
+[01:37:56.415] LOG: %cStart Phase PostSummonPhase color:green;
+[01:37:56.415] LOG: %cStart Phase TurnInitPhase color:green;
+[01:37:56.415] LOG: %cStart Phase CommandPhase color:green;
+[01:38:02.031] LOG: Seed: 5nECSWfqf435NszVlZ6A3H7o
+[01:38:02.031] LOG: Wave Seed: 5nECSWfqf435NszVlZ6A3H7o 0
+[01:38:02.213] WARN: AnimationManager key already exists: prompt
+[01:38:02.214] WARN: AnimationManager key already exists: tera_sparkle
+[01:38:02.214] LOG: Seed: C1kLSwuCRvXJWwyML0h3dVba
+[01:38:02.214] LOG: Wave Seed: C1kLSwuCRvXJWwyML0h3dVba 0
+[01:38:04.926] LOG: %cStart Phase LoginPhase color:green;
+[01:38:05.040] LOG: Client Session: 8zOUrmRvxrVC9x99ZCddVrTnxUVPYBmt
+[01:38:05.529] DEBUG: Using cached system data
+[01:38:05.592] LOG: %cStart Phase TitlePhase color:green;
+[01:38:05.592] LOG: Getting Session Slot id: %d 4
+[01:38:05.601] LOG: use seasonal splash messages true
+[01:38:05.601] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[01:38:32.837] LOG: %cStart Phase SelectStarterPhase color:green;
+[01:38:33.141] LOG: Wave Seed: H6pQX|zHW{]O\|~RQ5m8i[gf 5
+[01:38:33.147] LOG: %cStart Phase EncounterPhase color:green;
+[01:38:33.155] LOG: COMMON
+[01:38:33.155] LOG: Zigzagoon
+[01:38:33.156] LOG: ER #419: elite BST cap (420 @ w5) - replacing Porygon-Z (535) with Porygon (395)
+[01:38:33.168] LOG: Pokemon: Foe Porygon | Species ID: 137 | Level: 40 | Nature: Naughty (+Atk/-SpDef)
+[01:38:33.168] LOG: Stats (IVs): HP: 107 (21), Atk: 69 (2), Def: 71 (30), Spatk: 77 (17), Spdef: 64 (14), Spd: 42 (3)
+[01:38:33.168] LOG: Ability: Self Repair | Passive Ability: Levitate 
+[01:38:33.168] LOG: Moveset: ["Zap Cannon"]
+[01:38:33.168] LOG: COMMON
+[01:38:33.168] LOG: Zigzagoon
+[01:38:33.168] LOG: ER #419: elite BST cap (420 @ w5) - replacing Porygon-Z (535) with Porygon (395)
+[01:38:33.176] LOG: Pokemon: Foe Porygon | Species ID: 137 | Level: 40 | Nature: Calm (+SpDef/-Atk)
+[01:38:33.176] LOG: Stats (IVs): HP: 108 (1), Atk: 51 (20), Def: 67 (8), Spatk: 80 (19), Spdef: 79 (19), Spd: 39 (27)
+[01:38:33.177] LOG: Ability: Trace | Passive Ability: Levitate 
+[01:38:33.177] LOG: Moveset: ["Zap Cannon"]
+[01:38:33.352] LOG: Battle Seed: SiWcN0UaqfYe9aFH
+[01:38:33.353] LOG: Generated AI funcs
+[01:38:33.408] DEBUG: Session data saved to slot 4!
+[01:38:33.409] LOG: Wave Seed: H6pQX|zHW{]O\|~RQ5m8i[gf 5
+[01:38:33.613] LOG: Youngster Jacob
+[01:38:34.072] LOG: Dialogue saved as seen: dialogue:youngster.encounter.2
+[01:38:34.107] LOG: Youngster Jacob
+[01:38:34.648] LOG: %cStart Phase SummonPhase color:green;
+[01:38:34.648] LOG: Jacob
+[01:38:34.911] LOG: %cStart Phase SummonPhase color:green;
+[01:38:35.195] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:38:35.196] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:38:35.197] LOG: %cStart Phase PostSummonPhase color:green;
+[01:38:35.198] LOG: Ran PSP for: Blissey
+[01:38:35.198] LOG: %cStart Phase PostSummonPhase color:green;
+[01:38:35.198] LOG: %cStart Phase PostSummonPhase color:green;
+[01:38:35.199] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:38:35.363] LOG: %cStart Phase MovePhase color:green;
+[01:38:35.363] LOG: %cUser: Blissey
+Move: SAFEGUARD
+Use Mode: INDIRECT color:orchid
+[01:38:35.365] LOG: %cStart Phase MessagePhase color:green;
+[01:38:35.473] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:38:35.483] LOG: %cStart Phase MessagePhase color:green;
+[01:38:35.730] LOG: %cStart Phase MoveEndPhase color:green;
+[01:38:35.730] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:38:35.752] LOG: %cStart Phase PostSummonPhase color:green;
+[01:38:35.752] LOG: Ran PSP for: Porygon
+[01:38:35.752] LOG: %cStart Phase PostSummonPhase color:green;
+[01:38:35.752] LOG: %cStart Phase PostSummonPhase color:green;
+[01:38:35.753] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:38:35.919] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:38:36.100] LOG: %cStart Phase MessagePhase color:green;
+[01:38:36.313] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:38:36.335] LOG: %cStart Phase TurnInitPhase color:green;
+[01:38:36.335] LOG: %cStart Phase CommandPhase color:green;
+[01:38:37.066] LOG: Move: SOFT_BOILED Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Blissey
+[01:38:37.067] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:38:37.071] LOG: %cStart Phase TurnStartPhase color:green;
+[01:38:37.072] LOG: %cStart Phase MovePhase color:green;
+[01:38:37.072] LOG: %cUser: Blissey
+Move: SOFT_BOILED
+Use Mode: NORMAL color:orchid
+[01:38:37.073] LOG: %cStart Phase MessagePhase color:green;
+[01:38:37.181] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:38:37.426] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:38:37.426] LOG: %cStart Phase MessagePhase color:green;
+[01:38:37.633] LOG: %cStart Phase MoveEndPhase color:green;
+[01:38:37.633] LOG: %cStart Phase MovePhase color:green;
+[01:38:37.633] LOG: %cUser: Porygon
+Move: ZAP_CANNON
+Use Mode: NORMAL color:orchid
+[01:38:37.635] LOG: %cStart Phase MessagePhase color:green;
+[01:38:37.758] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:38:37.760] LOG: %cStart Phase MessagePhase color:green;
+[01:38:37.973] LOG: %cStart Phase MoveEndPhase color:green;
+[01:38:37.973] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:38:37.974] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:38:37.974] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:38:37.974] LOG: %cStart Phase BerryPhase color:green;
+[01:38:37.974] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:38:37.974] LOG: %cStart Phase TurnEndPhase color:green;
+[01:38:37.976] LOG: %cStart Phase TurnInitPhase color:green;
+[01:38:37.976] LOG: %cStart Phase CommandPhase color:green;
+[01:38:39.158] LOG: Move: SOFT_BOILED Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Blissey
+[01:38:39.159] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:38:39.160] LOG: Battle Seed: SiWcN0UaqfYe9aFH
+[01:38:39.160] LOG: %cStart Phase TurnStartPhase color:green;
+[01:38:39.161] LOG: %cStart Phase MovePhase color:green;
+[01:38:39.161] LOG: %cUser: Blissey
+Move: SOFT_BOILED
+Use Mode: NORMAL color:orchid
+[01:38:39.162] LOG: %cStart Phase MessagePhase color:green;
+[01:38:39.272] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:38:39.516] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:38:39.516] LOG: %cStart Phase MessagePhase color:green;
+[01:38:39.723] LOG: %cStart Phase MoveEndPhase color:green;
+[01:38:39.724] LOG: %cStart Phase MovePhase color:green;
+[01:38:39.724] LOG: %cUser: Porygon
+Move: ZAP_CANNON
+Use Mode: NORMAL color:orchid
+[01:38:39.725] LOG: %cStart Phase MessagePhase color:green;
+[01:38:39.848] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:38:40.078] LOG: crit stage: +0
+[01:38:40.079] LOG: Move: Zap Cannon | Base damage: 25.981837837837837 | Power: 156 | Source attack: 79 | Target defense: 185
+[01:38:40.080] LOG: Move: Zap Cannon | Attack damage: 18
+[01:38:40.080] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:38:40.092] LOG: %cStart Phase MoveEndPhase color:green;
+[01:38:40.093] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:38:40.093] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:38:40.093] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:38:40.093] LOG: %cStart Phase BerryPhase color:green;
+[01:38:40.093] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:38:40.093] LOG: %cStart Phase TurnEndPhase color:green;
+[01:38:40.094] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:38:40.259] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:38:40.371] LOG: %cStart Phase MessagePhase color:green;
+[01:38:40.626] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:38:40.648] LOG: %cStart Phase TurnInitPhase color:green;
+[01:38:40.648] LOG: %cStart Phase CommandPhase color:green;
+[01:38:40.936] LOG: Move: SOFT_BOILED Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Blissey
+[01:38:40.937] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:38:40.939] LOG: Battle Seed: SiWcN0UaqfYe9aFH
+[01:38:40.939] LOG: %cStart Phase TurnStartPhase color:green;
+[01:38:40.940] LOG: %cStart Phase MovePhase color:green;
+[01:38:40.940] LOG: %cUser: Blissey
+Move: SOFT_BOILED
+Use Mode: NORMAL color:orchid
+[01:38:40.941] LOG: %cStart Phase MessagePhase color:green;
+[01:38:41.050] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:38:41.293] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:38:41.294] LOG: %cStart Phase MessagePhase color:green;
+[01:38:41.501] LOG: %cStart Phase MoveEndPhase color:green;
+[01:38:41.501] LOG: %cStart Phase MovePhase color:green;
+[01:38:41.501] LOG: %cUser: Porygon
+Move: ZAP_CANNON
+Use Mode: NORMAL color:orchid
+[01:38:41.502] LOG: %cStart Phase MessagePhase color:green;
+[01:38:41.626] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:38:41.856] LOG: crit stage: +0
+[01:38:41.857] LOG: Move: Zap Cannon | Base damage: 25.981837837837837 | Power: 156 | Source attack: 79 | Target defense: 185
+[01:38:41.857] LOG: Move: Zap Cannon | Attack damage: 19
+[01:38:41.857] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:38:41.870] LOG: %cStart Phase MoveEndPhase color:green;
+[01:38:41.870] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:38:41.870] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:38:41.870] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:38:41.870] LOG: %cStart Phase BerryPhase color:green;
+[01:38:41.870] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:38:41.871] LOG: %cStart Phase TurnEndPhase color:green;
+[01:38:41.872] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:38:42.036] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:38:42.149] LOG: %cStart Phase MessagePhase color:green;
+[01:38:42.403] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:38:42.425] LOG: %cStart Phase TurnInitPhase color:green;
+[01:38:42.425] LOG: %cStart Phase CommandPhase color:green;
+[01:38:42.774] LOG: Move: SOFT_BOILED Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Blissey
+[01:38:42.775] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:38:42.776] LOG: Battle Seed: SiWcN0UaqfYe9aFH
+[01:38:42.776] LOG: %cStart Phase TurnStartPhase color:green;
+[01:38:42.777] LOG: %cStart Phase MovePhase color:green;
+[01:38:42.777] LOG: %cUser: Blissey
+Move: SOFT_BOILED
+Use Mode: NORMAL color:orchid
+[01:38:42.777] LOG: %cStart Phase MessagePhase color:green;
+[01:38:42.890] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:38:43.134] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:38:43.134] LOG: %cStart Phase MessagePhase color:green;
+[01:38:43.341] LOG: %cStart Phase MoveEndPhase color:green;
+[01:38:43.342] LOG: %cStart Phase MovePhase color:green;
+[01:38:43.342] LOG: %cUser: Porygon
+Move: ZAP_CANNON
+Use Mode: NORMAL color:orchid
+[01:38:43.342] LOG: %cStart Phase MessagePhase color:green;
+[01:38:43.466] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:38:43.696] LOG: crit stage: +0
+[01:38:43.697] LOG: Move: Zap Cannon | Base damage: 25.981837837837837 | Power: 156 | Source attack: 79 | Target defense: 185
+[01:38:43.697] LOG: Move: Zap Cannon | Attack damage: 19
+[01:38:43.697] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:38:43.711] LOG: %cStart Phase MoveEndPhase color:green;
+[01:38:43.711] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:38:43.711] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:38:43.711] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:38:43.711] LOG: %cStart Phase BerryPhase color:green;
+[01:38:43.711] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:38:43.711] LOG: %cStart Phase TurnEndPhase color:green;
+[01:38:43.713] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:38:43.877] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:38:43.989] LOG: %cStart Phase MessagePhase color:green;
+[01:38:44.244] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:38:44.266] LOG: %cStart Phase TurnInitPhase color:green;
+[01:38:44.266] LOG: %cStart Phase CommandPhase color:green;
+[01:38:44.506] LOG: Move: SOFT_BOILED Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Blissey
+[01:38:44.507] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:38:44.509] LOG: Battle Seed: SiWcN0UaqfYe9aFH
+[01:38:44.509] LOG: %cStart Phase TurnStartPhase color:green;
+[01:38:44.509] LOG: %cStart Phase MovePhase color:green;
+[01:38:44.509] LOG: %cUser: Blissey
+Move: SOFT_BOILED
+Use Mode: NORMAL color:orchid
+[01:38:44.510] LOG: %cStart Phase MessagePhase color:green;
+[01:38:44.619] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:38:44.862] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:38:44.863] LOG: %cStart Phase MessagePhase color:green;
+[01:38:45.071] LOG: %cStart Phase MoveEndPhase color:green;
+[01:38:45.071] LOG: %cStart Phase MovePhase color:green;
+[01:38:45.071] LOG: %cUser: Porygon
+Move: ZAP_CANNON
+Use Mode: NORMAL color:orchid
+[01:38:45.071] LOG: %cStart Phase MessagePhase color:green;
+[01:38:45.195] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:38:45.196] LOG: %cStart Phase MessagePhase color:green;
+[01:38:45.410] LOG: %cStart Phase MoveEndPhase color:green;
+[01:38:45.411] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:38:45.411] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:38:45.411] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:38:45.411] LOG: %cStart Phase BerryPhase color:green;
+[01:38:45.411] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:38:45.411] LOG: %cStart Phase TurnEndPhase color:green;
+[01:38:45.412] LOG: %cStart Phase MessagePhase color:green;
+[01:38:45.668] LOG: %cStart Phase TurnInitPhase color:green;
+[01:38:45.668] LOG: %cStart Phase CommandPhase color:green;
