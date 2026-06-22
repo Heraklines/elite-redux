@@ -88,3 +88,20 @@ CREATE TABLE IF NOT EXISTS devtest_events (
 );
 CREATE INDEX IF NOT EXISTS idx_devtest_scenario ON devtest_events (scenario, at);
 CREATE INDEX IF NOT EXISTS idx_devtest_at ON devtest_events (at);
+
+-- Rolling backups of the previous system_saves blob (KeeganDB92 incident, 2026-06).
+-- Before an accepted system-save overwrite the worker snapshots the about-to-be-
+-- replaced save here (rate-limited per user) and prunes to the most recent few, so
+-- a bad write is recoverable with one query instead of D1 Time Travel. The worker
+-- auto-creates this table on first system-save write, so a deployed DB needs no
+-- migration.
+CREATE TABLE IF NOT EXISTS system_save_backups (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  data         TEXT    NOT NULL,
+  trainer_id   INTEGER,
+  secret_id    INTEGER,
+  saved_at     INTEGER NOT NULL,   -- updated_at of the snapshotted (previous) save
+  backed_up_at INTEGER NOT NULL    -- epoch ms when the snapshot was taken
+);
+CREATE INDEX IF NOT EXISTS idx_ssb_user ON system_save_backups (user_id, backed_up_at);
