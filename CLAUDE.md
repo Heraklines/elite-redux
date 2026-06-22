@@ -141,9 +141,41 @@ method), every battle test throws during construction; add the stub.
   and hides a 3-hit / spread follow-up / same-turn cancel. Use a tanky species or
   pre-boost it (`start.enemyStages:[0,6,0,6,0,0,0]` = +6 Def/SpDef).
 - **Runner limits:** no in-battle mega-evolve toggle (spawn into the form); `kind:
-  "wild"` can still roll a TRAINER at some waves and trainers SWITCH (confounds
-  single-enemy / item-lock tests - prefer a 1-mon `kind:"party"`); a mega-form sprite
-  load can still throw in the headless mock (`this.load.on`) - stub it if a mega spec hangs.
+  "wild"` forces a WILD battle EXCEPT on fixed rival/boss waves (e.g. ~190 rolls the
+  rival regardless), and trainers SWITCH (confounds single-enemy / item-lock tests -
+  prefer a 1-mon `kind:"party"`). The old mega-form sprite-load crash in the headless
+  mock (`this.load.on is not a function`) is FIXED - `test/mocks/mock-loader.ts` now
+  stubs `on`/`off`, so megas (incl. ER customs like Mega Vanilluxe) summon cleanly.
+
+## Headless UI runner (non-combat surfaces, no browser, no pixels)
+
+The combat runner's sibling for NON-battle screens. Boots the real game headlessly
+and drives a UI handler directly, printing what the screen WOULD render - so the
+"visual" bug classes that are really DATA bugs surface without a browser or pixels:
+crash-to-black (handler throws), wrong/missing sprite (resolved sprite KEY/atlas
+points at the wrong slug, e.g. "Redux Rattata shows Mega Charizard X"), and
+blank/wrong fields (handler computes empty/garbled ability text).
+
+```
+node scripts/run-ui-scenario.mjs [species,species,...] [--strict]
+```
+
+- A species is a `SpeciesId` name, an `ErSpeciesId` NAME (e.g. `RATTATA_REDUX`), or a
+  numeric id. Omitted = a built-in demo (vanilla baseline + live wrong-sprite / crash
+  repros). `--strict` promotes the sprite-mismatch WARNING to a hard error.
+- Per species it prints a `STATE {…}` (threw / ability / passives / spriteKey /
+  spriteAtlas / iconId) then a `RESULT {…}` with `errors[]` (threw / blank ability -
+  fail the run) and `warnings[]` (sprite atlas does not reference the species name
+  token - possible wrong sprite). `getSpriteKey`/`getSpriteAtlasPath` route through the
+  ER sprite-redirect, so a redirect / id-collision regression shows up directly.
+- Files: `test/tools/run-ui-scenario.test.ts` (currently the STARTER_SELECT handler -
+  it calls the REAL `setSpeciesDetails`) + `scripts/run-ui-scenario.mjs`. Sets
+  `ER_SCENARIO=1` for you.
+- **SCOPE:** this is the DATA/STATE tier - it does NOT rasterize. True pixel checks
+  (alignment / colour / transparency / green-box) need a separate `CANVAS` +
+  node-canvas harness (`renderer.snapshot()` -> PNG diff); not built yet. It extends
+  to the pokedex / egg-hatch / shop / mystery-encounter handlers the same way: drive
+  the handler, snapshot its computed state + the keys it resolves.
 
 ## The in-game dev test suite
 
