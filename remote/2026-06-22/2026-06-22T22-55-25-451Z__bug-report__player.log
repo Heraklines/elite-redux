@@ -1,0 +1,285 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:66  difficulty:youngster
+seed:     RhgvpzLkCFF4NcCafWRdlT7Q
+party:    Sharpedo(L56 101/161), Kecleon(L56 117/157), Mr. Rime(L38 120/120), Ribombee(L38 0/105), Pentawug(L55 158/158), Basculegion(L54 209/209)
+
+----- DESCRIPTION -----
+Ribombee set up safeguard but Sharpedo still got frostbite
+
+----- CONSOLE -----
+[22:53:51.148] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:53:51.172] LOG: %cStart Phase MessagePhase color:green;
+[22:53:51.396] LOG: %cStart Phase MessagePhase color:green;
+[22:53:51.596] LOG: %cStart Phase FaintPhase color:green;
+[22:53:53.983] LOG: %cStart Phase MessagePhase color:green;
+[22:53:54.176] LOG: %cStart Phase VictoryPhase color:green;
+[22:53:54.177] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:53:54.178] LOG: Applied Super EXP. Charm 
+[22:53:54.178] LOG: Applied EXP. Charm 
+[22:53:54.178] LOG: %cStart Phase LevelUpPhase color:green;
+[22:53:54.178] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[22:53:58.722] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:53:58.722] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:53:58.723] LOG: Applied Super EXP. Charm 
+[22:53:58.723] LOG: Applied EXP. Charm 
+[22:53:58.723] LOG: %cStart Phase LevelUpPhase color:green;
+[22:53:58.723] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[22:54:00.205] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:54:00.205] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:54:00.205] LOG: Applied Super EXP. Charm 
+[22:54:00.205] LOG: Applied EXP. Charm 
+[22:54:00.205] LOG: %cStart Phase LevelUpPhase color:green;
+[22:54:00.206] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:54:00.206] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:54:00.206] LOG: Applied Super EXP. Charm 
+[22:54:00.206] LOG: Applied EXP. Charm 
+[22:54:00.206] LOG: %cStart Phase LevelUpPhase color:green;
+[22:54:00.207] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:54:00.207] LOG: %cStart Phase MoveEndPhase color:green;
+[22:54:00.207] LOG: %cStart Phase MovePhase color:green;
+[22:54:00.207] LOG: %cStart Phase MoveEndPhase color:green;
+[22:54:00.207] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:54:00.207] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:54:00.207] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:54:00.207] LOG: %cStart Phase BerryPhase color:green;
+[22:54:00.209] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:54:00.211] LOG: %cStart Phase TurnEndPhase color:green;
+[22:54:00.212] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:54:00.446] LOG: Colress
+[22:54:00.531] LOG: Applied Protein (enemy)
+[22:54:00.531] LOG: Applied Zinc (enemy)
+[22:54:00.531] LOG: Applied Carbos (enemy)
+[22:54:00.531] LOG: Applied Zinc (enemy)
+[22:54:00.531] LOG: Applied Protein (enemy)
+[22:54:00.531] LOG: Applied Protein (enemy)
+[22:54:00.531] LOG: Applied Carbos (enemy)
+[22:54:00.532] LOG: Applied Iron (enemy)
+[22:54:00.671] LOG: %cStart Phase PostSummonPhase color:green;
+[22:54:00.671] LOG: Ran PSP for: Beheeyem
+[22:54:00.672] LOG: %cStart Phase PostSummonPhase color:green;
+[22:54:00.678] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:54:00.831] LOG: %cStart Phase MessagePhase color:green;
+[22:54:01.079] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:54:01.115] LOG: %cStart Phase PostSummonPhase color:green;
+[22:54:01.117] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:54:01.290] LOG: %cStart Phase MessagePhase color:green;
+[22:54:01.546] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:54:01.581] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:54:01.748] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:54:01.798] LOG: %cStart Phase MovePhase color:green;
+[22:54:01.798] LOG: %cUser: Beheeyem
+Move: TELEKINESIS
+Use Mode: INDIRECT color:orchid
+[22:54:01.807] LOG: %cStart Phase MessagePhase color:green;
+[22:54:01.930] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:54:01.950] LOG: %cStart Phase MessagePhase color:green;
+[22:54:02.188] LOG: %cStart Phase MoveEndPhase color:green;
+[22:54:02.188] LOG: %cStart Phase TurnInitPhase color:green;
+[22:54:02.188] LOG: %cStart Phase CommandPhase color:green;
+[22:54:03.351] LOG: Move: OBSTRUCT Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Sharpedo
+[22:54:03.353] LOG: %cStart Phase CommandPhase color:green;
+[22:54:05.943] LOG: Move: EXTREME_SPEED Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Kecleon
+[22:54:05.945] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:54:07.104] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:54:07.123] LOG: Battle Seed: vx8zHnNzt0Bx3vjH
+[22:54:07.128] LOG: Move Pool: ["Glitzy Glow","Zap Cannon"]
+[22:54:07.128] LOG: Move Scores: [25.5,10.625]
+[22:54:07.128] LOG: Sorted Move Pool: ["Glitzy Glow","Zap Cannon"]
+[22:54:07.128] LOG: Chosen Move: Glitzy Glow
+[22:54:07.128] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:54:07.143] LOG: Move Pool: ["Thunderclap","Tri Attack","Eerie Impulse","Protect"]
+[22:54:07.143] LOG: Move Scores: [9.75,21,6,-20]
+[22:54:07.143] LOG: Sorted Move Pool: ["Tri Attack","Thunderclap","Eerie Impulse","Protect"]
+[22:54:07.143] LOG: Chosen Move: Tri Attack
+[22:54:07.143] LOG: %cStart Phase TurnStartPhase color:green;
+[22:54:07.149] LOG: %cStart Phase MovePhase color:green;
+[22:54:07.149] LOG: %cUser: Sharpedo
+Move: OBSTRUCT
+Use Mode: NORMAL color:orchid
+[22:54:07.155] LOG: %cStart Phase MessagePhase color:green;
+[22:54:07.233] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:54:07.657] LOG: %cStart Phase MessagePhase color:green;
+[22:54:07.888] LOG: %cStart Phase MoveEndPhase color:green;
+[22:54:07.891] LOG: %cStart Phase MovePhase color:green;
+[22:54:07.891] LOG: %cUser: Kecleon
+Move: EXTREME_SPEED
+Use Mode: NORMAL color:orchid
+[22:54:07.891] LOG: %cStart Phase MessagePhase color:green;
+[22:54:08.138] LOG: %cStart Phase CommonAnimPhase color:green;
+[22:54:08.405] LOG: %cStart Phase MoveEndPhase color:green;
+[22:54:08.406] LOG: %cStart Phase MovePhase color:green;
+[22:54:08.406] LOG: %cUser: Beheeyem
+Move: GLITZY_GLOW
+Use Mode: NORMAL color:orchid
+[22:54:08.420] LOG: %cStart Phase MessagePhase color:green;
+[22:54:08.538] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:54:09.781] LOG: crit stage: +0
+[22:54:09.786] LOG: Move: Glitzy Glow | Base damage: 36.07179487179487 | Power: 80 | Source attack: 151 | Target defense: 156
+[22:54:09.786] LOG: Move: Glitzy Glow | Attack damage: 26
+[22:54:09.791] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:54:09.948] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:54:09.998] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:54:10.032] LOG: %cStart Phase MessagePhase color:green;
+[22:54:10.263] LOG: %cStart Phase MessagePhase color:green;
+[22:54:10.580] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:54:10.757] LOG: %cStart Phase MessagePhase color:green;
+[22:54:10.996] LOG: %cStart Phase MoveEndPhase color:green;
+[22:54:10.997] LOG: %cStart Phase MovePhase color:green;
+[22:54:10.997] LOG: %cUser: Magnezone
+Move: TRI_ATTACK
+Use Mode: NORMAL color:orchid
+[22:54:11.012] LOG: %cStart Phase MessagePhase color:green;
+[22:54:11.146] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:54:11.149] LOG: %cStart Phase MessagePhase color:green;
+[22:54:11.379] LOG: %cStart Phase MoveEndPhase color:green;
+[22:54:11.380] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:54:11.380] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:54:11.380] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:54:11.380] LOG: %cStart Phase BerryPhase color:green;
+[22:54:11.387] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:54:11.392] LOG: %cStart Phase TurnEndPhase color:green;
+[22:54:11.399] LOG: %cStart Phase TurnInitPhase color:green;
+[22:54:11.399] LOG: %cStart Phase CommandPhase color:green;
+[22:54:15.127] LOG: Move: POISON_FANG Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Sharpedo
+[22:54:15.129] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:54:16.601] LOG: %cStart Phase CommandPhase color:green;
+[22:54:18.035] LOG: Move: RIP_AND_TEAR Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Sharpedo
+[22:54:18.036] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:54:19.528] LOG: %cStart Phase CommandPhase color:green;
+[22:54:20.227] LOG: Move: POISON_FANG Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Sharpedo
+[22:54:20.229] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:54:20.928] LOG: %cStart Phase CommandPhase color:green;
+[22:54:23.880] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:54:23.896] LOG: Battle Seed: vx8zHnNzt0Bx3vjH
+[22:54:23.898] LOG: Move Pool: ["Glitzy Glow"]
+[22:54:23.898] LOG: Move Scores: [12.1875]
+[22:54:23.898] LOG: Sorted Move Pool: ["Glitzy Glow"]
+[22:54:23.898] LOG: Chosen Move: Glitzy Glow
+[22:54:23.898] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:54:23.912] LOG: Move Pool: ["Thunderclap","Tri Attack","Eerie Impulse","Protect"]
+[22:54:23.912] LOG: Move Scores: [9.75,21,6,-20]
+[22:54:23.912] LOG: Sorted Move Pool: ["Tri Attack","Thunderclap","Eerie Impulse","Protect"]
+[22:54:23.912] LOG: Chosen Move: Tri Attack
+[22:54:23.912] LOG: %cStart Phase TurnStartPhase color:green;
+[22:54:23.916] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:54:24.122] LOG: Applied Protein 
+[22:54:24.123] LOG: Applied HP Up 
+[22:54:24.262] LOG: %cStart Phase PostSummonPhase color:green;
+[22:54:24.262] LOG: Ran PSP for: Ribombee
+[22:54:24.263] LOG: %cStart Phase PostSummonPhase color:green;
+[22:54:24.263] LOG: %cStart Phase PostSummonPhase color:green;
+[22:54:24.264] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:54:24.428] LOG: %cStart Phase MovePhase color:green;
+[22:54:24.428] LOG: %cUser: Beheeyem
+Move: GLITZY_GLOW
+Use Mode: NORMAL color:orchid
+[22:54:24.439] LOG: %cStart Phase MessagePhase color:green;
+[22:54:24.571] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:54:25.789] LOG: crit stage: +0
+[22:54:25.793] LOG: Move: Glitzy Glow | Base damage: 79.03188405797101 | Power: 80 | Source attack: 151 | Target defense: 69
+[22:54:25.793] LOG: Move: Glitzy Glow | Attack damage: 113
+[22:54:25.794] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:54:25.823] LOG: %cStart Phase FaintPhase color:green;
+[22:54:27.693] LOG: %cStart Phase MessagePhase color:green;
+[22:54:27.853] LOG: %cStart Phase MoveEndPhase color:green;
+[22:54:27.853] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:54:27.892] LOG: %cStart Phase MovePhase color:green;
+[22:54:27.892] LOG: %cUser: Magnezone
+Move: TRI_ATTACK
+Use Mode: NORMAL color:orchid
+[22:54:27.900] LOG: %cStart Phase MessagePhase color:green;
+[22:54:28.029] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:54:29.299] LOG: crit stage: +0
+[22:54:29.303] LOG: Move: Tri Attack | Base damage: 71.85 | Power: 90 | Source attack: 127 | Target defense: 72
+[22:54:29.303] LOG: Move: Tri Attack | Attack damage: 66
+[22:54:29.305] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:54:29.333] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:54:30.615] LOG: crit stage: +0
+[22:54:30.619] LOG: Move: Tri Attack | Base damage: 71.85 | Power: 90 | Source attack: 127 | Target defense: 72
+[22:54:30.619] LOG: Move: Tri Attack | Attack damage: 14
+[22:54:30.620] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:54:30.648] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:54:31.923] LOG: crit stage: +0
+[22:54:31.925] LOG: Move: Tri Attack | Base damage: 71.85 | Power: 90 | Source attack: 127 | Target defense: 72
+[22:54:31.925] LOG: Move: Tri Attack | Attack damage: 10
+[22:54:31.926] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:54:31.956] LOG: %cStart Phase MessagePhase color:green;
+[22:54:32.163] LOG: %cStart Phase MoveEndPhase color:green;
+[22:54:32.164] LOG: %cStart Phase MovePhase color:green;
+[22:54:32.164] LOG: %cStart Phase MoveEndPhase color:green;
+[22:54:32.165] LOG: %cStart Phase MovePhase color:green;
+[22:54:32.165] LOG: %cUser: Sharpedo
+Move: POISON_FANG
+Use Mode: NORMAL color:orchid
+[22:54:32.172] LOG: %cStart Phase MessagePhase color:green;
+[22:54:32.305] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:54:32.306] LOG: Applied Multi Lens 
+[22:54:32.697] LOG: Applied Scope Lens 
+[22:54:32.697] LOG: crit stage: +2
+[22:54:32.699] LOG: Move: Poison Fang | Base damage: 61.42365467625899 | Power: 91 | Source attack: 186 | Target defense: 139
+[22:54:32.699] LOG: Applied Multi Lens 
+[22:54:32.701] LOG: Move: Poison Fang | Attack damage: 83
+[22:54:32.703] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:54:32.856] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:54:32.897] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:54:32.932] LOG: %cStart Phase MessagePhase color:green;
+[22:54:33.146] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:54:33.564] LOG: Applied Scope Lens 
+[22:54:33.564] LOG: crit stage: +2
+[22:54:33.566] LOG: Move: Poison Fang | Base damage: 61.42365467625899 | Power: 91 | Source attack: 186 | Target defense: 139
+[22:54:33.566] LOG: Applied Multi Lens 
+[22:54:33.568] LOG: Move: Poison Fang | Attack damage: 3
+[22:54:33.569] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:54:33.598] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:54:34.030] LOG: Applied Scope Lens 
+[22:54:34.031] LOG: crit stage: +2
+[22:54:34.032] LOG: Move: Poison Fang | Base damage: 61.42365467625899 | Power: 91 | Source attack: 186 | Target defense: 139
+[22:54:34.034] LOG: Move: Poison Fang | Attack damage: 18
+[22:54:34.035] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:54:34.064] LOG: %cStart Phase MessagePhase color:green;
+[22:54:34.280] LOG: %cStart Phase MessagePhase color:green;
+[22:54:34.471] LOG: %cStart Phase MoveEndPhase color:green;
+[22:54:34.472] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:54:34.472] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:54:34.472] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:54:34.472] LOG: %cStart Phase BerryPhase color:green;
+[22:54:34.476] LOG: Applied Sitrus Berry 
+[22:54:34.476] LOG: Applied Protein 
+[22:54:34.477] LOG: Applied HP Up 
+[22:54:34.484] LOG: %cStart Phase CommonAnimPhase color:green;
+[22:54:34.805] LOG: %cStart Phase PokemonHealPhase color:green;
+[22:54:35.009] LOG: %cStart Phase MessagePhase color:green;
+[22:54:35.288] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:54:35.291] LOG: %cStart Phase TurnEndPhase color:green;
+[22:54:35.298] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:54:35.301] LOG: %cStart Phase SwitchPhase color:green;
+[22:54:36.863] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:54:36.947] LOG: Applied Protein 
+[22:54:36.948] LOG: Applied HP Up 
+[22:54:37.105] LOG: %cStart Phase ShinySparklePhase color:green;
+[22:54:37.213] LOG: %cStart Phase PostSummonPhase color:green;
+[22:54:37.213] LOG: Ran PSP for: Kecleon
+[22:54:37.215] LOG: %cStart Phase PostSummonPhase color:green;
+[22:54:37.215] LOG: %cStart Phase PostSummonPhase color:green;
+[22:54:37.215] LOG: %cStart Phase MovePhase color:green;
+[22:54:37.215] LOG: %cUser: Kecleon
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[22:54:37.215] LOG: Battle Seed: vx8zHnNzt0Bx3vjH
+[22:54:37.222] LOG: %cStart Phase MessagePhase color:green;
+[22:54:37.330] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:54:37.347] LOG: crit stage: +0
+[22:54:37.349] LOG: Move: Scratch | Base damage: 21.81134328358209 | Power: 40 | Source attack: 136 | Target defense: 134
+[22:54:37.349] LOG: Move: Scratch | Attack damage: 30
+[22:54:37.350] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:54:37.382] LOG: %cStart Phase MoveEndPhase color:green;
+[22:54:37.382] LOG: %cStart Phase TurnInitPhase color:green;
+[22:54:37.382] LOG: %cStart Phase CommandPhase color:green;
