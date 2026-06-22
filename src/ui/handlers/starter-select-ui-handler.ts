@@ -2307,6 +2307,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           break;
       }
     } else {
+      // ER hardening: an empty filter result (e.g. a misspelled ability-text
+      // search that matches NO mon) leaves nothing selected - setSpecies(null)
+      // makes `lastSpecies` null and the grid empty. Every grid interaction below
+      // dereferences `lastSpecies.speciesId` / `filteredStarterContainers[cursor]`,
+      // which crashed the game to a black screen on the next keypress. With nothing
+      // to act on, no-op safely instead.
+      if (this.lastSpecies == null || this.filteredStarterContainers.length === 0) {
+        return false;
+      }
       let starterContainer: StarterContainer;
       // The temporary, duplicated starter data to show info
       const starterData = this.getSpeciesData(this.lastSpecies.speciesId).starterDataEntry;
