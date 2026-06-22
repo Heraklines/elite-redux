@@ -203,10 +203,38 @@ node scripts/run-ui-scenario.mjs [species,species,...] [--surface S] [--strict]
 - Files: `test/tools/run-ui-scenario.test.ts` + `scripts/run-ui-scenario.mjs`. Sets
   `ER_SCENARIO=1` for you. Add a surface by adding a `snap*` + an `it.skipIf(SURFACE
   !== "…")` block (drive the handler, snapshot its computed state + resolved keys).
-- **SCOPE:** this is the DATA/STATE tier - it does NOT rasterize. True pixel checks
-  (alignment / colour / transparency / green-box) need a separate `CANVAS` +
-  node-canvas harness (`renderer.snapshot()` -> PNG diff); not built yet. Next
-  surfaces (egg-hatch / shop / mystery-encounter) extend it the same way.
+- **SCOPE:** this is the DATA/STATE tier - it does NOT rasterize (it asserts on the
+  resolved sprite KEY, not the pixels). For actual pixels see the Tier 2 rasterizer below.
+
+## Tier 2 - real-pixel sprite checks (`scripts/render-sprite.mjs`)
+
+The pixel companion to the data-tier runners. Decodes a sprite's REAL atlas frame
+from the local **er-assets** checkout (`../er-assets/images/pokemon/…`, the exact
+bytes the game ships) with `@napi-rs/canvas` (prebuilt, no native build), writes the
+cropped frame to a PNG, and analyzes the pixels. Sub-second, no game/Phaser boot.
+
+```
+node scripts/render-sprite.mjs <atlas-path | slug | dexNo> [--back] [--black] [--frame N] [--out file.png]
+```
+
+- Feed it the `spriteAtlas` value the Tier-1 `pokedex`/`starter-select` surface prints
+  (e.g. `elite-redux/rattata_redux/front`), a bare ER slug (`rattata_redux`), or a
+  vanilla dex number. `--black` reads the black-shiny atlas (the #393 class); `--back`
+  the back-sprite; `--frame N` a specific anim frame.
+- Prints `SOURCE <png>` + `ANALYSIS { dims, transparentPct, dominantColor,
+  dominantPctOfSprite, cornersOpaqueUniform, verdict }` and writes the PNG under
+  `dev-logs/sprite-renders/` (gitignored - eyeball it). `verdict` flags the
+  pixel-level visual-bug classes: **EMPTY** (fully transparent - missing sprite,
+  #107), **NO TRANSPARENCY / BOXED** (solid or 4-uniform-opaque-corner background -
+  the green/dark-box class, #134/#284), **FLAT FILL** (one colour dominates - a
+  placeholder / wrong tint, #393), else `ok`.
+- **What it does NOT do:** composite a full screen (layout/alignment/overlap). That
+  needs Phaser's real renderer driving the real browser client - the headless test
+  harness mocks rendering away (e.g. `MockText` discards positions), so a screen can't
+  be re-composited from the mock tree, and the real client can't boot-and-render in
+  Node. Sprite-level pixels are the achievable real-pixel check; full-scene render is not.
+- Dep: `@napi-rs/canvas` (devDependency). Local er-assets checkout required (it's the
+  asset source of truth; see the Assets section).
 
 ## The in-game dev test suite
 
