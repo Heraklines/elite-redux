@@ -57,13 +57,17 @@ import { BARGAIN_SIN_ORDER, DISABLED_BARGAIN_SINS } from "#data/elite-redux/er-b
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { DexAttr } from "#enums/dex-attr";
 import { ErSpeciesId } from "#enums/er-species-id";
+import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import { getPlayerShopModifierTypeOptionsForWave } from "#modifiers/modifier-type";
+import { getEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
+import { allMysteryEncounters } from "#mystery-encounters/mystery-encounters";
 import { GameManager } from "#test/framework/game-manager";
 import type { BiomeShopUiHandler } from "#ui/biome-shop-ui-handler";
 import type { ErBargainUiHandler } from "#ui/er-bargain-ui-handler";
+import type { MysteryEncounterUiHandler } from "#ui/mystery-encounter-ui-handler";
 import type { PokedexPageUiHandler } from "#ui/pokedex-page-ui-handler";
 import { PokemonHatchInfoContainer } from "#ui/pokemon-hatch-info-container";
 import type { StarterSelectUiHandler } from "#ui/starter-select-ui-handler";
@@ -84,6 +88,9 @@ const DEMO_BY_SURFACE: Record<string, string[]> = {
   pokedex: ["RATTATA", "RATTATA_REDUX", "CALYREX", "FLOETTE_ETERNAL_FLOWER", "MIMIKYU_BUSTED"],
   // egg-hatch summary card: the starterColors-undefined crash on ER-custom hover (#110).
   "egg-hatch": ["RATTATA", "RATTATA_REDUX", "MINCCINO_REDUX"],
+  // mystery-encounter: tokens are MysteryEncounterType NAMES (ER custom MEs). Render
+  // each ME's option panel - the intro-sprite / option-render crash class (#490 etc.).
+  "mystery-encounter": ["ER_FORTUNE_TELLER", "ER_BOG_WITCH", "ER_HIGH_NOON"],
 };
 const DEMO_SPECIES = DEMO_BY_SURFACE[SURFACE] ?? DEMO_BY_SURFACE["starter-select"];
 
@@ -407,6 +414,62 @@ function snapBargain(game: GameManager): BargainSnapshot {
   return { shown, threw, labels, offers, greeting };
 }
 
+interface EncounterSnapshot {
+  token: string;
+  type: number;
+  threw: string | false;
+  shown: boolean;
+  optionCount: number;
+  options: string[];
+  title: string;
+}
+
+/**
+ * Render a specific ER mystery encounter's option panel. Assigns the registry encounter
+ * directly to the (already-started) battle - ER gates ME spawns by biome/wave, so the
+ * override path won't force an ER ME onto an arbitrary wave. Caller must have started a
+ * battle first (the handler reads `currentBattle.mysteryEncounter`).
+ */
+function snapEncounter(game: GameManager, token: string): EncounterSnapshot | { token: string; error: string } {
+  const type = (MysteryEncounterType as Record<string, unknown>)[token];
+  if (typeof type !== "number") {
+    return { token, error: `unknown ME type "${token}"` };
+  }
+  const encounter = allMysteryEncounters[type as number];
+  if (!encounter) {
+    return { token, error: `no registered encounter for ${token} (#${type})` };
+  }
+  game.scene.currentBattle.mysteryEncounter = encounter;
+  const me = encounter;
+  const handler = game.scene.ui.handlers[UiMode.MYSTERY_ENCOUNTER] as MysteryEncounterUiHandler;
+  const safeText = (k: unknown): string => {
+    try {
+      return (getEncounterText(k as never) as string | null) ?? "";
+    } catch {
+      return "";
+    }
+  };
+  let threw: string | false = false;
+  let shown = false;
+  try {
+    // show([{}]) runs displayEncounterOptions against the live encounter - the
+    // intro-sprite / option-panel render path.
+    shown = handler.show([{}]);
+  } catch (e) {
+    threw = e instanceof Error ? e.message : String(e);
+  }
+  const opts = me?.options ?? [];
+  return {
+    token,
+    type: type as number,
+    threw,
+    shown,
+    optionCount: opts.length,
+    options: opts.map(o => safeText(o.dialogue?.buttonLabel)),
+    title: safeText(me?.dialogue?.encounterOptionsDialogue?.title),
+  };
+}
+
 describe.skipIf(!RUN)("headless UI runner", () => {
   let phaserGame: Phaser.Game;
 
@@ -562,4 +625,40 @@ describe.skipIf(!RUN)("headless UI runner", () => {
     console.log("\nRESULT", JSON.stringify({ surface: "bargain", errors }));
     expect(errors, errors.join("\n")).toEqual([]);
   });
+
+  it.skipIf(SURFACE !== "mystery-encounter")(
+    "mystery-encounter: renders each ME's option panel",
+    async () => {
+      console.log("\n===== UI SURFACE: mystery-encounter =====");
+      console.log(`encounters: ${TARGET_TOKENS.length}`);
+
+      // ONE battle (so currentBattle exists); each ME just swaps currentBattle.mysteryEncounter
+      // and re-renders. Reusing the GameManager avoids the per-test prompt-interval static.
+      const game = new GameManager(phaserGame);
+      await game.classicMode.startBattle(SpeciesId.RATTATA);
+
+      const errors: string[] = [];
+      for (const token of TARGET_TOKENS) {
+        const snap = snapEncounter(game, token);
+        if ("error" in snap) {
+          console.log(`\n=== ${token} ===\nERROR ${snap.error}`);
+          errors.push(snap.error);
+          continue;
+        }
+        console.log(`\n=== ${token} (#${snap.type}) ===`);
+        console.log("STATE", JSON.stringify(snap));
+        // Crash class: the option panel threw, returned false, or rendered no options.
+        if (snap.threw) {
+          errors.push(`${token}: ME show() threw — ${snap.threw}`);
+        } else if (!snap.shown) {
+          errors.push(`${token}: ME show() returned false`);
+        } else if (snap.optionCount === 0) {
+          errors.push(`${token}: ME rendered with ZERO options`);
+        }
+      }
+      console.log("\nRESULT", JSON.stringify({ surface: "mystery-encounter", count: TARGET_TOKENS.length, errors }));
+      expect(errors, errors.join("\n")).toEqual([]);
+    },
+    180000,
+  );
 });

@@ -192,6 +192,14 @@ node scripts/run-ui-scenario.mjs [species,species,...] [--surface S] [--strict]
     false. **This is the #550 diagnostic:** the handler renders cleanly headless (shown:true,
     no throw), so "never renders in-game" is a phase/encounter-gating issue, NOT a handler
     render bug.
+  - **`mystery-encounter`** - tokens are `MysteryEncounterType` NAMES (e.g. `ER_FORTUNE_TELLER`,
+    `ER_BOG_WITCH`, `ER_HIGH_NOON`). Starts ONE battle, then per ME assigns the registry
+    encounter (`allMysteryEncounters[type]`) onto `currentBattle.mysteryEncounter` and renders
+    the REAL `MysteryEncounterUiHandler.show([{}])` option panel. `STATE {…}` = type / threw /
+    shown / optionCount / options[] / title; `errors[]` = threw, show() false, or ZERO options.
+    NB: assigns the encounter directly because ER gates ME *spawns* by biome/wave (the override
+    won't force an ER ME onto an arbitrary wave); ONE GameManager is reused across MEs because
+    the prompt-handler interval is a per-test static.
 - Files: `test/tools/run-ui-scenario.test.ts` + `scripts/run-ui-scenario.mjs`. Sets
   `ER_SCENARIO=1` for you. Add a surface by adding a `snap*` + an `it.skipIf(SURFACE
   !== "…")` block (drive the handler, snapshot its computed state + resolved keys).
