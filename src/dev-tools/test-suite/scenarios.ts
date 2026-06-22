@@ -510,8 +510,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "Mega Vanilluxe Multi-headed hits 3x",
     description:
       "Multi-headed fix: a mega that GAINS a 3rd head (Vanilluxe, Mawile, Shuckle)\n"
-      + "should strike 3 times (100% / 20% / 15%), not 2 (100% / 25%). Your Vanilluxe\n"
-      + "starts ALREADY Mega-evolved (3-headed), facing a bulky Blissey that tanks the\n"
+      + "should strike 3 times (~100% / 20% / 15%), not 2 (100% / 25%). Your Vanilluxe is\n"
+      + "its MEGA form with Multi-headed forced ON, facing a bulky Blissey that tanks the\n"
       + "volley. DO: attack with ICE BEAM (a single-target move). EXPECT: it strikes\n"
       + "THREE times per use (watch the hit/damage count), not twice. Before the fix the\n"
       + "mega head-count lookup missed and it only hit twice.",
@@ -523,15 +523,21 @@ export const DEV_SCENARIOS: DevScenario[] = [
         // would faint on the first hit and hide the extra heads.
         STARTING_WAVE_OVERRIDE: 145,
         STARTING_LEVEL_OVERRIDE: 60,
+        // Mega Vanilluxe carries Multi-headed as an INNATE, not an active ability (its
+        // actives are Snow Cloak / Glacial Rage / Mirror Armor), and player innates are
+        // not unlocked in a dev scenario - so the mega alone strikes ONCE. Force
+        // Multi-headed active to exercise the mega head-count fix. Verified headless:
+        // mega form + this override -> Ice Beam hits 3x (~100/20/15%); without it, 1x.
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.MULTI_HEADED),
         ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
         ENEMY_LEVEL_OVERRIDE: 60,
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
       });
       return [
-        // Spawn directly in the Mega form (formIndex "mega"). Megas only revert on
-        // switch-out / battle end (never at the first summon), so it stays Mega for
-        // this fight - the tester controls a 3-headed Mega Vanilluxe immediately, with
-        // no shop / mega-stone / manual mega-evolve step (which is what failed before).
+        // Spawn directly in the Mega form (formIndex "mega") - megas are permanent in
+        // this fork (evolution-like), so the form sticks at summon. The mega form is
+        // what carries the 3-head count; the ABILITY_OVERRIDE above turns Multi-headed
+        // on so that count is actually exercised.
         makeStarter(SpeciesId.VANILLUXE, {
           formIndex: formIndexContaining(SpeciesId.VANILLUXE, "mega"),
           moveset: [MoveId.ICE_BEAM, MoveId.FLASH_CANNON, MoveId.FREEZE_DRY, MoveId.MIRROR_COAT],
