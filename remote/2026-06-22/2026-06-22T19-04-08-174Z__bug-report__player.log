@@ -1,0 +1,132 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     4  wave:191  difficulty:youngster
+seed:     PoUIGENmiR8kAHLlgp7HkKOC
+party:    Xerneas(L190 1152/1152), Mawile(L188 504/504), Aggron(L188 510/510), Flairgrance(L188 684/684), Primarina(L188 510/510), Dachsbun(L188 417/417)
+
+----- DESCRIPTION -----
+Whenever I click on the "Save and Quit" option in the menu the game freezes. And if it doesn't freeze it just won't let me leave the run
+
+----- CONSOLE -----
+[19:02:27.564] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[19:02:28.355] LOG: [ER] build mqnz75l2-jypp
+[19:02:40.413] DEBUG: Destroying loading scene
+[19:02:40.413] DEBUG: Destroyed loading scene
+[19:02:40.460] LOG: Seed: BUf49qOHUhRojdc25uE1vEAN
+[19:02:40.460] LOG: Wave Seed: BUf49qOHUhRojdc25uE1vEAN 0
+[19:02:41.612] LOG: %cStart Phase LoginPhase color:green;
+[19:02:42.043] LOG: Client Session: yoUWQEPq8Lut0mZROFohmpaS3a2EnplH
+[19:02:43.174] DEBUG: Using cached system data
+[19:02:43.218] LOG: %cStart Phase TitlePhase color:green;
+[19:02:43.219] LOG: Getting Session Slot id: %d 0
+[19:02:43.229] LOG: use seasonal splash messages true
+[19:02:43.229] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[19:02:46.464] LOG: Getting Session Slot id: %d 0
+[19:02:46.470] LOG: Wave Seed: PoUIGENmiR8kAHLlgp7HkKOC 0
+[19:02:46.470] LOG: Seed: PoUIGENmiR8kAHLlgp7HkKOC
+[19:02:46.506] LOG: Wave Seed: ďĮĔĈĆĄčĬĨđ÷ĪĀćċīĦįöćĪĊĎĂ 191
+[19:02:46.517] LOG: Applied Zinc 
+[19:02:46.517] LOG: Applied HP Up 
+[19:02:46.517] LOG: Applied Calcium 
+[19:02:46.517] LOG: Applied Iron 
+[19:02:46.517] LOG: Applied Carbos 
+[19:02:46.517] LOG: Applied Macho Brace 
+[19:02:46.518] LOG: Applied Macho Brace 
+[19:02:46.518] LOG: Applied Macho Brace 
+[19:02:46.518] LOG: Applied Macho Brace 
+[19:02:46.518] LOG: Applied Macho Brace 
+[19:02:46.518] LOG: Applied Macho Brace 
+[19:02:46.518] LOG: Applied Protein 
+[19:02:46.519] LOG: Applied Protein 
+[19:02:46.523] LOG: Applied Zinc 
+[19:02:46.523] LOG: Applied HP Up 
+[19:02:46.523] LOG: Applied Calcium 
+[19:02:46.523] LOG: Applied Iron 
+[19:02:46.523] LOG: Applied Carbos 
+[19:02:46.523] LOG: Applied Macho Brace 
+[19:02:46.523] LOG: Applied Macho Brace 
+[19:02:46.523] LOG: Applied Macho Brace 
+[19:02:46.523] LOG: Applied Macho Brace 
+[19:02:46.523] LOG: Applied Macho Brace 
+[19:02:46.523] LOG: Applied Macho Brace 
+[19:02:46.524] LOG: Applied Protein 
+[19:02:46.524] LOG: Applied Protein 
+[19:02:46.526] LOG: Applied Zinc 
+[19:02:46.526] LOG: Applied HP Up 
+[19:02:46.527] LOG: Applied Calcium 
+[19:02:46.527] LOG: Applied Iron 
+[19:02:46.527] LOG: Applied Carbos 
+[19:02:46.527] LOG: Applied Macho Brace 
+[19:02:46.527] LOG: Applied Macho Brace 
+[19:02:46.527] LOG: Applied Macho Brace 
+[19:02:46.527] LOG: Applied Macho Brace 
+[19:02:46.527] LOG: Applied Macho Brace 
+[19:02:46.527] LOG: Applied Macho Brace 
+[19:02:46.527] LOG: Applied Protein 
+[19:02:46.527] LOG: Applied Protein 
+[19:02:46.591] LOG: %cStart Phase EncounterPhase color:green;
+[19:02:46.595] LOG: Pokemon: Wild Flutter Mane | Species ID: 987 | Level: 172 | Nature: Gentle (+SpDef/-Def)
+[19:02:46.595] LOG: Stats (IVs): HP: 383 (7), Atk: 247 (31), Def: 174 (0), Spatk: 505 (21), Spdef: 541 (13), Spd: 512 (25)
+[19:02:46.595] LOG: Ability: Vengeful Spirit | Passive Ability: Protosynthesis 
+[19:02:46.595] LOG: Moveset: ["Infernal Parade","Poltergeist","Fake Tears","Healing Wish"]
+[19:02:47.511] LOG: Wave Seed: ďĮĔĈĆĄčĬĨđ÷ĪĀćċīĦįöćĪĊĎĂ 191
+[19:02:48.141] LOG: %cStart Phase SummonPhase color:green;
+[19:02:48.376] LOG: Applied Zinc 
+[19:02:48.376] LOG: Applied HP Up 
+[19:02:48.376] LOG: Applied Calcium 
+[19:02:48.376] LOG: Applied Iron 
+[19:02:48.376] LOG: Applied Carbos 
+[19:02:48.376] LOG: Applied Macho Brace 
+[19:02:48.377] LOG: Applied Macho Brace 
+[19:02:48.377] LOG: Applied Macho Brace 
+[19:02:48.377] LOG: Applied Macho Brace 
+[19:02:48.377] LOG: Applied Macho Brace 
+[19:02:48.377] LOG: Applied Macho Brace 
+[19:02:48.378] LOG: Applied Protein 
+[19:02:48.379] LOG: Applied Protein 
+[19:02:48.573] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:02:48.575] LOG: %cStart Phase ScanIvsPhase color:green;
+[19:02:49.753] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:02:49.755] LOG: %cStart Phase PostSummonPhase color:green;
+[19:02:49.755] LOG: Ran PSP for: Xerneas
+[19:02:49.757] LOG: %cStart Phase PostSummonPhase color:green;
+[19:02:49.758] LOG: %cStart Phase PostSummonPhase color:green;
+[19:02:49.758] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:02:49.992] LOG: %cStart Phase MessagePhase color:green;
+[19:02:50.340] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:02:50.376] LOG: %cStart Phase PostSummonPhase color:green;
+[19:02:50.376] LOG: Ran PSP for: Flutter Mane
+[19:02:50.376] LOG: %cStart Phase PostSummonPhase color:green;
+[19:02:50.376] LOG: %cStart Phase PostSummonPhase color:green;
+[19:02:50.377] LOG: %cStart Phase QuietFormChangePhase color:green;
+[19:02:50.596] LOG: Applied Zinc 
+[19:02:50.596] LOG: Applied HP Up 
+[19:02:50.596] LOG: Applied Calcium 
+[19:02:50.596] LOG: Applied Iron 
+[19:02:50.596] LOG: Applied Carbos 
+[19:02:50.596] LOG: Applied Macho Brace 
+[19:02:50.596] LOG: Applied Macho Brace 
+[19:02:50.597] LOG: Applied Macho Brace 
+[19:02:50.597] LOG: Applied Macho Brace 
+[19:02:50.597] LOG: Applied Macho Brace 
+[19:02:50.597] LOG: Applied Macho Brace 
+[19:02:50.597] LOG: Applied Zinc 
+[19:02:50.597] LOG: Applied HP Up 
+[19:02:50.597] LOG: Applied Calcium 
+[19:02:50.597] LOG: Applied Iron 
+[19:02:50.597] LOG: Applied Carbos 
+[19:02:50.597] LOG: Applied Macho Brace 
+[19:02:50.597] LOG: Applied Macho Brace 
+[19:02:50.597] LOG: Applied Macho Brace 
+[19:02:50.597] LOG: Applied Macho Brace 
+[19:02:50.597] LOG: Applied Macho Brace 
+[19:02:50.597] LOG: Applied Macho Brace 
+[19:02:50.597] LOG: Applied Protein 
+[19:02:50.597] LOG: Applied Protein 
+[19:02:51.257] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:02:51.491] LOG: %cStart Phase MessagePhase color:green;
+[19:02:51.841] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:02:51.876] LOG: %cStart Phase TurnInitPhase color:green;
+[19:02:51.877] LOG: %cStart Phase CommandPhase color:green;
