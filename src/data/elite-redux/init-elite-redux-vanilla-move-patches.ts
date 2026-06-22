@@ -51,6 +51,7 @@ import {
   CritOnlyAttr,
   DefDefAttr,
   ErCritBelowHalfHpAttr,
+  ErDecorateSideBoostAttr,
   ErSuperEffectiveVsTypeAttr,
   FlinchAttr,
   HealStatusEffectAttr,
@@ -289,12 +290,11 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       move.moveTarget = MoveTarget.NEAR_OTHER;
       orFlag(move, MoveFlags.MAKES_CONTACT);
       removeAttrsByName(move, ["StatStageChangeAttr"]);
-      // ER Decorate (dex #705): "Damages foes. Raises allies' Attack, Special Attack,
-      // and Crit by 2 stages." The Atk/SpAtk +2 was here; the CRIT +2 (the missing
-      // secondary effect) is the Focus-Energy CRIT_BOOST tag. Self-targeted, which is
-      // correct in singles (the lone "ally"); in doubles the dex also buffs the partner.
-      addAttrUnique(move, new StatStageChangeAttr([Stat.ATK, Stat.SPATK], 2, true));
-      addAttrUnique(move, new AddBattlerTagAttr(BattlerTagType.CRIT_BOOST, true, false));
+      // ER Decorate (dex #705): "Damages foes. Raises ALLIES' Attack, Special Attack,
+      // and Crit by 2 stages." Apply the +2 Atk/SpAtk + the Focus-Energy CRIT_BOOST to
+      // the user's WHOLE side (user + ally), not just the user - the old self-targeted
+      // boost missed the partner in doubles (reported on ally Kecleon).
+      addAttrUnique(move, new ErDecorateSideBoostAttr());
     },
   ],
   // CAPTIVATE: vanilla status (SpAtk -2 opposite-gender) → ER Special Fairy damaging.

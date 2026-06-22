@@ -692,6 +692,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "Decorate: buffs the WHOLE user side (doubles)",
+    description:
+      "ER Decorate (dex #705: 'Damages foes. Raises ALLIES' Attack, Special Attack, and\n"
+      + "Crit by 2 stages'). DOUBLE battle; your lead is Gardevoir, your ally is KECLEON.\n"
+      + "DO: have Gardevoir use DECORATE on a foe. EXPECT: it damages the foe AND BOTH your\n"
+      + "mons (Gardevoir AND Kecleon) get +2 Atk, +2 SpAtk and a crit boost (open Summary\n"
+      + "to confirm Kecleon's stages). Before the fix only the user was boosted, not the ally.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 60,
+        BATTLE_STYLE_OVERRIDE: "double",
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 30,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.DECORATE, MoveId.MOONBLAST, MoveId.PSYCHIC, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.KECLEON, {
+          moveset: [MoveId.SHADOW_SNEAK, MoveId.POWER_GEM, MoveId.PROTECT, MoveId.RECOVER],
+        }),
+      ];
+    },
+  },
   // ===========================================================================
   // QoL — level-up Move Learn panel
   // ===========================================================================

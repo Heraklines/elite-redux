@@ -7520,6 +7520,37 @@ export class ErSuperEffectiveVsTypeAttr extends MoveTypeChartOverrideAttr {
   }
 }
 
+/**
+ * ER Decorate (dex #705): "Damages foes. Raises ALLIES' Attack, Special Attack,
+ * and Crit by 2 stages." The move damages a foe, so the buff can't ride the move's
+ * target - it is applied to the user AND its ally (the user's whole side). The old
+ * patch used a self-targeted StatStageChange, so in doubles only the user got the
+ * boost and the partner (the reported "ally Kecleon") was missed.
+ */
+export class ErDecorateSideBoostAttr extends MoveEffectAttr {
+  constructor() {
+    super(true);
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    if (!super.apply(user, target, move, args)) {
+      return false;
+    }
+    const side = [user, user.getAlly()].filter((p): p is Pokemon => p != null && !p.isFainted());
+    for (const mon of side) {
+      globalScene.phaseManager.unshiftNew(
+        "StatStageChangePhase",
+        mon.getBattlerIndex(),
+        true,
+        [Stat.ATK, Stat.SPATK],
+        2,
+      );
+      mon.addTag(BattlerTagType.CRIT_BOOST, 0, move.id);
+    }
+    return true;
+  }
+}
+
 const screenTags = [ArenaTagType.REFLECT, ArenaTagType.LIGHT_SCREEN, ArenaTagType.AURORA_VEIL] as const;
 
 export class RemoveScreensAttr extends RemoveArenaTagsAttr {
