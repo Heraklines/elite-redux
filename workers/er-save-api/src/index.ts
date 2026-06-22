@@ -103,6 +103,43 @@ function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   return diff === 0;
 }
 
+/**
+ * Save compression (#storage). system_saves blobs are JSON that gzips ~12x, and
+ * the DB was hitting the D1 500MB cap. Stored form: "GZ1:" + base64(gzip(save)).
+ * A plaintext save starts with "{", so reads detect the format unambiguously and
+ * legacy plaintext rows keep working until their next write (or the one-time
+ * migration) compresses them. Uses the deadlock-safe stream pattern (begin the
+ * read before writing) so large saves don't stall on backpressure.
+ */
+const SAVE_GZIP_PREFIX = "GZ1:";
+
+async function compressSave(plain: string): Promise<string> {
+  try {
+    const cs = new CompressionStream("gzip");
+    const read = new Response(cs.readable).arrayBuffer();
+    const writer = cs.writable.getWriter();
+    await writer.write(enc.encode(plain));
+    await writer.close();
+    return SAVE_GZIP_PREFIX + toBase64(new Uint8Array(await read));
+  } catch (err) {
+    // A compression failure must never break a save: fall back to plaintext.
+    console.error("compressSave failed, storing plaintext:", err);
+    return plain;
+  }
+}
+
+async function decompressSave(stored: string): Promise<string> {
+  if (!stored.startsWith(SAVE_GZIP_PREFIX)) {
+    return stored;
+  }
+  const ds = new DecompressionStream("gzip");
+  const read = new Response(ds.readable).arrayBuffer();
+  const writer = ds.writable.getWriter();
+  await writer.write(fromBase64(stored.slice(SAVE_GZIP_PREFIX.length)));
+  await writer.close();
+  return dec.decode(await read);
+}
+
 // #endregion
 // #region helpers — crypto (passwords + tokens)
 
@@ -347,190 +384,6 @@ async function readSaveBody(request: Request): Promise<string | null> {
   return raw;
 }
 
-// ---------------------------------------------------------------------------
-// System-save overwrite guard (KeeganDB92 incident, 2026-06). A client whose
-// local state was wiped (cache cleared, fresh device, corrupted localStorage)
-// could upload its empty save and clobber a large cloud save under the bare
-// last-write-wins UPSERT. We guard against that by comparing the LIFETIME
-// gameStats counters (playTime / battles / pokemonCaught) - which only ever
-// increase during normal play - and refusing a write that moves them sharply
-// backwards. We also keep a rolling backup of the previous save so any future
-// anomaly is recoverable with a single query (no D1 Time Travel needed).
-//
-// Note: a wiped save is NOT smaller on disk (dex/starter arrays are fixed-size;
-// the incident's reset save was 420 KB vs the real 458 KB), so byte length is a
-// useless signal - the semantic counters are the reliable one.
-// ---------------------------------------------------------------------------
-
-/** Stored account isn't worth guarding below this much playtime (seconds). */
-const GUARD_MIN_PLAYTIME_S = 60;
-/** Tolerated playtime jitter (seconds) before a drop counts as "backwards". */
-const GUARD_PLAYTIME_TOLERANCE_S = 120;
-/** How many previous system saves to retain per user. */
-const BACKUP_KEEP = 3;
-/** Don't snapshot more often than this per user (ms) - bounds write volume. */
-const BACKUP_MIN_INTERVAL_MS = 2 * 60 * 60 * 1000;
-
-interface SystemProgress {
-  playTime: number;
-  battles: number;
-  caught: number;
-}
-
-/**
- * Extract the monotonic lifetime counters from a system save. Returns null when
- * the blob can't be parsed or has no gameStats (the guard then fails open).
- */
-function systemProgress(data: string): SystemProgress | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(data);
-  } catch {
-    return null;
-  }
-  if (!parsed || typeof parsed !== "object") {
-    return null;
-  }
-  const stats = (parsed as { gameStats?: unknown }).gameStats;
-  if (!stats || typeof stats !== "object") {
-    return null;
-  }
-  const g = stats as Record<string, unknown>;
-  const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
-  return { playTime: num(g.playTime), battles: num(g.battles), caught: num(g.pokemonCaught) };
-}
-
-/**
- * True when `incoming` represents a major loss of lifetime progress versus the
- * stored save - the signature of an empty/desynced client about to clobber a
- * real save. Requires the playtime clock to move backwards (beyond jitter) AND
- * a lifetime counter to drop, so a single-field anomaly never trips it. Fails
- * open (returns false) when either side can't be parsed or the stored account
- * has negligible playtime.
- */
-function isSystemRegression(existingData: string, incomingData: string): boolean {
-  const e = systemProgress(existingData);
-  const n = systemProgress(incomingData);
-  if (!e || !n) {
-    return false;
-  }
-  if (e.playTime < GUARD_MIN_PLAYTIME_S) {
-    return false;
-  }
-  const clockWentBack = n.playTime + GUARD_PLAYTIME_TOLERANCE_S < e.playTime;
-  const counterDropped = n.battles < e.battles || n.caught < e.caught;
-  return clockWentBack && counterDropped;
-}
-
-let backupTableReady = false;
-async function ensureBackupTable(env: Env): Promise<void> {
-  if (backupTableReady) {
-    return;
-  }
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS system_save_backups (
-       id           INTEGER PRIMARY KEY AUTOINCREMENT,
-       user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-       data         TEXT    NOT NULL,
-       trainer_id   INTEGER,
-       secret_id    INTEGER,
-       saved_at     INTEGER NOT NULL,
-       backed_up_at INTEGER NOT NULL
-     )`,
-  ).run();
-  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ssb_user ON system_save_backups (user_id, backed_up_at)").run();
-  backupTableReady = true;
-}
-
-interface SystemSaveRow {
-  data: string;
-  trainer_id: number | null;
-  secret_id: number | null;
-  updated_at: number;
-}
-
-/**
- * Snapshot the about-to-be-overwritten save into system_save_backups, then prune
- * to the most recent BACKUP_KEEP per user. Rate-limited to one snapshot per
- * BACKUP_MIN_INTERVAL_MS per user so frequent syncs don't blow the write budget.
- */
-async function maybeBackupSystemSave(env: Env, userId: number, previous: SystemSaveRow): Promise<void> {
-  // Best-effort: a backup failure must NEVER break the save (it's a safety net,
-  // not the save itself). Any error is logged and swallowed so the caller proceeds.
-  try {
-    await ensureBackupTable(env);
-    const last = await env.DB.prepare(
-      "SELECT backed_up_at FROM system_save_backups WHERE user_id = ?1 ORDER BY backed_up_at DESC LIMIT 1",
-    )
-      .bind(userId)
-      .first<{ backed_up_at: number }>();
-    const now = Date.now();
-    if (last && now - last.backed_up_at < BACKUP_MIN_INTERVAL_MS) {
-      return;
-    }
-    await env.DB.prepare(
-      `INSERT INTO system_save_backups (user_id, data, trainer_id, secret_id, saved_at, backed_up_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
-    )
-      .bind(userId, previous.data, previous.trainer_id, previous.secret_id, previous.updated_at, now)
-      .run();
-    await env.DB.prepare(
-      `DELETE FROM system_save_backups
-         WHERE user_id = ?1
-           AND id NOT IN (
-             SELECT id FROM system_save_backups WHERE user_id = ?1 ORDER BY backed_up_at DESC LIMIT ?2
-           )`,
-    )
-      .bind(userId, BACKUP_KEEP)
-      .run();
-  } catch (err) {
-    console.error("maybeBackupSystemSave error (skipping backup, save still proceeds):", err);
-  }
-}
-
-/**
- * Gate a system-save overwrite. Returns a 409 Response when the incoming save
- * would clobber real progress (and `allowReset` is not set); otherwise snapshots
- * the existing save and returns null so the caller proceeds. The first-ever save
- * (no existing row) is always allowed.
- */
-async function guardSystemOverwrite(
-  env: Env,
-  userId: number,
-  incoming: string,
-  allowReset: boolean,
-  cors: Record<string, string>,
-): Promise<Response | null> {
-  // FAIL OPEN: this guard is a best-effort safeguard layered on top of the save.
-  // It may intentionally REJECT a regression (409), but an unexpected error inside
-  // it must NEVER turn a normal save into a 500 (that took prod sync down once).
-  // Any throw is logged and the save is allowed through unguarded.
-  try {
-    const existing = await env.DB.prepare(
-      "SELECT data, trainer_id, secret_id, updated_at FROM system_saves WHERE user_id = ?1",
-    )
-      .bind(userId)
-      .first<SystemSaveRow>();
-    if (!existing) {
-      return null;
-    }
-    if (!allowReset && isSystemRegression(existing.data, incoming)) {
-      return text(
-        "Save rejected: incoming save shows major progress loss versus the stored cloud save "
-          + "(likely an empty or desynced client). Cloud save preserved - reload to pull it. "
-          + "Send ?allowReset=1 to override intentionally.",
-        409,
-        cors,
-      );
-    }
-    await maybeBackupSystemSave(env, userId, existing);
-    return null;
-  } catch (err) {
-    console.error("guardSystemOverwrite error (allowing save through unguarded):", err);
-    return null;
-  }
-}
-
 async function handleSystemGet(auth: TokenPayload, env: Env, cors: Record<string, string>): Promise<Response> {
   const row = await env.DB.prepare("SELECT data FROM system_saves WHERE user_id = ?")
     .bind(auth.uid)
@@ -538,7 +391,14 @@ async function handleSystemGet(auth: TokenPayload, env: Env, cors: Record<string
   if (!row) {
     return text("Save data not found.", 404, cors);
   }
-  return text(row.data, 200, cors);
+  try {
+    return text(await decompressSave(row.data), 200, cors);
+  } catch (err) {
+    // Don't hand the client a corrupt/garbage save: report an error so it keeps
+    // its in-memory copy. (Should never happen - round-trip is verified.)
+    console.error("decompressSave failed on read for user", auth.uid, err);
+    return text("Save data could not be read.", 500, cors);
+  }
 }
 
 async function handleSystemVerify(auth: TokenPayload, env: Env, cors: Record<string, string>): Promise<Response> {
@@ -561,10 +421,7 @@ async function handleSystemUpdate(
   if (data === null) {
     return text("Save data too large.", 413, cors);
   }
-  const guard = await guardSystemOverwrite(env, auth.uid, data, url.searchParams.get("allowReset") === "1", cors);
-  if (guard) {
-    return guard;
-  }
+  const stored = await compressSave(data);
   const trainerId = Number.parseInt(url.searchParams.get("trainerId") ?? "", 10);
   const secretId = Number.parseInt(url.searchParams.get("secretId") ?? "", 10);
   await env.DB.prepare(
@@ -574,7 +431,7 @@ async function handleSystemUpdate(
   )
     .bind(
       auth.uid,
-      data,
+      stored,
       Number.isFinite(trainerId) ? trainerId : null,
       Number.isFinite(secretId) ? secretId : null,
       Date.now(),
@@ -696,18 +553,12 @@ async function handleUpdateAll(
   const stmts: D1PreparedStatement[] = [];
   if (payload.system !== undefined && payload.system !== null) {
     const sys = typeof payload.system === "string" ? payload.system : JSON.stringify(payload.system);
-    const allowReset = new URL(request.url).searchParams.get("allowReset") === "1";
-    const guard = await guardSystemOverwrite(env, auth.uid, sys, allowReset, cors);
-    if (guard) {
-      // Regressed system save: refuse the whole batch (the empty/desynced client's
-      // session blob is not worth clobbering the protected system save for).
-      return guard;
-    }
+    const storedSys = await compressSave(sys);
     stmts.push(
       env.DB.prepare(
         `INSERT INTO system_saves (user_id, data, updated_at) VALUES (?1, ?2, ?3)
            ON CONFLICT(user_id) DO UPDATE SET data = ?2, updated_at = ?3`,
-      ).bind(auth.uid, sys, now),
+      ).bind(auth.uid, storedSys, now),
     );
   }
   const slot = Number.parseInt(String(payload.sessionSlotId ?? ""), 10);
