@@ -1,0 +1,276 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:55  difficulty:hell
+seed:     eqntDBZVFr1JxWqVPX0Vbr2w
+party:    Chi-Yu(L48 58/126), Accelgor(L48 149/149), Pangoro(L48 154/154), Alakazam Redux(L48 124/124), Lokix(L48 78/139), Ratfioso(L48 173/173)
+
+----- DESCRIPTION -----
+rival wave 55
+
+----- CONSOLE -----
+[11:12:46.560] LOG: %cStart Phase WeatherEffectPhase color:green;
+[11:12:46.560] LOG: %cStart Phase PositionalTagPhase color:green;
+[11:12:46.561] LOG: %cStart Phase BerryPhase color:green;
+[11:12:46.561] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[11:12:46.561] LOG: %cStart Phase TurnEndPhase color:green;
+[11:12:46.561] LOG: %cStart Phase SwitchSummonPhase color:green;
+[11:12:46.562] LOG: Applied X Speed 
+[11:12:46.563] LOG: Applied X Speed 
+[11:12:46.563] LOG: Applied X Speed 
+[11:12:46.791] LOG: Finn
+[11:12:46.876] LOG: Applied Protein (enemy)
+[11:12:46.876] LOG: Applied Carbos (enemy)
+[11:12:47.025] LOG: Applied X Speed 
+[11:12:47.026] LOG: %cStart Phase PostSummonPhase color:green;
+[11:12:47.026] LOG: Ran PSP for: Swellow
+[11:12:47.026] LOG: %cStart Phase PostSummonPhase color:green;
+[11:12:47.026] LOG: %cStart Phase PostSummonPhase color:green;
+[11:12:47.026] LOG: %cStart Phase TurnInitPhase color:green;
+[11:12:47.026] LOG: %cStart Phase CommandPhase color:green;
+[11:12:47.932] LOG: Move: BOILING_FLAME Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Chi-Yu
+[11:12:47.934] LOG: %cStart Phase EnemyCommandPhase color:green;
+[11:12:47.935] LOG: Applied X Speed 
+[11:12:47.936] LOG: Applied X Speed 
+[11:12:47.937] LOG: Applied X Speed 
+[11:12:47.938] LOG: Applied X Speed 
+[11:12:47.954] LOG: Battle Seed: eoMs0qoScnItbRbe
+[11:12:47.958] LOG: Applied X Speed 
+[11:12:47.967] LOG: Move Pool: ["Boomburst","Protect","Heat Wave","Hurricane"]
+[11:12:47.967] LOG: Move Scores: [-392.8571428571429,-1000000,-392.8571428571429,-392.8571428571429]
+[11:12:47.967] LOG: Sorted Move Pool: ["Boomburst","Heat Wave","Hurricane","Protect"]
+[11:12:47.967] LOG: Chosen Move: Boomburst
+[11:12:47.967] LOG: ER AI: experimental brain (sharpness 1)
+[11:12:47.967] LOG: %cStart Phase TurnStartPhase color:green;
+[11:12:47.967] LOG: Applied X Speed 
+[11:12:47.968] LOG: Applied X Speed 
+[11:12:47.968] LOG: Applied X Speed 
+[11:12:47.968] LOG: %cStart Phase MovePhase color:green;
+[11:12:47.969] LOG: %cUser: Chi-Yu
+Move: BOILING_FLAME
+Use Mode: NORMAL color:orchid
+[11:12:47.969] LOG: Applied X Speed 
+[11:12:47.969] LOG: Applied X Speed 
+[11:12:47.969] LOG: %cStart Phase MessagePhase color:green;
+[11:12:48.076] LOG: %cStart Phase MoveEffectPhase color:green;
+[11:12:48.443] LOG: crit stage: +0
+[11:12:48.445] LOG: Move: Boiling Flame | Base damage: 109.8656 | Power: 80 | Source attack: 159 | Target defense: 50
+[11:12:48.445] LOG: Move: Boiling Flame | Attack damage: 149
+[11:12:48.445] LOG: Applied Amulet Coin 
+[11:12:48.446] LOG: Applied Golden Punch 
+[11:12:48.447] LOG: %cStart Phase DamageAnimPhase color:green;
+[11:12:48.478] LOG: %cStart Phase FaintPhase color:green;
+[11:12:48.543] LOG: %cStart Phase MessagePhase color:green;
+[11:12:48.909] LOG: %cStart Phase VictoryPhase color:green;
+[11:12:48.909] LOG: %cStart Phase MoveEndPhase color:green;
+[11:12:48.909] LOG: %cStart Phase MovePhase color:green;
+[11:12:48.909] LOG: %cStart Phase MoveEndPhase color:green;
+[11:12:48.910] LOG: %cStart Phase CheckInterludePhase color:green;
+[11:12:48.910] LOG: %cStart Phase WeatherEffectPhase color:green;
+[11:12:48.910] LOG: %cStart Phase PositionalTagPhase color:green;
+[11:12:48.910] LOG: %cStart Phase BerryPhase color:green;
+[11:12:48.910] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[11:12:48.910] LOG: %cStart Phase TurnEndPhase color:green;
+[11:12:48.910] LOG: %cStart Phase SwitchSummonPhase color:green;
+[11:12:48.911] LOG: Applied X Speed 
+[11:12:48.911] LOG: Applied X Speed 
+[11:12:49.127] LOG: Finn
+[11:12:49.195] LOG: Applied Protein (enemy)
+[11:12:49.195] LOG: Applied Carbos (enemy)
+[11:12:49.328] LOG: Applied X Speed 
+[11:12:49.329] LOG: %cStart Phase PostSummonPhase color:green;
+[11:12:49.329] LOG: Ran PSP for: Sceptile
+[11:12:49.329] LOG: %cStart Phase PostSummonPhase color:green;
+[11:12:49.330] LOG: %cStart Phase PostSummonPhase color:green;
+[11:12:49.330] LOG: %cStart Phase TurnInitPhase color:green;
+[11:12:49.330] LOG: %cStart Phase CommandPhase color:green;
+[11:12:50.126] LOG: Move: BOILING_FLAME Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Chi-Yu
+[11:12:50.128] LOG: %cStart Phase EnemyCommandPhase color:green;
+[11:12:50.129] LOG: Applied X Speed 
+[11:12:50.130] LOG: Applied X Speed 
+[11:12:50.130] LOG: Applied X Speed 
+[11:12:50.144] LOG: Battle Seed: eoMs0qoScnItbRbe
+[11:12:50.147] LOG: Applied X Speed 
+[11:12:50.155] LOG: Move Pool: ["X-Scissor","Leech Blade","Dual Chop","Sharpen"]
+[11:12:50.155] LOG: Move Scores: [-467.8571428571429,-467.8571428571429,-467.8571428571429,-467.8571428571429]
+[11:12:50.155] LOG: Sorted Move Pool: ["X-Scissor","Leech Blade","Dual Chop","Sharpen"]
+[11:12:50.155] LOG: Chosen Move: X-Scissor
+[11:12:50.155] LOG: ER AI: experimental brain (sharpness 1)
+[11:12:50.155] LOG: %cStart Phase TurnStartPhase color:green;
+[11:12:50.156] LOG: Applied X Speed 
+[11:12:50.156] LOG: Applied X Speed 
+[11:12:50.157] LOG: Applied X Speed 
+[11:12:50.157] LOG: %cStart Phase MovePhase color:green;
+[11:12:50.157] LOG: %cUser: Chi-Yu
+Move: BOILING_FLAME
+Use Mode: NORMAL color:orchid
+[11:12:50.157] LOG: Applied X Speed 
+[11:12:50.158] LOG: Applied X Speed 
+[11:12:50.159] LOG: %cStart Phase MessagePhase color:green;
+[11:12:50.223] LOG: %cStart Phase MoveEffectPhase color:green;
+[11:12:50.562] LOG: crit stage: +0
+[11:12:50.563] LOG: Move: Boiling Flame | Base damage: 73.9104 | Power: 80 | Source attack: 159 | Target defense: 75
+[11:12:50.564] LOG: Move: Boiling Flame | Attack damage: 108
+[11:12:50.564] LOG: Applied Amulet Coin 
+[11:12:50.566] LOG: Applied Golden Punch 
+[11:12:50.566] LOG: %cStart Phase DamageAnimPhase color:green;
+[11:12:50.596] LOG: %cStart Phase MoveEndPhase color:green;
+[11:12:50.596] LOG: %cStart Phase MovePhase color:green;
+[11:12:50.596] LOG: %cUser: Sceptile
+Move: X_SCISSOR
+Use Mode: NORMAL color:orchid
+[11:12:50.597] LOG: Applied X Speed 
+[11:12:50.599] LOG: Applied X Speed 
+[11:12:50.600] LOG: %cStart Phase MessagePhase color:green;
+[11:12:50.728] LOG: %cStart Phase MoveEffectPhase color:green;
+[11:12:51.313] LOG: crit stage: +1
+[11:12:51.314] LOG: Move: X-Scissor | Base damage: 66.4904 | Power: 117 | Source attack: 130 | Target defense: 100
+[11:12:51.315] LOG: Move: X-Scissor | Attack damage: 59
+[11:12:51.315] LOG: %cStart Phase DamageAnimPhase color:green;
+[11:12:51.347] LOG: %cStart Phase MoveEndPhase color:green;
+[11:12:51.348] LOG: %cStart Phase CheckInterludePhase color:green;
+[11:12:51.348] LOG: %cStart Phase WeatherEffectPhase color:green;
+[11:12:51.348] LOG: %cStart Phase PositionalTagPhase color:green;
+[11:12:51.348] LOG: %cStart Phase BerryPhase color:green;
+[11:12:51.348] LOG: Applied X Speed 
+[11:12:51.349] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[11:12:51.349] LOG: Applied X Speed 
+[11:12:51.349] LOG: %cStart Phase TurnEndPhase color:green;
+[11:12:51.350] LOG: Applied X Speed 
+[11:12:51.351] LOG: %cStart Phase TurnInitPhase color:green;
+[11:12:51.351] LOG: %cStart Phase CommandPhase color:green;
+[11:12:51.901] LOG: Move: BOILING_FLAME Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Chi-Yu
+[11:12:51.903] LOG: %cStart Phase EnemyCommandPhase color:green;
+[11:12:51.904] LOG: Applied X Speed 
+[11:12:51.905] LOG: Applied X Speed 
+[11:12:51.906] LOG: Applied X Speed 
+[11:12:51.912] LOG: %cStart Phase TurnStartPhase color:green;
+[11:12:51.913] LOG: Applied X Speed 
+[11:12:51.913] LOG: Applied X Speed 
+[11:12:51.914] LOG: %cStart Phase SwitchSummonPhase color:green;
+[11:12:51.914] LOG: Finn
+[11:12:51.955] LOG: Applied X Speed 
+[11:12:52.196] LOG: Finn
+[11:12:52.280] LOG: Applied Carbos (enemy)
+[11:12:52.281] LOG: Applied Protein (enemy)
+[11:12:52.415] LOG: Applied X Speed 
+[11:12:52.415] LOG: %cStart Phase PostSummonPhase color:green;
+[11:12:52.415] LOG: Ran PSP for: Growlithe
+[11:12:52.415] LOG: %cStart Phase PostSummonPhase color:green;
+[11:12:52.415] LOG: %cStart Phase PostSummonPhase color:green;
+[11:12:52.415] LOG: %cStart Phase MovePhase color:green;
+[11:12:52.415] LOG: %cUser: Chi-Yu
+Move: BOILING_FLAME
+Use Mode: NORMAL color:orchid
+[11:12:52.416] LOG: Applied X Speed 
+[11:12:52.417] LOG: Applied X Speed 
+[11:12:52.417] LOG: %cStart Phase MessagePhase color:green;
+[11:12:52.546] LOG: %cStart Phase MoveEffectPhase color:green;
+[11:12:52.548] LOG: Battle Seed: eoMs0qoScnItbRbe
+[11:12:52.914] LOG: crit stage: +0
+[11:12:52.915] LOG: Move: Boiling Flame | Base damage: 116.75063829787234 | Power: 80 | Source attack: 159 | Target defense: 47
+[11:12:52.916] LOG: Move: Boiling Flame | Attack damage: 78
+[11:12:52.916] LOG: Applied Amulet Coin 
+[11:12:52.917] LOG: Applied Golden Punch 
+[11:12:52.918] LOG: %cStart Phase DamageAnimPhase color:green;
+[11:12:52.948] LOG: %cStart Phase MessagePhase color:green;
+[11:12:53.164] LOG: %cStart Phase FaintPhase color:green;
+[11:12:53.232] LOG: %cStart Phase MessagePhase color:green;
+[11:12:53.373] LOG: %cStart Phase VictoryPhase color:green;
+[11:12:53.373] LOG: %cStart Phase MoveEndPhase color:green;
+[11:12:53.373] LOG: %cStart Phase CheckInterludePhase color:green;
+[11:12:53.373] LOG: %cStart Phase WeatherEffectPhase color:green;
+[11:12:53.373] LOG: %cStart Phase PositionalTagPhase color:green;
+[11:12:53.373] LOG: %cStart Phase BerryPhase color:green;
+[11:12:53.373] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[11:12:53.374] LOG: %cStart Phase TurnEndPhase color:green;
+[11:12:53.374] LOG: %cStart Phase SwitchSummonPhase color:green;
+[11:12:53.374] LOG: Applied X Speed 
+[11:12:53.597] LOG: Finn
+[11:12:53.682] LOG: Applied Protein (enemy)
+[11:12:53.683] LOG: Applied Carbos (enemy)
+[11:12:53.815] LOG: Applied X Speed 
+[11:12:53.816] LOG: %cStart Phase PostSummonPhase color:green;
+[11:12:53.816] LOG: Ran PSP for: Sceptile
+[11:12:53.816] LOG: %cStart Phase PostSummonPhase color:green;
+[11:12:53.816] LOG: %cStart Phase PostSummonPhase color:green;
+[11:12:53.816] LOG: %cStart Phase TurnInitPhase color:green;
+[11:12:53.816] LOG: %cStart Phase CommandPhase color:green;
+[11:12:54.254] LOG: Move: BOILING_FLAME Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Chi-Yu
+[11:12:54.255] LOG: %cStart Phase EnemyCommandPhase color:green;
+[11:12:54.263] LOG: Battle Seed: eoMs0qoScnItbRbe
+[11:12:54.267] LOG: Applied X Speed 
+[11:12:54.275] LOG: Move Pool: ["X-Scissor","Leech Blade"]
+[11:12:54.275] LOG: Move Scores: [-496.031746031746,-496.031746031746]
+[11:12:54.275] LOG: Sorted Move Pool: ["X-Scissor","Leech Blade"]
+[11:12:54.275] LOG: Chosen Move: X-Scissor
+[11:12:54.275] LOG: ER AI: experimental brain (sharpness 1)
+[11:12:54.275] LOG: %cStart Phase TurnStartPhase color:green;
+[11:12:54.276] LOG: Applied X Speed 
+[11:12:54.276] LOG: Applied X Speed 
+[11:12:54.277] LOG: Applied X Speed 
+[11:12:54.277] LOG: %cStart Phase MovePhase color:green;
+[11:12:54.277] LOG: %cUser: Chi-Yu
+Move: BOILING_FLAME
+Use Mode: NORMAL color:orchid
+[11:12:54.277] LOG: Applied X Speed 
+[11:12:54.278] LOG: Applied X Speed 
+[11:12:54.278] LOG: %cStart Phase MessagePhase color:green;
+[11:12:54.390] LOG: %cStart Phase MoveEffectPhase color:green;
+[11:12:54.757] LOG: crit stage: +0
+[11:12:54.758] LOG: Move: Boiling Flame | Base damage: 73.9104 | Power: 80 | Source attack: 159 | Target defense: 75
+[11:12:54.759] LOG: Move: Boiling Flame | Attack damage: 101
+[11:12:54.759] LOG: Applied Amulet Coin 
+[11:12:54.760] LOG: Applied Golden Punch 
+[11:12:54.760] LOG: %cStart Phase DamageAnimPhase color:green;
+[11:12:54.791] LOG: %cStart Phase FaintPhase color:green;
+[11:12:54.857] LOG: %cStart Phase MessagePhase color:green;
+[11:12:55.239] LOG: %cStart Phase VictoryPhase color:green;
+[11:12:55.243] LOG: %cStart Phase MoveEndPhase color:green;
+[11:12:55.244] LOG: %cStart Phase MovePhase color:green;
+[11:12:55.244] LOG: %cStart Phase MoveEndPhase color:green;
+[11:12:55.244] LOG: %cStart Phase CheckInterludePhase color:green;
+[11:12:55.244] LOG: %cStart Phase WeatherEffectPhase color:green;
+[11:12:55.244] LOG: %cStart Phase PositionalTagPhase color:green;
+[11:12:55.244] LOG: %cStart Phase BerryPhase color:green;
+[11:12:55.244] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[11:12:55.244] LOG: %cStart Phase TurnEndPhase color:green;
+[11:12:55.244] LOG: %cStart Phase BattleEndPhase color:green;
+[11:12:55.245] LOG: Battle Score: 497 (6 Turns x0.69)
+[11:12:55.245] LOG: Total Score: 7891
+[11:12:55.263] LOG: Applied HP Up 
+[11:12:55.263] LOG: Applied Carbos 
+[11:12:55.263] LOG: Applied Iron 
+[11:12:55.265] LOG: Applied Protein 
+[11:12:55.267] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[11:12:55.269] LOG: Rival Finn
+[11:12:55.459] LOG: Rival Finn
+[11:12:55.459] LOG: Dialogue dialogue:rival3.victory.1 skipped
+[11:12:55.460] LOG: %cStart Phase MoneyRewardPhase color:green;
+[11:12:55.460] LOG: Applied Amulet Coin 
+[11:12:56.675] LOG: %cStart Phase ModifierRewardPhase color:green;
+[11:12:57.216] LOG: %cStart Phase ModifierRewardPhase color:green;
+[11:13:00.381] LOG: %cStart Phase ModifierRewardPhase color:green;
+[11:13:01.070] LOG: %cStart Phase EggLapsePhase color:green;
+[11:13:01.071] LOG: %cStart Phase SelectModifierPhase color:green;
+[11:13:01.071] LOG: Wave Seed: ¨¥«{y}©h¯¨g©i® 55
+[11:13:01.079] LOG: Applied Golden Poké Ball 
+[11:13:01.079] LOG: 0 0 [9,11,12,13,15,24,25]
+[11:13:01.079] LOG: {"id":"ULTRA_BALL","localeKey":"","iconImage":"ub","group":"pb","soundName":"se/pb_bounce_1","tier":2,"pokeballType":2,"count":5} 
+[11:13:01.079] LOG: 7 0 [9,11,12,13,15,24,25]
+[11:13:01.079] LOG: {"id":"FORM_CHANGE_ITEM","localeKey":"","iconImage":"alakazite","soundName":"se/restore","tier":2,"formChangeItem":155} 
+[11:13:01.080] LOG: 17 10 [2,3,4,5,6,7,8,9,10,16,23]
+[11:13:01.080] LOG: {"id":"SOOTHE_BELL","localeKey":"modifierType:ModifierType.SOOTHE_BELL","iconImage":"soothe_bell","soundName":"se/restore","tier":1} 
+[11:13:01.080] LOG: 0 0 [2,3,4,5,6,7,8,9,10,16,23]
+[11:13:01.080] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[11:13:01.080] LOG: 1 0 [2,3,4,5,6,7,8,9,10,16,23]
+[11:13:01.080] LOG: {"id":"PP_UP","localeKey":"modifierType:ModifierType.PP_UP","iconImage":"pp_up","group":"ppUp","soundName":"se/restore","tier":1,"upPoints":1} 
+[11:13:01.080] LOG: 21 10 [2,3,4,5,6,7,8,9,10,16,23]
+[11:13:01.080] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"zinc","soundName":"se/restore","tier":1,"stat":4,"key":"zinc"} 
+[11:13:01.080] LOG: 18 10 [2,3,4,5,6,7,8,9,10,16,23]
+[11:13:01.081] LOG: {"id":"TM_GREAT","localeKey":"","iconImage":"tm_ice","group":"tm","soundName":"se/restore","tier":1,"moveId":8} 
