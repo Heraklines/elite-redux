@@ -228,6 +228,8 @@ export class GameData {
   public lastLocalSaveFailed = false;
   /** Guards the "storage full" player notice so it shows once, not every save. */
   private warnedLocalStorageFull = false;
+  /** One-time guard for the cloud-save-protected notice (server save-clobber guard). */
+  private warnedCloudSaveProtected = false;
 
   public gender: PlayerGender;
 
@@ -381,6 +383,29 @@ export class GameData {
     }
   }
 
+  /**
+   * Surface a one-time, non-blocking notice that this device's system save was
+   * refused by the server save-clobber guard because it would regress the cloud
+   * save (stale or empty local data, e.g. a cleared cache). Nothing was overwritten
+   * locally or in the cloud; reloading re-pulls the authoritative cloud save. Shown
+   * once per session so repeated autosaves do not spam it.
+   */
+  private warnCloudSaveProtected(): void {
+    if (this.warnedCloudSaveProtected) {
+      return;
+    }
+    this.warnedCloudSaveProtected = true;
+    try {
+      globalScene.phaseManager.queueMessage(
+        "Your cloud save was protected. This device's data looks out of date, so it was not uploaded over your saved progress. Reload the page to restore your cloud save.",
+        null,
+        true,
+      );
+    } catch (e) {
+      console.debug("Could not show the cloud-save-protected notice in the current UI context:", e);
+    }
+  }
+
   public async saveSystem(forceSync = false): Promise<boolean> {
     globalScene.ui.savingIcon.show();
     // Catch-all for the one-time Legendary-egg gift: a brand-new account never
@@ -422,6 +447,16 @@ export class GameData {
         globalScene.phaseManager.unshiftNew("ReloadSessionPhase");
         console.error(error);
         return false;
+      }
+      if (error.startsWith("Save rejected")) {
+        // Server save-clobber guard refused this push: this device's save would
+        // regress the cloud copy (stale or empty local data, e.g. a cleared cache).
+        // The cloud save is untouched; warn the player once that a reload restores
+        // it. Same control flow as a generic sync failure otherwise.
+        this.markCloudSyncFailure();
+        this.warnCloudSaveProtected();
+        console.warn(error);
+        return true;
       }
       this.markCloudSyncFailure();
       console.error(error);
@@ -1846,6 +1881,16 @@ export class GameData {
       globalScene.phaseManager.unshiftNew("ReloadSessionPhase");
       console.error(saveError);
       return false;
+    }
+    if (saveError.startsWith("Save rejected")) {
+      // Server save-clobber guard refused the system portion of this push (stale or
+      // empty local data would regress the cloud save). Cloud is untouched; warn
+      // once that a reload restores it. Otherwise treated as a generic failure.
+      this.markCloudSyncFailure();
+      this.lastCloudSyncFailed = true;
+      this.warnCloudSaveProtected();
+      console.warn(saveError);
+      return true;
     }
     this.markCloudSyncFailure();
     this.lastCloudSyncFailed = true;
