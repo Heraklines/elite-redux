@@ -1,0 +1,259 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Avast/148.0.0.0
+mode:     0  wave:68  difficulty:hell
+seed:     sb0To0kFf4HYt6UseK8h3cgV
+party:    Bewear Angry(L56 100/241), Excadrill(L56 12/206), Hydreigon(L57 187/187)
+
+----- DESCRIPTION -----
+some moves like fissure randomly fail
+
+----- CONSOLE -----
+[05:53:21.412] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[05:53:22.042] LOG: [ER] build mqnz75l2-jypp
+[05:53:35.695] DEBUG: Destroying loading scene
+[05:53:35.695] DEBUG: Destroyed loading scene
+[05:53:35.838] LOG: Seed: 7J1P031ZSOOLeeKPnlpgi0fp
+[05:53:35.838] LOG: Wave Seed: 7J1P031ZSOOLeeKPnlpgi0fp 0
+[05:53:37.721] LOG: %cStart Phase LoginPhase color:green;
+[05:53:38.025] LOG: Client Session: zZ4Zdecq8NaHBfhJthtZymtfcdHF9uEe
+[05:53:38.609] DEBUG: Using cached system data
+[05:53:38.676] LOG: %cStart Phase TitlePhase color:green;
+[05:53:38.677] LOG: Getting Session Slot id: %d 0
+[05:53:38.689] LOG: use seasonal splash messages true
+[05:53:38.689] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[05:53:39.035] LOG: Getting Session Slot id: %d 0
+[05:53:39.043] LOG: Wave Seed: sb0To0kFf4HYt6UseK8h3cgV 0
+[05:53:39.043] LOG: Seed: sb0To0kFf4HYt6UseK8h3cgV
+[05:53:39.075] LOG: Wave Seed: ·¦t³t¯ªx¸z·©|¬w§« 68
+[05:53:39.158] LOG: Applied HP Up 
+[05:53:39.172] LOG: Applied HP Up 
+[05:53:39.179] LOG: Applied HP Up 
+[05:53:39.185] LOG: Applied Iron (enemy)
+[05:53:39.253] LOG: %cStart Phase EncounterPhase color:green;
+[05:53:39.257] LOG: Pokemon: Foe Sopranice | Species ID: 10010 | Level: 57 | Nature: Timid (+Spd/-Atk)
+[05:53:39.257] LOG: Stats (IVs): HP: 170 (31), Atk: 71 (31), Def: 108 (31), Spatk: 165 (31), Spdef: 165 (31), Spd: 138 (31)
+[05:53:39.257] LOG: Ability: Snow Song | Passive Ability: Resonance 
+[05:53:39.257] LOG: Moveset: ["Hyper Voice","Psychic Noise","Alluring Voice","Lovely Kiss"]
+[05:53:39.257] LOG: Pokemon: Foe Flygon | Species ID: 330 | Level: 57 | Nature: Timid (+Spd/-Atk)
+[05:53:39.258] LOG: Stats (IVs): HP: 175 (31), Atk: 122 (31), Def: 122 (31), Spatk: 136 (31), Spdef: 113 (31), Spd: 150 (31)
+[05:53:39.258] LOG: Ability: Amplifier | Passive Ability: Dragonfly 
+[05:53:39.258] LOG: Moveset: ["Hyper Voice","Bug Buzz","Dragon Pulse","Quiver Dance"]
+[05:53:39.258] LOG: Pokemon: Foe Exploud | Species ID: 295 | Level: 57 | Nature: Modest (+SpAtk/-Atk)
+[05:53:39.258] LOG: Stats (IVs): HP: 237 (31), Atk: 123 (31), Def: 105 (31), Spatk: 190 (31), Spdef: 105 (31), Spd: 122 (31)
+[05:53:39.258] LOG: Ability: Scrappy | Passive Ability: Limber 
+[05:53:39.258] LOG: Moveset: ["Boomburst","Boomburst","Boomburst","Boomburst"]
+[05:53:39.258] LOG: Pokemon: Foe Skeledirge | Species ID: 911 | Level: 57 | Nature: Timid (+Spd/-Atk)
+[05:53:39.258] LOG: Stats (IVs): HP: 203 (31), Atk: 97 (31), Def: 136 (31), Spatk: 148 (31), Spdef: 113 (31), Spd: 107 (31)
+[05:53:39.258] LOG: Ability: Banshee | Passive Ability: Blaze 
+[05:53:39.258] LOG: Moveset: ["Flame Charge","Torch Song","Hyper Voice","Alluring Voice"]
+[05:53:39.258] LOG: Pokemon: Foe Seismitoad | Species ID: 537 | Level: 57 | Nature: Jolly (+Spd/-SpAtk)
+[05:53:39.258] LOG: Stats (IVs): HP: 204 (31), Atk: 142 (31), Def: 108 (31), Spatk: 127 (31), Spdef: 108 (31), Spd: 118 (31)
+[05:53:39.258] LOG: Ability: Sand Song | Passive Ability: Water Absorb 
+[05:53:39.258] LOG: Moveset: ["Hyper Voice","Earth Power","Sludge Bomb","Focus Blast"]
+[05:53:40.388] LOG: Generated AI funcs
+[05:53:40.389] LOG: Applied Iron (enemy)
+[05:53:40.389] LOG: Wave Seed: ·¦t³t¯ªx¸z·©|¬w§« 68
+[05:53:40.794] LOG: Ace Duo Henry & Naomi
+[05:53:41.355] LOG: Dialogue saved as seen: dialogue:aceTrainer.encounter.2
+[05:53:41.408] LOG: Ace Duo Henry & Naomi
+[05:53:41.924] LOG: %cStart Phase SummonPhase color:green;
+[05:53:41.925] LOG: Henry
+[05:53:42.172] LOG: Applied Iron (enemy)
+[05:53:42.220] WARN: cry/10010 not found
+[05:53:42.420] LOG: %cStart Phase SummonPhase color:green;
+[05:53:42.420] LOG: Naomi
+[05:53:42.650] LOG: Applied Iron (enemy)
+[05:53:42.899] LOG: %cStart Phase SummonPhase color:green;
+[05:53:43.183] LOG: Applied HP Up 
+[05:53:43.233] WARN: cry/10766 not found
+[05:53:43.434] LOG: %cStart Phase ShinySparklePhase color:green;
+[05:53:43.634] LOG: %cStart Phase SummonPhase color:green;
+[05:53:43.918] LOG: Applied HP Up 
+[05:53:44.168] LOG: %cStart Phase InitEncounterPhase color:green;
+[05:53:44.173] LOG: %cStart Phase PostSummonPhase color:green;
+[05:53:44.173] LOG: Ran PSP for: Bewear Angry
+[05:53:44.177] LOG: %cStart Phase PostSummonPhase color:green;
+[05:53:44.177] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:53:44.482] LOG: %cStart Phase MessagePhase color:green;
+[05:53:44.902] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:53:44.947] LOG: %cStart Phase PostSummonPhase color:green;
+[05:53:44.949] LOG: %cStart Phase PostSummonPhase color:green;
+[05:53:44.949] LOG: Ran PSP for: Flygon
+[05:53:44.951] LOG: %cStart Phase PostSummonPhase color:green;
+[05:53:44.953] LOG: %cStart Phase PostSummonPhase color:green;
+[05:53:44.953] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:53:45.257] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:53:45.303] LOG: %cStart Phase PostSummonPhase color:green;
+[05:53:45.303] LOG: Ran PSP for: Sopranice
+[05:53:45.304] LOG: %cStart Phase PostSummonPhase color:green;
+[05:53:45.304] LOG: %cStart Phase PostSummonPhase color:green;
+[05:53:45.304] LOG: %cStart Phase PostSummonPhase color:green;
+[05:53:45.304] LOG: Ran PSP for: Excadrill
+[05:53:45.305] LOG: %cStart Phase PostSummonPhase color:green;
+[05:53:45.305] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:53:45.612] LOG: %cStart Phase MessagePhase color:green;
+[05:53:46.020] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:53:46.062] LOG: %cStart Phase PostSummonPhase color:green;
+[05:53:46.062] LOG: %cStart Phase TurnInitPhase color:green;
+[05:53:46.062] LOG: %cStart Phase CommandPhase color:green;
+[05:53:55.499] LOG: Move: NO_RETREAT Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Bewear Angry
+[05:53:55.501] LOG: %cStart Phase CommandPhase color:green;
+[05:53:56.115] LOG: %cStart Phase CommandPhase color:green;
+[05:53:59.051] LOG: Move: NO_RETREAT Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Bewear Angry
+[05:53:59.052] LOG: %cStart Phase CommandPhase color:green;
+[05:54:00.236] LOG: Move: SHIFT_GEAR Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Excadrill
+[05:54:00.236] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:54:00.254] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:54:00.268] LOG: %cStart Phase TurnStartPhase color:green;
+[05:54:00.275] LOG: %cStart Phase SwitchSummonPhase color:green;
+[05:54:00.276] LOG: Naomi
+[05:54:00.777] LOG: Naomi
+[05:54:00.911] LOG: Applied Iron (enemy)
+[05:54:01.166] LOG: %cStart Phase PostSummonPhase color:green;
+[05:54:01.166] LOG: Ran PSP for: Skeledirge
+[05:54:01.166] LOG: %cStart Phase PostSummonPhase color:green;
+[05:54:01.166] LOG: %cStart Phase PostSummonPhase color:green;
+[05:54:01.166] LOG: %cStart Phase SwitchSummonPhase color:green;
+[05:54:01.167] LOG: Henry
+[05:54:01.669] LOG: Henry
+[05:54:01.804] LOG: Applied Iron (enemy)
+[05:54:02.056] LOG: %cStart Phase PostSummonPhase color:green;
+[05:54:02.056] LOG: Ran PSP for: Seismitoad
+[05:54:02.057] LOG: %cStart Phase PostSummonPhase color:green;
+[05:54:02.057] LOG: %cStart Phase PostSummonPhase color:green;
+[05:54:02.057] LOG: %cStart Phase MovePhase color:green;
+[05:54:02.058] LOG: %cUser: Bewear Angry
+Move: NO_RETREAT
+Use Mode: NORMAL color:orchid
+[05:54:02.066] LOG: %cStart Phase MessagePhase color:green;
+[05:54:02.274] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:54:02.416] WARN: cry/10766 not found
+[05:54:02.656] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:54:02.656] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:54:03.006] LOG: %cStart Phase MessagePhase color:green;
+[05:54:03.417] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:54:03.769] LOG: %cStart Phase MessagePhase color:green;
+[05:54:04.184] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:54:04.537] LOG: %cStart Phase MessagePhase color:green;
+[05:54:04.952] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:54:05.304] LOG: %cStart Phase MessagePhase color:green;
+[05:54:05.719] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:54:06.072] LOG: %cStart Phase MessagePhase color:green;
+[05:54:06.479] LOG: %cStart Phase MessagePhase color:green;
+[05:54:06.921] LOG: %cStart Phase MoveEndPhase color:green;
+[05:54:06.921] LOG: %cStart Phase MovePhase color:green;
+[05:54:06.921] LOG: %cUser: Excadrill
+Move: SHIFT_GEAR
+Use Mode: NORMAL color:orchid
+[05:54:06.927] LOG: %cStart Phase MessagePhase color:green;
+[05:54:07.129] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:54:07.564] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:54:07.915] LOG: %cStart Phase MessagePhase color:green;
+[05:54:08.318] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:54:08.671] LOG: %cStart Phase MessagePhase color:green;
+[05:54:09.098] LOG: %cStart Phase MoveEndPhase color:green;
+[05:54:09.098] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:54:09.098] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:54:09.098] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:54:09.098] LOG: %cStart Phase BerryPhase color:green;
+[05:54:09.102] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:54:09.105] LOG: %cStart Phase TurnEndPhase color:green;
+[05:54:09.110] LOG: %cStart Phase TurnInitPhase color:green;
+[05:54:09.110] LOG: %cStart Phase CommandPhase color:green;
+[05:54:16.450] LOG: Move: AXE_KICK Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Bewear Angry
+[05:54:16.451] LOG: %cStart Phase SelectTargetPhase color:green;
+[05:54:19.235] LOG: %cStart Phase CommandPhase color:green;
+[05:54:23.851] LOG: Move: MEGA_PUNCH Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Bewear Angry
+[05:54:23.852] LOG: %cStart Phase SelectTargetPhase color:green;
+[05:54:24.339] LOG: %cStart Phase CommandPhase color:green;
+[05:54:26.106] LOG: Move: FISSURE Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Excadrill
+[05:54:26.107] LOG: %cStart Phase SelectTargetPhase color:green;
+[05:54:26.467] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:54:26.499] LOG: Battle Seed: h3FFLgATptpYTbGh
+[05:54:26.524] LOG: Move Pool: ["Hyper Voice","Earth Power","Sludge Bomb","Focus Blast"]
+[05:54:26.524] LOG: Move Scores: [9.12014563106796,10.157766990291263,2.0539419087136928,6.269417475728155]
+[05:54:26.524] LOG: Sorted Move Pool: ["Earth Power","Hyper Voice","Focus Blast","Sludge Bomb"]
+[05:54:26.524] LOG: Chosen Move: Earth Power
+[05:54:26.524] LOG: ER AI: experimental brain (sharpness 1)
+[05:54:26.525] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:54:26.555] LOG: Move Pool: ["Torch Song"]
+[05:54:26.555] LOG: Move Scores: [1081.1893203883494]
+[05:54:26.555] LOG: Sorted Move Pool: ["Torch Song"]
+[05:54:26.555] LOG: Chosen Move: Torch Song
+[05:54:26.555] LOG: ER AI: experimental brain (sharpness 1)
+[05:54:26.555] LOG: %cStart Phase TurnStartPhase color:green;
+[05:54:26.562] LOG: %cStart Phase MovePhase color:green;
+[05:54:26.562] LOG: %cUser: Bewear Angry
+Move: MEGA_PUNCH
+Use Mode: NORMAL color:orchid
+[05:54:26.568] LOG: %cStart Phase MessagePhase color:green;
+[05:54:26.708] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:54:26.709] LOG: Applied Wide Lens 
+[05:54:26.980] LOG: Applied Scope Lens 
+[05:54:26.980] LOG: crit stage: +1
+[05:54:26.981] LOG: Move: Mega Punch | Base damage: 161.59859259259258 | Power: 123.5 | Source attack: 286 | Target defense: 108
+[05:54:26.981] LOG: Move: Mega Punch | Attack damage: 220
+[05:54:26.982] LOG: Applied Golden Punch 
+[05:54:26.983] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:54:27.280] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:54:27.327] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:54:27.335] LOG: %cStart Phase MessagePhase color:green;
+[05:54:27.697] LOG: %cStart Phase FaintPhase color:green;
+[05:54:28.889] LOG: %cStart Phase MessagePhase color:green;
+[05:54:29.475] LOG: %cStart Phase VictoryPhase color:green;
+[05:54:29.476] LOG: Applied Soothe Bell 
+[05:54:29.476] LOG: Applied Soothe Bell 
+[05:54:29.476] LOG: %cStart Phase MoveEndPhase color:green;
+[05:54:29.477] LOG: %cStart Phase MovePhase color:green;
+[05:54:29.477] LOG: %cUser: Excadrill
+Move: FISSURE
+Use Mode: NORMAL color:orchid
+[05:54:29.478] LOG: %cStart Phase MessagePhase color:green;
+[05:54:29.674] LOG: %cStart Phase MessagePhase color:green;
+[05:54:30.036] LOG: %cStart Phase MoveEndPhase color:green;
+[05:54:30.037] LOG: %cStart Phase MovePhase color:green;
+[05:54:30.037] LOG: %cStart Phase MoveEndPhase color:green;
+[05:54:30.037] LOG: %cStart Phase MovePhase color:green;
+[05:54:30.037] LOG: %cUser: Skeledirge
+Move: TORCH_SONG
+Use Mode: NORMAL color:orchid
+[05:54:30.039] LOG: %cStart Phase MessagePhase color:green;
+[05:54:30.266] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:54:31.238] LOG: crit stage: +0
+[05:54:31.239] LOG: Move: Torch Song | Base damage: 104.93616179775282 | Power: 124.80000000000001 | Source attack: 148 | Target defense: 89
+[05:54:31.240] LOG: Move: Torch Song | Attack damage: 113
+[05:54:31.240] LOG: crit stage: +0
+[05:54:31.241] LOG: Move: Torch Song | Base damage: 99.4608340425532 | Power: 124.80000000000001 | Source attack: 148 | Target defense: 94
+[05:54:31.241] LOG: Move: Torch Song | Attack damage: 194
+[05:54:31.242] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:54:31.247] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:54:31.599] LOG: %cStart Phase MessagePhase color:green;
+[05:54:32.022] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:54:32.032] LOG: %cStart Phase MessagePhase color:green;
+[05:54:32.422] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:54:32.774] LOG: %cStart Phase MessagePhase color:green;
+[05:54:33.198] LOG: %cStart Phase MoveEndPhase color:green;
+[05:54:33.199] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:54:33.199] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:54:33.199] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:54:33.199] LOG: %cStart Phase BerryPhase color:green;
+[05:54:33.200] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:54:33.201] LOG: %cStart Phase TurnEndPhase color:green;
+[05:54:33.202] LOG: %cStart Phase SwitchSummonPhase color:green;
+[05:54:33.649] LOG: Henry
+[05:54:33.783] LOG: Applied Iron (enemy)
+[05:54:33.832] WARN: cry/10010 not found
+[05:54:34.035] LOG: %cStart Phase PostSummonPhase color:green;
+[05:54:34.035] LOG: Ran PSP for: Sopranice
+[05:54:34.036] LOG: %cStart Phase PostSummonPhase color:green;
+[05:54:34.036] LOG: %cStart Phase PostSummonPhase color:green;
+[05:54:34.036] LOG: %cStart Phase TurnInitPhase color:green;
+[05:54:34.036] LOG: %cStart Phase CommandPhase color:green;
