@@ -1,0 +1,169 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     4  wave:32  difficulty:youngster
+seed:     wuuqzZZ4D2myXvMgwpwsPi2I
+party:    Polartic Bluemoon(L25 103/103), Snom(L25 62/62), Seel(L26 77/77), Glaceon(L26 73/73), Piloswine(L24 84/84)
+
+----- DESCRIPTION -----
+They all kinda died from Polarctic's ability
+
+----- CONSOLE -----
+[17:04:44.820] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[17:04:45.397] LOG: [ER] build mqnz75l2-jypp
+[17:06:07.833] DEBUG: Destroying loading scene
+[17:06:07.833] DEBUG: Destroyed loading scene
+[17:06:07.924] LOG: Seed: 5TW1Rz6Hhu0lzVwQgFr7FgXK
+[17:06:07.924] LOG: Wave Seed: 5TW1Rz6Hhu0lzVwQgFr7FgXK 0
+[17:06:11.106] LOG: %cStart Phase LoginPhase color:green;
+[17:06:11.710] LOG: Client Session: ghf5acQcvkuhmAkoJjLJioojCOh4WRFh
+[17:06:12.680] DEBUG: Using cached system data
+[17:06:12.761] LOG: %cStart Phase TitlePhase color:green;
+[17:06:12.762] LOG: Getting Session Slot id: %d 0
+[17:06:12.778] LOG: use seasonal splash messages true
+[17:06:12.778] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[17:10:06.615] LOG: Getting Session Slot id: %d 0
+[17:10:06.641] LOG: Wave Seed: wuuqzZZ4D2myXvMgwpwsPi2I 0
+[17:10:06.641] LOG: Seed: wuuqzZZ4D2myXvMgwpwsPi2I
+[17:10:06.701] LOG: Wave Seed: zzTdRxmpRi 32
+[17:10:06.822] LOG: %cStart Phase EncounterPhase color:green;
+[17:10:06.832] LOG: Pokemon: Wild Furret | Species ID: 162 | Level: 21 | Nature: Relaxed (+Def/-Spd)
+[17:10:06.832] LOG: Stats (IVs): HP: 71 (25), Atk: 46 (27), Def: 36 (4), Spatk: 26 (24), Spdef: 38 (19), Spd: 51 (18)
+[17:10:06.833] LOG: Ability: Normalize | Passive Ability: Scrappy 
+[17:10:06.833] LOG: Moveset: ["Mega Punch","Scratch","Fury Swipes","Follow Me"]
+[17:10:06.838] LOG: Pokemon: Wild Teddiursa | Species ID: 216 | Level: 20 | Nature: Lax (+Def/-SpDef)
+[17:10:06.838] LOG: Stats (IVs): HP: 55 (9), Atk: 40 (16), Def: 30 (12), Spatk: 27 (13), Spdef: 27 (28), Spd: 35 (30)
+[17:10:06.839] LOG: Ability: Tough Claws | Passive Ability: Guts 
+[17:10:06.839] LOG: Moveset: ["Thrash","Sweet Scent","Dynamic Punch","Play Nice"]
+[17:10:12.062] LOG: Wave Seed: zzTdRxmpRi 32
+[17:10:12.719] LOG: %cStart Phase SummonPhase color:green;
+[17:10:12.987] WARN: cry/10438 not found
+[17:10:13.118] LOG: %cStart Phase SummonPhase color:green;
+[17:10:13.513] LOG: %cStart Phase CheckSwitchPhase color:green;
+[17:10:15.366] LOG: %cStart Phase CheckSwitchPhase color:green;
+[17:10:15.622] LOG: %cStart Phase InitEncounterPhase color:green;
+[17:10:15.625] LOG: %cStart Phase PostSummonPhase color:green;
+[17:10:15.625] LOG: Ran PSP for: Furret
+[17:10:15.630] LOG: %cStart Phase PostSummonPhase color:green;
+[17:10:15.634] LOG: %cStart Phase PostSummonPhase color:green;
+[17:10:15.635] LOG: %cStart Phase PostSummonPhase color:green;
+[17:10:15.635] LOG: Ran PSP for: Teddiursa
+[17:10:15.637] LOG: %cStart Phase PostSummonPhase color:green;
+[17:10:15.637] LOG: %cStart Phase PostSummonPhase color:green;
+[17:10:15.638] LOG: %cStart Phase TurnInitPhase color:green;
+[17:10:15.642] LOG: Battle Seed: xgZsQPlKI81rYwUP
+[17:10:15.677] WARN: BattlerTag CENTER_OF_ATTENTION is missing a score!
+[17:10:15.679] WARN: BattlerTag CENTER_OF_ATTENTION is missing a score!
+[17:10:15.679] LOG: Move Pool: ["Mega Punch","Scratch","Fury Swipes","Follow Me"]
+[17:10:15.679] LOG: Move Scores: [28.5,12,34.5,0]
+[17:10:15.679] LOG: Sorted Move Pool: ["Fury Swipes","Mega Punch","Scratch","Follow Me"]
+[17:10:15.679] LOG: Chosen Move: Fury Swipes
+[17:10:15.679] LOG: %cStart Phase MovePhase color:green;
+[17:10:15.680] LOG: %cUser: Furret
+Move: FURY_SWIPES
+Use Mode: NORMAL color:orchid
+[17:10:15.689] LOG: %cStart Phase MessagePhase color:green;
+[17:10:15.799] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:10:15.953] LOG: crit stage: +1
+[17:10:15.957] LOG: Move: Fury Swipes | Base damage: 7.011809523809523 | Power: 33 | Source attack: 46 | Target defense: 63
+[17:10:15.958] LOG: Move: Fury Swipes | Attack damage: 10
+[17:10:15.959] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:10:15.978] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:10:16.148] LOG: crit stage: +1
+[17:10:16.152] LOG: Move: Fury Swipes | Base damage: 7.011809523809523 | Power: 33 | Source attack: 46 | Target defense: 63
+[17:10:16.153] LOG: Move: Fury Swipes | Attack damage: 15
+[17:10:16.153] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:10:16.170] LOG: %cStart Phase MessagePhase color:green;
+[17:10:16.444] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:10:16.610] LOG: crit stage: +1
+[17:10:16.611] LOG: Move: Fury Swipes | Base damage: 7.011809523809523 | Power: 33 | Source attack: 46 | Target defense: 63
+[17:10:16.613] LOG: Move: Fury Swipes | Attack damage: 9
+[17:10:16.614] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:10:16.628] LOG: %cStart Phase MessagePhase color:green;
+[17:10:16.897] LOG: %cStart Phase MoveEndPhase color:green;
+[17:10:16.897] LOG: %cStart Phase MovePhase color:green;
+[17:10:16.897] LOG: %cUser: Polartic Bluemoon
+Move: ICICLE_CRASH
+Use Mode: INDIRECT color:orchid
+[17:10:16.906] LOG: %cStart Phase MessagePhase color:green;
+[17:10:17.104] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:10:17.118] LOG: crit stage: +0
+[17:10:17.123] LOG: Move: Icicle Crash | Base damage: 35.25333333333334 | Power: 60 | Source attack: 86 | Target defense: 36
+[17:10:17.124] LOG: Move: Icicle Crash | Attack damage: 78
+[17:10:17.125] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:10:17.135] LOG: %cStart Phase MessagePhase color:green;
+[17:10:17.411] LOG: %cStart Phase FaintPhase color:green;
+[17:10:18.055] LOG: %cStart Phase MessagePhase color:green;
+[17:10:18.523] LOG: %cStart Phase ShowAbilityPhase color:green;
+[17:10:18.755] LOG: %cStart Phase PokemonHealPhase color:green;
+[17:10:18.910] LOG: %cStart Phase MessagePhase color:green;
+[17:10:19.264] LOG: %cStart Phase HideAbilityPhase color:green;
+[17:10:19.296] LOG: %cStart Phase VictoryPhase color:green;
+[17:10:19.296] LOG: Applied Soothe Bell 
+[17:10:19.297] LOG: %cStart Phase ExpPhase color:green;
+[17:10:19.297] LOG: Applied Super EXP. Charm 
+[17:10:19.297] LOG: Applied EXP. Charm 
+[17:10:20.403] LOG: %cStart Phase LevelUpPhase color:green;
+[17:10:21.314] LOG: %cStart Phase ExpPhase color:green;
+[17:10:21.314] LOG: Applied Super EXP. Charm 
+[17:10:21.314] LOG: Applied EXP. Charm 
+[17:10:21.986] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:10:21.986] LOG: Applied Super EXP. Charm 
+[17:10:21.986] LOG: Applied EXP. Charm 
+[17:10:21.987] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:10:21.987] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:10:21.987] LOG: Applied Super EXP. Charm 
+[17:10:21.987] LOG: Applied EXP. Charm 
+[17:10:21.987] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:10:21.988] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:10:21.988] LOG: Applied Super EXP. Charm 
+[17:10:21.988] LOG: Applied EXP. Charm 
+[17:10:21.989] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:10:21.990] LOG: %cStart Phase MoveEndPhase color:green;
+[17:10:21.990] LOG: %cStart Phase MovePhase color:green;
+[17:10:21.990] LOG: %cUser: Polartic Bluemoon
+Move: ICICLE_CRASH
+Use Mode: INDIRECT color:orchid
+[17:10:21.994] LOG: %cStart Phase MessagePhase color:green;
+[17:10:22.181] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:10:22.198] LOG: crit stage: +0
+[17:10:22.202] LOG: Move: Icicle Crash | Base damage: 45.2 | Power: 60 | Source attack: 90 | Target defense: 30
+[17:10:22.203] LOG: Move: Icicle Crash | Attack damage: 58
+[17:10:22.205] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:10:22.222] LOG: %cStart Phase FaintPhase color:green;
+[17:10:23.344] LOG: %cStart Phase MessagePhase color:green;
+[17:10:24.050] LOG: %cStart Phase ShowAbilityPhase color:green;
+[17:10:24.283] LOG: %cStart Phase PokemonHealPhase color:green;
+[17:10:24.440] LOG: %cStart Phase MessagePhase color:green;
+[17:10:24.798] LOG: %cStart Phase HideAbilityPhase color:green;
+[17:10:24.831] LOG: %cStart Phase VictoryPhase color:green;
+[17:10:24.832] LOG: Applied Soothe Bell 
+[17:10:24.833] LOG: %cStart Phase ExpPhase color:green;
+[17:10:24.834] LOG: Applied Super EXP. Charm 
+[17:10:24.834] LOG: Applied EXP. Charm 
+[17:10:25.215] LOG: %cStart Phase ExpPhase color:green;
+[17:10:25.215] LOG: Applied Super EXP. Charm 
+[17:10:25.215] LOG: Applied EXP. Charm 
+[17:10:25.994] LOG: %cStart Phase LevelUpPhase color:green;
+[17:10:26.924] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:10:26.924] LOG: Applied Super EXP. Charm 
+[17:10:26.924] LOG: Applied EXP. Charm 
+[17:10:26.925] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:10:26.925] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:10:26.925] LOG: Applied Super EXP. Charm 
+[17:10:26.925] LOG: Applied EXP. Charm 
+[17:10:26.926] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:10:26.926] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:10:26.926] LOG: Applied Super EXP. Charm 
+[17:10:26.926] LOG: Applied EXP. Charm 
+[17:10:26.926] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:10:26.927] LOG: %cStart Phase MoveEndPhase color:green;
+[17:10:26.927] LOG: %cStart Phase MovePhase color:green;
+[17:10:26.928] LOG: %cUser: Polartic Bluemoon
+Move: ICICLE_CRASH
+Use Mode: INDIRECT color:orchid
+[17:10:26.932] LOG: %cStart Phase MessagePhase color:green;
+[17:10:27.104] LOG: %cStart Phase MessagePhase color:green;
+[17:10:27.374] LOG: %cStart Phase MoveEndPhase color:green;
+[17:10:27.374] LOG: %cStart Phase CommandPhase color:green;
