@@ -116,6 +116,35 @@ For assertion-style regression tests, write a normal vitest test under
 `scene.add.*` factory method that isn't stubbed there (or a `MockGraphics`
 method), every battle test throws during construction; add the stub.
 
+### 🔴 Scenario gotchas (learned the hard way - read before authoring/verifying)
+- **Player innates are NOT active in a scenario.** An ability a species/form carries
+  as an INNATE (passive) - not as an active ability - does NOTHING on YOUR mon unless
+  you force it: a fresh scenario mon lacks the candy unlock that turns innates on.
+  ENEMIES always have innates active; the player does not. So to test an innate-driven
+  behavior on your side, set `ability:"<NAME>"` (ABILITY_OVERRIDE) to make it the
+  ACTIVE ability. Example that bit us: **Mega Vanilluxe's Multi-headed is an innate**
+  (its actives are Snow Cloak / Glacial Rage / Mirror Armor) - the mega alone strikes
+  ONCE; add `ability:"MULTI_HEADED"` and it strikes 3x. If a "verified" ability/innate
+  silently does nothing on the player, this is almost always why - force it active.
+- **The #419 elite BST cap swaps your pinned enemy at low waves.** Below the cap
+  ladder (it ends ~wave 100) an enemy whose BST tops the wave's ceiling is silently
+  devolved/swapped (Skarmory->Clamperl, Snorlax->Munchlax, Exploud->Loudred,
+  Porygon-Z->Porygon), so your ability/type test runs against the wrong mon. Set
+  `run.wave:145` (past the ladder) for any >420-BST enemy. This is intended balance in
+  real runs - do NOT touch the curve, just pick a late wave for the scenario.
+- **Megas are permanent here** (evolution-like): spawn straight into the form with
+  `formIndex:"mega"` / `formIndexContaining(sp,"mega")` - it sticks at summon, no
+  stone/bracelet/manual-evolve. The mega FORM carries the stats + head count, but its
+  signature ability is usually an innate, so pair the formIndex with an `ability`
+  override (see the innate point above).
+- **Give the enemy enough bulk to OBSERVE the effect.** A frail foe faints on hit 1
+  and hides a 3-hit / spread follow-up / same-turn cancel. Use a tanky species or
+  pre-boost it (`start.enemyStages:[0,6,0,6,0,0,0]` = +6 Def/SpDef).
+- **Runner limits:** no in-battle mega-evolve toggle (spawn into the form); `kind:
+  "wild"` can still roll a TRAINER at some waves and trainers SWITCH (confounds
+  single-enemy / item-lock tests - prefer a 1-mon `kind:"party"`); a mega-form sprite
+  load can still throw in the headless mock (`this.load.on`) - stub it if a mega spec hangs.
+
 ## The in-game dev test suite
 
 - `src/dev-tools/test-suite/` — **TRACKED**. The shared suite: `scenarios.ts`
