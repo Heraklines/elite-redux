@@ -157,25 +157,30 @@ points at the wrong slug, e.g. "Redux Rattata shows Mega Charizard X"), and
 blank/wrong fields (handler computes empty/garbled ability text).
 
 ```
-node scripts/run-ui-scenario.mjs [species,species,...] [--strict]
+node scripts/run-ui-scenario.mjs [species,species,...] [--surface S] [--strict]
 ```
 
 - A species is a `SpeciesId` name, an `ErSpeciesId` NAME (e.g. `RATTATA_REDUX`), or a
-  numeric id. Omitted = a built-in demo (vanilla baseline + live wrong-sprite / crash
-  repros). `--strict` promotes the sprite-mismatch WARNING to a hard error.
-- Per species it prints a `STATE {…}` (threw / ability / passives / spriteKey /
-  spriteAtlas / iconId) then a `RESULT {…}` with `errors[]` (threw / blank ability -
-  fail the run) and `warnings[]` (sprite atlas does not reference the species name
-  token - possible wrong sprite). `getSpriteKey`/`getSpriteAtlasPath` route through the
-  ER sprite-redirect, so a redirect / id-collision regression shows up directly.
-- Files: `test/tools/run-ui-scenario.test.ts` (currently the STARTER_SELECT handler -
-  it calls the REAL `setSpeciesDetails`) + `scripts/run-ui-scenario.mjs`. Sets
-  `ER_SCENARIO=1` for you.
+  numeric id. Omitted = the surface's built-in demo (vanilla baseline + live repros).
+- `--surface` selects which handler to drive (default `starter-select`):
+  - **`starter-select`** - calls the REAL `setSpeciesDetails`; `STATE {…}` = threw /
+    ability / passives / spriteKey / spriteAtlas / iconId. `errors[]` = threw / blank
+    ability; `warnings[]` = sprite atlas does not reference the species name token
+    (possible wrong sprite; `--strict` makes it a hard error). `getSpriteKey` /
+    `getSpriteAtlasPath` route through the ER sprite-redirect, so a redirect /
+    id-collision regression shows up directly.
+  - **`pokedex`** - calls the REAL `PokedexPageUiHandler.show([species,{}])`; `STATE {…}`
+    = threw / crashed / name / form / category / spriteKey. NB the page wraps its
+    body in try/catch and logs `[pokedex-page] show() crashed:` instead of throwing,
+    so the runner spies `console.error` for that line - `errors[]` = threw OR that
+    logged crash (the #113 / #291 crash-to-black class).
+- Files: `test/tools/run-ui-scenario.test.ts` + `scripts/run-ui-scenario.mjs`. Sets
+  `ER_SCENARIO=1` for you. Add a surface by adding a `snap*` + an `it.skipIf(SURFACE
+  !== "…")` block (drive the handler, snapshot its computed state + resolved keys).
 - **SCOPE:** this is the DATA/STATE tier - it does NOT rasterize. True pixel checks
   (alignment / colour / transparency / green-box) need a separate `CANVAS` +
-  node-canvas harness (`renderer.snapshot()` -> PNG diff); not built yet. It extends
-  to the pokedex / egg-hatch / shop / mystery-encounter handlers the same way: drive
-  the handler, snapshot its computed state + the keys it resolves.
+  node-canvas harness (`renderer.snapshot()` -> PNG diff); not built yet. Next
+  surfaces (egg-hatch / shop / mystery-encounter) extend it the same way.
 
 ## The in-game dev test suite
 

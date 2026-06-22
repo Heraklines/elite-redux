@@ -20,19 +20,22 @@
 // handler's computed state + the sprite keys it resolves. True pixel inspection
 // (alignment/colour/transparency) is a separate, heavier CANVAS harness — not this.
 //
-// Surface (only "starter-select" for now):
-//   For each target species it sets up the dex/starter entry, calls the REAL
-//   StarterSelectUiHandler.setSpeciesDetails (the render path), and reports:
+// Surfaces (pick with ER_UI_SURFACE / the wrapper's --surface; default starter-select):
+//   starter-select - calls the REAL StarterSelectUiHandler.setSpeciesDetails and reports:
 //     - threw?            -> the crash-to-black class (#438/#443/#113)
-//     - name/ability/passive text  -> the blank/wrong-field class (#319/#428)
+//     - ability/passive text  -> the blank/wrong-field class (#319/#428)
 //     - resolved spriteKey / spriteAtlas / iconId  -> the wrong-sprite class
 //       (#337 Redux Rattata, #338 Redux Minccino, #434/#435), via getSpriteKey
 //       which routes through the ER sprite-redirect.
+//   pokedex - calls the REAL PokedexPageUiHandler.show([species,{}]) and reports threw
+//     / crashed (the page's show() swallows + logs "[pokedex-page] show() crashed:",
+//     so we spy console.error) / name / form / category / spriteKey. Crash classes
+//     #113 / #291.
 //
 // Drive it via the wrapper (preferred):
-//   node scripts/run-ui-scenario.mjs [species,species,...] [--strict]
+//   node scripts/run-ui-scenario.mjs [species,species,...] [--surface S] [--strict]
 // or directly:
-//   ER_SCENARIO=1 ER_UI_SPECIES='RATTATA_REDUX,MINCCINO_REDUX' \
+//   ER_SCENARIO=1 ER_UI_SURFACE=pokedex ER_UI_SPECIES='CALYREX,RATTATA_REDUX' \
 //     npx vitest run test/tools/run-ui-scenario.test.ts --silent=false
 //
 // Env:
@@ -54,13 +57,24 @@ import { ErSpeciesId } from "#enums/er-species-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
+import type { PokedexPageUiHandler } from "#ui/pokedex-page-ui-handler";
 import type { StarterSelectUiHandler } from "#ui/starter-select-ui-handler";
 import Phaser from "phaser";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
-// Built-in demo: a vanilla baseline that must render cleanly, then the live
-// repro species for the wrong-sprite (#337/#338) and ER-custom-form crash classes.
-const DEMO_SPECIES = ["RATTATA", "RATTATA_REDUX", "MINCCINO_REDUX", "FLOETTE_ETERNAL_FLOWER", "MIMIKYU_BUSTED"];
+// Which surface to drive (the wrapper's --surface flag). Each surface has its own
+// built-in demo set: a vanilla baseline that must render cleanly + the live repro
+// species for that surface's bug classes.
+const SURFACE = (process.env.ER_UI_SURFACE ?? "starter-select").trim();
+
+const DEMO_BY_SURFACE: Record<string, string[]> = {
+  // wrong-sprite (#337/#338) + ER-custom-form crash classes.
+  "starter-select": ["RATTATA", "RATTATA_REDUX", "MINCCINO_REDUX", "FLOETTE_ETERNAL_FLOWER", "MIMIKYU_BUSTED"],
+  // pokedex page render: ER-custom crash (#113), multi-form legendary (#291-adjacent),
+  // ER custom multi-form.
+  pokedex: ["RATTATA", "RATTATA_REDUX", "CALYREX", "FLOETTE_ETERNAL_FLOWER", "MIMIKYU_BUSTED"],
+};
+const DEMO_SPECIES = DEMO_BY_SURFACE[SURFACE] ?? DEMO_BY_SURFACE["starter-select"];
 
 const STRICT = process.env.ER_UI_STRICT === "1";
 const RUN = process.env.ER_SCENARIO === "1";
@@ -174,6 +188,81 @@ function snapSpecies(
   };
 }
 
+interface PokedexSnapshot {
+  token: string;
+  id: number;
+  species: string;
+  threw: string | false;
+  crashed: string | false;
+  name: string;
+  form: string;
+  category: string;
+  spriteKey: string;
+}
+
+/** Render one species' pokedex PAGE through the real handler and capture its state. */
+function snapPokedex(game: GameManager, token: string): PokedexSnapshot | { token: string; error: string } {
+  const id = resolveSpecies(token);
+  if (id === undefined) {
+    return { token, error: `unresolved species "${token}"` };
+  }
+  const species = allSpecies.find(s => (s.speciesId as number) === id);
+  if (!species) {
+    return { token, error: `species ${token} (${id}) not registered (ER init off? wrong id?)` };
+  }
+  const dexEntry = game.scene.gameData.dexData[id];
+  if (!dexEntry) {
+    return { token, error: `no dex entry for ${token} (${id})` };
+  }
+  // Mark caught so the FULL render branch runs (the crash classes live there).
+  dexEntry.caughtAttr = DexAttr.NON_SHINY | DexAttr.MALE | DexAttr.DEFAULT_VARIANT | DexAttr.DEFAULT_FORM;
+  dexEntry.seenAttr = dexEntry.caughtAttr;
+
+  const handler = game.scene.ui.handlers[UiMode.POKEDEX_PAGE] as PokedexPageUiHandler;
+  // The page's show() body is wrapped in try/catch: a crash is SWALLOWED and logged
+  // as "[pokedex-page] show() crashed: …" rather than thrown. Capture that line so
+  // the crash-to-black class (#113 / #291) still surfaces.
+  const crashes: string[] = [];
+  const errSpy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+    const line = args.map(String).join(" ");
+    if (line.includes("[pokedex-page] show() crashed")) {
+      crashes.push(line);
+    }
+  });
+
+  let threw: string | false = false;
+  try {
+    handler.show([species, {}]);
+  } catch (e) {
+    threw = e instanceof Error ? e.message : String(e);
+  }
+  errSpy.mockRestore();
+
+  const h = handler as unknown as {
+    pokemonNameText?: { text: string };
+    pokemonFormText?: { text: string };
+    pokemonCategoryText?: { text: string };
+  };
+  const safe = <T>(fn: () => T, fallback: T): T => {
+    try {
+      return fn();
+    } catch {
+      return fallback;
+    }
+  };
+  return {
+    token,
+    id,
+    species: species.name ?? String(id),
+    threw,
+    crashed: crashes[0] ?? false,
+    name: h.pokemonNameText?.text ?? "",
+    form: h.pokemonFormText?.text ?? "",
+    category: h.pokemonCategoryText?.text ?? "",
+    spriteKey: safe(() => species.getSpriteKey(false, 0, false, 0), "<threw>"),
+  };
+}
+
 describe.skipIf(!RUN)("headless UI runner", () => {
   let phaserGame: Phaser.Game;
 
@@ -181,7 +270,7 @@ describe.skipIf(!RUN)("headless UI runner", () => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
   });
 
-  it("starter-select: renders the target species", () => {
+  it.skipIf(SURFACE !== "starter-select")("starter-select: renders the target species", () => {
     console.log("\n===== UI SURFACE: starter-select =====");
     console.log(`species: ${TARGET_TOKENS.length} target(s)${STRICT ? " (strict)" : ""}`);
 
@@ -233,6 +322,36 @@ describe.skipIf(!RUN)("headless UI runner", () => {
         console.log(`  ! ${w}`);
       }
     }
+    expect(errors, errors.join("\n")).toEqual([]);
+  });
+
+  it.skipIf(SURFACE !== "pokedex")("pokedex: renders the target species page", () => {
+    console.log("\n===== UI SURFACE: pokedex =====");
+    console.log(`species: ${TARGET_TOKENS.length} target(s)`);
+
+    const game = new GameManager(phaserGame);
+    const errors: string[] = [];
+
+    for (const token of TARGET_TOKENS) {
+      const snap = snapPokedex(game, token);
+      if ("error" in snap) {
+        console.log(`\n=== ${token} ===\nERROR ${snap.error}`);
+        errors.push(snap.error);
+        continue;
+      }
+      console.log(`\n=== ${snap.species} (${snap.token} #${snap.id}) ===`);
+      console.log("STATE", JSON.stringify(snap));
+      // The crash-to-black class (#113 / #291): show() threw, or its internal
+      // try/catch swallowed + logged a crash. Either fails the run.
+      if (snap.threw) {
+        errors.push(`${snap.species} (${snap.token}): pokedex show() threw — ${snap.threw}`);
+      }
+      if (snap.crashed) {
+        errors.push(`${snap.species} (${snap.token}): pokedex page crashed — ${snap.crashed}`);
+      }
+    }
+
+    console.log("\nRESULT", JSON.stringify({ surface: "pokedex", count: TARGET_TOKENS.length, errors }));
     expect(errors, errors.join("\n")).toEqual([]);
   });
 });

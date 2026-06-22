@@ -10,29 +10,37 @@
  * env + spawns the vitest harness (test/tools/run-ui-scenario.test.ts).
  *
  * Usage:
- *   node scripts/run-ui-scenario.mjs [species,species,...] [--strict]
+ *   node scripts/run-ui-scenario.mjs [species,species,...] [--surface S] [--strict]
  *
  * Examples:
- *   node scripts/run-ui-scenario.mjs                                  # built-in demo set
+ *   node scripts/run-ui-scenario.mjs                                  # starter-select demo set
  *   node scripts/run-ui-scenario.mjs RATTATA_REDUX,MINCCINO_REDUX     # the wrong-sprite repros
  *   node scripts/run-ui-scenario.mjs CHARIZARD --strict               # fail on a sprite mismatch
+ *   node scripts/run-ui-scenario.mjs --surface pokedex                # pokedex page render check
+ *   node scripts/run-ui-scenario.mjs CALYREX --surface pokedex        # one species' dex page
  *
- * A species is a SpeciesId name, an ErSpeciesId name (e.g. RATTATA_REDUX), or a
- * numeric id. Omitted = a built-in demo (vanilla baseline + the live repro species).
+ * Surfaces: starter-select (default), pokedex. A species is a SpeciesId name, an
+ * ErSpeciesId name (e.g. RATTATA_REDUX), or a numeric id. Omitted = the surface's
+ * built-in demo (vanilla baseline + the live repro species).
  */
 import { spawnSync } from "node:child_process";
 
 const argv = process.argv.slice(2);
 if (argv[0] === "--help" || argv[0] === "-h") {
-  console.log("Usage: node scripts/run-ui-scenario.mjs [species,species,...] [--strict]");
+  console.log("Usage: node scripts/run-ui-scenario.mjs [species,species,...] [--surface S] [--strict]");
   process.exit(0);
 }
 
 let species;
+let surface;
 let strict = false;
-for (const arg of argv) {
+const rest = [...argv];
+while (rest.length > 0) {
+  const arg = rest.shift();
   if (arg === "--strict") {
     strict = true;
+  } else if (arg === "--surface") {
+    surface = rest.shift();
   } else if (arg.startsWith("--")) {
     console.error(`unknown arg: ${arg}`);
     process.exit(1);
@@ -47,6 +55,9 @@ const env = {
 };
 if (species) {
   env.ER_UI_SPECIES = species;
+}
+if (surface) {
+  env.ER_UI_SURFACE = surface;
 }
 if (strict) {
   env.ER_UI_STRICT = "1";
