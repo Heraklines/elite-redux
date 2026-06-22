@@ -12,6 +12,17 @@ export class MockLoader {
     callback();
   }
 
+  // Event registration (e.g. ER's atlas-retry handler binds FILE_LOAD_ERROR).
+  // No-op: the headless loader never errors, so the handler must NOT be invoked
+  // (running it would execute the retry path against a fake file and crash).
+  on(_event, _callback, _context) {
+    return this;
+  }
+
+  off(_event, _callback, _context) {
+    return this;
+  }
+
   setBaseURL(_url) {
     return null;
   }

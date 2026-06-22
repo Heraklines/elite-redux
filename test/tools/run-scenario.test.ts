@@ -49,6 +49,7 @@ import { MoveUseMode } from "#enums/move-use-mode";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
+import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
@@ -240,6 +241,9 @@ function normalizeSpec(spec: RunnerInput | null): void {
   }
   if (spec.run?.biome != null) {
     spec.run.biome = enumVal(BiomeId as never, spec.run.biome, "biome");
+  }
+  if (spec.enemy?.trainerType != null) {
+    spec.enemy.trainerType = enumVal(TrainerType as never, spec.enemy.trainerType, "trainerType");
   }
 }
 

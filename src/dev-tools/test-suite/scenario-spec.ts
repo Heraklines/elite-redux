@@ -356,6 +356,10 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
     const enemy = spec.enemy;
     if (enemy?.kind === "wild" && enemy.wild) {
       const w = enemy.wild;
+      // Force a WILD battle (the trainer branch forces TRAINER) so `kind` is
+      // authoritative - otherwise the wave/difficulty could roll a trainer and
+      // break wild-only setups like Frisk / held-item-on-the-foe tests.
+      O.BATTLE_TYPE_OVERRIDE = BattleType.WILD;
       O.ENEMY_SPECIES_OVERRIDE = w.species as SpeciesId;
       if (w.level && w.level >= 1) {
         O.ENEMY_LEVEL_OVERRIDE = w.level;

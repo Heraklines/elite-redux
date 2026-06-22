@@ -62,6 +62,17 @@ If you ever can't remember the testing workflow: it's all here. Re-read this rul
 
 ## Headless scenario runner (fast, no browser) - test bugs autonomously
 
+🔴 **STANDING RULE — every combat / ability / move change MUST be verified with
+this runner before you call it done.** Any addition, rebalance, or bug fix that
+touches abilities, innates/passives, moves, the type chart, weather/terrain,
+status, stat stages, multi-hit, items-in-battle, or megas/forms has to be
+reproduced and confirmed headlessly here (build a `ScenarioSpec` that forces the
+exact situation and add an `expect` block that asserts the fixed behavior). "It
+should work" / "tsc passes" is NOT verification - run the scenario and show the
+green `expect`. This is in addition to (not a replacement for) the in-game test
+scenario + vitest regression test required by the standing rules above. Only pure
+data/UI changes that can't be expressed as a battle are exempt.
+
 To reproduce / verify a combat bug WITHOUT a browser (Puppeteer is slow and flaky),
 play a dev `ScenarioSpec` through the REAL game logic headlessly via the vitest
 `GameManager`. All battle phases, ER abilities/innates/moves/AI/RNG run for real;
