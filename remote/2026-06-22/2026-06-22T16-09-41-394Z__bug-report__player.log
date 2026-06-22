@@ -1,0 +1,274 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     4  wave:5  difficulty:youngster
+seed:     wuuqzZZ4D2myXvMgwpwsPi2I
+party:    Polartic Bluemoon(L6 30/32), Eevee(L5 21/21), Seel(L5 23/23)
+
+----- DESCRIPTION -----
+Only sent out 1 pokemon during double battle
+
+----- CONSOLE -----
+[16:07:03.265] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:07:03.265] LOG: %cStart Phase BerryPhase color:green;
+[16:07:03.265] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:07:03.266] LOG: %cStart Phase TurnEndPhase color:green;
+[16:07:03.273] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:07:03.274] LOG: %cStart Phase MessagePhase color:green;
+[16:07:03.591] LOG: %cStart Phase BattleEndPhase color:green;
+[16:07:03.591] LOG: Battle Score: 12 (1 Turns x1)
+[16:07:03.591] LOG: Total Score: 19
+[16:07:03.603] LOG: %cStart Phase EggLapsePhase color:green;
+[16:07:03.603] LOG: %cStart Phase SelectModifierPhase color:green;
+[16:07:03.604] LOG: Wave Seed: ywws|\\6F4o{ZxOiyryuRk4K 2
+[16:07:03.609] LOG: 12 9 [2,3,4,5,6,7,8,9,10,23]
+[16:07:03.609] LOG: {"id":"SUPER_LURE","localeKey":"modifierType:ModifierType.SUPER_LURE","iconImage":"super_lure","group":"lure","soundName":"se/restore","tier":1,"maxBattles":15} 
+[16:07:03.609] LOG: 18 9 [2,3,4,5,6,7,8,9,10,23]
+[16:07:03.609] LOG: {"id":"TM_GREAT","localeKey":"","iconImage":"tm_flying","group":"tm","soundName":"se/restore","tier":1,"moveId":366} 
+[16:07:03.611] LOG: 7 4 [2,3,4,5]
+[16:07:03.612] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_accuracy","soundName":"se/restore","tier":0,"stat":6,"nameKey":"x_accuracy","quantityKey":"stage"} 
+[16:07:09.084] LOG: %cStart Phase LearnMovePhase color:green;
+[16:07:11.264] WARN: cry/86 not found
+[16:07:21.521] LOG: %cStart Phase NewBattlePhase color:green;
+[16:07:21.521] LOG: Wave Seed: zxxt}]]7G5p|[yPjzszvSl5L 3
+[16:07:21.522] LOG: %cStart Phase NextEncounterPhase color:green;
+[16:07:21.529] LOG: Starting species pool tier: COMMON
+[16:07:21.564] LOG: Pokemon: Wild Sunkern | Species ID: 191 | Level: 3 | Nature: Lax (+Def/-SpDef)
+[16:07:21.564] LOG: Stats (IVs): HP: 16 (23), Atk: 8 (11), Def: 9 (9), Spatk: 8 (4), Spdef: 8 (29), Spd: 7 (19)
+[16:07:21.564] LOG: Ability: Grassy Surge | Passive Ability: Guilt Trip 
+[16:07:21.564] LOG: Moveset: ["Mega Drain","Flower Shield","Growth","Encore"]
+[16:07:21.624] DEBUG: Session data saved to slot 0!
+[16:07:21.624] LOG: Wave Seed: zxxt}]]7G5p|[yPjzszvSl5L 3
+[16:07:22.221] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[16:07:22.221] LOG: %cStart Phase InitEncounterPhase color:green;
+[16:07:22.222] LOG: %cStart Phase PostSummonPhase color:green;
+[16:07:22.222] LOG: Ran PSP for: Sunkern
+[16:07:22.222] LOG: %cStart Phase PostSummonPhase color:green;
+[16:07:22.222] LOG: %cStart Phase PostSummonPhase color:green;
+[16:07:22.222] LOG: %cStart Phase TurnInitPhase color:green;
+[16:07:22.223] LOG: %cStart Phase CommandPhase color:green;
+[16:07:25.248] LOG: Move: SLASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Polartic Bluemoon
+[16:07:25.255] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:07:25.257] LOG: Battle Seed: xs5YmimW5UpWO0Kv
+[16:07:25.262] LOG: Move Pool: ["Mega Drain","Flower Shield","Growth","Encore"]
+[16:07:25.262] LOG: Move Scores: [15,0,0,2]
+[16:07:25.262] LOG: Sorted Move Pool: ["Mega Drain","Encore","Flower Shield","Growth"]
+[16:07:25.262] LOG: Chosen Move: Mega Drain
+[16:07:25.263] LOG: %cStart Phase TurnStartPhase color:green;
+[16:07:25.265] LOG: %cStart Phase MovePhase color:green;
+[16:07:25.265] LOG: %cUser: Polartic Bluemoon
+Move: SLASH
+Use Mode: NORMAL color:orchid
+[16:07:25.268] LOG: %cStart Phase MessagePhase color:green;
+[16:07:25.424] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:07:25.628] LOG: crit stage: +0
+[16:07:25.631] LOG: Move: Slash | Base damage: 12.666666666666668 | Power: 60 | Source attack: 20 | Target defense: 9
+[16:07:25.632] LOG: Move: Slash | Attack damage: 16
+[16:07:25.632] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:07:25.646] LOG: %cStart Phase MessagePhase color:green;
+[16:07:25.926] LOG: %cStart Phase FaintPhase color:green;
+[16:07:26.680] LOG: %cStart Phase MessagePhase color:green;
+[16:07:27.000] LOG: %cStart Phase VictoryPhase color:green;
+[16:07:27.001] LOG: %cStart Phase ExpPhase color:green;
+[16:07:27.445] LOG: %cStart Phase MoveEndPhase color:green;
+[16:07:27.445] LOG: %cStart Phase MovePhase color:green;
+[16:07:27.445] LOG: %cStart Phase MoveEndPhase color:green;
+[16:07:27.445] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:07:27.445] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:07:27.445] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:07:27.445] LOG: %cStart Phase BerryPhase color:green;
+[16:07:27.445] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:07:27.445] LOG: %cStart Phase TurnEndPhase color:green;
+[16:07:27.447] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:07:27.448] LOG: %cStart Phase MessagePhase color:green;
+[16:07:27.777] LOG: %cStart Phase BattleEndPhase color:green;
+[16:07:27.778] LOG: Battle Score: 11 (1 Turns x1)
+[16:07:27.778] LOG: Total Score: 30
+[16:07:27.787] LOG: %cStart Phase EggLapsePhase color:green;
+[16:07:27.787] LOG: %cStart Phase SelectModifierPhase color:green;
+[16:07:27.787] LOG: Wave Seed: zxxt}]]7G5p|[yPjzszvSl5L 3
+[16:07:27.791] LOG: 7 4 [2,3,4,5]
+[16:07:27.791] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_def","soundName":"se/restore","tier":0,"stat":4,"nameKey":"x_sp_def","quantityKey":"percentage"} 
+[16:07:27.791] LOG: 10 1 [9,11,12,13,15,25]
+[16:07:27.791] LOG: ULTRA 0
+[16:07:27.791] LOG: 23 5 [9,11,12,13,15,25]
+[16:07:27.791] LOG: {"id":"EXP_CHARM","localeKey":"modifierType:ModifierType.EXP_CHARM","iconImage":"exp_charm","soundName":"se/restore","tier":2,"boostPercent":25} 
+[16:07:27.792] LOG: 29 6 [9,11,12,13,15,25]
+[16:07:27.792] LOG: {"id":"ER_COPPER_ROD","localeKey":"","iconImage":"quick_claw","iconTint":14256208,"soundName":"se/restore","tier":2} 
+[16:07:27.792] LOG: 33 6 [9,11,12,13,15,25]
+[16:07:27.792] LOG: {"id":"ER_LUCKY_HEART","localeKey":"","iconImage":"healing_charm","iconTint":16744362,"soundName":"se/restore","tier":2} 
+[16:07:27.792] LOG: 0 0 [9,11,12,13,15,25]
+[16:07:27.792] LOG: {"id":"ULTRA_BALL","localeKey":"","iconImage":"ub","group":"pb","soundName":"se/pb_bounce_1","tier":2,"pokeballType":2,"count":5} 
+[16:07:27.792] LOG: 7 4 [2,3,4,5]
+[16:07:27.792] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[16:07:27.792] LOG: 8 4 [2,3,4,5]
+[16:07:27.792] LOG: {"id":"BERRY","localeKey":"","iconImage":"petaya_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":5} 
+[16:07:32.605] LOG: %cStart Phase NewBattlePhase color:green;
+[16:07:32.605] LOG: Wave Seed: {yyu~^^8H6q}\zQk{t{wTm6M 4
+[16:07:32.606] LOG: %cStart Phase NextEncounterPhase color:green;
+[16:07:32.610] LOG: Starting species pool tier: UNCOMMON
+[16:07:32.659] LOG: Pokemon: Wild Bellsprout | Species ID: 69 | Level: 4 | Nature: Brave (+Atk/-Spd)
+[16:07:32.659] LOG: Stats (IVs): HP: 20 (28), Atk: 13 (5), Def: 8 (11), Spatk: 11 (16), Spdef: 8 (17), Spd: 8 (26)
+[16:07:32.659] LOG: Ability: Solar Power | Passive Ability: Chlorophyll 
+[16:07:32.659] LOG: Moveset: ["Vine Whip","Poison Powder","Sweet Scent","Stun Spore"]
+[16:07:34.192] DEBUG: Session data saved to slot 0!
+[16:07:34.192] LOG: Wave Seed: {yyu~^^8H6q}\zQk{t{wTm6M 4
+[16:07:34.799] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[16:07:34.800] LOG: %cStart Phase InitEncounterPhase color:green;
+[16:07:34.800] LOG: %cStart Phase PostSummonPhase color:green;
+[16:07:34.801] LOG: Ran PSP for: Bellsprout
+[16:07:34.801] LOG: %cStart Phase PostSummonPhase color:green;
+[16:07:34.801] LOG: %cStart Phase PostSummonPhase color:green;
+[16:07:34.802] LOG: %cStart Phase TurnInitPhase color:green;
+[16:07:34.802] LOG: %cStart Phase CommandPhase color:green;
+[16:07:37.301] LOG: Move: SLASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Polartic Bluemoon
+[16:07:37.305] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:07:37.311] LOG: Battle Seed: fzLxN5HcKpoyod0P
+[16:07:37.314] LOG: Move Pool: ["Vine Whip","Poison Powder","Sweet Scent","Stun Spore"]
+[16:07:37.314] LOG: Move Scores: [27,10,6,10]
+[16:07:37.314] LOG: Sorted Move Pool: ["Vine Whip","Poison Powder","Stun Spore","Sweet Scent"]
+[16:07:37.314] LOG: Chosen Move: Poison Powder
+[16:07:37.314] LOG: %cStart Phase TurnStartPhase color:green;
+[16:07:37.320] LOG: %cStart Phase MovePhase color:green;
+[16:07:37.320] LOG: %cUser: Polartic Bluemoon
+Move: SLASH
+Use Mode: NORMAL color:orchid
+[16:07:37.323] LOG: %cStart Phase MessagePhase color:green;
+[16:07:37.468] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:07:37.669] LOG: crit stage: +0
+[16:07:37.672] LOG: Move: Slash | Base damage: 14 | Power: 60 | Source attack: 20 | Target defense: 8
+[16:07:37.672] LOG: Move: Slash | Attack damage: 18
+[16:07:37.673] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:07:37.683] LOG: %cStart Phase MessagePhase color:green;
+[16:07:37.963] LOG: %cStart Phase MoveEndPhase color:green;
+[16:07:37.963] LOG: %cStart Phase MovePhase color:green;
+[16:07:37.963] LOG: %cUser: Bellsprout
+Move: POISON_POWDER
+Use Mode: NORMAL color:orchid
+[16:07:37.971] LOG: %cStart Phase MessagePhase color:green;
+[16:07:38.151] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:07:38.514] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[16:07:38.760] LOG: %cStart Phase MessagePhase color:green;
+[16:07:39.093] LOG: %cStart Phase MoveEndPhase color:green;
+[16:07:39.094] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:07:39.095] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:07:39.095] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:07:39.095] LOG: %cStart Phase BerryPhase color:green;
+[16:07:39.096] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:07:39.098] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[16:07:39.328] LOG: %cStart Phase MessagePhase color:green;
+[16:07:39.678] LOG: %cStart Phase TurnEndPhase color:green;
+[16:07:39.683] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:07:39.838] LOG: %cStart Phase MessagePhase color:green;
+[16:07:40.169] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:07:40.321] LOG: %cStart Phase MessagePhase color:green;
+[16:07:40.648] LOG: %cStart Phase TurnInitPhase color:green;
+[16:07:40.649] LOG: %cStart Phase CommandPhase color:green;
+[16:07:41.412] LOG: Move: SLASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Polartic Bluemoon
+[16:07:41.419] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:07:41.424] LOG: Battle Seed: fzLxN5HcKpoyod0P
+[16:07:41.427] LOG: Move Pool: ["Vine Whip","Poison Powder","Sweet Scent","Stun Spore"]
+[16:07:41.427] LOG: Move Scores: [27,0,6,0]
+[16:07:41.427] LOG: Sorted Move Pool: ["Vine Whip","Sweet Scent","Poison Powder","Stun Spore"]
+[16:07:41.427] LOG: Chosen Move: Poison Powder
+[16:07:41.427] LOG: %cStart Phase TurnStartPhase color:green;
+[16:07:41.430] LOG: %cStart Phase MovePhase color:green;
+[16:07:41.430] LOG: %cUser: Polartic Bluemoon
+Move: SLASH
+Use Mode: NORMAL color:orchid
+[16:07:41.433] LOG: %cStart Phase MessagePhase color:green;
+[16:07:41.575] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:07:41.767] LOG: crit stage: +0
+[16:07:41.771] LOG: Move: Slash | Base damage: 14 | Power: 60 | Source attack: 20 | Target defense: 8
+[16:07:41.772] LOG: Move: Slash | Attack damage: 18
+[16:07:41.773] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:07:41.784] LOG: %cStart Phase MessagePhase color:green;
+[16:07:42.054] LOG: %cStart Phase FaintPhase color:green;
+[16:07:42.797] LOG: %cStart Phase MessagePhase color:green;
+[16:07:43.143] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:07:43.380] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:07:43.527] LOG: %cStart Phase MessagePhase color:green;
+[16:07:43.897] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:07:43.931] LOG: %cStart Phase VictoryPhase color:green;
+[16:07:43.931] LOG: %cStart Phase ExpPhase color:green;
+[16:07:44.659] LOG: %cStart Phase LevelUpPhase color:green;
+[16:07:45.413] LOG: %cStart Phase MoveEndPhase color:green;
+[16:07:45.414] LOG: %cStart Phase MovePhase color:green;
+[16:07:45.414] LOG: %cStart Phase MoveEndPhase color:green;
+[16:07:45.415] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:07:45.415] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:07:45.415] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:07:45.415] LOG: %cStart Phase BerryPhase color:green;
+[16:07:45.415] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:07:45.416] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[16:07:45.638] LOG: %cStart Phase MessagePhase color:green;
+[16:07:45.982] LOG: %cStart Phase TurnEndPhase color:green;
+[16:07:45.983] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:07:46.148] LOG: %cStart Phase MessagePhase color:green;
+[16:07:46.481] LOG: %cStart Phase BattleEndPhase color:green;
+[16:07:46.481] LOG: Battle Score: 22 (2 Turns x0.84)
+[16:07:46.481] LOG: Total Score: 52
+[16:07:46.494] LOG: %cStart Phase EggLapsePhase color:green;
+[16:07:46.497] LOG: %cStart Phase SelectModifierPhase color:green;
+[16:07:46.497] LOG: Wave Seed: {yyu~^^8H6q}\zQk{t{wTm6M 4
+[16:07:46.503] LOG: 6 4 [2,3,4,5]
+[16:07:46.503] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[16:07:46.503] LOG: 9 4 [2,3,4,5]
+[16:07:46.504] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_water","group":"tm","soundName":"se/restore","tier":0,"moveId":250} 
+[16:07:46.505] LOG: 1 0 [5]
+[16:07:46.505] LOG: {"id":"SHINY_CHARM","localeKey":"modifierType:ModifierType.SHINY_CHARM","iconImage":"shiny_charm","soundName":"se/restore","tier":4} 
+[16:07:57.844] LOG: %cStart Phase NewBattlePhase color:green;
+[16:07:57.845] LOG: Wave Seed: |zzv__9I7r~]{Rl|u|xUn7N 5
+[16:07:57.854] LOG: %cStart Phase MessagePhase color:green;
+[16:07:58.185] LOG: %cStart Phase ReturnPhase color:green;
+[16:07:58.341] LOG: %cStart Phase ShowTrainerPhase color:green;
+[16:07:58.494] LOG: %cStart Phase NextEncounterPhase color:green;
+[16:07:58.502] LOG: RARE
+[16:07:58.502] LOG: Downgraded trainer Pokemon rarity tier from RARE to UNCOMMON
+[16:07:58.502] LOG: Downgraded trainer Pokemon rarity tier from UNCOMMON to COMMON
+[16:07:58.504] LOG: Bidoof
+[16:07:58.540] LOG: Pokemon: Foe Bidoof | Species ID: 399 | Level: 4 | Nature: Naive (+Spd/-SpDef)
+[16:07:58.540] LOG: Stats (IVs): HP: 19 (6), Atk: 9 (28), Def: 9 (24), Spatk: 8 (16), Spdef: 8 (0), Spd: 9 (23)
+[16:07:58.541] LOG: Ability: Simple | Passive Ability: Unaware 
+[16:07:58.541] LOG: Moveset: ["Hyper Fang","Strength","Mud Sport","Defense Curl"]
+[16:07:58.541] LOG: COMMON
+[16:07:58.541] LOG: Zigzagoon
+[16:07:58.560] LOG: Pokemon: Foe Zigzagoon | Species ID: 263 | Level: 4 | Nature: Quirky (-)
+[16:07:58.560] LOG: Stats (IVs): HP: 17 (25), Atk: 10 (1), Def: 8 (13), Spatk: 8 (26), Spdef: 8 (18), Spd: 11 (20)
+[16:07:58.560] LOG: Ability: Momentum | Passive Ability: Pickup 
+[16:07:58.560] LOG: Moveset: ["Double-Edge","Stomping Tantrum","Mud Sport","Odor Sleuth"]
+[16:07:59.178] LOG: Generated AI funcs
+[16:07:59.249] DEBUG: Session data saved to slot 0!
+[16:07:59.250] LOG: Wave Seed: |zzv__9I7r~]{Rl|u|xUn7N 5
+[16:07:59.543] LOG: Youngster Travis
+[16:08:00.665] LOG: Dialogue saved as seen: dialogue:youngster.encounter.7
+[16:08:00.721] LOG: Youngster Travis
+[16:08:01.699] LOG: %cStart Phase SummonPhase color:green;
+[16:08:01.700] LOG: Travis
+[16:08:02.097] LOG: %cStart Phase SummonPhase color:green;
+[16:08:02.098] LOG: Travis
+[16:08:02.478] LOG: %cStart Phase SummonPhase color:green;
+[16:08:02.741] WARN: cry/10438 not found
+[16:08:02.898] LOG: %cStart Phase InitEncounterPhase color:green;
+[16:08:02.903] LOG: %cStart Phase PostSummonPhase color:green;
+[16:08:02.903] LOG: Ran PSP for: Polartic Bluemoon
+[16:08:02.906] LOG: %cStart Phase PostSummonPhase color:green;
+[16:08:02.913] LOG: %cStart Phase PostSummonPhase color:green;
+[16:08:02.914] LOG: %cStart Phase PostSummonPhase color:green;
+[16:08:02.914] LOG: Ran PSP for: Zigzagoon
+[16:08:02.919] LOG: %cStart Phase PostSummonPhase color:green;
+[16:08:02.921] LOG: %cStart Phase PostSummonPhase color:green;
+[16:08:02.922] LOG: %cStart Phase PostSummonPhase color:green;
+[16:08:02.922] LOG: Ran PSP for: Bidoof
+[16:08:02.922] LOG: %cStart Phase PostSummonPhase color:green;
+[16:08:02.922] LOG: %cStart Phase PostSummonPhase color:green;
+[16:08:02.923] LOG: %cStart Phase TurnInitPhase color:green;
+[16:08:02.923] LOG: %cStart Phase CommandPhase color:green;
+[16:08:17.711] LOG: Move: BLUE_MOON Move targets: {"targets":[2,3],"multiple":false} 
+Player Pokemon: Polartic Bluemoon
+[16:08:17.716] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:08:19.808] LOG: %cStart Phase CommandPhase color:green;
