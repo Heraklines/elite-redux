@@ -1,0 +1,278 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:147.0) Gecko/20100101 Firefox/147.0
+mode:     1  wave:17  difficulty:youngster
+seed:     KCuL6IC1UGZcHEKeumMHe5cT
+party:    Kecleong(L12 38/47), Kipmodo(L11 14/35), Sableye(L7 28/28), Marbeep(L7 28/28), Zigzagoon(L7 24/24), Scatterbug(L7 24/24)
+
+----- DESCRIPTION -----
+Retribution Blow still has the recharge turn that shouldn't be present
+
+----- CONSOLE -----
+[00:07:13.721] LOG: Applied Dire Hit 
+[00:07:13.721] LOG: crit stage: +1
+[00:07:13.722] LOG: Move: Ice Fang | Base damage: 14.434285714285714 | Power: 80 | Source attack: 32 | Target defense: 28
+[00:07:13.723] LOG: Move: Ice Fang | Attack damage: 37
+[00:07:13.725] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:07:13.737] LOG: %cStart Phase MessagePhase color:green;
+[00:07:13.941] LOG: %cStart Phase FaintPhase color:green;
+[00:07:13.945] WARN: cry/43 not found
+[00:07:14.002] LOG: %cStart Phase MessagePhase color:green;
+[00:07:14.362] LOG: %cStart Phase VictoryPhase color:green;
+[00:07:14.362] LOG: Applied Soothe Bell 
+[00:07:14.363] LOG: %cStart Phase ExpPhase color:green;
+[00:07:14.363] LOG: Applied EXP. Charm 
+[00:07:14.363] LOG: Applied Super EXP. Charm 
+[00:07:14.641] LOG: %cStart Phase ExpPhase color:green;
+[00:07:14.641] LOG: Applied EXP. Charm 
+[00:07:14.641] LOG: Applied Super EXP. Charm 
+[00:07:14.977] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:07:14.977] LOG: Applied EXP. Charm 
+[00:07:14.977] LOG: Applied Super EXP. Charm 
+[00:07:14.978] LOG: %cStart Phase LevelUpPhase color:green;
+[00:07:14.978] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:07:14.978] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:07:14.978] LOG: Applied EXP. Charm 
+[00:07:14.978] LOG: Applied Super EXP. Charm 
+[00:07:14.979] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:07:14.979] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:07:14.979] LOG: Applied EXP. Charm 
+[00:07:14.979] LOG: Applied Super EXP. Charm 
+[00:07:14.980] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:07:14.980] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:07:14.980] LOG: Applied EXP. Charm 
+[00:07:14.980] LOG: Applied Super EXP. Charm 
+[00:07:14.981] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:07:14.982] LOG: %cStart Phase MoveEndPhase color:green;
+[00:07:14.984] LOG: %cStart Phase MovePhase color:green;
+[00:07:14.984] LOG: %cUser: Kipmodo
+Move: EARTHQUAKE
+Use Mode: NORMAL color:orchid
+[00:07:14.986] LOG: %cStart Phase MessagePhase color:green;
+[00:07:15.092] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:07:15.803] LOG: Applied Dire Hit 
+[00:07:15.804] LOG: crit stage: +1
+[00:07:15.805] LOG: Move: Earthquake | Base damage: 10.08421052631579 | Power: 50 | Source attack: 24 | Target defense: 19
+[00:07:15.806] LOG: Move: Earthquake | Attack damage: 13
+[00:07:15.807] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:07:15.957] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:07:15.991] LOG: %cStart Phase MessagePhase color:green;
+[00:07:16.206] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:07:16.223] LOG: %cStart Phase MessagePhase color:green;
+[00:07:16.444] LOG: %cStart Phase MoveEndPhase color:green;
+[00:07:16.444] LOG: %cStart Phase MovePhase color:green;
+[00:07:16.444] LOG: %cUser: Pawniard
+Move: SHARPEN
+Use Mode: NORMAL color:orchid
+[00:07:16.450] LOG: %cStart Phase MessagePhase color:green;
+[00:07:16.563] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:07:16.761] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:07:16.958] LOG: %cStart Phase MessagePhase color:green;
+[00:07:17.164] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:07:17.325] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:07:17.356] LOG: %cStart Phase MoveEndPhase color:green;
+[00:07:17.357] LOG: %cStart Phase MovePhase color:green;
+[00:07:17.357] LOG: %cUser: Kecleong
+Move: HYPER_BEAM
+Use Mode: INDIRECT color:orchid
+[00:07:17.360] LOG: %cStart Phase MessagePhase color:green;
+[00:07:17.484] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:07:17.648] LOG: %cStart Phase MessagePhase color:green;
+[00:07:17.900] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:07:17.928] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:07:17.945] LOG: Applied Dire Hit 
+[00:07:17.945] LOG: crit stage: +1
+[00:07:17.948] LOG: Move: Hyper Beam | Base damage: 32 | Power: 150 | Source attack: 25 | Target defense: 17
+[00:07:17.949] LOG: Move: Hyper Beam | Attack damage: 22
+[00:07:17.952] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:07:17.965] LOG: %cStart Phase MessagePhase color:green;
+[00:07:18.176] LOG: %cStart Phase FaintPhase color:green;
+[00:07:19.298] LOG: %cStart Phase MessagePhase color:green;
+[00:07:19.681] LOG: %cStart Phase VictoryPhase color:green;
+[00:07:19.681] LOG: Applied Soothe Bell 
+[00:07:19.681] LOG: %cStart Phase ExpPhase color:green;
+[00:07:19.682] LOG: Applied EXP. Charm 
+[00:07:19.682] LOG: Applied Super EXP. Charm 
+[00:07:20.040] LOG: %cStart Phase ExpPhase color:green;
+[00:07:20.041] LOG: Applied EXP. Charm 
+[00:07:20.041] LOG: Applied Super EXP. Charm 
+[00:07:20.525] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:07:20.525] LOG: Applied EXP. Charm 
+[00:07:20.526] LOG: Applied Super EXP. Charm 
+[00:07:20.526] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:07:20.526] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:07:20.526] LOG: Applied EXP. Charm 
+[00:07:20.526] LOG: Applied Super EXP. Charm 
+[00:07:20.527] LOG: %cStart Phase LevelUpPhase color:green;
+[00:07:20.528] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:07:20.528] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:07:20.528] LOG: Applied EXP. Charm 
+[00:07:20.528] LOG: Applied Super EXP. Charm 
+[00:07:20.529] LOG: %cStart Phase LevelUpPhase color:green;
+[00:07:20.531] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:07:20.531] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:07:20.531] LOG: Applied EXP. Charm 
+[00:07:20.531] LOG: Applied Super EXP. Charm 
+[00:07:20.531] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:07:20.532] LOG: %cStart Phase MoveEndPhase color:green;
+[00:07:20.532] LOG: %cStart Phase MovePhase color:green;
+[00:07:20.532] LOG: %cStart Phase MoveEndPhase color:green;
+[00:07:20.532] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:07:20.532] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:07:20.532] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:07:20.532] LOG: %cStart Phase BerryPhase color:green;
+[00:07:20.532] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:07:20.533] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[00:07:20.777] LOG: %cStart Phase MessagePhase color:green;
+[00:07:20.998] LOG: %cStart Phase TurnEndPhase color:green;
+[00:07:21.003] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:07:21.136] LOG: %cStart Phase MessagePhase color:green;
+[00:07:21.350] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:07:21.468] LOG: %cStart Phase MessagePhase color:green;
+[00:07:21.676] LOG: %cStart Phase BattleEndPhase color:green;
+[00:07:21.677] LOG: Battle Score: 86 (1 Turns x1)
+[00:07:21.677] LOG: Total Score: 748
+[00:07:21.701] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:07:21.701] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:07:21.727] LOG: %cStart Phase MessagePhase color:green;
+[00:07:22.249] LOG: %cStart Phase EggLapsePhase color:green;
+[00:07:22.250] LOG: %cStart Phase SelectModifierPhase color:green;
+[00:07:22.250] LOG: Wave Seed: [S\FYSAeWjsXU[u}]XuEsd 16
+[00:07:22.258] LOG: 8 4 [2,3,4,5]
+[00:07:22.258] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} 
+[00:07:22.258] LOG: 13 9 [3,4,5,6,7,8,9,10,12,16,23]
+[00:07:22.258] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[00:07:22.258] LOG: 14 9 [3,4,5,6,7,8,9,10,12,16,23]
+[00:07:22.258] LOG: GREAT 0
+[00:07:22.258] LOG: 17 10 [3,4,5,6,7,8,9,10,12,16,23]
+[00:07:22.258] LOG: {"id":"SOOTHE_BELL","localeKey":"modifierType:ModifierType.SOOTHE_BELL","iconImage":"soothe_bell","soundName":"se/restore","tier":1} 
+[00:07:25.156] LOG: %cStart Phase NewBattlePhase color:green;
+[00:07:25.156] LOG: Wave Seed: \T]GZTBfXktYV\v~^YvFte 17
+[00:07:25.156] LOG: Applied Lure 
+[00:07:25.156] LOG: Applied Super Lure 
+[00:07:25.156] LOG: %cStart Phase NextEncounterPhase color:green;
+[00:07:25.158] LOG: Starting species pool tier: COMMON
+[00:07:25.167] LOG: Pokemon: Wild Oddish | Species ID: 43 | Level: 11 | Nature: Adamant (+Atk/-SpAtk)
+[00:07:25.167] LOG: Stats (IVs): HP: 31 (1), Atk: 18 (6), Def: 19 (25), Spatk: 23 (25), Spdef: 21 (0), Spd: 14 (29)
+[00:07:25.167] LOG: Ability: Poison Absorb | Passive Ability: Regenerator 
+[00:07:25.168] LOG: Moveset: ["Mega Drain","Poison Powder","Acid","Sweet Scent"]
+[00:07:25.168] LOG: Starting species pool tier: COMMON
+[00:07:25.176] LOG: Pokemon: Wild Spinarak | Species ID: 167 | Level: 11 | Nature: Lax (+Def/-SpDef)
+[00:07:25.176] LOG: Stats (IVs): HP: 30 (9), Atk: 18 (1), Def: 20 (22), Spatk: 16 (29), Spdef: 14 (2), Spd: 16 (10)
+[00:07:25.177] LOG: Ability: Prankster | Passive Ability: Poison Touch 
+[00:07:25.177] LOG: Moveset: ["Poison Sting","Toxic Thread","Fury Swipes","Pounce"]
+[00:07:25.377] LOG: Battle Seed: FfFij3qO92rayrn8
+[00:07:25.427] DEBUG: Session data saved to slot 4!
+[00:07:25.428] LOG: Wave Seed: \T]GZTBfXktYV\v~^YvFte 17
+[00:07:25.638] WARN: cry/43 not found
+[00:07:25.638] WARN: cry/167 not found
+[00:07:25.895] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[00:07:25.895] LOG: %cStart Phase CheckSwitchPhase color:green;
+[00:07:26.344] LOG: %cStart Phase SwitchPhase color:green;
+[00:07:26.809] WARN: cry/10684 not found
+[00:07:27.610] LOG: %cStart Phase CheckSwitchPhase color:green;
+[00:07:27.713] LOG: %cStart Phase InitEncounterPhase color:green;
+[00:07:27.714] LOG: %cStart Phase PostSummonPhase color:green;
+[00:07:27.714] LOG: Ran PSP for: Spinarak
+[00:07:27.716] LOG: %cStart Phase PostSummonPhase color:green;
+[00:07:27.717] LOG: %cStart Phase PostSummonPhase color:green;
+[00:07:27.717] LOG: %cStart Phase PostSummonPhase color:green;
+[00:07:27.717] LOG: Ran PSP for: Oddish
+[00:07:27.718] LOG: %cStart Phase PostSummonPhase color:green;
+[00:07:27.718] LOG: %cStart Phase PostSummonPhase color:green;
+[00:07:27.718] LOG: %cStart Phase TurnInitPhase color:green;
+[00:07:27.719] LOG: %cStart Phase CommandPhase color:green;
+[00:07:27.720] LOG: Move: NONE Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Kecleong
+[00:07:27.722] LOG: %cStart Phase CommandPhase color:green;
+[00:07:28.712] LOG: Move: IRON_HEAD Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Kipmodo
+[00:07:28.716] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:07:29.005] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:07:29.018] LOG: Move Pool: ["Mega Drain","Poison Powder","Acid","Sweet Scent"]
+[00:07:29.018] LOG: Move Scores: [15,0,21,6]
+[00:07:29.018] LOG: Sorted Move Pool: ["Acid","Mega Drain","Sweet Scent","Poison Powder"]
+[00:07:29.018] LOG: Chosen Move: Mega Drain
+[00:07:29.018] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:07:29.032] LOG: Move Pool: ["Poison Sting","Toxic Thread","Fury Swipes","Pounce"]
+[00:07:29.032] LOG: Move Scores: [12,2,23,8.625]
+[00:07:29.032] LOG: Sorted Move Pool: ["Fury Swipes","Poison Sting","Pounce","Toxic Thread"]
+[00:07:29.032] LOG: Chosen Move: Fury Swipes
+[00:07:29.032] LOG: %cStart Phase TurnStartPhase color:green;
+[00:07:29.038] LOG: %cStart Phase MovePhase color:green;
+[00:07:29.038] LOG: %cUser: Kecleong
+Move: NONE
+Use Mode: NORMAL color:orchid
+[00:07:29.038] WARN: Kecleong is attempting to use 0
+[00:07:29.038] LOG: %cStart Phase MessagePhase color:green;
+[00:07:29.221] LOG: %cStart Phase MoveEndPhase color:green;
+[00:07:29.222] LOG: %cStart Phase MovePhase color:green;
+[00:07:29.222] LOG: %cUser: Kipmodo
+Move: IRON_HEAD
+Use Mode: NORMAL color:orchid
+[00:07:29.232] LOG: %cStart Phase MessagePhase color:green;
+[00:07:29.329] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:07:29.520] LOG: Applied Dire Hit 
+[00:07:29.520] LOG: crit stage: +1
+[00:07:29.522] LOG: Move: Iron Head | Base damage: 14.934736842105263 | Power: 80 | Source attack: 24 | Target defense: 19
+[00:07:29.522] LOG: Move: Iron Head | Attack damage: 14
+[00:07:29.525] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:07:29.535] LOG: %cStart Phase MoveEndPhase color:green;
+[00:07:29.536] LOG: %cStart Phase MovePhase color:green;
+[00:07:29.536] LOG: %cUser: Spinarak
+Move: FURY_SWIPES
+Use Mode: NORMAL color:orchid
+[00:07:29.546] LOG: %cStart Phase MessagePhase color:green;
+[00:07:29.663] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:07:29.826] LOG: crit stage: +1
+[00:07:29.828] LOG: Move: Fury Swipes | Base damage: 4.88 | Power: 25 | Source attack: 18 | Target defense: 20
+[00:07:29.830] LOG: Move: Fury Swipes | Attack damage: 4
+[00:07:29.832] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:07:29.847] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:07:30.007] LOG: crit stage: +1
+[00:07:30.009] LOG: Move: Fury Swipes | Base damage: 4.88 | Power: 25 | Source attack: 18 | Target defense: 20
+[00:07:30.010] LOG: Move: Fury Swipes | Attack damage: 4
+[00:07:30.011] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:07:30.030] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:07:30.182] LOG: crit stage: +1
+[00:07:30.184] LOG: Move: Fury Swipes | Base damage: 4.88 | Power: 25 | Source attack: 18 | Target defense: 20
+[00:07:30.185] LOG: Move: Fury Swipes | Attack damage: 4
+[00:07:30.185] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:07:30.203] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:07:30.362] LOG: crit stage: +1
+[00:07:30.364] LOG: Move: Fury Swipes | Base damage: 4.88 | Power: 25 | Source attack: 18 | Target defense: 20
+[00:07:30.365] LOG: Move: Fury Swipes | Attack damage: 7
+[00:07:30.365] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:07:30.374] LOG: %cStart Phase MessagePhase color:green;
+[00:07:30.568] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:07:30.730] LOG: crit stage: +1
+[00:07:30.734] LOG: Move: Fury Swipes | Base damage: 4.88 | Power: 25 | Source attack: 18 | Target defense: 20
+[00:07:30.735] LOG: Move: Fury Swipes | Attack damage: 4
+[00:07:30.735] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:07:30.752] LOG: %cStart Phase MessagePhase color:green;
+[00:07:30.936] LOG: %cStart Phase MoveEndPhase color:green;
+[00:07:30.936] LOG: %cStart Phase MovePhase color:green;
+[00:07:30.937] LOG: %cUser: Oddish
+Move: MEGA_DRAIN
+Use Mode: NORMAL color:orchid
+[00:07:30.937] LOG: %cStart Phase MessagePhase color:green;
+[00:07:31.149] LOG: %cStart Phase MoveEndPhase color:green;
+[00:07:31.149] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:07:31.149] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:07:31.149] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:07:31.149] LOG: %cStart Phase BerryPhase color:green;
+[00:07:31.153] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:07:31.161] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[00:07:31.390] LOG: %cStart Phase MessagePhase color:green;
+[00:07:31.604] LOG: %cStart Phase TurnEndPhase color:green;
+[00:07:31.612] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:07:31.740] LOG: %cStart Phase MessagePhase color:green;
+[00:07:31.947] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:07:32.097] LOG: %cStart Phase MessagePhase color:green;
+[00:07:32.305] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:07:32.305] LOG: %cStart Phase MessagePhase color:green;
+[00:07:32.533] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:07:32.666] LOG: %cStart Phase MessagePhase color:green;
+[00:07:32.899] LOG: %cStart Phase TurnInitPhase color:green;
+[00:07:32.899] LOG: %cStart Phase CommandPhase color:green;
