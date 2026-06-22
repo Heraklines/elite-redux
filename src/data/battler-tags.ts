@@ -3923,7 +3923,7 @@ export class ErItemDisabledTag extends SerializableBattlerTag {
   /** modifierType ids of the locked held item(s). Empty = legacy "all items" (old saves). */
   public suppressedTypeIds: string[] = [];
 
-  constructor(turnCount = 2) {
+  constructor(turnCount = 3) {
     super(BattlerTagType.ER_ITEM_DISABLED, BattlerTagLapseType.TURN_END, turnCount);
   }
 
@@ -3941,7 +3941,7 @@ export class ErItemDisabledTag extends SerializableBattlerTag {
 
   override onOverlap(pokemon: Pokemon): void {
     // Re-applied (re-frisked / second contact): refresh the duration and re-lock.
-    this.turnCount = Math.max(this.turnCount, 2);
+    this.turnCount = Math.max(this.turnCount, 3);
     this.lockFirstItem(pokemon);
   }
 
@@ -4210,7 +4210,7 @@ export function getBattlerTag(
     case BattlerTagType.ER_FEAR:
       return new ErFearTag();
     case BattlerTagType.ER_ITEM_DISABLED:
-      return new ErItemDisabledTag(turnCount || 2);
+      return new ErItemDisabledTag(turnCount || 3);
     case BattlerTagType.ER_ICE_STATUE:
       return new ErIceStatueTag();
   }

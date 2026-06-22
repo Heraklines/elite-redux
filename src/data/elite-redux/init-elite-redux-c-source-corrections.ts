@@ -380,7 +380,12 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_LEAFAGE", { pp: 40 }],
   ["MOVE_LASER_FOCUS", { pp: 30 }],
   ["MOVE_GEAR_UP", { pp: 20 }],
-  ["MOVE_THROAT_CHOP", { chance: 0 }],
+  // chance 100, NOT 0: THROAT_CHOPPED is applied by AddBattlerTagAttr, which is
+  // gated by `move.chance` (getMoveChance). The raw c-source row has 0 (the dump
+  // models the sound-disable as a guaranteed flag, not a secondary chance), but
+  // pokerogue needs chance=100 or the tag never attaches and sound moves are never
+  // blocked. Same situation as MOVE_GROWL above. (Verified via headless runner.)
+  ["MOVE_THROAT_CHOP", { chance: 100 }],
   ["MOVE_LUNGE", { power: 80 }],
   ["MOVE_SMART_STRIKE", { power: 70 }],
   ["MOVE_BRUTAL_SWING", { power: 60 }],

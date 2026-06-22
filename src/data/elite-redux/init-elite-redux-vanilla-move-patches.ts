@@ -287,7 +287,11 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       setCategory(move, MoveCategory.SPECIAL);
       move.power = 80;
       move.accuracy = 100;
-      move.moveTarget = MoveTarget.NEAR_OTHER;
+      // NEAR_ENEMY (a single adjacent FOE), NOT NEAR_OTHER — NEAR_OTHER also lets
+      // you pick your own ally, so in doubles Decorate could be aimed at (and
+      // damage) your partner. The dex move "Damages foes"; it must never target an
+      // ally. (Reported: "decorate on my ally damages my ally AND buffs them".)
+      move.moveTarget = MoveTarget.NEAR_ENEMY;
       orFlag(move, MoveFlags.MAKES_CONTACT);
       removeAttrsByName(move, ["StatStageChangeAttr"]);
       // ER Decorate (dex #705): "Damages foes. Raises ALLIES' Attack, Special Attack,

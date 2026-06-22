@@ -28,8 +28,12 @@ import { MoveFlags } from "#enums/move-flags";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 
 export class DisableFoeItemsOnEntryAbAttr extends PostSummonAbAttr {
-  /** How long the foe's items stay disabled, in turns. */
-  private static readonly TURNS = 2;
+  // 3, not 2, to disable the foe's item for 2 full turns (the dex "2 turns").
+  // TurnEndPhase lapses TURN_END tags BEFORE held-item turn-end effects fire
+  // (turn-end-phase.ts), so a count-2 tag is already removed when turn 2's
+  // Leftovers heal runs - only turn 1 is actually blocked. Count 3 keeps the tag
+  // alive through both turn-end heals. (Reported: "frisk only locks for 1 turn".)
+  private static readonly TURNS = 3;
 
   constructor() {
     // showAbility=false: the vanilla Frisk reveal already raises the ability bar;
@@ -54,7 +58,9 @@ export class DisableFoeItemsOnEntryAbAttr extends PostSummonAbAttr {
  * the "item cannot be removed or stolen" half.)
  */
 export class DisableTargetItemOnContactAbAttr extends PostAttackAbAttr {
-  private static readonly TURNS = 2;
+  // 3 = 2 full turns of suppression; see DisableFoeItemsOnEntryAbAttr above for
+  // why (TURN_END tag lapse runs before the held-item turn-end heal).
+  private static readonly TURNS = 3;
 
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, opponent, move, hitResult } = params;

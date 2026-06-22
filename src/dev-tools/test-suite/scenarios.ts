@@ -359,7 +359,11 @@ export const DEV_SCENARIOS: DevScenario[] = [
     setup: () => {
       resetDevOverrides();
       setOverrides({
-        STARTING_WAVE_OVERRIDE: 5,
+        // Wave 145: past the ER #419 elite BST-cap ladder (caps end at w100), so
+        // the real Exploud (BST 600) spawns instead of being swapped down to a
+        // frail Loudred. The bulky Exploud also survives Throat Chop, so the
+        // same-turn Boomburst cancel is actually observable (it was one-shot before).
+        STARTING_WAVE_OVERRIDE: 145,
         STARTING_LEVEL_OVERRIDE: 50,
         ENEMY_SPECIES_OVERRIDE: SpeciesId.EXPLOUD,
         ENEMY_LEVEL_OVERRIDE: 50,
@@ -415,7 +419,11 @@ export const DEV_SCENARIOS: DevScenario[] = [
     setup: () => {
       resetDevOverrides();
       setOverrides({
-        STARTING_WAVE_OVERRIDE: 5,
+        // Wave 145: past the ER #419 elite BST-cap ladder (caps end at w100). At
+        // wave 5 the cap (420) swapped Porygon-Z (535) down to plain Porygon, which
+        // has NO Deadeye innate, so Zap Cannon missed regardless of the fix. The
+        // real Porygon-Z spawns at a late wave and keeps its Deadeye innate.
+        STARTING_WAVE_OVERRIDE: 145,
         STARTING_LEVEL_OVERRIDE: 60,
         ENEMY_SPECIES_OVERRIDE: SpeciesId.PORYGON_Z,
         ENEMY_LEVEL_OVERRIDE: 40,
@@ -442,12 +450,16 @@ export const DEV_SCENARIOS: DevScenario[] = [
     setup: () => {
       resetDevOverrides();
       setOverrides({
-        STARTING_WAVE_OVERRIDE: 5,
+        // Wave 145 + bulky Blissey foes (BST 540, past the #419 cap): the weak
+        // Magikarp used to be one-shot by Water Pulse, and a fainted trigger-target
+        // previously suppressed the follow-up entirely ("High Tide doesn't activate").
+        // Tanky foes survive the Water Pulse so the spread Surf visibly hits BOTH.
+        STARTING_WAVE_OVERRIDE: 145,
         STARTING_LEVEL_OVERRIDE: 55,
         BATTLE_STYLE_OVERRIDE: "double",
         ABILITY_OVERRIDE: erAbility(ErAbilityId.HIGH_TIDE),
-        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
-        ENEMY_LEVEL_OVERRIDE: 30,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 60,
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
       });
       return [
@@ -498,26 +510,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "Mega Vanilluxe Multi-headed hits 3x",
     description:
       "Multi-headed fix: a mega that GAINS a 3rd head (Vanilluxe, Mawile, Shuckle)\n"
-      + "should strike 3 times (100% / 20% / 15%), not 2 (100% / 25%). DO: win the\n"
-      + "opening battle, take Vanilluxe's Mega Stone from the shop, mega-evolve it next\n"
-      + "battle, then attack with Ice Beam (a single-target move). EXPECT: THREE hits.\n"
-      + "Before the fix the mega head-count lookup missed and it only hit twice.",
+      + "should strike 3 times (100% / 20% / 15%), not 2 (100% / 25%). Your Vanilluxe\n"
+      + "starts ALREADY Mega-evolved (3-headed), facing a bulky Blissey that tanks the\n"
+      + "volley. DO: attack with ICE BEAM (a single-target move). EXPECT: it strikes\n"
+      + "THREE times per use (watch the hit/damage count), not twice. Before the fix the\n"
+      + "mega head-count lookup missed and it only hit twice.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
-        STARTING_WAVE_OVERRIDE: 5,
+        // Wave 145: past the ER #419 elite BST-cap ladder (caps end at w100) so the
+        // bulky Blissey (BST 540) spawns intact to soak all 3 strikes - a frail mon
+        // would faint on the first hit and hide the extra heads.
+        STARTING_WAVE_OVERRIDE: 145,
         STARTING_LEVEL_OVERRIDE: 60,
-        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
-        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 60,
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
       });
       return [
+        // Spawn directly in the Mega form (formIndex "mega"). Megas only revert on
+        // switch-out / battle end (never at the first summon), so it stays Mega for
+        // this fight - the tester controls a 3-headed Mega Vanilluxe immediately, with
+        // no shop / mega-stone / manual mega-evolve step (which is what failed before).
         makeStarter(SpeciesId.VANILLUXE, {
+          formIndex: formIndexContaining(SpeciesId.VANILLUXE, "mega"),
           moveset: [MoveId.ICE_BEAM, MoveId.FLASH_CANNON, MoveId.FREEZE_DRY, MoveId.MIRROR_COAT],
         }),
       ];
     },
-    shopItems: [modifierTypes.FORM_CHANGE_ITEM],
   },
   // ===========================================================================
   // UI — Redux Litwick line renders its own sprite (not Pansear)
@@ -595,7 +615,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
     setup: () => {
       resetDevOverrides();
       setOverrides({
-        STARTING_WAVE_OVERRIDE: 5,
+        // Wave 145: past the ER #419 elite BST-cap ladder (caps end at w100) so the
+        // bulky Snorlax (BST 540) spawns instead of devolving to a frailer Munchlax.
+        STARTING_WAVE_OVERRIDE: 145,
         STARTING_LEVEL_OVERRIDE: 50,
         ABILITY_OVERRIDE: AbilityId.FRISK,
         ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
@@ -625,7 +647,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
     setup: () => {
       resetDevOverrides();
       setOverrides({
-        STARTING_WAVE_OVERRIDE: 5,
+        // Wave 145: past the ER #419 elite BST-cap ladder (caps end at w100). At
+        // wave 5 the cap (420) swapped Skarmory (465, no prevolution) for a random
+        // under-cap species, so the Steel-type target the test needs vanished.
+        STARTING_WAVE_OVERRIDE: 145,
         STARTING_LEVEL_OVERRIDE: 60,
         ABILITY_OVERRIDE: AbilityId.CORROSION,
         ENEMY_SPECIES_OVERRIDE: SpeciesId.SKARMORY,
@@ -651,7 +676,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
     setup: () => {
       resetDevOverrides();
       setOverrides({
-        STARTING_WAVE_OVERRIDE: 5,
+        // Wave 145: past the ER #419 elite BST-cap ladder (caps end at w100) so the
+        // Fire/Ground Camerupt (BST 460) spawns intact (the 4x super-effective Water
+        // read the test relies on), instead of devolving to Numel.
+        STARTING_WAVE_OVERRIDE: 145,
         STARTING_LEVEL_OVERRIDE: 60,
         ABILITY_OVERRIDE: AbilityId.LIQUID_VOICE,
         ENEMY_SPECIES_OVERRIDE: SpeciesId.CAMERUPT,
@@ -678,7 +706,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
     setup: () => {
       resetDevOverrides();
       setOverrides({
-        STARTING_WAVE_OVERRIDE: 5,
+        // Wave 145: past the ER #419 elite BST-cap ladder (caps end at w100) so the
+        // bulky Blissey (BST 540) spawns to soak hits while you watch the player's
+        // Wispywaspy school, instead of devolving down to Happiny.
+        STARTING_WAVE_OVERRIDE: 145,
         STARTING_LEVEL_OVERRIDE: 60,
         ABILITY_OVERRIDE: erAbility(ErAbilityId.LOCUST_SWARM),
         ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
@@ -731,7 +762,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
     setup: () => {
       resetDevOverrides();
       setOverrides({
-        STARTING_WAVE_OVERRIDE: 5,
+        // Wave 145: past the ER #419 elite BST-cap ladder (caps end at w100) so
+        // Scizor (BST 500) spawns intact instead of being devolved/swapped.
+        STARTING_WAVE_OVERRIDE: 145,
         STARTING_LEVEL_OVERRIDE: 60,
         ABILITY_OVERRIDE: erAbility(ErAbilityId.RETRIBUTION_BLOW),
         ENEMY_SPECIES_OVERRIDE: SpeciesId.SCIZOR,

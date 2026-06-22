@@ -64,7 +64,16 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
 
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, move, opponent } = params;
-    if (!opponent || opponent.isFainted()) {
+    if (!opponent) {
+      return false;
+    }
+    // The TRIGGERING target may have just FAINTED from the move that landed (e.g.
+    // a High Tide holder KOs one foe with a single-target Water move). That must
+    // NOT suppress the follow-up — a spread follow-up (Surf/Blizzard) still has to
+    // hit the rest of the field. Bail only when the holder has NO living foe left
+    // for the follow-up to hit. (Reported: "High Tide doesn't activate" — the lone
+    // weak foe was one-shot, so the old `opponent.isFainted()` bail killed the Surf.)
+    if (pokemon.getOpponents().every(o => o.isFainted())) {
       return false;
     }
     // Re-entry guard: the scripted follow-up is itself a damaging move, so when
@@ -118,7 +127,7 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
     // hook's `opponent` is the dancer itself - the scripted follow-up
     // (Two Step's Revelation Dance, Blade Dance's Leaf Blade, ...) then
     // SELF-HIT. Aim the follow-up at a real opponent instead.
-    if (opponent === pokemon || opponent.isPlayer() === pokemon.isPlayer()) {
+    if (opponent === pokemon || opponent.isPlayer() === pokemon.isPlayer() || opponent.isFainted()) {
       const foes = pokemon.getOpponents().filter(o => !o.isFainted());
       if (foes.length === 0) {
         return;
