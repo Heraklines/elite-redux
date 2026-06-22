@@ -1,0 +1,275 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 OPR/132.0.0.0
+mode:     0  wave:120  difficulty:ace
+seed:     gzfTMvkLpZ2Cbi0BlgSDivgy
+party:    Lumber Sloth(L104 0/393), Kingambit Redux(L104 333/333), Machamp Redux(L104 291/291), Hydreigon Redux(L104 267/354), Reuniclus Redux(L102 368/368), Dodrio Redux(L104 333/333)
+
+----- DESCRIPTION -----
+Entered the boss, H-Zoroark just one-tapped me at nearly full health, and now the it says that I can still attack even though the mon is fainted.
+
+----- CONSOLE -----
+[19:48:22.165] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:48:22.649] LOG: crit stage: +0
+[19:48:22.650] LOG: Applied X Defense 
+[19:48:22.650] LOG: Move: Mega Punch | Base damage: 56.34283389830509 | Power: 125.4 | Source attack: 204 | Target defense: 354
+[19:48:22.650] LOG: Move: Mega Punch | Attack damage: 76
+[19:48:22.650] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:48:22.698] LOG: %cStart Phase MoveEndPhase color:green;
+[19:48:22.698] LOG: %cStart Phase MovePhase color:green;
+[19:48:22.698] LOG: %cUser: Lumber Sloth
+Move: DRAIN_PUNCH
+Use Mode: NORMAL color:orchid
+[19:48:22.699] LOG: %cStart Phase MessagePhase color:green;
+[19:48:22.977] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:48:23.513] LOG: crit stage: +0
+[19:48:23.513] LOG: Move: Drain Punch | Base damage: 200.79676470588234 | Power: 97.5 | Source attack: 318 | Target defense: 136
+[19:48:23.513] LOG: Move: Drain Punch | Attack damage: 186
+[19:48:23.513] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:48:23.563] LOG: %cStart Phase MessagePhase color:green;
+[19:48:23.974] LOG: %cStart Phase PokemonHealPhase color:green;
+[19:48:23.974] LOG: Applied Healing Charm 
+[19:48:23.975] LOG: %cStart Phase MessagePhase color:green;
+[19:48:24.456] LOG: %cStart Phase FaintPhase color:green;
+[19:48:25.130] LOG: %cStart Phase MessagePhase color:green;
+[19:48:25.424] LOG: %cStart Phase VictoryPhase color:green;
+[19:48:25.424] LOG: Applied Soothe Bell 
+[19:48:25.424] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:48:25.424] LOG: Applied Super EXP. Charm 
+[19:48:25.424] LOG: Applied EXP. Charm 
+[19:48:25.425] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:48:25.425] LOG: %cStart Phase MoveEndPhase color:green;
+[19:48:25.425] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:48:25.425] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:48:26.367] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:48:26.367] LOG: %cStart Phase BerryPhase color:green;
+[19:48:26.368] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:48:26.368] LOG: %cStart Phase TurnEndPhase color:green;
+[19:48:26.368] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:48:26.369] LOG: %cStart Phase BattleEndPhase color:green;
+[19:48:26.369] LOG: Battle Score: 108 (2 Turns x0.84)
+[19:48:26.369] LOG: Total Score: 17032
+[19:48:26.374] LOG: Applied HP Up 
+[19:48:26.374] LOG: Applied Iron 
+[19:48:26.374] LOG: Applied Carbos 
+[19:48:26.374] LOG: Applied Soul Dew 
+[19:48:26.374] LOG: Applied Soul Dew 
+[19:48:26.374] LOG: Applied Calcium 
+[19:48:26.374] LOG: Applied Zinc 
+[19:48:26.376] LOG: %cStart Phase EggLapsePhase color:green;
+[19:48:26.376] LOG: %cStart Phase SelectModifierPhase color:green;
+[19:48:26.376] LOG: Wave Seed: ÝðÜÊÃìáÂæÐ¨¹Øß¦¸âÝÉºßìÝï 118
+[19:48:26.378] LOG: Applied Golden Poké Ball 
+[19:48:26.378] LOG: 8 2 [4,5]
+[19:48:26.378] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} 
+[19:48:26.378] LOG: 2 0 [4,5]
+[19:48:26.378] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[19:48:26.378] LOG: 7 2 [4,5]
+[19:48:26.378] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[19:48:26.378] LOG: 6 2 [4,5]
+[19:48:26.378] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[19:48:26.378] LOG: 1 0 [9,11,25]
+[19:48:26.378] LOG: {"id":"MAX_LURE","localeKey":"modifierType:ModifierType.MAX_LURE","iconImage":"max_lure","group":"lure","soundName":"se/restore","tier":2,"maxBattles":30} 
+[19:48:26.378] LOG: 18 2 [9,11,25]
+[19:48:26.378] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"dragon_fang","soundName":"se/restore","tier":2,"moveType":15,"boostPercent":20} 
+[19:48:26.379] LOG: 7 0 [9,11,25]
+[19:48:26.379] LOG: ULTRA 1
+[19:48:26.379] LOG: 27 3 [9,11,25]
+[19:48:26.379] LOG: {"id":"WIDE_LENS","localeKey":"modifierType:ModifierType.WIDE_LENS","iconImage":"wide_lens","soundName":"se/restore","tier":2,"amount":5} 
+[19:48:26.379] LOG: 14 2 [9,11,25]
+[19:48:26.379] LOG: {"id":"FROSTBITE_ORB","localeKey":"","iconImage":"frostbite_orb","soundName":"se/restore","tier":2} 
+[19:48:26.379] LOG: 32 3 [9,11,25]
+[19:48:26.379] LOG: {"id":"ER_LOADED_DICE","localeKey":"","iconImage":"wide_lens","iconTint":15255626,"soundName":"se/restore","tier":2} 
+[19:48:26.379] LOG: 5 0 [9,11,25]
+[19:48:26.379] LOG: {"id":"SPEED_ORDER","localeKey":"","iconImage":"scanner","soundName":"se/restore","tier":2} 
+[19:48:26.379] LOG: 12 2 [9,11,25]
+[19:48:26.379] LOG: {"id":"TOXIC_ORB","localeKey":"modifierType:ModifierType.TOXIC_ORB","iconImage":"toxic_orb","soundName":"se/restore","tier":2} 
+[19:48:26.379] LOG: 6 0 [9,11,25]
+[19:48:26.379] LOG: ULTRA 1
+[19:48:26.379] LOG: 17 2 [9,11,25]
+[19:48:26.379] LOG: {"id":"CANDY_JAR","localeKey":"modifierType:ModifierType.CANDY_JAR","iconImage":"candy_jar","soundName":"se/restore","tier":2} 
+[19:48:26.379] LOG: 6 0 [9,11,25]
+[19:48:26.379] LOG: ULTRA 1
+[19:48:26.379] LOG: 7 0 [9,11,25]
+[19:48:26.379] LOG: ULTRA 1
+[19:48:26.379] LOG: 13 2 [9,11,25]
+[19:48:26.379] LOG: {"id":"FLAME_ORB","localeKey":"modifierType:ModifierType.FLAME_ORB","iconImage":"flame_orb","soundName":"se/restore","tier":2} 
+[19:48:26.379] LOG: 6 0 [9,11,25]
+[19:48:26.379] LOG: ULTRA 1
+[19:48:26.379] LOG: 29 3 [9,11,25]
+[19:48:26.379] LOG: {"id":"ER_COPPER_ROD","localeKey":"","iconImage":"quick_claw","iconTint":14256208,"soundName":"se/restore","tier":2} 
+[19:48:26.379] LOG: 28 3 [9,11,25]
+[19:48:26.379] LOG: {"id":"ER_CHILI_SAMPLE","localeKey":"","iconImage":"charcoal","iconTint":16733491,"soundName":"se/restore","tier":2} 
+[19:48:26.379] LOG: 2 0 [9,11,25]
+[19:48:26.379] LOG: {"id":"BIG_NUGGET","localeKey":"modifierType:ModifierType.BIG_NUGGET","iconImage":"big_nugget","group":"money","soundName":"se/buy","tier":2,"moneyMultiplier":2.5,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.moderate"} 
+[19:48:28.860] LOG: %cStart Phase NewBattlePhase color:green;
+[19:48:28.860] LOG: Wave Seed: ÞñÝËÄíâÃçÑ©ºÙà§¹ãÞÊ»àíÞð 119
+[19:48:28.860] LOG: %cStart Phase NextEncounterPhase color:green;
+[19:48:28.861] LOG: Starting species pool tier: COMMON
+[19:48:28.861] LOG: Replaced SWINUB with MAMOSWINE
+[19:48:28.861] LOG: Applied Ability Charm 
+[19:48:28.865] LOG: Pokemon: Wild Mamoswine | Species ID: 473 | Level: 94 | Nature: Gentle (+SpDef/-Def)
+[19:48:28.865] LOG: Stats (IVs): HP: 319 (9), Atk: 254 (5), Def: 148 (11), Spatk: 138 (2), Spdef: 135 (5), Spd: 176 (22)
+[19:48:28.865] LOG: Ability: Sheer Force | Passive Ability: Thick Fat 
+[19:48:28.865] LOG: Moveset: ["Mountain Chunk","Ice Fang","Avalanche","Noble Roar"]
+[19:48:28.866] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"never_melt_ice","soundName":"se/restore","tier":2,"moveType":14,"boostPercent":20} (enemy)
+[19:48:28.866] LOG: {"id":"BERRY","localeKey":"","iconImage":"liechi_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":3} (enemy)
+[19:48:28.866] LOG: Battle Seed: 1nY9a8XodhbPaO0O
+[19:48:28.975] ERROR: Failed to write "data_DustyVachon" to localStorage - browser storage is full (save too large, e.g. too many eggs): QuotaExceededError: Failed to execute 'setItem' on 'Storage': Setting the value of 'data_DustyVachon' exceeded the quota.
+QuotaExceededError: Failed to execute 'setItem' on 'Storage': Setting the value of 'data_DustyVachon' exceeded the quota.
+    at trySetLocalStorageItem (https://elite-redux.pages.dev/assets/battle-scene-CahYoH4J.js:1004:149473)
+    at GameData.saveAll (https://elite-redux.pages.dev/assets/battle-scene-CahYoH4J.js:1004:170396)
+    at https://elite-redux.pages.dev/assets/battle-scene-CahYoH4J.js:22:37928
+[19:48:28.976] DEBUG: Session data saved to slot 0!
+[19:48:32.863] ERROR: Internal server error.
+[19:48:32.863] LOG: Wave Seed: ÞñÝËÄíâÃçÑ©ºÙà§¹ãÞÊ»àíÞð 119
+[19:48:33.710] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:48:33.710] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:48:34.268] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:48:34.268] LOG: %cStart Phase PostSummonPhase color:green;
+[19:48:34.268] LOG: Ran PSP for: Mamoswine
+[19:48:34.269] LOG: %cStart Phase PostSummonPhase color:green;
+[19:48:34.269] LOG: %cStart Phase PostSummonPhase color:green;
+[19:48:34.269] LOG: %cStart Phase TurnInitPhase color:green;
+[19:48:34.269] LOG: %cStart Phase CommandPhase color:green;
+[19:48:35.203] LOG: Move: HORN_LEECH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Lumber Sloth
+[19:48:35.203] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:48:35.204] LOG: Applied Never-Melt Ice (enemy)
+[19:48:35.204] LOG: Applied Never-Melt Ice (enemy)
+[19:48:35.206] LOG: Move Pool: ["Mountain Chunk","Ice Fang","Avalanche","Noble Roar"]
+[19:48:35.206] LOG: Move Scores: [28.5,24,18,4]
+[19:48:35.206] LOG: Sorted Move Pool: ["Mountain Chunk","Ice Fang","Avalanche","Noble Roar"]
+[19:48:35.206] LOG: Chosen Move: Mountain Chunk
+[19:48:35.206] LOG: %cStart Phase TurnStartPhase color:green;
+[19:48:35.206] LOG: %cStart Phase MovePhase color:green;
+[19:48:35.206] LOG: %cUser: Mamoswine
+Move: MOUNTAIN_CHUNK
+Use Mode: NORMAL color:orchid
+[19:48:35.207] LOG: %cStart Phase MessagePhase color:green;
+[19:48:35.423] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:48:36.851] LOG: crit stage: +0
+[19:48:36.852] LOG: Move: Mountain Chunk | Base damage: 99.51533559322033 | Power: 143 | Source attack: 254 | Target defense: 295
+[19:48:36.852] LOG: Move: Mountain Chunk | Attack damage: 137
+[19:48:36.852] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:48:36.896] LOG: %cStart Phase MoveEndPhase color:green;
+[19:48:36.897] LOG: %cStart Phase MovePhase color:green;
+[19:48:36.897] LOG: %cUser: Lumber Sloth
+Move: HORN_LEECH
+Use Mode: NORMAL color:orchid
+[19:48:36.899] LOG: %cStart Phase MessagePhase color:green;
+[19:48:37.158] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:48:38.048] LOG: crit stage: +0
+[19:48:38.049] LOG: Move: Horn Leech | Base damage: 221.21372972972972 | Power: 175.5 | Source attack: 318 | Target defense: 222
+[19:48:38.049] LOG: Move: Horn Leech | Attack damage: 637
+[19:48:38.049] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:48:38.092] LOG: %cStart Phase MessagePhase color:green;
+[19:48:38.518] LOG: %cStart Phase PokemonHealPhase color:green;
+[19:48:38.518] LOG: Applied Healing Charm 
+[19:48:38.519] LOG: %cStart Phase MessagePhase color:green;
+[19:48:38.971] LOG: %cStart Phase FaintPhase color:green;
+[19:48:41.151] LOG: %cStart Phase MessagePhase color:green;
+[19:48:41.459] LOG: %cStart Phase VictoryPhase color:green;
+[19:48:41.459] LOG: Applied Soothe Bell 
+[19:48:41.459] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:48:41.459] LOG: Applied Super EXP. Charm 
+[19:48:41.459] LOG: Applied EXP. Charm 
+[19:48:41.459] LOG: %cStart Phase LevelUpPhase color:green;
+[19:48:41.459] LOG: Applied Calcium 
+[19:48:41.459] LOG: Applied Zinc 
+[19:48:41.459] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:48:41.459] LOG: %cStart Phase MoveEndPhase color:green;
+[19:48:41.459] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:48:41.460] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:48:42.320] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:48:42.320] LOG: %cStart Phase BerryPhase color:green;
+[19:48:42.320] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:48:42.320] LOG: %cStart Phase TurnEndPhase color:green;
+[19:48:42.320] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:48:42.321] LOG: %cStart Phase BattleEndPhase color:green;
+[19:48:42.321] LOG: Battle Score: 264 (1 Turns x1)
+[19:48:42.321] LOG: Total Score: 17296
+[19:48:42.326] LOG: Applied HP Up 
+[19:48:42.326] LOG: Applied Iron 
+[19:48:42.326] LOG: Applied Carbos 
+[19:48:42.326] LOG: Applied Soul Dew 
+[19:48:42.326] LOG: Applied Soul Dew 
+[19:48:42.327] LOG: Applied Calcium 
+[19:48:42.327] LOG: Applied Zinc 
+[19:48:42.328] LOG: %cStart Phase EggLapsePhase color:green;
+[19:48:43.977] LOG: %cStart Phase MessagePhase color:green;
+[19:48:44.552] LOG: %cStart Phase MessagePhase color:green;
+[19:48:44.909] LOG: %cStart Phase EggSummaryPhase color:green;
+[19:49:29.898] LOG: %cStart Phase SelectModifierPhase color:green;
+[19:49:29.898] LOG: Wave Seed: ÞñÝËÄíâÃçÑ©ºÙà§¹ãÞÊ»àíÞð 119
+[19:49:29.900] LOG: Applied Golden Poké Ball 
+[19:49:29.900] LOG: 0 0 [4,5]
+[19:49:29.900] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[19:49:29.900] LOG: 26 3 [9,11,25]
+[19:49:29.900] LOG: {"id":"QUICK_CLAW","localeKey":"modifierType:ModifierType.QUICK_CLAW","iconImage":"quick_claw","soundName":"se/restore","tier":2} 
+[19:49:29.900] LOG: 3 0 [4,5]
+[19:49:29.900] LOG: {"id":"SUPER_POTION","localeKey":"modifierType:ModifierType.SUPER_POTION","iconImage":"super_potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":50,"restorePercent":25,"healStatus":false} 
+[19:49:29.900] LOG: 19 7 [2,5,7,8,9,10,16,23]
+[19:49:29.900] LOG: {"id":"MEMORY_MUSHROOM","localeKey":"modifierType:ModifierType.MEMORY_MUSHROOM","iconImage":"big_mushroom","soundName":"se/restore","tier":1} 
+[19:49:29.900] LOG: 15 6 [2,5,7,8,9,10,16,23]
+[19:49:29.900] LOG: GREAT 0
+[19:49:29.900] LOG: 24 8 [2,5,7,8,9,10,16,23]
+[19:49:29.900] LOG: {"id":"VOUCHER","localeKey":"","iconImage":"coupon","group":"voucher","soundName":"se/restore","tier":1,"voucherType":0,"count":1} 
+[19:49:29.900] LOG: 17 7 [2,5,7,8,9,10,16,23]
+[19:49:29.900] LOG: {"id":"SOOTHE_BELL","localeKey":"modifierType:ModifierType.SOOTHE_BELL","iconImage":"soothe_bell","soundName":"se/restore","tier":1} 
+[19:49:29.900] LOG: 15 6 [2,5,7,8,9,10,16,23]
+[19:49:29.900] LOG: GREAT 1
+[19:49:29.900] LOG: 4 1 [2,5,7,8,9,10,16,23]
+[19:49:29.900] LOG: {"id":"MAX_REVIVE","localeKey":"modifierType:ModifierType.MAX_REVIVE","iconImage":"max_revive","group":"revive","soundName":"se/restore","tier":1,"restorePoints":0,"restorePercent":100,"healStatus":false} 
+[19:49:29.911] WARN: Missing animation: pkmn__1
+[19:49:33.873] LOG: %cStart Phase NewBattlePhase color:green;
+[19:49:33.873] LOG: Wave Seed: ßòÞÌÅîãÄèÒª»Úá¨ºäßË¼áîßñ 120
+[19:49:33.873] LOG: %cStart Phase NextEncounterPhase color:green;
+[19:49:33.874] LOG: Starting species pool tier: BOSS_RARE
+[19:49:33.874] LOG: Applied Ability Charm 
+[19:49:33.882] LOG: Pokemon: Wild Zoroark | Species ID: 6571 | Level: 97 | Nature: Hasty (+Spd/-Def)
+[19:49:33.882] LOG: Stats (IVs): HP: 231 (18), Atk: 202 (15), Def: 129 (29), Spatk: 271 (20), Spdef: 121 (8), Spd: 248 (21)
+[19:49:33.882] LOG: Ability: Ambush | Passive Ability: Illusion (N) | Boss Bars: 2
+[19:49:33.882] LOG: Moveset: ["Swift","Flatter","Blood Moon","Destiny Bond"]
+[19:49:36.143] WARN: Could not load animation file for move 'blood-moon' 404 
+[19:49:36.361] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"calcium","soundName":"se/restore","tier":1,"stat":3,"key":"calcium"} (enemy)
+[19:49:36.361] LOG: {"id":"BERRY","localeKey":"","iconImage":"apicot_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":6} (enemy)
+[19:49:36.361] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"iron","soundName":"se/restore","tier":1,"stat":2,"key":"iron"} (enemy)
+[19:49:36.361] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"calcium","soundName":"se/restore","tier":1,"stat":3,"key":"calcium"} (enemy)
+[19:49:36.361] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"zinc","soundName":"se/restore","tier":1,"stat":4,"key":"zinc"} (enemy)
+[19:49:36.361] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[19:49:36.361] LOG: Battle Seed: ExARzqRqdpyf0rWq
+[19:49:36.361] LOG: Applied Calcium (enemy)
+[19:49:36.361] LOG: Applied Iron (enemy)
+[19:49:36.361] LOG: Applied Zinc (enemy)
+[19:49:36.467] DEBUG: Session data saved to slot 0!
+[19:49:36.468] LOG: Wave Seed: ßòÞÌÅîãÄèÒª»Úá¨ºäßË¼áîßñ 120
+[19:49:37.325] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:49:37.325] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:49:38.061] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:49:38.062] LOG: %cStart Phase PostSummonPhase color:green;
+[19:49:38.062] LOG: Ran PSP for: Zoroark
+[19:49:38.062] LOG: %cStart Phase PostSummonPhase color:green;
+[19:49:38.062] LOG: %cStart Phase PostSummonPhase color:green;
+[19:49:38.062] LOG: %cStart Phase TurnInitPhase color:green;
+[19:49:38.063] LOG: Move Pool: ["Blood Moon"]
+[19:49:38.063] LOG: Move Scores: [42]
+[19:49:38.063] LOG: Sorted Move Pool: ["Blood Moon"]
+[19:49:38.063] LOG: Chosen Move: Blood Moon
+[19:49:38.063] LOG: %cStart Phase MovePhase color:green;
+[19:49:38.063] LOG: %cUser: Zoroark
+Move: BLOOD_MOON
+Use Mode: NORMAL color:orchid
+[19:49:38.065] LOG: %cStart Phase MessagePhase color:green;
+[19:49:38.317] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:49:38.340] LOG: crit stage: +0
+[19:49:38.340] LOG: Move: Blood Moon | Base damage: 164.0972972972973 | Power: 140 | Source attack: 315 | Target defense: 222
+[19:49:38.341] LOG: Move: Blood Moon | Attack damage: 354
+[19:49:38.341] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:49:38.388] LOG: %cStart Phase MessagePhase color:green;
+[19:49:38.790] LOG: %cStart Phase FaintPhase color:green;
+[19:49:38.790] WARN: cry/10023 not found
+[19:49:38.902] LOG: %cStart Phase MessagePhase color:green;
+[19:49:39.296] LOG: %cStart Phase MoveEndPhase color:green;
+[19:49:39.296] LOG: %cStart Phase CommandPhase color:green;
