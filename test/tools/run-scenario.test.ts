@@ -38,6 +38,7 @@ import {
   type SpecMon,
 } from "#app/dev-tools/test-suite/scenario-spec";
 import { getGameMode } from "#app/game-mode";
+import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerIndex } from "#enums/battler-index";
 import { BiomeId } from "#enums/biome-id";
@@ -51,11 +52,12 @@ import { StatusEffect } from "#enums/status-effect";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
+import { Move } from "#moves/move";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { readFileSync } from "node:fs";
 import Phaser from "phaser";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 // A turn action for the optional `script`: which move the lead (and, in doubles,
 // the 2nd) player mon uses, and an optional target BattlerIndex (0/1 player,
@@ -86,6 +88,7 @@ interface ExpectSpec {
   playerStage?: { stat: string; value: number };
   enemyStage?: { stat: string; value: number };
   weather?: string;
+  terrain?: string;
   maxHits?: HpCheck;
   logIncludes?: string[];
   logExcludes?: string[];
@@ -102,6 +105,8 @@ const SPEC: ScenarioSpec | null = INPUT;
 const SCRIPT = INPUT?.script;
 const EXPECT = INPUT?.expect;
 const FORCED_MOVE = parseForcedMove(process.env.ER_RUN_MOVE);
+const NO_MISS = process.env.ER_RUN_NO_MISS === "1"; // force every move to hit
+const NO_CRIT = process.env.ER_RUN_NO_CRIT === "1"; // force no crits (deterministic stages)
 
 function computeMaxTurns(): number {
   const env = Number(process.env.ER_RUN_TURNS);
@@ -230,6 +235,9 @@ function normalizeSpec(spec: RunnerInput | null): void {
   if (spec.run?.weather != null) {
     spec.run.weather = enumVal(WeatherType as never, spec.run.weather, "weather");
   }
+  if (spec.run?.terrain != null) {
+    spec.run.terrain = enumVal(TerrainType as never, spec.run.terrain, "terrain");
+  }
   if (spec.run?.biome != null) {
     spec.run.biome = enumVal(BiomeId as never, spec.run.biome, "biome");
   }
@@ -264,8 +272,10 @@ function snapMon(mon: Pokemon | undefined) {
 
 function snapshot(game: GameManager) {
   const weather = game.scene.arena?.weather?.weatherType;
+  const terrain = game.scene.arena?.terrain?.terrainType;
   return {
     weather: weather ? WeatherType[weather] : null,
+    terrain: terrain ? TerrainType[terrain] : null,
     player: game.scene.getPlayerField().map(snapMon),
     enemy: game.scene.getEnemyField().map(snapMon),
   };
@@ -398,18 +408,30 @@ function evaluateExpect(
     },
     fails,
   );
-  if (exp.weather != null) {
-    const w = ctx.game.scene.arena?.weather?.weatherType;
-    const wn = w ? WeatherType[w] : "NONE";
-    if (wn.toUpperCase() !== exp.weather.toUpperCase()) {
-      fails.push(`weather ${wn} != ${exp.weather}`);
-    }
-  }
+  expectArena(exp, ctx.game, fails);
   if (exp.maxHits != null) {
     checkNum("maxHits", ctx.maxHits, exp.maxHits, fails);
   }
   expectLog(exp, ctx.log.toLowerCase(), fails);
   return fails;
+}
+
+/** Field-wide weather / terrain checks. */
+function expectArena(exp: ExpectSpec, game: GameManager, fails: string[]): void {
+  if (exp.weather != null) {
+    const w = game.scene.arena?.weather?.weatherType;
+    const wn = w ? WeatherType[w] : "NONE";
+    if (wn.toUpperCase() !== exp.weather.toUpperCase()) {
+      fails.push(`weather ${wn} != ${exp.weather}`);
+    }
+  }
+  if (exp.terrain != null) {
+    const t = game.scene.arena?.terrain?.terrainType;
+    const tn = t ? TerrainType[t] : "NONE";
+    if (tn.toUpperCase() !== exp.terrain.toUpperCase()) {
+      fails.push(`terrain ${tn} != ${exp.terrain}`);
+    }
+  }
 }
 
 /** Message-log substring checks (case-insensitive). */
@@ -429,6 +451,13 @@ function expectLog(exp: ExpectSpec, logLc: string, fails: string[]): void {
 /** Boot a fresh game and launch the scenario on the in-game dev rails; returns the GameManager at the first CommandPhase. */
 async function launchScenario(phaserGame: Phaser.Game, spec: ScenarioSpec): Promise<GameManager> {
   const game = new GameManager(phaserGame);
+  // Determinism knobs: force every move to hit / never crit.
+  if (NO_MISS) {
+    vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
+  }
+  if (NO_CRIT) {
+    game.override.criticalHits(false);
+  }
   const { scenario, postLaunch } = buildDevScenario(spec);
   await game.runToTitle();
   const starters = scenario.setup();

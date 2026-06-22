@@ -22,6 +22,7 @@ import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import type { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
 import { BiomeId } from "#enums/biome-id";
@@ -101,6 +102,8 @@ export interface ScenarioSpec {
         wave?: number | undefined;
         biome?: number | undefined;
         weather?: number | undefined;
+        /** Active terrain (TerrainType): NONE/MISTY/ELECTRIC/GRASSY/PSYCHIC/TOXIC. */
+        terrain?: number | undefined;
         /** Party-wide player level. */
         level?: number | undefined;
         money?: number | undefined;
@@ -142,6 +145,13 @@ export interface ScenarioSpec {
         enemyHpPct?: number | undefined;
         playerStatus?: number | undefined;
         enemyStatus?: number | undefined;
+        /** Same mid-battle state for the SECOND mon on each side (doubles only). */
+        player2Stages?: number[] | undefined;
+        enemy2Stages?: number[] | undefined;
+        player2HpPct?: number | undefined;
+        enemy2HpPct?: number | undefined;
+        player2Status?: number | undefined;
+        enemy2Status?: number | undefined;
       }
     | undefined;
 }
@@ -208,11 +218,17 @@ function toModifierOverrides(rows: SpecItemRow[] | undefined): ModifierOverride[
     .map(r => ({ name: r.name, count: r.count, type: r.type }) as ModifierOverride);
 }
 
-function applyStages(side: "player" | "enemy", stages: number[] | undefined): void {
+// The mon at field slot `idx` (0 = lead, 1 = the 2nd mon in doubles).
+function fieldMon(side: "player" | "enemy", idx: number) {
+  const field = side === "player" ? globalScene.getPlayerField() : globalScene.getEnemyField();
+  return field[idx];
+}
+
+function applyStages(side: "player" | "enemy", idx: number, stages: number[] | undefined): void {
   if (!stages?.some(s => s !== 0)) {
     return;
   }
-  const mon = side === "player" ? globalScene.getPlayerPokemon() : globalScene.getEnemyPokemon();
+  const mon = fieldMon(side, idx);
   if (!mon) {
     return;
   }
@@ -224,15 +240,22 @@ function applyStages(side: "player" | "enemy", stages: number[] | undefined): vo
   mon.updateInfo();
 }
 
-function applyHpPct(side: "player" | "enemy", pct: number | undefined): void {
+function applyHpPct(side: "player" | "enemy", idx: number, pct: number | undefined): void {
   if (pct === undefined || pct <= 0 || pct >= 100) {
     return;
   }
-  const mon = side === "player" ? globalScene.getPlayerPokemon() : globalScene.getEnemyPokemon();
+  const mon = fieldMon(side, idx);
   if (mon) {
     mon.hp = Math.max(1, Math.floor((mon.getMaxHp() * pct) / 100));
     mon.updateInfo();
   }
+}
+
+function applyStatus(side: "player" | "enemy", idx: number, status: number | undefined): void {
+  if (!status) {
+    return;
+  }
+  fieldMon(side, idx)?.trySetStatus(status as StatusEffect);
 }
 
 /** One-line human summary for the banner / log header. */
@@ -317,6 +340,9 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
     }
     if (run.weather) {
       O.WEATHER_OVERRIDE = run.weather as WeatherType;
+    }
+    if (run.terrain) {
+      O.STARTING_TERRAIN_OVERRIDE = run.terrain as TerrainType;
     }
     if (run.level && run.level >= 1) {
       O.STARTING_LEVEL_OVERRIDE = Math.min(100, run.level);
@@ -418,16 +444,19 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
 
   const onBattleStartFn = (): void => {
     const start = spec.start ?? {};
-    applyStages("player", start.playerStages);
-    applyStages("enemy", start.enemyStages);
-    applyHpPct("player", start.playerHpPct);
-    applyHpPct("enemy", start.enemyHpPct);
-    if (start.playerStatus) {
-      globalScene.getPlayerPokemon()?.trySetStatus(start.playerStatus as StatusEffect);
-    }
-    if (start.enemyStatus) {
-      globalScene.getEnemyPokemon()?.trySetStatus(start.enemyStatus as StatusEffect);
-    }
+    // Lead (slot 0), then the 2nd mon on each side (slot 1) for doubles.
+    applyStages("player", 0, start.playerStages);
+    applyStages("enemy", 0, start.enemyStages);
+    applyStages("player", 1, start.player2Stages);
+    applyStages("enemy", 1, start.enemy2Stages);
+    applyHpPct("player", 0, start.playerHpPct);
+    applyHpPct("enemy", 0, start.enemyHpPct);
+    applyHpPct("player", 1, start.player2HpPct);
+    applyHpPct("enemy", 1, start.enemy2HpPct);
+    applyStatus("player", 0, start.playerStatus);
+    applyStatus("enemy", 0, start.enemyStatus);
+    applyStatus("player", 1, start.player2Status);
+    applyStatus("enemy", 1, start.enemy2Status);
     // Wild ability slot: applied live (simplest reliable path).
     const wildSlot = spec.enemy?.kind === "wild" ? spec.enemy.wild?.abilitySlot : undefined;
     if (wildSlot !== undefined) {

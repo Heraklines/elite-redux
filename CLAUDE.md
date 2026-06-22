@@ -83,9 +83,13 @@ node scripts/run-scenario.mjs <ERS1-code | @spec.json | demo> [--turns N] [--mov
   move2,target2}]` (target is a BattlerIndex: 2/3 = enemies). Self-verify with an
   `expect` block: `playerAbility`/`enemyAbility`, `player/enemyStatus`,
   `player/enemyHp` ({min,max,equals}), `player/enemyStage` ({stat,value}),
-  `player/enemyFainted`, `weather`, `maxHits`, `outcome`, and `logIncludes` /
-  `logExcludes` (substring match on the battle message log — the catch-all). A
-  failed `expect` exits nonzero with the exact mismatches.
+  `player/enemyFainted`, `weather`, `terrain`, `maxHits`, `outcome`, and
+  `logIncludes` / `logExcludes` (substring match on the battle message log, the
+  catch-all). A failed `expect` exits nonzero with the exact mismatches.
+- More knobs: `run.terrain` (NONE/MISTY/ELECTRIC/GRASSY/PSYCHIC/TOXIC); in
+  doubles, `start.player2Stages`/`player2HpPct`/`player2Status` (+ `enemy2*`) set
+  the 2nd mon on each side. Flags `--no-miss` (force every move to hit) and
+  `--no-crit` (no crits) make damage / stat-stage assertions reproducible.
 - Output: a `=== TURN n ===` block per turn with a `STATE {…}` snapshot (each
   side's hp / status / stat stages / ability + weather), interleaved game logs,
   and a final `RESULT {…}`. A thrown error or phase-advance timeout (soft-lock /

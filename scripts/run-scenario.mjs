@@ -9,7 +9,7 @@
  * (test/tools/run-scenario.test.ts).
  *
  * Usage:
- *   node scripts/run-scenario.mjs <ERS1-code | @path/to/spec.json | demo> [--turns N] [--move MOVE]
+ *   node scripts/run-scenario.mjs <ERS1-code | @path/to/spec.json | demo> [--turns N] [--move MOVE] [--no-miss] [--no-crit]
  *
  * Examples:
  *   node scripts/run-scenario.mjs demo                       # built-in Anger Point repro
@@ -24,18 +24,26 @@ import { spawnSync } from "node:child_process";
 
 const argv = process.argv.slice(2);
 if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
-  console.log("Usage: node scripts/run-scenario.mjs <ERS1-code | @file.json | demo> [--turns N] [--move MOVE]");
+  console.log(
+    "Usage: node scripts/run-scenario.mjs <ERS1-code | @file.json | demo> [--turns N] [--move MOVE] [--no-miss] [--no-crit]",
+  );
   process.exit(argv.length === 0 ? 1 : 0);
 }
 
 const scenario = argv[0];
 let turns;
 let move;
+let noMiss = false;
+let noCrit = false;
 for (let i = 1; i < argv.length; i++) {
   if (argv[i] === "--turns") {
     turns = argv[++i];
   } else if (argv[i] === "--move") {
     move = argv[++i];
+  } else if (argv[i] === "--no-miss") {
+    noMiss = true;
+  } else if (argv[i] === "--no-crit") {
+    noCrit = true;
   } else {
     console.error(`unknown arg: ${argv[i]}`);
     process.exit(1);
@@ -52,6 +60,12 @@ if (turns) {
 }
 if (move) {
   env.ER_RUN_MOVE = move;
+}
+if (noMiss) {
+  env.ER_RUN_NO_MISS = "1";
+}
+if (noCrit) {
+  env.ER_RUN_NO_CRIT = "1";
 }
 
 // `--silent=false` so the game's console.log transcript reaches the terminal.
