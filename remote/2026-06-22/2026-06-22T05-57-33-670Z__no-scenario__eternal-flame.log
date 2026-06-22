@@ -1,0 +1,269 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqooi2ut-25k2
+mode:     4  wave:130
+seed:     0O0AVnVcO6aqKLvq4mIY5i19
+party:    Crobat(L115 336hp f0), Slyduck(L109 326hp f0), Sawsbuck(L108 357hp f3), Blastoise(L89 253hp f0), Ursaluna(L111 425hp f1), Skeledirge(L97 315hp f0)
+enemy:    Crobat(L115)
+
+----- COMMENT -----
+Greater Golden Ball keeps saying the stack is full when I dont have one
+
+----- CONSOLE -----
+[05:55:52.416] LOG: %cStart Phase SwitchPhase color:green;
+[05:55:54.320] LOG: %cStart Phase SwitchSummonPhase color:green;
+[05:55:54.390] LOG: Applied Protein 
+[05:55:54.390] LOG: Applied Iron 
+[05:55:54.390] LOG: Applied Carbos 
+[05:55:54.390] LOG: Applied HP Up 
+[05:55:54.414] WARN: cry/901-mega not found
+[05:55:54.517] LOG: Applied X Speed 
+[05:55:54.518] LOG: %cStart Phase PostSummonPhase color:green;
+[05:55:54.518] LOG: Ran PSP for: Mega Ursaluna
+[05:55:54.518] LOG: %cStart Phase PostSummonPhase color:green;
+[05:55:54.518] LOG: %cStart Phase PostSummonPhase color:green;
+[05:55:54.518] LOG: %cStart Phase TurnInitPhase color:green;
+[05:55:54.518] LOG: %cStart Phase CommandPhase color:green;
+[05:55:55.784] LOG: Move: THRASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega Ursaluna
+[05:55:55.786] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:55:55.788] LOG: Battle Seed: kZ0GPLlORMJVPfMK
+[05:55:55.788] LOG: Move Pool: ["Brave Bird"]
+[05:55:55.788] LOG: Move Scores: [27]
+[05:55:55.788] LOG: Sorted Move Pool: ["Brave Bird"]
+[05:55:55.788] LOG: Chosen Move: Brave Bird
+[05:55:55.788] LOG: %cStart Phase TurnStartPhase color:green;
+[05:55:55.788] LOG: Applied X Speed 
+[05:55:55.789] LOG: Applied X Speed 
+[05:55:55.789] LOG: Applied X Speed 
+[05:55:55.790] LOG: %cStart Phase MovePhase color:green;
+[05:55:55.790] LOG: %cUser: Crobat
+Move: BRAVE_BIRD
+Use Mode: NORMAL color:orchid
+[05:55:55.790] LOG: Applied X Speed 
+[05:55:55.792] LOG: Applied X Speed 
+[05:55:55.792] LOG: %cStart Phase MessagePhase color:green;
+[05:55:55.898] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:55:55.904] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:55.996] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:55.996] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.002] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.008] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.015] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.045] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.045] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.051] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.058] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.058] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.058] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.058] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.076] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.076] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.082] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.088] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.088] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.088] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.088] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.107] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.107] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.114] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.121] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.121] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.121] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.121] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.145] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.145] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.151] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.158] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.158] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.158] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.158] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.183] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:56.359] LOG: crit stage: +0
+[05:55:56.360] LOG: Move: Brave Bird | Base damage: 165.45486725663716 | Power: 120 | Source attack: 481 | Target defense: 339
+[05:55:56.360] LOG: Move: Brave Bird | Attack damage: 121
+[05:55:56.361] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:55:56.372] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:55:56.373] LOG: %cStart Phase MessagePhase color:green;
+[05:55:56.609] LOG: %cStart Phase MoveEndPhase color:green;
+[05:55:56.609] LOG: %cStart Phase MovePhase color:green;
+[05:55:56.609] LOG: %cUser: Mega Ursaluna
+Move: THRASH
+Use Mode: NORMAL color:orchid
+[05:55:56.609] LOG: Applied X Speed 
+[05:55:56.610] LOG: Applied X Speed 
+[05:55:56.610] LOG: %cStart Phase MessagePhase color:green;
+[05:55:56.724] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:55:56.949] LOG: crit stage: +0
+[05:55:56.949] LOG: Move: Thrash | Base damage: 218.70054054054054 | Power: 120 | Source attack: 432 | Target defense: 222
+[05:55:56.950] LOG: Move: Thrash | Attack damage: 282
+[05:55:56.950] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:55:56.962] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:55:57.145] LOG: %cStart Phase MessagePhase color:green;
+[05:55:57.365] LOG: %cStart Phase MoveEndPhase color:green;
+[05:55:57.365] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:55:57.365] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:55:57.365] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:55:57.365] LOG: %cStart Phase BerryPhase color:green;
+[05:55:57.366] LOG: Applied X Speed 
+[05:55:57.366] LOG: Applied Sitrus Berry (enemy)
+[05:55:57.368] LOG: %cStart Phase CommonAnimPhase color:green;
+[05:55:57.505] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:55:57.604] LOG: %cStart Phase MessagePhase color:green;
+[05:55:57.874] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:55:57.874] LOG: Applied X Speed 
+[05:55:57.874] LOG: %cStart Phase TurnEndPhase color:green;
+[05:55:57.875] LOG: Applied X Speed 
+[05:55:57.875] LOG: %cStart Phase TurnInitPhase color:green;
+[05:55:57.875] LOG: %cStart Phase CommandPhase color:green;
+[05:55:57.875] LOG: Move: THRASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega Ursaluna
+[05:55:57.876] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:55:57.877] LOG: Battle Seed: kZ0GPLlORMJVPfMK
+[05:55:57.878] LOG: Move Pool: ["Brave Bird","Air Cutter"]
+[05:55:57.878] LOG: Move Scores: [27,25.5]
+[05:55:57.878] LOG: Sorted Move Pool: ["Brave Bird","Air Cutter"]
+[05:55:57.878] LOG: Chosen Move: Brave Bird
+[05:55:57.879] LOG: %cStart Phase TurnStartPhase color:green;
+[05:55:57.879] LOG: Applied X Speed 
+[05:55:57.879] LOG: Applied X Speed 
+[05:55:57.879] LOG: Applied X Speed 
+[05:55:57.880] LOG: %cStart Phase MovePhase color:green;
+[05:55:57.880] LOG: %cUser: Crobat
+Move: BRAVE_BIRD
+Use Mode: NORMAL color:orchid
+[05:55:57.880] LOG: Applied X Speed 
+[05:55:57.880] LOG: Applied X Speed 
+[05:55:57.880] LOG: %cStart Phase MessagePhase color:green;
+[05:55:57.996] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:55:58.002] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.093] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.093] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.099] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.105] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.111] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.141] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.142] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.147] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.153] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.153] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.153] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.153] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.171] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.171] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.177] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.183] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.183] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.183] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.183] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.201] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.201] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.207] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.213] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.213] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.213] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.213] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.238] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.238] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.244] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.251] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.251] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.251] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.251] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.277] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[05:55:58.445] LOG: crit stage: +0
+[05:55:58.445] LOG: Move: Brave Bird | Base damage: 165.45486725663716 | Power: 120 | Source attack: 481 | Target defense: 339
+[05:55:58.446] LOG: Move: Brave Bird | Attack damage: 163
+[05:55:58.446] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:55:58.458] LOG: %cStart Phase MessagePhase color:green;
+[05:55:58.645] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:55:58.647] LOG: %cStart Phase MessagePhase color:green;
+[05:55:58.882] LOG: %cStart Phase FaintPhase color:green;
+[05:55:58.882] WARN: cry/901-mega not found
+[05:55:58.936] LOG: %cStart Phase MessagePhase color:green;
+[05:55:59.614] LOG: %cStart Phase MoveEndPhase color:green;
+[05:55:59.614] LOG: %cStart Phase MovePhase color:green;
+[05:55:59.614] LOG: %cStart Phase MoveEndPhase color:green;
+[05:55:59.614] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:55:59.614] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:55:59.614] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:55:59.614] LOG: %cStart Phase BerryPhase color:green;
+[05:55:59.614] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:55:59.614] LOG: %cStart Phase TurnEndPhase color:green;
+[05:55:59.614] LOG: %cStart Phase SwitchPhase color:green;
+[05:56:01.056] LOG: %cStart Phase SwitchSummonPhase color:green;
+[05:56:01.129] LOG: Applied Protein 
+[05:56:01.129] LOG: Applied Iron 
+[05:56:01.129] LOG: Applied Carbos 
+[05:56:01.129] LOG: Applied HP Up 
+[05:56:01.263] LOG: Applied X Speed 
+[05:56:01.263] LOG: %cStart Phase PostSummonPhase color:green;
+[05:56:01.263] LOG: Ran PSP for: Marowak
+[05:56:01.263] LOG: %cStart Phase PostSummonPhase color:green;
+[05:56:01.263] LOG: %cStart Phase PostSummonPhase color:green;
+[05:56:01.263] LOG: %cStart Phase TurnInitPhase color:green;
+[05:56:01.263] LOG: %cStart Phase CommandPhase color:green;
+[05:56:08.926] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:56:08.928] LOG: Battle Seed: kZ0GPLlORMJVPfMK
+[05:56:08.928] LOG: Move Pool: ["Brave Bird","Air Cutter"]
+[05:56:08.928] LOG: Move Scores: [27,25.5]
+[05:56:08.928] LOG: Sorted Move Pool: ["Brave Bird","Air Cutter"]
+[05:56:08.928] LOG: Chosen Move: Air Cutter
+[05:56:08.928] LOG: %cStart Phase TurnStartPhase color:green;
+[05:56:08.928] LOG: Applied X Speed 
+[05:56:08.929] LOG: Applied X Speed 
+[05:56:08.929] LOG: %cStart Phase AttemptCapturePhase color:green;
+[05:56:23.620] WARN: Texture "%s" has no frame "%s" items er_dark_gem
+[05:56:23.759] WARN: Texture "%s" has no frame "%s" items er_dark_gem
+[05:56:25.028] WARN: Texture "%s" has no frame "%s" items er_dark_gem
+[05:56:26.306] WARN: Texture "%s" has no frame "%s" items er_dark_gem
+[05:56:26.448] WARN: Texture "%s" has no frame "%s" items er_dark_gem
+[05:56:37.263] LOG: Applied Protein 
+[05:56:37.263] LOG: Applied Iron 
+[05:56:37.264] LOG: Applied Carbos 
+[05:56:37.264] LOG: Applied HP Up 
+[05:56:37.480] LOG: Applied Protein 
+[05:56:37.480] LOG: Applied Iron 
+[05:56:37.480] LOG: Applied Carbos 
+[05:56:37.480] LOG: Applied HP Up 
+[05:56:37.509] LOG: %cStart Phase VictoryPhase color:green;
+[05:56:37.509] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:56:37.509] LOG: Applied Super EXP. Charm 
+[05:56:37.509] LOG: Applied EXP. Charm 
+[05:56:37.510] LOG: %cStart Phase LevelUpPhase color:green;
+[05:56:37.510] LOG: Applied Carbos 
+[05:56:37.510] LOG: Applied HP Up 
+[05:56:37.510] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:56:37.510] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:56:37.510] LOG: Applied Super EXP. Charm 
+[05:56:37.510] LOG: Applied EXP. Charm 
+[05:56:37.510] LOG: %cStart Phase LevelUpPhase color:green;
+[05:56:37.510] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:56:37.510] LOG: %cStart Phase MovePhase color:green;
+[05:56:37.510] LOG: %cStart Phase MoveEndPhase color:green;
+[05:56:37.510] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:56:37.510] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:56:37.510] LOG: %cStart Phase TurnEndPhase color:green;
+[05:56:37.510] LOG: %cStart Phase BattleEndPhase color:green;
+[05:56:37.511] LOG: Battle Score: 336 (5 Turns x0.69)
+[05:56:37.511] LOG: Total Score: 22396
+[05:56:37.512] LOG: Applied Protein 
+[05:56:37.512] LOG: Applied Iron 
+[05:56:37.512] LOG: Applied Carbos 
+[05:56:37.512] LOG: Applied HP Up 
+[05:56:37.516] LOG: %cStart Phase EggLapsePhase color:green;
+[05:56:37.516] LOG: %cStart Phase ModifierRewardPhase color:green;
+[05:56:37.516] LOG: Applied Protein 
+[05:56:37.516] LOG: Applied Iron 
+[05:56:37.517] LOG: Applied Carbos 
+[05:56:37.517] LOG: Applied HP Up 
+[05:56:41.898] LOG: %cStart Phase TheBargainPhase color:green;
+[05:56:50.357] LOG: %cStart Phase ModifierRewardPhase color:green;
+[05:57:02.061] LOG: %cStart Phase MessagePhase color:green;
+[05:57:03.647] LOG: %cStart Phase PartyHealPhase color:green;
+[05:57:06.714] LOG: %cStart Phase ResetStatusPhase color:green;
+[05:57:06.714] LOG: %cStart Phase ResetStatusPhase color:green;
+[05:57:06.714] LOG: %cStart Phase ResetStatusPhase color:green;
+[05:57:06.714] LOG: %cStart Phase ResetStatusPhase color:green;
+[05:57:06.714] LOG: %cStart Phase ResetStatusPhase color:green;
+[05:57:06.714] LOG: %cStart Phase ResetStatusPhase color:green;
+[05:57:06.714] LOG: %cStart Phase ErCrossroadsPhase color:green;
