@@ -182,6 +182,16 @@ node scripts/run-ui-scenario.mjs [species,species,...] [--surface S] [--strict]
     is stubbed (its async sprite-play can't animate headless); the sprite key is captured
     via getSpriteKey instead. NB eggs hatch the BASE form (#133), so an evolved token
     hatches its root.
+  - **`biome-shop`** - starts a battle (for currentBattle + arena), rolls the REAL
+    per-biome market stock via `getPlayerShopModifierTypeOptionsForWave(wave,_,true)`, and
+    renders the REAL `BiomeShopUiHandler.show(...)`. `STATE {…}` = shown / threw / itemCount
+    / items[]; `errors[]` = threw or show() returned false. (Ignores the species list.)
+  - **`bargain`** - renders the REAL `ErBargainUiHandler.show(...)` for Giratina's deal,
+    args built from the bargain i18next namespace (first 3 Sins + Leave). `STATE {…}` =
+    shown / threw / labels[] / offers[] / greeting; `errors[]` = threw or show() returned
+    false. **This is the #550 diagnostic:** the handler renders cleanly headless (shown:true,
+    no throw), so "never renders in-game" is a phase/encounter-gating issue, NOT a handler
+    render bug.
 - Files: `test/tools/run-ui-scenario.test.ts` + `scripts/run-ui-scenario.mjs`. Sets
   `ER_SCENARIO=1` for you. Add a surface by adding a `snap*` + an `it.skipIf(SURFACE
   !== "…")` block (drive the handler, snapshot its computed state + resolved keys).

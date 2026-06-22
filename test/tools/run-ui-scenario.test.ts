@@ -53,16 +53,21 @@
 import { allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { EggHatchData } from "#data/egg-hatch-data";
+import { BARGAIN_SIN_ORDER, DISABLED_BARGAIN_SINS } from "#data/elite-redux/er-bargain-sins";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { DexAttr } from "#enums/dex-attr";
 import { ErSpeciesId } from "#enums/er-species-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
+import { getPlayerShopModifierTypeOptionsForWave } from "#modifiers/modifier-type";
 import { GameManager } from "#test/framework/game-manager";
+import type { BiomeShopUiHandler } from "#ui/biome-shop-ui-handler";
+import type { ErBargainUiHandler } from "#ui/er-bargain-ui-handler";
 import type { PokedexPageUiHandler } from "#ui/pokedex-page-ui-handler";
 import { PokemonHatchInfoContainer } from "#ui/pokemon-hatch-info-container";
 import type { StarterSelectUiHandler } from "#ui/starter-select-ui-handler";
+import i18next from "i18next";
 import Phaser from "phaser";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -350,6 +355,58 @@ function snapEgg(game: GameManager, token: string): EggSnapshot | { token: strin
   };
 }
 
+interface ShopSnapshot {
+  shown: boolean;
+  threw: string | false;
+  itemCount: number;
+  items: string[];
+}
+
+/** Render the ER biome-shop with the wave's REAL rolled stock (needs a started battle for arena/currentBattle). */
+function snapBiomeShop(game: GameManager): ShopSnapshot {
+  const wave = game.scene.currentBattle?.waveIndex ?? 1;
+  // forBiomeShop=true rolls the per-biome market stock (needs currentBattle + arena).
+  const options = getPlayerShopModifierTypeOptionsForWave(wave, 100, true);
+  const handler = game.scene.ui.handlers[UiMode.BIOME_SHOP] as BiomeShopUiHandler;
+  let threw: string | false = false;
+  let shown = false;
+  try {
+    shown = handler.show([options, game.scene.arena.biomeId, () => {}, options.map(() => 1)]);
+  } catch (e) {
+    threw = e instanceof Error ? e.message : String(e);
+  }
+  return { shown, threw, itemCount: options.length, items: options.map(o => o.type?.name ?? "?") };
+}
+
+interface BargainSnapshot {
+  shown: boolean;
+  threw: string | false;
+  labels: string[];
+  offers: string[];
+  greeting: string;
+}
+
+/** Render the Giratina bargain screen (ErBargainUiHandler) - the #550 "never renders in-game" diagnostic. */
+function snapBargain(game: GameManager): BargainSnapshot {
+  // Mirror TheBargainPhase.openScreen: build labels/descs/offers/greeting from the
+  // bargain i18next namespace for the first few (non-disabled) Sins + a Leave row.
+  const ns = "mysteryEncounters/theBargain";
+  const sins = BARGAIN_SIN_ORDER.filter(k => !DISABLED_BARGAIN_SINS.has(k)).slice(0, 3);
+  const labels = [...sins.map(k => i18next.t(`${ns}:sins.${k}.name`)), i18next.t(`${ns}:option.leave.label`)];
+  const descs = [...sins.map(k => i18next.t(`${ns}:sins.${k}.tooltip`)), i18next.t(`${ns}:option.leave.tooltip`)];
+  const offers = sins.map(k => i18next.t(`${ns}:sins.${k}.offer`));
+  const greeting = i18next.t(`${ns}:introDialogue`).split("$").slice(0, 2).join(" ");
+  const handler = game.scene.ui.handlers[UiMode.ER_BARGAIN] as ErBargainUiHandler;
+  let threw: string | false = false;
+  let shown = false;
+  try {
+    shown = handler.show([labels, descs, greeting, offers, () => {}, () => {}, () => {}]);
+  } catch (e) {
+    threw = e instanceof Error ? e.message : String(e);
+  }
+  return { shown, threw, labels, offers, greeting };
+}
+
 describe.skipIf(!RUN)("headless UI runner", () => {
   let phaserGame: Phaser.Game;
 
@@ -465,6 +522,44 @@ describe.skipIf(!RUN)("headless UI runner", () => {
     }
 
     console.log("\nRESULT", JSON.stringify({ surface: "egg-hatch", count: TARGET_TOKENS.length, errors }));
+    expect(errors, errors.join("\n")).toEqual([]);
+  });
+
+  it.skipIf(SURFACE !== "biome-shop")("biome-shop: renders the ER biome market with real stock", async () => {
+    console.log("\n===== UI SURFACE: biome-shop =====");
+    const game = new GameManager(phaserGame);
+    // A started battle gives the stock roller its currentBattle + arena (biome).
+    await game.classicMode.startBattle(SpeciesId.RATTATA);
+
+    const snap = snapBiomeShop(game);
+    console.log("STATE", JSON.stringify(snap));
+
+    const errors: string[] = [];
+    if (snap.threw) {
+      errors.push(`biome-shop show() threw — ${snap.threw}`);
+    }
+    if (!snap.shown && !snap.threw) {
+      errors.push("biome-shop show() returned false (bad args / not rendered)");
+    }
+    console.log("\nRESULT", JSON.stringify({ surface: "biome-shop", errors }));
+    expect(errors, errors.join("\n")).toEqual([]);
+  });
+
+  it.skipIf(SURFACE !== "bargain")("bargain: renders Giratina's bargain screen (#550 diagnostic)", () => {
+    console.log("\n===== UI SURFACE: bargain =====");
+    const game = new GameManager(phaserGame);
+
+    const snap = snapBargain(game);
+    console.log("STATE", JSON.stringify(snap));
+
+    const errors: string[] = [];
+    if (snap.threw) {
+      errors.push(`bargain show() threw — ${snap.threw}`);
+    }
+    if (!snap.shown && !snap.threw) {
+      errors.push('bargain show() returned false (bad args) — the #550 "never renders" failure mode');
+    }
+    console.log("\nRESULT", JSON.stringify({ surface: "bargain", errors }));
     expect(errors, errors.join("\n")).toEqual([]);
   });
 });

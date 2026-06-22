@@ -107,6 +107,11 @@ export class MockSprite implements MockGameObject {
     return this;
   }
 
+  setX(x): this {
+    this.phaserSprite.setX(x);
+    return this;
+  }
+
   setRotation(radians): this {
     this.phaserSprite.setRotation(radians);
     return this;

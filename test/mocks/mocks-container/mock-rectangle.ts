@@ -40,6 +40,11 @@ export class MockRectangle implements MockGameObject {
     // This callback is invoked when this Game Object is added to a Scene.
   }
 
+  setPosition(_x?: number, _y?: number, _z?: number, _w?: number): this {
+    // Sets the position of this Game Object.
+    return this;
+  }
+
   setPositionRelative(_source, _x, _y): this {
     /// Sets the position of this Game Object to be a relative position from the source Game Object.
     return this;
