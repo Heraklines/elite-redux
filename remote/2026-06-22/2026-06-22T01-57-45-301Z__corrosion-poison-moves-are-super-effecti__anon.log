@@ -1,0 +1,283 @@
+scenario: Corrosion: Poison moves are super effective vs Steel
+url:      https://elite-redux-staging.pages.dev/
+build:    mqohwu1r-co92
+mode:     0  wave:5
+seed:     zwDvGJm2RATJv7g70eteEzDQ
+party:    Roselia(L60 148hp f0)
+enemy:    Sableye(L55), Sableye(L55)
+
+----- COMMENT -----
+you didnt set up the dev scenario for corrosion to have a steel type to test it on???
+
+----- CONSOLE -----
+[01:56:35.585] LOG: Move: Splash | Base damage: 30.524137931034485 | Power: 60 | Source attack: 94 | Target defense: 87
+[01:56:35.586] LOG: Move: Splash | Attack damage: 12
+[01:56:35.586] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:56:35.599] LOG: %cStart Phase MessagePhase color:green;
+[01:56:35.806] LOG: %cStart Phase MoveEndPhase color:green;
+[01:56:35.807] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:56:35.807] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:56:35.807] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:56:35.807] LOG: %cStart Phase BerryPhase color:green;
+[01:56:35.808] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:56:35.808] LOG: %cStart Phase TurnEndPhase color:green;
+[01:56:35.809] LOG: %cStart Phase TurnInitPhase color:green;
+[01:56:35.810] LOG: %cStart Phase CommandPhase color:green;
+[01:56:37.779] LOG: Move: U_TURN Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Greninja
+[01:56:37.780] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:56:37.781] LOG: %cStart Phase TurnStartPhase color:green;
+[01:56:37.782] LOG: %cStart Phase MovePhase color:green;
+[01:56:37.782] LOG: %cUser: Greninja
+Move: U_TURN
+Use Mode: NORMAL color:orchid
+[01:56:37.783] LOG: %cStart Phase MessagePhase color:green;
+[01:56:37.883] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:56:37.883] LOG: Battle Seed: dhH1O6eRGLESS4yc
+[01:56:38.119] LOG: crit stage: +0
+[01:56:38.120] LOG: Move: U-turn | Base damage: 63.6 | Power: 84 | Source attack: 120 | Target defense: 72
+[01:56:38.120] LOG: Move: U-turn | Attack damage: 61
+[01:56:38.120] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:56:38.133] LOG: %cStart Phase MoveEndPhase color:green;
+[01:56:38.134] LOG: %cStart Phase MovePhase color:green;
+[01:56:38.134] LOG: %cUser: Munchlax
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[01:56:38.134] LOG: %cStart Phase MessagePhase color:green;
+[01:56:38.251] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:56:38.494] LOG: crit stage: +0
+[01:56:38.495] LOG: Move: Splash | Base damage: 30.524137931034485 | Power: 60 | Source attack: 94 | Target defense: 87
+[01:56:38.495] LOG: Move: Splash | Attack damage: 13
+[01:56:38.495] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:56:38.508] LOG: %cStart Phase MessagePhase color:green;
+[01:56:38.716] LOG: %cStart Phase MoveEndPhase color:green;
+[01:56:38.716] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:56:38.716] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:56:38.716] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:56:38.716] LOG: %cStart Phase BerryPhase color:green;
+[01:56:38.717] LOG: Applied Sitrus Berry (enemy)
+[01:56:38.718] LOG: Applied Iron (enemy)
+[01:56:38.719] LOG: %cStart Phase CommonAnimPhase color:green;
+[01:56:38.876] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:56:38.982] LOG: %cStart Phase MessagePhase color:green;
+[01:56:39.258] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:56:39.258] LOG: %cStart Phase TurnEndPhase color:green;
+[01:56:39.259] LOG: Applied Leftovers (enemy)
+[01:56:39.259] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:56:39.364] LOG: %cStart Phase MessagePhase color:green;
+[01:56:39.633] LOG: %cStart Phase TurnInitPhase color:green;
+[01:56:39.633] LOG: %cStart Phase CommandPhase color:green;
+[01:56:59.592] LOG: Seed: 2u9sx6ZMZTK9PQaC6fyuMR10
+[01:56:59.592] LOG: Wave Seed: 2u9sx6ZMZTK9PQaC6fyuMR10 0
+[01:56:59.779] WARN: AnimationManager key already exists: prompt
+[01:56:59.779] WARN: AnimationManager key already exists: tera_sparkle
+[01:56:59.779] LOG: Seed: zwDvGJm2RATJv7g70eteEzDQ
+[01:56:59.779] LOG: Wave Seed: zwDvGJm2RATJv7g70eteEzDQ 0
+[01:57:02.218] LOG: %cStart Phase LoginPhase color:green;
+[01:57:02.329] LOG: Client Session: 8zOUrmRvxrVC9x99ZCddVrTnxUVPYBmt
+[01:57:02.640] DEBUG: Using cached system data
+[01:57:02.676] LOG: %cStart Phase TitlePhase color:green;
+[01:57:02.677] LOG: Getting Session Slot id: %d 4
+[01:57:02.682] LOG: use seasonal splash messages true
+[01:57:02.682] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[01:57:02.685] LOG: %cStart Phase SelectStarterPhase color:green;
+[01:57:04.016] LOG: Wave Seed: |I{LOr7WFYO{<l<5jyjJIV 5
+[01:57:04.018] LOG: %cStart Phase EncounterPhase color:green;
+[01:57:04.020] LOG: COMMON
+[01:57:04.020] LOG: Sentret
+[01:57:04.024] LOG: ER #419: elite BST cap (420 @ w5) - replacing Skarmory (495) with Sableye (410)
+[01:57:04.043] LOG: Pokemon: Foe Sableye | Species ID: 302 | Level: 55 | Nature: Bashful (-)
+[01:57:04.043] LOG: Stats (IVs): HP: 145 (17), Atk: 99 (11), Def: 95 (31), Spatk: 80 (29), Spdef: 93 (3), Spd: 71 (29)
+[01:57:04.043] LOG: Ability: Hypnotist | Passive Ability: Analytic 
+[01:57:04.043] LOG: Moveset: ["Splash"]
+[01:57:04.043] LOG: COMMON
+[01:57:04.043] LOG: Zigzagoon
+[01:57:04.044] LOG: ER #419: elite BST cap (420 @ w5) - replacing Skarmory (495) with Sableye (410)
+[01:57:04.055] LOG: Pokemon: Foe Sableye | Species ID: 302 | Level: 55 | Nature: Bold (+Def/-Atk)
+[01:57:04.055] LOG: Stats (IVs): HP: 145 (21), Atk: 90 (4), Def: 111 (2), Spatk: 93 (7), Spdef: 83 (24), Spd: 73 (9)
+[01:57:04.055] LOG: Ability: Prankster | Passive Ability: Analytic 
+[01:57:04.055] LOG: Moveset: ["Splash"]
+[01:57:08.760] LOG: Battle Seed: jn9JRu4Vb0wN0W8s
+[01:57:08.761] LOG: Generated AI funcs
+[01:57:08.794] DEBUG: Session data saved to slot 4!
+[01:57:08.795] LOG: Wave Seed: |I{LOr7WFYO{<l<5jyjJIV 5
+[01:57:09.001] LOG: Lass Sally
+[01:57:09.649] LOG: Dialogue saved as seen: dialogue:lass.encounter.4
+[01:57:09.683] LOG: Lass Sally
+[01:57:09.966] LOG: %cStart Phase SummonPhase color:green;
+[01:57:09.967] LOG: Sally
+[01:57:10.230] LOG: %cStart Phase SummonPhase color:green;
+[01:57:10.514] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:57:10.515] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:57:10.516] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:10.516] LOG: Ran PSP for: Roselia
+[01:57:10.516] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:10.516] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:10.516] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:10.516] LOG: Ran PSP for: Sableye
+[01:57:10.516] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:10.516] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:10.516] LOG: %cStart Phase TurnInitPhase color:green;
+[01:57:10.516] LOG: %cStart Phase CommandPhase color:green;
+[01:57:13.061] LOG: Move: GIGA_DRAIN Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Roselia
+[01:57:13.062] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:57:13.063] LOG: %cStart Phase TurnStartPhase color:green;
+[01:57:13.064] LOG: %cStart Phase MovePhase color:green;
+[01:57:13.064] LOG: %cUser: Roselia
+Move: GIGA_DRAIN
+Use Mode: NORMAL color:orchid
+[01:57:13.065] LOG: %cStart Phase MessagePhase color:green;
+[01:57:13.167] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:57:13.578] LOG: crit stage: +0
+[01:57:13.579] LOG: Move: Giga Drain | Base damage: 63.554216867469876 | Power: 75 | Source attack: 131 | Target defense: 83
+[01:57:13.579] LOG: Move: Giga Drain | Attack damage: 81
+[01:57:13.581] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:57:13.592] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:57:13.592] LOG: %cStart Phase MessagePhase color:green;
+[01:57:13.799] LOG: %cStart Phase MoveEndPhase color:green;
+[01:57:13.799] LOG: %cStart Phase MovePhase color:green;
+[01:57:13.799] LOG: %cUser: Sableye
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[01:57:13.801] LOG: %cStart Phase MessagePhase color:green;
+[01:57:13.910] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:57:14.154] LOG: crit stage: +0
+[01:57:14.155] LOG: Move: Splash | Base damage: 92.43948051948051 | Power: 156 | Source attack: 93 | Target defense: 77
+[01:57:14.155] LOG: Move: Splash | Attack damage: 44
+[01:57:14.155] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:57:14.169] LOG: %cStart Phase MessagePhase color:green;
+[01:57:14.376] LOG: %cStart Phase MoveEndPhase color:green;
+[01:57:14.376] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:57:14.376] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:57:14.376] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:57:14.376] LOG: %cStart Phase BerryPhase color:green;
+[01:57:14.376] LOG: Applied Sitrus Berry (enemy)
+[01:57:14.377] LOG: %cStart Phase CommonAnimPhase color:green;
+[01:57:14.536] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:57:14.641] LOG: %cStart Phase MessagePhase color:green;
+[01:57:14.910] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:57:14.911] LOG: %cStart Phase TurnEndPhase color:green;
+[01:57:14.911] LOG: Applied Leftovers (enemy)
+[01:57:14.911] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:57:15.017] LOG: %cStart Phase MessagePhase color:green;
+[01:57:15.285] LOG: %cStart Phase TurnInitPhase color:green;
+[01:57:15.286] LOG: %cStart Phase CommandPhase color:green;
+[01:57:15.634] LOG: Move: GIGA_DRAIN Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Roselia
+[01:57:15.635] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:57:15.635] LOG: %cStart Phase TurnStartPhase color:green;
+[01:57:15.636] LOG: %cStart Phase MovePhase color:green;
+[01:57:15.636] LOG: %cUser: Roselia
+Move: GIGA_DRAIN
+Use Mode: NORMAL color:orchid
+[01:57:15.637] LOG: %cStart Phase MessagePhase color:green;
+[01:57:15.743] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:57:15.744] LOG: Battle Seed: jn9JRu4Vb0wN0W8s
+[01:57:16.154] LOG: crit stage: +0
+[01:57:16.155] LOG: Move: Giga Drain | Base damage: 63.554216867469876 | Power: 75 | Source attack: 131 | Target defense: 83
+[01:57:16.155] LOG: Move: Giga Drain | Attack damage: 91
+[01:57:16.155] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:57:16.169] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:57:16.171] LOG: %cStart Phase MessagePhase color:green;
+[01:57:16.376] LOG: %cStart Phase MoveEndPhase color:green;
+[01:57:16.376] LOG: %cStart Phase MovePhase color:green;
+[01:57:16.376] LOG: %cUser: Sableye
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[01:57:16.377] LOG: %cStart Phase MessagePhase color:green;
+[01:57:16.486] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:57:16.730] LOG: crit stage: +0
+[01:57:16.731] LOG: Move: Splash | Base damage: 92.43948051948051 | Power: 156 | Source attack: 93 | Target defense: 77
+[01:57:16.731] LOG: Move: Splash | Attack damage: 62
+[01:57:16.731] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:57:16.745] LOG: %cStart Phase MessagePhase color:green;
+[01:57:16.938] LOG: %cStart Phase MessagePhase color:green;
+[01:57:17.146] LOG: %cStart Phase MoveEndPhase color:green;
+[01:57:17.147] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:57:17.147] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:57:17.147] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:57:17.147] LOG: %cStart Phase BerryPhase color:green;
+[01:57:17.147] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:57:17.147] LOG: %cStart Phase TurnEndPhase color:green;
+[01:57:17.148] LOG: Applied Leftovers (enemy)
+[01:57:17.148] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:57:17.253] LOG: %cStart Phase MessagePhase color:green;
+[01:57:17.521] LOG: %cStart Phase TurnInitPhase color:green;
+[01:57:17.522] LOG: %cStart Phase CommandPhase color:green;
+[01:57:17.731] LOG: Move: GIGA_DRAIN Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Roselia
+[01:57:17.733] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:57:17.733] LOG: %cStart Phase TurnStartPhase color:green;
+[01:57:17.734] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:57:17.735] LOG: Sally
+[01:57:17.994] LOG: Sally
+[01:57:18.203] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:18.203] LOG: Ran PSP for: Sableye
+[01:57:18.203] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:18.203] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:18.203] LOG: %cStart Phase MovePhase color:green;
+[01:57:18.203] LOG: %cUser: Roselia
+Move: GIGA_DRAIN
+Use Mode: NORMAL color:orchid
+[01:57:18.204] LOG: %cStart Phase MessagePhase color:green;
+[01:57:18.313] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:57:18.314] LOG: Battle Seed: jn9JRu4Vb0wN0W8s
+[01:57:18.724] LOG: crit stage: +0
+[01:57:18.724] LOG: Move: Giga Drain | Base damage: 55.77894736842105 | Power: 75 | Source attack: 131 | Target defense: 95
+[01:57:18.724] LOG: Move: Giga Drain | Attack damage: 83
+[01:57:18.725] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:57:18.737] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:57:18.739] LOG: %cStart Phase MessagePhase color:green;
+[01:57:18.945] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:57:19.106] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[01:57:19.279] LOG: %cStart Phase MessagePhase color:green;
+[01:57:19.494] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:57:19.515] LOG: %cStart Phase MoveEndPhase color:green;
+[01:57:19.515] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:57:19.515] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:57:19.515] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:57:19.515] LOG: %cStart Phase BerryPhase color:green;
+[01:57:19.515] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:57:19.516] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[01:57:19.516] LOG: %cStart Phase TurnEndPhase color:green;
+[01:57:19.516] LOG: %cStart Phase TurnInitPhase color:green;
+[01:57:19.516] LOG: %cStart Phase CommandPhase color:green;
+[01:57:22.762] LOG: Move: GIGA_DRAIN Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Roselia
+[01:57:22.763] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:57:22.764] LOG: %cStart Phase TurnStartPhase color:green;
+[01:57:22.765] LOG: %cStart Phase MovePhase color:green;
+[01:57:22.765] LOG: %cUser: Roselia
+Move: GIGA_DRAIN
+Use Mode: NORMAL color:orchid
+[01:57:22.766] LOG: %cStart Phase MessagePhase color:green;
+[01:57:22.869] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:57:22.869] LOG: Battle Seed: jn9JRu4Vb0wN0W8s
+[01:57:23.279] LOG: crit stage: +0
+[01:57:23.280] LOG: Move: Giga Drain | Base damage: 55.77894736842105 | Power: 75 | Source attack: 131 | Target defense: 95
+[01:57:23.280] LOG: Move: Giga Drain | Attack damage: 119
+[01:57:23.280] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:57:23.293] LOG: %cStart Phase MessagePhase color:green;
+[01:57:23.486] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:57:23.489] LOG: %cStart Phase MessagePhase color:green;
+[01:57:23.695] LOG: %cStart Phase FaintPhase color:green;
+[01:57:23.751] LOG: %cStart Phase MessagePhase color:green;
+[01:57:23.871] LOG: %cStart Phase VictoryPhase color:green;
+[01:57:23.871] LOG: %cStart Phase MoveEndPhase color:green;
+[01:57:23.871] LOG: %cStart Phase MovePhase color:green;
+[01:57:23.871] LOG: %cStart Phase MoveEndPhase color:green;
+[01:57:23.872] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:57:23.872] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:57:23.872] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:57:23.872] LOG: %cStart Phase BerryPhase color:green;
+[01:57:23.872] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:57:23.872] LOG: %cStart Phase TurnEndPhase color:green;
+[01:57:23.872] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:57:24.099] LOG: Sally
+[01:57:24.307] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:24.307] LOG: Ran PSP for: Sableye
+[01:57:24.307] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:24.307] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:24.307] LOG: %cStart Phase TurnInitPhase color:green;
+[01:57:24.307] LOG: %cStart Phase CommandPhase color:green;
