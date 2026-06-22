@@ -121,7 +121,9 @@ export class OnOpponentStatRaiseScriptedMoveAbAttr extends StatStageChangeCopyAb
       "MovePhase",
       pokemon,
       [opponents[0].getBattlerIndex()],
-      scriptedPokemonMove(this.opts.moveId, this.opts.power, { alwaysHit: true }),
+      // noRecharge: the dex says the triggered Hyper Beam "has no recharge period,
+      // allowing normal actions next turn" - don't lock the holder into a recharge.
+      scriptedPokemonMove(this.opts.moveId, this.opts.power, { alwaysHit: true, noRecharge: true }),
       MoveUseMode.INDIRECT,
     );
   }

@@ -26,22 +26,73 @@
 // undefined for a custom scripted move.
 // =============================================================================
 
+import { globalScene } from "#app/global-scene";
 import { FirstMoveCondition } from "#data/moves/move-condition";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import type { MoveId } from "#enums/move-id";
-import type { Move } from "#moves/move";
+import type { Pokemon } from "#field/pokemon";
+import { MagnitudePowerAttr, type Move, PreMoveMessageAttr, RechargeAttr } from "#moves/move";
+import { randSeedIntRange } from "#utils/common";
+import type { NumberHolder } from "#utils/value-holder";
+import i18next from "i18next";
+
+export interface ScriptedMoveOptions {
+  readonly alwaysHit?: boolean;
+  readonly bypassFirstMoveCondition?: boolean;
+  readonly magnitudeRange?: readonly [min: number, max: number];
+  /**
+   * Strip {@linkcode RechargeAttr} from the scripted cast so the holder is NOT
+   * locked into a recharge turn afterwards. Used by ability-triggered casts of
+   * recharge moves (Retribution Blow's 150 BP Hyper Beam: "no recharge period,
+   * allowing normal actions next turn"). No-op for moves with no recharge.
+   */
+  readonly noRecharge?: boolean;
+}
+
+function getMagnitudeLevel(range: readonly [min: number, max: number]): number {
+  let level = range[0];
+  globalScene.executeWithSeedOffset(
+    () => {
+      level = randSeedIntRange(range[0], range[1]);
+    },
+    globalScene.currentBattle.turn << 6,
+    globalScene.waveSeed,
+  );
+  return level;
+}
+
+export class ScriptedMagnitudePowerAttr extends MagnitudePowerAttr {
+  private readonly min: number;
+  private readonly max: number;
+
+  constructor(min: number, max: number) {
+    super();
+    this.min = min;
+    this.max = max;
+  }
+
+  override apply(_user: Pokemon, _target: Pokemon, _move: Move, args: [NumberHolder, ...unknown[]]): boolean {
+    const powers = [10, 30, 50, 70, 90, 110, 150];
+    args[0].value = powers[getMagnitudeLevel([this.min, this.max]) - 4];
+    return true;
+  }
+}
 
 class PowerOverriddenPokemonMove extends PokemonMove {
   private readonly power: number | undefined;
   private readonly alwaysHit: boolean;
   private readonly bypassFirstMoveCondition: boolean;
+  private readonly magnitudeRange: readonly [min: number, max: number] | undefined;
+  private readonly noRecharge: boolean;
   private cached: Move | undefined;
 
-  constructor(moveId: MoveId, power: number | undefined, alwaysHit: boolean, bypassFirstMoveCondition: boolean) {
+  constructor(moveId: MoveId, power: number | undefined, opts: ScriptedMoveOptions) {
     super(moveId);
     this.power = power;
-    this.alwaysHit = alwaysHit;
-    this.bypassFirstMoveCondition = bypassFirstMoveCondition;
+    this.alwaysHit = opts.alwaysHit ?? false;
+    this.bypassFirstMoveCondition = opts.bypassFirstMoveCondition ?? false;
+    this.magnitudeRange = opts.magnitudeRange;
+    this.noRecharge = opts.noRecharge ?? false;
   }
 
   public override getMove(): Move {
@@ -66,6 +117,25 @@ class PowerOverriddenPokemonMove extends PokemonMove {
           condition => !(condition instanceof FirstMoveCondition),
         );
       }
+      if (this.noRecharge) {
+        // Drop the recharge so the scripted cast doesn't lock the holder next turn.
+        // A NEW array on the clone — the registered move's shared attrs are untouched.
+        clone.attrs = clone.attrs.filter(attr => !(attr instanceof RechargeAttr));
+      }
+      if (this.magnitudeRange !== undefined) {
+        const range = this.magnitudeRange;
+        clone.attrs = clone.attrs.map(attr => {
+          if (attr instanceof PreMoveMessageAttr) {
+            return new PreMoveMessageAttr(() =>
+              i18next.t("moveTriggers:magnitudeMessage", { magnitude: getMagnitudeLevel(range) }),
+            );
+          }
+          if (attr instanceof MagnitudePowerAttr) {
+            return new ScriptedMagnitudePowerAttr(range[0], range[1]);
+          }
+          return attr;
+        });
+      }
       this.cached = clone;
     }
     return this.cached;
@@ -81,14 +151,12 @@ class PowerOverriddenPokemonMove extends PokemonMove {
  * @param opts.alwaysHit - when true, the cast bypasses the accuracy check
  *   (accuracy -1) — e.g. Retribution Blow's Hyper Beam "cannot miss".
  */
-export function scriptedPokemonMove(
-  moveId: MoveId,
-  power?: number,
-  opts?: { alwaysHit?: boolean; bypassFirstMoveCondition?: boolean },
-): PokemonMove {
-  const alwaysHit = opts?.alwaysHit ?? false;
-  const bypassFirstMoveCondition = opts?.bypassFirstMoveCondition ?? false;
-  return power === undefined && !alwaysHit && !bypassFirstMoveCondition
+export function scriptedPokemonMove(moveId: MoveId, power?: number, opts: ScriptedMoveOptions = {}): PokemonMove {
+  const alwaysHit = opts.alwaysHit ?? false;
+  const bypassFirstMoveCondition = opts.bypassFirstMoveCondition ?? false;
+  const magnitudeRange = opts.magnitudeRange;
+  const noRecharge = opts.noRecharge ?? false;
+  return power === undefined && !alwaysHit && !bypassFirstMoveCondition && magnitudeRange === undefined && !noRecharge
     ? new PokemonMove(moveId)
-    : new PowerOverriddenPokemonMove(moveId, power, alwaysHit, bypassFirstMoveCondition);
+    : new PowerOverriddenPokemonMove(moveId, power, opts);
 }

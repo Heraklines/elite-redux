@@ -720,6 +720,31 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "Retribution Blow: auto Hyper Beam, NO recharge",
+    description:
+      "ER Retribution Blow (ability 407): when a foe boosts its stats you auto-fire a\n"
+      + "150 BP Hyper Beam that has NO recharge. Your Snorlax has Retribution Blow; the\n"
+      + "enemy Scizor only uses SWORDS DANCE. DO: let Scizor boost (the auto Hyper Beam\n"
+      + "fires at it), then on YOUR next turn pick a move. EXPECT: you act NORMALLY - you\n"
+      + "are NOT stuck 'must recharge'. Before the fix the triggered Hyper Beam locked you.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 60,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.RETRIBUTION_BLOW),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SCIZOR,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SWORDS_DANCE],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
   // ===========================================================================
   // QoL — level-up Move Learn panel
   // ===========================================================================
