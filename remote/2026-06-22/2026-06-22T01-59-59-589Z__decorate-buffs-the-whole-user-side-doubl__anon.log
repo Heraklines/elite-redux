@@ -1,0 +1,281 @@
+scenario: Decorate: buffs the WHOLE user side (doubles)
+url:      https://elite-redux-staging.pages.dev/
+build:    mqohwu1r-co92
+mode:     0  wave:5
+seed:     U9w9mgPybl8XcpwGj40P13H8
+party:    Gardevoir(L60 162hp f0), Kecleon(L60 71hp f0)
+enemy:    Magikarp(L30), Magikarp(L30)
+
+----- COMMENT -----
+decorate on the enemy attacks them but ALSO buffs my ally, and decorate on my ally damages my ally AND buffs them
+
+----- CONSOLE -----
+[01:57:54.648] LOG: Ran PSP for: Exploud
+[01:57:54.648] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:54.648] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:54.648] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:54.648] LOG: Ran PSP for: Numel
+[01:57:54.648] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:54.648] LOG: %cStart Phase PostSummonPhase color:green;
+[01:57:54.648] LOG: %cStart Phase TurnInitPhase color:green;
+[01:57:54.648] LOG: %cStart Phase CommandPhase color:green;
+[01:58:05.662] LOG: Seed: pnpLNF3P46ODaqIKZ9rsLZij
+[01:58:05.662] LOG: Wave Seed: pnpLNF3P46ODaqIKZ9rsLZij 0
+[01:58:05.847] WARN: AnimationManager key already exists: prompt
+[01:58:05.847] WARN: AnimationManager key already exists: tera_sparkle
+[01:58:05.847] LOG: Seed: iqPdxGiZ1KGRygAJDyYB4jKH
+[01:58:05.847] LOG: Wave Seed: iqPdxGiZ1KGRygAJDyYB4jKH 0
+[01:58:08.353] LOG: %cStart Phase LoginPhase color:green;
+[01:58:08.474] LOG: Client Session: 8zOUrmRvxrVC9x99ZCddVrTnxUVPYBmt
+[01:58:08.730] DEBUG: Using cached system data
+[01:58:08.770] LOG: %cStart Phase TitlePhase color:green;
+[01:58:08.771] LOG: Getting Session Slot id: %d 4
+[01:58:08.776] LOG: use seasonal splash messages true
+[01:58:08.776] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[01:58:08.779] LOG: %cStart Phase SelectStarterPhase color:green;
+[01:58:11.171] ERROR: Texture key already in use: PRAS- Sketch + Lick
+[01:58:11.749] LOG: Wave Seed: nvUi}Ln_6PLW~lFOI~^G9oPM 5
+[01:58:11.751] LOG: %cStart Phase EncounterPhase color:green;
+[01:58:11.753] LOG: COMMON
+[01:58:11.753] LOG: Zigzagoon
+[01:58:11.754] LOG: ER #419: elite BST cap (420 @ w5) - replacing Blissey (550) with Happiny (220)
+[01:58:11.767] LOG: Pokemon: Foe Happiny | Species ID: 440 | Level: 20 | Nature: Lonely (+Atk/-Def)
+[01:58:11.767] LOG: Stats (IVs): HP: 72 (19), Atk: 10 (7), Def: 8 (23), Spatk: 11 (8), Spdef: 32 (26), Spd: 22 (13)
+[01:58:11.767] LOG: Ability: Regenerator | Passive Ability: Cute Charm 
+[01:58:11.767] LOG: Moveset: ["Water Gun"]
+[01:58:11.767] LOG: UNCOMMON
+[01:58:11.767] LOG: Downgraded trainer Pokemon rarity tier from UNCOMMON to COMMON
+[01:58:11.767] LOG: Patrat
+[01:58:11.767] LOG: ER #419: elite BST cap (420 @ w5) - replacing Blissey (550) with Happiny (220)
+[01:58:11.773] LOG: Pokemon: Foe Happiny | Species ID: 440 | Level: 20 | Nature: Calm (+SpDef/-Atk)
+[01:58:11.773] LOG: Stats (IVs): HP: 74 (30), Atk: 8 (25), Def: 10 (0), Spatk: 12 (28), Spdef: 41 (0), Spd: 21 (23)
+[01:58:11.773] LOG: Ability: Regenerator | Passive Ability: Cute Charm 
+[01:58:11.773] LOG: Moveset: ["Water Gun"]
+[01:58:12.775] LOG: Battle Seed: 8uEMZoYbpnk3L399
+[01:58:12.776] LOG: Generated AI funcs
+[01:58:12.811] DEBUG: Session data saved to slot 4!
+[01:58:12.812] LOG: Wave Seed: nvUi}Ln_6PLW~lFOI~^G9oPM 5
+[01:58:13.015] LOG: Lass Lois
+[01:58:13.553] LOG: Dialogue saved as seen: dialogue:lass.encounter.5
+[01:58:13.585] LOG: Lass Lois
+[01:58:14.085] LOG: %cStart Phase SummonPhase color:green;
+[01:58:14.085] LOG: Lois
+[01:58:14.348] LOG: %cStart Phase SummonPhase color:green;
+[01:58:14.529] WARN: cry/65 not found
+[01:58:14.632] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:58:14.633] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:58:14.633] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:14.633] LOG: Ran PSP for: Wispywaspy
+[01:58:14.633] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:14.633] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:14.634] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:14.634] LOG: Ran PSP for: Happiny
+[01:58:14.634] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:14.634] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:14.634] LOG: %cStart Phase TurnInitPhase color:green;
+[01:58:14.634] LOG: %cStart Phase CommandPhase color:green;
+[01:58:45.527] LOG: Seed: 0J60cpPBOSEuI2URdbG2INQQ
+[01:58:45.527] LOG: Wave Seed: 0J60cpPBOSEuI2URdbG2INQQ 0
+[01:58:45.787] WARN: AnimationManager key already exists: prompt
+[01:58:45.787] WARN: AnimationManager key already exists: tera_sparkle
+[01:58:45.787] LOG: Seed: U9w9mgPybl8XcpwGj40P13H8
+[01:58:45.788] LOG: Wave Seed: U9w9mgPybl8XcpwGj40P13H8 0
+[01:58:48.674] LOG: %cStart Phase LoginPhase color:green;
+[01:58:48.804] LOG: Client Session: 8zOUrmRvxrVC9x99ZCddVrTnxUVPYBmt
+[01:58:49.151] DEBUG: Using cached system data
+[01:58:49.194] LOG: %cStart Phase TitlePhase color:green;
+[01:58:49.194] LOG: Getting Session Slot id: %d 4
+[01:58:49.199] LOG: use seasonal splash messages true
+[01:58:49.199] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[01:58:49.203] LOG: %cStart Phase SelectStarterPhase color:green;
+[01:58:52.203] LOG: Wave Seed: Z>|>rlU~gq=]hu|Lo95U68M= 5
+[01:58:52.204] LOG: %cStart Phase EncounterPhase color:green;
+[01:58:52.207] LOG: COMMON
+[01:58:52.207] LOG: Caterpie
+[01:58:52.224] LOG: Pokemon: Foe Magikarp | Species ID: 129 | Level: 30 | Nature: Lax (+Def/-SpDef)
+[01:58:52.224] LOG: Stats (IVs): HP: 55 (20), Atk: 16 (2), Def: 44 (13), Spatk: 20 (17), Spdef: 20 (24), Spd: 57 (28)
+[01:58:52.224] LOG: Ability: Guilt Trip | Passive Ability: Multiscale 
+[01:58:52.224] LOG: Moveset: ["Splash"]
+[01:58:52.224] LOG: UNCOMMON
+[01:58:52.224] LOG: Downgraded trainer Pokemon rarity tier from UNCOMMON to COMMON
+[01:58:52.224] LOG: Sentret
+[01:58:52.231] LOG: Pokemon: Foe Magikarp | Species ID: 129 | Level: 30 | Nature: Quirky (-)
+[01:58:52.231] LOG: Stats (IVs): HP: 61 (1), Atk: 19 (18), Def: 45 (28), Spatk: 15 (3), Spdef: 17 (9), Spd: 53 (6)
+[01:58:52.231] LOG: Ability: Marvel Scale | Passive Ability: Multiscale 
+[01:58:52.231] LOG: Moveset: ["Splash"]
+[01:58:52.317] LOG: Battle Seed: fxpgBd3tBCk0TFMo
+[01:58:52.319] LOG: Generated AI funcs
+[01:58:52.351] DEBUG: Session data saved to slot 4!
+[01:58:52.352] LOG: Wave Seed: Z>|>rlU~gq=]hu|Lo95U68M= 5
+[01:58:52.556] LOG: Lass Serena
+[01:58:53.029] LOG: Dialogue saved as seen: dialogue:lass.encounter.5
+[01:58:53.058] LOG: Lass Serena
+[01:58:53.918] LOG: %cStart Phase SummonPhase color:green;
+[01:58:53.918] LOG: Serena
+[01:58:54.188] LOG: %cStart Phase SummonPhase color:green;
+[01:58:54.189] LOG: Serena
+[01:58:54.459] LOG: %cStart Phase SummonPhase color:green;
+[01:58:54.744] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:58:54.745] LOG: %cStart Phase SummonPhase color:green;
+[01:58:55.028] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:58:55.031] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:55.031] LOG: Ran PSP for: Gardevoir
+[01:58:55.033] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:55.036] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:55.037] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:55.037] LOG: Ran PSP for: Kecleon
+[01:58:55.039] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:55.040] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:55.040] LOG: %cStart Phase MovePhase color:green;
+[01:58:55.040] LOG: %cUser: Kecleon
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[01:58:55.044] LOG: %cStart Phase MessagePhase color:green;
+[01:58:55.132] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:58:55.140] LOG: crit stage: +0
+[01:58:55.141] LOG: Move: Scratch | Base damage: 61.23478260869565 | Power: 40 | Source attack: 131 | Target defense: 46
+[01:58:55.142] LOG: Move: Scratch | Attack damage: 44
+[01:58:55.142] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:58:55.155] LOG: %cStart Phase MoveEndPhase color:green;
+[01:58:55.156] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:55.156] LOG: Ran PSP for: Magikarp
+[01:58:55.157] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:55.157] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:55.157] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:55.157] LOG: Ran PSP for: Magikarp
+[01:58:55.158] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:55.158] LOG: %cStart Phase PostSummonPhase color:green;
+[01:58:55.158] LOG: %cStart Phase TurnInitPhase color:green;
+[01:58:55.158] LOG: %cStart Phase CommandPhase color:green;
+[01:58:59.552] LOG: Move: DECORATE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Gardevoir
+[01:58:59.553] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:59:01.818] LOG: %cStart Phase CommandPhase color:green;
+[01:59:02.773] LOG: Move: DECORATE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Gardevoir
+[01:59:02.775] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:59:07.615] LOG: %cStart Phase CommandPhase color:green;
+[01:59:10.073] LOG: Move: PROTECT Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Kecleon
+[01:59:10.074] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:59:10.076] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:59:10.077] LOG: %cStart Phase TurnStartPhase color:green;
+[01:59:10.085] LOG: %cStart Phase MovePhase color:green;
+[01:59:10.085] LOG: %cUser: Kecleon
+Move: PROTECT
+Use Mode: NORMAL color:orchid
+[01:59:10.091] LOG: %cStart Phase MessagePhase color:green;
+[01:59:10.174] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:59:10.398] LOG: %cStart Phase MessagePhase color:green;
+[01:59:10.611] LOG: %cStart Phase MoveEndPhase color:green;
+[01:59:10.612] LOG: %cStart Phase MovePhase color:green;
+[01:59:10.613] LOG: %cUser: Gardevoir
+Move: DECORATE
+Use Mode: NORMAL color:orchid
+[01:59:10.617] LOG: %cStart Phase MessagePhase color:green;
+[01:59:10.722] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:59:11.029] LOG: crit stage: +0
+[01:59:11.030] LOG: Move: Decorate | Base damage: 344.7047619047619 | Power: 80 | Source attack: 173 | Target defense: 21
+[01:59:11.030] LOG: Move: Decorate | Attack damage: 496
+[01:59:11.031] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:59:11.044] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:59:11.044] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:59:11.225] LOG: %cStart Phase MessagePhase color:green;
+[01:59:11.452] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:59:11.634] LOG: %cStart Phase MessagePhase color:green;
+[01:59:11.861] LOG: %cStart Phase MessagePhase color:green;
+[01:59:12.083] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:59:12.084] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:59:12.266] LOG: %cStart Phase MessagePhase color:green;
+[01:59:12.486] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:59:12.668] LOG: %cStart Phase MessagePhase color:green;
+[01:59:12.889] LOG: %cStart Phase MessagePhase color:green;
+[01:59:13.104] LOG: %cStart Phase FaintPhase color:green;
+[01:59:13.162] LOG: %cStart Phase MessagePhase color:green;
+[01:59:21.154] LOG: %cStart Phase VictoryPhase color:green;
+[01:59:21.155] LOG: %cStart Phase MoveEndPhase color:green;
+[01:59:21.156] LOG: %cStart Phase MovePhase color:green;
+[01:59:21.156] LOG: %cStart Phase MoveEndPhase color:green;
+[01:59:21.156] LOG: %cStart Phase MovePhase color:green;
+[01:59:21.156] LOG: %cUser: Magikarp
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[01:59:21.161] LOG: %cStart Phase MessagePhase color:green;
+[01:59:21.265] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:59:21.508] LOG: crit stage: +0
+[01:59:21.509] LOG: Move: Splash | Base damage: 4.106930693069307 | Power: 40 | Source attack: 19 | Target defense: 101
+[01:59:21.510] LOG: Move: Splash | Attack damage: 8
+[01:59:21.511] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:59:21.522] LOG: %cStart Phase MoveEndPhase color:green;
+[01:59:21.522] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:59:21.522] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:59:21.523] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:59:21.523] LOG: %cStart Phase BerryPhase color:green;
+[01:59:21.524] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:59:21.525] LOG: %cStart Phase TurnEndPhase color:green;
+[01:59:21.526] LOG: %cStart Phase TurnInitPhase color:green;
+[01:59:21.526] LOG: %cStart Phase CommandPhase color:green;
+[01:59:22.802] LOG: Move: DECORATE Move targets: {"targets":[3,1],"multiple":false} 
+Player Pokemon: Gardevoir
+[01:59:22.804] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:59:24.046] LOG: %cStart Phase CommandPhase color:green;
+[01:59:25.526] LOG: Move: PROTECT Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Kecleon
+[01:59:25.527] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:59:25.528] LOG: Battle Seed: fxpgBd3tBCk0TFMo
+[01:59:25.529] LOG: %cStart Phase TurnStartPhase color:green;
+[01:59:25.531] LOG: %cStart Phase MovePhase color:green;
+[01:59:25.531] LOG: %cUser: Kecleon
+Move: PROTECT
+Use Mode: NORMAL color:orchid
+[01:59:25.533] LOG: %cStart Phase MessagePhase color:green;
+[01:59:25.633] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:59:25.856] LOG: %cStart Phase MessagePhase color:green;
+[01:59:26.070] LOG: %cStart Phase MoveEndPhase color:green;
+[01:59:26.071] LOG: %cStart Phase MovePhase color:green;
+[01:59:26.071] LOG: %cUser: Gardevoir
+Move: DECORATE
+Use Mode: NORMAL color:orchid
+[01:59:26.073] LOG: %cStart Phase MessagePhase color:green;
+[01:59:26.181] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:59:26.487] LOG: crit stage: +2
+[01:59:26.488] LOG: Move: Decorate | Base damage: 88.18922155688622 | Power: 80 | Source attack: 346 | Target defense: 167
+[01:59:26.488] LOG: Move: Decorate | Attack damage: 86
+[01:59:26.489] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:59:26.647] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:59:26.675] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:59:26.690] LOG: %cStart Phase MessagePhase color:green;
+[01:59:26.882] LOG: %cStart Phase MessagePhase color:green;
+[01:59:27.091] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:59:27.092] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:59:27.273] LOG: %cStart Phase MessagePhase color:green;
+[01:59:27.501] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:59:27.683] LOG: %cStart Phase MessagePhase color:green;
+[01:59:27.910] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:59:27.910] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:59:28.093] LOG: %cStart Phase MessagePhase color:green;
+[01:59:28.313] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:59:28.495] LOG: %cStart Phase MessagePhase color:green;
+[01:59:28.716] LOG: %cStart Phase MoveEndPhase color:green;
+[01:59:28.716] LOG: %cStart Phase MovePhase color:green;
+[01:59:28.716] LOG: %cUser: Magikarp
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[01:59:28.718] LOG: %cStart Phase MessagePhase color:green;
+[01:59:28.834] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:59:29.078] LOG: crit stage: +0
+[01:59:29.078] LOG: Move: Splash | Base damage: 3.988785046728972 | Power: 40 | Source attack: 19 | Target defense: 107
+[01:59:29.079] LOG: Move: Splash | Attack damage: 3
+[01:59:29.079] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:59:29.238] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:59:29.265] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:59:29.280] LOG: %cStart Phase MessagePhase color:green;
+[01:59:29.487] LOG: %cStart Phase MoveEndPhase color:green;
+[01:59:29.487] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:59:29.487] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:59:29.487] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:59:29.487] LOG: %cStart Phase BerryPhase color:green;
+[01:59:29.488] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:59:29.489] LOG: %cStart Phase TurnEndPhase color:green;
+[01:59:29.490] LOG: %cStart Phase TurnInitPhase color:green;
+[01:59:29.491] LOG: %cStart Phase CommandPhase color:green;
