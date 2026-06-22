@@ -455,31 +455,37 @@ interface SystemSaveRow {
  * BACKUP_MIN_INTERVAL_MS per user so frequent syncs don't blow the write budget.
  */
 async function maybeBackupSystemSave(env: Env, userId: number, previous: SystemSaveRow): Promise<void> {
-  await ensureBackupTable(env);
-  const last = await env.DB.prepare(
-    "SELECT backed_up_at FROM system_save_backups WHERE user_id = ?1 ORDER BY backed_up_at DESC LIMIT 1",
-  )
-    .bind(userId)
-    .first<{ backed_up_at: number }>();
-  const now = Date.now();
-  if (last && now - last.backed_up_at < BACKUP_MIN_INTERVAL_MS) {
-    return;
+  // Best-effort: a backup failure must NEVER break the save (it's a safety net,
+  // not the save itself). Any error is logged and swallowed so the caller proceeds.
+  try {
+    await ensureBackupTable(env);
+    const last = await env.DB.prepare(
+      "SELECT backed_up_at FROM system_save_backups WHERE user_id = ?1 ORDER BY backed_up_at DESC LIMIT 1",
+    )
+      .bind(userId)
+      .first<{ backed_up_at: number }>();
+    const now = Date.now();
+    if (last && now - last.backed_up_at < BACKUP_MIN_INTERVAL_MS) {
+      return;
+    }
+    await env.DB.prepare(
+      `INSERT INTO system_save_backups (user_id, data, trainer_id, secret_id, saved_at, backed_up_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+    )
+      .bind(userId, previous.data, previous.trainer_id, previous.secret_id, previous.updated_at, now)
+      .run();
+    await env.DB.prepare(
+      `DELETE FROM system_save_backups
+         WHERE user_id = ?1
+           AND id NOT IN (
+             SELECT id FROM system_save_backups WHERE user_id = ?1 ORDER BY backed_up_at DESC LIMIT ?2
+           )`,
+    )
+      .bind(userId, BACKUP_KEEP)
+      .run();
+  } catch (err) {
+    console.error("maybeBackupSystemSave error (skipping backup, save still proceeds):", err);
   }
-  await env.DB.prepare(
-    `INSERT INTO system_save_backups (user_id, data, trainer_id, secret_id, saved_at, backed_up_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
-  )
-    .bind(userId, previous.data, previous.trainer_id, previous.secret_id, previous.updated_at, now)
-    .run();
-  await env.DB.prepare(
-    `DELETE FROM system_save_backups
-       WHERE user_id = ?1
-         AND id NOT IN (
-           SELECT id FROM system_save_backups WHERE user_id = ?1 ORDER BY backed_up_at DESC LIMIT ?2
-         )`,
-  )
-    .bind(userId, BACKUP_KEEP)
-    .run();
 }
 
 /**
@@ -495,25 +501,34 @@ async function guardSystemOverwrite(
   allowReset: boolean,
   cors: Record<string, string>,
 ): Promise<Response | null> {
-  const existing = await env.DB.prepare(
-    "SELECT data, trainer_id, secret_id, updated_at FROM system_saves WHERE user_id = ?1",
-  )
-    .bind(userId)
-    .first<SystemSaveRow>();
-  if (!existing) {
+  // FAIL OPEN: this guard is a best-effort safeguard layered on top of the save.
+  // It may intentionally REJECT a regression (409), but an unexpected error inside
+  // it must NEVER turn a normal save into a 500 (that took prod sync down once).
+  // Any throw is logged and the save is allowed through unguarded.
+  try {
+    const existing = await env.DB.prepare(
+      "SELECT data, trainer_id, secret_id, updated_at FROM system_saves WHERE user_id = ?1",
+    )
+      .bind(userId)
+      .first<SystemSaveRow>();
+    if (!existing) {
+      return null;
+    }
+    if (!allowReset && isSystemRegression(existing.data, incoming)) {
+      return text(
+        "Save rejected: incoming save shows major progress loss versus the stored cloud save "
+          + "(likely an empty or desynced client). Cloud save preserved - reload to pull it. "
+          + "Send ?allowReset=1 to override intentionally.",
+        409,
+        cors,
+      );
+    }
+    await maybeBackupSystemSave(env, userId, existing);
+    return null;
+  } catch (err) {
+    console.error("guardSystemOverwrite error (allowing save through unguarded):", err);
     return null;
   }
-  if (!allowReset && isSystemRegression(existing.data, incoming)) {
-    return text(
-      "Save rejected: incoming save shows major progress loss versus the stored cloud save "
-        + "(likely an empty or desynced client). Cloud save preserved - reload to pull it. "
-        + "Send ?allowReset=1 to override intentionally.",
-      409,
-      cors,
-    );
-  }
-  await maybeBackupSystemSave(env, userId, existing);
-  return null;
 }
 
 async function handleSystemGet(auth: TokenPayload, env: Env, cors: Record<string, string>): Promise<Response> {
