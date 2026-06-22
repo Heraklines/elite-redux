@@ -174,6 +174,14 @@ node scripts/run-ui-scenario.mjs [species,species,...] [--surface S] [--strict]
     body in try/catch and logs `[pokedex-page] show() crashed:` instead of throwing,
     so the runner spies `console.error` for that line - `errors[]` = threw OR that
     logged crash (the #113 / #291 crash-to-black class).
+  - **`egg-hatch`** - hatches `new Egg({scene, species: id}).generatePlayerPokemon()`,
+    wraps it in an `EggHatchData`, and renders the REAL
+    `PokemonHatchInfoContainer.showHatchInfo()` (the egg-summary card). `STATE {…}` =
+    requested / hatched / threw / name / number / candy / spriteKey; `errors[]` = threw
+    (the #110 starterColors-undefined crash-to-black on ER-custom hover). `displayPokemon`
+    is stubbed (its async sprite-play can't animate headless); the sprite key is captured
+    via getSpriteKey instead. NB eggs hatch the BASE form (#133), so an evolved token
+    hatches its root.
 - Files: `test/tools/run-ui-scenario.test.ts` + `scripts/run-ui-scenario.mjs`. Sets
   `ER_SCENARIO=1` for you. Add a surface by adding a `snap*` + an `it.skipIf(SURFACE
   !== "…")` block (drive the handler, snapshot its computed state + resolved keys).

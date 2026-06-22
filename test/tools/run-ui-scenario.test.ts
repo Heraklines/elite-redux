@@ -51,13 +51,17 @@
 // =============================================================================
 
 import { allSpecies } from "#data/data-lists";
+import { Egg } from "#data/egg";
+import { EggHatchData } from "#data/egg-hatch-data";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { DexAttr } from "#enums/dex-attr";
 import { ErSpeciesId } from "#enums/er-species-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
+import type { PlayerPokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
 import type { PokedexPageUiHandler } from "#ui/pokedex-page-ui-handler";
+import { PokemonHatchInfoContainer } from "#ui/pokemon-hatch-info-container";
 import type { StarterSelectUiHandler } from "#ui/starter-select-ui-handler";
 import Phaser from "phaser";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -73,6 +77,8 @@ const DEMO_BY_SURFACE: Record<string, string[]> = {
   // pokedex page render: ER-custom crash (#113), multi-form legendary (#291-adjacent),
   // ER custom multi-form.
   pokedex: ["RATTATA", "RATTATA_REDUX", "CALYREX", "FLOETTE_ETERNAL_FLOWER", "MIMIKYU_BUSTED"],
+  // egg-hatch summary card: the starterColors-undefined crash on ER-custom hover (#110).
+  "egg-hatch": ["RATTATA", "RATTATA_REDUX", "MINCCINO_REDUX"],
 };
 const DEMO_SPECIES = DEMO_BY_SURFACE[SURFACE] ?? DEMO_BY_SURFACE["starter-select"];
 
@@ -263,6 +269,87 @@ function snapPokedex(game: GameManager, token: string): PokedexSnapshot | { toke
   };
 }
 
+interface EggSnapshot {
+  token: string;
+  id: number;
+  requested: string;
+  hatched: string;
+  hatchedId: number;
+  threw: string | false;
+  name: string;
+  number: string;
+  candy: string;
+  spriteKey: string;
+}
+
+/** Hatch an egg for the species and render its egg-summary hatch-info card (the #110 crash site). */
+function snapEgg(game: GameManager, token: string): EggSnapshot | { token: string; error: string } {
+  const id = resolveSpecies(token);
+  if (id === undefined) {
+    return { token, error: `unresolved species "${token}"` };
+  }
+  const species = allSpecies.find(s => (s.speciesId as number) === id);
+  if (!species) {
+    return { token, error: `species ${token} (${id}) not registered (ER init off? wrong id?)` };
+  }
+
+  let mon: PlayerPokemon;
+  try {
+    // Egg's `species` option is a numeric SpeciesId, NOT the PokemonSpecies object.
+    mon = new Egg({ scene: game.scene, species: id as SpeciesId }).generatePlayerPokemon();
+  } catch (e) {
+    return { token, error: `egg hatch failed for ${token}: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  const hatchData = new EggHatchData(mon, 0);
+  hatchData.setDex();
+
+  // Build the REAL hatch-info card; setup() constructs its Phaser children.
+  const listContainer = game.scene.add.container(0, 0);
+  const container = new PokemonHatchInfoContainer(listContainer);
+  const safe = <T>(fn: () => T, fallback: T): T => {
+    try {
+      return fn();
+    } catch {
+      return fallback;
+    }
+  };
+
+  let threw: string | false = false;
+  try {
+    container.setup();
+    // displayPokemon() kicks an async sprite load + play the headless sprite mock
+    // can't animate; the #110 crash is the SYNC starterColors/data path AFTER it, so
+    // stub the sprite render and capture the key separately.
+    vi.spyOn(container as unknown as { displayPokemon(p: PlayerPokemon): void }, "displayPokemon").mockImplementation(
+      () => {},
+    );
+    container.showHatchInfo(hatchData);
+  } catch (e) {
+    threw = e instanceof Error ? e.message : String(e);
+  }
+
+  const c = container as unknown as {
+    pokemonNameText?: { text: string };
+    pokemonNumberText?: { text: string };
+    pokemonCandyCountText?: { text: string };
+  };
+  return {
+    token,
+    id,
+    requested: species.name ?? String(id),
+    hatched: mon.species?.name ?? "",
+    hatchedId: (mon.species?.speciesId as number) ?? id,
+    threw,
+    name: c.pokemonNameText?.text ?? "",
+    number: c.pokemonNumberText?.text ?? "",
+    candy: c.pokemonCandyCountText?.text ?? "",
+    spriteKey: safe(
+      () => species.getSpriteKey(false, mon.formIndex ?? 0, mon.shiny ?? false, mon.variant ?? 0),
+      "<threw>",
+    ),
+  };
+}
+
 describe.skipIf(!RUN)("headless UI runner", () => {
   let phaserGame: Phaser.Game;
 
@@ -352,6 +439,32 @@ describe.skipIf(!RUN)("headless UI runner", () => {
     }
 
     console.log("\nRESULT", JSON.stringify({ surface: "pokedex", count: TARGET_TOKENS.length, errors }));
+    expect(errors, errors.join("\n")).toEqual([]);
+  });
+
+  it.skipIf(SURFACE !== "egg-hatch")("egg-hatch: renders the hatched-mon summary card", () => {
+    console.log("\n===== UI SURFACE: egg-hatch =====");
+    console.log(`species: ${TARGET_TOKENS.length} target(s)`);
+
+    const game = new GameManager(phaserGame);
+    const errors: string[] = [];
+
+    for (const token of TARGET_TOKENS) {
+      const snap = snapEgg(game, token);
+      if ("error" in snap) {
+        console.log(`\n=== ${token} ===\nERROR ${snap.error}`);
+        errors.push(snap.error);
+        continue;
+      }
+      console.log(`\n=== ${snap.hatched} (${snap.token} #${snap.hatchedId}) ===`);
+      console.log("STATE", JSON.stringify(snap));
+      // The crash class (#110): showHatchInfo threw (e.g. starterColors[id] undefined).
+      if (snap.threw) {
+        errors.push(`${snap.hatched} (${snap.token}): egg-summary showHatchInfo threw — ${snap.threw}`);
+      }
+    }
+
+    console.log("\nRESULT", JSON.stringify({ surface: "egg-hatch", count: TARGET_TOKENS.length, errors }));
     expect(errors, errors.join("\n")).toEqual([]);
   });
 });
