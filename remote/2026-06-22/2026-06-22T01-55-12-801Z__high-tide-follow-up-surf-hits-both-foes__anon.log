@@ -1,0 +1,280 @@
+scenario: High Tide: follow-up Surf hits BOTH foes
+url:      https://elite-redux-staging.pages.dev/
+build:    mqohwu1r-co92
+mode:     0  wave:5
+seed:     WJgVZkJqig4nKESpdAaf7IrA
+party:    Greninja(L55 161hp f0), Pikachu(L55 120hp f0)
+enemy:    Magikarp(L30), Magikarp(L30)
+
+----- COMMENT -----
+high tide doesnt activate in the staging build
+
+----- CONSOLE -----
+[01:53:48.504] LOG: %cStart Phase ExpPhase color:green;
+[01:53:48.710] LOG: %cStart Phase MoveEndPhase color:green;
+[01:53:48.710] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:53:48.710] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:53:48.710] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:53:48.710] LOG: %cStart Phase BerryPhase color:green;
+[01:53:48.710] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:53:48.710] LOG: %cStart Phase TurnEndPhase color:green;
+[01:53:48.710] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:53:48.876] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:53:48.989] LOG: %cStart Phase MessagePhase color:green;
+[01:53:49.244] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:53:49.266] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:53:49.501] LOG: Sinclair
+[01:53:49.710] LOG: %cStart Phase PostSummonPhase color:green;
+[01:53:49.710] LOG: Ran PSP for: Magikarp
+[01:53:49.710] LOG: %cStart Phase PostSummonPhase color:green;
+[01:53:49.710] LOG: %cStart Phase PostSummonPhase color:green;
+[01:53:49.710] LOG: %cStart Phase TurnInitPhase color:green;
+[01:53:49.710] LOG: %cStart Phase CommandPhase color:green;
+[01:53:49.999] LOG: Move: BODY_SLAM Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Snorlax
+[01:53:50.001] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:53:50.001] LOG: %cStart Phase TurnStartPhase color:green;
+[01:53:50.002] LOG: %cStart Phase MovePhase color:green;
+[01:53:50.002] LOG: %cUser: Magikarp
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[01:53:50.003] LOG: %cStart Phase MessagePhase color:green;
+[01:53:50.112] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:53:50.112] LOG: Battle Seed: j9WwiMz5hNB6edrC
+[01:53:50.355] LOG: crit stage: +0
+[01:53:50.356] LOG: Move: Splash | Base damage: 3.1789473684210527 | Power: 40 | Source attack: 7 | Target defense: 19
+[01:53:50.356] LOG: Move: Splash | Attack damage: 4
+[01:53:50.356] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:53:50.370] LOG: %cStart Phase MoveEndPhase color:green;
+[01:53:50.370] LOG: %cStart Phase MovePhase color:green;
+[01:53:50.370] LOG: %cUser: Snorlax
+Move: BODY_SLAM
+Use Mode: NORMAL color:orchid
+[01:53:50.371] LOG: %cStart Phase MessagePhase color:green;
+[01:53:50.480] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:53:50.626] LOG: crit stage: +0
+[01:53:50.627] LOG: Move: Body Slam | Base damage: 13.56 | Power: 85 | Source attack: 17 | Target defense: 10
+[01:53:50.627] LOG: Move: Body Slam | Attack damage: 9
+[01:53:50.627] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:53:50.641] LOG: %cStart Phase MoveEndPhase color:green;
+[01:53:50.641] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:53:50.641] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:53:50.641] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:53:50.641] LOG: %cStart Phase BerryPhase color:green;
+[01:53:50.641] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:53:50.641] LOG: %cStart Phase TurnEndPhase color:green;
+[01:53:50.641] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:53:50.807] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:53:50.919] LOG: %cStart Phase MessagePhase color:green;
+[01:53:51.175] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:53:51.196] LOG: %cStart Phase TurnInitPhase color:green;
+[01:53:51.196] LOG: %cStart Phase CommandPhase color:green;
+[01:53:51.517] LOG: Move: BODY_SLAM Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Snorlax
+[01:53:51.519] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:53:51.519] LOG: %cStart Phase TurnStartPhase color:green;
+[01:53:51.520] LOG: %cStart Phase MovePhase color:green;
+[01:53:51.520] LOG: %cUser: Magikarp
+Move: SPLASH
+Use Mode: NORMAL color:orchid
+[01:53:51.521] LOG: %cStart Phase MessagePhase color:green;
+[01:53:51.632] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:53:51.633] LOG: Battle Seed: j9WwiMz5hNB6edrC
+[01:53:51.877] LOG: crit stage: +0
+[01:53:51.877] LOG: Move: Splash | Base damage: 3.1789473684210527 | Power: 40 | Source attack: 7 | Target defense: 19
+[01:53:51.878] LOG: Move: Splash | Attack damage: 4
+[01:53:51.878] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:53:51.890] LOG: %cStart Phase MoveEndPhase color:green;
+[01:53:51.891] LOG: %cStart Phase MovePhase color:green;
+[01:53:51.891] LOG: %cUser: Snorlax
+Move: BODY_SLAM
+Use Mode: NORMAL color:orchid
+[01:53:51.891] LOG: %cStart Phase MessagePhase color:green;
+[01:53:52.001] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:53:52.147] LOG: crit stage: +0
+[01:53:52.148] LOG: Move: Body Slam | Base damage: 13.56 | Power: 85 | Source attack: 17 | Target defense: 10
+[01:53:52.148] LOG: Move: Body Slam | Attack damage: 19
+[01:53:52.148] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:53:52.161] LOG: %cStart Phase FaintPhase color:green;
+[01:53:52.223] LOG: %cStart Phase MessagePhase color:green;
+[01:53:52.337] LOG: %cStart Phase VictoryPhase color:green;
+[01:53:52.338] LOG: %cStart Phase ExpPhase color:green;
+[01:53:52.703] LOG: %cStart Phase LevelUpPhase color:green;
+[01:53:52.703] LOG: %cStart Phase MoveEndPhase color:green;
+[01:53:52.703] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:53:52.703] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:53:52.703] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:53:52.703] LOG: %cStart Phase BerryPhase color:green;
+[01:53:52.704] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:53:52.704] LOG: %cStart Phase TurnEndPhase color:green;
+[01:53:52.704] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:53:52.869] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:53:52.982] LOG: %cStart Phase MessagePhase color:green;
+[01:53:53.236] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:53:53.258] LOG: %cStart Phase BattleEndPhase color:green;
+[01:53:53.259] LOG: Battle Score: 28 (4 Turns x0.69)
+[01:53:53.259] LOG: Total Score: 28
+[01:53:53.264] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[01:53:53.266] LOG: Youngster Sinclair
+[01:53:53.613] LOG: Youngster Sinclair
+[01:53:53.895] LOG: Dialogue saved as seen: dialogue:youngster.victory.4
+[01:53:53.895] LOG: %cStart Phase MoneyRewardPhase color:green;
+[01:53:54.191] LOG: %cStart Phase ModifierRewardPhase color:green;
+[01:53:54.465] LOG: %cStart Phase EggLapsePhase color:green;
+[01:53:54.465] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:53:54.466] LOG: Wave Seed: >WM8ytv<:=Ws5hwkkqTXi~k: 5
+[01:53:54.470] LOG: 12 9 [2,3,4,5,6,7,8,9,10,23]
+[01:53:54.470] LOG: {"id":"SUPER_LURE","localeKey":"modifierType:ModifierType.SUPER_LURE","iconImage":"super_lure","group":"lure","soundName":"se/restore","tier":1,"maxBattles":15} 
+[01:53:54.470] LOG: 16 9 [2,3,4,5,6,7,8,9,10,23]
+[01:53:54.470] LOG: {"id":"ER_UPGRADED_MAP","localeKey":"","iconImage":"map","iconTint":16765514,"soundName":"se/restore","tier":1} 
+[01:53:54.470] LOG: 14 9 [2,3,4,5,6,7,8,9,10,23]
+[01:53:54.470] LOG: GREAT 0
+[01:53:54.470] LOG: 19 9 [2,3,4,5,6,7,8,9,10,23]
+[01:53:54.470] LOG: {"id":"MEMORY_MUSHROOM","localeKey":"modifierType:ModifierType.MEMORY_MUSHROOM","iconImage":"big_mushroom","soundName":"se/restore","tier":1} 
+[01:53:54.470] LOG: 20 9 [2,3,4,5,6,7,8,9,10,23]
+[01:53:54.470] LOG: {"id":"ER_ABILITY_CAPSULE","localeKey":"","iconImage":"ability_capsule","soundName":"se/restore","tier":1} 
+[01:53:54.470] LOG: 13 9 [2,3,4,5,6,7,8,9,10,23]
+[01:53:54.470] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[01:54:01.004] LOG: %cStart Phase ErCrossroadsPhase color:green;
+[01:54:02.374] LOG: %cStart Phase NewBattlePhase color:green;
+[01:54:02.374] LOG: Wave Seed: ?XN9zuw=;>Xt6ixllrUYjl; 6
+[01:54:02.376] LOG: %cStart Phase NextEncounterPhase color:green;
+[01:54:02.377] LOG: Starting species pool tier: UNCOMMON
+[01:54:02.384] LOG: Pokemon: Wild Magikarp | Species ID: 129 | Level: 5 | Nature: Brave (+Atk/-Spd)
+[01:54:02.385] LOG: Stats (IVs): HP: 18 (24), Atk: 7 (9), Def: 11 (14), Spatk: 6 (8), Spdef: 8 (21), Spd: 12 (25)
+[01:54:02.385] LOG: Ability: Guilt Trip | Passive Ability: Multiscale 
+[01:54:02.385] LOG: Moveset: ["Splash"]
+[01:54:02.385] LOG: Starting species pool tier: UNCOMMON
+[01:54:02.391] LOG: Pokemon: Wild Magikarp | Species ID: 129 | Level: 5 | Nature: Gentle (+SpDef/-Def)
+[01:54:02.391] LOG: Stats (IVs): HP: 18 (30), Atk: 7 (11), Def: 10 (31), Spatk: 7 (28), Spdef: 8 (19), Spd: 13 (16)
+[01:54:02.392] LOG: Ability: Marvel Scale | Passive Ability: Multiscale 
+[01:54:02.392] LOG: Moveset: ["Splash"]
+[01:54:02.441] DEBUG: Session data saved to slot 4!
+[01:54:02.442] LOG: Wave Seed: ?XN9zuw=;>Xt6ixllrUYjl; 6
+[01:54:02.883] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:54:02.946] LOG: %cStart Phase SummonPhase color:green;
+[01:54:03.230] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:54:03.628] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:54:03.883] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:54:03.884] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:03.884] LOG: Ran PSP for: Magikarp
+[01:54:03.884] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:03.885] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:03.885] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:03.885] LOG: Ran PSP for: Magikarp
+[01:54:03.886] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:03.886] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:03.886] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:03.886] LOG: Ran PSP for: Snorlax
+[01:54:03.887] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:03.887] LOG: %cStart Phase MovePhase color:green;
+[01:54:03.887] LOG: %cUser: Snorlax
+Move: DEFENSE_CURL
+Use Mode: INDIRECT color:orchid
+[01:54:03.890] LOG: %cStart Phase MessagePhase color:green;
+[01:54:03.993] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:54:04.001] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:54:04.183] LOG: %cStart Phase MessagePhase color:green;
+[01:54:04.389] LOG: %cStart Phase MoveEndPhase color:green;
+[01:54:04.389] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:04.389] LOG: %cStart Phase TurnInitPhase color:green;
+[01:54:04.390] LOG: %cStart Phase CommandPhase color:green;
+[01:54:08.916] LOG: Seed: pwomFmqjGZ753EFBu3pyRAWH
+[01:54:08.916] LOG: Wave Seed: pwomFmqjGZ753EFBu3pyRAWH 0
+[01:54:09.117] WARN: AnimationManager key already exists: prompt
+[01:54:09.117] WARN: AnimationManager key already exists: tera_sparkle
+[01:54:09.117] LOG: Seed: WJgVZkJqig4nKESpdAaf7IrA
+[01:54:09.117] LOG: Wave Seed: WJgVZkJqig4nKESpdAaf7IrA 0
+[01:54:12.442] LOG: %cStart Phase LoginPhase color:green;
+[01:54:12.631] LOG: Client Session: 8zOUrmRvxrVC9x99ZCddVrTnxUVPYBmt
+[01:54:12.992] DEBUG: Using cached system data
+[01:54:13.057] LOG: %cStart Phase TitlePhase color:green;
+[01:54:13.058] LOG: Getting Session Slot id: %d 4
+[01:54:13.064] LOG: use seasonal splash messages true
+[01:54:13.064] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[01:54:49.300] LOG: %cStart Phase SelectStarterPhase color:green;
+[01:54:49.671] LOG: Wave Seed: \Ol[_pOvnl9sPJXuiFfk<NwF 5
+[01:54:49.673] LOG: %cStart Phase EncounterPhase color:green;
+[01:54:49.677] LOG: COMMON
+[01:54:49.677] LOG: Zigzagoon
+[01:54:49.687] LOG: Pokemon: Foe Magikarp | Species ID: 129 | Level: 30 | Nature: Timid (+Spd/-Atk)
+[01:54:49.687] LOG: Stats (IVs): HP: 54 (30), Atk: 15 (5), Def: 42 (14), Spatk: 21 (2), Spdef: 24 (4), Spd: 63 (10)
+[01:54:49.687] LOG: Ability: Guilt Trip | Passive Ability: Multiscale 
+[01:54:49.687] LOG: Moveset: ["Splash"]
+[01:54:49.687] LOG: COMMON
+[01:54:49.687] LOG: Lillipup
+[01:54:49.697] LOG: Pokemon: Foe Magikarp | Species ID: 129 | Level: 30 | Nature: Rash (+SpAtk/-SpDef)
+[01:54:49.697] LOG: Stats (IVs): HP: 53 (15), Atk: 22 (6), Def: 41 (7), Spatk: 17 (18), Spdef: 17 (26), Spd: 61 (7)
+[01:54:49.697] LOG: Ability: Marvel Scale | Passive Ability: Multiscale 
+[01:54:49.697] LOG: Moveset: ["Splash"]
+[01:54:49.977] LOG: Battle Seed: 8ElKcE27GJ0e3HYZ
+[01:54:49.978] LOG: Generated AI funcs
+[01:54:50.015] DEBUG: Session data saved to slot 4!
+[01:54:50.015] LOG: Wave Seed: \Ol[_pOvnl9sPJXuiFfk<NwF 5
+[01:54:50.223] LOG: Lass Isabel
+[01:54:50.645] LOG: Dialogue saved as seen: dialogue:lass.encounter.5
+[01:54:50.676] LOG: Lass Isabel
+[01:54:51.120] LOG: %cStart Phase SummonPhase color:green;
+[01:54:51.120] LOG: Isabel
+[01:54:51.389] LOG: %cStart Phase SummonPhase color:green;
+[01:54:51.389] LOG: Isabel
+[01:54:51.660] LOG: %cStart Phase SummonPhase color:green;
+[01:54:51.945] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:54:51.946] LOG: %cStart Phase SummonPhase color:green;
+[01:54:52.229] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:54:52.232] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:52.232] LOG: Ran PSP for: Greninja
+[01:54:52.234] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:52.236] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:52.237] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:52.237] LOG: Ran PSP for: Pikachu
+[01:54:52.239] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:52.240] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:52.241] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:52.241] LOG: Ran PSP for: Magikarp
+[01:54:52.242] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:52.242] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:52.242] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:52.242] LOG: Ran PSP for: Magikarp
+[01:54:52.243] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:52.243] LOG: %cStart Phase PostSummonPhase color:green;
+[01:54:52.243] LOG: %cStart Phase TurnInitPhase color:green;
+[01:54:52.243] LOG: %cStart Phase CommandPhase color:green;
+[01:54:52.901] LOG: Move: WATER_PULSE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Greninja
+[01:54:52.902] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:54:53.331] LOG: %cStart Phase CommandPhase color:green;
+[01:54:53.867] LOG: Move: THUNDERBOLT Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Pikachu
+[01:54:53.868] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:54:55.055] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:54:55.058] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:54:55.058] LOG: %cStart Phase TurnStartPhase color:green;
+[01:54:55.065] LOG: %cStart Phase MovePhase color:green;
+[01:54:55.065] LOG: %cUser: Greninja
+Move: WATER_PULSE
+Use Mode: NORMAL color:orchid
+[01:54:55.071] LOG: %cStart Phase MessagePhase color:green;
+[01:54:55.160] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:54:55.370] LOG: crit stage: +0
+[01:54:55.371] LOG: Move: Water Pulse | Base damage: 347.6 | Power: 96 | Source attack: 135 | Target defense: 18
+[01:54:55.372] LOG: Move: Water Pulse | Attack damage: 118
+[01:54:55.373] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:54:55.384] LOG: %cStart Phase MessagePhase color:green;
+[01:54:55.590] LOG: %cStart Phase FaintPhase color:green;
+[01:54:55.649] LOG: %cStart Phase MessagePhase color:green;
+[01:54:56.332] LOG: %cStart Phase VictoryPhase color:green;
+[01:54:56.333] LOG: %cStart Phase MoveEndPhase color:green;
+[01:54:56.334] LOG: %cStart Phase MovePhase color:green;
+[01:54:56.334] LOG: %cUser: Pikachu
+Move: THUNDERBOLT
+Use Mode: NORMAL color:orchid
+[01:54:56.335] LOG: %cStart Phase MessagePhase color:green;
+[01:54:56.445] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:54:56.723] LOG: crit stage: +0
+[01:54:56.724] LOG: Move: Thunderbolt | Base damage: 192.08 | Power: 108 | Source attack: 77 | Target defense: 21
+[01:54:56.725] LOG: Move: Thunderbolt | Attack damage: 256
+[01:54:56.725] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:54:56.738] LOG: %cStart Phase MessagePhase color:green;
+[01:54:56.945] LOG: %cStart Phase FaintPhase color:green;
+[01:54:57.001] LOG: %cStart Phase MessagePhase color:green;
