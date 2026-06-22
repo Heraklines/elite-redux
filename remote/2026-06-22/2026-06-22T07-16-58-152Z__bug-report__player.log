@@ -1,0 +1,265 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:156  difficulty:youngster
+seed:     KrB31eBYFZt2DQc8KHwHEKbv
+party:    Cormoth(L143 533/533), Shaymin(L143 511/511), Sagaracas(L124 395/395), Sunflora(L138 259/452), Brute Bonnet(L127 472/472)
+
+----- DESCRIPTION -----
+Cormoth had a substitute from the relic already and switching in Shaymin caused it to also have a substitute
+
+----- CONSOLE -----
+[07:15:22.849] LOG: 7 2 [4,5]
+[07:15:22.849] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[07:15:22.849] LOG: 6 2 [4,5]
+[07:15:22.849] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[07:15:22.849] LOG: 8 1 [7,9,11,12,13,25]
+[07:15:22.849] LOG: {"id":"AMULET_COIN","localeKey":"modifierType:ModifierType.AMULET_COIN","iconImage":"amulet_coin","soundName":"se/restore","tier":2} 
+[07:15:22.849] LOG: 10 2 [7,9,11,12,13,25]
+[07:15:22.849] LOG: ULTRA 0
+[07:15:22.849] LOG: 6 0 [7,9,11,12,13,25]
+[07:15:22.849] LOG: ULTRA 0
+[07:15:22.849] LOG: 28 6 [7,9,11,12,13,25]
+[07:15:22.849] LOG: {"id":"ER_CHILI_SAMPLE","localeKey":"","iconImage":"charcoal","iconTint":16733491,"soundName":"se/restore","tier":2} 
+[07:15:22.849] LOG: 28 6 [7,9,11,12,13,25]
+[07:15:22.849] LOG: {"id":"ER_CHILI_SAMPLE","localeKey":"","iconImage":"charcoal","iconTint":16733491,"soundName":"se/restore","tier":2} 
+[07:15:22.849] LOG: 4 0 [7,9,11,12,13,25]
+[07:15:22.849] LOG: {"id":"MINT","localeKey":"","iconImage":"mint_spd","group":"mint","soundName":"se/restore","tier":2,"nature":14} 
+[07:15:22.850] LOG: 6 2 [4,5]
+[07:15:22.850] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[07:15:22.850] LOG: 9 2 [4,5]
+[07:15:22.851] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_dragon","group":"tm","soundName":"se/restore","tier":0,"moveId":913} 
+[07:15:22.851] LOG: 8 2 [4,5]
+[07:15:22.851] LOG: {"id":"BERRY","localeKey":"","iconImage":"ganlon_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":4} 
+[07:15:22.851] LOG: 35 6 [7,9,11,12,13,25]
+[07:15:22.851] LOG: {"id":"ER_POWER_HERB","localeKey":"","iconImage":"power_herb","iconTint":16777215,"soundName":"se/restore","tier":2} 
+[07:15:22.851] LOG: 27 6 [7,9,11,12,13,25]
+[07:15:22.851] LOG: {"id":"WIDE_LENS","localeKey":"modifierType:ModifierType.WIDE_LENS","iconImage":"wide_lens","soundName":"se/restore","tier":2,"amount":5} 
+[07:15:22.851] LOG: 2 0 [7,9,11,12,13,25]
+[07:15:22.851] LOG: {"id":"BIG_NUGGET","localeKey":"modifierType:ModifierType.BIG_NUGGET","iconImage":"big_nugget","group":"money","soundName":"se/buy","tier":2,"moneyMultiplier":2.5,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.moderate"} 
+[07:15:26.549] LOG: Applied Amulet Coin 
+[07:15:27.282] LOG: Applied Amulet Coin 
+[07:15:27.290] LOG: %cStart Phase NewBattlePhase color:green;
+[07:15:27.290] LOG: Wave Seed: æčÝÎÌĀÝôáõďÍßìþÓæãĒãàæýđ 155
+[07:15:27.290] LOG: Applied Super Lure 
+[07:15:27.290] LOG: %cStart Phase NextEncounterPhase color:green;
+[07:15:27.291] LOG: Starting species pool tier: COMMON
+[07:15:27.291] LOG: Replaced ZUBAT with CROBAT
+[07:15:27.302] LOG: Pokemon: Wild Crobat | Species ID: 169 | Level: 129 | Nature: Serious (-)
+[07:15:27.302] LOG: Stats (IVs): HP: 359 (1), Atk: 273 (28), Def: 237 (20), Spatk: 212 (1), Spdef: 233 (17), Spd: 379 (30)
+[07:15:27.302] LOG: Ability: Momentum | Passive Ability: Scare 
+[07:15:27.302] LOG: Moveset: ["Brave Bird","Boomburst","Cross Poison","Mean Look"]
+[07:15:27.464] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[07:15:27.464] LOG: Battle Seed: S2kN0goaHNzMcUHQ
+[07:15:27.522] DEBUG: Session data saved to slot 3!
+[07:15:27.523] LOG: Wave Seed: æčÝÎÌĀÝôáõďÍßìþÓæãĒãàæýđ 155
+[07:15:27.736] WARN: cry/169 not found
+[07:15:27.952] LOG: %cStart Phase ReturnPhase color:green;
+[07:15:28.085] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[07:15:28.151] LOG: %cStart Phase CheckSwitchPhase color:green;
+[07:15:28.924] LOG: %cStart Phase InitEncounterPhase color:green;
+[07:15:28.924] LOG: %cStart Phase PostSummonPhase color:green;
+[07:15:28.924] LOG: Ran PSP for: Crobat
+[07:15:28.924] LOG: %cStart Phase PostSummonPhase color:green;
+[07:15:28.924] LOG: %cStart Phase PostSummonPhase color:green;
+[07:15:28.924] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:15:29.102] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:15:29.152] LOG: %cStart Phase TurnInitPhase color:green;
+[07:15:29.154] LOG: %cStart Phase CommandPhase color:green;
+[07:15:31.108] LOG: Move: MATCHA_GOTCHA Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Mega Cormontonana
+[07:15:31.111] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:15:31.120] LOG: Move Pool: ["Brave Bird","Boomburst","Cross Poison","Mean Look"]
+[07:15:31.120] LOG: Move Scores: [12.9375,21,18.1875,3]
+[07:15:31.120] LOG: Sorted Move Pool: ["Boomburst","Cross Poison","Brave Bird","Mean Look"]
+[07:15:31.120] LOG: Chosen Move: Cross Poison
+[07:15:31.120] LOG: %cStart Phase TurnStartPhase color:green;
+[07:15:31.121] LOG: %cStart Phase MovePhase color:green;
+[07:15:31.121] LOG: %cUser: Mega Cormontonana
+Move: MATCHA_GOTCHA
+Use Mode: NORMAL color:orchid
+[07:15:31.122] LOG: %cStart Phase MessagePhase color:green;
+[07:15:31.251] LOG: %cStart Phase PokemonAnimPhase color:green;
+[07:15:31.334] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:15:31.335] LOG: Applied Multi Lens 
+[07:15:31.803] LOG: Applied Scope Lens 
+[07:15:31.803] LOG: crit stage: +1
+[07:15:31.804] LOG: Move: Matcha Gotcha | Base damage: 283.92412017167385 | Power: 80 | Source attack: 703 | Target defense: 233
+[07:15:31.805] LOG: Applied Multi Lens 
+[07:15:31.805] LOG: Move: Matcha Gotcha | Attack damage: 1411
+[07:15:31.811] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:15:31.837] LOG: %cStart Phase MessagePhase color:green;
+[07:15:32.051] LOG: %cStart Phase PokemonHealPhase color:green;
+[07:15:32.051] LOG: %cStart Phase MessagePhase color:green;
+[07:15:32.318] LOG: %cStart Phase MessagePhase color:green;
+[07:15:32.518] LOG: %cStart Phase FaintPhase color:green;
+[07:15:32.519] WARN: cry/169 not found
+[07:15:32.586] LOG: %cStart Phase MessagePhase color:green;
+[07:15:40.227] LOG: %cStart Phase VictoryPhase color:green;
+[07:15:40.227] LOG: Applied Soothe Bell 
+[07:15:40.227] LOG: %cStart Phase ExpPhase color:green;
+[07:15:40.228] LOG: Applied Super EXP. Charm 
+[07:15:40.228] LOG: Applied EXP. Charm 
+[07:15:40.994] LOG: %cStart Phase LevelUpPhase color:green;
+[07:15:40.995] LOG: Applied HP Up 
+[07:15:40.995] LOG: Applied Carbos 
+[07:15:40.995] LOG: Applied Calcium 
+[07:15:40.995] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[07:15:40.995] LOG: Applied Super EXP. Charm 
+[07:15:40.996] LOG: Applied EXP. Charm 
+[07:15:40.996] LOG: %cStart Phase LevelUpPhase color:green;
+[07:15:40.996] LOG: Applied Calcium 
+[07:15:40.996] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[07:15:40.996] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[07:15:40.996] LOG: Applied Super EXP. Charm 
+[07:15:40.996] LOG: Applied EXP. Charm 
+[07:15:40.996] LOG: %cStart Phase LevelUpPhase color:green;
+[07:15:40.997] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[07:15:40.997] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[07:15:40.997] LOG: Applied Super EXP. Charm 
+[07:15:40.997] LOG: Applied EXP. Charm 
+[07:15:40.997] LOG: %cStart Phase LevelUpPhase color:green;
+[07:15:40.997] LOG: Applied Zinc 
+[07:15:40.997] LOG: Applied Calcium 
+[07:15:40.997] LOG: Applied HP Up 
+[07:15:40.997] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[07:15:40.997] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[07:15:40.997] LOG: Applied Super EXP. Charm 
+[07:15:40.997] LOG: Applied EXP. Charm 
+[07:15:40.997] LOG: %cStart Phase LevelUpPhase color:green;
+[07:15:40.997] LOG: Applied HP Up 
+[07:15:40.998] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[07:15:40.998] LOG: %cStart Phase MoveEndPhase color:green;
+[07:15:40.998] LOG: %cStart Phase PokemonAnimPhase color:green;
+[07:15:41.110] LOG: %cStart Phase MovePhase color:green;
+[07:15:41.111] LOG: %cStart Phase MoveEndPhase color:green;
+[07:15:41.111] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:15:41.111] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:15:41.511] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:15:41.511] LOG: %cStart Phase BerryPhase color:green;
+[07:15:41.512] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:15:41.512] LOG: %cStart Phase TurnEndPhase color:green;
+[07:15:41.526] LOG: %cStart Phase PokemonHealPhase color:green;
+[07:15:41.527] LOG: %cStart Phase MessagePhase color:green;
+[07:15:41.751] LOG: %cStart Phase BattleEndPhase color:green;
+[07:15:41.751] LOG: Battle Score: 233 (1 Turns x1)
+[07:15:41.751] LOG: Total Score: 41323
+[07:15:41.759] LOG: Applied HP Up 
+[07:15:41.759] LOG: Applied Carbos 
+[07:15:41.759] LOG: Applied Calcium 
+[07:15:41.760] LOG: Applied Calcium 
+[07:15:41.760] LOG: Applied Zinc 
+[07:15:41.760] LOG: Applied Calcium 
+[07:15:41.760] LOG: Applied HP Up 
+[07:15:41.761] LOG: Applied HP Up 
+[07:15:41.767] LOG: %cStart Phase EggLapsePhase color:green;
+[07:15:41.768] LOG: %cStart Phase SelectModifierPhase color:green;
+[07:15:41.768] LOG: Wave Seed: æčÝÎÌĀÝôáõďÍßìþÓæãĒãàæýđ 155
+[07:15:41.770] LOG: Applied Golden Poké Ball 
+[07:15:41.770] LOG: 21 10 [2,3,4,5,7,8,9,10,12,16,23]
+[07:15:41.770] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"protein","soundName":"se/restore","tier":1,"stat":1,"key":"protein"} 
+[07:15:41.770] LOG: 9 2 [4,5]
+[07:15:41.771] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_fire","group":"tm","soundName":"se/restore","tier":0,"moveId":241} 
+[07:15:41.771] LOG: 34 6 [7,9,11,12,13,25]
+[07:15:41.771] LOG: {"id":"ER_DEX_NAV","localeKey":"","iconImage":"dex_nav","soundName":"se/restore","tier":2} 
+[07:15:41.771] LOG: 5 0 [7,9,11,12,13,25]
+[07:15:41.771] LOG: {"id":"SPEED_ORDER","localeKey":"","iconImage":"scanner","soundName":"se/restore","tier":2} 
+[07:15:41.771] LOG: 36 6 [7,9,11,12,13,25]
+[07:15:41.771] LOG: {"id":"ER_LEARNERS_SHROOM","localeKey":"","iconImage":"learners_shroom","soundName":"se/restore","tier":2} 
+[07:15:41.771] LOG: 19 5 [7,9,11,12,13,25]
+[07:15:41.771] LOG: {"id":"TM_ULTRA","localeKey":"","iconImage":"tm_grass","group":"tm","soundName":"se/restore","tier":2,"moveId":312} 
+[07:15:41.771] LOG: 30 6 [7,9,11,12,13,25]
+[07:15:41.771] LOG: {"id":"ER_RUSTY_CLAW","localeKey":"","iconImage":"quick_claw","iconTint":10115891,"soundName":"se/restore","tier":2} 
+[07:15:41.771] LOG: 2 0 [7,9,11,12,13,25]
+[07:15:41.771] LOG: {"id":"BIG_NUGGET","localeKey":"modifierType:ModifierType.BIG_NUGGET","iconImage":"big_nugget","group":"money","soundName":"se/buy","tier":2,"moneyMultiplier":2.5,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.moderate"} 
+[07:15:41.772] LOG: 9 2 [4,5]
+[07:15:41.772] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_grass","group":"tm","soundName":"se/restore","tier":0,"moveId":580} 
+[07:15:41.772] LOG: 7 2 [4,5]
+[07:15:41.772] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_attack","soundName":"se/restore","tier":0,"stat":1,"nameKey":"x_attack","quantityKey":"percentage"} 
+[07:15:41.772] LOG: 2 0 [4,5]
+[07:15:41.772] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[07:15:41.772] LOG: 1 0 [4,5]
+[07:15:41.772] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[07:15:41.772] LOG: 6 2 [4,5]
+[07:15:41.772] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[07:15:41.772] LOG: 11 8 [2,3,4,5,7,8,9,10,12,16,23]
+[07:15:41.772] LOG: {"id":"DIRE_HIT","localeKey":"modifierType:ModifierType.DIRE_HIT","iconImage":"dire_hit","soundName":"se/restore","tier":1} 
+[07:15:41.772] LOG: 13 9 [2,3,4,5,7,8,9,10,12,16,23]
+[07:15:41.772] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[07:15:41.773] LOG: 15 9 [2,3,4,5,7,8,9,10,12,16,23]
+[07:15:41.773] LOG: GREAT 0
+[07:15:41.773] LOG: 19 10 [2,3,4,5,7,8,9,10,12,16,23]
+[07:15:41.773] LOG: {"id":"MEMORY_MUSHROOM","localeKey":"modifierType:ModifierType.MEMORY_MUSHROOM","iconImage":"big_mushroom","soundName":"se/restore","tier":1} 
+[07:15:41.773] LOG: 15 9 [2,3,4,5,7,8,9,10,12,16,23]
+[07:15:41.773] LOG: GREAT 0
+[07:15:41.773] LOG: 21 10 [2,3,4,5,7,8,9,10,12,16,23]
+[07:15:41.773] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"hp_up","soundName":"se/restore","tier":1,"stat":0,"key":"hp_up"} 
+[07:15:41.773] LOG: 22 10 [2,3,4,5,7,8,9,10,12,16,23]
+[07:15:41.773] LOG: {"id":"TERA_SHARD","localeKey":"","iconImage":"steel_tera_shard","group":"tera_shard","soundName":"se/restore","tier":1,"teraType":8} 
+[07:15:44.274] LOG: Applied Amulet Coin 
+[07:15:44.839] LOG: Applied Amulet Coin 
+[07:15:44.848] LOG: %cStart Phase NewBattlePhase color:green;
+[07:15:44.848] LOG: Wave Seed: çĎÞÏÍāÞõâöĐÎàíÿÔçäēäáçþĒ 156
+[07:15:44.848] LOG: Applied Super Lure 
+[07:15:44.848] LOG: %cStart Phase NextEncounterPhase color:green;
+[07:15:44.849] LOG: Starting species pool tier: UNCOMMON
+[07:15:44.849] LOG: Replaced WIMPOD with GOLISOPOD
+[07:15:44.865] LOG: Pokemon: Wild Golisopod | Species ID: 768 | Level: 118 | Nature: Lonely (+Atk/-Def)
+[07:15:44.865] LOG: Stats (IVs): HP: 338 (28), Atk: 355 (19), Def: 304 (3), Spatk: 180 (29), Spdef: 243 (22), Spd: 101 (2)
+[07:15:44.865] LOG: Ability: Tough Claws | Passive Ability: Shell Armor 
+[07:15:44.865] LOG: Moveset: ["Waterfall","Aqua Jet","Brick Break","Insect Impact"]
+[07:15:44.865] LOG: Starting species pool tier: COMMON
+[07:15:44.865] LOG: Replaced WOOBAT with SWOOBAT
+[07:15:44.875] LOG: Pokemon: Wild Swoobat | Species ID: 528 | Level: 120 | Nature: Jolly (+Spd/-SpAtk)
+[07:15:44.875] LOG: Stats (IVs): HP: 318 (23), Atk: 145 (3), Def: 153 (14), Spatk: 213 (0), Spdef: 170 (28), Spd: 337 (23)
+[07:15:44.875] LOG: Ability: Unaware | Passive Ability: Emanate 
+[07:15:44.875] LOG: Moveset: ["Esper Wing","Kinesis","Power Swap","Synchronoise"]
+[07:15:45.003] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"carbos","soundName":"se/restore","tier":1,"stat":5,"key":"carbos"} (enemy)
+[07:15:45.003] LOG: Battle Seed: I0xphgY5rH0JsQLN
+[07:15:45.003] LOG: Applied Carbos (enemy)
+[07:15:45.041] DEBUG: Session data saved to slot 3!
+[07:15:45.042] LOG: Wave Seed: çĎÞÏÍāÞõâöĐÎàíÿÔçäēäáçþĒ 156
+[07:15:45.244] WARN: cry/528 not found
+[07:15:45.495] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[07:15:45.562] LOG: %cStart Phase SummonPhase color:green;
+[07:15:45.711] LOG: Applied HP Up 
+[07:15:45.711] LOG: Applied Carbos 
+[07:15:45.712] LOG: Applied Calcium 
+[07:15:45.712] LOG: Applied Calcium 
+[07:15:45.713] LOG: Applied Zinc 
+[07:15:45.713] LOG: Applied Calcium 
+[07:15:45.713] LOG: Applied HP Up 
+[07:15:45.713] LOG: Applied HP Up 
+[07:15:45.859] LOG: %cStart Phase CheckSwitchPhase color:green;
+[07:15:46.185] LOG: %cStart Phase CheckSwitchPhase color:green;
+[07:15:47.500] LOG: %cStart Phase SwitchPhase color:green;
+[07:15:49.338] LOG: %cStart Phase SwitchSummonPhase color:green;
+[07:15:49.552] LOG: Applied HP Up 
+[07:15:49.553] LOG: Applied Carbos 
+[07:15:49.553] LOG: Applied Calcium 
+[07:15:49.553] LOG: Applied Zinc 
+[07:15:49.553] LOG: Applied Calcium 
+[07:15:49.554] LOG: Applied HP Up 
+[07:15:49.554] LOG: Applied Calcium 
+[07:15:49.554] LOG: Applied HP Up 
+[07:15:49.694] LOG: %cStart Phase ShinySparklePhase color:green;
+[07:15:49.784] LOG: %cStart Phase PostSummonPhase color:green;
+[07:15:49.785] LOG: Ran PSP for: Shaymin
+[07:15:49.788] LOG: %cStart Phase PokemonAnimPhase color:green;
+[07:15:49.788] WARN: PRSFX- Transform not found
+[07:15:50.002] LOG: %cStart Phase MessagePhase color:green;
+[07:15:50.234] LOG: %cStart Phase MessagePhase color:green;
+[07:15:50.534] LOG: %cStart Phase PostSummonPhase color:green;
+[07:15:50.534] LOG: %cStart Phase PostSummonPhase color:green;
+[07:15:50.534] LOG: %cStart Phase InitEncounterPhase color:green;
+[07:15:50.535] LOG: %cStart Phase PostSummonPhase color:green;
+[07:15:50.535] LOG: Ran PSP for: Swoobat
+[07:15:50.536] LOG: %cStart Phase PostSummonPhase color:green;
+[07:15:50.537] LOG: %cStart Phase PostSummonPhase color:green;
+[07:15:50.537] LOG: %cStart Phase PostSummonPhase color:green;
+[07:15:50.537] LOG: Ran PSP for: Golisopod
+[07:15:50.537] LOG: %cStart Phase PostSummonPhase color:green;
+[07:15:50.537] LOG: %cStart Phase PostSummonPhase color:green;
+[07:15:50.537] LOG: %cStart Phase TurnInitPhase color:green;
+[07:15:50.537] LOG: %cStart Phase CommandPhase color:green;
