@@ -384,6 +384,164 @@ async function readSaveBody(request: Request): Promise<string | null> {
   return raw;
 }
 
+// ---------------------------------------------------------------------------
+// Save-clobber guard (KeeganDB92 incident). A wiped/desynced client can upload an
+// empty save and clobber a large one under last-write-wins. We reject (409) a
+// write whose lifetime gameStats (playTime/battles/pokemonCaught) crash backwards
+// versus the stored save, and keep a small rolling backup. Both are
+// compression-aware (the stored save is gzip'd, so we decompress before
+// comparing; backups store the already-gzip'd blob, ~10x cheaper than before) and
+// FAIL OPEN: any unexpected error is logged and the save is allowed through, so
+// the guard can never turn a save into a 500.
+// ---------------------------------------------------------------------------
+const GUARD_MIN_PLAYTIME_S = 60;
+const GUARD_PLAYTIME_TOLERANCE_S = 120;
+const BACKUP_KEEP = 3;
+const BACKUP_MIN_INTERVAL_MS = 2 * 60 * 60 * 1000;
+
+interface SystemProgress {
+  playTime: number;
+  battles: number;
+  caught: number;
+}
+interface SystemSaveRow {
+  data: string;
+  trainer_id: number | null;
+  secret_id: number | null;
+  updated_at: number;
+}
+
+/** Lifetime counters from a PLAINTEXT save. null when unparseable (guard fails open). */
+function systemProgress(plain: string): SystemProgress | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(plain);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object") {
+    return null;
+  }
+  const stats = (parsed as { gameStats?: unknown }).gameStats;
+  if (!stats || typeof stats !== "object") {
+    return null;
+  }
+  const g = stats as Record<string, unknown>;
+  const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  return { playTime: num(g.playTime), battles: num(g.battles), caught: num(g.pokemonCaught) };
+}
+
+/** True when `incoming` is a major loss of lifetime progress vs `existing` (both plaintext). */
+function isSystemRegression(existingPlain: string, incomingPlain: string): boolean {
+  const e = systemProgress(existingPlain);
+  const n = systemProgress(incomingPlain);
+  if (!e || !n) {
+    return false;
+  }
+  if (e.playTime < GUARD_MIN_PLAYTIME_S) {
+    return false;
+  }
+  const clockWentBack = n.playTime + GUARD_PLAYTIME_TOLERANCE_S < e.playTime;
+  const counterDropped = n.battles < e.battles || n.caught < e.caught;
+  return clockWentBack && counterDropped;
+}
+
+let backupTableReady = false;
+async function ensureBackupTable(env: Env): Promise<void> {
+  if (backupTableReady) {
+    return;
+  }
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS system_save_backups (
+       id           INTEGER PRIMARY KEY AUTOINCREMENT,
+       user_id      INTEGER NOT NULL,
+       data         TEXT    NOT NULL,
+       trainer_id   INTEGER,
+       secret_id    INTEGER,
+       saved_at     INTEGER NOT NULL,
+       backed_up_at INTEGER NOT NULL
+     )`,
+  ).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ssb_user ON system_save_backups (user_id, backed_up_at)").run();
+  backupTableReady = true;
+}
+
+/**
+ * Snapshot the about-to-be-overwritten save (stored form is already gzip'd, so the
+ * backup is small) and prune to the most recent BACKUP_KEEP per user. Rate-limited
+ * per user. Best-effort: never throws into the caller.
+ */
+async function maybeBackupSystemSave(env: Env, userId: number, previous: SystemSaveRow): Promise<void> {
+  try {
+    await ensureBackupTable(env);
+    const last = await env.DB.prepare(
+      "SELECT backed_up_at FROM system_save_backups WHERE user_id = ?1 ORDER BY backed_up_at DESC LIMIT 1",
+    )
+      .bind(userId)
+      .first<{ backed_up_at: number }>();
+    const now = Date.now();
+    if (last && now - last.backed_up_at < BACKUP_MIN_INTERVAL_MS) {
+      return;
+    }
+    await env.DB.prepare(
+      `INSERT INTO system_save_backups (user_id, data, trainer_id, secret_id, saved_at, backed_up_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+    )
+      .bind(userId, previous.data, previous.trainer_id, previous.secret_id, previous.updated_at, now)
+      .run();
+    await env.DB.prepare(
+      `DELETE FROM system_save_backups
+         WHERE user_id = ?1
+           AND id NOT IN (
+             SELECT id FROM system_save_backups WHERE user_id = ?1 ORDER BY backed_up_at DESC LIMIT ?2
+           )`,
+    )
+      .bind(userId, BACKUP_KEEP)
+      .run();
+  } catch (err) {
+    console.error("maybeBackupSystemSave error (skipping backup, save proceeds):", err);
+  }
+}
+
+/**
+ * Gate a system-save overwrite. `incomingPlain` is the client's plaintext save.
+ * Returns a 409 Response to block a regression (unless allowReset), else snapshots
+ * the previous save and returns null. FAIL OPEN: any error -> allow the save.
+ */
+async function guardSystemOverwrite(
+  env: Env,
+  userId: number,
+  incomingPlain: string,
+  allowReset: boolean,
+  cors: Record<string, string>,
+): Promise<Response | null> {
+  try {
+    const existing = await env.DB.prepare(
+      "SELECT data, trainer_id, secret_id, updated_at FROM system_saves WHERE user_id = ?1",
+    )
+      .bind(userId)
+      .first<SystemSaveRow>();
+    if (!existing) {
+      return null;
+    }
+    const existingPlain = await decompressSave(existing.data);
+    if (!allowReset && isSystemRegression(existingPlain, incomingPlain)) {
+      return text(
+        "Save rejected: incoming save shows major progress loss versus the stored cloud save "
+          + "(likely an empty or desynced client). Cloud save preserved - reload to pull it. "
+          + "Send ?allowReset=1 to override intentionally.",
+        409,
+        cors,
+      );
+    }
+    await maybeBackupSystemSave(env, userId, existing);
+    return null;
+  } catch (err) {
+    console.error("guardSystemOverwrite error (allowing save through unguarded):", err);
+    return null;
+  }
+}
+
 async function handleSystemGet(auth: TokenPayload, env: Env, cors: Record<string, string>): Promise<Response> {
   const row = await env.DB.prepare("SELECT data FROM system_saves WHERE user_id = ?")
     .bind(auth.uid)
@@ -420,6 +578,10 @@ async function handleSystemUpdate(
   const data = await readSaveBody(request);
   if (data === null) {
     return text("Save data too large.", 413, cors);
+  }
+  const guard = await guardSystemOverwrite(env, auth.uid, data, url.searchParams.get("allowReset") === "1", cors);
+  if (guard) {
+    return guard;
   }
   const stored = await compressSave(data);
   const trainerId = Number.parseInt(url.searchParams.get("trainerId") ?? "", 10);
@@ -553,6 +715,11 @@ async function handleUpdateAll(
   const stmts: D1PreparedStatement[] = [];
   if (payload.system !== undefined && payload.system !== null) {
     const sys = typeof payload.system === "string" ? payload.system : JSON.stringify(payload.system);
+    const allowReset = new URL(request.url).searchParams.get("allowReset") === "1";
+    const guard = await guardSystemOverwrite(env, auth.uid, sys, allowReset, cors);
+    if (guard) {
+      return guard;
+    }
     const storedSys = await compressSave(sys);
     stmts.push(
       env.DB.prepare(
