@@ -1,0 +1,255 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     0  wave:5  difficulty:youngster
+seed:     UFsJSyrOLeGLGgIweiW0mV15
+party:    Koffing(L7 2/23), Mankey(L6 21/21), Igglybuff(L5 25/25), Bulbasaur(L5 20/20), Pidgey(L5 19/19)
+
+----- DESCRIPTION -----
+Hyper Fang from Poochyena has 100% flinch rate. Stunlocking no matter how many times battle is retried - 5 times in a row until death.
+
+----- CONSOLE -----
+[00:45:18.926] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[00:45:19.325] LOG: [ER] build mqnz75l2-jypp
+[00:45:24.305] DEBUG: Destroying loading scene
+[00:45:24.305] DEBUG: Destroyed loading scene
+[00:45:24.378] LOG: Seed: yBRMHt7yeVIBK5DJMTqSzQwK
+[00:45:24.378] LOG: Wave Seed: yBRMHt7yeVIBK5DJMTqSzQwK 0
+[00:45:25.597] LOG: %cStart Phase LoginPhase color:green;
+[00:45:26.026] LOG: Client Session: QgGn3gpdzvlKlzGrwteYFoiYf02mXgxA
+[00:45:26.280] DEBUG: Using cached system data
+[00:45:26.317] LOG: %cStart Phase TitlePhase color:green;
+[00:45:26.320] LOG: use seasonal splash messages true
+[00:45:26.320] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[00:45:28.341] LOG: Getting Session Slot id: %d 0
+[00:45:28.344] LOG: Getting Session Slot id: %d 1
+[00:45:28.345] LOG: Getting Session Slot id: %d 2
+[00:45:28.345] LOG: Getting Session Slot id: %d 3
+[00:45:28.346] LOG: Getting Session Slot id: %d 4
+[00:45:28.347] LOG: Getting Session Slot id: %d 0
+[00:45:28.540] ERROR: Invalid save data JSON detected! Session not found.
+[00:45:28.551] ERROR: Invalid save data JSON detected! Session not found.
+[00:45:28.552] ERROR: Invalid save data JSON detected! Session not found.
+[00:45:28.572] ERROR: Invalid save data JSON detected! Session not found.
+[00:45:32.188] LOG: Getting Session Slot id: %d 0
+[00:45:32.192] LOG: Wave Seed: UFsJSyrOLeGLGgIweiW0mV15 0
+[00:45:32.192] LOG: Seed: UFsJSyrOLeGLGgIweiW0mV15
+[00:45:32.205] LOG: Wave Seed: ZKxOX~wTQjLQLlN|jn\5r[6: 5
+[00:45:32.341] LOG: %cStart Phase EncounterPhase color:green;
+[00:45:32.343] LOG: Pokemon: Foe Caterpie | Species ID: 10 | Level: 4 | Nature: Serious (-)
+[00:45:32.343] LOG: Stats (IVs): HP: 17 (0), Atk: 7 (11), Def: 8 (6), Spatk: 7 (17), Spdef: 6 (2), Spd: 9 (20)
+[00:45:32.343] LOG: Ability: Anticipation | Passive Ability: Swarm 
+[00:45:32.343] LOG: Moveset: ["Skitter Smack","Tackle"]
+[00:45:32.344] LOG: Pokemon: Foe Poochyena | Species ID: 261 | Level: 4 | Nature: Jolly (+Spd/-SpAtk)
+[00:45:32.344] LOG: Stats (IVs): HP: 17 (13), Atk: 12 (15), Def: 8 (25), Spatk: 6 (4), Spdef: 9 (18), Spd: 14 (18)
+[00:45:32.344] LOG: Ability: Intimidate | Passive Ability: Nocturnal 
+[00:45:32.344] LOG: Moveset: ["Odor Sleuth","Hyper Fang","Howl","Roar"]
+[00:45:32.486] LOG: Generated AI funcs
+[00:45:32.487] LOG: Wave Seed: ZKxOX~wTQjLQLlN|jn\5r[6: 5
+[00:45:32.994] LOG: Youngster Waylon
+[00:45:32.994] LOG: Dialogue dialogue:youngster.encounter.3 skipped
+[00:45:33.071] LOG: Youngster Waylon
+[00:45:33.862] LOG: %cStart Phase SummonPhase color:green;
+[00:45:33.863] LOG: Waylon
+[00:45:34.480] LOG: %cStart Phase SummonPhase color:green;
+[00:45:35.154] LOG: %cStart Phase InitEncounterPhase color:green;
+[00:45:35.155] LOG: %cStart Phase PostSummonPhase color:green;
+[00:45:35.156] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:45:35.537] LOG: %cStart Phase MessagePhase color:green;
+[00:45:36.133] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:45:36.190] LOG: %cStart Phase PostSummonPhase color:green;
+[00:45:36.190] LOG: Ran PSP for: Koffing
+[00:45:36.190] LOG: %cStart Phase PostSummonPhase color:green;
+[00:45:36.190] LOG: %cStart Phase PostSummonPhase color:green;
+[00:45:36.190] LOG: Ran PSP for: Caterpie
+[00:45:36.190] LOG: %cStart Phase PostSummonPhase color:green;
+[00:45:36.190] LOG: %cStart Phase PostSummonPhase color:green;
+[00:45:36.190] LOG: %cStart Phase TurnInitPhase color:green;
+[00:45:36.190] LOG: %cStart Phase CommandPhase color:green;
+[00:45:37.967] LOG: Move: POISON_FANG Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Koffing
+[00:45:37.968] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:45:37.971] LOG: Battle Seed: BhhOK6SxQ1sly5E8
+[00:45:37.972] LOG: Move Pool: ["Skitter Smack","Tackle"]
+[00:45:37.972] LOG: Move Scores: [10.125,8]
+[00:45:37.972] LOG: Sorted Move Pool: ["Skitter Smack","Tackle"]
+[00:45:37.972] LOG: Chosen Move: Tackle
+[00:45:37.972] LOG: %cStart Phase TurnStartPhase color:green;
+[00:45:37.973] LOG: %cStart Phase MovePhase color:green;
+[00:45:37.973] LOG: %cUser: Koffing
+Move: POISON_FANG
+Use Mode: NORMAL color:orchid
+[00:45:37.973] LOG: %cStart Phase MessagePhase color:green;
+[00:45:38.224] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:45:38.613] LOG: crit stage: +0
+[00:45:38.614] LOG: Move: Poison Fang | Base damage: 14.32 | Power: 70 | Source attack: 16 | Target defense: 8
+[00:45:38.614] LOG: Move: Poison Fang | Attack damage: 21
+[00:45:38.614] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:45:38.627] LOG: %cStart Phase FaintPhase color:green;
+[00:45:39.509] LOG: %cStart Phase MessagePhase color:green;
+[00:45:39.766] LOG: %cStart Phase VictoryPhase color:green;
+[00:45:39.767] LOG: %cStart Phase ExpPhase color:green;
+[00:45:40.245] LOG: %cStart Phase LevelUpPhase color:green;
+[00:45:40.246] LOG: %cStart Phase MoveEndPhase color:green;
+[00:45:40.246] LOG: %cStart Phase MovePhase color:green;
+[00:45:40.246] LOG: %cStart Phase MoveEndPhase color:green;
+[00:45:40.246] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:45:40.246] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:45:40.246] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:45:40.246] LOG: %cStart Phase BerryPhase color:green;
+[00:45:40.246] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:45:40.246] LOG: %cStart Phase TurnEndPhase color:green;
+[00:45:40.247] LOG: %cStart Phase SwitchSummonPhase color:green;
+[00:45:40.815] LOG: Waylon
+[00:45:41.302] LOG: %cStart Phase PostSummonPhase color:green;
+[00:45:41.302] LOG: Ran PSP for: Poochyena
+[00:45:41.302] LOG: %cStart Phase PostSummonPhase color:green;
+[00:45:41.302] LOG: %cStart Phase PostSummonPhase color:green;
+[00:45:41.302] LOG: %cStart Phase TurnInitPhase color:green;
+[00:45:41.302] LOG: %cStart Phase CommandPhase color:green;
+[00:45:44.413] LOG: Move: BODY_PRESS Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Koffing
+[00:45:44.414] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:45:44.415] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:45:44.415] LOG: Battle Seed: BhhOK6SxQ1sly5E8
+[00:45:44.415] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:45:44.416] LOG: Move Pool: ["Odor Sleuth","Hyper Fang","Howl","Roar"]
+[00:45:44.416] LOG: Move Scores: [0,19,2,-20]
+[00:45:44.416] LOG: Sorted Move Pool: ["Hyper Fang","Howl","Odor Sleuth","Roar"]
+[00:45:44.416] LOG: Chosen Move: Hyper Fang
+[00:45:44.416] LOG: %cStart Phase TurnStartPhase color:green;
+[00:45:44.416] LOG: %cStart Phase MovePhase color:green;
+[00:45:44.416] LOG: %cUser: Poochyena
+Move: HYPER_FANG
+Use Mode: NORMAL color:orchid
+[00:45:44.418] LOG: %cStart Phase MessagePhase color:green;
+[00:45:44.697] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:45:44.955] LOG: crit stage: +0
+[00:45:44.956] LOG: Move: Hyper Fang | Base damage: 5.672 | Power: 85 | Source attack: 12 | Target defense: 20
+[00:45:44.956] LOG: Move: Hyper Fang | Attack damage: 4
+[00:45:44.956] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:45:44.969] LOG: %cStart Phase MoveEndPhase color:green;
+[00:45:44.969] LOG: %cStart Phase MovePhase color:green;
+[00:45:44.969] LOG: %cUser: Koffing
+Move: BODY_PRESS
+Use Mode: NORMAL color:orchid
+[00:45:44.969] LOG: %cStart Phase MessagePhase color:green;
+[00:45:45.441] LOG: %cStart Phase MoveEndPhase color:green;
+[00:45:45.441] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:45:45.441] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:45:45.441] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:45:45.441] LOG: %cStart Phase BerryPhase color:green;
+[00:45:45.441] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:45:45.441] LOG: %cStart Phase TurnEndPhase color:green;
+[00:45:45.442] LOG: %cStart Phase TurnInitPhase color:green;
+[00:45:45.442] LOG: %cStart Phase CommandPhase color:green;
+[00:45:46.677] LOG: Move: BODY_PRESS Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Koffing
+[00:45:46.678] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:45:46.679] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:45:46.679] LOG: Battle Seed: BhhOK6SxQ1sly5E8
+[00:45:46.679] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:45:46.680] LOG: Move Pool: ["Odor Sleuth","Hyper Fang","Howl","Roar"]
+[00:45:46.680] LOG: Move Scores: [0,19,2,-20]
+[00:45:46.680] LOG: Sorted Move Pool: ["Hyper Fang","Howl","Odor Sleuth","Roar"]
+[00:45:46.680] LOG: Chosen Move: Hyper Fang
+[00:45:46.680] LOG: %cStart Phase TurnStartPhase color:green;
+[00:45:46.680] LOG: %cStart Phase MovePhase color:green;
+[00:45:46.680] LOG: %cUser: Poochyena
+Move: HYPER_FANG
+Use Mode: NORMAL color:orchid
+[00:45:46.681] LOG: %cStart Phase MessagePhase color:green;
+[00:45:46.969] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:45:47.226] LOG: crit stage: +0
+[00:45:47.227] LOG: Move: Hyper Fang | Base damage: 5.672 | Power: 85 | Source attack: 12 | Target defense: 20
+[00:45:47.227] LOG: Move: Hyper Fang | Attack damage: 8
+[00:45:47.227] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:45:47.240] LOG: %cStart Phase MessagePhase color:green;
+[00:45:47.698] LOG: %cStart Phase MoveEndPhase color:green;
+[00:45:47.698] LOG: %cStart Phase MovePhase color:green;
+[00:45:47.698] LOG: %cUser: Koffing
+Move: BODY_PRESS
+Use Mode: NORMAL color:orchid
+[00:45:47.698] LOG: %cStart Phase MessagePhase color:green;
+[00:45:48.170] LOG: %cStart Phase MoveEndPhase color:green;
+[00:45:48.171] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:45:48.171] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:45:48.171] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:45:48.171] LOG: %cStart Phase BerryPhase color:green;
+[00:45:48.171] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:45:48.171] LOG: %cStart Phase TurnEndPhase color:green;
+[00:45:48.172] LOG: %cStart Phase TurnInitPhase color:green;
+[00:45:48.172] LOG: %cStart Phase CommandPhase color:green;
+[00:45:53.192] LOG: Move: BODY_PRESS Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Koffing
+[00:45:53.193] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:45:53.194] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:45:53.194] LOG: Battle Seed: BhhOK6SxQ1sly5E8
+[00:45:53.194] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:45:53.195] LOG: Move Pool: ["Odor Sleuth","Hyper Fang","Howl","Roar"]
+[00:45:53.195] LOG: Move Scores: [0,19,2,-20]
+[00:45:53.195] LOG: Sorted Move Pool: ["Hyper Fang","Howl","Odor Sleuth","Roar"]
+[00:45:53.195] LOG: Chosen Move: Hyper Fang
+[00:45:53.195] LOG: %cStart Phase TurnStartPhase color:green;
+[00:45:53.195] LOG: %cStart Phase MovePhase color:green;
+[00:45:53.195] LOG: %cUser: Poochyena
+Move: HYPER_FANG
+Use Mode: NORMAL color:orchid
+[00:45:53.196] LOG: %cStart Phase MessagePhase color:green;
+[00:45:53.484] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:45:53.741] LOG: crit stage: +0
+[00:45:53.742] LOG: Move: Hyper Fang | Base damage: 5.672 | Power: 85 | Source attack: 12 | Target defense: 20
+[00:45:53.742] LOG: Move: Hyper Fang | Attack damage: 4
+[00:45:53.742] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:45:53.755] LOG: %cStart Phase MoveEndPhase color:green;
+[00:45:53.755] LOG: %cStart Phase MovePhase color:green;
+[00:45:53.755] LOG: %cUser: Koffing
+Move: BODY_PRESS
+Use Mode: NORMAL color:orchid
+[00:45:53.756] LOG: %cStart Phase MessagePhase color:green;
+[00:45:54.227] LOG: %cStart Phase MoveEndPhase color:green;
+[00:45:54.227] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:45:54.227] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:45:54.227] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:45:54.227] LOG: %cStart Phase BerryPhase color:green;
+[00:45:54.228] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:45:54.228] LOG: %cStart Phase TurnEndPhase color:green;
+[00:45:54.228] LOG: %cStart Phase TurnInitPhase color:green;
+[00:45:54.228] LOG: %cStart Phase CommandPhase color:green;
+[00:46:22.108] LOG: Move: POISON_FANG Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Koffing
+[00:46:22.109] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:46:22.110] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:46:22.110] LOG: Battle Seed: BhhOK6SxQ1sly5E8
+[00:46:22.110] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:46:22.110] LOG: Move Pool: ["Odor Sleuth","Hyper Fang","Howl","Roar"]
+[00:46:22.110] LOG: Move Scores: [0,19,2,-20]
+[00:46:22.110] LOG: Sorted Move Pool: ["Hyper Fang","Howl","Odor Sleuth","Roar"]
+[00:46:22.110] LOG: Chosen Move: Hyper Fang
+[00:46:22.110] LOG: %cStart Phase TurnStartPhase color:green;
+[00:46:22.111] LOG: %cStart Phase MovePhase color:green;
+[00:46:22.111] LOG: %cUser: Poochyena
+Move: HYPER_FANG
+Use Mode: NORMAL color:orchid
+[00:46:22.112] LOG: %cStart Phase MessagePhase color:green;
+[00:46:22.393] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:46:22.651] LOG: crit stage: +0
+[00:46:22.651] LOG: Move: Hyper Fang | Base damage: 5.672 | Power: 85 | Source attack: 12 | Target defense: 20
+[00:46:22.651] LOG: Move: Hyper Fang | Attack damage: 5
+[00:46:22.651] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:46:22.664] LOG: %cStart Phase MoveEndPhase color:green;
+[00:46:22.664] LOG: %cStart Phase MovePhase color:green;
+[00:46:22.664] LOG: %cUser: Koffing
+Move: POISON_FANG
+Use Mode: NORMAL color:orchid
+[00:46:22.664] LOG: %cStart Phase MessagePhase color:green;
+[00:46:23.136] LOG: %cStart Phase MoveEndPhase color:green;
+[00:46:23.136] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:46:23.136] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:46:23.136] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:46:23.136] LOG: %cStart Phase BerryPhase color:green;
+[00:46:23.137] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:46:23.137] LOG: %cStart Phase TurnEndPhase color:green;
+[00:46:23.138] LOG: %cStart Phase TurnInitPhase color:green;
+[00:46:23.138] LOG: %cStart Phase CommandPhase color:green;
