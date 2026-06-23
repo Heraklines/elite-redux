@@ -1,0 +1,287 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     4  wave:33  difficulty:youngster
+seed:     PgFXUgiUrnVvOMLimDMJcYMQ
+party:    Beautifly(L31 52/89), Froslass Redux(L32 80/96), Smeargle(L26 72/72), Cranidos(L25 72/72), Pancham(L22 68/68), Paras(L22 56/56)
+
+----- DESCRIPTION -----
+What is this moveset?
+
+----- CONSOLE -----
+[20:09:45.224] LOG: %cStart Phase MessagePhase color:green;
+[20:09:45.329] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:09:45.330] LOG: %cStart Phase MessagePhase color:green;
+[20:09:45.553] LOG: %cStart Phase MoveEndPhase color:green;
+[20:09:45.554] LOG: %cStart Phase MovePhase color:green;
+[20:09:45.554] LOG: %cUser: Ninetales
+Move: DISARMING_VOICE
+Use Mode: NORMAL color:orchid
+[20:09:45.555] LOG: %cStart Phase MessagePhase color:green;
+[20:09:45.682] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:09:45.849] LOG: crit stage: +0
+[20:09:45.850] LOG: Applied X Sp. Def 
+[20:09:45.850] LOG: Move: Disarming Voice | Base damage: 16.982857142857142 | Power: 60 | Source attack: 69 | Target defense: 84
+[20:09:45.850] LOG: Move: Disarming Voice | Attack damage: 21
+[20:09:45.850] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:09:45.858] LOG: %cStart Phase MoveEndPhase color:green;
+[20:09:45.858] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:09:45.858] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:09:45.858] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:09:45.858] LOG: %cStart Phase BerryPhase color:green;
+[20:09:45.858] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:09:45.859] LOG: %cStart Phase TurnEndPhase color:green;
+[20:09:45.859] LOG: %cStart Phase TurnInitPhase color:green;
+[20:09:45.859] LOG: %cStart Phase CommandPhase color:green;
+[20:09:46.771] LOG: Move: MORNING_SUN Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Beautifly
+[20:09:46.772] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:09:46.773] LOG: Applied X Sp. Def 
+[20:09:46.774] LOG: Applied X Sp. Def 
+[20:09:46.774] LOG: Battle Seed: 7mtfUHvhtBqTEYEF
+[20:09:46.774] LOG: Move Pool: ["Disarming Voice","Captivate"]
+[20:09:46.774] LOG: Move Scores: [18,6]
+[20:09:46.774] LOG: Sorted Move Pool: ["Disarming Voice","Captivate"]
+[20:09:46.774] LOG: Chosen Move: Disarming Voice
+[20:09:46.774] LOG: %cStart Phase TurnStartPhase color:green;
+[20:09:46.775] LOG: %cStart Phase MovePhase color:green;
+[20:09:46.775] LOG: %cUser: Beautifly
+Move: MORNING_SUN
+Use Mode: NORMAL color:orchid
+[20:09:46.775] LOG: %cStart Phase MessagePhase color:green;
+[20:09:46.881] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:09:47.056] LOG: %cStart Phase PokemonHealPhase color:green;
+[20:09:47.058] LOG: %cStart Phase MessagePhase color:green;
+[20:09:47.276] LOG: %cStart Phase MoveEndPhase color:green;
+[20:09:47.277] LOG: %cStart Phase MovePhase color:green;
+[20:09:47.277] LOG: %cUser: Ninetales
+Move: DISARMING_VOICE
+Use Mode: NORMAL color:orchid
+[20:09:47.278] LOG: %cStart Phase MessagePhase color:green;
+[20:09:47.405] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:09:47.576] LOG: crit stage: +0
+[20:09:47.577] LOG: Applied X Sp. Def 
+[20:09:47.577] LOG: Move: Disarming Voice | Base damage: 16.982857142857142 | Power: 60 | Source attack: 69 | Target defense: 84
+[20:09:47.577] LOG: Move: Disarming Voice | Attack damage: 25
+[20:09:47.577] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:09:47.585] LOG: %cStart Phase MoveEndPhase color:green;
+[20:09:47.585] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:09:47.585] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:09:47.585] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:09:47.585] LOG: %cStart Phase BerryPhase color:green;
+[20:09:47.585] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:09:47.585] LOG: %cStart Phase TurnEndPhase color:green;
+[20:09:47.586] LOG: %cStart Phase TurnInitPhase color:green;
+[20:09:47.586] LOG: %cStart Phase CommandPhase color:green;
+[20:09:48.676] LOG: Move: MORNING_SUN Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Beautifly
+[20:09:48.677] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:09:48.678] LOG: Applied X Sp. Def 
+[20:09:48.679] LOG: Applied X Sp. Def 
+[20:09:48.680] LOG: Battle Seed: 7mtfUHvhtBqTEYEF
+[20:09:48.681] LOG: Move Pool: ["Disarming Voice","Fairy Wind","Captivate","Roar"]
+[20:09:48.681] LOG: Move Scores: [18,-20,6,0]
+[20:09:48.681] LOG: Sorted Move Pool: ["Disarming Voice","Captivate","Roar","Fairy Wind"]
+[20:09:48.681] LOG: Chosen Move: Disarming Voice
+[20:09:48.681] LOG: %cStart Phase TurnStartPhase color:green;
+[20:09:48.682] LOG: %cStart Phase MovePhase color:green;
+[20:09:48.682] LOG: %cUser: Beautifly
+Move: MORNING_SUN
+Use Mode: NORMAL color:orchid
+[20:09:48.682] LOG: %cStart Phase MessagePhase color:green;
+[20:09:48.787] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:09:48.967] LOG: %cStart Phase PokemonHealPhase color:green;
+[20:09:48.968] LOG: %cStart Phase MessagePhase color:green;
+[20:09:49.187] LOG: %cStart Phase MoveEndPhase color:green;
+[20:09:49.187] LOG: %cStart Phase MovePhase color:green;
+[20:09:49.187] LOG: %cUser: Ninetales
+Move: DISARMING_VOICE
+Use Mode: NORMAL color:orchid
+[20:09:49.188] LOG: %cStart Phase MessagePhase color:green;
+[20:09:49.316] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:09:49.478] LOG: crit stage: +0
+[20:09:49.479] LOG: Applied X Sp. Def 
+[20:09:49.479] LOG: Move: Disarming Voice | Base damage: 16.982857142857142 | Power: 60 | Source attack: 69 | Target defense: 84
+[20:09:49.479] LOG: Move: Disarming Voice | Attack damage: 25
+[20:09:49.479] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:09:49.487] LOG: %cStart Phase MoveEndPhase color:green;
+[20:09:49.487] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:09:49.487] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:09:49.487] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:09:49.487] LOG: %cStart Phase BerryPhase color:green;
+[20:09:49.487] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:09:49.488] LOG: %cStart Phase TurnEndPhase color:green;
+[20:09:49.488] LOG: %cStart Phase TurnInitPhase color:green;
+[20:09:49.488] LOG: %cStart Phase CommandPhase color:green;
+[20:09:51.316] LOG: Move: SILVER_WIND Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Beautifly
+[20:09:51.317] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:09:51.318] LOG: Applied X Sp. Def 
+[20:09:51.319] LOG: Applied X Sp. Def 
+[20:09:51.319] LOG: Battle Seed: 7mtfUHvhtBqTEYEF
+[20:09:51.320] LOG: Move Pool: ["Disarming Voice","Fairy Wind","Captivate","Roar"]
+[20:09:51.320] LOG: Move Scores: [18,-20,6,0]
+[20:09:51.320] LOG: Sorted Move Pool: ["Disarming Voice","Captivate","Roar","Fairy Wind"]
+[20:09:51.320] LOG: Chosen Move: Disarming Voice
+[20:09:51.320] LOG: %cStart Phase TurnStartPhase color:green;
+[20:09:51.321] LOG: %cStart Phase MovePhase color:green;
+[20:09:51.321] LOG: %cUser: Beautifly
+Move: SILVER_WIND
+Use Mode: NORMAL color:orchid
+[20:09:51.321] LOG: %cStart Phase MessagePhase color:green;
+[20:09:51.425] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:09:51.434] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[20:09:51.442] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[20:09:51.459] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[20:09:51.467] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[20:09:51.480] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[20:09:51.492] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[20:09:51.496] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[20:09:51.513] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[20:09:51.530] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[20:09:51.730] LOG: crit stage: +0
+[20:09:51.730] LOG: Move: Silver Wind | Base damage: 31.925 | Power: 60 | Source attack: 114 | Target defense: 64
+[20:09:51.730] LOG: Move: Silver Wind | Attack damage: 23
+[20:09:51.731] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:09:51.738] LOG: %cStart Phase MessagePhase color:green;
+[20:09:51.946] LOG: %cStart Phase MoveEndPhase color:green;
+[20:09:51.946] LOG: %cStart Phase MovePhase color:green;
+[20:09:51.946] LOG: %cUser: Ninetales
+Move: DISARMING_VOICE
+Use Mode: NORMAL color:orchid
+[20:09:51.947] LOG: %cStart Phase MessagePhase color:green;
+[20:09:52.075] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:09:52.237] LOG: crit stage: +0
+[20:09:52.238] LOG: Applied X Sp. Def 
+[20:09:52.238] LOG: Move: Disarming Voice | Base damage: 16.982857142857142 | Power: 60 | Source attack: 69 | Target defense: 84
+[20:09:52.238] LOG: Move: Disarming Voice | Attack damage: 22
+[20:09:52.238] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:09:52.246] LOG: %cStart Phase MoveEndPhase color:green;
+[20:09:52.246] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:09:52.246] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:09:52.246] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:09:52.246] LOG: %cStart Phase BerryPhase color:green;
+[20:09:52.246] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:09:52.246] LOG: %cStart Phase TurnEndPhase color:green;
+[20:09:52.247] LOG: %cStart Phase TurnInitPhase color:green;
+[20:09:52.247] LOG: %cStart Phase CommandPhase color:green;
+[20:09:53.333] LOG: Move: MORNING_SUN Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Beautifly
+[20:09:53.333] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:09:53.334] LOG: Applied X Sp. Def 
+[20:09:53.335] LOG: Applied X Sp. Def 
+[20:09:53.335] LOG: Battle Seed: 7mtfUHvhtBqTEYEF
+[20:09:53.336] LOG: Move Pool: ["Disarming Voice","Fairy Wind","Captivate","Roar"]
+[20:09:53.336] LOG: Move Scores: [18,-20,6,0]
+[20:09:53.336] LOG: Sorted Move Pool: ["Disarming Voice","Captivate","Roar","Fairy Wind"]
+[20:09:53.336] LOG: Chosen Move: Disarming Voice
+[20:09:53.336] LOG: %cStart Phase TurnStartPhase color:green;
+[20:09:53.337] LOG: %cStart Phase MovePhase color:green;
+[20:09:53.337] LOG: %cUser: Beautifly
+Move: MORNING_SUN
+Use Mode: NORMAL color:orchid
+[20:09:53.337] LOG: %cStart Phase MessagePhase color:green;
+[20:09:53.444] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:09:53.624] LOG: %cStart Phase PokemonHealPhase color:green;
+[20:09:53.625] LOG: %cStart Phase MessagePhase color:green;
+[20:09:53.843] LOG: %cStart Phase MoveEndPhase color:green;
+[20:09:53.844] LOG: %cStart Phase MovePhase color:green;
+[20:09:53.844] LOG: %cUser: Ninetales
+Move: DISARMING_VOICE
+Use Mode: NORMAL color:orchid
+[20:09:53.845] LOG: %cStart Phase MessagePhase color:green;
+[20:09:53.972] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:09:54.135] LOG: crit stage: +0
+[20:09:54.136] LOG: Applied X Sp. Def 
+[20:09:54.136] LOG: Move: Disarming Voice | Base damage: 16.982857142857142 | Power: 60 | Source attack: 69 | Target defense: 84
+[20:09:54.136] LOG: Move: Disarming Voice | Attack damage: 22
+[20:09:54.136] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:09:54.144] LOG: %cStart Phase MoveEndPhase color:green;
+[20:09:54.144] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:09:54.144] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:09:54.144] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:09:54.144] LOG: %cStart Phase BerryPhase color:green;
+[20:09:54.144] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:09:54.144] LOG: %cStart Phase TurnEndPhase color:green;
+[20:09:54.144] LOG: %cStart Phase TurnInitPhase color:green;
+[20:09:54.144] LOG: %cStart Phase CommandPhase color:green;
+[20:09:55.237] LOG: Move: SPRINGTIDE_STORM Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Beautifly
+[20:09:55.237] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:09:55.239] LOG: Applied X Sp. Def 
+[20:09:55.239] LOG: Applied X Sp. Def 
+[20:09:55.240] LOG: Battle Seed: 7mtfUHvhtBqTEYEF
+[20:09:55.240] LOG: Move Pool: ["Disarming Voice","Fairy Wind","Captivate","Roar"]
+[20:09:55.240] LOG: Move Scores: [18,-20,6,0]
+[20:09:55.240] LOG: Sorted Move Pool: ["Disarming Voice","Captivate","Roar","Fairy Wind"]
+[20:09:55.240] LOG: Chosen Move: Disarming Voice
+[20:09:55.240] LOG: %cStart Phase TurnStartPhase color:green;
+[20:09:55.241] LOG: %cStart Phase MovePhase color:green;
+[20:09:55.241] LOG: %cUser: Beautifly
+Move: SPRINGTIDE_STORM
+Use Mode: NORMAL color:orchid
+[20:09:55.241] LOG: %cStart Phase MessagePhase color:green;
+[20:09:55.358] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:09:55.588] LOG: crit stage: +0
+[20:09:55.588] LOG: Move: Springtide Storm | Base damage: 51.875 | Power: 100 | Source attack: 114 | Target defense: 64
+[20:09:55.589] LOG: Move: Springtide Storm | Attack damage: 72
+[20:09:55.589] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:09:55.597] LOG: %cStart Phase MessagePhase color:green;
+[20:09:55.828] LOG: %cStart Phase FaintPhase color:green;
+[20:09:56.020] LOG: %cStart Phase MessagePhase color:green;
+[20:09:56.645] LOG: %cStart Phase VictoryPhase color:green;
+[20:09:56.645] LOG: Applied Soothe Bell 
+[20:09:56.645] LOG: %cStart Phase ExpPhase color:green;
+[20:09:56.645] LOG: Applied Super EXP. Charm 
+[20:09:56.645] LOG: Applied EXP. Charm 
+[20:09:57.560] LOG: %cStart Phase LevelUpPhase color:green;
+[20:09:57.560] LOG: Applied Calcium 
+[20:09:57.561] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:09:57.561] LOG: Applied Super EXP. Charm 
+[20:09:57.561] LOG: Applied EXP. Charm 
+[20:09:57.561] LOG: 31759 36816 32768
+[20:09:57.561] LOG: %cStart Phase LevelUpPhase color:green;
+[20:09:57.561] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:09:57.561] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:09:57.561] LOG: Applied Super EXP. Charm 
+[20:09:57.561] LOG: Applied EXP. Charm 
+[20:09:57.561] LOG: %cStart Phase LevelUpPhase color:green;
+[20:09:57.561] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:09:57.561] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:09:57.561] LOG: Applied Super EXP. Charm 
+[20:09:57.561] LOG: Applied EXP. Charm 
+[20:09:57.561] LOG: %cStart Phase LevelUpPhase color:green;
+[20:09:57.562] LOG: Applied Carbos 
+[20:09:57.562] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:09:57.562] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:09:57.562] LOG: Applied Super EXP. Charm 
+[20:09:57.562] LOG: Applied EXP. Charm 
+[20:09:57.562] LOG: %cStart Phase LevelUpPhase color:green;
+[20:09:57.562] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:09:57.562] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:09:57.562] LOG: Applied Super EXP. Charm 
+[20:09:57.562] LOG: Applied EXP. Charm 
+[20:09:57.562] LOG: %cStart Phase LevelUpPhase color:green;
+[20:09:57.562] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:09:57.562] LOG: %cStart Phase MoveEndPhase color:green;
+[20:09:57.562] LOG: %cStart Phase MovePhase color:green;
+[20:09:57.562] LOG: %cStart Phase MoveEndPhase color:green;
+[20:09:57.562] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:09:57.563] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:09:57.563] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:09:57.563] LOG: %cStart Phase BerryPhase color:green;
+[20:09:57.563] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:09:57.563] LOG: %cStart Phase TurnEndPhase color:green;
+[20:09:57.563] LOG: %cStart Phase SwitchSummonPhase color:green;
+[20:09:57.793] LOG: Alphonse
+[20:09:57.868] LOG: Applied Zinc (enemy)
+[20:09:57.869] LOG: Applied Iron (enemy)
+[20:09:57.869] LOG: Applied Zinc (enemy)
+[20:09:57.869] LOG: Applied Protein (enemy)
+[20:09:57.997] LOG: %cStart Phase PostSummonPhase color:green;
+[20:09:57.997] LOG: Ran PSP for: Avalugg
+[20:09:57.997] LOG: %cStart Phase PostSummonPhase color:green;
+[20:09:57.997] LOG: %cStart Phase PostSummonPhase color:green;
+[20:09:57.997] LOG: %cStart Phase TurnInitPhase color:green;
+[20:09:57.998] LOG: %cStart Phase CommandPhase color:green;
