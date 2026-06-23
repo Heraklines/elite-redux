@@ -1,0 +1,284 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:145  difficulty:youngster
+seed:     RhgvpzLkCFF4NcCafWRdlT7Q
+party:    Mr. Rime(L129 385/385), Pentawug(L131 217/363), Sharpedo(L132 0/367), Kecleon(L128 362/362), Basculegion(L128 482/482), Ribombee(L128 346/346)
+
+----- DESCRIPTION -----
+Mr Rime failed to use instruct on Pentawug after an Accelerate Dive, likely because its considering it to be the second turn of Dive
+
+----- CONSOLE -----
+[03:19:33.379] LOG: Applied HP Up (enemy)
+[03:19:33.379] LOG: Applied Zinc (enemy)
+[03:19:33.529] LOG: %cStart Phase PostSummonPhase color:green;
+[03:19:33.529] LOG: Ran PSP for: Cetitan
+[03:19:33.530] LOG: %cStart Phase PostSummonPhase color:green;
+[03:19:33.530] LOG: %cStart Phase PostSummonPhase color:green;
+[03:19:33.530] LOG: %cStart Phase MovePhase color:green;
+[03:19:33.530] LOG: %cUser: Cetitan
+Move: DEFENSE_CURL
+Use Mode: INDIRECT color:orchid
+[03:19:33.533] LOG: %cStart Phase MessagePhase color:green;
+[03:19:33.675] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:19:33.960] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:19:34.145] LOG: %cStart Phase MessagePhase color:green;
+[03:19:34.376] LOG: %cStart Phase MoveEndPhase color:green;
+[03:19:34.376] LOG: %cStart Phase SwitchPhase color:green;
+[03:19:36.069] LOG: %cStart Phase SwitchSummonPhase color:green;
+[03:19:36.152] LOG: Applied Protein 
+[03:19:36.152] LOG: Applied Carbos 
+[03:19:36.153] LOG: Applied HP Up 
+[03:19:36.153] LOG: Applied Calcium 
+[03:19:36.153] LOG: Applied HP Up 
+[03:19:36.309] LOG: %cStart Phase PostSummonPhase color:green;
+[03:19:36.309] LOG: Ran PSP for: Mr. Rime
+[03:19:36.311] LOG: %cStart Phase PostSummonPhase color:green;
+[03:19:36.317] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:19:36.469] LOG: %cStart Phase MessagePhase color:green;
+[03:19:36.784] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:19:36.820] LOG: %cStart Phase PostSummonPhase color:green;
+[03:19:36.820] LOG: %cStart Phase TurnInitPhase color:green;
+[03:19:36.820] LOG: %cStart Phase CommandPhase color:green;
+[03:19:38.865] LOG: Move: MAT_BLOCK Move targets: {"targets":[0,1],"multiple":true} 
+Player Pokemon: Mr. Rime
+[03:19:38.867] LOG: %cStart Phase SelectTargetPhase color:green;
+[03:19:39.148] LOG: %cStart Phase CommandPhase color:green;
+[03:19:40.907] LOG: Move: ICE_SPINNER Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Pentawug
+[03:19:40.909] LOG: %cStart Phase SelectTargetPhase color:green;
+[03:19:41.907] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:19:41.930] LOG: Battle Seed: z2oVr4j42T6aFKJx
+[03:19:41.931] LOG: Move Pool: ["Icicle Crash"]
+[03:19:41.931] LOG: Move Scores: [69]
+[03:19:41.931] LOG: Sorted Move Pool: ["Icicle Crash"]
+[03:19:41.931] LOG: Chosen Move: Icicle Crash
+[03:19:41.931] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:19:41.950] LOG: Move Pool: ["Esper Wing","Sky Attack","Tailwind","Inverse Room"]
+[03:19:41.950] LOG: Move Scores: [31.5,25.5,-20,0]
+[03:19:41.950] LOG: Sorted Move Pool: ["Esper Wing","Sky Attack","Inverse Room","Tailwind"]
+[03:19:41.950] LOG: Chosen Move: Esper Wing
+[03:19:41.950] LOG: %cStart Phase TurnStartPhase color:green;
+[03:19:41.953] LOG: Applied Quick Claw (enemy)
+[03:19:41.954] LOG: %cStart Phase MessagePhase color:green;
+[03:19:42.198] LOG: %cStart Phase MovePhase color:green;
+[03:19:42.199] LOG: %cUser: Mr. Rime
+Move: MAT_BLOCK
+Use Mode: NORMAL color:orchid
+[03:19:42.205] LOG: %cStart Phase MessagePhase color:green;
+[03:19:42.309] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:19:42.326] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[03:19:42.326] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[03:19:42.326] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[03:19:42.327] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[03:19:42.327] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[03:19:42.327] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[03:19:42.678] LOG: %cStart Phase MessagePhase color:green;
+[03:19:42.984] LOG: %cStart Phase MoveEndPhase color:green;
+[03:19:42.987] LOG: %cStart Phase MovePhase color:green;
+[03:19:42.987] LOG: %cUser: Noctowl
+Move: ESPER_WING
+Use Mode: NORMAL color:orchid
+[03:19:43.001] LOG: %cStart Phase MessagePhase color:green;
+[03:19:43.117] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:19:43.119] LOG: %cStart Phase MessagePhase color:green;
+[03:19:43.383] LOG: %cStart Phase MoveEndPhase color:green;
+[03:19:43.385] LOG: %cStart Phase MovePhase color:green;
+[03:19:43.385] LOG: %cUser: Pentawug
+Move: ICE_SPINNER
+Use Mode: NORMAL color:orchid
+[03:19:43.397] LOG: %cStart Phase MessagePhase color:green;
+[03:19:43.517] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:19:44.085] LOG: crit stage: +0
+[03:19:44.089] LOG: Move: Ice Spinner | Base damage: 587.6759322033898 | Power: 120 | Source attack: 794 | Target defense: 177
+[03:19:44.090] LOG: Move: Ice Spinner | Attack damage: 383
+[03:19:44.092] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:19:44.120] LOG: %cStart Phase MessagePhase color:green;
+[03:19:44.317] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[03:19:44.461] LOG: %cStart Phase MessagePhase color:green;
+[03:19:44.693] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:19:45.252] LOG: crit stage: +0
+[03:19:45.255] LOG: Move: Ice Spinner | Base damage: 393.187320754717 | Power: 120 | Source attack: 794 | Target defense: 265
+[03:19:45.257] LOG: Move: Ice Spinner | Attack damage: 36
+[03:19:45.257] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:19:45.286] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:19:45.852] LOG: crit stage: +0
+[03:19:45.854] LOG: Move: Ice Spinner | Base damage: 393.187320754717 | Power: 120 | Source attack: 794 | Target defense: 265
+[03:19:45.855] LOG: Move: Ice Spinner | Attack damage: 28
+[03:19:45.856] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:19:45.887] LOG: %cStart Phase MessagePhase color:green;
+[03:19:46.109] LOG: %cStart Phase MessagePhase color:green;
+[03:19:46.317] LOG: %cStart Phase MoveEndPhase color:green;
+[03:19:46.318] LOG: %cStart Phase MovePhase color:green;
+[03:19:46.318] LOG: %cUser: Cetitan
+Move: ICICLE_CRASH
+Use Mode: NORMAL color:orchid
+[03:19:46.333] LOG: %cStart Phase MessagePhase color:green;
+[03:19:46.451] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:19:46.452] LOG: %cStart Phase MessagePhase color:green;
+[03:19:46.717] LOG: %cStart Phase MoveEndPhase color:green;
+[03:19:46.718] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:19:46.718] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:19:46.718] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:19:46.718] LOG: %cStart Phase BerryPhase color:green;
+[03:19:46.728] LOG: Applied Lum Berry (enemy)
+[03:19:46.728] LOG: Applied Zinc (enemy)
+[03:19:46.728] LOG: Applied Protein (enemy)
+[03:19:46.728] LOG: Applied Calcium (enemy)
+[03:19:46.728] LOG: Applied Calcium (enemy)
+[03:19:46.728] LOG: Applied Carbos (enemy)
+[03:19:46.729] LOG: Applied HP Up (enemy)
+[03:19:46.729] LOG: Applied Calcium (enemy)
+[03:19:46.729] LOG: Applied Zinc (enemy)
+[03:19:46.729] LOG: Applied Calcium (enemy)
+[03:19:46.729] LOG: Applied Protein (enemy)
+[03:19:46.729] LOG: Applied Carbos (enemy)
+[03:19:46.729] LOG: Applied Calcium (enemy)
+[03:19:46.729] LOG: Applied Iron (enemy)
+[03:19:46.729] LOG: Applied HP Up (enemy)
+[03:19:46.730] LOG: Applied HP Up (enemy)
+[03:19:46.730] LOG: Applied Zinc (enemy)
+[03:19:46.733] LOG: %cStart Phase CommonAnimPhase color:green;
+[03:19:47.001] LOG: %cStart Phase MessagePhase color:green;
+[03:19:47.251] LOG: %cStart Phase ResetStatusPhase color:green;
+[03:19:47.252] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:19:47.260] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[03:19:47.409] LOG: %cStart Phase MessagePhase color:green;
+[03:19:47.634] LOG: %cStart Phase TurnEndPhase color:green;
+[03:19:47.650] LOG: %cStart Phase TurnInitPhase color:green;
+[03:19:47.650] LOG: %cStart Phase CommandPhase color:green;
+[03:19:49.915] LOG: Move: INSTRUCT Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Mr. Rime
+[03:19:49.917] LOG: %cStart Phase SelectTargetPhase color:green;
+[03:19:50.623] LOG: %cStart Phase CommandPhase color:green;
+[03:19:52.489] LOG: Move: DIVE Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Pentawug
+[03:19:52.491] LOG: %cStart Phase SelectTargetPhase color:green;
+[03:19:53.132] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:19:53.142] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:19:53.161] LOG: Battle Seed: z2oVr4j42T6aFKJx
+[03:19:53.164] LOG: Move Pool: ["Esper Wing","Sky Attack","Tailwind","Inverse Room"]
+[03:19:53.164] LOG: Move Scores: [31.5,25.5,-20,0]
+[03:19:53.164] LOG: Sorted Move Pool: ["Esper Wing","Sky Attack","Inverse Room","Tailwind"]
+[03:19:53.164] LOG: Chosen Move: Sky Attack
+[03:19:53.164] LOG: %cStart Phase TurnStartPhase color:green;
+[03:19:53.170] LOG: %cStart Phase SwitchSummonPhase color:green;
+[03:19:53.172] LOG: Ivy
+[03:19:53.434] LOG: Ivy
+[03:19:53.519] LOG: Applied HP Up (enemy)
+[03:19:53.519] LOG: Applied Zinc (enemy)
+[03:19:53.519] LOG: Applied Calcium (enemy)
+[03:19:53.519] LOG: Applied Carbos (enemy)
+[03:19:53.520] LOG: Applied HP Up (enemy)
+[03:19:53.520] LOG: Applied Calcium (enemy)
+[03:19:53.520] LOG: Applied Zinc (enemy)
+[03:19:53.520] LOG: Applied Calcium (enemy)
+[03:19:53.520] LOG: Applied Protein (enemy)
+[03:19:53.520] LOG: Applied Carbos (enemy)
+[03:19:53.520] LOG: Applied Calcium (enemy)
+[03:19:53.520] LOG: Applied Iron (enemy)
+[03:19:53.520] LOG: Applied HP Up (enemy)
+[03:19:53.521] LOG: Applied Zinc (enemy)
+[03:19:53.521] LOG: Applied Protein (enemy)
+[03:19:53.521] LOG: Applied Calcium (enemy)
+[03:19:53.552] WARN: cry/384 not found
+[03:19:53.659] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:19:53.767] LOG: %cStart Phase PostSummonPhase color:green;
+[03:19:53.768] LOG: Ran PSP for: Rayquaza
+[03:19:53.769] LOG: %cStart Phase PostSummonPhase color:green;
+[03:19:53.769] LOG: %cStart Phase PostSummonPhase color:green;
+[03:19:53.770] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:19:53.936] LOG: %cStart Phase MessagePhase color:green;
+[03:19:54.184] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:19:54.220] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:19:54.387] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:19:54.440] LOG: %cStart Phase MovePhase color:green;
+[03:19:54.440] LOG: %cUser: Noctowl
+Move: SKY_ATTACK
+Use Mode: NORMAL color:orchid
+[03:19:54.448] LOG: %cStart Phase MessagePhase color:green;
+[03:19:54.567] LOG: %cStart Phase MoveChargePhase color:green;
+[03:19:55.237] LOG: %cStart Phase MessagePhase color:green;
+[03:19:55.501] LOG: %cStart Phase MoveEndPhase color:green;
+[03:19:55.503] LOG: %cStart Phase MovePhase color:green;
+[03:19:55.503] LOG: %cUser: Pentawug
+Move: DIVE
+Use Mode: NORMAL color:orchid
+[03:19:55.510] LOG: %cStart Phase MessagePhase color:green;
+[03:19:55.617] LOG: %cStart Phase MoveChargePhase color:green;
+[03:19:55.954] LOG: %cStart Phase MessagePhase color:green;
+[03:19:56.177] LOG: %cStart Phase MovePhase color:green;
+[03:19:56.177] LOG: %cUser: Pentawug
+Move: DIVE
+Use Mode: IGNORE_PP color:orchid
+[03:19:56.190] LOG: %cStart Phase MessagePhase color:green;
+[03:19:56.310] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:19:56.761] LOG: crit stage: +0
+[03:19:56.764] LOG: Move: Dive | Base damage: 927.5771428571429 | Power: 165 | Source attack: 794 | Target defense: 154
+[03:19:56.765] LOG: Move: Dive | Attack damage: 605
+[03:19:56.765] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:19:56.795] LOG: %cStart Phase FaintPhase color:green;
+[03:19:58.147] LOG: %cStart Phase MessagePhase color:green;
+[03:19:58.239] LOG: %cStart Phase VictoryPhase color:green;
+[03:19:58.241] LOG: Applied Soothe Bell 
+[03:19:58.241] LOG: %cStart Phase ExpPhase color:green;
+[03:19:58.241] LOG: Applied Super EXP. Charm 
+[03:19:58.241] LOG: Applied EXP. Charm 
+[03:19:58.536] LOG: %cStart Phase LevelUpPhase color:green;
+[03:19:58.537] LOG: %cStart Phase ExpPhase color:green;
+[03:19:58.537] LOG: Applied Super EXP. Charm 
+[03:19:58.537] LOG: Applied EXP. Charm 
+[03:19:58.828] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[03:19:58.828] LOG: Applied Super EXP. Charm 
+[03:19:58.828] LOG: Applied EXP. Charm 
+[03:19:58.828] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[03:19:58.829] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[03:19:58.829] LOG: Applied Super EXP. Charm 
+[03:19:58.829] LOG: Applied EXP. Charm 
+[03:19:58.829] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[03:19:58.829] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[03:19:58.829] LOG: Applied Super EXP. Charm 
+[03:19:58.829] LOG: Applied EXP. Charm 
+[03:19:58.829] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[03:19:58.829] LOG: %cStart Phase MoveEndPhase color:green;
+[03:19:58.830] LOG: %cStart Phase MovePhase color:green;
+[03:19:58.830] LOG: %cUser: Mr. Rime
+Move: INSTRUCT
+Use Mode: NORMAL color:orchid
+[03:19:58.834] LOG: %cStart Phase MessagePhase color:green;
+[03:19:58.951] LOG: %cStart Phase MessagePhase color:green;
+[03:19:59.151] LOG: %cStart Phase MoveEndPhase color:green;
+[03:19:59.151] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:19:59.151] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:19:59.151] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:19:59.151] LOG: %cStart Phase BerryPhase color:green;
+[03:19:59.154] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:19:59.158] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[03:19:59.292] LOG: %cStart Phase MessagePhase color:green;
+[03:19:59.542] LOG: %cStart Phase TurnEndPhase color:green;
+[03:19:59.553] LOG: %cStart Phase MessagePhase color:green;
+[03:19:59.800] LOG: %cStart Phase SwitchSummonPhase color:green;
+[03:20:00.034] LOG: Ivy
+[03:20:00.116] LOG: Applied HP Up (enemy)
+[03:20:00.116] LOG: Applied Zinc (enemy)
+[03:20:00.117] LOG: Applied Calcium (enemy)
+[03:20:00.117] LOG: Applied Iron (enemy)
+[03:20:00.117] LOG: Applied HP Up (enemy)
+[03:20:00.117] LOG: Applied HP Up (enemy)
+[03:20:00.117] LOG: Applied Calcium (enemy)
+[03:20:00.117] LOG: Applied Zinc (enemy)
+[03:20:00.118] LOG: Applied Calcium (enemy)
+[03:20:00.118] LOG: Applied Protein (enemy)
+[03:20:00.118] LOG: Applied Carbos (enemy)
+[03:20:00.118] LOG: Applied Calcium (enemy)
+[03:20:00.118] LOG: Applied Carbos (enemy)
+[03:20:00.118] LOG: Applied Zinc (enemy)
+[03:20:00.118] LOG: Applied Protein (enemy)
+[03:20:00.118] LOG: Applied Calcium (enemy)
+[03:20:00.256] LOG: %cStart Phase PostSummonPhase color:green;
+[03:20:00.256] LOG: Ran PSP for: Kommo-o
+[03:20:00.256] LOG: %cStart Phase PostSummonPhase color:green;
+[03:20:00.256] LOG: %cStart Phase PostSummonPhase color:green;
+[03:20:00.256] LOG: %cStart Phase TurnInitPhase color:green;
+[03:20:00.256] LOG: %cStart Phase CommandPhase color:green;
