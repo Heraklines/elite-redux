@@ -1,0 +1,280 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     0  wave:1  difficulty:youngster
+seed:     KemLCm2BwL6IZqunGC0ZAvvq
+party:    Koffing(L5 20/20), Wispywaspy(L5 21/21)
+
+----- DESCRIPTION -----
+Locust Swarm acts like Schooling in ER by not being suppressed in neutralizing gas but is still suppressed here
+
+----- CONSOLE -----
+[01:47:12.413] LOG: Applied Protein 
+[01:47:12.413] LOG: Applied HP Up 
+[01:47:12.414] LOG: Applied Calcium 
+[01:47:12.414] LOG: Applied HP Up 
+[01:47:12.420] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[01:47:12.423] LOG: Gym Leader Valerie
+[01:47:12.551] LOG: Gym Leader Valerie
+[01:47:13.170] LOG: Dialogue saved as seen: dialogue:valerie.victory.1
+[01:47:13.171] LOG: %cStart Phase MoneyRewardPhase color:green;
+[01:47:13.171] LOG: Applied Amulet Coin 
+[01:47:13.511] LOG: %cStart Phase EggLapsePhase color:green;
+[01:47:13.586] LOG: %cStart Phase MessagePhase color:green;
+[01:47:13.972] LOG: %cStart Phase EggSummaryPhase color:green;
+[01:47:18.981] LOG: %cStart Phase ModifierRewardPhase color:green;
+[01:47:18.981] LOG: Applied Protein 
+[01:47:18.981] LOG: Applied HP Up 
+[01:47:18.981] LOG: Applied Calcium 
+[01:47:18.981] LOG: Applied HP Up 
+[01:47:18.984] WARN: Missing animation: pkmn__318
+[01:47:19.928] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:47:26.006] LOG: Applied Protein 
+[01:47:26.007] LOG: Applied HP Up 
+[01:47:26.008] LOG: Applied Calcium 
+[01:47:26.008] LOG: Applied HP Up 
+[01:47:29.372] LOG: Applied Protein 
+[01:47:29.373] LOG: Applied HP Up 
+[01:47:29.373] LOG: Applied Calcium 
+[01:47:29.374] LOG: Applied HP Up 
+[01:47:30.440] LOG: Applied Protein 
+[01:47:30.441] LOG: Applied HP Up 
+[01:47:30.442] LOG: Applied Calcium 
+[01:47:30.442] LOG: Applied HP Up 
+[01:47:34.339] LOG: Applied Protein 
+[01:47:34.339] LOG: Applied HP Up 
+[01:47:34.340] LOG: Applied Calcium 
+[01:47:34.340] LOG: Applied HP Up 
+[01:47:40.193] LOG: %cStart Phase PartyHealPhase color:green;
+[01:47:42.656] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:47:42.657] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:47:42.657] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:47:42.657] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:47:42.657] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:47:42.658] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:47:42.658] LOG: %cStart Phase ErCrossroadsPhase color:green;
+[01:47:46.494] LOG: %cStart Phase SelectBiomePhase color:green;
+[01:47:46.494] LOG: Wave Seed: ÞôóĂüĆØ÷ÏÒÒÀÚïÏíòãÞðøàÃÝ 140
+[01:47:54.940] LOG: %cStart Phase PartyHealPhase color:green;
+[02:10:09.817] LOG: %cStart Phase ResetStatusPhase color:green;
+[02:10:09.827] LOG: %cStart Phase ResetStatusPhase color:green;
+[02:10:09.828] LOG: %cStart Phase ResetStatusPhase color:green;
+[02:10:09.828] LOG: %cStart Phase ResetStatusPhase color:green;
+[02:10:09.829] LOG: %cStart Phase ResetStatusPhase color:green;
+[02:10:09.829] LOG: %cStart Phase ResetStatusPhase color:green;
+[02:10:09.830] LOG: %cStart Phase SwitchBiomePhase color:green;
+[02:10:10.292] LOG: %cStart Phase NewBattlePhase color:green;
+[02:10:10.292] LOG: Wave Seed: ßõôăýćÙøÐÓÓÁÛðÐîóäßñùáÄÞ 141
+[02:10:10.293] LOG: Applied Max Lure 
+[02:10:10.294] LOG: Applied Super Lure 
+[02:10:10.302] LOG: %cStart Phase ReturnPhase color:green;
+[02:10:10.408] LOG: %cStart Phase ReturnPhase color:green;
+[02:10:10.524] LOG: %cStart Phase ShowTrainerPhase color:green;
+[02:10:10.640] LOG: %cStart Phase NewBiomeEncounterPhase color:green;
+[02:10:10.649] LOG: Starting species pool tier: UNCOMMON
+[02:10:10.650] LOG: ER #479: vanilla-difficulty wild kept as COMBEE - skipped custom evolution Beefender
+[02:10:10.674] LOG: Pokemon: Wild Combee | Species ID: 415 | Level: 104 | Nature: Naughty (+Atk/-SpDef)
+[02:10:10.674] LOG: Stats (IVs): HP: 215 (18), Atk: 158 (13), Def: 121 (28), Spatk: 157 (27), Spdef: 94 (13), Spd: 199 (27)
+[02:10:10.674] LOG: Ability: Aerodynamics | Passive Ability: Swarm 
+[02:10:10.674] LOG: Moveset: ["Gust","Sweet Scent"]
+[02:10:10.674] LOG: Starting species pool tier: COMMON
+[02:10:10.675] LOG: Replaced SILCOON with BEAUTIFLY
+[02:10:10.698] LOG: Pokemon: Wild Beautifly | Species ID: 267 | Level: 109 | Nature: Lax (+Def/-SpDef)
+[02:10:10.698] LOG: Stats (IVs): HP: 294 (31), Atk: 146 (30), Def: 156 (5), Spatk: 245 (31), Spdef: 210 (21), Spd: 194 (4)
+[02:10:10.698] LOG: Ability: Giant Wings | Passive Ability: Majestic Moth 
+[02:10:10.698] LOG: Moveset: ["Struggle Bug","Morning Sun","Skitter Smack","Quiver Dance"]
+[02:10:10.806] LOG: {"id":"BERRY","localeKey":"","iconImage":"lansat_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":8} (enemy)
+[02:10:10.806] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} (enemy)
+[02:10:10.806] LOG: {"id":"BERRY","localeKey":"","iconImage":"lansat_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":8} (enemy)
+[02:10:10.806] LOG: Battle Seed: kDzbTRDNZ6I3PCit
+[02:10:10.866] DEBUG: Session data saved to slot 3!
+[02:10:14.540] LOG: Wave Seed: ßõôăýćÙøÐÓÓÁÛðÐîóäßñùáÄÞ 141
+[02:10:14.750] WARN: cry/415 not found
+[02:10:14.751] WARN: cry/267 not found
+[02:10:15.017] LOG: %cStart Phase CommonAnimPhase color:green;
+[02:10:15.018] LOG: %cStart Phase MessagePhase color:green;
+[02:10:15.282] LOG: %cStart Phase LevelCapPhase color:green;
+[02:10:17.957] LOG: %cStart Phase SummonPhase color:green;
+[02:10:18.101] LOG: Applied Protein 
+[02:10:18.102] LOG: Applied HP Up 
+[02:10:18.103] LOG: Applied Calcium 
+[02:10:18.103] LOG: Applied HP Up 
+[02:10:18.132] WARN: cry/319-mega not found
+[02:10:18.249] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[02:10:18.251] LOG: %cStart Phase SummonPhase color:green;
+[02:10:18.400] LOG: Applied Protein 
+[02:10:18.401] LOG: Applied HP Up 
+[02:10:18.402] LOG: Applied Calcium 
+[02:10:18.402] LOG: Applied HP Up 
+[02:10:18.549] LOG: %cStart Phase ShinySparklePhase color:green;
+[02:10:18.649] LOG: %cStart Phase CheckSwitchPhase color:green;
+[02:11:58.297] LOG: %cStart Phase CheckSwitchPhase color:green;
+[02:11:58.858] LOG: %cStart Phase InitEncounterPhase color:green;
+[02:11:58.863] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:58.863] LOG: Ran PSP for: Mega Sharpedo
+[02:11:58.867] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:58.870] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:58.871] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:58.871] LOG: Ran PSP for: Combee
+[02:11:58.873] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:58.874] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:58.875] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:58.875] LOG: Ran PSP for: Beautifly
+[02:11:58.876] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:58.877] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:58.886] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:11:59.051] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:11:59.243] LOG: %cStart Phase MessagePhase color:green;
+[02:11:59.483] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:11:59.518] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:59.518] LOG: Ran PSP for: Kecleon
+[02:11:59.520] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:59.520] LOG: %cStart Phase PostSummonPhase color:green;
+[02:11:59.521] LOG: %cStart Phase MovePhase color:green;
+[02:11:59.523] LOG: %cUser: Kecleon
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[02:11:59.534] LOG: %cStart Phase MessagePhase color:green;
+[02:11:59.651] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:11:59.668] LOG: crit stage: +0
+[02:11:59.673] LOG: Move: Scratch | Base damage: 100.50710743801653 | Power: 40 | Source attack: 291 | Target defense: 121
+[02:11:59.674] LOG: Move: Scratch | Attack damage: 128
+[02:11:59.675] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:11:59.702] LOG: %cStart Phase MoveEndPhase color:green;
+[02:11:59.703] LOG: %cStart Phase TurnInitPhase color:green;
+[02:11:59.703] LOG: %cStart Phase CommandPhase color:green;
+[02:12:00.523] DEBUG: Session data saved to slot 3!
+[02:12:04.607] LOG: Seed: jM5QOnC1JPMP5N9psOWwsKVQ
+[02:12:04.607] LOG: Wave Seed: jM5QOnC1JPMP5N9psOWwsKVQ 0
+[02:12:04.742] WARN: AnimationManager key already exists: prompt
+[02:12:04.742] WARN: AnimationManager key already exists: tera_sparkle
+[02:12:04.742] LOG: Seed: KemLCm2BwL6IZqunGC0ZAvvq
+[02:12:04.742] LOG: Wave Seed: KemLCm2BwL6IZqunGC0ZAvvq 0
+[02:12:06.839] LOG: %cStart Phase LoginPhase color:green;
+[02:12:07.277] LOG: Client Session: LZJJdz4uXKZNQmWfvcqZmZ8dheC12V7Z
+[02:12:07.656] LOG: %cStart Phase TitlePhase color:green;
+[02:12:07.656] LOG: Getting Session Slot id: %d 3
+[02:12:07.660] LOG: use seasonal splash messages true
+[02:12:07.660] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[02:12:37.338] WARN: cry/322 not found
+[02:12:43.395] WARN: cry/322 not found
+[02:12:44.562] WARN: cry/322 not found
+[02:13:51.436] WARN: cry/322 not found
+[02:14:14.389] WARN: cry/717 not found
+[02:14:32.341] LOG: %cStart Phase SelectChallengePhase color:green;
+[02:14:45.497] LOG: %cStart Phase SelectStarterPhase color:green;
+[02:14:55.789] WARN: cry/517 not found
+[02:15:03.811] LOG: %cSaving starter preferences color: blue
+[02:15:04.107] LOG: %cSaving starter preferences color: blue
+[02:15:05.423] WARN: cry/517 not found
+[02:31:21.821] LOG: %cStart Phase SelectChallengePhase color:green;
+[02:32:15.041] LOG: %cStart Phase TitlePhase color:green;
+[02:32:15.043] LOG: Getting Session Slot id: %d 3
+[02:32:15.072] LOG: use seasonal splash messages true
+[02:32:15.072] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[02:33:18.976] LOG: %cStart Phase TitlePhase color:green;
+[02:33:18.976] LOG: Getting Session Slot id: %d 3
+[02:33:18.988] LOG: use seasonal splash messages true
+[02:33:18.988] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[02:33:36.458] WARN: cry/10818 not found
+[02:33:37.819] WARN: cry/813 not found
+[02:33:39.417] WARN: cry/813 not found
+[02:34:00.405] WARN: cry/656 not found
+[02:34:02.456] WARN: cry/656 not found
+[02:34:09.652] WARN: cry/658 not found
+[02:34:13.074] WARN: cry/656 not found
+[02:34:29.096] WARN: cry/656 not found
+[02:38:39.397] WARN: cry/10213 not found
+[02:38:45.421] WARN: cry/201 not found
+[02:39:10.428] WARN: cry/65 not found
+[02:40:56.774] LOG: %cStart Phase TitlePhase color:green;
+[02:40:56.775] LOG: Getting Session Slot id: %d 3
+[02:40:56.802] LOG: use seasonal splash messages true
+[02:40:56.802] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[02:42:11.811] WARN: Could not get game title stats! AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-B-KNuhY1.js:1:22386
+[02:42:56.828] WARN: Could not get game title stats! TypeError: Failed to fetch
+TypeError: Failed to fetch
+    at PokerogueApi.doFetch (https://elite-redux.pages.dev/assets/BBCodeText-B-KNuhY1.js:1:22414)
+    at PokerogueApi.doGet (https://elite-redux.pages.dev/assets/BBCodeText-B-KNuhY1.js:1:21476)
+    at PokerogueApi.getGameTitleStats (https://elite-redux.pages.dev/assets/BBCodeText-B-KNuhY1.js:1:28356)
+    at TitleUiHandler.updateTitleStats (https://elite-redux.pages.dev/assets/battle-scene-CahYoH4J.js:1043:24520)
+    at https://elite-redux.pages.dev/assets/battle-scene-CahYoH4J.js:1044:1627
+[02:43:56.830] WARN: Could not get game title stats! TypeError: Failed to fetch
+TypeError: Failed to fetch
+    at PokerogueApi.doFetch (https://elite-redux.pages.dev/assets/BBCodeText-B-KNuhY1.js:1:22414)
+    at PokerogueApi.doGet (https://elite-redux.pages.dev/assets/BBCodeText-B-KNuhY1.js:1:21476)
+    at PokerogueApi.getGameTitleStats (https://elite-redux.pages.dev/assets/BBCodeText-B-KNuhY1.js:1:28356)
+    at TitleUiHandler.updateTitleStats (https://elite-redux.pages.dev/assets/battle-scene-CahYoH4J.js:1043:24520)
+    at https://elite-redux.pages.dev/assets/battle-scene-CahYoH4J.js:1044:1627
+[02:46:13.755] WARN: Could not get game title stats! AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-B-KNuhY1.js:1:22386
+[03:05:32.711] LOG: %cStart Phase SelectStarterPhase color:green;
+[03:05:42.041] WARN: cry/109 not found
+[03:06:11.468] WARN: cry/65 not found
+[03:06:22.256] LOG: Getting Session Slot id: %d 0
+[03:06:22.268] LOG: Getting Session Slot id: %d 1
+[03:06:22.275] LOG: Getting Session Slot id: %d 2
+[03:06:22.279] LOG: Getting Session Slot id: %d 3
+[03:06:22.282] LOG: Getting Session Slot id: %d 4
+[03:06:22.364] LOG: Getting Session Slot id: %d 3
+[03:06:23.998] LOG: %cStart Phase TitlePhase color:green;
+[03:06:23.999] LOG: Getting Session Slot id: %d 3
+[03:06:24.024] LOG: use seasonal splash messages true
+[03:06:24.024] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[03:06:27.409] LOG: %cStart Phase SelectStarterPhase color:green;
+[03:06:30.724] WARN: cry/109 not found
+[03:06:30.728] WARN: cry/65 not found
+[03:06:32.826] LOG: %cSaving starter preferences color: blue
+[03:06:34.513] LOG: Getting Session Slot id: %d 0
+[03:06:34.520] LOG: Getting Session Slot id: %d 1
+[03:06:34.524] LOG: Getting Session Slot id: %d 2
+[03:06:34.528] LOG: Getting Session Slot id: %d 3
+[03:06:34.531] LOG: Getting Session Slot id: %d 4
+[03:06:48.498] DEBUG: %cSending a request to delete session in slot %d color: blue 2
+[03:06:50.860] LOG: Wave Seed: LfnMDn3CxM7J[rvoHD1[Bwwr 1
+[03:06:50.861] LOG: %cStart Phase EncounterPhase color:green;
+[03:06:50.867] LOG: Starting species pool tier: COMMON
+[03:06:50.877] LOG: Pokemon: Wild Weedle | Species ID: 13 | Level: 2 | Nature: Quiet (+SpAtk/-Spd)
+[03:06:50.877] LOG: Stats (IVs): HP: 14 (24), Atk: 6 (18), Def: 6 (29), Spatk: 7 (11), Spdef: 6 (30), Spd: 6 (23)
+[03:06:50.877] LOG: Ability: Infiltrator | Passive Ability: Swarm 
+[03:06:50.877] LOG: Moveset: ["Lunge","Poison Sting"]
+[03:06:50.877] LOG: Starting species pool tier: COMMON
+[03:06:50.882] LOG: Pokemon: Wild Lechonk | Species ID: 915 | Level: 2 | Nature: Bold (+Def/-Atk)
+[03:06:50.882] LOG: Stats (IVs): HP: 14 (0), Atk: 6 (2), Def: 9 (26), Spatk: 6 (8), Spdef: 7 (14), Spd: 6 (6)
+[03:06:50.882] LOG: Ability: Strong Jaw | Passive Ability: Thick Fat 
+[03:06:50.882] LOG: Moveset: ["Hyper Fang","Quick Attack","Sweet Scent","Tail Slap"]
+[03:06:52.220] DEBUG: Session data saved to slot 2!
+[03:06:52.221] LOG: Wave Seed: LfnMDn3CxM7J[rvoHD1[Bwwr 1
+[03:06:52.427] WARN: cry/13 not found
+[03:06:52.678] LOG: %cStart Phase SummonPhase color:green;
+[03:06:52.860] WARN: cry/109 not found
+[03:06:52.959] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[03:06:52.961] LOG: %cStart Phase SummonPhase color:green;
+[03:06:53.144] WARN: cry/65 not found
+[03:06:53.243] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:06:53.360] LOG: %cStart Phase InitEncounterPhase color:green;
+[03:06:53.369] LOG: %cStart Phase PostSummonPhase color:green;
+[03:06:53.380] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:06:53.545] LOG: %cStart Phase MessagePhase color:green;
+[03:06:53.826] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:06:53.869] LOG: %cStart Phase PostSummonPhase color:green;
+[03:06:53.869] LOG: Ran PSP for: Wispywaspy
+[03:06:53.875] LOG: %cStart Phase PostSummonPhase color:green;
+[03:06:53.878] LOG: %cStart Phase PostSummonPhase color:green;
+[03:06:53.880] LOG: %cStart Phase PostSummonPhase color:green;
+[03:06:53.880] LOG: Ran PSP for: Koffing
+[03:06:53.882] LOG: %cStart Phase PostSummonPhase color:green;
+[03:06:53.882] LOG: %cStart Phase PostSummonPhase color:green;
+[03:06:53.882] LOG: Ran PSP for: Lechonk
+[03:06:53.883] LOG: %cStart Phase PostSummonPhase color:green;
+[03:06:53.883] LOG: Ran PSP for: Weedle
+[03:06:53.884] LOG: %cStart Phase PostSummonPhase color:green;
+[03:06:53.885] LOG: %cStart Phase PostSummonPhase color:green;
+[03:06:53.885] LOG: %cStart Phase PostSummonPhase color:green;
+[03:06:53.885] LOG: %cStart Phase PostSummonPhase color:green;
+[03:06:53.885] LOG: %cStart Phase TurnInitPhase color:green;
+[03:06:53.885] LOG: %cStart Phase CommandPhase color:green;
