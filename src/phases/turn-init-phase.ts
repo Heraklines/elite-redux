@@ -6,6 +6,7 @@ import { BattlerIndex } from "#enums/battler-index";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
 import { MoveUseMode } from "#enums/move-use-mode";
 import { Stat } from "#enums/stat";
+import { SwitchType } from "#enums/switch-type";
 import { TurnInitEvent } from "#events/battle-scene";
 import type { EnemyPokemon, PlayerPokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
@@ -150,5 +151,20 @@ export class TurnInitPhase extends FieldPhase {
       MoveUseMode.NORMAL,
       MovePhaseTimingModifier.FIRST,
     );
+    // #629: the ambush move runs BEFORE the player's CommandPhase (already queued
+    // above). If it KOs a player mon, FaintPhase only pushes its forced-switch
+    // SwitchPhase to the BACK of the queue, so the CommandPhase would otherwise run
+    // first and present the Fight menu for the FAINTED mon ("attack with a fainted
+    // mon"). Interpose a modal faint-switch per active player slot so the
+    // replacement is summoned BEFORE the command. The MovePhase is a dynamic phase
+    // (runs a level above), so these non-dynamic SwitchPhases queue right after it
+    // and before the CommandPhases. Modal + doReturn=false mirrors FaintPhase's own
+    // switch: SwitchPhase.start() no-ops it when the slot's mon survived (or there
+    // is no legal bench mon, or FaintPhase's back-queued switch already refilled it).
+    for (const playerMon of globalScene.getPlayerField()) {
+      if (playerMon?.isActive()) {
+        globalScene.phaseManager.unshiftNew("SwitchPhase", SwitchType.SWITCH, playerMon.getFieldIndex(), true, false);
+      }
+    }
   }
 }

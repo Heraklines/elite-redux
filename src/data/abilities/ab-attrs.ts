@@ -765,6 +765,9 @@ export class PostDefendStatStageChangeAbAttr extends PostDefendAbAttr {
   private readonly stages: number;
   private readonly selfTarget: boolean;
   private readonly allOthers: boolean;
+  /** ER: lower the stat on all OPPONENTS only (never the ally). Used by Cotton
+   * Down, whose 2.65 dex text is "Lowers the Speed of all foes ... when hit". */
+  private readonly opponentsOnly: boolean;
 
   constructor(
     condition: PokemonDefendCondition,
@@ -772,6 +775,7 @@ export class PostDefendStatStageChangeAbAttr extends PostDefendAbAttr {
     stages: number,
     selfTarget = true,
     allOthers = false,
+    opponentsOnly = false,
   ) {
     super(true);
 
@@ -780,6 +784,7 @@ export class PostDefendStatStageChangeAbAttr extends PostDefendAbAttr {
     this.stages = stages;
     this.selfTarget = selfTarget;
     this.allOthers = allOthers;
+    this.opponentsOnly = opponentsOnly;
   }
 
   override canApply({ pokemon, opponent: attacker, move }: PostMoveInteractionAbAttrParams): boolean {
@@ -791,9 +796,12 @@ export class PostDefendStatStageChangeAbAttr extends PostDefendAbAttr {
       return;
     }
 
-    if (this.allOthers) {
-      const ally = pokemon.getAlly();
-      const otherPokemon = ally == null ? pokemon.getOpponents() : pokemon.getOpponents().concat([ally]);
+    if (this.allOthers || this.opponentsOnly) {
+      const opponents = pokemon.getOpponents();
+      // `opponentsOnly` (ER Cotton Down: "all foes") excludes the ally; the
+      // vanilla `allOthers` path includes it.
+      const ally = this.opponentsOnly ? null : pokemon.getAlly();
+      const otherPokemon = ally == null ? opponents : opponents.concat([ally]);
       for (const other of otherPokemon) {
         globalScene.phaseManager.unshiftNew(
           "StatStageChangePhase",

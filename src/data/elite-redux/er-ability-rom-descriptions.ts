@@ -247,7 +247,7 @@ export const ER_ABILITY_ROM_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "dauntlessshield": "Dauntless Shield immediately raises Defense by one stage when entering battle.",
   "libero": "Libero overrides the user's type to match the move being used before it attacks. Cannot activate on Struggle moves.",
   "ballfetch": "No effect in battle.",
-  "cottondown": "Cotton Down triggers when the Pokemon is hit by any attack, lowering the Speed of ALL Pokemon by one stage. Activates multiple times against multihit moves.",
+  "cottondown": "Cotton Down triggers when the Pokemon is hit by any attack, lowering the Speed of all foes by one stage. Activates multiple times against multihit moves.",
   "propellertail": "Propeller Tail boosts the user's Speed by 50% during rain and grants immunity to redirection effects. The speed boost works in all forms of rain.",
   "mirrorarmor": "Mirror Armor reflects all stat- lowering effects aimed at the user back to the attacker. The reflection bypasses immunities.",
   "gulpmissile": "When Cramorant uses Surf, Triple Dive or Dive, it catches prey: Gulping form if HP >50% or Gorging form if HP <=50%. When hit in either form, spits prey dealing 25% max HP damage to attacker and returns to base. Gulping Form also lowers Defense by 1; Gorging Form paralyzes. Cannot be suppressed etc.",

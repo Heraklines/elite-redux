@@ -1755,8 +1755,9 @@ export function initAbilities() {
         (_target, _user, move) => move.category !== MoveCategory.STATUS,
         Stat.SPD,
         -1,
-        false,
-        true,
+        false, // selfTarget
+        false, // allOthers (would include the ally)
+        true, // opponentsOnly - ER 2.65: "Lowers the Speed of all foes by one stage when hit"
       )
       .bypassFaint()
       .build(),

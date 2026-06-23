@@ -343,6 +343,42 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Combat — Forest ambush KO must force a switch (never command a fainted mon)
+  // ===========================================================================
+  {
+    label: "Forest ambush: KO'd lead forces a switch (#629)",
+    description:
+      "#629 - 'H-Zoroark one-tapped me and now I can still attack with the fainted\n"
+      + "mon.' In FOREST / SNOWY_FOREST a wild foe has a ~20% chance to SNATCH a free\n"
+      + "turn-1 move when your lead is slower. Here a fast L100 foe one-shots your frail\n"
+      + "L5 Magikarp lead.\n"
+      + "DO: enter the battle and watch turn 1. The foe (faster) ambushes before you act.\n"
+      + "EXPECT: when the ambush KOs Magikarp you are FORCED to switch in your benched\n"
+      + "Pikachu BEFORE you get a command. You must NEVER be offered the Fight menu for\n"
+      + "the fainted Magikarp. (Before the fix the command menu opened on the fainted\n"
+      + "lead.) If the foe does NOT ambush (it loses the ~20% roll and just attacks on its\n"
+      + "normal turn), reset and re-pick this scenario until the ambush fires.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 5, // frail, slow lead the foe outspeeds + one-shots
+        STARTING_BIOME_OVERRIDE: BiomeId.FOREST,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [
+        makeStarter(SpeciesId.MAGIKARP, {
+          moveset: [MoveId.SPLASH, MoveId.TACKLE, MoveId.FLAIL, MoveId.BOUNCE],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.NUZZLE, MoveId.IRON_TAIL, MoveId.SURF],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Combat — Throat Chop blocks sound moves (incl. same-turn cancel)
   // ===========================================================================
   {
@@ -468,6 +504,42 @@ export const DEV_SCENARIOS: DevScenario[] = [
         }),
         makeStarter(SpeciesId.PIKACHU, {
           moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.WATER_PULSE, MoveId.IRON_TAIL],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Combat — Cotton Down lowers FOES' Speed only, not the ally (double battle)
+  // ===========================================================================
+  {
+    label: "Cotton Down slows FOES only, not your ally",
+    description:
+      "Cotton Down fix. The ER 2.65 dex says 'Lowers the Speed of all FOES by one stage\n"
+      + "when hit' - opponents only - but it was also slowing the holder's own ally.\n"
+      + "DOUBLE battle; your side has Cotton Down, the bulky foes use a contact move.\n"
+      + "DO: let the foes attack your mons for a turn or two, then open Battle Info ->\n"
+      + "Speed Order (or read the stat-stage arrows).\n"
+      + "EXPECT: every Cotton Down proc lowers ONLY the foes' Speed (-1 per hit). Your\n"
+      + "partner's Speed must stay at 0. Before the fix your own ally was slowed too.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        // Wave 145 (past the #419 cap) + bulky Snorlax foes so they survive to show
+        // the -1 Speed; bulky player mons survive the foe attacks across turns.
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 55,
+        BATTLE_STYLE_OVERRIDE: "double",
+        ABILITY_OVERRIDE: AbilityId.COTTON_DOWN,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE], // contact move -> triggers Cotton Down "when hit"
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.EARTHQUAKE],
+        }),
+        makeStarter(SpeciesId.BLISSEY, {
+          moveset: [MoveId.SOFT_BOILED, MoveId.SEISMIC_TOSS, MoveId.THUNDERBOLT, MoveId.ICE_BEAM],
         }),
       ];
     },
