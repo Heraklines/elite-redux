@@ -1,0 +1,42 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqp326uz-g1rr
+mode:     0  wave:?
+seed:     1jTrOzUYrbIWPPNMhxXaHtKl
+party:    
+enemy:    
+
+----- CONSOLE -----
+[06:24:01.113] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[06:24:01.776] LOG: [ER] build mqp326uz-g1rr
+[06:24:01.861] LOG: [dev-tools] loaded — 292 scenarios + Send Logs button
+[06:57:31.072] DEBUG: Destroying loading scene
+[06:57:31.072] DEBUG: Destroyed loading scene
+[06:57:31.247] LOG: Seed: 1jTrOzUYrbIWPPNMhxXaHtKl
+[06:57:31.247] LOG: Wave Seed: 1jTrOzUYrbIWPPNMhxXaHtKl 0
+[06:57:32.770] LOG: %cStart Phase LoginPhase color:green;
+[06:57:33.920] LOG: Client Session: pwl1bSDl0r05fOBLTV8JaYJW6WcuvLPa
+[06:57:34.558] LOG: %cStart Phase TitlePhase color:green;
+[06:57:34.558] LOG: Getting Session Slot id: %d 0
+[06:57:34.576] LOG: use seasonal splash messages true
+[06:57:34.576] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[07:29:46.412] WARN: Could not get game title stats! TypeError: Failed to fetch
+TypeError: Failed to fetch
+    at PokerogueApi.doFetch (https://elite-redux-staging.pages.dev/assets/BBCodeText-nCxk5Ccz.js:1:22477)
+    at PokerogueApi.doGet (https://elite-redux-staging.pages.dev/assets/BBCodeText-nCxk5Ccz.js:1:21539)
+    at PokerogueApi.getGameTitleStats (https://elite-redux-staging.pages.dev/assets/BBCodeText-nCxk5Ccz.js:1:28411)
+    at TitleUiHandler.updateTitleStats (https://elite-redux-staging.pages.dev/assets/battle-scene-BAx37DNL.js:1043:24554)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BAx37DNL.js:1044:1627
+[07:30:46.414] WARN: Could not get game title stats! TypeError: Failed to fetch
+TypeError: Failed to fetch
+    at PokerogueApi.doFetch (https://elite-redux-staging.pages.dev/assets/BBCodeText-nCxk5Ccz.js:1:22477)
+    at PokerogueApi.doGet (https://elite-redux-staging.pages.dev/assets/BBCodeText-nCxk5Ccz.js:1:21539)
+    at PokerogueApi.getGameTitleStats (https://elite-redux-staging.pages.dev/assets/BBCodeText-nCxk5Ccz.js:1:28411)
+    at TitleUiHandler.updateTitleStats (https://elite-redux-staging.pages.dev/assets/battle-scene-BAx37DNL.js:1043:24554)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BAx37DNL.js:1044:1627
+[07:32:47.563] WARN: Could not get game title stats! TypeError: Failed to fetch
+TypeError: Failed to fetch
+    at PokerogueApi.doFetch (https://elite-redux-staging.pages.dev/assets/BBCodeText-nCxk5Ccz.js:1:22477)
+    at PokerogueApi.doGet (https://elite-redux-staging.pages.dev/assets/BBCodeText-nCxk5Ccz.js:1:21539)
+    at PokerogueApi.getGameTitleStats (https://elite-redux-staging.pages.dev/assets/BBCodeText-nCxk5Ccz.js:1:28411)
+    at TitleUiHandler.updateTitleStats (https://elite-redux-staging.pages.dev/assets/battle-scene-BAx37DNL.js:1043:24554)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BAx37DNL.js:1044:1627
