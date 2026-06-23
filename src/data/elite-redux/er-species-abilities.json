@@ -19,6 +19,16 @@
     "ability2": 92,
     "hidden": 34
   },
+  "SPECIES_DEERLING_SUMMER": {
+    "ability1": 91,
+    "ability2": 92,
+    "hidden": 34
+  },
+  "SPECIES_DEERLING_WINTER": {
+    "ability1": 91,
+    "ability2": 92,
+    "hidden": 34
+  },
   "SPECIES_EMOLGA": {
     "ability1": 5208,
     "ability2": 5511,
