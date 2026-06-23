@@ -80,8 +80,8 @@
     ]
   },
   "SPECIES_SAWSBUCK": {
-    "ability1": 92,
-    "ability2": 91,
+    "ability1": 91,
+    "ability2": 92,
     "hidden": 34,
     "innates": [
       5129,
