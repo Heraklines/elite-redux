@@ -33,6 +33,7 @@ import { tmSpecies } from "#balance/tm-species-map";
 import { speciesTmMoves, tmPoolTiers } from "#balance/tms";
 import { allAbilities, allMoves, allSpecies } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
 import { AbilityId } from "#enums/ability-id";
 import { ModifierTier } from "#enums/modifier-tier";
@@ -259,6 +260,77 @@ function resolveAbilitySlot(
   return;
 }
 
+/** A species OR a form: both extend PokemonSpeciesForm, so both carry the three
+ * ability slots + `setPassives`. The override writes to whichever the in-game
+ * ability lookup actually reads (form-level wins for multi-form species). */
+type AbilitySlotTarget = MutableAbilitySlots & {
+  formKey: string;
+  setPassives(passives: readonly [AbilityId, AbilityId, AbilityId]): void;
+};
+
+/** ER mega/alt-form draft id → its base species draft id + the injected formKey. */
+const megaTargetToForm: ReadonlyMap<number, { baseDraftId: number; formKey: string }> = new Map(
+  ER_MEGA_FORMS.map(m => [m.targetErId, { baseDraftId: m.baseErId, formKey: m.formKey }]),
+);
+
+/**
+ * Resolve one editor ability entry to its final slot values ONCE (so a bad id is
+ * only counted once), then write those values onto every {@linkcode AbilitySlotTarget}.
+ * Returns whether anything was written.
+ *
+ * Writing to multiple targets is the crux of the multi-form fix: the in-game
+ * ability of a multi-form species (e.g. a Redux base + its Mega) is read from the
+ * FORM, not the species' top-level slots, so an editor edit must reach the form.
+ */
+function applyEntryToTargets(
+  targets: readonly AbilitySlotTarget[],
+  entry: ErAbilityEntry,
+  result: InitEliteReduxPokedexOverridesResult,
+): boolean {
+  if (targets.length === 0) {
+    return false;
+  }
+  const a1 = resolveAbilitySlot(entry.ability1, {}, result);
+  // Slot 2's NONE mirrors the NEW primary (a1) when present; the editor always
+  // writes a1 alongside a2, so a per-target fallback is unnecessary here.
+  const a2 = resolveAbilitySlot(entry.ability2, { noneTo: a1 ?? targets[0].ability1 }, result);
+  const ah = resolveAbilitySlot(entry.hidden, { allowNone: true }, result);
+  const triple = Array.isArray(entry.innates)
+    ? ([0, 1, 2].map(i => {
+        const v = entry.innates?.[i];
+        if (v === undefined || v === AbilityId.NONE) {
+          return AbilityId.NONE;
+        }
+        if (allAbilities[v]) {
+          return v as AbilityId;
+        }
+        result.idsDropped++;
+        return AbilityId.NONE;
+      }) as [AbilityId, AbilityId, AbilityId])
+    : undefined;
+
+  let changed = false;
+  for (const target of targets) {
+    if (a1 !== undefined) {
+      target.ability1 = a1;
+      changed = true;
+    }
+    if (a2 !== undefined) {
+      target.ability2 = a2;
+      changed = true;
+    }
+    if (ah !== undefined) {
+      target.abilityHidden = ah;
+      changed = true;
+    }
+    if (triple) {
+      target.setPassives(triple);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 /** Overwrite each overridden species' three ability slots (only resolvable ids). */
 function applyAbilities(
   abilities: ErSpeciesAbilities | undefined,
@@ -269,54 +341,74 @@ function applyAbilities(
   if (!abilities) {
     return;
   }
+  // Forms that have their OWN editor entry (a `_MEGA`/alt-form const) - keyed
+  // `${baseSpeciesId}:${formKey}`. A base-species override must NOT clobber these
+  // (e.g. Kingambit Redux's "mega" form is owned by SPECIES_KINGAMBIT_REDUX_MEGA),
+  // but it SHOULD reach every other form (e.g. all of Sawsbuck's seasons).
+  const formsWithOwnEntry = new Set<string>();
+  for (const key of Object.keys(abilities)) {
+    const d = draftIdByConst.get(key);
+    const m = d === undefined ? undefined : megaTargetToForm.get(d);
+    if (m) {
+      const baseId = ER_ID_MAP.species[m.baseDraftId];
+      if (baseId !== undefined) {
+        formsWithOwnEntry.add(`${baseId}:${m.formKey}`);
+      }
+    }
+  }
   for (const [speciesConst, entry] of Object.entries(abilities)) {
     if (!entry || typeof entry !== "object") {
       continue;
     }
+    const draftId = draftIdByConst.get(speciesConst);
     const pkrgId = resolveSpeciesId(speciesConst, draftIdByConst);
-    const species = pkrgId === undefined ? undefined : speciesById.get(pkrgId);
-    if (!species) {
+    // `ability*` are declared readonly; the `const` only freezes the binding,
+    // runtime assignment is fine. Cast species/forms to the mutable slot view.
+    const species =
+      pkrgId === undefined ? undefined : (speciesById.get(pkrgId) as unknown as AbilitySlotTarget | undefined);
+
+    // Collect every target the in-game ability lookup might read from.
+    const targets: AbilitySlotTarget[] = [];
+    if (species) {
+      targets.push(species);
+    }
+
+    const mega = draftId === undefined ? undefined : megaTargetToForm.get(draftId);
+    if (mega) {
+      // A mega/alt-form const: the live mega is reached as a FORM on the BASE
+      // species, NOT this standalone species - so its abilities are read from
+      // baseSpecies.forms[formKey]. Write there too (this is the Mega bug).
+      const baseId = ER_ID_MAP.species[mega.baseDraftId];
+      const baseForms = (baseId === undefined ? undefined : speciesById.get(baseId))?.forms as
+        | AbilitySlotTarget[]
+        | undefined;
+      const form = baseForms?.find(f => f.formKey === mega.formKey);
+      if (form) {
+        targets.push(form);
+      }
+    } else if (species) {
+      // A base-species const on a MULTI-FORM species: each form is a distinct
+      // object whose slots SHADOW the species-level ones, so write every form -
+      // EXCEPT any form that has its own dedicated editor entry (its `_MEGA`/alt
+      // const owns it). This makes one SPECIES_SAWSBUCK edit reach all 4 seasons,
+      // while SPECIES_KINGAMBIT_REDUX leaves the "mega" form to its own entry.
+      const forms = (speciesById.get(pkrgId as number)?.forms as AbilitySlotTarget[] | undefined) ?? [];
+      for (const form of forms) {
+        if ((form as unknown) === (species as unknown)) {
+          continue;
+        }
+        if (formsWithOwnEntry.has(`${pkrgId}:${form.formKey}`)) {
+          continue;
+        }
+        targets.push(form);
+      }
+    }
+
+    if (targets.length === 0) {
       result.skippedUnmapped++;
       continue;
     }
-    // `ability*` are declared readonly on PokemonSpecies; the `const` only freezes
-    // the binding, runtime assignment is fine. Cast to a mutable view.
-    const mutable = species as unknown as MutableAbilitySlots;
-    let changed = false;
-    const a1 = resolveAbilitySlot(entry.ability1, {}, result);
-    if (a1 !== undefined) {
-      mutable.ability1 = a1;
-      changed = true;
-    }
-    // Slot 2 resolves AFTER slot 1 so a NONE override mirrors the new primary.
-    const a2 = resolveAbilitySlot(entry.ability2, { noneTo: mutable.ability1 }, result);
-    if (a2 !== undefined) {
-      mutable.ability2 = a2;
-      changed = true;
-    }
-    const ah = resolveAbilitySlot(entry.hidden, { allowNone: true }, result);
-    if (ah !== undefined) {
-      mutable.abilityHidden = ah;
-      changed = true;
-    }
-    // Innates = ER's 3-passive triple. Present → replace the whole triple (an
-    // empty/invalid slot becomes NONE); absent → leave passives untouched.
-    if (Array.isArray(entry.innates)) {
-      const triple = [0, 1, 2].map(i => {
-        const v = entry.innates?.[i];
-        if (v === undefined || v === AbilityId.NONE) {
-          return AbilityId.NONE;
-        }
-        if (allAbilities[v]) {
-          return v as AbilityId;
-        }
-        result.idsDropped++;
-        return AbilityId.NONE;
-      }) as [AbilityId, AbilityId, AbilityId];
-      species.setPassives(triple);
-      changed = true;
-    }
-    if (changed) {
+    if (applyEntryToTargets(targets, entry, result)) {
       result.abilitiesApplied++;
     }
   }
