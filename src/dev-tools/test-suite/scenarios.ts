@@ -379,6 +379,40 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Combat — Coil Up spends its boost on the first biting move USED (even if it
+  // misses / is immune)
+  // ===========================================================================
+  {
+    label: "Coil Up: boost spent on first biting move USED (#632)",
+    description:
+      "#632 - Coil Up gives your FIRST biting move +1 priority on entry, and that\n"
+      + "boost is spent the first time you USE a biting move - even one that misses or\n"
+      + "has no effect. Your slow Snorlax has Coil Up; the foe Excadrill is a Ground type\n"
+      + "(immune to Electric).\n"
+      + "DO: turn 1 use THUNDER FANG (a biting Electric move). It does NOTHING to the\n"
+      + "Ground foe, but USING it still spends the Coil Up boost. Turn 2 use CRUNCH (also\n"
+      + "biting).\n"
+      + "EXPECT: on turn 2 the FASTER Excadrill moves first (your Crunch has no priority\n"
+      + "left). Before the fix the boost wrongly persisted and Crunch went first on turn\n"
+      + "2. (Tip: open Battle Info -> Speed Order, or just watch who attacks first.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145, // past the #419 BST cap
+        STARTING_LEVEL_OVERRIDE: 50,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.COIL_UP),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.EXCADRILL, // Ground -> immune to Thunder Fang; faster than Snorlax
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.THUNDER_FANG, MoveId.CRUNCH, MoveId.BODY_SLAM, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Combat — Throat Chop blocks sound moves (incl. same-turn cancel)
   // ===========================================================================
   {

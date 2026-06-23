@@ -310,7 +310,7 @@ export const ER_ABILITY_ROM_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "earthbound": "Boosts the power of Ground-type moves by 20%, or by 50% at 1/3 HP or lower.",
   "fightingspirit": "Changes the user's Normal-type moves to Fighting-type. If the user is Fighting-type its Fighting-type moves break screens, otherwise it gains Fighting STAB.",
   "crypticpower": "Feline Prowess increases the user's Special Attack stat by 2x. Multiplicative with other damage boosts.",
-  "coilup": "On entry, gives +1 priority to the first biting move used. Priority boost is consumed after landing any biting move.",
+  "coilup": "On entry, gives +1 priority to the first biting move used. Priority boost is consumed the first time a biting move is used, even if it misses or fails.",
   "fossilized": "Fossilized reduces Rock-type damage by 50% and boosts the user's Rock moves by 20%. Damage reduction is multiplicative with other sources, while the damage boost is additive with other sources.",
   "magicaldust": "If the user makes contact with another Pokemon, offensively or defensively, the other Pokemon's type is changed to pure Psychic. This happens immediately for multihit or priority moves and can remove STAB in the middle of an enemy's multihit move.",
   "dreamcatcher": "Dreamcatcher doubles the power of the user's moves when any opponent on the field is asleep. This includes the user, allies, or opponents. Attacks hit sleeping foes who are switching out for 1x power instead, damaging them before leaving. Does not activate against Comatose.",

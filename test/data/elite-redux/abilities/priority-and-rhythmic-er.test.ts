@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
+import type { AbAttrBaseParams, PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
 import { allMoves } from "#data/data-lists";
 import {
+  ConsumeFirstFlaggedMoveOnUseAbAttr,
   ConsumeFirstFlaggedMovePriorityAbAttr,
   FirstFlaggedMovePriorityAbAttr,
   FirstTurnPriorityClampAbAttr,
@@ -27,7 +28,9 @@ function priorityPokemon(): Pokemon {
 }
 
 describe("ER first-move priority abilities", () => {
-  it("consumes Coil Up after the first landed biting move", () => {
+  // The consume-on-LAND helper (Sidewinder 676's base behavior; Coil Up no longer
+  // uses this - see the on-USE test below).
+  it("consumes the on-land boost helper after a landed biting move", () => {
     const pokemon = priorityPokemon();
     const opponent = { isFainted: () => false } as unknown as Pokemon;
     const priorityAttr = new FirstFlaggedMovePriorityAbAttr(MoveFlags.BITING_MOVE);
@@ -47,6 +50,34 @@ describe("ER first-move priority abilities", () => {
       damage: 10,
     });
     expect(priorityAttr.canApply(priorityParams)).toBe(false);
+  });
+
+  // Coil Up (302): the on-USE consumer spends the boost the first time a biting
+  // move is used, EVEN if it does not land (miss / immune / fail) - #632.
+  it("consumes Coil Up's boost on a biting move USED, even without a landed hit", () => {
+    const priorityAttr = new FirstFlaggedMovePriorityAbAttr(MoveFlags.BITING_MOVE);
+    const onUseAttr = new ConsumeFirstFlaggedMoveOnUseAbAttr(MoveFlags.BITING_MOVE);
+    // The holder just USED Bite (a biting move) - the consumer reads it from move history.
+    const pokemon = {
+      tempSummonData: { waveTurnCount: 1 },
+      getLastXMoves: () => [{ move: MoveId.BITE }],
+    } as unknown as Pokemon;
+    const params = { pokemon } as unknown as AbAttrBaseParams;
+    const priorityParams = { pokemon, move: allMoves[MoveId.BITE], priority: new NumberHolder(0) };
+
+    expect(priorityAttr.canApply(priorityParams), "boost available before use").toBe(true);
+    expect(onUseAttr.canApply(params), "a biting move USED triggers consumption (no hit needed)").toBe(true);
+    onUseAttr.apply(params);
+    expect(priorityAttr.canApply(priorityParams), "boost consumed after the biting move was used").toBe(false);
+  });
+
+  it("does NOT consume Coil Up's boost on a non-biting move", () => {
+    const onUseAttr = new ConsumeFirstFlaggedMoveOnUseAbAttr(MoveFlags.BITING_MOVE);
+    const pokemon = {
+      tempSummonData: { waveTurnCount: 1 },
+      getLastXMoves: () => [{ move: MoveId.TACKLE }],
+    } as unknown as Pokemon;
+    expect(onUseAttr.canApply({ pokemon } as unknown as AbAttrBaseParams)).toBe(false);
   });
 
   it("regains Sidewinder after a direct KO", () => {

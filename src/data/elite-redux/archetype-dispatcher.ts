@@ -167,6 +167,7 @@ import { type EntryEffect, EntryEffectAbAttr } from "#data/elite-redux/archetype
 import { FieldCritBoostAbAttr } from "#data/elite-redux/archetypes/field-crit-boost";
 import { FieldStatShareAbAttr } from "#data/elite-redux/archetypes/field-stat-share";
 import {
+  ConsumeFirstFlaggedMoveOnUseAbAttr,
   ConsumeFirstFlaggedMovePriorityAbAttr,
   FirstFlaggedMovePriorityAbAttr,
   FirstTurnPriorityClampAbAttr,
@@ -5075,9 +5076,15 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new PriorityModifierAbAttr({ priority: 1, filter: { maxBasePower: 25 } }),
       ]);
     case 302:
+      // Coil Up — +1 priority to the first biting move on entry, consumed the
+      // first time a biting move is USED, even if it misses/fails (#632). The
+      // on-USE consumer (ExecutedMoveAbAttr) replaces the old PostAttack consumer,
+      // which only fired on a landed hit (so a non-landing biting move left the
+      // boost active). Sidewinder (676) keeps the consume-on-land + regain-on-KO
+      // variant, which is its distinct mechanic.
       return ok([
         new FirstFlaggedMovePriorityAbAttr(MoveFlags.BITING_MOVE),
-        new ConsumeFirstFlaggedMovePriorityAbAttr(MoveFlags.BITING_MOVE),
+        new ConsumeFirstFlaggedMoveOnUseAbAttr(MoveFlags.BITING_MOVE),
       ]);
     case 465:
       // Pixie Power — "1.2x accuracy. Boosts Fairy moves by 1.33x for ALL
