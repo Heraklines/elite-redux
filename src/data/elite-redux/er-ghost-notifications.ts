@@ -20,6 +20,7 @@ import { getCookie } from "#utils/cookies";
 
 const GHOST_TYPE = "ghost-battle";
 const SYSTEM_TYPE = "system";
+const REWARD_TYPE = "reward";
 /** Settings key gating ghost-battle notifications (registered in settings.ts). */
 export const GHOST_NOTIF_SETTING_KEY = "ghostNotifications";
 
@@ -91,6 +92,48 @@ async function fetchGhostNotifications(since: number): Promise<ErNotification[]>
 }
 
 /**
+ * Login pull source for server-pushed rewards + system announcements (e.g. a
+ * black-shiny grant). Mirrors {@linkcode fetchGhostNotifications}: same base/token
+ * guards, fetch `${base}/savedata/notifications?since=${since}`, parse `{items}`.
+ * `kind:"reward"` maps to the icon-rendering REWARD_TYPE, anything else to the
+ * text-only SYSTEM_TYPE.
+ */
+async function fetchSystemNotifications(since: number): Promise<ErNotification[]> {
+  const base = serverBase();
+  const token = getCookie(sessionIdKey);
+  if (bypassLogin || !base || !token || typeof fetch !== "function") {
+    return [];
+  }
+  const res = await fetch(`${base}/savedata/notifications?since=${since}`, {
+    headers: { Authorization: token },
+  });
+  if (!res.ok) {
+    return [];
+  }
+  const data = (await res.json()) as { items?: unknown };
+  const items = Array.isArray(data.items) ? data.items : [];
+  return items
+    .filter(
+      (x): x is { id: unknown; kind?: unknown; title?: unknown; body?: unknown; payload?: unknown; when?: number } =>
+        !!x && typeof x === "object" && (x as { id?: unknown }).id != null,
+    )
+    .map(it => {
+      const when = typeof it.when === "number" ? it.when : Date.now();
+      return {
+        id: String(it.id),
+        type: it.kind === "reward" ? REWARD_TYPE : SYSTEM_TYPE,
+        timestamp: when,
+        read: false,
+        data: {
+          title: typeof it.title === "string" ? it.title : "",
+          body: typeof it.body === "string" ? it.body : "",
+          payload: it.payload,
+        },
+      };
+    });
+}
+
+/**
  * Register the notification TYPES + the ghost source on the shared manager.
  * Idempotent (safe to call on every title load). Also drops a one-time welcome
  * note so the inbox is visibly non-empty on first use.
@@ -124,7 +167,21 @@ export function initErNotifications(): void {
       return { title: d?.title ?? "Notice", body: d?.body ?? "" };
     },
   });
+  notificationManager.registerType({
+    type: REWARD_TYPE,
+    summary(n) {
+      return (n.data as { title?: string })?.title ?? "Reward";
+    },
+    detail(n) {
+      const d = n.data as { title?: string; body?: string };
+      // customView tells the inbox UI to render the granted mon's icon (single
+      // large sprite) from data.payload; body stays as a text fallback.
+      return { title: d?.title ?? "Reward", body: d?.body ?? "", customView: "reward" };
+    },
+  });
   notificationManager.registerSource(GHOST_TYPE, fetchGhostNotifications, GHOST_NOTIF_SETTING_KEY);
+  // Server-pushed rewards + announcements: no setting gate, pulled on every title load.
+  notificationManager.registerSource(REWARD_TYPE, fetchSystemNotifications, undefined);
 
   // Retire sample notifications from earlier builds so players who already loaded a
   // staging/demo build start clean. The inbox MUST be empty for players on first

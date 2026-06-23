@@ -903,6 +903,77 @@ async function ensureGhostBattlesTable(env: Env): Promise<void> {
   ).run();
 }
 
+// ---------------------------------------------------------------------------
+// General per-player notifications (rewards / announcements). The client inbox
+// polls /savedata/notifications since its last-seen ts (like ghost-notifications),
+// so the server can push ANY message to ANY player. `payload` is an optional JSON
+// blob the client renders (e.g. {species, shiny, variant} for a reward icon).
+// Rows are inserted server-side (reward grants / admin).
+// ---------------------------------------------------------------------------
+let notificationsTableReady = false;
+async function ensureNotificationsTable(env: Env): Promise<void> {
+  if (notificationsTableReady) {
+    return;
+  }
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS notifications (
+       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+       username   TEXT    NOT NULL,
+       kind       TEXT    NOT NULL DEFAULT 'system',
+       title      TEXT    NOT NULL DEFAULT '',
+       body       TEXT    NOT NULL DEFAULT '',
+       payload    TEXT,
+       created_at INTEGER NOT NULL
+     )`,
+  ).run();
+  await env.DB.prepare(
+    "CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (username, created_at)",
+  ).run();
+  notificationsTableReady = true;
+}
+
+async function handleNotifications(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const sinceParsed = Number.parseInt(url.searchParams.get("since") ?? "", 10);
+  const since = Number.isFinite(sinceParsed) ? Math.max(sinceParsed, 0) : 0;
+  await ensureNotificationsTable(env);
+  const rows = await env.DB.prepare(
+    `SELECT id, kind, title, body, payload, created_at
+       FROM notifications
+      WHERE lower(username) = lower(?1) AND created_at > ?2
+      ORDER BY created_at DESC
+      LIMIT 50`,
+  )
+    .bind(auth.u, since)
+    .all();
+  const safeParse = (s: unknown): unknown => {
+    if (typeof s !== "string") {
+      return null;
+    }
+    try {
+      return JSON.parse(s);
+    } catch {
+      return null;
+    }
+  };
+  const items = (rows.results ?? []).map(r => {
+    const row = r as Record<string, unknown>;
+    return {
+      id: `notif:${row.id}`,
+      kind: typeof row.kind === "string" ? row.kind : "system",
+      title: typeof row.title === "string" ? row.title : "",
+      body: typeof row.body === "string" ? row.body : "",
+      payload: safeParse(row.payload),
+      when: typeof row.created_at === "number" ? row.created_at : 0,
+    };
+  });
+  return json({ items }, 200, cors);
+}
+
 /** Write one ghost_battles row per ghost the victim fought. Best-effort (swallows errors). */
 async function recordGhostBattles(env: Env, victimRunId: string, victim: string, ghostsFought: unknown): Promise<void> {
   try {
@@ -1504,6 +1575,9 @@ export default {
       }
       if (pathname === "/savedata/run/ghost-notifications" && method === "GET") {
         return await handleGhostNotifications(url, auth, env, cors);
+      }
+      if (pathname === "/savedata/notifications" && method === "GET") {
+        return await handleNotifications(url, auth, env, cors);
       }
 
       return text("Not found.", 404, cors);

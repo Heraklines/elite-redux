@@ -304,9 +304,10 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     const summary = def ? def.summary(n) : n.type;
     const title = this.clipInbox(detail?.title ?? summary, 36);
     const isGhost = detail?.customView === "ghost-battle";
+    const isReward = detail?.customView === "reward";
 
     const w = 150;
-    const h = isGhost ? 104 : 74;
+    const h = isGhost ? 104 : isReward ? 96 : 74;
     // Centre in the open left region (the title menu occupies the right side).
     const cx = Math.round(globalScene.scaledCanvas.width * 0.33);
     const cy = Math.round(globalScene.scaledCanvas.height * 0.52);
@@ -339,6 +340,18 @@ export class TitleUiHandler extends OptionSelectUiHandler {
       panel.add(addTextObject(left, y, "Their team", TextStyle.WINDOW, { fontSize: "54px" }).setOrigin(0, 0));
       y += 11;
       this.renderTeamIcons(d.victimTeam, left + 4, y + 7, panel);
+    } else if (isReward) {
+      // Server-pushed reward (e.g. a black-shiny grant): ONE large mon icon
+      // centred under the title, then the wrapped body text below it.
+      const payload = (n.data as { payload?: unknown }).payload as
+        | { species?: number; shiny?: boolean; variant?: number }
+        | undefined;
+      this.renderRewardIcon(payload, 0, y + 16, panel);
+      y += 36;
+      const body = detail?.body ?? "";
+      const bodyText = addTextObject(left, y, body, TextStyle.WINDOW, { fontSize: "54px" }).setOrigin(0, 0);
+      bodyText.setWordWrapWidth((w - 16) * 6);
+      panel.add(bodyText);
     } else {
       // Text-only detail (welcome / system): wrapped text inside the panel.
       const body = detail?.body ?? "";
@@ -379,6 +392,31 @@ export class TitleUiHandler extends OptionSelectUiHandler {
         // Unknown species id / missing icon frame - skip this slot.
       }
     });
+  }
+
+  /** Render ONE large mon icon (a server-pushed reward) centred at (xCentre, yCentre). */
+  private renderRewardIcon(
+    payload: { species?: number; shiny?: boolean; variant?: number } | undefined,
+    xCentre: number,
+    yCentre: number,
+    container: Phaser.GameObjects.Container,
+  ): void {
+    if (typeof payload?.species !== "number") {
+      return;
+    }
+    try {
+      const sp = getPokemonSpecies(payload.species as SpeciesId);
+      const shiny = payload.shiny === true;
+      const variant = typeof payload.variant === "number" ? payload.variant : 0;
+      const atlas = sp.getIconAtlasKey(0, shiny, variant);
+      const frame = sp.getIconId(false, 0, shiny, variant);
+      const icon = globalScene.add.sprite(xCentre, yCentre, atlas);
+      icon.setFrame(frame);
+      icon.setOrigin(0.5, 0.5).setScale(1);
+      container.add(icon);
+    } catch {
+      // Unknown species id / missing icon frame - render nothing (body text remains).
+    }
   }
 
   private closeInboxDetail(): void {

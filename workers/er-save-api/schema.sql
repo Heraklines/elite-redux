@@ -105,3 +105,18 @@ CREATE TABLE IF NOT EXISTS system_save_backups (
   backed_up_at INTEGER NOT NULL    -- epoch ms when the snapshot was taken
 );
 CREATE INDEX IF NOT EXISTS idx_ssb_user ON system_save_backups (user_id, backed_up_at);
+
+-- General per-player notifications (reward grants + announcements), polled by the
+-- client inbox at /savedata/notifications?since=. `payload` is optional JSON the
+-- client renders (e.g. {species,shiny,variant} for a reward icon). Auto-created by
+-- the worker on first hit, so a deployed DB needs no migration.
+CREATE TABLE IF NOT EXISTS notifications (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  username   TEXT    NOT NULL,         -- target player (matched case-insensitively)
+  kind       TEXT    NOT NULL DEFAULT 'system',   -- 'system' | 'reward'
+  title      TEXT    NOT NULL DEFAULT '',
+  body       TEXT    NOT NULL DEFAULT '',
+  payload    TEXT,                     -- optional JSON (icon/extra)
+  created_at INTEGER NOT NULL          -- epoch ms
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (username, created_at);
