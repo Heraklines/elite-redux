@@ -1,0 +1,273 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     4  wave:54  difficulty:youngster
+seed:     wuuqzZZ4D2myXvMgwpwsPi2I
+party:    Piloswine(L40 133/133), Glaceon(L39 105/105), Abomasnow(L32 101/101), Polartic Bluemoon(L39 156/156), Snom(L40 93/93), Dewgong(L36 114/114)
+
+----- DESCRIPTION -----
+Protect Gone Missing
+
+----- CONSOLE -----
+[17:05:00.095] LOG: %cStart Phase PostSummonPhase color:green;
+[17:05:00.095] LOG: Ran PSP for: Nidorino
+[17:05:00.096] LOG: %cStart Phase PostSummonPhase color:green;
+[17:05:00.096] LOG: %cStart Phase PostSummonPhase color:green;
+[17:05:00.097] LOG: %cStart Phase TurnInitPhase color:green;
+[17:05:00.097] LOG: %cStart Phase CommandPhase color:green;
+[17:05:02.155] LOG: Move: ICE_SHARD Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Piloswine
+[17:05:02.160] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:05:02.174] LOG: Move Pool: ["Poison Fang","Quick Guard","After You","Brick Break"]
+[17:05:02.174] LOG: Move Scores: [66,-20,-20,8.125]
+[17:05:02.174] LOG: Sorted Move Pool: ["Poison Fang","Brick Break","Quick Guard","After You"]
+[17:05:02.174] LOG: Chosen Move: Poison Fang
+[17:05:02.174] LOG: %cStart Phase TurnStartPhase color:green;
+[17:05:02.176] LOG: %cStart Phase MovePhase color:green;
+[17:05:02.177] LOG: %cUser: Piloswine
+Move: ICE_SHARD
+Use Mode: NORMAL color:orchid
+[17:05:02.181] LOG: %cStart Phase MessagePhase color:green;
+[17:05:02.310] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:05:02.582] LOG: crit stage: +0
+[17:05:02.584] LOG: Move: Ice Shard | Base damage: 75.6564705882353 | Power: 40 | Source attack: 273 | Target defense: 51
+[17:05:02.585] LOG: Move: Ice Shard | Attack damage: 97
+[17:05:02.585] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:05:02.602] LOG: %cStart Phase FaintPhase color:green;
+[17:05:03.714] LOG: %cStart Phase MessagePhase color:green;
+[17:05:04.153] LOG: %cStart Phase VictoryPhase color:green;
+[17:05:04.153] LOG: %cStart Phase ExpPhase color:green;
+[17:05:04.153] LOG: Applied Super EXP. Charm 
+[17:05:04.153] LOG: Applied EXP. Charm 
+[17:05:04.677] LOG: %cStart Phase LevelUpPhase color:green;
+[17:05:05.331] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:05:05.332] LOG: Applied Super EXP. Charm 
+[17:05:05.333] LOG: Applied EXP. Charm 
+[17:05:05.567] LOG: %cStart Phase LevelUpPhase color:green;
+[17:05:06.037] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:05:06.118] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:05:06.119] LOG: Applied Super EXP. Charm 
+[17:05:06.119] LOG: Applied EXP. Charm 
+[17:05:06.354] LOG: %cStart Phase LevelUpPhase color:green;
+[17:05:06.695] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:05:06.776] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:05:06.776] LOG: Applied Super EXP. Charm 
+[17:05:06.776] LOG: Applied EXP. Charm 
+[17:05:07.013] LOG: %cStart Phase LevelUpPhase color:green;
+[17:05:07.463] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:05:07.544] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:05:07.544] LOG: Applied Super EXP. Charm 
+[17:05:07.545] LOG: Applied EXP. Charm 
+[17:05:07.546] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:05:07.546] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:05:07.546] LOG: Applied Super EXP. Charm 
+[17:05:07.546] LOG: Applied EXP. Charm 
+[17:05:07.547] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:05:07.549] LOG: %cStart Phase MoveEndPhase color:green;
+[17:05:07.550] LOG: %cStart Phase MovePhase color:green;
+[17:05:07.550] LOG: %cStart Phase MoveEndPhase color:green;
+[17:05:07.550] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:05:07.550] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:05:07.902] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:05:07.903] LOG: %cStart Phase BerryPhase color:green;
+[17:05:07.903] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:05:07.903] LOG: %cStart Phase TurnEndPhase color:green;
+[17:05:07.904] LOG: %cStart Phase PokemonHealPhase color:green;
+[17:05:07.904] LOG: %cStart Phase MessagePhase color:green;
+[17:05:08.209] LOG: %cStart Phase BattleEndPhase color:green;
+[17:05:08.209] LOG: Battle Score: 96 (1 Turns x1)
+[17:05:08.209] LOG: Total Score: 4305
+[17:05:08.225] LOG: %cStart Phase EggLapsePhase color:green;
+[17:05:08.225] LOG: %cStart Phase SelectModifierPhase color:green;
+[17:05:08.225] LOG: Wave Seed: ¬ªª¦¯iyg¢®«¬¥¬¨g~ 53
+[17:05:08.233] LOG: Applied Golden Poké Ball 
+[17:05:08.233] LOG: 1 0 [2,3,4,5]
+[17:05:08.233] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[17:05:08.234] LOG: 18 10 [2,3,4,5,6,7,8,9,10,16,23]
+[17:05:08.234] LOG: {"id":"TM_GREAT","localeKey":"","iconImage":"tm_fighting","group":"tm","soundName":"se/restore","tier":1,"moveId":612} 
+[17:05:08.234] LOG: 8 4 [2,3,4,5]
+[17:05:08.235] LOG: {"id":"BERRY","localeKey":"","iconImage":"apicot_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":6} 
+[17:05:08.235] LOG: 8 4 [2,3,4,5]
+[17:05:08.235] LOG: {"id":"BERRY","localeKey":"","iconImage":"starf_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":9} 
+[17:05:08.235] LOG: 7 4 [2,3,4,5]
+[17:05:08.236] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[17:05:08.236] LOG: 8 4 [2,3,4,5]
+[17:05:08.236] LOG: {"id":"BERRY","localeKey":"","iconImage":"liechi_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":3} 
+[17:05:08.237] LOG: 8 4 [2,3,4,5]
+[17:05:08.237] LOG: {"id":"BERRY","localeKey":"","iconImage":"starf_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":9} 
+[17:05:08.238] LOG: 7 4 [2,3,4,5]
+[17:05:08.239] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_def","soundName":"se/restore","tier":0,"stat":4,"nameKey":"x_sp_def","quantityKey":"percentage"} 
+[17:05:08.240] LOG: 7 4 [2,3,4,5]
+[17:05:08.240] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_attack","soundName":"se/restore","tier":0,"stat":1,"nameKey":"x_attack","quantityKey":"percentage"} 
+[17:05:08.241] LOG: 7 4 [2,3,4,5]
+[17:05:08.241] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_def","soundName":"se/restore","tier":0,"stat":4,"nameKey":"x_sp_def","quantityKey":"percentage"} 
+[17:05:08.241] LOG: 9 4 [2,3,4,5]
+[17:05:08.242] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_normal","group":"tm","soundName":"se/restore","tier":0,"moveId":164} 
+[17:05:08.242] LOG: 0 0 [2,3,4,5]
+[17:05:08.243] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[17:05:20.843] LOG: Applied Candy Jar 
+[17:05:20.853] LOG: %cStart Phase LevelUpPhase color:green;
+[17:05:21.580] LOG: %cStart Phase NewBattlePhase color:green;
+[17:05:21.580] LOG: Wave Seed: ­««§°jzh£¯¬­¦­©h 54
+[17:05:21.581] LOG: %cStart Phase NextEncounterPhase color:green;
+[17:05:21.588] LOG: Starting species pool tier: UNCOMMON
+[17:05:21.589] LOG: ER #395: substitution SHEDINJA trips the early BST gate; keeping NINCADA
+[17:05:21.594] LOG: Applied Shiny Charm 
+[17:05:21.637] LOG: Pokemon: Wild Nincada | Species ID: 290 | Level: 37 | Nature: Relaxed (+Def/-Spd)
+[17:05:21.637] LOG: Stats (IVs): HP: 76 (19), Atk: 56 (30), Def: 82 (9), Spatk: 38 (30), Spdef: 27 (0), Spd: 39 (8)
+[17:05:21.637] LOG: Ability: Anticipation | Passive Ability: Shed Skin 
+[17:05:21.637] LOG: Moveset: ["Fury Cutter","Sharpen","Silver Wind","Detect"]
+[17:05:22.318] LOG: Battle Seed: X3tJPUT5BPiLZIUN
+[17:05:22.397] DEBUG: Session data saved to slot 0!
+[17:05:22.397] LOG: Wave Seed: ­««§°jzh£¯¬­¦­©h 54
+[17:05:22.989] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[17:05:22.989] LOG: %cStart Phase CheckSwitchPhase color:green;
+[17:05:27.529] LOG: %cStart Phase InitEncounterPhase color:green;
+[17:05:27.529] LOG: %cStart Phase PostSummonPhase color:green;
+[17:05:27.530] LOG: Ran PSP for: Nincada
+[17:05:27.530] LOG: %cStart Phase PostSummonPhase color:green;
+[17:05:27.531] LOG: %cStart Phase PostSummonPhase color:green;
+[17:05:27.531] LOG: %cStart Phase TurnInitPhase color:green;
+[17:05:27.532] LOG: %cStart Phase CommandPhase color:green;
+[17:05:31.274] LOG: Move: CHIP_AWAY Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Piloswine
+[17:05:31.277] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:05:31.287] LOG: Move Pool: ["Fury Cutter","Sharpen","Silver Wind","Detect"]
+[17:05:31.287] LOG: Move Scores: [13.5,2,33,-20]
+[17:05:31.287] LOG: Sorted Move Pool: ["Silver Wind","Fury Cutter","Sharpen","Detect"]
+[17:05:31.287] LOG: Chosen Move: Silver Wind
+[17:05:31.287] LOG: %cStart Phase TurnStartPhase color:green;
+[17:05:31.292] LOG: %cStart Phase MovePhase color:green;
+[17:05:31.292] LOG: %cUser: Piloswine
+Move: CHIP_AWAY
+Use Mode: NORMAL color:orchid
+[17:05:31.295] LOG: %cStart Phase MessagePhase color:green;
+[17:05:31.433] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:05:31.650] LOG: crit stage: +0
+[17:05:31.654] LOG: Move: Chip Away | Base damage: 91.82439024390243 | Power: 75 | Source attack: 279 | Target defense: 82
+[17:05:31.656] LOG: Move: Chip Away | Attack damage: 64
+[17:05:31.656] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:05:31.669] LOG: %cStart Phase MoveEndPhase color:green;
+[17:05:31.669] LOG: %cStart Phase MovePhase color:green;
+[17:05:31.669] LOG: %cUser: Nincada
+Move: SILVER_WIND
+Use Mode: NORMAL color:orchid
+[17:05:31.675] LOG: %cStart Phase MessagePhase color:green;
+[17:05:31.838] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:05:31.850] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[17:05:31.879] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[17:05:31.906] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[17:05:31.921] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[17:05:31.942] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[17:05:31.971] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[17:05:31.979] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[17:05:32.005] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[17:05:32.038] WARN: Texture "%s" has no frame "%s" PRAS- Silver Wind 1
+[17:05:32.358] LOG: crit stage: +0
+[17:05:32.360] LOG: Move: Silver Wind | Base damage: 7.394929577464788 | Power: 60 | Source attack: 38 | Target defense: 142
+[17:05:32.360] LOG: Move: Silver Wind | Attack damage: 9
+[17:05:32.362] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:05:32.386] LOG: %cStart Phase MoveEndPhase color:green;
+[17:05:32.387] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:05:32.387] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:05:32.742] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:05:32.742] LOG: %cStart Phase BerryPhase color:green;
+[17:05:32.745] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:05:32.749] LOG: %cStart Phase TurnEndPhase color:green;
+[17:05:32.754] LOG: %cStart Phase PokemonHealPhase color:green;
+[17:05:32.912] LOG: %cStart Phase MessagePhase color:green;
+[17:05:33.218] LOG: %cStart Phase PokemonHealPhase color:green;
+[17:05:33.365] LOG: %cStart Phase MessagePhase color:green;
+[17:05:33.689] LOG: %cStart Phase TurnInitPhase color:green;
+[17:05:33.690] LOG: %cStart Phase CommandPhase color:green;
+[17:05:36.466] LOG: Move: ICE_FANG Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Piloswine
+[17:05:36.467] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:05:36.475] LOG: Battle Seed: X3tJPUT5BPiLZIUN
+[17:05:36.481] LOG: Move Pool: ["Fury Cutter","Sharpen","Silver Wind","Detect"]
+[17:05:36.481] LOG: Move Scores: [13.5,2,33,-20]
+[17:05:36.482] LOG: Sorted Move Pool: ["Silver Wind","Fury Cutter","Sharpen","Detect"]
+[17:05:36.482] LOG: Chosen Move: Silver Wind
+[17:05:36.482] LOG: %cStart Phase TurnStartPhase color:green;
+[17:05:36.487] LOG: %cStart Phase MovePhase color:green;
+[17:05:36.487] LOG: %cUser: Piloswine
+Move: ICE_FANG
+Use Mode: NORMAL color:orchid
+[17:05:36.489] LOG: %cStart Phase MessagePhase color:green;
+[17:05:36.620] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:05:36.795] LOG: crit stage: +0
+[17:05:36.802] LOG: Move: Ice Fang | Base damage: 97.81268292682927 | Power: 80 | Source attack: 279 | Target defense: 82
+[17:05:36.804] LOG: Move: Ice Fang | Attack damage: 52
+[17:05:36.805] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:05:36.816] LOG: %cStart Phase MessagePhase color:green;
+[17:05:37.127] LOG: %cStart Phase ShowAbilityPhase color:green;
+[17:05:37.348] LOG: %cStart Phase StatStageChangePhase color:green;
+[17:05:37.605] LOG: %cStart Phase MessagePhase color:green;
+[17:05:37.904] LOG: %cStart Phase HideAbilityPhase color:green;
+[17:05:37.945] LOG: %cStart Phase FaintPhase color:green;
+[17:05:38.666] LOG: %cStart Phase MessagePhase color:green;
+[17:05:38.771] LOG: %cStart Phase VictoryPhase color:green;
+[17:05:38.771] LOG: %cStart Phase ExpPhase color:green;
+[17:05:38.772] LOG: Applied Super EXP. Charm 
+[17:05:38.772] LOG: Applied EXP. Charm 
+[17:05:39.328] LOG: %cStart Phase LevelUpPhase color:green;
+[17:05:40.037] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:05:40.038] LOG: Applied Super EXP. Charm 
+[17:05:40.038] LOG: Applied EXP. Charm 
+[17:05:40.039] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:05:40.039] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:05:40.039] LOG: Applied Super EXP. Charm 
+[17:05:40.040] LOG: Applied EXP. Charm 
+[17:05:40.040] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:05:40.041] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:05:40.041] LOG: Applied Super EXP. Charm 
+[17:05:40.041] LOG: Applied EXP. Charm 
+[17:05:40.042] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:05:40.042] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:05:40.042] LOG: Applied Super EXP. Charm 
+[17:05:40.042] LOG: Applied EXP. Charm 
+[17:05:40.042] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:05:40.042] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:05:40.043] LOG: Applied Super EXP. Charm 
+[17:05:40.043] LOG: Applied EXP. Charm 
+[17:05:40.271] LOG: %cStart Phase LevelUpPhase color:green;
+[17:05:40.884] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:05:40.963] LOG: %cStart Phase MoveEndPhase color:green;
+[17:05:40.963] LOG: %cStart Phase MovePhase color:green;
+[17:05:40.963] LOG: %cStart Phase MoveEndPhase color:green;
+[17:05:40.964] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:05:40.964] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:05:41.323] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:05:41.323] LOG: %cStart Phase BerryPhase color:green;
+[17:05:41.326] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:05:41.327] LOG: %cStart Phase TurnEndPhase color:green;
+[17:05:41.330] LOG: %cStart Phase PokemonHealPhase color:green;
+[17:05:41.467] LOG: %cStart Phase MessagePhase color:green;
+[17:05:41.774] LOG: %cStart Phase BattleEndPhase color:green;
+[17:05:41.774] LOG: Battle Score: 36 (2 Turns x0.84)
+[17:05:41.774] LOG: Total Score: 4341
+[17:05:41.793] LOG: %cStart Phase EggLapsePhase color:green;
+[17:05:41.793] LOG: %cStart Phase SelectModifierPhase color:green;
+[17:05:41.793] LOG: Wave Seed: ­««§°jzh£¯¬­¦­©h 54
+[17:05:41.800] LOG: Applied Golden Poké Ball 
+[17:05:41.800] LOG: 7 4 [2,3,4,5]
+[17:05:41.801] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[17:05:41.801] LOG: 7 4 [2,3,4,5]
+[17:05:41.801] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[17:05:41.801] LOG: 0 0 [2,3,4,5]
+[17:05:41.801] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[17:05:41.801] LOG: 0 0 [2,3,4,5]
+[17:05:41.801] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[17:05:41.802] LOG: 6 4 [2,3,4,5]
+[17:05:41.802] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[17:05:41.802] LOG: 7 4 [2,3,4,5]
+[17:05:41.802] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[17:05:41.803] LOG: 6 4 [2,3,4,5]
+[17:05:41.803] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[17:05:41.803] LOG: 7 4 [2,3,4,5]
+[17:05:41.803] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[17:05:41.803] LOG: 0 0 [2,3,4,5]
+[17:05:41.803] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[17:05:41.804] LOG: 9 4 [2,3,4,5]
+[17:05:41.804] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_normal","group":"tm","soundName":"se/restore","tier":0,"moveId":182} 
