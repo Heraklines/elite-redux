@@ -511,8 +511,10 @@ export class GameData {
 
     const cachedSystem = localStorage.getItem(`data_${loggedInUser?.username}`);
     return await this.initSystem(
+      // Route through decrypt() (not raw AES) so a compressed local cache (#631)
+      // is decompressed; legacy plaintext caches pass through unchanged.
       saveDataOrErr,
-      cachedSystem ? AES.decrypt(cachedSystem, saveKey).toString(enc.Utf8) : undefined,
+      cachedSystem ? decrypt(cachedSystem, bypassLogin) : undefined,
     );
   }
 

@@ -2,6 +2,20 @@ import { loggedInUser } from "#app/account";
 import { saveKey } from "#app/constants";
 import type { Starter, StarterAttributes } from "#types/save-data";
 import { AES, enc } from "crypto-js";
+import { compressToBase64, decompressFromBase64 } from "lz-string";
+
+/**
+ * Marker prefixing a COMPRESSED save payload (#629/#631). The client used to
+ * write the save to localStorage uncompressed (AES- or base64-encoded JSON, which
+ * INFLATES it), while the cloud worker gzips ~12x - so big saves (large egg
+ * backlogs) blew the ~5MB localStorage quota ("save too large, e.g. too many
+ * eggs"). We now LZ-compress the JSON before the existing transport (AES for
+ * logged-in, base64 for guest). The marker lets {@linkcode decrypt} tell a
+ * compressed payload from a legacy plaintext one, so existing saves keep loading
+ * and only re-compress on their next write. ":" is not a base64 character, so a
+ * legacy base64/AES blob can never begin with this prefix.
+ */
+const SAVE_COMPRESS_PREFIX = "LZ1:";
 
 /**
  * Perform a deep copy of an object.
@@ -45,17 +59,29 @@ export function deepMergeSpriteData(dest: object, source: object) {
 }
 
 export function encrypt(data: string, bypassLogin: boolean): string {
+  // Compress the JSON first (huge for big saves), then apply the existing
+  // transport. The compressed payload is ASCII base64, safe through both btoa and
+  // crypto-js's UTF-8 AES.
+  const payload = SAVE_COMPRESS_PREFIX + compressToBase64(data);
   if (bypassLogin) {
-    return btoa(encodeURIComponent(data));
+    return payload;
   }
-  return AES.encrypt(data, saveKey).toString();
+  return AES.encrypt(payload, saveKey).toString();
 }
 
 export function decrypt(data: string, bypassLogin: boolean): string {
   if (bypassLogin) {
-    return decodeURIComponent(atob(data));
+    // New (compressed) guest saves are stored as the bare marked payload; legacy
+    // guest saves are btoa(encodeURIComponent(json)).
+    return data.startsWith(SAVE_COMPRESS_PREFIX)
+      ? (decompressFromBase64(data.slice(SAVE_COMPRESS_PREFIX.length)) ?? "")
+      : decodeURIComponent(atob(data));
   }
-  return AES.decrypt(data, saveKey).toString(enc.Utf8);
+  const plain = AES.decrypt(data, saveKey).toString(enc.Utf8);
+  // Legacy AES saves decrypt straight to JSON; new ones to the marked payload.
+  return plain.startsWith(SAVE_COMPRESS_PREFIX)
+    ? (decompressFromBase64(plain.slice(SAVE_COMPRESS_PREFIX.length)) ?? "")
+    : plain;
 }
 
 /**
