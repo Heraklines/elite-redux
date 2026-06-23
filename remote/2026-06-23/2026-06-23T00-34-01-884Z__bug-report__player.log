@@ -1,0 +1,272 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:104  difficulty:youngster
+seed:     RhgvpzLkCFF4NcCafWRdlT7Q
+party:    Sharpedo(L93 262/262), Pentawug(L89 154/250), Kecleon(L86 246/246), Mr. Rime(L80 242/242), Basculegion(L85 323/323), Ribombee(L87 238/238)
+
+----- DESCRIPTION -----
+Multi-headed did not activate after using Accelerate boosted Dive, probably leftover from it being considered a two-turn move
+
+----- CONSOLE -----
+[00:29:19.021] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.021] LOG: 1 0 [2,3,4,5]
+[00:29:19.021] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[00:29:19.021] LOG: 7 4 [2,3,4,5]
+[00:29:19.021] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[00:29:19.021] LOG: 6 4 [2,3,4,5]
+[00:29:19.021] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[00:29:19.021] LOG: 0 0 [2,3,4,5]
+[00:29:19.021] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.022] LOG: 1 0 [2,3,4,5]
+[00:29:19.022] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[00:29:19.022] LOG: 7 4 [2,3,4,5]
+[00:29:19.022] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[00:29:19.022] LOG: 1 0 [2,3,4,5]
+[00:29:19.022] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[00:29:19.022] LOG: 1 0 [2,3,4,5]
+[00:29:19.022] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[00:29:19.022] LOG: 7 4 [2,3,4,5]
+[00:29:19.022] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[00:29:19.022] LOG: 0 0 [2,3,4,5]
+[00:29:19.022] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.022] LOG: 9 4 [2,3,4,5]
+[00:29:19.022] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_water","group":"tm","soundName":"se/restore","tier":0,"moveId":812} 
+[00:29:19.022] LOG: 8 4 [2,3,4,5]
+[00:29:19.022] LOG: {"id":"BERRY","localeKey":"","iconImage":"liechi_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":3} 
+[00:29:19.023] LOG: 0 0 [2,3,4,5]
+[00:29:19.023] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.023] LOG: 6 4 [2,3,4,5]
+[00:29:19.023] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[00:29:19.023] LOG: 6 4 [2,3,4,5]
+[00:29:19.023] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[00:29:19.023] LOG: 9 4 [2,3,4,5]
+[00:29:19.023] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_normal","group":"tm","soundName":"se/restore","tier":0,"moveId":219} 
+[00:29:19.023] LOG: 9 4 [2,3,4,5]
+[00:29:19.023] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_ice","group":"tm","soundName":"se/restore","tier":0,"moveId":258} 
+[00:29:19.024] LOG: 8 4 [2,3,4,5]
+[00:29:19.024] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} 
+[00:29:19.024] LOG: 0 0 [2,3,4,5]
+[00:29:19.024] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.024] LOG: 8 4 [2,3,4,5]
+[00:29:19.024] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} 
+[00:29:19.024] LOG: 0 0 [2,3,4,5]
+[00:29:19.024] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.024] LOG: 0 0 [2,3,4,5]
+[00:29:19.024] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.024] LOG: 0 0 [2,3,4,5]
+[00:29:19.024] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.025] LOG: 6 4 [2,3,4,5]
+[00:29:19.025] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[00:29:19.025] LOG: 7 4 [2,3,4,5]
+[00:29:19.025] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[00:29:19.025] LOG: 0 0 [2,3,4,5]
+[00:29:19.025] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.025] LOG: 0 0 [2,3,4,5]
+[00:29:19.025] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.025] LOG: 7 4 [2,3,4,5]
+[00:29:19.025] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_accuracy","soundName":"se/restore","tier":0,"stat":6,"nameKey":"x_accuracy","quantityKey":"stage"} 
+[00:29:19.025] LOG: 1 0 [2,3,4,5]
+[00:29:19.025] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[00:29:19.025] LOG: 8 4 [2,3,4,5]
+[00:29:19.025] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} 
+[00:29:19.025] LOG: 0 0 [2,3,4,5]
+[00:29:19.025] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.025] LOG: 0 0 [2,3,4,5]
+[00:29:19.025] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.026] LOG: 0 0 [2,3,4,5]
+[00:29:19.026] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.026] LOG: 8 4 [2,3,4,5]
+[00:29:19.026] LOG: {"id":"BERRY","localeKey":"","iconImage":"liechi_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":3} 
+[00:29:19.026] LOG: 0 0 [2,3,4,5]
+[00:29:19.026] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.026] LOG: 7 4 [2,3,4,5]
+[00:29:19.026] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[00:29:19.026] LOG: 7 4 [2,3,4,5]
+[00:29:19.026] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_def","soundName":"se/restore","tier":0,"stat":4,"nameKey":"x_sp_def","quantityKey":"percentage"} 
+[00:29:19.026] LOG: 0 0 [2,3,4,5]
+[00:29:19.026] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.026] LOG: 0 0 [2,3,4,5]
+[00:29:19.026] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.026] LOG: 1 0 [2,3,4,5]
+[00:29:19.026] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[00:29:19.026] LOG: 0 0 [2,3,4,5]
+[00:29:19.026] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:19.027] LOG: 0 0 [2,3,4,5]
+[00:29:19.027] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:29.591] WARN: cry/10075 not found
+[00:29:43.495] LOG: Applied Protein 
+[00:29:43.496] LOG: Applied HP Up 
+[00:29:43.497] LOG: Applied Calcium 
+[00:29:43.497] LOG: Applied HP Up 
+[00:29:43.506] LOG: %cStart Phase NewBattlePhase color:green;
+[00:29:43.506] LOG: Wave Seed: ºÐÏÞØâ´Ó«®®¶Ë«ÉÎ¿ºÌÔ¼¹ 104
+[00:29:43.506] LOG: Applied Super Lure 
+[00:29:43.506] LOG: Applied Max Lure 
+[00:29:43.506] LOG: %cStart Phase NextEncounterPhase color:green;
+[00:29:43.507] LOG: Starting species pool tier: COMMON
+[00:29:43.507] LOG: Replaced PETILIL with LILLIGANT
+[00:29:43.514] LOG: Pokemon: Wild Lilligant | Species ID: 549 | Level: 72 | Nature: Quirky (-)
+[00:29:43.514] LOG: Stats (IVs): HP: 219 (31), Atk: 111 (28), Def: 141 (29), Spatk: 181 (25), Spdef: 129 (13), Spd: 149 (20)
+[00:29:43.514] LOG: Ability: Solar Power | Passive Ability: Chlorophyll 
+[00:29:43.514] LOG: Moveset: ["Leaf Storm","Encore","Quiver Dance","Synthesis"]
+[00:29:43.514] LOG: Starting species pool tier: COMMON
+[00:29:43.514] LOG: Replaced VENIPEDE with SCOLIPEDE
+[00:29:43.520] LOG: Pokemon: Wild Scolipede | Species ID: 545 | Level: 70 | Nature: Naughty (+Atk/-SpDef)
+[00:29:43.520] LOG: Stats (IVs): HP: 212 (9), Atk: 179 (25), Def: 151 (17), Spatk: 84 (4), Spdef: 103 (20), Spd: 184 (26)
+[00:29:43.520] LOG: Ability: Predator | Passive Ability: Hemotoxin 
+[00:29:43.523] LOG: Moveset: ["Fury Cutter","King’s Shield","Lunge","Horn Leech"]
+[00:29:43.942] LOG: Battle Seed: avx05V4aKrHL1fHd
+[00:29:44.001] DEBUG: Session data saved to slot 3!
+[00:29:44.001] LOG: Wave Seed: ºÐÏÞØâ´Ó«®®¶Ë«ÉÎ¿ºÌÔ¼¹ 104
+[00:29:44.204] WARN: cry/545 not found
+[00:29:44.455] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[00:29:44.455] LOG: %cStart Phase CheckSwitchPhase color:green;
+[00:29:46.138] LOG: %cStart Phase CheckSwitchPhase color:green;
+[00:29:46.512] LOG: %cStart Phase InitEncounterPhase color:green;
+[00:29:46.514] LOG: %cStart Phase PostSummonPhase color:green;
+[00:29:46.514] LOG: Ran PSP for: Scolipede
+[00:29:46.515] LOG: %cStart Phase PostSummonPhase color:green;
+[00:29:46.516] LOG: %cStart Phase PostSummonPhase color:green;
+[00:29:46.516] LOG: %cStart Phase PostSummonPhase color:green;
+[00:29:46.516] LOG: Ran PSP for: Lilligant
+[00:29:46.517] LOG: %cStart Phase PostSummonPhase color:green;
+[00:29:46.517] LOG: %cStart Phase PostSummonPhase color:green;
+[00:29:46.517] LOG: %cStart Phase TurnInitPhase color:green;
+[00:29:46.517] LOG: %cStart Phase CommandPhase color:green;
+[00:29:48.393] LOG: Move: FISHIOUS_REND Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Sharpedo
+[00:29:48.395] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:29:48.760] LOG: %cStart Phase CommandPhase color:green;
+[00:29:49.968] LOG: Move: DIVE Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Pentawug
+[00:29:49.970] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:29:50.452] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:29:50.464] LOG: Move Pool: ["Leaf Storm","Encore","Quiver Dance","Synthesis"]
+[00:29:50.464] LOG: Move Scores: [18.75,2,4,-7]
+[00:29:50.464] LOG: Sorted Move Pool: ["Leaf Storm","Quiver Dance","Encore","Synthesis"]
+[00:29:50.464] LOG: Chosen Move: Quiver Dance
+[00:29:50.464] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:29:50.475] WARN: BattlerTag KINGS_SHIELD is missing a score!
+[00:29:50.478] WARN: BattlerTag KINGS_SHIELD is missing a score!
+[00:29:50.479] LOG: Move Pool: ["Fury Cutter","King’s Shield","Lunge","Horn Leech"]
+[00:29:50.479] LOG: Move Scores: [13.5,-20,27,7]
+[00:29:50.479] LOG: Sorted Move Pool: ["Lunge","Fury Cutter","Horn Leech","King’s Shield"]
+[00:29:50.479] LOG: Chosen Move: Lunge
+[00:29:50.479] LOG: %cStart Phase TurnStartPhase color:green;
+[00:29:50.486] LOG: %cStart Phase MovePhase color:green;
+[00:29:50.486] LOG: %cUser: Scolipede
+Move: LUNGE
+Use Mode: NORMAL color:orchid
+[00:29:50.491] LOG: %cStart Phase MessagePhase color:green;
+[00:29:50.570] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:29:50.887] LOG: crit stage: +0
+[00:29:50.890] LOG: Move: Lunge | Base damage: 53.75903614457831 | Power: 80 | Source attack: 179 | Target defense: 166
+[00:29:50.891] LOG: Move: Lunge | Attack damage: 79
+[00:29:50.892] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:29:51.055] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:29:51.105] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:29:51.140] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:29:51.324] LOG: %cStart Phase MessagePhase color:green;
+[00:29:51.536] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:29:51.854] LOG: crit stage: +0
+[00:29:51.857] LOG: Move: Lunge | Base damage: 53.75903614457831 | Power: 80 | Source attack: 179 | Target defense: 166
+[00:29:51.858] LOG: Move: Lunge | Attack damage: 17
+[00:29:51.859] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:29:51.889] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:29:52.073] LOG: %cStart Phase MessagePhase color:green;
+[00:29:52.286] LOG: %cStart Phase MessagePhase color:green;
+[00:29:52.503] LOG: %cStart Phase MoveEndPhase color:green;
+[00:29:52.506] LOG: %cStart Phase MovePhase color:green;
+[00:29:52.507] LOG: %cUser: Pentawug
+Move: DIVE
+Use Mode: NORMAL color:orchid
+[00:29:52.514] LOG: %cStart Phase MessagePhase color:green;
+[00:29:52.620] LOG: %cStart Phase MoveChargePhase color:green;
+[00:29:52.957] LOG: %cStart Phase MessagePhase color:green;
+[00:29:53.190] LOG: %cStart Phase MovePhase color:green;
+[00:29:53.190] LOG: %cUser: Pentawug
+Move: DIVE
+Use Mode: IGNORE_PP color:orchid
+[00:29:53.203] LOG: %cStart Phase MessagePhase color:green;
+[00:29:53.303] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:29:53.747] LOG: crit stage: +0
+[00:29:53.750] LOG: Move: Dive | Base damage: 112.93245033112582 | Power: 165 | Source attack: 135 | Target defense: 151
+[00:29:53.750] LOG: Move: Dive | Attack damage: 152
+[00:29:53.754] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:29:53.781] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:29:53.947] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[00:29:54.330] LOG: %cStart Phase MessagePhase color:green;
+[00:29:54.562] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:29:54.598] LOG: %cStart Phase MoveEndPhase color:green;
+[00:29:54.598] LOG: %cStart Phase MessagePhase color:green;
+[00:29:54.830] LOG: %cStart Phase MovePhase color:green;
+[00:29:54.830] LOG: %cUser: Sharpedo
+Move: FISHIOUS_REND
+Use Mode: NORMAL color:orchid
+[00:29:54.842] LOG: %cStart Phase MessagePhase color:green;
+[00:29:54.978] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:29:54.979] LOG: Applied Multi Lens 
+[00:29:54.980] LOG: Applied Wide Lens 
+[00:29:55.446] LOG: Applied Scope Lens 
+[00:29:55.446] LOG: crit stage: +1
+[00:29:55.449] LOG: Move: Fishious Rend | Base damage: 378.0197446808511 | Power: 221 | Source attack: 306 | Target defense: 141
+[00:29:55.450] LOG: Applied Multi Lens 
+[00:29:55.450] LOG: Move: Fishious Rend | Attack damage: 765
+[00:29:55.450] LOG: Applied Amulet Coin 
+[00:29:55.452] LOG: Applied Golden Punch 
+[00:29:55.453] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:29:55.596] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:29:55.647] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:29:55.682] LOG: %cStart Phase MessagePhase color:green;
+[00:29:55.912] LOG: %cStart Phase MessagePhase color:green;
+[00:29:56.112] LOG: %cStart Phase FaintPhase color:green;
+[00:29:57.799] LOG: %cStart Phase MessagePhase color:green;
+[00:29:57.967] LOG: %cStart Phase VictoryPhase color:green;
+[00:29:57.967] LOG: Applied Soothe Bell 
+[00:29:57.968] LOG: Applied Soothe Bell 
+[00:29:57.968] LOG: %cStart Phase ExpPhase color:green;
+[00:29:57.968] LOG: Applied Super EXP. Charm 
+[00:29:57.968] LOG: Applied EXP. Charm 
+[00:29:58.230] LOG: %cStart Phase ExpPhase color:green;
+[00:29:58.230] LOG: Applied Super EXP. Charm 
+[00:29:58.230] LOG: Applied EXP. Charm 
+[00:29:58.780] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:29:58.780] LOG: Applied Super EXP. Charm 
+[00:29:58.780] LOG: Applied EXP. Charm 
+[00:29:58.780] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:29:58.780] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:29:58.780] LOG: Applied Super EXP. Charm 
+[00:29:58.780] LOG: Applied EXP. Charm 
+[00:29:58.781] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:29:58.781] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:29:58.781] LOG: Applied Super EXP. Charm 
+[00:29:58.781] LOG: Applied EXP. Charm 
+[00:29:58.781] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:29:58.781] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:29:58.781] LOG: Applied Super EXP. Charm 
+[00:29:58.781] LOG: Applied EXP. Charm 
+[00:29:58.781] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:29:58.781] LOG: %cStart Phase MoveEndPhase color:green;
+[00:29:58.781] LOG: %cStart Phase MessagePhase color:green;
+[00:29:59.020] LOG: %cStart Phase MovePhase color:green;
+[00:29:59.020] LOG: %cStart Phase MoveEndPhase color:green;
+[00:29:59.020] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:29:59.020] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:29:59.020] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:29:59.020] LOG: %cStart Phase BerryPhase color:green;
+[00:29:59.024] LOG: Applied Lum Berry 
+[00:29:59.024] LOG: Applied Protein 
+[00:29:59.024] LOG: Applied HP Up 
+[00:29:59.025] LOG: Applied Calcium 
+[00:29:59.025] LOG: Applied HP Up 
+[00:29:59.035] LOG: %cStart Phase CommonAnimPhase color:green;
+[00:29:59.354] LOG: %cStart Phase MessagePhase color:green;
+[00:29:59.603] LOG: %cStart Phase ResetStatusPhase color:green;
+[00:29:59.604] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:29:59.607] LOG: %cStart Phase TurnEndPhase color:green;
+[00:29:59.610] LOG: %cStart Phase TurnInitPhase color:green;
+[00:29:59.610] LOG: %cStart Phase CommandPhase color:green;
+[00:31:18.901] WARN: WebGL Context lost. Renderer disabled
+[00:31:21.622] WARN: WebGL Context restored. Renderer running again.
