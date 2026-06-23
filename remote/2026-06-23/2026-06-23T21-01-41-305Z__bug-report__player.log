@@ -1,0 +1,273 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:99  difficulty:youngster
+seed:     gOL12ORw9FiRpnNoXiTiORPd
+party:    Musharna(L84 314/314), Gengar(L84 0/229), Kecleon(L84 220/220), Slaking(L84 334/334), Greninja(L84 240/240), Weezing(L84 276/276)
+
+----- DESCRIPTION -----
+Coil Up is meant to work on tbe first biting move even if it fails but seems to persist until it lands a biting move here
+
+----- CONSOLE -----
+[20:59:52.897] LOG: 24 5 [9,11,12,13,15,25]
+[20:59:52.897] LOG: {"id":"EXP_SHARE","localeKey":"modifierType:ModifierType.EXP_SHARE","iconImage":"exp_share","soundName":"se/restore","tier":2} 
+[20:59:52.897] LOG: 27 6 [9,11,12,13,15,25]
+[20:59:52.897] LOG: {"id":"WIDE_LENS","localeKey":"modifierType:ModifierType.WIDE_LENS","iconImage":"wide_lens","soundName":"se/restore","tier":2,"amount":5} 
+[20:59:52.897] LOG: 27 6 [9,11,12,13,15,25]
+[20:59:52.897] LOG: {"id":"WIDE_LENS","localeKey":"modifierType:ModifierType.WIDE_LENS","iconImage":"wide_lens","soundName":"se/restore","tier":2,"amount":5} 
+[20:59:52.897] LOG: 18 5 [9,11,12,13,15,25]
+[20:59:52.897] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"silk_scarf","soundName":"se/restore","tier":2,"moveType":0,"boostPercent":20} 
+[20:59:52.897] LOG: 0 0 [9,11,12,13,15,25]
+[20:59:52.897] LOG: {"id":"ULTRA_BALL","localeKey":"","iconImage":"ub","group":"pb","soundName":"se/pb_bounce_1","tier":2,"pokeballType":2,"count":5} 
+[20:59:52.898] LOG: 10 1 [9,11,12,13,15,25]
+[20:59:52.898] LOG: ULTRA 1
+[20:59:52.898] LOG: 34 6 [9,11,12,13,15,25]
+[20:59:52.898] LOG: {"id":"ER_DEX_NAV","localeKey":"","iconImage":"dex_nav","soundName":"se/restore","tier":2} 
+[20:59:52.898] LOG: 8 0 [9,11,12,13,15,25]
+[20:59:52.898] LOG: {"id":"AMULET_COIN","localeKey":"modifierType:ModifierType.AMULET_COIN","iconImage":"amulet_coin","soundName":"se/restore","tier":2} 
+[20:59:52.898] LOG: 28 6 [9,11,12,13,15,25]
+[20:59:52.898] LOG: {"id":"ER_CHILI_SAMPLE","localeKey":"","iconImage":"charcoal","iconTint":16733491,"soundName":"se/restore","tier":2} 
+[20:59:52.898] LOG: 34 6 [9,11,12,13,15,25]
+[20:59:52.898] LOG: {"id":"ER_DEX_NAV","localeKey":"","iconImage":"dex_nav","soundName":"se/restore","tier":2} 
+[20:59:52.898] LOG: 7 0 [9,11,12,13,15,25]
+[20:59:52.898] LOG: ULTRA 1
+[20:59:52.898] LOG: 0 0 [9,11,12,13,15,25]
+[20:59:52.898] LOG: {"id":"ULTRA_BALL","localeKey":"","iconImage":"ub","group":"pb","soundName":"se/pb_bounce_1","tier":2,"pokeballType":2,"count":5} 
+[20:59:52.898] LOG: 0 0 [9,11,12,13,15,25]
+[20:59:52.898] LOG: {"id":"ULTRA_BALL","localeKey":"","iconImage":"ub","group":"pb","soundName":"se/pb_bounce_1","tier":2,"pokeballType":2,"count":5} 
+[20:59:52.898] LOG: 6 0 [9,11,12,13,15,25]
+[20:59:52.898] LOG: ULTRA 1
+[20:59:52.898] LOG: 30 6 [9,11,12,13,15,25]
+[20:59:52.898] LOG: {"id":"ER_RUSTY_CLAW","localeKey":"","iconImage":"quick_claw","iconTint":10115891,"soundName":"se/restore","tier":2} 
+[20:59:52.898] LOG: 1 0 [9,11,12,13,15,25]
+[20:59:52.898] LOG: {"id":"MAX_LURE","localeKey":"modifierType:ModifierType.MAX_LURE","iconImage":"max_lure","group":"lure","soundName":"se/restore","tier":2,"maxBattles":30} 
+[20:59:52.899] LOG: 19 5 [9,11,12,13,15,25]
+[20:59:52.899] LOG: {"id":"TM_ULTRA","localeKey":"","iconImage":"tm_fighting","group":"tm","soundName":"se/restore","tier":2,"moveId":69} 
+[20:59:55.412] LOG: Applied Carbos 
+[20:59:55.413] LOG: Applied Zinc 
+[20:59:55.413] LOG: Applied Carbos 
+[20:59:55.414] LOG: Applied Protein 
+[20:59:55.414] LOG: Applied Protein 
+[20:59:55.414] LOG: Applied Zinc 
+[20:59:55.414] LOG: Applied HP Up 
+[20:59:55.424] LOG: %cStart Phase NewBattlePhase color:green;
+[20:59:55.424] LOG: Wave Seed: Ê²¯²µÚ©ÌµÓÑ±Ò»Ì·Ì²µ³Ç 99
+[20:59:55.424] LOG: Applied Lure 
+[20:59:55.425] LOG: %cStart Phase NextEncounterPhase color:green;
+[20:59:55.426] LOG: Starting species pool tier: COMMON
+[20:59:55.426] LOG: Replaced EKANS with ARBOK
+[20:59:55.428] LOG: Applied Shiny Charm 
+[20:59:55.435] LOG: Pokemon: Wild Arbok | Species ID: 24 | Level: 73 | Nature: Bashful (-)
+[20:59:55.435] LOG: Stats (IVs): HP: 215 (2), Atk: 167 (13), Def: 145 (25), Spatk: 110 (14), Spdef: 129 (3), Spd: 130 (12)
+[20:59:55.435] LOG: Ability: Ambush | Passive Ability: Solenoglyphs 
+[20:59:55.435] LOG: Moveset: ["Poison Fang","Venoshock","Draconic Fangs","Mystic Dance"]
+[20:59:56.045] LOG: Battle Seed: cxL95rPCbdtLdgbF
+[20:59:56.111] DEBUG: Session data saved to slot 3!
+[20:59:56.111] LOG: Wave Seed: Ê²¯²µÚ©ÌµÓÑ±Ò»Ì·Ì²µ³Ç 99
+[20:59:56.532] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[20:59:56.533] LOG: %cStart Phase CheckSwitchPhase color:green;
+[20:59:56.824] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:59:56.825] LOG: %cStart Phase PostSummonPhase color:green;
+[20:59:56.825] LOG: Ran PSP for: Arbok
+[20:59:56.825] LOG: %cStart Phase PostSummonPhase color:green;
+[20:59:56.825] LOG: %cStart Phase PostSummonPhase color:green;
+[20:59:56.825] LOG: %cStart Phase TurnInitPhase color:green;
+[20:59:56.825] LOG: %cStart Phase CommandPhase color:green;
+[20:59:57.979] LOG: Move: SHADOW_BALL Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Gengar
+[20:59:57.982] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:59:57.986] LOG: Move Pool: ["Poison Fang"]
+[20:59:57.986] LOG: Move Scores: [300]
+[20:59:57.986] LOG: Sorted Move Pool: ["Poison Fang"]
+[20:59:57.986] LOG: Chosen Move: Poison Fang
+[20:59:57.986] LOG: %cStart Phase TurnStartPhase color:green;
+[20:59:57.988] LOG: %cStart Phase MovePhase color:green;
+[20:59:57.988] LOG: %cUser: Arbok
+Move: POISON_FANG
+Use Mode: NORMAL color:orchid
+[20:59:57.990] LOG: %cStart Phase MessagePhase color:green;
+[20:59:58.106] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:59:58.524] LOG: crit stage: +0
+[20:59:58.526] LOG: Move: Poison Fang | Base damage: 57.68366412213741 | Power: 70 | Source attack: 167 | Target defense: 131
+[20:59:58.527] LOG: Move: Poison Fang | Attack damage: 519
+[20:59:58.529] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:59:58.558] LOG: %cStart Phase MessagePhase color:green;
+[20:59:58.756] LOG: %cStart Phase MessagePhase color:green;
+[20:59:58.973] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:59:59.141] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:59:59.190] LOG: %cStart Phase FaintPhase color:green;
+[21:00:00.348] LOG: %cStart Phase MessagePhase color:green;
+[21:00:00.477] LOG: %cStart Phase MoveEndPhase color:green;
+[21:00:00.477] LOG: %cStart Phase MovePhase color:green;
+[21:00:00.478] LOG: %cStart Phase MoveEndPhase color:green;
+[21:00:00.478] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:00:00.478] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:00:00.548] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:00:00.548] LOG: %cStart Phase BerryPhase color:green;
+[21:00:00.548] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:00:00.548] LOG: %cStart Phase TurnEndPhase color:green;
+[21:00:00.553] LOG: %cStart Phase SwitchPhase color:green;
+[21:00:01.276] LOG: %cStart Phase SwitchSummonPhase color:green;
+[21:00:01.364] LOG: Applied Protein 
+[21:00:01.365] LOG: Applied Zinc 
+[21:00:01.365] LOG: Applied Carbos 
+[21:00:01.365] LOG: Applied Carbos 
+[21:00:01.365] LOG: Applied Protein 
+[21:00:01.365] LOG: Applied Zinc 
+[21:00:01.365] LOG: Applied HP Up 
+[21:00:01.514] LOG: %cStart Phase PostSummonPhase color:green;
+[21:00:01.514] LOG: Ran PSP for: Slaking
+[21:00:01.514] LOG: %cStart Phase PostSummonPhase color:green;
+[21:00:01.514] LOG: %cStart Phase PostSummonPhase color:green;
+[21:00:01.515] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:00:01.690] LOG: %cStart Phase MessagePhase color:green;
+[21:00:01.922] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:00:01.948] LOG: %cStart Phase TurnInitPhase color:green;
+[21:00:01.948] LOG: %cStart Phase CommandPhase color:green;
+[21:00:03.301] DEBUG: Session data saved to slot 3!
+[21:00:04.587] LOG: Seed: KN8EdSCBKAisecZ4j07Onbqa
+[21:00:04.587] LOG: Wave Seed: KN8EdSCBKAisecZ4j07Onbqa 0
+[21:00:04.732] WARN: AnimationManager key already exists: prompt
+[21:00:04.732] WARN: AnimationManager key already exists: tera_sparkle
+[21:00:04.732] LOG: Seed: QB0kjSDU6w44cGS2ha15FTjp
+[21:00:04.732] LOG: Wave Seed: QB0kjSDU6w44cGS2ha15FTjp 0
+[21:00:06.824] LOG: %cStart Phase LoginPhase color:green;
+[21:00:07.306] LOG: Client Session: QZQt1pZRTgx8INDMibwzAWk42w0iyoOw
+[21:00:07.687] LOG: %cStart Phase TitlePhase color:green;
+[21:00:07.687] LOG: Getting Session Slot id: %d 3
+[21:00:07.690] LOG: use seasonal splash messages true
+[21:00:07.691] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[21:00:08.773] LOG: Getting Session Slot id: %d 3
+[21:00:08.777] LOG: Wave Seed: gOL12ORw9FiRpnNoXiTiORPd 0
+[21:00:08.777] LOG: Seed: gOL12ORw9FiRpnNoXiTiORPd
+[21:00:08.798] LOG: Wave Seed: Ê²¯²µÚ©ÌµÓÑ±Ò»Ì·Ì²µ³Ç 99
+[21:00:08.812] LOG: Applied Carbos 
+[21:00:08.812] LOG: Applied Zinc 
+[21:00:08.812] LOG: Applied Carbos 
+[21:00:08.812] LOG: Applied Protein 
+[21:00:08.812] LOG: Applied Protein 
+[21:00:08.812] LOG: Applied Zinc 
+[21:00:08.812] LOG: Applied HP Up 
+[21:00:08.814] LOG: Applied Carbos 
+[21:00:08.814] LOG: Applied Zinc 
+[21:00:08.814] LOG: Applied Carbos 
+[21:00:08.814] LOG: Applied Protein 
+[21:00:08.814] LOG: Applied Protein 
+[21:00:08.814] LOG: Applied Zinc 
+[21:00:08.814] LOG: Applied HP Up 
+[21:00:08.816] LOG: Applied Carbos 
+[21:00:08.816] LOG: Applied Zinc 
+[21:00:08.816] LOG: Applied Carbos 
+[21:00:08.817] LOG: Applied Protein 
+[21:00:08.817] LOG: Applied Protein 
+[21:00:08.817] LOG: Applied Zinc 
+[21:00:08.817] LOG: Applied HP Up 
+[21:00:08.845] LOG: %cStart Phase EncounterPhase color:green;
+[21:00:08.848] LOG: Pokemon: Wild Arbok | Species ID: 24 | Level: 73 | Nature: Bashful (-)
+[21:00:08.848] LOG: Stats (IVs): HP: 215 (2), Atk: 167 (13), Def: 145 (25), Spatk: 110 (14), Spdef: 129 (3), Spd: 130 (12)
+[21:00:08.848] LOG: Ability: Ambush | Passive Ability: Solenoglyphs 
+[21:00:08.848] LOG: Moveset: ["Poison Fang","Venoshock","Draconic Fangs","Mystic Dance"]
+[21:00:08.957] LOG: Wave Seed: Ê²¯²µÚ©ÌµÓÑ±Ò»Ì·Ì²µ³Ç 99
+[21:00:09.397] LOG: %cStart Phase SummonPhase color:green;
+[21:00:09.547] LOG: Applied Carbos 
+[21:00:09.548] LOG: Applied Zinc 
+[21:00:09.548] LOG: Applied Carbos 
+[21:00:09.549] LOG: Applied Protein 
+[21:00:09.549] LOG: Applied Protein 
+[21:00:09.549] LOG: Applied Zinc 
+[21:00:09.549] LOG: Applied HP Up 
+[21:00:09.687] LOG: %cStart Phase ShinySparklePhase color:green;
+[21:00:09.796] LOG: %cStart Phase CheckSwitchPhase color:green;
+[21:00:15.000] LOG: %cStart Phase InitEncounterPhase color:green;
+[21:00:15.000] LOG: %cStart Phase PostSummonPhase color:green;
+[21:00:15.000] LOG: Ran PSP for: Arbok
+[21:00:15.000] LOG: %cStart Phase PostSummonPhase color:green;
+[21:00:15.000] LOG: %cStart Phase PostSummonPhase color:green;
+[21:00:15.001] LOG: %cStart Phase TurnInitPhase color:green;
+[21:00:15.001] LOG: %cStart Phase CommandPhase color:green;
+[21:00:20.728] LOG: Move: BANEFUL_BUNKER Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Gengar
+[21:00:20.730] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:00:20.736] LOG: Battle Seed: cxL95rPCbdtLdgbF
+[21:00:20.736] LOG: Move Pool: ["Poison Fang"]
+[21:00:20.736] LOG: Move Scores: [300]
+[21:00:20.736] LOG: Sorted Move Pool: ["Poison Fang"]
+[21:00:20.736] LOG: Chosen Move: Poison Fang
+[21:00:20.736] LOG: %cStart Phase TurnStartPhase color:green;
+[21:00:20.738] LOG: %cStart Phase MovePhase color:green;
+[21:00:20.738] LOG: %cUser: Gengar
+Move: BANEFUL_BUNKER
+Use Mode: NORMAL color:orchid
+[21:00:20.739] LOG: %cStart Phase MessagePhase color:green;
+[21:00:20.833] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:00:21.424] LOG: %cStart Phase MessagePhase color:green;
+[21:00:21.637] LOG: %cStart Phase MoveEndPhase color:green;
+[21:00:21.637] LOG: %cStart Phase MovePhase color:green;
+[21:00:21.638] LOG: %cUser: Arbok
+Move: POISON_FANG
+Use Mode: NORMAL color:orchid
+[21:00:21.643] LOG: %cStart Phase MessagePhase color:green;
+[21:00:21.787] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:00:21.789] LOG: %cStart Phase MessagePhase color:green;
+[21:00:22.004] LOG: %cStart Phase MoveEndPhase color:green;
+[21:00:22.004] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:00:22.005] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:00:22.571] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:00:22.571] LOG: %cStart Phase BerryPhase color:green;
+[21:00:22.572] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:00:22.573] LOG: %cStart Phase TurnEndPhase color:green;
+[21:00:22.582] LOG: %cStart Phase TurnInitPhase color:green;
+[21:00:22.582] LOG: %cStart Phase CommandPhase color:green;
+[21:00:23.977] LOG: Move: SHADOW_BALL Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Gengar
+[21:00:23.979] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:00:23.987] LOG: Battle Seed: cxL95rPCbdtLdgbF
+[21:00:23.988] LOG: Move Pool: ["Poison Fang"]
+[21:00:23.988] LOG: Move Scores: [300]
+[21:00:23.988] LOG: Sorted Move Pool: ["Poison Fang"]
+[21:00:23.988] LOG: Chosen Move: Poison Fang
+[21:00:23.988] LOG: %cStart Phase TurnStartPhase color:green;
+[21:00:23.990] LOG: %cStart Phase MovePhase color:green;
+[21:00:23.990] LOG: %cUser: Arbok
+Move: POISON_FANG
+Use Mode: NORMAL color:orchid
+[21:00:23.992] LOG: %cStart Phase MessagePhase color:green;
+[21:00:24.104] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:00:24.497] LOG: crit stage: +0
+[21:00:24.499] LOG: Move: Poison Fang | Base damage: 57.68366412213741 | Power: 70 | Source attack: 167 | Target defense: 131
+[21:00:24.500] LOG: Move: Poison Fang | Attack damage: 314
+[21:00:24.501] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:00:24.521] LOG: %cStart Phase MessagePhase color:green;
+[21:00:24.746] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:00:24.915] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:00:24.964] LOG: %cStart Phase FaintPhase color:green;
+[21:00:26.130] LOG: %cStart Phase MessagePhase color:green;
+[21:00:26.276] LOG: %cStart Phase MoveEndPhase color:green;
+[21:00:26.277] LOG: %cStart Phase MovePhase color:green;
+[21:00:26.277] LOG: %cStart Phase MoveEndPhase color:green;
+[21:00:26.277] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:00:26.277] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:00:26.333] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:00:26.333] LOG: %cStart Phase BerryPhase color:green;
+[21:00:26.333] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:00:26.333] LOG: %cStart Phase TurnEndPhase color:green;
+[21:00:26.338] LOG: %cStart Phase SwitchPhase color:green;
+[21:00:27.488] LOG: %cStart Phase SwitchSummonPhase color:green;
+[21:00:27.573] LOG: Applied Zinc 
+[21:00:27.573] LOG: Applied Carbos 
+[21:00:27.574] LOG: Applied Carbos 
+[21:00:27.575] LOG: Applied Protein 
+[21:00:27.575] LOG: Applied Protein 
+[21:00:27.575] LOG: Applied Zinc 
+[21:00:27.575] LOG: Applied HP Up 
+[21:00:27.723] LOG: %cStart Phase ShinySparklePhase color:green;
+[21:00:27.821] LOG: %cStart Phase PostSummonPhase color:green;
+[21:00:27.832] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:00:27.989] LOG: %cStart Phase MessagePhase color:green;
+[21:00:28.254] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:00:28.289] LOG: %cStart Phase PostSummonPhase color:green;
+[21:00:28.289] LOG: Ran PSP for: Musharna
+[21:00:28.289] LOG: %cStart Phase PostSummonPhase color:green;
+[21:00:28.290] LOG: %cStart Phase TurnInitPhase color:green;
+[21:00:28.290] LOG: %cStart Phase CommandPhase color:green;
