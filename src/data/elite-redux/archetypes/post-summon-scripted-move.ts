@@ -41,6 +41,7 @@ export interface PostSummonScriptedMoveOptions {
    * never trigger when the holder is sent out first (no opponent yet).
    */
   readonly targetsSelf?: boolean;
+  readonly oncePerBattleKey?: string;
 }
 
 export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
@@ -52,6 +53,12 @@ export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
     const { pokemon, simulated } = params;
     if (simulated) {
       return true;
+    }
+    if (
+      this.opts.oncePerBattleKey !== undefined
+      && pokemon.waveData.entryEffectsFired.has(this.opts.oncePerBattleKey)
+    ) {
+      return false;
     }
     // Self-targeting buffs (Tailwind) fire regardless of who's on the field.
     if (this.opts.targetsSelf) {
@@ -79,6 +86,9 @@ export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
       }
       // Pick the first available opponent (in doubles, prefer the leftmost).
       targetIndex = opponents[0].getBattlerIndex();
+    }
+    if (this.opts.oncePerBattleKey !== undefined) {
+      pokemon.waveData.entryEffectsFired.add(this.opts.oncePerBattleKey);
     }
     globalScene.phaseManager.unshiftNew(
       "MovePhase",

@@ -29,14 +29,17 @@
 // (i18next would otherwise return the missing-key placeholder).
 // =============================================================================
 
-import type { AbAttr } from "#abilities/ab-attrs";
+import { type AbAttr, ConditionalCritAbAttr } from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities } from "#data/data-lists";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
+import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
+import { SpeedBonusToStatAbAttr } from "#data/elite-redux/archetypes/speed-bonus-to-stat";
 import { ER_ABILITIES, type ErAbilityDraft } from "#data/elite-redux/er-abilities";
 import { ER_ABILITY_ARCHETYPES, type ErArchetypeKind } from "#data/elite-redux/er-ability-archetypes";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { AbilityId } from "#enums/ability-id";
+import { Stat } from "#enums/stat";
 
 /**
  * Numeric cutoff for "vanilla pokerogue" ability ids. ER-custom abilities are
@@ -316,6 +319,25 @@ function buildCustomAbility(
   if (draft.id === 669) {
     // Flammable Coat — "Cannot be copied or suppressed."
     builder.unsuppressable().uncopiable().unreplaceable();
+  }
+
+  // Bespoke ER abilities whose behavior is two-part or otherwise not a single
+  // archetype shape, so the dispatcher leaves them empty (classified "bespoke").
+  // Wire their attrs by hand here. Keyed by ER source id (draft.id).
+  if (draft.id === 340) {
+    // Fatal Precision — "Super-effective moves never miss and always crit."
+    // Never-miss reuses the conditional-always-hit primitive's superEffective
+    // gate; always-crit adds a ConditionalCrit gated on the same SE check.
+    builder.attr(ConditionalAlwaysHitAbAttr, { superEffective: true });
+    builder.attr(
+      ConditionalCritAbAttr,
+      (user, target, move) => !!target && target.getMoveEffectiveness(user, move) > 1,
+    );
+  }
+  if (draft.id === 355) {
+    // Speed Force — "Contact moves use 20% of its Speed stat additionally."
+    // Adds 20% of the holder's Speed onto its Attack for contact moves.
+    builder.attr(SpeedBonusToStatAbAttr, { stat: Stat.ATK, speedFraction: 0.2, filter: { contact: "only" } });
   }
 
   const ability = builder.build();

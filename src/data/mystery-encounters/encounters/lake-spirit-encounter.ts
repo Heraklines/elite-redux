@@ -43,12 +43,15 @@ const REWARD_CHOICES = 3;
 /** Candy granted to EACH team member's species on a perfect round. */
 const PERFECT_CANDY_PER_MON = 5;
 
-/** The blessing pool - fortune-flavored Relics fitting a lake guardian's gift. */
-const BLESSING_RELIC_FUNCS: ModifierTypeFunc[] = [
-  modifierTypes.ER_RELIC_MYSTERY_CHARM,
-  modifierTypes.ER_RELIC_MORALE_BANNER,
-  modifierTypes.ER_RELIC_TWIN_LINK,
-];
+/**
+ * The blessing pool - fortune-flavored Relics fitting a lake guardian's gift.
+ * Resolved at CALL time, not module load: `modifierTypes` is populated lazily at game
+ * init, after this encounter module is imported, so a module-level capture froze in
+ * `undefined` relic funcs that were silently dropped from the reward (#616).
+ */
+function blessingRelicFuncs(): ModifierTypeFunc[] {
+  return [modifierTypes.ER_RELIC_MYSTERY_CHARM, modifierTypes.ER_RELIC_MORALE_BANNER, modifierTypes.ER_RELIC_TWIN_LINK];
+}
 
 /**
  * Hand out the spirit's blessing for `correct` riddles, then leave. A perfect
@@ -66,7 +69,7 @@ function grantSpiritBlessing(correct: number): void {
       true,
     );
     setEncounterRewards({
-      guaranteedModifierTypeFuncs: [randSeedItem(BLESSING_RELIC_FUNCS)],
+      guaranteedModifierTypeFuncs: [randSeedItem(blessingRelicFuncs())],
       guaranteedModifierTiers: [ModifierTier.ULTRA, ModifierTier.ULTRA],
       fillRemaining: false,
     });

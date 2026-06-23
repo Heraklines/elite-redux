@@ -32,7 +32,11 @@ import {
 import { getBerryEffectFunc } from "#data/berry";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
-import { erLoadedDiceMinHitBonus, erLuckyHeartChanceBonus } from "#data/elite-redux/er-community-items";
+import {
+  erHasUsablePowerHerb,
+  erLoadedDiceMinHitBonus,
+  erLuckyHeartChanceBonus,
+} from "#data/elite-redux/er-community-items";
 import { clearErAilments } from "#data/elite-redux/er-status-cure";
 import { SpeciesFormChangeRevertWeatherFormTrigger } from "#data/form-change-triggers";
 import { getNonVolatileStatusEffects, getStatusEffectHealText, isNonVolatileStatusEffect } from "#data/status-effect";
@@ -1419,7 +1423,14 @@ export abstract class Move implements Localizable {
    */
   // TODO: Remove target parameter used solely to circumvent Pollen Puff shenanigans - the entire move needs to be fixed anyhow
   public canBeMultiStrikeEnhanced(user: Pokemon, restrictSpread = false, target?: Pokemon | null): boolean {
-    if (this.isChargingMove()) {
+    // A charging (two-turn) move is normally ineligible. ER (#617): when the USER
+    // resolves the charge in a SINGLE turn - Accelerate (ability 474) or a usable
+    // Power Herb, the two charge-skip mechanisms checked in MoveChargePhase.end() -
+    // the move behaves like a normal move and must be enhanceable (e.g. a Multi-Headed
+    // mon's Accelerate-boosted Dive still strikes once per head). Move-intrinsic instant
+    // charge (Solar Beam in sun) is deliberately NOT included, to preserve vanilla
+    // Parental Bond parity there.
+    if (this.isChargingMove() && !userSkipsChargeTurn(user)) {
       return false;
     }
 
@@ -1455,6 +1466,16 @@ export abstract class Move implements Localizable {
 
     return true;
   }
+}
+
+/**
+ * ER (#617): whether `user` resolves a charging move in a SINGLE turn (so it should
+ * count as a normal, multi-strike-enhanceable move). Mirrors the two free/owned
+ * charge-skip mechanisms applied in {@linkcode MoveChargePhase.end} - Accelerate
+ * (ability 474) and a usable Power Herb - but WITHOUT consuming the herb charge.
+ */
+function userSkipsChargeTurn(user: Pokemon): boolean {
+  return user.hasAbility(ErAbilityId.ACCELERATE as unknown as AbilityId) || erHasUsablePowerHerb(user);
 }
 
 export class AttackMove extends Move {
@@ -8016,6 +8037,23 @@ export class ForceSwitchOutAttr extends MoveEffectAttr {
   }
 }
 
+/**
+ * ER: Roar of Time's force-switch, but suppressed when the user has Temporal
+ * Rupture (ER ability 830). Per the 2.65 dex, Temporal Rupture turns Roar of Time
+ * into a 100 BP, +0 priority attack that changes the target's Ability to Slow
+ * Start "but no longer forces the target to switch" - so the slow-started target
+ * stays in. (The power/priority changes are the move's other attrs; the Slow
+ * Start rider lives on the ability. `hasAbility` matches active OR an unlocked
+ * innate, with the same gating as that rider, so the two stay consistent.)
+ */
+export class RoarOfTimeForceSwitchOutAttr extends ForceSwitchOutAttr {
+  override getSwitchOutCondition(): MoveConditionFunc {
+    const base = super.getSwitchOutCondition();
+    return (user, target, move) =>
+      !user.hasAbility(ErAbilityId.TEMPORAL_RUPTURE as unknown as AbilityId) && base(user, target, move);
+  }
+}
+
 export class ChillyReceptionAttr extends ForceSwitchOutAttr {
   apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
     globalScene.arena.trySetWeather(WeatherType.SNOW, user);
@@ -11386,7 +11424,15 @@ export function initMoves() {
     // 150/90/5 + RechargeAttr). The Temporal Rupture ability further modifies it
     // (100 BP, +0 priority, sets Slow Start, no switch) via the dispatcher.
     new AttackMove(MoveId.ROAR_OF_TIME, PokemonType.DRAGON, MoveCategory.SPECIAL, 90, 100, 10, -1, -6, 4) //
-      .attr(ForceSwitchOutAttr, false, SwitchType.FORCE_SWITCH)
+      // Temporal Rupture (ER ability 830) "alters Roar of Time drastically": 90 ->
+      // 100 BP, -6 -> +0 priority, and it NO LONGER forces the target out (it stays
+      // in, slow-started by the ability's rider). Base Roar of Time keeps the -6
+      // force-switch and 90 BP.
+      .attr(MovePowerMultiplierAttr, user =>
+        user.hasAbility(ErAbilityId.TEMPORAL_RUPTURE as unknown as AbilityId) ? 10 / 9 : 1,
+      )
+      .attr(IncrementMovePriorityAttr, user => user.hasAbility(ErAbilityId.TEMPORAL_RUPTURE as unknown as AbilityId), 6)
+      .attr(RoarOfTimeForceSwitchOutAttr, false, SwitchType.FORCE_SWITCH)
       .hidesTarget(),
     new AttackMove(MoveId.SPACIAL_REND, PokemonType.DRAGON, MoveCategory.SPECIAL, 100, 95, 5, -1, 0, 4) //
       .attr(HighCritAttr),

@@ -56,7 +56,7 @@ import type { Variant } from "#sprites/variant";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { Starter, StarterMoveset } from "#types/save-data";
 import { openErMapOverlay } from "#ui/er-map-ui-handler";
-import { isSlotUnlocked, PASSIVE_SLOTS } from "#utils/passive-utils";
+import { isSlotUnlocked, PASSIVE_SLOTS, unlockSlot } from "#utils/passive-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 export interface DevScenario {
@@ -504,6 +504,43 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Combat — Hubris credits the holder's OWN KO, not a teammate's (#628)
+  // ===========================================================================
+  {
+    label: "Hubris: only the holder's own KO boosts (#628)",
+    description:
+      "#628 - 'Hubris activates if your teammate pokemon dies; even if the pokemon\n"
+      + "with it didn't kill the pokemon.' The on-KO boost (Hubris, Chilling Neigh,\n"
+      + "Adrenaline Rush, ...) used to fire whenever ANY Pokemon fainted on the field.\n"
+      + "DOUBLE battle vs two frail foes; your LEAD Bisharp has Hubris (+1 Sp.Atk on a\n"
+      + "KO). DO: in the SAME turn, KO foe A with your LEAD and KO foe B with your ALLY.\n"
+      + "EXPECT: the LEAD's Special Attack rises by exactly ONE stage - from its own KO\n"
+      + "only. Before the fix it rose by TWO (it also counted the ally's KO). It must\n"
+      + "NOT rise at all on a turn where only the ally / only the foe scores a faint.\n"
+      + "(Forsaken Heart is the lone exception that SHOULD boost on any faint.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 60,
+        BATTLE_STYLE_OVERRIDE: "double",
+        // Both party mons get Hubris (override is party-wide); watch the LEAD.
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.HUBRIS),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5, // frail - any lead attack OHKOs it
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.BISHARP, {
+          moveset: [MoveId.IRON_HEAD, MoveId.SUCKER_PUNCH, MoveId.BRICK_BREAK, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Combat — Mega Vanilluxe Multi-headed strikes 3 times
   // ===========================================================================
   {
@@ -605,6 +642,63 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
     shopItems: [modifierTypes.ER_RELIC_CURSED_IDOL],
+  },
+  {
+    label: "Cursed Idol doubles: left lead gets the Substitute (#609)",
+    description:
+      "#609 - in a DOUBLE battle the Cursed Idol must give the free Substitute to\n"
+      + "your LEFT lead (slot 0, the first you sent out) and HALVE the RIGHT lead's\n"
+      + "HP (slot 1). EXPECT: Snorlax (left) is shrouded in a free Substitute; Blissey\n"
+      + "(right) enters at half HP. Before the fix the FASTER lead got the Substitute\n"
+      + "and the player's actual lead was the one drained.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        BATTLE_STYLE_OVERRIDE: "double",
+        STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_CURSED_IDOL" }],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.PROTECT, MoveId.REST] }),
+        makeStarter(SpeciesId.BLISSEY, {
+          moveset: [MoveId.SEISMIC_TOSS, MoveId.SOFT_BOILED, MoveId.PROTECT, MoveId.TOXIC],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Abilities — Multi-Headed strikes per head on a SINGLE-turn charge move (#617)
+  // ===========================================================================
+  {
+    label: "Multi-Headed + instant charge move strikes per head (#617)",
+    description:
+      "#617 - a Multi-Headed mon's charge move that resolves in a SINGLE turn must still\n"
+      + "strike once per head. Dodrio is 3-headed and holds a Power Herb (Accelerate skips\n"
+      + "the charge the same way). DO: use Dive - the Power Herb skips the charge turn so it\n"
+      + "fires instantly. EXPECT: Dive strikes THREE times (3 heads; 2nd/3rd at reduced\n"
+      + "power), KO-ing or chunking the Snorlax. Before the fix the charge move was treated\n"
+      + "as a two-turn move, so Multi-Headed added NO extra strikes (Dive hit once).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        // Wave 145: past the #419 elite BST-cap ladder so the bulky Snorlax spawns and
+        // survives 3 hits (instead of devolving to a frail Munchlax at a low wave).
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 60,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.MULTI_HEADED),
+        STARTING_HELD_ITEMS_OVERRIDE: [{ name: "ER_POWER_HERB" }],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.DODRIO, { moveset: [MoveId.DIVE, MoveId.DRILL_PECK, MoveId.FLY, MoveId.QUICK_ATTACK] }),
+      ];
+    },
   },
   // ===========================================================================
   // Abilities — Frisk reveals items + locks only the FIRST item
@@ -883,6 +977,59 @@ export const DEV_SCENARIOS: DevScenario[] = [
       modifierTypes.ABILITY_RANDOMIZER,
       modifierTypes.ABILITY_RANDOMIZER,
     ],
+  },
+  {
+    label: "Fusion 3rd innate unlocks from the fusion species (#611)",
+    description:
+      "#611 - a fused mon's 3rd innate (passive3) is OWNED by the fusion species, so\n"
+      + "its candy unlock must be read from THAT species, not the base. Bulbasaur is\n"
+      + "fused with Charmander; only Charmander's 3rd innate slot is unlocked here.\n"
+      + "DO: open the in-battle Info -> Abilities panel (R, then Abilities) or SUMMARY.\n"
+      + "EXPECT: the 3rd Innate row (MOXIE) shows as a LIVE Innate, while the 1st/2nd\n"
+      + "Innate rows read 'Innate (Locked)'. Before the fix the 3rd innate also read\n"
+      + "'Locked' - its unlock was looked up on Bulbasaur (base) instead of Charmander.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTER_FUSION_OVERRIDE: true,
+        STARTER_FUSION_SPECIES_OVERRIDE: SpeciesId.CHARMANDER,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.BULBASAUR, {
+          moveset: [MoveId.TACKLE, MoveId.GROWL, MoveId.VINE_WHIP, MoveId.GROWTH],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const player = globalScene.getPlayerPokemon();
+      if (!player?.fusionSpecies) {
+        return;
+      }
+      // Force a recognizable ability into each of the 3 innate slots so the panel
+      // shows all three rows (slot 0 = STURDY, slot 1 = DRIZZLE, slot 2 = MOXIE).
+      player.setAbilityOverrideForSlot(1, AbilityId.STURDY);
+      player.setAbilityOverrideForSlot(2, AbilityId.DRIZZLE);
+      player.setAbilityOverrideForSlot(3, AbilityId.MOXIE);
+      // Candy unlocks (staging-only test save): base (Bulbasaur) unlocks NOTHING; the
+      // fusion species (Charmander) unlocks ONLY its 3rd innate slot. Innate slots 0 & 2
+      // are fusion-owned and slot 1 base-owned, so this lights up the fused mon's 3rd
+      // innate (MOXIE) and leaves the first two Locked - exactly the ownership read #611
+      // fixes (classic mode, so no Youngster free-innate slots interfere).
+      const sd = globalScene.gameData.starterData;
+      const baseRoot = player.species.getRootSpeciesId();
+      const fusionRoot = player.fusionSpecies.getRootSpeciesId();
+      if (sd[baseRoot]) {
+        sd[baseRoot].passiveAttr = 0;
+      }
+      if (sd[fusionRoot]) {
+        sd[fusionRoot].passiveAttr = unlockSlot(0, 2);
+      }
+      player.updateInfo();
+    },
   },
   {
     label: "Fusion Preview (DNA Splicers) (#560)",
@@ -2754,7 +2901,11 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "'Decline' for no cost.\n"
       + "EXPECT: a tiered reward shop - JACKPOT (~10%) = a Formation relic (Quartermaster\n"
       + "/ Lookout / Anchor / Twin Link); MID = pick 1 of 3 Great/Ultra; CONSOLATION = 2\n"
-      + "Poke Balls. Always pays something. Buy repeatedly to see the jackpot.",
+      + "Poke Balls. Always pays something. Buy repeatedly to see the jackpot.\n"
+      + "#616: the JACKPOT must actually GRANT a relic - before the fix the relic list was\n"
+      + "captured before the relic registry loaded, so a jackpot win came up with an EMPTY\n"
+      + "reward row (paid the fee, got nothing). Buy until the 'grand prize' bell rings and\n"
+      + "confirm a Formation relic is actually offered to take.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -3728,6 +3879,41 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
     // Evolve via a guaranteed Rare Candy in the post-battle shop (level 31 → 32),
     // not combat XP.
+    shopItems: [modifierTypes.RARE_CANDY],
+  },
+  {
+    label: "Capsule ability drops on evo (#607)",
+    description:
+      "#607 - this Shelmet's ACTIVE ability is pinned to Damp (as if Ability-\n"
+      + "Capsule'd to one of Shelmet's own abilities). DO: win the opening battle,\n"
+      + "then in the shop use the Rare Candy on Shelmet (L29 -> L30) so it evolves\n"
+      + "to Accelgor, and open its Abilities. EXPECT: the active ability is one of\n"
+      + "ACCELGOR's own (Momentum/Unburden/...), NOT Damp. Before the fix the capsule\n"
+      + "override kept Damp (an ability Accelgor cannot legally have).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 29, // one Rare Candy -> L30 -> evolves to Accelgor
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SHELMET, {
+          moveset: [MoveId.MEGA_DRAIN, MoveId.ACID, MoveId.PROTECT, MoveId.STRUGGLE_BUG],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const lead = globalScene.getPlayerPokemon();
+      if (lead) {
+        // Simulate an Ability Capsule pinning the active ability to Damp (one of
+        // Shelmet's own abilities). Accelgor has no Damp in its ability set.
+        lead.customPokemonData.ability = AbilityId.DAMP;
+        lead.updateInfo();
+      }
+    },
     shopItems: [modifierTypes.RARE_CANDY],
   },
   {
@@ -7996,6 +8182,57 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Temporal Rupture no switch",
+    description:
+      "ID 830 (#604) - DO: use Roar of Time on the foe. EXPECT: the target is\n"
+      + "NOT switched out (it stays on the field), its Ability becomes Slow Start,\n"
+      + "and Roar of Time moves at normal speed (not last). Without Temporal\n"
+      + "Rupture, Roar of Time instead forces the target to switch out.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.TEMPORAL_RUPTURE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 70,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.SOFT_BOILED, MoveId.PROTECT, MoveId.HEAL_PULSE],
+      });
+      return [
+        makeStarter(SpeciesId.DIALGA, {
+          moveset: [MoveId.ROAR_OF_TIME, MoveId.FLASH_CANNON, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Aftermath detonates through flinch (#605)",
+    description:
+      "#605 - the enemy's Fake Out flinches AND KOs this Drifblim. EXPECT: Aftermath\n"
+      + "STILL detonates (Drifblim self-KOs and the Fake Out user takes the blast),\n"
+      + "even though the KO hit also flinched it. Before the fix the explosion was\n"
+      + "flinch-cancelled and Drifblim was stranded at 1 HP.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 5, // frail + slow: enemy Fake Out goes first and KOs
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: AbilityId.AFTERMATH,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.HITMONLEE,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.FAKE_OUT],
+      });
+      return [
+        makeStarter(SpeciesId.DRIFBLIM, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.AIR_SLASH, MoveId.PROTECT, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.PROTECT, MoveId.REST, MoveId.YAWN],
+        }),
+      ];
+    },
+  },
+  {
     label: "Aftershock Magnitude 4-7",
     description:
       "ID 491 - DO: repeatedly use Tackle. EXPECT: every landed attack is\n"
@@ -8086,4 +8323,61 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "Fatal Precision SE crit (#623)",
+    description:
+      "Fatal Precision (was unimplemented). DO: use Psychic on the Machamp.\n"
+      + "EXPECT: the super-effective hit ALWAYS lands a critical hit and never\n"
+      + "misses. Try a few times - SE moves should never miss.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 80,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.FATAL_PRECISION),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MACHAMP,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.PROTECT, MoveId.REST, MoveId.BULK_UP],
+      });
+      return [
+        makeStarter(SpeciesId.MEWTWO, {
+          moveset: [MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.RECOVER, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Speed Force contact damage (#622)",
+    description:
+      "Speed Force (was unimplemented). DO: use Crunch (contact) then Earth\n"
+      + "Power (non-contact) on the Snorlax. EXPECT: Crunch hits noticeably\n"
+      + "harder than its base Attack implies (20% of Aerodactyl's high Speed is\n"
+      + "added to Attack); the non-contact move gets no bonus.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.SPEED_FORCE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 70,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.REST, MoveId.PROTECT, MoveId.BLOCK],
+      });
+      return [
+        makeStarter(SpeciesId.AERODACTYL, {
+          moveset: [MoveId.CRUNCH, MoveId.EARTH_POWER, MoveId.ROOST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // (note) #620 Tyrogue now evolves by level-up at L20 (ER dex) and the player
+  //   CHOOSES the path - Hitmonlee / Hitmonchan / Hitmontop - like other split
+  //   evos. No longer gated on knowing Low Sweep/Mach Punch/Rapid Spin. Check by
+  //   leveling a Tyrogue to 20: the evolution prompt offers all three Hitmons.
+  // (note) #625 Stantler learns Psyshield Bash at L25 again (the ER moveset
+  //   override had dropped it). Check its learnset / that it can evolve to Wyrdeer.
+  // (note) #626 Basculin and Basculegion now share a candy bucket (both root to
+  //   Basculin). Check the candy count is shared in starter-select.
+  // (note) #612 ER rivals at high waves now field fully evolved teams (no L60
+  //   Growlithe on a wave-55 Hell rival).
 ];

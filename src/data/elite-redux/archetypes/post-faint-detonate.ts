@@ -287,12 +287,19 @@ export class PostFaintDetonateAbAttr extends PreDefendFullHpEndureAbAttr {
     // detonation ahead of any remaining queued move, so it resolves immediately
     // on faint; the SacrificialAttr self-KO then re-faints the holder and its
     // pending move is skipped (a fainted Pokemon cannot run a move).
+    // FOLLOW_UP (not INDIRECT) so the detonation is NOT cancelled by an involuntary
+    // move-block on the holder. The forced explosion must fire regardless of the
+    // holder's state - in particular a KO hit that also flinches it (e.g. Fake Out)
+    // would otherwise flinch-cancel the queued blast and strand the holder at 1 HP
+    // (#605). INDIRECT runs the full `firstFailureCheck` (flinch/confusion/para...,
+    // correct for cancellable copies like Dancer); FOLLOW_UP runs only the subset
+    // (heal-block / throat-chop / gravity), none of which block Explosion.
     globalScene.phaseManager.unshiftNew(
       "MovePhase",
       pokemon,
       targets,
       new DetonationPokemonMove(move),
-      MoveUseMode.INDIRECT,
+      MoveUseMode.FOLLOW_UP,
       MovePhaseTimingModifier.FIRST,
     );
   }

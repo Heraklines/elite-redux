@@ -96,9 +96,48 @@ describe("StatTriggerOnKoAbAttr archetype (C1)", () => {
     expect(unshiftNew).not.toHaveBeenCalled();
   });
 
-  it("canApply always returns true", () => {
-    const attr = new StatTriggerOnKoAbAttr({ stats: [{ stat: Stat.ATK, stages: 1 }] });
-    expect(attr.canApply({ pokemon: makeStubPokemon(), victim: makeStubPokemon(), simulated: false })).toBe(true);
+  // #628: faint-phase applies `PostKnockOutAbAttr` to EVERY on-field Pokemon
+  // when one faints, so the on-KO trigger must gate to the mon credited with
+  // the KO (Moxie/Hubris semantics) - otherwise Hubris boosts off a teammate's
+  // death. The credit is `victim.turnData.attacksReceived[0].sourceId`, the same
+  // field faint-phase uses to award the PostVictory move attr.
+  function makeKoParams(opts: { holderId?: number; victimId?: number; killerId?: number | null; sameMon?: boolean }) {
+    const holder = { id: opts.holderId ?? 1 } as unknown as Pokemon;
+    const victim = opts.sameMon
+      ? holder
+      : ({
+          id: opts.victimId ?? 2,
+          turnData: { attacksReceived: opts.killerId == null ? [] : [{ sourceId: opts.killerId }] },
+        } as unknown as Pokemon);
+    return { pokemon: holder, victim, simulated: false } as never;
+  }
+
+  it("canApply fires when THIS Pokemon is credited with the KO (Moxie/Hubris)", () => {
+    const attr = new StatTriggerOnKoAbAttr({ stats: [{ stat: Stat.SPATK, stages: 1 }] });
+    expect(attr.canApply(makeKoParams({ holderId: 1, killerId: 1 }))).toBe(true);
+  });
+
+  it("canApply does NOT fire when another Pokemon scored the KO (#628 teammate-faint)", () => {
+    const attr = new StatTriggerOnKoAbAttr({ stats: [{ stat: Stat.SPATK, stages: 1 }] });
+    // A foe/teammate fainted with the KO credited to mon #9 - the holder (#1)
+    // must NOT boost. This is the exact reported bug.
+    expect(attr.canApply(makeKoParams({ holderId: 1, killerId: 9 }))).toBe(false);
+  });
+
+  it("canApply does NOT fire when the holder itself faints", () => {
+    const attr = new StatTriggerOnKoAbAttr({ stats: [{ stat: Stat.SPATK, stages: 1 }] });
+    expect(attr.canApply(makeKoParams({ sameMon: true }))).toBe(false);
+  });
+
+  it("canApply does NOT fire on an indirect faint with no recorded attacker", () => {
+    const attr = new StatTriggerOnKoAbAttr({ stats: [{ stat: Stat.SPATK, stages: 1 }] });
+    expect(attr.canApply(makeKoParams({ holderId: 1, killerId: null }))).toBe(false);
+  });
+
+  it("canApply fires on ANY faint when triggerOnAnyFaint is set (Forsaken Heart)", () => {
+    const attr = new StatTriggerOnKoAbAttr({ stats: [{ stat: Stat.ATK, stages: 1 }], triggerOnAnyFaint: true });
+    // Same uncredited faint as the #628 case - Forsaken Heart MUST still boost.
+    expect(attr.canApply(makeKoParams({ holderId: 1, killerId: 9 }))).toBe(true);
   });
 
   it("exposes payload via accessors", () => {

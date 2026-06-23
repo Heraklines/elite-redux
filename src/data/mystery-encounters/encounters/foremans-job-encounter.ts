@@ -43,12 +43,15 @@ const BOSS_LEVELS_ABOVE = 5;
 /** Thematic heavy-machine / construction guardians (Steel / Rock / Fighting). */
 const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.CONKELDURR, SpeciesId.BRONZONG, SpeciesId.COALOSSAL];
 
-/** The Relic awarded on top of the high-tier picks for winning. */
-const TRIAL_RELIC_FUNCS: ModifierTypeFunc[] = [
-  modifierTypes.ER_RELIC_ANCHOR,
-  modifierTypes.ER_RELIC_MORALE_BANNER,
-  modifierTypes.ER_RELIC_SECOND_WIND,
-];
+/**
+ * The Relic awarded on top of the high-tier picks for winning. Resolved at CALL
+ * time, not module load: `modifierTypes` is populated lazily at game init, after
+ * this encounter module is imported, so a module-level capture froze in `undefined`
+ * relic funcs that were silently dropped from the reward (#616).
+ */
+function trialRelicFuncs(): ModifierTypeFunc[] {
+  return [modifierTypes.ER_RELIC_ANCHOR, modifierTypes.ER_RELIC_MORALE_BANNER, modifierTypes.ER_RELIC_SECOND_WIND];
+}
 
 /** Enemy level for the guardian: the player's strongest mon plus a margin. */
 function guardianLevel(): number {
@@ -94,7 +97,7 @@ export const ForemansJobEncounter: MysteryEncounter = MysteryEncounterBuilder.wi
       })
       .withOptionPhase(async () => {
         setEncounterRewards({
-          guaranteedModifierTypeFuncs: [randSeedItem(TRIAL_RELIC_FUNCS)],
+          guaranteedModifierTypeFuncs: [randSeedItem(trialRelicFuncs())],
           guaranteedModifierTiers: [ModifierTier.ROGUE, ModifierTier.ROGUE],
           fillRemaining: false,
         });

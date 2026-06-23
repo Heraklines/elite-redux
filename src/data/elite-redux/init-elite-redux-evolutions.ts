@@ -73,6 +73,7 @@ import {
   initPokemonPrevolutions,
   initPokemonStarters,
   pokemonEvolutions,
+  pokemonPrevolutions,
   SpeciesEvolution,
   SpeciesFormEvolution,
 } from "#balance/pokemon-evolutions";
@@ -192,6 +193,15 @@ export function initEliteReduxEvolutions(): InitEliteReduxEvolutionsResult {
   // idempotent — they clear and re-derive from `pokemonEvolutions`.
   initPokemonPrevolutions();
   initPokemonStarters();
+
+  // #626: Basculin <-> Basculegion candy sharing. ER imports White-Striped
+  // Basculin as its OWN custom species, so the white-striped -> Basculegion
+  // edge makes initPokemonPrevolutions root Basculegion's candy onto that custom
+  // id instead of vanilla Basculin - splitting the candy bucket so the two never
+  // pool candy. Restore the vanilla prevolution (Basculegion <- Basculin) so the
+  // line shares a candy bucket again. The forward white-striped -> Basculegion
+  // evolution in `pokemonEvolutions` is untouched, so evolving still works.
+  pokemonPrevolutions[SpeciesId.BASCULEGION] = SpeciesId.BASCULIN;
 
   return result;
 }
@@ -388,9 +398,21 @@ function mergeOneEdge(
   // those simply become level-up player-choice evolutions — the ER design.
   const match = merged.find(e => e.speciesId === resolved.targetSpeciesId);
   if (match) {
-    if (match.level !== resolved.level || match.item != null) {
+    // A plain LEVEL ER evolution is a pure level-up: it drops the vanilla ITEM
+    // AND the vanilla CONDITION (friendship / time-of-day / move / biome, etc.)
+    // that ER removed. Examples: Igglybuff (L10, was friendship), Crobat (was
+    // friendship), Alolan Rattata (was night). Gender kinds (LEVEL_MALE /
+    // LEVEL_FEMALE) KEEP their condition so Gallade / Froslass-style branches
+    // stay gendered. When several edges share a level and all lose their
+    // conditions, they become player-choice split evos (Eevee, etc.) - the
+    // EvolutionPhase prompts a pick, like Tyrogue / Wurmple.
+    const clearsCondition = evo.kind === ER_EVO_KIND_LEVEL && match.condition != null;
+    if (match.level !== resolved.level || match.item != null || clearsCondition) {
       match.level = resolved.level;
       match.item = null;
+      if (clearsCondition) {
+        match.condition = null;
+      }
       // Reset memoized description so the new level/no-item is picked up.
       match.desc = "";
     }

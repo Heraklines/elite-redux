@@ -766,6 +766,22 @@ export function erApplyCursedIdol(pokemon: Pokemon): void {
   if (!hasErRelic("cursedIdol") || !pokemon.isPlayer()) {
     return;
   }
+  // #609: record entrants in FIELD-SLOT order, NOT the speed-ordered
+  // PostSummonPhase call order. In doubles the lead pair must be deterministic -
+  // slot 0 is "the first player Pokemon sent out" (free Substitute) and slot 1 is
+  // "the next to enter" (drained). Processing the on-field group lowest-slot-first
+  // (gated per-mon by firstTime) fixes the previous behaviour where the FASTER
+  // lead got the Substitute and the player's actual lead (slot 0) got drained.
+  // A lone switch-in is just the only on-field mon not yet recorded, so it still
+  // lands on its correct (later) ordinal.
+  const field: Pokemon[] = globalScene.getPlayerField().filter(p => p?.isActive(true));
+  for (const mon of field.includes(pokemon) ? field : [...field, pokemon]) {
+    applyCursedIdolEntrant(mon);
+  }
+}
+
+/** Apply the Cursed Idol entry effect to one mon, gated to once-per-mon-per-battle. */
+function applyCursedIdolEntrant(pokemon: Pokemon): void {
   const { ordinal, firstTime } = erBattleEntrantOrdinal("cursedIdol", pokemon.id);
   if (!firstTime) {
     return; // already processed this mon this battle (e.g. a reload re-summon)

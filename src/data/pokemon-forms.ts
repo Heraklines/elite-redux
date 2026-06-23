@@ -437,18 +437,16 @@ export const pokemonFormChanges: PokemonFormChanges = {
     new SpeciesFormChange(SpeciesId.PALAFIN, "hero", "zero", new SpeciesFormChangeAbilityTrigger(), true)
   ],
   [SpeciesId.AEGISLASH]: [
-    // Elite Redux (#480) — Stance Change. ER's Aegislash swaps between two Redux
-    // forms by the CATEGORY of the move it is about to use (2.65 dex: "Redux forms
-    // swap between physical/special based on move type"), resolved before the move
-    // executes. The "blade" form is the AXE (physical, sprite aegislash_blade_redux)
-    // and the "shield"/resting form is the BOW (special, sprite aegislash_redux):
-    // a physical move brings out the axe, a special move (or King's Shield, or
-    // switching out) returns it to the bow. Status moves leave the form unchanged.
-    // Gated on STANCE_CHANGE, which ER relocates into an innate slot — Pokemon's
-    // abilityDrivesFormChange exempts it from the innate unlock gate so the swap is
-    // never locked out (the actual cause of the "stuck" report).
-    new SpeciesFormChange(SpeciesId.AEGISLASH, "shield", "blade", new SpeciesFormChangePreMoveTrigger(m => allMoves[m].category === MoveCategory.PHYSICAL), true, new SpeciesFormChangeCondition(p => p.hasAbility(AbilityId.STANCE_CHANGE))),
-    new SpeciesFormChange(SpeciesId.AEGISLASH, "blade", "shield", new SpeciesFormChangePreMoveTrigger(m => allMoves[m].category === MoveCategory.SPECIAL || m === MoveId.KINGS_SHIELD), true, new SpeciesFormChangeCondition(p => p.hasAbility(AbilityId.STANCE_CHANGE))),
+    // VANILLA Aegislash (shield <-> blade) uses VANILLA Stance Change: ANY damaging
+    // move (physical OR special) brings out the Blade Forme; King's Shield (or
+    // switching out) returns to Shield Forme. The Redux physical/special "axe/bow"
+    // split (2.65 dex) applies to the separate AEGISLASH_REDUX forms — NOT to vanilla
+    // Aegislash. Using the Redux split here left a special-attacking vanilla Aegislash
+    // stuck in Shield forever (live report: "Aegislash spammed Vacuum Wave for 2 turns
+    // and never changed stance"). Gated on STANCE_CHANGE, which ER relocates into an
+    // innate slot — abilityDrivesFormChange unlocks that innate so the swap fires.
+    new SpeciesFormChange(SpeciesId.AEGISLASH, "shield", "blade", new SpeciesFormChangePreMoveTrigger(m => allMoves[m].category !== MoveCategory.STATUS), true, new SpeciesFormChangeCondition(p => p.hasAbility(AbilityId.STANCE_CHANGE))),
+    new SpeciesFormChange(SpeciesId.AEGISLASH, "blade", "shield", new SpeciesFormChangePreMoveTrigger(m => m === MoveId.KINGS_SHIELD), true, new SpeciesFormChangeCondition(p => p.hasAbility(AbilityId.STANCE_CHANGE))),
     new SpeciesFormChange(SpeciesId.AEGISLASH, "blade", "shield", new SpeciesFormChangeActiveTrigger(false), true)
   ],
   [SpeciesId.XERNEAS]: [

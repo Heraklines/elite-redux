@@ -44,13 +44,24 @@ const namespace = "mysteryEncounters/townRaffle";
 /** How many reward options to offer at the MID tier (player picks one). */
 const MID_TIER_CHOICES = 3;
 
-/** The Formation Relic registry funcs the jackpot draws from (one is rolled). */
-const FORMATION_RELIC_FUNCS: ModifierTypeFunc[] = [
-  modifierTypes.ER_RELIC_QUARTERMASTER,
-  modifierTypes.ER_RELIC_LOOKOUT,
-  modifierTypes.ER_RELIC_ANCHOR,
-  modifierTypes.ER_RELIC_TWIN_LINK,
-];
+/**
+ * The Formation Relic registry funcs the jackpot draws from (one is rolled).
+ *
+ * Resolved at CALL time, NOT at module load: `modifierTypes` (#data/data-lists) is an
+ * empty object populated lazily at game init, and this encounter module is imported
+ * (via mystery-encounters.ts) before the ER relics are registered. Capturing
+ * `modifierTypes.ER_RELIC_*` into a module-level const therefore froze in `undefined`
+ * entries, so a jackpot drew an `undefined` func and `setEncounterRewards` silently
+ * dropped it - the player won a relic and the reward shop came up empty (#616).
+ */
+function formationRelicFuncs(): ModifierTypeFunc[] {
+  return [
+    modifierTypes.ER_RELIC_QUARTERMASTER,
+    modifierTypes.ER_RELIC_LOOKOUT,
+    modifierTypes.ER_RELIC_ANCHOR,
+    modifierTypes.ER_RELIC_TWIN_LINK,
+  ];
+}
 
 /** Seeded ticket roll out of 100: 0-9 jackpot, 10-54 mid, 55-99 consolation. */
 const JACKPOT_THRESHOLD = 10;
@@ -65,7 +76,7 @@ const MID_THRESHOLD = 55;
 async function drawTicket(): Promise<void> {
   const roll = randSeedInt(100);
   if (roll < JACKPOT_THRESHOLD) {
-    const relic = randSeedItem(FORMATION_RELIC_FUNCS);
+    const relic = randSeedItem(formationRelicFuncs());
     setEncounterRewards({ guaranteedModifierTypeFuncs: [relic], fillRemaining: false });
     globalScene.playSound("item_fanfare");
     await showEncounterText(`${namespace}:jackpot`);

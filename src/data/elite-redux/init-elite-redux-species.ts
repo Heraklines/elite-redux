@@ -137,6 +137,15 @@ function deriveErFormSpeciesConst(baseConst: string, formKey: string, hasReduxRe
   if (upperFormKey === "ICE" || upperFormKey === "SHADOW") {
     candidates.push(`${baseConst}_${upperFormKey}_RIDER`);
   }
+  // Zacian/Zamazenta's pokerogue Crowned form key is "crowned", but ER ships the
+  // Crowned form species as SPECIES_ZACIAN_CROWNED_SWORD / _ZAMAZENTA_CROWNED_SHIELD.
+  // Without these the "crowned" lookup misses and the form silently inherits the
+  // BASE species kit (Zacian Crowned showed Intimidate + Intrepid Sword/Anger Point/
+  // Pixilate instead of Crowned Sword + Steelworker/Battle Armor/Keen Edge). Only the
+  // matching one resolves per species; the other simply isn't in erDraftByConst.
+  if (upperFormKey === "CROWNED") {
+    candidates.push(`${baseConst}_CROWNED_SWORD`, `${baseConst}_CROWNED_SHIELD`);
+  }
   // Spelling aliases (#361) — e.g. pokerogue "pompom" vs ER "_POM_POM".
   const alias = ER_FORM_KEY_SUFFIX_ALIASES[upperFormKey];
   if (alias) {

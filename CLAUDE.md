@@ -228,13 +228,127 @@ node scripts/render-sprite.mjs <atlas-path | slug | dexNo> [--back] [--black] [-
   #107), **NO TRANSPARENCY / BOXED** (solid or 4-uniform-opaque-corner background -
   the green/dark-box class, #134/#284), **FLAT FILL** (one colour dominates - a
   placeholder / wrong tint, #393), else `ok`.
-- **What it does NOT do:** composite a full screen (layout/alignment/overlap). That
-  needs Phaser's real renderer driving the real browser client - the headless test
-  harness mocks rendering away (e.g. `MockText` discards positions), so a screen can't
-  be re-composited from the mock tree, and the real client can't boot-and-render in
-  Node. Sprite-level pixels are the achievable real-pixel check; full-scene render is not.
+- For sprite-level pixel checks this is the fastest path (no Phaser boot). For a FULL
+  PAGE (layout/alignment/overlap), use the full-page render harness below.
 - Dep: `@napi-rs/canvas` (devDependency). Local er-assets checkout required (it's the
   asset source of truth; see the Assets section).
+
+## Tier 2b - full-page render harness (`test/tools/render-ui-page.test.ts`)
+
+Renders a REAL `UiHandler` page to a PNG so you can eyeball any layout/visual bug
+(the in-game-only screens included). Core: `test/tools/render-harness.ts`.
+
+🔴 **STANDING RULE — any work that changes what a SCREEN renders MUST go through this
+harness, before and after.** This covers: a visual/layout bug (overlap, alignment,
+missing/wrong sprite, wrong text, green `__MISSING` box, panel chrome, a wrong
+ability/passive/stat shown on a screen); building or restyling a screen; and new content
+that surfaces on a screen (a new item/relic icon, a new species/form, a new menu entry).
+Required, not optional:
+1. **Reproduce first.** Render the affected page and confirm the bug is visible in the PNG
+   *before* you change code. If you can't reproduce it here, say so and explain why (it may
+   be an interactive/animation/flow/browser bug this harness can't see — see "Out of scope").
+2. **Verify after.** Re-render and visually confirm the fix in the PNG. "tsc passes" / "looks
+   right in the code" is NOT verification - attach/inspect the actual image.
+3. **New screen ⇒ new recipe.** If you add a `UiHandler`/screen, add it to `PAGE_RECIPES`
+   in the same change so it (and every future change to it) is renderable. A screen with no
+   recipe is treated as incomplete.
+
+This complements - does not replace - the combat scenario runner (for battle/ability/move
+behavior) and the in-game test-suite scenario (standing rules above). Use whichever fit; for
+UI/visual work this harness is mandatory.
+
+```
+ER_SCENARIO=1 ER_RENDER_PAGE=<page> pnpm vitest run test/tools/render-ui-page.test.ts
+ER_SCENARIO=1 ER_RENDER_PAGE=all  pnpm vitest run test/tools/render-ui-page.test.ts   # every page, ONE boot
+ER_SCENARIO=1 ER_RENDER_PAGE=all  pnpm vitest     test/tools/render-ui-page.test.ts   # + watch (re-render on save)
+ER_SCENARIO=1 ER_RENDER_PAGE=bargain ER_SIMULATE_MISSING=1 ...   # repro a missing on-demand sprite
+ER_SCENARIO=1 ER_RENDER_PAGE=all ER_UPDATE_BASELINE=1 ...        # accept current renders as the new golden baselines
+```
+
+`ER_RENDER_PAGE` takes one page, a comma-list, or `all` (renders every recipe in a SINGLE
+GameManager boot - the ~30-50s ER init is paid once, then ~1-3s/page; without `run` you get
+watch-mode). **Golden-image gate:** each page pixel-diffs against
+`test/tools/ui-baselines/<page>.png` and FAILS on any change beyond the page's tolerance
+(0 = exact for static pages; the 2 pages with a live animated battle/hatch sprite use a coarse
+tolerance since that sprite is non-deterministic here). On an INTENDED visual change, re-run
+with `ER_UPDATE_BASELINE=1` and commit the updated baseline PNGs. A failing diff writes
+`dev-logs/ui-pages/<page>-diff.png` (red = changed pixels).
+
+Out: `dev-logs/ui-pages/<page>[-missing].png` (gitignored). All six wired pages
+(`PAGE_RECIPES`) render faithfully: `bargain`, `biome-shop`, `mystery-encounter`, `pokedex`,
+`egg-hatch` (real `EggSummaryUiHandler` - hatch-info card + IV hexagon + candy/egg-moves +
+the icon grid), and `starter-select` (real `show([cb])` - the species grid, filter bar,
+per-species detail panel with ER ability/passives/nature, party slots). Remaining green
+`__MISSING` boxes are genuinely-absent ER-custom icon keys (e.g. `er_icon__*` redux forms),
+not harness defects.
+
+How it works (so you can extend it):
+- Boots a normal headless `GameManager` for full DATA + every registered handler, then
+  boots a SECOND real Phaser **CANVAS** scene (`@napi-rs/canvas`) - the only thing that
+  rasterizes pixels (the GameManager scene is HEADLESS + mock factories, renders nothing).
+- `repointGlobalScene` swaps `globalScene`'s RENDER members (add/textures/anims/tweens/
+  time/cameras/ui + `loadPokemonAtlas`) onto the CANVAS scene, keeping all data. So the
+  real handler renders real pixels at the game's x6 logical->screen scale.
+- **Two-pass asset auto-injection**: pass 1 runs the handler and records every texture
+  key it requests; those keys are resolved against the local er-assets dirs and injected;
+  pass 2 renders for real. Adding a page rarely needs an asset list - it self-configures.
+- Phaser's `NineSlice` has NO canvas renderer (WebGL-only), so the harness installs one
+  (`patchNineSliceCanvas`) - without it every windowed panel is invisible. `setTint` is
+  approximated via an isolated offscreen multiply.
+- **`restoreSpriteTextureMethods` (critical)**: the test framework's `MockSprite` ctor
+  globally clobbers `Phaser.GameObjects.Sprite.prototype.setTexture/setFrame/setSizeToFrame`
+  to no-ops during GameManager boot. In the real CANVAS scene that silently blanks every
+  sprite NOT textured via `.play()` (icon grids, shiny stars). `repointGlobalScene` restores
+  the genuine impls from the `Components.TextureCrop`/`Size` mixins (which the mock never
+  touched). If a new screen's sprites mysteriously don't render, this is the first suspect.
+- The asset index walks the WHOLE `images/` tree by basename (first-wins), skipping only the
+  huge `images/pokemon` mass (battle sprites load by atlasPath via `loadPokemonAtlas`). Loads
+  where the texture KEY != file basename (e.g. `shiny_star`->`ui/shiny.png`) go in
+  `KEY_FILE_OVERRIDES`; ER-custom icon keys `er_icon__<slug>` resolve to
+  `pokemon/elite-redux/<slug>/icon` (mirrors `loading-scene.ts`) so custom-species grid icons
+  render instead of showing `__MISSING`. The 2D `batchSprite` guard skips frames with no
+  `canvasData`/source image so an un-injected key can't blank the whole page mid-pass.
+- Add a page: a `{ mode, prepare? }` recipe in `PAGE_RECIPES`. `prepare(game)` does run
+  setup (e.g. `startBattle`, assign an encounter, flag dex `caughtAttr`) on the ORIGINAL
+  scene and returns the handler's `show()` args; the it() body constructs a FRESH
+  `new HandlerClass()` (the registered instance's children are MockSprites) and re-points
+  rendering only after. A `{ render(game, ctx) }` recipe is also supported for fully custom
+  builds. `gs.ui` is a minimal mock (`add`/`bringToTop`/`clearText`/tooltip no-ops/
+  `getMessageHandler`) - extend it if a handler calls another UI method.
+- Known fidelity gaps: text/sprites render real; remaining `__MISSING` boxes are
+  genuinely-absent keys (logged as `unresolved`/`uninitialized-frame`); base (untinted)
+  windows render in the window's base colour.
+
+**Input driving (navigation / scroll / menu transitions / input-triggered crashes):**
+A recipe may carry `steps: Button[]` - after the page renders, each button is fired at the
+currently-active handler (`processInput`), with a `<page>-stepN.png` snapshot after each and
+the main PNG ending on the FINAL state. The `gs.ui` surface is stateful: when a press calls
+`setMode(...)` to hand off to ANOTHER screen (confirm dialog, option select, sub-menu) it
+builds + shows that handler fresh and routes subsequent input there - so this works
+**universally for any screen/menu**, including ones you transition INTO. A press that throws
+is captured to `<page>-stepN-crash.txt` and **is** the reproduction of an input-triggered
+crash/softlock (set `expectThrow: true` on the recipe to assert the crash). Use this for the
+cursor/scroll/menu-transition + softlock-to-black class (#135, #237, #438, #553). See the
+`starter-select-nav` demo recipe. (Residual: keyboard `Button` input only, not pointer/mouse
+hit-tests; very deep cross-handler chains may need extra `gs.ui` methods stubbed.)
+
+**Out of scope (do NOT expect this harness to catch these — use the noted tool instead):**
+- **Animation / timing / races** - tweens are force-completed to their end value and timers
+  no-op, so the GOLDEN snapshot is a still, not a film. Partial repro: set `frames: N` on a
+  recipe (or `ER_FRAMES=N`) to capture N successive LIVE frames as `<page>-frameNN.png` after
+  the page is built + input fired - a flip-book for sprite-anim / rapid-cycle-race bugs
+  (#140/#144). Tween-driven mid-animation states (fades) are still not stepped. 
+- **Multi-screen / phase flow & combat** - combat BEHAVIOR still goes through the **combat
+  scenario runner** + in-game test-suite (standing rules above). But a recipe CAN now render a
+  mid-run screen the phase pipeline reaches: set `captureActive: true` and DRIVE the game in
+  `prepare(game)` (e.g. `await game.classicMode.startBattle(...)`); the harness records the
+  last `ui.setMode(mode, args)` and renders that handler (see the `battle-command` demo).
+  Caveat: the battle FIELD (sprites, HP bars) is scene-level, not a UiHandler, so only the
+  active handler's own container renders - the menu/panel chrome, not the battlefield.
+- **WebGL-exact pixels** - it rasterizes with 2D `@napi-rs` canvas, not WebGL; shader/pipeline
+  output, variant **palette-swap colours**, masks, and glow/particle FX are approximated.
+- **Browser/prod-only** - service-worker/CDN cache staleness, cross-user/device sprite
+  variance (#335), audio/BGM (#403), and real save/cloud round-trips can't reproduce headlessly.
 
 ## The in-game dev test suite
 

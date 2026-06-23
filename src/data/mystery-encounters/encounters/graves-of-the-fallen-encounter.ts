@@ -270,15 +270,22 @@ function payRespects(grave: GhostTeamSnapshot): void {
   leaveEncounterWithoutBattle(false, MysteryEncounterMode.NO_BATTLE);
 }
 
-/** Solid, definitely-resolving held items used to top up a DISTURB payout. */
-const FALLBACK_HELD_FUNCS: ModifierTypeFunc[] = [
-  modifierTypes.LEFTOVERS,
-  modifierTypes.WIDE_LENS,
-  modifierTypes.SCOPE_LENS,
-  modifierTypes.FOCUS_BAND,
-  modifierTypes.QUICK_CLAW,
-  modifierTypes.KINGS_ROCK,
-];
+/**
+ * Solid, definitely-resolving held items used to top up a DISTURB payout. Resolved at
+ * CALL time, not module load: `modifierTypes` is populated lazily at game init, after
+ * this encounter module is imported, so a module-level capture froze in `undefined`
+ * item funcs that were silently dropped from the reward (#616).
+ */
+function fallbackHeldFuncs(): ModifierTypeFunc[] {
+  return [
+    modifierTypes.LEFTOVERS,
+    modifierTypes.WIDE_LENS,
+    modifierTypes.SCOPE_LENS,
+    modifierTypes.FOCUS_BAND,
+    modifierTypes.QUICK_CLAW,
+    modifierTypes.KINGS_ROCK,
+  ];
+}
 
 /**
  * The {@linkcode DISTURB_REWARD_ITEMS} held-item types a DISTURB win hands over:
@@ -301,7 +308,7 @@ function disturbMementoTypes(grave: GhostTeamSnapshot): PokemonHeldItemModifierT
   for (const fn of resolvableHeldItemFuncs(grave)) {
     tryAdd(fn);
   }
-  for (const fn of randSeedShuffle([...FALLBACK_HELD_FUNCS])) {
+  for (const fn of randSeedShuffle([...fallbackHeldFuncs()])) {
     tryAdd(fn);
   }
   return out;

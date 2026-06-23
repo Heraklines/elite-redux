@@ -57,15 +57,22 @@ const ALL_STATS = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD] as cons
 /** Colossal ancient constructs that can be the sealed guardian. */
 const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.GOLURK, SpeciesId.REGIROCK, SpeciesId.REGISTEEL, SpeciesId.GOLEM];
 
-/** The relic the guardian was set to protect (either outcome yields one). */
-const GUARDIAN_RELICS: ModifierTypeFunc[] = [
-  modifierTypes.ER_RELIC_MORALE_BANNER,
-  modifierTypes.ER_RELIC_SECOND_WIND,
-  modifierTypes.ER_RELIC_TWIN_LINK,
-  modifierTypes.ER_RELIC_ANCHOR,
-  modifierTypes.ER_RELIC_WEATHERVANE,
-  modifierTypes.ER_RELIC_MYSTERY_CHARM,
-];
+/**
+ * The relic the guardian was set to protect (either outcome yields one). Resolved at
+ * CALL time, not module load: `modifierTypes` is populated lazily at game init, after
+ * this encounter module is imported, so a module-level capture froze in `undefined`
+ * relic funcs that were silently dropped from the reward (#616).
+ */
+function guardianRelics(): ModifierTypeFunc[] {
+  return [
+    modifierTypes.ER_RELIC_MORALE_BANNER,
+    modifierTypes.ER_RELIC_SECOND_WIND,
+    modifierTypes.ER_RELIC_TWIN_LINK,
+    modifierTypes.ER_RELIC_ANCHOR,
+    modifierTypes.ER_RELIC_WEATHERVANE,
+    modifierTypes.ER_RELIC_MYSTERY_CHARM,
+  ];
+}
 
 interface GuardianMisc {
   guardianId: SpeciesId;
@@ -104,7 +111,7 @@ function buildGuardianBoss(): EnemyPartyConfig {
 
 /** Resolve the seal: clean read -> attune (relic, no fight); botch -> enraged boss. */
 async function resolveSeal(clean: boolean): Promise<void> {
-  const relic = randSeedItem(GUARDIAN_RELICS);
+  const relic = randSeedItem(guardianRelics());
   setEncounterRewards({
     guaranteedModifierTypeFuncs: [relic],
     guaranteedModifierTiers: [ModifierTier.ROGUE],

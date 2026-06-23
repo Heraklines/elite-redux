@@ -63,6 +63,7 @@ import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run
 import { chromaKeyErSpriteTexture } from "#data/elite-redux/er-sprite-chroma-key";
 import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
 import { ErWardStoneModifier } from "#data/elite-redux/er-ward-stones";
+import { erBattleFormDumpToBaseSpeciesId } from "#data/elite-redux/init-elite-redux-er-custom-form-changes";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
 import type { SpeciesFormChangeTrigger } from "#data/form-change-triggers";
 import { SpeciesFormChangeManualTrigger, SpeciesFormChangeTimeOfDayTrigger } from "#data/form-change-triggers";
@@ -1113,6 +1114,20 @@ export class BattleScene extends SceneBase {
       species = getPokemonSpecies(Overrides.ENEMY_SPECIES_OVERRIDE);
       // The fact that a Pokemon is a boss or not can change based on its Species and level
       boss = this.getEncounterBossSegments(this.currentBattle.waveIndex, level, species) > 1;
+    }
+    // ER: battle-FORM dump species (Wispywaspy Hivemind, Darmanitan Blunder,
+    // Mimikyu Busted, ...) are art-only - they have NO usable learnset, so
+    // constructing one as a battler yields a no-move Struggler (live gym-leader/
+    // ghost report). Whatever path produced the dump (ghost snapshot, trainer
+    // roster, ...), redirect to the BASE here - the single chokepoint every
+    // enemy passes - so the base's form-change innate (Locust Swarm, Battle
+    // Bond, ...) schools it into the alternate form. Idempotent for non-dump
+    // species; loaded save data is exempt (it round-trips already-legal mons).
+    if (!dataSource) {
+      const erBaseSpeciesId = erBattleFormDumpToBaseSpeciesId(species.speciesId);
+      if (erBaseSpeciesId !== undefined) {
+        species = getPokemonSpecies(erBaseSpeciesId);
+      }
     }
 
     const pokemon = new EnemyPokemon(species, level, trainerSlot, boss, shinyLock, dataSource, forRival);

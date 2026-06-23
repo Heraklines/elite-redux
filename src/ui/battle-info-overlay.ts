@@ -554,8 +554,6 @@ export class BattleInfoOverlay {
     // enemies gate slot 2 @ Lv15 and slot 3 @ Lv24. Show every slot (so the
     // player can read descriptions and plan), but mark the ones that aren't
     // actually in effect as Locked/Disabled instead of pretending they're live.
-    const rootSpeciesId = mon.species.getRootSpeciesId();
-    const passiveAttr = globalScene.gameData.starterData[rootSpeciesId]?.passiveAttr ?? 0;
     const isEnemy = mon.isEnemy?.() === true;
     const enemyLevelForSlot = [0, 15, 24];
     // ER Youngster mode (#368): innate slots temp-unlock by level, no candies.
@@ -591,12 +589,19 @@ export class BattleInfoOverlay {
         || ability.id === AbilityId.TRUANT // ER (#381): a TRUANT innate is always live for free (it is a nerf).
       ) {
         // live for free this run — fall through unlocked
-      } else if (!isSlotUnlocked(passiveAttr, passiveSlot)) {
-        locked = true;
-        label = "Innate (Locked)";
-      } else if (!isSlotEnabled(passiveAttr, passiveSlot)) {
-        locked = true;
-        label = "Innate (Disabled)";
+      } else {
+        // #611: a fusion's slots 0/2 are owned by the FUSION species, so read this
+        // slot's unlock from the species that owns it (mirrors the battle-time gate in
+        // Pokemon.canApplyAbility) - otherwise a fusion-owned innate that IS live in
+        // battle would still render here as "Locked".
+        const slotPassiveAttr = mon.innateSlotPassiveAttr(passiveSlot);
+        if (!isSlotUnlocked(slotPassiveAttr, passiveSlot)) {
+          locked = true;
+          label = "Innate (Locked)";
+        } else if (!isSlotEnabled(slotPassiveAttr, passiveSlot)) {
+          locked = true;
+          label = "Innate (Disabled)";
+        }
       }
       rows.push({ label, abilityId: ability.id, locked });
     }

@@ -104,6 +104,20 @@ export interface StatTriggerPayload {
   readonly stats: readonly StatChange[];
 }
 
+/** {@linkcode StatTriggerOnKoAbAttr} payload — adds the KO-credit opt-out. */
+export interface StatTriggerOnKoPayload extends StatTriggerPayload {
+  /**
+   * When `false`/omitted (the default), the trigger only fires if THIS Pokemon
+   * is credited with the knockout — Moxie/Hubris/Chilling Neigh semantics.
+   *
+   * When `true`, it fires whenever ANY Pokemon faints anywhere on the field,
+   * including allies and enemies. ER's `Forsaken Heart` is the only ability
+   * that wants this ("Raises Attack by one stage when any Pokemon faints on
+   * the battlefield, including allies and enemies").
+   */
+  readonly triggerOnAnyFaint?: boolean;
+}
+
 /** {@linkcode StatTriggerOnHitAbAttr} payload — adds an optional on-hit filter. */
 export interface StatTriggerOnHitPayload extends StatTriggerPayload {
   /** Optional filter for which incoming moves trigger the proc. Omit for "any hit". */
@@ -175,23 +189,45 @@ export interface StatTriggerOnEventAbAttr {
  *
  * @remarks
  * Extends {@linkcode PostKnockOutAbAttr}, which is dispatched from
- * `faint-phase.ts` for every still-alive Pokemon when one faints. The default
- * `canApply` returns true; subclasses that need to gate further (e.g. only on
- * direct-KO via the user's move) would extend this further — none of the
- * C1b targets need that, so we keep canApply unconditional.
+ * `faint-phase.ts` for every still-alive Pokemon when one faints. Because that
+ * fires for the holder even when a TEAMMATE faints, `canApply` is overridden to
+ * require (by default) that the holder is the one credited with the KO
+ * (Moxie/Hubris-style). `Forsaken Heart` opts out via `triggerOnAnyFaint`.
  */
 export class StatTriggerOnKoAbAttr extends PostKnockOutAbAttr implements StatTriggerOnEventAbAttr {
   public readonly event: StatTriggerEvent = "on-ko";
   private readonly stats: readonly StatChange[];
+  private readonly triggerOnAnyFaint: boolean;
 
-  constructor(payload: StatTriggerPayload) {
+  constructor(payload: StatTriggerOnKoPayload) {
     super();
     validateStatChanges("StatTriggerOnKoAbAttr", payload.stats);
     this.stats = payload.stats;
+    this.triggerOnAnyFaint = payload.triggerOnAnyFaint ?? false;
   }
 
   public getStatChanges(): readonly StatChange[] {
     return this.stats;
+  }
+
+  /**
+   * Moxie/Hubris semantics: only fire when THIS Pokemon landed the knockout -
+   * NOT when a teammate (or the foe's own mon) faints. `faint-phase` applies
+   * `PostKnockOutAbAttr` to EVERY on-field Pokemon when one faints, so without
+   * this gate the holder would boost off an ally's death. The victim's most
+   * recent attacker is the mon credited with the KO; require it to be us.
+   *
+   * `Forsaken Heart` sets `triggerOnAnyFaint` and skips the gate: it boosts on
+   * any faint anywhere on the field, by design.
+   */
+  public override canApply(params: PostKnockOutAbAttrParams): boolean {
+    if (this.triggerOnAnyFaint) {
+      return true;
+    }
+    if (params.victim === params.pokemon) {
+      return false;
+    }
+    return params.victim.turnData?.attacksReceived?.[0]?.sourceId === params.pokemon.id;
   }
 
   public override apply(params: PostKnockOutAbAttrParams): void {

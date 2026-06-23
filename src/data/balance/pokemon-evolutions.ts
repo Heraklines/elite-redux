@@ -72,8 +72,6 @@ export enum EvolutionItem {
   LEADERS_CREST
 }
 
-const tyrogueMoves = [MoveId.LOW_SWEEP, MoveId.MACH_PUNCH, MoveId.RAPID_SPIN] as const;
-type TyrogueMove = (typeof tyrogueMoves)[number];
 
 const EvoCondKey = {
   FRIENDSHIP: 1,
@@ -83,7 +81,6 @@ const EvoCondKey = {
   PARTY_TYPE: 5,
   WEATHER: 6,
   BIOME: 7,
-  TYROGUE: 8,
   SHEDINJA: 9,
   EVO_TREASURE_TRACKER: 10,
   RANDOM_FORM: 11,
@@ -104,7 +101,6 @@ type EvolutionConditionData =
   {key: typeof EvoCondKey.HELD_ITEM, itemKey: SpeciesStatBoosterItem} |
   {key: typeof EvoCondKey.NATURE, nature: Nature[]} |
   {key: typeof EvoCondKey.WEATHER, weather: WeatherType[]} |
-  {key: typeof EvoCondKey.TYROGUE, move: TyrogueMove} |
   {key: typeof EvoCondKey.SHEDINJA};
 
 export class SpeciesEvolutionCondition {
@@ -132,7 +128,6 @@ export class SpeciesEvolutionCondition {
         case EvoCondKey.GENDER:
           return i18next.t("pokemonEvolutions:gender", {gender: getGenderSymbol(cond.gender)});
         case EvoCondKey.MOVE:
-        case EvoCondKey.TYROGUE:
           return i18next.t("pokemonEvolutions:move", {move: allMoves[cond.move].name});
         case EvoCondKey.BIOME:
           return i18next.t("pokemonEvolutions:biome");
@@ -184,11 +179,6 @@ export class SpeciesEvolutionCondition {
           return cond.biome.includes(globalScene.arena.biomeId);
         case EvoCondKey.WEATHER:
           return cond.weather.includes(globalScene.arena.weatherType);
-        case EvoCondKey.TYROGUE:
-          return (
-            pokemon.getMoveset(true).find(m => (tyrogueMoves as readonly MoveId[]).includes(m.moveId))?.moveId
-            === cond.move
-          );
         case EvoCondKey.NATURE:
           return cond.nature.includes(pokemon.getNature());
         case EvoCondKey.RANDOM_FORM: {
@@ -474,14 +464,14 @@ export const pokemonEvolutions: PokemonEvolutions = {
   ],
   [SpeciesId.TYROGUE]: [
     /**
-     * Custom: Evolves into Hitmonlee, Hitmonchan or Hitmontop at level 20
-     * if it knows Low Sweep, Mach Punch, or Rapid Spin, respectively.
-     * If Tyrogue knows multiple of these moves, its evolution is based on
-     * the first qualifying move in its moveset.
+     * ER 2.65 dex: a plain level-20 evolution into all three Hitmons. Like other
+     * branched evolutions, the player CHOOSES the path at level 20 (all three are
+     * valid at once, so EvolutionPhase prompts a selection). No move requirement
+     * and no stat gating - it always evolves on level-up.
      */
-    new SpeciesEvolution(SpeciesId.HITMONLEE, 20, null, {key: EvoCondKey.TYROGUE, move: MoveId.LOW_SWEEP}),
-    new SpeciesEvolution(SpeciesId.HITMONCHAN, 20, null, {key: EvoCondKey.TYROGUE, move: MoveId.MACH_PUNCH}),
-    new SpeciesEvolution(SpeciesId.HITMONTOP, 20, null, {key: EvoCondKey.TYROGUE, move: MoveId.RAPID_SPIN}),
+    new SpeciesEvolution(SpeciesId.HITMONLEE, 20, null, null),
+    new SpeciesEvolution(SpeciesId.HITMONCHAN, 20, null, null),
+    new SpeciesEvolution(SpeciesId.HITMONTOP, 20, null, null),
   ],
   [SpeciesId.KOFFING]: [
     new SpeciesEvolution(SpeciesId.GALAR_WEEZING, 35, null, {key: EvoCondKey.TIME, time: [TimeOfDay.DUSK, TimeOfDay.NIGHT]}),
@@ -1503,23 +1493,26 @@ export const pokemonEvolutions: PokemonEvolutions = {
   [SpeciesId.STARYU]: [
     new SpeciesEvolution(SpeciesId.STARMIE, 1, EvolutionItem.WATER_STONE, null, [20, 25, 30])
   ],
+  // ER 2.65: Eevee evolves at level 23 and the player CHOOSES the eeveelution
+  // (the dex makes every branch a plain level-up; no friendship/time/stone gates).
+  // All branches share a level so EvolutionPhase prompts a pick, like Tyrogue.
   [SpeciesId.EEVEE]: [
-    new SpeciesFormEvolution(SpeciesId.SYLVEON, "", "", 1, null, [{key: EvoCondKey.FRIENDSHIP, value: 120}, {key: EvoCondKey.MOVE_TYPE, pkmnType: PokemonType.FAIRY}], [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.SYLVEON, "partner", "", 1, null, [{key: EvoCondKey.FRIENDSHIP, value: 120}, {key: EvoCondKey.MOVE_TYPE, pkmnType: PokemonType.FAIRY}], [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.ESPEON, "", "", 1, null, [{key: EvoCondKey.FRIENDSHIP, value: 120}, {key: EvoCondKey.TIME, time: [TimeOfDay.DAWN, TimeOfDay.DAY]}], [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.ESPEON, "partner", "", 1, null, [{key: EvoCondKey.FRIENDSHIP, value: 120}, {key: EvoCondKey.TIME, time: [TimeOfDay.DAWN, TimeOfDay.DAY]}], [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.UMBREON, "", "", 1, null, [{key: EvoCondKey.FRIENDSHIP, value: 120}, {key: EvoCondKey.TIME, time: [TimeOfDay.DUSK, TimeOfDay.NIGHT]}], [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.UMBREON, "partner", "", 1, null, [{key: EvoCondKey.FRIENDSHIP, value: 120}, {key: EvoCondKey.TIME, time: [TimeOfDay.DUSK, TimeOfDay.NIGHT]}], [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.VAPOREON, "", "", 1, EvolutionItem.WATER_STONE, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.VAPOREON, "partner", "", 1, EvolutionItem.WATER_STONE, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.JOLTEON, "", "", 1, EvolutionItem.THUNDER_STONE, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.JOLTEON, "partner", "", 1, EvolutionItem.THUNDER_STONE, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.FLAREON, "", "", 1, EvolutionItem.FIRE_STONE, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.FLAREON, "partner", "", 1, EvolutionItem.FIRE_STONE, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.LEAFEON, "", "", 1, EvolutionItem.LEAF_STONE, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.LEAFEON, "partner", "", 1, EvolutionItem.LEAF_STONE, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.GLACEON, "", "", 1, EvolutionItem.ICE_STONE, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.GLACEON, "partner", "", 1, EvolutionItem.ICE_STONE, null, [24, 28, 28])
+    new SpeciesFormEvolution(SpeciesId.SYLVEON, "", "", 23, null, null, [24, 28, 28]),
+    new SpeciesFormEvolution(SpeciesId.SYLVEON, "partner", "", 23, null, null, [24, 28, 28]),
+    new SpeciesFormEvolution(SpeciesId.ESPEON, "", "", 23, null, null, [24, 28, 28]),
+    new SpeciesFormEvolution(SpeciesId.ESPEON, "partner", "", 23, null, null, [24, 28, 28]),
+    new SpeciesFormEvolution(SpeciesId.UMBREON, "", "", 23, null, null, [24, 28, 28]),
+    new SpeciesFormEvolution(SpeciesId.UMBREON, "partner", "", 23, null, null, [24, 28, 28]),
+    new SpeciesFormEvolution(SpeciesId.VAPOREON, "", "", 23, null, null, [24, 28, 28]),
+    new SpeciesFormEvolution(SpeciesId.VAPOREON, "partner", "", 23, null, null, [24, 28, 28]),
+    new SpeciesFormEvolution(SpeciesId.JOLTEON, "", "", 23, null, null, [24, 28, 28]),
+    new SpeciesFormEvolution(SpeciesId.JOLTEON, "partner", "", 23, null, null, [24, 28, 28]),
+    new SpeciesFormEvolution(SpeciesId.FLAREON, "", "", 23, null, null, [24, 28, 28]),
+    new SpeciesFormEvolution(SpeciesId.FLAREON, "partner", "", 23, null, null, [24, 28, 28]),
+    new SpeciesFormEvolution(SpeciesId.LEAFEON, "", "", 23, null, null, [24, 28, 28]),
+    new SpeciesFormEvolution(SpeciesId.LEAFEON, "partner", "", 23, null, null, [24, 28, 28]),
+    new SpeciesFormEvolution(SpeciesId.GLACEON, "", "", 23, null, null, [24, 28, 28]),
+    new SpeciesFormEvolution(SpeciesId.GLACEON, "partner", "", 23, null, null, [24, 28, 28])
   ],
   [SpeciesId.TOGETIC]: [
     new SpeciesEvolution(SpeciesId.TOGEKISS, 1, EvolutionItem.SHINY_STONE, null, [40, 45, 50])
@@ -1634,10 +1627,12 @@ export const pokemonEvolutions: PokemonEvolutions = {
   [SpeciesId.CRABRAWLER]: [
     new SpeciesEvolution(SpeciesId.CRABOMINABLE, 1, EvolutionItem.ICE_STONE, null, [35, 40, 40])
   ],
+  // ER 2.65: Rockruff evolves at level 23 and the player CHOOSES the Lycanroc
+  // form (no time-of-day gate). Dusk still requires an Own Tempo Rockruff.
   [SpeciesId.ROCKRUFF]: [
-    new SpeciesFormEvolution(SpeciesId.LYCANROC, "own-tempo", "dusk", 25, null, null),
-    new SpeciesFormEvolution(SpeciesId.LYCANROC, "", "midday", 25, null, {key: EvoCondKey.TIME, time: [TimeOfDay.DAWN, TimeOfDay.DAY]}),
-    new SpeciesFormEvolution(SpeciesId.LYCANROC, "", "midnight", 25, null, {key: EvoCondKey.TIME, time: [TimeOfDay.DUSK, TimeOfDay.NIGHT]})
+    new SpeciesFormEvolution(SpeciesId.LYCANROC, "own-tempo", "dusk", 23, null, null),
+    new SpeciesFormEvolution(SpeciesId.LYCANROC, "", "midday", 23, null, null),
+    new SpeciesFormEvolution(SpeciesId.LYCANROC, "", "midnight", 23, null, null)
   ],
   [SpeciesId.STEENEE]: [
     new SpeciesEvolution(SpeciesId.TSAREENA, 28, null, {key: EvoCondKey.MOVE, move: MoveId.STOMP}, [29, 34, 39])
@@ -1820,9 +1815,10 @@ export const pokemonEvolutions: PokemonEvolutions = {
   [SpeciesId.CHANSEY]: [
     new SpeciesEvolution(SpeciesId.BLISSEY, 1, null, {key: EvoCondKey.FRIENDSHIP, value: 180}, [40, 45, 45])
   ],
+  // ER 2.65: Pichu evolves at level 10 (no friendship gate).
   [SpeciesId.PICHU]: [
-    new SpeciesFormEvolution(SpeciesId.PIKACHU, "spiky", "partner", 1, null, {key: EvoCondKey.FRIENDSHIP, value: 90}, [12, 12, 16]),
-    new SpeciesFormEvolution(SpeciesId.PIKACHU, "", "", 1, null, {key: EvoCondKey.FRIENDSHIP, value: 90}, [12, 12, 16]),
+    new SpeciesFormEvolution(SpeciesId.PIKACHU, "spiky", "partner", 10, null, null, [12, 12, 16]),
+    new SpeciesFormEvolution(SpeciesId.PIKACHU, "", "", 10, null, null, [12, 12, 16]),
   ],
   [SpeciesId.CLEFFA]: [
     new SpeciesEvolution(SpeciesId.CLEFAIRY, 1, null, {key: EvoCondKey.FRIENDSHIP, value: 160}, [12, 12, 16])

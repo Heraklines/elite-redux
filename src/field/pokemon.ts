@@ -240,7 +240,7 @@ import {
 import { calculateBossSegmentDamage } from "#utils/damage";
 import { getEnumValues } from "#utils/enums";
 import { cachedFetch } from "#utils/fetch-utils";
-import { hasAnyActiveSlot, isSlotActive } from "#utils/passive-utils";
+import { isSlotActive } from "#utils/passive-utils";
 import { decodeNickname, getFusedSpeciesName, getPokemonSpecies, getPokemonSpeciesForm } from "#utils/pokemon-utils";
 import { inSpeedOrder } from "#utils/speed-order-generator";
 import { ValueHolder } from "#utils/value-holder";
@@ -2831,12 +2831,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // flag reflected slot 0 only, so unlocking 2+ slots (or only slot 2) broke it.
     let basePassive = this.passive;
     if (this.isPlayer()) {
-      const passiveAttr = globalScene.gameData.starterData[this.species.getRootSpeciesId()]?.passiveAttr ?? 0;
       // ER Youngster mode (#368): innates are temp-unlocked by level for the
       // run, so the player "has a passive" whenever any slot is filled. ER
       // (#379): DAILY runs likewise unlock all innates for the run.
+      // #611: read each slot's unlock from the species that OWNS it (fusion-aware),
+      // so a fusion whose 3rd innate is unlocked only on the fusion species counts.
       basePassive =
-        hasAnyActiveSlot(passiveAttr)
+        ([0, 1, 2] as const).some(s => isSlotActive(this.innateSlotPassiveAttr(s), s))
         || ((erYoungsterFreeInnateSlots(this.level) > 0 || gameMode.isDaily)
           && this.getPassiveAbilities().some(a => a != null)) // ER (#381): a TRUANT innate is always live (it is a nerf).
         || this.getPassiveAbilities()
@@ -2922,6 +2923,24 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    *   the requested passive slot is empty (so the dispatcher in
    *   {@linkcode applySingleAbAttrs} short-circuits without falling back to slot 0).
    */
+  /**
+   * The candy `passiveAttr` that governs the unlock of innate `slot` for this mon.
+   * For a fusion the innate slots 0 and 2 (passive / passive3) belong to the FUSION
+   * species and slot 1 (passive2) to the base - mirroring {@linkcode getAbilitySlotOwner}
+   * - so each slot's unlock must be read from the species that OWNS it. For a
+   * non-fusion every slot uses the base species. (#611: a passive3 unlocked on the
+   * fusion species was ignored because every slot consulted the base's `passiveAttr`.)
+   *
+   * Public so UI surfaces that render per-slot lock state (the in-battle Abilities
+   * panel) read the unlock from the same owning species the battle-time gates do,
+   * keeping "shown locked" in sync with "actually live".
+   */
+  public innateSlotPassiveAttr(slot: 0 | 1 | 2): number {
+    const owner =
+      this.isFusion() && this.fusionSpecies && (slot === 0 || slot === 2) ? this.fusionSpecies : this.species;
+    return globalScene.gameData.starterData[owner.getRootSpeciesId()]?.passiveAttr ?? 0;
+  }
+
   public canApplyAbility(passive = false, passiveSlot = 0): boolean {
     // ER 3-passive: resolve the candidate ability first (before the unlock gates
     // below) so we can special-case form-change-driving innates. We avoid falling
@@ -2953,7 +2972,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       const overridden =
         Overrides.HAS_PASSIVE_ABILITY_OVERRIDE === true || Overrides.PASSIVE_ABILITY_OVERRIDE !== AbilityId.NONE;
       if (!overridden) {
-        const passiveAttr = globalScene.gameData.starterData[this.species.getRootSpeciesId()]?.passiveAttr ?? 0;
+        // #611: read the unlock from the species that OWNS this slot (the fusion
+        // species for the fusion-owned slots 0/2). See `innateSlotPassiveAttr`.
+        const passiveAttr = this.innateSlotPassiveAttr(passiveSlot as 0 | 1 | 2);
         // ER Youngster mode (#368): innate slots are TEMP-unlocked by level
         // for the run (no candy purchase needed; nothing persisted) — the
         // same 1/15/24 ramp enemies use. Candy unlocks still count too.
@@ -3084,7 +3105,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       // Dev/test passive overrides force all innate slots on (mirrors canApplyAbility).
       const overridden =
         Overrides.HAS_PASSIVE_ABILITY_OVERRIDE === true || Overrides.PASSIVE_ABILITY_OVERRIDE !== AbilityId.NONE;
-      const passiveAttr = globalScene.gameData.starterData[this.species.getRootSpeciesId()]?.passiveAttr ?? 0;
+      // #611: a fusion's slots 0/2 are owned by the fusion species, so read each
+      // slot's unlock from its owner (mirrors `canApplyAbility`/`hasPassive`) - keeps
+      // reward-pool gating consistent with what is actually live in battle.
+      const passiveAttr = this.innateSlotPassiveAttr(slot as 0 | 1 | 2);
       if (overridden || isSlotActive(passiveAttr, slot as 0 | 1 | 2)) {
         return true;
       }
@@ -5350,7 +5374,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       || formKey === SpeciesFormKey.GIGANTAMAX
       || formKey === SpeciesFormKey.GIGANTAMAX_RAPID
       || formKey === SpeciesFormKey.GIGANTAMAX_SINGLE
-      || formKey === SpeciesFormKey.ETERNAMAX
+      || formKey === SpeciesFormKey.ETERNAMAX // ER: Zacian/Zamazenta Crowned (Rusted Sword/Shield) carry their OWN ER // ability set in the form data (Crowned Sword + Steelworker/Battle Armor/ // Keen Edge), like a mega. Without this the form reads the BASE (Hero) kit
+      || // - the live "Zacian Crowned looks vanilla / doesn't get Keen Edge" report.
+      formKey === "crowned"
     );
   }
 
@@ -7582,7 +7608,18 @@ export class PlayerPokemon extends Pokemon {
       const capsuleAbilityId = this.customPokemonData.ability;
       if (capsuleAbilityId != null && capsuleAbilityId !== -1) {
         const evolvedInnates = this.getPassiveAbilities();
-        if (evolvedInnates.some(a => a?.id === capsuleAbilityId)) {
+        const duplicatesEvolvedInnate = evolvedInnates.some(a => a?.id === capsuleAbilityId);
+        // #607: a capsule override that pinned one of the PRE-evo species' OWN
+        // abilities is no longer legal if the evolved species doesn't share it (ER
+        // lines can diverge entirely, e.g. Shelmet's Damp -> Accelgor has no Damp).
+        // Drop it so the active re-derives to a real ability of the evolved form.
+        // Deliberate non-species overrides (ME / custom starter) are never one of
+        // the pre-evo's own abilities, so they're left alone.
+        const activeAbilityIds = (form: PokemonSpeciesForm): AbilityId[] =>
+          Array.from({ length: form.getAbilityCount() }, (_, i) => form.getAbility(i));
+        const wasPreEvoActive = activeAbilityIds(preEvolution).includes(capsuleAbilityId);
+        const isEvolvedActive = activeAbilityIds(this.getSpeciesForm()).includes(capsuleAbilityId);
+        if (duplicatesEvolvedInnate || (wasPreEvoActive && !isEvolvedActive)) {
           this.customPokemonData.ability = -1;
           this.customPokemonData.abilityOverridesForm = false;
         }

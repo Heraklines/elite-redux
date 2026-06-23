@@ -278,6 +278,18 @@ export function erTryConsumePowerHerb(user: Pokemon): boolean {
 }
 
 /**
+ * Power Herb (#401): non-consuming check of whether the holder has a USABLE Power
+ * Herb right now (a charge available and not Frisk-locked). Mirrors the eligibility
+ * gate in {@linkcode erTryConsumePowerHerb} without spending a charge - used to know,
+ * ahead of time, that a charge move will resolve in a SINGLE turn (e.g. so a
+ * Multi-Headed mon's Power-Herb'd Dive is still multi-strike eligible, #617).
+ */
+export function erHasUsablePowerHerb(user: Pokemon): boolean {
+  const herb = getPowerHerb(user);
+  return !!herb && herb.charges > 0 && !erIsHeldItemDisabled(user, herb.type?.id);
+}
+
+/**
  * Power Herb recharge (#401): +1 wave of progress per won wave; at
  * {@linkcode ER_POWER_HERB_RECHARGE_WAVES} the herb regains ONE charge
  * (capped at {@linkcode ER_POWER_HERB_CHARGES}). Called from BattleEndPhase

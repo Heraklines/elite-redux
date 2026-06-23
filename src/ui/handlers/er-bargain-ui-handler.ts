@@ -249,6 +249,16 @@ export class ErBargainUiHandler extends UiHandler {
     this.speaking = false;
     this.dialogueText.setText(this.greeting);
 
+    // Always reveal the big left visual immediately using the always-preloaded
+    // portrait texture as a stand-in, then upgrade to the real animated battle
+    // sprite when/if it lands (loadGiratina below). Without this, a failed/slow
+    // battle-sprite load (e.g. the giratina_origin atlas not reaching the client
+    // on staging) leaves the entire left side empty - the reported #550 follow-up
+    // where only the small portrait showed. The stand-in guarantees a Giratina is
+    // always on screen; the upgrade is seamless (synchronous when cached).
+    this.giratina.setTexture("er_bargain_giratina");
+    this.fitGiratina();
+
     // Restore the choosing UI. show() is the canonical re-entry (after Check Team
     // or backing out of the party); a prior speak() may have hidden the panel +
     // sub-box, and they would otherwise stay hidden on re-open.
@@ -297,12 +307,17 @@ export class ErBargainUiHandler extends UiHandler {
       .catch(() => {});
   }
 
-  /** Apply the Giratina texture/anim, fit it to the left visual area, reveal it. */
+  /** Apply the Giratina texture/anim, then fit + reveal it. */
   private showGiratinaSprite(key: string): void {
     this.giratina.setTexture(key);
     if (globalScene.anims.exists(key)) {
       this.giratina.play(key);
     }
+    this.fitGiratina();
+  }
+
+  /** Scale whatever texture is currently on the Giratina sprite to the left visual area and reveal it. */
+  private fitGiratina(): void {
     this.giratina.setScale(1);
     const sh = this.giratina.height || 1;
     const maxH = 122;

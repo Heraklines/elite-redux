@@ -698,7 +698,59 @@ export function applyErRivalOverride(trainer: Trainer, index: number): EnemyPoke
   if (index >= roster.length) {
     return null;
   }
-  return buildErEnemyFromMember(trainer, index, roster[index]);
+  const built = buildErEnemyFromMember(trainer, index, roster[index]);
+  if (built) {
+    erEvolveRivalToLevel(trainer, built, index);
+  }
+  return built;
+}
+
+/**
+ * ER (#612): evolve a rival roster member UP to the species its WAVE-SCALED LEVEL
+ * would have reached. The rival's STAGE (and so its roster species) is mapped from
+ * the encounter's position in the run's rival sequence, but its LEVEL is mapped from
+ * the wave - so on Hell, where extra early rivals push the early stages onto already
+ * mid-game waves, the Route-110 roster's Growlithe spawned at a wave-55 level (a
+ * high-level UNEVOLVED mon). Run each member through the same
+ * {@linkcode PokemonSpecies.getTrainerSpeciesForLevel} the vanilla trainer path uses,
+ * so the rival evolves exactly as a normal trainer's mon of that species would at the
+ * level/wave (Growlithe -> Arcanine). The curated, already-evolved late rosters
+ * (Route 119 / Lilycove) return the same species and are left untouched. The universal
+ * BST cap (enforceErEliteBstCurve) still runs afterwards and devolves the result if
+ * the evolved form overshoots the wave ceiling.
+ */
+function erEvolveRivalToLevel(trainer: Trainer, enemy: EnemyPokemon, index: number): void {
+  const template = trainer.getPartyTemplate?.();
+  if (!template) {
+    return;
+  }
+  const evolvedId = enemy.species.getTrainerSpeciesForLevel(
+    enemy.level,
+    true,
+    template.getStrength(index),
+    template.evoLevelThresholdKind,
+  );
+  if (evolvedId === enemy.species.speciesId) {
+    return; // already the level-appropriate stage
+  }
+  const evolved = getPokemonSpecies(evolvedId);
+  if (!evolved) {
+    return;
+  }
+  enemy.species = evolved;
+  enemy.formIndex = 0;
+  const abilityCount = enemy.getSpeciesForm().getAbilityCount();
+  if (enemy.abilityIndex >= abilityCount) {
+    enemy.abilityIndex = abilityCount - 1;
+  }
+  // The early-stage roster's moveset would be weak on the evolved species, so give it
+  // a level-appropriate moveset. Only species that ACTUALLY evolved reach here (the
+  // already-correct late rosters returned above with their curated movesets intact).
+  enemy.generateAndPopulateMoveset();
+  enemy.calculateStats();
+  enemy.generateName();
+  // ER (#434): the species changed after EncounterPhase loaded the sprite - rebind it.
+  void enemy.loadAssets(false);
 }
 
 /** Build the final rival's ace: Mega Rayquaza (#340), vanilla-finale parity. */

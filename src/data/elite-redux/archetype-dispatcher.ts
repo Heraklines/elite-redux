@@ -2737,11 +2737,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     }
     case 771:
-      // Forsaken Heart — Attack +1 whenever any Pokemon is KO'd. Uses the
-      // unfiltered KO trigger (the trigger fires for the holder regardless of
-      // who actually scored the KO, matching the "anywhere on the field"
-      // text).
-      return ok([new StatTriggerOnKoAbAttr({ stats: [{ stat: Stat.ATK, stages: 1 }] })]);
+      // Forsaken Heart — Attack +1 whenever ANY Pokemon faints on the field,
+      // including allies and enemies. This is the ONE ability in the on-KO
+      // family that intentionally fires regardless of who scored the KO, so it
+      // opts into `triggerOnAnyFaint` to skip the Moxie-style holder-credit gate
+      // that every other on-KO ability (Hubris, Chilling Neigh, etc.) needs.
+      return ok([new StatTriggerOnKoAbAttr({ stats: [{ stat: Stat.ATK, stages: 1 }], triggerOnAnyFaint: true })]);
     case 427:
       // Cheating Death — "Negates the first two instances of damage received."
       // Full no-damage-for-N-hits: the first 2 damaging instances are set to 0

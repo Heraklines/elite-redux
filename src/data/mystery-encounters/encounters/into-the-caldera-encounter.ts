@@ -97,12 +97,15 @@ const PAYOUT_CHANCE = 65;
 /** A paying descent is worth at least this fraction of the player's current money. */
 const PAYOUT_MONEY_FRACTION = 0.1;
 
-/** Thematic held items the lava tube can turn up (given straight to a party mon). */
-const CALDERA_ITEM_FUNCS: ModifierTypeFunc[] = [
-  modifierTypes.FLAME_ORB,
-  modifierTypes.QUICK_CLAW,
-  modifierTypes.KINGS_ROCK,
-];
+/**
+ * Thematic held items the lava tube can turn up (given straight to a party mon).
+ * Resolved at CALL time, not module load: `modifierTypes` is populated lazily at game
+ * init, after this encounter module is imported, so a module-level capture froze in
+ * `undefined` item funcs that were silently dropped from the reward (#616).
+ */
+function calderaItemFuncs(): ModifierTypeFunc[] {
+  return [modifierTypes.FLAME_ORB, modifierTypes.QUICK_CLAW, modifierTypes.KINGS_ROCK];
+}
 
 /** Percent chance a descent at `level` (0-indexed) also turns up a held item. */
 function itemFindChance(level: number): number {
@@ -117,7 +120,7 @@ function maybeFindCalderaItem(level: number): boolean {
   if (randSeedInt(100) >= itemFindChance(level)) {
     return false;
   }
-  const itemType = generateModifierType(randSeedItem(CALDERA_ITEM_FUNCS)) as PokemonHeldItemModifierType | null;
+  const itemType = generateModifierType(randSeedItem(calderaItemFuncs())) as PokemonHeldItemModifierType | null;
   if (!itemType) {
     return false;
   }
