@@ -1,0 +1,108 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Co-op battle CHECKPOINT (#633, LIVE-D). The PURE core of the authoritative
+// post-turn state the host streams and the guest applies: build a
+// `CoopBattleCheckpoint` from a readable view of the field + arena, and normalize a
+// target mon-state before the guest writes it onto its engine mon.
+//
+// Deliberately engine-FREE (no `globalScene` / `Pokemon` import) so it is unit-
+// testable headlessly. The thin engine adapters that READ a live `Pokemon`/arena
+// into these views and WRITE a normalized state back live in the phase wiring (which
+// may import the engine); this module is just the data transform, so the clamping /
+// shape logic is verifiable without booting the game.
+// =============================================================================
+
+import type { CoopBattleCheckpoint, CoopSerializedMonState } from "#data/elite-redux/coop/coop-transport";
+
+/** A readable snapshot of ONE live field mon (extracted from a `Pokemon` at the call site). */
+export interface CoopFieldMonView {
+  /** Battler index (0 host lead, 1 guest lead, 2/3 enemies). */
+  bi: number;
+  hp: number;
+  maxHp: number;
+  /** `StatusEffect` enum value (0 = none). */
+  status: number;
+  /** The 7 stat stages (ATK..ACC/EVA). */
+  statStages: number[];
+  fainted: boolean;
+  /** Only when it changed this turn. */
+  formIndex?: number;
+  /** Only when the active ability changed this turn (`AbilityId`). */
+  abilityId?: number;
+}
+
+/** A readable snapshot of the arena's weather + terrain. */
+export interface CoopArenaView {
+  weather: number;
+  weatherTurnsLeft: number;
+  terrain: number;
+  terrainTurnsLeft: number;
+}
+
+/** Clamp a single stat stage into the engine's legal [-6, 6] range. */
+function clampStage(v: number): number {
+  return v < -6 ? -6 : v > 6 ? 6 : Math.trunc(v);
+}
+
+/** Normalize a field mon's mutable state into the wire shape (clamped, cloned, safe). */
+export function serializeMonState(mon: CoopFieldMonView): CoopSerializedMonState {
+  const maxHp = Math.max(1, Math.trunc(mon.maxHp));
+  const hp = Math.max(0, Math.min(maxHp, Math.trunc(mon.hp)));
+  const state: CoopSerializedMonState = {
+    bi: mon.bi,
+    hp,
+    maxHp,
+    status: Math.max(0, Math.trunc(mon.status)),
+    // Always 7 stages; pad/truncate defensively so a malformed view can't desync length.
+    statStages: Array.from({ length: 7 }, (_, i) => clampStage(mon.statStages[i] ?? 0)),
+    // A 0-hp mon is fainted regardless of the source flag (the authoritative invariant).
+    fainted: mon.fainted || hp === 0,
+  };
+  if (mon.formIndex !== undefined) {
+    state.formIndex = mon.formIndex;
+  }
+  if (mon.abilityId !== undefined) {
+    state.abilityId = mon.abilityId;
+  }
+  return state;
+}
+
+/** Build the authoritative post-turn checkpoint from the live field + arena views. */
+export function buildCheckpoint(mons: CoopFieldMonView[], arena: CoopArenaView): CoopBattleCheckpoint {
+  return {
+    field: mons.map(serializeMonState),
+    weather: Math.max(0, Math.trunc(arena.weather)),
+    weatherTurnsLeft: Math.max(0, Math.trunc(arena.weatherTurnsLeft)),
+    terrain: Math.max(0, Math.trunc(arena.terrain)),
+    terrainTurnsLeft: Math.max(0, Math.trunc(arena.terrainTurnsLeft)),
+  };
+}
+
+/** Find the authoritative state for the mon at battler index `bi` (undefined if absent). */
+export function monStateByIndex(checkpoint: CoopBattleCheckpoint, bi: number): CoopSerializedMonState | undefined {
+  return checkpoint.field.find(f => f.bi === bi);
+}
+
+/**
+ * Re-clamp a received mon-state before the guest writes it onto its engine mon. The
+ * guest trusts the host but must never write an out-of-range value (a corrupt/old
+ * packet must not poison engine state): hp into [0, maxHp], stages into [-6, 6],
+ * faint forced when hp is 0.
+ */
+export function normalizeMonState(state: CoopSerializedMonState): CoopSerializedMonState {
+  return serializeMonState({
+    bi: state.bi,
+    hp: state.hp,
+    maxHp: state.maxHp,
+    status: state.status,
+    statStages: state.statStages,
+    fainted: state.fainted,
+    ...(state.formIndex === undefined ? {} : { formIndex: state.formIndex }),
+    ...(state.abilityId === undefined ? {} : { abilityId: state.abilityId }),
+  });
+}

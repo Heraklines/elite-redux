@@ -1,0 +1,83 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// Co-op battle CHECKPOINT pure core (#633, LIVE-D). The authoritative post-turn
+// state the host streams and the guest applies. These verify the data transform +
+// the defensive clamping (the guest trusts the host but never writes an illegal
+// value) WITHOUT booting the engine.
+
+import {
+  buildCheckpoint,
+  type CoopArenaView,
+  type CoopFieldMonView,
+  monStateByIndex,
+  normalizeMonState,
+  serializeMonState,
+} from "#data/elite-redux/coop/coop-battle-checkpoint";
+import { describe, expect, it } from "vitest";
+
+const arena: CoopArenaView = { weather: 3, weatherTurnsLeft: 5, terrain: 0, terrainTurnsLeft: 0 };
+
+const mon = (over: Partial<CoopFieldMonView> = {}): CoopFieldMonView => ({
+  bi: 0,
+  hp: 20,
+  maxHp: 21,
+  status: 0,
+  statStages: [0, 0, 0, 0, 0, 0, 0],
+  fainted: false,
+  ...over,
+});
+
+describe("co-op battle checkpoint pure core (#633, LIVE-D)", () => {
+  it("serializeMonState clamps hp into [0, maxHp] and floors fractional hp", () => {
+    expect(serializeMonState(mon({ hp: 99, maxHp: 21 })).hp).toBe(21);
+    expect(serializeMonState(mon({ hp: -5, maxHp: 21 })).hp).toBe(0);
+    expect(serializeMonState(mon({ hp: 10.9, maxHp: 21 })).hp).toBe(10);
+  });
+
+  it("a 0-hp mon is fainted regardless of the source flag (authoritative invariant)", () => {
+    expect(serializeMonState(mon({ hp: 0, fainted: false })).fainted).toBe(true);
+    expect(serializeMonState(mon({ hp: 5, fainted: false })).fainted).toBe(false);
+  });
+
+  it("stat stages are always length 7 and clamped to [-6, 6]", () => {
+    const s = serializeMonState(mon({ statStages: [9, -9, 2, 0, 0] }));
+    expect(s.statStages).toHaveLength(7);
+    expect(s.statStages[0]).toBe(6);
+    expect(s.statStages[1]).toBe(-6);
+    expect(s.statStages[2]).toBe(2);
+    expect(s.statStages[6]).toBe(0); // padded
+  });
+
+  it("optional form/ability changes are carried only when present", () => {
+    expect(serializeMonState(mon()).formIndex).toBeUndefined();
+    const changed = serializeMonState(mon({ formIndex: 1, abilityId: 42 }));
+    expect(changed.formIndex).toBe(1);
+    expect(changed.abilityId).toBe(42);
+  });
+
+  it("buildCheckpoint maps every field mon + the arena", () => {
+    const cp = buildCheckpoint([mon({ bi: 0 }), mon({ bi: 1, hp: 0 })], arena);
+    expect(cp.field).toHaveLength(2);
+    expect(cp.weather).toBe(3);
+    expect(cp.weatherTurnsLeft).toBe(5);
+    expect(monStateByIndex(cp, 1)?.fainted).toBe(true);
+    expect(monStateByIndex(cp, 9)).toBeUndefined();
+  });
+
+  it("normalizeMonState re-clamps a received (possibly corrupt) state before the guest applies it", () => {
+    const safe = normalizeMonState({
+      bi: 2,
+      hp: 9999,
+      maxHp: 14,
+      status: -1,
+      statStages: [99, 0, 0, 0, 0, 0, 0],
+      fainted: false,
+    });
+    expect(safe.hp).toBe(14);
+    expect(safe.status).toBe(0);
+    expect(safe.statStages[0]).toBe(6);
+  });
+});
