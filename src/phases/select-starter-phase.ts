@@ -82,12 +82,18 @@ export class SelectStarterPhase extends Phase {
    */
   private startCoopSelect(): void {
     const controller = getCoopController()!;
+    console.log(
+      `[coop-launch] startCoopSelect role=${controller.role} partnerConnected=${controller.partnerConnected} partnerReady=${controller.partnerReady}`,
+    );
     // Stand-in player 2 (local dev): join, pick, lock in. No-op for a real peer.
     getCoopRuntime()?.spoof?.autoComplete();
 
     let hostStarters: Starter[] = [];
     let launched = false;
     const proceedIfReady = () => {
+      console.log(
+        `[coop-launch] proceedIfReady launched=${launched} localTeam=${hostStarters.length} bothReady=${controller.bothReady()} role=${controller.role} partnerReady=${controller.partnerReady}`,
+      );
       if (launched || hostStarters.length === 0 || !controller.bothReady()) {
         return;
       }
@@ -115,6 +121,7 @@ export class SelectStarterPhase extends Phase {
 
     globalScene.ui.setMode(UiMode.STARTER_SELECT, (starters: Starter[]) => {
       hostStarters = starters;
+      console.log(`[coop-launch] local team locked in: ${starters.length} mons, role=${controller.role}`);
       // Mirror the local team to the partner and lock in. The roster carries the
       // FULL starter blob (#633, LIVE-B) - not just speciesId+cost - so the partner
       // rebuilds our mons EXACTLY (same form / IVs / nature / ability / moves) and
@@ -154,11 +161,21 @@ export class SelectStarterPhase extends Phase {
    * below is the exact pre-existing SAVE_SLOT flow).
    */
   launchCoopMergedParty(merged: Starter[], owners: CoopRole[], role: CoopRole): void {
+    console.log(
+      `[coop-launch] launchCoopMergedParty role=${role} merged=${merged.length} slot=${globalScene.sessionSlotId}`,
+    );
     if (role === "guest") {
       globalScene.sessionSlotId = coopGuestSessionSlot(globalScene.sessionSlotId);
-      this.initBattle(merged, true, owners);
+      // The guest skips the SAVE_SLOT screen - but on the host/solo path it is that
+      // setMode(SAVE_SLOT) which TEARS DOWN the starter-select UI. Without leaving
+      // STARTER_SELECT here, the starter-select handler stays active and re-fires its
+      // "Begin with these Pokemon?" confirm in a loop (#633 guest launch-loop). Move
+      // to MESSAGE first (as the SAVE_SLOT flow ultimately does), THEN launch.
+      console.log("[coop-launch] guest: clearing STARTER_SELECT -> MESSAGE, then initBattle");
+      void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.initBattle(merged, true, owners));
       return;
     }
+    console.log("[coop-launch] host: opening SAVE_SLOT picker");
     globalScene.ui.setMode(UiMode.SAVE_SLOT, SaveSlotUiMode.SAVE, (slotId: number) => {
       if (slotId === -1) {
         globalScene.phaseManager.toTitleScreen();

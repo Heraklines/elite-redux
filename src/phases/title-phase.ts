@@ -485,6 +485,13 @@ export class TitlePhase extends Phase {
       // runConfig sync (the host's Start broadcasts difficulty + challenges). Without
       // this the guest also saw + picked its own challenges, which was incoherent.
       const isCoopGuest = this.gameMode === GameModes.COOP && getCoopController()?.role === "guest";
+      if (this.gameMode === GameModes.COOP) {
+        console.log(
+          `[coop-launch] title challenge-gate: role=${getCoopController()?.role ?? "NO-CONTROLLER"} isCoopGuest=${isCoopGuest} -> ${
+            isCoopGuest ? "SelectStarterPhase" : "SelectChallengePhase"
+          }`,
+        );
+      }
       if ((this.gameMode === GameModes.CHALLENGE || this.gameMode === GameModes.COOP) && !isCoopGuest) {
         globalScene.phaseManager.pushNew("SelectChallengePhase");
       } else {
