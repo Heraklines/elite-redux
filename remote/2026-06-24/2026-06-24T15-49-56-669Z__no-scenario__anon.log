@@ -1,0 +1,37 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqs8pg8u-9u38
+mode:     6  wave:?
+seed:     RzU8CUAILMNiA5Q0I69u5dI6
+party:    Bulbasaur(L5 20hp f0), Caterpie(L5 21hp f0), Chikorita(L5 20hp f0), Weedle(L5 20hp f0), Rattata(L5 19hp f0)
+enemy:    
+
+----- COMMENT -----
+p2
+
+----- CONSOLE -----
+[15:48:12.061] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[15:48:12.445] LOG: [ER] build mqs8pg8u-9u38
+[15:48:12.471] LOG: [dev-tools] loaded — 306 scenarios + Send Logs button
+[15:48:29.504] DEBUG: Destroying loading scene
+[15:48:29.505] DEBUG: Destroyed loading scene
+[15:48:29.584] LOG: Seed: QergQc4kOJYzFWJOeWJrEpzm
+[15:48:29.584] LOG: Wave Seed: QergQc4kOJYzFWJOeWJrEpzm 0
+[15:48:34.289] LOG: %cStart Phase LoginPhase color:green;
+[15:48:34.453] LOG: Client Session: B1yR922OvkgNnDHM48cIJWEqGBvMBYu2
+[15:48:34.981] LOG: %cStart Phase TitlePhase color:green;
+[15:48:34.981] LOG: Getting Session Slot id: %d 4
+[15:48:35.001] LOG: use seasonal splash messages true
+[15:48:35.002] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[15:48:46.048] LOG: %cStart Phase SelectStarterPhase color:green;
+[15:48:53.002] WARN: cry/10 not found
+[15:48:53.486] WARN: cry/13 not found
+[15:48:54.253] WARN: cry/19 not found
+[15:49:04.925] LOG: Wave Seed: RzU8CUAILMNiA5Q0I69u5dI6 0
+[15:49:04.928] LOG: Wave Seed: RzU8CUAILMNiA5Q0I69u5dI6 0
+[15:49:05.003] LOG: Getting Session Slot id: %d 0
+[15:49:05.019] LOG: Getting Session Slot id: %d 1
+[15:49:05.030] LOG: Getting Session Slot id: %d 2
+[15:49:05.039] LOG: Getting Session Slot id: %d 3
+[15:49:05.045] LOG: Getting Session Slot id: %d 4
+[15:49:05.307] LOG: Getting Session Slot id: %d 4
+[15:49:15.815] DEBUG: %cSending a request to delete session in slot %d color: blue 4
