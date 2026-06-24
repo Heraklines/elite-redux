@@ -1,6 +1,12 @@
 import { consumePendingDevShop } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
+import {
+  COOP_INTERACTION_LEAVE,
+  COOP_INTERACTION_REROLL,
+  type CoopInteractionChoice,
+} from "#data/elite-redux/coop/coop-interaction-relay";
+import { getCoopController, getCoopInteractionRelay, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { erBalanceArr, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { erScrapMagnetExtraRewards } from "#data/elite-redux/er-relics";
 import { BattleType } from "#enums/battle-type";
@@ -39,6 +45,17 @@ import i18next from "i18next";
 
 export type ModifierSelectCallback = (rowCursor: number, cursor: number) => boolean;
 
+// Co-op (#633): action-type codes packed as data[0] of a relayed reward choice, so the
+// WATCHER can route a pick whose `choice` alone is ambiguous (reward vs shop both carry a
+// cursor; lock vs transfer both carry 0). REROLL / LEAVE are distinguished by the sentinel
+// `choice` value itself and carry no data code.
+const COOP_ACT_REWARD = 0;
+const COOP_ACT_SHOP = 1;
+const COOP_ACT_TRANSFER = 2;
+const COOP_ACT_LOCK = 3;
+/** How long the WATCHER waits for the owner's next reward pick before leaving (never hangs). */
+const COOP_REWARD_WAIT_MS = 300_000;
+
 export class SelectModifierPhase extends BattlePhase {
   public readonly phaseName = "SelectModifierPhase";
   private rerollCount: number;
@@ -47,6 +64,17 @@ export class SelectModifierPhase extends BattlePhase {
   private isCopy: boolean;
 
   private typeOptions: ModifierTypeOption[];
+
+  // ---- Co-op alternating reward shop (#633) ----
+  /** True only on the WATCHER's phase: it replays the owner's relayed picks with NO interactive UI. */
+  private coopWatcher = false;
+  /** Owner-side: the selection captured at row/cursor time, relayed once the party target resolves. */
+  private coopPendingKind: "reward" | "shop" | null = null;
+  private coopPendingCursor = 0;
+  private coopPendingRow = 0;
+  /** Watcher-side: the owner's relayed party-target slot + sub-option for the pick being replayed. */
+  private coopRelayedSlot = -1;
+  private coopRelayedOption = 0;
 
   constructor(
     rerollCount = 0,
@@ -69,18 +97,30 @@ export class SelectModifierPhase extends BattlePhase {
       return false;
     }
 
+    // Co-op (#633): the reward screen ALTERNATES full control - the player whose turn
+    // it is drives it; the partner WATCHES and mirrors the relayed picks against its
+    // own identical pool (same seed -> identical options/prices/money). Resolved once
+    // here; solo / non-coop keeps the original flow untouched.
+    const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
+
     // Dev test-suite "start in the store" scenarios stage guaranteed reward
     // options (e.g. a Rare Candy, or a Form-Change Item that resolves to a
     // single-mon party's mega stone). consumePendingDevShop() returns null in
     // production / clean checkout, so this is inert there. Consumed by the FIRST
-    // reward screen after the scenario's opening battle.
-    const devShop = consumePendingDevShop();
-    if (devShop && devShop.length > 0) {
-      this.customModifierSettings = {
-        ...(this.customModifierSettings ?? {}),
-        guaranteedModifierTypeFuncs: [...(this.customModifierSettings?.guaranteedModifierTypeFuncs ?? []), ...devShop],
-        fillRemaining: true,
-      };
+    // reward screen after the scenario's opening battle. NEVER in co-op: it would
+    // inject non-deterministic content onto one client and desync the shared pool.
+    if (coopController == null) {
+      const devShop = consumePendingDevShop();
+      if (devShop && devShop.length > 0) {
+        this.customModifierSettings = {
+          ...(this.customModifierSettings ?? {}),
+          guaranteedModifierTypeFuncs: [
+            ...(this.customModifierSettings?.guaranteedModifierTypeFuncs ?? []),
+            ...devShop,
+          ],
+          fillRemaining: true,
+        };
+      }
     }
 
     if (!this.rerollCount && !this.isCopy) {
@@ -105,7 +145,10 @@ export class SelectModifierPhase extends BattlePhase {
             () => {
               globalScene.ui.revertMode();
               globalScene.ui.setMode(UiMode.MESSAGE);
+              // Co-op (#633): relay the skip to the watcher, then advance the turn.
+              this.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip");
               super.end();
+              this.coopAdvanceInteractionIfHost();
             },
             () => this.resetModifierSelect(modifierSelectCallback),
           );
@@ -142,6 +185,28 @@ export class SelectModifierPhase extends BattlePhase {
       }
     };
 
+    // Co-op (#633): only the player whose alternating turn it is drives the reward
+    // screen; the partner watches and mirrors the relayed picks. Solo / non-coop falls
+    // straight through to the normal interactive screen below.
+    if (coopController != null) {
+      // Dev / hotseat (SpoofGuest) path: the stand-in partner has no screen to drive an
+      // interaction, so the local human (host) OWNS every reward screen. Only a REAL peer
+      // alternates control. The counter still advances so persistence stays coherent.
+      const spoofed = getCoopRuntime()?.spoof != null;
+      if (spoofed || coopController.isLocalInteractionTurn()) {
+        console.log(
+          `[coop-reward] OWNER drives reward screen (turn=${coopController.interactionCounter()} role=${coopController.role} spoof=${spoofed} wave=${globalScene.currentBattle?.waveIndex})`,
+        );
+        this.resetModifierSelect(modifierSelectCallback);
+      } else {
+        console.log(
+          `[coop-reward] WATCHER waits for partner's reward picks (turn=${coopController.interactionCounter()} role=${coopController.role} wave=${globalScene.currentBattle?.waveIndex})`,
+        );
+        void this.startCoopWatch();
+      }
+      return;
+    }
+
     this.resetModifierSelect(modifierSelectCallback);
   }
 
@@ -150,10 +215,16 @@ export class SelectModifierPhase extends BattlePhase {
     if (this.typeOptions.length === 0) {
       globalScene.ui.clearText();
       globalScene.ui.setMode(UiMode.MESSAGE);
+      // Co-op (#633): no reward to pick is the same as leaving - relay + advance.
+      this.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip");
       super.end();
+      this.coopAdvanceInteractionIfHost();
       return true;
     }
     const modifierType = this.typeOptions[cursor].type;
+    // Co-op (#633): capture the free-reward pick so it is relayed to the watcher once
+    // any party target / sub-option is resolved (or immediately for a non-party item).
+    this.coopBeginPending("reward", cursor, 1);
     return this.applyChosenModifier(modifierType, -1, modifierSelectCallback);
   }
 
@@ -182,6 +253,9 @@ export class SelectModifierPhase extends BattlePhase {
       return false;
     }
 
+    // Co-op (#633): capture the shop purchase (row+cursor identify the option on the
+    // watcher's identical stock) so it is relayed once any party target is resolved.
+    this.coopBeginPending("shop", cursor, rowCursor);
     return this.applyChosenModifier(modifierType, cost, modifierSelectCallback);
   }
 
@@ -208,6 +282,9 @@ export class SelectModifierPhase extends BattlePhase {
         this.openModifierMenu(modifierType, cost, modifierSelectCallback);
       }
     } else {
+      // Co-op (#633): a non-party item resolves immediately - relay the pick now (the
+      // party-target items relay from their menu callbacks once the slot is chosen).
+      this.coopFlushPending([]);
       this.applyModifier(modifierType.newModifier()!, cost);
     }
     return cost === -1;
@@ -220,6 +297,10 @@ export class SelectModifierPhase extends BattlePhase {
       globalScene.ui.playError();
       return false;
     }
+    // Co-op (#633): relay the reroll so the watcher rerolls its identical pool too. Sent
+    // before the new phase is unshifted; the watcher reaches this same method on replay
+    // (where the send is a no-op, since the watcher is not the interaction owner).
+    this.coopRelaySend(COOP_INTERACTION_REROLL, undefined, "reroll");
     globalScene.reroll = true;
     globalScene.phaseManager.unshiftNew(
       "SelectModifierPhase",
@@ -239,7 +320,6 @@ export class SelectModifierPhase extends BattlePhase {
 
   // Transfer modifiers among party pokemon
   private openModifierTransferScreen(modifierSelectCallback: ModifierSelectCallback) {
-    const party = globalScene.getPlayerParty();
     globalScene.ui.setModeWithoutClear(
       UiMode.PARTY,
       PartyUiMode.MODIFIER_TRANSFER,
@@ -252,19 +332,10 @@ export class SelectModifierPhase extends BattlePhase {
           && fromSlotIndex !== toSlotIndex
           && itemIndex > -1
         ) {
-          const itemModifiers = globalScene.findModifiers(
-            m => m instanceof PokemonHeldItemModifier && m.isTransferable && m.pokemonId === party[fromSlotIndex].id,
-          ) as PokemonHeldItemModifier[];
-          const itemModifier = itemModifiers[itemIndex];
-          globalScene.tryTransferHeldItemModifier(
-            itemModifier,
-            party[toSlotIndex],
-            true,
-            itemQuantity,
-            undefined,
-            undefined,
-            false,
-          );
+          // Co-op (#633): relay the resolved transfer so the watcher mirrors it on its
+          // identical party (same held items), then apply it locally.
+          this.coopRelaySend(0, [COOP_ACT_TRANSFER, fromSlotIndex, itemIndex, itemQuantity, toSlotIndex], "transfer");
+          this.applyTransfer(fromSlotIndex, itemIndex, itemQuantity, toSlotIndex);
         } else {
           this.resetModifierSelect(modifierSelectCallback);
         }
@@ -274,19 +345,54 @@ export class SelectModifierPhase extends BattlePhase {
     return true;
   }
 
+  /**
+   * Apply a held-item transfer (shared by the owner's transfer-menu callback and the
+   * watcher's replay). Pure state mutation - no reward-screen UI - so it is safe to run
+   * on the watcher (which has no MODIFIER_SELECT open). Co-op (#633).
+   */
+  private applyTransfer(fromSlotIndex: number, itemIndex: number, itemQuantity: number, toSlotIndex: number): void {
+    const party = globalScene.getPlayerParty();
+    if (fromSlotIndex >= 6 || toSlotIndex >= 6 || fromSlotIndex === toSlotIndex || itemIndex < 0) {
+      return;
+    }
+    const itemModifiers = globalScene.findModifiers(
+      m => m instanceof PokemonHeldItemModifier && m.isTransferable && m.pokemonId === party[fromSlotIndex].id,
+    ) as PokemonHeldItemModifier[];
+    const itemModifier = itemModifiers[itemIndex];
+    if (itemModifier == null) {
+      return;
+    }
+    globalScene.tryTransferHeldItemModifier(
+      itemModifier,
+      party[toSlotIndex],
+      true,
+      itemQuantity,
+      undefined,
+      undefined,
+      false,
+    );
+  }
+
   // Toggle reroll lock
   private toggleRerollLock() {
     const rerollCost = this.getRerollCost(globalScene.lockModifierTiers);
     if (rerollCost < 0) {
       // Reroll lock button is also disabled when reroll is disabled
-      globalScene.ui.playError();
+      if (!this.coopWatcher) {
+        globalScene.ui.playError();
+      }
       return false;
     }
     globalScene.lockModifierTiers = !globalScene.lockModifierTiers;
-    const uiHandler = globalScene.ui.getHandler() as ModifierSelectUiHandler;
-    uiHandler.setRerollCost(this.getRerollCost(globalScene.lockModifierTiers));
-    uiHandler.updateLockRaritiesText();
-    uiHandler.updateRerollCostText();
+    // Co-op (#633): relay the lock toggle (engine state the next pool generation reads).
+    this.coopRelaySend(0, [COOP_ACT_LOCK], "lock");
+    // The WATCHER has no MODIFIER_SELECT handler open - mutate the flag only, skip UI.
+    if (!this.coopWatcher) {
+      const uiHandler = globalScene.ui.getHandler() as ModifierSelectUiHandler;
+      uiHandler.setRerollCost(this.getRerollCost(globalScene.lockModifierTiers));
+      uiHandler.updateLockRaritiesText();
+      uiHandler.updateRerollCostText();
+    }
     return false;
   }
 
@@ -305,11 +411,11 @@ export class SelectModifierPhase extends BattlePhase {
     // (LearnMoveType.MEMORY) and was missing here, so backing out of its
     // move-select consumed it without granting a move (#25). The successful-learn
     // cleanup (learn-move-phase MEMORY branch) removes this copy.
-    if (
+    const queuesContinuation =
       modifier.type instanceof RememberMoveModifierType
       || modifier.type instanceof TmModifierType
-      || modifier.type instanceof ErLearnersShroomModifierType
-    ) {
+      || modifier.type instanceof ErLearnersShroomModifierType;
+    if (queuesContinuation) {
       globalScene.phaseManager.unshiftPhase(this.copy());
     }
 
@@ -321,7 +427,13 @@ export class SelectModifierPhase extends BattlePhase {
           globalScene.animateMoneyChanged(false);
         }
         globalScene.playSound("se/buy");
-        (globalScene.ui.getHandler() as ModifierSelectUiHandler).updateCostText();
+        // Co-op (#633): the WATCHER has no MODIFIER_SELECT handler open (it shows a
+        // "partner is choosing" message) - the money is still deducted above to stay in
+        // sync, but the reward-screen cost text must NOT be touched (it would crash on
+        // the message handler). The OWNER and solo path repaint as before.
+        if (!this.coopWatcher) {
+          (globalScene.ui.getHandler() as ModifierSelectUiHandler).updateCostText();
+        }
       } else {
         globalScene.ui.playError();
       }
@@ -329,6 +441,12 @@ export class SelectModifierPhase extends BattlePhase {
       globalScene.ui.clearText();
       globalScene.ui.setMode(UiMode.MESSAGE);
       super.end();
+      // Co-op (#633): picking a free reward that does NOT queue a move-learn
+      // continuation ends the whole interaction -> advance the alternation turn
+      // (host-authoritative; a no-op off the host / outside co-op).
+      if (!queuesContinuation) {
+        this.coopAdvanceInteractionIfHost();
+      }
     }
   }
 
@@ -339,6 +457,15 @@ export class SelectModifierPhase extends BattlePhase {
     modifierSelectCallback: ModifierSelectCallback,
   ): void {
     const party = globalScene.getPlayerParty();
+    // Co-op (#633) WATCHER: apply the owner's relayed fusion pair (from + splice slot)
+    // directly, never opening the party UI on a mon it does not drive.
+    if (this.coopWatcher) {
+      const modifier = modifierType.newModifier(party[this.coopRelayedSlot], party[this.coopRelayedOption]);
+      if (modifier != null) {
+        this.applyModifier(modifier, cost, true);
+      }
+      return;
+    }
     globalScene.ui.setModeWithoutClear(
       UiMode.PARTY,
       PartyUiMode.SPLICE,
@@ -351,6 +478,8 @@ export class SelectModifierPhase extends BattlePhase {
           && fromSlotIndex !== spliceSlotIndex
         ) {
           globalScene.ui.setMode(this.getModifierSelectMode(), this.isPlayer()).then(() => {
+            // Co-op (#633): relay the resolved fusion pair so the watcher mirrors it.
+            this.coopFlushPending([fromSlotIndex, spliceSlotIndex]);
             const modifier = modifierType.newModifier(party[fromSlotIndex], party[spliceSlotIndex])!; //TODO: is the bang correct?
             this.applyModifier(modifier, cost, true);
           });
@@ -368,7 +497,6 @@ export class SelectModifierPhase extends BattlePhase {
     cost: number,
     modifierSelectCallback: ModifierSelectCallback,
   ): void {
-    const party = globalScene.getPlayerParty();
     const pokemonModifierType = modifierType as PokemonModifierType;
     const isMoveModifier = modifierType instanceof PokemonMoveModifierType;
     const isAbilityModifier = modifierType instanceof PokemonAbilityModifierType;
@@ -394,6 +522,15 @@ export class SelectModifierPhase extends BattlePhase {
               ? PartyUiMode.ER_LEARNERS_SHROOM_MODIFIER
               : PartyUiMode.MODIFIER;
     const tmMoveId = isTmModifier ? (modifierType as TmModifierType).moveId : undefined;
+    // Co-op (#633) WATCHER: apply the owner's relayed target slot + sub-option directly,
+    // never opening the party UI on a mon it does not drive.
+    if (this.coopWatcher) {
+      const modifier = this.buildPokemonModifier(modifierType, this.coopRelayedSlot, this.coopRelayedOption);
+      if (modifier != null) {
+        this.applyModifier(modifier, cost, true);
+      }
+      return;
+    }
     globalScene.ui.setModeWithoutClear(
       UiMode.PARTY,
       partyUiMode,
@@ -401,13 +538,9 @@ export class SelectModifierPhase extends BattlePhase {
       (slotIndex: number, option: PartyOption) => {
         if (slotIndex < 6) {
           globalScene.ui.setMode(this.getModifierSelectMode(), this.isPlayer()).then(() => {
-            const modifier = isMoveModifier
-              ? modifierType.newModifier(party[slotIndex], option - PartyOption.MOVE_1)
-              : isAbilityModifier
-                ? modifierType.newModifier(party[slotIndex], option - PartyOption.ABILITY_SLOT_0)
-                : isRememberMoveModifier || isErLearnersShroom
-                  ? modifierType.newModifier(party[slotIndex], option as number)
-                  : modifierType.newModifier(party[slotIndex]);
+            // Co-op (#633): relay the resolved target slot + sub-option to the watcher.
+            this.coopFlushPending([slotIndex, option]);
+            const modifier = this.buildPokemonModifier(modifierType, slotIndex, option);
             this.applyModifier(modifier!, cost, true); // TODO: is the bang correct?
           });
         } else {
@@ -538,5 +671,166 @@ export class SelectModifierPhase extends BattlePhase {
 
   addModifier(modifier: Modifier): boolean {
     return globalScene.addModifier(modifier, false, true);
+  }
+
+  // ==========================================================================
+  // Co-op alternating reward shop (#633). The OWNER drives the normal UI and relays
+  // each pick; the WATCHER runs startCoopWatch() (no interactive UI) and replays the
+  // picks against its own identical pool. Same seed -> identical options/prices/money,
+  // so only the CHOICE (index + resolved party target) crosses the wire. All gated by
+  // isCoop + a live controller, so the solo path is byte-for-byte unaffected.
+  // ==========================================================================
+
+  /** Build the modifier for a resolved party-target pick (shared by the owner's menu
+   *  callback and the watcher's direct replay) - mirrors the openModifierMenu dispatch. */
+  private buildPokemonModifier(modifierType: PokemonModifierType, slotIndex: number, option: number): Modifier | null {
+    const target = globalScene.getPlayerParty()[slotIndex];
+    if (target == null) {
+      return null;
+    }
+    if (modifierType instanceof PokemonMoveModifierType) {
+      return modifierType.newModifier(target, option - PartyOption.MOVE_1);
+    }
+    if (modifierType instanceof PokemonAbilityModifierType) {
+      return modifierType.newModifier(target, option - PartyOption.ABILITY_SLOT_0);
+    }
+    if (
+      modifierType instanceof RememberMoveModifierType
+      || modifierType instanceof PokemonAddMoveSlotModifierType
+      || modifierType instanceof ErLearnersShroomModifierType
+    ) {
+      return modifierType.newModifier(target, option);
+    }
+    return modifierType.newModifier(target);
+  }
+
+  /** OWNER only: relay one reward-screen pick to the watcher on this interaction's seq. */
+  private coopRelaySend(choice: number, data: number[] | undefined, label: string): void {
+    if (!globalScene.gameMode.isCoop) {
+      return;
+    }
+    const controller = getCoopController();
+    if (controller == null || !controller.isLocalInteractionTurn()) {
+      return;
+    }
+    getCoopInteractionRelay()?.sendInteractionChoice(controller.interactionCounter(), label, choice, data);
+  }
+
+  /** Advance the alternating-interaction turn once the reward screen is left for good.
+   *  Host-authoritative (the host broadcasts the new counter; the guest mirrors it). */
+  private coopAdvanceInteractionIfHost(): void {
+    if (!globalScene.gameMode.isCoop) {
+      return;
+    }
+    const controller = getCoopController();
+    if (controller?.role === "host") {
+      console.log(`[coop-reward] host advances interaction turn from ${controller.interactionCounter()}`);
+      controller.advanceInteraction();
+    }
+  }
+
+  /** OWNER: stash the current reward/shop selection so it is relayed once the party
+   *  target (if any) resolves. No-op for the watcher (it applies the relayed target). */
+  private coopBeginPending(kind: "reward" | "shop", cursor: number, row: number): void {
+    const controller = globalScene.gameMode.isCoop ? getCoopController() : null;
+    if (controller != null && controller.isLocalInteractionTurn()) {
+      this.coopPendingKind = kind;
+      this.coopPendingCursor = cursor;
+      this.coopPendingRow = row;
+    } else {
+      this.coopPendingKind = null;
+    }
+  }
+
+  /** OWNER: relay the stashed selection now that the resolved `extra` (party slot +
+   *  sub-option, or empty for a non-party item) is known. */
+  private coopFlushPending(extra: number[]): void {
+    if (this.coopPendingKind == null) {
+      return;
+    }
+    const data =
+      this.coopPendingKind === "shop" ? [COOP_ACT_SHOP, this.coopPendingRow, ...extra] : [COOP_ACT_REWARD, ...extra];
+    this.coopRelaySend(this.coopPendingCursor, data, this.coopPendingKind);
+    this.coopPendingKind = null;
+  }
+
+  /** WATCHER: show a non-interactive "partner is choosing" message and mirror the
+   *  owner's relayed picks against this client's identical pool until they leave. */
+  private async startCoopWatch(): Promise<void> {
+    this.coopWatcher = true;
+    const controller = getCoopController();
+    const relay = getCoopInteractionRelay();
+    await globalScene.ui.setMode(UiMode.MESSAGE);
+    globalScene.ui.showText(
+      i18next.t("battle:coopPartnerChoosingReward", {
+        defaultValue: "Your partner is choosing the wave reward...",
+      }),
+      null,
+      () => {},
+      null,
+      true,
+    );
+    if (controller == null || relay == null) {
+      // No live session: fail safe by leaving the screen so the run never hangs.
+      globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+      return;
+    }
+    const seq = controller.interactionCounter();
+    for (;;) {
+      const action = await relay.awaitInteractionChoice(seq, COOP_REWARD_WAIT_MS);
+      if (action == null) {
+        console.log("[coop-reward] WATCHER timed out waiting for partner -> leaving reward screen");
+        globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+        this.coopAdvanceInteractionIfHost();
+        return;
+      }
+      if (this.applyRelayedRewardAction(action)) {
+        return;
+      }
+    }
+  }
+
+  /**
+   * WATCHER: apply one relayed reward-screen action against the identical pool.
+   * Returns true when this phase is finished (terminal pick / skip / reroll-handoff),
+   * false to keep waiting for the next pick (shop buy / lock / transfer).
+   */
+  private applyRelayedRewardAction(action: CoopInteractionChoice): boolean {
+    const noop: ModifierSelectCallback = () => false;
+    if (action.choice === COOP_INTERACTION_LEAVE) {
+      globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+      this.coopAdvanceInteractionIfHost();
+      return true;
+    }
+    if (action.choice === COOP_INTERACTION_REROLL) {
+      // rerollModifiers unshifts a fresh SelectModifierPhase (which re-enters watch on
+      // the same seq) and ends this one.
+      this.rerollModifiers();
+      return true;
+    }
+    const data = action.data ?? [];
+    const act = data[0];
+    if (act === COOP_ACT_LOCK) {
+      this.toggleRerollLock();
+      return false;
+    }
+    if (act === COOP_ACT_TRANSFER) {
+      this.applyTransfer(data[1], data[2], data[3], data[4]);
+      return false;
+    }
+    if (act === COOP_ACT_REWARD) {
+      this.coopRelayedSlot = data[1] ?? -1;
+      this.coopRelayedOption = data[2] ?? 0;
+      this.selectRewardModifierOption(action.choice, noop);
+      return true;
+    }
+    if (act === COOP_ACT_SHOP) {
+      this.coopRelayedSlot = data[2] ?? -1;
+      this.coopRelayedOption = data[3] ?? 0;
+      this.selectShopModifierOption(data[1], action.choice, noop);
+      return false;
+    }
+    console.log(`[coop-reward] WATCHER ignoring unknown reward action choice=${action.choice} data=${data.join(",")}`);
+    return false;
   }
 }
