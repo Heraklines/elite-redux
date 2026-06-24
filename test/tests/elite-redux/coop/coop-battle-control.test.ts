@@ -155,6 +155,44 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     expect(openedCommandForGuest).toBe(false);
   });
 
+  it("the HOST's OWN FIGHT command is BROADCAST over the transport (lockstep, LIVE-C)", async () => {
+    await startCoopDouble();
+
+    // The host commits its own slot's move; in co-op that command must be broadcast
+    // as a `command` message for the LOCAL field index, so a real peer's partner-
+    // slot await resolves with the host's actual pick instead of its AI.
+    const sendSpy = vi.spyOn(getCoopRuntime()!.localTransport, "send");
+    globalScene.currentBattle.turnCommands = {};
+
+    const hostPhase = game.scene.phaseManager.create("CommandPhase", COOP_HOST_FIELD_INDEX) as CommandPhase;
+    // Drive the host's own command directly (simulates the human's FIGHT pick).
+    hostPhase.handleCommand(Command.FIGHT, 0);
+
+    const broadcast = sendSpy.mock.calls.some(
+      ([msg]) =>
+        msg.t === "command" && msg.fieldIndex === COOP_HOST_FIELD_INDEX && msg.command.command === Command.FIGHT,
+    );
+    expect(broadcast).toBe(true);
+    // The local slot's turn command is set (the host's own pick), proving this is
+    // the local-commit path, not the partner await.
+    expect(globalScene.currentBattle.turnCommands[COOP_HOST_FIELD_INDEX]?.command).toBe(Command.FIGHT);
+  });
+
+  it("a SOLO (non-coop) FIGHT command is NOT broadcast (guard holds)", async () => {
+    await startCoopDouble();
+    // Flip the run OUT of co-op: the broadcast guard must suppress the send so the
+    // solo path is byte-for-byte unaffected.
+    game.scene.gameMode = getGameMode(GameModes.CLASSIC);
+    const sendSpy = vi.spyOn(getCoopRuntime()!.localTransport, "send");
+    globalScene.currentBattle.turnCommands = {};
+
+    const phase = game.scene.phaseManager.create("CommandPhase", COOP_HOST_FIELD_INDEX) as CommandPhase;
+    phase.handleCommand(Command.FIGHT, 0);
+
+    const broadcast = sendSpy.mock.calls.some(([msg]) => msg.t === "command");
+    expect(broadcast).toBe(false);
+  });
+
   it("the HOST CommandPhase opens the interactive command menu (human-driven)", async () => {
     await startCoopDouble();
 

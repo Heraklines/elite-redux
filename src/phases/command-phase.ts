@@ -16,6 +16,7 @@ import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattleType } from "#enums/battle-type";
+import type { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { BiomeId } from "#enums/biome-id";
 import { Command } from "#enums/command";
@@ -376,7 +377,61 @@ export class CommandPhase extends FieldPhase {
     globalScene.currentBattle.preTurnCommands[this.fieldIndex] = preTurnCommand;
     globalScene.currentBattle.turnCommands[this.fieldIndex] = turnCommand;
 
+    this.broadcastLocalCoopCommand(turnCommand, moveId, moveTargets.targets, useMode);
+
     return true;
+  }
+
+  /**
+   * Co-op LOCKSTEP (#633, LIVE-C): broadcast the LOCAL human's OWN-slot FIGHT
+   * command over the transport so the PEER's partner-slot await
+   * ({@linkcode tryCoopAutoResolve}) resolves with the move the human actually
+   * picked, instead of falling back to the peer's AI. Each client commands only
+   * its own field slot interactively and broadcasts it; the other client awaits
+   * and applies it - that is how two real humans trade moves.
+   *
+   * GUARDED so the solo / non-coop path is byte-for-byte unaffected:
+   *   - only in a co-op run with a live session, and
+   *   - only for the LOCAL player's OWN field slot (the partner slot is the one we
+   *     AWAIT, never broadcast; broadcasting it would feed the peer its own pick).
+   *
+   * Known gap (this first cut): only the FIGHT command is broadcast. Non-FIGHT
+   * partner commands (switch / item / run) still fall back to the peer's AI - those
+   * are not yet relayed. The peer applies `cursor` (the move slot) via
+   * {@linkcode resolvePartnerSlotCommand}, which re-validates + re-resolves targets
+   * host-side; the wired `targets` are sent for parity / future use but a single-
+   * target move with multiple candidates in a double is re-picked by the peer's
+   * seeded RNG (a known determinism edge until the apply path consumes the wired
+   * targets directly).
+   */
+  private broadcastLocalCoopCommand(
+    turnCommand: TurnCommand,
+    moveId: MoveId,
+    targets: BattlerIndex[],
+    useMode: MoveUseMode,
+  ): void {
+    if (!globalScene.gameMode.isCoop) {
+      return;
+    }
+    const controller = getCoopController();
+    if (controller == null) {
+      return;
+    }
+    // Only broadcast OUR OWN slot; the partner slot is awaited, not broadcast.
+    if (coopOwnerOfFieldIndex(this.fieldIndex) !== controller.role) {
+      return;
+    }
+    const sync = getCoopBattleSync();
+    if (sync == null) {
+      return;
+    }
+    sync.broadcastLocalCommand(this.fieldIndex, {
+      command: Command.FIGHT,
+      cursor: turnCommand.cursor ?? -1,
+      moveId,
+      targets,
+      useMode,
+    });
   }
 
   /**

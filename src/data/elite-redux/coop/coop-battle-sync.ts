@@ -112,6 +112,19 @@ export class CoopBattleSync {
     this.responder = responder;
   }
 
+  /**
+   * LOCKSTEP (#633, LIVE-C): broadcast the LOCAL human's OWN-slot command to the
+   * peer UNPROMPTED (no preceding `commandRequest`). The peer's CommandPhase, for
+   * THIS slot's partner-await, is sitting in a {@linkcode requestPartnerCommand}
+   * that matches by `fieldIndex` - so this `command` message resolves it with the
+   * exact move the human picked, instead of the peer's AI fallback. This is what
+   * makes two real humans trade actual moves: each client commands only its own
+   * slot interactively and broadcasts it; the other client awaits and applies it.
+   */
+  broadcastLocalCommand(fieldIndex: number, command: SerializedCommand): void {
+    this.transport.send({ t: "command", fieldIndex, command });
+  }
+
   /** Whether a responder is installed (this client can answer requests). */
   get hasResponder(): boolean {
     return this.responder != null;

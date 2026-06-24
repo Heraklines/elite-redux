@@ -56,6 +56,46 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     expect(cmd?.cursor).toBe(2); // the first offered slot
   });
 
+  it("broadcastLocalCommand resolves the PEER's awaiting partner-command (lockstep, #633, LIVE-C)", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+
+    // LOCKSTEP: the HOST awaits the partner's slot 1 (the guest's own slot). The
+    // GUEST, instead of answering a request, BROADCASTS its own pick for slot 1.
+    // That `command` message matches the host's pending request by fieldIndex and
+    // resolves it with the exact move the human chose - no AI fallback.
+    const awaited = hostSync.requestPartnerCommand(1, 0, [0, 1, 2]);
+    guestSync.broadcastLocalCommand(1, { command: Command.FIGHT, cursor: 2, moveId: 999, targets: [2] });
+
+    const cmd = await awaited;
+    expect(cmd).not.toBeNull();
+    expect(cmd?.command).toBe(Command.FIGHT);
+    expect(cmd?.cursor).toBe(2); // the human's actual pick crossed the wire
+    expect(cmd?.moveId).toBe(999);
+  });
+
+  it("broadcastLocalCommand for a DIFFERENT slot does not resolve an await on another slot", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host, {
+      timeoutMs: 5,
+      schedule: cb => {
+        const id = setTimeout(cb, 5);
+        return () => clearTimeout(id);
+      },
+    });
+    const guestSync = new CoopBattleSync(guest);
+
+    // Host awaits slot 1; the guest broadcasts a command for slot 0. Matching is by
+    // fieldIndex, so slot 1's await is untouched and falls through to the timeout
+    // (null -> the caller's AI fallback).
+    const awaited = hostSync.requestPartnerCommand(1, 0, [0]);
+    guestSync.broadcastLocalCommand(0, { command: Command.FIGHT, cursor: 0 });
+
+    const cmd = await awaited;
+    expect(cmd).toBeNull();
+  });
+
   it("a superseding request for the same slot resolves the stale one null", async () => {
     const { host, guest } = createLoopbackPair();
     const hostSync = new CoopBattleSync(host);

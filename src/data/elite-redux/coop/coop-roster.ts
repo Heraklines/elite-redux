@@ -22,7 +22,7 @@
 // =============================================================================
 
 import { COOP_SLOTS_PER_PLAYER, coopPartySlotRange } from "#data/elite-redux/coop/coop-session";
-import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
+import type { CoopRole, CoopSerializedStarter } from "#data/elite-redux/coop/coop-transport";
 
 /** Each player's starter-point budget in co-op (vs. the solo 10/15 pool). */
 export const COOP_STARTER_COST_BUDGET = 5;
@@ -39,6 +39,14 @@ export interface CoopRosterEntry {
   speciesId: number;
   /** Starter-point cost (`gameData.getSpeciesStarterValue(speciesId)`). */
   cost: number;
+  /**
+   * The FULL serialized starter (form / IVs / nature / ability / moves / ...),
+   * when known (#633, LIVE-B). Carried so the merged-party builder rebuilds the
+   * partner's mons EXACTLY (not from defaults), keeping the two clients' launch
+   * parties byte-identical. Optional: only speciesId+cost are needed for the
+   * budget/cap rules, and a partner mid-selection may not have a full blob yet.
+   */
+  starter?: CoopSerializedStarter | undefined;
 }
 
 /** Why a pick was rejected, or `ok` when it is allowed. */
@@ -112,7 +120,10 @@ export class CoopRoster {
   add(role: CoopRole, entry: CoopRosterEntry): CoopRosterResult {
     const check = this.canAdd(role, entry.cost, entry.speciesId);
     if (check.ok) {
-      this.picks[role].push({ speciesId: entry.speciesId, cost: entry.cost });
+      // Preserve the full `starter` blob (#633, LIVE-B) when present so the merged
+      // party can rebuild the partner's mons exactly; falls back to undefined for
+      // budget-only entries.
+      this.picks[role].push({ speciesId: entry.speciesId, cost: entry.cost, starter: entry.starter });
     }
     return check;
   }

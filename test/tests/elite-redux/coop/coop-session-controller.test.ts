@@ -260,5 +260,132 @@ describe("co-op session controller (#633, P1)", () => {
       await flush();
       expect(g.runConfig()?.difficulty).toBe("elite");
     });
+
+    it("the host's run SEED crosses the wire so the guest pins to it (#633, LIVE-A)", async () => {
+      const { host, guest } = createLoopbackPair();
+      const h = new CoopSessionController(host);
+      const g = new CoopSessionController(guest);
+
+      h.broadcastRunConfig({ difficulty: "hell", challenges: [], seed: "ABC123seedXYZ" });
+      await flush();
+
+      // The host knows its own seed immediately; the guest mirrors the SAME seed so
+      // both engines roll identical enemies / RNG (lockstep).
+      expect(h.runConfig()?.seed).toBe("ABC123seedXYZ");
+      expect(g.runConfig()?.seed).toBe("ABC123seedXYZ");
+    });
+
+    it("a run config with no seed leaves the guest's seed unset (back-compat)", async () => {
+      const { host, guest } = createLoopbackPair();
+      const h = new CoopSessionController(host);
+      const g = new CoopSessionController(guest);
+
+      // Older host (no seed in the config) -> the guest sees an undefined seed and
+      // keeps its own (the legacy behavior), never crashing on the missing field.
+      h.broadcastRunConfig({ difficulty: "ace", challenges: [] });
+      await flush();
+      expect(g.runConfig()?.difficulty).toBe("ace");
+      expect(g.runConfig()?.seed).toBeUndefined();
+    });
+  });
+
+  describe("full-starter roster sync (#633, LIVE-B) - byte-identical merged party", () => {
+    it("the partner's FULL starter blob crosses the wire and both clients merge the SAME party", async () => {
+      const { host, guest } = createLoopbackPair();
+      const h = new CoopSessionController(host, { username: "Red" });
+      const g = new CoopSessionController(guest, { username: "Blue" });
+      h.connect();
+      g.connect();
+
+      // Each side picks with FULL starter data (form / IVs / nature / ability /
+      // moves), not just speciesId+cost.
+      h.setLocalRoster([
+        {
+          speciesId: 3,
+          cost: 5,
+          starter: {
+            speciesId: 3,
+            shiny: true,
+            variant: 2,
+            formIndex: 1,
+            female: true,
+            abilityIndex: 2,
+            passive: true,
+            nature: 5,
+            moveset: [33, 22, 11, 44],
+            pokerus: false,
+            teraType: 7,
+            ivs: [31, 30, 29, 28, 27, 26],
+          },
+        },
+      ]);
+      g.setLocalRoster([
+        {
+          speciesId: 6,
+          cost: 3,
+          starter: {
+            speciesId: 6,
+            shiny: false,
+            variant: 0,
+            formIndex: 0,
+            female: false,
+            abilityIndex: 1,
+            passive: false,
+            nature: 10,
+            moveset: [52, 53],
+            pokerus: true,
+            ivs: [1, 2, 3, 4, 5, 6],
+          },
+        },
+      ]);
+      h.setLocalReady(true);
+      g.setLocalReady(true);
+      await flush();
+
+      // The HOST sees the GUEST's full blob as its partner half (rebuilt exactly).
+      const hPartner = h.partnerEntries();
+      expect(hPartner).toHaveLength(1);
+      expect(hPartner[0].starter?.moveset).toEqual([52, 53]);
+      expect(hPartner[0].starter?.abilityIndex).toBe(1);
+      expect(hPartner[0].starter?.ivs).toEqual([1, 2, 3, 4, 5, 6]);
+
+      // The GUEST sees the HOST's full blob as its partner half.
+      const gPartner = g.partnerEntries();
+      expect(gPartner).toHaveLength(1);
+      expect(gPartner[0].starter?.shiny).toBe(true);
+      expect(gPartner[0].starter?.formIndex).toBe(1);
+      expect(gPartner[0].starter?.nature).toBe(5);
+      expect(gPartner[0].starter?.teraType).toBe(7);
+      expect(gPartner[0].starter?.moveset).toEqual([33, 22, 11, 44]);
+
+      // Both authorities can reconstruct the SAME merged party (host half first):
+      // host's full starter in slot 0, guest's in slot 3. The full blobs match
+      // across machines, so the launch parties are byte-identical.
+      const hMerged = h.mergedLaunchParty();
+      const gMerged = g.mergedLaunchParty();
+      expect(hMerged[0]?.starter?.moveset).toEqual([33, 22, 11, 44]); // host pick
+      expect(hMerged[3]?.starter?.moveset).toEqual([52, 53]); // guest pick
+      // The guest's controller agrees on the exact same merged starters.
+      expect(gMerged[0]?.starter).toEqual(hMerged[0]?.starter);
+      expect(gMerged[3]?.starter).toEqual(hMerged[3]?.starter);
+    });
+
+    it("a roster entry WITHOUT a full blob still syncs by speciesId+cost (back-compat)", async () => {
+      const { host, guest } = createLoopbackPair();
+      const h = new CoopSessionController(host);
+      const g = new CoopSessionController(guest);
+      h.connect();
+      g.connect();
+
+      // Older client / mid-select snapshot: speciesId + cost only, no `starter`.
+      g.setLocalRoster([{ speciesId: 25, cost: 4 }]);
+      await flush();
+
+      const partner = h.partnerEntries();
+      expect(partner).toHaveLength(1);
+      expect(partner[0].speciesId).toBe(25);
+      expect(partner[0].cost).toBe(4);
+      expect(partner[0].starter).toBeUndefined();
+    });
   });
 });

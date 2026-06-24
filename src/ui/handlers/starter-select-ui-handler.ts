@@ -5745,6 +5745,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                     value: c.value,
                     severity: c.severity,
                   })),
+                  // Co-op (#633, LIVE-A): pin the guest to the HOST's run seed so
+                  // both engines roll identical enemies / RNG and stay in lockstep.
+                  // The seed is already fixed by globalScene.reset() at title entry,
+                  // so it is stable here and shared verbatim.
+                  seed: globalScene.seed,
                 });
               }
               resetErRunTrainerTracking();
@@ -5798,6 +5803,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                     match.value = ch.value;
                     match.severity = ch.severity;
                   }
+                }
+                // Co-op (#633, LIVE-A): pin our engine to the HOST's run seed BEFORE
+                // the first wave generates, so both clients roll identical enemies /
+                // RNG. setSeed + resetSeed mirrors how a daily / loaded run pins its
+                // seed (see TitlePhase.initDailyRun). The first wave is generated in
+                // SelectStarterPhase.initBattle -> newBattle (downstream of startRun),
+                // which re-seeds from globalScene.seed, so setting it here is in time.
+                if (cfg.seed !== undefined) {
+                  globalScene.setSeed(cfg.seed);
+                  globalScene.resetSeed();
                 }
                 startRun(cfg.difficulty as ErDifficulty);
                 return true;

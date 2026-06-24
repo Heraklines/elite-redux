@@ -50,6 +50,34 @@ export interface SerializedCommand {
 }
 
 /**
+ * A player's FULL starter pick serialized for the wire (#633, LIVE-A/B). The
+ * partner's starters cross the transport in full so BOTH clients can rebuild the
+ * EXACT same merged launch party (byte-identical species / form / IVs / nature /
+ * ability / moves) - a prerequisite for the two engines staying in lockstep over a
+ * shared seed. Mirrors the engine `Starter` struct (all fields are plain JSON, so
+ * it serializes cleanly over the real WebRTC transport). Distinct from the minimal
+ * {@linkcode CoopRosterEntry} (which keeps just speciesId+cost for the budget
+ * logic); this is the optional full blob carried alongside it.
+ */
+export interface CoopSerializedStarter {
+  speciesId: number;
+  shiny: boolean;
+  variant: number;
+  formIndex: number;
+  female?: boolean | undefined;
+  abilityIndex: number;
+  passive: boolean;
+  nature: number;
+  moveset?: number[] | undefined;
+  pokerus: boolean;
+  nickname?: string | undefined;
+  teraType?: number | undefined;
+  ivs: number[];
+  /** ER Black Shinies (#349): start this mon as a t4 black shiny. */
+  erBlackShiny?: boolean | undefined;
+}
+
+/**
  * The co-op wire protocol: a discriminated union on `t`. This GROWS per
  * implementation phase. Rule: every addition is a NEW `t` value with a typed
  * payload, so a client can ignore an unknown kind gracefully (clients are also
@@ -79,18 +107,33 @@ export type CoopMessage =
    * without sharing a screen. `entries` is the partner's tentative roster (shape
    * mirrors `CoopRosterEntry`; inlined to keep the protocol the lowest layer with
    * no import cycle); `ready` flips true when they lock in.
+   *
+   * Each entry MAY carry the partner's FULL `starter` blob (#633, LIVE-B): the
+   * complete serialized starter (form / IVs / nature / ability / moves / ...) so
+   * the receiving client rebuilds the partner's mons EXACTLY, not from defaults.
+   * Optional + additive: during early selection only speciesId+cost are known, and
+   * older clients ignore the extra field gracefully.
    */
-  | { t: "rosterSync"; role: CoopRole; entries: { speciesId: number; cost: number }[]; ready: boolean }
+  | {
+      t: "rosterSync";
+      role: CoopRole;
+      entries: { speciesId: number; cost: number; starter?: CoopSerializedStarter }[];
+      ready: boolean;
+    }
   /**
    * Host -> guest: the AUTHORITATIVE run configuration both players share (#633,
    * LIVE-C). The host decides the ER difficulty (youngster/ace/elite/hell) and the
    * challenge set; the guest mirrors them so the run is coherent (the guest never
    * picks its own). `challenges` is the serialized challenge list ({id,value,severity}).
-   */
+   *
+   * `seed` (#633, LIVE-A) is the HOST's run seed: the guest pins its engine to the
+   * SAME seed so both clients roll identical enemies / RNG and stay in lockstep.
+   * Optional + additive (older clients fall back to their own seed). */
   | {
       t: "runConfig";
       difficulty: string;
       challenges: { id: number; value: number; severity: number }[];
+      seed?: string;
     }
   /** A choice on an alternation-owned interaction screen (reward / shop / ME) (P4). */
   | { t: "interaction"; screen: string; choice: unknown }

@@ -9,8 +9,9 @@ import { PokemonMove } from "#moves/pokemon-move";
 /** Throwaway save slot used by dev test-scenarios so they don't clobber slot 0. */
 const DEV_SCENARIO_SLOT = 4;
 
+import type { CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
 import { getCoopController, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
+import type { CoopRole, CoopSerializedStarter } from "#data/elite-redux/coop/coop-transport";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
 import { ChallengeType } from "#enums/challenge-type";
@@ -94,7 +95,17 @@ export class SelectStarterPhase extends Phase {
       // the two double leads (party[0]/party[1] = field slots 0/1) are the host's
       // and the guest's FIRST mon respectively - each player gets an active mon to
       // control from turn 1 (#633, P2). `owners` tags each launch mon's coopOwner.
-      const { starters: merged, owners } = buildCoopMergedStarters(hostStarters, controller.partnerEntries());
+      //
+      // The merge is keyed by ROLE (not local/partner) so BOTH clients produce the
+      // SAME party (#633, LIVE-B): the host's machine and the guest's machine each
+      // pass their own local picks + the partner's mirrored picks, and the builder
+      // puts the host-role half first regardless of who is local. With the full
+      // starter blobs over the wire, the two parties are byte-identical.
+      const { starters: merged, owners } = buildCoopMergedStarters(
+        hostStarters,
+        controller.role,
+        controller.partnerEntries(),
+      );
       globalScene.ui.clearText();
       globalScene.ui.setMode(UiMode.SAVE_SLOT, SaveSlotUiMode.SAVE, (slotId: number) => {
         if (slotId === -1) {
@@ -111,9 +122,17 @@ export class SelectStarterPhase extends Phase {
 
     globalScene.ui.setMode(UiMode.STARTER_SELECT, (starters: Starter[]) => {
       hostStarters = starters;
-      // Mirror the local team to the partner and lock in.
+      // Mirror the local team to the partner and lock in. The roster carries the
+      // FULL starter blob (#633, LIVE-B) - not just speciesId+cost - so the partner
+      // rebuilds our mons EXACTLY (same form / IVs / nature / ability / moves) and
+      // both clients' merged launch parties are byte-identical (a prerequisite for
+      // the shared-seed lockstep).
       controller.setLocalRoster(
-        starters.map(s => ({ speciesId: s.speciesId, cost: globalScene.gameData.getSpeciesStarterValue(s.speciesId) })),
+        starters.map<CoopRosterEntry>(s => ({
+          speciesId: s.speciesId,
+          cost: globalScene.gameData.getSpeciesStarterValue(s.speciesId),
+          starter: serializeCoopStarter(s),
+        })),
       );
       controller.setLocalReady(true);
       proceedIfReady();
@@ -255,21 +274,66 @@ export class SelectStarterPhase extends Phase {
 }
 
 /**
- * Build the merged co-op launch party (#633), INTERLEAVED: host0, guest0, host1,
- * guest1, ... so the two double leads (party[0]/party[1] = field slots 0/1) are
- * each player's FIRST mon - the host commands field 0, the guest field 1, from
- * turn 1. The partner's roster crosses the transport as just `{speciesId, cost}`
- * in phase P1, so its mons are rebuilt with sensible defaults here (base form,
- * neutral nature, perfect IVs, default ability; the level-up moveset
- * auto-populates). Full per-mon partner data lands when the real transport carries
- * the whole Starter struct (P6). Returns the interleaved `starters` plus a parallel
- * `owners` array so `initBattle` can tag each launch mon's `coopOwner`.
+ * Serialize an engine {@linkcode Starter} into the wire {@linkcode CoopSerializedStarter}
+ * (#633, LIVE-B) so a partner can rebuild it EXACTLY. The shapes are nearly
+ * identical; this pins the explicit field set + clones the array fields so the
+ * struct that crosses the transport never aliases live engine state.
  */
-function buildCoopMergedStarters(
-  hostStarters: Starter[],
-  partnerEntries: readonly { speciesId: number; cost: number }[],
-): { starters: Starter[]; owners: CoopRole[] } {
-  const partnerStarters: Starter[] = partnerEntries.map(e => ({
+function serializeCoopStarter(s: Starter): CoopSerializedStarter {
+  return {
+    speciesId: s.speciesId,
+    shiny: s.shiny,
+    variant: s.variant,
+    formIndex: s.formIndex,
+    female: s.female,
+    abilityIndex: s.abilityIndex,
+    passive: s.passive,
+    nature: s.nature,
+    moveset: s.moveset ? [...s.moveset] : undefined,
+    pokerus: s.pokerus,
+    nickname: s.nickname,
+    teraType: s.teraType,
+    ivs: [...s.ivs],
+    erBlackShiny: s.erBlackShiny,
+  };
+}
+
+/**
+ * Rebuild an engine {@linkcode Starter} from a wire {@linkcode CoopSerializedStarter}
+ * (#633, LIVE-B). The inverse of {@linkcode serializeCoopStarter}: produces the
+ * EXACT same starter the partner picked, so both clients' merged parties match
+ * byte-for-byte. `nature` / `teraType` are stored as plain numbers on the wire and
+ * narrowed back to their engine enums here.
+ */
+function rebuildCoopStarter(blob: CoopSerializedStarter): Starter {
+  return {
+    speciesId: blob.speciesId,
+    shiny: blob.shiny,
+    variant: blob.variant as Starter["variant"],
+    formIndex: blob.formIndex,
+    female: blob.female,
+    abilityIndex: blob.abilityIndex,
+    passive: blob.passive,
+    nature: blob.nature as Nature,
+    moveset: blob.moveset ? ([...blob.moveset] as Starter["moveset"]) : undefined,
+    pokerus: blob.pokerus,
+    nickname: blob.nickname,
+    teraType: blob.teraType as Starter["teraType"],
+    ivs: [...blob.ivs],
+    erBlackShiny: blob.erBlackShiny,
+  };
+}
+
+/** Rebuild a partner roster entry into an engine {@linkcode Starter} (#633, LIVE-B):
+ *  use the full blob when present, else fall back to sensible defaults (older
+ *  client / mid-select snapshot) so the merge never breaks. */
+function partnerEntryToStarter(e: CoopRosterEntry): Starter {
+  if (e.starter) {
+    return rebuildCoopStarter(e.starter);
+  }
+  // Back-compat fallback (no full blob): sensible defaults, level-up moveset
+  // auto-populates in initBattle.
+  return {
     speciesId: e.speciesId,
     shiny: false,
     variant: 0,
@@ -280,17 +344,48 @@ function buildCoopMergedStarters(
     nature: Nature.HARDY,
     pokerus: false,
     ivs: [31, 31, 31, 31, 31, 31],
-  }));
+  };
+}
+
+/**
+ * Build the merged co-op launch party (#633), INTERLEAVED: host0, guest0, host1,
+ * guest1, ... so the two double leads (party[0]/party[1] = field slots 0/1) are
+ * each player's FIRST mon - the host commands field 0, the guest field 1, from
+ * turn 1.
+ *
+ * Keyed by ROLE, not by local/partner (#633, LIVE-B): `localStarters` are the
+ * local client's own picks, `localRole` says which role that is, and
+ * `partnerEntries` are the mirrored partner picks. The builder always lays the
+ * HOST-role half into the interleave's first stream and the GUEST-role half into
+ * the second - so the host's machine and the guest's machine produce the SAME
+ * party order. With the full starter blobs carried over the wire (LIVE-B), each
+ * partner mon is rebuilt EXACTLY (same form / IVs / nature / ability / moveset /
+ * tera / black-shiny), making the two clients' 6-slot parties byte-identical - the
+ * prerequisite for sharing a seed and staying in lockstep. Returns the interleaved
+ * `starters` plus a parallel `owners` array so `initBattle` can tag each launch
+ * mon's `coopOwner`.
+ */
+function buildCoopMergedStarters(
+  localStarters: Starter[],
+  localRole: CoopRole,
+  partnerEntries: readonly CoopRosterEntry[],
+): { starters: Starter[]; owners: CoopRole[] } {
+  const partnerStarters = partnerEntries.map(partnerEntryToStarter);
+  // Resolve each role's half from local vs partner so the result is identical on
+  // both machines (host half first, guest half second).
+  const hostHalf = localRole === "host" ? localStarters : partnerStarters;
+  const guestHalf = localRole === "host" ? partnerStarters : localStarters;
+
   const starters: Starter[] = [];
   const owners: CoopRole[] = [];
-  const max = Math.max(hostStarters.length, partnerStarters.length);
+  const max = Math.max(hostHalf.length, guestHalf.length);
   for (let i = 0; i < max; i++) {
-    if (i < hostStarters.length) {
-      starters.push(hostStarters[i]);
+    if (i < hostHalf.length) {
+      starters.push(hostHalf[i]);
       owners.push("host");
     }
-    if (i < partnerStarters.length) {
-      starters.push(partnerStarters[i]);
+    if (i < guestHalf.length) {
+      starters.push(guestHalf[i]);
       owners.push("guest");
     }
   }

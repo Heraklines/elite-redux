@@ -43,6 +43,13 @@ export interface CoopRunConfig {
   difficulty: string;
   /** The active challenge set (empty for a plain run). */
   challenges: CoopChallengeConfig[];
+  /**
+   * The host's run seed (#633, LIVE-A). The guest pins its engine to this exact
+   * seed so both clients roll identical enemies / RNG and stay in lockstep.
+   * Optional: absent when the host hasn't supplied one (the guest then keeps its
+   * own seed, the legacy behavior).
+   */
+  seed?: string | undefined;
 }
 
 /** The other role: host's partner is guest and vice-versa. */
@@ -236,7 +243,13 @@ export class CoopSessionController {
    */
   broadcastRunConfig(config: CoopRunConfig): void {
     this._runConfig = config;
-    this.transport.send({ t: "runConfig", difficulty: config.difficulty, challenges: config.challenges });
+    this.transport.send({
+      t: "runConfig",
+      difficulty: config.difficulty,
+      challenges: config.challenges,
+      // The host's run seed (#633, LIVE-A) rides along so the guest pins to it.
+      ...(config.seed === undefined ? {} : { seed: config.seed }),
+    });
     this.emit();
   }
 
@@ -285,7 +298,13 @@ export class CoopSessionController {
     this.transport.send({
       t: "rosterSync",
       role: this.role,
-      entries: this.roster.entries(this.role).map(e => ({ speciesId: e.speciesId, cost: e.cost })),
+      // Carry the FULL starter blob (#633, LIVE-B) when present so the partner
+      // rebuilds our mons exactly; speciesId+cost remain for the budget/cap logic.
+      entries: this.roster.entries(this.role).map(e => ({
+        speciesId: e.speciesId,
+        cost: e.cost,
+        ...(e.starter === undefined ? {} : { starter: e.starter }),
+      })),
       ready: this._localReady,
     });
   }
@@ -316,10 +335,11 @@ export class CoopSessionController {
         }
         break;
       case "runConfig":
-        // The HOST decides difficulty + challenges; the guest mirrors them so the
-        // run is coherent (#633, LIVE-C). Only honour it FROM the host.
+        // The HOST decides difficulty + challenges + seed; the guest mirrors them
+        // so the run is coherent and both engines stay in lockstep (#633, LIVE-A/C).
+        // Only honour it FROM the host.
         if (this.role === "guest") {
-          this._runConfig = { difficulty: msg.difficulty, challenges: msg.challenges };
+          this._runConfig = { difficulty: msg.difficulty, challenges: msg.challenges, seed: msg.seed };
           this.emit();
         }
         break;
