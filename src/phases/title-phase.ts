@@ -21,7 +21,6 @@ import { Unlockables } from "#enums/unlockables";
 import { getBiomeKey } from "#field/arena";
 import type { Modifier } from "#modifiers/modifier";
 import { getDailyRunStarterModifiers, regenerateModifierPoolThresholds } from "#modifiers/modifier-type";
-import { isDirectorConfigured } from "#system/llm-director/director-runtime";
 import { vouchers } from "#system/voucher";
 import type { OptionSelectConfig, OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
@@ -113,30 +112,8 @@ export class TitlePhase extends Phase {
               return true;
             },
           });
-          // The LLM "Director" (Story Mode) is only playable when its NanoGPT
-          // env vars are configured (dev/beta builds, or a deploy that opts in).
-          // In a public production build without the key it would silently
-          // degrade to Classic, which is confusing — so there we show a
-          // non-selectable "Story Mode (Coming Soon)" placeholder instead.
-          if (isDev || isBeta || isDirectorConfigured()) {
-            options.push({
-              label: GameMode.getModeName(GameModes.LLM_DIRECTOR),
-              handler: () => {
-                setModeAndEnd(GameModes.LLM_DIRECTOR);
-                return true;
-              },
-            });
-          } else {
-            options.push({
-              label: i18next.t("menu:storyModeComingSoon"),
-              handler: () => {
-                // Not yet available in this build: reject the selection (keeps
-                // the mode menu open) with the standard error feedback.
-                globalScene.ui.playError();
-                return false;
-              },
-            });
-          }
+          // Story Mode (the LLM "Director") is hidden for now — it crowded the
+          // mode menu. Re-add the block here when bringing it back.
           // Co-op (#633): a 2-player shared run. Shown only where dev tools appear
           // (local + staging), never in a production build, until it is flipped on.
           // VITE_DEV_TOOLS is set on the staging build (mirrors the dev-tools
@@ -144,93 +121,88 @@ export class TitlePhase extends Phase {
           const devToolsEnabled =
             (import.meta.env as unknown as Record<string, string | undefined>).VITE_DEV_TOOLS === "1";
           if (isDev || isBeta || devToolsEnabled) {
-            options.push({
-              label: GameMode.getModeName(GameModes.COOP),
-              handler: () => {
-                const username = loggedInUser?.username;
-                // Surface a connection failure, then bounce back to the title.
-                const failed = (e: unknown) => {
-                  const msg = e instanceof Error ? e.message : String(e);
-                  globalScene.ui.showText(
-                    `Co-op connection failed:\n${msg}`,
-                    null,
-                    () => {
-                      globalScene.phaseManager.toTitleScreen();
-                      super.end();
-                    },
-                    null,
-                    true,
-                  );
-                };
-                // The data channel is open: confirm to the player, then start.
-                const connected = () => {
-                  globalScene.ui.showText(
-                    "Connected to your partner!\nPress to start co-op.",
-                    null,
-                    () => setModeAndEnd(GameModes.COOP),
-                    null,
-                    true,
-                  );
-                };
-                // Co-op lobby: HOST (get + share a code) / JOIN (enter a code) over
-                // the real WebRTC transport, or SOLO against a CPU stand-in partner.
-                const lobbyOptions: OptionSelectItem[] = [
-                  {
-                    label: "Host Game",
-                    handler: () => {
-                      globalScene.ui.setMode(UiMode.MESSAGE);
-                      globalScene.ui.showText("Creating co-op game...", null);
-                      connectCoopAsHost({
-                        username,
-                        onCode: code =>
-                          globalScene.ui.showText(
-                            `Your co-op code:\n${formatPairingCode(code)}\n\nShare it with your partner,\nthen wait here for them to join.`,
-                            null,
-                          ),
-                      })
-                        .then(connected)
-                        .catch(failed);
-                      return true;
-                    },
-                  },
-                  {
-                    label: "Join Game",
-                    handler: () => {
-                      const raw =
-                        typeof window === "undefined" ? null : window.prompt("Enter your partner's co-op code:");
-                      const code = raw ? normalizePairingCode(raw) : "";
-                      if (!code) {
-                        return true; // cancelled the prompt -> stay on the lobby menu
-                      }
-                      if (!isValidPairingCode(code)) {
-                        failed(new Error("that code doesn't look right"));
-                        return true;
-                      }
-                      globalScene.ui.setMode(UiMode.MESSAGE);
-                      globalScene.ui.showText("Connecting to your partner...", null);
-                      connectCoopAsGuest(code, { username }).then(connected).catch(failed);
-                      return true;
-                    },
-                  },
-                  {
-                    label: "Solo (CPU partner)",
-                    handler: () => {
-                      startLocalCoopSession({ username });
-                      setModeAndEnd(GameModes.COOP);
-                      return true;
-                    },
-                  },
-                  {
-                    label: i18next.t("menu:cancel"),
-                    handler: () => true,
-                  },
-                ];
-                globalScene.ui.showText("Co-op: host a game or join your partner.", null, () =>
-                  globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options: lobbyOptions }),
-                );
-                return true;
+            const username = loggedInUser?.username;
+            // Surface a connection failure, then bounce back to the title.
+            const coopFailed = (e: unknown) => {
+              const msg = e instanceof Error ? e.message : String(e);
+              globalScene.ui.showText(
+                `Co-op connection failed:\n${msg}`,
+                null,
+                () => {
+                  globalScene.phaseManager.toTitleScreen();
+                  super.end();
+                },
+                null,
+                true,
+              );
+            };
+            // The data channel is open: confirm to the player, then start.
+            const coopConnected = () => {
+              globalScene.ui.showText(
+                "Connected to your partner!\nPress to start co-op.",
+                null,
+                () => setModeAndEnd(GameModes.COOP),
+                null,
+                true,
+              );
+            };
+            // Leave the mode menu cleanly and show a progress message while the
+            // async connect runs. resetModeChain() clears the OPTION_SELECT overlay
+            // (mirrors loadSaveSlot) so the message isn't trapped under the menu -
+            // the bug where the lobby was a NESTED overlay and never showed.
+            const coopProgress = (text: string) => {
+              globalScene.ui.setMode(UiMode.MESSAGE);
+              globalScene.ui.resetModeChain();
+              globalScene.ui.showText(text, null);
+            };
+            // Co-op is three flat mode-menu entries (no nested submenu): HOST a game
+            // (get + share a code), JOIN a partner's game (enter their code) over the
+            // real WebRTC transport, or play SOLO against a CPU stand-in partner.
+            options.push(
+              {
+                label: "Co-op: Host",
+                handler: () => {
+                  coopProgress("Creating co-op game...");
+                  connectCoopAsHost({
+                    username,
+                    onCode: code =>
+                      globalScene.ui.showText(
+                        `Your co-op code:\n${formatPairingCode(code)}\n\nShare it with your partner,\nthen wait here for them to join.`,
+                        null,
+                      ),
+                  })
+                    .then(coopConnected)
+                    .catch(coopFailed);
+                  return true;
+                },
               },
-            });
+              {
+                label: "Co-op: Join",
+                handler: () => {
+                  const raw = typeof window === "undefined" ? null : window.prompt("Enter your partner's co-op code:");
+                  const code = raw ? normalizePairingCode(raw) : "";
+                  if (!code) {
+                    return false; // cancelled the prompt -> keep the mode menu open
+                  }
+                  if (!isValidPairingCode(code)) {
+                    coopProgress("");
+                    coopFailed(new Error("that code doesn't look right"));
+                    return true;
+                  }
+                  coopProgress("Connecting to your partner...");
+                  connectCoopAsGuest(code, { username }).then(coopConnected).catch(coopFailed);
+                  return true;
+                },
+              },
+              {
+                label: "Co-op: Solo (CPU)",
+                handler: () => {
+                  startLocalCoopSession({ username });
+                  setModeAndEnd(GameModes.COOP);
+                  return true;
+                },
+              },
+            );
           }
           options.push({
             label: i18next.t("menu:dailyRun"),
