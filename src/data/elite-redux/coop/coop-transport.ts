@@ -240,6 +240,17 @@ export type CoopMessage =
    * switch / capture / encounter start / resume). `reason` is a short tag for logging.
    */
   | { t: "battleCheckpoint"; reason: string; checkpoint: CoopBattleCheckpoint }
+  /**
+   * Owner -> watcher (#633): the owner's pick on an ALTERNATING-control interaction
+   * screen (reward shop / biome shop / mystery encounter). Same seed -> both clients
+   * generate the IDENTICAL option pool, so only the CHOICE crosses the wire: the
+   * watcher applies `choice` to its own identical pool for the identical outcome.
+   *  - `seq`    the interaction-counter value this choice belongs to (stale seq ignored)
+   *  - `kind`   "reward" | "biomeShop" | "me" (routing / logging)
+   *  - `choice` the picked option index, or a sentinel (-1 = leave/skip, -2 = reroll)
+   *  - `data`   optional extra indices (e.g. party-target slot, ME sub-option)
+   */
+  | { t: "interactionChoice"; seq: number; kind: string; choice: number; data?: number[] }
   /** Session lifecycle signal (P5). */
   | { t: "lifecycle"; event: CoopLifecycleEvent };
 
