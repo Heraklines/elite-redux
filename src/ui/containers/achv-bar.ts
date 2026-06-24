@@ -1,7 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import type { PlayerGender } from "#enums/player-gender";
 import { TextStyle } from "#enums/text-style";
-import { Achv, getAchievementDescription } from "#system/achv";
+import { Achv, getAchievementDescription, RewardAchv } from "#system/achv";
 import { Voucher } from "#system/voucher";
 import { addTextObject } from "#ui/text";
 
@@ -68,14 +68,17 @@ export class AchvBar extends Phaser.GameObjects.Container {
     this.bg.setTexture(`achv_bar${tier ? `_${tier + 1}` : ""}`);
     this.icon.setFrame(achv.getIconImage());
     this.titleText.setText(achv.getName(this.playerGender));
-    this.scoreText.setVisible(achv instanceof Achv);
-    if (achv instanceof Achv) {
+    const isReward = achv instanceof RewardAchv;
+    this.scoreText.setVisible(achv instanceof Achv && !isReward);
+    if (isReward) {
+      this.descriptionText.setText((achv as RewardAchv).rewardText);
+    } else if (achv instanceof Achv) {
       this.descriptionText.setText(getAchievementDescription((achv as Achv).localizationKey));
     } else if (achv instanceof Voucher) {
       this.descriptionText.setText((achv as Voucher).description);
     }
 
-    if (achv instanceof Achv) {
+    if (achv instanceof Achv && !isReward) {
       this.scoreText.setText(`+${(achv as Achv).score}pt`);
     }
 

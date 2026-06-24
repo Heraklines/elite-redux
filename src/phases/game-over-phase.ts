@@ -196,6 +196,10 @@ export class GameOverPhase extends BattlePhase {
               }
             }
             this.awardRibbons();
+            // Master of All: fired right after the ribbon award transition (never
+            // at load); the achv's conditionFunc gates on owning all 18 mono-type
+            // ribbons across the dex.
+            globalScene.validateAchv(achvs.MASTER_OF_ALL);
           } else if (globalScene.gameMode.isDaily && newClear) {
             globalScene.gameData.gameStats.dailyRunSessionsWon++;
             globalScene.validateAchv(achvs.DAILY_VICTORY);

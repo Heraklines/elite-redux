@@ -24,10 +24,13 @@
 // Out:  dev-logs/ui-pages/<page>[-missing].png   (gitignored)
 // =============================================================================
 
+import { getGameMode } from "#app/game-mode";
 import { Egg } from "#data/egg";
 import { EggHatchData } from "#data/egg-hatch-data";
+import { startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { Button } from "#enums/buttons";
 import { DexAttr } from "#enums/dex-attr";
+import { GameModes } from "#enums/game-modes";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
@@ -205,6 +208,23 @@ const RECIPES: Record<string, Recipe> = {
   "starter-select": {
     mode: UiMode.STARTER_SELECT,
     prepare: game => {
+      for (let id = 1; id <= 151; id++) {
+        caughtSpecies(game, id as SpeciesId);
+      }
+      return [() => {}];
+    },
+  },
+  // Co-op (#633) starter-select: forces COOP mode so the budget panel reads 0/5
+  // (per-player) and the per-player 3-mon cap applies. This is the real screen the
+  // host plays - each player picks their OWN team on their OWN screen.
+  "starter-select-coop": {
+    mode: UiMode.STARTER_SELECT,
+    prepare: game => {
+      game.scene.gameMode = getGameMode(GameModes.COOP);
+      // Spin up a spoofed co-op session so the partner-status banner populates
+      // (the spoof "joins" + locks in; the await in the test flushes its messages).
+      const runtime = startLocalCoopSession({ username: "Ash" });
+      runtime.spoof?.autoComplete();
       for (let id = 1; id <= 151; id++) {
         caughtSpecies(game, id as SpeciesId);
       }

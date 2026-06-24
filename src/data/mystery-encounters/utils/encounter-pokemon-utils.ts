@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { speciesStarterCosts } from "#balance/starters";
 import { modifierTypes } from "#data/data-lists";
+import { coopAttributeNewMon } from "#data/elite-redux/coop/coop-session";
 import { Gender } from "#data/gender";
 import {
   doPokeballBounceAnim,
@@ -713,7 +714,13 @@ export async function catchPokemon(
           end();
           return;
         }
-        if (globalScene.getPlayerParty().length === 6) {
+        // Co-op (#633, P1g): the obtaining player's HALF being full counts as
+        // "full" so the release/replace prompt fires at 3 (their cap), not 6. With
+        // no half having room, coopAttributeNewMon returns null. Solo uses the 6-cap.
+        const mePartyFull = globalScene.gameMode.isCoop
+          ? coopAttributeNewMon(globalScene.getPlayerParty()) === null
+          : globalScene.getPlayerParty().length === 6;
+        if (mePartyFull) {
           const promptRelease = () => {
             globalScene.ui.showText(
               i18next.t("battle:partyFull", {

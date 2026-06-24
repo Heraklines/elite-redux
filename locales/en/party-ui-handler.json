@@ -25,6 +25,8 @@
   "doWhatWithThisPokemon": "Do what with this Pokémon?",
   "noEnergy": "{{pokemonName}} has no energy\nleft to battle!",
   "hasEnergy": "{{pokemonName}} still has energy\nto battle!",
+  "coopPartnerMon": "{{pokemonName}} belongs to your\npartner!",
+  "coopGiveToPartner": "Give to Partner",
   "cantBeUsed": "{{pokemonName}} can’t be used in\nthis challenge!",
   "tooManyItems": "{{pokemonName}} has too many\nof this item!",
   "anyEffect": "It won’t have any effect.",

@@ -5,4 +5,6 @@ export enum GameModes {
   DAILY,
   CHALLENGE,
   LLM_DIRECTOR,
+  // Appended (id 6) so existing modes keep their numeric ids (saved as modeId).
+  COOP,
 }

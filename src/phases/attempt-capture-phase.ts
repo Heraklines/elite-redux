@@ -3,6 +3,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { IS_TEST, isBeta, isDev } from "#constants/app-constants";
 import { SubstituteTag } from "#data/battler-tags";
+import { coopAttributeNewMon } from "#data/elite-redux/coop/coop-session";
 import { erCollectorsAlbumRecordCatch } from "#data/elite-redux/er-relics";
 import { Gender } from "#data/gender";
 import {
@@ -319,7 +320,14 @@ export class AttemptCapturePhase extends PokemonPhase {
             end();
             return;
           }
-          if (globalScene.getPlayerParty().length === PLAYER_PARTY_MAX_SIZE) {
+          // Co-op (#633, P1g): the catcher's HALF being full counts as "full" so
+          // the release/replace prompt fires at 3 (their cap), not 6. With no half
+          // having room, coopAttributeNewMon returns null. Solo modes use the 6-cap.
+          const party = globalScene.getPlayerParty();
+          const partyFull = globalScene.gameMode.isCoop
+            ? coopAttributeNewMon(party) === null
+            : party.length === PLAYER_PARTY_MAX_SIZE;
+          if (partyFull) {
             const promptRelease = () => {
               globalScene.ui.showText(
                 i18next.t("battle:partyFull", {

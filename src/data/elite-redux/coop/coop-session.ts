@@ -32,6 +32,59 @@ export function coopOwnerOfPartySlot(partySlot: number): CoopRole {
   return partySlot < COOP_SLOTS_PER_PLAYER ? "host" : "guest";
 }
 
+/** The minimal shape the per-owner cap helpers operate on: anything that carries
+ *  the persistent `coopOwner` tag. Engine-free so this is fully unit-testable. */
+export interface CoopOwnedMon {
+  coopOwner?: CoopRole;
+}
+
+/**
+ * Count how many party members are owned by `owner` (#633, P1g). Slot index is
+ * NOT used: slots shift on add/remove, so the persistent per-mon `coopOwner` tag
+ * is the reliable signal. Mons with no tag (non-co-op) never count toward a half.
+ */
+export function coopOwnedCount(party: readonly CoopOwnedMon[], owner: CoopRole): number {
+  let count = 0;
+  for (const mon of party) {
+    if (mon.coopOwner === owner) {
+      count++;
+    }
+  }
+  return count;
+}
+
+/** Whether `owner`'s half of the shared party is already at the per-player cap. */
+export function coopHalfIsFull(party: readonly CoopOwnedMon[], owner: CoopRole): boolean {
+  return coopOwnedCount(party, owner) >= COOP_SLOTS_PER_PLAYER;
+}
+
+/**
+ * Decide which player a freshly OBTAINED co-op mon (catch / gift) is attributed
+ * to in phase P1 (#633, P1g). There is no live co-op battle / command-routing
+ * yet (that lands in P2 with the actual ball-thrower), so for now we attribute
+ * the obtain to the half that has ROOM, preferring the EMPTIER half so the two
+ * teams stay balanced. Returns `null` when BOTH halves are full (the add is
+ * blocked by the caller). Exposed as a small helper so P2 can swap it for
+ * "attribute to the actual thrower".
+ */
+export function coopAttributeNewMon(party: readonly CoopOwnedMon[]): CoopRole | null {
+  const hostCount = coopOwnedCount(party, "host");
+  const guestCount = coopOwnedCount(party, "guest");
+  const hostFull = hostCount >= COOP_SLOTS_PER_PLAYER;
+  const guestFull = guestCount >= COOP_SLOTS_PER_PLAYER;
+  if (hostFull && guestFull) {
+    return null;
+  }
+  if (hostFull) {
+    return "guest";
+  }
+  if (guestFull) {
+    return "host";
+  }
+  // Both have room: give it to the emptier half (ties go to host).
+  return hostCount <= guestCount ? "host" : "guest";
+}
+
 /** The party-slot index range `[start, end)` owned by `role`. */
 export function coopPartySlotRange(role: CoopRole): { start: number; end: number } {
   return role === "host"
@@ -47,6 +100,91 @@ export function coopOwnerOfFieldIndex(fieldIndex: number): CoopRole {
 /** The field slot a given player commands. */
 export function coopFieldIndexOf(role: CoopRole): number {
   return role === "guest" ? COOP_GUEST_FIELD_INDEX : COOP_HOST_FIELD_INDEX;
+}
+
+/**
+ * Battle-control ownership predicate (#633, P2). When a switch is being made FOR
+ * field slot `fieldIndex`, only the mons belonging to that slot's owner are legal
+ * replacements: a host switch may only pull from the host's party half and a
+ * guest switch only from the guest's. Returns `true` when `monOwner` is the WRONG
+ * half for `fieldIndex` (i.e. the candidate must be BLOCKED).
+ *
+ * Pure logic - takes the candidate's `coopOwner` tag directly - so the switch UI
+ * gate and its unit test share one source of truth. A mon with no `coopOwner` tag
+ * (should not happen inside a co-op run) is treated as NOT blocked, so the gate
+ * fails open rather than locking the player out of every replacement.
+ */
+export function coopSwitchBlocksMon(fieldIndex: number, monOwner: CoopRole | undefined): boolean {
+  if (monOwner === undefined) {
+    return false;
+  }
+  return monOwner !== coopOwnerOfFieldIndex(fieldIndex);
+}
+
+/**
+ * Re-order a co-op party into the INTERLEAVED launch order (host0, guest0, host1,
+ * guest1, ...), stable within each half, so the two double leads (index 0/1) are
+ * one host and one guest mon - matching the field-slot ownership model. Mons with
+ * no `coopOwner` tag (should not occur inside a co-op run) are appended at the end
+ * so they are never silently dropped. Pure - returns a new array, mutates nothing.
+ *
+ * Used after a give-to-partner re-attribution (and at any point the party must be
+ * normalized) to keep field slot 0 = host / slot 1 = guest. Generic over anything
+ * carrying the `coopOwner` tag so the engine party and the unit test share it.
+ */
+export function coopInterleaveOrder<T extends CoopOwnedMon>(party: readonly T[]): T[] {
+  const host = party.filter(m => m.coopOwner === "host");
+  const guest = party.filter(m => m.coopOwner === "guest");
+  const untagged = party.filter(m => m.coopOwner === undefined);
+  const out: T[] = [];
+  const max = Math.max(host.length, guest.length);
+  for (let i = 0; i < max; i++) {
+    if (i < host.length) {
+      out.push(host[i]);
+    }
+    if (i < guest.length) {
+      out.push(guest[i]);
+    }
+  }
+  out.push(...untagged);
+  return out;
+}
+
+/** Why a give-to-partner transfer was rejected, or `ok` when it is allowed. */
+export type CoopGiveResult =
+  | { ok: true }
+  /** The mon carries no `coopOwner` tag, so it isn't a co-op mon to give. */
+  | { ok: false; reason: "not-owned" }
+  /** The partner already holds {@linkcode COOP_SLOTS_PER_PLAYER} Pokemon. */
+  | { ok: false; reason: "partner-full" }
+  /** This is the giver's only Pokemon - giving it would leave them with none. */
+  | { ok: false; reason: "last-mon" };
+
+/**
+ * Validate giving the mon owned by `monOwner` to the partner (#633, P3). The gift
+ * re-attributes the mon to the other half of the shared party. It is allowed only
+ * when:
+ *   - the mon is actually a co-op mon (`monOwner` is tagged),
+ *   - the partner's half has room (`< COOP_SLOTS_PER_PLAYER`), and
+ *   - the giver is NOT giving away their last Pokemon (each player must always
+ *     keep at least one mon, else they would have nothing to control in the
+ *     co-op double).
+ *
+ * Pure logic over the same `coopOwner`-tagged party the caps key off, so the UI
+ * gate and its unit test share one source of truth.
+ */
+export function coopGiveToPartner(party: readonly CoopOwnedMon[], monOwner: CoopRole | undefined): CoopGiveResult {
+  if (monOwner === undefined) {
+    return { ok: false, reason: "not-owned" };
+  }
+  const partner: CoopRole = monOwner === "host" ? "guest" : "host";
+  if (coopHalfIsFull(party, partner)) {
+    return { ok: false, reason: "partner-full" };
+  }
+  if (coopOwnedCount(party, monOwner) <= 1) {
+    return { ok: false, reason: "last-mon" };
+  }
+  return { ok: true };
 }
 
 /**

@@ -13,12 +13,14 @@ import type { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
+import { SpeciesId } from "#enums/species-id";
 import { StatusEffect } from "#enums/status-effect";
 import { SwitchType } from "#enums/switch-type";
 import type { EnemyPokemon, PlayerPokemon, Pokemon } from "#field/pokemon";
 import { PokemonInstantReviveModifier } from "#modifiers/modifier";
 import { PokemonMove } from "#moves/pokemon-move";
 import { PokemonPhase } from "#phases/pokemon-phase";
+import { achvs } from "#system/achv";
 import { inSpeedOrder } from "#utils/speed-order-generator";
 import i18next from "i18next";
 
@@ -237,6 +239,10 @@ export class FaintPhase extends PokemonPhase {
     const enemy = this.getPokemon();
 
     if (enemy.formIndex > 0) {
+      // Primal Cascoon: the second-stage final boss is the Primal Cascoon.
+      if (enemy.species.speciesId === SpeciesId.CASCOON) {
+        globalScene.validateAchv(achvs.PRIMAL_CASCOON);
+      }
       ui.showDialogue(classicFinalBossDialogue.secondStageWin, enemy.species.name, null, () => this.doFaint());
       return;
     }

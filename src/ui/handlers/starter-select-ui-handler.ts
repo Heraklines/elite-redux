@@ -18,6 +18,9 @@ import {
 } from "#balance/starters";
 import { allAbilities, allMoves, allSpecies } from "#data/data-lists";
 import { Egg, getEggTierForSpecies, MAX_EGG_COUNT } from "#data/egg";
+import { COOP_STARTER_COST_BUDGET } from "#data/elite-redux/coop/coop-roster";
+import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_SLOTS_PER_PLAYER } from "#data/elite-redux/coop/coop-session";
 import { matchesAbilityText } from "#data/elite-redux/er-ability-search";
 import { ER_BLACK_SHINY_TINT } from "#data/elite-redux/er-black-shinies";
 import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
@@ -497,6 +500,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private starterIcons: Phaser.GameObjects.Sprite[];
   private starterIconsCursorObj: Phaser.GameObjects.Image;
   private valueLimitLabel: Phaser.GameObjects.Text;
+  /** Co-op (#633): partner-status banner ("<name>: ready", "P2: 2/3", ...). Hidden off co-op. */
+  private coopStatusText: Phaser.GameObjects.Text;
+  private coopStatusUnsub: (() => void) | null = null;
   private startCursorObj: Phaser.GameObjects.NineSlice;
   private randomCursorObj: Phaser.GameObjects.NineSlice;
   /** ER: cursor for the "Use Last Team" action (sits above the Random button). */
@@ -955,6 +961,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       0.5,
       0,
     );
+
+    // Co-op (#633): partner-status banner as a bottom-left status strip (wide enough
+    // for the partner's name). Driven by the live CoopSessionController; hidden +
+    // empty in every non-co-op mode.
+    this.coopStatusText = addTextObject(2, 178, "", TextStyle.STARTER_VALUE_LIMIT).setOrigin(0, 1).setVisible(false);
 
     const startLabel = addTextObject(
       teamWindowX + 17,
@@ -1421,6 +1432,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.pokemonNatureLabelText,
       this.pokemonNatureText,
       this.valueLimitLabel,
+      this.coopStatusText,
       startLabel,
       this.startCursorObj,
       lastTeamSelectLabel,
@@ -1488,6 +1500,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.starterSelectCallback = args[0] as StarterSelectCallback;
 
       this.starterSelectContainer.setVisible(true);
+      // Co-op (#633): subscribe the partner-status banner to the live session.
+      this.coopStatusUnsub?.();
+      this.coopStatusUnsub = null;
+      const coopController = getCoopController();
+      if (globalScene.gameMode.isCoop && coopController) {
+        this.coopStatusUnsub = coopController.onChange(() => this.updateCoopStatus());
+      }
+      this.updateCoopStatus();
       this.spriteLoadAttempts.clear(); // fresh visit: allow previously-failed sprites to retry
       // Background grid pre-warmer (idle-gated, single-flight — see prewarmVisibleSprites).
       this.spritePrewarmTimer?.remove();
@@ -2182,7 +2202,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     } else if (this.randomCursorObj.visible) {
       switch (button) {
         case Button.ACTION: {
-          if (this.starterSpecies.length >= 6) {
+          if (this.starterSpecies.length >= this.getPartySizeLimit()) {
             error = true;
             break;
           }
@@ -2379,7 +2399,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             !isDupe
             && isValidForChallenge
             && currentPartyValue + newCost <= this.getValueLimit()
-            && this.starterSpecies.length < PLAYER_PARTY_MAX_SIZE
+            && this.starterSpecies.length < this.getPartySizeLimit()
           ) {
             options = [
               {
@@ -3668,6 +3688,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   }
 
   getValueLimit(): number {
+    // Co-op (#633): each player picks their OWN team on their OWN screen with an
+    // independent 5-point budget (two players ~= the solo 10-point pool), not the
+    // shared solo limit. Flat for now; co-op challenge interplay lands in P6.
+    if (globalScene.gameMode.isCoop) {
+      return COOP_STARTER_COST_BUDGET;
+    }
+
     const valueLimit = new NumberHolder(0);
     switch (globalScene.gameMode.modeId) {
       case GameModes.ENDLESS:
@@ -3681,6 +3708,42 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     applyChallenges(ChallengeType.STARTER_POINTS, valueLimit);
 
     return valueLimit.value;
+  }
+
+  /**
+   * Max Pokemon a single player may add during selection. Co-op (#633) caps each
+   * player at {@linkcode COOP_SLOTS_PER_PLAYER} (3) - the two players' halves fill
+   * the shared 6-slot party; solo modes use the full {@linkcode PLAYER_PARTY_MAX_SIZE}.
+   */
+  getPartySizeLimit(): number {
+    return globalScene.gameMode.isCoop ? COOP_SLOTS_PER_PLAYER : PLAYER_PARTY_MAX_SIZE;
+  }
+
+  /**
+   * Co-op (#633): refresh the partner-status banner from the live session so the
+   * player sees their partner's progress without sharing a screen ("Waiting for
+   * partner..." -> "<name>: 2/3" -> "<name>: ready" -> "Both ready!"). Hidden in
+   * every non-co-op mode and when no session is active.
+   */
+  private updateCoopStatus(): void {
+    const controller = getCoopController();
+    if (!globalScene.gameMode.isCoop || !controller) {
+      this.coopStatusText.setVisible(false);
+      return;
+    }
+    const s = controller.snapshot();
+    const name = s.partnerName ?? "Partner";
+    let msg: string;
+    if (!s.partnerConnected) {
+      msg = "Waiting for partner...";
+    } else if (s.bothReady) {
+      msg = "Both ready!";
+    } else if (s.partnerReady) {
+      msg = `${name}: ready`;
+    } else {
+      msg = `${name}: ${s.partnerCount}/${COOP_SLOTS_PER_PLAYER}`;
+    }
+    this.coopStatusText.setText(msg).setVisible(true);
   }
 
   /**
@@ -5897,6 +5960,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     globalScene.ui.hideTooltip();
 
     this.starterSelectContainer.setVisible(false);
+    this.coopStatusUnsub?.();
+    this.coopStatusUnsub = null;
+    this.coopStatusText?.setVisible(false);
     this.blockInput = false;
     this.spritePrewarmTimer?.remove();
     this.spritePrewarmTimer = null;

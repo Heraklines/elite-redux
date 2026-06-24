@@ -65,6 +65,15 @@ export type CoopMessage =
   | { t: "command"; fieldIndex: number; command: SerializedCommand }
   /** A forced/voluntary switch replacement: bring in party `partySlot` to `fieldIndex` (P2). */
   | { t: "switchChoice"; fieldIndex: number; partySlot: number }
+  /**
+   * A player's full starter-select snapshot during co-op selection (phase P1).
+   * Each player picks on THEIR OWN screen independently; this mirrors that state
+   * to the partner so the UI can show "Partner is choosing... / Partner is ready"
+   * without sharing a screen. `entries` is the partner's tentative roster (shape
+   * mirrors `CoopRosterEntry`; inlined to keep the protocol the lowest layer with
+   * no import cycle); `ready` flips true when they lock in.
+   */
+  | { t: "rosterSync"; role: CoopRole; entries: { speciesId: number; cost: number }[]; ready: boolean }
   /** A choice on an alternation-owned interaction screen (reward / shop / ME) (P4). */
   | { t: "interaction"; screen: string; choice: unknown }
   /** Host -> guest authoritative state checkpoint: a compressed SessionSaveData blob (P2/P5). */

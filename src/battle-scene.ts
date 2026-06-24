@@ -30,6 +30,7 @@ import { initCommonAnims, initMoveAnim, loadCommonAnimAssets, loadMoveAnimAssets
 import { getDailyMysteryEncounter } from "#data/daily-seed/daily-run";
 import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
+import { grantErAchievementReward } from "#data/elite-redux/er-achievement-rewards";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
 import {
   erBiomeBossChancePct,
@@ -118,6 +119,7 @@ import {
   ConsumableModifier,
   ConsumablePokemonModifier,
   DoubleBattleChanceBoosterModifier,
+  ErRelicModifier,
   ExpBalanceModifier,
   ExpShareModifier,
   FusePokemonModifier,
@@ -1902,6 +1904,14 @@ export class BattleScene extends SceneBase {
       return false;
     }
 
+    // Co-op (#633): every regular battle (wild OR trainer) is a DOUBLE so each of
+    // the two players always has an active Pokemon to control. The finale / endless
+    // boss / ME edges above already returned single. Lures (which only boost the
+    // double-battle CHANCE) are therefore inert in co-op - "deactivated" as designed.
+    if (this.gameMode.isCoop) {
+      return true;
+    }
+
     // ER (#383): the Doubles Only challenge makes every TRAINER battle a
     // double battle (before fixed-battle forcing, after the finale/ME edge
     // cases above - the finale stays single).
@@ -3316,6 +3326,12 @@ export class BattleScene extends SceneBase {
             success = modifier.apply(pokemon, true);
           }
         }
+        // ER Relic Hunter: a relic was just picked up (its stack grew). Fired here
+        // so it gates on the actual acquisition EVENT, never a load-time state
+        // check - the conditionFunc (>= 5 held relics) is the gate.
+        if (modifier instanceof ErRelicModifier) {
+          this.validateAchv(achvs.RELIC_HUNTER);
+        }
         if (playSound && !this.sound.get(soundName)) {
           this.playSound(soundName);
         }
@@ -3966,6 +3982,9 @@ export class BattleScene extends SceneBase {
       if (Object.hasOwn(vouchers, achv.id)) {
         this.validateVoucher(vouchers[achv.id]);
       }
+      // ER: grant the achievement's reward (one-time, never retroactive - this is
+      // the first-unlock path). Fail-open internally, so it can't break the unlock.
+      grantErAchievementReward(achv.id);
       return true;
     }
 

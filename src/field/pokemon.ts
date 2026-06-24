@@ -57,6 +57,8 @@ import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-
 import { allAbilities, allMoves } from "#data/data-lists";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
 import { suppressesOpponentDamageBoosts } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
+import { coopAttributeNewMon, coopHalfIsFull } from "#data/elite-redux/coop/coop-session";
+import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import {
   getErSharedGiftAbilityIdsFor,
@@ -5374,9 +5376,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       || formKey === SpeciesFormKey.GIGANTAMAX
       || formKey === SpeciesFormKey.GIGANTAMAX_RAPID
       || formKey === SpeciesFormKey.GIGANTAMAX_SINGLE
-      || formKey === SpeciesFormKey.ETERNAMAX // ER: Zacian/Zamazenta Crowned (Rusted Sword/Shield) carry their OWN ER // ability set in the form data (Crowned Sword + Steelworker/Battle Armor/ // Keen Edge), like a mega. Without this the form reads the BASE (Hero) kit
-      || // - the live "Zacian Crowned looks vanilla / doesn't get Keen Edge" report.
-      formKey === "crowned"
+      || formKey === SpeciesFormKey.ETERNAMAX // ER: Zacian/Zamazenta Crowned (Rusted Sword/Shield) carry their OWN ER // ability set in the form data (Crowned Sword + Steelworker/Battle Armor/ // Keen Edge), like a mega. Without this the form reads the BASE (Hero) kit // - the live "Zacian Crowned looks vanilla / doesn't get Keen Edge" report.
+      || formKey === "crowned"
     );
   }
 
@@ -7251,6 +7252,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 export class PlayerPokemon extends Pokemon {
   protected declare battleInfo: PlayerBattleInfo;
   public compatibleTms: MoveId[];
+  /**
+   * Co-op ownership tag (#633, P1g): in co-op mode the single shared 6-slot party
+   * is split between two players (up to 3 each). This records WHICH player owns
+   * this mon, so the per-player 3-cap is enforced off a persistent tag (party
+   * slots shift on add/remove, so slot index is unreliable). `undefined` for
+   * every non-co-op mon, which leaves all other modes untouched.
+   */
+  public coopOwner?: CoopRole;
 
   constructor(
     species: PokemonSpecies,
@@ -7296,6 +7305,15 @@ export class PlayerPokemon extends Pokemon {
         this.generateAndPopulateMoveset();
       } else {
         this.moveset = [];
+      }
+    }
+    if (dataSource) {
+      // Restore the co-op ownership tag (#633, P1g) from the save / source mon so
+      // it survives a serialize -> deserialize round-trip and a clone-on-evolve.
+      // Player-only field, so it is restored here rather than in the base ctor.
+      const sourceOwner = (dataSource as { coopOwner?: CoopRole }).coopOwner;
+      if (sourceOwner !== undefined) {
+        this.coopOwner = sourceOwner;
       }
     }
     this.generateCompatibleTms();
@@ -7754,6 +7772,13 @@ export class PlayerPokemon extends Pokemon {
         newPokemon.fusionLuck = this.fusionLuck;
         newPokemon.fusionTeraType = this.fusionTeraType;
         newPokemon.usedTMs = this.usedTMs;
+        // Co-op (#633, P1g): the evolved mon INHERITS the evolving mon's owner so
+        // an evolution never shifts a mon between halves or breaks the per-player
+        // cap. (Nincada -> Ninjask + Shedinja: the bonus Shedinja stays the same
+        // owner; an evolution is owner-net-neutral.)
+        if (this.coopOwner !== undefined) {
+          newPokemon.coopOwner = this.coopOwner;
+        }
 
         globalScene.getPlayerParty().push(newPokemon);
         newPokemon.evolve(isFusion ? new FusionSpeciesFormEvolution(this.id, newEvolution) : newEvolution, evoSpecies);
@@ -8909,6 +8934,19 @@ export class EnemyPokemon extends Pokemon {
     const party = globalScene.getPlayerParty();
     let ret: PlayerPokemon | null = null;
 
+    // Co-op (#633, P1g): a single player can never grow their half of the shared
+    // party past COOP_SLOTS_PER_PLAYER. Attribute this obtain to the half with
+    // room via coopAttributeNewMon (P1: the emptier half - swappable so P2 can
+    // attribute to the actual ball-thrower instead) and reject when BOTH halves
+    // are full. Solo / all other modes skip this entirely (6-cap below unchanged).
+    let coopOwner: CoopRole | undefined;
+    if (globalScene.gameMode.isCoop) {
+      coopOwner = coopAttributeNewMon(party) ?? undefined;
+      if (coopOwner === undefined || coopHalfIsFull(party, coopOwner)) {
+        return ret;
+      }
+    }
+
     if (party.length < PLAYER_PARTY_MAX_SIZE) {
       this.pokeball = pokeballType;
       this.metLevel = this.level;
@@ -8927,6 +8965,12 @@ export class EnemyPokemon extends Pokemon {
         this.nature,
         this,
       );
+
+      // Co-op (#633, P1g): stamp the resolved owner on the newly added mon so the
+      // per-player cap holds for this mon's whole life (incl. save/reload).
+      if (coopOwner !== undefined) {
+        newPokemon.coopOwner = coopOwner;
+      }
 
       if (isBetween(slotIndex, 0, PLAYER_PARTY_MAX_SIZE - 1)) {
         party.splice(slotIndex, 0, newPokemon);

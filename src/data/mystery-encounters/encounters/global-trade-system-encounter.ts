@@ -237,6 +237,11 @@ export const GlobalTradeSystemEncounter: MysteryEncounter = MysteryEncounterBuil
           dataSource.nature,
           dataSource,
         );
+        // Co-op (#633, P1g): a trade is owner-net-neutral - the received mon
+        // inherits the traded-away mon's owner so the per-player cap holds.
+        if (globalScene.gameMode.isCoop && tradedPokemon.coopOwner !== undefined) {
+          newPlayerPokemon.coopOwner = tradedPokemon.coopOwner;
+        }
         globalScene.getPlayerParty().push(newPlayerPokemon);
         await newPlayerPokemon.loadAssets();
 
@@ -341,6 +346,11 @@ export const GlobalTradeSystemEncounter: MysteryEncounter = MysteryEncounterBuil
           dataSource.nature,
           dataSource,
         );
+        // Co-op (#633, P1g): a trade is owner-net-neutral - the received mon
+        // inherits the traded-away mon's owner so the per-player cap holds.
+        if (globalScene.gameMode.isCoop && tradedPokemon.coopOwner !== undefined) {
+          newPlayerPokemon.coopOwner = tradedPokemon.coopOwner;
+        }
         globalScene.getPlayerParty().push(newPlayerPokemon);
         await newPlayerPokemon.loadAssets();
 

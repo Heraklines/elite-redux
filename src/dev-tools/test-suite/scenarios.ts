@@ -23,9 +23,12 @@
 
 import { loggedInUser } from "#app/account";
 import { setClearMeOverrideAfterFirst } from "#app/dev-tools/registry";
+import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
+import { getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import { coopOwnedCount } from "#data/elite-redux/coop/coop-session";
 import type { ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
 import { seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
@@ -40,6 +43,7 @@ import { BiomeId } from "#enums/biome-id";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { ErMoveId } from "#enums/er-move-id";
 import { ErSpeciesId } from "#enums/er-species-id";
+import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { Nature } from "#enums/nature";
@@ -1455,7 +1459,11 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "held item from slot 4 or 6 - give slot 4/6 an item (e.g. Leftovers) in a shop,\n"
       + "then reach a wave divisible by 10.\n"
       + "COLLECTOR'S ALBUM (note): every 3rd NEW species you CATCH grants +3 candy to\n"
-      + "that species - catch 3 different wild mons and watch the 3rd.",
+      + "that species - catch 3 different wild mons and watch the 3rd.\n"
+      + "ACHIEVEMENT REWARDS (note): unlocking any achievement now grants a reward (candy/\n"
+      + "eggs/Pokemon/shiny) shown via the native achievement pop-up and saved - one-time,\n"
+      + "never retroactive. The achievements menu shows the new ER entries with icons;\n"
+      + "Inferno (Hell + NU + Doubles Only + Ghost Trainers) is the ONLY black-shiny source.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -8486,4 +8494,119 @@ export const DEV_SCENARIOS: DevScenario[] = [
   //   Basculin). Check the candy count is shared in starter-select.
   // (note) #612 ER rivals at high waves now field fully evolved teams (no L60
   //   Growlithe on a wave-55 Hell rival).
+  // ===========================================================================
+  // Co-op — per-player 3-mon cap holds on catch (#633, P1g)
+  // ===========================================================================
+  {
+    label: "Co-op: host at 3 can't reach 4 on catch (#633)",
+    description:
+      "#633 co-op - the shared 6-slot party is split between two players, each\n"
+      + "owning up to 3. The host starts here with a FULL 3-mon half (all tagged\n"
+      + "'host'); the guest half is empty.\n"
+      + "DO: catch the wild Magikarp (throw a Poke Ball - the L3 Magikarp catches\n"
+      + "easily). Then open Check Team and look at the 4-mon party.\n"
+      + "EXPECT: the catch SUCCEEDS but is attributed to the GUEST half - the host\n"
+      + "still owns exactly 3, never 4. (Before the fix a player who started with 3\n"
+      + "could grow to 6 by catching.) The console prints the per-side counts after\n"
+      + "the catch: host=3, guest=1. If you fill BOTH halves to 3 (total 6), a further\n"
+      + "catch must offer the RELEASE/replace prompt at 6 just like solo.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3, // frail + easy to catch
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.WATERFALL, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.DRAGON_DANCE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      // Flip the live run into co-op and tag the 3 starters as the HOST's half so
+      // the per-player cap is exercised by an ordinary catch this battle.
+      globalScene.gameMode = getGameMode(GameModes.COOP);
+      for (const mon of globalScene.getPlayerParty()) {
+        mon.coopOwner = "host";
+      }
+      const party = globalScene.getPlayerParty();
+      console.log(
+        `[#633 co-op cap] start: host=${coopOwnedCount(party, "host")} guest=${coopOwnedCount(party, "guest")} `
+          + "(catch the Magikarp; it should land on the guest half, host stays 3)",
+      );
+    },
+  },
+  {
+    label: "Co-op: partner slot auto-acts + switch is half-locked (#633)",
+    description:
+      "#633 co-op BATTLE CONTROL - in the forced-DOUBLE co-op battle each player\n"
+      + "drives ONLY their own active mon. Field slot 0 (LEFT, Snorlax) = YOUR mon\n"
+      + "(the host); field slot 1 (RIGHT, Gengar) = your PARTNER's mon (auto-played\n"
+      + "by AI in this local/spoof path).\n"
+      + "DO: take a turn. You are prompted for the LEFT mon ONLY. The RIGHT mon acts\n"
+      + "on its own (watch the log: it uses one of Gengar's moves every turn without\n"
+      + "ever opening a menu for it). Then on the LEFT mon pick Pokemon -> Switch.\n"
+      + "EXPECT: the command menu appears ONLY for the LEFT (host) mon - the RIGHT\n"
+      + "(guest) mon never prompts you and auto-submits a legal move. In the switch\n"
+      + "list, only the HOST's bench (Gyarados) is selectable; the GUEST's bench\n"
+      + "(Alakazam) is blocked with a 'belongs to your partner!' message. (Before the\n"
+      + "fix you controlled both mons and could switch in anyone.) Console prints the\n"
+      + "ownership tags and the partner's auto-chosen move.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        BATTLE_STYLE_OVERRIDE: "double",
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 40,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      // Host half = slots 0-2 (Snorlax lead + Gyarados bench), guest half = slots
+      // 3-5 (Gengar lead + Alakazam bench). The launch partition is by slot order.
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.WATERFALL, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.DRAGON_DANCE],
+        }),
+        makeStarter(SpeciesId.ALAKAZAM, {
+          moveset: [MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.FOCUS_BLAST, MoveId.RECOVER],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      // Flip the live run into co-op and register the local (host) session so the
+      // command-routing + switch-ownership gates engage. The forced-double above
+      // gives each side two active mons; the merged party is partitioned host =
+      // slots 0-2, guest = slots 3-5.
+      globalScene.gameMode = getGameMode(GameModes.COOP);
+      if (getCoopController() == null) {
+        startLocalCoopSession({ username: loggedInUser?.username });
+      }
+      const party = globalScene.getPlayerParty();
+      party.forEach((mon, i) => {
+        mon.coopOwner = i < 3 ? "host" : "guest";
+      });
+      console.log(
+        "[#633 co-op control] tags: "
+          + party.map(m => `${m.getNameToRender()}=${m.coopOwner}`).join(", ")
+          + ` | local role=${getCoopController()?.role} `
+          + "(you drive the LEFT mon; the RIGHT mon is auto-played and switch is half-locked)",
+      );
+    },
+  },
 ];

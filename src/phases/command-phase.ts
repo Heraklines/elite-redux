@@ -5,6 +5,9 @@ import { speciesStarterCosts } from "#balance/starters";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
+import { resolvePartnerCommand } from "#data/elite-redux/coop/coop-partner-ai";
+import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -165,6 +168,40 @@ export class CommandPhase extends FieldPhase {
     return true;
   }
 
+  /**
+   * Co-op battle control (#633, P2): in a co-op double the local human only ever
+   * drives THEIR OWN field slot; the PARTNER's slot is auto-resolved and never
+   * shown. In the current local/spoof path the partner is a bot, so its command is
+   * picked by a self-contained AI ({@linkcode resolvePartnerCommand}), which
+   * returns a complete legal `{move, targets, useMode}`. A real remote partner
+   * sends the command over the transport in phase P6; this seam is where that path
+   * slots in - the inbound `command` message resolves into the same
+   * command-shaped result fed to `handleCommand` here. Returns `true` when the
+   * slot was auto-resolved (the phase has ended) and the interactive menu must be
+   * skipped.
+   */
+  private tryCoopAutoResolve(): boolean {
+    if (!globalScene.gameMode.isCoop) {
+      return false;
+    }
+    const controller = getCoopController();
+    // Fall back to normal (interactive) behavior if there is somehow no live
+    // session - never lock the human out of their command.
+    if (controller == null) {
+      return false;
+    }
+    // Only auto-resolve the PARTNER's slot; the local player commands their own.
+    if (coopOwnerOfFieldIndex(this.fieldIndex) === controller.role) {
+      return false;
+    }
+
+    const resolved = resolvePartnerCommand(this.getPokemon());
+    // Passing the full `move` arg makes handleFightCommand reuse the resolved
+    // targets and SKIP the interactive SelectTargetPhase.
+    this.handleCommand(resolved.command, resolved.moveIndex, resolved.turnMove.useMode, resolved.turnMove);
+    return true;
+  }
+
   public override start(): void {
     super.start();
 
@@ -183,6 +220,10 @@ export class CommandPhase extends FieldPhase {
     }
 
     if (this.tryExecuteQueuedMove()) {
+      return;
+    }
+
+    if (this.tryCoopAutoResolve()) {
       return;
     }
 

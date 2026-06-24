@@ -43,6 +43,7 @@ import { Stat } from "#enums/stat";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import { PokemonFormChangeItemModifier } from "#modifiers/modifier";
+import { achvs } from "#system/achv";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import i18next from "i18next";
 
@@ -115,6 +116,8 @@ export class TheBargainPhase extends Phase {
     await globalScene.ui.setMode(UiMode.MESSAGE);
     const committed = await this.applySin(key);
     if (committed) {
+      // The player accepted (and the deal was applied) one of Giratina's bargains.
+      globalScene.validateAchv(achvs.DEVILS_BARGAIN);
       this.end();
       return;
     }

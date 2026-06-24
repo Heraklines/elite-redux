@@ -15,6 +15,7 @@ import { EntryHazardTag } from "#data/arena-tag";
 import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed/daily-seed-utils";
 import { allMoves, allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
+import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
 import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
 import { getErMapSaveData, restoreErMapState } from "#data/elite-redux/er-map-nodes";
@@ -1475,6 +1476,18 @@ export class GameData {
       party.push(pokemon);
     }
 
+    // Co-op (#633, P5 resume): a saved co-op run re-establishes the local session
+    // (host + spoofed partner) on load, so the in-battle co-op behaviors - command
+    // routing to your own slot, switch ownership - work again. The per-mon coopOwner
+    // tags were restored from the save above (PokemonData). For any non-co-op load,
+    // tear down a stale co-op session left over from a prior run. (P6's real
+    // transport reconnects the actual partner at this seam instead of a spoof.)
+    if (globalScene.gameMode.isCoop) {
+      startLocalCoopSession();
+    } else {
+      clearCoopRuntime();
+    }
+
     Object.keys(globalScene.pokeballCounts).forEach((key: string) => {
       globalScene.pokeballCounts[key] = fromSession.pokeballCounts[key] || 0;
     });
@@ -2390,6 +2403,14 @@ export class GameData {
 
     // Mark as caught
     dexEntry.caughtAttr |= dexAttr;
+
+    // All That Glitters: a shiny was just recorded to the dex. Fired only on a
+    // shiny acquisition EVENT (never at load); the achv's conditionFunc gates on
+    // owning a shiny of all three variant tiers. validateAchv dedupes, so the
+    // prevolution recursion below can call this again harmlessly.
+    if (pokemon.isShiny()) {
+      globalScene.validateAchv(achvs.ALL_SHINY_TIERS);
+    }
 
     // If the caught form is a battleform, we want to also mark the base form as caught.
     // This snippet assumes that the base form has formIndex equal to 0, which should be

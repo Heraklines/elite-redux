@@ -2,6 +2,8 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { allMoves } from "#data/data-lists";
+import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
+import { coopGiveToPartner, coopSwitchBlocksMon } from "#data/elite-redux/coop/coop-session";
 import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
@@ -151,6 +153,9 @@ export enum PartyOption {
   /** ER: out-of-battle party reorder — pick this on a mon to start a swap, then
    * pick it on a second mon to swap their party slots (CHECK mode only). */
   MOVE,
+  /** Co-op (#633, P3): hand this mon to the partner (re-attributes its `coopOwner`
+   * to the other player's half). Co-op runs only, CHECK mode. */
+  GIVE_TO_PARTNER,
   SCROLL_UP = 1000,
   SCROLL_DOWN = 1001,
   FORM_CHANGE_ITEM = 2000,
@@ -846,12 +851,39 @@ export class PartyUiHandler extends MessageUiHandler {
     ) as PokemonHeldItemModifier[];
   }
 
+  /**
+   * Co-op battle control (#633, P2): block any party mon that belongs to the
+   * PARTNER's half when this party screen was opened to switch FOR the local
+   * player's field slot. Centralized here so the single gate covers BOTH switch
+   * paths - the voluntary POKEMON command (command-ui-handler opens PARTY with the
+   * commanding mon's field index) and the forced faint-switch (switch-phase opens
+   * PARTY with the fainted slot's field index). Both store the field index in
+   * `this.fieldIndex`, so the owner of THAT slot is the only half a switch may pull
+   * from. Returns an i18n block string for a partner-owned mon, else `null`.
+   * Outside a co-op run (or with no live session) it never blocks anything, so
+   * solo + every other mode is untouched.
+   */
+  private coopSwitchFilter(pokemon: PlayerPokemon): string | null {
+    if (!globalScene.gameMode.isCoop || this.fieldIndex < 0) {
+      return null;
+    }
+    if (!coopSwitchBlocksMon(this.fieldIndex, pokemon.coopOwner)) {
+      return null;
+    }
+    return i18next.t("partyUiHandler:coopPartnerMon", {
+      pokemonName: getPokemonNameWithAffix(pokemon, false),
+    });
+  }
+
   private getFilterResult(option: number, pokemon: PlayerPokemon): string | null {
     let filterResult: string | null;
     if (option !== PartyOption.TRANSFER && option !== PartyOption.SPLICE) {
       filterResult = (this.selectFilter as PokemonSelectFilter)(pokemon);
       if (filterResult === null && (option === PartyOption.SEND_OUT || option === PartyOption.PASS_BATON)) {
         filterResult = this.FilterChallengeLegal(pokemon);
+        if (filterResult === null) {
+          filterResult = this.coopSwitchFilter(pokemon);
+        }
       }
       if (filterResult === null && this.partyUiMode === PartyUiMode.MOVE_MODIFIER) {
         filterResult = this.moveSelectFilter(pokemon.moveset[this.optionsCursor]);
@@ -986,6 +1018,22 @@ export class PartyUiHandler extends MessageUiHandler {
       }
       this.clearOptions();
       ui.playSelect();
+      return true;
+    }
+
+    // Co-op (#633, P3): hand the selected mon to the partner. Re-attributes its
+    // coopOwner to the other half and re-orders the party so the field leads stay
+    // host/guest, then re-renders the list. The new ownership serializes with the
+    // session at the next save.
+    if (option === PartyOption.GIVE_TO_PARTNER) {
+      const given = coopGiveMonToPartner(pokemon);
+      this.clearOptions();
+      if (given.ok) {
+        this.populatePartySlots();
+        ui.playSelect();
+      } else {
+        ui.playError();
+      }
       return true;
     }
 
@@ -1683,6 +1731,15 @@ export class PartyUiHandler extends MessageUiHandler {
         } else if (globalScene.getPlayerParty().length > 1) {
           this.options.push(PartyOption.MOVE);
         }
+        // Co-op (#633, P3): offer "Give to Partner" when the transfer is legal
+        // (partner has room, and this isn't the giver's last mon).
+        if (
+          globalScene.gameMode.isCoop
+          && !this.transferMode
+          && coopGiveToPartner(globalScene.getPlayerParty(), pokemon.coopOwner).ok
+        ) {
+          this.options.push(PartyOption.GIVE_TO_PARTNER);
+        }
         this.addCommonOptions(pokemon);
         if (globalScene.phaseManager.getCurrentPhase().is("SelectModifierPhase")) {
           if (pokemon.isFusion()) {
@@ -1801,6 +1858,9 @@ export class PartyUiHandler extends MessageUiHandler {
             } else if (option === PartyOption.MOVE) {
               // ER party reorder: "Move" picks the source mon, "Swap here" the target.
               optionName = this.transferMode ? "Swap here" : "Move";
+            } else if (option === PartyOption.GIVE_TO_PARTNER) {
+              // Co-op (#633, P3): hand this mon to the other player.
+              optionName = i18next.t("partyUiHandler:coopGiveToPartner");
             } else if (this.localizedOptions.includes(option)) {
               optionName = i18next.t(`partyUiHandler:${toCamelCase(PartyOption[option])}`);
             } else {

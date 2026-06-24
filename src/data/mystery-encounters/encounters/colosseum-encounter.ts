@@ -48,6 +48,7 @@ import {
 } from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
+import { achvs } from "#system/achv";
 import { colosseumHeadSprite } from "#ui/colosseum-ui-handler";
 import { addTextObject } from "#ui/text";
 import i18next from "i18next";
@@ -257,6 +258,11 @@ export const ColosseumEncounter: MysteryEncounter = MysteryEncounterBuilder.with
       encounter.doContinueEncounter = async () => {
         const enc = globalScene.currentBattle.mysteryEncounter!;
         enc.misc.wins += 1;
+        // Exorcist: the round just cleared (1-indexed = enc.misc.wins) was a real
+        // player GHOST team. getGauntlet()[round - 1] is that round's challenger.
+        if (getGauntlet()[enc.misc.wins - 1]?.isGhost) {
+          globalScene.validateAchv(achvs.EXORCIST);
+        }
         halfHealSurvivors();
         if (enc.misc.wins >= MAX_ROUNDS) {
           await endColosseum(enc.misc.wins);

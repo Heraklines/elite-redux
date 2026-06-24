@@ -432,6 +432,12 @@ function serializeHeldItems(p: any, isPlayer: boolean): [string, number][] {
 
 /** Snapshot the current player party into a ghost team, or `null` if empty. */
 export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
+  // Co-op (#633, P6): a co-op run's party is a MERGED two-player team (each player
+  // brought up to 3 mons), not a single solo team. It must NOT seed the solo ghost
+  // pool, which other players face one-vs-one. Exclude co-op runs entirely.
+  if (globalScene?.gameMode?.isCoop) {
+    return null;
+  }
   const party = globalScene?.getPlayerParty?.() ?? [];
   if (party.length === 0) {
     return null;

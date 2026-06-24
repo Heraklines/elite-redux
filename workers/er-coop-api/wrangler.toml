@@ -1,0 +1,40 @@
+# Cloudflare Worker - Elite Redux co-op signaling + run-relay API (#633, P5/P6).
+#
+# Carries ONLY matchmaking/signaling + a thin host-authoritative save relay; the
+# co-op gameplay itself is peer-to-peer (WebRTC DataChannel), so a running session
+# costs effectively nothing here. Deploy:
+#   cd workers/er-coop-api
+#   npx wrangler d1 create er-coop          # once; paste database_id below
+#   npx wrangler d1 execute er-coop --remote --file ./schema.sql
+#   npx wrangler deploy
+
+name = "er-coop-api"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# D1 (SQLite) holding the coop_runs signaling rows. Create with `wrangler d1
+# create er-coop` and paste the returned id here.
+[[d1_databases]]
+binding = "DB"
+database_name = "er-coop"
+database_id = "62e9c1e7-2383-42de-bf66-3ac93e6fe5ea"
+
+[vars]
+# Optional origin allowlist; "*" / unset = allow any origin.
+ALLOWED_ORIGIN = "*"
+# A peer is considered PRESENT if its last heartbeat is within this many ms.
+PRESENCE_WINDOW_MS = "30000"
+# Rows untouched for this long are pruned by the cron (abandoned/finished runs).
+RUN_TTL_MS = "86400000"
+
+# Cloudflare Realtime TURN (OPTIONAL - co-op works on free STUN without it). To
+# relay the ~10-20% of players behind symmetric NAT, create a TURN key in the
+# Cloudflare dashboard (Realtime -> TURN) and set these as SECRETS (not here):
+#   npx wrangler secret put CF_TURN_KEY_ID
+#   npx wrangler secret put CF_TURN_API_TOKEN
+# The worker then mints short-lived TURN credentials at GET /coop/ice. Billed on
+# relay egress only (~1000 GB/mo free); co-op traffic is tiny game commands.
+
+# Prune stale runs once an hour.
+[triggers]
+crons = ["0 * * * *"]

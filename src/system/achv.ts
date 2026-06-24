@@ -9,10 +9,13 @@ import {
   SingleGenerationChallenge,
   SingleTypeChallenge,
 } from "#data/challenge";
+import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { Challenges } from "#enums/challenges";
+import { DexAttr } from "#enums/dex-attr";
 import { PlayerGender } from "#enums/player-gender";
 import { getShortenedStatKey, Stat } from "#enums/stat";
-import { TurnHeldItemTransferModifier } from "#modifiers/modifier";
+import { ErRelicModifier, TurnHeldItemTransferModifier } from "#modifiers/modifier";
+import { RibbonData } from "#system/ribbons/ribbon-data";
 import type { ConditionFn } from "#types/common";
 import { isNuzlockeChallenge } from "#utils/challenge-utils";
 import { NumberHolder } from "#utils/common";
@@ -191,6 +194,27 @@ export class ChallengeAchv extends Achv {
     challengeFunc: (challenge: Challenge) => boolean,
   ) {
     super(localizationKey, description, iconImage, score, (args: any[]) => challengeFunc(args[0] as Challenge));
+  }
+}
+
+/**
+ * A transient achievement-bar entry used to announce a granted REWARD through the
+ * game's native pop-up. NOT a real achievement (never added to `achvs`): it carries
+ * its own display name, reward text, and icon frame, and {@linkcode AchvBar}
+ * special-cases it (custom description, no score). One-off, never persisted.
+ */
+export class RewardAchv extends Achv {
+  public readonly rewardText: string;
+  private readonly displayName: string;
+
+  constructor(displayName: string, rewardText: string, iconImage: string) {
+    super("", "", iconImage, 0);
+    this.displayName = displayName;
+    this.rewardText = rewardText;
+  }
+
+  override getName(_playerGender: PlayerGender = PlayerGender.UNSET): string {
+    return this.displayName;
   }
 }
 
@@ -445,6 +469,28 @@ export function getAchievementDescription(localizationKey: string): string {
       return i18next.t("achv:breedersInSpace.description", {
         context: genderStr,
       });
+    case "limbo":
+      return i18next.t("achv:limbo.description", { context: genderStr });
+    case "purgatory":
+      return i18next.t("achv:purgatory.description", { context: genderStr });
+    case "inferno":
+      return i18next.t("achv:inferno.description", { context: genderStr });
+    case "lastStand":
+      return i18next.t("achv:lastStand.description", { context: genderStr });
+    case "permadeath":
+      return i18next.t("achv:permadeath.description", { context: genderStr });
+    case "devilsBargain":
+      return i18next.t("achv:devilsBargain.description", { context: genderStr });
+    case "exorcist":
+      return i18next.t("achv:exorcist.description", { context: genderStr });
+    case "primalCascoon":
+      return i18next.t("achv:primalCascoon.description", { context: genderStr });
+    case "relicHunter":
+      return i18next.t("achv:relicHunter.description", { context: genderStr });
+    case "allShinyTiers":
+      return i18next.t("achv:allShinyTiers.description", { context: genderStr });
+    case "masterOfAll":
+      return i18next.t("achv:masterOfAll.description", { context: genderStr });
     case "dailyVictory":
       return i18next.t("achv:dailyVictory.description", { context: genderStr });
     case "passives":
@@ -464,6 +510,80 @@ const inverseAndFlipStatAchievementsBlock = () =>
 /** Returns `true` if the passives challenge on `all` is active */
 const passivesChallengeAchievementsBlock = () =>
   globalScene.gameMode.challenges.some(c => c.id === Challenges.PASSIVES && c.value === 2);
+
+/**
+ * Returns `true` when the ER "apex stack" challenges are ALL active: NU usage tier
+ * (`USAGE_TIER` value 4) + Doubles Only + Ghost Trainers. Difficulty is gated
+ * separately by each tier (Limbo = ace/youngster, Purgatory = elite, Inferno = hell).
+ */
+const apexStackActive = () => {
+  const ch = globalScene.gameMode.challenges;
+  return (
+    ch.some(c => c.id === Challenges.USAGE_TIER && c.value === 4)
+    && ch.some(c => c.id === Challenges.DOUBLES_ONLY && c.value > 0)
+    && ch.some(c => c.id === Challenges.GHOST_TRAINERS && c.value > 0)
+  );
+};
+
+/** The eighteen mono-TYPE ribbon flags (one per type), for the Master of All achv. */
+const MONO_TYPE_RIBBONS = [
+  RibbonData.MONO_NORMAL,
+  RibbonData.MONO_FIGHTING,
+  RibbonData.MONO_FLYING,
+  RibbonData.MONO_POISON,
+  RibbonData.MONO_GROUND,
+  RibbonData.MONO_ROCK,
+  RibbonData.MONO_BUG,
+  RibbonData.MONO_GHOST,
+  RibbonData.MONO_STEEL,
+  RibbonData.MONO_FIRE,
+  RibbonData.MONO_WATER,
+  RibbonData.MONO_GRASS,
+  RibbonData.MONO_ELECTRIC,
+  RibbonData.MONO_PSYCHIC,
+  RibbonData.MONO_ICE,
+  RibbonData.MONO_DRAGON,
+  RibbonData.MONO_DARK,
+  RibbonData.MONO_FAIRY,
+] as const;
+
+/**
+ * True once every one of the eighteen mono-type ribbons has been earned by ANY
+ * species (the ribbon bitfields are OR'd across the whole dex). STATE check -
+ * only fired from the ribbon-award transition (game-over), never at load.
+ */
+const allMonoTypeRibbonsEarned = () => {
+  let all = 0n;
+  for (const entry of Object.values(globalScene.gameData.dexData)) {
+    all |= entry.ribbons.getRibbons();
+  }
+  return MONO_TYPE_RIBBONS.every(flag => (all & flag) !== 0n);
+};
+
+/**
+ * True once the dex records a shiny in all three variant tiers (variant 1/2/3) -
+ * some entry with each of DEFAULT_VARIANT, VARIANT_2, VARIANT_3 alongside SHINY.
+ * Mirrors the starter-select variant-unlock read. STATE check - fired only from
+ * the shiny-catch transition, never at load.
+ */
+const ownsShinyOfEveryTier = () => {
+  let has1 = false;
+  let has2 = false;
+  let has3 = false;
+  for (const entry of Object.values(globalScene.gameData.dexData)) {
+    const shiny = entry.caughtAttr & DexAttr.SHINY;
+    if (!shiny) {
+      continue;
+    }
+    has1 ||= (entry.caughtAttr & DexAttr.DEFAULT_VARIANT) !== 0n;
+    has2 ||= (entry.caughtAttr & DexAttr.VARIANT_2) !== 0n;
+    has3 ||= (entry.caughtAttr & DexAttr.VARIANT_3) !== 0n;
+    if (has1 && has2 && has3) {
+      return true;
+    }
+  }
+  return false;
+};
 
 export const achvs = {
   CLASSIC_VICTORY: new Achv(
@@ -878,6 +998,72 @@ export const achvs = {
       && globalScene.gameMode.challenges.some(c => c.id === Challenges.INVERSE_BATTLE && c.value > 0),
   ).setSecret(),
   BREEDERS_IN_SPACE: new Achv("breedersInSpace", "breedersInSpace.description", "moon_stone", 50).setSecret(),
+  // ER apex stack: NU usage tier + Doubles Only + Ghost Trainers, one tier per
+  // difficulty (difficulty-exclusive, so a single run unlocks exactly one). Auto-
+  // validated at game-over (ChallengeAchv) only on a challenge victory.
+  LIMBO: new ChallengeAchv(
+    "limbo",
+    "limbo.description",
+    "spell_tag",
+    100,
+    () => apexStackActive() && (getErDifficulty() === "ace" || getErDifficulty() === "youngster"),
+  ),
+  PURGATORY: new ChallengeAchv(
+    "purgatory",
+    "purgatory.description",
+    "reaper_cloth",
+    125,
+    () => apexStackActive() && getErDifficulty() === "elite",
+  ),
+  INFERNO: new ChallengeAchv(
+    "inferno",
+    "inferno.description",
+    "pb_black",
+    150,
+    () => apexStackActive() && getErDifficulty() === "hell",
+  ),
+  // ER difficulty-tiered Nuzlocke (the base NUZLOCKE above still fires on any
+  // difficulty; these add the harder Elite/Hell tiers with bigger shiny rewards).
+  LAST_STAND: new ChallengeAchv(
+    "lastStand",
+    "lastStand.description",
+    "focus_sash",
+    110,
+    () =>
+      isNuzlockeChallenge()
+      && getErDifficulty() === "elite"
+      && !inverseAndFlipStatAchievementsBlock()
+      && !passivesChallengeAchievementsBlock(),
+  ),
+  PERMADEATH: new ChallengeAchv(
+    "permadeath",
+    "permadeath.description",
+    "dusk_stone",
+    125,
+    () =>
+      isNuzlockeChallenge()
+      && getErDifficulty() === "hell"
+      && !inverseAndFlipStatAchievementsBlock()
+      && !passivesChallengeAchievementsBlock(),
+  ),
+  // ER milestone achievements (event-gated). The three event-based ones are plain
+  // Achvs validated at their phase site; the three state-based ones carry a
+  // conditionFunc GATE and are validated only from the matching in-run transition
+  // (a relic pickup / a shiny catch / the ribbon award) so they never fire on load.
+  DEVILS_BARGAIN: new Achv("devilsBargain", "devilsBargain.description", "soul_dew", 50),
+  EXORCIST: new Achv("exorcist", "exorcist.description", "ghost_gem", 75),
+  PRIMAL_CASCOON: new Achv("primalCascoon", "primalCascoon.description", "shed_shell", 100),
+  RELIC_HUNTER: new Achv(
+    "relicHunter",
+    "relicHunter.description",
+    "relic_band",
+    50,
+    () => globalScene.findModifiers(m => m instanceof ErRelicModifier).length >= 5,
+  ),
+  ALL_SHINY_TIERS: new Achv("allShinyTiers", "allShinyTiers.description", "pb_gold", 75, () => ownsShinyOfEveryTier()),
+  MASTER_OF_ALL: new Achv("masterOfAll", "masterOfAll.description", "relic_crown", 150, () =>
+    allMonoTypeRibbonsEarned(),
+  ),
 };
 
 export function initAchievements() {

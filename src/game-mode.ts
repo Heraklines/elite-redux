@@ -44,6 +44,9 @@ interface GameModeConfig {
   hasMysteryEncounters?: boolean;
   /** True for the LLM Director mode (per-run story arcs). */
   isLLMDirector?: boolean;
+  /** True for the 2-player Co-op mode (#633). Classic-like, but a shared run
+   *  driven by two players over a P2P transport (doubles, 3 mons each). */
+  isCoop?: boolean;
   /** Excludes this mode from daily-seed/leaderboard logic. */
   nonDeterministic?: boolean;
 }
@@ -67,6 +70,7 @@ export class GameMode implements GameModeConfig {
   public minMysteryEncounterWave: number;
   public maxMysteryEncounterWave: number;
   public isLLMDirector: boolean;
+  public isCoop: boolean;
   public nonDeterministic: boolean;
 
   constructor(modeId: GameModes, config: GameModeConfig, battleConfig?: FixedBattleConfigs) {
@@ -364,6 +368,7 @@ export class GameMode implements GameModeConfig {
       case GameModes.CLASSIC:
       case GameModes.CHALLENGE:
       case GameModes.LLM_DIRECTOR:
+      case GameModes.COOP:
         return waveIndex === 200;
       case GameModes.ENDLESS:
       case GameModes.SPLICED_ENDLESS:
@@ -385,7 +390,10 @@ export class GameMode implements GameModeConfig {
    * @returns `true` if the current battle is against classic mode's final boss
    */
   isBattleClassicFinalBoss(waveIndex: number): boolean {
-    return (this.modeId === GameModes.CLASSIC || this.modeId === GameModes.CHALLENGE) && this.isWaveFinal(waveIndex);
+    return (
+      (this.modeId === GameModes.CLASSIC || this.modeId === GameModes.CHALLENGE || this.modeId === GameModes.COOP)
+      && this.isWaveFinal(waveIndex)
+    );
   }
 
   /**
@@ -456,6 +464,7 @@ export class GameMode implements GameModeConfig {
     switch (this.modeId) {
       case GameModes.CLASSIC:
       case GameModes.CHALLENGE:
+      case GameModes.COOP:
         return 5000;
       case GameModes.DAILY:
         return 2500;
@@ -472,6 +481,7 @@ export class GameMode implements GameModeConfig {
       case GameModes.CHALLENGE:
       case GameModes.DAILY:
       case GameModes.LLM_DIRECTOR:
+      case GameModes.COOP:
         return isBoss ? chances.classicBoss : chances.classicNonBoss;
       case GameModes.ENDLESS:
       case GameModes.SPLICED_ENDLESS:
@@ -493,6 +503,8 @@ export class GameMode implements GameModeConfig {
         return i18next.t("gameMode:challenge");
       case GameModes.LLM_DIRECTOR:
         return i18next.t("gameMode:llmDirector");
+      case GameModes.COOP:
+        return i18next.t("gameMode:coop");
     }
   }
 
@@ -502,6 +514,7 @@ export class GameMode implements GameModeConfig {
   getMysteryEncounterLegalWaves(): [minWave: number, maxWave: number] {
     switch (this.modeId) {
       case GameModes.CLASSIC:
+      case GameModes.COOP:
         return CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES;
       case GameModes.CHALLENGE:
         return CHALLENGE_MODE_MYSTERY_ENCOUNTER_WAVES;
@@ -536,6 +549,8 @@ export class GameMode implements GameModeConfig {
         return i18next.t("gameMode:challenge");
       case GameModes.LLM_DIRECTOR:
         return i18next.t("gameMode:llmDirector");
+      case GameModes.COOP:
+        return i18next.t("gameMode:coop");
     }
   }
 }
@@ -590,6 +605,28 @@ export function getGameMode(gameMode: GameModes): GameMode {
           hasMysteryEncounters: true,
           isLLMDirector: true,
           nonDeterministic: true,
+        },
+        classicFixedBattles,
+      );
+    case GameModes.COOP:
+      // 2-player co-op (#633): Classic's starter selection, level curve, and
+      // 200-wave count; `isCoop` flips the co-op-specific deltas (doubles-only,
+      // 3-mon-per-player cap, lures off, shared run, ghost-pool exclusion).
+      // Challenges can be layered on top (the co-op flow can route through the
+      // challenge menu); they get cloned in by `setChallengeValue` when used.
+      return new GameMode(
+        GameModes.COOP,
+        {
+          isClassic: true,
+          hasTrainers: true,
+          hasMysteryEncounters: true,
+          isCoop: true,
+          // Co-op (#633) is challenge-capable: the co-op flow routes through the
+          // challenge-select screen so players can layer challenges on a co-op run
+          // ("co-op challenge"). With nothing selected the challenges are all 0 and
+          // it plays as plain co-op. (getValueLimit stays a flat 5 - the STARTER_POINTS
+          // challenge does not re-scale the co-op budget.)
+          isChallenge: true,
         },
         classicFixedBattles,
       );

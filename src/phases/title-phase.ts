@@ -9,6 +9,7 @@ import { Phase } from "#app/phase";
 import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-seed/daily-run";
 import { modifierTypes } from "#data/data-lists";
+import { startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -131,6 +132,24 @@ export class TitlePhase extends Phase {
                 // the mode menu open) with the standard error feedback.
                 globalScene.ui.playError();
                 return false;
+              },
+            });
+          }
+          // Co-op (#633): a 2-player shared run. Until the real WebRTC transport
+          // lands (P6) this is a LOCAL hotseat - the human hosts and a spoofed
+          // partner stands in for player 2 - so it is shown only where dev tools
+          // appear (local + staging), never in a production build.
+          // VITE_DEV_TOOLS is set on the staging build (mirrors the dev-tools
+          // registry gate); cast since it's not in the typed ImportMetaEnv.
+          const devToolsEnabled =
+            (import.meta.env as unknown as Record<string, string | undefined>).VITE_DEV_TOOLS === "1";
+          if (isDev || isBeta || devToolsEnabled) {
+            options.push({
+              label: GameMode.getModeName(GameModes.COOP),
+              handler: () => {
+                startLocalCoopSession({ username: loggedInUser?.username });
+                setModeAndEnd(GameModes.COOP);
+                return true;
               },
             });
           }
@@ -397,7 +416,10 @@ export class TitlePhase extends Phase {
       if (this.gameMode === GameModes.LLM_DIRECTOR) {
         globalScene.phaseManager.pushNew("LLMDirectorStartPhase");
       }
-      if (this.gameMode === GameModes.CHALLENGE) {
+      if (this.gameMode === GameModes.CHALLENGE || this.gameMode === GameModes.COOP) {
+        // Co-op (#633) routes through the challenge-select screen too, so challenges
+        // are selectable inside co-op (the screen's Start unshifts SelectStarterPhase,
+        // which then takes the co-op branch). Pick nothing = plain co-op.
         globalScene.phaseManager.pushNew("SelectChallengePhase");
       } else {
         globalScene.phaseManager.pushNew("SelectStarterPhase");

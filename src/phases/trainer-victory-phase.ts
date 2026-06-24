@@ -2,6 +2,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
+import { hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { BiomeId } from "#enums/biome-id";
 import { TrainerSlot } from "#enums/trainer-slot";
@@ -66,6 +67,11 @@ export class TrainerVictoryPhase extends BattlePhase {
       && (trainerType === TrainerType.BREEDER || trainerType === TrainerType.EXPERT_POKEMON_BREEDER)
     ) {
       globalScene.validateAchv(achvs.BREEDERS_IN_SPACE);
+    }
+    // Exorcist: defeating a cross-player GHOST-team trainer (#217).
+    const trainer = globalScene.currentBattle.trainer;
+    if (trainer && hasErGhostOverride(trainer)) {
+      globalScene.validateAchv(achvs.EXORCIST);
     }
 
     globalScene.ui.showText(

@@ -887,6 +887,11 @@ function skipInLastClassicWaveOrDefault(defaultWeight: number): WeightedModifier
  */
 function lureWeightFunc(maxBattles: number, weight: number): WeightedModifierTypeWeightFunc {
   return () => {
+    // Co-op (#633): every battle is already a forced double, so a lure (which only
+    // boosts double-battle CHANCE) does nothing - keep it out of the reward pool.
+    if (globalScene.gameMode.isCoop) {
+      return 0;
+    }
     const lures = globalScene.getModifiers(DoubleBattleChanceBoosterModifier);
     return !(globalScene.gameMode.isClassic && globalScene.currentBattle.waveIndex === 199)
       && (lures.length === 0

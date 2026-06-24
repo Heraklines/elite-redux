@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import type { Gender } from "#data/gender";
 import { CustomPokemonData, PokemonBattleData, PokemonSummonData } from "#data/pokemon-data";
 import { Status } from "#data/status-effect";
@@ -60,6 +61,13 @@ export class PokemonData {
 
   public boss: boolean;
   public bossSegments: number;
+
+  /**
+   * Co-op ownership tag (#633, P1g): which player owns this mon in the shared
+   * co-op party. Persisted so the per-player 3-cap survives save/reload.
+   * `undefined` for every non-co-op mon.
+   */
+  public coopOwner?: CoopRole;
 
   // Effects that need to be preserved between waves
   public summonData: PokemonSummonData;
@@ -141,6 +149,10 @@ export class PokemonData {
 
     this.boss = (source instanceof EnemyPokemon && !!source.bossSegments) || (!this.player && !!source.boss);
     this.bossSegments = source.bossSegments ?? 0;
+
+    // Co-op ownership tag (#633, P1g) - present on the live PlayerPokemon and on
+    // the serialized JSON, so this one read round-trips it through save/reload.
+    this.coopOwner = source.coopOwner;
 
     this.summonData = new PokemonSummonData(source.summonData);
     this.battleData = new PokemonBattleData(source.battleData);

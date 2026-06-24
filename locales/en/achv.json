@@ -300,6 +300,26 @@
     "name": "Breeders in Space!",
     "description": "Beat a Pokémon Breeder or the Expert Pokémon Breeder in the Space Biome."
   },
+  "limbo": {
+    "name": "Limbo",
+    "description": "Win an Ace or Youngster classic run with the NU usage tier, Doubles Only, and Ghost Trainers all active."
+  },
+  "purgatory": {
+    "name": "Purgatory",
+    "description": "Win an Elite classic run with the NU usage tier, Doubles Only, and Ghost Trainers all active."
+  },
+  "inferno": {
+    "name": "Inferno",
+    "description": "Win a Hell classic run with the NU usage tier, Doubles Only, and Ghost Trainers all active."
+  },
+  "lastStand": {
+    "name": "Last Stand",
+    "description": "Complete an Elite Nuzlocke run."
+  },
+  "permadeath": {
+    "name": "Permadeath",
+    "description": "Complete a Hell Nuzlocke run."
+  },
   "dailyVictory": {
     "name": "A Run a Day…",
     "description": "Complete a Daily Run."
@@ -308,5 +328,35 @@
     "name": "Passive Mastery",
     "name_female": "Passive Mastery",
     "description": "Complete the Active Passives challenge."
+  },
+  "devilsBargain": {
+    "name": "Devil's Bargain",
+    "name_female": "Devil's Bargain",
+    "description": "Accept one of Giratina's Bargain deals."
+  },
+  "exorcist": {
+    "name": "Exorcist",
+    "name_female": "Exorcist",
+    "description": "Defeat a ghost trainer in battle."
+  },
+  "primalCascoon": {
+    "name": "Primal Cascoon",
+    "name_female": "Primal Cascoon",
+    "description": "Defeat the Primal Cascoon."
+  },
+  "relicHunter": {
+    "name": "Relic Hunter",
+    "name_female": "Relic Hunter",
+    "description": "Hold five relics in a single run."
+  },
+  "allShinyTiers": {
+    "name": "All That Glitters",
+    "name_female": "All That Glitters",
+    "description": "Own a shiny Pokémon of all three tiers."
+  },
+  "masterOfAll": {
+    "name": "Master of All",
+    "name_female": "Master of All",
+    "description": "Earn all eighteen mono-type ribbons."
   }
 }
