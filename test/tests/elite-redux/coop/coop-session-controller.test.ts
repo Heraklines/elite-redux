@@ -226,4 +226,39 @@ describe("co-op session controller (#633, P1)", () => {
       expect(h.snapshot().localInteractionTurn).toBe(false);
     });
   });
+
+  describe("run-config sync (#633, LIVE-C) - host decides, guest follows", () => {
+    it("the host's difficulty + challenges cross the wire to the guest", async () => {
+      const { host, guest } = createLoopbackPair();
+      const h = new CoopSessionController(host);
+      const g = new CoopSessionController(guest);
+      // Before the host decides, neither side has a config.
+      expect(h.runConfig()).toBeNull();
+      expect(g.runConfig()).toBeNull();
+
+      h.broadcastRunConfig({ difficulty: "hell", challenges: [{ id: 3, value: 1, severity: 0 }] });
+      await flush();
+
+      // The host knows its own config immediately; the guest mirrors it.
+      expect(h.runConfig()?.difficulty).toBe("hell");
+      expect(g.runConfig()?.difficulty).toBe("hell");
+      expect(g.runConfig()?.challenges).toEqual([{ id: 3, value: 1, severity: 0 }]);
+    });
+
+    it("a guest does NOT override the run config (host-authoritative)", async () => {
+      const { host, guest } = createLoopbackPair();
+      const h = new CoopSessionController(host);
+      const g = new CoopSessionController(guest);
+
+      // A stray broadcast FROM the guest must not become the host's config.
+      g.broadcastRunConfig({ difficulty: "youngster", challenges: [] });
+      await flush();
+      expect(h.runConfig()).toBeNull(); // host ignores a guest-sourced config
+
+      // The host's broadcast is authoritative and reaches the guest.
+      h.broadcastRunConfig({ difficulty: "elite", challenges: [] });
+      await flush();
+      expect(g.runConfig()?.difficulty).toBe("elite");
+    });
+  });
 });

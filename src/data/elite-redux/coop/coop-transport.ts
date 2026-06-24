@@ -81,6 +81,17 @@ export type CoopMessage =
    * no import cycle); `ready` flips true when they lock in.
    */
   | { t: "rosterSync"; role: CoopRole; entries: { speciesId: number; cost: number }[]; ready: boolean }
+  /**
+   * Host -> guest: the AUTHORITATIVE run configuration both players share (#633,
+   * LIVE-C). The host decides the ER difficulty (youngster/ace/elite/hell) and the
+   * challenge set; the guest mirrors them so the run is coherent (the guest never
+   * picks its own). `challenges` is the serialized challenge list ({id,value,severity}).
+   */
+  | {
+      t: "runConfig";
+      difficulty: string;
+      challenges: { id: number; value: number; severity: number }[];
+    }
   /** A choice on an alternation-owned interaction screen (reward / shop / ME) (P4). */
   | { t: "interaction"; screen: string; choice: unknown }
   /** Host -> guest authoritative state checkpoint: a compressed SessionSaveData blob (P2/P5). */

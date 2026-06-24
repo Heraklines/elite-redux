@@ -30,6 +30,21 @@ import type { CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coo
  *  interaction choice so it is dispatched separately. */
 const COOP_INTERACTION_TURN_SCREEN = "__turn__";
 
+/** One serialized challenge in the shared run config (#633, LIVE-C). */
+export interface CoopChallengeConfig {
+  id: number;
+  value: number;
+  severity: number;
+}
+
+/** The authoritative run config the host decides and the guest mirrors. */
+export interface CoopRunConfig {
+  /** ER difficulty: "youngster" | "ace" | "elite" | "hell". */
+  difficulty: string;
+  /** The active challenge set (empty for a plain run). */
+  challenges: CoopChallengeConfig[];
+}
+
 /** The other role: host's partner is guest and vice-versa. */
 export function coopPartnerRole(role: CoopRole): CoopRole {
   return role === "host" ? "guest" : "host";
@@ -88,6 +103,8 @@ export class CoopSessionController {
   private readonly roster = new CoopRoster();
   /** Whose turn it is to drive the current alternating interaction (#633, P4). */
   private interactionTurn = new CoopInteractionTurn();
+  /** The host-authoritative run config once received/known (#633, LIVE-C). */
+  private _runConfig: CoopRunConfig | null = null;
   private _localReady = false;
   private _partnerReady = false;
   private _partnerConnected = false;
@@ -212,6 +229,26 @@ export class CoopSessionController {
     this.emit();
   }
 
+  /**
+   * HOST: publish the authoritative run config (ER difficulty + challenge set) so
+   * the guest mirrors it and the run is coherent (#633, LIVE-C). Stores it locally
+   * too. No-op shape-wise on the guest (the guest receives it via the transport).
+   */
+  broadcastRunConfig(config: CoopRunConfig): void {
+    this._runConfig = config;
+    this.transport.send({ t: "runConfig", difficulty: config.difficulty, challenges: config.challenges });
+    this.emit();
+  }
+
+  /**
+   * The shared run config (host's choice of difficulty + challenges), or null
+   * until the host has decided. The guest reads this to apply the host's run setup
+   * instead of choosing its own.
+   */
+  runConfig(): CoopRunConfig | null {
+    return this._runConfig;
+  }
+
   /** Current state snapshot from the local point of view. */
   snapshot(): CoopSessionSnapshot {
     return {
@@ -275,6 +312,14 @@ export class CoopSessionController {
         // other screen) is handled by the encounter layer, not here.
         if (msg.screen === COOP_INTERACTION_TURN_SCREEN && typeof msg.choice === "number") {
           this.interactionTurn = CoopInteractionTurn.fromJSON(msg.choice);
+          this.emit();
+        }
+        break;
+      case "runConfig":
+        // The HOST decides difficulty + challenges; the guest mirrors them so the
+        // run is coherent (#633, LIVE-C). Only honour it FROM the host.
+        if (this.role === "guest") {
+          this._runConfig = { difficulty: msg.difficulty, challenges: msg.challenges };
           this.emit();
         }
         break;
