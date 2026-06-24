@@ -60,11 +60,23 @@ interface CoopRunRow {
 
 type CoopRole = "host" | "guest";
 
+/** A lobby presence row: a player waiting to be matched (#633, matchmaking). */
+interface CoopLobbyRow {
+  id: string;
+  name: string;
+  seen_at: number;
+  paired_code: string | null;
+  paired_role: string | null;
+  created_at: number;
+}
+
 /** Pairing-code alphabet/length - MUST match src/.../coop-pairing.ts. */
 const PAIRING_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const PAIRING_CODE_LENGTH = 6;
 const DEFAULT_PRESENCE_WINDOW_MS = 30_000;
 const DEFAULT_RUN_TTL_MS = 86_400_000;
+/** Lobby presence: drop a waiting player whose last poll is older than this. */
+const LOBBY_PRESENCE_MS = 12_000;
 /** Reject save blobs larger than this (defensive; a session blob is well under). */
 const MAX_BLOB_BYTES = 4_000_000;
 
@@ -136,6 +148,23 @@ async function ensureSchema(env: Env): Promise<void> {
   await env.DB.exec(
     "CREATE TABLE IF NOT EXISTS coop_runs (code TEXT PRIMARY KEY, host_username TEXT NOT NULL, guest_username TEXT, seed TEXT, host_signal TEXT, guest_signal TEXT, save_blob TEXT, state TEXT NOT NULL DEFAULT 'lobby', host_seen_at INTEGER NOT NULL, guest_seen_at INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)",
   );
+  // Matchmaking lobby: one row per player WAITING to be matched. The worker
+  // assigns host/guest roles on pick (players never choose), so the run code +
+  // role are written back here for each side to read on its next poll.
+  await env.DB.exec(
+    "CREATE TABLE IF NOT EXISTS coop_lobby (id TEXT PRIMARY KEY, name TEXT NOT NULL, seen_at INTEGER NOT NULL, paired_code TEXT, paired_role TEXT, created_at INTEGER NOT NULL)",
+  );
+}
+
+async function getLobby(env: Env, id: string): Promise<CoopLobbyRow | null> {
+  return env.DB.prepare("SELECT * FROM coop_lobby WHERE id = ?").bind(id).first<CoopLobbyRow>();
+}
+
+function lobbyPairing(row: CoopLobbyRow | null): { code: string; role: CoopRole } | null {
+  if (row?.paired_code && isRole(row.paired_role)) {
+    return { code: row.paired_code, role: row.paired_role };
+  }
+  return null;
 }
 
 // #endregion
@@ -306,6 +335,108 @@ async function handleLeave(env: Env, body: Record<string, unknown>, now: number)
   return json(env, { ok: true });
 }
 
+// #region matchmaking lobby (#633)
+
+/**
+ * Announce/refresh my presence in the lobby. Mints an id on first call (the client
+ * keeps it). Returns my current pairing if the worker has already matched me.
+ */
+async function handleLobbyAnnounce(env: Env, body: Record<string, unknown>, now: number): Promise<Response> {
+  const name = typeof body.name === "string" ? body.name.slice(0, 32).trim() : "";
+  if (!name) {
+    return err(env, "missing name");
+  }
+  const id = typeof body.id === "string" && body.id.length >= 8 ? body.id.slice(0, 64) : crypto.randomUUID();
+  await env.DB.prepare(
+    "INSERT INTO coop_lobby (id, name, seen_at, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, seen_at = excluded.seen_at",
+  )
+    .bind(id, name, now, now)
+    .run();
+  return json(env, { id, pairing: lobbyPairing(await getLobby(env, id)) });
+}
+
+/**
+ * List OTHER waiting (unpaired, present) players and report MY pairing if one was
+ * made. Doubles as a heartbeat: refreshes the caller's seen_at so a polling client
+ * stays listed.
+ */
+async function handleLobbyList(env: Env, url: URL, now: number): Promise<Response> {
+  const self = url.searchParams.get("self") ?? "";
+  if (self) {
+    await env.DB.prepare("UPDATE coop_lobby SET seen_at = ? WHERE id = ?").bind(now, self).run();
+  }
+  const cutoff = now - LOBBY_PRESENCE_MS;
+  const rows = await env.DB.prepare(
+    "SELECT id, name, seen_at FROM coop_lobby WHERE id != ? AND paired_code IS NULL AND seen_at >= ? ORDER BY created_at ASC LIMIT 50",
+  )
+    .bind(self, cutoff)
+    .all<{ id: string; name: string; seen_at: number }>();
+  const players = (rows.results ?? []).map(r => ({ id: r.id, name: r.name, age: Math.max(0, now - r.seen_at) }));
+  return json(env, { players, pairing: lobbyPairing(self ? await getLobby(env, self) : null) });
+}
+
+/**
+ * Pick a player to co-op with. The worker MATCHES the two and ASSIGNS roles (the
+ * picked player hosts, the picker joins - invisible to both) by creating the run
+ * row + writing the code/role back onto each lobby row. Returns the caller's
+ * pairing; the partner discovers theirs on its next poll.
+ */
+async function handleLobbyPick(env: Env, body: Record<string, unknown>, now: number): Promise<Response> {
+  const self = typeof body.self === "string" ? body.self : "";
+  const target = typeof body.target === "string" ? body.target : "";
+  if (!self || !target || self === target) {
+    return err(env, "missing/invalid self or target");
+  }
+  const selfRow = await getLobby(env, self);
+  const targetRow = await getLobby(env, target);
+  if (!selfRow) {
+    return err(env, "you left the lobby", 410);
+  }
+  // Idempotent: if I'm already matched, just return that pairing.
+  const existing = lobbyPairing(selfRow);
+  if (existing) {
+    return json(env, existing);
+  }
+  if (!targetRow || now - targetRow.seen_at > LOBBY_PRESENCE_MS) {
+    return err(env, "that player is no longer available", 410);
+  }
+  if (targetRow.paired_code) {
+    return err(env, "that player was just matched - pick another", 409);
+  }
+  // Create the run (target hosts, self joins) and claim the target atomically.
+  const code = newPairingCode();
+  await env.DB.prepare(
+    "INSERT INTO coop_runs (code, host_username, guest_username, seed, state, host_seen_at, guest_seen_at, created_at, updated_at) VALUES (?, ?, ?, NULL, 'active', ?, ?, ?, ?)",
+  )
+    .bind(code, targetRow.name, selfRow.name, now, now, now, now)
+    .run();
+  const claim = await env.DB.prepare(
+    "UPDATE coop_lobby SET paired_code = ?, paired_role = 'host' WHERE id = ? AND paired_code IS NULL",
+  )
+    .bind(code, target)
+    .run();
+  if (!claim.meta.changes) {
+    // Lost the race - someone matched the target first. Roll back the run.
+    await env.DB.prepare("DELETE FROM coop_runs WHERE code = ?").bind(code).run();
+    return err(env, "that player was just matched - pick another", 409);
+  }
+  await env.DB.prepare("UPDATE coop_lobby SET paired_code = ?, paired_role = 'guest' WHERE id = ?")
+    .bind(code, self)
+    .run();
+  return json(env, { code, role: "guest" });
+}
+
+/** Leave the lobby (remove my presence row). */
+async function handleLobbyLeave(env: Env, body: Record<string, unknown>): Promise<Response> {
+  const self = typeof body.self === "string" ? body.self : "";
+  if (self) {
+    await env.DB.prepare("DELETE FROM coop_lobby WHERE id = ?").bind(self).run();
+  }
+  return json(env, { ok: true });
+}
+
+// #endregion
+
 /** STUN-only ICE config (free, no relay) - the no-TURN fallback. */
 function stunOnlyIce(env: Env): Response {
   return json(env, {
@@ -366,6 +497,8 @@ export default {
             return await handleSignalPoll(env, url);
           case "/coop/load":
             return await handleLoad(env, url, now);
+          case "/coop/lobby":
+            return await handleLobbyList(env, url, now);
           case "/coop/ice":
             return await handleIce(env);
           case "/coop/health":
@@ -395,6 +528,12 @@ export default {
             return await handleSave(env, body, now);
           case "/coop/leave":
             return await handleLeave(env, body, now);
+          case "/coop/lobby/announce":
+            return await handleLobbyAnnounce(env, body, now);
+          case "/coop/lobby/pick":
+            return await handleLobbyPick(env, body, now);
+          case "/coop/lobby/leave":
+            return await handleLobbyLeave(env, body);
         }
         return err(env, "not found", 404);
       }
@@ -408,10 +547,15 @@ export default {
   /** Hourly cron: prune runs untouched past their TTL. */
   async scheduled(_event: ScheduledEvent, env: Env): Promise<void> {
     await ensureSchema(env);
+    const now = Date.now();
     const ttl = Number(env.RUN_TTL_MS);
     const ttlMs = Number.isFinite(ttl) && ttl > 0 ? ttl : DEFAULT_RUN_TTL_MS;
     await env.DB.prepare("DELETE FROM coop_runs WHERE updated_at < ?")
-      .bind(Date.now() - ttlMs)
+      .bind(now - ttlMs)
+      .run();
+    // Drop abandoned lobby presence rows (stale far past the live-poll window).
+    await env.DB.prepare("DELETE FROM coop_lobby WHERE seen_at < ?")
+      .bind(now - 5 * 60_000)
       .run();
   },
 };

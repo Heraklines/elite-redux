@@ -31,3 +31,19 @@ CREATE TABLE IF NOT EXISTS coop_runs (
   updated_at     INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_coop_runs_updated ON coop_runs (updated_at);
+
+-- Matchmaking lobby (#633): one row per player WAITING to be matched. Players
+-- announce a name, poll for the list of OTHER waiting players, and pick one. The
+-- WORKER then matches the pair and ASSIGNS roles (the picked player hosts, the
+-- picker joins - invisible to both), writing the run `code` + each side's `role`
+-- back here so each client reads its pairing on its next poll. Rows are dropped
+-- once stale (no poll within the live-presence window); the cron sweeps leftovers.
+CREATE TABLE IF NOT EXISTS coop_lobby (
+  id          TEXT    PRIMARY KEY,   -- worker-minted presence id (client keeps it)
+  name        TEXT    NOT NULL,      -- display name shown to other players
+  seen_at     INTEGER NOT NULL,      -- last poll/announce (epoch ms) = presence
+  paired_code TEXT,                  -- run code once matched (null while waiting)
+  paired_role TEXT,                  -- 'host' | 'guest' once matched
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_coop_lobby_seen ON coop_lobby (seen_at);

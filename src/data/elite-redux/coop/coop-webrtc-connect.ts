@@ -199,9 +199,61 @@ export interface CoopConnectOptions {
 }
 
 /**
+ * The non-trickle ICE + SDP exchange for an ALREADY-CREATED run row (`code`).
+ * host = offerer, guest = answerer. Resolves with the open RTCDataChannel. Shared
+ * by every connect entrypoint (manual host/guest + matchmaking).
+ */
+async function exchangeAndOpenChannel(code: string, role: CoopRole, ice?: CoopIceConfig): Promise<RTCDataChannel> {
+  const iceServers = ice ? buildIceServers(ice) : await fetchIceServers();
+  const pc = new RTCPeerConnection({ iceServers });
+
+  if (role === "host") {
+    const channel = pc.createDataChannel("coop", { ordered: true });
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await waitForIceComplete(pc);
+    await pushSignal(code, "host", JSON.stringify(pc.localDescription));
+
+    const answer = await pollPeerSignal(code, "host");
+    await pc.setRemoteDescription(JSON.parse(answer) as RTCSessionDescriptionInit);
+    return waitForChannelOpen(channel);
+  }
+
+  const channelPromise = new Promise<RTCDataChannel>(resolve => {
+    pc.addEventListener("datachannel", ev => resolve(ev.channel));
+  });
+  const offer = await pollPeerSignal(code, "guest");
+  await pc.setRemoteDescription(JSON.parse(offer) as RTCSessionDescriptionInit);
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  await waitForIceComplete(pc);
+  await pushSignal(code, "guest", JSON.stringify(pc.localDescription));
+  return waitForChannelOpen(await channelPromise);
+}
+
+/**
+ * Connect to an already-paired co-op run by its `code` and worker-assigned `role`
+ * (#633, matchmaking). The run row already exists (the matchmaker created it), so
+ * this skips create/join and goes straight to the SDP exchange. This is the entry
+ * the lobby uses - players never see host/guest; the worker decides.
+ */
+export async function connectCoopWithCode(
+  code: string,
+  role: CoopRole,
+  opts: CoopConnectOptions = {},
+): Promise<CoopRuntime> {
+  if (!isCoopNetworkingConfigured()) {
+    throw new Error("coop networking is not configured (VITE_COOP_SERVER_URL unset)");
+  }
+  const channel = await exchangeAndOpenChannel(code, role, opts.ice);
+  return connectCoopSession(webRtcTransportFromChannel(role, channel), { username: opts.username });
+}
+
+/**
  * HOST a co-op run (#633, P6): create the run (get a shareable pairing code),
  * open the data channel as the offerer, and start the live session over it.
- * Returns the pairing code (show it to the guest) and the CoopRuntime.
+ * Returns the pairing code (show it to the guest) and the CoopRuntime. (Manual
+ * code flow; the matchmaking lobby uses {@linkcode connectCoopWithCode} instead.)
  */
 export async function connectCoopAsHost(
   opts: CoopConnectOptions & { seed?: string; onCode?: (code: string) => void } = {},
@@ -215,46 +267,21 @@ export async function connectCoopAsHost(
   // rest of this function blocks waiting for the guest to connect.
   opts.onCode?.(code);
 
-  const iceServers = opts.ice ? buildIceServers(opts.ice) : await fetchIceServers();
-  const pc = new RTCPeerConnection({ iceServers });
-  const channel = pc.createDataChannel("coop", { ordered: true });
-
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  await waitForIceComplete(pc);
-  await pushSignal(code, "host", JSON.stringify(pc.localDescription));
-
-  const answer = await pollPeerSignal(code, "host");
-  await pc.setRemoteDescription(JSON.parse(answer) as RTCSessionDescriptionInit);
-
-  await waitForChannelOpen(channel);
+  const channel = await exchangeAndOpenChannel(code, "host", opts.ice);
   const runtime = connectCoopSession(webRtcTransportFromChannel("host", channel), { username: opts.username });
   return { code, runtime };
 }
 
 /**
  * JOIN a co-op run as the guest (#633, P6): exchange SDP via the worker, open the
- * data channel as the answerer, and start the live session over it.
+ * data channel as the answerer, and start the live session over it. (Manual code
+ * flow; the matchmaking lobby uses {@linkcode connectCoopWithCode} instead.)
  */
 export async function connectCoopAsGuest(code: string, opts: CoopConnectOptions = {}): Promise<CoopRuntime> {
   if (!isCoopNetworkingConfigured()) {
     throw new Error("coop networking is not configured (VITE_COOP_SERVER_URL unset)");
   }
   await postJson("/coop/join", { code, guest: opts.username ?? "Player 2" });
-
-  const iceServers = opts.ice ? buildIceServers(opts.ice) : await fetchIceServers();
-  const pc = new RTCPeerConnection({ iceServers });
-  const channelPromise = new Promise<RTCDataChannel>(resolve => {
-    pc.addEventListener("datachannel", ev => resolve(ev.channel));
-  });
-
-  const offer = await pollPeerSignal(code, "guest");
-  await pc.setRemoteDescription(JSON.parse(offer) as RTCSessionDescriptionInit);
-  const answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-  await waitForIceComplete(pc);
-  await pushSignal(code, "guest", JSON.stringify(pc.localDescription));
-
-  const channel = await waitForChannelOpen(await channelPromise);
+  const channel = await exchangeAndOpenChannel(code, "guest", opts.ice);
   return connectCoopSession(webRtcTransportFromChannel("guest", channel), { username: opts.username });
 }

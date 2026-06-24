@@ -9,9 +9,8 @@ import { Phase } from "#app/phase";
 import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-seed/daily-run";
 import { modifierTypes } from "#data/data-lists";
-import { formatPairingCode, isValidPairingCode, normalizePairingCode } from "#data/elite-redux/coop/coop-pairing";
+import { CoopLobbyController, type LobbyPlayer } from "#data/elite-redux/coop/coop-lobby";
 import { startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
-import { connectCoopAsGuest, connectCoopAsHost } from "#data/elite-redux/coop/coop-webrtc-connect";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -121,88 +120,13 @@ export class TitlePhase extends Phase {
           const devToolsEnabled =
             (import.meta.env as unknown as Record<string, string | undefined>).VITE_DEV_TOOLS === "1";
           if (isDev || isBeta || devToolsEnabled) {
-            const username = loggedInUser?.username;
-            // Surface a connection failure, then bounce back to the title.
-            const coopFailed = (e: unknown) => {
-              const msg = e instanceof Error ? e.message : String(e);
-              globalScene.ui.showText(
-                `Co-op connection failed:\n${msg}`,
-                null,
-                () => {
-                  globalScene.phaseManager.toTitleScreen();
-                  super.end();
-                },
-                null,
-                true,
-              );
-            };
-            // The data channel is open: confirm to the player, then start.
-            const coopConnected = () => {
-              globalScene.ui.showText(
-                "Connected to your partner!\nPress to start co-op.",
-                null,
-                () => setModeAndEnd(GameModes.COOP),
-                null,
-                true,
-              );
-            };
-            // Leave the mode menu cleanly and show a progress message while the
-            // async connect runs. resetModeChain() clears the OPTION_SELECT overlay
-            // (mirrors loadSaveSlot) so the message isn't trapped under the menu -
-            // the bug where the lobby was a NESTED overlay and never showed.
-            const coopProgress = (text: string) => {
-              globalScene.ui.setMode(UiMode.MESSAGE);
-              globalScene.ui.resetModeChain();
-              globalScene.ui.showText(text, null);
-            };
-            // Co-op is three flat mode-menu entries (no nested submenu): HOST a game
-            // (get + share a code), JOIN a partner's game (enter their code) over the
-            // real WebRTC transport, or play SOLO against a CPU stand-in partner.
-            options.push(
-              {
-                label: "Co-op: Host",
-                handler: () => {
-                  coopProgress("Creating co-op game...");
-                  connectCoopAsHost({
-                    username,
-                    onCode: code =>
-                      globalScene.ui.showText(
-                        `Your co-op code:\n${formatPairingCode(code)}\n\nShare it with your partner,\nthen wait here for them to join.`,
-                        null,
-                      ),
-                  })
-                    .then(coopConnected)
-                    .catch(coopFailed);
-                  return true;
-                },
+            options.push({
+              label: GameMode.getModeName(GameModes.COOP),
+              handler: () => {
+                this.openCoopLobby(setModeAndEnd);
+                return true;
               },
-              {
-                label: "Co-op: Join",
-                handler: () => {
-                  const raw = typeof window === "undefined" ? null : window.prompt("Enter your partner's co-op code:");
-                  const code = raw ? normalizePairingCode(raw) : "";
-                  if (!code) {
-                    return false; // cancelled the prompt -> keep the mode menu open
-                  }
-                  if (!isValidPairingCode(code)) {
-                    coopProgress("");
-                    coopFailed(new Error("that code doesn't look right"));
-                    return true;
-                  }
-                  coopProgress("Connecting to your partner...");
-                  connectCoopAsGuest(code, { username }).then(coopConnected).catch(coopFailed);
-                  return true;
-                },
-              },
-              {
-                label: "Co-op: Solo (CPU)",
-                handler: () => {
-                  startLocalCoopSession({ username });
-                  setModeAndEnd(GameModes.COOP);
-                  return true;
-                },
-              },
-            );
+            });
           }
           options.push({
             label: i18next.t("menu:dailyRun"),
@@ -299,6 +223,95 @@ export class TitlePhase extends Phase {
       yOffset: 47,
     };
     await globalScene.ui.setMode(UiMode.TITLE, config);
+  }
+
+  /**
+   * Co-op matchmaking lobby (#633). Announce into the worker lobby and show the
+   * live list of OTHER waiting players in a blue OPTION_SELECT panel; picking one
+   * connects (the WORKER silently assigns host/guest - irrelevant to players).
+   * "Play vs CPU" runs a local spoof partner; Cancel backs out to the title.
+   * `setModeAndEnd` is the newGame helper that launches the chosen GameMode.
+   */
+  private openCoopLobby(setModeAndEnd: (gameMode: GameModes) => void): void {
+    const username = loggedInUser?.username ?? "Player";
+    let listSig: string | null = null;
+    let controller: CoopLobbyController | null = null;
+
+    const backToTitle = () => {
+      controller?.cancel();
+      globalScene.phaseManager.toTitleScreen();
+      super.end();
+    };
+
+    // Render (or re-render) the waiting-player list as a blue OPTION_SELECT panel.
+    // resetModeChain() clears the previous overlay first, so re-rendering on a
+    // list change REPLACES the panel rather than stacking a new one.
+    const renderList = (players: LobbyPlayer[]) => {
+      const opts: OptionSelectItem[] = players.map(p => ({
+        label: `${p.name}  (${Math.round(p.age / 1000)}s)`,
+        handler: () => {
+          void controller?.pick(p.id);
+          return true;
+        },
+      }));
+      opts.push(
+        {
+          label: "▶ Play vs CPU",
+          handler: () => {
+            controller?.cancel();
+            startLocalCoopSession({ username });
+            setModeAndEnd(GameModes.COOP);
+            return true;
+          },
+        },
+        {
+          label: i18next.t("menu:cancel"),
+          handler: () => {
+            backToTitle();
+            return true;
+          },
+        },
+      );
+      const header = players.length > 0 ? "Co-op: pick a player to connect." : "Co-op: waiting for another player...";
+      globalScene.ui.setMode(UiMode.MESSAGE);
+      globalScene.ui.resetModeChain();
+      globalScene.ui.showText(header, null, () =>
+        globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options: opts }),
+      );
+    };
+
+    controller = new CoopLobbyController(username, {
+      onPlayers: players => {
+        const sig = players.map(p => p.id).join(",");
+        if (sig !== listSig) {
+          listSig = sig;
+          renderList(players);
+        }
+      },
+      onConnecting: () => {
+        globalScene.ui.setMode(UiMode.MESSAGE);
+        globalScene.ui.resetModeChain();
+        globalScene.ui.showText("Connecting to your partner...", null);
+      },
+      onConnected: () => {
+        globalScene.ui.showText(
+          "Connected to your partner!\nPress to start co-op.",
+          null,
+          () => setModeAndEnd(GameModes.COOP),
+          null,
+          true,
+        );
+      },
+      onError: e => {
+        globalScene.ui.showText(`Co-op error:\n${e}`, null, backToTitle, null, true);
+      },
+    });
+
+    // Enter the lobby: clear the mode menu and show progress while we announce.
+    globalScene.ui.setMode(UiMode.MESSAGE);
+    globalScene.ui.resetModeChain();
+    globalScene.ui.showText("Finding co-op players...", null);
+    void controller.start();
   }
 
   // TODO: Make callers actually wait for the save slot to load
