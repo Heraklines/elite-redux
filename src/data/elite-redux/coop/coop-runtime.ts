@@ -18,6 +18,7 @@
 // constructed over a real WebRTC transport instead and nothing here changes.
 // =============================================================================
 
+import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import { type CoopTransport, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -26,6 +27,8 @@ import { type CoopTransport, createLoopbackPair } from "#data/elite-redux/coop/c
 export interface CoopRuntime {
   /** The local player's session brain (host authority in the spoof/dev path). */
   controller: CoopSessionController;
+  /** Relays the partner's in-battle command over the transport (#633, LIVE-C). */
+  battleSync: CoopBattleSync;
   /** The local client's transport endpoint. */
   localTransport: CoopTransport;
   /** The spoofed partner's transport endpoint (local dev only; absent for real peers). */
@@ -51,6 +54,11 @@ export function getCoopController(): CoopSessionController | null {
   return active?.controller ?? null;
 }
 
+/** Convenience: the live battle-command relay, or null when not in a co-op run. */
+export function getCoopBattleSync(): CoopBattleSync | null {
+  return active?.battleSync ?? null;
+}
+
 /** Whether a co-op session is currently active. */
 export function isCoopRuntimeActive(): boolean {
   return active != null;
@@ -67,8 +75,9 @@ export function startLocalCoopSession(opts: { username?: string | undefined } = 
   clearCoopRuntime();
   const { host, guest } = createLoopbackPair();
   const controller = new CoopSessionController(host, { username: opts.username });
+  const battleSync = new CoopBattleSync(host);
   const spoof = new SpoofGuest(guest);
-  const runtime: CoopRuntime = { controller, localTransport: host, partnerTransport: guest, spoof };
+  const runtime: CoopRuntime = { controller, battleSync, localTransport: host, partnerTransport: guest, spoof };
   setCoopRuntime(runtime);
   controller.connect();
   return runtime;
@@ -88,7 +97,8 @@ export function connectCoopSession(
 ): CoopRuntime {
   clearCoopRuntime();
   const controller = new CoopSessionController(transport, { username: opts.username });
-  const runtime: CoopRuntime = { controller, localTransport: transport };
+  const battleSync = new CoopBattleSync(transport);
+  const runtime: CoopRuntime = { controller, battleSync, localTransport: transport };
   setCoopRuntime(runtime);
   controller.connect();
   return runtime;
@@ -100,6 +110,8 @@ export function clearCoopRuntime(): void {
     return;
   }
   active.controller.dispose();
+  active.battleSync.dispose();
+  active.spoof?.dispose();
   active.localTransport.close();
   active = null;
 }

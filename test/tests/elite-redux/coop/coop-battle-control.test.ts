@@ -26,7 +26,12 @@ import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { resolvePartnerCommand } from "#data/elite-redux/coop/coop-partner-ai";
 import { coopGiveMonToPartner, coopReorderParty } from "#data/elite-redux/coop/coop-party-ops";
-import { clearCoopRuntime, getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import {
+  clearCoopRuntime,
+  getCoopController,
+  getCoopRuntime,
+  startLocalCoopSession,
+} from "#data/elite-redux/coop/coop-runtime";
 import {
   COOP_GUEST_FIELD_INDEX,
   COOP_HOST_FIELD_INDEX,
@@ -117,19 +122,32 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     expect(coopOwnerOfFieldIndex(COOP_GUEST_FIELD_INDEX)).not.toBe(getCoopController()?.role);
   });
 
-  it("the GUEST CommandPhase auto-submits a command without opening UiMode.COMMAND", async () => {
+  it("the GUEST slot is resolved OVER THE TRANSPORT (relay round-trip), menu never opens (LIVE-C)", async () => {
     await startCoopDouble();
 
     const setModeSpy = vi.spyOn(globalScene.ui, "setMode");
+    // Spy the host transport: the partner slot must go through the relay - the
+    // host sends a `commandRequest` and the SpoofGuest answers it over loopback.
+    const sendSpy = vi.spyOn(getCoopRuntime()!.localTransport, "send");
     globalScene.currentBattle.turnCommands = {};
 
     const guestPhase = game.scene.phaseManager.create("CommandPhase", COOP_GUEST_FIELD_INDEX) as CommandPhase;
     guestPhase.start();
+    // The command now arrives asynchronously (request -> spoof reply -> apply, all
+    // over the loopback transport on microtasks); flush them.
+    await new Promise(resolve => setTimeout(resolve, 0));
 
-    // The partner's slot is auto-resolved: a FIGHT turn command is populated...
+    // The host requested the partner's command for the guest slot over the wire...
+    const sentRequest = sendSpy.mock.calls.some(
+      ([msg]) => msg.t === "commandRequest" && msg.fieldIndex === COOP_GUEST_FIELD_INDEX,
+    );
+    expect(sentRequest).toBe(true);
+
+    // ...the spoof's reply was applied as a populated FIGHT command...
     const cmd = globalScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX];
     expect(cmd).toBeDefined();
     expect(cmd?.command).toBe(Command.FIGHT);
+
     // ...and the interactive command menu was NEVER opened for the partner slot.
     const openedCommandForGuest = setModeSpy.mock.calls.some(
       ([mode, fieldIndex]) => mode === UiMode.COMMAND && fieldIndex === COOP_GUEST_FIELD_INDEX,

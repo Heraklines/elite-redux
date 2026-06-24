@@ -126,3 +126,28 @@ export function resolvePartnerCommand(partner: PlayerPokemon): ResolvedPartnerCo
     },
   };
 }
+
+/**
+ * Build a partner command for a SPECIFIC move slot - the choice a remote partner
+ * (real guest, or the SpoofGuest) sent back over the transport (#633, LIVE-C).
+ * The host stays authoritative: it re-validates the peer's pick (slot in range +
+ * the move actually usable) and, if it isn't legal, re-picks locally via
+ * {@linkcode resolvePartnerCommand} - so a bad/stale wire choice can never produce
+ * an illegal turn. Targets are resolved host-side exactly like the AI path.
+ */
+export function resolvePartnerSlotCommand(partner: PlayerPokemon, slot: number): ResolvedPartnerCommand {
+  const moveset = partner.getMoveset();
+  const move = slot >= 0 && slot < moveset.length ? moveset[slot] : undefined;
+  if (move == null || !move.isUsable(partner, false, true)[0]) {
+    return resolvePartnerCommand(partner);
+  }
+  return {
+    command: Command.FIGHT,
+    moveIndex: slot,
+    turnMove: {
+      move: move.moveId,
+      targets: resolvePartnerTargets(partner, move.moveId),
+      useMode: MoveUseMode.NORMAL,
+    },
+  };
+}

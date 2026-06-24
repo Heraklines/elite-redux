@@ -5,8 +5,12 @@ import { speciesStarterCosts } from "#balance/starters";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
-import { resolvePartnerCommand } from "#data/elite-redux/coop/coop-partner-ai";
-import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import {
+  type ResolvedPartnerCommand,
+  resolvePartnerCommand,
+  resolvePartnerSlotCommand,
+} from "#data/elite-redux/coop/coop-partner-ai";
+import { getCoopBattleSync, getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -169,16 +173,18 @@ export class CommandPhase extends FieldPhase {
   }
 
   /**
-   * Co-op battle control (#633, P2): in a co-op double the local human only ever
-   * drives THEIR OWN field slot; the PARTNER's slot is auto-resolved and never
-   * shown. In the current local/spoof path the partner is a bot, so its command is
-   * picked by a self-contained AI ({@linkcode resolvePartnerCommand}), which
-   * returns a complete legal `{move, targets, useMode}`. A real remote partner
-   * sends the command over the transport in phase P6; this seam is where that path
-   * slots in - the inbound `command` message resolves into the same
-   * command-shaped result fed to `handleCommand` here. Returns `true` when the
-   * slot was auto-resolved (the phase has ended) and the interactive menu must be
-   * skipped.
+   * Co-op battle control (#633, P2 + LIVE-C): in a co-op double the local human
+   * only ever drives THEIR OWN field slot; the PARTNER's slot is resolved here and
+   * the interactive menu is never opened for it. Returns `true` when this is the
+   * partner slot (its command will be submitted, possibly asynchronously) so the
+   * caller skips the menu.
+   *
+   * The partner's command comes from the partner OVER THE TRANSPORT (LIVE-C): the
+   * host (authoritative) offers the legal move slots it computed and awaits the
+   * peer's pick - a real guest live, or the {@linkcode SpoofGuest} over loopback in
+   * dev/tests. If no relay is present or the peer does not answer within the
+   * timeout, it falls back to the self-contained AI picker
+   * ({@linkcode resolvePartnerCommand}) so the turn never hangs.
    */
   private tryCoopAutoResolve(): boolean {
     if (!globalScene.gameMode.isCoop) {
@@ -195,10 +201,27 @@ export class CommandPhase extends FieldPhase {
       return false;
     }
 
-    const resolved = resolvePartnerCommand(this.getPokemon());
+    const partner = this.getPokemon();
     // Passing the full `move` arg makes handleFightCommand reuse the resolved
     // targets and SKIP the interactive SelectTargetPhase.
-    this.handleCommand(resolved.command, resolved.moveIndex, resolved.turnMove.useMode, resolved.turnMove);
+    const apply = (resolved: ResolvedPartnerCommand) =>
+      this.handleCommand(resolved.command, resolved.moveIndex, resolved.turnMove.useMode, resolved.turnMove);
+    // The local AI command: both the no-relay path and the timeout/illegal fallback.
+    const fallback = () => resolvePartnerCommand(partner);
+
+    const sync = getCoopBattleSync();
+    if (sync == null) {
+      apply(fallback());
+      return true;
+    }
+    // Offer the legal move slots WE computed and await the partner's pick. The host
+    // re-validates the reply ({@linkcode resolvePartnerSlotCommand}); a missing /
+    // slow reply resolves null -> AI fallback.
+    const moveset = partner.getMoveset();
+    const moveSlots = moveset.map((m, i) => (m.isUsable(partner, false, true)[0] ? i : -1)).filter(i => i >= 0);
+    void sync
+      .requestPartnerCommand(this.fieldIndex, globalScene.currentBattle.turn, moveSlots)
+      .then(cmd => apply(cmd == null ? fallback() : resolvePartnerSlotCommand(partner, cmd.cursor)));
     return true;
   }
 

@@ -20,8 +20,10 @@
 // directly and flush microtasks. This keeps the spoof headlessly testable.
 // =============================================================================
 
+import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import type { CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
 import type { CoopTransport } from "#data/elite-redux/coop/coop-transport";
+import { Command } from "#enums/command";
 
 /** Options for {@linkcode SpoofGuest}. */
 export interface SpoofGuestOptions {
@@ -54,12 +56,23 @@ export class SpoofGuest {
   private readonly username: string;
   private readonly version: string;
   private readonly roster: CoopRosterEntry[];
+  /** Answers the host's in-battle command requests over the transport (#633, LIVE-C). */
+  private readonly battleSync: CoopBattleSync;
 
   constructor(transport: CoopTransport, opts: SpoofGuestOptions = {}) {
     this.transport = transport;
     this.username = opts.username ?? "Player 2 (CPU)";
     this.version = opts.version ?? "1";
     this.roster = (opts.roster ?? DEFAULT_SPOOF_ROSTER).map(e => ({ speciesId: e.speciesId, cost: e.cost }));
+    // Stand in for a real guest in battle: pick the FIRST legal move the host
+    // offered (the host did the legality work; the spoof needs no engine). An
+    // empty offer means only Struggle is legal - cursor 0 + the host's own
+    // no-usable-move fallback resolves it to Struggle.
+    this.battleSync = new CoopBattleSync(transport);
+    this.battleSync.onCommandRequest(({ moveSlots }) => ({
+      command: Command.FIGHT,
+      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
+    }));
   }
 
   /** Announce the spoofed partner (mirrors a real client's opening `hello`). */
@@ -87,6 +100,11 @@ export class SpoofGuest {
   /** The roster the spoof brings (so the host side can show / merge it). */
   pickedRoster(): readonly CoopRosterEntry[] {
     return this.roster;
+  }
+
+  /** Stop answering battle command requests (call on teardown). */
+  dispose(): void {
+    this.battleSync.dispose();
   }
 
   private sendRoster(ready: boolean): void {

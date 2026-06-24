@@ -61,7 +61,14 @@ export type CoopMessage =
   /** Keepalive / latency probe. */
   | { t: "ping"; ts: number }
   | { t: "pong"; ts: number }
-  /** A player's battle command for their own field slot (phase P2). */
+  /**
+   * Host -> peer: the partner's field slot needs a command this `turn`. The host
+   * is authoritative, so it sends the LEGAL move slots (indices into the partner
+   * mon's moveset) it computed; the peer just picks one and replies with a
+   * `command`. `moveSlots` empty => only Struggle is legal (#633, LIVE-C).
+   */
+  | { t: "commandRequest"; fieldIndex: number; turn: number; moveSlots: number[] }
+  /** A player's battle command for their own field slot (phase P2 / LIVE-C reply). */
   | { t: "command"; fieldIndex: number; command: SerializedCommand }
   /** A forced/voluntary switch replacement: bring in party `partySlot` to `fieldIndex` (P2). */
   | { t: "switchChoice"; fieldIndex: number; partySlot: number }
