@@ -55,8 +55,9 @@ type PumpRole = "owner" | "watcher";
 
 /** Routing tag for relayed ME buttons (distinguishes them on the wire / in logs). */
 const ME_PUMP_KIND = "meBtn";
-/** Default watcher wait for the owner's next button before degrading (generous: a human reads). */
-const DEFAULT_ME_WAIT_MS = 300_000;
+/** Default watcher wait for the owner's next button before degrading (20min: "wait for the
+ *  human" - a slow owner reading dialogue must never trip the watcher's safe-skip). */
+const DEFAULT_ME_WAIT_MS = 1_200_000;
 /** Readiness poll cadence + bound (the watcher waits out its own text scroll before applying). */
 const READY_TICK_MS = 16;
 const READY_MAX_TICKS = 900; // ~14s ceiling, then apply best-effort rather than wait forever
