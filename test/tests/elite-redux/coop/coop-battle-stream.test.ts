@@ -96,6 +96,23 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     expect(await second).not.toBeNull();
   });
 
+  it("consumeEnemyParty returns the host's party for the matching wave, then clears it", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    const guestStream = new CoopBattleStreamer(guest);
+
+    hostStream.sendEnemyParty(3, [{ fieldIndex: 0, data: { species: 265, abilityIndex: 1 } }]);
+    await new Promise(r => setTimeout(r, 0));
+
+    // Wrong wave -> nothing (the guest never adopts a stale wave's enemies).
+    expect(guestStream.consumeEnemyParty(2)).toBeNull();
+    // Right wave -> the party, and it is consumed (one-shot).
+    const enemies = guestStream.consumeEnemyParty(3);
+    expect(enemies).not.toBeNull();
+    expect(enemies?.[0].data.abilityIndex).toBe(1);
+    expect(guestStream.consumeEnemyParty(3)).toBeNull();
+  });
+
   it("out-of-turn checkpoints reach the guest's handler", async () => {
     const { host, guest } = createLoopbackPair();
     const hostStream = new CoopBattleStreamer(host);

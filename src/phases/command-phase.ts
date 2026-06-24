@@ -5,7 +5,12 @@ import { speciesStarterCosts } from "#balance/starters";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
-import { applyCoopCheckpoint, captureCoopCheckpoint } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  applyCoopCheckpoint,
+  applyCoopEnemies,
+  captureCoopCheckpoint,
+  captureCoopEnemies,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import {
   applyWiredPartnerCommand,
   type ResolvedPartnerCommand,
@@ -246,16 +251,29 @@ export class CommandPhase extends FieldPhase {
     if (controller == null || streamer == null) {
       return;
     }
+    const { turn, waveIndex } = globalScene.currentBattle;
     if (controller.role === "host") {
-      // Once per turn (the first command phase) after turn 1: snapshot + broadcast.
-      if (this.fieldIndex === 0 && globalScene.currentBattle.turn > 1) {
+      // Turn 1 of each wave (first command phase): broadcast the authoritative enemy
+      // party so the guest's enemies match exactly (ability/moveset/IVs/nature).
+      if (this.fieldIndex === 0 && turn === 1) {
+        streamer.sendEnemyParty(waveIndex, captureCoopEnemies());
+      }
+      // Once per turn after turn 1: snapshot + broadcast the post-turn state.
+      if (this.fieldIndex === 0 && turn > 1) {
         const checkpoint = captureCoopCheckpoint();
         if (checkpoint != null) {
           streamer.sendCheckpoint("turn", checkpoint);
         }
       }
     } else {
-      // Guest: apply the host's latest authoritative checkpoint at this safe boundary.
+      // Guest: at the wave's first turn, adopt the host's exact enemy party.
+      if (turn === 1) {
+        const enemies = streamer.consumeEnemyParty(waveIndex);
+        if (enemies != null) {
+          applyCoopEnemies(enemies);
+        }
+      }
+      // Apply the host's latest authoritative checkpoint at this safe boundary.
       const checkpoint = streamer.consumeCheckpoint();
       if (checkpoint != null) {
         applyCoopCheckpoint(checkpoint);

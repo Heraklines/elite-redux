@@ -79,6 +79,8 @@ export class CoopBattleStreamer {
   private checkpointHandler: ((reason: string, checkpoint: CoopBattleCheckpoint) => void) | null = null;
   /** Latest authoritative checkpoint the guest has not yet applied (consumed at a turn boundary). */
   private lastCheckpoint: CoopBattleCheckpoint | null = null;
+  /** Latest enemy party the guest has not yet adopted (consumed at the wave's first turn). */
+  private lastEnemyParty: { wave: number; enemies: CoopSerializedEnemy[] } | null = null;
 
   constructor(transport: CoopTransport, opts: CoopBattleStreamerOptions = {}) {
     this.transport = transport;
@@ -109,6 +111,20 @@ export class CoopBattleStreamer {
   /** GUEST: handle the host's enemy party (adopt it verbatim). */
   onEnemyPartySync(handler: (wave: number, enemies: CoopSerializedEnemy[]) => void): void {
     this.enemyPartyHandler = handler;
+  }
+
+  /**
+   * GUEST: take + clear the latest enemy party the host streamed for `wave`, if any.
+   * Returns null when none is buffered or it is for a different wave (so the guest
+   * never adopts a stale wave's enemies). Applied at the wave's first turn boundary.
+   */
+  consumeEnemyParty(wave: number): CoopSerializedEnemy[] | null {
+    const buffered = this.lastEnemyParty;
+    if (buffered == null || buffered.wave !== wave) {
+      return null;
+    }
+    this.lastEnemyParty = null;
+    return buffered.enemies;
   }
 
   /** GUEST: handle an out-of-turn authoritative checkpoint. */
@@ -170,6 +186,8 @@ export class CoopBattleStreamer {
     }
     this.pending.clear();
     this.inbox.clear();
+    this.lastCheckpoint = null;
+    this.lastEnemyParty = null;
     this.enemyPartyHandler = null;
     this.checkpointHandler = null;
   }
@@ -177,6 +195,9 @@ export class CoopBattleStreamer {
   private handle(msg: CoopMessage): void {
     switch (msg.t) {
       case "enemyPartySync":
+        // Buffer for the guest to adopt at the wave's first turn boundary, and fire
+        // any live handler.
+        this.lastEnemyParty = { wave: msg.wave, enemies: msg.enemies };
         this.enemyPartyHandler?.(msg.wave, msg.enemies);
         return;
       case "turnResolution": {
