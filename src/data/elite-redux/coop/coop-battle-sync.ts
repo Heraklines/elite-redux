@@ -41,15 +41,19 @@ export type CoopCommandResponder = (req: CoopCommandRequest) => SerializedComman
 /** Options for {@linkcode CoopBattleSync}. */
 export interface CoopBattleSyncOptions {
   /** Per-request timeout before {@linkcode CoopBattleSync.requestPartnerCommand}
-   *  resolves null (the caller then falls back to AI). Default 15s. */
+   *  resolves null (the caller then falls back to AI). Default 5min. */
   timeoutMs?: number;
   /** Timer injection (tests). Returns a cancel fn. Defaults to setTimeout/clearTimeout. */
   schedule?: (cb: () => void, ms: number) => () => void;
 }
 
-// Give the real partner up to 30s to choose their move before the AI takes the
-// turn (#633, LIVE-C) - the co-op "your partner is thinking..." window.
-const DEFAULT_TIMEOUT_MS = 30_000;
+// Wait up to 5 MINUTES for the real partner's move before the AI takes over (#633).
+// The old 30s window was the main live desync source: a partner who took a moment
+// longer than 30s tripped the AI fallback, which picks a DIFFERENT move than the one
+// the partner then actually sent -> the two engines diverge from that turn on. Five
+// minutes effectively means "wait for the human"; the AI is now only a last-resort
+// safety net for a genuinely-gone partner, not a turn-timer that fires mid-think.
+const DEFAULT_TIMEOUT_MS = 300_000;
 
 function defaultSchedule(cb: () => void, ms: number): () => void {
   const id = setTimeout(cb, ms);

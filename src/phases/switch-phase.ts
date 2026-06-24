@@ -1,8 +1,13 @@
 import { globalScene } from "#app/global-scene";
+import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import { SwitchType } from "#enums/switch-type";
 import { UiMode } from "#enums/ui-mode";
 import { BattlePhase } from "#phases/battle-phase";
 import { PartyOption, PartyUiHandler, PartyUiMode } from "#ui/party-ui-handler";
+
+/** Co-op (#633): how long the WATCHER waits for the owner's relayed replacement choice. */
+const COOP_SWITCH_WAIT_MS = 300_000;
 
 /**
  * Opens the party selector UI and transitions into a {@linkcode SwitchSummonPhase}
@@ -65,6 +70,50 @@ export class SwitchPhase extends BattlePhase {
       globalScene.currentBattle.getBattlerCount() === 1 || globalScene.getPokemonAllowedInBattle().length > 1
         ? this.fieldIndex
         : 0;
+
+    // Co-op (#633): a replacement is chosen ONLY by the player who owns the field slot
+    // (host = slot 0, guest = slot 1). The partner must NOT pick the other player's
+    // mon; it WATCHES and applies the owner's relayed choice to its own identical
+    // party (same seed -> same bench). Keyed by turn+slot so both clients agree on the
+    // choice this belongs to. Solo / non-coop is byte-for-byte unchanged (skips this).
+    const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
+    const coopRelay = coopController == null ? null : getCoopInteractionRelay();
+    if (coopController != null && coopRelay != null) {
+      const seq = (globalScene.currentBattle.turn ?? 0) * 4 + this.fieldIndex;
+      if (coopOwnerOfFieldIndex(this.fieldIndex) !== coopController.role) {
+        // WATCHER: do not open the picker; apply the owner's relayed replacement.
+        void coopRelay.awaitInteractionChoice(seq, COOP_SWITCH_WAIT_MS).then(res => {
+          const slotIndex = res?.choice ?? -1;
+          if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
+            globalScene.phaseManager.unshiftNew(
+              "SwitchSummonPhase",
+              this.switchType,
+              fieldIndex,
+              slotIndex,
+              this.doReturn,
+            );
+          }
+          globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+        });
+        return;
+      }
+      // OWNER: pick normally, and relay the chosen slot so the watcher mirrors it.
+      globalScene.ui.setMode(
+        UiMode.PARTY,
+        this.isModal ? PartyUiMode.FAINT_SWITCH : PartyUiMode.POST_BATTLE_SWITCH,
+        fieldIndex,
+        (slotIndex: number, option: PartyOption) => {
+          coopRelay.sendInteractionChoice(seq, "switch", slotIndex);
+          if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
+            const switchType = option === PartyOption.PASS_BATON ? SwitchType.BATON_PASS : this.switchType;
+            globalScene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
+          }
+          globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+        },
+        PartyUiHandler.FilterNonFainted,
+      );
+      return;
+    }
 
     globalScene.ui.setMode(
       UiMode.PARTY,
