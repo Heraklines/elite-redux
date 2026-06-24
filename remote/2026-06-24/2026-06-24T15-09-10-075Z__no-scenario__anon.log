@@ -1,0 +1,125 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqs7cl5d-9ylc
+mode:     6  wave:1
+seed:     Bk7KItPFIF0YzwqoJvM86Ks6
+party:    Bisasam(L5 21hp f0), Bisasam(L5 20hp f0), Schiggy(L5 21hp f0), Endivie(L5 20hp f0), Hornliu(L5 20hp f0)
+enemy:    Pii(L2), Sensect(L2)
+
+----- COMMENT -----
+p1
+
+----- CONSOLE -----
+[15:04:24.837] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[15:04:25.356] LOG: [ER] build mqs7cl5d-9ylc
+[15:04:25.630] LOG: [dev-tools] loaded — 306 scenarios + Send Logs button
+[15:04:46.236] DEBUG: Destroying loading scene
+[15:04:46.237] DEBUG: Destroyed loading scene
+[15:04:46.322] LOG: Seed: KYOCKYtT1bEVbOlGNY6bxqOt
+[15:04:46.323] LOG: Wave Seed: KYOCKYtT1bEVbOlGNY6bxqOt 0
+[15:04:51.903] LOG: %cStart Phase LoginPhase color:green;
+[15:05:06.503] WARN: Login failed! 401 
+[15:05:14.194] LOG: %cStart Phase LoginPhase color:green;
+[15:05:28.819] LOG: Client Session: UQ7oqiB6d5YIjFA7Wzhp5UfvvaK7FTTO
+[15:05:28.973] WARN: Could not get system savedata! 404 Save data not found.
+[15:05:28.974] LOG: %cStart Phase MessagePhase color:green;
+[15:05:30.183] LOG: %cStart Phase SelectGenderPhase color:green;
+[15:05:30.628] LOG: [er-gift] granted 2 free Legendary eggs (one-time)
+[15:05:31.892] LOG: %cStart Phase SelectGenderPhase color:green;
+[15:05:32.914] LOG: %cStart Phase TitlePhase color:green;
+[15:05:32.930] LOG: use seasonal splash messages true
+[15:05:32.930] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[15:05:43.109] LOG: %cStart Phase SelectChallengePhase color:green;
+[15:05:46.076] LOG: %cStart Phase SelectStarterPhase color:green;
+[15:05:58.082] WARN: cry/1 not found
+[15:05:59.017] WARN: cry/152 not found
+[15:06:09.825] LOG: Wave Seed: Bk7KItPFIF0YzwqoJvM86Ks6 0
+[15:06:09.828] LOG: Wave Seed: Bk7KItPFIF0YzwqoJvM86Ks6 0
+[15:06:09.953] LOG: Getting Session Slot id: %d 0
+[15:06:09.955] LOG: Getting Session Slot id: %d 1
+[15:06:09.958] LOG: Getting Session Slot id: %d 2
+[15:06:09.960] LOG: Getting Session Slot id: %d 3
+[15:06:09.962] LOG: Getting Session Slot id: %d 4
+[15:06:10.156] ERROR: Invalid save data JSON detected! Session not found.
+[15:06:10.160] ERROR: Invalid save data JSON detected! Session not found.
+[15:06:10.162] ERROR: Invalid save data JSON detected! Session not found.
+[15:06:10.163] ERROR: Invalid save data JSON detected! Session not found.
+[15:06:10.164] ERROR: Invalid save data JSON detected! Session not found.
+[15:06:16.637] LOG: Wave Seed: Cl8LJuQGJG1Z{xrpKwN97Lt7 1
+[15:06:16.639] LOG: %cStart Phase EncounterPhase color:green;
+[15:06:16.648] LOG: Starting species pool tier: RARE
+[15:06:16.675] LOG: Pokemon: Pii (wild) | Species ID: 173 | Level: 2 | Nature: Frech (+Ang/-SpVert)
+[15:06:16.675] LOG: Stats (IVs): HP: 14 (25), Atk: 7 (27), Def: 6 (29), Spatk: 7 (15), Spdef: 6 (0), Spd: 5 (2)
+[15:06:16.675] LOG: Ability: Feenaura | Passive Ability: Wunderhaut 
+[15:06:16.675] LOG: Moveset: ["Säuselstimme","Teleport","Zugabe","Spotlight"]
+[15:06:16.676] LOG: Starting species pool tier: COMMON
+[15:06:16.693] LOG: Pokemon: Sensect (wild) | Species ID: 824 | Level: 2 | Nature: Scheu (+Init/-Ang)
+[15:06:16.693] LOG: Stats (IVs): HP: 13 (0), Atk: 5 (10), Def: 6 (31), Spatk: 6 (18), Spdef: 7 (24), Spd: 8 (27)
+[15:06:16.693] LOG: Ability: Vorahnung | Passive Ability: Wankelmut 
+[15:06:16.693] LOG: Moveset: ["Anfallen","Plage"]
+[15:06:18.186] DEBUG: Session data saved to slot 0!
+[15:06:18.187] LOG: Wave Seed: Cl8LJuQGJG1Z{xrpKwN97Lt7 1
+[15:06:19.648] LOG: %cStart Phase SummonPhase color:green;
+[15:06:20.216] WARN: cry/1 not found
+[15:06:20.563] LOG: %cStart Phase ShinySparklePhase color:green;
+[15:06:20.902] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[15:06:20.904] LOG: %cStart Phase SummonPhase color:green;
+[15:06:21.482] WARN: cry/1 not found
+[15:06:21.828] LOG: %cStart Phase CheckSwitchPhase color:green;
+[15:06:23.064] LOG: %cStart Phase CheckSwitchPhase color:green;
+[15:06:23.595] LOG: %cStart Phase InitEncounterPhase color:green;
+[15:06:23.599] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:23.600] LOG: Ran PSP for: Bisasam
+[15:06:23.604] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:23.606] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:23.606] LOG: Ran PSP for: Bisasam
+[15:06:23.609] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:23.610] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:23.610] LOG: Ran PSP for: Sensect
+[15:06:23.611] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:23.612] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:23.612] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:23.612] LOG: Ran PSP for: Pii
+[15:06:23.613] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:23.613] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:06:24.127] LOG: %cStart Phase MessagePhase color:green;
+[15:06:24.902] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:06:24.972] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:24.972] LOG: %cStart Phase TurnInitPhase color:green;
+[15:06:24.972] LOG: %cStart Phase CommandPhase color:green;
+[15:06:29.695] LOG: Move: SAPPY_SEED Move targets: {"targets":[2,3,1],"multiple":true} 
+Player Pokemon: Bisasam
+[15:06:29.696] LOG: %cStart Phase SelectTargetPhase color:green;
+[15:06:32.796] LOG: %cStart Phase CommandPhase color:green;
+[15:06:34.395] LOG: %cStart Phase CommandPhase color:green;
+[15:07:04.397] LOG: Battle Seed: rYomW6HEiVNDyyBB
+[15:07:04.397] LOG: Move: EARTH_POWER Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Bisasam
+[15:07:04.397] LOG: %cStart Phase CommandPhase color:green;
+[15:07:07.929] LOG: Move: TACKLE Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Bisasam
+[15:07:07.933] LOG: %cStart Phase SelectTargetPhase color:green;
+[15:07:09.031] LOG: %cStart Phase EnemyCommandPhase color:green;
+[15:07:09.039] WARN: BattlerTag CENTER_OF_ATTENTION is missing a score!
+[15:07:09.041] WARN: BattlerTag CENTER_OF_ATTENTION is missing a score!
+[15:07:09.041] LOG: Move Pool: ["Säuselstimme","Teleport","Zugabe","Spotlight"]
+[15:07:09.041] LOG: Move Scores: [8.625,-20,-20,0]
+[15:07:09.041] LOG: Sorted Move Pool: ["Säuselstimme","Spotlight","Teleport","Zugabe"]
+[15:07:09.041] LOG: Chosen Move: Säuselstimme
+[15:07:09.041] LOG: %cStart Phase EnemyCommandPhase color:green;
+[15:07:09.056] LOG: Move Pool: ["Anfallen","Plage"]
+[15:07:09.056] LOG: Move Scores: [27,18]
+[15:07:09.056] LOG: Sorted Move Pool: ["Anfallen","Plage"]
+[15:07:09.056] LOG: Chosen Move: Anfallen
+[15:07:09.056] LOG: %cStart Phase TurnStartPhase color:green;
+[15:07:09.068] LOG: %cStart Phase MovePhase color:green;
+[15:07:09.068] LOG: %cUser: Bisasam
+Move: EARTH_POWER
+Use Mode: NORMAL color:orchid
+[15:07:09.073] LOG: %cStart Phase MessagePhase color:green;
+[15:07:09.392] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:07:10.878] LOG: crit stage: +0
+[15:07:10.879] LOG: Move: Erdkräfte | Base damage: 17.6 | Power: 90 | Source attack: 13 | Target defense: 6
+[15:07:10.880] LOG: Move: Erdkräfte | Attack damage: 17
+[15:07:10.881] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:07:10.893] LOG: %cStart Phase FaintPhase color:green;
+[15:07:11.611] LOG: %cStart Phase MessagePhase color:green;
