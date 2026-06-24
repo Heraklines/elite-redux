@@ -68,6 +68,17 @@ export class CoopBattleSync {
   private readonly schedule: (cb: () => void, ms: number) => () => void;
   /** fieldIndex -> resolver for the in-flight request on that slot. */
   private readonly pending = new Map<number, (cmd: SerializedCommand | null) => void>();
+  /**
+   * fieldIndex -> a `command` that arrived with NO pending request yet (#633,
+   * LIVE-C). In lockstep the two clients are NOT time-locked: the peer may
+   * broadcast its move before this client reaches that slot's await. Buffer it so
+   * the next {@linkcode requestPartnerCommand} for that slot resolves instantly
+   * instead of dropping the move and timing out -> AI (the live "stuck 30s then
+   * desync" bug). The turn barrier (each side awaits the other's command before the
+   * turn resolves) keeps the two clients within one turn, so a per-slot, latest-wins
+   * buffer consumed on request is correct.
+   */
+  private readonly inbox = new Map<number, SerializedCommand>();
   private responder: CoopCommandResponder | null = null;
   private readonly offMessage: () => void;
 
@@ -87,6 +98,13 @@ export class CoopBattleSync {
   requestPartnerCommand(fieldIndex: number, turn: number, moveSlots: number[]): Promise<SerializedCommand | null> {
     // Supersede any stale in-flight request on this slot.
     this.pending.get(fieldIndex)?.(null);
+    // The peer may have already broadcast its move (lockstep, no time-lock). If so,
+    // consume the buffered command immediately - no request, no wait.
+    const buffered = this.inbox.get(fieldIndex);
+    if (buffered !== undefined) {
+      this.inbox.delete(fieldIndex);
+      return Promise.resolve(buffered);
+    }
     return new Promise<SerializedCommand | null>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
@@ -137,6 +155,7 @@ export class CoopBattleSync {
       finish(null);
     }
     this.pending.clear();
+    this.inbox.clear();
     this.responder = null;
   }
 
@@ -151,7 +170,14 @@ export class CoopBattleSync {
       return;
     }
     if (msg.t === "command") {
-      this.pending.get(msg.fieldIndex)?.(msg.command);
+      const resolver = this.pending.get(msg.fieldIndex);
+      if (resolver) {
+        resolver(msg.command);
+      } else {
+        // No one is awaiting this slot yet - buffer it (latest wins) so the next
+        // request for this slot resolves instantly (#633, LIVE-C race fix).
+        this.inbox.set(msg.fieldIndex, msg.command);
+      }
     }
   }
 }

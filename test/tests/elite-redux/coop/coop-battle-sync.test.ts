@@ -75,6 +75,23 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     expect(cmd?.moveId).toBe(999);
   });
 
+  it("a command broadcast BEFORE the request is buffered and resolves the later await (race fix, #633)", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+
+    // The peer is FASTER: it broadcasts its slot-1 move before this client has
+    // even reached that slot's await. Without buffering this dropped -> the host
+    // timed out 30s -> AI (the live "stuck then desync" bug). Now it's buffered.
+    guestSync.broadcastLocalCommand(1, { command: Command.FIGHT, cursor: 3, moveId: 42 });
+    await new Promise(r => setTimeout(r, 0)); // let the broadcast land in the host inbox
+
+    const cmd = await hostSync.requestPartnerCommand(1, 0, [0, 1, 2, 3]);
+    expect(cmd?.command).toBe(Command.FIGHT);
+    expect(cmd?.cursor).toBe(3); // the buffered pick, not an AI fallback
+    expect(cmd?.moveId).toBe(42);
+  });
+
   it("broadcastLocalCommand for a DIFFERENT slot does not resolve an await on another slot", async () => {
     const { host, guest } = createLoopbackPair();
     const hostSync = new CoopBattleSync(host, {
