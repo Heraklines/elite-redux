@@ -399,7 +399,17 @@ export class CommandPhase extends FieldPhase {
         ? getMoveTargets(playerPokemon, moveId)
         : {
             targets: move.targets,
-            multiple: move.targets.length > 1,
+            // Co-op (#633): a relayed PARTNER move must take its spread/`multiple`
+            // flag from the MOVE DEFINITION (deterministic + identical on both
+            // clients, same source the local-human path above uses) - NOT from the
+            // wired target-array length. The length proxy diverged across clients
+            // (one treated Sappy Seed as spread, the other single-target), flipping
+            // the spread-damage modifier and desyncing the whole battle. Same seed
+            // already gives both clients identical enemies + RNG, so matching this
+            // one flag is all that's needed. Solo / queued moves keep the proxy.
+            multiple: globalScene.gameMode.isCoop
+              ? getMoveTargets(playerPokemon, moveId).multiple
+              : move.targets.length > 1,
           };
 
     if (moveId === MoveId.NONE) {

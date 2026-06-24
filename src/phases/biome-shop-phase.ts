@@ -22,6 +22,7 @@
 
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
+import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { erBiomeStockCount } from "#data/elite-redux/er-biome-economy";
 import { ModifierTier } from "#enums/modifier-tier";
 import { UiMode } from "#enums/ui-mode";
@@ -55,6 +56,15 @@ export class BiomeShopPhase extends SelectModifierPhase {
     if (!this.isPlayer()) {
       this.end();
       return false;
+    }
+
+    // Co-op (#633): the biome shop is an interactive, shared-economy screen that
+    // would open INDEPENDENTLY on each client (two players buying from one money
+    // pool -> desync). Until it is driven host-authoritatively, skip it in co-op so
+    // both clients deterministically move on together. Solo / non-coop unaffected.
+    if (globalScene.gameMode.isCoop && getCoopController() != null) {
+      this.end();
+      return;
     }
 
     this.buildStock();

@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { allBiomes } from "#data/data-lists";
+import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import {
   erBiomeRoutingActive,
   getErPendingNodes,
@@ -46,6 +47,16 @@ export class SelectBiomePhase extends BattlePhase {
     const travelTarget = consumeMapTravelTarget();
     if (travelTarget != null) {
       this.setNextBiomeAndEnd(travelTarget);
+      return;
+    }
+
+    // Co-op (#633): the biome / World-Map route pickers are interactive and run
+    // INDEPENDENTLY on each client - two players choosing different biomes split the
+    // run apart. Auto-pick the next biome DETERMINISTICALLY from the shared, just-
+    // reset wave seed so both clients land in the SAME biome with no prompt. Solo /
+    // non-coop keeps the full ER World Map + biome chooser below.
+    if (globalScene.gameMode.isCoop && getCoopController() != null) {
+      this.setNextBiomeAndEnd(this.generateNextBiome(nextWaveIndex));
       return;
     }
 

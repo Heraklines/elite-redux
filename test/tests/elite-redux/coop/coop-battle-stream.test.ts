@@ -69,27 +69,27 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
 
   it("awaitEnemyParty resolves null on timeout (guest then generates its own - never hangs)", async () => {
     const { guest } = createLoopbackPair();
-    let fire: (() => void) | null = null;
+    const timer: { fire?: () => void } = {};
     const guestStream = new CoopBattleStreamer(guest, {
       schedule: cb => {
-        fire = cb;
+        timer.fire = cb;
         return () => {};
       },
     });
 
     const awaited = guestStream.awaitEnemyParty(3, 1000);
-    expect(fire).not.toBeNull();
-    fire?.(); // simulate the timeout firing
+    expect(timer.fire).toBeDefined();
+    timer.fire?.(); // simulate the timeout firing
     expect(await awaited).toBeNull();
   });
 
   it("awaitEnemyParty for one wave is NOT satisfied by a stale OTHER wave's party", async () => {
     const { host, guest } = createLoopbackPair();
     const hostStream = new CoopBattleStreamer(host);
-    let fire: (() => void) | null = null;
+    const timer: { fire?: () => void } = {};
     const guestStream = new CoopBattleStreamer(guest, {
       schedule: cb => {
-        fire = cb;
+        timer.fire = cb;
         return () => {};
       },
     });
@@ -99,7 +99,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     hostStream.sendEnemyParty(5, [{ fieldIndex: 2, data: { speciesId: 1 } }]);
     const awaited = guestStream.awaitEnemyParty(6, 1000);
     await new Promise(r => setTimeout(r, 0));
-    fire?.();
+    timer.fire?.();
     expect(await awaited).toBeNull();
   });
 

@@ -285,6 +285,42 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     expect(getCoopController()?.role).toBe("host");
   });
 
+  it("co-op runs 10 waves end-to-end: no hang, no desync, every wave a healthy double", async () => {
+    await startCoopDouble();
+    const TARGET_WAVES = 10;
+    const startWave = globalScene.currentBattle.waveIndex;
+
+    for (let i = 0; i < TARGET_WAVES; i++) {
+      const wave = globalScene.currentBattle.waveIndex;
+
+      // Pre-turn health: co-op forces a DOUBLE, the enemy field is populated, and BOTH
+      // players still have a controllable mon (the field leads are one host / one guest).
+      expect(globalScene.currentBattle.double, `wave ${wave} should be a co-op double`).toBe(true);
+      expect(globalScene.getEnemyField().length, `wave ${wave} has on-field enemies`).toBeGreaterThan(0);
+      const party = globalScene.getPlayerParty();
+      expect(coopOwnedCount(party, "host"), `wave ${wave}: host owns a mon`).toBeGreaterThan(0);
+      expect(coopOwnedCount(party, "guest"), `wave ${wave}: guest owns a mon`).toBeGreaterThan(0);
+      // Field slot ownership stays host=0 / guest=1 (the command-routing invariant).
+      const field = globalScene.getPlayerField();
+      expect(field[COOP_HOST_FIELD_INDEX]?.coopOwner, `wave ${wave}: field 0 is host`).toBe("host");
+      expect(field[COOP_GUEST_FIELD_INDEX]?.coopOwner, `wave ${wave}: field 1 is guest`).toBe("guest");
+
+      // The human commands ONLY the host slot; the guest slot auto-resolves over the
+      // relay. If the guest slot ever stalled, this turn would hang (test timeout).
+      game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX);
+      await game.doKillOpponents();
+      await game.toNextWave();
+
+      expect(globalScene.currentBattle.waveIndex, `advanced past wave ${wave}`).toBeGreaterThan(wave);
+    }
+
+    // The run cleared 10 co-op doubles back-to-back with a single human selection per
+    // turn - no hang, no crash, the session stayed live and the mode stayed co-op.
+    expect(globalScene.currentBattle.waveIndex).toBeGreaterThanOrEqual(startWave + TARGET_WAVES);
+    expect(globalScene.gameMode.isCoop).toBe(true);
+    expect(getCoopController()?.role).toBe("host");
+  }, 180_000);
+
   it("co-op is challenge-capable: the co-op gameMode carries challenges and accepts one (co-op challenge)", () => {
     // The co-op flow routes through the challenge-select screen, so the co-op
     // gameMode must carry the challenge array and apply a chosen challenge.

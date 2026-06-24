@@ -25,6 +25,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { erHasNotoriety } from "#data/elite-redux/er-biome-notoriety";
 import { erMarkBiomeStay, setErLeaveBiomeNow } from "#data/elite-redux/er-biome-structure";
 import { UiMode } from "#enums/ui-mode";
@@ -39,6 +40,18 @@ export class ErCrossroadsPhase extends Phase {
 
   start(): void {
     super.start();
+
+    // Co-op (#633): the Stay/Leave map choice is interactive and runs INDEPENDENTLY
+    // on each client - two players could pick different paths and split the run into
+    // different biomes. Auto-resolve it DETERMINISTICALLY (no prompt): leave once the
+    // locals have turned hostile (past the notoriety-free window), else stay. Both
+    // clients compute this identically from the shared wave index, so they stay in
+    // lockstep with no extra messaging (same desync-avoidance as the battle-start
+    // switch prompt, the save-slot screen, and the challenge screen). Solo unaffected.
+    if (globalScene.gameMode.isCoop && getCoopController() != null) {
+      this.resolve(erHasNotoriety(globalScene.currentBattle?.waveIndex ?? 0));
+      return;
+    }
 
     const biomeName = getBiomeName(globalScene.arena.biomeId);
     const options: OptionSelectItem[] = [
